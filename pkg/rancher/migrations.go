@@ -104,10 +104,8 @@ func forceSystemNamespaceAssignment(configMapController controllerv1.ConfigMapCo
 	}
 
 	for i := range clusterList.Items {
-		c := &clusterList.Items[i]
-
 		if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-			c, err = clusterClient.Get(c.Name, metav1.GetOptions{})
+			c, err := clusterClient.Get(clusterList.Items[i].Name, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
