@@ -34,6 +34,7 @@ import (
 const (
 	Provisioned         = condition.Cond("Provisioned")
 	InfrastructureReady = condition.Cond(capi.InfrastructureReadyCondition)
+	BootstrapReady      = condition.Cond(capi.BootstrapReadyCondition)
 )
 
 type handler struct {
@@ -175,6 +176,11 @@ func (h *handler) OnChange(key string, machine *capi.Machine) (*capi.Machine, er
 
 	rkeBootstrap, err := h.bootstrapCache.Get(machine.Namespace, machine.Spec.Bootstrap.ConfigRef.Name)
 	if err != nil {
+		if machine.DeletionTimestamp != nil {
+			// If the machine is being deleted and the bootstrap object is not found,
+			// then update the status of the machine object so the CAPI controller picks it up.
+			return h.setMachineCondition(machine, BootstrapReady, corev1.ConditionFalse, capi.DeletedReason, "bootstrap is deleted")
+		}
 		return machine, err
 	}
 
@@ -240,7 +246,7 @@ func (h *handler) setMachineCondition(machine *capi.Machine, cond condition.Cond
 			Reason:             reason,
 			Message:            message,
 		}
-		if cond != InfrastructureReady && status == corev1.ConditionFalse {
+		if cond == Provisioned && status == corev1.ConditionFalse {
 			newCond.Severity = capi.ConditionSeverityError
 		} else {
 			newCond.Severity = capi.ConditionSeverityInfo
