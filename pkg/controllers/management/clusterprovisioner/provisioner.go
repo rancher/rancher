@@ -463,6 +463,9 @@ var errKeyRotationFailed = errors.New("encryption key rotation failed, please re
 
 func (p *Provisioner) reconcileCluster(cluster *v3.Cluster, create bool) (*v3.Cluster, error) {
 	if skipLocalK3sImported(cluster) {
+		if cluster.Status.Driver == apimgmtv3.ClusterDriverImported && IsOwnedByProvisioningCluster(cluster) {
+			cluster.Status.AppliedSpec.LocalClusterAuthEndpoint = cluster.Spec.LocalClusterAuthEndpoint
+		}
 		return cluster, nil
 	}
 
