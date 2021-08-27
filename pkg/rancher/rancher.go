@@ -198,10 +198,8 @@ func (r *Rancher) Start(ctx context.Context) error {
 		if err := forceSystemAndDefaultProjectCreation(r.Wrangler.Core.ConfigMap(), r.Wrangler.Mgmt.Cluster()); err != nil {
 			return err
 		}
-		if err := forceSystemNamespaceAssignment(r.Wrangler.Core.ConfigMap(), r.Wrangler.Mgmt.Cluster()); err != nil {
-			return err
-		}
-		return nil
+
+		return forceSystemNamespaceAssignment(r.Wrangler.Core.ConfigMap(), r.Wrangler.Mgmt.Cluster())
 	})
 
 	if err := r.authServer.Start(ctx, false); err != nil {

@@ -44,7 +44,8 @@ func (p *pLifecycle) Create(project *v3.Project) (runtime.Object, error) {
 }
 
 func (p *pLifecycle) Updated(project *v3.Project) (runtime.Object, error) {
-	return nil, nil
+	err := p.ensureNamespacesAssigned(project)
+	return project, err
 }
 
 func (p *pLifecycle) Remove(project *v3.Project) (runtime.Object, error) {

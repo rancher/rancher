@@ -99,19 +99,22 @@ func forceSystemNamespaceAssignment(configMapController controllerv1.ConfigMapCo
 	}
 
 	clusterList, err := clusterClient.List(metav1.ListOptions{})
-
 	if err != nil {
 		return err
 	}
 
-	for _, cluster := range clusterList.Items {
+	for i := range clusterList.Items {
+		c := &clusterList.Items[i]
+
 		if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-			v32.ClusterConditionSystemNamespacesAssigned.Unknown(&cluster)
-			v32.ClusterConditionDefaultNamespaceAssigned.Unknown(&cluster)
-			if _, err := clusterClient.Update(&cluster); err != nil {
+			c, err = clusterClient.Get(c.Name, metav1.GetOptions{})
+			if err != nil {
 				return err
 			}
-			return nil
+			v32.ClusterConditionSystemNamespacesAssigned.Unknown(c)
+			v32.ClusterConditionDefaultNamespaceAssigned.Unknown(c)
+			_, err = clusterClient.Update(c)
+			return err
 		}); err != nil {
 			return err
 		}
