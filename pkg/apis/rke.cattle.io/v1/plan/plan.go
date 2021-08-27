@@ -20,6 +20,7 @@ type Node struct {
 	Plan        NodePlan               `json:"plan,omitempty"`
 	AppliedPlan *NodePlan              `json:"appliedPlan,omitempty"`
 	Output      map[string][]byte      `json:"-"`
+	Failed      bool                   `json:"failed,omitempty"`
 	InSync      bool                   `json:"inSync,omitempty"`
 	Healthy     bool                   `json:"healthy,omitempty"`
 	ProbeStatus map[string]ProbeStatus `json:"probeStatus,omitempty"`

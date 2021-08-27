@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
@@ -29,6 +30,7 @@ const (
 	WaitingPlanStatusMessage = "waiting for plan to be applied"
 	InSyncPlanStatus         = "InSync"
 	InSyncPlanStatusMessage  = "plan applied"
+	FailedPlanStatusMessage  = "failure while applying plan"
 	ErrorStatus              = "Error"
 )
 
@@ -133,6 +135,8 @@ func GetPlanStatusReasonMessage(machine *capi.Machine, plan *plan.Node) (corev1.
 		return corev1.ConditionUnknown, UnHealthyProbes, probesMessage(plan)
 	case plan.InSync:
 		return corev1.ConditionTrue, InSyncPlanStatus, InSyncPlanStatusMessage
+	case plan.Failed:
+		return corev1.ConditionFalse, ErrorStatus, FailedPlanStatusMessage
 	default:
 		return corev1.ConditionUnknown, WaitingPlanStatus, WaitingPlanStatusMessage
 	}
@@ -146,6 +150,26 @@ func SecretToNode(secret *corev1.Secret) (*plan.Node, error) {
 	appliedPlanData := secret.Data["appliedPlan"]
 	output := secret.Data["applied-output"]
 	probes := secret.Data["probe-statuses"]
+	failureCount := secret.Data["failure-count"]
+	maxFailures := secret.Data["max-failures"]
+
+	if len(failureCount) > 0 && len(maxFailures) > 0 {
+		failureCount, err := strconv.Atoi(string(failureCount))
+		if err != nil {
+			return nil, err
+		}
+		maxFailures, err := strconv.Atoi(string(maxFailures))
+		if err != nil {
+			return nil, err
+		}
+		if failureCount >= maxFailures {
+			result.Failed = true
+		} else {
+			result.Failed = false
+		}
+	} else {
+		result.Failed = false
+	}
 
 	if len(probes) > 0 {
 		result.ProbeStatus = map[string]plan.ProbeStatus{}
@@ -215,7 +239,7 @@ func isRKEBootstrap(machine *capi.Machine) bool {
 		machine.Spec.Bootstrap.ConfigRef.Kind == "RKEBootstrap"
 }
 
-func (p *PlanStore) UpdatePlan(machine *capi.Machine, plan plan.NodePlan) error {
+func (p *PlanStore) UpdatePlan(machine *capi.Machine, plan plan.NodePlan, maxFailures int) error {
 	if !isRKEBootstrap(machine) {
 		return fmt.Errorf("machine %s/%s is not using RKEBootstrap", machine.Namespace, machine.Name)
 	}
@@ -235,19 +259,25 @@ func (p *PlanStore) UpdatePlan(machine *capi.Machine, plan plan.NodePlan) error 
 	}
 
 	secret.Data["plan"] = data
+	if maxFailures > 0 {
+		secret.Data["max-failures"] = []byte(strconv.Itoa(maxFailures))
+	}
 	_, err = p.secrets.Update(secret)
 	return err
 }
 
-func assignAndCheckPlan(store *PlanStore, msg string, server planEntry, newPlan plan.NodePlan) error {
+func assignAndCheckPlan(store *PlanStore, msg string, server planEntry, newPlan plan.NodePlan, maxFailures int) error {
 	if server.Plan == nil || !equality.Semantic.DeepEqual(server.Plan.Plan, newPlan) {
-		if err := store.UpdatePlan(server.Machine, newPlan); err != nil {
+		if err := store.UpdatePlan(server.Machine, newPlan, maxFailures); err != nil {
 			return err
 		}
 		return ErrWaiting(fmt.Sprintf("starting %s", msg))
 	}
 	if !server.Plan.InSync {
 		return ErrWaiting(fmt.Sprintf("waiting for %s", msg))
+	}
+	if server.Plan.Failed {
+		return fmt.Errorf("operation %s failed", msg)
 	}
 	return nil
 }

@@ -39,6 +39,7 @@ var (
 	ETCDSnapshotPhaseShutdown ETCDSnapshotPhase = "Shutdown"
 	ETCDSnapshotPhaseRestore  ETCDSnapshotPhase = "Restore"
 	ETCDSnapshotPhaseFinished ETCDSnapshotPhase = "Finished"
+	ETCDSnapshotPhaseFailed   ETCDSnapshotPhase = "Failed"
 )
 
 type RKEControlPlaneStatus struct {
