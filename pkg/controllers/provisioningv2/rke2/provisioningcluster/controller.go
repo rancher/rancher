@@ -149,12 +149,17 @@ func (h *handler) infraWatch(obj runtime.Object) (runtime.Object, error) {
 }
 
 func (h *handler) OnRancherClusterChange(obj *rancherv1.Cluster, status rancherv1.ClusterStatus) ([]runtime.Object, rancherv1.ClusterStatus, error) {
-	if obj.Spec.RKEConfig == nil || obj.Status.ClusterName == "" {
+	if obj.Spec.RKEConfig == nil || obj.Status.ClusterName == "" || obj.DeletionTimestamp != nil {
 		return nil, status, nil
 	}
 
 	if obj.Spec.KubernetesVersion == "" {
 		return nil, status, fmt.Errorf("kubernetesVersion not set on %s/%s", obj.Namespace, obj.Name)
+	}
+
+	if len(obj.Finalizers) == 0 {
+		// If the cluster doesn't have any finalizers, then we don't apply any objects to ensure the finalizer can be put on the cluster.
+		return nil, status, nil
 	}
 
 	status, err := h.updateClusterProvisioningStatus(obj, status)
