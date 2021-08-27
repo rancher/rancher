@@ -52,8 +52,9 @@ type handler struct {
 	kubeconfigManager *kubeconfig.Manager
 	apply             apply.Apply
 
-	capiClusters capicontrollers.ClusterCache
-	capiMachines capicontrollers.MachineCache
+	capiClustersCache capicontrollers.ClusterCache
+	capiClusters      capicontrollers.ClusterClient
+	capiMachinesCache capicontrollers.MachineCache
 }
 
 func Register(
@@ -67,8 +68,9 @@ func Register(
 		clusters:          clients.Provisioning.Cluster(),
 		clusterCache:      clients.Provisioning.Cluster().Cache(),
 		secretCache:       clients.Core.Secret().Cache(),
-		capiClusters:      clients.CAPI.Cluster().Cache(),
-		capiMachines:      clients.CAPI.Machine().Cache(),
+		capiClustersCache: clients.CAPI.Cluster().Cache(),
+		capiClusters:      clients.CAPI.Cluster(),
+		capiMachinesCache: clients.CAPI.Machine().Cache(),
 		kubeconfigManager: kubeconfig.New(clients),
 		apply: clients.Apply.WithCacheTypes(
 			clients.Provisioning.Cluster(),
