@@ -27,6 +27,7 @@ type handler struct {
 	roleLocker                           locker.Locker
 	roleCache                            rbacv1.RoleCache
 	roleController                       rbacv1.RoleController
+	roleBindingController                rbacv1.RoleBindingController
 	clusterRoleCache                     rbacv1.ClusterRoleCache
 	roleTemplateController               mgmtcontrollers.RoleTemplateController
 	clusterRoleTemplateBindings          mgmtcontrollers.ClusterRoleTemplateBindingCache
@@ -54,6 +55,7 @@ func Register(ctx context.Context, clients *wrangler.Context) error {
 	h := &handler{
 		roleCache:                            clients.RBAC.Role().Cache(),
 		roleController:                       clients.RBAC.Role(),
+		roleBindingController:                clients.RBAC.RoleBinding(),
 		clusterRoleCache:                     clients.RBAC.ClusterRole().Cache(),
 		roleTemplateController:               clients.Mgmt.RoleTemplate(),
 		clusterRoleTemplateBindings:          clients.Mgmt.ClusterRoleTemplateBinding().Cache(),
