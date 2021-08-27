@@ -16,14 +16,17 @@ import (
 	k8serror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/client-go/util/retry"
 )
 
 const (
 	cattleNamespace                           = "cattle-system"
 	forceUpgradeLogoutConfig                  = "forceupgradelogout"
 	forceLocalSystemAndDefaultProjectCreation = "forcelocalprojectcreation"
+	forceSystemNamespacesAssignment           = "forcesystemnamespaceassignment"
 	rancherVersionKey                         = "rancherVersion"
 	projectsCreatedKey                        = "projectsCreated"
+	namespacesAssignedKey                     = "namespacesAssigned"
 	caSecretName                              = "tls-ca-additional"
 	caSecretField                             = "ca-additional.pem"
 )
@@ -108,7 +111,7 @@ func forceUpgradeLogout(configMapController controllerv1.ConfigMapController, to
 	return createOrUpdateConfigMap(configMapController, cm)
 }
 
-// forceSystemAndDefaultProjectCreation will set the correcsponding conditions on the local cluster object,
+// forceSystemAndDefaultProjectCreation will set the corresponding conditions on the local cluster object,
 // if it exists, to Unknown. This will force the corresponding controller to check that the projects exist
 // and create them, if necessary.
 func forceSystemAndDefaultProjectCreation(configMapController controllerv1.ConfigMapController, clusterClient v3.ClusterClient) error {
@@ -175,4 +178,41 @@ func copyCAAdditionalSecret(secretClient controllerv1.SecretClient) error {
 	}
 
 	return err
+
+}
+
+func forceSystemNamespaceAssignment(configMapController controllerv1.ConfigMapController, clusterClient v3.ClusterClient) error {
+	cm, err := getConfigMap(configMapController, forceSystemNamespacesAssignment)
+	if err != nil || cm == nil {
+		return err
+	}
+
+	if cm.Data[namespacesAssignedKey] == rancherversion.Version {
+		return nil
+	}
+
+	clusterList, err := clusterClient.List(metav1.ListOptions{})
+	if err != nil {
+		return err
+	}
+
+	for i := range clusterList.Items {
+		c := &clusterList.Items[i]
+
+		if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+			c, err = clusterClient.Get(c.Name, metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+			v32.ClusterConditionSystemNamespacesAssigned.Unknown(c)
+			v32.ClusterConditionDefaultNamespaceAssigned.Unknown(c)
+			_, err = clusterClient.Update(c)
+			return err
+		}); err != nil {
+			return err
+		}
+	}
+
+	cm.Data[namespacesAssignedKey] = rancherversion.Version
+	return createOrUpdateConfigMap(configMapController, cm)
 }

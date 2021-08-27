@@ -112,20 +112,24 @@ func (p *pLifecycle) ensureNamespacesAssigned(project *v3.Project) error {
 		if err = p.ensureSystemNamespaceAssigned(cluster, project); err != nil {
 			return err
 		}
+	default:
+		return nil
 	}
 
-	return nil
+	_, err = p.m.workload.Management.Management.Clusters("").Update(cluster)
+
+	return err
 }
 
 func (p *pLifecycle) ensureDefaultNamespaceAssigned(cluster *v3.Cluster, project *v3.Project) error {
-	_, err := v32.ClusterConditionDefaultNamespaceAssigned.DoUntilTrue(cluster.DeepCopy(), func() (runtime.Object, error) {
+	_, err := v32.ClusterConditionDefaultNamespaceAssigned.DoUntilTrue(cluster, func() (runtime.Object, error) {
 		return nil, p.assignNamespacesToProject(project, projectpkg.Default)
 	})
 	return err
 }
 
 func (p *pLifecycle) ensureSystemNamespaceAssigned(cluster *v3.Cluster, project *v3.Project) error {
-	_, err := v32.ClusterConditionSystemNamespacesAssigned.DoUntilTrue(cluster.DeepCopy(), func() (runtime.Object, error) {
+	_, err := v32.ClusterConditionSystemNamespacesAssigned.DoUntilTrue(cluster, func() (runtime.Object, error) {
 		return nil, p.assignNamespacesToProject(project, projectpkg.System)
 	})
 	return err
@@ -146,7 +150,7 @@ func (p *pLifecycle) assignNamespacesToProject(project *v3.Project, projectName 
 		}
 		projectID := ns.Annotations[projectIDAnnotation]
 		if projectID != "" {
-			return nil
+			continue
 		}
 
 		ns = ns.DeepCopy()
