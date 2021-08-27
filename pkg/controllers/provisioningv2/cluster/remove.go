@@ -8,8 +8,10 @@ import (
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	v1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	"github.com/rancher/wrangler/pkg/condition"
+	"github.com/rancher/wrangler/pkg/generic"
 	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 )
 
@@ -53,9 +55,7 @@ func (h *handler) OnClusterRemove(_ string, cluster *v1.Cluster) (*v1.Cluster, e
 	message, err := h.doClusterRemove(cluster)
 	if err != nil {
 		Removed.SetError(status, "", err)
-		return h.updateClusterStatus(cluster, *status, err)
-	}
-	if message == "" {
+	} else if message == "" {
 		Removed.SetStatusBool(status, true)
 		Removed.Reason(status, "")
 		Removed.Message(status, "")
@@ -64,8 +64,11 @@ func (h *handler) OnClusterRemove(_ string, cluster *v1.Cluster) (*v1.Cluster, e
 		Removed.Reason(status, "Waiting")
 		Removed.Message(status, message)
 		h.clusters.EnqueueAfter(cluster.Namespace, cluster.Name, 5*time.Second)
+		// generic.ErrSkip will mark the cluster as reconciled, but not remove the finalizer.
+		// The finalizer shouldn't be removed until other objects have all been removed.
+		err = generic.ErrSkip
 	}
-	return h.updateClusterStatus(cluster, *status, nil)
+	return h.updateClusterStatus(cluster, *status, err)
 }
 
 func (h *handler) doClusterRemove(cluster *v1.Cluster) (string, error) {
@@ -81,7 +84,20 @@ func (h *handler) doClusterRemove(cluster *v1.Cluster) (string, error) {
 		}
 	}
 
-	machines, err := h.capiMachines.List(cluster.Namespace, labels.SelectorFromSet(labels.Set{
+	capiCluster, capiClusterErr := h.capiClustersCache.Get(cluster.Namespace, cluster.Name)
+	if capiClusterErr != nil && !apierrors.IsNotFound(capiClusterErr) {
+		return "", capiClusterErr
+	}
+
+	if capiCluster != nil && capiCluster.DeletionTimestamp == nil {
+		// Deleting the CAPI cluster will start the process of deleting Machines, Bootstraps, etc.
+		if err := h.capiClusters.Delete(capiCluster.Namespace, capiCluster.Name, &metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
+			return "", err
+		}
+	}
+
+	// Machines will delete first so report their status, if any exist.
+	machines, err := h.capiMachinesCache.List(cluster.Namespace, labels.SelectorFromSet(labels.Set{
 		capiClusterLabel: cluster.Name,
 	}))
 	if err != nil {
@@ -94,9 +110,9 @@ func (h *handler) doClusterRemove(cluster *v1.Cluster) (string, error) {
 		return fmt.Sprintf("waiting for machine [%s] to delete", machine.Name), nil
 	}
 
-	_, err = h.capiClusters.Get(cluster.Namespace, cluster.Name)
-	if apierrors.IsNotFound(err) {
-		return "", nil
+	if capiClusterErr == nil {
+		return fmt.Sprintf("waiting for cluster-api cluster [%s] to delete", cluster.Name), nil
 	}
-	return fmt.Sprintf("waiting for cluster-api cluster [%s] to delete", cluster.Name), nil
+
+	return "", nil
 }
