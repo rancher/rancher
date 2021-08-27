@@ -26,6 +26,7 @@ import (
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/rancher/wrangler/pkg/condition"
+	"github.com/rancher/wrangler/pkg/data"
 	"github.com/rancher/wrangler/pkg/data/convert"
 	corecontrollers "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/pkg/generic"
@@ -669,15 +670,50 @@ func (p *Planner) addManifests(nodePlan plan.NodePlan, controlPlane *rkev1.RKECo
 	return nodePlan, nil
 }
 
+func isVSphereProvider(controlPlane *rkev1.RKEControlPlane, machine *capi.Machine) (bool, error) {
+	data := map[string]interface{}{}
+	if err := addUserConfig(data, controlPlane, machine); err != nil {
+		return false, err
+	}
+	return data["cloud-provider-name"] == "rancher-vsphere", nil
+}
+
+func addVSphereCharts(controlPlane *rkev1.RKEControlPlane, machine *capi.Machine) (map[string]interface{}, error) {
+	if isVSphere, err := isVSphereProvider(controlPlane, machine); err != nil {
+		return nil, err
+	} else if isVSphere && controlPlane.Spec.ChartValues.Data["rancher-vsphere-csi"] == nil {
+		// ensure we have this chart config so that the global.cattle.clusterId is set
+		newData := controlPlane.Spec.ChartValues.DeepCopy()
+		if newData.Data == nil {
+			newData.Data = map[string]interface{}{}
+		}
+		newData.Data["rancher-vsphere-csi"] = map[string]interface{}{}
+		return newData.Data, nil
+	}
+
+	return controlPlane.Spec.ChartValues.Data, nil
+}
+
 func (p *Planner) addChartConfigs(nodePlan plan.NodePlan, controlPlane *rkev1.RKEControlPlane,
 	machine *capi.Machine) (plan.NodePlan, error) {
 	if isOnlyWorker(machine) {
 		return nodePlan, nil
 	}
 
+	chartValues, err := addVSphereCharts(controlPlane, machine)
+	if err != nil {
+		return nodePlan, err
+	}
+
 	var chartConfigs []runtime.Object
-	for chart, values := range controlPlane.Spec.ChartValues.Data {
-		data, err := json.Marshal(values)
+	for chart, values := range chartValues {
+		valuesMap := convert.ToMapInterface(values)
+		if valuesMap == nil {
+			valuesMap = map[string]interface{}{}
+		}
+		data.PutValue(valuesMap, controlPlane.Spec.ManagementClusterName, "global", "cattle", "clusterId")
+
+		data, err := json.Marshal(valuesMap)
 		if err != nil {
 			return plan.NodePlan{}, err
 		}
