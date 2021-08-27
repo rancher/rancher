@@ -61,10 +61,11 @@ func newGlobalRoleBindingHandler(workload *config.UserContext) v3.GlobalRoleBind
 	informer := workload.Management.Management.GlobalRoleBindings("").Controller().Informer()
 
 	h := &grbHandler{
-		clusterName:                 workload.ClusterName,
-		grbIndexer:                  informer.GetIndexer(),
-		clusterRoleBindings:         workload.RBAC.ClusterRoleBindings(""),
-		crbLister:                   workload.RBAC.ClusterRoleBindings("").Controller().Lister(),
+		clusterName:         workload.ClusterName,
+		grbIndexer:          informer.GetIndexer(),
+		clusterRoleBindings: workload.RBAC.ClusterRoleBindings(""),
+		crbLister:           workload.RBAC.ClusterRoleBindings("").Controller().Lister(),
+		// The following clients/controllers all point at the management cluster
 		grLister:                    workload.Management.Management.GlobalRoles("").Controller().Lister(),
 		rbLister:                    workload.Management.RBAC.RoleBindings("").Controller().Lister(),
 		roleBindings:                workload.Management.RBAC.RoleBindings(""),
@@ -123,6 +124,7 @@ func (c *grbHandler) sync(key string, obj *v3.GlobalRoleBinding) (runtime.Object
 	return obj, nil
 }
 
+// ensureClusterAdminBinding creates a cluster-admin binding in the downstream cluster
 func (c *grbHandler) ensureClusterAdminBinding(obj *v3.GlobalRoleBinding) error {
 	bindingName := rbac.GrbCRBName(obj)
 	b, err := c.crbLister.Get("", bindingName)
@@ -153,7 +155,17 @@ func (c *grbHandler) ensureClusterAdminBinding(obj *v3.GlobalRoleBinding) error 
 	return nil
 }
 
+// ensureProvisioningClusterAdminBinding creates a bindings from the restricted-admin to the
+// cluster-owner role in the cluster namespace in the management cluster. This grants
+// permissions to all the v2 provisioning resources that are marked as cluster indexed in the
+// management cluster.
 func (c *grbHandler) ensureProvisioningClusterAdminBinding(obj *v3.GlobalRoleBinding) error {
+	// Restricted-admin needs this, a regular admin will already have access to all the resources
+	// this binding grants in the management cluster.
+	if obj.GlobalRoleName != rbac.GlobalRestrictedAdmin {
+		return nil
+	}
+
 	pClusters, err := c.provClusters.GetByIndex(clusterv2.ByCluster, c.clusterName)
 	if err != nil {
 		return err
