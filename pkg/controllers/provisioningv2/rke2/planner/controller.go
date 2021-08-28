@@ -17,12 +17,14 @@ import (
 )
 
 type handler struct {
-	planner *planner.Planner
+	planner       *planner.Planner
+	controlPlanes v1.RKEControlPlaneController
 }
 
 func Register(ctx context.Context, clients *wrangler.Context, planner *planner.Planner) {
 	h := handler{
-		planner: planner,
+		planner:       planner,
+		controlPlanes: clients.RKE.RKEControlPlane(),
 	}
 	v1.RegisterRKEControlPlaneStatusHandler(ctx,
 		clients.RKE.RKEControlPlane(), "", "planner", h.OnChange)
@@ -59,5 +61,14 @@ func (h *handler) OnChange(cluster *rkev1.RKEControlPlane, status rkev1.RKEContr
 	}
 
 	planner.Provisioned.SetError(&status, "", err)
-	return status, err
+	if err != nil {
+		// don't return error because the controller will reset the status and then not assign the error
+		// because we don't register this handler with an associated condition. This is pretty much a bug in the
+		// framework but it's too impactful to change right before 2.6.0 so we should consider changing this later.
+		// If you are reading this years later we'll just assume we decided not to change the framework.
+		logrus.Errorf("error in planner for '%s/%s': %v", cluster.Namespace, cluster.Name, err)
+		// This will rate limit
+		h.controlPlanes.Enqueue(cluster.Namespace, cluster.Name)
+	}
+	return status, nil
 }
