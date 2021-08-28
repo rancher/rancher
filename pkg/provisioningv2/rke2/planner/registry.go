@@ -74,8 +74,9 @@ func toRegistryConfig(secrets v1.SecretCache, runtime, namespace string, registr
 			if err != nil {
 				return nil, nil, err
 			}
-			if secret.Type != rkev1.AuthConfigSecretType {
-				return nil, nil, fmt.Errorf("secret [%s] must be of type [%s]", config.TLSSecretName, rkev1.AuthConfigSecretType)
+			if secret.Type != rkev1.AuthConfigSecretType && secret.Type != corev1.SecretTypeBasicAuth {
+				return nil, nil, fmt.Errorf("secret [%s] must be of type [%s] or [%s]",
+					config.AuthConfigSecretName, rkev1.AuthConfigSecretType, corev1.SecretTypeBasicAuth)
 			}
 			registryConfig.Auth = &authConfig{
 				Username:      string(secret.Data[rkev1.UsernameAuthConfigSecretKey]),
