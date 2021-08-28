@@ -83,6 +83,9 @@ var (
 		"private-registry",
 		"flannel-conf",
 	}
+	filePaths = map[string]string{
+		"private-registry": "/etc/rancher/%s/registries.yaml",
+	}
 	AuthnWebhook = []byte(`
 apiVersion: v1
 kind: Config
@@ -935,6 +938,12 @@ func addTaints(config map[string]interface{}, machine *capi.Machine, runtime str
 }
 
 func configFile(controlPlane *rkev1.RKEControlPlane, filename string) string {
+	if path := filePaths[filename]; path != "" {
+		if strings.Contains(path, "%s") {
+			return fmt.Sprintf(path, GetRuntime(controlPlane.Spec.KubernetesVersion))
+		}
+		return path
+	}
 	return fmt.Sprintf("/var/lib/rancher/%s/etc/config-files/%s",
 		GetRuntime(controlPlane.Spec.KubernetesVersion), filename)
 }
