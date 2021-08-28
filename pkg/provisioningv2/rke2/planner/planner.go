@@ -847,19 +847,23 @@ func addAddresses(secrets corecontrollers.SecretCache, config map[string]interfa
 		return
 	}
 
-	if machine.Annotations["objectset.rio.cattle.io/id"] == "unmanaged-machine" || machine.Spec.InfrastructureRef.Kind == "PodMachine" {
+	if config["cloud-provider-name"] != nil || machine.Annotations["objectset.rio.cattle.io/id"] == "unmanaged-machine" {
 		// Unmanaged machines won't have a state secret,
-		// and PodMachine's IP address is not external
+		// and the cloud provider will handle this, if it is set.
 		return
 	}
 
 	secret, err := secrets.Get(machine.Spec.InfrastructureRef.Namespace, name.SafeConcatName(machine.Spec.InfrastructureRef.Name, "machine", "state"))
 	if err == nil && secret != nil && len(secret.Data["extractedConfig"]) != 0 {
 		driverConfig, err := nodeconfig.ExtractConfigJSON(base64.StdEncoding.EncodeToString(secret.Data["extractedConfig"]))
+
 		if err == nil && len(driverConfig) != 0 {
 			ipAddress := convert.ToString(values.GetValueN(driverConfig, "Driver", "IPAddress"))
-			if ipAddress != "" {
+			internalIPAddress := convert.ToString(values.GetValueN(driverConfig, "Driver", "PrivateIPAddress"))
+
+			if ipAddress != "" && internalIPAddress != "" && ipAddress != internalIPAddress {
 				config["node-external-ip"] = ipAddress
+				config["advertise-address"] = internalIPAddress
 			}
 		}
 	}
