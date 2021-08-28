@@ -250,5 +250,5 @@ func gatherRules(clusterRoles k8srbacv1.ClusterRoleCache, roleTemplates v32.Role
 }
 
 func ProvisioningClusterAdminName(cluster *provv1.Cluster) string {
-	return name.SafeConcatName("r-cluster", cluster.Name, "admin")
+	return name.SafeConcatName("crt", cluster.Name, "cluster-owner")
 }

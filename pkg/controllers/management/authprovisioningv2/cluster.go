@@ -22,17 +22,7 @@ func (h *handler) OnCluster(key string, cluster *v1.Cluster) (*v1.Cluster, error
 		return cluster, h.cleanClusterAdminRoleBindings(cluster)
 	}
 
-	err := h.createClusterViewRole(cluster)
-	if err != nil {
-		return nil, err
-	}
-
-	err = h.createClusterAdminRole(cluster)
-	if err != nil {
-		return nil, err
-	}
-
-	return cluster, nil
+	return cluster, h.createClusterViewRole(cluster)
 }
 
 func (h *handler) createClusterViewRole(cluster *v1.Cluster) error {
@@ -57,54 +47,6 @@ func (h *handler) createClusterViewRole(cluster *v1.Cluster) error {
 				Resources:     []string{"clusters"},
 				ResourceNames: []string{cluster.Name},
 				Verbs:         []string{"get"},
-			},
-		},
-	}
-
-	existingRole, err := h.roleCache.Get(cluster.Namespace, roleName)
-	if err != nil {
-		if !k8serrors.IsNotFound(err) {
-			return err
-		}
-
-		if _, err := h.roleController.Create(role); err != nil && !k8serrors.IsAlreadyExists(err) {
-			return err
-		}
-		return nil
-	}
-
-	if !reflect.DeepEqual(existingRole.Rules, role.Rules) {
-		existingRole = existingRole.DeepCopy()
-		existingRole.Rules = role.Rules
-		_, err := h.roleController.Update(existingRole)
-		return err
-	}
-
-	return nil
-}
-
-func (h *handler) createClusterAdminRole(cluster *v1.Cluster) error {
-	roleName := rbac.ProvisioningClusterAdminName(cluster)
-	role := &rbacv1.Role{
-		TypeMeta: metav1.TypeMeta{},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      roleName,
-			Namespace: cluster.Namespace,
-			OwnerReferences: []metav1.OwnerReference{
-				{
-					APIVersion: cluster.APIVersion,
-					Kind:       cluster.Kind,
-					Name:       cluster.Name,
-					UID:        cluster.UID,
-				},
-			},
-		},
-		Rules: []rbacv1.PolicyRule{
-			{
-				APIGroups:     []string{cluster.GroupVersionKind().Group},
-				Resources:     []string{"clusters"},
-				ResourceNames: []string{cluster.Name},
-				Verbs:         []string{"*"},
 			},
 		},
 	}
