@@ -219,13 +219,13 @@ func (m *Manager) GetCRTBForAdmin(cluster *v1.Cluster, status v1.ClusterStatus) 
 	}, nil
 }
 
-func (m *Manager) getKubeConfigData(clusterNamespace, clusterName, secretName, managementClusterName string) (map[string][]byte, error) {
-	secret, err := m.secretCache.Get(clusterNamespace, secretName)
+func (m *Manager) getKubeConfigData(cluster *v1.Cluster, secretName, managementClusterName string) (map[string][]byte, error) {
+	secret, err := m.secretCache.Get(cluster.Namespace, secretName)
 	if err == nil {
-		if secret.Data == nil || secret.Data["token"] == nil {
+		if secret.Data == nil || secret.Data["token"] == nil || len(secret.OwnerReferences) == 0 {
 			// Check if we require a new secret based on the token value and annotation(s). We delete the old secret since it may contain
 			// annotations, owner references, etc. that are out of date. We will then continue to create the new secret.
-			if err := m.secrets.Delete(clusterNamespace, secretName, &metav1.DeleteOptions{}); err != nil && !apierror.IsNotFound(err) {
+			if err := m.secrets.Delete(cluster.Namespace, secretName, &metav1.DeleteOptions{}); err != nil && !apierror.IsNotFound(err) {
 				return nil, err
 			}
 		} else {
@@ -235,16 +235,16 @@ func (m *Manager) getKubeConfigData(clusterNamespace, clusterName, secretName, m
 		return nil, err
 	}
 
-	lockID := clusterNamespace + "/" + clusterName
+	lockID := cluster.Namespace + "/" + cluster.Name
 	m.kubeConfigLocker.Lock(lockID)
 	defer m.kubeConfigLocker.Unlock(lockID)
 
-	secret, err = m.secrets.Get(clusterNamespace, secretName, metav1.GetOptions{})
+	secret, err = m.secrets.Get(cluster.Namespace, secretName, metav1.GetOptions{})
 	if err == nil {
 		return secret.Data, nil
 	}
 
-	tokenValue, err := m.getToken(clusterNamespace, clusterName)
+	tokenValue, err := m.getToken(cluster.Namespace, cluster.Name)
 	if err != nil {
 		return nil, err
 	}
@@ -280,8 +280,14 @@ func (m *Manager) getKubeConfigData(clusterNamespace, clusterName, secretName, m
 
 	secret, err = m.secrets.Create(&corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Namespace: clusterNamespace,
+			Namespace: cluster.Namespace,
 			Name:      secretName,
+			OwnerReferences: []metav1.OwnerReference{{
+				APIVersion: "provisioning.cattle.io/v1",
+				Kind:       "Cluster",
+				Name:       cluster.Name,
+				UID:        cluster.UID,
+			}},
 		},
 		Data: map[string][]byte{
 			"value": data,
@@ -313,7 +319,7 @@ func (m *Manager) GetKubeConfig(cluster *v1.Cluster, status v1.ClusterStatus) (*
 		secretName = getKubeConfigSecretName(cluster.Name)
 	)
 
-	data, err := m.getKubeConfigData(cluster.Namespace, cluster.Name, secretName, status.ClusterName)
+	data, err := m.getKubeConfigData(cluster, secretName, status.ClusterName)
 	if err != nil {
 		return nil, err
 	}
