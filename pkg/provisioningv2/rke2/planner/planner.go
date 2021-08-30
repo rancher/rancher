@@ -884,35 +884,37 @@ func PruneEmpty(config map[string]interface{}) {
 }
 
 func addAddresses(secrets corecontrollers.SecretCache, config map[string]interface{}, machine *capi.Machine) {
-	if data := machine.Annotations[InternalAddressAnnotation]; data != "" {
-		config["node-ip"] = data
-	}
-
-	if data := machine.Annotations[AddressAnnotation]; data != "" {
-		config["node-external-ip"] = data
-		// Don't check for an IP address from the secret if it is already provided.
-		return
-	}
-
-	if config["cloud-provider-name"] != nil || machine.Annotations["objectset.rio.cattle.io/id"] == "unmanaged-machine" {
-		// Unmanaged machines won't have a state secret,
-		// and the cloud provider will handle this, if it is set.
-		return
-	}
+	internalIPAddress := machine.Annotations[InternalAddressAnnotation]
+	ipAddress := machine.Annotations[AddressAnnotation]
+	internalAddressProvided, addressProvided := internalIPAddress != "", ipAddress != ""
 
 	secret, err := secrets.Get(machine.Spec.InfrastructureRef.Namespace, name.SafeConcatName(machine.Spec.InfrastructureRef.Name, "machine", "state"))
-	if err == nil && secret != nil && len(secret.Data["extractedConfig"]) != 0 {
+	if err == nil && len(secret.Data["extractedConfig"]) != 0 {
 		driverConfig, err := nodeconfig.ExtractConfigJSON(base64.StdEncoding.EncodeToString(secret.Data["extractedConfig"]))
-
 		if err == nil && len(driverConfig) != 0 {
-			ipAddress := convert.ToString(values.GetValueN(driverConfig, "Driver", "IPAddress"))
-			internalIPAddress := convert.ToString(values.GetValueN(driverConfig, "Driver", "PrivateIPAddress"))
-
-			if ipAddress != "" && internalIPAddress != "" && ipAddress != internalIPAddress {
-				config["node-external-ip"] = ipAddress
-				config["advertise-address"] = internalIPAddress
+			if !addressProvided {
+				ipAddress = convert.ToString(values.GetValueN(driverConfig, "Driver", "IPAddress"))
+			}
+			if !internalAddressProvided {
+				internalIPAddress = convert.ToString(values.GetValueN(driverConfig, "Driver", "PrivateIPAddress"))
 			}
 		}
+	}
+
+	setNodeExternalIP := ipAddress != "" && internalIPAddress != "" && ipAddress != internalIPAddress
+
+	if setNodeExternalIP && !isOnlyWorker(machine) {
+		config["advertise-address"] = internalIPAddress
+		config["tls-san"] = append(convert.ToStringSlice(config["tls-san"]), ipAddress)
+	}
+
+	if internalIPAddress != "" {
+		config["node-ip"] = append(convert.ToStringSlice(config["node-ip"]), internalIPAddress)
+	}
+
+	// Cloud provider, if set, will handle external IP
+	if convert.ToString(config["cloud-provider-name"]) == "" && (addressProvided || setNodeExternalIP) {
+		config["node-external-ip"] = append(convert.ToStringSlice(config["node-external-ip"]), ipAddress)
 	}
 }
 
