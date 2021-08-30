@@ -75,7 +75,10 @@ func (c *ClusterLifecycleCleanup) Remove(obj *v3.Cluster) (runtime.Object, error
 		obj.Status.Driver == v32.ClusterDriverK3s ||
 		obj.Status.Driver == v32.ClusterDriverK3os ||
 		obj.Status.Driver == v32.ClusterDriverRke2 ||
-		obj.Status.Driver == v32.ClusterDriverRancherD {
+		obj.Status.Driver == v32.ClusterDriverRancherD ||
+		(obj.Status.AKSStatus.UpstreamSpec != nil && obj.Status.AKSStatus.UpstreamSpec.Imported) ||
+		(obj.Status.EKSStatus.UpstreamSpec != nil && obj.Status.EKSStatus.UpstreamSpec.Imported) ||
+		(obj.Status.GKEStatus.UpstreamSpec != nil && obj.Status.GKEStatus.UpstreamSpec.Imported) {
 		err = c.cleanupImportedCluster(obj)
 	}
 	if err != nil {
