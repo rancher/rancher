@@ -254,9 +254,10 @@ func ToRESTConfig(cluster *v3.Cluster, context *config.ScaledContext) (*rest.Con
 		return nil, nil
 	}
 
-	// rke1 custom clusters need cleanup and the cluster delete is being paused by cluster-scoped-gc
+	// rke1 custom clusters and imported clusters need to be cleaned up, and the cluster delete is being paused by cluster-scoped-gc
 	// allow a rest config since the nodes still exist and we need to start jobs on them for cleanup
-	if cluster.DeletionTimestamp != nil && cluster.Status.Driver != v32.ClusterDriverRKE {
+	_, hasGC := cluster.GetAnnotations()["lifecycle.cattle.io/create.cluster-scoped-gc"]
+	if cluster.DeletionTimestamp != nil && !hasGC {
 		return nil, nil
 	}
 
