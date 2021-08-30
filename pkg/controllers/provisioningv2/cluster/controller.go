@@ -3,6 +3,7 @@ package cluster
 import (
 	"context"
 	"regexp"
+	"strconv"
 
 	"github.com/rancher/norman/types/convert"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
@@ -33,8 +34,9 @@ import (
 )
 
 const (
-	ByCluster    = "by-cluster"
-	creatorIDAnn = "field.cattle.io/creatorId"
+	ByCluster        = "by-cluster"
+	creatorIDAnn     = "field.cattle.io/creatorId"
+	administratedAnn = "provisioning.cattle.io/administrated"
 )
 
 var (
@@ -263,7 +265,7 @@ func (h *handler) createNewCluster(cluster *v1.Cluster, status v1.ClusterStatus,
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        cluster.Status.ClusterName,
 			Labels:      cluster.Labels,
-			Annotations: map[string]string{},
+			Annotations: map[string]string{administratedAnn: strconv.FormatBool(cluster.Spec.RKEConfig != nil)},
 		},
 		Spec: spec,
 	}
