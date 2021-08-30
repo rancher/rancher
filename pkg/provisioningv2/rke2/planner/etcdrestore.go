@@ -68,7 +68,7 @@ func (e *etcdRestore) etcdRestore(controlPlane *rkev1.RKEControlPlane, clusterPl
 			if err != nil {
 				return err
 			}
-			return assignAndCheckPlan(e.store, "etcd restore", server, restorePlan)
+			return assignAndCheckPlan(e.store, "etcd restore", server, restorePlan, 0)
 		}
 	}
 
@@ -102,27 +102,55 @@ func (e *etcdRestore) restorePlan(controlPlane *rkev1.RKEControlPlane, snapshot 
 		return plan.NodePlan{}, err
 	}
 
-	stopPlan, err := e.stopPlan(controlPlane)
+	stopPlan, err := e.stopEtcdPlan(controlPlane)
 	if err != nil {
 		return plan.NodePlan{}, err
 	}
 
-	return commonNodePlan(e.secrets, controlPlane, plan.NodePlan{
-		Files: s3Files,
-		Instructions: append(stopPlan.Instructions, []plan.Instruction{
-			ensureInstalledInstruction(controlPlane),
-			{
-				Name:    "restore",
-				Env:     s3Env,
-				Args:    append(args, s3Args...),
-				Command: GetRuntimeCommand(controlPlane.Spec.KubernetesVersion),
-			},
-		}...),
+	planInstructions := append(stopPlan.Instructions, plan.Instruction{
+		Name:    "remove-tombstone",
+		Command: "rm",
+		Args: []string{
+			"-f",
+			fmt.Sprintf("/var/lib/rancher/%s/server/db/etcd/tombstone", GetRuntimeCommand(controlPlane.Spec.KubernetesVersion)),
+		},
 	})
+
+	nodePlan := plan.NodePlan{
+		Files: s3Files,
+		Instructions: append(planInstructions, plan.Instruction{
+			Name:    "restore",
+			Env:     s3Env,
+			Args:    append(args, s3Args...),
+			Command: GetRuntimeCommand(controlPlane.Spec.KubernetesVersion),
+		}),
+	}
+
+	return commonNodePlan(e.secrets, controlPlane, nodePlan)
 }
 
-func (e *etcdRestore) stopPlan(controlPlane *rkev1.RKEControlPlane) (plan.NodePlan, error) {
-	return commonNodePlan(e.secrets, controlPlane, plan.NodePlan{
+func (e *etcdRestore) stopControlPlanePlan(controlPlane *rkev1.RKEControlPlane) (plan.NodePlan, error) {
+	nodePlan := plan.NodePlan{
+		Instructions: []plan.Instruction{
+			ensureInstalledInstruction(controlPlane),
+			{
+				Name:    "shutdown",
+				Command: "systemctl",
+				Args: []string{
+					"stop", GetRuntimeServerUnit(controlPlane.Spec.KubernetesVersion),
+				},
+			},
+			{
+				Name:    "shutdown",
+				Command: GetRuntimeCommand(controlPlane.Spec.KubernetesVersion) + "-killall.sh",
+			},
+		},
+	}
+	return commonNodePlan(e.secrets, controlPlane, nodePlan)
+}
+
+func (e *etcdRestore) stopEtcdPlan(controlPlane *rkev1.RKEControlPlane) (plan.NodePlan, error) {
+	nodePlan := plan.NodePlan{
 		Instructions: []plan.Instruction{
 			ensureInstalledInstruction(controlPlane),
 			{
@@ -136,22 +164,39 @@ func (e *etcdRestore) stopPlan(controlPlane *rkev1.RKEControlPlane) (plan.NodePl
 				Name:    "shutdown",
 				Command: fmt.Sprintf("%s-killall.sh", GetRuntimeCommand(controlPlane.Spec.KubernetesVersion)),
 			},
+			{
+				Name:    "tombstone",
+				Command: "touch",
+				Args: []string{
+					fmt.Sprintf("/var/lib/rancher/%s/server/db/etcd/tombstone", GetRuntimeCommand(controlPlane.Spec.KubernetesVersion)),
+				},
+			},
 		},
-	})
+	}
+	return commonNodePlan(e.secrets, controlPlane, nodePlan)
 }
 
 func (e *etcdRestore) etcdShutdown(controlPlane *rkev1.RKEControlPlane, clusterPlan *plan.Plan) error {
-	servers := collect(clusterPlan, isEtcd)
+	servers := collect(clusterPlan, isControlPlaneEtcd)
 
-	stopPlan, err := e.stopPlan(controlPlane)
+	stopControlPlanePlan, err := e.stopControlPlanePlan(controlPlane)
+	if err != nil {
+		return err
+	}
+
+	stopEtcdPlan, err := e.stopEtcdPlan(controlPlane)
 	if err != nil {
 		return err
 	}
 
 	updated := false
 	for _, server := range servers {
+		stopPlan := stopControlPlanePlan
+		if isEtcd(server.Machine) {
+			stopPlan = stopEtcdPlan
+		}
 		if server.Plan == nil || !equality.Semantic.DeepEqual(server.Plan.Plan, stopPlan) {
-			if err := e.store.UpdatePlan(server.Machine, stopPlan); err != nil {
+			if err := e.store.UpdatePlan(server.Machine, stopPlan, 0); err != nil {
 				return err
 			}
 			updated = true
@@ -159,7 +204,7 @@ func (e *etcdRestore) etcdShutdown(controlPlane *rkev1.RKEControlPlane, clusterP
 	}
 
 	if updated {
-		return ErrWaiting("shutting down control plane")
+		return ErrWaiting("shutting down control plane and etcd")
 	}
 
 	for _, server := range servers {

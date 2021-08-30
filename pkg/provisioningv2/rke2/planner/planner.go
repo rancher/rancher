@@ -205,15 +205,26 @@ func (p *Planner) Process(controlPlane *rkev1.RKEControlPlane) error {
 		joinServer       string
 	)
 
-	if err := p.etcdCreate.Create(controlPlane, plan); err != nil {
+	if errs := p.etcdCreate.Create(controlPlane, plan); len(errs) > 0 {
+		var errMsg string
+		for i, err := range errs {
+			if err == nil {
+				continue
+			}
+			if i == 0 {
+				errMsg = err.Error()
+			} else {
+				errMsg = errMsg + ", " + err.Error()
+			}
+		}
+		return ErrWaiting(errMsg)
+	}
+
+	if _, err := p.electInitNode(controlPlane, plan); err != nil {
 		return err
 	}
 
 	if err := p.etcdRestore.Restore(controlPlane, plan); err != nil {
-		return err
-	}
-
-	if _, err := p.electInitNode(controlPlane, plan); err != nil {
 		return err
 	}
 
@@ -349,6 +360,39 @@ func (p *Planner) electInitNode(rkeControlPlane *rkev1.RKEControlPlane, plan *pl
 	entries := collect(plan, isEtcd)
 	joinURL := ""
 	initNodeFound := false
+
+	// Ensure we set our initNode to the initNode that is specified in the etcd snapshot restore
+	if rkeControlPlane.Spec.ETCDSnapshotRestore != nil && rkeControlPlane.Spec.ETCDSnapshotRestore.S3 == nil &&
+		rkeControlPlane.Status.ETCDSnapshotRestorePhase != rkev1.ETCDSnapshotPhaseFinished { // In the event that we are restoring a local snapshot, we
+		// need to reset our initNode
+		cacheInvalidated := false
+		for _, entry := range entries {
+			if entry.Machine.Status.NodeRef != nil &&
+				entry.Machine.Status.NodeRef.Name == rkeControlPlane.Spec.ETCDSnapshotRestore.NodeName {
+				// this is our new initNode
+				if _, err := p.setInitNodeMark(entry.Machine); err != nil {
+					if errors.Is(err, generic.ErrSkip) {
+						cacheInvalidated = true
+						continue
+					}
+					return "", err
+				}
+
+			} else {
+				if err := p.clearInitNodeMark(entry.Machine); err != nil {
+					if errors.Is(err, generic.ErrSkip) {
+						cacheInvalidated = true
+						continue
+					}
+					return "", err
+				}
+			}
+		}
+		if cacheInvalidated {
+			return "", generic.ErrSkip
+		}
+	}
+
 	for _, entry := range entries {
 		if !isInitNode(entry.Machine) {
 			continue
@@ -469,7 +513,7 @@ func (p *Planner) reconcile(controlPlane *rkev1.RKEControlPlane, secret plan.Sec
 
 		if entry.Plan == nil {
 			outOfSync = append(outOfSync, entry.Machine.Name)
-			if err := p.store.UpdatePlan(entry.Machine, plan); err != nil {
+			if err := p.store.UpdatePlan(entry.Machine, plan, 0); err != nil {
 				return err
 			}
 		} else if !equality.Semantic.DeepEqual(entry.Plan.Plan, plan) {
@@ -486,7 +530,7 @@ func (p *Planner) reconcile(controlPlane *rkev1.RKEControlPlane, secret plan.Sec
 				if ok, err := p.drain(entry.Machine, clusterPlan, drainOptions); err != nil {
 					return err
 				} else if ok {
-					if err := p.store.UpdatePlan(entry.Machine, plan); err != nil {
+					if err := p.store.UpdatePlan(entry.Machine, plan, 0); err != nil {
 						return err
 					}
 				} else {
@@ -1094,6 +1138,10 @@ func none(_ *capi.Machine) bool {
 
 func isControlPlane(machine *capi.Machine) bool {
 	return machine.Labels[ControlPlaneRoleLabel] == "true"
+}
+
+func isControlPlaneEtcd(machine *capi.Machine) bool {
+	return isControlPlane(machine) || isEtcd(machine)
 }
 
 func IsOnlyEtcd(machine *capi.Machine) bool {
