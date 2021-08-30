@@ -463,7 +463,7 @@ var errKeyRotationFailed = errors.New("encryption key rotation failed, please re
 
 func (p *Provisioner) reconcileCluster(cluster *v3.Cluster, create bool) (*v3.Cluster, error) {
 	if skipLocalK3sImported(cluster) {
-		if cluster.Status.Driver == apimgmtv3.ClusterDriverImported && IsOwnedByProvisioningCluster(cluster) {
+		if IsAdministratedByProvisioningCluster(cluster) {
 			cluster.Status.AppliedSpec.LocalClusterAuthEndpoint = cluster.Spec.LocalClusterAuthEndpoint
 		}
 		return cluster, nil
@@ -1057,7 +1057,7 @@ func (p *Provisioner) k3sBasedClusterConfig(cluster *v3.Cluster, nodes []*v3.Nod
 		cluster.Status.Driver == apimgmtv3.ClusterDriverK3os ||
 		cluster.Status.Driver == apimgmtv3.ClusterDriverRke2 ||
 		cluster.Status.Driver == apimgmtv3.ClusterDriverRancherD ||
-		(cluster.Status.Driver == apimgmtv3.ClusterDriverImported && IsOwnedByProvisioningCluster(cluster)) {
+		IsAdministratedByProvisioningCluster(cluster) {
 		return nil //no-op
 	}
 	isEmbedded := cluster.Status.Driver == apimgmtv3.ClusterDriverLocal
@@ -1100,6 +1100,6 @@ func (p *Provisioner) k3sBasedClusterConfig(cluster *v3.Cluster, nodes []*v3.Nod
 	return nil
 }
 
-func IsOwnedByProvisioningCluster(cluster *v3.Cluster) bool {
-	return strings.HasPrefix(cluster.Annotations["objectset.rio.cattle.io/owner-gvk"], "provisioning.cattle.io/v1, Kind=Cluster")
+func IsAdministratedByProvisioningCluster(cluster *v3.Cluster) bool {
+	return cluster.Status.Driver == apimgmtv3.ClusterDriverImported && cluster.Annotations["provisioning.cattle.io/administrated"] == "true"
 }
