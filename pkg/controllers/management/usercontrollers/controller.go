@@ -98,7 +98,7 @@ func (c *ClusterLifecycleCleanup) Remove(obj *v3.Cluster) (runtime.Object, error
 }
 
 func (c *ClusterLifecycleCleanup) cleanupLocalCluster(obj *v3.Cluster) error {
-	userContext, err := c.Manager.UserContext(obj.Name)
+	userContext, err := c.Manager.UserContextFromCluster(obj)
 	if err != nil {
 		return err
 	}
@@ -129,7 +129,7 @@ func (c *ClusterLifecycleCleanup) Updated(obj *v3.Cluster) (runtime.Object, erro
 }
 
 func (c *ClusterLifecycleCleanup) cleanupImportedCluster(cluster *v3.Cluster) error {
-	userContext, err := c.Manager.UserContext(cluster.Name)
+	userContext, err := c.Manager.UserContextFromCluster(cluster)
 	if err != nil {
 		return err
 	}
