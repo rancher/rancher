@@ -92,6 +92,7 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 	// restricted-admin will get cluster admin access to all downstream clusters but limited access to the local cluster
 	restrictedAdminRole := addUserRules(rb.addRole("Restricted Admin", "restricted-admin"))
 	restrictedAdminRole.
+		addRule().apiGroups("catalog.cattle.io").resources("clusterrepos").verbs("*").
 		addRule().apiGroups("management.cattle.io").resources("clustertemplates").verbs("*").
 		addRule().apiGroups("management.cattle.io").resources("clustertemplaterevisions").verbs("*").
 		addRule().apiGroups("management.cattle.io").resources("globalroles", "globalrolebindings").verbs("*").
@@ -111,7 +112,9 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 	}
 
 	userRole := addUserRules(rb.addRole("User", "user"))
-	userRole.addRule().apiGroups("management.cattle.io").resources("podsecuritypolicytemplates").verbs("get", "list", "watch")
+	userRole.
+		addRule().apiGroups("catalog.cattle.io").resources("clusterrepos").verbs("get", "list", "watch").
+		addRule().apiGroups("management.cattle.io").resources("podsecuritypolicytemplates").verbs("get", "list", "watch")
 
 	rb.addRole("User Base", "user-base").
 		addRule().apiGroups("management.cattle.io").resources("preferences").verbs("*").
@@ -454,7 +457,6 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 func addUserRules(role *roleBuilder) *roleBuilder {
 	role.
 		addRule().apiGroups("").resources("secrets").verbs("create").
-		addRule().apiGroups("catalog.cattle.io").resources("clusterrepos").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("principals", "roletemplates").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("preferences").verbs("*").
 		addRule().apiGroups("management.cattle.io").resources("settings").verbs("get", "list", "watch").
