@@ -1,16 +1,17 @@
 import base64
 from rancher import ApiError
 import pytest
+from packaging import version
 
 from .common import *  # NOQA
 
 CLUSTER_NAME = os.environ.get("CLUSTER_NAME", "")
 
 namespace = {"p_client": None, "ns": None, "cluster": None, "project": None}
+rancher_version_26 = False
 
 
 def test_secret_create_all_ns():
-
     """
     Verify creation of secrets is functional
     """
@@ -31,7 +32,6 @@ def test_secret_create_all_ns():
 
     # Create workloads with secret in existing namespaces
     for ns in namespacelist:
-
         create_and_validate_workload_with_secret_as_volume(p_client, secret,
                                                            ns,
                                                            keyvaluepair)
@@ -55,7 +55,6 @@ def test_secret_create_all_ns():
 
 
 def test_secret_create_single_ns():
-
     """
     Verify editing secrets is functional
     """
@@ -76,7 +75,6 @@ def test_secret_create_single_ns():
 
 
 def test_secret_delete_all_ns():
-
     """
     Verify Deletion of secrets is functional
     """
@@ -90,7 +88,6 @@ def test_secret_delete_all_ns():
 
 
 def test_secret_delete_single_ns():
-
     p_client = namespace["p_client"]
     ns = namespace["ns"]
     # Value is base64 encoded
@@ -102,7 +99,6 @@ def test_secret_delete_single_ns():
 
 
 def test_secret_edit_all_ns():
-
     p_client = namespace["p_client"]
     name = random_test_name("default")
     # Value is base64 encoded
@@ -152,7 +148,6 @@ def test_secret_edit_all_ns():
 
 
 def test_secret_edit_single_ns():
-
     p_client = namespace["p_client"]
     ns = namespace["ns"]
     name = random_test_name("default")
@@ -236,7 +231,6 @@ def test_rbac_secret_delete(role):
 
 @if_test_rbac
 def test_rbac_secret_create_cluster_member(remove_resource):
-
     """
     Verify cluster member can create secret and deploy workload using secret
     in the project he created
@@ -272,7 +266,6 @@ def test_rbac_secret_create_cluster_member(remove_resource):
 
 @if_test_rbac
 def test_rbac_secret_edit_cluster_member(remove_resource):
-
     """
     Verify cluster member can create secret and edit secret in the project he
     created
@@ -318,7 +311,6 @@ def test_rbac_secret_edit_cluster_member(remove_resource):
 
 @if_test_rbac
 def test_rbac_secret_delete_cluster_member(remove_resource):
-
     """
     Verify cluster member can create secret and delete secret in the project he
     created
@@ -358,7 +350,6 @@ def test_rbac_secret_delete_cluster_member(remove_resource):
 
 @if_test_rbac
 def test_rbac_secret_create_project_readonly():
-
     """
     Verify read-only user cannot create secret
     """
@@ -379,7 +370,6 @@ def test_rbac_secret_create_project_readonly():
 
 @if_test_rbac
 def test_rbac_secret_edit_project_readonly_member(remove_resource):
-
     """
     Verify read-only user cannot edit secret
     """
@@ -414,7 +404,6 @@ def test_rbac_secret_edit_project_readonly_member(remove_resource):
 
 @if_test_rbac
 def test_rbac_secret_delete_project_readonly(remove_resource):
-
     """
     Verify read-only user cannot delete secret
     """
@@ -443,7 +432,6 @@ def test_rbac_secret_delete_project_readonly(remove_resource):
 @if_test_rbac
 @pytest.mark.parametrize("role", rbac_role_list)
 def test_rbac_secret_list(remove_resource, role):
-
     user_token = rbac_get_user_token_by_role(role)
     project = rbac_get_project()
     p_client = get_project_client_for_token(project, user_token)
@@ -452,7 +440,6 @@ def test_rbac_secret_list(remove_resource, role):
 
 @if_test_rbac
 def test_rbac_secret_list_cluster_member(remove_resource):
-
     """
     Verify cluster member can list secret in the project he created
     """
@@ -491,7 +478,6 @@ def test_rbac_secret_list_cluster_member(remove_resource):
 
 @if_test_rbac
 def test_rbac_secret_list_project_readonly():
-
     """
     Verify read-only user cannot list secret
     """
@@ -513,7 +499,6 @@ def test_rbac_secret_list_project_readonly():
 
 
 def rbac_secret_create(p_client, ns):
-
     """
     Verify creating secret is functional.
     The p_client passed as the parameter would be as per the role assigned
@@ -529,7 +514,6 @@ def rbac_secret_create(p_client, ns):
 
 
 def rbac_secret_edit(p_client, ns, project=None):
-
     """
     Verify creating, editing secret is functional.
     The p_client passed as the parameter would be as per the role assigned
@@ -578,7 +562,6 @@ def rbac_secret_edit(p_client, ns, project=None):
 
 
 def rbac_secret_delete(p_client, ns):
-
     """
     Verify creating, deleting secret is functional.
     The p_client passed as the parameter would be as per the role assigned
@@ -611,6 +594,7 @@ def rbac_secret_list(p_client):
 
 @pytest.fixture(scope='module', autouse="True")
 def create_project_client(request):
+    global rancher_version_26
     client, cluster = get_user_client_and_cluster()
     create_kubeconfig(cluster)
     p, ns = create_project_and_ns(USER_TOKEN, cluster, "testsecret")
@@ -622,10 +606,19 @@ def create_project_client(request):
     namespace["cluster"] = cluster
     namespace["project"] = p
     namespace["c_client"] = c_client
+    rancher_version = get_setting_value_by_name('server-version')
+
+    # Checks if rancher version is greater than v26
+
+    rancher_version = ''.join(rancher_version.split(".")[:2]) if rancher_version.startswith('v') else None
+
+    if version.parse(rancher_version) > version.parse('v2.5') or rancher_version.startswith('master'):
+        rancher_version_26 = True
 
     def fin():
         client = get_user_client()
         client.delete(namespace["project"])
+
     request.addfinalizer(fin)
 
 
@@ -634,7 +627,6 @@ def validate_workload_with_secret(p_client, workload,
                                   workloadwithsecretasVolume=False,
                                   workloadwithsecretasenvvar=False,
                                   podcount=1):
-
     validate_workload(p_client, workload, type, ns_name, pod_count=podcount)
 
     pod_list = p_client.list_pod(workloadId=workload.id).data
@@ -659,7 +651,6 @@ def validate_workload_with_secret(p_client, workload,
 
 
 def delete_secret(client, secret, ns, keyvaluepair):
-
     key = list(keyvaluepair.keys())[0]
     secretname = secret.name
     print("Delete Secret")
@@ -738,14 +729,27 @@ def create_and_validate_workload_with_secret_as_env_variable(p_client, secret,
     # Create Workload with secret as env variable
     secretName = secret['name']
 
-    environmentdata = [{
-        "source": "secret",
-        "sourceKey": None,
-        "sourceName": secretName
-    }]
+    # Checking if rancher version is 26 and above.
+    # If yes env should be "environment" and envFrom should be "environmentFrom"
+
+    if rancher_version_26:
+        env_str = "envFrom"
+        environment_data = [{
+            "secretRef": {
+                "name": secretName,
+                "optional": False
+            }
+        }]
+    else:
+        env_str = "environmentFrom"
+        environment_data = [{
+            "source": "secret",
+            "sourceKey": None,
+            "sourceName": secretName
+        }]
     con = [{"name": "test",
             "image": TEST_IMAGE,
-            "environmentFrom": environmentdata}]
+            env_str: environment_data}]
 
     workload = p_client.create_workload(name=name,
                                         containers=con,
@@ -757,7 +761,6 @@ def create_and_validate_workload_with_secret_as_env_variable(p_client, secret,
 
 def create_secret(keyvaluepair, singlenamespace=False,
                   p_client=None, ns=None, name=None):
-
     if p_client is None:
         p_client = namespace["p_client"]
 
