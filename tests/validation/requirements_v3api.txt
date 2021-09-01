@@ -21,3 +21,4 @@ requests==2.22.0
 rsa==4.7.2
 websocket-client==0.57.0
 semver==2.13.0
+packaging==20.9

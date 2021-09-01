@@ -1,13 +1,13 @@
 import base64
 from rancher import ApiError
 import pytest
+from packaging import version
 
 from .common import *  # NOQA
 
 CLUSTER_NAME = os.environ.get("CLUSTER_NAME", "")
 
 namespace = {"p_client": None, "ns": None, "cluster": None, "project": None}
-
 
 def test_secret_create_all_ns():
 
@@ -623,10 +623,31 @@ def create_project_client(request):
     namespace["project"] = p
     namespace["c_client"] = c_client
 
+
     def fin():
         client = get_user_client()
         client.delete(namespace["project"])
+
     request.addfinalizer(fin)
+
+
+def is_version_greater_than_v25():
+    # Checks if rancher version is greater than v2.5
+    # eg: v2.5-head, v2.5 etc.
+
+    rancher_version = get_setting_value_by_name('server-version')
+
+    version_check = False
+    if rancher_version.startswith('v'):
+        if "head" in rancher_version:
+            rancher_version = ''.join(rancher_version.split("-")[0])
+        else:
+            rancher_version = '.'.join(rancher_version.split(".")[:2])
+
+    if version.parse(rancher_version) > version.parse('v2.5'):
+        version_check = True
+
+    return version_check
 
 
 def validate_workload_with_secret(p_client, workload,
@@ -738,14 +759,27 @@ def create_and_validate_workload_with_secret_as_env_variable(p_client, secret,
     # Create Workload with secret as env variable
     secretName = secret['name']
 
-    environmentdata = [{
-        "source": "secret",
-        "sourceKey": None,
-        "sourceName": secretName
-    }]
+    # Checking if rancher version is 26 and above.
+    # If yes env should be "environment" and envFrom should be "environmentFrom"
+    rancher_version_26 = is_version_greater_than_v25()
+    if rancher_version_26:
+        env_str = "envFrom"
+        environment_data = [{
+            "secretRef": {
+                "name": secretName,
+                "optional": False
+            }
+        }]
+    else:
+        env_str = "environmentFrom"
+        environment_data = [{
+            "source": "secret",
+            "sourceKey": None,
+            "sourceName": secretName
+        }]
     con = [{"name": "test",
             "image": TEST_IMAGE,
-            "environmentFrom": environmentdata}]
+            env_str: environment_data }]
 
     workload = p_client.create_workload(name=name,
                                         containers=con,
