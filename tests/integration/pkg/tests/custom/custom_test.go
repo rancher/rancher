@@ -2,6 +2,7 @@ package custom
 
 import (
 	"encoding/json"
+	"os"
 	"testing"
 
 	provisioningv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
@@ -11,7 +12,24 @@ import (
 	"github.com/rancher/rancher/tests/integration/pkg/systemdnode"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
+
+func TestSystemAgentVersion(t *testing.T) {
+	clients, err := clients.New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer clients.Close()
+
+	setting, err := clients.Mgmt.Setting().Get("system-agent-version", metav1.GetOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.NotEmpty(t, setting.Value)
+	assert.True(t, setting.Value == os.Getenv("CATTLE_SYSTEM_AGENT_VERSION"))
+}
 
 func TestCustomOneNode(t *testing.T) {
 	clients, err := clients.New()
