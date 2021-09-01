@@ -26,19 +26,22 @@ var (
 )
 
 type repoHandler struct {
-	secrets      corev1controllers.SecretCache
-	clusterRepos catalogcontrollers.ClusterRepoController
-	configMaps   corev1controllers.ConfigMapClient
+	secrets        corev1controllers.SecretCache
+	clusterRepos   catalogcontrollers.ClusterRepoController
+	configMaps     corev1controllers.ConfigMapClient
+	configMapCache corev1controllers.ConfigMapCache
 }
 
 func RegisterRepos(ctx context.Context,
 	secrets corev1controllers.SecretCache,
 	clusterRepos catalogcontrollers.ClusterRepoController,
-	configMap corev1controllers.ConfigMapClient) {
+	configMap corev1controllers.ConfigMapController,
+	configMapCache corev1controllers.ConfigMapCache) {
 	h := &repoHandler{
-		secrets:      secrets,
-		clusterRepos: clusterRepos,
-		configMaps:   configMap,
+		secrets:        secrets,
+		clusterRepos:   clusterRepos,
+		configMaps:     configMap,
+		configMapCache: configMapCache,
 	}
 
 	catalogcontrollers.RegisterClusterRepoStatusHandler(ctx, clusterRepos,
@@ -65,6 +68,10 @@ func (r *repoHandler) ClusterRepoDownloadEnsureStatusHandler(repo *catalog.Clust
 }
 
 func (r *repoHandler) ClusterRepoDownloadStatusHandler(repo *catalog.ClusterRepo, status catalog.RepoStatus) (catalog.RepoStatus, error) {
+	err := r.ensureIndexConfigMap(repo, &status)
+	if err != nil {
+		return status, err
+	}
 	if !shouldRefresh(&repo.Spec, &status) {
 		r.clusterRepos.EnqueueAfter(repo.Name, interval)
 		return status, nil
@@ -195,6 +202,25 @@ func (r *repoHandler) download(repoSpec *catalog.RepoSpec, status catalog.RepoSt
 	status.DownloadTime = downloadTime
 	status.Commit = commit
 	return status, nil
+}
+
+func (r *repoHandler) ensureIndexConfigMap(repo *catalog.ClusterRepo, status *catalog.RepoStatus) error {
+	// Charts from the clusterRepo will be unavailable if the IndexConfigMap recorded in the status does not exist.
+	// By resetting the value of IndexConfigMapName, IndexConfigMapNamespace, IndexConfigMapResourceVersion to "",
+	// the method shouldRefresh will return true and trigger the rebuild of the IndexConfigMap and accordingly update the status.
+	if repo.Spec.GitRepo != "" && status.IndexConfigMapName != "" {
+		_, err := r.configMapCache.Get(status.IndexConfigMapNamespace, status.IndexConfigMapName)
+		if err != nil {
+			if apierrors.IsNotFound(err) {
+				status.IndexConfigMapName = ""
+				status.IndexConfigMapNamespace = ""
+				status.IndexConfigMapResourceVersion = ""
+				return nil
+			}
+			return err
+		}
+	}
+	return nil
 }
 
 func shouldRefresh(spec *catalog.RepoSpec, status *catalog.RepoStatus) bool {
