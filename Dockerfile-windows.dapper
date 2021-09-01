@@ -4,6 +4,10 @@ SHELL ["powershell", "-NoLogo", "-Command", "$ErrorActionPreference = 'Stop'; $P
 ARG DAPPER_HOST_ARCH
 ENV HOST_ARCH=${DAPPER_HOST_ARCH} ARCH=${DAPPER_HOST_ARCH}
 
+RUN curl.exe -sfL https://raw.githubusercontent.com/fossas/spectrometer/master/install.ps1 -o $Env:TEMP/fossa.ps1; \
+    Invoke-Expression -Command $Env:TEMP/fossa.ps1; \
+    Remove-Item -Path $Env:TEMP/fossa.ps1;
+
 RUN pushd c:\; \
     $URL = 'https://github.com/StefanScherer/docker-cli-builder/releases/download/20.10.5/docker.exe'; \
     \

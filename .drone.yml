@@ -88,6 +88,24 @@ steps:
     - pull_request
     - tag
 
+- name: fossa-amd64
+  image: rancher/dapper:v0.5.4
+  environment:
+    FOSSA_API_KEY:
+      from_secret: FOSSA_API_KEY
+  commands:
+    - dapper fossa
+  when:
+    instance:
+      - drone-publish.rancher.io
+    ref:
+      include:
+        - "refs/heads/master"
+        - "refs/heads/release/v*"
+    event:
+      - push
+      - tag
+
 - name: stage-binaries
   image: rancher/dapper:v0.5.4
   commands:
@@ -556,6 +574,24 @@ steps:
       event:
         - push
         - pull_request
+        - tag
+
+  - name: fossa-windows-1809
+    image: rancher/dapper:v0.5.4
+    environment:
+      FOSSA_API_KEY:
+        from_secret: FOSSA_API_KEY
+    commands:
+      - dapper.exe -f Dockerfile-windows.dapper -d fossa
+    when:
+      instance:
+        - drone-publish.rancher.io
+      ref:
+        include:
+          - "refs/heads/master"
+          - "refs/heads/release/v*"
+      event:
+        - push
         - tag
 
   - name: stage-binaries
