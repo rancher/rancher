@@ -79,6 +79,13 @@ class AmazonWebServices(CloudProviderBase):
             aws_secret_access_key=AWS_SECRET_ACCESS_KEY,
             region_name=AWS_REGION)
 
+        self._ec2_resource = boto3.resource(
+            'ec2',
+            aws_access_key_id=AWS_ACCESS_KEY_ID,
+            aws_secret_access_key=AWS_SECRET_ACCESS_KEY,
+            region_name=AWS_REGION
+        )
+
         self.master_ssh_key = None
         self.master_ssh_key_path = None
 
@@ -584,6 +591,8 @@ class AmazonWebServices(CloudProviderBase):
             return None
 
     def create_eks_cluster(self, name):
+        for sn in AWS_SUBNETS:
+            self.set_subnet_tag(sn, name)
         kubeconfig_path = self.create_eks_controlplane(name)
         self.create_eks_nodegroup(name, '{}-ng'.format(name))
         return kubeconfig_path
@@ -642,6 +651,18 @@ class AmazonWebServices(CloudProviderBase):
             )
         except ClientError:
             return None
+
+    def set_subnet_tag(self, subnet_id, cluster_name):
+        subnet = self._ec2_resource.Subnet(subnet_id)
+        cluster_tag = 'kubernetes.io/cluster/{0}'.format(cluster_name)
+        subnet.create_tags(
+            Tags=[
+                {
+                    'Key': cluster_tag,
+                    'Value': 'shared'
+                }
+            ]
+        )
 
     def wait_for_eks_cluster_state(self, name, target_state, timeout=1200):
         start = time.time()
