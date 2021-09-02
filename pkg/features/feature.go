@@ -95,6 +95,12 @@ var (
 		false,
 		true,
 		true)
+	Harvester = newFeature(
+		"harvester",
+		"Enable Harvester integration, with ability to import and manage Harvester clusters",
+		true,
+		true,
+		true)
 )
 
 type Feature struct {
