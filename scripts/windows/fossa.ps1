@@ -1,0 +1,2 @@
+fossa analyze
+fossa test
