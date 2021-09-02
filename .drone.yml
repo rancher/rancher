@@ -95,6 +95,9 @@ steps:
       from_secret: FOSSA_API_KEY
   commands:
     - dapper fossa
+  volumes:
+    - name: docker
+      path: /var/run/docker.sock
   when:
     instance:
       - drone-publish.rancher.io
@@ -583,6 +586,9 @@ steps:
         from_secret: FOSSA_API_KEY
     commands:
       - dapper.exe -f Dockerfile-windows.dapper -d fossa
+    volumes:
+      - name: docker_pipe
+        path: \\\\.\\pipe\\docker_engine
     when:
       instance:
         - drone-publish.rancher.io
