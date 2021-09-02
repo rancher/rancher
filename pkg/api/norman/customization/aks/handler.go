@@ -40,6 +40,7 @@ type Capabilities struct {
 	ClientID         string `json:"clientId"`
 	ClientSecret     string `json:"clientSecret"`
 	ResourceLocation string `json:"region"`
+	CurrentVersion   string `json:"currentVersion"`
 }
 
 // AKS handler lists available resources in Azure API
@@ -239,10 +240,8 @@ func (h *handler) getCloudCredential(req *http.Request, cap *Capabilities, credI
 	if cap.AuthBaseURL == "" {
 		cap.AuthBaseURL = azure.PublicCloud.ActiveDirectoryEndpoint
 	}
-	region := req.URL.Query().Get("region")
-	if region != "" {
-		cap.ResourceLocation = region
-	}
+	cap.ResourceLocation = req.URL.Query().Get("region")
+	cap.CurrentVersion = req.URL.Query().Get("currentVersion")
 
 	return http.StatusOK, nil
 }

@@ -141,13 +141,24 @@ func listKubernetesVersions(ctx context.Context, cap *Capabilities) ([]byte, int
 
 	var kubernetesVersions []string
 
-	for _, profile := range *orchestrators.Orchestrators {
-		if profile.OrchestratorType == nil || profile.OrchestratorVersion == nil {
-			return nil, http.StatusInternalServerError, fmt.Errorf("unexpected nil orchestrator type or version")
+	// If listing for an upgrade only list the versions available for the current version
+	if cap.CurrentVersion != "" {
+		// find the current version's profile
+		for _, profile := range *orchestrators.Orchestrators {
+			if *profile.OrchestratorType == "Kubernetes" && *profile.OrchestratorVersion == cap.CurrentVersion {
+				// get available upgrade versions for the current version
+				kubernetesVersions, err = kubernetesVersionsFromOrchestratorProfiles(*profile.Upgrades...)
+				if err != nil {
+					return nil, http.StatusInternalServerError, err
+				}
+				break
+			}
 		}
-
-		if *profile.OrchestratorType == "Kubernetes" {
-			kubernetesVersions = append(kubernetesVersions, *profile.OrchestratorVersion)
+	} else {
+		// list all available versions
+		kubernetesVersions, err = kubernetesVersionsFromOrchestratorVersionProfiles(*orchestrators.Orchestrators...)
+		if err != nil {
+			return nil, http.StatusInternalServerError, err
 		}
 	}
 
@@ -325,4 +336,36 @@ func encodeOutput(result interface{}) ([]byte, int, error) {
 	}
 
 	return data, http.StatusOK, err
+}
+
+func kubernetesVersionsFromOrchestratorVersionProfiles(profiles ...containerservice.OrchestratorVersionProfile) ([]string, error) {
+	var kubernetesVersions []string
+
+	for _, profile := range profiles {
+		if profile.OrchestratorType == nil || profile.OrchestratorVersion == nil {
+			return kubernetesVersions, fmt.Errorf("unexpected nil orchestrator type or version")
+		}
+
+		if *profile.OrchestratorType == "Kubernetes" {
+			kubernetesVersions = append(kubernetesVersions, *profile.OrchestratorVersion)
+		}
+	}
+
+	return kubernetesVersions, nil
+}
+
+func kubernetesVersionsFromOrchestratorProfiles(profiles ...containerservice.OrchestratorProfile) ([]string, error) {
+	var kubernetesVersions []string
+
+	for _, profile := range profiles {
+		if profile.OrchestratorType == nil || profile.OrchestratorVersion == nil {
+			return kubernetesVersions, fmt.Errorf("unexpected nil orchestrator type or version")
+		}
+
+		if *profile.OrchestratorType == "Kubernetes" {
+			kubernetesVersions = append(kubernetesVersions, *profile.OrchestratorVersion)
+		}
+	}
+
+	return kubernetesVersions, nil
 }
