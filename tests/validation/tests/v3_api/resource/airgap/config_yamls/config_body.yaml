@@ -1,0 +1,6 @@
+      user: ubuntu
+      role:
+        - controlplane
+        - etcd
+        - worker
+      ssh_key_path: /home/ubuntu/jenkins-rke-validation.pem
