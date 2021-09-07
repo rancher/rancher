@@ -46,7 +46,8 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 	rb.addRole("Manage Cluster Drivers", "kontainerdrivers-manage").
 		addRule().apiGroups("management.cattle.io").resources("kontainerdrivers").verbs("*")
 	rb.addRole("Manage Catalogs", "catalogs-manage").
-		addRule().apiGroups("management.cattle.io").resources("catalogs", "templates", "templateversions").verbs("*")
+		addRule().apiGroups("management.cattle.io").resources("catalogs", "templates", "templateversions").verbs("*").
+		addRule().apiGroups("catalog.cattle.io").resources("clusterrepos").verbs("*")
 	rb.addRole("Use Catalog Templates", "catalogs-use").
 		addRule().apiGroups("management.cattle.io").resources("templates", "templateversions").verbs("get", "list", "watch")
 	rb.addRole("Manage Users", "users-manage").
