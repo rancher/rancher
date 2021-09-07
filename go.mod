@@ -60,6 +60,7 @@ require (
 	github.com/coreos/go-iptables v0.6.0
 	github.com/coreos/go-oidc/v3 v3.0.0
 	github.com/coreos/go-semver v0.3.0
+	github.com/creasty/defaults v1.5.2
 	github.com/crewjam/saml v0.4.5
 	github.com/davecgh/go-spew v1.1.1
 	github.com/docker/distribution v2.7.1+incompatible
@@ -95,28 +96,29 @@ require (
 	github.com/prometheus/client_golang v1.9.0
 	github.com/prometheus/client_model v0.2.0
 	github.com/prometheus/common v0.15.0
-	github.com/rancher/aks-operator v1.0.1-rc18
-	github.com/rancher/apiserver v0.0.0-20210818221223-fb33444dfae8
+	github.com/rancher/aks-operator v1.0.2
+	github.com/rancher/apiserver v0.0.0-20211025232108-df28932a5627
 	github.com/rancher/channelserver v0.5.1-0.20210618172430-5cbefd383369
 	github.com/rancher/dynamiclistener v0.3.1-0.20210616080009-9865ae859c7f
 	github.com/rancher/eks-operator v1.1.1
-	github.com/rancher/fleet/pkg/apis v0.0.0-20210608014113-99e848822739
+	github.com/rancher/fleet/pkg/apis v0.0.0-20210918015053-5a141a6b18f0
 	github.com/rancher/gke-operator v1.1.1
 	github.com/rancher/kubernetes-provider-detector v0.1.5
 	github.com/rancher/lasso v0.0.0-20210616224652-fc3ebd901c08
 	github.com/rancher/lasso/controller-runtime v0.0.0-20210608205930-775fcaf2f523
-	github.com/rancher/machine v0.15.0-rancher69
+	github.com/rancher/machine v0.15.0-rancher70
 	github.com/rancher/norman v0.0.0-20210608202517-59b3523c3133
 	github.com/rancher/rancher/pkg/apis v0.0.0
 	github.com/rancher/rancher/pkg/client v0.0.0
 	github.com/rancher/rdns-server v0.0.0-20180802070304-bf662911db6a
 	github.com/rancher/remotedialer v0.2.6-0.20210318171128-d1ebd5202be4
-	github.com/rancher/rke v1.3.0
+	github.com/rancher/rke v1.3.1
 	github.com/rancher/security-scan v0.1.7-0.20200222041501-f7377f127168
-	github.com/rancher/steve v0.0.0-20210819001752-8ecda307ee49
+	github.com/rancher/steve v0.0.0-20210922195510-7224dc21013d
 	github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20210727200656-10b094e30007
-	github.com/rancher/wrangler v0.8.6-0.20210819203859-0babd42fbad8
+	github.com/rancher/wrangler v0.8.7
 	github.com/robfig/cron v1.1.0
+	github.com/russellhaering/goxmldsig v1.1.1 // indirect
 	github.com/satori/go.uuid v1.2.0
 	github.com/segmentio/kafka-go v0.0.0-20190411192201-218fd49cff39
 	github.com/sirupsen/logrus v1.8.1
@@ -133,7 +135,7 @@ require (
 	github.com/yvasiyarov/go-metrics v0.0.0-20150112132944-c25f46c4b940 // indirect
 	github.com/yvasiyarov/gorelic v0.0.7 // indirect
 	github.com/yvasiyarov/newrelic_platform_go v0.0.0-20160601141957-9c099fbc30e9 // indirect
-	golang.org/x/crypto v0.0.0-20210711020723-a769d52b0f97
+	golang.org/x/crypto v0.0.0-20210921155107-089bfa567519
 	golang.org/x/mod v0.4.0
 	golang.org/x/net v0.0.0-20210315170653-34ac3e1c2000
 	golang.org/x/oauth2 v0.0.0-20201208152858-08078c50e5b5
@@ -143,14 +145,14 @@ require (
 	google.golang.org/genproto v0.0.0-20210315173758-2651cd453018 // indirect
 	google.golang.org/grpc v1.34.0
 	gopkg.in/asn1-ber.v1 v1.0.0-20181015200546-f715ec2f112d // indirect
-	gopkg.in/check.v1 v1.0.0-20200227125254-8fa46927fb4f
+	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c
 	gopkg.in/ldap.v2 v2.5.1
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
 	gopkg.in/yaml.v2 v2.4.0
 	helm.sh/helm/v3 v3.5.4
-	k8s.io/api v0.21.2
+	k8s.io/api v0.21.3
 	k8s.io/apiextensions-apiserver v0.21.0
-	k8s.io/apimachinery v0.21.2
+	k8s.io/apimachinery v0.21.3
 	k8s.io/apiserver v0.21.0
 	k8s.io/cli-runtime v0.21.0
 	k8s.io/client-go v12.0.0+incompatible
