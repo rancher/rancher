@@ -34,20 +34,19 @@ func toRegistryConfig(secrets v1.SecretCache, runtime, namespace string, registr
 
 	for registryName, config := range registry.Configs {
 		registryConfig := &registryConfig{}
-		if config.TLSSecretName == "" && config.InsecureSkipVerify {
+		if config.InsecureSkipVerify || config.TLSSecretName != "" || len(config.CABundle) > 0 {
 			registryConfig.TLS = &tlsConfig{
-				InsecureSkipVerify: true,
+				InsecureSkipVerify: config.InsecureSkipVerify,
 			}
-		} else if config.TLSSecretName != "" {
+		}
+
+		if config.TLSSecretName != "" {
 			secret, err := secrets.Get(namespace, config.TLSSecretName)
 			if err != nil {
 				return nil, nil, err
 			}
 			if secret.Type != corev1.SecretTypeTLS {
 				return nil, nil, fmt.Errorf("secret [%s] must be of type [%s]", config.TLSSecretName, corev1.SecretTypeTLS)
-			}
-			registryConfig.TLS = &tlsConfig{
-				InsecureSkipVerify: config.InsecureSkipVerify,
 			}
 
 			if cert := secret.Data[corev1.TLSCertKey]; len(cert) != 0 {
