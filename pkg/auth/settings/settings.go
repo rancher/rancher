@@ -25,5 +25,6 @@ func (s *setting) Get() string {
 }
 
 func (s *setting) Set(val string) error {
-	panic("not implemented")
+	s.val = val
+	return nil
 }

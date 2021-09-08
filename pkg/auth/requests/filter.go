@@ -29,7 +29,7 @@ func (h authHeaderHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) 
 		return
 	}
 
-	//clean extra that is not part of userInfo
+	// clean extra that is not part of userInfo
 	for header := range req.Header {
 		if strings.HasPrefix(header, "Impersonate-Extra-") {
 			key := strings.TrimPrefix(header, "Impersonate-Extra-")
