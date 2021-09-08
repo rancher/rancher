@@ -151,14 +151,15 @@ func (m *Manager) startController(r *record, controllers, clusterOwner bool) err
 	r.Lock()
 	defer r.Unlock()
 	if !r.started {
+		r.started = true
 		go func() {
 			if err := m.doStart(r, clusterOwner); err != nil {
 				logrus.Errorf("failed to start cluster controllers %s: %v", r.cluster.ClusterName, err)
 				m.markUnavailable(r.clusterRec.Name)
 				m.Stop(r.clusterRec)
+				r.started = false
 			}
 		}()
-		r.started = true
 		r.owner = clusterOwner
 	}
 	return nil
@@ -193,6 +194,7 @@ func (m *Manager) doStart(rec *record, clusterOwner bool) (exit error) {
 		// To work around this, now we try to get a namespace from the API, even if not found, it means the API is up.
 		if _, err := rec.cluster.K8sClient.CoreV1().Namespaces().Get(rec.ctx, "kube-system", v1.GetOptions{}); err != nil && !apierrors.IsNotFound(err) {
 			if i == 2 {
+				logrus.Debugf("Fail to get kube-system namespace from downstream cluster, mark cluster %v as unavailable", rec.cluster.ClusterName)
 				m.markUnavailable(rec.cluster.ClusterName)
 			}
 			select {
