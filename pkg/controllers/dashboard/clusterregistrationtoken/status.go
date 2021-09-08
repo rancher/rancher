@@ -198,7 +198,7 @@ func ShareMntCommand(nodeName, token string, cluster *v3.Cluster) ([]string, err
 
 	ca := systemtemplate.CAChecksum()
 	if ca != "" {
-		cmd = append(cmd, fmt.Sprintf("--ca-checksum %s", ca))
+		cmd = append(cmd, "--ca-checksum", ca)
 	}
 
 	return cmd, nil
