@@ -824,10 +824,11 @@ def run_command(command):
         return None
 
 
-def get_system_client(user):
+def get_system_client(user, projects = None):
     # Gets client and cluster using USER_TOKEN, who is a CLUSTER_OWNER
-    client, cluster = get_user_client_and_cluster()
-    projects = client.list_project(name='System', clusterId=cluster.id)
+    if projects == None:
+        client, cluster = get_user_client_and_cluster()
+        projects = client.list_project(name='System', clusterId=cluster.id)
     if len(projects.data) == 0:
         raise AssertionError(
             "System project not found in the cluster " + cluster.Name)
@@ -961,8 +962,6 @@ def enable_monitoring_istio(client, c_client, p_client,cluster,project,additiona
     istio_versions = list(client.list_template(
         id=ISTIO_TEMPLATE_ID).data[0].versionLinks.keys())
     istio_version = istio_versions[len(istio_versions) - 1]
-
-
 
     if ISTIO_VERSION != "":
         istio_version = ISTIO_VERSION

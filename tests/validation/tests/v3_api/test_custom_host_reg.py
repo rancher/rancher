@@ -2,12 +2,13 @@ from .test_auth import enable_ad, load_setup_data, enable_openldap, \
     OPENLDAP_AUTH_USER_PASSWORD, enable_freeipa, FREEIPA_AUTH_USER_PASSWORD
 from .common import *  # NOQA
 import ast
+from .test_cluster_templates import get_k8s_versionlist
 
 AGENT_REG_CMD = os.environ.get('RANCHER_AGENT_REG_CMD', "")
 HOST_COUNT = int(os.environ.get('RANCHER_HOST_COUNT', 1))
 HOST_NAME = os.environ.get('RANCHER_HOST_NAME', "testsa")
 RANCHER_SERVER_VERSION = os.environ.get('RANCHER_SERVER_VERSION',
-                                        "master-head")
+                                        "v2.6-head")
 rke_config = {"authentication": {"type": "authnConfig", "strategy": "x509"},
               "ignoreDockerVersion": False,
               "network": {"type": "networkConfig", "plugin": "canal"},
@@ -43,8 +44,9 @@ def test_delete_keypair():
     AmazonWebServices().delete_keypairs(KEYPAIR_NAME_PREFIX)
 
 
-def test_deploy_rancher_server():
-    if "v2.5" in  RANCHER_SERVER_VERSION or "master" in RANCHER_SERVER_VERSION:
+def test_deploy_rancher_server(node_custom_roles = None,k8sv1=False):
+    print("Creating rncher server with the specified config - new \n")
+    if "v2.5" in  RANCHER_SERVER_VERSION or "v2.6" in RANCHER_SERVER_VERSION:
         RANCHER_SERVER_CMD = \
             'sudo docker run -d --privileged --name="rancher-server" ' \
             '--restart=unless-stopped -p 80:80 -p 443:443  ' \
@@ -67,10 +69,10 @@ def test_deploy_rancher_server():
     RANCHER_SET_DEBUG_CMD = \
         "sudo docker exec rancher-server loglevel --set debug"
     aws_nodes[0].execute_command(RANCHER_SET_DEBUG_CMD)
-
     token = set_url_password_token(RANCHER_SERVER_URL)
     admin_client = rancher.Client(url=RANCHER_SERVER_URL + "/v3",
                                   token=token, verify=False)
+
     if AUTH_PROVIDER:
         enable_url = \
             RANCHER_SERVER_URL + "/v3/" + AUTH_PROVIDER + \
@@ -115,34 +117,50 @@ def test_deploy_rancher_server():
     env_details += "env.ADMIN_TOKEN='" + token + "'\n"
     env_details += "env.USER_TOKEN='" + user_token + "'\n"
 
-    if AUTO_DEPLOY_CUSTOM_CLUSTER:
-        aws_nodes = \
-            AmazonWebServices().create_multiple_nodes(
-                5, random_test_name("testcustom"))
-        node_roles = [["controlplane"], ["etcd"],
-                      ["worker"], ["worker"], ["worker"]]
-        client = rancher.Client(url=RANCHER_SERVER_URL + "/v3",
-                                token=user_token, verify=False)
-        if K8S_VERSION != "":
-            rke_config["kubernetesVersion"] = K8S_VERSION
-        print("the rke config for creating the cluster:")
-        print(rke_config)
-        cluster = client.create_cluster(
-            name=random_name(),
-            driver="rancherKubernetesEngine",
-            rancherKubernetesEngineConfig=rke_config)
-        assert cluster.state == "provisioning"
-        i = 0
-        for aws_node in aws_nodes:
-            docker_run_cmd = \
-                get_custom_host_registration_cmd(
-                    client, cluster, node_roles[i], aws_node)
-            aws_node.execute_command(docker_run_cmd)
-            i += 1
-        validate_cluster_state(client, cluster)
-        env_details += "env.CLUSTER_NAME='" + cluster.name + "'\n"
-    create_config_file(env_details)
+    print("Created rancher server" +env_details)
 
+    if AUTO_DEPLOY_CUSTOM_CLUSTER:
+        if node_custom_roles == None:
+            node_roles = [["controlplane"], ["etcd"],
+                          ["worker"], ["worker"], ["worker"]]
+        else:
+            node_roles = node_custom_roles
+
+        cluster = create_custom_cluster(RANCHER_SERVER_URL,user_token,node_roles)
+
+        env_details += "env.CLUSTER_NAME='" + cluster.name + "'\n"
+        create_config_file(env_details)
+    print("Created config and cluster successfully" + cluster.name )
+
+    return env_details
+
+def create_custom_cluster(RANCHER_SERVER_URL, user_token, node_roles,k8s_version=K8S_VERSION):
+
+    aws_nodes = \
+        AmazonWebServices().create_multiple_nodes(
+            len(node_roles), random_test_name("testcustom"))
+
+
+    client = rancher.Client(url=RANCHER_SERVER_URL + "/v3",
+                            token=user_token, verify=False)
+    if k8s_version != "":
+        rke_config["kubernetesVersion"] = k8s_version
+    print("the rke config for creating the cluster:")
+    print(rke_config)
+    cluster = client.create_cluster(
+        name=random_name(),
+        driver="rancherKubernetesEngine",
+        rancherKubernetesEngineConfig=rke_config)
+    assert cluster.state == "provisioning"
+    i = 0
+    for aws_node in aws_nodes:
+        docker_run_cmd = \
+            get_custom_host_registration_cmd(
+                client, cluster, node_roles[i], aws_node)
+        aws_node.execute_command(docker_run_cmd)
+        i += 1
+    validate_cluster_state(client, cluster)
+    return cluster
 
 def test_delete_rancher_server():
     client = get_admin_client()
