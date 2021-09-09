@@ -40,6 +40,7 @@ type Capabilities struct {
 	ClientID         string `json:"clientId"`
 	ClientSecret     string `json:"clientSecret"`
 	ResourceLocation string `json:"region"`
+	ClusterID        string `json:"clusterId"`
 }
 
 // AKS handler lists available resources in Azure API
@@ -100,6 +101,13 @@ func (h *handler) ServeHTTP(writer http.ResponseWriter, req *http.Request) {
 	var err error
 
 	switch resourceType {
+	case "aksUpgrades":
+		if serialized, errCode, err = listKubernetesUpgradeVersions(req.Context(), h.clusterLister, capa); err != nil {
+			logrus.Errorf("[aks-handler] error getting kubernetes upgrade versions: %v", err)
+			handleErr(writer, errCode, err)
+			return
+		}
+		writer.Write(serialized)
 	case "aksVersions":
 		if serialized, errCode, err = listKubernetesVersions(req.Context(), capa); err != nil {
 			logrus.Errorf("[aks-handler] error getting kubernetes versions: %v", err)
@@ -239,10 +247,9 @@ func (h *handler) getCloudCredential(req *http.Request, cap *Capabilities, credI
 	if cap.AuthBaseURL == "" {
 		cap.AuthBaseURL = azure.PublicCloud.ActiveDirectoryEndpoint
 	}
-	region := req.URL.Query().Get("region")
-	if region != "" {
-		cap.ResourceLocation = region
-	}
+
+	cap.ResourceLocation = req.URL.Query().Get("region")
+	cap.ClusterID = req.URL.Query().Get("clusterId")
 
 	return http.StatusOK, nil
 }

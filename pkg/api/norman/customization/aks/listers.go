@@ -16,6 +16,8 @@ import (
 	"github.com/Azure/go-autorest/autorest/adal"
 	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/mcuadros/go-version"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	"github.com/sirupsen/logrus"
 )
 
 type virtualNetworksResponseBody struct {
@@ -118,6 +120,102 @@ func (s sortableVersion) Swap(a, b int) {
 
 func (s sortableVersion) Less(a, b int) bool {
 	return version.Compare(s[a], s[b], "<")
+}
+
+type KubernetesUpgradeVersion struct {
+	Version string `json:"version"`
+	Enabled bool   `json:"enabled"`
+}
+
+type KubernetesUpgradeVersions []*KubernetesUpgradeVersion
+
+func (s KubernetesUpgradeVersions) Len() int {
+	return len(s)
+}
+
+func (s KubernetesUpgradeVersions) Swap(a, b int) {
+	s[a], s[b] = s[b], s[a]
+}
+
+func (s KubernetesUpgradeVersions) Less(a, b int) bool {
+	return version.Compare(s[a].Version, s[b].Version, "<")
+}
+
+type UpgradeVersionsResponse struct {
+	CurrentVersion string                    `json:"currentVersion"`
+	Upgrades       KubernetesUpgradeVersions `json:"upgrades"`
+}
+
+// listKubernetesUpgradeVersions lists all kubernetes versions listed by AKS Container Service and marks which ones the
+//given cluster can be upgraded to.  A version's `Enabled` flag is true if the cluster can be upgraded to the version
+//in its current state.
+func listKubernetesUpgradeVersions(ctx context.Context, clusterLister v3.ClusterLister, cap *Capabilities) ([]byte, int, error) {
+	var resp UpgradeVersionsResponse
+
+	// load the target cluster, if the cluster is not found we cannot proceed
+	cluster, err := clusterLister.Get("", cap.ClusterID)
+	if err != nil {
+		return nil, http.StatusBadRequest, fmt.Errorf("invalid cluster id")
+	}
+
+	resp.CurrentVersion = *cluster.Spec.AKSConfig.KubernetesVersion
+
+	// get the client for aks container service
+	clientContainer, err := NewContainerServiceClient(cap)
+	if err != nil {
+		return nil, http.StatusInternalServerError, err
+	}
+
+	// request a list of orchestrators
+	orchestrators, err := clientContainer.ListOrchestrators(ctx, cap.ResourceLocation, "managedClusters")
+	if err != nil {
+		return nil, http.StatusBadRequest, fmt.Errorf("failed to get orchestrators: %v", err)
+	}
+
+	// ensure the orchestrators are returned
+	if orchestrators.Orchestrators == nil {
+		return nil, http.StatusBadRequest, fmt.Errorf("no version profiles returned: %v", err)
+	}
+
+	var upgradeVersions map[string]bool
+	for _, profile := range *orchestrators.Orchestrators {
+		// check for nil pointers to avoid a panic
+		if profile.OrchestratorType == nil || profile.OrchestratorVersion == nil {
+			logrus.Warning("unexpected nil orchestrator type or version")
+			continue
+		}
+
+		// exclude any non kubernetes types
+		if containerservice.OrchestratorTypes(*profile.OrchestratorType) != containerservice.Kubernetes {
+			continue
+		}
+
+		// exclude any versions older than the current version
+		if version.Compare(*profile.OrchestratorVersion, resp.CurrentVersion, "<") {
+			continue
+		}
+
+		// generate the upgrade map when the current version is found
+		if *profile.OrchestratorVersion == resp.CurrentVersion {
+			upgradeVersions = upgradeableVersionsMap(profile)
+			continue
+		}
+
+		// store this kubernetes version
+		resp.Upgrades = append(resp.Upgrades, &KubernetesUpgradeVersion{Version: *profile.OrchestratorVersion})
+	}
+
+	// enable any version listed in the upgrade versions
+	for _, kubernetesVersion := range resp.Upgrades {
+		if upgradeVersions[kubernetesVersion.Version] {
+			kubernetesVersion.Enabled = true
+		}
+	}
+
+	// sort versions
+	sort.Sort(resp.Upgrades)
+
+	return encodeOutput(resp)
 }
 
 func listKubernetesVersions(ctx context.Context, cap *Capabilities) ([]byte, int, error) {
@@ -325,4 +423,14 @@ func encodeOutput(result interface{}) ([]byte, int, error) {
 	}
 
 	return data, http.StatusOK, err
+}
+
+func upgradeableVersionsMap(upgradeProfile containerservice.OrchestratorVersionProfile) map[string]bool {
+	rval := make(map[string]bool, 0)
+
+	for _, profile := range *upgradeProfile.Upgrades {
+		rval[*profile.OrchestratorVersion] = true
+	}
+
+	return rval
 }
