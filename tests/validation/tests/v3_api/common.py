@@ -2084,15 +2084,29 @@ def readDataFile(data_dir, name):
         return f.read()
 
 
-def set_url_password_token(rancher_url, server_url=None):
+def set_url_password_token(rancher_url, server_url=None, version=""):
     """Returns a ManagementContext for the default global admin user."""
     auth_url = \
         rancher_url + "/v3-public/localproviders/local?action=login"
-    r = requests.post(auth_url, json={
-        'username': 'admin',
-        'password': 'admin',
-        'responseType': 'json',
-    }, verify=False)
+    rpassword = 'admin'
+    print(auth_url)
+    if version.find("master") > -1 or version.find("2.6") > -1:
+        rpassword = ADMIN_PASSWORD
+        print("on 2.6 or later")
+    retries = 5
+    for attempt in range(1,retries):
+        try:
+            r = requests.post(auth_url, json={
+            'username': 'admin',
+            'password': rpassword,
+            'responseType': 'json',
+            }, verify=False)
+        except requests.exceptions.RequestException:
+            print("password request failed. Retry attempt: ",
+                  "{} of {}".format(attempt, retries))
+            time.sleep(2)
+        else:
+            break
     print(r.json())
     token = r.json()['token']
     print(token)
