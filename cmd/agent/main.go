@@ -13,7 +13,9 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"os/signal"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/docker/docker/api/types"
@@ -42,7 +44,8 @@ const (
 )
 
 func main() {
-	if _, err := reconcileKubelet(context.Background()); err != nil {
+	ctx := context.Background()
+	if _, err := reconcileKubelet(ctx); err != nil {
 		logrus.Warnf("failed to reconcile kubelet, error: %v", err)
 	}
 
@@ -61,7 +64,7 @@ func main() {
 	} else if os.Getenv("BINDING_CLEANUP") == "true" {
 		err = clean.Bindings(nil)
 	} else {
-		err = run()
+		err = run(ctx)
 	}
 
 	if err != nil {
@@ -115,7 +118,7 @@ func cleanup(ctx context.Context) error {
 		return nil
 	}
 
-	c, err := client.NewEnvClient()
+	c, err := client.NewClientWithOpts(client.WithAPIVersionNegotiation(), client.FromEnv)
 	if err != nil {
 		return err
 	}
@@ -154,7 +157,7 @@ func cleanup(ctx context.Context) error {
 	return nil
 }
 
-func run() error {
+func run(ctx context.Context) error {
 	topContext := signals.SetupSignalHandler(context.Background())
 
 	logrus.Infof("Rancher agent version %s is starting", VERSION)
@@ -320,6 +323,10 @@ func run() error {
 		return nil
 	}
 
+	if writeCertsOnly {
+		exitCertWriter(ctx)
+	}
+
 	if isCluster() {
 		go func() {
 			log.Println(http.ListenAndServe("localhost:6060", nil))
@@ -332,7 +339,7 @@ func run() error {
 			wsURL += "/register"
 		}
 		logrus.Infof("Connecting to %s with token %s", wsURL, token)
-		remotedialer.ClientConnect(context.Background(), wsURL, http.Header(headers), nil, func(proto, address string) bool {
+		remotedialer.ClientConnect(ctx, wsURL, headers, nil, func(proto, address string) bool {
 			switch proto {
 			case "tcp":
 				return true
@@ -345,6 +352,50 @@ func run() error {
 		}, onConnect)
 		time.Sleep(5 * time.Second)
 	}
+}
+
+func exitCertWriter(ctx context.Context) {
+	// share-mnt process needs an always restart policy and to be killed so it can restart on startup
+	// this functionality is really only needed for OSes with ephemeral /etc like RancherOS
+	// everything here will just exit(0) with errors as we need to bail out completely.
+	sigs := make(chan os.Signal, 1)
+	signal.Notify(sigs, syscall.SIGTERM)
+	// trap SIGTERM here so that container can exit with 0
+	go func() {
+		<-sigs
+		os.Exit(0)
+	}()
+
+	logrus.Info("attempting to stop the share-mnt container so it can reboot on startup")
+	c, err := client.NewClientWithOpts(client.WithAPIVersionNegotiation(), client.FromEnv)
+	if err != nil {
+		logrus.Error(err)
+		os.Exit(0)
+	}
+
+	args := filters.NewArgs()
+	args.Add("label", "io.rancher.rke.container.name=share-mnt")
+	containers, err := c.ContainerList(ctx, types.ContainerListOptions{
+		All:     true,
+		Filters: args,
+	})
+	if err != nil {
+		logrus.Error(err)
+		os.Exit(0)
+	}
+
+	for _, container := range containers {
+		if len(container.Names) > 0 && strings.Contains(container.Names[0], "share-mnt") {
+			err := c.ContainerKill(ctx, container.ID, "SIGTERM")
+			if err != nil {
+				logrus.Error(err)
+				os.Exit(0) // only need to write certs so exit cleanly
+			}
+		}
+	}
+
+	// wait for itself to be kill with SIGTERM so it can return exit 0
+	select {}
 }
 
 func certinfo(cert *x509.Certificate) {
@@ -378,7 +429,7 @@ func reconcileKubelet(ctx context.Context) (bool, error) {
 		return true, nil
 	}
 
-	c, err := client.NewEnvClient()
+	c, err := client.NewClientWithOpts(client.WithAPIVersionNegotiation(), client.FromEnv)
 	if err != nil {
 		return false, err
 	}

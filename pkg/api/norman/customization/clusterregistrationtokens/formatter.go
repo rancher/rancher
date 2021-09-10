@@ -97,6 +97,24 @@ func getWindowsPrefixPathArg(rkeConfig *rketypes.RancherKubernetesEngineConfig) 
 	return ""
 }
 
+func ShareMntCommand(nodeName, token string) []string {
+	rootURL := getRootURL(nil)
+
+	cmd := []string{
+		"--no-register", "--only-write-certs",
+		"--node-name", nodeName,
+		"--server", rootURL,
+		"--token", token,
+	}
+
+	ca := systemtemplate.CAChecksum()
+	if ca != "" {
+		cmd = append(cmd, fmt.Sprintf("--ca-checksum %s", ca))
+	}
+
+	return cmd
+}
+
 func AgentEnvVars(cluster *v3.Cluster) string {
 	var agentEnvVars []string
 	if cluster != nil {

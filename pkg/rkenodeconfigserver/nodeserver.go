@@ -7,12 +7,9 @@ import (
 	"net/http"
 	"strings"
 
-	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-
-	rketypes "github.com/rancher/rke/types"
-
 	"github.com/pkg/errors"
 	"github.com/rancher/rancher/pkg/api/norman/customization/clusterregistrationtokens"
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	util "github.com/rancher/rancher/pkg/cluster"
 	kd "github.com/rancher/rancher/pkg/controllers/management/kontainerdrivermetadata"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
@@ -26,6 +23,7 @@ import (
 	"github.com/rancher/rancher/pkg/types/config"
 	rkepki "github.com/rancher/rke/pki"
 	rkeservices "github.com/rancher/rke/services"
+	rketypes "github.com/rancher/rke/types"
 	"github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
 )
@@ -269,17 +267,18 @@ OuterLoop:
 
 	if shared {
 		agentImage := settings.AgentImage.Get()
-		nodeCommand := clusterregistrationtokens.NodeCommand(token, cluster) + " --no-register --only-write-certs --node-name " + nodeName
-		args := []string{"--", "share-root.sh", strings.TrimPrefix(nodeCommand, "sudo ")}
+		nodeCommand := clusterregistrationtokens.ShareMntCommand(nodeName, token)
 		privateRegistryConfig, _ := util.GenerateClusterPrivateRegistryDockerConfig(cluster)
 		processes["share-mnt"] = rketypes.Process{
-			Name:                    "share-mnt",
-			Args:                    args,
-			Image:                   image.ResolveWithCluster(agentImage, cluster),
-			Binds:                   []string{"/var/run:/var/run"},
+			Name:  "share-mnt",
+			Args:  nodeCommand,
+			Image: image.ResolveWithCluster(agentImage, cluster),
+			Binds: []string{
+				"/var/run:/var/run",
+				"/etc/kubernetes:/etc/kubernetes",
+			},
 			NetworkMode:             "host",
 			RestartPolicy:           "always",
-			PidMode:                 "host",
 			Privileged:              true,
 			ImageRegistryAuthConfig: privateRegistryConfig,
 		}

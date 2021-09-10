@@ -66,9 +66,8 @@ func TestAppendKubeletArgs(t *testing.T) {
 func TestShareMntArgs(t *testing.T) {
 	augmentedProcesses := getAugmentedKubeletProcesses()
 	args := augmentedProcesses["share-mnt"].Args
-	// args should be "--", "share-root.sh", "node command in one string"
-	// By default, arg count is 3
-	assert.Equal(t, 3, len(args), "args count for share-mnt should be the same")
+	// args are agent call params, by default, arg count is 8 with ca it's 9
+	assert.Equal(t, 8, len(args), "default args count for share-mnt should 8")
 }
 
 func getKubeletProcess(commands []string) map[string]rketypes.Process {
