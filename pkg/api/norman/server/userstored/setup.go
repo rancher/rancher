@@ -144,6 +144,7 @@ func Secret(ctx context.Context, management *config.ScaledContext, schemas *type
 	schema := schemas.Schema(&schema.Version, "namespacedSecret")
 	schema.Store = secret.NewNamespacedSecretStore(ctx, management.ClientGetter)
 	schema.Validator = sec.Validator
+	schema.CollectionFormatter = sec.TruncateBytesInData
 
 	for _, subSchema := range schemas.Schemas() {
 		if subSchema.BaseType == schema.ID && subSchema.ID != schema.ID {

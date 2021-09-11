@@ -17,6 +17,8 @@ import (
 	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/api/extensions/v1beta1"
+
+	sec "github.com/rancher/rancher/pkg/api/norman/customization/secret"
 )
 
 var (
@@ -60,6 +62,7 @@ func configMapTypes(schemas *types.Schemas) *types.Schemas {
 			field.Required = true
 			return field
 		})
+		schema.CollectionFormatter = sec.TruncateBytesInData
 	}, projectOverride{})
 }
 

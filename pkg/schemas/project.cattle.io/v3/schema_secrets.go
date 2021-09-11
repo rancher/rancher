@@ -4,6 +4,7 @@ import (
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
 	m "github.com/rancher/norman/types/mapper"
+	sec "github.com/rancher/rancher/pkg/api/norman/customization/secret"
 	v3 "github.com/rancher/rancher/pkg/apis/project.cattle.io/v3"
 	v1 "k8s.io/api/core/v1"
 )
@@ -225,6 +226,7 @@ func secretTypes(schemas *types.Schemas) *types.Schemas {
 				field.Required = true
 				return field
 			})
+			schema.CollectionFormatter = sec.TruncateBytesInData
 		}, projectOverride{}, struct {
 			Description string `json:"description"`
 		}{}).
