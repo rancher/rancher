@@ -1,4 +1,4 @@
-FROM registry.suse.com/suse/sle15:15.3
+FROM registry.suse.com/suse/sle15:15.3.17.8.1
 
 RUN zypper -n install git-core curl ca-certificates unzip xz gzip sed tar shadow gawk vim && \
     zypper -n clean -a && rm -rf /tmp/* /var/tmp/* /usr/share/doc/packages/* && \
