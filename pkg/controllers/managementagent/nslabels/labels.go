@@ -71,7 +71,9 @@ func (nsh *namespaceHandler) addProjectIDLabelToNamespace(ns *corev1.Namespace, 
 		return fmt.Errorf("cannot add label to nil namespace")
 	}
 	if ns.Labels[ProjectIDFieldLabel] != projectID {
-		nsh.updateProjectIDLabelForSecrets(projectID, ns.Name, clusterID)
+		if err := nsh.updateProjectIDLabelForSecrets(projectID, ns.Name, clusterID); err != nil {
+			logrus.Trace(err)
+		}
 		logrus.Infof("namespaceHandler: addProjectIDLabelToNamespace: adding label %v=%v to namespace=%v", ProjectIDFieldLabel, projectID, ns.Name)
 		nscopy := ns.DeepCopy()
 		if nscopy.Labels == nil {

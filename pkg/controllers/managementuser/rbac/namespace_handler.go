@@ -93,7 +93,15 @@ func (n *nsLifecycle) syncNS(obj *v1.Namespace) (bool, error) {
 		if err != nil {
 			return false, errors.Wrapf(err, "failed to add namespace %s to system project", obj.Name)
 		}
-		obj.Annotations[projectIDAnnotation] = fmt.Sprintf("%v:%v", n.m.clusterName, systemProjectName)
+
+		// When there is no system project, we should not set this annotation as a result because the project name
+		// is empty. If the annotation already exists, and there is no system project, then we need to delete the
+		// annotation.
+		if systemProjectName != "" {
+			obj.Annotations[projectIDAnnotation] = fmt.Sprintf("%v:%v", n.m.clusterName, systemProjectName)
+		} else {
+			delete(obj.Annotations, projectIDAnnotation)
+		}
 	}
 	hasPRTBs, err := n.ensurePRTBAddToNamespace(obj)
 	if err != nil {
