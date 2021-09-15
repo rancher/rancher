@@ -5,19 +5,18 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
-	"time"
-
-	"github.com/rancher/rancher/pkg/namespace"
 
 	mVersion "github.com/mcuadros/go-version"
 	"github.com/rancher/norman/api/handler"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/pkg/catalog/utils"
+	"github.com/rancher/rancher/pkg/channelserver"
 	kd "github.com/rancher/rancher/pkg/controllers/management/kontainerdrivermetadata"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/image"
+	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/settings"
 	rketypes "github.com/rancher/rke/types"
 	img "github.com/rancher/rke/types/image"
@@ -81,20 +80,8 @@ func (a ActionHandler) refresh(apiContext *types.APIContext) error {
 		return httperror.WrapAPIError(err, httperror.ServerError, msg)
 	}
 
-	setting, err := a.MetadataHandler.SettingLister.Get("", rkeMetadataConfig)
-	if err != nil {
-		return err
-	}
-
-	if setting.Annotations == nil {
-		setting.Annotations = make(map[string]string)
-	}
-
-	setting.Annotations[forceRefreshAnnotation] = strconv.FormatInt(time.Now().Unix(), 10)
-	_, err = a.MetadataHandler.Settings.Update(setting)
-	if err != nil {
-		return err
-	}
+	// refresh to sync k3s/rke2 releases
+	channelserver.Refresh()
 	apiContext.WriteResponse(http.StatusOK, response)
 	return nil
 }
