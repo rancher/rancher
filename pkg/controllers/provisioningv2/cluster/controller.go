@@ -45,7 +45,7 @@ var (
 
 type handler struct {
 	mgmtClusterCache  mgmtcontrollers.ClusterCache
-	mgmtClusters      mgmtcontrollers.ClusterClient
+	mgmtClusters      mgmtcontrollers.ClusterController
 	clusterTokenCache mgmtcontrollers.ClusterRegistrationTokenCache
 	clusterTokens     mgmtcontrollers.ClusterRegistrationTokenClient
 	clusters          rocontrollers.ClusterController

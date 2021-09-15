@@ -3,6 +3,7 @@ package machineprovision
 import (
 	"context"
 	errors2 "errors"
+	"fmt"
 	"path"
 	"strings"
 	"time"
@@ -50,13 +51,11 @@ type handler struct {
 func Register(ctx context.Context, clients *wrangler.Context) {
 	h := &handler{
 		ctx: ctx,
-		apply: clients.Apply.
-			WithSetOwnerReference(true, true).
-			WithCacheTypes(clients.Core.Secret(),
-				clients.Core.ServiceAccount(),
-				clients.RBAC.RoleBinding(),
-				clients.RBAC.Role(),
-				clients.Batch.Job()),
+		apply: clients.Apply.WithCacheTypes(clients.Core.Secret(),
+			clients.Core.ServiceAccount(),
+			clients.RBAC.RoleBinding(),
+			clients.RBAC.Role(),
+			clients.Batch.Job()),
 		pods:                clients.Core.Pod().Cache(),
 		jobs:                clients.Batch.Job().Cache(),
 		secrets:             clients.Core.Secret().Cache(),
@@ -117,7 +116,7 @@ func (h *handler) OnJobChange(key string, job *batchv1.Job) (*batchv1.Job, error
 		return job, err
 	}
 
-	newStatus, err := h.getMachineStatus(job)
+	newStatus, err := h.getMachineStatus(job, job.Spec.BackoffLimit == nil || *job.Spec.BackoffLimit == 0)
 	if err != nil {
 		return job, err
 	}
@@ -136,7 +135,7 @@ func (h *handler) OnJobChange(key string, job *batchv1.Job) (*batchv1.Job, error
 	return job, nil
 }
 
-func (h *handler) getMachineStatus(job *batchv1.Job) (rkev1.RKEMachineStatus, error) {
+func (h *handler) getMachineStatus(job *batchv1.Job, create bool) (rkev1.RKEMachineStatus, error) {
 	if job.Status.CompletionTime != nil {
 		return rkev1.RKEMachineStatus{
 			JobComplete: true,
@@ -165,14 +164,14 @@ func (h *handler) getMachineStatus(job *batchv1.Job) (rkev1.RKEMachineStatus, er
 		}
 
 		if lastPod != nil {
-			return getMachineStatusFromPod(lastPod), nil
+			return getMachineStatusFromPod(lastPod, create), nil
 		}
 	}
 
 	return rkev1.RKEMachineStatus{}, nil
 }
 
-func getMachineStatusFromPod(pod *corev1.Pod) rkev1.RKEMachineStatus {
+func getMachineStatusFromPod(pod *corev1.Pod, create bool) rkev1.RKEMachineStatus {
 	if pod.Status.Phase == corev1.PodSucceeded {
 		return rkev1.RKEMachineStatus{
 			JobComplete: true,
@@ -181,8 +180,14 @@ func getMachineStatusFromPod(pod *corev1.Pod) rkev1.RKEMachineStatus {
 
 	for _, containerStatus := range pod.Status.ContainerStatuses {
 		if containerStatus.State.Terminated != nil && containerStatus.State.Terminated.ExitCode != 0 {
+			var reason string
+			if create {
+				reason = string(errors.CreateMachineError)
+			} else {
+				reason = string(errors.DeleteMachineError)
+			}
 			return rkev1.RKEMachineStatus{
-				FailureReason:  string(errors.CreateMachineError),
+				FailureReason:  reason,
 				FailureMessage: strings.TrimSpace(pod.Status.ContainerStatuses[0].State.Terminated.Message),
 			}
 		}
@@ -210,22 +215,35 @@ func (h *handler) OnRemove(_ string, obj runtime.Object) (runtime.Object, error)
 		return obj, err
 	}
 
-	obj, err := h.run(obj, false)
+	d, err := data.Convert(obj.DeepCopyObject())
 	if err != nil {
 		return nil, err
 	}
 
-	meta, err := meta.Accessor(obj)
+	infraName := d.String("metadata", "name")
+	if !d.Bool("status", "jobComplete") && d.String("status", "failureReason") == "" {
+		return obj, fmt.Errorf("cannot delete machine %s because create job has not finished", infraName)
+	}
+
+	obj, err = h.run(obj, false)
 	if err != nil {
 		return nil, err
 	}
 
-	job, err := h.jobs.Get(meta.GetNamespace(), getJobName(meta.GetName()))
+	job, err := h.jobs.Get(d.String("metadata", "namespace"), getJobName(infraName))
 	if err != nil {
 		return nil, err
 	}
 
-	if condition.Cond("Failed").IsTrue(job) || job.Status.CompletionTime != nil {
+	if job.Status.CompletionTime != nil {
+		// Calling WithOwner(obj).ApplyObjects with no objects here will look for all objects with types passed to
+		// WithCacheTypes above that have an owner label (not owner reference) to the given obj. It will compare the existing
+		// objects it finds to the ones that are passed to ApplyObjects (which there are none in this case). The apply
+		// controller will delete all existing objects it finds that are not passed to ApplyObjects. Since no objects are
+		// passed here, it will delete all objects it finds.
+		if err := h.apply.WithOwner(obj).ApplyObjects(); err != nil {
+			return nil, err
+		}
 		return obj, nil
 	}
 
@@ -270,7 +288,7 @@ func (h *handler) run(obj runtime.Object, create bool) (runtime.Object, error) {
 		return obj, err
 	}
 
-	dArgs, err := h.getArgsEnvAndStatus(typeMeta, meta, d, args, driver, create)
+	dArgs, err := h.getArgsEnvAndStatus(meta, d, args, driver, create)
 	if err != nil {
 		return obj, err
 	}
@@ -285,7 +303,13 @@ func (h *handler) run(obj runtime.Object, create bool) (runtime.Object, error) {
 		return nil, err
 	}
 
-	if err := h.apply.WithOwner(obj).ApplyObjects(objs...); err != nil {
+	applier := h.apply.WithOwner(obj)
+	if !create {
+		// If the infrastructure is being deleted, ignore previously applied objects.
+		// If creation failed, this will allow deletion to process.
+		applier = applier.WithIgnorePreviousApplied()
+	}
+	if err := applier.ApplyObjects(objs...); err != nil {
 		return nil, err
 	}
 
@@ -300,6 +324,16 @@ func (h *handler) patchStatus(obj runtime.Object, d data.Object, state rkev1.RKE
 	statusData, err := convert.EncodeToMap(state)
 	if err != nil {
 		return nil, err
+	}
+
+	if state.JobComplete {
+		// Reset failureMessage and failureReason if they are not provided.
+		if _, ok := statusData["failureMessage"]; !ok {
+			statusData["failureMessage"] = ""
+		}
+		if _, ok := statusData["failureReason"]; !ok {
+			statusData["failureReason"] = ""
+		}
 	}
 
 	changed := false

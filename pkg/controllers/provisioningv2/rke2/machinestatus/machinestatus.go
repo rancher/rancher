@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	capi "sigs.k8s.io/cluster-api/api/v1alpha4"
+	capierror "sigs.k8s.io/cluster-api/errors"
 )
 
 const (
@@ -166,8 +167,8 @@ func (h *handler) OnChange(key string, machine *capi.Machine) (*capi.Machine, er
 	}
 
 	status, reason, message, providerID, err := h.getInfraMachineState(machine)
-	if machine.DeletionTimestamp != nil && apierror.IsNotFound(err) {
-		// If the machine is being deleted and the infrastructure machine object is not found,
+	if machine.DeletionTimestamp != nil && (apierror.IsNotFound(err) || reason == capi.DeletionFailedReason) {
+		// If the machine is being deleted and the infrastructure machine object is not found or failed to delete,
 		// then update the status of the machine object so the CAPI controller picks it up.
 		return h.setMachineCondition(machine, InfrastructureReady, status, reason, message)
 	} else if err != nil {
@@ -176,7 +177,7 @@ func (h *handler) OnChange(key string, machine *capi.Machine) (*capi.Machine, er
 
 	rkeBootstrap, err := h.bootstrapCache.Get(machine.Namespace, machine.Spec.Bootstrap.ConfigRef.Name)
 	if err != nil {
-		if machine.DeletionTimestamp != nil {
+		if machine.DeletionTimestamp != nil && apierror.IsNotFound(err) {
 			// If the machine is being deleted and the bootstrap object is not found,
 			// then update the status of the machine object so the CAPI controller picks it up.
 			return h.setMachineCondition(machine, BootstrapReady, corev1.ConditionFalse, capi.DeletedReason, "bootstrap is deleted")
@@ -238,7 +239,7 @@ func (h *handler) setMachineCondition(machine *capi.Machine, cond condition.Cond
 	if corev1.ConditionStatus(cond.GetStatus(machine)) != status ||
 		cond.GetReason(machine) != reason ||
 		cond.GetMessage(machine) != message {
-		machine := machine.DeepCopy()
+		machine = machine.DeepCopy()
 		newCond := capi.Condition{
 			Type:               capi.ConditionType(cond),
 			Status:             status,
@@ -265,10 +266,7 @@ func (h *handler) setMachineCondition(machine *capi.Machine, cond condition.Cond
 			machine.Status.Conditions = append(machine.Status.Conditions, newCond)
 		}
 
-		_, err := h.machines.UpdateStatus(machine)
-		if err != nil {
-			return machine, err
-		}
+		return h.machines.UpdateStatus(machine)
 	}
 
 	return machine, nil
@@ -307,6 +305,15 @@ func (h *handler) getInfraMachineState(capiMachine *capi.Machine) (status corev1
 			return corev1.ConditionUnknown, "Creating",
 				fmt.Sprintf("creating server (%s) in infrastructure provider", capiMachine.Spec.InfrastructureRef.Kind), "", nil
 		}
+	}
+
+	if capiMachine.DeletionTimestamp != nil && obj.String("status", "failureReason") == string(capierror.DeleteMachineError) {
+		capiMachine.Status.FailureReason = &[]capierror.MachineStatusError{capierror.DeleteMachineError}[0]
+		return corev1.ConditionFalse, capi.DeletionFailedReason,
+			fmt.Sprintf("failed deleting server (%s) in infrastructure provider: %s: %s",
+				capiMachine.Spec.InfrastructureRef.Kind,
+				obj.String("status", "failureReason"),
+				obj.String("status", "failureMessage")), obj.String("spec", "providerID"), nil
 	}
 
 	return "", "", "", obj.String("spec", "providerID"), nil
