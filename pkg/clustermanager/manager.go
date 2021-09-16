@@ -117,6 +117,9 @@ func (m *Manager) markUnavailable(clusterName string) {
 }
 
 func (m *Manager) start(ctx context.Context, cluster *v3.Cluster, controllers, clusterOwner bool) (*record, error) {
+	if cluster.DeletionTimestamp != nil {
+		return nil, nil
+	}
 	obj, ok := m.controllers.Load(cluster.UID)
 	if ok {
 		if !m.changed(obj.(*record), cluster, controllers, clusterOwner) {
@@ -251,12 +254,6 @@ func (m *Manager) doStart(rec *record, clusterOwner bool) (exit error) {
 
 func ToRESTConfig(cluster *v3.Cluster, context *config.ScaledContext) (*rest.Config, error) {
 	if cluster == nil {
-		return nil, nil
-	}
-
-	// rke1 custom clusters need cleanup and the cluster delete is being paused by cluster-scoped-gc
-	// allow a rest config since the nodes still exist and we need to start jobs on them for cleanup
-	if cluster.DeletionTimestamp != nil && cluster.Status.Driver != v32.ClusterDriverRKE {
 		return nil, nil
 	}
 
@@ -450,6 +447,8 @@ func (m *Manager) APIExtClient(apiContext *types.APIContext, storageContext type
 	return m.ScaledContext.APIExtClient, nil
 }
 
+// UserContext accepts a cluster name and returns a client for that cluster,
+// starting all controllers for that cluster in the process.
 func (m *Manager) UserContext(clusterName string) (*config.UserContext, error) {
 	cluster, err := m.clusterLister.Get("", clusterName)
 	if err != nil {
@@ -466,6 +465,20 @@ func (m *Manager) UserContext(clusterName string) (*config.UserContext, error) {
 	}
 
 	return record.cluster, nil
+}
+
+// UserContextFromCluster accepts a pointer to a Cluster and returns a client
+// for that cluster. It does not start any controllers.
+func (m *Manager) UserContextFromCluster(cluster *v3.Cluster) (*config.UserContext, error) {
+	kubeConfig, err := ToRESTConfig(cluster, m.ScaledContext)
+	if err != nil {
+		return nil, err
+	}
+	if kubeConfig == nil {
+		logrus.Debugf("could not get kubeconfig for cluster %s", cluster.Name)
+		return nil, nil
+	}
+	return config.NewUserContext(m.ScaledContext, *kubeConfig, cluster.Name)
 }
 
 func (m *Manager) record(apiContext *types.APIContext, storageContext types.StorageContext) (*record, error) {

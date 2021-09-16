@@ -36,11 +36,15 @@ func (m *Lifecycle) deleteV1Node(node *v3.Node) (runtime.Object, error) {
 		return node, nil
 	}
 
-	userClient, err := m.clusterManager.UserContext(node.Namespace)
+	cluster, err := m.clusterLister.Get("", node.Namespace)
 	if err != nil {
 		if kerror.IsNotFound(err) {
 			return node, nil
 		}
+		return node, err
+	}
+	userClient, err := m.clusterManager.UserContextFromCluster(cluster)
+	if err != nil {
 		return node, err
 	}
 
@@ -136,11 +140,8 @@ func (m *Lifecycle) cleanRKENode(node *v3.Node) error {
 		return nil // not an rke node, bail out
 	}
 
-	userContext, err := m.clusterManager.UserContext(node.Namespace)
+	userContext, err := m.clusterManager.UserContextFromCluster(cluster)
 	if err != nil {
-		if kerror.IsNotFound(err) {
-			return nil
-		}
 		return err
 	}
 
