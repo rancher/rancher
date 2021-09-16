@@ -95,7 +95,7 @@ func addMachineDrivers(management *config.ManagementContext) error {
 	if err := addMachineDriver(GoogleDriver, "local://", "", "", nil, false, true, true, management); err != nil {
 		return err
 	}
-	if err := addMachineDriver(HarvesterDriver, "https://releases.rancher.com/harvester-node-driver/v0.3.0/docker-machine-driver-harvester-amd64.tar.gz", "", "08321a666cd664039e318bd1b3c7085f8bda3ef9b3c1e046796dfe1c45c91cf9", []string{"releases.rancher.com"}, false, false, false, management); err != nil {
+	if err := addMachineDriver(HarvesterDriver, "https://releases.rancher.com/harvester-node-driver/v0.3.1/docker-machine-driver-harvester-amd64.tar.gz", "", "08a0df7f0c703bcc4d9fa79df5b615cf4b96516c1095334423cc1f75f7769533", []string{"releases.rancher.com"}, false, false, false, management); err != nil {
 		return err
 	}
 	linodeBuiltin := true
