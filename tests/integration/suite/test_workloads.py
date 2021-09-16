@@ -419,8 +419,11 @@ def test_perform_workload_action_read_only(admin_mc, admin_pc, remove_resource,
 
     # Member users will be able to perform the rollback.
     workload = client.reload(workload)
-    user_member_pc.action(obj=workload, action_name="rollback",
-                          replicaSetId=original_rev_id)
+    wait_for_workload(client, workload.id, ns.id)
+    wait_for(user_member_pc.action(
+            obj=workload,
+            action_name="rollback",
+            replicaSetId=original_rev_id))
 
 
 def wait_for_service_create(client, name, timeout=30):
