@@ -25,6 +25,7 @@ const (
 	ClusterStatusFieldGKEStatus                            = "gkeStatus"
 	ClusterStatusFieldIstioEnabled                         = "istioEnabled"
 	ClusterStatusFieldLimits                               = "limits"
+	ClusterStatusFieldLinuxWorkerCount                     = "linuxWorkerCount"
 	ClusterStatusFieldMonitoringStatus                     = "monitoringStatus"
 	ClusterStatusFieldNodeCount                            = "nodeCount"
 	ClusterStatusFieldNodeVersion                          = "nodeVersion"
@@ -32,6 +33,7 @@ const (
 	ClusterStatusFieldRequested                            = "requested"
 	ClusterStatusFieldScheduledClusterScanStatus           = "scheduledClusterScanStatus"
 	ClusterStatusFieldVersion                              = "version"
+	ClusterStatusFieldWindowsWorkerCount                   = "windowsWorkerCount"
 )
 
 type ClusterStatus struct {
@@ -58,6 +60,7 @@ type ClusterStatus struct {
 	GKEStatus                            *GKEStatus                  `json:"gkeStatus,omitempty" yaml:"gkeStatus,omitempty"`
 	IstioEnabled                         bool                        `json:"istioEnabled,omitempty" yaml:"istioEnabled,omitempty"`
 	Limits                               map[string]string           `json:"limits,omitempty" yaml:"limits,omitempty"`
+	LinuxWorkerCount                     int64                       `json:"linuxWorkerCount,omitempty" yaml:"linuxWorkerCount,omitempty"`
 	MonitoringStatus                     *MonitoringStatus           `json:"monitoringStatus,omitempty" yaml:"monitoringStatus,omitempty"`
 	NodeCount                            int64                       `json:"nodeCount,omitempty" yaml:"nodeCount,omitempty"`
 	NodeVersion                          int64                       `json:"nodeVersion,omitempty" yaml:"nodeVersion,omitempty"`
@@ -65,4 +68,5 @@ type ClusterStatus struct {
 	Requested                            map[string]string           `json:"requested,omitempty" yaml:"requested,omitempty"`
 	ScheduledClusterScanStatus           *ScheduledClusterScanStatus `json:"scheduledClusterScanStatus,omitempty" yaml:"scheduledClusterScanStatus,omitempty"`
 	Version                              *Info                       `json:"version,omitempty" yaml:"version,omitempty"`
+	WindowsWorkerCount                   int64                       `json:"windowsWorkerCount,omitempty" yaml:"windowsWorkerCount,omitempty"`
 }
