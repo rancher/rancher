@@ -3,6 +3,7 @@ package impersonation
 import (
 	"fmt"
 	"reflect"
+	"sort"
 	"time"
 
 	"github.com/rancher/rancher/pkg/types/config"
@@ -14,6 +15,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/authentication/user"
+	"k8s.io/client-go/util/retry"
 )
 
 const (
@@ -27,8 +29,16 @@ type Impersonator struct {
 	clusterContext *config.UserContext
 }
 
-func New(user user.Info, clusterContext *config.UserContext) Impersonator {
-	return Impersonator{user: user, clusterContext: clusterContext}
+func New(userInfo user.Info, group string, clusterContext *config.UserContext) (Impersonator, error) {
+	user, err := getUser(clusterContext, userInfo, group)
+	if err != nil {
+		return Impersonator{}, err
+	}
+
+	return Impersonator{
+		user:           user,
+		clusterContext: clusterContext,
+	}, nil
 }
 
 func (i *Impersonator) SetUpImpersonation() (*corev1.ServiceAccount, error) {
@@ -167,17 +177,27 @@ func (i *Impersonator) createNamespace() error {
 
 func (i *Impersonator) checkAndUpdateRole(rules []rbacv1.PolicyRule) (*rbacv1.ClusterRole, error) {
 	name := ImpersonationPrefix + i.user.GetUID()
-	role, err := i.clusterContext.RBAC.ClusterRoles("").Controller().Lister().Get("", name)
-	if apierrors.IsNotFound(err) {
-		return nil, nil
-	}
+	var role *rbacv1.ClusterRole
+	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		var err error
+		role, err = i.clusterContext.RBAC.ClusterRoles("").Controller().Lister().Get("", name)
+		if apierrors.IsNotFound(err) {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		if !reflect.DeepEqual(role.Rules, rules) {
+			role.Rules = rules
+			role, err = i.clusterContext.RBAC.ClusterRoles("").Update(role)
+			return err
+		}
+		return nil
+	})
 	if err != nil {
 		return nil, err
 	}
-	if !reflect.DeepEqual(role.Rules, rules) {
-		role.Rules = rules
-		return i.clusterContext.RBAC.ClusterRoles("").Update(role)
-	}
+
 	return role, nil
 }
 
@@ -322,4 +342,57 @@ func (i *Impersonator) waitForServiceAccount(sa *corev1.ServiceAccount) (*corev1
 		return nil, fmt.Errorf("failed to get secret for service account: %s/%s, error: %w", sa.Namespace, sa.Name, err)
 	}
 	return ret, nil
+}
+
+func getUser(clusterContext *config.UserContext, userInfo user.Info, groupName string) (user.Info, error) {
+	u, err := clusterContext.Management.Management.Users("").Controller().Lister().Get("", userInfo.GetUID())
+	if err != nil {
+		return &user.DefaultInfo{}, err
+	}
+
+	groups := []string{"system:authenticated", "system:cattle:authenticated"}
+	if groupName != "" {
+		groups = append(groups, groupName)
+	}
+	attribs, err := clusterContext.Management.Management.UserAttributes("").Controller().Lister().Get("", userInfo.GetUID())
+	if err != nil && !apierrors.IsNotFound(err) {
+		return &user.DefaultInfo{}, err
+	}
+	if attribs != nil {
+		for _, gps := range attribs.GroupPrincipals {
+			for _, groupPrincipal := range gps.Items {
+				if !isInList(groupPrincipal.Name, groups) {
+					groups = append(groups, groupPrincipal.Name)
+				}
+			}
+		}
+	}
+	// sort to make comparable
+	sort.Strings(groups)
+
+	extras := userInfo.GetExtra()
+	// sort to make comparable
+	if _, ok := extras["username"]; ok {
+		sort.Strings(extras["username"])
+	}
+	if _, ok := extras["principalid"]; ok {
+		sort.Strings(extras["principalid"])
+	}
+
+	user := &user.DefaultInfo{
+		UID:    u.GetName(),
+		Name:   u.Username,
+		Groups: groups,
+		Extra:  extras,
+	}
+	return user, nil
+}
+
+func isInList(item string, list []string) bool {
+	for _, s := range list {
+		if item == s {
+			return true
+		}
+	}
+	return false
 }
