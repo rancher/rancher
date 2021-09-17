@@ -6,6 +6,7 @@ import (
 	"sort"
 	"time"
 
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
@@ -25,20 +26,25 @@ const (
 )
 
 type Impersonator struct {
-	user           user.Info
-	clusterContext *config.UserContext
+	user                user.Info
+	clusterContext      *config.UserContext
+	userLister          v3.UserLister
+	userAttributeLister v3.UserAttributeLister
 }
 
 func New(userInfo user.Info, group string, clusterContext *config.UserContext) (Impersonator, error) {
-	user, err := getUser(clusterContext, userInfo, group)
+	impersonator := Impersonator{
+		clusterContext:      clusterContext,
+		userLister:          clusterContext.Management.Management.Users("").Controller().Lister(),
+		userAttributeLister: clusterContext.Management.Management.UserAttributes("").Controller().Lister(),
+	}
+	user, err := impersonator.getUser(userInfo, group)
+	impersonator.user = user
 	if err != nil {
 		return Impersonator{}, err
 	}
 
-	return Impersonator{
-		user:           user,
-		clusterContext: clusterContext,
-	}, nil
+	return impersonator, nil
 }
 
 func (i *Impersonator) SetUpImpersonation() (*corev1.ServiceAccount, error) {
@@ -344,8 +350,8 @@ func (i *Impersonator) waitForServiceAccount(sa *corev1.ServiceAccount) (*corev1
 	return ret, nil
 }
 
-func getUser(clusterContext *config.UserContext, userInfo user.Info, groupName string) (user.Info, error) {
-	u, err := clusterContext.Management.Management.Users("").Controller().Lister().Get("", userInfo.GetUID())
+func (i *Impersonator) getUser(userInfo user.Info, groupName string) (user.Info, error) {
+	u, err := i.userLister.Get("", userInfo.GetUID())
 	if err != nil {
 		return &user.DefaultInfo{}, err
 	}
@@ -354,7 +360,7 @@ func getUser(clusterContext *config.UserContext, userInfo user.Info, groupName s
 	if groupName != "" {
 		groups = append(groups, groupName)
 	}
-	attribs, err := clusterContext.Management.Management.UserAttributes("").Controller().Lister().Get("", userInfo.GetUID())
+	attribs, err := i.userAttributeLister.Get("", userInfo.GetUID())
 	if err != nil && !apierrors.IsNotFound(err) {
 		return &user.DefaultInfo{}, err
 	}
