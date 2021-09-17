@@ -47,6 +47,10 @@ func (m *Lifecycle) deleteV1Node(node *v3.Node) (runtime.Object, error) {
 	if err != nil {
 		return node, err
 	}
+	if userClient == nil {
+		logrus.Debugf("cluster is already deleted, cannot delete RKE node")
+		return node, nil
+	}
 
 	ctx, cancel := context.WithTimeout(context.TODO(), 45*time.Second)
 	defer cancel()
@@ -143,6 +147,10 @@ func (m *Lifecycle) cleanRKENode(node *v3.Node) error {
 	userContext, err := m.clusterManager.UserContextFromCluster(cluster)
 	if err != nil {
 		return err
+	}
+	if userContext == nil {
+		logrus.Debugf("cluster is already deleted, cannot clean RKE node")
+		return nil
 	}
 
 	job, err := m.createCleanupJob(userContext, node)
