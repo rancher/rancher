@@ -62,8 +62,7 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 	rb.addRole("Manage Cluster Drivers", "kontainerdrivers-manage").
 		addRule().apiGroups("management.cattle.io").resources("kontainerdrivers").verbs("*")
 	rb.addRole("Manage Catalogs", "catalogs-manage").
-		addRule().apiGroups("management.cattle.io").resources("catalogs", "templates", "templateversions").verbs("*").
-		addRule().apiGroups("catalog.cattle.io").resources("clusterrepos").verbs("*")
+		addRule().apiGroups("management.cattle.io").resources("catalogs", "templates", "templateversions").verbs("*")
 	rb.addRole("Use Catalog Templates", "catalogs-use").
 		addRule().apiGroups("management.cattle.io").resources("templates", "templateversions").verbs("get", "list", "watch")
 	rb.addRole("Manage Users", "users-manage").
@@ -221,8 +220,7 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 		addRule().apiGroups("management.cattle.io").resources("clusterroletemplatebindings").verbs("get", "list", "watch")
 
 	rb.addRoleTemplate("Manage Cluster Catalogs", "clustercatalogs-manage", "cluster", false, false, true).
-		addRule().apiGroups("management.cattle.io").resources("clustercatalogs").verbs("*").
-		addRule().apiGroups("catalog.cattle.io").resources("clusterrepos").verbs("*")
+		addRule().apiGroups("management.cattle.io").resources("clustercatalogs").verbs("*")
 
 	rb.addRoleTemplate("View Cluster Catalogs", "clustercatalogs-view", "cluster", false, false, false).
 		addRule().apiGroups("management.cattle.io").resources("clustercatalogs").verbs("get", "list", "watch")
