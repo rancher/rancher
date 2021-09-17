@@ -102,6 +102,10 @@ func (n *NamespaceController) sync(key string, obj *corev1.Namespace) (runtime.O
 	if obj.Annotations[projectIDLabel] != "" {
 		parts := strings.Split(obj.Annotations[projectIDLabel], ":")
 		if len(parts) == 2 {
+			if parts[1] == "" {
+				logrus.Debugf("[NamspaceController|sync] empty project name found in obj.Annotations[projectIDLabel] for cluster: %s", parts[0])
+				return nil, nil
+			}
 			// on the management side, secret's namespace name equals to project name
 			secrets, err := n.managementSecrets.List(parts[1], labels.NewSelector())
 			if err != nil {
