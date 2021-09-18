@@ -2,10 +2,12 @@ package fleetcluster
 
 import (
 	"context"
+	"time"
 
 	fleet "github.com/rancher/fleet/pkg/apis/fleet.cattle.io/v1alpha1"
 	mgmt "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	v1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
+	fleetcontrollers "github.com/rancher/rancher/pkg/generated/controllers/fleet.cattle.io/v1alpha1"
 	mgmtcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	rocontrollers "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/settings"
@@ -21,6 +23,7 @@ import (
 type handler struct {
 	clusters      mgmtcontrollers.ClusterClient
 	clustersCache mgmtcontrollers.ClusterCache
+	fleetClusters fleetcontrollers.ClusterController
 	apply         apply.Apply
 }
 
@@ -28,6 +31,7 @@ func Register(ctx context.Context, clients *wrangler.Context) {
 	h := &handler{
 		clusters:      clients.Mgmt.Cluster(),
 		clustersCache: clients.Mgmt.Cluster().Cache(),
+		fleetClusters: clients.Fleet.Cluster(),
 		apply:         clients.Apply.WithCacheTypes(clients.Provisioning.Cluster()),
 	}
 
@@ -43,6 +47,7 @@ func Register(ctx context.Context, clients *wrangler.Context) {
 	)
 
 	clients.Mgmt.Cluster().OnChange(ctx, "fleet-cluster-assign", h.assignWorkspace)
+	clients.Fleet.Cluster().OnChange(ctx, "fleet-local-agent-migration", h.ensureAgentMigrated)
 }
 
 func (h *handler) assignWorkspace(key string, cluster *mgmt.Cluster) (*mgmt.Cluster, error) {
@@ -72,6 +77,16 @@ func (h *handler) assignWorkspace(key string, cluster *mgmt.Cluster) (*mgmt.Clus
 	return cluster, nil
 }
 
+func (h *handler) ensureAgentMigrated(key string, cluster *fleet.Cluster) (*fleet.Cluster, error) {
+	if cluster != nil && cluster.Name == "local" && cluster.Namespace == "fleet-local" &&
+		cluster.Spec.AgentNamespace == "" {
+		// keep re-enqueueing until agentNamespace is set. This happens before the fleet
+		// CRD is upgraded to include the new agentNamespace field
+		h.fleetClusters.EnqueueAfter(cluster.Namespace, cluster.Name, 5*time.Second)
+	}
+	return cluster, nil
+}
+
 func (h *handler) createCluster(cluster *v1.Cluster, status v1.ClusterStatus) ([]runtime.Object, v1.ClusterStatus, error) {
 	if status.ClusterName == "" || status.ClientSecretName == "" {
 		return nil, status, nil
@@ -92,6 +107,11 @@ func (h *handler) createCluster(cluster *v1.Cluster, status v1.ClusterStatus) ([
 		labels["management.cattle.io/cluster-display-name"] = mgmtCluster.Spec.DisplayName
 	}
 
+	agentNamespace := ""
+	if mgmtCluster.Spec.Internal {
+		agentNamespace = "cattle-fleet-local-system"
+	}
+
 	return []runtime.Object{&fleet.Cluster{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      cluster.Name,
@@ -101,6 +121,7 @@ func (h *handler) createCluster(cluster *v1.Cluster, status v1.ClusterStatus) ([
 		Spec: fleet.ClusterSpec{
 			KubeConfigSecret: status.ClientSecretName,
 			AgentEnvVars:     mgmtCluster.Spec.AgentEnvVars,
+			AgentNamespace:   agentNamespace,
 		},
 	}}, status, nil
 }
