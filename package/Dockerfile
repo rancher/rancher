@@ -43,7 +43,7 @@ ENV CATTLE_SYSTEM_AGENT_VERSION v0.1.0
 ENV CATTLE_SYSTEM_AGENT_UPGRADE_IMAGE rancher/system-agent:${CATTLE_SYSTEM_AGENT_VERSION}-suc
 
 # System charts minimal version
-ENV CATTLE_FLEET_MIN_VERSION=100.0.0+up0.3.6
+ENV CATTLE_FLEET_MIN_VERSION=100.0.1+up0.3.7
 ENV CATTLE_RANCHER_WEBHOOK_MIN_VERSION=1.0.1+up0.2.1
 
 RUN mkdir -p /var/lib/rancher-data/local-catalogs/system-library && \

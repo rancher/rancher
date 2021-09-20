@@ -86,6 +86,10 @@ func (h *handler) onSetting(key string, setting *v3.Setting) (*v3.Setting, error
 		"apiServerURL": settings.ServerURL.Get(),
 		"apiServerCA":  settings.CACerts.Get(),
 		"global":       systemGlobalRegistry,
+		"bootstrap": map[string]interface{}{
+			// Don't install fleet-local/local cluster
+			"namespace": "-",
+		},
 	}
 
 	fleetChartValues["gitops"] = map[string]interface{}{
