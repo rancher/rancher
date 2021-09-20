@@ -248,7 +248,7 @@ type AzureADConfig struct {
 	AuthEndpoint      string `json:"authEndpoint,omitempty" norman:"required,notnullable"`
 	TenantID          string `json:"tenantId,omitempty" norman:"required,notnullable"`
 	ApplicationID     string `json:"applicationId,omitempty" norman:"required,notnullable"`
-	ApplicationSecret string `json:"applicationSecret,omitempty" norman:"required,notnullable,type=password"`
+	ApplicationSecret string `json:"applicationSecret,omitempty" norman:"required,type=password"`
 	RancherURL        string `json:"rancherUrl,omitempty" norman:"required,notnullable"`
 }
 
