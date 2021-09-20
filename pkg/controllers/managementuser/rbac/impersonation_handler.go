@@ -41,7 +41,8 @@ func (m *manager) getUser(username, groupname string) (user.Info, error) {
 }
 
 func (m *manager) ensureServiceAccountImpersonator(username, groupname string) error {
-	user, err := m.getUser(username, groupname)
+	logrus.Debugf("ensuring service account impersonator for %s", username)
+	i, err := impersonation.New(&user.DefaultInfo{UID: username}, groupname, m.workload)
 	if apierrors.IsNotFound(err) {
 		logrus.Warnf("could not find user %s, will not create impersonation account on cluster", username)
 		return nil
@@ -49,8 +50,6 @@ func (m *manager) ensureServiceAccountImpersonator(username, groupname string) e
 	if err != nil {
 		return err
 	}
-	logrus.Debugf("ensuring service account impersonator for %s", user.GetUID())
-	i := impersonation.New(user, m.workload)
 	_, err = i.SetUpImpersonation()
 	return err
 }
