@@ -2,6 +2,7 @@ package machineprovision
 
 import (
 	"fmt"
+	"os"
 	"regexp"
 	"sort"
 	"strings"
@@ -82,7 +83,11 @@ func (h *handler) getArgsEnvAndStatus(typeMeta meta.Type, meta metav1.Object, da
 			Name:      name2.SafeConcatName(meta.GetName(), "machine", "driver", "secret"),
 			Namespace: meta.GetNamespace(),
 		},
-		Data: map[string][]byte{},
+		Data: map[string][]byte{
+			"HTTP_PROXY":  []byte(os.Getenv("HTTP_PROXY")),
+			"HTTPS_PROXY": []byte(os.Getenv("HTTPS_PROXY")),
+			"NO_PROXY":    []byte(os.Getenv("NO_PROXY")),
+		},
 	}
 
 	bootstrapName, cloudCredentialSecretName, secrets, err := h.getSecretData(meta, data, create)
