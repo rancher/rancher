@@ -28,6 +28,10 @@ import (
 	"k8s.io/client-go/rest"
 )
 
+type ClusterContextGetter interface {
+	UserContext(string) (*config.UserContext, error)
+}
+
 type RemoteService struct {
 	sync.Mutex
 
@@ -35,12 +39,12 @@ type RemoteService struct {
 	transport transportGetter
 	url       urlGetter
 
-	factory        dialer.Factory
-	clusterLister  v3.ClusterLister
-	caCert         string
-	localAuth      string
-	httpTransport  *http.Transport
-	clusterContext *config.UserContext
+	factory              dialer.Factory
+	clusterLister        v3.ClusterLister
+	caCert               string
+	localAuth            string
+	httpTransport        *http.Transport
+	clusterContextGetter ClusterContextGetter
 }
 
 var (
@@ -65,11 +69,11 @@ func prefix(cluster *v3.Cluster) string {
 	return "/k8s/clusters/" + cluster.Name
 }
 
-func New(localConfig *rest.Config, cluster *v3.Cluster, clusterLister v3.ClusterLister, factory dialer.Factory, clusterContext *config.UserContext) (*RemoteService, error) {
+func New(localConfig *rest.Config, cluster *v3.Cluster, clusterLister v3.ClusterLister, factory dialer.Factory, clusterContextGetter ClusterContextGetter) (*RemoteService, error) {
 	if cluster.Spec.Internal {
 		return NewLocal(localConfig, cluster)
 	}
-	return NewRemote(cluster, clusterLister, factory, clusterContext)
+	return NewRemote(cluster, clusterLister, factory, clusterContextGetter)
 }
 
 func NewLocal(localConfig *rest.Config, cluster *v3.Cluster) (*RemoteService, error) {
@@ -104,7 +108,7 @@ func NewLocal(localConfig *rest.Config, cluster *v3.Cluster) (*RemoteService, er
 	return rs, nil
 }
 
-func NewRemote(cluster *v3.Cluster, clusterLister v3.ClusterLister, factory dialer.Factory, clusterContext *config.UserContext) (*RemoteService, error) {
+func NewRemote(cluster *v3.Cluster, clusterLister v3.ClusterLister, factory dialer.Factory, clusterContextGetter ClusterContextGetter) (*RemoteService, error) {
 	if !v32.ClusterConditionProvisioned.IsTrue(cluster) {
 		return nil, httperror.NewAPIError(httperror.ClusterUnavailable, "cluster not provisioned")
 	}
@@ -123,11 +127,11 @@ func NewRemote(cluster *v3.Cluster, clusterLister v3.ClusterLister, factory dial
 	}
 
 	return &RemoteService{
-		cluster:        cluster,
-		url:            urlGetter,
-		clusterLister:  clusterLister,
-		factory:        factory,
-		clusterContext: clusterContext,
+		cluster:              cluster,
+		url:                  urlGetter,
+		clusterLister:        clusterLister,
+		factory:              factory,
+		clusterContextGetter: clusterContextGetter,
 	}, nil
 }
 
@@ -279,13 +283,18 @@ func (p *UpgradeProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 // getImpersonatorAccountToken creates, if not already present, a service account and role bindings
 // whose only permission is to impersonate the given user, and returns the bearer token for the account.
 func (r *RemoteService) getImpersonatorAccountToken(user user.Info) (string, error) {
-	i := impersonation.New(user, r.clusterContext)
+	clusterContext, err := r.clusterContextGetter.UserContext(r.cluster.Name)
+	if err != nil {
+		return "", err
+	}
 
-	err := i.SetUpImpersonation()
+	i := impersonation.New(user, clusterContext)
+
+	sa, err := i.SetUpImpersonation()
 	if err != nil {
 		return "", fmt.Errorf("error setting up impersonation for user %s: %w", user.GetUID(), err)
 	}
-	saToken, err := i.GetToken()
+	saToken, err := i.GetToken(sa)
 	if err != nil {
 		return "", fmt.Errorf("error getting service account token: %w", err)
 	}
