@@ -55,6 +55,7 @@ const (
 	ClusterFieldK3sConfig                            = "k3sConfig"
 	ClusterFieldLabels                               = "labels"
 	ClusterFieldLimits                               = "limits"
+	ClusterFieldLinuxWorkerCount                     = "linuxWorkerCount"
 	ClusterFieldLocalClusterAuthEndpoint             = "localClusterAuthEndpoint"
 	ClusterFieldMonitoringStatus                     = "monitoringStatus"
 	ClusterFieldName                                 = "name"
@@ -74,6 +75,7 @@ const (
 	ClusterFieldUUID                                 = "uuid"
 	ClusterFieldVersion                              = "version"
 	ClusterFieldWindowsPreferedCluster               = "windowsPreferedCluster"
+	ClusterFieldWindowsWorkerCount                   = "windowsWorkerCount"
 )
 
 type Cluster struct {
@@ -127,6 +129,7 @@ type Cluster struct {
 	K3sConfig                            *K3sConfig                     `json:"k3sConfig,omitempty" yaml:"k3sConfig,omitempty"`
 	Labels                               map[string]string              `json:"labels,omitempty" yaml:"labels,omitempty"`
 	Limits                               map[string]string              `json:"limits,omitempty" yaml:"limits,omitempty"`
+	LinuxWorkerCount                     int64                          `json:"linuxWorkerCount,omitempty" yaml:"linuxWorkerCount,omitempty"`
 	LocalClusterAuthEndpoint             *LocalClusterAuthEndpoint      `json:"localClusterAuthEndpoint,omitempty" yaml:"localClusterAuthEndpoint,omitempty"`
 	MonitoringStatus                     *MonitoringStatus              `json:"monitoringStatus,omitempty" yaml:"monitoringStatus,omitempty"`
 	Name                                 string                         `json:"name,omitempty" yaml:"name,omitempty"`
@@ -146,6 +149,7 @@ type Cluster struct {
 	UUID                                 string                         `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 	Version                              *Info                          `json:"version,omitempty" yaml:"version,omitempty"`
 	WindowsPreferedCluster               bool                           `json:"windowsPreferedCluster,omitempty" yaml:"windowsPreferedCluster,omitempty"`
+	WindowsWorkerCount                   int64                          `json:"windowsWorkerCount,omitempty" yaml:"windowsWorkerCount,omitempty"`
 }
 
 type ClusterCollection struct {

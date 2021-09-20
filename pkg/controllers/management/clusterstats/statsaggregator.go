@@ -5,17 +5,15 @@ import (
 	"reflect"
 	"time"
 
-	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-
-	"k8s.io/apimachinery/pkg/runtime"
-
 	"github.com/pkg/errors"
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/clustermanager"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 const (
@@ -68,6 +66,7 @@ func (s *StatsAggregator) aggregate(cluster *v3.Cluster, clusterName string) err
 		return err
 	}
 
+	workerCounts := make(map[string]int)
 	var machines []*v3.Node
 	// only include worker nodes
 	for _, m := range allMachines {
@@ -81,11 +80,24 @@ func (s *StatsAggregator) aggregate(cluster *v3.Cluster, clusterName string) err
 		if m.Spec.InternalNodeSpec.Unschedulable {
 			continue
 		}
+
+		if os, ok := m.Status.NodeLabels["kubernetes.io/os"]; ok && m.Spec.Worker {
+			workerCounts[os]++
+		}
+
 		machines = append(machines, m)
 	}
 
 	origStatus := cluster.Status.DeepCopy()
 	cluster = cluster.DeepCopy()
+
+	cluster.Status.NodeCount = len(allMachines)
+	if c, ok := workerCounts["windows"]; ok {
+		cluster.Status.WindowsWorkerCount = c
+	}
+	if c, ok := workerCounts["linux"]; ok {
+		cluster.Status.LinuxWorkerCount = c
+	}
 
 	// capacity keys
 	pods, mem, cpu := resource.Quantity{}, resource.Quantity{}, resource.Quantity{}
@@ -150,7 +162,7 @@ func (s *StatsAggregator) aggregate(cluster *v3.Cluster, clusterName string) err
 
 	versionChanged := s.updateVersion(cluster)
 
-	if statsChanged(origStatus, &cluster.Status) || versionChanged {
+	if statusChanged(origStatus, &cluster.Status) || versionChanged {
 		_, err = s.Clusters.Update(cluster)
 		return err
 	}
@@ -179,8 +191,14 @@ func (s *StatsAggregator) updateVersion(cluster *v3.Cluster) bool {
 	return updated
 }
 
-func statsChanged(existingCluster, newCluster *v32.ClusterStatus) bool {
+func statusChanged(existingCluster, newCluster *v32.ClusterStatus) bool {
 	if !reflect.DeepEqual(existingCluster.Conditions, newCluster.Conditions) {
+		return true
+	}
+
+	if existingCluster.LinuxWorkerCount != newCluster.LinuxWorkerCount ||
+		existingCluster.WindowsWorkerCount != newCluster.WindowsWorkerCount ||
+		existingCluster.NodeCount != newCluster.NodeCount {
 		return true
 	}
 
