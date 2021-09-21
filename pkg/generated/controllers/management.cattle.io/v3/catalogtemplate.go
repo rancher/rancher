@@ -25,7 +25,10 @@ import (
 	"github.com/rancher/lasso/pkg/client"
 	"github.com/rancher/lasso/pkg/controller"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/wrangler/pkg/apply"
+	"github.com/rancher/wrangler/pkg/condition"
 	"github.com/rancher/wrangler/pkg/generic"
+	"github.com/rancher/wrangler/pkg/kv"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -55,7 +58,7 @@ type CatalogTemplateController interface {
 type CatalogTemplateClient interface {
 	Create(*v3.CatalogTemplate) (*v3.CatalogTemplate, error)
 	Update(*v3.CatalogTemplate) (*v3.CatalogTemplate, error)
-
+	UpdateStatus(*v3.CatalogTemplate) (*v3.CatalogTemplate, error)
 	Delete(namespace, name string, options *metav1.DeleteOptions) error
 	Get(namespace, name string, options metav1.GetOptions) (*v3.CatalogTemplate, error)
 	List(namespace string, opts metav1.ListOptions) (*v3.CatalogTemplateList, error)
@@ -184,6 +187,11 @@ func (c *catalogTemplateController) Update(obj *v3.CatalogTemplate) (*v3.Catalog
 	return result, c.client.Update(context.TODO(), obj.Namespace, obj, result, metav1.UpdateOptions{})
 }
 
+func (c *catalogTemplateController) UpdateStatus(obj *v3.CatalogTemplate) (*v3.CatalogTemplate, error) {
+	result := &v3.CatalogTemplate{}
+	return result, c.client.UpdateStatus(context.TODO(), obj.Namespace, obj, result, metav1.UpdateOptions{})
+}
+
 func (c *catalogTemplateController) Delete(namespace, name string, options *metav1.DeleteOptions) error {
 	if options == nil {
 		options = &metav1.DeleteOptions{}
@@ -253,4 +261,116 @@ func (c *catalogTemplateCache) GetByIndex(indexName, key string) (result []*v3.C
 		result = append(result, obj.(*v3.CatalogTemplate))
 	}
 	return result, nil
+}
+
+type CatalogTemplateStatusHandler func(obj *v3.CatalogTemplate, status v3.TemplateStatus) (v3.TemplateStatus, error)
+
+type CatalogTemplateGeneratingHandler func(obj *v3.CatalogTemplate, status v3.TemplateStatus) ([]runtime.Object, v3.TemplateStatus, error)
+
+func RegisterCatalogTemplateStatusHandler(ctx context.Context, controller CatalogTemplateController, condition condition.Cond, name string, handler CatalogTemplateStatusHandler) {
+	statusHandler := &catalogTemplateStatusHandler{
+		client:    controller,
+		condition: condition,
+		handler:   handler,
+	}
+	controller.AddGenericHandler(ctx, name, FromCatalogTemplateHandlerToHandler(statusHandler.sync))
+}
+
+func RegisterCatalogTemplateGeneratingHandler(ctx context.Context, controller CatalogTemplateController, apply apply.Apply,
+	condition condition.Cond, name string, handler CatalogTemplateGeneratingHandler, opts *generic.GeneratingHandlerOptions) {
+	statusHandler := &catalogTemplateGeneratingHandler{
+		CatalogTemplateGeneratingHandler: handler,
+		apply:                            apply,
+		name:                             name,
+		gvk:                              controller.GroupVersionKind(),
+	}
+	if opts != nil {
+		statusHandler.opts = *opts
+	}
+	controller.OnChange(ctx, name, statusHandler.Remove)
+	RegisterCatalogTemplateStatusHandler(ctx, controller, condition, name, statusHandler.Handle)
+}
+
+type catalogTemplateStatusHandler struct {
+	client    CatalogTemplateClient
+	condition condition.Cond
+	handler   CatalogTemplateStatusHandler
+}
+
+func (a *catalogTemplateStatusHandler) sync(key string, obj *v3.CatalogTemplate) (*v3.CatalogTemplate, error) {
+	if obj == nil {
+		return obj, nil
+	}
+
+	origStatus := obj.Status.DeepCopy()
+	obj = obj.DeepCopy()
+	newStatus, err := a.handler(obj, obj.Status)
+	if err != nil {
+		// Revert to old status on error
+		newStatus = *origStatus.DeepCopy()
+	}
+
+	if a.condition != "" {
+		if errors.IsConflict(err) {
+			a.condition.SetError(&newStatus, "", nil)
+		} else {
+			a.condition.SetError(&newStatus, "", err)
+		}
+	}
+	if !equality.Semantic.DeepEqual(origStatus, &newStatus) {
+		if a.condition != "" {
+			// Since status has changed, update the lastUpdatedTime
+			a.condition.LastUpdated(&newStatus, time.Now().UTC().Format(time.RFC3339))
+		}
+
+		var newErr error
+		obj.Status = newStatus
+		newObj, newErr := a.client.UpdateStatus(obj)
+		if err == nil {
+			err = newErr
+		}
+		if newErr == nil {
+			obj = newObj
+		}
+	}
+	return obj, err
+}
+
+type catalogTemplateGeneratingHandler struct {
+	CatalogTemplateGeneratingHandler
+	apply apply.Apply
+	opts  generic.GeneratingHandlerOptions
+	gvk   schema.GroupVersionKind
+	name  string
+}
+
+func (a *catalogTemplateGeneratingHandler) Remove(key string, obj *v3.CatalogTemplate) (*v3.CatalogTemplate, error) {
+	if obj != nil {
+		return obj, nil
+	}
+
+	obj = &v3.CatalogTemplate{}
+	obj.Namespace, obj.Name = kv.RSplit(key, "/")
+	obj.SetGroupVersionKind(a.gvk)
+
+	return nil, generic.ConfigureApplyForObject(a.apply, obj, &a.opts).
+		WithOwner(obj).
+		WithSetID(a.name).
+		ApplyObjects()
+}
+
+func (a *catalogTemplateGeneratingHandler) Handle(obj *v3.CatalogTemplate, status v3.TemplateStatus) (v3.TemplateStatus, error) {
+	if !obj.DeletionTimestamp.IsZero() {
+		return status, nil
+	}
+
+	objs, newStatus, err := a.CatalogTemplateGeneratingHandler(obj, status)
+	if err != nil {
+		return newStatus, err
+	}
+
+	return newStatus, generic.ConfigureApplyForObject(a.apply, obj, &a.opts).
+		WithOwner(obj).
+		WithSetID(a.name).
+		ApplyObjects(objs...)
 }
