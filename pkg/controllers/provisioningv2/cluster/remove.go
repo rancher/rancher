@@ -13,6 +13,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	capierror "sigs.k8s.io/cluster-api/errors"
 )
 
 const (
@@ -20,21 +21,36 @@ const (
 )
 
 var (
-	Removed = condition.Cond("Removed")
+	Provisioned = condition.Cond("Provisioned")
+	Waiting     = condition.Cond("Waiting")
+	Pending     = condition.Cond("Pending")
+	Removed     = condition.Cond("Removed")
 )
 
-func (h *handler) OnMgmtClusterRemove(key string, cluster *v3.Cluster) (*v3.Cluster, error) {
+func (h *handler) OnMgmtClusterRemove(_ string, cluster *v3.Cluster) (*v3.Cluster, error) {
 	provisioningClusters, err := h.clusterCache.GetByIndex(ByCluster, cluster.Name)
 	if err != nil {
 		return nil, err
 	}
+
+	var legacyCluster bool
 	for _, provisioningCluster := range provisioningClusters {
+		legacyCluster = legacyCluster || h.isLegacyCluster(provisioningCluster)
 		if err := h.clusters.Delete(provisioningCluster.Namespace, provisioningCluster.Name, nil); err != nil {
 			return nil, err
 		}
 	}
 
-	return cluster, nil
+	if len(provisioningClusters) == 0 || legacyCluster {
+		// If any of the provisioning clusters are legacy clusters (i.e. RKE1 clusters) then we don't wait for the
+		// provisioning clusters to be deleted because the provisioning cluster is waiting for the management cluster to delete.
+		return cluster, nil
+	}
+
+	h.mgmtClusters.EnqueueAfter(cluster.Name, 5*time.Second)
+	// generic.ErrSkip will mark the cluster object as reconciled, but won't remove the finalizer.
+	// The finalizer should be removed after the provisioning cluster is gone.
+	return cluster, generic.ErrSkip
 }
 
 func (h *handler) updateClusterStatus(cluster *v1.Cluster, status v1.ClusterStatus, previousErr error) (*v1.Cluster, error) {
@@ -52,6 +68,12 @@ func (h *handler) updateClusterStatus(cluster *v1.Cluster, status v1.ClusterStat
 
 func (h *handler) OnClusterRemove(_ string, cluster *v1.Cluster) (*v1.Cluster, error) {
 	status := cluster.Status.DeepCopy()
+	if !Provisioned.IsTrue(status) || !Waiting.IsTrue(status) || !Pending.IsTrue(status) {
+		// Ensure the Removed status appears in the UI.
+		Provisioned.SetStatus(status, "True")
+		Waiting.SetStatus(status, "True")
+		Pending.SetStatus(status, "True")
+	}
 	message, err := h.doClusterRemove(cluster)
 	if err != nil {
 		Removed.SetError(status, "", err)
@@ -78,9 +100,12 @@ func (h *handler) doClusterRemove(cluster *v1.Cluster) (string, error) {
 			return "", err
 		}
 
-		_, err = h.mgmtClusterCache.Get(cluster.Status.ClusterName)
-		if !apierrors.IsNotFound(err) {
-			return fmt.Sprintf("waiting for cluster [%s] to delete", cluster.Status.ClusterName), nil
+		if h.isLegacyCluster(cluster) {
+			// If this is a legacy cluster (i.e. RKE1 cluster) then we should wait to remove the provisioning cluster until the v3.Cluster is gone.
+			_, err = h.mgmtClusterCache.Get(cluster.Status.ClusterName)
+			if !apierrors.IsNotFound(err) {
+				return fmt.Sprintf("waiting for cluster [%s] to delete", cluster.Status.ClusterName), nil
+			}
 		}
 	}
 
@@ -107,6 +132,9 @@ func (h *handler) doClusterRemove(cluster *v1.Cluster) (string, error) {
 		return machines[i].Name < machines[j].Name
 	})
 	for _, machine := range machines {
+		if machine.Status.FailureReason != nil && *machine.Status.FailureReason == capierror.DeleteMachineError {
+			return "", fmt.Errorf("error deleting machine [%s], machine must be deleted manually", machine.Name)
+		}
 		return fmt.Sprintf("waiting for machine [%s] to delete", machine.Name), nil
 	}
 

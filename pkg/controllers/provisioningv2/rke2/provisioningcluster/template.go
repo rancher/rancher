@@ -287,6 +287,8 @@ func machineDeployments(cluster *rancherv1.Cluster, capiCluster *capi.Cluster, d
 				Name:        machinePoolName,
 				Labels:      machineDeploymentLabels,
 				Annotations: machinePool.MachineDeploymentAnnotations,
+				// This ensures that the CAPI cluster is not deleted before the machines are deleted.
+				Finalizers: []string{metav1.FinalizerDeleteDependents},
 			},
 			Spec: capi.MachineDeploymentSpec{
 				ClusterName: capiCluster.Name,

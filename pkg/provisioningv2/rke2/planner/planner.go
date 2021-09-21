@@ -195,7 +195,7 @@ func (p *Planner) Process(controlPlane *rkev1.RKEControlPlane) error {
 		return err
 	}
 
-	controlPlane, secret, err := p.generateSecrets(controlPlane, plan)
+	controlPlane, secret, err := p.generateSecrets(controlPlane)
 	if err != nil {
 		return err
 	}
@@ -228,7 +228,7 @@ func (p *Planner) Process(controlPlane *rkev1.RKEControlPlane) error {
 		return err
 	}
 
-	err = p.reconcile(controlPlane, secret, plan, "bootstrap", true, isInitNode, none,
+	err = p.reconcile(controlPlane, secret, plan, "bootstrap", true, isInitNode, isDeleting,
 		controlPlane.Spec.UpgradeStrategy.ControlPlaneConcurrency, "",
 		controlPlane.Spec.UpgradeStrategy.ControlPlaneDrainOptions)
 	firstIgnoreError, err = ignoreErrors(firstIgnoreError, err)
@@ -245,7 +245,7 @@ func (p *Planner) Process(controlPlane *rkev1.RKEControlPlane) error {
 		return ErrWaiting("waiting for join url to be available on bootstrap node")
 	}
 
-	err = p.reconcile(controlPlane, secret, plan, "etcd", true, isEtcd, isInitNode,
+	err = p.reconcile(controlPlane, secret, plan, "etcd", true, isEtcd, isInitNodeOrDeleting,
 		controlPlane.Spec.UpgradeStrategy.ControlPlaneConcurrency, joinServer,
 		controlPlane.Spec.UpgradeStrategy.ControlPlaneDrainOptions)
 	firstIgnoreError, err = ignoreErrors(firstIgnoreError, err)
@@ -253,7 +253,7 @@ func (p *Planner) Process(controlPlane *rkev1.RKEControlPlane) error {
 		return err
 	}
 
-	err = p.reconcile(controlPlane, secret, plan, "control plane", true, isControlPlane, isInitNode,
+	err = p.reconcile(controlPlane, secret, plan, "control plane", true, isControlPlane, isInitNodeOrDeleting,
 		controlPlane.Spec.UpgradeStrategy.ControlPlaneConcurrency, joinServer,
 		controlPlane.Spec.UpgradeStrategy.ControlPlaneDrainOptions)
 	firstIgnoreError, err = ignoreErrors(firstIgnoreError, err)
@@ -266,7 +266,7 @@ func (p *Planner) Process(controlPlane *rkev1.RKEControlPlane) error {
 		return ErrWaiting("waiting for control plane to be available")
 	}
 
-	err = p.reconcile(controlPlane, secret, plan, "worker", false, isOnlyWorker, isInitNode,
+	err = p.reconcile(controlPlane, secret, plan, "worker", false, isOnlyWorker, isInitNodeOrDeleting,
 		controlPlane.Spec.UpgradeStrategy.WorkerConcurrency, joinServer,
 		controlPlane.Spec.UpgradeStrategy.WorkerDrainOptions)
 	firstIgnoreError, err = ignoreErrors(firstIgnoreError, err)
@@ -1128,12 +1128,16 @@ func isInitNode(machine *capi.Machine) bool {
 	return machine.Labels[InitNodeLabel] == "true"
 }
 
+func isInitNodeOrDeleting(machine *capi.Machine) bool {
+	return isInitNode(machine) || isDeleting(machine)
+}
+
 func IsEtcdOnlyInitNode(machine *capi.Machine) bool {
 	return isInitNode(machine) && IsOnlyEtcd(machine)
 }
 
-func none(_ *capi.Machine) bool {
-	return false
+func isDeleting(machine *capi.Machine) bool {
+	return machine.DeletionTimestamp != nil
 }
 
 func isControlPlane(machine *capi.Machine) bool {
@@ -1187,8 +1191,8 @@ func collect(plan *plan.Plan, include func(*capi.Machine) bool) (result []planEn
 	return result
 }
 
-func (p *Planner) generateSecrets(controlPlane *rkev1.RKEControlPlane, fullPlan *plan.Plan) (*rkev1.RKEControlPlane, plan.Secret, error) {
-	_, secret, err := p.ensureRKEStateSecret(controlPlane, fullPlan)
+func (p *Planner) generateSecrets(controlPlane *rkev1.RKEControlPlane) (*rkev1.RKEControlPlane, plan.Secret, error) {
+	_, secret, err := p.ensureRKEStateSecret(controlPlane)
 	if err != nil {
 		return nil, secret, err
 	}
@@ -1197,7 +1201,7 @@ func (p *Planner) generateSecrets(controlPlane *rkev1.RKEControlPlane, fullPlan 
 	return controlPlane, secret, nil
 }
 
-func (p *Planner) ensureRKEStateSecret(controlPlane *rkev1.RKEControlPlane, fullPlan *plan.Plan) (string, plan.Secret, error) {
+func (p *Planner) ensureRKEStateSecret(controlPlane *rkev1.RKEControlPlane) (string, plan.Secret, error) {
 	if controlPlane.Spec.UnmanagedConfig {
 		return "", plan.Secret{}, nil
 	}
