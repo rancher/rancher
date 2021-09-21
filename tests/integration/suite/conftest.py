@@ -198,8 +198,11 @@ def user_factory(admin_mc, remove_resource):
     """
     def _create_user(globalRoleId='user'):
         admin = admin_mc.client
-        username = random_str()
-        password = random_str()
+        # User creation will fail if password < minimum (default: 12) or
+        # username == password. Since random_str concatenates a random number
+        # plus seconds since epoch, this ensures no collisions
+        username = random_str() + "username"
+        password = random_str() + "password"
         user = admin.create_user(username=username, password=password)
         remove_resource(user)
         grb = admin.create_global_role_binding(
