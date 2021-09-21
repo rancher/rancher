@@ -8,6 +8,7 @@ import (
 	"github.com/rancher/norman/store/proxy"
 	"github.com/rancher/norman/store/transform"
 	"github.com/rancher/norman/types"
+	"github.com/rancher/rancher/pkg/api/scheme"
 	"github.com/rancher/rancher/pkg/catalog/manager"
 	catUtil "github.com/rancher/rancher/pkg/catalog/utils"
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
@@ -34,6 +35,7 @@ func GetTemplateStore(ctx context.Context, managementContext *config.ScaledConte
 	s := &transform.Store{
 		Store: proxy.NewProxyStore(ctx, managementContext.ClientGetter,
 			config.ManagementStorageContext,
+			scheme.Scheme,
 			[]string{"apis"},
 			"management.cattle.io",
 			"v3",
