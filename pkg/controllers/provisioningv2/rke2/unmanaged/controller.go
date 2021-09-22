@@ -3,6 +3,8 @@ package unmanaged
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"k8s.io/client-go/util/retry"
 	"strings"
 	"time"
 
@@ -359,11 +361,56 @@ func (h *handler) onUnmanagedMachineOnRemove(key string, customMachine *rkev1.Cu
 	if err != nil {
 		return customMachine, err
 	}
-	err = clientset.CoreV1().Nodes().Delete(context.TODO(), machine.Status.NodeRef.Name, metav1.DeleteOptions{})
-	if apierror.IsNotFound(err) {
-		return customMachine, nil
+
+	if _, ok := machine.Labels[planner.EtcdRoleLabel]; !ok {
+		err = clientset.CoreV1().Nodes().Delete(context.TODO(), machine.Status.NodeRef.Name, metav1.DeleteOptions{})
+		if apierror.IsNotFound(err) {
+			return customMachine, nil
+		}
+		return customMachine, err
 	}
-	return customMachine, err
+	// Check status of v1 node
+
+	removeAnnotation := "etcd." + planner.GetRuntimeCommand(cluster.Spec.KubernetesVersion) + ".cattle.io/remove"
+	removedNodeNameAnnotation := "etcd." + planner.GetRuntimeCommand(cluster.Spec.KubernetesVersion) + ".cattle.io/removed-node-name"
+
+	node, err := clientset.CoreV1().Nodes().Get(context.TODO(), machine.Status.NodeRef.Name, metav1.GetOptions{})
+	if err != nil {
+		if apierror.IsNotFound(err) {
+			return customMachine, nil
+		}
+		return customMachine, err
+	}
+
+	if val, ok := node.Annotations[removeAnnotation]; ok {
+		// check val to see if it's true, if not, continue
+		if val == "true" {
+			// check the status of the removal
+			if removedNodeName, ok := node.Annotations[removedNodeNameAnnotation]; ok {
+				// There is the possibility the annotation is defined, but empty.
+				if removedNodeName != "" {
+					err = clientset.CoreV1().Nodes().Delete(context.TODO(), machine.Status.NodeRef.Name, metav1.DeleteOptions{})
+					if apierror.IsNotFound(err) {
+						return customMachine, nil
+					}
+					return customMachine, err
+				}
+			}
+		}
+	}
+	// The remove annotation has not been set to true, so we'll go ahead and set it on the node.
+	err = retry.RetryOnConflict(retry.DefaultRetry,
+		func() error {
+			node.Annotations[removeAnnotation] = "true"
+			node, err = clientset.CoreV1().Nodes().Update(context.TODO(), node, metav1.UpdateOptions{})
+			return err
+		})
+	if err != nil {
+		// there was an error updating the node
+		return customMachine, err
+	}
+
+	return customMachine, fmt.Errorf("waiting for etcd member removal")
 }
 
 func (h *handler) onUnmanagedMachineChange(key string, machine *rkev1.CustomMachine) (*rkev1.CustomMachine, error) {

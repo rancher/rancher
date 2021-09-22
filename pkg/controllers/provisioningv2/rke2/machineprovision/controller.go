@@ -4,7 +4,13 @@ import (
 	"context"
 	errors2 "errors"
 	"fmt"
+	"github.com/rancher/rancher/pkg/provisioningv2/kubeconfig"
+	v2provruntime "github.com/rancher/rancher/pkg/provisioningv2/rke2/runtime"
+	"github.com/sirupsen/logrus"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/util/retry"
 	"path"
+	capi "sigs.k8s.io/cluster-api/api/v1alpha4"
 	"strings"
 	"time"
 
@@ -46,6 +52,7 @@ type handler struct {
 	nodeDriverCache     mgmtcontrollers.NodeDriverCache
 	dynamic             *dynamic.Controller
 	rancherClusterCache ranchercontrollers.ClusterCache
+	kubeconfigManager	*kubeconfig.Manager
 }
 
 func Register(ctx context.Context, clients *wrangler.Context) {
@@ -64,6 +71,7 @@ func Register(ctx context.Context, clients *wrangler.Context) {
 		namespaces:          clients.Core.Namespace().Cache(),
 		dynamic:             clients.Dynamic,
 		rancherClusterCache: clients.Provisioning.Cluster().Cache(),
+		kubeconfigManager: kubeconfig.New(clients),
 	}
 
 	removeHandler := generic.NewRemoveHandler("machine-provision-remove", clients.Dynamic.Update, h.OnRemove)
@@ -133,6 +141,30 @@ func (h *handler) OnJobChange(key string, job *batchv1.Job) (*batchv1.Job, error
 	}
 
 	return job, nil
+}
+
+func (h *handler) getMachine(obj runtime.Object) (*capi.Machine, error) {
+	var (
+		machine *capi.Machine
+		err     error
+	)
+
+	meta, err := meta.Accessor(obj)
+	if err != nil {
+		return nil, err
+	}
+	for _, owner := range meta.GetOwnerReferences() {
+		if owner.Kind == "Machine" {
+			machine, err = h.machines.Get(meta.GetNamespace(), owner.Name)
+			if err != nil {
+				return nil, err
+			}
+			break
+		}
+	}
+
+	return machine, nil
+
 }
 
 func (h *handler) getMachineStatus(job *batchv1.Job, create bool) (rkev1.RKEMachineStatus, error) {
@@ -210,11 +242,112 @@ func (h *handler) namespaceIsRemoved(obj runtime.Object) (bool, error) {
 	return ns.DeletionTimestamp != nil, nil
 }
 
-func (h *handler) OnRemove(_ string, obj runtime.Object) (runtime.Object, error) {
+func (h *handler) OnRemove(key string, obj runtime.Object) (runtime.Object, error) {
 	if removed, err := h.namespaceIsRemoved(obj); err != nil || removed {
 		return obj, err
 	}
 
+	d, err := data.Convert(obj.DeepCopyObject())
+	if err != nil {
+		return nil, err
+	}
+
+	if val, ok := d.Map("metadata", "labels")["rke.cattle.io/etcd-role"]; ok {
+		if val.(string) == "true" {
+			// we need to block removal until our the v1 node that corresponds has been removed
+			clusterName := d.Map("metadata", "labels")[CapiMachineLabel].(string)
+			if clusterName == "" {
+				logrus.Errorf("MachineProvision There was an error retrieving the clustername for this etcd node")
+				return obj, fmt.Errorf("nope")
+			}
+			cluster, err := h.rancherClusterCache.Get(d.String("metadata", "namespace"), clusterName)
+			if apierror.IsNotFound(err) {
+				// we can go ahead and remove
+				logrus.Infof("MachineProvision Proceeding with removal of node as cluster was not found.")
+				return h.doRemove(obj)
+			} else if err != nil {
+				return obj, err
+			}
+			if !cluster.DeletionTimestamp.IsZero() {
+				// If the cluster deletion timestamp has been set, we can blindly proceed with delete.
+				logrus.Infof("MachineProvision cluster deletion timestamp was not zero. proceeding with delete")
+				return h.doRemove(obj)
+			}
+			restConfig, err := h.kubeconfigManager.GetRESTConfig(cluster, cluster.Status)
+			if err != nil {
+				return obj, err
+			}
+
+			clientset, err := kubernetes.NewForConfig(restConfig)
+			if err != nil {
+				return obj, err
+			}
+
+			logrus.Infof("MachineProvision built k8s clientset")
+
+			removeAnnotation := "etcd." + v2provruntime.GetRuntimeCommand(cluster.Spec.KubernetesVersion) + ".cattle.io/remove"
+			removedNodeNameAnnotation := "etcd." + v2provruntime.GetRuntimeCommand(cluster.Spec.KubernetesVersion) + ".cattle.io/removed-node-name"
+
+			machine, err := h.getMachine(obj)
+
+			if err != nil {
+				return obj, err
+			}
+
+			if machine.Status.NodeRef == nil {
+				// Machine noderef is nil, we should just allow deletion.
+				logrus.Infof("MachineProvision there was no associated node with this etcd node. proceeding with deletion")
+				return h.doRemove(obj)
+			}
+
+			logrus.Infof("MachineProvision getting node %s for the dynamic machine %s", machine.Status.NodeRef.Name, key)
+
+			node, err := clientset.CoreV1().Nodes().Get(context.TODO(), machine.Status.NodeRef.Name, metav1.GetOptions{})
+			if err != nil {
+				if apierror.IsNotFound(err) {
+					logrus.Infof("MachineProvision Node not found. proceeding with delete")
+					return h.doRemove(obj)
+				}
+				return obj, err
+			}
+
+			if val, ok := node.Annotations[removeAnnotation]; ok {
+				// check val to see if it's true, if not, continue
+				if val == "true" {
+					// check the status of the removal
+					logrus.Infof("MachineProvision machine removal is already in progress as per the annotation")
+					if removedNodeName, ok := node.Annotations[removedNodeNameAnnotation]; ok {
+						// There is the possibility the annotation is defined, but empty.
+						if removedNodeName != "" {
+							err = clientset.CoreV1().Nodes().Delete(context.TODO(), machine.Status.NodeRef.Name, metav1.DeleteOptions{})
+							if apierror.IsNotFound(err) {
+								return h.doRemove(obj)
+							}
+							return obj, err
+						}
+					}
+					return obj, fmt.Errorf("remove annotation already set, waiting for node removal to be successful")
+				}
+			}
+			// The remove annotation has not been set to true, so we'll go ahead and set it on the node.
+			err = retry.RetryOnConflict(retry.DefaultRetry,
+				func() error {
+					node.Annotations[removeAnnotation] = "true"
+					node, err = clientset.CoreV1().Nodes().Update(context.TODO(), node, metav1.UpdateOptions{})
+					return err
+				})
+			if err != nil {
+				// there was an error updating the node
+				return obj, err
+			}
+
+			return obj, fmt.Errorf("waiting for etcd member removal")
+		}
+	}
+	return h.doRemove(obj)
+}
+
+func (h *handler) doRemove(obj runtime.Object) (runtime.Object, error) {
 	d, err := data.Convert(obj.DeepCopyObject())
 	if err != nil {
 		return nil, err

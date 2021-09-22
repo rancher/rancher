@@ -1,7 +1,7 @@
-package planner
+package runtime
 
 import (
-"strings"
+	"strings"
 )
 
 var (
