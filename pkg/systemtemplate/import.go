@@ -39,6 +39,7 @@ type context struct {
 	PrivateRegistryConfig string
 	Tolerations           string
 	ClusterRegistry       string
+	ServerVersion         string
 }
 
 func toFeatureString(features map[string]bool) string {
@@ -101,6 +102,7 @@ func SystemTemplate(resp io.Writer, agentImage, authImage, namespace, token, url
 		PrivateRegistryConfig: privateRegistryConfig,
 		Tolerations:           tolerations,
 		ClusterRegistry:       clusterRegistry,
+		ServerVersion:         settings.ServerVersion.Get(),
 	}
 
 	return t.Execute(resp, context)

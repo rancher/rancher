@@ -195,6 +195,8 @@ spec:
             value: "true"
           - name: CATTLE_CLUSTER_REGISTRY
             value: "{{.ClusterRegistry}}" 
+          - name: CATTLE_SERVER_VERSION
+            value: "{{.ServerVersion}}"
       {{- if .AgentEnvVars}}
 {{ .AgentEnvVars | indent 10 }}
       {{- end }}
