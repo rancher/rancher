@@ -315,15 +315,11 @@ func (h *handler) OnRemove(key string, obj runtime.Object) (runtime.Object, erro
 				// check val to see if it's true, if not, continue
 				if val == "true" {
 					// check the status of the removal
-					logrus.Infof("MachineProvision machine removal is already in progress as per the annotation")
+					logrus.Infof("MachineProvision etcd removal is already in progress as per the annotation")
 					if removedNodeName, ok := node.Annotations[removedNodeNameAnnotation]; ok {
 						// There is the possibility the annotation is defined, but empty.
 						if removedNodeName != "" {
-							err = clientset.CoreV1().Nodes().Delete(context.TODO(), machine.Status.NodeRef.Name, metav1.DeleteOptions{})
-							if apierror.IsNotFound(err) {
-								return h.doRemove(obj)
-							}
-							return obj, err
+							return h.doRemove(obj)
 						}
 					}
 					return obj, fmt.Errorf("remove annotation already set, waiting for node removal to be successful")
