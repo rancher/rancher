@@ -113,7 +113,7 @@ func (e *etcdRestore) restorePlan(controlPlane *rkev1.RKEControlPlane, snapshot 
 		Command: "rm",
 		Args: []string{
 			"-f",
-			fmt.Sprintf("/var/lib/rancher/%s/server/db/etcd/tombstone", GetRuntimeCommand(controlPlane.Spec.KubernetesVersion)),
+			fmt.Sprintf("/var/lib/rancher/%s/server/db/etcd/tombstone", runtime.GetRuntimeCommand(controlPlane.Spec.KubernetesVersion)),
 		},
 	})
 
@@ -123,7 +123,7 @@ func (e *etcdRestore) restorePlan(controlPlane *rkev1.RKEControlPlane, snapshot 
 			Name:    "restore",
 			Env:     s3Env,
 			Args:    append(args, s3Args...),
-			Command: GetRuntimeCommand(controlPlane.Spec.KubernetesVersion),
+			Command: runtime.GetRuntimeCommand(controlPlane.Spec.KubernetesVersion),
 		}),
 	}
 
@@ -138,12 +138,12 @@ func (e *etcdRestore) stopControlPlanePlan(controlPlane *rkev1.RKEControlPlane) 
 				Name:    "shutdown",
 				Command: "systemctl",
 				Args: []string{
-					"stop", GetRuntimeServerUnit(controlPlane.Spec.KubernetesVersion),
+					"stop", runtime.GetRuntimeServerUnit(controlPlane.Spec.KubernetesVersion),
 				},
 			},
 			{
 				Name:    "shutdown",
-				Command: GetRuntimeCommand(controlPlane.Spec.KubernetesVersion) + "-killall.sh",
+				Command: runtime.GetRuntimeCommand(controlPlane.Spec.KubernetesVersion) + "-killall.sh",
 			},
 		},
 	}
@@ -158,18 +158,18 @@ func (e *etcdRestore) stopEtcdPlan(controlPlane *rkev1.RKEControlPlane) (plan.No
 				Name:    "shutdown",
 				Command: "systemctl",
 				Args: []string{
-					"stop", GetRuntimeServerUnit(controlPlane.Spec.KubernetesVersion),
+					"stop", runtime.GetRuntimeServerUnit(controlPlane.Spec.KubernetesVersion),
 				},
 			},
 			{
 				Name:    "shutdown",
-				Command: fmt.Sprintf("%s-killall.sh", GetRuntimeCommand(controlPlane.Spec.KubernetesVersion)),
+				Command: fmt.Sprintf("%s-killall.sh", runtime.GetRuntimeCommand(controlPlane.Spec.KubernetesVersion)),
 			},
 			{
 				Name:    "tombstone",
 				Command: "touch",
 				Args: []string{
-					fmt.Sprintf("/var/lib/rancher/%s/server/db/etcd/tombstone", GetRuntimeCommand(controlPlane.Spec.KubernetesVersion)),
+					fmt.Sprintf("/var/lib/rancher/%s/server/db/etcd/tombstone", runtime.GetRuntimeCommand(controlPlane.Spec.KubernetesVersion)),
 				},
 			},
 		},
