@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/rancher/norman/types/slice"
 	"github.com/rancher/rancher/pkg/controllers/managementagent/nslabels"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/helm/common"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
@@ -19,6 +18,7 @@ import (
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/kubectl/pkg/util/slice"
 )
 
 const (
@@ -52,7 +52,7 @@ func EnsureAppProjectName(userNSClient v1.NamespaceInterface, ownedProjectID, cl
 
 	expectedAppProjectName := fmt.Sprintf("%s:%s", clusterName, ownedProjectID)
 	appProjectID := deployNamespace.Annotations[nslabels.ProjectIDFieldLabel]
-	if appProjectID != "" && slice.ContainsString(strings.Split(settings.SystemNamespaces.Get(), ","), deployNamespace.Name) {
+	if appProjectID != "" && slice.ContainsString(strings.Split(settings.SystemNamespaces.Get(), ","), deployNamespace.Name, nil) {
 		// Don't reassign the system namespaces to another project.
 		return expectedAppProjectName, nil
 	}
