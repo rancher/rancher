@@ -23,6 +23,7 @@ import (
 	rkecontrollers "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/nodeconfig"
 	"github.com/rancher/rancher/pkg/provisioningv2/kubeconfig"
+	rancherruntime "github.com/rancher/rancher/pkg/provisioningv2/rke2/runtime"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/rancher/wrangler/pkg/condition"
@@ -627,7 +628,7 @@ func (p *Planner) addETCD(config map[string]interface{}, controlPlane *rkev1.RKE
 }
 
 func addDefaults(config map[string]interface{}, controlPlane *rkev1.RKEControlPlane, machine *capi.Machine) {
-	if GetRuntime(controlPlane.Spec.KubernetesVersion) == RuntimeRKE2 {
+	if rancherruntime.GetRuntime(controlPlane.Spec.KubernetesVersion) == rancherruntime.RuntimeRKE2 {
 		config["cni"] = "calico"
 		if settings.SystemDefaultRegistry.Get() != "" {
 			config["system-default-registry"] = settings.SystemDefaultRegistry.Get()
@@ -658,7 +659,7 @@ func addUserConfig(config map[string]interface{}, controlPlane *rkev1.RKEControl
 
 func addRoleConfig(config map[string]interface{}, controlPlane *rkev1.RKEControlPlane, machine *capi.Machine, initNode bool, joinServer string) {
 	if initNode {
-		if GetRuntime(controlPlane.Spec.KubernetesVersion) == RuntimeK3S {
+		if rancherruntime.GetRuntime(controlPlane.Spec.KubernetesVersion) == rancherruntime.RuntimeK3S {
 			config["cluster-init"] = true
 		}
 	} else if joinServer != "" {
@@ -687,7 +688,7 @@ func addLocalClusterAuthenticationEndpointConfig(config map[string]interface{}, 
 		return
 	}
 
-	authFile := fmt.Sprintf(authnWebhookFileName, GetRuntime(controlPlane.Spec.KubernetesVersion))
+	authFile := fmt.Sprintf(authnWebhookFileName, rancherruntime.GetRuntime(controlPlane.Spec.KubernetesVersion))
 	config["kube-apiserver-arg"] = append(convert.ToStringSlice(config["kube-apiserver-arg"]),
 		fmt.Sprintf("authentication-token-webhook-config-file=%s", authFile))
 }
@@ -698,7 +699,7 @@ func addLocalClusterAuthenticationEndpointFile(nodePlan plan.NodePlan, controlPl
 		return nodePlan
 	}
 
-	authFile := fmt.Sprintf(authnWebhookFileName, GetRuntime(controlPlane.Spec.KubernetesVersion))
+	authFile := fmt.Sprintf(authnWebhookFileName, rancherruntime.GetRuntime(controlPlane.Spec.KubernetesVersion))
 	nodePlan.Files = append(nodePlan.Files, plan.File{
 		Content: base64.StdEncoding.EncodeToString(AuthnWebhook),
 		Path:    authFile,
@@ -786,7 +787,7 @@ func (p *Planner) addChartConfigs(nodePlan plan.NodePlan, controlPlane *rkev1.RK
 
 	nodePlan.Files = append(nodePlan.Files, plan.File{
 		Content: base64.StdEncoding.EncodeToString(contents),
-		Path:    fmt.Sprintf("/var/lib/rancher/%s/server/manifests/rancher/managed-chart-config.yaml", GetRuntime(controlPlane.Spec.KubernetesVersion)),
+		Path:    fmt.Sprintf("/var/lib/rancher/%s/server/manifests/rancher/managed-chart-config.yaml", rancherruntime.GetRuntime(controlPlane.Spec.KubernetesVersion)),
 		Dynamic: true,
 	})
 
@@ -826,7 +827,7 @@ func (p *Planner) addInstruction(nodePlan plan.NodePlan, controlPlane *rkev1.RKE
 	}
 
 	if isOnlyWorker(machine) {
-		instruction.Env = append(instruction.Env, fmt.Sprintf("INSTALL_%s_EXEC=agent", GetRuntimeEnv(controlPlane.Spec.KubernetesVersion)))
+		instruction.Env = append(instruction.Env, fmt.Sprintf("INSTALL_%s_EXEC=agent", rancherruntime.GetRuntimeEnv(controlPlane.Spec.KubernetesVersion)))
 	}
 	nodePlan.Instructions = append(nodePlan.Instructions, instruction)
 	return nodePlan, nil
@@ -842,8 +843,8 @@ func (p *Planner) addInitNodeInstruction(nodePlan plan.NodePlan, controlPlane *r
 			// the grep here is to make the command fail if we don't get the output we expect, like empty string.
 			fmt.Sprintf("curl -f --retry 100 --retry-delay 5 --cacert "+
 				"/var/lib/rancher/%s/server/tls/server-ca.crt https://localhost:%d/db/info | grep 'clientURLs'",
-				GetRuntime(controlPlane.Spec.KubernetesVersion),
-				GetRuntimeSupervisorPort(controlPlane.Spec.KubernetesVersion)),
+				rancherruntime.GetRuntime(controlPlane.Spec.KubernetesVersion),
+				rancherruntime.GetRuntimeSupervisorPort(controlPlane.Spec.KubernetesVersion)),
 		},
 	})
 	return nodePlan, nil
@@ -946,7 +947,7 @@ func getTaints(machine *capi.Machine, runtime string) (result []corev1.Taint, _ 
 		}
 	}
 
-	if runtime == RuntimeRKE2 {
+	if runtime == rancherruntime.RuntimeRKE2 {
 		if isEtcd(machine) && !isWorker(machine) {
 			result = append(result, corev1.Taint{
 				Key:    "node-role.kubernetes.io/etcd",
@@ -990,12 +991,12 @@ func addTaints(config map[string]interface{}, machine *capi.Machine, runtime str
 func configFile(controlPlane *rkev1.RKEControlPlane, filename string) string {
 	if path := filePaths[filename]; path != "" {
 		if strings.Contains(path, "%s") {
-			return fmt.Sprintf(path, GetRuntime(controlPlane.Spec.KubernetesVersion))
+			return fmt.Sprintf(path, rancherruntime.GetRuntime(controlPlane.Spec.KubernetesVersion))
 		}
 		return path
 	}
 	return fmt.Sprintf("/var/lib/rancher/%s/etc/config-files/%s",
-		GetRuntime(controlPlane.Spec.KubernetesVersion), filename)
+		rancherruntime.GetRuntime(controlPlane.Spec.KubernetesVersion), filename)
 }
 
 func (p *Planner) addConfigFile(nodePlan plan.NodePlan, controlPlane *rkev1.RKEControlPlane, machine *capi.Machine, secret plan.Secret,
@@ -1030,7 +1031,7 @@ func (p *Planner) addConfigFile(nodePlan plan.NodePlan, controlPlane *rkev1.RKEC
 		return nodePlan, err
 	}
 
-	runtime := GetRuntime(controlPlane.Spec.KubernetesVersion)
+	runtime := rancherruntime.GetRuntime(controlPlane.Spec.KubernetesVersion)
 	if err := addTaints(config, machine, runtime); err != nil {
 		return nodePlan, err
 	}
@@ -1058,7 +1059,7 @@ func (p *Planner) addConfigFile(nodePlan plan.NodePlan, controlPlane *rkev1.RKEC
 
 	nodePlan.Files = append(nodePlan.Files, plan.File{
 		Content: base64.StdEncoding.EncodeToString(configData),
-		Path:    fmt.Sprintf(ConfigYamlFileName, GetRuntime(controlPlane.Spec.KubernetesVersion)),
+		Path:    fmt.Sprintf(ConfigYamlFileName, rancherruntime.GetRuntime(controlPlane.Spec.KubernetesVersion)),
 	})
 
 	return nodePlan, nil
@@ -1114,7 +1115,7 @@ func (p *Planner) desiredPlan(controlPlane *rkev1.RKEControlPlane, secret plan.S
 }
 
 func getInstallerImage(controlPlane *rkev1.RKEControlPlane) string {
-	runtime := GetRuntime(controlPlane.Spec.KubernetesVersion)
+	runtime := rancherruntime.GetRuntime(controlPlane.Spec.KubernetesVersion)
 	image := settings.SystemAgentInstallerImage.Get()
 	image = image + runtime + ":" + strings.ReplaceAll(controlPlane.Spec.KubernetesVersion, "+", "-")
 	return settings.PrefixPrivateRegistry(image)

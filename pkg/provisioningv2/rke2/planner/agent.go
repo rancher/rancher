@@ -5,6 +5,7 @@ import (
 	"sort"
 
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
+	"github.com/rancher/rancher/pkg/provisioningv2/rke2/runtime"
 	"github.com/rancher/rancher/pkg/systemtemplate"
 	capi "sigs.k8s.io/cluster-api/api/v1alpha4"
 )
@@ -32,7 +33,7 @@ func (p *Planner) loadClusterAgent(controlPlane *rkev1.RKEControlPlane, machine 
 		return nil, err
 	}
 
-	taints, err := getTaints(machine, GetRuntime(controlPlane.Spec.KubernetesVersion))
+	taints, err := getTaints(machine, runtime.GetRuntime(controlPlane.Spec.KubernetesVersion))
 	if err != nil {
 		return nil, err
 	}

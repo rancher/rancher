@@ -6,6 +6,7 @@ import (
 
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
+	"github.com/rancher/rancher/pkg/provisioningv2/rke2/runtime"
 	capi "sigs.k8s.io/cluster-api/api/v1alpha4"
 )
 
@@ -16,13 +17,13 @@ func (p *Planner) getControlPlaneManifests(controlPlane *rkev1.RKEControlPlane, 
 		return nil, nil
 	}
 
-	clusterAgent, err := p.getClusterAgent(controlPlane, GetRuntime(controlPlane.Spec.KubernetesVersion), machine)
+	clusterAgent, err := p.getClusterAgent(controlPlane, runtime.GetRuntime(controlPlane.Spec.KubernetesVersion), machine)
 	if err != nil {
 		return nil, err
 	}
 	result = append(result, clusterAgent)
 
-	addons := p.getAddons(controlPlane, GetRuntime(controlPlane.Spec.KubernetesVersion))
+	addons := p.getAddons(controlPlane, runtime.GetRuntime(controlPlane.Spec.KubernetesVersion))
 	result = append(result, addons)
 
 	return result, nil

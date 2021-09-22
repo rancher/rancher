@@ -7,6 +7,7 @@ import (
 	"github.com/rancher/norman/types/convert"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/channelserver"
+	"github.com/rancher/rancher/pkg/provisioningv2/rke2/runtime"
 	capi "sigs.k8s.io/cluster-api/api/v1alpha4"
 )
 
@@ -14,7 +15,7 @@ func filterConfigData(config map[string]interface{}, controlPlane *rkev1.RKECont
 	var (
 		isServer = isControlPlane(machine) || isEtcd(machine)
 		release  = channelserver.GetReleaseConfigByRuntimeAndVersion(context.TODO(),
-			GetRuntime(controlPlane.Spec.KubernetesVersion),
+			runtime.GetRuntime(controlPlane.Spec.KubernetesVersion),
 			controlPlane.Spec.KubernetesVersion)
 	)
 
