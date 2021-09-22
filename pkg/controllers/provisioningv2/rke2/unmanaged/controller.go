@@ -4,9 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"k8s.io/client-go/util/retry"
 	"strings"
 	"time"
+
+	"k8s.io/client-go/util/retry"
 
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/clusterindex"
@@ -16,6 +17,7 @@ import (
 	rkecontroller "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/provisioningv2/kubeconfig"
 	"github.com/rancher/rancher/pkg/provisioningv2/rke2/planner"
+	rancherruntime "github.com/rancher/rancher/pkg/provisioningv2/rke2/runtime"
 	"github.com/rancher/rancher/pkg/taints"
 	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/rancher/wrangler/pkg/apply"
@@ -366,8 +368,8 @@ func (h *handler) onUnmanagedMachineOnRemove(key string, customMachine *rkev1.Cu
 		return customMachine, err
 	}
 
-	removeAnnotation := "etcd." + planner.GetRuntimeCommand(cluster.Spec.KubernetesVersion) + ".cattle.io/remove"
-	removedNodeNameAnnotation := "etcd." + planner.GetRuntimeCommand(cluster.Spec.KubernetesVersion) + ".cattle.io/removed-node-name"
+	removeAnnotation := "etcd." + rancherruntime.GetRuntimeCommand(cluster.Spec.KubernetesVersion) + ".cattle.io/remove"
+	removedNodeNameAnnotation := "etcd." + rancherruntime.GetRuntimeCommand(cluster.Spec.KubernetesVersion) + ".cattle.io/removed-node-name"
 
 	node, err := clientset.CoreV1().Nodes().Get(context.TODO(), machine.Status.NodeRef.Name, metav1.GetOptions{})
 	if err != nil {

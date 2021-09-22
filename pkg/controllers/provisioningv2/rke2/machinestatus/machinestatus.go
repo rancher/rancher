@@ -17,6 +17,7 @@ import (
 	provisioningcontrollers "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
 	rkecontroller "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/provisioningv2/rke2/planner"
+	rancherruntime "github.com/rancher/rancher/pkg/provisioningv2/rke2/runtime"
 	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/rancher/wrangler/pkg/condition"
 	"github.com/rancher/wrangler/pkg/data"
@@ -149,7 +150,7 @@ func (h *handler) setJoinURLFromOutput(machine *capi.Machine, nodePlan *plan.Nod
 	}
 
 	joinURL := fmt.Sprintf("https://%s:%d", u.Hostname(),
-		planner.GetRuntimeSupervisorPort(rkeControlPlane.Spec.KubernetesVersion))
+		rancherruntime.GetRuntimeSupervisorPort(rkeControlPlane.Spec.KubernetesVersion))
 	machine = machine.DeepCopy()
 	if machine.Annotations == nil {
 		machine.Annotations = map[string]string{}

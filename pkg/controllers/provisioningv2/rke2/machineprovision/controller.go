@@ -4,15 +4,16 @@ import (
 	"context"
 	errors2 "errors"
 	"fmt"
+	"path"
+	"strings"
+	"time"
+
 	"github.com/rancher/rancher/pkg/provisioningv2/kubeconfig"
 	v2provruntime "github.com/rancher/rancher/pkg/provisioningv2/rke2/runtime"
 	"github.com/sirupsen/logrus"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/util/retry"
-	"path"
 	capi "sigs.k8s.io/cluster-api/api/v1alpha4"
-	"strings"
-	"time"
 
 	"github.com/rancher/lasso/pkg/dynamic"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
@@ -52,7 +53,7 @@ type handler struct {
 	nodeDriverCache     mgmtcontrollers.NodeDriverCache
 	dynamic             *dynamic.Controller
 	rancherClusterCache ranchercontrollers.ClusterCache
-	kubeconfigManager	*kubeconfig.Manager
+	kubeconfigManager   *kubeconfig.Manager
 }
 
 func Register(ctx context.Context, clients *wrangler.Context) {
@@ -71,7 +72,7 @@ func Register(ctx context.Context, clients *wrangler.Context) {
 		namespaces:          clients.Core.Namespace().Cache(),
 		dynamic:             clients.Dynamic,
 		rancherClusterCache: clients.Provisioning.Cluster().Cache(),
-		kubeconfigManager: kubeconfig.New(clients),
+		kubeconfigManager:   kubeconfig.New(clients),
 	}
 
 	removeHandler := generic.NewRemoveHandler("machine-provision-remove", clients.Dynamic.Update, h.OnRemove)
