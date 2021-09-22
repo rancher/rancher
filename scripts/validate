@@ -17,6 +17,9 @@ echo Running: golangci-lint
 golangci-lint run
 
 echo Tidying up modules
+cd pkg/apis/
+go mod tidy
+cd ../..
 go mod tidy
 
 echo Verifying modules
