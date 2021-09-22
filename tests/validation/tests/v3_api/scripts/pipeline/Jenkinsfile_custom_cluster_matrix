@@ -24,7 +24,7 @@ node {
   def PYTEST_OPTIONS = "-k \"" + TESTS_TO_RUN.join(" or ") +"\""
 
   // set the branch for the testing code
-  def branch = "master"
+  def branch = "release/v2.6"
   if ("${env.branch}" != "null" && "${env.branch}" != "") {
     branch = "${env.branch}"
   }
