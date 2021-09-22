@@ -3,10 +3,11 @@ package planner
 import (
 	"errors"
 	"fmt"
-	"github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
 
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
+	"github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
 	rkecontroller "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
+	"github.com/rancher/rancher/pkg/provisioningv2/rke2/runtime"
 	"github.com/rancher/rancher/pkg/wrangler"
 	corecontrollers "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
@@ -105,7 +106,7 @@ func (e *etcdCreate) createPlan(controlPlane *rkev1.RKEControlPlane, snapshot *r
 		Files: s3Files,
 		Instructions: []plan.Instruction{{
 			Name:    "create",
-			Command: GetRuntimeCommand(controlPlane.Spec.KubernetesVersion),
+			Command: runtime.GetRuntimeCommand(controlPlane.Spec.KubernetesVersion),
 			Env:     s3Env,
 			Args:    append(args, s3Args...),
 		}},

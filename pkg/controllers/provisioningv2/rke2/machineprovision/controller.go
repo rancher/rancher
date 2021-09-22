@@ -344,6 +344,7 @@ func (h *handler) OnRemove(key string, obj runtime.Object) (runtime.Object, erro
 }
 
 func (h *handler) doRemove(obj runtime.Object) (runtime.Object, error) {
+	logrus.Infof("MachineProvision doing removal now")
 	d, err := data.Convert(obj.DeepCopyObject())
 	if err != nil {
 		return nil, err

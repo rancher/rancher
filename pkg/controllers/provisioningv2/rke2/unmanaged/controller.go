@@ -348,10 +348,14 @@ func (h *handler) onUnmanagedMachineOnRemove(key string, customMachine *rkev1.Cu
 		return customMachine, err
 	}
 
+	if _, ok := machine.Labels[planner.EtcdRoleLabel]; !ok {
+		return customMachine, nil // If we are not dealing with an unmanaged etcd node, we can go ahead and allow removal
+	}
+
 	if machine.Status.NodeRef == nil {
 		return customMachine, nil
 	}
-
+	// Check status of v1 node
 	restConfig, err := h.kubeconfigManager.GetRESTConfig(cluster, cluster.Status)
 	if err != nil {
 		return customMachine, err
@@ -361,15 +365,6 @@ func (h *handler) onUnmanagedMachineOnRemove(key string, customMachine *rkev1.Cu
 	if err != nil {
 		return customMachine, err
 	}
-
-	if _, ok := machine.Labels[planner.EtcdRoleLabel]; !ok {
-		err = clientset.CoreV1().Nodes().Delete(context.TODO(), machine.Status.NodeRef.Name, metav1.DeleteOptions{})
-		if apierror.IsNotFound(err) {
-			return customMachine, nil
-		}
-		return customMachine, err
-	}
-	// Check status of v1 node
 
 	removeAnnotation := "etcd." + planner.GetRuntimeCommand(cluster.Spec.KubernetesVersion) + ".cattle.io/remove"
 	removedNodeNameAnnotation := "etcd." + planner.GetRuntimeCommand(cluster.Spec.KubernetesVersion) + ".cattle.io/removed-node-name"
@@ -389,11 +384,7 @@ func (h *handler) onUnmanagedMachineOnRemove(key string, customMachine *rkev1.Cu
 			if removedNodeName, ok := node.Annotations[removedNodeNameAnnotation]; ok {
 				// There is the possibility the annotation is defined, but empty.
 				if removedNodeName != "" {
-					err = clientset.CoreV1().Nodes().Delete(context.TODO(), machine.Status.NodeRef.Name, metav1.DeleteOptions{})
-					if apierror.IsNotFound(err) {
-						return customMachine, nil
-					}
-					return customMachine, err
+					return customMachine, nil
 				}
 			}
 		}

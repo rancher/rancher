@@ -6,6 +6,7 @@ import (
 
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
+	rancherruntime "github.com/rancher/rancher/pkg/provisioningv2/rke2/runtime"
 	"github.com/rancher/wrangler/pkg/data/convert"
 	capi "sigs.k8s.io/cluster-api/api/v1alpha4"
 )
@@ -71,7 +72,7 @@ var allProbes = map[string]plan.Probe{
 }
 
 func isCalico(controlPlane *rkev1.RKEControlPlane, runtime string) bool {
-	if runtime != RuntimeRKE2 {
+	if runtime != rancherruntime.RuntimeRKE2 {
 		return false
 	}
 	cni := convert.ToString(controlPlane.Spec.MachineGlobalConfig.Data["cni"])
@@ -82,13 +83,13 @@ func isCalico(controlPlane *rkev1.RKEControlPlane, runtime string) bool {
 
 func (p *Planner) addProbes(nodePlan plan.NodePlan, controlPlane *rkev1.RKEControlPlane, machine *capi.Machine) (plan.NodePlan, error) {
 	var (
-		runtime    = GetRuntime(controlPlane.Spec.KubernetesVersion)
+		runtime    = rancherruntime.GetRuntime(controlPlane.Spec.KubernetesVersion)
 		probeNames []string
 	)
 
 	nodePlan.Probes = map[string]plan.Probe{}
 
-	if runtime != RuntimeK3S && isEtcd(machine) {
+	if runtime != rancherruntime.RuntimeK3S && isEtcd(machine) {
 		probeNames = append(probeNames, "etcd")
 	}
 	if isControlPlane(machine) {
@@ -96,7 +97,7 @@ func (p *Planner) addProbes(nodePlan plan.NodePlan, controlPlane *rkev1.RKEContr
 		probeNames = append(probeNames, "kube-controller-manager")
 		probeNames = append(probeNames, "kube-scheduler")
 	}
-	if !(IsOnlyEtcd(machine) && runtime == RuntimeK3S) {
+	if !(IsOnlyEtcd(machine) && runtime == rancherruntime.RuntimeK3S) {
 		// k3s doesn't run the kubelet on etcd only nodes
 		probeNames = append(probeNames, "kubelet")
 	}

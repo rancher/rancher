@@ -7,6 +7,7 @@ import (
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
 	rkecontroller "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
+	"github.com/rancher/rancher/pkg/provisioningv2/rke2/runtime"
 	"github.com/rancher/rancher/pkg/wrangler"
 	corecontrollers "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
@@ -80,7 +81,7 @@ func ensureInstalledInstruction(controlPlane *rkev1.RKEControlPlane) plan.Instru
 		Name:  "install",
 		Image: getInstallerImage(controlPlane),
 		Env: []string{
-			fmt.Sprintf("INSTALL_%s_SKIP_START=true", strings.ToUpper(GetRuntime(controlPlane.Spec.KubernetesVersion))),
+			fmt.Sprintf("INSTALL_%s_SKIP_START=true", strings.ToUpper(runtime.GetRuntime(controlPlane.Spec.KubernetesVersion))),
 		},
 	}
 }

@@ -5,6 +5,7 @@ import (
 
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
+	"github.com/rancher/rancher/pkg/provisioningv2/rke2/runtime"
 	corecontrollers "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
 )
 
@@ -13,7 +14,7 @@ func commonNodePlan(secrets corecontrollers.SecretCache, controlPlane *rkev1.RKE
 		return options, nil
 	}
 
-	registryConfig, files, err := toRegistryConfig(secrets, GetRuntime(controlPlane.Spec.KubernetesVersion),
+	registryConfig, files, err := toRegistryConfig(secrets, runtime.GetRuntime(controlPlane.Spec.KubernetesVersion),
 		controlPlane.Namespace, controlPlane.Spec.Registries)
 	if err != nil {
 		return plan.NodePlan{}, err
