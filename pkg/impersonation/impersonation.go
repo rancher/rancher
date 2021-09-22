@@ -55,7 +55,11 @@ func (i *Impersonator) SetUpImpersonation() (*corev1.ServiceAccount, error) {
 		return nil, err
 	}
 	if role != nil {
-		return i.getServiceAccount()
+		sa, err := i.getServiceAccount()
+		// in case the role exists but we were interrupted before creating the service account, proceed to create resources
+		if err == nil || !apierrors.IsNotFound(err) {
+			return sa, err
+		}
 	}
 	logrus.Tracef("impersonation: creating impersonation namespace")
 	err = i.createNamespace()
@@ -129,7 +133,7 @@ func (i *Impersonator) getServiceAccount() (*corev1.ServiceAccount, error) {
 				logrus.Tracef("impersonation: cached service accounts: %+v", sas)
 			}
 		}
-		return nil, fmt.Errorf("failed to get secret for service account: %s/%s, error: %w", impersonationNamespace, name, err)
+		return nil, fmt.Errorf("failed to get service account: %s/%s, error: %w", impersonationNamespace, name, err)
 	}
 	return sa, nil
 }
