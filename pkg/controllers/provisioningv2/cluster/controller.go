@@ -351,7 +351,7 @@ func (h *handler) updateStatus(objs []runtime.Object, cluster *v1.Cluster, statu
 			status.ClientSecretName = secret.Name
 
 			if features.MCM.Enabled() {
-				crtb, err := h.kubeconfigManager.GetCRTBForAdmin(cluster, status)
+				crtb, err := h.kubeconfigManager.GetCRTBForClusterOwner(cluster, status)
 				if err != nil {
 					return nil, status, err
 				}
