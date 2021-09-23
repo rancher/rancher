@@ -356,11 +356,12 @@ func (h *handler) doRemove(obj runtime.Object) (runtime.Object, error) {
 		return obj, fmt.Errorf("cannot delete machine %s because create job has not finished", infraName)
 	}
 
+	logrus.Infof("MachineProvision Running the removal via run")
 	obj, err = h.run(obj, false)
 	if err != nil {
 		return nil, err
 	}
-
+	logrus.Infof("MachineProvision run returned no error")
 	job, err := h.jobs.Get(d.String("metadata", "namespace"), getJobName(infraName))
 	if err != nil {
 		return nil, err
@@ -379,6 +380,7 @@ func (h *handler) doRemove(obj runtime.Object) (runtime.Object, error) {
 	}
 
 	// ErrSkip will not remove finalizer but treat this as currently reconciled
+	logrus.Infof("MachineProvision returning ErrSkip")
 	return nil, generic.ErrSkip
 }
 
