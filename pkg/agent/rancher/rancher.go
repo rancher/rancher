@@ -75,6 +75,7 @@ func (h *handler) startRancher() {
 		HTTPSListenPort: 443,
 		Features:        os.Getenv("CATTLE_FEATURES"),
 		AddLocal:        "true",
+		ClusterRegistry: os.Getenv("CATTLE_CLUSTER_REGISTRY"),
 	})
 	if err != nil {
 		logrus.Fatalf("Embedded rancher failed to initialize: %v", err)

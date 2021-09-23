@@ -24,9 +24,10 @@ import (
 
 func Register(ctx context.Context, server *steve.Server, wrangler *wrangler.Context) error {
 	shell := &shell{
-		cg:           server.ClientFactory,
-		namespace:    "cattle-system",
-		impersonator: podimpersonation.New("shell", server.ClientFactory, time.Hour, settings.FullShellImage),
+		cg:              server.ClientFactory,
+		namespace:       "cattle-system",
+		impersonator:    podimpersonation.New("shell", server.ClientFactory, time.Hour, settings.FullShellImage),
+		clusterRegistry: server.ClusterRegistry,
 	}
 	sc, err := config.NewScaledContext(*wrangler.RESTConfig, nil)
 	if err != nil {

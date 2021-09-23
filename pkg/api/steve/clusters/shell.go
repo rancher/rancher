@@ -21,9 +21,10 @@ import (
 )
 
 type shell struct {
-	namespace    string
-	impersonator *podimpersonation.PodImpersonation
-	cg           proxy.ClientGetter
+	namespace       string
+	impersonator    *podimpersonation.PodImpersonation
+	cg              proxy.ClientGetter
+	clusterRegistry string
 }
 
 func (s *shell) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
@@ -33,8 +34,14 @@ func (s *shell) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	pod, err := s.impersonator.CreatePod(ctx, user, s.createPod(), &podimpersonation.PodOptions{
-		Wait: true,
+	var imageOverride string
+	if s.clusterRegistry != "" {
+		imageOverride = s.clusterRegistry + "/" + settings.ShellImage.Get()
+	}
+
+	pod, err := s.impersonator.CreatePod(ctx, user, s.createPod(imageOverride), &podimpersonation.PodOptions{
+		Wait:          true,
+		ImageOverride: imageOverride,
 	})
 	if err != nil {
 		http.Error(rw, err.Error(), http.StatusInternalServerError)
@@ -102,7 +109,11 @@ func (s *shell) contextAndClient(req *http.Request) (context.Context, user.Info,
 	return ctx, user, client, nil
 }
 
-func (s *shell) createPod() *v1.Pod {
+func (s *shell) createPod(imageOverride string) *v1.Pod {
+	imageName := imageOverride
+	if imageName == "" {
+		imageName = settings.FullShellImage()
+	}
 	return &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: "dashboard-shell-",
@@ -146,7 +157,7 @@ func (s *shell) createPod() *v1.Pod {
 							Value: "/home/shell/.kube/config",
 						},
 					},
-					Image:           settings.FullShellImage(),
+					Image:           imageName,
 					ImagePullPolicy: v1.PullIfNotPresent,
 				},
 			},

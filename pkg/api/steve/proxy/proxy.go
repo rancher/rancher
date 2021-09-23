@@ -26,7 +26,6 @@ import (
 type Handler struct {
 	authorizer    authorizer.Authorizer
 	dialerFactory ClusterDialerFactory
-	clusters      v3.ClusterCache
 }
 
 type ClusterDialerFactory func(clusterID string) remotedialer.Dialer
@@ -109,7 +108,6 @@ func NewProxyHandler(authorizer authorizer.Authorizer,
 	return &Handler{
 		authorizer:    authorizer,
 		dialerFactory: dialerFactory,
-		clusters:      clusters,
 	}
 }
 

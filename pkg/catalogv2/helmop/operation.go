@@ -104,7 +104,7 @@ func NewOperations(
 	}
 }
 
-func (s *Operations) Uninstall(ctx context.Context, user user.Info, namespace, name string, options io.Reader) (*catalog.Operation, error) {
+func (s *Operations) Uninstall(ctx context.Context, user user.Info, namespace, name string, options io.Reader, imageOverride string) (*catalog.Operation, error) {
 	status, cmds, err := s.getUninstallArgs(namespace, name, options)
 	if err != nil {
 		return nil, err
@@ -115,10 +115,10 @@ func (s *Operations) Uninstall(ctx context.Context, user user.Info, namespace, n
 		return nil, err
 	}
 
-	return s.createOperation(ctx, user, status, cmds)
+	return s.createOperation(ctx, user, status, cmds, imageOverride)
 }
 
-func (s *Operations) Upgrade(ctx context.Context, user user.Info, namespace, name string, options io.Reader) (*catalog.Operation, error) {
+func (s *Operations) Upgrade(ctx context.Context, user user.Info, namespace, name string, options io.Reader, imageOverride string) (*catalog.Operation, error) {
 	status, cmds, err := s.getUpgradeCommand(namespace, name, options)
 	if err != nil {
 		return nil, err
@@ -129,10 +129,10 @@ func (s *Operations) Upgrade(ctx context.Context, user user.Info, namespace, nam
 		return nil, err
 	}
 
-	return s.createOperation(ctx, user, status, cmds)
+	return s.createOperation(ctx, user, status, cmds, imageOverride)
 }
 
-func (s *Operations) Install(ctx context.Context, user user.Info, namespace, name string, options io.Reader) (*catalog.Operation, error) {
+func (s *Operations) Install(ctx context.Context, user user.Info, namespace, name string, options io.Reader, imageOverride string) (*catalog.Operation, error) {
 	status, cmds, err := s.getInstallCommand(namespace, name, options)
 	if err != nil {
 		return nil, err
@@ -143,7 +143,7 @@ func (s *Operations) Install(ctx context.Context, user user.Info, namespace, nam
 		return nil, err
 	}
 
-	return s.createOperation(ctx, user, status, cmds)
+	return s.createOperation(ctx, user, status, cmds, imageOverride)
 }
 
 func decodeParams(req *http.Request, target runtime.Object) error {
@@ -631,7 +631,7 @@ func namespace(ns string) string {
 	return ns
 }
 
-func (s *Operations) createOperation(ctx context.Context, user user.Info, status catalog.OperationStatus, cmds Commands) (*catalog.Operation, error) {
+func (s *Operations) createOperation(ctx context.Context, user user.Info, status catalog.OperationStatus, cmds Commands, imageOverride string) (*catalog.Operation, error) {
 	if status.Action != "uninstall" {
 		_, err := s.createNamespace(ctx, status.Namespace, status.ProjectID)
 		if err != nil {
@@ -644,7 +644,7 @@ func (s *Operations) createOperation(ctx context.Context, user user.Info, status
 		return nil, err
 	}
 
-	pod, podOptions := s.createPod(secretData)
+	pod, podOptions := s.createPod(secretData, imageOverride)
 	pod, err = s.Impersonator.CreatePod(ctx, user, pod, podOptions)
 	if err != nil {
 		return nil, err
@@ -789,7 +789,11 @@ func (s *Operations) createNamespace(ctx context.Context, namespace, projectID s
 	return nil, fmt.Errorf("failed to wait for roles to be populated")
 }
 
-func (s *Operations) createPod(secretData map[string][]byte) (*v1.Pod, *podimpersonation.PodOptions) {
+func (s *Operations) createPod(secretData map[string][]byte, imageOverride string) (*v1.Pod, *podimpersonation.PodOptions) {
+	image := imageOverride
+	if image == "" {
+		image = settings.FullShellImage()
+	}
 	secret := &v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: "helm-operation-",
@@ -856,7 +860,7 @@ func (s *Operations) createPod(secretData map[string][]byte) (*v1.Pod, *podimper
 					Stdin:           true,
 					TTY:             true,
 					StdinOnce:       true,
-					Image:           settings.FullShellImage(),
+					Image:           image,
 					ImagePullPolicy: v1.PullIfNotPresent,
 					Command:         []string{"helm-cmd"},
 					WorkingDir:      helmDataPath,
@@ -875,5 +879,6 @@ func (s *Operations) createPod(secretData map[string][]byte) (*v1.Pod, *podimper
 		SecretsToCreate: []*v1.Secret{
 			secret,
 		},
+		ImageOverride: imageOverride,
 	}
 }
