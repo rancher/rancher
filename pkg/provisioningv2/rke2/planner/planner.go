@@ -816,13 +816,19 @@ func restartStamp(nodePlan plan.NodePlan, controlPlane *rkev1.RKEControlPlane, i
 func (p *Planner) addInstruction(nodePlan plan.NodePlan, controlPlane *rkev1.RKEControlPlane, machine *capi.Machine) (plan.NodePlan, error) {
 	image := getInstallerImage(controlPlane)
 
+	agentArgs := make([]string, 0, len(controlPlane.Spec.AgentEnvVars))
+	for _, arg := range controlPlane.Spec.AgentEnvVars {
+		if arg.Value == "" {
+			continue
+		}
+		agentArgs = append(agentArgs, fmt.Sprintf("%s=%s", arg.Name, arg.Value))
+	}
+
 	instruction := plan.Instruction{
 		Image:   image,
 		Command: "sh",
 		Args:    []string{"-c", "run.sh"},
-		Env: []string{
-			fmt.Sprintf("RESTART_STAMP=%s", restartStamp(nodePlan, controlPlane, image)),
-		},
+		Env:     append(agentArgs, fmt.Sprintf("RESTART_STAMP=%s", restartStamp(nodePlan, controlPlane, image))),
 	}
 
 	if isOnlyWorker(machine) {
