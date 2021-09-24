@@ -41,6 +41,19 @@ restrictedAdmin: false
 # extraEnv:
 # - name: CATTLE_TLS_MIN_VERSION
 #   value: "1.0"
+#
+# Extra volumes for the rancher pods.
+# extraVolumes:
+# - name: extra-volume
+#   configMap:
+#     name: extra-volume-configmap
+#
+# Extra volume mounts for the rancher pods.
+# extraVolumeMounts:
+#   - mountPath: /etc/extra/extra.conf
+#     name: extra-volume
+#     subPath: extra.conf
+#     readOnly: true
 
 # Fully qualified name to reach your Rancher server
 # hostname: rancher.my.org

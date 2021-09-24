@@ -155,6 +155,9 @@ spec:
         resources:
 {{ toYaml .Values.resources | indent 10 }}
         volumeMounts:
+{{- if .Values.extraVolumeMounts }}
+{{ toYaml .Values.extraVolumeMounts | indent 10 }}
+{{- end }}
 {{- if .Values.additionalTrustedCAs }}
         - mountPath: /etc/pki/trust/anchors/ca-additional.pem
           name: tls-ca-additional-volume
@@ -197,6 +200,9 @@ spec:
           name: audit-log
 {{- end }}
       volumes:
+{{- if .Values.extraVolumes }}
+{{ toYaml .Values.extraVolumes | indent 8 }}
+{{- end }}
 {{- if .Values.additionalTrustedCAs }}
       - name: tls-ca-additional-volume
         secret:
