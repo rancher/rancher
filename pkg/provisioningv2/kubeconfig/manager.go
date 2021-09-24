@@ -90,6 +90,10 @@ func (m *Manager) EnsureUser(clusterNamespace, clusterName string) (string, erro
 	return userName, m.createUser(principalID, userName)
 }
 
+func (m *Manager) DeleteUser(clusterNamespace, clusterName string) error {
+	return m.deleteUser(getUserNameForPrincipal(getPrincipalID(clusterNamespace, clusterName)))
+}
+
 func getUserNameForPrincipal(principal string) string {
 	hasher := sha256.New()
 	hasher.Write([]byte(principal))
@@ -147,6 +151,13 @@ func (m *Manager) createUser(principalID, userName string) error {
 	return err
 }
 
+func (m *Manager) deleteUser(userName string) error {
+	if err := m.users.Delete(userName, nil); err != nil && !apierror.IsNotFound(err) {
+		return err
+	}
+	return nil
+}
+
 func (m *Manager) createUserToken(userName string) (string, error) {
 	_, err := m.tokens.Get(userName, metav1.GetOptions{})
 	if err == nil {
@@ -201,7 +212,7 @@ func createSHA256Hash(secretKey string) (string, error) {
 	return fmt.Sprintf(hashFormat, Version, encSalt, encKey), nil
 }
 
-func (m *Manager) GetCRTBForAdmin(cluster *v1.Cluster, status v1.ClusterStatus) (*v3.ClusterRoleTemplateBinding, error) {
+func (m *Manager) GetCRTBForClusterOwner(cluster *v1.Cluster, status v1.ClusterStatus) (*v3.ClusterRoleTemplateBinding, error) {
 	if status.ClusterName == "" {
 		return nil, fmt.Errorf("management cluster is not assigned to v1.Cluster")
 	}
@@ -209,7 +220,7 @@ func (m *Manager) GetCRTBForAdmin(cluster *v1.Cluster, status v1.ClusterStatus) 
 	userName := getUserNameForPrincipal(principalID)
 	return &v3.ClusterRoleTemplateBinding{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      name.SafeConcatName(status.ClusterName, "owner"),
+			Name:      name.SafeConcatName(status.ClusterName, cluster.Namespace, "owner"),
 			Namespace: status.ClusterName,
 		},
 		ClusterName:       status.ClusterName,
@@ -283,7 +294,7 @@ func (m *Manager) getKubeConfigData(cluster *v1.Cluster, secretName, managementC
 			Namespace: cluster.Namespace,
 			Name:      secretName,
 			OwnerReferences: []metav1.OwnerReference{{
-				APIVersion: "provisioning.cattle.io/v1",
+				APIVersion: v1.SchemeGroupVersion.String(),
 				Kind:       "Cluster",
 				Name:       cluster.Name,
 				UID:        cluster.UID,
