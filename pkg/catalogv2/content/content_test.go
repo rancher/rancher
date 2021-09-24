@@ -211,7 +211,7 @@ func TestFilteringReleases(t *testing.T) {
 		rancherVersion              string
 		kubernetesVersionAnnotation string
 		kubernetesVersion           string
-		skipFiltering								bool
+		skipFiltering               bool
 		expectedPass                bool
 	}{
 		{

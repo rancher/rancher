@@ -2,6 +2,7 @@ package dashboard
 
 import (
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	fleetconst "github.com/rancher/rancher/pkg/fleet"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/wrangler"
@@ -18,7 +19,7 @@ func addLocalCluster(embedded bool, wrangler *wrangler.Context) error {
 		Spec: v32.ClusterSpec{
 			Internal:           true,
 			DisplayName:        "local",
-			FleetWorkspaceName: "fleet-local",
+			FleetWorkspaceName: fleetconst.ClustersLocalNamespace,
 			ClusterSpecBase: v32.ClusterSpecBase{
 				DockerRootDir: settings.InitialDockerRootDir.Get(),
 			},

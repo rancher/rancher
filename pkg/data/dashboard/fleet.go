@@ -5,6 +5,7 @@ import (
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/features"
+	fleetconst "github.com/rancher/rancher/pkg/fleet"
 	mngtv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/wrangler"
 	rbacv1 "github.com/rancher/wrangler/pkg/generated/controllers/rbac/v1"
@@ -60,7 +61,7 @@ func ensureWebhookAPIService(apiservices mngtv3.APIServiceClient) error {
 
 		Spec: v3.APIServiceSpec{
 			SecretName:      "stv-aggregation",
-			SecretNamespace: "cattle-fleet-system",
+			SecretNamespace: fleetconst.ReleaseNamespace,
 			Paths: []string{
 				"/fleet/webhook",
 			},

@@ -7,6 +7,7 @@ import (
 	fleet "github.com/rancher/fleet/pkg/apis/fleet.cattle.io/v1alpha1"
 	mgmt "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	v1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
+	fleetconst "github.com/rancher/rancher/pkg/fleet"
 	fleetcontrollers "github.com/rancher/rancher/pkg/generated/controllers/fleet.cattle.io/v1alpha1"
 	mgmtcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	rocontrollers "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
@@ -57,7 +58,7 @@ func (h *handler) assignWorkspace(key string, cluster *mgmt.Cluster) (*mgmt.Clus
 
 	if cluster.Spec.Internal && cluster.Spec.FleetWorkspaceName == "" {
 		newCluster := cluster.DeepCopy()
-		newCluster.Spec.FleetWorkspaceName = "fleet-local"
+		newCluster.Spec.FleetWorkspaceName = fleetconst.ClustersLocalNamespace
 		return h.clusters.Update(newCluster)
 	} else if cluster.Spec.Internal {
 		return cluster, nil
@@ -78,7 +79,7 @@ func (h *handler) assignWorkspace(key string, cluster *mgmt.Cluster) (*mgmt.Clus
 }
 
 func (h *handler) ensureAgentMigrated(key string, cluster *fleet.Cluster) (*fleet.Cluster, error) {
-	if cluster != nil && cluster.Name == "local" && cluster.Namespace == "fleet-local" &&
+	if cluster != nil && cluster.Name == "local" && cluster.Namespace == fleetconst.ClustersLocalNamespace &&
 		cluster.Spec.AgentNamespace == "" {
 		// keep re-enqueueing until agentNamespace is set. This happens before the fleet
 		// CRD is upgraded to include the new agentNamespace field
@@ -110,7 +111,7 @@ func (h *handler) createCluster(cluster *v1.Cluster, status v1.ClusterStatus) ([
 	agentNamespace := ""
 	clientSecret := status.ClientSecretName
 	if mgmtCluster.Spec.Internal {
-		agentNamespace = "cattle-fleet-local-system"
+		agentNamespace = fleetconst.ReleaseLocalNamespace
 		clientSecret = "local-cluster"
 	}
 

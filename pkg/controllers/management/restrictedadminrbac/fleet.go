@@ -5,6 +5,7 @@ import (
 
 	"github.com/hashicorp/go-multierror"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	fleetconst "github.com/rancher/rancher/pkg/fleet"
 	"github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/wrangler/pkg/relatedresource"
 	k8srbac "k8s.io/api/rbac/v1"
@@ -15,7 +16,7 @@ import (
 )
 
 func (r *rbaccontroller) enqueueGrb(namespace, _ string, obj runtime.Object) ([]relatedresource.Key, error) {
-	if fw, ok := obj.(*v3.FleetWorkspace); !ok || fw.Name == "fleet-local" {
+	if fw, ok := obj.(*v3.FleetWorkspace); !ok || fw.Name == fleetconst.ClustersLocalNamespace {
 		return nil, nil
 	}
 
@@ -51,7 +52,7 @@ func (r *rbaccontroller) ensureRestricedAdminForFleet(key string, obj *v3.Global
 
 	var finalError error
 	for _, fw := range fleetworkspaces {
-		if fw.Name == "fleet-local" {
+		if fw.Name == fleetconst.ClustersLocalNamespace {
 			continue
 		}
 		if err := r.ensureRolebinding(fw.Name, obj.UserName, obj); err != nil {

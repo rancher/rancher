@@ -12,6 +12,7 @@ import (
 	"github.com/rancher/fleet/pkg/apis/fleet.cattle.io/v1alpha1"
 	rancherv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
+	fleetconst "github.com/rancher/rancher/pkg/fleet"
 	v3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	rocontrollers "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
 	namespaces "github.com/rancher/rancher/pkg/namespace"
@@ -70,7 +71,7 @@ func (h *handler) OnChange(cluster *rancherv1.Cluster, status rancherv1.ClusterS
 		result     []runtime.Object
 	)
 
-	if cluster.Status.ClusterName == "local" && cluster.Namespace == "fleet-local" {
+	if cluster.Status.ClusterName == "local" && cluster.Namespace == fleetconst.ClustersLocalNamespace {
 		secretName += "-local-"
 
 		token, err := h.clusterRegistrationTokens.Get(cluster.Status.ClusterName, "default-token")

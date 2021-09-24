@@ -10,6 +10,7 @@ import (
 
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	authsettings "github.com/rancher/rancher/pkg/auth/settings"
+	fleetconst "github.com/rancher/rancher/pkg/fleet"
 	"github.com/sirupsen/logrus"
 )
 
@@ -102,7 +103,7 @@ var (
 	ChartDefaultBranch                = NewSetting("chart-default-branch", "dev-v2.6")
 	PartnerChartDefaultBranch         = NewSetting("partner-chart-default-branch", "main")
 	RKE2ChartDefaultBranch            = NewSetting("rke2-chart-default-branch", "main")
-	FleetDefaultWorkspaceName         = NewSetting("fleet-default-workspace-name", "fleet-default") // fleetWorkspaceName to assign to clusters with none
+	FleetDefaultWorkspaceName         = NewSetting("fleet-default-workspace-name", fleetconst.ClustersDefaultNamespace) // fleetWorkspaceName to assign to clusters with none
 	ShellImage                        = NewSetting("shell-image", "rancher/shell:v0.1.10")
 	IgnoreNodeName                    = NewSetting("ignore-node-name", "") // nodes to ignore when syncing v1.node to v3.node
 	NoDefaultAdmin                    = NewSetting("no-default-admin", "")
