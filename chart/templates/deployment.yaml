@@ -156,7 +156,7 @@ spec:
 {{ toYaml .Values.resources | indent 10 }}
         volumeMounts:
 {{- if .Values.extraVolumeMounts }}
-{{ toYaml .Values.extraVolumeMounts | indent 10 }}
+{{ toYaml .Values.extraVolumeMounts | indent 8 }}
 {{- end }}
 {{- if .Values.additionalTrustedCAs }}
         - mountPath: /etc/pki/trust/anchors/ca-additional.pem
@@ -201,7 +201,7 @@ spec:
 {{- end }}
       volumes:
 {{- if .Values.extraVolumes }}
-{{ toYaml .Values.extraVolumes | indent 8 }}
+{{ toYaml .Values.extraVolumes | indent 6 }}
 {{- end }}
 {{- if .Values.additionalTrustedCAs }}
       - name: tls-ca-additional-volume
