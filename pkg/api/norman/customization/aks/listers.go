@@ -428,6 +428,10 @@ func encodeOutput(result interface{}) ([]byte, int, error) {
 func upgradeableVersionsMap(upgradeProfile containerservice.OrchestratorVersionProfile) map[string]bool {
 	rval := make(map[string]bool, 0)
 
+	if upgradeProfile.Upgrades == nil {
+		// already on latest version, no upgrades available
+		return rval
+	}
 	for _, profile := range *upgradeProfile.Upgrades {
 		rval[*profile.OrchestratorVersion] = true
 	}
