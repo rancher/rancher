@@ -246,7 +246,11 @@ func (r *Rancher) Start(ctx context.Context) error {
 			return err
 		}
 
-		return forceUpgradeLogout(r.Wrangler.Core.ConfigMap(), r.Wrangler.Mgmt.Token(), "v2.6.0")
+		if err := forceUpgradeLogout(r.Wrangler.Core.ConfigMap(), r.Wrangler.Mgmt.Token(), "v2.6.0"); err != nil {
+			return err
+		}
+
+		return forceSystemAndDefaultProjectCreation(r.Wrangler.Core.ConfigMap(), r.Wrangler.Mgmt.Cluster())
 	})
 
 	if err := r.authServer.Start(ctx, false); err != nil {

@@ -2,6 +2,7 @@ package rancher
 
 import (
 	"github.com/mcuadros/go-version"
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	v3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	rancherversion "github.com/rancher/rancher/pkg/version"
@@ -15,25 +16,24 @@ import (
 )
 
 const (
-	cattleNamespace          = "cattle-system"
-	forceUpgradeLogoutConfig = "forceupgradelogout"
-	rancherVersionKey        = "rancherVersion"
+	cattleNamespace                           = "cattle-system"
+	forceUpgradeLogoutConfig                  = "forceupgradelogout"
+	forceLocalSystemAndDefaultProjectCreation = "forcelocalprojectcreation"
+	rancherVersionKey                         = "rancherVersion"
+	projectsCreatedKey                        = "projectsCreated"
 )
 
-// forceUpgradeLogout will delete all dashboard tokens forcing a logout.  This is useful when there is a major frontend
-// upgrade and we want all users to be sent to a central point.  This function will check for the `forceUpgradeLogoutConfig`
-// configuration map and only run if the last migrated version is lower than the given `migrationVersion`.
-func forceUpgradeLogout(configMapController controllerv1.ConfigMapController, tokenController v3.TokenController, migrationVersion string) error {
-	cm, err := configMapController.Cache().Get(cattleNamespace, forceUpgradeLogoutConfig)
+func getConfigMap(configMapController controllerv1.ConfigMapController, configMapName string) (*v1.ConfigMap, error) {
+	cm, err := configMapController.Cache().Get(cattleNamespace, configMapName)
 	if err != nil && !k8serror.IsNotFound(err) {
-		return err
+		return nil, err
 	}
 
 	// if this is the first ever migration initialize the configmap
 	if cm == nil {
 		cm = &v1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      forceUpgradeLogoutConfig,
+				Name:      configMapName,
 				Namespace: cattleNamespace,
 			},
 			Data: make(map[string]string, 1),
@@ -42,7 +42,30 @@ func forceUpgradeLogout(configMapController controllerv1.ConfigMapController, to
 
 	// we do not migrate in development environments
 	if rancherversion.Version == "dev" {
-		return nil
+		return nil, nil
+	}
+
+	return cm, nil
+}
+
+func createOrUpdateConfigMap(configMapClient controllerv1.ConfigMapClient, cm *v1.ConfigMap) error {
+	var err error
+	if cm.ObjectMeta.GetResourceVersion() != "" {
+		_, err = configMapClient.Update(cm)
+	} else {
+		_, err = configMapClient.Create(cm)
+	}
+
+	return err
+}
+
+// forceUpgradeLogout will delete all dashboard tokens forcing a logout.  This is useful when there is a major frontend
+// upgrade and we want all users to be sent to a central point.  This function will check for the `forceUpgradeLogoutConfig`
+// configuration map and only run if the last migrated version is lower than the given `migrationVersion`.
+func forceUpgradeLogout(configMapController controllerv1.ConfigMapController, tokenController v3.TokenController, migrationVersion string) error {
+	cm, err := getConfigMap(configMapController, forceUpgradeLogoutConfig)
+	if err != nil || cm == nil {
+		return err
 	}
 
 	// if no last migration is found we always run force logout
@@ -76,13 +99,39 @@ func forceUpgradeLogout(configMapController controllerv1.ConfigMapController, to
 		}
 	}
 
-	// record the migration being completed
 	cm.Data[rancherVersionKey] = rancherversion.Version
-	if cm.ObjectMeta.GetResourceVersion() != "" {
-		_, err = configMapController.Update(cm)
-	} else {
-		_, err = configMapController.Create(cm)
+	return createOrUpdateConfigMap(configMapController, cm)
+}
+
+// forceSystemAndDefaultProjectCreation will set the correcsponding conditions on the local cluster object,
+// if it exists, to Unknown. This will force the corresponding controller to check that the projects exist
+// and create them, if necessary.
+func forceSystemAndDefaultProjectCreation(configMapController controllerv1.ConfigMapController, clusterClient v3.ClusterClient) error {
+	cm, err := getConfigMap(configMapController, forceLocalSystemAndDefaultProjectCreation)
+	if err != nil || cm == nil {
+		return err
 	}
 
-	return err
+	if cm.Data[projectsCreatedKey] == "true" {
+		return nil
+	}
+
+	localCluster, err := clusterClient.Get("local", metav1.GetOptions{})
+	if err != nil {
+		if k8serror.IsNotFound(err) {
+			return nil
+		}
+		return err
+	}
+
+	v32.ClusterConditionconditionDefaultProjectCreated.Unknown(localCluster)
+	v32.ClusterConditionconditionSystemProjectCreated.Unknown(localCluster)
+
+	_, err = clusterClient.Update(localCluster)
+	if err != nil {
+		return err
+	}
+
+	cm.Data[projectsCreatedKey] = "true"
+	return createOrUpdateConfigMap(configMapController, cm)
 }
