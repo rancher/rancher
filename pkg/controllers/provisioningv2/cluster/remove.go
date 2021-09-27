@@ -95,16 +95,28 @@ func (h *handler) OnClusterRemove(_ string, cluster *v1.Cluster) (*v1.Cluster, e
 
 func (h *handler) doClusterRemove(cluster *v1.Cluster) (string, error) {
 	if cluster.Status.ClusterName != "" {
-		err := h.mgmtClusters.Delete(cluster.Status.ClusterName, nil)
-		if err != nil && !apierrors.IsNotFound(err) {
-			return "", err
-		}
-
-		if h.isLegacyCluster(cluster) {
-			// If this is a legacy cluster (i.e. RKE1 cluster) then we should wait to remove the provisioning cluster until the v3.Cluster is gone.
-			_, err = h.mgmtClusterCache.Get(cluster.Status.ClusterName)
+		mgmtCluster, err := h.mgmtClusters.Get(cluster.Status.ClusterName, metav1.GetOptions{})
+		if err != nil {
+			// We do nothing if the management cluster does not exist (IsNotFound) because it's been deleted.
 			if !apierrors.IsNotFound(err) {
-				return fmt.Sprintf("waiting for cluster [%s] to delete", cluster.Status.ClusterName), nil
+				return "", err
+			}
+		} else if cluster.Namespace == mgmtCluster.Spec.FleetWorkspaceName {
+			// We only delete the management cluster if its FleetWorkspaceName matches the provisioning cluster's
+			// namespace. The reason: if there's a mismatch, we know that the provisioning cluster needs to be migrated
+			// because the user moved the Fleet cluster (and provisioning cluster, by extension) to another
+			// FleetWorkspace. Ultimately, the aforementioned cluster objects are re-created in another namespace.
+			err := h.mgmtClusters.Delete(cluster.Status.ClusterName, nil)
+			if err != nil && !apierrors.IsNotFound(err) {
+				return "", err
+			}
+
+			if h.isLegacyCluster(cluster) {
+				// If this is a legacy cluster (i.e. RKE1 cluster) then we should wait to remove the provisioning cluster until the v3.Cluster is gone.
+				_, err = h.mgmtClusterCache.Get(cluster.Status.ClusterName)
+				if !apierrors.IsNotFound(err) {
+					return fmt.Sprintf("waiting for cluster [%s] to delete", cluster.Status.ClusterName), nil
+				}
 			}
 		}
 	}
@@ -142,5 +154,5 @@ func (h *handler) doClusterRemove(cluster *v1.Cluster) (string, error) {
 		return fmt.Sprintf("waiting for cluster-api cluster [%s] to delete", cluster.Name), nil
 	}
 
-	return "", nil
+	return "", h.kubeconfigManager.DeleteUser(cluster.Namespace, cluster.Name)
 }
