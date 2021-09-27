@@ -66,6 +66,11 @@ func (s *AppStateCalculator) sync(key string, obj *util.Workload) error {
 		}
 		app, err := s.appLister.Get(projectNS, label)
 		if err != nil {
+			if errors.IsNotFound(err) {
+				// If Rancher is unaware of an app, we should ignore tracking its state
+				// A non-existent app is likely managed by another Rancher (e.g. Hosted Rancher)
+				return nil
+			}
 			if !errors.IsNotFound(err) {
 				return err
 			}
