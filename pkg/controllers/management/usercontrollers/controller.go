@@ -181,11 +181,6 @@ func (c *ClusterLifecycleCleanup) cleanupImportedCluster(cluster *v3.Cluster) er
 		return err
 	}
 
-	err = userContext.Core.Namespaces("").Delete("cattle-system", &metav1.DeleteOptions{})
-	if err != nil {
-		return err
-	}
-
 	return nil
 }
 
