@@ -3,12 +3,14 @@ package planner
 import (
 	"context"
 	"errors"
+	"time"
 
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2/bootstrap"
 	v1 "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/provisioningv2/rke2/planner"
 	"github.com/rancher/rancher/pkg/wrangler"
+	"github.com/rancher/wrangler/pkg/generic"
 	"github.com/rancher/wrangler/pkg/relatedresource"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
@@ -61,14 +63,13 @@ func (h *handler) OnChange(cluster *rkev1.RKEControlPlane, status rkev1.RKEContr
 	}
 
 	planner.Provisioned.SetError(&status, "", err)
-	if err != nil {
+	if err != nil && !errors.Is(err, generic.ErrSkip) {
 		// don't return error because the controller will reset the status and then not assign the error
 		// because we don't register this handler with an associated condition. This is pretty much a bug in the
 		// framework but it's too impactful to change right before 2.6.0 so we should consider changing this later.
 		// If you are reading this years later we'll just assume we decided not to change the framework.
 		logrus.Errorf("error in planner for '%s/%s': %v", cluster.Namespace, cluster.Name, err)
-		// This will rate limit
-		h.controlPlanes.Enqueue(cluster.Namespace, cluster.Name)
+		h.controlPlanes.EnqueueAfter(cluster.Namespace, cluster.Name, 5*time.Second)
 	}
 	return status, nil
 }
