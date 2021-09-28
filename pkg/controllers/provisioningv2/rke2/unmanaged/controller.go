@@ -7,8 +7,6 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/client-go/util/retry"
-
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/clusterindex"
 	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1alpha4"
@@ -24,12 +22,14 @@ import (
 	"github.com/rancher/wrangler/pkg/data"
 	corecontrollers "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/pkg/kv"
+	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	apierror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/util/retry"
 	capi "sigs.k8s.io/cluster-api/api/v1alpha4"
 )
 
@@ -334,6 +334,8 @@ func (h *handler) onUnmanagedMachineOnRemove(key string, customMachine *rkev1.Cu
 		return customMachine, nil
 	}
 
+	logrus.Debugf("[UnmanagedMachine] Removing machine %s in cluster %s", key, clusterName)
+
 	cluster, err := h.clusterCache.Get(customMachine.Namespace, clusterName)
 	if apierror.IsNotFound(err) {
 		return customMachine, nil
@@ -342,7 +344,8 @@ func (h *handler) onUnmanagedMachineOnRemove(key string, customMachine *rkev1.Cu
 	}
 
 	if !cluster.DeletionTimestamp.IsZero() {
-		return customMachine, nil
+		logrus.Debugf("[UnmanagedMachine] Machine %s belonged to cluster %s that is being deleted. Skipping safe removal", key, clusterName)
+		return customMachine, nil // if the cluster is deleting, we don't care about safe etcd member removal.
 	}
 
 	machine, err := h.getMachine(customMachine)
@@ -351,10 +354,12 @@ func (h *handler) onUnmanagedMachineOnRemove(key string, customMachine *rkev1.Cu
 	}
 
 	if _, ok := machine.Labels[planner.EtcdRoleLabel]; !ok {
-		return customMachine, nil // If we are not dealing with an unmanaged etcd node, we can go ahead and allow removal
+		logrus.Debugf("[UnmanagedMachine] Safe removal for machine %s in cluster %s not necessary as it is not an etcd node", key, clusterName)
+		return customMachine, nil // If we are not dealing with an etcd node, we can go ahead and allow removal
 	}
 
 	if machine.Status.NodeRef == nil {
+		logrus.Infof("[UnmanagedMachine] No associated node found for machine %s in cluster %s, proceeding with removal", key, clusterName)
 		return customMachine, nil
 	}
 	// Check status of v1 node

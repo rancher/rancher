@@ -8,13 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/rancher/rancher/pkg/provisioningv2/kubeconfig"
-	v2provruntime "github.com/rancher/rancher/pkg/provisioningv2/rke2/runtime"
-	"github.com/sirupsen/logrus"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/util/retry"
-	capi "sigs.k8s.io/cluster-api/api/v1alpha4"
-
 	"github.com/rancher/lasso/pkg/dynamic"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/controllers/management/drivers/nodedriver"
@@ -22,6 +15,8 @@ import (
 	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1alpha4"
 	mgmtcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	ranchercontrollers "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
+	"github.com/rancher/rancher/pkg/provisioningv2/kubeconfig"
+	v2provruntime "github.com/rancher/rancher/pkg/provisioningv2/rke2/runtime"
 	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/rancher/wrangler/pkg/apply"
 	"github.com/rancher/wrangler/pkg/condition"
@@ -31,6 +26,7 @@ import (
 	corecontrollers "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/pkg/generic"
 	"github.com/rancher/wrangler/pkg/summary"
+	"github.com/sirupsen/logrus"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierror "k8s.io/apimachinery/pkg/api/errors"
@@ -39,6 +35,9 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/util/retry"
+	capi "sigs.k8s.io/cluster-api/api/v1alpha4"
 	"sigs.k8s.io/cluster-api/errors"
 )
 
@@ -253,25 +252,25 @@ func (h *handler) OnRemove(key string, obj runtime.Object) (runtime.Object, erro
 		return nil, err
 	}
 
+	// In the event we are removing an etcd node (as indicated by the etcd-role label on the node), we must safely remove the etcd node from the cluster before allowing machine deprovisioning
 	if val, ok := d.Map("metadata", "labels")["rke.cattle.io/etcd-role"]; ok {
 		if val.(string) == "true" {
 			// we need to block removal until our the v1 node that corresponds has been removed
 			clusterName := d.Map("metadata", "labels")[CapiMachineLabel].(string)
 			if clusterName == "" {
-				logrus.Errorf("MachineProvision There was an error retrieving the clustername for this etcd node")
-				return obj, fmt.Errorf("nope")
+				return obj, fmt.Errorf("error retrieving the clustername for this etcd node, label does not appear to exist %s for dynamic machine %s", CapiMachineLabel, key)
 			}
 			cluster, err := h.rancherClusterCache.Get(d.String("metadata", "namespace"), clusterName)
 			if apierror.IsNotFound(err) {
-				// we can go ahead and remove
-				logrus.Infof("MachineProvision Proceeding with removal of node as cluster was not found.")
+				// we can't find teh corresponding cluster, so we can go ahead and simply allow removal of the node.
+				logrus.Debugf("[MachineProvision] Proceeding with removal of dynamic machine %s as cluster was not found.", key)
 				return h.doRemove(obj)
 			} else if err != nil {
 				return obj, err
 			}
 			if !cluster.DeletionTimestamp.IsZero() {
 				// If the cluster deletion timestamp has been set, we can blindly proceed with delete.
-				logrus.Infof("MachineProvision cluster deletion timestamp was not zero. proceeding with delete")
+				logrus.Debugf("[MachineProvision] Cluster (%s) deletion timestamp was not zero that owns dynamic machine %s. Proceeding with delete", clusterName, key)
 				return h.doRemove(obj)
 			}
 			restConfig, err := h.kubeconfigManager.GetRESTConfig(cluster, cluster.Status)
@@ -284,7 +283,7 @@ func (h *handler) OnRemove(key string, obj runtime.Object) (runtime.Object, erro
 				return obj, err
 			}
 
-			logrus.Infof("MachineProvision built k8s clientset")
+			logrus.Debugf("[MachineProvision] Built K8s clientset to cluster: %s while processing dynamic machine removal %s", clusterName, key)
 
 			removeAnnotation := "etcd." + v2provruntime.GetRuntimeCommand(cluster.Spec.KubernetesVersion) + ".cattle.io/remove"
 			removedNodeNameAnnotation := "etcd." + v2provruntime.GetRuntimeCommand(cluster.Spec.KubernetesVersion) + ".cattle.io/removed-node-name"
@@ -297,16 +296,16 @@ func (h *handler) OnRemove(key string, obj runtime.Object) (runtime.Object, erro
 
 			if machine.Status.NodeRef == nil {
 				// Machine noderef is nil, we should just allow deletion.
-				logrus.Infof("MachineProvision there was no associated node with this etcd node. proceeding with deletion")
+				logrus.Debugf("[MachineProvision] There was no associated K8s node with this etcd dynamicmachine %s. proceeding with deletion", key)
 				return h.doRemove(obj)
 			}
 
-			logrus.Infof("MachineProvision getting node %s for the dynamic machine %s", machine.Status.NodeRef.Name, key)
+			logrus.Debugf("[MachineProvision] Retrieving node %s from K8s for the dynamic machine %s", machine.Status.NodeRef.Name, key)
 
 			node, err := clientset.CoreV1().Nodes().Get(context.TODO(), machine.Status.NodeRef.Name, metav1.GetOptions{})
 			if err != nil {
 				if apierror.IsNotFound(err) {
-					logrus.Infof("MachineProvision Node not found. proceeding with delete")
+					logrus.Debugf("[MachineProvision] Node %s for dynamic machine %s was not found. proceeding with deletion", machine.Status.NodeRef.Name, key)
 					return h.doRemove(obj)
 				}
 				return obj, err
@@ -316,10 +315,11 @@ func (h *handler) OnRemove(key string, obj runtime.Object) (runtime.Object, erro
 				// check val to see if it's true, if not, continue
 				if val == "true" {
 					// check the status of the removal
-					logrus.Infof("MachineProvision etcd removal is already in progress as per the annotation")
+					logrus.Debugf("[MachineProvision] etcd member removal is currently in progress per the annotation %s", removeAnnotation)
 					if removedNodeName, ok := node.Annotations[removedNodeNameAnnotation]; ok {
 						// There is the possibility the annotation is defined, but empty.
 						if removedNodeName != "" {
+							logrus.Infof("[MachineProvision] Encountered empty value in removed node name annotation on dynamic machine %s, proceeding with deletion", key)
 							return h.doRemove(obj)
 						}
 					}
