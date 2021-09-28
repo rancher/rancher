@@ -68,6 +68,12 @@ func (p *ldapProvider) loginUser(credential *v32.BasicLogin, config *v3.LdapConf
 		return v3.Principal{}, nil, httperror.WrapAPIError(err, httperror.ServerError, "server error while authenticating")
 	}
 
+	/* Rebind as read-only / bind user account for further queries */
+	err = ldap.AuthenticateServiceAccountUser(serviceAccountPassword, serviceAccountUserName, "", lConn)
+	if err != nil {
+		return v3.Principal{}, nil, err
+	}
+
 	searchOpRequest := ldapv2.NewSearchRequest(userDN,
 		ldapv2.ScopeWholeSubtree, ldapv2.NeverDerefAliases, 0, 0, false,
 		fmt.Sprintf("(%v=%v)", ObjectClass, config.UserObjectClass),
