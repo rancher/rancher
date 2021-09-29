@@ -120,7 +120,10 @@ func (m *Manager) onTrigger(_ string, obj *catalog.ClusterRepo) (*catalog.Cluste
 		return obj, nil
 	}
 
-	m.trigger <- struct{}{}
+	select {
+	case m.trigger <- struct{}{}:
+	default:
+	}
 	return obj, nil
 }
 
