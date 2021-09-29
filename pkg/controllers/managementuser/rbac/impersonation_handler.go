@@ -51,8 +51,7 @@ func (m *manager) ensureServiceAccountImpersonator(username, groupname string) e
 	}
 	logrus.Debugf("ensuring service account impersonator for %s", user.GetUID())
 	i := impersonation.New(user, m.workload)
-	_, err = i.SetUpImpersonation()
-	return err
+	return i.SetUpImpersonation()
 }
 
 func (m *manager) deleteServiceAccountImpersonator(username string) error {
