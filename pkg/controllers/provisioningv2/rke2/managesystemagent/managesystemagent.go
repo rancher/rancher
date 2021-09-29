@@ -165,9 +165,6 @@ func installer(envs []rkev1.EnvVar, allWorkers bool, secretName, generation stri
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "system-agent-upgrader",
 			Namespace: namespaces.System,
-			Annotations: map[string]string{
-				"upgrade.cattle.io/digest": "spec.upgrade.envs",
-			},
 		},
 		Spec: upgradev1.PlanSpec{
 			Concurrency: 10,
