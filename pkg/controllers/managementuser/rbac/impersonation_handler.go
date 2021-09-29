@@ -18,7 +18,7 @@ func (m *manager) getUser(username, groupname string) (user.Info, error) {
 		groups = append(groups, groupname)
 	}
 	attribs, err := m.userAttributeLister.Get("", username)
-	if err != nil && !apierrors.IsNotFound(err) {
+	if err != nil {
 		return &user.DefaultInfo{}, err
 	}
 	if attribs != nil {
