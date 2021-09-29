@@ -1,6 +1,7 @@
 package proxy
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/base64"
@@ -15,16 +16,12 @@ import (
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	dialer2 "github.com/rancher/rancher/pkg/dialer"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
-	"github.com/rancher/rancher/pkg/impersonation"
-	"github.com/rancher/rancher/pkg/types/config"
+	"github.com/rancher/rancher/pkg/kontainer-engine/drivers/gke"
 	"github.com/rancher/rancher/pkg/types/config/dialer"
-	"github.com/rancher/wrangler/pkg/schemas/validation"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/httpstream"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/proxy"
-	"k8s.io/apiserver/pkg/authentication/user"
-	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/client-go/rest"
 )
 
@@ -34,13 +31,12 @@ type RemoteService struct {
 	cluster   *v3.Cluster
 	transport transportGetter
 	url       urlGetter
+	auth      authGetter
 
-	factory        dialer.Factory
-	clusterLister  v3.ClusterLister
-	caCert         string
-	localAuth      string
-	httpTransport  *http.Transport
-	clusterContext *config.UserContext
+	factory       dialer.Factory
+	clusterLister v3.ClusterLister
+	caCert        string
+	httpTransport *http.Transport
 }
 
 var (
@@ -65,11 +61,11 @@ func prefix(cluster *v3.Cluster) string {
 	return "/k8s/clusters/" + cluster.Name
 }
 
-func New(localConfig *rest.Config, cluster *v3.Cluster, clusterLister v3.ClusterLister, factory dialer.Factory, clusterContext *config.UserContext) (*RemoteService, error) {
+func New(localConfig *rest.Config, cluster *v3.Cluster, clusterLister v3.ClusterLister, factory dialer.Factory) (*RemoteService, error) {
 	if cluster.Spec.Internal {
 		return NewLocal(localConfig, cluster)
 	}
-	return NewRemote(cluster, clusterLister, factory, clusterContext)
+	return NewRemote(cluster, clusterLister, factory)
 }
 
 func NewLocal(localConfig *rest.Config, cluster *v3.Cluster) (*RemoteService, error) {
@@ -96,15 +92,17 @@ func NewLocal(localConfig *rest.Config, cluster *v3.Cluster) (*RemoteService, er
 		transport: transportGetter,
 	}
 	if localConfig.BearerToken != "" {
-		rs.localAuth = "Bearer " + localConfig.BearerToken
+		rs.auth = func() (string, error) { return "Bearer " + localConfig.BearerToken, nil }
 	} else if localConfig.Password != "" {
-		rs.localAuth = "Basic " + base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%s:%s", localConfig.Username, localConfig.Password)))
+		rs.auth = func() (string, error) {
+			return "Basic " + base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%s:%s", localConfig.Username, localConfig.Password))), nil
+		}
 	}
 
 	return rs, nil
 }
 
-func NewRemote(cluster *v3.Cluster, clusterLister v3.ClusterLister, factory dialer.Factory, clusterContext *config.UserContext) (*RemoteService, error) {
+func NewRemote(cluster *v3.Cluster, clusterLister v3.ClusterLister, factory dialer.Factory) (*RemoteService, error) {
 	if !v32.ClusterConditionProvisioned.IsTrue(cluster) {
 		return nil, httperror.NewAPIError(httperror.ClusterUnavailable, "cluster not provisioned")
 	}
@@ -122,12 +120,21 @@ func NewRemote(cluster *v3.Cluster, clusterLister v3.ClusterLister, factory dial
 		return *u, nil
 	}
 
+	authGetter := func() (string, error) {
+		newCluster, err := clusterLister.Get("", cluster.Name)
+		if err != nil {
+			return "", err
+		}
+
+		return "Bearer " + newCluster.Status.ServiceAccountToken, nil
+	}
+
 	return &RemoteService{
-		cluster:        cluster,
-		url:            urlGetter,
-		clusterLister:  clusterLister,
-		factory:        factory,
-		clusterContext: clusterContext,
+		cluster:       cluster,
+		url:           urlGetter,
+		auth:          authGetter,
+		clusterLister: clusterLister,
+		factory:       factory,
 	}, nil
 }
 
@@ -221,20 +228,22 @@ func (r *RemoteService) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	if r.cluster.Spec.Internal && r.localAuth == "" {
+	if r.cluster.Status.Driver == "googleKubernetesEngine" && r.cluster.Spec.GenericEngineConfig != nil {
+		cred, _ := (*r.cluster.Spec.GenericEngineConfig)["credential"].(string)
+		transport, err = gke.Oauth2Transport(context.Background(), transport, cred)
+		if err != nil {
+			er.Error(rw, req, fmt.Errorf("unable to retrieve token source for GKE oauth2: %v", err))
+			return
+		}
+	} else if r.auth == nil {
 		req.Header.Del("Authorization")
 	} else {
-		userInfo, authed := request.UserFrom(req.Context())
-		if !authed {
-			er.Error(rw, req, validation.Unauthorized)
+		token, err := r.auth()
+		if err != nil {
+			er.Error(rw, req, err)
 			return
 		}
-		token, err := r.getImpersonatorAccountToken(userInfo)
-		if err != nil && !strings.Contains(err.Error(), fmt.Sprintf(dialer2.WaitForAgentError, r.cluster.Name)) {
-			er.Error(rw, req, fmt.Errorf("unable to create impersonator account: %w", err))
-			return
-		}
-		req.Header.Set("Authorization", "Bearer "+token)
+		req.Header.Set("Authorization", token)
 	}
 
 	if httpstream.IsUpgradeRequest(req) {
@@ -274,21 +283,4 @@ func (p *UpgradeProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	httpProxy := httputil.NewSingleHostReverseProxy(&url.URL{Scheme: p.Location.Scheme, Host: p.Location.Host})
 	httpProxy.Transport = p.Transport
 	httpProxy.ServeHTTP(rw, newReq)
-}
-
-// getImpersonatorAccountToken creates, if not already present, a service account and role bindings
-// whose only permission is to impersonate the given user, and returns the bearer token for the account.
-func (r *RemoteService) getImpersonatorAccountToken(user user.Info) (string, error) {
-	i := impersonation.New(user, r.clusterContext)
-
-	sa, err := i.SetUpImpersonation()
-	if err != nil {
-		return "", fmt.Errorf("error setting up impersonation for user %s: %w", user.GetUID(), err)
-	}
-	saToken, err := i.GetToken(sa)
-	if err != nil {
-		return "", fmt.Errorf("error getting service account token: %w", err)
-	}
-
-	return saToken, nil
 }
