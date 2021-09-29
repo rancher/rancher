@@ -102,6 +102,5 @@ func RegisterFollower(ctx context.Context, cluster *config.UserContext, kubeConf
 	cluster.RBAC.RoleBindings("").Controller()
 	cluster.Core.Endpoints("").Controller()
 	cluster.APIAggregation.APIServices("").Controller()
-	cluster.Core.Secrets("").Controller()
 	return nil
 }
