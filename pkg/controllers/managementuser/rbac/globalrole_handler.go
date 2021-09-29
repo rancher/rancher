@@ -38,7 +38,6 @@ func RegisterIndexers(ctx context.Context, scaledContext *config.ScaledContext) 
 		rtbByClusterAndRoleTemplateIndex: rtbByClusterAndRoleTemplateName,
 		prtbByUIDIndex:                   prtbByUID,
 		prtbByNsAndNameIndex:             prtbByNsName,
-		rtbByClusterAndUserIndex:         rtbByClusterAndUserNotDeleting,
 	}
 	if err := prtbInformer.AddIndexers(prtbIndexers); err != nil {
 		return err
@@ -47,7 +46,6 @@ func RegisterIndexers(ctx context.Context, scaledContext *config.ScaledContext) 
 	crtbInformer := scaledContext.Management.ClusterRoleTemplateBindings("").Controller().Informer()
 	crtbIndexers := map[string]cache.IndexFunc{
 		rtbByClusterAndRoleTemplateIndex: rtbByClusterAndRoleTemplateName,
-		rtbByClusterAndUserIndex:         rtbByClusterAndUserNotDeleting,
 	}
 	if err := crtbInformer.AddIndexers(crtbIndexers); err != nil {
 		return err

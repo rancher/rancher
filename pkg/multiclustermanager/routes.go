@@ -38,7 +38,7 @@ import (
 
 func router(ctx context.Context, localClusterEnabled bool, scaledContext *config.ScaledContext, clusterManager *clustermanager.Manager) (func(http.Handler) http.Handler, error) {
 	var (
-		k8sProxy             = k8sProxyPkg.New(scaledContext, scaledContext.Dialer, clusterManager)
+		k8sProxy             = k8sProxyPkg.New(scaledContext, scaledContext.Dialer)
 		connectHandler       = scaledContext.Dialer.(*rancherdialer.Factory).TunnelServer
 		connectConfigHandler = rkenodeconfigserver.Handler(scaledContext.Dialer.(*rancherdialer.Factory).TunnelAuthorizer, scaledContext)
 		clusterImport        = clusterregistrationtokens.ClusterImport{Clusters: scaledContext.Management.Clusters("")}
@@ -89,6 +89,7 @@ func router(ctx context.Context, localClusterEnabled bool, scaledContext *config
 	// Authenticated routes
 	authed := mux.NewRouter()
 	authed.UseEncodedPath()
+	authed.Use(requests.NewHeaderSanitizer)
 	authed.Use(mux.MiddlewareFunc(auth.ToMiddleware(requests.NewImpersonatingAuth(sar.NewSubjectAccessReview(clusterManager)))))
 	authed.Use(mux.MiddlewareFunc(rbac.NewAccessControlHandler()))
 	authed.Use(requests.NewAuthenticatedFilter)

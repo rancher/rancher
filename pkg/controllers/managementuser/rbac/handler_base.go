@@ -36,13 +36,11 @@ const (
 	prtbByUIDIndex                   = "authz.cluster.cattle.io/rtb-owner"
 	prtbByNsAndNameIndex             = "authz.cluster.cattle.io/rtb-owner-updated"
 	rtbByClusterAndRoleTemplateIndex = "authz.cluster.cattle.io/rtb-by-cluster-rt"
-	rtbByClusterAndUserIndex         = "authz.cluster.cattle.io/rtb-by-cluster-user"
 	nsByProjectIndex                 = "authz.cluster.cattle.io/ns-by-project"
 	crByNSIndex                      = "authz.cluster.cattle.io/cr-by-ns"
 	crbByRoleAndSubjectIndex         = "authz.cluster.cattle.io/crb-by-role-and-subject"
 	rtbLabelUpdated                  = "authz.cluster.cattle.io/rtb-label-updated"
 	rtbCrbRbLabelsUpdated            = "authz.cluster.cattle.io/crb-rb-labels-updated"
-	impersonationLabel               = "authz.cluster.cattle.io/impersonator"
 )
 
 func Register(ctx context.Context, workload *config.UserContext) {
@@ -91,8 +89,6 @@ func Register(ctx context.Context, workload *config.UserContext) {
 		nsController:        workload.Core.Namespaces("").Controller(),
 		clusterLister:       workload.Management.Management.Clusters("").Controller().Lister(),
 		projectLister:       workload.Management.Management.Projects(workload.ClusterName).Controller().Lister(),
-		userLister:          workload.Management.Management.Users("").Controller().Lister(),
-		userAttributeLister: workload.Management.Management.UserAttributes("").Controller().Lister(),
 		crtbs:               workload.Management.Management.ClusterRoleTemplateBindings(""),
 		prtbs:               workload.Management.Management.ProjectRoleTemplateBindings(""),
 		clusterName:         workload.ClusterName,
@@ -139,8 +135,6 @@ type manager struct {
 	nsController        typescorev1.NamespaceController
 	clusterLister       v3.ClusterLister
 	projectLister       v3.ProjectLister
-	userLister          v3.UserLister
-	userAttributeLister v3.UserAttributeLister
 	crtbs               v3.ClusterRoleTemplateBindingInterface
 	prtbs               v3.ProjectRoleTemplateBindingInterface
 	clusterName         string
@@ -604,35 +598,6 @@ func rtbByClusterAndRoleTemplateName(obj interface{}) ([]string, error) {
 	case *v3.ClusterRoleTemplateBinding:
 		if rtb.RoleTemplateName != "" && rtb.ClusterName != "" {
 			idx = rtb.ClusterName + "-" + rtb.RoleTemplateName
-		}
-	}
-
-	if idx == "" {
-		return []string{}, nil
-	}
-	return []string{idx}, nil
-}
-
-func rtbByClusterAndUserNotDeleting(obj interface{}) ([]string, error) {
-	meta, err := meta.Accessor(obj)
-	if err != nil {
-		return []string{}, err
-	}
-	if meta.GetDeletionTimestamp() != nil {
-		return []string{}, nil
-	}
-	var idx string
-	switch rtb := obj.(type) {
-	case *v3.ProjectRoleTemplateBinding:
-		if rtb.UserName != "" && rtb.ProjectName != "" {
-			parts := strings.SplitN(rtb.ProjectName, ":", 2)
-			if len(parts) == 2 {
-				idx = parts[0] + "-" + rtb.UserName
-			}
-		}
-	case *v3.ClusterRoleTemplateBinding:
-		if rtb.UserName != "" && rtb.ClusterName != "" {
-			idx = rtb.ClusterName + "-" + rtb.UserName
 		}
 	}
 
