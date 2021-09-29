@@ -6,7 +6,6 @@ import (
 	"sort"
 	"time"
 
-	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
@@ -26,25 +25,20 @@ const (
 )
 
 type Impersonator struct {
-	user                user.Info
-	clusterContext      *config.UserContext
-	userLister          v3.UserLister
-	userAttributeLister v3.UserAttributeLister
+	user           user.Info
+	clusterContext *config.UserContext
 }
 
 func New(userInfo user.Info, group string, clusterContext *config.UserContext) (Impersonator, error) {
-	impersonator := Impersonator{
-		clusterContext:      clusterContext,
-		userLister:          clusterContext.Management.Management.Users("").Controller().Lister(),
-		userAttributeLister: clusterContext.Management.Management.UserAttributes("").Controller().Lister(),
-	}
-	user, err := impersonator.getUser(userInfo, group)
-	impersonator.user = user
+	user, err := getUser(clusterContext, userInfo, group)
 	if err != nil {
 		return Impersonator{}, err
 	}
 
-	return impersonator, nil
+	return Impersonator{
+		user:           user,
+		clusterContext: clusterContext,
+	}, nil
 }
 
 func (i *Impersonator) SetUpImpersonation() (*corev1.ServiceAccount, error) {
@@ -350,8 +344,8 @@ func (i *Impersonator) waitForServiceAccount(sa *corev1.ServiceAccount) (*corev1
 	return ret, nil
 }
 
-func (i *Impersonator) getUser(userInfo user.Info, groupName string) (user.Info, error) {
-	u, err := i.userLister.Get("", userInfo.GetUID())
+func getUser(clusterContext *config.UserContext, userInfo user.Info, groupName string) (user.Info, error) {
+	u, err := clusterContext.Management.Management.Users("").Controller().Lister().Get("", userInfo.GetUID())
 	if err != nil {
 		return &user.DefaultInfo{}, err
 	}
@@ -360,7 +354,7 @@ func (i *Impersonator) getUser(userInfo user.Info, groupName string) (user.Info,
 	if groupName != "" {
 		groups = append(groups, groupName)
 	}
-	attribs, err := i.userAttributeLister.Get("", userInfo.GetUID())
+	attribs, err := clusterContext.Management.Management.UserAttributes("").Controller().Lister().Get("", userInfo.GetUID())
 	if err != nil && !apierrors.IsNotFound(err) {
 		return &user.DefaultInfo{}, err
 	}
