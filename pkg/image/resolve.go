@@ -313,6 +313,7 @@ func setRequirementImages(osType OSType, imagesSet map[string]map[string]bool) {
 	switch osType {
 	case Linux:
 		addSourceToImage(imagesSet, settings.ShellImage.Get(), coreLabel)
+		addSourceToImage(imagesSet, settings.MachineProvisionImage.Get(), coreLabel)
 		addSourceToImage(imagesSet, "busybox", coreLabel)
 	}
 }
