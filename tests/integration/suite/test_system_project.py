@@ -54,7 +54,7 @@ def test_system_namespaces_assigned(admin_cc):
     if loggingNamespace in system_namespaces_names:
         system_namespaces_names.remove(loggingNamespace)
 
-    assert initial_system_namespaces.issubset(system_namespaces_names)
+    assert system_namespaces_names == initial_system_namespaces
 
 
 def test_system_project_cant_be_deleted(admin_mc, admin_cc):
