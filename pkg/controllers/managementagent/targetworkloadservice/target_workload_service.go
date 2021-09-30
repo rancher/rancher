@@ -29,6 +29,8 @@ import (
 
 const (
 	WorkloadIDLabelPrefix = "workloadID"
+	creatorLabelKey       = "cattle.io/creator"
+	creatorNorman         = "norman"
 )
 
 var workloadServiceUUIDToWorkloadIDs sync.Map
@@ -72,6 +74,11 @@ func (c *Controller) sync(key string, obj *corev1.Service) (runtime.Object, erro
 		// delete from the workload map
 		workloadServiceUUIDToWorkloadIDs.Delete(key)
 		return nil, nil
+	}
+
+	// add WorkloadID selector only if service is created by norman
+	if obj.Labels == nil || obj.Labels[creatorLabelKey] != creatorNorman {
+		return obj, nil
 	}
 
 	workloadIDs := getServiceWorkloadIDs(obj)
