@@ -108,8 +108,10 @@ func (h *handler) createCluster(cluster *v1.Cluster, status v1.ClusterStatus) ([
 	}
 
 	agentNamespace := ""
+	clientSecret := status.ClientSecretName
 	if mgmtCluster.Spec.Internal {
 		agentNamespace = "cattle-fleet-local-system"
+		clientSecret = "local-cluster"
 	}
 
 	return []runtime.Object{&fleet.Cluster{
@@ -119,7 +121,7 @@ func (h *handler) createCluster(cluster *v1.Cluster, status v1.ClusterStatus) ([
 			Labels:    labels,
 		},
 		Spec: fleet.ClusterSpec{
-			KubeConfigSecret: status.ClientSecretName,
+			KubeConfigSecret: clientSecret,
 			AgentEnvVars:     mgmtCluster.Spec.AgentEnvVars,
 			AgentNamespace:   agentNamespace,
 		},
