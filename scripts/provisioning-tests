@@ -20,9 +20,21 @@ PID=$!
 #tail -F /tmp/rancher.log &
 #TPID=$!
 while ! curl -sf http://localhost:8080/ping; do
+    if [ ! -e /proc/$PID ]; then
+        echo Rancher died
+        cat /tmp/rancher.log
+        ./scripts/run >/tmp/rancher.log 2>&1 &
+        PID=$!
+    fi
     sleep 2
 done
 while ! kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml rollout status -w -n cattle-system deploy/rancher-webhook; do
+    if [ ! -e /proc/$PID ]; then
+        echo Rancher died
+        cat /tmp/rancher.log
+        ./scripts/run >/tmp/rancher.log 2>&1 &
+        PID=$!
+    fi
     sleep 2
 done
 #kill $TPID
