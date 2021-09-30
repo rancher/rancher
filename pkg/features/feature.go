@@ -98,7 +98,7 @@ var (
 	Harvester = newFeature(
 		"harvester",
 		"Enable Harvester integration, with ability to import and manage Harvester clusters",
-		true,
+		false,
 		true,
 		true)
 )
