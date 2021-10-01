@@ -11,7 +11,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/condition"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	systemimage "github.com/rancher/rancher/pkg/controllers/managementuser/systemimage"
+	"github.com/rancher/rancher/pkg/controllers/managementuser/systemimage"
 	corev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	rrbacv1 "github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1"
@@ -42,13 +42,6 @@ const (
 var defaultProjectLabels = labels.Set(map[string]string{"authz.management.cattle.io/default-project": "true"})
 var systemProjectLabels = labels.Set(map[string]string{"authz.management.cattle.io/system-project": "true"})
 var crtbCreatorOwnerAnnotations = map[string]string{creatorOwnerBindingAnnotation: "true"}
-
-var defaultProjects = map[string]bool{
-	project.Default: true,
-}
-var systemProjects = map[string]bool{
-	project.System: true,
-}
 
 func newPandCLifecycles(management *config.ManagementContext) (*projectLifecycle, *clusterLifecycle) {
 	m := &mgr{
@@ -235,14 +228,14 @@ type mgr struct {
 }
 
 func (m *mgr) createDefaultProject(obj runtime.Object) (runtime.Object, error) {
-	return m.createProject(project.Default, v32.ClusterConditionconditionDefaultProjectCreated, obj, defaultProjectLabels, defaultProjects)
+	return m.createProject(project.Default, v32.ClusterConditionconditionDefaultProjectCreated, obj, defaultProjectLabels)
 }
 
 func (m *mgr) createSystemProject(obj runtime.Object) (runtime.Object, error) {
-	return m.createProject(project.System, v32.ClusterConditionconditionSystemProjectCreated, obj, systemProjectLabels, systemProjects)
+	return m.createProject(project.System, v32.ClusterConditionconditionSystemProjectCreated, obj, systemProjectLabels)
 }
 
-func (m *mgr) createProject(name string, cond condition.Cond, obj runtime.Object, labels labels.Set, projectMap map[string]bool) (runtime.Object, error) {
+func (m *mgr) createProject(name string, cond condition.Cond, obj runtime.Object, labels labels.Set) (runtime.Object, error) {
 	return cond.DoUntilTrue(obj, func() (runtime.Object, error) {
 		metaAccessor, err := meta.Accessor(obj)
 		if err != nil {
@@ -250,20 +243,14 @@ func (m *mgr) createProject(name string, cond condition.Cond, obj runtime.Object
 		}
 		// Attempt to use the cache first
 		projects, err := m.projectLister.List(metaAccessor.GetName(), labels.AsSelector())
-		if err != nil {
+		if err != nil || len(projects) > 0 {
 			return obj, err
-		}
-		if len(projects) > 0 {
-			return obj, nil
 		}
 
 		// Cache failed, try the API
 		projects2, err := m.projects.ListNamespaced(metaAccessor.GetName(), v1.ListOptions{LabelSelector: labels.String()})
-		if err != nil {
+		if err != nil || len(projects2.Items) > 0 {
 			return obj, err
-		}
-		if len(projects2.Items) > 0 {
-			return obj, nil
 		}
 
 		annotation := make(map[string]string)
