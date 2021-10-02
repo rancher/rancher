@@ -1,0 +1,5 @@
+sysctl vm.overcommit_memory=1
+sysctl vm.panic_on_oom=0
+sysctl kernel.panic=10
+sysctl kernel.panic_on_oops=1
+sysctl kernel.keys.root_maxbytes=25000000
