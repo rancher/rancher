@@ -193,7 +193,7 @@ func (m *mcm) Start(ctx context.Context) error {
 				return errors.Wrap(err, "failed to add management data")
 			}
 
-			managementController.Register(ctx, management, m.ScaledContext.ClientGetter.(*clustermanager.Manager))
+			managementController.Register(ctx, management, m.ScaledContext.ClientGetter.(*clustermanager.Manager), m.wranglerContext)
 			if err := managementController.RegisterWrangler(ctx, m.wranglerContext, management, m.ScaledContext.ClientGetter.(*clustermanager.Manager)); err != nil {
 				return errors.Wrap(err, "failed to register wrangler controllers")
 			}
