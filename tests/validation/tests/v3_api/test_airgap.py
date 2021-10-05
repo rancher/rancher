@@ -560,8 +560,8 @@ def deploy_airgap_rancher(bastion_node):
             '-e CATTLE_SYSTEM_CATALOG=bundled ' \
             '-e CATTLE_BOOTSTRAP_PASSWORD={} ' \
             '{}/rancher/rancher:{} --no-cacerts --trace'.format(
-                privileged, bastion_node.host_name, bastion_node.host_name,
-                ADMIN_PASSWORD, RANCHER_SERVER_VERSION)
+                privileged, bastion_node.host_name, ADMIN_PASSWORD,
+                bastion_node.host_name, RANCHER_SERVER_VERSION)
     else:
         deploy_rancher_command = \
             'sudo docker run -d {} --restart=unless-stopped ' \
