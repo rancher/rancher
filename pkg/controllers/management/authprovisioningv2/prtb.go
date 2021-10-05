@@ -1,6 +1,8 @@
 package authprovisioningv2
 
 import (
+	"crypto/sha256"
+	"encoding/base32"
 	"strings"
 	"time"
 
@@ -51,11 +53,16 @@ func (h *handler) OnPRTB(key string, prtb *v3.ProjectRoleTemplateBinding) (*v3.P
 }
 
 func (h *handler) ensureClusterViewBinding(cluster *v1.Cluster, prtb *v3.ProjectRoleTemplateBinding) error {
-	// The roleBinding name format: r-cluster-<cluster name>-view-<prtb name>
-	// Example: r-cluster1-view-prtb-foo
+	subject, err := rbac.BuildSubjectFromRTB(prtb)
+	if err != nil {
+		return err
+	}
+
+	// The roleBinding name format: r-cluster-<cluster name>-view-<prtb name>-<hashed subject>
+	// Example: r-cluster1-view-prtb-foo-wn5d5n7udr
 	roleBinding := &rbacv1.RoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      name.SafeConcatName(clusterViewName(cluster), prtb.Name),
+			Name:      name.SafeConcatName(clusterViewName(cluster), prtb.Name, hashSubject(subject)),
 			Namespace: cluster.Namespace,
 			OwnerReferences: []metav1.OwnerReference{
 				{
@@ -73,11 +80,6 @@ func (h *handler) ensureClusterViewBinding(cluster *v1.Cluster, prtb *v3.Project
 		},
 	}
 
-	subject, err := rbac.BuildSubjectFromRTB(prtb)
-	if err != nil {
-		return err
-	}
-
 	roleBinding.Subjects = []rbacv1.Subject{subject}
 
 	return h.roleBindingApply.
@@ -89,4 +91,10 @@ func (h *handler) ensureClusterViewBinding(cluster *v1.Cluster, prtb *v3.Project
 
 func clusterViewName(cluster *v1.Cluster) string {
 	return name.SafeConcatName("r-cluster", cluster.Name, "view")
+}
+
+func hashSubject(subject rbacv1.Subject) string {
+	h := sha256.New()
+	h.Write([]byte(subject.String()))
+	return strings.ToLower(base32.StdEncoding.WithPadding(-1).EncodeToString(h.Sum(nil))[:10])
 }
