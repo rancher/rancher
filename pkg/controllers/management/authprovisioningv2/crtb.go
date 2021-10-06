@@ -54,6 +54,8 @@ func (h *handler) OnCRTB(key string, crtb *v3.ClusterRoleTemplateBinding) (*v3.C
 		return nil, err
 	}
 
+	hashedSubject := hashSubject(subject)
+
 	var bindings []runtime.Object
 
 	// Based on the rules in the roleTemplate we need to decide if an additional role binding
@@ -70,11 +72,11 @@ func (h *handler) OnCRTB(key string, crtb *v3.ClusterRoleTemplateBinding) (*v3.C
 	// for the original CRTB and a 2nd one for viewing the provisioning cluster since the original
 	// roleTemplate does not grant permission for the provisioning cluster.
 	if clusterIndexed {
-		// The roleBinding name format: crt-<cluster name>-<roleTemplate name>-<crtb name>
-		// Example: crt-cluster1-cluster-member-crtb-aaaaa
+		// The roleBinding name format: crt-<cluster name>-<crtb name>-<hashed subject>
+		// Example: crt-cluster1-creator-cluster-owner-blxbujr34t
 		roleBinding := &rbacv1.RoleBinding{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      name.SafeConcatName(roleTemplateRoleName(crtb.RoleTemplateName, cluster.Name), crtb.Name),
+				Name:      name.SafeConcatName("crt", cluster.Name, crtb.Name, hashedSubject),
 				Namespace: cluster.Namespace,
 			},
 			RoleRef: rbacv1.RoleRef{
@@ -88,11 +90,11 @@ func (h *handler) OnCRTB(key string, crtb *v3.ClusterRoleTemplateBinding) (*v3.C
 	}
 
 	if !provisioningCluster {
-		// The roleBinding name format: r-cluster-<cluster name>-view-<prtb name>
-		// Example: r-cluster1-view-prtb-foo
+		// The roleBinding name format: r-cluster-<cluster name>-view-<crtb name>-<hashed subject>
+		// Example: r-cluster1-view-crtb-foo-wn5d5n7udr
 		roleBinding := &rbacv1.RoleBinding{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      name.SafeConcatName(clusterViewName(cluster), crtb.Name),
+				Name:      name.SafeConcatName(clusterViewName(cluster), crtb.Name, hashedSubject),
 				Namespace: cluster.Namespace,
 			},
 			RoleRef: rbacv1.RoleRef{
