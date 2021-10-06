@@ -298,7 +298,7 @@ func (h *handler) run(obj runtime.Object, create bool) (runtime.Object, error) {
 			h.dynamic.EnqueueAfter(obj.GetObjectKind().GroupVersionKind(), meta.GetNamespace(), meta.GetName(), 2*time.Second)
 	}
 
-	objs, err := h.objects(d.Bool("status", "ready") && create, typeMeta, meta, dArgs, filesSecret)
+	objs, err := h.objects(args.String("providerID") != "" && create, typeMeta, meta, dArgs, filesSecret)
 	if err != nil {
 		return nil, err
 	}
