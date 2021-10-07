@@ -12,7 +12,7 @@ import (
 	apierror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"sigs.k8s.io/cluster-api/api/v1alpha4"
+	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 )
 
 const (
@@ -62,7 +62,7 @@ func (r *RKE2ConfigServer) findMachineByClusterToken(req *http.Request) (string,
 	return machineNamespace, machineName, nil
 }
 
-func (r *RKE2ConfigServer) findMachineByID(machineID, ns string) (*v1alpha4.Machine, error) {
+func (r *RKE2ConfigServer) findMachineByID(machineID, ns string) (*capi.Machine, error) {
 	machines, err := r.machineCache.List(ns, labels.SelectorFromSet(map[string]string{
 		machineIDLabel: machineID,
 	}))

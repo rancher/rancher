@@ -17,7 +17,7 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/rancher/apiserver/pkg/types"
 	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2/machineprovision"
-	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1alpha4"
+	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta1"
 	corecontrollers "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
 	"golang.org/x/crypto/ssh"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

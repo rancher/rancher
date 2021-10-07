@@ -41,7 +41,7 @@ replace (
 	k8s.io/mount-utils => k8s.io/mount-utils v0.22.3
 	k8s.io/pod-security-admission => k8s.io/pod-security-admission v0.22.0
 	k8s.io/sample-apiserver => k8s.io/sample-apiserver v0.22.3
-	sigs.k8s.io/cluster-api => sigs.k8s.io/cluster-api v0.4.4
+	sigs.k8s.io/cluster-api => sigs.k8s.io/cluster-api v1.0.2
 )
 
 require (
@@ -49,7 +49,6 @@ require (
 	github.com/Azure/go-autorest/autorest v0.11.19
 	github.com/Azure/go-autorest/autorest/adal v0.9.14
 	github.com/Azure/go-autorest/autorest/to v0.4.1-0.20210111195520-9fc88b15294e
-	github.com/BurntSushi/toml v0.4.1 // indirect
 	github.com/DataDog/zstd v1.4.5 // indirect
 	github.com/Masterminds/semver/v3 v3.1.1
 	github.com/Masterminds/sprig/v3 v3.2.2
@@ -68,18 +67,15 @@ require (
 	github.com/docker/libtrust v0.0.0-20160708172513-aabc10ec26b7 // indirect
 	github.com/ehazlett/simplelog v0.0.0-20200226020431-d374894e92a4
 	github.com/evanphx/json-patch v4.11.0+incompatible
-	github.com/fatih/color v1.13.0 // indirect
 	github.com/garyburd/redigo v1.6.2 // indirect
 	github.com/ghodss/yaml v1.0.0
 	github.com/go-asn1-ber/asn1-ber v1.5.3 // indirect
 	github.com/go-ldap/ldap/v3 v3.4.1
 	github.com/go-logr/logr v0.4.0
-	github.com/gofrs/flock v0.8.1 // indirect
 	github.com/golang-jwt/jwt v3.2.1+incompatible
 	github.com/golang/protobuf v1.5.2
 	github.com/google/go-github v17.0.0+incompatible
 	github.com/google/go-querystring v1.0.0
-	github.com/google/uuid v1.3.0 // indirect
 	github.com/gorilla/mux v1.8.0
 	github.com/gorilla/websocket v1.4.2
 	github.com/gregjones/httpcache v0.0.0-20190611155906-901d90724c79 // indirect
@@ -94,7 +90,6 @@ require (
 	github.com/mitchellh/mapstructure v1.4.2
 	github.com/moby/locker v1.0.1
 	github.com/mrjones/oauth v0.0.0-20180629183705-f4e24b6d100c
-	github.com/onsi/gomega v1.16.0 // indirect
 	github.com/oracle/oci-go-sdk v18.0.0+incompatible
 	github.com/pborman/uuid v1.2.0
 	github.com/pkg/errors v0.9.1
@@ -105,14 +100,14 @@ require (
 	github.com/rancher/aks-operator v1.0.3
 	github.com/rancher/apiserver v0.0.0-20211025232108-df28932a5627
 	github.com/rancher/channelserver v0.5.1-0.20210618172430-5cbefd383369
-	github.com/rancher/dynamiclistener v0.3.1-0.20211104200948-cd5d71f2fe95
+	github.com/rancher/dynamiclistener v0.3.1-0.20210616080009-9865ae859c7f
 	github.com/rancher/eks-operator v1.1.2
 	github.com/rancher/fleet/pkg/apis v0.0.0-20210918015053-5a141a6b18f0
 	github.com/rancher/gke-operator v1.1.2
 	github.com/rancher/kubernetes-provider-detector v0.1.5
-	github.com/rancher/lasso v0.0.0-20211217013041-3c6118a30611
-	github.com/rancher/lasso/controller-runtime v0.0.0-20211217013041-3c6118a30611
-	github.com/rancher/machine v0.15.0-rancher73
+	github.com/rancher/lasso v0.0.0-20210709145333-6c6cd7fd6607
+	github.com/rancher/lasso/controller-runtime v0.0.0-20210608205930-775fcaf2f523
+	github.com/rancher/machine v0.15.0-rancher70
 	github.com/rancher/norman v0.0.0-20211201154850-abe17976423e
 	github.com/rancher/rancher/pkg/apis v0.0.0
 	github.com/rancher/rancher/pkg/client v0.0.0
@@ -128,7 +123,6 @@ require (
 	github.com/satori/go.uuid v1.2.0
 	github.com/segmentio/kafka-go v0.0.0-20190411192201-218fd49cff39
 	github.com/sirupsen/logrus v1.8.1
-	github.com/spf13/viper v1.9.0 // indirect
 	github.com/stretchr/testify v1.7.0
 	github.com/tomnomnom/linkheader v0.0.0-20180905144013-02ca5825eb80
 	github.com/urfave/cli v1.22.2
@@ -167,9 +161,9 @@ require (
 	k8s.io/kube-aggregator v0.21.0
 	k8s.io/kubectl v0.22.3
 	k8s.io/kubernetes v1.21.0
-	k8s.io/utils v0.0.0-20210819203725-bdf08cb9a70a
+	k8s.io/utils v0.0.0-20210930125809-cb0fa318a74b
 	sigs.k8s.io/aws-iam-authenticator v0.5.1
-	sigs.k8s.io/cluster-api v0.4.4
-	sigs.k8s.io/controller-runtime v0.9.7
-	sigs.k8s.io/yaml v1.2.0
+	sigs.k8s.io/cluster-api v1.0.2
+	sigs.k8s.io/controller-runtime v0.10.3
+	sigs.k8s.io/yaml v1.3.0
 )

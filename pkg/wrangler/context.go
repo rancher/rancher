@@ -25,7 +25,7 @@ import (
 	"github.com/rancher/rancher/pkg/generated/controllers/catalog.cattle.io"
 	catalogcontrollers "github.com/rancher/rancher/pkg/generated/controllers/catalog.cattle.io/v1"
 	capi "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io"
-	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1alpha4"
+	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta1"
 	"github.com/rancher/rancher/pkg/generated/controllers/fleet.cattle.io"
 	fleetv1alpha1 "github.com/rancher/rancher/pkg/generated/controllers/fleet.cattle.io/v1alpha1"
 	"github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io"
@@ -68,13 +68,13 @@ import (
 	"k8s.io/client-go/restmapper"
 	"k8s.io/client-go/tools/clientcmd"
 	apiregistrationv12 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
-	capiv1alpha4api "sigs.k8s.io/cluster-api/api/v1alpha4"
+	capiv1beta1api "sigs.k8s.io/cluster-api/api/v1beta1"
 )
 
 var (
 	localSchemeBuilder = runtime.SchemeBuilder{
 		provisioningv1api.AddToScheme,
-		capiv1alpha4api.AddToScheme,
+		capiv1beta1api.AddToScheme,
 		fleetv1alpha1api.AddToScheme,
 		managementv3api.AddToScheme,
 		projectv3api.AddToScheme,
@@ -325,7 +325,7 @@ func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restCo
 		Apply:                   apply,
 		SharedControllerFactory: controllerFactory,
 		Dynamic:                 dynamic.New(steveControllers.K8s.Discovery()),
-		CAPI:                    capi.Cluster().V1alpha4(),
+		CAPI:                    capi.Cluster().V1beta1(),
 		RKE:                     rke.Rke().V1(),
 		Mgmt:                    mgmt.Management().V3(),
 		Apps:                    apps.Apps().V1(),
