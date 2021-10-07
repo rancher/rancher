@@ -57,7 +57,27 @@ func (s *projectStore) Create(apiContext *types.APIContext, schema *types.Schema
 
 	values.PutValue(data, annotation, "annotations", roleTemplatesRequired)
 
+	if s.exists(apiContext, schema, data) {
+		return nil, httperror.NewAPIError(httperror.Conflict, fmt.Sprintf("Project %q already exists.", data["name"]))
+	}
 	return s.Store.Create(apiContext, schema, data)
+}
+
+// exists checks if a project with a given name already exists. It has to search through all projects, since a new one
+// does not yet have an ID.
+func (s *projectStore) exists(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}) bool {
+	opts := types.QueryOptions{}
+	existingProjects, err := s.Store.List(apiContext, schema, &opts)
+	if err != nil {
+		return false
+	}
+
+	for _, project := range existingProjects {
+		if project["name"] == data["name"] {
+			return true
+		}
+	}
+	return false
 }
 
 func (s *projectStore) Update(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}, id string) (map[string]interface{}, error) {
