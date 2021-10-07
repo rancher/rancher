@@ -85,10 +85,18 @@ func BuildSubjectFromRTB(object interface{}) (rbacv1.Subject, error) {
 		return rbacv1.Subject{}, errors.Errorf("roletemplatebinding doesn't have any subject fields set: %v", object)
 	}
 
+	// apiGroup default for both User and Group
+	apiGroup := "rbac.authorization.k8s.io"
+
+	if kind == "ServiceAccount" {
+		// ServiceAccount default is empty string
+		apiGroup = ""
+	}
 	return rbacv1.Subject{
 		Namespace: namespace,
 		Kind:      kind,
 		Name:      name,
+		APIGroup:  apiGroup,
 	}, nil
 }
 
