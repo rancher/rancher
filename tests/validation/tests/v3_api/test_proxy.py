@@ -144,8 +144,8 @@ def deploy_proxy_rancher(bastion_node):
         '-e HTTP_PROXY={} ' \
         '-e HTTPS_PROXY={} ' \
         '-e NO_PROXY="localhost,127.0.0.1,0.0.0.0,10.0.0.0/8,' \
-        '-e CATTLE_BOOTSTRAP_PASSWORD={} ' \
         'cattle-system.svc" ' \
+        '-e CATTLE_BOOTSTRAP_PASSWORD={} ' \
         'rancher/rancher:{} --trace'.format(
             proxy_url, proxy_url,
             ADMIN_PASSWORD, RANCHER_SERVER_VERSION)
