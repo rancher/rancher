@@ -13,10 +13,15 @@ import (
 	"k8s.io/client-go/tools/record"
 	clusterv1alpha3 "sigs.k8s.io/cluster-api/api/v1alpha3"
 	clusterv1alpha4 "sigs.k8s.io/cluster-api/api/v1alpha4"
+	clusterv1beta1 "sigs.k8s.io/cluster-api/api/v1beta1"
 	"sigs.k8s.io/cluster-api/controllers"
 	"sigs.k8s.io/cluster-api/controllers/remote"
 	addonsv1alpha3 "sigs.k8s.io/cluster-api/exp/addons/api/v1alpha3"
+	addonsv1alpha4 "sigs.k8s.io/cluster-api/exp/addons/api/v1alpha4"
+	addonsv1beta1 "sigs.k8s.io/cluster-api/exp/addons/api/v1beta1"
 	expv1alpha3 "sigs.k8s.io/cluster-api/exp/api/v1alpha3"
+	expv1alpha4 "sigs.k8s.io/cluster-api/exp/api/v1alpha4"
+	expv1beta1 "sigs.k8s.io/cluster-api/exp/api/v1beta1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -26,8 +31,13 @@ func init() {
 	_ = clientgoscheme.AddToScheme(schemes.All)
 	_ = clusterv1alpha3.AddToScheme(schemes.All)
 	_ = clusterv1alpha4.AddToScheme(schemes.All)
+	_ = clusterv1beta1.AddToScheme(schemes.All)
 	_ = expv1alpha3.AddToScheme(schemes.All)
+	_ = expv1alpha4.AddToScheme(schemes.All)
+	_ = expv1beta1.AddToScheme(schemes.All)
 	_ = addonsv1alpha3.AddToScheme(schemes.All)
+	_ = addonsv1alpha4.AddToScheme(schemes.All)
+	_ = addonsv1beta1.AddToScheme(schemes.All)
 	_ = apiextensionsv1.AddToScheme(schemes.All)
 }
 

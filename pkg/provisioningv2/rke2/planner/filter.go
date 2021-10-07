@@ -8,7 +8,7 @@ import (
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/channelserver"
 	"github.com/rancher/rancher/pkg/provisioningv2/rke2/runtime"
-	capi "sigs.k8s.io/cluster-api/api/v1alpha4"
+	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 )
 
 func filterConfigData(config map[string]interface{}, controlPlane *rkev1.RKEControlPlane, machine *capi.Machine) {
