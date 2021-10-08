@@ -253,12 +253,10 @@ func (h *handler) createNewCluster(cluster *v1.Cluster, status v1.ClusterStatus,
 		})
 	}
 
-	if cluster.Spec.RKEConfig != nil {
-		spec.LocalClusterAuthEndpoint = v3.LocalClusterAuthEndpoint{
-			FQDN:    cluster.Spec.RKEConfig.LocalClusterAuthEndpoint.FQDN,
-			CACerts: cluster.Spec.RKEConfig.LocalClusterAuthEndpoint.CACerts,
-			Enabled: cluster.Spec.RKEConfig.LocalClusterAuthEndpoint.Enabled,
-		}
+	spec.LocalClusterAuthEndpoint = v3.LocalClusterAuthEndpoint{
+		FQDN:    cluster.Spec.LocalClusterAuthEndpoint.FQDN,
+		CACerts: cluster.Spec.LocalClusterAuthEndpoint.CACerts,
+		Enabled: cluster.Spec.LocalClusterAuthEndpoint.Enabled,
 	}
 
 	newCluster := &v3.Cluster{
