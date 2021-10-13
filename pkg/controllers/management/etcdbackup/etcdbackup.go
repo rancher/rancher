@@ -37,7 +37,7 @@ import (
 )
 
 const (
-	clusterBackupCheckInterval = 5 * time.Minute
+	backupCheckBuffer = 5 * time.Minute
 	compressedExtension        = "zip"
 	s3Endpoint                 = "s3.amazonaws.com"
 )
@@ -79,7 +79,7 @@ func Register(ctx context.Context, management *config.ManagementContext) {
 	rkeDriver.WrapTransportFactory = docker.WrapTransport
 
 	c.backupClient.AddLifecycle(ctx, "etcdbackup-controller", c)
-	go c.clusterBackupSync(ctx, clusterBackupCheckInterval)
+	go c.clusterBackupSync(ctx, backupCheckBuffer)
 }
 
 func (c *Controller) Create(b *v3.EtcdBackup) (runtime.Object, error) {
@@ -132,13 +132,18 @@ func (c *Controller) Updated(b *v3.EtcdBackup) (runtime.Object, error) {
 }
 
 func (c *Controller) clusterBackupSync(ctx context.Context, interval time.Duration) error {
-	for range ticker.Context(ctx, interval) {
-		clusters, err := c.clusterLister.List("", labels.NewSelector())
-		if err != nil {
-			logrus.Error(fmt.Errorf("[etcd-backup] error while listing clusters: %v", err))
-			return err
-		}
-		for _, cluster := range clusters {
+	clusters, err := c.clusterLister.List("", labels.NewSelector())
+	if err != nil {
+		logrus.Error(fmt.Errorf("[etcd-backup] error while listing clusters: %v", err))
+		return err
+	}
+	for _, cluster := range clusters {
+		// set interval per cluster 
+		// backupCheckBuffer + Etcd.BackupConfig.Timeout
+		clusterInterval := interval +
+			(time.Duration(cluster.Spec.RancherKubernetesEngineConfig.Services.Etcd.BackupConfig.Timeout) * time.Second)
+
+		for range ticker.Context(ctx, clusterInterval) {
 			logrus.Debugf("[etcd-backup] checking backups for cluster [%s]", cluster.Name)
 			if err := c.doClusterBackupSync(cluster); err != nil && !apierrors.IsConflict(err) {
 				logrus.Error(fmt.Errorf("[etcd-backup] error while syncing cluster backups for cluster [%s]: %v", cluster.Name, err))
