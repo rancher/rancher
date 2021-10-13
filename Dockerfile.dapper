@@ -1,4 +1,4 @@
-FROM registry.suse.com/suse/sle15:15.3.17.8.1
+FROM registry.suse.com/suse/sle15:15.3.17.8.12
 
 ARG DAPPER_HOST_ARCH
 ENV HOST_ARCH=${DAPPER_HOST_ARCH} ARCH=${DAPPER_HOST_ARCH}
