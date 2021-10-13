@@ -22,6 +22,8 @@ then
      echo -e "node-external-ip: ${6}" >> /etc/rancher/rke2/config.yaml
    fi
    cat /etc/rancher/rke2/config.yaml
+else
+  echo -e "node-external-ip: ${6}" >> /etc/rancher/rke2/config.yaml
 fi
 
 if [[ ${1} == *"rhel"* ]]
