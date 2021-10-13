@@ -37,7 +37,7 @@ import (
 )
 
 const (
-	backupCheckBuffer = 5 * time.Minute
+	backupCheckBuffer          = 5 * time.Minute
 	compressedExtension        = "zip"
 	s3Endpoint                 = "s3.amazonaws.com"
 )
