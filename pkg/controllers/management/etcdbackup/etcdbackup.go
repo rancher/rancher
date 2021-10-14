@@ -144,9 +144,10 @@ func (c *Controller) clusterBackupSync(ctx context.Context, interval time.Durati
 		if cluster.Spec.RancherKubernetesEngineConfig != nil {
 			timeout = cluster.Spec.RancherKubernetesEngineConfig.Services.Etcd.BackupConfig.Timeout
 		}
-		clusterInterval := interval + (time.Duration(timeout) * time.Second)
+		clusterCheckInterval := interval + time.Duration(timeout)*time.Second
+		logrus.Debugf("[etcd-backup] checking %s every %v", cluster.Name, clusterCheckInterval)
 
-		for range ticker.Context(ctx, clusterInterval) {
+		for range ticker.Context(ctx, clusterCheckInterval) {
 			logrus.Debugf("[etcd-backup] checking backups for cluster [%s]", cluster.Name)
 			if err := c.doClusterBackupSync(cluster); err != nil && !apierrors.IsConflict(err) {
 				logrus.Error(fmt.Errorf("[etcd-backup] error while syncing cluster backups for cluster [%s]: %v", cluster.Name, err))
