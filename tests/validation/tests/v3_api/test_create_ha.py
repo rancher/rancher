@@ -384,8 +384,8 @@ def write_kubeconfig():
     file.close()
 
 
-def set_url_and_password(rancher_url, server_url=None):
-    admin_token = set_url_password_token(rancher_url, server_url)
+def set_url_and_password(rancher_url, server_url=None, version=""):
+    admin_token = set_url_password_token(rancher_url, server_url, version=version)
     admin_client = rancher.Client(url=rancher_url + "/v3",
                                   token=admin_token, verify=False)
     auth_url = rancher_url + "/v3-public/localproviders/local?action=login"

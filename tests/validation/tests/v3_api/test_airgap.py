@@ -210,7 +210,7 @@ def setup_rancher_server():
     wait_for_status_code(url=base_url + "/v3", expected_code=401)
     auth_url = base_url + "/v3-public/localproviders/local?action=login"
     wait_for_status_code(url=auth_url, expected_code=200)
-    set_url_and_password(base_url, "https://" + RANCHER_AG_INTERNAL_HOSTNAME)
+    set_url_and_password(base_url, "https://" + RANCHER_AG_INTERNAL_HOSTNAME, version=RANCHER_SERVER_VERSION)
 
 
 def deploy_bastion_server():
