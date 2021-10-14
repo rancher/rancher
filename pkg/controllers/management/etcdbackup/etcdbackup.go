@@ -37,9 +37,9 @@ import (
 )
 
 const (
-	backupCheckBuffer          = 5 * time.Minute
-	compressedExtension        = "zip"
-	s3Endpoint                 = "s3.amazonaws.com"
+	backupCheckBuffer   = 5 * time.Minute
+	compressedExtension = "zip"
+	s3Endpoint          = "s3.amazonaws.com"
 )
 
 type Controller struct {
@@ -138,10 +138,13 @@ func (c *Controller) clusterBackupSync(ctx context.Context, interval time.Durati
 		return err
 	}
 	for _, cluster := range clusters {
-		// set interval per cluster 
+		// set interval per cluster
 		// backupCheckBuffer + Etcd.BackupConfig.Timeout
-		clusterInterval := interval +
-			(time.Duration(cluster.Spec.RancherKubernetesEngineConfig.Services.Etcd.BackupConfig.Timeout) * time.Second)
+		timeout := 0
+		if cluster.Spec.RancherKubernetesEngineConfig != nil {
+			timeout = cluster.Spec.RancherKubernetesEngineConfig.Services.Etcd.BackupConfig.Timeout
+		}
+		clusterInterval := interval + (time.Duration(timeout) * time.Second)
 
 		for range ticker.Context(ctx, clusterInterval) {
 			logrus.Debugf("[etcd-backup] checking backups for cluster [%s]", cluster.Name)
