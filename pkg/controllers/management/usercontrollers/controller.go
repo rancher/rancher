@@ -102,6 +102,10 @@ func (c *ClusterLifecycleCleanup) cleanupLocalCluster(obj *v3.Cluster) error {
 	if err != nil {
 		return err
 	}
+	if userContext == nil {
+		logrus.Debugf("could not get context for local cluster, skipping cleanup")
+		return nil
+	}
 
 	err = cleanupNamespaces(userContext.K8sClient)
 	if err != nil {
@@ -132,6 +136,10 @@ func (c *ClusterLifecycleCleanup) cleanupImportedCluster(cluster *v3.Cluster) er
 	userContext, err := c.Manager.UserContextFromCluster(cluster)
 	if err != nil {
 		return err
+	}
+	if userContext == nil {
+		logrus.Debugf("could not get context for imported cluster, skipping cleanup")
+		return nil
 	}
 
 	role, err := c.createCleanupClusterRole(userContext)
