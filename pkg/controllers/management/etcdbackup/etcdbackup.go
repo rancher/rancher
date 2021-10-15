@@ -179,7 +179,7 @@ func (c *Controller) doClusterBackupSync(cluster *v3.Cluster) error {
 		for _, clusterBackup := range clusterBackups {
 			// cluster backup is younger than its timeout and completion is unknown
 			// therefore, it's currently running
-			if time.Since(getBackupCreatedTime(clusterBackup)) < clusterTimeout && rketypes.BackupConditionCompleted.IsUnknown(clusterBackup) {
+			if time.Since(getBackupCreatedTime(clusterBackup)) < clusterTimeout && !rketypes.BackupConditionCompleted.IsTrue(clusterBackup) {
 				logrus.Debugf("[etcd-backup] cluster [%s] is currently creating a backup, skipping", cluster.Name)
 				return nil
 			}
