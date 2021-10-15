@@ -116,7 +116,7 @@ func toInfraRefKey(ref corev1.ObjectReference, namespace string) string {
 }
 
 func matchRKENodeGroup(gvk schema.GroupVersionKind) bool {
-	return gvk.Group == defaultMachineConfigAPIVersion &&
+	return gvk.GroupVersion().String() == defaultMachineConfigAPIVersion &&
 		strings.HasSuffix(gvk.Kind, "Config")
 }
 
