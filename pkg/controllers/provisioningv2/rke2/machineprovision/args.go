@@ -127,7 +127,10 @@ func (h *handler) getArgsEnvAndStatus(meta metav1.Object, data data.Object, args
 	} else {
 		cmd = append(cmd, "rm", "-y")
 	}
-	cmd = append(cmd, meta.GetName())
+
+	// cloud-init will split the hostname on '.' and set the hostname to the first chunk. This causes an issue where all
+	// nodes in a machine pool may have the same node name in Kubernetes. Converting the '.' to '-' here prevents this.
+	cmd = append(cmd, strings.ReplaceAll(meta.GetName(), ".", "-"))
 
 	return driverArgs{
 		DriverName:          driver,
