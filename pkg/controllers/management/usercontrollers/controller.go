@@ -4,10 +4,10 @@ import (
 	"context"
 	"time"
 
-	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-
 	"github.com/rancher/norman/httperror"
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/clustermanager"
+	"github.com/rancher/rancher/pkg/controllers/management/clusterprovisioner"
 	"github.com/rancher/rancher/pkg/controllers/managementagent/nslabels"
 	"github.com/rancher/rancher/pkg/controllers/managementuserlegacy/helm"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
@@ -71,11 +71,11 @@ func (c *ClusterLifecycleCleanup) Remove(obj *v3.Cluster) (runtime.Object, error
 	var err error
 	if obj.Name == "local" && obj.Spec.Internal {
 		err = c.cleanupLocalCluster(obj)
-	} else if obj.Status.Driver == v32.ClusterDriverImported ||
-		obj.Status.Driver == v32.ClusterDriverK3s ||
+	} else if obj.Status.Driver == v32.ClusterDriverK3s ||
 		obj.Status.Driver == v32.ClusterDriverK3os ||
 		obj.Status.Driver == v32.ClusterDriverRke2 ||
 		obj.Status.Driver == v32.ClusterDriverRancherD ||
+		(obj.Status.Driver == v32.ClusterDriverImported && !clusterprovisioner.IsAdministratedByProvisioningCluster(obj)) ||
 		(obj.Status.AKSStatus.UpstreamSpec != nil && obj.Status.AKSStatus.UpstreamSpec.Imported) ||
 		(obj.Status.EKSStatus.UpstreamSpec != nil && obj.Status.EKSStatus.UpstreamSpec.Imported) ||
 		(obj.Status.GKEStatus.UpstreamSpec != nil && obj.Status.GKEStatus.UpstreamSpec.Imported) {
