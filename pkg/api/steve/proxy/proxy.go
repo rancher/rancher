@@ -2,6 +2,7 @@ package proxy
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"net/http"
 	"strings"
@@ -14,6 +15,7 @@ import (
 	"github.com/rancher/remotedialer"
 	"github.com/rancher/steve/pkg/auth"
 	"github.com/rancher/steve/pkg/proxy"
+	"github.com/sirupsen/logrus"
 	authzv1 "k8s.io/api/authorization/v1"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
@@ -155,7 +157,24 @@ func (h *Handler) dialer(ctx context.Context, network, address string) (net.Conn
 		return nil, err
 	}
 	dialer := h.dialerFactory("stv-cluster-" + host)
-	return dialer(ctx, network, "127.0.0.1:6080")
+	var conn net.Conn
+	for i := 0; i < 15; i++ {
+		conn, err = dialer(ctx, network, "127.0.0.1:6080")
+		if err != nil && strings.Contains(err.Error(), "failed to find Session for client") {
+			if i < 14 {
+				logrus.Tracef("steve.proxy.dialer: lost connection, retrying")
+				time.Sleep(time.Second)
+			} else {
+				logrus.Tracef("steve.proxy.dialer: lost connection, failed to reconnect after 15 attempts")
+			}
+		} else {
+			break
+		}
+	}
+	if err != nil {
+		return conn, fmt.Errorf("lost connection to cluster: %w", err)
+	}
+	return conn, nil
 }
 
 func (h *Handler) next(clusterID, prefix string) (http.Handler, error) {
