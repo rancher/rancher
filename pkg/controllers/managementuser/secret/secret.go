@@ -250,12 +250,14 @@ func getNamespacedSecret(obj *corev1.Secret, namespace string) *corev1.Secret {
 	namespacedSecret.Namespace = namespace
 	namespacedSecret.Type = obj.Type
 	namespacedSecret.Annotations = make(map[string]string)
-	copyMap(obj.Annotations, namespacedSecret.Annotations)
+	namespacedSecret.Labels = make(map[string]string)
+	copyMap(namespacedSecret.Annotations, obj.Annotations)
+	copyMap(namespacedSecret.Labels, obj.Labels)
 	namespacedSecret.Annotations[userSecretAnnotation] = "true"
 	return namespacedSecret
 }
 
-func copyMap(src map[string]string, dst map[string]string) {
+func copyMap(dst map[string]string, src map[string]string) {
 	for k, v := range src {
 		dst[k] = v
 	}
