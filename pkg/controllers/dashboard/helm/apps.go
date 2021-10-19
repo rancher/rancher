@@ -44,8 +44,8 @@ func RegisterApps(ctx context.Context,
 		secretCache:         secrets.Cache(),
 		configMapCache:      configMap.Cache(),
 	}
-	configMap.OnChange(ctx, "helm-app", r.OnConfigMapChange)
-	secrets.OnChange(ctx, "helm-app", r.OnSecretChange)
+	configMap.OnChange(ctx, "helm-app-configmap", r.OnConfigMapChange)
+	secrets.OnChange(ctx, "helm-app-secret", r.OnSecretChange)
 	catalogv1.RegisterAppStatusHandler(ctx, apps, "", "helm-app-status", r.appStatus)
 	relatedresource.Watch(ctx, "helm-app",
 		relatedresource.OwnerResolver(true, "v1", "ConfigMap"),

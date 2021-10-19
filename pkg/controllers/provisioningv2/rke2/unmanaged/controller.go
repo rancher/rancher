@@ -55,7 +55,7 @@ func Register(ctx context.Context, clients *wrangler.Context) {
 	clients.RKE.CustomMachine().OnChange(ctx, "unmanaged-machine", h.onUnmanagedMachineHealth)
 	clients.RKE.CustomMachine().OnRemove(ctx, "unmanaged-machine", h.onUnmanagedMachineOnRemove)
 	clients.RKE.CustomMachine().OnChange(ctx, "unmanaged-health", h.onUnmanagedMachineChange)
-	clients.Core.Secret().OnChange(ctx, "unmanaged-machine", h.onSecretChange)
+	clients.Core.Secret().OnChange(ctx, "unmanaged-machine-secret", h.onSecretChange)
 }
 
 type handler struct {

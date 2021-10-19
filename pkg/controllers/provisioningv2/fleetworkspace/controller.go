@@ -50,14 +50,14 @@ func Register(ctx context.Context, clients *wrangler.Context) {
 			AllowClusterScoped: true,
 		})
 
-	clients.Fleet.Cluster().OnChange(ctx, "workspace-backport",
+	clients.Fleet.Cluster().OnChange(ctx, "workspace-backport-cluster",
 		func(s string, obj *fleet.Cluster) (*fleet.Cluster, error) {
 			if obj == nil {
 				return nil, nil
 			}
 			return obj, h.onFleetObject(obj)
 		})
-	clients.Fleet.Bundle().OnChange(ctx, "workspace-backport",
+	clients.Fleet.Bundle().OnChange(ctx, "workspace-backport-bundle",
 		func(s string, obj *fleet.Bundle) (*fleet.Bundle, error) {
 			if obj == nil {
 				return nil, nil
