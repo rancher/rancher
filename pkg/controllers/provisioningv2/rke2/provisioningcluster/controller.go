@@ -56,7 +56,7 @@ func Register(ctx context.Context, clients *wrangler.Context) {
 		h.dynamicSchema = clients.Mgmt.DynamicSchema().Cache()
 	}
 
-	clients.Dynamic.OnChange(ctx, "rke", matchRKENodeGroup, h.infraWatch)
+	clients.Dynamic.OnChange(ctx, "rke-dynamic", matchRKENodeGroup, h.infraWatch)
 	clients.Provisioning.Cluster().Cache().AddIndexer(byNodeInfra, byNodeInfraIndex)
 
 	rocontrollers.RegisterClusterGeneratingHandler(ctx,

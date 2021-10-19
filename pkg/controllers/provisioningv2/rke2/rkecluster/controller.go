@@ -27,7 +27,7 @@ func Register(ctx context.Context, clients *wrangler.Context) {
 		rkeControlPlanes: clients.RKE.RKEControlPlane().Cache(),
 	}
 
-	clients.RKE.RKECluster().OnChange(ctx, "rke", h.UpdateSpec)
+	clients.RKE.RKECluster().OnChange(ctx, "rke-cluster", h.UpdateSpec)
 	rkecontroller.RegisterRKEClusterStatusHandler(ctx,
 		clients.RKE.RKECluster(),
 		"Defined",
