@@ -266,24 +266,27 @@ func (l *Lifecycle) Remove(obj *v3.App) (runtime.Object, error) {
 			return obj, err
 		}
 	}
-	tempDirs, err := createTempDir(obj)
-	if err != nil {
-		return obj, err
-	}
-	defer os.RemoveAll(tempDirs.FullPath)
-	err = l.writeKubeConfig(obj, tempDirs.KubeConfigFull, true)
-	if err != nil {
-		return obj, err
-	}
-	// try three times and succeed
-	start := time.Second * 1
-	for i := 0; i < 3; i++ {
-		if err = helmDelete(tempDirs, obj); err == nil {
-			break
+
+	if !(obj.Annotations["cattle.io/skipUninstall"] == "true") {
+		tempDirs, err := createTempDir(obj)
+		if err != nil {
+			return obj, err
 		}
-		logrus.Warn(err)
-		time.Sleep(start)
-		start *= 2
+		defer os.RemoveAll(tempDirs.FullPath)
+		err = l.writeKubeConfig(obj, tempDirs.KubeConfigFull, true)
+		if err != nil {
+			return obj, err
+		}
+		// try three times and succeed
+		start := time.Second * 1
+		for i := 0; i < 3; i++ {
+			if err = helmDelete(tempDirs, obj); err == nil {
+				break
+			}
+			logrus.Warn(err)
+			time.Sleep(start)
+			start *= 2
+		}
 	}
 	ns, err := l.NsClient.Get(obj.Spec.TargetNamespace, metav1.GetOptions{})
 	if err != nil && !errors.IsNotFound(err) {
