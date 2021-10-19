@@ -537,8 +537,8 @@ def test_node_label_node_template_edit():
                                       cloudCredentialId=do_cloud_credential.id,
                                       digitaloceanConfig=
                                       {"region": "nyc3",
-                                       "size": "2gb",
-                                       "image": "ubuntu-16-04-x64"})
+                                       "size": "s-2vcpu-2gb-intel",
+                                       "image": "ubuntu-18-04-x64"})
     node_template_new = client.wait_success(node_template_new)
     assert test_label in node_template_new["labels"], \
         "Label is not set on node template"
@@ -593,8 +593,8 @@ def test_node_label_node_template_delete():
                                       cloudCredentialId=do_cloud_credential.id,
                                       digitaloceanConfig=
                                       {"region": "nyc3",
-                                       "size": "2gb",
-                                       "image": "ubuntu-16-04-x64"})
+                                       "size": "s-2vcpu-2gb-intel",
+                                       "image": "ubuntu-18-04-x64"})
     node_template_new = client.wait_success(node_template_new)
     assert test_label not in node_template_new["labels"], \
         "Label is available on the node template"
