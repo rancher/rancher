@@ -164,7 +164,7 @@ func (h *handler) objects(ready bool, typeMeta metav1.Type, meta metav1.Object, 
 							Name: "tls-ca-additional-volume",
 							VolumeSource: corev1.VolumeSource{
 								Secret: &corev1.SecretVolumeSource{
-									SecretName:  "tls-ca-additional-volume",
+									SecretName:  "tls-ca-additional",
 									DefaultMode: &[]int32{0444}[0],
 									Optional:    &[]bool{true}[0],
 								},

@@ -250,7 +250,11 @@ func (r *Rancher) Start(ctx context.Context) error {
 			return err
 		}
 
-		return forceSystemAndDefaultProjectCreation(r.Wrangler.Core.ConfigMap(), r.Wrangler.Mgmt.Cluster())
+		if err := forceSystemAndDefaultProjectCreation(r.Wrangler.Core.ConfigMap(), r.Wrangler.Mgmt.Cluster()); err != nil {
+			return err
+		}
+
+		return copyCAAdditionalSecret(r.Wrangler.Core.Secret())
 	})
 
 	if err := r.authServer.Start(ctx, false); err != nil {
