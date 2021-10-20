@@ -331,7 +331,7 @@ func (s *Provider) HandleSamlAssertion(w http.ResponseWriter, r *http.Request, a
 			http.Redirect(w, r, redirectURL+"errorCode=500", http.StatusFound)
 			return
 		} else if err != nil && user != nil {
-			http.Redirect(w, r, redirectURL+"errorCode=422&errMsg="+err.Error(), http.StatusFound)
+			http.Redirect(w, r, redirectURL+"errorCode=422&errorMsg="+err.Error(), http.StatusFound)
 			return
 		}
 
