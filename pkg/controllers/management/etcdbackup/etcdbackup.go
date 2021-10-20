@@ -177,9 +177,14 @@ func (c *Controller) doClusterBackupSync(cluster *v3.Cluster) error {
 	if cluster.Spec.RancherKubernetesEngineConfig != nil {
 		clusterTimeout := time.Duration(cluster.Spec.RancherKubernetesEngineConfig.Services.Etcd.BackupConfig.Timeout) * time.Second
 		for _, clusterBackup := range clusterBackups {
+			backupCreationTime, err := getBackupCreatedTime(clusterBackup)
+			if err != nil {
+				logrus.Errorf("[etcd-backup] cluster [%s] backup [%s] is missing creation time: %v", cluster.Name, clusterBackup.Name, err)
+				continue
+			}
 			// cluster backup is younger than its timeout and completion is unknown
 			// therefore, it's currently running
-			if time.Since(getBackupCreatedTime(clusterBackup)) < clusterTimeout && !rketypes.BackupConditionCompleted.IsTrue(clusterBackup) {
+			if time.Since(backupCreationTime) < clusterTimeout && !rketypes.BackupConditionCompleted.IsTrue(clusterBackup) {
 				logrus.Debugf("[etcd-backup] cluster [%s] is currently creating a backup, skipping", cluster.Name)
 				return nil
 			}
@@ -480,9 +485,9 @@ func getBackupCompletedTime(o runtime.Object) time.Time {
 	return t
 }
 
-func getBackupCreatedTime(o runtime.Object) time.Time {
-	t, _ := time.Parse(time.RFC3339, rketypes.BackupConditionCreated.GetLastUpdated(o))
-	return t
+func getBackupCreatedTime(o runtime.Object) (time.Time, error) {
+	t, err := time.Parse(time.RFC3339, rketypes.BackupConditionCreated.GetLastUpdated(o))
+	return t, err
 }
 
 func getExpiredBackups(retention, intervalHours int, backups []*v3.EtcdBackup) []*v3.EtcdBackup {
