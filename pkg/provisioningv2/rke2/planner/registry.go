@@ -7,6 +7,7 @@ import (
 
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
+	"github.com/rancher/rancher/pkg/provisioningv2/rke2/runtime"
 	v1 "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
 	corev1 "k8s.io/api/core/v1"
 )
@@ -17,7 +18,7 @@ func (p *Planner) addRegistryConfig(config map[string]interface{}, controlPlane 
 		return nil, nil
 	}
 
-	registryConfig, files, err := toRegistryConfig(p.secretCache, GetRuntime(controlPlane.Spec.KubernetesVersion), controlPlane.Namespace, registry)
+	registryConfig, files, err := toRegistryConfig(p.secretCache, runtime.GetRuntime(controlPlane.Spec.KubernetesVersion), controlPlane.Namespace, registry)
 	if err != nil {
 		return nil, err
 	}

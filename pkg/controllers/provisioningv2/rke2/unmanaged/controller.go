@@ -8,18 +8,22 @@ import (
 
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/clusterindex"
+	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2/etcdmgmt"
 	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1alpha4"
 	mgmtcontroller "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	rocontrollers "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
 	rkecontroller "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/provisioningv2/kubeconfig"
 	"github.com/rancher/rancher/pkg/provisioningv2/rke2/planner"
+	rancherruntime "github.com/rancher/rancher/pkg/provisioningv2/rke2/runtime"
 	"github.com/rancher/rancher/pkg/taints"
 	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/rancher/wrangler/pkg/apply"
 	"github.com/rancher/wrangler/pkg/data"
 	corecontrollers "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
+	"github.com/rancher/wrangler/pkg/generic"
 	"github.com/rancher/wrangler/pkg/kv"
+	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	apierror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -330,6 +334,8 @@ func (h *handler) onUnmanagedMachineOnRemove(key string, customMachine *rkev1.Cu
 		return customMachine, nil
 	}
 
+	logrus.Debugf("[UnmanagedMachine] Removing machine %s in cluster %s", key, clusterName)
+
 	cluster, err := h.clusterCache.Get(customMachine.Namespace, clusterName)
 	if apierror.IsNotFound(err) {
 		return customMachine, nil
@@ -338,7 +344,8 @@ func (h *handler) onUnmanagedMachineOnRemove(key string, customMachine *rkev1.Cu
 	}
 
 	if !cluster.DeletionTimestamp.IsZero() {
-		return customMachine, nil
+		logrus.Debugf("[UnmanagedMachine] Machine %s belonged to cluster %s that is being deleted. Skipping safe removal", key, clusterName)
+		return customMachine, nil // if the cluster is deleting, we don't care about safe etcd member removal.
 	}
 
 	machine, err := h.getMachine(customMachine)
@@ -346,7 +353,13 @@ func (h *handler) onUnmanagedMachineOnRemove(key string, customMachine *rkev1.Cu
 		return customMachine, err
 	}
 
+	if _, ok := machine.Labels[planner.EtcdRoleLabel]; !ok {
+		logrus.Debugf("[UnmanagedMachine] Safe removal for machine %s in cluster %s not necessary as it is not an etcd node", key, clusterName)
+		return customMachine, nil // If we are not dealing with an etcd node, we can go ahead and allow removal
+	}
+
 	if machine.Status.NodeRef == nil {
+		logrus.Infof("[UnmanagedMachine] No associated node found for machine %s in cluster %s, proceeding with removal", key, clusterName)
 		return customMachine, nil
 	}
 
@@ -355,15 +368,15 @@ func (h *handler) onUnmanagedMachineOnRemove(key string, customMachine *rkev1.Cu
 		return customMachine, err
 	}
 
-	clientset, err := kubernetes.NewForConfig(restConfig)
+	removed, err := etcdmgmt.SafelyRemoved(restConfig, rancherruntime.GetRuntimeCommand(cluster.Spec.KubernetesVersion), machine.Status.NodeRef.Name)
 	if err != nil {
 		return customMachine, err
 	}
-	err = clientset.CoreV1().Nodes().Delete(context.TODO(), machine.Status.NodeRef.Name, metav1.DeleteOptions{})
-	if apierror.IsNotFound(err) {
-		return customMachine, nil
+	if !removed {
+		h.unmanagedMachine.EnqueueAfter(customMachine.Namespace, customMachine.Name, 5*time.Second)
+		return customMachine, generic.ErrSkip
 	}
-	return customMachine, err
+	return customMachine, nil
 }
 
 func (h *handler) onUnmanagedMachineChange(key string, machine *rkev1.CustomMachine) (*rkev1.CustomMachine, error) {

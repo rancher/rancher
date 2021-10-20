@@ -13,6 +13,7 @@ import (
 	rkecontroller "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/provisioningv2/kubeconfig"
 	"github.com/rancher/rancher/pkg/provisioningv2/rke2/planner"
+	"github.com/rancher/rancher/pkg/provisioningv2/rke2/runtime"
 	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/rancher/wrangler/pkg/data"
 	"github.com/rancher/wrangler/pkg/generic"
@@ -135,7 +136,7 @@ func (h *handler) updateMachineJoinURL(node *corev1.Node, machine *capi.Machine,
 		}
 	}
 
-	url := fmt.Sprintf("https://%s:%d", address, planner.GetRuntimeSupervisorPort(rancherCluster.Spec.KubernetesVersion))
+	url := fmt.Sprintf("https://%s:%d", address, runtime.GetRuntimeSupervisorPort(rancherCluster.Spec.KubernetesVersion))
 	if machine.Annotations[planner.JoinURLAnnotation] == url {
 		return nil
 	}

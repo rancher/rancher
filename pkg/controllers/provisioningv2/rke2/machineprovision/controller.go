@@ -12,9 +12,12 @@ import (
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/controllers/management/drivers/nodedriver"
 	"github.com/rancher/rancher/pkg/controllers/management/node"
+	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2/etcdmgmt"
 	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1alpha4"
 	mgmtcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	ranchercontrollers "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
+	"github.com/rancher/rancher/pkg/provisioningv2/kubeconfig"
+	v2provruntime "github.com/rancher/rancher/pkg/provisioningv2/rke2/runtime"
 	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/rancher/wrangler/pkg/apply"
 	"github.com/rancher/wrangler/pkg/condition"
@@ -24,6 +27,7 @@ import (
 	corecontrollers "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/pkg/generic"
 	"github.com/rancher/wrangler/pkg/summary"
+	"github.com/sirupsen/logrus"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierror "k8s.io/apimachinery/pkg/api/errors"
@@ -32,6 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	capi "sigs.k8s.io/cluster-api/api/v1alpha4"
 	"sigs.k8s.io/cluster-api/errors"
 )
 
@@ -46,6 +51,7 @@ type handler struct {
 	nodeDriverCache     mgmtcontrollers.NodeDriverCache
 	dynamic             *dynamic.Controller
 	rancherClusterCache ranchercontrollers.ClusterCache
+	kubeconfigManager   *kubeconfig.Manager
 }
 
 func Register(ctx context.Context, clients *wrangler.Context) {
@@ -64,6 +70,7 @@ func Register(ctx context.Context, clients *wrangler.Context) {
 		namespaces:          clients.Core.Namespace().Cache(),
 		dynamic:             clients.Dynamic,
 		rancherClusterCache: clients.Provisioning.Cluster().Cache(),
+		kubeconfigManager:   kubeconfig.New(clients),
 	}
 
 	removeHandler := generic.NewRemoveHandler("machine-provision-remove", clients.Dynamic.Update, h.OnRemove)
@@ -133,6 +140,20 @@ func (h *handler) OnJobChange(key string, job *batchv1.Job) (*batchv1.Job, error
 	}
 
 	return job, nil
+}
+
+func (h *handler) getMachine(obj runtime.Object) (*capi.Machine, error) {
+	meta, err := meta.Accessor(obj)
+	if err != nil {
+		return nil, err
+	}
+	for _, owner := range meta.GetOwnerReferences() {
+		if owner.Kind == "Machine" {
+			return h.machines.Get(meta.GetNamespace(), owner.Name)
+		}
+	}
+
+	return nil, nil
 }
 
 func (h *handler) getMachineStatus(job *batchv1.Job, create bool) (rkev1.RKEMachineStatus, error) {
@@ -210,11 +231,60 @@ func (h *handler) namespaceIsRemoved(obj runtime.Object) (bool, error) {
 	return ns.DeletionTimestamp != nil, nil
 }
 
-func (h *handler) OnRemove(_ string, obj runtime.Object) (runtime.Object, error) {
+func (h *handler) OnRemove(key string, obj runtime.Object) (runtime.Object, error) {
 	if removed, err := h.namespaceIsRemoved(obj); err != nil || removed {
 		return obj, err
 	}
 
+	d, err := data.Convert(obj.DeepCopyObject())
+	if err != nil {
+		return nil, err
+	}
+
+	// In the event we are removing an etcd node (as indicated by the etcd-role label on the node), we must safely remove the etcd node from the cluster before allowing machine deprovisioning
+	if val, ok := d.Map("metadata", "labels")["rke.cattle.io/etcd-role"]; ok && val.(string) == "true" {
+		// we need to block removal until our the v1 node that corresponds has been removed
+		clusterName, _ := d.Map("metadata", "labels")[CapiMachineLabel].(string)
+		if clusterName == "" {
+			return obj, fmt.Errorf("error retrieving the clustername for etcd node, label key %s does not appear to exist for dynamic machine %s", CapiMachineLabel, key)
+		}
+		cluster, err := h.rancherClusterCache.Get(d.String("metadata", "namespace"), clusterName)
+		if err != nil && !apierror.IsNotFound(err) {
+			return obj, err
+		}
+		if apierror.IsNotFound(err) || !cluster.DeletionTimestamp.IsZero() {
+			return h.doRemove(obj)
+		}
+
+		machine, err := h.getMachine(obj)
+		if err != nil {
+			return obj, err
+		}
+
+		if machine == nil || machine.Status.NodeRef == nil {
+			// Machine noderef is nil, we should just allow deletion.
+			logrus.Debugf("[MachineProvision] There was no associated K8s node with this etcd dynamicmachine %s. proceeding with deletion", key)
+			return h.doRemove(obj)
+		}
+
+		restConfig, err := h.kubeconfigManager.GetRESTConfig(cluster, cluster.Status)
+		if err != nil {
+			return obj, err
+		}
+
+		removed, err := etcdmgmt.SafelyRemoved(restConfig, v2provruntime.GetRuntimeCommand(cluster.Spec.KubernetesVersion), machine.Status.NodeRef.Name)
+		if err != nil {
+			return obj, err
+		}
+		if !removed {
+			h.dynamic.EnqueueAfter(obj.GetObjectKind().GroupVersionKind(), d.String("metadata", "namespace"), d.String("metadata", "name"), 5*time.Second)
+			return obj, generic.ErrSkip
+		}
+	}
+	return h.doRemove(obj)
+}
+
+func (h *handler) doRemove(obj runtime.Object) (runtime.Object, error) {
 	d, err := data.Convert(obj.DeepCopyObject())
 	if err != nil {
 		return nil, err
@@ -229,7 +299,6 @@ func (h *handler) OnRemove(_ string, obj runtime.Object) (runtime.Object, error)
 	if err != nil {
 		return nil, err
 	}
-
 	job, err := h.jobs.Get(d.String("metadata", "namespace"), getJobName(infraName))
 	if err != nil {
 		return nil, err
