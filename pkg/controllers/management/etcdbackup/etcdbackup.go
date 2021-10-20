@@ -486,8 +486,7 @@ func getBackupCompletedTime(o runtime.Object) time.Time {
 }
 
 func getBackupCreatedTime(o runtime.Object) (time.Time, error) {
-	t, err := time.Parse(time.RFC3339, rketypes.BackupConditionCreated.GetLastUpdated(o))
-	return t, err
+	return time.Parse(time.RFC3339, rketypes.BackupConditionCreated.GetLastUpdated(o))
 }
 
 func getExpiredBackups(retention, intervalHours int, backups []*v3.EtcdBackup) []*v3.EtcdBackup {
