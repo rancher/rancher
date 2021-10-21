@@ -316,8 +316,7 @@ steps:
     - tag
     ref:
       include:
-      - "refs/tags/*rc*"
-      - "refs/tags/*alpha*"
+      - "refs/tags/*-*"
 
 - name: github_binary_release
   image: plugins/github-release
@@ -335,8 +334,7 @@ steps:
       include:
       - "refs/tags/v2*"
       exclude:
-      - "refs/tags/*rc*"
-      - "refs/tags/*alpha*"
+      - "refs/tags/*-*"
 
 - name: slack_notify
   image: plugins/slack

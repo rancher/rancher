@@ -120,7 +120,10 @@ func (m *Manager) onTrigger(_ string, obj *catalog.ClusterRepo) (*catalog.Cluste
 		return obj, nil
 	}
 
-	m.trigger <- struct{}{}
+	select {
+	case m.trigger <- struct{}{}:
+	default:
+	}
 	return obj, nil
 }
 
@@ -231,7 +234,7 @@ func (m *Manager) Remove(namespace, name, minVersion string) {
 }
 
 func (m *Manager) install(namespace, name, minVersion string, values map[string]interface{}, forceAdopt bool) error {
-	index, err := m.content.Index("", "rancher-charts")
+	index, err := m.content.Index("", "rancher-charts", true)
 	if err != nil {
 		return err
 	}

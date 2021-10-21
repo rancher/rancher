@@ -543,7 +543,7 @@ func addAnnotations(data []byte, annotations map[string]string) ([]byte, error) 
 }
 
 func (s *Operations) getChartCommand(namespace, name, chartName, chartVersion string, annotations map[string]string, values map[string]interface{}) (Command, error) {
-	chart, err := s.contentManager.Chart(namespace, name, chartName, chartVersion)
+	chart, err := s.contentManager.Chart(namespace, name, chartName, chartVersion, true)
 	if err != nil {
 		return Command{}, err
 	}

@@ -5,13 +5,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Masterminds/semver/v3"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/stretchr/testify/assert"
 	"helm.sh/helm/v3/pkg/chart"
 	"helm.sh/helm/v3/pkg/repo"
 )
 
-func TestFilterReleases(t *testing.T) {
+func TestFilterReleasesSemver(t *testing.T) {
 	tests := []struct {
 		testName               string
 		chartVersionAnnotation string
@@ -193,7 +194,145 @@ func TestFilterReleases(t *testing.T) {
 			}
 			contentManager := Manager{}
 			settings.ServerVersion.Set(tt.rancherVersion)
-			contentManager.filterReleases(&filteredIndexFile, nil)
+			contentManager.filterReleases(&filteredIndexFile, nil, false)
+			result := reflect.DeepEqual(indexFile, filteredIndexFile)
+			assert.Equal(t, tt.expectedPass, result)
+			if result != tt.expectedPass {
+				t.Logf("Expected %v, got %v for %s with rancher version %s", tt.expectedPass, result, tt.chartVersionAnnotation, tt.rancherVersion)
+			}
+		})
+	}
+}
+
+func TestFilteringReleases(t *testing.T) {
+	tests := []struct {
+		testName                    string
+		chartVersionAnnotation      string
+		rancherVersion              string
+		kubernetesVersionAnnotation string
+		kubernetesVersion           string
+		skipFiltering								bool
+		expectedPass                bool
+	}{
+		{
+			"Index with chart that has no filters and skips filtering",
+			"",
+			"",
+			"",
+			"",
+			true,
+			true,
+		},
+		{
+			"Index with chart that has rancher-version annotation filter and skips filtering",
+			">= 2.5.0-alpha3 <2.6.0",
+			"v2.5.0+123",
+			"",
+			"v1.21.0",
+			true,
+			true,
+		},
+		{
+			"Index with chart that has kubernetes version filter and skips filtering",
+			"",
+			"v2.5.7",
+			"v1.20.0",
+			"v1.21.0",
+			true,
+			true,
+		},
+		{
+			"Index with chart that has kubernetes version and rancher-version annotation filter and skips filtering",
+			">2.5.0-rc1 <=2.6.0-0",
+			"v2.5.0-rc2",
+			"v1.20.0",
+			"v1.21.0",
+			true,
+			true,
+		},
+		{
+			"Index with chart that has no filters and applies filters",
+			"",
+			"",
+			"",
+			"",
+			false,
+			true,
+		},
+		{
+			"Index with chart that has rancher-version annotation filter and applies filtering",
+			">= 2.5.0-alpha3 <2.6.0",
+			"v2.5.0+123",
+			"",
+			"v1.21.0",
+			false,
+			true,
+		},
+		{
+			"Index with chart that has kubernetes version filter and applies filtering",
+			"",
+			"v2.5.7",
+			"v1.20.0",
+			"v1.21.0",
+			false,
+			false,
+		},
+		{
+			"Index with chart that has kubernetes version and rancher-version annotation filter and applies filtering",
+			">2.5.0-rc1 <=2.6.0-0",
+			"v2.5.0-rc2",
+			"v1.20.0",
+			"v1.21.0",
+			false,
+			false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.testName, func(t *testing.T) {
+			indexFile := repo.IndexFile{
+				Entries: map[string]repo.ChartVersions{
+					"test-chart": {
+						{
+							Metadata: &chart.Metadata{
+								Name:    "test-chart",
+								Version: "1.0.0",
+								Annotations: map[string]string{
+									"catalog.cattle.io/rancher-version": tt.chartVersionAnnotation,
+								},
+								KubeVersion: tt.kubernetesVersionAnnotation,
+							},
+							URLs:    nil,
+							Created: time.Time{},
+							Removed: false,
+							Digest:  "",
+						},
+					},
+				},
+			}
+			filteredIndexFile := repo.IndexFile{
+				Entries: map[string]repo.ChartVersions{
+					"test-chart": {
+						{
+							Metadata: &chart.Metadata{
+								Name:    "test-chart",
+								Version: "1.0.0",
+								Annotations: map[string]string{
+									"catalog.cattle.io/rancher-version": tt.chartVersionAnnotation,
+								},
+								KubeVersion: tt.kubernetesVersionAnnotation,
+							},
+							URLs:    nil,
+							Created: time.Time{},
+							Removed: false,
+							Digest:  "",
+						},
+					},
+				},
+			}
+			contentManager := Manager{}
+			settings.ServerVersion.Set(tt.rancherVersion)
+			kubeVersion, _ := semver.NewVersion(tt.kubernetesVersion)
+			contentManager.filterReleases(&filteredIndexFile, kubeVersion, tt.skipFiltering)
 			result := reflect.DeepEqual(indexFile, filteredIndexFile)
 			assert.Equal(t, tt.expectedPass, result)
 			if result != tt.expectedPass {

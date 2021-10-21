@@ -88,7 +88,14 @@ func (n *nsLifecycle) Remove(obj *v1.Namespace) (runtime.Object, error) {
 
 func (n *nsLifecycle) syncNS(obj *v1.Namespace) (bool, error) {
 	// add fleet namespace to system project
-	if isFleetNamespace(obj) {
+	if IsFleetNamespace(obj) &&
+		// If this is the local cluster, then only move the namespace to ths system project if the projectIDAnnotation is
+		// empty or beings with "local" (i.e. not c-). If the projectIDAnnotation begins with something other than "local"
+		// then it is likely that local cluster is the tenant cluster in a hosted Rancher setup and the namespace belongs to
+		// the system project for the cluster in the host cluster. Moving it here would only cause the namespace to be
+		// continually moved between projects forever.
+		(n.m.clusterName != "local" || obj.Annotations[projectIDAnnotation] == "" || strings.HasPrefix(obj.Annotations[projectIDAnnotation], "local")) {
+
 		systemProjectName, err := n.GetSystemProjectName()
 		if err != nil {
 			return false, errors.Wrapf(err, "failed to add namespace %s to system project", obj.Name)
@@ -103,6 +110,7 @@ func (n *nsLifecycle) syncNS(obj *v1.Namespace) (bool, error) {
 			delete(obj.Annotations, projectIDAnnotation)
 		}
 	}
+
 	hasPRTBs, err := n.ensurePRTBAddToNamespace(obj)
 	if err != nil {
 		return false, err
@@ -168,7 +176,7 @@ func (n *nsLifecycle) GetSystemProjectName() (string, error) {
 	return projects[0].Name, nil
 }
 
-func isFleetNamespace(ns *v1.Namespace) bool {
+func IsFleetNamespace(ns *v1.Namespace) bool {
 	return ns.Name == "fleet-local" || ns.Name == "fleet-default" || ns.Name == "cattle-fleet-clusters-system" || ns.Labels["fleet.cattle.io/managed"] == "true"
 }
 

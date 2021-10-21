@@ -101,7 +101,7 @@ func (c *Manager) readBytes(cm *corev1.ConfigMap) ([]byte, error) {
 	return bytes, nil
 }
 
-func (c *Manager) Index(namespace, name string) (*repo.IndexFile, error) {
+func (c *Manager) Index(namespace, name string, skipFilter bool) (*repo.IndexFile, error) {
 	r, err := c.getRepo(namespace, name)
 	if err != nil {
 		return nil, err
@@ -121,7 +121,7 @@ func (c *Manager) Index(namespace, name string) (*repo.IndexFile, error) {
 	if cache, ok := c.IndexCache[fmt.Sprintf("%s/%s", r.status.IndexConfigMapNamespace, r.status.IndexConfigMapName)]; ok {
 		if cm.ResourceVersion == cache.revision {
 			c.lock.RUnlock()
-			return c.filterReleases(deepCopyIndex(cache.index), k8sVersion), nil
+			return c.filterReleases(deepCopyIndex(cache.index), k8sVersion, skipFilter), nil
 		}
 	}
 	c.lock.RUnlock()
@@ -158,7 +158,7 @@ func (c *Manager) Index(namespace, name string) (*repo.IndexFile, error) {
 	}
 	c.lock.Unlock()
 
-	return c.filterReleases(deepCopyIndex(index), k8sVersion), nil
+	return c.filterReleases(deepCopyIndex(index), k8sVersion, skipFilter), nil
 }
 
 func (c *Manager) k8sVersion() (*semver.Version, error) {
@@ -195,8 +195,8 @@ func deepCopyIndex(src *repo.IndexFile) *repo.IndexFile {
 	return &deepcopy
 }
 
-func (c *Manager) filterReleases(index *repo.IndexFile, k8sVersion *semver.Version) *repo.IndexFile {
-	if !settings.IsRelease() {
+func (c *Manager) filterReleases(index *repo.IndexFile, k8sVersion *semver.Version, skipFilter bool) *repo.IndexFile {
+	if !settings.IsRelease() || skipFilter {
 		return index
 	}
 
@@ -243,7 +243,7 @@ func (c *Manager) filterReleases(index *repo.IndexFile, k8sVersion *semver.Versi
 }
 
 func (c *Manager) Icon(namespace, name, chartName, version string) (io.ReadCloser, string, error) {
-	index, err := c.Index(namespace, name)
+	index, err := c.Index(namespace, name, true)
 	if err != nil {
 		return nil, "", err
 	}
@@ -275,8 +275,8 @@ func isHTTP(iconURL string) bool {
 	return err == nil && (u.Scheme == "http" || u.Scheme == "https")
 }
 
-func (c *Manager) Chart(namespace, name, chartName, version string) (io.ReadCloser, error) {
-	index, err := c.Index(namespace, name)
+func (c *Manager) Chart(namespace, name, chartName, version string, skipFilter bool) (io.ReadCloser, error) {
+	index, err := c.Index(namespace, name, skipFilter)
 	if err != nil {
 		return nil, err
 	}
@@ -304,7 +304,7 @@ func (c *Manager) Chart(namespace, name, chartName, version string) (io.ReadClos
 }
 
 func (c *Manager) Info(namespace, name, chartName, version string) (*types.ChartInfo, error) {
-	chart, err := c.Chart(namespace, name, chartName, version)
+	chart, err := c.Chart(namespace, name, chartName, version, true)
 	if err != nil {
 		return nil, err
 	}

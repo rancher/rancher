@@ -18,19 +18,22 @@ func Test_BuildSubjectFromRTB(t *testing.T) {
 	}
 
 	userSubject := rbacv1.Subject{
-		Kind: "User",
-		Name: "tmp-user",
+		Kind:     "User",
+		Name:     "tmp-user",
+		APIGroup: "rbac.authorization.k8s.io",
 	}
 
 	groupSubject := rbacv1.Subject{
-		Kind: "Group",
-		Name: "tmp-group",
+		Kind:     "Group",
+		Name:     "tmp-group",
+		APIGroup: "rbac.authorization.k8s.io",
 	}
 
 	saSubject := rbacv1.Subject{
 		Kind:      "ServiceAccount",
 		Name:      "tmp-sa",
 		Namespace: "tmp-namespace",
+		APIGroup:  "",
 	}
 
 	testCases := []testCase{

@@ -2,6 +2,7 @@ package settings
 
 import (
 	"context"
+	"fmt"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/settings"
@@ -19,7 +20,8 @@ var (
 )
 
 type handler struct {
-	apply apply.Apply
+	clusterID string
+	apply     apply.Apply
 }
 
 func Register(ctx context.Context, userContext *config.UserContext) error {
@@ -29,7 +31,8 @@ func Register(ctx context.Context, userContext *config.UserContext) error {
 	}
 
 	h := &handler{
-		apply: apply.WithDynamicLookup(),
+		clusterID: userContext.ClusterName,
+		apply:     apply.WithDynamicLookup().WithCacheTypes(userContext.Management.Wrangler.Mgmt.Setting()),
 	}
 
 	userContext.Management.Management.Settings("").AddHandler(ctx, "copy-settings", h.onChange)
@@ -41,7 +44,7 @@ func (h *handler) onChange(key string, obj *v3.Setting) (runtime.Object, error) 
 		return nil, nil
 	}
 
-	return obj, h.apply.
+	err := h.apply.
 		WithOwner(obj).
 		ApplyObjects(&v3.Setting{
 			ObjectMeta: metav1.ObjectMeta{
@@ -50,4 +53,8 @@ func (h *handler) onChange(key string, obj *v3.Setting) (runtime.Object, error) 
 			Value:   obj.Value,
 			Default: obj.Default,
 		})
+	if err != nil {
+		return obj, fmt.Errorf("error applying setting object for cluster [%s]: %v", h.clusterID, err)
+	}
+	return obj, nil
 }
