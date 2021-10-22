@@ -51,7 +51,7 @@ setup_env() {
 
     # --- make sure install channel has a value
     if [ -z "${INSTALL_RANCHERD_CHANNEL}" ]; then
-        INSTALL_RANCHERD_CHANNEL="latest"
+        INSTALL_RANCHERD_CHANNEL="v2.5"
     fi
 
     # --- make sure install type has a value
