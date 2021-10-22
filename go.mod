@@ -71,6 +71,8 @@ require (
 	github.com/evanphx/json-patch v4.9.0+incompatible
 	github.com/garyburd/redigo v1.6.2 // indirect
 	github.com/ghodss/yaml v1.0.0
+	github.com/go-asn1-ber/asn1-ber v1.5.3 // indirect
+	github.com/go-ldap/ldap/v3 v3.4.1
 	github.com/go-logr/logr v0.4.0
 	github.com/golang-jwt/jwt v3.2.1+incompatible
 	github.com/golang/protobuf v1.5.0
@@ -134,7 +136,7 @@ require (
 	github.com/yvasiyarov/go-metrics v0.0.0-20150112132944-c25f46c4b940 // indirect
 	github.com/yvasiyarov/gorelic v0.0.7 // indirect
 	github.com/yvasiyarov/newrelic_platform_go v0.0.0-20160601141957-9c099fbc30e9 // indirect
-	golang.org/x/crypto v0.0.0-20210711020723-a769d52b0f97
+	golang.org/x/crypto v0.0.0-20210921155107-089bfa567519
 	golang.org/x/mod v0.4.0
 	golang.org/x/net v0.0.0-20210315170653-34ac3e1c2000
 	golang.org/x/oauth2 v0.0.0-20201208152858-08078c50e5b5
@@ -143,9 +145,7 @@ require (
 	google.golang.org/api v0.40.0
 	google.golang.org/genproto v0.0.0-20210315173758-2651cd453018 // indirect
 	google.golang.org/grpc v1.34.0
-	gopkg.in/asn1-ber.v1 v1.0.0-20181015200546-f715ec2f112d // indirect
 	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c
-	gopkg.in/ldap.v2 v2.5.1
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
 	gopkg.in/yaml.v2 v2.4.0
 	helm.sh/helm/v3 v3.5.4

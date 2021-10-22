@@ -8,12 +8,12 @@ import (
 	"strings"
 	"time"
 
+	ldapv3 "github.com/go-ldap/ldap/v3"
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/httperror"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
-	ldapv2 "gopkg.in/ldap.v2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -29,16 +29,16 @@ type ConfigAttributes struct {
 	UserObjectClass             string
 }
 
-func Connect(config *v3.LdapConfig, caPool *x509.CertPool) (*ldapv2.Conn, error) {
+func Connect(config *v3.LdapConfig, caPool *x509.CertPool) (*ldapv3.Conn, error) {
 	return NewLDAPConn(config.Servers, config.TLS, config.StartTLS, config.Port, config.ConnectionTimeout, caPool)
 }
 
-func NewLDAPConn(servers []string, TLS, startTLS bool, port int64, connectionTimeout int64, caPool *x509.CertPool) (*ldapv2.Conn, error) {
+func NewLDAPConn(servers []string, TLS, startTLS bool, port int64, connectionTimeout int64, caPool *x509.CertPool) (*ldapv3.Conn, error) {
 	logrus.Debug("Now creating Ldap connection")
-	var lConn *ldapv2.Conn
+	var lConn *ldapv3.Conn
 	var err error
 	var tlsConfig *tls.Config
-	ldapv2.DefaultTimeout = time.Duration(connectionTimeout) * time.Millisecond
+	ldapv3.DefaultTimeout = time.Duration(connectionTimeout) * time.Millisecond
 	// TODO implment multi-server support
 	if len(servers) != 1 {
 		return nil, errors.New("invalid server config. only exactly 1 server is currently supported")
@@ -46,12 +46,12 @@ func NewLDAPConn(servers []string, TLS, startTLS bool, port int64, connectionTim
 	server := servers[0]
 	tlsConfig = &tls.Config{RootCAs: caPool, InsecureSkipVerify: false, ServerName: server}
 	if TLS {
-		lConn, err = ldapv2.DialTLS("tcp", fmt.Sprintf("%s:%d", server, port), tlsConfig)
+		lConn, err = ldapv3.DialTLS("tcp", fmt.Sprintf("%s:%d", server, port), tlsConfig)
 		if err != nil {
 			return nil, fmt.Errorf("Error creating ssl connection: %v", err)
 		}
 	} else if startTLS {
-		lConn, err = ldapv2.Dial("tcp", fmt.Sprintf("%s:%d", server, port))
+		lConn, err = ldapv3.Dial("tcp", fmt.Sprintf("%s:%d", server, port))
 		if err != nil {
 			return nil, fmt.Errorf("Error creating connection for startTLS: %v", err)
 		}
@@ -59,7 +59,7 @@ func NewLDAPConn(servers []string, TLS, startTLS bool, port int64, connectionTim
 			return nil, fmt.Errorf("Error upgrading startTLS connection: %v", err)
 		}
 	} else {
-		lConn, err = ldapv2.Dial("tcp", fmt.Sprintf("%s:%d", server, port))
+		lConn, err = ldapv3.Dial("tcp", fmt.Sprintf("%s:%d", server, port))
 		if err != nil {
 			return nil, fmt.Errorf("Error creating connection: %v", err)
 		}
@@ -79,7 +79,7 @@ func GetUserExternalID(username string, loginDomain string) string {
 	return username
 }
 
-func HasPermission(attributes []*ldapv2.EntryAttribute, userObjectClass string, userEnabledAttribute string, userDisabledBitMask int64) bool {
+func HasPermission(attributes []*ldapv3.EntryAttribute, userObjectClass string, userEnabledAttribute string, userDisabledBitMask int64) bool {
 	var permission int64
 	if !IsType(attributes, userObjectClass) {
 		return true
@@ -105,7 +105,7 @@ func HasPermission(attributes []*ldapv2.EntryAttribute, userObjectClass string, 
 	return permission != userDisabledBitMask
 }
 
-func IsType(search []*ldapv2.EntryAttribute, varType string) bool {
+func IsType(search []*ldapv3.EntryAttribute, varType string) bool {
 	for _, attrib := range search {
 		if strings.EqualFold(attrib.Name, "objectClass") {
 			for _, val := range attrib.Values {
@@ -120,7 +120,7 @@ func IsType(search []*ldapv2.EntryAttribute, varType string) bool {
 	return false
 }
 
-func GetAttributeValuesByName(search []*ldapv2.EntryAttribute, attributeName string) []string {
+func GetAttributeValuesByName(search []*ldapv3.EntryAttribute, attributeName string) []string {
 	for _, attrib := range search {
 		if attrib.Name == attributeName {
 			return attrib.Values
@@ -169,7 +169,7 @@ func GetGroupSearchAttributesForLDAP(ObjectClass string, config *v3.LdapConfig) 
 	return groupSeachAttributes
 }
 
-func AuthenticateServiceAccountUser(serviceAccountPassword string, serviceAccountUsername string, defaultLoginDomain string, lConn *ldapv2.Conn) error {
+func AuthenticateServiceAccountUser(serviceAccountPassword string, serviceAccountUsername string, defaultLoginDomain string, lConn *ldapv3.Conn) error {
 	logrus.Debug("Binding service account username password")
 	if serviceAccountPassword == "" {
 		return httperror.NewAPIError(httperror.MissingRequired, "service account password not provided")
@@ -177,7 +177,7 @@ func AuthenticateServiceAccountUser(serviceAccountPassword string, serviceAccoun
 	sausername := GetUserExternalID(serviceAccountUsername, defaultLoginDomain)
 	err := lConn.Bind(sausername, serviceAccountPassword)
 	if err != nil {
-		if ldapv2.IsErrorWithCode(err, ldapv2.LDAPResultInvalidCredentials) {
+		if ldapv3.IsErrorWithCode(err, ldapv3.LDAPResultInvalidCredentials) {
 			return httperror.WrapAPIError(err, httperror.Unauthorized, "authentication failed")
 		}
 		return httperror.WrapAPIError(err, httperror.ServerError, "server error while authenticating")
@@ -186,7 +186,7 @@ func AuthenticateServiceAccountUser(serviceAccountPassword string, serviceAccoun
 	return nil
 }
 
-func AttributesToPrincipal(attribs []*ldapv2.EntryAttribute, dnStr, scope, providerName, userObjectClass, userNameAttribute, userLoginAttribute, groupObjectClass, groupNameAttribute string) (*v3.Principal, error) {
+func AttributesToPrincipal(attribs []*ldapv3.EntryAttribute, dnStr, scope, providerName, userObjectClass, userNameAttribute, userLoginAttribute, groupObjectClass, groupNameAttribute string) (*v3.Principal, error) {
 	var externalIDType, accountName, externalID, login, kind string
 	externalID = dnStr
 	externalIDType = scope
@@ -244,7 +244,7 @@ func AttributesToPrincipal(attribs []*ldapv2.EntryAttribute, dnStr, scope, provi
 	return principal, nil
 }
 
-func GatherParentGroups(groupPrincipal v3.Principal, searchDomain string, groupScope string, config *ConfigAttributes, lConn *ldapv2.Conn,
+func GatherParentGroups(groupPrincipal v3.Principal, searchDomain string, groupScope string, config *ConfigAttributes, lConn *ldapv3.Conn,
 	groupMap map[string]bool, nestedGroupPrincipals *[]v3.Principal, searchAttributes []string) error {
 	groupMap[groupPrincipal.ObjectMeta.Name] = true
 	principals := []v3.Principal{}
@@ -255,9 +255,9 @@ func GatherParentGroups(groupPrincipal v3.Principal, searchDomain string, groupS
 	}
 	groupDN := strings.TrimPrefix(parts[1], "//")
 
-	searchGroup := ldapv2.NewSearchRequest(searchDomain,
-		ldapv2.ScopeWholeSubtree, ldapv2.NeverDerefAliases, 0, 0, false,
-		fmt.Sprintf("(&(%v=%v)(%v=%v))", config.GroupMemberMappingAttribute, ldapv2.EscapeFilter(groupDN), config.ObjectClass, config.GroupObjectClass),
+	searchGroup := ldapv3.NewSearchRequest(searchDomain,
+		ldapv3.ScopeWholeSubtree, ldapv3.NeverDerefAliases, 0, 0, false,
+		fmt.Sprintf("(&(%v=%v)(%v=%v))", config.GroupMemberMappingAttribute, ldapv3.EscapeFilter(groupDN), config.ObjectClass, config.GroupObjectClass),
 		searchAttributes, nil)
 	resultGroups, err := lConn.SearchWithPaging(searchGroup, 1000)
 	if err != nil {
