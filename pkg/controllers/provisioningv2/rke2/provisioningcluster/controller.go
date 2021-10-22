@@ -13,6 +13,7 @@ import (
 	mgmtcontroller "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	rocontrollers "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
 	rkecontroller "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
+	"github.com/rancher/rancher/pkg/provisioningv2/rke2/planner"
 	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/rancher/wrangler/pkg/condition"
 	corecontrollers "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
@@ -38,6 +39,8 @@ type handler struct {
 	secretCache       corecontrollers.SecretCache
 	secretClient      corecontrollers.SecretClient
 	capiClusters      capicontrollers.ClusterCache
+	mgmtClusterCache  mgmtcontroller.ClusterCache
+	mgmtClusterClient mgmtcontroller.ClusterClient
 	rkeControlPlane   rkecontroller.RKEControlPlaneCache
 }
 
@@ -54,6 +57,8 @@ func Register(ctx context.Context, clients *wrangler.Context) {
 
 	if features.MCM.Enabled() {
 		h.dynamicSchema = clients.Mgmt.DynamicSchema().Cache()
+		h.mgmtClusterCache = clients.Mgmt.Cluster().Cache()
+		h.mgmtClusterClient = clients.Mgmt.Cluster()
 	}
 
 	clients.Dynamic.OnChange(ctx, "rke-dynamic", matchRKENodeGroup, h.infraWatch)
@@ -191,8 +196,30 @@ func (h *handler) updateClusterProvisioningStatus(cluster *rancherv1.Cluster, st
 		return status, err
 	}
 
+	if h.mgmtClusterCache != nil {
+		mgmtCluster, err := h.mgmtClusterCache.Get(cluster.Status.ClusterName)
+		if err != nil {
+			return status, err
+		}
+
+		message := Provisioned.GetMessage(cp)
+		if (message == "" && Provisioned.GetMessage(mgmtCluster) != "") || strings.Contains(message, planner.ETCDRestoreMessage) {
+			mgmtCluster = mgmtCluster.DeepCopy()
+
+			Provisioned.SetStatus(mgmtCluster, Provisioned.GetStatus(cp))
+			Provisioned.Reason(mgmtCluster, Provisioned.GetReason(cp))
+			Provisioned.Message(mgmtCluster, message)
+
+			_, err = h.mgmtClusterClient.Update(mgmtCluster)
+			if err != nil {
+				return status, err
+			}
+		}
+	}
+
 	Provisioned.SetStatus(&status, Provisioned.GetStatus(cp))
 	Provisioned.Reason(&status, Provisioned.GetReason(cp))
 	Provisioned.Message(&status, Provisioned.GetMessage(cp))
+
 	return status, nil
 }
