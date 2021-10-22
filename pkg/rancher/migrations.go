@@ -1,6 +1,8 @@
 package rancher
 
 import (
+	"bytes"
+
 	"github.com/mcuadros/go-version"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/tokens"
@@ -21,6 +23,8 @@ const (
 	forceLocalSystemAndDefaultProjectCreation = "forcelocalprojectcreation"
 	rancherVersionKey                         = "rancherVersion"
 	projectsCreatedKey                        = "projectsCreated"
+	caSecretName                              = "tls-ca-additional"
+	caSecretField                             = "ca-additional.pem"
 )
 
 func getConfigMap(configMapController controllerv1.ConfigMapController, configMapName string) (*v1.ConfigMap, error) {
@@ -134,4 +138,40 @@ func forceSystemAndDefaultProjectCreation(configMapController controllerv1.Confi
 
 	cm.Data[projectsCreatedKey] = "true"
 	return createOrUpdateConfigMap(configMapController, cm)
+}
+
+// copyCAAdditionalSecret will ensure that if a secret named tls-ca-additional exists in the cattle-system namespace
+// then this secret also exists in the fleet-default namespace. This is because the machine creation and deletion jobs
+// need to have access to this secret as well.
+func copyCAAdditionalSecret(secretClient controllerv1.SecretClient) error {
+	cattleSecret, err := secretClient.Get("cattle-system", caSecretName, metav1.GetOptions{})
+	if err != nil {
+		if k8serror.IsNotFound(err) {
+			return nil
+		}
+		return err
+	}
+
+	fleetSecret, err := secretClient.Get("fleet-default", caSecretName, metav1.GetOptions{})
+	if err != nil {
+		if !k8serror.IsNotFound(err) {
+			return err
+		}
+		fleetSecret.Name = cattleSecret.Name
+		fleetSecret.Namespace = "fleet-default"
+	} else if bytes.Equal(fleetSecret.Data[caSecretField], cattleSecret.Data[caSecretField]) {
+		// Both secrets contain the same data.
+		return nil
+	}
+
+	fleetSecret.Data = cattleSecret.Data
+
+	if err != nil {
+		// In this case, the fleetSecret doesn't exist yet.
+		_, err = secretClient.Create(fleetSecret)
+	} else {
+		_, err = secretClient.Update(fleetSecret)
+	}
+
+	return err
 }
