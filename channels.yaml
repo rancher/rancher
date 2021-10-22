@@ -2,6 +2,9 @@ channels:
 - name: latest
   latestRegexp: .*
   excludeRegexp: ^[^+]+-
+- name: v2.5
+  latestRegexp: v2\.5\..*
+  excludeRegexp: ^[^+]+-
 - name: testing
   latestRegexp: .*
 github:
