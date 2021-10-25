@@ -6,6 +6,7 @@ import (
 	"github.com/mcuadros/go-version"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/tokens"
+	fleetconst "github.com/rancher/rancher/pkg/fleet"
 	v3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	rancherversion "github.com/rancher/rancher/pkg/version"
 	controllerv1 "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
@@ -152,13 +153,13 @@ func copyCAAdditionalSecret(secretClient controllerv1.SecretClient) error {
 		return err
 	}
 
-	fleetSecret, err := secretClient.Get("fleet-default", caSecretName, metav1.GetOptions{})
+	fleetSecret, err := secretClient.Get(fleetconst.ClustersDefaultNamespace, caSecretName, metav1.GetOptions{})
 	if err != nil {
 		if !k8serror.IsNotFound(err) {
 			return err
 		}
 		fleetSecret.Name = cattleSecret.Name
-		fleetSecret.Namespace = "fleet-default"
+		fleetSecret.Namespace = fleetconst.ClustersDefaultNamespace
 	} else if bytes.Equal(fleetSecret.Data[caSecretField], cattleSecret.Data[caSecretField]) {
 		// Both secrets contain the same data.
 		return nil

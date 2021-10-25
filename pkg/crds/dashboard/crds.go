@@ -9,6 +9,7 @@ import (
 	uiv1 "github.com/rancher/rancher/pkg/apis/ui.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/crds/provisioningv2"
 	"github.com/rancher/rancher/pkg/features"
+	fleetconst "github.com/rancher/rancher/pkg/fleet"
 	"github.com/rancher/wrangler/pkg/apply"
 	"github.com/rancher/wrangler/pkg/crd"
 	"github.com/rancher/wrangler/pkg/generated/controllers/apiextensions.k8s.io"
@@ -146,8 +147,8 @@ func fleetBootstrap(crds []crd.CRD, cfg *rest.Config) ([]crd.CRD, error) {
 				"app.kubernetes.io/managed-by": "Helm",
 			},
 			Annotations: map[string]string{
-				"meta.helm.sh/release-name":      "fleet-crd",
-				"meta.helm.sh/release-namespace": "cattle-fleet-system",
+				"meta.helm.sh/release-name":      fleetconst.CRDChartName,
+				"meta.helm.sh/release-namespace": fleetconst.ReleaseNamespace,
 			},
 		})
 	}

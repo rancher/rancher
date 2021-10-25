@@ -9,6 +9,7 @@ import (
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	v1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/features"
+	fleetconst "github.com/rancher/rancher/pkg/fleet"
 	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1alpha4"
 	mgmtcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	rocontrollers "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
@@ -356,7 +357,7 @@ func (h *handler) updateStatus(objs []runtime.Object, cluster *v1.Cluster, statu
 					return nil, status, err
 				}
 				objs = append(objs, crtb)
-			} else if cluster.Namespace == "fleet-local" && cluster.Name == "local" {
+			} else if cluster.Namespace == fleetconst.ClustersLocalNamespace && cluster.Name == "local" {
 				user, err := h.kubeconfigManager.EnsureUser(cluster.Namespace, cluster.Name)
 				if err != nil {
 					return objs, status, err
