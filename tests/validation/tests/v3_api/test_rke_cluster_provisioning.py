@@ -2,7 +2,6 @@ from threading import Thread
 import pytest
 from .common import *  # NOQA
 from rancher import ApiError
-
 K8S_VERSION = os.environ.get('RANCHER_K8S_VERSION', "")
 K8S_VERSION_UPGRADE = os.environ.get('RANCHER_K8S_VERSION_UPGRADE', "")
 POD_SECURITY_POLICY_TEMPLATE = \
@@ -15,8 +14,8 @@ AZURE_CLIENT_SECRET = os.environ.get("AZURE_CLIENT_SECRET")
 AZURE_TENANT_ID = os.environ.get("AZURE_TENANT_ID")
 worker_count = int(os.environ.get('RANCHER_STRESS_TEST_WORKER_COUNT', 1))
 HOST_NAME = os.environ.get('RANCHER_HOST_NAME', "testcustom")
+NETWORK_PLUGIN = os.environ.get('RANCHER_NETWORK_PLUGIN', "canal")
 engine_install_url = "https://releases.rancher.com/install-docker/20.10.sh"
-
 rke_config = {
     "addonJobTimeout": 30,
     "authentication":
@@ -50,6 +49,7 @@ rke_config = {
             "serviceNodePortRange": "30000-32767",
             "type": "kubeAPIService"}},
     "sshAgentAuth": False}
+
 
 rke_config_windows = {
     "addonJobTimeout": 30,
@@ -340,7 +340,7 @@ def test_cis_complaint():
         AmazonWebServices().create_multiple_nodes(
             len(node_roles), random_test_name(HOST_NAME))
     rke_config_cis = get_cis_rke_config()
-    client = get_admin_client()
+    client = get_user_client()
     cluster = client.create_cluster(
         name=evaluate_clustername(),
         driver="rancherKubernetesEngine",
@@ -354,6 +354,53 @@ def test_cis_complaint():
                                cluster
                                )
     cluster_cleanup(client, cluster, aws_nodes)
+
+def test_create_flatcar_linux():
+    node_roles = [
+        ["controlplane"], ["etcd"],
+        ["worker"], ["worker"], ["worker"]
+    ]
+    aws_nodes = \
+        AmazonWebServices().create_multiple_nodes(
+            len(node_roles), random_test_name(HOST_NAME))
+    config = rke_config
+    if NETWORK_PLUGIN == "calico":
+        config["network"]["options"] = {}
+        config["network"]["options"][
+            "calico_flex_volume_plugin_dir"] = \
+            "/opt/kubernetes/kubelet-plugins/volume/exec/nodeagent~uds"
+    elif NETWORK_PLUGIN == "canal":
+        config["network"]["options"] = {}
+        config["network"]["options"][
+            "canal_flex_volume_plugin_dir"] = \
+            "/opt/kubernetes/kubelet-plugins/volume/exec/nodeagent~uds"
+    config["services"]["kubeController"] = {}
+    config["services"]["kubeController"]["extraArgs"] = {}
+    config["services"]["kubeController"]["extraArgs"]["flex-volume-plugin-dir"] = \
+        "/opt/kubernetes/kubelet-plugins/volume/exec/"
+    client = get_user_client()
+    cluster = client.create_cluster(name=evaluate_clustername(),
+                                    driver="rancherKubernetesEngine",
+                                    rancherKubernetesEngineConfig=config)
+    assert cluster.state == "provisioning"
+
+    i = 0
+    for node in aws_nodes:
+        docker_run_cmd = \
+            get_custom_host_registration_cmd(client, cluster, node_roles[i],
+                                             node)
+        print("Docker run command: " + docker_run_cmd)
+
+        for nr in node_roles[i]:
+            node.roles.append(nr)
+
+        result = node.execute_command(docker_run_cmd)
+        print(result)
+        i += 1
+
+    cluster = validate_cluster_state(client, cluster,
+                                     check_intermediate_state=False)
+    cluster_cleanup(get_user_client(), cluster, aws_nodes)
 
 
 def test_rke_az_host_1(node_template_az):
@@ -1149,7 +1196,6 @@ def create_custom_host_from_nodes(nodes, node_roles,
             config = rke_config_windows_host_gw_aws_provider
         else:
             config = rke_config_windows
-
     else:
         config = rke_config
     if version != "":
