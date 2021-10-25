@@ -2,6 +2,7 @@ from .test_auth import enable_ad, load_setup_data, enable_openldap, \
     OPENLDAP_AUTH_USER_PASSWORD, enable_freeipa, FREEIPA_AUTH_USER_PASSWORD
 from .common import *  # NOQA
 import ast
+from lib.aws import WINDOWS_AWS_AMI, WINDOWS_AWS_USER
 
 AGENT_REG_CMD = os.environ.get('RANCHER_AGENT_REG_CMD', "")
 HOST_COUNT = int(os.environ.get('RANCHER_HOST_COUNT', 1))
@@ -23,8 +24,13 @@ K8S_VERSION = os.environ.get('RANCHER_K8S_VERSION', "")
 
 
 def test_add_custom_host():
-    aws_nodes = AmazonWebServices().create_multiple_nodes(
-        HOST_COUNT, random_test_name("testsa" + HOST_NAME))
+    if TEST_OS == "windows":
+        aws_nodes = AmazonWebServices().create_multiple_nodes(
+            HOST_COUNT, random_test_name("testsa" + HOST_NAME),
+            ami=WINDOWS_AWS_AMI,ssh_user=WINDOWS_AWS_USER)
+    else:
+        aws_nodes = AmazonWebServices().create_multiple_nodes(
+            HOST_COUNT, random_test_name("testsa" + HOST_NAME))
     if AGENT_REG_CMD != "":
         for aws_node in aws_nodes:
             additional_options = " --address " + aws_node.public_ip_address + \
