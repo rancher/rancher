@@ -22,14 +22,13 @@ type RKEClusterStatus struct {
 }
 
 type RKEClusterSpecCommon struct {
-	LocalClusterAuthEndpoint LocalClusterAuthEndpoint `json:"localClusterAuthEndpoint,omitempty"`
-	UpgradeStrategy          ClusterUpgradeStrategy   `json:"upgradeStrategy,omitempty"`
-	ChartValues              GenericMap               `json:"chartValues,omitempty" wrangler:"nullable"`
-	MachineGlobalConfig      GenericMap               `json:"machineGlobalConfig,omitempty" wrangler:"nullable"`
-	MachineSelectorConfig    []RKESystemConfig        `json:"machineSelectorConfig,omitempty"`
-	AdditionalManifest       string                   `json:"additionalManifest,omitempty"`
-	Registries               *Registry                `json:"registries,omitempty"`
-	ETCD                     *ETCD                    `json:"etcd,omitempty"`
+	UpgradeStrategy       ClusterUpgradeStrategy `json:"upgradeStrategy,omitempty"`
+	ChartValues           GenericMap             `json:"chartValues,omitempty" wrangler:"nullable"`
+	MachineGlobalConfig   GenericMap             `json:"machineGlobalConfig,omitempty" wrangler:"nullable"`
+	MachineSelectorConfig []RKESystemConfig      `json:"machineSelectorConfig,omitempty"`
+	AdditionalManifest    string                 `json:"additionalManifest,omitempty"`
+	Registries            *Registry              `json:"registries,omitempty"`
+	ETCD                  *ETCD                  `json:"etcd,omitempty"`
 }
 
 type LocalClusterAuthEndpoint struct {

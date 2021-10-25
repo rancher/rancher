@@ -389,13 +389,14 @@ func rkeControlPlane(cluster *rancherv1.Cluster) *rkev1.RKEControlPlane {
 			},
 		},
 		Spec: rkev1.RKEControlPlaneSpec{
-			RKEClusterSpecCommon:  *cluster.Spec.RKEConfig.RKEClusterSpecCommon.DeepCopy(),
-			ETCDSnapshotRestore:   cluster.Spec.RKEConfig.ETCDSnapshotRestore.DeepCopy(),
-			ETCDSnapshotCreate:    cluster.Spec.RKEConfig.ETCDSnapshotCreate.DeepCopy(),
-			KubernetesVersion:     cluster.Spec.KubernetesVersion,
-			ManagementClusterName: cluster.Status.ClusterName,
-			AgentEnvVars:          cluster.Spec.AgentEnvVars,
-			ClusterName:           cluster.Name,
+			RKEClusterSpecCommon:     *cluster.Spec.RKEConfig.RKEClusterSpecCommon.DeepCopy(),
+			LocalClusterAuthEndpoint: *cluster.Spec.LocalClusterAuthEndpoint.DeepCopy(),
+			ETCDSnapshotRestore:      cluster.Spec.RKEConfig.ETCDSnapshotRestore.DeepCopy(),
+			ETCDSnapshotCreate:       cluster.Spec.RKEConfig.ETCDSnapshotCreate.DeepCopy(),
+			KubernetesVersion:        cluster.Spec.KubernetesVersion,
+			ManagementClusterName:    cluster.Status.ClusterName,
+			AgentEnvVars:             cluster.Spec.AgentEnvVars,
+			ClusterName:              cluster.Name,
 		},
 	}
 }

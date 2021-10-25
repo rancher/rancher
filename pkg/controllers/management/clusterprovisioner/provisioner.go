@@ -463,9 +463,7 @@ var errKeyRotationFailed = errors.New("encryption key rotation failed, please re
 
 func (p *Provisioner) reconcileCluster(cluster *v3.Cluster, create bool) (*v3.Cluster, error) {
 	if skipLocalK3sImported(cluster) {
-		if IsAdministratedByProvisioningCluster(cluster) {
-			cluster.Status.AppliedSpec.LocalClusterAuthEndpoint = cluster.Spec.LocalClusterAuthEndpoint
-		}
+		reconcileACE(cluster)
 		return cluster, nil
 	}
 
@@ -1102,4 +1100,10 @@ func (p *Provisioner) k3sBasedClusterConfig(cluster *v3.Cluster, nodes []*v3.Nod
 
 func IsAdministratedByProvisioningCluster(cluster *v3.Cluster) bool {
 	return cluster.Status.Driver == apimgmtv3.ClusterDriverImported && cluster.Annotations["provisioning.cattle.io/administrated"] == "true"
+}
+
+func reconcileACE(cluster *v3.Cluster) {
+	if IsAdministratedByProvisioningCluster(cluster) || cluster.Status.Driver == apimgmtv3.ClusterDriverRke2 || cluster.Status.Driver == apimgmtv3.ClusterDriverK3s {
+		cluster.Status.AppliedSpec.LocalClusterAuthEndpoint = cluster.Spec.LocalClusterAuthEndpoint
+	}
 }
