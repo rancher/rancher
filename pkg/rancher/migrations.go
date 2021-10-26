@@ -8,12 +8,15 @@ import (
 	v1 "k8s.io/api/core/v1"
 	k8serror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/util/retry"
 )
 
 const (
 	cattleNamespace                           = "cattle-system"
 	forceLocalSystemAndDefaultProjectCreation = "forcelocalprojectcreation"
+	forceSystemNamespacesAssignment           = "forcesystemnamespaceassignment"
 	projectsCreatedKey                        = "projectsCreated"
+	namespacesAssignedKey                     = "namespacesAssigned"
 )
 
 func getConfigMap(configMapController controllerv1.ConfigMapController, configMapName string) (*v1.ConfigMap, error) {
@@ -52,7 +55,7 @@ func createOrUpdateConfigMap(configMapClient controllerv1.ConfigMapClient, cm *v
 	return err
 }
 
-// forceSystemAndDefaultProjectCreation will set the correcsponding conditions on the local cluster object,
+// forceSystemAndDefaultProjectCreation will set the corresponding conditions on the local cluster object,
 // if it exists, to Unknown. This will force the corresponding controller to check that the projects exist
 // and create them, if necessary.
 func forceSystemAndDefaultProjectCreation(configMapController controllerv1.ConfigMapController, clusterClient v3.ClusterClient) error {
@@ -82,5 +85,38 @@ func forceSystemAndDefaultProjectCreation(configMapController controllerv1.Confi
 	}
 
 	cm.Data[projectsCreatedKey] = "true"
+	return createOrUpdateConfigMap(configMapController, cm)
+}
+
+func forceSystemNamespaceAssignment(configMapController controllerv1.ConfigMapController, clusterClient v3.ClusterClient) error {
+	cm, err := getConfigMap(configMapController, forceSystemNamespacesAssignment)
+	if err != nil || cm == nil {
+		return err
+	}
+
+	if cm.Data[namespacesAssignedKey] == rancherversion.Version {
+		return nil
+	}
+
+	clusterList, err := clusterClient.List(metav1.ListOptions{})
+
+	if err != nil {
+		return err
+	}
+
+	for _, cluster := range clusterList.Items {
+		if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+			v32.ClusterConditionSystemNamespacesAssigned.Unknown(&cluster)
+			v32.ClusterConditionDefaultNamespaceAssigned.Unknown(&cluster)
+			if _, err := clusterClient.Update(&cluster); err != nil {
+				return err
+			}
+			return nil
+		}); err != nil {
+			return err
+		}
+	}
+
+	cm.Data[namespacesAssignedKey] = rancherversion.Version
 	return createOrUpdateConfigMap(configMapController, cm)
 }
