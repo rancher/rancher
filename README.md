@@ -33,7 +33,7 @@ Rancher can be deployed in either a single node or multi-node setup.  Please ref
 ### Minimum Requirements
 
 * Operating Systems
-  * Please see [Support Matrix](https://rancher.com/support-maintenance-terms/) for specific OS versions for each Rancher version. Note that the link will default to the support matrix for the latest version of Rancher. Use the left navigation menu to select a different Rancher version. 
+  * Please see [Support Matrix](https://rancher.com/support-matrix/) for specific OS versions for each Rancher version. Note that the link will default to the support matrix for the latest version of Rancher. Use the left navigation menu to select a different Rancher version. 
 * Hardware
   * 4 GB of Memory
 * Software
