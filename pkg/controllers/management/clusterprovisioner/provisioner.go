@@ -18,6 +18,7 @@ import (
 	"github.com/rancher/norman/types/values"
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	util "github.com/rancher/rancher/pkg/cluster"
+	"github.com/rancher/rancher/pkg/controllers/management/imported"
 	kd "github.com/rancher/rancher/pkg/controllers/management/kontainerdrivermetadata"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/apps/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
@@ -1055,7 +1056,7 @@ func (p *Provisioner) k3sBasedClusterConfig(cluster *v3.Cluster, nodes []*v3.Nod
 		cluster.Status.Driver == apimgmtv3.ClusterDriverK3os ||
 		cluster.Status.Driver == apimgmtv3.ClusterDriverRke2 ||
 		cluster.Status.Driver == apimgmtv3.ClusterDriverRancherD ||
-		IsAdministratedByProvisioningCluster(cluster) {
+		imported.IsAdministratedByProvisioningCluster(cluster) {
 		return nil //no-op
 	}
 	isEmbedded := cluster.Status.Driver == apimgmtv3.ClusterDriverLocal
@@ -1098,12 +1099,8 @@ func (p *Provisioner) k3sBasedClusterConfig(cluster *v3.Cluster, nodes []*v3.Nod
 	return nil
 }
 
-func IsAdministratedByProvisioningCluster(cluster *v3.Cluster) bool {
-	return cluster.Status.Driver == apimgmtv3.ClusterDriverImported && cluster.Annotations["provisioning.cattle.io/administrated"] == "true"
-}
-
 func reconcileACE(cluster *v3.Cluster) {
-	if IsAdministratedByProvisioningCluster(cluster) || cluster.Status.Driver == apimgmtv3.ClusterDriverRke2 || cluster.Status.Driver == apimgmtv3.ClusterDriverK3s {
+	if imported.IsAdministratedByProvisioningCluster(cluster) || cluster.Status.Driver == apimgmtv3.ClusterDriverRke2 || cluster.Status.Driver == apimgmtv3.ClusterDriverK3s {
 		cluster.Status.AppliedSpec.LocalClusterAuthEndpoint = cluster.Spec.LocalClusterAuthEndpoint
 	}
 }
