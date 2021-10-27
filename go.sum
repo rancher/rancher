@@ -1002,8 +1002,8 @@ github.com/rancher/client-go v0.21.0-rancher.1/go.mod h1:nNBytTF9qPFDEhoqgEPaaro
 github.com/rancher/cluster-api v0.3.11-0.20210514043303-8726f6e84d41 h1:4YsdMzVRGze/N9cAgeqbGNTjuY08wtVB92+OinhOtw8=
 github.com/rancher/cluster-api v0.3.11-0.20210514043303-8726f6e84d41/go.mod h1:iDmIO2c5/RSiSciQnI7Xocfe8hTu+KafcgEuc/hnhS4=
 github.com/rancher/dynamiclistener v0.2.1-0.20200714201033-9c1939da3af9/go.mod h1:qr0QfhwzcVCR+Ao9WyfnE+jmOpfEAdRhXtNOZGJ3nCQ=
-github.com/rancher/dynamiclistener v0.3.1-0.20210616080009-9865ae859c7f h1:4csSA3WprYZk0uQIaYguJeHv2LM5zOCKxiBd18pBvEk=
-github.com/rancher/dynamiclistener v0.3.1-0.20210616080009-9865ae859c7f/go.mod h1:xbxyiF1/UaPrOrFUOZeYMQW82RPgZIe5UfiT9CyE3Ks=
+github.com/rancher/dynamiclistener v0.3.1-0.20211104200948-cd5d71f2fe95 h1:s7YkJ/5nEQS+qAYlfMHEPIBFmuRfkwKOaRaTD6kICDY=
+github.com/rancher/dynamiclistener v0.3.1-0.20211104200948-cd5d71f2fe95/go.mod h1:xbxyiF1/UaPrOrFUOZeYMQW82RPgZIe5UfiT9CyE3Ks=
 github.com/rancher/eks-operator v1.1.1 h1:wuvztSSA78qmtngQap5dESNJGhhjUTlSbQYc+obj9rc=
 github.com/rancher/eks-operator v1.1.1/go.mod h1:MIgvBMHO0MqPuvehwAGxpg7Zcg20GhYO1dXjh9BAHqs=
 github.com/rancher/fleet/pkg/apis v0.0.0-20210918015053-5a141a6b18f0 h1:2A92uT1+4GUdZolQg5wfOSLa6RFRkfpnc3Iw7+Z/Bk8=
