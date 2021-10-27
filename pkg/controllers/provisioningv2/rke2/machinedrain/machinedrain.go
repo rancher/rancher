@@ -12,6 +12,7 @@ import (
 	"github.com/rancher/rancher/pkg/wrangler"
 	corecontrollers "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/pkg/name"
+	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
@@ -66,6 +67,11 @@ func (h *handler) k8sClient(machine *capi.Machine) (kubernetes.Interface, error)
 }
 
 func (h *handler) undrain(machine *capi.Machine) (*capi.Machine, error) {
+	if machine.Status.NodeRef == nil || machine.Status.NodeRef.Name == "" {
+		logrus.Debugf("unable to drain machine %s as there is no noderef", machine.Name)
+		return machine, nil
+	}
+
 	k8s, err := h.k8sClient(machine)
 	if err != nil {
 		return nil, err
