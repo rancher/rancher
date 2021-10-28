@@ -33,9 +33,7 @@ Rancher can be deployed in either a single node or multi-node setup.  Please ref
 ### Minimum Requirements
 
 * Operating Systems
-  * Ubuntu 16.04 (64-bit)
-  * Red Hat Enterprise Linux 7.5 (64-bit)
-  * RancherOS 1.4 (64-bit)
+  * Please see [Support Matrix](https://rancher.com/support-matrix/) for specific OS versions for each Rancher version. Note that the link will default to the support matrix for the latest version of Rancher. Use the left navigation menu to select a different Rancher version. 
 * Hardware
   * 4 GB of Memory
 * Software
@@ -43,7 +41,7 @@ Rancher can be deployed in either a single node or multi-node setup.  Please ref
 
 ### Using Rancher
 
-To learn more about using Rancher, please refer to our [Rancher Documentation](https://rancher.com/docs/rancher/v2.5/en/).
+To learn more about using Rancher, please refer to our [Rancher Documentation](https://rancher.com/docs/rancher/v2.6/en/).
 
 ## Source Code
 
