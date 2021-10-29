@@ -40,6 +40,8 @@ import (
 	"sigs.k8s.io/cluster-api/errors"
 )
 
+const drainingSucceededCondition = condition.Cond(capi.DrainingSucceededCondition)
+
 type handler struct {
 	ctx                 context.Context
 	apply               apply.Apply
@@ -293,6 +295,19 @@ func (h *handler) doRemove(obj runtime.Object) (runtime.Object, error) {
 	infraName := d.String("metadata", "name")
 	if !d.Bool("status", "jobComplete") && d.String("status", "failureReason") == "" {
 		return obj, fmt.Errorf("cannot delete machine %s because create job has not finished", infraName)
+	}
+
+	machine, err := h.getMachine(obj)
+	if err != nil && !apierror.IsNotFound(err) {
+		return nil, err
+	}
+
+	if machine != nil && drainingSucceededCondition.IsFalse(machine) && drainingSucceededCondition.GetReason(machine) != capi.DrainingFailedReason {
+		// Wait for node to drain before deleting infrastructure
+		if err := h.dynamic.EnqueueAfter(machine.Spec.InfrastructureRef.GroupVersionKind(), d.String("metadata", "namespace"), infraName, 5*time.Second); err != nil {
+			return nil, err
+		}
+		return obj, generic.ErrSkip
 	}
 
 	obj, err = h.run(obj, false)

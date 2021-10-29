@@ -394,13 +394,15 @@ func (p *Planner) electInitNode(rkeControlPlane *rkev1.RKEControlPlane, plan *pl
 		}
 	}
 
+	possibleInitNodes := collect(plan, canBeInitNode)
+	hasPossibleInitNodes := len(possibleInitNodes) != 0
 	for _, entry := range entries {
 		if !isInitNode(entry.Machine) {
 			continue
 		}
 
-		// Clear old or misconfigured init nodes
-		if entry.Machine.DeletionTimestamp != nil || initNodeFound {
+		// Clear old or misconfigured init nodes if there are other nodes that can be init nodes
+		if initNodeFound || (hasPossibleInitNodes && !canBeInitNode(entry.Machine)) {
 			if err := p.clearInitNodeMark(entry.Machine); err != nil {
 				return "", err
 			}
@@ -416,14 +418,13 @@ func (p *Planner) electInitNode(rkeControlPlane *rkev1.RKEControlPlane, plan *pl
 		return joinURL, nil
 	}
 
-	for _, entry := range entries {
-		if entry.Machine.DeletionTimestamp == nil {
-			_, err := p.setInitNodeMark(entry.Machine)
-			if err != nil {
-				return "", err
-			}
-			return entry.Machine.Annotations[JoinURLAnnotation], nil
+	for _, entry := range possibleInitNodes {
+		_, err := p.setInitNodeMark(entry.Machine)
+		if err != nil {
+			return "", err
 		}
+
+		return entry.Machine.Annotations[JoinURLAnnotation], nil
 	}
 
 	return "", nil
@@ -1145,6 +1146,14 @@ func IsEtcdOnlyInitNode(machine *capi.Machine) bool {
 
 func isDeleting(machine *capi.Machine) bool {
 	return machine.DeletionTimestamp != nil
+}
+
+func isFailed(machine *capi.Machine) bool {
+	return machine.Status.Phase == string(capi.MachinePhaseFailed)
+}
+
+func canBeInitNode(machine *capi.Machine) bool {
+	return isEtcd(machine) && !isDeleting(machine) && !isFailed(machine)
 }
 
 func isControlPlane(machine *capi.Machine) bool {
