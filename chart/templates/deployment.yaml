@@ -29,6 +29,9 @@ spec:
       labels:
         app: {{ template "rancher.fullname" . }}
         release: {{ .Release.Name }}
+{{- if .Values.podLabels }}
+  {{ toYaml .Values.podLabels | indent 6 }}
+{{- end }}
     spec:
       serviceAccountName: {{ template "rancher.fullname" . }}
 {{- if .Values.imagePullSecrets }}
