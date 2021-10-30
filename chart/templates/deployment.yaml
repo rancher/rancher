@@ -26,12 +26,7 @@ spec:
     type: RollingUpdate
   template:
     metadata:
-      labels:
-        app: {{ template "rancher.fullname" . }}
-        release: {{ .Release.Name }}
-{{- if .Values.podLabels }}
-  {{ toYaml .Values.podLabels | indent 6 }}
-{{- end }}
+      labels: {{ include "rancher.labels" . | nindent 8 }}
     spec:
       serviceAccountName: {{ template "rancher.fullname" . }}
 {{- if .Values.imagePullSecrets }}

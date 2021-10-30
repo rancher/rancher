@@ -40,6 +40,9 @@ app: {{ template "rancher.fullname" . }}
 chart: {{ template "rancher.chartname" . }}
 heritage: {{ .Release.Service }}
 release: {{ .Release.Name }}
+{{- if .Values.podLabels }}
+{{ toYaml .Values.podLabels }}
+{{- end }}
 {{- end }}
 
 # Windows Support
