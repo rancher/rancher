@@ -106,6 +106,10 @@ replicas: 3
 # Set pod resource requests/limits for Rancher.
 resources: {}
 
+# Set annotations on the Rancher service
+service:
+  annotations: {}
+
 #
 # tls
 #   Where to offload the TLS/SSL encryption
