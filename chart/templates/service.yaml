@@ -5,7 +5,8 @@ metadata:
   labels:
 {{ include "rancher.labels" . | indent 4 }}
 {{- if .Values.service.annotations }}
-  annotations:{{ toYaml .Values.service.annotations | indent 4 }}
+  annotations:
+{{ toYaml .Values.service.annotations | indent 4 }}
 {{- end }}
 spec:
   ports:
