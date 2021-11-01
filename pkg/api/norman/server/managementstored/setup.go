@@ -293,6 +293,7 @@ func Clusters(schemas *types.Schemas, managementContext *config.ScaledContext, c
 	clusterValidator.CisConfigLister = managementContext.Management.CisConfigs(namespace.GlobalNamespace).Controller().Lister()
 	clusterValidator.CisBenchmarkVersionClient = managementContext.Management.CisBenchmarkVersions(namespace.GlobalNamespace)
 	clusterValidator.CisBenchmarkVersionLister = managementContext.Management.CisBenchmarkVersions(namespace.GlobalNamespace).Controller().Lister()
+	clusterValidator.SecretLister = managementContext.Core.Secrets("").Controller().Lister()
 
 	schema.ActionHandler = handler.ClusterActionHandler
 	schema.Validator = clusterValidator.Validator

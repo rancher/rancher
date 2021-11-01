@@ -19,9 +19,11 @@ import (
 	mgmtclient "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	"github.com/rancher/rancher/pkg/controllers/management/k3sbasedupgrade"
 	"github.com/rancher/rancher/pkg/controllers/managementuserlegacy/cis"
+	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/kontainer-engine/service"
 	"github.com/rancher/rancher/pkg/namespace"
+	"github.com/rancher/rancher/pkg/ref"
 	mgmtSchema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/robfig/cron"
@@ -40,6 +42,7 @@ type Validator struct {
 	CisConfigLister               v3.CisConfigLister
 	CisBenchmarkVersionClient     v3.CisBenchmarkVersionInterface
 	CisBenchmarkVersionLister     v3.CisBenchmarkVersionLister
+	SecretLister								  v1.SecretLister
 }
 
 func (v *Validator) Validator(request *types.APIContext, schema *types.Schema, data map[string]interface{}) error {
@@ -383,7 +386,7 @@ func (v *Validator) validateAKSConfig(request *types.APIContext, cluster map[str
 	}
 
 	// validation for creates only
-	if err := validateAKSClusterName(v.ClusterClient, clusterSpec); err != nil {
+	if err := v.validateAKSClusterName(clusterSpec); err != nil {
 		return err
 	}
 
@@ -462,18 +465,26 @@ func validateAKSNodePools(spec *v32.ClusterSpec) error {
 	return nil
 }
 
-func validateAKSClusterName(client v3.ClusterInterface, spec *v32.ClusterSpec) error {
+func (v *Validator) validateAKSClusterName(spec *v32.ClusterSpec) error {
+	var msgSuffix string
 	// validate cluster does not reference an AKS cluster that is already backed by a Rancher cluster
 	name := spec.AKSConfig.ClusterName
 	region := spec.AKSConfig.ResourceLocation
-	msgSuffix := fmt.Sprintf("in region [%s]", region)
+	msgSuffix = fmt.Sprintf("in region [%s]", region)
 
 	// cluster client is being used instead of lister to avoid the use of an outdated cache
-	clusters, err := client.List(metav1.ListOptions{})
+	clusters, err := v.ClusterClient.List(metav1.ListOptions{})
 	if err != nil {
 		return httperror.NewAPIError(httperror.ServerError, "failed to confirm clusterName is unique among Rancher AKS clusters "+msgSuffix)
 	}
 
+	subscriptionID, err := v.getAzureSubscriptionID(spec.AKSConfig.AzureCredentialSecret)
+	if err != nil {
+		return httperror.NewAPIError(httperror.InvalidBodyContent, err.Error())
+	}
+
+	msgSuffix = fmt.Sprintf("%s in subscription [%s]", msgSuffix, subscriptionID)
+	
 	for _, cluster := range clusters.Items {
 		if cluster.Spec.AKSConfig == nil {
 			continue
@@ -485,9 +496,28 @@ func validateAKSClusterName(client v3.ClusterInterface, spec *v32.ClusterSpec) e
 			continue
 		}
 
+		clusterSubscriptionID, err := v.getAzureSubscriptionID(cluster.Spec.AKSConfig.AzureCredentialSecret)
+		if err != nil {
+			return httperror.NewAPIError(httperror.ServerError, err.Error())
+		}
+
+		if subscriptionID != clusterSubscriptionID {
+			continue
+		}
+
 		return httperror.NewAPIError(httperror.InvalidBodyContent, fmt.Sprintf("cluster already exists for AKS cluster [%s] "+msgSuffix, name))
 	}
 	return nil
+}
+
+func (v *Validator) getAzureSubscriptionID(credentialID string) (string, error) {
+		ns, name := ref.Parse(credentialID)
+		cc, err := v.SecretLister.Get(ns, name)
+		if err != nil {
+			return "", fmt.Errorf("error accessing cloud credential %s", credentialID)
+		}
+		subscriptionID := string(cc.Data["azurecredentialConfig-subscriptionId"])
+		return subscriptionID, nil
 }
 
 // validateAKSNetworkPolicy performs validation around setting enableNetworkPolicy on AKS clusters which turns on Project Network Isolation
