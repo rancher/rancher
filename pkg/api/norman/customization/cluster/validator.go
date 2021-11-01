@@ -42,7 +42,7 @@ type Validator struct {
 	CisConfigLister               v3.CisConfigLister
 	CisBenchmarkVersionClient     v3.CisBenchmarkVersionInterface
 	CisBenchmarkVersionLister     v3.CisBenchmarkVersionLister
-	SecretLister								  v1.SecretLister
+	SecretLister                  v1.SecretLister
 }
 
 func (v *Validator) Validator(request *types.APIContext, schema *types.Schema, data map[string]interface{}) error {
@@ -484,7 +484,7 @@ func (v *Validator) validateAKSClusterName(spec *v32.ClusterSpec) error {
 	}
 
 	msgSuffix = fmt.Sprintf("%s in subscription [%s]", msgSuffix, subscriptionID)
-	
+
 	for _, cluster := range clusters.Items {
 		if cluster.Spec.AKSConfig == nil {
 			continue
@@ -511,13 +511,13 @@ func (v *Validator) validateAKSClusterName(spec *v32.ClusterSpec) error {
 }
 
 func (v *Validator) getAzureSubscriptionID(credentialID string) (string, error) {
-		ns, name := ref.Parse(credentialID)
-		cc, err := v.SecretLister.Get(ns, name)
-		if err != nil {
-			return "", fmt.Errorf("error accessing cloud credential %s", credentialID)
-		}
-		subscriptionID := string(cc.Data["azurecredentialConfig-subscriptionId"])
-		return subscriptionID, nil
+	ns, name := ref.Parse(credentialID)
+	cc, err := v.SecretLister.Get(ns, name)
+	if err != nil {
+		return "", fmt.Errorf("error accessing cloud credential %s", credentialID)
+	}
+	subscriptionID := string(cc.Data["azurecredentialConfig-subscriptionId"])
+	return subscriptionID, nil
 }
 
 // validateAKSNetworkPolicy performs validation around setting enableNetworkPolicy on AKS clusters which turns on Project Network Isolation
