@@ -109,6 +109,16 @@ resources: {}
 # Set annotations on the Rancher service
 service:
   annotations: {}
+  type: ClusterIP
+  ports:
+  - port: 80
+    targetPort: 80
+    protocol: TCP
+    name: http
+  - port: 443
+    targetPort: 444
+    protocol: TCP
+    name: https-internal
 
 #
 # tls

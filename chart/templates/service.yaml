@@ -9,14 +9,8 @@ metadata:
 {{ toYaml .Values.service.annotations | indent 4 }}
 {{- end }}
 spec:
+  type: {{ .Values.service.type }}
   ports:
-  - port: 80
-    targetPort: 80
-    protocol: TCP
-    name: http
-  - port: 443
-    targetPort: 444
-    protocol: TCP
-    name: https-internal
+{{ toYaml .Values.service.ports | indent 2 }}
   selector:
     app: {{ template "rancher.fullname" . }}
