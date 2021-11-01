@@ -30,6 +30,7 @@ const (
 	RKESystemImagesFieldFlannelCNI                = "flannelCni"
 	RKESystemImagesFieldIngress                   = "ingress"
 	RKESystemImagesFieldIngressBackend            = "ingressBackend"
+	RKESystemImagesFieldIngressWebhook            = "ingressWebhook"
 	RKESystemImagesFieldKubeDNS                   = "kubedns"
 	RKESystemImagesFieldKubeDNSAutoscaler         = "kubednsAutoscaler"
 	RKESystemImagesFieldKubeDNSSidecar            = "kubednsSidecar"
@@ -73,6 +74,7 @@ type RKESystemImages struct {
 	FlannelCNI                string `json:"flannelCni,omitempty" yaml:"flannelCni,omitempty"`
 	Ingress                   string `json:"ingress,omitempty" yaml:"ingress,omitempty"`
 	IngressBackend            string `json:"ingressBackend,omitempty" yaml:"ingressBackend,omitempty"`
+	IngressWebhook            string `json:"ingressWebhook,omitempty" yaml:"ingressWebhook,omitempty"`
 	KubeDNS                   string `json:"kubedns,omitempty" yaml:"kubedns,omitempty"`
 	KubeDNSAutoscaler         string `json:"kubednsAutoscaler,omitempty" yaml:"kubednsAutoscaler,omitempty"`
 	KubeDNSSidecar            string `json:"kubednsSidecar,omitempty" yaml:"kubednsSidecar,omitempty"`
