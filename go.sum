@@ -1021,8 +1021,9 @@ github.com/rancher/lasso v0.0.0-20200820172840-0e4cc0ef5cb0/go.mod h1:OhBBBO1pBw
 github.com/rancher/lasso v0.0.0-20200905045615-7fcb07d6a20b/go.mod h1:OhBBBO1pBwYp0hacWdnvSGOj+XE9yMLOLnaypIlic18=
 github.com/rancher/lasso v0.0.0-20210218205127-cbbdbcc1c003/go.mod h1:OhBBBO1pBwYp0hacWdnvSGOj+XE9yMLOLnaypIlic18=
 github.com/rancher/lasso v0.0.0-20210408231703-9ddd9378d08d/go.mod h1:OhBBBO1pBwYp0hacWdnvSGOj+XE9yMLOLnaypIlic18=
-github.com/rancher/lasso v0.0.0-20210616224652-fc3ebd901c08 h1:NxR8Fh0eE7/5/5Zvlog9B5NVjWKqBSb1WYMUF7/IE5c=
 github.com/rancher/lasso v0.0.0-20210616224652-fc3ebd901c08/go.mod h1:9qZd/S8DqWzfKtjKGgSoHqGEByYmUE3qRaBaaAHwfEM=
+github.com/rancher/lasso v0.0.0-20210709145333-6c6cd7fd6607 h1:uakTpglC2zfVEy8v4PiaG/G+2RKSzXXtSVd2d7hC0Ck=
+github.com/rancher/lasso v0.0.0-20210709145333-6c6cd7fd6607/go.mod h1:9qZd/S8DqWzfKtjKGgSoHqGEByYmUE3qRaBaaAHwfEM=
 github.com/rancher/lasso/controller-runtime v0.0.0-20210608205930-775fcaf2f523 h1:MMmUCzmS7I6GQfJoWc/eJXpBa5PGBok8H9KlS12KX0s=
 github.com/rancher/lasso/controller-runtime v0.0.0-20210608205930-775fcaf2f523/go.mod h1:+0JeyzD5Cb1eavAbVF1+7SfQUItne0C+UxsTk+PU1Ms=
 github.com/rancher/machine v0.15.0-rancher63/go.mod h1:qXYNumxy0J08MO/mh/jNjyRuEc2QKDLUOZIBE5vxaZE=
@@ -1033,8 +1034,8 @@ github.com/rancher/moq v0.0.0-20200712062324-13d1f37d2d77/go.mod h1:wpITyDPTi/Na
 github.com/rancher/norman v0.0.0-20200517050325-f53cae161640/go.mod h1:92rz/7QN7DOeLQZlJY/8aFBOmF085igIVguR0wpxLas=
 github.com/rancher/norman v0.0.0-20200820172041-261460ee9088/go.mod h1:W9LfZ96OfjkWSGTy2DUqYPt47Jpzrs7eM0i3AAx6fOI=
 github.com/rancher/norman v0.0.0-20210423002317-8e6ffc77a819/go.mod h1:hhnf77V2lmZD7cvUqi4vTBpIs3KpHNL/AmuN0MqEClI=
-github.com/rancher/norman v0.0.0-20210608202517-59b3523c3133 h1:X1Tn2q3iDekvqajJCbY2QYkEUJ51rJC9BuxS3os6nX4=
-github.com/rancher/norman v0.0.0-20210608202517-59b3523c3133/go.mod h1:hhnf77V2lmZD7cvUqi4vTBpIs3KpHNL/AmuN0MqEClI=
+github.com/rancher/norman v0.0.0-20210709145327-afd06f533ca3 h1:CPWaNmPWrbqPdilCWpUnAOkD+v37zebLQVuMUI/kSXY=
+github.com/rancher/norman v0.0.0-20210709145327-afd06f533ca3/go.mod h1:hhnf77V2lmZD7cvUqi4vTBpIs3KpHNL/AmuN0MqEClI=
 github.com/rancher/pkg v0.0.0-20190514055449-b30ab9de040e h1:j6+HqCET/NLPBtew2m5apL7jWw/PStQ7iGwXjgAqdvo=
 github.com/rancher/pkg v0.0.0-20190514055449-b30ab9de040e/go.mod h1:XbYHTPaXuw8ZY9bylhYKQh/nJxDaTKk3YhAxPl4Qy/k=
 github.com/rancher/rdns-server v0.0.0-20180802070304-bf662911db6a h1:6xqYlVz4uAXBa/AuNAG0bhMusIXVh74dc1bbYOAe+HY=

@@ -53,7 +53,7 @@ import (
 	"github.com/rancher/wrangler/pkg/generic"
 	"github.com/rancher/wrangler/pkg/leader"
 	"github.com/rancher/wrangler/pkg/schemes"
-	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -81,7 +81,7 @@ var (
 		clusterv3api.AddToScheme,
 		rkev1api.AddToScheme,
 		scheme.AddToScheme,
-		apiextensionsv1beta1.AddToScheme,
+		apiextensionsv1.AddToScheme,
 		apiregistrationv12.AddToScheme,
 		prommonitoringv1.AddToScheme,
 		istiov1alpha3api.AddToScheme,
