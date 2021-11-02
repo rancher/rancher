@@ -17,6 +17,7 @@ import (
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	"github.com/rancher/rancher/pkg/provisioningv2/rke2/planner"
 	"github.com/rancher/rancher/pkg/settings"
+	"github.com/rancher/rancher/pkg/tls"
 	"github.com/rancher/rancher/pkg/wrangler"
 	corecontrollers "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -116,8 +117,13 @@ func (r *RKE2ConfigServer) connectAgent(planSecret string, secret *v1.Secret, rw
 	}
 
 	if url == "" {
-		_, pem = settings.InternalServerURL.Get(), settings.InternalCACerts.Get()
+		pem = settings.InternalCACerts.Get()
 		url = fmt.Sprintf("https://%s", req.Host)
+		if strings.TrimSpace(pem) != "" {
+			ca = []byte(pem)
+		}
+	} else if v, ok := req.Context().Value(tls.InternalAPI).(bool); ok && v {
+		pem = settings.InternalCACerts.Get()
 		if strings.TrimSpace(pem) != "" {
 			ca = []byte(pem)
 		}

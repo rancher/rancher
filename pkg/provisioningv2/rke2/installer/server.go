@@ -14,9 +14,9 @@ func (s *handler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 
 	switch req.URL.Path {
 	case SystemAgentInstallPath:
-		content, err = LinuxInstallScript("", nil, req.Host)
+		content, err = LinuxInstallScript(req.Context(), "", nil, req.Host)
 	case WindowsRke2InstallPath:
-		content, err = WindowsInstallScript("", nil, req.Host)
+		content, err = WindowsInstallScript(req.Context(), "", nil, req.Host)
 	}
 
 	if err != nil {

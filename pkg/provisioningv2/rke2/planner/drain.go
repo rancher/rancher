@@ -24,7 +24,7 @@ func DrainHash(data []byte) string {
 
 func (p *Planner) drain(machine *capi.Machine, clusterPlan *plan.Plan, options rkev1.DrainOptions) (bool, error) {
 	// We never drain a single node cluster
-	if !options.Enabled || len(clusterPlan.Machines) == 1 {
+	if !options.Enabled || len(clusterPlan.Machines) == 1 || machine == nil || machine.Status.NodeRef == nil {
 		return true, nil
 	}
 
