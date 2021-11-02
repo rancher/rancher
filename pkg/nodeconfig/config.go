@@ -32,7 +32,7 @@ type NodeConfig struct {
 }
 
 func NewStore(namespaceInterface v1.NamespaceInterface, secretsGetter v1.SecretsGetter) (*encryptedstore.GenericEncryptedStore, error) {
-	return encryptedstore.NewGenericEncrypedStore("mc-", "", namespaceInterface, secretsGetter)
+	return encryptedstore.NewGenericEncryptedStore("mc-", "", namespaceInterface, secretsGetter)
 }
 
 func NewNodeConfig(store *encryptedstore.GenericEncryptedStore, node *v3.Node) (*NodeConfig, error) {

@@ -23,7 +23,7 @@ type GenericEncryptedStore struct {
 	secretLister v1.SecretLister
 }
 
-func NewGenericEncrypedStore(prefix, namespace string, namespaceInterface v1.NamespaceInterface, secretsGetter v1.SecretsGetter) (*GenericEncryptedStore, error) {
+func NewGenericEncryptedStore(prefix, namespace string, namespaceInterface v1.NamespaceInterface, secretsGetter v1.SecretsGetter) (*GenericEncryptedStore, error) {
 	if namespace == "" {
 		namespace = defaultNamespace
 	}
