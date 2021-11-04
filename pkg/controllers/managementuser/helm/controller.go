@@ -421,5 +421,5 @@ func (l *Lifecycle) getHelmVersion(obj *v3.App) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return templateVersion.TemplateVersion.Status.HelmVersion, nil
+	return templateVersion.Status.HelmVersion, nil
 }
