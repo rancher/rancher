@@ -836,7 +836,8 @@ func (in *CatalogTemplate) DeepCopyInto(out *CatalogTemplate) {
 	out.Namespaced = in.Namespaced
 	out.TypeMeta = in.TypeMeta
 	in.ObjectMeta.DeepCopyInto(&out.ObjectMeta)
-	in.Template.DeepCopyInto(&out.Template)
+	in.Spec.DeepCopyInto(&out.Spec)
+	out.Status = in.Status
 	return
 }
 
@@ -897,7 +898,8 @@ func (in *CatalogTemplateVersion) DeepCopyInto(out *CatalogTemplateVersion) {
 	out.Namespaced = in.Namespaced
 	out.TypeMeta = in.TypeMeta
 	in.ObjectMeta.DeepCopyInto(&out.ObjectMeta)
-	in.TemplateVersion.DeepCopyInto(&out.TemplateVersion)
+	in.Spec.DeepCopyInto(&out.Spec)
+	out.Status = in.Status
 	return
 }
 

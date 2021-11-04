@@ -9,6 +9,7 @@ import (
 	clusterSchema "github.com/rancher/rancher/pkg/schemas/cluster.cattle.io/v3"
 	schema "github.com/rancher/rancher/pkg/schemas/project.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
+	"k8s.io/kubectl/pkg/scheme"
 )
 
 type storeWrapperFunc func(types.Store) types.Store
@@ -39,6 +40,7 @@ func addProxyStore(ctx context.Context, schemas *types.Schemas, context *config.
 
 	s.Store = proxy.NewProxyStore(ctx, context.ClientGetter,
 		config.UserStorageContext,
+		scheme.Scheme,
 		prefix,
 		group,
 		version,
