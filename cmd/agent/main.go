@@ -22,6 +22,7 @@ import (
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/client"
+	"github.com/hashicorp/go-multierror"
 	"github.com/mattn/go-colorable"
 	"github.com/rancher/rancher/pkg/agent/clean"
 	"github.com/rancher/rancher/pkg/agent/cluster"
@@ -65,7 +66,16 @@ func main() {
 		if os.Getenv("CLUSTER_CLEANUP") == "true" {
 			err = clean.Cluster()
 		} else if os.Getenv("BINDING_CLEANUP") == "true" {
-			err = clean.Bindings(nil)
+			var bindingErr error
+			err = clean.DuplicateBindings(nil)
+			if err != nil {
+				bindingErr = multierror.Append(bindingErr, err)
+			}
+			err = clean.OrphanBindings(nil)
+			if err != nil {
+				bindingErr = multierror.Append(bindingErr, err)
+			}
+			err = bindingErr
 		} else {
 			err = run(ctx)
 		}
