@@ -9,16 +9,16 @@ import (
 )
 
 type EC2Client struct {
-	svc   *ec2.EC2
-	Nodes []*EC2Node
+	svc       *ec2.EC2
+	Nodes     []*EC2Node
+	awsConfig *config.AWSConfig
 }
 
-func NewEC2Client() (*EC2Client, error) {
-	configuration := config.GetInstance()
-	credential := credentials.NewStaticCredentials(configuration.AWSConfig.GetAWSAccessKeyID(), configuration.AWSConfig.GetAWSSecretAccessKey(), "")
+func NewEC2Client(awsConfig *config.AWSConfig) (*EC2Client, error) {
+	credential := credentials.NewStaticCredentials(awsConfig.GetAWSAccessKeyID(), awsConfig.GetAWSSecretAccessKey(), "")
 	sess, err := session.NewSession(&aws.Config{
 		Credentials: credential,
-		Region:      aws.String(configuration.AWSConfig.GetAWSRegion())},
+		Region:      aws.String(awsConfig.GetAWSRegion())},
 	)
 	if err != nil {
 		return nil, err
@@ -27,17 +27,17 @@ func NewEC2Client() (*EC2Client, error) {
 	// Create EC2 service client
 	svc := ec2.New(sess)
 	return &EC2Client{
-		svc: svc,
+		svc:       svc,
+		awsConfig: awsConfig,
 	}, nil
 }
 
 func (e *EC2Client) CreateNodes(nodeNameBase string, publicIp bool, numOfInstancs int64) (func() error, error) {
-	configuration := config.GetInstance()
-	sshName := getSSHKeyName(configuration.AWSConfig.GetAWSSSHKeyName())
+	sshName := getSSHKeyName(e.awsConfig.GetAWSSSHKeyName())
 
 	runInstancesInput := &ec2.RunInstancesInput{
-		ImageId:      aws.String(configuration.AWSConfig.GetAWSAMI()),
-		InstanceType: aws.String(configuration.AWSConfig.GetAWSInstanceType()),
+		ImageId:      aws.String(e.awsConfig.GetAWSSSHKeyName()),
+		InstanceType: aws.String(e.awsConfig.GetAWSSSHKeyName()),
 		MinCount:     aws.Int64(numOfInstancs),
 		MaxCount:     aws.Int64(numOfInstancs),
 		KeyName:      aws.String(sshName),
@@ -45,21 +45,21 @@ func (e *EC2Client) CreateNodes(nodeNameBase string, publicIp bool, numOfInstanc
 			{
 				DeviceName: aws.String("/dev/sda1"),
 				Ebs: &ec2.EbsBlockDevice{
-					VolumeSize: aws.Int64(int64(configuration.AWSConfig.GetAWSVolumeSize())),
+					VolumeSize: aws.Int64(int64(e.awsConfig.GetAWSVolumeSize())),
 				},
 			},
 		},
 		IamInstanceProfile: &ec2.IamInstanceProfileSpecification{
-			Name: aws.String(configuration.AWSConfig.GetAWSIAMProfile()),
+			Name: aws.String(e.awsConfig.GetAWSIAMProfile()),
 		},
 		Placement: &ec2.Placement{
-			AvailabilityZone: aws.String(configuration.AWSConfig.GetAWSRegionAZ()),
+			AvailabilityZone: aws.String(e.awsConfig.GetAWSRegionAZ()),
 		},
 		NetworkInterfaces: []*ec2.InstanceNetworkInterfaceSpecification{
 			{
 				DeviceIndex:              aws.Int64(0),
 				AssociatePublicIpAddress: aws.Bool(publicIp),
-				Groups:                   aws.StringSlice([]string{configuration.AWSConfig.GetAWSSecurityGroup()}),
+				Groups:                   aws.StringSlice([]string{e.awsConfig.GetAWSSecurityGroup()}),
 			},
 		},
 		TagSpecifications: []*ec2.TagSpecification{
@@ -72,7 +72,7 @@ func (e *EC2Client) CreateNodes(nodeNameBase string, publicIp bool, numOfInstanc
 					},
 					{
 						Key:   aws.String("CICD"),
-						Value: aws.String(configuration.AWSConfig.GetAWSCICDInstanceTag()),
+						Value: aws.String(e.awsConfig.GetAWSCICDInstanceTag()),
 					},
 				},
 			},
@@ -121,7 +121,7 @@ func (e *EC2Client) CreateNodes(nodeNameBase string, publicIp bool, numOfInstanc
 
 	readyInstances := describe.Reservations[0].Instances
 
-	sshKey, err := getSSHKey(configuration.AWSConfig.GetAWSSSHKeyName())
+	sshKey, err := getSSHKey(e.awsConfig.GetAWSSSHKeyName())
 	if err != nil {
 		return insanceCleanup, err
 	}
@@ -134,7 +134,7 @@ func (e *EC2Client) CreateNodes(nodeNameBase string, publicIp bool, numOfInstanc
 			NodeID:           *readyInstance.InstanceId,
 			PublicIPAdress:   *readyInstance.PublicIpAddress,
 			PrivateIPAddress: *readyInstance.PrivateIpAddress,
-			SSHUser:          configuration.AWSConfig.GetAWSUser(),
+			SSHUser:          e.awsConfig.GetAWSUser(),
 			SSHKey:           sshKey,
 		}
 		ec2Nodes = append(ec2Nodes, ec2Node)

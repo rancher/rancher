@@ -1,18 +1,5 @@
 package config
 
-import (
-	"encoding/json"
-	"io/ioutil"
-	"os"
-
-	"github.com/creasty/defaults"
-)
-
-var (
-	instance   *configuration = nil
-	configPath                = os.Getenv("CONFIG_PATH")
-)
-
 type RancherServerConfig struct {
 	CattleTestURL     string `json:"cattleTestURL"`
 	AdminToken        string `json:"adminToken"`
@@ -47,35 +34,4 @@ type AWSConfig struct {
 	AWSUser            string `json:"awsUser,omitempty"`
 	AWSVolumeSize      int64  `json:"awsVolumeSize,omitempty"`
 	AWSSSHKeyPath      string `json:"awsSSHKeyPath,omitempty"`
-}
-
-type configuration struct {
-	RancherServerConfig RancherServerConfig `json:"rancherServerConfig"`
-	DigitalOceanConfig  DigitalOceanConfig  `json:"digitalOceanConfig"`
-	AWSConfig           AWSConfig           `json:"awsConfig"`
-}
-
-func init() {
-	var conf configuration
-	if configPath != "" {
-		configContents, err := ioutil.ReadFile(configPath)
-		if err != nil {
-			panic(err)
-		}
-
-		err = json.Unmarshal(configContents, &conf)
-		if err != nil {
-			panic(err)
-		}
-	}
-
-	if err := defaults.Set(&conf); err != nil {
-		panic(err)
-	}
-	instance = &conf
-
-}
-
-func GetInstance() *configuration {
-	return instance
 }

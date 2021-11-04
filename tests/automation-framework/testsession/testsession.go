@@ -21,43 +21,42 @@ func NewTestSession(t *testing.T) *TestSession {
 }
 
 // RegisterCleanupFunc functions passed to this method will be called in the order they are added when `Cleanup` is called.
-// If TestSession is locked, it will cause a panic if a new cleanup function is registered.
+// If TestSession is closed, it will cause a panic if a new cleanup function is registered.
 func (ts *TestSession) RegisterCleanupFunc(f CleanupFunc) {
 	if ts.open {
-		count := len(ts.cleanupQueue)
-		ts.cleanupQueue = append(ts.cleanupQueue[:count], f)
+		ts.cleanupQueue = append(ts.cleanupQueue, f)
 	} else {
-		panic("TestSession is locked, if function cannot be registered")
+		panic("attempted to register cleanup function to closed test session")
 	}
 
 }
 
-// Cleanup this method will call all registered cleanup functions in order. Calling cleanup will lock the test session.  If a cleanup function returns an error it will be logged.
+// Cleanup this method will call all registered cleanup functions in order and close the test session.
 func (ts *TestSession) Cleanup() {
 	ts.open = false
-	count := len(ts.cleanupQueue) - 1
-	for count >= 0 {
-		err := ts.cleanupQueue[count]()
-		count--
+
+	for _, f := range ts.cleanupQueue {
+		err := f()
 		if err != nil {
-			ts.testingT.Errorf("error with cleanup: %v", err)
+			ts.testingT.Logf("error calling cleanup function: %v", err)
 		}
 	}
 }
 
-// NewSubSession returns a `TestSession` who's cleanup method is registered with this `TestSession`
-func (ts *TestSession) NewSubSession(t *testing.T) *TestSession {
-	testSession := &TestSession{
-		cleanupQueue: []CleanupFunc{},
-		open:         true,
-		testingT:     t,
-	}
+// NewSession returns a `TestSession` who's cleanup method is registered with this `TestSession`
+func (ts *TestSession) NewSession() *TestSession {
+	sess := NewTestSession(ts.testingT)
 
-	subSessionCleanupFunc := func() error {
-		testSession.Cleanup()
+	ts.RegisterCleanupFunc(func() error {
+		sess.Cleanup()
 		return nil
-	}
+	})
 
-	ts.RegisterCleanupFunc(subSessionCleanupFunc)
-	return nil
+	return sess
 }
+
+// NewRancherClient returns a rancher client registered with this `TestSession`.
+//rancherConfig *config.RancherClientConfiguration
+// func (ts *TestSession) NewRancherClient() *rancherclient.RancherClient {
+// 	panic("impl me")
+// }
