@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"github.com/rancher/rancher/pkg/api/scheme"
 	"net/http"
 
 	normanapi "github.com/rancher/norman/api"
@@ -42,7 +43,7 @@ func newSchemas(ctx context.Context, apiContext *config.ScaledContext) (*types.S
 	schemas.AddSchemas(managementschema.Schemas)
 
 	factory := &crd.Factory{ClientGetter: apiContext.ClientGetter}
-	factory.BatchCreateCRDs(ctx, config.ManagementStorageContext, schemas, &managementschema.Version,
+	factory.BatchCreateCRDs(ctx, config.ManagementStorageContext, scheme.Scheme, schemas, &managementschema.Version,
 		client.AuthConfigType,
 		client.GroupMemberType,
 		client.GroupType,

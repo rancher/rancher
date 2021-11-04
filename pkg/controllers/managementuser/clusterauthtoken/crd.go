@@ -2,6 +2,7 @@ package clusterauthtoken
 
 import (
 	"context"
+	"github.com/rancher/rancher/pkg/api/scheme"
 
 	"github.com/rancher/norman/store/crd"
 	client "github.com/rancher/rancher/pkg/client/generated/cluster/v3"
@@ -14,7 +15,7 @@ func CRDSetup(ctx context.Context, apiContext *config.UserOnlyContext) error {
 	if err != nil {
 		return err
 	}
-	factory.BatchCreateCRDs(ctx, config.UserStorageContext, apiContext.Schemas, &clusterSchema.Version,
+	factory.BatchCreateCRDs(ctx, config.UserStorageContext, scheme.Scheme, apiContext.Schemas, &clusterSchema.Version,
 		client.ClusterAuthTokenType,
 		client.ClusterUserAttributeType,
 	)

@@ -284,9 +284,7 @@ func (m *Manager) LatestAvailableTemplateVersion(template *v3.CatalogTemplate, c
 
 	for _, templateVersion := range versions {
 		catalogTemplateVersion := &v3.CatalogTemplateVersion{
-			TemplateVersion: v3.TemplateVersion{
-				Spec: templateVersion,
-			},
+			Spec: templateVersion,
 		}
 
 		if err := m.ValidateChartCompatibility(catalogTemplateVersion, clusterName); err == nil {

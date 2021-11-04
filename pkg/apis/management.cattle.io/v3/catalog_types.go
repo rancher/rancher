@@ -98,7 +98,8 @@ type CatalogTemplate struct {
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 	// Specification of the desired behavior of the the cluster. More info:
 	// https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#spec-and-status
-	Template
+	Spec   TemplateSpec   `json:"spec"`
+	Status TemplateStatus `json:"status"`
 }
 
 type TemplateSpec struct {
@@ -159,7 +160,8 @@ type CatalogTemplateVersion struct {
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 	// Specification of the desired behavior of the the cluster. More info:
 	// https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#spec-and-status
-	TemplateVersion
+	Spec   TemplateVersionSpec   `json:"spec"`
+	Status TemplateVersionStatus `json:"status"`
 }
 
 type TemplateVersionSpec struct {

@@ -2,6 +2,7 @@ package userstored
 
 import (
 	"context"
+	"k8s.io/kubectl/pkg/scheme"
 	"strings"
 
 	"github.com/rancher/norman/store/proxy"
@@ -39,6 +40,7 @@ func addProxyStore(ctx context.Context, schemas *types.Schemas, context *config.
 
 	s.Store = proxy.NewProxyStore(ctx, context.ClientGetter,
 		config.UserStorageContext,
+		scheme.Scheme,
 		prefix,
 		group,
 		version,

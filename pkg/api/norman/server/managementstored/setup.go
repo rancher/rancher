@@ -2,6 +2,7 @@ package managementstored
 
 import (
 	"context"
+	"github.com/rancher/rancher/pkg/api/scheme"
 	"net/http"
 
 	"github.com/rancher/norman/store/crd"
@@ -82,7 +83,7 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 
 	factory := &crd.Factory{ClientGetter: apiContext.ClientGetter}
 
-	factory.BatchCreateCRDs(ctx, config.ManagementStorageContext, schemas, &managementschema.Version,
+	factory.BatchCreateCRDs(ctx, config.ManagementStorageContext, scheme.Scheme, schemas, &managementschema.Version,
 		client.AuthConfigType,
 		client.CatalogType,
 		client.CatalogTemplateType,
@@ -147,7 +148,7 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 		client.ClusterTemplateRevisionType,
 	)
 
-	factory.BatchCreateCRDs(ctx, config.ManagementStorageContext, schemas, &projectschema.Version,
+	factory.BatchCreateCRDs(ctx, config.ManagementStorageContext, scheme.Scheme, schemas, &projectschema.Version,
 		projectclient.AppType,
 		projectclient.AppRevisionType,
 		projectclient.PipelineExecutionType,
@@ -316,6 +317,7 @@ func TemplateVersion(ctx context.Context, schemas *types.Schemas, managementCont
 	schema.Scope = types.NamespaceScope
 	schema.Store = proxy.NewProxyStore(ctx, managementContext.ClientGetter,
 		config.ManagementStorageContext,
+		scheme.Scheme,
 		[]string{"apis"},
 		"management.cattle.io",
 		"v3",
@@ -424,6 +426,7 @@ func SecretTypes(ctx context.Context, schemas *types.Schemas, management *config
 	secretSchema := schemas.Schema(&projectschema.Version, projectclient.SecretType)
 	secretSchema.Store = proxy.NewProxyStore(ctx, management.ClientGetter,
 		config.ManagementStorageContext,
+		scheme.Scheme,
 		[]string{"api"},
 		"",
 		"v1",
@@ -445,6 +448,7 @@ func SecretTypes(ctx context.Context, schemas *types.Schemas, management *config
 	mgmtSecretSchema := schemas.Schema(&managementschema.Version, client.ManagementSecretType)
 	mgmtSecretSchema.Store = proxy.NewProxyStore(ctx, management.ClientGetter,
 		config.ManagementStorageContext,
+		scheme.Scheme,
 		[]string{"api"},
 		"",
 		"v1",

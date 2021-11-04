@@ -3,6 +3,7 @@ package catalog
 import (
 	"context"
 	"fmt"
+	"github.com/rancher/rancher/pkg/api/scheme"
 	"strconv"
 
 	"github.com/rancher/norman/store/proxy"
@@ -34,6 +35,7 @@ func GetTemplateStore(ctx context.Context, managementContext *config.ScaledConte
 	s := &transform.Store{
 		Store: proxy.NewProxyStore(ctx, managementContext.ClientGetter,
 			config.ManagementStorageContext,
+			scheme.Scheme,
 			[]string{"apis"},
 			"management.cattle.io",
 			"v3",

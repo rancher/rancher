@@ -2,6 +2,7 @@ package secret
 
 import (
 	"context"
+	"github.com/rancher/rancher/pkg/api/scheme"
 	"strings"
 
 	"github.com/rancher/norman/store/proxy"
@@ -29,6 +30,7 @@ func (s *Store) Create(apiContext *types.APIContext, schema *types.Schema, data 
 func NewNamespacedSecretStore(ctx context.Context, clientGetter proxy.ClientGetter) *Store {
 	secretsStore := proxy.NewProxyStore(ctx, clientGetter,
 		config.UserStorageContext,
+		scheme.Scheme,
 		[]string{"api"},
 		"",
 		"v1",
