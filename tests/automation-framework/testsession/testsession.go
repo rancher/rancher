@@ -54,9 +54,3 @@ func (ts *TestSession) NewSession() *TestSession {
 
 	return sess
 }
-
-// NewRancherClient returns a rancher client registered with this `TestSession`.
-//rancherConfig *config.RancherClientConfiguration
-// func (ts *TestSession) NewRancherClient() *rancherclient.RancherClient {
-// 	panic("impl me")
-// }
