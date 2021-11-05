@@ -1020,7 +1020,8 @@ def validate_dns_entry(pod, host, expected, port=TEST_IMAGE_PORT):
     dig_output = kubectl_pod_exec(pod, dig_cmd)
 
     for expected_value in expected:
-        assert expected_value in str(dig_output)
+        assert expected_value in str(dig_output), \
+            "Error the dig command returned: {0}".format(dig_output)
 
 
 def validate_dns_entry_windows(pod, host, expected):
