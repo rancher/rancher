@@ -62,7 +62,7 @@ func Icon(secret *corev1.Secret, repoURL string, caBundle []byte, insecureSkipTL
 	if err != nil {
 		return nil, "", err
 	}
-	return ioutil.NopCloser(bytes.NewBuffer(data)), path.Ext(u.String()), nil
+	return ioutil.NopCloser(bytes.NewBuffer(data)), path.Ext(u.Path), nil
 }
 
 func Chart(secret *corev1.Secret, repoURL string, caBundle []byte, insecureSkipTLSVerify bool, chart *repo.ChartVersion) (io.ReadCloser, error) {
