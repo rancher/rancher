@@ -2,6 +2,7 @@ package audit
 
 import (
 	"bytes"
+	"compress/gzip"
 	"context"
 	"encoding/json"
 	"io/ioutil"
@@ -127,6 +128,15 @@ func (a *auditLog) write(userInfo *User, reqHeaders, resHeaders http.Header, res
 	}
 	if a.writer.Level >= levelRequestResponse && resHeaders.Get("Content-Type") == contentTypeJSON && len(resBody) > 0 {
 		buffer.WriteString(`,"responseBody":`)
+		if resHeaders.Get("Content-Encoding") == "gzip" {
+			data, err := gunzipResBody(resBody)
+			if err != nil {
+				emptyBody := `""`
+				resBody = ([]byte)(emptyBody)
+			} else {
+				resBody = data
+			}
+		}
 		buffer.Write(bytes.TrimSuffix(a.concealSensitiveData(a.log.RequestURI, resBody), []byte("\n")))
 	}
 	buffer.WriteString("}")
@@ -140,6 +150,19 @@ func (a *auditLog) write(userInfo *User, reqHeaders, resHeaders http.Header, res
 	compactBuffer.WriteString("\n")
 	_, err = a.writer.Output.Write(compactBuffer.Bytes())
 	return err
+}
+
+func gunzipResBody(resBody []byte) ([]byte, error) {
+	gr, err := gzip.NewReader(bytes.NewBuffer(resBody))
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to gzip newreader")
+	}
+	defer gr.Close()
+	data, err := ioutil.ReadAll(gr)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to gunzip response body")
+	}
+	return data, nil
 }
 
 func readBodyWithoutLosingContent(req *http.Request) ([]byte, error) {
