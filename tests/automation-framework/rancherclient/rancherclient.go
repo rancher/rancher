@@ -43,11 +43,11 @@ func NewClient(restConfig *rest.Config, testSession *testsession.TestSession) (*
 // NewRestConfig is the config used the various clients
 func NewRestConfig(bearerToken string, rancherConfig *Config) *rest.Config {
 	return &rest.Config{
-		Host:        rancherConfig.GetCattleTestURL(),
+		Host:        rancherConfig.RancherHost,
 		BearerToken: bearerToken,
 		TLSClientConfig: rest.TLSClientConfig{
-			Insecure: rancherConfig.GetInsecure(),
-			CAFile:   rancherConfig.GetCAFile(),
+			Insecure: *rancherConfig.Insecure,
+			CAFile:   rancherConfig.CAFile,
 		},
 	}
 }
@@ -57,6 +57,6 @@ func clientOpts(restConfig *rest.Config, rancherConfig *Config) *clientbase.Clie
 		URL:      restConfig.Host + "v3",
 		TokenKey: restConfig.BearerToken,
 		Insecure: restConfig.Insecure,
-		CACerts:  rancherConfig.GetCAFile(),
+		CACerts:  rancherConfig.CACerts,
 	}
 }
