@@ -241,6 +241,9 @@ func (s *Controller) createOrUpdate(obj *corev1.Secret, action string) error {
 		return err
 	}
 	for _, namespace := range clusterNamespaces {
+		if !namespace.DeletionTimestamp.IsZero() {
+			continue
+		}
 		// copy the secret into namespace
 		namespacedSecret := getNamespacedSecret(obj, namespace.Name)
 		switch action {
