@@ -9,6 +9,7 @@ import (
 	"github.com/rancher/norman/objectclient"
 	"github.com/rancher/norman/types/slice"
 	"github.com/rancher/rancher/pkg/clustermanager"
+	"github.com/rancher/rancher/pkg/controllers/managementuser/rbac"
 	v13 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	typesrbacv1 "github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1"
@@ -637,6 +638,9 @@ func (m *manager) gatherAndDedupeRoles(roleTemplateName string) (map[string]*v3.
 	for _, role := range allRoles {
 		roles[role.Name] = role
 	}
+
+	//toLower
+	rbac.ToLowerRoleTemplates(roles)
 	return roles, nil
 }
 
@@ -722,10 +726,12 @@ func (m *manager) reconcileManagementPlaneRole(namespace string, resourceToVerbs
 		for resource, newVerbs := range resourceToVerbs {
 			currentVerbs := map[string]string{}
 			for _, rule := range role.Rules {
-				if slice.ContainsString(rule.Resources, resource) {
+				if slice.ContainsString(rule.Resources, resource) || slice.ContainsString(rule.Resources, "*") {
 					for _, v := range rule.Verbs {
 						if rule.APIGroups[0] == newVerbs[v] {
 							currentVerbs[v] = rule.APIGroups[0]
+						} else if rule.APIGroups[0] == "*" || newVerbs[v] == "*" {
+							currentVerbs[v] = newVerbs[v]
 						}
 					}
 				}
@@ -736,7 +742,7 @@ func (m *manager) reconcileManagementPlaneRole(namespace string, resourceToVerbs
 				role = role.DeepCopy()
 				added := false
 				for i, rule := range newRole.Rules {
-					if slice.ContainsString(rule.Resources, resource) {
+					if slice.ContainsString(rule.Resources, resource) || slice.ContainsString(rule.Resources, "*") {
 						newRole.Rules[i] = buildRule(resource, newVerbs)
 						added = true
 					}
