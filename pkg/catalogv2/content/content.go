@@ -240,7 +240,7 @@ func (c *Manager) Icon(namespace, name, chartName, version string) (io.ReadClose
 		return nil, "", err
 	}
 
-	return helmhttp.Icon(secret, repo.status.URL, repo.spec.CABundle, repo.spec.InsecureSkipTLSverify, chart)
+	return helmhttp.Icon(secret, repo.status.URL, repo.spec.CABundle, repo.spec.InsecureSkipTLSverify, repo.spec.DisableSameOriginCheck, chart)
 }
 
 func isHTTP(iconURL string) bool {
@@ -273,7 +273,7 @@ func (c *Manager) Chart(namespace, name, chartName, version string) (io.ReadClos
 		return nil, err
 	}
 
-	return helmhttp.Chart(secret, repo.status.URL, repo.spec.CABundle, repo.spec.InsecureSkipTLSverify, chart)
+	return helmhttp.Chart(secret, repo.status.URL, repo.spec.CABundle, repo.spec.InsecureSkipTLSverify, repo.spec.DisableSameOriginCheck, chart)
 }
 
 func (c *Manager) Info(namespace, name, chartName, version string) (*types.ChartInfo, error) {
