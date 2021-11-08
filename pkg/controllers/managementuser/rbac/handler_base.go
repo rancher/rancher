@@ -313,12 +313,7 @@ func (m *manager) compareAndUpdateNamespacedRole(role *rbacv1.Role, rt *v3.RoleT
 	return err
 }
 
-func (m *manager) gatherRoles(rt *v3.RoleTemplate, roleTemplates map[string]*v3.RoleTemplate) error {
-	err := m.gatherRolesRecurse(rt, roleTemplates)
-	if err != nil {
-		return err
-	}
-
+func ToLowerRoleTemplates(roleTemplates map[string]*v3.RoleTemplate) {
 	// clean the roles for kubeneretes: lowercase resources and verbs
 	for key, rt := range roleTemplates {
 		if rt.External {
@@ -346,7 +341,14 @@ func (m *manager) gatherRoles(rt *v3.RoleTemplate, roleTemplates map[string]*v3.
 		rt.Rules = toLowerRules
 		roleTemplates[key] = rt
 	}
+}
 
+func (m *manager) gatherRoles(rt *v3.RoleTemplate, roleTemplates map[string]*v3.RoleTemplate) error {
+	err := m.gatherRolesRecurse(rt, roleTemplates)
+	if err != nil {
+		return err
+	}
+	ToLowerRoleTemplates(roleTemplates)
 	return nil
 }
 
