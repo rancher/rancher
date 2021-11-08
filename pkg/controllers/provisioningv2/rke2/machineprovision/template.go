@@ -1,6 +1,8 @@
 package machineprovision
 
 import (
+	"strconv"
+
 	name2 "github.com/rancher/wrangler/pkg/name"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -15,6 +17,7 @@ const (
 	InfraMachineVersion = "rke.cattle.io/infra-machine-version"
 	InfraMachineKind    = "rke.cattle.io/infra-machine-kind"
 	InfraMachineName    = "rke.cattle.io/infra-machine-name"
+	InfraJobRemove      = "rke.cattle.io/infra-remove"
 
 	pathToMachineFiles = "/path/to/machine/files"
 )
@@ -27,7 +30,7 @@ func getJobName(name string) string {
 	return name2.SafeConcatName(name, "machine", "provision")
 }
 
-func (h *handler) objects(ready bool, typeMeta metav1.Type, meta metav1.Object, args driverArgs, filesSecret *corev1.Secret) ([]runtime.Object, error) {
+func (h *handler) objects(ready bool, typeMeta metav1.Type, meta metav1.Object, args driverArgs, filesSecret *corev1.Secret, jobBackoffLimit int32) ([]runtime.Object, error) {
 	var volumes []corev1.Volume
 	var volumeMounts []corev1.VolumeMount
 	machineGVK := schema.FromAPIVersionAndKind(typeMeta.GetAPIVersion(), typeMeta.GetKind())
@@ -138,7 +141,7 @@ func (h *handler) objects(ready bool, typeMeta metav1.Type, meta metav1.Object, 
 			Namespace: meta.GetNamespace(),
 		},
 		Spec: batchv1.JobSpec{
-			BackoffLimit: &[]int32{0}[0],
+			BackoffLimit: &jobBackoffLimit,
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
@@ -146,6 +149,7 @@ func (h *handler) objects(ready bool, typeMeta metav1.Type, meta metav1.Object, 
 						InfraMachineVersion: machineGVK.Version,
 						InfraMachineKind:    machineGVK.Kind,
 						InfraMachineName:    meta.GetName(),
+						InfraJobRemove:      strconv.FormatBool(args.BootstrapOptional),
 					},
 				},
 				Spec: corev1.PodSpec{
