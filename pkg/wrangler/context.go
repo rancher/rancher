@@ -120,6 +120,11 @@ func (w *Context) StartWithTransaction(ctx context.Context, f func(context.Conte
 		transaction.Rollback()
 		return err
 	}
+	if err := w.ControllerFactory.SharedCacheFactory().Start(ctx); err != nil {
+		transaction.Rollback()
+		return err
+	}
+	w.ControllerFactory.SharedCacheFactory().WaitForCacheSync(ctx)
 	transaction.Commit()
 	return nil
 }
