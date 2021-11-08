@@ -397,12 +397,13 @@ func (l *AlertService) removeFinalizerFromLegacyAlerting() error {
 	}
 
 	for _, v := range oldProjectAlert {
+		if len(v.Finalizers) == 0 {
+			continue
+		}
 		newObj := v.DeepCopy()
 		newObj.SetFinalizers([]string{})
-		if !reflect.DeepEqual(newObj, v) {
-			if _, err = l.oldProjectAlerts.Update(newObj); err != nil {
-				return errors.Wrapf(err, "remove finalizer from legacy projectAlert %s:%s failed", newObj.Namespace, newObj.Name)
-			}
+		if _, err = l.oldProjectAlerts.Update(newObj); err != nil {
+			return errors.Wrapf(err, "remove finalizer from legacy projectAlert %s:%s failed", newObj.Namespace, newObj.Name)
 		}
 	}
 
