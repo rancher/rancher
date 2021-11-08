@@ -91,6 +91,16 @@ resource "aws_instance" "master" {
   }
 
   provisioner "file" {
+    source = "v120ingresspolicy.yaml"
+    destination = "/tmp/v120ingresspolicy.yaml"
+  }
+
+  provisioner "file" {
+    source = "v121ingresspolicy.yaml"
+    destination = "/tmp/v121ingresspolicy.yaml"
+  }
+
+  provisioner "file" {
     source = "nginx-ingress.yaml"
     destination = "/tmp/nginx-ingress.yaml"
   }
@@ -171,6 +181,16 @@ resource "aws_instance" "master2-ha" {
   provisioner "file" {
     source = "policy.yaml"
     destination = "/tmp/policy.yaml"
+  }
+
+  provisioner "file" {
+    source = "v120ingresspolicy.yaml"
+    destination = "/tmp/v120ingresspolicy.yaml"
+  }
+
+  provisioner "file" {
+    source = "v121ingresspolicy.yaml"
+    destination = "/tmp/v121ingresspolicy.yaml"
   }
 
   provisioner "remote-exec" {
