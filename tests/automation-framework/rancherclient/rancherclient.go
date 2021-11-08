@@ -1,7 +1,8 @@
 package rancherclient
 
 import (
-	projectClient "github.com/rancher/rancher/tests/automation-framework/client/generated/project/v3"
+	"fmt"
+
 	"github.com/rancher/rancher/tests/automation-framework/clientbase"
 	managementClient "github.com/rancher/rancher/tests/automation-framework/management"
 	"github.com/rancher/rancher/tests/automation-framework/testsession"
@@ -10,38 +11,25 @@ import (
 
 type Client struct {
 	Management    *managementClient.Client
-	Project       *projectClient.Client
-	RestConfig    *rest.Config
 	RancherConfig *Config
 }
 
 // NewClient is returns a larger client wrapping individual api clients.
-func NewClient(restConfig *rest.Config, testSession *testsession.TestSession) (*Client, error) {
+func NewClient(bearerToken string, rancherConfig *Config, testSession *testsession.TestSession) (*Client, error) {
 	c := &Client{
-		RestConfig: restConfig,
+		RancherConfig: rancherConfig,
 	}
 
-	clientOpts := clientOpts(c.RestConfig, c.RancherConfig)
-
-	managementClient, err := managementClient.NewClient(clientOpts, testSession)
+	var err error
+	c.Management, err = managementClient.NewClient(clientOpts(newRestConfig(bearerToken, rancherConfig), c.RancherConfig), testSession)
 	if err != nil {
 		return nil, err
 	}
-	c.Management = managementClient
-
-	projectClient, err := projectClient.NewClient(clientOpts)
-	if err != nil {
-		return nil, err
-	}
-
-	c.Project = projectClient
-	c.Project.APIBaseClient.Ops.TestSession = testSession
 
 	return c, nil
 }
 
-// NewRestConfig is the config used the various clients
-func NewRestConfig(bearerToken string, rancherConfig *Config) *rest.Config {
+func newRestConfig(bearerToken string, rancherConfig *Config) *rest.Config {
 	return &rest.Config{
 		Host:        rancherConfig.RancherHost,
 		BearerToken: bearerToken,
@@ -54,7 +42,7 @@ func NewRestConfig(bearerToken string, rancherConfig *Config) *rest.Config {
 
 func clientOpts(restConfig *rest.Config, rancherConfig *Config) *clientbase.ClientOpts {
 	return &clientbase.ClientOpts{
-		URL:      restConfig.Host + "v3",
+		URL:      fmt.Sprintf("https://%s/v3", rancherConfig.RancherHost),
 		TokenKey: restConfig.BearerToken,
 		Insecure: restConfig.Insecure,
 		CACerts:  rancherConfig.CACerts,
