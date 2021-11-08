@@ -478,9 +478,14 @@ func (m *manager) ensureBindings(ns string, roles map[string]*v3.RoleTemplate, b
 	for key, rb := range desiredRBs {
 		switch roleBinding := rb.(type) {
 		case *rbacv1.RoleBinding:
-			logrus.Infof("Creating roleBinding %v", key)
-			_, err := m.workload.RBAC.RoleBindings(ns).Create(roleBinding)
-			if err != nil && !apierrors.IsAlreadyExists(err) {
+			_, err := m.workload.RBAC.RoleBindings("").Controller().Lister().Get(ns, roleBinding.Name)
+			if apierrors.IsNotFound(err) {
+				logrus.Infof("Creating roleBinding %v in %s", key, ns)
+				_, err := m.workload.RBAC.RoleBindings(ns).Create(roleBinding)
+				if err != nil && !apierrors.IsAlreadyExists(err) {
+					return err
+				}
+			} else if err != nil {
 				return err
 			}
 		case *rbacv1.ClusterRoleBinding:
