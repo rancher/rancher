@@ -347,7 +347,7 @@ func (s *Provider) HandleSamlAssertion(w http.ResponseWriter, r *http.Request, a
 		if r.URL.Scheme == "https" {
 			isSecure = true
 		}
-		err = setRancherToken(w, r, s.tokenMGR, user.Name, userPrincipal, groupPrincipals, isSecure)
+		err = s.setRancherToken(w, r, s.tokenMGR, user.Name, userPrincipal, groupPrincipals, isSecure)
 		if err != nil {
 			log.Errorf("SAML: Failed creating token with error: %v", err)
 			http.Redirect(w, r, redirectURL+"errorCode=500", http.StatusFound)
@@ -382,7 +382,7 @@ func (s *Provider) HandleSamlAssertion(w http.ResponseWriter, r *http.Request, a
 		return
 	}
 
-	err = setRancherToken(w, r, s.tokenMGR, user.Name, userPrincipal, groupPrincipals, true)
+	err = s.setRancherToken(w, r, s.tokenMGR, user.Name, userPrincipal, groupPrincipals, true)
 	if err != nil {
 		log.Errorf("SAML: Failed creating token with error: %v", err)
 		http.Redirect(w, r, redirectURL+"errorCode=500", http.StatusFound)
@@ -400,7 +400,7 @@ func (s *Provider) HandleSamlAssertion(w http.ResponseWriter, r *http.Request, a
 			responseType := s.clientState.GetState(r, "Rancher_ResponseType")
 			publicKey := s.clientState.GetState(r, "Rancher_PublicKey")
 
-			token, tokenValue, err := tokens.GetKubeConfigToken(user.Name, responseType, s.userMGR)
+			token, tokenValue, err := tokens.GetKubeConfigToken(user.Name, responseType, s.userMGR, userPrincipal)
 			if err != nil {
 				log.Errorf("SAML: getToken error %v", err)
 				http.Redirect(w, r, redirectURL+"errorCode=500", http.StatusFound)
@@ -460,14 +460,15 @@ func (s *Provider) HandleSamlAssertion(w http.ResponseWriter, r *http.Request, a
 	}
 }
 
-func setRancherToken(w http.ResponseWriter, r *http.Request, tokenMGR *tokens.Manager, userID string, userPrincipal v3.Principal,
+func (s *Provider) setRancherToken(w http.ResponseWriter, r *http.Request, tokenMGR *tokens.Manager, userID string, userPrincipal v3.Principal,
 	groupPrincipals []v3.Principal, isSecure bool) error {
 	authTimeout := settings.AuthUserSessionTTLMinutes.Get()
 	var ttl int64
 	if minutes, err := strconv.ParseInt(authTimeout, 10, 64); err == nil {
 		ttl = minutes * 60 * 1000
 	}
-	rToken, unhashedTokenKey, err := tokenMGR.NewLoginToken(userID, userPrincipal, groupPrincipals, "", ttl, "")
+	userExtraInfo := s.GetUserExtraAttributes(userPrincipal)
+	rToken, unhashedTokenKey, err := tokenMGR.NewLoginToken(userID, userPrincipal, groupPrincipals, "", ttl, "", userExtraInfo)
 	if err != nil {
 		return err
 	}
