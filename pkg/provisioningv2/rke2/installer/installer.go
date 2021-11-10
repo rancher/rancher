@@ -1,6 +1,7 @@
 package installer
 
 import (
+	"context"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -9,6 +10,7 @@ import (
 
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/systemtemplate"
+	"github.com/rancher/rancher/pkg/tls"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 )
@@ -53,7 +55,7 @@ func installScript(setting settings.Setting, files []string) ([]byte, error) {
 	return ioutil.ReadAll(resp.Body)
 }
 
-func LinuxInstallScript(token string, envVars []corev1.EnvVar, defaultHost string) ([]byte, error) {
+func LinuxInstallScript(ctx context.Context, token string, envVars []corev1.EnvVar, defaultHost string) ([]byte, error) {
 	data, err := installScript(
 		settings.SystemAgentInstallScript,
 		localAgentInstallScripts)
@@ -69,6 +71,9 @@ func LinuxInstallScript(token string, envVars []corev1.EnvVar, defaultHost strin
 		}
 	}
 	ca := systemtemplate.CAChecksum()
+	if v, ok := ctx.Value(tls.InternalAPI).(bool); ok && v {
+		ca = systemtemplate.InternalCAChecksum()
+	}
 	if ca != "" {
 		ca = "CATTLE_CA_CHECKSUM=\"" + ca + "\""
 	}
@@ -97,7 +102,7 @@ func LinuxInstallScript(token string, envVars []corev1.EnvVar, defaultHost strin
 `, envVarBuf.String(), binaryURL, server, ca, token, data)), nil
 }
 
-func WindowsInstallScript(token string, envVars []corev1.EnvVar, defaultHost string) ([]byte, error) {
+func WindowsInstallScript(ctx context.Context, token string, envVars []corev1.EnvVar, defaultHost string) ([]byte, error) {
 	data, err := installScript(
 		settings.WindowsRke2InstallScript,
 		localWindowsRke2InstallScripts)
@@ -106,6 +111,9 @@ func WindowsInstallScript(token string, envVars []corev1.EnvVar, defaultHost str
 	}
 
 	ca := systemtemplate.CAChecksum()
+	if v, ok := ctx.Value(tls.InternalAPI).(bool); ok && v {
+		ca = systemtemplate.InternalCAChecksum()
+	}
 	if ca != "" {
 		ca = "$env:CATTLE_CA_CHECKSUM=\"" + ca + "\""
 	}

@@ -84,7 +84,12 @@ func (h *handler) undrain(machine *capi.Machine) (*capi.Machine, error) {
 
 	c := drain.NewCordonHelper(node)
 
-	if updateRequired := c.UpdateIfRequired(false); !updateRequired {
+	if !c.UpdateIfRequired(false) {
+		if machine.Annotations[planner.UnCordonAnnotation] != "" {
+			machine = machine.DeepCopy()
+			delete(machine.Annotations, planner.UnCordonAnnotation)
+			return h.machines.Update(machine)
+		}
 		return machine, nil
 	}
 

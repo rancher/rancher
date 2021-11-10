@@ -9,9 +9,12 @@ import (
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1alpha4"
 	rkecontroller "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
+	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/provisioningv2/rke2/installer"
 	"github.com/rancher/rancher/pkg/provisioningv2/rke2/planner"
+	"github.com/rancher/rancher/pkg/tls"
 	"github.com/rancher/rancher/pkg/wrangler"
+	appcontrollers "github.com/rancher/wrangler/pkg/generated/controllers/apps/v1"
 	corecontrollers "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/pkg/generic"
 	"github.com/rancher/wrangler/pkg/name"
@@ -43,6 +46,7 @@ type handler struct {
 	secretCache         corecontrollers.SecretCache
 	machineCache        capicontrollers.MachineCache
 	capiClusters        capicontrollers.ClusterCache
+	deploymentCache     appcontrollers.DeploymentCache
 	rkeControlPlanes    rkecontroller.RKEControlPlaneCache
 }
 
@@ -52,6 +56,7 @@ func Register(ctx context.Context, clients *wrangler.Context) {
 		secretCache:         clients.Core.Secret().Cache(),
 		machineCache:        clients.CAPI.Machine().Cache(),
 		capiClusters:        clients.CAPI.Cluster().Cache(),
+		deploymentCache:     clients.Apps.Deployment().Cache(),
 		rkeControlPlanes:    clients.RKE.RKEControlPlane().Cache(),
 	}
 	rkecontroller.RegisterRKEBootstrapGeneratingHandler(ctx,
@@ -109,7 +114,13 @@ func (h *handler) getBootstrapSecret(namespace, name string, envVars []corev1.En
 		}
 
 		hash := sha256.Sum256(secret.Data["token"])
-		data, err := installer.LinuxInstallScript(base64.URLEncoding.EncodeToString(hash[:]), envVars, "")
+
+		hasHostPort, err := h.rancherDeploymentHasHostPort()
+		if err != nil {
+			return nil, err
+		}
+
+		data, err := installer.LinuxInstallScript(context.WithValue(context.Background(), tls.InternalAPI, hasHostPort), base64.URLEncoding.EncodeToString(hash[:]), envVars, "")
 		if err != nil {
 			return nil, err
 		}
@@ -298,4 +309,24 @@ func (h *handler) OnChange(obj *rkev1.RKEBootstrap, status rkev1.RKEBootstrapSta
 
 	result = append(result, objs...)
 	return result, status, nil
+}
+
+func (h *handler) rancherDeploymentHasHostPort() (bool, error) {
+	deployment, err := h.deploymentCache.Get(namespace.System, "rancher")
+	if err != nil {
+		if apierror.IsNotFound(err) {
+			return false, nil
+		}
+		return false, err
+	}
+
+	for _, container := range deployment.Spec.Template.Spec.Containers {
+		for _, port := range container.Ports {
+			if container.Name == "rancher" && port.HostPort != 0 {
+				return true, nil
+			}
+		}
+	}
+
+	return false, nil
 }
