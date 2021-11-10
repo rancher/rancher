@@ -3,112 +3,67 @@ package dynamic
 import (
 	"context"
 
+	"k8s.io/client-go/rest"
+
 	"github.com/rancher/rancher/tests/automation-framework/testsession"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/dynamic"
-	"k8s.io/client-go/rest"
 )
 
-type dynamicClient struct {
+type Client struct {
 	dynamic.Interface
-	testSession *testsession.TestSession
+
+	ts *testsession.TestSession
 }
 
-var _ Interface = &dynamicClient{}
+func NewForConfig(ts *testsession.TestSession, inConfig *rest.Config) (dynamic.Interface, error) {
+	dynamicClient, err := dynamic.NewForConfig(inConfig)
+	if err != nil {
+		return nil, err
+	}
 
-type Interface interface {
-	Resource(resource schema.GroupVersionResource) NamespaceableResourceInterface
+	return &Client{
+		Interface: dynamicClient,
+		ts:        ts,
+	}, nil
 }
 
-type ResourceInterface interface {
-	Create(ctx context.Context, obj *unstructured.Unstructured, options metav1.CreateOptions, subresources ...string) (*unstructured.Unstructured, error)
-	Update(ctx context.Context, obj *unstructured.Unstructured, options metav1.UpdateOptions, subresources ...string) (*unstructured.Unstructured, error)
-	UpdateStatus(ctx context.Context, obj *unstructured.Unstructured, options metav1.UpdateOptions) (*unstructured.Unstructured, error)
-	Delete(ctx context.Context, name string, options metav1.DeleteOptions, subresources ...string) error
-	DeleteCollection(ctx context.Context, options metav1.DeleteOptions, listOptions metav1.ListOptions) error
-	Get(ctx context.Context, name string, options metav1.GetOptions, subresources ...string) (*unstructured.Unstructured, error)
-	List(ctx context.Context, opts metav1.ListOptions) (*unstructured.UnstructuredList, error)
-	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, options metav1.PatchOptions, subresources ...string) (*unstructured.Unstructured, error)
+func (d *Client) Resource(resource schema.GroupVersionResource) dynamic.NamespaceableResourceInterface {
+	return &NamespaceableResourceClient{
+		NamespaceableResourceInterface: d.Interface.Resource(resource),
+		ts:                             d.ts,
+	}
 }
 
-type NamespaceableResourceInterface interface {
-	Namespace(string) ResourceInterface
-	ResourceInterface
-}
-
-type dynamicResourceClient struct {
+type NamespaceableResourceClient struct {
 	dynamic.NamespaceableResourceInterface
-	*dynamicClient
+	ts *testsession.TestSession
 }
 
-// NewForConfig creates a new dynamic client or returns an error.
-func NewForConfig(inConfig *rest.Config, testSession *testsession.TestSession) (Interface, error) {
-	dynamic, err := dynamic.NewForConfig(inConfig)
-	if err != nil {
-		return nil, err
+func (d *NamespaceableResourceClient) Namespace(s string) dynamic.ResourceInterface {
+	return &ResourceClient{
+		ResourceInterface: d.NamespaceableResourceInterface.Namespace(s),
+		ts:                d.ts,
 	}
-
-	return &dynamicClient{Interface: dynamic, testSession: testSession}, nil
 }
 
-func (c *dynamicClient) Resource(resource schema.GroupVersionResource) NamespaceableResourceInterface {
-	return &dynamicResourceClient{c.Interface.Resource(resource), c}
+type ResourceClient struct {
+	dynamic.ResourceInterface
+	ts *testsession.TestSession
 }
 
-func (c *dynamicResourceClient) Namespace(ns string) ResourceInterface {
-	ret := *c
-	ret.NamespaceableResourceInterface.Namespace(ns)
-	return &ret
-}
+func (c *ResourceClient) Create(ctx context.Context, obj *unstructured.Unstructured, opts metav1.CreateOptions, subresources ...string) (*unstructured.Unstructured, error) {
+	c.ts.RegisterCleanupFunc(func() error {
+		err := c.Delete(context.TODO(), obj.GetName(), metav1.DeleteOptions{}, subresources...)
+		if errors.IsNotFound(err) {
+			return nil
+		}
 
-func (c *dynamicResourceClient) Create(ctx context.Context, obj *unstructured.Unstructured, opts metav1.CreateOptions, subresources ...string) (*unstructured.Unstructured, error) {
-	resp, err := c.NamespaceableResourceInterface.Create(ctx, obj, opts, subresources...)
-	if err != nil {
-		return nil, err
-	}
+		return err
+	})
 
-	deleteFunction := func() error {
-		c.Delete(ctx, resp.GetName(), metav1.DeleteOptions{}, subresources...)
-		return nil
-	}
-
-	c.dynamicClient.testSession.RegisterCleanupFunc(deleteFunction)
-	return resp, nil
-}
-
-func (c *dynamicResourceClient) Update(ctx context.Context, obj *unstructured.Unstructured, opts metav1.UpdateOptions, subresources ...string) (*unstructured.Unstructured, error) {
-	return c.NamespaceableResourceInterface.Update(ctx, obj, opts, subresources...)
-}
-
-func (c *dynamicResourceClient) UpdateStatus(ctx context.Context, obj *unstructured.Unstructured, opts metav1.UpdateOptions) (*unstructured.Unstructured, error) {
-	return c.NamespaceableResourceInterface.UpdateStatus(ctx, obj, opts)
-}
-
-func (c *dynamicResourceClient) Delete(ctx context.Context, name string, opts metav1.DeleteOptions, subresources ...string) error {
-	return c.NamespaceableResourceInterface.Delete(ctx, name, opts, subresources...)
-}
-
-func (c *dynamicResourceClient) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOptions metav1.ListOptions) error {
-	return c.NamespaceableResourceInterface.DeleteCollection(ctx, opts, listOptions)
-}
-
-func (c *dynamicResourceClient) Get(ctx context.Context, name string, opts metav1.GetOptions, subresources ...string) (*unstructured.Unstructured, error) {
-	return c.NamespaceableResourceInterface.Get(ctx, name, opts, subresources...)
-}
-
-func (c *dynamicResourceClient) List(ctx context.Context, opts metav1.ListOptions) (*unstructured.UnstructuredList, error) {
-	return c.NamespaceableResourceInterface.List(ctx, opts)
-}
-
-func (c *dynamicResourceClient) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
-	return c.NamespaceableResourceInterface.Watch(ctx, opts)
-}
-
-func (c *dynamicResourceClient) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (*unstructured.Unstructured, error) {
-	return c.NamespaceableResourceInterface.Patch(ctx, name, pt, data, opts, subresources...)
+	return c.ResourceInterface.Create(ctx, obj, opts, subresources...)
 }
