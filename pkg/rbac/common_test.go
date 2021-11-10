@@ -8,11 +8,12 @@ import (
 	"github.com/rancher/norman/types"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	rbacv1 "k8s.io/api/rbac/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func Test_BuildSubjectFromRTB(t *testing.T) {
 	type testCase struct {
-		from  interface{}
+		from  metav1.Object
 		to    rbacv1.Subject
 		iserr bool
 	}
