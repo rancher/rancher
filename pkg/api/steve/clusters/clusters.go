@@ -9,6 +9,8 @@ import (
 	"github.com/rancher/apiserver/pkg/types"
 	"github.com/rancher/rancher/pkg/api/steve/norman"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
+	"github.com/rancher/rancher/pkg/auth/requests"
+	"github.com/rancher/rancher/pkg/clusterrouter"
 	normanv3 "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/types/config"
@@ -40,6 +42,7 @@ func Register(ctx context.Context, server *steve.Server, wrangler *wrangler.Cont
 	}
 	kubeconfig := kubeconfigDownload{
 		userMgr: userManager,
+		auth:    requests.NewAuthenticator(ctx, clusterrouter.GetClusterID, sc),
 	}
 
 	server.ClusterCache.OnAdd(ctx, shell.impersonator.PurgeOldRoles)

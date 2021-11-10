@@ -212,7 +212,7 @@ func (h *loginHandler) createLoginToken(request *types.APIContext) (v3.Token, st
 	}
 
 	if strings.HasPrefix(responseType, tokens.KubeconfigResponseType) {
-		token, tokenValue, err := tokens.GetKubeConfigToken(currUser.Name, responseType, h.userMGR)
+		token, tokenValue, err := tokens.GetKubeConfigToken(currUser.Name, responseType, h.userMGR, userPrincipal)
 		if err != nil {
 			return v3.Token{}, "", "", err
 		}
@@ -224,7 +224,9 @@ func (h *loginHandler) createLoginToken(request *types.APIContext) (v3.Token, st
 		return *token, tokenValue, responseType, nil
 	}
 
-	rToken, unhashedTokenKey, err := h.tokenMGR.NewLoginToken(currUser.Name, userPrincipal, groupPrincipals, providerToken, ttl, description)
+	userExtraInfo := providers.GetUserExtraAttributes(providerName, userPrincipal)
+
+	rToken, unhashedTokenKey, err := h.tokenMGR.NewLoginToken(currUser.Name, userPrincipal, groupPrincipals, providerToken, ttl, description, userExtraInfo)
 	return rToken, unhashedTokenKey, responseType, err
 }
 

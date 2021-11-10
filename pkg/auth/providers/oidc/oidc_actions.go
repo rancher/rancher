@@ -108,5 +108,7 @@ func (o *OpenIDCProvider) TestAndApply(actionName string, action *types.Action, 
 		return httperror.NewAPIError(httperror.ServerError, fmt.Sprintf("[generic oidc]: failed to save oidc config: %v", err))
 	}
 
-	return o.TokenMGR.CreateTokenAndSetCookie(user.Name, userPrincipal, groupPrincipals, providerToken, 0, "Token via OIDC Configuration", request)
+	userExtraInfo := o.GetUserExtraAttributes(userPrincipal)
+
+	return o.TokenMGR.CreateTokenAndSetCookie(user.Name, userPrincipal, groupPrincipals, providerToken, 0, "Token via OIDC Configuration", request, userExtraInfo)
 }

@@ -31,7 +31,7 @@ var (
 	LocalProvider          = "local"
 	providersByType        = make(map[string]common.AuthProvider)
 	confMu                 sync.Mutex
-	userExtraAttributesMap = map[string]bool{"principalid": true, "username": true}
+	userExtraAttributesMap = map[string]bool{common.UserAttributePrincipalID: true, common.UserAttributeUserName: true}
 )
 
 func GetProvider(providerName string) (common.AuthProvider, error) {
@@ -205,6 +205,6 @@ func RefetchGroupPrincipals(principalID string, providerName string, secret stri
 	return providers[providerName].RefetchGroupPrincipals(principalID, secret)
 }
 
-func GetUserExtraAttributes(providerName string, token *v3.Token) map[string][]string {
-	return providers[providerName].GetUserExtraAttributes(token)
+func GetUserExtraAttributes(providerName string, userPrincipal v3.Principal) map[string][]string {
+	return providers[providerName].GetUserExtraAttributes(userPrincipal)
 }

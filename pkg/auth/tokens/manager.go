@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"reflect"
 	"sort"
 	"time"
 
@@ -562,6 +563,7 @@ func (m *Manager) EnsureAndGetUserAttribute(userID string) (*v3.UserAttribute, b
 			},
 		},
 		GroupPrincipals: map[string]v32.Principals{},
+		ExtraByProvider: map[string]map[string][]string{},
 		LastRefresh:     "",
 		NeedsRefresh:    false,
 	}
@@ -569,14 +571,18 @@ func (m *Manager) EnsureAndGetUserAttribute(userID string) (*v3.UserAttribute, b
 	return attribs, true, nil
 }
 
-func (m *Manager) UserAttributeCreateOrUpdate(userID, provider string, groupPrincipals []v3.Principal) error {
+func (m *Manager) UserAttributeCreateOrUpdate(userID, provider string, groupPrincipals []v3.Principal, userExtraInfo map[string][]string) error {
 	attribs, needCreate, err := m.EnsureAndGetUserAttribute(userID)
 	if err != nil {
 		return err
 	}
 
+	if userExtraInfo == nil {
+		userExtraInfo = make(map[string][]string)
+	}
 	if needCreate {
 		attribs.GroupPrincipals[provider] = v32.Principals{Items: groupPrincipals}
+		attribs.ExtraByProvider[provider] = userExtraInfo
 		_, err := m.userAttributes.Create(attribs)
 		if err != nil {
 			return err
@@ -585,8 +591,12 @@ func (m *Manager) UserAttributeCreateOrUpdate(userID, provider string, groupPrin
 	}
 
 	// Exists, just update if necessary
-	if m.UserAttributeChanged(attribs, provider, groupPrincipals) {
+	if m.UserAttributeChanged(attribs, provider, userExtraInfo, groupPrincipals) {
+		if attribs.ExtraByProvider == nil {
+			attribs.ExtraByProvider = make(map[string]map[string][]string)
+		}
 		attribs.GroupPrincipals[provider] = v32.Principals{Items: groupPrincipals}
+		attribs.ExtraByProvider[provider] = userExtraInfo
 		_, err := m.userAttributes.Update(attribs)
 		if err != nil {
 			return err
@@ -596,7 +606,7 @@ func (m *Manager) UserAttributeCreateOrUpdate(userID, provider string, groupPrin
 	return nil
 }
 
-func (m *Manager) UserAttributeChanged(attribs *v32.UserAttribute, provider string, groupPrincipals []v32.Principal) bool {
+func (m *Manager) UserAttributeChanged(attribs *v32.UserAttribute, provider string, extraInfo map[string][]string, groupPrincipals []v32.Principal) bool {
 	oldSet := []string{}
 	newSet := []string{}
 	for _, principal := range attribs.GroupPrincipals[provider].Items {
@@ -618,6 +628,13 @@ func (m *Manager) UserAttributeChanged(attribs *v32.UserAttribute, provider stri
 		}
 	}
 
+	if attribs.ExtraByProvider == nil && extraInfo != nil {
+		return true
+	}
+	if !reflect.DeepEqual(attribs.ExtraByProvider[provider], extraInfo) {
+		return true
+	}
+
 	return false
 }
 
@@ -628,7 +645,7 @@ var uaBackoff = wait.Backoff{
 	Steps:    5,
 }
 
-func (m *Manager) NewLoginToken(userID string, userPrincipal v3.Principal, groupPrincipals []v3.Principal, providerToken string, ttl int64, description string) (v3.Token, string, error) {
+func (m *Manager) NewLoginToken(userID string, userPrincipal v3.Principal, groupPrincipals []v3.Principal, providerToken string, ttl int64, description string, userExtraInfo map[string][]string) (v3.Token, string, error) {
 	provider := userPrincipal.Provider
 	// Providers that use oauth need to create a secret for storing the access token.
 	if (provider == "github" || provider == "azuread" || provider == "googleoauth" || provider == "oidc" || provider == "keycloakoidc") && providerToken != "" {
@@ -639,7 +656,7 @@ func (m *Manager) NewLoginToken(userID string, userPrincipal v3.Principal, group
 	}
 
 	err := wait.ExponentialBackoff(uaBackoff, func() (bool, error) {
-		err := m.UserAttributeCreateOrUpdate(userID, provider, groupPrincipals)
+		err := m.UserAttributeCreateOrUpdate(userID, provider, groupPrincipals, userExtraInfo)
 		if err != nil {
 			logrus.Warnf("Problem creating or updating userAttribute for %v: %v", userID, err)
 		}
@@ -730,8 +747,8 @@ func (m *Manager) IsMemberOf(token v3.Token, group v3.Principal) bool {
 	return groups[group.Name]
 }
 
-func (m *Manager) CreateTokenAndSetCookie(userID string, userPrincipal v3.Principal, groupPrincipals []v3.Principal, providerToken string, ttl int, description string, request *types.APIContext) error {
-	token, unhashedTokenKey, err := m.NewLoginToken(userID, userPrincipal, groupPrincipals, providerToken, 0, description)
+func (m *Manager) CreateTokenAndSetCookie(userID string, userPrincipal v3.Principal, groupPrincipals []v3.Principal, providerToken string, ttl int, description string, request *types.APIContext, userExtraInfo map[string][]string) error {
+	token, unhashedTokenKey, err := m.NewLoginToken(userID, userPrincipal, groupPrincipals, providerToken, 0, description, userExtraInfo)
 	if err != nil {
 		logrus.Errorf("Failed creating token with error: %v", err)
 		return httperror.NewAPIErrorLong(500, "", fmt.Sprintf("Failed creating token with error: %v", err))
