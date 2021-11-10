@@ -24,10 +24,6 @@ import (
 	capi "sigs.k8s.io/cluster-api/api/v1alpha4"
 )
 
-const (
-	CapiMachineLabel = "cluster.x-k8s.io/cluster-name"
-)
-
 var (
 	regExHyphen     = regexp.MustCompile("([a-z])([A-Z])")
 	envNameOverride = map[string]string{
@@ -119,7 +115,7 @@ func (h *handler) getArgsEnvAndStatus(meta metav1.Object, data data.Object, args
 			fmt.Sprintf("--driver=%s", driver),
 			fmt.Sprintf("--custom-install-script=/run/secrets/machine/value"))
 
-		rancherCluster, err := h.rancherClusterCache.Get(meta.GetNamespace(), meta.GetLabels()[CapiMachineLabel])
+		rancherCluster, err := h.rancherClusterCache.Get(meta.GetNamespace(), meta.GetLabels()[capi.ClusterLabelName])
 		if err != nil {
 			return driverArgs{}, err
 		}
@@ -141,7 +137,6 @@ func (h *handler) getArgsEnvAndStatus(meta metav1.Object, data data.Object, args
 		BootstrapSecretName: bootstrapName,
 		BootstrapOptional:   !create,
 		Args:                cmd,
-
 		RKEMachineStatus: rkev1.RKEMachineStatus{
 			Ready:                     data.String("spec", "providerID") != "" && data.Bool("status", "jobComplete"),
 			DriverHash:                hash,
