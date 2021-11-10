@@ -1,0 +1,17 @@
+sonobuoy-config:
+  driver: Job
+  plugin-name: rancher-sonobuoy
+  result-type: junit
+spec:
+  image: docker.io/bmdepesa/ranchersono
+  imagePullPolicy: Always
+  name: plugin
+  env:
+    - name: RANCHER_CLUSTER_NAME
+    - name: RANCHER_ADMIN_TOKEN
+    - name: RANCHER_USER_TOKEN
+    - name: CATTLE_TEST_URL
+  resources: { }
+  volumeMounts:
+    - mountPath: /tmp/results
+      name: results
