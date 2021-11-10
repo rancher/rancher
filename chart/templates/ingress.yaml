@@ -1,5 +1,5 @@
 {{- if .Values.ingress.enabled }}
-{{- if .Capabilities.APIVersions.Has "networking.k8s.io/v1/Ingress" }}
+{{- if or (.Capabilities.APIVersions.Has "networking.k8s.io/v1/Ingress") (not (.Capabilities.APIVersions.Has "networking.k8s.io/v1beta1/Ingress")) }}
 apiVersion: networking.k8s.io/v1
 {{- else }}
 apiVersion: networking.k8s.io/v1beta1
@@ -41,7 +41,7 @@ spec:
     http:
       paths:
       - backend:
-          {{- if .Capabilities.APIVersions.Has "networking.k8s.io/v1/Ingress" }}
+          {{- if or (.Capabilities.APIVersions.Has "networking.k8s.io/v1/Ingress") (not (.Capabilities.APIVersions.Has "networking.k8s.io/v1beta1/Ingress")) }}
           service:
             name: {{ template "rancher.fullname" . }}
             port:
@@ -50,7 +50,7 @@ spec:
           serviceName: {{ template "rancher.fullname" . }}
           servicePort: 80
           {{- end }}
-        {{- if .Capabilities.APIVersions.Has "networking.k8s.io/v1/Ingress" }}
+        {{- if or (.Capabilities.APIVersions.Has "networking.k8s.io/v1/Ingress") (not (.Capabilities.APIVersions.Has "networking.k8s.io/v1beta1/Ingress")) }}
         pathType: ImplementationSpecific
         {{- end }}
 {{- if eq .Values.tls "ingress" }}
