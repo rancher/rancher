@@ -49,6 +49,7 @@ require (
 	github.com/Azure/go-autorest/autorest v0.11.19
 	github.com/Azure/go-autorest/autorest/adal v0.9.14
 	github.com/Azure/go-autorest/autorest/to v0.4.1-0.20210111195520-9fc88b15294e
+	github.com/BurntSushi/toml v0.4.1 // indirect
 	github.com/DataDog/zstd v1.4.5 // indirect
 	github.com/Masterminds/semver/v3 v3.1.1
 	github.com/Masterminds/sprig/v3 v3.2.2
@@ -60,6 +61,7 @@ require (
 	github.com/coreos/go-iptables v0.6.0
 	github.com/coreos/go-oidc/v3 v3.0.0
 	github.com/coreos/go-semver v0.3.0
+	github.com/coreos/go-systemd v0.0.0-20190620071333-e64a0ec8b42a // indirect
 	github.com/crewjam/saml v0.4.5
 	github.com/davecgh/go-spew v1.1.1
 	github.com/docker/distribution v2.7.1+incompatible
@@ -69,27 +71,36 @@ require (
 	github.com/docker/libtrust v0.0.0-20160708172513-aabc10ec26b7 // indirect
 	github.com/ehazlett/simplelog v0.0.0-20200226020431-d374894e92a4
 	github.com/evanphx/json-patch v4.9.0+incompatible
+	github.com/fatih/color v1.13.0 // indirect
 	github.com/garyburd/redigo v1.6.2 // indirect
 	github.com/ghodss/yaml v1.0.0
 	github.com/go-asn1-ber/asn1-ber v1.5.3 // indirect
 	github.com/go-ldap/ldap/v3 v3.4.1
 	github.com/go-logr/logr v0.4.0
+	github.com/gofrs/flock v0.8.1 // indirect
 	github.com/golang-jwt/jwt v3.2.1+incompatible
-	github.com/golang/protobuf v1.5.0
+	github.com/golang/protobuf v1.5.2
 	github.com/google/go-github v17.0.0+incompatible
 	github.com/google/go-querystring v1.0.0
+	github.com/google/uuid v1.3.0 // indirect
 	github.com/gorilla/mux v1.8.0
 	github.com/gorilla/websocket v1.4.2
-	github.com/hashicorp/go-multierror v1.0.0
+	github.com/gregjones/httpcache v0.0.0-20190611155906-901d90724c79 // indirect
+	github.com/grpc-ecosystem/go-grpc-middleware v1.2.2 // indirect
+	github.com/hashicorp/go-multierror v1.1.1
 	github.com/hashicorp/golang-lru v0.5.4
 	github.com/heptio/authenticator v0.0.0-20180409043135-d282f87a1972
 	github.com/knative/pkg v0.0.0-20190817231834-12ee58e32cc8
-	github.com/mattn/go-colorable v0.1.8
+	github.com/lib/pq v1.10.3 // indirect
+	github.com/mattn/go-colorable v0.1.11
+	github.com/mattn/go-runewidth v0.0.9 // indirect
 	github.com/mcuadros/go-version v0.0.0-20180611085657-6d5863ca60fa
 	github.com/minio/minio-go/v7 v7.0.10
-	github.com/mitchellh/mapstructure v1.1.2
+	github.com/mitchellh/mapstructure v1.4.2
+	github.com/mitchellh/reflectwalk v1.0.1 // indirect
 	github.com/moby/locker v1.0.1
 	github.com/mrjones/oauth v0.0.0-20180629183705-f4e24b6d100c
+	github.com/onsi/gomega v1.16.0 // indirect
 	github.com/oracle/oci-go-sdk v18.0.0+incompatible
 	github.com/pborman/uuid v1.2.0
 	github.com/pkg/errors v0.9.1
@@ -97,6 +108,7 @@ require (
 	github.com/prometheus/client_golang v1.9.0
 	github.com/prometheus/client_model v0.2.0
 	github.com/prometheus/common v0.15.0
+	github.com/prometheus/procfs v0.6.0 // indirect
 	github.com/rancher/aks-operator v1.0.2
 	github.com/rancher/apiserver v0.0.0-20211025232108-df28932a5627
 	github.com/rancher/channelserver v0.5.1-0.20210618172430-5cbefd383369
@@ -123,7 +135,10 @@ require (
 	github.com/satori/go.uuid v1.2.0
 	github.com/segmentio/kafka-go v0.0.0-20190411192201-218fd49cff39
 	github.com/sirupsen/logrus v1.8.1
+	github.com/spf13/cobra v1.2.1 // indirect
+	github.com/spf13/viper v1.9.0 // indirect
 	github.com/stretchr/testify v1.7.0
+	github.com/tmc/grpc-websocket-proxy v0.0.0-20200427203606-3cfed13b9966 // indirect
 	github.com/tomnomnom/linkheader v0.0.0-20180905144013-02ca5825eb80
 	github.com/urfave/cli v1.22.2
 	github.com/vishvananda/netlink v1.1.0
@@ -137,14 +152,15 @@ require (
 	github.com/yvasiyarov/gorelic v0.0.7 // indirect
 	github.com/yvasiyarov/newrelic_platform_go v0.0.0-20160601141957-9c099fbc30e9 // indirect
 	golang.org/x/crypto v0.0.0-20210921155107-089bfa567519
-	golang.org/x/mod v0.4.0
-	golang.org/x/net v0.0.0-20210315170653-34ac3e1c2000
-	golang.org/x/oauth2 v0.0.0-20201208152858-08078c50e5b5
-	golang.org/x/sync v0.0.0-20201207232520-09787c993a3a
-	golang.org/x/text v0.3.5 // indirect
-	google.golang.org/api v0.40.0
-	google.golang.org/genproto v0.0.0-20210315173758-2651cd453018 // indirect
-	google.golang.org/grpc v1.34.0
+	golang.org/x/mod v0.5.0
+	golang.org/x/net v0.0.0-20210805182204-aaa1db679c0d
+	golang.org/x/oauth2 v0.0.0-20210819190943-2bc19b11175f
+	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
+	golang.org/x/sys v0.0.0-20211013075003-97ac67df715c // indirect
+	golang.org/x/text v0.3.7 // indirect
+	golang.org/x/tools v0.1.7 // indirect
+	google.golang.org/api v0.56.0
+	google.golang.org/grpc v1.40.0
 	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
 	gopkg.in/yaml.v2 v2.4.0

@@ -26,7 +26,7 @@ ENV GOLANG_ARCH_amd64=amd64 GOLANG_ARCH_arm=armv6l GOLANG_ARCH_arm64=arm64 GOLAN
 RUN curl -sLf https://storage.googleapis.com/golang/go1.16.9.linux-${!GOLANG_ARCH}.tar.gz | tar -xzf - -C /usr/local
 
 RUN if [ "${ARCH}" == "amd64" ]; then \
-        curl -sL https://install.goreleaser.com/github.com/golangci/golangci-lint.sh | sh -s v1.43.0; \
+        curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s v1.43.0; \
         curl -H 'Cache-Control: no-cache' https://raw.githubusercontent.com/fossas/spectrometer/master/install.sh | sh; \
     fi
 # workaround for https://bugzilla.suse.com/show_bug.cgi?id=1183043
