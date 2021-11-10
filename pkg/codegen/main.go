@@ -119,7 +119,9 @@ func main() {
 
 	clusterAPIVersion := &types.APIVersion{Group: capi.GroupVersion.Group, Version: capi.GroupVersion.Version, Path: "/v1"}
 	generator.GenerateClient(factory.Schemas(clusterAPIVersion).Init(func(schemas *types.Schemas) *types.Schemas {
-		return schemas.MustImport(clusterAPIVersion, capi.Machine{})
+		return schemas.MustImportAndCustomize(clusterAPIVersion, capi.Machine{}, func(schema *types.Schema) {
+			schema.ID = "cluster.x-k8s.io.machine"
+		})
 	}), nil)
 
 	generator.GenerateComposeType(projectSchema.Schemas, managementSchema.Schemas, clusterSchema.Schemas)

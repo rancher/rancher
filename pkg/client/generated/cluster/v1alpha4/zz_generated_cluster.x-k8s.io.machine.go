@@ -5,7 +5,7 @@ import (
 )
 
 const (
-	MachineType                      = "machine"
+	MachineType                      = "cluster.x-k8s.io.machine"
 	MachineFieldAnnotations          = "annotations"
 	MachineFieldBootstrap            = "bootstrap"
 	MachineFieldClusterName          = "clusterName"
