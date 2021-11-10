@@ -4,7 +4,14 @@ import (
 	"fmt"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 )
+
+var NamespaceGroupVersionResource = schema.GroupVersionResource{
+	Group:    "",
+	Version:  "v1",
+	Resource: "namespaces",
+}
 
 // ContainerDefaultResourceLimit sets the container default resource limit in a string
 // limitsCPU and requestsCPU in form of "3m"
