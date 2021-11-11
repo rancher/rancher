@@ -8,7 +8,7 @@ import (
 	"github.com/creasty/defaults"
 )
 
-// LoadConfig reads a config json file and unmarshals it into an object depending on the config object.
+// LoadConfig reads the file defined by  the `CATTLE_TEST_CONFIG` environment variable and loads the object found at the given key onto the given configuration reference.
 // The functions takes a pointer of the object.
 func LoadConfig(key string, config interface{}) {
 	configPath := os.Getenv("CATTLE_TEST_CONFIG")
