@@ -75,7 +75,7 @@ require (
 	github.com/go-ldap/ldap/v3 v3.4.1
 	github.com/go-logr/logr v0.4.0
 	github.com/golang-jwt/jwt v3.2.1+incompatible
-	github.com/golang/protobuf v1.5.0
+	github.com/golang/protobuf v1.5.2
 	github.com/google/go-github v17.0.0+incompatible
 	github.com/google/go-querystring v1.0.0
 	github.com/gorilla/mux v1.8.0
@@ -94,9 +94,9 @@ require (
 	github.com/pborman/uuid v1.2.0
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.48.0
-	github.com/prometheus/client_golang v1.9.0
+	github.com/prometheus/client_golang v1.11.0
 	github.com/prometheus/client_model v0.2.0
-	github.com/prometheus/common v0.15.0
+	github.com/prometheus/common v0.26.0
 	github.com/rancher/aks-operator v1.0.2
 	github.com/rancher/apiserver v0.0.0-20211025232108-df28932a5627
 	github.com/rancher/channelserver v0.5.1-0.20210618172430-5cbefd383369
@@ -113,7 +113,7 @@ require (
 	github.com/rancher/rancher/pkg/client v0.0.0
 	github.com/rancher/rdns-server v0.0.0-20180802070304-bf662911db6a
 	github.com/rancher/remotedialer v0.2.6-0.20210318171128-d1ebd5202be4
-	github.com/rancher/rke v1.3.1
+	github.com/rancher/rke v1.3.3-0.20211111165535-69dbe30b464c
 	github.com/rancher/security-scan v0.1.7-0.20200222041501-f7377f127168
 	github.com/rancher/steve v0.0.0-20210922195510-7224dc21013d
 	github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20210727200656-10b094e30007
@@ -137,28 +137,26 @@ require (
 	github.com/yvasiyarov/gorelic v0.0.7 // indirect
 	github.com/yvasiyarov/newrelic_platform_go v0.0.0-20160601141957-9c099fbc30e9 // indirect
 	golang.org/x/crypto v0.0.0-20210921155107-089bfa567519
-	golang.org/x/mod v0.4.0
-	golang.org/x/net v0.0.0-20210315170653-34ac3e1c2000
+	golang.org/x/mod v0.4.2
+	golang.org/x/net v0.0.0-20210405180319-a5a99cb37ef4
 	golang.org/x/oauth2 v0.0.0-20201208152858-08078c50e5b5
-	golang.org/x/sync v0.0.0-20201207232520-09787c993a3a
-	golang.org/x/text v0.3.5 // indirect
+	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
 	google.golang.org/api v0.40.0
-	google.golang.org/genproto v0.0.0-20210315173758-2651cd453018 // indirect
-	google.golang.org/grpc v1.34.0
+	google.golang.org/grpc v1.38.0
 	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
 	gopkg.in/yaml.v2 v2.4.0
 	helm.sh/helm/v3 v3.5.4
-	k8s.io/api v0.21.3
+	k8s.io/api v0.22.3
 	k8s.io/apiextensions-apiserver v0.21.0
-	k8s.io/apimachinery v0.21.3
-	k8s.io/apiserver v0.21.0
+	k8s.io/apimachinery v0.22.3
+	k8s.io/apiserver v0.22.3
 	k8s.io/cli-runtime v0.21.0
 	k8s.io/client-go v12.0.0+incompatible
 	k8s.io/gengo v0.0.0-20201214224949-b6c5ce23f027
 	k8s.io/helm v2.16.7+incompatible
 	k8s.io/kube-aggregator v0.21.0
-	k8s.io/kubectl v0.21.0
+	k8s.io/kubectl v0.22.3
 	k8s.io/kubernetes v1.21.0
 	k8s.io/utils v0.0.0-20210305010621-2afb4311ab10
 	rsc.io/letsencrypt v0.0.3 // indirect
