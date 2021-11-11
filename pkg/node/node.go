@@ -83,6 +83,29 @@ func GetNodeInternalAddress(node *corev1.Node) string {
 	return ""
 }
 
+func GetEndpointV1NodeIP(node *v1.Node) string {
+	externalIP := ""
+	internalIP := ""
+	for _, ip := range node.Status.Addresses {
+		if ip.Type == "ExternalIP" && ip.Address != "" {
+			externalIP = ip.Address
+			break
+		} else if ip.Type == "InternalIP" && ip.Address != "" {
+			internalIP = ip.Address
+		}
+	}
+	if externalIP != "" {
+		return externalIP
+	}
+	if node.Annotations != nil {
+		externalIP = node.Annotations[externalAddressAnnotation]
+		if externalIP != "" {
+			return externalIP
+		}
+	}
+	return internalIP
+}
+
 func GetEndpointNodeIP(node *v3.Node) string {
 	externalIP := ""
 	internalIP := ""

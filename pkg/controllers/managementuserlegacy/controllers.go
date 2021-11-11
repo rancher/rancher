@@ -25,7 +25,7 @@ func Register(ctx context.Context, cluster *config.UserContext, clusterRec *mana
 	cis.Register(ctx, cluster)
 	pipeline.Register(ctx, cluster)
 	systemimage.Register(ctx, cluster)
-	endpoints.Register(ctx, cluster)
+	endpoints.Register(ctx, cluster.UserOnlyContext())
 	approuter.Register(ctx, cluster)
 	alert.Register(ctx, cluster)
 	globaldns.Register(ctx, cluster)

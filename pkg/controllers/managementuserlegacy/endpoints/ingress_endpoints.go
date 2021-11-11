@@ -6,6 +6,7 @@ import (
 
 	workloadutil "github.com/rancher/rancher/pkg/controllers/managementagent/workload"
 	"github.com/rancher/rancher/pkg/ingresswrapper"
+	"github.com/rancher/rancher/pkg/settings"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/runtime"
 )
@@ -13,7 +14,6 @@ import (
 type IngressEndpointsController struct {
 	workloadController workloadutil.CommonController
 	ingressInterface   ingresswrapper.CompatInterface
-	isRKE              bool
 }
 
 func (c *IngressEndpointsController) sync(key string, obj ingresswrapper.Ingress) (runtime.Object, error) {
@@ -39,7 +39,7 @@ func (c *IngressEndpointsController) sync(key string, obj ingresswrapper.Ingress
 }
 
 func (c *IngressEndpointsController) reconcileEndpointsForIngress(obj ingresswrapper.Ingress) (bool, error) {
-	fromObj, err := convertIngressToPublicEndpoints(obj, c.isRKE)
+	fromObj, err := convertIngressToPublicEndpoints(obj, settings.IsRKE.Get() == "true")
 	if err != nil {
 		return false, err
 	}

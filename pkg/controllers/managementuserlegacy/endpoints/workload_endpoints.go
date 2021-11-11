@@ -6,10 +6,10 @@ import (
 	"strings"
 
 	v32 "github.com/rancher/rancher/pkg/apis/project.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/settings"
 
 	workloadutil "github.com/rancher/rancher/pkg/controllers/managementagent/workload"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
-	managementv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/ingresswrapper"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
@@ -25,10 +25,8 @@ type WorkloadEndpointsController struct {
 	serviceLister           v1.ServiceLister
 	podLister               v1.PodLister
 	WorkloadController      workloadutil.CommonController
-	machinesLister          managementv3.NodeLister
 	nodeLister              v1.NodeLister
 	clusterName             string
-	isRKE                   bool
 	serverSupportsIngressV1 bool
 }
 
@@ -77,18 +75,18 @@ func (c *WorkloadEndpointsController) UpdateEndpoints(key string, obj *workloadu
 		return err
 	}
 
-	nodeNameToMachine, err := getNodeNameToMachine(c.clusterName, c.machinesLister, c.nodeLister)
+	nodeNameToMachine, err := getNodeNameToMachine(c.nodeLister)
 	if err != nil {
 		return err
 	}
-	allNodesIP, err := getAllNodesPublicEndpointIP(c.machinesLister, c.clusterName)
+	allNodesIP, err := getAllNodesPublicEndpointIP(c.nodeLister, c.clusterName)
 	if err != nil {
 		return err
 	}
 	// get ingress endpoint group by service
 	serviceToIngressEndpoints := make(map[string][]v32.PublicEndpoint)
 	for _, ingress := range ingresses {
-		epsMap, err := convertIngressToServicePublicEndpointsMap(ingress, c.isRKE)
+		epsMap, err := convertIngressToServicePublicEndpointsMap(ingress, settings.IsRKE.Get() == "true")
 		if err != nil {
 			return err
 		}

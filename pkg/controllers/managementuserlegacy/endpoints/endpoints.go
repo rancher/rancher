@@ -15,17 +15,12 @@ import (
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	managementv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/ingresswrapper"
-	"github.com/rancher/rancher/pkg/namespace"
 	nodehelper "github.com/rancher/rancher/pkg/node"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
-	kextv1beta1 "k8s.io/api/extensions/v1beta1"
-	knetworkingv1 "k8s.io/api/networking/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
 )
@@ -35,87 +30,38 @@ const (
 	endpointsAnnotation = "field.cattle.io/publicEndpoints"
 )
 
-func Register(ctx context.Context, workload *config.UserContext) {
-	isRKE := false
-	cluster, err := workload.Management.Management.Clusters("").Get(workload.ClusterName, metav1.GetOptions{})
-	if err != nil {
-		logrus.WithError(err).Warnf("Can not get cluster %s when registering endpoint controller", workload.ClusterName)
-	}
-	if cluster != nil {
-		//assume that cluster always has a spec
-		isRKE = cluster.Spec.RancherKubernetesEngineConfig != nil
-	}
-
-	ignore := func() bool {
-		return false
-	}
-	if cluster.Spec.Internal {
-		deployments := workload.Apps.Deployments("").Controller().Lister()
-		ignore = func() bool {
-			_, err := deployments.Get(namespace.System, "cattle-cluster-agent")
-			return err == nil
-		}
-	}
-
+func Register(ctx context.Context, workload *config.UserOnlyContext) {
 	s := &ServicesController{
 		services:           workload.Core.Services(""),
-		workloadController: workloadUtil.NewWorkloadController(ctx, workload.UserOnlyContext(), nil),
-		machinesLister:     workload.Management.Management.Nodes(workload.ClusterName).Controller().Lister(),
+		workloadController: workloadUtil.NewWorkloadController(ctx, workload, nil),
+		nodesLister:        workload.Core.Nodes("").Controller().Lister(),
 		clusterName:        workload.ClusterName,
 	}
-	workload.Core.Services("").AddHandler(ctx, "servicesEndpointsController", func(key string, obj *corev1.Service) (runtime.Object, error) {
-		if ignore() {
-			return obj, nil
-		}
-		return s.sync(key, obj)
-	})
+	workload.Core.Services("").AddHandler(ctx, "servicesEndpointsController", s.sync)
 
 	p := &PodsController{
 		podLister:          workload.Core.Pods("").Controller().Lister(),
-		workloadController: workloadUtil.NewWorkloadController(ctx, workload.UserOnlyContext(), nil),
+		workloadController: workloadUtil.NewWorkloadController(ctx, workload, nil),
 	}
-	workload.Core.Pods("").AddHandler(ctx, "hostPortEndpointsController", func(key string, obj *corev1.Pod) (runtime.Object, error) {
-		if ignore() {
-			return obj, nil
-		}
-		return p.sync(key, obj)
-	})
+	workload.Core.Pods("").AddHandler(ctx, "hostPortEndpointsController", p.sync)
 
 	w := &WorkloadEndpointsController{
-		ingressLister:  ingresswrapper.NewCompatLister(workload.Networking, workload.Extensions, workload.K8sClient),
-		serviceLister:  workload.Core.Services("").Controller().Lister(),
-		podLister:      workload.Core.Pods("").Controller().Lister(),
-		machinesLister: workload.Management.Management.Nodes(workload.ClusterName).Controller().Lister(),
-		nodeLister:     workload.Core.Nodes("").Controller().Lister(),
-		clusterName:    workload.ClusterName,
-		isRKE:          isRKE,
+		ingressLister: ingresswrapper.NewCompatLister(workload.Networking, workload.Extensions, workload.K8sClient),
+		serviceLister: workload.Core.Services("").Controller().Lister(),
+		podLister:     workload.Core.Pods("").Controller().Lister(),
+		nodeLister:    workload.Core.Nodes("").Controller().Lister(),
+		clusterName:   workload.ClusterName,
 	}
-	w.WorkloadController = workloadUtil.NewWorkloadController(ctx, workload.UserOnlyContext(), func(key string, workload *workloadUtil.Workload) error {
-		if ignore() {
-			return nil
-		}
-		return w.UpdateEndpoints(key, workload)
-	})
+	w.WorkloadController = workloadUtil.NewWorkloadController(ctx, workload, w.UpdateEndpoints)
 
 	i := &IngressEndpointsController{
-		workloadController: workloadUtil.NewWorkloadController(ctx, workload.UserOnlyContext(), nil),
+		workloadController: workloadUtil.NewWorkloadController(ctx, workload, nil),
 		ingressInterface:   ingresswrapper.NewCompatInterface(workload.Networking, workload.Extensions, workload.K8sClient),
-		isRKE:              isRKE,
 	}
 	if i.ingressInterface.ServerSupportsIngressV1 {
-		workload.Networking.Ingresses("").AddHandler(ctx, "ingressEndpointsController", func(key string, obj *knetworkingv1.Ingress) (runtime.Object, error) {
-			if ignore() {
-				return obj, nil
-			}
-			return ingresswrapper.CompatSyncV1(i.sync)(key, obj)
-		})
+		workload.Networking.Ingresses("").AddHandler(ctx, "ingressEndpointsController", ingresswrapper.CompatSyncV1(i.sync))
 	} else {
-		workload.Extensions.Ingresses("").AddHandler(ctx, "ingressEndpointsController", func(key string, obj *kextv1beta1.Ingress) (runtime.Object, error) {
-			if ignore() {
-				return obj, nil
-			}
-			return ingresswrapper.CompatSyncV1Beta1(i.sync)(key, obj)
-		})
+		workload.Extensions.Ingresses("").AddHandler(ctx, "ingressEndpointsController", ingresswrapper.CompatSyncV1Beta1(i.sync))
 	}
 }
 
@@ -220,7 +166,7 @@ func convertServiceToPublicEndpoints(svc *corev1.Service, clusterName string, no
 	return eps, nil
 }
 
-func convertHostPortToEndpoint(pod *corev1.Pod, clusterName string, node *managementv3.Node) ([]v32.PublicEndpoint, error) {
+func convertHostPortToEndpoint(pod *corev1.Pod, clusterName string, node *v1.Node) ([]v32.PublicEndpoint, error) {
 	var eps []v32.PublicEndpoint
 	if pod.DeletionTimestamp != nil {
 		return eps, nil
@@ -240,7 +186,7 @@ func convertHostPortToEndpoint(pod *corev1.Pod, clusterName string, node *manage
 			if p.HostIP != "" {
 				address = p.HostIP
 			} else {
-				address = nodehelper.GetEndpointNodeIP(node)
+				address = nodehelper.GetEndpointV1NodeIP(node)
 			}
 			p := v32.PublicEndpoint{
 				NodeName:  fmt.Sprintf("%s:%s", clusterName, node.Name),
@@ -262,21 +208,14 @@ func publicEndpointToString(p v32.PublicEndpoint) string {
 	return fmt.Sprintf("%s_%v_%v_%s_%s_%s_%s_%s_%s", p.NodeName, p.Addresses, p.Port, p.Protocol, p.ServiceName, p.PodName, p.IngressName, p.Hostname, p.Path)
 }
 
-func getNodeNameToMachine(clusterName string, machineLister managementv3.NodeLister, nodeLister v1.NodeLister) (map[string]*managementv3.Node, error) {
-	machines, err := machineLister.List(clusterName, labels.NewSelector())
+func getNodeNameToMachine(nodeLister v1.NodeLister) (map[string]*v1.Node, error) {
+	nodes, err := nodeLister.List("", labels.NewSelector())
 	if err != nil {
 		return nil, err
 	}
-	machineMap := map[string]*managementv3.Node{}
-	for _, machine := range machines {
-		var node *corev1.Node
-		node, err = nodehelper.GetNodeForMachine(machine, nodeLister)
-		if err != nil {
-			return nil, err
-		}
-		if node != nil {
-			machineMap[node.Name] = machine
-		}
+	machineMap := map[string]*v1.Node{}
+	for _, node := range nodes {
+		machineMap[node.Name] = node
 	}
 	return machineMap, nil
 }
@@ -290,15 +229,15 @@ func isMachineReady(machine *managementv3.Node) bool {
 	return false
 }
 
-func getAllNodesPublicEndpointIP(machineLister managementv3.NodeLister, clusterName string) (string, error) {
+func getAllNodesPublicEndpointIP(nodesLister v1.NodeLister, clusterName string) (string, error) {
 	var addresses []string
-	machines, err := machineLister.List(clusterName, labels.NewSelector())
+	nodes, err := nodesLister.List(clusterName, labels.NewSelector())
 	if err != nil {
 		return "", err
 	}
-	for _, machine := range machines {
-		if machine.Spec.Worker && nodehelper.IsMachineReady(machine) {
-			nodePublicIP := getEndpointNodeAddress(machine)
+	for _, node := range nodes {
+		if len(node.Spec.Taints) == 0 {
+			nodePublicIP := getEndpointNodeAddress(node)
 			if nodePublicIP != "" {
 				addresses = append(addresses, nodePublicIP)
 			}
@@ -396,8 +335,8 @@ func convertIngressToPublicEndpoints(obj ingresswrapper.Ingress, isRKE bool) ([]
 	return eps, nil
 }
 
-func getEndpointNodeAddress(machine *managementv3.Node) string {
-	endpointAddress := nodehelper.GetEndpointNodeIP(machine)
+func getEndpointNodeAddress(machine *v1.Node) string {
+	endpointAddress := nodehelper.GetEndpointV1NodeIP(machine)
 	if endpointAddress == "" {
 		return ""
 	}
