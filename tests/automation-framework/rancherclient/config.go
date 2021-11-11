@@ -3,9 +3,9 @@ package rancherclient
 const ConfigurationFileKey = "rancher"
 
 type Config struct {
-	RancherHost string `json:"rancherHost"`
-	AdminToken  string `json:"adminToken"`
-	Insecure    *bool  `json:"insecure" default:"true"`
-	CAFile      string `json:"caFile" default:""`
-	CACerts     string `json:"caCerts" default:""`
+	RancherHost string `yaml:"rancherHost"`
+	AdminToken  string `yaml:"adminToken"`
+	Insecure    *bool  `yaml:"insecure" default:"true"`
+	CAFile      string `yaml:"caFile" default:""`
+	CACerts     string `yaml:"caCerts" default:""`
 }

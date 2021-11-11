@@ -1,11 +1,11 @@
 package config
 
 import (
-	"encoding/json"
 	"io/ioutil"
 	"os"
 
 	"github.com/creasty/defaults"
+	"gopkg.in/yaml.v2"
 )
 
 // LoadConfig reads the file defined by  the `CATTLE_TEST_CONFIG` environment variable and loads the object found at the given key onto the given configuration reference.
@@ -19,18 +19,18 @@ func LoadConfig(key string, config interface{}) {
 		panic(err)
 	}
 
-	err = json.Unmarshal(configContents, &configMap)
+	err = yaml.Unmarshal(configContents, &configMap)
 	if err != nil {
 		panic(err)
 	}
 
 	configObject := configMap[key]
-	jsonEncodedConfigObject, err := json.Marshal(configObject)
+	yamlEncodedConfigObject, err := yaml.Marshal(configObject)
 	if err != nil {
 		panic(err)
 	}
 
-	err = json.Unmarshal(jsonEncodedConfigObject, config)
+	err = yaml.Unmarshal(yamlEncodedConfigObject, config)
 	if err != nil {
 		panic(err)
 	}
