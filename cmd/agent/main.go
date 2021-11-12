@@ -181,7 +181,7 @@ func cleanup(ctx context.Context) error {
 }
 
 func run(ctx context.Context) error {
-	topContext := signals.SetupSignalHandler(context.Background())
+	topContext := signals.SetupSignalContext()
 
 	logrus.Infof("Rancher agent version %s is starting", VERSION)
 	params, err := getParams()

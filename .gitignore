@@ -1,4 +1,5 @@
 /.dapper
+/.dapper.exe
 /bin
 /dist
 /build
