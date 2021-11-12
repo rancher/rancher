@@ -16,7 +16,6 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/managementuser/rbac/podsecuritypolicy"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/resourcequota"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/secret"
-	"github.com/rancher/rancher/pkg/controllers/managementuser/settings"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/snapshotbackpopulate"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/windows"
 	"github.com/rancher/rancher/pkg/controllers/managementuserlegacy"
@@ -59,13 +58,6 @@ func Register(ctx context.Context, cluster *config.UserContext, clusterRec *mana
 			return err
 		}
 		clusterauthtoken.Register(ctx, cluster)
-	}
-
-	if !clusterRec.Spec.Internal {
-		err := settings.Register(ctx, cluster)
-		if err != nil {
-			return err
-		}
 	}
 
 	return managementuserlegacy.Register(ctx, cluster, clusterRec, kubeConfigGetter)

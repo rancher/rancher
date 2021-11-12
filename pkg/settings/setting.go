@@ -12,6 +12,7 @@ import (
 	authsettings "github.com/rancher/rancher/pkg/auth/settings"
 	fleetconst "github.com/rancher/rancher/pkg/fleet"
 	"github.com/sirupsen/logrus"
+	v1 "k8s.io/api/core/v1"
 )
 
 var (
@@ -257,4 +258,26 @@ func GetSettingByID(id string) string {
 		return s.Default
 	}
 	return provider.Get(id)
+}
+
+func DefaultAgentSettings() []Setting {
+	return []Setting{
+		ServerVersion,
+		InstallUUID,
+		IngressIPDomain,
+	}
+}
+
+func DefaultAgentSettingsAsEnvVars() []v1.EnvVar {
+	defaultAgentSettings := DefaultAgentSettings()
+	envVars := make([]v1.EnvVar, 0, len(defaultAgentSettings))
+
+	for _, s := range defaultAgentSettings {
+		envVars = append(envVars, v1.EnvVar{
+			Name:  GetEnvKey(s.Name),
+			Value: s.Get(),
+		})
+	}
+
+	return envVars
 }
