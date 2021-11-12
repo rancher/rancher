@@ -311,23 +311,27 @@ def test_app_create_validation(admin_mc, admin_pc, custom_catalog,
         }]
     }
 
-    set_server_version(client, "2.4.2-beta2")
+    server_version = "2.4.2-beta2"
+    set_server_version(client, server_version)
 
     # First try requires a min of 2.5.0 so an error should be returned
     with pytest.raises(ApiError) as e:
         app1 = admin_pc.client.create_app(app_data)
         remove_resource(app1)
     assert e.value.error.status == 422
-    assert e.value.error.message == 'rancher min version not met'
+    assert 'incompatible rancher version [%s] for template' % server_version \
+        in e.value.error.message
 
-    set_server_version(client, "2.7.1")
+    server_version = "2.7.1"
+    set_server_version(client, server_version)
 
     # Second try requires a max of 2.7.0 so an error should be returned
     with pytest.raises(ApiError) as e:
         app1 = admin_pc.client.create_app(app_data)
         remove_resource(app1)
     assert e.value.error.status == 422
-    assert e.value.error.message == 'rancher max version exceeded'
+    assert 'incompatible rancher version [%s] for template' % server_version \
+        in e.value.error.message
 
     set_server_version(client, "2.5.1-rc4")
 
@@ -387,7 +391,8 @@ def test_app_update_validation(admin_mc, admin_pc, custom_catalog,
         }]
     }
 
-    set_server_version(client, "2.4.2-rc3")
+    server_version = "2.4.2-rc3"
+    set_server_version(client, server_version)
 
     # Launch the app version 2.3.1 with rancher 2.4.2-rc3
     app1 = admin_pc.client.create_app(app_data)
@@ -407,15 +412,18 @@ def test_app_update_validation(admin_mc, admin_pc, custom_catalog,
     with pytest.raises(ApiError) as e:
         app1 = client.action(**upgrade_dict)
     assert e.value.error.status == 422
-    assert e.value.error.message == 'rancher min version not met'
+    assert 'incompatible rancher version [%s] for template' % server_version \
+        in e.value.error.message
 
-    set_server_version(client, "2.7.1")
+    server_version = "2.7.1"
+    set_server_version(client, server_version)
 
     # # Second try requires a max of 2.7.0 so an error should be returned
     with pytest.raises(ApiError) as e:
         app1 = client.action(**upgrade_dict)
     assert e.value.error.status == 422
-    assert e.value.error.message == 'rancher max version exceeded'
+    assert 'incompatible rancher version [%s] for template' % server_version \
+        in e.value.error.message
 
 
 @pytest.mark.nonparallel
@@ -523,23 +531,25 @@ def test_app_rollback_validation(admin_mc, admin_pc, custom_catalog,
         'forceUpgrade': False,
     }
 
-    set_server_version(client, "2.6.1")
+    server_version = "2.6.1"
+    set_server_version(client, server_version)
 
     # Rollback requires a max of 2.6.0 so an error should be returned
     with pytest.raises(ApiError) as e:
         client.action(**rollback_dict)
     assert e.value.error.status == 422
-    assert e.value.error.message == 'rancher max version exceeded'
+    assert 'incompatible rancher version [%s] for template' % server_version \
+        in e.value.error.message
 
-    set_server_version(client, "2.0.0-rc3")
+    server_version = "2.0.0-rc3"
+    set_server_version(client, server_version)
 
     # Second try requires a min of 2.4.1 so an error should be returned
     with pytest.raises(ApiError) as e:
         client.action(**rollback_dict)
-
-    msg = e.value.error
-    assert e.value.error.message == 'rancher min version not met', msg
     assert e.value.error.status == 422
+    assert 'incompatible rancher version [%s] for template' % server_version \
+        in e.value.error.message
 
 
 def test_app_has_helmversion(admin_pc, admin_mc, remove_resource):
