@@ -1,5 +1,7 @@
 from .common import random_str, check_subject_in_rb
+
 from rancher import ApiError
+
 from .conftest import (
     wait_until, wait_for, set_server_version, wait_until_available,
     user_project_client
@@ -462,7 +464,8 @@ def test_mcapp_create_validation(admin_mc, admin_pc, custom_catalog,
     custom_catalog(name=c_name)
 
     client = admin_mc.client
-    set_server_version(client, "2.0.0")
+    server_version = "2.0.0"
+    set_server_version(client, server_version)
 
     cat_ns_name = "cattle-global-data:"+c_name
 
@@ -478,7 +481,8 @@ def test_mcapp_create_validation(admin_mc, admin_pc, custom_catalog,
         mcapp1 = client.create_multi_cluster_app(mcapp_data)
         remove_resource(mcapp1)
     assert e.value.error.status == 422
-    assert e.value.error.message == 'rancher min version not met'
+    assert 'incompatible rancher version [%s] for template' % server_version \
+        in e.value.error.message
 
     # Second app requires a min of 2.0 so no error should be returned
     mcapp_data['name'] = random_str()
@@ -487,14 +491,16 @@ def test_mcapp_create_validation(admin_mc, admin_pc, custom_catalog,
     remove_resource(mcapp2)
     wait_for_app(admin_pc, mcapp_data['name'])
 
-    set_server_version(client, "2.2.1")
+    server_version = "2.2.1"
+    set_server_version(client, server_version)
     # Third app requires a max of version 2.2.0 so expect error
     with pytest.raises(ApiError) as e:
         mcapp_data['name'] = random_str()
         mcapp3 = client.create_multi_cluster_app(mcapp_data)
         remove_resource(mcapp3)
     assert e.value.error.status == 422
-    assert e.value.error.message == 'rancher max version exceeded'
+    assert 'incompatible rancher version [%s] for template' % server_version \
+        in e.value.error.message
 
 
 @pytest.mark.nonparallel
@@ -510,7 +516,8 @@ def test_mcapp_update_validation(admin_mc, admin_pc, custom_catalog,
     custom_catalog(name=c_name)
 
     client = admin_mc.client
-    set_server_version(client, "2.0.0")
+    server_version = "2.0.0"
+    set_server_version(client, server_version)
 
     cat_ns_name = "cattle-global-data:"+c_name
 
@@ -531,15 +538,18 @@ def test_mcapp_update_validation(admin_mc, admin_pc, custom_catalog,
         mcapp1 = client.update_by_id_multi_cluster_app(
             id=mcapp1.id, templateVersionId=cat_ns_name+"-chartmuseum-1.6.2")
     assert e.value.error.status == 422
-    assert e.value.error.message == 'rancher min version not met'
+    assert 'incompatible rancher version [%s] for template' % server_version \
+        in e.value.error.message
 
-    set_server_version(client, "2.3.1")
+    server_version = "2.3.1"
+    set_server_version(client, server_version)
     # App upgrade requires a max of 2.3 so expect error
     with pytest.raises(ApiError) as e:
         mcapp1 = client.update_by_id_multi_cluster_app(
             id=mcapp1.id, templateVersionId=cat_ns_name+"-chartmuseum-1.6.2")
     assert e.value.error.status == 422
-    assert e.value.error.message == 'rancher max version exceeded'
+    assert 'incompatible rancher version [%s] for template' % server_version \
+        in e.value.error.message
 
 
 @pytest.mark.nonparallel
@@ -607,13 +617,15 @@ def test_mcapp_rollback_validation(admin_mc, admin_pc, custom_catalog,
 
     assert mcapp1.status.revisionId != original_rev, 'app did not upgrade'
 
-    set_server_version(client, "2.3.1")
+    server_version = "2.3.1"
+    set_server_version(client, server_version)
     # App rollback requires a max of 2.2 so expect error
     with pytest.raises(ApiError) as e:
         client.action(obj=mcapp1, action_name='rollback',
                       revisionId=original_rev)
     assert e.value.error.status == 422
-    assert e.value.error.message == 'rancher max version exceeded'
+    assert 'incompatible rancher version [%s] for template' % server_version \
+        in e.value.error.message
 
 
 def test_perform_mca_action_read_only(admin_mc, admin_pc, remove_resource,
