@@ -43,6 +43,26 @@ func newUserIngressController(ctx context.Context, clusterContext *config.UserCo
 
 func Register(ctx context.Context, clusterContext *config.UserContext) {
 	n := newUserIngressController(ctx, clusterContext)
+	starter := clusterContext.DeferredStart(ctx, func(ctx context.Context) error {
+		registerDeferred(ctx, clusterContext)
+		return nil
+	})
+
+	globalDNS := clusterContext.Management.Management.GlobalDnses("")
+	globalDNS.AddHandler(ctx, "globaldns-deferred", func(key string, obj *v3.GlobalDns) (runtime.Object, error) {
+		if obj == nil {
+			return obj, nil
+		} else if ok, err := n.doesGlobalDNSTargetCurrentCluster(obj); err != nil {
+			return obj, err
+		} else if ok {
+			return obj, starter()
+		}
+		return obj, nil
+	})
+}
+
+func registerDeferred(ctx context.Context, clusterContext *config.UserContext) {
+	n := newUserIngressController(ctx, clusterContext)
 	if ingresswrapper.ServerSupportsIngressV1(clusterContext.K8sClient) {
 		clusterContext.Networking.Ingresses("").AddHandler(ctx, UserIngressControllerName, ingresswrapper.CompatSyncV1(n.sync))
 	} else {
