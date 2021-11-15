@@ -350,7 +350,7 @@ func (l *Lifecycle) pruneOldRevisions(obj *v3.App) {
 		LabelSelector: fmt.Sprintf("%s=%s", appLabel, obj.Name),
 	})
 	if err != nil {
-		logrus.Tracef("[helm-controller] Failed to list revisions for app %s: %v", projectName, err)
+		logrus.Warnf("[helm-controller] Failed to list revisions for app %s: %v", projectName, err)
 		return
 	}
 
@@ -359,7 +359,7 @@ func (l *Lifecycle) pruneOldRevisions(obj *v3.App) {
 		deleteCount := len(revisions.Items) - obj.Spec.MaxRevisionCount
 		for _, revision := range revisions.Items[:deleteCount] {
 			if err := appRevisionClient.Delete(revision.Name, &metav1.DeleteOptions{}); err != nil && !errors.IsNotFound(err) {
-				logrus.Tracef("[helm-controller] Failed to delete app revision %s: %v", revision.Name, err)
+				logrus.Warnf("[helm-controller] Failed to delete app revision %s: %v", revision.Name, err)
 			}
 		}
 	}
