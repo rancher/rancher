@@ -3,12 +3,31 @@ package networkpolicy
 import (
 	"context"
 
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/sirupsen/logrus"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 // Register initializes the controllers and registers
 func Register(ctx context.Context, cluster *config.UserContext) {
+	starter := cluster.DeferredStart(ctx, func(ctx context.Context) error {
+		registerDeferred(ctx, cluster)
+		return nil
+	})
+	clusters := cluster.Management.Management.Clusters("")
+	clusters.AddHandler(ctx, "networkpolicy-deferred", func(key string, obj *v3.Cluster) (runtime.Object, error) {
+		if obj != nil &&
+			obj.Name == cluster.ClusterName &&
+			obj.Spec.EnableNetworkPolicy != nil &&
+			*obj.Spec.EnableNetworkPolicy {
+			return obj, starter()
+		}
+		return obj, nil
+	})
+}
+
+func registerDeferred(ctx context.Context, cluster *config.UserContext) {
 	logrus.Infof("Registering project network policy")
 
 	pnpLister := cluster.Management.Management.ProjectNetworkPolicies("").Controller().Lister()
