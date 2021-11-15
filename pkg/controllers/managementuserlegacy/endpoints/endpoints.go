@@ -14,13 +14,15 @@ import (
 	workloadUtil "github.com/rancher/rancher/pkg/controllers/managementagent/workload"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	managementv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/ingresswrapper"
 	"github.com/rancher/rancher/pkg/namespace"
 	nodehelper "github.com/rancher/rancher/pkg/node"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
-	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
+	kextv1beta1 "k8s.io/api/extensions/v1beta1"
+	knetworkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -80,7 +82,7 @@ func Register(ctx context.Context, workload *config.UserContext) {
 	})
 
 	w := &WorkloadEndpointsController{
-		ingressLister:  workload.Extensions.Ingresses("").Controller().Lister(),
+		ingressLister:  ingresswrapper.NewCompatLister(workload.Networking, workload.Extensions, workload.K8sClient),
 		serviceLister:  workload.Core.Services("").Controller().Lister(),
 		podLister:      workload.Core.Pods("").Controller().Lister(),
 		machinesLister: workload.Management.Management.Nodes(workload.ClusterName).Controller().Lister(),
@@ -97,15 +99,24 @@ func Register(ctx context.Context, workload *config.UserContext) {
 
 	i := &IngressEndpointsController{
 		workloadController: workloadUtil.NewWorkloadController(ctx, workload.UserOnlyContext(), nil),
-		ingressInterface:   workload.Extensions.Ingresses(""),
+		ingressInterface:   ingresswrapper.NewCompatInterface(workload.Networking, workload.Extensions, workload.K8sClient),
 		isRKE:              isRKE,
 	}
-	workload.Extensions.Ingresses("").AddHandler(ctx, "ingressEndpointsController", func(key string, obj *extensionsv1beta1.Ingress) (runtime.Object, error) {
-		if ignore() {
-			return obj, nil
-		}
-		return i.sync(key, obj)
-	})
+	if i.ingressInterface.ServerSupportsIngressV1 {
+		workload.Networking.Ingresses("").AddHandler(ctx, "ingressEndpointsController", func(key string, obj *knetworkingv1.Ingress) (runtime.Object, error) {
+			if ignore() {
+				return obj, nil
+			}
+			return ingresswrapper.CompatSyncV1(i.sync)(key, obj)
+		})
+	} else {
+		workload.Extensions.Ingresses("").AddHandler(ctx, "ingressEndpointsController", func(key string, obj *kextv1beta1.Ingress) (runtime.Object, error) {
+			if ignore() {
+				return obj, nil
+			}
+			return ingresswrapper.CompatSyncV1Beta1(i.sync)(key, obj)
+		})
+	}
 }
 
 func areEqualEndpoints(one []v32.PublicEndpoint, two []v32.PublicEndpoint) bool {
@@ -303,10 +314,14 @@ func getAllNodesPublicEndpointIP(machineLister managementv3.NodeLister, clusterN
 	return addresses[0], nil
 }
 
-func convertIngressToServicePublicEndpointsMap(obj *extensionsv1beta1.Ingress, allNodes bool) map[string][]v32.PublicEndpoint {
+func convertIngressToServicePublicEndpointsMap(ingress ingresswrapper.Ingress, allNodes bool) (map[string][]v32.PublicEndpoint, error) {
 	epsMap := map[string][]v32.PublicEndpoint{}
+	obj, err := ingresswrapper.ToCompatIngress(ingress)
+	if err != nil {
+		return epsMap, err
+	}
 	if len(obj.Status.LoadBalancer.Ingress) == 0 {
-		return epsMap
+		return epsMap, nil
 	}
 	var addresses []string
 	var ips []net.IP
@@ -322,7 +337,7 @@ func convertIngressToServicePublicEndpointsMap(obj *extensionsv1beta1.Ingress, a
 	}
 
 	if len(addresses) == 0 {
-		return epsMap
+		return epsMap, nil
 	}
 
 	tlsHosts := sets.NewString()
@@ -355,27 +370,30 @@ func convertIngressToServicePublicEndpointsMap(obj *extensionsv1beta1.Ingress, a
 				p := v32.PublicEndpoint{
 					Hostname:    rule.Host,
 					Path:        path.Path,
-					ServiceName: fmt.Sprintf("%s:%s", obj.Namespace, path.Backend.ServiceName),
+					ServiceName: fmt.Sprintf("%s:%s", obj.Namespace, path.Backend.Service.Name),
 					Addresses:   addresses,
 					Port:        port,
 					Protocol:    proto,
 					AllNodes:    allNodes,
 					IngressName: fmt.Sprintf("%s:%s", obj.Namespace, obj.Name),
 				}
-				epsMap[path.Backend.ServiceName] = append(epsMap[path.Backend.ServiceName], p)
+				epsMap[path.Backend.Service.Name] = append(epsMap[path.Backend.Service.Name], p)
 			}
 		}
 	}
-	return epsMap
+	return epsMap, nil
 }
 
-func convertIngressToPublicEndpoints(obj *extensionsv1beta1.Ingress, isRKE bool) []v32.PublicEndpoint {
-	epsMap := convertIngressToServicePublicEndpointsMap(obj, isRKE)
+func convertIngressToPublicEndpoints(obj ingresswrapper.Ingress, isRKE bool) ([]v32.PublicEndpoint, error) {
 	var eps []v32.PublicEndpoint
+	epsMap, err := convertIngressToServicePublicEndpointsMap(obj, isRKE)
+	if err != nil {
+		return eps, err
+	}
 	for _, v := range epsMap {
 		eps = append(eps, v...)
 	}
-	return eps
+	return eps, nil
 }
 
 func getEndpointNodeAddress(machine *managementv3.Node) string {

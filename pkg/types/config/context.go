@@ -241,6 +241,7 @@ func (w *UserContext) UserOnlyContext() *UserOnlyContext {
 		Core:         w.Core,
 		RBAC:         w.RBAC,
 		Extensions:   w.Extensions,
+		Networking:   w.Networking,
 		BatchV1:      w.BatchV1,
 		BatchV1Beta1: w.BatchV1Beta1,
 		Monitoring:   w.Monitoring,
@@ -268,6 +269,7 @@ type UserOnlyContext struct {
 	Extensions      extv1beta1.Interface
 	BatchV1         batchv1.Interface
 	BatchV1Beta1    batchv1beta1.Interface
+	Networking      knetworkingv1.Interface
 	Monitoring      monitoringv1.Interface
 	Cluster         clusterv3.Interface
 	Istio           istiov1alpha3.Interface
@@ -514,6 +516,11 @@ func NewUserOnlyContext(config *wrangler.Context) (*UserOnlyContext, error) {
 	}
 
 	context.RBAC, err = rbacv1.NewFromControllerFactory(context.ControllerFactory)
+	if err != nil {
+		return nil, err
+	}
+
+	context.Networking, err = knetworkingv1.NewFromControllerFactory(context.ControllerFactory)
 	if err != nil {
 		return nil, err
 	}

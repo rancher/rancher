@@ -9,11 +9,10 @@ import (
 
 	workloadutil "github.com/rancher/rancher/pkg/controllers/managementagent/workload"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
-	"github.com/rancher/rancher/pkg/generated/norman/extensions/v1beta1"
 	managementv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/ingresswrapper"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
-	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/labels"
 )
 
@@ -22,14 +21,15 @@ import (
 // and NodePort services backing up the workload
 
 type WorkloadEndpointsController struct {
-	ingressLister      v1beta1.IngressLister
-	serviceLister      v1.ServiceLister
-	podLister          v1.PodLister
-	WorkloadController workloadutil.CommonController
-	machinesLister     managementv3.NodeLister
-	nodeLister         v1.NodeLister
-	clusterName        string
-	isRKE              bool
+	ingressLister           ingresswrapper.CompatLister
+	serviceLister           v1.ServiceLister
+	podLister               v1.PodLister
+	WorkloadController      workloadutil.CommonController
+	machinesLister          managementv3.NodeLister
+	nodeLister              v1.NodeLister
+	clusterName             string
+	isRKE                   bool
+	serverSupportsIngressV1 bool
 }
 
 func (c *WorkloadEndpointsController) UpdateEndpoints(key string, obj *workloadutil.Workload) error {
@@ -39,7 +39,7 @@ func (c *WorkloadEndpointsController) UpdateEndpoints(key string, obj *workloadu
 
 	var workloads []*workloadutil.Workload
 	var services []*corev1.Service
-	var ingresses []*extensionsv1beta1.Ingress
+	var ingresses []*ingresswrapper.CompatIngress
 	var err error
 	if strings.HasSuffix(key, allEndpoints) {
 		namespace := ""
@@ -88,7 +88,10 @@ func (c *WorkloadEndpointsController) UpdateEndpoints(key string, obj *workloadu
 	// get ingress endpoint group by service
 	serviceToIngressEndpoints := make(map[string][]v32.PublicEndpoint)
 	for _, ingress := range ingresses {
-		epsMap := convertIngressToServicePublicEndpointsMap(ingress, c.isRKE)
+		epsMap, err := convertIngressToServicePublicEndpointsMap(ingress, c.isRKE)
+		if err != nil {
+			return err
+		}
 		for k, v := range epsMap {
 			serviceToIngressEndpoints[k] = append(serviceToIngressEndpoints[k], v...)
 		}
