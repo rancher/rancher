@@ -20,7 +20,7 @@ import (
 const DriverNameField = "driverName"
 
 func (p *Provisioner) driverCreate(cluster *v3.Cluster, spec v32.ClusterSpec) (api string, token string, cert string, err error) {
-	ctx, logger := clusterprovisioninglogger.NewLogger(p.Clusters, cluster, v32.ClusterConditionProvisioned)
+	ctx, logger := clusterprovisioninglogger.NewLogger(p.Clusters, p.ConfigMaps, cluster, v32.ClusterConditionProvisioned)
 	defer logger.Close()
 
 	spec = cleanRKE(spec)
@@ -54,7 +54,7 @@ func (p *Provisioner) getKontainerDriver(spec v32.ClusterSpec) (*v3.KontainerDri
 }
 
 func (p *Provisioner) driverUpdate(cluster *v3.Cluster, spec v32.ClusterSpec) (api string, token string, cert string, updateTriggered bool, err error) {
-	ctx, logger := clusterprovisioninglogger.NewLogger(p.Clusters, cluster, v32.ClusterConditionUpdated)
+	ctx, logger := clusterprovisioninglogger.NewLogger(p.Clusters, p.ConfigMaps, cluster, v32.ClusterConditionUpdated)
 	defer logger.Close()
 
 	spec = cleanRKE(spec)
@@ -85,7 +85,7 @@ func (p *Provisioner) driverUpdate(cluster *v3.Cluster, spec v32.ClusterSpec) (a
 }
 
 func (p *Provisioner) driverRemove(cluster *v3.Cluster, forceRemove bool) error {
-	ctx, logger := clusterprovisioninglogger.NewLogger(p.Clusters, cluster, v32.ClusterConditionProvisioned)
+	ctx, logger := clusterprovisioninglogger.NewLogger(p.Clusters, p.ConfigMaps, cluster, v32.ClusterConditionProvisioned)
 	defer logger.Close()
 
 	spec := cleanRKE(cluster.Spec)
@@ -111,7 +111,7 @@ func (p *Provisioner) driverRemove(cluster *v3.Cluster, forceRemove bool) error 
 }
 
 func (p *Provisioner) driverRestore(cluster *v3.Cluster, spec v32.ClusterSpec, snapshot string) (string, string, string, error) {
-	ctx, logger := clusterprovisioninglogger.NewLogger(p.Clusters, cluster, v32.ClusterConditionUpdated)
+	ctx, logger := clusterprovisioninglogger.NewLogger(p.Clusters, p.ConfigMaps, cluster, v32.ClusterConditionUpdated)
 	defer logger.Close()
 
 	spec = cleanRKE(spec)
@@ -131,7 +131,7 @@ func (p *Provisioner) driverRestore(cluster *v3.Cluster, spec v32.ClusterSpec, s
 }
 
 func (p *Provisioner) generateServiceAccount(cluster *v3.Cluster, spec v32.ClusterSpec) (string, error) {
-	ctx, logger := clusterprovisioninglogger.NewLogger(p.Clusters, cluster, v32.ClusterConditionUpdated)
+	ctx, logger := clusterprovisioninglogger.NewLogger(p.Clusters, p.ConfigMaps, cluster, v32.ClusterConditionUpdated)
 	defer logger.Close()
 
 	spec = cleanRKE(spec)
@@ -145,7 +145,7 @@ func (p *Provisioner) generateServiceAccount(cluster *v3.Cluster, spec v32.Clust
 }
 
 func (p *Provisioner) removeLegacyServiceAccount(cluster *v3.Cluster, spec v32.ClusterSpec) error {
-	ctx, logger := clusterprovisioninglogger.NewLogger(p.Clusters, cluster, v32.ClusterConditionUpdated)
+	ctx, logger := clusterprovisioninglogger.NewLogger(p.Clusters, p.ConfigMaps, cluster, v32.ClusterConditionUpdated)
 	defer logger.Close()
 
 	spec = cleanRKE(spec)
