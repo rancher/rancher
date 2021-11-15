@@ -42,7 +42,6 @@ type HealthSyncer struct {
 	clusterLister     v3.ClusterLister
 	clusters          v3.ClusterInterface
 	componentStatuses corev1.ComponentStatusInterface
-	namespaces        corev1.NamespaceInterface
 	k8s               kubernetes.Interface
 }
 
@@ -53,7 +52,6 @@ func Register(ctx context.Context, workload *config.UserContext) {
 		clusterLister:     workload.Management.Management.Clusters("").Controller().Lister(),
 		clusters:          workload.Management.Management.Clusters(""),
 		componentStatuses: workload.Core.ComponentStatuses(""),
-		namespaces:        workload.Core.Namespaces(""),
 		k8s:               workload.K8sClient,
 	}
 
