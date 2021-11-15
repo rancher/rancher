@@ -44,6 +44,18 @@ const (
 )
 
 func Register(ctx context.Context, user *config.UserContext, kubeConfigGetter common.KubeConfigGetter) {
+	starter := user.DeferredStart(ctx, func(ctx context.Context) error {
+		registerDeferred(ctx, user, kubeConfigGetter)
+		return nil
+	})
+
+	apps := user.Management.Project.Apps("")
+	apps.AddClusterScopedHandler(ctx, "helm-deferred", user.ClusterName, func(key string, obj *v32.App) (runtime.Object, error) {
+		return obj, starter()
+	})
+}
+
+func registerDeferred(ctx context.Context, user *config.UserContext, kubeConfigGetter common.KubeConfigGetter) {
 	appClient := user.Management.Project.Apps("")
 	stackLifecycle := &Lifecycle{
 		KubeConfigGetter:      kubeConfigGetter,
