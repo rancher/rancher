@@ -17,7 +17,7 @@ type Validator struct {
 
 func (v *Validator) Validator(request *types.APIContext, schema *types.Schema, data map[string]interface{}) error {
 	clusterName := v.ClusterManager.ClusterName(request)
-	c, err := v.ClusterManager.UserContext(clusterName)
+	c, err := v.ClusterManager.UserContextNoControllers(clusterName)
 	if err != nil {
 		return err
 	}

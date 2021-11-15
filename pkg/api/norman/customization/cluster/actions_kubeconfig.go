@@ -65,7 +65,7 @@ func (a ActionHandler) GenerateKubeconfigActionHandler(actionName string, action
 
 	if endpointEnabled {
 		clusterName := apiContext.ID
-		clusterClient, err := a.ClusterManager.UserContext(clusterName)
+		clusterClient, err := a.ClusterManager.UserContextNoControllers(clusterName)
 		if err != nil {
 			return err
 		}

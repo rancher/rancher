@@ -50,7 +50,7 @@ func (h *ExecutionHandler) handleLog(apiContext *types.APIContext) error {
 		return err
 	}
 	clusterName, _ := ref.Parse(execution.Spec.ProjectName)
-	userContext, err := h.ClusterManager.UserContext(clusterName)
+	userContext, err := h.ClusterManager.UserContextNoControllers(clusterName)
 	if err != nil {
 		return err
 	}

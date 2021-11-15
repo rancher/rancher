@@ -25,7 +25,7 @@ type ShellLinkHandler struct {
 }
 
 func (s *ShellLinkHandler) LinkHandler(apiContext *types.APIContext, next types.RequestHandler) error {
-	context, err := s.ClusterManager.UserContext(apiContext.ID)
+	context, err := s.ClusterManager.UserContextNoControllers(apiContext.ID)
 	if err != nil {
 		return err
 	}

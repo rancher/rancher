@@ -445,7 +445,7 @@ func (cd *clusterDeploy) getYAML(cluster *v3.Cluster, agentImage, authImage stri
 }
 
 func (cd *clusterDeploy) getClusterAgentImage(name string) (string, error) {
-	uc, err := cd.clusterManager.UserContext(name)
+	uc, err := cd.clusterManager.UserContextNoControllers(name)
 	if err != nil {
 		return "", err
 	}
@@ -468,7 +468,7 @@ func (cd *clusterDeploy) getClusterAgentImage(name string) (string, error) {
 }
 
 func (cd *clusterDeploy) getNodeAgentImage(name string) (string, error) {
-	uc, err := cd.clusterManager.UserContext(name)
+	uc, err := cd.clusterManager.UserContextNoControllers(name)
 	if err != nil {
 		return "", err
 	}

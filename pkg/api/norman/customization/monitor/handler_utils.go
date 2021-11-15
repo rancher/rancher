@@ -124,18 +124,16 @@ func (p *projectGraphInputParser) parseFilter() error {
 }
 
 type authChecker struct {
-	ProjectID          string
-	Input              *v32.QueryGraphInput
-	UserContext        *config.UserContext
-	WorkloadController workload.CommonController
+	ProjectID   string
+	Input       *v32.QueryGraphInput
+	UserContext *config.UserContext
 }
 
 func newAuthChecker(ctx context.Context, userContext *config.UserContext, input *v32.QueryGraphInput, projectID string) *authChecker {
 	return &authChecker{
-		ProjectID:          projectID,
-		Input:              input,
-		UserContext:        userContext,
-		WorkloadController: workload.NewWorkloadController(ctx, userContext.UserOnlyContext(), nil),
+		ProjectID:   projectID,
+		Input:       input,
+		UserContext: userContext,
 	}
 }
 
