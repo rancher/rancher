@@ -182,8 +182,15 @@ func (w *Context) Start(ctx context.Context) error {
 	return nil
 }
 
+func enableProtobuf(cfg *rest.Config) *rest.Config {
+	cpy := rest.CopyConfig(cfg)
+	cpy.AcceptContentTypes = "application/vnd.kubernetes.protobuf, application/json"
+	cpy.ContentType = "application/json"
+	return cpy
+}
+
 func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restConfig *rest.Config) (*Context, error) {
-	controllerFactory, err := controller.NewSharedControllerFactoryFromConfig(restConfig, Scheme)
+	controllerFactory, err := controller.NewSharedControllerFactoryFromConfig(enableProtobuf(restConfig), Scheme)
 	if err != nil {
 		return nil, err
 	}
