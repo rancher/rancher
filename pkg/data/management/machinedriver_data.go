@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/features"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/sirupsen/logrus"
@@ -95,7 +96,9 @@ func addMachineDrivers(management *config.ManagementContext) error {
 	if err := addMachineDriver(GoogleDriver, "local://", "", "", nil, false, true, true, management); err != nil {
 		return err
 	}
-	if err := addMachineDriver(HarvesterDriver, "https://releases.rancher.com/harvester-node-driver/v0.3.2/docker-machine-driver-harvester-amd64.tar.gz", "", "f113d826b8bee79abf60f1026b4076befdf735c6675889240c75da6b30f09971", []string{"releases.rancher.com"}, false, false, false, management); err != nil {
+	harvesterEnabled := features.GetFeatureByName(HarvesterDriver).Enabled()
+	// make sure the version number is consistent with the one at Line 40 of package/Dockerfile
+	if err := addMachineDriver(HarvesterDriver, "https://releases.rancher.com/harvester-node-driver/v0.3.2/docker-machine-driver-harvester-amd64.tar.gz", "", "f113d826b8bee79abf60f1026b4076befdf735c6675889240c75da6b30f09971", []string{"releases.rancher.com"}, harvesterEnabled, harvesterEnabled, false, management); err != nil {
 		return err
 	}
 	linodeBuiltin := true

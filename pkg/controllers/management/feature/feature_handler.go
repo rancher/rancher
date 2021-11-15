@@ -13,16 +13,18 @@ import (
 )
 
 type handler struct {
-	featuresClient managementv3.FeatureClient
-	tokensLister   managementv3.TokenCache
-	tokenEnqueue   func(string, time.Duration)
+	featuresClient       managementv3.FeatureClient
+	tokensLister         managementv3.TokenCache
+	tokenEnqueue         func(string, time.Duration)
+	nodeDriverController managementv3.NodeDriverController
 }
 
 func Register(ctx context.Context, wContext *wrangler.Context) {
 	h := handler{
-		featuresClient: wContext.Mgmt.Feature(),
-		tokensLister:   wContext.Mgmt.Token().Cache(),
-		tokenEnqueue:   wContext.Mgmt.Token().EnqueueAfter,
+		featuresClient:       wContext.Mgmt.Feature(),
+		tokensLister:         wContext.Mgmt.Token().Cache(),
+		tokenEnqueue:         wContext.Mgmt.Token().EnqueueAfter,
+		nodeDriverController: wContext.Mgmt.NodeDriver(),
 	}
 	wContext.Mgmt.Feature().OnChange(ctx, "feature-handler", h.sync)
 }
@@ -40,7 +42,24 @@ func (h *handler) sync(_ string, obj *v3.Feature) (*v3.Feature, error) {
 	if obj.Name == features.TokenHashing.Name() {
 		return obj, h.refreshTokens()
 	}
+
+	if obj.Name == features.Harvester.Name() {
+		return obj, h.toggleHarvesterNodeDriver(obj.Name)
+	}
 	return obj, nil
+}
+
+func (h *handler) toggleHarvesterNodeDriver(harvester string) error {
+	if val := features.GetFeatureByName(harvester).Enabled(); val {
+		m, err := h.nodeDriverController.Cache().Get(harvester)
+		if err != nil {
+			return err
+		}
+		m.Spec.Active = val
+		_, err = h.nodeDriverController.Update(m)
+		return err
+	}
+	return nil
 }
 
 func (h *handler) refreshTokens() error {

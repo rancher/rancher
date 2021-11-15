@@ -36,6 +36,8 @@ ENV TINI_VERSION v0.18.0
 ENV TELEMETRY_VERSION v0.5.16
 ENV DOCKER_MACHINE_LINODE_VERSION v0.1.8
 ENV LINODE_UI_DRIVER_VERSION v0.3.0
+# make sure the version number is consistent with the one at Line 100 of pkg/data/management/machinedriver_data.go
+ENV DOCKER_MACHINE_HARVESTER_VERSION v0.3.2
 ENV CATTLE_KDM_BRANCH ${CATTLE_KDM_BRANCH}
 ENV HELM_VERSION v3.6.0
 ENV KUSTOMIZE_VERSION v3.10.0
@@ -63,6 +65,10 @@ RUN curl -sLf https://github.com/rancher/machine/releases/download/${CATTLE_MACH
     curl -LO https://github.com/linode/docker-machine-driver-linode/releases/download/${DOCKER_MACHINE_LINODE_VERSION}/docker-machine-driver-linode_linux-amd64.zip && \
     unzip docker-machine-driver-linode_linux-amd64.zip -d /opt/drivers/management-state/bin && \
     rm docker-machine-driver-linode_linux-amd64.zip
+
+RUN curl -LO https://releases.rancher.com/harvester-node-driver/${DOCKER_MACHINE_HARVESTER_VERSION}/docker-machine-driver-harvester-amd64.tar.gz && \
+    tar -xf docker-machine-driver-harvester-amd64.tar.gz -C /opt/drivers/management-state/bin && \
+    rm docker-machine-driver-harvester-amd64.tar.gz
 
 ENV TINI_URL_amd64=https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini \
     TINI_URL_arm64=https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini-arm64 \
