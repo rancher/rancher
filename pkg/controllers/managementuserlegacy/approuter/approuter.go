@@ -3,6 +3,7 @@ package approuter
 import (
 	"context"
 
+	"github.com/rancher/rancher/pkg/ingresswrapper"
 	"github.com/rancher/rancher/pkg/types/config"
 )
 
@@ -19,10 +20,14 @@ func Register(ctx context.Context, cluster *config.UserContext) {
 	secretLister := cluster.Management.Core.Secrets("").Controller().Lister()
 	workload := cluster.UserOnlyContext()
 	c := &Controller{
-		ingressInterface: workload.Extensions.Ingresses(""),
-		ingressLister:    workload.Extensions.Ingresses("").Controller().Lister(),
+		ingressInterface: ingresswrapper.NewCompatInterface(workload.Networking, workload.Extensions, workload.K8sClient),
+		ingressLister:    ingresswrapper.NewCompatLister(workload.Networking, workload.Extensions, workload.K8sClient),
 		dnsClient:        NewClient(secrets, secretLister, workload.ClusterName),
 	}
-	workload.Extensions.Ingresses("").AddHandler(ctx, "approuterController", c.sync)
+	if c.ingressInterface.ServerSupportsIngressV1 {
+		workload.Networking.Ingresses("").AddHandler(ctx, "approuterController", ingresswrapper.CompatSyncV1(c.sync))
+	} else {
+		workload.Extensions.Ingresses("").AddHandler(ctx, "approuterController", ingresswrapper.CompatSyncV1Beta1(c.sync))
+	}
 	go c.renew(ctx)
 }

@@ -166,6 +166,7 @@ func main() {
 	})
 	generator.GenerateNativeTypes(knetworkingv1.SchemeGroupVersion, []interface{}{
 		knetworkingv1.NetworkPolicy{},
+		knetworkingv1.Ingress{},
 	}, nil)
 	generator.GenerateNativeTypes(batchv1.SchemeGroupVersion, []interface{}{
 		batchv1.Job{},

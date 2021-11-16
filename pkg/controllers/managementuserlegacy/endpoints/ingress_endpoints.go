@@ -1,25 +1,25 @@
 package endpoints
 
 import (
+	"reflect"
 	"strings"
 
 	workloadutil "github.com/rancher/rancher/pkg/controllers/managementagent/workload"
-	"github.com/rancher/rancher/pkg/generated/norman/extensions/v1beta1"
+	"github.com/rancher/rancher/pkg/ingresswrapper"
 	"github.com/sirupsen/logrus"
-	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
 type IngressEndpointsController struct {
 	workloadController workloadutil.CommonController
-	ingressInterface   v1beta1.IngressInterface
+	ingressInterface   ingresswrapper.CompatInterface
 	isRKE              bool
 }
 
-func (c *IngressEndpointsController) sync(key string, obj *extensionsv1beta1.Ingress) (runtime.Object, error) {
+func (c *IngressEndpointsController) sync(key string, obj ingresswrapper.Ingress) (runtime.Object, error) {
 	namespace := ""
-	if obj != nil {
-		namespace = obj.Namespace
+	if obj != nil && !reflect.ValueOf(obj).IsNil() {
+		namespace = obj.GetNamespace()
 	} else {
 		split := strings.Split(key, "/")
 		if len(split) == 2 {
@@ -28,7 +28,7 @@ func (c *IngressEndpointsController) sync(key string, obj *extensionsv1beta1.Ing
 	}
 	c.workloadController.EnqueueAllWorkloads(namespace)
 
-	if obj == nil || obj.DeletionTimestamp != nil {
+	if obj == nil || reflect.ValueOf(obj).IsNil() || obj.GetDeletionTimestamp() != nil {
 		return nil, nil
 	}
 
@@ -38,9 +38,12 @@ func (c *IngressEndpointsController) sync(key string, obj *extensionsv1beta1.Ing
 	return nil, nil
 }
 
-func (c *IngressEndpointsController) reconcileEndpointsForIngress(obj *extensionsv1beta1.Ingress) (bool, error) {
-	fromObj := convertIngressToPublicEndpoints(obj, c.isRKE)
-	fromAnnotation := getPublicEndpointsFromAnnotations(obj.Annotations)
+func (c *IngressEndpointsController) reconcileEndpointsForIngress(obj ingresswrapper.Ingress) (bool, error) {
+	fromObj, err := convertIngressToPublicEndpoints(obj, c.isRKE)
+	if err != nil {
+		return false, err
+	}
+	fromAnnotation := getPublicEndpointsFromAnnotations(obj.GetAnnotations())
 
 	if areEqualEndpoints(fromAnnotation, fromObj) {
 		return false, nil
@@ -51,14 +54,20 @@ func (c *IngressEndpointsController) reconcileEndpointsForIngress(obj *extension
 		return false, err
 	}
 
-	logrus.Infof("Updating ingress [%s:%s] with public endpoints [%v]", obj.Namespace, obj.Name, epsToUpdate)
+	logrus.Infof("Updating ingress [%s:%s] with public endpoints [%v]", obj.GetNamespace(), obj.GetName(), epsToUpdate)
 
-	toUpdate := obj.DeepCopy()
-	if toUpdate.Annotations == nil {
-		toUpdate.Annotations = make(map[string]string)
+	toUpdate, err := ingresswrapper.ToCompatIngress(obj.DeepCopyObject())
+	if err != nil {
+		return false, err
 	}
-	toUpdate.Annotations[endpointsAnnotation] = epsToUpdate
-	_, err = c.ingressInterface.Update(toUpdate)
 
+	annotations := toUpdate.GetAnnotations()
+	if annotations == nil {
+		annotations = make(map[string]string)
+	}
+	annotations[endpointsAnnotation] = epsToUpdate
+	toUpdate.SetAnnotations(annotations)
+
+	_, err = c.ingressInterface.Update(toUpdate)
 	return false, err
 }
