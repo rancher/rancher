@@ -246,7 +246,7 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 		addRule().apiGroups("catalog.cattle.io").resources("operations").verbs("get", "list", "watch").
 		addRule().apiGroups("catalog.cattle.io").resources("releases").verbs("get", "list", "watch").
 		addRule().apiGroups("catalog.cattle.io").resources("apps").verbs("get", "list", "watch").
-		addRule().apiGroups("management.cattle.io").resources("clusters").verbs("get").
+		addRule().apiGroups("management.cattle.io").resources("clusters").verbs("get").resourceNames("local").
 		setRoleTemplateNames("admin")
 
 	rb.addRoleTemplate("Project Member", "project-member", "project", false, false, false).
@@ -282,7 +282,7 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 		addRule().apiGroups("catalog.cattle.io").resources("operations").verbs("get", "list", "watch").
 		addRule().apiGroups("catalog.cattle.io").resources("releases").verbs("get", "list", "watch").
 		addRule().apiGroups("catalog.cattle.io").resources("apps").verbs("get", "list", "watch").
-		addRule().apiGroups("management.cattle.io").resources("clusters").verbs("get").
+		addRule().apiGroups("management.cattle.io").resources("clusters").verbs("get").resourceNames("local").
 		setRoleTemplateNames("edit")
 
 	rb.addRoleTemplate("Read-only", "read-only", "project", false, false, false).
@@ -314,7 +314,7 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 		addRule().apiGroups("catalog.cattle.io").resources("operations").verbs("get", "list", "watch").
 		addRule().apiGroups("catalog.cattle.io").resources("releases").verbs("get", "list", "watch").
 		addRule().apiGroups("catalog.cattle.io").resources("apps").verbs("get", "list", "watch").
-		addRule().apiGroups("management.cattle.io").resources("clusters").verbs("get").
+		addRule().apiGroups("management.cattle.io").resources("clusters").verbs("get").resourceNames("local").
 		setRoleTemplateNames("view")
 
 	rb.addRoleTemplate("Create Namespaces", "create-ns", "project", false, false, false).
