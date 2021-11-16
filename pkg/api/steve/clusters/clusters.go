@@ -25,6 +25,9 @@ import (
 )
 
 func Register(ctx context.Context, server *steve.Server, wrangler *wrangler.Context) error {
+	log := &log{
+		cg: server.ClientFactory,
+	}
 	shell := &shell{
 		cg:              server.ClientFactory,
 		namespace:       "cattle-system",
@@ -60,6 +63,7 @@ func Register(ctx context.Context, server *steve.Server, wrangler *wrangler.Cont
 				schema.LinkHandlers = map[string]http.Handler{}
 			}
 			schema.LinkHandlers["shell"] = shell
+			schema.LinkHandlers["log"] = log
 			if schema.ActionHandlers == nil {
 				schema.ActionHandlers = map[string]http.Handler{}
 			}

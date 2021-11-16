@@ -21,6 +21,7 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/management/imported"
 	kd "github.com/rancher/rancher/pkg/controllers/management/kontainerdrivermetadata"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/apps/v1"
+	corev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/kontainer-engine/drivers/rke"
 	"github.com/rancher/rancher/pkg/kontainer-engine/service"
@@ -49,6 +50,7 @@ const (
 type Provisioner struct {
 	ClusterController     v3.ClusterController
 	Clusters              v3.ClusterInterface
+	ConfigMaps            corev1.ConfigMapInterface
 	NodeLister            v3.NodeLister
 	Nodes                 v3.NodeInterface
 	engineService         *service.EngineService
@@ -65,6 +67,7 @@ func Register(ctx context.Context, management *config.ManagementContext) {
 	p := &Provisioner{
 		engineService:         service.NewEngineService(NewPersistentStore(management.Core.Namespaces(""), management.Core)),
 		Clusters:              management.Management.Clusters(""),
+		ConfigMaps:            management.Core.ConfigMaps(""),
 		ClusterController:     management.Management.Clusters("").Controller(),
 		NodeLister:            management.Management.Nodes("").Controller().Lister(),
 		Nodes:                 management.Management.Nodes(""),
