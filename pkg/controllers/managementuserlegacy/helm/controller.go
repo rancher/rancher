@@ -41,6 +41,7 @@ const (
 	creatorIDAnn              = "field.cattle.io/creatorId"
 	MultiClusterAppIDSelector = "mcapp"
 	projectIDFieldLabel       = "field.cattle.io/projectId"
+	defaultMaxRevisionCount   = 10
 )
 
 func Register(ctx context.Context, user *config.UserContext, kubeConfigGetter common.KubeConfigGetter) {
@@ -329,6 +330,7 @@ func (l *Lifecycle) Remove(obj *v3.App) (runtime.Object, error) {
 }
 
 func (l *Lifecycle) Run(obj *v3.App, template string, tempDirs *hCommon.HelmPath) error {
+	defer l.pruneOldRevisions(obj)
 	tokenName, err := l.writeKubeConfig(obj, tempDirs.KubeConfigFull, false)
 	if err != nil {
 		return err
@@ -349,6 +351,33 @@ func (l *Lifecycle) Run(obj *v3.App, template string, tempDirs *hCommon.HelmPath
 		return err
 	}
 	return l.createAppRevision(obj, template, notes, false)
+}
+
+// pruneOldRevisions checks if the total number of app revisions does not exceed the set maximum.
+// If it does, the method deletes the oldest revision(s) to maintain the maximum number of revisions and no more.
+func (l *Lifecycle) pruneOldRevisions(obj *v3.App) {
+	if obj.Spec.MaxRevisionCount < 1 {
+		obj.Spec.MaxRevisionCount = defaultMaxRevisionCount
+	}
+	_, projectName := ref.Parse(obj.Spec.ProjectName)
+	appRevisionClient := l.AppRevisionGetter.AppRevisions(projectName)
+	revisions, err := appRevisionClient.List(metav1.ListOptions{
+		LabelSelector: fmt.Sprintf("%s=%s", appLabel, obj.Name),
+	})
+	if err != nil {
+		logrus.Warnf("[helm-controller] Failed to list revisions for app %s: %v", projectName, err)
+		return
+	}
+
+	if len(revisions.Items) > obj.Spec.MaxRevisionCount {
+		logrus.Tracef("[helm-controller] App %s is exceeding the maximum (%d) number of stored revisions", obj.Name, obj.Spec.MaxRevisionCount)
+		deleteCount := len(revisions.Items) - obj.Spec.MaxRevisionCount
+		for _, revision := range revisions.Items[:deleteCount] {
+			if err := appRevisionClient.Delete(revision.Name, &metav1.DeleteOptions{}); err != nil && !errors.IsNotFound(err) {
+				logrus.Warnf("[helm-controller] Failed to delete app revision %s: %v", revision.Name, err)
+			}
+		}
+	}
 }
 
 func (l *Lifecycle) createAppRevision(obj *v3.App, template, notes string, failed bool) error {
