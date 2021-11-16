@@ -23,25 +23,32 @@ import (
 
 const owner = "owner-user"
 
-var globalResourcesNeededInProjects = map[string][]string{
-	"navlinks": {
-		"ui.cattle.io",
+// globalResourceRulesNeededInProjects is the set of PolicyRules that need to be present on *-promoted ClusterRoles
+// Binding a user to a *-promoted ClusterRole with these PolicyRules results in that user being granted access to these "global" resources.
+// The PolicyRule for each resource is the base policy rule, verbs are added dynamically and the key is used for the Resources value of each rule
+var globalResourceRulesNeededInProjects = map[string]rbacv1.PolicyRule{
+	"navlinks": rbacv1.PolicyRule{
+		APIGroups: []string{"ui.cattle.io"},
 	},
-	"persistentvolumes": {
-		"",
-		"core",
+	"persistentvolumes": rbacv1.PolicyRule{
+		APIGroups: []string{"", "core"},
 	},
-	"storageclasses": {
-		"storage.k8s.io",
+	"storageclasses": rbacv1.PolicyRule{
+		APIGroups: []string{"storage.k8s.io"},
 	},
-	"apiservices": {
-		"apiregistration.k8s.io",
+	"apiservices": rbacv1.PolicyRule{
+		APIGroups: []string{"apiregistration.k8s.io"},
 	},
-	"clusterrepos": {
-		"catalog.cattle.io",
+	"clusterrepos": rbacv1.PolicyRule{
+		APIGroups: []string{"catalog.cattle.io"},
 	},
-	"clusters": {
-		"management.cattle.io",
+	"clusters": rbacv1.PolicyRule{
+		APIGroups: []string{"management.cattle.io"},
+		// since *-promoted roles may be applied in all clusters, the resource name needs to be "local"
+		// performing 'kubectl get clusters.management.cattle.io local' needs to work for the user within the context of the cluster they are promoted in,
+		// otherwise certain functionality that relies on this global permission will not work correctly, e.g. kubectl shell
+		// this will not grant the user permissions on the management cluster unless they are added as a project member/owner/read-only within that cluster
+		ResourceNames: []string{"local"},
 	},
 }
 
@@ -232,7 +239,7 @@ func (m *manager) ownerExistsByNsName(nsAndName interface{}) (bool, error) {
 }
 
 // If the roleTemplate has rules granting access to non-namespaced (global) resource, return the verbs for those rules
-func (m *manager) checkForGlobalResourceRules(role *v3.RoleTemplate, resource string) (map[string]bool, error) {
+func (m *manager) checkForGlobalResourceRules(role *v3.RoleTemplate, resource string, baseRule rbacv1.PolicyRule) (map[string]bool, error) {
 	var rules []rbacv1.PolicyRule
 	if role.External {
 		externalRole, err := m.crLister.Get("", role.Name)
@@ -249,7 +256,9 @@ func (m *manager) checkForGlobalResourceRules(role *v3.RoleTemplate, resource st
 
 	verbs := map[string]bool{}
 	for _, rule := range rules {
-		if (slice.ContainsString(rule.Resources, resource) || slice.ContainsString(rule.Resources, "*")) && len(rule.ResourceNames) == 0 {
+		// given the global resource, we check if the passed in RoleTemplate has a corresponding rule, if it does, we add the verbs specified in the rule to the map of verbs that is returned
+		// NOTE: ResourceNames are checked since some global resources are scoped to specific resources, e.g. management.cattle.io/v3.Clusters are scoped to just the "local" cluster resource
+		if (slice.ContainsString(rule.Resources, resource) || slice.ContainsString(rule.Resources, "*")) && reflect.DeepEqual(rule.ResourceNames, baseRule.ResourceNames) {
 			if checkGroup(resource, rule) {
 				for _, v := range rule.Verbs {
 					verbs[v] = true
@@ -309,21 +318,23 @@ func (m *manager) reconcileRoleForProjectAccessToGlobalResource(resource string,
 	return roleName, nil
 }
 
+// checkGroup returns true if the passed in PolicyRule has a group that matches the corresponding baseRule for the passed in global resource
 func checkGroup(resource string, rule rbacv1.PolicyRule) bool {
 	if slice.ContainsString(rule.APIGroups, "*") {
 		return true
 	}
 
-	groups, ok := globalResourcesNeededInProjects[resource]
+	baseRule, ok := globalResourceRulesNeededInProjects[resource]
 	if !ok {
 		return false
 	}
 
 	for _, rg := range rule.APIGroups {
-		if slice.ContainsString(groups, rg) {
+		if slice.ContainsString(baseRule.APIGroups, rg) {
 			return true
 		}
 	}
+
 	return false
 }
 
@@ -336,12 +347,13 @@ func buildRule(resource string, verbs map[string]bool) rbacv1.PolicyRule {
 	// Sort the verbs, a map does not guarantee order
 	sort.Strings(vs)
 
-	groups := globalResourcesNeededInProjects[resource]
+	baseRule := globalResourceRulesNeededInProjects[resource]
 
 	return rbacv1.PolicyRule{
-		Resources: []string{resource},
-		Verbs:     vs,
-		APIGroups: groups,
+		Resources:     []string{resource},
+		Verbs:         vs,
+		APIGroups:     baseRule.APIGroups,
+		ResourceNames: baseRule.ResourceNames,
 	}
 }
 
