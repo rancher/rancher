@@ -58,11 +58,11 @@ func (h *handler) ensureClusterViewBinding(cluster *v1.Cluster, prtb *v3.Project
 		return err
 	}
 
-	// The roleBinding name format: r-cluster-<cluster name>-view-<prtb name>-<hashed subject>
-	// Example: r-cluster1-view-prtb-foo-wn5d5n7udr
+	// The roleBinding name format: r-cluster-<cluster name>-view-<prtb namespace>-<prtb name>-<hashed subject>
+	// Example: r-cluster1-view-prtb-bar-foo-wn5d5n7udr
 	roleBinding := &rbacv1.RoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      name.SafeConcatName(clusterViewName(cluster), prtb.Name, hashSubject(subject)),
+			Name:      name.SafeConcatName(clusterViewName(cluster), prtb.Namespace, prtb.Name, hashSubject(subject)),
 			Namespace: cluster.Namespace,
 			OwnerReferences: []metav1.OwnerReference{
 				{
