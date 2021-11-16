@@ -1,6 +1,8 @@
 package scheme
 
 import (
+	"fmt"
+
 	istiov1alpha3 "github.com/knative/pkg/apis/istio/v1alpha3"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	monitoringv1alpha1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
@@ -29,11 +31,29 @@ import (
 	storagev1 "k8s.io/api/storage/v1"
 	storagev1beta1 "k8s.io/api/storage/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	apiregistrationv1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 	apiregistrationv1beta1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1"
 )
 
-var Scheme *runtime.Scheme
+type FilteredScheme struct {
+	*runtime.Scheme
+	excludedGVKs map[schema.GroupVersionKind]struct{}
+}
+
+func (f *FilteredScheme) New(kind schema.GroupVersionKind) (runtime.Object, error) {
+	if _, ok := f.excludedGVKs[kind]; ok {
+		return nil, fmt.Errorf("%s is explicitly excluded from this scheme", kind.String())
+	}
+
+	return f.Scheme.New(kind)
+}
+
+func (f *FilteredScheme) ExcludeGVK(kind schema.GroupVersionKind) {
+	f.excludedGVKs[kind] = struct{}{}
+}
+
+var Scheme *FilteredScheme
 
 var builders = []runtime.SchemeBuilder{
 	ui.SchemeBuilder,
@@ -69,10 +89,21 @@ var builders = []runtime.SchemeBuilder{
 }
 
 func init() {
-	Scheme = runtime.NewScheme()
-	if err := addKnownTypes(Scheme); err != nil {
+	Scheme = &FilteredScheme{
+		Scheme:       runtime.NewScheme(),
+		excludedGVKs: make(map[schema.GroupVersionKind]struct{}),
+	}
+
+	if err := addKnownTypes(Scheme.Scheme); err != nil {
 		panic(err)
 	}
+
+	// Some resources in Norman have values that are not part of go struct associated with their GVK.
+	// When Norman uses the appropriate go struct it will drop any field not on that go struct.
+	// Solution: Do not inform Norman about the struct associated with some GVKs so that it will fall back to the
+	// unstructured object and allow the missing fields to be included.
+	Scheme.ExcludeGVK(management.SchemeGroupVersion.WithKind("ClusterList"))
+	Scheme.ExcludeGVK(management.SchemeGroupVersion.WithKind("NodeTemplateList"))
 }
 
 func addKnownTypes(scheme *runtime.Scheme) error {
