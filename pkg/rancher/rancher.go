@@ -199,7 +199,7 @@ func (r *Rancher) Start(ctx context.Context) error {
 			return err
 		}
 
-		return forceSystemNamespaceAssignment(r.Wrangler.Core.ConfigMap(), r.Wrangler.Mgmt.Cluster())
+		return forceSystemNamespaceAssignment(r.Wrangler.Core.ConfigMap(), r.Wrangler.Mgmt.Project())
 	})
 
 	if err := r.authServer.Start(ctx, false); err != nil {

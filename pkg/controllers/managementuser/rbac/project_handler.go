@@ -97,41 +97,32 @@ func (p *pLifecycle) ensureNamespacesAssigned(project *v3.Project) error {
 		return nil
 	}
 
-	cluster, err := p.m.clusterLister.Get("", p.m.clusterName)
-	if err != nil {
-		return err
-	}
-	if cluster == nil {
-		return errors.Errorf("couldn't find cluster %v", p.m.clusterName)
-	}
-
 	switch projectName {
 	case projectpkg.Default:
-		if err = p.ensureDefaultNamespaceAssigned(cluster, project); err != nil {
+		if err := p.ensureDefaultNamespaceAssigned(project); err != nil {
 			return err
 		}
 	case projectpkg.System:
-		if err = p.ensureSystemNamespaceAssigned(cluster, project); err != nil {
+		if err := p.ensureSystemNamespaceAssigned(project); err != nil {
 			return err
 		}
 	default:
 		return nil
 	}
 
-	_, err = p.m.workload.Management.Management.Clusters("").Update(cluster)
-
+	_, err := p.m.workload.Management.Management.Projects(p.m.workload.ClusterName).Update(project)
 	return err
 }
 
-func (p *pLifecycle) ensureDefaultNamespaceAssigned(cluster *v3.Cluster, project *v3.Project) error {
-	_, err := v32.ClusterConditionDefaultNamespaceAssigned.DoUntilTrue(cluster, func() (runtime.Object, error) {
+func (p *pLifecycle) ensureDefaultNamespaceAssigned(project *v3.Project) error {
+	_, err := v32.ProjectConditionDefaultNamespacesAssigned.DoUntilTrue(project, func() (runtime.Object, error) {
 		return nil, p.assignNamespacesToProject(project, projectpkg.Default)
 	})
 	return err
 }
 
-func (p *pLifecycle) ensureSystemNamespaceAssigned(cluster *v3.Cluster, project *v3.Project) error {
-	_, err := v32.ClusterConditionSystemNamespacesAssigned.DoUntilTrue(cluster, func() (runtime.Object, error) {
+func (p *pLifecycle) ensureSystemNamespaceAssigned(project *v3.Project) error {
+	_, err := v32.ProjectConditionSystemNamespacesAssigned.DoUntilTrue(project, func() (runtime.Object, error) {
 		return nil, p.assignNamespacesToProject(project, projectpkg.System)
 	})
 	return err
