@@ -8,6 +8,7 @@ import (
 	"github.com/rancher/norman/types"
 	projectclient "github.com/rancher/rancher/pkg/client/generated/project/v3"
 	"github.com/rancher/rancher/pkg/controllers/managementagent/dnsrecord"
+	"github.com/rancher/rancher/pkg/controllers/managementagent/endpoints"
 	"github.com/rancher/rancher/pkg/controllers/managementagent/externalservice"
 	"github.com/rancher/rancher/pkg/controllers/managementagent/ingress"
 	"github.com/rancher/rancher/pkg/controllers/managementagent/ingresshostgen"
@@ -26,6 +27,7 @@ import (
 func Register(ctx context.Context, cluster *config.UserOnlyContext) error {
 	dnsrecord.Register(ctx, cluster)
 	externalservice.Register(ctx, cluster)
+	endpoints.Register(ctx, cluster)
 	ingress.Register(ctx, cluster)
 	ingresshostgen.Register(ctx, cluster)
 	nslabels.Register(ctx, cluster)

@@ -236,7 +236,7 @@ func getAllNodesPublicEndpointIP(nodesLister v1.NodeLister, clusterName string) 
 		return "", err
 	}
 	for _, node := range nodes {
-		if len(node.Spec.Taints) == 0 {
+		if node.Labels["node-role.kubernetes.io/worker"] == "true" && nodehelper.IsNodeReady(node) {
 			nodePublicIP := getEndpointNodeAddress(node)
 			if nodePublicIP != "" {
 				addresses = append(addresses, nodePublicIP)
