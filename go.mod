@@ -42,7 +42,7 @@ replace (
 	k8s.io/mount-utils => k8s.io/mount-utils v0.22.3
 	k8s.io/pod-security-admission => k8s.io/pod-security-admission v0.22.0
 	k8s.io/sample-apiserver => k8s.io/sample-apiserver v0.22.3
-	sigs.k8s.io/cluster-api => github.com/rancher/cluster-api v0.3.11-0.20210514043303-8726f6e84d41
+	sigs.k8s.io/cluster-api => github.com/rancher/cluster-api v0.4.4
 )
 
 require (
