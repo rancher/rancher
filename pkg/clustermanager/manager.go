@@ -232,7 +232,7 @@ func (m *Manager) doStart(rec *record, clusterOwner bool) (exit error) {
 		defer close(done)
 
 		logrus.Debugf("[clustermanager] creating AccessControl for cluster %v", rec.cluster.ClusterName)
-		rec.accessControl = rbac.NewAccessControl(rec.ctx, rec.cluster.ClusterName, rec.cluster.RBACw)
+		rec.accessControl = rbac.NewAccessControl(transaction, rec.cluster.ClusterName, rec.cluster.RBACw)
 
 		err := rec.cluster.Start(rec.ctx)
 		if err == nil {
