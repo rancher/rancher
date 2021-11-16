@@ -21,7 +21,6 @@ const (
 	ServiceSpecFieldServiceKind                   = "serviceKind"
 	ServiceSpecFieldSessionAffinity               = "sessionAffinity"
 	ServiceSpecFieldSessionAffinityConfig         = "sessionAffinityConfig"
-	ServiceSpecFieldTopologyKeys                  = "topologyKeys"
 )
 
 type ServiceSpec struct {
@@ -44,5 +43,4 @@ type ServiceSpec struct {
 	ServiceKind                   string                 `json:"serviceKind,omitempty" yaml:"serviceKind,omitempty"`
 	SessionAffinity               string                 `json:"sessionAffinity,omitempty" yaml:"sessionAffinity,omitempty"`
 	SessionAffinityConfig         *SessionAffinityConfig `json:"sessionAffinityConfig,omitempty" yaml:"sessionAffinityConfig,omitempty"`
-	TopologyKeys                  []string               `json:"topologyKeys,omitempty" yaml:"topologyKeys,omitempty"`
 }
