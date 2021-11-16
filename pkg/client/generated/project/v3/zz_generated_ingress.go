@@ -7,6 +7,7 @@ import (
 const (
 	IngressType                      = "ingress"
 	IngressFieldAnnotations          = "annotations"
+	IngressFieldBackend              = "backend"
 	IngressFieldCreated              = "created"
 	IngressFieldCreatorID            = "creatorId"
 	IngressFieldDefaultBackend       = "defaultBackend"
@@ -31,6 +32,7 @@ const (
 type Ingress struct {
 	types.Resource
 	Annotations          map[string]string `json:"annotations,omitempty" yaml:"annotations,omitempty"`
+	Backend              *IngressBackend   `json:"backend,omitempty" yaml:"backend,omitempty"`
 	Created              string            `json:"created,omitempty" yaml:"created,omitempty"`
 	CreatorID            string            `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
 	DefaultBackend       *IngressBackend   `json:"defaultBackend,omitempty" yaml:"defaultBackend,omitempty"`
