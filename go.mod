@@ -13,7 +13,6 @@ replace (
 	github.com/opencontainers/runc => github.com/opencontainers/runc v1.0.1
 	github.com/rancher/rancher/pkg/apis => ./pkg/apis
 	github.com/rancher/rancher/pkg/client => ./pkg/client
-	google.golang.org/grpc => google.golang.org/grpc v1.29.1 // etcd depends on google.golang.org/grpc/naming which was removed in grpc v1.30.0
 	helm.sh/helm/v3 => github.com/rancher/helm/v3 v3.5.4-rancher.1
 
 	k8s.io/api => k8s.io/api v0.22.3
@@ -42,7 +41,7 @@ replace (
 	k8s.io/mount-utils => k8s.io/mount-utils v0.22.3
 	k8s.io/pod-security-admission => k8s.io/pod-security-admission v0.22.0
 	k8s.io/sample-apiserver => k8s.io/sample-apiserver v0.22.3
-	sigs.k8s.io/cluster-api => github.com/rancher/cluster-api v0.4.4
+	sigs.k8s.io/cluster-api => sigs.k8s.io/cluster-api v0.4.4
 )
 
 require (
@@ -62,7 +61,6 @@ require (
 	github.com/coreos/go-iptables v0.6.0
 	github.com/coreos/go-oidc/v3 v3.0.0
 	github.com/coreos/go-semver v0.3.0
-	github.com/coreos/go-systemd v0.0.0-20190620071333-e64a0ec8b42a // indirect
 	github.com/crewjam/saml v0.4.5
 	github.com/davecgh/go-spew v1.1.1
 	github.com/docker/distribution v2.7.1+incompatible
@@ -93,7 +91,6 @@ require (
 	github.com/knative/pkg v0.0.0-20190817231834-12ee58e32cc8
 	github.com/lib/pq v1.10.3 // indirect
 	github.com/mattn/go-colorable v0.1.11
-	github.com/mattn/go-runewidth v0.0.9 // indirect
 	github.com/mcuadros/go-version v0.0.0-20180611085657-6d5863ca60fa
 	github.com/minio/minio-go/v7 v7.0.10
 	github.com/mitchellh/mapstructure v1.4.2
@@ -124,7 +121,7 @@ require (
 	github.com/rancher/rancher/pkg/client v0.0.0
 	github.com/rancher/rdns-server v0.0.0-20180802070304-bf662911db6a
 	github.com/rancher/remotedialer v0.2.6-0.20210318171128-d1ebd5202be4
-	github.com/rancher/rke v1.3.1
+	github.com/rancher/rke v1.3.3-0.20211115185936-528992a82509
 	github.com/rancher/security-scan v0.1.7-0.20200222041501-f7377f127168
 	github.com/rancher/steve v0.0.0-20210915171517-ae8b16260899
 	github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20210727200656-10b094e30007
@@ -134,7 +131,6 @@ require (
 	github.com/satori/go.uuid v1.2.0
 	github.com/segmentio/kafka-go v0.0.0-20190411192201-218fd49cff39
 	github.com/sirupsen/logrus v1.8.1
-	github.com/spf13/cobra v1.2.1 // indirect
 	github.com/spf13/viper v1.9.0 // indirect
 	github.com/stretchr/testify v1.7.0
 	github.com/tomnomnom/linkheader v0.0.0-20180905144013-02ca5825eb80
@@ -164,7 +160,7 @@ require (
 	gopkg.in/yaml.v2 v2.4.0
 	helm.sh/helm/v3 v3.5.4
 	k8s.io/api v0.22.3
-	k8s.io/apiextensions-apiserver v0.21.0
+	k8s.io/apiextensions-apiserver v0.21.4
 	k8s.io/apimachinery v0.22.3
 	k8s.io/apiserver v0.22.3
 	k8s.io/cli-runtime v0.22.3
@@ -172,12 +168,12 @@ require (
 	k8s.io/gengo v0.0.0-20201214224949-b6c5ce23f027
 	k8s.io/helm v2.16.7+incompatible
 	k8s.io/kube-aggregator v0.21.0
-	k8s.io/kubectl v0.21.0
+	k8s.io/kubectl v0.22.3
 	k8s.io/kubernetes v1.21.0
 	k8s.io/utils v0.0.0-20210819203725-bdf08cb9a70a
 	rsc.io/letsencrypt v0.0.3 // indirect
 	sigs.k8s.io/aws-iam-authenticator v0.5.1
-	sigs.k8s.io/cluster-api v0.3.11-0.20210430180359-45b6080c2764
-	sigs.k8s.io/controller-runtime v0.9.0-beta.0
+	sigs.k8s.io/cluster-api v0.4.4
+	sigs.k8s.io/controller-runtime v0.9.7
 	sigs.k8s.io/yaml v1.2.0
 )
