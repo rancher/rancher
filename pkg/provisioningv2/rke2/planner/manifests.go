@@ -29,10 +29,6 @@ func (p *Planner) getControlPlaneManifests(controlPlane *rkev1.RKEControlPlane, 
 	return result, nil
 }
 
-func isDefaultTrueEnabled(b *bool) bool {
-	return b == nil || *b
-}
-
 func (p *Planner) getClusterAgent(controlPlane *rkev1.RKEControlPlane, runtime string, machine *capi.Machine) (plan.File, error) {
 	data, err := p.loadClusterAgent(controlPlane, machine)
 	if err != nil {

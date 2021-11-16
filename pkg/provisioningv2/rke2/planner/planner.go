@@ -75,6 +75,9 @@ const (
 	authnWebhookFileName = "/var/lib/rancher/%s/kube-api-authn-webhook.yaml"
 	ConfigYamlFileName   = "/etc/rancher/%s/config.yaml.d/50-rancher.yaml"
 	Provisioned          = condition.Cond("Provisioned")
+
+	CattleOSLabel = "cattle.io/os"
+	windows       = "windows"
 )
 
 var (
@@ -539,7 +542,7 @@ func (p *Planner) reconcile(controlPlane *rkev1.RKEControlPlane, secret plan.Sec
 					draining = append(draining, entry.Machine.Name)
 				}
 			}
-		} else if !entry.Plan.InSync && entry.Machine.Labels["cattle.io/os"] != "windows" {
+		} else if !entry.Plan.InSync {
 			outOfSync = append(outOfSync, entry.Machine.Name)
 		} else {
 			if ok, err := p.undrain(entry.Machine); err != nil {
@@ -816,7 +819,9 @@ func restartStamp(nodePlan plan.NodePlan, controlPlane *rkev1.RKEControlPlane, i
 }
 
 func (p *Planner) addInstruction(nodePlan plan.NodePlan, controlPlane *rkev1.RKEControlPlane, machine *capi.Machine) (plan.NodePlan, error) {
+	var instruction plan.Instruction
 	image := getInstallerImage(controlPlane)
+	cattleOS := machine.Labels[CattleOSLabel]
 
 	agentArgs := make([]string, 0, len(controlPlane.Spec.AgentEnvVars))
 	for _, arg := range controlPlane.Spec.AgentEnvVars {
@@ -826,15 +831,31 @@ func (p *Planner) addInstruction(nodePlan plan.NodePlan, controlPlane *rkev1.RKE
 		agentArgs = append(agentArgs, fmt.Sprintf("%s=%s", arg.Name, arg.Value))
 	}
 
-	instruction := plan.Instruction{
-		Image:   image,
-		Command: "sh",
-		Args:    []string{"-c", "run.sh"},
-		Env:     append(agentArgs, fmt.Sprintf("RESTART_STAMP=%s", restartStamp(nodePlan, controlPlane, image))),
+	switch cattleOS {
+	case windows:
+		instruction = plan.Instruction{
+			Image:   image,
+			Command: "powershell.exe",
+			Args:    []string{"-File", "run.ps1"},
+			Env:     append(agentArgs, fmt.Sprintf("$env:RESTART_STAMP=%s", restartStamp(nodePlan, controlPlane, image))),
+		}
+	default:
+		instruction = plan.Instruction{
+			Image:   image,
+			Command: "sh",
+			Args:    []string{"-c", "run.sh"},
+			Env:     append(agentArgs, fmt.Sprintf("RESTART_STAMP=%s", restartStamp(nodePlan, controlPlane, image))),
+		}
 	}
 
 	if isOnlyWorker(machine) {
-		instruction.Env = append(instruction.Env, fmt.Sprintf("INSTALL_%s_EXEC=agent", rancherruntime.GetRuntimeEnv(controlPlane.Spec.KubernetesVersion)))
+		switch cattleOS {
+		case windows:
+			instruction.Env = append(instruction.Env, fmt.Sprintf("$env:INSTALL_%s_EXEC=agent", rancherruntime.GetRuntimeEnv(controlPlane.Spec.KubernetesVersion)))
+		default:
+			instruction.Env = append(instruction.Env, fmt.Sprintf("INSTALL_%s_EXEC=agent", rancherruntime.GetRuntimeEnv(controlPlane.Spec.KubernetesVersion)))
+
+		}
 	}
 	nodePlan.Instructions = append(nodePlan.Instructions, instruction)
 	return nodePlan, nil

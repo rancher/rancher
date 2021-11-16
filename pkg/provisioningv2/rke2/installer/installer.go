@@ -17,7 +17,7 @@ import (
 
 const (
 	SystemAgentInstallPath = "/system-agent-install.sh" // corresponding curl -o in package/Dockerfile
-	WindowsRke2InstallPath = "/rke2-agent-install.ps1"  // corresponding curl -o in package/Dockerfile
+	WindowsRke2InstallPath = "/wins-agent-install.ps1"  // corresponding curl -o in package/Dockerfile
 )
 
 var (
@@ -26,7 +26,7 @@ var (
 		"." + SystemAgentInstallPath,
 	}
 	localWindowsRke2InstallScripts = []string{
-		"./rke2-install.ps1",
+		"./wins-install.ps1",
 	}
 )
 
@@ -110,6 +110,15 @@ func WindowsInstallScript(ctx context.Context, token string, envVars []corev1.En
 		return nil, err
 	}
 
+	binaryURL := ""
+	if settings.WinsAgentVersion.Get() != "" {
+		if settings.ServerURL.Get() != "" {
+			binaryURL = fmt.Sprintf("CATTLE_AGENT_BINARY_BASE_URL=\"%s/assets\"", settings.ServerURL.Get())
+		} else if defaultHost != "" {
+			binaryURL = fmt.Sprintf("CATTLE_AGENT_BINARY_BASE_URL=\"https://%s/assets\"", defaultHost)
+		}
+	}
+
 	ca := systemtemplate.CAChecksum()
 	if v, ok := ctx.Value(tls.InternalAPI).(bool); ok && v {
 		ca = systemtemplate.InternalCAChecksum()
@@ -138,8 +147,9 @@ func WindowsInstallScript(ctx context.Context, token string, envVars []corev1.En
 %s
 %s
 %s
+%s
 
-Rke2-Installer @PSBoundParameters
+Invoke-WinsInstaller @PSBoundParameters
 exit 0
-`, data, envVarBuf.String(), server, ca, token)), nil
+`, data, envVarBuf.String(), binaryURL, server, ca, token)), nil
 }
