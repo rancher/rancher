@@ -57,8 +57,12 @@ eks_config = {
             "subnets": [],
             "tags": {},
             "labels": {},
-            "ec2SshKey": ""
-
+            "ec2SshKey": "",
+            "userData": "",
+            "resourceTags": {},
+            "requestSpotInstances": False,
+            "spotInstanceTypes": [],
+            "launchTemplate": None
         }]
     }
 
@@ -444,19 +448,3 @@ def validate_nodegroup(nodegroup_list, cluster_name):
         assert nodegroup["minSize"] \
                == eks_nodegroup["nodegroup"]["scalingConfig"]["minSize"], \
             "minSize is incorrect on the nodes"
-
-        # check instance type
-        assert nodegroup["instanceType"] \
-               == eks_nodegroup["nodegroup"]["instanceTypes"][0], \
-            "instanceType is incorrect on the nodes"
-
-        # check disk size
-        assert nodegroup["diskSize"] \
-               == eks_nodegroup["nodegroup"]["diskSize"], \
-            "diskSize is incorrect on the nodes"
-        # check ec2SshKey
-        if "ec2SshKey" in nodegroup.keys() and \
-                nodegroup["ec2SshKey"] is not "":
-            assert nodegroup["ec2SshKey"] \
-                == eks_nodegroup["nodegroup"]["remoteAccess"]["ec2SshKey"], \
-                "Ssh key is incorrect on the nodes"
