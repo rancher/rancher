@@ -50,11 +50,6 @@ tests:
         value: NAMESPACE
       - name: CATTLE_PEER_SERVICE
         value: RELEASE-NAME-rancher
-      - name: CATTLE_BOOTSTRAP_PASSWORD
-        valueFrom:
-          secretKeyRef:
-            name: "bootstrap-secret"
-            key: "bootstrapPassword"
 - it: should default imagePullPolicy to IfNotPresent
   asserts:
   - equal:
