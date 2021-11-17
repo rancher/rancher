@@ -8,6 +8,7 @@ const (
 	AppSpecFieldDescription       = "description"
 	AppSpecFieldExternalID        = "externalId"
 	AppSpecFieldFiles             = "files"
+	AppSpecFieldMaxRevisionCount  = "maxRevisionCount"
 	AppSpecFieldMultiClusterAppID = "multiClusterAppId"
 	AppSpecFieldProjectID         = "projectId"
 	AppSpecFieldPrune             = "prune"
@@ -24,6 +25,7 @@ type AppSpec struct {
 	Description       string            `json:"description,omitempty" yaml:"description,omitempty"`
 	ExternalID        string            `json:"externalId,omitempty" yaml:"externalId,omitempty"`
 	Files             map[string]string `json:"files,omitempty" yaml:"files,omitempty"`
+	MaxRevisionCount  int64             `json:"maxRevisionCount,omitempty" yaml:"maxRevisionCount,omitempty"`
 	MultiClusterAppID string            `json:"multiClusterAppId,omitempty" yaml:"multiClusterAppId,omitempty"`
 	ProjectID         string            `json:"projectId,omitempty" yaml:"projectId,omitempty"`
 	Prune             bool              `json:"prune,omitempty" yaml:"prune,omitempty"`
