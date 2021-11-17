@@ -1,10 +1,19 @@
 package client
 
+
+	
+
+
+import (
+	
+)
+
 const (
-	SetPasswordInputType             = "setPasswordInput"
+    SetPasswordInputType = "setPasswordInput"
 	SetPasswordInputFieldNewPassword = "newPassword"
 )
 
 type SetPasswordInput struct {
-	NewPassword string `json:"newPassword,omitempty" yaml:"newPassword,omitempty"`
+        NewPassword string `json:"newPassword,omitempty" yaml:"newPassword,omitempty"`
 }
+

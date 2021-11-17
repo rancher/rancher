@@ -1,12 +1,23 @@
 package client
 
+
+	
+
+	
+
+
+import (
+	
+)
+
 const (
-	RunAsUserStrategyOptionsType        = "runAsUserStrategyOptions"
+    RunAsUserStrategyOptionsType = "runAsUserStrategyOptions"
 	RunAsUserStrategyOptionsFieldRanges = "ranges"
-	RunAsUserStrategyOptionsFieldRule   = "rule"
+	RunAsUserStrategyOptionsFieldRule = "rule"
 )
 
 type RunAsUserStrategyOptions struct {
-	Ranges []IDRange `json:"ranges,omitempty" yaml:"ranges,omitempty"`
-	Rule   string    `json:"rule,omitempty" yaml:"rule,omitempty"`
+        Ranges []IDRange `json:"ranges,omitempty" yaml:"ranges,omitempty"`
+        Rule string `json:"rule,omitempty" yaml:"rule,omitempty"`
 }
+

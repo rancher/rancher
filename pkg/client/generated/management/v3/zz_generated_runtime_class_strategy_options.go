@@ -1,12 +1,23 @@
 package client
 
+
+	
+
+	
+
+
+import (
+	
+)
+
 const (
-	RuntimeClassStrategyOptionsType                          = "runtimeClassStrategyOptions"
+    RuntimeClassStrategyOptionsType = "runtimeClassStrategyOptions"
 	RuntimeClassStrategyOptionsFieldAllowedRuntimeClassNames = "allowedRuntimeClassNames"
-	RuntimeClassStrategyOptionsFieldDefaultRuntimeClassName  = "defaultRuntimeClassName"
+	RuntimeClassStrategyOptionsFieldDefaultRuntimeClassName = "defaultRuntimeClassName"
 )
 
 type RuntimeClassStrategyOptions struct {
-	AllowedRuntimeClassNames []string `json:"allowedRuntimeClassNames,omitempty" yaml:"allowedRuntimeClassNames,omitempty"`
-	DefaultRuntimeClassName  string   `json:"defaultRuntimeClassName,omitempty" yaml:"defaultRuntimeClassName,omitempty"`
+        AllowedRuntimeClassNames []string `json:"allowedRuntimeClassNames,omitempty" yaml:"allowedRuntimeClassNames,omitempty"`
+        DefaultRuntimeClassName string `json:"defaultRuntimeClassName,omitempty" yaml:"defaultRuntimeClassName,omitempty"`
 }
+

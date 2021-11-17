@@ -1,14 +1,27 @@
 package client
 
+
+	
+
+	
+
+	
+
+
+import (
+	
+)
+
 const (
-	LocalClusterAuthEndpointType         = "localClusterAuthEndpoint"
+    LocalClusterAuthEndpointType = "localClusterAuthEndpoint"
 	LocalClusterAuthEndpointFieldCACerts = "caCerts"
 	LocalClusterAuthEndpointFieldEnabled = "enabled"
-	LocalClusterAuthEndpointFieldFQDN    = "fqdn"
+	LocalClusterAuthEndpointFieldFQDN = "fqdn"
 )
 
 type LocalClusterAuthEndpoint struct {
-	CACerts string `json:"caCerts,omitempty" yaml:"caCerts,omitempty"`
-	Enabled bool   `json:"enabled,omitempty" yaml:"enabled,omitempty"`
-	FQDN    string `json:"fqdn,omitempty" yaml:"fqdn,omitempty"`
+        CACerts string `json:"caCerts,omitempty" yaml:"caCerts,omitempty"`
+        Enabled bool `json:"enabled,omitempty" yaml:"enabled,omitempty"`
+        FQDN string `json:"fqdn,omitempty" yaml:"fqdn,omitempty"`
 }
+

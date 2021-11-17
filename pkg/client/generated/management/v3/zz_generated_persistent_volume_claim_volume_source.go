@@ -1,12 +1,23 @@
 package client
 
+
+	
+
+	
+
+
+import (
+	
+)
+
 const (
-	PersistentVolumeClaimVolumeSourceType           = "persistentVolumeClaimVolumeSource"
+    PersistentVolumeClaimVolumeSourceType = "persistentVolumeClaimVolumeSource"
 	PersistentVolumeClaimVolumeSourceFieldClaimName = "claimName"
-	PersistentVolumeClaimVolumeSourceFieldReadOnly  = "readOnly"
+	PersistentVolumeClaimVolumeSourceFieldReadOnly = "readOnly"
 )
 
 type PersistentVolumeClaimVolumeSource struct {
-	ClaimName string `json:"claimName,omitempty" yaml:"claimName,omitempty"`
-	ReadOnly  bool   `json:"readOnly,omitempty" yaml:"readOnly,omitempty"`
+        ClaimName string `json:"claimName,omitempty" yaml:"claimName,omitempty"`
+        ReadOnly bool `json:"readOnly,omitempty" yaml:"readOnly,omitempty"`
 }
+

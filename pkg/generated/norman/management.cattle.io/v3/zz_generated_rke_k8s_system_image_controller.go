@@ -4,10 +4,10 @@ import (
 	"context"
 	"time"
 
-	"github.com/rancher/norman/controller"
-	"github.com/rancher/norman/objectclient"
-	"github.com/rancher/norman/resource"
 	"github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/norman/objectclient"
+	"github.com/rancher/norman/controller"
+	"github.com/rancher/norman/resource"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -29,13 +29,13 @@ var (
 		SingularName: "rkek8ssystemimage",
 		Namespaced:   true,
 
-		Kind: RkeK8sSystemImageGroupVersionKind.Kind,
+		Kind:         RkeK8sSystemImageGroupVersionKind.Kind,
 	}
 
 	RkeK8sSystemImageGroupVersionResource = schema.GroupVersionResource{
-		Group:    GroupName,
-		Version:  Version,
-		Resource: "rkek8ssystemimages",
+		Group:     GroupName,
+		Version:   Version,
+		Resource:  "rkek8ssystemimages",
 	}
 )
 
@@ -52,6 +52,8 @@ func NewRkeK8sSystemImage(namespace, name string, obj v3.RkeK8sSystemImage) *v3.
 	obj.Namespace = namespace
 	return &obj
 }
+
+
 
 type RkeK8sSystemImageHandlerFunc func(key string, obj *v3.RkeK8sSystemImage) (runtime.Object, error)
 
@@ -75,7 +77,7 @@ type RkeK8sSystemImageController interface {
 }
 
 type RkeK8sSystemImageInterface interface {
-	ObjectClient() *objectclient.ObjectClient
+    ObjectClient() *objectclient.ObjectClient
 	Create(*v3.RkeK8sSystemImage) (*v3.RkeK8sSystemImage, error)
 	GetNamespaced(namespace, name string, opts metav1.GetOptions) (*v3.RkeK8sSystemImage, error)
 	Get(name string, opts metav1.GetOptions) (*v3.RkeK8sSystemImage, error)
@@ -98,7 +100,7 @@ type RkeK8sSystemImageInterface interface {
 }
 
 type rkeK8sSystemImageLister struct {
-	ns         string
+	ns string
 	controller *rkeK8sSystemImageController
 }
 
@@ -125,7 +127,7 @@ func (l *rkeK8sSystemImageLister) Get(namespace, name string) (*v3.RkeK8sSystemI
 	}
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
-			Group:    RkeK8sSystemImageGroupVersionKind.Group,
+			Group: RkeK8sSystemImageGroupVersionKind.Group,
 			Resource: RkeK8sSystemImageGroupVersionResource.Resource,
 		}, key)
 	}
@@ -143,10 +145,11 @@ func (c *rkeK8sSystemImageController) Generic() controller.GenericController {
 
 func (c *rkeK8sSystemImageController) Lister() RkeK8sSystemImageLister {
 	return &rkeK8sSystemImageLister{
-		ns:         c.ns,
+		ns: c.ns,
 		controller: c,
 	}
 }
+
 
 func (c *rkeK8sSystemImageController) AddHandler(ctx context.Context, name string, handler RkeK8sSystemImageHandlerFunc) {
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
@@ -216,14 +219,14 @@ func (s *rkeK8sSystemImageClient) Controller() RkeK8sSystemImageController {
 		s.client.controllerFactory.ForResourceKind(RkeK8sSystemImageGroupVersionResource, RkeK8sSystemImageGroupVersionKind.Kind, true))
 
 	return &rkeK8sSystemImageController{
-		ns:                s.ns,
+		ns: s.ns,
 		GenericController: genericController,
 	}
 }
 
 type rkeK8sSystemImageClient struct {
-	client       *Client
-	ns           string
+	client *Client
+	ns string
 	objectClient *objectclient.ObjectClient
 	controller   RkeK8sSystemImageController
 }

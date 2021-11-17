@@ -4,10 +4,10 @@ import (
 	"context"
 	"time"
 
-	"github.com/rancher/norman/controller"
-	"github.com/rancher/norman/objectclient"
-	"github.com/rancher/norman/resource"
 	"github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/norman/objectclient"
+	"github.com/rancher/norman/controller"
+	"github.com/rancher/norman/resource"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -29,13 +29,13 @@ var (
 		SingularName: "projectlogging",
 		Namespaced:   true,
 
-		Kind: ProjectLoggingGroupVersionKind.Kind,
+		Kind:         ProjectLoggingGroupVersionKind.Kind,
 	}
 
 	ProjectLoggingGroupVersionResource = schema.GroupVersionResource{
-		Group:    GroupName,
-		Version:  Version,
-		Resource: "projectloggings",
+		Group:     GroupName,
+		Version:   Version,
+		Resource:  "projectloggings",
 	}
 )
 
@@ -52,6 +52,8 @@ func NewProjectLogging(namespace, name string, obj v3.ProjectLogging) *v3.Projec
 	obj.Namespace = namespace
 	return &obj
 }
+
+
 
 type ProjectLoggingHandlerFunc func(key string, obj *v3.ProjectLogging) (runtime.Object, error)
 
@@ -75,7 +77,7 @@ type ProjectLoggingController interface {
 }
 
 type ProjectLoggingInterface interface {
-	ObjectClient() *objectclient.ObjectClient
+    ObjectClient() *objectclient.ObjectClient
 	Create(*v3.ProjectLogging) (*v3.ProjectLogging, error)
 	GetNamespaced(namespace, name string, opts metav1.GetOptions) (*v3.ProjectLogging, error)
 	Get(name string, opts metav1.GetOptions) (*v3.ProjectLogging, error)
@@ -98,7 +100,7 @@ type ProjectLoggingInterface interface {
 }
 
 type projectLoggingLister struct {
-	ns         string
+	ns string
 	controller *projectLoggingController
 }
 
@@ -125,7 +127,7 @@ func (l *projectLoggingLister) Get(namespace, name string) (*v3.ProjectLogging, 
 	}
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
-			Group:    ProjectLoggingGroupVersionKind.Group,
+			Group: ProjectLoggingGroupVersionKind.Group,
 			Resource: ProjectLoggingGroupVersionResource.Resource,
 		}, key)
 	}
@@ -143,10 +145,11 @@ func (c *projectLoggingController) Generic() controller.GenericController {
 
 func (c *projectLoggingController) Lister() ProjectLoggingLister {
 	return &projectLoggingLister{
-		ns:         c.ns,
+		ns: c.ns,
 		controller: c,
 	}
 }
+
 
 func (c *projectLoggingController) AddHandler(ctx context.Context, name string, handler ProjectLoggingHandlerFunc) {
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
@@ -216,14 +219,14 @@ func (s *projectLoggingClient) Controller() ProjectLoggingController {
 		s.client.controllerFactory.ForResourceKind(ProjectLoggingGroupVersionResource, ProjectLoggingGroupVersionKind.Kind, true))
 
 	return &projectLoggingController{
-		ns:                s.ns,
+		ns: s.ns,
 		GenericController: genericController,
 	}
 }
 
 type projectLoggingClient struct {
-	client       *Client
-	ns           string
+	client *Client
+	ns string
 	objectClient *objectclient.ObjectClient
 	controller   ProjectLoggingController
 }

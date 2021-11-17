@@ -4,10 +4,10 @@ import (
 	"context"
 	"time"
 
-	"github.com/rancher/norman/controller"
-	"github.com/rancher/norman/objectclient"
-	"github.com/rancher/norman/resource"
 	"github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/norman/objectclient"
+	"github.com/rancher/norman/controller"
+	"github.com/rancher/norman/resource"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -29,13 +29,13 @@ var (
 		SingularName: "projectmonitorgraph",
 		Namespaced:   true,
 
-		Kind: ProjectMonitorGraphGroupVersionKind.Kind,
+		Kind:         ProjectMonitorGraphGroupVersionKind.Kind,
 	}
 
 	ProjectMonitorGraphGroupVersionResource = schema.GroupVersionResource{
-		Group:    GroupName,
-		Version:  Version,
-		Resource: "projectmonitorgraphs",
+		Group:     GroupName,
+		Version:   Version,
+		Resource:  "projectmonitorgraphs",
 	}
 )
 
@@ -52,6 +52,8 @@ func NewProjectMonitorGraph(namespace, name string, obj v3.ProjectMonitorGraph) 
 	obj.Namespace = namespace
 	return &obj
 }
+
+
 
 type ProjectMonitorGraphHandlerFunc func(key string, obj *v3.ProjectMonitorGraph) (runtime.Object, error)
 
@@ -75,7 +77,7 @@ type ProjectMonitorGraphController interface {
 }
 
 type ProjectMonitorGraphInterface interface {
-	ObjectClient() *objectclient.ObjectClient
+    ObjectClient() *objectclient.ObjectClient
 	Create(*v3.ProjectMonitorGraph) (*v3.ProjectMonitorGraph, error)
 	GetNamespaced(namespace, name string, opts metav1.GetOptions) (*v3.ProjectMonitorGraph, error)
 	Get(name string, opts metav1.GetOptions) (*v3.ProjectMonitorGraph, error)
@@ -98,7 +100,7 @@ type ProjectMonitorGraphInterface interface {
 }
 
 type projectMonitorGraphLister struct {
-	ns         string
+	ns string
 	controller *projectMonitorGraphController
 }
 
@@ -125,7 +127,7 @@ func (l *projectMonitorGraphLister) Get(namespace, name string) (*v3.ProjectMoni
 	}
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
-			Group:    ProjectMonitorGraphGroupVersionKind.Group,
+			Group: ProjectMonitorGraphGroupVersionKind.Group,
 			Resource: ProjectMonitorGraphGroupVersionResource.Resource,
 		}, key)
 	}
@@ -143,10 +145,11 @@ func (c *projectMonitorGraphController) Generic() controller.GenericController {
 
 func (c *projectMonitorGraphController) Lister() ProjectMonitorGraphLister {
 	return &projectMonitorGraphLister{
-		ns:         c.ns,
+		ns: c.ns,
 		controller: c,
 	}
 }
+
 
 func (c *projectMonitorGraphController) AddHandler(ctx context.Context, name string, handler ProjectMonitorGraphHandlerFunc) {
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
@@ -216,14 +219,14 @@ func (s *projectMonitorGraphClient) Controller() ProjectMonitorGraphController {
 		s.client.controllerFactory.ForResourceKind(ProjectMonitorGraphGroupVersionResource, ProjectMonitorGraphGroupVersionKind.Kind, true))
 
 	return &projectMonitorGraphController{
-		ns:                s.ns,
+		ns: s.ns,
 		GenericController: genericController,
 	}
 }
 
 type projectMonitorGraphClient struct {
-	client       *Client
-	ns           string
+	client *Client
+	ns string
 	objectClient *objectclient.ObjectClient
 	controller   ProjectMonitorGraphController
 }

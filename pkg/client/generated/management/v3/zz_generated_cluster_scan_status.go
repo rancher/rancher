@@ -1,12 +1,23 @@
 package client
 
+
+	
+
+	
+
+
+import (
+	
+)
+
 const (
-	ClusterScanStatusType               = "clusterScanStatus"
+    ClusterScanStatusType = "clusterScanStatus"
 	ClusterScanStatusFieldCisScanStatus = "cisScanStatus"
-	ClusterScanStatusFieldConditions    = "conditions"
+	ClusterScanStatusFieldConditions = "conditions"
 )
 
 type ClusterScanStatus struct {
-	CisScanStatus *CisScanStatus         `json:"cisScanStatus,omitempty" yaml:"cisScanStatus,omitempty"`
-	Conditions    []ClusterScanCondition `json:"conditions,omitempty" yaml:"conditions,omitempty"`
+        CisScanStatus *CisScanStatus `json:"cisScanStatus,omitempty" yaml:"cisScanStatus,omitempty"`
+        Conditions []ClusterScanCondition `json:"conditions,omitempty" yaml:"conditions,omitempty"`
 }
+

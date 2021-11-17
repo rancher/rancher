@@ -1,10 +1,19 @@
 package client
 
+
+	
+
+
+import (
+	
+)
+
 const (
-	VersionCommitsType       = "versionCommits"
+    VersionCommitsType = "versionCommits"
 	VersionCommitsFieldValue = "Value"
 )
 
 type VersionCommits struct {
-	Value map[string]string `json:"Value,omitempty" yaml:"Value,omitempty"`
+        Value map[string]string `json:"Value,omitempty" yaml:"Value,omitempty"`
 }
+

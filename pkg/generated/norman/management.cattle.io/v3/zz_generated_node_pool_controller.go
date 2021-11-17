@@ -4,10 +4,10 @@ import (
 	"context"
 	"time"
 
-	"github.com/rancher/norman/controller"
-	"github.com/rancher/norman/objectclient"
-	"github.com/rancher/norman/resource"
 	"github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/norman/objectclient"
+	"github.com/rancher/norman/controller"
+	"github.com/rancher/norman/resource"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -29,13 +29,13 @@ var (
 		SingularName: "nodepool",
 		Namespaced:   true,
 
-		Kind: NodePoolGroupVersionKind.Kind,
+		Kind:         NodePoolGroupVersionKind.Kind,
 	}
 
 	NodePoolGroupVersionResource = schema.GroupVersionResource{
-		Group:    GroupName,
-		Version:  Version,
-		Resource: "nodepools",
+		Group:     GroupName,
+		Version:   Version,
+		Resource:  "nodepools",
 	}
 )
 
@@ -52,6 +52,8 @@ func NewNodePool(namespace, name string, obj v3.NodePool) *v3.NodePool {
 	obj.Namespace = namespace
 	return &obj
 }
+
+
 
 type NodePoolHandlerFunc func(key string, obj *v3.NodePool) (runtime.Object, error)
 
@@ -75,7 +77,7 @@ type NodePoolController interface {
 }
 
 type NodePoolInterface interface {
-	ObjectClient() *objectclient.ObjectClient
+    ObjectClient() *objectclient.ObjectClient
 	Create(*v3.NodePool) (*v3.NodePool, error)
 	GetNamespaced(namespace, name string, opts metav1.GetOptions) (*v3.NodePool, error)
 	Get(name string, opts metav1.GetOptions) (*v3.NodePool, error)
@@ -98,7 +100,7 @@ type NodePoolInterface interface {
 }
 
 type nodePoolLister struct {
-	ns         string
+	ns string
 	controller *nodePoolController
 }
 
@@ -125,7 +127,7 @@ func (l *nodePoolLister) Get(namespace, name string) (*v3.NodePool, error) {
 	}
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
-			Group:    NodePoolGroupVersionKind.Group,
+			Group: NodePoolGroupVersionKind.Group,
 			Resource: NodePoolGroupVersionResource.Resource,
 		}, key)
 	}
@@ -143,10 +145,11 @@ func (c *nodePoolController) Generic() controller.GenericController {
 
 func (c *nodePoolController) Lister() NodePoolLister {
 	return &nodePoolLister{
-		ns:         c.ns,
+		ns: c.ns,
 		controller: c,
 	}
 }
+
 
 func (c *nodePoolController) AddHandler(ctx context.Context, name string, handler NodePoolHandlerFunc) {
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
@@ -216,14 +219,14 @@ func (s *nodePoolClient) Controller() NodePoolController {
 		s.client.controllerFactory.ForResourceKind(NodePoolGroupVersionResource, NodePoolGroupVersionKind.Kind, true))
 
 	return &nodePoolController{
-		ns:                s.ns,
+		ns: s.ns,
 		GenericController: genericController,
 	}
 }
 
 type nodePoolClient struct {
-	client       *Client
-	ns           string
+	client *Client
+	ns string
 	objectClient *objectclient.ObjectClient
 	controller   NodePoolController
 }

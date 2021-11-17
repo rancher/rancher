@@ -1,12 +1,23 @@
 package client
 
+
+	
+
+	
+
+
+import (
+	
+)
+
 const (
-	EventRuleType              = "eventRule"
-	EventRuleFieldEventType    = "eventType"
+    EventRuleType = "eventRule"
+	EventRuleFieldEventType = "eventType"
 	EventRuleFieldResourceKind = "resourceKind"
 )
 
 type EventRule struct {
-	EventType    string `json:"eventType,omitempty" yaml:"eventType,omitempty"`
-	ResourceKind string `json:"resourceKind,omitempty" yaml:"resourceKind,omitempty"`
+        EventType string `json:"eventType,omitempty" yaml:"eventType,omitempty"`
+        ResourceKind string `json:"resourceKind,omitempty" yaml:"resourceKind,omitempty"`
 }
+

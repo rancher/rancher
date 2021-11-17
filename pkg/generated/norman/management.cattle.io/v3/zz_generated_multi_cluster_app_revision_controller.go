@@ -4,10 +4,10 @@ import (
 	"context"
 	"time"
 
-	"github.com/rancher/norman/controller"
-	"github.com/rancher/norman/objectclient"
-	"github.com/rancher/norman/resource"
 	"github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/norman/objectclient"
+	"github.com/rancher/norman/controller"
+	"github.com/rancher/norman/resource"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -29,13 +29,13 @@ var (
 		SingularName: "multiclusterapprevision",
 		Namespaced:   true,
 
-		Kind: MultiClusterAppRevisionGroupVersionKind.Kind,
+		Kind:         MultiClusterAppRevisionGroupVersionKind.Kind,
 	}
 
 	MultiClusterAppRevisionGroupVersionResource = schema.GroupVersionResource{
-		Group:    GroupName,
-		Version:  Version,
-		Resource: "multiclusterapprevisions",
+		Group:     GroupName,
+		Version:   Version,
+		Resource:  "multiclusterapprevisions",
 	}
 )
 
@@ -52,6 +52,8 @@ func NewMultiClusterAppRevision(namespace, name string, obj v3.MultiClusterAppRe
 	obj.Namespace = namespace
 	return &obj
 }
+
+
 
 type MultiClusterAppRevisionHandlerFunc func(key string, obj *v3.MultiClusterAppRevision) (runtime.Object, error)
 
@@ -75,7 +77,7 @@ type MultiClusterAppRevisionController interface {
 }
 
 type MultiClusterAppRevisionInterface interface {
-	ObjectClient() *objectclient.ObjectClient
+    ObjectClient() *objectclient.ObjectClient
 	Create(*v3.MultiClusterAppRevision) (*v3.MultiClusterAppRevision, error)
 	GetNamespaced(namespace, name string, opts metav1.GetOptions) (*v3.MultiClusterAppRevision, error)
 	Get(name string, opts metav1.GetOptions) (*v3.MultiClusterAppRevision, error)
@@ -98,7 +100,7 @@ type MultiClusterAppRevisionInterface interface {
 }
 
 type multiClusterAppRevisionLister struct {
-	ns         string
+	ns string
 	controller *multiClusterAppRevisionController
 }
 
@@ -125,7 +127,7 @@ func (l *multiClusterAppRevisionLister) Get(namespace, name string) (*v3.MultiCl
 	}
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
-			Group:    MultiClusterAppRevisionGroupVersionKind.Group,
+			Group: MultiClusterAppRevisionGroupVersionKind.Group,
 			Resource: MultiClusterAppRevisionGroupVersionResource.Resource,
 		}, key)
 	}
@@ -143,10 +145,11 @@ func (c *multiClusterAppRevisionController) Generic() controller.GenericControll
 
 func (c *multiClusterAppRevisionController) Lister() MultiClusterAppRevisionLister {
 	return &multiClusterAppRevisionLister{
-		ns:         c.ns,
+		ns: c.ns,
 		controller: c,
 	}
 }
+
 
 func (c *multiClusterAppRevisionController) AddHandler(ctx context.Context, name string, handler MultiClusterAppRevisionHandlerFunc) {
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
@@ -216,14 +219,14 @@ func (s *multiClusterAppRevisionClient) Controller() MultiClusterAppRevisionCont
 		s.client.controllerFactory.ForResourceKind(MultiClusterAppRevisionGroupVersionResource, MultiClusterAppRevisionGroupVersionKind.Kind, true))
 
 	return &multiClusterAppRevisionController{
-		ns:                s.ns,
+		ns: s.ns,
 		GenericController: genericController,
 	}
 }
 
 type multiClusterAppRevisionClient struct {
-	client       *Client
-	ns           string
+	client *Client
+	ns string
 	objectClient *objectclient.ObjectClient
 	controller   MultiClusterAppRevisionController
 }

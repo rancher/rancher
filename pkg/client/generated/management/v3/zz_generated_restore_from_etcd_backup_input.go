@@ -1,12 +1,23 @@
 package client
 
+
+	
+
+	
+
+
+import (
+	
+)
+
 const (
-	RestoreFromEtcdBackupInputType                  = "restoreFromEtcdBackupInput"
-	RestoreFromEtcdBackupInputFieldEtcdBackupID     = "etcdBackupId"
+    RestoreFromEtcdBackupInputType = "restoreFromEtcdBackupInput"
+	RestoreFromEtcdBackupInputFieldEtcdBackupID = "etcdBackupId"
 	RestoreFromEtcdBackupInputFieldRestoreRkeConfig = "restoreRkeConfig"
 )
 
 type RestoreFromEtcdBackupInput struct {
-	EtcdBackupID     string `json:"etcdBackupId,omitempty" yaml:"etcdBackupId,omitempty"`
-	RestoreRkeConfig string `json:"restoreRkeConfig,omitempty" yaml:"restoreRkeConfig,omitempty"`
+        EtcdBackupID string `json:"etcdBackupId,omitempty" yaml:"etcdBackupId,omitempty"`
+        RestoreRkeConfig string `json:"restoreRkeConfig,omitempty" yaml:"restoreRkeConfig,omitempty"`
 }
+

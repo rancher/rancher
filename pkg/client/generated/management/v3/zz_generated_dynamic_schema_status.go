@@ -1,10 +1,19 @@
 package client
 
+
+	
+
+
+import (
+	
+)
+
 const (
-	DynamicSchemaStatusType      = "dynamicSchemaStatus"
+    DynamicSchemaStatusType = "dynamicSchemaStatus"
 	DynamicSchemaStatusFieldFake = "fake"
 )
 
 type DynamicSchemaStatus struct {
-	Fake string `json:"fake,omitempty" yaml:"fake,omitempty"`
+        Fake string `json:"fake,omitempty" yaml:"fake,omitempty"`
 }
+

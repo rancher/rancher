@@ -1,12 +1,23 @@
 package client
 
+
+	
+
+	
+
+
+import (
+	
+)
+
 const (
-	PhotonPersistentDiskVolumeSourceType        = "photonPersistentDiskVolumeSource"
+    PhotonPersistentDiskVolumeSourceType = "photonPersistentDiskVolumeSource"
 	PhotonPersistentDiskVolumeSourceFieldFSType = "fsType"
-	PhotonPersistentDiskVolumeSourceFieldPdID   = "pdID"
+	PhotonPersistentDiskVolumeSourceFieldPdID = "pdID"
 )
 
 type PhotonPersistentDiskVolumeSource struct {
-	FSType string `json:"fsType,omitempty" yaml:"fsType,omitempty"`
-	PdID   string `json:"pdID,omitempty" yaml:"pdID,omitempty"`
+        FSType string `json:"fsType,omitempty" yaml:"fsType,omitempty"`
+        PdID string `json:"pdID,omitempty" yaml:"pdID,omitempty"`
 }
+

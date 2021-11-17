@@ -1,10 +1,19 @@
 package client
 
+
+	
+
+
+import (
+	
+)
+
 const (
-	FilterType           = "filter"
+    FilterType = "filter"
 	FilterFieldModifiers = "modifiers"
 )
 
 type Filter struct {
-	Modifiers []string `json:"modifiers,omitempty" yaml:"modifiers,omitempty"`
+        Modifiers []string `json:"modifiers,omitempty" yaml:"modifiers,omitempty"`
 }
+

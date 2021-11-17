@@ -4,10 +4,10 @@ import (
 	"context"
 	"time"
 
-	"github.com/rancher/norman/controller"
-	"github.com/rancher/norman/objectclient"
-	"github.com/rancher/norman/resource"
 	"github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/norman/objectclient"
+	"github.com/rancher/norman/controller"
+	"github.com/rancher/norman/resource"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -32,9 +32,9 @@ var (
 	}
 
 	UserGroupVersionResource = schema.GroupVersionResource{
-		Group:    GroupName,
-		Version:  Version,
-		Resource: "users",
+		Group:     GroupName,
+		Version:   Version,
+		Resource:  "users",
 	}
 )
 
@@ -51,6 +51,8 @@ func NewUser(namespace, name string, obj v3.User) *v3.User {
 	obj.Namespace = namespace
 	return &obj
 }
+
+
 
 type UserHandlerFunc func(key string, obj *v3.User) (runtime.Object, error)
 
@@ -74,7 +76,7 @@ type UserController interface {
 }
 
 type UserInterface interface {
-	ObjectClient() *objectclient.ObjectClient
+    ObjectClient() *objectclient.ObjectClient
 	Create(*v3.User) (*v3.User, error)
 	GetNamespaced(namespace, name string, opts metav1.GetOptions) (*v3.User, error)
 	Get(name string, opts metav1.GetOptions) (*v3.User, error)
@@ -97,7 +99,7 @@ type UserInterface interface {
 }
 
 type userLister struct {
-	ns         string
+	ns string
 	controller *userController
 }
 
@@ -124,7 +126,7 @@ func (l *userLister) Get(namespace, name string) (*v3.User, error) {
 	}
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
-			Group:    UserGroupVersionKind.Group,
+			Group: UserGroupVersionKind.Group,
 			Resource: UserGroupVersionResource.Resource,
 		}, key)
 	}
@@ -142,10 +144,11 @@ func (c *userController) Generic() controller.GenericController {
 
 func (c *userController) Lister() UserLister {
 	return &userLister{
-		ns:         c.ns,
+		ns: c.ns,
 		controller: c,
 	}
 }
+
 
 func (c *userController) AddHandler(ctx context.Context, name string, handler UserHandlerFunc) {
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
@@ -215,14 +218,14 @@ func (s *userClient) Controller() UserController {
 		s.client.controllerFactory.ForResourceKind(UserGroupVersionResource, UserGroupVersionKind.Kind, false))
 
 	return &userController{
-		ns:                s.ns,
+		ns: s.ns,
 		GenericController: genericController,
 	}
 }
 
 type userClient struct {
-	client       *Client
-	ns           string
+	client *Client
+	ns string
 	objectClient *objectclient.ObjectClient
 	controller   UserController
 }

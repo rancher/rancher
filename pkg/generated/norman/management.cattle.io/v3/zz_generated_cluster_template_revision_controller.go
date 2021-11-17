@@ -4,10 +4,10 @@ import (
 	"context"
 	"time"
 
-	"github.com/rancher/norman/controller"
-	"github.com/rancher/norman/objectclient"
-	"github.com/rancher/norman/resource"
 	"github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/norman/objectclient"
+	"github.com/rancher/norman/controller"
+	"github.com/rancher/norman/resource"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -29,13 +29,13 @@ var (
 		SingularName: "clustertemplaterevision",
 		Namespaced:   true,
 
-		Kind: ClusterTemplateRevisionGroupVersionKind.Kind,
+		Kind:         ClusterTemplateRevisionGroupVersionKind.Kind,
 	}
 
 	ClusterTemplateRevisionGroupVersionResource = schema.GroupVersionResource{
-		Group:    GroupName,
-		Version:  Version,
-		Resource: "clustertemplaterevisions",
+		Group:     GroupName,
+		Version:   Version,
+		Resource:  "clustertemplaterevisions",
 	}
 )
 
@@ -52,6 +52,8 @@ func NewClusterTemplateRevision(namespace, name string, obj v3.ClusterTemplateRe
 	obj.Namespace = namespace
 	return &obj
 }
+
+
 
 type ClusterTemplateRevisionHandlerFunc func(key string, obj *v3.ClusterTemplateRevision) (runtime.Object, error)
 
@@ -75,7 +77,7 @@ type ClusterTemplateRevisionController interface {
 }
 
 type ClusterTemplateRevisionInterface interface {
-	ObjectClient() *objectclient.ObjectClient
+    ObjectClient() *objectclient.ObjectClient
 	Create(*v3.ClusterTemplateRevision) (*v3.ClusterTemplateRevision, error)
 	GetNamespaced(namespace, name string, opts metav1.GetOptions) (*v3.ClusterTemplateRevision, error)
 	Get(name string, opts metav1.GetOptions) (*v3.ClusterTemplateRevision, error)
@@ -98,7 +100,7 @@ type ClusterTemplateRevisionInterface interface {
 }
 
 type clusterTemplateRevisionLister struct {
-	ns         string
+	ns string
 	controller *clusterTemplateRevisionController
 }
 
@@ -125,7 +127,7 @@ func (l *clusterTemplateRevisionLister) Get(namespace, name string) (*v3.Cluster
 	}
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
-			Group:    ClusterTemplateRevisionGroupVersionKind.Group,
+			Group: ClusterTemplateRevisionGroupVersionKind.Group,
 			Resource: ClusterTemplateRevisionGroupVersionResource.Resource,
 		}, key)
 	}
@@ -143,10 +145,11 @@ func (c *clusterTemplateRevisionController) Generic() controller.GenericControll
 
 func (c *clusterTemplateRevisionController) Lister() ClusterTemplateRevisionLister {
 	return &clusterTemplateRevisionLister{
-		ns:         c.ns,
+		ns: c.ns,
 		controller: c,
 	}
 }
+
 
 func (c *clusterTemplateRevisionController) AddHandler(ctx context.Context, name string, handler ClusterTemplateRevisionHandlerFunc) {
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
@@ -216,14 +219,14 @@ func (s *clusterTemplateRevisionClient) Controller() ClusterTemplateRevisionCont
 		s.client.controllerFactory.ForResourceKind(ClusterTemplateRevisionGroupVersionResource, ClusterTemplateRevisionGroupVersionKind.Kind, true))
 
 	return &clusterTemplateRevisionController{
-		ns:                s.ns,
+		ns: s.ns,
 		GenericController: genericController,
 	}
 }
 
 type clusterTemplateRevisionClient struct {
-	client       *Client
-	ns           string
+	client *Client
+	ns string
 	objectClient *objectclient.ObjectClient
 	controller   ClusterTemplateRevisionController
 }

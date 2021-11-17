@@ -1,12 +1,23 @@
 package client
 
+
+	
+
+	
+
+
+import (
+	
+)
+
 const (
-	QueryProjectGraphType           = "queryProjectGraph"
+    QueryProjectGraphType = "queryProjectGraph"
 	QueryProjectGraphFieldGraphName = "graphID"
-	QueryProjectGraphFieldSeries    = "series"
+	QueryProjectGraphFieldSeries = "series"
 )
 
 type QueryProjectGraph struct {
-	GraphName string   `json:"graphID,omitempty" yaml:"graphID,omitempty"`
-	Series    []string `json:"series,omitempty" yaml:"series,omitempty"`
+        GraphName string `json:"graphID,omitempty" yaml:"graphID,omitempty"`
+        Series []string `json:"series,omitempty" yaml:"series,omitempty"`
 }
+

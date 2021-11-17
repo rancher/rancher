@@ -1,8 +1,15 @@
 package client
 
+
+
+import (
+	
+)
+
 const (
-	UserSpecType = "userSpec"
+    UserSpecType = "userSpec"
 )
 
 type UserSpec struct {
 }
+

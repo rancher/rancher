@@ -1,10 +1,19 @@
 package client
 
+
+	
+
+
+import (
+	
+)
+
 const (
-	NodeConfigSourceType           = "nodeConfigSource"
+    NodeConfigSourceType = "nodeConfigSource"
 	NodeConfigSourceFieldConfigMap = "configMap"
 )
 
 type NodeConfigSource struct {
-	ConfigMap *ConfigMapNodeConfigSource `json:"configMap,omitempty" yaml:"configMap,omitempty"`
+        ConfigMap *ConfigMapNodeConfigSource `json:"configMap,omitempty" yaml:"configMap,omitempty"`
 }
+

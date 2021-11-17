@@ -4,10 +4,10 @@ import (
 	"context"
 	"time"
 
-	"github.com/rancher/norman/controller"
-	"github.com/rancher/norman/objectclient"
-	"github.com/rancher/norman/resource"
 	"github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/norman/objectclient"
+	"github.com/rancher/norman/controller"
+	"github.com/rancher/norman/resource"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -29,13 +29,13 @@ var (
 		SingularName: "cisbenchmarkversion",
 		Namespaced:   true,
 
-		Kind: CisBenchmarkVersionGroupVersionKind.Kind,
+		Kind:         CisBenchmarkVersionGroupVersionKind.Kind,
 	}
 
 	CisBenchmarkVersionGroupVersionResource = schema.GroupVersionResource{
-		Group:    GroupName,
-		Version:  Version,
-		Resource: "cisbenchmarkversions",
+		Group:     GroupName,
+		Version:   Version,
+		Resource:  "cisbenchmarkversions",
 	}
 )
 
@@ -52,6 +52,8 @@ func NewCisBenchmarkVersion(namespace, name string, obj v3.CisBenchmarkVersion) 
 	obj.Namespace = namespace
 	return &obj
 }
+
+
 
 type CisBenchmarkVersionHandlerFunc func(key string, obj *v3.CisBenchmarkVersion) (runtime.Object, error)
 
@@ -75,7 +77,7 @@ type CisBenchmarkVersionController interface {
 }
 
 type CisBenchmarkVersionInterface interface {
-	ObjectClient() *objectclient.ObjectClient
+    ObjectClient() *objectclient.ObjectClient
 	Create(*v3.CisBenchmarkVersion) (*v3.CisBenchmarkVersion, error)
 	GetNamespaced(namespace, name string, opts metav1.GetOptions) (*v3.CisBenchmarkVersion, error)
 	Get(name string, opts metav1.GetOptions) (*v3.CisBenchmarkVersion, error)
@@ -98,7 +100,7 @@ type CisBenchmarkVersionInterface interface {
 }
 
 type cisBenchmarkVersionLister struct {
-	ns         string
+	ns string
 	controller *cisBenchmarkVersionController
 }
 
@@ -125,7 +127,7 @@ func (l *cisBenchmarkVersionLister) Get(namespace, name string) (*v3.CisBenchmar
 	}
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
-			Group:    CisBenchmarkVersionGroupVersionKind.Group,
+			Group: CisBenchmarkVersionGroupVersionKind.Group,
 			Resource: CisBenchmarkVersionGroupVersionResource.Resource,
 		}, key)
 	}
@@ -143,10 +145,11 @@ func (c *cisBenchmarkVersionController) Generic() controller.GenericController {
 
 func (c *cisBenchmarkVersionController) Lister() CisBenchmarkVersionLister {
 	return &cisBenchmarkVersionLister{
-		ns:         c.ns,
+		ns: c.ns,
 		controller: c,
 	}
 }
+
 
 func (c *cisBenchmarkVersionController) AddHandler(ctx context.Context, name string, handler CisBenchmarkVersionHandlerFunc) {
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
@@ -216,14 +219,14 @@ func (s *cisBenchmarkVersionClient) Controller() CisBenchmarkVersionController {
 		s.client.controllerFactory.ForResourceKind(CisBenchmarkVersionGroupVersionResource, CisBenchmarkVersionGroupVersionKind.Kind, true))
 
 	return &cisBenchmarkVersionController{
-		ns:                s.ns,
+		ns: s.ns,
 		GenericController: genericController,
 	}
 }
 
 type cisBenchmarkVersionClient struct {
-	client       *Client
-	ns           string
+	client *Client
+	ns string
 	objectClient *objectclient.ObjectClient
 	controller   CisBenchmarkVersionController
 }

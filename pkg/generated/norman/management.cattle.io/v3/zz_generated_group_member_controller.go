@@ -4,10 +4,10 @@ import (
 	"context"
 	"time"
 
-	"github.com/rancher/norman/controller"
-	"github.com/rancher/norman/objectclient"
-	"github.com/rancher/norman/resource"
 	"github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/norman/objectclient"
+	"github.com/rancher/norman/controller"
+	"github.com/rancher/norman/resource"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -32,9 +32,9 @@ var (
 	}
 
 	GroupMemberGroupVersionResource = schema.GroupVersionResource{
-		Group:    GroupName,
-		Version:  Version,
-		Resource: "groupmembers",
+		Group:     GroupName,
+		Version:   Version,
+		Resource:  "groupmembers",
 	}
 )
 
@@ -51,6 +51,8 @@ func NewGroupMember(namespace, name string, obj v3.GroupMember) *v3.GroupMember 
 	obj.Namespace = namespace
 	return &obj
 }
+
+
 
 type GroupMemberHandlerFunc func(key string, obj *v3.GroupMember) (runtime.Object, error)
 
@@ -74,7 +76,7 @@ type GroupMemberController interface {
 }
 
 type GroupMemberInterface interface {
-	ObjectClient() *objectclient.ObjectClient
+    ObjectClient() *objectclient.ObjectClient
 	Create(*v3.GroupMember) (*v3.GroupMember, error)
 	GetNamespaced(namespace, name string, opts metav1.GetOptions) (*v3.GroupMember, error)
 	Get(name string, opts metav1.GetOptions) (*v3.GroupMember, error)
@@ -97,7 +99,7 @@ type GroupMemberInterface interface {
 }
 
 type groupMemberLister struct {
-	ns         string
+	ns string
 	controller *groupMemberController
 }
 
@@ -124,7 +126,7 @@ func (l *groupMemberLister) Get(namespace, name string) (*v3.GroupMember, error)
 	}
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
-			Group:    GroupMemberGroupVersionKind.Group,
+			Group: GroupMemberGroupVersionKind.Group,
 			Resource: GroupMemberGroupVersionResource.Resource,
 		}, key)
 	}
@@ -142,10 +144,11 @@ func (c *groupMemberController) Generic() controller.GenericController {
 
 func (c *groupMemberController) Lister() GroupMemberLister {
 	return &groupMemberLister{
-		ns:         c.ns,
+		ns: c.ns,
 		controller: c,
 	}
 }
+
 
 func (c *groupMemberController) AddHandler(ctx context.Context, name string, handler GroupMemberHandlerFunc) {
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
@@ -215,14 +218,14 @@ func (s *groupMemberClient) Controller() GroupMemberController {
 		s.client.controllerFactory.ForResourceKind(GroupMemberGroupVersionResource, GroupMemberGroupVersionKind.Kind, false))
 
 	return &groupMemberController{
-		ns:                s.ns,
+		ns: s.ns,
 		GenericController: genericController,
 	}
 }
 
 type groupMemberClient struct {
-	client       *Client
-	ns           string
+	client *Client
+	ns string
 	objectClient *objectclient.ObjectClient
 	controller   GroupMemberController
 }

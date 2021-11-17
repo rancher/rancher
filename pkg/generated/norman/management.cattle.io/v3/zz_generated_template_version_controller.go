@@ -4,10 +4,10 @@ import (
 	"context"
 	"time"
 
-	"github.com/rancher/norman/controller"
-	"github.com/rancher/norman/objectclient"
-	"github.com/rancher/norman/resource"
 	"github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/norman/objectclient"
+	"github.com/rancher/norman/controller"
+	"github.com/rancher/norman/resource"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -32,9 +32,9 @@ var (
 	}
 
 	TemplateVersionGroupVersionResource = schema.GroupVersionResource{
-		Group:    GroupName,
-		Version:  Version,
-		Resource: "templateversions",
+		Group:     GroupName,
+		Version:   Version,
+		Resource:  "templateversions",
 	}
 )
 
@@ -51,6 +51,8 @@ func NewTemplateVersion(namespace, name string, obj v3.TemplateVersion) *v3.Temp
 	obj.Namespace = namespace
 	return &obj
 }
+
+
 
 type TemplateVersionHandlerFunc func(key string, obj *v3.TemplateVersion) (runtime.Object, error)
 
@@ -74,7 +76,7 @@ type TemplateVersionController interface {
 }
 
 type TemplateVersionInterface interface {
-	ObjectClient() *objectclient.ObjectClient
+    ObjectClient() *objectclient.ObjectClient
 	Create(*v3.TemplateVersion) (*v3.TemplateVersion, error)
 	GetNamespaced(namespace, name string, opts metav1.GetOptions) (*v3.TemplateVersion, error)
 	Get(name string, opts metav1.GetOptions) (*v3.TemplateVersion, error)
@@ -97,7 +99,7 @@ type TemplateVersionInterface interface {
 }
 
 type templateVersionLister struct {
-	ns         string
+	ns string
 	controller *templateVersionController
 }
 
@@ -124,7 +126,7 @@ func (l *templateVersionLister) Get(namespace, name string) (*v3.TemplateVersion
 	}
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
-			Group:    TemplateVersionGroupVersionKind.Group,
+			Group: TemplateVersionGroupVersionKind.Group,
 			Resource: TemplateVersionGroupVersionResource.Resource,
 		}, key)
 	}
@@ -142,10 +144,11 @@ func (c *templateVersionController) Generic() controller.GenericController {
 
 func (c *templateVersionController) Lister() TemplateVersionLister {
 	return &templateVersionLister{
-		ns:         c.ns,
+		ns: c.ns,
 		controller: c,
 	}
 }
+
 
 func (c *templateVersionController) AddHandler(ctx context.Context, name string, handler TemplateVersionHandlerFunc) {
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
@@ -215,14 +218,14 @@ func (s *templateVersionClient) Controller() TemplateVersionController {
 		s.client.controllerFactory.ForResourceKind(TemplateVersionGroupVersionResource, TemplateVersionGroupVersionKind.Kind, false))
 
 	return &templateVersionController{
-		ns:                s.ns,
+		ns: s.ns,
 		GenericController: genericController,
 	}
 }
 
 type templateVersionClient struct {
-	client       *Client
-	ns           string
+	client *Client
+	ns string
 	objectClient *objectclient.ObjectClient
 	controller   TemplateVersionController
 }

@@ -1,12 +1,23 @@
 package client
 
+
+	
+
+	
+
+
+import (
+	
+)
+
 const (
-	AuthWebhookConfigType              = "authWebhookConfig"
+    AuthWebhookConfigType = "authWebhookConfig"
 	AuthWebhookConfigFieldCacheTimeout = "cacheTimeout"
-	AuthWebhookConfigFieldConfigFile   = "configFile"
+	AuthWebhookConfigFieldConfigFile = "configFile"
 )
 
 type AuthWebhookConfig struct {
-	CacheTimeout string `json:"cacheTimeout,omitempty" yaml:"cacheTimeout,omitempty"`
-	ConfigFile   string `json:"configFile,omitempty" yaml:"configFile,omitempty"`
+        CacheTimeout string `json:"cacheTimeout,omitempty" yaml:"cacheTimeout,omitempty"`
+        ConfigFile string `json:"configFile,omitempty" yaml:"configFile,omitempty"`
 }
+

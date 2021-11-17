@@ -4,10 +4,10 @@ import (
 	"context"
 	"time"
 
-	"github.com/rancher/norman/controller"
-	"github.com/rancher/norman/objectclient"
-	"github.com/rancher/norman/resource"
 	"github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/norman/objectclient"
+	"github.com/rancher/norman/controller"
+	"github.com/rancher/norman/resource"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -32,9 +32,9 @@ var (
 	}
 
 	SettingGroupVersionResource = schema.GroupVersionResource{
-		Group:    GroupName,
-		Version:  Version,
-		Resource: "settings",
+		Group:     GroupName,
+		Version:   Version,
+		Resource:  "settings",
 	}
 )
 
@@ -51,6 +51,8 @@ func NewSetting(namespace, name string, obj v3.Setting) *v3.Setting {
 	obj.Namespace = namespace
 	return &obj
 }
+
+
 
 type SettingHandlerFunc func(key string, obj *v3.Setting) (runtime.Object, error)
 
@@ -74,7 +76,7 @@ type SettingController interface {
 }
 
 type SettingInterface interface {
-	ObjectClient() *objectclient.ObjectClient
+    ObjectClient() *objectclient.ObjectClient
 	Create(*v3.Setting) (*v3.Setting, error)
 	GetNamespaced(namespace, name string, opts metav1.GetOptions) (*v3.Setting, error)
 	Get(name string, opts metav1.GetOptions) (*v3.Setting, error)
@@ -97,7 +99,7 @@ type SettingInterface interface {
 }
 
 type settingLister struct {
-	ns         string
+	ns string
 	controller *settingController
 }
 
@@ -124,7 +126,7 @@ func (l *settingLister) Get(namespace, name string) (*v3.Setting, error) {
 	}
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
-			Group:    SettingGroupVersionKind.Group,
+			Group: SettingGroupVersionKind.Group,
 			Resource: SettingGroupVersionResource.Resource,
 		}, key)
 	}
@@ -142,10 +144,11 @@ func (c *settingController) Generic() controller.GenericController {
 
 func (c *settingController) Lister() SettingLister {
 	return &settingLister{
-		ns:         c.ns,
+		ns: c.ns,
 		controller: c,
 	}
 }
+
 
 func (c *settingController) AddHandler(ctx context.Context, name string, handler SettingHandlerFunc) {
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
@@ -215,14 +218,14 @@ func (s *settingClient) Controller() SettingController {
 		s.client.controllerFactory.ForResourceKind(SettingGroupVersionResource, SettingGroupVersionKind.Kind, false))
 
 	return &settingController{
-		ns:                s.ns,
+		ns: s.ns,
 		GenericController: genericController,
 	}
 }
 
 type settingClient struct {
-	client       *Client
-	ns           string
+	client *Client
+	ns string
 	objectClient *objectclient.ObjectClient
 	controller   SettingController
 }

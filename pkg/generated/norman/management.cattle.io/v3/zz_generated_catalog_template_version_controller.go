@@ -4,10 +4,10 @@ import (
 	"context"
 	"time"
 
-	"github.com/rancher/norman/controller"
-	"github.com/rancher/norman/objectclient"
-	"github.com/rancher/norman/resource"
 	"github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/norman/objectclient"
+	"github.com/rancher/norman/controller"
+	"github.com/rancher/norman/resource"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -29,13 +29,13 @@ var (
 		SingularName: "catalogtemplateversion",
 		Namespaced:   true,
 
-		Kind: CatalogTemplateVersionGroupVersionKind.Kind,
+		Kind:         CatalogTemplateVersionGroupVersionKind.Kind,
 	}
 
 	CatalogTemplateVersionGroupVersionResource = schema.GroupVersionResource{
-		Group:    GroupName,
-		Version:  Version,
-		Resource: "catalogtemplateversions",
+		Group:     GroupName,
+		Version:   Version,
+		Resource:  "catalogtemplateversions",
 	}
 )
 
@@ -52,6 +52,8 @@ func NewCatalogTemplateVersion(namespace, name string, obj v3.CatalogTemplateVer
 	obj.Namespace = namespace
 	return &obj
 }
+
+
 
 type CatalogTemplateVersionHandlerFunc func(key string, obj *v3.CatalogTemplateVersion) (runtime.Object, error)
 
@@ -75,7 +77,7 @@ type CatalogTemplateVersionController interface {
 }
 
 type CatalogTemplateVersionInterface interface {
-	ObjectClient() *objectclient.ObjectClient
+    ObjectClient() *objectclient.ObjectClient
 	Create(*v3.CatalogTemplateVersion) (*v3.CatalogTemplateVersion, error)
 	GetNamespaced(namespace, name string, opts metav1.GetOptions) (*v3.CatalogTemplateVersion, error)
 	Get(name string, opts metav1.GetOptions) (*v3.CatalogTemplateVersion, error)
@@ -98,7 +100,7 @@ type CatalogTemplateVersionInterface interface {
 }
 
 type catalogTemplateVersionLister struct {
-	ns         string
+	ns string
 	controller *catalogTemplateVersionController
 }
 
@@ -125,7 +127,7 @@ func (l *catalogTemplateVersionLister) Get(namespace, name string) (*v3.CatalogT
 	}
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
-			Group:    CatalogTemplateVersionGroupVersionKind.Group,
+			Group: CatalogTemplateVersionGroupVersionKind.Group,
 			Resource: CatalogTemplateVersionGroupVersionResource.Resource,
 		}, key)
 	}
@@ -143,10 +145,11 @@ func (c *catalogTemplateVersionController) Generic() controller.GenericControlle
 
 func (c *catalogTemplateVersionController) Lister() CatalogTemplateVersionLister {
 	return &catalogTemplateVersionLister{
-		ns:         c.ns,
+		ns: c.ns,
 		controller: c,
 	}
 }
+
 
 func (c *catalogTemplateVersionController) AddHandler(ctx context.Context, name string, handler CatalogTemplateVersionHandlerFunc) {
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
@@ -216,14 +219,14 @@ func (s *catalogTemplateVersionClient) Controller() CatalogTemplateVersionContro
 		s.client.controllerFactory.ForResourceKind(CatalogTemplateVersionGroupVersionResource, CatalogTemplateVersionGroupVersionKind.Kind, true))
 
 	return &catalogTemplateVersionController{
-		ns:                s.ns,
+		ns: s.ns,
 		GenericController: genericController,
 	}
 }
 
 type catalogTemplateVersionClient struct {
-	client       *Client
-	ns           string
+	client *Client
+	ns string
 	objectClient *objectclient.ObjectClient
 	controller   CatalogTemplateVersionController
 }

@@ -4,10 +4,10 @@ import (
 	"context"
 	"time"
 
-	"github.com/rancher/norman/controller"
-	"github.com/rancher/norman/objectclient"
-	"github.com/rancher/norman/resource"
 	"github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/norman/objectclient"
+	"github.com/rancher/norman/controller"
+	"github.com/rancher/norman/resource"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -32,9 +32,9 @@ var (
 	}
 
 	LdapConfigGroupVersionResource = schema.GroupVersionResource{
-		Group:    GroupName,
-		Version:  Version,
-		Resource: "ldapconfigs",
+		Group:     GroupName,
+		Version:   Version,
+		Resource:  "ldapconfigs",
 	}
 )
 
@@ -51,6 +51,8 @@ func NewLdapConfig(namespace, name string, obj v3.LdapConfig) *v3.LdapConfig {
 	obj.Namespace = namespace
 	return &obj
 }
+
+
 
 type LdapConfigHandlerFunc func(key string, obj *v3.LdapConfig) (runtime.Object, error)
 
@@ -74,7 +76,7 @@ type LdapConfigController interface {
 }
 
 type LdapConfigInterface interface {
-	ObjectClient() *objectclient.ObjectClient
+    ObjectClient() *objectclient.ObjectClient
 	Create(*v3.LdapConfig) (*v3.LdapConfig, error)
 	GetNamespaced(namespace, name string, opts metav1.GetOptions) (*v3.LdapConfig, error)
 	Get(name string, opts metav1.GetOptions) (*v3.LdapConfig, error)
@@ -97,7 +99,7 @@ type LdapConfigInterface interface {
 }
 
 type ldapConfigLister struct {
-	ns         string
+	ns string
 	controller *ldapConfigController
 }
 
@@ -124,7 +126,7 @@ func (l *ldapConfigLister) Get(namespace, name string) (*v3.LdapConfig, error) {
 	}
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
-			Group:    LdapConfigGroupVersionKind.Group,
+			Group: LdapConfigGroupVersionKind.Group,
 			Resource: LdapConfigGroupVersionResource.Resource,
 		}, key)
 	}
@@ -142,10 +144,11 @@ func (c *ldapConfigController) Generic() controller.GenericController {
 
 func (c *ldapConfigController) Lister() LdapConfigLister {
 	return &ldapConfigLister{
-		ns:         c.ns,
+		ns: c.ns,
 		controller: c,
 	}
 }
+
 
 func (c *ldapConfigController) AddHandler(ctx context.Context, name string, handler LdapConfigHandlerFunc) {
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
@@ -215,14 +218,14 @@ func (s *ldapConfigClient) Controller() LdapConfigController {
 		s.client.controllerFactory.ForResourceKind(LdapConfigGroupVersionResource, LdapConfigGroupVersionKind.Kind, false))
 
 	return &ldapConfigController{
-		ns:                s.ns,
+		ns: s.ns,
 		GenericController: genericController,
 	}
 }
 
 type ldapConfigClient struct {
-	client       *Client
-	ns           string
+	client *Client
+	ns string
 	objectClient *objectclient.ObjectClient
 	controller   LdapConfigController
 }

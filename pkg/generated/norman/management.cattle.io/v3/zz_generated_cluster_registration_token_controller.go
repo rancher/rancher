@@ -4,10 +4,10 @@ import (
 	"context"
 	"time"
 
-	"github.com/rancher/norman/controller"
-	"github.com/rancher/norman/objectclient"
-	"github.com/rancher/norman/resource"
 	"github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/norman/objectclient"
+	"github.com/rancher/norman/controller"
+	"github.com/rancher/norman/resource"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -29,13 +29,13 @@ var (
 		SingularName: "clusterregistrationtoken",
 		Namespaced:   true,
 
-		Kind: ClusterRegistrationTokenGroupVersionKind.Kind,
+		Kind:         ClusterRegistrationTokenGroupVersionKind.Kind,
 	}
 
 	ClusterRegistrationTokenGroupVersionResource = schema.GroupVersionResource{
-		Group:    GroupName,
-		Version:  Version,
-		Resource: "clusterregistrationtokens",
+		Group:     GroupName,
+		Version:   Version,
+		Resource:  "clusterregistrationtokens",
 	}
 )
 
@@ -52,6 +52,8 @@ func NewClusterRegistrationToken(namespace, name string, obj v3.ClusterRegistrat
 	obj.Namespace = namespace
 	return &obj
 }
+
+
 
 type ClusterRegistrationTokenHandlerFunc func(key string, obj *v3.ClusterRegistrationToken) (runtime.Object, error)
 
@@ -75,7 +77,7 @@ type ClusterRegistrationTokenController interface {
 }
 
 type ClusterRegistrationTokenInterface interface {
-	ObjectClient() *objectclient.ObjectClient
+    ObjectClient() *objectclient.ObjectClient
 	Create(*v3.ClusterRegistrationToken) (*v3.ClusterRegistrationToken, error)
 	GetNamespaced(namespace, name string, opts metav1.GetOptions) (*v3.ClusterRegistrationToken, error)
 	Get(name string, opts metav1.GetOptions) (*v3.ClusterRegistrationToken, error)
@@ -98,7 +100,7 @@ type ClusterRegistrationTokenInterface interface {
 }
 
 type clusterRegistrationTokenLister struct {
-	ns         string
+	ns string
 	controller *clusterRegistrationTokenController
 }
 
@@ -125,7 +127,7 @@ func (l *clusterRegistrationTokenLister) Get(namespace, name string) (*v3.Cluste
 	}
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
-			Group:    ClusterRegistrationTokenGroupVersionKind.Group,
+			Group: ClusterRegistrationTokenGroupVersionKind.Group,
 			Resource: ClusterRegistrationTokenGroupVersionResource.Resource,
 		}, key)
 	}
@@ -143,10 +145,11 @@ func (c *clusterRegistrationTokenController) Generic() controller.GenericControl
 
 func (c *clusterRegistrationTokenController) Lister() ClusterRegistrationTokenLister {
 	return &clusterRegistrationTokenLister{
-		ns:         c.ns,
+		ns: c.ns,
 		controller: c,
 	}
 }
+
 
 func (c *clusterRegistrationTokenController) AddHandler(ctx context.Context, name string, handler ClusterRegistrationTokenHandlerFunc) {
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
@@ -216,14 +219,14 @@ func (s *clusterRegistrationTokenClient) Controller() ClusterRegistrationTokenCo
 		s.client.controllerFactory.ForResourceKind(ClusterRegistrationTokenGroupVersionResource, ClusterRegistrationTokenGroupVersionKind.Kind, true))
 
 	return &clusterRegistrationTokenController{
-		ns:                s.ns,
+		ns: s.ns,
 		GenericController: genericController,
 	}
 }
 
 type clusterRegistrationTokenClient struct {
-	client       *Client
-	ns           string
+	client *Client
+	ns string
 	objectClient *objectclient.ObjectClient
 	controller   ClusterRegistrationTokenController
 }

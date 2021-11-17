@@ -1,10 +1,19 @@
 package client
 
+
+	
+
+
+import (
+	
+)
+
 const (
-	NodePoolStatusType            = "nodePoolStatus"
+    NodePoolStatusType = "nodePoolStatus"
 	NodePoolStatusFieldConditions = "conditions"
 )
 
 type NodePoolStatus struct {
-	Conditions []Condition `json:"conditions,omitempty" yaml:"conditions,omitempty"`
+        Conditions []Condition `json:"conditions,omitempty" yaml:"conditions,omitempty"`
 }
+

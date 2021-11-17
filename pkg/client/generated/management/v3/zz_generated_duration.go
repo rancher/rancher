@@ -1,8 +1,15 @@
 package client
 
+
+
+import (
+	
+)
+
 const (
-	DurationType = "duration"
+    DurationType = "duration"
 )
 
 type Duration struct {
 }
+

@@ -4,10 +4,10 @@ import (
 	"context"
 	"time"
 
-	"github.com/rancher/norman/controller"
-	"github.com/rancher/norman/objectclient"
-	"github.com/rancher/norman/resource"
 	"github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/norman/objectclient"
+	"github.com/rancher/norman/controller"
+	"github.com/rancher/norman/resource"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -29,13 +29,13 @@ var (
 		SingularName: "clusterscan",
 		Namespaced:   true,
 
-		Kind: ClusterScanGroupVersionKind.Kind,
+		Kind:         ClusterScanGroupVersionKind.Kind,
 	}
 
 	ClusterScanGroupVersionResource = schema.GroupVersionResource{
-		Group:    GroupName,
-		Version:  Version,
-		Resource: "clusterscans",
+		Group:     GroupName,
+		Version:   Version,
+		Resource:  "clusterscans",
 	}
 )
 
@@ -52,6 +52,8 @@ func NewClusterScan(namespace, name string, obj v3.ClusterScan) *v3.ClusterScan 
 	obj.Namespace = namespace
 	return &obj
 }
+
+
 
 type ClusterScanHandlerFunc func(key string, obj *v3.ClusterScan) (runtime.Object, error)
 
@@ -75,7 +77,7 @@ type ClusterScanController interface {
 }
 
 type ClusterScanInterface interface {
-	ObjectClient() *objectclient.ObjectClient
+    ObjectClient() *objectclient.ObjectClient
 	Create(*v3.ClusterScan) (*v3.ClusterScan, error)
 	GetNamespaced(namespace, name string, opts metav1.GetOptions) (*v3.ClusterScan, error)
 	Get(name string, opts metav1.GetOptions) (*v3.ClusterScan, error)
@@ -98,7 +100,7 @@ type ClusterScanInterface interface {
 }
 
 type clusterScanLister struct {
-	ns         string
+	ns string
 	controller *clusterScanController
 }
 
@@ -125,7 +127,7 @@ func (l *clusterScanLister) Get(namespace, name string) (*v3.ClusterScan, error)
 	}
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
-			Group:    ClusterScanGroupVersionKind.Group,
+			Group: ClusterScanGroupVersionKind.Group,
 			Resource: ClusterScanGroupVersionResource.Resource,
 		}, key)
 	}
@@ -143,10 +145,11 @@ func (c *clusterScanController) Generic() controller.GenericController {
 
 func (c *clusterScanController) Lister() ClusterScanLister {
 	return &clusterScanLister{
-		ns:         c.ns,
+		ns: c.ns,
 		controller: c,
 	}
 }
+
 
 func (c *clusterScanController) AddHandler(ctx context.Context, name string, handler ClusterScanHandlerFunc) {
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
@@ -216,14 +219,14 @@ func (s *clusterScanClient) Controller() ClusterScanController {
 		s.client.controllerFactory.ForResourceKind(ClusterScanGroupVersionResource, ClusterScanGroupVersionKind.Kind, true))
 
 	return &clusterScanController{
-		ns:                s.ns,
+		ns: s.ns,
 		GenericController: genericController,
 	}
 }
 
 type clusterScanClient struct {
-	client       *Client
-	ns           string
+	client *Client
+	ns string
 	objectClient *objectclient.ObjectClient
 	controller   ClusterScanController
 }

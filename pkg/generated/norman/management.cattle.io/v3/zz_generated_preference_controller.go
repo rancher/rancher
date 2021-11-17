@@ -4,10 +4,10 @@ import (
 	"context"
 	"time"
 
-	"github.com/rancher/norman/controller"
-	"github.com/rancher/norman/objectclient"
-	"github.com/rancher/norman/resource"
 	"github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/norman/objectclient"
+	"github.com/rancher/norman/controller"
+	"github.com/rancher/norman/resource"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -29,13 +29,13 @@ var (
 		SingularName: "preference",
 		Namespaced:   true,
 
-		Kind: PreferenceGroupVersionKind.Kind,
+		Kind:         PreferenceGroupVersionKind.Kind,
 	}
 
 	PreferenceGroupVersionResource = schema.GroupVersionResource{
-		Group:    GroupName,
-		Version:  Version,
-		Resource: "preferences",
+		Group:     GroupName,
+		Version:   Version,
+		Resource:  "preferences",
 	}
 )
 
@@ -52,6 +52,8 @@ func NewPreference(namespace, name string, obj v3.Preference) *v3.Preference {
 	obj.Namespace = namespace
 	return &obj
 }
+
+
 
 type PreferenceHandlerFunc func(key string, obj *v3.Preference) (runtime.Object, error)
 
@@ -75,7 +77,7 @@ type PreferenceController interface {
 }
 
 type PreferenceInterface interface {
-	ObjectClient() *objectclient.ObjectClient
+    ObjectClient() *objectclient.ObjectClient
 	Create(*v3.Preference) (*v3.Preference, error)
 	GetNamespaced(namespace, name string, opts metav1.GetOptions) (*v3.Preference, error)
 	Get(name string, opts metav1.GetOptions) (*v3.Preference, error)
@@ -98,7 +100,7 @@ type PreferenceInterface interface {
 }
 
 type preferenceLister struct {
-	ns         string
+	ns string
 	controller *preferenceController
 }
 
@@ -125,7 +127,7 @@ func (l *preferenceLister) Get(namespace, name string) (*v3.Preference, error) {
 	}
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
-			Group:    PreferenceGroupVersionKind.Group,
+			Group: PreferenceGroupVersionKind.Group,
 			Resource: PreferenceGroupVersionResource.Resource,
 		}, key)
 	}
@@ -143,10 +145,11 @@ func (c *preferenceController) Generic() controller.GenericController {
 
 func (c *preferenceController) Lister() PreferenceLister {
 	return &preferenceLister{
-		ns:         c.ns,
+		ns: c.ns,
 		controller: c,
 	}
 }
+
 
 func (c *preferenceController) AddHandler(ctx context.Context, name string, handler PreferenceHandlerFunc) {
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
@@ -216,14 +219,14 @@ func (s *preferenceClient) Controller() PreferenceController {
 		s.client.controllerFactory.ForResourceKind(PreferenceGroupVersionResource, PreferenceGroupVersionKind.Kind, true))
 
 	return &preferenceController{
-		ns:                s.ns,
+		ns: s.ns,
 		GenericController: genericController,
 	}
 }
 
 type preferenceClient struct {
-	client       *Client
-	ns           string
+	client *Client
+	ns string
 	objectClient *objectclient.ObjectClient
 	controller   PreferenceController
 }

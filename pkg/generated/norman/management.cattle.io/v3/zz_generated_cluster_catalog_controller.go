@@ -4,10 +4,10 @@ import (
 	"context"
 	"time"
 
-	"github.com/rancher/norman/controller"
-	"github.com/rancher/norman/objectclient"
-	"github.com/rancher/norman/resource"
 	"github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/norman/objectclient"
+	"github.com/rancher/norman/controller"
+	"github.com/rancher/norman/resource"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -29,13 +29,13 @@ var (
 		SingularName: "clustercatalog",
 		Namespaced:   true,
 
-		Kind: ClusterCatalogGroupVersionKind.Kind,
+		Kind:         ClusterCatalogGroupVersionKind.Kind,
 	}
 
 	ClusterCatalogGroupVersionResource = schema.GroupVersionResource{
-		Group:    GroupName,
-		Version:  Version,
-		Resource: "clustercatalogs",
+		Group:     GroupName,
+		Version:   Version,
+		Resource:  "clustercatalogs",
 	}
 )
 
@@ -52,6 +52,8 @@ func NewClusterCatalog(namespace, name string, obj v3.ClusterCatalog) *v3.Cluste
 	obj.Namespace = namespace
 	return &obj
 }
+
+
 
 type ClusterCatalogHandlerFunc func(key string, obj *v3.ClusterCatalog) (runtime.Object, error)
 
@@ -75,7 +77,7 @@ type ClusterCatalogController interface {
 }
 
 type ClusterCatalogInterface interface {
-	ObjectClient() *objectclient.ObjectClient
+    ObjectClient() *objectclient.ObjectClient
 	Create(*v3.ClusterCatalog) (*v3.ClusterCatalog, error)
 	GetNamespaced(namespace, name string, opts metav1.GetOptions) (*v3.ClusterCatalog, error)
 	Get(name string, opts metav1.GetOptions) (*v3.ClusterCatalog, error)
@@ -98,7 +100,7 @@ type ClusterCatalogInterface interface {
 }
 
 type clusterCatalogLister struct {
-	ns         string
+	ns string
 	controller *clusterCatalogController
 }
 
@@ -125,7 +127,7 @@ func (l *clusterCatalogLister) Get(namespace, name string) (*v3.ClusterCatalog, 
 	}
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
-			Group:    ClusterCatalogGroupVersionKind.Group,
+			Group: ClusterCatalogGroupVersionKind.Group,
 			Resource: ClusterCatalogGroupVersionResource.Resource,
 		}, key)
 	}
@@ -143,10 +145,11 @@ func (c *clusterCatalogController) Generic() controller.GenericController {
 
 func (c *clusterCatalogController) Lister() ClusterCatalogLister {
 	return &clusterCatalogLister{
-		ns:         c.ns,
+		ns: c.ns,
 		controller: c,
 	}
 }
+
 
 func (c *clusterCatalogController) AddHandler(ctx context.Context, name string, handler ClusterCatalogHandlerFunc) {
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
@@ -216,14 +219,14 @@ func (s *clusterCatalogClient) Controller() ClusterCatalogController {
 		s.client.controllerFactory.ForResourceKind(ClusterCatalogGroupVersionResource, ClusterCatalogGroupVersionKind.Kind, true))
 
 	return &clusterCatalogController{
-		ns:                s.ns,
+		ns: s.ns,
 		GenericController: genericController,
 	}
 }
 
 type clusterCatalogClient struct {
-	client       *Client
-	ns           string
+	client *Client
+	ns string
 	objectClient *objectclient.ObjectClient
 	controller   ClusterCatalogController
 }

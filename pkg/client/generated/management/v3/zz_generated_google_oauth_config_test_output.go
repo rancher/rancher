@@ -1,10 +1,19 @@
 package client
 
+
+	
+
+
+import (
+	
+)
+
 const (
-	GoogleOauthConfigTestOutputType             = "googleOauthConfigTestOutput"
+    GoogleOauthConfigTestOutputType = "googleOauthConfigTestOutput"
 	GoogleOauthConfigTestOutputFieldRedirectURL = "redirectUrl"
 )
 
 type GoogleOauthConfigTestOutput struct {
-	RedirectURL string `json:"redirectUrl,omitempty" yaml:"redirectUrl,omitempty"`
+        RedirectURL string `json:"redirectUrl,omitempty" yaml:"redirectUrl,omitempty"`
 }
+

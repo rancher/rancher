@@ -1,10 +1,19 @@
 package client
 
+
+	
+
+
+import (
+	
+)
+
 const (
-	SetPodSecurityPolicyTemplateInputType                               = "setPodSecurityPolicyTemplateInput"
+    SetPodSecurityPolicyTemplateInputType = "setPodSecurityPolicyTemplateInput"
 	SetPodSecurityPolicyTemplateInputFieldPodSecurityPolicyTemplateName = "podSecurityPolicyTemplateId"
 )
 
 type SetPodSecurityPolicyTemplateInput struct {
-	PodSecurityPolicyTemplateName string `json:"podSecurityPolicyTemplateId,omitempty" yaml:"podSecurityPolicyTemplateId,omitempty"`
+        PodSecurityPolicyTemplateName string `json:"podSecurityPolicyTemplateId,omitempty" yaml:"podSecurityPolicyTemplateId,omitempty"`
 }
+

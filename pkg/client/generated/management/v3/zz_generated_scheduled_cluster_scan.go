@@ -1,14 +1,27 @@
 package client
 
+
+	
+
+	
+
+	
+
+
+import (
+	
+)
+
 const (
-	ScheduledClusterScanType                = "scheduledClusterScan"
-	ScheduledClusterScanFieldEnabled        = "enabled"
-	ScheduledClusterScanFieldScanConfig     = "scanConfig"
+    ScheduledClusterScanType = "scheduledClusterScan"
+	ScheduledClusterScanFieldEnabled = "enabled"
+	ScheduledClusterScanFieldScanConfig = "scanConfig"
 	ScheduledClusterScanFieldScheduleConfig = "scheduleConfig"
 )
 
 type ScheduledClusterScan struct {
-	Enabled        bool                        `json:"enabled,omitempty" yaml:"enabled,omitempty"`
-	ScanConfig     *ClusterScanConfig          `json:"scanConfig,omitempty" yaml:"scanConfig,omitempty"`
-	ScheduleConfig *ScheduledClusterScanConfig `json:"scheduleConfig,omitempty" yaml:"scheduleConfig,omitempty"`
+        Enabled bool `json:"enabled,omitempty" yaml:"enabled,omitempty"`
+        ScanConfig *ClusterScanConfig `json:"scanConfig,omitempty" yaml:"scanConfig,omitempty"`
+        ScheduleConfig *ScheduledClusterScanConfig `json:"scheduleConfig,omitempty" yaml:"scheduleConfig,omitempty"`
 }
+

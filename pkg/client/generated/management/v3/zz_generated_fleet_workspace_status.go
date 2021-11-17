@@ -1,8 +1,15 @@
 package client
 
+
+
+import (
+	
+)
+
 const (
-	FleetWorkspaceStatusType = "fleetWorkspaceStatus"
+    FleetWorkspaceStatusType = "fleetWorkspaceStatus"
 )
 
 type FleetWorkspaceStatus struct {
 }
+

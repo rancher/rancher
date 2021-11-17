@@ -1,14 +1,27 @@
 package client
 
+
+	
+
+	
+
+	
+
+
+import (
+	
+)
+
 const (
-	LabelSelectorRequirementType          = "labelSelectorRequirement"
-	LabelSelectorRequirementFieldKey      = "key"
+    LabelSelectorRequirementType = "labelSelectorRequirement"
+	LabelSelectorRequirementFieldKey = "key"
 	LabelSelectorRequirementFieldOperator = "operator"
-	LabelSelectorRequirementFieldValues   = "values"
+	LabelSelectorRequirementFieldValues = "values"
 )
 
 type LabelSelectorRequirement struct {
-	Key      string   `json:"key,omitempty" yaml:"key,omitempty"`
-	Operator string   `json:"operator,omitempty" yaml:"operator,omitempty"`
-	Values   []string `json:"values,omitempty" yaml:"values,omitempty"`
+        Key string `json:"key,omitempty" yaml:"key,omitempty"`
+        Operator string `json:"operator,omitempty" yaml:"operator,omitempty"`
+        Values []string `json:"values,omitempty" yaml:"values,omitempty"`
 }
+

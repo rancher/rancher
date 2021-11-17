@@ -1,10 +1,19 @@
 package client
 
+
+	
+
+
+import (
+	
+)
+
 const (
-	ClusterMetricNamesInputType             = "clusterMetricNamesInput"
+    ClusterMetricNamesInputType = "clusterMetricNamesInput"
 	ClusterMetricNamesInputFieldClusterName = "clusterId"
 )
 
 type ClusterMetricNamesInput struct {
-	ClusterName string `json:"clusterId,omitempty" yaml:"clusterId,omitempty"`
+        ClusterName string `json:"clusterId,omitempty" yaml:"clusterId,omitempty"`
 }
+

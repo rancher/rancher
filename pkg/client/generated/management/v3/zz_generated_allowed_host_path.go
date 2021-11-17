@@ -1,12 +1,23 @@
 package client
 
+
+	
+
+	
+
+
+import (
+	
+)
+
 const (
-	AllowedHostPathType            = "allowedHostPath"
+    AllowedHostPathType = "allowedHostPath"
 	AllowedHostPathFieldPathPrefix = "pathPrefix"
-	AllowedHostPathFieldReadOnly   = "readOnly"
+	AllowedHostPathFieldReadOnly = "readOnly"
 )
 
 type AllowedHostPath struct {
-	PathPrefix string `json:"pathPrefix,omitempty" yaml:"pathPrefix,omitempty"`
-	ReadOnly   bool   `json:"readOnly,omitempty" yaml:"readOnly,omitempty"`
+        PathPrefix string `json:"pathPrefix,omitempty" yaml:"pathPrefix,omitempty"`
+        ReadOnly bool `json:"readOnly,omitempty" yaml:"readOnly,omitempty"`
 }
+

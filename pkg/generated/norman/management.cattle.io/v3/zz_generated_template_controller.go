@@ -4,10 +4,10 @@ import (
 	"context"
 	"time"
 
-	"github.com/rancher/norman/controller"
-	"github.com/rancher/norman/objectclient"
-	"github.com/rancher/norman/resource"
 	"github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/norman/objectclient"
+	"github.com/rancher/norman/controller"
+	"github.com/rancher/norman/resource"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -32,9 +32,9 @@ var (
 	}
 
 	TemplateGroupVersionResource = schema.GroupVersionResource{
-		Group:    GroupName,
-		Version:  Version,
-		Resource: "templates",
+		Group:     GroupName,
+		Version:   Version,
+		Resource:  "templates",
 	}
 )
 
@@ -51,6 +51,8 @@ func NewTemplate(namespace, name string, obj v3.Template) *v3.Template {
 	obj.Namespace = namespace
 	return &obj
 }
+
+
 
 type TemplateHandlerFunc func(key string, obj *v3.Template) (runtime.Object, error)
 
@@ -74,7 +76,7 @@ type TemplateController interface {
 }
 
 type TemplateInterface interface {
-	ObjectClient() *objectclient.ObjectClient
+    ObjectClient() *objectclient.ObjectClient
 	Create(*v3.Template) (*v3.Template, error)
 	GetNamespaced(namespace, name string, opts metav1.GetOptions) (*v3.Template, error)
 	Get(name string, opts metav1.GetOptions) (*v3.Template, error)
@@ -97,7 +99,7 @@ type TemplateInterface interface {
 }
 
 type templateLister struct {
-	ns         string
+	ns string
 	controller *templateController
 }
 
@@ -124,7 +126,7 @@ func (l *templateLister) Get(namespace, name string) (*v3.Template, error) {
 	}
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
-			Group:    TemplateGroupVersionKind.Group,
+			Group: TemplateGroupVersionKind.Group,
 			Resource: TemplateGroupVersionResource.Resource,
 		}, key)
 	}
@@ -142,10 +144,11 @@ func (c *templateController) Generic() controller.GenericController {
 
 func (c *templateController) Lister() TemplateLister {
 	return &templateLister{
-		ns:         c.ns,
+		ns: c.ns,
 		controller: c,
 	}
 }
+
 
 func (c *templateController) AddHandler(ctx context.Context, name string, handler TemplateHandlerFunc) {
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
@@ -215,14 +218,14 @@ func (s *templateClient) Controller() TemplateController {
 		s.client.controllerFactory.ForResourceKind(TemplateGroupVersionResource, TemplateGroupVersionKind.Kind, false))
 
 	return &templateController{
-		ns:                s.ns,
+		ns: s.ns,
 		GenericController: genericController,
 	}
 }
 
 type templateClient struct {
-	client       *Client
-	ns           string
+	client *Client
+	ns string
 	objectClient *objectclient.ObjectClient
 	controller   TemplateController
 }

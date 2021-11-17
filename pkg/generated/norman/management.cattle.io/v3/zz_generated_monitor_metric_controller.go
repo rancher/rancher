@@ -4,10 +4,10 @@ import (
 	"context"
 	"time"
 
-	"github.com/rancher/norman/controller"
-	"github.com/rancher/norman/objectclient"
-	"github.com/rancher/norman/resource"
 	"github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/norman/objectclient"
+	"github.com/rancher/norman/controller"
+	"github.com/rancher/norman/resource"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -29,13 +29,13 @@ var (
 		SingularName: "monitormetric",
 		Namespaced:   true,
 
-		Kind: MonitorMetricGroupVersionKind.Kind,
+		Kind:         MonitorMetricGroupVersionKind.Kind,
 	}
 
 	MonitorMetricGroupVersionResource = schema.GroupVersionResource{
-		Group:    GroupName,
-		Version:  Version,
-		Resource: "monitormetrics",
+		Group:     GroupName,
+		Version:   Version,
+		Resource:  "monitormetrics",
 	}
 )
 
@@ -52,6 +52,8 @@ func NewMonitorMetric(namespace, name string, obj v3.MonitorMetric) *v3.MonitorM
 	obj.Namespace = namespace
 	return &obj
 }
+
+
 
 type MonitorMetricHandlerFunc func(key string, obj *v3.MonitorMetric) (runtime.Object, error)
 
@@ -75,7 +77,7 @@ type MonitorMetricController interface {
 }
 
 type MonitorMetricInterface interface {
-	ObjectClient() *objectclient.ObjectClient
+    ObjectClient() *objectclient.ObjectClient
 	Create(*v3.MonitorMetric) (*v3.MonitorMetric, error)
 	GetNamespaced(namespace, name string, opts metav1.GetOptions) (*v3.MonitorMetric, error)
 	Get(name string, opts metav1.GetOptions) (*v3.MonitorMetric, error)
@@ -98,7 +100,7 @@ type MonitorMetricInterface interface {
 }
 
 type monitorMetricLister struct {
-	ns         string
+	ns string
 	controller *monitorMetricController
 }
 
@@ -125,7 +127,7 @@ func (l *monitorMetricLister) Get(namespace, name string) (*v3.MonitorMetric, er
 	}
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
-			Group:    MonitorMetricGroupVersionKind.Group,
+			Group: MonitorMetricGroupVersionKind.Group,
 			Resource: MonitorMetricGroupVersionResource.Resource,
 		}, key)
 	}
@@ -143,10 +145,11 @@ func (c *monitorMetricController) Generic() controller.GenericController {
 
 func (c *monitorMetricController) Lister() MonitorMetricLister {
 	return &monitorMetricLister{
-		ns:         c.ns,
+		ns: c.ns,
 		controller: c,
 	}
 }
+
 
 func (c *monitorMetricController) AddHandler(ctx context.Context, name string, handler MonitorMetricHandlerFunc) {
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
@@ -216,14 +219,14 @@ func (s *monitorMetricClient) Controller() MonitorMetricController {
 		s.client.controllerFactory.ForResourceKind(MonitorMetricGroupVersionResource, MonitorMetricGroupVersionKind.Kind, true))
 
 	return &monitorMetricController{
-		ns:                s.ns,
+		ns: s.ns,
 		GenericController: genericController,
 	}
 }
 
 type monitorMetricClient struct {
-	client       *Client
-	ns           string
+	client *Client
+	ns string
 	objectClient *objectclient.ObjectClient
 	controller   MonitorMetricController
 }

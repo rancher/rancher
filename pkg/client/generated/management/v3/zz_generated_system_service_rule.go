@@ -1,10 +1,19 @@
 package client
 
+
+	
+
+
+import (
+	
+)
+
 const (
-	SystemServiceRuleType           = "systemServiceRule"
+    SystemServiceRuleType = "systemServiceRule"
 	SystemServiceRuleFieldCondition = "condition"
 )
 
 type SystemServiceRule struct {
-	Condition string `json:"condition,omitempty" yaml:"condition,omitempty"`
+        Condition string `json:"condition,omitempty" yaml:"condition,omitempty"`
 }
+

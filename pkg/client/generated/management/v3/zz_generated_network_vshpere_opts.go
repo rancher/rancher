@@ -1,10 +1,19 @@
 package client
 
+
+	
+
+
+import (
+	
+)
+
 const (
-	NetworkVshpereOptsType               = "networkVshpereOpts"
+    NetworkVshpereOptsType = "networkVshpereOpts"
 	NetworkVshpereOptsFieldPublicNetwork = "public-network"
 )
 
 type NetworkVshpereOpts struct {
-	PublicNetwork string `json:"public-network,omitempty" yaml:"public-network,omitempty"`
+        PublicNetwork string `json:"public-network,omitempty" yaml:"public-network,omitempty"`
 }
+

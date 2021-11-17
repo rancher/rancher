@@ -4,10 +4,10 @@ import (
 	"context"
 	"time"
 
-	"github.com/rancher/norman/controller"
-	"github.com/rancher/norman/objectclient"
-	"github.com/rancher/norman/resource"
 	"github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/norman/objectclient"
+	"github.com/rancher/norman/controller"
+	"github.com/rancher/norman/resource"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -29,13 +29,13 @@ var (
 		SingularName: "clusterroletemplatebinding",
 		Namespaced:   true,
 
-		Kind: ClusterRoleTemplateBindingGroupVersionKind.Kind,
+		Kind:         ClusterRoleTemplateBindingGroupVersionKind.Kind,
 	}
 
 	ClusterRoleTemplateBindingGroupVersionResource = schema.GroupVersionResource{
-		Group:    GroupName,
-		Version:  Version,
-		Resource: "clusterroletemplatebindings",
+		Group:     GroupName,
+		Version:   Version,
+		Resource:  "clusterroletemplatebindings",
 	}
 )
 
@@ -52,6 +52,8 @@ func NewClusterRoleTemplateBinding(namespace, name string, obj v3.ClusterRoleTem
 	obj.Namespace = namespace
 	return &obj
 }
+
+
 
 type ClusterRoleTemplateBindingHandlerFunc func(key string, obj *v3.ClusterRoleTemplateBinding) (runtime.Object, error)
 
@@ -75,7 +77,7 @@ type ClusterRoleTemplateBindingController interface {
 }
 
 type ClusterRoleTemplateBindingInterface interface {
-	ObjectClient() *objectclient.ObjectClient
+    ObjectClient() *objectclient.ObjectClient
 	Create(*v3.ClusterRoleTemplateBinding) (*v3.ClusterRoleTemplateBinding, error)
 	GetNamespaced(namespace, name string, opts metav1.GetOptions) (*v3.ClusterRoleTemplateBinding, error)
 	Get(name string, opts metav1.GetOptions) (*v3.ClusterRoleTemplateBinding, error)
@@ -98,7 +100,7 @@ type ClusterRoleTemplateBindingInterface interface {
 }
 
 type clusterRoleTemplateBindingLister struct {
-	ns         string
+	ns string
 	controller *clusterRoleTemplateBindingController
 }
 
@@ -125,7 +127,7 @@ func (l *clusterRoleTemplateBindingLister) Get(namespace, name string) (*v3.Clus
 	}
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
-			Group:    ClusterRoleTemplateBindingGroupVersionKind.Group,
+			Group: ClusterRoleTemplateBindingGroupVersionKind.Group,
 			Resource: ClusterRoleTemplateBindingGroupVersionResource.Resource,
 		}, key)
 	}
@@ -143,10 +145,11 @@ func (c *clusterRoleTemplateBindingController) Generic() controller.GenericContr
 
 func (c *clusterRoleTemplateBindingController) Lister() ClusterRoleTemplateBindingLister {
 	return &clusterRoleTemplateBindingLister{
-		ns:         c.ns,
+		ns: c.ns,
 		controller: c,
 	}
 }
+
 
 func (c *clusterRoleTemplateBindingController) AddHandler(ctx context.Context, name string, handler ClusterRoleTemplateBindingHandlerFunc) {
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
@@ -216,14 +219,14 @@ func (s *clusterRoleTemplateBindingClient) Controller() ClusterRoleTemplateBindi
 		s.client.controllerFactory.ForResourceKind(ClusterRoleTemplateBindingGroupVersionResource, ClusterRoleTemplateBindingGroupVersionKind.Kind, true))
 
 	return &clusterRoleTemplateBindingController{
-		ns:                s.ns,
+		ns: s.ns,
 		GenericController: genericController,
 	}
 }
 
 type clusterRoleTemplateBindingClient struct {
-	client       *Client
-	ns           string
+	client *Client
+	ns string
 	objectClient *objectclient.ObjectClient
 	controller   ClusterRoleTemplateBindingController
 }

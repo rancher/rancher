@@ -4,10 +4,10 @@ import (
 	"context"
 	"time"
 
-	"github.com/rancher/norman/controller"
-	"github.com/rancher/norman/objectclient"
-	"github.com/rancher/norman/resource"
 	"github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/norman/objectclient"
+	"github.com/rancher/norman/controller"
+	"github.com/rancher/norman/resource"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -29,13 +29,13 @@ var (
 		SingularName: "clusteralert",
 		Namespaced:   true,
 
-		Kind: ClusterAlertGroupVersionKind.Kind,
+		Kind:         ClusterAlertGroupVersionKind.Kind,
 	}
 
 	ClusterAlertGroupVersionResource = schema.GroupVersionResource{
-		Group:    GroupName,
-		Version:  Version,
-		Resource: "clusteralerts",
+		Group:     GroupName,
+		Version:   Version,
+		Resource:  "clusteralerts",
 	}
 )
 
@@ -52,6 +52,8 @@ func NewClusterAlert(namespace, name string, obj v3.ClusterAlert) *v3.ClusterAle
 	obj.Namespace = namespace
 	return &obj
 }
+
+
 
 type ClusterAlertHandlerFunc func(key string, obj *v3.ClusterAlert) (runtime.Object, error)
 
@@ -75,7 +77,7 @@ type ClusterAlertController interface {
 }
 
 type ClusterAlertInterface interface {
-	ObjectClient() *objectclient.ObjectClient
+    ObjectClient() *objectclient.ObjectClient
 	Create(*v3.ClusterAlert) (*v3.ClusterAlert, error)
 	GetNamespaced(namespace, name string, opts metav1.GetOptions) (*v3.ClusterAlert, error)
 	Get(name string, opts metav1.GetOptions) (*v3.ClusterAlert, error)
@@ -98,7 +100,7 @@ type ClusterAlertInterface interface {
 }
 
 type clusterAlertLister struct {
-	ns         string
+	ns string
 	controller *clusterAlertController
 }
 
@@ -125,7 +127,7 @@ func (l *clusterAlertLister) Get(namespace, name string) (*v3.ClusterAlert, erro
 	}
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
-			Group:    ClusterAlertGroupVersionKind.Group,
+			Group: ClusterAlertGroupVersionKind.Group,
 			Resource: ClusterAlertGroupVersionResource.Resource,
 		}, key)
 	}
@@ -143,10 +145,11 @@ func (c *clusterAlertController) Generic() controller.GenericController {
 
 func (c *clusterAlertController) Lister() ClusterAlertLister {
 	return &clusterAlertLister{
-		ns:         c.ns,
+		ns: c.ns,
 		controller: c,
 	}
 }
+
 
 func (c *clusterAlertController) AddHandler(ctx context.Context, name string, handler ClusterAlertHandlerFunc) {
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
@@ -216,14 +219,14 @@ func (s *clusterAlertClient) Controller() ClusterAlertController {
 		s.client.controllerFactory.ForResourceKind(ClusterAlertGroupVersionResource, ClusterAlertGroupVersionKind.Kind, true))
 
 	return &clusterAlertController{
-		ns:                s.ns,
+		ns: s.ns,
 		GenericController: genericController,
 	}
 }
 
 type clusterAlertClient struct {
-	client       *Client
-	ns           string
+	client *Client
+	ns string
 	objectClient *objectclient.ObjectClient
 	controller   ClusterAlertController
 }

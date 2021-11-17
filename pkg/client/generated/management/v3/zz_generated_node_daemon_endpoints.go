@@ -1,10 +1,19 @@
 package client
 
+
+	
+
+
+import (
+	
+)
+
 const (
-	NodeDaemonEndpointsType                 = "nodeDaemonEndpoints"
+    NodeDaemonEndpointsType = "nodeDaemonEndpoints"
 	NodeDaemonEndpointsFieldKubeletEndpoint = "kubeletEndpoint"
 )
 
 type NodeDaemonEndpoints struct {
-	KubeletEndpoint *DaemonEndpoint `json:"kubeletEndpoint,omitempty" yaml:"kubeletEndpoint,omitempty"`
+        KubeletEndpoint *DaemonEndpoint `json:"kubeletEndpoint,omitempty" yaml:"kubeletEndpoint,omitempty"`
 }
+

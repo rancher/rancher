@@ -4,10 +4,10 @@ import (
 	"context"
 	"time"
 
-	"github.com/rancher/norman/controller"
-	"github.com/rancher/norman/objectclient"
-	"github.com/rancher/norman/resource"
 	"github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/norman/objectclient"
+	"github.com/rancher/norman/controller"
+	"github.com/rancher/norman/resource"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -29,13 +29,13 @@ var (
 		SingularName: "projectcatalog",
 		Namespaced:   true,
 
-		Kind: ProjectCatalogGroupVersionKind.Kind,
+		Kind:         ProjectCatalogGroupVersionKind.Kind,
 	}
 
 	ProjectCatalogGroupVersionResource = schema.GroupVersionResource{
-		Group:    GroupName,
-		Version:  Version,
-		Resource: "projectcatalogs",
+		Group:     GroupName,
+		Version:   Version,
+		Resource:  "projectcatalogs",
 	}
 )
 
@@ -52,6 +52,8 @@ func NewProjectCatalog(namespace, name string, obj v3.ProjectCatalog) *v3.Projec
 	obj.Namespace = namespace
 	return &obj
 }
+
+
 
 type ProjectCatalogHandlerFunc func(key string, obj *v3.ProjectCatalog) (runtime.Object, error)
 
@@ -75,7 +77,7 @@ type ProjectCatalogController interface {
 }
 
 type ProjectCatalogInterface interface {
-	ObjectClient() *objectclient.ObjectClient
+    ObjectClient() *objectclient.ObjectClient
 	Create(*v3.ProjectCatalog) (*v3.ProjectCatalog, error)
 	GetNamespaced(namespace, name string, opts metav1.GetOptions) (*v3.ProjectCatalog, error)
 	Get(name string, opts metav1.GetOptions) (*v3.ProjectCatalog, error)
@@ -98,7 +100,7 @@ type ProjectCatalogInterface interface {
 }
 
 type projectCatalogLister struct {
-	ns         string
+	ns string
 	controller *projectCatalogController
 }
 
@@ -125,7 +127,7 @@ func (l *projectCatalogLister) Get(namespace, name string) (*v3.ProjectCatalog, 
 	}
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
-			Group:    ProjectCatalogGroupVersionKind.Group,
+			Group: ProjectCatalogGroupVersionKind.Group,
 			Resource: ProjectCatalogGroupVersionResource.Resource,
 		}, key)
 	}
@@ -143,10 +145,11 @@ func (c *projectCatalogController) Generic() controller.GenericController {
 
 func (c *projectCatalogController) Lister() ProjectCatalogLister {
 	return &projectCatalogLister{
-		ns:         c.ns,
+		ns: c.ns,
 		controller: c,
 	}
 }
+
 
 func (c *projectCatalogController) AddHandler(ctx context.Context, name string, handler ProjectCatalogHandlerFunc) {
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
@@ -216,14 +219,14 @@ func (s *projectCatalogClient) Controller() ProjectCatalogController {
 		s.client.controllerFactory.ForResourceKind(ProjectCatalogGroupVersionResource, ProjectCatalogGroupVersionKind.Kind, true))
 
 	return &projectCatalogController{
-		ns:                s.ns,
+		ns: s.ns,
 		GenericController: genericController,
 	}
 }
 
 type projectCatalogClient struct {
-	client       *Client
-	ns           string
+	client *Client
+	ns string
 	objectClient *objectclient.ObjectClient
 	controller   ProjectCatalogController
 }

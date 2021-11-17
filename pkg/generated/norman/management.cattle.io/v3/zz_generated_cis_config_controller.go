@@ -4,10 +4,10 @@ import (
 	"context"
 	"time"
 
-	"github.com/rancher/norman/controller"
-	"github.com/rancher/norman/objectclient"
-	"github.com/rancher/norman/resource"
 	"github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/norman/objectclient"
+	"github.com/rancher/norman/controller"
+	"github.com/rancher/norman/resource"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -29,13 +29,13 @@ var (
 		SingularName: "cisconfig",
 		Namespaced:   true,
 
-		Kind: CisConfigGroupVersionKind.Kind,
+		Kind:         CisConfigGroupVersionKind.Kind,
 	}
 
 	CisConfigGroupVersionResource = schema.GroupVersionResource{
-		Group:    GroupName,
-		Version:  Version,
-		Resource: "cisconfigs",
+		Group:     GroupName,
+		Version:   Version,
+		Resource:  "cisconfigs",
 	}
 )
 
@@ -52,6 +52,8 @@ func NewCisConfig(namespace, name string, obj v3.CisConfig) *v3.CisConfig {
 	obj.Namespace = namespace
 	return &obj
 }
+
+
 
 type CisConfigHandlerFunc func(key string, obj *v3.CisConfig) (runtime.Object, error)
 
@@ -75,7 +77,7 @@ type CisConfigController interface {
 }
 
 type CisConfigInterface interface {
-	ObjectClient() *objectclient.ObjectClient
+    ObjectClient() *objectclient.ObjectClient
 	Create(*v3.CisConfig) (*v3.CisConfig, error)
 	GetNamespaced(namespace, name string, opts metav1.GetOptions) (*v3.CisConfig, error)
 	Get(name string, opts metav1.GetOptions) (*v3.CisConfig, error)
@@ -98,7 +100,7 @@ type CisConfigInterface interface {
 }
 
 type cisConfigLister struct {
-	ns         string
+	ns string
 	controller *cisConfigController
 }
 
@@ -125,7 +127,7 @@ func (l *cisConfigLister) Get(namespace, name string) (*v3.CisConfig, error) {
 	}
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
-			Group:    CisConfigGroupVersionKind.Group,
+			Group: CisConfigGroupVersionKind.Group,
 			Resource: CisConfigGroupVersionResource.Resource,
 		}, key)
 	}
@@ -143,10 +145,11 @@ func (c *cisConfigController) Generic() controller.GenericController {
 
 func (c *cisConfigController) Lister() CisConfigLister {
 	return &cisConfigLister{
-		ns:         c.ns,
+		ns: c.ns,
 		controller: c,
 	}
 }
+
 
 func (c *cisConfigController) AddHandler(ctx context.Context, name string, handler CisConfigHandlerFunc) {
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
@@ -216,14 +219,14 @@ func (s *cisConfigClient) Controller() CisConfigController {
 		s.client.controllerFactory.ForResourceKind(CisConfigGroupVersionResource, CisConfigGroupVersionKind.Kind, true))
 
 	return &cisConfigController{
-		ns:                s.ns,
+		ns: s.ns,
 		GenericController: genericController,
 	}
 }
 
 type cisConfigClient struct {
-	client       *Client
-	ns           string
+	client *Client
+	ns string
 	objectClient *objectclient.ObjectClient
 	controller   CisConfigController
 }

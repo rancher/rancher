@@ -1,10 +1,19 @@
 package client
 
+
+	
+
+
+import (
+	
+)
+
 const (
-	CisConfigParamsType                  = "cisConfigParams"
+    CisConfigParamsType = "cisConfigParams"
 	CisConfigParamsFieldBenchmarkVersion = "benchmarkVersion"
 )
 
 type CisConfigParams struct {
-	BenchmarkVersion string `json:"benchmarkVersion,omitempty" yaml:"benchmarkVersion,omitempty"`
+        BenchmarkVersion string `json:"benchmarkVersion,omitempty" yaml:"benchmarkVersion,omitempty"`
 }
+

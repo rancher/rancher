@@ -1,10 +1,19 @@
 package client
 
+
+	
+
+
+import (
+	
+)
+
 const (
-	CatalogRefreshType          = "catalogRefresh"
+    CatalogRefreshType = "catalogRefresh"
 	CatalogRefreshFieldCatalogs = "catalogs"
 )
 
 type CatalogRefresh struct {
-	Catalogs []string `json:"catalogs,omitempty" yaml:"catalogs,omitempty"`
+        Catalogs []string `json:"catalogs,omitempty" yaml:"catalogs,omitempty"`
 }
+

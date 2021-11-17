@@ -4,10 +4,10 @@ import (
 	"context"
 	"time"
 
-	"github.com/rancher/norman/controller"
-	"github.com/rancher/norman/objectclient"
-	"github.com/rancher/norman/resource"
 	"github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/norman/objectclient"
+	"github.com/rancher/norman/controller"
+	"github.com/rancher/norman/resource"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -29,13 +29,13 @@ var (
 		SingularName: "rkek8sserviceoption",
 		Namespaced:   true,
 
-		Kind: RkeK8sServiceOptionGroupVersionKind.Kind,
+		Kind:         RkeK8sServiceOptionGroupVersionKind.Kind,
 	}
 
 	RkeK8sServiceOptionGroupVersionResource = schema.GroupVersionResource{
-		Group:    GroupName,
-		Version:  Version,
-		Resource: "rkek8sserviceoptions",
+		Group:     GroupName,
+		Version:   Version,
+		Resource:  "rkek8sserviceoptions",
 	}
 )
 
@@ -52,6 +52,8 @@ func NewRkeK8sServiceOption(namespace, name string, obj v3.RkeK8sServiceOption) 
 	obj.Namespace = namespace
 	return &obj
 }
+
+
 
 type RkeK8sServiceOptionHandlerFunc func(key string, obj *v3.RkeK8sServiceOption) (runtime.Object, error)
 
@@ -75,7 +77,7 @@ type RkeK8sServiceOptionController interface {
 }
 
 type RkeK8sServiceOptionInterface interface {
-	ObjectClient() *objectclient.ObjectClient
+    ObjectClient() *objectclient.ObjectClient
 	Create(*v3.RkeK8sServiceOption) (*v3.RkeK8sServiceOption, error)
 	GetNamespaced(namespace, name string, opts metav1.GetOptions) (*v3.RkeK8sServiceOption, error)
 	Get(name string, opts metav1.GetOptions) (*v3.RkeK8sServiceOption, error)
@@ -98,7 +100,7 @@ type RkeK8sServiceOptionInterface interface {
 }
 
 type rkeK8sServiceOptionLister struct {
-	ns         string
+	ns string
 	controller *rkeK8sServiceOptionController
 }
 
@@ -125,7 +127,7 @@ func (l *rkeK8sServiceOptionLister) Get(namespace, name string) (*v3.RkeK8sServi
 	}
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
-			Group:    RkeK8sServiceOptionGroupVersionKind.Group,
+			Group: RkeK8sServiceOptionGroupVersionKind.Group,
 			Resource: RkeK8sServiceOptionGroupVersionResource.Resource,
 		}, key)
 	}
@@ -143,10 +145,11 @@ func (c *rkeK8sServiceOptionController) Generic() controller.GenericController {
 
 func (c *rkeK8sServiceOptionController) Lister() RkeK8sServiceOptionLister {
 	return &rkeK8sServiceOptionLister{
-		ns:         c.ns,
+		ns: c.ns,
 		controller: c,
 	}
 }
+
 
 func (c *rkeK8sServiceOptionController) AddHandler(ctx context.Context, name string, handler RkeK8sServiceOptionHandlerFunc) {
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
@@ -216,14 +219,14 @@ func (s *rkeK8sServiceOptionClient) Controller() RkeK8sServiceOptionController {
 		s.client.controllerFactory.ForResourceKind(RkeK8sServiceOptionGroupVersionResource, RkeK8sServiceOptionGroupVersionKind.Kind, true))
 
 	return &rkeK8sServiceOptionController{
-		ns:                s.ns,
+		ns: s.ns,
 		GenericController: genericController,
 	}
 }
 
 type rkeK8sServiceOptionClient struct {
-	client       *Client
-	ns           string
+	client *Client
+	ns string
 	objectClient *objectclient.ObjectClient
 	controller   RkeK8sServiceOptionController
 }

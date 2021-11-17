@@ -4,10 +4,10 @@ import (
 	"context"
 	"time"
 
-	"github.com/rancher/norman/controller"
-	"github.com/rancher/norman/objectclient"
-	"github.com/rancher/norman/resource"
 	"github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/norman/objectclient"
+	"github.com/rancher/norman/controller"
+	"github.com/rancher/norman/resource"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -29,13 +29,13 @@ var (
 		SingularName: "clustermonitorgraph",
 		Namespaced:   true,
 
-		Kind: ClusterMonitorGraphGroupVersionKind.Kind,
+		Kind:         ClusterMonitorGraphGroupVersionKind.Kind,
 	}
 
 	ClusterMonitorGraphGroupVersionResource = schema.GroupVersionResource{
-		Group:    GroupName,
-		Version:  Version,
-		Resource: "clustermonitorgraphs",
+		Group:     GroupName,
+		Version:   Version,
+		Resource:  "clustermonitorgraphs",
 	}
 )
 
@@ -52,6 +52,8 @@ func NewClusterMonitorGraph(namespace, name string, obj v3.ClusterMonitorGraph) 
 	obj.Namespace = namespace
 	return &obj
 }
+
+
 
 type ClusterMonitorGraphHandlerFunc func(key string, obj *v3.ClusterMonitorGraph) (runtime.Object, error)
 
@@ -75,7 +77,7 @@ type ClusterMonitorGraphController interface {
 }
 
 type ClusterMonitorGraphInterface interface {
-	ObjectClient() *objectclient.ObjectClient
+    ObjectClient() *objectclient.ObjectClient
 	Create(*v3.ClusterMonitorGraph) (*v3.ClusterMonitorGraph, error)
 	GetNamespaced(namespace, name string, opts metav1.GetOptions) (*v3.ClusterMonitorGraph, error)
 	Get(name string, opts metav1.GetOptions) (*v3.ClusterMonitorGraph, error)
@@ -98,7 +100,7 @@ type ClusterMonitorGraphInterface interface {
 }
 
 type clusterMonitorGraphLister struct {
-	ns         string
+	ns string
 	controller *clusterMonitorGraphController
 }
 
@@ -125,7 +127,7 @@ func (l *clusterMonitorGraphLister) Get(namespace, name string) (*v3.ClusterMoni
 	}
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
-			Group:    ClusterMonitorGraphGroupVersionKind.Group,
+			Group: ClusterMonitorGraphGroupVersionKind.Group,
 			Resource: ClusterMonitorGraphGroupVersionResource.Resource,
 		}, key)
 	}
@@ -143,10 +145,11 @@ func (c *clusterMonitorGraphController) Generic() controller.GenericController {
 
 func (c *clusterMonitorGraphController) Lister() ClusterMonitorGraphLister {
 	return &clusterMonitorGraphLister{
-		ns:         c.ns,
+		ns: c.ns,
 		controller: c,
 	}
 }
+
 
 func (c *clusterMonitorGraphController) AddHandler(ctx context.Context, name string, handler ClusterMonitorGraphHandlerFunc) {
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
@@ -216,14 +219,14 @@ func (s *clusterMonitorGraphClient) Controller() ClusterMonitorGraphController {
 		s.client.controllerFactory.ForResourceKind(ClusterMonitorGraphGroupVersionResource, ClusterMonitorGraphGroupVersionKind.Kind, true))
 
 	return &clusterMonitorGraphController{
-		ns:                s.ns,
+		ns: s.ns,
 		GenericController: genericController,
 	}
 }
 
 type clusterMonitorGraphClient struct {
-	client       *Client
-	ns           string
+	client *Client
+	ns string
 	objectClient *objectclient.ObjectClient
 	controller   ClusterMonitorGraphController
 }

@@ -1,12 +1,23 @@
 package client
 
+
+	
+
+	
+
+
+import (
+	
+)
+
 const (
-	DaemonSetUpdateStrategyType               = "daemonSetUpdateStrategy"
+    DaemonSetUpdateStrategyType = "daemonSetUpdateStrategy"
 	DaemonSetUpdateStrategyFieldRollingUpdate = "rollingUpdate"
-	DaemonSetUpdateStrategyFieldStrategy      = "strategy"
+	DaemonSetUpdateStrategyFieldStrategy = "strategy"
 )
 
 type DaemonSetUpdateStrategy struct {
-	RollingUpdate *RollingUpdateDaemonSet `json:"rollingUpdate,omitempty" yaml:"rollingUpdate,omitempty"`
-	Strategy      string                  `json:"strategy,omitempty" yaml:"strategy,omitempty"`
+        RollingUpdate *RollingUpdateDaemonSet `json:"rollingUpdate,omitempty" yaml:"rollingUpdate,omitempty"`
+        Strategy string `json:"strategy,omitempty" yaml:"strategy,omitempty"`
 }
+

@@ -1,10 +1,19 @@
 package client
 
+
+	
+
+
+import (
+	
+)
+
 const (
-	ClusterRegistrationTokenSpecType           = "clusterRegistrationTokenSpec"
+    ClusterRegistrationTokenSpecType = "clusterRegistrationTokenSpec"
 	ClusterRegistrationTokenSpecFieldClusterID = "clusterId"
 )
 
 type ClusterRegistrationTokenSpec struct {
-	ClusterID string `json:"clusterId,omitempty" yaml:"clusterId,omitempty"`
+        ClusterID string `json:"clusterId,omitempty" yaml:"clusterId,omitempty"`
 }
+

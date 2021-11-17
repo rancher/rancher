@@ -1,12 +1,23 @@
 package client
 
+
+	
+
+	
+
+
+import (
+	
+)
+
 const (
-	LabelSelectorType                  = "labelSelector"
+    LabelSelectorType = "labelSelector"
 	LabelSelectorFieldMatchExpressions = "matchExpressions"
-	LabelSelectorFieldMatchLabels      = "matchLabels"
+	LabelSelectorFieldMatchLabels = "matchLabels"
 )
 
 type LabelSelector struct {
-	MatchExpressions []LabelSelectorRequirement `json:"matchExpressions,omitempty" yaml:"matchExpressions,omitempty"`
-	MatchLabels      map[string]string          `json:"matchLabels,omitempty" yaml:"matchLabels,omitempty"`
+        MatchExpressions []LabelSelectorRequirement `json:"matchExpressions,omitempty" yaml:"matchExpressions,omitempty"`
+        MatchLabels map[string]string `json:"matchLabels,omitempty" yaml:"matchLabels,omitempty"`
 }
+

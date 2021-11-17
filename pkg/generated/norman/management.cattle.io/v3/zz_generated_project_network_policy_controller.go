@@ -4,10 +4,10 @@ import (
 	"context"
 	"time"
 
-	"github.com/rancher/norman/controller"
-	"github.com/rancher/norman/objectclient"
-	"github.com/rancher/norman/resource"
 	"github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/norman/objectclient"
+	"github.com/rancher/norman/controller"
+	"github.com/rancher/norman/resource"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -29,13 +29,13 @@ var (
 		SingularName: "projectnetworkpolicy",
 		Namespaced:   true,
 
-		Kind: ProjectNetworkPolicyGroupVersionKind.Kind,
+		Kind:         ProjectNetworkPolicyGroupVersionKind.Kind,
 	}
 
 	ProjectNetworkPolicyGroupVersionResource = schema.GroupVersionResource{
-		Group:    GroupName,
-		Version:  Version,
-		Resource: "projectnetworkpolicies",
+		Group:     GroupName,
+		Version:   Version,
+		Resource:  "projectnetworkpolicies",
 	}
 )
 
@@ -52,6 +52,8 @@ func NewProjectNetworkPolicy(namespace, name string, obj v3.ProjectNetworkPolicy
 	obj.Namespace = namespace
 	return &obj
 }
+
+
 
 type ProjectNetworkPolicyHandlerFunc func(key string, obj *v3.ProjectNetworkPolicy) (runtime.Object, error)
 
@@ -75,7 +77,7 @@ type ProjectNetworkPolicyController interface {
 }
 
 type ProjectNetworkPolicyInterface interface {
-	ObjectClient() *objectclient.ObjectClient
+    ObjectClient() *objectclient.ObjectClient
 	Create(*v3.ProjectNetworkPolicy) (*v3.ProjectNetworkPolicy, error)
 	GetNamespaced(namespace, name string, opts metav1.GetOptions) (*v3.ProjectNetworkPolicy, error)
 	Get(name string, opts metav1.GetOptions) (*v3.ProjectNetworkPolicy, error)
@@ -98,7 +100,7 @@ type ProjectNetworkPolicyInterface interface {
 }
 
 type projectNetworkPolicyLister struct {
-	ns         string
+	ns string
 	controller *projectNetworkPolicyController
 }
 
@@ -125,7 +127,7 @@ func (l *projectNetworkPolicyLister) Get(namespace, name string) (*v3.ProjectNet
 	}
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
-			Group:    ProjectNetworkPolicyGroupVersionKind.Group,
+			Group: ProjectNetworkPolicyGroupVersionKind.Group,
 			Resource: ProjectNetworkPolicyGroupVersionResource.Resource,
 		}, key)
 	}
@@ -143,10 +145,11 @@ func (c *projectNetworkPolicyController) Generic() controller.GenericController 
 
 func (c *projectNetworkPolicyController) Lister() ProjectNetworkPolicyLister {
 	return &projectNetworkPolicyLister{
-		ns:         c.ns,
+		ns: c.ns,
 		controller: c,
 	}
 }
+
 
 func (c *projectNetworkPolicyController) AddHandler(ctx context.Context, name string, handler ProjectNetworkPolicyHandlerFunc) {
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
@@ -216,14 +219,14 @@ func (s *projectNetworkPolicyClient) Controller() ProjectNetworkPolicyController
 		s.client.controllerFactory.ForResourceKind(ProjectNetworkPolicyGroupVersionResource, ProjectNetworkPolicyGroupVersionKind.Kind, true))
 
 	return &projectNetworkPolicyController{
-		ns:                s.ns,
+		ns: s.ns,
 		GenericController: genericController,
 	}
 }
 
 type projectNetworkPolicyClient struct {
-	client       *Client
-	ns           string
+	client *Client
+	ns string
 	objectClient *objectclient.ObjectClient
 	controller   ProjectNetworkPolicyController
 }

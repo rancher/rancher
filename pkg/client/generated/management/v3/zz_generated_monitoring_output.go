@@ -1,14 +1,27 @@
 package client
 
+
+	
+
+	
+
+	
+
+
+import (
+	
+)
+
 const (
-	MonitoringOutputType                  = "monitoringOutput"
-	MonitoringOutputFieldAnswers          = "answers"
+    MonitoringOutputType = "monitoringOutput"
+	MonitoringOutputFieldAnswers = "answers"
 	MonitoringOutputFieldAnswersSetString = "answersSetString"
-	MonitoringOutputFieldVersion          = "version"
+	MonitoringOutputFieldVersion = "version"
 )
 
 type MonitoringOutput struct {
-	Answers          map[string]string `json:"answers,omitempty" yaml:"answers,omitempty"`
-	AnswersSetString map[string]string `json:"answersSetString,omitempty" yaml:"answersSetString,omitempty"`
-	Version          string            `json:"version,omitempty" yaml:"version,omitempty"`
+        Answers map[string]string `json:"answers,omitempty" yaml:"answers,omitempty"`
+        AnswersSetString map[string]string `json:"answersSetString,omitempty" yaml:"answersSetString,omitempty"`
+        Version string `json:"version,omitempty" yaml:"version,omitempty"`
 }
+

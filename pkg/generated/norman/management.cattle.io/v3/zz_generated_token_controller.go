@@ -4,10 +4,10 @@ import (
 	"context"
 	"time"
 
-	"github.com/rancher/norman/controller"
-	"github.com/rancher/norman/objectclient"
-	"github.com/rancher/norman/resource"
 	"github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/norman/objectclient"
+	"github.com/rancher/norman/controller"
+	"github.com/rancher/norman/resource"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -32,9 +32,9 @@ var (
 	}
 
 	TokenGroupVersionResource = schema.GroupVersionResource{
-		Group:    GroupName,
-		Version:  Version,
-		Resource: "tokens",
+		Group:     GroupName,
+		Version:   Version,
+		Resource:  "tokens",
 	}
 )
 
@@ -51,6 +51,8 @@ func NewToken(namespace, name string, obj v3.Token) *v3.Token {
 	obj.Namespace = namespace
 	return &obj
 }
+
+
 
 type TokenHandlerFunc func(key string, obj *v3.Token) (runtime.Object, error)
 
@@ -74,7 +76,7 @@ type TokenController interface {
 }
 
 type TokenInterface interface {
-	ObjectClient() *objectclient.ObjectClient
+    ObjectClient() *objectclient.ObjectClient
 	Create(*v3.Token) (*v3.Token, error)
 	GetNamespaced(namespace, name string, opts metav1.GetOptions) (*v3.Token, error)
 	Get(name string, opts metav1.GetOptions) (*v3.Token, error)
@@ -97,7 +99,7 @@ type TokenInterface interface {
 }
 
 type tokenLister struct {
-	ns         string
+	ns string
 	controller *tokenController
 }
 
@@ -124,7 +126,7 @@ func (l *tokenLister) Get(namespace, name string) (*v3.Token, error) {
 	}
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
-			Group:    TokenGroupVersionKind.Group,
+			Group: TokenGroupVersionKind.Group,
 			Resource: TokenGroupVersionResource.Resource,
 		}, key)
 	}
@@ -142,10 +144,11 @@ func (c *tokenController) Generic() controller.GenericController {
 
 func (c *tokenController) Lister() TokenLister {
 	return &tokenLister{
-		ns:         c.ns,
+		ns: c.ns,
 		controller: c,
 	}
 }
+
 
 func (c *tokenController) AddHandler(ctx context.Context, name string, handler TokenHandlerFunc) {
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
@@ -215,14 +218,14 @@ func (s *tokenClient) Controller() TokenController {
 		s.client.controllerFactory.ForResourceKind(TokenGroupVersionResource, TokenGroupVersionKind.Kind, false))
 
 	return &tokenController{
-		ns:                s.ns,
+		ns: s.ns,
 		GenericController: genericController,
 	}
 }
 
 type tokenClient struct {
-	client       *Client
-	ns           string
+	client *Client
+	ns string
 	objectClient *objectclient.ObjectClient
 	controller   TokenController
 }

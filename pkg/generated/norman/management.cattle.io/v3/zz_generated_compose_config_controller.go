@@ -4,10 +4,10 @@ import (
 	"context"
 	"time"
 
-	"github.com/rancher/norman/controller"
-	"github.com/rancher/norman/objectclient"
-	"github.com/rancher/norman/resource"
 	"github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/norman/objectclient"
+	"github.com/rancher/norman/controller"
+	"github.com/rancher/norman/resource"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -32,9 +32,9 @@ var (
 	}
 
 	ComposeConfigGroupVersionResource = schema.GroupVersionResource{
-		Group:    GroupName,
-		Version:  Version,
-		Resource: "composeconfigs",
+		Group:     GroupName,
+		Version:   Version,
+		Resource:  "composeconfigs",
 	}
 )
 
@@ -51,6 +51,8 @@ func NewComposeConfig(namespace, name string, obj v3.ComposeConfig) *v3.ComposeC
 	obj.Namespace = namespace
 	return &obj
 }
+
+
 
 type ComposeConfigHandlerFunc func(key string, obj *v3.ComposeConfig) (runtime.Object, error)
 
@@ -74,7 +76,7 @@ type ComposeConfigController interface {
 }
 
 type ComposeConfigInterface interface {
-	ObjectClient() *objectclient.ObjectClient
+    ObjectClient() *objectclient.ObjectClient
 	Create(*v3.ComposeConfig) (*v3.ComposeConfig, error)
 	GetNamespaced(namespace, name string, opts metav1.GetOptions) (*v3.ComposeConfig, error)
 	Get(name string, opts metav1.GetOptions) (*v3.ComposeConfig, error)
@@ -97,7 +99,7 @@ type ComposeConfigInterface interface {
 }
 
 type composeConfigLister struct {
-	ns         string
+	ns string
 	controller *composeConfigController
 }
 
@@ -124,7 +126,7 @@ func (l *composeConfigLister) Get(namespace, name string) (*v3.ComposeConfig, er
 	}
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
-			Group:    ComposeConfigGroupVersionKind.Group,
+			Group: ComposeConfigGroupVersionKind.Group,
 			Resource: ComposeConfigGroupVersionResource.Resource,
 		}, key)
 	}
@@ -142,10 +144,11 @@ func (c *composeConfigController) Generic() controller.GenericController {
 
 func (c *composeConfigController) Lister() ComposeConfigLister {
 	return &composeConfigLister{
-		ns:         c.ns,
+		ns: c.ns,
 		controller: c,
 	}
 }
+
 
 func (c *composeConfigController) AddHandler(ctx context.Context, name string, handler ComposeConfigHandlerFunc) {
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
@@ -215,14 +218,14 @@ func (s *composeConfigClient) Controller() ComposeConfigController {
 		s.client.controllerFactory.ForResourceKind(ComposeConfigGroupVersionResource, ComposeConfigGroupVersionKind.Kind, false))
 
 	return &composeConfigController{
-		ns:                s.ns,
+		ns: s.ns,
 		GenericController: genericController,
 	}
 }
 
 type composeConfigClient struct {
-	client       *Client
-	ns           string
+	client *Client
+	ns string
 	objectClient *objectclient.ObjectClient
 	controller   ComposeConfigController
 }

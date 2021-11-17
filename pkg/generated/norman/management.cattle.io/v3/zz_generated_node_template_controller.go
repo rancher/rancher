@@ -4,10 +4,10 @@ import (
 	"context"
 	"time"
 
-	"github.com/rancher/norman/controller"
-	"github.com/rancher/norman/objectclient"
-	"github.com/rancher/norman/resource"
 	"github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/norman/objectclient"
+	"github.com/rancher/norman/controller"
+	"github.com/rancher/norman/resource"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -29,13 +29,13 @@ var (
 		SingularName: "nodetemplate",
 		Namespaced:   true,
 
-		Kind: NodeTemplateGroupVersionKind.Kind,
+		Kind:         NodeTemplateGroupVersionKind.Kind,
 	}
 
 	NodeTemplateGroupVersionResource = schema.GroupVersionResource{
-		Group:    GroupName,
-		Version:  Version,
-		Resource: "nodetemplates",
+		Group:     GroupName,
+		Version:   Version,
+		Resource:  "nodetemplates",
 	}
 )
 
@@ -52,6 +52,8 @@ func NewNodeTemplate(namespace, name string, obj v3.NodeTemplate) *v3.NodeTempla
 	obj.Namespace = namespace
 	return &obj
 }
+
+
 
 type NodeTemplateHandlerFunc func(key string, obj *v3.NodeTemplate) (runtime.Object, error)
 
@@ -75,7 +77,7 @@ type NodeTemplateController interface {
 }
 
 type NodeTemplateInterface interface {
-	ObjectClient() *objectclient.ObjectClient
+    ObjectClient() *objectclient.ObjectClient
 	Create(*v3.NodeTemplate) (*v3.NodeTemplate, error)
 	GetNamespaced(namespace, name string, opts metav1.GetOptions) (*v3.NodeTemplate, error)
 	Get(name string, opts metav1.GetOptions) (*v3.NodeTemplate, error)
@@ -98,7 +100,7 @@ type NodeTemplateInterface interface {
 }
 
 type nodeTemplateLister struct {
-	ns         string
+	ns string
 	controller *nodeTemplateController
 }
 
@@ -125,7 +127,7 @@ func (l *nodeTemplateLister) Get(namespace, name string) (*v3.NodeTemplate, erro
 	}
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
-			Group:    NodeTemplateGroupVersionKind.Group,
+			Group: NodeTemplateGroupVersionKind.Group,
 			Resource: NodeTemplateGroupVersionResource.Resource,
 		}, key)
 	}
@@ -143,10 +145,11 @@ func (c *nodeTemplateController) Generic() controller.GenericController {
 
 func (c *nodeTemplateController) Lister() NodeTemplateLister {
 	return &nodeTemplateLister{
-		ns:         c.ns,
+		ns: c.ns,
 		controller: c,
 	}
 }
+
 
 func (c *nodeTemplateController) AddHandler(ctx context.Context, name string, handler NodeTemplateHandlerFunc) {
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
@@ -216,14 +219,14 @@ func (s *nodeTemplateClient) Controller() NodeTemplateController {
 		s.client.controllerFactory.ForResourceKind(NodeTemplateGroupVersionResource, NodeTemplateGroupVersionKind.Kind, true))
 
 	return &nodeTemplateController{
-		ns:                s.ns,
+		ns: s.ns,
 		GenericController: genericController,
 	}
 }
 
 type nodeTemplateClient struct {
-	client       *Client
-	ns           string
+	client *Client
+	ns string
 	objectClient *objectclient.ObjectClient
 	controller   NodeTemplateController
 }

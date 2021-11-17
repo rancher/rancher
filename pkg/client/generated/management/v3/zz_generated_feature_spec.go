@@ -1,10 +1,19 @@
 package client
 
+
+	
+
+
+import (
+	
+)
+
 const (
-	FeatureSpecType       = "featureSpec"
+    FeatureSpecType = "featureSpec"
 	FeatureSpecFieldValue = "value"
 )
 
 type FeatureSpec struct {
-	Value *bool `json:"value,omitempty" yaml:"value,omitempty"`
+        Value *bool `json:"value,omitempty" yaml:"value,omitempty"`
 }
+

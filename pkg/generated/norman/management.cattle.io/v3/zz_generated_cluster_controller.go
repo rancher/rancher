@@ -4,10 +4,10 @@ import (
 	"context"
 	"time"
 
-	"github.com/rancher/norman/controller"
-	"github.com/rancher/norman/objectclient"
-	"github.com/rancher/norman/resource"
 	"github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/norman/objectclient"
+	"github.com/rancher/norman/controller"
+	"github.com/rancher/norman/resource"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -32,9 +32,9 @@ var (
 	}
 
 	ClusterGroupVersionResource = schema.GroupVersionResource{
-		Group:    GroupName,
-		Version:  Version,
-		Resource: "clusters",
+		Group:     GroupName,
+		Version:   Version,
+		Resource:  "clusters",
 	}
 )
 
@@ -51,6 +51,8 @@ func NewCluster(namespace, name string, obj v3.Cluster) *v3.Cluster {
 	obj.Namespace = namespace
 	return &obj
 }
+
+
 
 type ClusterHandlerFunc func(key string, obj *v3.Cluster) (runtime.Object, error)
 
@@ -74,7 +76,7 @@ type ClusterController interface {
 }
 
 type ClusterInterface interface {
-	ObjectClient() *objectclient.ObjectClient
+    ObjectClient() *objectclient.ObjectClient
 	Create(*v3.Cluster) (*v3.Cluster, error)
 	GetNamespaced(namespace, name string, opts metav1.GetOptions) (*v3.Cluster, error)
 	Get(name string, opts metav1.GetOptions) (*v3.Cluster, error)
@@ -97,7 +99,7 @@ type ClusterInterface interface {
 }
 
 type clusterLister struct {
-	ns         string
+	ns string
 	controller *clusterController
 }
 
@@ -124,7 +126,7 @@ func (l *clusterLister) Get(namespace, name string) (*v3.Cluster, error) {
 	}
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
-			Group:    ClusterGroupVersionKind.Group,
+			Group: ClusterGroupVersionKind.Group,
 			Resource: ClusterGroupVersionResource.Resource,
 		}, key)
 	}
@@ -142,10 +144,11 @@ func (c *clusterController) Generic() controller.GenericController {
 
 func (c *clusterController) Lister() ClusterLister {
 	return &clusterLister{
-		ns:         c.ns,
+		ns: c.ns,
 		controller: c,
 	}
 }
+
 
 func (c *clusterController) AddHandler(ctx context.Context, name string, handler ClusterHandlerFunc) {
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
@@ -215,14 +218,14 @@ func (s *clusterClient) Controller() ClusterController {
 		s.client.controllerFactory.ForResourceKind(ClusterGroupVersionResource, ClusterGroupVersionKind.Kind, false))
 
 	return &clusterController{
-		ns:                s.ns,
+		ns: s.ns,
 		GenericController: genericController,
 	}
 }
 
 type clusterClient struct {
-	client       *Client
-	ns           string
+	client *Client
+	ns string
 	objectClient *objectclient.ObjectClient
 	controller   ClusterController
 }

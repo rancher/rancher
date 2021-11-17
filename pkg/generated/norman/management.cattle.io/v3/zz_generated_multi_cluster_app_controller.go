@@ -4,10 +4,10 @@ import (
 	"context"
 	"time"
 
-	"github.com/rancher/norman/controller"
-	"github.com/rancher/norman/objectclient"
-	"github.com/rancher/norman/resource"
 	"github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/norman/objectclient"
+	"github.com/rancher/norman/controller"
+	"github.com/rancher/norman/resource"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -29,13 +29,13 @@ var (
 		SingularName: "multiclusterapp",
 		Namespaced:   true,
 
-		Kind: MultiClusterAppGroupVersionKind.Kind,
+		Kind:         MultiClusterAppGroupVersionKind.Kind,
 	}
 
 	MultiClusterAppGroupVersionResource = schema.GroupVersionResource{
-		Group:    GroupName,
-		Version:  Version,
-		Resource: "multiclusterapps",
+		Group:     GroupName,
+		Version:   Version,
+		Resource:  "multiclusterapps",
 	}
 )
 
@@ -52,6 +52,8 @@ func NewMultiClusterApp(namespace, name string, obj v3.MultiClusterApp) *v3.Mult
 	obj.Namespace = namespace
 	return &obj
 }
+
+
 
 type MultiClusterAppHandlerFunc func(key string, obj *v3.MultiClusterApp) (runtime.Object, error)
 
@@ -75,7 +77,7 @@ type MultiClusterAppController interface {
 }
 
 type MultiClusterAppInterface interface {
-	ObjectClient() *objectclient.ObjectClient
+    ObjectClient() *objectclient.ObjectClient
 	Create(*v3.MultiClusterApp) (*v3.MultiClusterApp, error)
 	GetNamespaced(namespace, name string, opts metav1.GetOptions) (*v3.MultiClusterApp, error)
 	Get(name string, opts metav1.GetOptions) (*v3.MultiClusterApp, error)
@@ -98,7 +100,7 @@ type MultiClusterAppInterface interface {
 }
 
 type multiClusterAppLister struct {
-	ns         string
+	ns string
 	controller *multiClusterAppController
 }
 
@@ -125,7 +127,7 @@ func (l *multiClusterAppLister) Get(namespace, name string) (*v3.MultiClusterApp
 	}
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
-			Group:    MultiClusterAppGroupVersionKind.Group,
+			Group: MultiClusterAppGroupVersionKind.Group,
 			Resource: MultiClusterAppGroupVersionResource.Resource,
 		}, key)
 	}
@@ -143,10 +145,11 @@ func (c *multiClusterAppController) Generic() controller.GenericController {
 
 func (c *multiClusterAppController) Lister() MultiClusterAppLister {
 	return &multiClusterAppLister{
-		ns:         c.ns,
+		ns: c.ns,
 		controller: c,
 	}
 }
+
 
 func (c *multiClusterAppController) AddHandler(ctx context.Context, name string, handler MultiClusterAppHandlerFunc) {
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
@@ -216,14 +219,14 @@ func (s *multiClusterAppClient) Controller() MultiClusterAppController {
 		s.client.controllerFactory.ForResourceKind(MultiClusterAppGroupVersionResource, MultiClusterAppGroupVersionKind.Kind, true))
 
 	return &multiClusterAppController{
-		ns:                s.ns,
+		ns: s.ns,
 		GenericController: genericController,
 	}
 }
 
 type multiClusterAppClient struct {
-	client       *Client
-	ns           string
+	client *Client
+	ns string
 	objectClient *objectclient.ObjectClient
 	controller   MultiClusterAppController
 }

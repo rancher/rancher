@@ -1,10 +1,19 @@
 package client
 
+
+	
+
+
+import (
+	
+)
+
 const (
-	AESConfigurationType      = "aesConfiguration"
+    AESConfigurationType = "aesConfiguration"
 	AESConfigurationFieldKeys = "keys"
 )
 
 type AESConfiguration struct {
-	Keys []Key `json:"keys,omitempty" yaml:"keys,omitempty"`
+        Keys []Key `json:"keys,omitempty" yaml:"keys,omitempty"`
 }
+

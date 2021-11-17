@@ -1,10 +1,19 @@
 package client
 
+
+	
+
+
+import (
+	
+)
+
 const (
-	ImportYamlOutputType         = "importYamlOutput"
+    ImportYamlOutputType = "importYamlOutput"
 	ImportYamlOutputFieldMessage = "message"
 )
 
 type ImportYamlOutput struct {
-	Message string `json:"message,omitempty" yaml:"message,omitempty"`
+        Message string `json:"message,omitempty" yaml:"message,omitempty"`
 }
+

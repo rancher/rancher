@@ -1,12 +1,23 @@
 package client
 
+
+	
+
+	
+
+
+import (
+	
+)
+
 const (
-	QueryClusterGraphOutputType      = "queryClusterGraphOutput"
+    QueryClusterGraphOutputType = "queryClusterGraphOutput"
 	QueryClusterGraphOutputFieldData = "data"
 	QueryClusterGraphOutputFieldType = "type"
 )
 
 type QueryClusterGraphOutput struct {
-	Data []QueryClusterGraph `json:"data,omitempty" yaml:"data,omitempty"`
-	Type string              `json:"type,omitempty" yaml:"type,omitempty"`
+        Data []QueryClusterGraph `json:"data,omitempty" yaml:"data,omitempty"`
+        Type string `json:"type,omitempty" yaml:"type,omitempty"`
 }
+

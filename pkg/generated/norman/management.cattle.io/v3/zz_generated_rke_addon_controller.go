@@ -4,10 +4,10 @@ import (
 	"context"
 	"time"
 
-	"github.com/rancher/norman/controller"
-	"github.com/rancher/norman/objectclient"
-	"github.com/rancher/norman/resource"
 	"github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/norman/objectclient"
+	"github.com/rancher/norman/controller"
+	"github.com/rancher/norman/resource"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -29,13 +29,13 @@ var (
 		SingularName: "rkeaddon",
 		Namespaced:   true,
 
-		Kind: RkeAddonGroupVersionKind.Kind,
+		Kind:         RkeAddonGroupVersionKind.Kind,
 	}
 
 	RkeAddonGroupVersionResource = schema.GroupVersionResource{
-		Group:    GroupName,
-		Version:  Version,
-		Resource: "rkeaddons",
+		Group:     GroupName,
+		Version:   Version,
+		Resource:  "rkeaddons",
 	}
 )
 
@@ -52,6 +52,8 @@ func NewRkeAddon(namespace, name string, obj v3.RkeAddon) *v3.RkeAddon {
 	obj.Namespace = namespace
 	return &obj
 }
+
+
 
 type RkeAddonHandlerFunc func(key string, obj *v3.RkeAddon) (runtime.Object, error)
 
@@ -75,7 +77,7 @@ type RkeAddonController interface {
 }
 
 type RkeAddonInterface interface {
-	ObjectClient() *objectclient.ObjectClient
+    ObjectClient() *objectclient.ObjectClient
 	Create(*v3.RkeAddon) (*v3.RkeAddon, error)
 	GetNamespaced(namespace, name string, opts metav1.GetOptions) (*v3.RkeAddon, error)
 	Get(name string, opts metav1.GetOptions) (*v3.RkeAddon, error)
@@ -98,7 +100,7 @@ type RkeAddonInterface interface {
 }
 
 type rkeAddonLister struct {
-	ns         string
+	ns string
 	controller *rkeAddonController
 }
 
@@ -125,7 +127,7 @@ func (l *rkeAddonLister) Get(namespace, name string) (*v3.RkeAddon, error) {
 	}
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
-			Group:    RkeAddonGroupVersionKind.Group,
+			Group: RkeAddonGroupVersionKind.Group,
 			Resource: RkeAddonGroupVersionResource.Resource,
 		}, key)
 	}
@@ -143,10 +145,11 @@ func (c *rkeAddonController) Generic() controller.GenericController {
 
 func (c *rkeAddonController) Lister() RkeAddonLister {
 	return &rkeAddonLister{
-		ns:         c.ns,
+		ns: c.ns,
 		controller: c,
 	}
 }
+
 
 func (c *rkeAddonController) AddHandler(ctx context.Context, name string, handler RkeAddonHandlerFunc) {
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
@@ -216,14 +219,14 @@ func (s *rkeAddonClient) Controller() RkeAddonController {
 		s.client.controllerFactory.ForResourceKind(RkeAddonGroupVersionResource, RkeAddonGroupVersionKind.Kind, true))
 
 	return &rkeAddonController{
-		ns:                s.ns,
+		ns: s.ns,
 		GenericController: genericController,
 	}
 }
 
 type rkeAddonClient struct {
-	client       *Client
-	ns           string
+	client *Client
+	ns string
 	objectClient *objectclient.ObjectClient
 	controller   RkeAddonController
 }

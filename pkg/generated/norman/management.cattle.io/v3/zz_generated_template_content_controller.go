@@ -4,10 +4,10 @@ import (
 	"context"
 	"time"
 
-	"github.com/rancher/norman/controller"
-	"github.com/rancher/norman/objectclient"
-	"github.com/rancher/norman/resource"
 	"github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/norman/objectclient"
+	"github.com/rancher/norman/controller"
+	"github.com/rancher/norman/resource"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -32,9 +32,9 @@ var (
 	}
 
 	TemplateContentGroupVersionResource = schema.GroupVersionResource{
-		Group:    GroupName,
-		Version:  Version,
-		Resource: "templatecontents",
+		Group:     GroupName,
+		Version:   Version,
+		Resource:  "templatecontents",
 	}
 )
 
@@ -51,6 +51,8 @@ func NewTemplateContent(namespace, name string, obj v3.TemplateContent) *v3.Temp
 	obj.Namespace = namespace
 	return &obj
 }
+
+
 
 type TemplateContentHandlerFunc func(key string, obj *v3.TemplateContent) (runtime.Object, error)
 
@@ -74,7 +76,7 @@ type TemplateContentController interface {
 }
 
 type TemplateContentInterface interface {
-	ObjectClient() *objectclient.ObjectClient
+    ObjectClient() *objectclient.ObjectClient
 	Create(*v3.TemplateContent) (*v3.TemplateContent, error)
 	GetNamespaced(namespace, name string, opts metav1.GetOptions) (*v3.TemplateContent, error)
 	Get(name string, opts metav1.GetOptions) (*v3.TemplateContent, error)
@@ -97,7 +99,7 @@ type TemplateContentInterface interface {
 }
 
 type templateContentLister struct {
-	ns         string
+	ns string
 	controller *templateContentController
 }
 
@@ -124,7 +126,7 @@ func (l *templateContentLister) Get(namespace, name string) (*v3.TemplateContent
 	}
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
-			Group:    TemplateContentGroupVersionKind.Group,
+			Group: TemplateContentGroupVersionKind.Group,
 			Resource: TemplateContentGroupVersionResource.Resource,
 		}, key)
 	}
@@ -142,10 +144,11 @@ func (c *templateContentController) Generic() controller.GenericController {
 
 func (c *templateContentController) Lister() TemplateContentLister {
 	return &templateContentLister{
-		ns:         c.ns,
+		ns: c.ns,
 		controller: c,
 	}
 }
+
 
 func (c *templateContentController) AddHandler(ctx context.Context, name string, handler TemplateContentHandlerFunc) {
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
@@ -215,14 +218,14 @@ func (s *templateContentClient) Controller() TemplateContentController {
 		s.client.controllerFactory.ForResourceKind(TemplateContentGroupVersionResource, TemplateContentGroupVersionKind.Kind, false))
 
 	return &templateContentController{
-		ns:                s.ns,
+		ns: s.ns,
 		GenericController: genericController,
 	}
 }
 
 type templateContentClient struct {
-	client       *Client
-	ns           string
+	client *Client
+	ns string
 	objectClient *objectclient.ObjectClient
 	controller   TemplateContentController
 }

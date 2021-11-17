@@ -1,10 +1,19 @@
 package client
 
+
+	
+
+
+import (
+	
+)
+
 const (
-	NamespaceResourceQuotaType       = "namespaceResourceQuota"
+    NamespaceResourceQuotaType = "namespaceResourceQuota"
 	NamespaceResourceQuotaFieldLimit = "limit"
 )
 
 type NamespaceResourceQuota struct {
-	Limit *ResourceQuotaLimit `json:"limit,omitempty" yaml:"limit,omitempty"`
+        Limit *ResourceQuotaLimit `json:"limit,omitempty" yaml:"limit,omitempty"`
 }
+

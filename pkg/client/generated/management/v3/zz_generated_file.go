@@ -1,12 +1,23 @@
 package client
 
+
+	
+
+	
+
+
+import (
+	
+)
+
 const (
-	FileType          = "file"
+    FileType = "file"
 	FileFieldContents = "contents"
-	FileFieldName     = "name"
+	FileFieldName = "name"
 )
 
 type File struct {
-	Contents string `json:"contents,omitempty" yaml:"contents,omitempty"`
-	Name     string `json:"name,omitempty" yaml:"name,omitempty"`
+        Contents string `json:"contents,omitempty" yaml:"contents,omitempty"`
+        Name string `json:"name,omitempty" yaml:"name,omitempty"`
 }
+

@@ -1,14 +1,27 @@
 package client
 
+
+	
+
+	
+
+	
+
+
+import (
+	
+)
+
 const (
-	AzureFileVolumeSourceType            = "azureFileVolumeSource"
-	AzureFileVolumeSourceFieldReadOnly   = "readOnly"
+    AzureFileVolumeSourceType = "azureFileVolumeSource"
+	AzureFileVolumeSourceFieldReadOnly = "readOnly"
 	AzureFileVolumeSourceFieldSecretName = "secretName"
-	AzureFileVolumeSourceFieldShareName  = "shareName"
+	AzureFileVolumeSourceFieldShareName = "shareName"
 )
 
 type AzureFileVolumeSource struct {
-	ReadOnly   bool   `json:"readOnly,omitempty" yaml:"readOnly,omitempty"`
-	SecretName string `json:"secretName,omitempty" yaml:"secretName,omitempty"`
-	ShareName  string `json:"shareName,omitempty" yaml:"shareName,omitempty"`
+        ReadOnly bool `json:"readOnly,omitempty" yaml:"readOnly,omitempty"`
+        SecretName string `json:"secretName,omitempty" yaml:"secretName,omitempty"`
+        ShareName string `json:"shareName,omitempty" yaml:"shareName,omitempty"`
 }
+

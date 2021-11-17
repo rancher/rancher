@@ -1,10 +1,19 @@
 package client
 
+
+	
+
+
+import (
+	
+)
+
 const (
-	NodeTemplateStatusType            = "nodeTemplateStatus"
+    NodeTemplateStatusType = "nodeTemplateStatus"
 	NodeTemplateStatusFieldConditions = "conditions"
 )
 
 type NodeTemplateStatus struct {
-	Conditions []NodeTemplateCondition `json:"conditions,omitempty" yaml:"conditions,omitempty"`
+        Conditions []NodeTemplateCondition `json:"conditions,omitempty" yaml:"conditions,omitempty"`
 }
+

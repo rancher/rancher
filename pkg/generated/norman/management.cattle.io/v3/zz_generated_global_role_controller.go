@@ -4,10 +4,10 @@ import (
 	"context"
 	"time"
 
-	"github.com/rancher/norman/controller"
-	"github.com/rancher/norman/objectclient"
-	"github.com/rancher/norman/resource"
 	"github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/norman/objectclient"
+	"github.com/rancher/norman/controller"
+	"github.com/rancher/norman/resource"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -32,9 +32,9 @@ var (
 	}
 
 	GlobalRoleGroupVersionResource = schema.GroupVersionResource{
-		Group:    GroupName,
-		Version:  Version,
-		Resource: "globalroles",
+		Group:     GroupName,
+		Version:   Version,
+		Resource:  "globalroles",
 	}
 )
 
@@ -51,6 +51,8 @@ func NewGlobalRole(namespace, name string, obj v3.GlobalRole) *v3.GlobalRole {
 	obj.Namespace = namespace
 	return &obj
 }
+
+
 
 type GlobalRoleHandlerFunc func(key string, obj *v3.GlobalRole) (runtime.Object, error)
 
@@ -74,7 +76,7 @@ type GlobalRoleController interface {
 }
 
 type GlobalRoleInterface interface {
-	ObjectClient() *objectclient.ObjectClient
+    ObjectClient() *objectclient.ObjectClient
 	Create(*v3.GlobalRole) (*v3.GlobalRole, error)
 	GetNamespaced(namespace, name string, opts metav1.GetOptions) (*v3.GlobalRole, error)
 	Get(name string, opts metav1.GetOptions) (*v3.GlobalRole, error)
@@ -97,7 +99,7 @@ type GlobalRoleInterface interface {
 }
 
 type globalRoleLister struct {
-	ns         string
+	ns string
 	controller *globalRoleController
 }
 
@@ -124,7 +126,7 @@ func (l *globalRoleLister) Get(namespace, name string) (*v3.GlobalRole, error) {
 	}
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
-			Group:    GlobalRoleGroupVersionKind.Group,
+			Group: GlobalRoleGroupVersionKind.Group,
 			Resource: GlobalRoleGroupVersionResource.Resource,
 		}, key)
 	}
@@ -142,10 +144,11 @@ func (c *globalRoleController) Generic() controller.GenericController {
 
 func (c *globalRoleController) Lister() GlobalRoleLister {
 	return &globalRoleLister{
-		ns:         c.ns,
+		ns: c.ns,
 		controller: c,
 	}
 }
+
 
 func (c *globalRoleController) AddHandler(ctx context.Context, name string, handler GlobalRoleHandlerFunc) {
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
@@ -215,14 +218,14 @@ func (s *globalRoleClient) Controller() GlobalRoleController {
 		s.client.controllerFactory.ForResourceKind(GlobalRoleGroupVersionResource, GlobalRoleGroupVersionKind.Kind, false))
 
 	return &globalRoleController{
-		ns:                s.ns,
+		ns: s.ns,
 		GenericController: genericController,
 	}
 }
 
 type globalRoleClient struct {
-	client       *Client
-	ns           string
+	client *Client
+	ns string
 	objectClient *objectclient.ObjectClient
 	controller   GlobalRoleController
 }

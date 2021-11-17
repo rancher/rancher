@@ -1,12 +1,23 @@
 package client
 
+
+	
+
+	
+
+
+import (
+	
+)
+
 const (
-	ScheduledClusterScanConfigType              = "scheduledClusterScanConfig"
+    ScheduledClusterScanConfigType = "scheduledClusterScanConfig"
 	ScheduledClusterScanConfigFieldCronSchedule = "cronSchedule"
-	ScheduledClusterScanConfigFieldRetention    = "retention"
+	ScheduledClusterScanConfigFieldRetention = "retention"
 )
 
 type ScheduledClusterScanConfig struct {
-	CronSchedule string `json:"cronSchedule,omitempty" yaml:"cronSchedule,omitempty"`
-	Retention    int64  `json:"retention,omitempty" yaml:"retention,omitempty"`
+        CronSchedule string `json:"cronSchedule,omitempty" yaml:"cronSchedule,omitempty"`
+        Retention int64 `json:"retention,omitempty" yaml:"retention,omitempty"`
 }
+

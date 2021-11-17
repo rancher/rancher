@@ -4,10 +4,10 @@ import (
 	"context"
 	"time"
 
-	"github.com/rancher/norman/controller"
-	"github.com/rancher/norman/objectclient"
-	"github.com/rancher/norman/resource"
 	"github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/norman/objectclient"
+	"github.com/rancher/norman/controller"
+	"github.com/rancher/norman/resource"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -32,9 +32,9 @@ var (
 	}
 
 	NodeDriverGroupVersionResource = schema.GroupVersionResource{
-		Group:    GroupName,
-		Version:  Version,
-		Resource: "nodedrivers",
+		Group:     GroupName,
+		Version:   Version,
+		Resource:  "nodedrivers",
 	}
 )
 
@@ -51,6 +51,8 @@ func NewNodeDriver(namespace, name string, obj v3.NodeDriver) *v3.NodeDriver {
 	obj.Namespace = namespace
 	return &obj
 }
+
+
 
 type NodeDriverHandlerFunc func(key string, obj *v3.NodeDriver) (runtime.Object, error)
 
@@ -74,7 +76,7 @@ type NodeDriverController interface {
 }
 
 type NodeDriverInterface interface {
-	ObjectClient() *objectclient.ObjectClient
+    ObjectClient() *objectclient.ObjectClient
 	Create(*v3.NodeDriver) (*v3.NodeDriver, error)
 	GetNamespaced(namespace, name string, opts metav1.GetOptions) (*v3.NodeDriver, error)
 	Get(name string, opts metav1.GetOptions) (*v3.NodeDriver, error)
@@ -97,7 +99,7 @@ type NodeDriverInterface interface {
 }
 
 type nodeDriverLister struct {
-	ns         string
+	ns string
 	controller *nodeDriverController
 }
 
@@ -124,7 +126,7 @@ func (l *nodeDriverLister) Get(namespace, name string) (*v3.NodeDriver, error) {
 	}
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
-			Group:    NodeDriverGroupVersionKind.Group,
+			Group: NodeDriverGroupVersionKind.Group,
 			Resource: NodeDriverGroupVersionResource.Resource,
 		}, key)
 	}
@@ -142,10 +144,11 @@ func (c *nodeDriverController) Generic() controller.GenericController {
 
 func (c *nodeDriverController) Lister() NodeDriverLister {
 	return &nodeDriverLister{
-		ns:         c.ns,
+		ns: c.ns,
 		controller: c,
 	}
 }
+
 
 func (c *nodeDriverController) AddHandler(ctx context.Context, name string, handler NodeDriverHandlerFunc) {
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
@@ -215,14 +218,14 @@ func (s *nodeDriverClient) Controller() NodeDriverController {
 		s.client.controllerFactory.ForResourceKind(NodeDriverGroupVersionResource, NodeDriverGroupVersionKind.Kind, false))
 
 	return &nodeDriverController{
-		ns:                s.ns,
+		ns: s.ns,
 		GenericController: genericController,
 	}
 }
 
 type nodeDriverClient struct {
-	client       *Client
-	ns           string
+	client *Client
+	ns string
 	objectClient *objectclient.ObjectClient
 	controller   NodeDriverController
 }

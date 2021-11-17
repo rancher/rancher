@@ -1,10 +1,19 @@
 package client
 
+
+	
+
+
+import (
+	
+)
+
 const (
-	UpgradeStrategyType               = "upgradeStrategy"
+    UpgradeStrategyType = "upgradeStrategy"
 	UpgradeStrategyFieldRollingUpdate = "rollingUpdate"
 )
 
 type UpgradeStrategy struct {
-	RollingUpdate *RollingUpdate `json:"rollingUpdate,omitempty" yaml:"rollingUpdate,omitempty"`
+        RollingUpdate *RollingUpdate `json:"rollingUpdate,omitempty" yaml:"rollingUpdate,omitempty"`
 }
+

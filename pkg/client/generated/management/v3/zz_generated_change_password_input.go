@@ -1,12 +1,23 @@
 package client
 
+
+	
+
+	
+
+
+import (
+	
+)
+
 const (
-	ChangePasswordInputType                 = "changePasswordInput"
+    ChangePasswordInputType = "changePasswordInput"
 	ChangePasswordInputFieldCurrentPassword = "currentPassword"
-	ChangePasswordInputFieldNewPassword     = "newPassword"
+	ChangePasswordInputFieldNewPassword = "newPassword"
 )
 
 type ChangePasswordInput struct {
-	CurrentPassword string `json:"currentPassword,omitempty" yaml:"currentPassword,omitempty"`
-	NewPassword     string `json:"newPassword,omitempty" yaml:"newPassword,omitempty"`
+        CurrentPassword string `json:"currentPassword,omitempty" yaml:"currentPassword,omitempty"`
+        NewPassword string `json:"newPassword,omitempty" yaml:"newPassword,omitempty"`
 }
+

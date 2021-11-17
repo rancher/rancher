@@ -1,12 +1,23 @@
 package client
 
+
+	
+
+	
+
+
+import (
+	
+)
+
 const (
-	ClusterComponentStatusType            = "clusterComponentStatus"
+    ClusterComponentStatusType = "clusterComponentStatus"
 	ClusterComponentStatusFieldConditions = "conditions"
-	ClusterComponentStatusFieldName       = "name"
+	ClusterComponentStatusFieldName = "name"
 )
 
 type ClusterComponentStatus struct {
-	Conditions []ComponentCondition `json:"conditions,omitempty" yaml:"conditions,omitempty"`
-	Name       string               `json:"name,omitempty" yaml:"name,omitempty"`
+        Conditions []ComponentCondition `json:"conditions,omitempty" yaml:"conditions,omitempty"`
+        Name string `json:"name,omitempty" yaml:"name,omitempty"`
 }
+

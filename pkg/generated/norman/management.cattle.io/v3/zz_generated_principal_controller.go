@@ -4,10 +4,10 @@ import (
 	"context"
 	"time"
 
-	"github.com/rancher/norman/controller"
-	"github.com/rancher/norman/objectclient"
-	"github.com/rancher/norman/resource"
 	"github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/norman/objectclient"
+	"github.com/rancher/norman/controller"
+	"github.com/rancher/norman/resource"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -32,9 +32,9 @@ var (
 	}
 
 	PrincipalGroupVersionResource = schema.GroupVersionResource{
-		Group:    GroupName,
-		Version:  Version,
-		Resource: "principals",
+		Group:     GroupName,
+		Version:   Version,
+		Resource:  "principals",
 	}
 )
 
@@ -51,6 +51,8 @@ func NewPrincipal(namespace, name string, obj v3.Principal) *v3.Principal {
 	obj.Namespace = namespace
 	return &obj
 }
+
+
 
 type PrincipalHandlerFunc func(key string, obj *v3.Principal) (runtime.Object, error)
 
@@ -74,7 +76,7 @@ type PrincipalController interface {
 }
 
 type PrincipalInterface interface {
-	ObjectClient() *objectclient.ObjectClient
+    ObjectClient() *objectclient.ObjectClient
 	Create(*v3.Principal) (*v3.Principal, error)
 	GetNamespaced(namespace, name string, opts metav1.GetOptions) (*v3.Principal, error)
 	Get(name string, opts metav1.GetOptions) (*v3.Principal, error)
@@ -97,7 +99,7 @@ type PrincipalInterface interface {
 }
 
 type principalLister struct {
-	ns         string
+	ns string
 	controller *principalController
 }
 
@@ -124,7 +126,7 @@ func (l *principalLister) Get(namespace, name string) (*v3.Principal, error) {
 	}
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
-			Group:    PrincipalGroupVersionKind.Group,
+			Group: PrincipalGroupVersionKind.Group,
 			Resource: PrincipalGroupVersionResource.Resource,
 		}, key)
 	}
@@ -142,10 +144,11 @@ func (c *principalController) Generic() controller.GenericController {
 
 func (c *principalController) Lister() PrincipalLister {
 	return &principalLister{
-		ns:         c.ns,
+		ns: c.ns,
 		controller: c,
 	}
 }
+
 
 func (c *principalController) AddHandler(ctx context.Context, name string, handler PrincipalHandlerFunc) {
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
@@ -215,14 +218,14 @@ func (s *principalClient) Controller() PrincipalController {
 		s.client.controllerFactory.ForResourceKind(PrincipalGroupVersionResource, PrincipalGroupVersionKind.Kind, false))
 
 	return &principalController{
-		ns:                s.ns,
+		ns: s.ns,
 		GenericController: genericController,
 	}
 }
 
 type principalClient struct {
-	client       *Client
-	ns           string
+	client *Client
+	ns string
 	objectClient *objectclient.ObjectClient
 	controller   PrincipalController
 }

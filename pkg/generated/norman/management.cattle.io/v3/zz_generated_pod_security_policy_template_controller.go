@@ -4,10 +4,10 @@ import (
 	"context"
 	"time"
 
-	"github.com/rancher/norman/controller"
-	"github.com/rancher/norman/objectclient"
-	"github.com/rancher/norman/resource"
 	"github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/norman/objectclient"
+	"github.com/rancher/norman/controller"
+	"github.com/rancher/norman/resource"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -32,9 +32,9 @@ var (
 	}
 
 	PodSecurityPolicyTemplateGroupVersionResource = schema.GroupVersionResource{
-		Group:    GroupName,
-		Version:  Version,
-		Resource: "podsecuritypolicytemplates",
+		Group:     GroupName,
+		Version:   Version,
+		Resource:  "podsecuritypolicytemplates",
 	}
 )
 
@@ -51,6 +51,8 @@ func NewPodSecurityPolicyTemplate(namespace, name string, obj v3.PodSecurityPoli
 	obj.Namespace = namespace
 	return &obj
 }
+
+
 
 type PodSecurityPolicyTemplateHandlerFunc func(key string, obj *v3.PodSecurityPolicyTemplate) (runtime.Object, error)
 
@@ -74,7 +76,7 @@ type PodSecurityPolicyTemplateController interface {
 }
 
 type PodSecurityPolicyTemplateInterface interface {
-	ObjectClient() *objectclient.ObjectClient
+    ObjectClient() *objectclient.ObjectClient
 	Create(*v3.PodSecurityPolicyTemplate) (*v3.PodSecurityPolicyTemplate, error)
 	GetNamespaced(namespace, name string, opts metav1.GetOptions) (*v3.PodSecurityPolicyTemplate, error)
 	Get(name string, opts metav1.GetOptions) (*v3.PodSecurityPolicyTemplate, error)
@@ -97,7 +99,7 @@ type PodSecurityPolicyTemplateInterface interface {
 }
 
 type podSecurityPolicyTemplateLister struct {
-	ns         string
+	ns string
 	controller *podSecurityPolicyTemplateController
 }
 
@@ -124,7 +126,7 @@ func (l *podSecurityPolicyTemplateLister) Get(namespace, name string) (*v3.PodSe
 	}
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
-			Group:    PodSecurityPolicyTemplateGroupVersionKind.Group,
+			Group: PodSecurityPolicyTemplateGroupVersionKind.Group,
 			Resource: PodSecurityPolicyTemplateGroupVersionResource.Resource,
 		}, key)
 	}
@@ -142,10 +144,11 @@ func (c *podSecurityPolicyTemplateController) Generic() controller.GenericContro
 
 func (c *podSecurityPolicyTemplateController) Lister() PodSecurityPolicyTemplateLister {
 	return &podSecurityPolicyTemplateLister{
-		ns:         c.ns,
+		ns: c.ns,
 		controller: c,
 	}
 }
+
 
 func (c *podSecurityPolicyTemplateController) AddHandler(ctx context.Context, name string, handler PodSecurityPolicyTemplateHandlerFunc) {
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
@@ -215,14 +218,14 @@ func (s *podSecurityPolicyTemplateClient) Controller() PodSecurityPolicyTemplate
 		s.client.controllerFactory.ForResourceKind(PodSecurityPolicyTemplateGroupVersionResource, PodSecurityPolicyTemplateGroupVersionKind.Kind, false))
 
 	return &podSecurityPolicyTemplateController{
-		ns:                s.ns,
+		ns: s.ns,
 		GenericController: genericController,
 	}
 }
 
 type podSecurityPolicyTemplateClient struct {
-	client       *Client
-	ns           string
+	client *Client
+	ns string
 	objectClient *objectclient.ObjectClient
 	controller   PodSecurityPolicyTemplateController
 }

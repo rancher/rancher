@@ -1,8 +1,15 @@
 package client
 
+
+
+import (
+	
+)
+
 const (
-	NotifierStatusType = "notifierStatus"
+    NotifierStatusType = "notifierStatus"
 )
 
 type NotifierStatus struct {
 }
+

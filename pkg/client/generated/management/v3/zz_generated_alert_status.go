@@ -1,10 +1,19 @@
 package client
 
+
+	
+
+
+import (
+	
+)
+
 const (
-	AlertStatusType            = "alertStatus"
+    AlertStatusType = "alertStatus"
 	AlertStatusFieldAlertState = "alertState"
 )
 
 type AlertStatus struct {
-	AlertState string `json:"alertState,omitempty" yaml:"alertState,omitempty"`
+        AlertState string `json:"alertState,omitempty" yaml:"alertState,omitempty"`
 }
+

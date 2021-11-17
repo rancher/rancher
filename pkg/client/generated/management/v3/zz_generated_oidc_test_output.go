@@ -1,10 +1,19 @@
 package client
 
+
+	
+
+
+import (
+	
+)
+
 const (
-	OIDCTestOutputType             = "oidcTestOutput"
+    OIDCTestOutputType = "oidcTestOutput"
 	OIDCTestOutputFieldRedirectURL = "redirectUrl"
 )
 
 type OIDCTestOutput struct {
-	RedirectURL string `json:"redirectUrl,omitempty" yaml:"redirectUrl,omitempty"`
+        RedirectURL string `json:"redirectUrl,omitempty" yaml:"redirectUrl,omitempty"`
 }
+

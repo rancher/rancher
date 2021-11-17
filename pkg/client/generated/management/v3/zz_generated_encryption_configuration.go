@@ -1,14 +1,27 @@
 package client
 
+
+	
+
+	
+
+	
+
+
+import (
+	
+)
+
 const (
-	EncryptionConfigurationType            = "encryptionConfiguration"
+    EncryptionConfigurationType = "encryptionConfiguration"
 	EncryptionConfigurationFieldAPIVersion = "apiVersion"
-	EncryptionConfigurationFieldKind       = "kind"
-	EncryptionConfigurationFieldResources  = "resources"
+	EncryptionConfigurationFieldKind = "kind"
+	EncryptionConfigurationFieldResources = "resources"
 )
 
 type EncryptionConfiguration struct {
-	APIVersion string                  `json:"apiVersion,omitempty" yaml:"apiVersion,omitempty"`
-	Kind       string                  `json:"kind,omitempty" yaml:"kind,omitempty"`
-	Resources  []ResourceConfiguration `json:"resources,omitempty" yaml:"resources,omitempty"`
+        APIVersion string `json:"apiVersion,omitempty" yaml:"apiVersion,omitempty"`
+        Kind string `json:"kind,omitempty" yaml:"kind,omitempty"`
+        Resources []ResourceConfiguration `json:"resources,omitempty" yaml:"resources,omitempty"`
 }
+

@@ -1,8 +1,15 @@
 package client
 
+
+
+import (
+	
+)
+
 const (
-	IdentityConfigurationType = "identityConfiguration"
+    IdentityConfigurationType = "identityConfiguration"
 )
 
 type IdentityConfiguration struct {
 }
+

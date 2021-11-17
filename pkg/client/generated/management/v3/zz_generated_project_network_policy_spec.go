@@ -1,12 +1,23 @@
 package client
 
+
+	
+
+	
+
+
+import (
+	
+)
+
 const (
-	ProjectNetworkPolicySpecType             = "projectNetworkPolicySpec"
+    ProjectNetworkPolicySpecType = "projectNetworkPolicySpec"
 	ProjectNetworkPolicySpecFieldDescription = "description"
-	ProjectNetworkPolicySpecFieldProjectID   = "projectId"
+	ProjectNetworkPolicySpecFieldProjectID = "projectId"
 )
 
 type ProjectNetworkPolicySpec struct {
-	Description string `json:"description,omitempty" yaml:"description,omitempty"`
-	ProjectID   string `json:"projectId,omitempty" yaml:"projectId,omitempty"`
+        Description string `json:"description,omitempty" yaml:"description,omitempty"`
+        ProjectID string `json:"projectId,omitempty" yaml:"projectId,omitempty"`
 }
+

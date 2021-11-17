@@ -4,10 +4,10 @@ import (
 	"context"
 	"time"
 
-	"github.com/rancher/norman/controller"
-	"github.com/rancher/norman/objectclient"
-	"github.com/rancher/norman/resource"
 	"github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/norman/objectclient"
+	"github.com/rancher/norman/controller"
+	"github.com/rancher/norman/resource"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -29,13 +29,13 @@ var (
 		SingularName: "clusterlogging",
 		Namespaced:   true,
 
-		Kind: ClusterLoggingGroupVersionKind.Kind,
+		Kind:         ClusterLoggingGroupVersionKind.Kind,
 	}
 
 	ClusterLoggingGroupVersionResource = schema.GroupVersionResource{
-		Group:    GroupName,
-		Version:  Version,
-		Resource: "clusterloggings",
+		Group:     GroupName,
+		Version:   Version,
+		Resource:  "clusterloggings",
 	}
 )
 
@@ -52,6 +52,8 @@ func NewClusterLogging(namespace, name string, obj v3.ClusterLogging) *v3.Cluste
 	obj.Namespace = namespace
 	return &obj
 }
+
+
 
 type ClusterLoggingHandlerFunc func(key string, obj *v3.ClusterLogging) (runtime.Object, error)
 
@@ -75,7 +77,7 @@ type ClusterLoggingController interface {
 }
 
 type ClusterLoggingInterface interface {
-	ObjectClient() *objectclient.ObjectClient
+    ObjectClient() *objectclient.ObjectClient
 	Create(*v3.ClusterLogging) (*v3.ClusterLogging, error)
 	GetNamespaced(namespace, name string, opts metav1.GetOptions) (*v3.ClusterLogging, error)
 	Get(name string, opts metav1.GetOptions) (*v3.ClusterLogging, error)
@@ -98,7 +100,7 @@ type ClusterLoggingInterface interface {
 }
 
 type clusterLoggingLister struct {
-	ns         string
+	ns string
 	controller *clusterLoggingController
 }
 
@@ -125,7 +127,7 @@ func (l *clusterLoggingLister) Get(namespace, name string) (*v3.ClusterLogging, 
 	}
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
-			Group:    ClusterLoggingGroupVersionKind.Group,
+			Group: ClusterLoggingGroupVersionKind.Group,
 			Resource: ClusterLoggingGroupVersionResource.Resource,
 		}, key)
 	}
@@ -143,10 +145,11 @@ func (c *clusterLoggingController) Generic() controller.GenericController {
 
 func (c *clusterLoggingController) Lister() ClusterLoggingLister {
 	return &clusterLoggingLister{
-		ns:         c.ns,
+		ns: c.ns,
 		controller: c,
 	}
 }
+
 
 func (c *clusterLoggingController) AddHandler(ctx context.Context, name string, handler ClusterLoggingHandlerFunc) {
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
@@ -216,14 +219,14 @@ func (s *clusterLoggingClient) Controller() ClusterLoggingController {
 		s.client.controllerFactory.ForResourceKind(ClusterLoggingGroupVersionResource, ClusterLoggingGroupVersionKind.Kind, true))
 
 	return &clusterLoggingController{
-		ns:                s.ns,
+		ns: s.ns,
 		GenericController: genericController,
 	}
 }
 
 type clusterLoggingClient struct {
-	client       *Client
-	ns           string
+	client *Client
+	ns string
 	objectClient *objectclient.ObjectClient
 	controller   ClusterLoggingController
 }

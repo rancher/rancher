@@ -4,10 +4,10 @@ import (
 	"context"
 	"time"
 
-	"github.com/rancher/norman/controller"
-	"github.com/rancher/norman/objectclient"
-	"github.com/rancher/norman/resource"
 	"github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/norman/objectclient"
+	"github.com/rancher/norman/controller"
+	"github.com/rancher/norman/resource"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -29,13 +29,13 @@ var (
 		SingularName: "globaldns",
 		Namespaced:   true,
 
-		Kind: GlobalDnsGroupVersionKind.Kind,
+		Kind:         GlobalDnsGroupVersionKind.Kind,
 	}
 
 	GlobalDnsGroupVersionResource = schema.GroupVersionResource{
-		Group:    GroupName,
-		Version:  Version,
-		Resource: "globaldnses",
+		Group:     GroupName,
+		Version:   Version,
+		Resource:  "globaldnses",
 	}
 )
 
@@ -52,6 +52,8 @@ func NewGlobalDns(namespace, name string, obj v3.GlobalDns) *v3.GlobalDns {
 	obj.Namespace = namespace
 	return &obj
 }
+
+
 
 type GlobalDnsHandlerFunc func(key string, obj *v3.GlobalDns) (runtime.Object, error)
 
@@ -75,7 +77,7 @@ type GlobalDnsController interface {
 }
 
 type GlobalDnsInterface interface {
-	ObjectClient() *objectclient.ObjectClient
+    ObjectClient() *objectclient.ObjectClient
 	Create(*v3.GlobalDns) (*v3.GlobalDns, error)
 	GetNamespaced(namespace, name string, opts metav1.GetOptions) (*v3.GlobalDns, error)
 	Get(name string, opts metav1.GetOptions) (*v3.GlobalDns, error)
@@ -98,7 +100,7 @@ type GlobalDnsInterface interface {
 }
 
 type globalDnsLister struct {
-	ns         string
+	ns string
 	controller *globalDnsController
 }
 
@@ -125,7 +127,7 @@ func (l *globalDnsLister) Get(namespace, name string) (*v3.GlobalDns, error) {
 	}
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
-			Group:    GlobalDnsGroupVersionKind.Group,
+			Group: GlobalDnsGroupVersionKind.Group,
 			Resource: GlobalDnsGroupVersionResource.Resource,
 		}, key)
 	}
@@ -143,10 +145,11 @@ func (c *globalDnsController) Generic() controller.GenericController {
 
 func (c *globalDnsController) Lister() GlobalDnsLister {
 	return &globalDnsLister{
-		ns:         c.ns,
+		ns: c.ns,
 		controller: c,
 	}
 }
+
 
 func (c *globalDnsController) AddHandler(ctx context.Context, name string, handler GlobalDnsHandlerFunc) {
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
@@ -216,14 +219,14 @@ func (s *globalDnsClient) Controller() GlobalDnsController {
 		s.client.controllerFactory.ForResourceKind(GlobalDnsGroupVersionResource, GlobalDnsGroupVersionKind.Kind, true))
 
 	return &globalDnsController{
-		ns:                s.ns,
+		ns: s.ns,
 		GenericController: genericController,
 	}
 }
 
 type globalDnsClient struct {
-	client       *Client
-	ns           string
+	client *Client
+	ns string
 	objectClient *objectclient.ObjectClient
 	controller   GlobalDnsController
 }

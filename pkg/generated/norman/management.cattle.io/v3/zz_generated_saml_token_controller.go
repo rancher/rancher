@@ -4,10 +4,10 @@ import (
 	"context"
 	"time"
 
-	"github.com/rancher/norman/controller"
-	"github.com/rancher/norman/objectclient"
-	"github.com/rancher/norman/resource"
 	"github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/norman/objectclient"
+	"github.com/rancher/norman/controller"
+	"github.com/rancher/norman/resource"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -29,13 +29,13 @@ var (
 		SingularName: "samltoken",
 		Namespaced:   true,
 
-		Kind: SamlTokenGroupVersionKind.Kind,
+		Kind:         SamlTokenGroupVersionKind.Kind,
 	}
 
 	SamlTokenGroupVersionResource = schema.GroupVersionResource{
-		Group:    GroupName,
-		Version:  Version,
-		Resource: "samltokens",
+		Group:     GroupName,
+		Version:   Version,
+		Resource:  "samltokens",
 	}
 )
 
@@ -52,6 +52,8 @@ func NewSamlToken(namespace, name string, obj v3.SamlToken) *v3.SamlToken {
 	obj.Namespace = namespace
 	return &obj
 }
+
+
 
 type SamlTokenHandlerFunc func(key string, obj *v3.SamlToken) (runtime.Object, error)
 
@@ -75,7 +77,7 @@ type SamlTokenController interface {
 }
 
 type SamlTokenInterface interface {
-	ObjectClient() *objectclient.ObjectClient
+    ObjectClient() *objectclient.ObjectClient
 	Create(*v3.SamlToken) (*v3.SamlToken, error)
 	GetNamespaced(namespace, name string, opts metav1.GetOptions) (*v3.SamlToken, error)
 	Get(name string, opts metav1.GetOptions) (*v3.SamlToken, error)
@@ -98,7 +100,7 @@ type SamlTokenInterface interface {
 }
 
 type samlTokenLister struct {
-	ns         string
+	ns string
 	controller *samlTokenController
 }
 
@@ -125,7 +127,7 @@ func (l *samlTokenLister) Get(namespace, name string) (*v3.SamlToken, error) {
 	}
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
-			Group:    SamlTokenGroupVersionKind.Group,
+			Group: SamlTokenGroupVersionKind.Group,
 			Resource: SamlTokenGroupVersionResource.Resource,
 		}, key)
 	}
@@ -143,10 +145,11 @@ func (c *samlTokenController) Generic() controller.GenericController {
 
 func (c *samlTokenController) Lister() SamlTokenLister {
 	return &samlTokenLister{
-		ns:         c.ns,
+		ns: c.ns,
 		controller: c,
 	}
 }
+
 
 func (c *samlTokenController) AddHandler(ctx context.Context, name string, handler SamlTokenHandlerFunc) {
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
@@ -216,14 +219,14 @@ func (s *samlTokenClient) Controller() SamlTokenController {
 		s.client.controllerFactory.ForResourceKind(SamlTokenGroupVersionResource, SamlTokenGroupVersionKind.Kind, true))
 
 	return &samlTokenController{
-		ns:                s.ns,
+		ns: s.ns,
 		GenericController: genericController,
 	}
 }
 
 type samlTokenClient struct {
-	client       *Client
-	ns           string
+	client *Client
+	ns string
 	objectClient *objectclient.ObjectClient
 	controller   SamlTokenController
 }

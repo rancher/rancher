@@ -4,10 +4,10 @@ import (
 	"context"
 	"time"
 
-	"github.com/rancher/norman/controller"
-	"github.com/rancher/norman/objectclient"
-	"github.com/rancher/norman/resource"
 	"github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/norman/objectclient"
+	"github.com/rancher/norman/controller"
+	"github.com/rancher/norman/resource"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -29,13 +29,13 @@ var (
 		SingularName: "clustertemplate",
 		Namespaced:   true,
 
-		Kind: ClusterTemplateGroupVersionKind.Kind,
+		Kind:         ClusterTemplateGroupVersionKind.Kind,
 	}
 
 	ClusterTemplateGroupVersionResource = schema.GroupVersionResource{
-		Group:    GroupName,
-		Version:  Version,
-		Resource: "clustertemplates",
+		Group:     GroupName,
+		Version:   Version,
+		Resource:  "clustertemplates",
 	}
 )
 
@@ -52,6 +52,8 @@ func NewClusterTemplate(namespace, name string, obj v3.ClusterTemplate) *v3.Clus
 	obj.Namespace = namespace
 	return &obj
 }
+
+
 
 type ClusterTemplateHandlerFunc func(key string, obj *v3.ClusterTemplate) (runtime.Object, error)
 
@@ -75,7 +77,7 @@ type ClusterTemplateController interface {
 }
 
 type ClusterTemplateInterface interface {
-	ObjectClient() *objectclient.ObjectClient
+    ObjectClient() *objectclient.ObjectClient
 	Create(*v3.ClusterTemplate) (*v3.ClusterTemplate, error)
 	GetNamespaced(namespace, name string, opts metav1.GetOptions) (*v3.ClusterTemplate, error)
 	Get(name string, opts metav1.GetOptions) (*v3.ClusterTemplate, error)
@@ -98,7 +100,7 @@ type ClusterTemplateInterface interface {
 }
 
 type clusterTemplateLister struct {
-	ns         string
+	ns string
 	controller *clusterTemplateController
 }
 
@@ -125,7 +127,7 @@ func (l *clusterTemplateLister) Get(namespace, name string) (*v3.ClusterTemplate
 	}
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
-			Group:    ClusterTemplateGroupVersionKind.Group,
+			Group: ClusterTemplateGroupVersionKind.Group,
 			Resource: ClusterTemplateGroupVersionResource.Resource,
 		}, key)
 	}
@@ -143,10 +145,11 @@ func (c *clusterTemplateController) Generic() controller.GenericController {
 
 func (c *clusterTemplateController) Lister() ClusterTemplateLister {
 	return &clusterTemplateLister{
-		ns:         c.ns,
+		ns: c.ns,
 		controller: c,
 	}
 }
+
 
 func (c *clusterTemplateController) AddHandler(ctx context.Context, name string, handler ClusterTemplateHandlerFunc) {
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
@@ -216,14 +219,14 @@ func (s *clusterTemplateClient) Controller() ClusterTemplateController {
 		s.client.controllerFactory.ForResourceKind(ClusterTemplateGroupVersionResource, ClusterTemplateGroupVersionKind.Kind, true))
 
 	return &clusterTemplateController{
-		ns:                s.ns,
+		ns: s.ns,
 		GenericController: genericController,
 	}
 }
 
 type clusterTemplateClient struct {
-	client       *Client
-	ns           string
+	client *Client
+	ns string
 	objectClient *objectclient.ObjectClient
 	controller   ClusterTemplateController
 }

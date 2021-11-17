@@ -1,12 +1,23 @@
 package client
 
+
+	
+
+	
+
+
+import (
+	
+)
+
 const (
-	ActionType        = "action"
-	ActionFieldInput  = "input"
+    ActionType = "action"
+	ActionFieldInput = "input"
 	ActionFieldOutput = "output"
 )
 
 type Action struct {
-	Input  string `json:"input,omitempty" yaml:"input,omitempty"`
-	Output string `json:"output,omitempty" yaml:"output,omitempty"`
+        Input string `json:"input,omitempty" yaml:"input,omitempty"`
+        Output string `json:"output,omitempty" yaml:"output,omitempty"`
 }
+

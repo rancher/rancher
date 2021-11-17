@@ -4,12 +4,13 @@ import (
 	"github.com/rancher/lasso/pkg/client"
 	"github.com/rancher/lasso/pkg/controller"
 	"github.com/rancher/norman/objectclient"
-	"github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/rest"
+	"github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 )
 
 type Interface interface {
+	
 	NodePoolsGetter
 	NodesGetter
 	NodeDriversGetter
@@ -100,6 +101,7 @@ func NewFromControllerFactory(factory controller.SharedControllerFactory) (Inter
 		clientFactory:     factory.SharedCacheFactory().SharedClientFactory(),
 	}, nil
 }
+
 
 type NodePoolsGetter interface {
 	NodePools(namespace string) NodePoolInterface
@@ -1010,3 +1012,4 @@ func (c *Client) FleetWorkspaces(namespace string) FleetWorkspaceInterface {
 		objectClient: objectClient,
 	}
 }
+

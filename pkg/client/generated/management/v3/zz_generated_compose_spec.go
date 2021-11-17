@@ -1,10 +1,19 @@
 package client
 
+
+	
+
+
+import (
+	
+)
+
 const (
-	ComposeSpecType                = "composeSpec"
+    ComposeSpecType = "composeSpec"
 	ComposeSpecFieldRancherCompose = "rancherCompose"
 )
 
 type ComposeSpec struct {
-	RancherCompose string `json:"rancherCompose,omitempty" yaml:"rancherCompose,omitempty"`
+        RancherCompose string `json:"rancherCompose,omitempty" yaml:"rancherCompose,omitempty"`
 }
+

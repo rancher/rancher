@@ -4,10 +4,10 @@ import (
 	"context"
 	"time"
 
-	"github.com/rancher/norman/controller"
-	"github.com/rancher/norman/objectclient"
-	"github.com/rancher/norman/resource"
 	"github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/norman/objectclient"
+	"github.com/rancher/norman/controller"
+	"github.com/rancher/norman/resource"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -32,9 +32,9 @@ var (
 	}
 
 	FeatureGroupVersionResource = schema.GroupVersionResource{
-		Group:    GroupName,
-		Version:  Version,
-		Resource: "features",
+		Group:     GroupName,
+		Version:   Version,
+		Resource:  "features",
 	}
 )
 
@@ -51,6 +51,8 @@ func NewFeature(namespace, name string, obj v3.Feature) *v3.Feature {
 	obj.Namespace = namespace
 	return &obj
 }
+
+
 
 type FeatureHandlerFunc func(key string, obj *v3.Feature) (runtime.Object, error)
 
@@ -74,7 +76,7 @@ type FeatureController interface {
 }
 
 type FeatureInterface interface {
-	ObjectClient() *objectclient.ObjectClient
+    ObjectClient() *objectclient.ObjectClient
 	Create(*v3.Feature) (*v3.Feature, error)
 	GetNamespaced(namespace, name string, opts metav1.GetOptions) (*v3.Feature, error)
 	Get(name string, opts metav1.GetOptions) (*v3.Feature, error)
@@ -97,7 +99,7 @@ type FeatureInterface interface {
 }
 
 type featureLister struct {
-	ns         string
+	ns string
 	controller *featureController
 }
 
@@ -124,7 +126,7 @@ func (l *featureLister) Get(namespace, name string) (*v3.Feature, error) {
 	}
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
-			Group:    FeatureGroupVersionKind.Group,
+			Group: FeatureGroupVersionKind.Group,
 			Resource: FeatureGroupVersionResource.Resource,
 		}, key)
 	}
@@ -142,10 +144,11 @@ func (c *featureController) Generic() controller.GenericController {
 
 func (c *featureController) Lister() FeatureLister {
 	return &featureLister{
-		ns:         c.ns,
+		ns: c.ns,
 		controller: c,
 	}
 }
+
 
 func (c *featureController) AddHandler(ctx context.Context, name string, handler FeatureHandlerFunc) {
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
@@ -215,14 +218,14 @@ func (s *featureClient) Controller() FeatureController {
 		s.client.controllerFactory.ForResourceKind(FeatureGroupVersionResource, FeatureGroupVersionKind.Kind, false))
 
 	return &featureController{
-		ns:                s.ns,
+		ns: s.ns,
 		GenericController: genericController,
 	}
 }
 
 type featureClient struct {
-	client       *Client
-	ns           string
+	client *Client
+	ns string
 	objectClient *objectclient.ObjectClient
 	controller   FeatureController
 }

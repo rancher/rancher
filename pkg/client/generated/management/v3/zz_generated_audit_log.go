@@ -1,12 +1,23 @@
 package client
 
+
+	
+
+	
+
+
+import (
+	
+)
+
 const (
-	AuditLogType               = "auditLog"
+    AuditLogType = "auditLog"
 	AuditLogFieldConfiguration = "configuration"
-	AuditLogFieldEnabled       = "enabled"
+	AuditLogFieldEnabled = "enabled"
 )
 
 type AuditLog struct {
-	Configuration *AuditLogConfig `json:"configuration,omitempty" yaml:"configuration,omitempty"`
-	Enabled       bool            `json:"enabled,omitempty" yaml:"enabled,omitempty"`
+        Configuration *AuditLogConfig `json:"configuration,omitempty" yaml:"configuration,omitempty"`
+        Enabled bool `json:"enabled,omitempty" yaml:"enabled,omitempty"`
 }
+

@@ -1,12 +1,23 @@
 package client
 
+
+	
+
+	
+
+
+import (
+	
+)
+
 const (
-	PersistentVolumeClaimTemplateType            = "persistentVolumeClaimTemplate"
+    PersistentVolumeClaimTemplateType = "persistentVolumeClaimTemplate"
 	PersistentVolumeClaimTemplateFieldObjectMeta = "metadata"
-	PersistentVolumeClaimTemplateFieldSpec       = "spec"
+	PersistentVolumeClaimTemplateFieldSpec = "spec"
 )
 
 type PersistentVolumeClaimTemplate struct {
-	ObjectMeta *ObjectMeta                `json:"metadata,omitempty" yaml:"metadata,omitempty"`
-	Spec       *PersistentVolumeClaimSpec `json:"spec,omitempty" yaml:"spec,omitempty"`
+        ObjectMeta *ObjectMeta `json:"metadata,omitempty" yaml:"metadata,omitempty"`
+        Spec *PersistentVolumeClaimSpec `json:"spec,omitempty" yaml:"spec,omitempty"`
 }
+

@@ -1,10 +1,19 @@
 package client
 
+
+	
+
+
+import (
+	
+)
+
 const (
-	DiskVsphereOptsType                    = "diskVsphereOpts"
+    DiskVsphereOptsType = "diskVsphereOpts"
 	DiskVsphereOptsFieldSCSIControllerType = "scsicontrollertype"
 )
 
 type DiskVsphereOpts struct {
-	SCSIControllerType string `json:"scsicontrollertype,omitempty" yaml:"scsicontrollertype,omitempty"`
+        SCSIControllerType string `json:"scsicontrollertype,omitempty" yaml:"scsicontrollertype,omitempty"`
 }
+

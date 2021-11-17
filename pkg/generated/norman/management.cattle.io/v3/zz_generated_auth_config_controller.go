@@ -4,10 +4,10 @@ import (
 	"context"
 	"time"
 
-	"github.com/rancher/norman/controller"
-	"github.com/rancher/norman/objectclient"
-	"github.com/rancher/norman/resource"
 	"github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/norman/objectclient"
+	"github.com/rancher/norman/controller"
+	"github.com/rancher/norman/resource"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -32,9 +32,9 @@ var (
 	}
 
 	AuthConfigGroupVersionResource = schema.GroupVersionResource{
-		Group:    GroupName,
-		Version:  Version,
-		Resource: "authconfigs",
+		Group:     GroupName,
+		Version:   Version,
+		Resource:  "authconfigs",
 	}
 )
 
@@ -51,6 +51,8 @@ func NewAuthConfig(namespace, name string, obj v3.AuthConfig) *v3.AuthConfig {
 	obj.Namespace = namespace
 	return &obj
 }
+
+
 
 type AuthConfigHandlerFunc func(key string, obj *v3.AuthConfig) (runtime.Object, error)
 
@@ -74,7 +76,7 @@ type AuthConfigController interface {
 }
 
 type AuthConfigInterface interface {
-	ObjectClient() *objectclient.ObjectClient
+    ObjectClient() *objectclient.ObjectClient
 	Create(*v3.AuthConfig) (*v3.AuthConfig, error)
 	GetNamespaced(namespace, name string, opts metav1.GetOptions) (*v3.AuthConfig, error)
 	Get(name string, opts metav1.GetOptions) (*v3.AuthConfig, error)
@@ -97,7 +99,7 @@ type AuthConfigInterface interface {
 }
 
 type authConfigLister struct {
-	ns         string
+	ns string
 	controller *authConfigController
 }
 
@@ -124,7 +126,7 @@ func (l *authConfigLister) Get(namespace, name string) (*v3.AuthConfig, error) {
 	}
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
-			Group:    AuthConfigGroupVersionKind.Group,
+			Group: AuthConfigGroupVersionKind.Group,
 			Resource: AuthConfigGroupVersionResource.Resource,
 		}, key)
 	}
@@ -142,10 +144,11 @@ func (c *authConfigController) Generic() controller.GenericController {
 
 func (c *authConfigController) Lister() AuthConfigLister {
 	return &authConfigLister{
-		ns:         c.ns,
+		ns: c.ns,
 		controller: c,
 	}
 }
+
 
 func (c *authConfigController) AddHandler(ctx context.Context, name string, handler AuthConfigHandlerFunc) {
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
@@ -215,14 +218,14 @@ func (s *authConfigClient) Controller() AuthConfigController {
 		s.client.controllerFactory.ForResourceKind(AuthConfigGroupVersionResource, AuthConfigGroupVersionKind.Kind, false))
 
 	return &authConfigController{
-		ns:                s.ns,
+		ns: s.ns,
 		GenericController: genericController,
 	}
 }
 
 type authConfigClient struct {
-	client       *Client
-	ns           string
+	client *Client
+	ns string
 	objectClient *objectclient.ObjectClient
 	controller   AuthConfigController
 }

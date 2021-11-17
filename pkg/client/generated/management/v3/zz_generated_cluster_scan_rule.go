@@ -1,12 +1,23 @@
 package client
 
+
+	
+
+	
+
+
+import (
+	
+)
+
 const (
-	ClusterScanRuleType              = "clusterScanRule"
+    ClusterScanRuleType = "clusterScanRule"
 	ClusterScanRuleFieldFailuresOnly = "failuresOnly"
-	ClusterScanRuleFieldScanRunType  = "scanRunType"
+	ClusterScanRuleFieldScanRunType = "scanRunType"
 )
 
 type ClusterScanRule struct {
-	FailuresOnly bool   `json:"failuresOnly,omitempty" yaml:"failuresOnly,omitempty"`
-	ScanRunType  string `json:"scanRunType,omitempty" yaml:"scanRunType,omitempty"`
+        FailuresOnly bool `json:"failuresOnly,omitempty" yaml:"failuresOnly,omitempty"`
+        ScanRunType string `json:"scanRunType,omitempty" yaml:"scanRunType,omitempty"`
 }
+

@@ -1,10 +1,19 @@
 package client
 
+
+	
+
+
+import (
+	
+)
+
 const (
-	HealthCheckType     = "healthCheck"
+    HealthCheckType = "healthCheck"
 	HealthCheckFieldURL = "url"
 )
 
 type HealthCheck struct {
-	URL string `json:"url,omitempty" yaml:"url,omitempty"`
+        URL string `json:"url,omitempty" yaml:"url,omitempty"`
 }
+

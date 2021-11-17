@@ -1,10 +1,19 @@
 package client
 
+
+	
+
+
+import (
+	
+)
+
 const (
-	AllowedCSIDriverType      = "allowedCSIDriver"
+    AllowedCSIDriverType = "allowedCSIDriver"
 	AllowedCSIDriverFieldName = "name"
 )
 
 type AllowedCSIDriver struct {
-	Name string `json:"name,omitempty" yaml:"name,omitempty"`
+        Name string `json:"name,omitempty" yaml:"name,omitempty"`
 }
+

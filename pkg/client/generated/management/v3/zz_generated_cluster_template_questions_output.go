@@ -1,10 +1,19 @@
 package client
 
+
+	
+
+
+import (
+	
+)
+
 const (
-	ClusterTemplateQuestionsOutputType           = "clusterTemplateQuestionsOutput"
+    ClusterTemplateQuestionsOutputType = "clusterTemplateQuestionsOutput"
 	ClusterTemplateQuestionsOutputFieldQuestions = "questions"
 )
 
 type ClusterTemplateQuestionsOutput struct {
-	Questions []Question `json:"questions,omitempty" yaml:"questions,omitempty"`
+        Questions []Question `json:"questions,omitempty" yaml:"questions,omitempty"`
 }
+

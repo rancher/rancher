@@ -1,12 +1,23 @@
 package client
 
+
+	
+
+	
+
+
+import (
+	
+)
+
 const (
-	MSTeamsConfigType          = "msTeamsConfig"
+    MSTeamsConfigType = "msTeamsConfig"
 	MSTeamsConfigFieldProxyURL = "proxyUrl"
-	MSTeamsConfigFieldURL      = "url"
+	MSTeamsConfigFieldURL = "url"
 )
 
 type MSTeamsConfig struct {
-	ProxyURL string `json:"proxyUrl,omitempty" yaml:"proxyUrl,omitempty"`
-	URL      string `json:"url,omitempty" yaml:"url,omitempty"`
+        ProxyURL string `json:"proxyUrl,omitempty" yaml:"proxyUrl,omitempty"`
+        URL string `json:"url,omitempty" yaml:"url,omitempty"`
 }
+

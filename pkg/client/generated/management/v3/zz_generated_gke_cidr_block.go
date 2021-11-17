@@ -1,12 +1,23 @@
 package client
 
+
+	
+
+	
+
+
+import (
+	
+)
+
 const (
-	GKECidrBlockType             = "gkeCidrBlock"
-	GKECidrBlockFieldCidrBlock   = "cidrBlock"
+    GKECidrBlockType = "gkeCidrBlock"
+	GKECidrBlockFieldCidrBlock = "cidrBlock"
 	GKECidrBlockFieldDisplayName = "displayName"
 )
 
 type GKECidrBlock struct {
-	CidrBlock   string `json:"cidrBlock,omitempty" yaml:"cidrBlock,omitempty"`
-	DisplayName string `json:"displayName,omitempty" yaml:"displayName,omitempty"`
+        CidrBlock string `json:"cidrBlock,omitempty" yaml:"cidrBlock,omitempty"`
+        DisplayName string `json:"displayName,omitempty" yaml:"displayName,omitempty"`
 }
+

@@ -4,10 +4,10 @@ import (
 	"context"
 	"time"
 
-	"github.com/rancher/norman/controller"
-	"github.com/rancher/norman/objectclient"
-	"github.com/rancher/norman/resource"
 	"github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/norman/objectclient"
+	"github.com/rancher/norman/controller"
+	"github.com/rancher/norman/resource"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -32,9 +32,9 @@ var (
 	}
 
 	CatalogGroupVersionResource = schema.GroupVersionResource{
-		Group:    GroupName,
-		Version:  Version,
-		Resource: "catalogs",
+		Group:     GroupName,
+		Version:   Version,
+		Resource:  "catalogs",
 	}
 )
 
@@ -51,6 +51,8 @@ func NewCatalog(namespace, name string, obj v3.Catalog) *v3.Catalog {
 	obj.Namespace = namespace
 	return &obj
 }
+
+
 
 type CatalogHandlerFunc func(key string, obj *v3.Catalog) (runtime.Object, error)
 
@@ -74,7 +76,7 @@ type CatalogController interface {
 }
 
 type CatalogInterface interface {
-	ObjectClient() *objectclient.ObjectClient
+    ObjectClient() *objectclient.ObjectClient
 	Create(*v3.Catalog) (*v3.Catalog, error)
 	GetNamespaced(namespace, name string, opts metav1.GetOptions) (*v3.Catalog, error)
 	Get(name string, opts metav1.GetOptions) (*v3.Catalog, error)
@@ -97,7 +99,7 @@ type CatalogInterface interface {
 }
 
 type catalogLister struct {
-	ns         string
+	ns string
 	controller *catalogController
 }
 
@@ -124,7 +126,7 @@ func (l *catalogLister) Get(namespace, name string) (*v3.Catalog, error) {
 	}
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
-			Group:    CatalogGroupVersionKind.Group,
+			Group: CatalogGroupVersionKind.Group,
 			Resource: CatalogGroupVersionResource.Resource,
 		}, key)
 	}
@@ -142,10 +144,11 @@ func (c *catalogController) Generic() controller.GenericController {
 
 func (c *catalogController) Lister() CatalogLister {
 	return &catalogLister{
-		ns:         c.ns,
+		ns: c.ns,
 		controller: c,
 	}
 }
+
 
 func (c *catalogController) AddHandler(ctx context.Context, name string, handler CatalogHandlerFunc) {
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
@@ -215,14 +218,14 @@ func (s *catalogClient) Controller() CatalogController {
 		s.client.controllerFactory.ForResourceKind(CatalogGroupVersionResource, CatalogGroupVersionKind.Kind, false))
 
 	return &catalogController{
-		ns:                s.ns,
+		ns: s.ns,
 		GenericController: genericController,
 	}
 }
 
 type catalogClient struct {
-	client       *Client
-	ns           string
+	client *Client
+	ns string
 	objectClient *objectclient.ObjectClient
 	controller   CatalogController
 }

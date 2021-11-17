@@ -1,10 +1,19 @@
 package client
 
+
+	
+
+
+import (
+	
+)
+
 const (
-	AzureADConfigTestOutputType             = "azureADConfigTestOutput"
+    AzureADConfigTestOutputType = "azureADConfigTestOutput"
 	AzureADConfigTestOutputFieldRedirectURL = "redirectUrl"
 )
 
 type AzureADConfigTestOutput struct {
-	RedirectURL string `json:"redirectUrl,omitempty" yaml:"redirectUrl,omitempty"`
+        RedirectURL string `json:"redirectUrl,omitempty" yaml:"redirectUrl,omitempty"`
 }
+

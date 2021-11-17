@@ -4,10 +4,10 @@ import (
 	"context"
 	"time"
 
-	"github.com/rancher/norman/controller"
-	"github.com/rancher/norman/objectclient"
-	"github.com/rancher/norman/resource"
 	"github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/norman/objectclient"
+	"github.com/rancher/norman/controller"
+	"github.com/rancher/norman/resource"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -32,9 +32,9 @@ var (
 	}
 
 	GlobalRoleBindingGroupVersionResource = schema.GroupVersionResource{
-		Group:    GroupName,
-		Version:  Version,
-		Resource: "globalrolebindings",
+		Group:     GroupName,
+		Version:   Version,
+		Resource:  "globalrolebindings",
 	}
 )
 
@@ -51,6 +51,8 @@ func NewGlobalRoleBinding(namespace, name string, obj v3.GlobalRoleBinding) *v3.
 	obj.Namespace = namespace
 	return &obj
 }
+
+
 
 type GlobalRoleBindingHandlerFunc func(key string, obj *v3.GlobalRoleBinding) (runtime.Object, error)
 
@@ -74,7 +76,7 @@ type GlobalRoleBindingController interface {
 }
 
 type GlobalRoleBindingInterface interface {
-	ObjectClient() *objectclient.ObjectClient
+    ObjectClient() *objectclient.ObjectClient
 	Create(*v3.GlobalRoleBinding) (*v3.GlobalRoleBinding, error)
 	GetNamespaced(namespace, name string, opts metav1.GetOptions) (*v3.GlobalRoleBinding, error)
 	Get(name string, opts metav1.GetOptions) (*v3.GlobalRoleBinding, error)
@@ -97,7 +99,7 @@ type GlobalRoleBindingInterface interface {
 }
 
 type globalRoleBindingLister struct {
-	ns         string
+	ns string
 	controller *globalRoleBindingController
 }
 
@@ -124,7 +126,7 @@ func (l *globalRoleBindingLister) Get(namespace, name string) (*v3.GlobalRoleBin
 	}
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
-			Group:    GlobalRoleBindingGroupVersionKind.Group,
+			Group: GlobalRoleBindingGroupVersionKind.Group,
 			Resource: GlobalRoleBindingGroupVersionResource.Resource,
 		}, key)
 	}
@@ -142,10 +144,11 @@ func (c *globalRoleBindingController) Generic() controller.GenericController {
 
 func (c *globalRoleBindingController) Lister() GlobalRoleBindingLister {
 	return &globalRoleBindingLister{
-		ns:         c.ns,
+		ns: c.ns,
 		controller: c,
 	}
 }
+
 
 func (c *globalRoleBindingController) AddHandler(ctx context.Context, name string, handler GlobalRoleBindingHandlerFunc) {
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
@@ -215,14 +218,14 @@ func (s *globalRoleBindingClient) Controller() GlobalRoleBindingController {
 		s.client.controllerFactory.ForResourceKind(GlobalRoleBindingGroupVersionResource, GlobalRoleBindingGroupVersionKind.Kind, false))
 
 	return &globalRoleBindingController{
-		ns:                s.ns,
+		ns: s.ns,
 		GenericController: genericController,
 	}
 }
 
 type globalRoleBindingClient struct {
-	client       *Client
-	ns           string
+	client *Client
+	ns string
 	objectClient *objectclient.ObjectClient
 	controller   GlobalRoleBindingController
 }

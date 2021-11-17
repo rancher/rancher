@@ -1,10 +1,19 @@
 package client
 
+
+	
+
+
+import (
+	
+)
+
 const (
-	SamlConfigTestOutputType                = "samlConfigTestOutput"
+    SamlConfigTestOutputType = "samlConfigTestOutput"
 	SamlConfigTestOutputFieldIdpRedirectURL = "idpRedirectUrl"
 )
 
 type SamlConfigTestOutput struct {
-	IdpRedirectURL string `json:"idpRedirectUrl,omitempty" yaml:"idpRedirectUrl,omitempty"`
+        IdpRedirectURL string `json:"idpRedirectUrl,omitempty" yaml:"idpRedirectUrl,omitempty"`
 }
+

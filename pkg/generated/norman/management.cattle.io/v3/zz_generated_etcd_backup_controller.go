@@ -4,10 +4,10 @@ import (
 	"context"
 	"time"
 
-	"github.com/rancher/norman/controller"
-	"github.com/rancher/norman/objectclient"
-	"github.com/rancher/norman/resource"
 	"github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/norman/objectclient"
+	"github.com/rancher/norman/controller"
+	"github.com/rancher/norman/resource"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -29,13 +29,13 @@ var (
 		SingularName: "etcdbackup",
 		Namespaced:   true,
 
-		Kind: EtcdBackupGroupVersionKind.Kind,
+		Kind:         EtcdBackupGroupVersionKind.Kind,
 	}
 
 	EtcdBackupGroupVersionResource = schema.GroupVersionResource{
-		Group:    GroupName,
-		Version:  Version,
-		Resource: "etcdbackups",
+		Group:     GroupName,
+		Version:   Version,
+		Resource:  "etcdbackups",
 	}
 )
 
@@ -52,6 +52,8 @@ func NewEtcdBackup(namespace, name string, obj v3.EtcdBackup) *v3.EtcdBackup {
 	obj.Namespace = namespace
 	return &obj
 }
+
+
 
 type EtcdBackupHandlerFunc func(key string, obj *v3.EtcdBackup) (runtime.Object, error)
 
@@ -75,7 +77,7 @@ type EtcdBackupController interface {
 }
 
 type EtcdBackupInterface interface {
-	ObjectClient() *objectclient.ObjectClient
+    ObjectClient() *objectclient.ObjectClient
 	Create(*v3.EtcdBackup) (*v3.EtcdBackup, error)
 	GetNamespaced(namespace, name string, opts metav1.GetOptions) (*v3.EtcdBackup, error)
 	Get(name string, opts metav1.GetOptions) (*v3.EtcdBackup, error)
@@ -98,7 +100,7 @@ type EtcdBackupInterface interface {
 }
 
 type etcdBackupLister struct {
-	ns         string
+	ns string
 	controller *etcdBackupController
 }
 
@@ -125,7 +127,7 @@ func (l *etcdBackupLister) Get(namespace, name string) (*v3.EtcdBackup, error) {
 	}
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
-			Group:    EtcdBackupGroupVersionKind.Group,
+			Group: EtcdBackupGroupVersionKind.Group,
 			Resource: EtcdBackupGroupVersionResource.Resource,
 		}, key)
 	}
@@ -143,10 +145,11 @@ func (c *etcdBackupController) Generic() controller.GenericController {
 
 func (c *etcdBackupController) Lister() EtcdBackupLister {
 	return &etcdBackupLister{
-		ns:         c.ns,
+		ns: c.ns,
 		controller: c,
 	}
 }
+
 
 func (c *etcdBackupController) AddHandler(ctx context.Context, name string, handler EtcdBackupHandlerFunc) {
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
@@ -216,14 +219,14 @@ func (s *etcdBackupClient) Controller() EtcdBackupController {
 		s.client.controllerFactory.ForResourceKind(EtcdBackupGroupVersionResource, EtcdBackupGroupVersionKind.Kind, true))
 
 	return &etcdBackupController{
-		ns:                s.ns,
+		ns: s.ns,
 		GenericController: genericController,
 	}
 }
 
 type etcdBackupClient struct {
-	client       *Client
-	ns           string
+	client *Client
+	ns string
 	objectClient *objectclient.ObjectClient
 	controller   EtcdBackupController
 }

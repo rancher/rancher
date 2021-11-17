@@ -4,10 +4,10 @@ import (
 	"context"
 	"time"
 
-	"github.com/rancher/norman/controller"
-	"github.com/rancher/norman/objectclient"
-	"github.com/rancher/norman/resource"
 	"github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/norman/objectclient"
+	"github.com/rancher/norman/controller"
+	"github.com/rancher/norman/resource"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -29,13 +29,13 @@ var (
 		SingularName: "projectroletemplatebinding",
 		Namespaced:   true,
 
-		Kind: ProjectRoleTemplateBindingGroupVersionKind.Kind,
+		Kind:         ProjectRoleTemplateBindingGroupVersionKind.Kind,
 	}
 
 	ProjectRoleTemplateBindingGroupVersionResource = schema.GroupVersionResource{
-		Group:    GroupName,
-		Version:  Version,
-		Resource: "projectroletemplatebindings",
+		Group:     GroupName,
+		Version:   Version,
+		Resource:  "projectroletemplatebindings",
 	}
 )
 
@@ -52,6 +52,8 @@ func NewProjectRoleTemplateBinding(namespace, name string, obj v3.ProjectRoleTem
 	obj.Namespace = namespace
 	return &obj
 }
+
+
 
 type ProjectRoleTemplateBindingHandlerFunc func(key string, obj *v3.ProjectRoleTemplateBinding) (runtime.Object, error)
 
@@ -75,7 +77,7 @@ type ProjectRoleTemplateBindingController interface {
 }
 
 type ProjectRoleTemplateBindingInterface interface {
-	ObjectClient() *objectclient.ObjectClient
+    ObjectClient() *objectclient.ObjectClient
 	Create(*v3.ProjectRoleTemplateBinding) (*v3.ProjectRoleTemplateBinding, error)
 	GetNamespaced(namespace, name string, opts metav1.GetOptions) (*v3.ProjectRoleTemplateBinding, error)
 	Get(name string, opts metav1.GetOptions) (*v3.ProjectRoleTemplateBinding, error)
@@ -98,7 +100,7 @@ type ProjectRoleTemplateBindingInterface interface {
 }
 
 type projectRoleTemplateBindingLister struct {
-	ns         string
+	ns string
 	controller *projectRoleTemplateBindingController
 }
 
@@ -125,7 +127,7 @@ func (l *projectRoleTemplateBindingLister) Get(namespace, name string) (*v3.Proj
 	}
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
-			Group:    ProjectRoleTemplateBindingGroupVersionKind.Group,
+			Group: ProjectRoleTemplateBindingGroupVersionKind.Group,
 			Resource: ProjectRoleTemplateBindingGroupVersionResource.Resource,
 		}, key)
 	}
@@ -143,10 +145,11 @@ func (c *projectRoleTemplateBindingController) Generic() controller.GenericContr
 
 func (c *projectRoleTemplateBindingController) Lister() ProjectRoleTemplateBindingLister {
 	return &projectRoleTemplateBindingLister{
-		ns:         c.ns,
+		ns: c.ns,
 		controller: c,
 	}
 }
+
 
 func (c *projectRoleTemplateBindingController) AddHandler(ctx context.Context, name string, handler ProjectRoleTemplateBindingHandlerFunc) {
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
@@ -216,14 +219,14 @@ func (s *projectRoleTemplateBindingClient) Controller() ProjectRoleTemplateBindi
 		s.client.controllerFactory.ForResourceKind(ProjectRoleTemplateBindingGroupVersionResource, ProjectRoleTemplateBindingGroupVersionKind.Kind, true))
 
 	return &projectRoleTemplateBindingController{
-		ns:                s.ns,
+		ns: s.ns,
 		GenericController: genericController,
 	}
 }
 
 type projectRoleTemplateBindingClient struct {
-	client       *Client
-	ns           string
+	client *Client
+	ns string
 	objectClient *objectclient.ObjectClient
 	controller   ProjectRoleTemplateBindingController
 }

@@ -4,10 +4,10 @@ import (
 	"context"
 	"time"
 
-	"github.com/rancher/norman/controller"
-	"github.com/rancher/norman/objectclient"
-	"github.com/rancher/norman/resource"
 	"github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/norman/objectclient"
+	"github.com/rancher/norman/controller"
+	"github.com/rancher/norman/resource"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -32,9 +32,9 @@ var (
 	}
 
 	UserAttributeGroupVersionResource = schema.GroupVersionResource{
-		Group:    GroupName,
-		Version:  Version,
-		Resource: "userattributes",
+		Group:     GroupName,
+		Version:   Version,
+		Resource:  "userattributes",
 	}
 )
 
@@ -51,6 +51,8 @@ func NewUserAttribute(namespace, name string, obj v3.UserAttribute) *v3.UserAttr
 	obj.Namespace = namespace
 	return &obj
 }
+
+
 
 type UserAttributeHandlerFunc func(key string, obj *v3.UserAttribute) (runtime.Object, error)
 
@@ -74,7 +76,7 @@ type UserAttributeController interface {
 }
 
 type UserAttributeInterface interface {
-	ObjectClient() *objectclient.ObjectClient
+    ObjectClient() *objectclient.ObjectClient
 	Create(*v3.UserAttribute) (*v3.UserAttribute, error)
 	GetNamespaced(namespace, name string, opts metav1.GetOptions) (*v3.UserAttribute, error)
 	Get(name string, opts metav1.GetOptions) (*v3.UserAttribute, error)
@@ -97,7 +99,7 @@ type UserAttributeInterface interface {
 }
 
 type userAttributeLister struct {
-	ns         string
+	ns string
 	controller *userAttributeController
 }
 
@@ -124,7 +126,7 @@ func (l *userAttributeLister) Get(namespace, name string) (*v3.UserAttribute, er
 	}
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
-			Group:    UserAttributeGroupVersionKind.Group,
+			Group: UserAttributeGroupVersionKind.Group,
 			Resource: UserAttributeGroupVersionResource.Resource,
 		}, key)
 	}
@@ -142,10 +144,11 @@ func (c *userAttributeController) Generic() controller.GenericController {
 
 func (c *userAttributeController) Lister() UserAttributeLister {
 	return &userAttributeLister{
-		ns:         c.ns,
+		ns: c.ns,
 		controller: c,
 	}
 }
+
 
 func (c *userAttributeController) AddHandler(ctx context.Context, name string, handler UserAttributeHandlerFunc) {
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
@@ -215,14 +218,14 @@ func (s *userAttributeClient) Controller() UserAttributeController {
 		s.client.controllerFactory.ForResourceKind(UserAttributeGroupVersionResource, UserAttributeGroupVersionKind.Kind, false))
 
 	return &userAttributeController{
-		ns:                s.ns,
+		ns: s.ns,
 		GenericController: genericController,
 	}
 }
 
 type userAttributeClient struct {
-	client       *Client
-	ns           string
+	client *Client
+	ns string
 	objectClient *objectclient.ObjectClient
 	controller   UserAttributeController
 }

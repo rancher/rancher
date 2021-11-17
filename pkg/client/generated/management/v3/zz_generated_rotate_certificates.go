@@ -1,12 +1,23 @@
 package client
 
+
+	
+
+	
+
+
+import (
+	
+)
+
 const (
-	RotateCertificatesType                = "rotateCertificates"
+    RotateCertificatesType = "rotateCertificates"
 	RotateCertificatesFieldCACertificates = "caCertificates"
-	RotateCertificatesFieldServices       = "services"
+	RotateCertificatesFieldServices = "services"
 )
 
 type RotateCertificates struct {
-	CACertificates bool   `json:"caCertificates,omitempty" yaml:"caCertificates,omitempty"`
-	Services       string `json:"services,omitempty" yaml:"services,omitempty"`
+        CACertificates bool `json:"caCertificates,omitempty" yaml:"caCertificates,omitempty"`
+        Services string `json:"services,omitempty" yaml:"services,omitempty"`
 }
+

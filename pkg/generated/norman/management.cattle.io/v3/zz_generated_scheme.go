@@ -6,7 +6,7 @@ import (
 
 const (
 	GroupName = "management.cattle.io"
-	Version   = "v3"
+	Version = "v3"
 )
 
 // SchemeGroupVersion is group version used to register these objects

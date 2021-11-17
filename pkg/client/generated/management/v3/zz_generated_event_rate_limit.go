@@ -1,12 +1,23 @@
 package client
 
+
+	
+
+	
+
+
+import (
+	
+)
+
 const (
-	EventRateLimitType               = "eventRateLimit"
+    EventRateLimitType = "eventRateLimit"
 	EventRateLimitFieldConfiguration = "configuration"
-	EventRateLimitFieldEnabled       = "enabled"
+	EventRateLimitFieldEnabled = "enabled"
 )
 
 type EventRateLimit struct {
-	Configuration map[string]interface{} `json:"configuration,omitempty" yaml:"configuration,omitempty"`
-	Enabled       bool                   `json:"enabled,omitempty" yaml:"enabled,omitempty"`
+        Configuration map[string]interface{} `json:"configuration,omitempty" yaml:"configuration,omitempty"`
+        Enabled bool `json:"enabled,omitempty" yaml:"enabled,omitempty"`
 }
+

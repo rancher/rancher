@@ -4,10 +4,10 @@ import (
 	"context"
 	"time"
 
-	"github.com/rancher/norman/controller"
-	"github.com/rancher/norman/objectclient"
-	"github.com/rancher/norman/resource"
 	"github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/norman/objectclient"
+	"github.com/rancher/norman/controller"
+	"github.com/rancher/norman/resource"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -29,13 +29,13 @@ var (
 		SingularName: "project",
 		Namespaced:   true,
 
-		Kind: ProjectGroupVersionKind.Kind,
+		Kind:         ProjectGroupVersionKind.Kind,
 	}
 
 	ProjectGroupVersionResource = schema.GroupVersionResource{
-		Group:    GroupName,
-		Version:  Version,
-		Resource: "projects",
+		Group:     GroupName,
+		Version:   Version,
+		Resource:  "projects",
 	}
 )
 
@@ -52,6 +52,8 @@ func NewProject(namespace, name string, obj v3.Project) *v3.Project {
 	obj.Namespace = namespace
 	return &obj
 }
+
+
 
 type ProjectHandlerFunc func(key string, obj *v3.Project) (runtime.Object, error)
 
@@ -75,7 +77,7 @@ type ProjectController interface {
 }
 
 type ProjectInterface interface {
-	ObjectClient() *objectclient.ObjectClient
+    ObjectClient() *objectclient.ObjectClient
 	Create(*v3.Project) (*v3.Project, error)
 	GetNamespaced(namespace, name string, opts metav1.GetOptions) (*v3.Project, error)
 	Get(name string, opts metav1.GetOptions) (*v3.Project, error)
@@ -98,7 +100,7 @@ type ProjectInterface interface {
 }
 
 type projectLister struct {
-	ns         string
+	ns string
 	controller *projectController
 }
 
@@ -125,7 +127,7 @@ func (l *projectLister) Get(namespace, name string) (*v3.Project, error) {
 	}
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
-			Group:    ProjectGroupVersionKind.Group,
+			Group: ProjectGroupVersionKind.Group,
 			Resource: ProjectGroupVersionResource.Resource,
 		}, key)
 	}
@@ -143,10 +145,11 @@ func (c *projectController) Generic() controller.GenericController {
 
 func (c *projectController) Lister() ProjectLister {
 	return &projectLister{
-		ns:         c.ns,
+		ns: c.ns,
 		controller: c,
 	}
 }
+
 
 func (c *projectController) AddHandler(ctx context.Context, name string, handler ProjectHandlerFunc) {
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
@@ -216,14 +219,14 @@ func (s *projectClient) Controller() ProjectController {
 		s.client.controllerFactory.ForResourceKind(ProjectGroupVersionResource, ProjectGroupVersionKind.Kind, true))
 
 	return &projectController{
-		ns:                s.ns,
+		ns: s.ns,
 		GenericController: genericController,
 	}
 }
 
 type projectClient struct {
-	client       *Client
-	ns           string
+	client *Client
+	ns string
 	objectClient *objectclient.ObjectClient
 	controller   ProjectController
 }

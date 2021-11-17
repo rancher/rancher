@@ -4,10 +4,10 @@ import (
 	"context"
 	"time"
 
-	"github.com/rancher/norman/controller"
-	"github.com/rancher/norman/objectclient"
-	"github.com/rancher/norman/resource"
 	"github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/norman/objectclient"
+	"github.com/rancher/norman/controller"
+	"github.com/rancher/norman/resource"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -29,13 +29,13 @@ var (
 		SingularName: "cloudcredential",
 		Namespaced:   true,
 
-		Kind: CloudCredentialGroupVersionKind.Kind,
+		Kind:         CloudCredentialGroupVersionKind.Kind,
 	}
 
 	CloudCredentialGroupVersionResource = schema.GroupVersionResource{
-		Group:    GroupName,
-		Version:  Version,
-		Resource: "cloudcredentials",
+		Group:     GroupName,
+		Version:   Version,
+		Resource:  "cloudcredentials",
 	}
 )
 
@@ -52,6 +52,8 @@ func NewCloudCredential(namespace, name string, obj v3.CloudCredential) *v3.Clou
 	obj.Namespace = namespace
 	return &obj
 }
+
+
 
 type CloudCredentialHandlerFunc func(key string, obj *v3.CloudCredential) (runtime.Object, error)
 
@@ -75,7 +77,7 @@ type CloudCredentialController interface {
 }
 
 type CloudCredentialInterface interface {
-	ObjectClient() *objectclient.ObjectClient
+    ObjectClient() *objectclient.ObjectClient
 	Create(*v3.CloudCredential) (*v3.CloudCredential, error)
 	GetNamespaced(namespace, name string, opts metav1.GetOptions) (*v3.CloudCredential, error)
 	Get(name string, opts metav1.GetOptions) (*v3.CloudCredential, error)
@@ -98,7 +100,7 @@ type CloudCredentialInterface interface {
 }
 
 type cloudCredentialLister struct {
-	ns         string
+	ns string
 	controller *cloudCredentialController
 }
 
@@ -125,7 +127,7 @@ func (l *cloudCredentialLister) Get(namespace, name string) (*v3.CloudCredential
 	}
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
-			Group:    CloudCredentialGroupVersionKind.Group,
+			Group: CloudCredentialGroupVersionKind.Group,
 			Resource: CloudCredentialGroupVersionResource.Resource,
 		}, key)
 	}
@@ -143,10 +145,11 @@ func (c *cloudCredentialController) Generic() controller.GenericController {
 
 func (c *cloudCredentialController) Lister() CloudCredentialLister {
 	return &cloudCredentialLister{
-		ns:         c.ns,
+		ns: c.ns,
 		controller: c,
 	}
 }
+
 
 func (c *cloudCredentialController) AddHandler(ctx context.Context, name string, handler CloudCredentialHandlerFunc) {
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
@@ -216,14 +219,14 @@ func (s *cloudCredentialClient) Controller() CloudCredentialController {
 		s.client.controllerFactory.ForResourceKind(CloudCredentialGroupVersionResource, CloudCredentialGroupVersionKind.Kind, true))
 
 	return &cloudCredentialController{
-		ns:                s.ns,
+		ns: s.ns,
 		GenericController: genericController,
 	}
 }
 
 type cloudCredentialClient struct {
-	client       *Client
-	ns           string
+	client *Client
+	ns string
 	objectClient *objectclient.ObjectClient
 	controller   CloudCredentialController
 }

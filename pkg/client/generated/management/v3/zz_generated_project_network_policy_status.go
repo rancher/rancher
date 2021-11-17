@@ -1,8 +1,15 @@
 package client
 
+
+
+import (
+	
+)
+
 const (
-	ProjectNetworkPolicyStatusType = "projectNetworkPolicyStatus"
+    ProjectNetworkPolicyStatusType = "projectNetworkPolicyStatus"
 )
 
 type ProjectNetworkPolicyStatus struct {
 }
+

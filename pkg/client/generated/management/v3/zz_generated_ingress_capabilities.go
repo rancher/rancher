@@ -1,12 +1,23 @@
 package client
 
+
+	
+
+	
+
+
+import (
+	
+)
+
 const (
-	IngressCapabilitiesType                      = "ingressCapabilities"
+    IngressCapabilitiesType = "ingressCapabilities"
 	IngressCapabilitiesFieldCustomDefaultBackend = "customDefaultBackend"
-	IngressCapabilitiesFieldIngressProvider      = "ingressProvider"
+	IngressCapabilitiesFieldIngressProvider = "ingressProvider"
 )
 
 type IngressCapabilities struct {
-	CustomDefaultBackend *bool  `json:"customDefaultBackend,omitempty" yaml:"customDefaultBackend,omitempty"`
-	IngressProvider      string `json:"ingressProvider,omitempty" yaml:"ingressProvider,omitempty"`
+        CustomDefaultBackend *bool `json:"customDefaultBackend,omitempty" yaml:"customDefaultBackend,omitempty"`
+        IngressProvider string `json:"ingressProvider,omitempty" yaml:"ingressProvider,omitempty"`
 }
+

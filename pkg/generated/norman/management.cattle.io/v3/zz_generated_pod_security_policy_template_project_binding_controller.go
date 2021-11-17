@@ -4,10 +4,10 @@ import (
 	"context"
 	"time"
 
-	"github.com/rancher/norman/controller"
-	"github.com/rancher/norman/objectclient"
-	"github.com/rancher/norman/resource"
 	"github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/norman/objectclient"
+	"github.com/rancher/norman/controller"
+	"github.com/rancher/norman/resource"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -29,13 +29,13 @@ var (
 		SingularName: "podsecuritypolicytemplateprojectbinding",
 		Namespaced:   true,
 
-		Kind: PodSecurityPolicyTemplateProjectBindingGroupVersionKind.Kind,
+		Kind:         PodSecurityPolicyTemplateProjectBindingGroupVersionKind.Kind,
 	}
 
 	PodSecurityPolicyTemplateProjectBindingGroupVersionResource = schema.GroupVersionResource{
-		Group:    GroupName,
-		Version:  Version,
-		Resource: "podsecuritypolicytemplateprojectbindings",
+		Group:     GroupName,
+		Version:   Version,
+		Resource:  "podsecuritypolicytemplateprojectbindings",
 	}
 )
 
@@ -52,6 +52,8 @@ func NewPodSecurityPolicyTemplateProjectBinding(namespace, name string, obj v3.P
 	obj.Namespace = namespace
 	return &obj
 }
+
+
 
 type PodSecurityPolicyTemplateProjectBindingHandlerFunc func(key string, obj *v3.PodSecurityPolicyTemplateProjectBinding) (runtime.Object, error)
 
@@ -75,7 +77,7 @@ type PodSecurityPolicyTemplateProjectBindingController interface {
 }
 
 type PodSecurityPolicyTemplateProjectBindingInterface interface {
-	ObjectClient() *objectclient.ObjectClient
+    ObjectClient() *objectclient.ObjectClient
 	Create(*v3.PodSecurityPolicyTemplateProjectBinding) (*v3.PodSecurityPolicyTemplateProjectBinding, error)
 	GetNamespaced(namespace, name string, opts metav1.GetOptions) (*v3.PodSecurityPolicyTemplateProjectBinding, error)
 	Get(name string, opts metav1.GetOptions) (*v3.PodSecurityPolicyTemplateProjectBinding, error)
@@ -98,7 +100,7 @@ type PodSecurityPolicyTemplateProjectBindingInterface interface {
 }
 
 type podSecurityPolicyTemplateProjectBindingLister struct {
-	ns         string
+	ns string
 	controller *podSecurityPolicyTemplateProjectBindingController
 }
 
@@ -125,7 +127,7 @@ func (l *podSecurityPolicyTemplateProjectBindingLister) Get(namespace, name stri
 	}
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
-			Group:    PodSecurityPolicyTemplateProjectBindingGroupVersionKind.Group,
+			Group: PodSecurityPolicyTemplateProjectBindingGroupVersionKind.Group,
 			Resource: PodSecurityPolicyTemplateProjectBindingGroupVersionResource.Resource,
 		}, key)
 	}
@@ -143,10 +145,11 @@ func (c *podSecurityPolicyTemplateProjectBindingController) Generic() controller
 
 func (c *podSecurityPolicyTemplateProjectBindingController) Lister() PodSecurityPolicyTemplateProjectBindingLister {
 	return &podSecurityPolicyTemplateProjectBindingLister{
-		ns:         c.ns,
+		ns: c.ns,
 		controller: c,
 	}
 }
+
 
 func (c *podSecurityPolicyTemplateProjectBindingController) AddHandler(ctx context.Context, name string, handler PodSecurityPolicyTemplateProjectBindingHandlerFunc) {
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
@@ -216,14 +219,14 @@ func (s *podSecurityPolicyTemplateProjectBindingClient) Controller() PodSecurity
 		s.client.controllerFactory.ForResourceKind(PodSecurityPolicyTemplateProjectBindingGroupVersionResource, PodSecurityPolicyTemplateProjectBindingGroupVersionKind.Kind, true))
 
 	return &podSecurityPolicyTemplateProjectBindingController{
-		ns:                s.ns,
+		ns: s.ns,
 		GenericController: genericController,
 	}
 }
 
 type podSecurityPolicyTemplateProjectBindingClient struct {
-	client       *Client
-	ns           string
+	client *Client
+	ns string
 	objectClient *objectclient.ObjectClient
 	controller   PodSecurityPolicyTemplateProjectBindingController
 }

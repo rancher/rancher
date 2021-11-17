@@ -1,12 +1,23 @@
 package client
 
+
+	
+
+	
+
+
+import (
+	
+)
+
 const (
-	ProjectLoggingStatusType             = "projectLoggingStatus"
+    ProjectLoggingStatusType = "projectLoggingStatus"
 	ProjectLoggingStatusFieldAppliedSpec = "appliedSpec"
-	ProjectLoggingStatusFieldConditions  = "conditions"
+	ProjectLoggingStatusFieldConditions = "conditions"
 )
 
 type ProjectLoggingStatus struct {
-	AppliedSpec *ProjectLoggingSpec `json:"appliedSpec,omitempty" yaml:"appliedSpec,omitempty"`
-	Conditions  []LoggingCondition  `json:"conditions,omitempty" yaml:"conditions,omitempty"`
+        AppliedSpec *ProjectLoggingSpec `json:"appliedSpec,omitempty" yaml:"appliedSpec,omitempty"`
+        Conditions []LoggingCondition `json:"conditions,omitempty" yaml:"conditions,omitempty"`
 }
+

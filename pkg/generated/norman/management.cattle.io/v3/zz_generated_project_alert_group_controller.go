@@ -4,10 +4,10 @@ import (
 	"context"
 	"time"
 
-	"github.com/rancher/norman/controller"
-	"github.com/rancher/norman/objectclient"
-	"github.com/rancher/norman/resource"
 	"github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/norman/objectclient"
+	"github.com/rancher/norman/controller"
+	"github.com/rancher/norman/resource"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -29,13 +29,13 @@ var (
 		SingularName: "projectalertgroup",
 		Namespaced:   true,
 
-		Kind: ProjectAlertGroupGroupVersionKind.Kind,
+		Kind:         ProjectAlertGroupGroupVersionKind.Kind,
 	}
 
 	ProjectAlertGroupGroupVersionResource = schema.GroupVersionResource{
-		Group:    GroupName,
-		Version:  Version,
-		Resource: "projectalertgroups",
+		Group:     GroupName,
+		Version:   Version,
+		Resource:  "projectalertgroups",
 	}
 )
 
@@ -52,6 +52,8 @@ func NewProjectAlertGroup(namespace, name string, obj v3.ProjectAlertGroup) *v3.
 	obj.Namespace = namespace
 	return &obj
 }
+
+
 
 type ProjectAlertGroupHandlerFunc func(key string, obj *v3.ProjectAlertGroup) (runtime.Object, error)
 
@@ -75,7 +77,7 @@ type ProjectAlertGroupController interface {
 }
 
 type ProjectAlertGroupInterface interface {
-	ObjectClient() *objectclient.ObjectClient
+    ObjectClient() *objectclient.ObjectClient
 	Create(*v3.ProjectAlertGroup) (*v3.ProjectAlertGroup, error)
 	GetNamespaced(namespace, name string, opts metav1.GetOptions) (*v3.ProjectAlertGroup, error)
 	Get(name string, opts metav1.GetOptions) (*v3.ProjectAlertGroup, error)
@@ -98,7 +100,7 @@ type ProjectAlertGroupInterface interface {
 }
 
 type projectAlertGroupLister struct {
-	ns         string
+	ns string
 	controller *projectAlertGroupController
 }
 
@@ -125,7 +127,7 @@ func (l *projectAlertGroupLister) Get(namespace, name string) (*v3.ProjectAlertG
 	}
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
-			Group:    ProjectAlertGroupGroupVersionKind.Group,
+			Group: ProjectAlertGroupGroupVersionKind.Group,
 			Resource: ProjectAlertGroupGroupVersionResource.Resource,
 		}, key)
 	}
@@ -143,10 +145,11 @@ func (c *projectAlertGroupController) Generic() controller.GenericController {
 
 func (c *projectAlertGroupController) Lister() ProjectAlertGroupLister {
 	return &projectAlertGroupLister{
-		ns:         c.ns,
+		ns: c.ns,
 		controller: c,
 	}
 }
+
 
 func (c *projectAlertGroupController) AddHandler(ctx context.Context, name string, handler ProjectAlertGroupHandlerFunc) {
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
@@ -216,14 +219,14 @@ func (s *projectAlertGroupClient) Controller() ProjectAlertGroupController {
 		s.client.controllerFactory.ForResourceKind(ProjectAlertGroupGroupVersionResource, ProjectAlertGroupGroupVersionKind.Kind, true))
 
 	return &projectAlertGroupController{
-		ns:                s.ns,
+		ns: s.ns,
 		GenericController: genericController,
 	}
 }
 
 type projectAlertGroupClient struct {
-	client       *Client
-	ns           string
+	client *Client
+	ns string
 	objectClient *objectclient.ObjectClient
 	controller   ProjectAlertGroupController
 }

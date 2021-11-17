@@ -4,10 +4,10 @@ import (
 	"context"
 	"time"
 
-	"github.com/rancher/norman/controller"
-	"github.com/rancher/norman/objectclient"
-	"github.com/rancher/norman/resource"
 	"github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/norman/objectclient"
+	"github.com/rancher/norman/controller"
+	"github.com/rancher/norman/resource"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -32,9 +32,9 @@ var (
 	}
 
 	DynamicSchemaGroupVersionResource = schema.GroupVersionResource{
-		Group:    GroupName,
-		Version:  Version,
-		Resource: "dynamicschemas",
+		Group:     GroupName,
+		Version:   Version,
+		Resource:  "dynamicschemas",
 	}
 )
 
@@ -51,6 +51,8 @@ func NewDynamicSchema(namespace, name string, obj v3.DynamicSchema) *v3.DynamicS
 	obj.Namespace = namespace
 	return &obj
 }
+
+
 
 type DynamicSchemaHandlerFunc func(key string, obj *v3.DynamicSchema) (runtime.Object, error)
 
@@ -74,7 +76,7 @@ type DynamicSchemaController interface {
 }
 
 type DynamicSchemaInterface interface {
-	ObjectClient() *objectclient.ObjectClient
+    ObjectClient() *objectclient.ObjectClient
 	Create(*v3.DynamicSchema) (*v3.DynamicSchema, error)
 	GetNamespaced(namespace, name string, opts metav1.GetOptions) (*v3.DynamicSchema, error)
 	Get(name string, opts metav1.GetOptions) (*v3.DynamicSchema, error)
@@ -97,7 +99,7 @@ type DynamicSchemaInterface interface {
 }
 
 type dynamicSchemaLister struct {
-	ns         string
+	ns string
 	controller *dynamicSchemaController
 }
 
@@ -124,7 +126,7 @@ func (l *dynamicSchemaLister) Get(namespace, name string) (*v3.DynamicSchema, er
 	}
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
-			Group:    DynamicSchemaGroupVersionKind.Group,
+			Group: DynamicSchemaGroupVersionKind.Group,
 			Resource: DynamicSchemaGroupVersionResource.Resource,
 		}, key)
 	}
@@ -142,10 +144,11 @@ func (c *dynamicSchemaController) Generic() controller.GenericController {
 
 func (c *dynamicSchemaController) Lister() DynamicSchemaLister {
 	return &dynamicSchemaLister{
-		ns:         c.ns,
+		ns: c.ns,
 		controller: c,
 	}
 }
+
 
 func (c *dynamicSchemaController) AddHandler(ctx context.Context, name string, handler DynamicSchemaHandlerFunc) {
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
@@ -215,14 +218,14 @@ func (s *dynamicSchemaClient) Controller() DynamicSchemaController {
 		s.client.controllerFactory.ForResourceKind(DynamicSchemaGroupVersionResource, DynamicSchemaGroupVersionKind.Kind, false))
 
 	return &dynamicSchemaController{
-		ns:                s.ns,
+		ns: s.ns,
 		GenericController: genericController,
 	}
 }
 
 type dynamicSchemaClient struct {
-	client       *Client
-	ns           string
+	client *Client
+	ns string
 	objectClient *objectclient.ObjectClient
 	controller   DynamicSchemaController
 }

@@ -1,14 +1,27 @@
 package client
 
+
+	
+
+	
+
+	
+
+
+import (
+	
+)
+
 const (
-	RecipientType              = "recipient"
-	RecipientFieldNotifierID   = "notifierId"
+    RecipientType = "recipient"
+	RecipientFieldNotifierID = "notifierId"
 	RecipientFieldNotifierType = "notifierType"
-	RecipientFieldRecipient    = "recipient"
+	RecipientFieldRecipient = "recipient"
 )
 
 type Recipient struct {
-	NotifierID   string `json:"notifierId,omitempty" yaml:"notifierId,omitempty"`
-	NotifierType string `json:"notifierType,omitempty" yaml:"notifierType,omitempty"`
-	Recipient    string `json:"recipient,omitempty" yaml:"recipient,omitempty"`
+        NotifierID string `json:"notifierId,omitempty" yaml:"notifierId,omitempty"`
+        NotifierType string `json:"notifierType,omitempty" yaml:"notifierType,omitempty"`
+        Recipient string `json:"recipient,omitempty" yaml:"recipient,omitempty"`
 }
+

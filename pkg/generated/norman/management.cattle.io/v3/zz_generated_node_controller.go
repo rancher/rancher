@@ -4,10 +4,10 @@ import (
 	"context"
 	"time"
 
-	"github.com/rancher/norman/controller"
-	"github.com/rancher/norman/objectclient"
-	"github.com/rancher/norman/resource"
 	"github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/norman/objectclient"
+	"github.com/rancher/norman/controller"
+	"github.com/rancher/norman/resource"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -29,13 +29,13 @@ var (
 		SingularName: "node",
 		Namespaced:   true,
 
-		Kind: NodeGroupVersionKind.Kind,
+		Kind:         NodeGroupVersionKind.Kind,
 	}
 
 	NodeGroupVersionResource = schema.GroupVersionResource{
-		Group:    GroupName,
-		Version:  Version,
-		Resource: "nodes",
+		Group:     GroupName,
+		Version:   Version,
+		Resource:  "nodes",
 	}
 )
 
@@ -52,6 +52,8 @@ func NewNode(namespace, name string, obj v3.Node) *v3.Node {
 	obj.Namespace = namespace
 	return &obj
 }
+
+
 
 type NodeHandlerFunc func(key string, obj *v3.Node) (runtime.Object, error)
 
@@ -75,7 +77,7 @@ type NodeController interface {
 }
 
 type NodeInterface interface {
-	ObjectClient() *objectclient.ObjectClient
+    ObjectClient() *objectclient.ObjectClient
 	Create(*v3.Node) (*v3.Node, error)
 	GetNamespaced(namespace, name string, opts metav1.GetOptions) (*v3.Node, error)
 	Get(name string, opts metav1.GetOptions) (*v3.Node, error)
@@ -98,7 +100,7 @@ type NodeInterface interface {
 }
 
 type nodeLister struct {
-	ns         string
+	ns string
 	controller *nodeController
 }
 
@@ -125,7 +127,7 @@ func (l *nodeLister) Get(namespace, name string) (*v3.Node, error) {
 	}
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
-			Group:    NodeGroupVersionKind.Group,
+			Group: NodeGroupVersionKind.Group,
 			Resource: NodeGroupVersionResource.Resource,
 		}, key)
 	}
@@ -143,10 +145,11 @@ func (c *nodeController) Generic() controller.GenericController {
 
 func (c *nodeController) Lister() NodeLister {
 	return &nodeLister{
-		ns:         c.ns,
+		ns: c.ns,
 		controller: c,
 	}
 }
+
 
 func (c *nodeController) AddHandler(ctx context.Context, name string, handler NodeHandlerFunc) {
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
@@ -216,14 +219,14 @@ func (s *nodeClient) Controller() NodeController {
 		s.client.controllerFactory.ForResourceKind(NodeGroupVersionResource, NodeGroupVersionKind.Kind, true))
 
 	return &nodeController{
-		ns:                s.ns,
+		ns: s.ns,
 		GenericController: genericController,
 	}
 }
 
 type nodeClient struct {
-	client       *Client
-	ns           string
+	client *Client
+	ns string
 	objectClient *objectclient.ObjectClient
 	controller   NodeController
 }

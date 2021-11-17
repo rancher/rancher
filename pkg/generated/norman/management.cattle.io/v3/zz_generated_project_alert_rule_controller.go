@@ -4,10 +4,10 @@ import (
 	"context"
 	"time"
 
-	"github.com/rancher/norman/controller"
-	"github.com/rancher/norman/objectclient"
-	"github.com/rancher/norman/resource"
 	"github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/norman/objectclient"
+	"github.com/rancher/norman/controller"
+	"github.com/rancher/norman/resource"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -29,13 +29,13 @@ var (
 		SingularName: "projectalertrule",
 		Namespaced:   true,
 
-		Kind: ProjectAlertRuleGroupVersionKind.Kind,
+		Kind:         ProjectAlertRuleGroupVersionKind.Kind,
 	}
 
 	ProjectAlertRuleGroupVersionResource = schema.GroupVersionResource{
-		Group:    GroupName,
-		Version:  Version,
-		Resource: "projectalertrules",
+		Group:     GroupName,
+		Version:   Version,
+		Resource:  "projectalertrules",
 	}
 )
 
@@ -52,6 +52,8 @@ func NewProjectAlertRule(namespace, name string, obj v3.ProjectAlertRule) *v3.Pr
 	obj.Namespace = namespace
 	return &obj
 }
+
+
 
 type ProjectAlertRuleHandlerFunc func(key string, obj *v3.ProjectAlertRule) (runtime.Object, error)
 
@@ -75,7 +77,7 @@ type ProjectAlertRuleController interface {
 }
 
 type ProjectAlertRuleInterface interface {
-	ObjectClient() *objectclient.ObjectClient
+    ObjectClient() *objectclient.ObjectClient
 	Create(*v3.ProjectAlertRule) (*v3.ProjectAlertRule, error)
 	GetNamespaced(namespace, name string, opts metav1.GetOptions) (*v3.ProjectAlertRule, error)
 	Get(name string, opts metav1.GetOptions) (*v3.ProjectAlertRule, error)
@@ -98,7 +100,7 @@ type ProjectAlertRuleInterface interface {
 }
 
 type projectAlertRuleLister struct {
-	ns         string
+	ns string
 	controller *projectAlertRuleController
 }
 
@@ -125,7 +127,7 @@ func (l *projectAlertRuleLister) Get(namespace, name string) (*v3.ProjectAlertRu
 	}
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
-			Group:    ProjectAlertRuleGroupVersionKind.Group,
+			Group: ProjectAlertRuleGroupVersionKind.Group,
 			Resource: ProjectAlertRuleGroupVersionResource.Resource,
 		}, key)
 	}
@@ -143,10 +145,11 @@ func (c *projectAlertRuleController) Generic() controller.GenericController {
 
 func (c *projectAlertRuleController) Lister() ProjectAlertRuleLister {
 	return &projectAlertRuleLister{
-		ns:         c.ns,
+		ns: c.ns,
 		controller: c,
 	}
 }
+
 
 func (c *projectAlertRuleController) AddHandler(ctx context.Context, name string, handler ProjectAlertRuleHandlerFunc) {
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
@@ -216,14 +219,14 @@ func (s *projectAlertRuleClient) Controller() ProjectAlertRuleController {
 		s.client.controllerFactory.ForResourceKind(ProjectAlertRuleGroupVersionResource, ProjectAlertRuleGroupVersionKind.Kind, true))
 
 	return &projectAlertRuleController{
-		ns:                s.ns,
+		ns: s.ns,
 		GenericController: genericController,
 	}
 }
 
 type projectAlertRuleClient struct {
-	client       *Client
-	ns           string
+	client *Client
+	ns string
 	objectClient *objectclient.ObjectClient
 	controller   ProjectAlertRuleController
 }

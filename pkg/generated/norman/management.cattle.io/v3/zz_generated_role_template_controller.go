@@ -4,10 +4,10 @@ import (
 	"context"
 	"time"
 
-	"github.com/rancher/norman/controller"
-	"github.com/rancher/norman/objectclient"
-	"github.com/rancher/norman/resource"
 	"github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/norman/objectclient"
+	"github.com/rancher/norman/controller"
+	"github.com/rancher/norman/resource"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -32,9 +32,9 @@ var (
 	}
 
 	RoleTemplateGroupVersionResource = schema.GroupVersionResource{
-		Group:    GroupName,
-		Version:  Version,
-		Resource: "roletemplates",
+		Group:     GroupName,
+		Version:   Version,
+		Resource:  "roletemplates",
 	}
 )
 
@@ -51,6 +51,8 @@ func NewRoleTemplate(namespace, name string, obj v3.RoleTemplate) *v3.RoleTempla
 	obj.Namespace = namespace
 	return &obj
 }
+
+
 
 type RoleTemplateHandlerFunc func(key string, obj *v3.RoleTemplate) (runtime.Object, error)
 
@@ -74,7 +76,7 @@ type RoleTemplateController interface {
 }
 
 type RoleTemplateInterface interface {
-	ObjectClient() *objectclient.ObjectClient
+    ObjectClient() *objectclient.ObjectClient
 	Create(*v3.RoleTemplate) (*v3.RoleTemplate, error)
 	GetNamespaced(namespace, name string, opts metav1.GetOptions) (*v3.RoleTemplate, error)
 	Get(name string, opts metav1.GetOptions) (*v3.RoleTemplate, error)
@@ -97,7 +99,7 @@ type RoleTemplateInterface interface {
 }
 
 type roleTemplateLister struct {
-	ns         string
+	ns string
 	controller *roleTemplateController
 }
 
@@ -124,7 +126,7 @@ func (l *roleTemplateLister) Get(namespace, name string) (*v3.RoleTemplate, erro
 	}
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
-			Group:    RoleTemplateGroupVersionKind.Group,
+			Group: RoleTemplateGroupVersionKind.Group,
 			Resource: RoleTemplateGroupVersionResource.Resource,
 		}, key)
 	}
@@ -142,10 +144,11 @@ func (c *roleTemplateController) Generic() controller.GenericController {
 
 func (c *roleTemplateController) Lister() RoleTemplateLister {
 	return &roleTemplateLister{
-		ns:         c.ns,
+		ns: c.ns,
 		controller: c,
 	}
 }
+
 
 func (c *roleTemplateController) AddHandler(ctx context.Context, name string, handler RoleTemplateHandlerFunc) {
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
@@ -215,14 +218,14 @@ func (s *roleTemplateClient) Controller() RoleTemplateController {
 		s.client.controllerFactory.ForResourceKind(RoleTemplateGroupVersionResource, RoleTemplateGroupVersionKind.Kind, false))
 
 	return &roleTemplateController{
-		ns:                s.ns,
+		ns: s.ns,
 		GenericController: genericController,
 	}
 }
 
 type roleTemplateClient struct {
-	client       *Client
-	ns           string
+	client *Client
+	ns string
 	objectClient *objectclient.ObjectClient
 	controller   RoleTemplateController
 }

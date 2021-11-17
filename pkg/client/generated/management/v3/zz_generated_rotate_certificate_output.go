@@ -1,10 +1,19 @@
 package client
 
+
+	
+
+
+import (
+	
+)
+
 const (
-	RotateCertificateOutputType         = "rotateCertificateOutput"
+    RotateCertificateOutputType = "rotateCertificateOutput"
 	RotateCertificateOutputFieldMessage = "message"
 )
 
 type RotateCertificateOutput struct {
-	Message string `json:"message,omitempty" yaml:"message,omitempty"`
+        Message string `json:"message,omitempty" yaml:"message,omitempty"`
 }
+

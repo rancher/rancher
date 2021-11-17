@@ -4,10 +4,10 @@ import (
 	"context"
 	"time"
 
-	"github.com/rancher/norman/controller"
-	"github.com/rancher/norman/objectclient"
-	"github.com/rancher/norman/resource"
 	"github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/norman/objectclient"
+	"github.com/rancher/norman/controller"
+	"github.com/rancher/norman/resource"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -29,13 +29,13 @@ var (
 		SingularName: "notifier",
 		Namespaced:   true,
 
-		Kind: NotifierGroupVersionKind.Kind,
+		Kind:         NotifierGroupVersionKind.Kind,
 	}
 
 	NotifierGroupVersionResource = schema.GroupVersionResource{
-		Group:    GroupName,
-		Version:  Version,
-		Resource: "notifiers",
+		Group:     GroupName,
+		Version:   Version,
+		Resource:  "notifiers",
 	}
 )
 
@@ -52,6 +52,8 @@ func NewNotifier(namespace, name string, obj v3.Notifier) *v3.Notifier {
 	obj.Namespace = namespace
 	return &obj
 }
+
+
 
 type NotifierHandlerFunc func(key string, obj *v3.Notifier) (runtime.Object, error)
 
@@ -75,7 +77,7 @@ type NotifierController interface {
 }
 
 type NotifierInterface interface {
-	ObjectClient() *objectclient.ObjectClient
+    ObjectClient() *objectclient.ObjectClient
 	Create(*v3.Notifier) (*v3.Notifier, error)
 	GetNamespaced(namespace, name string, opts metav1.GetOptions) (*v3.Notifier, error)
 	Get(name string, opts metav1.GetOptions) (*v3.Notifier, error)
@@ -98,7 +100,7 @@ type NotifierInterface interface {
 }
 
 type notifierLister struct {
-	ns         string
+	ns string
 	controller *notifierController
 }
 
@@ -125,7 +127,7 @@ func (l *notifierLister) Get(namespace, name string) (*v3.Notifier, error) {
 	}
 	if !exists {
 		return nil, errors.NewNotFound(schema.GroupResource{
-			Group:    NotifierGroupVersionKind.Group,
+			Group: NotifierGroupVersionKind.Group,
 			Resource: NotifierGroupVersionResource.Resource,
 		}, key)
 	}
@@ -143,10 +145,11 @@ func (c *notifierController) Generic() controller.GenericController {
 
 func (c *notifierController) Lister() NotifierLister {
 	return &notifierLister{
-		ns:         c.ns,
+		ns: c.ns,
 		controller: c,
 	}
 }
+
 
 func (c *notifierController) AddHandler(ctx context.Context, name string, handler NotifierHandlerFunc) {
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
@@ -216,14 +219,14 @@ func (s *notifierClient) Controller() NotifierController {
 		s.client.controllerFactory.ForResourceKind(NotifierGroupVersionResource, NotifierGroupVersionKind.Kind, true))
 
 	return &notifierController{
-		ns:                s.ns,
+		ns: s.ns,
 		GenericController: genericController,
 	}
 }
 
 type notifierClient struct {
-	client       *Client
-	ns           string
+	client *Client
+	ns string
 	objectClient *objectclient.ObjectClient
 	controller   NotifierController
 }

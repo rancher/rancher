@@ -1,12 +1,23 @@
 package client
 
+
+	
+
+	
+
+
+import (
+	
+)
+
 const (
-	SupplementalGroupsStrategyOptionsType        = "supplementalGroupsStrategyOptions"
+    SupplementalGroupsStrategyOptionsType = "supplementalGroupsStrategyOptions"
 	SupplementalGroupsStrategyOptionsFieldRanges = "ranges"
-	SupplementalGroupsStrategyOptionsFieldRule   = "rule"
+	SupplementalGroupsStrategyOptionsFieldRule = "rule"
 )
 
 type SupplementalGroupsStrategyOptions struct {
-	Ranges []IDRange `json:"ranges,omitempty" yaml:"ranges,omitempty"`
-	Rule   string    `json:"rule,omitempty" yaml:"rule,omitempty"`
+        Ranges []IDRange `json:"ranges,omitempty" yaml:"ranges,omitempty"`
+        Rule string `json:"rule,omitempty" yaml:"rule,omitempty"`
 }
+
