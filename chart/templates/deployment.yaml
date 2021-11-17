@@ -132,11 +132,13 @@ spec:
         - name: CATTLE_RESTRICTED_DEFAULT_ADMIN
           value: "true"
 {{- end}}
+{{- if .Values.bootstrapPassword }}
         - name: CATTLE_BOOTSTRAP_PASSWORD
           valueFrom:
             secretKeyRef:
               name: "bootstrap-secret"
               key: "bootstrapPassword"
+{{- end }}
 {{- if .Values.extraEnv }}
 {{ toYaml .Values.extraEnv | indent 8}}
 {{- end }}

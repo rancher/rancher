@@ -2,7 +2,6 @@ package management
 
 import (
 	"context"
-	"os"
 	"reflect"
 	"sort"
 	"sync"
@@ -15,7 +14,6 @@ import (
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/wrangler"
-	"github.com/rancher/wrangler/pkg/randomtoken"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/bcrypt"
 	corev1 "k8s.io/api/core/v1"
@@ -28,12 +26,11 @@ import (
 )
 
 const (
-	bootstrappedRole            = "authz.management.cattle.io/bootstrapped-role"
-	bootstrapAdminConfig        = "admincreated"
-	cattleNamespace             = "cattle-system"
-	defaultAdminLabelKey        = "authz.management.cattle.io/bootstrapping"
-	defaultAdminLabelValue      = "admin-user"
-	bootstrapPasswordSecretName = "bootstrap-secret"
+	bootstrappedRole       = "authz.management.cattle.io/bootstrapped-role"
+	bootstrapAdminConfig   = "admincreated"
+	cattleNamespace        = "cattle-system"
+	defaultAdminLabelKey   = "authz.management.cattle.io/bootstrapping"
+	defaultAdminLabelValue = "admin-user"
 )
 
 var (
@@ -521,43 +518,13 @@ func BootstrapAdmin(management *wrangler.Context) (string, error) {
 
 	if len(users.Items) == 0 {
 		// Config map does not exist and no users, attempt to create the default admin user
-		var showPassword, mustChangePassword bool
-
-		bootstrapPassword := os.Getenv("CATTLE_BOOTSTRAP_PASSWORD")
-		if bootstrapPassword == "" {
-			// Default: Generate a password and show it
-			showPassword = true
-			mustChangePassword = true
-			bootstrapPassword, err = randomtoken.Generate()
-			if err != nil {
-				return "", err
-			}
-		} else if bootstrapPassword == "admin" {
-			// Legacy: User has explicitly set the bootstrap password back to admin
-			showPassword = false
-			mustChangePassword = true
-		} else {
-			// User provided bootstrap password
-			showPassword = false
-			mustChangePassword = false
+		bootstrapPassword, bootstrapPasswordIsGenerated, err := GetBootstrapPassword(context.TODO(), management.K8s.CoreV1().Secrets(cattleNamespace))
+		if err != nil {
+			return "", errors.Wrap(err, "failed to retrieve bootstrap password")
 		}
 
-		// get the existing secret, ignore if not found
-		var bootstrapPasswordSecret *corev1.Secret
-		bootstrapPasswordSecret, err = management.K8s.CoreV1().Secrets(cattleNamespace).Get(context.TODO(), bootstrapPasswordSecretName, v1.GetOptions{})
-		if err != nil && !apierrors.IsNotFound(err) {
-			return "", err
-		}
+		bootstrapPasswordHash, _ := bcrypt.GenerateFromPassword([]byte(bootstrapPassword), bcrypt.DefaultCost)
 
-		// persist the secret
-		if bootstrapPasswordSecret.ObjectMeta.GetResourceVersion() != "" {
-			bootstrapPasswordSecret.StringData = map[string]string{"bootstrapPassword": bootstrapPassword}
-			if _, err := management.K8s.CoreV1().Secrets(cattleNamespace).Update(context.TODO(), bootstrapPasswordSecret, v1.UpdateOptions{}); err != nil {
-				return "", err
-			}
-		}
-
-		hash, _ := bcrypt.GenerateFromPassword([]byte(bootstrapPassword), bcrypt.DefaultCost)
 		admin, err := management.Mgmt.User().Create(&v3.User{
 			ObjectMeta: v1.ObjectMeta{
 				GenerateName: "user-",
@@ -565,8 +532,8 @@ func BootstrapAdmin(management *wrangler.Context) (string, error) {
 			},
 			DisplayName:        "Default Admin",
 			Username:           "admin",
-			Password:           string(hash),
-			MustChangePassword: mustChangePassword,
+			Password:           string(bootstrapPasswordHash),
+			MustChangePassword: bootstrapPasswordIsGenerated || bootstrapPassword == "admin",
 		})
 		if err != nil && !apierrors.IsAlreadyExists(err) {
 			return "", errors.Wrap(err, "can not ensure admin user exists")
@@ -589,7 +556,7 @@ func BootstrapAdmin(management *wrangler.Context) (string, error) {
 			logrus.Infof("")
 			logrus.Infof("-----------------------------------------")
 			logrus.Infof("Welcome to Rancher")
-			if showPassword {
+			if bootstrapPasswordIsGenerated {
 				logrus.Infof("A bootstrap password has been generated for your admin user.")
 				logrus.Infof("")
 				logrus.Infof("Bootstrap Password: %s", bootstrapPassword)
