@@ -3,6 +3,7 @@ package machinestatus
 import (
 	"fmt"
 
+	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2/machineprovision"
 	"github.com/rancher/wrangler/pkg/condition"
 	"github.com/rancher/wrangler/pkg/data"
 	corev1 "k8s.io/api/core/v1"
@@ -128,29 +129,25 @@ func (h *handler) getInfraMachineState(capiMachine *capi.Machine) (*machineStatu
 					cond:    Provisioned,
 					status:  corev1.ConditionUnknown,
 					reason:  "Creating",
-					message: fmt.Sprintf("creating server (%s) in infrastructure provider", capiMachine.Spec.InfrastructureRef.Kind),
+					message: machineprovision.CreatingMachineMessage(capiMachine.Spec.InfrastructureRef.Kind),
 				}, nil
 			}
 		} else {
 			if obj.String("status", "failureReason") == string(capierror.DeleteMachineError) {
 				return &machineStatus{
-					cond:   InfrastructureReady,
-					status: corev1.ConditionFalse,
-					reason: capi.DeletionFailedReason,
-					message: fmt.Sprintf("failed deleting server (%s) in infrastructure provider: %s: %s",
-						capiMachine.Spec.InfrastructureRef.Kind,
-						obj.String("status", "failureReason"),
-						obj.String("status", "failureMessage"),
-					),
+					cond:       InfrastructureReady,
+					status:     corev1.ConditionFalse,
+					reason:     obj.String("status", "failureReason"),
+					message:    machineprovision.FailedMachineDeleteMessage(capiMachine.Spec.InfrastructureRef.Kind, obj.String("status", "failureReason"), obj.String("status", "failureMessage")),
 					providerID: obj.String("spec", "providerID"),
 				}, nil
 			}
 
 			return &machineStatus{
 				cond:       InfrastructureReady,
-				status:     corev1.ConditionUnknown,
+				status:     corev1.ConditionFalse,
 				reason:     capi.DeletingReason,
-				message:    fmt.Sprintf("deleting server (%s) in infrastructure provider", capiMachine.Spec.InfrastructureRef.Kind),
+				message:    machineprovision.DeletingMachineMessage(capiMachine.Spec.InfrastructureRef.Kind),
 				providerID: obj.String("spec", "providerID"),
 			}, nil
 		}
