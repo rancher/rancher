@@ -21,7 +21,9 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/managementuserlegacy"
 	"github.com/rancher/rancher/pkg/features"
 	managementv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/impersonation"
 	"github.com/rancher/rancher/pkg/types/config"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 func Register(ctx context.Context, cluster *config.UserContext, clusterRec *managementv3.Cluster, kubeConfigGetter common.KubeConfigGetter) error {
@@ -60,19 +62,30 @@ func Register(ctx context.Context, cluster *config.UserContext, clusterRec *mana
 		clusterauthtoken.Register(ctx, cluster)
 	}
 
+	// Ensure these caches are started
+	cluster.Core.Namespaces("").Controller()
+	cluster.Core.Secrets("").Controller()
+	cluster.Core.ServiceAccounts("").Controller()
+
 	return managementuserlegacy.Register(ctx, cluster, clusterRec, kubeConfigGetter)
 }
 
 func RegisterFollower(ctx context.Context, cluster *config.UserContext, kubeConfigGetter common.KubeConfigGetter, clusterManager healthsyncer.ClusterControllerLifecycle) error {
-	cluster.Core.Pods("").Controller()
+	cluster.KindNamespaces[schema.GroupVersionKind{
+		Version: "v1",
+		Kind:    "Secret",
+	}] = impersonation.ImpersonationNamespace
+	cluster.KindNamespaces[schema.GroupVersionKind{
+		Version: "v1",
+		Kind:    "ServiceAccount",
+	}] = impersonation.ImpersonationNamespace
+
 	cluster.Core.Namespaces("").Controller()
-	cluster.Core.Services("").Controller()
+	cluster.Core.Secrets("").Controller()
+	cluster.Core.ServiceAccounts("").Controller()
 	cluster.RBAC.ClusterRoleBindings("").Controller()
 	cluster.RBAC.ClusterRoles("").Controller()
 	cluster.RBAC.RoleBindings("").Controller()
-	cluster.Core.Endpoints("").Controller()
-	cluster.APIAggregation.APIServices("").Controller()
-	cluster.Core.Secrets("").Controller()
-	cluster.Core.ServiceAccounts("").Controller()
+	cluster.RBAC.Roles("").Controller()
 	return nil
 }
