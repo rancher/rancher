@@ -9,6 +9,7 @@ const (
 	MachineStatusFieldFailureReason       = "failureReason"
 	MachineStatusFieldInfrastructureReady = "infrastructureReady"
 	MachineStatusFieldLastUpdated         = "lastUpdated"
+	MachineStatusFieldNodeInfo            = "nodeInfo"
 	MachineStatusFieldNodeRef             = "nodeRef"
 	MachineStatusFieldObservedGeneration  = "observedGeneration"
 	MachineStatusFieldPhase               = "phase"
@@ -23,6 +24,7 @@ type MachineStatus struct {
 	FailureReason       string           `json:"failureReason,omitempty" yaml:"failureReason,omitempty"`
 	InfrastructureReady bool             `json:"infrastructureReady,omitempty" yaml:"infrastructureReady,omitempty"`
 	LastUpdated         string           `json:"lastUpdated,omitempty" yaml:"lastUpdated,omitempty"`
+	NodeInfo            *NodeSystemInfo  `json:"nodeInfo,omitempty" yaml:"nodeInfo,omitempty"`
 	NodeRef             *ObjectReference `json:"nodeRef,omitempty" yaml:"nodeRef,omitempty"`
 	ObservedGeneration  int64            `json:"observedGeneration,omitempty" yaml:"observedGeneration,omitempty"`
 	Phase               string           `json:"phase,omitempty" yaml:"phase,omitempty"`

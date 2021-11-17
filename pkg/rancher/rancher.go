@@ -175,7 +175,7 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 		return nil, err
 	}
 
-	clusterProxy, err := proxy.NewProxyMiddleware(wranglerContext.K8s.AuthorizationV1().SubjectAccessReviews(),
+	clusterProxy, err := proxy.NewProxyMiddleware(wranglerContext.K8s.AuthorizationV1(),
 		wranglerContext.TunnelServer.Dialer,
 		wranglerContext.Mgmt.Cluster().Cache(),
 		localClusterEnabled(opts),

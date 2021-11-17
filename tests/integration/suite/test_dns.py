@@ -18,7 +18,6 @@ def test_dns_fields(admin_pc_client):
         'targetWorkloadIds': 'cru',
         'workloadId': 'r',
         'targetDnsRecordIds': 'cru',
-        'topologyKeys': 'cru',
         'publicEndpoints': 'r',
         'ports': 'r',
     })

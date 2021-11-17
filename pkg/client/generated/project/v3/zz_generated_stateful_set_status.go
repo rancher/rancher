@@ -2,6 +2,7 @@ package client
 
 const (
 	StatefulSetStatusType                    = "statefulSetStatus"
+	StatefulSetStatusFieldAvailableReplicas  = "availableReplicas"
 	StatefulSetStatusFieldCollisionCount     = "collisionCount"
 	StatefulSetStatusFieldConditions         = "conditions"
 	StatefulSetStatusFieldCurrentReplicas    = "currentReplicas"
@@ -14,6 +15,7 @@ const (
 )
 
 type StatefulSetStatus struct {
+	AvailableReplicas  int64                  `json:"availableReplicas,omitempty" yaml:"availableReplicas,omitempty"`
 	CollisionCount     *int64                 `json:"collisionCount,omitempty" yaml:"collisionCount,omitempty"`
 	Conditions         []StatefulSetCondition `json:"conditions,omitempty" yaml:"conditions,omitempty"`
 	CurrentReplicas    int64                  `json:"currentReplicas,omitempty" yaml:"currentReplicas,omitempty"`

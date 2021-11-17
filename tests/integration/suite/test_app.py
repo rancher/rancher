@@ -40,6 +40,7 @@ def test_app_mysql(admin_pc, admin_mc):
     wait_for_workload(client, ns.name, count=1)
 
 
+@pytest.mark.skip(reason='skipping for now, enable with ingress 1.22 fix')
 def test_app_wordpress(admin_pc, admin_mc):
     client = admin_pc.client
     name = random_str()

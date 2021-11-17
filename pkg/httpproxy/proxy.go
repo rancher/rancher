@@ -84,7 +84,7 @@ func (p *proxy) isAllowed(host string) bool {
 
 func NewProxy(prefix string, validHosts Supplier, scaledContext *config.ScaledContext) (http.Handler, error) {
 	cfg := authorizerfactory.DelegatingAuthorizerConfig{
-		SubjectAccessReviewClient: scaledContext.K8sClient.AuthorizationV1().SubjectAccessReviews(),
+		SubjectAccessReviewClient: scaledContext.K8sClient.AuthorizationV1(),
 		AllowCacheTTL:             time.Second * time.Duration(settings.AuthorizationCacheTTLSeconds.GetInt()),
 		DenyCacheTTL:              time.Second * time.Duration(settings.AuthorizationDenyCacheTTLSeconds.GetInt()),
 		WebhookRetryBackoff:       &auth.WebhookBackoff,
