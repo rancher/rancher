@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"time"
 
-	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	v1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/wrangler/pkg/apply"
@@ -19,10 +18,8 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 )
 
-func (h *handler) createClusterAndDeployAgent(cluster *v1.Cluster, status v1.ClusterStatus) ([]runtime.Object, v1.ClusterStatus, error) {
-	objs, status, err := h.createCluster(cluster, status, v3.ClusterSpec{
-		ImportedConfig: &v3.ImportedConfig{},
-	})
+func (h *handler) createOrUpdateClusterAndDeployAgent(cluster *v1.Cluster, status v1.ClusterStatus) ([]runtime.Object, v1.ClusterStatus, error) {
+	objs, status, err := h.createOrUpdateCluster(cluster, status)
 	if err != nil {
 		return nil, status, err
 	}

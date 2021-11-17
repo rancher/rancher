@@ -181,11 +181,9 @@ func (h *handler) generateProvisioning(cluster *v3.Cluster, status v3.ClusterSta
 func (h *handler) generateCluster(cluster *v1.Cluster, status v1.ClusterStatus) ([]runtime.Object, v1.ClusterStatus, error) {
 	switch {
 	case cluster.Spec.ClusterAPIConfig != nil:
-		return h.createClusterAndDeployAgent(cluster, status)
+		return h.createOrUpdateClusterAndDeployAgent(cluster, status)
 	default:
-		return h.createCluster(cluster, status, v3.ClusterSpec{
-			ImportedConfig: &v3.ImportedConfig{},
-		})
+		return h.createOrUpdateCluster(cluster, status)
 	}
 }
 
@@ -224,15 +222,33 @@ func (h *handler) createToken(_ string, cluster *v3.Cluster) (*v3.Cluster, error
 	return cluster, err
 }
 
-func (h *handler) createCluster(cluster *v1.Cluster, status v1.ClusterStatus, spec v3.ClusterSpec) ([]runtime.Object, v1.ClusterStatus, error) {
+func (h *handler) createOrUpdateCluster(cluster *v1.Cluster, status v1.ClusterStatus) ([]runtime.Object, v1.ClusterStatus, error) {
+	mgmtCluster, err := h.mgmtClusterCache.Get(cluster.Name)
 	if h.isLegacyCluster(cluster) {
-		mgmtCluster, err := h.mgmtClusterCache.Get(cluster.Name)
 		if err != nil {
+			// For legacy clusters, if the mgmt cluster does not exist we must immediately return
 			return nil, status, err
 		}
+		// otherwise, we can proceed to update the v1 cluster's status
 		return h.updateStatus(nil, cluster, status, mgmtCluster)
 	}
-	return h.createNewCluster(cluster, status, spec)
+	if err != nil {
+		if !apierror.IsNotFound(err) {
+			return nil, status, err
+		}
+		// by default, preserve the existing mgmtCluster, but if it does not exist, define a new skeleton
+		mgmtCluster = &v3.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:        cluster.Status.ClusterName,
+				Labels:      cluster.Labels,
+				Annotations: map[string]string{administratedAnn: strconv.FormatBool(cluster.Spec.RKEConfig != nil)},
+			},
+			Spec: v3.ClusterSpec{
+				ImportedConfig: &v3.ImportedConfig{},
+			},
+		}
+	}
+	return h.updateMgmtClusterFields(cluster, status, mgmtCluster)
 }
 
 func mgmtClusterName() (string, error) {
@@ -243,17 +259,17 @@ func mgmtClusterName() (string, error) {
 	return name.SafeConcatName("c", "m", rand[:8]), nil
 }
 
-func (h *handler) createNewCluster(cluster *v1.Cluster, status v1.ClusterStatus, spec v3.ClusterSpec) ([]runtime.Object, v1.ClusterStatus, error) {
-	spec.DisplayName = cluster.Name
-	spec.Description = cluster.Annotations["field.cattle.io/description"]
-	spec.FleetWorkspaceName = cluster.Namespace
-	spec.DefaultPodSecurityPolicyTemplateName = cluster.Spec.DefaultPodSecurityPolicyTemplateName
-	spec.DefaultClusterRoleForProjectMembers = cluster.Spec.DefaultClusterRoleForProjectMembers
-	spec.EnableNetworkPolicy = cluster.Spec.EnableNetworkPolicy
+func (h *handler) updateMgmtClusterFields(cluster *v1.Cluster, status v1.ClusterStatus, rCluster *v3.Cluster) ([]runtime.Object, v1.ClusterStatus, error) {
+	rCluster.Spec.DisplayName = cluster.Name
+	rCluster.Spec.Description = cluster.Annotations["field.cattle.io/description"]
+	rCluster.Spec.FleetWorkspaceName = cluster.Namespace
+	rCluster.Spec.DefaultPodSecurityPolicyTemplateName = cluster.Spec.DefaultPodSecurityPolicyTemplateName
+	rCluster.Spec.DefaultClusterRoleForProjectMembers = cluster.Spec.DefaultClusterRoleForProjectMembers
+	rCluster.Spec.EnableNetworkPolicy = cluster.Spec.EnableNetworkPolicy
 
-	spec.AgentEnvVars = nil
+	rCluster.Spec.AgentEnvVars = nil
 	for _, env := range cluster.Spec.AgentEnvVars {
-		spec.AgentEnvVars = append(spec.AgentEnvVars, corev1.EnvVar{
+		rCluster.Spec.AgentEnvVars = append(rCluster.Spec.AgentEnvVars, corev1.EnvVar{
 			Name:  env.Name,
 			Value: env.Value,
 		})
@@ -265,43 +281,34 @@ func (h *handler) createNewCluster(cluster *v1.Cluster, status v1.ClusterStatus,
 		}
 	}
 
-	spec.LocalClusterAuthEndpoint = v3.LocalClusterAuthEndpoint{
+	rCluster.Spec.LocalClusterAuthEndpoint = v3.LocalClusterAuthEndpoint{
 		FQDN:    cluster.Spec.LocalClusterAuthEndpoint.FQDN,
 		CACerts: cluster.Spec.LocalClusterAuthEndpoint.CACerts,
 		Enabled: cluster.Spec.LocalClusterAuthEndpoint.Enabled,
 	}
 
-	newCluster := &v3.Cluster{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:        cluster.Status.ClusterName,
-			Labels:      cluster.Labels,
-			Annotations: map[string]string{administratedAnn: strconv.FormatBool(cluster.Spec.RKEConfig != nil)},
-		},
-		Spec: spec,
-	}
-
-	if newCluster.Name == "" {
+	if rCluster.Name == "" {
 		mgmtName, err := mgmtClusterName()
 		if err != nil {
 			return nil, status, err
 		}
-		newCluster.Name = mgmtName
+		rCluster.Name = mgmtName
 	}
 
 	for k, v := range cluster.Annotations {
-		newCluster.Annotations[k] = v
+		rCluster.Annotations[k] = v
 	}
 
 	delete(cluster.Annotations, creatorIDAnn)
 
-	normalizedCluster, err := NormalizeCluster(newCluster)
+	normalizedCluster, err := NormalizeCluster(rCluster)
 	if err != nil {
 		return nil, status, err
 	}
 
 	return h.updateStatus([]runtime.Object{
 		normalizedCluster,
-	}, cluster, status, newCluster)
+	}, cluster, status, rCluster)
 }
 
 func (h *handler) updateStatus(objs []runtime.Object, cluster *v1.Cluster, status v1.ClusterStatus, rCluster *v3.Cluster) ([]runtime.Object, v1.ClusterStatus, error) {
