@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/ref"
 
 	"github.com/rancher/norman/controller"
@@ -34,6 +35,34 @@ var (
 )
 
 func Register(ctx context.Context, cluster *config.UserContext) {
+	starter := cluster.DeferredStart(ctx, func(ctx context.Context) error {
+		registerDeferred(ctx, cluster)
+		return nil
+	})
+
+	AddStarter(ctx, cluster, starter)
+}
+
+func AddStarter(ctx context.Context, cluster *config.UserContext, starter func() error) {
+	cluster.Management.Management.Features("").AddHandler(ctx, "alerts-deferred", func(key string, obj *v32.Feature) (runtime.Object, error) {
+		if features.Legacy.Enabled() {
+			return obj, starter()
+		}
+		return obj, nil
+	})
+
+	alerts := cluster.Management.Management.ClusterAlerts("")
+	alerts.AddClusterScopedHandler(ctx, "alerts-deferred", cluster.ClusterName, func(key string, obj *v32.ClusterAlert) (runtime.Object, error) {
+		return obj, starter()
+	})
+
+	notifiers := cluster.Management.Management.Notifiers("")
+	notifiers.AddClusterScopedHandler(ctx, "alerts-deferred", cluster.ClusterName, func(key string, obj *v32.Notifier) (runtime.Object, error) {
+		return obj, starter()
+	})
+}
+
+func registerDeferred(ctx context.Context, cluster *config.UserContext) {
 	alertmanager := manager.NewAlertManager(cluster)
 
 	prometheusCRDManager := manager.NewPrometheusCRDManager(ctx, cluster)
