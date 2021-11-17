@@ -9,7 +9,7 @@ ENV CATTLE_ETCD_VERSION v3.5.0
 # version used by helm plugin install script
 ENV CATTLE_HELM_UNITTEST_VERSION v0.1.7-rancher3
 # helm 3 version
-ENV HELM_VERSION v3.6.0
+ENV HELM_VERSION v3.7.1
 ENV KUSTOMIZE_VERSION v3.10.0
 
 # kontainer-driver-metadata branch to be set for specific branch other than dev/master, logic at rancher/rancher/pkg/settings/setting.go
