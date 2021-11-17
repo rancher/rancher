@@ -4,9 +4,11 @@ import (
 	"context"
 	"fmt"
 
+	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/clusterauthtoken/common"
 	managementv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -22,6 +24,23 @@ func RegisterIndexers(ctx context.Context, scaledContext *config.ScaledContext) 
 }
 
 func Register(ctx context.Context, cluster *config.UserContext) {
+	starter := cluster.DeferredStart(ctx, func(ctx context.Context) error {
+		registerDeferred(ctx, cluster)
+		return nil
+	})
+
+	clusters := cluster.Management.Management.Clusters("")
+	clusters.AddHandler(ctx, "clusterauthtoken-deferred", func(key string, obj *v3.Cluster) (runtime.Object, error) {
+		if obj != nil &&
+			obj.Name == cluster.ClusterName &&
+			obj.Spec.LocalClusterAuthEndpoint.Enabled {
+			return obj, starter()
+		}
+		return obj, nil
+	})
+}
+
+func registerDeferred(ctx context.Context, cluster *config.UserContext) {
 	tokenInformer := cluster.Management.Management.Tokens("").Controller().Informer()
 
 	namespace := common.DefaultNamespace
