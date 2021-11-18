@@ -177,6 +177,8 @@ if ( true == via_webhook() && (!(rancher_version ==~ rancher_version_regex)) ) {
                       jobs["gke"] = { build job: 'rancher-v3_ontag_gke_certification', parameters: params2 }
                       jobs["eks"] = { build job: 'rancher-v3_ontag_eks_certification', parameters: params2 }
                       jobs["aks"] = { build job: 'rancher-v3_ontag_aks_certification', parameters: params2 }
+                      jobs["eksv2"] = { build job: 'rancher-v3_ontag_eks_v2_certification', parameters: params2 }
+                      jobs["aksv2"] = { build job: 'rancher-v3_ontag_aks_v2_certification', parameters: params2 }
                       jobs["import"] = { build job: 'rancher-v3_ontag_import_certification', parameters: params2}
                       jobs["importk3s"] = { build job: 'rancher-v3_ontag_import_k3s_certification', parameters: params2}
 
