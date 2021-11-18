@@ -13,7 +13,7 @@ replace (
 	github.com/opencontainers/runc => github.com/opencontainers/runc v1.0.1
 	github.com/rancher/rancher/pkg/apis => ./pkg/apis
 	github.com/rancher/rancher/pkg/client => ./pkg/client
-	helm.sh/helm/v3 => github.com/rancher/helm/v3 v3.5.4-rancher.1
+	helm.sh/helm/v3 => github.com/rancher/helm/v3 v3.7.1-rancher.1
 
 	k8s.io/api => k8s.io/api v0.22.3
 	k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.22.3
@@ -53,11 +53,9 @@ require (
 	github.com/DataDog/zstd v1.4.5 // indirect
 	github.com/Masterminds/semver/v3 v3.1.1
 	github.com/Masterminds/sprig/v3 v3.2.2
-	github.com/Shopify/logrus-bugsnag v0.0.0-20171204204709-577dee27f20d // indirect
 	github.com/aws/aws-sdk-go v1.38.65
 	github.com/bep/debounce v1.2.0
 	github.com/blang/semver v3.5.1+incompatible
-	github.com/bshuster-repo/logrus-logstash-hook v1.0.0 // indirect
 	github.com/coreos/go-iptables v0.6.0
 	github.com/coreos/go-oidc/v3 v3.0.0
 	github.com/coreos/go-semver v0.3.0
@@ -66,7 +64,6 @@ require (
 	github.com/docker/distribution v2.7.1+incompatible
 	github.com/docker/docker v20.10.6+incompatible
 	github.com/docker/go-connections v0.4.0
-	github.com/docker/go-metrics v0.0.1 // indirect
 	github.com/docker/libtrust v0.0.0-20160708172513-aabc10ec26b7 // indirect
 	github.com/ehazlett/simplelog v0.0.0-20200226020431-d374894e92a4
 	github.com/evanphx/json-patch v4.11.0+incompatible
@@ -94,7 +91,6 @@ require (
 	github.com/mcuadros/go-version v0.0.0-20180611085657-6d5863ca60fa
 	github.com/minio/minio-go/v7 v7.0.10
 	github.com/mitchellh/mapstructure v1.4.2
-	github.com/mitchellh/reflectwalk v1.0.1 // indirect
 	github.com/moby/locker v1.0.1
 	github.com/mrjones/oauth v0.0.0-20180629183705-f4e24b6d100c
 	github.com/onsi/gomega v1.16.0 // indirect
@@ -135,7 +131,7 @@ require (
 	github.com/stretchr/testify v1.7.0
 	github.com/tomnomnom/linkheader v0.0.0-20180905144013-02ca5825eb80
 	github.com/urfave/cli v1.22.2
-	github.com/vishvananda/netlink v1.1.0
+	github.com/vishvananda/netlink v1.1.1-0.20201029203352-d40f9887b852
 	github.com/vmihailenco/msgpack v4.0.1+incompatible
 	github.com/vmware/govmomi v0.26.0
 	github.com/vmware/kube-fluentd-operator v0.0.0-20190307154903-bf9de7e79eaf
@@ -158,9 +154,9 @@ require (
 	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
 	gopkg.in/yaml.v2 v2.4.0
-	helm.sh/helm/v3 v3.5.4
+	helm.sh/helm/v3 v3.7.1
 	k8s.io/api v0.22.3
-	k8s.io/apiextensions-apiserver v0.21.4
+	k8s.io/apiextensions-apiserver v0.22.1
 	k8s.io/apimachinery v0.22.3
 	k8s.io/apiserver v0.22.3
 	k8s.io/cli-runtime v0.22.3
@@ -171,7 +167,6 @@ require (
 	k8s.io/kubectl v0.22.3
 	k8s.io/kubernetes v1.21.0
 	k8s.io/utils v0.0.0-20210819203725-bdf08cb9a70a
-	rsc.io/letsencrypt v0.0.3 // indirect
 	sigs.k8s.io/aws-iam-authenticator v0.5.1
 	sigs.k8s.io/cluster-api v0.4.4
 	sigs.k8s.io/controller-runtime v0.9.7
