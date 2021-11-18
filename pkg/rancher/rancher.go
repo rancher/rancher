@@ -254,7 +254,7 @@ func (r *Rancher) Start(ctx context.Context) error {
 			return err
 		}
 
-		if err := forceSystemNamespaceAssignment(r.Wrangler.Core.ConfigMap(), r.Wrangler.Mgmt.Cluster()); err != nil {
+		if err := forceSystemNamespaceAssignment(r.Wrangler.Core.ConfigMap(), r.Wrangler.Mgmt.Project()); err != nil {
 			return err
 		}
 
