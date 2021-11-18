@@ -51,6 +51,8 @@ func Register(ctx context.Context, cluster *config.UserContext, clusterRec *mana
 
 	// register controller for API
 	cluster.APIAggregation.APIServices("").Controller()
+	// register secrets controller for impersonation
+	cluster.Core.Secrets("").Controller()
 
 	if clusterRec.Spec.LocalClusterAuthEndpoint.Enabled {
 		err := clusterauthtoken.CRDSetup(ctx, cluster.UserOnlyContext())
