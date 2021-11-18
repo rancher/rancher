@@ -223,7 +223,7 @@ func (h *handler) createToken(_ string, cluster *v3.Cluster) (*v3.Cluster, error
 }
 
 func (h *handler) createOrUpdateCluster(cluster *v1.Cluster, status v1.ClusterStatus) ([]runtime.Object, v1.ClusterStatus, error) {
-	mgmtCluster, err := h.mgmtClusterCache.Get(cluster.Name)
+	mgmtCluster, err := h.mgmtClusters.Get(cluster.Name, metav1.GetOptions{})
 	if h.isLegacyCluster(cluster) {
 		if err != nil {
 			// For legacy clusters, if the mgmt cluster does not exist we must immediately return
