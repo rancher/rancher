@@ -31,13 +31,14 @@ func NewPeerManager(ctx context.Context, endpoints corecontrollers.EndpointsCont
 
 type peerManager struct {
 	sync.Mutex
-	leader    bool
-	ready     bool
-	token     string
-	urlFormat string
-	server    *remotedialer.Server
-	peers     map[string]bool
-	listeners map[chan<- peermanager.Peers]bool
+	leader        bool
+	ready         bool
+	token         string
+	urlFormat     string
+	server        *remotedialer.Server
+	peers         map[string]bool
+	endpointCache corecontrollers.EndpointsCache
+	listeners     map[chan<- peermanager.Peers]bool
 }
 
 func getTokenFromToken(ctx context.Context, tokenBytes []byte) ([]byte, error) {
@@ -113,11 +114,12 @@ func startPeerManager(ctx context.Context, endpoints corecontrollers.EndpointsCo
 	server.PeerToken = string(tokenBytes)
 
 	pm := &peerManager{
-		token:     server.PeerToken,
-		urlFormat: "wss://%s/v3/connect",
-		server:    server,
-		peers:     map[string]bool{},
-		listeners: map[chan<- peermanager.Peers]bool{},
+		token:         server.PeerToken,
+		urlFormat:     "wss://%s/v3/connect",
+		server:        server,
+		peers:         map[string]bool{},
+		endpointCache: endpoints.Cache(),
+		listeners:     map[chan<- peermanager.Peers]bool{},
 	}
 
 	endpoints.OnChange(ctx, "peer-manager-controller", pm.syncService)
@@ -145,7 +147,9 @@ func (p *peerManager) syncService(key string, endpoint *v1.Endpoints) (*v1.Endpo
 
 	for _, svc := range strings.Split(settings.PeerServices.Get(), ",") {
 		if name == strings.TrimSpace(svc) {
-			p.addRemovePeers(endpoint)
+			if err := p.addRemovePeers(endpoint); err != nil {
+				return endpoint, err
+			}
 			break
 		}
 	}
@@ -153,7 +157,7 @@ func (p *peerManager) syncService(key string, endpoint *v1.Endpoints) (*v1.Endpo
 	return nil, nil
 }
 
-func (p *peerManager) addRemovePeers(endpoints *v1.Endpoints) {
+func (p *peerManager) addRemovePeers(endpoints *v1.Endpoints) error {
 	p.Lock()
 	defer p.Unlock()
 
@@ -179,23 +183,57 @@ func (p *peerManager) addRemovePeers(endpoints *v1.Endpoints) {
 
 	p.peers = newSet
 	p.ready = ready
-	p.notify()
+	return p.notify()
 }
 
-func (p *peerManager) notify() {
+func (p *peerManager) getUserControllerPeers() (ready bool, result []string, err error) {
+	userControllerService := settings.ControllerService.Get()
+	if userControllerService == "" {
+		for id := range p.peers {
+			result = append(result, id)
+		}
+		return p.ready, result, nil
+	}
+
+	endpoints, err := p.endpointCache.Get(settings.Namespace.Get(), userControllerService)
+	if err != nil {
+		return false, nil, err
+	}
+
+	newSet := map[string]bool{}
+	for _, subset := range endpoints.Subsets {
+		for _, addr := range subset.Addresses {
+			if addr.IP == p.server.PeerID {
+				ready = true
+			} else {
+				newSet[addr.IP] = true
+			}
+		}
+	}
+
+	for id := range newSet {
+		result = append(result, id)
+	}
+
+	return
+}
+
+func (p *peerManager) notify() (err error) {
 	peers := peermanager.Peers{
 		Leader: p.leader,
-		Ready:  p.ready,
 		SelfID: p.server.PeerID,
 	}
 
-	for id := range p.peers {
-		peers.IDs = append(peers.IDs, id)
+	peers.Ready, peers.IDs, err = p.getUserControllerPeers()
+	if err != nil {
+		return err
 	}
 
 	for c := range p.listeners {
 		c <- peers
 	}
+
+	return nil
 }
 
 func (p *peerManager) AddListener(c chan<- peermanager.Peers) {

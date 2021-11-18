@@ -1,24 +1,21 @@
+{{- if gt (int .Values.controllerReplicas) 0 }}
 kind: Deployment
 apiVersion: apps/v1
 metadata:
-  name: {{ template "rancher.fullname" . }}
+  name: {{ template "rancher.fullname" . }}-controllers
   annotations:
-{{- if (lt (int .Values.replicas) 0) }}
-    management.cattle.io/scale-available: "{{ sub 0 (int .Values.replicas)}}"
-{{- end  }}
   labels:
 {{ include "rancher.labels" . | indent 4 }}
 spec:
-{{- if (gt (int .Values.replicas) 0) }}
-  replicas: {{ .Values.replicas }}
-{{- end  }}
+  replicas: {{ .Values.controllerReplicas }}
   selector:
     matchLabels:
       app: {{ template "rancher.fullname" . }}
+      tier: "controllers"
   strategy:
     rollingUpdate:
       maxSurge: 1
-{{- if (eq (int .Values.replicas) 1) }}
+{{- if (eq (int .Values.controllerReplicas) 1) }}
       maxUnavailable: 0
 {{- else }}
       maxUnavailable: 1
@@ -29,9 +26,7 @@ spec:
       labels:
         app: {{ template "rancher.fullname" . }}
         release: {{ .Release.Name }}
-        {{- if gt (int .Values.controllerReplicas) 0 }}
-        tier: "api"
-        {{- end }}
+        tier: "controllers"
     spec:
       serviceAccountName: {{ template "rancher.fullname" . }}
 {{- if .Values.imagePullSecrets }}
@@ -97,7 +92,7 @@ spec:
           value: {{ .Release.Namespace }}
 {{- if gt (int .Values.controllerReplicas) 0 }}
         - name: CATTLE_FOLLOWER
-          value: "true"
+          value: "false"
         - name: CATTLE_CONTROLLER_SERVICE
           value: {{ template "rancher.fullname" . }}-controllers
 {{- end}}
@@ -237,3 +232,4 @@ spec:
           name: {{ .Values.customLogos.volumeName }}
   {{- end }}
 {{- end }}
+{{- end}}

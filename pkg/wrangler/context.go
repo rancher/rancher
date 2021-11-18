@@ -37,6 +37,7 @@ import (
 	"github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io"
 	rkecontrollers "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/peermanager"
+	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/tunnelserver"
 	"github.com/rancher/remotedialer"
 	"github.com/rancher/steve/pkg/accesscontrol"
@@ -178,7 +179,9 @@ func (w *Context) Start(ctx context.Context) error {
 	if err := w.ControllerFactory.Start(ctx, 50); err != nil {
 		return err
 	}
-	w.leadership.Start(ctx)
+	if settings.Follower.Get() != "true" {
+		w.leadership.Start(ctx)
+	}
 	return nil
 }
 

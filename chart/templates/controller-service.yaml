@@ -1,7 +1,8 @@
+{{- if gt (int .Values.controllerReplicas) 0 }}
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ template "rancher.fullname" . }}
+  name: {{ template "rancher.fullname" . }}-controllers
   labels:
 {{ include "rancher.labels" . | indent 4 }}
 spec:
@@ -16,6 +17,5 @@ spec:
     name: https-internal
   selector:
     app: {{ template "rancher.fullname" . }}
-{{- if gt (int .Values.controllerReplicas) 0 }}
-    tier: "api"
-{{- end }}
+    tier: "controllers"
+{{- end}}

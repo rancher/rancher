@@ -103,6 +103,11 @@ rancherImage: rancher/rancher
 # of available nodes in the cluster
 replicas: 3
 
+# Number of Rancher controller pods. The default is zero and not required to be set.  If set to something greater than 0
+# Rancher will run in a mode where the REST API layer is separated from the backend controllers.
+#
+# controllerReplicas: 0
+
 # Set pod resource requests/limits for Rancher.
 resources: {}
 
@@ -142,8 +147,8 @@ customLogos:
 postDelete:
   enabled: true
   image:
-    repository: %POST_DELETE_IMAGE_NAME%
-    tag: %POST_DELETE_IMAGE_TAG%
+    repository: "%POST_DELETE_IMAGE_NAME%"
+    tag: "%POST_DELETE_IMAGE_TAG%"
   namespaceList:
     - cattle-fleet-system
     - cattle-system
