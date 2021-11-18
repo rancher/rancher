@@ -189,15 +189,22 @@ func (h *handler) generateCluster(cluster *v1.Cluster, status v1.ClusterStatus) 
 	}
 }
 
-func NormalizeCluster(cluster *v3.Cluster) (runtime.Object, error) {
+func NormalizeCluster(cluster *v3.Cluster, isImportedCluster bool) (runtime.Object, error) {
 	// We do this so that we don't clobber status because the rancher object is pretty dirty and doesn't have a status subresource
 	data, err := convert.EncodeToMap(cluster)
 	if err != nil {
 		return nil, err
 	}
+	spec, _ := data["spec"].(map[string]interface{})
+	if _, ok := spec["localClusterAuthEndpoint"]; ok && isImportedCluster {
+		// For imported clusters, we need to delete the localClusterAuthEndpoint so that it doesn't get overwritten here.
+		// In general, imported clusters don't support localClusterAuthEndpoint.
+		// However, imported RKE2/K3S clusters do and this is driven by the management cluster.
+		delete(spec, "localClusterAuthEndpoint")
+	}
 	data = map[string]interface{}{
 		"metadata": data["metadata"],
-		"spec":     data["spec"],
+		"spec":     spec,
 	}
 	data["kind"] = "Cluster"
 	data["apiVersion"] = "management.cattle.io/v3"
@@ -294,7 +301,7 @@ func (h *handler) createNewCluster(cluster *v1.Cluster, status v1.ClusterStatus,
 
 	delete(cluster.Annotations, creatorIDAnn)
 
-	normalizedCluster, err := NormalizeCluster(newCluster)
+	normalizedCluster, err := NormalizeCluster(newCluster, cluster.Spec.RKEConfig == nil)
 	if err != nil {
 		return nil, status, err
 	}
