@@ -154,10 +154,6 @@ func (c *Cluster) GenerateServiceAccount(ctx context.Context) error {
 		return err
 	}
 
-	if err := c.PersistStore.PersistStatus(*c, Updating); err != nil {
-		return err
-	}
-
 	// receive cluster info back
 	info, err := c.Driver.PostCheck(ctx, toInfo(c))
 	if err != nil {
