@@ -167,8 +167,22 @@ func (h *handler) getMachine(obj runtime.Object) (*capi.Machine, error) {
 }
 
 func (h *handler) getMachineStatus(job *batchv1.Job, remove bool) (rkev1.RKEMachineStatus, error) {
-	if job.Status.CompletionTime != nil {
+	condType := createJobConditionType
+	if remove {
+		condType = deleteJobConditionType
+	}
+	if !job.Status.CompletionTime.IsZero() {
 		return rkev1.RKEMachineStatus{
+			Conditions: []genericcondition.GenericCondition{
+				{
+					Type:   condType,
+					Status: corev1.ConditionTrue,
+				},
+				{
+					Type:   "Ready",
+					Status: corev1.ConditionTrue,
+				},
+			},
 			JobComplete: true,
 		}, nil
 	}
@@ -195,19 +209,28 @@ func (h *handler) getMachineStatus(job *batchv1.Job, remove bool) (rkev1.RKEMach
 		}
 
 		if lastPod != nil {
-			return getMachineStatusFromPod(lastPod, remove), nil
+			return getMachineStatusFromPod(lastPod, job.Spec.Template.Labels[InfraMachineKind], condType), nil
 		}
 	}
 
-	return rkev1.RKEMachineStatus{}, nil
+	message := CreatingMachineMessage(job.Spec.Template.Labels[InfraMachineKind])
+	if condType != createJobConditionType {
+		message = DeletingMachineMessage(job.Spec.Template.Labels[InfraMachineKind])
+	}
+
+	return rkev1.RKEMachineStatus{Conditions: []genericcondition.GenericCondition{
+		{
+			Type:    "Ready",
+			Status:  corev1.ConditionFalse,
+			Message: message,
+		},
+	}}, nil
 }
 
-func getMachineStatusFromPod(pod *corev1.Pod, remove bool) rkev1.RKEMachineStatus {
+func getMachineStatusFromPod(pod *corev1.Pod, kind, condType string) rkev1.RKEMachineStatus {
 	reason := string(errors.CreateMachineError)
-	condType := createJobConditionType
-	if remove {
+	if condType == deleteJobConditionType {
 		reason = string(errors.DeleteMachineError)
-		condType = deleteJobConditionType
 	}
 
 	if pod.Status.Phase == corev1.PodSucceeded {
@@ -217,6 +240,10 @@ func getMachineStatusFromPod(pod *corev1.Pod, remove bool) rkev1.RKEMachineStatu
 					Type:   condType,
 					Status: corev1.ConditionTrue,
 				},
+				{
+					Type:   "Ready",
+					Status: corev1.ConditionTrue,
+				},
 			},
 			JobComplete: true,
 		}
@@ -224,17 +251,28 @@ func getMachineStatusFromPod(pod *corev1.Pod, remove bool) rkev1.RKEMachineStatu
 
 	for _, containerStatus := range pod.Status.ContainerStatuses {
 		if containerStatus.State.Terminated != nil && containerStatus.State.Terminated.ExitCode != 0 {
+			failureMessage := strings.TrimSpace(containerStatus.State.Terminated.Message)
+			message := CreatingMachineMessage(kind)
+			if condType != createJobConditionType {
+				message = FailedMachineDeleteMessage(kind, reason, failureMessage)
+			}
 			return rkev1.RKEMachineStatus{
 				Conditions: []genericcondition.GenericCondition{
 					{
 						Type:    condType,
 						Status:  corev1.ConditionFalse,
 						Reason:  reason,
-						Message: strings.TrimSpace(containerStatus.State.Terminated.Message),
+						Message: message,
+					},
+					{
+						Type:    "Ready",
+						Status:  corev1.ConditionFalse,
+						Reason:  reason,
+						Message: message,
 					},
 				},
 				FailureReason:  reason,
-				FailureMessage: strings.TrimSpace(containerStatus.State.Terminated.Message),
+				FailureMessage: failureMessage,
 			}
 		}
 	}
@@ -306,7 +344,7 @@ func (h *handler) OnRemove(key string, obj runtime.Object) (runtime.Object, erro
 	}
 
 	if _, nodeDrainExcluded := machine.Annotations[capi.ExcludeNodeDrainingAnnotation]; !removed ||
-		(!nodeDrainExcluded && drainingSucceededCondition.IsFalse(machine) && drainingSucceededCondition.GetReason(machine) != capi.DrainingFailedReason) {
+		(!nodeDrainExcluded && !drainingSucceededCondition.IsTrue(machine) && drainingSucceededCondition.GetReason(machine) != capi.DrainingFailedReason) {
 		if err = h.dynamic.EnqueueAfter(obj.GetObjectKind().GroupVersionKind(), objMeta.GetNamespace(), objMeta.GetName(), 5*time.Second); err != nil {
 			return obj, err
 		}
@@ -449,7 +487,11 @@ func (h *handler) patchStatus(obj runtime.Object, d data.Object, state rkev1.RKE
 			}
 		} else if len(state.Conditions) > 0 {
 			for _, c := range state.Conditions {
-				changed = insertOrUpdateCondition(d, summary.NewCondition(c.Type, string(c.Status), c.Reason, c.Message)) || changed
+				if thisChanged, err := insertOrUpdateCondition(d, summary.NewCondition(c.Type, string(c.Status), c.Reason, c.Message)); err != nil {
+					return nil, err
+				} else if thisChanged {
+					changed = true
+				}
 			}
 		}
 	}
@@ -498,8 +540,8 @@ func setCondition(dynamic *dynamic.Controller, obj runtime.Object, conditionType
 		return obj, mapErr
 	}
 
-	if !insertOrUpdateCondition(d, desiredCondition) {
-		return obj, nil
+	if updated, err := insertOrUpdateCondition(d, desiredCondition); !updated || err != nil {
+		return obj, err
 	}
 
 	obj, updateErr := dynamic.UpdateStatus(&unstructured.Unstructured{
@@ -511,28 +553,41 @@ func setCondition(dynamic *dynamic.Controller, obj runtime.Object, conditionType
 	return obj, err
 }
 
-func insertOrUpdateCondition(d data.Object, desiredCondition summary.Condition) bool {
+func insertOrUpdateCondition(d data.Object, desiredCondition summary.Condition) (bool, error) {
 	for _, cond := range summary.GetUnstructuredConditions(d) {
 		if desiredCondition.Equals(cond) {
-			return false
+			return false, nil
 		}
 	}
 
-	conditions := d.Slice("status", "conditions")
+	// The conditions must be converted to a map so that DeepCopyJSONValue will
+	// recognize it as a map instead of a data.Object.
+	newCond, err := convert.EncodeToMap(desiredCondition.Object)
+	if err != nil {
+		return false, err
+	}
+
+	dConditions := d.Slice("status", "conditions")
+	conditions := make([]interface{}, len(dConditions))
 	found := false
-	for i, cond := range conditions {
+	for i, cond := range dConditions {
 		if cond.String("type") == desiredCondition.Type() {
-			conditions[i] = desiredCondition.Object
-			d.SetNested(conditions, "status", "conditions")
+			conditions[i] = newCond
 			found = true
+		} else {
+			conditions[i], err = convert.EncodeToMap(cond)
+			if err != nil {
+				return false, err
+			}
 		}
 	}
 
 	if !found {
-		d.SetNested(append(conditions, desiredCondition.Object), "status", "conditions")
+		conditions = append(conditions, newCond)
 	}
+	d.SetNested(conditions, "status", "conditions")
 
-	return true
+	return true, nil
 }
 
 func constructFilesSecret(driver string, config map[string]interface{}) (*corev1.Secret, error) {
@@ -585,4 +640,16 @@ func shouldForceRemoval(job *batchv1.Job, d data.Object) bool {
 	}
 
 	return condition.Cond("Failed").IsTrue(job)
+}
+
+func FailedMachineDeleteMessage(kind, failureReason, failureMessage string) string {
+	return fmt.Sprintf("failed deleting server (%s) in infrastructure provider: %s: %s", kind, failureReason, failureMessage)
+}
+
+func CreatingMachineMessage(kind string) string {
+	return fmt.Sprintf("creating server (%s) in infrastructure provider", kind)
+}
+
+func DeletingMachineMessage(kind string) string {
+	return fmt.Sprintf("deleting server (%s) in infrastructure provider", kind)
 }
