@@ -1,6 +1,7 @@
 package rancher
 
 import (
+	"github.com/rancher/norman/condition"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	rancherversion "github.com/rancher/rancher/pkg/version"
@@ -88,7 +89,7 @@ func forceSystemAndDefaultProjectCreation(configMapController controllerv1.Confi
 	return createOrUpdateConfigMap(configMapController, cm)
 }
 
-func forceSystemNamespaceAssignment(configMapController controllerv1.ConfigMapController, clusterClient v3.ClusterClient) error {
+func forceSystemNamespaceAssignment(configMapController controllerv1.ConfigMapController, projectClient v3.ProjectClient) error {
 	cm, err := getConfigMap(configMapController, forceSystemNamespacesAssignment)
 	if err != nil || cm == nil {
 		return err
@@ -98,28 +99,39 @@ func forceSystemNamespaceAssignment(configMapController controllerv1.ConfigMapCo
 		return nil
 	}
 
-	clusterList, err := clusterClient.List(metav1.ListOptions{})
+	err = applyProjectConditionForNamespaceAssignment("authz.management.cattle.io/system-project=true", v32.ProjectConditionSystemNamespacesAssigned, projectClient)
+	if err != nil {
+		return err
+	}
+	err = applyProjectConditionForNamespaceAssignment("authz.management.cattle.io/default-project=true", v32.ProjectConditionDefaultNamespacesAssigned, projectClient)
 	if err != nil {
 		return err
 	}
 
-	for i := range clusterList.Items {
-		c := &clusterList.Items[i]
+	cm.Data[namespacesAssignedKey] = rancherversion.Version
+	return createOrUpdateConfigMap(configMapController, cm)
+}
 
+func applyProjectConditionForNamespaceAssignment(label string, condition condition.Cond, projectClient v3.ProjectClient) error {
+	projects, err := projectClient.List("", metav1.ListOptions{LabelSelector: label})
+	if err != nil {
+		return err
+	}
+
+	for i := range projects.Items {
 		if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-			c, err = clusterClient.Get(c.Name, metav1.GetOptions{})
+			p := &projects.Items[i]
+			p, err = projectClient.Get(p.Namespace, p.Name, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
-			v32.ClusterConditionSystemNamespacesAssigned.Unknown(c)
-			v32.ClusterConditionDefaultNamespaceAssigned.Unknown(c)
-			_, err = clusterClient.Update(c)
+
+			condition.Unknown(p)
+			_, err = projectClient.Update(p)
 			return err
 		}); err != nil {
 			return err
 		}
 	}
-
-	cm.Data[namespacesAssignedKey] = rancherversion.Version
-	return createOrUpdateConfigMap(configMapController, cm)
+	return nil
 }
