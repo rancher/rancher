@@ -114,6 +114,9 @@ func (c *rtSync) syncRT(template *v3.RoleTemplate, usedInProjects bool, prtbs []
 
 		for _, n := range namespaces {
 			ns := n.(*v1.Namespace)
+			if !ns.DeletionTimestamp.IsZero() {
+				continue
+			}
 			if err := c.m.ensureProjectRoleBindings(ns.Name, roles, prtb); err != nil {
 				return errors.Wrapf(err, "couldn't ensure binding %v in %v", prtb.Name, ns.Name)
 			}

@@ -154,13 +154,14 @@ func (w *Context) StartWithTransaction(ctx context.Context, f func(context.Conte
 		return err
 	}
 
-	if err = w.Start(ctx); err != nil {
+	if err := w.ControllerFactory.SharedCacheFactory().Start(ctx); err != nil {
+		transaction.Rollback()
 		return err
 	}
 
-	w.SharedControllerFactory.SharedCacheFactory().WaitForCacheSync(ctx)
+	w.ControllerFactory.SharedCacheFactory().WaitForCacheSync(ctx)
 	transaction.Commit()
-	return nil
+	return w.Start(ctx)
 }
 
 func (w *Context) Start(ctx context.Context) error {
