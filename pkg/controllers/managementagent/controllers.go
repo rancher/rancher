@@ -13,6 +13,7 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/managementagent/ingress"
 	"github.com/rancher/rancher/pkg/controllers/managementagent/ingresshostgen"
 	"github.com/rancher/rancher/pkg/controllers/managementagent/nslabels"
+	"github.com/rancher/rancher/pkg/controllers/managementagent/nsserviceaccount"
 	"github.com/rancher/rancher/pkg/controllers/managementagent/podresources"
 	"github.com/rancher/rancher/pkg/controllers/managementagent/servicemonitor"
 	"github.com/rancher/rancher/pkg/controllers/managementagent/targetworkloadservice"
@@ -34,6 +35,7 @@ func Register(ctx context.Context, cluster *config.UserOnlyContext) error {
 	podresources.Register(ctx, cluster)
 	targetworkloadservice.Register(ctx, cluster)
 	workload.Register(ctx, cluster)
+	nsserviceaccount.Register(ctx, cluster)
 
 	if features.MonitoringV1.Enabled() {
 		if err := createUserClusterCRDs(ctx, cluster); err != nil {
