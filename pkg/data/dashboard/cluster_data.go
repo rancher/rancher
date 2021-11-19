@@ -62,6 +62,9 @@ func addLocalCluster(embedded bool, wrangler *wrangler.Context) error {
 					UID:        c.UID,
 				},
 			},
+			Annotations: map[string]string{
+				"management.cattle.io/system-namespace": "true",
+			},
 		},
 	})
 	if apierrors.IsAlreadyExists(err) {
