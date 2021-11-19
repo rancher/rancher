@@ -2,10 +2,12 @@ package healthsyncer
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 	"sort"
 	"time"
 
+	"github.com/blang/semver"
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/condition"
 	"github.com/rancher/norman/types/slice"
@@ -31,6 +33,9 @@ var excludedComponentMap = map[string][]string{
 	"tencent": {"controller-manager", "scheduler"},
 	"lke":     {"controller-manager", "scheduler"},
 }
+
+// ComponentStatus is disabled with k8s v1.22
+var componentStatusDisabledRange, _ = semver.ParseRange(">=1.22.0")
 
 type ClusterControllerLifecycle interface {
 	Stop(cluster *v3.Cluster)
@@ -80,11 +85,18 @@ func (h *HealthSyncer) getComponentStatus(cluster *v3.Cluster) error {
 		return condition.Error("ComponentStatsFetchingFailure", errors.Wrap(err, "Failed to communicate with API server during namespace check"))
 	}
 
+	cluster.Status.ComponentStatuses = []v32.ClusterComponentStatus{}
+	k8sVersion, err := semver.Parse(fmt.Sprintf("%s.%s.0", cluster.Status.Version.Major, cluster.Status.Version.Minor))
+	if err != nil {
+		return condition.Error("ComponentStatsFetchingFailure", errors.Wrap(err, "Failed to parse cluster status version"))
+	}
+	if componentStatusDisabledRange(k8sVersion) {
+		return nil
+	}
 	cses, err := h.componentStatuses.List(metav1.ListOptions{})
 	if err != nil {
 		return condition.Error("ComponentStatsFetchingFailure", errors.Wrap(err, "Failed to communicate with API server"))
 	}
-	cluster.Status.ComponentStatuses = []v32.ClusterComponentStatus{}
 	clusterType := cluster.Status.Provider // the provider detector is more accurate but we can fall back on the driver in some cases
 	if clusterType == "" {
 		clusterType = cluster.Status.Driver
