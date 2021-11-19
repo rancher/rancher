@@ -102,6 +102,13 @@ type ScaleContextOptions struct {
 	ControllerFactory controller.SharedControllerFactory
 }
 
+func enableProtobuf(cfg *rest.Config) *rest.Config {
+	cpy := rest.CopyConfig(cfg)
+	cpy.AcceptContentTypes = "application/vnd.kubernetes.protobuf, application/json"
+	cpy.ContentType = "application/json"
+	return cpy
+}
+
 func NewScaledContext(config rest.Config, opts *ScaleContextOptions) (*ScaledContext, error) {
 	var err error
 
@@ -114,7 +121,7 @@ func NewScaledContext(config rest.Config, opts *ScaleContextOptions) (*ScaledCon
 	}
 
 	if opts.ControllerFactory == nil {
-		controllerFactory, err := controller.NewSharedControllerFactoryFromConfig(&context.RESTConfig, wrangler.Scheme)
+		controllerFactory, err := controller.NewSharedControllerFactoryFromConfig(enableProtobuf(&context.RESTConfig), wrangler.Scheme)
 		if err != nil {
 			return nil, err
 		}
@@ -409,7 +416,7 @@ func NewUserContext(scaledContext *ScaledContext, config rest.Config, clusterNam
 		return nil, err
 	}
 
-	clientFactory, err := client.NewSharedClientFactory(&context.RESTConfig, &client.SharedClientFactoryOptions{
+	clientFactory, err := client.NewSharedClientFactory(enableProtobuf(&context.RESTConfig), &client.SharedClientFactoryOptions{
 		Scheme: wrangler.Scheme,
 	})
 	if err != nil {
