@@ -2,11 +2,10 @@ package secret
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	"k8s.io/apimachinery/pkg/runtime"
-
-	"fmt"
 
 	"github.com/rancher/norman/controller"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
@@ -43,6 +42,34 @@ type Controller struct {
 }
 
 func Register(ctx context.Context, cluster *config.UserContext) {
+	starter := cluster.DeferredStart(ctx, func(ctx context.Context) error {
+		registerDeferred(ctx, cluster)
+		return nil
+	})
+
+	projectLister := cluster.Management.Management.Projects("").Controller().Lister()
+	secrets := cluster.Management.Core.Secrets("")
+	secrets.AddHandler(ctx, "secret-deferred", func(key string, obj *corev1.Secret) (runtime.Object, error) {
+		if obj == nil {
+			return nil, nil
+		}
+
+		_, err := projectLister.Get(cluster.ClusterName, obj.Namespace)
+		if errors.IsNotFound(err) {
+			return obj, nil
+		} else if err != nil {
+			return obj, err
+		}
+
+		if !strings.HasPrefix(obj.Name, "default-token-") {
+			return obj, starter()
+		}
+
+		return obj, nil
+	})
+}
+
+func registerDeferred(ctx context.Context, cluster *config.UserContext) {
 	clusterSecretsClient := cluster.Core.Secrets("")
 	s := &Controller{
 		secrets:                   clusterSecretsClient,
