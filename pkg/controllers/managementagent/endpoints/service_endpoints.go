@@ -3,7 +3,6 @@ package endpoints
 import (
 	workloadutil "github.com/rancher/rancher/pkg/controllers/managementagent/workload"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
-	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -15,7 +14,7 @@ import (
 type ServicesController struct {
 	services           v1.ServiceInterface
 	workloadController workloadutil.CommonController
-	machinesLister     v3.NodeLister
+	nodesLister        v1.NodeLister
 	clusterName        string
 }
 
@@ -41,7 +40,7 @@ func (s *ServicesController) sync(key string, obj *corev1.Service) (runtime.Obje
 
 func (s *ServicesController) reconcileEndpointsForService(svc *corev1.Service) (bool, error) {
 	// 1. update service with endpoints
-	allNodesIP, err := getAllNodesPublicEndpointIP(s.machinesLister, s.clusterName)
+	allNodesIP, err := getAllNodesPublicEndpointIP(s.nodesLister, s.clusterName)
 	if err != nil {
 		return false, err
 	}

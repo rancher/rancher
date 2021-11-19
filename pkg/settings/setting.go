@@ -47,6 +47,7 @@ var (
 	InstallUUID                       = NewSetting("install-uuid", "")
 	InternalServerURL                 = NewSetting("internal-server-url", "")
 	InternalCACerts                   = NewSetting("internal-cacerts", "")
+	IsRKE                             = NewSetting("is-rke", "")
 	JailerTimeout                     = NewSetting("jailer-timeout", "60")
 	KubeconfigGenerateToken           = NewSetting("kubeconfig-generate-token", "true")
 	KubeconfigTokenTTLMinutes         = NewSetting("kubeconfig-token-ttl-minutes", "960") // 16 hours

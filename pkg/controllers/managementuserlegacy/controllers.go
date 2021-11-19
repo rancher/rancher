@@ -7,7 +7,6 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/managementuserlegacy/alert"
 	"github.com/rancher/rancher/pkg/controllers/managementuserlegacy/approuter"
 	"github.com/rancher/rancher/pkg/controllers/managementuserlegacy/cis"
-	"github.com/rancher/rancher/pkg/controllers/managementuserlegacy/endpoints"
 	"github.com/rancher/rancher/pkg/controllers/managementuserlegacy/globaldns"
 	"github.com/rancher/rancher/pkg/controllers/managementuserlegacy/helm"
 	"github.com/rancher/rancher/pkg/controllers/managementuserlegacy/istio"
@@ -25,7 +24,6 @@ func Register(ctx context.Context, cluster *config.UserContext, clusterRec *mana
 	cis.Register(ctx, cluster)
 	pipeline.Register(ctx, cluster)
 	systemimage.Register(ctx, cluster)
-	endpoints.Register(ctx, cluster)
 	approuter.Register(ctx, cluster)
 	alert.Register(ctx, cluster)
 	globaldns.Register(ctx, cluster)
