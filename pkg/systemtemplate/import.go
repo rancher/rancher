@@ -81,9 +81,12 @@ func SystemTemplate(resp io.Writer, agentImage, authImage, namespace, token, url
 		tolerations = templates.ToYAML(taints)
 	}
 
-	if cluster != nil && len(cluster.Spec.AgentEnvVars) > 0 {
-		agentEnvVars = templates.ToYAML(cluster.Spec.AgentEnvVars)
+	envVars := settings.DefaultAgentSettingsAsEnvVars()
+	if cluster != nil {
+		envVars = append(envVars, cluster.Spec.AgentEnvVars...)
 	}
+
+	agentEnvVars = templates.ToYAML(envVars)
 
 	context := &context{
 		Features:              toFeatureString(features),
