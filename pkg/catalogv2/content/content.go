@@ -218,7 +218,15 @@ func (c *Manager) filterReleases(index *repo.IndexFile, k8sVersion *semver.Versi
 					logrus.Errorf("failed to parse constraint version %s: %v", constraintStr, err)
 				}
 			}
-
+			if constraintStr, ok := version.Annotations["catalog.cattle.io/kube-version"]; ok {
+				if constraint, err := semver.NewConstraint(constraintStr); err == nil {
+					if !constraint.Check(k8sVersion) {
+						continue
+					}
+				} else {
+					logrus.Errorf("failed to parse constraint kube-version %s from annotation: %v", constraintStr, err)
+				}
+			}
 			if version.KubeVersion != "" {
 				if constraint, err := semver.NewConstraint(version.KubeVersion); err == nil {
 					if !constraint.Check(k8sVersion) {
