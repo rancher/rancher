@@ -532,7 +532,7 @@ func (p *Planner) reconcile(controlPlane *rkev1.RKEControlPlane, secret plan.Sec
 				if entry.Plan.InSync {
 					unavailable++
 				}
-				if ok, err := p.drain(entry.Machine, clusterPlan, drainOptions); err != nil {
+				if ok, err := p.drain(entry.Plan.AppliedPlan, plan, entry.Machine, clusterPlan, drainOptions); err != nil {
 					return err
 				} else if ok {
 					if err := p.store.UpdatePlan(entry.Machine, plan, 0); err != nil {
@@ -806,6 +806,7 @@ func (p *Planner) addOtherFiles(nodePlan plan.NodePlan, controlPlane *rkev1.RKEC
 
 func restartStamp(nodePlan plan.NodePlan, controlPlane *rkev1.RKEControlPlane, image string) string {
 	restartStamp := sha256.New()
+	restartStamp.Write([]byte(strconv.Itoa(controlPlane.Spec.ProvisionGeneration)))
 	restartStamp.Write([]byte(image))
 	for _, file := range nodePlan.Files {
 		if file.Dynamic {
