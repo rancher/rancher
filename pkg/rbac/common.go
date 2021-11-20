@@ -35,19 +35,24 @@ const (
 // BuildSubjectFromRTB This function will generate
 // PRTB and CRTB to the subject with user, group
 // or service account
-func BuildSubjectFromRTB(object interface{}) (rbacv1.Subject, error) {
+func BuildSubjectFromRTB(object metav1.Object) (rbacv1.Subject, error) {
 	var userName, groupPrincipalName, groupName, name, kind, sa, namespace string
-	if rtb, ok := object.(*v3.ProjectRoleTemplateBinding); ok {
+	switch rtb := object.(type) {
+	case *v3.ProjectRoleTemplateBinding:
 		userName = rtb.UserName
 		groupPrincipalName = rtb.GroupPrincipalName
 		groupName = rtb.GroupName
 		sa = rtb.ServiceAccount
-	} else if rtb, ok := object.(*v3.ClusterRoleTemplateBinding); ok {
+	case *v3.ClusterRoleTemplateBinding:
 		userName = rtb.UserName
 		groupPrincipalName = rtb.GroupPrincipalName
 		groupName = rtb.GroupName
-	} else {
-		return rbacv1.Subject{}, errors.Errorf("unrecognized roleTemplateBinding type: %v", object)
+	default:
+		objectName := ""
+		if object != nil {
+			objectName = object.GetName()
+		}
+		return rbacv1.Subject{}, errors.Errorf("unrecognized roleTemplateBinding type: %v", objectName)
 	}
 
 	if userName != "" {
@@ -57,7 +62,7 @@ func BuildSubjectFromRTB(object interface{}) (rbacv1.Subject, error) {
 
 	if groupPrincipalName != "" {
 		if name != "" {
-			return rbacv1.Subject{}, errors.Errorf("roletemplatebinding has more than one subject fields set: %v", object)
+			return rbacv1.Subject{}, errors.Errorf("roletemplatebinding has more than one subject fields set: %v", object.GetName())
 		}
 		name = groupPrincipalName
 		kind = "Group"
@@ -65,7 +70,7 @@ func BuildSubjectFromRTB(object interface{}) (rbacv1.Subject, error) {
 
 	if groupName != "" {
 		if name != "" {
-			return rbacv1.Subject{}, errors.Errorf("roletemplatebinding has more than one subject fields set: %v", object)
+			return rbacv1.Subject{}, errors.Errorf("roletemplatebinding has more than one subject fields set: %v", object.GetName())
 		}
 		name = groupName
 		kind = "Group"
@@ -74,7 +79,7 @@ func BuildSubjectFromRTB(object interface{}) (rbacv1.Subject, error) {
 	if sa != "" {
 		parts := strings.SplitN(sa, ":", 2)
 		if len(parts) < 2 {
-			return rbacv1.Subject{}, errors.Errorf("service account %s of projectroletemplatebinding is invalid: %v", sa, object)
+			return rbacv1.Subject{}, errors.Errorf("service account %s of projectroletemplatebinding is invalid: %v", sa, object.GetName())
 		}
 		namespace = parts[0]
 		name = parts[1]
@@ -82,7 +87,7 @@ func BuildSubjectFromRTB(object interface{}) (rbacv1.Subject, error) {
 	}
 
 	if name == "" {
-		return rbacv1.Subject{}, errors.Errorf("roletemplatebinding doesn't have any subject fields set: %v", object)
+		return rbacv1.Subject{}, errors.Errorf("roletemplatebinding doesn't have any subject fields set: %v", object.GetName())
 	}
 
 	// apiGroup default for both User and Group

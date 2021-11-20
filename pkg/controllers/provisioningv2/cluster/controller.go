@@ -37,6 +37,7 @@ import (
 
 const (
 	ByCluster        = "by-cluster"
+	ByCloudCred      = "by-cloud-cred"
 	creatorIDAnn     = "field.cattle.io/creatorId"
 	administratedAnn = "provisioning.cattle.io/administrated"
 )
@@ -125,6 +126,7 @@ func Register(
 func RegisterIndexers(context *config.ScaledContext) {
 	if features.ProvisioningV2.Enabled() {
 		context.Wrangler.Provisioning.Cluster().Cache().AddIndexer(ByCluster, byClusterIndex)
+		context.Wrangler.Provisioning.Cluster().Cache().AddIndexer(ByCloudCred, byCloudCredentialIndex)
 	}
 }
 
@@ -133,6 +135,13 @@ func byClusterIndex(obj *v1.Cluster) ([]string, error) {
 		return nil, nil
 	}
 	return []string{obj.Status.ClusterName}, nil
+}
+
+func byCloudCredentialIndex(obj *v1.Cluster) ([]string, error) {
+	if obj.Spec.CloudCredentialSecretName == "" {
+		return nil, nil
+	}
+	return []string{obj.Spec.CloudCredentialSecretName}, nil
 }
 
 func (h *handler) clusterWatch(namespace, name string, obj runtime.Object) ([]relatedresource.Key, error) {

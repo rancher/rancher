@@ -7,6 +7,7 @@ import (
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	"github.com/rancher/rancher/pkg/clustermanager"
 	"github.com/rancher/rancher/pkg/controllers/management/auth"
+	v3cluster "github.com/rancher/rancher/pkg/controllers/management/cluster"
 	podsecuritypolicy2 "github.com/rancher/rancher/pkg/controllers/management/podsecuritypolicy"
 	"github.com/rancher/rancher/pkg/controllers/managementapi/catalog"
 	"github.com/rancher/rancher/pkg/controllers/managementapi/dynamicschema"
@@ -59,5 +60,6 @@ func registerIndexers(ctx context.Context, scaledContext *config.ScaledContext) 
 		return err
 	}
 	cluster.RegisterIndexers(scaledContext)
+	v3cluster.RegisterIndexers(scaledContext)
 	return nil
 }

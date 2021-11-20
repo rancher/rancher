@@ -360,7 +360,7 @@ func (v *Validator) validateAKSConfig(request *types.APIContext, cluster map[str
 
 	// check user's access to cloud credential
 	if azureCredential, ok := aksConfig["azureCredentialSecret"].(string); ok {
-		if err := validateAKSCredentialAuth(request, azureCredential, prevCluster); err != nil {
+		if err := validateCredentialAuth(request, azureCredential); err != nil {
 			return err
 		}
 	}
@@ -392,35 +392,6 @@ func (v *Validator) validateAKSConfig(request *types.APIContext, cluster map[str
 	region, regionOk := aksConfig["resourceLocation"]
 	if !regionOk || region == "" {
 		return httperror.NewAPIError(httperror.InvalidBodyContent, "must provide region")
-	}
-
-	return nil
-}
-
-// validateAKSCredentialAuth validates that a user has access to the credential they are setting and the credential
-// they are overwriting. If there is no previous credential such as during a create or the old credential cannot
-// be found, the auth check will succeed as long as the user can access the new credential.
-func validateAKSCredentialAuth(request *types.APIContext, credential string, prevCluster *v3.Cluster) error {
-	var accessCred mgmtclient.CloudCredential
-	credentialErr := "error accessing cloud credential"
-	if err := access.ByID(request, &mgmtSchema.Version, mgmtclient.CloudCredentialType, credential, &accessCred); err != nil {
-		return httperror.NewAPIError(httperror.NotFound, credentialErr)
-	}
-
-	if prevCluster == nil || prevCluster.Spec.AKSConfig == nil {
-		return nil
-	}
-
-	// validate the user has access to the old cloud credential before allowing them to change it
-	credential = prevCluster.Spec.AKSConfig.AzureCredentialSecret
-	if err := access.ByID(request, &mgmtSchema.Version, mgmtclient.CloudCredentialType, credential, &accessCred); err != nil {
-		if apiError, ok := err.(*httperror.APIError); ok {
-			if apiError.Code.Status == httperror.NotFound.Status {
-				// old cloud credential doesn't exist anymore, anyone can change it
-				return nil
-			}
-		}
-		return httperror.NewAPIError(httperror.NotFound, credentialErr)
 	}
 
 	return nil
@@ -533,7 +504,7 @@ func (v *Validator) validateEKSConfig(request *types.APIContext, cluster map[str
 
 	// check user's access to cloud credential
 	if amazonCredential, ok := eksConfig["amazonCredentialSecret"].(string); ok {
-		if err := validateEKSCredentialAuth(request, amazonCredential, prevCluster); err != nil {
+		if err := validateCredentialAuth(request, amazonCredential); err != nil {
 			return err
 		}
 	}
@@ -629,36 +600,13 @@ func validateEKSKubernetesVersion(spec *v32.ClusterSpec, prevCluster *v3.Cluster
 	return nil
 }
 
-// validateEKSCredentialAuth validates that a user has access to the credential they are setting and the credential
-// they are overwriting. If there is no previous credential such as during a create or the old credential cannot
-// be found, the auth check will succeed as long as the user can access the new credential.
-func validateEKSCredentialAuth(request *types.APIContext, credential string, prevCluster *v3.Cluster) error {
+// validateCredentialAuth validates that a user has access to the credential they are setting.
+func validateCredentialAuth(request *types.APIContext, credential string) error {
 	var accessCred mgmtclient.CloudCredential
 	credentialErr := "error accessing cloud credential"
 	if err := access.ByID(request, &mgmtSchema.Version, mgmtclient.CloudCredentialType, credential, &accessCred); err != nil {
 		return httperror.NewAPIError(httperror.NotFound, credentialErr)
 	}
-
-	if prevCluster == nil {
-		return nil
-	}
-
-	if prevCluster.Spec.EKSConfig == nil {
-		return nil
-	}
-
-	// validate the user has access to the old cloud credential before allowing them to change it
-	credential = prevCluster.Spec.EKSConfig.AmazonCredentialSecret
-	if err := access.ByID(request, &mgmtSchema.Version, mgmtclient.CloudCredentialType, credential, &accessCred); err != nil {
-		if apiError, ok := err.(*httperror.APIError); ok {
-			if apiError.Code.Status == httperror.NotFound.Status {
-				// old cloud credential doesn't exist anymore, anyone can change it
-				return nil
-			}
-		}
-		return httperror.NewAPIError(httperror.NotFound, credentialErr)
-	}
-
 	return nil
 }
 
@@ -735,7 +683,7 @@ func (v *Validator) validateGKEConfig(request *types.APIContext, cluster map[str
 
 	// check user's access to cloud credential
 	if googleCredential, ok := gkeConfig["googleCredentialSecret"].(string); ok {
-		if err := validateGKECredentialAuth(request, googleCredential, prevCluster); err != nil {
+		if err := validateCredentialAuth(request, googleCredential); err != nil {
 			return err
 		}
 	}
@@ -795,39 +743,6 @@ func (v *Validator) validateGKENetworkPolicy(clusterSpec *v32.ClusterSpec, prevC
 			httperror.InvalidBodyContent,
 			"Network Policy support must be enabled on GKE cluster in order to enable Project Network Isolation",
 		)
-	}
-
-	return nil
-}
-
-// validateGKECredentialAuth validates that a user has access to the credential they are setting and the credential
-// they are overwriting. If there is no previous credential such as during a create or the old credential cannot
-// be found, the auth check will succeed as long as the user can access the new credential.
-func validateGKECredentialAuth(request *types.APIContext, credential string, prevCluster *v3.Cluster) error {
-	var accessCred mgmtclient.CloudCredential
-	credentialErr := "error accessing cloud credential"
-	if err := access.ByID(request, &mgmtSchema.Version, mgmtclient.CloudCredentialType, credential, &accessCred); err != nil {
-		return httperror.NewAPIError(httperror.NotFound, credentialErr)
-	}
-
-	if prevCluster == nil {
-		return nil
-	}
-
-	if prevCluster.Spec.GKEConfig == nil {
-		return nil
-	}
-
-	// validate the user has access to the old cloud credential before allowing them to change it
-	credential = prevCluster.Spec.GKEConfig.GoogleCredentialSecret
-	if err := access.ByID(request, &mgmtSchema.Version, mgmtclient.CloudCredentialType, credential, &accessCred); err != nil {
-		if apiError, ok := err.(*httperror.APIError); ok {
-			if apiError.Code.Status == httperror.NotFound.Status {
-				// old cloud credential doesn't exist anymore, anyone can change it
-				return nil
-			}
-		}
-		return httperror.NewAPIError(httperror.NotFound, credentialErr)
 	}
 
 	return nil
