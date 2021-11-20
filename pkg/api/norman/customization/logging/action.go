@@ -174,14 +174,14 @@ func (h *Handler) testLoggingTarget(ctx context.Context, clusterName string, tar
 }
 
 func (h *Handler) dryRunLoggingTarget(apiContext *types.APIContext, level, clusterName, projectID string, target v33.LoggingTargets) error {
-	context, err := h.clusterManager.UserContext(clusterName)
+	context, err := h.clusterManager.UserContextNoControllers(clusterName)
 	if err != nil {
 		return err
 	}
 
-	podLister := context.Core.Pods(metav1.NamespaceAll).Controller().Lister()
+	pods := context.Core.Pods(metav1.NamespaceAll)
 	namespaces := context.Core.Namespaces(metav1.NamespaceAll)
-	testerDeployer := deployer.NewTesterDeployer(context.Management, h.appsGetter, h.appLister, h.projectLister, podLister, h.projectLoggingLister, namespaces, h.templateLister)
+	testerDeployer := deployer.NewTesterDeployer(context.Management, h.appsGetter, h.appLister, h.projectLister, pods, h.projectLoggingLister, namespaces, h.templateLister)
 	configGenerator := configsyncer.NewConfigGenerator(metav1.NamespaceAll, h.projectLoggingLister, namespaces.Controller().Lister())
 
 	var dryRunConfigBuf []byte

@@ -106,7 +106,7 @@ func (h *metricsHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 // if getting 'local'. The count would show as 0 for a downstream cluster since the CR that backs the project only
 // lives in management.
 func (h *metricsHandler) getClusterObjectCount(clusterID string, rw http.ResponseWriter, req *http.Request) {
-	cluster, err := h.clusterManager.UserContext(clusterID)
+	cluster, err := h.clusterManager.UserContextNoControllers(clusterID)
 	if err != nil {
 		var (
 			normanError *httperror.APIError

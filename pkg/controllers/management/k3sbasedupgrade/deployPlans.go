@@ -43,7 +43,7 @@ func (h *handler) deployPlans(cluster *v3.Cluster, isK3s, isRke2 bool) error {
 		strategy = cluster.Spec.K3sConfig.ClusterUpgradeStrategy
 	}
 	// access downstream cluster
-	clusterCtx, err := h.manager.UserContext(cluster.Name)
+	clusterCtx, err := h.manager.UserContextNoControllers(cluster.Name)
 	if err != nil {
 		return err
 

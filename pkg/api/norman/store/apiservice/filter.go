@@ -8,6 +8,7 @@ import (
 	"github.com/rancher/rancher/pkg/clustermanager"
 	apiregistrationv1 "github.com/rancher/rancher/pkg/generated/norman/apiregistration.k8s.io/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 type noWatchByAPIServiceStore struct {
@@ -29,25 +30,25 @@ func NewAPIServicFilterStoreFunc(cm *clustermanager.Manager, apiVersion string) 
 func (s *noWatchByAPIServiceStore) Watch(apiContext *types.APIContext, schema *types.Schema, opt *types.QueryOptions) (chan map[string]interface{}, error) {
 	clustername := s.manager.ClusterName(apiContext)
 	versionName := getAPIVersionName(s.version)
-	lister, err := s.getAPIServiceLister(clustername)
+	apiServiceClient, err := s.getAPIServiceClient(clustername)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to get api service lister in cluster %s", clustername)
+		return nil, errors.Wrapf(err, "failed to get api service client in cluster %s", clustername)
 	}
-	if _, err := lister.Get("", versionName); err != nil {
+	if _, err := apiServiceClient.Get(versionName, metav1.GetOptions{}); err != nil {
 		if !apierrors.IsNotFound(err) {
-			return nil, errors.Wrapf(err, "failed to get apiservice %s from lister in cluster %s", versionName, clustername)
+			return nil, errors.Wrapf(err, "failed to get apiservice %s from client in cluster %s", versionName, clustername)
 		}
 		return nil, nil
 	}
 	return s.Store.Watch(apiContext, schema, opt)
 }
 
-func (s *noWatchByAPIServiceStore) getAPIServiceLister(clusterName string) (apiregistrationv1.APIServiceLister, error) {
-	userContext, err := s.manager.UserContext(clusterName)
+func (s *noWatchByAPIServiceStore) getAPIServiceClient(clusterName string) (apiregistrationv1.APIServiceInterface, error) {
+	userContext, err := s.manager.UserContextNoControllers(clusterName)
 	if err != nil {
 		return nil, err
 	}
-	return userContext.APIAggregation.APIServices("").Controller().Lister(), nil
+	return userContext.APIAggregation.APIServices(""), nil
 }
 
 func getAPIVersionName(version string) string {
