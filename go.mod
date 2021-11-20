@@ -131,7 +131,7 @@ require (
 	github.com/stretchr/testify v1.7.0
 	github.com/tomnomnom/linkheader v0.0.0-20180905144013-02ca5825eb80
 	github.com/urfave/cli v1.22.2
-	github.com/vishvananda/netlink v1.1.1-0.20201029203352-d40f9887b852
+	github.com/vishvananda/netlink v1.1.1-0.20201228183132-77e4d032a06a
 	github.com/vmihailenco/msgpack v4.0.1+incompatible
 	github.com/vmware/govmomi v0.26.0
 	github.com/vmware/kube-fluentd-operator v0.0.0-20190307154903-bf9de7e79eaf
