@@ -14,6 +14,7 @@ import (
 	"strings"
 
 	"github.com/moby/locker"
+	"github.com/rancher/lasso/pkg/dynamic"
 	"github.com/rancher/norman/types/values"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
@@ -132,6 +133,7 @@ type Planner struct {
 	secretClient                  corecontrollers.SecretClient
 	secretCache                   corecontrollers.SecretCache
 	machines                      capicontrollers.MachineClient
+	dynamic                       *dynamic.Controller
 	clusterRegistrationTokenCache mgmtcontrollers.ClusterRegistrationTokenCache
 	capiClusters                  capicontrollers.ClusterCache
 	managementClusters            mgmtcontrollers.ClusterCache
@@ -152,6 +154,7 @@ func New(ctx context.Context, clients *wrangler.Context) *Planner {
 		ctx:                           ctx,
 		store:                         store,
 		machines:                      clients.CAPI.Machine(),
+		dynamic:                       clients.Dynamic,
 		secretClient:                  clients.Core.Secret(),
 		secretCache:                   clients.Core.Secret().Cache(),
 		clusterRegistrationTokenCache: clients.Mgmt.ClusterRegistrationToken().Cache(),
@@ -640,7 +643,7 @@ func addDefaults(config map[string]interface{}, controlPlane *rkev1.RKEControlPl
 	}
 }
 
-func addUserConfig(config map[string]interface{}, controlPlane *rkev1.RKEControlPlane, machine *capi.Machine) error {
+func (p *Planner) addUserConfig(config map[string]interface{}, controlPlane *rkev1.RKEControlPlane, machine *capi.Machine) error {
 	for k, v := range controlPlane.Spec.MachineGlobalConfig.Data {
 		config[k] = v
 	}
@@ -658,7 +661,44 @@ func addUserConfig(config map[string]interface{}, controlPlane *rkev1.RKEControl
 	}
 
 	filterConfigData(config, controlPlane, machine)
+
+	if _, ok := config["node-name"]; !ok && config["cloud-provider-name"] == "aws" {
+		// If the AWS cloud provider is set, then we need to make sure that that node name is set to the value the cloud
+		// provider expects. RKE2 sets the node name to the hostname of the machine. Since the hostname of the machine is set
+		// via the infrastructure object name, then the node name needs to be set separately.
+		region, err := getAWSRegionForMachine(machine, p.dynamic)
+		if err != nil {
+			return err
+		}
+
+		_, internalIPAddress, _, _ := getIPAddressesFromMachine(machine, p.secretCache)
+		config["node-name"] = fmt.Sprintf("ip-%s.%s.compute.internal", strings.ReplaceAll(internalIPAddress, ".", "-"), region)
+	}
+
 	return nil
+}
+
+func getAWSRegionForMachine(machine *capi.Machine, dynamic *dynamic.Controller) (string, error) {
+	if machine.Spec.InfrastructureRef.Kind != "Amazonec2Machine" {
+		return "", fmt.Errorf("machine %s does not appear to be an EC2 instance", machine.Name)
+	}
+
+	infra, err := dynamic.Get(
+		schema.FromAPIVersionAndKind(machine.Spec.InfrastructureRef.APIVersion, machine.Spec.InfrastructureRef.Kind),
+		machine.Spec.InfrastructureRef.Namespace,
+		machine.Spec.InfrastructureRef.Name,
+	)
+	if err != nil {
+		return "", err
+	}
+
+	infraMap, err := convert.EncodeToMap(infra)
+	if err != nil {
+		return "", err
+	}
+
+	infraMap, _ = infraMap["spec"].(map[string]interface{})
+	return infraMap["region"].(string), nil
 }
 
 func addRoleConfig(config map[string]interface{}, controlPlane *rkev1.RKEControlPlane, machine *capi.Machine, initNode bool, joinServer string) {
@@ -722,16 +762,16 @@ func (p *Planner) addManifests(nodePlan plan.NodePlan, controlPlane *rkev1.RKECo
 	return nodePlan, nil
 }
 
-func isVSphereProvider(controlPlane *rkev1.RKEControlPlane, machine *capi.Machine) (bool, error) {
+func (p *Planner) isVSphereProvider(controlPlane *rkev1.RKEControlPlane, machine *capi.Machine) (bool, error) {
 	data := map[string]interface{}{}
-	if err := addUserConfig(data, controlPlane, machine); err != nil {
+	if err := p.addUserConfig(data, controlPlane, machine); err != nil {
 		return false, err
 	}
 	return data["cloud-provider-name"] == "rancher-vsphere", nil
 }
 
-func addVSphereCharts(controlPlane *rkev1.RKEControlPlane, machine *capi.Machine) (map[string]interface{}, error) {
-	if isVSphere, err := isVSphereProvider(controlPlane, machine); err != nil {
+func (p *Planner) addVSphereCharts(controlPlane *rkev1.RKEControlPlane, machine *capi.Machine, secrets corecontrollers.SecretCache) (map[string]interface{}, error) {
+	if isVSphere, err := p.isVSphereProvider(controlPlane, machine); err != nil {
 		return nil, err
 	} else if isVSphere && controlPlane.Spec.ChartValues.Data["rancher-vsphere-csi"] == nil {
 		// ensure we have this chart config so that the global.cattle.clusterId is set
@@ -752,7 +792,7 @@ func (p *Planner) addChartConfigs(nodePlan plan.NodePlan, controlPlane *rkev1.RK
 		return nodePlan, nil
 	}
 
-	chartValues, err := addVSphereCharts(controlPlane, machine)
+	chartValues, err := p.addVSphereCharts(controlPlane, machine, p.secretCache)
 	if err != nil {
 		return nodePlan, err
 	}
@@ -913,7 +953,7 @@ func PruneEmpty(config map[string]interface{}) {
 	}
 }
 
-func addAddresses(secrets corecontrollers.SecretCache, config map[string]interface{}, machine *capi.Machine) {
+func getIPAddressesFromMachine(machine *capi.Machine, secrets corecontrollers.SecretCache) (string, string, bool, bool) {
 	internalIPAddress := machine.Annotations[InternalAddressAnnotation]
 	ipAddress := machine.Annotations[AddressAnnotation]
 	internalAddressProvided, addressProvided := internalIPAddress != "", ipAddress != ""
@@ -930,6 +970,11 @@ func addAddresses(secrets corecontrollers.SecretCache, config map[string]interfa
 			}
 		}
 	}
+	return ipAddress, internalIPAddress, addressProvided, internalAddressProvided
+}
+
+func addAddresses(secrets corecontrollers.SecretCache, config map[string]interface{}, machine *capi.Machine) {
+	ipAddress, internalIPAddress, addressProvided, _ := getIPAddressesFromMachine(machine, secrets)
 
 	setNodeExternalIP := ipAddress != "" && internalIPAddress != "" && ipAddress != internalIPAddress
 
@@ -1035,7 +1080,7 @@ func (p *Planner) addConfigFile(nodePlan plan.NodePlan, controlPlane *rkev1.RKEC
 	addDefaults(config, controlPlane, machine)
 
 	// Must call addUserConfig first because it will filter out non-kdm data
-	if err := addUserConfig(config, controlPlane, machine); err != nil {
+	if err := p.addUserConfig(config, controlPlane, machine); err != nil {
 		return nodePlan, err
 	}
 
