@@ -107,7 +107,7 @@ func (h *handler) recordMessage(provCluster *provv1.Cluster, cm *corev1.ConfigMa
 }
 
 func (h *handler) OnNamespace(key string, ns *corev1.Namespace) (*corev1.Namespace, error) {
-	if ns == nil {
+	if ns == nil || !ns.DeletionTimestamp.IsZero() {
 		return nil, nil
 	}
 	if !clusterRegexp.MatchString(ns.Name) {
