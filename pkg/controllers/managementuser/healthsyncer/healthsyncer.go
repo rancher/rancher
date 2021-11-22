@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"regexp"
 	"sort"
 	"time"
 
@@ -27,6 +28,9 @@ import (
 const (
 	syncInterval = 15 * time.Second
 )
+
+// kubernetes/apimachinery/pkg/util/version/version.go
+var versionMatchRE = regexp.MustCompile(`^\s*v?([0-9]+(?:\.[0-9]+)*)(.*)*$`)
 
 var excludedComponentMap = map[string][]string{
 	"aks":     {"controller-manager", "scheduler"},
@@ -82,20 +86,29 @@ func (h *HealthSyncer) getComponentStatus(cluster *v3.Cluster) error {
 	// As of k8s v1.14, kubeapi returns a successful ComponentStatuses response even if etcd is not available.
 	// To work around this, now we try to get a namespace from the API, even if not found, it means the API is up.
 	if _, err := h.k8s.CoreV1().Namespaces().Get(ctx, "kube-system", metav1.GetOptions{}); err != nil && !apierrors.IsNotFound(err) {
-		return condition.Error("ComponentStatsFetchingFailure", errors.Wrap(err, "Failed to communicate with API server during namespace check"))
+		return condition.Error("ComponentStatusFetchingFailure", errors.Wrap(err, "Failed to communicate with API server during namespace check"))
 	}
 
 	cluster.Status.ComponentStatuses = []v32.ClusterComponentStatus{}
-	k8sVersion, err := semver.Parse(fmt.Sprintf("%s.%s.0", cluster.Status.Version.Major, cluster.Status.Version.Minor))
+	if cluster.Status.Version == nil {
+		return nil
+	}
+	parts := versionMatchRE.FindStringSubmatch(cluster.Status.Version.String())
+	if parts == nil || len(parts) < 2 {
+		return condition.Error("ComponentStatusFetchingFailure", fmt.Errorf("Failed to parse cluster status version %s",
+			cluster.Status.Version.String()))
+	}
+	k8sVersion, err := semver.Parse(parts[1])
 	if err != nil {
-		return condition.Error("ComponentStatsFetchingFailure", errors.Wrap(err, "Failed to parse cluster status version"))
+		return condition.Error("ComponentStatusFetchingFailure", fmt.Errorf("Failed to parse cluster k8s version %s",
+			cluster.Status.Version.String()))
 	}
 	if componentStatusDisabledRange(k8sVersion) {
 		return nil
 	}
 	cses, err := h.componentStatuses.List(metav1.ListOptions{})
 	if err != nil {
-		return condition.Error("ComponentStatsFetchingFailure", errors.Wrap(err, "Failed to communicate with API server"))
+		return condition.Error("ComponentStatusFetchingFailure", errors.Wrap(err, "Failed to communicate with API server"))
 	}
 	clusterType := cluster.Status.Provider // the provider detector is more accurate but we can fall back on the driver in some cases
 	if clusterType == "" {
