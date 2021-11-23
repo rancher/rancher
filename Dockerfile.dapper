@@ -5,7 +5,6 @@ ENV HOST_ARCH=${DAPPER_HOST_ARCH} ARCH=${DAPPER_HOST_ARCH}
 ENV CATTLE_HELM_VERSION v2.16.8-rancher1
 ENV CATTLE_MACHINE_VERSION v0.15.0-rancher73
 ENV CATTLE_K3S_VERSION v1.22.3+k3s1
-ENV CATTLE_ETCD_VERSION v3.5.0
 # version used by helm plugin install script
 ENV CATTLE_HELM_UNITTEST_VERSION v0.1.7-rancher3
 # helm 3 version
@@ -41,10 +40,9 @@ ENV HELM_URL_V2_amd64=https://github.com/rancher/helm/releases/download/${CATTLE
     TILLER_URL_amd64=https://github.com/rancher/helm/releases/download/${CATTLE_HELM_VERSION}/rancher-tiller \
     TILLER_URL_arm64=https://github.com/rancher/helm/releases/download/${CATTLE_HELM_VERSION}/rancher-tiller-arm64 \
     TILLER_URL=TILLER_URL_${ARCH} \
-    K3S_URL_amd64=https://github.com/rancher/k3s/releases/download/${CATTLE_K3S_VERSION}/k3s \
-    K3S_URL_arm64=https://github.com/rancher/k3s/releases/download/${CATTLE_K3S_VERSION}/k3s-arm64 \
-    K3S_URL=K3S_URL_${ARCH} \
-    ETCD_URL=https://github.com/etcd-io/etcd/releases/download/${CATTLE_ETCD_VERSION}/etcd-${CATTLE_ETCD_VERSION}-linux-${ARCH}.tar.gz \
+    K3S_DOWNLOAD_URL_amd64=https://github.com/rancher/k3s/releases/download/${CATTLE_K3S_VERSION}/k3s \
+    K3S_DOWNLOAD_URL_arm64=https://github.com/rancher/k3s/releases/download/${CATTLE_K3S_VERSION}/k3s-arm64 \
+    K3S_DOWNLOAD_URL=K3S_DOWNLOAD_URL_${ARCH} \
     KUSTOMIZE_URL=https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize/${KUSTOMIZE_VERSION}/kustomize_${KUSTOMIZE_VERSION}_linux_${ARCH}.tar.gz
 
 RUN curl -sLf ${KUSTOMIZE_URL} | tar -xzf - -C /usr/bin
@@ -64,8 +62,7 @@ RUN mkdir /usr/tmp && \
     mv /usr/tmp/helm /usr/bin/helm_v3 && \
     chmod +x /usr/bin/kustomize
 
-RUN curl -sLf ${!K3S_URL} -o /usr/bin/k3s && \
-    curl -sfL ${ETCD_URL} | tar xvzf - --strip-components=1 -C /usr/bin/ etcd-${CATTLE_ETCD_VERSION}-linux-${ARCH}/etcd && \
+RUN curl -sLf ${!K3S_DOWNLOAD_URL} -o /usr/bin/k3s && \
     chmod +x /usr/bin/k3s && \
     mkdir -p /go/src/github.com/rancher/rancher/.kube && \
     ln -s /etc/rancher/k3s/k3s.yaml /go/src/github.com/rancher/rancher/.kube/k3s.yaml

@@ -672,8 +672,8 @@ github.com/rancher/lasso v0.0.0-20210616224652-fc3ebd901c08 h1:NxR8Fh0eE7/5/5Zvl
 github.com/rancher/lasso v0.0.0-20210616224652-fc3ebd901c08/go.mod h1:9qZd/S8DqWzfKtjKGgSoHqGEByYmUE3qRaBaaAHwfEM=
 github.com/rancher/machine v0.15.0-rancher63/go.mod h1:qXYNumxy0J08MO/mh/jNjyRuEc2QKDLUOZIBE5vxaZE=
 github.com/rancher/norman v0.0.0-20200517050325-f53cae161640/go.mod h1:92rz/7QN7DOeLQZlJY/8aFBOmF085igIVguR0wpxLas=
-github.com/rancher/norman v0.0.0-20211029152448-85ac7aa15a91 h1:qjqrM2IquBZSiFETqpADUxafriXT9i3rzQnyzU74/oE=
-github.com/rancher/norman v0.0.0-20211029152448-85ac7aa15a91/go.mod h1:hhnf77V2lmZD7cvUqi4vTBpIs3KpHNL/AmuN0MqEClI=
+github.com/rancher/norman v0.0.0-20211103153832-33e911789833 h1:faXz+Jc4w9UCHrGB/8tVzmEaXMWpKAij3bDOdfnClRs=
+github.com/rancher/norman v0.0.0-20211103153832-33e911789833/go.mod h1:hhnf77V2lmZD7cvUqi4vTBpIs3KpHNL/AmuN0MqEClI=
 github.com/rancher/rke v1.3.3-rc2.0.20211119212717-6f1661aaa9c7 h1:rStN/aIp7vcYy5jSd99Xy5XW9ywlgWlxN4wpkn3eCvY=
 github.com/rancher/rke v1.3.3-rc2.0.20211119212717-6f1661aaa9c7/go.mod h1:4StVBXSN7EbrfoWE7nI2AAf/N1td8qSyQMDRyR6nGAg=
 github.com/rancher/wrangler v0.6.2-0.20200427172034-da9b142ae061/go.mod h1:n5Du/gGD7WoiqnEo0SHnPirDIp1V9Zu+6guc8lXS2dk=
