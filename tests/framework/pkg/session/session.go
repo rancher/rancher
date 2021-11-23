@@ -35,8 +35,8 @@ func (ts *Session) RegisterCleanupFunc(f CleanupFunc) {
 func (ts *Session) Cleanup() {
 	ts.open = false
 
-	for _, f := range ts.cleanupQueue {
-		err := f()
+	for i := len(ts.cleanupQueue) - 1; i >= 0; i-- {
+		err := ts.cleanupQueue[i]()
 		if err != nil {
 			ts.testingT.Logf("error calling cleanup function: %v", err)
 		}

@@ -56,8 +56,13 @@ type ResourceClient struct {
 }
 
 func (c *ResourceClient) Create(ctx context.Context, obj *unstructured.Unstructured, opts metav1.CreateOptions, subresources ...string) (*unstructured.Unstructured, error) {
+	unstructuredObj, err := c.ResourceInterface.Create(ctx, obj, opts, subresources...)
+	if err != nil {
+		return nil, err
+	}
+
 	c.ts.RegisterCleanupFunc(func() error {
-		err := c.Delete(context.TODO(), obj.GetName(), metav1.DeleteOptions{}, subresources...)
+		err := c.Delete(context.TODO(), unstructuredObj.GetName(), metav1.DeleteOptions{}, subresources...)
 		if errors.IsNotFound(err) {
 			return nil
 		}
@@ -65,5 +70,5 @@ func (c *ResourceClient) Create(ctx context.Context, obj *unstructured.Unstructu
 		return err
 	})
 
-	return c.ResourceInterface.Create(ctx, obj, opts, subresources...)
+	return unstructuredObj, err
 }

@@ -1,10 +1,24 @@
 package clusters
 
 import (
+	"context"
+	"fmt"
+
 	apisV1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
+	"github.com/rancher/rancher/tests/framework/clients/rancher"
+	"github.com/rancher/rancher/tests/framework/pkg/wait"
+	"github.com/rancher/rancher/tests/integration/pkg/defaults"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/watch"
 )
+
+func IsProvisioningClusterReady(event watch.Event) (ready bool, err error) {
+	cluster := event.Object.(*apisV1.Cluster)
+
+	ready = cluster.Status.Ready
+	return ready, nil
+}
 
 func NewRKE2ClusterConfig(clusterName, namespace, cni, cloudCredentialSecretName, kubernetesVersion string, machinePools []apisV1.RKEMachinePool) *apisV1.Cluster {
 	typeMeta := metav1.TypeMeta{
@@ -77,4 +91,33 @@ func NewRKE2ClusterConfig(clusterName, namespace, cni, cloudCredentialSecretName
 	}
 
 	return v1Cluster
+}
+
+func CreateRKE2Cluster(client *rancher.Client, rke2Cluster *apisV1.Cluster) (*apisV1.Cluster, error) {
+	client.Session.RegisterCleanupFunc(func() error {
+		err := client.Provisioning.Clusters(rke2Cluster.Namespace).Delete(context.TODO(), rke2Cluster.GetName(), metav1.DeleteOptions{})
+		if err != nil {
+			return err
+		}
+
+		watchInterface, err := client.Provisioning.Clusters(rke2Cluster.Namespace).Watch(context.TODO(), metav1.ListOptions{
+			FieldSelector:  "metadata.name=" + rke2Cluster.GetName(),
+			TimeoutSeconds: &defaults.WatchTimeoutSeconds,
+		})
+
+		if err != nil {
+			return err
+		}
+
+		return wait.WatchWait(watchInterface, func(event watch.Event) (ready bool, err error) {
+			if event.Type == watch.Error {
+				return false, fmt.Errorf("there was an error deleting cluster")
+			} else if event.Type == watch.Deleted {
+				return true, nil
+			}
+			return false, nil
+		})
+	})
+
+	return client.Provisioning.Clusters(rke2Cluster.Namespace).Create(context.TODO(), rke2Cluster, metav1.CreateOptions{})
 }
