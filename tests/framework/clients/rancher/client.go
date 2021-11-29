@@ -7,8 +7,9 @@ import (
 
 	frameworkDynamic "github.com/rancher/rancher/tests/framework/clients/dynamic"
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
-	provisioning "github.com/rancher/rancher/tests/framework/clients/rancher/provisioning"
+	"github.com/rancher/rancher/tests/framework/clients/rancher/provisioning"
 	"github.com/rancher/rancher/tests/framework/pkg/clientbase"
+	"github.com/rancher/rancher/tests/framework/pkg/config"
 	"github.com/rancher/rancher/tests/framework/pkg/session"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -25,7 +26,14 @@ type Client struct {
 	Session       *session.Session
 }
 
-func NewClient(bearerToken string, rancherConfig *Config, session *session.Session) (*Client, error) {
+func NewClient(bearerToken string, session *session.Session) (*Client, error) {
+	rancherConfig := new(Config)
+	config.LoadConfig(ConfigurationFileKey, rancherConfig)
+
+	if bearerToken == "" {
+		bearerToken = rancherConfig.AdminToken
+	}
+
 	c := &Client{
 		RancherConfig: rancherConfig,
 	}
@@ -53,7 +61,7 @@ func NewClient(bearerToken string, rancherConfig *Config, session *session.Sessi
 
 func newRestConfig(bearerToken string, rancherConfig *Config) *rest.Config {
 	return &rest.Config{
-		Host:        rancherConfig.RancherHost,
+		Host:        rancherConfig.Host,
 		BearerToken: bearerToken,
 		TLSClientConfig: rest.TLSClientConfig{
 			Insecure: *rancherConfig.Insecure,
@@ -64,7 +72,7 @@ func newRestConfig(bearerToken string, rancherConfig *Config) *rest.Config {
 
 func clientOpts(restConfig *rest.Config, rancherConfig *Config) *clientbase.ClientOpts {
 	return &clientbase.ClientOpts{
-		URL:      fmt.Sprintf("https://%s/v3", rancherConfig.RancherHost),
+		URL:      fmt.Sprintf("https://%s/v3", rancherConfig.Host),
 		TokenKey: restConfig.BearerToken,
 		Insecure: restConfig.Insecure,
 		CACerts:  rancherConfig.CACerts,
@@ -81,7 +89,7 @@ func (c *Client) AsUser(user *management.User) (*Client, error) {
 		return nil, err
 	}
 
-	return NewClient(returnedToken.Token, c.RancherConfig, c.Session)
+	return NewClient(returnedToken.Token, c.Session)
 }
 
 // GetRancherDynamicClient is a helper function that instantiates a dynamic client to communicate with the rancher host.
@@ -109,5 +117,5 @@ func (c *Client) GetManagementWatchInterface(schemaType string, opts metav1.List
 		return nil, err
 	}
 
-	return dynamicClient.Resource(groupVersionResource).Namespace("").Watch(context.TODO(), opts)
+	return dynamicClient.Resource(groupVersionResource).Watch(context.TODO(), opts)
 }

@@ -13,6 +13,11 @@ import (
 func LoadConfig(key string, config interface{}) {
 	configPath := os.Getenv("CATTLE_TEST_CONFIG")
 
+	if configPath == "" {
+		yaml.Unmarshal([]byte("{}"), config)
+		return
+	}
+
 	allString, err := ioutil.ReadFile(configPath)
 	if err != nil {
 		panic(err)
