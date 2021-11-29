@@ -20,6 +20,9 @@ func WatchWait(watchInterface watch.Interface, check WatchCheckFunc) error {
 			if !open {
 				return fmt.Errorf("timeout waiting on condition")
 			}
+			if event.Type == watch.Error {
+				return fmt.Errorf("error with watch connection")
+			}
 
 			done, err := check(event)
 			if err != nil {
