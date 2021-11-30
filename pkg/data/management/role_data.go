@@ -199,10 +199,12 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 		addRule().apiGroups("management.cattle.io").resources("clusterroletemplatebindings").verbs("get", "list", "watch")
 
 	rb.addRoleTemplate("Manage Cluster Catalogs", "clustercatalogs-manage", "cluster", false, false, true).
-		addRule().apiGroups("management.cattle.io").resources("clustercatalogs").verbs("*")
+		addRule().apiGroups("management.cattle.io").resources("clustercatalogs").verbs("*").
+		addRule().apiGroups("catalog.cattle.io").resources("clusterrepos").verbs("*")
 
 	rb.addRoleTemplate("View Cluster Catalogs", "clustercatalogs-view", "cluster", false, false, false).
-		addRule().apiGroups("management.cattle.io").resources("clustercatalogs").verbs("get", "list", "watch")
+		addRule().apiGroups("management.cattle.io").resources("clustercatalogs").verbs("get", "list", "watch").
+		addRule().apiGroups("catalog.cattle.io").resources("clusterrepos").verbs("get", "list", "watch")
 
 	rb.addRoleTemplate("Manage Cluster Backups", "backups-manage", "cluster", false, false, false).
 		addRule().apiGroups("management.cattle.io").resources("etcdbackups").verbs("*")
