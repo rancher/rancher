@@ -64,6 +64,9 @@ ingress:
   # configurationSnippet: |
   #   more_set_input_headers "X-Forwarded-Host: {{ .Values.hostname }}";
 
+  # className can be set to specify which IngressClass will be used by the created Ingress
+  className: ""
+
   tls:
     # options: rancher, letsEncrypt, secret
     source: rancher

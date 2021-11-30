@@ -36,6 +36,9 @@ metadata:
 {{ toYaml .Values.ingress.extraAnnotations | indent 4 }}
 {{- end }}
 spec:
+{{- if .Values.ingress.className }}
+  ingressClassName: {{ .Values.ingress.className }}
+{{- end }}
   rules:
   - host: {{ .Values.hostname }}  # hostname to access rancher server
     http:
