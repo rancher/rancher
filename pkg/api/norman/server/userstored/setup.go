@@ -27,7 +27,6 @@ import (
 	clusterClient "github.com/rancher/rancher/pkg/client/generated/cluster/v3"
 	client "github.com/rancher/rancher/pkg/client/generated/project/v3"
 	"github.com/rancher/rancher/pkg/clustermanager"
-	"github.com/rancher/rancher/pkg/ingresswrapper"
 	clusterschema "github.com/rancher/rancher/pkg/schemas/cluster.cattle.io/v3"
 	schema "github.com/rancher/rancher/pkg/schemas/project.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
@@ -42,11 +41,7 @@ func Setup(ctx context.Context, mgmt *config.ScaledContext, clusterManager *clus
 	addProxyStore(ctx, schemas, mgmt, client.CronJobType, "batch/v1beta1", workload.NewCustomizeStore)
 	addProxyStore(ctx, schemas, mgmt, client.DaemonSetType, "apps/v1", workload.NewCustomizeStore)
 	addProxyStore(ctx, schemas, mgmt, client.DeploymentType, "apps/v1", workload.NewCustomizeStore)
-	if ingresswrapper.ServerSupportsIngressV1(mgmt.K8sClient) {
-		addProxyStore(ctx, schemas, mgmt, client.IngressType, "networking.k8s.io/v1", ingress.Wrap)
-	} else {
-		addProxyStore(ctx, schemas, mgmt, client.IngressType, "extensions/v1beta1", ingress.Wrap)
-	}
+	addProxyStore(ctx, schemas, mgmt, client.IngressType, "networking.k8s.io/v1", ingress.Wrap(clusterManager, mgmt))
 	addProxyStore(ctx, schemas, mgmt, client.JobType, "batch/v1", workload.NewCustomizeStore)
 	addProxyStore(ctx, schemas, mgmt, client.PersistentVolumeClaimType, "v1", nil)
 	addProxyStore(ctx, schemas, mgmt, client.PodType, "v1", func(store types.Store) types.Store {
