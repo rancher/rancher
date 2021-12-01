@@ -359,7 +359,8 @@ func (v *Validator) validateAKSConfig(request *types.APIContext, cluster map[str
 	}
 
 	// check user's access to cloud credential
-	if azureCredential, ok := aksConfig["azureCredentialSecret"].(string); ok {
+	if azureCredential, ok := aksConfig["azureCredentialSecret"].(string); ok && (prevCluster == nil || azureCredential != prevCluster.Spec.AKSConfig.AzureCredentialSecret) {
+		// Only check that the user has access to the credential if the credential is being changed.
 		if err := validateCredentialAuth(request, azureCredential); err != nil {
 			return err
 		}
@@ -503,7 +504,8 @@ func (v *Validator) validateEKSConfig(request *types.APIContext, cluster map[str
 	}
 
 	// check user's access to cloud credential
-	if amazonCredential, ok := eksConfig["amazonCredentialSecret"].(string); ok {
+	if amazonCredential, ok := eksConfig["amazonCredentialSecret"].(string); ok && (prevCluster == nil || amazonCredential != prevCluster.Spec.EKSConfig.AmazonCredentialSecret) {
+		// Only check that the user has access to the credential if the credential is being changed.
 		if err := validateCredentialAuth(request, amazonCredential); err != nil {
 			return err
 		}
@@ -682,7 +684,8 @@ func (v *Validator) validateGKEConfig(request *types.APIContext, cluster map[str
 	}
 
 	// check user's access to cloud credential
-	if googleCredential, ok := gkeConfig["googleCredentialSecret"].(string); ok {
+	if googleCredential, ok := gkeConfig["googleCredentialSecret"].(string); ok && (prevCluster == nil || googleCredential != prevCluster.Spec.GKEConfig.GoogleCredentialSecret) {
+		// Only check that the user has access to the credential if the credential is being changed.
 		if err := validateCredentialAuth(request, googleCredential); err != nil {
 			return err
 		}
