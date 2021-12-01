@@ -11,6 +11,7 @@ import (
 	"github.com/rancher/rancher/tests/framework/pkg/wait"
 	"github.com/rancher/rancher/tests/integration/pkg/defaults"
 	coreV1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/watch"
@@ -61,6 +62,9 @@ func CreateNamespace(client *rancher.Client, namespaceName, containerDefaultReso
 
 	client.Session.RegisterCleanupFunc(func() error {
 		err := namespaceResource.Delete(context.TODO(), unstructuredResp.GetName(), metav1.DeleteOptions{})
+		if errors.IsNotFound(err) {
+			return nil
+		}
 		if err != nil {
 			return err
 		}

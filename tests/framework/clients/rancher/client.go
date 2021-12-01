@@ -92,6 +92,10 @@ func (c *Client) AsUser(user *management.User) (*Client, error) {
 	return NewClient(returnedToken.Token, c.Session)
 }
 
+func (c *Client) WithSession(session *session.Session) (*Client, error) {
+	return NewClient(c.restConfig.BearerToken, session)
+}
+
 // GetRancherDynamicClient is a helper function that instantiates a dynamic client to communicate with the rancher host.
 func (c *Client) GetRancherDynamicClient() (dynamic.Interface, error) {
 	dynamic, err := frameworkDynamic.NewForConfig(c.Session, c.restConfig)
