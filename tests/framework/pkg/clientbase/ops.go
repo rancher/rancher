@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"reflect"
 	"regexp"
+	"strings"
 
 	"github.com/gorilla/websocket"
 	"github.com/pkg/errors"
@@ -204,7 +205,11 @@ func (a *APIOperations) DoCreate(schemaType string, createObj interface{}, respO
 
 	a.Session.RegisterCleanupFunc(func() error {
 		obj := resource.Interface().(types.Resource)
-		return a.DoResourceDelete(schemaType, &obj)
+		err := a.DoResourceDelete(schemaType, &obj)
+		if err != nil && strings.Contains(err.Error(), "404 Not Found") {
+			return nil
+		}
+		return err
 	})
 
 	return err

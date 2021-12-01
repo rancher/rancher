@@ -34,13 +34,13 @@ func (ts *Session) RegisterCleanupFunc(f CleanupFunc) {
 // Cleanup this method will call all registered cleanup functions in order and close the test session.
 func (ts *Session) Cleanup() {
 	ts.open = false
-
 	for i := len(ts.cleanupQueue) - 1; i >= 0; i-- {
 		err := ts.cleanupQueue[i]()
 		if err != nil {
 			ts.testingT.Logf("error calling cleanup function: %v", err)
 		}
 	}
+	ts.cleanupQueue = []CleanupFunc{}
 }
 
 // NewSession returns a `Session` who's cleanup method is registered with this `Session`
