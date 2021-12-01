@@ -57,12 +57,12 @@ func (t *templateStore) extractVersionLinks(apiContext *types.APIContext, resour
 	r := map[string]interface{}{}
 	versionMaps, ok := resource[client.CatalogTemplateFieldVersions].([]interface{})
 	if ok {
-		for _, version := range versionMaps {
+		for _, versionData := range versionMaps {
 			revision := ""
-			if v, ok := version.(map[string]interface{})["revision"].(int64); ok {
+			if v, ok := versionData.(map[string]interface{})["revision"].(int64); ok {
 				revision = strconv.FormatInt(v, 10)
 			}
-			versionString, ok := version.(map[string]interface{})["version"].(string)
+			versionString, ok := versionData.(map[string]interface{})["version"].(string)
 			if !ok {
 				logrus.Trace("[templateStore] failed type assertion for field \"version\" for CatalogTemplateFieldVersion")
 				continue
@@ -71,8 +71,14 @@ func (t *templateStore) extractVersionLinks(apiContext *types.APIContext, resour
 			if revision != "" {
 				versionID = fmt.Sprintf("%v-%v", resource["id"], revision)
 			}
-			if t.isTemplateVersionCompatible(apiContext.Query.Get("clusterName"), version.(map[string]interface{})["externalId"].(string)) {
-				r[versionString] = apiContext.URLBuilder.ResourceLinkByID(schema, versionID)
+			versionLink := apiContext.URLBuilder.ResourceLinkByID(schema, versionID)
+			currentVersion := apiContext.Query.Get("currentVersion")
+			if currentVersion != "" && currentVersion == versionString {
+				r[versionString] = versionLink
+				continue
+			}
+			if t.isTemplateVersionCompatible(apiContext.Query.Get("clusterName"), versionData.(map[string]interface{})["externalId"].(string)) {
+				r[versionString] = versionLink
 			}
 		}
 	}
