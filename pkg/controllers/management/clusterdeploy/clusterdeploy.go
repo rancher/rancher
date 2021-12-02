@@ -16,6 +16,7 @@ import (
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	util "github.com/rancher/rancher/pkg/cluster"
 	"github.com/rancher/rancher/pkg/clustermanager"
+	"github.com/rancher/rancher/pkg/controllers/management/clusterconnected"
 	"github.com/rancher/rancher/pkg/features"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/image"
@@ -90,6 +91,10 @@ func (cd *clusterDeploy) sync(key string, cluster *v3.Cluster) (runtime.Object, 
 			return nil, err
 		}
 		return nil, nil
+	}
+
+	if cluster.Status.Driver == v32.ClusterDriverImported && clusterconnected.Connected.IsFalse(cluster) {
+		return cluster, nil
 	}
 
 	original := cluster
@@ -238,8 +243,8 @@ func redeployAgent(cluster *v3.Cluster, desiredAgent, desiredAuth string, desire
 		return true
 	}
 
-	if !reflect.DeepEqual(cluster.Spec.AgentEnvVars, cluster.Status.AppliedAgentEnvVars) {
-		logrus.Infof("clusterDeploy: redeployAgent: redeploy Rancher agents due to agent env vars mismatched for [%s], was [%v] and will be [%v]", cluster.Name, cluster.Spec.AgentEnvVars, cluster.Status.AppliedAgentEnvVars)
+	if !reflect.DeepEqual(append(settings.DefaultAgentSettingsAsEnvVars(), cluster.Spec.AgentEnvVars...), cluster.Status.AppliedAgentEnvVars) {
+		logrus.Infof("clusterDeploy: redeployAgent: redeploy Rancher agents due to agent env vars mismatched for [%s], was [%v] and will be [%v]", cluster.Name, cluster.Status.AppliedAgentEnvVars, cluster.Spec.AgentEnvVars)
 		return true
 	}
 
@@ -383,7 +388,8 @@ func (cd *clusterDeploy) deployAgent(cluster *v3.Cluster) error {
 	if cluster.Annotations[AgentForceDeployAnn] == "true" {
 		cluster.Annotations[AgentForceDeployAnn] = "false"
 	}
-	cluster.Status.AppliedAgentEnvVars = cluster.Spec.AgentEnvVars
+
+	cluster.Status.AppliedAgentEnvVars = append(settings.DefaultAgentSettingsAsEnvVars(), cluster.Spec.AgentEnvVars...)
 
 	return nil
 }
@@ -444,7 +450,7 @@ func (cd *clusterDeploy) getYAML(cluster *v3.Cluster, agentImage, authImage stri
 }
 
 func (cd *clusterDeploy) getClusterAgentImage(name string) (string, error) {
-	uc, err := cd.clusterManager.UserContext(name)
+	uc, err := cd.clusterManager.UserContextNoControllers(name)
 	if err != nil {
 		return "", err
 	}
@@ -467,7 +473,7 @@ func (cd *clusterDeploy) getClusterAgentImage(name string) (string, error) {
 }
 
 func (cd *clusterDeploy) getNodeAgentImage(name string) (string, error) {
-	uc, err := cd.clusterManager.UserContext(name)
+	uc, err := cd.clusterManager.UserContextNoControllers(name)
 	if err != nil {
 		return "", err
 	}

@@ -2,8 +2,11 @@ package config
 
 import (
 	"context"
+	"sync"
 	"time"
 
+	"github.com/rancher/lasso/pkg/cache"
+	"github.com/rancher/lasso/pkg/client"
 	"github.com/rancher/lasso/pkg/controller"
 	"github.com/rancher/norman/objectclient/dynamic"
 	"github.com/rancher/norman/restwatch"
@@ -41,6 +44,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	k8dynamic "k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -98,6 +102,13 @@ type ScaleContextOptions struct {
 	ControllerFactory controller.SharedControllerFactory
 }
 
+func enableProtobuf(cfg *rest.Config) *rest.Config {
+	cpy := rest.CopyConfig(cfg)
+	cpy.AcceptContentTypes = "application/vnd.kubernetes.protobuf, application/json"
+	cpy.ContentType = "application/json"
+	return cpy
+}
+
 func NewScaledContext(config rest.Config, opts *ScaleContextOptions) (*ScaledContext, error) {
 	var err error
 
@@ -110,7 +121,7 @@ func NewScaledContext(config rest.Config, opts *ScaleContextOptions) (*ScaledCon
 	}
 
 	if opts.ControllerFactory == nil {
-		controllerFactory, err := controller.NewSharedControllerFactoryFromConfig(&context.RESTConfig, wrangler.Scheme)
+		controllerFactory, err := controller.NewSharedControllerFactoryFromConfig(enableProtobuf(&context.RESTConfig), wrangler.Scheme)
 		if err != nil {
 			return nil, err
 		}
@@ -224,7 +235,47 @@ type UserContext struct {
 	Storage        storagev1.Interface
 	Policy         policyv1beta1.Interface
 
-	RBACw wrbacv1.Interface
+	RBACw          wrbacv1.Interface
+	KindNamespaces map[schema.GroupVersionKind]string
+}
+
+func (w *UserContext) DeferredStart(ctx context.Context, register func(ctx context.Context) error) func() error {
+	var (
+		startLock sync.Mutex
+		started   = false
+	)
+
+	return func() error {
+		startLock.Lock()
+		defer startLock.Unlock()
+
+		if started {
+			return nil
+		}
+
+		cancelCtx, cancel := context.WithCancel(ctx)
+		transaction := controller.NewHandlerTransaction(cancelCtx)
+		if err := register(transaction); err != nil {
+			cancel()
+			transaction.Rollback()
+			return err
+		}
+
+		if err := w.Start(cancelCtx); err != nil {
+			cancel()
+			transaction.Rollback()
+			return err
+		}
+
+		transaction.Commit()
+		started = true
+		go func() {
+			// this is make go vet happy that we aren't leaking a context
+			<-ctx.Done()
+			cancel()
+		}()
+		return nil
+	}
 }
 
 func (w *UserContext) UserOnlyContext() *UserOnlyContext {
@@ -241,6 +292,7 @@ func (w *UserContext) UserOnlyContext() *UserOnlyContext {
 		Core:         w.Core,
 		RBAC:         w.RBAC,
 		Extensions:   w.Extensions,
+		Networking:   w.Networking,
 		BatchV1:      w.BatchV1,
 		BatchV1Beta1: w.BatchV1Beta1,
 		Monitoring:   w.Monitoring,
@@ -268,6 +320,7 @@ type UserOnlyContext struct {
 	Extensions      extv1beta1.Interface
 	BatchV1         batchv1.Interface
 	BatchV1Beta1    batchv1beta1.Interface
+	Networking      knetworkingv1.Interface
 	Monitoring      monitoringv1.Interface
 	Cluster         clusterv3.Interface
 	Istio           istiov1alpha3.Interface
@@ -352,9 +405,10 @@ func newManagementContext(c *ScaledContext) (*ManagementContext, error) {
 func NewUserContext(scaledContext *ScaledContext, config rest.Config, clusterName string) (*UserContext, error) {
 	var err error
 	context := &UserContext{
-		RESTConfig:  *steve.RestConfigDefaults(&config),
-		ClusterName: clusterName,
-		runContext:  scaledContext.RunContext,
+		RESTConfig:     *steve.RestConfigDefaults(&config),
+		ClusterName:    clusterName,
+		runContext:     scaledContext.RunContext,
+		KindNamespaces: map[schema.GroupVersionKind]string{},
 	}
 
 	context.Management, err = scaledContext.NewManagementContext()
@@ -362,10 +416,18 @@ func NewUserContext(scaledContext *ScaledContext, config rest.Config, clusterNam
 		return nil, err
 	}
 
-	controllerFactory, err := controller.NewSharedControllerFactoryFromConfig(&context.RESTConfig, wrangler.Scheme)
+	clientFactory, err := client.NewSharedClientFactory(enableProtobuf(&context.RESTConfig), &client.SharedClientFactoryOptions{
+		Scheme: wrangler.Scheme,
+	})
 	if err != nil {
 		return nil, err
 	}
+
+	cacheFactory := cache.NewSharedCachedFactory(clientFactory, &cache.SharedCacheFactoryOptions{
+		KindNamespace: context.KindNamespaces,
+	})
+
+	controllerFactory := controller.NewSharedControllerFactory(cacheFactory, nil)
 	context.ControllerFactory = controllerFactory
 
 	context.K8sClient, err = kubernetes.NewForConfig(&config)
@@ -514,6 +576,11 @@ func NewUserOnlyContext(config *wrangler.Context) (*UserOnlyContext, error) {
 	}
 
 	context.RBAC, err = rbacv1.NewFromControllerFactory(context.ControllerFactory)
+	if err != nil {
+		return nil, err
+	}
+
+	context.Networking, err = knetworkingv1.NewFromControllerFactory(context.ControllerFactory)
 	if err != nil {
 		return nil, err
 	}

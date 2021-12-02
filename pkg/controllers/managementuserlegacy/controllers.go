@@ -7,10 +7,8 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/managementuserlegacy/alert"
 	"github.com/rancher/rancher/pkg/controllers/managementuserlegacy/approuter"
 	"github.com/rancher/rancher/pkg/controllers/managementuserlegacy/cis"
-	"github.com/rancher/rancher/pkg/controllers/managementuserlegacy/endpoints"
 	"github.com/rancher/rancher/pkg/controllers/managementuserlegacy/globaldns"
 	"github.com/rancher/rancher/pkg/controllers/managementuserlegacy/helm"
-	"github.com/rancher/rancher/pkg/controllers/managementuserlegacy/ingresshostgen"
 	"github.com/rancher/rancher/pkg/controllers/managementuserlegacy/istio"
 	"github.com/rancher/rancher/pkg/controllers/managementuserlegacy/logging"
 	"github.com/rancher/rancher/pkg/controllers/managementuserlegacy/monitoring"
@@ -26,13 +24,11 @@ func Register(ctx context.Context, cluster *config.UserContext, clusterRec *mana
 	cis.Register(ctx, cluster)
 	pipeline.Register(ctx, cluster)
 	systemimage.Register(ctx, cluster)
-	endpoints.Register(ctx, cluster)
 	approuter.Register(ctx, cluster)
 	alert.Register(ctx, cluster)
 	globaldns.Register(ctx, cluster)
 	monitoring.Register(ctx, cluster)
 	istio.Register(ctx, cluster)
-	ingresshostgen.Register(ctx, cluster.UserOnlyContext())
 
 	// register controller for API
 	cluster.APIAggregation.APIServices("").Controller()

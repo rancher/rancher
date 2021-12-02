@@ -1,9 +1,13 @@
 package rancher
 
 import (
+	"bytes"
+
 	"github.com/mcuadros/go-version"
+	"github.com/rancher/norman/condition"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/tokens"
+	fleetconst "github.com/rancher/rancher/pkg/fleet"
 	v3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	rancherversion "github.com/rancher/rancher/pkg/version"
 	controllerv1 "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
@@ -13,14 +17,19 @@ import (
 	k8serror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/client-go/util/retry"
 )
 
 const (
 	cattleNamespace                           = "cattle-system"
 	forceUpgradeLogoutConfig                  = "forceupgradelogout"
 	forceLocalSystemAndDefaultProjectCreation = "forcelocalprojectcreation"
+	forceSystemNamespacesAssignment           = "forcesystemnamespaceassignment"
 	rancherVersionKey                         = "rancherVersion"
 	projectsCreatedKey                        = "projectsCreated"
+	namespacesAssignedKey                     = "namespacesAssigned"
+	caSecretName                              = "tls-ca-additional"
+	caSecretField                             = "ca-additional.pem"
 )
 
 func getConfigMap(configMapController controllerv1.ConfigMapController, configMapName string) (*v1.ConfigMap, error) {
@@ -103,7 +112,7 @@ func forceUpgradeLogout(configMapController controllerv1.ConfigMapController, to
 	return createOrUpdateConfigMap(configMapController, cm)
 }
 
-// forceSystemAndDefaultProjectCreation will set the correcsponding conditions on the local cluster object,
+// forceSystemAndDefaultProjectCreation will set the corresponding conditions on the local cluster object,
 // if it exists, to Unknown. This will force the corresponding controller to check that the projects exist
 // and create them, if necessary.
 func forceSystemAndDefaultProjectCreation(configMapController controllerv1.ConfigMapController, clusterClient v3.ClusterClient) error {
@@ -134,4 +143,88 @@ func forceSystemAndDefaultProjectCreation(configMapController controllerv1.Confi
 
 	cm.Data[projectsCreatedKey] = "true"
 	return createOrUpdateConfigMap(configMapController, cm)
+}
+
+// copyCAAdditionalSecret will ensure that if a secret named tls-ca-additional exists in the cattle-system namespace
+// then this secret also exists in the fleet-default namespace. This is because the machine creation and deletion jobs
+// need to have access to this secret as well.
+func copyCAAdditionalSecret(secretClient controllerv1.SecretClient) error {
+	cattleSecret, err := secretClient.Get("cattle-system", caSecretName, metav1.GetOptions{})
+	if err != nil {
+		if k8serror.IsNotFound(err) {
+			return nil
+		}
+		return err
+	}
+
+	fleetSecret, err := secretClient.Get(fleetconst.ClustersDefaultNamespace, caSecretName, metav1.GetOptions{})
+	if err != nil {
+		if !k8serror.IsNotFound(err) {
+			return err
+		}
+		fleetSecret.Name = cattleSecret.Name
+		fleetSecret.Namespace = fleetconst.ClustersDefaultNamespace
+	} else if bytes.Equal(fleetSecret.Data[caSecretField], cattleSecret.Data[caSecretField]) {
+		// Both secrets contain the same data.
+		return nil
+	}
+
+	fleetSecret.Data = cattleSecret.Data
+
+	if err != nil {
+		// In this case, the fleetSecret doesn't exist yet.
+		_, err = secretClient.Create(fleetSecret)
+	} else {
+		_, err = secretClient.Update(fleetSecret)
+	}
+
+	return err
+
+}
+
+func forceSystemNamespaceAssignment(configMapController controllerv1.ConfigMapController, projectClient v3.ProjectClient) error {
+	cm, err := getConfigMap(configMapController, forceSystemNamespacesAssignment)
+	if err != nil || cm == nil {
+		return err
+	}
+
+	if cm.Data[namespacesAssignedKey] == rancherversion.Version {
+		return nil
+	}
+
+	err = applyProjectConditionForNamespaceAssignment("authz.management.cattle.io/system-project=true", v32.ProjectConditionSystemNamespacesAssigned, projectClient)
+	if err != nil {
+		return err
+	}
+	err = applyProjectConditionForNamespaceAssignment("authz.management.cattle.io/default-project=true", v32.ProjectConditionDefaultNamespacesAssigned, projectClient)
+	if err != nil {
+		return err
+	}
+
+	cm.Data[namespacesAssignedKey] = rancherversion.Version
+	return createOrUpdateConfigMap(configMapController, cm)
+}
+
+func applyProjectConditionForNamespaceAssignment(label string, condition condition.Cond, projectClient v3.ProjectClient) error {
+	projects, err := projectClient.List("", metav1.ListOptions{LabelSelector: label})
+	if err != nil {
+		return err
+	}
+
+	for i := range projects.Items {
+		if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+			p := &projects.Items[i]
+			p, err = projectClient.Get(p.Namespace, p.Name, metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+
+			condition.Unknown(p)
+			_, err = projectClient.Update(p)
+			return err
+		}); err != nil {
+			return err
+		}
+	}
+	return nil
 }

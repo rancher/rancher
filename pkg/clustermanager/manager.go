@@ -62,11 +62,11 @@ type record struct {
 	cancel        context.CancelFunc
 }
 
-func NewManager(httpsPort int, context *config.ScaledContext, rbacControllers rbacv1.Interface, asl accesscontrol.AccessSetLookup) *Manager {
+func NewManager(httpsPort int, context *config.ScaledContext, asl accesscontrol.AccessSetLookup) *Manager {
 	return &Manager{
 		httpsPort:     httpsPort,
 		ScaledContext: context,
-		accessControl: rbac.NewAccessControlWithASL("", rbacControllers, asl),
+		accessControl: rbac.NewAccessControlWithASL("", asl),
 		clusterLister: context.Management.Clusters("").Controller().Lister(),
 		clusters:      context.Management.Clusters(""),
 		startSem:      semaphore.NewWeighted(int64(settings.ClusterControllerStartCount.GetInt())),
@@ -232,7 +232,7 @@ func (m *Manager) doStart(rec *record, clusterOwner bool) (exit error) {
 		defer close(done)
 
 		logrus.Debugf("[clustermanager] creating AccessControl for cluster %v", rec.cluster.ClusterName)
-		rec.accessControl = rbac.NewAccessControl(rec.ctx, rec.cluster.ClusterName, rec.cluster.RBACw)
+		rec.accessControl = rbac.NewAccessControl(transaction, rec.cluster.ClusterName, rec.cluster.RBACw)
 
 		err := rec.cluster.Start(rec.ctx)
 		if err == nil {
@@ -447,6 +447,20 @@ func (m *Manager) APIExtClient(apiContext *types.APIContext, storageContext type
 	return m.ScaledContext.APIExtClient, nil
 }
 
+// UserContextNoControllers accepts a cluster name and returns a client for that cluster,
+// no controllers are started for that cluster in the process.
+func (m *Manager) UserContextNoControllers(clusterName string) (*config.UserContext, error) {
+	cluster, err := m.clusterLister.Get("", clusterName)
+	if err != nil {
+		return nil, err
+	}
+	ctx, err := m.UserContextFromCluster(cluster)
+	if ctx == nil && err == nil {
+		return nil, fmt.Errorf("cluster context %s is unavaiblable", clusterName)
+	}
+	return ctx, err
+}
+
 // UserContext accepts a cluster name and returns a client for that cluster,
 // starting all controllers for that cluster in the process.
 func (m *Manager) UserContext(clusterName string) (*config.UserContext, error) {
@@ -565,7 +579,7 @@ func (m *Manager) GetHTTPSPort() int {
 
 func (m *Manager) SubjectAccessReviewForCluster(req *http.Request) (authv1.SubjectAccessReviewInterface, error) {
 	clusterID := clusterrouter.GetClusterID(req)
-	userContext, err := m.UserContext(clusterID)
+	userContext, err := m.UserContextNoControllers(clusterID)
 	if err != nil {
 		return nil, err
 	}

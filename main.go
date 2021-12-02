@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"log"
 	"net/http"
@@ -216,7 +215,7 @@ func migrateETCDlocal() {
 func run(cli *cli.Context, cfg rancher.Options) error {
 	logrus.Infof("Rancher version %s is starting", version.FriendlyVersion())
 	logrus.Infof("Rancher arguments %+v", cfg)
-	ctx := signals.SetupSignalHandler(context.Background())
+	ctx := signals.SetupSignalContext()
 
 	if cfg.AddLocal != "true" && cfg.AddLocal != "auto" {
 		logrus.Fatal("add-local flag must be set to 'true', see Rancher 2.5.0 release notes for more information")

@@ -22,14 +22,15 @@ type RKEClusterStatus struct {
 }
 
 type RKEClusterSpecCommon struct {
-	LocalClusterAuthEndpoint LocalClusterAuthEndpoint `json:"localClusterAuthEndpoint,omitempty"`
-	UpgradeStrategy          ClusterUpgradeStrategy   `json:"upgradeStrategy,omitempty"`
-	ChartValues              GenericMap               `json:"chartValues,omitempty" wrangler:"nullable"`
-	MachineGlobalConfig      GenericMap               `json:"machineGlobalConfig,omitempty" wrangler:"nullable"`
-	MachineSelectorConfig    []RKESystemConfig        `json:"machineSelectorConfig,omitempty"`
-	AdditionalManifest       string                   `json:"additionalManifest,omitempty"`
-	Registries               *Registry                `json:"registries,omitempty"`
-	ETCD                     *ETCD                    `json:"etcd,omitempty"`
+	UpgradeStrategy       ClusterUpgradeStrategy `json:"upgradeStrategy,omitempty"`
+	ChartValues           GenericMap             `json:"chartValues,omitempty" wrangler:"nullable"`
+	MachineGlobalConfig   GenericMap             `json:"machineGlobalConfig,omitempty" wrangler:"nullable"`
+	MachineSelectorConfig []RKESystemConfig      `json:"machineSelectorConfig,omitempty"`
+	AdditionalManifest    string                 `json:"additionalManifest,omitempty"`
+	Registries            *Registry              `json:"registries,omitempty"`
+	ETCD                  *ETCD                  `json:"etcd,omitempty"`
+	// Increment to force all nodes to re-provision
+	ProvisionGeneration int `json:"provisionGeneration,omitempty"`
 }
 
 type LocalClusterAuthEndpoint struct {
@@ -81,6 +82,18 @@ type DrainOptions struct {
 	Timeout int `json:"timeout"`
 	// SkipWaitForDeleteTimeoutSeconds If pod DeletionTimestamp older than N seconds, skip waiting for the pod.  Seconds must be greater than 0 to skip.
 	SkipWaitForDeleteTimeoutSeconds int `json:"skipWaitForDeleteTimeoutSeconds,omitempty"`
+
+	// PreDrainHooks A list of hooks to run prior to draining a node
+	PreDrainHooks []DrainHook `json:"preDrainHooks,omitempty"`
+	// PostDrainHook A list of hooks to run after draining AND UPDATING a node
+	PostDrainHooks []DrainHook `json:"postDrainHooks,omitempty"`
+}
+
+type DrainHook struct {
+	// Annotation This annotation will need to be populated on the capi.Machine with the value from the annotation
+	// "rke.cattle.io/pre-drain" before the planner will continue with drain the specific node.  The annotation
+	// "rke.cattle.io/pre-drain" is used for pre-drain and "rke.cattle.io/post-drain" is used for post drain.
+	Annotation string `json:"annotation,omitempty"`
 }
 
 type Endpoint struct {

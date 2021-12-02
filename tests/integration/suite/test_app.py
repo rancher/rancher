@@ -40,56 +40,6 @@ def test_app_mysql(admin_pc, admin_mc):
     wait_for_workload(client, ns.name, count=1)
 
 
-def test_app_wordpress(admin_pc, admin_mc):
-    client = admin_pc.client
-    name = random_str()
-
-    ns = admin_pc.cluster.client.create_namespace(name=random_str(),
-                                                  projectId=admin_pc.
-                                                  project.id)
-    wait_for_template_to_be_created(admin_mc.client, "library")
-    answers = {
-        "defaultImage": "true",
-        "externalDatabase.database": "",
-        "externalDatabase.host": "",
-        "externalDatabase.password": "",
-        "externalDatabase.port": "3306",
-        "externalDatabase.user": "",
-        "image.repository": "bitnami/wordpress",
-        "image.tag": "5.2.3",
-        "ingress.enabled": "true",
-        "ingress.hosts[0].name": "xip.io",
-        "mariadb.enabled": "true",
-        "mariadb.image.repository": "bitnami/mariadb",
-        "mariadb.image.tag": "10.1.32",
-        "mariadb.mariadbDatabase": "wordpress",
-        "mariadb.mariadbPassword": "",
-        "mariadb.mariadbUser": "wordpress",
-        "mariadb.persistence.enabled": "false",
-        "mariadb.persistence.size": "8Gi",
-        "mariadb.persistence.storageClass": "",
-        "nodePorts.http": "",
-        "nodePorts.https": "",
-        "persistence.enabled": "false",
-        "persistence.size": "10Gi",
-        "persistence.storageClass": "",
-        "serviceType": "NodePort",
-        "wordpressEmail": "user@example.com",
-        "wordpressPassword": "",
-        "wordpressUsername": "user"
-    }
-    external_id = "catalog://?catalog=library&template=wordpress" \
-                  "&version=7.3.8&namespace=cattle-global-data"
-    client.create_app(
-        name=name,
-        externalId=external_id,
-        targetNamespace=ns.name,
-        projectId=admin_pc.project.id,
-        answers=answers
-    )
-    wait_for_workload(client, ns.name, count=2)
-
-
 @pytest.mark.skip(reason="istio disabled")
 def test_app_istio(admin_cc, admin_pc, admin_mc):
     client = admin_pc.client

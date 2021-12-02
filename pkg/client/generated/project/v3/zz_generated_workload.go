@@ -38,6 +38,7 @@ const (
 	WorkloadFieldJobStatus                     = "jobStatus"
 	WorkloadFieldLabels                        = "labels"
 	WorkloadFieldMaxSurge                      = "maxSurge"
+	WorkloadFieldMinReadySeconds               = "minReadySeconds"
 	WorkloadFieldName                          = "name"
 	WorkloadFieldNamespaceId                   = "namespaceId"
 	WorkloadFieldNodeID                        = "nodeId"
@@ -116,6 +117,7 @@ type Workload struct {
 	JobStatus                     *JobStatus                     `json:"jobStatus,omitempty" yaml:"jobStatus,omitempty"`
 	Labels                        map[string]string              `json:"labels,omitempty" yaml:"labels,omitempty"`
 	MaxSurge                      intstr.IntOrString             `json:"maxSurge,omitempty" yaml:"maxSurge,omitempty"`
+	MinReadySeconds               int64                          `json:"minReadySeconds,omitempty" yaml:"minReadySeconds,omitempty"`
 	Name                          string                         `json:"name,omitempty" yaml:"name,omitempty"`
 	NamespaceId                   string                         `json:"namespaceId,omitempty" yaml:"namespaceId,omitempty"`
 	NodeID                        string                         `json:"nodeId,omitempty" yaml:"nodeId,omitempty"`

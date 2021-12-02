@@ -396,9 +396,13 @@ func (s *Provider) hasLdapGroupSearch() bool {
 	return false
 }
 
-func (s *Provider) GetUserExtraAttributes(token *v3.Token) map[string][]string {
+func (s *Provider) GetUserExtraAttributes(userPrincipal v3.Principal) map[string][]string {
 	extras := make(map[string][]string)
-	extras["principalid"] = []string{token.UserPrincipal.Name}
-	extras["username"] = []string{token.UserPrincipal.LoginName}
+	if userPrincipal.Name != "" {
+		extras[common.UserAttributePrincipalID] = []string{userPrincipal.Name}
+	}
+	if userPrincipal.LoginName != "" {
+		extras[common.UserAttributeUserName] = []string{userPrincipal.LoginName}
+	}
 	return extras
 }

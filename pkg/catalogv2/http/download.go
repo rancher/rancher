@@ -20,12 +20,12 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
-func Icon(secret *corev1.Secret, repoURL string, caBundle []byte, insecureSkipTLSVerify bool, chart *repo.ChartVersion) (io.ReadCloser, string, error) {
+func Icon(secret *corev1.Secret, repoURL string, caBundle []byte, insecureSkipTLSVerify bool, disableSameOriginCheck bool, chart *repo.ChartVersion) (io.ReadCloser, string, error) {
 	if len(chart.URLs) == 0 {
 		return nil, "", fmt.Errorf("failed to find chartName %s version %s: %w", chart.Name, chart.Version, validation.NotFound)
 	}
 
-	client, err := HelmClient(secret, caBundle, insecureSkipTLSVerify)
+	client, err := HelmClient(secret, caBundle, insecureSkipTLSVerify, disableSameOriginCheck, repoURL)
 	if err != nil {
 		return nil, "", err
 	}
@@ -62,15 +62,15 @@ func Icon(secret *corev1.Secret, repoURL string, caBundle []byte, insecureSkipTL
 	if err != nil {
 		return nil, "", err
 	}
-	return ioutil.NopCloser(bytes.NewBuffer(data)), path.Ext(u.String()), nil
+	return ioutil.NopCloser(bytes.NewBuffer(data)), path.Ext(u.Path), nil
 }
 
-func Chart(secret *corev1.Secret, repoURL string, caBundle []byte, insecureSkipTLSVerify bool, chart *repo.ChartVersion) (io.ReadCloser, error) {
+func Chart(secret *corev1.Secret, repoURL string, caBundle []byte, insecureSkipTLSVerify bool, disableSameOriginCheck bool, chart *repo.ChartVersion) (io.ReadCloser, error) {
 	if len(chart.URLs) == 0 {
 		return nil, fmt.Errorf("failed to find chartName %s version %s: %w", chart.Name, chart.Version, validation.NotFound)
 	}
 
-	client, err := HelmClient(secret, caBundle, insecureSkipTLSVerify)
+	client, err := HelmClient(secret, caBundle, insecureSkipTLSVerify, disableSameOriginCheck, repoURL)
 	if err != nil {
 		return nil, err
 	}
@@ -104,8 +104,8 @@ func Chart(secret *corev1.Secret, repoURL string, caBundle []byte, insecureSkipT
 	return ioutil.NopCloser(bytes.NewBuffer(data)), err
 }
 
-func DownloadIndex(secret *corev1.Secret, repoURL string, caBundle []byte, insecureSkipTLSVerify bool) (*repo.IndexFile, error) {
-	client, err := HelmClient(secret, caBundle, insecureSkipTLSVerify)
+func DownloadIndex(secret *corev1.Secret, repoURL string, caBundle []byte, insecureSkipTLSVerify bool, disableSameOriginCheck bool) (*repo.IndexFile, error) {
+	client, err := HelmClient(secret, caBundle, insecureSkipTLSVerify, disableSameOriginCheck, repoURL)
 	if err != nil {
 		return nil, err
 	}

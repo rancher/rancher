@@ -9,6 +9,7 @@ import (
 	"github.com/rancher/rancher/pkg/catalogv2/system"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/chart"
 	"github.com/rancher/rancher/pkg/features"
+	fleetconst "github.com/rancher/rancher/pkg/fleet"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/rancher/wrangler/pkg/relatedresource"
@@ -17,16 +18,16 @@ import (
 
 var (
 	fleetCRDChart = chart.Definition{
-		ReleaseNamespace: "cattle-fleet-system",
-		ChartName:        "fleet-crd",
+		ReleaseNamespace: fleetconst.ReleaseNamespace,
+		ChartName:        fleetconst.CRDChartName,
 	}
 	fleetChart = chart.Definition{
-		ReleaseNamespace: "cattle-fleet-system",
-		ChartName:        "fleet",
+		ReleaseNamespace: fleetconst.ReleaseNamespace,
+		ChartName:        fleetconst.ChartName,
 	}
 	fleetUninstallChart = chart.Definition{
-		ReleaseNamespace: "fleet-system",
-		ChartName:        "fleet",
+		ReleaseNamespace: fleetconst.ReleaseLegacyNamespace,
+		ChartName:        fleetconst.ChartName,
 	}
 )
 
@@ -87,7 +88,7 @@ func (h *handler) onSetting(key string, setting *v3.Setting) (*v3.Setting, error
 		"apiServerCA":  settings.CACerts.Get(),
 		"global":       systemGlobalRegistry,
 		"bootstrap": map[string]interface{}{
-			"agentNamespace": "cattle-fleet-local-system",
+			"agentNamespace": fleetconst.ReleaseLocalNamespace,
 		},
 	}
 

@@ -9,8 +9,11 @@ import (
 	"github.com/rancher/norman/api/access"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
+	prov "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/auth/util"
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
+	provcluster "github.com/rancher/rancher/pkg/controllers/provisioningv2/cluster"
+	provv1 "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/ref"
@@ -55,16 +58,18 @@ var dataFields = map[string]string{
 }
 
 type handler struct {
-	schemas       *types.Schemas
-	secretsLister v1.SecretLister
-	ac            types.AccessControl
+	schemas          *types.Schemas
+	secretsLister    v1.SecretLister
+	provClusterCache provv1.ClusterCache
+	ac               types.AccessControl
 }
 
 func NewVsphereHandler(scaledContext *config.ScaledContext) http.Handler {
 	return &handler{
-		schemas:       scaledContext.Schemas,
-		secretsLister: scaledContext.Core.Secrets(namespace.GlobalNamespace).Controller().Lister(),
-		ac:            scaledContext.AccessControl,
+		schemas:          scaledContext.Schemas,
+		secretsLister:    scaledContext.Core.Secrets(namespace.GlobalNamespace).Controller().Lister(),
+		provClusterCache: scaledContext.Wrangler.Provisioning.Cluster().Cache(),
+		ac:               scaledContext.AccessControl,
 	}
 }
 
@@ -145,14 +150,27 @@ func (v *handler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 }
 
 func (v *handler) getCloudCredential(id string, req *http.Request) (*corev1.Secret, httperror.ErrorCode, error) {
-	var accessCred client.CloudCredential //var to check access
-	if err := access.ByID(v.generateAPIContext(req), &schema.Version, client.CloudCredentialType, id, &accessCred); err != nil {
+	apiContext := v.generateAPIContext(req)
+	if err := access.ByID(apiContext, &schema.Version, client.CloudCredentialType, id, &client.CloudCredentialClient{}); err != nil {
 		if apiError, ok := err.(*httperror.APIError); ok {
 			if apiError.Code.Status == httperror.PermissionDenied.Status || apiError.Code.Status == httperror.NotFound.Status {
-				return nil, httperror.NotFound, fmt.Errorf("cloud credential not found")
+				// If the user doesn't have direct access to the cloud credential, then we check if the user
+				// has access to a cluster that uses the cloud credential.
+				var clusters []*prov.Cluster
+				clusters, err = v.provClusterCache.GetByIndex(provcluster.ByCloudCred, id)
+				if err != nil || len(clusters) == 0 {
+					return nil, httperror.NotFound, fmt.Errorf("cloud credential not found")
+				}
+				for _, cluster := range clusters {
+					if err = access.ByID(apiContext, &schema.Version, client.ClusterType, cluster.Status.ClusterName, &client.Cluster{}); err == nil {
+						break
+					}
+				}
 			}
 		}
-		return nil, httperror.NotFound, err
+		if err != nil {
+			return nil, httperror.NotFound, err
+		}
 	}
 
 	ns, name := ref.Parse(id)

@@ -26,6 +26,7 @@ import (
 	batchcontrollers "github.com/rancher/wrangler/pkg/generated/controllers/batch/v1"
 	corecontrollers "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/pkg/generic"
+	"github.com/rancher/wrangler/pkg/genericcondition"
 	"github.com/rancher/wrangler/pkg/summary"
 	"github.com/sirupsen/logrus"
 	batchv1 "k8s.io/api/batch/v1"
@@ -38,6 +39,15 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	capi "sigs.k8s.io/cluster-api/api/v1alpha4"
 	"sigs.k8s.io/cluster-api/errors"
+)
+
+const (
+	createJobConditionType = "CreateJob"
+	deleteJobConditionType = "DeleteJob"
+
+	forceRemoveMachineAnn = "provisioning.cattle.io/force-machine-remove"
+
+	drainingSucceededCondition = condition.Cond(capi.DrainingSucceededCondition)
 )
 
 type handler struct {
@@ -123,7 +133,7 @@ func (h *handler) OnJobChange(key string, job *batchv1.Job) (*batchv1.Job, error
 		return job, err
 	}
 
-	newStatus, err := h.getMachineStatus(job, job.Spec.BackoffLimit == nil || *job.Spec.BackoffLimit == 0)
+	newStatus, err := h.getMachineStatus(job, job.Spec.Template.Labels[InfraJobRemove] == "true")
 	if err != nil {
 		return job, err
 	}
@@ -156,9 +166,23 @@ func (h *handler) getMachine(obj runtime.Object) (*capi.Machine, error) {
 	return nil, nil
 }
 
-func (h *handler) getMachineStatus(job *batchv1.Job, create bool) (rkev1.RKEMachineStatus, error) {
-	if job.Status.CompletionTime != nil {
+func (h *handler) getMachineStatus(job *batchv1.Job, remove bool) (rkev1.RKEMachineStatus, error) {
+	condType := createJobConditionType
+	if remove {
+		condType = deleteJobConditionType
+	}
+	if !job.Status.CompletionTime.IsZero() {
 		return rkev1.RKEMachineStatus{
+			Conditions: []genericcondition.GenericCondition{
+				{
+					Type:   condType,
+					Status: corev1.ConditionTrue,
+				},
+				{
+					Type:   "Ready",
+					Status: corev1.ConditionTrue,
+				},
+			},
 			JobComplete: true,
 		}, nil
 	}
@@ -185,31 +209,70 @@ func (h *handler) getMachineStatus(job *batchv1.Job, create bool) (rkev1.RKEMach
 		}
 
 		if lastPod != nil {
-			return getMachineStatusFromPod(lastPod, create), nil
+			return getMachineStatusFromPod(lastPod, job.Spec.Template.Labels[InfraMachineKind], condType), nil
 		}
 	}
 
-	return rkev1.RKEMachineStatus{}, nil
+	message := CreatingMachineMessage(job.Spec.Template.Labels[InfraMachineKind])
+	if condType != createJobConditionType {
+		message = DeletingMachineMessage(job.Spec.Template.Labels[InfraMachineKind])
+	}
+
+	return rkev1.RKEMachineStatus{Conditions: []genericcondition.GenericCondition{
+		{
+			Type:    "Ready",
+			Status:  corev1.ConditionFalse,
+			Message: message,
+		},
+	}}, nil
 }
 
-func getMachineStatusFromPod(pod *corev1.Pod, create bool) rkev1.RKEMachineStatus {
+func getMachineStatusFromPod(pod *corev1.Pod, kind, condType string) rkev1.RKEMachineStatus {
+	reason := string(errors.CreateMachineError)
+	if condType == deleteJobConditionType {
+		reason = string(errors.DeleteMachineError)
+	}
+
 	if pod.Status.Phase == corev1.PodSucceeded {
 		return rkev1.RKEMachineStatus{
+			Conditions: []genericcondition.GenericCondition{
+				{
+					Type:   condType,
+					Status: corev1.ConditionTrue,
+				},
+				{
+					Type:   "Ready",
+					Status: corev1.ConditionTrue,
+				},
+			},
 			JobComplete: true,
 		}
 	}
 
 	for _, containerStatus := range pod.Status.ContainerStatuses {
 		if containerStatus.State.Terminated != nil && containerStatus.State.Terminated.ExitCode != 0 {
-			var reason string
-			if create {
-				reason = string(errors.CreateMachineError)
-			} else {
-				reason = string(errors.DeleteMachineError)
+			failureMessage := strings.TrimSpace(containerStatus.State.Terminated.Message)
+			message := CreatingMachineMessage(kind)
+			if condType != createJobConditionType {
+				message = FailedMachineDeleteMessage(kind, reason, failureMessage)
 			}
 			return rkev1.RKEMachineStatus{
+				Conditions: []genericcondition.GenericCondition{
+					{
+						Type:    condType,
+						Status:  corev1.ConditionFalse,
+						Reason:  reason,
+						Message: message,
+					},
+					{
+						Type:    "Ready",
+						Status:  corev1.ConditionFalse,
+						Reason:  reason,
+						Message: message,
+					},
+				},
 				FailureReason:  reason,
-				FailureMessage: strings.TrimSpace(pod.Status.ContainerStatuses[0].State.Terminated.Message),
+				FailureMessage: failureMessage,
 			}
 		}
 	}
@@ -236,75 +299,82 @@ func (h *handler) OnRemove(key string, obj runtime.Object) (runtime.Object, erro
 		return obj, err
 	}
 
-	d, err := data.Convert(obj.DeepCopyObject())
+	objMeta, err := meta.Accessor(obj)
 	if err != nil {
 		return nil, err
 	}
 
+	clusterName := objMeta.GetLabels()[capi.ClusterLabelName]
+	if clusterName == "" {
+		return obj, fmt.Errorf("error retrieving the clustername for machine, label key %s does not appear to exist for dynamic machine %s", capi.ClusterLabelName, key)
+	}
+
+	machine, err := h.getMachine(obj)
+	if err != nil {
+		return obj, err
+	}
+
+	if machine == nil || machine.Status.NodeRef == nil {
+		// Machine noderef is nil, we should just allow deletion.
+		logrus.Debugf("[MachineProvision] There was no associated K8s node with this etcd dynamicmachine %s. proceeding with deletion", key)
+		return h.doRemove(obj, objMeta)
+	}
+
+	cluster, err := h.rancherClusterCache.Get(objMeta.GetNamespace(), clusterName)
+	if err != nil && !apierror.IsNotFound(err) {
+		return obj, err
+	}
+	if apierror.IsNotFound(err) || !cluster.DeletionTimestamp.IsZero() {
+		return h.doRemove(obj, objMeta)
+	}
+
+	removed := true
 	// In the event we are removing an etcd node (as indicated by the etcd-role label on the node), we must safely remove the etcd node from the cluster before allowing machine deprovisioning
-	if val, ok := d.Map("metadata", "labels")["rke.cattle.io/etcd-role"]; ok && val.(string) == "true" {
+	if val := objMeta.GetLabels()["rke.cattle.io/etcd-role"]; val == "true" {
 		// we need to block removal until our the v1 node that corresponds has been removed
-		clusterName, _ := d.Map("metadata", "labels")[CapiMachineLabel].(string)
-		if clusterName == "" {
-			return obj, fmt.Errorf("error retrieving the clustername for etcd node, label key %s does not appear to exist for dynamic machine %s", CapiMachineLabel, key)
-		}
-		cluster, err := h.rancherClusterCache.Get(d.String("metadata", "namespace"), clusterName)
-		if err != nil && !apierror.IsNotFound(err) {
-			return obj, err
-		}
-		if apierror.IsNotFound(err) || !cluster.DeletionTimestamp.IsZero() {
-			return h.doRemove(obj)
-		}
-
-		machine, err := h.getMachine(obj)
-		if err != nil {
-			return obj, err
-		}
-
-		if machine == nil || machine.Status.NodeRef == nil {
-			// Machine noderef is nil, we should just allow deletion.
-			logrus.Debugf("[MachineProvision] There was no associated K8s node with this etcd dynamicmachine %s. proceeding with deletion", key)
-			return h.doRemove(obj)
-		}
-
 		restConfig, err := h.kubeconfigManager.GetRESTConfig(cluster, cluster.Status)
 		if err != nil {
 			return obj, err
 		}
 
-		removed, err := etcdmgmt.SafelyRemoved(restConfig, v2provruntime.GetRuntimeCommand(cluster.Spec.KubernetesVersion), machine.Status.NodeRef.Name)
+		removed, err = etcdmgmt.SafelyRemoved(restConfig, v2provruntime.GetRuntimeCommand(cluster.Spec.KubernetesVersion), machine.Status.NodeRef.Name)
 		if err != nil {
 			return obj, err
 		}
-		if !removed {
-			h.dynamic.EnqueueAfter(obj.GetObjectKind().GroupVersionKind(), d.String("metadata", "namespace"), d.String("metadata", "name"), 5*time.Second)
-			return obj, generic.ErrSkip
-		}
 	}
-	return h.doRemove(obj)
+
+	if _, nodeDrainExcluded := machine.Annotations[capi.ExcludeNodeDrainingAnnotation]; !removed ||
+		(!nodeDrainExcluded && !drainingSucceededCondition.IsTrue(machine) && drainingSucceededCondition.GetReason(machine) != capi.DrainingFailedReason) {
+		if err = h.dynamic.EnqueueAfter(obj.GetObjectKind().GroupVersionKind(), objMeta.GetNamespace(), objMeta.GetName(), 5*time.Second); err != nil {
+			return obj, err
+		}
+		return obj, generic.ErrSkip
+	}
+
+	return h.doRemove(obj, objMeta)
 }
 
-func (h *handler) doRemove(obj runtime.Object) (runtime.Object, error) {
+func (h *handler) doRemove(obj runtime.Object, objMeta metav1.Object) (runtime.Object, error) {
 	d, err := data.Convert(obj.DeepCopyObject())
 	if err != nil {
 		return nil, err
 	}
 
-	infraName := d.String("metadata", "name")
+	infraName := objMeta.GetName()
 	if !d.Bool("status", "jobComplete") && d.String("status", "failureReason") == "" {
 		return obj, fmt.Errorf("cannot delete machine %s because create job has not finished", infraName)
 	}
 
-	obj, err = h.run(obj, false)
+	obj, err = h.run(obj, objMeta, false, 3)
 	if err != nil {
 		return nil, err
 	}
-	job, err := h.jobs.Get(d.String("metadata", "namespace"), getJobName(infraName))
+	job, err := h.jobs.Get(objMeta.GetNamespace(), getJobName(infraName))
 	if err != nil {
 		return nil, err
 	}
 
-	if job.Status.CompletionTime != nil {
+	if !job.Status.CompletionTime.IsZero() || shouldForceRemoval(job, d) {
 		// Calling WithOwner(obj).ApplyObjects with no objects here will look for all objects with types passed to
 		// WithCacheTypes above that have an owner label (not owner reference) to the given obj. It will compare the existing
 		// objects it finds to the ones that are passed to ApplyObjects (which there are none in this case). The apply
@@ -321,27 +391,31 @@ func (h *handler) doRemove(obj runtime.Object) (runtime.Object, error) {
 }
 
 func (h *handler) OnChange(obj runtime.Object) (runtime.Object, error) {
-	newObj, err := h.run(obj, true)
-	if newObj == nil {
-		newObj = obj
-	}
-	return setCondition(h.dynamic, newObj, "CreateJob", err)
-}
-
-func (h *handler) run(obj runtime.Object, create bool) (runtime.Object, error) {
-	typeMeta, err := meta.TypeAccessor(obj)
-	if err != nil {
-		return nil, err
-	}
-
-	meta, err := meta.Accessor(obj)
+	objMeta, err := meta.Accessor(obj)
 	if err != nil {
 		return nil, err
 	}
 
 	// don't process create if deleting
-	if create && meta.GetDeletionTimestamp() != nil {
+	if !objMeta.GetDeletionTimestamp().IsZero() {
 		return obj, nil
+	}
+
+	newObj, err := h.run(obj, objMeta, true, 0)
+	if newObj == nil {
+		newObj = obj
+	}
+
+	if err != nil {
+		return setCondition(h.dynamic, newObj, createJobConditionType, err)
+	}
+	return newObj, nil
+}
+
+func (h *handler) run(obj runtime.Object, objMeta metav1.Object, create bool, jobBackoffLimit int32) (runtime.Object, error) {
+	typeMeta, err := meta.TypeAccessor(obj)
+	if err != nil {
+		return nil, err
 	}
 
 	d, err := data.Convert(obj.DeepCopyObject())
@@ -357,17 +431,17 @@ func (h *handler) run(obj runtime.Object, create bool) (runtime.Object, error) {
 		return obj, err
 	}
 
-	dArgs, err := h.getArgsEnvAndStatus(meta, d, args, driver, create)
+	dArgs, err := h.getArgsEnvAndStatus(objMeta, d, args, driver, create)
 	if err != nil {
 		return obj, err
 	}
 
 	if dArgs.BootstrapSecretName == "" && !dArgs.BootstrapOptional {
 		return obj,
-			h.dynamic.EnqueueAfter(obj.GetObjectKind().GroupVersionKind(), meta.GetNamespace(), meta.GetName(), 2*time.Second)
+			h.dynamic.EnqueueAfter(obj.GetObjectKind().GroupVersionKind(), objMeta.GetNamespace(), objMeta.GetName(), 2*time.Second)
 	}
 
-	objs, err := h.objects(args.String("providerID") != "" && create, typeMeta, meta, dArgs, filesSecret)
+	objs, err := h.objects(args.String("providerID") != "" && create, typeMeta, objMeta, dArgs, filesSecret, jobBackoffLimit)
 	if err != nil {
 		return nil, err
 	}
@@ -407,19 +481,23 @@ func (h *handler) patchStatus(obj runtime.Object, d data.Object, state rkev1.RKE
 
 	changed := false
 	for k, v := range statusData {
-		if d.String("status", k) != convert.ToString(v) {
-			changed = true
-			break
+		if k != "conditions" {
+			if d.String("status", k) != convert.ToString(v) {
+				changed = true
+			}
+		} else if len(state.Conditions) > 0 {
+			for _, c := range state.Conditions {
+				if thisChanged, err := insertOrUpdateCondition(d, summary.NewCondition(c.Type, string(c.Status), c.Reason, c.Message)); err != nil {
+					return nil, err
+				} else if thisChanged {
+					changed = true
+				}
+			}
 		}
 	}
 
 	if !changed {
 		return obj, nil
-	}
-
-	d, err = data.Convert(obj.DeepCopyObject())
-	if err != nil {
-		return nil, err
 	}
 
 	status := d.Map("status")
@@ -428,7 +506,9 @@ func (h *handler) patchStatus(obj runtime.Object, d data.Object, state rkev1.RKE
 		d.Set("status", status)
 	}
 	for k, v := range statusData {
-		status[k] = v
+		if k != "conditions" {
+			status[k] = v
+		}
 	}
 
 	return h.dynamic.UpdateStatus(&unstructured.Unstructured{
@@ -455,45 +535,59 @@ func setCondition(dynamic *dynamic.Controller, obj runtime.Object, conditionType
 
 	desiredCondition := summary.NewCondition(conditionType, status, reason, message)
 
-	d, mapErr := data.Convert(obj)
+	d, mapErr := data.Convert(obj.DeepCopyObject())
 	if mapErr != nil {
 		return obj, mapErr
 	}
 
-	for _, condition := range summary.GetUnstructuredConditions(d) {
-		if condition.Type() == conditionType {
-			if desiredCondition.Equals(condition) {
-				return obj, err
-			}
-			break
+	if updated, err := insertOrUpdateCondition(d, desiredCondition); !updated || err != nil {
+		return obj, err
+	}
+
+	obj, updateErr := dynamic.UpdateStatus(&unstructured.Unstructured{
+		Object: d,
+	})
+	if updateErr != nil {
+		return obj, updateErr
+	}
+	return obj, err
+}
+
+func insertOrUpdateCondition(d data.Object, desiredCondition summary.Condition) (bool, error) {
+	for _, cond := range summary.GetUnstructuredConditions(d) {
+		if desiredCondition.Equals(cond) {
+			return false, nil
 		}
 	}
 
-	d, mapErr = data.Convert(obj.DeepCopyObject())
-	if mapErr != nil {
-		return obj, mapErr
+	// The conditions must be converted to a map so that DeepCopyJSONValue will
+	// recognize it as a map instead of a data.Object.
+	newCond, err := convert.EncodeToMap(desiredCondition.Object)
+	if err != nil {
+		return false, err
 	}
 
-	conditions := d.Slice("status", "conditions")
+	dConditions := d.Slice("status", "conditions")
+	conditions := make([]interface{}, len(dConditions))
 	found := false
-	for i, condition := range conditions {
-		if condition.String("type") == conditionType {
-			conditions[i] = desiredCondition.Object
-			d.SetNested(conditions, "status", "conditions")
+	for i, cond := range dConditions {
+		if cond.String("type") == desiredCondition.Type() {
+			conditions[i] = newCond
 			found = true
+		} else {
+			conditions[i], err = convert.EncodeToMap(cond)
+			if err != nil {
+				return false, err
+			}
 		}
 	}
 
 	if !found {
-		d.SetNested(append(conditions, desiredCondition.Object), "status", "conditions")
+		conditions = append(conditions, newCond)
 	}
-	obj, updateErr := dynamic.UpdateStatus(&unstructured.Unstructured{
-		Object: d,
-	})
-	if err != nil {
-		return obj, err
-	}
-	return obj, updateErr
+	d.SetNested(conditions, "status", "conditions")
+
+	return true, nil
 }
 
 func constructFilesSecret(driver string, config map[string]interface{}) (*corev1.Secret, error) {
@@ -527,4 +621,35 @@ func constructFilesSecret(driver string, config map[string]interface{}) (*corev1
 		return &corev1.Secret{Data: secretData}, nil
 	}
 	return nil, nil
+}
+
+func shouldForceRemoval(job *batchv1.Job, d data.Object) bool {
+	var createJobCondition summary.Condition
+	for _, c := range summary.GetUnstructuredConditions(d) {
+		if c.Type() == createJobConditionType {
+			createJobCondition = c
+			break
+		}
+	}
+
+	forceRemoveAnnValue, _ := d.Map("metadata", "annotations")[forceRemoveMachineAnn].(string)
+
+	if createJobCondition.Reason() != string(errors.CreateMachineError) &&
+		strings.ToLower(forceRemoveAnnValue) != "true" {
+		return false
+	}
+
+	return condition.Cond("Failed").IsTrue(job)
+}
+
+func FailedMachineDeleteMessage(kind, failureReason, failureMessage string) string {
+	return fmt.Sprintf("failed deleting server (%s) in infrastructure provider: %s: %s", kind, failureReason, failureMessage)
+}
+
+func CreatingMachineMessage(kind string) string {
+	return fmt.Sprintf("creating server (%s) in infrastructure provider", kind)
+}
+
+func DeletingMachineMessage(kind string) string {
+	return fmt.Sprintf("deleting server (%s) in infrastructure provider", kind)
 }

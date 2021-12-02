@@ -90,7 +90,7 @@ func (h Handler) LinkHandler(apiContext *types.APIContext, next types.RequestHan
 
 	clusterID, clusterScanID := ref.Parse(cs["id"].(string))
 
-	clusterContext, err := h.ClusterManager.UserContext(clusterID)
+	clusterContext, err := h.ClusterManager.UserContextNoControllers(clusterID)
 	if err != nil {
 		return err
 	}

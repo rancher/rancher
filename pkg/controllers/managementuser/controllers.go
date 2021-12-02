@@ -16,13 +16,14 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/managementuser/rbac/podsecuritypolicy"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/resourcequota"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/secret"
-	"github.com/rancher/rancher/pkg/controllers/managementuser/settings"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/snapshotbackpopulate"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/windows"
 	"github.com/rancher/rancher/pkg/controllers/managementuserlegacy"
 	"github.com/rancher/rancher/pkg/features"
 	managementv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/impersonation"
 	"github.com/rancher/rancher/pkg/types/config"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 func Register(ctx context.Context, cluster *config.UserContext, clusterRec *managementv3.Cluster, kubeConfigGetter common.KubeConfigGetter) error {
@@ -30,13 +31,7 @@ func Register(ctx context.Context, cluster *config.UserContext, clusterRec *mana
 	healthsyncer.Register(ctx, cluster)
 	networkpolicy.Register(ctx, cluster)
 	nodesyncer.Register(ctx, cluster, kubeConfigGetter)
-	podsecuritypolicy.RegisterCluster(ctx, cluster)
-	podsecuritypolicy.RegisterClusterRole(ctx, cluster)
-	podsecuritypolicy.RegisterBindings(ctx, cluster)
-	podsecuritypolicy.RegisterNamespace(ctx, cluster)
-	podsecuritypolicy.RegisterPodSecurityPolicy(ctx, cluster)
-	podsecuritypolicy.RegisterServiceAccount(ctx, cluster)
-	podsecuritypolicy.RegisterTemplate(ctx, cluster)
+	podsecuritypolicy.Register(ctx, cluster)
 	secret.Register(ctx, cluster)
 	resourcequota.Register(ctx, cluster)
 	certsexpiration.Register(ctx, cluster)
@@ -52,6 +47,8 @@ func Register(ctx context.Context, cluster *config.UserContext, clusterRec *mana
 
 	// register controller for API
 	cluster.APIAggregation.APIServices("").Controller()
+	// register secrets controller for impersonation
+	cluster.Core.Secrets("").Controller()
 
 	if clusterRec.Spec.LocalClusterAuthEndpoint.Enabled {
 		err := clusterauthtoken.CRDSetup(ctx, cluster.UserOnlyContext())
@@ -61,26 +58,30 @@ func Register(ctx context.Context, cluster *config.UserContext, clusterRec *mana
 		clusterauthtoken.Register(ctx, cluster)
 	}
 
-	if !clusterRec.Spec.Internal {
-		err := settings.Register(ctx, cluster)
-		if err != nil {
-			return err
-		}
-	}
+	// Ensure these caches are started
+	cluster.Core.Namespaces("").Controller()
+	cluster.Core.Secrets("").Controller()
+	cluster.Core.ServiceAccounts("").Controller()
 
 	return managementuserlegacy.Register(ctx, cluster, clusterRec, kubeConfigGetter)
 }
 
 func RegisterFollower(ctx context.Context, cluster *config.UserContext, kubeConfigGetter common.KubeConfigGetter, clusterManager healthsyncer.ClusterControllerLifecycle) error {
-	cluster.Core.Pods("").Controller()
+	cluster.KindNamespaces[schema.GroupVersionKind{
+		Version: "v1",
+		Kind:    "Secret",
+	}] = impersonation.ImpersonationNamespace
+	cluster.KindNamespaces[schema.GroupVersionKind{
+		Version: "v1",
+		Kind:    "ServiceAccount",
+	}] = impersonation.ImpersonationNamespace
+
 	cluster.Core.Namespaces("").Controller()
-	cluster.Core.Services("").Controller()
+	cluster.Core.Secrets("").Controller()
+	cluster.Core.ServiceAccounts("").Controller()
 	cluster.RBAC.ClusterRoleBindings("").Controller()
 	cluster.RBAC.ClusterRoles("").Controller()
 	cluster.RBAC.RoleBindings("").Controller()
-	cluster.Core.Endpoints("").Controller()
-	cluster.APIAggregation.APIServices("").Controller()
-	cluster.Core.Secrets("").Controller()
-	cluster.Core.ServiceAccounts("").Controller()
+	cluster.RBAC.Roles("").Controller()
 	return nil
 }

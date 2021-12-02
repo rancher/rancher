@@ -8,6 +8,7 @@ import (
 	"time"
 
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/controllers/management/clusterdeploy"
 	planClientset "github.com/rancher/rancher/pkg/generated/clientset/versioned/typed/upgrade.cattle.io/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	planv1 "github.com/rancher/system-upgrade-controller/pkg/apis/upgrade.cattle.io/v1"
@@ -42,7 +43,7 @@ func (h *handler) deployPlans(cluster *v3.Cluster, isK3s, isRke2 bool) error {
 		strategy = cluster.Spec.K3sConfig.ClusterUpgradeStrategy
 	}
 	// access downstream cluster
-	clusterCtx, err := h.manager.UserContext(cluster.Name)
+	clusterCtx, err := h.manager.UserContextNoControllers(cluster.Name)
 	if err != nil {
 		return err
 
@@ -215,6 +216,10 @@ func (h *handler) modifyClusterCondition(cluster *v3.Cluster, masterPlan, worker
 	// if we made it this far nothing is applying
 	// see k3supgrade_handler also
 	v32.ClusterConditionUpgraded.True(cluster)
+	if cluster.Spec.LocalClusterAuthEndpoint.Enabled {
+		// If ACE is enabled, the force a re-deploy of the cluster-agent and kube-api-auth
+		cluster.Annotations[clusterdeploy.AgentForceDeployAnn] = "true"
+	}
 	return h.clusterClient.Update(cluster)
 
 }

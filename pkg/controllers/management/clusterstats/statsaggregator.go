@@ -172,7 +172,7 @@ func (s *StatsAggregator) aggregate(cluster *v3.Cluster, clusterName string) err
 
 func (s *StatsAggregator) updateVersion(cluster *v3.Cluster) bool {
 	updated := false
-	userContext, err := s.ClusterManager.UserContext(cluster.Name)
+	userContext, err := s.ClusterManager.UserContextNoControllers(cluster.Name)
 	if err == nil {
 		callWithTimeout(func() {
 			// This has the tendency to timeout

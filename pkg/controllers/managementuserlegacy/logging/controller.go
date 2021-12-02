@@ -3,15 +3,36 @@ package logging
 import (
 	"context"
 
+	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/controllers/managementuserlegacy/logging/configsyncer"
 	"github.com/rancher/rancher/pkg/controllers/managementuserlegacy/logging/deployer"
 	"github.com/rancher/rancher/pkg/controllers/managementuserlegacy/logging/watcher"
 	"github.com/rancher/rancher/pkg/types/config"
+	"k8s.io/apimachinery/pkg/runtime"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func Register(ctx context.Context, cluster *config.UserContext) {
+	starter := cluster.DeferredStart(ctx, func(ctx context.Context) error {
+		registerDeferred(ctx, cluster)
+		return nil
+	})
+	AddStarter(ctx, cluster, starter)
+}
+
+func AddStarter(ctx context.Context, cluster *config.UserContext, starter func() error) {
+	clusterLogging := cluster.Management.Management.ClusterLoggings("")
+	projectLogging := cluster.Management.Management.ProjectLoggings("")
+	clusterLogging.AddClusterScopedHandler(ctx, "logging-deferred", cluster.ClusterName, func(key string, obj *v3.ClusterLogging) (runtime.Object, error) {
+		return obj, starter()
+	})
+	projectLogging.AddClusterScopedHandler(ctx, "logging-deferred", cluster.ClusterName, func(key string, obj *v3.ProjectLogging) (runtime.Object, error) {
+		return obj, starter()
+	})
+}
+
+func registerDeferred(ctx context.Context, cluster *config.UserContext) {
 
 	clusterName := cluster.ClusterName
 	secretManager := configsyncer.NewSecretManager(cluster)

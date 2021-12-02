@@ -8,9 +8,9 @@ import (
 	"github.com/rancher/rancher/pkg/types/config"
 	"gopkg.in/check.v1"
 	corev1 "k8s.io/api/core/v1"
-	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	extclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
-	crdclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1beta1"
+	crdclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/watch"
@@ -71,7 +71,7 @@ func setupNS(name, projectName string, nsClient v1.NamespaceInterface, c *check.
 	return ns
 }
 
-func setupCRD(name, plural, group, kind, version string, scope apiextensionsv1beta1.ResourceScope, crdClient crdclient.CustomResourceDefinitionInterface,
+func setupCRD(name, plural, group, kind, version string, scope apiextensionsv1.ResourceScope, crdClient crdclient.CustomResourceDefinitionInterface,
 	crdWatch watch.Interface, c *check.C) {
 	fullName := plural + "." + group
 
@@ -90,12 +90,12 @@ func waitForCRDEstablished(name string, crdWatch watch.Interface, crdClient crdc
 		select {
 		case watchEvent := <-crdWatch.ResultChan():
 			if watch.Modified == watchEvent.Type || watch.Added == watchEvent.Type {
-				if crd, ok := watchEvent.Object.(*apiextensionsv1beta1.CustomResourceDefinition); ok && crd.Name == name {
+				if crd, ok := watchEvent.Object.(*apiextensionsv1.CustomResourceDefinition); ok && crd.Name == name {
 					got, err := crdClient.Get(context.TODO(), name, metav1.GetOptions{})
 					c.Assert(err, check.IsNil)
 
 					for _, c := range got.Status.Conditions {
-						if apiextensionsv1beta1.Established == c.Type && apiextensionsv1beta1.ConditionTrue == c.Status {
+						if apiextensionsv1.Established == c.Type && apiextensionsv1.ConditionTrue == c.Status {
 							return
 						}
 					}
@@ -113,7 +113,7 @@ Loop:
 		select {
 		case watchEvent := <-crdWatch.ResultChan():
 			if watch.Deleted == watchEvent.Type {
-				if crd, ok := watchEvent.Object.(*apiextensionsv1beta1.CustomResourceDefinition); ok && crd.Name == name {
+				if crd, ok := watchEvent.Object.(*apiextensionsv1.CustomResourceDefinition); ok && crd.Name == name {
 					break Loop
 				}
 			}
@@ -123,15 +123,27 @@ Loop:
 	}
 }
 
-func newCRD(fullName, name, plural, group, kind, version string, scope apiextensionsv1beta1.ResourceScope) *apiextensionsv1beta1.CustomResourceDefinition {
-	return &apiextensionsv1beta1.CustomResourceDefinition{
+func newCRD(fullName, name, plural, group, kind, version string, scope apiextensionsv1.ResourceScope) *apiextensionsv1.CustomResourceDefinition {
+	return &apiextensionsv1.CustomResourceDefinition{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: fullName,
 		},
-		Spec: apiextensionsv1beta1.CustomResourceDefinitionSpec{
-			Group:   group,
-			Version: version,
-			Names: apiextensionsv1beta1.CustomResourceDefinitionNames{
+		Spec: apiextensionsv1.CustomResourceDefinitionSpec{
+			Group: group,
+			Versions: []apiextensionsv1.CustomResourceDefinitionVersion{
+				{
+					Name:    version,
+					Served:  true,
+					Storage: true,
+					Schema: &apiextensionsv1.CustomResourceValidation{
+						OpenAPIV3Schema: &apiextensionsv1.JSONSchemaProps{
+							Type:                   "object",
+							XPreserveUnknownFields: &[]bool{true}[0],
+						},
+					},
+				},
+			},
+			Names: apiextensionsv1.CustomResourceDefinitionNames{
 				Plural:   plural,
 				Singular: name,
 				Kind:     kind,

@@ -1,0 +1,5 @@
+sudo sysctl vm.overcommit_memory=1
+sudo sysctl vm.panic_on_oom=0
+sudo sysctl kernel.panic=10
+sudo sysctl kernel.panic_on_oops=1
+sudo sysctl kernel.keys.root_maxbytes=25000000

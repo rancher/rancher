@@ -5,6 +5,7 @@ metadata:
   name: mutating-webhook-configuration
 webhooks:
 - admissionReviewVersions:
+  - v1
   - v1beta1
   clientConfig:
     service:
@@ -26,6 +27,7 @@ webhooks:
     - clusters
   sideEffects: None
 - admissionReviewVersions:
+  - v1
   - v1beta1
   clientConfig:
     service:
@@ -47,6 +49,7 @@ webhooks:
     - machines
   sideEffects: None
 - admissionReviewVersions:
+  - v1
   - v1beta1
   clientConfig:
     service:
@@ -68,6 +71,7 @@ webhooks:
     - machinedeployments
   sideEffects: None
 - admissionReviewVersions:
+  - v1
   - v1beta1
   clientConfig:
     service:
@@ -89,6 +93,7 @@ webhooks:
     - machinehealthchecks
   sideEffects: None
 - admissionReviewVersions:
+  - v1
   - v1beta1
   clientConfig:
     service:
@@ -110,6 +115,7 @@ webhooks:
     - machinesets
   sideEffects: None
 - admissionReviewVersions:
+  - v1
   - v1beta1
   clientConfig:
     service:
@@ -131,6 +137,7 @@ webhooks:
     - machinepools
   sideEffects: None
 - admissionReviewVersions:
+  - v1
   - v1beta1
   clientConfig:
     service:
@@ -159,6 +166,7 @@ metadata:
   name: validating-webhook-configuration
 webhooks:
 - admissionReviewVersions:
+  - v1
   - v1beta1
   clientConfig:
     service:
@@ -180,6 +188,7 @@ webhooks:
     - clusters
   sideEffects: None
 - admissionReviewVersions:
+  - v1
   - v1beta1
   clientConfig:
     service:
@@ -201,6 +210,7 @@ webhooks:
     - machines
   sideEffects: None
 - admissionReviewVersions:
+  - v1
   - v1beta1
   clientConfig:
     service:
@@ -222,6 +232,7 @@ webhooks:
     - machinedeployments
   sideEffects: None
 - admissionReviewVersions:
+  - v1
   - v1beta1
   clientConfig:
     service:
@@ -243,6 +254,7 @@ webhooks:
     - machinehealthchecks
   sideEffects: None
 - admissionReviewVersions:
+  - v1
   - v1beta1
   clientConfig:
     service:
@@ -264,6 +276,7 @@ webhooks:
     - machinesets
   sideEffects: None
 - admissionReviewVersions:
+  - v1
   - v1beta1
   clientConfig:
     service:
@@ -285,6 +298,7 @@ webhooks:
     - machinepools
   sideEffects: None
 - admissionReviewVersions:
+  - v1
   - v1beta1
   clientConfig:
     service:

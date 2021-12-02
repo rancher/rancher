@@ -6,6 +6,7 @@ import (
 
 	"github.com/rancher/norman/store/proxy"
 	"github.com/rancher/norman/types"
+	"github.com/rancher/rancher/pkg/api/scheme"
 	clusterSchema "github.com/rancher/rancher/pkg/schemas/cluster.cattle.io/v3"
 	schema "github.com/rancher/rancher/pkg/schemas/project.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
@@ -39,6 +40,7 @@ func addProxyStore(ctx context.Context, schemas *types.Schemas, context *config.
 
 	s.Store = proxy.NewProxyStore(ctx, context.ClientGetter,
 		config.UserStorageContext,
+		scheme.Scheme,
 		prefix,
 		group,
 		version,

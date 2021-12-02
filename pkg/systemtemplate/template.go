@@ -209,9 +209,7 @@ spec:
           - name: CATTLE_K8S_MANAGED
             value: "true"
           - name: CATTLE_CLUSTER_REGISTRY
-            value: "{{.ClusterRegistry}}" 
-          - name: CATTLE_SERVER_VERSION
-            value: "{{.ServerVersion}}"
+            value: "{{.ClusterRegistry}}"
       {{- if .AgentEnvVars}}
 {{ .AgentEnvVars | indent 10 }}
       {{- end }}

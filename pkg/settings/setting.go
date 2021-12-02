@@ -10,7 +10,9 @@ import (
 
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	authsettings "github.com/rancher/rancher/pkg/auth/settings"
+	fleetconst "github.com/rancher/rancher/pkg/fleet"
 	"github.com/sirupsen/logrus"
+	v1 "k8s.io/api/core/v1"
 )
 
 var (
@@ -45,6 +47,7 @@ var (
 	InstallUUID                       = NewSetting("install-uuid", "")
 	InternalServerURL                 = NewSetting("internal-server-url", "")
 	InternalCACerts                   = NewSetting("internal-cacerts", "")
+	IsRKE                             = NewSetting("is-rke", "")
 	JailerTimeout                     = NewSetting("jailer-timeout", "60")
 	KubeconfigGenerateToken           = NewSetting("kubeconfig-generate-token", "true")
 	KubeconfigTokenTTLMinutes         = NewSetting("kubeconfig-token-ttl-minutes", "960") // 16 hours
@@ -53,7 +56,7 @@ var (
 	KubernetesVersionToSystemImages   = NewSetting("k8s-version-to-images", "")
 	KubernetesVersionsCurrent         = NewSetting("k8s-versions-current", "")
 	KubernetesVersionsDeprecated      = NewSetting("k8s-versions-deprecated", "")
-	KDMBranch                         = NewSetting("kdm-branch", "dev-v2.6")
+	KDMBranch                         = NewSetting("kdm-branch", "dev-v2.6-1.22")
 	MachineVersion                    = NewSetting("machine-version", "dev")
 	Namespace                         = NewSetting("namespace", os.Getenv("CATTLE_NAMESPACE"))
 	PasswordMinLength                 = NewSetting("password-min-length", "12")
@@ -65,12 +68,13 @@ var (
 	ServerURL                         = NewSetting("server-url", "")
 	ServerVersion                     = NewSetting("server-version", "dev")
 	SystemAgentVersion                = NewSetting("system-agent-version", "")
+	WinsAgentVersion                  = NewSetting("wins-agent-version", "")
 	SystemAgentInstallScript          = NewSetting("system-agent-install-script", "https://raw.githubusercontent.com/rancher/system-agent/main/install.sh")
-	WindowsRke2InstallScript          = NewSetting("windows-rke2-install-script", "https://raw.githubusercontent.com/rancher/rke2/master/windows/rke2-install.ps1")
+	WindowsRke2InstallScript          = NewSetting("windows-rke2-install-script", "https://raw.githubusercontent.com/rancher/wins/main/install.ps1")
 	SystemAgentInstallerImage         = NewSetting("system-agent-installer-image", "rancher/system-agent-installer-")
 	SystemAgentUpgradeImage           = NewSetting("system-agent-upgrade-image", "")
 	SystemDefaultRegistry             = NewSetting("system-default-registry", "")
-	SystemNamespaces                  = NewSetting("system-namespaces", "kube-system,kube-public,cattle-system,cattle-alerting,cattle-logging,cattle-pipeline,cattle-prometheus,ingress-nginx,cattle-global-data,cattle-istio,kube-node-lease,cert-manager,cattle-global-nt,security-scan,cattle-fleet-system,cattle-fleet-local-system,calico-system,tigera-operator,cattle-impersonation-system")
+	SystemNamespaces                  = NewSetting("system-namespaces", "kube-system,kube-public,cattle-system,cattle-alerting,cattle-logging,cattle-pipeline,cattle-prometheus,ingress-nginx,cattle-global-data,cattle-istio,kube-node-lease,cert-manager,cattle-global-nt,security-scan,cattle-fleet-system,cattle-fleet-local-system,calico-system,tigera-operator,cattle-impersonation-system,rancher-operator-system")
 	TelemetryOpt                      = NewSetting("telemetry-opt", "")
 	TLSMinVersion                     = NewSetting("tls-min-version", "1.2")
 	TLSCiphers                        = NewSetting("tls-ciphers", "TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305")
@@ -102,8 +106,8 @@ var (
 	ChartDefaultBranch                = NewSetting("chart-default-branch", "dev-v2.6")
 	PartnerChartDefaultBranch         = NewSetting("partner-chart-default-branch", "main")
 	RKE2ChartDefaultBranch            = NewSetting("rke2-chart-default-branch", "main")
-	FleetDefaultWorkspaceName         = NewSetting("fleet-default-workspace-name", "fleet-default") // fleetWorkspaceName to assign to clusters with none
-	ShellImage                        = NewSetting("shell-image", "rancher/shell:v0.1.10")
+	FleetDefaultWorkspaceName         = NewSetting("fleet-default-workspace-name", fleetconst.ClustersDefaultNamespace) // fleetWorkspaceName to assign to clusters with none
+	ShellImage                        = NewSetting("shell-image", "rancher/shell:v0.1.14")
 	IgnoreNodeName                    = NewSetting("ignore-node-name", "") // nodes to ignore when syncing v1.node to v3.node
 	NoDefaultAdmin                    = NewSetting("no-default-admin", "")
 	RestrictedDefaultAdmin            = NewSetting("restricted-default-admin", "false") // When bootstrapping the admin for the first time, give them the global role restricted-admin
@@ -112,7 +116,7 @@ var (
 	EKSUpstreamRefresh                = NewSetting("eks-refresh", "300")
 	GKEUpstreamRefresh                = NewSetting("gke-refresh", "300")
 	HideLocalCluster                  = NewSetting("hide-local-cluster", "false")
-	MachineProvisionImage             = NewSetting("machine-provision-image", "rancher/machine:v0.15.0-rancher70")
+	MachineProvisionImage             = NewSetting("machine-provision-image", "rancher/machine:v0.15.0-rancher73")
 	SystemFeatureChartRefreshSeconds  = NewSetting("system-feature-chart-refresh-seconds", "900")
 
 	FleetMinVersion          = NewSetting("fleet-min-version", "")
@@ -256,4 +260,26 @@ func GetSettingByID(id string) string {
 		return s.Default
 	}
 	return provider.Get(id)
+}
+
+func DefaultAgentSettings() []Setting {
+	return []Setting{
+		ServerVersion,
+		InstallUUID,
+		IngressIPDomain,
+	}
+}
+
+func DefaultAgentSettingsAsEnvVars() []v1.EnvVar {
+	defaultAgentSettings := DefaultAgentSettings()
+	envVars := make([]v1.EnvVar, 0, len(defaultAgentSettings))
+
+	for _, s := range defaultAgentSettings {
+		envVars = append(envVars, v1.EnvVar{
+			Name:  GetEnvKey(s.Name),
+			Value: s.Get(),
+		})
+	}
+
+	return envVars
 }

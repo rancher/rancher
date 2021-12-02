@@ -3,6 +3,7 @@ package machine
 import (
 	"archive/zip"
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -24,6 +25,13 @@ func (s *sshClient) download(apiContext *types.APIRequest) error {
 		return err
 	}
 	if err := addFile(zw, name+"/id_rsa.pub", machineInfo.IDRSAPub); err != nil {
+		return err
+	}
+	machineConfigBytes, err := json.Marshal(machineInfo.Driver)
+	if err != nil {
+		return err
+	}
+	if err := addFile(zw, name+"/config.json", machineConfigBytes); err != nil {
 		return err
 	}
 	if err := zw.Close(); err != nil {

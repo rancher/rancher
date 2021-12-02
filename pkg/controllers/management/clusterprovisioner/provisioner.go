@@ -18,8 +18,10 @@ import (
 	"github.com/rancher/norman/types/values"
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	util "github.com/rancher/rancher/pkg/cluster"
+	"github.com/rancher/rancher/pkg/controllers/management/imported"
 	kd "github.com/rancher/rancher/pkg/controllers/management/kontainerdrivermetadata"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/apps/v1"
+	corev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/kontainer-engine/drivers/rke"
 	"github.com/rancher/rancher/pkg/kontainer-engine/service"
@@ -48,6 +50,7 @@ const (
 type Provisioner struct {
 	ClusterController     v3.ClusterController
 	Clusters              v3.ClusterInterface
+	ConfigMaps            corev1.ConfigMapInterface
 	NodeLister            v3.NodeLister
 	Nodes                 v3.NodeInterface
 	engineService         *service.EngineService
@@ -64,6 +67,7 @@ func Register(ctx context.Context, management *config.ManagementContext) {
 	p := &Provisioner{
 		engineService:         service.NewEngineService(NewPersistentStore(management.Core.Namespaces(""), management.Core)),
 		Clusters:              management.Management.Clusters(""),
+		ConfigMaps:            management.Core.ConfigMaps(""),
 		ClusterController:     management.Management.Clusters("").Controller(),
 		NodeLister:            management.Management.Nodes("").Controller().Lister(),
 		Nodes:                 management.Management.Nodes(""),
@@ -463,9 +467,7 @@ var errKeyRotationFailed = errors.New("encryption key rotation failed, please re
 
 func (p *Provisioner) reconcileCluster(cluster *v3.Cluster, create bool) (*v3.Cluster, error) {
 	if skipLocalK3sImported(cluster) {
-		if IsAdministratedByProvisioningCluster(cluster) {
-			cluster.Status.AppliedSpec.LocalClusterAuthEndpoint = cluster.Spec.LocalClusterAuthEndpoint
-		}
+		reconcileACE(cluster)
 		return cluster, nil
 	}
 
@@ -1057,7 +1059,7 @@ func (p *Provisioner) k3sBasedClusterConfig(cluster *v3.Cluster, nodes []*v3.Nod
 		cluster.Status.Driver == apimgmtv3.ClusterDriverK3os ||
 		cluster.Status.Driver == apimgmtv3.ClusterDriverRke2 ||
 		cluster.Status.Driver == apimgmtv3.ClusterDriverRancherD ||
-		IsAdministratedByProvisioningCluster(cluster) {
+		imported.IsAdministratedByProvisioningCluster(cluster) {
 		return nil //no-op
 	}
 	isEmbedded := cluster.Status.Driver == apimgmtv3.ClusterDriverLocal
@@ -1100,6 +1102,8 @@ func (p *Provisioner) k3sBasedClusterConfig(cluster *v3.Cluster, nodes []*v3.Nod
 	return nil
 }
 
-func IsAdministratedByProvisioningCluster(cluster *v3.Cluster) bool {
-	return cluster.Status.Driver == apimgmtv3.ClusterDriverImported && cluster.Annotations["provisioning.cattle.io/administrated"] == "true"
+func reconcileACE(cluster *v3.Cluster) {
+	if imported.IsAdministratedByProvisioningCluster(cluster) || cluster.Status.Driver == apimgmtv3.ClusterDriverRke2 || cluster.Status.Driver == apimgmtv3.ClusterDriverK3s {
+		cluster.Status.AppliedSpec.LocalClusterAuthEndpoint = cluster.Spec.LocalClusterAuthEndpoint
+	}
 }

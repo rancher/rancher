@@ -44,7 +44,6 @@ type context struct {
 	PrivateRegistryConfig string
 	Tolerations           string
 	ClusterRegistry       string
-	ServerVersion         string
 }
 
 var (
@@ -103,9 +102,12 @@ func SystemTemplate(resp io.Writer, agentImage, authImage, namespace, token, url
 		tolerations = templates.ToYAML(taints)
 	}
 
-	if cluster != nil && len(cluster.Spec.AgentEnvVars) > 0 {
-		agentEnvVars = templates.ToYAML(cluster.Spec.AgentEnvVars)
+	envVars := settings.DefaultAgentSettingsAsEnvVars()
+	if cluster != nil {
+		envVars = append(envVars, cluster.Spec.AgentEnvVars...)
 	}
+
+	agentEnvVars = templates.ToYAML(envVars)
 
 	context := &context{
 		Features:              toFeatureString(features),
@@ -123,7 +125,6 @@ func SystemTemplate(resp io.Writer, agentImage, authImage, namespace, token, url
 		PrivateRegistryConfig: privateRegistryConfig,
 		Tolerations:           tolerations,
 		ClusterRegistry:       clusterRegistry,
-		ServerVersion:         settings.ServerVersion.Get(),
 	}
 
 	return t.Execute(resp, context)

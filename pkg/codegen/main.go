@@ -7,9 +7,11 @@ import (
 	"github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	fleet "github.com/rancher/fleet/pkg/apis/fleet.cattle.io/v1alpha1"
+	"github.com/rancher/norman/types"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/codegen/generator"
 	clusterSchema "github.com/rancher/rancher/pkg/schemas/cluster.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/schemas/factory"
 	managementSchema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
 	publicSchema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3public"
 	projectSchema "github.com/rancher/rancher/pkg/schemas/project.cattle.io/v3"
@@ -115,6 +117,13 @@ func main() {
 		},
 	})
 
+	clusterAPIVersion := &types.APIVersion{Group: capi.GroupVersion.Group, Version: capi.GroupVersion.Version, Path: "/v1"}
+	generator.GenerateClient(factory.Schemas(clusterAPIVersion).Init(func(schemas *types.Schemas) *types.Schemas {
+		return schemas.MustImportAndCustomize(clusterAPIVersion, capi.Machine{}, func(schema *types.Schema) {
+			schema.ID = "cluster.x-k8s.io.machine"
+		})
+	}), nil)
+
 	generator.GenerateComposeType(projectSchema.Schemas, managementSchema.Schemas, clusterSchema.Schemas)
 	generator.Generate(managementSchema.Schemas, map[string]bool{
 		"userAttribute": true,
@@ -157,6 +166,7 @@ func main() {
 	})
 	generator.GenerateNativeTypes(knetworkingv1.SchemeGroupVersion, []interface{}{
 		knetworkingv1.NetworkPolicy{},
+		knetworkingv1.Ingress{},
 	}, nil)
 	generator.GenerateNativeTypes(batchv1.SchemeGroupVersion, []interface{}{
 		batchv1.Job{},

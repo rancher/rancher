@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/pkg/errors"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	projectpkg "github.com/rancher/rancher/pkg/project"
@@ -43,7 +42,8 @@ func (p *pLifecycle) Create(project *v3.Project) (runtime.Object, error) {
 }
 
 func (p *pLifecycle) Updated(project *v3.Project) (runtime.Object, error) {
-	return nil, nil
+	err := p.ensureNamespacesAssigned(project)
+	return project, err
 }
 
 func (p *pLifecycle) Remove(project *v3.Project) (runtime.Object, error) {
@@ -95,37 +95,32 @@ func (p *pLifecycle) ensureNamespacesAssigned(project *v3.Project) error {
 		return nil
 	}
 
-	cluster, err := p.m.clusterLister.Get("", p.m.clusterName)
-	if err != nil {
-		return err
-	}
-	if cluster == nil {
-		return errors.Errorf("couldn't find cluster %v", p.m.clusterName)
-	}
-
 	switch projectName {
 	case projectpkg.Default:
-		if err = p.ensureDefaultNamespaceAssigned(cluster, project); err != nil {
+		if err := p.ensureDefaultNamespaceAssigned(project); err != nil {
 			return err
 		}
 	case projectpkg.System:
-		if err = p.ensureSystemNamespaceAssigned(cluster, project); err != nil {
+		if err := p.ensureSystemNamespaceAssigned(project); err != nil {
 			return err
 		}
+	default:
+		return nil
 	}
 
-	return nil
+	_, err := p.m.workload.Management.Management.Projects(p.m.workload.ClusterName).Update(project)
+	return err
 }
 
-func (p *pLifecycle) ensureDefaultNamespaceAssigned(cluster *v3.Cluster, project *v3.Project) error {
-	_, err := v32.ClusterConditionDefaultNamespaceAssigned.DoUntilTrue(cluster.DeepCopy(), func() (runtime.Object, error) {
+func (p *pLifecycle) ensureDefaultNamespaceAssigned(project *v3.Project) error {
+	_, err := v32.ProjectConditionDefaultNamespacesAssigned.DoUntilTrue(project, func() (runtime.Object, error) {
 		return nil, p.assignNamespacesToProject(project, projectpkg.Default)
 	})
 	return err
 }
 
-func (p *pLifecycle) ensureSystemNamespaceAssigned(cluster *v3.Cluster, project *v3.Project) error {
-	_, err := v32.ClusterConditionSystemNamespacesAssigned.DoUntilTrue(cluster.DeepCopy(), func() (runtime.Object, error) {
+func (p *pLifecycle) ensureSystemNamespaceAssigned(project *v3.Project) error {
+	_, err := v32.ProjectConditionSystemNamespacesAssigned.DoUntilTrue(project, func() (runtime.Object, error) {
 		return nil, p.assignNamespacesToProject(project, projectpkg.System)
 	})
 	return err
@@ -146,7 +141,7 @@ func (p *pLifecycle) assignNamespacesToProject(project *v3.Project, projectName 
 		}
 		projectID := ns.Annotations[projectIDAnnotation]
 		if projectID != "" {
-			return nil
+			continue
 		}
 
 		ns = ns.DeepCopy()

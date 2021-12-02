@@ -75,6 +75,9 @@ const (
 	authnWebhookFileName = "/var/lib/rancher/%s/kube-api-authn-webhook.yaml"
 	ConfigYamlFileName   = "/etc/rancher/%s/config.yaml.d/50-rancher.yaml"
 	Provisioned          = condition.Cond("Provisioned")
+
+	CattleOSLabel = "cattle.io/os"
+	windows       = "windows"
 )
 
 var (
@@ -394,13 +397,15 @@ func (p *Planner) electInitNode(rkeControlPlane *rkev1.RKEControlPlane, plan *pl
 		}
 	}
 
+	possibleInitNodes := collect(plan, canBeInitNode)
+	hasPossibleInitNodes := len(possibleInitNodes) != 0
 	for _, entry := range entries {
 		if !isInitNode(entry.Machine) {
 			continue
 		}
 
-		// Clear old or misconfigured init nodes
-		if entry.Machine.DeletionTimestamp != nil || initNodeFound {
+		// Clear old or misconfigured init nodes if there are other nodes that can be init nodes
+		if initNodeFound || (hasPossibleInitNodes && !canBeInitNode(entry.Machine)) {
 			if err := p.clearInitNodeMark(entry.Machine); err != nil {
 				return "", err
 			}
@@ -416,14 +421,13 @@ func (p *Planner) electInitNode(rkeControlPlane *rkev1.RKEControlPlane, plan *pl
 		return joinURL, nil
 	}
 
-	for _, entry := range entries {
-		if entry.Machine.DeletionTimestamp == nil {
-			_, err := p.setInitNodeMark(entry.Machine)
-			if err != nil {
-				return "", err
-			}
-			return entry.Machine.Annotations[JoinURLAnnotation], nil
+	for _, entry := range possibleInitNodes {
+		_, err := p.setInitNodeMark(entry.Machine)
+		if err != nil {
+			return "", err
 		}
+
+		return entry.Machine.Annotations[JoinURLAnnotation], nil
 	}
 
 	return "", nil
@@ -528,7 +532,7 @@ func (p *Planner) reconcile(controlPlane *rkev1.RKEControlPlane, secret plan.Sec
 				if entry.Plan.InSync {
 					unavailable++
 				}
-				if ok, err := p.drain(entry.Machine, clusterPlan, drainOptions); err != nil {
+				if ok, err := p.drain(entry.Plan.AppliedPlan, plan, entry.Machine, clusterPlan, drainOptions); err != nil {
 					return err
 				} else if ok {
 					if err := p.store.UpdatePlan(entry.Machine, plan, 0); err != nil {
@@ -538,7 +542,7 @@ func (p *Planner) reconcile(controlPlane *rkev1.RKEControlPlane, secret plan.Sec
 					draining = append(draining, entry.Machine.Name)
 				}
 			}
-		} else if !entry.Plan.InSync && entry.Machine.Labels["cattle.io/os"] != "windows" {
+		} else if !entry.Plan.InSync {
 			outOfSync = append(outOfSync, entry.Machine.Name)
 		} else {
 			if ok, err := p.undrain(entry.Machine); err != nil {
@@ -802,6 +806,7 @@ func (p *Planner) addOtherFiles(nodePlan plan.NodePlan, controlPlane *rkev1.RKEC
 
 func restartStamp(nodePlan plan.NodePlan, controlPlane *rkev1.RKEControlPlane, image string) string {
 	restartStamp := sha256.New()
+	restartStamp.Write([]byte(strconv.Itoa(controlPlane.Spec.ProvisionGeneration)))
 	restartStamp.Write([]byte(image))
 	for _, file := range nodePlan.Files {
 		if file.Dynamic {
@@ -815,19 +820,43 @@ func restartStamp(nodePlan plan.NodePlan, controlPlane *rkev1.RKEControlPlane, i
 }
 
 func (p *Planner) addInstruction(nodePlan plan.NodePlan, controlPlane *rkev1.RKEControlPlane, machine *capi.Machine) (plan.NodePlan, error) {
+	var instruction plan.Instruction
 	image := getInstallerImage(controlPlane)
+	cattleOS := machine.Labels[CattleOSLabel]
 
-	instruction := plan.Instruction{
-		Image:   image,
-		Command: "sh",
-		Args:    []string{"-c", "run.sh"},
-		Env: []string{
-			fmt.Sprintf("RESTART_STAMP=%s", restartStamp(nodePlan, controlPlane, image)),
-		},
+	agentArgs := make([]string, 0, len(controlPlane.Spec.AgentEnvVars))
+	for _, arg := range controlPlane.Spec.AgentEnvVars {
+		if arg.Value == "" {
+			continue
+		}
+		agentArgs = append(agentArgs, fmt.Sprintf("%s=%s", arg.Name, arg.Value))
+	}
+
+	switch cattleOS {
+	case windows:
+		instruction = plan.Instruction{
+			Image:   image,
+			Command: "powershell.exe",
+			Args:    []string{"-File", "run.ps1"},
+			Env:     append(agentArgs, fmt.Sprintf("$env:RESTART_STAMP=%s", restartStamp(nodePlan, controlPlane, image))),
+		}
+	default:
+		instruction = plan.Instruction{
+			Image:   image,
+			Command: "sh",
+			Args:    []string{"-c", "run.sh"},
+			Env:     append(agentArgs, fmt.Sprintf("RESTART_STAMP=%s", restartStamp(nodePlan, controlPlane, image))),
+		}
 	}
 
 	if isOnlyWorker(machine) {
-		instruction.Env = append(instruction.Env, fmt.Sprintf("INSTALL_%s_EXEC=agent", rancherruntime.GetRuntimeEnv(controlPlane.Spec.KubernetesVersion)))
+		switch cattleOS {
+		case windows:
+			instruction.Env = append(instruction.Env, fmt.Sprintf("$env:INSTALL_%s_EXEC=agent", rancherruntime.GetRuntimeEnv(controlPlane.Spec.KubernetesVersion)))
+		default:
+			instruction.Env = append(instruction.Env, fmt.Sprintf("INSTALL_%s_EXEC=agent", rancherruntime.GetRuntimeEnv(controlPlane.Spec.KubernetesVersion)))
+
+		}
 	}
 	nodePlan.Instructions = append(nodePlan.Instructions, instruction)
 	return nodePlan, nil
@@ -1059,7 +1088,7 @@ func (p *Planner) addConfigFile(nodePlan plan.NodePlan, controlPlane *rkev1.RKEC
 
 	nodePlan.Files = append(nodePlan.Files, plan.File{
 		Content: base64.StdEncoding.EncodeToString(configData),
-		Path:    fmt.Sprintf(ConfigYamlFileName, rancherruntime.GetRuntime(controlPlane.Spec.KubernetesVersion)),
+		Path:    fmt.Sprintf(ConfigYamlFileName, runtime),
 	})
 
 	return nodePlan, nil
@@ -1139,6 +1168,14 @@ func IsEtcdOnlyInitNode(machine *capi.Machine) bool {
 
 func isDeleting(machine *capi.Machine) bool {
 	return machine.DeletionTimestamp != nil
+}
+
+func isFailed(machine *capi.Machine) bool {
+	return machine.Status.Phase == string(capi.MachinePhaseFailed)
+}
+
+func canBeInitNode(machine *capi.Machine) bool {
+	return isEtcd(machine) && !isDeleting(machine) && !isFailed(machine)
 }
 
 func isControlPlane(machine *capi.Machine) bool {

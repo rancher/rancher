@@ -3,11 +3,13 @@ package monitoring
 import (
 	"context"
 
+	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/monitoring"
 	"github.com/rancher/rancher/pkg/systemaccount"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -20,6 +22,31 @@ func RegisterIndexers(ctx context.Context, scaledContext *config.ScaledContext) 
 
 // Register initializes the controllers and registers
 func Register(ctx context.Context, agentContext *config.UserContext) {
+	starter := agentContext.DeferredStart(ctx, func(ctx context.Context) error {
+		registerDeferred(ctx, agentContext)
+		return nil
+	})
+	clusters := agentContext.Management.Management.Clusters("")
+	clusters.AddHandler(ctx, "monitoring-deferred", func(key string, obj *v3.Cluster) (runtime.Object, error) {
+		if obj == nil {
+			return nil, nil
+		}
+		if obj.Name == agentContext.ClusterName && obj.Spec.EnableClusterMonitoring {
+			return obj, starter()
+		}
+		return obj, nil
+	})
+	projects := agentContext.Management.Management.Projects(agentContext.ClusterName)
+	projects.AddHandler(ctx, "monitoring-deferred", func(key string, obj *v3.Project) (runtime.Object, error) {
+		if obj != nil &&
+			obj.Spec.EnableProjectMonitoring {
+			return obj, starter()
+		}
+		return obj, nil
+	})
+}
+
+func registerDeferred(ctx context.Context, agentContext *config.UserContext) {
 	clusterName := agentContext.ClusterName
 	logrus.Infof("Registering monitoring for cluster %q", clusterName)
 

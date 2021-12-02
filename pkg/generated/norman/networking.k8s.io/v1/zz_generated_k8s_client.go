@@ -11,6 +11,7 @@ import (
 
 type Interface interface {
 	NetworkPoliciesGetter
+	IngressesGetter
 }
 
 type Client struct {
@@ -45,6 +46,20 @@ func (c *Client) NetworkPolicies(namespace string) NetworkPolicyInterface {
 	sharedClient := c.clientFactory.ForResourceKind(NetworkPolicyGroupVersionResource, NetworkPolicyGroupVersionKind.Kind, true)
 	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &NetworkPolicyResource, NetworkPolicyGroupVersionKind, networkPolicyFactory{})
 	return &networkPolicyClient{
+		ns:           namespace,
+		client:       c,
+		objectClient: objectClient,
+	}
+}
+
+type IngressesGetter interface {
+	Ingresses(namespace string) IngressInterface
+}
+
+func (c *Client) Ingresses(namespace string) IngressInterface {
+	sharedClient := c.clientFactory.ForResourceKind(IngressGroupVersionResource, IngressGroupVersionKind.Kind, true)
+	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &IngressResource, IngressGroupVersionKind, ingressFactory{})
+	return &ingressClient{
 		ns:           namespace,
 		client:       c,
 		objectClient: objectClient,

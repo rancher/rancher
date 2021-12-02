@@ -64,7 +64,7 @@ type handler struct {
 	secrets      v1.SecretController
 }
 
-func Register(ctx context.Context, wContext *wrangler.Context) error {
+func Register(ctx context.Context, wContext *wrangler.Context) {
 	h := &handler{
 		manager:      wContext.SystemChartsManager,
 		apps:         wContext.Project.App(),
@@ -75,8 +75,6 @@ func Register(ctx context.Context, wContext *wrangler.Context) error {
 
 	wContext.Mgmt.Cluster().OnChange(ctx, "cluster-provisioning-operator", h.onClusterChange)
 	wContext.Core.Secret().OnChange(ctx, "watch-helm-release", h.onSecretChange)
-
-	return nil
 }
 
 func (h handler) onClusterChange(key string, cluster *v3.Cluster) (*v3.Cluster, error) {

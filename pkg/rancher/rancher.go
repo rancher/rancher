@@ -131,7 +131,7 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 		return nil, err
 	}
 
-	if err := features.MigrateFeatures(wranglerContext.Mgmt.Feature(), wranglerContext.CRD.CustomResourceDefinition()); err != nil {
+	if err := features.MigrateFeatures(wranglerContext.Mgmt.Feature(), wranglerContext.CRD.CustomResourceDefinition(), wranglerContext.Mgmt.Cluster()); err != nil {
 		return nil, fmt.Errorf("migrating features: %w", err)
 	}
 	features.InitializeFeatures(wranglerContext.Mgmt.Feature(), opts.Features)
@@ -175,7 +175,7 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 		return nil, err
 	}
 
-	clusterProxy, err := proxy.NewProxyMiddleware(wranglerContext.K8s.AuthorizationV1().SubjectAccessReviews(),
+	clusterProxy, err := proxy.NewProxyMiddleware(wranglerContext.K8s.AuthorizationV1(),
 		wranglerContext.TunnelServer.Dialer,
 		wranglerContext.Mgmt.Cluster().Cache(),
 		localClusterEnabled(opts),
@@ -250,7 +250,15 @@ func (r *Rancher) Start(ctx context.Context) error {
 			return err
 		}
 
-		return forceSystemAndDefaultProjectCreation(r.Wrangler.Core.ConfigMap(), r.Wrangler.Mgmt.Cluster())
+		if err := forceSystemAndDefaultProjectCreation(r.Wrangler.Core.ConfigMap(), r.Wrangler.Mgmt.Cluster()); err != nil {
+			return err
+		}
+
+		if err := forceSystemNamespaceAssignment(r.Wrangler.Core.ConfigMap(), r.Wrangler.Mgmt.Project()); err != nil {
+			return err
+		}
+
+		return copyCAAdditionalSecret(r.Wrangler.Core.Secret())
 	})
 
 	if err := r.authServer.Start(ctx, false); err != nil {

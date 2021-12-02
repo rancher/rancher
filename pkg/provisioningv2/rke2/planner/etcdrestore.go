@@ -13,6 +13,8 @@ import (
 	"k8s.io/apimachinery/pkg/api/equality"
 )
 
+const ETCDRestoreMessage = "etcd restore"
+
 type etcdRestore struct {
 	controlPlane rkecontroller.RKEControlPlaneClient
 	secrets      corecontrollers.SecretCache
@@ -69,7 +71,7 @@ func (e *etcdRestore) etcdRestore(controlPlane *rkev1.RKEControlPlane, clusterPl
 			if err != nil {
 				return err
 			}
-			return assignAndCheckPlan(e.store, "etcd restore", server, restorePlan, 0)
+			return assignAndCheckPlan(e.store, ETCDRestoreMessage, server, restorePlan, 0)
 		}
 	}
 

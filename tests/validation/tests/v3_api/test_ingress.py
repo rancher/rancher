@@ -39,7 +39,12 @@ from .common import get_user_client
 from .common import DEFAULT_TIMEOUT
 from .common import rbac_get_workload
 from .common import wait_for_ingress_to_active
+from .common import get_setting_value_by_name
+from .test_secrets import is_version_greater_than_v25
+from packaging import version
 
+domain_ip_v25 = "xip.ip"
+domain_ip_v26 = "sslip.io"
 
 namespace = {"p_client": None, "ns": None, "cluster": None, "project": None}
 rbac_role_list = [
@@ -302,7 +307,10 @@ def test_ingress_upgrade_target():
                             rules=[rule])
     validate_ingress(namespace["p_client"], namespace["cluster"],
                      [workload], host, path)
-    con["environment"] = {"test1": "value1"}
+    if(is_version_greater_than_v25()):
+        con["env"] = {"test1": "value1"}
+    else:
+        con["environment"] = {"test1": "value1"}
     workload = p_client.update(workload, containers=[con])
     wait_for_pods_in_workload(p_client, workload, pod_count=2)
     validate_workload(p_client, workload, "deployment", ns.name, pod_count=2)
@@ -359,7 +367,20 @@ def test_ingress_rule_with_only_host():
                      [workload], host, "/service1.html")
 
 
-def test_ingress_xip_io():
+def get_ingress_ip_domain():
+    current_server_version = get_setting_value_by_name('server-version')
+
+    if current_server_version.startswith('v'):
+        if "head" in current_server_version:
+            current_server_version = ''.join(current_server_version.split("-")[0])
+        else:
+            current_server_version = '.'.join(current_server_version.split(".")[:3])
+    if(version.parse(current_server_version) > version.parse('v2.5.9')):
+        return domain_ip_v26
+    else:
+        return domain_ip_v25
+
+def test_ingress_ip_domain():
     p_client = namespace["p_client"]
     ns = namespace["ns"]
     cluster = namespace["cluster"]
@@ -371,15 +392,17 @@ def test_ingress_xip_io():
                                         namespaceId=ns.id,
                                         daemonSetConfig={})
     validate_workload(p_client, workload, "daemonSet", ns.name,
-                      len(get_schedulable_nodes(cluster)))
+                    len(get_schedulable_nodes(cluster)))
     path = "/name.html"
-    rule = {"host": "xip.io",
-            "paths": [{"path": path,
-                       "workloadIds": [workload.id],
-                       "targetPort": TEST_IMAGE_PORT}]}
+
+
+    rule = {"host": get_ingress_ip_domain(),
+                "paths": [{"path": path,
+                        "workloadIds": [workload.id],
+                        "targetPort": TEST_IMAGE_PORT}]}
     ingress = p_client.create_ingress(name=name,
-                                      namespaceId=ns.id,
-                                      rules=[rule])
+                                    namespaceId=ns.id,
+                                    rules=[rule])
     validate_ingress_using_endpoint(namespace["p_client"], ingress, [workload])
 
 
@@ -398,8 +421,7 @@ def test_rbac_ingress_create(role):
     p_client = get_project_client_for_token(project, token)
     name = random_test_name("default")
 
-    host = "xip.io"
-    rule = {"host": host,
+    rule = {"host": get_ingress_ip_domain(),
             "paths": [{"workloadIds": [workload.id],
                        "targetPort": TEST_IMAGE_PORT}]}
     if role in (CLUSTER_MEMBER, PROJECT_READ_ONLY):
@@ -433,12 +455,11 @@ def test_rbac_ingress_edit(role):
     p_client_for_c_owner = get_project_client_for_token(project, c_owner_token)
     p_client = get_project_client_for_token(project, token)
 
-    host = "xip.io"
     path = "/name.html"
-    rule_1 = {"host": host,
+    rule_1 = {"host": get_ingress_ip_domain(),
               "paths": [{"workloadIds": [workload.id],
                          "targetPort": TEST_IMAGE_PORT}]}
-    rule_2 = {"host": host,
+    rule_2 = {"host": get_ingress_ip_domain(),
               "paths": [{"path": path, "workloadIds": [workload.id],
                          "targetPort": TEST_IMAGE_PORT}]}
     name = random_test_name("default")
@@ -474,8 +495,7 @@ def test_rbac_ingress_delete(role):
     p_client = get_project_client_for_token(project, token)
     name = random_test_name("default")
 
-    host = "xip.io"
-    rule = {"host": host,
+    rule = {"host": get_ingress_ip_domain(),
             "paths": [{"workloadIds": [workload.id],
                        "targetPort": TEST_IMAGE_PORT}]}
 

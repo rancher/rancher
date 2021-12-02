@@ -53,7 +53,7 @@ import (
 	"github.com/rancher/wrangler/pkg/generic"
 	"github.com/rancher/wrangler/pkg/leader"
 	"github.com/rancher/wrangler/pkg/schemes"
-	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -81,7 +81,7 @@ var (
 		clusterv3api.AddToScheme,
 		rkev1api.AddToScheme,
 		scheme.AddToScheme,
-		apiextensionsv1beta1.AddToScheme,
+		apiextensionsv1.AddToScheme,
 		apiregistrationv12.AddToScheme,
 		prommonitoringv1.AddToScheme,
 		istiov1alpha3api.AddToScheme,
@@ -154,13 +154,14 @@ func (w *Context) StartWithTransaction(ctx context.Context, f func(context.Conte
 		return err
 	}
 
-	if err = w.Start(ctx); err != nil {
+	if err := w.ControllerFactory.SharedCacheFactory().Start(ctx); err != nil {
+		transaction.Rollback()
 		return err
 	}
 
-	w.SharedControllerFactory.SharedCacheFactory().WaitForCacheSync(ctx)
+	w.ControllerFactory.SharedCacheFactory().WaitForCacheSync(ctx)
 	transaction.Commit()
-	return nil
+	return w.Start(ctx)
 }
 
 func (w *Context) Start(ctx context.Context) error {
@@ -182,8 +183,15 @@ func (w *Context) Start(ctx context.Context) error {
 	return nil
 }
 
+func enableProtobuf(cfg *rest.Config) *rest.Config {
+	cpy := rest.CopyConfig(cfg)
+	cpy.AcceptContentTypes = "application/vnd.kubernetes.protobuf, application/json"
+	cpy.ContentType = "application/json"
+	return cpy
+}
+
 func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restConfig *rest.Config) (*Context, error) {
-	controllerFactory, err := controller.NewSharedControllerFactoryFromConfig(restConfig, Scheme)
+	controllerFactory, err := controller.NewSharedControllerFactoryFromConfig(enableProtobuf(restConfig), Scheme)
 	if err != nil {
 		return nil, err
 	}

@@ -11,8 +11,11 @@ import (
 	"github.com/rancher/norman/api/access"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
+	prov "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/auth/util"
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
+	provcluster "github.com/rancher/rancher/pkg/controllers/provisioningv2/cluster"
+	provv1 "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/ref"
@@ -40,20 +43,21 @@ var requiredDataFields = map[string]string{
 }
 
 type handler struct {
-	Action        string
-	schemas       *types.Schemas
-	secretsLister v1.SecretLister
+	Action           string
+	provClusterCache provv1.ClusterCache
+	schemas          *types.Schemas
+	secretsLister    v1.SecretLister
 }
 
 func NewOCIHandler(scaledContext *config.ScaledContext) http.Handler {
 	return &handler{
-		schemas:       scaledContext.Schemas,
-		secretsLister: scaledContext.Core.Secrets(namespace.GlobalNamespace).Controller().Lister(),
+		provClusterCache: scaledContext.Wrangler.Provisioning.Cluster().Cache(),
+		schemas:          scaledContext.Schemas,
+		secretsLister:    scaledContext.Core.Secrets(namespace.GlobalNamespace).Controller().Lister(),
 	}
 }
 
 func (handler *handler) ServeHTTP(writer http.ResponseWriter, req *http.Request) {
-
 	writer.Header().Set("Content-Type", "application/json")
 
 	// New credential every invocation
@@ -134,7 +138,6 @@ func (handler *handler) ServeHTTP(writer http.ResponseWriter, req *http.Request)
 
 // extractCreds attempts to extract the credentials from a given request either from the body or cloud credentials.
 func (handler *handler) extractCreds(req *http.Request, creds *Credentials) (int, error) {
-
 	if credID := req.URL.Query().Get("cloudCredentialId"); credID != "" {
 		ns, name := ref.Parse(credID)
 		if ns == "" || name == "" {
@@ -142,14 +145,27 @@ func (handler *handler) extractCreds(req *http.Request, creds *Credentials) (int
 			return httperror.InvalidBodyContent.Status, fmt.Errorf("invalid cloud credential ID %s", credID)
 		}
 
-		var accessCred client.CloudCredential //var to check access
-		if err := access.ByID(handler.generateAPIContext(req), &schema.Version, client.CloudCredentialType, credID, &accessCred); err != nil {
+		apiContext := handler.generateAPIContext(req)
+		if err := access.ByID(apiContext, &schema.Version, client.CloudCredentialType, credID, &client.CloudCredential{}); err != nil {
 			if apiError, ok := err.(*httperror.APIError); ok {
 				if apiError.Code.Status == httperror.PermissionDenied.Status || apiError.Code.Status == httperror.NotFound.Status {
-					return httperror.NotFound.Status, fmt.Errorf("cloud credential not found")
+					// If the user doesn't have direct access to the cloud credential, then we check if the user
+					// has access to a cluster that uses the cloud credential.
+					var clusters []*prov.Cluster
+					clusters, err = handler.provClusterCache.GetByIndex(provcluster.ByCloudCred, credID)
+					if err != nil || len(clusters) == 0 {
+						return httperror.NotFound.Status, fmt.Errorf("cloud credential not found")
+					}
+					for _, cluster := range clusters {
+						if err = access.ByID(apiContext, &schema.Version, client.ClusterType, cluster.Status.ClusterName, &client.Cluster{}); err == nil {
+							break
+						}
+					}
 				}
 			}
-			return httperror.NotFound.Status, err
+			if err != nil {
+				return httperror.NotFound.Status, err
+			}
 		}
 
 		cc, err := handler.secretsLister.Get(namespace.GlobalNamespace, name)

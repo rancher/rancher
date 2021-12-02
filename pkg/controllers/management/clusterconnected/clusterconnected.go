@@ -92,10 +92,10 @@ func (c *checker) checkCluster(cluster *v3.Cluster) error {
 
 	hasSession := c.hasSession(cluster)
 	// The simpler condition of hasSession == Connected.IsTrue(cluster) is not
-	// used because it treat a non-existent conditions as False
+	// used because it treats a non-existent conditions as False
 	if hasSession && Connected.IsTrue(cluster) {
 		return nil
-	} else if !hasSession && Connected.IsFalse(cluster) {
+	} else if !hasSession && Connected.IsFalse(cluster) && v3.ClusterConditionReady.GetReason(cluster) == "Disconnected" {
 		return nil
 	}
 
@@ -106,6 +106,11 @@ func (c *checker) checkCluster(cluster *v3.Cluster) error {
 	for i := 0; i < 3; i++ {
 		cluster = cluster.DeepCopy()
 		Connected.SetStatusBool(cluster, hasSession)
+		if !hasSession && v3.ClusterConditionProvisioned.IsTrue(cluster) {
+			v3.ClusterConditionReady.False(cluster)
+			v3.ClusterConditionReady.Reason(cluster, "Disconnected")
+			v3.ClusterConditionReady.Message(cluster, "Cluster agent is not connected")
+		}
 		_, err = c.clusters.Update(cluster)
 		if apierror.IsConflict(err) {
 			cluster, err = c.clusters.Get(cluster.Name, metav1.GetOptions{})

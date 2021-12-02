@@ -14,7 +14,7 @@ const (
 )
 
 func NewPersistentStore(namespaces v1.NamespaceInterface, secretsGetter v1.SecretsGetter) cluster.PersistentStore {
-	store, err := encryptedstore.NewGenericEncrypedStore("c-", "", namespaces, secretsGetter)
+	store, err := encryptedstore.NewGenericEncryptedStore("c-", "", namespaces, secretsGetter)
 	if err != nil {
 		logrus.Fatal(err)
 	}

@@ -3,18 +3,17 @@ package approuter
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"strings"
 	"time"
 
-	"k8s.io/apimachinery/pkg/runtime"
-
 	"github.com/pkg/errors"
-	"github.com/rancher/rancher/pkg/generated/norman/extensions/v1beta1"
+	"github.com/rancher/rancher/pkg/ingresswrapper"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/wrangler/pkg/ticker"
 	"github.com/sirupsen/logrus"
-	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 const (
@@ -30,26 +29,29 @@ var (
 
 type Controller struct {
 	ctx              context.Context
-	ingressInterface v1beta1.IngressInterface
-	ingressLister    v1beta1.IngressLister
+	ingressInterface ingresswrapper.CompatInterface
+	ingressLister    ingresswrapper.CompatLister
 	dnsClient        *Client
 }
 
-func isGeneratedDomain(obj *extensionsv1beta1.Ingress, host, domain string) bool {
+func isGeneratedDomain(obj ingresswrapper.Ingress, host, domain string) bool {
 	parts := strings.Split(host, ".")
-	return strings.HasSuffix(host, "."+domain) && len(parts) == 6 && parts[1] == obj.Namespace
+	return strings.HasSuffix(host, "."+domain) && len(parts) == 6 && parts[1] == obj.GetNamespace()
 }
 
-func (c *Controller) sync(key string, obj *extensionsv1beta1.Ingress) (runtime.Object, error) {
-	if obj == nil || obj.DeletionTimestamp != nil {
+func (c *Controller) sync(key string, ingress ingresswrapper.Ingress) (runtime.Object, error) {
+	if ingress == nil || reflect.ValueOf(ingress).IsNil() || ingress.GetDeletionTimestamp() != nil {
 		return nil, nil
+	}
+	obj, err := ingresswrapper.ToCompatIngress(ingress)
+	if err != nil {
+		return obj, err
 	}
 
 	ipDomain := settings.IngressIPDomain.Get()
 	if ipDomain != RdnsIPDomain {
 		return nil, nil
 	}
-
 	isNeedSync := false
 	for _, rule := range obj.Spec.Rules {
 		if strings.HasSuffix(rule.Host, RdnsIPDomain) {
@@ -93,12 +95,12 @@ func (c *Controller) sync(key string, obj *extensionsv1beta1.Ingress) (runtime.O
 	return c.refresh(fqdn, obj)
 }
 
-func (c *Controller) refresh(rootDomain string, obj *extensionsv1beta1.Ingress) (*extensionsv1beta1.Ingress, error) {
-	if obj == nil || obj.DeletionTimestamp != nil {
+func (c *Controller) refresh(rootDomain string, obj *ingresswrapper.CompatIngress) (runtime.Object, error) {
+	if obj == nil || obj.GetDeletionTimestamp() != nil {
 		return nil, errors.New("Got a nil ingress object")
 	}
 
-	annotations := obj.Annotations
+	annotations := obj.GetAnnotations()
 
 	if annotations == nil {
 		annotations = make(map[string]string)
@@ -129,20 +131,18 @@ func (c *Controller) refresh(rootDomain string, obj *extensionsv1beta1.Ingress) 
 		return obj, nil
 	}
 
-	newObj := obj.DeepCopy()
 	// Also need to update rules for hostname when using nginx
+	newObj, err := ingresswrapper.ToCompatIngress(obj.DeepCopyObject())
+	if err != nil {
+		return obj, err
+	}
 	for i, rule := range newObj.Spec.Rules {
 		logrus.Debugf("Got ingress resource hostname: %s", rule.Host)
 		if strings.HasSuffix(rule.Host, RdnsIPDomain) {
 			newObj.Spec.Rules[i].Host = targetHostname
 		}
 	}
-
-	if _, err := c.ingressInterface.Update(newObj); err != nil {
-		return obj, err
-	}
-
-	return newObj, nil
+	return c.ingressInterface.Update(newObj)
 }
 
 func (c *Controller) refreshAll(rootDomain string) error {
@@ -152,15 +152,15 @@ func (c *Controller) refreshAll(rootDomain string) error {
 	}
 	for _, obj := range ingresses {
 		if _, err = c.refresh(rootDomain, obj); err != nil {
-			logrus.WithError(err).Errorf("refresh ingress %s:%s hostname annotation error", obj.Namespace, obj.Name)
+			logrus.WithError(err).Errorf("refresh ingress %s:%s hostname annotation error", obj.GetNamespace(), obj.GetName())
 		}
 	}
 	return nil
 }
 
-func (c *Controller) getRdnsHostname(obj *extensionsv1beta1.Ingress, rootDomain string) string {
+func (c *Controller) getRdnsHostname(obj ingresswrapper.Ingress, rootDomain string) string {
 	if rootDomain != "" {
-		return fmt.Sprintf("%s.%s.%s", obj.Name, obj.Namespace, rootDomain)
+		return fmt.Sprintf("%s.%s.%s", obj.GetName(), obj.GetNamespace(), rootDomain)
 	}
 	return ""
 }

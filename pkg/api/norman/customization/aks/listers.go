@@ -16,7 +16,7 @@ import (
 	"github.com/Azure/go-autorest/autorest/adal"
 	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/mcuadros/go-version"
-	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	mgmtv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 )
 
@@ -147,13 +147,13 @@ type UpgradeVersionsResponse struct {
 }
 
 // listKubernetesUpgradeVersions lists all kubernetes versions listed by AKS Container Service and marks which ones the
-//given cluster can be upgraded to.  A version's `Enabled` flag is true if the cluster can be upgraded to the version
-//in its current state.
-func listKubernetesUpgradeVersions(ctx context.Context, clusterLister v3.ClusterLister, cap *Capabilities) ([]byte, int, error) {
+// given cluster can be upgraded to.  A version's `Enabled` flag is true if the cluster can be upgraded to the version
+// in its current state.
+func listKubernetesUpgradeVersions(ctx context.Context, clusterLister mgmtv3.ClusterCache, cap *Capabilities) ([]byte, int, error) {
 	var resp UpgradeVersionsResponse
 
 	// load the target cluster, if the cluster is not found we cannot proceed
-	cluster, err := clusterLister.Get("", cap.ClusterID)
+	cluster, err := clusterLister.Get(cap.ClusterID)
 	if err != nil {
 		return nil, http.StatusBadRequest, fmt.Errorf("invalid cluster id")
 	}

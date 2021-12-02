@@ -89,7 +89,7 @@ func buildScaledContext(ctx context.Context, wranglerContext *wrangler.Context, 
 	systemTokens := systemtokens.NewSystemTokensFromScale(scaledContext)
 	scaledContext.SystemTokens = systemTokens
 
-	manager := clustermanager.NewManager(cfg.HTTPSListenPort, scaledContext, wranglerContext.RBAC, wranglerContext.ASL)
+	manager := clustermanager.NewManager(cfg.HTTPSListenPort, scaledContext, wranglerContext.ASL)
 
 	scaledContext.AccessControl = manager
 	scaledContext.ClientGetter = manager
@@ -218,6 +218,7 @@ func (m *mcm) Start(ctx context.Context) error {
 		managementdata.CleanupOrphanedSystemUsers(ctx, management)
 		clusterupstreamrefresher.MigrateEksRefreshCronSetting(m.wranglerContext)
 		go managementdata.CleanupDuplicateBindings(m.ScaledContext, m.wranglerContext)
+		go managementdata.CleanupOrphanBindings(m.ScaledContext, m.wranglerContext)
 		logrus.Infof("Rancher startup complete")
 		return nil
 	})

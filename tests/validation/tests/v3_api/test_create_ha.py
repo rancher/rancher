@@ -9,6 +9,7 @@ from .test_rke_cluster_provisioning import rke_config
 # RANCHER_HA_KUBECONFIG and RANCHER_HA_HOSTNAME are provided
 # when installing Rancher into a k3s setup
 RANCHER_HA_KUBECONFIG = os.environ.get("RANCHER_HA_KUBECONFIG")
+RANCHER_HA_HARDENED = ast.literal_eval(os.environ.get("RANCHER_HA_HARDENED", "False"))
 RANCHER_HA_HOSTNAME = os.environ.get(
     "RANCHER_HA_HOSTNAME", RANCHER_HOSTNAME_PREFIX + ".qa.rancher.space")
 resource_prefix = RANCHER_HA_HOSTNAME.split(".qa.rancher.space")[0]
@@ -75,6 +76,13 @@ def test_install_rancher_ha(precheck_certificate_options):
         if RANCHER_LOCAL_CLUSTER_TYPE == "RKE":
             print("RKE cluster is provisioning for the local cluster")
             nodes = create_resources()
+            if RANCHER_HA_HARDENED:
+                profile = 'rke-cis-1.5'
+                node_role = [["worker", "controlplane", "etcd"]]
+                node_roles =[]
+                for role in node_role:
+                    node_roles.extend([role, role, role])
+                prepare_hardened_nodes(nodes, profile, node_roles)
             config_path = create_rke_cluster_config(nodes)
             create_rke_cluster(config_path)
         elif RANCHER_LOCAL_CLUSTER_TYPE == "K3S":
@@ -116,6 +124,8 @@ def test_install_rancher_ha(precheck_certificate_options):
         assert False, "check the logs in console for details"
 
     print_kubeconfig()
+    if RANCHER_HA_HARDENED:
+        prepare_hardened_cluster(profile, kubeconfig_path)
     if RANCHER_LOCAL_CLUSTER_TYPE == "RKE":
         check_rke_ingress_rollout()
     if cm_install:
@@ -454,6 +464,11 @@ def create_rke_cluster_config(aws_nodes):
 
     rkeconfig = rkeconfig.replace("$AWS_SSH_KEY_NAME", AWS_SSH_KEY_NAME)
     rkeconfig = rkeconfig.replace("$KUBERNETES_VERSION", KUBERNETES_VERSION)
+    
+    if RANCHER_HA_HARDENED:
+        rkeconfig_hardened = readDataFile(DATA_SUBDIR, "hardened-cluster.yml")
+        rkeconfig += "\n"
+        rkeconfig += rkeconfig_hardened
     print("cluster-ha-filled.yml: \n" + rkeconfig + "\n")
 
     clusterfilepath = DATA_SUBDIR + "/" + "cluster-ha-filled.yml"

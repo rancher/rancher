@@ -119,6 +119,7 @@ func (in *ClusterSpec) DeepCopyInto(out *ClusterSpec) {
 		*out = new(RKEConfig)
 		(*in).DeepCopyInto(*out)
 	}
+	out.LocalClusterAuthEndpoint = in.LocalClusterAuthEndpoint
 	if in.AgentEnvVars != nil {
 		in, out := &in.AgentEnvVars, &out.AgentEnvVars
 		*out = make([]rkecattleiov1.EnvVar, len(*in))

@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/rancher/apiserver/pkg/types"
+	"github.com/rancher/rancher/pkg/auth/requests"
 	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/kubeconfig"
 	"github.com/rancher/rancher/pkg/settings"
@@ -17,6 +18,7 @@ import (
 
 type kubeconfigDownload struct {
 	userMgr user.Manager
+	auth    requests.Authenticator
 }
 
 func (k kubeconfigDownload) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
@@ -40,7 +42,7 @@ func (k kubeconfigDownload) ServeHTTP(rw http.ResponseWriter, req *http.Request)
 	var err error
 	generateToken := strings.EqualFold(settings.KubeconfigGenerateToken.Get(), "true")
 	if generateToken {
-		tokenKey, err = k.ensureToken(userName.GetName())
+		tokenKey, err = k.ensureToken(userName.GetName(), req)
 		if err != nil {
 			apiRequest.WriteError(err)
 			return
@@ -71,8 +73,23 @@ func (k kubeconfigDownload) ServeHTTP(rw http.ResponseWriter, req *http.Request)
 	})
 }
 
-func (k kubeconfigDownload) ensureToken(userName string) (string, error) {
+func (k kubeconfigDownload) ensureToken(userName string, req *http.Request) (string, error) {
+
+	authToken, err := k.auth.TokenFromRequest(req)
+	if err != nil {
+		return "", err
+	}
 	tokenNamePrefix := fmt.Sprintf("kubeconfig-%s", userName)
-	token, err := k.userMgr.EnsureToken(tokenNamePrefix, "Kubeconfig token", "kubeconfig", userName, nil, true)
+	input := user.TokenInput{
+		TokenName:     tokenNamePrefix,
+		Description:   "Kubeconfig token",
+		Kind:          "kubeconfig",
+		UserName:      userName,
+		AuthProvider:  authToken.AuthProvider,
+		TTL:           nil,
+		Randomize:     true,
+		UserPrincipal: authToken.UserPrincipal,
+	}
+	token, err := k.userMgr.EnsureToken(input)
 	return token, err
 }

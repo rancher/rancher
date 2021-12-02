@@ -8,6 +8,7 @@ import (
 
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 
+	ldapv3 "github.com/go-ldap/ldap/v3"
 	"github.com/mitchellh/mapstructure"
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/types"
@@ -20,7 +21,6 @@ import (
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/user"
 	"github.com/sirupsen/logrus"
-	ldapv2 "gopkg.in/ldap.v2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 )
@@ -316,19 +316,19 @@ func (p *ldapProvider) samlSearchGetPrincipal(
 		return nil, err
 	}
 
-	var searchRequest *ldapv2.SearchRequest
+	var searchRequest *ldapv3.SearchRequest
 	var filter string
 	if scope == p.userScope {
 		filter = fmt.Sprintf("(&(%v=%v)(%v=%v))",
-			ObjectClass, config.UserObjectClass, config.UserLoginAttribute, ldapv2.EscapeFilter(externalID))
-		searchRequest = ldapv2.NewSearchRequest(config.UserSearchBase,
-			ldapv2.ScopeWholeSubtree, ldapv2.NeverDerefAliases, 0, 0, false,
+			ObjectClass, config.UserObjectClass, config.UserLoginAttribute, ldapv3.EscapeFilter(externalID))
+		searchRequest = ldapv3.NewSearchRequest(config.UserSearchBase,
+			ldapv3.ScopeWholeSubtree, ldapv3.NeverDerefAliases, 0, 0, false,
 			filter, ldap.GetUserSearchAttributesForLDAP(ObjectClass, config), nil)
 	} else {
 		filter = fmt.Sprintf("(&(%v=%v)(%v=%v))",
-			ObjectClass, config.GroupObjectClass, config.GroupDNAttribute, ldapv2.EscapeFilter(externalID))
-		searchRequest = ldapv2.NewSearchRequest(config.GroupSearchBase,
-			ldapv2.ScopeWholeSubtree, ldapv2.NeverDerefAliases, 0, 0, false,
+			ObjectClass, config.GroupObjectClass, config.GroupDNAttribute, ldapv3.EscapeFilter(externalID))
+		searchRequest = ldapv3.NewSearchRequest(config.GroupSearchBase,
+			ldapv3.ScopeWholeSubtree, ldapv3.NeverDerefAliases, 0, 0, false,
 			filter, ldap.GetGroupSearchAttributesForLDAP(ObjectClass, config), nil)
 	}
 
@@ -370,9 +370,13 @@ func (p *ldapProvider) samlSearchGetPrincipal(
 		config.GroupNameAttribute)
 }
 
-func (p *ldapProvider) GetUserExtraAttributes(token *v3.Token) map[string][]string {
+func (p *ldapProvider) GetUserExtraAttributes(userPrincipal v3.Principal) map[string][]string {
 	extras := make(map[string][]string)
-	extras["principalid"] = []string{token.UserPrincipal.Name}
-	extras["username"] = []string{token.UserPrincipal.LoginName}
+	if userPrincipal.Name != "" {
+		extras[common.UserAttributePrincipalID] = []string{userPrincipal.Name}
+	}
+	if userPrincipal.LoginName != "" {
+		extras[common.UserAttributeUserName] = []string{userPrincipal.LoginName}
+	}
 	return extras
 }

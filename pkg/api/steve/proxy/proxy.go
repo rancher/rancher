@@ -44,7 +44,7 @@ func RewriteLocalCluster(next http.Handler) http.Handler {
 	})
 }
 
-func NewProxyMiddleware(sar v1.SubjectAccessReviewInterface,
+func NewProxyMiddleware(sar v1.AuthorizationV1Interface,
 	dialerFactory ClusterDialerFactory,
 	clusters v3.ClusterCache,
 	localSupport bool,

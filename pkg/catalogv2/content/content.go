@@ -218,7 +218,15 @@ func (c *Manager) filterReleases(index *repo.IndexFile, k8sVersion *semver.Versi
 					logrus.Errorf("failed to parse constraint version %s: %v", constraintStr, err)
 				}
 			}
-
+			if constraintStr, ok := version.Annotations["catalog.cattle.io/kube-version"]; ok {
+				if constraint, err := semver.NewConstraint(constraintStr); err == nil {
+					if !constraint.Check(k8sVersion) {
+						continue
+					}
+				} else {
+					logrus.Errorf("failed to parse constraint kube-version %s from annotation: %v", constraintStr, err)
+				}
+			}
 			if version.KubeVersion != "" {
 				if constraint, err := semver.NewConstraint(version.KubeVersion); err == nil {
 					if !constraint.Check(k8sVersion) {
@@ -267,7 +275,7 @@ func (c *Manager) Icon(namespace, name, chartName, version string) (io.ReadClose
 		return nil, "", err
 	}
 
-	return helmhttp.Icon(secret, repo.status.URL, repo.spec.CABundle, repo.spec.InsecureSkipTLSverify, chart)
+	return helmhttp.Icon(secret, repo.status.URL, repo.spec.CABundle, repo.spec.InsecureSkipTLSverify, repo.spec.DisableSameOriginCheck, chart)
 }
 
 func isHTTP(iconURL string) bool {
@@ -300,7 +308,7 @@ func (c *Manager) Chart(namespace, name, chartName, version string, skipFilter b
 		return nil, err
 	}
 
-	return helmhttp.Chart(secret, repo.status.URL, repo.spec.CABundle, repo.spec.InsecureSkipTLSverify, chart)
+	return helmhttp.Chart(secret, repo.status.URL, repo.spec.CABundle, repo.spec.InsecureSkipTLSverify, repo.spec.DisableSameOriginCheck, chart)
 }
 
 func (c *Manager) Info(namespace, name, chartName, version string) (*types.ChartInfo, error) {

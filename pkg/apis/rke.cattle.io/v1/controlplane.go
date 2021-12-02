@@ -23,13 +23,14 @@ type EnvVar struct {
 type RKEControlPlaneSpec struct {
 	RKEClusterSpecCommon
 
-	AgentEnvVars          []EnvVar             `json:"agentEnvVars,omitempty"`
-	ETCDSnapshotCreate    *ETCDSnapshotCreate  `json:"etcdSnapshotCreate,omitempty"`
-	ETCDSnapshotRestore   *ETCDSnapshotRestore `json:"etcdSnapshotRestore,omitempty"`
-	KubernetesVersion     string               `json:"kubernetesVersion,omitempty"`
-	ClusterName           string               `json:"clusterName,omitempty" wrangler:"required"`
-	ManagementClusterName string               `json:"managementClusterName,omitempty" wrangler:"required"`
-	UnmanagedConfig       bool                 `json:"unmanagedConfig,omitempty"`
+	AgentEnvVars             []EnvVar                 `json:"agentEnvVars,omitempty"`
+	LocalClusterAuthEndpoint LocalClusterAuthEndpoint `json:"localClusterAuthEndpoint"`
+	ETCDSnapshotCreate       *ETCDSnapshotCreate      `json:"etcdSnapshotCreate,omitempty"`
+	ETCDSnapshotRestore      *ETCDSnapshotRestore     `json:"etcdSnapshotRestore,omitempty"`
+	KubernetesVersion        string                   `json:"kubernetesVersion,omitempty"`
+	ClusterName              string                   `json:"clusterName,omitempty" wrangler:"required"`
+	ManagementClusterName    string                   `json:"managementClusterName,omitempty" wrangler:"required"`
+	UnmanagedConfig          bool                     `json:"unmanagedConfig,omitempty"`
 }
 
 type ETCDSnapshotPhase string

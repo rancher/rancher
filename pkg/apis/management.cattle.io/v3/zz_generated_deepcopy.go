@@ -980,7 +980,8 @@ func (in *CatalogTemplate) DeepCopyInto(out *CatalogTemplate) {
 	out.Namespaced = in.Namespaced
 	out.TypeMeta = in.TypeMeta
 	in.ObjectMeta.DeepCopyInto(&out.ObjectMeta)
-	in.Template.DeepCopyInto(&out.Template)
+	in.Spec.DeepCopyInto(&out.Spec)
+	out.Status = in.Status
 	return
 }
 
@@ -1041,7 +1042,8 @@ func (in *CatalogTemplateVersion) DeepCopyInto(out *CatalogTemplateVersion) {
 	out.Namespaced = in.Namespaced
 	out.TypeMeta = in.TypeMeta
 	in.ObjectMeta.DeepCopyInto(&out.ObjectMeta)
-	in.TemplateVersion.DeepCopyInto(&out.TemplateVersion)
+	in.Spec.DeepCopyInto(&out.Spec)
+	out.Status = in.Status
 	return
 }
 
@@ -10204,6 +10206,31 @@ func (in *UserAttribute) DeepCopyInto(out *UserAttribute) {
 		*out = make(map[string]Principals, len(*in))
 		for key, val := range *in {
 			(*out)[key] = *val.DeepCopy()
+		}
+	}
+	if in.ExtraByProvider != nil {
+		in, out := &in.ExtraByProvider, &out.ExtraByProvider
+		*out = make(map[string]map[string][]string, len(*in))
+		for key, val := range *in {
+			var outVal map[string][]string
+			if val == nil {
+				(*out)[key] = nil
+			} else {
+				in, out := &val, &outVal
+				*out = make(map[string][]string, len(*in))
+				for key, val := range *in {
+					var outVal []string
+					if val == nil {
+						(*out)[key] = nil
+					} else {
+						in, out := &val, &outVal
+						*out = make([]string, len(*in))
+						copy(*out, *in)
+					}
+					(*out)[key] = outVal
+				}
+			}
+			(*out)[key] = outVal
 		}
 	}
 	return

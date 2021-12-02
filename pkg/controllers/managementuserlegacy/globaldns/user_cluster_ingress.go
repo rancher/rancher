@@ -11,7 +11,7 @@ import (
 	"github.com/sirupsen/logrus"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 
-	"k8s.io/api/extensions/v1beta1"
+	"github.com/rancher/rancher/pkg/ingresswrapper"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 )
@@ -43,12 +43,36 @@ func newUserIngressController(ctx context.Context, clusterContext *config.UserCo
 
 func Register(ctx context.Context, clusterContext *config.UserContext) {
 	n := newUserIngressController(ctx, clusterContext)
-	clusterContext.Extensions.Ingresses("").AddHandler(ctx, UserIngressControllerName, n.sync)
+	starter := clusterContext.DeferredStart(ctx, func(ctx context.Context) error {
+		registerDeferred(ctx, clusterContext)
+		return nil
+	})
+
+	globalDNS := clusterContext.Management.Management.GlobalDnses("")
+	globalDNS.AddHandler(ctx, "globaldns-deferred", func(key string, obj *v3.GlobalDns) (runtime.Object, error) {
+		if obj == nil {
+			return obj, nil
+		} else if ok, err := n.doesGlobalDNSTargetCurrentCluster(obj); err != nil {
+			return obj, err
+		} else if ok {
+			return obj, starter()
+		}
+		return obj, nil
+	})
+}
+
+func registerDeferred(ctx context.Context, clusterContext *config.UserContext) {
+	n := newUserIngressController(ctx, clusterContext)
+	if ingresswrapper.ServerSupportsIngressV1(clusterContext.K8sClient) {
+		clusterContext.Networking.Ingresses("").AddHandler(ctx, UserIngressControllerName, ingresswrapper.CompatSyncV1(n.sync))
+	} else {
+		clusterContext.Extensions.Ingresses("").AddHandler(ctx, UserIngressControllerName, ingresswrapper.CompatSyncV1Beta1(n.sync))
+	}
 	g := newUserGlobalDNSController(clusterContext)
 	clusterContext.Management.Management.GlobalDnses("").AddHandler(ctx, UserGlobalDNSControllerName, g.sync)
 }
 
-func (ic *UserIngressController) sync(key string, obj *v1beta1.Ingress) (runtime.Object, error) {
+func (ic *UserIngressController) sync(key string, obj ingresswrapper.Ingress) (runtime.Object, error) {
 	return ic.reconcileAllGlobalDNSs()
 }
 

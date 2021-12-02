@@ -2,10 +2,14 @@ package nsserviceaccount
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	"github.com/rancher/norman/types/slice"
+	"github.com/rancher/rancher/pkg/controllers/managementagent/nsserviceaccount"
 	rv1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/project"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/sirupsen/logrus"
@@ -13,52 +17,59 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
+const (
+	projectIDAnnotation    = "field.cattle.io/projectId"
+	sysNamespaceAnnotation = "management.cattle.io/system-namespace"
+)
+
 type defaultSvcAccountHandler struct {
-	serviceAccounts rv1.ServiceAccountInterface
+	namespaces    rv1.NamespaceInterface
+	projectLister v3.ProjectLister
+	clusterName   string
 }
 
 func Register(ctx context.Context, cluster *config.UserContext) {
 	logrus.Debugf("Registering defaultSvcAccountHandler for checking default service account of system namespaces")
 	nsh := &defaultSvcAccountHandler{
-		serviceAccounts: cluster.Core.ServiceAccounts(""),
+		namespaces:    cluster.Core.Namespaces(""),
+		clusterName:   cluster.ClusterName,
+		projectLister: cluster.Management.Management.Projects("").Controller().Lister(),
 	}
-	cluster.Core.ServiceAccounts("").AddHandler(ctx, "defaultSvcAccountHandler", nsh.Sync)
+	cluster.Core.Namespaces("").AddHandler(ctx, "defaultSvcAccountHandler", nsh.Sync)
 }
 
-func (nsh *defaultSvcAccountHandler) Sync(key string, sa *corev1.ServiceAccount) (runtime.Object, error) {
-	if sa == nil || sa.DeletionTimestamp != nil {
+func (nsh *defaultSvcAccountHandler) Sync(key string, ns *corev1.Namespace) (runtime.Object, error) {
+	if ns == nil || ns.DeletionTimestamp != nil {
 		return nil, nil
 	}
 	logrus.Debugf("defaultSvcAccountHandler: Sync service account: key=%v", key)
 	//handle default svcAccount of system namespaces only
-	if err := nsh.handleIfSystemNSDefaultSA(sa); err != nil {
+	ret, err := nsh.handleIfSystemNSDefaultSA(ns)
+	if err != nil {
 		logrus.Errorf("defaultSvcAccountHandler: Sync: error handling default ServiceAccount of namespace key=%v, err=%v", key, err)
 	}
-	return nil, nil
+	return ret, err
 }
 
-func (nsh *defaultSvcAccountHandler) handleIfSystemNSDefaultSA(defSvcAccnt *corev1.ServiceAccount) error {
-	//check if sa is "default"
-	if defSvcAccnt.Name != "default" {
-		return nil
-	}
-	//check if ns is a system-ns
-	namespace := defSvcAccnt.Namespace
-	if namespace == "kube-system" || namespace == "default" || !nsh.isSystemNS(namespace) {
-		return nil
-	}
-	if defSvcAccnt.AutomountServiceAccountToken != nil && *defSvcAccnt.AutomountServiceAccountToken == false {
-		return nil
-	}
-	automountServiceAccountToken := false
-	defSvcAccnt.AutomountServiceAccountToken = &automountServiceAccountToken
-	logrus.Debugf("defaultSvcAccountHandler: updating default service account key=%v", defSvcAccnt)
-	_, err := nsh.serviceAccounts.Update(defSvcAccnt)
+func (nsh *defaultSvcAccountHandler) handleIfSystemNSDefaultSA(ns *corev1.Namespace) (runtime.Object, error) {
+	namespace := ns.Name
+	proj, err := project.GetSystemProject(nsh.clusterName, nsh.projectLister)
 	if err != nil {
-		logrus.Errorf("defaultSvcAccountHandler: error updating default service account flag for namespace: %v, err=%+v", namespace, err)
-		return err
+		return nil, err
 	}
-	return nil
+	sysProjAnn := fmt.Sprintf("%v:%v", nsh.clusterName, proj.Name)
+	if namespace == "kube-system" || namespace == "default" || (!nsh.isSystemNS(namespace) && !nsh.isSystemProjectNS(ns, sysProjAnn)) {
+		return nil, nil
+	}
+	if ns.Annotations[nsserviceaccount.NoDefaultSATokenAnnotation] != "true" {
+		ns = ns.DeepCopy()
+		if ns.Annotations == nil {
+			ns.Annotations = map[string]string{}
+		}
+		ns.Annotations[nsserviceaccount.NoDefaultSATokenAnnotation] = "true"
+		return nsh.namespaces.Update(ns)
+	}
+	return ns, nil
 }
 
 func (nsh *defaultSvcAccountHandler) isSystemNS(namespace string) bool {
@@ -68,4 +79,20 @@ func (nsh *defaultSvcAccountHandler) isSystemNS(namespace string) bool {
 	}
 	systemNamespaces := strings.Split(systemNamespacesStr, ",")
 	return slice.ContainsString(systemNamespaces, namespace)
+}
+
+func (nsh *defaultSvcAccountHandler) isSystemProjectNS(nsObj *corev1.Namespace, sysProjectAnnotation string) bool {
+	if nsObj.Annotations == nil {
+		return false
+	}
+
+	if val, ok := nsObj.Annotations[sysNamespaceAnnotation]; ok && val == "true" {
+		return true
+	}
+
+	if prjAnnVal, ok := nsObj.Annotations[projectIDAnnotation]; ok && prjAnnVal == sysProjectAnnotation {
+		return true
+	}
+
+	return false
 }

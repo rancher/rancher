@@ -49,7 +49,7 @@ func getStatusSchema(allSchemas *schemas.Schemas) (*schemas.Schema, error) {
 	return allSchemas.Import(rkev1.RKEMachineStatus{})
 }
 
-func addConfigSchema(name string, specSchema, statusSchema *schemas.Schema, allSchemas *schemas.Schemas) (string, error) {
+func addConfigSchema(name string, specSchema *schemas.Schema, allSchemas *schemas.Schemas) (string, error) {
 	nodeConfigFields := removeKey(specSchema.ResourceFields, "common")
 	nodeConfigFields = removeKey(nodeConfigFields, "providerID")
 	id := name + "Config"
@@ -131,7 +131,7 @@ func getSchemas(name string, spec *v3.DynamicSchemaSpec) (string, string, string
 		return "", "", "", nil, err
 	}
 
-	nodeConfigID, err := addConfigSchema(name, specSchema, statusSchema, allSchemas)
+	nodeConfigID, err := addConfigSchema(name, specSchema, allSchemas)
 	if err != nil {
 		return "", "", "", nil, err
 	}

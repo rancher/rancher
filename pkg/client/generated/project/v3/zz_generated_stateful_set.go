@@ -26,6 +26,7 @@ const (
 	StatefulSetFieldHostname                      = "hostname"
 	StatefulSetFieldImagePullSecrets              = "imagePullSecrets"
 	StatefulSetFieldLabels                        = "labels"
+	StatefulSetFieldMinReadySeconds               = "minReadySeconds"
 	StatefulSetFieldName                          = "name"
 	StatefulSetFieldNamespaceId                   = "namespaceId"
 	StatefulSetFieldNodeID                        = "nodeId"
@@ -87,6 +88,7 @@ type StatefulSet struct {
 	Hostname                      string                         `json:"hostname,omitempty" yaml:"hostname,omitempty"`
 	ImagePullSecrets              []LocalObjectReference         `json:"imagePullSecrets,omitempty" yaml:"imagePullSecrets,omitempty"`
 	Labels                        map[string]string              `json:"labels,omitempty" yaml:"labels,omitempty"`
+	MinReadySeconds               int64                          `json:"minReadySeconds,omitempty" yaml:"minReadySeconds,omitempty"`
 	Name                          string                         `json:"name,omitempty" yaml:"name,omitempty"`
 	NamespaceId                   string                         `json:"namespaceId,omitempty" yaml:"namespaceId,omitempty"`
 	NodeID                        string                         `json:"nodeId,omitempty" yaml:"nodeId,omitempty"`
