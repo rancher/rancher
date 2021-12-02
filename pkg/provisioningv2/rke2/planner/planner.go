@@ -232,7 +232,8 @@ func (p *Planner) Process(controlPlane *rkev1.RKEControlPlane) error {
 		return err
 	}
 
-	err = p.reconcile(controlPlane, secret, plan, "bootstrap", true, isInitNode, isDeleting,
+	// select all etcd and then filter to just initNodes to that unavailable count is correct
+	err = p.reconcile(controlPlane, secret, plan, "bootstrap", true, isEtcd, isNotInitNodeOrIsDeleting,
 		controlPlane.Spec.UpgradeStrategy.ControlPlaneConcurrency, "",
 		controlPlane.Spec.UpgradeStrategy.ControlPlaneDrainOptions)
 	firstIgnoreError, err = ignoreErrors(firstIgnoreError, err)
@@ -433,6 +434,17 @@ func (p *Planner) electInitNode(rkeControlPlane *rkev1.RKEControlPlane, plan *pl
 	return "", nil
 }
 
+func isUnavailable(entry planEntry) bool {
+	return !entry.Plan.InSync || isInDrain(entry.Machine)
+}
+
+func isInDrain(machine *capi.Machine) bool {
+	return machine.Annotations[PreDrainAnnotation] != "" ||
+		machine.Annotations[PostDrainAnnotation] != "" ||
+		machine.Annotations[DrainAnnotation] != "" ||
+		machine.Annotations[UnCordonAnnotation] != ""
+}
+
 func calculateConcurrency(maxUnavailable string, entries []planEntry, exclude roleFilter) (int, int, error) {
 	var (
 		count, unavailable int
@@ -442,7 +454,7 @@ func calculateConcurrency(maxUnavailable string, entries []planEntry, exclude ro
 		if !exclude(entry.Machine) {
 			count++
 		}
-		if entry.Plan != nil && !entry.Plan.InSync {
+		if entry.Plan != nil && isUnavailable(entry) {
 			unavailable++
 		}
 	}
@@ -528,8 +540,8 @@ func (p *Planner) reconcile(controlPlane *rkev1.RKEControlPlane, secret plan.Sec
 			//    the node will have already been considered unavailable.
 			// 2. concurrency == 0 which means infinite concurrency.
 			// 3. unavailable < concurrency meaning we have capacity to make something unavailable
-			if !entry.Plan.InSync || concurrency == 0 || unavailable < concurrency {
-				if entry.Plan.InSync {
+			if isUnavailable(entry) || concurrency == 0 || unavailable < concurrency {
+				if !isUnavailable(entry) {
 					unavailable++
 				}
 				if ok, err := p.drain(entry.Plan.AppliedPlan, plan, entry.Machine, clusterPlan, drainOptions); err != nil {
@@ -1164,6 +1176,10 @@ func isInitNodeOrDeleting(machine *capi.Machine) bool {
 
 func IsEtcdOnlyInitNode(machine *capi.Machine) bool {
 	return isInitNode(machine) && IsOnlyEtcd(machine)
+}
+
+func isNotInitNodeOrIsDeleting(machine *capi.Machine) bool {
+	return !isInitNode(machine) || isDeleting(machine)
 }
 
 func isDeleting(machine *capi.Machine) bool {
