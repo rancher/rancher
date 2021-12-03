@@ -15,6 +15,7 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 )
 
+// CreateUserWithRole is helper function that creates a user with a role or multiple roles
 func CreateUserWithRole(rancherClient *rancher.Client, user *management.User, roles ...string) (*management.User, error) {
 	createdUser, err := rancherClient.Management.User.Create(user)
 	if err != nil {
@@ -36,6 +37,7 @@ func CreateUserWithRole(rancherClient *rancher.Client, user *management.User, ro
 	return createdUser, nil
 }
 
+// AddProjectMember is a helper function that adds a project role to `user`. It uses the watch.WatchWait ensure BackingNamespaceCreated is true
 func AddProjectMember(rancherClient *rancher.Client, project *management.Project, user *management.User, projectRole string) error {
 	role := &management.ProjectRoleTemplateBinding{
 		ProjectID:       project.ID,
@@ -77,6 +79,7 @@ func AddProjectMember(rancherClient *rancher.Client, project *management.Project
 	return err
 }
 
+// RemoveProjectMember is a helper function that removes the project role from `user`
 func RemoveProjectMember(rancherClient *rancher.Client, user *management.User) error {
 	roles, err := rancherClient.Management.ProjectRoleTemplateBinding.List(&types.ListOpts{})
 	if err != nil {

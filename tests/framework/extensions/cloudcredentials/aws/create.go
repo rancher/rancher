@@ -9,6 +9,8 @@ import (
 
 const awsCloudCredNameBase = "awsCloudCredential"
 
+// CreateAWSCloudCredentials is a helper function that takes the rancher Client as a prameter and creates
+// an AWS cloud credential, and returns the CloudCredential response
 func CreateAWSCloudCredentials(rancherClient *rancher.Client) (*cloudcredentials.CloudCredential, error) {
 	var amazonEC2CredentialConfig cloudcredentials.AmazonEC2CredentialConfig
 	config.LoadConfig(cloudcredentials.AmazonEC2CredentialConfigurationFileKey, &amazonEC2CredentialConfig)

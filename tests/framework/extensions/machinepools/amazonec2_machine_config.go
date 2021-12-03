@@ -8,6 +8,8 @@ const (
 	AWSResourceConfig = "amazonec2configs"
 )
 
+// NewAWSMachineConfig is a constructor to set up rke-machine-config.cattle.io.amazonec2config. It returns an *unstructured.Unstructured
+// that CreateMachineConfig uses to created the rke-machine-config
 func NewAWSMachineConfig(generatedPoolName, namespace, region string) *unstructured.Unstructured {
 	machineConfig := &unstructured.Unstructured{}
 	machineConfig.SetAPIVersion("rke-machine-config.cattle.io/v1")

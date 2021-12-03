@@ -9,6 +9,8 @@ import (
 
 const digitalOceanCloudCredNameBase = "digitalOceanCloudCredential"
 
+// CreateDigitalOceanCloudCredentials is a helper function that takes the rancher Client as a prameter and creates
+// a Digital Ocean cloud credential, and returns the CloudCredential response
 func CreateDigitalOceanCloudCredentials(rancherClient *rancher.Client) (*cloudcredentials.CloudCredential, error) {
 	var digitalOceanCredentialConfig cloudcredentials.DigitalOceanCredentialConfig
 	config.LoadConfig(cloudcredentials.DigitalOceanCredentialConfigurationFileKey, &digitalOceanCredentialConfig)

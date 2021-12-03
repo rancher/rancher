@@ -6,6 +6,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
+// MustToUnstructured is a helper function that converts a runtime.Object to an unstructured.Unstructured
+// to be used by the dynamic client
 func MustToUnstructured(obj runtime.Object) *unstructured.Unstructured {
 	var out unstructured.Unstructured
 	err := scheme.Scheme.Convert(obj, &out, nil)
