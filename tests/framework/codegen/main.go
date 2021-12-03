@@ -17,12 +17,15 @@ func main() {
 		"userAttribute": true,
 	})
 
-	if err := replaceClientBasePackager(); err != nil {
+	if err := replaceClientBasePackages(); err != nil {
 		panic(err)
 	}
 }
 
-func replaceClientBasePackager() error {
+// replaceClientBasePackages walks through the zz_generated_client genreated by generator.GenerateClient to replace imports from
+// "github.com/rancher/norman/clientbase" to "github.com/rancher/rancher/tests/framework/pkg/clientbase" to use our modified code of the
+// session.Session tracking the resources created by the Management Client.
+func replaceClientBasePackages() error {
 	return filepath.Walk("./clients/rancher/generated", func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err

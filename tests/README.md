@@ -22,7 +22,9 @@ Validation tests have the same requirements as integration tests however differe
 
 ### Integration vs Validation
 
-TODO
+Integration tests - Don't require any external configuration or access to any other external services. These should also be short running as they will run on every PR within CI. Integration tests do not need access keys to cloud providers to run.
+
+Validation tests - Require access to external services, and needs to a config file to run them.
 
 ### Extensions
 
@@ -30,7 +32,11 @@ Extensions are functions that complete common operations used by tests.  Extensi
 
 ### Clients
 
-TODO
+Clients are used to create the resources in the tests. The advantage of the cients is they register the cleanups with sessions, making resource cleanup trivial. There are three clients; the rancher client, dynamic client, and the k3d client. The rancher client is used to create resources on a rancher instance. Given a host url, and a bearer token the rancher client communicates directly with the rancher instance. The dynamic client is used as means of communication on a downstream cluster, and used for kubernete resource management on that cluster. The k3d client is used to create a minimal k3d cluster, this is to give the integration tests the ability to test against a downstream cluster.
+
+### Wait
+
+Wait is used to monitor resources, and wait for specified conditions. There are multiple ways to wait for a resource. There is WatchWait that uses the watch.Interface of a resource to wait until the check function returns true. For more generic polling or waiting, the "k8s.io/apimachinery/pkg/util/wait" package can be used.
 
 ### Sessions
 

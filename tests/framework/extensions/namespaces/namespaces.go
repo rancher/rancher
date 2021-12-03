@@ -32,6 +32,8 @@ func ContainerDefaultResourceLimit(limitsCPU, limitsMemory, requestsCPU, request
 	return containerDefaultResourceLimit
 }
 
+// CreateNamespace is a helper function that uses the dynamic client to create a namespace on a project.
+// It registers a delete fuction with a wait.WatchWait to ensure the namspace is deleted cleanly.
 func CreateNamespace(client *rancher.Client, namespaceName, containerDefaultResourceLimit string, labels, annotations map[string]string, project *management.Project) (*coreV1.Namespace, error) {
 	// Namespace object for a project name space
 	annotations["field.cattle.io/containerDefaultResourceLimit"] = containerDefaultResourceLimit

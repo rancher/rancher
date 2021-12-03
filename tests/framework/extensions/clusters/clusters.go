@@ -13,6 +13,8 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 )
 
+// IsProvisioningClusterReady is basic check function that would be used for the wait.WatchWait func in pkg/wait.
+// This functions just waits until a cluster becomes ready.
 func IsProvisioningClusterReady(event watch.Event) (ready bool, err error) {
 	cluster := event.Object.(*apisV1.Cluster)
 
@@ -20,6 +22,7 @@ func IsProvisioningClusterReady(event watch.Event) (ready bool, err error) {
 	return ready, nil
 }
 
+// NewRKE2ClusterConfig is a constructor for a apisV1.Cluster object, to be used by the rancher.Client.Provisioning client.
 func NewRKE2ClusterConfig(clusterName, namespace, cni, cloudCredentialSecretName, kubernetesVersion string, machinePools []apisV1.RKEMachinePool) *apisV1.Cluster {
 	typeMeta := metav1.TypeMeta{
 		Kind:       "Cluster",
@@ -93,6 +96,8 @@ func NewRKE2ClusterConfig(clusterName, namespace, cni, cloudCredentialSecretName
 	return v1Cluster
 }
 
+// CreateRKE2Cluster is a "helper" functions that takes a rancher client, and the rke2 cluster config as parameters. This function
+// registers a delete cluster fuction with a wait.WatchWait to ensure the cluster is removed cleanly.
 func CreateRKE2Cluster(client *rancher.Client, rke2Cluster *apisV1.Cluster) (*apisV1.Cluster, error) {
 	client.Session.RegisterCleanupFunc(func() error {
 		err := client.Provisioning.Clusters(rke2Cluster.Namespace).Delete(context.TODO(), rke2Cluster.GetName(), metav1.DeleteOptions{})
