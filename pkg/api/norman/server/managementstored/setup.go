@@ -66,7 +66,6 @@ import (
 	projectclient "github.com/rancher/rancher/pkg/client/generated/project/v3"
 	"github.com/rancher/rancher/pkg/clustermanager"
 	"github.com/rancher/rancher/pkg/clusterrouter"
-	"github.com/rancher/rancher/pkg/controllers/management/compose/common"
 	md "github.com/rancher/rancher/pkg/controllers/management/kontainerdrivermetadata"
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/nodeconfig"
@@ -518,7 +517,7 @@ func NodeTypes(schemas *types.Schemas, management *config.ScaledContext) error {
 	return nil
 }
 
-func App(schemas *types.Schemas, management *config.ScaledContext, kubeConfigGetter common.KubeConfigGetter) {
+func App(schemas *types.Schemas, management *config.ScaledContext, clusterManager *clustermanager.Manager) {
 	schema := schemas.Schema(&projectschema.Version, projectclient.AppType)
 	store := &appStore.Store{
 		Store:                 schema.Store,
@@ -530,10 +529,10 @@ func App(schemas *types.Schemas, management *config.ScaledContext, kubeConfigGet
 	schema.Store = store
 	wrapper := app.Wrapper{
 		Clusters:              management.Management.Clusters(""),
+		ClusterManager:        clusterManager,
 		CatalogManager:        management.CatalogManager,
 		TemplateVersionClient: management.Management.CatalogTemplateVersions(""),
 		TemplateVersionLister: management.Management.CatalogTemplateVersions("").Controller().Lister(),
-		KubeConfigGetter:      kubeConfigGetter,
 		AppGetter:             management.Project,
 		UserLister:            management.Management.Users("").Controller().Lister(),
 		UserManager:           management.UserManager,

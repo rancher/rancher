@@ -10,6 +10,7 @@ import (
 	"github.com/rancher/norman/store/proxy"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/pkg/catalog/manager"
+	"github.com/rancher/rancher/pkg/generated/controllers/catalog.cattle.io"
 	apiregistrationv1 "github.com/rancher/rancher/pkg/generated/norman/apiregistration.k8s.io/v1"
 	appsv1 "github.com/rancher/rancher/pkg/generated/norman/apps/v1"
 	autoscaling "github.com/rancher/rancher/pkg/generated/norman/autoscaling/v2beta2"
@@ -204,6 +205,7 @@ type UserContext struct {
 	APIAggregation apiregistrationv1.Interface
 	Apps           appsv1.Interface
 	Autoscaling    autoscaling.Interface
+	Catalog        catalog.Interface
 	Project        projectv3.Interface
 	Core           corev1.Interface
 	RBAC           rbacv1.Interface
@@ -452,6 +454,12 @@ func NewUserContext(scaledContext *ScaledContext, config rest.Config, clusterNam
 		return nil, err
 	}
 	context.RBACw = context.rbacw.Rbac().V1()
+
+	ctlg, err := catalog.NewFactoryFromConfigWithOptions(&context.RESTConfig, &catalog.FactoryOptions{SharedControllerFactory: controllerFactory})
+	if err != nil {
+		return nil, err
+	}
+	context.Catalog = ctlg.Catalog()
 
 	dynamicConfig := config
 	if dynamicConfig.NegotiatedSerializer == nil {
