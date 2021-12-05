@@ -15,6 +15,7 @@ import (
 	"github.com/rancher/rancher/pkg/provisioningv2/rke2/planner"
 	"github.com/rancher/rancher/pkg/provisioningv2/rke2/runtime"
 	"github.com/rancher/rancher/pkg/wrangler"
+	"github.com/rancher/wrangler/pkg/condition"
 	"github.com/rancher/wrangler/pkg/data"
 	"github.com/rancher/wrangler/pkg/generic"
 	"github.com/sirupsen/logrus"
@@ -113,7 +114,7 @@ func (h *handler) associateMachineWithNode(_ string, bootstrap *rkev1.RKEBootstr
 
 	nodeLabelSelector := metav1.LabelSelector{MatchLabels: map[string]string{planner.MachineUIDLabel: string(machine.GetUID())}}
 	nodes, err := clientset.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{LabelSelector: labels.Set(nodeLabelSelector.MatchLabels).String()})
-	if err != nil || len(nodes.Items) == 0 || nodes.Items[0].Spec.ProviderID == "" {
+	if err != nil || len(nodes.Items) == 0 || nodes.Items[0].Spec.ProviderID == "" || !condition.Cond("Ready").IsTrue(nodes.Items[0]) {
 		logrus.Debugf("Searching for providerID for selector %s in cluster %s/%s, machine %s: %v",
 			labels.Set(nodeLabelSelector.MatchLabels), rancherCluster.Namespace, rancherCluster.Name, machine.Name, err)
 		h.rkeBootstrap.EnqueueAfter(bootstrap.Namespace, bootstrap.Name, nodeErrorEnqueueTime)
