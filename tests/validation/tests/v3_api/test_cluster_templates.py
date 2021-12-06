@@ -690,7 +690,7 @@ def test_cluster_template_create_with_monitoring():
     cluster_name = random_test_name("test-auto")
     # Create a cluster using the cluster template revision
     cluster = create_node_cluster(
-        standard_user_client, name=cluster_name, nodecount=3, nodesize="8gb",
+        standard_user_client, name=cluster_name, nodecount=3, nodesize="s-4vcpu-8gb",
         clusterTemplateRevisionId=cluster_template_revision.id,
         userToken=userToken)
     check_cluster_version(cluster, k8sversionlist[0])
@@ -760,7 +760,7 @@ def test_cluster_template_create_update_with_monitoring():
 
     # Create a cluster using the cluster template revision created
     cluster = create_node_cluster(
-        standard_user_client, name=cluster_name, nodecount=3, nodesize="8gb",
+        standard_user_client, name=cluster_name, nodecount=3, nodesize="s-4vcpu-8gb",
         clusterTemplateRevisionId=cluster_template_revision1.id,
         userToken=userToken)
     check_cluster_version(cluster, k8sversionlist[0])
@@ -1008,7 +1008,7 @@ def node_template_digocean(userclient, nodesize):
     return node_template
 
 
-def create_node_cluster(userclient, name, nodecount=1, nodesize="4gb",
+def create_node_cluster(userclient, name, nodecount=1, nodesize="s-2vcpu-4gb",
                         clusterTemplateRevisionId=None,
                         rancherKubernetesEngineConfig=None, answers=None,
                         userToken=None):
