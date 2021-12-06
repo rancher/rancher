@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
+	cond "github.com/rancher/norman/condition"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	kd "github.com/rancher/rancher/pkg/controllers/management/kontainerdrivermetadata"
 	"github.com/rancher/rancher/pkg/controllers/managementagent/podresources"
@@ -584,6 +585,7 @@ func objectsAreEqual(existing *v3.Node, toUpdate *v3.Node) bool {
 	toUpdateToCompare := resetConditions(toUpdate)
 	existingToCompare := resetConditions(existing)
 	statusEqual := statusEqualTest(toUpdateToCompare.Status.InternalNodeStatus, existingToCompare.Status.InternalNodeStatus)
+	conditionsEqual := reflect.DeepEqual(toUpdateToCompare.Status.Conditions, existing.Status.Conditions)
 	labelsEqual := reflect.DeepEqual(toUpdateToCompare.Status.NodeLabels, existing.Status.NodeLabels) && reflect.DeepEqual(toUpdateToCompare.Labels, existing.Labels)
 	annotationsEqual := reflect.DeepEqual(toUpdateToCompare.Status.NodeAnnotations, existing.Status.NodeAnnotations)
 	specEqual := reflect.DeepEqual(toUpdateToCompare.Spec.InternalNodeSpec, existingToCompare.Spec.InternalNodeSpec)
@@ -593,11 +595,11 @@ func objectsAreEqual(existing *v3.Node, toUpdate *v3.Node) bool {
 	rolesEqual := toUpdateToCompare.Spec.Worker == existingToCompare.Spec.Worker && toUpdateToCompare.Spec.Etcd == existingToCompare.Spec.Etcd &&
 		toUpdateToCompare.Spec.ControlPlane == existingToCompare.Spec.ControlPlane
 
-	retVal := statusEqual && specEqual && nodeNameEqual && labelsEqual && annotationsEqual && requestsEqual && limitsEqual && rolesEqual
+	retVal := statusEqual && conditionsEqual && specEqual && nodeNameEqual && labelsEqual && annotationsEqual && requestsEqual && limitsEqual && rolesEqual
 	if !retVal {
-		logrus.Debugf("ObjectsAreEqualResults for %s: statusEqual: %t specEqual: %t"+
+		logrus.Debugf("ObjectsAreEqualResults for %s: statusEqual: %t conditionsEqual: %t specEqual: %t"+
 			" nodeNameEqual: %t labelsEqual: %t annotationsEqual: %t requestsEqual: %t limitsEqual: %t rolesEqual: %t",
-			toUpdate.Name, statusEqual, specEqual, nodeNameEqual, labelsEqual, annotationsEqual, requestsEqual, limitsEqual, rolesEqual)
+			toUpdate.Name, statusEqual, conditionsEqual, specEqual, nodeNameEqual, labelsEqual, annotationsEqual, requestsEqual, limitsEqual, rolesEqual)
 	}
 	return retVal
 }
@@ -676,6 +678,25 @@ func cleanStatus(machine *v3.Node) {
 	for _, condition := range machine.Status.InternalNodeStatus.Conditions {
 		if condition.Type == "Ready" {
 			conditions = append(conditions, condition)
+			readyCondition := v32.NodeCondition{
+				Type:               cond.Cond(condition.Type),
+				Status:             condition.Status,
+				LastTransitionTime: condition.LastTransitionTime.String(),
+				LastUpdateTime:     condition.LastHeartbeatTime.String(),
+				Reason:             condition.Reason,
+				Message:            condition.Message,
+			}
+			var exists bool
+			for i, cond := range machine.Status.Conditions {
+				if cond.Type == "Ready" {
+					exists = true
+					machine.Status.Conditions[i] = readyCondition
+					break
+				}
+			}
+			if !exists {
+				machine.Status.Conditions = append(machine.Status.Conditions, readyCondition)
+			}
 		}
 	}
 
