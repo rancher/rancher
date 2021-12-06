@@ -867,8 +867,7 @@ def validate_http_response(cmd, target_name_list, client_pod=None,
     if client_pod is None and cmd.startswith("http://"):
         wait_until_active(cmd, 60)
     target_hit_list = target_name_list[:]
-    count = 5 * len(target_name_list)
-    for i in range(1, count):
+    while len(target_hit_list) != 0:
         if len(target_hit_list) == 0:
             break
         if client_pod is None:
@@ -883,6 +882,7 @@ def validate_http_response(cmd, target_name_list, client_pod=None,
                            '{0}).Content }}"'.format(cmd)
             else:
                 wget_cmd = "wget -qO- " + cmd
+            time.sleep(6)
             result = kubectl_pod_exec(client_pod, wget_cmd)
             result = result.decode()
         if result is not None:
