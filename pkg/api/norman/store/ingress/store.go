@@ -1,6 +1,7 @@
 package ingress
 
 import (
+	"context"
 	"crypto/md5"
 	"encoding/base64"
 	"encoding/hex"
@@ -9,13 +10,18 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/rancher/norman/store/proxy"
 	"github.com/rancher/norman/store/transform"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/values"
 	"github.com/rancher/rancher/pkg/api/norman/store/workload"
+	"github.com/rancher/rancher/pkg/api/scheme"
+	"github.com/rancher/rancher/pkg/clustermanager"
 	"github.com/rancher/rancher/pkg/controllers/managementagent/ingress"
+	"github.com/rancher/rancher/pkg/ingresswrapper"
 	"github.com/rancher/rancher/pkg/ref"
+	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/sirupsen/logrus"
 )
 
@@ -23,15 +29,17 @@ const (
 	ingressStateAnnotation = "field.cattle.io/ingressState"
 )
 
-func Wrap(store types.Store) types.Store {
-	modify := &Store{
-		store,
+func Wrap(manager *clustermanager.Manager, userContext *config.ScaledContext) func(types.Store) types.Store {
+	return func(store types.Store) types.Store {
+		return New(store, manager, userContext)
 	}
-	return New(modify)
 }
 
 type Store struct {
 	types.Store
+	legacyStore    types.Store
+	userContext    *config.ScaledContext
+	ClusterManager *clustermanager.Manager
 }
 
 func (p *Store) Create(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}) (map[string]interface{}, error) {
@@ -39,14 +47,71 @@ func (p *Store) Create(apiContext *types.APIContext, schema *types.Schema, data 
 	namespace, _ := data["namespaceId"].(string)
 	id := ref.FromStrings(namespace, name)
 	formatData(id, data, false)
-	data, err := p.Store.Create(apiContext, schema, data)
-	return data, err
+	clusterContext, err := p.downstreamClusterContext(apiContext)
+	if err != nil {
+		return nil, err
+	}
+	if ingresswrapper.ServerSupportsIngressV1(clusterContext.K8sClient) {
+		return p.Store.Create(apiContext, schema, data)
+	}
+	// TODO: remove when support for k8s 1.18 is dropped
+	return p.legacyStore.Create(apiContext, schema, data)
 }
 
 func (p *Store) Update(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}, id string) (map[string]interface{}, error) {
 	formatData(id, data, false)
-	data, err := p.Store.Update(apiContext, schema, data, id)
-	return data, err
+	clusterContext, err := p.downstreamClusterContext(apiContext)
+	if err != nil {
+		return nil, err
+	}
+	if ingresswrapper.ServerSupportsIngressV1(clusterContext.K8sClient) {
+		return p.Store.Update(apiContext, schema, data, id)
+	}
+	// TODO: remove when support for k8s 1.18 is dropped
+	return p.legacyStore.Update(apiContext, schema, data, id)
+}
+
+func (p *Store) List(apiContext *types.APIContext, schema *types.Schema, opt *types.QueryOptions) ([]map[string]interface{}, error) {
+	clusterContext, err := p.downstreamClusterContext(apiContext)
+	if err != nil {
+		return nil, err
+	}
+	if ingresswrapper.ServerSupportsIngressV1(clusterContext.K8sClient) {
+		return p.Store.List(apiContext, schema, opt)
+	}
+	// TODO: remove when support for k8s 1.18 is dropped
+	return p.legacyStore.List(apiContext, schema, opt)
+}
+
+func (p *Store) Watch(apiContext *types.APIContext, schema *types.Schema, opt *types.QueryOptions) (chan map[string]interface{}, error) {
+	clusterContext, err := p.downstreamClusterContext(apiContext)
+	if err != nil {
+		return nil, err
+	}
+	if ingresswrapper.ServerSupportsIngressV1(clusterContext.K8sClient) {
+		return p.Store.Watch(apiContext, schema, opt)
+	}
+	// TODO: remove when support for k8s 1.18 is dropped
+	return p.legacyStore.Watch(apiContext, schema, opt)
+}
+
+func (p *Store) ByID(apiContext *types.APIContext, schema *types.Schema, id string) (map[string]interface{}, error) {
+	clusterContext, err := p.downstreamClusterContext(apiContext)
+	if err != nil {
+		return nil, err
+	}
+	if ingresswrapper.ServerSupportsIngressV1(clusterContext.K8sClient) {
+		return p.Store.ByID(apiContext, schema, id)
+	}
+	// TODO: remove when support for k8s 1.18 is dropped
+	return p.legacyStore.ByID(apiContext, schema, id)
+}
+
+// downstreamClusterContext is a helper for fetching the cluster context from the request.
+// TODO: remove when support for k8s 1.18 is dropped
+func (p *Store) downstreamClusterContext(apiContext *types.APIContext) (*config.UserContext, error) {
+	clusterName := p.ClusterManager.ClusterName(apiContext)
+	return p.ClusterManager.UserContext(clusterName)
 }
 
 func formatData(id string, data map[string]interface{}, forFrontend bool) {
@@ -238,9 +303,30 @@ func updateCerts(data map[string]interface{}, forFrontend bool, oldState map[str
 	}
 }
 
-func New(store types.Store) types.Store {
+func New(store types.Store, manager *clustermanager.Manager, userContext *config.ScaledContext) types.Store {
+	// legacyStore is a norman proxy store object for the
+	// extensions/v1beta1/Ingress API that can be used to sidestep the registered
+	// networking.k8s.io/v1/Ingress API if the server doesn't support it.
+	// TODO: remove when support for k8s 1.18 is dropped
+	legacyStore := proxy.NewProxyStore(
+		context.Background(),
+		userContext.ClientGetter,
+		config.UserStorageContext,
+		scheme.Scheme,
+		[]string{"apis"},
+		"extensions",
+		"v1beta1",
+		"Ingress",
+		"ingresses",
+	)
+	s := &Store{
+		store,
+		legacyStore,
+		userContext,
+		manager,
+	}
 	return &transform.Store{
-		Store: store,
+		Store: s,
 		Transformer: func(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}, opt *types.QueryOptions) (map[string]interface{}, error) {
 			id, _ := data["id"].(string)
 			formatData(id, data, true)
