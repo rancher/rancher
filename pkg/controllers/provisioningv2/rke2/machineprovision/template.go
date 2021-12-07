@@ -30,7 +30,7 @@ func getJobName(name string) string {
 	return name2.SafeConcatName(name, "machine", "provision")
 }
 
-func (h *handler) objects(ready bool, typeMeta metav1.Type, meta metav1.Object, args driverArgs, filesSecret *corev1.Secret, jobBackoffLimit int32) ([]runtime.Object, error) {
+func (h *handler) objects(ready bool, typeMeta metav1.Type, meta metav1.Object, args driverArgs, filesSecret *corev1.Secret, jobBackoffLimit int32) []runtime.Object {
 	var volumes []corev1.Volume
 	var volumeMounts []corev1.VolumeMount
 	machineGVK := schema.FromAPIVersionAndKind(typeMeta.GetAPIVersion(), typeMeta.GetKind())
@@ -44,7 +44,7 @@ func (h *handler) objects(ready bool, typeMeta metav1.Type, meta metav1.Object, 
 	}
 
 	if ready {
-		return []runtime.Object{secret}, nil
+		return []runtime.Object{secret}
 	}
 
 	if args.BootstrapOptional && args.BootstrapSecretName == "" {
@@ -225,5 +225,5 @@ func (h *handler) objects(ready bool, typeMeta metav1.Type, meta metav1.Object, 
 		filesSecret,
 		rb2,
 		job,
-	}, nil
+	}
 }
