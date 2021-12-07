@@ -50,6 +50,10 @@ func Register(ctx context.Context, clients *wrangler.Context, planner *planner.P
 }
 
 func (h *handler) OnChange(cluster *rkev1.RKEControlPlane, status rkev1.RKEControlPlaneStatus) (rkev1.RKEControlPlaneStatus, error) {
+	if !cluster.DeletionTimestamp.IsZero() {
+		return status, nil
+	}
+
 	status.ObservedGeneration = cluster.Generation
 
 	err := h.planner.Process(cluster)

@@ -190,7 +190,7 @@ func (p *Planner) Process(controlPlane *rkev1.RKEControlPlane) error {
 	defer p.locker.Unlock(string(controlPlane.UID))
 
 	cluster, err := p.getCAPICluster(controlPlane)
-	if err != nil {
+	if err != nil || !cluster.DeletionTimestamp.IsZero() {
 		return err
 	}
 
