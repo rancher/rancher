@@ -109,7 +109,6 @@ func getProviderAndReadyStatus(cluster *mgmtv3.Cluster) (string, bool) {
 // getProviderRefreshInterval returns the duration that should pass between
 // refreshing a cluster created by the given cloud provider.
 func getProviderRefreshInterval(provider string) (time.Duration, error) {
-
 	providerRefreshInterval := settings.GetSettingByID(fmt.Sprintf(refreshSettingFormat, strings.ToLower(provider)))
 	if providerRefreshInterval == "" {
 		return 300 * time.Second, nil
@@ -137,7 +136,6 @@ func nextRefreshTime(refreshInterval time.Duration, lastRefreshTime string) (tim
 }
 
 func (c *clusterRefreshController) refreshClusterUpstreamSpec(cluster *mgmtv3.Cluster, cloudDriver string) (*mgmtv3.Cluster, error) {
-
 	logrus.Infof("checking cluster [%s] upstream state for changes", cluster.Name)
 
 	// In this call, it is possible to get errors back with non-nil upstreamSpec.
@@ -147,14 +145,16 @@ func (c *clusterRefreshController) refreshClusterUpstreamSpec(cluster *mgmtv3.Cl
 	upstreamConfig, err := getComparableUpstreamSpec(c.secretsCache, cluster)
 	if err != nil {
 		var syncFailed string
-		if upstreamConfig == nil {
+		if upstreamConfig == nil || (upstreamConfig.gkeConfig == nil && upstreamConfig.eksConfig == nil) {
 			syncFailed = ": syncing failed"
 		}
 		cluster = cluster.DeepCopy()
 		apimgmtv3.ClusterConditionUpdated.False(cluster)
 		apimgmtv3.ClusterConditionUpdated.Message(cluster, fmt.Sprintf("[Syncing error%s] %s", syncFailed, err.Error()))
 
-		if upstreamConfig == nil {
+		// Only continue if one of the configs on upstreamConfig is not nil.
+		// Otherwise, an error occurred and no syncing should occur.
+		if upstreamConfig == nil || (upstreamConfig.gkeConfig == nil && upstreamConfig.eksConfig == nil) {
 			return c.updateCluster(cluster)
 		}
 	} else if strings.Contains(apimgmtv3.ClusterConditionUpdated.GetMessage(cluster), "[Syncing error") {
@@ -244,7 +244,6 @@ func (c *clusterRefreshController) refreshClusterUpstreamSpec(cluster *mgmtv3.Cl
 }
 
 func (c *clusterRefreshController) updateCluster(cluster *mgmtv3.Cluster) (*mgmtv3.Cluster, error) {
-
 	if cluster.Annotations == nil {
 		cluster.Annotations = make(map[string]string)
 	}
