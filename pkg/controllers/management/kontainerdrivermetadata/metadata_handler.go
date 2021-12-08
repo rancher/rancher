@@ -10,23 +10,23 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/types/convert"
+	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/settings"
-	v1 "github.com/rancher/types/apis/core/v1"
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
-	"github.com/rancher/types/config"
+	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
 type MetadataController struct {
 	NamespacesLister          v1.NamespaceLister
-	SystemImagesLister        v3.RKEK8sSystemImageLister
-	SystemImages              v3.RKEK8sSystemImageInterface
-	ServiceOptionsLister      v3.RKEK8sServiceOptionLister
-	ServiceOptions            v3.RKEK8sServiceOptionInterface
-	AddonsLister              v3.RKEAddonLister
-	Addons                    v3.RKEAddonInterface
+	SystemImagesLister        v3.RkeK8sSystemImageLister
+	SystemImages              v3.RkeK8sSystemImageInterface
+	ServiceOptionsLister      v3.RkeK8sServiceOptionLister
+	ServiceOptions            v3.RkeK8sServiceOptionInterface
+	AddonsLister              v3.RkeAddonLister
+	Addons                    v3.RkeAddonInterface
 	SettingLister             v3.SettingLister
 	Settings                  v3.SettingInterface
 	CisConfigLister           v3.CisConfigLister
@@ -66,22 +66,24 @@ func Register(ctx context.Context, management *config.ManagementContext) {
 	mgmt := management.Management
 
 	m := &MetadataController{
-		SystemImagesLister:        mgmt.RKEK8sSystemImages("").Controller().Lister(),
-		SystemImages:              mgmt.RKEK8sSystemImages(""),
-		ServiceOptionsLister:      mgmt.RKEK8sServiceOptions("").Controller().Lister(),
-		ServiceOptions:            mgmt.RKEK8sServiceOptions(""),
-		NamespacesLister:          management.Core.Namespaces("").Controller().Lister(),
-		AddonsLister:              mgmt.RKEAddons("").Controller().Lister(),
-		Addons:                    mgmt.RKEAddons(""),
-		SettingLister:             mgmt.Settings("").Controller().Lister(),
-		Settings:                  mgmt.Settings(""),
-		CisConfigLister:           mgmt.CisConfigs("").Controller().Lister(),
-		CisConfig:                 mgmt.CisConfigs(""),
-		CisBenchmarkVersionLister: mgmt.CisBenchmarkVersions("").Controller().Lister(),
-		CisBenchmarkVersion:       mgmt.CisBenchmarkVersions(""),
+		SystemImagesLister:   mgmt.RkeK8sSystemImages("").Controller().Lister(),
+		SystemImages:         mgmt.RkeK8sSystemImages(""),
+		ServiceOptionsLister: mgmt.RkeK8sServiceOptions("").Controller().Lister(),
+		ServiceOptions:       mgmt.RkeK8sServiceOptions(""),
+		NamespacesLister:     management.Core.Namespaces("").Controller().Lister(),
+		AddonsLister:         mgmt.RkeAddons("").Controller().Lister(),
+		Addons:               mgmt.RkeAddons(""),
+		SettingLister:        mgmt.Settings("").Controller().Lister(),
+		Settings:             mgmt.Settings(""),
 	}
 
+	m.CisConfigLister = mgmt.CisConfigs("").Controller().Lister()
+	m.CisConfig = mgmt.CisConfigs("")
+	m.CisBenchmarkVersionLister = mgmt.CisBenchmarkVersions("").Controller().Lister()
+	m.CisBenchmarkVersion = mgmt.CisBenchmarkVersions("")
+
 	mgmt.Settings("").AddHandler(ctx, "rke-metadata-handler", m.sync)
+	mgmt.Settings("").Controller().Enqueue("", rkeMetadataConfig)
 }
 
 func (m *MetadataController) sync(key string, setting *v3.Setting) (runtime.Object, error) {
@@ -123,11 +125,11 @@ func (m *MetadataController) sync(key string, setting *v3.Setting) (runtime.Obje
 
 func (m *MetadataController) refresh() error {
 	if !toSync(m.url) {
-		logrus.Debugf("driverMetadata: skip sync, hash up to date %v", m.url.latestHash)
+		logrus.Infof("driverMetadata: skip sync, hash up to date %v", m.url.latestHash)
 		return nil
 	}
 	if !storeMap(m.url) {
-		logrus.Debugf("driverMetadata: already in progress")
+		logrus.Infof("driverMetadata: already in progress")
 		return nil
 	}
 	defer deleteMap(m.url)

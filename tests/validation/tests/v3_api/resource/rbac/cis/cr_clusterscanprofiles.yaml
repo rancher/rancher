@@ -1,0 +1,6 @@
+apiVersion: cis.cattle.io/v1
+kind: ClusterScanProfile
+metadata:
+  name: profile-sample
+spec:
+  benchmarkVersion: rke-cis-1.5-permissive

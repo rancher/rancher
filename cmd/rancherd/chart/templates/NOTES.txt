@@ -1,0 +1,7 @@
+Rancher Server has been installed.
+
+Check out our docs at https://rancher.com/docs/rancher/v2.x/en/
+
+Browse to https://{{ .Values.hostname }}
+
+Happy Containering!

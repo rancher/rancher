@@ -10,8 +10,8 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/rancher/rancher/pkg/settings"
-	"github.com/rancher/rancher/pkg/ticker"
-	"github.com/rancher/types/config"
+	"github.com/rancher/rancher/pkg/types/config"
+	"github.com/rancher/wrangler/pkg/ticker"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/labels"
 )
@@ -134,7 +134,7 @@ func createToken(management *config.ScaledContext) (string, error) {
 	}
 	for _, user := range users {
 		if user.DisplayName == adminRole {
-			token, err := management.UserManager.EnsureToken("telemetry", "telemetry token", "telemetry", user.Name)
+			token, err := management.UserManager.EnsureToken("telemetry", "telemetry token", "telemetry", user.Name, nil, false)
 			if err != nil {
 				return "", errors.Wrapf(err, "Can't create token for telemetry. Err: %v. Retry after 5 seconds", err)
 			}

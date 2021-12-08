@@ -3,8 +3,8 @@ package auth
 import (
 	"testing"
 
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
-	"github.com/rancher/types/apis/management.cattle.io/v3/fakes"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3/fakes"
 	"github.com/stretchr/testify/assert"
 
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -15,7 +15,6 @@ const testNamespace = "test-cluster"
 const testRoleTemplateName = "fake-role-template"
 
 func TestEnqueuePrtbsOnRoleTemplateUpdate(t *testing.T) {
-
 	existingPrtbs := []*v3.ProjectRoleTemplateBinding{
 		{
 			ObjectMeta: v1.ObjectMeta{
@@ -74,4 +73,65 @@ func TestEnqueuePrtbsOnRoleTemplateUpdate(t *testing.T) {
 	err := rtl.enqueuePrtbs(&updatedRT)
 	assert.Nil(t, err)
 	assert.Equal(t, 2, len(mockedProjectRoleTemplateBindingController.EnqueueCalls()))
+}
+
+func TestEnqueueCrtbsOnRoleTemplateUpdate(t *testing.T) {
+	existingCrtbs := []*v3.ClusterRoleTemplateBinding{
+		{
+			ObjectMeta: v1.ObjectMeta{
+				Name:      "crtb-1",
+				Namespace: testNamespace,
+			},
+			RoleTemplateName: testRoleTemplateName,
+		},
+		{
+			ObjectMeta: v1.ObjectMeta{
+				Name:      "crtb-2",
+				Namespace: testNamespace,
+			},
+			RoleTemplateName: "this-is-not-the-rt-you-are-looking-for",
+		},
+		{
+			ObjectMeta: v1.ObjectMeta{
+				Name:      "crtb-3",
+				Namespace: testNamespace,
+			},
+			RoleTemplateName: testRoleTemplateName,
+		},
+	}
+
+	// Mock crtb controller to catch enqueue calls
+	mockCrtbController := fakes.ClusterRoleTemplateBindingControllerMock{
+		EnqueueFunc: func(namespace string, name string) {},
+	}
+
+	// Setup a mock indexer that uses our custom index and method, then add test objects
+	indexers := map[string]cache.IndexFunc{
+		crtbByRoleTemplateIndex: crtbByRoleTemplate,
+	}
+	mockIndexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+	mockIndexer.AddIndexers(indexers)
+	for _, obj := range existingCrtbs {
+		mockIndexer.Add(obj)
+	}
+
+	rtl := roleTemplateLifecycle{
+		crtbIndexer: mockIndexer,
+		crtbClient: &fakes.ClusterRoleTemplateBindingInterfaceMock{
+			ControllerFunc: func() v3.ClusterRoleTemplateBindingController {
+				return &mockCrtbController
+			},
+		},
+	}
+
+	updatedRT := v3.RoleTemplate{
+		ObjectMeta: v1.ObjectMeta{
+			Name:      testRoleTemplateName,
+			Namespace: testNamespace,
+		},
+	}
+	// Now pass in a roleTemplate with name that matches a subset of test objects
+	err := rtl.enqueueCrtbs(&updatedRT)
+	assert.Nil(t, err)
+	assert.Equal(t, 2, len(mockCrtbController.EnqueueCalls()))
 }

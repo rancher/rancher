@@ -5,14 +5,15 @@ import (
 	"fmt"
 	"strings"
 
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/tokens"
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
-	"github.com/rancher/types/apis/management.cattle.io/v3public"
-	"github.com/rancher/types/config"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/bcrypt"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -100,7 +101,7 @@ func (l *Provider) getUser(username string) (*v3.User, error) {
 }
 
 func (l *Provider) AuthenticateUser(ctx context.Context, input interface{}) (v3.Principal, []v3.Principal, string, error) {
-	localInput, ok := input.(*v3public.BasicLogin)
+	localInput, ok := input.(*v32.BasicLogin)
 	if !ok {
 		return v3.Principal{}, nil, "", httperror.NewAPIError(httperror.ServerError, "Unexpected input type")
 	}
@@ -108,17 +109,19 @@ func (l *Provider) AuthenticateUser(ctx context.Context, input interface{}) (v3.
 	username := localInput.Username
 	pwd := localInput.Password
 
+	authFailedError := httperror.NewAPIError(httperror.Unauthorized, "authentication failed")
 	user, err := l.getUser(username)
-
 	if err != nil {
 		// If the user don't exist the password is evaluated
 		// to avoid user enumeration via timing attack (time based side-channel).
 		bcrypt.CompareHashAndPassword(l.invalidHash, []byte(pwd))
-		return v3.Principal{}, nil, "", err
+		logrus.Debugf("Get User [%s] failed during Authentication: %v", username, err)
+		return v3.Principal{}, nil, "", authFailedError
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(pwd)); err != nil {
-		return v3.Principal{}, nil, "", httperror.WrapAPIError(err, httperror.Unauthorized, "authentication failed")
+		logrus.Debugf("Authentication failed for User [%s]: %v", username, err)
+		return v3.Principal{}, nil, "", authFailedError
 	}
 
 	principalID := getLocalPrincipalID(user)
@@ -140,6 +143,9 @@ func getLocalPrincipalID(user *v3.User) string {
 		if strings.HasPrefix(p, Name+"://") {
 			principalID = p
 		}
+	}
+	if principalID == "" {
+		return Name + "://" + user.Name
 	}
 	return principalID
 }
@@ -440,4 +446,11 @@ func (l *Provider) CanAccessWithGroupProviders(userPrincipalID string, groupPrin
 	}
 
 	return false, nil
+}
+
+func (l *Provider) GetUserExtraAttributes(token *v3.Token) map[string][]string {
+	extras := make(map[string][]string)
+	extras["principalid"] = []string{token.UserPrincipal.Name}
+	extras["username"] = []string{token.UserPrincipal.LoginName}
+	return extras
 }

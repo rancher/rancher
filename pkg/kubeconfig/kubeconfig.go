@@ -5,11 +5,12 @@ import (
 	"encoding/base64"
 	"fmt"
 	"regexp"
+	"strings"
 
-	"github.com/rancher/norman/types/slice"
+	managementv3 "github.com/rancher/rancher/pkg/client/generated/management/v3"
+	mgmtv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/node"
 	"github.com/rancher/rancher/pkg/settings"
-	"github.com/rancher/rke/services"
-	managementv3 "github.com/rancher/types/client/management/v3"
 )
 
 const (
@@ -21,7 +22,7 @@ var (
 	splitRegexp = regexp.MustCompile(`\S{1,76}`)
 )
 
-type node struct {
+type kubeNode struct {
 	ClusterName string
 	Server      string
 	Cert        string
@@ -29,15 +30,16 @@ type node struct {
 }
 
 type data struct {
-	ClusterName string
-	Host        string
-	ClusterID   string
-	Cert        string
-	User        string
-	Username    string
-	Password    string
-	Token       string
-	Nodes       []node
+	ClusterName     string
+	Host            string
+	ClusterID       string
+	Cert            string
+	User            string
+	Username        string
+	Password        string
+	Token           string
+	EndpointEnabled bool
+	Nodes           []kubeNode
 }
 
 func ForBasic(host, username, password string) (string, error) {
@@ -85,8 +87,8 @@ func caCertString() string {
 	return formatCertString(certData)
 }
 
-func getDefaultNode(clusterName, clusterID, host string) node {
-	return node{
+func getDefaultNode(clusterName, clusterID, host string) kubeNode {
+	return kubeNode{
 		Server:      fmt.Sprintf("https://%s/k8s/clusters/%s", host, clusterID),
 		Cert:        caCertString(),
 		ClusterName: clusterName,
@@ -96,13 +98,14 @@ func getDefaultNode(clusterName, clusterID, host string) node {
 
 func ForTokenBased(clusterName, clusterID, host, token string) (string, error) {
 	data := &data{
-		ClusterName: clusterName,
-		ClusterID:   clusterID,
-		Host:        host,
-		Cert:        caCertString(),
-		User:        clusterName,
-		Token:       token,
-		Nodes:       []node{getDefaultNode(clusterName, clusterID, host)},
+		ClusterName:     clusterName,
+		ClusterID:       clusterID,
+		Host:            host,
+		Cert:            caCertString(),
+		User:            clusterName,
+		Token:           token,
+		Nodes:           []kubeNode{getDefaultNode(clusterName, clusterID, host)},
+		EndpointEnabled: false,
 	}
 
 	if data.ClusterName == "" {
@@ -114,50 +117,47 @@ func ForTokenBased(clusterName, clusterID, host, token string) (string, error) {
 	return buf.String(), err
 }
 
-func ForClusterTokenBased(cluster *managementv3.Cluster, clusterID, host, token string) (string, error) {
+func ForClusterTokenBased(cluster *managementv3.Cluster, nodes []*mgmtv3.Node, clusterID, host, token string) (string, error) {
 	clusterName := cluster.Name
 	if clusterName == "" {
 		clusterName = clusterID
 	}
 
-	nodes := []node{getDefaultNode(clusterName, clusterID, host)}
+	nodesForConfig := []kubeNode{getDefaultNode(clusterName, clusterID, host)}
 
 	if cluster.LocalClusterAuthEndpoint.FQDN != "" {
 		fqdnCACerts := base64.StdEncoding.EncodeToString([]byte(cluster.LocalClusterAuthEndpoint.CACerts))
-		clusterNode := node{
+		clusterNode := kubeNode{
 			ClusterName: clusterName + "-fqdn",
 			Server:      "https://" + cluster.LocalClusterAuthEndpoint.FQDN,
 			Cert:        formatCertString(fqdnCACerts),
 			User:        clusterName,
 		}
-		nodes = append(nodes, clusterNode)
+		nodesForConfig = append(nodesForConfig, clusterNode)
 	} else {
-		var rkeNodes []managementv3.RKEConfigNode
-		if cluster.AppliedSpec != nil && cluster.AppliedSpec.RancherKubernetesEngineConfig != nil {
-			rkeNodes = cluster.AppliedSpec.RancherKubernetesEngineConfig.Nodes
-		}
-		for _, rkeNode := range rkeNodes {
-			if !slice.ContainsString(rkeNode.Role, services.ControlRole) {
-				continue
+		for _, n := range nodes {
+			if n.Spec.ControlPlane {
+				nodeName := clusterName + "-" + strings.TrimPrefix(n.Spec.RequestedHostname, clusterName+"-")
+				clusterNode := kubeNode{
+					ClusterName: nodeName,
+					Server:      "https://" + node.GetEndpointNodeIP(n) + ":6443",
+					Cert:        formatCertString(cluster.CACert),
+					User:        clusterName,
+				}
+				nodesForConfig = append(nodesForConfig, clusterNode)
 			}
-			clusterNode := node{
-				ClusterName: clusterName + "-" + rkeNode.HostnameOverride,
-				Server:      "https://" + rkeNode.Address + ":6443",
-				Cert:        formatCertString(cluster.CACert),
-				User:        clusterName,
-			}
-			nodes = append(nodes, clusterNode)
 		}
 	}
 
 	data := &data{
-		ClusterName: clusterName,
-		ClusterID:   clusterID,
-		Host:        host,
-		Cert:        caCertString(),
-		User:        clusterName,
-		Token:       token,
-		Nodes:       nodes,
+		ClusterName:     clusterName,
+		ClusterID:       clusterID,
+		Host:            host,
+		Cert:            caCertString(),
+		User:            clusterName,
+		Token:           token,
+		Nodes:           nodesForConfig,
+		EndpointEnabled: true,
 	}
 
 	buf := &bytes.Buffer{}

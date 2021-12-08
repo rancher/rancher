@@ -394,7 +394,7 @@ def test_add_remove_fields(admin_cc, admin_pc):
                                           resourceQuota=pq,
                                           namespaceDefaultResourceQuota=dq)
     wait_for_used_svcs_limit_set(admin_cc.management.client, p,
-                                 10, "4")
+                                 30, "4")
 
     # remove services quota
     pq = {"limit": {"pods": "10"}}
@@ -403,7 +403,7 @@ def test_add_remove_fields(admin_cc, admin_pc):
                                           resourceQuota=pq,
                                           namespaceDefaultResourceQuota=dq)
     wait_for_used_svcs_limit_set(admin_cc.management.client, p,
-                                 10, "0")
+                                 30, "0")
 
 
 def wait_for_used_svcs_limit_set(admin_cc_client, project, timeout=30,

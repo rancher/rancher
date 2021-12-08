@@ -42,8 +42,9 @@ IP = get_ip()
 SERVER_URL = 'https://' + IP + ':8443'
 BASE_URL = SERVER_URL + '/v3'
 AUTH_URL = BASE_URL + '-public/localproviders/local?action=login'
-DEFAULT_TIMEOUT = 45
+DEFAULT_TIMEOUT = 120
 DEFAULT_CATALOG = "https://github.com/rancher/integration-test-charts"
+WAIT_HTTP_ERROR_CODES = [404, 405]
 
 
 class ManagementContext:
@@ -129,8 +130,14 @@ def cluster_and_client(cluster_id, mgmt_client):
 
 
 def user_project_client(user, project):
-    """Returns a project level  client for the user"""
+    """Returns a project level client for the user"""
     return rancher.Client(url=project.links.self+'/schemas', verify=False,
+                          token=user.client.token)
+
+
+def user_cluster_client(user, cluster):
+    """Returns a cluster level client for the user"""
+    return rancher.Client(url=cluster.links.self+'/schemas', verify=False,
                           token=user.client.token)
 
 
@@ -370,7 +377,7 @@ def remove_resource(admin_mc, request):
                 if code == 409 and "namespace will automatically be purged " \
                         in e.error.message:
                     pass
-                elif code != 404:
+                elif code not in WAIT_HTTP_ERROR_CODES:
                     raise e
         request.addfinalizer(clean)
     return _cleanup
@@ -388,7 +395,7 @@ def remove_resouce_func(request):
                 delete_func(name)
             except ApiException as e:
                 body = json.loads(e.body)
-                if body["code"] != 404:
+                if body["code"] not in WAIT_HTTP_ERROR_CODES:
                     raise e
         request.addfinalizer(clean)
     return _cleanup
@@ -428,11 +435,10 @@ def raw_remove_custom_resource(admin_mc, request):
                     version,
                     metadata["namespace"],
                     crd.spec.names.plural,
-                    metadata["name"],
-                    {})
+                    metadata["name"])
             except ApiException as e:
                 body = json.loads(e.body)
-                if body["code"] != 404:
+                if body["code"] not in WAIT_HTTP_ERROR_CODES:
                     raise e
         request.addfinalizer(clean)
     return _cleanup
@@ -450,7 +456,7 @@ def remove_resource_session(admin_mc, request):
             try:
                 client.delete(resource)
             except ApiError as e:
-                if e.error.status != 404:
+                if e.error.status not in WAIT_HTTP_ERROR_CODES:
                     raise e
         request.addfinalizer(clean)
     return _cleanup
@@ -471,7 +477,7 @@ def wait_remove_resource(admin_mc, request, timeout=DEFAULT_TIMEOUT):
                 if code == 409 and "namespace will automatically be purged " \
                         in e.error.message:
                     pass
-                elif code != 404:
+                elif code not in WAIT_HTTP_ERROR_CODES:
                     raise e
             wait_until(lambda: client.reload(resource) is None)
         request.addfinalizer(clean)
@@ -489,7 +495,7 @@ def list_remove_resource(admin_mc, request):
                 try:
                     client.delete(item)
                 except ApiError as e:
-                    if e.error.status != 404:
+                    if e.error.status not in WAIT_HTTP_ERROR_CODES:
                         raise e
                 wait_until(lambda: client.reload(item) is None)
         request.addfinalizer(clean)

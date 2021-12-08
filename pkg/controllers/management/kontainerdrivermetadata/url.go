@@ -8,10 +8,10 @@ import (
 	"strings"
 
 	"github.com/rancher/norman/types/convert"
-	"github.com/rancher/rancher/pkg/catalog/git"
-	"github.com/rancher/rancher/pkg/randomtoken"
+	"github.com/rancher/rancher/pkg/git"
 	"github.com/rancher/rancher/pkg/settings"
-	"github.com/rancher/types/kdm"
+	"github.com/rancher/rke/types/kdm"
+	"github.com/rancher/wrangler/pkg/randomtoken"
 	"github.com/sirupsen/logrus"
 )
 

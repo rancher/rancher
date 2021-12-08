@@ -1,0 +1,28 @@
+{
+  "type": "fleet.cattle.io.gitrepo",
+  "metadata": {
+    "namespace": "fleet-default",
+    "name": ""
+  },
+  "metadata.annotations": {
+  },
+  "metadata.labels": {
+  },
+  "spec": {
+    "repo": "https://github.com/rancher/fleet-examples",
+    "branch": "master",
+    "paths": [
+      "/simple"
+    ],
+    "targets": [
+      {
+        "clusterSelector": {
+          "matchLabels": {
+            "management.cattle.io/cluster-name": ""
+          }
+        }
+      }
+    ],
+    "insecureSkipTLSVerify": false
+  }
+}

@@ -175,19 +175,22 @@ def test_cluster_catalog_templates_access(admin_mc, user_factory,
     # Now remove user1 also from the cluster, this should mean user1 should
     # no longer be able to access the catalog and templates
     admin_client.delete(crtb_member)
-    wait_for_clustercatalog_template_to_be_deleted(user1.client, catalog_name)
+    wait_for_clustercatalog_template_to_be_deleted(user1.client, catalog_name,
+                                                   120)
 
     # Now remove the user admin_pc from the project of this cluster,
     # so admin_pc should no longer have access to catalog and templates
     admin_client.delete(prtb_owner)
-    wait_for_clustercatalog_template_to_be_deleted(user2.client, catalog_name)
+    wait_for_clustercatalog_template_to_be_deleted(user2.client, catalog_name,
+                                                   120)
 
     templateversions = \
         user2.client.list_template(clusterCatalogId=catalog_name)
     assert len(templateversions) == 0
 
     admin_client.delete(cc)
-    wait_for_clustercatalog_template_to_be_deleted(admin_client, catalog_name)
+    wait_for_clustercatalog_template_to_be_deleted(admin_client, catalog_name,
+                                                   120)
 
 
 def wait_for_clustercatalog_template_to_be_created(client, name, timeout=45):

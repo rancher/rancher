@@ -5,9 +5,10 @@ import time
 
 from .common import random_str
 from .test_catalog import wait_for_template_to_be_created
-from .conftest import wait_until_available, \
+from .conftest import wait_until_available, wait_until, \
     cluster_and_client, user_project_client, \
-    kubernetes_api_client, wait_for, ClusterContext
+    kubernetes_api_client, wait_for, ClusterContext, \
+    user_cluster_client
 
 
 def test_multi_user(admin_mc, user_mc):
@@ -232,8 +233,78 @@ def test_removing_user_from_cluster(admin_pc, admin_mc, user_mc, admin_cc,
     to see the cluster.
     """
 
-    # Yes, this is misspelled, it's how the actual label is spelled.
-    mbo = 'memberhsip-binding-owner'
+    mbo = 'membership-binding-owner'
+
+    admin_client = admin_mc.client
+    prtb = admin_client.create_project_role_template_binding(
+        userId=user_mc.user.id,
+        roleTemplateId="project-member",
+        projectId=admin_pc.project.id,
+    )
+    remove_resource(prtb)
+
+    # Verify the user can see the cluster
+    wait_until_available(user_mc.client, admin_cc.cluster)
+
+    split = str.split(prtb.id, ":")
+    prtb_key = split[0] + "_" + split[1]
+    api_instance = kubernetes.client.RbacAuthorizationV1Api(
+        admin_mc.k8s_client)
+
+    def crb_created():
+        crbs = api_instance.list_cluster_role_binding(
+            label_selector=prtb_key + "=" + mbo)
+        return len(crbs.items) == 1
+
+    # Find the expected k8s clusterRoleBinding
+    wait_for(crb_created,
+             fail_handler=lambda: "failed waiting for clusterRoleBinding"
+                                  " to get created",
+             timeout=120)
+
+    # Delete the projectRoleTemplateBinding, this should cause the user to no
+    # longer be able to see the cluster
+    admin_mc.client.delete(prtb)
+
+    def crb_deleted():
+        crbs = api_instance.list_cluster_role_binding(
+            label_selector=prtb_key + "=" + mbo)
+        return len(crbs.items) == 0
+
+    wait_for(crb_deleted,
+             fail_handler=lambda: "failed waiting for clusterRoleBinding"
+                                  " to get deleted",
+             timeout=120)
+
+    # user should now have no access to any clusters
+    def list_clusters():
+        clusters = user_mc.client.list_cluster()
+        return len(clusters.data) == 0
+
+    wait_for(list_clusters,
+             fail_handler=lambda: "failed revoking access to cluster",
+             timeout=120)
+
+    with pytest.raises(ApiError) as e:
+        user_mc.client.by_id_cluster(admin_cc.cluster.id)
+    assert e.value.error.status == 403
+
+
+def test_upgraded_setup_removing_user_from_cluster(admin_pc, admin_mc,
+                                                   user_mc, admin_cc,
+                                                   remove_resource):
+    """Test that a user added to a project in a cluster prior to 2.5, upon
+    upgrade is able to see that cluster, and after being removed from the
+    project they are no longer able to see the cluster.
+    Upgrade will be simulated by editing the CRB to include the older label
+    format, containing the PRTB UID
+    """
+
+    mbo = 'membership-binding-owner'
+
+    # Yes, this is misspelled, it's how the actual label was spelled
+    #  prior to 2.5.
+    mbo_legacy = 'memberhsip-binding-owner'
 
     admin_client = admin_mc.client
     prtb = admin_client.create_project_role_template_binding(
@@ -249,31 +320,67 @@ def test_removing_user_from_cluster(admin_pc, admin_mc, user_mc, admin_cc,
     api_instance = kubernetes.client.RbacAuthorizationV1Api(
         admin_mc.k8s_client)
 
+    split = str.split(prtb.id, ":")
+    prtb_key = split[0]+"_"+split[1]
+
+    def crb_created():
+        crbs = api_instance.list_cluster_role_binding(
+            label_selector=prtb_key + "=" + mbo)
+        return len(crbs.items) == 1
+
     # Find the expected k8s clusterRoleBinding
+    wait_for(crb_created,
+             fail_handler=lambda: "failed waiting for clusterRoleBinding to"
+                                  "get created", timeout=120)
+
     crbs = api_instance.list_cluster_role_binding(
-        label_selector=prtb.uuid + "=" + mbo)
+        label_selector=prtb_key + "=" + mbo)
 
     assert len(crbs.items) == 1
+
+    # edit this CRB to add in the legacy label to simulate an upgraded setup
+    crb = crbs.items[0]
+    crb.metadata.labels[prtb.uuid] = mbo_legacy
+    api_instance.patch_cluster_role_binding(crb.metadata.name, crb)
+
+    def crb_label_updated():
+        crbs = api_instance.list_cluster_role_binding(
+            label_selector=prtb.uuid + "=" + mbo_legacy)
+        return len(crbs.items) == 1
+
+    wait_for(crb_label_updated,
+             fail_handler=lambda: "failed waiting for cluster role binding to"
+                                  "be updated", timeout=120)
 
     # Delete the projectRoleTemplateBinding, this should cause the user to no
     # longer be able to see the cluster
     admin_mc.client.delete(prtb)
 
     def crb_callback():
-        crbs = api_instance.list_cluster_role_binding(
-            label_selector=prtb.uuid + "=" + mbo)
-        return len(crbs.items) == 0
+        crbs_listed_with_new_label = api_instance.list_cluster_role_binding(
+            label_selector=prtb_key + "=" + mbo)
+        crbs_listed_with_old_label = api_instance.list_cluster_role_binding(
+            label_selector=prtb.uuid + "=" + mbo_legacy)
+        return len(crbs_listed_with_new_label.items) == 0 and\
+            len(crbs_listed_with_old_label.items) == 0
 
     def fail_handler():
         return "failed waiting for cluster role binding to be deleted"
 
-    wait_for(crb_callback, fail_handler=fail_handler)
+    wait_for(crb_callback, fail_handler=fail_handler, timeout=120)
 
-    try:
-        cluster = user_mc.client.by_id_cluster(admin_cc.cluster.id)
-        assert cluster is None
-    except ApiError as e:
-        assert e.error.status == 403
+    # user should now have no access to any clusters
+    def list_clusters():
+        clusters = user_mc.client.list_cluster()
+        return len(clusters.data) == 0
+
+    wait_for(list_clusters,
+             fail_handler=lambda: "failed revoking access to cluster",
+             timeout=120)
+
+    with pytest.raises(ApiError) as e:
+        user_mc.client.by_id_cluster(admin_cc.cluster.id)
+    assert e.value.error.status == 403
 
 
 def test_user_role_permissions(admin_mc, user_factory, remove_resource):
@@ -470,14 +577,14 @@ def ns_count(client, count):
 
 def test_appropriate_users_can_see_kontainer_drivers(user_factory):
     kds = user_factory().client.list_kontainer_driver()
-    assert len(kds) == 8
+    assert len(kds) == 11
 
     kds = user_factory('clusters-create').client.list_kontainer_driver()
-    assert len(kds) == 8
+    assert len(kds) == 11
 
     kds = user_factory('kontainerdrivers-manage').client. \
         list_kontainer_driver()
-    assert len(kds) == 8
+    assert len(kds) == 11
 
     kds = user_factory('settings-manage').client.list_kontainer_driver()
     assert len(kds) == 0
@@ -767,6 +874,63 @@ def test_member_can_edit_secret(admin_mc, admin_pc, remove_resource,
     )
 
 
+def test_readonly_cannot_move_namespace(
+        admin_cc, admin_mc, user_mc, remove_resource):
+    """Tests that a user with readonly access is not able to
+    move namespace across projects. Makes 2 projects and one
+    namespace and then moves NS across.
+    """
+    p1 = admin_mc.client.create_project(
+        name='test-' + random_str(),
+        clusterId=admin_cc.cluster.id
+    )
+    remove_resource(p1)
+    p1 = admin_cc.management.client.wait_success(p1)
+
+    p2 = admin_mc.client.create_project(
+        name='test-' + random_str(),
+        clusterId=admin_cc.cluster.id
+    )
+    remove_resource(p2)
+    p2 = admin_mc.client.wait_success(p2)
+
+    # Use k8s client to see if project namespace exists
+    k8s_client = kubernetes.client.CoreV1Api(admin_mc.k8s_client)
+    wait_until(cluster_has_namespace(k8s_client, p1.id.split(":")[1]))
+    wait_until(cluster_has_namespace(k8s_client, p2.id.split(":")[1]))
+
+    prtb = admin_mc.client.create_project_role_template_binding(
+        name="prtb-" + random_str(),
+        userId=user_mc.user.id,
+        projectId=p1.id,
+        roleTemplateId="read-only")
+    remove_resource(prtb)
+
+    prtb2 = admin_mc.client.create_project_role_template_binding(
+        name="prtb-" + random_str(),
+        userId=user_mc.user.id,
+        projectId=p2.id,
+        roleTemplateId="read-only")
+    remove_resource(prtb2)
+
+    wait_until_available(user_mc.client, p1)
+    wait_until_available(user_mc.client, p2)
+
+    ns = admin_cc.client.create_namespace(
+        name=random_str(),
+        projectId=p1.id
+    )
+    wait_until_available(admin_cc.client, ns)
+    remove_resource(ns)
+
+    cluster_user_client = user_cluster_client(user_mc, admin_cc.cluster)
+    wait_until_available(cluster_user_client, ns)
+
+    with pytest.raises(ApiError) as e:
+        user_mc.client.action(obj=ns, action_name="move", projectId=p2.id)
+    assert e.value.error.status == 404
+
+
 def wait_for_workload(client, ns, timeout=60, count=0):
     start = time.time()
     interval = 0.5
@@ -779,3 +943,11 @@ def wait_for_workload(client, ns, timeout=60, count=0):
         interval *= 2
         workloads = client.list_workload(namespaceId=ns)
     return workloads
+
+
+def cluster_has_namespace(client, ns_name):
+    """Wait for the give namespace to exist, useful for project namespaces"""
+    def cb():
+        return ns_name in \
+               [ns.metadata.name for ns in client.list_namespace().items]
+    return cb

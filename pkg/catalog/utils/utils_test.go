@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"github.com/rancher/rancher/pkg/git"
 	"testing"
 )
 
@@ -33,7 +34,7 @@ func TestValidateURL(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := ValidateURL(tt.url); (err != nil) != tt.wantErr {
+			if err := git.ValidateURL(tt.url); (err != nil) != tt.wantErr {
 				t.Errorf("ValidateURL() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})

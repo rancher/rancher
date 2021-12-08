@@ -1,42 +1,48 @@
 node {
+  def job_name = "${JOB_NAME}"
+  if (job_name.contains('/')) {
+    job_names = job_name.split('/')
+    job_name = job_names[job_names.size() - 1]
+  }
   wrap([$class: 'AnsiColorBuildWrapper', 'colorMapName': 'XTerm', 'defaultFg': 2, 'defaultBg':1]) {
-    withCredentials([ string(credentialsId: 'AWS_ACCESS_KEY_ID', variable: 'AWS_ACCESS_KEY_ID'),
-                      string(credentialsId: 'AWS_SECRET_ACCESS_KEY', variable: 'AWS_SECRET_ACCESS_KEY'),
-                      string(credentialsId: 'AWS_SSH_PEM_KEY', variable: 'AWS_SSH_PEM_KEY')
-                    ]) {
-      checkout scm
-
-      dir ("tests/validation") {
-        stage('Configure and Build') {
-          sh "./tests/rke/scripts/configure.sh"
-          if (env.AWS_SSH_PEM_KEY && env.AWS_SSH_KEY_NAME) {
-            dir(".ssh") {
-              def decoded = new String(AWS_SSH_PEM_KEY.decodeBase64())
-              writeFile file: AWS_SSH_KEY_NAME, text: decoded
+    withFolderProperties {
+      withCredentials([ string(credentialsId: 'AWS_ACCESS_KEY_ID', variable: 'AWS_ACCESS_KEY_ID'),
+                          string(credentialsId: 'AWS_SECRET_ACCESS_KEY', variable: 'AWS_SECRET_ACCESS_KEY'),
+                          string(credentialsId: 'AWS_SSH_PEM_KEY', variable: 'AWS_SSH_PEM_KEY')
+                        ]){
+        checkout scm
+        dir ("tests/validation") {
+            stage('Configure and Build') {
+              sh "./tests/rke/scripts/configure.sh"
+              if (env.AWS_SSH_PEM_KEY && env.AWS_SSH_KEY_NAME) {
+                dir(".ssh") {
+                  def decoded = new String(AWS_SSH_PEM_KEY.decodeBase64())
+                  writeFile file: AWS_SSH_KEY_NAME, text: decoded
+                }
+              }
+              sh "./tests/rke/scripts/build.sh"
             }
-          }
-          sh "./tests/rke/scripts/build.sh"
-        }
-      
-        try {
-          stage('Run Validation Tests') {
+
             try {
-              sh "docker run --name ${JOB_NAME}${env.BUILD_NUMBER}  --env-file .env " +
-                "rancher-validation-tests /bin/bash -c \'pytest -v -s --junit-xml=results.xml ${PYTEST_OPTIONS} tests/rke/\'"
-            } catch(err) {
-              echo 'Test run had failures. Collecting results...'
+              stage('Run Validation Tests') {
+                try {
+                  sh "docker run --name ${job_name}${env.BUILD_NUMBER}  --env-file .env " +
+                    "rancher-validation-tests /bin/bash -c \'pytest -v -s --junit-xml=results.xml ${PYTEST_OPTIONS} tests/rke/\'"
+                } catch(err) {
+                  echo 'Test run had failures. Collecting results...'
+                }
+              }
+
+              stage('Test Report') {
+                sh "docker cp ${job_name}${env.BUILD_NUMBER}:/src/rancher-validation/results.xml ."
+                step([$class: 'JUnitResultArchiver', testResults: '**/results.xml'])
+                sh "docker rm -v ${job_name}${env.BUILD_NUMBER}"
+              }
+            } catch(err){
+              sh "docker stop ${job_name}${env.BUILD_NUMBER}"
+              sh "docker rm -v ${job_name}${env.BUILD_NUMBER}"
             }
           }
-
-          stage('Test Report') {
-            sh "docker cp ${JOB_NAME}${env.BUILD_NUMBER}:/src/rancher-validation/results.xml ."
-            step([$class: 'JUnitResultArchiver', testResults: '**/results.xml'])
-            sh "docker rm -v ${JOB_NAME}${env.BUILD_NUMBER}"
-          }
-        } catch(err){
-          sh "docker stop ${JOB_NAME}${env.BUILD_NUMBER}"
-          sh "docker rm -v ${JOB_NAME}${env.BUILD_NUMBER}"
-        }
       }
     }
   }

@@ -67,7 +67,8 @@ def auth_check(schema, id, access, props=None):
 
     for i in ['created', 'removed', 'transitioning', 'transitioningProgress',
               'removeTime', 'transitioningMessage', 'id', 'uuid', 'kind',
-              'state', 'creatorId', 'finalizers', 'ownerReferences', 'type']:
+              'state', 'creatorId', 'finalizers', 'ownerReferences', 'type',
+              'scaledownTime']:
         if i not in props and i in schema_type.resourceFields.keys():
             props[i] = 'r'
 

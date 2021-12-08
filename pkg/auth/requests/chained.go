@@ -3,7 +3,7 @@ package requests
 import (
 	"net/http"
 
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 )
 
 func Chain(auths ...Authenticator) Authenticator {
@@ -16,14 +16,16 @@ type chainedAuth struct {
 	auths []Authenticator
 }
 
-func (c *chainedAuth) Authenticate(req *http.Request) (authed bool, user string, groups []string, err error) {
+func (c *chainedAuth) Authenticate(req *http.Request) (*AuthenticatorResponse, error) {
 	for _, auth := range c.auths {
-		authed, user, groups, err := auth.Authenticate(req)
-		if err != nil || authed {
-			return authed, user, groups, err
+		authResponse, err := auth.Authenticate(req)
+		if err != nil || authResponse.IsAuthed {
+			return authResponse, err
 		}
 	}
-	return false, "", nil, nil
+	return &AuthenticatorResponse{
+		Extras: make(map[string][]string),
+	}, nil
 }
 
 func (c *chainedAuth) TokenFromRequest(req *http.Request) (*v3.Token, error) {

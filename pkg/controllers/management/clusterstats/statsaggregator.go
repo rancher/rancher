@@ -5,14 +5,24 @@ import (
 	"reflect"
 	"time"
 
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+
 	"k8s.io/apimachinery/pkg/runtime"
 
+	"github.com/pkg/errors"
 	"github.com/rancher/rancher/pkg/clustermanager"
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
-	"github.com/rancher/types/config"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/types/config"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/labels"
+)
+
+const (
+	nodeRoleControlPlane       = "node-role.kubernetes.io/controlplane"
+	nodeRoleControlPlaneHyphen = "node-role.kubernetes.io/control-plane"
+	nodeRoleETCD               = "node-role.kubernetes.io/etcd"
+	nodeRoleMaster             = "node-role.kubernetes.io/master"
 )
 
 type StatsAggregator struct {
@@ -61,9 +71,17 @@ func (s *StatsAggregator) aggregate(cluster *v3.Cluster, clusterName string) err
 	var machines []*v3.Node
 	// only include worker nodes
 	for _, m := range allMachines {
-		if m.Spec.Worker && !m.Spec.InternalNodeSpec.Unschedulable {
-			machines = append(machines, m)
+		// if none are set, then nodes syncer has not completed
+		if !m.Spec.Worker && !m.Spec.ControlPlane && !m.Spec.Etcd {
+			return errors.Errorf("node role cannot be determined because node %s has not finished syncing. retrying...", m.Status.NodeName)
 		}
+		if isTaintedNoExecuteNoSchedule(m) && !m.Spec.Worker {
+			continue
+		}
+		if m.Spec.InternalNodeSpec.Unschedulable {
+			continue
+		}
+		machines = append(machines, m)
 	}
 
 	origStatus := cluster.Status.DeepCopy()
@@ -107,10 +125,10 @@ func (s *StatsAggregator) aggregate(cluster *v3.Cluster, clusterName string) err
 			lcpu.Add(*limits.Cpu())
 		}
 
-		if condDisk == v1.ConditionTrue && v3.ClusterConditionNoDiskPressure.IsTrue(machine) {
+		if condDisk == v1.ConditionTrue && v32.ClusterConditionNoDiskPressure.IsTrue(machine) {
 			condDisk = v1.ConditionFalse
 		}
-		if condMem == v1.ConditionTrue && v3.ClusterConditionNoMemoryPressure.IsTrue(machine) {
+		if condMem == v1.ConditionTrue && v32.ClusterConditionNoMemoryPressure.IsTrue(machine) {
 			condMem = v1.ConditionFalse
 		}
 	}
@@ -120,14 +138,14 @@ func (s *StatsAggregator) aggregate(cluster *v3.Cluster, clusterName string) err
 	cluster.Status.Requested = v1.ResourceList{v1.ResourcePods: rpods, v1.ResourceMemory: rmem, v1.ResourceCPU: rcpu}
 	cluster.Status.Limits = v1.ResourceList{v1.ResourcePods: lpods, v1.ResourceMemory: lmem, v1.ResourceCPU: lcpu}
 	if condDisk == v1.ConditionTrue {
-		v3.ClusterConditionNoDiskPressure.True(cluster)
+		v32.ClusterConditionNoDiskPressure.True(cluster)
 	} else {
-		v3.ClusterConditionNoDiskPressure.False(cluster)
+		v32.ClusterConditionNoDiskPressure.False(cluster)
 	}
 	if condMem == v1.ConditionTrue {
-		v3.ClusterConditionNoMemoryPressure.True(cluster)
+		v32.ClusterConditionNoMemoryPressure.True(cluster)
 	} else {
-		v3.ClusterConditionNoMemoryPressure.False(cluster)
+		v32.ClusterConditionNoMemoryPressure.False(cluster)
 	}
 
 	versionChanged := s.updateVersion(cluster)
@@ -161,7 +179,7 @@ func (s *StatsAggregator) updateVersion(cluster *v3.Cluster) bool {
 	return updated
 }
 
-func statsChanged(existingCluster, newCluster *v3.ClusterStatus) bool {
+func statsChanged(existingCluster, newCluster *v32.ClusterStatus) bool {
 	if !reflect.DeepEqual(existingCluster.Conditions, newCluster.Conditions) {
 		return true
 	}
@@ -217,4 +235,15 @@ func (s *StatsAggregator) machineChanged(key string, machine *v3.Node) (runtime.
 		s.Clusters.Controller().Enqueue("", machine.Namespace)
 	}
 	return nil, nil
+}
+
+func isTaintedNoExecuteNoSchedule(m *v3.Node) bool {
+	for _, taint := range m.Spec.InternalNodeSpec.Taints {
+		isETCDOrControlPlane := taint.Key == nodeRoleControlPlane || taint.Key == nodeRoleETCD ||
+			taint.Key == nodeRoleControlPlaneHyphen || taint.Key == nodeRoleMaster
+		if isETCDOrControlPlane && (taint.Effect == "NoSchedule" || taint.Effect == "NoExecute") {
+			return true
+		}
+	}
+	return false
 }

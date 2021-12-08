@@ -4,11 +4,14 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"os"
 	"path/filepath"
 	"reflect"
 	"runtime"
 	"strings"
 	"time"
+
+	rketypes "github.com/rancher/rke/types"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
@@ -17,7 +20,6 @@ import (
 	"github.com/docker/go-connections/nat"
 	"github.com/rancher/rke/hosts"
 	"github.com/rancher/rke/services"
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 )
 
@@ -28,16 +30,16 @@ const (
 )
 
 type NodeConfig struct {
-	ClusterName        string                `json:"clusterName"`
-	Certs              string                `json:"certs"`
-	Processes          map[string]v3.Process `json:"processes"`
-	Files              []v3.File             `json:"files"`
-	NodeVersion        int                   `json:"nodeVersion"`
-	AgentCheckInterval int                   `json:"agentCheckInterval"`
+	ClusterName        string                      `json:"clusterName"`
+	Certs              string                      `json:"certs"`
+	Processes          map[string]rketypes.Process `json:"processes"`
+	Files              []rketypes.File             `json:"files"`
+	NodeVersion        int                         `json:"nodeVersion"`
+	AgentCheckInterval int                         `json:"agentCheckInterval"`
 }
 
-func runProcess(ctx context.Context, name string, p v3.Process, start, forceRestart bool) error {
-	c, err := client.NewEnvClient()
+func runProcess(ctx context.Context, name string, p rketypes.Process, start, forceRestart bool) error {
+	c, err := client.NewClientWithOpts(client.WithAPIVersionNegotiation(), client.FromEnv)
 	if err != nil {
 		return err
 	}
@@ -129,7 +131,7 @@ func runProcess(ctx context.Context, name string, p v3.Process, start, forceRest
 	}
 	config.Labels[RKEContainerNameLabel] = name
 
-	newContainer, err := c.ContainerCreate(ctx, config, hostConfig, nil, name)
+	newContainer, err := c.ContainerCreate(ctx, config, hostConfig, nil, nil, name)
 	if client.IsErrNotFound(err) {
 		var output io.ReadCloser
 		imagePullOptions := types.ImagePullOptions{}
@@ -143,7 +145,7 @@ func runProcess(ctx context.Context, name string, p v3.Process, start, forceRest
 		}
 		defer output.Close()
 		io.Copy(logrus.StandardLogger().Writer(), output)
-		newContainer, err = c.ContainerCreate(ctx, config, hostConfig, nil, name)
+		newContainer, err = c.ContainerCreate(ctx, config, hostConfig, nil, nil, name)
 	}
 	if err == nil && start {
 		if err := c.ContainerStart(ctx, newContainer.ID, types.ContainerStartOptions{}); err != nil {
@@ -169,7 +171,7 @@ func restart(ctx context.Context, c *client.Client, id string) error {
 	return c.ContainerRestart(ctx, id, &timeoutDuration)
 }
 
-func changed(ctx context.Context, c *client.Client, expectedProcess v3.Process, container types.Container) (bool, error) {
+func changed(ctx context.Context, c *client.Client, expectedProcess rketypes.Process, container types.Container) (bool, error) {
 	actualDockerInspect, err := c.ContainerInspect(ctx, container.ID)
 	if err != nil {
 		return false, err
@@ -178,7 +180,7 @@ func changed(ctx context.Context, c *client.Client, expectedProcess v3.Process, 
 	if err != nil {
 		return false, err
 	}
-	actualProcess := v3.Process{
+	actualProcess := rketypes.Process{
 		Command:     actualDockerInspect.Config.Entrypoint,
 		Args:        actualDockerInspect.Config.Cmd,
 		Env:         actualDockerInspect.Config.Env,
@@ -328,7 +330,7 @@ func natPortSetToSlice(args map[nat.Port]struct{}) []nat.Port {
 	return result
 }
 
-func runLogLinker(ctx context.Context, c *client.Client, containerName string, p v3.Process) error {
+func runLogLinker(ctx context.Context, c *client.Client, containerName string, p rketypes.Process) error {
 	inspect, err := c.ContainerInspect(ctx, containerName)
 	if err != nil {
 		return err
@@ -369,10 +371,11 @@ func runLogLinker(ctx context.Context, c *client.Client, containerName string, p
 		hostConfig = &container.HostConfig{
 			Binds: []string{
 				// symbolic link source: docker container logs location
-				"c:/ProgramData:c:/ProgramData",
+				"c:\\ProgramData:c:\\ProgramData",
 				// symbolic link target
-				"c:/var/lib:c:/var/lib",
+				fmt.Sprintf("%svar\\lib:c:\\var\\lib", getWindowsPrefixPath()),
 			},
+
 			NetworkMode: "none",
 		}
 	}
@@ -382,7 +385,7 @@ func runLogLinker(ctx context.Context, c *client.Client, containerName string, p
 	/*
 		the following logic is as same as `docker run --rm`
 	*/
-	newContainer, err := c.ContainerCreate(ctx, config, hostConfig, nil, logLinkerName)
+	newContainer, err := c.ContainerCreate(ctx, config, hostConfig, nil, nil, logLinkerName)
 	if err != nil {
 		return err
 	}
@@ -440,4 +443,25 @@ func (s containerWaitingStatus) error() error {
 	}
 
 	return nil
+}
+
+func getWindowsPrefixPath() string {
+	p := os.Getenv("CATTLE_PREFIX_PATH")
+	if p == "" {
+		return "c:\\"
+	}
+
+	// clean backslashes added from encoding
+	var new []string
+
+	// squash multi backslashes
+	sp := strings.Split(p, "\\")
+	for _, v := range sp {
+		if v != "" {
+			new = append(new, v)
+		}
+	}
+
+	new = append(new, "") // always add trailing slash
+	return strings.Join(new, "\\")
 }

@@ -1,6 +1,7 @@
 package rkedialerfactory
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"net/http"
@@ -8,15 +9,16 @@ import (
 
 	"github.com/rancher/norman/types/slice"
 	"github.com/rancher/rancher/pkg/ref"
+	"github.com/rancher/rancher/pkg/types/config/dialer"
 	"github.com/rancher/rke/hosts"
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
-	"github.com/rancher/types/config/dialer"
+	rketypes "github.com/rancher/rke/types"
 	"k8s.io/client-go/transport"
 )
 
 type RKEDialerFactory struct {
 	Factory dialer.Factory
 	Docker  bool
+	Ctx     context.Context
 }
 
 func (t *RKEDialerFactory) Build(h *hosts.Host) (func(network, address string) (net.Conn, error), error) {
@@ -30,12 +32,24 @@ func (t *RKEDialerFactory) Build(h *hosts.Host) (func(network, address string) (
 	}
 
 	if t.Docker {
-		return t.Factory.DockerDialer(parts[0], parts[1])
+		return func(network, address string) (net.Conn, error) {
+			d, err := t.Factory.DockerDialer(parts[0], parts[1])
+			if err != nil {
+				return nil, err
+			}
+			return d(t.Ctx, network, address)
+		}, nil
 	}
-	return t.Factory.NodeDialer(parts[0], parts[1])
+	return func(network, address string) (net.Conn, error) {
+		d, err := t.Factory.NodeDialer(parts[0], parts[1])
+		if err != nil {
+			return nil, err
+		}
+		return d(t.Ctx, network, address)
+	}, nil
 }
 
-func (t *RKEDialerFactory) WrapTransport(config *v3.RancherKubernetesEngineConfig) transport.WrapperFunc {
+func (t *RKEDialerFactory) WrapTransport(config *rketypes.RancherKubernetesEngineConfig) transport.WrapperFunc {
 	translateAddress := map[string]string{}
 
 	for _, node := range config.Nodes {
@@ -62,16 +76,16 @@ func (t *RKEDialerFactory) WrapTransport(config *v3.RancherKubernetesEngineConfi
 			if ht, ok := rt.(*http.Transport); ok {
 				ht.DialContext = nil
 				ht.DialTLS = nil
-				ht.Dial = func(network, address string) (net.Conn, error) {
+				ht.DialContext = func(ctx context.Context, network, address string) (net.Conn, error) {
 					ip, _, _ := net.SplitHostPort(address)
 					if privateIP, ok := translateAddress[ip]; ok {
 						address = strings.Replace(address, ip, privateIP, 1)
 					}
-					conn, err := dialer(network, address)
+					conn, err := dialer(ctx, network, address)
 					if ref.IsNodeNotFound(err) {
 						clusterDialer, dialerErr := t.Factory.ClusterDialer(ns)
 						if dialerErr == nil {
-							return clusterDialer(network, address)
+							return clusterDialer(ctx, network, address)
 						}
 					}
 					return conn, err

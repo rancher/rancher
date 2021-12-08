@@ -4,7 +4,7 @@ import (
 	"net/http"
 
 	"github.com/rancher/rancher/pkg/pipeline/hooks/drivers"
-	"github.com/rancher/types/config"
+	"github.com/rancher/rancher/pkg/types/config"
 )
 
 var Drivers map[string]Driver

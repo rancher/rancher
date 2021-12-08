@@ -1,8 +1,13 @@
 import time
 import os
+import json
 
-k8s_resurce_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), 
-                          "resources/k8s_ymls/")
+k8s_resource_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)),
+                               "resources/k8s_ymls/")
+
+# Global expectedimagesdict declared to store the images for a specific
+# k8s Version
+expectedimagesdict = {}
 
 
 def create_and_validate(
@@ -146,6 +151,155 @@ def wait_for_etcd_cluster_health(node, etcd_private_ip=False):
     return result
 
 
+def verify_metrics_server_addon_images(k8sversion, kubectl,
+                                       namespace, selector):
+
+    metricserver = get_component_version(k8sversion,
+                                         "rancher/metrics-server")
+    # Sleep to allow the metrics server component to get to running state
+    time.sleep(10)
+    verify_component_status_with_kubectl(kubectl, namespace, selector,
+                                         metricserver)
+
+
+def verify_ingress_addon_images(k8sversion, kubectl, namespace,
+                                selector1, selector2):
+
+    ingressdefaultbackend = \
+        get_component_version(k8sversion,
+                              "rancher/nginx-ingress-controller-defaultbackend"
+                              )
+    nginxingresscontoller =\
+        get_component_version(k8sversion,
+                              "rancher/nginx-ingress-controller")
+    # Sleep to allow the ingress addon components to get to running state
+    time.sleep(5)
+    verify_component_status_with_kubectl(kubectl, namespace, selector1,
+                                         nginxingresscontoller)
+    verify_component_status_with_kubectl(kubectl, namespace, selector2,
+                                         ingressdefaultbackend)
+
+
+def verify_dns_addon_images(k8sversion, kubectl, namespace,
+                            selector):
+
+    coredns = get_component_version(k8sversion,
+                                    "rancher/coredns-coredns")
+    # Sleep to allow the dns addon component to get to running state
+    time.sleep(5)
+
+    verify_component_status_with_kubectl(kubectl, namespace, selector, coredns)
+
+
+def verify_networking_addon_images(k8sversion, kubectl,
+                                   namespace, selector):
+
+    flannel = get_component_version(k8sversion,
+                                    "rancher/coreos-flannel")
+
+    calico = get_component_version(k8sversion,
+                                   "rancher/calico-node")
+    # Sleep to allow the network addon component to get to running state
+    time.sleep(5)
+    verify_component_status_with_kubectl(kubectl, namespace, selector, calico,
+                                         flannel)
+
+
+def verify_component_status_with_kubectl(kubectl, namespace, selector, *args):
+    # Method to verify addon status and images
+
+    command = "get pod --namespace " + namespace + " -l " + selector
+
+    res = kubectl.execute_kubectl_cmd(command, json_out=True)
+    result = json.loads(res)
+    timeout = 180
+    start = time.time()
+    # Check if the pod is running
+    for pod in result["items"]:
+        podstatus = pod["status"]["phase"]
+        podname = pod["metadata"]["name"]
+        print("Pod name is " + podname)
+        podreloadcommand = "get pod " + podname + " --namespace " + namespace
+        while (podstatus != "Running"):
+            if time.time() - start > timeout:
+                raise AssertionError("Timed out waiting to reach running state")
+            time.sleep(.5)
+            podresult = kubectl.execute_kubectl_cmd(podreloadcommand,
+                                                    json_out=True)
+            podresult = json.loads(podresult)
+            podname = podresult["metadata"]["name"]
+            print("Pod name is " + podname)
+            podstatus = podresult["status"]["phase"]
+            print("Pod status is " + podstatus)
+        assert True
+
+    # Verify the component images in the pods
+    testresult = kubectl.execute_kubectl_cmd(command, json_out=True)
+    updatedresult = json.loads(testresult)
+    for pod in updatedresult["items"]:
+        print("Required Resource Image: ")
+        print(args[0])
+        podstatus = pod["status"]["phase"]
+        if(podstatus == "Running"):
+           for i in range(0, len(args)):
+               print(pod["status"]["containerStatuses"][i]["image"])
+               assert pod["status"]["containerStatuses"][i]["image"] == args[i]
+        
+
+def get_system_images(rke_client, k8s_version):
+
+    # Method to obtain the system images for a k8s version  from rke cli
+
+    command = ("rke config --system-images --version " + k8s_version)
+    print(command)
+    rke_system_images_dict = rke_client.run_command(command)
+    result = rke_system_images_dict.split("\n")
+    # Removing the first item which is not required
+    result.pop(0)
+    print(result)
+    return result
+
+
+def get_component_version(k8s_version, componentname):
+    # Method to obtain the image version for a specific component
+
+    systemimageslist = expectedimagesdict[k8s_version]["rkesystemimages"]
+    print(systemimageslist)
+    for item in systemimageslist:
+        itemlist = item.split(":")
+        if componentname == itemlist[0]:
+           print(componentname)
+           componentversion = item
+    print("VERSION IS " + componentversion)
+    return componentversion
+
+
+def build_expectedimages_dict(k8s_version, rke_client):
+    # Build the expected image list from rke system images list
+    
+    if k8s_version in expectedimagesdict.keys():
+        return expectedimagesdict[k8s_version]
+    else:
+        expectedimagesdict[k8s_version] = {}
+        result = get_system_images(rke_client, k8s_version)
+        for item in result:
+            itemlist = item.split(":")
+            if "rancher/hyperkube" == itemlist[0]:
+                expectedimagesdict[k8s_version]["kube-proxy"] = item
+                expectedimagesdict[k8s_version]["kube-scheduler"] = item
+                expectedimagesdict[k8s_version]["kube-controller-manager"] \
+                    = item
+                expectedimagesdict[k8s_version]["kube-apiserver"] = item
+                expectedimagesdict[k8s_version]["kubelet"] = item
+            if "rancher/coreos-etc[k8s_version]" == itemlist[0]:
+                expectedimagesdict[k8s_version]["etcd"] = item
+            if "rancher/rke-tools" == itemlist[0]:
+                expectedimagesdict[k8s_version]["service-sidekick"] = item
+
+        expectedimagesdict[k8s_version]["rkesystemimages"] = result
+        return expectedimagesdict[k8s_version]
+
+
 def validation_node_roles(nodes, k8s_nodes, etcd_private_ip=False):
     """
     Validates each node's labels for match its roles
@@ -213,7 +367,7 @@ class PodIntercommunicationValidation(object):
     def __init__(self, kubectl, base_namespace):
         self.kubectl = kubectl
         self.yml_file = (
-            k8s_resurce_dir + 'daemonset_pods_per_node.yml')
+            k8s_resource_dir + 'daemonset_pods_per_node.yml')
         self.ns_out = 'daemonset-out-{}'.format(base_namespace)
         self.ns_in = 'daemonset-in-{}'.format(base_namespace)
         self.selector = 'name=daemonset-test1'
@@ -308,12 +462,12 @@ class DNSServiceDiscoveryValidation(object):
             'k8test1': {
                 'namespace': namespace_one,
                 'selector': 'k8s-app=k8test1-service',
-                'yml_file': k8s_resurce_dir + 'service_k8test1.yml',
+                'yml_file': k8s_resource_dir + 'service_k8test1.yml',
             },
             'k8test2': {
                 'namespace': namespace_two,
                 'selector': 'k8s-app=k8test2-service',
-                'yml_file': k8s_resurce_dir + 'service_k8test2.yml',
+                'yml_file': k8s_resource_dir + 'service_k8test2.yml',
             }
         }
         self.pod_selector = 'k8s-app=pod-test-util'
@@ -329,7 +483,7 @@ class DNSServiceDiscoveryValidation(object):
                 service_info['yml_file'], namespace=service_info['namespace'])
 
         result = self.kubectl.create_resourse_from_yml(
-            k8s_resurce_dir + 'single_pod.yml',
+            k8s_resource_dir + 'single_pod.yml',
             namespace=self.namespace)
 
     def validate(self):
@@ -385,13 +539,15 @@ class DNSServiceDiscoveryValidation(object):
                 'namespace', service_info['namespace'])
 
 
-def validate_k8s_service_images(nodes, expectedimagesdict):
+def validate_k8s_service_images(nodes, k8s_version, rke_client, kubectl):
     """
-    expected_images should be sent from the tests
+    expectedimages dictionary will be built in this method
     This verifies that the nodes have the correct image version
     This does not validate containers per role,
     assert_containers_exist_for_roles method does that
     """
+    expectedimagesdict = build_expectedimages_dict(k8s_version, rke_client)
+    print(expectedimagesdict)
 
     for node in nodes:
         containers = node.docker_ps()
@@ -426,6 +582,16 @@ def validate_k8s_service_images(nodes, expectedimagesdict):
                     "{1}, found {2} on node {3}".format(
                     sidekickservice, expectedimagesdict[sidekickservice],
                     allcontainers[sidekickservice], node.node_name))
+
+    verify_ingress_addon_images(k8s_version, kubectl,
+                                "ingress-nginx", "app=ingress-nginx",
+                                "app=default-http-backend")
+    verify_networking_addon_images(k8s_version, kubectl,
+                                   "kube-system", "k8s-app=canal")
+    verify_metrics_server_addon_images(k8s_version, kubectl,
+                                      "kube-system", "k8s-app=metrics-server")
+    verify_dns_addon_images(k8s_version, kubectl,
+                            "kube-system", "k8s-app=kube-dns")
 
 
 def validate_remove_cluster(nodes):

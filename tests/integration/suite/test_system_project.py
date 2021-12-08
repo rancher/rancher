@@ -1,5 +1,7 @@
 import pytest
 from rancher import ApiError
+from kubernetes.client import CoreV1Api
+from .conftest import wait_for
 
 systemProjectLabel = "authz.management.cattle.io/system-project"
 defaultProjectLabel = "authz.management.cattle.io/default-project"
@@ -7,7 +9,9 @@ initial_system_namespaces = set(["kube-node-lease",
                                  "kube-system",
                                  "cattle-system",
                                  "kube-public",
-                                 "cattle-global-data"])
+                                 "cattle-global-data",
+                                 "cattle-global-nt",
+                                 "cattle-fleet-system"])
 loggingNamespace = "cattle-logging"
 
 
@@ -50,7 +54,7 @@ def test_system_namespaces_assigned(admin_cc):
     if loggingNamespace in system_namespaces_names:
         system_namespaces_names.remove(loggingNamespace)
 
-    assert system_namespaces_names == initial_system_namespaces
+    assert initial_system_namespaces.issubset(system_namespaces_names)
 
 
 def test_system_project_cant_be_deleted(admin_mc, admin_cc):
@@ -71,3 +75,31 @@ def test_system_project_cant_be_deleted(admin_mc, admin_cc):
         admin_mc.client.delete(system_project)
     assert e.value.error.status == 405
     assert e.value.error.message == 'System Project cannot be deleted'
+
+
+def test_system_namespaces_default_svc_account(admin_mc):
+    system_namespaces_setting = admin_mc.client.by_id_setting(
+                                "system-namespaces")
+    system_namespaces = system_namespaces_setting["value"].split(",")
+    k8sclient = CoreV1Api(admin_mc.k8s_client)
+    def_saccnts = k8sclient.list_service_account_for_all_namespaces(
+        field_selector='metadata.name=default')
+    for sa in def_saccnts.items:
+        ns = sa.metadata.namespace
+
+        def _check_system_sa_flag():
+            if ns in system_namespaces and ns != "kube-system":
+                if sa.automount_service_account_token is False:
+                    return True
+                else:
+                    return False
+            else:
+                return True
+
+        def _sa_update_fail():
+            name = sa.metadata.name
+            flag = sa.automount_service_account_token
+            return 'Service account {} in namespace {} does not have correct \
+            automount_service_account_token flag: {}'.format(name, ns, flag)
+
+        wait_for(_check_system_sa_flag, fail_handler=_sa_update_fail)

@@ -41,7 +41,7 @@ AWS_ACCESS_KEY_ID no default, your AWS access key id
 AWS_SECRET_ACCESS_KEY no default, your AWS secret access key
 AWS_SSH_KEY_NAME no default, the filename of the private key, e.i. jenkins-rke-validation.pem
 AWS_CICD_INSTANCE_TAG defaults to 'rancher-validation', Tags the instance with CICD=AWS_CICD_INSTANCE_TAG
-AWS_INSTANCE_TYPE defaults to 't2.medium', selects the instance type and size
+AWS_INSTANCE_TYPE defaults to 't3a.medium', selects the instance type and size
 AWS_REGION no default, the region for your ec2 instances
 AWS_SUBNET no default, the subnet for your ec2 instances
 AWS_VPC no default, the VPC for your ec2 instances
@@ -83,6 +83,22 @@ RANCHER_VSPHERE_VCENTER_PORT port of vCenter web interface, defaults to 443
 RANCHER_ENGINE_INSTALL_URL defaults to https://get.docker.com/, docker installer engine script
 RANCHER_CLONE_FROM defaults to ubuntu-bionic-18.04-cloudimg, vm to clone from.
 RANCHER_RESOURCE_POOL defaults to the validation-tests pool resource pool to put the vms in
+```
+### oke_cluster test
+Environment variables for the Oracle Container Engine (OKE) cluster test
+```
+CATTLE_TEST_URL no default. The Rancher server for test execution.
+USER_TOKEN user token used for /meta/oci/ calls
+RANCHER_OCI_TENANCY_OCID required OCID of the tenancy in which to create the cluster and resources
+RANCHER_OCI_COMPARTMENT_OCID required OCID of the compartment in which to create the cluster and resources
+RANCHER_OCI_USER_OCID required OCID of a user who has access to the specified tenancy/compartment
+RANCHER_OCI_FINGERPRINT URL required fingerprint corresponding to the specified user's private API Key
+RANCHER_OCI_PRIVATE_KEY_PATH required private API key path for the specified OCI user, in PEM format
+RANCHER_OCI_PRIVATE_KEY_PASSPHRASE required if user private key is protected with a passphrase
+RANCHER_OCI_REGION defaults to us-phoenix-1
+RANCHER_OKE_VERSION defaults to latest version 
+RANCHER_OKE_NODE_SHAPE defaults to random OKE node shape
+RANCHER_OKE_NODE_IMAGE defaults to latest Oracle Linux node image
 ```
 
 ## RKE template defaults variables:

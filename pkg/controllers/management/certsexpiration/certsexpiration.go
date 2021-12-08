@@ -5,11 +5,13 @@ import (
 	"reflect"
 	"time"
 
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+
+	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/rkecerts"
+	"github.com/rancher/rancher/pkg/types/config"
 	rkeCluster "github.com/rancher/rke/cluster"
-	v1 "github.com/rancher/types/apis/core/v1"
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
-	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -46,7 +48,7 @@ func (c *certsExpiration) sync(key string, cluster *v3.Cluster) (runtime.Object,
 	}
 	rkecerts.CleanCertificateBundle(certBundle)
 
-	certsExpInfo := map[string]v3.CertExpiration{}
+	certsExpInfo := map[string]v32.CertExpiration{}
 	for certName, certObj := range certBundle {
 		info, err := rkecerts.GetCertExpiration(certObj.CertificatePEM)
 		if err != nil {
@@ -68,7 +70,7 @@ func (c *certsExpiration) sync(key string, cluster *v3.Cluster) (runtime.Object,
 	return cluster, nil
 }
 
-func logCertExpirationWarning(name string, certExp v3.CertExpiration) error {
+func logCertExpirationWarning(name string, certExp v32.CertExpiration) error {
 	date, err := time.Parse(time.RFC3339, certExp.ExpirationDate)
 	if err != nil {
 		return err

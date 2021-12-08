@@ -1,0 +1,44 @@
+{{- if .Values.postDelete.enabled }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ template "rancher.fullname" . }}-post-delete
+  namespace: {{ .Release.Namespace }}
+  labels: {{ include "rancher.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": post-delete
+    "helm.sh/hook-weight": "3"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: 3
+  template:
+    metadata:
+      name: {{ template "rancher.fullname" . }}-post-delete
+      labels: {{ include "rancher.labels" . | nindent 8 }}
+    spec:
+      serviceAccountName: {{ template "rancher.fullname" . }}-post-delete
+      restartPolicy: OnFailure
+      containers:
+        - name: {{ template "rancher.name" . }}-post-delete
+          image: "{{ include "system_default_registry" . }}{{ .Values.postDelete.image.repository }}:{{ .Values.postDelete.image.tag }}"
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            runAsUser: 0
+          command:
+            - /scripts/post-delete-hook.sh
+          volumeMounts:
+            - mountPath: /scripts
+              name: config-volume
+          env:
+            - name: NAMESPACES
+              value: {{ .Values.postDelete.namespaceList | join " " | quote }}
+            - name: TIMEOUT
+              value: {{ .Values.postDelete.timeout | quote }}
+            - name: IGNORETIMEOUTERROR
+              value: {{ .Values.postDelete.ignoreTimeoutError | quote }}
+      volumes:
+        - name: config-volume
+          configMap:
+            name: {{ template "rancher.fullname" . }}-post-delete
+            defaultMode: 0777
+{{- end }}

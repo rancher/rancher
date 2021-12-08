@@ -1,0 +1,10 @@
+apiVersion: logging.banzaicloud.io/v1beta1
+kind: Flow
+metadata:
+  name: do-flow
+  namespace: default
+spec:
+  match:
+    - select: {}
+  outputRefs:
+    - do-output

@@ -3,14 +3,16 @@ package bitbucketcloud
 import (
 	"fmt"
 
+	v32 "github.com/rancher/rancher/pkg/apis/project.cattle.io/v3"
+
 	"github.com/mitchellh/mapstructure"
 	"github.com/rancher/norman/store/subtype"
 	"github.com/rancher/norman/types"
+	client "github.com/rancher/rancher/pkg/client/generated/project/v3"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/project.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/pipeline/providers/common"
 	"github.com/rancher/rancher/pkg/pipeline/remote/model"
-	v3 "github.com/rancher/types/apis/project.cattle.io/v3"
-	"github.com/rancher/types/apis/project.cattle.io/v3/schema"
-	client "github.com/rancher/types/client/project/v3"
+	schema "github.com/rancher/rancher/pkg/schemas/project.cattle.io/v3"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 )
@@ -55,23 +57,16 @@ func (b *BcProvider) GetProviderConfig(projectID string) (interface{}, error) {
 	}
 	storedBitbucketPipelineConfigMap := u.UnstructuredContent()
 
-	storedBitbucketPipelineConfig := &v3.BitbucketCloudPipelineConfig{}
+	storedBitbucketPipelineConfig := &v32.BitbucketCloudPipelineConfig{}
 	if err := mapstructure.Decode(storedBitbucketPipelineConfigMap, storedBitbucketPipelineConfig); err != nil {
 		return nil, fmt.Errorf("failed to decode the config, error: %v", err)
 	}
 
-	metadataMap, ok := storedBitbucketPipelineConfigMap["metadata"].(map[string]interface{})
-	if !ok {
-		return nil, fmt.Errorf("failed to retrieve BitbucketConfig metadata, cannot read k8s Unstructured data")
+	objectMeta, err := common.ObjectMetaFromUnstructureContent(storedBitbucketPipelineConfigMap)
+	if err != nil {
+		return nil, err
 	}
-
-	typemeta := &metav1.ObjectMeta{}
-	//time.Time cannot decode directly
-	delete(metadataMap, "creationTimestamp")
-	if err := mapstructure.Decode(metadataMap, typemeta); err != nil {
-		return nil, fmt.Errorf("failed to decode the config, error: %v", err)
-	}
-	storedBitbucketPipelineConfig.ObjectMeta = *typemeta
+	storedBitbucketPipelineConfig.ObjectMeta = *objectMeta
 	storedBitbucketPipelineConfig.APIVersion = "project.cattle.io/v3"
 	storedBitbucketPipelineConfig.Kind = v3.SourceCodeProviderConfigGroupVersionKind.Kind
 	return storedBitbucketPipelineConfig, nil

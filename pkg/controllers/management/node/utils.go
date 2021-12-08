@@ -11,15 +11,17 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/types/convert"
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/auth/tokens"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/jailer"
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )
 
 var regExHyphen = regexp.MustCompile("([a-z])([A-Z])")
@@ -42,6 +44,12 @@ func buildAgentCommand(node *v3.Node, dockerRun string) []string {
 	cmd := []string{"--native-ssh", "ssh", node.Spec.RequestedHostname}
 	cmd = append(cmd, drun...)
 	cmd = append(cmd, "-r", "-n", node.Name)
+	return cmd
+}
+
+func buildLoginCommand(node *v3.Node, login string) []string {
+	cmd := []string{"--native-ssh", "ssh", node.Spec.RequestedHostname}
+	cmd = append(cmd, strings.Fields(login)...)
 	return cmd
 }
 
@@ -82,7 +90,7 @@ func buildCreateCommand(node *v3.Node, configMap map[string]interface{}) []strin
 			}
 		}
 	}
-	logrus.Debugf("create cmd %v", cmd)
+	logrus.Tracef("create cmd %v", cmd)
 	cmd = append(cmd, node.Spec.RequestedHostname)
 	return cmd
 }
@@ -107,29 +115,28 @@ func mapToSlice(m map[string]string) []string {
 }
 
 func buildCommand(nodeDir string, node *v3.Node, cmdArgs []string) (*exec.Cmd, error) {
+	// only in trace because machine has sensitive details and we can't control who debugs what in there easily
+	if logrus.GetLevel() >= logrus.TraceLevel {
+		// prepend --debug to pass directly to machine
+		cmdArgs = append([]string{"--debug"}, cmdArgs...)
+	}
+
 	// In dev_mode, don't need jail or reference to jail in command
 	if os.Getenv("CATTLE_DEV_MODE") != "" {
 		env := initEnviron(nodeDir)
 		command := exec.Command(nodeCmd, cmdArgs...)
 		command.Env = env
+		logrus.Tracef("buildCommand args: %v", command.Args)
 		return command, nil
 	}
 
-	cred, err := jailer.GetUserCred()
-	if err != nil {
-		return nil, errors.WithMessage(err, "get user cred error")
-	}
-
 	command := exec.Command(nodeCmd, cmdArgs...)
-	command.SysProcAttr = &syscall.SysProcAttr{}
-	command.SysProcAttr.Credential = cred
-	command.SysProcAttr.Chroot = path.Join(jailer.BaseJailPath, node.Namespace)
-	envvars := []string{
+	command.Env = []string{
 		nodeDirEnvKey + nodeDir,
 		"PATH=/usr/bin:/var/lib/rancher/management-state/bin",
 	}
-	command.Env = jailer.WhitelistEnvvars(envvars)
-	return command, nil
+	logrus.Tracef("buildCommand args: %v", command.Args)
+	return jailer.JailCommand(command, path.Join(jailer.BaseJailPath, node.Namespace))
 }
 
 func initEnviron(nodeDir string) []string {
@@ -187,18 +194,25 @@ func getSSHKey(nodeDir, keyPath string, obj *v3.Node) (string, error) {
 
 func (m *Lifecycle) reportStatus(stdoutReader io.Reader, stderrReader io.Reader, node *v3.Node) (*v3.Node, error) {
 	scanner := bufio.NewScanner(stdoutReader)
+	debugPrefix := fmt.Sprintf("(%s) DBG | ", node.Spec.RequestedHostname)
 	for scanner.Scan() {
 		msg := scanner.Text()
 		if strings.Contains(msg, "To see how to connect") {
 			continue
 		}
-		logrus.Debugf("stdout: %s", msg)
 		_, err := filterDockerMessage(msg, node)
 		if err != nil {
 			return node, err
 		}
-		logrus.Infof("[node-controller-rancher-machine] %v", msg)
-		v3.NodeConditionProvisioned.Message(node, msg)
+		if strings.HasPrefix(msg, debugPrefix) {
+			// calls in machine with log.Debug are all prefixed and spammy so only log
+			// under trace and don't add to the v3.NodeConditionProvisioned.Message
+			logrus.Tracef("[node-controller-rancher-machine] %v", msg)
+		} else {
+			logrus.Infof("[node-controller-rancher-machine] %v", msg)
+			v32.NodeConditionProvisioned.Message(node, msg)
+		}
+
 		// ignore update errors
 		if newObj, err := m.nodeClient.Update(node); err == nil {
 			node = newObj
@@ -319,4 +333,20 @@ func setEc2ClusterIDTag(data interface{}, clusterID string) {
 			m[ec2TagFlag] = convert.ToString(tags) + "," + tagValue
 		}
 	}
+}
+
+func (m *Lifecycle) getKubeConfig(cluster *v3.Cluster) (*clientcmdapi.Config, string, error) {
+	user, err := m.systemAccountManager.GetSystemUser(cluster.Name)
+	if err != nil {
+		return nil, "", err
+	}
+
+	tokenPrefix := "node-removal-drain-" + user.Name
+	token, err := m.systemTokens.EnsureSystemToken(tokenPrefix, "token for node drain during removal", "agent", user.Name, nil, true)
+	if err != nil {
+		return nil, "", err
+	}
+
+	tokenName, _ := tokens.SplitTokenParts(token)
+	return m.clusterManager.KubeConfig(cluster.Name, token), tokenName, nil
 }

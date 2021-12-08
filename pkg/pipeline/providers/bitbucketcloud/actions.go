@@ -6,15 +6,16 @@ import (
 	"io/ioutil"
 	"net/http"
 
+	v32 "github.com/rancher/rancher/pkg/apis/project.cattle.io/v3"
+
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/api/access"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
+	client "github.com/rancher/rancher/pkg/client/generated/project/v3"
 	"github.com/rancher/rancher/pkg/pipeline/remote/model"
 	"github.com/rancher/rancher/pkg/ref"
-	v3 "github.com/rancher/types/apis/project.cattle.io/v3"
-	client "github.com/rancher/types/client/project/v3"
 )
 
 const (
@@ -60,7 +61,7 @@ func formBitbucketRedirectURLFromMap(config map[string]interface{}) string {
 }
 
 func (b *BcProvider) testAndApply(actionName string, action *types.Action, apiContext *types.APIContext) error {
-	applyInput := &v3.BitbucketCloudApplyInput{}
+	applyInput := &v32.BitbucketCloudApplyInput{}
 
 	if err := json.NewDecoder(apiContext.Request.Body).Decode(applyInput); err != nil {
 		return httperror.NewAPIError(httperror.InvalidBodyContent,
@@ -72,7 +73,7 @@ func (b *BcProvider) testAndApply(actionName string, action *types.Action, apiCo
 	if err != nil {
 		return err
 	}
-	storedBitbucketPipelineConfig, ok := pConfig.(*v3.BitbucketCloudPipelineConfig)
+	storedBitbucketPipelineConfig, ok := pConfig.(*v32.BitbucketCloudPipelineConfig)
 	if !ok {
 		return fmt.Errorf("Failed to get github provider config")
 	}
@@ -102,7 +103,7 @@ func (b *BcProvider) testAndApply(actionName string, action *types.Action, apiCo
 }
 
 func (b *BcProvider) authuser(apiContext *types.APIContext) error {
-	authUserInput := v3.AuthUserInput{}
+	authUserInput := v32.AuthUserInput{}
 	requestBytes, err := ioutil.ReadAll(apiContext.Request.Body)
 	if err != nil {
 		return err
@@ -116,7 +117,7 @@ func (b *BcProvider) authuser(apiContext *types.APIContext) error {
 	if err != nil {
 		return err
 	}
-	config, ok := pConfig.(*v3.BitbucketCloudPipelineConfig)
+	config, ok := pConfig.(*v32.BitbucketCloudPipelineConfig)
 	if !ok {
 		return fmt.Errorf("Failed to get bitbucket provider config")
 	}

@@ -36,7 +36,7 @@ def test_globalrole_must_exist(admin_mc, remove_resource):
         )
         remove_resource(grb)
     assert e.value.error.status == 404
-    assert "globalRole.management.cattle.io \"somefakerole\" not found" in \
+    assert "globalroles.management.cattle.io \"somefakerole\" not found" in \
            e.value.error.message
 
 

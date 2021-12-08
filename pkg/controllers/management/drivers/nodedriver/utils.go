@@ -7,15 +7,16 @@ import (
 	"strconv"
 	"strings"
 
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+
 	"github.com/rancher/machine/libmachine/drivers/plugin/localbinary"
 	rpcdriver "github.com/rancher/machine/libmachine/drivers/rpc"
 	cli "github.com/rancher/machine/libmachine/mcnflag"
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 )
 
-func FlagToField(flag cli.Flag) (string, v3.Field, error) {
-	field := v3.Field{
+func FlagToField(flag cli.Flag) (string, v32.Field, error) {
+	field := v32.Field{
 		Create: true,
 		Update: true,
 		Type:   "string",
@@ -68,6 +69,21 @@ func ToLowerCamelCase(nodeFlagName string) (string, error) {
 }
 
 func getCreateFlagsForDriver(driver string) ([]cli.Flag, error) {
+	var flags []cli.Flag
+	// NOTE(cmurphy): There is not currently a real google machine driver, but
+	// we still want to be able to create a Google cloud credential to use with
+	// GKE. This fake driver flag allows us to go through the motions of
+	// handling the credential fields without actually needing to run the
+	// machine driver binary.
+	if driver == "google" {
+		flags = []cli.Flag{
+			&cli.StringFlag{
+				Name: "google-auth-encoded-json",
+			},
+		}
+		return flags, nil
+	}
+
 	logrus.Debug("Starting binary ", driver)
 	p, err := localbinary.NewPlugin(driver)
 	if err != nil {
@@ -92,8 +108,6 @@ func getCreateFlagsForDriver(driver string) ([]cli.Flag, error) {
 	defer rpcclient.Close()
 
 	c := rpcdriver.NewInternalClient(rpcclient)
-
-	var flags []cli.Flag
 
 	if err := c.Call(".GetCreateFlags", struct{}{}, &flags); err != nil {
 		return nil, fmt.Errorf("Error getting flags err=%v", err)

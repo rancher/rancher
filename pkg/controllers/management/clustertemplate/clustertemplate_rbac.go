@@ -6,9 +6,9 @@ import (
 	"strings"
 
 	"github.com/rancher/rancher/pkg/controllers/management/rbac"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/namespace"
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
-	"github.com/rancher/types/config"
+	"github.com/rancher/rancher/pkg/types/config"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -64,8 +64,8 @@ func (ct *clusterTemplateController) sync(key string, clusterTemplate *v3.Cluste
 		return clusterTemplate, fmt.Errorf("clusterTemplate %v has no creatorId annotation", metaAccessor.GetName())
 	}
 
-	if err := rbac.CreateRoleAndRoleBinding(rbac.ClusterTemplateResource, clusterTemplate.Name, namespace.GlobalNamespace,
-		rbac.RancherManagementAPIVersion, creatorID, []string{rbac.RancherManagementAPIVersion},
+	if err := rbac.CreateRoleAndRoleBinding(rbac.ClusterTemplateResource, v3.ClusterTemplateGroupVersionKind.Kind, clusterTemplate.Name, namespace.GlobalNamespace,
+		rbac.RancherManagementAPIVersion, creatorID, []string{rbac.RancherManagementAPIGroup},
 		clusterTemplate.UID,
 		clusterTemplate.Spec.Members, ct.managementContext); err != nil {
 		return nil, err
@@ -105,8 +105,8 @@ func (ctr *clusterTemplateRevisionController) sync(key string, clusterTemplateRe
 	if err != nil {
 		return nil, err
 	}
-	if err := rbac.CreateRoleAndRoleBinding(rbac.ClusterTemplateRevisionResource, clusterTemplateRev.Name, namespace.GlobalNamespace,
-		rbac.RancherManagementAPIVersion, creatorID, []string{rbac.RancherManagementAPIVersion},
+	if err := rbac.CreateRoleAndRoleBinding(rbac.ClusterTemplateRevisionResource, v3.ClusterTemplateRevisionGroupVersionKind.Kind, clusterTemplateRev.Name, namespace.GlobalNamespace,
+		rbac.RancherManagementAPIVersion, creatorID, []string{rbac.RancherManagementAPIGroup},
 		clusterTemplateRev.UID,
 		clusterTemp.Spec.Members, ctr.managementContext); err != nil {
 		return nil, err

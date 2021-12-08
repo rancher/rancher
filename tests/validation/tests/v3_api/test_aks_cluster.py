@@ -18,18 +18,23 @@ akscredential = pytest.mark.skipif(not (SUBSCRIPTION_ID and TENANT_ID and
 
 @akscredential
 def test_create_aks_cluster():
-
-    client = get_user_client()
-    aksConfig = get_aks_config()
-
-    print("Cluster creation")
-    cluster = client.create_cluster(aksConfig)
-    cluster = validate_cluster(client, cluster, check_intermediate_state=True,
-                               skipIngresscheck=True)
+    version = get_aks_version()
+    client, cluster = create_and_validate_aks_cluster(version)
     cluster_cleanup(client, cluster)
 
 
-def get_aks_version():
+def create_and_validate_aks_cluster(version):
+    client = get_user_client()
+    aks_config = get_aks_config(version)
+
+    print("Cluster creation")
+    cluster = client.create_cluster(aks_config)
+    cluster = validate_cluster(client, cluster, check_intermediate_state=True,
+                               skipIngresscheck=True)
+    return client, cluster
+
+
+def get_aks_version(multiple_versions=False):
 
     if not AKS_CLUSTER_VERSION:
         data_test = {
@@ -53,9 +58,11 @@ def get_aks_version():
         print("JSON RESPONSE IS")
         print(response.content)
         json_response = json.loads(response.content)
-        versionarray_length = len(json_response)
-        aksclusterversion = json_response[versionarray_length-1]
-        print(aksclusterversion)
+
+        if multiple_versions and len(json_response) > 1:
+            aksclusterversion = [json_response[0], json_response[-1]]
+        else:
+            aksclusterversion = json_response[-1]
     else:
         aksclusterversion = AKS_CLUSTER_VERSION
 
@@ -63,16 +70,9 @@ def get_aks_version():
     return aksclusterversion
 
 
-def get_aks_config():
-
-    # Generate the config for AKS cluster
-    aksclusterversion = get_aks_version()
-
-    print(aksclusterversion)
-
-    aksConfig = {
+def get_aks_config(version):
+    aks_config = {
         "azureKubernetesServiceConfig": {
-
             "adminUsername": "azureuser",
             "agentPoolName": "rancher",
             "agentVmSize": "Standard_D2_v2",
@@ -81,7 +81,7 @@ def get_aks_config():
             "count": 3,
             "dnsServiceIp": None,
             "dockerBridgeCidr": None,
-            "kubernetesVersion": aksclusterversion,
+            "kubernetesVersion": version,
             "location": AKS_REGION,
             "osDiskSizeGb": 100,
             "resourceGroup": RESOURCE_GROUP,
@@ -96,9 +96,7 @@ def get_aks_config():
             "dockerRootDir": "/var/lib/docker",
             "enableNetworkPolicy": False,
         },
-
         "name": random_test_name("test-auto-aks"),
         "type": "cluster"
     }
-
-    return aksConfig
+    return aks_config

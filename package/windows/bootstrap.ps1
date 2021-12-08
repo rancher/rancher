@@ -9,54 +9,91 @@ $VerbosePreference = 'SilentlyContinue'
 $DebugPreference = 'SilentlyContinue'
 $InformationPreference = 'SilentlyContinue'
 
+Import-Module -WarningAction Ignore -Name "$PSScriptRoot\utils.psm1"
+$CATTLE_PREFIX_PATH = Get-Env -Key "CATTLE_PREFIX_PATH"
+
+# parse arguments
+$vals = $null
+for ($i = $args.Length; $i -ge 0; $i--)
+{
+    $arg = $args[$i]
+    switch -regex ($arg)
+    {
+        '^(--prefix-path)$' {
+            $CATTLE_PREFIX_PATH = ($vals | Select-Object -First 1)
+            $vals = $null
+        }
+        default {
+			if ($vals) {
+				$vals = ,$arg + $vals
+			} else {
+				$vals = @($arg)
+			}
+		}
+	}
+}
+
+if ([string]::IsNullOrEmpty($CATTLE_PREFIX_PATH)) {
+	$CATTLE_PREFIX_PATH = "c:\"
+}
+
+if ($CATTLE_PREFIX_PATH.Chars($CATTLE_PREFIX_PATH.Length - 1) -ne '\') {
+    # confirm trailing slash for path building below
+    $CATTLE_PREFIX_PATH = ($CATTLE_PREFIX_PATH + '\')
+}
+
+$hostPrefixPath = $CATTLE_PREFIX_PATH -Replace "c:\\", "c:\host\"
+
+
 # create directories on the host
-# windows docker only can mount the existing path into container
+# windows docker can only mount an existing path into containers
 try
 {
     New-Item -Force -ItemType Directory -Path @(
-        "c:\host\opt"
-        "c:\host\opt\bin"
-        "c:\host\opt\cni"
-        "c:\host\opt\cni\bin"
-        "c:\host\etc"
-        "c:\host\etc\rancher"
-        "c:\host\etc\rancher\wins"
-        "c:\host\etc\kubernetes"
-        "c:\host\etc\kubernetes\bin"
-        "c:\host\etc\cni"
-        "c:\host\etc\cni\net.d"
-        "c:\host\etc\nginx"
-        "c:\host\etc\nginx\logs"
-        "c:\host\etc\nginx\temp"
-        "c:\host\etc\nginx\conf"
-        "c:\host\etc\kube-flannel"
-        "c:\host\var"
-        "c:\host\var\run"
-        "c:\host\var\log"
-        "c:\host\var\log\pods"
-        "c:\host\var\log\containers"
-        "c:\host\var\lib"
-        "c:\host\var\lib\cni"
-        "c:\host\var\lib\rancher"
-        "c:\host\var\lib\kubelet"
-        "c:\host\var\lib\kubelet\volumeplugins"
-        "c:\host\run"
+        "$($hostPrefixPath)opt"
+        "$($hostPrefixPath)opt\bin"
+        "$($hostPrefixPath)opt\cni"
+        "$($hostPrefixPath)opt\cni\bin"
+        "$($hostPrefixPath)etc"
+        "$($hostPrefixPath)etc\rancher"
+        "$($hostPrefixPath)etc\rancher\wins"
+        "$($hostPrefixPath)etc\kubernetes"
+        "$($hostPrefixPath)etc\kubernetes\bin"
+        "$($hostPrefixPath)etc\cni"
+        "$($hostPrefixPath)etc\cni\net.d"
+        "$($hostPrefixPath)etc\nginx"
+        "$($hostPrefixPath)etc\nginx\logs"
+        "$($hostPrefixPath)etc\nginx\temp"
+        "$($hostPrefixPath)etc\nginx\conf"
+        "$($hostPrefixPath)etc\kube-flannel"
+        "$($hostPrefixPath)var"
+        "$($hostPrefixPath)var\run"
+        "$($hostPrefixPath)var\log"
+        "$($hostPrefixPath)var\log\pods"
+        "$($hostPrefixPath)var\log\containers"
+        "$($hostPrefixPath)var\lib"
+        "$($hostPrefixPath)var\lib\cni"
+        "$($hostPrefixPath)var\lib\rancher"
+        "$($hostPrefixPath)var\lib\rancher\rke"
+        "$($hostPrefixPath)var\lib\rancher\rke\log"
+        "$($hostPrefixPath)var\lib\kubelet"
+        "$($hostPrefixPath)var\lib\kubelet\volumeplugins"
+        "$($hostPrefixPath)run"
         "c:\host\ProgramData\docker\certs.d"
     ) | Out-Null
 } catch { }
 
 # copy cleanup.ps1 & wins.exe to the host
-# wins needs to run as a server on the host to accept the request from container
+# wins needs to run as a service on the host to accept requests from container
 try
 {
-    Copy-Item -Force -Destination "c:\host\etc\rancher" -Path @(
+    Copy-Item -Force -Destination "$($hostPrefixPath)etc\rancher" -Path @(
         "c:\etc\rancher\utils.psm1"
-        "c:\etc\rancher\cleanup.ps1"
         "c:\Windows\wins.exe"
     )
 } catch { }
 
-$verfication = @"
+$verification = @"
 Log-Info "Detecting running permission ..."
 if (-not (Is-Administrator))
 {
@@ -123,26 +160,26 @@ catch
     Log-Warn "Could not detect the DISK resource: `$(`$_.Exception.Message)"
 }
 
-Log-Info "Detecting host Docker name pipe existing ..."
+Log-Info "Detecting host Docker named pipe existing ..."
 `$dockerNPipe = Get-ChildItem //./pipe/ -ErrorAction Ignore | ? Name -eq "docker_engine"
 if (-not `$dockerNPipe)
 {
-    Log-Warn "Default docker named pipe is not available"
+    Log-Warn "Default Docker named pipe is not available"
     Log-Warn "Please create '//./pipe/docker_engine' named pipe to access docker daemon if docker errors occur"
 }
 
-Log-Info "Detecting host Docker release version ..."
+Log-Info "Detecting host Docker platform name..."
 try
 {
     `$dockerPlatform = docker.exe version -f "{{.Server.Platform.Name}}"
-    if (-not (`$dockerPlatform -like '*Enterprise*'))
+    if (-not (`$dockerPlatform -like '*Enterprise*') -AND -not (`$dockerPlatform -eq 'Mirantis Container Runtime'))
     {
-        Log-Fatal "Only support with Docker EE"
+        Log-Fatal "Only Docker EE or Mirantis Container Runtime supported"
     }
 }
 catch
 {
-    Log-Fatal "Could not found Docker service: `$(`$_.Exception.Message)"
+    Log-Fatal "Could not find Docker service: `$(`$_.Exception.Message)"
 }
 
 Log-Info "Detecting host network interface ..."
@@ -151,19 +188,19 @@ Log-Info "Detecting host network interface ..."
 `$networkCount = `$allNetAdapters | Measure-Object | Select-Object -ExpandProperty "Count"
 if (`$networkCount -gt 1)
 {
-    Log-Warn "More than 1 network interfaces are found: `$(`$allNetAdapters -join ", ")"
+    Log-Warn "More than 1 network interface was found: `$(`$allNetAdapters -join ", ")"
     Log-Warn "Please indicate --internal-address when adding failed"
 }
 
-Log-Info "Configuring host Docker startup mode to automatical ..."
+Log-Info "Configuring host Docker Service to start automatically..."
 try
 {
     Get-Service -Name "docker" -ErrorAction Ignore | Where-Object {`$_.StartType -ne "Automatic"} | Set-Service -StartupType Automatic
 }
 catch
 {
-    Log-Warn "Could not configure the docker to start automatically: `$(`$_.Exception.Message)"
-    Log-Warn "Please configure the 'StartupType' to 'Automatic' for the docker service"
+    Log-Warn "Could not configure the Docker service to start automatically: `$(`$_.Exception.Message)"
+    Log-Warn "Please change the Docker service 'StartupType' to 'Automatic'"
 }
 
 Log-Info "Enabling host msiscsi service to support iscsi storage ..."
@@ -178,12 +215,12 @@ if (`$svcMsiscsi -and (`$svcMsiscsi.Status -ne "Running"))
 }
 "@
 
-# allow user to disable the verfication
+# allow user to disable the verification
 if ($env:WITHOUT_VERIFICATION -eq "true") {
-    $verfication = ""
+    $verification = ""
 }
 
-Out-File -Encoding ascii -FilePath "c:\host\etc\rancher\bootstrap.ps1" -InputObject @"
+Out-File -Encoding ascii -FilePath "$($hostPrefixPath)etc\rancher\bootstrap.ps1" -InputObject @"
 `$ErrorActionPreference = 'Stop'
 `$WarningPreference = 'SilentlyContinue'
 `$VerbosePreference = 'SilentlyContinue'
@@ -196,10 +233,10 @@ Import-Module -WarningAction Ignore -Name "`$PSScriptRoot\utils.psm1"
 # remove script
 Remove-Item -Force -Path "`$PSScriptRoot\bootstrap.ps1" -ErrorAction Ignore
 
-$verfication
+$verification
 
 # repair Get-GcePdName method
-# this's a stopgap, we could drop this after https://github.com/kubernetes/kubernetes/issues/74674 fixed
+# this is a stopgap, we could drop this after https://github.com/kubernetes/kubernetes/issues/74674 fixed
 # related: rke-tools container
 `$getGcePodNameCommand = Get-Command -Name "Get-GcePdName" -ErrorAction Ignore
 if (-not `$getGcePodNameCommand)
@@ -212,7 +249,7 @@ if (-not `$getGcePodNameCommand)
 Unblock-File -Path DLLPATH -ErrorAction Ignore
 Import-Module -Name DLLPATH -ErrorAction Ignore
 '@
-    Add-Content -Path `$profilePath -Value `$appendProfile.replace('DLLPATH', "c:\run\GetGcePdName.dll") -ErrorAction Ignore
+    Add-Content -Path `$profilePath -Value `$appendProfile.replace('DLLPATH', "$($CATTLE_PREFIX_PATH)run\GetGcePdName.dll") -ErrorAction Ignore
 }
 
 # clean up the stale HNS network if required
@@ -238,22 +275,31 @@ catch
     Log-Warn "Could not clean: `$(`$_.Exception.Message)"
 }
 
+# make a powershell copy for wins to use
+Copy-Item $($(Get-Command powershell).Source) $($CATTLE_PREFIX_PATH)etc\rancher\powershell.exe
+
 # output wins config
 @{
     whiteList = @{
         processPaths = @(
-            "c:\etc\wmi-exporter\wmi-exporter.exe"
-            "c:\etc\kubernetes\bin\kube-proxy.exe"
-            "c:\etc\kubernetes\bin\kubelet.exe"
-            "c:\etc\nginx\nginx.exe"
-            "c:\opt\bin\flanneld.exe"
+            "$($CATTLE_PREFIX_PATH)etc\wmi-exporter\wmi-exporter.exe"
+            "$($CATTLE_PREFIX_PATH)etc\kubernetes\bin\kube-proxy.exe"
+            "$($CATTLE_PREFIX_PATH)etc\kubernetes\bin\kubelet.exe"
+            "$($CATTLE_PREFIX_PATH)etc\nginx\nginx.exe"
+            "$($CATTLE_PREFIX_PATH)opt\bin\flanneld.exe"
+            "$($CATTLE_PREFIX_PATH)etc\rancher\wins\wins-upgrade.exe"
+            "$($CATTLE_PREFIX_PATH)etc\rancher\powershell.exe"
+            "$($CATTLE_PREFIX_PATH)etc\windows-exporter\windows-exporter.exe"
+        )
+        proxyPorts = @(
+            9796
         )
     }
-} | ConvertTo-Json -Compress -Depth 32 | Out-File -NoNewline -Encoding utf8 -Force -FilePath "c:\etc\rancher\wins\config"
+} | ConvertTo-Json -Compress -Depth 32 | Out-File -NoNewline -Encoding utf8 -Force -FilePath "$($CATTLE_PREFIX_PATH)etc\rancher\wins\config"
 
 # register wins
 Start-Process -NoNewWindow -Wait ``
-    -FilePath "c:\etc\rancher\wins.exe" ``
+    -FilePath "$($CATTLE_PREFIX_PATH)etc\rancher\wins.exe" ``
     -ArgumentList "srv app run --register"
 
 # start wins
@@ -262,7 +308,9 @@ Start-Service -Name "rancher-wins" -ErrorAction Ignore
 # run agent
 Start-Process -NoNewWindow -Wait ``
     -FilePath "docker.exe" ``
-    -ArgumentList "run -d --restart=unless-stopped -v //./pipe/docker_engine://./pipe/docker_engine -v c:/ProgramData/docker/certs.d:c:/etc/docker/certs.d -v c:/etc/kubernetes:c:/etc/kubernetes -v //./pipe/rancher_wins://./pipe/rancher_wins -v c:/etc/rancher/wins:c:/etc/rancher/wins $($env:AGENT_IMAGE) execute $($args -join " ")"
+    -ArgumentList "run -d --restart=unless-stopped -e CATTLE_PREFIX_PATH=$CATTLE_PREFIX_PATH -v \\.\pipe\docker_engine:\\.\pipe\docker_engine -v c:\ProgramData\docker\certs.d:c:\etc\docker\certs.d -v $($CATTLE_PREFIX_PATH)etc\kubernetes:c:\etc\kubernetes -v \\.\pipe\rancher_wins:\\.\pipe\rancher_wins -v $($CATTLE_PREFIX_PATH)etc\rancher\wins:c:\etc\rancher\wins $($env:AGENT_IMAGE) execute $($args -join " ")"
 "@
 
-Write-Output -InputObject "c:\etc\rancher\bootstrap.ps1"
+
+Write-Output -InputObject "$($CATTLE_PREFIX_PATH)etc\rancher\bootstrap.ps1"
+

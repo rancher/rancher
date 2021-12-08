@@ -270,6 +270,7 @@ def test_embedded_system_catalog_missing_edit_link(admin_mc):
     assert "update" not in system_catalog.links
 
 
+@pytest.mark.nonparallel
 def test_catalog_refresh(admin_mc):
     """Test that on refresh the response includes the names of the catalogs
     that are being refreshed"""
@@ -394,3 +395,16 @@ def test_catalog_has_helmversion(admin_mc, remove_resource):
     for template in templates2:
         assert "helmVersion" in template.status
         assert template.status.helmVersion == "helm_v3"
+
+
+def test_refresh_catalog_access(admin_mc, user_mc):
+    """Tests that a user with standard access is not
+    able to refresh a catalog.
+    """
+    catalog = admin_mc.client.by_id_catalog("library")
+    out = admin_mc.client.action(obj=catalog, action_name="refresh")
+    assert out['catalogs'][0] == "library"
+    # use catalog obj from admin client to get action not available to user
+    with pytest.raises(ApiError) as e:
+        user_mc.client.action(obj=catalog, action_name="refresh")
+    assert e.value.error.status == 404

@@ -74,6 +74,19 @@ class BaseCli:
             clusters.append(cluster)
         return clusters
 
+    def inspect(self, resource_type, resource_id, **kwargs):
+        resource_format = kwargs.get("format", "{{.id}}")
+        result = self.run_command("inspect --type {} --format '{}' {}".format(
+            resource_type, resource_format, resource_id))
+        return result.strip()
+
+    def ps(self):
+        return self.run_command(
+            "ps --format '{{.NameSpace}}|{{.Name}}|{{.Image}}|{{.Scale}}'")
+
+    def kubectl(self, cmd):
+        return self.run_command("kubectl {}".format(cmd))
+
     def wait_for_ready(self, command, val_to_check, **kwargs):
         timeout = kwargs.get("timeout", DEFAULT_TIMEOUT)
         condition_func = kwargs.get("condition_func",

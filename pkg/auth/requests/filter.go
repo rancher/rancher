@@ -1,62 +1,105 @@
 package requests
 
 import (
-	"context"
-	"fmt"
 	"net/http"
 	"strings"
 
-	"github.com/rancher/rancher/pkg/audit"
-	"github.com/rancher/rancher/pkg/auth/providerrefresh"
+	"github.com/rancher/rancher/pkg/auth/audit"
+	"github.com/rancher/rancher/pkg/auth/providers"
 	"github.com/rancher/rancher/pkg/auth/util"
-	"github.com/rancher/types/config"
+	"github.com/sirupsen/logrus"
+	"k8s.io/apiserver/pkg/endpoints/request"
 )
 
-func NewAuthenticationFilter(ctx context.Context, auth Authenticator, managementContext *config.ScaledContext, next http.Handler) (http.Handler, error) {
-	if managementContext == nil {
-		return nil, fmt.Errorf("Failed to build NewAuthenticationFilter, nil ManagementContext")
-	}
+func NewAuthenticatedFilter(next http.Handler) http.Handler {
 	return &authHeaderHandler{
-		auth:              auth,
-		next:              next,
-		userAuthRefresher: providerrefresh.NewUserAuthRefresher(ctx, managementContext),
-	}, nil
+		next: next,
+	}
 }
 
 type authHeaderHandler struct {
-	auth              Authenticator
-	next              http.Handler
-	userAuthRefresher providerrefresh.UserAuthRefresher
+	next http.Handler
 }
 
 func (h authHeaderHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
-	authed, user, groups, err := h.auth.Authenticate(req)
-	if err != nil || !authed {
-		util.ReturnHTTPError(rw, req, 401, err.Error())
+	userInfo, authed := request.UserFrom(req.Context())
+	// checking for system:cattle:error user keeps the old behavior of always returning 401 when authentication fails
+	if !authed || userInfo.GetName() == "system:cattle:error" {
+		util.ReturnHTTPError(rw, req, 401, ErrMustAuthenticate.Error())
 		return
 	}
 
-	// clean extra
+	//clean extra that is not part of userInfo
 	for header := range req.Header {
 		if strings.HasPrefix(header, "Impersonate-Extra-") {
-			req.Header.Del(header)
+			key := strings.TrimPrefix(header, "Impersonate-Extra-")
+			if !providers.IsValidUserExtraAttribute(key) {
+				req.Header.Del(header)
+			}
 		}
 	}
 
-	req.Header.Set("Impersonate-User", user)
+	req.Header.Set("Impersonate-User", userInfo.GetName())
 	req.Header.Del("Impersonate-Group")
-	for _, group := range groups {
+	for _, group := range userInfo.GetGroups() {
 		req.Header.Add("Impersonate-Group", group)
 	}
 
-	auditUser, ok := audit.FromContext(req.Context())
-	if ok {
-		auditUser.Name = user
-		auditUser.Group = groups
+	for key, extras := range userInfo.GetExtra() {
+		for _, s := range extras {
+			if s != "" {
+				req.Header.Add("Impersonate-Extra-"+key, s)
+			}
+		}
 	}
 
-	if !strings.HasPrefix(user, "system:") {
-		go h.userAuthRefresher.TriggerUserRefresh(user, false)
+	logrus.Tracef("Rancher Auth Filter ##headers %v: ", req.Header)
+
+	auditUser, ok := audit.FromContext(req.Context())
+	if ok {
+		auditUser.Name = userInfo.GetName()
+		auditUser.Group = userInfo.GetGroups()
+	}
+
+	h.next.ServeHTTP(rw, req)
+}
+
+func NewRequireAuthenticatedFilter(pathPrefix string, ignorePrefix ...string) func(next http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return &authedFilter{
+			next:         next,
+			pathPrefix:   pathPrefix,
+			ignorePrefix: ignorePrefix,
+		}
+	}
+}
+
+type authedFilter struct {
+	next         http.Handler
+	pathPrefix   string
+	ignorePrefix []string
+}
+
+func (h authedFilter) matches(path string) bool {
+	if strings.HasPrefix(path, h.pathPrefix) {
+		for _, prefix := range h.ignorePrefix {
+			if strings.HasPrefix(path, prefix) {
+				return false
+			}
+		}
+		return true
+	}
+	return false
+}
+
+func (h authedFilter) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
+	if h.matches(req.URL.Path) {
+		userInfo, authed := request.UserFrom(req.Context())
+		// checking for system:cattle:error user keeps the old behavior of always returning 401 when authentication fails
+		if !authed || userInfo.GetName() == "system:cattle:error" {
+			util.ReturnHTTPError(rw, req, 401, ErrMustAuthenticate.Error())
+			return
+		}
 	}
 
 	h.next.ServeHTTP(rw, req)

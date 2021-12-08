@@ -4,9 +4,11 @@ import (
 	"encoding/base64"
 	"encoding/json"
 
-	"github.com/docker/docker/api/types"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/settings"
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
+	rketypes "github.com/rancher/rke/types"
+	"github.com/rancher/rke/util"
+	"k8s.io/kubernetes/pkg/credentialprovider"
 )
 
 func GetPrivateRepoURL(cluster *v3.Cluster) string {
@@ -17,13 +19,13 @@ func GetPrivateRepoURL(cluster *v3.Cluster) string {
 	return registry.URL
 }
 
-func GetPrivateRepo(cluster *v3.Cluster) *v3.PrivateRegistry {
+func GetPrivateRepo(cluster *v3.Cluster) *rketypes.PrivateRegistry {
 	if cluster != nil && cluster.Spec.RancherKubernetesEngineConfig != nil && len(cluster.Spec.RancherKubernetesEngineConfig.PrivateRegistries) > 0 {
 		config := cluster.Spec.RancherKubernetesEngineConfig
 		return &config.PrivateRegistries[0]
 	}
 	if settings.SystemDefaultRegistry.Get() != "" {
-		return &v3.PrivateRegistry{
+		return &rketypes.PrivateRegistry{
 			URL: settings.SystemDefaultRegistry.Get(),
 		}
 	}
@@ -38,13 +40,33 @@ func GenerateClusterPrivateRegistryDockerConfig(cluster *v3.Cluster) (string, er
 }
 
 // This method generates base64 encoded credentials for the registry
-func GeneratePrivateRegistryDockerConfig(privateRegistry *v3.PrivateRegistry) (string, error) {
-	if privateRegistry == nil || privateRegistry.User == "" || privateRegistry.Password == "" {
+func GeneratePrivateRegistryDockerConfig(privateRegistry *rketypes.PrivateRegistry) (string, error) {
+	if privateRegistry == nil {
 		return "", nil
 	}
-	authConfig := types.AuthConfig{
-		Username: privateRegistry.User,
-		Password: privateRegistry.Password,
+
+	if privateRegistry.ECRCredentialPlugin != nil {
+		// generate ecr authConfig
+		authConfig, err := util.ECRCredentialPlugin(privateRegistry.ECRCredentialPlugin, privateRegistry.URL)
+		if err != nil {
+			return "", err
+		}
+		encodedJSON, err := json.Marshal(authConfig)
+		if err != nil {
+			return "", err
+		}
+		return base64.URLEncoding.EncodeToString(encodedJSON), nil
+	}
+	if privateRegistry.User == "" || privateRegistry.Password == "" {
+		return "", nil
+	}
+	authConfig := credentialprovider.DockerConfigJSON{
+		Auths: credentialprovider.DockerConfig{
+			privateRegistry.URL: credentialprovider.DockerConfigEntry{
+				Username: privateRegistry.User,
+				Password: privateRegistry.Password,
+			},
+		},
 	}
 	encodedJSON, err := json.Marshal(authConfig)
 	if err != nil {

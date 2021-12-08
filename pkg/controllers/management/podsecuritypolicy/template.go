@@ -6,20 +6,24 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
-	"github.com/rancher/types/config"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/types/config"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/cache"
 )
 
 const psptpbByPSPTNameIndex = "something.something.psptpb/pspt-name"
 
-func Register(ctx context.Context, management *config.ManagementContext) {
-	psptpbInformer := management.Management.PodSecurityPolicyTemplateProjectBindings("").Controller().Informer()
+func RegisterIndexers(ctx context.Context, scaledContext *config.ScaledContext) error {
+	psptpbInformer := scaledContext.Management.PodSecurityPolicyTemplateProjectBindings("").Controller().Informer()
 	psptpbIndexers := map[string]cache.IndexFunc{
 		psptpbByPSPTNameIndex: PSPTPBByPSPTName,
 	}
-	psptpbInformer.AddIndexers(psptpbIndexers)
+	return psptpbInformer.AddIndexers(psptpbIndexers)
+}
+
+func Register(ctx context.Context, management *config.ManagementContext) {
+	psptpbInformer := management.Management.PodSecurityPolicyTemplateProjectBindings("").Controller().Informer()
 
 	lifecycle := &lifecycle{
 		psptpbs:       management.Management.PodSecurityPolicyTemplateProjectBindings(""),

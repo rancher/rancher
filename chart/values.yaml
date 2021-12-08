@@ -4,6 +4,7 @@
 additionalTrustedCAs: false
 
 antiAffinity: preferred
+topologyKey: kubernetes.io/hostname
 
 # Audit Logs https://rancher.com/docs/rancher/v2.x/en/installation/api-auditing/
 # The audit log is piped to the console of the rancher-audit-log container in the rancher pod.
@@ -18,17 +19,23 @@ auditLog:
   maxBackup: 1
   maxSize: 100
 
-# Have Rancher detect and import the "local" Rancher server cluster
-# Adding the "local" cluster available in the GUI can be convenient, but any user with access to this cluster has "root" on any of the clusters that Rancher manages.
-# options; "auto", "false". (auto pretty much means true)
-addLocal: "auto"
+# As of Rancher v2.5.0 this flag is deprecated and must be set to 'true' in order for Rancher to start
+addLocal: "true"
 
 # Image for collecting rancher audit logs.
 # Important: update pkg/image/export/main.go when this default image is changed, so that it's reflected accordingly in rancher-images.txt generated for air-gapped setups.
 busyboxImage: busybox
 
+# Override imagePullPolicy for busybox images
+# options: Always, Never, IfNotPresent
+# Defaults to IfNotPresent
+# busyboxImagePullPolicy: <pullPolicy>
+
 # Add debug flag to Rancher server
 debug: false
+
+# When starting Rancher for the first time, bootstrap the admin as restricted-admin
+restrictedAdmin: false
 
 # Extra environment variables passed to the rancher pods.
 # extraEnv:
@@ -46,10 +53,12 @@ imagePullSecrets: []
 ### ingress ###
 # Readme for details and instruction on adding tls secrets.
 ingress:
-  extraAnnotations:
-    nginx.ingress.kubernetes.io/proxy-connect-timeout: "30"
-    nginx.ingress.kubernetes.io/proxy-read-timeout: "1800"
-    nginx.ingress.kubernetes.io/proxy-send-timeout: "1800"
+  # If set to false, ingress will not be created
+  # Defaults to true
+  # options: true, false
+  enabled: true
+  includeDefaultExtraAnnotations: true
+  extraAnnotations: {}
 
   # configurationSnippet - Add additional Nginx configuration. This example statically sets a header on the ingress.
   # configurationSnippet: |
@@ -58,6 +67,7 @@ ingress:
   tls:
     # options: rancher, letsEncrypt, secret
     source: rancher
+    secretName: tls-rancher-ingress
 
 ### LetsEncrypt config ###
 # ProTip: The production environment only allows you to register a name 5 times a week.
@@ -65,7 +75,9 @@ ingress:
 letsEncrypt:
   # email: none@example.com
   environment: production
-
+  ingress:
+    # options: traefik, nginx
+    class: ""
 # If you are using certs signed by a private CA set to 'true' and set the 'tls-ca'
 # in the 'rancher-system' namespace. See the README.md for details
 privateCA: false
@@ -74,7 +86,7 @@ privateCA: false
 # proxy: http://<username>@<password>:<url>:<port>
 
 # comma separated list of domains or ip addresses that will not use the proxy
-noProxy: 127.0.0.0/8,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16
+noProxy: 127.0.0.0/8,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,.svc,.cluster.local
 
 # Override rancher image location for Air Gap installs
 rancherImage: rancher/rancher
@@ -87,7 +99,8 @@ rancherImage: rancher/rancher
 # Defaults to IfNotPresent
 # rancherImagePullPolicy: <pullPolicy>
 
-# Number of Rancher server replicas.
+# Number of Rancher server replicas. Setting to negative number will dynamically between 0 and the abs(replicas) based on available nodes.
+# of available nodes in the cluster
 replicas: 3
 
 # Set pod resource requests/limits for Rancher.
@@ -108,3 +121,37 @@ useBundledSystemChart: false
 # Certmanager version compatibility
 certmanager: 
   version: ""
+
+# Rancher custom logos persistence
+customLogos:
+  enabled: false
+  volumeSubpaths:
+    emberUi: "ember"
+    vueUi: "vue"
+  ## Volume kind to use for persistence: persistentVolumeClaim, configMap
+  volumeKind: persistentVolumeClaim
+  ## Use an existing volume. Custom logos should be copied to the volume by the user
+  # volumeName: custom-logos
+  ## Just for volumeKind: persistentVolumeClaim 
+  ## To disables dynamic provisioning, set storageClass: "" or storageClass: "-"
+  # storageClass: "-"
+  accessMode: ReadWriteOnce
+  size: 1Gi
+
+# Rancher post-delete hook
+postDelete:
+  enabled: true
+  image:
+    repository: %POST_DELETE_IMAGE_NAME%
+    tag: %POST_DELETE_IMAGE_TAG%
+  namespaceList:
+    - cattle-fleet-system
+    - cattle-system
+    - rancher-operator-system
+  # Number of seconds to wait for an app to be uninstalled
+  timeout: 120
+  # by default, the job will fail if it fail to uninstall any of the apps
+  ignoreTimeoutError: false
+
+# Set a bootstrap password. If leave empty, a random password will be generated.
+bootstrapPassword: ""

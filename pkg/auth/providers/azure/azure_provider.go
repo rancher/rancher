@@ -4,24 +4,27 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/Azure/azure-sdk-for-go/services/graphrbac/1.6/graphrbac"
 	"github.com/Azure/go-autorest/autorest/adal"
+	lru "github.com/hashicorp/golang-lru"
 	"github.com/mitchellh/mapstructure"
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/tokens"
-	corev1 "github.com/rancher/types/apis/core/v1"
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
-	"github.com/rancher/types/apis/management.cattle.io/v3public"
-	client "github.com/rancher/types/client/management/v3"
-	publicclient "github.com/rancher/types/client/management/v3public"
-	"github.com/rancher/types/config"
-	"github.com/rancher/types/user"
+	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
+	publicclient "github.com/rancher/rancher/pkg/client/generated/management/v3public"
+	corev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/settings"
+	"github.com/rancher/rancher/pkg/types/config"
+	"github.com/rancher/rancher/pkg/user"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -34,6 +37,8 @@ const (
 	Name = "azuread"
 )
 
+var groupCache *lru.Cache
+
 type azureProvider struct {
 	ctx         context.Context
 	authConfigs v3.AuthConfigInterface
@@ -42,12 +47,13 @@ type azureProvider struct {
 	tokenMGR    *tokens.Manager
 }
 
-func Configure(
-	ctx context.Context,
-	mgmtCtx *config.ScaledContext,
-	userMGR user.Manager,
-	tokenMGR *tokens.Manager,
-) common.AuthProvider {
+func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, userMGR user.Manager, tokenMGR *tokens.Manager) common.AuthProvider {
+	var err error
+	groupCache, err = lru.New(settings.AzureGroupCacheSize.GetInt())
+	if err != nil {
+		logrus.Warnf("initial azure-group-cache-size was invalid value, setting to 10000 error:%v", err)
+		groupCache, _ = lru.New(10000)
+	}
 
 	return &azureProvider{
 		ctx:         ctx,
@@ -65,7 +71,7 @@ func (ap *azureProvider) GetName() string {
 func (ap *azureProvider) AuthenticateUser(
 	ctx context.Context, input interface{},
 ) (v3.Principal, []v3.Principal, string, error) {
-	login, ok := input.(*v3public.AzureADLogin)
+	login, ok := input.(*v32.AzureADLogin)
 	if !ok {
 		return v3.Principal{}, nil, "", errors.New("unexpected input type")
 	}
@@ -206,8 +212,8 @@ func (ap *azureProvider) TransformToAuthProvider(
 }
 
 func (ap *azureProvider) loginUser(
-	azureCredential *v3public.AzureADLogin,
-	config *v3.AzureADConfig,
+	azureCredential *v32.AzureADLogin,
+	config *v32.AzureADConfig,
 	test bool,
 ) (v3.Principal, []v3.Principal, string, error) {
 	var err error
@@ -307,7 +313,7 @@ func (ap *azureProvider) getGroup(client *azureClient, principalID string, token
 
 func (ap *azureProvider) searchUsers(client *azureClient, name string, token v3.Token) ([]v3.Principal, error) {
 	filter := fmt.Sprintf("startswith(userPrincipalName,'%[1]s') or startswith(displayName,'%[1]s') or startswith(givenName,'%[1]s') or startswith(surname,'%[1]s')", name)
-	users, err := client.userClient.List(context.Background(), filter)
+	users, err := client.userClient.List(context.Background(), filter, "")
 	if err != nil {
 		return nil, err
 	}
@@ -355,7 +361,7 @@ func (ap *azureProvider) newAzureClient(secret string) (*azureClient, error) {
 	return client, nil
 }
 
-func (ap *azureProvider) saveAzureConfigK8s(config *v3.AzureADConfig) error {
+func (ap *azureProvider) saveAzureConfigK8s(config *v32.AzureADConfig) error {
 	storedAzureConfig, err := ap.getAzureConfigK8s()
 	if err != nil {
 		return err
@@ -380,7 +386,7 @@ func (ap *azureProvider) saveAzureConfigK8s(config *v3.AzureADConfig) error {
 	return nil
 }
 
-func (ap *azureProvider) getAzureConfigK8s() (*v3.AzureADConfig, error) {
+func (ap *azureProvider) getAzureConfigK8s() (*v32.AzureADConfig, error) {
 	authConfigObj, err := ap.authConfigs.ObjectClient().UnstructuredClient().Get(Name, metav1.GetOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve AzureADConfig, error: %v", err)
@@ -392,7 +398,7 @@ func (ap *azureProvider) getAzureConfigK8s() (*v3.AzureADConfig, error) {
 	}
 	storedAzureADConfigMap := u.UnstructuredContent()
 
-	storedAzureADConfig := &v3.AzureADConfig{}
+	storedAzureADConfig := &v32.AzureADConfig{}
 	mapstructure.Decode(storedAzureADConfigMap, storedAzureADConfig)
 
 	metadataMap, ok := storedAzureADConfigMap["metadata"].(map[string]interface{})
@@ -427,17 +433,23 @@ func (ap *azureProvider) userToPrincipal(user graphrbac.User) v3.Principal {
 	return p
 }
 
-func (ap *azureProvider) userGroupsToPrincipals(
-	azureClient *azureClient,
-	groups graphrbac.UserGetMemberGroupsResult,
-) ([]v3.Principal, error) {
+func (ap *azureProvider) userGroupsToPrincipals(azureClient *azureClient, groups graphrbac.UserGetMemberGroupsResult) ([]v3.Principal, error) {
 	start := time.Now()
 	logrus.Debug("[AZURE_PROVIDER] Started gathering users groups")
+
 	var g errgroup.Group
 	groupPrincipals := make([]v3.Principal, len(*groups.Value))
 	for i, group := range *groups.Value {
 		j := i
 		gp := group
+
+		// Check the cache first, if it exists that saves an API call to azure
+		if principal, ok := groupCache.Get(gp); ok {
+			p := principal.(v3.Principal)
+			groupPrincipals[j] = p
+			continue
+		}
+
 		g.Go(func() error {
 			groupObj, err := azureClient.groupClient.Get(context.Background(), gp)
 			if err != nil {
@@ -447,6 +459,9 @@ func (ap *azureProvider) userGroupsToPrincipals(
 
 			p := ap.groupToPrincipal(groupObj)
 			p.MemberOf = true
+
+			// Add to the cache
+			groupCache.Add(gp, p)
 			groupPrincipals[j] = p
 			return nil
 		})
@@ -454,7 +469,7 @@ func (ap *azureProvider) userGroupsToPrincipals(
 	if err := g.Wait(); err != nil {
 		return nil, err
 	}
-	logrus.Debugf("[AZURE_PROVIDER] Completed gathering users groups, took %v", time.Now().Sub(start))
+	logrus.Debugf("[AZURE_PROVIDER] Completed gathering users groups, took %v, keys in cache:%v", time.Since(start), groupCache.Len())
 	return groupPrincipals, nil
 }
 
@@ -558,4 +573,24 @@ func (ap *azureProvider) CanAccessWithGroupProviders(userPrincipalID string, gro
 		return false, err
 	}
 	return allowed, nil
+}
+
+func UpdateGroupCacheSize(size string) {
+	i, err := strconv.Atoi(size)
+	if err != nil {
+		logrus.Errorf("error parsing azure-group-cache-size, skipping update %v", err)
+		return
+	}
+	if i < 0 {
+		logrus.Error("azure-group-cache-size must be >= 0, skipping update")
+		return
+	}
+	groupCache.Resize(i)
+}
+
+func (ap *azureProvider) GetUserExtraAttributes(token *v3.Token) map[string][]string {
+	extras := make(map[string][]string)
+	extras["principalid"] = []string{token.UserPrincipal.Name}
+	extras["username"] = []string{token.UserPrincipal.LoginName}
+	return extras
 }

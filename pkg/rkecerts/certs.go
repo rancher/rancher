@@ -9,6 +9,8 @@ import (
 	"os"
 	"path/filepath"
 
+	rketypes "github.com/rancher/rke/types"
+
 	"context"
 
 	"fmt"
@@ -18,12 +20,11 @@ import (
 	"time"
 
 	"github.com/ghodss/yaml"
-	"github.com/rancher/kontainer-engine/drivers/rke/rkecerts"
 	"github.com/rancher/norman/types"
+	"github.com/rancher/rancher/pkg/kontainer-engine/drivers/rke/rkecerts"
 	"github.com/rancher/rancher/pkg/librke"
 	"github.com/rancher/rke/pki"
 	"github.com/rancher/rke/pki/cert"
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	k8sclientv1 "k8s.io/client-go/tools/clientcmd/api/v1"
 )
@@ -65,7 +66,7 @@ func LoadLocal() (*Bundle, error) {
 	return NewBundle(certMap), nil
 }
 
-func Generate(config *v3.RancherKubernetesEngineConfig) (*Bundle, error) {
+func Generate(config *rketypes.RancherKubernetesEngineConfig) (*Bundle, error) {
 	certs, err := librke.New().GenerateCerts(config)
 	if err != nil {
 		return nil, err
@@ -90,15 +91,15 @@ func (b *Bundle) SafeMarshal() (string, error) {
 
 }
 
-func (b *Bundle) ForNode(config *v3.RancherKubernetesEngineConfig, nodeAddress string) *Bundle {
+func (b *Bundle) ForNode(config *rketypes.RancherKubernetesEngineConfig, nodeAddress string) *Bundle {
 	certs := librke.New().GenerateRKENodeCerts(context.Background(), *config, nodeAddress, b.certs)
 	return &Bundle{
 		certs: certs,
 	}
 }
 
-func (b *Bundle) ForWindowsNode(config *v3.RancherKubernetesEngineConfig, nodeAddress string) *Bundle {
-	nb := b.ForNode(config, nodeAddress)
+func (b *Bundle) ForWindowsNode(rkeconfig *rketypes.RancherKubernetesEngineConfig, nodeAddress string) *Bundle {
+	nb := b.ForNode(rkeconfig, nodeAddress)
 
 	certs := make(map[string]pki.CertificatePKI, len(nb.certs))
 	for key, cert := range nb.certs {
@@ -111,7 +112,11 @@ func (b *Bundle) ForWindowsNode(config *v3.RancherKubernetesEngineConfig, nodeAd
 					cluster := &config.Clusters[i].Cluster
 
 					if len(cluster.CertificateAuthority) != 0 {
-						cluster.CertificateAuthority = "c:" + cluster.CertificateAuthority
+						if rkeconfig.WindowsPrefixPath != "" {
+							cluster.CertificateAuthority = rkeconfig.WindowsPrefixPath + cluster.CertificateAuthority
+						} else {
+							cluster.CertificateAuthority = "c:" + cluster.CertificateAuthority
+						}
 					}
 				}
 
@@ -120,11 +125,20 @@ func (b *Bundle) ForWindowsNode(config *v3.RancherKubernetesEngineConfig, nodeAd
 					authInfo := &config.AuthInfos[i].AuthInfo
 
 					if len(authInfo.ClientCertificate) != 0 {
-						authInfo.ClientCertificate = "c:" + authInfo.ClientCertificate
+						if rkeconfig.WindowsPrefixPath != "" {
+							authInfo.ClientCertificate = rkeconfig.WindowsPrefixPath + authInfo.ClientCertificate
+						} else {
+							authInfo.ClientCertificate = "c:" + authInfo.ClientCertificate
+						}
 					}
 
 					if len(authInfo.ClientKey) != 0 {
-						authInfo.ClientKey = "c:" + authInfo.ClientKey
+						if rkeconfig.WindowsPrefixPath != "" {
+							authInfo.ClientKey = rkeconfig.WindowsPrefixPath + authInfo.ClientKey
+
+						} else {
+							authInfo.ClientKey = "c:" + authInfo.ClientKey
+						}
 					}
 				}
 

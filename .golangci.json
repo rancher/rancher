@@ -2,9 +2,12 @@
     "linters": {
         "disable-all": true,
         "enable": [
-            "govet",
-            "golint",
-            "goimports"
+           "govet",
+           "revive",
+           "goimports",
+           "misspell",
+           "ineffassign",
+           "gofmt"
         ]
     },
     "linters-settings": {
@@ -19,7 +22,8 @@
         "skip-dirs": [
             "vendor",
             "tests",
-            "pkg/wrangler/generated"
+            "pkg/client",
+            "pkg/generated"
         ],
         "tests": false,
         "timeout": "10m"
@@ -29,6 +33,30 @@
             {
                 "linters": "govet",
                 "text": "^(nilness|structtag)"
+            },
+            {
+                "path":"pkg/apis/management.cattle.io/v3/globaldns_types.go",
+                "text":".*lobalDns.*"
+            },
+            {
+                "path": "pkg/apis/management.cattle.io/v3/zz_generated_register.go",
+                "text":".*lobalDns.*"
+            },
+            {
+                "path":"pkg/apis/management.cattle.io/v3/zz_generated_list_types.go",
+                "text":".*lobalDns.*"
+            },
+            {
+                "linters": "revive",
+                "text": "should have comment"
+            },
+            {
+                "linters": "revive",
+                "text": "should be of the form"
+            },
+            {
+                "linters": "typecheck",
+                "text": "imported but not used as apierrors"
             }
         ]
     }
