@@ -13,6 +13,7 @@ import (
 	"github.com/rancher/norman/condition"
 	"github.com/rancher/norman/types/slice"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/controllers/management/clusterconnected"
 	corev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
@@ -137,6 +138,12 @@ func (h *HealthSyncer) updateClusterHealth() error {
 	cluster := oldCluster.DeepCopy()
 	if !v32.ClusterConditionProvisioned.IsTrue(cluster) {
 		logrus.Debugf("Skip updating cluster health - cluster [%s] not provisioned yet", h.clusterName)
+		return nil
+	}
+
+	// cluster condition ready is set to false if connected is false, return to avoid setting it to true incorrectly
+	if clusterconnected.Connected.IsFalse(cluster) {
+		logrus.Debugf("Skip updating cluster condition ready - cluster agent for [%s] isn't connected yet", h.clusterName)
 		return nil
 	}
 
