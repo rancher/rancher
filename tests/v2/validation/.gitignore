@@ -1,0 +1,6 @@
+# dot env
+.env
+# json
+*.json
+#yaml
+*.yaml
