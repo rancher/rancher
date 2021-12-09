@@ -3,10 +3,12 @@ package clusters
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	apisV1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
+	"github.com/rancher/rancher/tests/framework/pkg/config"
 	"github.com/rancher/rancher/tests/framework/pkg/wait"
 	"github.com/rancher/rancher/tests/integration/pkg/defaults"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -19,6 +21,11 @@ func IsProvisioningClusterReady(event watch.Event) (ready bool, err error) {
 	cluster := event.Object.(*apisV1.Cluster)
 
 	ready = cluster.Status.Ready
+	// for _, condition := range cluster.Status.Conditions {
+	// 	if strings.Contains(condition.Reason, "Error") {
+	// 		fmt.Println("there was an error: ", condition.Message)
+	// 	}
+	// }
 	return ready, nil
 }
 
@@ -125,4 +132,24 @@ func CreateRKE2Cluster(client *rancher.Client, rke2Cluster *apisV1.Cluster) (*ap
 	})
 
 	return client.Provisioning.Clusters(rke2Cluster.Namespace).Create(context.TODO(), rke2Cluster, metav1.CreateOptions{})
+}
+
+func NodesAndRolesInput() []map[string]bool {
+	clustersConfig := new(Config)
+
+	config.LoadConfig(ConfigurationFileKey, clustersConfig)
+	nodeRolesBoolSliceMap := []map[string]bool{}
+
+	rolesSlice := strings.Split(clustersConfig.NodesAndRoles, "|")
+	for _, roles := range rolesSlice {
+		nodeRoles := strings.Split(roles, ",")
+		nodeRoleBoolMap := map[string]bool{}
+		for _, nodeRole := range nodeRoles {
+			nodeRoleBoolMap[nodeRole] = true
+
+		}
+		nodeRolesBoolSliceMap = append(nodeRolesBoolSliceMap, nodeRoleBoolMap)
+	}
+
+	return nodeRolesBoolSliceMap
 }
