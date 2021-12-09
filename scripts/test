@@ -32,6 +32,7 @@ keepalive()
         if [ ! -e /proc/$PID ]; then
             echo Rancher died
             cat /tmp/rancher.log
+            cat build/testdata/k3s.log
             ./scripts/run >/tmp/rancher.log 2>&1 &
             PID=$!
         fi
@@ -41,8 +42,8 @@ keepalive()
 
 # uncomment to get startup logs. Don't leave them on because it slows drone down too
 # much
-#tail -F /tmp/rancher.log &
-#TPID=$!
+tail -F /tmp/rancher.log &
+TPID=$!
 
 keepalive &
 
@@ -52,7 +53,7 @@ done
 while ! kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml rollout status -w -n cattle-system deploy/rancher-webhook; do
     sleep 2
 done
-#kill $TPID
+kill $TPID
 
 echo Running tests
 
@@ -60,4 +61,4 @@ cd ./tests/integration
 tox -e rancher -- -m "not nonparallel" -n $(nproc)
 tox -e rancher -- -m nonparallel
 
-#tail -f /tmp/rancher-test.log &
+tail -f /tmp/rancher-test.log &
