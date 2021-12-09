@@ -13,7 +13,7 @@ func init() {
 	rand.Seed(time.Now().UnixNano())
 }
 
-func RandStringLowerBytes(n int) string {
+func RandStringLower(n int) string {
 	b := make([]byte, n)
 	for i := range b {
 		b[i] = lowerLetterBytes[rand.Intn(len(lowerLetterBytes))]
@@ -29,6 +29,6 @@ func RandStringWithCharset(length int, charset string) string {
 	return string(b)
 }
 
-func RandStringAllBytes(length int) string {
+func RandStringAll(length int) string {
 	return RandStringWithCharset(length, lowerLetterBytes+upperLetterBytes+numberBytes)
 }
