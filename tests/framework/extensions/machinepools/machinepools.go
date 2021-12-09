@@ -60,11 +60,6 @@ func NewRKEMachinePool(controlPlaneRole, etcdRole, workerRole bool, poolName str
 // 	"etcd":         true,
 // 	"worker":       false,
 // },
-// {
-// 	"controlplane": false,
-// 	"etcd":         false,
-// 	"worker":       true,
-// },
 // }
 func RKEMachinePoolSetup(nodeRoles []map[string]bool, machineConfig *unstructured.Unstructured) []apisV1.RKEMachinePool {
 	machinePools := []apisV1.RKEMachinePool{}

@@ -42,7 +42,7 @@ func NewClient(bearerToken string, session *session.Session) (*Client, error) {
 		RancherConfig: rancherConfig,
 	}
 
-	session.HasCleanupSet = *rancherConfig.Cleanup
+	session.CleanupEnabled = *rancherConfig.Cleanup
 
 	var err error
 	restConfig := newRestConfig(bearerToken, rancherConfig)
