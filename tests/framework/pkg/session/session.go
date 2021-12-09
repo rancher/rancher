@@ -9,9 +9,10 @@ type CleanupFunc func() error
 
 // Session is used to track resources created by tests by having a LIFO queue the keeps track of the delete functions.
 type Session struct {
-	cleanupQueue []CleanupFunc
-	open         bool
-	testingT     *testing.T
+	HasCleanupSet bool
+	cleanupQueue  []CleanupFunc
+	open          bool
+	testingT      *testing.T
 }
 
 // NewSession is a constructor instantiates a new `Session`
@@ -37,14 +38,16 @@ func (ts *Session) RegisterCleanupFunc(f CleanupFunc) {
 
 // Cleanup this method will call all registered cleanup functions in order and close the test session.
 func (ts *Session) Cleanup() {
-	ts.open = false
-	for i := len(ts.cleanupQueue) - 1; i >= 0; i-- {
-		err := ts.cleanupQueue[i]()
-		if err != nil {
-			ts.testingT.Logf("error calling cleanup function: %v", err)
+	if ts.HasCleanupSet {
+		ts.open = false
+		for i := len(ts.cleanupQueue) - 1; i >= 0; i-- {
+			err := ts.cleanupQueue[i]()
+			if err != nil {
+				ts.testingT.Logf("error calling cleanup function: %v", err)
+			}
 		}
+		ts.cleanupQueue = []CleanupFunc{}
 	}
-	ts.cleanupQueue = []CleanupFunc{}
 }
 
 // NewSession returns a `Session` who's cleanup method is registered with this `Session`
