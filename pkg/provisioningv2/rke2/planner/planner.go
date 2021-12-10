@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
@@ -36,6 +37,7 @@ import (
 	"github.com/rancher/wrangler/pkg/randomtoken"
 	"github.com/rancher/wrangler/pkg/summary"
 	"github.com/rancher/wrangler/pkg/yaml"
+	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	apierror "k8s.io/apimachinery/pkg/api/errors"
@@ -71,6 +73,20 @@ const (
 	InternalAddressAnnotation = "rke.cattle.io/internal-address"
 
 	SecretTypeMachinePlan = "rke.cattle.io/machine-plan"
+
+	KubeControllerManagerArg                      = "kube-controller-manager-arg"
+	KubeControllerManagerExtraMount               = "kube-controller-manager-extra-mount"
+	DefaultKubeControllerManagerCertDir           = "/var/lib/rancher/%s/server/tls/kube-controller-manager"
+	DefaultKubeControllerManagerDefaultSecurePort = "10257"
+	DefaultKubeControllerManagerCert              = "kube-controller-manager.crt"
+	KubeSchedulerArg                              = "kube-scheduler-arg"
+	KubeSchedulerExtraMount                       = "kube-scheduler-extra-mount"
+	DefaultKubeSchedulerCertDir                   = "/var/lib/rancher/%s/server/tls/kube-scheduler"
+	DefaultKubeSchedulerDefaultSecurePort         = "10259"
+	DefaultKubeSchedulerCert                      = "kube-scheduler.crt"
+	SecurePortArgument                            = "secure-port"
+	CertDirArgument                               = "cert-dir"
+	TLSCertFileArgument                           = "tls-cert-file"
 
 	authnWebhookFileName = "/var/lib/rancher/%s/kube-api-authn-webhook.yaml"
 	ConfigYamlFileName   = "/etc/rancher/%s/config.yaml.d/50-rancher.yaml"
@@ -673,9 +689,142 @@ func addUserConfig(config map[string]interface{}, controlPlane *rkev1.RKEControl
 	return nil
 }
 
+// splitArgKeyVal takes a value and returns a pair (key, value) of the argument, or two empty strings if there was not
+// a parsed key/val.
+func splitArgKeyVal(val string, delim string) (string, string) {
+	if splitSubArg := strings.SplitN(val, delim, 2); len(splitSubArg) == 2 {
+		return splitSubArg[0], splitSubArg[1]
+	}
+	return "", ""
+}
+
+// getArgValue will search the passed in interface (arg) for a key that matches the searchArg. If a match is found, it
+// returns the value of the argument, otherwise it returns an empty string.
+func getArgValue(arg interface{}, searchArg string, delim string) string {
+	logrus.Tracef("getArgValue (searchArg: %s, delim: %s) type of %v is %T", searchArg, delim, arg, arg)
+	switch arg := arg.(type) {
+	case []interface{}:
+		logrus.Tracef("getArgValue (searchArg: %s, delim: %s) encountered interface slice %v", searchArg, delim, arg)
+		return getArgValue(convertInterfaceSliceToStringSlice(arg), searchArg, delim)
+	case []string:
+		logrus.Tracef("getArgValue (searchArg: %s, delim: %s) found string array: %v", searchArg, delim, arg)
+		for _, v := range arg {
+			argKey, argVal := splitArgKeyVal(v, delim)
+			if argKey == searchArg {
+				return argVal
+			}
+		}
+	case string:
+		logrus.Tracef("getArgValue (searchArg: %s, delim: %s) found string: %v", searchArg, delim, arg)
+		argKey, argVal := splitArgKeyVal(arg, delim)
+		if argKey == searchArg {
+			return argVal
+		}
+	}
+	logrus.Tracef("getArgValue (searchArg: %s, delim: %s) did not find searchArg in: %v", searchArg, delim, arg)
+	return ""
+}
+
+// convertInterfaceSliceToStringSlice converts an input interface slice to a string slice by iterating through the
+// interface slice and converting each entry to a string using Sprintf.
+func convertInterfaceSliceToStringSlice(input []interface{}) []string {
+	var stringArr []string
+	for _, v := range input {
+		stringArr = append(stringArr, fmt.Sprintf("%v", v))
+	}
+	return stringArr
+}
+
+// appendToInterface will return an interface that has the value appended to it. The interface returned will always be
+// a slice of strings, and will convert a raw string to a slice of strings.
+func appendToInterface(input interface{}, elem string) []string {
+	switch input := input.(type) {
+	case []interface{}:
+		stringArr := convertInterfaceSliceToStringSlice(input)
+		return appendToInterface(stringArr, elem)
+	case []string:
+		return append(input, elem)
+	case string:
+		return []string{input, elem}
+	}
+	return []string{elem}
+}
+
+// convertInterfaceToStringSlice converts an input interface to a string slice by determining its type and converting
+// it accordingly. If it is not a known convertible type, an empty string slice is returned.
+func convertInterfaceToStringSlice(input interface{}) []string {
+	switch input := input.(type) {
+	case []interface{}:
+		return convertInterfaceSliceToStringSlice(input)
+	case []string:
+		return input
+	case string:
+		return []string{input}
+	}
+	return []string{}
+}
+
+// renderArgAndMount takes the value of the existing value of the argument and mount and renders an output argument and
+// mount based on the value of the input interfaces. It will always return a set of slice of strings.
+func renderArgAndMount(existingArg interface{}, existingMount interface{}, runtime string, defaultSecurePort string, defaultCertDir string) ([]string, []string) {
+	retArg := convertInterfaceToStringSlice(existingArg)
+	retMount := convertInterfaceToStringSlice(existingMount)
+	renderedCertDir := fmt.Sprintf(defaultCertDir, runtime)
+	// Set a default value for certDirArg and certDirMount (for the case where the user does not set these values)
+	// If a user sets these values, we will set them to an empty string and check to make sure they are not empty
+	// strings before adding them to the rendered arg/mount slices.
+	certDirMount := fmt.Sprintf("%s:%s", renderedCertDir, renderedCertDir)
+	certDirArg := fmt.Sprintf("%s=%s", CertDirArgument, renderedCertDir)
+	securePortArg := fmt.Sprintf("%s=%s", SecurePortArgument, defaultSecurePort)
+	if len(retArg) > 0 {
+		tlsCF := getArgValue(retArg, TLSCertFileArgument, "=")
+		if tlsCF == "" {
+			// If the --tls-cert-file Argument was not set in the config for this component, we can look to see if
+			// the --cert-dir was set. --tls-cert-file (if set) will take precedence over --tls-cert-file
+			certDir := getArgValue(retArg, CertDirArgument, "=")
+			if certDir != "" {
+				// If --cert-dir was set, we use the --cert-dir that the user provided and should set certDirArg to ""
+				// so that we don't append it.
+				certDirArg = ""
+				// Set certDirMount to an intelligently interpolated value based off of the custom certDir set by the
+				// user.
+				certDirMount = fmt.Sprintf("%s:%s", certDir, certDir)
+			}
+		} else {
+			// If the --tls-cert-file argument was set by the user, we don't need to set --cert-dir, but still should
+			// render a --cert-dir-mount that is based on the --tls-cert-file argument to map the files necessary
+			// to the static pod (in the RKE2 case)
+			certDirArg = ""
+			dir := filepath.Dir(tlsCF)
+			certDirMount = fmt.Sprintf("%s:%s", dir, dir)
+		}
+		sPA := getArgValue(retArg, SecurePortArgument, "=")
+		if sPA != "" {
+			// If the user set a custom --secure-port, set --secure-port to an empty string so we don't override
+			// their custom value
+			securePortArg = ""
+		}
+	}
+	if certDirArg != "" {
+		logrus.Debugf("renderArgAndMount adding %s to component arguments", certDirArg)
+		retArg = appendToInterface(existingArg, certDirArg)
+	}
+	if securePortArg != "" {
+		logrus.Debugf("renderArgAndMount adding %s to component arguments", securePortArg)
+		retArg = appendToInterface(retArg, securePortArg)
+	}
+	if runtime == rancherruntime.RuntimeRKE2 {
+		// todo: make sure the certDirMount is not already set by the user to some custom value before we set it for the static pod extraMount
+		logrus.Debugf("renderArgAndMount adding %s to component mounts", certDirMount)
+		retMount = appendToInterface(existingMount, certDirMount)
+	}
+	return retArg, retMount
+}
+
 func addRoleConfig(config map[string]interface{}, controlPlane *rkev1.RKEControlPlane, machine *capi.Machine, initNode bool, joinServer string) {
+	runtime := rancherruntime.GetRuntime(controlPlane.Spec.KubernetesVersion)
 	if initNode {
-		if rancherruntime.GetRuntime(controlPlane.Spec.KubernetesVersion) == rancherruntime.RuntimeK3S {
+		if runtime == rancherruntime.RuntimeK3S {
 			config["cluster-init"] = true
 		}
 	} else if joinServer != "" {
@@ -691,6 +840,24 @@ func addRoleConfig(config map[string]interface{}, controlPlane *rkev1.RKEControl
 		config["disable-controller-manager"] = true
 	} else if isOnlyControlPlane(machine) {
 		config["disable-etcd"] = true
+	}
+
+	// If this is a control-plane node, then we need to set arguments/(and for RKE2, volume mounts) to allow probes
+	// to run.
+	if isControlPlane(machine) {
+		logrus.Debug("addRoleConfig rendering arguments and mounts for kube-controller-manager")
+		certDirArg, certDirMount := renderArgAndMount(config[KubeControllerManagerArg], config[KubeControllerManagerExtraMount], runtime, DefaultKubeControllerManagerDefaultSecurePort, DefaultKubeControllerManagerCertDir)
+		config[KubeControllerManagerArg] = certDirArg
+		if runtime == rancherruntime.RuntimeRKE2 {
+			config[KubeControllerManagerExtraMount] = certDirMount
+		}
+
+		logrus.Debug("addRoleConfig rendering arguments and mounts for kube-scheduler")
+		certDirArg, certDirMount = renderArgAndMount(config[KubeSchedulerArg], config[KubeSchedulerExtraMount], runtime, DefaultKubeSchedulerDefaultSecurePort, DefaultKubeSchedulerCertDir)
+		config[KubeSchedulerArg] = certDirArg
+		if runtime == rancherruntime.RuntimeRKE2 {
+			config[KubeSchedulerExtraMount] = certDirMount
+		}
 	}
 
 	if nodeName := machine.Labels[NodeNameLabel]; nodeName != "" {
@@ -1041,25 +1208,25 @@ func configFile(controlPlane *rkev1.RKEControlPlane, filename string) string {
 }
 
 func (p *Planner) addConfigFile(nodePlan plan.NodePlan, controlPlane *rkev1.RKEControlPlane, machine *capi.Machine, secret plan.Secret,
-	initNode bool, joinServer string) (plan.NodePlan, error) {
+	initNode bool, joinServer string) (plan.NodePlan, map[string]interface{}, error) {
 	config := map[string]interface{}{}
 
 	addDefaults(config, controlPlane, machine)
 
 	// Must call addUserConfig first because it will filter out non-kdm data
 	if err := addUserConfig(config, controlPlane, machine); err != nil {
-		return nodePlan, err
+		return nodePlan, config, err
 	}
 
 	files, err := p.addRegistryConfig(config, controlPlane)
 	if err != nil {
-		return nodePlan, err
+		return nodePlan, config, err
 	}
 	nodePlan.Files = append(nodePlan.Files, files...)
 
 	files, err = p.addETCD(config, controlPlane, machine)
 	if err != nil {
-		return nodePlan, err
+		return nodePlan, config, err
 	}
 	nodePlan.Files = append(nodePlan.Files, files...)
 
@@ -1069,12 +1236,12 @@ func (p *Planner) addConfigFile(nodePlan plan.NodePlan, controlPlane *rkev1.RKEC
 	addAddresses(p.secretCache, config, machine)
 
 	if err := addLabels(config, machine); err != nil {
-		return nodePlan, err
+		return nodePlan, config, err
 	}
 
 	runtime := rancherruntime.GetRuntime(controlPlane.Spec.KubernetesVersion)
 	if err := addTaints(config, machine, runtime); err != nil {
-		return nodePlan, err
+		return nodePlan, config, err
 	}
 
 	for _, fileParam := range fileParams {
@@ -1095,7 +1262,7 @@ func (p *Planner) addConfigFile(nodePlan plan.NodePlan, controlPlane *rkev1.RKEC
 
 	configData, err := json.MarshalIndent(config, "", "  ")
 	if err != nil {
-		return nodePlan, err
+		return nodePlan, config, err
 	}
 
 	nodePlan.Files = append(nodePlan.Files, plan.File{
@@ -1103,17 +1270,18 @@ func (p *Planner) addConfigFile(nodePlan plan.NodePlan, controlPlane *rkev1.RKEC
 		Path:    fmt.Sprintf(ConfigYamlFileName, runtime),
 	})
 
-	return nodePlan, nil
+	return nodePlan, config, nil
 }
 
 func (p *Planner) desiredPlan(controlPlane *rkev1.RKEControlPlane, secret plan.Secret, entry planEntry, initNode bool, joinServer string) (nodePlan plan.NodePlan, err error) {
+	config := map[string]interface{}{}
 	if !controlPlane.Spec.UnmanagedConfig {
 		nodePlan, err = commonNodePlan(p.secretCache, controlPlane, plan.NodePlan{})
 		if err != nil {
 			return nodePlan, err
 		}
 
-		nodePlan, err = p.addConfigFile(nodePlan, controlPlane, entry.Machine, secret, initNode, joinServer)
+		nodePlan, config, err = p.addConfigFile(nodePlan, controlPlane, entry.Machine, secret, initNode, joinServer)
 		if err != nil {
 			return nodePlan, err
 		}
@@ -1134,7 +1302,7 @@ func (p *Planner) desiredPlan(controlPlane *rkev1.RKEControlPlane, secret plan.S
 		}
 	}
 
-	nodePlan, err = p.addProbes(nodePlan, controlPlane, entry.Machine)
+	nodePlan, err = p.addProbes(nodePlan, controlPlane, entry.Machine, config)
 	if err != nil {
 		return nodePlan, err
 	}
