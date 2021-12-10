@@ -93,7 +93,7 @@ func renderSecureProbe(arg interface{}, rawProbe plan.Probe, runtime string, def
 	TLSCert := getArgValue(arg, TLSCertFileArgument, "=")
 	if TLSCert == "" {
 		// If the --tls-cert-file Argument was not set in the config for this component, we can look to see if
-		// the --cert-dir was set. --tls-cert-file (if set) will take precedence over --tls-cert-file
+		// the --cert-dir was set. --tls-cert-file (if set) will take precedence over --cert-dir
 		certDir := getArgValue(arg, CertDirArgument, "=")
 		if certDir == "" {
 			// If --cert-dir was not set, we use defaultCertDir value that was passed in, but must render it to replace
