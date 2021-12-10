@@ -380,7 +380,10 @@ func (l *Lifecycle) pruneOldRevisions(obj *v3.App) {
 		logrus.Warnf("[helm-controller] Failed to list revisions for app %s: %v", projectName, err)
 		return
 	}
-
+	// Sort revisions by creation timestamp, starting with the oldest.
+	sort.Slice(revisions.Items, func(i, j int) bool {
+		return revisions.Items[i].CreationTimestamp.Before(&revisions.Items[j].CreationTimestamp)
+	})
 	if len(revisions.Items) > obj.Spec.MaxRevisionCount {
 		logrus.Tracef("[helm-controller] App %s is exceeding the maximum (%d) number of stored revisions", obj.Name, obj.Spec.MaxRevisionCount)
 		deleteCount := len(revisions.Items) - obj.Spec.MaxRevisionCount
