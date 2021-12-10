@@ -5,7 +5,7 @@ source $(dirname $0)/version
 
 ARCH=${ARCH:-"amd64"}
 SYSTEM_CHART_REPO_DIR=build/system-charts
-SYSTEM_CHART_DEFAULT_BRANCH=${SYSTEM_CHART_DEFAULT_BRANCH:-"dev-v2.6"}
+SYSTEM_CHART_DEFAULT_BRANCH=${SYSTEM_CHART_DEFAULT_BRANCH:-"devv26-add-missing-minmax"}
 CHART_REPO_DIR=build/charts
 CHART_DEFAULT_BRANCH=${CHART_DEFAULT_BRANCH:-"dev-v2.6"}
 
@@ -58,7 +58,7 @@ cd ../bin
 
 if [ ! -d build/system-charts ]; then
     mkdir -p build
-    git clone --depth=1 --no-tags --branch $SYSTEM_CHART_DEFAULT_BRANCH https://github.com/rancher/system-charts $SYSTEM_CHART_REPO_DIR
+    git clone --depth=1 --no-tags --branch $SYSTEM_CHART_DEFAULT_BRANCH https://github.com/pennyscissors/system-charts $SYSTEM_CHART_REPO_DIR
 fi
 
 if [ ! -d $CHART_REPO_DIR ]; then
