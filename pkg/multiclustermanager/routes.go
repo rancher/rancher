@@ -66,6 +66,8 @@ func router(ctx context.Context, localClusterEnabled bool, tunnelAuthorizer *mcm
 
 	metricsHandler := metrics.NewMetricsHandler(scaledContext, clusterManager, promhttp.Handler())
 
+	channelserver := channelserver.NewHandler(ctx)
+
 	// Unauthenticated routes
 	unauthed := mux.NewRouter()
 	unauthed.UseEncodedPath()
@@ -82,7 +84,8 @@ func router(ctx context.Context, localClusterEnabled bool, tunnelAuthorizer *mcm
 	unauthed.Handle("/v3/settings/ui-pl", managementAPI).MatcherFunc(onlyGet)
 	unauthed.Handle("/v3/settings/ui-default-landing", managementAPI).MatcherFunc(onlyGet)
 	unauthed.PathPrefix("/hooks").Handler(hooks.New(scaledContext))
-	unauthed.PathPrefix("/v1-{prefix}-release/release").Handler(channelserver.NewHandler(ctx))
+	unauthed.PathPrefix("/v1-{prefix}-release/channel").Handler(channelserver)
+	unauthed.PathPrefix("/v1-{prefix}-release/release").Handler(channelserver)
 	unauthed.PathPrefix("/v1-saml").Handler(saml.AuthHandler())
 	unauthed.PathPrefix("/v3-public").Handler(publicAPI)
 
