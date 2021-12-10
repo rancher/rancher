@@ -44,6 +44,21 @@ func Register(ctx context.Context, agentContext *config.UserContext) {
 		}
 		return obj, nil
 	})
+
+	// register prometheus operator handler which needs to run if either monitoring or alerting is enabled
+	starterPrometheusOperatorDeferred := agentContext.DeferredStart(ctx, func(ctx context.Context) error {
+		registerPrometheusOperatorDeferred(ctx, agentContext)
+		return nil
+	})
+	clusters.AddHandler(ctx, "prometheus-operator-deferred", func(key string, obj *v3.Cluster) (runtime.Object, error) {
+		if obj == nil {
+			return nil, nil
+		}
+		if obj.Name == agentContext.ClusterName && (obj.Spec.EnableClusterMonitoring || obj.Spec.EnableClusterAlerting) {
+			return obj, starterPrometheusOperatorDeferred()
+		}
+		return obj, nil
+	})
 }
 
 func registerDeferred(ctx context.Context, agentContext *config.UserContext) {
@@ -74,17 +89,6 @@ func registerDeferred(ctx context.Context, agentContext *config.UserContext) {
 		projectLister:             mgmtContext.Projects(metav1.NamespaceAll).Controller().Lister(),
 		catalogTemplateLister:     mgmtContext.CatalogTemplates(metav1.NamespaceAll).Controller().Lister(),
 	}
-
-	// operator handler
-	oh := &operatorHandler{
-		clusterName:    clusterName,
-		clusters:       cattleClustersClient,
-		clusterLister:  mgmtContext.Clusters(metav1.NamespaceAll).Controller().Lister(),
-		catalogManager: cattleContext.CatalogManager,
-		app:            ah,
-	}
-	cattleClustersClient.AddHandler(ctx, "prometheus-operator-handler", oh.syncCluster)
-	cattleProjectsClient.Controller().AddClusterScopedHandler(ctx, "prometheus-operator-handler", clusterName, oh.syncProject)
 
 	_, clusterMonitoringNamespace := monitoring.ClusterMonitoringInfo()
 	agentClusterMonitoringEndpointClient := agentContext.Core.Endpoints(clusterMonitoringNamespace)
@@ -125,6 +129,46 @@ func registerDeferred(ctx context.Context, agentContext *config.UserContext) {
 		app:                 ah,
 	}
 	cattleProjectsClient.Controller().AddClusterScopedHandler(ctx, "project-monitoring-handler", clusterName, ph.sync)
+}
+
+func registerPrometheusOperatorDeferred(ctx context.Context, agentContext *config.UserContext) {
+	clusterName := agentContext.ClusterName
+	cattleContext := agentContext.Management
+	mgmtContext := cattleContext.Management
+	cattleClustersClient := mgmtContext.Clusters(metav1.NamespaceAll)
+	cattleProjectsClient := mgmtContext.Projects(clusterName)
+
+	// app handler
+	ah := &appHandler{
+		cattleAppClient:           cattleContext.Project.Apps(metav1.NamespaceAll),
+		cattleProjectClient:       cattleProjectsClient,
+		cattleSecretClient:        cattleContext.Core.Secrets(metav1.NamespaceAll),
+		cattleClusterGraphClient:  mgmtContext.ClusterMonitorGraphs(metav1.NamespaceAll),
+		cattleProjectGraphClient:  mgmtContext.ProjectMonitorGraphs(metav1.NamespaceAll),
+		cattleMonitorMetricClient: mgmtContext.MonitorMetrics(metav1.NamespaceAll),
+		agentDeploymentClient:     agentContext.Apps.Deployments(metav1.NamespaceAll),
+		agentStatefulSetClient:    agentContext.Apps.StatefulSets(metav1.NamespaceAll),
+		agentStatefulSetLister:    agentContext.Apps.StatefulSets(metav1.NamespaceAll).Controller().Lister(),
+		agentServiceAccountClient: agentContext.Core.ServiceAccounts(metav1.NamespaceAll),
+		agentSecretClient:         agentContext.Core.Secrets(metav1.NamespaceAll),
+		agentNodeClient:           agentContext.Core.Nodes(metav1.NamespaceAll),
+		agentNamespaceClient:      agentContext.Core.Namespaces(metav1.NamespaceAll),
+		systemAccountManager:      systemaccount.NewManager(agentContext.Management),
+		projectLister:             mgmtContext.Projects(metav1.NamespaceAll).Controller().Lister(),
+		catalogTemplateLister:     mgmtContext.CatalogTemplates(metav1.NamespaceAll).Controller().Lister(),
+	}
+
+	// operator handler
+	oh := &operatorHandler{
+		clusterName:    clusterName,
+		clusters:       cattleClustersClient,
+		clusterLister:  mgmtContext.Clusters(metav1.NamespaceAll).Controller().Lister(),
+		catalogManager: cattleContext.CatalogManager,
+		app:            ah,
+	}
+
+	cattleClustersClient.AddHandler(ctx, "prometheus-operator-handler", oh.syncCluster)
+	cattleProjectsClient.Controller().AddClusterScopedHandler(ctx, "prometheus-operator-handler", clusterName, oh.syncProject)
 }
 
 func RegisterAgent(ctx context.Context, agentContext *config.UserOnlyContext) {
