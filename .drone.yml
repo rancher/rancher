@@ -38,7 +38,21 @@ platform:
   os: linux
   arch: amd64
 
+clone:
+  disable: true
+
 steps:
+- name: clone
+  image: drone/git
+  when:
+    instance:
+      include:
+      - drone-publish.rancher.io
+    event:
+    - push
+    - pull_request
+    - tag
+
 - name: provisioning-tests
   image: rancher/dapper:v0.5.8
   commands:
@@ -1085,7 +1099,19 @@ platform:
   os: linux
   arch: amd64
 
+clone:
+  disable: true
+
 steps:
+- name: clone
+  image: drone/git
+  when:
+    instance:
+      include:
+      - drone-publish.rancher.io
+    event:
+    - tag
+
 - name: docker-image-digests
   image: rancher/drone-docker-image-digests:v0.0.12
   environment:
@@ -1126,7 +1152,19 @@ platform:
   os: linux
   arch: arm64
 
+clone:
+  disable: true
+
 steps:
+- name: clone
+  image: drone/git
+  when:
+    instance:
+      include:
+      - drone-publish.rancher.io
+    event:
+    - tag
+
 - name: docker-image-digests
   image: rancher/drone-docker-image-digests:v0.0.12
   environment:
@@ -1169,7 +1207,19 @@ platform:
   arch: amd64
   version: 1809
 
+clone:
+  disable: true
+
 steps:
+- name: clone
+  image: drone/git
+  when:
+    instance:
+      include:
+      - drone-publish.rancher.io
+    event:
+    - tag
+
 - name: docker-image-digests
   image: rancher/drone-docker-image-digests:v0.0.12
   environment:
@@ -1222,6 +1272,12 @@ steps:
   image: rancher/drone-images:git-20H2
   settings:
     depth: 1
+  when:
+    instance:
+      include:
+      - drone-publish.rancher.io
+    event:
+    - tag
 
 - name: docker-image-digests
   image: rancher/drone-docker-image-digests:v0.0.12
@@ -1275,6 +1331,12 @@ steps:
   image: rancher/drone-images:git-amd64-ltsc2022
   settings:
     depth: 1
+  when:
+    instance:
+      include:
+      - drone-publish.rancher.io
+    event:
+    - tag
 
 - name: docker-image-digests
   image: rancher/drone-docker-image-digests:v0.0.12
