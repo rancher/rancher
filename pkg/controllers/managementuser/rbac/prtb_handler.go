@@ -257,20 +257,31 @@ func (m *manager) checkForGlobalResourceRules(role *v3.RoleTemplate, resource st
 }
 
 // Ensure the clusterRole used to grant access of global resources to users/groups in projects has appropriate rules for the given resource and verbs
-func (m *manager) reconcileRoleForProjectAccessToGlobalResource(resource string, rt *v3.RoleTemplate, newVerbs map[string]bool) (string, error) {
+func (m *manager) reconcileRoleForProjectAccessToGlobalResource(resource string, rt *v3.RoleTemplate, newVerbs map[string]bool, baseRule rbacv1.PolicyRule) (string, error) {
 	clusterRoles := m.workload.RBAC.ClusterRoles("")
 	roleName := rt.Name + "-promoted"
 	if role, err := m.crLister.Get("", roleName); err == nil && role != nil {
 		currentVerbs := map[string]bool{}
+		currentResourceNames := map[string]struct{}{}
 		for _, rule := range role.Rules {
 			if slice.ContainsString(rule.Resources, resource) {
 				for _, v := range rule.Verbs {
 					currentVerbs[v] = true
 				}
+				for _, v := range rule.ResourceNames {
+					currentResourceNames[v] = struct{}{}
+				}
 			}
 		}
 
-		if !reflect.DeepEqual(currentVerbs, newVerbs) {
+		desiredResourceNames := map[string]struct{}{}
+		for _, resourceName := range baseRule.ResourceNames {
+			desiredResourceNames[resourceName] = struct{}{}
+		}
+
+		// if the verbs or the resourceNames in the promoted clusterrole don't match what's desired then the role requires updating
+		// desired verbs are passed in and the desired resourceNames come from the resource's base rule
+		if !reflect.DeepEqual(currentVerbs, newVerbs) || !reflect.DeepEqual(currentResourceNames, desiredResourceNames) {
 			role = role.DeepCopy()
 			added := false
 			for i, rule := range role.Rules {
@@ -286,6 +297,7 @@ func (m *manager) reconcileRoleForProjectAccessToGlobalResource(resource string,
 			_, err := clusterRoles.Update(role)
 			return roleName, err
 		}
+
 		return roleName, nil
 	}
 
