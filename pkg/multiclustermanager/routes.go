@@ -82,6 +82,7 @@ func router(ctx context.Context, localClusterEnabled bool, tunnelAuthorizer *mcm
 	unauthed.Handle("/v3/settings/ui-banners", managementAPI).MatcherFunc(onlyGet)
 	unauthed.Handle("/v3/settings/ui-issues", managementAPI).MatcherFunc(onlyGet)
 	unauthed.Handle("/v3/settings/ui-pl", managementAPI).MatcherFunc(onlyGet)
+	unauthed.Handle("/v3/settings/ui-brand", managementAPI).MatcherFunc(onlyGet)
 	unauthed.Handle("/v3/settings/ui-default-landing", managementAPI).MatcherFunc(onlyGet)
 	unauthed.PathPrefix("/hooks").Handler(hooks.New(scaledContext))
 	unauthed.PathPrefix("/v1-{prefix}-release/channel").Handler(channelserver)
