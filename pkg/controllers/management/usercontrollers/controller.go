@@ -2,14 +2,15 @@ package usercontrollers
 
 import (
 	"context"
+	"errors"
 	"time"
 
-	"github.com/rancher/norman/httperror"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/clustermanager"
 	"github.com/rancher/rancher/pkg/controllers/management/imported"
 	"github.com/rancher/rancher/pkg/controllers/managementagent/nslabels"
 	"github.com/rancher/rancher/pkg/controllers/managementuserlegacy/helm"
+	"github.com/rancher/rancher/pkg/dialer"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/types/config"
@@ -17,7 +18,6 @@ import (
 	batchV1 "k8s.io/api/batch/v1"
 	coreV1 "k8s.io/api/core/v1"
 	rbacV1 "k8s.io/api/rbac/v1"
-	apierror "k8s.io/apimachinery/pkg/api/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -82,13 +82,8 @@ func (c *ClusterLifecycleCleanup) Remove(obj *v3.Cluster) (runtime.Object, error
 		err = c.cleanupImportedCluster(obj)
 	}
 	if err != nil {
-		apiError, ok := err.(*httperror.APIError)
-		// If it's not an API error give it back
-		if !ok {
-			return nil, err
-		}
-		// If it's anything but clusterUnavailable give it back
-		if apiError.Code != httperror.ClusterUnavailable {
+		// If it's anything but cluster agent disconnected give it back
+		if !errors.Is(err, dialer.ErrAgentDisconnected) {
 			return nil, err
 		}
 	}
@@ -377,7 +372,7 @@ func cleanupNamespaces(client kubernetes.Interface) error {
 		err = tryUpdate(func() error {
 			nameSpace, err := client.CoreV1().Namespaces().Get(context.TODO(), ns.Name, metav1.GetOptions{})
 			if err != nil {
-				if apierror.IsNotFound(err) {
+				if apierrors.IsNotFound(err) {
 					return nil
 				}
 				return err
