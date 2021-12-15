@@ -185,7 +185,7 @@ subjects:
   kind: Group
   name: system:serviceaccounts
 ---
-# Reference https://rancher.com/docs/k3s/latest/en/security/hardening_guide/
+# Reference https://rancher.com/docs/k3s/latest/en/security/hardening_guide/#networkpolicies
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -195,6 +195,21 @@ spec:
   podSelector:
     matchLabels:
       app: svclb-traefik
+  ingress:
+  - {}
+  policyTypes:
+  - Ingress
+---
+# Reference https://rancher.com/docs/k3s/latest/en/security/hardening_guide/#networkpolicies
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-all-metrics-server
+  namespace: kube-system
+spec:
+  podSelector:
+    matchLabels:
+      k8s-app: metrics-server
   ingress:
   - {}
   policyTypes:

@@ -8,6 +8,7 @@ cat <<EOF >>/etc/rancher/k3s/config.yaml
 write-kubeconfig-mode: "0644"
 tls-san:
   - ${2}
+token: ${8}
 EOF
 
 if [[ -n "${10}" ]] && [[ "${10}" == *":"* ]]
@@ -47,7 +48,7 @@ then
     then
         curl -sfL https://get.k3s.io | INSTALL_K3S_TYPE='server' sh -s - server --server https://"${7}":6443 --token "${8}" --node-external-ip="${6}" --tls-san "${2}" --write-kubeconfig-mode "0644"
     else
-        curl -sfL https://get.k3s.io | INSTALL_K3S_TYPE='server' sh -s - server --server https://"${7}":6443 --token "${8}" --node-external-ip="${6}"
+        curl -sfL https://get.k3s.io | INSTALL_K3S_TYPE='server' sh -s - server --server https://"${7}":6443 --node-external-ip="${6}"
     fi
 else
    if [[ "${4}" == *"v1.18"* ]] || [["${4}" == *"v1.17"* ]] && [[ -n "${10}" ]]
