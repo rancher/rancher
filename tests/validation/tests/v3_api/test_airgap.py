@@ -625,7 +625,7 @@ def run_command_on_airgap_node(bastion_node, ag_node, cmd, log_out=False):
     result = bastion_node.execute_command(ag_command)
     if log_out:
         print("Running command: {}".format(ag_command))
-        print("Result: {}".format(result))
+        print("Result:\n{}".format("\n---\n".join(result)))
     return result
 
 
@@ -643,10 +643,16 @@ def wait_for_airgap_pods_ready(bastion_node, ag_nodes,
         unready_pods = []
         unready_nodes = []
         if time.time() - start > DEFAULT_CLUSTER_STATE_TIMEOUT:
+            print_cluster_state(bastion_node, ag_nodes, kubectl, kubeconfig)
             raise AssertionError("Timed out waiting for cluster to be ready")
         time.sleep(10)
         nodes = run_command_on_airgap_node(bastion_node, ag_nodes[0], node_cmd)
         nodes_arr = nodes[0].strip().split("\n")[1:]
+        missing_nodes = NUMBER_OF_INSTANCES - len(nodes_arr)
+        if missing_nodes:
+            print("Waiting for {} more node(s) to join the cluster.".format(
+                missing_nodes))
+            unready_nodes.append(missing_nodes)
         for node in nodes_arr:
             if "NotReady" in node:
                 print("Waiting for node: {}".format(node))
@@ -663,6 +669,17 @@ def wait_for_airgap_pods_ready(bastion_node, ag_nodes,
             wait_for_pods_to_be_ready = True
         else:
             wait_for_pods_to_be_ready = False
+    print_cluster_state(bastion_node, ag_nodes, kubectl, kubeconfig)
+
+
+def print_cluster_state(bastion_node, ag_nodes, kubectl='kubectl',
+                        kubeconfig=None):
+    if kubeconfig:
+        cmd = "{} get nodes,pods -A -o wide --kubeconfig {}".format(kubectl,
+                                                                    kubeconfig)
+    else:
+        cmd = "{} get nodes,pods -A -o wide".format(kubectl)
+    run_command_on_airgap_node(bastion_node, ag_nodes[0], cmd, log_out=True)
 
 
 def create_nlb_and_add_targets(aws_nodes):
