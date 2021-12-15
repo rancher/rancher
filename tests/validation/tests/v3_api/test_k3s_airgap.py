@@ -21,8 +21,7 @@ def test_deploy_airgap_k3s_system_default_registry():
                                   'system_default_registry')
     server_ops = K3S_SERVER_OPTIONS + " --system-default-registry={}".format(
         bastion_node.host_name)
-    agent_ops = K3S_AGENT_OPTIONS + " --system-default-registry={}".format(
-        bastion_node.host_name)
+    agent_ops = K3S_AGENT_OPTIONS
     deploy_airgap_cluster(bastion_node, ag_nodes, "k3s", server_ops, agent_ops)
 
 
