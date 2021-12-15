@@ -124,6 +124,8 @@ func configureMasterPlan(masterPlan planv1.Plan, version string, concurrency int
 		Operator: corev1.TolerationOpExists,
 	}}
 
+	masterPlan.Spec.ServiceAccountName = genericPlan.Spec.ServiceAccountName
+
 	return masterPlan
 }
 
@@ -154,6 +156,8 @@ func configureWorkerPlan(workerPlan planv1.Plan, version string, concurrency int
 	workerPlan.Spec.Tolerations = []corev1.Toleration{{
 		Operator: corev1.TolerationOpExists,
 	}}
+
+	workerPlan.Spec.ServiceAccountName = genericPlan.Spec.ServiceAccountName
 
 	return workerPlan
 }
