@@ -28,7 +28,7 @@ func RegisterWrangler(ctx context.Context, wranglerContext *wrangler.Context, ma
 	clusterconnected.Register(ctx, wranglerContext)
 
 	if features.ProvisioningV2.Enabled() {
-		if err := authprovisioningv2.Register(ctx, wranglerContext); err != nil {
+		if err := authprovisioningv2.Register(ctx, wranglerContext, management); err != nil {
 			return err
 		}
 	}

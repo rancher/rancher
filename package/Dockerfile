@@ -47,7 +47,7 @@ ENV CATTLE_SYSTEM_UPGRADE_CONTROLLER_CHART_VERSION 100.0.1+up0.3.1
 
 # System charts minimal version
 ENV CATTLE_FLEET_MIN_VERSION=100.0.2+up0.3.8
-ENV CATTLE_RANCHER_WEBHOOK_MIN_VERSION=1.0.3+up0.2.4-rc3
+ENV CATTLE_RANCHER_WEBHOOK_MIN_VERSION=1.0.3+up0.2.4-rc4
 
 RUN mkdir -p /var/lib/rancher-data/local-catalogs/system-library && \
     mkdir -p /var/lib/rancher-data/local-catalogs/library && \
