@@ -3,6 +3,7 @@ package clusterstats
 import (
 	"context"
 	"reflect"
+	"regexp"
 	"strconv"
 	"time"
 
@@ -27,6 +28,8 @@ const (
 	nodeRoleMaster             = "node-role.kubernetes.io/master"
 	agentVersionUpgraded       = "agent.cluster.cattle.io/upgraded-v1.22"
 )
+
+var numericReg = regexp.MustCompile("[^0-9]")
 
 type StatsAggregator struct {
 	NodesLister    v3.NodeLister
@@ -167,7 +170,7 @@ func (s *StatsAggregator) aggregate(cluster *v3.Cluster, clusterName string) err
 
 	var oldVersion int
 	if cluster.Status.Version != nil {
-		oldVersion, err = strconv.Atoi(cluster.Status.Version.Minor)
+		oldVersion, err = minorVersion(cluster)
 		if err != nil {
 			return err
 		}
@@ -183,7 +186,7 @@ func (s *StatsAggregator) aggregate(cluster *v3.Cluster, clusterName string) err
 	// the cluster agent in order to restart controllers that will no longer work
 	// with the new API.
 	if versionChanged && !cluster.Spec.Internal {
-		newVersion, err := strconv.Atoi(cluster.Status.Version.Minor)
+		newVersion, err := minorVersion(cluster)
 		if err != nil {
 			return err
 		}
@@ -196,6 +199,11 @@ func (s *StatsAggregator) aggregate(cluster *v3.Cluster, clusterName string) err
 	}
 
 	return nil
+}
+
+func minorVersion(cluster *v3.Cluster) (int, error) {
+	minorVersion := numericReg.ReplaceAllString(cluster.Status.Version.Minor, "")
+	return strconv.Atoi(minorVersion)
 }
 
 func (s *StatsAggregator) updateVersion(cluster *v3.Cluster) bool {
