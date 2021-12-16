@@ -174,10 +174,15 @@ func (s *StatsAggregator) aggregate(cluster *v3.Cluster, clusterName string) err
 	}
 	versionChanged := s.updateVersion(cluster)
 
+	if statusChanged(origStatus, &cluster.Status) || versionChanged {
+		_, err = s.Clusters.Update(cluster)
+		return err
+	}
+
 	// If the cluster went through an upgrade from <=1.21 to >=1.22, restart
 	// the cluster agent in order to restart controllers that will no longer work
 	// with the new API.
-	if versionChanged {
+	if versionChanged && !cluster.Spec.Internal {
 		newVersion, err := strconv.Atoi(cluster.Status.Version.Minor)
 		if err != nil {
 			return err
@@ -188,11 +193,6 @@ func (s *StatsAggregator) aggregate(cluster *v3.Cluster, clusterName string) err
 				return err
 			}
 		}
-	}
-
-	if statusChanged(origStatus, &cluster.Status) || versionChanged {
-		_, err = s.Clusters.Update(cluster)
-		return err
 	}
 
 	return nil
@@ -232,19 +232,20 @@ func (s *StatsAggregator) restartAgentDeployment(cluster *v3.Cluster) error {
 	if err != nil && !apierrors.IsNotFound(err) {
 		return err
 	}
+	if apierrors.IsNotFound(err) {
+		return nil
+	}
 	// Add annotation to the agent deployment template in order to force a restart
-	if deployment != nil {
-		if deployment.Spec.Template.Annotations == nil {
-			deployment.Spec.Template.Annotations = make(map[string]string)
-		}
-		if deployment.Spec.Template.Annotations[agentVersionUpgraded] != "true" {
-			logrus.Tracef("statsAggregator: updated cluster %s to v1.22, annotating agent deployment", cluster.Name)
-			toUpdate := deployment.DeepCopy()
-			toUpdate.Spec.Template.Annotations[agentVersionUpgraded] = "true"
-			_, err = userContext.Apps.Deployments("cattle-system").Update(toUpdate)
-			if err != nil {
-				return err
-			}
+	if deployment.Spec.Template.Annotations == nil {
+		deployment.Spec.Template.Annotations = make(map[string]string)
+	}
+	if deployment.Spec.Template.Annotations[agentVersionUpgraded] != "true" {
+		logrus.Tracef("statsAggregator: updated cluster %s to v1.22, annotating agent deployment", cluster.Name)
+		toUpdate := deployment.DeepCopy()
+		toUpdate.Spec.Template.Annotations[agentVersionUpgraded] = "true"
+		_, err = userContext.Apps.Deployments("cattle-system").Update(toUpdate)
+		if err != nil {
+			return err
 		}
 	}
 	return nil
