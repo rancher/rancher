@@ -149,6 +149,11 @@ func WindowsInstallScript(ctx context.Context, token string, envVars []corev1.En
 %s
 %s
 
+# Enables CSI Proxy
+$env:CSI_PROXY_URL = "https://acs-mirror.azureedge.net/csi-proxy/%%[1]s/binaries/csi-proxy-%%[1]s.tar.gz"
+$env:CSI_PROXY_VERSION = "v1.0.0"
+$env:CSI_PROXY_KUBELET_PATH = "C:/var/lib/rancher/rke2/bin/kubelet.exe"
+
 Invoke-WinsInstaller @PSBoundParameters
 exit 0
 `, data, envVarBuf.String(), binaryURL, server, ca, token)), nil
