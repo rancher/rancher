@@ -242,6 +242,14 @@ type UserContext struct {
 }
 
 func (w *UserContext) DeferredStart(ctx context.Context, register func(ctx context.Context) error) func() error {
+	f := w.deferredStartAsync(ctx, register)
+	return func() error {
+		go f()
+		return nil
+	}
+}
+
+func (w *UserContext) deferredStartAsync(ctx context.Context, register func(ctx context.Context) error) func() error {
 	var (
 		startLock sync.Mutex
 		started   = false
