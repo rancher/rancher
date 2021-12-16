@@ -22,7 +22,7 @@ import (
 )
 
 const (
-	ownerBindingsAnno = "ownerBindingsCreated"
+	OwnerBindingsAnno = "ownerBindingsCreated"
 	vmwaredriver      = "vmwarevsphere"
 )
 
@@ -78,7 +78,7 @@ func (nt *nodeTemplateController) sync(key string, nodeTemplate *v3.NodeTemplate
 
 	// if owner bindings annotation is present, the node template is in the proper namespace and has had
 	// its creator rolebindings created
-	if nodeTemplate.Annotations != nil && nodeTemplate.Annotations[ownerBindingsAnno] == "true" {
+	if nodeTemplate.Annotations != nil && nodeTemplate.Annotations[OwnerBindingsAnno] == "true" {
 		return nodeTemplate, nil
 	}
 
@@ -115,7 +115,7 @@ func (nt *nodeTemplateController) sync(key string, nodeTemplate *v3.NodeTemplate
 
 	annotations := dynamicNodeTemplate.GetAnnotations()
 	// owner bindings annotation is meant to prevent bindings from being created again if they have been removed from creator
-	annotations[ownerBindingsAnno] = "true"
+	annotations[OwnerBindingsAnno] = "true"
 	dynamicNodeTemplate.SetAnnotations(annotations)
 
 	if _, err = nt.ntDynamicClient.Namespace(namespace.NodeTemplateGlobalNamespace).Update(context.TODO(), dynamicNodeTemplate, metav1.UpdateOptions{}); err != nil {
