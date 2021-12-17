@@ -52,4 +52,5 @@ type RKEControlPlaneStatus struct {
 	ETCDSnapshotCreate       *ETCDSnapshotCreate                 `json:"etcdSnapshotCreate,omitempty"`
 	ETCDSnapshotCreatePhase  ETCDSnapshotPhase                   `json:"etcdSnapshotCreatePhase,omitempty"`
 	ConfigGeneration         int64                               `json:"configGeneration,omitempty"`
+	Initialized              bool                                `json:"initialized,omitempty"`
 }

@@ -24,6 +24,7 @@ import (
 	rkecattleiov1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	genericcondition "github.com/rancher/wrangler/pkg/genericcondition"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	intstr "k8s.io/apimachinery/pkg/util/intstr"
 )
@@ -257,6 +258,26 @@ func (in *RKEMachinePool) DeepCopyInto(out *RKEMachinePool) {
 		for key, val := range *in {
 			(*out)[key] = val
 		}
+	}
+	if in.NodeStartupTimeout != nil {
+		in, out := &in.NodeStartupTimeout, &out.NodeStartupTimeout
+		*out = new(metav1.Duration)
+		**out = **in
+	}
+	if in.UnhealthyNodeTimeout != nil {
+		in, out := &in.UnhealthyNodeTimeout, &out.UnhealthyNodeTimeout
+		*out = new(metav1.Duration)
+		**out = **in
+	}
+	if in.MaxUnhealthy != nil {
+		in, out := &in.MaxUnhealthy, &out.MaxUnhealthy
+		*out = new(intstr.IntOrString)
+		**out = **in
+	}
+	if in.UnhealthyRange != nil {
+		in, out := &in.UnhealthyRange, &out.UnhealthyRange
+		*out = new(string)
+		**out = **in
 	}
 	return
 }

@@ -13,7 +13,7 @@ import (
 )
 
 var (
-	Provisioned condition.Cond = "Provisioned"
+	Ready condition.Cond = "Ready"
 )
 
 type handler struct {
@@ -41,7 +41,7 @@ func Register(ctx context.Context, clients *wrangler.Context) {
 	}, clients.RKE.RKECluster(), clients.RKE.RKEControlPlane())
 }
 
-func (h *handler) UpdateSpec(key string, cluster *v1.RKECluster) (*v1.RKECluster, error) {
+func (h *handler) UpdateSpec(_ string, cluster *v1.RKECluster) (*v1.RKECluster, error) {
 	if cluster == nil {
 		return nil, nil
 	}
@@ -61,14 +61,14 @@ func (h *handler) UpdateSpec(key string, cluster *v1.RKECluster) (*v1.RKECluster
 func (h *handler) OnChange(obj *v1.RKECluster, status v1.RKEClusterStatus) (v1.RKEClusterStatus, error) {
 	cp, err := h.rkeControlPlanes.Get(obj.Namespace, obj.Name)
 	if err == nil {
-		Provisioned.SetStatus(&status, Provisioned.GetStatus(cp))
-		Provisioned.Reason(&status, Provisioned.GetReason(cp))
-		Provisioned.Message(&status, Provisioned.GetMessage(cp))
+		Ready.SetStatus(&status, Ready.GetStatus(cp))
+		Ready.Reason(&status, Ready.GetReason(cp))
+		Ready.Message(&status, Ready.GetMessage(cp))
 	} else if !apierrors.IsNotFound(err) {
 		return status, err
 	}
 
-	status.Ready = condition.Cond("Provisioned").IsTrue(&status)
+	status.Ready = Ready.IsTrue(&status)
 	status.ObservedGeneration = obj.Generation
 	return status, nil
 }
