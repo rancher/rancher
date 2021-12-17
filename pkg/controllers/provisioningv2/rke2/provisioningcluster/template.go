@@ -369,9 +369,48 @@ func machineDeployments(cluster *rancherv1.Cluster, capiCluster *capi.Cluster, d
 		}
 
 		result = append(result, machineDeployment)
+
+		// if a health check timeout was specified create health checks for this machine pool
+		if machinePool.UnhealthyNodeTimeout != nil {
+			hc := deploymentHealthChecks(machineDeployment, machinePool)
+			result = append(result, hc)
+		}
 	}
 
 	return result, nil
+}
+
+// deploymentHealthChecks Health checks will mark a machine as failed if it has any of the conditions below for the duration of the given timeout. https://cluster-api.sigs.k8s.io/tasks/healthcheck.html#what-is-a-machinehealthcheck
+func deploymentHealthChecks(machineDeployment *capi.MachineDeployment, machinePool rancherv1.RKEMachinePool) *capi.MachineHealthCheck {
+	return &capi.MachineHealthCheck{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      machineDeployment.Name,
+			Namespace: machineDeployment.Namespace,
+		},
+		Spec: capi.MachineHealthCheckSpec{
+			ClusterName: machineDeployment.Spec.ClusterName,
+			Selector: metav1.LabelSelector{ // this health check only applies to machines in this deployment
+				MatchLabels: map[string]string{
+					capi.MachineDeploymentLabelName: machineDeployment.Name,
+				},
+			},
+			UnhealthyConditions: []capi.UnhealthyCondition{ // if a node status is unready or unknown for the timeout mark it unhealthy
+				{
+					Status:  corev1.ConditionUnknown,
+					Type:    corev1.NodeReady,
+					Timeout: *machinePool.UnhealthyNodeTimeout,
+				},
+				{
+					Status:  corev1.ConditionFalse,
+					Type:    corev1.NodeReady,
+					Timeout: *machinePool.UnhealthyNodeTimeout,
+				},
+			},
+			MaxUnhealthy:       machinePool.MaxUnhealthy,
+			UnhealthyRange:     machinePool.UnhealthyRange,
+			NodeStartupTimeout: machinePool.NodeStartupTimeout,
+		},
+	}
 }
 
 func assign(labels map[string]string, key string, value interface{}) error {

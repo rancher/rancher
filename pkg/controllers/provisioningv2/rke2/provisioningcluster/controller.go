@@ -27,7 +27,7 @@ import (
 
 const (
 	byNodeInfra                    = "by-node-infra"
-	Provisioned                    = condition.Cond("Provisioned")
+	Ready                          = condition.Cond("Ready")
 	defaultMachineConfigAPIVersion = "rke-machine-config.cattle.io/v1"
 )
 
@@ -202,13 +202,13 @@ func (h *handler) updateClusterProvisioningStatus(cluster *rancherv1.Cluster, st
 			return status, err
 		}
 
-		message := Provisioned.GetMessage(cp)
-		if (message == "" && Provisioned.GetMessage(mgmtCluster) != "") || strings.Contains(message, planner.ETCDRestoreMessage) {
+		message := Ready.GetMessage(cp)
+		if (message == "" && Ready.GetMessage(mgmtCluster) != "") || strings.Contains(message, planner.ETCDRestoreMessage) {
 			mgmtCluster = mgmtCluster.DeepCopy()
 
-			Provisioned.SetStatus(mgmtCluster, Provisioned.GetStatus(cp))
-			Provisioned.Reason(mgmtCluster, Provisioned.GetReason(cp))
-			Provisioned.Message(mgmtCluster, message)
+			Ready.SetStatus(mgmtCluster, Ready.GetStatus(cp))
+			Ready.Reason(mgmtCluster, Ready.GetReason(cp))
+			Ready.Message(mgmtCluster, message)
 
 			_, err = h.mgmtClusterClient.Update(mgmtCluster)
 			if err != nil {
@@ -217,9 +217,9 @@ func (h *handler) updateClusterProvisioningStatus(cluster *rancherv1.Cluster, st
 		}
 	}
 
-	Provisioned.SetStatus(&status, Provisioned.GetStatus(cp))
-	Provisioned.Reason(&status, Provisioned.GetReason(cp))
-	Provisioned.Message(&status, Provisioned.GetMessage(cp))
+	Ready.SetStatus(&status, Ready.GetStatus(cp))
+	Ready.Reason(&status, Ready.GetReason(cp))
+	Ready.Message(&status, Ready.GetMessage(cp))
 
 	return status, nil
 }

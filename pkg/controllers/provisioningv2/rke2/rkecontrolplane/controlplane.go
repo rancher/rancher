@@ -13,6 +13,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
+var Ready condition.Cond = "Ready"
+
 func Register(ctx context.Context, clients *wrangler.Context) {
 	h := &handler{
 		clusterCache:              clients.Mgmt.Cluster().Cache(),
@@ -42,6 +44,11 @@ func (h *handler) OnChange(obj *rkev1.RKEControlPlane, status rkev1.RKEControlPl
 		return status, nil
 	}
 
-	status.Ready = condition.Cond("Ready").IsTrue(cluster)
+	Ready.SetStatus(&status, Ready.GetStatus(cluster))
+	Ready.Reason(&status, Ready.GetReason(cluster))
+	Ready.Message(&status, Ready.GetMessage(cluster))
+
+	status.Ready = Ready.IsTrue(cluster)
+	status.Initialized = Ready.IsTrue(cluster)
 	return status, nil
 }
