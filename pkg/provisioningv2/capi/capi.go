@@ -14,6 +14,7 @@ import (
 	clusterv1alpha3 "sigs.k8s.io/cluster-api/api/v1alpha3"
 	clusterv1alpha4 "sigs.k8s.io/cluster-api/api/v1alpha4"
 	clusterv1beta1 "sigs.k8s.io/cluster-api/api/v1beta1"
+	"sigs.k8s.io/cluster-api/api/v1beta1/index"
 	"sigs.k8s.io/cluster-api/controllers"
 	"sigs.k8s.io/cluster-api/controllers/remote"
 	addonsv1alpha3 "sigs.k8s.io/cluster-api/exp/addons/api/v1alpha3"
@@ -55,6 +56,12 @@ func Register(ctx context.Context, clients *wrangler.Context) (func(ctx context.
 		// Work around a panic where the broadcaster is immediately closed
 		EventBroadcaster: record.NewBroadcaster(),
 	})
+	if err != nil {
+		return nil, err
+	}
+
+	// add the node ref indexer for health checks
+	err = index.AddDefaultIndexes(ctx, mgr)
 	if err != nil {
 		return nil, err
 	}

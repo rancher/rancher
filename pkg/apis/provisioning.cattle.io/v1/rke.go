@@ -3,6 +3,7 @@ package v1
 import (
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
@@ -21,6 +22,10 @@ type RKEMachinePool struct {
 	RollingUpdate                *RKEMachinePoolRollingUpdate `json:"rollingUpdate,omitempty"`
 	MachineDeploymentLabels      map[string]string            `json:"machineDeploymentLabels,omitempty"`
 	MachineDeploymentAnnotations map[string]string            `json:"machineDeploymentAnnotations,omitempty"`
+	NodeStartupTimeout           *metav1.Duration             `json:"nodeStartupTimeout,omitempty"`
+	UnhealthyNodeTimeout         *metav1.Duration             `json:"UnhealthyNodeTimeout,omitempty"`
+	MaxUnhealthy                 *intstr.IntOrString          `json:"maxUnhealthy,omitempty"`
+	UnhealthyRange               *string                      `json:"unhealthyRange,omitempty"`
 }
 
 type RKEMachinePoolRollingUpdate struct {
