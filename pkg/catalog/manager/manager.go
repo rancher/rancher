@@ -45,9 +45,9 @@ type Manager struct {
 }
 
 type CatalogManager interface {
-	ValidateChartCompatibility(template *v3.CatalogTemplateVersion, clusterName string) error
+	ValidateChartCompatibility(template *v3.CatalogTemplateVersion, clusterName, currentAppVersion string) error
 	ValidateKubeVersion(template *v3.CatalogTemplateVersion, clusterName string) error
-	ValidateRancherVersion(template *v3.CatalogTemplateVersion) error
+	ValidateRancherVersion(template *v3.CatalogTemplateVersion, currentAppVersion string) error
 	LatestAvailableTemplateVersion(template *v3.CatalogTemplate, clusterName string) (*v32.TemplateVersionSpec, error)
 	GetSystemAppCatalogID(templateVersionID, clusterName string) (string, error)
 }
@@ -206,8 +206,8 @@ func (m *Manager) deleteBadCatalogTemplates() []error {
 	return errs
 }
 
-func (m *Manager) ValidateChartCompatibility(template *v3.CatalogTemplateVersion, clusterName string) error {
-	if err := m.ValidateRancherVersion(template); err != nil {
+func (m *Manager) ValidateChartCompatibility(template *v3.CatalogTemplateVersion, clusterName, currentAppVersion string) error {
+	if err := m.ValidateRancherVersion(template, currentAppVersion); err != nil {
 		return err
 	}
 	return m.ValidateKubeVersion(template, clusterName)
@@ -242,7 +242,13 @@ func (m *Manager) ValidateKubeVersion(template *v3.CatalogTemplateVersion, clust
 	return nil
 }
 
-func (m *Manager) ValidateRancherVersion(template *v3.CatalogTemplateVersion) error {
+func (m *Manager) ValidateRancherVersion(template *v3.CatalogTemplateVersion, currentAppVersion string) error {
+	if currentAppVersion != "" && currentAppVersion == template.Spec.Version {
+		// if current app version is provided and the version in the update is equal to it then the
+		// version is deemed okay as it is already installed. This ensures the app can continue to
+		// be edited as long as it is not being upgraded/rollbacked to another incompatible version.
+		return nil
+	}
 	rancherMin := template.Spec.RancherMinVersion
 	rancherMax := template.Spec.RancherMaxVersion
 
@@ -289,7 +295,7 @@ func (m *Manager) LatestAvailableTemplateVersion(template *v3.CatalogTemplate, c
 			Spec: templateVersion,
 		}
 
-		if err := m.ValidateChartCompatibility(catalogTemplateVersion, clusterName); err == nil {
+		if err := m.ValidateChartCompatibility(catalogTemplateVersion, clusterName, ""); err == nil {
 			return &templateVersion, nil
 		}
 	}

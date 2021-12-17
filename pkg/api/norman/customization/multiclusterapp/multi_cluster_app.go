@@ -84,7 +84,9 @@ func (w Wrapper) ActionHandler(actionName string, action *types.Action, apiConte
 			return nil
 		}
 
-		if err := w.validateChartCompatibility(revision.TemplateVersionName, obj.Spec.Targets); err != nil {
+		mcappTemplateVersionParts := strings.Split(mcApp.TemplateVersionID, "-")
+		mcappCurrentTemplateVersion := mcappTemplateVersionParts[len(mcappTemplateVersionParts)-1]
+		if err := w.validateChartCompatibility(revision.TemplateVersionName, mcappCurrentTemplateVersion, obj.Spec.Targets); err != nil {
 			return err
 		}
 
@@ -284,7 +286,7 @@ func (w Wrapper) modifyProjects(request *types.APIContext, actionName string) ([
 	return inputProjects, inputAnswers, nil
 }
 
-func (w Wrapper) validateChartCompatibility(tempVersion string, targets []v32.Target) error {
+func (w Wrapper) validateChartCompatibility(tempVersion, currentAppVersion string, targets []v32.Target) error {
 	parts := strings.Split(tempVersion, ":")
 	if len(parts) != 2 {
 		return httperror.NewAPIError(httperror.InvalidBodyContent, "invalid templateVersionId")
@@ -295,7 +297,7 @@ func (w Wrapper) validateChartCompatibility(tempVersion string, targets []v32.Ta
 		return err
 	}
 
-	if err := w.CatalogManager.ValidateRancherVersion(template); err != nil {
+	if err := w.CatalogManager.ValidateRancherVersion(template, currentAppVersion); err != nil {
 		return httperror.NewAPIError(httperror.InvalidBodyContent, err.Error())
 	}
 

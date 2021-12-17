@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/rancher/rancher/pkg/ref"
+
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/store/transform"
 	"github.com/rancher/norman/types"
@@ -65,6 +67,7 @@ func SetMemberStore(ctx context.Context, schema *types.Schema, mgmt *config.Scal
 		templateVersionLister: mgmt.Management.CatalogTemplateVersions("").Controller().Lister(),
 		users:                 mgmt.Management.Users(""),
 		rtLister:              mgmt.Management.RoleTemplates("").Controller().Lister(),
+		mcappLister:           mgmt.Management.MultiClusterApps("").Controller().Lister(),
 		catalogManager:        mgmt.CatalogManager,
 	}
 
@@ -81,11 +84,12 @@ type Store struct {
 	templateVersionLister v3.CatalogTemplateVersionLister
 	users                 v3.UserInterface
 	rtLister              v3.RoleTemplateLister
+	mcappLister           v3.MultiClusterAppLister
 	catalogManager        manager.CatalogManager
 }
 
 func (s *Store) Create(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}) (map[string]interface{}, error) {
-	if err := s.validateChartCompatibility(data); err != nil {
+	if err := s.validateChartCompatibility("", data); err != nil {
 		return nil, err
 	}
 
@@ -103,7 +107,7 @@ func (s *Store) Create(apiContext *types.APIContext, schema *types.Schema, data 
 }
 
 func (s *Store) Update(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}, id string) (map[string]interface{}, error) {
-	if err := s.validateChartCompatibility(data); err != nil {
+	if err := s.validateChartCompatibility(id, data); err != nil {
 		return nil, err
 	}
 
@@ -167,7 +171,7 @@ func (s *Store) ensureRolesNotDisabled(apiContext *types.APIContext, data map[st
 	return nil
 }
 
-func (s *Store) validateChartCompatibility(data map[string]interface{}) error {
+func (s *Store) validateChartCompatibility(id string, data map[string]interface{}) error {
 	rawTempVersion, ok := data["templateVersionId"]
 	if !ok {
 		return nil
@@ -185,7 +189,18 @@ func (s *Store) validateChartCompatibility(data map[string]interface{}) error {
 		return err
 	}
 
-	if err := s.catalogManager.ValidateRancherVersion(template); err != nil {
+	var mcappCurrentTemplateVersion string
+	mcappNamespace, mcappID := ref.Parse(id)
+	if mcappID != "" {
+		mcapp, err := s.mcappLister.Get(mcappNamespace, mcappID)
+		if err != nil {
+			return httperror.NewAPIError(httperror.NotFound, fmt.Sprintf("cannot find multiclusterapp [%s:%s]", mcappNamespace, mcappID))
+		}
+		mcappTemplateVersionParts := strings.Split(mcapp.Spec.TemplateVersionName, "-")
+		mcappCurrentTemplateVersion = mcappTemplateVersionParts[len(mcappTemplateVersionParts)-1]
+	}
+
+	if err := s.catalogManager.ValidateRancherVersion(template, mcappCurrentTemplateVersion); err != nil {
 		return httperror.NewAPIError(httperror.InvalidBodyContent, err.Error())
 	}
 
