@@ -3,8 +3,6 @@ set -e
 
 ./k3s-images.sh
 
-./create-components-file.sh
-
 source $(dirname $0)/version
 
 ARCH=${ARCH:-"amd64"}
@@ -75,3 +73,5 @@ if [ ${ARCH} == amd64 ]; then
     cp -vf rancherd build/rancherd/bundle/bin
     tar czf rancherd-${ARCH}.tar.gz -C build/rancherd/bundle .
 fi
+
+../scripts/create-components-file.sh
