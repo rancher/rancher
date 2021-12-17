@@ -105,7 +105,7 @@ func (t *templateStore) isTemplateVersionCompatible(clusterName, externalID stri
 		return true
 	}
 
-	err = t.CatalogManager.ValidateRancherVersion(template)
+	err = t.CatalogManager.ValidateRancherVersion(template, "")
 	if err != nil {
 		return false
 	}

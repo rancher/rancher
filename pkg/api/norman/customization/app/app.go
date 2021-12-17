@@ -169,7 +169,12 @@ func (w Wrapper) ActionHandler(actionName string, action *types.Action, apiConte
 	case "upgrade":
 		externalID := convert.ToString(actionInput["externalId"])
 
-		if err := w.validateChartCompatibility(externalID, clusterName); err != nil {
+		_, _, _, _, currentAppVersion, err := hcommon.SplitExternalID(obj.Spec.ExternalID)
+		if err != nil {
+			httperror.NewAPIError(httperror.InvalidBodyContent, fmt.Sprintf("could not parse current externalID [%s]: %s",
+				obj.Spec.ExternalID, err.Error()))
+		}
+		if err := w.validateChartCompatibility(externalID, clusterName, currentAppVersion); err != nil {
 			return httperror.NewAPIError(httperror.InvalidBodyContent, err.Error())
 		}
 
@@ -227,7 +232,12 @@ func (w Wrapper) ActionHandler(actionName string, action *types.Action, apiConte
 			return err
 		}
 
-		if err := w.validateChartCompatibility(appRevision.Status.ExternalID, clusterName); err != nil {
+		_, _, _, _, currentAppVersion, err := hcommon.SplitExternalID(obj.Spec.ExternalID)
+		if err != nil {
+			httperror.NewAPIError(httperror.InvalidBodyContent, fmt.Sprintf("could not parse current externalID [%s]: %s",
+				obj.Spec.ExternalID, err.Error()))
+		}
+		if err := w.validateChartCompatibility(appRevision.Status.ExternalID, clusterName, currentAppVersion); err != nil {
 			return httperror.NewAPIError(httperror.InvalidBodyContent, err.Error())
 		}
 
@@ -282,7 +292,7 @@ func (w Wrapper) LinkHandler(apiContext *types.APIContext, next types.RequestHan
 	return nil
 }
 
-func (w Wrapper) validateChartCompatibility(externalID, clusterName string) error {
+func (w Wrapper) validateChartCompatibility(externalID, clusterName, currentAppVersion string) error {
 	if externalID == "" {
 		return nil
 	}
@@ -294,5 +304,5 @@ func (w Wrapper) validateChartCompatibility(externalID, clusterName string) erro
 	if err != nil {
 		return err
 	}
-	return w.CatalogManager.ValidateChartCompatibility(template, clusterName)
+	return w.CatalogManager.ValidateChartCompatibility(template, clusterName, currentAppVersion)
 }
