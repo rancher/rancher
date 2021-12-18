@@ -458,7 +458,7 @@ func (h *handler) run(infraObj *infraObject, create bool, jobBackoffLimit int32)
 		return infraObj.obj, err
 	}
 
-	if dArgs.BootstrapSecretName == "" && !dArgs.BootstrapOptional {
+	if dArgs.BootstrapSecretName == "" && dArgs.BootstrapRequired {
 		return infraObj.obj,
 			h.dynamic.EnqueueAfter(infraObj.obj.GetObjectKind().GroupVersionKind(), infraObj.meta.GetNamespace(), infraObj.meta.GetName(), 2*time.Second)
 	}

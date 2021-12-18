@@ -45,7 +45,7 @@ type driverArgs struct {
 	EnvSecret           *corev1.Secret
 	StateSecretName     string
 	BootstrapSecretName string
-	BootstrapOptional   bool
+	BootstrapRequired   bool
 	Args                []string
 }
 
@@ -135,7 +135,7 @@ func (h *handler) getArgsEnvAndStatus(meta metav1.Object, data data.Object, args
 		EnvSecret:           secret,
 		StateSecretName:     secretName,
 		BootstrapSecretName: bootstrapName,
-		BootstrapOptional:   !create,
+		BootstrapRequired:   create,
 		Args:                cmd,
 		RKEMachineStatus: rkev1.RKEMachineStatus{
 			Ready:                     data.String("spec", "providerID") != "" && data.Bool("status", "jobComplete"),
