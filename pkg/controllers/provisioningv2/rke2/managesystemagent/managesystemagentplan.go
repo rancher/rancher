@@ -29,7 +29,9 @@ func (h *handler) OnChangeInstallSUC(cluster *rancherv1.Cluster, status rancherv
 			Values: &v1alpha1.GenericMap{
 				Data: map[string]interface{}{
 					"global": map[string]interface{}{
-						"systemDefaultRegistry": settings.SystemDefaultRegistry.Get(),
+						"cattle": map[string]interface{}{
+							"systemDefaultRegistry": settings.SystemDefaultRegistry.Get(),
+						},
 					},
 				},
 			},
