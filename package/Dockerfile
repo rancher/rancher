@@ -110,8 +110,8 @@ RUN curl -sLf ${!TINI_URL} > /usr/bin/tini && \
     chmod +x /usr/bin/tini /usr/bin/telemetry /usr/bin/k3s /usr/bin/kubectl && \
     mkdir -p /var/lib/rancher-data/driver-metadata
 
-ENV CATTLE_UI_VERSION 2.6.3-rc6
-ENV CATTLE_DASHBOARD_UI_VERSION v2.6.3-rc6
+ENV CATTLE_UI_VERSION 2.6.3-rc7
+ENV CATTLE_DASHBOARD_UI_VERSION v2.6.3-rc8
 ENV CATTLE_CLI_VERSION v2.6.0
 
 # Please update the api-ui-version in pkg/settings/settings.go when updating the version here.
