@@ -413,7 +413,7 @@ func (h *handler) OnRemove(key string, obj runtime.Object) (runtime.Object, erro
 }
 
 func (h *handler) doRemove(infraObj *infraObject) (runtime.Object, error) {
-	obj, err := h.run(infraObj, false, 3)
+	obj, err := h.run(infraObj, false)
 	if err != nil {
 		return nil, err
 	}
@@ -433,7 +433,7 @@ func (h *handler) OnChange(obj runtime.Object) (runtime.Object, error) {
 		return obj, nil
 	}
 
-	newObj, err := h.run(infraObj, true, 0)
+	newObj, err := h.run(infraObj, true)
 	if newObj == nil {
 		newObj = obj
 	}
@@ -444,16 +444,11 @@ func (h *handler) OnChange(obj runtime.Object) (runtime.Object, error) {
 	return newObj, nil
 }
 
-func (h *handler) run(infraObj *infraObject, create bool, jobBackoffLimit int32) (runtime.Object, error) {
+func (h *handler) run(infraObj *infraObject, create bool) (runtime.Object, error) {
 	args := infraObj.data.Map("spec")
 	driver := getNodeDriverName(infraObj.typeMeta)
 
-	filesSecret, err := constructFilesSecret(driver, args)
-	if err != nil {
-		return infraObj.obj, err
-	}
-
-	dArgs, err := h.getArgsEnvAndStatus(infraObj.meta, infraObj.data, args, driver, create)
+	dArgs, err := h.getArgsEnvAndStatus(infraObj, args, driver, create)
 	if err != nil {
 		return infraObj.obj, err
 	}
@@ -463,9 +458,7 @@ func (h *handler) run(infraObj *infraObject, create bool, jobBackoffLimit int32)
 			h.dynamic.EnqueueAfter(infraObj.obj.GetObjectKind().GroupVersionKind(), infraObj.meta.GetNamespace(), infraObj.meta.GetName(), 2*time.Second)
 	}
 
-	if err := h.apply.WithOwner(infraObj.obj).ApplyObjects(
-		h.objects(args.String("providerID") != "" && create, infraObj.typeMeta, infraObj.meta, dArgs, filesSecret, jobBackoffLimit)...,
-	); err != nil {
+	if err := h.apply.WithOwner(infraObj.obj).ApplyObjects(objects(args.String("providerID") != "" && create, dArgs)...); err != nil {
 		return nil, err
 	}
 
@@ -613,7 +606,7 @@ func getCondition(d data.Object, conditionType string) *summary.Condition {
 	return nil
 }
 
-func constructFilesSecret(driver string, config map[string]interface{}) (*corev1.Secret, error) {
+func constructFilesSecret(driver string, config map[string]interface{}) *corev1.Secret {
 	secretData := make(map[string][]byte)
 	// Check if the required driver has aliased fields
 	if fields, ok := node.SchemaToDriverFields[driver]; ok {
@@ -641,9 +634,9 @@ func constructFilesSecret(driver string, config map[string]interface{}) (*corev1
 				config[driverField] = path.Join(pathToMachineFiles, fileName)
 			}
 		}
-		return &corev1.Secret{Data: secretData}, nil
+		return &corev1.Secret{Data: secretData}
 	}
-	return nil, nil
+	return nil
 }
 
 func shouldCleanupObjects(job *batchv1.Job, d data.Object) bool {
