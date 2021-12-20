@@ -41,27 +41,33 @@ type driverArgs struct {
 
 	DriverName          string
 	ImageName           string
+	MachineName         string
+	MachineNamespace    string
+	MachineGVK          schema.GroupVersionKind
 	ImagePullPolicy     corev1.PullPolicy
 	EnvSecret           *corev1.Secret
+	FilesSecret         *corev1.Secret
 	StateSecretName     string
 	BootstrapSecretName string
 	BootstrapRequired   bool
 	Args                []string
+	BackoffLimit        int32
 }
 
 func MachineStateSecretName(machineName string) string {
 	return name2.SafeConcatName(machineName, "machine", "state")
 }
 
-func (h *handler) getArgsEnvAndStatus(meta metav1.Object, data data.Object, args map[string]interface{}, driver string, create bool) (driverArgs, error) {
+func (h *handler) getArgsEnvAndStatus(infraObj *infraObject, args map[string]interface{}, driver string, create bool) (driverArgs, error) {
 	var (
 		url, hash, cloudCredentialSecretName string
+		jobBackoffLimit                      int32
 	)
 
 	nd, err := h.nodeDriverCache.Get(driver)
 	if !create && apierror.IsNotFound(err) {
-		url = data.String("status", "driverURL")
-		hash = data.String("status", "driverHash")
+		url = infraObj.data.String("status", "driverURL")
+		hash = infraObj.data.String("status", "driverHash")
 	} else if err != nil {
 		return driverArgs{}, err
 	} else {
@@ -74,10 +80,10 @@ func (h *handler) getArgsEnvAndStatus(meta metav1.Object, data data.Object, args
 		hash = ""
 	}
 
-	secret := &corev1.Secret{
+	envSecret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      name2.SafeConcatName(meta.GetName(), "machine", "driver", "secret"),
-			Namespace: meta.GetNamespace(),
+			Name:      name2.SafeConcatName(infraObj.meta.GetName(), "machine", "driver", "secret"),
+			Namespace: infraObj.meta.GetNamespace(),
 		},
 		Data: map[string][]byte{
 			"HTTP_PROXY":  []byte(os.Getenv("HTTP_PROXY")),
@@ -86,7 +92,7 @@ func (h *handler) getArgsEnvAndStatus(meta metav1.Object, data data.Object, args
 		},
 	}
 
-	bootstrapName, cloudCredentialSecretName, secrets, err := h.getSecretData(meta, data, create)
+	bootstrapName, cloudCredentialSecretName, secrets, err := h.getSecretData(infraObj.meta, infraObj.data, create)
 	if err != nil {
 		return driverArgs{}, err
 	}
@@ -98,15 +104,15 @@ func (h *handler) getArgsEnvAndStatus(meta metav1.Object, data data.Object, args
 			envName = driver
 		}
 		k := strings.ToUpper(envName + "_" + regExHyphen.ReplaceAllString(k, "${1}_${2}"))
-		secret.Data[k] = []byte(v)
+		envSecret.Data[k] = []byte(v)
 	}
 
-	secretName := MachineStateSecretName(meta.GetName())
+	secretName := MachineStateSecretName(infraObj.meta.GetName())
 
 	cmd := []string{
 		fmt.Sprintf("--driver-download-url=%s", url),
 		fmt.Sprintf("--driver-hash=%s", hash),
-		fmt.Sprintf("--secret-namespace=%s", meta.GetNamespace()),
+		fmt.Sprintf("--secret-namespace=%s", infraObj.meta.GetNamespace()),
 		fmt.Sprintf("--secret-name=%s", secretName),
 	}
 
@@ -115,30 +121,36 @@ func (h *handler) getArgsEnvAndStatus(meta metav1.Object, data data.Object, args
 			fmt.Sprintf("--driver=%s", driver),
 			fmt.Sprintf("--custom-install-script=/run/secrets/machine/value"))
 
-		rancherCluster, err := h.rancherClusterCache.Get(meta.GetNamespace(), meta.GetLabels()[capi.ClusterLabelName])
+		rancherCluster, err := h.rancherClusterCache.Get(infraObj.meta.GetNamespace(), infraObj.meta.GetLabels()[capi.ClusterLabelName])
 		if err != nil {
 			return driverArgs{}, err
 		}
 		cmd = append(cmd, toArgs(driver, args, rancherCluster.Status.ClusterName)...)
 	} else {
 		cmd = append(cmd, "rm", "-y")
+		jobBackoffLimit = 3
 	}
 
 	// cloud-init will split the hostname on '.' and set the hostname to the first chunk. This causes an issue where all
 	// nodes in a machine pool may have the same node name in Kubernetes. Converting the '.' to '-' here prevents this.
-	cmd = append(cmd, strings.ReplaceAll(meta.GetName(), ".", "-"))
+	cmd = append(cmd, strings.ReplaceAll(infraObj.meta.GetName(), ".", "-"))
 
 	return driverArgs{
 		DriverName:          driver,
+		MachineName:         infraObj.meta.GetName(),
+		MachineNamespace:    infraObj.meta.GetNamespace(),
+		MachineGVK:          infraObj.obj.GetObjectKind().GroupVersionKind(),
 		ImageName:           settings.PrefixPrivateRegistry(settings.MachineProvisionImage.Get()),
 		ImagePullPolicy:     corev1.PullAlways,
-		EnvSecret:           secret,
+		EnvSecret:           envSecret,
+		FilesSecret:         constructFilesSecret(driver, args),
 		StateSecretName:     secretName,
 		BootstrapSecretName: bootstrapName,
 		BootstrapRequired:   create,
 		Args:                cmd,
+		BackoffLimit:        jobBackoffLimit,
 		RKEMachineStatus: rkev1.RKEMachineStatus{
-			Ready:                     data.String("spec", "providerID") != "" && data.Bool("status", "jobComplete"),
+			Ready:                     infraObj.data.String("spec", "providerID") != "" && infraObj.data.Bool("status", "jobComplete"),
 			DriverHash:                hash,
 			DriverURL:                 url,
 			CloudCredentialSecretName: cloudCredentialSecretName,
