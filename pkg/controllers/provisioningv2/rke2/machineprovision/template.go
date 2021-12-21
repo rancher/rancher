@@ -25,7 +25,7 @@ var (
 	oneThousand int64 = 1000
 )
 
-func getJobName(name string) string {
+func GetJobName(name string) string {
 	return name2.SafeConcatName(name, "machine", "provision")
 }
 
@@ -45,7 +45,7 @@ func objects(ready bool, args driverArgs) []runtime.Object {
 
 	volumes := make([]corev1.Volume, 0, 2)
 	volumeMounts := make([]corev1.VolumeMount, 0, 2)
-	saName := getJobName(args.MachineName)
+	saName := GetJobName(args.MachineName)
 
 	if args.BootstrapRequired {
 		volumes = append(volumes, corev1.Volume{

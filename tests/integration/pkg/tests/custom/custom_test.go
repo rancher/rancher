@@ -59,7 +59,7 @@ func TestCustomOneNode(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, err = cluster.WaitFor(clients, c)
+	_, err = cluster.WaitForCreate(clients, c)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -113,7 +113,7 @@ func TestCustomThreeNode(t *testing.T) {
 		}
 	}
 
-	_, err = cluster.WaitFor(clients, c)
+	_, err = cluster.WaitForCreate(clients, c)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -180,7 +180,7 @@ func TestCustomUniqueRoles(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, err = cluster.WaitFor(clients, c)
+	_, err = cluster.WaitForCreate(clients, c)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -248,7 +248,7 @@ func TestCustomThreeNodeWithTaints(t *testing.T) {
 		}
 	}
 
-	_, err = cluster.WaitFor(clients, c)
+	_, err = cluster.WaitForCreate(clients, c)
 	if err != nil {
 		t.Fatal(err)
 	}
