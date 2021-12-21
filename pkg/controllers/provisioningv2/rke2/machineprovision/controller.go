@@ -340,7 +340,7 @@ func (h *handler) OnRemove(key string, obj runtime.Object) (runtime.Object, erro
 	}
 
 	if cond := getCondition(infraObj.data, deleteJobConditionType); cond != nil {
-		job, err := h.jobs.Get(infraObj.meta.GetNamespace(), getJobName(infraObj.meta.GetName()))
+		job, err := h.jobs.Get(infraObj.meta.GetNamespace(), GetJobName(infraObj.meta.GetName()))
 		if apierror.IsNotFound(err) {
 			// If the deletion job condition has been set on the infrastructure object and the deletion job has been removed,
 			// then we don't want to create another deletion job.
