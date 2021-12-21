@@ -6,6 +6,7 @@ import (
 
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/stretchr/testify/assert"
+	rbacv1 "k8s.io/api/rbac/v1"
 	v1 "k8s.io/api/rbac/v1"
 )
 
@@ -14,6 +15,7 @@ func Test_manager_checkForGlobalResourceRules(t *testing.T) {
 		name     string
 		role     *v3.RoleTemplate
 		resource string
+		baseRule rbacv1.PolicyRule
 		want     map[string]bool
 	}
 
@@ -30,6 +32,7 @@ func Test_manager_checkForGlobalResourceRules(t *testing.T) {
 				},
 			},
 			resource: "persistentvolumes",
+			baseRule: rbacv1.PolicyRule{},
 			want:     map[string]bool{"put": true},
 		},
 		{
@@ -44,6 +47,7 @@ func Test_manager_checkForGlobalResourceRules(t *testing.T) {
 				},
 			},
 			resource: "persistentvolumes",
+			baseRule: rbacv1.PolicyRule{},
 			want:     map[string]bool{},
 		},
 		{
@@ -58,6 +62,7 @@ func Test_manager_checkForGlobalResourceRules(t *testing.T) {
 				},
 			},
 			resource: "storageclasses",
+			baseRule: rbacv1.PolicyRule{},
 			want:     map[string]bool{"put": true},
 		},
 		{
@@ -72,6 +77,7 @@ func Test_manager_checkForGlobalResourceRules(t *testing.T) {
 				},
 			},
 			resource: "storageclasses",
+			baseRule: rbacv1.PolicyRule{},
 			want:     map[string]bool{},
 		},
 		{
@@ -86,6 +92,7 @@ func Test_manager_checkForGlobalResourceRules(t *testing.T) {
 				},
 			},
 			resource: "persistentvolumes",
+			baseRule: rbacv1.PolicyRule{},
 			want:     map[string]bool{"put": true},
 		},
 		{
@@ -100,6 +107,73 @@ func Test_manager_checkForGlobalResourceRules(t *testing.T) {
 				},
 			},
 			resource: "persistentvolumes",
+			baseRule: rbacv1.PolicyRule{},
+			want:     map[string]bool{},
+		},
+		{
+			name: "cluster_rule_match",
+			role: &v3.RoleTemplate{
+				Rules: []v1.PolicyRule{
+					{
+						Verbs:     []string{"get"},
+						APIGroups: []string{"management.cattle.io"},
+						Resources: []string{"clusters"},
+					},
+				},
+			},
+			resource: "clusters",
+			baseRule: rbacv1.PolicyRule{},
+			want:     map[string]bool{"get": true},
+		},
+		{
+			name: "cluster_rule_resource_names_match",
+			role: &v3.RoleTemplate{
+				Rules: []v1.PolicyRule{
+					{
+						Verbs:         []string{"get"},
+						APIGroups:     []string{"management.cattle.io"},
+						Resources:     []string{"clusters"},
+						ResourceNames: []string{"local"},
+					},
+				},
+			},
+			resource: "clusters",
+			baseRule: rbacv1.PolicyRule{
+				ResourceNames: []string{"local"},
+			},
+			want: map[string]bool{"get": true},
+		},
+		{
+			name: "cluster_rule_baserule_resource_names_no_match",
+			role: &v3.RoleTemplate{
+				Rules: []v1.PolicyRule{
+					{
+						Verbs:     []string{"get"},
+						APIGroups: []string{"management.cattle.io"},
+						Resources: []string{"clusters"},
+					},
+				},
+			},
+			resource: "clusters",
+			baseRule: rbacv1.PolicyRule{
+				ResourceNames: []string{"local"},
+			},
+			want:     map[string]bool{},
+		},
+		{
+			name: "cluster_rule_roletemplate_resource_names_no_match",
+			role: &v3.RoleTemplate{
+				Rules: []v1.PolicyRule{
+					{
+						Verbs:     []string{"get"},
+						APIGroups: []string{"management.cattle.io"},
+						Resources: []string{"clusters"},
+						ResourceNames: []string{"local"},
+					},
+				},
+			},
+			resource: "clusters",
+			baseRule: rbacv1.PolicyRule{},
 			want:     map[string]bool{},
 		},
 	}
@@ -107,7 +181,7 @@ func Test_manager_checkForGlobalResourceRules(t *testing.T) {
 	m := &manager{}
 
 	for _, test := range testCases {
-		got, err := m.checkForGlobalResourceRules(test.role, test.resource)
+		got, err := m.checkForGlobalResourceRules(test.role, test.resource, test.baseRule)
 		assert.Nil(t, err)
 		assert.Equal(t, test.want, got, fmt.Sprintf("test %v failed", test.name))
 	}
