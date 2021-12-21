@@ -59,7 +59,6 @@ then
            cp -f /usr/local/share/rke2/rke2-cis-sysctl.conf /etc/sysctl.d/60-rke2-cis.conf
        fi
        systemctl restart systemd-sysctl
-       useradd -r -c "etcd user" -s /sbin/nologin -M etcd
    fi
    sudo systemctl enable rke2-agent
    sudo systemctl start rke2-agent
