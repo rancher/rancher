@@ -13,7 +13,6 @@ const (
 	MachineStatusFieldNodeRef             = "nodeRef"
 	MachineStatusFieldObservedGeneration  = "observedGeneration"
 	MachineStatusFieldPhase               = "phase"
-	MachineStatusFieldVersion             = "version"
 )
 
 type MachineStatus struct {
@@ -28,5 +27,4 @@ type MachineStatus struct {
 	NodeRef             *ObjectReference `json:"nodeRef,omitempty" yaml:"nodeRef,omitempty"`
 	ObservedGeneration  int64            `json:"observedGeneration,omitempty" yaml:"observedGeneration,omitempty"`
 	Phase               string           `json:"phase,omitempty" yaml:"phase,omitempty"`
-	Version             string           `json:"version,omitempty" yaml:"version,omitempty"`
 }
