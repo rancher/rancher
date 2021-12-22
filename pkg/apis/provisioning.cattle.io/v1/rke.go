@@ -13,6 +13,7 @@ type RKEMachinePool struct {
 	EtcdRole                     bool                         `json:"etcdRole,omitempty"`
 	ControlPlaneRole             bool                         `json:"controlPlaneRole,omitempty"`
 	WorkerRole                   bool                         `json:"workerRole,omitempty"`
+	DrainBeforeDelete            bool                         `json:"drainBeforeDelete,omitempty"`
 	NodeConfig                   *corev1.ObjectReference      `json:"machineConfigRef,omitempty" wrangler:"required"`
 	Name                         string                       `json:"name,omitempty" wrangler:"required"`
 	DisplayName                  string                       `json:"displayName,omitempty"`
