@@ -280,6 +280,10 @@ func machineDeployments(cluster *rancherv1.Cluster, capiCluster *capi.Cluster, d
 		for k, v := range machinePool.MachineDeploymentLabels {
 			machineDeploymentLabels[k] = v
 		}
+		machineSpecAnnotations := map[string]string{}
+		if !machinePool.DrainBeforeDelete {
+			machineSpecAnnotations[capi.ExcludeNodeDrainingAnnotation] = "true"
+		}
 
 		machineDeployment := &capi.MachineDeployment{
 			ObjectMeta: metav1.ObjectMeta{
@@ -299,7 +303,7 @@ func machineDeployments(cluster *rancherv1.Cluster, capiCluster *capi.Cluster, d
 							capi.ClusterLabelName:           capiCluster.Name,
 							capi.MachineDeploymentLabelName: machinePoolName,
 						},
-						Annotations: map[string]string{},
+						Annotations: machineSpecAnnotations,
 					},
 					Spec: capi.MachineSpec{
 						ClusterName: capiCluster.Name,
