@@ -3,10 +3,12 @@ echo "$@"
 
 mkdir -p /etc/rancher/k3s
 mkdir -p /var/lib/rancher/k3s/server/logs
+token=$(openssl rand -base64 21)
 cat << EOF >/etc/rancher/k3s/config.yaml
 write-kubeconfig-mode: "0644"
 tls-san:
   - ${2}
+token: ${token}
 EOF
 
 if [[ -n "${8}" ]] && [[ "${8}" == *":"* ]]
