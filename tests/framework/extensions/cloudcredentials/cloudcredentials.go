@@ -15,5 +15,6 @@ type CloudCredential struct {
 	Removed                      string                        `json:"removed,omitempty"`
 	AmazonEC2CredentialConfig    *AmazonEC2CredentialConfig    `json:"amazonec2credentialConfig,omitempty"`
 	DigitalOceanCredentialConfig *DigitalOceanCredentialConfig `json:"digitaloceancredentialConfig,omitempty"`
+	HarvesterCredentialConfig    *HarvesterCredentialConfig    `json:"harvestercredentialConfig,omitempty"`
 	UUID                         string                        `json:"uuid,omitempty"`
 }
