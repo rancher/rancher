@@ -35,22 +35,6 @@ func NewFormatter(schemas *types.Schemas, managementContext *config.ScaledContex
 	return &clusterFormatter
 }
 
-func canUserUpdateCluster(request *types.APIContext, resource *types.RawResource) bool {
-	if request == nil || resource == nil {
-		return false
-	}
-	cluster := map[string]interface{}{
-		"id": resource.ID,
-	}
-	return request.AccessControl.CanDo(
-		v3.ClusterGroupVersionKind.Group,
-		v3.ClusterResource.Name,
-		"update",
-		request,
-		cluster,
-		resource.Schema) == nil
-}
-
 func (f *Formatter) Formatter(request *types.APIContext, resource *types.RawResource) {
 	if convert.ToBool(resource.Values["internal"]) {
 		delete(resource.Links, "remove")
@@ -61,16 +45,43 @@ func (f *Formatter) Formatter(request *types.APIContext, resource *types.RawReso
 	resource.Links["shell"] = shellLink
 	resource.AddAction(request, v32.ClusterActionGenerateKubeconfig)
 	resource.AddAction(request, v32.ClusterActionImportYaml)
+
+	// If user has permissions to update the cluster (regardless of RKE1 or not)
+	if canUpdateClusterWithValues(request, resource.Values) {
+		if convert.ToBool(resource.Values["enableClusterMonitoring"]) {
+			resource.AddAction(request, v32.ClusterActionDisableMonitoring)
+			resource.AddAction(request, v32.ClusterActionEditMonitoring)
+		} else {
+			resource.AddAction(request, v32.ClusterActionEnableMonitoring)
+		}
+	}
+
+	// If this is an RKE1 cluster only
 	if _, ok := resource.Values["rancherKubernetesEngineConfig"]; ok {
 		resource.AddAction(request, v32.ClusterActionExportYaml)
-		resource.AddAction(request, v32.ClusterActionRotateCertificates)
-		if rotateEncryptionKeyEnabled(f.clusterLister, resource.ID) {
-			resource.AddAction(request, v32.ClusterActionRotateEncryptionKey)
-		}
-		if _, ok := values.GetValue(resource.Values, "rancherKubernetesEngineConfig", "services", "etcd", "backupConfig"); ok {
+
+		// If a user has the backupetcd role/privilege, add it
+		if _, ok := values.GetValue(resource.Values, "rancherKubernetesEngineConfig", "services", "etcd", "backupConfig"); ok && canBackupEtcd(request) {
 			resource.AddAction(request, v32.ClusterActionBackupEtcd)
-			resource.AddAction(request, v32.ClusterActionRestoreFromEtcdBackup)
 		}
+
+		// If user has permissions to update the cluster
+		if canUpdateClusterWithValues(request, resource.Values) {
+			if _, ok := values.GetValue(resource.Values, "rancherKubernetesEngineConfig", "services", "etcd", "backupConfig"); ok {
+				resource.AddAction(request, v32.ClusterActionRestoreFromEtcdBackup)
+			}
+			resource.AddAction(request, v32.ClusterActionRotateCertificates)
+			if rotateEncryptionKeyEnabled(f.clusterLister, resource.ID) {
+				resource.AddAction(request, v32.ClusterActionRotateEncryptionKey)
+			}
+
+			if val, ok := values.GetValue(resource.Values, "clusterTemplateRevisionId"); ok && val == nil {
+				if err := request.AccessControl.CanDo(v3.ClusterTemplateGroupVersionKind.Group, v3.ClusterTemplateResource.Name, "create", request, resource.Values, request.Schema); err == nil {
+					resource.AddAction(request, v32.ClusterActionSaveAsTemplate)
+				}
+			}
+		}
+
 		isActiveCluster := false
 		if resource.Values["state"] == "active" {
 			isActiveCluster = true
@@ -80,26 +91,10 @@ func (f *Formatter) Formatter(request *types.APIContext, resource *types.RawReso
 			isWindowsCluster = true
 		}
 		if isActiveCluster && !isWindowsCluster {
-			canUpdateCluster := canUserUpdateCluster(request, resource)
+			canUpdateCluster := canUpdateCluster(request)
 			logrus.Debugf("isActiveCluster: %v isWindowsCluster: %v user: %v, canUpdateCluster: %v", isActiveCluster, isWindowsCluster, request.Request.Header.Get("Impersonate-User"), canUpdateCluster)
 			if canUpdateCluster {
 				resource.AddAction(request, v32.ClusterActionRunSecurityScan)
-			}
-		}
-	}
-
-	if err := request.AccessControl.CanDo(v3.ClusterGroupVersionKind.Group, v3.ClusterResource.Name, "update", request, resource.Values, request.Schema); err == nil {
-		if convert.ToBool(resource.Values["enableClusterMonitoring"]) {
-			resource.AddAction(request, v32.ClusterActionDisableMonitoring)
-			resource.AddAction(request, v32.ClusterActionEditMonitoring)
-		} else {
-			resource.AddAction(request, v32.ClusterActionEnableMonitoring)
-		}
-		if _, ok := resource.Values["rancherKubernetesEngineConfig"]; ok {
-			if val, ok := values.GetValue(resource.Values, "clusterTemplateRevisionId"); ok && val == nil {
-				if err := request.AccessControl.CanDo(v3.ClusterTemplateGroupVersionKind.Group, v3.ClusterTemplateResource.Name, "create", request, resource.Values, request.Schema); err == nil {
-					resource.AddAction(request, v32.ClusterActionSaveAsTemplate)
-				}
 			}
 		}
 	}
