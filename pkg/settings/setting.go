@@ -71,7 +71,7 @@ var (
 	UIFeedBackForm                    = NewSetting("ui-feedback-form", "")
 	UIIndex                           = NewSetting("ui-index", "https://releases.rancher.com/ui/latest-2.5/index.html")
 	UIPath                            = NewSetting("ui-path", "/usr/share/rancher/ui")
-	UIDashboardIndex                  = NewSetting("ui-dashboard-index", "https://releases.rancher.com/dashboard/v2.5.8/index.html")
+	UIDashboardIndex                  = NewSetting("ui-dashboard-index", "https://releases.rancher.com/dashboard/release-2.5/index.html")
 	UIDashboardPath                   = NewSetting("ui-dashboard-path", "/usr/share/rancher/ui-dashboard")
 	UIPreferred                       = NewSetting("ui-preferred", "ember")
 	UIOfflinePreferred                = NewSetting("ui-offline-preferred", "dynamic")
