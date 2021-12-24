@@ -266,6 +266,12 @@ func (r *Rancher) Start(ctx context.Context) error {
 			}
 		}
 
+		if features.EmbeddedClusterAPI.Enabled() {
+			if err := addWebhookConfigToCAPICRDs(r.Wrangler.CRD.CustomResourceDefinition()); err != nil {
+				return err
+			}
+		}
+
 		return copyCAAdditionalSecret(r.Wrangler.Core.Secret())
 	})
 
