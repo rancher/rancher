@@ -121,7 +121,7 @@ func decodeHelm3(data string) (*release.Release, error) {
 	// For backwards compatibility with releases that were stored before
 	// compression was introduced we skip decompression if the
 	// gzip magic header is not found
-	if bytes.Equal(b[0:3], magicGzip) {
+	if len(b) >= 3 && bytes.Equal(b[0:3], magicGzip) {
 		r, err := gzip.NewReader(bytes.NewReader(b))
 		if err != nil {
 			return nil, err
