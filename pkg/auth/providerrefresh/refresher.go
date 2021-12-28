@@ -206,6 +206,10 @@ func (r *refresher) refreshAttributes(attribs *v3.UserAttribute) (*v3.UserAttrib
 			secret := ""
 			if providers.ProvidersWithSecrets[providerName] {
 				secret, err = r.tokenMGR.GetSecret(user.Name, providerName, loginTokens[providerName])
+				if apierrors.IsNotFound(err) {
+					// There is no secret so we can't refresh, just continue to the next attribute
+					return attribs, nil
+				}
 				if err != nil {
 					return nil, err
 				}
