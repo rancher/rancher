@@ -173,6 +173,24 @@ func (c *Controller) doClusterBackupSync(cluster *v3.Cluster) error {
 		return nil
 	}
 
+	// check for backups in progress
+	if cluster.Spec.RancherKubernetesEngineConfig != nil {
+		clusterTimeout := time.Duration(cluster.Spec.RancherKubernetesEngineConfig.Services.Etcd.BackupConfig.Timeout) * time.Second
+		for _, clusterBackup := range clusterBackups {
+			backupCreationTime, err := getBackupCreatedTime(clusterBackup)
+			if err != nil {
+				logrus.Errorf("[etcd-backup] cluster [%s] backup [%s] is missing creation time: %v", cluster.Name, clusterBackup.Name, err)
+				continue
+			}
+			// cluster backup is younger than its timeout and completion is unknown
+			// therefore, it's currently running
+			if time.Since(backupCreationTime) < clusterTimeout && !rketypes.BackupConditionCompleted.IsTrue(clusterBackup) {
+				logrus.Debugf("[etcd-backup] cluster [%s] is currently creating a backup, skipping", cluster.Name)
+				return nil
+			}
+		}
+	}
+
 	newestBackup := clusterBackups[0]
 	for _, clusterBackup := range clusterBackups[1:] {
 		if getBackupCompletedTime(clusterBackup).After(getBackupCompletedTime(newestBackup)) {
@@ -465,6 +483,10 @@ func getBucketLookupType(endpoint string) minio.BucketLookupType {
 func getBackupCompletedTime(o runtime.Object) time.Time {
 	t, _ := time.Parse(time.RFC3339, rketypes.BackupConditionCompleted.GetLastUpdated(o))
 	return t
+}
+
+func getBackupCreatedTime(o runtime.Object) (time.Time, error) {
+	return time.Parse(time.RFC3339, rketypes.BackupConditionCreated.GetLastUpdated(o))
 }
 
 func getExpiredBackups(retention, intervalHours int, backups []*v3.EtcdBackup) []*v3.EtcdBackup {
