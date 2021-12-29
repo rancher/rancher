@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"path"
 	"strings"
+	"time"
 
 	"github.com/rancher/wrangler/pkg/schemas/validation"
 
@@ -29,6 +30,7 @@ func Icon(secret *corev1.Secret, repoURL string, caBundle []byte, insecureSkipTL
 	if err != nil {
 		return nil, "", err
 	}
+	client.Timeout = 500 * time.Millisecond // rewrite timeout for Icon load
 	defer client.CloseIdleConnections()
 
 	u, err := url.Parse(chart.Icon)
