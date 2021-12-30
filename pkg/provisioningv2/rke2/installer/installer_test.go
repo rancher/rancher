@@ -21,4 +21,8 @@ func TestInstaller_WindowsInstallScript(t *testing.T) {
 	a.NotNil(script)
 	a.Contains(string(script), "$env:CATTLE_TOKEN=\"test\"")
 	a.Contains(string(script), "$env:CATTLE_ROLE_NONE=true")
+	a.Contains(string(script), "$env:CATTLE_ROLE_NONE=true")
+	a.Contains(string(script), "$env:CSI_PROXY_URL")
+	a.Contains(string(script), "$env:CSI_PROXY_VERSION")
+	a.Contains(string(script), "$env:CSI_PROXY_KUBELET_PATH")
 }
