@@ -2,9 +2,9 @@ package rancher
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
+	"github.com/pkg/errors"
 	frameworkDynamic "github.com/rancher/rancher/tests/framework/clients/dynamic"
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
 	"github.com/rancher/rancher/tests/framework/clients/rancher/provisioning"
@@ -16,6 +16,7 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
 )
 
 // Client is the main rancher Client object that gives an end user access to the Provisioning and Management
@@ -108,6 +109,32 @@ func (c *Client) WithSession(session *session.Session) (*Client, error) {
 // GetRancherDynamicClient is a helper function that instantiates a dynamic client to communicate with the rancher host.
 func (c *Client) GetRancherDynamicClient() (dynamic.Interface, error) {
 	dynamic, err := frameworkDynamic.NewForConfig(c.Session, c.restConfig)
+	if err != nil {
+		return nil, err
+	}
+	return dynamic, nil
+}
+
+// GetDownStreamClusterClient is a helper function that instantiates a dynamic client to communicate with a specific cluster.
+func (c *Client) GetDownStreamClusterClient(clusterName string) (dynamic.Interface, error) {
+	cluster, err := c.Management.Cluster.ByID(clusterName)
+	if err != nil {
+		return nil, err
+	}
+
+	kubeConfig, err := c.Management.Cluster.ActionGenerateKubeconfig(cluster)
+	if err != nil {
+		return nil, err
+	}
+
+	configBytes := []byte(kubeConfig.Config)
+
+	restConfig, err := clientcmd.RESTConfigFromKubeConfig(configBytes)
+	if err != nil {
+		return nil, errors.Wrap(err, "CreateK3DCluster: failed to parse kubeconfig for k3d cluster")
+	}
+
+	dynamic, err := frameworkDynamic.NewForConfig(c.Session, restConfig)
 	if err != nil {
 		return nil, err
 	}
