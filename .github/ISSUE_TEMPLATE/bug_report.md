@@ -24,6 +24,12 @@ assignees: ''
  * Infrastructure Provider = Rancher provisioning the nodes using different node drivers (e.g. AWS, Digital Ocean, etc)
 -->
 
+**User Information**
+- What is the role of the user logged in? (Admin/Cluster Owner/Cluster Member/Project Owner/Project Member/Custom)
+  - If custom, define the set of permissions:
+
+
+   
 **Describe the bug**
 <!--A clear and concise description of what the bug is.-->
 
