@@ -97,10 +97,10 @@ require (
 	github.com/rancher/rancher/pkg/apis v0.0.0
 	github.com/rancher/rancher/pkg/client v0.0.0
 	github.com/rancher/rdns-server v0.0.0-20180802070304-bf662911db6a
-	github.com/rancher/remotedialer v0.2.6-0.20210318171128-d1ebd5202be4
+	github.com/rancher/remotedialer v0.2.6-0.20220104192242-f3837f8d649a
 	github.com/rancher/rke v1.2.14
 	github.com/rancher/security-scan v0.1.7-0.20200222041501-f7377f127168
-	github.com/rancher/steve v0.0.0-20210924211130-03e0fc00983d
+	github.com/rancher/steve v0.0.0-20220104222734-c69493b52ded
 	github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20200825145542-a04e2061be24
 	github.com/rancher/wrangler v0.7.3-0.20210331224822-5bd357588083
 	github.com/robfig/cron v1.1.0
