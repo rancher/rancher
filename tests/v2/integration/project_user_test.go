@@ -58,7 +58,7 @@ func (p *ProjectUserTestSuite) SetupSuite() {
 
 	newUser, err := users.CreateUserWithRole(client, user, "user")
 	require.NoError(p.T(), err)
-
+	newUser.Password = user.Password
 	p.testUser = newUser
 }
 
