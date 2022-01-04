@@ -258,7 +258,7 @@ func (h *handler) OnChange(obj *v3.DynamicSchema, status v3.DynamicSchemaStatus)
 			},
 			Schema: props,
 			Labels: map[string]string{
-				"cluster.x-k8s.io/v1alpha4":      "v1",
+				"cluster.x-k8s.io/v1beta1":       "v1",
 				"auth.cattle.io/cluster-indexed": "true",
 			},
 			Status: ok,
