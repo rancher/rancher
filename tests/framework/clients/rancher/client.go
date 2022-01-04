@@ -1,10 +1,15 @@
 package rancher
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"net/http"
 
 	"github.com/pkg/errors"
+	"github.com/rancher/norman/httperror"
 	frameworkDynamic "github.com/rancher/rancher/tests/framework/clients/dynamic"
 	"github.com/rancher/rancher/tests/framework/clients/rancher/catalog"
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
@@ -31,7 +36,7 @@ type Client struct {
 	Session       *session.Session
 }
 
-// NewClient is the constructor to the intializing a rancher Client. It takes a bearer token and session.Session. If bearer token is not provided,
+// NewClient is the constructor to the initializing a rancher Client. It takes a bearer token and session.Session. If bearer token is not provided,
 // the bearer token provided in the configuration file is used.
 func NewClient(bearerToken string, session *session.Session) (*Client, error) {
 	rancherConfig := new(Config)
@@ -97,13 +102,47 @@ func clientOpts(restConfig *rest.Config, rancherConfig *Config) *clientbase.Clie
 	}
 }
 
-// AsUser accepts a user object, and then creates a token for said `user`. Then it instantiates and returns a Client using the token created
-func (c *Client) AsUser(user *management.User) (*Client, error) {
-	token := &management.Token{
-		UserID: user.ID,
+// doAction is used to post an action to an endpoint, and marshal the response into the output parameter.
+func (c *Client) doAction(endpoint, action string, body []byte, output interface{}) error {
+	url := "https://" + c.restConfig.Host + endpoint + "?action=" + action
+	req, err := http.NewRequest("POST", url, bytes.NewBuffer(body))
+	if err != nil {
+		return err
 	}
 
-	returnedToken, err := c.Management.Token.Create(token)
+	req.Header.Add("Authorization", "Bearer "+c.restConfig.BearerToken)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.Management.APIBaseClient.Ops.Client.Do(req)
+	if err != nil {
+		return err
+	}
+
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 300 {
+		return httperror.NewAPIErrorLong(resp.StatusCode, resp.Status, url)
+	}
+
+	byteContent, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
+
+	if len(byteContent) > 0 {
+		err = json.Unmarshal(byteContent, output)
+		if err != nil {
+			return err
+		}
+		return nil
+	}
+	return fmt.Errorf("received empty response")
+}
+
+// AsUser accepts a user object, and then creates a token for said `user`. Then it instantiates and returns a Client using the token created.
+// This function uses the login action, and user must have a correct username and password combination.
+func (c *Client) AsUser(user *management.User) (*Client, error) {
+	returnedToken, err := c.login(user)
 	if err != nil {
 		return nil, err
 	}
@@ -112,7 +151,7 @@ func (c *Client) AsUser(user *management.User) (*Client, error) {
 }
 
 // WithSession accepts a session.Session and instantiates a new Client to reference this new session.Session. The main purpose is to use it
-// when created "sub sessions" when tracking resources created at a test case scope
+// when created "sub sessions" when tracking resources created at a test case scope.
 func (c *Client) WithSession(session *session.Session) (*Client, error) {
 	return NewClient(c.restConfig.BearerToken, session)
 }
@@ -181,4 +220,25 @@ func (c *Client) GetManagementWatchInterface(schemaType string, opts metav1.List
 	}
 
 	return dynamicClient.Resource(groupVersionResource).Watch(context.TODO(), opts)
+}
+
+// login uses the local authentication provider to authenticate a user and return the subsequent token.
+func (c *Client) login(user *management.User) (*management.Token, error) {
+	token := &management.Token{}
+	bodyContent, err := json.Marshal(struct {
+		Username string `json:"username"`
+		Password string `json:"password"`
+	}{
+		Username: user.Username,
+		Password: user.Password,
+	})
+	if err != nil {
+		return nil, err
+	}
+	err = c.doAction("/v3-public/localproviders/local", "login", bodyContent, token)
+	if err != nil {
+		return nil, err
+	}
+
+	return token, nil
 }
