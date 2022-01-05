@@ -78,7 +78,7 @@ func contains(catalogs []*v3.Catalog, c *v3.Catalog) bool {
 }
 
 func (c *CacheCleaner) cleanUpCatalogs(targetCatalogs []*v3.Catalog) error {
-	logrus.Debug("Catalog-cache running cleanUpWithTarget")
+	logrus.Debug("Catalog-cache running cleanUpCatalogs")
 	catalogCacheFiles, err := readDirNames(helmlib.CatalogCache)
 	if err != nil && !os.IsNotExist(err) {
 		return err
