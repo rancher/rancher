@@ -10,7 +10,8 @@ import (
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 )
 
-func (p *Planner) loadClusterAgent(controlPlane *rkev1.RKEControlPlane, machine *capi.Machine) ([]byte, error) {
+// generateClusterAgentManifest generates a cluster agent manifest
+func (p *Planner) generateClusterAgentManifest(controlPlane *rkev1.RKEControlPlane, machine *capi.Machine) ([]byte, error) {
 	if controlPlane.Spec.ManagementClusterName == "local" {
 		return nil, nil
 	}

@@ -1,7 +1,10 @@
 package provisioningcluster
 
 import (
+	"bytes"
+	"compress/gzip"
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -19,6 +22,7 @@ import (
 	v1 "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/pkg/gvk"
 	"github.com/rancher/wrangler/pkg/name"
+	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	apierror "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -38,6 +42,8 @@ func getInfraRef(rkeCluster *rkev1.RKECluster) *corev1.ObjectReference {
 	return infraRef
 }
 
+// objects generates the corresponding rkecontrolplanes.rke.cattle.io, clusters.cluster.x-k8s.io, and
+// machinedeployments.cluster.x-k8s.io objects based on the passed in clusters.provisioning.cattle.io object
 func objects(cluster *rancherv1.Cluster, dynamic *dynamic.Controller, dynamicSchema mgmtcontroller.DynamicSchemaCache, secrets v1.SecretCache) (result []runtime.Object, _ error) {
 	infraRef := cluster.Spec.RKEConfig.InfrastructureRef
 	if infraRef == nil {
@@ -46,7 +52,10 @@ func objects(cluster *rancherv1.Cluster, dynamic *dynamic.Controller, dynamicSch
 		result = append(result, rkeCluster)
 	}
 
-	rkeControlPlane := rkeControlPlane(cluster)
+	rkeControlPlane, err := rkeControlPlane(cluster)
+	if err != nil {
+		return nil, err
+	}
 	result = append(result, rkeControlPlane)
 
 	capiCluster := capiCluster(cluster, rkeControlPlane, infraRef)
@@ -383,13 +392,46 @@ func rkeCluster(cluster *rancherv1.Cluster) *rkev1.RKECluster {
 	}
 }
 
-func rkeControlPlane(cluster *rancherv1.Cluster) *rkev1.RKEControlPlane {
+// b64GZInterface is a function that will gzip then base64 encode the provided interface.
+func b64GZInterface(v interface{}) (string, error) {
+	var b64GZCluster string
+	marshalledCluster, err := json.Marshal(v)
+	if err != nil {
+		return "", err
+	}
+	var b bytes.Buffer
+	gz := gzip.NewWriter(&b)
+	if _, err := gz.Write(marshalledCluster); err != nil {
+		return "", err
+	}
+	if err := gz.Flush(); err != nil {
+		return "", err
+	}
+	if err := gz.Close(); err != nil {
+		return "", err
+	}
+	b64GZCluster = base64.StdEncoding.EncodeToString(b.Bytes())
+	return b64GZCluster, nil
+}
+
+// rkeControlPlane generates the rkecontrolplane object for a provided cluster object
+func rkeControlPlane(cluster *rancherv1.Cluster) (*rkev1.RKEControlPlane, error) {
+	// We need to base64/gzip encode the spec of our rancherv1.Cluster object so that we can reference it from the
+	// downstream cluster
+	b64GZCluster, err := b64GZInterface(cluster.Spec)
+	if err != nil {
+		logrus.Errorf("cluster: %s/%s : error while gz/b64 encoding cluster specification: %v", cluster.Namespace, cluster.ClusterName, err)
+		return nil, err
+	}
 	return &rkev1.RKEControlPlane{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      cluster.Name,
 			Namespace: cluster.Namespace,
 			Labels: map[string]string{
 				planner.InitNodeMachineIDLabel: cluster.Labels[planner.InitNodeMachineIDLabel],
+			},
+			Annotations: map[string]string{
+				planner.ClusterSpecAnnotation: b64GZCluster,
 			},
 		},
 		Spec: rkev1.RKEControlPlaneSpec{
@@ -398,11 +440,11 @@ func rkeControlPlane(cluster *rancherv1.Cluster) *rkev1.RKEControlPlane {
 			ETCDSnapshotRestore:      cluster.Spec.RKEConfig.ETCDSnapshotRestore.DeepCopy(),
 			ETCDSnapshotCreate:       cluster.Spec.RKEConfig.ETCDSnapshotCreate.DeepCopy(),
 			KubernetesVersion:        cluster.Spec.KubernetesVersion,
-			ManagementClusterName:    cluster.Status.ClusterName,
+			ManagementClusterName:    cluster.Status.ClusterName, // management cluster
 			AgentEnvVars:             cluster.Spec.AgentEnvVars,
-			ClusterName:              cluster.Name,
+			ClusterName:              cluster.Name, // cluster name is for the CAPI cluster
 		},
-	}
+	}, nil
 }
 
 func capiCluster(cluster *rancherv1.Cluster, rkeControlPlane *rkev1.RKEControlPlane, infraRef *corev1.ObjectReference) *capi.Cluster {

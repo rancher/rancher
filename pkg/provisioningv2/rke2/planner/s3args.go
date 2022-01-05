@@ -11,6 +11,8 @@ import (
 	"github.com/rancher/wrangler/pkg/kv"
 )
 
+// s3Args is a struct that contains functions used to generate arguments for etcd snapshots stored in S3
+// If env is set to true, it will set the AWS_SECRET_ACCESS_KEY as an environment variable rather than as an argument.
 type s3Args struct {
 	prefix      string
 	secretCache corecontrollers.SecretCache

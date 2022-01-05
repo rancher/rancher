@@ -75,5 +75,6 @@ func (h *handler) OnChange(cluster *rkev1.RKEControlPlane, status rkev1.RKEContr
 		logrus.Errorf("error in planner for '%s/%s': %v", cluster.Namespace, cluster.Name, err)
 		h.controlPlanes.EnqueueAfter(cluster.Namespace, cluster.Name, 5*time.Second)
 	}
+	logrus.Infof("rkecluster %s/%s: reconciliation complete", cluster.Namespace, cluster.Name)
 	return status, nil
 }

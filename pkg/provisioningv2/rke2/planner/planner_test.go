@@ -68,7 +68,7 @@ func TestPlanner_addInstruction(t *testing.T) {
 			machine := createTestMachine(tt.args.os)
 
 			// act
-			p, err := planner.addInstruction(plan.NodePlan{}, controlPlane, machine)
+			p, err := planner.addInstallInstructionWithRestartStamp(plan.NodePlan{}, controlPlane, machine)
 
 			// assert
 			a.Nil(err)
