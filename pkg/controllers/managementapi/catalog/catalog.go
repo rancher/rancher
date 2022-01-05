@@ -143,7 +143,7 @@ func (c *CacheCleaner) Cleanup() error {
 }
 
 func (c *CacheCleaner) CleanTarget(catalog *v3.Catalog) error {
-	logrus.Debug("Catalog-cache running cleanTarget:%v", catalog.Name)
+	logrus.Debugf("Catalog-cache running cleanTarget:%v", catalog.Name)
 	return c.cleanUpCatalogs([]*v3.Catalog{catalog})
 }
 
