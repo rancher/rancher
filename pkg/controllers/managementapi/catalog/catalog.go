@@ -106,22 +106,28 @@ func (c *CacheCleaner) cleanUpCatalogs(targetCatalogs []*v3.Catalog) error {
 	if err != nil {
 		return err
 	}
+
 	for _, catalog := range catalogs.Items {
 		allCatalogs = append(allCatalogs, &catalog)
 	}
-
 	for _, clusterCatalog := range clusterCatalogs.Items {
 		allCatalogs = append(allCatalogs, &clusterCatalog.Catalog)
 	}
-
 	for _, projectCatalog := range projectCatalogs.Items {
 		allCatalogs = append(allCatalogs, &projectCatalog.Catalog)
+	}
+
+	if len(targetCatalogs) == 0 {
+		for _, catalog := range allCatalogs {
+			catalogHashes[helmlib.CatalogSHA256Hash(catalog)] = true
+		}
 	}
 	for _, catalog := range targetCatalogs {
 		if contains(allCatalogs, catalog) {
 			catalogHashes[helmlib.CatalogSHA256Hash(catalog)] = true
 		}
 	}
+
 	var cleanupCount int
 	cleanupCount += cleanupPath(helmlib.CatalogCache, catalogCacheFiles, catalogHashes)
 	cleanupCount += cleanupPath(helmlib.IconCache, iconCacheFiles, catalogHashes)
