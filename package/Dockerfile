@@ -73,6 +73,7 @@ RUN curl -LO https://releases.rancher.com/harvester-node-driver/${DOCKER_MACHINE
 
 ENV TINI_URL_amd64=https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini \
     TINI_URL_arm64=https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini-arm64 \
+    TINI_URL_s390x=https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini-s390x \
     TINI_URL=TINI_URL_${ARCH}
 
 ENV HELM_URL_V2_amd64=https://github.com/rancher/helm/releases/download/${CATTLE_HELM_VERSION}/rancher-helm \
