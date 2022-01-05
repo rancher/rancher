@@ -84,7 +84,7 @@ type Rancher struct {
 	opts       *Options
 }
 
-func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options) (*Rancher, error) {
+func New(ctx context.Context, clientConfig clientcmd.ClientConfig, opts *Options) (*Rancher, error) {
 	var (
 		authServer *auth.Server
 	)
@@ -93,7 +93,7 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 		opts = &Options{}
 	}
 
-	restConfig, err := clientConfg.ClientConfig()
+	restConfig, err := clientConfig.ClientConfig()
 	if err != nil {
 		return nil, err
 	}
@@ -108,7 +108,7 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 		return nil, err
 	}
 
-	wranglerContext, err := wrangler.NewContext(ctx, clientConfg, restConfig)
+	wranglerContext, err := wrangler.NewContext(ctx, clientConfig, restConfig)
 	if err != nil {
 		return nil, err
 	}
