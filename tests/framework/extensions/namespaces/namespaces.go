@@ -39,10 +39,6 @@ func CreateNamespace(client *rancher.Client, namespaceName, containerDefaultReso
 	annotations["field.cattle.io/containerDefaultResourceLimit"] = containerDefaultResourceLimit
 	annotations["field.cattle.io/projectId"] = project.ID
 	namespace := &coreV1.Namespace{
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: "v1",
-			Kind:       "Namespace",
-		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        namespaceName,
 			Annotations: annotations,
