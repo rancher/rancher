@@ -7,13 +7,13 @@ import (
 	"strings"
 	"time"
 
-	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-
 	"github.com/ghodss/yaml"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
+	catalogApi "github.com/rancher/rancher/pkg/controllers/managementapi/catalog"
 	"github.com/rancher/rancher/pkg/generated/compose"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/rbac"
@@ -60,9 +60,13 @@ func (a ActionHandler) refreshCatalog(catalog *v3.Catalog) (err error) {
 		if err != nil {
 			return err
 		}
-
 		catalog.Status.LastRefreshTimestamp = time.Now().Format(time.RFC3339)
 		v32.CatalogConditionRefreshed.Unknown(catalog)
+		catalogCleaner := new(catalogApi.CacheCleaner)
+		err = catalogCleaner.CleanTarget(catalog)
+		if err == nil {
+			break
+		}
 		_, err = a.CatalogClient.Update(catalog)
 		if err == nil {
 			break

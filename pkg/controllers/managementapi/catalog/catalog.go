@@ -68,9 +68,17 @@ func (c *CacheCleaner) GoCleanupLogError() {
 	}()
 }
 
-func (c *CacheCleaner) Cleanup() error {
-	logrus.Debug("Catalog-cache running cleanup")
+func contains(catalogs []*v3.Catalog, c *v3.Catalog) bool {
+	for _, catalog := range catalogs {
+		if catalog.Name == c.Name {
+			return true
+		}
+	}
+	return false
+}
 
+func (c *CacheCleaner) cleanUpCatalogs(targetCatalogs []*v3.Catalog) error {
+	logrus.Debug("Catalog-cache running cleanUpWithTarget")
 	catalogCacheFiles, err := readDirNames(helmlib.CatalogCache)
 	if err != nil && !os.IsNotExist(err) {
 		return err
@@ -83,30 +91,37 @@ func (c *CacheCleaner) Cleanup() error {
 		return nil
 	}
 
+	var allCatalogs []*v3.Catalog
 	var catalogHashes = map[string]bool{}
 
 	catalogs, err := c.catalogClient.List(metav1.ListOptions{})
 	if err != nil {
 		return err
 	}
-	for _, catalog := range catalogs.Items {
-		catalogHashes[helmlib.CatalogSHA256Hash(&catalog)] = true
-	}
 	clusterCatalogs, err := c.clusterCatalogClient.List(metav1.ListOptions{})
 	if err != nil {
 		return err
-	}
-	for _, clusterCatalog := range clusterCatalogs.Items {
-		catalogHashes[helmlib.CatalogSHA256Hash(&clusterCatalog.Catalog)] = true
 	}
 	projectCatalogs, err := c.projectCatalogClient.List(metav1.ListOptions{})
 	if err != nil {
 		return err
 	}
-	for _, projectCatalog := range projectCatalogs.Items {
-		catalogHashes[helmlib.CatalogSHA256Hash(&projectCatalog.Catalog)] = true
+	for _, catalog := range catalogs.Items {
+		allCatalogs = append(allCatalogs, &catalog)
 	}
 
+	for _, clusterCatalog := range clusterCatalogs.Items {
+		allCatalogs = append(allCatalogs, &clusterCatalog.Catalog)
+	}
+
+	for _, projectCatalog := range projectCatalogs.Items {
+		allCatalogs = append(allCatalogs, &projectCatalog.Catalog)
+	}
+	for _, catalog := range targetCatalogs {
+		if contains(allCatalogs, catalog) {
+			catalogHashes[helmlib.CatalogSHA256Hash(catalog)] = true
+		}
+	}
 	var cleanupCount int
 	cleanupCount += cleanupPath(helmlib.CatalogCache, catalogCacheFiles, catalogHashes)
 	cleanupCount += cleanupPath(helmlib.IconCache, iconCacheFiles, catalogHashes)
@@ -114,6 +129,16 @@ func (c *CacheCleaner) Cleanup() error {
 		logrus.Infof("Catalog-cache removed %d entries from disk", cleanupCount)
 	}
 	return nil
+}
+
+func (c *CacheCleaner) Cleanup() error {
+	logrus.Debug("Catalog-cache running cleanup")
+	return c.cleanUpCatalogs(nil)
+}
+
+func (c *CacheCleaner) CleanTarget(catalog *v3.Catalog) error {
+	logrus.Debug("Catalog-cache running cleanTarget:%v", catalog.Name)
+	return c.cleanUpCatalogs([]*v3.Catalog{catalog})
 }
 
 func readDirNames(dir string) ([]string, error) {
