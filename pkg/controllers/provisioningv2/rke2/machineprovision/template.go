@@ -9,7 +9,6 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 const (
@@ -26,35 +25,50 @@ var (
 	oneThousand int64 = 1000
 )
 
-func getJobName(name string) string {
+func GetJobName(name string) string {
 	return name2.SafeConcatName(name, "machine", "provision")
 }
 
-func (h *handler) objects(ready bool, typeMeta metav1.Type, meta metav1.Object, args driverArgs, filesSecret *corev1.Secret, jobBackoffLimit int32) []runtime.Object {
-	var volumes []corev1.Volume
-	var volumeMounts []corev1.VolumeMount
-	machineGVK := schema.FromAPIVersionAndKind(typeMeta.GetAPIVersion(), typeMeta.GetKind())
-	saName := getJobName(meta.GetName())
+func objects(ready bool, args driverArgs) []runtime.Object {
 	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      args.StateSecretName,
-			Namespace: meta.GetNamespace(),
+			Namespace: args.MachineNamespace,
 		},
 		Type: "rke.cattle.io/machine-state",
 	}
 
 	if ready {
+		// If the machine is ready, then we only need the secret.
 		return []runtime.Object{secret}
 	}
 
-	if args.BootstrapOptional && args.BootstrapSecretName == "" {
-		args.BootstrapSecretName = "not-found"
+	volumes := make([]corev1.Volume, 0, 2)
+	volumeMounts := make([]corev1.VolumeMount, 0, 2)
+	saName := GetJobName(args.MachineName)
+
+	if args.BootstrapRequired {
+		volumes = append(volumes, corev1.Volume{
+			Name: "bootstrap",
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName:  args.BootstrapSecretName,
+					DefaultMode: &[]int32{0777}[0],
+				},
+			},
+		})
+
+		volumeMounts = append(volumeMounts, corev1.VolumeMount{
+			Name:      "bootstrap",
+			MountPath: "/run/secrets/machine",
+			ReadOnly:  true,
+		})
 	}
 
-	if filesSecret != nil {
-		if filesSecret.Name == "" {
-			filesSecret.Name = saName
-			filesSecret.Namespace = meta.GetNamespace()
+	if args.FilesSecret != nil {
+		if args.FilesSecret.Name == "" {
+			args.FilesSecret.Name = saName
+			args.FilesSecret.Namespace = args.MachineNamespace
 		}
 
 		volumeMounts = append(volumeMounts, corev1.VolumeMount{
@@ -63,15 +77,15 @@ func (h *handler) objects(ready bool, typeMeta metav1.Type, meta metav1.Object, 
 			MountPath: pathToMachineFiles,
 		})
 
-		keysToPaths := make([]corev1.KeyToPath, 0, len(filesSecret.Data))
-		for file := range filesSecret.Data {
+		keysToPaths := make([]corev1.KeyToPath, 0, len(args.FilesSecret.Data))
+		for file := range args.FilesSecret.Data {
 			keysToPaths = append(keysToPaths, corev1.KeyToPath{Key: file, Path: file})
 		}
 		volumes = append(volumes, corev1.Volume{
 			Name: "machine-files",
 			VolumeSource: corev1.VolumeSource{
 				Secret: &corev1.SecretVolumeSource{
-					SecretName:  filesSecret.Name,
+					SecretName:  args.FilesSecret.Name,
 					Items:       keysToPaths,
 					DefaultMode: &[]int32{0644}[0],
 				},
@@ -82,13 +96,13 @@ func (h *handler) objects(ready bool, typeMeta metav1.Type, meta metav1.Object, 
 	sa := &corev1.ServiceAccount{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      saName,
-			Namespace: meta.GetNamespace(),
+			Namespace: args.MachineNamespace,
 		},
 	}
 	role := &rbacv1.Role{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      saName,
-			Namespace: meta.GetNamespace(),
+			Namespace: args.MachineNamespace,
 		},
 		Rules: []rbacv1.PolicyRule{
 			{
@@ -102,13 +116,13 @@ func (h *handler) objects(ready bool, typeMeta metav1.Type, meta metav1.Object, 
 	rb := &rbacv1.RoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      saName,
-			Namespace: meta.GetNamespace(),
+			Namespace: args.MachineNamespace,
 		},
 		Subjects: []rbacv1.Subject{
 			{
 				Kind:      "ServiceAccount",
 				Name:      saName,
-				Namespace: meta.GetNamespace(),
+				Namespace: args.MachineNamespace,
 			},
 		},
 		RoleRef: rbacv1.RoleRef{
@@ -120,13 +134,13 @@ func (h *handler) objects(ready bool, typeMeta metav1.Type, meta metav1.Object, 
 	rb2 := &rbacv1.RoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name2.SafeConcatName(saName, "extension"),
-			Namespace: meta.GetNamespace(),
+			Namespace: args.MachineNamespace,
 		},
 		Subjects: []rbacv1.Subject{
 			{
 				Kind:      "ServiceAccount",
 				Name:      saName,
-				Namespace: meta.GetNamespace(),
+				Namespace: args.MachineNamespace,
 			},
 		},
 		RoleRef: rbacv1.RoleRef{
@@ -138,43 +152,31 @@ func (h *handler) objects(ready bool, typeMeta metav1.Type, meta metav1.Object, 
 	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      saName,
-			Namespace: meta.GetNamespace(),
+			Namespace: args.MachineNamespace,
 		},
 		Spec: batchv1.JobSpec{
-			BackoffLimit: &jobBackoffLimit,
+			BackoffLimit: &args.BackoffLimit,
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
-						InfraMachineGroup:   machineGVK.Group,
-						InfraMachineVersion: machineGVK.Version,
-						InfraMachineKind:    machineGVK.Kind,
-						InfraMachineName:    meta.GetName(),
-						InfraJobRemove:      strconv.FormatBool(args.BootstrapOptional),
+						InfraMachineGroup:   args.MachineGVK.Group,
+						InfraMachineVersion: args.MachineGVK.Version,
+						InfraMachineKind:    args.MachineGVK.Kind,
+						InfraMachineName:    args.MachineName,
+						InfraJobRemove:      strconv.FormatBool(!args.BootstrapRequired),
 					},
 				},
 				Spec: corev1.PodSpec{
-					Volumes: append(volumes, []corev1.Volume{
-						{
-							Name: "bootstrap",
-							VolumeSource: corev1.VolumeSource{
-								Secret: &corev1.SecretVolumeSource{
-									SecretName:  args.BootstrapSecretName,
-									DefaultMode: &[]int32{0777}[0],
-									Optional:    &args.BootstrapOptional,
-								},
+					Volumes: append(volumes, corev1.Volume{
+						Name: "tls-ca-additional-volume",
+						VolumeSource: corev1.VolumeSource{
+							Secret: &corev1.SecretVolumeSource{
+								SecretName:  "tls-ca-additional",
+								DefaultMode: &[]int32{0444}[0],
+								Optional:    &[]bool{true}[0],
 							},
 						},
-						{
-							Name: "tls-ca-additional-volume",
-							VolumeSource: corev1.VolumeSource{
-								Secret: &corev1.SecretVolumeSource{
-									SecretName:  "tls-ca-additional",
-									DefaultMode: &[]int32{0444}[0],
-									Optional:    &[]bool{true}[0],
-								},
-							},
-						},
-					}...),
+					}),
 					RestartPolicy: corev1.RestartPolicyNever,
 					Containers: []corev1.Container{
 						{
@@ -195,19 +197,12 @@ func (h *handler) objects(ready bool, typeMeta metav1.Type, meta metav1.Object, 
 									},
 								},
 							},
-							VolumeMounts: append(volumeMounts, []corev1.VolumeMount{
-								{
-									Name:      "bootstrap",
-									ReadOnly:  false,
-									MountPath: "/run/secrets/machine",
-								},
-								{
-									Name:      "tls-ca-additional-volume",
-									ReadOnly:  true,
-									MountPath: "/etc/ssl/certs/ca-additional.pem",
-									SubPath:   "ca-additional.pem",
-								},
-							}...),
+							VolumeMounts: append(volumeMounts, corev1.VolumeMount{
+								Name:      "tls-ca-additional-volume",
+								ReadOnly:  true,
+								MountPath: "/etc/ssl/certs/ca-additional.pem",
+								SubPath:   "ca-additional.pem",
+							}),
 						},
 					},
 					ServiceAccountName: saName,
@@ -222,7 +217,7 @@ func (h *handler) objects(ready bool, typeMeta metav1.Type, meta metav1.Object, 
 		sa,
 		role,
 		rb,
-		filesSecret,
+		args.FilesSecret,
 		rb2,
 		job,
 	}

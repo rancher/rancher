@@ -20,7 +20,7 @@ import (
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 )
 
-func TestSingleNodeAllRoles(t *testing.T) {
+func TestSingleNodeAllRolesWithDelete(t *testing.T) {
 	clients, err := clients.New()
 	if err != nil {
 		t.Fatal(err)
@@ -44,7 +44,7 @@ func TestSingleNodeAllRoles(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	c, err = cluster.WaitFor(clients, c)
+	c, err = cluster.WaitForCreate(clients, c)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -75,9 +75,20 @@ func TestSingleNodeAllRoles(t *testing.T) {
 	// This shouldn't be one, fix when node args starts returning what is from the config file
 	assert.Greater(t, len(args), 10)
 	assert.Len(t, machine.Status.Addresses, 2)
+
+	// Delete the cluster and wait for cleanup.
+	err = clients.Provisioning.Cluster().Delete(c.Namespace, c.Name, &metav1.DeleteOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	c, err = cluster.WaitForDelete(clients, c)
+	if err != nil {
+		t.Fatal(err)
+	}
 }
 
-func TestThreeNodesAllRoles(t *testing.T) {
+func TestThreeNodesAllRolesWithDelete(t *testing.T) {
 	clients, err := clients.New()
 	if err != nil {
 		t.Fatal(err)
@@ -101,13 +112,24 @@ func TestThreeNodesAllRoles(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	c, err = cluster.WaitFor(clients, c)
+	c, err = cluster.WaitForCreate(clients, c)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Delete the cluster and wait for cleanup.
+	err = clients.Provisioning.Cluster().Delete(c.Namespace, c.Name, &metav1.DeleteOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	c, err = cluster.WaitForDelete(clients, c)
 	if err != nil {
 		t.Fatal(err)
 	}
 }
 
-func TestFiveNodesUniqueRoles(t *testing.T) {
+func TestFiveNodesUniqueRolesWithDelete(t *testing.T) {
 	clients, err := clients.New()
 	if err != nil {
 		t.Fatal(err)
@@ -139,13 +161,24 @@ func TestFiveNodesUniqueRoles(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	c, err = cluster.WaitFor(clients, c)
+	c, err = cluster.WaitForCreate(clients, c)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Delete the cluster and wait for cleanup.
+	err = clients.Provisioning.Cluster().Delete(c.Namespace, c.Name, &metav1.DeleteOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	c, err = cluster.WaitForDelete(clients, c)
 	if err != nil {
 		t.Fatal(err)
 	}
 }
 
-func TestFourNodesServerAndWorkerRoles(t *testing.T) {
+func TestFourNodesServerAndWorkerRolesWithDelete(t *testing.T) {
 	t.Parallel()
 	clients, err := clients.New()
 	if err != nil {
@@ -175,7 +208,18 @@ func TestFourNodesServerAndWorkerRoles(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	c, err = cluster.WaitFor(clients, c)
+	c, err = cluster.WaitForCreate(clients, c)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Delete the cluster and wait for cleanup.
+	err = clients.Provisioning.Cluster().Delete(c.Namespace, c.Name, &metav1.DeleteOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	c, err = cluster.WaitForDelete(clients, c)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -236,7 +280,7 @@ func TestDrain(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	c, err = cluster.WaitFor(clients, c)
+	c, err = cluster.WaitForCreate(clients, c)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -298,7 +342,7 @@ func TestDrain(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	c, err = cluster.WaitFor(clients, c)
+	c, err = cluster.WaitForCreate(clients, c)
 	if err != nil {
 		t.Fatal(err)
 	}
