@@ -15,6 +15,11 @@ cleanup()
     return $EXIT
 }
 
+# skipping tests for s390x since k3s doesn't support s390x yet
+if [ ${ARCH} == s390x ]; then
+    return 0
+fi
+
 cd $(dirname $0)/..
 
 #[ "${ARCH}" == "amd64" ] && RACE=-race
