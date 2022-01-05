@@ -29,10 +29,14 @@ type ETCDSnapshotRestore struct {
 
 type ETCDSnapshot struct {
 	Name      string          `json:"name,omitempty"`
+	Location  string          `json:"location,omitempty"`
+	Metadata  string          `json:"metadata,omitempty"`
+	Message   string          `json:"message,omitempty"`
 	NodeName  string          `json:"nodeName,omitempty"`
 	CreatedAt *metav1.Time    `json:"createdAt,omitempty"`
 	Size      int64           `json:"size,omitempty"`
 	S3        *ETCDSnapshotS3 `json:"s3,omitempty"`
+	Status    string          `json:"status,omitempty"`
 }
 
 type ETCD struct {

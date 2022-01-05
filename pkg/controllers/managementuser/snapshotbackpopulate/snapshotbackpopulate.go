@@ -33,6 +33,8 @@ type handler struct {
 	clusters     provisioningcontrollers.ClusterClient
 }
 
+// Register sets up the v2provisioning snapshot backpopulate controller. This controller is responsible for monitoring
+// the downstream etcd-snapshots configmap and backpopulating snapshots to the Rancher management cluster
 func Register(ctx context.Context, userContext *config.UserContext) error {
 	h := handler{
 		clusterName:  userContext.ClusterName,
@@ -104,9 +106,13 @@ func (h *handler) configMapToSnapshots(configMap *corev1.ConfigMap) (result []rk
 		}
 		snapshot := rkev1.ETCDSnapshot{
 			Name:      file.Name,
+			Location:  file.Location,
+			Metadata:  file.Metadata,
+			Message:   file.Message,
 			NodeName:  file.NodeName,
 			CreatedAt: file.CreatedAt,
 			Size:      file.Size,
+			Status:    file.Status,
 		}
 		if file.S3 != nil {
 			snapshot.S3 = &rkev1.ETCDSnapshotS3{
@@ -139,8 +145,12 @@ type s3Config struct {
 // metadata.
 type snapshotFile struct {
 	Name      string       `json:"name"`
+	Location  string       `json:"location,omitempty"`
 	NodeName  string       `json:"nodeName,omitempty"`
+	Metadata  string       `json:"metadata,omitempty"`
+	Message   string       `json:"message,omitempty"`
 	CreatedAt *metav1.Time `json:"createdAt,omitempty"`
 	Size      int64        `json:"size,omitempty"`
+	Status    string       `json:"status,omitempty"`
 	S3        *s3Config    `json:"s3Config,omitempty"`
 }
