@@ -7,13 +7,11 @@ import (
 	"time"
 
 	"github.com/blang/semver"
-	mVersion "github.com/mcuadros/go-version"
 	"github.com/pkg/errors"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/catalog/utils"
 	"github.com/rancher/rancher/pkg/controllers/managementuserlegacy/helm/common"
 	corev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
-	managementv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	projectv3 "github.com/rancher/rancher/pkg/generated/norman/project.cattle.io/v3"
 	helmlib "github.com/rancher/rancher/pkg/helm"
@@ -52,7 +50,7 @@ type CatalogManager interface {
 	GetSystemAppCatalogID(templateVersionID, clusterName string) (string, error)
 }
 
-func New(management managementv3.Interface, project projectv3.Interface, core corev1.Interface) *Manager {
+func New(management v3.Interface, project projectv3.Interface, core corev1.Interface) *Manager {
 	var bundledMode bool
 	if strings.ToLower(settings.SystemCatalog.Get()) == "bundled" {
 		bundledMode = true
@@ -107,7 +105,7 @@ func (m *Manager) DeleteOldTemplateContent() bool {
 }
 
 func (m *Manager) DeleteBadCatalogTemplates() bool {
-	// Orphaned catalog templates and template versions may exist, remove any where the catalog does not exist
+	// Orphaned catalog templates and template versions may exist, remove anywhere the catalog does not exist
 	errs := m.deleteBadCatalogTemplates()
 	if len(errs) == 0 {
 		return true
@@ -249,8 +247,6 @@ func (m *Manager) ValidateRancherVersion(template *v3.CatalogTemplateVersion, cu
 		// be edited as long as it is not being upgraded/rollbacked to another incompatible version.
 		return nil
 	}
-	rancherMin := template.Spec.RancherMinVersion
-	rancherMax := template.Spec.RancherMaxVersion
 
 	serverVersion := settings.ServerVersion.Get()
 
@@ -259,14 +255,31 @@ func (m *Manager) ValidateRancherVersion(template *v3.CatalogTemplateVersion, cu
 		return nil
 	}
 
-	if rancherMin != "" && !mVersion.Compare(serverVersion, rancherMin, ">=") {
-		return fmt.Errorf("rancher min version not met")
+	serverVersion = strings.TrimPrefix(serverVersion, "v")
+
+	versionRange := ""
+	if template.Spec.RancherMinVersion != "" {
+		versionRange += " >=" + strings.TrimPrefix(template.Spec.RancherMinVersion, "v")
+	}
+	if template.Spec.RancherMaxVersion != "" {
+		versionRange += " <=" + strings.TrimPrefix(template.Spec.RancherMaxVersion, "v")
+	}
+	if versionRange == "" {
+		return nil
+	}
+	constraint, err := semver.ParseRange(versionRange)
+	if err != nil {
+		logrus.Errorf("failed to parse constraint for rancher version %s: %v", versionRange, err)
+		return nil
 	}
 
-	if rancherMax != "" && !mVersion.Compare(serverVersion, rancherMax, "<=") {
-		return fmt.Errorf("rancher max version exceeded")
+	rancherVersion, err := semver.Parse(serverVersion)
+	if err != nil {
+		return err
 	}
-
+	if !constraint(rancherVersion) {
+		return fmt.Errorf("incompatible rancher version [%s] for template [%s]", serverVersion, template.Name)
+	}
 	return nil
 }
 
