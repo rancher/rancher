@@ -75,7 +75,7 @@ func (c *Controller) needsReconcile(nodePool *v3.NodePool, nodes []*v3.Node) boo
 func (c *Controller) reconcile(nodePool *v3.NodePool, nodes []*v3.Node) {
 	_, qty, err := c.createOrCheckNodes(nodePool, nodes, false)
 	if err != nil {
-		logrus.Errorf("[nodepool] reconcile erorr, create or check nodes: %s", err)
+		logrus.Errorf("[nodepool] reconcile error, create or check nodes: %s", err)
 	}
 
 	if qty != nodePool.Spec.Quantity {

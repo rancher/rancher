@@ -349,3 +349,54 @@ func TestDrain(t *testing.T) {
 
 	assert.Equal(t, int32(2), atomic.LoadInt32(&doneHooks))
 }
+
+func TestDrainNoDelete(t *testing.T) {
+	clients, err := clients.New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer clients.Close()
+
+	c, err := cluster.New(clients, &provisioningv1api.Cluster{
+		Spec: provisioningv1api.ClusterSpec{
+			KubernetesVersion: defaults.SomeK8sVersion,
+			RKEConfig: &provisioningv1api.RKEConfig{
+				MachinePools: []provisioningv1api.RKEMachinePool{
+					{
+						EtcdRole:          true,
+						ControlPlaneRole:  true,
+						Quantity:          &defaults.One,
+						DrainBeforeDelete: false,
+					},
+					{
+						WorkerRole:        true,
+						Quantity:          &defaults.One,
+						DrainBeforeDelete: true,
+					},
+				},
+			},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	c, err = cluster.WaitForCreate(clients, c)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	machines, err := cluster.Machines(clients, c)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Equal(t, len(machines.Items), 2)
+
+	excludeNodeDraining, ok := machines.Items[0].Annotations[capi.ExcludeNodeDrainingAnnotation]
+	assert.True(t, ok)
+	assert.Equal(t, excludeNodeDraining, "true")
+
+	_, ok = machines.Items[1].Annotations[capi.ExcludeNodeDrainingAnnotation]
+	assert.False(t, ok)
+}
