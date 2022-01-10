@@ -758,9 +758,15 @@ func (m *nodesSyncer) convertNodeToMachine(node *corev1.Node, existing *v3.Node)
 	for name, quantity := range limits {
 		machine.Status.Limits[name] = quantity
 	}
-	machine.Status.NodeLabels = node.Labels
+	machine.Status.NodeLabels = make(map[string]string)
+	for k, v := range node.Labels {
+		machine.Status.NodeLabels[k] = v
+	}
 	determineNodeRoles(machine)
-	machine.Status.NodeAnnotations = node.Annotations
+	machine.Status.NodeAnnotations = make(map[string]string)
+	for k, v := range node.Annotations {
+		machine.Status.NodeAnnotations[k] = v
+	}
 	machine.Status.NodeName = node.Name
 	machine.APIVersion = "management.cattle.io/v3"
 	machine.Kind = "Node"
