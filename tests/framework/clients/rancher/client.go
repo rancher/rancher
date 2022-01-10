@@ -133,7 +133,7 @@ func (c *Client) GetDownStreamClusterClient(clusterName string) (dynamic.Interfa
 
 	restConfig, err := clientcmd.RESTConfigFromKubeConfig(configBytes)
 	if err != nil {
-		return nil, errors.Wrap(err, "CreateK3DCluster: failed to parse kubeconfig for k3d cluster")
+		return nil, errors.Wrap(err, "GetDownStreamClusterClient: failed to parse kubeconfig for a k8s client")
 	}
 
 	dynamic, err := frameworkDynamic.NewForConfig(c.Session, restConfig)

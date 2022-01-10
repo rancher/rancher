@@ -17,7 +17,7 @@ var SecretGroupVersionResource = schema.GroupVersionResource{
 	Resource: "secrets",
 }
 
-// CreateSecret is a helper function that uses the dynamic client to create a secreton a namespace for a specific cluster.
+// CreateSecret is a helper function that uses the dynamic client to create a secret on a namespace for a specific cluster.
 // It registers a delete fuction.
 func CreateSecret(client *rancher.Client, secret *coreV1.Secret, clusterName, namespace string) (*coreV1.Secret, error) {
 	dynamicClient, err := client.GetDownStreamClusterClient(clusterName)
