@@ -6,9 +6,9 @@ if [ ! -e /run/secrets/kubernetes.io/serviceaccount ] && [ ! -e /dev/kmsg ]; the
     exit 1
 fi
 rm -f /var/lib/rancher/k3s/server/cred/node-passwd
-if [ -e /var/lib/rancher/etcd ] && [ ! -e /var/lib/rancher/k3s/server/db/etcd ]; then
+if [ -e /var/lib/rancher/management-state/etcd ] && [ ! -e /var/lib/rancher/k3s/server/db/etcd ]; then
   mkdir -p /var/lib/rancher/k3s/server/db
-  ln -sf /var/lib/rancher/etcd /var/lib/rancher/k3s/server/db/etcd
+  ln -sf /var/lib/rancher/management-state/etcd /var/lib/rancher/k3s/server/db/etcd
   echo -n 'default' > /var/lib/rancher/k3s/server/db/etcd/name
 fi
 if [ -e /var/lib/rancher/k3s/server/db/etcd ]; then
