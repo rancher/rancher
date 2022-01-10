@@ -105,14 +105,6 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 		addRule().apiGroups("management.cattle.io").resources("cisconfigs").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("cisbenchmarkversions").verbs("get", "list", "watch")
 
-	restrictedAdminRole := addUserRules(rb.addRole("Restricted Admin", "restricted-admin"))
-	restrictedAdminRole.
-		addRule().apiGroups("management.cattle.io").resources("clustertemplates").verbs("*").
-		addRule().apiGroups("management.cattle.io").resources("globalroles", "globalrolebindings").verbs("*").
-		addRule().apiGroups("management.cattle.io").resources("users", "userattribute", "groups", "groupmembers").verbs("*").
-		addRule().apiGroups("management.cattle.io").resources("podsecuritypolicytemplates").verbs("*").
-		addRule().apiGroups("management.cattle.io").resources("fleetworkspaces").verbs("*")
-
 	rb.addRole("User Base", "user-base").
 		addRule().apiGroups("management.cattle.io").resources("preferences").verbs("*").
 		addRule().apiGroups("management.cattle.io").resources("settings").verbs("get", "list", "watch").
@@ -424,31 +416,6 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 	}
 
 	return adminName, nil
-}
-
-func addUserRules(role *roleBuilder) *roleBuilder {
-	role.
-		addRule().apiGroups("management.cattle.io").resources("principals", "roletemplates").verbs("get", "list", "watch").
-		addRule().apiGroups("management.cattle.io").resources("preferences").verbs("*").
-		addRule().apiGroups("management.cattle.io").resources("settings").verbs("get", "list", "watch").
-		addRule().apiGroups("management.cattle.io").resources("features").verbs("get", "list", "watch").
-		addRule().apiGroups("management.cattle.io").resources("templates", "templateversions", "catalogs").verbs("get", "list", "watch").
-		addRule().apiGroups("management.cattle.io").resources("clusters").verbs("create").
-		addRule().apiGroups("management.cattle.io").resources("nodedrivers").verbs("get", "list", "watch").
-		addRule().apiGroups("management.cattle.io").resources("kontainerdrivers").verbs("get", "list", "watch").
-		addRule().apiGroups("management.cattle.io").resources("nodetemplates").verbs("create").
-		addRule().apiGroups("management.cattle.io").resources("fleetworkspaces").verbs("create").
-		addRule().apiGroups("").resources("secrets").verbs("create").
-		addRule().apiGroups("management.cattle.io").resources("multiclusterapps", "globaldnses", "globaldnsproviders", "clustertemplaterevisions").verbs("create").
-		addRule().apiGroups("project.cattle.io").resources("sourcecodecredentials").verbs("*").
-		addRule().apiGroups("project.cattle.io").resources("sourcecoderepositories").verbs("*").
-		addRule().apiGroups("management.cattle.io").resources("rkek8ssystemimages").verbs("get", "list", "watch").
-		addRule().apiGroups("management.cattle.io").resources("rkek8sserviceoptions").verbs("get", "list", "watch").
-		addRule().apiGroups("management.cattle.io").resources("rkeaddons").verbs("get", "list", "watch").
-		addRule().apiGroups("management.cattle.io").resources("cisconfigs").verbs("get", "list", "watch").
-		addRule().apiGroups("management.cattle.io").resources("cisbenchmarkversions").verbs("get", "list", "watch")
-
-	return role
 }
 
 // bootstrapAdmin checks if the bootstrapAdminConfig exists, if it does this indicates rancher has
