@@ -62,6 +62,7 @@ func (h *handler) getArgsEnvAndStatus(infraObj *infraObject, args map[string]int
 	var (
 		url, hash, cloudCredentialSecretName string
 		jobBackoffLimit                      int32
+		filesSecret                          *corev1.Secret
 	)
 
 	nd, err := h.nodeDriverCache.Get(driver)
@@ -125,6 +126,9 @@ func (h *handler) getArgsEnvAndStatus(infraObj *infraObject, args map[string]int
 		if err != nil {
 			return driverArgs{}, err
 		}
+		// The files secret must be constructed before toArgs is called because
+		// constructFilesSecret replaces file contents and creates a secret to be passed as a volume.
+		filesSecret = constructFilesSecret(driver, args)
 		cmd = append(cmd, toArgs(driver, args, rancherCluster.Status.ClusterName)...)
 	} else {
 		cmd = append(cmd, "rm", "-y")
@@ -143,7 +147,7 @@ func (h *handler) getArgsEnvAndStatus(infraObj *infraObject, args map[string]int
 		ImageName:           settings.PrefixPrivateRegistry(settings.MachineProvisionImage.Get()),
 		ImagePullPolicy:     corev1.PullAlways,
 		EnvSecret:           envSecret,
-		FilesSecret:         constructFilesSecret(driver, args),
+		FilesSecret:         filesSecret,
 		StateSecretName:     secretName,
 		BootstrapSecretName: bootstrapName,
 		BootstrapRequired:   create,
