@@ -566,6 +566,7 @@ node:
 steps:
 - name: build
   image: rancher/dapper:v0.5.8
+  failure: ignore
   commands:
   - dapper ci
   privileged: true
@@ -580,6 +581,7 @@ steps:
 
 - name: stage-binaries
   image: rancher/dapper:v0.5.8
+  failure: ignore
   commands:
   - "cp -r ./bin/* ./package/"
   when:
@@ -589,6 +591,7 @@ steps:
 
 - name: docker-publish-head
   image: rancher/drone-docker-image-digests:v0.0.13
+  failure: ignore
   volumes:
   - name: docker
     path: /var/run/docker.sock
@@ -616,6 +619,7 @@ steps:
 
 - name: docker-publish-head-installer
   image: rancher/drone-images:docker-s390x
+  failure: ignore
   volumes:
     - name: docker
       path: /var/run/docker.sock
@@ -644,6 +648,7 @@ steps:
 
 - name: docker-publish-head-agent
   image: rancher/drone-images:docker-s390x
+  failure: ignore
   volumes:
     - name: docker
       path: /var/run/docker.sock
@@ -672,6 +677,7 @@ steps:
 
 - name: docker-publish
   image: rancher/drone-images:docker-s390x
+  failure: ignore
   volumes:
     - name: docker
       path: /var/run/docker.sock
@@ -695,6 +701,7 @@ steps:
 
 - name: docker-publish-installer
   image: rancher/drone-images:docker-s390x
+  failure: ignore
   volumes:
     - name: docker
       path: /var/run/docker.sock
@@ -719,6 +726,7 @@ steps:
 
 - name: docker-publish-agent
   image: rancher/drone-images:docker-s390x
+  failure: ignore
   volumes:
     - name: docker
       path: /var/run/docker.sock
@@ -1128,6 +1136,7 @@ steps:
     password:
       from_secret: docker_password
     spec: manifest-installer.tmpl
+    ignore_missing: true
   when:
     instance:
       include:
@@ -1144,6 +1153,7 @@ steps:
     password:
       from_secret: docker_password
     spec: manifest-installer-head.tmpl
+    ignore_missing: true
   when:
     instance:
       include:
@@ -1159,6 +1169,7 @@ steps:
     password:
       from_secret: docker_password
     spec: manifest-agent.tmpl
+    ignore_missing: true
   when:
     instance:
       include:
@@ -1175,6 +1186,7 @@ steps:
     password:
       from_secret: docker_password
     spec: manifest-agent-head.tmpl
+    ignore_missing: true
   when:
     instance:
       include:
@@ -1190,6 +1202,7 @@ steps:
     password:
       from_secret: docker_password
     spec: manifest-head.tmpl
+    ignore_missing: true
   when:
     instance:
       include:
@@ -1205,6 +1218,7 @@ steps:
     password:
       from_secret: docker_password
     spec: manifest.tmpl
+    ignore_missing: true
   when:
     instance:
       include:
@@ -1372,6 +1386,7 @@ node:
 steps:
 - name: docker-image-digests
   image: rancher/drone-docker-digests:s390x
+  failure: ignore
   environment:
     PLUGIN_GITHUB_REPOSITORY: "rancher/rancher"
     PLUGIN_GITHUB_TOKEN:
