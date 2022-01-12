@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"reflect"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -287,6 +288,12 @@ func loadDataFromTemplate(clusterTemplateRevision *v3.ClusterTemplateRevision, c
 
 	defaultedAnswers := make(map[string]string)
 
+	// The key in the map is used to preserve the order of registries
+	registryMap := make(map[int]map[string]interface{})
+	existingRegistries := convert.ToMapSlice(convert.ToMapInterface(existingCluster[managementv3.ClusterSpecFieldRancherKubernetesEngineConfig])[managementv3.RancherKubernetesEngineConfigFieldPrivateRegistries])
+	for i, registry := range existingRegistries {
+		registryMap[i] = registry
+	}
 	for _, question := range clusterTemplateRevision.Spec.Questions {
 		answer, ok := allAnswers[question.Variable]
 		if !ok {
@@ -306,13 +313,37 @@ func loadDataFromTemplate(clusterTemplateRevision *v3.ClusterTemplateRevision, c
 			return nil, httperror.WrapAPIError(err, httperror.ServerError, "Error processing clusterTemplate answers")
 		}
 		keyParts := strings.Split(question.Variable, ".")
-		values.PutValue(dataFromTemplate, val, keyParts...)
+		if strings.HasPrefix(question.Variable, "rancherKubernetesEngineConfig.privateRegistries") {
+			// for example: question.Variable = rancherKubernetesEngineConfig.privateRegistries[0].url
+			index, err := getIndexFromQuestion(question.Variable)
+			if err != nil {
+				return nil, httperror.WrapAPIError(err, httperror.ServerError, "Error processing clusterTemplate answers to private registry")
+			}
+			key := keyParts[len(keyParts)-1]
+			if _, ok := registryMap[index]; ok {
+				registryMap[index][key] = val
+			} else {
+				registryMap[index] = map[string]interface{}{
+					key: val,
+				}
+			}
+		} else {
+			values.PutValue(dataFromTemplate, val, keyParts...)
+		}
 
 		questionMap, err := convert.EncodeToMap(question)
 		if err != nil {
 			return nil, httperror.WrapAPIError(err, httperror.ServerError, "Error reading clusterTemplate questions")
 		}
 		revisionQuestions = append(revisionQuestions, questionMap)
+	}
+	if len(registryMap) > 0 {
+		registries, err := convertRegistryMapToSliceInOrder(registryMap)
+		if err != nil {
+			return nil, httperror.WrapAPIError(err, httperror.ServerError, "Error processing clusterTemplate answers to private registry")
+		}
+		// save privateRegistries back to rancherKubernetesEngineConfig
+		values.PutValue(dataFromTemplate, registries, managementv3.ClusterSpecFieldRancherKubernetesEngineConfig, managementv3.RancherKubernetesEngineConfigFieldPrivateRegistries)
 	}
 	//save defaultAnswers to answer
 	if allAnswers == nil {
@@ -352,6 +383,35 @@ func loadDataFromTemplate(clusterTemplateRevision *v3.ClusterTemplateRevision, c
 	}
 
 	return dataFromTemplate, nil
+}
+
+func convertRegistryMapToSliceInOrder(registryMap map[int]map[string]interface{}) ([]map[string]interface{}, error) {
+	size := len(registryMap)
+	registries := make([]map[string]interface{}, size)
+	for k, v := range registryMap {
+		if k >= size {
+			return nil, fmt.Errorf("the index %d is out of the bound of the registry list (size of %d)", k, size)
+		}
+		registries[k] = v
+		registries[k][managementv3.PrivateRegistryFieldIsDefault] = false
+	}
+	// set the first registry in the list as the default registry if it exists
+	if len(registries) > 0 {
+		registries[0][managementv3.PrivateRegistryFieldIsDefault] = true
+	}
+	return registries, nil
+}
+
+func getIndexFromQuestion(question string) (int, error) {
+	re, err := regexp.Compile(`\[\d+\]`)
+	if err != nil {
+		return 0, err
+	}
+	target := re.FindString(question)
+	if target == "" {
+		return 0, fmt.Errorf("cannot get index from the question: %s", question)
+	}
+	return strconv.Atoi(target[1 : len(target)-1])
 }
 
 func hasTemplate(data map[string]interface{}) bool {
