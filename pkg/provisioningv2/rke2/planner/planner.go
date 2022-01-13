@@ -426,11 +426,11 @@ func (p *Planner) reconcile(controlPlane *rkev1.RKEControlPlane, secret plan.Sec
 		} else if !equality.Semantic.DeepEqual(entry.Plan.Plan, plan) {
 			outOfSync = append(outOfSync, entry.Machine.Name)
 			// Conditions
-			// 1. If plan is not in sync then there is no harm in updating it to something else because
-			//    the node will have already been considered unavailable.
+			// 1. If the node is already draining then the plan is out of sync.  There is no harm in updating it if
+			// the node is currently drained.
 			// 2. concurrency == 0 which means infinite concurrency.
 			// 3. unavailable < concurrency meaning we have capacity to make something unavailable
-			if isUnavailable(entry) || concurrency == 0 || unavailable < concurrency {
+			if isInDrain(entry.Machine) || concurrency == 0 || unavailable < concurrency {
 				if !isUnavailable(entry) {
 					unavailable++
 				}
