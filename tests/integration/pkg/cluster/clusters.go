@@ -75,7 +75,16 @@ func New(clients *clients.Clients, cluster *provisioningv1api.Cluster) (*provisi
 		}
 	}
 
-	return clients.Provisioning.Cluster().Create(cluster)
+	c, err := clients.Provisioning.Cluster().Create(cluster)
+	if err != nil {
+		return nil, err
+	}
+
+	clients.OnClose(func() {
+		clients.Provisioning.Cluster().Delete(c.Namespace, c.Name, &metav1.DeleteOptions{})
+	})
+
+	return c, nil
 }
 
 func Machines(clients *clients.Clients, cluster *provisioningv1api.Cluster) (*capi.MachineList, error) {
