@@ -410,7 +410,7 @@ steps:
     pull: always
     image: rancher/dapper:v0.5.4
     commands:
-      - dapper.exe -f Dockerfile-windows.dapper -d ci
+      - dapper.exe -f Dockerfile-windows-1809.dapper -d ci
     volumes:
       - name: docker_pipe
         path: \\\\.\\pipe\\docker_engine
@@ -529,7 +529,7 @@ steps:
     pull: always
     image: rancher/dapper:v0.5.4
     commands:
-      - dapper.exe -f Dockerfile-windows.dapper -d ci
+      - dapper.exe -f Dockerfile-windows-2004.dapper -d ci
     volumes:
       - name: docker_pipe
         path: \\\\.\\pipe\\docker_engine
@@ -647,7 +647,7 @@ steps:
     pull: always
     image: rancher/dapper:v0.5.4
     commands:
-      - dapper.exe -f Dockerfile-windows.dapper -d ci
+      - dapper.exe -f Dockerfile-windows-20H2.dapper -d ci
     volumes:
       - name: docker_pipe
         path: \\\\.\\pipe\\docker_engine
