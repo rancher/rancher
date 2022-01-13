@@ -167,8 +167,8 @@ type clusterLifecycle struct {
 }
 
 func (l *clusterLifecycle) sync(key string, orig *v3.Cluster) (runtime.Object, error) {
-	if orig == nil {
-		return nil, nil
+	if orig == nil || !orig.DeletionTimestamp.IsZero() {
+		return orig, nil
 	}
 
 	obj := orig.DeepCopyObject()
