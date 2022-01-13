@@ -3,12 +3,23 @@ set -e
 
 cd $(dirname $0)/..
 
+if [ -z "${DIST}" ]; then
+  DIST=k3s
+  AIRGAP=-airgap
+else
+  LINUX=.linux
+fi
+export DIST=${DIST}
+
 eval "$(grep '^ENV CATTLE_SYSTEM_AGENT' package/Dockerfile | awk '{print "export " $2 "=" $3}')"
+eval "$(grep '^ENV CATTLE_KDM_BRANCH' package/Dockerfile | awk '{print "export " $2 "=" $3}')"
+export SOME_K8S_VERSION=$(curl https://raw.githubusercontent.com/rancher/kontainer-driver-metadata/$CATTLE_KDM_BRANCH/data/data.json | jq -r ".$DIST.channels[0].latest")
 
 echo Starting rancher server
-mkdir -p /var/lib/rancher/k3s/agent/images
-grep PodTestImage ./tests/integration/pkg/defaults/defaults.go | cut -f2 -d'"' > /var/lib/rancher/k3s/agent/images/pull.txt
-grep MachineProvisionImage ./pkg/settings/setting.go | cut -f4 -d'"' >> /var/lib/rancher/k3s/agent/images/pull.txt
+mkdir -p /var/lib/rancher/$DIST/agent/images
+grep PodTestImage ./tests/integration/pkg/defaults/defaults.go | cut -f2 -d'"' > /var/lib/rancher/$DIST/agent/images/pull.txt
+grep MachineProvisionImage ./pkg/settings/setting.go | cut -f4 -d'"' >> /var/lib/rancher/$DIST/agent/images/pull.txt
+curl -sLf https://github.com/rancher/$DIST/releases/download/$SOME_K8S_VERSION/$DIST$AIRGAP-images$LINUX-amd64.tar.zst -o /var/lib/rancher/$DIST/agent/images/$DIST$AIRGAP-images$LINUX-amd64.tar.zst
 touch /tmp/rancher.log
 mkdir -p /usr/share/rancher/ui/assets
 curl -sLf https://github.com/rancher/system-agent/releases/download/${CATTLE_SYSTEM_AGENT_VERSION}/rancher-system-agent-amd64 -o /usr/share/rancher/ui/assets/rancher-system-agent-amd64

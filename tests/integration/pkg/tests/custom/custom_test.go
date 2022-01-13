@@ -39,6 +39,9 @@ func TestCustomOneNode(t *testing.T) {
 	defer clients.Close()
 
 	c, err := cluster.New(clients, &provisioningv1.Cluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-custom-one-node",
+		},
 		Spec: provisioningv1.ClusterSpec{
 			RKEConfig: &provisioningv1.RKEConfig{},
 		},
@@ -91,6 +94,9 @@ func TestCustomThreeNode(t *testing.T) {
 	defer clients.Close()
 
 	c, err := cluster.New(clients, &provisioningv1.Cluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-custom-three-node",
+		},
 		Spec: provisioningv1.ClusterSpec{
 			RKEConfig: &provisioningv1.RKEConfig{},
 		},
@@ -146,6 +152,9 @@ func TestCustomUniqueRoles(t *testing.T) {
 	defer clients.Close()
 
 	c, err := cluster.New(clients, &provisioningv1.Cluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-custom-unique-roles",
+		},
 		Spec: provisioningv1.ClusterSpec{
 			RKEConfig: &provisioningv1.RKEConfig{},
 		},
@@ -221,6 +230,9 @@ func TestCustomThreeNodeWithTaints(t *testing.T) {
 	defer clients.Close()
 
 	c, err := cluster.New(clients, &provisioningv1.Cluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-custom-three-node-with-taints",
+		},
 		Spec: provisioningv1.ClusterSpec{
 			RKEConfig: &provisioningv1.RKEConfig{},
 		},
