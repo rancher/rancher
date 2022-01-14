@@ -127,19 +127,21 @@ func forceSystemAndDefaultProjectCreation(configMapController controllerv1.Confi
 		return nil
 	}
 
-	localCluster, err := clusterClient.Get("local", metav1.GetOptions{})
-	if err != nil {
-		if k8serror.IsNotFound(err) {
-			return nil
+	if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		localCluster, err := clusterClient.Get("local", metav1.GetOptions{})
+		if err != nil {
+			if k8serror.IsNotFound(err) {
+				return nil
+			}
+			return err
 		}
+
+		v32.ClusterConditionconditionDefaultProjectCreated.Unknown(localCluster)
+		v32.ClusterConditionconditionSystemProjectCreated.Unknown(localCluster)
+
+		_, err = clusterClient.Update(localCluster)
 		return err
-	}
-
-	v32.ClusterConditionconditionDefaultProjectCreated.Unknown(localCluster)
-	v32.ClusterConditionconditionSystemProjectCreated.Unknown(localCluster)
-
-	_, err = clusterClient.Update(localCluster)
-	if err != nil {
+	}); err != nil {
 		return err
 	}
 
@@ -242,23 +244,29 @@ func addWebhookConfigToCAPICRDs(crdClient controllerapiextv1.CustomResourceDefin
 		if crd.Spec.Group != "cluster.x-k8s.io" || (crd.Spec.Conversion != nil && crd.Spec.Conversion.Strategy != apiextv1.NoneConverter) {
 			continue
 		}
+		if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+			latestCrd, err := crdClient.Get(crd.Name, metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
 
-		crd.Spec.Conversion = &apiextv1.CustomResourceConversion{
-			Strategy: apiextv1.WebhookConverter,
-			Webhook: &apiextv1.WebhookConversion{
-				ClientConfig: &apiextv1.WebhookClientConfig{
-					Service: &apiextv1.ServiceReference{
-						Namespace: "cattle-system",
-						Name:      "webhook-service",
-						Path:      &[]string{"/convert"}[0],
-						Port:      &[]int32{443}[0],
+			latestCrd.Spec.Conversion = &apiextv1.CustomResourceConversion{
+				Strategy: apiextv1.WebhookConverter,
+				Webhook: &apiextv1.WebhookConversion{
+					ClientConfig: &apiextv1.WebhookClientConfig{
+						Service: &apiextv1.ServiceReference{
+							Namespace: "cattle-system",
+							Name:      "webhook-service",
+							Path:      &[]string{"/convert"}[0],
+							Port:      &[]int32{443}[0],
+						},
 					},
+					ConversionReviewVersions: []string{"v1", "v1beta1"},
 				},
-				ConversionReviewVersions: []string{"v1", "v1beta1"},
-			},
-		}
-		_, err = crdClient.Update(&crd)
-		if err != nil {
+			}
+			_, err = crdClient.Update(&crd)
+			return err
+		}); err != nil {
 			return err
 		}
 	}
