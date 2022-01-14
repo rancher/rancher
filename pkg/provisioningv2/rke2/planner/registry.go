@@ -8,7 +8,6 @@ import (
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
 	"github.com/rancher/rancher/pkg/provisioningv2/rke2/runtime"
-	v1 "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
 	corev1 "k8s.io/api/core/v1"
 )
 
@@ -18,7 +17,7 @@ func (p *Planner) addRegistryConfig(config map[string]interface{}, controlPlane 
 		return nil, nil
 	}
 
-	registryConfig, files, err := toRegistryConfig(p.secretCache, runtime.GetRuntime(controlPlane.Spec.KubernetesVersion), controlPlane.Namespace, registry)
+	registryConfig, files, err := p.toRegistryConfig(runtime.GetRuntime(controlPlane.Spec.KubernetesVersion), controlPlane.Namespace, registry)
 	if err != nil {
 		return nil, err
 	}
@@ -27,7 +26,7 @@ func (p *Planner) addRegistryConfig(config map[string]interface{}, controlPlane 
 	return files, nil
 }
 
-func toRegistryConfig(secrets v1.SecretCache, runtime, namespace string, registry *rkev1.Registry) ([]byte, []plan.File, error) {
+func (p *Planner) toRegistryConfig(runtime, namespace string, registry *rkev1.Registry) ([]byte, []plan.File, error) {
 	var (
 		files   []plan.File
 		configs = map[string]interface{}{}
@@ -42,7 +41,7 @@ func toRegistryConfig(secrets v1.SecretCache, runtime, namespace string, registr
 		}
 
 		if config.TLSSecretName != "" {
-			secret, err := secrets.Get(namespace, config.TLSSecretName)
+			secret, err := p.secretCache.Get(namespace, config.TLSSecretName)
 			if err != nil {
 				return nil, nil, err
 			}
@@ -70,7 +69,7 @@ func toRegistryConfig(secrets v1.SecretCache, runtime, namespace string, registr
 		}
 
 		if config.AuthConfigSecretName != "" {
-			secret, err := secrets.Get(namespace, config.AuthConfigSecretName)
+			secret, err := p.secretCache.Get(namespace, config.AuthConfigSecretName)
 			if err != nil {
 				return nil, nil, err
 			}
