@@ -1,6 +1,8 @@
 package machineprovisioning
 
 import (
+	"os"
+	"strings"
 	"sync/atomic"
 	"testing"
 
@@ -136,6 +138,9 @@ func TestThreeNodesAllRolesWithDelete(t *testing.T) {
 }
 
 func TestFiveNodesUniqueRolesWithDelete(t *testing.T) {
+	if strings.ToLower(os.Getenv("DIST")) == "rke2" {
+		t.Skip()
+	}
 	clients, err := clients.New()
 	if err != nil {
 		t.Fatal(err)
@@ -188,6 +193,9 @@ func TestFiveNodesUniqueRolesWithDelete(t *testing.T) {
 }
 
 func TestFourNodesServerAndWorkerRolesWithDelete(t *testing.T) {
+	if strings.ToLower(os.Getenv("DIST")) == "rke2" {
+		t.Skip()
+	}
 	t.Parallel()
 	clients, err := clients.New()
 	if err != nil {
