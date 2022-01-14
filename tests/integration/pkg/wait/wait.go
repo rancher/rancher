@@ -49,6 +49,10 @@ func doWatch(ctx context.Context, watchFunc watchFunc, cb func(obj runtime.Objec
 			case watch.Added, watch.Modified, watch.Deleted:
 				done, err := cb(event.Object)
 				if err != nil || done {
+					if apierrors.IsConflict(err) {
+						// if we got a conflict, return a false (not done) and nil for error
+						return false, nil
+					}
 					return true, err
 				}
 			}
