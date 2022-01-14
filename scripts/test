@@ -40,6 +40,10 @@ run_rancher()
               echo Rancher died after tests started, aborting
               exit 1
             fi
+            set +e
+            echo Attempting to kill K3s
+            pkill -e k3s
+            set -e
             PID=-1
             sleep 5
         fi
