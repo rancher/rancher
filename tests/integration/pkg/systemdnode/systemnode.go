@@ -44,14 +44,44 @@ func New(clients *clients.Clients, namespace, script string) (*corev1.Pod, error
 					},
 				},
 				{
-					Name: "system-images",
+					Name: "image-assets",
 					VolumeSource: corev1.VolumeSource{
 						HostPath: &corev1.HostPathVolumeSource{
-							Path: imagesPath,
+							Path: "/image-assets",
 						},
 					},
 				},
+				{
+					Name: "agent-images",
+					VolumeSource: corev1.VolumeSource{
+						EmptyDir: &corev1.EmptyDirVolumeSource{},
+					},
+				},
 			},
+			InitContainers: []corev1.Container{{
+				Name:  "copy-image-assets",
+				Image: defaults.PodTestImage,
+				SecurityContext: &corev1.SecurityContext{
+					Privileged: &[]bool{true}[0],
+				},
+				Command: []string{
+					"/bin/sh",
+				},
+				Args: []string{
+					"-c",
+					"cp -rf /image-assets/* /image-assets-destination",
+				},
+				VolumeMounts: []corev1.VolumeMount{
+					{
+						Name:      "image-assets",
+						MountPath: "/image-assets",
+					},
+					{
+						Name:      "agent-images",
+						MountPath: "/image-assets-destination",
+					},
+				},
+			}},
 			Containers: []corev1.Container{{
 				Name:  "container",
 				Image: defaults.PodTestImage,
@@ -68,7 +98,7 @@ func New(clients *clients.Clients, namespace, script string) (*corev1.Pod, error
 						SubPath:   "user-data",
 					},
 					{
-						Name:      "system-images",
+						Name:      "agent-images",
 						MountPath: imagesPath,
 					},
 				},
