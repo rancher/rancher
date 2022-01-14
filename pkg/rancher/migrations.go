@@ -125,19 +125,21 @@ func forceSystemAndDefaultProjectCreation(configMapController controllerv1.Confi
 		return nil
 	}
 
-	localCluster, err := clusterClient.Get("local", metav1.GetOptions{})
-	if err != nil {
-		if k8serror.IsNotFound(err) {
-			return nil
+	if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		localCluster, err := clusterClient.Get("local", metav1.GetOptions{})
+		if err != nil {
+			if k8serror.IsNotFound(err) {
+				return nil
+			}
+			return err
 		}
+
+		v32.ClusterConditionconditionDefaultProjectCreated.Unknown(localCluster)
+		v32.ClusterConditionconditionSystemProjectCreated.Unknown(localCluster)
+
+		_, err = clusterClient.Update(localCluster)
 		return err
-	}
-
-	v32.ClusterConditionconditionDefaultProjectCreated.Unknown(localCluster)
-	v32.ClusterConditionconditionSystemProjectCreated.Unknown(localCluster)
-
-	_, err = clusterClient.Update(localCluster)
-	if err != nil {
+	}); err != nil {
 		return err
 	}
 
