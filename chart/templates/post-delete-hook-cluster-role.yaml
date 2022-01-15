@@ -32,7 +32,7 @@ rules:
     verbs: [ "get", "list", "delete" ]
   - apiGroups: [ "policy" ]
     resources: [ "podsecuritypolicies" ]
-    verbs: [ "use", "delete" ]
+    verbs: [ "use", "delete", "create" ]
   - apiGroups: [ "networking.k8s.io" ]
     resources: [ "ingresses" ]
     verbs: [ "delete" ]
