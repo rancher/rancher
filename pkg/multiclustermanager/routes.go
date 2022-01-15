@@ -93,8 +93,11 @@ func router(ctx context.Context, localClusterEnabled bool, tunnelAuthorizer *mcm
 	// Authenticated routes
 	authed := mux.NewRouter()
 	authed.UseEncodedPath()
-	authed.Use(mux.MiddlewareFunc(auth.ToMiddleware(requests.NewImpersonatingAuth(sar.NewSubjectAccessReview(clusterManager)))))
-	authed.Use(mux.MiddlewareFunc(rbac.NewAccessControlHandler()))
+	impersonatingAuth := auth.ToMiddleware(requests.NewImpersonatingAuth(sar.NewSubjectAccessReview(clusterManager)))
+	accessControlHandler := rbac.NewAccessControlHandler()
+
+	authed.Use(mux.MiddlewareFunc(impersonatingAuth))
+	authed.Use(mux.MiddlewareFunc(accessControlHandler))
 	authed.Use(requests.NewAuthenticatedFilter)
 
 	authed.Path("/meta/{resource:aks.+}").Handler(aks.NewAKSHandler(scaledContext))
@@ -102,7 +105,6 @@ func router(ctx context.Context, localClusterEnabled bool, tunnelAuthorizer *mcm
 	authed.Path("/meta/oci/{resource}").Handler(oci.NewOCIHandler(scaledContext))
 	authed.Path("/meta/vsphere/{field}").Handler(vsphere.NewVsphereHandler(scaledContext))
 	authed.Path("/v3/tokenreview").Methods(http.MethodPost).Handler(&webhook.TokenReviewer{})
-	authed.Path("/metrics").Handler(metricsHandler)
 	authed.Path("/metrics/{clusterID}").Handler(metricsHandler)
 	authed.PathPrefix("/k8s/clusters/").Handler(k8sProxy)
 	authed.PathPrefix("/meta/proxy").Handler(metaProxy)
@@ -111,9 +113,20 @@ func router(ctx context.Context, localClusterEnabled bool, tunnelAuthorizer *mcm
 	authed.PathPrefix("/v3/token").Handler(tokenAPI)
 	authed.PathPrefix("/v3").Handler(managementAPI)
 
+	// Metrics authenticated route
+	metricsAuthed := mux.NewRouter()
+	metricsAuthed.UseEncodedPath()
+	tokenReviewAuth := auth.ToMiddleware(requests.NewTokenReviewAuth(scaledContext.K8sClient.AuthenticationV1()))
+	metricsAuthed.Use(mux.MiddlewareFunc(tokenReviewAuth.Chain(impersonatingAuth)))
+	metricsAuthed.Use(mux.MiddlewareFunc(accessControlHandler))
+	metricsAuthed.Use(requests.NewAuthenticatedFilter)
+
+	metricsAuthed.Path("/metrics").Handler(metricsHandler)
+
 	unauthed.NotFoundHandler = authed
+	authed.NotFoundHandler = metricsAuthed
 	return func(next http.Handler) http.Handler {
-		authed.NotFoundHandler = next
+		metricsAuthed.NotFoundHandler = next
 		return unauthed
 	}, nil
 }
