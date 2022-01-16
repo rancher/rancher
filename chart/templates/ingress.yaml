@@ -16,6 +16,7 @@ metadata:
 {{- end }}
 {{- if eq .Values.tls "external" }}
     nginx.ingress.kubernetes.io/ssl-redirect: "false" # turn off ssl redirect for external.
+    traefik.ingress.kubernetes.io/router.tls: "false" # turn off ssl redirect for external.
 {{- else }}
   {{- if ne .Values.ingress.tls.source "secret" }}
     {{- $certmanagerVer :=  split "." .Values.certmanager.version -}}
@@ -26,6 +27,8 @@ metadata:
     cert-manager.io/issuer-kind: Issuer
     {{- end }}
   {{- end }}
+    traefik.ingress.kubernetes.io/router.entrypoints: "web,websecure"
+    traefik.ingress.kubernetes.io/router.tls: "true"
 {{- end }}
 {{- if .Values.ingress.includeDefaultExtraAnnotations }}
     nginx.ingress.kubernetes.io/proxy-connect-timeout: "30"
