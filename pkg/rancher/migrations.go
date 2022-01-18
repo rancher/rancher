@@ -7,6 +7,7 @@ import (
 	"github.com/rancher/norman/condition"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/tokens"
+	"github.com/rancher/rancher/pkg/features"
 	fleetconst "github.com/rancher/rancher/pkg/fleet"
 	v3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	rancherversion "github.com/rancher/rancher/pkg/version"
@@ -234,6 +235,10 @@ func applyProjectConditionForNamespaceAssignment(label string, condition conditi
 }
 
 func addWebhookConfigToCAPICRDs(crdClient controllerapiextv1.CustomResourceDefinitionClient) error {
+	if !features.EmbeddedClusterAPI.Enabled() {
+		return nil
+	}
+
 	crds, err := crdClient.List(metav1.ListOptions{
 		LabelSelector: "auth.cattle.io/cluster-indexed=true",
 	})
