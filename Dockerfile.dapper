@@ -59,10 +59,11 @@ RUN mkdir /usr/tmp && \
     chmod +x /usr/bin/kustomize
 
 # Set up K3s: copy the necessary binaries from the K3s image.
-COPY --from=rancher/k3s:v1.22.5-k3s1 \
+FROM rancher/k3s:v1.22.5-k3s1-$DAPPER_HOST_ARCH AS k3s
+COPY --from=k3s \
     /bin/blkid \
     /bin/charon \
-    /bin/cni \
+    /bin/cni k3s\
     /bin/conntrack \
     /bin/containerd \
     /bin/containerd-shim-runc-v2 \
