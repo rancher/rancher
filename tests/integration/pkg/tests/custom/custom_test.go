@@ -3,6 +3,7 @@ package custom
 import (
 	"encoding/json"
 	"os"
+	"strings"
 	"testing"
 
 	provisioningv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
@@ -32,6 +33,9 @@ func TestSystemAgentVersion(t *testing.T) {
 }
 
 func TestCustomOneNode(t *testing.T) {
+	if strings.ToLower(os.Getenv("DIST")) == "rke2" {
+		t.Skip()
+	}
 	clients, err := clients.New()
 	if err != nil {
 		t.Fatal(err)
@@ -214,6 +218,9 @@ func TestCustomUniqueRoles(t *testing.T) {
 }
 
 func TestCustomThreeNodeWithTaints(t *testing.T) {
+	if strings.ToLower(os.Getenv("DIST")) == "rke2" {
+		t.Skip()
+	}
 	clients, err := clients.New()
 	if err != nil {
 		t.Fatal(err)
