@@ -1,28 +1,84 @@
 #!/bin/bash
 set -e
 
+cleanup()
+{
+    EXIT=$?
+    set +ex
+    echo Stopping rancher server
+    kill $RANCHER_RUN_PID
+    wait $RANCHER_RUN_PID
+    if [ $PID != -1 ]; then
+      kill $PID
+      wait $PID
+    fi
+    return $EXIT
+}
+
 cd $(dirname $0)/..
 
-eval "$(grep '^ENV CATTLE_SYSTEM_AGENT' package/Dockerfile | awk '{print "export " $2 "=" $3}')"
+# Due to https://github.com/k3s-io/k3s/issues/4784 we need to hardcode to an older version
+SOME_K8S_VERSION=v1.21.5+rke2r2
+TB_ORG=rancher
 
-echo Starting rancher server
-mkdir -p /var/lib/rancher/k3s/agent/images
-grep PodTestImage ./tests/integration/pkg/defaults/defaults.go | cut -f2 -d'"' > /var/lib/rancher/k3s/agent/images/pull.txt
-grep MachineProvisionImage ./pkg/settings/setting.go | cut -f4 -d'"' >> /var/lib/rancher/k3s/agent/images/pull.txt
+if [ -z "${DIST}" ]; then
+  DIST=k3s
+  AIRGAP=-airgap
+  # Due to https://github.com/k3s-io/k3s/issues/4784 we need to hardcode to an older version
+  SOME_K8S_VERSION=v1.21.1+k3s1
+  TB_ORG=k3s-io
+else
+  LINUX=.linux
+fi
+
+export DIST=${DIST}
+export SOME_K8S_VERSION=${SOME_K8S_VERSION}
+export TB_ORG=${TB_ORG}
+
+eval "$(grep '^ENV CATTLE_SYSTEM_AGENT' package/Dockerfile | awk '{print "export " $2 "=" $3}')"
+eval "$(grep '^ENV CATTLE_KDM_BRANCH' package/Dockerfile | awk '{print "export " $2 "=" $3}')"
+
+# One day, we should be able to pull the latest version of K3s/RKE2 out of KDM for the branch we have. We cannot currently due to https://github.com/k3s-io/k3s/issues/4784
+#export SOME_K8S_VERSION=$(curl https://raw.githubusercontent.com/rancher/kontainer-driver-metadata/$CATTLE_KDM_BRANCH/data/data.json | jq -r ".$DIST.channels[0].latest")
+
+echo Starting rancher server for provisioning-tests
 touch /tmp/rancher.log
+
+mkdir -p /var/lib/rancher/$DIST/agent/images
+grep PodTestImage ./tests/integration/pkg/defaults/defaults.go | cut -f2 -d'"' > /var/lib/rancher/$DIST/agent/images/pull.txt
+grep MachineProvisionImage ./pkg/settings/setting.go | cut -f4 -d'"' >> /var/lib/rancher/$DIST/agent/images/pull.txt
 mkdir -p /usr/share/rancher/ui/assets
 curl -sLf https://github.com/rancher/system-agent/releases/download/${CATTLE_SYSTEM_AGENT_VERSION}/rancher-system-agent-amd64 -o /usr/share/rancher/ui/assets/rancher-system-agent-amd64
-./scripts/run >/tmp/rancher.log 2>&1 &
-PID=$!
 
-keepalive()
+mkdir -p /image-assets
+curl -sLf https://github.com/$TB_ORG/$DIST/releases/download/$SOME_K8S_VERSION/$DIST$AIRGAP-images$LINUX-amd64.tar.gz -o /image-assets/$DIST$AIRGAP-images$LINUX-amd64.tar.gz
+echo Decompressing airgap tarball
+gzip -d /image-assets/$DIST$AIRGAP-images$LINUX-amd64.tar.gz
+
+run_rancher()
 {
     while sleep 2; do
-        if [ ! -e /proc/$PID ]; then
+        if [ "$PID" != "-1" ] && [ ! -e /proc/$PID ]; then
             echo Rancher died
-            cat /tmp/rancher.log
-            ./scripts/run >/tmp/rancher.log 2>&1 &
-            PID=$!
+            echo Rancher logs were
+            tail -n 25 /tmp/rancher.log
+            echo K3s logs were:
+            tail -n 25 build/testdata/k3s.log
+            if [ "$INT_TESTS_STARTED" = "true" ]; then
+              echo Rancher died after tests started, aborting
+              exit 1
+            fi
+            set +e
+            echo Attempting to kill K3s
+            pkill -e k3s
+            set -e
+            PID=-1
+            sleep 5
+        fi
+        if [ "$PID" = "-1" ]; then
+          echo Starting rancher server using run
+          ./scripts/run >/tmp/rancher.log 2>&1 &
+          PID=$!
         fi
         sleep 2
     done
@@ -32,8 +88,13 @@ keepalive()
 # much
 #tail -F /tmp/rancher.log &
 #TPID=$!
+PID=-1
+run_rancher &
+RANCHER_RUN_PID=$!
+trap cleanup exit
 
-keepalive &
+echo Sleeping for 5 seconds before checking Rancher health
+sleep 5
 
 while ! curl -sf http://localhost:8080/ping; do
     sleep 2
@@ -43,9 +104,9 @@ while ! kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml rollout status -w -n catt
 done
 #kill $TPID
 
-echo Running tests
+echo Running provisioning-tests
 export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
-go test -v -timeout 40m ./tests/integration/pkg/tests/... || {
+go test -v -timeout 60m ./tests/integration/pkg/tests/... || {
     cat /tmp/rancher.log | gzip | base64
     exit 1
 }

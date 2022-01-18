@@ -1,6 +1,8 @@
 package machineprovisioning
 
 import (
+	"os"
+	"strings"
 	"sync/atomic"
 	"testing"
 
@@ -28,6 +30,9 @@ func TestSingleNodeAllRolesWithDelete(t *testing.T) {
 	defer clients.Close()
 
 	c, err := cluster.New(clients, &provisioningv1api.Cluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-single-node-all-roles-with-delete",
+		},
 		Spec: provisioningv1api.ClusterSpec{
 			KubernetesVersion: defaults.SomeK8sVersion,
 			RKEConfig: &provisioningv1api.RKEConfig{
@@ -96,6 +101,9 @@ func TestThreeNodesAllRolesWithDelete(t *testing.T) {
 	defer clients.Close()
 
 	c, err := cluster.New(clients, &provisioningv1api.Cluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-three-nodes-all-roles-with-delete",
+		},
 		Spec: provisioningv1api.ClusterSpec{
 			KubernetesVersion: defaults.SomeK8sVersion,
 			RKEConfig: &provisioningv1api.RKEConfig{
@@ -130,6 +138,9 @@ func TestThreeNodesAllRolesWithDelete(t *testing.T) {
 }
 
 func TestFiveNodesUniqueRolesWithDelete(t *testing.T) {
+	if strings.ToLower(os.Getenv("DIST")) == "rke2" {
+		t.Skip()
+	}
 	clients, err := clients.New()
 	if err != nil {
 		t.Fatal(err)
@@ -137,6 +148,9 @@ func TestFiveNodesUniqueRolesWithDelete(t *testing.T) {
 	defer clients.Close()
 
 	c, err := cluster.New(clients, &provisioningv1api.Cluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-five-nodes-unique-roles-with-delete",
+		},
 		Spec: provisioningv1api.ClusterSpec{
 			KubernetesVersion: defaults.SomeK8sVersion,
 			RKEConfig: &provisioningv1api.RKEConfig{
@@ -179,6 +193,9 @@ func TestFiveNodesUniqueRolesWithDelete(t *testing.T) {
 }
 
 func TestFourNodesServerAndWorkerRolesWithDelete(t *testing.T) {
+	if strings.ToLower(os.Getenv("DIST")) == "rke2" {
+		t.Skip()
+	}
 	t.Parallel()
 	clients, err := clients.New()
 	if err != nil {
@@ -187,6 +204,9 @@ func TestFourNodesServerAndWorkerRolesWithDelete(t *testing.T) {
 	defer clients.Close()
 
 	c, err := cluster.New(clients, &provisioningv1api.Cluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-four-nodes-server-and-worker-roles-with-delete",
+		},
 		Spec: provisioningv1api.ClusterSpec{
 			KubernetesVersion: defaults.SomeK8sVersion,
 			RKEConfig: &provisioningv1api.RKEConfig{
@@ -255,6 +275,9 @@ func TestDrain(t *testing.T) {
 	}
 
 	c, err := cluster.New(clients, &provisioningv1api.Cluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-drain",
+		},
 		Spec: provisioningv1api.ClusterSpec{
 			KubernetesVersion: defaults.SomeK8sVersion,
 			RKEConfig: &provisioningv1api.RKEConfig{
@@ -358,6 +381,9 @@ func TestDrainNoDelete(t *testing.T) {
 	defer clients.Close()
 
 	c, err := cluster.New(clients, &provisioningv1api.Cluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-drain-no-delete",
+		},
 		Spec: provisioningv1api.ClusterSpec{
 			KubernetesVersion: defaults.SomeK8sVersion,
 			RKEConfig: &provisioningv1api.RKEConfig{

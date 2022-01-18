@@ -23,8 +23,8 @@ type Clients struct {
 }
 
 func (c *Clients) Close() {
-	for _, f := range c.onClose {
-		f()
+	for i := len(c.onClose); i > 0; i-- {
+		c.onClose[i-1]()
 	}
 	c.cancel()
 }
