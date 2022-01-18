@@ -3,4 +3,4 @@ set -e
 
 cd $(dirname $0)/..
 
-TEST_RKE=true ./scripts/provisioning-tests
+DIST=rke2 ./scripts/provisioning-tests
