@@ -110,7 +110,7 @@ func (p *ldapProvider) getPrincipalsFromSearchResult(result *ldapv3.SearchResult
 	userAttributes := entry.Attributes
 
 	if !p.permissionCheck(userAttributes, config) {
-		logrus.Debug("Now checking {%v} access permission", userAttributes)
+		logrus.Debugf("permissionCheck: user attributes: %v ", userAttributes)
 		return v3.Principal{}, nil, fmt.Errorf("Permission denied")
 	}
 
