@@ -234,6 +234,40 @@ steps:
     event:
     - tag
 
+- name: docker-mirror-tag
+  image: rancher/dapper:v0.5.4
+  environment:
+    AWS_REGISTRY_ID:
+      from_secret: aws_registry_id
+  commands:
+  - "docker tag rancher/rancher:${DRONE_TAG} ${AWS_REGISTRY_ID}.dkr.ecr.us-east-1.amazonaws.com/suse/rancher:${DRONE_TAG}"
+  privileged: true
+  volumes:
+  - name: docker
+    path: /var/run/docker.sock
+  when:
+    ref:
+      include:
+      - "refs/tags/v*"
+    event:
+    - tag
+
+- name: docker-publish-mirror-ecr
+  image: plugins/ecr
+  environment:
+    AWS_REGISTRY_ID:
+      from_secret: aws_registry_id
+  settings:
+    access_key:
+      from_secret: ecr_access_key
+    secret_key:
+      from_secret: ecr_secret_key
+    repo: suse/rancher
+    registry: "${AWS_REGISTRY_ID}.dkr.ecr.us-east-1.amazonaws.com"
+  when:
+    event:
+    - tag
+
 - name: docker-publish-installer
   image: plugins/docker
   settings:
