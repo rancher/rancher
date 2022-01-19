@@ -1,0 +1,133 @@
+// Job Params
+// Requires: PYTEST_OPTIONS, CATTLE_TEST_URL, ADMIN_TOKEN
+// Optional: AWS_SSH_PEM_KEY, AWS_SSH_KEY_NAME, DEBUG
+
+node {
+  def job_name = "${JOB_NAME}"
+  if (job_name.contains('/')) { 
+    job_names = job_name.split('/')
+    job_name = job_names[job_names.size() - 1] 
+  }
+  def testContainer = "${job_name}${env.BUILD_NUMBER}_test"
+
+  def imageName = "rancher-validation-${job_name}${env.BUILD_NUMBER}"
+  def envFile = ".env"
+  def RANCHER_API_URL = "${env.RANCHER_API_URL}"
+  def RANCHER_TOKEN_KEY = "${env.RANCHER_TOKEN_KEY}"
+  def hostname_prefix = "${env.HOSTNAME_PREFIX}"
+  def worker_count = "${env.WORKER_COUNT}"
+  def TF_VERSION = "${env.TF_VERSION}"
+  def AWS_AMI = "${env.AWS_AMI}"
+  def AWS_AMI_USER = "${env.AWS_AMI_USER}"
+  def k8s_version = "${env.K8S_VERSION}"
+  def suffix = "-tf-cluster-0"
+  def etcd_suffix = "-tf-etcd-0"
+  def cp_suffix = "-tf-controlplane-0"
+  def worker_suffix = "-tf-worker-0"
+  def aws_cluster_name = "-aws-tf-charts"
+  def do_cluster_name = "-do-tf-charts"
+  def AWS_ACCESS_KEY = "${env.AWS_ACCESS_KEY}"
+  def AWS_SECRET_KEY = "${env.AWS_SECRET_KEY}"
+  def DO_ACCESS_KEY = "${env.DO_ACCESS_KEY}"
+
+  def branch = "release/v2.6"
+  if ("${env.branch}" != "null" && "${env.branch}" != "") {
+    branch = "${env.branch}"
+  }
+
+  wrap([$class: 'AnsiColorBuildWrapper', 'colorMapName': 'XTerm', 'defaultFg': 2, 'defaultBg':1]) {
+    withFolderProperties {
+      paramsMap = []
+      params.each {
+        paramsMap << "$it.key=$it.value"
+      }
+      withEnv(paramsMap) {
+      withCredentials([ string(credentialsId: 'AWS_ACCESS_KEY_ID', variable: 'AWS_ACCESS_KEY_ID'),
+                        string(credentialsId: 'AWS_SECRET_ACCESS_KEY', variable: 'AWS_SECRET_ACCESS_KEY'),
+                        string(credentialsId: 'AWS_SSH_PEM_KEY', variable: 'AWS_SSH_PEM_KEY'),
+                        string(credentialsId: 'DO_ACCESSKEY', variable: 'DO_ACCESSKEY'),
+                        string(credentialsId: 'ADMIN_PASSWORD', variable: 'ADMIN_PASSWORD'),
+                        string(credentialsId: 'USER_PASSWORD', variable: 'USER_PASSWORD')
+                        ]) {
+                          
+        stage('Checkout') {
+          deleteDir()
+          checkout([
+                    $class: 'GitSCM',
+                    branches: [[name: "*/${branch}"]],
+                    extensions: scm.extensions + [[$class: 'CleanCheckout']],
+                    userRemoteConfigs: scm.userRemoteConfigs
+                  ])
+        }
+
+        dir ("./") {
+
+          stage('Configure and Build') {
+            if (env.AWS_SSH_PEM_KEY && env.AWS_SSH_KEY_NAME) {
+              dir(".ssh") {
+                def decoded = new String(AWS_SSH_PEM_KEY.decodeBase64())
+                writeFile file: AWS_SSH_KEY_NAME, text: decoded
+              }
+            }
+
+            sh "./tests/v2/validation/resource/terraform/v1charts/configure.sh"
+            sh "./tests/v2/validation/resource/terraform/v1charts/build.sh"
+          }
+
+          try {
+            stage('Run Chart Installation') {
+
+              if (AWS_ACCESS_KEY != "") {
+                sh "docker run --name ${testContainer} -t --env-file ${envFile} " + 
+                "${imageName} sh -c \"export TF_VAR_rancher_api_url=${RANCHER_API_URL}" + 
+                "&& export TF_VAR_rancher_token_key=${RANCHER_TOKEN_KEY}" + 
+                "&& export TF_VAR_aws_access_key=${AWS_ACCESS_KEY}" + 
+                "&& export TF_VAR_aws_secret_key=${AWS_SECRET_KEY}" + 
+                "&& export provider=aws" + 
+                "&& export tfversion=${TF_VERSION}" + 
+                "&& export TF_VAR_cluster_name=${hostname_prefix}"+"$aws_cluster_name" + 
+                "&& export TF_VAR_hostname_prefix_etcd=${hostname_prefix}"+"$etcd_suffix" + 
+                "&& export TF_VAR_hostname_prefix_cp=${hostname_prefix}"+"$cp_suffix" + 
+                "&& export TF_VAR_hostname_prefix_worker=${hostname_prefix}"+"$worker_suffix" + 
+                "&& export TF_VAR_worker_count=${worker_count}" + 
+                "&& export TF_VAR_ami=${AWS_AMI}" +  
+                "&& export TF_VAR_ami_user=${AWS_AMI_USER}" + 
+                "&& export TF_VAR_k8s_version=${k8s_version}" +
+                "&& go run .\""
+              }
+
+              if (DO_ACCESS_KEY != "") { 
+                sh "docker run --name ${testContainer} -t --env-file ${envFile} " + 
+                "${imageName} sh -c \"export TF_VAR_rancher_api_url=${RANCHER_API_URL}" + 
+                "&& export TF_VAR_rancher_token_key=${RANCHER_TOKEN_KEY}" + 
+                "&& export provider=do" + 
+                "&& export tfversion=${TF_VERSION}" + 
+                "&& export TF_VAR_cluster_name=${hostname_prefix}"+"$do_cluster_name" + 
+                "&& export TF_VAR_hostname_prefix_etcd=${hostname_prefix}"+"$etcd_suffix" + 
+                "&& export TF_VAR_hostname_prefix_cp=${hostname_prefix}"+"$cp_suffix" + 
+                "&& export TF_VAR_hostname_prefix_worker=${hostname_prefix}"+"$worker_suffix" + 
+                "&& export TF_VAR_do_access_token=${DO_ACCESS_KEY}" + 
+                "&& export TF_VAR_worker_count=${worker_count}" + 
+                "&& go run .\""
+              }
+            }
+          } catch(err) {
+            echo 'Test run had failures. Collecting results...'
+          }
+
+          try {
+            stage('Cleanup') {
+              sh "docker rm -v ${testContainer}"
+              sh "docker rmi ${imageName}"
+            }
+          } catch(err){
+            sh "docker stop ${testContainer}"
+            sh "docker rm -v ${testContainer}"
+            sh "docker rmi ${imageName}"
+          }
+        }
+      }
+    }
+  } 
+  }
+}
