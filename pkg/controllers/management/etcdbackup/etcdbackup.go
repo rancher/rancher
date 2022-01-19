@@ -157,13 +157,13 @@ func (c *Controller) doClusterBackupSync(cluster *v3.Cluster) error {
 		return nil
 	}
 
-	clusterBackups, err := c.getRecuringBackupsList(cluster)
+	backups, err := c.getBackupsList(cluster)
 	if err != nil {
 		return err
 	}
 
 	// cluster has no backups, we need to kick a new one.
-	if len(clusterBackups) == 0 {
+	if len(backups) == 0 {
 		logrus.Debugf("[etcd-backup] cluster [%s] has no backups, creating first backup", cluster.Name)
 		newBackup, err := c.createNewBackup(cluster)
 		if err != nil {
@@ -176,7 +176,7 @@ func (c *Controller) doClusterBackupSync(cluster *v3.Cluster) error {
 	// check for backups in progress
 	if cluster.Spec.RancherKubernetesEngineConfig != nil {
 		clusterTimeout := time.Duration(cluster.Spec.RancherKubernetesEngineConfig.Services.Etcd.BackupConfig.Timeout) * time.Second
-		for _, clusterBackup := range clusterBackups {
+		for _, clusterBackup := range backups {
 			backupCreationTime, err := getBackupCreatedTime(clusterBackup)
 			if err != nil {
 				logrus.Errorf("[etcd-backup] cluster [%s] backup [%s] is missing creation time: %v", cluster.Name, clusterBackup.Name, err)
@@ -191,8 +191,20 @@ func (c *Controller) doClusterBackupSync(cluster *v3.Cluster) error {
 		}
 	}
 
-	newestBackup := clusterBackups[0]
-	for _, clusterBackup := range clusterBackups[1:] {
+	recurringBackups := getRecurringBackupsList(backups)
+	// cluster has no recurring backups, because the user created one before we could.
+	if len(recurringBackups) == 0 {
+		logrus.Debugf("[etcd-backup] cluster [%s] has no backups, creating first backup", cluster.Name)
+		newBackup, err := c.createNewBackup(cluster)
+		if err != nil {
+			return fmt.Errorf("[etcd-backup] error while creating backup for cluster [%s]: %v", cluster.Name, err)
+		}
+		logrus.Debugf("[etcd-backup] cluster [%s] new backup is created: %s", cluster.Name, newBackup.Name)
+		return nil
+	}
+
+	newestBackup := recurringBackups[0]
+	for _, clusterBackup := range recurringBackups[1:] {
 		if getBackupCompletedTime(clusterBackup).After(getBackupCompletedTime(newestBackup)) {
 			newestBackup = clusterBackup
 		}
@@ -212,7 +224,7 @@ func (c *Controller) doClusterBackupSync(cluster *v3.Cluster) error {
 	}
 
 	// rotate old backups
-	return c.rotateExpiredBackups(cluster, clusterBackups)
+	return c.rotateExpiredBackups(cluster, recurringBackups)
 }
 
 func (c *Controller) createNewBackup(cluster *v3.Cluster) (*v3.EtcdBackup, error) {
@@ -456,18 +468,19 @@ func GetS3Client(sbc *rketypes.S3BackupConfig, timeout int, dialer dialer.Dialer
 	return s3Client, nil
 }
 
-func (c *Controller) getRecuringBackupsList(cluster *v3.Cluster) ([]*v3.EtcdBackup, error) {
+func getRecurringBackupsList(backups []*v3.EtcdBackup) []*v3.EtcdBackup {
 	retList := []*v3.EtcdBackup{}
-	backups, err := c.backupLister.List(cluster.Name, labels.NewSelector())
-	if err != nil {
-		return nil, err
-	}
 	for _, backup := range backups {
 		if !backup.Spec.Manual {
 			retList = append(retList, backup)
 		}
 	}
-	return retList, nil
+	return retList
+}
+
+func (c *Controller) getBackupsList(cluster *v3.Cluster) ([]*v3.EtcdBackup, error) {
+	backups, err := c.backupLister.List(cluster.Name, labels.NewSelector())
+	return backups, err
 }
 
 func getBucketLookupType(endpoint string) minio.BucketLookupType {
