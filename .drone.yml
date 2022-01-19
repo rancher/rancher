@@ -568,7 +568,7 @@ steps:
   image: rancher/dapper:v0.5.8
   failure: ignore
   commands:
-  - dapper ci
+  - K3S_BUILDER=k3s_root dapper ci
   privileged: true
   volumes:
   - name: docker

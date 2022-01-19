@@ -1,3 +1,17 @@
+ARG K3S_BUILDER
+
+# Use binaries from k3s root for s390x as k3s is not available on s390x
+FROM registry.suse.com/suse/sle15:15.3 AS k3s_root
+ARG ARCH
+ENV ARCH=${ARCH}
+ENV K3S_ROOT_VERSION v0.11.0
+ONBUILD RUN zypper -n in tar
+ONBUILD ADD https://github.com/rancher/k3s-root/releases/download/${K3S_ROOT_VERSION}/k3s-root-${ARCH}.tar /k3s-root.tar
+ONBUILD RUN tar xvf /k3s-root.tar; \
+  touch /bin/cni /bin/containerd /bin/containerd-shim-runc-v2 /bin/runc
+
+FROM ${K3S_BUILDER} as k3s_builder
+
 FROM registry.suse.com/suse/sle15:15.3
 
 RUN zypper -n install git-core curl ca-certificates unzip xz gzip sed tar shadow gawk vim && \
@@ -102,7 +116,7 @@ RUN curl ${HELM_URL_V3} | tar xvzf - --strip-components=1 -C /usr/bin && \
     chmod +x /usr/bin/kustomize
 
 # Set up K3s: copy the necessary binaries from the K3s image.
-COPY --from=rancher/k3s:v1.22.5-k3s1 \
+COPY --from=k3s_builder \
     /bin/blkid \
     /bin/charon \
     /bin/cni \
@@ -146,7 +160,7 @@ RUN curl -sLf ${!TINI_URL} > /usr/bin/tini && \
     mkdir -p /var/lib/rancher/k3s/agent/images/ && \
     curl -sfL ${ETCD_URL} | tar xvzf - --strip-components=1 -C /usr/bin/ etcd-${CATTLE_ETCD_VERSION}-linux-${ARCH}/etcdctl && \
     curl -sLf https://github.com/rancher/telemetry/releases/download/${TELEMETRY_VERSION}/telemetry-${ARCH} > /usr/bin/telemetry && \
-    chmod +x /usr/bin/tini /usr/bin/telemetry && \
+    chmod +x /usr/bin/tini /usr/bin/telemetry
 
 RUN curl -sLf ${!TINI_URL} > /usr/bin/tini && \
     curl -sfL ${ETCD_URL} | tar xvzf - --strip-components=1 -C /usr/bin/ etcd-${CATTLE_ETCD_VERSION}-linux-${ARCH}/etcdctl && \
