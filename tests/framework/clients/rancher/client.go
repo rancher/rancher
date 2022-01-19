@@ -6,6 +6,7 @@ import (
 
 	"github.com/pkg/errors"
 	frameworkDynamic "github.com/rancher/rancher/tests/framework/clients/dynamic"
+	"github.com/rancher/rancher/tests/framework/clients/rancher/catalog"
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
 	"github.com/rancher/rancher/tests/framework/clients/rancher/provisioning"
 	"github.com/rancher/rancher/tests/framework/pkg/clientbase"
@@ -24,6 +25,7 @@ import (
 type Client struct {
 	Management    *management.Client
 	Provisioning  *provisioning.Client
+	Catalog       *catalog.Client
 	RancherConfig *Config
 	restConfig    *rest.Config
 	Session       *session.Session
@@ -62,6 +64,13 @@ func NewClient(bearerToken string, session *session.Session) (*Client, error) {
 	}
 
 	c.Provisioning = provClient
+
+	catalogClient, err := catalog.NewForConfig(restConfig, session)
+	if err != nil {
+		return nil, err
+	}
+
+	c.Catalog = catalogClient
 
 	return c, nil
 }

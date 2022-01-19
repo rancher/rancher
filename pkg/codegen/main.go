@@ -79,7 +79,8 @@ func main() {
 					// All structs with an embedded ObjectMeta field will be picked up
 					"./pkg/apis/catalog.cattle.io/v1",
 				},
-				GenerateTypes: true,
+				GenerateTypes:   true,
+				GenerateClients: true,
 			},
 			"upgrade.cattle.io": {
 				PackageName: "upgrade.cattle.io",

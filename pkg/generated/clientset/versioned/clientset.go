@@ -21,6 +21,7 @@ package versioned
 import (
 	"fmt"
 
+	catalogv1 "github.com/rancher/rancher/pkg/generated/clientset/versioned/typed/catalog.cattle.io/v1"
 	provisioningv1 "github.com/rancher/rancher/pkg/generated/clientset/versioned/typed/provisioning.cattle.io/v1"
 	upgradev1 "github.com/rancher/rancher/pkg/generated/clientset/versioned/typed/upgrade.cattle.io/v1"
 	discovery "k8s.io/client-go/discovery"
@@ -30,6 +31,7 @@ import (
 
 type Interface interface {
 	Discovery() discovery.DiscoveryInterface
+	CatalogV1() catalogv1.CatalogV1Interface
 	ProvisioningV1() provisioningv1.ProvisioningV1Interface
 	UpgradeV1() upgradev1.UpgradeV1Interface
 }
@@ -38,8 +40,14 @@ type Interface interface {
 // version included in a Clientset.
 type Clientset struct {
 	*discovery.DiscoveryClient
+	catalogV1      *catalogv1.CatalogV1Client
 	provisioningV1 *provisioningv1.ProvisioningV1Client
 	upgradeV1      *upgradev1.UpgradeV1Client
+}
+
+// CatalogV1 retrieves the CatalogV1Client
+func (c *Clientset) CatalogV1() catalogv1.CatalogV1Interface {
+	return c.catalogV1
 }
 
 // ProvisioningV1 retrieves the ProvisioningV1Client
@@ -73,6 +81,10 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 	}
 	var cs Clientset
 	var err error
+	cs.catalogV1, err = catalogv1.NewForConfig(&configShallowCopy)
+	if err != nil {
+		return nil, err
+	}
 	cs.provisioningV1, err = provisioningv1.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
@@ -93,6 +105,7 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 // panics if there is an error in the config.
 func NewForConfigOrDie(c *rest.Config) *Clientset {
 	var cs Clientset
+	cs.catalogV1 = catalogv1.NewForConfigOrDie(c)
 	cs.provisioningV1 = provisioningv1.NewForConfigOrDie(c)
 	cs.upgradeV1 = upgradev1.NewForConfigOrDie(c)
 
@@ -103,6 +116,7 @@ func NewForConfigOrDie(c *rest.Config) *Clientset {
 // New creates a new Clientset for the given RESTClient.
 func New(c rest.Interface) *Clientset {
 	var cs Clientset
+	cs.catalogV1 = catalogv1.New(c)
 	cs.provisioningV1 = provisioningv1.New(c)
 	cs.upgradeV1 = upgradev1.New(c)
 
