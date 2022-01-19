@@ -13,7 +13,7 @@ type Client struct {
 	ts *session.Session
 }
 
-// Client is a struct that embedds ClusterInterface and has session.Session as an attribute to keep track of the resources created by ClusterInterface
+// Cluster is a struct that embedds ClusterInterface and has session.Session as an attribute to keep track of the resources created by ClusterInterface
 type Cluster struct {
 	provisionClientV1.ClusterInterface
 	ts *session.Session
