@@ -1,4 +1,4 @@
-FROM python:3.7.0
+FROM python:3.7.12
 
 ARG KUBECTL_VERSION=v1.16.6
 ENV WORKSPACE /src/rancher-validation
