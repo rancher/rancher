@@ -12,6 +12,7 @@ type Config struct {
 	NodesAndRoles      string   `json:"nodesAndRoles" yaml:"nodesAndRoles" default:""`
 	KubernetesVersions []string `json:"kubernetesVersion" yaml:"kubernetesVersion"`
 	CNIs               []string `json:"cni" yaml:"cni"`
+	Providers          []string `json:"providers" yaml:"providers"`
 }
 
 func NodesAndRolesInput() []map[string]bool {
