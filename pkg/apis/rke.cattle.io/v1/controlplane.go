@@ -27,6 +27,7 @@ type RKEControlPlaneSpec struct {
 	LocalClusterAuthEndpoint LocalClusterAuthEndpoint `json:"localClusterAuthEndpoint"`
 	ETCDSnapshotCreate       *ETCDSnapshotCreate      `json:"etcdSnapshotCreate,omitempty"`
 	ETCDSnapshotRestore      *ETCDSnapshotRestore     `json:"etcdSnapshotRestore,omitempty"`
+	RotateCertificates       *RotateCertificates      `json:"rotateCertificates,omitempty"`
 	KubernetesVersion        string                   `json:"kubernetesVersion,omitempty"`
 	ClusterName              string                   `json:"clusterName,omitempty" wrangler:"required"`
 	ManagementClusterName    string                   `json:"managementClusterName,omitempty" wrangler:"required"`
@@ -44,13 +45,14 @@ var (
 )
 
 type RKEControlPlaneStatus struct {
-	Conditions               []genericcondition.GenericCondition `json:"conditions,omitempty"`
-	Ready                    bool                                `json:"ready,omitempty"`
-	ObservedGeneration       int64                               `json:"observedGeneration"`
-	ETCDSnapshotRestore      *ETCDSnapshotRestore                `json:"etcdSnapshotRestore,omitempty"`
-	ETCDSnapshotRestorePhase ETCDSnapshotPhase                   `json:"etcdSnapshotRestorePhase,omitempty"`
-	ETCDSnapshotCreate       *ETCDSnapshotCreate                 `json:"etcdSnapshotCreate,omitempty"`
-	ETCDSnapshotCreatePhase  ETCDSnapshotPhase                   `json:"etcdSnapshotCreatePhase,omitempty"`
-	ConfigGeneration         int64                               `json:"configGeneration,omitempty"`
-	Initialized              bool                                `json:"initialized,omitempty"`
+	Conditions                    []genericcondition.GenericCondition `json:"conditions,omitempty"`
+	Ready                         bool                                `json:"ready,omitempty"`
+	ObservedGeneration            int64                               `json:"observedGeneration"`
+	CertificateRotationGeneration int64                               `json:"certificateRotationGeneration"`
+	ETCDSnapshotRestore           *ETCDSnapshotRestore                `json:"etcdSnapshotRestore,omitempty"`
+	ETCDSnapshotRestorePhase      ETCDSnapshotPhase                   `json:"etcdSnapshotRestorePhase,omitempty"`
+	ETCDSnapshotCreate            *ETCDSnapshotCreate                 `json:"etcdSnapshotCreate,omitempty"`
+	ETCDSnapshotCreatePhase       ETCDSnapshotPhase                   `json:"etcdSnapshotCreatePhase,omitempty"`
+	ConfigGeneration              int64                               `json:"configGeneration,omitempty"`
+	Initialized                   bool                                `json:"initialized,omitempty"`
 }
