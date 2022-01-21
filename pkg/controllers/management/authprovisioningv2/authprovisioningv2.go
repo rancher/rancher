@@ -8,8 +8,10 @@ import (
 	"github.com/rancher/lasso/pkg/dynamic"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	v1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
+	"github.com/rancher/rancher/pkg/features"
 	mgmtcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	provisioningcontrollers "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
+	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/rancher/wrangler/pkg/apply"
 	apiextcontrollers "github.com/rancher/wrangler/pkg/generated/controllers/apiextensions.k8s.io/v1"
@@ -24,6 +26,7 @@ const (
 )
 
 type handler struct {
+	mgmtCtx                              *config.ManagementContext
 	roleLocker                           locker.Locker
 	roleCache                            rbacv1.RoleCache
 	roleController                       rbacv1.RoleController
@@ -45,7 +48,7 @@ type handler struct {
 	provisioningClusterGVK               schema.GroupVersionKind
 }
 
-func Register(ctx context.Context, clients *wrangler.Context) error {
+func Register(ctx context.Context, clients *wrangler.Context, management *config.ManagementContext) error {
 	clusterGVK, err := gvk.Get(&v1.Cluster{})
 	if err != nil {
 		// this is a build issue if it happens
@@ -53,6 +56,7 @@ func Register(ctx context.Context, clients *wrangler.Context) error {
 	}
 
 	h := &handler{
+		mgmtCtx:                              management,
 		roleCache:                            clients.RBAC.Role().Cache(),
 		roleController:                       clients.RBAC.Role(),
 		roleBindingController:                clients.RBAC.RoleBinding(),
@@ -86,6 +90,9 @@ func Register(ctx context.Context, clients *wrangler.Context) error {
 	clients.Mgmt.ProjectRoleTemplateBinding().OnChange(ctx, "auth-prov-v2-prtb", h.OnPRTB)
 	clients.Provisioning.Cluster().OnChange(ctx, "auth-prov-v2-cluster", h.OnCluster)
 	clients.CRD.CustomResourceDefinition().OnChange(ctx, "auth-prov-v2-crd", h.OnCRD)
+	if features.RKE2.Enabled() {
+		clients.Dynamic.OnChange(ctx, "auth-prov-v2-rke-machine-config", validMachineConfigGVK, h.OnMachineConfigChange)
+	}
 	clients.Provisioning.Cluster().Cache().AddIndexer(byClusterName, func(obj *v1.Cluster) ([]string, error) {
 		return []string{obj.Status.ClusterName}, nil
 	})

@@ -234,7 +234,7 @@ func GetRoleNameAndVerbs(roleAccess string, resourceName string, resourceType st
 	case NodeTemplateResource:
 		resourceName += "-nt-"
 	default:
-		resourceName += "-" + resourceName + "-"
+		resourceName += "-" + resourceType + "-"
 	}
 	switch roleAccess {
 	case OwnerAccess:
@@ -288,7 +288,7 @@ func buildSubjectForMember(member v32.Member, managementContext *config.Manageme
 	}
 
 	if name == "*" {
-		//member.GroupPrincipalName = subjectWithAllUsers.Name
+		// member.GroupPrincipalName = subjectWithAllUsers.Name
 		return subjectWithAllUsers, nil
 	}
 
