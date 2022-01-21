@@ -2,6 +2,11 @@
 
 echo "-- chart/test --"
 
+# skipping tests for s390x since helm v2 doesn't support s390x yet
+if [ ${ARCH} == s390x ]; then
+    exit 0
+fi
+
 # Check for helm
 if [ -z "$(type -p helm)" ]; then
     echo "helm not found. Helm is required to run tests."

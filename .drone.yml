@@ -553,6 +553,214 @@ trigger:
     - promote
 ---
 kind: pipeline
+name: default-linux-s390x
+
+platform:
+  os: linux
+  arch: amd64
+
+# Hack needed for s390x: https://gist.github.com/colstrom/c2f359f72658aaabb44150ac20b16d7c#gistcomment-3858388
+node:
+  arch: s390x
+
+steps:
+- name: build
+  image: rancher/dapper:v0.5.8
+  failure: ignore
+  commands:
+  - K3S_BUILDER=k3s_root dapper ci
+  privileged: true
+  volumes:
+  - name: docker
+    path: /var/run/docker.sock
+  when:
+    event:
+    - push
+    - pull_request
+    - tag
+
+- name: stage-binaries
+  image: rancher/dapper:v0.5.8
+  failure: ignore
+  commands:
+  - "cp -r ./bin/* ./package/"
+  when:
+    event:
+    - push
+    - tag
+
+- name: docker-publish-head
+  image: rancher/drone-docker-image-digests:v0.0.13
+  failure: ignore
+  volumes:
+  - name: docker
+    path: /var/run/docker.sock
+  settings:
+    purge: false
+    build_args:
+    - ARCH=s390x
+    - VERSION=${DRONE_BRANCH/release\//}-${DRONE_COMMIT}-head
+    - K3S_BUILDER=k3s_root
+    context: package/
+    custom_dns: 1.1.1.1
+    dockerfile: package/Dockerfile
+    tag: ${DRONE_BRANCH/release\//}-${DRONE_COMMIT}-linux-s390x
+    password:
+      from_secret: docker_password
+    repo: rancher/rancher
+    username:
+      from_secret: docker_username
+  when:
+    ref:
+      include:
+      - "refs/heads/master"
+      - "refs/heads/release/v*"
+    event:
+    - push
+
+- name: docker-publish-head-installer
+  image: rancher/drone-images:docker-s390x
+  failure: ignore
+  volumes:
+    - name: docker
+      path: /var/run/docker.sock
+  settings:
+    purge: false
+    build_args:
+    - ARCH=s390x
+    - VERSION=${DRONE_BRANCH/release\//}-${DRONE_COMMIT}-head
+    - RANCHER_TAG=${DRONE_BRANCH/release\//}-${DRONE_COMMIT}-linux-s390x
+    context: package/
+    custom_dns: 1.1.1.1
+    dockerfile: package/Dockerfile.installer
+    tag: ${DRONE_BRANCH/release\//}-${DRONE_COMMIT}-linux-s390x
+    password:
+      from_secret: docker_password
+    repo: rancher/system-agent-installer-rancher
+    username:
+      from_secret: docker_username
+  when:
+    ref:
+      include:
+      - "refs/heads/master"
+      - "refs/heads/release/v*"
+    event:
+    - push
+
+- name: docker-publish-head-agent
+  image: rancher/drone-images:docker-s390x
+  failure: ignore
+  volumes:
+    - name: docker
+      path: /var/run/docker.sock
+  settings:
+    purge: false
+    build_args:
+    - ARCH=s390x
+    - VERSION=${DRONE_BRANCH/release\//}-${DRONE_COMMIT}-head
+    - RANCHER_TAG=${DRONE_BRANCH/release\//}-${DRONE_COMMIT}-linux-s390x
+    context: package/
+    custom_dns: 1.1.1.1
+    dockerfile: package/Dockerfile.agent
+    tag: ${DRONE_BRANCH/release\//}-${DRONE_COMMIT}-linux-s390x
+    password:
+      from_secret: docker_password
+    repo: rancher/rancher-agent
+    username:
+      from_secret: docker_username
+  when:
+    ref:
+      include:
+      - "refs/heads/master"
+      - "refs/heads/release/v*"
+    event:
+    - push
+
+- name: docker-publish
+  image: rancher/drone-images:docker-s390x
+  failure: ignore
+  volumes:
+    - name: docker
+      path: /var/run/docker.sock
+  settings:
+    purge: false
+    build_args:
+    - ARCH=s390x
+    - "VERSION=${DRONE_TAG}"
+    context: package/
+    custom_dns: 1.1.1.1
+    dockerfile: package/Dockerfile
+    password:
+      from_secret: docker_password
+    repo: rancher/rancher
+    tag: "${DRONE_TAG}-linux-s390x"
+    username:
+      from_secret: docker_username
+  when:
+    event:
+    - tag
+
+- name: docker-publish-installer
+  image: rancher/drone-images:docker-s390x
+  failure: ignore
+  volumes:
+    - name: docker
+      path: /var/run/docker.sock
+  settings:
+    purge: false
+    build_args:
+    - ARCH=s390x
+    - "VERSION=${DRONE_TAG}"
+    - "RANCHER_TAG=${DRONE_TAG}-linux-s390x"
+    context: package/
+    custom_dns: 1.1.1.1
+    dockerfile: package/Dockerfile.installer
+    password:
+      from_secret: docker_password
+    repo: rancher/system-agent-installer-rancher
+    tag: "${DRONE_TAG}-linux-s390x"
+    username:
+      from_secret: docker_username
+  when:
+    event:
+    - tag
+
+- name: docker-publish-agent
+  image: rancher/drone-images:docker-s390x
+  failure: ignore
+  volumes:
+    - name: docker
+      path: /var/run/docker.sock
+  settings:
+    purge: false
+    build_args:
+    - ARCH=s390x
+    - "VERSION=${DRONE_TAG}"
+    - "RANCHER_TAG=${DRONE_TAG}-linux-s390x"
+    context: package/
+    custom_dns: 1.1.1.1
+    dockerfile: package/Dockerfile.agent
+    password:
+      from_secret: docker_password
+    repo: rancher/rancher-agent
+    tag: "${DRONE_TAG}-linux-s390x"
+    username:
+      from_secret: docker_username
+  when:
+    event:
+    - tag
+
+volumes:
+- name: docker
+  host:
+    path: /var/run/docker.sock
+
+trigger:
+  event:
+    exclude:
+    - promote
+---
+kind: pipeline
 name: default-windows-1809
 
 platform:
@@ -929,6 +1137,7 @@ steps:
     password:
       from_secret: docker_password
     spec: manifest-installer.tmpl
+    ignore_missing: true
   when:
     instance:
       include:
@@ -945,6 +1154,7 @@ steps:
     password:
       from_secret: docker_password
     spec: manifest-installer-head.tmpl
+    ignore_missing: true
   when:
     instance:
       include:
@@ -960,6 +1170,7 @@ steps:
     password:
       from_secret: docker_password
     spec: manifest-agent.tmpl
+    ignore_missing: true
   when:
     instance:
       include:
@@ -976,6 +1187,7 @@ steps:
     password:
       from_secret: docker_password
     spec: manifest-agent-head.tmpl
+    ignore_missing: true
   when:
     instance:
       include:
@@ -991,6 +1203,7 @@ steps:
     password:
       from_secret: docker_password
     spec: manifest-head.tmpl
+    ignore_missing: true
   when:
     instance:
       include:
@@ -1006,6 +1219,7 @@ steps:
     password:
       from_secret: docker_password
     spec: manifest.tmpl
+    ignore_missing: true
   when:
     instance:
       include:
@@ -1071,6 +1285,7 @@ trigger:
 depends_on:
 - default-linux-amd64
 - default-linux-arm64
+- default-linux-s390x
 - default-windows-1809
 - default-windows-20H2
 - default-windows-ltsc2022
@@ -1157,6 +1372,52 @@ trigger:
 depends_on:
 - default-linux-amd64
 - default-linux-arm64
+---
+kind: pipeline
+name: docker-image-digests-linux-s390x
+
+platform:
+  os: linux
+  arch: amd64
+
+# Hack needed for s390x: https://gist.github.com/colstrom/c2f359f72658aaabb44150ac20b16d7c#gistcomment-3858388
+node:
+  arch: s390x
+
+steps:
+- name: docker-image-digests
+  image: rancher/drone-docker-digests:s390x
+  failure: ignore
+  environment:
+    PLUGIN_GITHUB_REPOSITORY: "rancher/rancher"
+    PLUGIN_GITHUB_TOKEN:
+      from_secret: github_token
+    PLUGIN_GITHUB_TAG: "${DRONE_TAG}"
+    PLUGIN_INPUT_FILE: "rancher-images.txt"
+    PLUGIN_OUTPUT_FILE: "rancher-images-digests-linux-s390x.txt"
+    PLUGIN_REGISTRY: "docker.io"
+  volumes:
+  - name: docker
+    path: /var/run/docker.sock
+  when:
+    instance:
+      include:
+      - drone-publish.rancher.io
+    event:
+    - tag
+
+volumes:
+- name: docker
+  host:
+    path: /var/run/docker.sock
+
+trigger:
+  event:
+    exclude:
+    - promote
+
+depends_on:
+- default-linux-s390x
 ---
 kind: pipeline
 name: docker-image-digests-windows-1809

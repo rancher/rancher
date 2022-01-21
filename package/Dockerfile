@@ -1,3 +1,17 @@
+ARG K3S_BUILDER=rancher/k3s:v1.22.5-k3s1
+
+# Use binaries from k3s root for s390x as k3s is not available on s390x
+FROM registry.suse.com/suse/sle15:15.3 AS k3s_root
+ARG ARCH
+ENV ARCH=${ARCH}
+ENV K3S_ROOT_VERSION v0.11.0
+ONBUILD RUN zypper -n in tar
+ONBUILD ADD https://github.com/rancher/k3s-root/releases/download/${K3S_ROOT_VERSION}/k3s-root-${ARCH}.tar /k3s-root.tar
+ONBUILD RUN tar xvf /k3s-root.tar; \
+  touch /bin/cni /bin/containerd /bin/containerd-shim-runc-v2 /bin/runc
+
+FROM ${K3S_BUILDER} as k3s_builder
+
 FROM registry.suse.com/suse/sle15:15.3
 
 RUN zypper -n install git-core curl ca-certificates unzip xz gzip sed tar shadow gawk vim && \
@@ -31,16 +45,16 @@ ENV CATTLE_K3S_VERSION v1.22.5+k3s1
 ENV CATTLE_MACHINE_VERSION v0.15.0-rancher73
 ENV CATTLE_MACHINE_PROVISION_IMAGE rancher/machine:${CATTLE_MACHINE_VERSION}
 ENV CATTLE_ETCD_VERSION v3.5.1
-ENV LOGLEVEL_VERSION v0.1.3
+ENV LOGLEVEL_VERSION v0.1.4
 ENV TINI_VERSION v0.18.0
-ENV TELEMETRY_VERSION v0.5.16
+ENV TELEMETRY_VERSION v0.5.17
 ENV DOCKER_MACHINE_LINODE_VERSION v0.1.8
 ENV LINODE_UI_DRIVER_VERSION v0.3.0
 # make sure the version number is consistent with the one at Line 100 of pkg/data/management/machinedriver_data.go
 ENV DOCKER_MACHINE_HARVESTER_VERSION v0.3.4
 ENV CATTLE_KDM_BRANCH ${CATTLE_KDM_BRANCH}
 ENV HELM_VERSION v3.7.1
-ENV KUSTOMIZE_VERSION v3.10.0
+ENV KUSTOMIZE_VERSION v4.4.1
 ENV CATTLE_SYSTEM_AGENT_VERSION v0.1.1
 ENV CATTLE_SYSTEM_AGENT_UPGRADE_IMAGE rancher/system-agent:${CATTLE_SYSTEM_AGENT_VERSION}-suc
 ENV CATTLE_SYSTEM_UPGRADE_CONTROLLER_CHART_VERSION 100.0.1+up0.3.1
@@ -73,6 +87,7 @@ RUN curl -LO https://releases.rancher.com/harvester-node-driver/${DOCKER_MACHINE
 
 ENV TINI_URL_amd64=https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini \
     TINI_URL_arm64=https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini-arm64 \
+    TINI_URL_s390x=https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini-s390x \
     TINI_URL=TINI_URL_${ARCH}
 
 ENV HELM_URL_V2_amd64=https://github.com/rancher/helm/releases/download/${CATTLE_HELM_VERSION}/rancher-helm \
@@ -87,12 +102,13 @@ ENV HELM_URL_V2_amd64=https://github.com/rancher/helm/releases/download/${CATTLE
 
 RUN curl -sLf ${KUSTOMIZE_URL} | tar -xzf - -C /usr/bin
 
-# set up helm 2
-RUN curl -sLf ${!HELM_URL_V2} > /usr/bin/rancher-helm && \
-    curl -sLf ${!TILLER_URL} > /usr/bin/rancher-tiller && \
-    ln -s /usr/bin/rancher-helm /usr/bin/helm && \
-    ln -s /usr/bin/rancher-tiller /usr/bin/tiller && \
-    chmod +x /usr/bin/rancher-helm /usr/bin/rancher-tiller
+RUN if [ "${ARCH}" != "s390x" ]; then \
+        curl -sLf ${!HELM_URL_V2} > /usr/bin/rancher-helm && \
+        curl -sLf ${!TILLER_URL} > /usr/bin/rancher-tiller && \
+        ln -s /usr/bin/rancher-helm /usr/bin/helm && \
+        ln -s /usr/bin/rancher-tiller /usr/bin/tiller && \
+        chmod +x /usr/bin/rancher-helm /usr/bin/rancher-tiller; \
+    fi
 
 # set up helm 3
 RUN curl ${HELM_URL_V3} | tar xvzf - --strip-components=1 -C /usr/bin && \
@@ -100,7 +116,7 @@ RUN curl ${HELM_URL_V3} | tar xvzf - --strip-components=1 -C /usr/bin && \
     chmod +x /usr/bin/kustomize
 
 # Set up K3s: copy the necessary binaries from the K3s image.
-COPY --from=rancher/k3s:v1.22.5-k3s1 \
+COPY --from=k3s_builder \
     /bin/blkid \
     /bin/charon \
     /bin/cni \
@@ -180,6 +196,7 @@ RUN mkdir -p /usr/share/rancher/ui && \
     curl -sfL https://github.com/rancher/system-agent/releases/download/${CATTLE_SYSTEM_AGENT_VERSION}/rancher-system-agent-arm -O && \
     curl -sfL https://github.com/rancher/system-agent/releases/download/${CATTLE_SYSTEM_AGENT_VERSION}/rancher-system-agent-arm64 -O && \
     curl -sfL https://github.com/rancher/system-agent/releases/download/${CATTLE_SYSTEM_AGENT_VERSION}/rancher-system-agent-amd64 -O && \
+    curl -sfL https://github.com/rancher/system-agent/releases/download/${CATTLE_SYSTEM_AGENT_VERSION}/rancher-system-agent-s390x -O && \
     curl -sfL https://github.com/rancher/system-agent/releases/download/${CATTLE_SYSTEM_AGENT_VERSION}/install.sh -o system-agent-install.sh && \
     curl -sfL https://raw.githubusercontent.com/rancher/rke2/master/windows/rke2-install.ps1 -o rke2-install.ps1
 

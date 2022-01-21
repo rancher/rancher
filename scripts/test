@@ -15,13 +15,18 @@ cleanup()
     return $EXIT
 }
 
+# skipping tests for s390x since k3s doesn't support s390x yet
+if [ ${ARCH} == s390x ]; then
+    exit 0
+fi
+
 cd $(dirname $0)/..
 
 #[ "${ARCH}" == "amd64" ] && RACE=-race
 go test -cover -tags=test ./pkg/...
 
-if [ ${ARCH} == arm64 ]; then
-    export ETCD_UNSUPPORTED_ARCH=arm64
+if [ ${ARCH} == arm64 ] || [ ${ARCH} == s390x ]; then
+    export ETCD_UNSUPPORTED_ARCH=${ARCH}
 fi
 
 echo Starting rancher server for test
