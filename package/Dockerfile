@@ -16,7 +16,7 @@ WORKDIR /var/lib/rancher
 ARG ARCH=amd64
 ARG IMAGE_REPO=rancher
 ARG SYSTEM_CHART_DEFAULT_BRANCH=release-v2.6
-ARG CHART_DEFAULT_BRANCH=release-v2.6
+ARG CHART_DEFAULT_BRANCH=release-v2.6.3-patch1
 ARG PARTNER_CHART_DEFAULT_BRANCH=main
 ARG RKE2_CHART_DEFAULT_BRANCH=main
 # kontainer-driver-metadata branch to be set for specific branch other than dev/master, logic at rancher/rancher/pkg/settings/setting.go
@@ -46,7 +46,7 @@ ENV CATTLE_SYSTEM_AGENT_UPGRADE_IMAGE rancher/system-agent:${CATTLE_SYSTEM_AGENT
 
 # System charts minimal version
 ENV CATTLE_FLEET_MIN_VERSION=100.0.2+up0.3.8
-ENV CATTLE_RANCHER_WEBHOOK_MIN_VERSION=1.0.2+up0.2.2
+ENV CATTLE_RANCHER_WEBHOOK_MIN_VERSION=1.0.3+up0.2.4-rc7
 
 RUN mkdir -p /var/lib/rancher-data/local-catalogs/system-library && \
     mkdir -p /var/lib/rancher-data/local-catalogs/library && \
