@@ -1,3 +1,17 @@
+ARG K3S_BUILDER=rancher/k3s:v1.22.5-k3s1
+
+# Use binaries from k3s root for s390x as k3s is not available on s390x
+FROM registry.suse.com/suse/sle15:15.3 AS k3s_root
+ARG DAPPER_HOST_ARCH
+ENV ARCH=${DAPPER_HOST_ARCH}
+ENV K3S_ROOT_VERSION v0.11.0
+ONBUILD RUN zypper -n in tar
+ONBUILD ADD https://github.com/rancher/k3s-root/releases/download/${K3S_ROOT_VERSION}/k3s-root-${ARCH}.tar /k3s-root.tar
+ONBUILD RUN tar xvf /k3s-root.tar; \
+  touch /bin/cni /bin/containerd /bin/containerd-shim-runc-v2 /bin/runc
+
+FROM ${K3S_BUILDER} as k3s_builder
+
 FROM registry.suse.com/suse/sle15:15.3
 
 ARG DAPPER_HOST_ARCH
@@ -9,7 +23,7 @@ ENV CATTLE_K3S_VERSION v1.22.5+k3s1
 ENV CATTLE_HELM_UNITTEST_VERSION v0.1.7-rancher3
 # helm 3 version
 ENV HELM_VERSION v3.7.1
-ENV KUSTOMIZE_VERSION v3.10.0
+ENV KUSTOMIZE_VERSION v4.4.1
 
 # kontainer-driver-metadata branch to be set for specific branch other than dev/master, logic at rancher/rancher/pkg/settings/setting.go
 ENV CATTLE_KDM_BRANCH=dev-v2.6
@@ -19,10 +33,7 @@ RUN zypper install -y -f docker
 
 RUN curl -sLf https://github.com/rancher/machine/releases/download/${CATTLE_MACHINE_VERSION}/rancher-machine-${ARCH}.tar.gz | tar xvzf - -C /usr/bin
 
-ENV GOLANG_ARCH_amd64=amd64 GOLANG_ARCH_arm=armv6l GOLANG_ARCH_arm64=arm64 GOLANG_ARCH=GOLANG_ARCH_${ARCH} \
-    GOPATH=/go PATH=/go/bin:/usr/local/go/bin:${PATH} SHELL=/bin/bash
-
-RUN curl -sLf https://storage.googleapis.com/golang/go1.16.9.linux-${!GOLANG_ARCH}.tar.gz | tar -xzf - -C /usr/local
+RUN zypper -n in go1.16
 
 RUN if [ "${ARCH}" == "amd64" ]; then \
         curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s v1.43.0; \
@@ -44,14 +55,16 @@ ENV HELM_URL_V2_amd64=https://github.com/rancher/helm/releases/download/${CATTLE
 
 RUN curl -sLf ${KUSTOMIZE_URL} | tar -xzf - -C /usr/bin
 
-# set up helm 2
-RUN curl -sLf ${!HELM_URL_V2} -o /usr/bin/rancher-helm && \
-    curl -sLf ${!TILLER_URL} -o /usr/bin/rancher-tiller && \
-    chmod +x /usr/bin/rancher-helm /usr/bin/rancher-tiller && \
-    ln -s /usr/bin/rancher-helm /usr/bin/helm && \
-    ln -s /usr/bin/rancher-tiller /usr/bin/tiller && \
-    helm init -c --stable-repo-url https://charts.helm.sh/stable/ && \
-    helm plugin install https://github.com/rancher/helm-unittest
+# set up helm 2 to all archs other than s390x
+RUN if [ "${ARCH}" != "s390x" ]; then \
+        curl -sLf ${!HELM_URL_V2} -o /usr/bin/rancher-helm && \
+        curl -sLf ${!TILLER_URL} -o /usr/bin/rancher-tiller && \
+        chmod +x /usr/bin/rancher-helm /usr/bin/rancher-tiller && \
+        ln -s /usr/bin/rancher-helm /usr/bin/helm && \
+        ln -s /usr/bin/rancher-tiller /usr/bin/tiller && \
+        helm init -c --stable-repo-url https://charts.helm.sh/stable/ && \
+        helm plugin install https://github.com/rancher/helm-unittest; \
+    fi
 
 # set up helm 3
 RUN mkdir /usr/tmp && \
@@ -60,7 +73,7 @@ RUN mkdir /usr/tmp && \
     chmod +x /usr/bin/kustomize
 
 # Set up K3s: copy the necessary binaries from the K3s image.
-COPY --from=rancher/k3s:v1.22.5-k3s1 \
+COPY --from=k3s_builder \
     /bin/blkid \
     /bin/charon \
     /bin/cni \
@@ -103,7 +116,10 @@ RUN ln -s /usr/bin/cni /usr/bin/bridge && \
 RUN mkdir -p /go/src/github.com/rancher/rancher/.kube && \
     ln -s /etc/rancher/k3s/k3s.yaml /go/src/github.com/rancher/rancher/.kube/k3s.yaml
 
-RUN curl -sLf https://github.com/rancher/k3s/releases/download/${CATTLE_K3S_VERSION}/k3s-images.txt -o /usr/tmp/k3s-images.txt
+# Add k3s for all archs except s390x since k3s doesn't support s390x
+RUN if [ "${ARCH}" != "s390x" ]; then \
+        curl -sLf https://github.com/rancher/k3s/releases/download/${CATTLE_K3S_VERSION}/k3s-images.txt -o /usr/tmp/k3s-images.txt; \
+    fi
 
 ENV YQ_URL=https://github.com/mikefarah/yq/releases/download/3.4.1/yq_linux_${ARCH}
 RUN curl -sLf ${YQ_URL} -o /usr/bin/yq && chmod +x /usr/bin/yq
