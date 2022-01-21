@@ -66,6 +66,8 @@ type RKEConfig struct {
 
 	ETCDSnapshotCreate  *rkev1.ETCDSnapshotCreate  `json:"etcdSnapshotCreate,omitempty"`
 	ETCDSnapshotRestore *rkev1.ETCDSnapshotRestore `json:"etcdSnapshotRestore,omitempty"`
-	MachinePools        []RKEMachinePool           `json:"machinePools,omitempty"`
-	InfrastructureRef   *corev1.ObjectReference    `json:"infrastructureRef,omitempty"`
+	RotateCertificates  *rkev1.RotateCertificates  `json:"rotateCertificates,omitempty"`
+
+	MachinePools      []RKEMachinePool        `json:"machinePools,omitempty"`
+	InfrastructureRef *corev1.ObjectReference `json:"infrastructureRef,omitempty"`
 }

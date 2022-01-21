@@ -120,6 +120,8 @@ type Planner struct {
 	kubeconfig                    *kubeconfig.Manager
 	locker                        locker.Locker
 	etcdS3Args                    s3Args
+	etcdArgs                      s3Args
+	certificateRotation           *certificateRotation
 }
 
 func New(ctx context.Context, clients *wrangler.Context) *Planner {
@@ -144,6 +146,7 @@ func New(ctx context.Context, clients *wrangler.Context) *Planner {
 			env:         true,
 			secretCache: clients.Core.Secret().Cache(),
 		},
+		certificateRotation: newCertificateRotation(clients, store),
 	}
 }
 
@@ -206,6 +209,10 @@ func (p *Planner) Process(controlPlane *rkev1.RKEControlPlane) error {
 	// on the first run through, electInitNode will return a `generic.ErrSkip` as it is attempting to wait for the cache to catch up.
 	joinServer, err = p.electInitNode(controlPlane, plan)
 	if err != nil {
+		return err
+	}
+
+	if err := p.certificateRotation.RotateCertificates(controlPlane, plan); err != nil {
 		return err
 	}
 
