@@ -1,4 +1,4 @@
-ARG K3S_BUILDER
+ARG K3S_BUILDER=rancher/k3s:v1.22.5-k3s1
 
 # Use binaries from k3s root for s390x as k3s is not available on s390x
 FROM registry.suse.com/suse/sle15:15.3 AS k3s_root

@@ -600,6 +600,7 @@ steps:
     build_args:
     - ARCH=s390x
     - VERSION=${DRONE_BRANCH/release\//}-${DRONE_COMMIT}-head
+    - K3S_BUILDER=k3s_root
     context: package/
     custom_dns: 1.1.1.1
     dockerfile: package/Dockerfile
