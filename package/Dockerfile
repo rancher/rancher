@@ -60,8 +60,8 @@ ENV CATTLE_SYSTEM_AGENT_UPGRADE_IMAGE rancher/system-agent:${CATTLE_SYSTEM_AGENT
 ENV CATTLE_SYSTEM_UPGRADE_CONTROLLER_CHART_VERSION 100.0.1+up0.3.1
 
 # System charts minimal version
-ENV CATTLE_FLEET_MIN_VERSION=100.0.2+up0.3.8
-ENV CATTLE_RANCHER_WEBHOOK_MIN_VERSION=1.0.3+up0.2.4-rc4
+ENV CATTLE_FLEET_MIN_VERSION=100.0.3+up0.3.9-rc1
+ENV CATTLE_RANCHER_WEBHOOK_MIN_VERSION=1.0.3+up0.2.4-rc6
 
 RUN mkdir -p /var/lib/rancher-data/local-catalogs/system-library && \
     mkdir -p /var/lib/rancher-data/local-catalogs/library && \
@@ -163,8 +163,8 @@ RUN curl -sLf ${!TINI_URL} > /usr/bin/tini && \
     chmod +x /usr/bin/tini /usr/bin/telemetry && \
     mkdir -p /var/lib/rancher-data/driver-metadata
 
-ENV CATTLE_UI_VERSION 2.6.3
-ENV CATTLE_DASHBOARD_UI_VERSION v2.6.3
+ENV CATTLE_UI_VERSION 2.6.4-alpha1
+ENV CATTLE_DASHBOARD_UI_VERSION v2.6.4-alpha1
 ENV CATTLE_CLI_VERSION v2.6.0
 
 # Please update the api-ui-version in pkg/settings/settings.go when updating the version here.
