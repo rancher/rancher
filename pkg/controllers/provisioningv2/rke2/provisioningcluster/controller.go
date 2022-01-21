@@ -169,7 +169,7 @@ func (h *handler) OnRancherClusterChange(obj *rancherv1.Cluster, status rancherv
 	}
 
 	status, err := h.updateClusterProvisioningStatus(obj, status)
-	if err != nil {
+	if err != nil && !apierror.IsNotFound(err) {
 		return nil, status, err
 	}
 
@@ -179,9 +179,7 @@ func (h *handler) OnRancherClusterChange(obj *rancherv1.Cluster, status rancherv
 
 func (h *handler) updateClusterProvisioningStatus(cluster *rancherv1.Cluster, status rancherv1.ClusterStatus) (rancherv1.ClusterStatus, error) {
 	capiCluster, err := h.capiClusters.Get(cluster.Namespace, cluster.Name)
-	if apierror.IsNotFound(err) {
-		return status, nil
-	} else if err != nil {
+	if err != nil {
 		return status, err
 	}
 

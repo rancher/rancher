@@ -489,6 +489,7 @@ func rkeControlPlane(cluster *rancherv1.Cluster) (*rkev1.RKEControlPlane, error)
 			LocalClusterAuthEndpoint: *cluster.Spec.LocalClusterAuthEndpoint.DeepCopy(),
 			ETCDSnapshotRestore:      cluster.Spec.RKEConfig.ETCDSnapshotRestore.DeepCopy(),
 			ETCDSnapshotCreate:       cluster.Spec.RKEConfig.ETCDSnapshotCreate.DeepCopy(),
+			RotateCertificates:       cluster.Spec.RKEConfig.RotateCertificates.DeepCopy(),
 			KubernetesVersion:        cluster.Spec.KubernetesVersion,
 			ManagementClusterName:    cluster.Status.ClusterName, // management cluster
 			AgentEnvVars:             cluster.Spec.AgentEnvVars,
