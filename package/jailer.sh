@@ -79,11 +79,17 @@ cp -l /usr/bin/kustomize.sh /opt/jail/$NAME
 # Hard link ssh into the jail
 cp -l /usr/bin/ssh /opt/jail/$NAME/usr/bin
 
+# Hard link nc into the jail
+cp -l /usr/bin/nc /opt/jail/$NAME/usr/bin
+
 # Hard link cat into the jail
 cp -l /bin/cat /opt/jail/$NAME/bin/
 
 # Hard link bash into the jail
 cp -l /bin/bash /opt/jail/$NAME/bin/
+
+# Hard link sh into the jail
+cp -l /bin/sh /opt/jail/$NAME/bin/
 
 # Hard link rm into the jail
 cp -l /bin/rm /opt/jail/$NAME/bin/
