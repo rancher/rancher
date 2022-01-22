@@ -14,7 +14,7 @@ FROM ${K3S_BUILDER} as k3s_builder
 
 FROM registry.suse.com/suse/sle15:15.3
 
-RUN zypper -n install git-core curl ca-certificates unzip xz gzip sed tar shadow gawk vim && \
+RUN zypper -n install git-core curl ca-certificates unzip xz gzip sed tar shadow gawk vim netcat-openbsd && \
     zypper -n clean -a && rm -rf /tmp/* /var/tmp/* /usr/share/doc/packages/* && \
     useradd rancher && \
     mkdir -p /var/lib/rancher /var/lib/cattle /opt/jail /opt/drivers/management-state/bin && \

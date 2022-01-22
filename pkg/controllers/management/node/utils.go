@@ -41,14 +41,14 @@ const (
 
 func buildAgentCommand(node *v3.Node, dockerRun string) []string {
 	drun := strings.Fields(dockerRun)
-	cmd := []string{"--native-ssh", "ssh", node.Spec.RequestedHostname}
+	cmd := []string{"ssh", node.Spec.RequestedHostname}
 	cmd = append(cmd, drun...)
 	cmd = append(cmd, "-r", "-n", node.Name)
 	return cmd
 }
 
 func buildLoginCommand(node *v3.Node, login string) []string {
-	cmd := []string{"--native-ssh", "ssh", node.Spec.RequestedHostname}
+	cmd := []string{"ssh", node.Spec.RequestedHostname}
 	cmd = append(cmd, strings.Fields(login)...)
 	return cmd
 }
