@@ -22,6 +22,8 @@ import (
 	clientset "github.com/rancher/rancher/pkg/generated/clientset/versioned"
 	catalogv1 "github.com/rancher/rancher/pkg/generated/clientset/versioned/typed/catalog.cattle.io/v1"
 	fakecatalogv1 "github.com/rancher/rancher/pkg/generated/clientset/versioned/typed/catalog.cattle.io/v1/fake"
+	fleetv1alpha1 "github.com/rancher/rancher/pkg/generated/clientset/versioned/typed/fleet.cattle.io/v1alpha1"
+	fakefleetv1alpha1 "github.com/rancher/rancher/pkg/generated/clientset/versioned/typed/fleet.cattle.io/v1alpha1/fake"
 	provisioningv1 "github.com/rancher/rancher/pkg/generated/clientset/versioned/typed/provisioning.cattle.io/v1"
 	fakeprovisioningv1 "github.com/rancher/rancher/pkg/generated/clientset/versioned/typed/provisioning.cattle.io/v1/fake"
 	upgradev1 "github.com/rancher/rancher/pkg/generated/clientset/versioned/typed/upgrade.cattle.io/v1"
@@ -86,6 +88,9 @@ var (
 // CatalogV1 retrieves the CatalogV1Client
 func (c *Clientset) CatalogV1() catalogv1.CatalogV1Interface {
 	return &fakecatalogv1.FakeCatalogV1{Fake: &c.Fake}
+// FleetV1alpha1 retrieves the FleetV1alpha1Client
+func (c *Clientset) FleetV1alpha1() fleetv1alpha1.FleetV1alpha1Interface {
+	return &fakefleetv1alpha1.FakeFleetV1alpha1{Fake: &c.Fake}
 }
 
 // ProvisioningV1 retrieves the ProvisioningV1Client

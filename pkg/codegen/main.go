@@ -101,6 +101,7 @@ func main() {
 					fleet.Bundle{},
 					fleet.Cluster{},
 				},
+				GenerateClients: true,
 			},
 			"rke.cattle.io": {
 				Types: []interface{}{
