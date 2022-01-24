@@ -91,30 +91,37 @@ COPY --from=k3s_builder \
     /bin/aux/xtables-legacy-multi \
 /usr/bin/
 
-RUN ln -s /usr/bin/cni /usr/bin/bridge && \
-    ln -s /usr/bin/cni /usr/bin/flannel && \
-    ln -s /usr/bin/cni /usr/bin/host-local && \
-    ln -s /usr/bin/cni /usr/bin/loopback && \
-    ln -s /usr/bin/cni /usr/bin/portmap && \
-    ln -s /usr/bin/containerd /usr/bin/crictl && \
-    ln -s /usr/bin/containerd /usr/bin/ctr && \
-    ln -s /usr/bin/containerd /usr/bin/k3s && \
-    ln -s /usr/bin/containerd /usr/bin/k3s-agent && \
-    ln -s /usr/bin/containerd /usr/bin/k3s-etcd-snapshot && \
-    ln -s /usr/bin/containerd /usr/bin/k3s-server && \
-    ln -s /usr/bin/containerd /usr/bin/kubectl && \
-    ln -s /usr/bin/pigz /usr/bin/unpigz && \
-    ln -s /usr/bin/xtables-legacy-multi /usr/bin/iptables && \
-    ln -s /usr/bin/xtables-legacy-multi /usr/bin/iptables-save && \
-    ln -s /usr/bin/xtables-legacy-multi /usr/bin/iptables-restore && \
-    ln -s /usr/bin/xtables-legacy-multi /usr/bin/iptables-translate && \
-    ln -s /usr/bin/xtables-legacy-multi /usr/bin/ip6tables && \
-    ln -s /usr/bin/xtables-legacy-multi /usr/bin/ip6tables-save && \
-    ln -s /usr/bin/xtables-legacy-multi /usr/bin/ip6tables-restore && \
-    ln -s /usr/bin/xtables-legacy-multi /usr/bin/ip6tables-translate
+RUN mkdir -p /go/src/github.com/rancher/rancher/.kube
 
-RUN mkdir -p /go/src/github.com/rancher/rancher/.kube && \
-    ln -s /etc/rancher/k3s/k3s.yaml /go/src/github.com/rancher/rancher/.kube/k3s.yaml
+RUN if [ "${ARCH}" != "s390x" ]; then \
+        ln -s /usr/bin/cni /usr/bin/bridge && \
+        ln -s /usr/bin/cni /usr/bin/flannel && \
+        ln -s /usr/bin/cni /usr/bin/host-local && \
+        ln -s /usr/bin/cni /usr/bin/loopback && \
+        ln -s /usr/bin/cni /usr/bin/portmap && \
+        ln -s /usr/bin/containerd /usr/bin/crictl && \
+        ln -s /usr/bin/containerd /usr/bin/ctr && \
+        ln -s /usr/bin/containerd /usr/bin/k3s && \
+        ln -s /usr/bin/containerd /usr/bin/k3s-agent && \
+        ln -s /usr/bin/containerd /usr/bin/k3s-etcd-snapshot && \
+        ln -s /usr/bin/containerd /usr/bin/k3s-server && \
+        ln -s /usr/bin/containerd /usr/bin/kubectl && \
+        ln -s /usr/bin/pigz /usr/bin/unpigz && \
+        ln -s /usr/bin/xtables-legacy-multi /usr/bin/iptables && \
+        ln -s /usr/bin/xtables-legacy-multi /usr/bin/iptables-save && \
+        ln -s /usr/bin/xtables-legacy-multi /usr/bin/iptables-restore && \
+        ln -s /usr/bin/xtables-legacy-multi /usr/bin/iptables-translate && \
+        ln -s /usr/bin/xtables-legacy-multi /usr/bin/ip6tables && \
+        ln -s /usr/bin/xtables-legacy-multi /usr/bin/ip6tables-save && \
+        ln -s /usr/bin/xtables-legacy-multi /usr/bin/ip6tables-restore && \
+        ln -s /usr/bin/xtables-legacy-multi /usr/bin/ip6tables-translate && \
+        ln -s /etc/rancher/k3s/k3s.yaml /go/src/github.com/rancher/rancher/.kube/k3s.yaml; \
+    else  \
+        # Download kubectl for s390x since k3s is not available
+        KUBECTL_URL=https://storage.googleapis.com/kubernetes-release/release/v1.21.7/bin/linux/${ARCH}/kubectl; \
+        curl -sLf ${KUBECTL_URL} -o /usr/bin/kubectl && chmod +x /usr/bin/kubectl; \
+    fi
+
 
 # Add k3s for all archs except s390x since k3s doesn't support s390x
 RUN if [ "${ARCH}" != "s390x" ]; then \

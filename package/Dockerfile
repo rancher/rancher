@@ -134,27 +134,29 @@ COPY --from=k3s_builder \
     /bin/aux/xtables-legacy-multi \
 /usr/bin/
 
-RUN ln -s /usr/bin/cni /usr/bin/bridge && \
-    ln -s /usr/bin/cni /usr/bin/flannel && \
-    ln -s /usr/bin/cni /usr/bin/host-local && \
-    ln -s /usr/bin/cni /usr/bin/loopback && \
-    ln -s /usr/bin/cni /usr/bin/portmap && \
-    ln -s /usr/bin/containerd /usr/bin/crictl && \
-    ln -s /usr/bin/containerd /usr/bin/ctr && \
-    ln -s /usr/bin/containerd /usr/bin/k3s && \
-    ln -s /usr/bin/containerd /usr/bin/k3s-agent && \
-    ln -s /usr/bin/containerd /usr/bin/k3s-etcd-snapshot && \
-    ln -s /usr/bin/containerd /usr/bin/k3s-server && \
-    ln -s /usr/bin/containerd /usr/bin/kubectl && \
-    ln -s /usr/bin/pigz /usr/bin/unpigz && \
-    ln -s /usr/bin/xtables-legacy-multi /usr/bin/iptables && \
-    ln -s /usr/bin/xtables-legacy-multi /usr/bin/iptables-save && \
-    ln -s /usr/bin/xtables-legacy-multi /usr/bin/iptables-restore && \
-    ln -s /usr/bin/xtables-legacy-multi /usr/bin/iptables-translate && \
-    ln -s /usr/bin/xtables-legacy-multi /usr/bin/ip6tables && \
-    ln -s /usr/bin/xtables-legacy-multi /usr/bin/ip6tables-save && \
-    ln -s /usr/bin/xtables-legacy-multi /usr/bin/ip6tables-restore && \
-    ln -s /usr/bin/xtables-legacy-multi /usr/bin/ip6tables-translate
+RUN if [ "${ARCH}" != "s390x" ]; then \
+        ln -s /usr/bin/cni /usr/bin/bridge && \
+        ln -s /usr/bin/cni /usr/bin/flannel && \
+        ln -s /usr/bin/cni /usr/bin/host-local && \
+        ln -s /usr/bin/cni /usr/bin/loopback && \
+        ln -s /usr/bin/cni /usr/bin/portmap && \
+        ln -s /usr/bin/containerd /usr/bin/crictl && \
+        ln -s /usr/bin/containerd /usr/bin/ctr && \
+        ln -s /usr/bin/containerd /usr/bin/k3s && \
+        ln -s /usr/bin/containerd /usr/bin/k3s-agent && \
+        ln -s /usr/bin/containerd /usr/bin/k3s-etcd-snapshot && \
+        ln -s /usr/bin/containerd /usr/bin/k3s-server && \
+        ln -s /usr/bin/containerd /usr/bin/kubectl && \
+        ln -s /usr/bin/pigz /usr/bin/unpigz && \
+        ln -s /usr/bin/xtables-legacy-multi /usr/bin/iptables && \
+        ln -s /usr/bin/xtables-legacy-multi /usr/bin/iptables-save && \
+        ln -s /usr/bin/xtables-legacy-multi /usr/bin/iptables-restore && \
+        ln -s /usr/bin/xtables-legacy-multi /usr/bin/iptables-translate && \
+        ln -s /usr/bin/xtables-legacy-multi /usr/bin/ip6tables && \
+        ln -s /usr/bin/xtables-legacy-multi /usr/bin/ip6tables-save && \
+        ln -s /usr/bin/xtables-legacy-multi /usr/bin/ip6tables-restore && \
+        ln -s /usr/bin/xtables-legacy-multi /usr/bin/ip6tables-translate; \
+    fi
 
 RUN curl -sLf ${!TINI_URL} > /usr/bin/tini && \
     mkdir -p /var/lib/rancher/k3s/agent/images/ && \
@@ -162,6 +164,11 @@ RUN curl -sLf ${!TINI_URL} > /usr/bin/tini && \
     curl -sLf https://github.com/rancher/telemetry/releases/download/${TELEMETRY_VERSION}/telemetry-${ARCH} > /usr/bin/telemetry && \
     chmod +x /usr/bin/tini /usr/bin/telemetry && \
     mkdir -p /var/lib/rancher-data/driver-metadata
+
+RUN  if [ "${ARCH}" == "s390x" ]; then \
+      curl -sLf https://storage.googleapis.com/kubernetes-release/release/${CATTLE_K3S_VERSION%+*}/bin/linux/${ARCH}/kubectl > /usr/bin/kubectl && \
+      chmod +x /usr/bin/kubectl; \
+     fi
 
 ENV CATTLE_UI_VERSION 2.6.4-alpha1
 ENV CATTLE_DASHBOARD_UI_VERSION v2.6.4-alpha1
