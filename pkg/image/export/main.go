@@ -55,13 +55,12 @@ func main() {
 	}
 }
 
-func run(systemChartPath, chartPath string, imagesFromArgs []string) error {
-	tag, ok := os.LookupEnv("TAG")
+func run(systemChartsPath, chartsPath string, imagesFromArgs []string) error {
+	rancherVersion, ok := os.LookupEnv("TAG")
 	if !ok {
-		return fmt.Errorf("no tag %s", tag)
+		return fmt.Errorf("no tag %s", rancherVersion)
 	}
-	rancherVersion := tag
-	if strings.HasPrefix(rancherVersion, "dev") || strings.HasPrefix(rancherVersion, "master") || strings.HasSuffix(rancherVersion, "-head") {
+	if !img.IsValidSemver(rancherVersion) || strings.HasPrefix(rancherVersion, "dev") || strings.HasPrefix(rancherVersion, "master") || strings.HasSuffix(rancherVersion, "-head") {
 		rancherVersion = settings.RancherVersionDev
 	}
 	rancherVersion = strings.TrimPrefix(rancherVersion, "v")
@@ -117,12 +116,19 @@ func run(systemChartPath, chartPath string, imagesFromArgs []string) error {
 		externalImages["rke2All"] = rke2AllImages
 	}
 
-	targetImages, targetImagesAndSources, err := img.GetImages(systemChartPath, chartPath, externalImages, imagesFromArgs, linuxInfo.RKESystemImages, img.Linux)
+	exportConfig := img.ExportConfig{
+		SystemChartsPath: systemChartsPath,
+		ChartsPath:       chartsPath,
+		OsType:           img.Linux,
+		RancherVersion:   rancherVersion,
+	}
+	targetImages, targetImagesAndSources, err := img.GetImages(exportConfig, externalImages, imagesFromArgs, linuxInfo.RKESystemImages)
 	if err != nil {
 		return err
 	}
 
-	targetWindowsImages, targetWindowsImagesAndSources, err := img.GetImages(systemChartPath, chartPath, nil, []string{getWindowsAgentImage()}, windowsInfo.RKESystemImages, img.Windows)
+	exportConfig.OsType = img.Windows
+	targetWindowsImages, targetWindowsImagesAndSources, err := img.GetImages(exportConfig, nil, []string{getWindowsAgentImage()}, windowsInfo.RKESystemImages)
 	if err != nil {
 		return err
 	}
@@ -252,8 +258,6 @@ func imagesText(arch string, targetImages []string) error {
 		if err != nil {
 			return err
 		}
-
-		log.Println("Image:", image)
 		fmt.Fprintln(save, image)
 	}
 

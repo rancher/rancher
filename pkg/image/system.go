@@ -6,23 +6,24 @@ import (
 	rketypes "github.com/rancher/rke/types"
 )
 
-func fetchImagesFromSystem(rkeSystemImages map[string]rketypes.RKESystemImages, osType OSType, imagesSet map[string]map[string]bool) error {
-	collectionImagesList := []interface{}{
-		rkeSystemImages,
+type System struct {
+	Config ExportConfig
+}
+
+func (s System) FetchImages(rkeSystemImages map[string]rketypes.RKESystemImages, imagesSet map[string]map[string]struct{}) error {
+	if len(rkeSystemImages) <= 0 {
+		return nil
 	}
-	switch osType {
-	case Linux:
+	collectionImagesList := []interface{}{rkeSystemImages}
+	if s.Config.OsType == Linux {
 		collectionImagesList = append(collectionImagesList, v32.ToolsSystemImages)
 	}
-
 	images, err := flatImagesFromCollections(collectionImagesList...)
 	if err != nil {
 		return err
 	}
-
 	for _, image := range images {
 		addSourceToImage(imagesSet, image, "system")
-
 	}
 	return nil
 }
@@ -33,7 +34,6 @@ func flatImagesFromCollections(cols ...interface{}) (images []string, err error)
 		if err := convert.ToObj(col, &colObj); err != nil {
 			return []string{}, err
 		}
-
 		images = append(images, fetchImagesFromCollection(colObj)...)
 	}
 	return images, nil
