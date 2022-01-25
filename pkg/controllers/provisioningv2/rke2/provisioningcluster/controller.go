@@ -8,6 +8,7 @@ import (
 	"github.com/rancher/lasso/pkg/dynamic"
 	rancherv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
+	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2"
 	"github.com/rancher/rancher/pkg/features"
 	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta1"
 	mgmtcontroller "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
@@ -15,8 +16,8 @@ import (
 	rkecontroller "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/provisioningv2/rke2/planner"
 	"github.com/rancher/rancher/pkg/wrangler"
-	"github.com/rancher/wrangler/pkg/condition"
 	corecontrollers "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
+	"github.com/rancher/wrangler/pkg/generic"
 	"github.com/rancher/wrangler/pkg/relatedresource"
 	corev1 "k8s.io/api/core/v1"
 	apierror "k8s.io/apimachinery/pkg/api/errors"
@@ -27,7 +28,6 @@ import (
 
 const (
 	byNodeInfra                    = "by-node-infra"
-	Ready                          = condition.Cond("Ready")
 	defaultMachineConfigAPIVersion = "rke-machine-config.cattle.io/v1"
 )
 
@@ -90,6 +90,8 @@ func Register(ctx context.Context, clients *wrangler.Context) {
 		}
 		return nil, nil
 	}, clients.Provisioning.Cluster(), clients.RKE.RKEControlPlane())
+
+	clients.Provisioning.Cluster().OnRemove(ctx, "rke-cluster-remove", h.OnRemove)
 }
 
 func byNodeInfraIndex(obj *rancherv1.Cluster) ([]string, error) {
@@ -162,7 +164,7 @@ func (h *handler) OnRancherClusterChange(obj *rancherv1.Cluster, status rancherv
 		return nil, status, fmt.Errorf("kubernetesVersion not set on %s/%s", obj.Namespace, obj.Name)
 	}
 
-	if len(obj.Finalizers) == 0 {
+	if len(obj.Finalizers) == 0 && obj.DeletionTimestamp.IsZero() {
 		// If the cluster doesn't have any finalizers, then we don't apply any objects to ensure the finalizer can be put on the cluster.
 		return nil, status, nil
 	}
@@ -189,26 +191,26 @@ func (h *handler) updateClusterProvisioningStatus(cluster *rancherv1.Cluster, st
 		return status, nil
 	}
 
-	cp, err := h.rkeControlPlane.Get(cluster.Namespace, capiCluster.Spec.ControlPlaneRef.Name)
-	if apierror.IsNotFound(err) {
+	cp, err := h.rkeControlPlane.Get(capiCluster.Spec.ControlPlaneRef.Namespace, capiCluster.Spec.ControlPlaneRef.Name)
+	if apierror.IsNotFound(err) && cluster.DeletionTimestamp == nil {
 		return status, nil
 	} else if err != nil {
 		return status, err
 	}
 
-	if h.mgmtClusterCache != nil {
+	if cluster.DeletionTimestamp != nil && h.mgmtClusterCache != nil {
 		mgmtCluster, err := h.mgmtClusterCache.Get(cluster.Status.ClusterName)
 		if err != nil {
 			return status, err
 		}
 
-		message := Ready.GetMessage(cp)
-		if (message == "" && Ready.GetMessage(mgmtCluster) != "") || strings.Contains(message, planner.ETCDRestoreMessage) {
+		message := rke2.Ready.GetMessage(cp)
+		if (message == "" && rke2.Ready.GetMessage(mgmtCluster) != "") || strings.Contains(message, planner.ETCDRestoreMessage) {
 			mgmtCluster = mgmtCluster.DeepCopy()
 
-			Ready.SetStatus(mgmtCluster, Ready.GetStatus(cp))
-			Ready.Reason(mgmtCluster, Ready.GetReason(cp))
-			Ready.Message(mgmtCluster, message)
+			rke2.Provisioned.SetStatus(mgmtCluster, rke2.Ready.GetStatus(cp))
+			rke2.Provisioned.Reason(mgmtCluster, rke2.Ready.GetReason(cp))
+			rke2.Provisioned.Message(mgmtCluster, message)
 
 			_, err = h.mgmtClusterClient.Update(mgmtCluster)
 			if err != nil {
@@ -217,9 +219,35 @@ func (h *handler) updateClusterProvisioningStatus(cluster *rancherv1.Cluster, st
 		}
 	}
 
-	Ready.SetStatus(&status, Ready.GetStatus(cp))
-	Ready.Reason(&status, Ready.GetReason(cp))
-	Ready.Message(&status, Ready.GetMessage(cp))
+	clusterCondition := rke2.Provisioned
+	cpCondition := rke2.Ready
+	if !cluster.DeletionTimestamp.IsZero() {
+		clusterCondition = rke2.Removed
+		cpCondition = rke2.Removed
+	}
+	clusterCondition.SetStatus(&status, cpCondition.GetStatus(cp))
+	clusterCondition.Reason(&status, cpCondition.GetReason(cp))
+	clusterCondition.Message(&status, cpCondition.GetMessage(cp))
 
 	return status, nil
+}
+
+func (h *handler) OnRemove(_ string, cluster *rancherv1.Cluster) (*rancherv1.Cluster, error) {
+	if cluster == nil || cluster.Spec.RKEConfig == nil || cluster.Status.ClusterName == "" {
+		return nil, nil
+	}
+
+	status, err := h.updateClusterProvisioningStatus(cluster, *cluster.Status.DeepCopy())
+	if apierror.IsNotFound(err) {
+		return cluster, nil
+	} else if err != nil {
+		return cluster, err
+	}
+
+	cluster.Status = status
+	cluster, err = h.clusterController.UpdateStatus(cluster)
+	if err != nil {
+		return cluster, err
+	}
+	return cluster, generic.ErrSkip
 }

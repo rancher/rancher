@@ -42,6 +42,7 @@ type CustomMachineSpec struct {
 }
 
 type CustomMachineStatus struct {
-	Ready     bool                  `json:"ready,omitempty"`
-	Addresses []capi.MachineAddress `json:"addresses,omitempty"`
+	Conditions []genericcondition.GenericCondition `json:"conditions,omitempty"`
+	Ready      bool                                `json:"ready,omitempty"`
+	Addresses  []capi.MachineAddress               `json:"addresses,omitempty"`
 }

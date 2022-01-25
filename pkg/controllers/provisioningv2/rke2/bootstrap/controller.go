@@ -4,14 +4,15 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/base64"
+	"errors"
 	"fmt"
 
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
+	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2"
 	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta1"
 	rkecontroller "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/provisioningv2/rke2/installer"
-	"github.com/rancher/rancher/pkg/provisioningv2/rke2/planner"
 	"github.com/rancher/rancher/pkg/tls"
 	"github.com/rancher/rancher/pkg/wrangler"
 	appcontrollers "github.com/rancher/wrangler/pkg/generated/controllers/apps/v1"
@@ -24,21 +25,13 @@ import (
 	apierror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 )
 
 const (
-	ClusterNameLabel = "rke.cattle.io/cluster-name"
-	planSecret       = "rke.cattle.io/plan-secret-name"
-	roleLabel        = "rke.cattle.io/service-account-role"
 	rkeBootstrapName = "rke.cattle.io/rkebootstrap-name"
 	roleBootstrap    = "bootstrap"
 	rolePlan         = "plan"
-)
-
-var (
-	bootstrapAPIVersion = fmt.Sprintf("%s/%s", rkev1.SchemeGroupVersion.Group, rkev1.SchemeGroupVersion.Version)
 )
 
 type handler struct {
@@ -140,36 +133,35 @@ func (h *handler) getBootstrapSecret(namespace, name string, envVars []corev1.En
 	return nil, nil
 }
 
-func (h *handler) assignPlanSecret(machine *capi.Machine, obj *rkev1.RKEBootstrap) ([]runtime.Object, error) {
-	secretName := planner.PlanSecretFromBootstrapName(obj.Name)
+func (h *handler) assignPlanSecret(machine *capi.Machine, bootstrap *rkev1.RKEBootstrap) []runtime.Object {
+	secretName := rke2.PlanSecretFromBootstrapName(bootstrap.Name)
+	labels, annotations := getLabelsAndAnnotationsForPlanSecret(bootstrap, machine)
 
 	sa := &corev1.ServiceAccount{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      secretName,
-			Namespace: obj.Namespace,
+			Namespace: bootstrap.Namespace,
 			Labels: map[string]string{
-				planner.MachineNameLabel: machine.Name,
-				rkeBootstrapName:         obj.Name,
-				roleLabel:                rolePlan,
-				planSecret:               secretName,
+				rke2.MachineNameLabel: machine.Name,
+				rkeBootstrapName:      bootstrap.Name,
+				rke2.RoleLabel:        rolePlan,
+				rke2.PlanSecret:       secretName,
 			},
 		},
 	}
 	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      secretName,
-			Namespace: obj.Namespace,
-			Labels: map[string]string{
-				planner.MachineNameLabel: machine.Name,
-				ClusterNameLabel:         machine.Spec.ClusterName,
-			},
+			Name:        secretName,
+			Namespace:   bootstrap.Namespace,
+			Labels:      labels,
+			Annotations: annotations,
 		},
-		Type: planner.SecretTypeMachinePlan,
+		Type: rke2.SecretTypeMachinePlan,
 	}
 	role := &rbacv1.Role{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      secretName,
-			Namespace: obj.Namespace,
+			Namespace: bootstrap.Namespace,
 		},
 		Rules: []rbacv1.PolicyRule{
 			{
@@ -183,7 +175,7 @@ func (h *handler) assignPlanSecret(machine *capi.Machine, obj *rkev1.RKEBootstra
 	rolebinding := &rbacv1.RoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      secretName,
-			Namespace: obj.Namespace,
+			Namespace: bootstrap.Namespace,
 		},
 		Subjects: []rbacv1.Subject{
 			{
@@ -199,24 +191,11 @@ func (h *handler) assignPlanSecret(machine *capi.Machine, obj *rkev1.RKEBootstra
 		},
 	}
 
-	return []runtime.Object{sa, secret, role, rolebinding}, nil
+	return []runtime.Object{sa, secret, role, rolebinding}
 }
 
-func (h *handler) getMachine(obj *rkev1.RKEBootstrap) (*capi.Machine, error) {
-	for _, ref := range obj.OwnerReferences {
-		gvk := schema.FromAPIVersionAndKind(ref.APIVersion, ref.Kind)
-		if capi.GroupVersion.Group != gvk.Group ||
-			ref.Kind != "Machine" {
-			continue
-		}
-
-		return h.machineCache.Get(obj.Namespace, ref.Name)
-	}
-	return nil, generic.ErrSkip
-}
-
-func (h *handler) getEnvVar(machine *capi.Machine) (result []corev1.EnvVar, _ error) {
-	capiCluster, err := h.capiClusters.Get(machine.Namespace, machine.Spec.ClusterName)
+func (h *handler) getEnvVar(bootstrap *rkev1.RKEBootstrap) (result []corev1.EnvVar, _ error) {
+	capiCluster, err := h.capiClusters.Get(bootstrap.Namespace, bootstrap.Spec.ClusterName)
 	if apierror.IsNotFound(err) {
 		return nil, nil
 	} else if err != nil {
@@ -227,7 +206,7 @@ func (h *handler) getEnvVar(machine *capi.Machine) (result []corev1.EnvVar, _ er
 		return nil, nil
 	}
 
-	cp, err := h.rkeControlPlanes.Get(machine.Namespace, capiCluster.Spec.ControlPlaneRef.Name)
+	cp, err := h.rkeControlPlanes.Get(bootstrap.Namespace, capiCluster.Spec.ControlPlaneRef.Name)
 	if err != nil {
 		return nil, err
 	}
@@ -242,7 +221,7 @@ func (h *handler) getEnvVar(machine *capi.Machine) (result []corev1.EnvVar, _ er
 	return result, nil
 }
 
-func (h *handler) assignBootStrapSecret(machine *capi.Machine, obj *rkev1.RKEBootstrap) (*corev1.Secret, []runtime.Object, error) {
+func (h *handler) assignBootStrapSecret(machine *capi.Machine, bootstrap *rkev1.RKEBootstrap) (*corev1.Secret, []runtime.Object, error) {
 	if capi.MachinePhase(machine.Status.Phase) != capi.MachinePhasePending &&
 		capi.MachinePhase(machine.Status.Phase) != capi.MachinePhaseDeleting &&
 		capi.MachinePhase(machine.Status.Phase) != capi.MachinePhaseFailed &&
@@ -250,21 +229,21 @@ func (h *handler) assignBootStrapSecret(machine *capi.Machine, obj *rkev1.RKEBoo
 		return nil, nil, nil
 	}
 
-	envVars, err := h.getEnvVar(machine)
+	envVars, err := h.getEnvVar(bootstrap)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	secretName := name.SafeConcatName(obj.Name, "machine", "bootstrap")
+	secretName := name.SafeConcatName(bootstrap.Name, "machine", "bootstrap")
 
 	sa := &corev1.ServiceAccount{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      secretName,
-			Namespace: obj.Namespace,
+			Namespace: bootstrap.Namespace,
 			Labels: map[string]string{
-				planner.MachineNameLabel: machine.Name,
-				rkeBootstrapName:         obj.Name,
-				roleLabel:                roleBootstrap,
+				rke2.MachineNameLabel: machine.Name,
+				rkeBootstrapName:      bootstrap.Name,
+				rke2.RoleLabel:        roleBootstrap,
 			},
 		},
 	}
@@ -277,24 +256,22 @@ func (h *handler) assignBootStrapSecret(machine *capi.Machine, obj *rkev1.RKEBoo
 	return bootstrapSecret, []runtime.Object{sa}, nil
 }
 
-func (h *handler) OnChange(obj *rkev1.RKEBootstrap, status rkev1.RKEBootstrapStatus) ([]runtime.Object, rkev1.RKEBootstrapStatus, error) {
+func (h *handler) OnChange(bootstrap *rkev1.RKEBootstrap, status rkev1.RKEBootstrapStatus) ([]runtime.Object, rkev1.RKEBootstrapStatus, error) {
 	var (
 		result []runtime.Object
 	)
 
-	machine, err := h.getMachine(obj)
+	machine, err := rke2.GetMachineByOwner(h.machineCache, bootstrap)
 	if err != nil {
+		if errors.Is(err, rke2.ErrNoMachineOwnerRef) {
+			return nil, status, generic.ErrSkip
+		}
 		return nil, status, err
 	}
 
-	objs, err := h.assignPlanSecret(machine, obj)
-	if err != nil {
-		return nil, status, err
-	}
+	result = append(result, h.assignPlanSecret(machine, bootstrap)...)
 
-	result = append(result, objs...)
-
-	bootstrapSecret, objs, err := h.assignBootStrapSecret(machine, obj)
+	bootstrapSecret, objs, err := h.assignBootStrapSecret(machine, bootstrap)
 	if err != nil {
 		return nil, status, err
 	}
@@ -329,4 +306,41 @@ func (h *handler) rancherDeploymentHasHostPort() (bool, error) {
 	}
 
 	return false, nil
+}
+
+func getLabelsAndAnnotationsForPlanSecret(bootstrap *rkev1.RKEBootstrap, machine *capi.Machine) (map[string]string, map[string]string) {
+	labels := make(map[string]string, len(bootstrap.Labels)+2)
+	labels[rke2.MachineNameLabel] = machine.Name
+	labels[rke2.ClusterNameLabel] = bootstrap.Spec.ClusterName
+	for k, v := range bootstrap.Labels {
+		labels[k] = v
+	}
+
+	annotations := make(map[string]string, len(bootstrap.Annotations)+1)
+	annotations[rke2.JoinURLAnnotation] = getMachineJoinURL(machine)
+	for k, v := range bootstrap.Annotations {
+		annotations[k] = v
+	}
+
+	return labels, annotations
+}
+
+func getMachineJoinURL(machine *capi.Machine) string {
+	if machine.Status.NodeInfo == nil {
+		return ""
+	}
+
+	address := ""
+	for _, machineAddress := range machine.Status.Addresses {
+		switch machineAddress.Type {
+		case capi.MachineInternalIP:
+			address = machineAddress.Address
+		case capi.MachineExternalIP:
+			if address == "" {
+				address = machineAddress.Address
+			}
+		}
+	}
+
+	return fmt.Sprintf("https://%s:%d", address, rke2.GetRuntimeSupervisorPort(machine.Status.NodeInfo.KubeletVersion))
 }

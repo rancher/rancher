@@ -1,13 +1,17 @@
 package plan
 
-import (
-	capi "sigs.k8s.io/cluster-api/api/v1beta1"
-)
+import capi "sigs.k8s.io/cluster-api/api/v1beta1"
 
 type Plan struct {
 	Nodes    map[string]*Node         `json:"nodes,omitempty"`
 	Machines map[string]*capi.Machine `json:"machines,omitempty"`
+	Metadata map[string]*Metadata     `json:"metadata,omitempty"`
 	Cluster  *capi.Cluster            `json:"cluster,omitempty"`
+}
+
+type Metadata struct {
+	Labels      map[string]string `json:"labels,omitempty"`
+	Annotations map[string]string `json:"annotations,omitempty"`
 }
 
 type ProbeStatus struct {

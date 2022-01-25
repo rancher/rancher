@@ -6,10 +6,9 @@ import (
 
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
-	"github.com/rancher/rancher/pkg/provisioningv2/rke2/runtime"
+	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2"
 	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 )
 
 const EtcdSnapshotExtraMetadataConfigMapTemplate = `
@@ -23,28 +22,28 @@ data:
 `
 
 // getControlPlaneManifests returns a slice of plan.File objects that are necessary to be placed on a controlplane node.
-func (p *Planner) getControlPlaneManifests(controlPlane *rkev1.RKEControlPlane, machine *capi.Machine) (result []plan.File, _ error) {
+func (p *Planner) getControlPlaneManifests(controlPlane *rkev1.RKEControlPlane, entry *planEntry) (result []plan.File, _ error) {
 	// NOTE: The agent does not have a means to delete files.  If you add a manifest that
 	// may not exist in the future then you should create an empty file to "delete" the file
-	if !isControlPlane(machine) {
+	if !isControlPlane(entry) {
 		return nil, nil
 	}
 
-	clusterAgent, err := p.getClusterAgentManifestFile(controlPlane, runtime.GetRuntime(controlPlane.Spec.KubernetesVersion), machine)
+	clusterAgent, err := p.getClusterAgentManifestFile(controlPlane, rke2.GetRuntime(controlPlane.Spec.KubernetesVersion), entry)
 	if err != nil {
 		return nil, err
 	}
 	result = append(result, clusterAgent)
 
 	// if we have a nil snapshotMetadata object, it's probably because the annotation didn't exist on the controlplane object. this is not breaking though so don't block.
-	snapshotMetadata := getEtcdSnapshotExtraMetadata(controlPlane, runtime.GetRuntime(controlPlane.Spec.KubernetesVersion))
+	snapshotMetadata := getEtcdSnapshotExtraMetadata(controlPlane, rke2.GetRuntime(controlPlane.Spec.KubernetesVersion))
 	if snapshotMetadata == nil {
 		logrus.Errorf("Error while generating etcd snapshot extra metadata manifest for cluster %s: %v", controlPlane.ClusterName, err)
 	} else {
 		result = append(result, *snapshotMetadata)
 	}
 
-	addons := p.getAddons(controlPlane, runtime.GetRuntime(controlPlane.Spec.KubernetesVersion))
+	addons := p.getAddons(controlPlane, rke2.GetRuntime(controlPlane.Spec.KubernetesVersion))
 	result = append(result, addons)
 
 	return result, nil
@@ -53,7 +52,7 @@ func (p *Planner) getControlPlaneManifests(controlPlane *rkev1.RKEControlPlane, 
 // getEtcdSnapshotExtraMetadata returns a plan.File that contains the ConfigMap manifest of the cluster specification, if it exists.
 // Otherwise, it will return an empty plan.File and error.
 func getEtcdSnapshotExtraMetadata(controlPlane *rkev1.RKEControlPlane, runtime string) *plan.File {
-	if v, ok := controlPlane.Annotations[ClusterSpecAnnotation]; ok {
+	if v, ok := controlPlane.Annotations[rke2.ClusterSpecAnnotation]; ok {
 		cm := fmt.Sprintf(EtcdSnapshotExtraMetadataConfigMapTemplate, runtime, metav1.NamespaceSystem, EtcdSnapshotConfigMapKey, v)
 		return &plan.File{
 			Content: base64.StdEncoding.EncodeToString([]byte(cm)),
@@ -66,8 +65,8 @@ func getEtcdSnapshotExtraMetadata(controlPlane *rkev1.RKEControlPlane, runtime s
 }
 
 // getClusterAgentManifestFile returns a plan.File that contains the cluster agent manifest.
-func (p *Planner) getClusterAgentManifestFile(controlPlane *rkev1.RKEControlPlane, runtime string, machine *capi.Machine) (plan.File, error) {
-	data, err := p.generateClusterAgentManifest(controlPlane, machine)
+func (p *Planner) getClusterAgentManifestFile(controlPlane *rkev1.RKEControlPlane, runtime string, entry *planEntry) (plan.File, error) {
+	data, err := p.generateClusterAgentManifest(controlPlane, entry)
 	if err != nil {
 		return plan.File{}, err
 	}

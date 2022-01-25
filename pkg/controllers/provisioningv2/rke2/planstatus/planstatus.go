@@ -6,7 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 
-	"github.com/rancher/rancher/pkg/provisioningv2/rke2/planner"
+	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2"
 	"github.com/rancher/rancher/pkg/wrangler"
 	corecontrollers "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -24,7 +24,7 @@ func Register(ctx context.Context, clients *wrangler.Context) {
 }
 
 func (h *handler) OnChange(key string, secret *corev1.Secret) (*corev1.Secret, error) {
-	if secret == nil || secret.Type != planner.SecretTypeMachinePlan || len(secret.Data) == 0 {
+	if secret == nil || secret.Type != rke2.SecretTypeMachinePlan || len(secret.Data) == 0 {
 		return secret, nil
 	}
 

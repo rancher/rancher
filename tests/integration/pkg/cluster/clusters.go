@@ -8,8 +8,8 @@ import (
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	provisioningv1api "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
+	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2"
 	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2/machineprovision"
-	"github.com/rancher/rancher/pkg/provisioningv2/rke2/planner"
 	"github.com/rancher/rancher/tests/integration/pkg/clients"
 	"github.com/rancher/rancher/tests/integration/pkg/defaults"
 	"github.com/rancher/rancher/tests/integration/pkg/namespace"
@@ -112,7 +112,7 @@ func WaitForCreate(clients *clients.Clients, c *provisioningv1api.Cluster) (_ *p
 				if machine.Spec.Bootstrap.ConfigRef == nil {
 					continue
 				}
-				secretName := planner.PlanSecretFromBootstrapName(machine.Spec.Bootstrap.ConfigRef.Name)
+				secretName := rke2.PlanSecretFromBootstrapName(machine.Spec.Bootstrap.ConfigRef.Name)
 				secret, err := clients.Core.Secret().Get(machine.Namespace, secretName, metav1.GetOptions{})
 				if err == nil {
 					plans = append(plans, secret)

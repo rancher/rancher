@@ -13,6 +13,7 @@ import (
 	"github.com/rancher/lasso/pkg/dynamic"
 	rancherv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
+	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2"
 	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2/machineprovision"
 	mgmtcontroller "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/provisioningv2/rke2/planner"
@@ -45,6 +46,10 @@ func getInfraRef(rkeCluster *rkev1.RKECluster) *corev1.ObjectReference {
 // objects generates the corresponding rkecontrolplanes.rke.cattle.io, clusters.cluster.x-k8s.io, and
 // machinedeployments.cluster.x-k8s.io objects based on the passed in clusters.provisioning.cattle.io object
 func objects(cluster *rancherv1.Cluster, dynamic *dynamic.Controller, dynamicSchema mgmtcontroller.DynamicSchemaCache, secrets v1.SecretCache) (result []runtime.Object, _ error) {
+	if !cluster.DeletionTimestamp.IsZero() {
+		return nil, nil
+	}
+
 	infraRef := cluster.Spec.RKEConfig.InfrastructureRef
 	if infraRef == nil {
 		rkeCluster := rkeCluster(cluster)
@@ -175,7 +180,7 @@ func toMachineTemplate(machinePoolName string, cluster *rancherv1.Cluster, machi
 	ustr := &unstructured.Unstructured{
 		Object: map[string]interface{}{
 			"kind":       strings.TrimSuffix(kind, "Config") + "MachineTemplate",
-			"apiVersion": "rke-machine.cattle.io/v1",
+			"apiVersion": rke2.RKEMachineAPIVersion,
 			"metadata": map[string]interface{}{
 				"name":      machinePoolName,
 				"namespace": cluster.Namespace,
@@ -341,29 +346,29 @@ func machineDeployments(cluster *rancherv1.Cluster, capiCluster *capi.Cluster, d
 		}
 
 		if machinePool.EtcdRole {
-			machineDeployment.Spec.Template.Labels[planner.EtcdRoleLabel] = "true"
+			machineDeployment.Spec.Template.Labels[rke2.EtcdRoleLabel] = "true"
 		}
 
 		if machinePool.ControlPlaneRole {
-			machineDeployment.Spec.Template.Labels[planner.ControlPlaneRoleLabel] = "true"
+			machineDeployment.Spec.Template.Labels[rke2.ControlPlaneRoleLabel] = "true"
 			machineDeployment.Spec.Template.Labels[capi.MachineControlPlaneLabelName] = "true"
 		}
 
 		if machinePool.WorkerRole {
-			machineDeployment.Spec.Template.Labels[planner.WorkerRoleLabel] = "true"
+			machineDeployment.Spec.Template.Labels[rke2.WorkerRoleLabel] = "true"
 		}
 
 		if len(machinePool.Labels) > 0 {
 			for k, v := range machinePool.Labels {
 				machineDeployment.Spec.Template.Labels[k] = v
 			}
-			if err := assign(machineDeployment.Spec.Template.Annotations, planner.LabelsAnnotation, machinePool.Labels); err != nil {
+			if err := assign(machineDeployment.Spec.Template.Annotations, rke2.LabelsAnnotation, machinePool.Labels); err != nil {
 				return nil, err
 			}
 		}
 
 		if len(machinePool.Taints) > 0 {
-			if err := assign(machineDeployment.Spec.Template.Annotations, planner.TaintsAnnotation, machinePool.Taints); err != nil {
+			if err := assign(machineDeployment.Spec.Template.Annotations, rke2.TaintsAnnotation, machinePool.Taints); err != nil {
 				return nil, err
 			}
 		}
@@ -467,10 +472,10 @@ func rkeControlPlane(cluster *rancherv1.Cluster) (*rkev1.RKEControlPlane, error)
 			Name:      cluster.Name,
 			Namespace: cluster.Namespace,
 			Labels: map[string]string{
-				planner.InitNodeMachineIDLabel: cluster.Labels[planner.InitNodeMachineIDLabel],
+				rke2.InitNodeMachineIDLabel: cluster.Labels[rke2.InitNodeMachineIDLabel],
 			},
 			Annotations: map[string]string{
-				planner.ClusterSpecAnnotation: b64GZCluster,
+				rke2.ClusterSpecAnnotation: b64GZCluster,
 			},
 		},
 		Spec: rkev1.RKEControlPlaneSpec{

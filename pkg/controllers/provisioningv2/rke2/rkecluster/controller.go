@@ -4,16 +4,12 @@ import (
 	"context"
 
 	v1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
+	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2"
 	rkecontroller "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/wrangler"
-	"github.com/rancher/wrangler/pkg/condition"
 	"github.com/rancher/wrangler/pkg/relatedresource"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
-)
-
-var (
-	Ready condition.Cond = "Ready"
 )
 
 type handler struct {
@@ -59,16 +55,20 @@ func (h *handler) UpdateSpec(_ string, cluster *v1.RKECluster) (*v1.RKECluster, 
 }
 
 func (h *handler) OnChange(obj *v1.RKECluster, status v1.RKEClusterStatus) (v1.RKEClusterStatus, error) {
+	conditionToUpdate := rke2.Ready
+	if !obj.DeletionTimestamp.IsZero() {
+		conditionToUpdate = rke2.Removed
+	}
 	cp, err := h.rkeControlPlanes.Get(obj.Namespace, obj.Name)
 	if err == nil {
-		Ready.SetStatus(&status, Ready.GetStatus(cp))
-		Ready.Reason(&status, Ready.GetReason(cp))
-		Ready.Message(&status, Ready.GetMessage(cp))
+		conditionToUpdate.SetStatus(&status, conditionToUpdate.GetStatus(cp))
+		conditionToUpdate.Reason(&status, conditionToUpdate.GetReason(cp))
+		conditionToUpdate.Message(&status, conditionToUpdate.GetMessage(cp))
 	} else if !apierrors.IsNotFound(err) {
 		return status, err
 	}
 
-	status.Ready = Ready.IsTrue(&status)
+	status.Ready = rke2.Ready.IsTrue(&status)
 	status.ObservedGeneration = obj.Generation
 	return status, nil
 }

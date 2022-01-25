@@ -8,7 +8,7 @@ import (
 
 	provisioningv1api "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
-	"github.com/rancher/rancher/pkg/provisioningv2/rke2/planner"
+	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2"
 	"github.com/rancher/rancher/tests/integration/pkg/clients"
 	"github.com/rancher/rancher/tests/integration/pkg/cluster"
 	"github.com/rancher/rancher/tests/integration/pkg/defaults"
@@ -16,9 +16,11 @@ import (
 	"github.com/rancher/rancher/tests/integration/pkg/wait"
 	"github.com/stretchr/testify/assert"
 	errgroup2 "golang.org/x/sync/errgroup"
+	corev1 "k8s.io/api/core/v1"
 	apierror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/util/retry"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 )
 
@@ -330,20 +332,29 @@ func TestDrain(t *testing.T) {
 
 	var doneHooks int32
 	runHooks := func(machine *capi.Machine) error {
-		return wait.Object(clients.Ctx, clients.CAPI.Machine().Watch, machine, func(obj runtime.Object) (bool, error) {
-			machine := obj.(*capi.Machine)
-			if machine.Annotations[planner.PreDrainAnnotation] != "" &&
-				machine.Annotations[planner.PreDrainAnnotation] != machine.Annotations["test.io/pre-hook1"] {
-				machine.Annotations["test.io/pre-hook1"] = machine.Annotations[planner.PreDrainAnnotation]
-				machine.Annotations["test.io/pre-hook2"] = machine.Annotations[planner.PreDrainAnnotation]
-				_, err := clients.CAPI.Machine().Update(machine)
+		var secret *corev1.Secret
+		err = retry.OnError(retry.DefaultBackoff, func(err error) bool { return !apierror.IsNotFound(err) }, func() error {
+			bootstrap, err := clients.RKE.RKEBootstrap().Get(machine.Spec.Bootstrap.ConfigRef.Namespace, machine.Spec.Bootstrap.ConfigRef.Name, metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+			secret, err = clients.Core.Secret().Get(bootstrap.Namespace, rke2.PlanSecretFromBootstrapName(bootstrap.Name), metav1.GetOptions{})
+			return err
+		})
+		return wait.Object(clients.Ctx, clients.Core.Secret().Watch, secret, func(obj runtime.Object) (bool, error) {
+			secret := obj.(*corev1.Secret)
+			if secret.Annotations[rke2.PreDrainAnnotation] != "" &&
+				secret.Annotations[rke2.PreDrainAnnotation] != secret.Annotations["test.io/pre-hook1"] {
+				secret.Annotations["test.io/pre-hook1"] = secret.Annotations[rke2.PreDrainAnnotation]
+				secret.Annotations["test.io/pre-hook2"] = secret.Annotations[rke2.PreDrainAnnotation]
+				_, err := clients.Core.Secret().Update(secret)
 				return false, err
 			}
-			if machine.Annotations[planner.PostDrainAnnotation] != "" &&
-				machine.Annotations[planner.PostDrainAnnotation] != machine.Annotations["test.io/post-hook1"] {
-				machine.Annotations["test.io/post-hook1"] = machine.Annotations[planner.PostDrainAnnotation]
-				machine.Annotations["test.io/post-hook2"] = machine.Annotations[planner.PostDrainAnnotation]
-				_, err := clients.CAPI.Machine().Update(machine)
+			if secret.Annotations[rke2.PostDrainAnnotation] != "" &&
+				secret.Annotations[rke2.PostDrainAnnotation] != secret.Annotations["test.io/post-hook1"] {
+				secret.Annotations["test.io/post-hook1"] = secret.Annotations[rke2.PostDrainAnnotation]
+				secret.Annotations["test.io/post-hook2"] = secret.Annotations[rke2.PostDrainAnnotation]
+				_, err := clients.Core.Secret().Update(secret)
 				if err != nil {
 					return false, err
 				}
