@@ -7,10 +7,16 @@ import (
 	"github.com/rancher/norman/condition"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/tokens"
+	"github.com/rancher/rancher/pkg/controllers/provisioningv2/cluster"
+	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2"
 	"github.com/rancher/rancher/pkg/features"
 	fleetconst "github.com/rancher/rancher/pkg/fleet"
+	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta1"
 	v3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
+	provv1 "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
+	rkecontrollers "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
 	rancherversion "github.com/rancher/rancher/pkg/version"
+	"github.com/rancher/rancher/pkg/wrangler"
 	controllerapiextv1 "github.com/rancher/wrangler/pkg/generated/controllers/apiextensions.k8s.io/v1"
 	controllerv1 "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
 	"github.com/sirupsen/logrus"
@@ -28,12 +34,51 @@ const (
 	forceUpgradeLogoutConfig                  = "forceupgradelogout"
 	forceLocalSystemAndDefaultProjectCreation = "forcelocalprojectcreation"
 	forceSystemNamespacesAssignment           = "forcesystemnamespaceassignment"
+	migrateFromMachineToPlanSecret            = "migratefrommachinetoplanesecret"
 	rancherVersionKey                         = "rancherVersion"
 	projectsCreatedKey                        = "projectsCreated"
 	namespacesAssignedKey                     = "namespacesAssigned"
 	caSecretName                              = "tls-ca-additional"
 	caSecretField                             = "ca-additional.pem"
+	capiMigratedKey                           = "capiMigrated"
 )
+
+func runMigrations(wranglerContext *wrangler.Context) error {
+	if err := forceUpgradeLogout(wranglerContext.Core.ConfigMap(), wranglerContext.Mgmt.Token(), "v2.6.0"); err != nil {
+		return err
+	}
+
+	if err := forceSystemAndDefaultProjectCreation(wranglerContext.Core.ConfigMap(), wranglerContext.Mgmt.Cluster()); err != nil {
+		return err
+	}
+
+	if features.MCM.Enabled() {
+		if err := forceSystemNamespaceAssignment(wranglerContext.Core.ConfigMap(), wranglerContext.Mgmt.Project()); err != nil {
+			return err
+		}
+	}
+
+	if features.EmbeddedClusterAPI.Enabled() {
+		if err := addWebhookConfigToCAPICRDs(wranglerContext.CRD.CustomResourceDefinition()); err != nil {
+			return err
+		}
+	}
+
+	if features.RKE2.Enabled() {
+		if err := migrateCAPIMachineLabelsAndAnnotationsToPlanSecret(
+			wranglerContext.Core.ConfigMap(),
+			wranglerContext.Core.Secret(),
+			wranglerContext.Mgmt.Cluster().Cache(),
+			wranglerContext.Provisioning.Cluster().Cache(),
+			wranglerContext.CAPI.Machine().Cache(),
+			wranglerContext.RKE.RKEBootstrap(),
+		); err != nil {
+			return err
+		}
+	}
+
+	return copyCAAdditionalSecret(wranglerContext.Core.Secret())
+}
 
 func getConfigMap(configMapController controllerv1.ConfigMapController, configMapName string) (*v1.ConfigMap, error) {
 	cm, err := configMapController.Cache().Get(cattleNamespace, configMapName)
@@ -235,10 +280,6 @@ func applyProjectConditionForNamespaceAssignment(label string, condition conditi
 }
 
 func addWebhookConfigToCAPICRDs(crdClient controllerapiextv1.CustomResourceDefinitionClient) error {
-	if !features.EmbeddedClusterAPI.Enabled() {
-		return nil
-	}
-
 	crds, err := crdClient.List(metav1.ListOptions{
 		LabelSelector: "auth.cattle.io/cluster-indexed=true",
 	})
@@ -277,4 +318,100 @@ func addWebhookConfigToCAPICRDs(crdClient controllerapiextv1.CustomResourceDefin
 	}
 
 	return nil
+}
+
+func migrateCAPIMachineLabelsAndAnnotationsToPlanSecret(configMapController controllerv1.ConfigMapController, secretsController controllerv1.SecretController, mgmtClusterCache v3.ClusterCache,
+	provClusterCache provv1.ClusterCache, capiMachineCache capicontrollers.MachineCache, bootstrapClient rkecontrollers.RKEBootstrapClient) error {
+	cm, err := getConfigMap(configMapController, migrateFromMachineToPlanSecret)
+	if err != nil || cm == nil {
+		return err
+	}
+
+	if cm.Data[capiMigratedKey] == "true" {
+		return nil
+	}
+
+	mgmtClusters, err := mgmtClusterCache.List(labels.Everything())
+	if err != nil {
+		return err
+	}
+
+	bootstrapLabelExcludes := map[string]struct{}{
+		rke2.InitNodeMachineIDLabel:     {},
+		rke2.InitNodeMachineIDDoneLabel: {},
+		rke2.InitNodeLabel:              {},
+	}
+
+	boostrapAnnotationExcludes := map[string]struct{}{
+		rke2.DrainAnnotation:     {},
+		rke2.DrainDoneAnnotation: {},
+		rke2.JoinURLAnnotation:   {},
+		rke2.PostDrainAnnotation: {},
+		rke2.PreDrainAnnotation:  {},
+		rke2.UnCordonAnnotation:  {},
+	}
+
+	for _, mgmtCluster := range mgmtClusters {
+		provClusters, err := provClusterCache.GetByIndex(cluster.ByCluster, mgmtCluster.Name)
+		if k8serror.IsNotFound(err) || len(provClusters) == 0 {
+			continue
+		} else if err != nil {
+			return err
+		}
+
+		for _, provCluster := range provClusters {
+			machines, err := capiMachineCache.List(provCluster.Namespace, labels.Set{rke2.ClusterNameLabel: provCluster.Name}.AsSelector())
+			if err != nil {
+				return err
+			}
+
+			for _, machine := range machines {
+				if machine.Spec.Bootstrap.ConfigRef == nil || machine.Spec.Bootstrap.ConfigRef.APIVersion != rke2.RKEMachineAPIVersion {
+					continue
+				}
+
+				planSecrets, err := secretsController.Cache().List(machine.Namespace, labels.Set{rke2.MachineNameLabel: machine.Name}.AsSelector())
+				if err != nil {
+					return err
+				}
+				if len(planSecrets) == 0 {
+					continue
+				}
+
+				for _, secret := range planSecrets {
+					if err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+						secret, err := secretsController.Get(secret.Namespace, secret.Name, metav1.GetOptions{})
+						if err != nil {
+							return err
+						}
+
+						secret = secret.DeepCopy()
+						rke2.CopyMap(secret.Labels, machine.Labels)
+						rke2.CopyMap(secret.Annotations, machine.Annotations)
+						_, err = secretsController.Update(secret)
+						return err
+					}); err != nil {
+						return err
+					}
+				}
+
+				if err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+					bootstrap, err := bootstrapClient.Get(machine.Spec.Bootstrap.ConfigRef.Namespace, machine.Spec.Bootstrap.ConfigRef.Name, metav1.GetOptions{})
+					if err != nil {
+						return err
+					}
+					bootstrap = bootstrap.DeepCopy()
+					rke2.CopyMapWithExcludes(bootstrap.Labels, machine.Labels, bootstrapLabelExcludes)
+					rke2.CopyMapWithExcludes(bootstrap.Annotations, machine.Annotations, boostrapAnnotationExcludes)
+					_, err = bootstrapClient.Update(bootstrap)
+					return err
+				}); err != nil {
+					return err
+				}
+			}
+		}
+	}
+
+	cm.Data[capiMigratedKey] = "true"
+	return createOrUpdateConfigMap(configMapController, cm)
 }

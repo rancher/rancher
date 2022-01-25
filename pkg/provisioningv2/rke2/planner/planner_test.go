@@ -6,6 +6,7 @@ import (
 
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
+	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2"
 	"github.com/stretchr/testify/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
@@ -65,15 +66,15 @@ func TestPlanner_addInstruction(t *testing.T) {
 			a := assert.New(t)
 			var planner Planner
 			controlPlane := createTestControlPlane(tt.args.version)
-			machine := createTestMachine(tt.args.os)
+			entry := createTestPlanEntry(tt.args.os)
 
 			// act
-			p, err := planner.addInstallInstructionWithRestartStamp(plan.NodePlan{}, controlPlane, machine)
+			p, err := planner.addInstallInstructionWithRestartStamp(plan.NodePlan{}, controlPlane, entry)
 
 			// assert
 			a.Nil(err)
 			a.NotNil(p)
-			a.Equal(machine.Labels[CattleOSLabel], tt.args.os)
+			a.Equal(entry.Metadata.Labels[rke2.CattleOSLabel], tt.args.os)
 			a.NotZero(len(p.Instructions))
 			instruction := p.Instructions[0]
 			a.Contains(instruction.Command, tt.args.command)
@@ -94,19 +95,28 @@ func createTestControlPlane(version string) *rkev1.RKEControlPlane {
 	}
 }
 
-func createTestMachine(os string) *capi.Machine {
-	return &capi.Machine{
-		TypeMeta: metav1.TypeMeta{},
-		ObjectMeta: metav1.ObjectMeta{
+func createTestPlanEntry(os string) *planEntry {
+	return &planEntry{
+		Machine: &capi.Machine{
+			TypeMeta: metav1.TypeMeta{},
+			ObjectMeta: metav1.ObjectMeta{
+				Labels: map[string]string{
+					rke2.ControlPlaneRoleLabel: "false",
+					rke2.EtcdRoleLabel:         "false",
+					rke2.WorkerRoleLabel:       "true",
+				},
+			},
+			Spec:   capi.MachineSpec{},
+			Status: capi.MachineStatus{},
+		},
+		Metadata: &plan.Metadata{
 			Labels: map[string]string{
-				CattleOSLabel:         os,
-				ControlPlaneRoleLabel: "false",
-				EtcdRoleLabel:         "false",
-				WorkerRoleLabel:       "true",
+				rke2.CattleOSLabel:         os,
+				rke2.ControlPlaneRoleLabel: "false",
+				rke2.EtcdRoleLabel:         "false",
+				rke2.WorkerRoleLabel:       "true",
 			},
 		},
-		Spec:   capi.MachineSpec{},
-		Status: capi.MachineStatus{},
 	}
 }
 
