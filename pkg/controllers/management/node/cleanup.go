@@ -196,10 +196,7 @@ func (m *Lifecycle) waitUntilJobCompletes(userContext *config.UserContext, job *
 
 		logrus.Infof("[node-cleanup] job %s finished, continuing to delete v3 node", job.Name)
 		return true, nil
-	}); err != nil {
-		if err.Error() == "timed out waiting for the condition" {
-			return nil // gave it 30s and it timed out so move to delete v1 node
-		}
+	}); err != nil && err.Error() != "timed out waiting for the condition" {
 		return err
 	}
 
