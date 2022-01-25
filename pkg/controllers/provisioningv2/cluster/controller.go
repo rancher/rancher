@@ -13,6 +13,7 @@ import (
 	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta1"
 	mgmtcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	rocontrollers "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
+	rkecontrollers "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/provisioningv2/kubeconfig"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/wrangler"
@@ -47,17 +48,19 @@ var (
 )
 
 type handler struct {
-	mgmtClusterCache  mgmtcontrollers.ClusterCache
-	mgmtClusters      mgmtcontrollers.ClusterController
-	clusterTokenCache mgmtcontrollers.ClusterRegistrationTokenCache
-	clusterTokens     mgmtcontrollers.ClusterRegistrationTokenClient
-	featureCache      mgmtcontrollers.FeatureCache
-	featureClient     mgmtcontrollers.FeatureClient
-	clusters          rocontrollers.ClusterController
-	clusterCache      rocontrollers.ClusterCache
-	secretCache       corecontrollers.SecretCache
-	kubeconfigManager *kubeconfig.Manager
-	apply             apply.Apply
+	mgmtClusterCache      mgmtcontrollers.ClusterCache
+	mgmtClusters          mgmtcontrollers.ClusterController
+	clusterTokenCache     mgmtcontrollers.ClusterRegistrationTokenCache
+	clusterTokens         mgmtcontrollers.ClusterRegistrationTokenClient
+	featureCache          mgmtcontrollers.FeatureCache
+	featureClient         mgmtcontrollers.FeatureClient
+	clusters              rocontrollers.ClusterController
+	clusterCache          rocontrollers.ClusterCache
+	rkeControlPlanes      rkecontrollers.RKEControlPlaneClient
+	rkeControlPlanesCache rkecontrollers.RKEControlPlaneCache
+	secretCache           corecontrollers.SecretCache
+	kubeconfigManager     *kubeconfig.Manager
+	apply                 apply.Apply
 
 	capiClustersCache capicontrollers.ClusterCache
 	capiClusters      capicontrollers.ClusterClient
@@ -68,19 +71,21 @@ func Register(
 	ctx context.Context,
 	clients *wrangler.Context) {
 	h := handler{
-		mgmtClusterCache:  clients.Mgmt.Cluster().Cache(),
-		mgmtClusters:      clients.Mgmt.Cluster(),
-		clusterTokenCache: clients.Mgmt.ClusterRegistrationToken().Cache(),
-		clusterTokens:     clients.Mgmt.ClusterRegistrationToken(),
-		featureCache:      clients.Mgmt.Feature().Cache(),
-		featureClient:     clients.Mgmt.Feature(),
-		clusters:          clients.Provisioning.Cluster(),
-		clusterCache:      clients.Provisioning.Cluster().Cache(),
-		secretCache:       clients.Core.Secret().Cache(),
-		capiClustersCache: clients.CAPI.Cluster().Cache(),
-		capiClusters:      clients.CAPI.Cluster(),
-		capiMachinesCache: clients.CAPI.Machine().Cache(),
-		kubeconfigManager: kubeconfig.New(clients),
+		mgmtClusterCache:      clients.Mgmt.Cluster().Cache(),
+		mgmtClusters:          clients.Mgmt.Cluster(),
+		clusterTokenCache:     clients.Mgmt.ClusterRegistrationToken().Cache(),
+		clusterTokens:         clients.Mgmt.ClusterRegistrationToken(),
+		featureCache:          clients.Mgmt.Feature().Cache(),
+		featureClient:         clients.Mgmt.Feature(),
+		clusters:              clients.Provisioning.Cluster(),
+		clusterCache:          clients.Provisioning.Cluster().Cache(),
+		rkeControlPlanes:      clients.RKE.RKEControlPlane(),
+		rkeControlPlanesCache: clients.RKE.RKEControlPlane().Cache(),
+		secretCache:           clients.Core.Secret().Cache(),
+		capiClustersCache:     clients.CAPI.Cluster().Cache(),
+		capiClusters:          clients.CAPI.Cluster(),
+		capiMachinesCache:     clients.CAPI.Machine().Cache(),
+		kubeconfigManager:     kubeconfig.New(clients),
 		apply: clients.Apply.WithCacheTypes(
 			clients.Provisioning.Cluster(),
 			clients.Mgmt.Cluster()),

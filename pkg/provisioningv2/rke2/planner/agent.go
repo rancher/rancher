@@ -5,13 +5,12 @@ import (
 	"sort"
 
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
-	"github.com/rancher/rancher/pkg/provisioningv2/rke2/runtime"
+	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2"
 	"github.com/rancher/rancher/pkg/systemtemplate"
-	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 )
 
 // generateClusterAgentManifest generates a cluster agent manifest
-func (p *Planner) generateClusterAgentManifest(controlPlane *rkev1.RKEControlPlane, machine *capi.Machine) ([]byte, error) {
+func (p *Planner) generateClusterAgentManifest(controlPlane *rkev1.RKEControlPlane, entry *planEntry) ([]byte, error) {
 	if controlPlane.Spec.ManagementClusterName == "local" {
 		return nil, nil
 	}
@@ -34,7 +33,7 @@ func (p *Planner) generateClusterAgentManifest(controlPlane *rkev1.RKEControlPla
 		return nil, err
 	}
 
-	taints, err := getTaints(machine, runtime.GetRuntime(controlPlane.Spec.KubernetesVersion))
+	taints, err := getTaints(entry, rke2.GetRuntime(controlPlane.Spec.KubernetesVersion))
 	if err != nil {
 		return nil, err
 	}

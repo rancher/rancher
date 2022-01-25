@@ -6,9 +6,8 @@ import (
 
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
-	"github.com/rancher/rancher/pkg/provisioningv2/rke2/runtime"
+	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2"
 	"k8s.io/apimachinery/pkg/api/equality"
-	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 )
 
 func (p *Planner) setEtcdSnapshotCreateState(controlPlane *rkev1.RKEControlPlane, spec *rkev1.ETCDSnapshotCreate, phase rkev1.ETCDSnapshotPhase) error {
@@ -37,12 +36,12 @@ func (p *Planner) startOrRestartEtcdSnapshotCreate(controlPlane *rkev1.RKEContro
 }
 
 func (p *Planner) runEtcdSnapshotCreate(controlPlane *rkev1.RKEControlPlane, clusterPlan *plan.Plan, snapshot *rkev1.ETCDSnapshotCreate) []error {
-	servers := collect(clusterPlan, func(machine *capi.Machine) bool {
-		if !isEtcd(machine) || machine.Status.NodeRef == nil {
+	servers := collect(clusterPlan, func(entry *planEntry) bool {
+		if !isEtcd(entry) || entry.Machine.Status.NodeRef == nil {
 			return false
 		}
 		return snapshot.NodeName == "" ||
-			machine.Status.NodeRef.Name == snapshot.NodeName
+			entry.Machine.Status.NodeRef.Name == snapshot.NodeName
 	})
 
 	if len(servers) == 0 {
@@ -84,7 +83,7 @@ func (p *Planner) generateEtcdSnapshotCreatePlan(controlPlane *rkev1.RKEControlP
 		Files: s3Files,
 		Instructions: []plan.Instruction{{
 			Name:    "create",
-			Command: runtime.GetRuntimeCommand(controlPlane.Spec.KubernetesVersion),
+			Command: rke2.GetRuntimeCommand(controlPlane.Spec.KubernetesVersion),
 			Env:     s3Env,
 			Args:    append(args, s3Args...),
 		}},
@@ -92,7 +91,7 @@ func (p *Planner) generateEtcdSnapshotCreatePlan(controlPlane *rkev1.RKEControlP
 }
 
 func (p *Planner) createEtcdSnapshot(controlPlane *rkev1.RKEControlPlane, clusterPlan *plan.Plan) []error {
-	if !Provisioned.IsTrue(controlPlane) && controlPlane.Status.ETCDSnapshotCreatePhase == "" {
+	if !rke2.Provisioned.IsTrue(controlPlane) && controlPlane.Status.ETCDSnapshotCreatePhase == "" {
 		return nil
 	}
 

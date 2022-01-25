@@ -3,25 +3,26 @@ package unmanaged
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"strings"
 	"time"
 
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/clusterindex"
+	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2"
 	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2/etcdmgmt"
 	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta1"
 	mgmtcontroller "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	rocontrollers "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
 	rkecontroller "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/provisioningv2/kubeconfig"
-	"github.com/rancher/rancher/pkg/provisioningv2/rke2/planner"
-	rancherruntime "github.com/rancher/rancher/pkg/provisioningv2/rke2/runtime"
 	"github.com/rancher/rancher/pkg/taints"
 	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/rancher/wrangler/pkg/apply"
 	"github.com/rancher/wrangler/pkg/data"
 	corecontrollers "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/pkg/generic"
+	"github.com/rancher/wrangler/pkg/genericcondition"
 	"github.com/rancher/wrangler/pkg/kv"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
@@ -31,11 +32,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
-)
-
-const (
-	machineRequestType = "rke.cattle.io/machine-request"
-	capiClusterLabel   = "cluster.x-k8s.io/cluster-name"
 )
 
 func Register(ctx context.Context, clients *wrangler.Context) {
@@ -78,7 +74,7 @@ func (h *handler) findMachine(cluster *capi.Cluster, machineName, machineID stri
 	_, err := h.machineCache.Get(cluster.Namespace, machineName)
 	if apierror.IsNotFound(err) {
 		machines, err := h.machineCache.List(cluster.Namespace, labels.SelectorFromSet(map[string]string{
-			"rke.cattle.io/machine-id": machineID,
+			rke2.MachineIDLabel: machineID,
 		}))
 		if len(machines) != 1 || err != nil || machines[0].Spec.ClusterName != cluster.Name {
 			return "", err
@@ -92,7 +88,7 @@ func (h *handler) findMachine(cluster *capi.Cluster, machineName, machineID stri
 }
 
 func (h *handler) onSecretChange(key string, secret *corev1.Secret) (*corev1.Secret, error) {
-	if secret == nil || secret.Type != machineRequestType {
+	if secret == nil || secret.Type != rke2.MachineRequestType {
 		return secret, nil
 	}
 
@@ -125,14 +121,14 @@ func (h *handler) onSecretChange(key string, secret *corev1.Secret) (*corev1.Sec
 		}
 	}
 
-	if secret.Labels[planner.MachineNamespaceLabel] != capiCluster.Namespace ||
-		secret.Labels[planner.MachineNameLabel] != machineName {
+	if secret.Labels[rke2.MachineNamespaceLabel] != capiCluster.Namespace ||
+		secret.Labels[rke2.MachineNameLabel] != machineName {
 		secret = secret.DeepCopy()
 		if secret.Labels == nil {
 			secret.Labels = map[string]string{}
 		}
-		secret.Labels[planner.MachineNamespaceLabel] = capiCluster.Namespace
-		secret.Labels[planner.MachineNameLabel] = machineName
+		secret.Labels[rke2.MachineNamespaceLabel] = capiCluster.Namespace
+		secret.Labels[rke2.MachineNameLabel] = machineName
 
 		return h.secrets.Update(secret)
 	}
@@ -153,25 +149,26 @@ func (h *handler) createMachineObjects(capiCluster *capi.Cluster, machineName st
 	annotations := map[string]string{}
 
 	if data.Bool("role-control-plane") {
-		labels[planner.ControlPlaneRoleLabel] = "true"
+		labels[rke2.ControlPlaneRoleLabel] = "true"
 	}
 	if data.Bool("role-etcd") {
-		labels[planner.EtcdRoleLabel] = "true"
+		labels[rke2.EtcdRoleLabel] = "true"
 	}
 	if data.Bool("role-worker") {
-		labels[planner.WorkerRoleLabel] = "true"
+		labels[rke2.WorkerRoleLabel] = "true"
 	}
 	if val := data.String("node-name"); val != "" {
-		labels[planner.NodeNameLabel] = val
+		labels[rke2.NodeNameLabel] = val
 	}
 	if address := data.String("address"); address != "" {
-		annotations[planner.AddressAnnotation] = address
+		annotations[rke2.AddressAnnotation] = address
 	}
 	if internalAddress := data.String("internal-address"); internalAddress != "" {
-		annotations[planner.InternalAddressAnnotation] = internalAddress
+		annotations[rke2.InternalAddressAnnotation] = internalAddress
 	}
 
-	labels["rke.cattle.io/machine-id"] = data.String("id")
+	labels[rke2.MachineIDLabel] = data.String("id")
+	labels[rke2.ClusterNameLabel] = capiCluster.Name
 
 	labelsMap := map[string]string{}
 	for _, str := range strings.Split(data.String("labels"), ",") {
@@ -190,7 +187,7 @@ func (h *handler) createMachineObjects(capiCluster *capi.Cluster, machineName st
 		if err != nil {
 			return nil, err
 		}
-		annotations[planner.LabelsAnnotation] = string(data)
+		annotations[rke2.LabelsAnnotation] = string(data)
 	}
 
 	var coreTaints []corev1.Taint
@@ -203,14 +200,16 @@ func (h *handler) createMachineObjects(capiCluster *capi.Cluster, machineName st
 		if err != nil {
 			return nil, err
 		}
-		annotations[planner.TaintsAnnotation] = string(data)
+		annotations[rke2.TaintsAnnotation] = string(data)
 	}
 
 	return []runtime.Object{
 		&rkev1.RKEBootstrap{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      machineName,
-				Namespace: capiCluster.Namespace,
+				Name:        machineName,
+				Namespace:   capiCluster.Namespace,
+				Labels:      labels,
+				Annotations: annotations,
 			},
 		},
 		&rkev1.CustomMachine{
@@ -219,14 +218,21 @@ func (h *handler) createMachineObjects(capiCluster *capi.Cluster, machineName st
 				Namespace: capiCluster.Namespace,
 				Labels:    labels,
 			},
+			Status: rkev1.CustomMachineStatus{
+				Conditions: []genericcondition.GenericCondition{
+					{
+						Type:   "Ready",
+						Status: corev1.ConditionTrue,
+					},
+				},
+			},
 		},
 		&capi.Machine{
 			TypeMeta: metav1.TypeMeta{},
 			ObjectMeta: metav1.ObjectMeta{
-				Name:        machineName,
-				Namespace:   capiCluster.Namespace,
-				Labels:      labels,
-				Annotations: annotations,
+				Name:      machineName,
+				Namespace: capiCluster.Namespace,
+				Labels:    labels,
 			},
 			Spec: capi.MachineSpec{
 				ClusterName: capiCluster.Name,
@@ -265,25 +271,6 @@ func (h *handler) getCAPICluster(secret *corev1.Secret) (*capi.Cluster, error) {
 	return h.capiClusterCache.Get(rClusters[0].Namespace, rClusters[0].Name)
 }
 
-func (h *handler) getMachine(customMachine *rkev1.CustomMachine) (*capi.Machine, error) {
-	var (
-		machine *capi.Machine
-		err     error
-	)
-
-	for _, owner := range customMachine.OwnerReferences {
-		if owner.Kind == "Machine" {
-			machine, err = h.machineCache.Get(customMachine.Namespace, owner.Name)
-			if err != nil {
-				return nil, err
-			}
-			break
-		}
-	}
-
-	return machine, nil
-}
-
 func (h *handler) onUnmanagedMachineHealth(key string, customMachine *rkev1.CustomMachine) (*rkev1.CustomMachine, error) {
 	if customMachine == nil {
 		return nil, nil
@@ -293,8 +280,11 @@ func (h *handler) onUnmanagedMachineHealth(key string, customMachine *rkev1.Cust
 		return customMachine, nil
 	}
 
-	machine, err := h.getMachine(customMachine)
-	if err != nil || machine == nil {
+	machine, err := rke2.GetMachineByOwner(h.machineCache, customMachine)
+	if err != nil {
+		if errors.Is(err, rke2.ErrNoMachineOwnerRef) {
+			return customMachine, nil
+		}
 		return customMachine, err
 	}
 
@@ -322,14 +312,13 @@ func (h *handler) onUnmanagedMachineHealth(key string, customMachine *rkev1.Cust
 	_, err = clientset.CoreV1().Nodes().Get(context.Background(), machine.Status.NodeRef.Name, metav1.GetOptions{})
 	if apierror.IsNotFound(err) {
 		err = h.machineClient.Delete(machine.Namespace, machine.Name, nil)
-		return customMachine, err
 	}
 
-	return customMachine, nil
+	return customMachine, err
 }
 
 func (h *handler) onUnmanagedMachineOnRemove(key string, customMachine *rkev1.CustomMachine) (*rkev1.CustomMachine, error) {
-	clusterName := customMachine.Labels[capiClusterLabel]
+	clusterName := customMachine.Labels[capi.ClusterLabelName]
 	if clusterName == "" {
 		return customMachine, nil
 	}
@@ -348,12 +337,15 @@ func (h *handler) onUnmanagedMachineOnRemove(key string, customMachine *rkev1.Cu
 		return customMachine, nil // if the cluster is deleting, we don't care about safe etcd member removal.
 	}
 
-	machine, err := h.getMachine(customMachine)
-	if err != nil || machine == nil {
+	machine, err := rke2.GetMachineByOwner(h.machineCache, customMachine)
+	if err != nil {
+		if errors.Is(err, rke2.ErrNoMachineOwnerRef) {
+			return customMachine, nil
+		}
 		return customMachine, err
 	}
 
-	if _, ok := machine.Labels[planner.EtcdRoleLabel]; !ok {
+	if _, ok := machine.Labels[rke2.EtcdRoleLabel]; !ok {
 		logrus.Debugf("[UnmanagedMachine] Safe removal for machine %s in cluster %s not necessary as it is not an etcd node", key, clusterName)
 		return customMachine, nil // If we are not dealing with an etcd node, we can go ahead and allow removal
 	}
@@ -368,7 +360,7 @@ func (h *handler) onUnmanagedMachineOnRemove(key string, customMachine *rkev1.Cu
 		return customMachine, err
 	}
 
-	removed, err := etcdmgmt.SafelyRemoved(restConfig, rancherruntime.GetRuntimeCommand(cluster.Spec.KubernetesVersion), machine.Status.NodeRef.Name)
+	removed, err := etcdmgmt.SafelyRemoved(restConfig, rke2.GetRuntimeCommand(cluster.Spec.KubernetesVersion), machine.Status.NodeRef.Name)
 	if err != nil {
 		return customMachine, err
 	}

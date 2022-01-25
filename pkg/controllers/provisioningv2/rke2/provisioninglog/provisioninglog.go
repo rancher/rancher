@@ -9,7 +9,7 @@ import (
 
 	provv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/clusterindex"
-	"github.com/rancher/rancher/pkg/controllers/provisioningv2/cluster"
+	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2"
 	provisioningcontrollers "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/wrangler"
 	corev1controllers "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
@@ -79,9 +79,9 @@ func appendLog(error bool, oldLog, log string) string {
 }
 
 func (h *handler) recordMessage(provCluster *provv1.Cluster, cm *corev1.ConfigMap) (*corev1.ConfigMap, error) {
-	msg := cluster.Provisioned.GetMessage(provCluster)
-	error := cluster.Provisioned.IsFalse(provCluster)
-	done := cluster.Provisioned.IsTrue(provCluster)
+	msg := rke2.Provisioned.GetMessage(provCluster)
+	error := rke2.Provisioned.IsFalse(provCluster)
+	done := rke2.Provisioned.IsTrue(provCluster)
 
 	if done && msg == "" && provCluster.Status.Ready {
 		msg = "provisioning done"
