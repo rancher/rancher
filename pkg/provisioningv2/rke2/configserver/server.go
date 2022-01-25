@@ -10,6 +10,7 @@ import (
 	"time"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2"
 	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta1"
 	mgmtcontroller "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	provisioningcontrollers "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
@@ -27,14 +28,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
+	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 )
 
 const (
-	machineIDLabel        = "rke.cattle.io/machine-id"
-	machineNameLabel      = "rke.cattle.io/machine-name"
-	machineNamespaceLabel = "rke.cattle.io/machine-namespace"
-	planSecret            = "rke.cattle.io/plan-secret-name"
-	roleLabel             = "rke.cattle.io/service-account-role"
 	roleBootstrap         = "bootstrap"
 	rolePlan              = "plan"
 	ConnectClusterInfo    = "/v3/connect/cluster-info"
@@ -101,11 +98,11 @@ func (r *RKE2ConfigServer) ServeHTTP(rw http.ResponseWriter, req *http.Request) 
 
 	switch req.URL.Path {
 	case ConnectConfigYamlPath:
-		r.connectConfigYaml(planSecret, secret.Namespace, rw, req)
+		r.connectConfigYaml(planSecret, secret.Namespace, rw)
 	case ConnectAgent:
 		r.connectAgent(planSecret, secret, rw, req)
 	case ConnectClusterInfo:
-		r.connectClusterInfo(planSecret, secret, rw, req)
+		r.connectClusterInfo(secret, rw, req)
 	}
 }
 
@@ -164,7 +161,7 @@ func (r *RKE2ConfigServer) connectAgent(planSecret string, secret *v1.Secret, rw
 	})
 }
 
-func (r *RKE2ConfigServer) connectConfigYaml(name, ns string, rw http.ResponseWriter, req *http.Request) {
+func (r *RKE2ConfigServer) connectConfigYaml(name, ns string, rw http.ResponseWriter) {
 	mpSecret, err := r.getMachinePlanSecret(ns, name)
 	if err != nil {
 		http.Error(rw, err.Error(), http.StatusInternalServerError)
@@ -182,10 +179,16 @@ func (r *RKE2ConfigServer) connectConfigYaml(name, ns string, rw http.ResponseWr
 		return
 	}
 
+	kubernetesVersion, err := r.getClusterKubernetesVersion(mpSecret.Labels[capi.ClusterLabelName], ns)
+	if err != nil {
+		http.Error(rw, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
 	var content string
 	for _, f := range config["files"].([]interface{}) {
 		f := f.(map[string]interface{})
-		if path, ok := f["path"].(string); ok && path == fmt.Sprintf(planner.ConfigYamlFileName, "rke2") {
+		if path, ok := f["path"].(string); ok && path == fmt.Sprintf(planner.ConfigYamlFileName, rke2.GetRuntime(kubernetesVersion)) {
 			if _, ok := f["content"]; ok {
 				content = f["content"].(string)
 			}
@@ -207,7 +210,7 @@ func (r *RKE2ConfigServer) connectConfigYaml(name, ns string, rw http.ResponseWr
 	rw.Write(jsonContent)
 }
 
-func (r *RKE2ConfigServer) connectClusterInfo(planSecret string, secret *v1.Secret, rw http.ResponseWriter, req *http.Request) {
+func (r *RKE2ConfigServer) connectClusterInfo(secret *v1.Secret, rw http.ResponseWriter, req *http.Request) {
 	headers := dataFromHeaders(req)
 
 	// expecting -H "X-Cattle-Field: kubernetesversion" -H "X-Cattle-Field: name"
@@ -255,11 +258,15 @@ func (r *RKE2ConfigServer) infoKubernetesVersion(machineID, ns string) (string, 
 		return "", err
 	}
 
-	clusterName, ok := machine.Labels[planner.CapiMachineLabel]
+	clusterName, ok := machine.Labels[capi.ClusterLabelName]
 	if !ok {
 		return "", fmt.Errorf("unable to find cluster name for machine")
 	}
 
+	return r.getClusterKubernetesVersion(clusterName, ns)
+}
+
+func (r *RKE2ConfigServer) getClusterKubernetesVersion(clusterName, ns string) (string, error) {
 	cluster, err := r.provisioningClusterCache.Get(ns, clusterName)
 	if err != nil {
 		return "", err
@@ -294,7 +301,7 @@ func (r *RKE2ConfigServer) findSA(req *http.Request) (string, *corev1.Secret, er
 	}
 
 	planSAs, err := r.serviceAccountsCache.List(machineNamespace, labels.SelectorFromSet(map[string]string{
-		machineNameLabel: machineName,
+		rke2.MachineNameLabel: machineName,
 	}))
 	if err != nil {
 		return "", nil, err
@@ -308,7 +315,7 @@ func (r *RKE2ConfigServer) findSA(req *http.Request) (string, *corev1.Secret, er
 	}
 
 	resp, err := r.serviceAccounts.Watch(machineNamespace, metav1.ListOptions{
-		LabelSelector: machineNameLabel + "=" + machineName,
+		LabelSelector: rke2.MachineNameLabel + "=" + machineName,
 	})
 	if err != nil {
 		return "", nil, err
@@ -337,7 +344,7 @@ func (r *RKE2ConfigServer) setOrUpdateMachineID(machineNamespace, machineName, m
 		return err
 	}
 
-	if machine.Labels[machineIDLabel] == machineID {
+	if machine.Labels[rke2.MachineIDLabel] == machineID {
 		return nil
 	}
 
@@ -346,7 +353,7 @@ func (r *RKE2ConfigServer) setOrUpdateMachineID(machineNamespace, machineName, m
 		machine.Labels = map[string]string{}
 	}
 
-	machine.Labels[machineIDLabel] = machineID
+	machine.Labels[rke2.MachineIDLabel] = machineID
 	_, err = r.machines.Update(machine)
 	return err
 }
@@ -370,9 +377,9 @@ func (r *RKE2ConfigServer) isOwnedByMachine(machineName string, sa *corev1.Servi
 }
 
 func (r *RKE2ConfigServer) getServiceAccountSecret(machineName string, planSA *corev1.ServiceAccount) (string, *corev1.Secret, error) {
-	if planSA.Labels[machineNameLabel] != machineName ||
-		planSA.Labels[roleLabel] != rolePlan ||
-		planSA.Labels[planSecret] == "" {
+	if planSA.Labels[rke2.MachineNameLabel] != machineName ||
+		planSA.Labels[rke2.RoleLabel] != rolePlan ||
+		planSA.Labels[rke2.PlanSecret] == "" {
 		return "", nil, nil
 	}
 
@@ -385,10 +392,10 @@ func (r *RKE2ConfigServer) getServiceAccountSecret(machineName string, planSA *c
 	}
 
 	secret, err := r.secretsCache.Get(planSA.Namespace, planSA.Secrets[0].Name)
-	return planSA.Labels[planSecret], secret, err
+	return planSA.Labels[rke2.PlanSecret], secret, err
 }
 
-func (r *RKE2ConfigServer) getMachinePlanSecret(name, ns string) (*v1.Secret, error) {
+func (r *RKE2ConfigServer) getMachinePlanSecret(ns, name string) (*v1.Secret, error) {
 	backoff := wait.Backoff{
 		Duration: 500 * time.Millisecond,
 		Factor:   2,

@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
+	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2"
 	namespace2 "github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/wrangler/pkg/data"
@@ -52,10 +53,6 @@ type driverArgs struct {
 	BootstrapRequired   bool
 	Args                []string
 	BackoffLimit        int32
-}
-
-func MachineStateSecretName(machineName string) string {
-	return name2.SafeConcatName(machineName, "machine", "state")
 }
 
 func (h *handler) getArgsEnvAndStatus(infraObj *infraObject, args map[string]interface{}, driver string, create bool) (driverArgs, error) {
@@ -108,7 +105,7 @@ func (h *handler) getArgsEnvAndStatus(infraObj *infraObject, args map[string]int
 		envSecret.Data[k] = []byte(v)
 	}
 
-	secretName := MachineStateSecretName(infraObj.meta.GetName())
+	secretName := rke2.MachineStateSecretName(infraObj.meta.GetName())
 
 	cmd := []string{
 		fmt.Sprintf("--driver-download-url=%s", url),

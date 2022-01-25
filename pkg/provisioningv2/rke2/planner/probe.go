@@ -6,9 +6,8 @@ import (
 
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
-	rancherruntime "github.com/rancher/rancher/pkg/provisioningv2/rke2/runtime"
+	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2"
 	"github.com/rancher/wrangler/pkg/data/convert"
-	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 )
 
 var allProbes = map[string]plan.Probe{
@@ -72,7 +71,7 @@ var allProbes = map[string]plan.Probe{
 }
 
 func isCalico(controlPlane *rkev1.RKEControlPlane, runtime string) bool {
-	if runtime != rancherruntime.RuntimeRKE2 {
+	if runtime != rke2.RuntimeRKE2 {
 		return false
 	}
 	cni := convert.ToString(controlPlane.Spec.MachineGlobalConfig.Data["cni"])
@@ -108,27 +107,27 @@ func renderSecureProbe(arg interface{}, rawProbe plan.Probe, runtime string, def
 
 // addProbes adds probes for the machine (based on type of machine) to the nodePlan and returns the nodePlan and an error
 // if one occurred.
-func (p *Planner) addProbes(nodePlan plan.NodePlan, controlPlane *rkev1.RKEControlPlane, machine *capi.Machine, config map[string]interface{}) (plan.NodePlan, error) {
+func (p *Planner) addProbes(nodePlan plan.NodePlan, controlPlane *rkev1.RKEControlPlane, entry *planEntry, config map[string]interface{}) (plan.NodePlan, error) {
 	var (
-		runtime    = rancherruntime.GetRuntime(controlPlane.Spec.KubernetesVersion)
+		runtime    = rke2.GetRuntime(controlPlane.Spec.KubernetesVersion)
 		probeNames []string
 	)
 
 	nodePlan.Probes = map[string]plan.Probe{}
 
-	if runtime != rancherruntime.RuntimeK3S && isEtcd(machine) {
+	if runtime != rke2.RuntimeK3S && isEtcd(entry) {
 		probeNames = append(probeNames, "etcd")
 	}
-	if isControlPlane(machine) {
+	if isControlPlane(entry) {
 		probeNames = append(probeNames, "kube-apiserver")
 		probeNames = append(probeNames, "kube-controller-manager")
 		probeNames = append(probeNames, "kube-scheduler")
 	}
-	if !(IsOnlyEtcd(machine) && runtime == rancherruntime.RuntimeK3S) {
+	if !(IsOnlyEtcd(entry) && runtime == rke2.RuntimeK3S) {
 		// k3s doesn't run the kubelet on etcd only nodes
 		probeNames = append(probeNames, "kubelet")
 	}
-	if !IsOnlyEtcd(machine) && isCalico(controlPlane, runtime) {
+	if !IsOnlyEtcd(entry) && isCalico(controlPlane, runtime) {
 		probeNames = append(probeNames, "calico")
 	}
 
@@ -138,14 +137,14 @@ func (p *Planner) addProbes(nodePlan plan.NodePlan, controlPlane *rkev1.RKEContr
 
 	nodePlan.Probes = replaceRuntimeForProbes(nodePlan.Probes, runtime)
 
-	if isControlPlane(machine) {
-		kcmProbe, err := renderSecureProbe(config[KubeControllerManagerArg], nodePlan.Probes["kube-controller-manager"], rancherruntime.GetRuntime(controlPlane.Spec.KubernetesVersion), DefaultKubeControllerManagerDefaultSecurePort, DefaultKubeControllerManagerCertDir, DefaultKubeControllerManagerCert)
+	if isControlPlane(entry) {
+		kcmProbe, err := renderSecureProbe(config[KubeControllerManagerArg], nodePlan.Probes["kube-controller-manager"], rke2.GetRuntime(controlPlane.Spec.KubernetesVersion), DefaultKubeControllerManagerDefaultSecurePort, DefaultKubeControllerManagerCertDir, DefaultKubeControllerManagerCert)
 		if err != nil {
 			return nodePlan, err
 		}
 		nodePlan.Probes["kube-controller-manager"] = kcmProbe
 
-		ksProbe, err := renderSecureProbe(config[KubeSchedulerArg], nodePlan.Probes["kube-scheduler"], rancherruntime.GetRuntime(controlPlane.Spec.KubernetesVersion), DefaultKubeSchedulerDefaultSecurePort, DefaultKubeSchedulerCertDir, DefaultKubeSchedulerCert)
+		ksProbe, err := renderSecureProbe(config[KubeSchedulerArg], nodePlan.Probes["kube-scheduler"], rke2.GetRuntime(controlPlane.Spec.KubernetesVersion), DefaultKubeSchedulerDefaultSecurePort, DefaultKubeSchedulerCertDir, DefaultKubeSchedulerCert)
 		if err != nil {
 			return nodePlan, err
 		}

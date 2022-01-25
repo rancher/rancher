@@ -6,16 +6,8 @@ import (
 	"github.com/rancher/norman/types/convert"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
+	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2"
 	"github.com/rancher/wrangler/pkg/kv"
-	capi "sigs.k8s.io/cluster-api/api/v1beta1"
-)
-
-const (
-	PreDrainAnnotation  = "rke.cattle.io/pre-drain"
-	PostDrainAnnotation = "rke.cattle.io/post-drain"
-	DrainAnnotation     = "rke.cattle.io/drain-options"
-	UnCordonAnnotation  = "rke.cattle.io/uncordon"
-	DrainDoneAnnotation = "rke.cattle.io/drain-done"
 )
 
 func getRestartStamp(plan *plan.NodePlan) string {
@@ -56,8 +48,8 @@ func optionsToString(options rkev1.DrainOptions, disable bool) (string, error) {
 	return string(data), nil
 }
 
-func (p *Planner) drain(oldPlan *plan.NodePlan, newPlan plan.NodePlan, machine *capi.Machine, clusterPlan *plan.Plan, options rkev1.DrainOptions) (bool, error) {
-	if machine == nil || machine.Status.NodeRef == nil {
+func (p *Planner) drain(oldPlan *plan.NodePlan, newPlan plan.NodePlan, entry *planEntry, clusterPlan *plan.Plan, options rkev1.DrainOptions) (bool, error) {
+	if entry == nil || entry.Metadata == nil || entry.Metadata.Annotations == nil || entry.Machine == nil || entry.Machine.Status.NodeRef == nil {
 		return true, nil
 	}
 
@@ -78,28 +70,20 @@ func (p *Planner) drain(oldPlan *plan.NodePlan, newPlan plan.NodePlan, machine *
 		return false, err
 	}
 
-	if machine.Annotations[DrainAnnotation] != optionString {
-		return p.setMachineAnnotation(machine, DrainAnnotation, optionString)
+	if entry.Metadata.Annotations[rke2.DrainAnnotation] != optionString {
+		entry.Metadata.Annotations[rke2.DrainAnnotation] = optionString
+		return false, p.store.updatePlanSecretLabelsAndAnnotations(entry)
 	}
 
-	return machine.Annotations[DrainDoneAnnotation] == optionString, nil
+	return entry.Metadata.Annotations[rke2.DrainDoneAnnotation] == optionString, nil
 }
 
-func (p *Planner) setMachineAnnotation(machine *capi.Machine, key, value string) (bool, error) {
-	machine = machine.DeepCopy()
-	if machine.Annotations == nil {
-		machine.Annotations = map[string]string{}
-	}
-	machine.Annotations[key] = value
-	_, err := p.machines.Update(machine)
-	return false, err
-}
-
-func (p *Planner) undrain(machine *capi.Machine) (bool, error) {
-	if machine.Annotations[DrainAnnotation] != "" &&
-		machine.Annotations[DrainAnnotation] != machine.Annotations[UnCordonAnnotation] {
-		return p.setMachineAnnotation(machine, UnCordonAnnotation, machine.Annotations[DrainAnnotation])
+func (p *Planner) undrain(entry *planEntry) (bool, error) {
+	if entry.Metadata.Annotations[rke2.DrainAnnotation] != "" &&
+		entry.Metadata.Annotations[rke2.DrainAnnotation] != entry.Metadata.Annotations[rke2.UnCordonAnnotation] {
+		entry.Metadata.Annotations[rke2.UnCordonAnnotation] = entry.Metadata.Annotations[rke2.DrainAnnotation]
+		return false, p.store.updatePlanSecretLabelsAndAnnotations(entry)
 	}
 
-	return machine.Annotations[UnCordonAnnotation] == "", nil
+	return entry.Metadata.Annotations[rke2.UnCordonAnnotation] == "", nil
 }

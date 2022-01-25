@@ -252,27 +252,7 @@ func (r *Rancher) Start(ctx context.Context) error {
 			return err
 		}
 
-		if err := forceUpgradeLogout(r.Wrangler.Core.ConfigMap(), r.Wrangler.Mgmt.Token(), "v2.6.0"); err != nil {
-			return err
-		}
-
-		if err := forceSystemAndDefaultProjectCreation(r.Wrangler.Core.ConfigMap(), r.Wrangler.Mgmt.Cluster()); err != nil {
-			return err
-		}
-
-		if features.MCM.Enabled() {
-			if err := forceSystemNamespaceAssignment(r.Wrangler.Core.ConfigMap(), r.Wrangler.Mgmt.Project()); err != nil {
-				return err
-			}
-		}
-
-		if features.EmbeddedClusterAPI.Enabled() {
-			if err := addWebhookConfigToCAPICRDs(r.Wrangler.CRD.CustomResourceDefinition()); err != nil {
-				return err
-			}
-		}
-
-		return copyCAAdditionalSecret(r.Wrangler.Core.Secret())
+		return runMigrations(r.Wrangler)
 	})
 
 	if err := r.authServer.Start(ctx, false); err != nil {

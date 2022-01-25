@@ -2,7 +2,7 @@ package machineprovision
 
 import (
 	"context"
-	errors2 "errors"
+	"errors"
 	"fmt"
 	"path"
 	"strings"
@@ -12,12 +12,12 @@ import (
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/controllers/management/drivers/nodedriver"
 	"github.com/rancher/rancher/pkg/controllers/management/node"
+	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2"
 	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2/etcdmgmt"
 	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta1"
 	mgmtcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	ranchercontrollers "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/provisioningv2/kubeconfig"
-	v2provruntime "github.com/rancher/rancher/pkg/provisioningv2/rke2/runtime"
 	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/rancher/wrangler/pkg/apply"
 	"github.com/rancher/wrangler/pkg/condition"
@@ -31,14 +31,14 @@ import (
 	"github.com/sirupsen/logrus"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
-	apierror "k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
-	"sigs.k8s.io/cluster-api/errors"
+	capierrors "sigs.k8s.io/cluster-api/errors"
 )
 
 const (
@@ -147,7 +147,7 @@ func (h *handler) OnJobChange(key string, job *batchv1.Job) (*batchv1.Job, error
 		Version: version,
 		Kind:    kind,
 	}, job.Namespace, name)
-	if apierror.IsNotFound(err) {
+	if apierrors.IsNotFound(err) {
 		// ignore err
 		return job, nil
 	} else if err != nil {
@@ -181,20 +181,6 @@ func (h *handler) OnJobChange(key string, job *batchv1.Job) (*batchv1.Job, error
 	}
 
 	return job, nil
-}
-
-func (h *handler) getMachine(obj runtime.Object) (*capi.Machine, error) {
-	meta, err := meta.Accessor(obj)
-	if err != nil {
-		return nil, err
-	}
-	for _, owner := range meta.GetOwnerReferences() {
-		if owner.Kind == "Machine" {
-			return h.machines.Get(meta.GetNamespace(), owner.Name)
-		}
-	}
-
-	return nil, nil
 }
 
 func (h *handler) getMachineStatus(job *batchv1.Job, remove bool) (rkev1.RKEMachineStatus, error) {
@@ -259,9 +245,9 @@ func (h *handler) getMachineStatus(job *batchv1.Job, remove bool) (rkev1.RKEMach
 }
 
 func getMachineStatusFromPod(pod *corev1.Pod, kind, condType string) rkev1.RKEMachineStatus {
-	reason := string(errors.CreateMachineError)
+	reason := string(capierrors.CreateMachineError)
 	if condType == deleteJobConditionType {
-		reason = string(errors.DeleteMachineError)
+		reason = string(capierrors.DeleteMachineError)
 	}
 
 	if pod.Status.Phase == corev1.PodSucceeded {
@@ -341,7 +327,7 @@ func (h *handler) OnRemove(key string, obj runtime.Object) (runtime.Object, erro
 
 	if cond := getCondition(infraObj.data, deleteJobConditionType); cond != nil {
 		job, err := h.jobs.Get(infraObj.meta.GetNamespace(), GetJobName(infraObj.meta.GetName()))
-		if apierror.IsNotFound(err) {
+		if apierrors.IsNotFound(err) {
 			// If the deletion job condition has been set on the infrastructure object and the deletion job has been removed,
 			// then we don't want to create another deletion job.
 			logrus.Infof("Machine %s %s has already been deleted", infraObj.obj.GetObjectKind().GroupVersionKind(), infraObj.meta.GetName())
@@ -367,8 +353,8 @@ func (h *handler) OnRemove(key string, obj runtime.Object) (runtime.Object, erro
 		return obj, fmt.Errorf("error retrieving the clustername for machine, label key %s does not appear to exist for dynamic machine %s", capi.ClusterLabelName, key)
 	}
 
-	machine, err := h.getMachine(obj)
-	if err != nil {
+	machine, err := rke2.GetMachineByOwner(h.machines, infraObj.meta)
+	if err != nil && !errors.Is(err, rke2.ErrNoMachineOwnerRef) {
 		return obj, err
 	}
 
@@ -379,10 +365,10 @@ func (h *handler) OnRemove(key string, obj runtime.Object) (runtime.Object, erro
 	}
 
 	cluster, err := h.rancherClusterCache.Get(infraObj.meta.GetNamespace(), clusterName)
-	if err != nil && !apierror.IsNotFound(err) {
+	if err != nil && !apierrors.IsNotFound(err) {
 		return obj, err
 	}
-	if apierror.IsNotFound(err) || !cluster.DeletionTimestamp.IsZero() {
+	if apierrors.IsNotFound(err) || !cluster.DeletionTimestamp.IsZero() {
 		return h.doRemove(infraObj)
 	}
 
@@ -395,7 +381,7 @@ func (h *handler) OnRemove(key string, obj runtime.Object) (runtime.Object, erro
 			return obj, err
 		}
 
-		removed, err = etcdmgmt.SafelyRemoved(restConfig, v2provruntime.GetRuntimeCommand(cluster.Spec.KubernetesVersion), machine.Status.NodeRef.Name)
+		removed, err = etcdmgmt.SafelyRemoved(restConfig, rke2.GetRuntimeCommand(cluster.Spec.KubernetesVersion), machine.Status.NodeRef.Name)
 		if err != nil {
 			return obj, err
 		}
@@ -529,7 +515,7 @@ func setCondition(dynamic *dynamic.Controller, obj runtime.Object, conditionType
 		message = ""
 	)
 
-	if errors2.Is(generic.ErrSkip, err) {
+	if errors.Is(generic.ErrSkip, err) {
 		err = nil
 	}
 
@@ -651,7 +637,7 @@ func shouldCleanupObjects(job *batchv1.Job, d data.Object) bool {
 
 	forceRemoveAnnValue, _ := d.Map("metadata", "annotations")[forceRemoveMachineAnn].(string)
 
-	if createJobCondition.Reason() == string(errors.CreateMachineError) || strings.ToLower(forceRemoveAnnValue) == "true" {
+	if createJobCondition.Reason() == string(capierrors.CreateMachineError) || strings.ToLower(forceRemoveAnnValue) == "true" {
 		return strings.ToLower(job.Spec.Template.Labels[InfraJobRemove]) == "true" && condition.Cond("Failed").IsTrue(job)
 	}
 
