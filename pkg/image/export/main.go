@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/coreos/go-semver/semver"
@@ -86,6 +87,13 @@ func run(systemChartPath, chartPath string, imagesFromArgs []string) error {
 		data.K8sVersionWindowsServiceOptions,
 		data.K8sVersionInfo,
 	)
+
+	var k8sVersions []string
+	for k := range linuxInfo.RKESystemImages {
+		k8sVersions = append(k8sVersions, k)
+	}
+	sort.Strings(k8sVersions)
+	writeSliceToFile(filepath.Join(os.Getenv("HOME"), "bin", "rancher-rke-k8s-versions.txt"), k8sVersions)
 
 	externalImages := make(map[string][]string)
 	k3sUpgradeImages, err := ext.GetExternalImages(rancherVersion, data.K3S, ext.K3S, nil)
@@ -248,6 +256,22 @@ func imagesText(arch string, targetImages []string) error {
 
 		log.Println("Image:", image)
 		fmt.Fprintln(save, image)
+	}
+
+	return nil
+}
+
+func writeSliceToFile(filename string, versions []string) error {
+	log.Printf("Creating %s\n", filename)
+	save, err := os.Create(filename)
+	if err != nil {
+		return err
+	}
+	defer save.Close()
+	save.Chmod(0755)
+
+	for _, version := range versions {
+		fmt.Fprintln(save, version)
 	}
 
 	return nil

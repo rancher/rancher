@@ -20,4 +20,11 @@ printf '%s\n' "$(grep "_VERSION" ./package/Dockerfile | grep ENV | egrep -v "htt
 
 printf '%s\n' "$(grep "rancher/" ./go.mod | egrep -v "\./"  | egrep -v "\/pkg\/apis|\/pkg\/client|^module" | grep -v "=>" | awk -F'/' '{ print $NF }' | awk '$1 = toupper($1)' | sort | grep "\-rc")" >> $COMPONENTSFILE
 
+K8SVERSIONSFILE=./bin/rancher-rke-k8s-versions.txt
+
+if [[ -f "$K8SVERSIONSFILE" ]]; then
+    echo "# RKE Kubernetes versions" >> $COMPONENTSFILE
+    cat $K8SVERSIONSFILE >> $COMPONENTSFILE
+fi
+
 echo "Done creating ./bin/rancher-components.txt"
