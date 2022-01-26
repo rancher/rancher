@@ -7,9 +7,6 @@ import (
 
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
-	"github.com/rancher/rancher/tests/framework/extensions/cloudcredentials/aws"
-	"github.com/rancher/rancher/tests/framework/extensions/cloudcredentials/digitalocean"
-	"github.com/rancher/rancher/tests/framework/extensions/cloudcredentials/harvester"
 	"github.com/rancher/rancher/tests/framework/extensions/clusters"
 	"github.com/rancher/rancher/tests/framework/extensions/machinepools"
 	"github.com/rancher/rancher/tests/framework/extensions/users"
@@ -31,18 +28,16 @@ type RKE2NodeDriverProvisioningTestSuite struct {
 	standardUserClient *rancher.Client
 	kubernetesVersions []string
 	cnis               []string
+	providers          []string
 }
 
 const (
-	baseDOClusterName        = "automationdo-"
-	baseAWSClusterName       = "automationaws-"
-	baseHarvesterClusterName = "automationharvester-"
-	namespace                = "fleet-default"
-	defaultRandStringLength  = 5
+	namespace               = "fleet-default"
+	defaultRandStringLength = 5
 )
 
 func AppendRandomString(baseClusterName string) string {
-	clusterName := baseClusterName + namegenerator.RandStringLower(5)
+	clusterName := "auto-" + baseClusterName + "-" + namegenerator.RandStringLower(5)
 	return clusterName
 }
 
@@ -59,6 +54,7 @@ func (r *RKE2NodeDriverProvisioningTestSuite) SetupSuite() {
 
 	r.kubernetesVersions = clustersConfig.KubernetesVersions
 	r.cnis = clustersConfig.CNIs
+	r.providers = clustersConfig.Providers
 
 	client, err := rancher.NewClient("", testSession)
 	require.NoError(r.T(), err)
@@ -66,7 +62,7 @@ func (r *RKE2NodeDriverProvisioningTestSuite) SetupSuite() {
 	r.client = client
 
 	enabled := true
-	var testuser = AppendRandomString("testuser")
+	var testuser = AppendRandomString("testuser-")
 	user := &management.User{
 		Username: testuser,
 		Password: "rancherrancher123!",
@@ -83,14 +79,15 @@ func (r *RKE2NodeDriverProvisioningTestSuite) SetupSuite() {
 	r.standardUserClient = standardUserClient
 }
 
-func (r *RKE2NodeDriverProvisioningTestSuite) TestProvisioning_RKE2DigitalOceanCluster() {
+func (r *RKE2NodeDriverProvisioningTestSuite) Provisioning_RKE2Cluster(provider Provider) {
+
 	subSession := r.session.NewSession()
 	defer subSession.Cleanup()
 
 	client, err := r.client.WithSession(subSession)
 	require.NoError(r.T(), err)
 
-	cloudCredential, err := digitalocean.CreateDigitalOceanCloudCredentials(client)
+	cloudCredential, err := provider.CloudCredFunc(client)
 	require.NoError(r.T(), err)
 
 	nodeRoles0 := []map[string]bool{
@@ -143,11 +140,11 @@ func (r *RKE2NodeDriverProvisioningTestSuite) TestProvisioning_RKE2DigitalOceanC
 					testSessionClient, err := tt.client.WithSession(testSession)
 					require.NoError(r.T(), err)
 
-					clusterName := AppendRandomString(baseDOClusterName)
+					clusterName := AppendRandomString(provider.Name)
 					generatedPoolName := fmt.Sprintf("nc-%s-pool1-", clusterName)
-					machinePoolConfig := machinepools.NewDigitalOceanMachineConfig(generatedPoolName, namespace)
+					machinePoolConfig := provider.MachinePoolFunc(generatedPoolName, namespace)
 
-					machineConfigResp, err := machinepools.CreateMachineConfig(machinepools.DOResourceConfig, machinePoolConfig, testSessionClient)
+					machineConfigResp, err := machinepools.CreateMachineConfig(provider.MachineConfig, machinePoolConfig, testSessionClient)
 					require.NoError(r.T(), err)
 
 					machinePools := machinepools.RKEMachinePoolSetup(tt.nodeRoles, machineConfigResp)
@@ -175,11 +172,7 @@ func (r *RKE2NodeDriverProvisioningTestSuite) TestProvisioning_RKE2DigitalOceanC
 	}
 }
 
-func (r *RKE2NodeDriverProvisioningTestSuite) TestProvisioning_RKE2igitalOceanClusterDynamicInput() {
-	nodesAndRoles := NodesAndRolesInput()
-	if len(nodesAndRoles) == 0 {
-		r.T().Skip()
-	}
+func (r *RKE2NodeDriverProvisioningTestSuite) Provisioning_RKE2ClusterDynamicInput(provider Provider) {
 
 	subSession := r.session.NewSession()
 	defer subSession.Cleanup()
@@ -187,7 +180,7 @@ func (r *RKE2NodeDriverProvisioningTestSuite) TestProvisioning_RKE2igitalOceanCl
 	client, err := r.client.WithSession(subSession)
 	require.NoError(r.T(), err)
 
-	cloudCredential, err := digitalocean.CreateDigitalOceanCloudCredentials(client)
+	cloudCredential, err := provider.CloudCredFunc(client)
 	require.NoError(r.T(), err)
 
 	tests := []struct {
@@ -211,11 +204,11 @@ func (r *RKE2NodeDriverProvisioningTestSuite) TestProvisioning_RKE2igitalOceanCl
 					testSessionClient, err := tt.client.WithSession(testSession)
 					require.NoError(r.T(), err)
 
-					clusterName := AppendRandomString(baseDOClusterName)
+					clusterName := AppendRandomString(provider.Name)
 					generatedPoolName := fmt.Sprintf("nc-%s-pool1-", clusterName)
-					machinePoolConfig := machinepools.NewDigitalOceanMachineConfig(generatedPoolName, namespace)
+					machinePoolConfig := provider.MachinePoolFunc(generatedPoolName, namespace)
 
-					machineConfigResp, err := machinepools.CreateMachineConfig(machinepools.DOResourceConfig, machinePoolConfig, testSessionClient)
+					machineConfigResp, err := machinepools.CreateMachineConfig(provider.MachineConfig, machinePoolConfig, testSessionClient)
 					require.NoError(r.T(), err)
 
 					machinePools := machinepools.RKEMachinePoolSetup(nodesAndRoles, machineConfigResp)
@@ -243,323 +236,22 @@ func (r *RKE2NodeDriverProvisioningTestSuite) TestProvisioning_RKE2igitalOceanCl
 	}
 }
 
-func (r *RKE2NodeDriverProvisioningTestSuite) TestProvisioning_RKE2AWSCluster() {
-	subSession := r.session.NewSession()
-	defer subSession.Cleanup()
-
-	client, err := r.client.WithSession(subSession)
-	require.NoError(r.T(), err)
-
-	cloudCredential, err := aws.CreateAWSCloudCredentials(client)
-	require.NoError(r.T(), err)
-
-	nodeRoles0 := []map[string]bool{
-		{
-			"controlplane": true,
-			"etcd":         true,
-			"worker":       true,
-		},
-	}
-
-	nodeRoles1 := []map[string]bool{
-		{
-			"controlplane": true,
-			"etcd":         false,
-			"worker":       false,
-		},
-		{
-			"controlplane": false,
-			"etcd":         true,
-			"worker":       false,
-		},
-		{
-			"controlplane": false,
-			"etcd":         false,
-			"worker":       true,
-		},
-	}
-
-	tests := []struct {
-		name      string
-		nodeRoles []map[string]bool
-		client    *rancher.Client
-	}{
-		{"1 Node all roles Admin User", nodeRoles0, r.client},
-		{"1 Node all roles Standard User", nodeRoles0, r.standardUserClient},
-		{"3 nodes - 1 role per node Admin User", nodeRoles1, r.client},
-		{"3 nodes - 1 role per node Standard User", nodeRoles1, r.standardUserClient},
-	}
-
-	var name string
-	for _, tt := range tests {
-		for _, kubeVersion := range r.kubernetesVersions {
-			name = tt.name + " Kubernetes version: " + kubeVersion
-			for _, cni := range r.cnis {
-				name += " cni: " + cni
-				r.Run(name, func() {
-					testSession := session.NewSession(r.T())
-					defer testSession.Cleanup()
-
-					testSessionClient, err := tt.client.WithSession(testSession)
-					require.NoError(r.T(), err)
-
-					clusterName := AppendRandomString(baseAWSClusterName)
-					generatedPoolName := fmt.Sprintf("nc-%s-pool1-", clusterName)
-					machinePoolConfig := machinepools.NewAWSMachineConfig(generatedPoolName, namespace)
-
-					machineConfigResp, err := machinepools.CreateMachineConfig(machinepools.AWSResourceConfig, machinePoolConfig, testSessionClient)
-					require.NoError(r.T(), err)
-
-					machinePools := machinepools.RKEMachinePoolSetup(tt.nodeRoles, machineConfigResp)
-
-					cluster := clusters.NewRKE2ClusterConfig(clusterName, namespace, cni, cloudCredential.ID, kubeVersion, machinePools)
-
-					clusterResp, err := clusters.CreateRKE2Cluster(testSessionClient, cluster)
-					require.NoError(r.T(), err)
-
-					result, err := testSessionClient.Provisioning.Clusters(namespace).Watch(context.TODO(), metav1.ListOptions{
-						FieldSelector:  "metadata.name=" + clusterName,
-						TimeoutSeconds: &defaults.WatchTimeoutSeconds,
-					})
-					require.NoError(r.T(), err)
-
-					checkFunc := clusters.IsProvisioningClusterReady
-
-					err = wait.WatchWait(result, checkFunc)
-					assert.NoError(r.T(), err)
-					assert.Equal(r.T(), clusterName, clusterResp.Name)
-
-				})
-			}
-		}
+func (r *RKE2NodeDriverProvisioningTestSuite) TestProvisioning() {
+	for provider_name := range r.providers {
+		provider_struct := CreateProvider(r.providers[provider_name])
+		r.Provisioning_RKE2Cluster(provider_struct)
 	}
 }
 
-func (r *RKE2NodeDriverProvisioningTestSuite) TestProvisioning_RKE2AWSClusterDynamicInput() {
+func (r *RKE2NodeDriverProvisioningTestSuite) TestProvisioningDynamicInput() {
 	nodesAndRoles := NodesAndRolesInput()
 	if len(nodesAndRoles) == 0 {
 		r.T().Skip()
 	}
 
-	subSession := r.session.NewSession()
-	defer subSession.Cleanup()
-
-	client, err := r.client.WithSession(subSession)
-	require.NoError(r.T(), err)
-
-	cloudCredential, err := aws.CreateAWSCloudCredentials(client)
-	require.NoError(r.T(), err)
-
-	tests := []struct {
-		name   string
-		client *rancher.Client
-	}{
-		{"Admin User", r.client},
-		{"Standard User", r.standardUserClient},
-	}
-
-	var name string
-	for _, tt := range tests {
-		for _, kubeVersion := range r.kubernetesVersions {
-			name = tt.name + " Kubernetes version: " + kubeVersion
-			for _, cni := range r.cnis {
-				name += " cni: " + cni
-				r.Run(name, func() {
-					testSession := session.NewSession(r.T())
-					defer testSession.Cleanup()
-
-					testSessionClient, err := tt.client.WithSession(testSession)
-					require.NoError(r.T(), err)
-
-					clusterName := AppendRandomString(baseAWSClusterName)
-					generatedPoolName := fmt.Sprintf("nc-%s-pool1-", clusterName)
-					machinePoolConfig := machinepools.NewAWSMachineConfig(generatedPoolName, namespace)
-
-					machineConfigResp, err := machinepools.CreateMachineConfig(machinepools.AWSResourceConfig, machinePoolConfig, testSessionClient)
-					require.NoError(r.T(), err)
-
-					machinePools := machinepools.RKEMachinePoolSetup(nodesAndRoles, machineConfigResp)
-
-					cluster := clusters.NewRKE2ClusterConfig(clusterName, namespace, cni, cloudCredential.ID, kubeVersion, machinePools)
-
-					clusterResp, err := clusters.CreateRKE2Cluster(testSessionClient, cluster)
-					require.NoError(r.T(), err)
-
-					result, err := testSessionClient.Provisioning.Clusters(namespace).Watch(context.TODO(), metav1.ListOptions{
-						FieldSelector:  "metadata.name=" + clusterName,
-						TimeoutSeconds: &defaults.WatchTimeoutSeconds,
-					})
-					require.NoError(r.T(), err)
-
-					checkFunc := clusters.IsProvisioningClusterReady
-
-					err = wait.WatchWait(result, checkFunc)
-					assert.NoError(r.T(), err)
-					assert.Equal(r.T(), clusterName, clusterResp.Name)
-
-				})
-			}
-		}
-	}
-}
-
-func (r *RKE2NodeDriverProvisioningTestSuite) TestProvisioning_RKE2HarvesterCluster() {
-	subSession := r.session.NewSession()
-	defer subSession.Cleanup()
-
-	client, err := r.client.WithSession(subSession)
-	require.NoError(r.T(), err)
-
-	cloudCredential, err := harvester.CreateHarvesterCloudCredentials(client)
-	require.NoError(r.T(), err)
-
-	nodeRoles0 := []map[string]bool{
-		{
-			"controlplane": true,
-			"etcd":         true,
-			"worker":       true,
-		},
-	}
-
-	nodeRoles1 := []map[string]bool{
-		{
-			"controlplane": true,
-			"etcd":         false,
-			"worker":       false,
-		},
-		{
-			"controlplane": false,
-			"etcd":         true,
-			"worker":       false,
-		},
-		{
-			"controlplane": false,
-			"etcd":         false,
-			"worker":       true,
-		},
-	}
-
-	tests := []struct {
-		name      string
-		nodeRoles []map[string]bool
-		client    *rancher.Client
-	}{
-		{"1 Node all roles Admin User", nodeRoles0, r.client},
-		{"1 Node all roles Standard User", nodeRoles0, r.standardUserClient},
-		{"3 nodes - 1 role per node Admin User", nodeRoles1, r.client},
-		{"3 nodes - 1 role per node Standard User", nodeRoles1, r.standardUserClient},
-	}
-
-	var name string
-	for _, tt := range tests {
-		for _, kubeVersion := range r.kubernetesVersions {
-			name = tt.name + " Kubernetes version: " + kubeVersion
-			for _, cni := range r.cnis {
-				name += " cni: " + cni
-				r.Run(name, func() {
-					testSession := session.NewSession(r.T())
-					defer testSession.Cleanup()
-
-					testSessionClient, err := tt.client.WithSession(testSession)
-					require.NoError(r.T(), err)
-
-					clusterName := AppendRandomString(baseHarvesterClusterName)
-					generatedPoolName := fmt.Sprintf("nc-%s-pool1-", clusterName)
-					machinePoolConfig := machinepools.NewHarvesterMachineConfig(generatedPoolName, namespace)
-
-					machineConfigResp, err := machinepools.CreateMachineConfig(machinepools.HarvesterResourceConfig, machinePoolConfig, testSessionClient)
-					require.NoError(r.T(), err)
-
-					machinePools := machinepools.RKEMachinePoolSetup(tt.nodeRoles, machineConfigResp)
-
-					cluster := clusters.NewRKE2ClusterConfig(clusterName, namespace, cni, cloudCredential.ID, kubeVersion, machinePools)
-
-					clusterResp, err := clusters.CreateRKE2Cluster(testSessionClient, cluster)
-					require.NoError(r.T(), err)
-
-					result, err := testSessionClient.Provisioning.Clusters(namespace).Watch(context.TODO(), metav1.ListOptions{
-						FieldSelector:  "metadata.name=" + clusterName,
-						TimeoutSeconds: &defaults.WatchTimeoutSeconds,
-					})
-					require.NoError(r.T(), err)
-
-					checkFunc := clusters.IsProvisioningClusterReady
-
-					err = wait.WatchWait(result, checkFunc)
-					assert.NoError(r.T(), err)
-					assert.Equal(r.T(), clusterName, clusterResp.Name)
-
-				})
-			}
-		}
-	}
-}
-
-func (r *RKE2NodeDriverProvisioningTestSuite) TestProvisioning_RKE2HarvesterClusterDynamicInput() {
-	nodesAndRoles := NodesAndRolesInput()
-	if len(nodesAndRoles) == 0 {
-		r.T().Skip()
-	}
-
-	subSession := r.session.NewSession()
-	defer subSession.Cleanup()
-
-	client, err := r.client.WithSession(subSession)
-	require.NoError(r.T(), err)
-
-	cloudCredential, err := harvester.CreateHarvesterCloudCredentials(client)
-	require.NoError(r.T(), err)
-
-	tests := []struct {
-		name   string
-		client *rancher.Client
-	}{
-		{"Admin User", r.client},
-		{"Standard User", r.standardUserClient},
-	}
-
-	var name string
-	for _, tt := range tests {
-		for _, kubeVersion := range r.kubernetesVersions {
-			name = tt.name + " Kubernetes version: " + kubeVersion
-			for _, cni := range r.cnis {
-				name += " cni: " + cni
-				r.Run(name, func() {
-					testSession := session.NewSession(r.T())
-					defer testSession.Cleanup()
-
-					testSessionClient, err := tt.client.WithSession(testSession)
-					require.NoError(r.T(), err)
-
-					clusterName := AppendRandomString(baseHarvesterClusterName)
-					generatedPoolName := fmt.Sprintf("nc-%s-pool1-", clusterName)
-					machinePoolConfig := machinepools.NewHarvesterMachineConfig(generatedPoolName, namespace)
-
-					machineConfigResp, err := machinepools.CreateMachineConfig(machinepools.HarvesterResourceConfig, machinePoolConfig, testSessionClient)
-					require.NoError(r.T(), err)
-
-					machinePools := machinepools.RKEMachinePoolSetup(nodesAndRoles, machineConfigResp)
-
-					cluster := clusters.NewRKE2ClusterConfig(clusterName, namespace, cni, cloudCredential.ID, kubeVersion, machinePools)
-
-					clusterResp, err := clusters.CreateRKE2Cluster(testSessionClient, cluster)
-					require.NoError(r.T(), err)
-
-					result, err := testSessionClient.Provisioning.Clusters(namespace).Watch(context.TODO(), metav1.ListOptions{
-						FieldSelector:  "metadata.name=" + clusterName,
-						TimeoutSeconds: &defaults.WatchTimeoutSeconds,
-					})
-					require.NoError(r.T(), err)
-
-					checkFunc := clusters.IsProvisioningClusterReady
-
-					err = wait.WatchWait(result, checkFunc)
-					assert.NoError(r.T(), err)
-					assert.Equal(r.T(), clusterName, clusterResp.Name)
-
-				})
-			}
-		}
+	for provider_name := range r.providers {
+		provider_struct := CreateProvider(r.providers[provider_name])
+		r.Provisioning_RKE2ClusterDynamicInput(provider_struct)
 	}
 }
 
