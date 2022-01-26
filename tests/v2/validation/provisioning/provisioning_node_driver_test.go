@@ -172,7 +172,7 @@ func (r *RKE2NodeDriverProvisioningTestSuite) Provisioning_RKE2Cluster(provider 
 	}
 }
 
-func (r *RKE2NodeDriverProvisioningTestSuite) Provisioning_RKE2ClusterDynamicInput(provider Provider) {
+func (r *RKE2NodeDriverProvisioningTestSuite) Provisioning_RKE2ClusterDynamicInput(provider Provider, nodesAndRoles []map[string]bool) {
 
 	subSession := r.session.NewSession()
 	defer subSession.Cleanup()
@@ -251,7 +251,7 @@ func (r *RKE2NodeDriverProvisioningTestSuite) TestProvisioningDynamicInput() {
 
 	for provider_name := range r.providers {
 		provider_struct := CreateProvider(r.providers[provider_name])
-		r.Provisioning_RKE2ClusterDynamicInput(provider_struct)
+		r.Provisioning_RKE2ClusterDynamicInput(provider_struct, nodesAndRoles)
 	}
 }
 
