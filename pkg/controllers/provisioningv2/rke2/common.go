@@ -50,9 +50,14 @@ const (
 	UnCordonAnnotation         = "rke.cattle.io/uncordon"
 	WorkerRoleLabel            = "rke.cattle.io/worker-role"
 
+	MachineTemplateClonedFromGroupVersionAnn = "rke.cattle.io/cloned-from-group-version"
+	MachineTemplateClonedFromKindAnn         = "rke.cattle.io/cloned-from-kind"
+	MachineTemplateClonedFromNameAnn         = "rke.cattle.io/cloned-from-name"
+
 	CattleOSLabel = "cattle.io/os"
 
-	RKEMachineAPIVersion = "rke-machine.cattle.io/v1"
+	DefaultMachineConfigAPIVersion = "rke-machine-config.cattle.io/v1"
+	RKEMachineAPIVersion           = "rke-machine.cattle.io/v1"
 
 	Provisioned = condition.Cond("Provisioned")
 	Ready       = condition.Cond("Ready")

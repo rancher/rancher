@@ -136,7 +136,7 @@ func toMachineTemplate(machinePoolName string, cluster *rancherv1.Cluster, machi
 	apiVersion := machinePool.NodeConfig.APIVersion
 	kind := machinePool.NodeConfig.Kind
 	if apiVersion == "" {
-		apiVersion = defaultMachineConfigAPIVersion
+		apiVersion = rke2.DefaultMachineConfigAPIVersion
 	}
 
 	gvk := schema.FromAPIVersionAndKind(apiVersion, kind)
@@ -182,6 +182,11 @@ func toMachineTemplate(machinePoolName string, cluster *rancherv1.Cluster, machi
 			"kind":       strings.TrimSuffix(kind, "Config") + "MachineTemplate",
 			"apiVersion": rke2.RKEMachineAPIVersion,
 			"metadata": map[string]interface{}{
+				"annotations": map[string]interface{}{
+					rke2.MachineTemplateClonedFromGroupVersionAnn: gvk.GroupVersion().String(),
+					rke2.MachineTemplateClonedFromKindAnn:         gvk.Kind,
+					rke2.MachineTemplateClonedFromNameAnn:         machinePool.NodeConfig.Name,
+				},
 				"name":      machinePoolName,
 				"namespace": cluster.Namespace,
 				"labels": map[string]interface{}{

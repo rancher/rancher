@@ -27,8 +27,7 @@ import (
 )
 
 const (
-	byNodeInfra                    = "by-node-infra"
-	defaultMachineConfigAPIVersion = "rke-machine-config.cattle.io/v1"
+	byNodeInfra = "by-node-infra"
 )
 
 type handler struct {
@@ -112,13 +111,13 @@ func byNodeInfraIndex(obj *rancherv1.Cluster) ([]string, error) {
 
 func toInfraRefKey(ref corev1.ObjectReference, namespace string) string {
 	if ref.APIVersion == "" {
-		ref.APIVersion = defaultMachineConfigAPIVersion
+		ref.APIVersion = rke2.DefaultMachineConfigAPIVersion
 	}
 	return fmt.Sprintf("%s/%s/%s/%s", ref.APIVersion, ref.Kind, namespace, ref.Name)
 }
 
 func matchRKENodeGroup(gvk schema.GroupVersionKind) bool {
-	return gvk.GroupVersion().String() == defaultMachineConfigAPIVersion &&
+	return gvk.GroupVersion().String() == rke2.DefaultMachineConfigAPIVersion &&
 		strings.HasSuffix(gvk.Kind, "Config")
 }
 
