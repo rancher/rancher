@@ -21,6 +21,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/watch"
@@ -89,6 +90,16 @@ func New(clients *clients.Clients, cluster *provisioningv1api.Cluster) (*provisi
 
 func Machines(clients *clients.Clients, cluster *provisioningv1api.Cluster) (*capi.MachineList, error) {
 	return clients.CAPI.Machine().List(cluster.Namespace, metav1.ListOptions{
+		LabelSelector: "cluster.x-k8s.io/cluster-name=" + cluster.Name,
+	})
+}
+
+func PodInfraMachines(clients *clients.Clients, cluster *provisioningv1api.Cluster) (*unstructured.UnstructuredList, error) {
+	return clients.Dynamic.Resource(schema.GroupVersionResource{
+		Group:    "rke-machine.cattle.io",
+		Version:  "v1",
+		Resource: "podmachines",
+	}).Namespace(cluster.Namespace).List(clients.Ctx, metav1.ListOptions{
 		LabelSelector: "cluster.x-k8s.io/cluster-name=" + cluster.Name,
 	})
 }
