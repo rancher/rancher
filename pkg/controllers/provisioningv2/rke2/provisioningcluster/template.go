@@ -310,12 +310,18 @@ func machineDeployments(cluster *rancherv1.Cluster, capiCluster *capi.Cluster, d
 				Name:        machinePoolName,
 				Labels:      machineDeploymentLabels,
 				Annotations: machinePool.MachineDeploymentAnnotations,
-				// This ensures that the CAPI cluster is not deleted before the machines are deleted.
-				Finalizers: []string{metav1.FinalizerDeleteDependents},
 			},
 			Spec: capi.MachineDeploymentSpec{
 				ClusterName: capiCluster.Name,
 				Replicas:    machinePool.Quantity,
+				Strategy: &capi.MachineDeploymentStrategy{
+					// RollingUpdate is the default, so no harm in setting it here.
+					Type: capi.RollingUpdateMachineDeploymentStrategyType,
+					RollingUpdate: &capi.MachineRollingUpdateDeployment{
+						// Delete oldest machines by default.
+						DeletePolicy: &[]string{string(capi.OldestMachineSetDeletePolicy)}[0],
+					},
+				},
 				Template: capi.MachineTemplateSpec{
 					ObjectMeta: capi.ObjectMeta{
 						Labels: map[string]string{
@@ -341,13 +347,8 @@ func machineDeployments(cluster *rancherv1.Cluster, capiCluster *capi.Cluster, d
 			},
 		}
 		if machinePool.RollingUpdate != nil {
-			machineDeployment.Spec.Strategy = &capi.MachineDeploymentStrategy{
-				Type: capi.RollingUpdateMachineDeploymentStrategyType,
-				RollingUpdate: &capi.MachineRollingUpdateDeployment{
-					MaxUnavailable: machinePool.RollingUpdate.MaxUnavailable,
-					MaxSurge:       machinePool.RollingUpdate.MaxSurge,
-				},
-			}
+			machineDeployment.Spec.Strategy.RollingUpdate.MaxSurge = machinePool.RollingUpdate.MaxSurge
+			machineDeployment.Spec.Strategy.RollingUpdate.MaxUnavailable = machinePool.RollingUpdate.MaxUnavailable
 		}
 
 		if machinePool.EtcdRole {
