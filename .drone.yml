@@ -103,6 +103,7 @@ steps:
       include:
         - "refs/heads/master"
         - "refs/heads/release/v*"
+        - "refs/tags/v*"
     event:
       - push
       - tag
