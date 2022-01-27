@@ -22,7 +22,7 @@ func TestFilterReleasesSemver(t *testing.T) {
 		{
 			"rancher version in range comparison with `>= <`style comparison",
 			">= 2.5.0-alpha3 <2.6.0",
-			"v2.5.0+123", //SemVer comparisons using constraints without a prerelease comparator will skip prerelease versions
+			"v2.5.0+123",
 			true,
 		},
 		{
@@ -92,16 +92,22 @@ func TestFilterReleasesSemver(t *testing.T) {
 			false,
 		},
 		{
+			"rancher prerelease version in range comparison with `>= <`style comparison",
+			">= 2.5.0-alpha3 <2.6.0-0",
+			"v2.5.0-alpha4", //SemVer comparisons using constraints with prerelease will be evaluated using an ASCII sort order, per the spec
+			true,
+		},
+		{
 			"rancher version out of range comparison with `> <`style comparison",
 			">2.5.0 <2.6.0",
-			"v2.5.3-alpha3", //SemVer comparisons using constraints without a prerelease comparator will skip prerelease versions
-			false,
+			"v2.5.3-alpha3",
+			true,
 		},
 		{
 			"rancher version out of range comparison with `> <=`style comparison",
 			"> 2.5.0-alpha <=2.6.0",
-			"v2.5.1-alpha", //SemVer comparisons using constraints without a prerelease comparator will skip prerelease versions
-			false,
+			"v2.5.1-alpha",
+			true,
 		},
 		{
 			"rancher version out of range comparison with `>= <=`style comparison",
@@ -130,7 +136,7 @@ func TestFilterReleasesSemver(t *testing.T) {
 		{
 			"rancher version out of range comparison with `>=` style comparison",
 			">= 2.4.3",
-			"v2.4.2-alpha1", //SemVer comparisons using constraints without a prerelease comparator will skip prerelease versions
+			"v2.4.2-alpha1",
 			false,
 		},
 		{
