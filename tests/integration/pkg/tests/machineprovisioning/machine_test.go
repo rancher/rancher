@@ -14,6 +14,7 @@ import (
 	"github.com/rancher/rancher/tests/integration/pkg/defaults"
 	"github.com/rancher/rancher/tests/integration/pkg/nodeconfig"
 	"github.com/rancher/rancher/tests/integration/pkg/wait"
+	"github.com/rancher/wrangler/pkg/data"
 	"github.com/stretchr/testify/assert"
 	errgroup2 "golang.org/x/sync/errgroup"
 	corev1 "k8s.io/api/core/v1"
@@ -21,6 +22,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/util/retry"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 )
@@ -156,7 +158,75 @@ func TestMachineTemplateClonedAnnotations(t *testing.T) {
 		assert.Equal(t, machineTemplate.GetAnnotations()[rke2.MachineTemplateClonedFromKindAnn], c.Spec.RKEConfig.MachinePools[0].NodeConfig.Kind)
 		assert.Equal(t, machineTemplate.GetAnnotations()[rke2.MachineTemplateClonedFromNameAnn], c.Spec.RKEConfig.MachinePools[0].NodeConfig.Name)
 	}
+}
 
+func TestMachineSetDeletePolicyOldestSet(t *testing.T) {
+	if strings.ToLower(os.Getenv("DIST")) == "rke2" {
+		t.Skip()
+	}
+
+	clients, err := clients.New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer clients.Close()
+
+	c, err := cluster.New(clients, &provisioningv1api.Cluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-machine-set-delete-policy-oldest-set",
+		},
+		Spec: provisioningv1api.ClusterSpec{
+			KubernetesVersion: defaults.SomeK8sVersion,
+			RKEConfig: &provisioningv1api.RKEConfig{
+				MachinePools: []provisioningv1api.RKEMachinePool{
+					{
+						EtcdRole:         true,
+						ControlPlaneRole: true,
+						WorkerRole:       true,
+						Quantity:         &defaults.One,
+					},
+					{
+						EtcdRole:         true,
+						ControlPlaneRole: true,
+						WorkerRole:       true,
+						Quantity:         &defaults.One,
+						RollingUpdate: &provisioningv1api.RKEMachinePoolRollingUpdate{
+							MaxUnavailable: &intstr.IntOrString{
+								Type:   intstr.String,
+								StrVal: "10%",
+							},
+							MaxSurge: &intstr.IntOrString{
+								Type:   intstr.String,
+								StrVal: "10%",
+							},
+						},
+					},
+				},
+			},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	c, err = cluster.WaitForCreate(clients, c)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	machineSets, err := cluster.MachineSets(clients, c)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, machineSet := range machineSets.Items {
+		d, err := data.Convert(machineSet)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		assert.Equal(t, string(capi.OldestMachineSetDeletePolicy), d.String("Object", "spec", "deletePolicy"))
+	}
 }
 
 func TestThreeNodesAllRolesWithDelete(t *testing.T) {
