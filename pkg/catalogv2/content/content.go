@@ -8,6 +8,7 @@ import (
 	"io"
 	"io/ioutil"
 	"net/url"
+	"strings"
 	"sync"
 
 	"github.com/Masterminds/semver/v3"
@@ -205,13 +206,31 @@ func (c *Manager) filterReleases(index *repo.IndexFile, k8sVersion *semver.Versi
 		logrus.Errorf("failed to parse server version %s: %v", settings.ServerVersion.Get(), err)
 		return index
 	}
+	rancherVersionWithoutPrerelease, err := rancherVersion.SetPrerelease("")
+	if err != nil {
+		logrus.Errorf("failed to remove prerelease from %s: %v", settings.ServerVersion.Get(), err)
+		return index
+	}
 
 	for rel, versions := range index.Entries {
 		newVersions := make([]*repo.ChartVersion, 0, len(versions))
 		for _, version := range versions {
 			if constraintStr, ok := version.Annotations["catalog.cattle.io/rancher-version"]; ok {
 				if constraint, err := semver.NewConstraint(constraintStr); err == nil {
-					if !constraint.Check(rancherVersion) {
+					satisfiesConstraint, errs := constraint.Validate(rancherVersion)
+					// Check if the reason for failure is because it is ignroing prereleases
+					constraintDoesNotMatchPrereleases := false
+					for _, err := range errs {
+						// Comes from error in https://github.com/Masterminds/semver/blob/60c7ae8a99210a90a9457d5de5f6dcbc4dab8e64/constraints.go#L93
+						if strings.Contains(err.Error(), "the constraint is only looking for release versions") {
+							constraintDoesNotMatchPrereleases = true
+							break
+						}
+					}
+					if constraintDoesNotMatchPrereleases {
+						satisfiesConstraint = constraint.Check(&rancherVersionWithoutPrerelease)
+					}
+					if !satisfiesConstraint {
 						continue
 					}
 				} else {
