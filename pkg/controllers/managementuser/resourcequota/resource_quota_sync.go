@@ -450,9 +450,11 @@ func (c *SyncController) getResourceLimitToUpdate(ns *corev1.Namespace) (*corev1
 		return convertPodResourceLimitToLimitRangeSpec(updatedLimit)
 	} else if nsLimit != nil {
 		return convertPodResourceLimitToLimitRangeSpec(nsLimit)
+	} else if projectLimit != nil {
+		return convertPodResourceLimitToLimitRangeSpec(projectLimit)
+	} else {
+		return nil, nil
 	}
-
-	return nil, nil
 }
 
 func completeQuota(existingQuota *v32.NamespaceResourceQuota, defaultQuota *v32.NamespaceResourceQuota) (*v32.NamespaceResourceQuota, error) {
