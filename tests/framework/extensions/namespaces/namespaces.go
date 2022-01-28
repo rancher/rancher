@@ -46,7 +46,7 @@ func CreateNamespace(client *rancher.Client, namespaceName, containerDefaultReso
 		},
 	}
 
-	dynamicClient, err := client.GetRancherDynamicClient()
+	dynamicClient, err := client.GetDownStreamClusterClient(project.ClusterID)
 	if err != nil {
 		return nil, err
 	}

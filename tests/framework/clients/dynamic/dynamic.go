@@ -23,6 +23,8 @@ type Client struct {
 
 // NewForConfig creates a new dynamic client or returns an error.
 func NewForConfig(ts *session.Session, inConfig *rest.Config) (dynamic.Interface, error) {
+	ts.TestingT.Logf("Dynamic Client Host:%s", inConfig.Host)
+
 	dynamicClient, err := dynamic.NewForConfig(inConfig)
 	if err != nil {
 		return nil, err
