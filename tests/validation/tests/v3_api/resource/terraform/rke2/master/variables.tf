@@ -23,3 +23,7 @@ variable "vpc_id" {}
 variable "username" {
   default = "username"
 }
+variable "create_lb" {
+  description = "Create Network Load Balancer if set to true"
+  type = bool
+}

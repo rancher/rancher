@@ -20,6 +20,11 @@ variable "server_flags" {}
 variable "cluster_type" {}
 variable "node_os" {}
 
+variable "create_lb" {
+  description = "Create Network Load Balancer if set to true"
+  type = bool
+}
+
 variable "external_db" {}
 variable "external_db_version" {}
 variable "db_group_name" {}

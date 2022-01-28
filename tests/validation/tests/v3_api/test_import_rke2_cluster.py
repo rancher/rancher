@@ -14,6 +14,7 @@ RANCHER_EC2_INSTANCE_CLASS = os.environ.get("RANCHER_EC2_INSTANCE_CLASS",
                                             "t3a.medium")
 HOST_NAME = os.environ.get('RANCHER_HOST_NAME', "sa")
 RANCHER_IAM_ROLE = os.environ.get("RANCHER_IAM_ROLE")
+RKE2_CREATE_LB = os.environ.get("RKE2_CREATE_LB", False)
 
 RANCHER_RKE2_VERSION = os.environ.get("RANCHER_RKE2_VERSION", "")
 RANCHER_RKE2_CHANNEL = os.environ.get("RANCHER_RKE2_CHANNEL", "null")
@@ -101,7 +102,8 @@ def create_rke2_multiple_control_cluster(cluster_type, cluster_version):
                               'node_os': RANCHER_RKE2_OPERATING_SYSTEM,
                               'cluster_type': cluster_type,
                               'iam_role': RANCHER_IAM_ROLE,
-                              'volume_size': AWS_VOLUME_SIZE})
+                              'volume_size': AWS_VOLUME_SIZE,
+                              'create_lb': str(RKE2_CREATE_LB).lower()})
     print("Creating cluster")
     tf.init()
     tf.plan(out="plan_server.out")
