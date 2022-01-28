@@ -94,6 +94,16 @@ func Machines(clients *clients.Clients, cluster *provisioningv1api.Cluster) (*ca
 	})
 }
 
+func MachineSets(clients *clients.Clients, cluster *provisioningv1api.Cluster) (*unstructured.UnstructuredList, error) {
+	return clients.Dynamic.Resource(schema.GroupVersionResource{
+		Group:    "cluster.x-k8s.io",
+		Version:  "v1beta1",
+		Resource: "machinesets",
+	}).Namespace(cluster.Namespace).List(clients.Ctx, metav1.ListOptions{
+		LabelSelector: "cluster.x-k8s.io/cluster-name=" + cluster.Name,
+	})
+}
+
 func PodInfraMachines(clients *clients.Clients, cluster *provisioningv1api.Cluster) (*unstructured.UnstructuredList, error) {
 	return clients.Dynamic.Resource(schema.GroupVersionResource{
 		Group:    "rke-machine.cattle.io",
