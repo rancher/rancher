@@ -287,7 +287,7 @@ func shouldRefresh(spec *catalog.RepoSpec, status *catalog.RepoStatus) bool {
 	if status.IndexConfigMapName == "" {
 		return true
 	}
-	if spec.ForceUpdate != nil && spec.ForceUpdate.After(status.DownloadTime.Time) && spec.ForceUpdate.Time.Before(time.Now()) {
+	if spec.ForceUpdate != nil && spec.ForceUpdate.After(status.DownloadTime.Time) && spec.ForceUpdate.Time.Before(time.Now().Add(time.Minute)) {
 		return true
 	}
 	refreshTime := time.Now().Add(-interval)
