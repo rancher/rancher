@@ -279,7 +279,7 @@ func (h *handler) getRKEControlPlaneForCluster(cluster *rancherv1.Cluster) (*rke
 	}
 
 	cp, err := h.rkeControlPlane.Get(capiCluster.Spec.ControlPlaneRef.Namespace, capiCluster.Spec.ControlPlaneRef.Name)
-	if apierror.IsNotFound(err) && cluster.DeletionTimestamp == nil {
+	if apierror.IsNotFound(err) && cluster.DeletionTimestamp != nil {
 		return nil, nil
 	} else if err != nil {
 		return nil, err
