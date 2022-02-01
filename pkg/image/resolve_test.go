@@ -401,6 +401,7 @@ func getTestK8sVersionInfo() (*kd.VersionInfo, *kd.VersionInfo, error) {
 		data.K8sVersionServiceOptions,
 		data.K8sVersionWindowsServiceOptions,
 		data.K8sVersionInfo,
+		false,
 	)
 	return l, w, nil
 }

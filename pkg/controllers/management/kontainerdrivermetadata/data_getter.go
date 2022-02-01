@@ -143,6 +143,7 @@ func GetK8sVersionInfo(
 	linuxSvcOptions map[string]rketypes.KubernetesServicesOptions,
 	windowsSvcOptions map[string]rketypes.KubernetesServicesOptions,
 	rancherVersions map[string]rketypes.K8sVersionInfo,
+	allK8sVersions bool,
 ) (linuxInfo, windowsInfo *VersionInfo) {
 
 	linuxInfo = newVersionInfo()
@@ -157,8 +158,10 @@ func GetK8sVersionInfo(
 		if majorVersionInfo, ok := rancherVersions[majorVersion]; ok && toIgnoreForK8sCurrent(majorVersionInfo, rancherVersion) {
 			continue
 		}
-		if curr, ok := maxVersionForMajorK8sVersion[majorVersion]; !ok || mVersion.Compare(k8sVersion, curr, ">") {
-			maxVersionForMajorK8sVersion[majorVersion] = k8sVersion
+		if !allK8sVersions {
+			if curr, ok := maxVersionForMajorK8sVersion[majorVersion]; !ok || mVersion.Compare(k8sVersion, curr, ">") {
+				maxVersionForMajorK8sVersion[majorVersion] = k8sVersion
+			}
 		}
 	}
 	for majorVersion, k8sVersion := range maxVersionForMajorK8sVersion {

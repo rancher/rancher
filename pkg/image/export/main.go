@@ -86,6 +86,7 @@ func run(systemChartPath, chartPath string, imagesFromArgs []string) error {
 		data.K8sVersionServiceOptions,
 		data.K8sVersionWindowsServiceOptions,
 		data.K8sVersionInfo,
+		false,
 	)
 
 	var k8sVersions []string
