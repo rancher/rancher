@@ -58,6 +58,7 @@ const (
 
 	DefaultMachineConfigAPIVersion = "rke-machine-config.cattle.io/v1"
 	RKEMachineAPIVersion           = "rke-machine.cattle.io/v1"
+	RKEAPIVersion                  = "rke.cattle.io/v1"
 
 	Provisioned = condition.Cond("Provisioned")
 	Ready       = condition.Cond("Ready")

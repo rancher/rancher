@@ -337,7 +337,7 @@ func machineDeployments(cluster *rancherv1.Cluster, capiCluster *capi.Cluster, d
 								Kind:       "RKEBootstrapTemplate",
 								Namespace:  cluster.Namespace,
 								Name:       bootstrapName,
-								APIVersion: "rke.cattle.io/v1",
+								APIVersion: rke2.RKEAPIVersion,
 							},
 						},
 						InfrastructureRef: infraRef,
