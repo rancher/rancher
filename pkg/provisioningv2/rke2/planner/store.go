@@ -161,6 +161,7 @@ func SecretToNode(secret *corev1.Secret) (*plan.Node, error) {
 	planData := secret.Data["plan"]
 	appliedPlanData := secret.Data["appliedPlan"]
 	output := secret.Data["applied-output"]
+	appliedPeriodicOutput := secret.Data["applied-periodic-output"]
 	probes := secret.Data["probe-statuses"]
 	failureCount := secret.Data["failure-count"]
 	maxFailures := secret.Data["max-failures"]
@@ -226,6 +227,21 @@ func SecretToNode(secret *corev1.Secret) (*plan.Node, error) {
 		}
 	}
 
+	if len(appliedPeriodicOutput) > 0 {
+		gz, err := gzip.NewReader(bytes.NewBuffer(appliedPeriodicOutput))
+		if err != nil {
+			return nil, err
+		}
+		output, err = ioutil.ReadAll(gz)
+		if err != nil {
+			return nil, err
+		}
+		result.PeriodicOutput = map[string]plan.PeriodicInstructionOutput{}
+		if err := json.Unmarshal(output, &result.PeriodicOutput); err != nil {
+			return nil, err
+		}
+	}
+
 	result.InSync = result.Healthy && bytes.Equal(planData, appliedPlanData)
 	return result, nil
 }
@@ -276,6 +292,11 @@ func (p *PlanStore) UpdatePlan(entry *planEntry, plan plan.NodePlan, maxFailures
 		secret.Data = map[string][]byte{}
 	}
 
+	// if there are no probes, clear the statuses of the probes so as to prevent false positives
+	if len(plan.Probes) == 0 {
+		delete(secret.Data, "probe-statuses")
+	}
+
 	secret.Data["plan"] = data
 	if maxFailures > 0 {
 		secret.Data["max-failures"] = []byte(strconv.Itoa(maxFailures))
@@ -309,6 +330,7 @@ func (p *PlanStore) removePlanSecretLabel(entry *planEntry, key string) error {
 	return err
 }
 
+// assignAndCheckPlan assigns the given newPlan to the designated server in the planEntry, and will return nil if the plan is assigned and in sync.
 func assignAndCheckPlan(store *PlanStore, msg string, server *planEntry, newPlan plan.NodePlan, maxFailures int) error {
 	if server.Plan == nil || !equality.Semantic.DeepEqual(server.Plan.Plan, newPlan) {
 		if err := store.UpdatePlan(server, newPlan, maxFailures); err != nil {
@@ -369,13 +391,15 @@ func (p *PlanStore) setMachineJoinURL(entry *planEntry, capiCluster *capi.Cluste
 }
 
 func getJoinURLFromOutput(entry *planEntry, capiCluster *capi.Cluster, rkeControlPlane *rkev1.RKEControlPlane) (string, error) {
-	if entry.Plan == nil || !IsEtcdOnlyInitNode(entry) || entry.Metadata.Annotations[rke2.JoinURLAnnotation] != "" {
+	if entry.Plan == nil || !IsEtcdOnlyInitNode(entry) {
 		return "", nil
 	}
 
-	address, ok := entry.Plan.Output["capture-address"]
-	if !ok {
-		return "", nil
+	var address []byte
+	if ca, ok := entry.Plan.PeriodicOutput["capture-address"]; ok && ca.ExitCode == 0 {
+		address = ca.Stdout
+	} else {
+		return "", fmt.Errorf("error encountered while retrieving joinURL for machine %s", entry.Machine.Name)
 	}
 
 	var str string

@@ -211,6 +211,9 @@ func (h *handler) createMachineObjects(capiCluster *capi.Cluster, machineName st
 				Labels:      labels,
 				Annotations: annotations,
 			},
+			Spec: rkev1.RKEBootstrapSpec{
+				ClusterName: capiCluster.Name,
+			},
 		},
 		&rkev1.CustomMachine{
 			ObjectMeta: metav1.ObjectMeta{

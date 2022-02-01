@@ -41,6 +41,7 @@ type handler struct {
 	capiClusters        capicontrollers.ClusterCache
 	deploymentCache     appcontrollers.DeploymentCache
 	rkeControlPlanes    rkecontroller.RKEControlPlaneCache
+	rkeBootstrapClient  rkecontroller.RKEBootstrapClient
 }
 
 func Register(ctx context.Context, clients *wrangler.Context) {
@@ -51,6 +52,7 @@ func Register(ctx context.Context, clients *wrangler.Context) {
 		capiClusters:        clients.CAPI.Cluster().Cache(),
 		deploymentCache:     clients.Apps.Deployment().Cache(),
 		rkeControlPlanes:    clients.RKE.RKEControlPlane().Cache(),
+		rkeBootstrapClient:  clients.RKE.RKEBootstrap(),
 	}
 	rkecontroller.RegisterRKEBootstrapGeneratingHandler(ctx,
 		clients.RKE.RKEBootstrap(),
@@ -260,6 +262,20 @@ func (h *handler) OnChange(bootstrap *rkev1.RKEBootstrap, status rkev1.RKEBootst
 	var (
 		result []runtime.Object
 	)
+
+	if bootstrap.Spec.ClusterName == "" {
+		// If the bootstrap spec cluster name is blank, we need to update the bootstrap spec to the correct value
+		// This is to handle old rkebootstrap objects for unmanaged clusters that did not have the spec properly set
+		if v, ok := bootstrap.Labels[capi.ClusterLabelName]; ok && v != "" {
+			bootstrap = bootstrap.DeepCopy()
+			bootstrap.Spec.ClusterName = v
+			var err error
+			bootstrap, err = h.rkeBootstrapClient.Update(bootstrap)
+			if err != nil {
+				return nil, bootstrap.Status, err
+			}
+		}
+	}
 
 	machine, err := rke2.GetMachineByOwner(h.machineCache, bootstrap)
 	if err != nil {

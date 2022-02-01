@@ -50,7 +50,7 @@ func (p *Planner) getControlPlaneManifests(controlPlane *rkev1.RKEControlPlane, 
 }
 
 // getEtcdSnapshotExtraMetadata returns a plan.File that contains the ConfigMap manifest of the cluster specification, if it exists.
-// Otherwise, it will return an empty plan.File and error.
+// Otherwise, it will return an empty plan.File and log an error.
 func getEtcdSnapshotExtraMetadata(controlPlane *rkev1.RKEControlPlane, runtime string) *plan.File {
 	if v, ok := controlPlane.Annotations[rke2.ClusterSpecAnnotation]; ok {
 		cm := fmt.Sprintf(EtcdSnapshotExtraMetadataConfigMapTemplate, runtime, metav1.NamespaceSystem, EtcdSnapshotConfigMapKey, v)

@@ -104,6 +104,12 @@ func rke2() []crd.CRD {
 			}
 			return clusterIndexed(c)
 		}),
+		newRKECRD(&rkev1.ETCDSnapshot{}, func(c crd.CRD) crd.CRD {
+			c.Labels = map[string]string{
+				"cluster.x-k8s.io/v1beta1": "v1",
+			}
+			return clusterIndexed(c)
+		}),
 	}
 }
 

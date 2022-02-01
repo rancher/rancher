@@ -43,6 +43,23 @@ func NewCustomMachine(namespace, name string, obj CustomMachine) *CustomMachine 
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
+// ETCDSnapshotList is a list of ETCDSnapshot resources
+type ETCDSnapshotList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata"`
+
+	Items []ETCDSnapshot `json:"items"`
+}
+
+func NewETCDSnapshot(namespace, name string, obj ETCDSnapshot) *ETCDSnapshot {
+	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("ETCDSnapshot").ToAPIVersionAndKind()
+	obj.Name = name
+	obj.Namespace = namespace
+	return &obj
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 // RKEBootstrapList is a list of RKEBootstrap resources
 type RKEBootstrapList struct {
 	metav1.TypeMeta `json:",inline"`
