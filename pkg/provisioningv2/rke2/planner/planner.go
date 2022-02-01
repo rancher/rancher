@@ -855,7 +855,7 @@ func (p *Planner) ensureRKEStateSecret(controlPlane *rkev1.RKEControlPlane) (str
 				Namespace: controlPlane.Namespace,
 				OwnerReferences: []metav1.OwnerReference{
 					{
-						APIVersion: "rke.cattle.io/v1",
+						APIVersion: rke2.RKEAPIVersion,
 						Kind:       "RKEControlPlane",
 						Name:       controlPlane.Name,
 						UID:        controlPlane.UID,

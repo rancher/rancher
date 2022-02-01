@@ -27,6 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/util/retry"
+	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 )
 
 const (
@@ -360,13 +361,13 @@ func migrateCAPIMachineLabelsAndAnnotationsToPlanSecret(configMapController cont
 		}
 
 		for _, provCluster := range provClusters {
-			machines, err := capiMachineCache.List(provCluster.Namespace, labels.Set{rke2.ClusterNameLabel: provCluster.Name}.AsSelector())
+			machines, err := capiMachineCache.List(provCluster.Namespace, labels.Set{capi.ClusterLabelName: provCluster.Name}.AsSelector())
 			if err != nil {
 				return err
 			}
 
 			for _, machine := range machines {
-				if machine.Spec.Bootstrap.ConfigRef == nil || machine.Spec.Bootstrap.ConfigRef.APIVersion != rke2.RKEMachineAPIVersion {
+				if machine.Spec.Bootstrap.ConfigRef == nil || machine.Spec.Bootstrap.ConfigRef.APIVersion != rke2.RKEAPIVersion {
 					continue
 				}
 
