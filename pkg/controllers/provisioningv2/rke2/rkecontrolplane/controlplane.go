@@ -101,11 +101,10 @@ func (h *handler) doRemove(obj *rkev1.RKEControlPlane) func() (string, error) {
 
 		// CustomMachines are not associated to a MachineDeployment, so they have to be deleted manually.
 		for _, m := range machines {
-			if m.APIVersion == rke2.RKEMachineAPIVersion || !m.DeletionTimestamp.IsZero() {
-				continue
-			}
-			if err := h.machineClient.Delete(m.Namespace, m.Name, &metav1.DeleteOptions{}); err != nil {
-				return "", err
+			if m.Spec.InfrastructureRef.APIVersion == rke2.RKEMachineAPIVersion && m.Spec.InfrastructureRef.Kind == "CustomMachine" && m.DeletionTimestamp.IsZero() {
+				if err := h.machineClient.Delete(m.Namespace, m.Name, &metav1.DeleteOptions{}); err != nil {
+					return "", err
+				}
 			}
 		}
 

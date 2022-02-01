@@ -400,7 +400,7 @@ func machineDeployments(cluster *rancherv1.Cluster, capiCluster *capi.Cluster, d
 		result = append(result, machineDeployment)
 
 		// if a health check timeout was specified create health checks for this machine pool
-		if machinePool.UnhealthyNodeTimeout != nil {
+		if machinePool.UnhealthyNodeTimeout != nil && machinePool.UnhealthyNodeTimeout.Duration > 0 {
 			hc := deploymentHealthChecks(machineDeployment, machinePool)
 			result = append(result, hc)
 		}
@@ -530,6 +530,7 @@ func rkeControlPlane(cluster *rancherv1.Cluster) (*rkev1.RKEControlPlane, error)
 		logrus.Errorf("cluster: %s/%s : error while gz/b64 encoding cluster specification: %v", cluster.Namespace, cluster.ClusterName, err)
 		return nil, err
 	}
+	rkeConfig := cluster.Spec.RKEConfig.DeepCopy()
 	return &rkev1.RKEControlPlane{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      cluster.Name,
@@ -542,11 +543,12 @@ func rkeControlPlane(cluster *rancherv1.Cluster) (*rkev1.RKEControlPlane, error)
 			},
 		},
 		Spec: rkev1.RKEControlPlaneSpec{
-			RKEClusterSpecCommon:     *cluster.Spec.RKEConfig.RKEClusterSpecCommon.DeepCopy(),
+			RKEClusterSpecCommon:     rkeConfig.RKEClusterSpecCommon,
 			LocalClusterAuthEndpoint: *cluster.Spec.LocalClusterAuthEndpoint.DeepCopy(),
-			ETCDSnapshotRestore:      cluster.Spec.RKEConfig.ETCDSnapshotRestore.DeepCopy(),
-			ETCDSnapshotCreate:       cluster.Spec.RKEConfig.ETCDSnapshotCreate.DeepCopy(),
-			RotateCertificates:       cluster.Spec.RKEConfig.RotateCertificates.DeepCopy(),
+			ETCDSnapshotRestore:      rkeConfig.ETCDSnapshotRestore,
+			ETCDSnapshotCreate:       rkeConfig.ETCDSnapshotCreate,
+			RotateCertificates:       rkeConfig.RotateCertificates,
+			RotateEncryptionKeys:     rkeConfig.RotateEncryptionKeys,
 			KubernetesVersion:        cluster.Spec.KubernetesVersion,
 			ManagementClusterName:    cluster.Status.ClusterName, // management cluster
 			AgentEnvVars:             cluster.Spec.AgentEnvVars,
