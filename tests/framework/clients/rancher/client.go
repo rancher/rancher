@@ -6,6 +6,7 @@ import (
 
 	"github.com/pkg/errors"
 	frameworkDynamic "github.com/rancher/rancher/tests/framework/clients/dynamic"
+	"github.com/rancher/rancher/tests/framework/clients/ec2"
 	"github.com/rancher/rancher/tests/framework/clients/rancher/catalog"
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
 	"github.com/rancher/rancher/tests/framework/clients/rancher/provisioning"
@@ -150,6 +151,10 @@ func (c *Client) GetDownStreamClusterClient(clusterName string) (dynamic.Interfa
 		return nil, err
 	}
 	return dynamic, nil
+}
+
+func (c *Client) GetEC2Client() (*ec2.EC2Client, error) {
+	return ec2.NewEC2Client()
 }
 
 // GetManagementWatchInterface is a functions used to get a watch.Interface from a resource created by the Management Client.
