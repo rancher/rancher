@@ -184,6 +184,7 @@ type ClusterStatus struct {
 	EKSStatus                            EKSStatus                   `json:"eksStatus,omitempty" norman:"nocreate,noupdate"`
 	GKEStatus                            GKEStatus                   `json:"gkeStatus,omitempty" norman:"nocreate,noupdate"`
 	PrivateRegistrySecret                string                      `json:"privateRegistrySecret,omitempty" norman:"nocreate,noupdate"`
+	S3CredentialSecret                   string                      `json:"s3CredentialSecret,omitempty" norman:"nocreate,noupdate"`
 }
 
 type ClusterComponentStatus struct {
