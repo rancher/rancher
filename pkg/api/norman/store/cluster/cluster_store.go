@@ -226,6 +226,7 @@ func (r *Store) Create(apiContext *types.APIContext, schema *types.Schema, data 
 		if err != nil {
 			return nil, err
 		}
+		data = cleanQuestions(data)
 	}
 
 	err := setKubernetesVersion(data, true)
@@ -570,6 +571,7 @@ func (r *Store) Update(apiContext *types.APIContext, schema *types.Schema, data 
 		if err != nil {
 			return nil, err
 		}
+		clusterUpdate = cleanQuestions(clusterUpdate)
 
 		data = clusterUpdate
 
@@ -1199,4 +1201,29 @@ func canUpgrade(nodes []*v3.Node, upgradeStrategy *rketypes.NodeUpgradeStrategy)
 			maxUnavailableWorker, workerOnlyNotReady, workerOnlyReady)
 	}
 	return nil
+}
+
+func cleanQuestions(data map[string]interface{}) map[string]interface{} {
+	if _, ok := data["questions"]; ok {
+		questions := data["questions"].([]map[string]interface{})
+		for i, q := range questions {
+			if secretmigrator.MatchesQuestionPath(q["variable"].(string)) {
+				delete(q, "default")
+			}
+			questions[i] = q
+		}
+		values.PutValue(data, questions, "questions")
+	}
+	if _, ok := values.GetValue(data, "answers", "values"); ok {
+		values.RemoveValue(data, "answers", "values", secretmigrator.S3BackupAnswersPath)
+		values.RemoveValue(data, "answers", "values", secretmigrator.WeavePasswordAnswersPath)
+		for i := 0; ; i++ {
+			key := fmt.Sprintf(secretmigrator.RegistryPasswordAnswersPath, i)
+			if _, ok := values.GetValue(data, "answers", "values", key); !ok {
+				break
+			}
+			values.RemoveValue(data, "answers", "values", key)
+		}
+	}
+	return data
 }
