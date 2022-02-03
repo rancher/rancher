@@ -5,6 +5,7 @@ import (
 
 	v1 "github.com/rancher/types/apis/core/v1"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
+	pv3 "github.com/rancher/types/apis/project.cattle.io/v3"
 	"github.com/rancher/types/config"
 )
 
@@ -25,6 +26,7 @@ type handler struct {
 	projectCatalogLister      v3.ProjectCatalogLister
 	projectCatalogs           v3.ProjectCatalogInterface
 	projectLister             v3.ProjectLister
+	sourceCodeProviderConfigs pv3.SourceCodeProviderConfigInterface
 }
 
 func NewMigrator(secretLister v1.SecretLister, secrets v1.SecretInterface) *Migrator {
@@ -50,6 +52,7 @@ func Register(ctx context.Context, management *config.ManagementContext) {
 		projectCatalogLister:      management.Management.ProjectCatalogs("").Controller().Lister(),
 		projectCatalogs:           management.Management.ProjectCatalogs(""),
 		projectLister:             management.Management.Projects("").Controller().Lister(),
+		sourceCodeProviderConfigs: management.Project.SourceCodeProviderConfigs(""),
 	}
 	management.Management.Clusters("").AddHandler(ctx, "cluster-secret-migrator", h.sync)
 	management.Management.Catalogs("").AddHandler(ctx, "catalog-secret-migrator", h.syncCatalog)

@@ -8,6 +8,7 @@ import (
 	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/pkg/pipeline/providers/common"
 	"github.com/rancher/rancher/pkg/pipeline/remote/model"
+	"github.com/rancher/rancher/pkg/pipeline/utils"
 	v3 "github.com/rancher/types/apis/project.cattle.io/v3"
 	"github.com/rancher/types/apis/project.cattle.io/v3/schema"
 	client "github.com/rancher/types/client/project/v3"
@@ -53,17 +54,21 @@ func (b *BsProvider) GetProviderConfig(projectID string) (interface{}, error) {
 	}
 	storedBitbucketPipelineConfigMap := u.UnstructuredContent()
 
-	storedBitbucketPipelineConfig := &v3.BitbucketServerPipelineConfig{}
-	if err := mapstructure.Decode(storedBitbucketPipelineConfigMap, storedBitbucketPipelineConfig); err != nil {
+	storedBitbucketPipelineConfig := v3.BitbucketServerPipelineConfig{}
+	if err := mapstructure.Decode(storedBitbucketPipelineConfigMap, &storedBitbucketPipelineConfig); err != nil {
 		return nil, fmt.Errorf("failed to decode the config, error: %v", err)
 	}
+	storedBitbucketPipelineConfig, err = b.SecretMigrator.AssembleBitbucketServerPipelineConfigCredential(storedBitbucketPipelineConfig)
+	if err != nil {
+		return nil, err
+	}
 
-	objectMeta, err := common.ObjectMetaFromUnstructureContent(storedBitbucketPipelineConfigMap)
+	objectMeta, err := utils.ObjectMetaFromUnstructureContent(storedBitbucketPipelineConfigMap)
 	if err != nil {
 		return nil, err
 	}
 	storedBitbucketPipelineConfig.ObjectMeta = *objectMeta
 	storedBitbucketPipelineConfig.APIVersion = "project.cattle.io/v3"
 	storedBitbucketPipelineConfig.Kind = v3.SourceCodeProviderConfigGroupVersionKind.Kind
-	return storedBitbucketPipelineConfig, nil
+	return &storedBitbucketPipelineConfig, nil
 }
