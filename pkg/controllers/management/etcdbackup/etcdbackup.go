@@ -21,6 +21,8 @@ import (
 	minio "github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
 	"github.com/rancher/rancher/pkg/controllers/management/clusterprovisioner"
+	"github.com/rancher/rancher/pkg/controllers/management/secretmigrator"
+	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/kontainer-engine/drivers/rke"
 	"github.com/rancher/rancher/pkg/kontainer-engine/service"
@@ -50,6 +52,7 @@ type Controller struct {
 	backupLister          v3.EtcdBackupLister
 	backupDriver          *service.EngineService
 	KontainerDriverLister v3.KontainerDriverLister
+	secretLister          v1.SecretLister
 }
 
 func Register(ctx context.Context, management *config.ManagementContext) {
@@ -60,6 +63,7 @@ func Register(ctx context.Context, management *config.ManagementContext) {
 		backupClient:          management.Management.EtcdBackups(""),
 		backupLister:          management.Management.EtcdBackups("").Controller().Lister(),
 		backupDriver:          service.NewEngineService(clusterprovisioner.NewPersistentStore(management.Core.Namespaces(""), management.Core)),
+		secretLister:          management.Core.Secrets("").Controller().Lister(),
 		KontainerDriverLister: management.Management.KontainerDrivers("").Controller().Lister(),
 	}
 
@@ -99,6 +103,10 @@ func (c *Controller) Create(b *v3.EtcdBackup) (runtime.Object, error) {
 	if !rketypes.BackupConditionCreated.IsTrue(b) {
 		b.Spec.Filename = generateBackupFilename(b.Name, cluster.Spec.RancherKubernetesEngineConfig.Services.Etcd.BackupConfig)
 		b.Spec.BackupConfig = *cluster.Spec.RancherKubernetesEngineConfig.Services.Etcd.BackupConfig
+		cluster.Spec, err = secretmigrator.AssembleS3Credential(cluster, cluster.Spec, c.secretLister)
+		if err != nil {
+			return b, err
+		}
 		rketypes.BackupConditionCreated.True(b)
 		// we set ConditionCompleted to Unknown to avoid incorrect "active" state
 		rketypes.BackupConditionCompleted.Unknown(b)

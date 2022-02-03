@@ -57,6 +57,7 @@ const (
 	DefaultBackupRetention     = 6
 	s3TransportTimeout         = 10
 	registrySecretKey          = "privateRegistrySecret"
+	s3SecretKey                = "s3CredentialSecret"
 )
 
 type Store struct {
@@ -274,6 +275,14 @@ func (r *Store) Create(apiContext *types.APIContext, schema *types.Schema, data 
 		data[registrySecretKey] = regSecret.Name
 		rkeConfig.PrivateRegistries = secretmigrator.CleanRegistries(rkeConfig.PrivateRegistries)
 	}
+	s3Secret, err := r.secretMigrator.CreateOrUpdateS3Secret("", rkeConfig, nil)
+	if err != nil {
+		return nil, err
+	}
+	if s3Secret != nil {
+		data[s3SecretKey] = s3Secret.Name
+		rkeConfig.Services.Etcd.BackupConfig.S3BackupConfig.SecretKey = ""
+	}
 	if rkeConfig != nil {
 		data["rancherKubernetesEngineConfig"], err = convert.EncodeToMap(rkeConfig)
 		if err != nil {
@@ -293,6 +302,12 @@ func (r *Store) Create(apiContext *types.APIContext, schema *types.Schema, data 
 	}
 	if regSecret != nil {
 		err = r.secretMigrator.UpdateSecretOwnerReference(regSecret, owner)
+		if err != nil {
+			logrus.Errorf("cluster store: failed to set %s %s as secret owner", owner.Kind, owner.Name)
+		}
+	}
+	if s3Secret != nil {
+		err = r.secretMigrator.UpdateSecretOwnerReference(s3Secret, owner)
 		if err != nil {
 			logrus.Errorf("cluster store: failed to set %s %s as secret owner", owner.Kind, owner.Name)
 		}
@@ -585,8 +600,8 @@ func (r *Store) Update(apiContext *types.APIContext, schema *types.Schema, data 
 		return nil, httperror.NewFieldAPIError(httperror.InvalidOption, "enableNetworkPolicy", err.Error())
 	}
 
-	setBackupConfigSecretKeyIfNotExists(existingCluster, data)
 	currentRegSecret, _ := existingCluster[registrySecretKey].(string)
+	currentS3Secret, _ := existingCluster[s3SecretKey].(string)
 	rkeConfig, err := getRkeConfig(data)
 	if err != nil {
 		return nil, err
@@ -598,6 +613,13 @@ func (r *Store) Update(apiContext *types.APIContext, schema *types.Schema, data 
 	if regSecret != nil {
 		data[registrySecretKey] = regSecret.Name
 		rkeConfig.PrivateRegistries = secretmigrator.CleanRegistries(rkeConfig.PrivateRegistries)
+	}
+	s3Secret, err := r.secretMigrator.CreateOrUpdateS3Secret(currentS3Secret, rkeConfig, nil)
+	if err != nil {
+		return nil, err
+	}
+	if s3Secret != nil {
+		data[s3SecretKey] = s3Secret.Name
 	}
 	if rkeConfig != nil {
 		data["rancherKubernetesEngineConfig"], err = convert.EncodeToMap(rkeConfig)
@@ -950,21 +972,6 @@ func handleScheduledScan(data map[string]interface{}) {
 		}
 		handleScheduleScanScheduleConfig(data)
 		handleScheduleScanScanConfig(data)
-	}
-}
-
-func setBackupConfigSecretKeyIfNotExists(oldData, newData map[string]interface{}) {
-	s3BackupConfig := values.GetValueN(newData, "rancherKubernetesEngineConfig", "services", "etcd", "backupConfig", "s3BackupConfig")
-	if s3BackupConfig == nil {
-		return
-	}
-	val := convert.ToMapInterface(s3BackupConfig)
-	if val["secretKey"] != nil {
-		return
-	}
-	oldSecretKey := convert.ToString(values.GetValueN(oldData, "rancherKubernetesEngineConfig", "services", "etcd", "backupConfig", "s3BackupConfig", "secretKey"))
-	if oldSecretKey != "" {
-		values.PutValue(newData, oldSecretKey, "rancherKubernetesEngineConfig", "services", "etcd", "backupConfig", "s3BackupConfig", "secretKey")
 	}
 }
 
