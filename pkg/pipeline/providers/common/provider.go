@@ -2,16 +2,15 @@ package common
 
 import (
 	"fmt"
-	"reflect"
 	"strings"
-	"time"
 
-	"github.com/mitchellh/mapstructure"
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
 	client "github.com/rancher/rancher/pkg/client/generated/project/v3"
+	"github.com/rancher/rancher/pkg/controllers/management/secretmigrator"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
+	mv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/project.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/pipeline/remote"
 	"github.com/rancher/rancher/pkg/pipeline/utils"
@@ -39,6 +38,8 @@ type BaseProvider struct {
 	PipelineExecutions         v3.PipelineExecutionInterface
 	NamespaceLister            v1.NamespaceLister
 	Namespaces                 v1.NamespaceInterface
+	ClusterLister              mv3.ClusterLister
+	SecretMigrator             *secretmigrator.Migrator
 
 	PipelineIndexer             cache.Indexer
 	PipelineExecutionIndexer    cache.Indexer
@@ -122,7 +123,13 @@ func (b BaseProvider) DisableAction(request *types.APIContext, sourceCodeType st
 	config := u.UnstructuredContent()
 	if convert.ToBool(config[client.SourceCodeProviderConfigFieldEnabled]) {
 		config[client.SourceCodeProviderConfigFieldEnabled] = false
-		if _, err := b.SourceCodeProviderConfigs.ObjectClient().Update(sourceCodeType, o); err != nil {
+		if credentialSecret, ok := config["credentialSecret"]; ok {
+			if err := b.SecretMigrator.Cleanup(credentialSecret.(string)); err != nil {
+				return err
+			}
+			config["credentialSecret"] = nil
+		}
+		if _, err = b.SourceCodeProviderConfigs.ObjectClient().Update(sourceCodeType, o); err != nil {
 			return err
 		}
 		if t := convert.ToString(config[projectNameField]); t != "" {
@@ -223,33 +230,6 @@ func (b BaseProvider) RefreshReposByCredentialAndConfig(credential *v3.SourceCod
 	}
 
 	return repos, nil
-}
-
-func ObjectMetaFromUnstructureContent(unstructuredContent map[string]interface{}) (*metav1.ObjectMeta, error) {
-	metadataMap, ok := unstructuredContent["metadata"].(map[string]interface{})
-	if !ok {
-		return nil, fmt.Errorf("failed to retrieve metadata, cannot read k8s unstructured data")
-	}
-
-	objectMeta := &metav1.ObjectMeta{}
-	stringToTimeHook := func(f reflect.Type, t reflect.Type, data interface{}) (interface{}, error) {
-		if f.Kind() == reflect.String && t == reflect.TypeOf(metav1.Time{}) {
-			time, err := time.Parse(time.RFC3339, data.(string))
-			return metav1.Time{Time: time}, err
-		}
-		return data, nil
-	}
-	decoder, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
-		DecodeHook: stringToTimeHook,
-		Result:     objectMeta,
-	})
-	if err != nil {
-		return nil, err
-	}
-	if err := decoder.Decode(metadataMap); err != nil {
-		return nil, fmt.Errorf("failed to decode metadata, error: %v", err)
-	}
-	return objectMeta, nil
 }
 
 func normalizeName(name string) string {
