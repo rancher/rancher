@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"regexp"
 
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
@@ -19,10 +20,13 @@ import (
 )
 
 const (
-	secretNamespace          = namespace.GlobalNamespace
-	S3BackupAnswersPath      = "rancherKubernetesEngineConfig.services.etcd.backupConfig.s3BackupConfig.secretKey"
-	WeavePasswordAnswersPath = "rancherKubernetesEngineConfig.network.weaveNetworkProvider.password"
+	secretNamespace             = namespace.GlobalNamespace
+	S3BackupAnswersPath         = "rancherKubernetesEngineConfig.services.etcd.backupConfig.s3BackupConfig.secretKey"
+	WeavePasswordAnswersPath    = "rancherKubernetesEngineConfig.network.weaveNetworkProvider.password"
+	RegistryPasswordAnswersPath = "rancherKubernetesEngineConfig.privateRegistries[%d].password"
 )
+
+var PrivateRegistryQuestion = regexp.MustCompile("rancherKubernetesEngineConfig.privateRegistries[[0-9]+].password")
 
 func (h *handler) sync(key string, cluster *v3.Cluster) (runtime.Object, error) {
 	if cluster == nil || cluster.DeletionTimestamp != nil {
@@ -126,6 +130,9 @@ func (h *handler) sync(key string, cluster *v3.Cluster) (runtime.Object, error) 
 			}
 		}
 
+		// cluster template questions and answers
+		logrus.Tracef("[secretmigrator] cleaning questions and answers from cluster %s", cluster.Name)
+		cleanQuestions(cluster)
 		logrus.Tracef("[secretmigrator] setting cluster condition and updating cluster %s", cluster.Name)
 		apimgmtv3.ClusterConditionSecretsMigrated.True(cluster)
 		return h.clusters.Update(cluster)
@@ -354,4 +361,36 @@ func (m *Migrator) Cleanup(secretName string) error {
 	}
 	err = m.secrets.DeleteNamespaced(namespace.GlobalNamespace, secretName, &metav1.DeleteOptions{})
 	return err
+}
+
+// MatchesQuestionPath checks whether the given string matches the question-formatted path of the
+// s3 secret, weave password, or registry password.
+func MatchesQuestionPath(variable string) bool {
+	return variable == "rancherKubernetesEngineConfig.services.etcd.backupConfig.s3BackupConfig.secretKey" ||
+		variable == "rancherKubernetesEngineConfig.network.weaveNetworkProvider.password" ||
+		PrivateRegistryQuestion.MatchString(variable)
+}
+
+// cleanQuestions removes credentials from the questions and answers sections of the cluster object.
+// Answers are already substituted into the spec in norman, so they can be deleted without migration.
+func cleanQuestions(cluster *v3.Cluster) {
+	if cluster.Spec.ClusterTemplateQuestions != nil {
+		for i, q := range cluster.Spec.ClusterTemplateQuestions {
+			if MatchesQuestionPath(q.Variable) {
+				cluster.Spec.ClusterTemplateQuestions[i].Default = ""
+			}
+		}
+	}
+	if cluster.Spec.ClusterTemplateAnswers.Values != nil {
+		for i := 0; ; i++ {
+			key := fmt.Sprintf(RegistryPasswordAnswersPath, i)
+			if _, ok := cluster.Spec.ClusterTemplateAnswers.Values[key]; !ok {
+				break
+			}
+			delete(cluster.Spec.ClusterTemplateAnswers.Values, key)
+		}
+		delete(cluster.Spec.ClusterTemplateAnswers.Values, S3BackupAnswersPath)
+		delete(cluster.Spec.ClusterTemplateAnswers.Values, WeavePasswordAnswersPath)
+	}
+
 }
