@@ -13,6 +13,8 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
+	secretmigrator "github.com/rancher/rancher/pkg/controllers/management/secretmigrator/catalog"
+	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/git"
 	"github.com/sirupsen/logrus"
@@ -32,8 +34,8 @@ var (
 	}
 )
 
-func New(catalog *v3.Catalog) (*Helm, error) {
-	h, err := NewNoUpdate(catalog)
+func New(catalog *v3.Catalog, secretLister v1.SecretLister) (*Helm, error) {
+	h, err := NewNoUpdate(catalog, secretLister)
 	if err != nil {
 		return nil, err
 	}
@@ -41,15 +43,15 @@ func New(catalog *v3.Catalog) (*Helm, error) {
 	return h, err
 }
 
-func NewNoUpdate(catalog *v3.Catalog) (*Helm, error) {
+func NewNoUpdate(catalog *v3.Catalog, secretLister v1.SecretLister) (*Helm, error) {
 	if catalog == nil || catalog.Name == "" {
 		return nil, errors.New("Catalog is not defined for helm")
 	}
-	return newCache(catalog), nil
+	return newCache(catalog, secretLister)
 }
 
-func NewForceUpdate(catalog *v3.Catalog) (string, *Helm, error) {
-	h, err := NewNoUpdate(catalog)
+func NewForceUpdate(catalog *v3.Catalog, secretLister v1.SecretLister) (string, *Helm, error) {
+	h, err := NewNoUpdate(catalog, secretLister)
 	if err != nil {
 		return "", nil, err
 	}
@@ -66,7 +68,13 @@ func CatalogSHA256Hash(catalog *v3.Catalog) string {
 	return hex.EncodeToString(hashBytes[:])
 }
 
-func newCache(catalog *v3.Catalog) *Helm {
+func newCache(catalog *v3.Catalog, secretLister v1.SecretLister) (*Helm, error) {
+	catalog = catalog.DeepCopy()
+	var err error
+	catalog.Spec, err = secretmigrator.AssembleCatalogCredential(catalog, secretLister)
+	if err != nil {
+		return nil, err
+	}
 	hash := CatalogSHA256Hash(catalog)
 	localPath := filepath.Join(CatalogCache, hash)
 	kind := getCatalogKind(catalog, localPath)
@@ -86,7 +94,7 @@ func newCache(catalog *v3.Catalog) *Helm {
 		username:    catalog.Spec.Username,
 		password:    catalog.Spec.Password,
 		lastCommit:  catalog.Status.Commit,
-	}
+	}, nil
 }
 
 func getCatalogKind(catalog *v3.Catalog, localPath string) string {
