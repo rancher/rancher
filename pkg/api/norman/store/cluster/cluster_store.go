@@ -45,6 +45,7 @@ import (
 	rkeservices "github.com/rancher/rke/services"
 	rketypes "github.com/rancher/rke/types"
 	"github.com/sirupsen/logrus"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	k8sTypes "k8s.io/apimachinery/pkg/types"
@@ -58,6 +59,7 @@ const (
 	s3TransportTimeout         = 10
 	registrySecretKey          = "privateRegistrySecret"
 	s3SecretKey                = "s3CredentialSecret"
+	weaveSecretKey             = "weavePasswordSecret"
 )
 
 type Store struct {
@@ -263,35 +265,28 @@ func (r *Store) Create(apiContext *types.APIContext, schema *types.Schema, data 
 		return nil, err
 	}
 
-	rkeConfig, err := getRkeConfig(data)
+	regSecret, s3Secret, weaveSecret, err := r.migrateSecrets(data, "", "", "")
 	if err != nil {
 		return nil, err
-	}
-	regSecret, err := r.secretMigrator.CreateOrUpdatePrivateRegistrySecret("", rkeConfig, nil)
-	if err != nil {
-		return nil, err
-	}
-	if regSecret != nil {
-		data[registrySecretKey] = regSecret.Name
-		rkeConfig.PrivateRegistries = secretmigrator.CleanRegistries(rkeConfig.PrivateRegistries)
-	}
-	s3Secret, err := r.secretMigrator.CreateOrUpdateS3Secret("", rkeConfig, nil)
-	if err != nil {
-		return nil, err
-	}
-	if s3Secret != nil {
-		data[s3SecretKey] = s3Secret.Name
-		rkeConfig.Services.Etcd.BackupConfig.S3BackupConfig.SecretKey = ""
-	}
-	if rkeConfig != nil {
-		data["rancherKubernetesEngineConfig"], err = convert.EncodeToMap(rkeConfig)
-		if err != nil {
-			return nil, err
-		}
 	}
 
 	data, err = r.Store.Create(apiContext, schema, data)
 	if err != nil {
+		if regSecret != nil {
+			if cleanupErr := r.secretMigrator.Cleanup(regSecret.Name); cleanupErr != nil {
+				logrus.Errorf("cluster store: encountered error while handling migration error: %v, original error: %v", cleanupErr, err)
+			}
+		}
+		if s3Secret != nil {
+			if cleanupErr := r.secretMigrator.Cleanup(s3Secret.Name); cleanupErr != nil {
+				logrus.Errorf("cluster store: encountered error while handling migration error: %v, original error: %v", cleanupErr, err)
+			}
+		}
+		if weaveSecret != nil {
+			if cleanupErr := r.secretMigrator.Cleanup(weaveSecret.Name); cleanupErr != nil {
+				logrus.Errorf("cluster store: encountered error while handling migration error: %v, original error: %v", cleanupErr, err)
+			}
+		}
 		return nil, err
 	}
 	owner := metav1.OwnerReference{
@@ -308,6 +303,12 @@ func (r *Store) Create(apiContext *types.APIContext, schema *types.Schema, data 
 	}
 	if s3Secret != nil {
 		err = r.secretMigrator.UpdateSecretOwnerReference(s3Secret, owner)
+		if err != nil {
+			logrus.Errorf("cluster store: failed to set %s %s as secret owner", owner.Kind, owner.Name)
+		}
+	}
+	if weaveSecret != nil {
+		err = r.secretMigrator.UpdateSecretOwnerReference(weaveSecret, owner)
 		if err != nil {
 			logrus.Errorf("cluster store: failed to set %s %s as secret owner", owner.Kind, owner.Name)
 		}
@@ -600,35 +601,7 @@ func (r *Store) Update(apiContext *types.APIContext, schema *types.Schema, data 
 		return nil, httperror.NewFieldAPIError(httperror.InvalidOption, "enableNetworkPolicy", err.Error())
 	}
 
-	currentRegSecret, _ := existingCluster[registrySecretKey].(string)
-	currentS3Secret, _ := existingCluster[s3SecretKey].(string)
-	rkeConfig, err := getRkeConfig(data)
-	if err != nil {
-		return nil, err
-	}
-	regSecret, err := r.secretMigrator.CreateOrUpdatePrivateRegistrySecret(currentRegSecret, rkeConfig, nil)
-	if err != nil {
-		return nil, err
-	}
-	if regSecret != nil {
-		data[registrySecretKey] = regSecret.Name
-		rkeConfig.PrivateRegistries = secretmigrator.CleanRegistries(rkeConfig.PrivateRegistries)
-	}
-	s3Secret, err := r.secretMigrator.CreateOrUpdateS3Secret(currentS3Secret, rkeConfig, nil)
-	if err != nil {
-		return nil, err
-	}
-	if s3Secret != nil {
-		data[s3SecretKey] = s3Secret.Name
-	}
-	if rkeConfig != nil {
-		data["rancherKubernetesEngineConfig"], err = convert.EncodeToMap(rkeConfig)
-		if err != nil {
-			return nil, err
-		}
-	}
 	setCloudProviderPasswordFieldsIfNotExists(existingCluster, data)
-	setWeavePasswordFieldsIfNotExists(existingCluster, data)
 	dialer, err := r.DialerFactory.ClusterDialer(id)
 	if err != nil {
 		return nil, errors.Wrap(err, "error getting dialer")
@@ -657,7 +630,32 @@ func (r *Store) Update(apiContext *types.APIContext, schema *types.Schema, data 
 		}
 	}
 
-	return r.Store.Update(apiContext, schema, data, id)
+	currentRegSecret, _ := existingCluster[registrySecretKey].(string)
+	currentS3Secret, _ := existingCluster[s3SecretKey].(string)
+	currentWeaveSecret, _ := existingCluster[weaveSecretKey].(string)
+	regSecret, s3Secret, weaveSecret, err := r.migrateSecrets(data, currentRegSecret, currentS3Secret, currentWeaveSecret)
+	if err != nil {
+		return nil, err
+	}
+	data, err = r.Store.Update(apiContext, schema, data, id)
+	if err != nil {
+		if regSecret != nil && currentRegSecret == "" {
+			if cleanupErr := r.secretMigrator.Cleanup(regSecret.Name); cleanupErr != nil {
+				logrus.Errorf("cluster store: encountered error while handling migration error: %v, original error: %v", cleanupErr, err)
+			}
+		}
+		if s3Secret != nil && currentS3Secret == "" {
+			if cleanupErr := r.secretMigrator.Cleanup(s3Secret.Name); cleanupErr != nil {
+				logrus.Errorf("cluster store: encountered error while handling migration error: %v, original error: %v", cleanupErr, err)
+			}
+		}
+		if weaveSecret != nil && currentWeaveSecret == "" {
+			if cleanupErr := r.secretMigrator.Cleanup(weaveSecret.Name); cleanupErr != nil {
+				logrus.Errorf("cluster store: encountered error while handling migration error: %v, original error: %v", cleanupErr, err)
+			}
+		}
+	}
+	return data, err
 }
 
 // this method moves the cluster config to and from the genericEngineConfig field so that
@@ -731,6 +729,42 @@ func (r *Store) updateClusterByK8sclient(ctx context.Context, id, name string, d
 	values.RemoveValue(object.Object, "spec", "displayName")
 
 	return object.Object["spec"].(map[string]interface{}), nil
+}
+
+func (r *Store) migrateSecrets(data map[string]interface{}, currentReg, currentS3, currentWeave string) (*corev1.Secret, *corev1.Secret, *corev1.Secret, error) {
+	rkeConfig, err := getRkeConfig(data)
+	if err != nil || rkeConfig == nil {
+		return nil, nil, nil, err
+	}
+	regSecret, err := r.secretMigrator.CreateOrUpdatePrivateRegistrySecret(currentReg, rkeConfig, nil)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	if regSecret != nil {
+		data[registrySecretKey] = regSecret.Name
+		rkeConfig.PrivateRegistries = secretmigrator.CleanRegistries(rkeConfig.PrivateRegistries)
+	}
+	s3Secret, err := r.secretMigrator.CreateOrUpdateS3Secret(currentS3, rkeConfig, nil)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	if s3Secret != nil {
+		data[s3SecretKey] = s3Secret.Name
+		rkeConfig.Services.Etcd.BackupConfig.S3BackupConfig.SecretKey = ""
+	}
+	weaveSecret, err := r.secretMigrator.CreateOrUpdateWeaveSecret(currentWeave, rkeConfig, nil)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	if weaveSecret != nil {
+		data[weaveSecretKey] = weaveSecret.Name
+		rkeConfig.Network.WeaveNetworkProvider.Password = ""
+	}
+	data["rancherKubernetesEngineConfig"], err = convert.EncodeToMap(rkeConfig)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	return regSecret, s3Secret, weaveSecret, nil
 }
 
 func canUseClusterName(apiContext *types.APIContext, requestedName string) error {
@@ -972,21 +1006,6 @@ func handleScheduledScan(data map[string]interface{}) {
 		}
 		handleScheduleScanScheduleConfig(data)
 		handleScheduleScanScanConfig(data)
-	}
-}
-
-func setWeavePasswordFieldsIfNotExists(oldData, newData map[string]interface{}) {
-	weaveConfig := values.GetValueN(newData, "rancherKubernetesEngineConfig", "network", "weaveNetworkProvider")
-	if weaveConfig == nil {
-		return
-	}
-	val := convert.ToMapInterface(weaveConfig)
-	if val["password"] != nil {
-		return
-	}
-	oldWeavePassword := convert.ToString(values.GetValueN(oldData, "rancherKubernetesEngineConfig", "network", "weaveNetworkProvider", "password"))
-	if oldWeavePassword != "" {
-		values.PutValue(newData, oldWeavePassword, "rancherKubernetesEngineConfig", "network", "weaveNetworkProvider", "password")
 	}
 }
 
