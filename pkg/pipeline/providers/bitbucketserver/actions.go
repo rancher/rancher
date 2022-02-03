@@ -20,6 +20,7 @@ import (
 	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/rke/pki/cert"
 	"github.com/rancher/wrangler/pkg/randomtoken"
+	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -89,9 +90,24 @@ func (b *BsProvider) generateKeys(apiContext *types.APIContext) error {
 	if err != nil {
 		return err
 	}
-	toUpdate.PrivateKey = private
 	toUpdate.PublicKey = pub
+	clusterID, _ := ref.Parse(apiContext.SubContext["/v3/schemas/project"])
+	cluster, err := b.ClusterLister.Get("", clusterID)
+	if err != nil {
+		return err
+	}
+	secret, err := b.SecretMigrator.CreateOrUpdateSourceCodeProviderConfigSecret("", private, cluster, model.BitbucketServerType)
+	if err != nil {
+		return err
+	}
+	toUpdate.CredentialSecret = secret.Name
+	toUpdate.PrivateKey = ""
 	if _, err = b.SourceCodeProviderConfigs.ObjectClient().Update(toUpdate.Name, toUpdate); err != nil {
+		if secret != nil {
+			if cleanupErr := b.SecretMigrator.Cleanup(secret.Name); cleanupErr != nil {
+				logrus.Errorf("bitbucketserver pipeline: encountered error while handling migration error: %v, original error: %v", cleanupErr, err)
+			}
+		}
 		return err
 	}
 
