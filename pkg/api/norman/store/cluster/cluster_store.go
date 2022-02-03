@@ -31,6 +31,8 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/management/clusterstatus"
 	"github.com/rancher/rancher/pkg/controllers/management/etcdbackup"
 	"github.com/rancher/rancher/pkg/controllers/management/rkeworkerupgrader"
+	"github.com/rancher/rancher/pkg/controllers/management/secretmigrator"
+	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/namespace"
 	nodehelper "github.com/rancher/rancher/pkg/node"
@@ -45,6 +47,7 @@ import (
 	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	k8sTypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/dynamic"
 )
@@ -53,6 +56,7 @@ const (
 	DefaultBackupIntervalHours = 12
 	DefaultBackupRetention     = 6
 	s3TransportTimeout         = 10
+	registrySecretKey          = "privateRegistrySecret"
 )
 
 type Store struct {
@@ -66,6 +70,9 @@ type Store struct {
 	ClusterLister                 v3.ClusterLister
 	DialerFactory                 dialer.Factory
 	ClusterClient                 dynamic.ResourceInterface
+	SecretClient                  v1.SecretInterface
+	SecretLister                  v1.SecretLister
+	secretMigrator                *secretmigrator.Migrator
 }
 
 type transformer struct {
@@ -138,6 +145,10 @@ func GetClusterStore(schema *types.Schema, mgmt *config.ScaledContext, clusterMa
 		ClusterLister:                 mgmt.Management.Clusters("").Controller().Lister(),
 		NodeLister:                    mgmt.Management.Nodes("").Controller().Lister(),
 		DialerFactory:                 mgmt.Dialer,
+		secretMigrator: secretmigrator.NewMigrator(
+			mgmt.Core.Secrets("").Controller().Lister(),
+			mgmt.Core.Secrets(""),
+		),
 	}
 
 	dynamicClient, err := dynamic.NewForConfig(&mgmt.RESTConfig)
@@ -251,7 +262,42 @@ func (r *Store) Create(apiContext *types.APIContext, schema *types.Schema, data 
 		return nil, err
 	}
 
-	return r.Store.Create(apiContext, schema, data)
+	rkeConfig, err := getRkeConfig(data)
+	if err != nil {
+		return nil, err
+	}
+	regSecret, err := r.secretMigrator.CreateOrUpdatePrivateRegistrySecret("", rkeConfig, nil)
+	if err != nil {
+		return nil, err
+	}
+	if regSecret != nil {
+		data[registrySecretKey] = regSecret.Name
+		rkeConfig.PrivateRegistries = secretmigrator.CleanRegistries(rkeConfig.PrivateRegistries)
+	}
+	if rkeConfig != nil {
+		data["rancherKubernetesEngineConfig"], err = convert.EncodeToMap(rkeConfig)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	data, err = r.Store.Create(apiContext, schema, data)
+	if err != nil {
+		return nil, err
+	}
+	owner := metav1.OwnerReference{
+		APIVersion: "management.cattle.io/v3",
+		Kind:       "Cluster",
+		Name:       data["id"].(string),
+		UID:        k8sTypes.UID(data["uuid"].(string)),
+	}
+	if regSecret != nil {
+		err = r.secretMigrator.UpdateSecretOwnerReference(regSecret, owner)
+		if err != nil {
+			logrus.Errorf("cluster store: failed to set %s %s as secret owner", owner.Kind, owner.Name)
+		}
+	}
+	return data, nil
 }
 
 func transposeNameFields(data map[string]interface{}, clusterConfigSchema *types.Schema) map[string]interface{} {
@@ -540,7 +586,25 @@ func (r *Store) Update(apiContext *types.APIContext, schema *types.Schema, data 
 	}
 
 	setBackupConfigSecretKeyIfNotExists(existingCluster, data)
-	setPrivateRegistryPasswordIfNotExists(existingCluster, data)
+	currentRegSecret, _ := existingCluster[registrySecretKey].(string)
+	rkeConfig, err := getRkeConfig(data)
+	if err != nil {
+		return nil, err
+	}
+	regSecret, err := r.secretMigrator.CreateOrUpdatePrivateRegistrySecret(currentRegSecret, rkeConfig, nil)
+	if err != nil {
+		return nil, err
+	}
+	if regSecret != nil {
+		data[registrySecretKey] = regSecret.Name
+		rkeConfig.PrivateRegistries = secretmigrator.CleanRegistries(rkeConfig.PrivateRegistries)
+	}
+	if rkeConfig != nil {
+		data["rancherKubernetesEngineConfig"], err = convert.EncodeToMap(rkeConfig)
+		if err != nil {
+			return nil, err
+		}
+	}
 	setCloudProviderPasswordFieldsIfNotExists(existingCluster, data)
 	setWeavePasswordFieldsIfNotExists(existingCluster, data)
 	dialer, err := r.DialerFactory.ClusterDialer(id)
@@ -970,34 +1034,6 @@ func validateS3Credentials(data map[string]interface{}, dialer dialer.Dialer) er
 		return fmt.Errorf("Unable to validate S3 backup target configuration: bucket [%v] not found", bucket)
 	}
 	return nil
-}
-
-func setPrivateRegistryPasswordIfNotExists(oldData, newData map[string]interface{}) {
-	newSlice, ok := values.GetSlice(newData, "rancherKubernetesEngineConfig", "privateRegistries")
-	if !ok || newSlice == nil {
-		return
-	}
-	oldSlice, ok := values.GetSlice(oldData, "rancherKubernetesEngineConfig", "privateRegistries")
-	if !ok || oldSlice == nil {
-		return
-	}
-
-	var updatedConfig []map[string]interface{}
-	for _, newConfig := range newSlice {
-		if newConfig["password"] != nil {
-			updatedConfig = append(updatedConfig, newConfig)
-			continue
-		}
-		for _, oldConfig := range oldSlice {
-			if newConfig["url"] == oldConfig["url"] && newConfig["user"] == oldConfig["user"] &&
-				oldConfig["password"] != nil {
-				newConfig["password"] = oldConfig["password"]
-				break
-			}
-		}
-		updatedConfig = append(updatedConfig, newConfig)
-	}
-	values.PutValue(newData, updatedConfig, "rancherKubernetesEngineConfig", "privateRegistries")
 }
 
 func setCloudProviderPasswordFieldsIfNotExists(oldData, newData map[string]interface{}) {
