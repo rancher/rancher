@@ -61,6 +61,7 @@ type Provisioner struct {
 	Backups               v3.EtcdBackupLister
 	RKESystemImages       v3.RkeK8sSystemImageInterface
 	RKESystemImagesLister v3.RkeK8sSystemImageLister
+	SecretLister          corev1.SecretLister
 }
 
 func Register(ctx context.Context, management *config.ManagementContext) {
@@ -78,6 +79,7 @@ func Register(ctx context.Context, management *config.ManagementContext) {
 		RKESystemImagesLister: management.Management.RkeK8sSystemImages("").Controller().Lister(),
 		RKESystemImages:       management.Management.RkeK8sSystemImages(""),
 		DaemonsetLister:       management.Apps.DaemonSets("").Controller().Lister(),
+		SecretLister:          management.Core.Secrets("").Controller().Lister(),
 	}
 	// Add handlers
 	p.Clusters.AddLifecycle(ctx, "cluster-provisioner-controller", p)

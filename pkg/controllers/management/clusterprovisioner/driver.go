@@ -5,13 +5,12 @@ import (
 	"reflect"
 
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-
-	rketypes "github.com/rancher/rke/types"
-
 	"github.com/rancher/rancher/pkg/clusterprovisioninglogger"
+	"github.com/rancher/rancher/pkg/controllers/management/secretmigrator"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/kontainer-engine/service"
 	"github.com/rancher/rke/services"
+	rketypes "github.com/rancher/rke/types"
 	"github.com/sirupsen/logrus"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -24,6 +23,10 @@ func (p *Provisioner) driverCreate(cluster *v3.Cluster, spec v32.ClusterSpec) (a
 	defer logger.Close()
 
 	spec = cleanRKE(spec)
+	spec, err = secretmigrator.AssemblePrivateRegistryCredential(cluster, spec, p.SecretLister)
+	if err != nil {
+		return "", "", "", err
+	}
 
 	if newCluster, err := p.Clusters.Update(cluster); err == nil {
 		cluster = newCluster
