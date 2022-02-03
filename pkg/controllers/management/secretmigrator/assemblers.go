@@ -81,3 +81,66 @@ func AssembleWeaveCredential(cluster *apimgmtv3.Cluster, spec apimgmtv3.ClusterS
 	spec.RancherKubernetesEngineConfig.Network.WeaveNetworkProvider.Password = string(registrySecret.Data["password"])
 	return spec, nil
 }
+
+// AssembleSMTPCredential looks up the SMTP Secret and inserts the keys into the Notifier.
+// It returns a new copy of the Notifier without modifying the original. The Notifier is never updated.
+func AssembleSMTPCredential(notifier *apimgmtv3.Notifier, secretLister v1.SecretLister) (*apimgmtv3.NotifierSpec, error) {
+	if notifier.Spec.SMTPConfig == nil {
+		return &notifier.Spec, nil
+	}
+	if notifier.Status.SMTPCredentialSecret == "" {
+		if notifier.Spec.SMTPConfig.Password != "" {
+			logrus.Warnf("[secretmigrator] secrets for notifier %s are not finished migrating", notifier.Name)
+		}
+		return &notifier.Spec, nil
+	}
+	smtpSecret, err := secretLister.Get(namespace.GlobalNamespace, notifier.Status.SMTPCredentialSecret)
+	if err != nil {
+		return &notifier.Spec, err
+	}
+	spec := notifier.Spec.DeepCopy()
+	spec.SMTPConfig.Password = string(smtpSecret.Data["password"])
+	return spec, nil
+}
+
+// AssembleWechatCredential looks up the Wechat Secret and inserts the keys into the Notifier.
+// It returns a new copy of the Notifier without modifying the original. The Notifier is never updated.
+func AssembleWechatCredential(notifier *apimgmtv3.Notifier, secretLister v1.SecretLister) (*apimgmtv3.NotifierSpec, error) {
+	if notifier.Spec.WechatConfig == nil {
+		return &notifier.Spec, nil
+	}
+	if notifier.Status.WechatCredentialSecret == "" {
+		if notifier.Spec.WechatConfig.Secret != "" {
+			logrus.Warnf("[secretmigrator] secrets for notifier %s are not finished migrating", notifier.Name)
+		}
+		return &notifier.Spec, nil
+	}
+	wechatSecret, err := secretLister.Get(namespace.GlobalNamespace, notifier.Status.WechatCredentialSecret)
+	if err != nil {
+		return &notifier.Spec, err
+	}
+	spec := notifier.Spec.DeepCopy()
+	spec.WechatConfig.Secret = string(wechatSecret.Data["secret"])
+	return spec, nil
+}
+
+// AssembleDingtalkCredential looks up the Dingtalk Secret and inserts the keys into the Notifier.
+// It returns a new copy of the Notifier without modifying the original. The Notifier is never updated.
+func AssembleDingtalkCredential(notifier *apimgmtv3.Notifier, secretLister v1.SecretLister) (*apimgmtv3.NotifierSpec, error) {
+	if notifier.Spec.DingtalkConfig == nil {
+		return &notifier.Spec, nil
+	}
+	if notifier.Status.DingtalkCredentialSecret == "" {
+		if notifier.Spec.DingtalkConfig.Secret != "" {
+			logrus.Warnf("[secretmigrator] secrets for notifier %s are not finished migrating", notifier.Name)
+		}
+		return &notifier.Spec, nil
+	}
+	secret, err := secretLister.Get(namespace.GlobalNamespace, notifier.Status.DingtalkCredentialSecret)
+	if err != nil {
+		return &notifier.Spec, err
+	}
+	spec := notifier.Spec.DeepCopy()
+	spec.DingtalkConfig.Secret = string(secret.Data["credential"])
+	return spec, nil
+}

@@ -87,7 +87,7 @@ func (h *Handler) testNotifier(ctx context.Context, actionName string, action *t
 	if err != nil {
 		return errors.Wrap(err, "error getting dialer")
 	}
-	return notifiers.SendMessage(ctx, notifier, "", notifierMessage, dialer)
+	return notifiers.SendMessage(ctx, notifier, "", notifierMessage, dialer, nil)
 }
 
 func canCreateNotifier(apiContext *types.APIContext, resource *types.RawResource, clusterID string) bool {
