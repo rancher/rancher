@@ -81,10 +81,11 @@ func Register(ctx context.Context, clients *wrangler.Context) (func(ctx context.
 }
 
 func reconcilers(mgr ctrl.Manager) ([]reconciler, error) {
+	l := ctrl.Log.WithName("remote").WithName("ClusterCacheTracker")
 	tracker, err := remote.NewClusterCacheTracker(
 		mgr,
 		remote.ClusterCacheTrackerOptions{
-			Log:     ctrl.Log.WithName("remote").WithName("ClusterCacheTracker"),
+			Log:     &l,
 			Indexes: remote.DefaultIndexes,
 		},
 	)
