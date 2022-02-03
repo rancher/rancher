@@ -11,19 +11,23 @@ type Logger struct {
 	entry *logrus.Entry
 }
 
-func New(level int) *Logger {
-	return &Logger{
+func New(level int) logr.Logger {
+	return logr.New(&Logger{
 		level: level,
 		l:     logrus.StandardLogger(),
 		entry: logrus.StandardLogger().WithFields(logrus.Fields{}),
-	}
+	})
 }
 
-func (l *Logger) Enabled() bool {
+func (l *Logger) Init(info logr.RuntimeInfo) {
+
+}
+
+func (l *Logger) Enabled(level int) bool {
 	return true
 }
 
-func (l *Logger) Info(msg string, keysAndValues ...interface{}) {
+func (l *Logger) Info(level int, msg string, keysAndValues ...interface{}) {
 	l.withValues(keysAndValues...).Debug(msg)
 }
 
@@ -31,14 +35,7 @@ func (l *Logger) Error(err error, msg string, keysAndValues ...interface{}) {
 	l.withValues(keysAndValues...).Errorf("%s: %v", msg, err)
 }
 
-func (l *Logger) V(level int) logr.Logger {
-	if level <= l.level {
-		return l.WithValues("v", level)
-	}
-	return logr.Discard()
-}
-
-func (l *Logger) WithValues(keysAndValues ...interface{}) logr.Logger {
+func (l *Logger) WithValues(keysAndValues ...interface{}) logr.LogSink {
 	return &Logger{
 		level: l.level,
 		l:     l.l,
@@ -61,6 +58,6 @@ func (l *Logger) withValues(keysAndValues ...interface{}) *logrus.Entry {
 	return entry
 }
 
-func (l *Logger) WithName(name string) logr.Logger {
+func (l *Logger) WithName(name string) logr.LogSink {
 	return l.WithValues("name", name)
 }
