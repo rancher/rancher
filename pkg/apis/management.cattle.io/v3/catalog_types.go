@@ -42,13 +42,15 @@ type CatalogStatus struct {
 	// Deprecated: should no longer be in use. If a Catalog CR is encountered with this field
 	// populated, it will be set to nil.
 	HelmVersionCommits map[string]VersionCommits `json:"helmVersionCommits,omitempty"`
+	CredentialSecret   string                    `json:"credentialSecret,omitempty" norman:"nocreate,noupdate"`
 }
 
 var (
-	CatalogConditionRefreshed  condition.Cond = "Refreshed"
-	CatalogConditionUpgraded   condition.Cond = "Upgraded"
-	CatalogConditionDiskCached condition.Cond = "DiskCached"
-	CatalogConditionProcessed  condition.Cond = "Processed"
+	CatalogConditionRefreshed       condition.Cond = "Refreshed"
+	CatalogConditionUpgraded        condition.Cond = "Upgraded"
+	CatalogConditionDiskCached      condition.Cond = "DiskCached"
+	CatalogConditionProcessed       condition.Cond = "Processed"
+	CatalogConditionSecretsMigrated condition.Cond = "SecretsMigrated"
 )
 
 type CatalogCondition struct {

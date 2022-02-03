@@ -77,6 +77,7 @@ func registerDeferred(ctx context.Context, user *config.UserContext, kubeConfigG
 		AppsLister:            user.Management.Project.Apps("").Controller().Lister(),
 		NsLister:              user.Core.Namespaces("").Controller().Lister(),
 		NsClient:              user.Core.Namespaces(""),
+		SecretLister:          user.Core.Secrets("").Controller().Lister(),
 	}
 	appClient.AddClusterScopedLifecycle(ctx, "helm-controller", user.ClusterName, stackLifecycle)
 
@@ -103,6 +104,7 @@ type Lifecycle struct {
 	AppsLister            v3.AppLister
 	NsLister              corev1.NamespaceLister
 	NsClient              corev1.NamespaceInterface
+	SecretLister          corev1.SecretLister
 }
 
 func (l *Lifecycle) Create(obj *v3.App) (runtime.Object, error) {
