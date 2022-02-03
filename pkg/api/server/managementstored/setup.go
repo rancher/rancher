@@ -40,6 +40,7 @@ import (
 	"github.com/rancher/rancher/pkg/api/customization/roletemplatebinding"
 	"github.com/rancher/rancher/pkg/api/customization/secret"
 	"github.com/rancher/rancher/pkg/api/customization/setting"
+	alertStore "github.com/rancher/rancher/pkg/api/norman/store/alert"
 	appStore "github.com/rancher/rancher/pkg/api/store/app"
 	catalogStore "github.com/rancher/rancher/pkg/api/store/catalog"
 	"github.com/rancher/rancher/pkg/api/store/cert"
@@ -580,6 +581,7 @@ func Alert(schemas *types.Schemas, management *config.ScaledContext) {
 	schema.CollectionFormatter = alert.NotifierCollectionFormatter
 	schema.Formatter = alert.NotifierFormatter
 	schema.ActionHandler = handler.NotifierActionHandler
+	schema.Store = alertStore.NewNotifier(management, schema.Store)
 
 	schema = schemas.Schema(&managementschema.Version, client.ClusterAlertRuleType)
 	schema.Formatter = alert.RuleFormatter

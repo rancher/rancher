@@ -22,6 +22,8 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/prometheus/common/model"
+	"github.com/rancher/rancher/pkg/controllers/management/secretmigrator"
+	v1 "github.com/rancher/types/apis/core/v1"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config/dialer"
 )
@@ -47,7 +49,7 @@ type dingtalkResponse struct {
 	Errmsg  string `json:"errmsg"`
 }
 
-func SendMessage(notifier *v3.Notifier, recipient string, msg *Message, dialer dialer.Dialer) error {
+func SendMessage(notifier *v3.Notifier, recipient string, msg *Message, dialer dialer.Dialer, secretLister *v1.SecretLister) error {
 	if notifier.Spec.SlackConfig != nil {
 		if recipient == "" {
 			recipient = notifier.Spec.SlackConfig.DefaultRecipient
@@ -56,6 +58,14 @@ func SendMessage(notifier *v3.Notifier, recipient string, msg *Message, dialer d
 	}
 
 	if notifier.Spec.SMTPConfig != nil {
+		if secretLister != nil {
+			spec, err := secretmigrator.AssembleSMTPCredential(notifier, *secretLister)
+			if err != nil {
+				return err
+			}
+			notifier = notifier.DeepCopy()
+			notifier.Spec = *spec
+		}
 		s := notifier.Spec.SMTPConfig
 		if recipient == "" {
 			recipient = s.DefaultRecipient
@@ -68,6 +78,14 @@ func SendMessage(notifier *v3.Notifier, recipient string, msg *Message, dialer d
 	}
 
 	if notifier.Spec.WechatConfig != nil {
+		if secretLister != nil {
+			spec, err := secretmigrator.AssembleWechatCredential(notifier, *secretLister)
+			if err != nil {
+				return err
+			}
+			notifier = notifier.DeepCopy()
+			notifier.Spec = *spec
+		}
 		s := notifier.Spec.WechatConfig
 		if recipient == "" {
 			recipient = s.DefaultRecipient
@@ -81,6 +99,14 @@ func SendMessage(notifier *v3.Notifier, recipient string, msg *Message, dialer d
 	}
 
 	if notifier.Spec.DingtalkConfig != nil {
+		if secretLister != nil {
+			spec, err := secretmigrator.AssembleDingtalkCredential(notifier, *secretLister)
+			if err != nil {
+				return err
+			}
+			notifier = notifier.DeepCopy()
+			notifier.Spec = *spec
+		}
 		return TestDingtalk(notifier.Spec.DingtalkConfig.URL, notifier.Spec.DingtalkConfig.Secret, msg.Content, notifier.Spec.DingtalkConfig.HTTPClientConfig, dialer)
 	}
 
