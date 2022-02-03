@@ -29,6 +29,10 @@ func (p *Provisioner) driverCreate(cluster *v3.Cluster, spec v3.ClusterSpec) (ap
 	if err != nil {
 		return "", "", "", err
 	}
+	spec, err = secretmigrator.AssembleWeaveCredential(cluster, spec, p.SecretLister)
+	if err != nil {
+		return "", "", "", err
+	}
 
 	if newCluster, err := p.Clusters.Update(cluster); err == nil {
 		cluster = newCluster

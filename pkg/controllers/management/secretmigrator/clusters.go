@@ -17,8 +17,9 @@ import (
 )
 
 const (
-	secretNamespace     = namespace.GlobalNamespace
-	S3BackupAnswersPath = "rancherKubernetesEngineConfig.services.etcd.backupConfig.s3BackupConfig.secretKey"
+	secretNamespace          = namespace.GlobalNamespace
+	S3BackupAnswersPath      = "rancherKubernetesEngineConfig.services.etcd.backupConfig.s3BackupConfig.secretKey"
+	WeavePasswordAnswersPath = "rancherKubernetesEngineConfig.network.weaveNetworkProvider.password"
 )
 
 func (h *handler) sync(key string, cluster *v3.Cluster) (runtime.Object, error) {
@@ -83,6 +84,37 @@ func (h *handler) sync(key string, cluster *v3.Cluster) (runtime.Object, error) 
 				if err != nil {
 					logrus.Errorf("[secretmigrator] failed to migrate S3 secrets for cluster %s, will retry: %v", cluster.Name, err)
 					deleteErr := h.migrator.secrets.DeleteNamespaced(secretNamespace, s3Secret.Name, &metav1.DeleteOptions{})
+					if deleteErr != nil {
+						logrus.Errorf("[secretmigrator] encountered error while handling migration error: %v", deleteErr)
+					}
+					return nil, err
+				}
+				cluster = clusterCopy
+			}
+		}
+
+		// weave CNI password
+		if cluster.Status.WeavePasswordSecret == "" {
+			logrus.Tracef("[secretmigrator] migrating weave CNI secrets for cluster %s", cluster.Name)
+			weaveSecret, err := h.migrator.CreateOrUpdateWeaveSecret("", cluster.Spec.RancherKubernetesEngineConfig, cluster)
+			if err != nil {
+				logrus.Errorf("[secretmigrator] failed to migrate weave CNI secrets for cluster %s, will retry: %v", cluster.Name, err)
+				return nil, err
+			}
+			if weaveSecret != nil {
+				logrus.Tracef("[secretmigrator] weave secret found for cluster %s", cluster.Name)
+				cluster.Status.WeavePasswordSecret = weaveSecret.Name
+				cluster.Spec.RancherKubernetesEngineConfig.Network.WeaveNetworkProvider.Password = ""
+				if cluster.Status.AppliedSpec.RancherKubernetesEngineConfig != nil && cluster.Status.AppliedSpec.RancherKubernetesEngineConfig.Network.WeaveNetworkProvider != nil {
+					cluster.Status.AppliedSpec.RancherKubernetesEngineConfig.Network.WeaveNetworkProvider.Password = ""
+				}
+				if cluster.Status.FailedSpec != nil && cluster.Status.FailedSpec.RancherKubernetesEngineConfig != nil && cluster.Status.FailedSpec.RancherKubernetesEngineConfig.Network.WeaveNetworkProvider != nil {
+					cluster.Status.FailedSpec.RancherKubernetesEngineConfig.Network.WeaveNetworkProvider.Password = ""
+				}
+				clusterCopy, err := h.clusters.Update(cluster)
+				if err != nil {
+					logrus.Errorf("[secretmigrator] failed to migrate weave CNI secrets for cluster %s, will retry: %v", cluster.Name, err)
+					deleteErr := h.migrator.secrets.DeleteNamespaced(secretNamespace, weaveSecret.Name, &metav1.DeleteOptions{})
 					if deleteErr != nil {
 						logrus.Errorf("[secretmigrator] encountered error while handling migration error: %v", deleteErr)
 					}
@@ -291,4 +323,33 @@ func (m *Migrator) CreateOrUpdateS3Secret(secretName string, rkeConfig *v3.Ranch
 		return nil, nil
 	}
 	return m.createOrUpdateSecretForCredential(secretName, rkeConfig.Services.Etcd.BackupConfig.S3BackupConfig.SecretKey, owner, "cluster", "s3backup")
+}
+
+// CreateOrUpdateWeaveSecret accepts an optional secret name and a RancherKubernetesEngineConfig object
+// and creates a Secret for the Weave CNI password if there is one.
+// If an owner is passed, the owner is set as an owner reference on the Secret.
+// It returns a reference to the Secret if one was created. If the returned Secret is not nil and there is no error,
+// the caller is responsible for un-setting the secret data, setting a reference to the Secret, and
+// updating the Cluster object, if applicable.
+func (m *Migrator) CreateOrUpdateWeaveSecret(secretName string, rkeConfig *v3.RancherKubernetesEngineConfig, owner runtime.Object) (*corev1.Secret, error) {
+	if rkeConfig == nil || rkeConfig.Network.WeaveNetworkProvider == nil {
+		return nil, nil
+	}
+	return m.createOrUpdateSecretForCredential(secretName, rkeConfig.Network.WeaveNetworkProvider.Password, owner, "cluster", "weave")
+}
+
+// Cleanup deletes a secret if provided a secret name, otherwise does nothing.
+func (m *Migrator) Cleanup(secretName string) error {
+	if secretName == "" {
+		return nil
+	}
+	_, err := m.secretLister.Get(namespace.GlobalNamespace, secretName)
+	if apierrors.IsNotFound(err) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	err = m.secrets.DeleteNamespaced(namespace.GlobalNamespace, secretName, &metav1.DeleteOptions{})
+	return err
 }

@@ -162,6 +162,7 @@ type ClusterStatus struct {
 	CurrentCisRunName                    string                      `json:"currentCisRunName,omitempty"`
 	PrivateRegistrySecret                string                      `json:"privateRegistrySecret,omitempty" norman:"nocreate,noupdate"`
 	S3CredentialSecret                   string                      `json:"s3CredentialSecret,omitempty" norman:"nocreate,noupdate"`
+	WeavePasswordSecret                  string                      `json:"weavePasswordSecret,omitempty" norman:"nocreate,noupdate"`
 }
 
 type ClusterComponentStatus struct {
