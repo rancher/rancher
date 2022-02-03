@@ -60,3 +60,24 @@ func AssembleS3Credential(cluster *apimgmtv3.Cluster, spec apimgmtv3.ClusterSpec
 	spec.RancherKubernetesEngineConfig.Services.Etcd.BackupConfig.S3BackupConfig.SecretKey = string(s3Cred.Data["secretKey"])
 	return spec, nil
 }
+
+// AssembleWeaveCredential looks up the weave Secret and inserts the keys into the network provider config on the Cluster spec.
+// It returns a new copy of the spec without modifying the original. The Cluster is never updated.
+func AssembleWeaveCredential(cluster *apimgmtv3.Cluster, spec apimgmtv3.ClusterSpec, secretLister v1.SecretLister) (apimgmtv3.ClusterSpec, error) {
+	if cluster.Spec.RancherKubernetesEngineConfig == nil || cluster.Spec.RancherKubernetesEngineConfig.Network.WeaveNetworkProvider == nil {
+		return spec, nil
+	}
+	if cluster.Status.WeavePasswordSecret == "" {
+		if cluster.Spec.RancherKubernetesEngineConfig.Network.WeaveNetworkProvider.Password != "" {
+			logrus.Warnf("[secretmigrator] secrets for cluster %s are not finished migrating", cluster.Name)
+		}
+		return spec, nil
+
+	}
+	registrySecret, err := secretLister.Get(secretNamespace, cluster.Status.WeavePasswordSecret)
+	if err != nil {
+		return spec, err
+	}
+	spec.RancherKubernetesEngineConfig.Network.WeaveNetworkProvider.Password = string(registrySecret.Data["password"])
+	return spec, nil
+}
