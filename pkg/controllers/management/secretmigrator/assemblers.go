@@ -4,8 +4,10 @@ import (
 	"encoding/json"
 
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	apiprjv3 "github.com/rancher/rancher/pkg/apis/project.cattle.io/v3"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	"github.com/rancher/rancher/pkg/namespace"
+	"github.com/rancher/rancher/pkg/pipeline/remote/model"
 	"github.com/sirupsen/logrus"
 	"k8s.io/kubernetes/pkg/credentialprovider"
 )
@@ -143,4 +145,72 @@ func AssembleDingtalkCredential(notifier *apimgmtv3.Notifier, secretLister v1.Se
 	spec := notifier.Spec.DeepCopy()
 	spec.DingtalkConfig.Secret = string(secret.Data["credential"])
 	return spec, nil
+}
+
+// AssembleGithubPipelineConfigCredential looks up the github pipeline client secret and inserts it into the config.
+// It returns a new copy of the GithubPipelineConfig without modifying the original. The config is never updated.
+func (m *Migrator) AssembleGithubPipelineConfigCredential(config apiprjv3.GithubPipelineConfig) (apiprjv3.GithubPipelineConfig, error) {
+	if config.CredentialSecret == "" {
+		if config.ClientSecret != "" {
+			logrus.Warnf("[secretmigrator] secrets for %s pipeline config in project %s are not finished migrating", model.GithubType, config.ProjectName)
+		}
+		return config, nil
+	}
+	secret, err := m.secretLister.Get(namespace.GlobalNamespace, config.CredentialSecret)
+	if err != nil {
+		return config, err
+	}
+	config.ClientSecret = string(secret.Data["credential"])
+	return config, nil
+}
+
+// AssembleGitlabPipelineConfigCredential looks up the gitlab pipeline client secret and inserts it into the config.
+// It returns a new copy of the GitlabPipelineConfig without modifying the original. The config is never updated.
+func (m *Migrator) AssembleGitlabPipelineConfigCredential(config apiprjv3.GitlabPipelineConfig) (apiprjv3.GitlabPipelineConfig, error) {
+	if config.CredentialSecret == "" {
+		if config.ClientSecret != "" {
+			logrus.Warnf("[secretmigrator] secrets for %s pipeline config in project %s are not finished migrating", model.GitlabType, config.ProjectName)
+		}
+		return config, nil
+	}
+	secret, err := m.secretLister.Get(namespace.GlobalNamespace, config.CredentialSecret)
+	if err != nil {
+		return config, err
+	}
+	config.ClientSecret = string(secret.Data["credential"])
+	return config, nil
+}
+
+// AssembleBitbucketCloudPipelineConfigCredential looks up the bitbucket cloud pipeline client secret and inserts it into the config.
+// It returns a new copy of the BitbucketCloudPipelineConfig without modifying the original. The config is never updated.
+func (m *Migrator) AssembleBitbucketCloudPipelineConfigCredential(config apiprjv3.BitbucketCloudPipelineConfig) (apiprjv3.BitbucketCloudPipelineConfig, error) {
+	if config.CredentialSecret == "" {
+		if config.ClientSecret != "" {
+			logrus.Warnf("[secretmigrator] secrets for %s pipeline config in project %s are not finished migrating", model.BitbucketCloudType, config.ProjectName)
+		}
+		return config, nil
+	}
+	secret, err := m.secretLister.Get(namespace.GlobalNamespace, config.CredentialSecret)
+	if err != nil {
+		return config, err
+	}
+	config.ClientSecret = string(secret.Data["credential"])
+	return config, nil
+}
+
+// AssembleBitbucketServerPipelineConfigCredential looks up the bitbucket server pipeline client secret and inserts it into the config.
+// It returns a new copy of the BitbucketServerPipelineConfig without modifying the original. The config is never updated.
+func (m *Migrator) AssembleBitbucketServerPipelineConfigCredential(config apiprjv3.BitbucketServerPipelineConfig) (apiprjv3.BitbucketServerPipelineConfig, error) {
+	if config.CredentialSecret == "" {
+		if config.PrivateKey != "" {
+			logrus.Warnf("[secretmigrator] secrets for %s pipeline config in project %s are not finished migrating", model.BitbucketServerType, config.ProjectName)
+		}
+		return config, nil
+	}
+	secret, err := m.secretLister.Get(namespace.GlobalNamespace, config.CredentialSecret)
+	if err != nil {
+		return config, err
+	}
+	config.PrivateKey = string(secret.Data["credential"])
+	return config, nil
 }

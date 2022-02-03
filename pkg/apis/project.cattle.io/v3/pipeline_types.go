@@ -74,9 +74,10 @@ type SourceCodeProviderConfig struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	ProjectName string `json:"projectName" norman:"required,type=reference[project]"`
-	Type        string `json:"type" norman:"noupdate,options=github|gitlab|bitbucketcloud|bitbucketserver"`
-	Enabled     bool   `json:"enabled,omitempty"`
+	ProjectName      string `json:"projectName" norman:"required,type=reference[project]"`
+	Type             string `json:"type" norman:"noupdate,options=github|gitlab|bitbucketcloud|bitbucketserver"`
+	Enabled          bool   `json:"enabled,omitempty"`
+	CredentialSecret string `json:"credentialSecret,omitempty" norman:"nocreate,noupdate"`
 }
 
 func (s *SourceCodeProviderConfig) ObjClusterName() string {
