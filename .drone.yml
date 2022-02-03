@@ -309,6 +309,7 @@ steps:
     prerelease: true
     title: "Pre-release ${DRONE_TAG}"
     note: ./bin/rancher-components.txt
+    overwrite: true
   when:
     event:
     - tag
