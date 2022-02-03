@@ -17,7 +17,6 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/clientcmd"
 )
 
 // Client is the main rancher Client object that gives an end user access to the Provisioning and Management
@@ -127,25 +126,10 @@ func (c *Client) GetRancherDynamicClient() (dynamic.Interface, error) {
 }
 
 // GetDownStreamClusterClient is a helper function that instantiates a dynamic client to communicate with a specific cluster.
-func (c *Client) GetDownStreamClusterClient(clusterName string) (dynamic.Interface, error) {
-	cluster, err := c.Management.Cluster.ByID(clusterName)
-	if err != nil {
-		return nil, err
-	}
+func (c *Client) GetDownStreamClusterClient(clusterID string) (dynamic.Interface, error) {
+	c.restConfig.Host = fmt.Sprintf("https://%s/k8s/clusters/%s", c.restConfig.Host, clusterID)
 
-	kubeConfig, err := c.Management.Cluster.ActionGenerateKubeconfig(cluster)
-	if err != nil {
-		return nil, err
-	}
-
-	configBytes := []byte(kubeConfig.Config)
-
-	restConfig, err := clientcmd.RESTConfigFromKubeConfig(configBytes)
-	if err != nil {
-		return nil, errors.Wrap(err, "GetDownStreamClusterClient: failed to parse kubeconfig for a k8s client")
-	}
-
-	dynamic, err := frameworkDynamic.NewForConfig(c.Session, restConfig)
+	dynamic, err := frameworkDynamic.NewForConfig(c.Session, c.restConfig)
 	if err != nil {
 		return nil, err
 	}
