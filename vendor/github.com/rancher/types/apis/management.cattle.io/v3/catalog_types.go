@@ -36,13 +36,15 @@ type CatalogStatus struct {
 	// helmVersionCommits records hash of each helm template version
 	HelmVersionCommits map[string]VersionCommits `json:"helmVersionCommits,omitempty"`
 	Conditions         []CatalogCondition        `json:"conditions,omitempty"`
+	CredentialSecret   string                    `json:"credentialSecret,omitempty" norman:"nocreate,noupdate"`
 }
 
 var (
-	CatalogConditionRefreshed  condition.Cond = "Refreshed"
-	CatalogConditionUpgraded   condition.Cond = "Upgraded"
-	CatalogConditionDiskCached condition.Cond = "DiskCached"
-	CatalogConditionProcessed  condition.Cond = "Processed"
+	CatalogConditionRefreshed       condition.Cond = "Refreshed"
+	CatalogConditionUpgraded        condition.Cond = "Upgraded"
+	CatalogConditionDiskCached      condition.Cond = "DiskCached"
+	CatalogConditionProcessed       condition.Cond = "Processed"
+	CatalogConditionSecretsMigrated condition.Cond = "SecretsMigrated"
 )
 
 type CatalogCondition struct {

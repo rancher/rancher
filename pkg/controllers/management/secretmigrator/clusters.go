@@ -208,6 +208,76 @@ func (h *handler) sync(key string, cluster *v3.Cluster) (runtime.Object, error) 
 			}
 		}
 
+		// cluster catalogs
+		clusterCatalogs, err := h.clusterCatalogLister.List(cluster.Name, labels.NewSelector())
+		if err != nil {
+			logrus.Errorf("[secretmigrator] failed to get cluster catalogs for cluster %s, will retry: %v", cluster.Name, err)
+			return nil, err
+		}
+		for _, c := range clusterCatalogs {
+			if c.Status.CredentialSecret == "" && c.Spec.Password != "" {
+				logrus.Tracef("[secretmigrator] migrating secrets for cluster catalog %s in cluster %s", c.Name, cluster.Name)
+				secret, err := h.migrator.CreateOrUpdateCatalogSecret(c.Status.CredentialSecret, c.Spec.Password, cluster)
+				if err != nil {
+					logrus.Errorf("[secretmigrator] failed to migrate secrets for cluster catalog %s in cluster %s, will retry: %v", c.Name, cluster.Name, err)
+					return nil, err
+				}
+				if secret != nil {
+					logrus.Tracef("[secretmigrator] secret found for cluster catalog %s in cluster %s", c.Name, cluster.Name)
+					c.Status.CredentialSecret = secret.Name
+					c.Spec.Password = ""
+					_, err = h.clusterCatalogs.Update(c)
+					if err != nil {
+						logrus.Errorf("[secretmigrator] failed to migrate secrets for cluster catalog %s in cluster %s, will retry: %v", c.Name, cluster.Name, err)
+						deleteErr := h.migrator.secrets.DeleteNamespaced(secretNamespace, secret.Name, &metav1.DeleteOptions{})
+						if deleteErr != nil {
+							logrus.Errorf("[secretmigrator] encountered error while handling migration error: %v", deleteErr)
+						}
+						return nil, err
+					}
+				}
+			}
+		}
+
+		projects, err := h.projectLister.List(cluster.Name, labels.NewSelector())
+		if err != nil {
+			logrus.Errorf("[secretmigrator] failed to get projects for cluster %s, will retry: %v", cluster.Name, err)
+			return nil, err
+		}
+
+		// project catalogs
+		for _, p := range projects {
+			projectCatalogs, err := h.projectCatalogLister.List(p.Name, labels.NewSelector())
+			if err != nil {
+				logrus.Errorf("[secretmigrator] failed to get project catalogs for cluster %s, will retry: %v", cluster.Name, err)
+				return nil, err
+			}
+			for _, c := range projectCatalogs {
+				if c.Status.CredentialSecret == "" && c.Spec.Password != "" {
+					logrus.Tracef("[secretmigrator] migrating secrets for project catalog %s in cluster %s", c.Name, cluster.Name)
+					secret, err := h.migrator.CreateOrUpdateCatalogSecret(c.Status.CredentialSecret, c.Spec.Password, cluster)
+					if err != nil {
+						logrus.Errorf("[secretmigrator] failed to migrate secrets for project catalog %s in cluster %s, will retry: %v", c.Name, cluster.Name, err)
+						return nil, err
+					}
+					if secret != nil {
+						logrus.Tracef("[secretmigrator] secret found for project catalog %s in cluster %s", c.Name, cluster.Name)
+						c.Status.CredentialSecret = secret.Name
+						c.Spec.Password = ""
+						_, err = h.projectCatalogs.Update(c)
+						if err != nil {
+							logrus.Errorf("[secretmigrator] failed to migrate secrets for project catalog %s in cluster %s, will retry: %v", c.Name, cluster.Name, err)
+							deleteErr := h.migrator.secrets.DeleteNamespaced(secretNamespace, secret.Name, &metav1.DeleteOptions{})
+							if deleteErr != nil {
+								logrus.Errorf("[secretmigrator] encountered error while handling migration error: %v", deleteErr)
+							}
+							return nil, err
+						}
+					}
+				}
+			}
+		}
+
 		logrus.Tracef("[secretmigrator] setting cluster condition and updating cluster %s", cluster.Name)
 		v3.ClusterConditionSecretsMigrated.True(cluster)
 		return h.clusters.Update(cluster)
