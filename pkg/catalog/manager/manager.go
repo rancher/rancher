@@ -13,6 +13,7 @@ import (
 	helmlib "github.com/rancher/rancher/pkg/catalog/helm"
 	"github.com/rancher/rancher/pkg/catalog/utils"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/helm/common"
+	corev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	managementv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	projectv3 "github.com/rancher/rancher/pkg/generated/norman/project.cattle.io/v3"
@@ -39,6 +40,7 @@ type Manager struct {
 	appRevisionClient     projectv3.AppRevisionInterface
 	lastUpdateTime        time.Time
 	bundledMode           bool
+	SecretLister          corev1.SecretLister
 }
 
 type CatalogManager interface {
@@ -49,7 +51,7 @@ type CatalogManager interface {
 	GetSystemAppCatalogID(templateVersionID, clusterName string) (string, error)
 }
 
-func New(management managementv3.Interface, project projectv3.Interface) *Manager {
+func New(management managementv3.Interface, project projectv3.Interface, core corev1.Interface) *Manager {
 	var bundledMode bool
 	if strings.ToLower(settings.SystemCatalog.Get()) == "bundled" {
 		bundledMode = true
@@ -69,6 +71,7 @@ func New(management managementv3.Interface, project projectv3.Interface) *Manage
 		ClusterCatalogLister:  management.ClusterCatalogs("").Controller().Lister(),
 		appRevisionClient:     project.AppRevisions(""),
 		bundledMode:           bundledMode,
+		SecretLister:          core.Secrets("").Controller().Lister(),
 	}
 }
 

@@ -31,7 +31,7 @@ func (m *Manager) ClusterCatalogSync(key string, obj *v3.ClusterCatalog) (runtim
 		return nil, err
 	}
 
-	commit, helm, err := helmlib.NewForceUpdate(&clusterCatalog.Catalog)
+	commit, helm, err := helmlib.NewForceUpdate(&clusterCatalog.Catalog, m.SecretLister)
 	if err != nil {
 		return m.updateClusterCatalogError(clusterCatalog, err)
 	}

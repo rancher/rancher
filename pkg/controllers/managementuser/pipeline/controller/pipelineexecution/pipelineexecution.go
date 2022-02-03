@@ -73,6 +73,7 @@ type Lifecycle struct {
 	namespaceLister      v1.NamespaceLister
 	namespaces           v1.NamespaceInterface
 	secrets              v1.SecretInterface
+	secretLister         v1.SecretLister
 	serviceLister        v1.ServiceLister
 	managementSecrets    v1.SecretInterface
 	services             v1.ServiceInterface
@@ -137,6 +138,7 @@ func Register(ctx context.Context, cluster *config.UserContext) {
 		namespaces:                 namespaces,
 		namespaceLister:            namespaceLister,
 		secrets:                    secrets,
+		secretLister:               secretLister,
 		managementSecrets:          managementSecrets,
 		services:                   services,
 		serviceLister:              serviceLister,

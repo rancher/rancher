@@ -61,7 +61,7 @@ func buildScaledContext(ctx context.Context, wranglerContext *wrangler.Context, 
 		return nil, nil, err
 	}
 
-	scaledContext.CatalogManager = manager.New(scaledContext.Management, scaledContext.Project)
+	scaledContext.CatalogManager = manager.New(scaledContext.Management, scaledContext.Project, scaledContext.Core)
 
 	if err := managementcrds.Create(ctx, wranglerContext.RESTConfig); err != nil {
 		return nil, nil, err
