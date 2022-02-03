@@ -6,7 +6,7 @@ replace (
 	git.apache.org/thrift.git => github.com/apache/thrift v0.12.0
 
 	github.com/docker/distribution => github.com/docker/distribution v2.7.1+incompatible // oras dep requires a replace is set
-	github.com/docker/docker => github.com/docker/docker v20.10.6+incompatible // oras dep requires a replace is set
+	github.com/docker/docker => github.com/docker/docker v20.10.9+incompatible // oras dep requires a replace is set
 
 	github.com/knative/pkg => github.com/rancher/pkg v0.0.0-20190514055449-b30ab9de040e
 	github.com/matryer/moq => github.com/rancher/moq v0.0.0-20200712062324-13d1f37d2d77
@@ -62,7 +62,7 @@ require (
 	github.com/crewjam/saml v0.4.5
 	github.com/davecgh/go-spew v1.1.1
 	github.com/docker/distribution v2.7.1+incompatible
-	github.com/docker/docker v20.10.6+incompatible
+	github.com/docker/docker v20.10.9+incompatible
 	github.com/docker/go-connections v0.4.0
 	github.com/docker/libtrust v0.0.0-20160708172513-aabc10ec26b7 // indirect
 	github.com/ehazlett/simplelog v0.0.0-20200226020431-d374894e92a4
