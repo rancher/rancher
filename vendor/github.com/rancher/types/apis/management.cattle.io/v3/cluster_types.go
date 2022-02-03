@@ -161,6 +161,7 @@ type ClusterStatus struct {
 	ScheduledClusterScanStatus           *ScheduledClusterScanStatus `json:"scheduledClusterScanStatus,omitempty"`
 	CurrentCisRunName                    string                      `json:"currentCisRunName,omitempty"`
 	PrivateRegistrySecret                string                      `json:"privateRegistrySecret,omitempty" norman:"nocreate,noupdate"`
+	S3CredentialSecret                   string                      `json:"s3CredentialSecret,omitempty" norman:"nocreate,noupdate"`
 }
 
 type ClusterComponentStatus struct {

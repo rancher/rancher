@@ -2,6 +2,7 @@ package secretmigrator
 
 import (
 	"encoding/json"
+	"fmt"
 	"reflect"
 
 	"github.com/rancher/rancher/pkg/namespace"
@@ -9,13 +10,15 @@ import (
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/credentialprovider"
 )
 
 const (
-	secretNamespace = namespace.GlobalNamespace
+	secretNamespace     = namespace.GlobalNamespace
+	S3BackupAnswersPath = "rancherKubernetesEngineConfig.services.etcd.backupConfig.s3BackupConfig.secretKey"
 )
 
 func (h *handler) sync(key string, cluster *v3.Cluster) (runtime.Object, error) {
@@ -49,6 +52,37 @@ func (h *handler) sync(key string, cluster *v3.Cluster) (runtime.Object, error) 
 				if err != nil {
 					logrus.Errorf("[secretmigrator] failed to migrate private registry secrets for cluster %s, will retry: %v", cluster.Name, err)
 					deleteErr := h.migrator.secrets.DeleteNamespaced(secretNamespace, regSecret.Name, &metav1.DeleteOptions{})
+					if deleteErr != nil {
+						logrus.Errorf("[secretmigrator] encountered error while handling migration error: %v", deleteErr)
+					}
+					return nil, err
+				}
+				cluster = clusterCopy
+			}
+		}
+
+		// s3 backup cred
+		if cluster.Status.S3CredentialSecret == "" {
+			logrus.Tracef("[secretmigrator] migrating S3 secrets for cluster %s", cluster.Name)
+			s3Secret, err := h.migrator.CreateOrUpdateS3Secret("", cluster.Spec.RancherKubernetesEngineConfig, cluster)
+			if err != nil {
+				logrus.Errorf("[secretmigrator] failed to migrate S3 secrets for cluster %s, will retry: %v", cluster.Name, err)
+				return nil, err
+			}
+			if s3Secret != nil {
+				logrus.Tracef("[secretmigrator] S3 secret found for cluster %s", cluster.Name)
+				cluster.Status.S3CredentialSecret = s3Secret.Name
+				cluster.Spec.RancherKubernetesEngineConfig.Services.Etcd.BackupConfig.S3BackupConfig.SecretKey = ""
+				if cluster.Status.AppliedSpec.RancherKubernetesEngineConfig != nil && cluster.Status.AppliedSpec.RancherKubernetesEngineConfig.Services.Etcd.BackupConfig != nil && cluster.Status.AppliedSpec.RancherKubernetesEngineConfig.Services.Etcd.BackupConfig.S3BackupConfig != nil {
+					cluster.Status.AppliedSpec.RancherKubernetesEngineConfig.Services.Etcd.BackupConfig.S3BackupConfig.SecretKey = ""
+				}
+				if cluster.Status.FailedSpec != nil && cluster.Status.FailedSpec.RancherKubernetesEngineConfig != nil && cluster.Status.FailedSpec.RancherKubernetesEngineConfig.Services.Etcd.BackupConfig != nil && cluster.Status.FailedSpec.RancherKubernetesEngineConfig.Services.Etcd.BackupConfig.S3BackupConfig != nil {
+					cluster.Status.FailedSpec.RancherKubernetesEngineConfig.Services.Etcd.BackupConfig.S3BackupConfig.SecretKey = ""
+				}
+				clusterCopy, err := h.clusters.Update(cluster)
+				if err != nil {
+					logrus.Errorf("[secretmigrator] failed to migrate S3 secrets for cluster %s, will retry: %v", cluster.Name, err)
+					deleteErr := h.migrator.secrets.DeleteNamespaced(secretNamespace, s3Secret.Name, &metav1.DeleteOptions{})
 					if deleteErr != nil {
 						logrus.Errorf("[secretmigrator] encountered error while handling migration error: %v", deleteErr)
 					}
@@ -184,4 +218,77 @@ func (m *Migrator) UpdateSecretOwnerReference(secret *corev1.Secret, owner metav
 	secret.OwnerReferences = []metav1.OwnerReference{owner}
 	_, err := m.secrets.Update(secret)
 	return err
+}
+
+// createOrUpdateSecret accepts an optional secret name and tries to update it with the provided data if it exists, or creates it.
+// If an owner is provided, it sets it as an owner reference before creating or updating it.
+func (m *Migrator) createOrUpdateSecret(secretName string, data map[string]string, owner runtime.Object, kind, field string) (*corev1.Secret, error) {
+	var existing *corev1.Secret
+	var err error
+	if secretName != "" {
+		existing, err = m.secretLister.Get(secretNamespace, secretName)
+		if err != nil && !apierrors.IsNotFound(err) {
+			return nil, err
+		}
+	}
+	secret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:         secretName,
+			GenerateName: fmt.Sprintf("%s-%s-", kind, field),
+			Namespace:    secretNamespace,
+		},
+		StringData: data,
+		Type:       corev1.SecretTypeOpaque,
+	}
+	if owner != nil {
+		gvk := owner.GetObjectKind().GroupVersionKind()
+		accessor, err := meta.Accessor(owner)
+		if err != nil {
+			return nil, err
+		}
+		secret.OwnerReferences = []metav1.OwnerReference{
+			{
+				APIVersion: gvk.Group + "/" + gvk.Version,
+				Kind:       gvk.Kind,
+				Name:       accessor.GetName(),
+				UID:        accessor.GetUID(),
+			},
+		}
+	}
+	if existing == nil {
+		return m.secrets.Create(secret)
+	} else if !reflect.DeepEqual(existing.StringData, secret.StringData) {
+		existing.StringData = data
+		return m.secrets.Update(existing)
+	}
+	return secret, nil
+}
+
+// createOrUpdateSecretForCredential accepts an optional secret name and a value containing the data that needs to be sanitized,
+// and creates a secret to hold the sanitized data. If an owner is passed, the owner is set as an owner reference on the secret.
+func (m *Migrator) createOrUpdateSecretForCredential(secretName, secretValue string, owner runtime.Object, kind, field string) (*corev1.Secret, error) {
+	if secretValue == "" {
+		return nil, nil
+	}
+	data := map[string]string{
+		"credential": secretValue,
+	}
+	secret, err := m.createOrUpdateSecret(secretName, data, owner, kind, field)
+	if err != nil {
+		return nil, fmt.Errorf("error creating secret for credential: %w", err)
+	}
+	return secret, nil
+}
+
+// CreateOrUpdateS3Secret accepts an optional secret name and a RancherKubernetesEngineConfig object
+// and creates a Secret for the S3BackupConfig credentials if there are any.
+// If an owner is passed, the owner is set as an owner reference on the Secret.
+// It returns a reference to the Secret if one was created. If the returned Secret is not nil and there is no error,
+// the caller is responsible for un-setting the secret data, setting a reference to the Secret, and
+// updating the Cluster object, if applicable.
+func (m *Migrator) CreateOrUpdateS3Secret(secretName string, rkeConfig *v3.RancherKubernetesEngineConfig, owner runtime.Object) (*corev1.Secret, error) {
+	if rkeConfig == nil || rkeConfig.Services.Etcd.BackupConfig == nil || rkeConfig.Services.Etcd.BackupConfig.S3BackupConfig == nil {
+		return nil, nil
+	}
+	return m.createOrUpdateSecretForCredential(secretName, rkeConfig.Services.Etcd.BackupConfig.S3BackupConfig.SecretKey, owner, "cluster", "s3backup")
 }

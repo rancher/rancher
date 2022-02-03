@@ -21,6 +21,10 @@ func (p *Provisioner) driverCreate(cluster *v3.Cluster, spec v3.ClusterSpec) (ap
 	defer logger.Close()
 
 	spec = cleanRKE(spec)
+	spec, err = secretmigrator.AssembleS3Credential(cluster, spec, p.SecretLister)
+	if err != nil {
+		return "", "", "", err
+	}
 	spec, err = secretmigrator.AssemblePrivateRegistryCredential(cluster, spec, p.SecretLister)
 	if err != nil {
 		return "", "", "", err

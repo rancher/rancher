@@ -19,8 +19,10 @@ import (
 	"github.com/rancher/kontainer-engine/drivers/rke"
 	"github.com/rancher/kontainer-engine/service"
 	"github.com/rancher/rancher/pkg/controllers/management/clusterprovisioner"
+	"github.com/rancher/rancher/pkg/controllers/management/secretmigrator"
 	"github.com/rancher/rancher/pkg/rkedialerfactory"
 	"github.com/rancher/rancher/pkg/ticker"
+	v1 "github.com/rancher/types/apis/core/v1"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
 	"github.com/rancher/types/config/dialer"
@@ -46,6 +48,7 @@ type Controller struct {
 	backupLister          v3.EtcdBackupLister
 	backupDriver          *service.EngineService
 	KontainerDriverLister v3.KontainerDriverLister
+	secretLister          v1.SecretLister
 }
 
 func Register(ctx context.Context, management *config.ManagementContext) {
@@ -56,6 +59,7 @@ func Register(ctx context.Context, management *config.ManagementContext) {
 		backupClient:          management.Management.EtcdBackups(""),
 		backupLister:          management.Management.EtcdBackups("").Controller().Lister(),
 		backupDriver:          service.NewEngineService(clusterprovisioner.NewPersistentStore(management.Core.Namespaces(""), management.Core)),
+		secretLister:          management.Core.Secrets("").Controller().Lister(),
 		KontainerDriverLister: management.Management.KontainerDrivers("").Controller().Lister(),
 	}
 
@@ -93,6 +97,10 @@ func (c *Controller) Create(b *v3.EtcdBackup) (runtime.Object, error) {
 	if !v3.BackupConditionCreated.IsTrue(b) {
 		b.Spec.Filename = generateBackupFilename(b.Name, cluster.Spec.RancherKubernetesEngineConfig.Services.Etcd.BackupConfig)
 		b.Spec.BackupConfig = *cluster.Spec.RancherKubernetesEngineConfig.Services.Etcd.BackupConfig
+		cluster.Spec, err = secretmigrator.AssembleS3Credential(cluster, cluster.Spec, c.secretLister)
+		if err != nil {
+			return b, err
+		}
 		v3.BackupConditionCreated.True(b)
 		// we set ConditionCompleted to Unknown to avoid incorrect "active" state
 		v3.BackupConditionCompleted.Unknown(b)
