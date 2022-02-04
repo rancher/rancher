@@ -150,7 +150,7 @@ node {
                       string(name: 'AWS_VOLUME_SIZE', value: "${AWS_VOLUME_SIZE}"),
                     ]
                     echo "Params are: ${params}"
-                    jobs["test-${i}"] = { build job: 'rancher_v3_import_rke2_cluster', parameters: params }
+                    jobs["test-${i}"] = { build job: 'import_rke2_cluster', parameters: params }
                   }
                   parallel jobs
                   CLUSTERS_CREATED = true
