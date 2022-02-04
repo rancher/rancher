@@ -201,7 +201,7 @@ func (m *Lifecycle) waitUntilJobCompletes(userContext *config.UserContext, job *
 	}
 
 	// remove the job to clean up
-	return userContext.K8sClient.BatchV1().Jobs(job.Namespace).Delete(m.ctx, job.Name, metav1.DeleteOptions{})
+	return userContext.K8sClient.BatchV1().Jobs(job.Namespace).Delete(m.ctx, job.Name, metav1.DeleteOptions{PropagationPolicy: &[]metav1.DeletionPropagation{metav1.DeletePropagationForeground}[0]})
 }
 
 func (m *Lifecycle) createCleanupJob(userContext *config.UserContext, node *v3.Node) (*batchV1.Job, error) {
