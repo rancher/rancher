@@ -149,22 +149,26 @@ func objects(ready bool, args driverArgs) []runtime.Object {
 			Name:     "rke2-machine-provisioner",
 		},
 	}
+
+	labels := map[string]string{
+		InfraMachineGroup:   args.MachineGVK.Group,
+		InfraMachineVersion: args.MachineGVK.Version,
+		InfraMachineKind:    args.MachineGVK.Kind,
+		InfraMachineName:    args.MachineName,
+		InfraJobRemove:      strconv.FormatBool(!args.BootstrapRequired),
+	}
+
 	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      saName,
 			Namespace: args.MachineNamespace,
+			Labels:    labels,
 		},
 		Spec: batchv1.JobSpec{
 			BackoffLimit: &args.BackoffLimit,
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{
-						InfraMachineGroup:   args.MachineGVK.Group,
-						InfraMachineVersion: args.MachineGVK.Version,
-						InfraMachineKind:    args.MachineGVK.Kind,
-						InfraMachineName:    args.MachineName,
-						InfraJobRemove:      strconv.FormatBool(!args.BootstrapRequired),
-					},
+					Labels: labels,
 				},
 				Spec: corev1.PodSpec{
 					Volumes: append(volumes, corev1.Volume{
