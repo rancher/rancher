@@ -17,6 +17,7 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
 )
 
 // Client is the main rancher Client object that gives an end user access to the Provisioning and Management
@@ -133,6 +134,30 @@ func (c *Client) GetDownStreamClusterClient(clusterID string) (dynamic.Interface
 	if err != nil {
 		return nil, err
 	}
+	return dynamic, nil
+}
+
+// SwitchContext is a helper function that changes the current context to `context` and instantiates a dynamic client
+func (c *Client) SwitchContext(context string, clientConfig *clientcmd.ClientConfig) (dynamic.Interface, error) {
+	overrides := clientcmd.ConfigOverrides{CurrentContext: context}
+
+	rawConfig, err := (*clientConfig).RawConfig()
+	if err != nil {
+		return nil, err
+	}
+
+	updatedConfig := clientcmd.NewNonInteractiveClientConfig(rawConfig, rawConfig.CurrentContext, &overrides, (*clientConfig).ConfigAccess())
+
+	restConfig, err := updatedConfig.ClientConfig()
+	if err != nil {
+		return nil, err
+	}
+
+	dynamic, err := frameworkDynamic.NewForConfig(c.Session, restConfig)
+	if err != nil {
+		return nil, err
+	}
+
 	return dynamic, nil
 }
 
