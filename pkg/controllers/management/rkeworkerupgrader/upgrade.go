@@ -310,8 +310,15 @@ func (uh *upgradeHandler) upgradeCluster(cluster *v3.Cluster, nodeName string, p
 
 	notReady := len(status.notReady)
 	if notReady > maxAllowed {
-		return fmt.Errorf("cluster [%s] worker-upgrade: not enough nodes to upgrade: nodes %v notReady %v maxUnavailable %v",
-			clusterName, status.filtered, keys(status.notReady), maxAllowed)
+		v32.ClusterConditionUpgraded.False(cluster)
+		v32.ClusterConditionUpgraded.Message(cluster, fmt.Sprintf("cluster [%s] worker-upgrade: too many unavailable nodes to upgrade: nodes %v notReady %v maxUnavailable %v",
+			clusterName, status.filtered, keys(status.notReady), maxAllowed))
+
+		if _, err := uh.clusters.Update(cluster); err != nil {
+			return err
+		}
+
+		return fmt.Errorf(v32.ClusterConditionUpgraded.GetMessage(cluster))
 	}
 
 	if notReady > 0 {
@@ -334,8 +341,15 @@ func (uh *upgradeHandler) upgradeCluster(cluster *v3.Cluster, nodeName string, p
 	unavailable := status.upgrading + notReady
 
 	if unavailable > maxAllowed {
-		return fmt.Errorf("cluster [%s] worker-upgrade: more than allowed nodes upgrading for cluster: unavailable %v maxUnavailable %v",
-			clusterName, unavailable, maxAllowed)
+		v32.ClusterConditionUpgraded.False(cluster)
+		v32.ClusterConditionUpgraded.Message(cluster, fmt.Sprintf("cluster [%s] worker-upgrade: more than allowed nodes upgrading for cluster: unavailable %v maxUnavailable %v",
+			clusterName, unavailable, maxAllowed))
+
+		if _, err := uh.clusters.Update(cluster); err != nil {
+			return err
+		}
+
+		return fmt.Errorf(v32.ClusterConditionUpgraded.GetMessage(cluster))
 	}
 
 	for _, node := range status.toProcess {
