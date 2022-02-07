@@ -3,7 +3,12 @@ from pkg_resources import packaging
 
 from .common import *  # NOQA
 from .test_boto_create_eks import get_eks_kubeconfig
-from .test_import_k3s_cluster import create_multiple_control_cluster
+from .test_import_k3s_cluster import (
+    create_multiple_control_cluster
+)
+from .test_import_rke2_cluster import (
+    RANCHER_RKE2_VERSION, create_rke2_multiple_control_cluster
+)
 from .test_rke_cluster_provisioning import rke_config
 
 # RANCHER_HA_KUBECONFIG and RANCHER_HA_HOSTNAME are provided
@@ -34,7 +39,6 @@ RANCHER_LOCAL_CLUSTER_TYPE = os.environ.get("RANCHER_LOCAL_CLUSTER_TYPE")
 RANCHER_ADD_CUSTOM_CLUSTER = os.environ.get("RANCHER_ADD_CUSTOM_CLUSTER",
                                             "True")
 KUBERNETES_VERSION = os.environ.get("RANCHER_LOCAL_KUBERNETES_VERSION","")
-RANCHER_K3S_VERSION = os.environ.get("RANCHER_K3S_VERSION", "")
 
 kubeconfig_path = DATA_SUBDIR + "/kube_config_cluster-ha-filled.yml"
 export_cmd = "export KUBECONFIG=" + kubeconfig_path
@@ -90,6 +94,13 @@ def test_install_rancher_ha(precheck_certificate_options):
             k3s_kubeconfig_path = \
                 create_multiple_control_cluster()
             cmd = "cp {0} {1}".format(k3s_kubeconfig_path, kubeconfig_path)
+            run_command_with_stderr(cmd)
+        elif RANCHER_LOCAL_CLUSTER_TYPE == "RKE2":
+            print("RKE2 cluster is provisioning for the local cluster")
+            rke2_kubeconfig_path = \
+                create_rke2_multiple_control_cluster("rke2",
+                                                     RANCHER_RKE2_VERSION)
+            cmd = "cp {0} {1}".format(rke2_kubeconfig_path, kubeconfig_path)
             run_command_with_stderr(cmd)
         elif RANCHER_LOCAL_CLUSTER_TYPE == "EKS":
             create_resources_eks()
