@@ -262,7 +262,7 @@ resource "aws_lb_listener" "aws_nlb_listener_443" {
 
 resource "aws_route53_record" "aws_route53" {
   zone_id            = "${data.aws_route53_zone.selected.zone_id}"
-  name               = "${var.resource_name}-route53"
+  name               = "${var.resource_name}"
   type               = "CNAME"
   ttl                = "300"
   records            = ["${aws_lb.aws_nlb[0].dns_name}"]
