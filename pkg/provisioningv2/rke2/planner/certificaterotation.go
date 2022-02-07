@@ -1,6 +1,8 @@
 package planner
 
 import (
+	"fmt"
+
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
 	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2"
@@ -26,9 +28,9 @@ func (r *certificateRotation) RotateCertificates(controlPlane *rkev1.RKEControlP
 		return nil
 	}
 
-	rotatePlan := rotateCertificatesPlan(controlPlane, controlPlane.Spec.RotateCertificates)
-	for _, node := range collect(clusterPlan, isControlPlaneEtcd) {
-		err := r.store.UpdatePlan(node, rotatePlan, 0)
+	for _, node := range collect(clusterPlan, anyRole) {
+		rotatePlan := rotateCertificatesPlan(controlPlane, controlPlane.Spec.RotateCertificates, node)
+		err := assignAndCheckPlan(r.store, fmt.Sprintf("[%s] certificate rotation", node.Machine.Name), node, rotatePlan, 0)
 		if err != nil {
 			return err
 		}
@@ -39,7 +41,7 @@ func (r *certificateRotation) RotateCertificates(controlPlane *rkev1.RKEControlP
 	return err
 }
 
-// shouldRotate `true` if any services are specified or the CA cert is to be rotated.
+// shouldRotate `true` if the cluster is ready and the generation is stale
 func shouldRotate(cp *rkev1.RKEControlPlane) bool {
 	// The controlplane must be initialized before we rotate anything
 	if cp.Status.Initialized != true {
@@ -52,52 +54,50 @@ func shouldRotate(cp *rkev1.RKEControlPlane) bool {
 	}
 
 	// if this generation has already been applied there is no work
-	if cp.Status.CertificateRotationGeneration == cp.Spec.RotateCertificates.Generation {
-		return false
-	}
-
-	// atleast one service or the ca must be rotated for there to be any work
-	if len(cp.Spec.RotateCertificates.Services) > 0 || cp.Spec.RotateCertificates.CACertificates {
-		return true
-	}
-
-	return false
+	return cp.Status.CertificateRotationGeneration != cp.Spec.RotateCertificates.Generation
 }
 
-// rotateCertificatesPlan rotates the certificates for the services specified, if any, and restarts the service.  If `CACertificates` is true
+// rotateCertificatesPlan rotates the certificates for the services specified, if any, and restarts the service.  If no services are specified
 // all certificates are rotated.
-func rotateCertificatesPlan(controlPlane *rkev1.RKEControlPlane, rotation *rkev1.RotateCertificates) plan.NodePlan {
+func rotateCertificatesPlan(controlPlane *rkev1.RKEControlPlane, rotation *rkev1.RotateCertificates, entry *planEntry) plan.NodePlan {
 	args := []string{
 		"certificate",
 		"rotate",
 	}
 
-	if len(rotation.Services) > 0 && !rotation.CACertificates {
+	if len(rotation.Services) > 0 {
 		for _, service := range rotation.Services {
 			args = append(args, "-s", service)
+		}
+	}
+
+	if isOnlyWorker(entry) {
+		return plan.NodePlan{
+			Instructions: []plan.OneTimeInstruction{
+				{
+					Name:    "restart",
+					Command: "systemctl",
+					Args: []string{
+						"restart",
+						rke2.GetRuntimeAgentUnit(controlPlane.Spec.KubernetesVersion),
+					},
+				},
+			},
 		}
 	}
 
 	return plan.NodePlan{
 		Instructions: []plan.OneTimeInstruction{
 			{
-				Name:    "stop service",
-				Command: "systemctl",
-				Args: []string{
-					"stop",
-					rke2.GetRuntimeServerUnit(controlPlane.Spec.KubernetesVersion),
-				},
-			},
-			{
 				Name:    "rotate certificates",
 				Command: rke2.GetRuntimeCommand(controlPlane.Spec.KubernetesVersion),
 				Args:    args,
 			},
 			{
-				Name:    "start service",
+				Name:    "restart",
 				Command: "systemctl",
 				Args: []string{
-					"start",
+					"restart",
 					rke2.GetRuntimeServerUnit(controlPlane.Spec.KubernetesVersion),
 				},
 			},

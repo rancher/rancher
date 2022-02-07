@@ -809,6 +809,10 @@ func noRole(entry *planEntry) bool {
 	return !isEtcd(entry) && !isControlPlane(entry) && !isWorker(entry)
 }
 
+func anyRole(_ *planEntry) bool {
+	return true
+}
+
 func isOnlyWorker(entry *planEntry) bool {
 	return !isEtcd(entry) && !isControlPlane(entry) && isWorker(entry)
 }
