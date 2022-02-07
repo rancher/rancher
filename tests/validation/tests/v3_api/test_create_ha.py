@@ -155,6 +155,8 @@ def test_install_rancher_ha(precheck_certificate_options):
     admin_client = set_url_and_password(RANCHER_SERVER_URL)
     cluster = get_cluster_by_name(admin_client, "local")
     validate_cluster_state(admin_client, cluster, False)
+    print("Local HA Rancher cluster created successfully! "
+          "Access the UI via:\n{}").format(RANCHER_SERVER_URL)
     if RANCHER_ADD_CUSTOM_CLUSTER.upper() == "TRUE":
         print("creating an custom cluster")
         create_custom_cluster(admin_client)
