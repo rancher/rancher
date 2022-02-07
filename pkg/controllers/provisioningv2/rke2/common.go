@@ -117,6 +117,10 @@ func GetRuntimeServerUnit(kubernetesVersion string) string {
 	return RuntimeRKE2 + "-server"
 }
 
+func GetRuntimeAgentUnit(kubernetesVersion string) string {
+	return GetRuntimeCommand(kubernetesVersion) + "-agent"
+}
+
 func GetRuntimeEnv(kubernetesVersion string) string {
 	return strings.ToUpper(GetRuntime(kubernetesVersion))
 }
