@@ -58,8 +58,7 @@ def test_create_rancherd_multiple_control_cluster():
 def test_create_rke2_multiple_control_cluster():
     cluster_version = RANCHER_RKE2_VERSION
     cluster_type = "rke2"
-    rke2_clusterfilepath = create_rke2_multiple_control_cluster(cluster_type, \
-                                                                cluster_version)
+    create_rke2_multiple_control_cluster(cluster_type, cluster_version)
 
 
 def test_import_rke2_multiple_control_cluster():
@@ -133,11 +132,11 @@ def create_rke2_multiple_control_cluster(cluster_type, cluster_version):
                                   'iam_role': RANCHER_IAM_ROLE,
                                   'volume_size': AWS_VOLUME_SIZE})
 
-    print("Joining worker nodes")
-    tf.init()
-    tf.plan(out="plan_worker.out")
-    print(tf.apply("--auto-approve"))
-    print("\n\n")
+        print("Joining worker nodes")
+        tf.init()
+        tf.plan(out="plan_worker.out")
+        print(tf.apply("--auto-approve"))
+        print("\n\n")
     cmd = "cp /tmp/" + RANCHER_HOSTNAME_PREFIX + "_kubeconfig " + \
           rke2_clusterfilepath
     os.system(cmd)
