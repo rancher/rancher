@@ -142,6 +142,8 @@ func TestCompareRancherVersionToConstraint(t *testing.T) {
 		// Assert error
 		{"", "", false, true},
 		{"2.5.8", "", false, true},
+		// Assert Rancher version 2.6.99 is changed to 2.6.98 to handle edge case when compared against 2.6.99-0
+		{"2.6.99", "2.5.99 - 2.6.99-0", true, false},
 	}
 	assert := assertlib.New(t)
 	for _, tc := range testCases {

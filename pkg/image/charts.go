@@ -261,7 +261,7 @@ func pickImagesFromValuesMap(imagesSet map[string]map[string]struct{}, values ma
 		if !ok {
 			return
 		}
-		// No string type assetion because some charts have float typed image tags
+		// No string type assertion because some charts have float typed image tags
 		tag, ok := inputMap["tag"]
 		if !ok {
 			return
