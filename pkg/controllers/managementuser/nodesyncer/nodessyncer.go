@@ -706,8 +706,15 @@ func cleanStatus(machine *v3.Node) {
 	machine.Status.InternalNodeStatus.Images = nil
 	machine.Status.InternalNodeStatus.Conditions = conditions
 
-	delete(machine.Status.NodeAnnotations, podresources.RequestsAnnotation)
-	delete(machine.Status.NodeAnnotations, podresources.LimitsAnnotation)
+	annoMap := make(map[string]string, len(machine.Status.NodeAnnotations))
+	for key, val := range machine.Status.NodeAnnotations {
+		if key == podresources.LimitsAnnotation || key == podresources.RequestsAnnotation {
+			continue
+		}
+		annoMap[key] = val
+	}
+
+	machine.Status.NodeAnnotations = annoMap
 }
 
 func getResourceList(annotation string, node *corev1.Node) corev1.ResourceList {
@@ -758,9 +765,15 @@ func (m *nodesSyncer) convertNodeToMachine(node *corev1.Node, existing *v3.Node)
 	for name, quantity := range limits {
 		machine.Status.Limits[name] = quantity
 	}
-	machine.Status.NodeLabels = node.Labels
+	machine.Status.NodeLabels = make(map[string]string, len(node.Labels))
+	for k, v := range node.Labels {
+		machine.Status.NodeLabels[k] = v
+	}
 	determineNodeRoles(machine)
-	machine.Status.NodeAnnotations = node.Annotations
+	machine.Status.NodeAnnotations = make(map[string]string, len(node.Annotations))
+	for k, v := range node.Annotations {
+		machine.Status.NodeAnnotations[k] = v
+	}
 	machine.Status.NodeName = node.Name
 	machine.APIVersion = "management.cattle.io/v3"
 	machine.Kind = "Node"
