@@ -663,16 +663,16 @@ def get_schedulable_nodes(cluster, client=None, os_type=TEST_OS):
     nodes = client.list_node(clusterId=cluster.id).data
     schedulable_nodes = []
     for node in nodes:
-        if node.worker and (not node.unschedulable):
+        if not node.unschedulable:
+            for tkey, tval in node.taints.items():
+                if tval == "NoExecute" or tval == "NoSchedule":
+                    break
             for key, val in node.labels.items():
                 # Either one of the labels should be present on the node
                 if key == 'kubernetes.io/os' or key == 'beta.kubernetes.io/os':
                     if val == os_type:
                         schedulable_nodes.append(node)
                         break
-        # Including master in list of nodes as master is also schedulable
-        if ('k3s' in cluster.version["gitVersion"] or 'rke2' in cluster.version["gitVersion"]) and node.controlPlane:
-            schedulable_nodes.append(node)
     return schedulable_nodes
 
 
