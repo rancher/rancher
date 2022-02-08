@@ -6,6 +6,7 @@ import (
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
+	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2"
 	mgmtcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/rancher/wrangler/pkg/crd"
@@ -52,6 +53,13 @@ func getStatusSchema(allSchemas *schemas.Schemas) (*schemas.Schema, error) {
 func addConfigSchema(name string, specSchema *schemas.Schema, allSchemas *schemas.Schemas) (string, error) {
 	nodeConfigFields := removeKey(specSchema.ResourceFields, "common")
 	nodeConfigFields = removeKey(nodeConfigFields, "providerID")
+
+	// check if the infra provider supports Windows
+	// and add the OS field to an infra provider node's config
+	if rke2.WindowsCheck(name) {
+		nodeConfigFields = addField(specSchema.ResourceFields, name, "os")
+	}
+
 	id := name + "Config"
 	return id, allSchemas.AddSchema(schemas.Schema{
 		ID:             id,
@@ -157,6 +165,18 @@ func removeKey(fields map[string]schemas.Field, key string) map[string]schemas.F
 		}
 	}
 	return result
+}
+
+func addField(rFields map[string]schemas.Field, name, newField string) map[string]schemas.Field {
+	newf := rFields
+	if _, ok := newf[newField]; !ok {
+		newf[newField] = schemas.Field{
+			Type:   "string",
+			Create: true,
+			Update: true,
+		}
+	}
+	return newf
 }
 
 func getSpecSchemas(name string, allSchemas *schemas.Schemas, spec *v3.DynamicSchemaSpec) (*schemas.Schema, error) {

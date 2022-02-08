@@ -89,8 +89,12 @@ func (h *handler) getArgsEnvAndStatus(infraObj *infraObject, args map[string]int
 			"NO_PROXY":    []byte(os.Getenv("NO_PROXY")),
 		},
 	}
+	machine, err := rke2.GetMachineByOwner(h.machines, infraObj.meta)
+	if err != nil {
+		return driverArgs{}, err
+	}
 
-	bootstrapName, cloudCredentialSecretName, secrets, err := h.getSecretData(infraObj.meta, infraObj.data, create)
+	bootstrapName, cloudCredentialSecretName, secrets, err := h.getSecretData(machine, infraObj.data, create)
 	if err != nil {
 		return driverArgs{}, err
 	}
@@ -104,7 +108,6 @@ func (h *handler) getArgsEnvAndStatus(infraObj *infraObject, args map[string]int
 		k := strings.ToUpper(envName + "_" + regExHyphen.ReplaceAllString(k, "${1}_${2}"))
 		envSecret.Data[k] = []byte(v)
 	}
-
 	secretName := rke2.MachineStateSecretName(infraObj.meta.GetName())
 
 	cmd := []string{
@@ -180,26 +183,14 @@ func (h *handler) getBootstrapSecret(machine *capi.Machine) (string, error) {
 	return d.String("status", "dataSecretName"), nil
 }
 
-func (h *handler) getSecretData(meta metav1.Object, obj data.Object, create bool) (string, string, map[string]string, error) {
+func (h *handler) getSecretData(machine *capi.Machine, obj data.Object, create bool) (string, string, map[string]string, error) {
 	var (
-		err     error
-		machine *capi.Machine
-		result  = map[string]string{}
+		err    error
+		result = map[string]string{}
 	)
 
 	oldCredential := obj.String("status", "cloudCredentialSecretName")
 	cloudCredentialSecretName := obj.String("spec", "common", "cloudCredentialSecretName")
-
-	for _, ref := range meta.GetOwnerReferences() {
-		if ref.Kind != "Machine" {
-			continue
-		}
-
-		machine, err = h.machines.Get(meta.GetNamespace(), ref.Name)
-		if err != nil && !apierror.IsNotFound(err) {
-			return "", "", nil, err
-		}
-	}
 
 	if machine == nil && create {
 		return "", "", nil, generic.ErrSkip
@@ -209,8 +200,8 @@ func (h *handler) getSecretData(meta metav1.Object, obj data.Object, create bool
 		cloudCredentialSecretName = oldCredential
 	}
 
-	if cloudCredentialSecretName != "" {
-		secret, err := GetCloudCredentialSecret(h.secrets, meta.GetNamespace(), cloudCredentialSecretName)
+	if cloudCredentialSecretName != "" && machine != nil {
+		secret, err := GetCloudCredentialSecret(h.secrets, machine.GetNamespace(), cloudCredentialSecretName)
 		if err != nil {
 			return "", "", nil, err
 		}
