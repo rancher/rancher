@@ -203,7 +203,7 @@ func getProjectContainerDefaultLimit(ns *corev1.Namespace, projectLister v3.Proj
 		return nil, nil
 	}
 	project, err := projectLister.Get(projectNamespace, projectName)
-	if err != nil || project.Spec.ResourceQuota == nil {
+	if err != nil {
 		if errors.IsNotFound(err) {
 			// If Rancher is unaware of a project, we should ignore trying to get the default container limit
 			// A non-existent project is likely managed by another Rancher (e.g. Hosted Rancher)
