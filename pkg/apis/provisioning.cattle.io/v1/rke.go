@@ -26,6 +26,7 @@ type RKEMachinePool struct {
 	UnhealthyNodeTimeout         *metav1.Duration             `json:"unhealthyNodeTimeout,omitempty"`
 	MaxUnhealthy                 *intstr.IntOrString          `json:"maxUnhealthy,omitempty"`
 	UnhealthyRange               *string                      `json:"unhealthyRange,omitempty"`
+	MachineOS                    string                       `json:"machineOS,omitempty"`
 }
 
 type RKEMachinePoolRollingUpdate struct {
