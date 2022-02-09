@@ -225,8 +225,10 @@ func (r *RemoteService) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	if r.cluster.Spec.Internal && r.localAuth == "" {
-		req.Header.Del("Authorization")
+	if r.cluster.Spec.Internal {
+		if r.localAuth == "" {
+			req.Header.Del("Authorization")
+		}
 	} else {
 		userInfo, authed := request.UserFrom(req.Context())
 		if !authed {
