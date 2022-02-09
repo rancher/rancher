@@ -37,8 +37,8 @@ type GKEClusterConfigSpec struct {
 	IPAllocationPolicy             *GKEIPAllocationPolicy             `json:"ipAllocationPolicy,omitempty" yaml:"ipAllocationPolicy,omitempty"`
 	Imported                       bool                               `json:"imported,omitempty" yaml:"imported,omitempty"`
 	KubernetesVersion              *string                            `json:"kubernetesVersion,omitempty" yaml:"kubernetesVersion,omitempty"`
-	Labels                         *map[string]string                 `json:"labels,omitempty" yaml:"labels,omitempty"`
-	Locations                      *[]string                          `json:"locations,omitempty" yaml:"locations,omitempty"`
+	Labels                         map[string]string                  `json:"labels,omitempty" yaml:"labels,omitempty"`
+	Locations                      []string                           `json:"locations,omitempty" yaml:"locations,omitempty"`
 	LoggingService                 *string                            `json:"loggingService,omitempty" yaml:"loggingService,omitempty"`
 	MaintenanceWindow              *string                            `json:"maintenanceWindow,omitempty" yaml:"maintenanceWindow,omitempty"`
 	MasterAuthorizedNetworksConfig *GKEMasterAuthorizedNetworksConfig `json:"masterAuthorizedNetworks,omitempty" yaml:"masterAuthorizedNetworks,omitempty"`
