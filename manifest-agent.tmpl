@@ -17,14 +17,14 @@ manifests:
       os: windows
       version: 1809
   -
-    image: rancher/rancher-agent:{{#if build.tag}}{{build.tag}}{{else}}{{replace "release/" "" build.branch }}-{{build.commit}}{{/if}}-windows-1903
+    image: rancher/rancher-agent:{{#if build.tag}}{{build.tag}}{{else}}{{replace "release/" "" build.branch }}-{{build.commit}}{{/if}}-windows-2004
     platform:
       architecture: amd64
       os: windows
-      version: 1903
+      version: 2004
   -
-    image: rancher/rancher-agent:{{#if build.tag}}{{build.tag}}{{else}}{{replace "release/" "" build.branch }}-{{build.commit}}{{/if}}-windows-1909
+    image: rancher/rancher-agent:{{#if build.tag}}{{build.tag}}{{else}}{{replace "release/" "" build.branch }}-{{build.commit}}{{/if}}-windows-20H2
     platform:
       architecture: amd64
       os: windows
-      version: 1909
+      version: 20H2

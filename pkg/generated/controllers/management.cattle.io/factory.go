@@ -1,5 +1,5 @@
 /*
-Copyright 2020 Rancher Labs, Inc.
+Copyright 2021 Rancher Labs, Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -52,6 +52,14 @@ func NewFactoryFromConfigWithOptions(config *rest.Config, opts *FactoryOptions) 
 	return &Factory{
 		Factory: f,
 	}, err
+}
+
+func NewFactoryFromConfigWithOptionsOrDie(config *rest.Config, opts *FactoryOptions) *Factory {
+	f, err := NewFactoryFromConfigWithOptions(config, opts)
+	if err != nil {
+		panic(err)
+	}
+	return f
 }
 
 func (c *Factory) Management() Interface {

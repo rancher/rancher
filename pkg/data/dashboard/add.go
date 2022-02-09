@@ -3,9 +3,9 @@ package dashboard
 import (
 	"context"
 
-	managementdata "github.com/rancher/rancher/pkg/data/management"
+	"github.com/rancher/rancher/pkg/data/management"
+	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/wrangler"
-	apierror "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/client-go/kubernetes"
 )
 
@@ -14,16 +14,13 @@ func EarlyData(ctx context.Context, k8s kubernetes.Interface) error {
 }
 
 func Add(ctx context.Context, wrangler *wrangler.Context, addLocal, removeLocal, embedded bool) error {
-	adminName, err := managementdata.BootstrapAdmin(wrangler, true)
-	if apierror.IsNotFound(err) {
-		// ignore if users type doesn't exist
-		adminName = ""
-	} else if err != nil {
-		return err
+	if !features.MCMAgent.Enabled() {
+		if _, err := management.BootstrapAdmin(wrangler); err != nil {
+			return err
+		}
 	}
-
 	if addLocal {
-		if err := addLocalCluster(embedded, adminName, wrangler); err != nil {
+		if err := addLocalCluster(embedded, wrangler); err != nil {
 			return err
 		}
 	} else if removeLocal {
@@ -40,5 +37,9 @@ func Add(ctx context.Context, wrangler *wrangler.Context, addLocal, removeLocal,
 		return err
 	}
 
-	return nil
+	if err := AddFleetRoles(wrangler); err != nil {
+		return err
+	}
+
+	return addUnauthenticatedRoles(wrangler.Apply)
 }

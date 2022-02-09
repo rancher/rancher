@@ -17,13 +17,19 @@ else
     VERSION="${COMMIT}${DIRTY}"
 fi
 
+if [ -z "$DRONE_TAG" ] && [ -n "$DRONE_COMMIT" ] && [ -n "$DRONE_BRANCH" ]; then
+    APP_VERSION=${DRONE_BRANCH/release\//}-${DRONE_COMMIT}-head
+else
+    APP_VERSION=$VERSION
+fi
+
 # Chart tag.
 if [[ -z "${DIRTY}" && -n "${GIT_TAG}" ]]; then
     CHART_VERSION="${GIT_TAG}"
 elif [[ "$DIRTY" ]]; then
-    CHART_VERSION="${LAST_TAG}${DIRTY}.${COMMIT}"
+    CHART_VERSION="${LAST_TAG}${DIRTY}.commit-${COMMIT}"
 else
-    CHART_VERSION="${LAST_TAG}-${COMMIT_DATE}.${COMMIT}.${COMMIT_BRANCH}"
+    CHART_VERSION="${LAST_TAG}-${COMMIT_DATE}.commit-${COMMIT}.${COMMIT_BRANCH}"
 fi
 
 # Drop the v prefix for Chart Version to follow existing pattern.
@@ -68,6 +74,7 @@ echo "ARCH: $ARCH"
 echo "CHART_REPO: $CHART_REPO"
 echo "CHART_VERSION: $CHART_VERSION"
 echo "VERSION: $VERSION"
+echo "APP_VERSION: $APP_VERSION"
 echo "SUFFIX: $SUFFIX"
 echo "REPO: $REPO"
 echo "TAG: $TAG"

@@ -46,19 +46,34 @@ func (ph *podHandler) Sync(key string, pod *corev1.Pod) (runtime.Object, error) 
 	if moved {
 		return nil, nil
 	}
+	systemNamespaces, _, err := ph.npmgr.getSystemNSInfo(ph.clusterNamespace)
+	if err != nil {
+		return nil, fmt.Errorf("netpolMgr: podHandler: getSystemNamespaces: err=%v", err)
+	}
 	logrus.Debugf("podHandler: Sync: %+v", *pod)
-	if err := ph.addLabelIfHostPortsPresent(pod); err != nil {
+	if err := ph.addLabelIfHostPortsPresent(pod, systemNamespaces); err != nil {
 		return nil, err
 	}
-	return nil, ph.npmgr.hostPortsUpdateHandler(pod, ph.clusterNamespace)
+	return nil, ph.npmgr.hostPortsUpdateHandler(pod, systemNamespaces)
 }
 
 // k8s native network policy can select pods only using labels,
 // hence need to add a label which can be used to select this pod
 // which has hostPorts
-func (ph *podHandler) addLabelIfHostPortsPresent(pod *corev1.Pod) error {
+func (ph *podHandler) addLabelIfHostPortsPresent(pod *corev1.Pod, systemNamespaces map[string]bool) error {
 	if pod.Labels != nil {
-		if _, ok := pod.Labels[PodNameFieldLabel]; ok {
+		if _, ok := systemNamespaces[pod.Namespace]; ok {
+			if _, ok := pod.Labels[PodNameFieldLabel]; ok {
+				// we don't create network policies in system namespaces, delete label
+				logrus.Debugf("podHandler: addLabelIfHostPortsPresent: deleting podNameFieldLabel %+v in %s", pod.Labels, pod.Namespace)
+				podCopy := pod.DeepCopy()
+				delete(podCopy.Labels, PodNameFieldLabel)
+				_, err := ph.pods.Update(podCopy)
+				if err != nil {
+					return err
+				}
+			}
+			// don't add hostPort label for pods in system namespaces
 			return nil
 		}
 	}
@@ -87,11 +102,7 @@ Loop:
 	return nil
 }
 
-func (npmgr *netpolMgr) hostPortsUpdateHandler(pod *corev1.Pod, clusterNamespace string) error {
-	systemNamespaces, _, err := npmgr.getSystemNSInfo(clusterNamespace)
-	if err != nil {
-		return fmt.Errorf("netpolMgr: hostPortsUpdateHandler: getSystemNamespaces: err=%v", err)
-	}
+func (npmgr *netpolMgr) hostPortsUpdateHandler(pod *corev1.Pod, systemNamespaces map[string]bool) error {
 	policyName := getHostPortsPolicyName(pod)
 
 	if _, ok := systemNamespaces[pod.Namespace]; ok {
@@ -136,6 +147,9 @@ func generatePodNetworkPolicy(pod *corev1.Pod, policyName string) *knetworkingv1
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      policyName,
 			Namespace: pod.Namespace,
+			Labels: map[string]string{
+				creatorLabel: creatorNorman,
+			},
 			OwnerReferences: []metav1.OwnerReference{
 				{
 					APIVersion: "v1",

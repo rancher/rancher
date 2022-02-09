@@ -32,6 +32,19 @@ func Params() map[string]interface{} {
 		"requestedHostname": os.Getenv("CATTLE_NODE_NAME"),
 	}
 
+	dclient, err := client.NewClientWithOpts(client.WithAPIVersionNegotiation(), client.FromEnv)
+	if err != nil {
+		logrus.Errorf("Error getting docker client: %v", err)
+	} else {
+		defer dclient.Close()
+		info, err := dclient.Info(context.Background())
+		if err != nil {
+			logrus.Errorf("Error getting docker info: %v", err)
+		} else {
+			params["dockerInfo"] = info
+		}
+	}
+
 	for k, v := range params {
 		if m, ok := v.(map[string]string); ok {
 			for k, v := range m {
@@ -39,15 +52,6 @@ func Params() map[string]interface{} {
 			}
 		} else {
 			logrus.Infof("Option %s=%v", k, v)
-		}
-	}
-
-	dclient, err := client.NewEnvClient()
-	if err == nil {
-		defer dclient.Close()
-		info, err := dclient.Info(context.Background())
-		if err == nil {
-			params["dockerInfo"] = info
 		}
 	}
 

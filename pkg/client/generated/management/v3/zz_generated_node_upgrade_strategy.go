@@ -9,7 +9,7 @@ const (
 )
 
 type NodeUpgradeStrategy struct {
-	Drain                      bool            `json:"drain,omitempty" yaml:"drain,omitempty"`
+	Drain                      *bool           `json:"drain,omitempty" yaml:"drain,omitempty"`
 	DrainInput                 *NodeDrainInput `json:"nodeDrainInput,omitempty" yaml:"nodeDrainInput,omitempty"`
 	MaxUnavailableControlplane string          `json:"maxUnavailableControlplane,omitempty" yaml:"maxUnavailableControlplane,omitempty"`
 	MaxUnavailableWorker       string          `json:"maxUnavailableWorker,omitempty" yaml:"maxUnavailableWorker,omitempty"`

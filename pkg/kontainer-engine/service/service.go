@@ -62,15 +62,13 @@ func (c controllerConfigGetter) GetConfig() (types.DriverOptions, error) {
 		IntOptions:         make(map[string]int64),
 		StringSliceOptions: make(map[string]*types.StringSlice),
 	}
-	data := map[string]interface{}{}
 	switch c.driverName {
 	case ImportDriverName:
 		config, err := toMap(c.clusterSpec.ImportedConfig, "json")
 		if err != nil {
 			return driverOptions, err
 		}
-		data = config
-		flatten(data, &driverOptions)
+		flatten(config, &driverOptions)
 	case RancherKubernetesEngineDriverName:
 		config, err := yaml.Marshal(c.clusterSpec.RancherKubernetesEngineConfig)
 		if err != nil {
@@ -82,10 +80,8 @@ func (c controllerConfigGetter) GetConfig() (types.DriverOptions, error) {
 		if err != nil {
 			return driverOptions, err
 		}
-		data = config
-		flatten(data, &driverOptions)
+		flatten(config, &driverOptions)
 	}
-
 	driverOptions.StringOptions["name"] = c.clusterName
 	displayName := c.clusterSpec.DisplayName
 	if displayName == "" {

@@ -8,6 +8,7 @@ import (
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/rancher/pkg/types/config"
+	"github.com/rancher/rancher/pkg/types/config/systemtokens"
 	"github.com/rancher/rancher/pkg/user"
 	"github.com/rancher/wrangler/pkg/randomtoken"
 	errors2 "k8s.io/apimachinery/pkg/api/errors"
@@ -23,36 +24,41 @@ const (
 
 func NewManager(management *config.ManagementContext) *Manager {
 	return &Manager{
-		userManager: management.UserManager,
-		crtbs:       management.Management.ClusterRoleTemplateBindings(""),
-		crts:        management.Management.ClusterRegistrationTokens(""),
-		prtbs:       management.Management.ProjectRoleTemplateBindings(""),
-		prtbLister:  management.Management.ProjectRoleTemplateBindings("").Controller().Lister(),
-		tokens:      management.Management.Tokens(""),
-		users:       management.Management.Users(""),
+		userManager:  management.UserManager,
+		systemTokens: management.SystemTokens,
+		crtbs:        management.Management.ClusterRoleTemplateBindings(""),
+		crts:         management.Management.ClusterRegistrationTokens(""),
+		prtbs:        management.Management.ProjectRoleTemplateBindings(""),
+		prtbLister:   management.Management.ProjectRoleTemplateBindings("").Controller().Lister(),
+		tokens:       management.Management.Tokens(""),
+		users:        management.Management.Users(""),
 	}
 }
 
 func NewManagerFromScale(management *config.ScaledContext) *Manager {
 	return &Manager{
-		userManager: management.UserManager,
-		crtbs:       management.Management.ClusterRoleTemplateBindings(""),
-		crts:        management.Management.ClusterRegistrationTokens(""),
-		prtbs:       management.Management.ProjectRoleTemplateBindings(""),
-		prtbLister:  management.Management.ProjectRoleTemplateBindings("").Controller().Lister(),
-		tokens:      management.Management.Tokens(""),
-		users:       management.Management.Users(""),
+		userManager:  management.UserManager,
+		systemTokens: management.SystemTokens,
+		crtbs:        management.Management.ClusterRoleTemplateBindings(""),
+		crts:         management.Management.ClusterRegistrationTokens(""),
+		prtbs:        management.Management.ProjectRoleTemplateBindings(""),
+		prtbLister:   management.Management.ProjectRoleTemplateBindings("").Controller().Lister(),
+		tokens:       management.Management.Tokens(""),
+		tokenLister:  management.Management.Tokens("").Controller().Lister(),
+		users:        management.Management.Users(""),
 	}
 }
 
 type Manager struct {
-	userManager user.Manager
-	crtbs       v3.ClusterRoleTemplateBindingInterface
-	crts        v3.ClusterRegistrationTokenInterface
-	prtbs       v3.ProjectRoleTemplateBindingInterface
-	prtbLister  v3.ProjectRoleTemplateBindingLister
-	tokens      v3.TokenInterface
-	users       v3.UserInterface
+	userManager  user.Manager
+	systemTokens systemtokens.Interface
+	crtbs        v3.ClusterRoleTemplateBindingInterface
+	crts         v3.ClusterRegistrationTokenInterface
+	prtbs        v3.ProjectRoleTemplateBindingInterface
+	prtbLister   v3.ProjectRoleTemplateBindingLister
+	tokens       v3.TokenInterface
+	tokenLister  v3.TokenLister
+	users        v3.UserInterface
 }
 
 func (s *Manager) CreateSystemAccount(cluster *v3.Cluster) error {
@@ -153,12 +159,28 @@ func (s *Manager) GetProjectSystemUser(projectName string) (*v3.User, error) {
 	return s.userManager.EnsureUser(fmt.Sprintf("system://%s", projectName), ProjectSystemAccountPrefix+projectName)
 }
 
-func (s *Manager) GetOrCreateProjectSystemToken(projectName string) (string, error) {
+func (s *Manager) GetProjectPipelineSystemToken(projectName string) (*v3.Token, error) {
+	return s.tokenLister.Get("", projectName+"-pipeline")
+}
+
+// CreateProjectPipelineSystemToken will create a new pipeline token for the given project
+// if one does not exist. If a token already exists, it's value will be overwritten with a
+// new token.
+func (s *Manager) CreateProjectPipelineSystemToken(projectName string) (string, error) {
 	user, err := s.GetProjectSystemUser(projectName)
 	if err != nil {
 		return "", err
 	}
-	return s.userManager.EnsureToken(projectName+"-pipeline", "Pipeline token for project "+projectName, "pipeline", user.Name)
+	var ttl int64
+	return s.systemTokens.EnsureSystemToken(projectName+"-pipeline", "Pipeline token for project "+projectName, "pipeline", user.Name, &ttl, false)
+}
+
+func (s *Manager) CreateProjectHelmSystemToken(projectName string) (string, error) {
+	user, err := s.GetProjectSystemUser(projectName)
+	if err != nil {
+		return "", err
+	}
+	return s.systemTokens.EnsureSystemToken(projectName+"-helm", "Helm token for project "+projectName, "helm", user.Name, nil, true)
 }
 
 func (s *Manager) RemoveSystemAccount(userID string) error {

@@ -30,10 +30,10 @@ type ConfigAttributes struct {
 }
 
 func Connect(config *v3.LdapConfig, caPool *x509.CertPool) (*ldapv2.Conn, error) {
-	return NewLDAPConn(config.Servers, config.TLS, config.Port, config.ConnectionTimeout, caPool)
+	return NewLDAPConn(config.Servers, config.TLS, config.StartTLS, config.Port, config.ConnectionTimeout, caPool)
 }
 
-func NewLDAPConn(servers []string, TLS bool, port int64, connectionTimeout int64, caPool *x509.CertPool) (*ldapv2.Conn, error) {
+func NewLDAPConn(servers []string, TLS, startTLS bool, port int64, connectionTimeout int64, caPool *x509.CertPool) (*ldapv2.Conn, error) {
 	logrus.Debug("Now creating Ldap connection")
 	var lConn *ldapv2.Conn
 	var err error
@@ -44,11 +44,19 @@ func NewLDAPConn(servers []string, TLS bool, port int64, connectionTimeout int64
 		return nil, errors.New("invalid server config. only exactly 1 server is currently supported")
 	}
 	server := servers[0]
+	tlsConfig = &tls.Config{RootCAs: caPool, InsecureSkipVerify: false, ServerName: server}
 	if TLS {
-		tlsConfig = &tls.Config{RootCAs: caPool, InsecureSkipVerify: false, ServerName: server}
 		lConn, err = ldapv2.DialTLS("tcp", fmt.Sprintf("%s:%d", server, port), tlsConfig)
 		if err != nil {
 			return nil, fmt.Errorf("Error creating ssl connection: %v", err)
+		}
+	} else if startTLS {
+		lConn, err = ldapv2.Dial("tcp", fmt.Sprintf("%s:%d", server, port))
+		if err != nil {
+			return nil, fmt.Errorf("Error creating connection for startTLS: %v", err)
+		}
+		if err := lConn.StartTLS(tlsConfig); err != nil {
+			return nil, fmt.Errorf("Error upgrading startTLS connection: %v", err)
 		}
 	} else {
 		lConn, err = ldapv2.Dial("tcp", fmt.Sprintf("%s:%d", server, port))
@@ -99,7 +107,7 @@ func HasPermission(attributes []*ldapv2.EntryAttribute, userObjectClass string, 
 
 func IsType(search []*ldapv2.EntryAttribute, varType string) bool {
 	for _, attrib := range search {
-		if attrib.Name == "objectClass" {
+		if strings.EqualFold(attrib.Name, "objectClass") {
 			for _, val := range attrib.Values {
 				if strings.EqualFold(val, varType) {
 					logrus.Debugf("ldap IsType found object of type %s", varType)
@@ -131,13 +139,13 @@ func GetUserSearchAttributes(memberOfAttribute, ObjectClass string, config *v32.
 	return userSearchAttributes
 }
 
-func GetGroupSearchAttributes(memberOfAttribute, ObjectClass string, config *v32.ActiveDirectoryConfig) []string {
-	groupSeachAttributes := []string{memberOfAttribute,
-		ObjectClass,
+func GetGroupSearchAttributes(config *v32.ActiveDirectoryConfig, searchAttributes ...string) []string {
+	groupSeachAttributes := []string{
 		config.GroupObjectClass,
 		config.UserLoginAttribute,
 		config.GroupNameAttribute,
 		config.GroupSearchAttribute}
+	groupSeachAttributes = append(groupSeachAttributes, searchAttributes...)
 	return groupSeachAttributes
 }
 

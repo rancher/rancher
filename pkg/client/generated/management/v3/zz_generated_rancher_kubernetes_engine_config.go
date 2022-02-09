@@ -11,6 +11,7 @@ const (
 	RancherKubernetesEngineConfigFieldCloudProvider       = "cloudProvider"
 	RancherKubernetesEngineConfigFieldClusterName         = "clusterName"
 	RancherKubernetesEngineConfigFieldDNS                 = "dns"
+	RancherKubernetesEngineConfigFieldEnableCRIDockerd    = "enableCriDockerd"
 	RancherKubernetesEngineConfigFieldIgnoreDockerVersion = "ignoreDockerVersion"
 	RancherKubernetesEngineConfigFieldIngress             = "ingress"
 	RancherKubernetesEngineConfigFieldMonitoring          = "monitoring"
@@ -20,6 +21,7 @@ const (
 	RancherKubernetesEngineConfigFieldPrivateRegistries   = "privateRegistries"
 	RancherKubernetesEngineConfigFieldRestore             = "restore"
 	RancherKubernetesEngineConfigFieldRotateCertificates  = "rotateCertificates"
+	RancherKubernetesEngineConfigFieldRotateEncryptionKey = "rotateEncryptionKey"
 	RancherKubernetesEngineConfigFieldSSHAgentAuth        = "sshAgentAuth"
 	RancherKubernetesEngineConfigFieldSSHCertPath         = "sshCertPath"
 	RancherKubernetesEngineConfigFieldSSHKeyPath          = "sshKeyPath"
@@ -39,6 +41,7 @@ type RancherKubernetesEngineConfig struct {
 	CloudProvider       *CloudProvider       `json:"cloudProvider,omitempty" yaml:"cloudProvider,omitempty"`
 	ClusterName         string               `json:"clusterName,omitempty" yaml:"clusterName,omitempty"`
 	DNS                 *DNSConfig           `json:"dns,omitempty" yaml:"dns,omitempty"`
+	EnableCRIDockerd    *bool                `json:"enableCriDockerd,omitempty" yaml:"enableCriDockerd,omitempty"`
 	IgnoreDockerVersion *bool                `json:"ignoreDockerVersion,omitempty" yaml:"ignoreDockerVersion,omitempty"`
 	Ingress             *IngressConfig       `json:"ingress,omitempty" yaml:"ingress,omitempty"`
 	Monitoring          *MonitoringConfig    `json:"monitoring,omitempty" yaml:"monitoring,omitempty"`
@@ -48,6 +51,7 @@ type RancherKubernetesEngineConfig struct {
 	PrivateRegistries   []PrivateRegistry    `json:"privateRegistries,omitempty" yaml:"privateRegistries,omitempty"`
 	Restore             *RestoreConfig       `json:"restore,omitempty" yaml:"restore,omitempty"`
 	RotateCertificates  *RotateCertificates  `json:"rotateCertificates,omitempty" yaml:"rotateCertificates,omitempty"`
+	RotateEncryptionKey bool                 `json:"rotateEncryptionKey,omitempty" yaml:"rotateEncryptionKey,omitempty"`
 	SSHAgentAuth        bool                 `json:"sshAgentAuth,omitempty" yaml:"sshAgentAuth,omitempty"`
 	SSHCertPath         string               `json:"sshCertPath,omitempty" yaml:"sshCertPath,omitempty"`
 	SSHKeyPath          string               `json:"sshKeyPath,omitempty" yaml:"sshKeyPath,omitempty"`

@@ -9,15 +9,15 @@ import (
 
 	"github.com/pkg/errors"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	"github.com/rancher/rancher/pkg/controllers/management/compose/common"
 	kd "github.com/rancher/rancher/pkg/controllers/management/kontainerdrivermetadata"
+	"github.com/rancher/rancher/pkg/controllers/managementlegacy/compose/common"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/librke"
 	nodehelper "github.com/rancher/rancher/pkg/node"
 	"github.com/rancher/rancher/pkg/systemaccount"
 	"github.com/rancher/rancher/pkg/types/config"
-	"github.com/rancher/rancher/pkg/user"
+	"github.com/rancher/rancher/pkg/types/config/systemtokens"
 	rketypes "github.com/rancher/rke/types"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
@@ -56,7 +56,7 @@ type nodesSyncer struct {
 }
 
 type nodeDrain struct {
-	userManager          user.Manager
+	systemTokens         systemtokens.Interface
 	tokenClient          v3.TokenInterface
 	userClient           v3.UserInterface
 	kubeConfigGetter     common.KubeConfigGetter
@@ -93,7 +93,7 @@ func Register(ctx context.Context, cluster *config.UserContext, kubeConfigGetter
 	}
 
 	d := &nodeDrain{
-		userManager:          cluster.Management.UserManager,
+		systemTokens:         cluster.Management.SystemTokens,
 		tokenClient:          cluster.Management.Management.Tokens(""),
 		userClient:           cluster.Management.Management.Users(""),
 		kubeConfigGetter:     kubeConfigGetter,
@@ -715,24 +715,9 @@ func (m *nodesSyncer) convertNodeToMachine(node *corev1.Node, existing *v3.Node,
 	for name, quantity := range limits {
 		machine.Status.Limits[name] = quantity
 	}
-
-	if node.Labels != nil {
-		_, etcd := node.Labels["node-role.kubernetes.io/etcd"]
-		machine.Spec.Etcd = etcd
-		_, control := node.Labels["node-role.kubernetes.io/controlplane"]
-		_, master := node.Labels["node-role.kubernetes.io/master"]
-		if control || master {
-			machine.Spec.ControlPlane = true
-		}
-		_, worker := node.Labels["node-role.kubernetes.io/worker"]
-		machine.Spec.Worker = worker
-		if !machine.Spec.Worker && !machine.Spec.ControlPlane && !machine.Spec.Etcd {
-			machine.Spec.Worker = true
-		}
-	}
-
-	machine.Status.NodeAnnotations = node.Annotations
 	machine.Status.NodeLabels = node.Labels
+	determineNodeRoles(machine)
+	machine.Status.NodeAnnotations = node.Annotations
 	machine.Status.NodeName = node.Name
 	machine.APIVersion = "management.cattle.io/v3"
 	machine.Kind = "Node"
@@ -850,4 +835,19 @@ func (m *nodesSyncer) isClusterRestoring() (bool, error) {
 		return true, nil
 	}
 	return false, nil
+}
+
+func determineNodeRoles(machine *v3.Node) {
+	if machine.Status.NodeLabels != nil {
+		_, etcd := machine.Status.NodeLabels["node-role.kubernetes.io/etcd"]
+		_, control := machine.Status.NodeLabels["node-role.kubernetes.io/controlplane"]
+		_, master := machine.Status.NodeLabels["node-role.kubernetes.io/master"]
+		_, worker := machine.Status.NodeLabels["node-role.kubernetes.io/worker"]
+		machine.Spec.Etcd = etcd
+		machine.Spec.Worker = worker
+		machine.Spec.ControlPlane = control || master
+		if !machine.Spec.Worker && !machine.Spec.ControlPlane && !machine.Spec.Etcd {
+			machine.Spec.Worker = true
+		}
+	}
 }

@@ -17,11 +17,7 @@ func Register(settingController managementcontrollers.SettingController) error {
 		settingCache: settingController.Cache(),
 	}
 
-	if err := settings.SetProvider(sp); err != nil {
-		return err
-	}
-
-	return nil
+	return settings.SetProvider(sp)
 }
 
 type settingsProvider struct {
@@ -84,7 +80,7 @@ func (s *settingsProvider) SetAll(settingsMap map[string]settings.Setting) error
 
 	for name, setting := range settingsMap {
 		key := settings.GetEnvKey(name)
-		value := os.Getenv(key)
+		envValue := os.Getenv(key)
 
 		obj, err := s.settings.Get(setting.Name, metav1.GetOptions{})
 		if errors.IsNotFound(err) {
@@ -94,8 +90,9 @@ func (s *settingsProvider) SetAll(settingsMap map[string]settings.Setting) error
 				},
 				Default: setting.Default,
 			}
-			if value != "" {
-				newSetting.Value = value
+			if envValue != "" {
+				newSetting.Source = "env"
+				newSetting.Value = envValue
 			}
 			if newSetting.Value == "" {
 				fallback[newSetting.Name] = newSetting.Default
@@ -103,7 +100,9 @@ func (s *settingsProvider) SetAll(settingsMap map[string]settings.Setting) error
 				fallback[newSetting.Name] = newSetting.Value
 			}
 			_, err := s.settings.Create(newSetting)
-			if err != nil {
+			// Rancher will race in an HA setup to try and create the settings
+			// so if it exists just move on.
+			if err != nil && !errors.IsAlreadyExists(err) {
 				return err
 			}
 		} else if err != nil {
@@ -114,8 +113,12 @@ func (s *settingsProvider) SetAll(settingsMap map[string]settings.Setting) error
 				obj.Default = setting.Default
 				update = true
 			}
-			if value != "" && obj.Value != value {
-				obj.Value = value
+			if envValue != "" && obj.Source != "env" {
+				obj.Source = "env"
+				update = true
+			}
+			if envValue != "" && obj.Value != envValue {
+				obj.Value = envValue
 				update = true
 			}
 			if obj.Value == "" {

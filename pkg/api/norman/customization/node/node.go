@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 
@@ -40,7 +41,9 @@ func Formatter(apiContext *types.APIContext, resource *types.RawResource) {
 	}
 
 	// add nodeConfig link
+	canUpdateNode := false
 	if err := apiContext.AccessControl.CanDo(v3.NodeGroupVersionKind.Group, v3.NodeResource.Name, "update", apiContext, resource.Values, apiContext.Schema); err == nil {
+		canUpdateNode = true
 		resource.Links["nodeConfig"] = apiContext.URLBuilder.Link("nodeConfig", resource)
 	}
 
@@ -49,6 +52,8 @@ func Formatter(apiContext *types.APIContext, resource *types.RawResource) {
 	customConfig := resource.Values["customConfig"]
 	if nodeTemplateID == nil {
 		delete(resource.Links, "nodeConfig")
+	} else if canUpdateNode {
+		resource.AddAction(apiContext, "scaledown")
 	}
 
 	if nodeTemplateID == nil && customConfig == nil {
@@ -99,7 +104,24 @@ func (a ActionWrapper) ActionHandler(actionName string, action *types.Action, ap
 		return drainNode(actionName, apiContext, false)
 	case "stopDrain":
 		return drainNode(actionName, apiContext, true)
+	case "scaledown":
+		return scaledownNode(actionName, apiContext)
 	}
+	return nil
+}
+
+func scaledownNode(actionName string, apiContext *types.APIContext) error {
+	node, schema, err := getNodeAndSchema(apiContext)
+	if err != nil {
+		return err
+	}
+
+	values.PutValue(node, time.Now().Format(time.RFC3339), "scaledownTime")
+	err = updateNode(apiContext, node, schema, actionName)
+	if err != nil {
+		return err
+	}
+	apiContext.WriteResponse(http.StatusOK, map[string]interface{}{})
 	return nil
 }
 
@@ -127,7 +149,7 @@ func drainNode(actionName string, apiContext *types.APIContext, stop bool) error
 		return err
 	}
 	if !stop {
-		drainInput, err := validate(apiContext)
+		drainInput, err := validateDrainInput(apiContext)
 		if err != nil {
 			return err
 		}
@@ -146,7 +168,7 @@ func drainNode(actionName string, apiContext *types.APIContext, stop bool) error
 	return nil
 }
 
-func validate(apiContext *types.APIContext) (*v32.NodeDrainInput, error) {
+func validateDrainInput(apiContext *types.APIContext) (*v32.NodeDrainInput, error) {
 	input, err := handler.ParseAndValidateActionBody(apiContext, apiContext.Schemas.Schema(&managementschema.Version,
 		client.NodeDrainInputType))
 	if err != nil {
@@ -256,7 +278,7 @@ func (h Handler) LinkHandler(apiContext *types.APIContext, next types.RequestHan
 
 func updateNode(apiContext *types.APIContext, node map[string]interface{}, schema *types.Schema, actionName string) error {
 	if _, err := schema.Store.Update(apiContext, schema, node, apiContext.ID); err != nil {
-		return httperror.NewAPIError(httperror.ServerError, fmt.Sprintf("Error updating node %s by %s : %s", apiContext.ID, actionName, err.Error()))
+		return err
 	}
 	return nil
 }

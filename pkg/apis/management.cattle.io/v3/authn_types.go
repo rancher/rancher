@@ -269,6 +269,7 @@ type ActiveDirectoryConfig struct {
 	Servers                      []string `json:"servers,omitempty"                     norman:"type=array[string],required"`
 	Port                         int64    `json:"port,omitempty"                        norman:"default=389"`
 	TLS                          bool     `json:"tls,omitempty"                         norman:"default=false"`
+	StartTLS                     bool     `json:"starttls,omitempty"                    norman:"default=false"`
 	Certificate                  string   `json:"certificate,omitempty"`
 	DefaultLoginDomain           string   `json:"defaultLoginDomain,omitempty"`
 	ServiceAccountUsername       string   `json:"serviceAccountUsername,omitempty"      norman:"required"`
@@ -304,6 +305,7 @@ type LdapFields struct {
 	Servers                         []string `json:"servers,omitempty"                         norman:"type=array[string],notnullable,required"`
 	Port                            int64    `json:"port,omitempty"                            norman:"default=389,notnullable,required"`
 	TLS                             bool     `json:"tls,omitempty"                             norman:"default=false,notnullable,required"`
+	StartTLS                        bool     `json:"starttls,omitempty"                        norman:"default=false"`
 	Certificate                     string   `json:"certificate,omitempty"`
 	ServiceAccountDistinguishedName string   `json:"serviceAccountDistinguishedName,omitempty" norman:"required"`
 	ServiceAccountPassword          string   `json:"serviceAccountPassword,omitempty"          norman:"type=password,required"`
@@ -370,6 +372,7 @@ type SamlConfig struct {
 	UserNameField      string `json:"userNameField"      norman:"required"`
 	UIDField           string `json:"uidField"           norman:"required"`
 	RancherAPIHost     string `json:"rancherApiHost"     norman:"required"`
+	EntityID           string `json:"entityID"`
 }
 
 type SamlConfigTestInput struct {
@@ -403,4 +406,34 @@ type ShibbolethConfig struct {
 
 type AuthSystemImages struct {
 	KubeAPIAuth string `json:"kubeAPIAuth,omitempty"`
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+type OIDCConfig struct {
+	AuthConfig `json:",inline" mapstructure:",squash"`
+
+	ClientID           string `json:"clientId" norman:"required"`
+	ClientSecret       string `json:"clientSecret,omitempty" norman:"required,type=password"`
+	Scopes             string `json:"scope", norman:"required,notnullable"`
+	AuthEndpoint       string `json:"authEndpoint,omitempty" norman:"required,notnullable"`
+	Issuer             string `json:"issuer" norman:"required,notnullable"`
+	Certificate        string `json:"certificate,omitempty"`
+	PrivateKey         string `json:"privateKey" norman:"type=password"`
+	RancherURL         string `json:"rancherUrl" norman:"required,notnullable"`
+	GroupSearchEnabled *bool  `json:"groupSearchEnabled"`
+}
+
+type OIDCTestOutput struct {
+	RedirectURL string `json:"redirectUrl"`
+}
+
+type OIDCApplyInput struct {
+	OIDCConfig OIDCConfig `json:"oidcConfig,omitempty"`
+	Code       string     `json:"code,omitempty"`
+	Enabled    bool       `json:"enabled,omitempty"`
+}
+
+type KeyCloakOIDCConfig struct {
+	OIDCConfig `json:",inline" mapstructure:",squash"`
 }

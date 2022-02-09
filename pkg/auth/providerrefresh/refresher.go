@@ -199,7 +199,7 @@ func (r *refresher) refreshAttributes(attribs *v3.UserAttribute) (*v3.UserAttrib
 				break
 			}
 		}
-		newGroupPrincipals := []v3.Principal{}
+		var newGroupPrincipals []v3.Principal
 
 		// If there is no principalID for the provider, there is no reason to go through the refetch process
 		if principalID != "" {

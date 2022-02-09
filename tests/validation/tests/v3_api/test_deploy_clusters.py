@@ -6,11 +6,6 @@ from .test_gke_cluster import get_gke_config, \
 from .test_rke_cluster_provisioning import create_and_validate_custom_host
 from .test_import_cluster import create_and_validate_import_cluster
 
-KDM_BRANCH = os.environ.get('RANCHER_KDM_BRANCH', "")
-KDM_URL = os.environ.get(
-    "RANCHER_KDM_URL",
-    "https://github.com/rancher/kontainer-driver-metadata.git")
-
 env_details = "env.RANCHER_CLUSTER_NAMES='"
 cluster_details = {"rke": {}, "rke_import": {},
                    "eks": {}, "aks": {}, "gke": {}}
@@ -176,29 +171,8 @@ def test_deploy_aks():
 
 @pytest.fixture(scope='module', autouse="True")
 def set_data(request):
-    print("In set_data function")
-    if KDM_BRANCH != "":
-        print("Updating KDM to use {}/tree/{}".format(KDM_URL, KDM_BRANCH))
-        header = {'Authorization': 'Bearer ' + ADMIN_TOKEN}
-        kdm_url = CATTLE_API_URL + "/settings/rke-metadata-config"
-        kdm_json = {
-            "name": "rke-metadata-config",
-            "value": json.dumps({
-                "branch": KDM_BRANCH,
-                "refresh-interval-minutes": "1440",
-                "url": KDM_URL
-            })
-        }
-        r = requests.put(kdm_url, verify=False, headers=header, json=kdm_json)
-        r_content = json.loads(r.content)
-        assert r.ok
-        assert r_content['name'] == kdm_json['name']
-        assert r_content['value'] == kdm_json['value']
-
-        # Refresh Kubernetes Metadata
-        kdm_refresh_url = CATTLE_API_URL + "/kontainerdrivers?action=refresh"
-        response = requests.post(kdm_refresh_url, verify=False, headers=header)
-        assert response.ok
+    if UPDATE_KDM is True:
+        update_and_validate_kdm(KDM_URL)
 
     def fin():
         global env_details

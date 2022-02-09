@@ -6,7 +6,10 @@ import (
 	"net"
 	"net/http"
 	"sync"
+	"time"
 
+	"github.com/rancher/norman/types"
+	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/wrangler"
 	"k8s.io/client-go/kubernetes"
 )
@@ -24,6 +27,35 @@ func NewDeferredServer(wrangler *wrangler.Context, opts *Options) *DeferredServe
 		wrangler: wrangler,
 		opts:     opts,
 	}
+}
+
+func (s *DeferredServer) Wait(ctx context.Context) {
+	if !features.MCM.Enabled() {
+		return
+	}
+	for {
+		s.Lock()
+		if s.mcm == nil {
+			s.Unlock()
+			select {
+			case <-time.After(500 * time.Millisecond):
+				continue
+			case <-ctx.Done():
+				return
+			}
+		}
+		s.Unlock()
+		s.mcm.Wait(ctx)
+		break
+	}
+}
+
+func (s *DeferredServer) NormanSchemas() *types.Schemas {
+	mcm := s.getMCM()
+	if mcm == nil {
+		return nil
+	}
+	return mcm.NormanSchemas()
 }
 
 func (s *DeferredServer) Start(ctx context.Context) error {
@@ -47,6 +79,10 @@ func (s *DeferredServer) Start(ctx context.Context) error {
 
 		return mcm.Start(ctx)
 	})
+	if mcm != nil {
+		// always start, even on error
+		mcm.started(ctx)
+	}
 	if err != nil {
 		return err
 	}

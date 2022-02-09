@@ -1,6 +1,7 @@
 package cluster
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -8,10 +9,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-
-	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-
-	rketypes "github.com/rancher/rke/types"
 
 	"github.com/blang/semver"
 	"github.com/pkg/errors"
@@ -26,13 +23,14 @@ import (
 	"github.com/rancher/norman/types/values"
 	ccluster "github.com/rancher/rancher/pkg/api/norman/customization/cluster"
 	"github.com/rancher/rancher/pkg/api/norman/customization/clustertemplate"
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	managementv3 "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	"github.com/rancher/rancher/pkg/clustermanager"
-	"github.com/rancher/rancher/pkg/controllers/management/cis"
 	"github.com/rancher/rancher/pkg/controllers/management/clusterprovisioner"
 	"github.com/rancher/rancher/pkg/controllers/management/clusterstatus"
 	"github.com/rancher/rancher/pkg/controllers/management/etcdbackup"
 	"github.com/rancher/rancher/pkg/controllers/management/rkeworkerupgrader"
+	"github.com/rancher/rancher/pkg/controllers/managementlegacy/cis"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/namespace"
 	nodehelper "github.com/rancher/rancher/pkg/node"
@@ -40,11 +38,15 @@ import (
 	managementschema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/types/config"
+	"github.com/rancher/rancher/pkg/types/config/dialer"
 	rkedefaults "github.com/rancher/rke/cluster"
 	rkeservices "github.com/rancher/rke/services"
+	rketypes "github.com/rancher/rke/types"
 	"github.com/sirupsen/logrus"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/client-go/dynamic"
 )
 
 const (
@@ -62,6 +64,8 @@ type Store struct {
 	ClusterTemplateRevisionLister v3.ClusterTemplateRevisionLister
 	NodeLister                    v3.NodeLister
 	ClusterLister                 v3.ClusterLister
+	DialerFactory                 dialer.Factory
+	ClusterClient                 dynamic.ResourceInterface
 }
 
 type transformer struct {
@@ -133,7 +137,16 @@ func GetClusterStore(schema *types.Schema, mgmt *config.ScaledContext, clusterMa
 		ClusterTemplateRevisionLister: mgmt.Management.ClusterTemplateRevisions("").Controller().Lister(),
 		ClusterLister:                 mgmt.Management.Clusters("").Controller().Lister(),
 		NodeLister:                    mgmt.Management.Nodes("").Controller().Lister(),
+		DialerFactory:                 mgmt.Dialer,
 	}
+
+	dynamicClient, err := dynamic.NewForConfig(&mgmt.RESTConfig)
+	if err != nil {
+		logrus.Warnf("GetClusterStore error creating K8s dynamic client: %v", err)
+	} else {
+		s.ClusterClient = dynamicClient.Resource(v3.ClusterGroupVersionResource)
+	}
+
 	schema.Store = s
 	return s
 }
@@ -234,7 +247,7 @@ func (r *Store) Create(apiContext *types.APIContext, schema *types.Schema, data 
 	if err = setInitialConditions(data); err != nil {
 		return nil, err
 	}
-	if err := validateS3Credentials(data); err != nil {
+	if err := validateS3Credentials(data, nil); err != nil {
 		return nil, err
 	}
 
@@ -324,6 +337,12 @@ func loadDataFromTemplate(clusterTemplateRevision *v3.ClusterTemplateRevision, c
 	labels, ok := data[managementv3.MetadataUpdateFieldLabels]
 	if ok {
 		dataFromTemplate[managementv3.MetadataUpdateFieldLabels] = convert.ToMapInterface(labels)
+	}
+
+	// make sure fleetworkspace is copied over
+	fleetworkspace, ok := data[managementv3.ClusterFieldFleetWorkspaceName]
+	if ok {
+		dataFromTemplate[managementv3.ClusterFieldFleetWorkspaceName] = fleetworkspace
 	}
 
 	//validate that the data loaded is valid clusterSpec
@@ -524,13 +543,34 @@ func (r *Store) Update(apiContext *types.APIContext, schema *types.Schema, data 
 	setPrivateRegistryPasswordIfNotExists(existingCluster, data)
 	setCloudProviderPasswordFieldsIfNotExists(existingCluster, data)
 	setWeavePasswordFieldsIfNotExists(existingCluster, data)
-	if err := validateUpdatedS3Credentials(existingCluster, data); err != nil {
+	dialer, err := r.DialerFactory.ClusterDialer(id)
+	if err != nil {
+		return nil, errors.Wrap(err, "error getting dialer")
+	}
+	if err := validateUpdatedS3Credentials(existingCluster, data, dialer); err != nil {
 		return nil, err
 	}
 	handleScheduledScan(data)
 	if err := r.validateUnavailableNodes(data, existingCluster, id); err != nil {
 		return nil, err
 	}
+
+	// When any rancherKubernetesEngineConfig.cloudProvider.vsphereCloudProvider.virtualCenter has been removed, updating cluster using k8s dynamic client to properly
+	// replace cluster spec. This is required due to r.Store.Update is merging this data instead of replacing it, https://github.com/rancher/rancher/issues/27306
+	if newVCenter, ok := values.GetValue(data, "rancherKubernetesEngineConfig", "cloudProvider", "vsphereCloudProvider", "virtualCenter"); ok && newVCenter != nil {
+		if oldVCenter, ok := values.GetValue(existingCluster, "rancherKubernetesEngineConfig", "cloudProvider", "vsphereCloudProvider", "virtualCenter"); ok && oldVCenter != nil {
+			if oldVCenterMap, oldOk := oldVCenter.(map[string]interface{}); oldOk && oldVCenterMap != nil {
+				if newVCenterMap, newOk := newVCenter.(map[string]interface{}); newOk && newVCenterMap != nil {
+					for k := range oldVCenterMap {
+						if _, ok := newVCenterMap[k]; !ok && oldVCenterMap[k] != nil {
+							return r.updateClusterByK8sclient(apiContext.Request.Context(), id, updatedName, data)
+						}
+					}
+				}
+			}
+		}
+	}
+
 	return r.Store.Update(apiContext, schema, data, id)
 }
 
@@ -576,6 +616,35 @@ func (r *Store) getDynamicField(data map[string]interface{}) (string, error) {
 	}
 
 	return "", nil
+}
+
+func (r *Store) updateClusterByK8sclient(ctx context.Context, id, name string, data map[string]interface{}) (map[string]interface{}, error) {
+	logrus.Tracef("Updating cluster [%s] using K8s dynamic client", id)
+	if r.ClusterClient == nil {
+		return nil, fmt.Errorf("Error updating the cluster: k8s client is nil")
+	}
+
+	object, err := r.ClusterClient.Get(ctx, id, metav1.GetOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("Error updating the cluster: %v", err)
+	}
+
+	// Replacing name by displayName to properly update cluster using k8s format
+	values.PutValue(data, name, "displayName")
+	values.RemoveValue(data, "name")
+
+	// Setting data as cluster spec before update
+	object.Object["spec"] = data
+	object, err = r.ClusterClient.Update(ctx, object, metav1.UpdateOptions{})
+	if err != nil || object == nil {
+		return nil, fmt.Errorf("Error updating the cluster: %v", err)
+	}
+
+	// Replacing displayName by name to properly return updated data using API format
+	values.PutValue(object.Object, name, "spec", "name")
+	values.RemoveValue(object.Object, "spec", "displayName")
+
+	return object.Object["spec"].(map[string]interface{}), nil
 }
 
 func canUseClusterName(apiContext *types.APIContext, requestedName string) error {
@@ -670,25 +739,20 @@ func getSupportedK8sVersion(k8sVersionRequest string) (string, error) {
 
 func validateNetworkFlag(data map[string]interface{}, create bool) error {
 	enableNetworkPolicy := values.GetValueN(data, "enableNetworkPolicy")
-	rkeConfig := values.GetValueN(data, "rancherKubernetesEngineConfig")
-	plugin := convert.ToString(values.GetValueN(convert.ToMapInterface(rkeConfig), "network", "plugin"))
-
 	if enableNetworkPolicy == nil && create {
 		// setting default values for new clusters if value not passed
 		values.PutValue(data, false, "enableNetworkPolicy")
 	} else if value := convert.ToBool(enableNetworkPolicy); value {
-		if rkeConfig == nil {
+		rke2Config := values.GetValueN(data, "rke2Config")
+		k3sConfig := values.GetValueN(data, "k3sConfig")
+		if rke2Config != nil || k3sConfig != nil {
 			if create {
 				values.PutValue(data, false, "enableNetworkPolicy")
 				return nil
 			}
-			return fmt.Errorf("enableNetworkPolicy should be false for non-RKE clusters")
-		}
-		if plugin != "canal" {
-			return fmt.Errorf("plugin %s should have enableNetworkPolicy %v", plugin, !value)
+			return fmt.Errorf("enableNetworkPolicy should be false for k3s or rke2 clusters")
 		}
 	}
-
 	return nil
 }
 
@@ -707,7 +771,7 @@ func setNodeUpgradeStrategy(newData, oldData map[string]interface{}) error {
 			upgradeStrategy = &rketypes.NodeUpgradeStrategy{
 				MaxUnavailableWorker:       rkedefaults.DefaultMaxUnavailableWorker,
 				MaxUnavailableControlplane: rkedefaults.DefaultMaxUnavailableControlplane,
-				Drain:                      false,
+				Drain:                      func() *bool { b := false; return &b }(),
 			}
 		}
 		values.PutValue(newData, upgradeStrategy, "rancherKubernetesEngineConfig", "upgradeStrategy")
@@ -854,7 +918,7 @@ func setWeavePasswordFieldsIfNotExists(oldData, newData map[string]interface{}) 
 	}
 }
 
-func validateUpdatedS3Credentials(oldData, newData map[string]interface{}) error {
+func validateUpdatedS3Credentials(oldData, newData map[string]interface{}, dialer dialer.Dialer) error {
 	newConfig := convert.ToMapInterface(values.GetValueN(newData, "rancherKubernetesEngineConfig", "services", "etcd", "backupConfig", "s3BackupConfig"))
 	if newConfig == nil {
 		return nil
@@ -862,17 +926,17 @@ func validateUpdatedS3Credentials(oldData, newData map[string]interface{}) error
 
 	oldConfig := convert.ToMapInterface(values.GetValueN(oldData, "rancherKubernetesEngineConfig", "services", "etcd", "backupConfig", "s3BackupConfig"))
 	if oldConfig == nil {
-		return validateS3Credentials(newData)
+		return validateS3Credentials(newData, dialer)
 	}
 	// remove "type" since it's added to the object by API, and it's not present in newConfig yet.
 	delete(oldConfig, "type")
 	if !reflect.DeepEqual(newConfig, oldConfig) {
-		return validateS3Credentials(newData)
+		return validateS3Credentials(newData, dialer)
 	}
 	return nil
 }
 
-func validateS3Credentials(data map[string]interface{}) error {
+func validateS3Credentials(data map[string]interface{}, dialer dialer.Dialer) error {
 	s3BackupConfig := values.GetValueN(data, "rancherKubernetesEngineConfig", "services", "etcd", "backupConfig", "s3BackupConfig")
 	if s3BackupConfig == nil {
 		return nil
@@ -893,11 +957,11 @@ func validateS3Credentials(data map[string]interface{}) error {
 	if bucket == "" {
 		return fmt.Errorf("Empty bucket name")
 	}
-	s3Client, err := etcdbackup.GetS3Client(sbc, s3TransportTimeout)
+	s3Client, err := etcdbackup.GetS3Client(sbc, s3TransportTimeout, dialer)
 	if err != nil {
 		return err
 	}
-	exists, err := s3Client.BucketExists(bucket)
+	exists, err := s3Client.BucketExists(context.TODO(), bucket)
 	if err != nil {
 		return fmt.Errorf("Unable to validate S3 backup target configuration: %v", err)
 	}

@@ -264,7 +264,7 @@ func (p *adProvider) getGroupPrincipalsFromSearch(searchBase string, filter stri
 	search := ldapv2.NewSearchRequest(searchBase,
 		ldapv2.ScopeWholeSubtree, ldapv2.NeverDerefAliases, 0, 0, false,
 		filter,
-		ldap.GetGroupSearchAttributes(MemberOfAttribute, ObjectClass, config), nil)
+		ldap.GetGroupSearchAttributes(config, ObjectClass), nil)
 
 	serviceAccountUsername := ldap.GetUserExternalID(config.ServiceAccountUsername, config.DefaultLoginDomain)
 	err := lConn.Bind(serviceAccountUsername, config.ServiceAccountPassword)
@@ -380,7 +380,7 @@ func (p *adProvider) getPrincipal(distinguishedName string, scope string, config
 		search = ldapv2.NewSearchRequest(distinguishedName,
 			ldapv2.ScopeBaseObject, ldapv2.NeverDerefAliases, 0, 0, false,
 			filter,
-			ldap.GetGroupSearchAttributes(MemberOfAttribute, ObjectClass, config), nil)
+			ldap.GetGroupSearchAttributes(config, MemberOfAttribute, ObjectClass), nil)
 	}
 
 	result, err := lConn.Search(search)
@@ -471,7 +471,7 @@ func (p *adProvider) searchLdap(query string, scope string, config *v32.ActiveDi
 		search = ldapv2.NewSearchRequest(searchDomain,
 			ldapv2.ScopeWholeSubtree, ldapv2.NeverDerefAliases, 0, 0, false,
 			query,
-			ldap.GetGroupSearchAttributes(MemberOfAttribute, ObjectClass, config), nil)
+			ldap.GetGroupSearchAttributes(config, MemberOfAttribute, ObjectClass), nil)
 	}
 
 	// Bind before query
@@ -507,7 +507,8 @@ func (p *adProvider) ldapConnection(config *v32.ActiveDirectoryConfig, caPool *x
 	TLS := config.TLS
 	port := config.Port
 	connectionTimeout := config.ConnectionTimeout
-	return ldap.NewLDAPConn(servers, TLS, port, connectionTimeout, caPool)
+	startTLS := config.StartTLS
+	return ldap.NewLDAPConn(servers, TLS, startTLS, port, connectionTimeout, caPool)
 }
 func (p *adProvider) permissionCheck(attributes []*ldapv2.EntryAttribute, config *v32.ActiveDirectoryConfig) bool {
 	userObjectClass := config.UserObjectClass

@@ -13,4 +13,19 @@ rm -rf build/chart/rancher
 cp -rf ${1} build/chart/rancher
 
 sed -i -e "s/%VERSION%/${CHART_VERSION}/g" build/chart/rancher/Chart.yaml
-sed -i -e "s/%APP_VERSION%/${VERSION}/g" build/chart/rancher/Chart.yaml
+sed -i -e "s/%APP_VERSION%/${APP_VERSION}/g" build/chart/rancher/Chart.yaml
+
+# get the value of shell-image, such as rancher/shell:v0.1.6, from the file pkg/settings/setting.go
+post_delete_base=$(grep -i shell-image pkg/settings/setting.go | cut -d "," -f 2 | sed -e 's/"//g' | sed -e 's/)//g' | sed -e 's/ //g') || ""
+post_delete_image_name=$(echo "${post_delete_base}" | cut -d ":" -f 1) || ""
+post_delete_image_tag=$(echo "${post_delete_base}" | cut -d ":" -f 2) || ""
+if [[ ! ${post_delete_image_name} =~ ^rancher\/.+ ]]; then
+  echo "The image name [$post_delete_image_name] is invalid. Its prefix should be rancher/"
+  exit 1
+fi
+if [[ ! ${post_delete_image_tag} =~ ^v.+ ]]; then
+  echo "The image tag [$post_delete_image_tag] is invalid. It should start with the letter v"
+  exit 1
+fi
+sed -i -e "s@%POST_DELETE_IMAGE_NAME%@${post_delete_image_name}@g" build/chart/rancher/values.yaml
+sed -i -e "s/%POST_DELETE_IMAGE_TAG%/${post_delete_image_tag}/g" build/chart/rancher/values.yaml

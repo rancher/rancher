@@ -76,26 +76,16 @@ This step is only required to use certificates issued by Rancher’s generated C
 helm install rancher rancher-latest/rancher \
   --namespace cattle-system \
   --set hostname=rancher.my.org
-
-# Wait for Rancher to be rolled out
-kubectl -n cattle-system rollout status deploy/rancher
-Waiting for deployment "rancher" rollout to finish: 0 of 3 updated replicas are available...
-deployment "rancher" successfully rolled out
 ```
 
 - [Let’s Encrypt](https://rancher.com/docs/rancher/v2.x/en/installation/k8s-install/helm-rancher/#6-install-rancher-with-helm-and-your-chosen-certificate-option)
-  
+
 ```bash
 helm install rancher rancher-latest/rancher \
   --namespace cattle-system \
   --set hostname=rancher.my.org \
   --set ingress.tls.source=letsEncrypt \
   --set letsEncrypt.email=me@example.org
-
-# Wait for Rancher to be rolled out
-kubectl -n cattle-system rollout status deploy/rancher
-Waiting for deployment "rancher" rollout to finish: 0 of 3 updated replicas are available...
-deployment "rancher" successfully rolled out
 ```
 
 - [Certificates from Files](https://rancher.com/docs/rancher/v2.x/en/installation/k8s-install/helm-rancher/#6-install-rancher-with-helm-and-your-chosen-certificate-option)
@@ -115,11 +105,6 @@ helm install rancher rancher-latest/rancher \
   --set hostname=rancher.my.org \
   --set ingress.tls.source=secret \
   --set privateCA=true
-
-# Wait for Rancher to be rolled out
-kubectl -n cattle-system rollout status deploy/rancher
-Waiting for deployment "rancher" rollout to finish: 0 of 3 updated replicas are available...
-deployment "rancher" successfully rolled out
 ```
 
 #### Verify that the Rancher Server is Successfully Deployed
@@ -174,8 +159,6 @@ Specify each parameter using the `--set key=value[,key=value]` argument to `helm
 
 #### Advanced Options
 
-
-
 | Parameter                      | Default Value                                         | Description                                                                                                                                                                                                  |
 | ------------------------------ | ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `additionalTrustedCAs`         | false                                                 | ***bool*** - [See Additional Trusted CAs Server](https://rancher.com/docs/rancher/v2.x/en/installation/options/chart-options/#additional-trusted-cas)                                                        |
@@ -186,18 +169,21 @@ Specify each parameter using the `--set key=value[,key=value]` argument to `helm
 | `auditLog.hostPath`            | "/var/log/rancher/audit"                              | ***string*** - log file destination on host (only applies when **auditLog.destination** is set to **hostPath**)                                                                                              |
 | `auditLog.level`               | 0                                                     | ***int*** - set the [API Audit Log level](https://rancher.com/docs/rancher/v2.x/en/installation/api-auditing). 0 is off. [0-3]                                                                               |
 | `auditLog.maxAge`              | 1                                                     | ***int*** - maximum number of days to retain old audit log files (only applies when **auditLog.destination** is set to **hostPath**)                                                                         |
-| `auditLog.maxBackups`          | 1                                                     | int - maximum number of audit log files to retain (only applies when **auditLog.destination** is set to **hostPath**)                                                                                        |
+| `auditLog.maxBackup`           | 1                                                     | int - maximum number of audit log files to retain (only applies when **auditLog.destination** is set to **hostPath**)                                                                                        |
 | `auditLog.maxSize`             | 100                                                   | ***int*** - maximum size in megabytes of the audit log file before it gets rotated (only applies when **auditLog.destination** is set to **hostPath**)                                                       |
 | `busyboxImage`                 | "busybox"                                             | ***string*** - Image location for busybox image used to collect audit logs *Note: Available as of v2.2.0*                                                                                                    |
+| `busyboxImagePullPolicy`       | "IfNotPresent"                                        | ***string*** - Override imagePullPolicy for busybox images - *"Always", "Never", "IfNotPresent"*                                                                                                      |
 | `debug`                        | false                                                 | ***bool*** - set debug flag on rancher server                                                                                                                                                                |
 | `certmanager.version`          | " "                                                   | ***string*** - set cert-manager compatibility                                                                                                                                                                |
 | `extraEnv`                     | []                                                    | ***list*** - set additional environment variables for Rancher Note: *Available as of v2.2.0*                                                                                                                 |
 | `imagePullSecrets`             | []                                                    | ***list*** - list of names of Secret resource containing private registry credentials                                                                                                                        |
+| `ingress.enabled`              | true                                                  | ***bool*** - install ingress resource
+| `ingress.includeDefaultExtraAnnotations` | true                                        | ***bool*** - Add default nginx annotations
 | `ingress.extraAnnotations`     | {}                                                    | ***map*** - additional annotations to customize the ingress                                                                                                                                                  |
 | `ingress.configurationSnippet` | " "                                                   | ***string*** - Add additional Nginx configuration. Can be used for proxy configuration. Note: *Available as of v2.0.15, v2.1.10 and v2.2.4*                                                                  |
 | `letsEncrypt.ingress.class`    | " "                                                   | ***string*** - optional ingress class for the cert-manager acmesolver ingress that responds to the Let’s *Encrypt ACME challenges*                                                                           |
 | `proxy`                        | " "                                                   | ***string** - HTTP[S] proxy server for Rancher                                                                                                                                                               |
-| `noProxy`                      | "127.0.0.0/8,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16" | ***string*** - comma separated list of hostnames or ip address not to use the proxy                                                                                                                          |
+| `noProxy`                      | "127.0.0.0/8,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,.svc,.cluster.local" | ***string*** - comma separated list of hostnames or ip address not to use the proxy                                                                                                      |
 | `resources`                    | {}                                                    | ***map*** - rancher pod resource requests & limits                                                                                                                                                           |
 | `rancherImage`                 | "rancher/rancher"                                     | ***string*** - rancher image source                                                                                                                                                                          |
 | `rancherImageTag`              | same as chart version                                 | ***string*** - rancher/rancher image tag                                                                                                                                                                     |
@@ -205,4 +191,11 @@ Specify each parameter using the `--set key=value[,key=value]` argument to `helm
 | `tls`                          | "ingress"                                             | ***string*** - See External TLS Termination for details. - *"ingress, external"*                                                                                                                             |
 | `systemDefaultRegistry`        | ""                                                    | ***string*** - private registry to be used for all system Docker images, e.g., [http://registry.example.com/] *Available as of v2.3.0*                                                                       |
 | `useBundledSystemChart`        | false                                                 | ***bool*** - select to use the system-charts packaged with Rancher server. This option is used for air gapped installations.  *Available as of v2.3.0*                                                       |
-| `podAnnotations`               | {}                                                    | ***map*** - pod annotations
+| `podAnnotations`               | {}                                                    | ***map*** - pod annotations                                                                                                                                                                                  |
+| `customLogos.enabled`          | false                                                 | ***bool*** - Enabled [Ember Rancher UI (cluster manager) custom logos](https://github.com/rancher/ui/tree/master/public/assets/images/logos) and [Vue Rancher UI (cluster explorer) custom logos](https://github.com/rancher/dashboard/tree/master/assets/images/pl) persistence volume|
+| `customLogos.volumeSubpaths.emberUi` | "ember"                                         | ***string*** - Volume subpath for [Ember Rancher UI (cluster manager) custom logos](https://github.com/rancher/ui/tree/master/public/assets/images/logos) persistence|
+| `customLogos.volumeSubpaths.vueUi` | "vue"                                             | ***string*** - Volume subpath for [Vue Rancher UI (cluster explorer) custom logos](https://github.com/rancher/dashboard/tree/master/assets/images/pl) persistence|
+| `customLogos.volumeName`       | ""                                                    | ***string*** - Use an existing volume. Custom logos should be copied to the proper `volume/subpath` folder by the user. Optional for persistentVolumeClaim, required for configMap|
+| `customLogos.storageClass`     | ""                                                    | ***string*** - Set custom logos persistentVolumeClaim storage class. Required for dynamic pv|
+| `customLogos.accessMode`       | "ReadWriteOnce"                                       | ***string*** - Set custom persistentVolumeClaim access mode|
+| `customLogos.size`             | "1Gi"                                                 | ***string*** - Set custom persistentVolumeClaim size|

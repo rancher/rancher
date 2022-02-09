@@ -17,7 +17,6 @@ import (
 	pkgrbac "github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/sirupsen/logrus"
-
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -37,11 +36,13 @@ const (
 	prtbByUIDIndex                   = "authz.cluster.cattle.io/rtb-owner"
 	prtbByNsAndNameIndex             = "authz.cluster.cattle.io/rtb-owner-updated"
 	rtbByClusterAndRoleTemplateIndex = "authz.cluster.cattle.io/rtb-by-cluster-rt"
+	rtbByClusterAndUserIndex         = "authz.cluster.cattle.io/rtb-by-cluster-user"
 	nsByProjectIndex                 = "authz.cluster.cattle.io/ns-by-project"
 	crByNSIndex                      = "authz.cluster.cattle.io/cr-by-ns"
 	crbByRoleAndSubjectIndex         = "authz.cluster.cattle.io/crb-by-role-and-subject"
 	rtbLabelUpdated                  = "authz.cluster.cattle.io/rtb-label-updated"
 	rtbCrbRbLabelsUpdated            = "authz.cluster.cattle.io/crb-rb-labels-updated"
+	impersonationLabel               = "authz.cluster.cattle.io/impersonator"
 )
 
 func Register(ctx context.Context, workload *config.UserContext) {
@@ -90,6 +91,8 @@ func Register(ctx context.Context, workload *config.UserContext) {
 		nsController:        workload.Core.Namespaces("").Controller(),
 		clusterLister:       workload.Management.Management.Clusters("").Controller().Lister(),
 		projectLister:       workload.Management.Management.Projects(workload.ClusterName).Controller().Lister(),
+		userLister:          workload.Management.Management.Users("").Controller().Lister(),
+		userAttributeLister: workload.Management.Management.UserAttributes("").Controller().Lister(),
 		crtbs:               workload.Management.Management.ClusterRoleTemplateBindings(""),
 		prtbs:               workload.Management.Management.ProjectRoleTemplateBindings(""),
 		clusterName:         workload.ClusterName,
@@ -136,6 +139,8 @@ type manager struct {
 	nsController        typescorev1.NamespaceController
 	clusterLister       v3.ClusterLister
 	projectLister       v3.ProjectLister
+	userLister          v3.UserLister
+	userAttributeLister v3.UserAttributeLister
 	crtbs               v3.ClusterRoleTemplateBindingInterface
 	prtbs               v3.ProjectRoleTemplateBindingInterface
 	clusterName         string
@@ -436,7 +441,7 @@ func (m *manager) ensureBindings(ns string, roles map[string]*v3.RoleTemplate, b
 		return err
 	}
 	for roleName := range roles {
-		rbKey, objectMeta, subjects, roleRef := bindingParts(roleName, meta.GetNamespace()+"_"+meta.GetName(), subject)
+		rbKey, objectMeta, subjects, roleRef := bindingParts(ns, roleName, meta.GetNamespace()+"_"+meta.GetName(), subject)
 		desiredRBs[rbKey] = create(objectMeta, subjects, roleRef)
 	}
 
@@ -469,16 +474,17 @@ func (m *manager) ensureBindings(ns string, roles map[string]*v3.RoleTemplate, b
 	}
 
 	for key, rb := range desiredRBs {
-		logrus.Infof("Creating roleBinding %v", key)
 		switch roleBinding := rb.(type) {
 		case *rbacv1.RoleBinding:
+			logrus.Infof("Creating roleBinding %v", key)
 			_, err := m.workload.RBAC.RoleBindings(ns).Create(roleBinding)
-			if err != nil {
+			if err != nil && !apierrors.IsAlreadyExists(err) {
 				return err
 			}
 		case *rbacv1.ClusterRoleBinding:
+			logrus.Infof("Creating clusterRoleBinding %v", key)
 			_, err := m.workload.RBAC.ClusterRoleBindings("").Create(roleBinding)
-			if err != nil {
+			if err != nil && !apierrors.IsAlreadyExists(err) {
 				return err
 			}
 		}
@@ -493,18 +499,28 @@ func (m *manager) ensureBindings(ns string, roles map[string]*v3.RoleTemplate, b
 	return nil
 }
 
-func bindingParts(roleName, parentNsAndName string, subject rbacv1.Subject) (string, metav1.ObjectMeta, []rbacv1.Subject, rbacv1.RoleRef) {
-	crbKey := rbRoleSubjectKey(roleName, subject)
-	return crbKey,
+func bindingParts(namespace, roleName, parentNsAndName string, subject rbacv1.Subject) (string, metav1.ObjectMeta, []rbacv1.Subject, rbacv1.RoleRef) {
+	key := rbRoleSubjectKey(roleName, subject)
+
+	roleRef := rbacv1.RoleRef{
+		Kind: "ClusterRole",
+		Name: roleName,
+	}
+
+	var name string
+	if namespace == "" { // if namespace is empty, binding will be ClusterRoleBinding, so name accordingly
+		name = pkgrbac.NameForClusterRoleBinding(roleRef, subject)
+	} else {
+		name = pkgrbac.NameForRoleBinding(namespace, roleRef, subject)
+	}
+
+	return key,
 		metav1.ObjectMeta{
-			GenerateName: "clusterrolebinding-",
-			Labels:       map[string]string{rtbOwnerLabel: parentNsAndName},
+			Name:   name,
+			Labels: map[string]string{rtbOwnerLabel: parentNsAndName},
 		},
 		[]rbacv1.Subject{subject},
-		rbacv1.RoleRef{
-			Kind: "ClusterRole",
-			Name: roleName,
-		}
+		roleRef
 }
 
 func prtbByProjectName(obj interface{}) ([]string, error) {
@@ -512,7 +528,6 @@ func prtbByProjectName(obj interface{}) ([]string, error) {
 	if !ok {
 		return []string{}, nil
 	}
-
 	return []string{prtb.ProjectName}, nil
 }
 
@@ -537,7 +552,6 @@ func prtbByProjectAndSubject(obj interface{}) ([]string, error) {
 	if !ok {
 		return []string{}, nil
 	}
-
 	return []string{getPRTBProjectAndSubjectKey(prtb)}, nil
 }
 
@@ -567,7 +581,6 @@ func crbRoleSubjectKeys(roleName string, subjects []rbacv1.Subject) []string {
 
 func rbRoleSubjectKey(roleName string, subject rbacv1.Subject) string {
 	return subject.Kind + " " + subject.Name + " Role " + roleName
-
 }
 
 func crbByRoleAndSubject(obj interface{}) ([]string, error) {
@@ -575,7 +588,6 @@ func crbByRoleAndSubject(obj interface{}) ([]string, error) {
 	if !ok {
 		return []string{}, nil
 	}
-
 	return crbRoleSubjectKeys(crb.RoleRef.Name, crb.Subjects), nil
 }
 
@@ -592,6 +604,35 @@ func rtbByClusterAndRoleTemplateName(obj interface{}) ([]string, error) {
 	case *v3.ClusterRoleTemplateBinding:
 		if rtb.RoleTemplateName != "" && rtb.ClusterName != "" {
 			idx = rtb.ClusterName + "-" + rtb.RoleTemplateName
+		}
+	}
+
+	if idx == "" {
+		return []string{}, nil
+	}
+	return []string{idx}, nil
+}
+
+func rtbByClusterAndUserNotDeleting(obj interface{}) ([]string, error) {
+	meta, err := meta.Accessor(obj)
+	if err != nil {
+		return []string{}, err
+	}
+	if meta.GetDeletionTimestamp() != nil {
+		return []string{}, nil
+	}
+	var idx string
+	switch rtb := obj.(type) {
+	case *v3.ProjectRoleTemplateBinding:
+		if rtb.UserName != "" && rtb.ProjectName != "" {
+			parts := strings.SplitN(rtb.ProjectName, ":", 2)
+			if len(parts) == 2 {
+				idx = parts[0] + "-" + rtb.UserName
+			}
+		}
+	case *v3.ClusterRoleTemplateBinding:
+		if rtb.UserName != "" && rtb.ClusterName != "" {
+			idx = rtb.ClusterName + "-" + rtb.UserName
 		}
 	}
 

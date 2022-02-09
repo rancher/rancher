@@ -108,8 +108,6 @@ check_x509_cert()
     fi
 }
 
-AGENT_IMAGE=${AGENT_IMAGE:-ubuntu:14.04}
-
 export CATTLE_ADDRESS
 export CATTLE_AGENT_CONNECT
 export CATTLE_INTERNAL_ADDRESS
@@ -258,4 +256,4 @@ if [ -n "$CATTLE_CA_CHECKSUM" ]; then
     fi
 fi
 
-exec agent
+exec tini -- agent

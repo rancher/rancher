@@ -5,19 +5,18 @@ import (
 	"net/http"
 	"reflect"
 
-	v32 "github.com/rancher/rancher/pkg/apis/project.cattle.io/v3"
-
 	"github.com/rancher/norman/api/access"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/parse"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/values"
-	catUtil "github.com/rancher/rancher/pkg/catalog/utils"
+	v32 "github.com/rancher/rancher/pkg/apis/project.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/catalog/manager"
 	clusterv3 "github.com/rancher/rancher/pkg/client/generated/cluster/v3"
 	projectv3 "github.com/rancher/rancher/pkg/client/generated/project/v3"
-	"github.com/rancher/rancher/pkg/controllers/management/compose/common"
-	hcommon "github.com/rancher/rancher/pkg/controllers/managementuser/helm/common"
+	"github.com/rancher/rancher/pkg/controllers/managementlegacy/compose/common"
+	hcommon "github.com/rancher/rancher/pkg/controllers/managementuserlegacy/helm/common"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	pv3 "github.com/rancher/rancher/pkg/generated/norman/project.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/ref"
@@ -30,6 +29,7 @@ import (
 
 type Wrapper struct {
 	Clusters              v3.ClusterInterface
+	CatalogManager        manager.CatalogManager
 	TemplateVersionClient v3.CatalogTemplateVersionInterface
 	TemplateVersionLister v3.CatalogTemplateVersionLister
 	KubeConfigGetter      common.KubeConfigGetter
@@ -92,6 +92,15 @@ func (w Wrapper) Validator(request *types.APIContext, schema *types.Schema, data
 	return nil
 }
 
+func copyAnswers(specAnswers map[string]string, answers interface{}) {
+	m, ok := answers.(map[string]interface{})
+	if ok {
+		for k, v := range m {
+			specAnswers[k] = convert.ToString(v)
+		}
+	}
+}
+
 func (w Wrapper) ActionHandler(actionName string, action *types.Action, apiContext *types.APIContext) error {
 	var app projectv3.App
 	if err := access.ByID(apiContext, &projectschema.Version, projectv3.AppType, apiContext.ID, &app); err != nil {
@@ -116,35 +125,29 @@ func (w Wrapper) ActionHandler(actionName string, action *types.Action, apiConte
 	if err != nil {
 		return err
 	}
+	clusterName, namespace := ref.Parse(app.ProjectID)
+	obj, err := w.AppGetter.Apps(namespace).Get(app.Name, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
 	switch actionName {
 	case "upgrade":
 		externalID := convert.ToString(actionInput["externalId"])
 
-		err := w.validateRancherVersion(externalID)
-		if err != nil {
-			return err
+		if err := w.validateChartCompatibility(externalID, clusterName); err != nil {
+			return httperror.NewAPIError(httperror.InvalidBodyContent, err.Error())
 		}
 
 		answers := actionInput["answers"]
+		answersSetString := actionInput["answersSetString"]
 		forceUpgrade := actionInput["forceUpgrade"]
 		files := actionInput["files"]
 		valuesYaml := actionInput["valuesYaml"]
-		_, namespace := ref.Parse(app.ProjectID)
-		obj, err := w.AppGetter.Apps(namespace).Get(app.Name, metav1.GetOptions{})
-		if err != nil {
-			return err
-		}
-		if answers != nil {
-			m, ok := answers.(map[string]interface{})
-			if ok {
-				obj.Spec.Answers = make(map[string]string)
-				for k, v := range m {
-					obj.Spec.Answers[k] = convert.ToString(v)
-				}
-			}
-		} else {
-			obj.Spec.Answers = make(map[string]string)
-		}
+		obj.Spec.Answers = make(map[string]string)
+		obj.Spec.AnswersSetString = make(map[string]string)
+
+		copyAnswers(obj.Spec.Answers, answers)
+		copyAnswers(obj.Spec.AnswersSetString, answersSetString)
 		obj.Spec.ExternalID = externalID
 		if convert.ToBool(forceUpgrade) {
 			v32.AppConditionForceUpgrade.Unknown(obj)
@@ -189,9 +192,8 @@ func (w Wrapper) ActionHandler(actionName string, action *types.Action, apiConte
 			return err
 		}
 
-		err := w.validateRancherVersion(appRevision.Status.ExternalID)
-		if err != nil {
-			return err
+		if err := w.validateChartCompatibility(appRevision.Status.ExternalID, clusterName); err != nil {
+			return httperror.NewAPIError(httperror.InvalidBodyContent, err.Error())
 		}
 
 		_, namespace := ref.Parse(app.ProjectID)
@@ -200,6 +202,7 @@ func (w Wrapper) ActionHandler(actionName string, action *types.Action, apiConte
 			return err
 		}
 		obj.Spec.Answers = appRevision.Status.Answers
+		obj.Spec.AnswersSetString = appRevision.Status.AnswersSetString
 		obj.Spec.ExternalID = appRevision.Status.ExternalID
 		obj.Spec.ValuesYaml = appRevision.Status.ValuesYaml
 		if convert.ToBool(forceUpgrade) {
@@ -244,7 +247,7 @@ func (w Wrapper) LinkHandler(apiContext *types.APIContext, next types.RequestHan
 	return nil
 }
 
-func (w Wrapper) validateRancherVersion(externalID string) error {
+func (w Wrapper) validateChartCompatibility(externalID, clusterName string) error {
 	if externalID == "" {
 		return nil
 	}
@@ -256,5 +259,5 @@ func (w Wrapper) validateRancherVersion(externalID string) error {
 	if err != nil {
 		return err
 	}
-	return catUtil.ValidateRancherVersion(template)
+	return w.CatalogManager.ValidateChartCompatibility(template, clusterName)
 }

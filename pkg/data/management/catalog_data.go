@@ -9,10 +9,12 @@ import (
 	"time"
 
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/catalog/manager"
+	"github.com/rancher/rancher/pkg/catalog/utils"
 
-	"github.com/rancher/rancher/pkg/catalog/helm"
-	"github.com/rancher/rancher/pkg/controllers/managementuser/helm/common"
+	"github.com/rancher/rancher/pkg/controllers/managementuserlegacy/helm/common"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/helm"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/types/config"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -171,6 +173,9 @@ func syncCatalogs(management *config.ManagementContext) error {
 }
 
 func doAddCatalogs(management *config.ManagementContext, name, url, branch, helmVersion string, bundledMode bool) error {
+	var obj *v3.Catalog
+	var err error
+
 	catalogClient := management.Management.Catalogs("")
 
 	kind := helm.KindHelmGit
@@ -178,11 +183,11 @@ func doAddCatalogs(management *config.ManagementContext, name, url, branch, helm
 		kind = helm.KindHelmInternal
 	}
 
-	_, err := catalogClient.Get(name, metav1.GetOptions{})
+	obj, err = catalogClient.Get(name, metav1.GetOptions{})
 	if err != nil && !errors.IsNotFound(err) {
 		return err
 	} else if errors.IsNotFound(err) {
-		obj := &v3.Catalog{
+		obj = &v3.Catalog{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: name,
 			},
@@ -193,9 +198,17 @@ func doAddCatalogs(management *config.ManagementContext, name, url, branch, helm
 				HelmVersion: helmVersion,
 			},
 		}
-		if _, err := catalogClient.Create(obj); err != nil {
+		if obj, err = catalogClient.Create(obj); err != nil {
 			return err
 		}
+	}
+
+	if bundledMode && obj.Name == utils.SystemLibraryName {
+		// force update the catalog cache on every startup; this ensures that setups using bundledMode can load new image
+		// into the ConfigMap when the bundled system-chart is updated (e.g. during Rancher upgrades) upon restarting Rancher
+		configMapInterface := management.Core.ConfigMaps("")
+		configMapLister := configMapInterface.Controller().Lister()
+		return manager.CreateOrUpdateSystemCatalogImageCache(obj, configMapInterface, configMapLister, true, true)
 	}
 
 	return nil

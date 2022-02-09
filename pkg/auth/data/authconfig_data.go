@@ -5,14 +5,14 @@ import (
 	"github.com/rancher/rancher/pkg/auth/providers/azure"
 	"github.com/rancher/rancher/pkg/auth/providers/github"
 	"github.com/rancher/rancher/pkg/auth/providers/googleoauth"
+	"github.com/rancher/rancher/pkg/auth/providers/keycloakoidc"
 	"github.com/rancher/rancher/pkg/auth/providers/ldap"
 	localprovider "github.com/rancher/rancher/pkg/auth/providers/local"
+	"github.com/rancher/rancher/pkg/auth/providers/oidc"
 	"github.com/rancher/rancher/pkg/auth/providers/saml"
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
-	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/types/config"
-	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -62,7 +62,11 @@ func AuthConfigs(management *config.ManagementContext) error {
 		return err
 	}
 
-	if err := createMgmtNamespace(management); err != nil {
+	if err := addAuthConfig(oidc.Name, client.OIDCConfigType, false, management); err != nil {
+		return err
+	}
+
+	if err := addAuthConfig(keycloakoidc.Name, client.KeyCloakOIDCConfigType, false, management); err != nil {
 		return err
 	}
 
@@ -81,17 +85,5 @@ func addAuthConfig(name, aType string, enabled bool, management *config.Manageme
 		return err
 	}
 
-	return nil
-}
-
-func createMgmtNamespace(management *config.ManagementContext) error {
-	_, err := management.Core.Namespaces("").Create(&corev1.Namespace{
-		ObjectMeta: v1.ObjectMeta{
-			Name: namespace.GlobalNamespace,
-		},
-	})
-	if err != nil && !apierrors.IsAlreadyExists(err) {
-		return err
-	}
 	return nil
 }

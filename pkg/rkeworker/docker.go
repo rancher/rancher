@@ -39,7 +39,7 @@ type NodeConfig struct {
 }
 
 func runProcess(ctx context.Context, name string, p rketypes.Process, start, forceRestart bool) error {
-	c, err := client.NewEnvClient()
+	c, err := client.NewClientWithOpts(client.WithAPIVersionNegotiation(), client.FromEnv)
 	if err != nil {
 		return err
 	}
@@ -131,7 +131,7 @@ func runProcess(ctx context.Context, name string, p rketypes.Process, start, for
 	}
 	config.Labels[RKEContainerNameLabel] = name
 
-	newContainer, err := c.ContainerCreate(ctx, config, hostConfig, nil, name)
+	newContainer, err := c.ContainerCreate(ctx, config, hostConfig, nil, nil, name)
 	if client.IsErrNotFound(err) {
 		var output io.ReadCloser
 		imagePullOptions := types.ImagePullOptions{}
@@ -145,7 +145,7 @@ func runProcess(ctx context.Context, name string, p rketypes.Process, start, for
 		}
 		defer output.Close()
 		io.Copy(logrus.StandardLogger().Writer(), output)
-		newContainer, err = c.ContainerCreate(ctx, config, hostConfig, nil, name)
+		newContainer, err = c.ContainerCreate(ctx, config, hostConfig, nil, nil, name)
 	}
 	if err == nil && start {
 		if err := c.ContainerStart(ctx, newContainer.ID, types.ContainerStartOptions{}); err != nil {
@@ -371,10 +371,11 @@ func runLogLinker(ctx context.Context, c *client.Client, containerName string, p
 		hostConfig = &container.HostConfig{
 			Binds: []string{
 				// symbolic link source: docker container logs location
-				"c:/ProgramData:c:/ProgramData",
+				"c:\\ProgramData:c:\\ProgramData",
 				// symbolic link target
-				fmt.Sprintf("%s/var/lib:c:/var/lib", getWindowsPrefixPath()),
+				fmt.Sprintf("%svar\\lib:c:\\var\\lib", getWindowsPrefixPath()),
 			},
+
 			NetworkMode: "none",
 		}
 	}
@@ -384,7 +385,7 @@ func runLogLinker(ctx context.Context, c *client.Client, containerName string, p
 	/*
 		the following logic is as same as `docker run --rm`
 	*/
-	newContainer, err := c.ContainerCreate(ctx, config, hostConfig, nil, logLinkerName)
+	newContainer, err := c.ContainerCreate(ctx, config, hostConfig, nil, nil, logLinkerName)
 	if err != nil {
 		return err
 	}
@@ -445,10 +446,22 @@ func (s containerWaitingStatus) error() error {
 }
 
 func getWindowsPrefixPath() string {
-	prefixPath := os.Getenv("CATTLE_PREFIX_PATH")
-	if prefixPath == "" {
-		prefixPath = "c:\\"
+	p := os.Getenv("CATTLE_PREFIX_PATH")
+	if p == "" {
+		return "c:\\"
 	}
 
-	return prefixPath
+	// clean backslashes added from encoding
+	var new []string
+
+	// squash multi backslashes
+	sp := strings.Split(p, "\\")
+	for _, v := range sp {
+		if v != "" {
+			new = append(new, v)
+		}
+	}
+
+	new = append(new, "") // always add trailing slash
+	return strings.Join(new, "\\")
 }

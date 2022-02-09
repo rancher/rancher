@@ -13,16 +13,14 @@ import (
 	"sync"
 	"time"
 
-	"github.com/rancher/wrangler/pkg/ratelimit"
-
-	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-
 	"github.com/rancher/lasso/pkg/controller"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/clusterrouter"
 	clusterController "github.com/rancher/rancher/pkg/controllers/managementuser"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/kontainer-engine/drivers/gke"
 	"github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/types/config"
@@ -30,6 +28,7 @@ import (
 	"github.com/rancher/rke/pki/cert"
 	"github.com/rancher/steve/pkg/accesscontrol"
 	rbacv1 "github.com/rancher/wrangler/pkg/generated/controllers/rbac/v1"
+	"github.com/rancher/wrangler/pkg/ratelimit"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/semaphore"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
@@ -126,20 +125,21 @@ func (m *Manager) start(ctx context.Context, cluster *v3.Cluster, controllers, c
 		m.Stop(obj.(*record).clusterRec)
 	}
 
-	controller, err := m.toRecord(ctx, cluster)
+	clusterRecord, err := m.toRecord(ctx, cluster)
 	if err != nil {
 		m.markUnavailable(cluster.Name)
 		return nil, err
 	}
-	if controller == nil {
+	if clusterRecord == nil {
 		return nil, httperror.NewAPIError(httperror.ClusterUnavailable, "cluster not found")
 	}
 
-	obj, _ = m.controllers.LoadOrStore(cluster.UID, controller)
+	obj, _ = m.controllers.LoadOrStore(cluster.UID, clusterRecord)
 	if err := m.startController(obj.(*record), controllers, clusterOwner); err != nil {
 		m.markUnavailable(cluster.Name)
 		return nil, err
 	}
+
 	return obj.(*record), nil
 }
 
@@ -227,6 +227,10 @@ func (m *Manager) doStart(rec *record, clusterOwner bool) (exit error) {
 	done := make(chan error, 1)
 	go func() {
 		defer close(done)
+
+		logrus.Debugf("[clustermanager] creating AccessControl for cluster %v", rec.cluster.ClusterName)
+		rec.accessControl = rbac.NewAccessControl(rec.ctx, rec.cluster.ClusterName, rec.cluster.RBACw)
+
 		err := rec.cluster.Start(rec.ctx)
 		if err == nil {
 			transaction.Commit()
@@ -250,7 +254,9 @@ func ToRESTConfig(cluster *v3.Cluster, context *config.ScaledContext) (*rest.Con
 		return nil, nil
 	}
 
-	if cluster.DeletionTimestamp != nil {
+	// rke1 custom clusters need cleanup and the cluster delete is being paused by cluster-scoped-gc
+	// allow a rest config since the nodes still exist and we need to start jobs on them for cleanup
+	if cluster.DeletionTimestamp != nil && cluster.Status.Driver != v32.ClusterDriverRKE {
 		return nil, nil
 	}
 
@@ -308,6 +314,13 @@ func ToRESTConfig(cluster *v3.Cluster, context *config.ScaledContext) (*rest.Con
 				} else {
 					ht.DialContext = nil
 					ht.DialTLS = tlsDialer
+				}
+			}
+			if cluster.Status.Driver == "googleKubernetesEngine" && cluster.Spec.GenericEngineConfig != nil {
+				cred, _ := (*cluster.Spec.GenericEngineConfig)["credential"].(string)
+				rt, err = gke.Oauth2Transport(context.RunContext, rt, cred)
+				if err != nil {
+					logrus.Errorf("unable to retrieve token source for GKE oauth2: %v", err)
 				}
 			}
 			return rt
@@ -398,9 +411,8 @@ func (m *Manager) toRecord(ctx context.Context, cluster *v3.Cluster) (*record, e
 	}
 
 	s := &record{
-		cluster:       clusterContext,
-		clusterRec:    cluster,
-		accessControl: rbac.NewAccessControl(ctx, cluster.Name, clusterContext.RBACw),
+		cluster:    clusterContext,
+		clusterRec: cluster,
 	}
 	s.ctx, s.cancel = context.WithCancel(ctx)
 
@@ -414,6 +426,10 @@ func (m *Manager) AccessControl(apiContext *types.APIContext, storageContext typ
 	}
 	if record == nil {
 		return m.accessControl, nil
+	}
+
+	if record.accessControl == nil {
+		return nil, httperror.NewAPIError(httperror.ClusterUnavailable, "cannot determine access, cluster is unavailable")
 	}
 
 	return record.accessControl, nil

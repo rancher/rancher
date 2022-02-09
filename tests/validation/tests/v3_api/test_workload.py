@@ -259,7 +259,7 @@ def test_wl_with_hostPort():
     p_client = namespace["p_client"]
     ns = namespace["ns"]
     source_port = 9999
-    port = {"containerPort": 80,
+    port = {"containerPort": TEST_IMAGE_PORT,
             "type": "containerPort",
             "kind": "HostPort",
             "protocol": "TCP",
@@ -282,7 +282,7 @@ def test_wl_with_nodePort():
     p_client = namespace["p_client"]
     ns = namespace["ns"]
     source_port = 30456
-    port = {"containerPort": 80,
+    port = {"containerPort": TEST_IMAGE_PORT,
             "type": "containerPort",
             "kind": "NodePort",
             "protocol": "TCP",
@@ -305,7 +305,7 @@ def test_wl_with_clusterIp():
     p_client = namespace["p_client"]
     ns = namespace["ns"]
     source_port = 30458
-    port = {"containerPort": "80",
+    port = {"containerPort": TEST_IMAGE_PORT,
             "type": "containerPort",
             "kind": "ClusterIP",
             "protocol": "TCP",
@@ -345,7 +345,7 @@ def test_wl_with_lb():
     p_client = namespace["p_client"]
     ns = namespace["ns"]
     source_port = 9001
-    port = {"containerPort": 80,
+    port = {"containerPort": TEST_IMAGE_PORT,
             "type": "containerPort",
             "kind": "LoadBalancer",
             "protocol": "TCP",
@@ -367,7 +367,7 @@ def test_wl_with_clusterIp_scale_and_upgrade():
     p_client = namespace["p_client"]
     ns = namespace["ns"]
     source_port = 30459
-    port = {"containerPort": "80",
+    port = {"containerPort": TEST_IMAGE_PORT,
             "type": "containerPort",
             "kind": "ClusterIP",
             "protocol": "TCP",
@@ -422,7 +422,7 @@ def test_wl_with_nodePort_scale_and_upgrade():
     p_client = namespace["p_client"]
     ns = namespace["ns"]
     source_port = 30457
-    port = {"containerPort": 80,
+    port = {"containerPort": TEST_IMAGE_PORT,
             "type": "containerPort",
             "kind": "NodePort",
             "protocol": "TCP",
@@ -468,7 +468,7 @@ def test_wl_with_hostPort_scale_and_upgrade():
     p_client = namespace["p_client"]
     ns = namespace["ns"]
     source_port = 8888
-    port = {"containerPort": 80,
+    port = {"containerPort": TEST_IMAGE_PORT,
             "type": "containerPort",
             "kind": "HostPort",
             "protocol": "TCP",
@@ -517,7 +517,7 @@ def test_wl_with_lb_scale_and_upgrade():
     p_client = namespace["p_client"]
     ns = namespace["ns"]
     source_port = 9001
-    port = {"containerPort": 80,
+    port = {"containerPort": TEST_IMAGE_PORT,
             "type": "containerPort",
             "kind": "LoadBalancer",
             "protocol": "TCP",

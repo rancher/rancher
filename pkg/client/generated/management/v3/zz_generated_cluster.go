@@ -6,12 +6,16 @@ import (
 
 const (
 	ClusterType                                      = "cluster"
+	ClusterFieldAKSConfig                            = "aksConfig"
+	ClusterFieldAKSStatus                            = "aksStatus"
 	ClusterFieldAPIEndpoint                          = "apiEndpoint"
+	ClusterFieldAgentEnvVars                         = "agentEnvVars"
 	ClusterFieldAgentFeatures                        = "agentFeatures"
 	ClusterFieldAgentImage                           = "agentImage"
 	ClusterFieldAgentImageOverride                   = "agentImageOverride"
 	ClusterFieldAllocatable                          = "allocatable"
 	ClusterFieldAnnotations                          = "annotations"
+	ClusterFieldAppliedAgentEnvVars                  = "appliedAgentEnvVars"
 	ClusterFieldAppliedEnableNetworkPolicy           = "appliedEnableNetworkPolicy"
 	ClusterFieldAppliedPodSecurityPolicyTemplateName = "appliedPodSecurityPolicyTemplateId"
 	ClusterFieldAppliedSpec                          = "appliedSpec"
@@ -43,6 +47,8 @@ const (
 	ClusterFieldEnableNetworkPolicy                  = "enableNetworkPolicy"
 	ClusterFieldFailedSpec                           = "failedSpec"
 	ClusterFieldFleetWorkspaceName                   = "fleetWorkspaceName"
+	ClusterFieldGKEConfig                            = "gkeConfig"
+	ClusterFieldGKEStatus                            = "gkeStatus"
 	ClusterFieldImportedConfig                       = "importedConfig"
 	ClusterFieldInternal                             = "internal"
 	ClusterFieldIstioEnabled                         = "istioEnabled"
@@ -72,12 +78,16 @@ const (
 
 type Cluster struct {
 	types.Resource
+	AKSConfig                            *AKSClusterConfigSpec          `json:"aksConfig,omitempty" yaml:"aksConfig,omitempty"`
+	AKSStatus                            *AKSStatus                     `json:"aksStatus,omitempty" yaml:"aksStatus,omitempty"`
 	APIEndpoint                          string                         `json:"apiEndpoint,omitempty" yaml:"apiEndpoint,omitempty"`
+	AgentEnvVars                         []EnvVar                       `json:"agentEnvVars,omitempty" yaml:"agentEnvVars,omitempty"`
 	AgentFeatures                        map[string]bool                `json:"agentFeatures,omitempty" yaml:"agentFeatures,omitempty"`
 	AgentImage                           string                         `json:"agentImage,omitempty" yaml:"agentImage,omitempty"`
 	AgentImageOverride                   string                         `json:"agentImageOverride,omitempty" yaml:"agentImageOverride,omitempty"`
 	Allocatable                          map[string]string              `json:"allocatable,omitempty" yaml:"allocatable,omitempty"`
 	Annotations                          map[string]string              `json:"annotations,omitempty" yaml:"annotations,omitempty"`
+	AppliedAgentEnvVars                  []EnvVar                       `json:"appliedAgentEnvVars,omitempty" yaml:"appliedAgentEnvVars,omitempty"`
 	AppliedEnableNetworkPolicy           bool                           `json:"appliedEnableNetworkPolicy,omitempty" yaml:"appliedEnableNetworkPolicy,omitempty"`
 	AppliedPodSecurityPolicyTemplateName string                         `json:"appliedPodSecurityPolicyTemplateId,omitempty" yaml:"appliedPodSecurityPolicyTemplateId,omitempty"`
 	AppliedSpec                          *ClusterSpec                   `json:"appliedSpec,omitempty" yaml:"appliedSpec,omitempty"`
@@ -109,6 +119,8 @@ type Cluster struct {
 	EnableNetworkPolicy                  *bool                          `json:"enableNetworkPolicy,omitempty" yaml:"enableNetworkPolicy,omitempty"`
 	FailedSpec                           *ClusterSpec                   `json:"failedSpec,omitempty" yaml:"failedSpec,omitempty"`
 	FleetWorkspaceName                   string                         `json:"fleetWorkspaceName,omitempty" yaml:"fleetWorkspaceName,omitempty"`
+	GKEConfig                            *GKEClusterConfigSpec          `json:"gkeConfig,omitempty" yaml:"gkeConfig,omitempty"`
+	GKEStatus                            *GKEStatus                     `json:"gkeStatus,omitempty" yaml:"gkeStatus,omitempty"`
 	ImportedConfig                       *ImportedConfig                `json:"importedConfig,omitempty" yaml:"importedConfig,omitempty"`
 	Internal                             bool                           `json:"internal,omitempty" yaml:"internal,omitempty"`
 	IstioEnabled                         bool                           `json:"istioEnabled,omitempty" yaml:"istioEnabled,omitempty"`
@@ -172,6 +184,8 @@ type ClusterOperations interface {
 	ActionRestoreFromEtcdBackup(resource *Cluster, input *RestoreFromEtcdBackupInput) error
 
 	ActionRotateCertificates(resource *Cluster, input *RotateCertificateInput) (*RotateCertificateOutput, error)
+
+	ActionRotateEncryptionKey(resource *Cluster) (*RotateEncryptionKeyOutput, error)
 
 	ActionRunSecurityScan(resource *Cluster, input *CisScanConfig) error
 
@@ -295,6 +309,12 @@ func (c *ClusterClient) ActionRestoreFromEtcdBackup(resource *Cluster, input *Re
 func (c *ClusterClient) ActionRotateCertificates(resource *Cluster, input *RotateCertificateInput) (*RotateCertificateOutput, error) {
 	resp := &RotateCertificateOutput{}
 	err := c.apiClient.Ops.DoAction(ClusterType, "rotateCertificates", &resource.Resource, input, resp)
+	return resp, err
+}
+
+func (c *ClusterClient) ActionRotateEncryptionKey(resource *Cluster) (*RotateEncryptionKeyOutput, error) {
+	resp := &RotateEncryptionKeyOutput{}
+	err := c.apiClient.Ops.DoAction(ClusterType, "rotateEncryptionKey", &resource.Resource, nil, resp)
 	return resp, err
 }
 

@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"path"
+	"strings"
 
 	"github.com/rancher/wrangler/pkg/schemas/validation"
 
@@ -39,7 +40,9 @@ func Icon(secret *corev1.Secret, repoURL string, caBundle []byte, insecureSkipTL
 		if err != nil {
 			return nil, "", err
 		}
+		base.Path = strings.TrimSuffix(base.Path, "/") + "/"
 		u = base.ResolveReference(u)
+		u.RawQuery = base.RawQuery
 	}
 
 	resp, err := client.Get(u.String())
@@ -56,6 +59,9 @@ func Icon(secret *corev1.Secret, repoURL string, caBundle []byte, insecureSkipTL
 	}
 
 	data, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, "", err
+	}
 	return ioutil.NopCloser(bytes.NewBuffer(data)), path.Ext(u.String()), nil
 }
 
@@ -79,7 +85,13 @@ func Chart(secret *corev1.Secret, repoURL string, caBundle []byte, insecureSkipT
 		if err != nil {
 			return nil, err
 		}
+		// Prevent ResolveReference from stripping the last element
+		// of the path by ensuring it has a trailing slash
+		base.Path = strings.TrimSuffix(base.Path, "/") + "/"
 		u = base.ResolveReference(u)
+		// Retain the query string of the repository URL as it might
+		// contain an access credential.
+		u.RawQuery = base.RawQuery
 	}
 
 	resp, err := client.Get(u.String())

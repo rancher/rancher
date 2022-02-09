@@ -1,3 +1,4 @@
+from ..common import *  # NOQA
 import inspect
 import json
 import os
@@ -19,20 +20,19 @@ from threading import Thread
 import websocket
 import base64
 
-DEFAULT_TIMEOUT = 120
 DEFAULT_CATALOG_TIMEOUT = 15
 DEFAULT_MONITORING_TIMEOUT = 180
-DEFAULT_CLUSTER_STATE_TIMEOUT = 240
+DEFAULT_CLUSTER_STATE_TIMEOUT = 320
 DEFAULT_MULTI_CLUSTER_APP_TIMEOUT = 300
 DEFAULT_APP_DELETION_TIMEOUT = 360
+DEFAULT_APP_V2_TIMEOUT = 60
 
-CATTLE_TEST_URL = os.environ.get('CATTLE_TEST_URL', "")
 CATTLE_API_URL = CATTLE_TEST_URL + "/v3"
 CATTLE_AUTH_URL = \
     CATTLE_TEST_URL + "/v3-public/localproviders/local?action=login"
 
-ADMIN_TOKEN = os.environ.get('ADMIN_TOKEN', "None")
-USER_TOKEN = os.environ.get('USER_TOKEN', "None")
+DNS_REGEX = "(https*://)(.*[^/])"
+
 USER_PASSWORD = os.environ.get('USER_PASSWORD', "None")
 ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', "None")
 
@@ -40,8 +40,11 @@ kube_fname = os.path.join(os.path.dirname(os.path.realpath(__file__)),
                           "k8s_kube_config")
 MACHINE_TIMEOUT = float(os.environ.get('RANCHER_MACHINE_TIMEOUT', "1200"))
 
+HARDENED_CLUSTER = ast.literal_eval(
+    os.environ.get('RANCHER_HARDENED_CLUSTER', "False"))
 TEST_OS = os.environ.get('RANCHER_TEST_OS', "linux")
-TEST_IMAGE = os.environ.get('RANCHER_TEST_IMAGE', "sangeetha/mytestcontainer")
+TEST_IMAGE = os.environ.get('RANCHER_TEST_IMAGE', "ranchertest/mytestcontainer")
+TEST_IMAGE_PORT = os.environ.get('RANCHER_TEST_IMAGE_PORT', "80")
 TEST_IMAGE_NGINX = os.environ.get('RANCHER_TEST_IMAGE_NGINX', "nginx")
 TEST_IMAGE_OS_BASE = os.environ.get('RANCHER_TEST_IMAGE_OS_BASE', "ubuntu")
 if TEST_OS == "windows":
@@ -49,7 +52,12 @@ if TEST_OS == "windows":
 skip_test_windows_os = pytest.mark.skipif(
     TEST_OS == "windows",
     reason='Tests Skipped for including Windows nodes cluster')
+skip_test_hardened = pytest.mark.skipif(
+    HARDENED_CLUSTER,
+    reason='Tests Skipped due to being a hardened cluster')
 
+UPDATE_KDM = ast.literal_eval(os.environ.get('RANCHER_UPDATE_KDM', "False"))
+KDM_URL = os.environ.get("RANCHER_KDM_URL", "")
 CLUSTER_NAME = os.environ.get("RANCHER_CLUSTER_NAME", "")
 RANCHER_CLEANUP_CLUSTER = \
     ast.literal_eval(os.environ.get('RANCHER_CLEANUP_CLUSTER', "True"))
@@ -209,20 +217,9 @@ def is_windows(os_type=TEST_OS):
     return os_type == "windows"
 
 
-def random_str():
-    return 'random-{0}-{1}'.format(random_num(), int(time.time()))
-
-
-def random_num():
-    return random.randint(0, 1000000)
-
-
-def random_int(start, end):
-    return random.randint(start, end)
-
-
-def random_test_name(name="test"):
-    return name + "-" + str(random_int(10000, 99999))
+def get_cluster_client_for_token_v1(cluster_id, token):
+    url = CATTLE_TEST_URL + "/k8s/clusters/" + cluster_id + "/v1/schemas"
+    return rancher.Client(url=url, token=token, verify=False)
 
 
 def get_admin_client():
@@ -275,24 +272,6 @@ def wait_for_condition(client, resource, check_function, fail_handler=None,
         time.sleep(.5)
         resource = client.reload(resource)
     return resource
-
-
-def wait_for(callback, timeout=DEFAULT_TIMEOUT, timeout_message=None):
-    start = time.time()
-    ret = callback()
-    while ret is None or ret is False:
-        time.sleep(.5)
-        if time.time() - start > timeout:
-            if timeout_message:
-                raise Exception(timeout_message)
-            else:
-                raise Exception('Timeout waiting for condition')
-        ret = callback()
-    return ret
-
-
-def random_name():
-    return "test" + "-" + str(random_int(10000, 99999))
 
 
 def get_setting_value_by_name(name):
@@ -413,16 +392,18 @@ def validate_all_workload_image_from_rancher(project_client, ns, pod_count=1,
                                              ignore_pod_count=False,
                                              deployment_list=None,
                                              daemonset_list=None,
-                                             cronjob_list=None):
+                                             cronjob_list=None, job_list=None):
     if cronjob_list is None:
         cronjob_list = []
     if daemonset_list is None:
         daemonset_list = []
     if deployment_list is None:
         deployment_list = []
-    workload_list = deployment_list + daemonset_list + cronjob_list
+    if job_list is None:
+        job_list = []
+    workload_list = deployment_list + daemonset_list + cronjob_list + job_list
 
-    wls = project_client.list_workload(namespaceId=ns.id).data
+    wls = [dep.name for dep in project_client.list_workload(namespaceId=ns.id).data]
     assert len(workload_list) == len(wls), \
         "Expected {} workload(s) to be present in {} namespace " \
         "but there were {}".format(len(workload_list), ns.name, len(wls))
@@ -452,6 +433,11 @@ def validate_all_workload_image_from_rancher(project_client, ns, pod_count=1,
                                   ns.name, pod_count=pod_count,
                                   ignore_pod_count=ignore_pod_count)
                 cronjob_list.remove(workload_name)
+            if workload_name in job_list:
+                validate_workload(project_client, workload, "job",
+                                  ns.name, pod_count=pod_count,
+                                  ignore_pod_count=ignore_pod_count)
+                job_list.remove(workload_name)
     # Final assertion to ensure all expected workloads have been validated
     assert not deployment_list + daemonset_list + cronjob_list
 
@@ -472,8 +458,15 @@ def validate_workload(p_client, workload, type, ns_name, pod_count=1,
         pods = p_client.list_pod(workloadId=workload.id).data
         assert len(pods) == pod_count
     for pod in pods:
-        p = wait_for_pod_to_running(p_client, pod)
-        assert p["status"]["phase"] == "Running"
+        if type == "job":
+            job_type = True
+            expected_status = "Succeeded"
+        else:
+            job_type = False
+            expected_status = "Running"
+        p = wait_for_pod_to_running(p_client, pod, job_type=job_type)
+        assert p["status"]["phase"] == expected_status
+
 
     wl_result = execute_kubectl_cmd(
         "get " + type + " " + workload.name + " -n " + ns_name)
@@ -483,6 +476,8 @@ def validate_workload(p_client, workload, type, ns_name, pod_count=1,
         assert wl_result["status"]["currentNumberScheduled"] == len(pods)
     if type == "cronJob":
         assert len(wl_result["status"]["active"]) >= len(pods)
+    if type == "job":
+        assert wl_result["status"]["succeeded"] == len(pods)
 
 
 def validate_workload_with_sidekicks(p_client, workload, type, ns_name,
@@ -642,12 +637,16 @@ def wait_for_wl_transitioning(client, workload, timeout=DEFAULT_TIMEOUT,
     return wl
 
 
-def wait_for_pod_to_running(client, pod, timeout=DEFAULT_TIMEOUT):
+def wait_for_pod_to_running(client, pod, timeout=DEFAULT_TIMEOUT, job_type=False):
     start = time.time()
     pods = client.list_pod(uuid=pod.uuid).data
     assert len(pods) == 1
     p = pods[0]
-    while p.state != "running":
+    if job_type:
+        expected_state = "succeeded"
+    else:
+        expected_state = "running"
+    while p.state != expected_state :
         if time.time() - start > timeout:
             raise AssertionError(
                 "Timed out waiting for state to get to active")
@@ -672,7 +671,7 @@ def get_schedulable_nodes(cluster, client=None, os_type=TEST_OS):
                         schedulable_nodes.append(node)
                         break
         # Including master in list of nodes as master is also schedulable
-        if 'k3s' in cluster.version["gitVersion"] and node.controlPlane:
+        if ('k3s' in cluster.version["gitVersion"] or 'rke2' in cluster.version["gitVersion"]) and node.controlPlane:
             schedulable_nodes.append(node)
     return schedulable_nodes
 
@@ -886,10 +885,11 @@ def validate_http_response(cmd, target_name_list, client_pod=None,
                 wget_cmd = "wget -qO- " + cmd
             result = kubectl_pod_exec(client_pod, wget_cmd)
             result = result.decode()
-        result = result.rstrip()
-        assert result in target_name_list
-        if result in target_hit_list:
-            target_hit_list.remove(result)
+        if result is not None:
+            result = result.rstrip()
+            assert result in target_name_list
+            if result in target_hit_list:
+                target_hit_list.remove(result)
     print("After removing all, the rest is: ", target_hit_list)
     assert len(target_hit_list) == 0
 
@@ -944,7 +944,8 @@ def validate_cluster(client, cluster, intermediate_state="provisioning",
         path = "/name.html"
         rule = {"host": host,
                 "paths":
-                    [{"workloadIds": [workload.id], "targetPort": "80"}]}
+                    [{"workloadIds": [workload.id],
+                      "targetPort": TEST_IMAGE_PORT}]}
         ingress = p_client.create_ingress(name=name,
                                           namespaceId=ns.id,
                                           rules=[rule])
@@ -984,30 +985,36 @@ def check_cluster_state(etcd_count):
     assert len(components) == 0
 
 
-def validate_dns_record(pod, record, expected):
+def validate_dns_record(pod, record, expected, port=TEST_IMAGE_PORT):
     # requires pod with `dig` available - TEST_IMAGE
     host = '{0}.{1}.svc.cluster.local'.format(
         record["name"], record["namespaceId"])
-    validate_dns_entry(pod, host, expected)
+    validate_dns_entry(pod, host, expected, port=port)
 
 
-def validate_dns_entry(pod, host, expected):
+def validate_dns_entry(pod, host, expected, port=TEST_IMAGE_PORT):
     if is_windows():
         validate_dns_entry_windows(pod, host, expected)
         return
 
     # requires pod with `dig` available - TEST_IMAGE
-    cmd = 'ping -c 1 -W 1 {0}'.format(host)
-    ping_output = kubectl_pod_exec(pod, cmd)
+    if HARDENED_CLUSTER:
+        cmd = 'curl -vs {}:{} 2>&1'.format(host, port)
+    else:
+        cmd = 'ping -c 1 -W 1 {0}'.format(host)
+    cmd_output = kubectl_pod_exec(pod, cmd)
 
-    ping_validation_pass = False
+    connectivity_validation_pass = False
     for expected_value in expected:
-        if expected_value in str(ping_output):
-            ping_validation_pass = True
+        if expected_value in str(cmd_output):
+            connectivity_validation_pass = True
             break
 
-    assert ping_validation_pass is True
-    assert " 0% packet loss" in str(ping_output)
+    assert connectivity_validation_pass is True
+    if HARDENED_CLUSTER:
+        assert " 200 OK" in str(cmd_output)
+    else:
+        assert " 0% packet loss" in str(cmd_output)
 
     dig_cmd = 'dig {0} +short'.format(host)
     dig_output = kubectl_pod_exec(pod, dig_cmd)
@@ -1117,7 +1124,7 @@ def wait_for_node_to_be_deleted(client, node, timeout=300):
     while node_count != 0:
         if time.time() - start > timeout:
             raise AssertionError(
-                "Timed out waiting for state to get to active")
+                "Timed out waiting for node delete")
         time.sleep(.5)
         nodes = client.list_node(uuid=uuid).data
         node_count = len(nodes)
@@ -1250,20 +1257,28 @@ def check_connectivity_between_workload_pods(p_client, workload):
 def check_connectivity_between_pods(pod1, pod2, allow_connectivity=True):
     pod_ip = pod2.status.podIp
 
-    cmd = "ping -c 1 -W 1 " + pod_ip
     if is_windows():
         cmd = 'ping -w 1 -n 1 {0}'.format(pod_ip)
+    elif HARDENED_CLUSTER:
+        cmd = 'curl -I {}:{}'.format(pod_ip, TEST_IMAGE_PORT)
+    else:
+        cmd = "ping -c 1 -W 1 " + pod_ip
 
     response = kubectl_pod_exec(pod1, cmd)
-    assert pod_ip in str(response)
+    if not HARDENED_CLUSTER:
+        assert pod_ip in str(response)
     if allow_connectivity:
         if is_windows():
             assert " (0% loss)" in str(response)
+        elif HARDENED_CLUSTER:
+            assert " 200 OK" in str(response)
         else:
             assert " 0% packet loss" in str(response)
     else:
         if is_windows():
             assert " (100% loss)" in str(response)
+        elif HARDENED_CLUSTER:
+            assert " 200 OK" not in str(response)
         else:
             assert " 100% packet loss" in str(response)
 
@@ -1643,7 +1658,9 @@ def wait_for_app_to_active(client, app_id,
     while application.state != "active":
         if time.time() - start > timeout:
             raise AssertionError(
-                "Timed out waiting for state to get to active")
+                "Timed out waiting for {0} to get to active,"
+                " the actual state: {1}".format(application.name,
+                                                application.state))
         time.sleep(.5)
         app = client.list_app(id=app_id).data
         assert len(app) >= 1
@@ -2201,7 +2218,7 @@ def validate_backup_create(namespace, backup_info, backup_mode=None):
     path = "/name.html"
     rule = {"host": host,
             "paths": [{"workloadIds": [backup_info["workload"].id],
-                       "targetPort": "80"}]}
+                       "targetPort": TEST_IMAGE_PORT}]}
     p_client.create_ingress(name=name,
                             namespaceId=ns.id,
                             rules=[rule])
@@ -2492,12 +2509,10 @@ class WebsocketLogParse:
     the class is used for receiving and parsing the message
     received from the websocket
     """
-
     def __init__(self):
         self.lock = Lock()
         self._last_message = ''
-
-    def receiver(self, socket, skip):
+    def receiver(self, socket, skip, b64=True):
         """
         run a thread to receive and save the message from the web socket
         :param socket: the socket connection
@@ -2511,7 +2526,8 @@ class WebsocketLogParse:
                     data = data[1:]
                 if len(data) < 5:
                     pass
-                data = base64.b64decode(data).decode()
+                if b64:
+                    data = base64.b64decode(data).decode()
                 self.lock.acquire()
                 self._last_message += data
                 self.lock.release()
@@ -2645,7 +2661,6 @@ def delete_resource_in_AWS_by_prefix(resource_prefix):
     tg_list = []
     lb_list = []
     lb_names = [resource_prefix + '-nlb',
-                resource_prefix + '-multinode-nlb',
                 resource_prefix + '-k3s-nlb',
                 resource_prefix + '-internal-nlb']
     for name in lb_names:
@@ -2663,7 +2678,7 @@ def delete_resource_in_AWS_by_prefix(resource_prefix):
         AmazonWebServices().delete_target_group(tg)
 
     # delete rds
-    db_name = resource_prefix + "-multinode-db"
+    db_name = resource_prefix + "-db"
     print("deleting the database (if it exists): {}".format(db_name))
     AmazonWebServices().delete_db(db_name)
 
@@ -2865,3 +2880,87 @@ def validate_cluster_role_rbac(cluster_role, command, authorization, name):
             "{} should NOT have the authorization to run {}".format(
                 cluster_role, command)
 
+
+def wait_until_app_v2_deployed(client, app_name, timeout=DEFAULT_APP_V2_TIMEOUT):
+    """
+    List all installed apps and check for the state of "app_name" to see
+    if it == "deployed"
+    :param client: cluster client for the user
+    :param app_name: app which is being installed
+    :param timeout: time for the app to come to Deployed state
+    :return:
+    """
+    start = time.time()
+    app = client.list_catalog_cattle_io_app()
+    while True:
+        app_list = []
+        if time.time() - start > timeout:
+            raise AssertionError(
+                "Timed out waiting for state to get to Deployed")
+        time.sleep(.5)
+        for app in app["data"]:
+            app_list.append(app["metadata"]["name"])
+            if app["metadata"]["name"] == app_name:
+                if app["status"]["summary"]["state"] == "deployed":
+                    return app_list
+        app = client.list_catalog_cattle_io_app()
+    return
+
+
+def wait_until_app_v2_uninstall(client, app_name, timeout=DEFAULT_APP_V2_TIMEOUT):
+    """
+    list all installed apps. search for "app_name" in the list
+    if app_name is NOT in list, indicates the app has been uninstalled successfully
+    :param client: cluster client for the user
+    :param app_name: app which is being unstalled
+    :param timeout: time for app to be uninstalled
+    """
+    start = time.time()
+    app = client.list_catalog_cattle_io_app()
+    while True:
+        app_list = []
+        if time.time() - start > timeout:
+            raise AssertionError(
+                "Timed out waiting for state to get to Uninstalled")
+        time.sleep(.5)
+        for app in app["data"]:
+            app_list.append(app["metadata"]["name"])
+        if app_name not in app_list:
+            return app_list
+        app = client.list_catalog_cattle_io_app()
+    return
+
+
+def check_v2_app_and_uninstall(client, chart_name):
+    app = client.list_catalog_cattle_io_app()
+    for app in app["data"]:
+        if app["metadata"]["name"] == chart_name:
+            response = client.action(obj=app, action_name="uninstall")
+            app_list = wait_until_app_v2_uninstall(client, chart_name)
+            assert chart_name not in app_list, \
+                "App has not uninstalled"
+
+
+def update_and_validate_kdm(kdm_url, admin_token=ADMIN_TOKEN,
+                            rancher_api_url=CATTLE_API_URL):
+    print("Updating KDM to use {}".format(kdm_url))
+    header = {'Authorization': 'Bearer ' + admin_token}
+    api_url = rancher_api_url + "/settings/rke-metadata-config"
+    kdm_json = {
+        "name": "rke-metadata-config",
+        "value": json.dumps({
+            "refresh-interval-minutes": "1440",
+            "url": kdm_url
+        })
+    }
+    r = requests.put(api_url, verify=False, headers=header, json=kdm_json)
+    r_content = json.loads(r.content)
+    assert r.ok
+    assert r_content['name'] == kdm_json['name']
+    assert r_content['value'] == kdm_json['value']
+    time.sleep(2)
+
+    # Refresh Kubernetes Metadata
+    kdm_refresh_url = rancher_api_url + "/kontainerdrivers?action=refresh"
+    response = requests.post(kdm_refresh_url, verify=False, headers=header)
+    assert response.ok

@@ -1,0 +1,42 @@
+{{- if .Values.postDelete.enabled }}
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: {{ template "rancher.fullname" . }}-post-delete
+  labels: {{ include "rancher.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": post-delete
+    "helm.sh/hook-weight": "1"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded,hook-failed
+rules:
+  - apiGroups: [ "extensions","apps" ]
+    resources: [ "deployments" ]
+    verbs: [ "get", "list", "delete" ]
+  - apiGroups: [ "batch" ]
+    resources: [ "jobs" ]
+    verbs: [ "get", "list", "watch", "delete", "create" ]
+  - apiGroups: [ "rbac.authorization.k8s.io" ]
+    resources: [ "clusterroles", "clusterrolebindings", "roles", "rolebindings" ]
+    verbs: [ "get", "list", "delete", "create" ]
+  - apiGroups: [ "" ]
+    resources: [ "pods", "secrets", "services", "configmaps" ]
+    verbs: [ "get", "list", "delete" ]
+  - apiGroups: [ "" ]
+    resources: [ "serviceaccounts" ]
+    verbs: [ "get", "list", "delete", "create" ]
+  - apiGroups: [ "networking.k8s.io" ]
+    resources: [ "networkpolicies" ]
+    verbs: [ "get", "list", "delete" ]
+  - apiGroups: [ "admissionregistration.k8s.io" ]
+    resources: [ "validatingwebhookconfigurations", "mutatingwebhookconfigurations" ]
+    verbs: [ "get", "list", "delete" ]
+  - apiGroups: [ "policy" ]
+    resources: [ "podsecuritypolicies" ]
+    verbs: [ "use", "delete", "create" ]
+  - apiGroups: [ "networking.k8s.io" ]
+    resources: [ "ingresses" ]
+    verbs: [ "delete" ]
+  - apiGroups: [ "cert-manager.io" ]
+    resources: [ "issuers" ]
+    verbs: [ "delete" ]
+{{- end }}

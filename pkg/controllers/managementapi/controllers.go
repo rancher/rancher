@@ -8,10 +8,8 @@ import (
 	"github.com/rancher/rancher/pkg/clustermanager"
 	"github.com/rancher/rancher/pkg/controllers/management/auth"
 	podsecuritypolicy2 "github.com/rancher/rancher/pkg/controllers/management/podsecuritypolicy"
-	"github.com/rancher/rancher/pkg/controllers/managementagent/monitoring"
 	"github.com/rancher/rancher/pkg/controllers/managementapi/catalog"
 	"github.com/rancher/rancher/pkg/controllers/managementapi/dynamicschema"
-	"github.com/rancher/rancher/pkg/controllers/managementapi/k3smetadata"
 	"github.com/rancher/rancher/pkg/controllers/managementapi/samlconfig"
 	"github.com/rancher/rancher/pkg/controllers/managementapi/usercontrollers"
 	whitelistproxyKontainerDriver "github.com/rancher/rancher/pkg/controllers/managementapi/whitelistproxy/kontainerdriver"
@@ -19,6 +17,8 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/managementuser/clusterauthtoken"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/rbac"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/rbac/podsecuritypolicy"
+	"github.com/rancher/rancher/pkg/controllers/managementuserlegacy/monitoring"
+	"github.com/rancher/rancher/pkg/controllers/provisioningv2/cluster"
 	"github.com/rancher/rancher/pkg/types/config"
 )
 
@@ -32,7 +32,6 @@ func Register(ctx context.Context, scaledContext *config.ScaledContext, clusterM
 	whitelistproxyNodeDriver.Register(ctx, scaledContext)
 	whitelistproxyKontainerDriver.Register(ctx, scaledContext)
 	samlconfig.Register(ctx, scaledContext)
-	k3smetadata.Register(ctx, scaledContext)
 	usercontrollers.Register(ctx, scaledContext, clusterManager)
 	return nil
 }
@@ -59,5 +58,6 @@ func registerIndexers(ctx context.Context, scaledContext *config.ScaledContext) 
 	if err := podsecuritypolicy2.RegisterIndexers(ctx, scaledContext); err != nil {
 		return err
 	}
+	cluster.RegisterIndexers(scaledContext)
 	return nil
 }

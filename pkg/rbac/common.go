@@ -7,18 +7,29 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/types"
+	provv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
+	v32 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/ref"
+	k8srbacv1 "github.com/rancher/wrangler/pkg/generated/controllers/rbac/v1"
+	"github.com/rancher/wrangler/pkg/name"
+	"github.com/sirupsen/logrus"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const (
-	NamespaceID           = "namespaceId"
-	ProjectID             = "projectId"
-	ClusterID             = "clusterId"
-	GlobalAdmin           = "admin"
-	GlobalRestrictedAdmin = "restricted-admin"
+	NamespaceID                       = "namespaceId"
+	ProjectID                         = "projectId"
+	ClusterID                         = "clusterId"
+	GlobalAdmin                       = "admin"
+	GlobalRestrictedAdmin             = "restricted-admin"
+	ClusterCRDsClusterRole            = "cluster-crd-clusterRole"
+	RestrictedAdminClusterRoleBinding = "restricted-admin-rb-cluster"
+	ProjectCRDsClusterRole            = "project-crd-clusterRole"
+	RestrictedAdminProjectRoleBinding = "restricted-admin-rb-project"
+	RestrictedAdminCRForClusters      = "restricted-admin-cr-clusters"
+	RestrictedAdminCRBForClusters     = "restricted-admin-crb-clusters"
 )
 
 // BuildSubjectFromRTB This function will generate
@@ -154,4 +165,90 @@ func TypeFromContext(apiContext *types.APIContext, resource *types.RawResource) 
 
 func GetRTBLabel(objMeta metav1.ObjectMeta) string {
 	return objMeta.Namespace + "_" + objMeta.Name
+}
+
+// NameForRoleBinding returns a deterministic name for a RoleBinding with the provided namespace, roleName, and subject
+func NameForRoleBinding(namespace string, role rbacv1.RoleRef, subject rbacv1.Subject) string {
+	var name strings.Builder
+	name.WriteString("rb-")
+	name.WriteString(getBindingHash(namespace, role, subject))
+	nm := name.String()
+	logrus.Debugf("RoleBinding with namespace=%s role.kind=%s role.name=%s subject.kind=%s subject.name=%s has name: %s", namespace, role.Kind, role.Name, subject.Kind, subject.Name, nm)
+	return nm
+}
+
+// NameForClusterRoleBinding returns a deterministic name for a ClusterRoleBinding with the provided roleName and subject
+func NameForClusterRoleBinding(role rbacv1.RoleRef, subject rbacv1.Subject) string {
+	var name strings.Builder
+	name.WriteString("crb-")
+	name.WriteString(getBindingHash("", role, subject))
+	nm := name.String()
+	logrus.Debugf("ClusterRoleBinding with role.kind=%s role.name=%s subject.kind=%s subject.name=%s has name: %s", role.Kind, role.Name, subject.Kind, subject.Name, nm)
+	return nm
+}
+
+// getBindingHash returns a hash created from the passed in arguments
+// uses base32 encoding for hash, since all characters in encoding scheme are valid in k8s resource names
+// probability of collision is: 1/32^10 == 1/(2^5)^10 == 1/2^50 (sufficiently low)
+func getBindingHash(namespace string, role rbacv1.RoleRef, subject rbacv1.Subject) string {
+	var input strings.Builder
+	input.WriteString(namespace)
+	input.WriteString(role.Kind)
+	input.WriteString(role.Name)
+	input.WriteString(subject.Kind)
+	input.WriteString(subject.Name)
+
+	hasher := sha256.New()
+	hasher.Write([]byte(input.String()))
+	digest := base32.StdEncoding.WithPadding(-1).EncodeToString(hasher.Sum(nil))
+	return strings.ToLower(digest[:10])
+}
+
+// RulesFromTemplate gets all rules from the template and all referenced templates
+func RulesFromTemplate(clusterRoles k8srbacv1.ClusterRoleCache, roleTemplates v32.RoleTemplateCache, rt *v3.RoleTemplate) ([]rbacv1.PolicyRule, error) {
+	var rules []rbacv1.PolicyRule
+	var err error
+	templatesSeen := make(map[string]bool)
+
+	// Kickoff gathering rules
+	rules, err = gatherRules(clusterRoles, roleTemplates, rt, rules, templatesSeen)
+	if err != nil {
+		return rules, err
+	}
+	return rules, nil
+}
+
+// gatherRules appends the rules from current template and does a recursive call to get all inherited roles referenced
+func gatherRules(clusterRoles k8srbacv1.ClusterRoleCache, roleTemplates v32.RoleTemplateCache, rt *v3.RoleTemplate, rules []rbacv1.PolicyRule, seen map[string]bool) ([]rbacv1.PolicyRule, error) {
+	seen[rt.Name] = true
+
+	if rt.External && rt.Context == "cluster" {
+		cr, err := clusterRoles.Get(rt.Name)
+		if err != nil {
+			return nil, err
+		}
+		rules = append(rules, cr.Rules...)
+	}
+
+	rules = append(rules, rt.Rules...)
+
+	for _, r := range rt.RoleTemplateNames {
+		// If we have already seen the roleTemplate, skip it
+		if seen[r] {
+			continue
+		}
+		next, err := roleTemplates.Get(r)
+		if err != nil {
+			return nil, err
+		}
+		rules, err = gatherRules(clusterRoles, roleTemplates, next, rules, seen)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return rules, nil
+}
+
+func ProvisioningClusterAdminName(cluster *provv1.Cluster) string {
+	return name.SafeConcatName("crt", cluster.Name, "cluster-owner")
 }

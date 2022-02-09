@@ -3,11 +3,11 @@ package cluster
 import (
 	"fmt"
 
-	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	gaccess "github.com/rancher/rancher/pkg/api/norman/customization/globalnamespaceaccess"
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/catalog/manager"
 	mgmtclient "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	"github.com/rancher/rancher/pkg/clustermanager"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
@@ -18,10 +18,13 @@ import (
 
 type ActionHandler struct {
 	NodepoolGetter                v3.NodePoolsGetter
+	NodeLister                    v3.NodeLister
 	ClusterClient                 v3.ClusterInterface
+	CatalogManager                manager.CatalogManager
 	NodeTemplateGetter            v3.NodeTemplatesGetter
 	UserMgr                       user.Manager
 	ClusterManager                *clustermanager.Manager
+	CatalogTemplateVersionLister  v3.CatalogTemplateVersionLister
 	BackupClient                  v3.EtcdBackupInterface
 	ClusterScanClient             v3.ClusterScanInterface
 	ClusterTemplateClient         v3.ClusterTemplateInterface
@@ -31,6 +34,7 @@ type ActionHandler struct {
 	CisBenchmarkVersionLister     v3.CisBenchmarkVersionLister
 	CisConfigClient               v3.CisConfigInterface
 	CisConfigLister               v3.CisConfigLister
+	TokenClient                   v3.TokenInterface
 }
 
 func (a ActionHandler) ClusterActionHandler(actionName string, action *types.Action, apiContext *types.APIContext) error {
@@ -38,7 +42,6 @@ func (a ActionHandler) ClusterActionHandler(actionName string, action *types.Act
 		cluster := map[string]interface{}{
 			"id": apiContext.ID,
 		}
-
 		return apiContext.AccessControl.CanDo(v3.ClusterGroupVersionKind.Group, v3.ClusterResource.Name, "update", apiContext, cluster, apiContext.Schema) == nil
 	}
 
@@ -52,7 +55,6 @@ func (a ActionHandler) ClusterActionHandler(actionName string, action *types.Act
 	}
 
 	canCreateClusterTemplate := func() bool {
-
 		callerID := apiContext.Request.Header.Get(gaccess.ImpersonateUserHeader)
 		canCreateTemplates, _ := CanCreateRKETemplate(callerID, a.SubjectAccessReviewClient)
 		return canCreateTemplates
@@ -97,6 +99,11 @@ func (a ActionHandler) ClusterActionHandler(actionName string, action *types.Act
 			return httperror.NewAPIError(httperror.PermissionDenied, "can not rotate certificates")
 		}
 		return a.RotateCertificates(actionName, action, apiContext)
+	case v32.ClusterActionRotateEncryptionKey:
+		if !canUpdateCluster() {
+			return httperror.NewAPIError(httperror.PermissionDenied, "can not rotate encryption key")
+		}
+		return a.RotateEncryptionKey(actionName, action, apiContext)
 	case v32.ClusterActionRunSecurityScan:
 		return a.runCisScan(actionName, action, apiContext)
 	case v32.ClusterActionSaveAsTemplate:
@@ -111,18 +118,23 @@ func (a ActionHandler) ClusterActionHandler(actionName string, action *types.Act
 	return httperror.NewAPIError(httperror.NotFound, "not found")
 }
 
-func (a ActionHandler) getClusterToken(clusterID string, apiContext *types.APIContext) (string, error) {
+func (a ActionHandler) ensureClusterToken(clusterID string, apiContext *types.APIContext) (string, error) {
 	userName := a.UserMgr.GetUser(apiContext)
-	return a.UserMgr.EnsureClusterToken(clusterID, fmt.Sprintf("kubeconfig-%s.%s", userName, clusterID), "Kubeconfig token", "kubeconfig", userName)
+	tokenNamePrefix := fmt.Sprintf("kubeconfig-%s", userName)
+
+	token, err := a.UserMgr.EnsureClusterToken(clusterID, tokenNamePrefix, "Kubeconfig token", "kubeconfig", userName, nil, true)
+	return token, err
 }
 
-func (a ActionHandler) getToken(apiContext *types.APIContext) (string, error) {
+func (a ActionHandler) ensureToken(apiContext *types.APIContext) (string, error) {
 	userName := a.UserMgr.GetUser(apiContext)
-	return a.UserMgr.EnsureToken("kubeconfig-"+userName, "Kubeconfig token", "kubeconfig", userName)
+	tokenNamePrefix := fmt.Sprintf("kubeconfig-%s", userName)
+	token, err := a.UserMgr.EnsureToken(tokenNamePrefix, "Kubeconfig token", "kubeconfig", userName, nil, true)
+	return token, err
 }
 
-func (a ActionHandler) getKubeConfig(apiContext *types.APIContext, cluster *mgmtclient.Cluster) (*clientcmdapi.Config, error) {
-	token, err := a.getToken(apiContext)
+func (a ActionHandler) generateKubeConfig(apiContext *types.APIContext, cluster *mgmtclient.Cluster) (*clientcmdapi.Config, error) {
+	token, err := a.ensureToken(apiContext)
 	if err != nil {
 		return nil, err
 	}

@@ -42,7 +42,7 @@ IP = get_ip()
 SERVER_URL = 'https://' + IP + ':8443'
 BASE_URL = SERVER_URL + '/v3'
 AUTH_URL = BASE_URL + '-public/localproviders/local?action=login'
-DEFAULT_TIMEOUT = 45
+DEFAULT_TIMEOUT = 120
 DEFAULT_CATALOG = "https://github.com/rancher/integration-test-charts"
 WAIT_HTTP_ERROR_CODES = [404, 405]
 
@@ -435,8 +435,7 @@ def raw_remove_custom_resource(admin_mc, request):
                     version,
                     metadata["namespace"],
                     crd.spec.names.plural,
-                    metadata["name"],
-                    {})
+                    metadata["name"])
             except ApiException as e:
                 body = json.loads(e.body)
                 if body["code"] not in WAIT_HTTP_ERROR_CODES:

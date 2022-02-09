@@ -31,15 +31,19 @@ import (
 	data2 "github.com/rancher/wrangler/pkg/data"
 	"github.com/rancher/wrangler/pkg/data/convert"
 	corev1controllers "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
+	rbacv1controllers "github.com/rancher/wrangler/pkg/generated/controllers/rbac/v1"
+	"github.com/rancher/wrangler/pkg/name"
 	"github.com/rancher/wrangler/pkg/schemas/validation"
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
+	v1internal "k8s.io/kubernetes/pkg/apis/core/v1"
 	"sigs.k8s.io/yaml"
 )
 
@@ -58,6 +62,15 @@ var (
 	}
 )
 
+var (
+	podOptionsScheme = runtime.NewScheme()
+	podOptionsCodec  = runtime.NewParameterCodec(podOptionsScheme)
+)
+
+func init() {
+	v1internal.AddToScheme(podOptionsScheme)
+}
+
 type Operations struct {
 	namespace      string
 	contentManager *content.Manager
@@ -66,12 +79,15 @@ type Operations struct {
 	ops            catalogcontrollers.OperationClient
 	pods           corev1controllers.PodClient
 	apps           catalogcontrollers.AppClient
+	roles          rbacv1controllers.RoleClient
+	roleBindings   rbacv1controllers.RoleBindingClient
 	cg             proxy.ClientGetter
 }
 
 func NewOperations(
 	cg proxy.ClientGetter,
 	catalog catalogcontrollers.Interface,
+	rbac rbacv1controllers.Interface,
 	contentManager *content.Manager,
 	pods corev1controllers.PodClient) *Operations {
 	return &Operations{
@@ -83,11 +99,18 @@ func NewOperations(
 		clusterRepos:   catalog.ClusterRepo(),
 		ops:            catalog.Operation(),
 		apps:           catalog.App(),
+		roleBindings:   rbac.RoleBinding(),
+		roles:          rbac.Role(),
 	}
 }
 
 func (s *Operations) Uninstall(ctx context.Context, user user.Info, namespace, name string, options io.Reader) (*catalog.Operation, error) {
 	status, cmds, err := s.getUninstallArgs(namespace, name, options)
+	if err != nil {
+		return nil, err
+	}
+
+	user, err = s.getUser(user, namespace, name, true)
 	if err != nil {
 		return nil, err
 	}
@@ -101,7 +124,7 @@ func (s *Operations) Upgrade(ctx context.Context, user user.Info, namespace, nam
 		return nil, err
 	}
 
-	user, err = s.getUser(user, namespace, name)
+	user, err = s.getUser(user, namespace, name, false)
 	if err != nil {
 		return nil, err
 	}
@@ -115,7 +138,7 @@ func (s *Operations) Install(ctx context.Context, user user.Info, namespace, nam
 		return nil, err
 	}
 
-	user, err = s.getUser(user, namespace, name)
+	user, err = s.getUser(user, namespace, name, false)
 	if err != nil {
 		return nil, err
 	}
@@ -124,7 +147,7 @@ func (s *Operations) Install(ctx context.Context, user user.Info, namespace, nam
 }
 
 func decodeParams(req *http.Request, target runtime.Object) error {
-	return scheme.ParameterCodec.DecodeParameters(req.URL.Query(), corev1.SchemeGroupVersion, target)
+	return podOptionsCodec.DecodeParameters(req.URL.Query(), corev1.SchemeGroupVersion, target)
 }
 
 func (s *Operations) proxyLogRequest(rw http.ResponseWriter, req *http.Request, pod *v1.Pod, client kubernetes.Interface) error {
@@ -147,6 +170,11 @@ func (s *Operations) proxyLogRequest(rw http.ResponseWriter, req *http.Request, 
 		Director: func(req *http.Request) {
 			req.URL = logURL
 			req.Host = logURL.Host
+			for key := range req.Header {
+				if strings.HasPrefix(key, "Impersonate-Extra-") {
+					delete(req.Header, key)
+				}
+			}
 			delete(req.Header, "Impersonate-Group")
 			delete(req.Header, "Impersonate-User")
 			delete(req.Header, "Authorization")
@@ -187,7 +215,28 @@ func (s *Operations) Log(rw http.ResponseWriter, req *http.Request, namespace, n
 	return s.proxyLogRequest(rw, req, pod, client)
 }
 
-func (s *Operations) getSpec(namespace, name string) (*catalog.RepoSpec, error) {
+func (s *Operations) getSpec(namespace, name string, isApp bool) (*catalog.RepoSpec, error) {
+	if isApp {
+		rel, err := s.apps.Get(namespace, name, metav1.GetOptions{})
+		if err != nil {
+			return nil, err
+		}
+
+		if rel.Spec.Chart != nil && rel.Spec.Chart.Metadata != nil {
+			isClusterRepo := rel.Spec.Chart.Metadata.Annotations["catalog.cattle.io/ui-source-repo-type"]
+			if isClusterRepo != "cluster" {
+				return &catalog.RepoSpec{}, nil
+			}
+			clusterRepoName := rel.Spec.Chart.Metadata.Annotations["catalog.cattle.io/ui-source-repo"]
+			clusterRepo, err := s.clusterRepos.Get(clusterRepoName, metav1.GetOptions{})
+			if err != nil {
+				// don't report error if annotation doesn't exist
+				return &catalog.RepoSpec{}, nil
+			}
+			return &clusterRepo.Spec, nil
+		}
+		return &catalog.RepoSpec{}, nil
+	}
 	if namespace == "" {
 		clusterRepo, err := s.clusterRepos.Get(name, metav1.GetOptions{})
 		if err != nil {
@@ -199,8 +248,8 @@ func (s *Operations) getSpec(namespace, name string) (*catalog.RepoSpec, error) 
 	panic("namespace should not be empty")
 }
 
-func (s *Operations) getUser(userInfo user.Info, namespace, name string) (user.Info, error) {
-	repoSpec, err := s.getSpec(namespace, name)
+func (s *Operations) getUser(userInfo user.Info, namespace, name string, isApp bool) (user.Info, error) {
+	repoSpec, err := s.getSpec(namespace, name, isApp)
 	if err != nil {
 		return nil, err
 	}
@@ -216,7 +265,7 @@ func (s *Operations) getUser(userInfo user.Info, namespace, name string) (user.I
 		return userInfo, nil
 	}
 	return &user.DefaultInfo{
-		Name: fmt.Sprintf("system:serviceaccount:%s:%s", repoSpec.ServiceAccount, serviceAccountNS),
+		Name: fmt.Sprintf("system:serviceaccount:%s:%s", serviceAccountNS, repoSpec.ServiceAccount),
 		Groups: []string{
 			"system:serviceaccounts",
 			"system:serviceaccounts:" + serviceAccountNS,
@@ -622,8 +671,66 @@ func (s *Operations) createOperation(ctx context.Context, user user.Info, status
 		return nil, err
 	}
 
+	if err := s.createRoleAndRoleBindings(op, user.GetName()); err != nil {
+		return nil, err
+	}
+
 	op.Status = status
 	return s.ops.UpdateStatus(op)
+}
+
+func (s *Operations) createRoleAndRoleBindings(op *catalog.Operation, user string) error {
+	ownerRef := metav1.OwnerReference{
+		APIVersion: op.APIVersion,
+		Kind:       op.Kind,
+		Name:       op.Name,
+		UID:        op.UID,
+	}
+	role := &rbacv1.Role{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            name.SafeConcatName(op.GetName(), user, "role"),
+			Namespace:       op.Namespace,
+			OwnerReferences: []metav1.OwnerReference{ownerRef},
+		},
+		Rules: []rbacv1.PolicyRule{
+			{
+				Verbs:         []string{"get"},
+				Resources:     []string{"operations"},
+				APIGroups:     []string{"catalog.cattle.io"},
+				ResourceNames: []string{op.Name},
+			},
+		},
+	}
+
+	roleBinding := &rbacv1.RoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            name.SafeConcatName(op.GetName(), user, "rolebinding"),
+			Namespace:       op.Namespace,
+			OwnerReferences: []metav1.OwnerReference{ownerRef},
+		},
+		Subjects: []rbacv1.Subject{
+			{
+				APIGroup: rbacv1.GroupName,
+				Kind:     rbacv1.UserKind,
+				Name:     user,
+			},
+		},
+		RoleRef: rbacv1.RoleRef{
+			APIGroup: rbacv1.GroupName,
+			Kind:     "Role",
+			Name:     role.Name,
+		},
+	}
+
+	if _, err := s.roles.Create(role); err != nil {
+		return err
+	}
+
+	if _, err := s.roleBindings.Create(roleBinding); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (s *Operations) createNamespace(ctx context.Context, namespace, projectID string) (*v1.Namespace, error) {
@@ -714,8 +821,26 @@ func (s *Operations) createPod(secretData map[string][]byte) (*v1.Pod, *podimper
 			Tolerations: []v1.Toleration{
 				{
 					Key:      "cattle.io/os",
-					Operator: "Equal",
+					Operator: corev1.TolerationOpEqual,
 					Value:    "linux",
+					Effect:   "NoSchedule",
+				},
+				{
+					Key:      "node-role.kubernetes.io/controlplane",
+					Operator: corev1.TolerationOpEqual,
+					Value:    "true",
+					Effect:   "NoSchedule",
+				},
+				{
+					Key:      "node-role.kubernetes.io/etcd",
+					Operator: corev1.TolerationOpEqual,
+					Value:    "true",
+					Effect:   "NoExecute",
+				},
+				{
+					Key:      "node.cloudprovider.kubernetes.io/uninitialized",
+					Operator: corev1.TolerationOpEqual,
+					Value:    "true",
 					Effect:   "NoSchedule",
 				},
 			},

@@ -8,11 +8,12 @@ import (
 	"strings"
 
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/controllers/dashboard/clusterregistrationtoken"
+	"github.com/rancher/rancher/pkg/tunnelserver/mcmauthorizer"
 
 	rketypes "github.com/rancher/rke/types"
 
 	"github.com/pkg/errors"
-	"github.com/rancher/rancher/pkg/api/norman/customization/clusterregistrationtokens"
 	util "github.com/rancher/rancher/pkg/cluster"
 	kd "github.com/rancher/rancher/pkg/controllers/management/kontainerdrivermetadata"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
@@ -22,7 +23,6 @@ import (
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/systemaccount"
 	"github.com/rancher/rancher/pkg/taints"
-	"github.com/rancher/rancher/pkg/tunnelserver"
 	"github.com/rancher/rancher/pkg/types/config"
 	rkepki "github.com/rancher/rke/pki"
 	rkeservices "github.com/rancher/rke/services"
@@ -37,7 +37,7 @@ const (
 )
 
 type RKENodeConfigServer struct {
-	auth                 *tunnelserver.Authorizer
+	auth                 *mcmauthorizer.Authorizer
 	lookup               *BundleLookup
 	systemAccountManager *systemaccount.Manager
 	serviceOptionsLister v3.RkeK8sServiceOptionLister
@@ -47,7 +47,7 @@ type RKENodeConfigServer struct {
 	nodes                v3.NodeInterface
 }
 
-func Handler(auth *tunnelserver.Authorizer, scaledContext *config.ScaledContext) http.Handler {
+func Handler(auth *mcmauthorizer.Authorizer, scaledContext *config.ScaledContext) http.Handler {
 	return &RKENodeConfigServer{
 		auth:                 auth,
 		lookup:               NewLookup(scaledContext.Core.Namespaces(""), scaledContext.Core),
@@ -96,14 +96,15 @@ func (n *RKENodeConfigServer) ServeHTTP(rw http.ResponseWriter, req *http.Reques
 		return
 	}
 
+	if client.Cluster.Status.AppliedSpec.RancherKubernetesEngineConfig == nil {
+		rw.WriteHeader(http.StatusServiceUnavailable)
+		return
+	}
+
 	var nodeConfig *rkeworker.NodeConfig
 	if IsNonWorker(client.Node.Status.NodeConfig.Role) {
 		nodeConfig, err = n.nonWorkerConfig(req.Context(), client.Cluster, client.Node)
 	} else {
-		if client.Cluster.Status.AppliedSpec.RancherKubernetesEngineConfig == nil {
-			rw.WriteHeader(http.StatusServiceUnavailable)
-			return
-		}
 		if client.NodeVersion != 0 {
 			logrus.Debugf("cluster [%s] worker-upgrade: received node-version [%v] for node [%s]", client.Cluster.Name,
 				client.NodeVersion, client.Node.Name)
@@ -252,7 +253,7 @@ func FilterHostForSpec(spec *rketypes.RancherKubernetesEngineConfig, n *v3.Node)
 }
 
 func AugmentProcesses(token string, processes map[string]rketypes.Process, worker bool, nodeName string,
-	cluster *v3.Cluster) map[string]rketypes.Process {
+	cluster *v3.Cluster) (map[string]rketypes.Process, error) {
 	var shared bool
 
 OuterLoop:
@@ -268,17 +269,21 @@ OuterLoop:
 
 	if shared {
 		agentImage := settings.AgentImage.Get()
-		nodeCommand := clusterregistrationtokens.NodeCommand(token, cluster) + " --no-register --only-write-certs --node-name " + nodeName
-		args := []string{"--", "share-root.sh", strings.TrimPrefix(nodeCommand, "sudo ")}
+		nodeCommand, err := clusterregistrationtoken.ShareMntCommand(nodeName, token, cluster)
+		if err != nil {
+			return nil, err
+		}
 		privateRegistryConfig, _ := util.GenerateClusterPrivateRegistryDockerConfig(cluster)
 		processes["share-mnt"] = rketypes.Process{
-			Name:                    "share-mnt",
-			Args:                    args,
-			Image:                   image.ResolveWithCluster(agentImage, cluster),
-			Binds:                   []string{"/var/run:/var/run"},
+			Name:  "share-mnt",
+			Args:  nodeCommand,
+			Image: image.ResolveWithCluster(agentImage, cluster),
+			Binds: []string{
+				"/var/run:/var/run",
+				"/etc/kubernetes:/etc/kubernetes",
+			},
 			NetworkMode:             "host",
 			RestartPolicy:           "always",
-			PidMode:                 "host",
 			Privileged:              true,
 			ImageRegistryAuthConfig: privateRegistryConfig,
 		}
@@ -307,7 +312,7 @@ OuterLoop:
 		}
 	}
 
-	return processes
+	return processes, nil
 }
 
 func EnhanceWindowsProcesses(processes map[string]rketypes.Process) map[string]rketypes.Process {

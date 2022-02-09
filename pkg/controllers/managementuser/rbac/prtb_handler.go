@@ -2,6 +2,7 @@ package rbac
 
 import (
 	"reflect"
+	"sort"
 
 	"github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
@@ -22,22 +23,25 @@ import (
 
 const owner = "owner-user"
 
-var globalResourcesNeededInProjects = map[string]map[string]bool{
+var globalResourcesNeededInProjects = map[string][]string{
+	"navlinks": {
+		"ui.cattle.io",
+	},
 	"persistentvolumes": {
-		"":     true,
-		"core": true,
+		"",
+		"core",
 	},
 	"storageclasses": {
-		"storage.k8s.io": true,
+		"storage.k8s.io",
 	},
 	"apiservices": {
-		"apiregistration.k8s.io": true,
+		"apiregistration.k8s.io",
 	},
 	"clusterrepos": {
-		"catalog.cattle.io": true,
+		"catalog.cattle.io",
 	},
 	"clusters": {
-		"management.cattle.io": true,
+		"management.cattle.io",
 	},
 }
 
@@ -102,6 +106,10 @@ func (p *prtbLifecycle) syncPRTB(binding *v3.ProjectRoleTemplateBinding) error {
 		}
 	}
 
+	if err := p.m.ensureServiceAccountImpersonator(binding.UserName, binding.GroupName); err != nil {
+		return errors.Wrapf(err, "couldn't ensure service account impersonator")
+	}
+
 	return p.reconcileProjectAccessToGlobalResources(binding, roles)
 }
 
@@ -128,6 +136,10 @@ func (p *prtbLifecycle) ensurePRTBDelete(binding *v3.ProjectRoleTemplateBinding)
 				}
 			}
 		}
+	}
+
+	if err := p.m.deleteServiceAccountImpersonator(binding.UserName); err != nil {
+		return errors.Wrap(err, "error deleting service account impersonator")
 	}
 
 	return p.reconcileProjectAccessToGlobalResourcesForDelete(binding)
@@ -246,7 +258,7 @@ func (m *manager) checkForGlobalResourceRules(role *v3.RoleTemplate, resource st
 	return verbs, nil
 }
 
-// Ensure the clusterRole used to grant access of global resources to users/groups in projects has appropriate rulesfor the give resource and verbs
+// Ensure the clusterRole used to grant access of global resources to users/groups in projects has appropriate rules for the given resource and verbs
 func (m *manager) reconcileRoleForProjectAccessToGlobalResource(resource string, rt *v3.RoleTemplate, newVerbs map[string]bool) (string, error) {
 	clusterRoles := m.workload.RBAC.ClusterRoles("")
 	roleName := rt.Name + "-promoted"
@@ -305,7 +317,7 @@ func checkGroup(resource string, rule rbacv1.PolicyRule) bool {
 	}
 
 	for _, rg := range rule.APIGroups {
-		if _, ok := groups[rg]; ok {
+		if slice.ContainsString(groups, rg) {
 			return true
 		}
 	}
@@ -317,10 +329,16 @@ func buildRule(resource string, verbs map[string]bool) rbacv1.PolicyRule {
 	for v := range verbs {
 		vs = append(vs, v)
 	}
+
+	// Sort the verbs, a map does not guarantee order
+	sort.Strings(vs)
+
+	groups := globalResourcesNeededInProjects[resource]
+
 	return rbacv1.PolicyRule{
 		Resources: []string{resource},
 		Verbs:     vs,
-		APIGroups: []string{"*"},
+		APIGroups: groups,
 	}
 }
 
@@ -356,6 +374,9 @@ func (p *prtbLifecycle) reconcilePRTBUserClusterLabels(binding *v3.ProjectRoleTe
 			if updateErr != nil {
 				return updateErr
 			}
+			if crbToUpdate.Labels == nil {
+				crbToUpdate.Labels = make(map[string]string)
+			}
 			crbToUpdate.Labels[bindingLabel] = owner
 			crbToUpdate.Labels[rtbLabelUpdated] = "true"
 			_, err := p.m.clusterRoleBindings.Update(crbToUpdate)
@@ -381,6 +402,9 @@ func (p *prtbLifecycle) reconcilePRTBUserClusterLabels(binding *v3.ProjectRoleTe
 			if updateErr != nil {
 				return updateErr
 			}
+			if rbToUpdate.Labels == nil {
+				rbToUpdate.Labels = make(map[string]string)
+			}
 			rbToUpdate.Labels[rtbOwnerLabel] = bindingLabel
 			rbToUpdate.Labels[rtbLabelUpdated] = "true"
 			_, err := p.m.roleBindings.Update(rbToUpdate)
@@ -400,7 +424,10 @@ func (p *prtbLifecycle) reconcilePRTBUserClusterLabels(binding *v3.ProjectRoleTe
 		if updateErr != nil {
 			return updateErr
 		}
-		binding.Labels[rtbCrbRbLabelsUpdated] = "true"
+		if crtbToUpdate.Labels == nil {
+			crtbToUpdate.Labels = make(map[string]string)
+		}
+		crtbToUpdate.Labels[rtbCrbRbLabelsUpdated] = "true"
 		_, err := p.m.prtbs.Update(crtbToUpdate)
 		return err
 	})

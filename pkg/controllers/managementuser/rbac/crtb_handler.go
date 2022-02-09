@@ -68,6 +68,10 @@ func (c *crtbLifecycle) syncCRTB(binding *v3.ClusterRoleTemplateBinding) error {
 		return errors.Wrapf(err, "couldn't ensure cluster bindings %v", binding)
 	}
 
+	if err := c.m.ensureServiceAccountImpersonator(binding.UserName, binding.GroupName); err != nil {
+		return errors.Wrapf(err, "couldn't ensure service account impersonator")
+	}
+
 	return nil
 }
 
@@ -85,6 +89,10 @@ func (c *crtbLifecycle) ensureCRTBDelete(binding *v3.ClusterRoleTemplateBinding)
 				return errors.Wrapf(err, "error deleting clusterrolebinding %v", rb.Name)
 			}
 		}
+	}
+
+	if err := c.m.deleteServiceAccountImpersonator(binding.UserName); err != nil {
+		return errors.Wrap(err, "error deleting service account impersonator")
 	}
 
 	return nil
@@ -121,6 +129,9 @@ func (c *crtbLifecycle) reconcileCRTBUserClusterLabels(binding *v3.ClusterRoleTe
 			if updateErr != nil {
 				return updateErr
 			}
+			if crbToUpdate.Labels == nil {
+				crbToUpdate.Labels = make(map[string]string)
+			}
 			crbToUpdate.Labels[rtbOwnerLabel] = bindingValue
 			crbToUpdate.Labels[rtbLabelUpdated] = "true"
 			_, err := c.m.clusterRoleBindings.Update(crbToUpdate)
@@ -139,7 +150,10 @@ func (c *crtbLifecycle) reconcileCRTBUserClusterLabels(binding *v3.ClusterRoleTe
 		if updateErr != nil {
 			return updateErr
 		}
-		binding.Labels[rtbCrbRbLabelsUpdated] = "true"
+		if crtbToUpdate.Labels == nil {
+			crtbToUpdate.Labels = make(map[string]string)
+		}
+		crtbToUpdate.Labels[rtbCrbRbLabelsUpdated] = "true"
 		_, err := c.m.crtbs.Update(crtbToUpdate)
 		return err
 	})

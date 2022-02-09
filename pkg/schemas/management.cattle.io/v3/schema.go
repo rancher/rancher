@@ -21,6 +21,11 @@ var (
 		Path:    "/v3",
 	}
 
+	AuthSchemas = factory.Schemas(&Version).
+			Init(authnTypes).
+			Init(tokens).
+			Init(userTypes)
+
 	Schemas = factory.Schemas(&Version).
 		Init(nativeNodeTypes).
 		Init(nodeTypes).
@@ -95,6 +100,7 @@ func credTypes(schemas *types.Schemas) *types.Schemas {
 			&m.DisplayName{},
 			&mapper.CredentialMapper{},
 			&m.AnnotationField{Field: "name"},
+			&m.AnnotationField{Field: "description"},
 			&m.Drop{Field: "namespaceId"}).
 		MustImport(&Version, v3.CloudCredential{})
 }
@@ -239,6 +245,7 @@ func clusterTypes(schemas *types.Schemas) *types.Schemas {
 		MustImport(&Version, v3.ImportClusterYamlInput{}).
 		MustImport(&Version, v3.RotateCertificateInput{}).
 		MustImport(&Version, v3.RotateCertificateOutput{}).
+		MustImport(&Version, v3.RotateEncryptionKeyOutput{}).
 		MustImport(&Version, v3.ImportYamlOutput{}).
 		MustImport(&Version, v3.ExportOutput{}).
 		MustImport(&Version, v3.MonitoringInput{}).
@@ -246,6 +253,11 @@ func clusterTypes(schemas *types.Schemas) *types.Schemas {
 		MustImport(&Version, v3.RestoreFromEtcdBackupInput{}).
 		MustImport(&Version, v3.SaveAsTemplateInput{}).
 		MustImport(&Version, v3.SaveAsTemplateOutput{}).
+		AddMapperForType(&Version, v1.EnvVar{},
+			&m.Move{
+				From: "envVar",
+				To:   "agentEnvVar",
+			}).
 		MustImportAndCustomize(&Version, rketypes.ETCDService{}, func(schema *types.Schema) {
 			schema.MustCustomizeField("extraArgs", func(field types.Field) types.Field {
 				field.Default = map[string]interface{}{
@@ -288,6 +300,9 @@ func clusterTypes(schemas *types.Schemas) *types.Schemas {
 			schema.ResourceActions[v3.ClusterActionRotateCertificates] = types.Action{
 				Input:  "rotateCertificateInput",
 				Output: "rotateCertificateOutput",
+			}
+			schema.ResourceActions[v3.ClusterActionRotateEncryptionKey] = types.Action{
+				Output: "rotateEncryptionKeyOutput",
 			}
 			schema.ResourceActions[v3.ClusterActionRunSecurityScan] = types.Action{
 				Input: "cisScanConfig",
@@ -406,6 +421,7 @@ func nodeTypes(schemas *types.Schemas) *types.Schemas {
 			schema.ResourceActions["cordon"] = types.Action{}
 			schema.ResourceActions["uncordon"] = types.Action{}
 			schema.ResourceActions["stopDrain"] = types.Action{}
+			schema.ResourceActions["scaledown"] = types.Action{}
 			schema.ResourceActions["drain"] = types.Action{
 				Input: "nodeDrainInput",
 			}
@@ -603,7 +619,41 @@ func authnTypes(schemas *types.Schemas) *types.Schemas {
 			schema.ResourceMethods = []string{http.MethodGet, http.MethodPut}
 		}).
 		MustImport(&Version, v3.GoogleOauthConfigApplyInput{}).
-		MustImport(&Version, v3.GoogleOauthConfigTestOutput{})
+		MustImport(&Version, v3.GoogleOauthConfigTestOutput{}).
+		//OIDC Config
+		MustImportAndCustomize(&Version, v3.OIDCConfig{}, func(schema *types.Schema) {
+			schema.BaseType = "authConfig"
+			schema.ResourceActions = map[string]types.Action{
+				"disable": {},
+				"configureTest": {
+					Input:  "oidcConfig",
+					Output: "oidcTestOutput",
+				},
+				"testAndApply": {
+					Input: "oidcApplyInput",
+				},
+			}
+			schema.CollectionMethods = []string{}
+			schema.ResourceMethods = []string{http.MethodGet, http.MethodPut}
+		}).
+		MustImport(&Version, v3.OIDCApplyInput{}).
+		MustImport(&Version, v3.OIDCTestOutput{}).
+		//KeyCloakOIDC Config
+		MustImportAndCustomize(&Version, v3.KeyCloakOIDCConfig{}, func(schema *types.Schema) {
+			schema.BaseType = "authConfig"
+			schema.ResourceActions = map[string]types.Action{
+				"disable": {},
+				"configureTest": {
+					Input:  "keyCloakOidcConfig",
+					Output: "keyCloakOidcTestOutput",
+				},
+				"testAndApply": {
+					Input: "keyCloakOidcApplyInput",
+				},
+			}
+			schema.CollectionMethods = []string{}
+			schema.ResourceMethods = []string{http.MethodGet, http.MethodPut}
+		})
 }
 
 func configSchema(schema *types.Schema) {

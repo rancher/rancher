@@ -8,6 +8,7 @@ const (
 	AppType                      = "app"
 	AppFieldAnnotations          = "annotations"
 	AppFieldAnswers              = "answers"
+	AppFieldAnswersSetString     = "answersSetString"
 	AppFieldAppRevisionID        = "appRevisionId"
 	AppFieldAppliedFiles         = "appliedFiles"
 	AppFieldConditions           = "conditions"
@@ -41,6 +42,7 @@ type App struct {
 	types.Resource
 	Annotations          map[string]string `json:"annotations,omitempty" yaml:"annotations,omitempty"`
 	Answers              map[string]string `json:"answers,omitempty" yaml:"answers,omitempty"`
+	AnswersSetString     map[string]string `json:"answersSetString,omitempty" yaml:"answersSetString,omitempty"`
 	AppRevisionID        string            `json:"appRevisionId,omitempty" yaml:"appRevisionId,omitempty"`
 	AppliedFiles         map[string]string `json:"appliedFiles,omitempty" yaml:"appliedFiles,omitempty"`
 	Conditions           []AppCondition    `json:"conditions,omitempty" yaml:"conditions,omitempty"`

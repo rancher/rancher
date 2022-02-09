@@ -8,10 +8,10 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/controller"
-	helmlib "github.com/rancher/rancher/pkg/catalog/helm"
 	cutils "github.com/rancher/rancher/pkg/catalog/utils"
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	helmlib "github.com/rancher/rancher/pkg/helm"
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v2"
@@ -21,30 +21,35 @@ import (
 )
 
 func (m *Manager) traverseAndUpdate(helm *helmlib.Helm, commit string, cmt *CatalogInfo) error {
-	var templateNamespace string
-	catalog := cmt.catalog
-	projectCatalog := cmt.projectCatalog
-	clusterCatalog := cmt.clusterCatalog
-	catalogType := getCatalogType(cmt)
-
 	index, err := helm.LoadIndex()
 	if err != nil {
 		return err
 	}
 
+	var catalogName, templateNamespace string
+	catalog := cmt.catalog
+	projectCatalog := cmt.projectCatalog
+	clusterCatalog := cmt.clusterCatalog
+	catalogType := getCatalogType(cmt)
+
 	switch catalogType {
 	case client.CatalogType:
 		templateNamespace = namespace.GlobalNamespace
+		catalogName = catalog.Name
 	case client.ClusterCatalogType:
 		templateNamespace = clusterCatalog.Namespace
+		catalogName = clusterCatalog.Name
 	case client.ProjectCatalogType:
 		templateNamespace = projectCatalog.Namespace
+		catalogName = projectCatalog.Name
 	}
 
-	newHelmVersionCommits := map[string]v32.VersionCommits{}
-	var errs []error
-	var updateErrors []error
-	var createErrors []error
+	// Remove contents of deprecated field if found. This can greatly reduce Catalog CR size.
+	if err := m.dropDeprecatedFields(cmt, catalogType); err != nil {
+		return err
+	}
+
+	var errs, createErrors, updateErrors []error
 	var createdTemplates, updatedTemplates, deletedTemplates, failedTemplates int
 
 	if (v32.CatalogConditionRefreshed.IsUnknown(catalog) && !strings.Contains(v32.CatalogConditionRefreshed.GetStatus(catalog), "syncing catalog")) || v32.CatalogConditionRefreshed.IsTrue(catalog) || catalog.Status.Conditions == nil {
@@ -54,36 +59,20 @@ func (m *Manager) traverseAndUpdate(helm *helmlib.Helm, commit string, cmt *Cata
 		}
 	}
 
-	entriesWithErrors, entriesToProcess := m.preprocessCatalog(catalog, index.IndexFile.Entries)
-	for chart, metadata := range entriesToProcess {
-		newHelmVersionCommits[chart] = v32.VersionCommits{
-			Value: map[string]string{},
-		}
-		existingHelmVersionCommits := map[string]string{}
-		if catalog.Status.HelmVersionCommits[chart].Value != nil {
-			existingHelmVersionCommits = catalog.Status.HelmVersionCommits[chart].Value
-		}
-		keywords := map[string]struct{}{}
-		// comparing version commit with the previous commit to detect if a template has been changed.
-		hasChanged := false
-		versionNumber := 0
-		for _, version := range metadata {
-			newHelmVersionCommits[chart].Value[version.Version] = version.Digest
-			digest, ok := existingHelmVersionCommits[version.Version]
-			if !ok || digest != version.Digest {
-				hasChanged = true
-			}
-			if ok {
-				versionNumber++
-			}
-		}
-		// if there is a version getting deleted then also set hasChanged to true
-		if versionNumber != len(existingHelmVersionCommits) {
-			hasChanged = true
-		}
+	catalogTemplateMap, err := m.getTemplateMap(catalogName, templateNamespace)
+	if err != nil {
+		return err
+	}
 
-		if !hasChanged && hasAllUpdates(catalog) {
-			logrus.Debugf("chart %s has not been changed. Skipping generating templates for it", chart)
+	var skippedCharts []string
+	catalogHasAllUpdates := hasAllUpdates(catalog)
+	entriesWithErrors, entriesToProcess := m.preprocessCatalog(catalog, index.IndexFile.Entries)
+	for chart, chartVersions := range entriesToProcess {
+		if chartVersions == nil {
+			continue
+		}
+		if !hasChartChanged(catalogTemplateMap[getValidTemplateName(catalogName, chart)], chartVersions) && catalogHasAllUpdates {
+			skippedCharts = append(skippedCharts, chart)
 			continue
 		}
 
@@ -93,12 +82,12 @@ func (m *Manager) traverseAndUpdate(helm *helmlib.Helm, commit string, cmt *Cata
 			},
 		}
 		template.Namespace = templateNamespace
-		template.Spec.Description = metadata[0].Description
-		template.Spec.DefaultVersion = metadata[0].Version
-		if len(metadata[0].Sources) > 0 {
-			template.Spec.ProjectURL = metadata[0].Sources[0]
+		template.Spec.Description = chartVersions[0].Description
+		template.Spec.DefaultVersion = chartVersions[0].Version
+		if len(chartVersions[0].Sources) > 0 {
+			template.Spec.ProjectURL = chartVersions[0].Sources[0]
 		}
-		iconFilename, iconURL, err := helm.Icon(metadata)
+		iconFilename, iconURL, err := helm.Icon(chartVersions)
 		if err != nil {
 			return err
 		}
@@ -108,9 +97,11 @@ func (m *Manager) traverseAndUpdate(helm *helmlib.Helm, commit string, cmt *Cata
 		template.Spec.FolderName = chart
 		template.Spec.DisplayName = chart
 		template.Status.HelmVersion = catalog.Spec.HelmVersion
-		label := map[string]string{}
+
+		label := make(map[string]string)
+		keywords := make(map[string]struct{})
 		var versions []v32.TemplateVersionSpec
-		for _, version := range metadata {
+		for _, version := range chartVersions {
 			v := v32.TemplateVersionSpec{
 				Version: strings.ToLower(version.Version),
 			}
@@ -236,15 +227,17 @@ func (m *Manager) traverseAndUpdate(helm *helmlib.Helm, commit string, cmt *Cata
 				updatedTemplates++
 			}
 		}
-		if err != nil {
-			delete(newHelmVersionCommits, template.Spec.DisplayName)
-		}
 	}
+	logrus.Debugf("skipped generating templates for charts that have not been changed: %v", skippedCharts)
 
-	toDeleteChart := []string{}
-	for chart := range catalog.Status.HelmVersionCommits {
+	var toDeleteChart []string
+	for templateName := range catalogTemplateMap {
+		chart := getChartName(catalog.Name, templateName)
+		if chart == "" {
+			continue
+		}
 		if _, ok := index.IndexFile.Entries[chart]; !ok {
-			toDeleteChart = append(toDeleteChart, getValidTemplateName(catalog.Name, chart))
+			toDeleteChart = append(toDeleteChart, templateName)
 		}
 	}
 	// delete non-existing templates
@@ -257,8 +250,6 @@ func (m *Manager) traverseAndUpdate(helm *helmlib.Helm, commit string, cmt *Cata
 	}
 	failedTemplates = failedTemplates + len(entriesWithErrors)
 	logrus.Infof("Catalog sync done. %v templates created, %v templates updated, %v templates deleted, %v templates failed", createdTemplates, updatedTemplates, deletedTemplates, failedTemplates)
-
-	catalog.Status.HelmVersionCommits = newHelmVersionCommits
 
 	if projectCatalog != nil {
 		projectCatalog.Catalog = *catalog
@@ -282,7 +273,7 @@ func (m *Manager) traverseAndUpdate(helm *helmlib.Helm, commit string, cmt *Cata
 		if _, err := m.updateCatalogInfo(cmt, catalogType, "", false, true); err != nil {
 			return err
 		}
-		logrus.Error(fmt.Sprintf("failed to sync templates. Multiple error(s) occured: %v", invalidChartErrors))
+		logrus.Error(fmt.Sprintf("failed to sync templates. Multiple error(s) occurred: %v", invalidChartErrors))
 		return &controller.ForgetError{Err: errors.Errorf("failed to sync templates. Multiple error(s) occurred: %v", invalidChartErrors)}
 	}
 	if len(errstrings) > 0 {
@@ -314,6 +305,54 @@ func (m *Manager) traverseAndUpdate(helm *helmlib.Helm, commit string, cmt *Cata
 	}
 
 	return finalError
+}
+
+func (m *Manager) dropDeprecatedFields(cmt *CatalogInfo, catalogType string) error {
+	switch catalogType {
+	case client.CatalogType:
+		catalog := cmt.catalog
+		if catalog.Status.HelmVersionCommits == nil {
+			return nil
+		}
+		catalog.Status.HelmVersionCommits = nil
+	case client.ClusterCatalogType:
+		clusterCatalog := cmt.clusterCatalog
+		if clusterCatalog.Status.HelmVersionCommits == nil {
+			return nil
+		}
+		clusterCatalog.Status.HelmVersionCommits = nil
+	case client.ProjectCatalogType:
+		projectCatalog := cmt.projectCatalog
+		if projectCatalog.Status.HelmVersionCommits == nil {
+			return nil
+		}
+		projectCatalog.Status.HelmVersionCommits = nil
+	}
+	_, err := m.updateCatalogInfo(cmt, catalogType, "", true, true)
+	return err
+}
+
+// hasChartChanged checks if a version has been deleted from a template or if an existing template version has changed.
+func hasChartChanged(existingTemplate *v3.CatalogTemplate, desiredChartVersions helmlib.ChartVersions) bool {
+	// If this check does not pass, the existing template has been populated and the lengths of each slice are the same.
+	if existingTemplate == nil || (len(desiredChartVersions) != len(existingTemplate.Spec.Versions)) {
+		return true
+	}
+
+	desiredChartVersionsMap := make(map[string]string)
+	for _, desiredChartVersion := range desiredChartVersions {
+		desiredChartVersionsMap[desiredChartVersion.Version] = desiredChartVersion.Digest
+	}
+	for _, templateVersion := range existingTemplate.Spec.Versions {
+		// If the digest is not the same between the actual and desired version, or if the version does not
+		// exist in the desired versions slice, then we know that the chart has changed. In addition, we do not have to
+		// check if desired versions exist because the length of each slice is the same at this point.
+		digest, ok := desiredChartVersionsMap[templateVersion.Version]
+		if !ok || digest != templateVersion.Digest {
+			return true
+		}
+	}
+	return false
 }
 
 var supportedFiles = []string{"catalog.yml", "catalog.yaml", "questions.yml", "questions.yaml"}

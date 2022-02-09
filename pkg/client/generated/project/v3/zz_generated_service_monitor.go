@@ -22,6 +22,7 @@ const (
 	ServiceMonitorFieldSampleLimit       = "sampleLimit"
 	ServiceMonitorFieldSelector          = "selector"
 	ServiceMonitorFieldTargetLabels      = "targetLabels"
+	ServiceMonitorFieldTargetLimit       = "targetLimit"
 	ServiceMonitorFieldTargetService     = "targetService"
 	ServiceMonitorFieldTargetWorkload    = "targetWorkload"
 	ServiceMonitorFieldUUID              = "uuid"
@@ -45,6 +46,7 @@ type ServiceMonitor struct {
 	SampleLimit       int64             `json:"sampleLimit,omitempty" yaml:"sampleLimit,omitempty"`
 	Selector          *LabelSelector    `json:"selector,omitempty" yaml:"selector,omitempty"`
 	TargetLabels      []string          `json:"targetLabels,omitempty" yaml:"targetLabels,omitempty"`
+	TargetLimit       int64             `json:"targetLimit,omitempty" yaml:"targetLimit,omitempty"`
 	TargetService     string            `json:"targetService,omitempty" yaml:"targetService,omitempty"`
 	TargetWorkload    string            `json:"targetWorkload,omitempty" yaml:"targetWorkload,omitempty"`
 	UUID              string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`

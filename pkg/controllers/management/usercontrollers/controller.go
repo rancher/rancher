@@ -9,7 +9,7 @@ import (
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/rancher/pkg/clustermanager"
 	"github.com/rancher/rancher/pkg/controllers/managementagent/nslabels"
-	"github.com/rancher/rancher/pkg/controllers/managementuser/helm"
+	"github.com/rancher/rancher/pkg/controllers/managementuserlegacy/helm"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/types/config"
@@ -209,6 +209,13 @@ func (c *ClusterLifecycleCleanup) createCleanupClusterRole(userContext *config.U
 			Verbs:     []string{"list", "get", "delete"},
 			APIGroups: []string{"batch"},
 			Resources: []string{"jobs"},
+		},
+		// The job checks for the presence of the rancher service first
+		rbacV1.PolicyRule{
+			Verbs:         []string{"get"},
+			APIGroups:     []string{""},
+			Resources:     []string{"services"},
+			ResourceNames: []string{"rancher"},
 		},
 	}
 	clusterRole := rbacV1.ClusterRole{

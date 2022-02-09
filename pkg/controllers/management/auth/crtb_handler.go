@@ -6,6 +6,7 @@ import (
 
 	"github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
+	"github.com/rancher/rancher/pkg/controllers/management/authprovisioningv2"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	pkgrbac "github.com/rancher/rancher/pkg/rbac"
 	"github.com/sirupsen/logrus"
@@ -20,19 +21,19 @@ const (
 	2.5 onwards, instead of the roleTemplateBinding's UID, a combination of its namespace and name will be used in this label.
 	CRB/RBs on clusters upgraded from 2.4.x to 2.5 will continue to carry the original label with UID. To ensure permissions are managed properly on upgrade,
 	we need to change the label value as well.
-	So the older label value, membershipBindingOwnerLegacy (<=2.4.x) will continue to be "memberhsip-binding-owner" (notice the spelling mistake),
-	and the new label, membershipBindingOwner will be "membership-binding-owner" (a different label value with the right spelling)*/
-	membershipBindingOwnerLegacy = "memberhsip-binding-owner"
-	membershipBindingOwner       = "membership-binding-owner"
+	So the older label value, MembershipBindingOwnerLegacy (<=2.4.x) will continue to be "memberhsip-binding-owner" (notice the spelling mistake),
+	and the new label, MembershipBindingOwner will be "membership-binding-owner" (a different label value with the right spelling)*/
+	MembershipBindingOwnerLegacy = "memberhsip-binding-owner"
+	MembershipBindingOwner       = "membership-binding-owner"
 	clusterResource              = "clusters"
 	membershipBindingOwnerIndex  = "auth.management.cattle.io/membership-binding-owner"
-	crtbInProjectBindingOwner    = "crtb-in-project-binding-owner"
-	prtbInClusterBindingOwner    = "prtb-in-cluster-binding-owner"
+	CrtbInProjectBindingOwner    = "crtb-in-project-binding-owner"
+	PrtbInClusterBindingOwner    = "prtb-in-cluster-binding-owner"
 	rbByOwnerIndex               = "auth.management.cattle.io/rb-by-owner"
 	rbByRoleAndSubjectIndex      = "auth.management.cattle.io/crb-by-role-and-subject"
 	ctrbMGMTController           = "mgmt-auth-crtb-controller"
 	rtbLabelUpdated              = "auth.management.cattle.io/rtb-label-updated"
-	rtbCrbRbLabelsUpdated        = "auth.management.cattle.io/crb-rb-labels-updated"
+	RtbCrbRbLabelsUpdated        = "auth.management.cattle.io/crb-rb-labels-updated"
 )
 
 var clusterManagmentPlaneResources = map[string]string{
@@ -85,7 +86,11 @@ func (c *crtbLifecycle) Remove(obj *v3.ClusterRoleTemplateBinding) (runtime.Obje
 	if err := c.mgr.reconcileClusterMembershipBindingForDelete("", pkgrbac.GetRTBLabel(obj.ObjectMeta)); err != nil {
 		return nil, err
 	}
-	err := c.removeMGMTClusterScopedPrivilegesInProjectNamespace(obj)
+	if err := c.removeMGMTClusterScopedPrivilegesInProjectNamespace(obj); err != nil {
+		return nil, err
+	}
+
+	err := c.mgr.removeAuthV2Permissions(authprovisioningv2.CRTBRoleBindingID, obj)
 	return nil, err
 }
 
@@ -141,7 +146,7 @@ func (c *crtbLifecycle) reconcileBindings(binding *v3.ClusterRoleTemplateBinding
 		return errors.Errorf("cannot create binding because cluster %v was not found", clusterName)
 	}
 	// if roletemplate is not builtin, check if it's inherited/cloned
-	isOwnerRole, err := c.mgr.checkReferencedRoles(binding.RoleTemplateName)
+	isOwnerRole, err := c.mgr.checkReferencedRoles(binding.RoleTemplateName, clusterContext)
 	if err != nil {
 		return err
 	}
@@ -184,7 +189,7 @@ func (c *crtbLifecycle) removeMGMTClusterScopedPrivilegesInProjectNamespace(bind
 	}
 	bindingKey := pkgrbac.GetRTBLabel(binding.ObjectMeta)
 	for _, p := range projects {
-		set := labels.Set(map[string]string{bindingKey: crtbInProjectBindingOwner})
+		set := labels.Set(map[string]string{bindingKey: CrtbInProjectBindingOwner})
 		rbs, err := c.mgr.rbLister.List(p.Name, set.AsSelector())
 		if err != nil {
 			return err
@@ -205,7 +210,7 @@ func (c *crtbLifecycle) reconcileLabels(binding *v3.ClusterRoleTemplateBinding) 
 	    2. CRTB.UID is label key for the RB, CRTB.UID=crtb-in-project-binding-owner (in the namespace of each project in the cluster that the user has access to)
 	Using above labels, list the CRB and RB and update them to add a label with ns+name of CRTB
 	*/
-	if binding.Labels[rtbCrbRbLabelsUpdated] == "true" {
+	if binding.Labels[RtbCrbRbLabelsUpdated] == "true" {
 		return nil
 	}
 
@@ -215,7 +220,7 @@ func (c *crtbLifecycle) reconcileLabels(binding *v3.ClusterRoleTemplateBinding) 
 		return err
 	}
 
-	set := labels.Set(map[string]string{string(binding.UID): membershipBindingOwnerLegacy})
+	set := labels.Set(map[string]string{string(binding.UID): MembershipBindingOwnerLegacy})
 	crbs, err := c.mgr.crbLister.List(v1.NamespaceAll, set.AsSelector().Add(requirements...))
 	if err != nil {
 		return err
@@ -227,7 +232,10 @@ func (c *crtbLifecycle) reconcileLabels(binding *v3.ClusterRoleTemplateBinding) 
 			if updateErr != nil {
 				return updateErr
 			}
-			crbToUpdate.Labels[bindingKey] = membershipBindingOwner
+			if crbToUpdate.Labels == nil {
+				crbToUpdate.Labels = make(map[string]string)
+			}
+			crbToUpdate.Labels[bindingKey] = MembershipBindingOwner
 			crbToUpdate.Labels[rtbLabelUpdated] = "true"
 			_, err := c.mgr.crbClient.Update(crbToUpdate)
 			return err
@@ -237,7 +245,7 @@ func (c *crtbLifecycle) reconcileLabels(binding *v3.ClusterRoleTemplateBinding) 
 		}
 	}
 
-	set = map[string]string{string(binding.UID): crtbInProjectBindingOwner}
+	set = map[string]string{string(binding.UID): CrtbInProjectBindingOwner}
 	rbs, err := c.mgr.rbLister.List(v1.NamespaceAll, set.AsSelector().Add(requirements...))
 	if err != nil {
 		return err
@@ -249,7 +257,10 @@ func (c *crtbLifecycle) reconcileLabels(binding *v3.ClusterRoleTemplateBinding) 
 			if updateErr != nil {
 				return updateErr
 			}
-			rbToUpdate.Labels[bindingKey] = crtbInProjectBindingOwner
+			if rbToUpdate.Labels == nil {
+				rbToUpdate.Labels = make(map[string]string)
+			}
+			rbToUpdate.Labels[bindingKey] = CrtbInProjectBindingOwner
 			rbToUpdate.Labels[rtbLabelUpdated] = "true"
 			_, err := c.mgr.rbClient.Update(rbToUpdate)
 			return err
@@ -267,7 +278,10 @@ func (c *crtbLifecycle) reconcileLabels(binding *v3.ClusterRoleTemplateBinding) 
 		if updateErr != nil {
 			return updateErr
 		}
-		binding.Labels[rtbCrbRbLabelsUpdated] = "true"
+		if crtbToUpdate.Labels == nil {
+			crtbToUpdate.Labels = make(map[string]string)
+		}
+		crtbToUpdate.Labels[RtbCrbRbLabelsUpdated] = "true"
 		_, err := c.mgr.crtbs.Update(crtbToUpdate)
 		return err
 	})

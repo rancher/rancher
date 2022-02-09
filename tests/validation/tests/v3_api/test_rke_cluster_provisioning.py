@@ -15,7 +15,7 @@ AZURE_CLIENT_SECRET = os.environ.get("AZURE_CLIENT_SECRET")
 AZURE_TENANT_ID = os.environ.get("AZURE_TENANT_ID")
 worker_count = int(os.environ.get('RANCHER_STRESS_TEST_WORKER_COUNT', 1))
 HOST_NAME = os.environ.get('RANCHER_HOST_NAME', "testcustom")
-engine_install_url = "https://releases.rancher.com/install-docker/19.03.sh"
+engine_install_url = "https://releases.rancher.com/install-docker/20.10.sh"
 
 rke_config = {
     "addonJobTimeout": 30,
@@ -71,6 +71,44 @@ rke_config_windows = {
             "flannel_backend_type": "vxlan",
             "flannel_backend_port": "4789",
             "flannel_backend_vni": "4096"
+        }
+    },
+    "services": {
+        "etcd": {
+            "extraArgs":
+                {"heartbeat-interval": 500,
+                 "election-timeout": 5000},
+            "snapshot": False,
+            "backupConfig":
+                {"intervalHours": 12, "retention": 6, "type": "backupConfig"},
+            "creation": "12h",
+            "retention": "72h",
+            "type": "etcdService"},
+        "kubeApi": {
+            "alwaysPullImages": False,
+            "podSecurityPolicy": False,
+            "serviceNodePortRange": "30000-32767",
+            "type": "kubeAPIService"}},
+    "sshAgentAuth": False}
+
+rke_config_windows_host_gw = {
+    "addonJobTimeout": 30,
+    "authentication":
+    {"strategy": "x509",
+     "type": "authnConfig"},
+    "ignoreDockerVersion": True,
+    "ingress":
+        {"provider": "nginx",
+         "type": "ingressConfig"},
+    "monitoring":
+        {"provider": "metrics-server",
+         "type": "monitoringConfig"},
+    "network": {
+        "mtu": 0,
+        "plugin": "flannel",
+        "type": "networkConfig",
+        "options": {
+            "flannel_backend_type": "host-gw"
         }
     },
     "services": {
@@ -257,6 +295,11 @@ if K8S_VERSION != "":
     rke_config_cis_1_4["kubernetesVersion"] = K8S_VERSION
     rke_config_cis_1_5["kubernetesVersion"] = K8S_VERSION
 
+rke_config_windows_host_gw_aws_provider = rke_config_windows_host_gw.copy()
+rke_config_windows_host_gw_aws_provider["cloudProvider"] = {"name": "aws",
+                                            "type": "cloudProvider",
+                                            "awsCloudProvider":
+                                            {"type": "awsCloudProvider"}}
 
 rke_config_aws_provider = rke_config.copy()
 rke_config_aws_provider["cloudProvider"] = {"name": "aws",
@@ -1095,13 +1138,18 @@ def create_and_validate_custom_host(node_roles, random_cluster_name=False,
 
 def create_custom_host_from_nodes(nodes, node_roles,
                                   random_cluster_name=False, windows=False,
+                                  windows_flannel_backend='vxlan',
                                   version=K8S_VERSION):
     client = get_user_client()
     cluster_name = random_name() if random_cluster_name \
         else evaluate_clustername()
 
     if windows:
-        config = rke_config_windows
+        if windows_flannel_backend == "host-gw":
+            config = rke_config_windows_host_gw_aws_provider
+        else:
+            config = rke_config_windows
+
     else:
         config = rke_config
     if version != "":

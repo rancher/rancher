@@ -2,10 +2,12 @@ package client
 
 const (
 	ClusterStatusType                                      = "clusterStatus"
+	ClusterStatusFieldAKSStatus                            = "aksStatus"
 	ClusterStatusFieldAPIEndpoint                          = "apiEndpoint"
 	ClusterStatusFieldAgentFeatures                        = "agentFeatures"
 	ClusterStatusFieldAgentImage                           = "agentImage"
 	ClusterStatusFieldAllocatable                          = "allocatable"
+	ClusterStatusFieldAppliedAgentEnvVars                  = "appliedAgentEnvVars"
 	ClusterStatusFieldAppliedEnableNetworkPolicy           = "appliedEnableNetworkPolicy"
 	ClusterStatusFieldAppliedPodSecurityPolicyTemplateName = "appliedPodSecurityPolicyTemplateId"
 	ClusterStatusFieldAppliedSpec                          = "appliedSpec"
@@ -20,6 +22,7 @@ const (
 	ClusterStatusFieldDriver                               = "driver"
 	ClusterStatusFieldEKSStatus                            = "eksStatus"
 	ClusterStatusFieldFailedSpec                           = "failedSpec"
+	ClusterStatusFieldGKEStatus                            = "gkeStatus"
 	ClusterStatusFieldIstioEnabled                         = "istioEnabled"
 	ClusterStatusFieldLimits                               = "limits"
 	ClusterStatusFieldMonitoringStatus                     = "monitoringStatus"
@@ -32,10 +35,12 @@ const (
 )
 
 type ClusterStatus struct {
+	AKSStatus                            *AKSStatus                  `json:"aksStatus,omitempty" yaml:"aksStatus,omitempty"`
 	APIEndpoint                          string                      `json:"apiEndpoint,omitempty" yaml:"apiEndpoint,omitempty"`
 	AgentFeatures                        map[string]bool             `json:"agentFeatures,omitempty" yaml:"agentFeatures,omitempty"`
 	AgentImage                           string                      `json:"agentImage,omitempty" yaml:"agentImage,omitempty"`
 	Allocatable                          map[string]string           `json:"allocatable,omitempty" yaml:"allocatable,omitempty"`
+	AppliedAgentEnvVars                  []EnvVar                    `json:"appliedAgentEnvVars,omitempty" yaml:"appliedAgentEnvVars,omitempty"`
 	AppliedEnableNetworkPolicy           bool                        `json:"appliedEnableNetworkPolicy,omitempty" yaml:"appliedEnableNetworkPolicy,omitempty"`
 	AppliedPodSecurityPolicyTemplateName string                      `json:"appliedPodSecurityPolicyTemplateId,omitempty" yaml:"appliedPodSecurityPolicyTemplateId,omitempty"`
 	AppliedSpec                          *ClusterSpec                `json:"appliedSpec,omitempty" yaml:"appliedSpec,omitempty"`
@@ -50,6 +55,7 @@ type ClusterStatus struct {
 	Driver                               string                      `json:"driver,omitempty" yaml:"driver,omitempty"`
 	EKSStatus                            *EKSStatus                  `json:"eksStatus,omitempty" yaml:"eksStatus,omitempty"`
 	FailedSpec                           *ClusterSpec                `json:"failedSpec,omitempty" yaml:"failedSpec,omitempty"`
+	GKEStatus                            *GKEStatus                  `json:"gkeStatus,omitempty" yaml:"gkeStatus,omitempty"`
 	IstioEnabled                         bool                        `json:"istioEnabled,omitempty" yaml:"istioEnabled,omitempty"`
 	Limits                               map[string]string           `json:"limits,omitempty" yaml:"limits,omitempty"`
 	MonitoringStatus                     *MonitoringStatus           `json:"monitoringStatus,omitempty" yaml:"monitoringStatus,omitempty"`

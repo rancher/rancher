@@ -7,10 +7,18 @@ import (
 	"net/url"
 	"regexp"
 	"strings"
+	"time"
 
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/types/config"
+	"github.com/rancher/steve/pkg/auth"
 	"github.com/sirupsen/logrus"
+	"k8s.io/apiserver/pkg/authentication/user"
+	"k8s.io/apiserver/pkg/authorization/authorizer"
+	"k8s.io/apiserver/pkg/authorization/authorizerfactory"
+	"k8s.io/apiserver/pkg/endpoints/request"
 )
 
 const (
@@ -49,6 +57,8 @@ type proxy struct {
 	prefix             string
 	validHostsSupplier Supplier
 	credentials        v1.SecretInterface
+	clusters           v3.ClusterInterface
+	authorizer         authorizer.Authorizer
 }
 
 func (p *proxy) isAllowed(host string) bool {
@@ -72,11 +82,25 @@ func (p *proxy) isAllowed(host string) bool {
 	return false
 }
 
-func NewProxy(prefix string, validHosts Supplier, scaledContext *config.ScaledContext) http.Handler {
+func NewProxy(prefix string, validHosts Supplier, scaledContext *config.ScaledContext) (http.Handler, error) {
+	cfg := authorizerfactory.DelegatingAuthorizerConfig{
+		SubjectAccessReviewClient: scaledContext.K8sClient.AuthorizationV1().SubjectAccessReviews(),
+		AllowCacheTTL:             time.Second * time.Duration(settings.AuthorizationCacheTTLSeconds.GetInt()),
+		DenyCacheTTL:              time.Second * time.Duration(settings.AuthorizationDenyCacheTTLSeconds.GetInt()),
+		WebhookRetryBackoff:       &auth.WebhookBackoff,
+	}
+
+	authorizer, err := cfg.New()
+	if err != nil {
+		return nil, err
+	}
+
 	p := proxy{
+		authorizer:         authorizer,
 		prefix:             prefix,
 		validHostsSupplier: validHosts,
 		credentials:        scaledContext.Core.Secrets(""),
+		clusters:           scaledContext.Management.Clusters(""),
 	}
 
 	return &httputil.ReverseProxy{
@@ -86,7 +110,7 @@ func NewProxy(prefix string, validHosts Supplier, scaledContext *config.ScaledCo
 			}
 		},
 		ModifyResponse: setModifiedHeaders,
-	}
+	}, nil
 }
 
 func setModifiedHeaders(res *http.Response) error {
@@ -159,7 +183,7 @@ func (p *proxy) proxy(req *http.Request) error {
 		// and generate signature
 		signer := newSigner(cAuth)
 		if signer != nil {
-			return signer.sign(req, p.credentials, cAuth)
+			return signer.sign(req, p.secretGetter(req, cAuth), cAuth)
 		}
 		req.Header.Set(AuthHeader, cAuth)
 	}
@@ -167,6 +191,65 @@ func (p *proxy) proxy(req *http.Request) error {
 	replaceCookies(req)
 
 	return nil
+}
+
+func (p *proxy) secretGetter(req *http.Request, cAuth string) SecretGetter {
+	clusterID := getRequestParams(cAuth)["clusterID"]
+	return func(namespace, name string) (*v1.Secret, error) {
+		user, ok := request.UserFrom(req.Context())
+		if !ok {
+			return nil, fmt.Errorf("failed to find user")
+		}
+		decision, reason, err := p.authorizer.Authorize(req.Context(), authorizer.AttributesRecord{
+			User:            user,
+			Verb:            "get",
+			Namespace:       namespace,
+			APIVersion:      "v1",
+			Resource:        "secrets",
+			Name:            name,
+			ResourceRequest: true,
+		})
+		if err != nil {
+			return nil, err
+		}
+		unauthorizedErr := fmt.Errorf("unauthorized %s to %s/%s: %s", user.GetName(), namespace, name, reason)
+		if decision != authorizer.DecisionAllow {
+			if clusterID == "" {
+				return nil, unauthorizedErr
+			}
+			decision, err = p.checkCluster(req, user, clusterID, fmt.Sprintf("%s:%s", namespace, name))
+			if err != nil {
+				return nil, err
+			}
+			if decision != authorizer.DecisionAllow {
+				return nil, unauthorizedErr
+			}
+		}
+		return p.credentials.Controller().Lister().Get(namespace, name)
+	}
+}
+
+func (p *proxy) checkCluster(req *http.Request, user user.Info, clusterID, credID string) (authorizer.Decision, error) {
+	cluster, err := p.clusters.Controller().Lister().Get("", clusterID)
+	if err != nil {
+		return authorizer.DecisionDeny, err
+	}
+	if cluster.Spec.EKSConfig == nil {
+		return authorizer.DecisionDeny, nil
+	}
+	if cluster.Spec.EKSConfig.AmazonCredentialSecret != credID {
+		return authorizer.DecisionDeny, nil
+	}
+	decision, _, err := p.authorizer.Authorize(req.Context(), authorizer.AttributesRecord{
+		User:            user,
+		Verb:            "update",
+		APIGroup:        v3.GroupName,
+		APIVersion:      v3.Version,
+		Resource:        "clusters",
+		Name:            clusterID,
+		ResourceRequest: true,
+	})
+	return decision, err
 }
 
 func replaceCookies(req *http.Request) {

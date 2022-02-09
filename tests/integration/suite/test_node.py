@@ -4,7 +4,7 @@ import pytest
 from rancher import ApiError
 from kubernetes.client import CoreV1Api
 from .common import auth_check, random_str, string_to_encoding
-from .conftest import wait_for
+from .conftest import wait_for, wait_for_condition
 import time
 
 
@@ -46,6 +46,7 @@ def test_node_fields(admin_mc):
         'sshUser': 'r',
         'imported': 'cru',
         'dockerInfo': 'r',
+        'scaledownTime': 'cru'
     }
 
     for name in cclient.schema.types['node'].resourceFields.keys():
@@ -77,14 +78,18 @@ def test_node_template_delete(admin_mc, remove_resource):
 
     assert node_pool.nodeTemplateId == node_template.id
 
+    def _wait_for_no_remove_link():
+        nt = client.reload(node_template)
+        if not hasattr(nt.links, "remove"):
+            return True
+        return False
+
+    wait_for(_wait_for_no_remove_link)
+
     # Attempting to delete the template should raise an ApiError
     with pytest.raises(ApiError) as e:
         client.delete(node_template)
     assert e.value.error.status == 405
-
-    # remove link should not be available
-    node_template = client.reload(node_template)
-    assert 'remove' not in node_template.links
 
     client.delete(node_pool)
 
@@ -139,9 +144,9 @@ def test_writing_config_to_disk(admin_mc, wait_remove_resource):
         digitaloceancredentialConfig={"accessToken": "test"})
     wait_remove_resource(cloud_credential)
 
-    data = {'userdata': 'do cool stuff\n',
+    data = {'userdata': 'do cool stuff' + random_str() + '\n',
             # This validates ssh keys don't drop the ending \n
-            'id_rsa': 'some\nfake\nstuff\n'
+            'id_rsa': 'some\nfake\nstuff\n' + random_str() + '\n'
             }
 
     def _node_template():
@@ -166,6 +171,15 @@ def test_writing_config_to_disk(admin_mc, wait_remove_resource):
         nodeTemplateId=node_template.id,
         hostnamePrefix="test1",
         clusterId="local")
+
+    def node_available():
+        node = client.list_node(nodePoolId=node_pool.id)
+        if len(node.data):
+            return node.data[0]
+        return None
+
+    node = wait_for(node_available)
+    wait_for_condition("Saved", "False", client, node)
     wait_remove_resource(node_pool)
 
     for key, value in data.items():
@@ -180,7 +194,7 @@ def test_writing_config_to_disk(admin_mc, wait_remove_resource):
             except FileNotFoundError:
                 return False
 
-        wait_for(file_exists, timeout=10,
+        wait_for(file_exists, timeout=120,
                  fail_handler=lambda: 'file is missing from disk')
 
         with open(full_path, 'r') as f:

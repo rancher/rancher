@@ -3,13 +3,16 @@ package auth
 import (
 	"context"
 	"fmt"
+	"io/ioutil"
 	"os"
+	"strings"
 
 	"github.com/pkg/errors"
 	"github.com/rancher/wrangler/pkg/randomtoken"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 	"golang.org/x/crypto/bcrypt"
+	"gopkg.in/yaml.v2"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -19,6 +22,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
+	corev1interface "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/clientcmd"
 )
 
@@ -31,11 +35,41 @@ var (
 	defaultAdminLabel      = map[string]string{defaultAdminLabelKey: defaultAdminLabelValue}
 )
 
-func ResetAdmin(_ *cli.Context) error {
+func ResetAdmin(clx *cli.Context) error {
+	if err := validation(clx); err != nil {
+		return err
+	}
+	if err := resetAdmin(clx); err != nil {
+		return errors.Wrap(err, "cluster and rancher are not ready. Please try later.")
+	}
+	return nil
+}
+
+func validation(clx *cli.Context) error {
+	if clx.String("password") != "" && clx.String("password-file") != "" {
+		return errors.New("only one option can be set for password and password-file")
+	}
+	return nil
+}
+
+func resetAdmin(clx *cli.Context) error {
 	ctx := context.Background()
 	token, err := randomtoken.Generate()
 	if err != nil {
 		return err
+	}
+	mustChangePassword := true
+	if clx.String("password") != "" {
+		token = clx.String("password")
+		mustChangePassword = false
+	}
+	if clx.String("password-file") != "" {
+		passwordFromFile, err := ioutil.ReadFile(clx.String("password-file"))
+		if err != nil {
+			return err
+		}
+		token = strings.TrimSuffix(string(passwordFromFile), "\n")
+		mustChangePassword = false
 	}
 
 	kubeconfig := os.Getenv("KUBECONFIG")
@@ -76,7 +110,9 @@ func ResetAdmin(_ *cli.Context) error {
 		Version:  "v3",
 		Resource: "clusters",
 	})
+
 	var adminName string
+	var adminUser unstructured.Unstructured
 	set := labels.Set(defaultAdminLabel)
 	admins, err := userClient.List(ctx, v1.ListOptions{LabelSelector: set.String()})
 	if err != nil {
@@ -85,6 +121,7 @@ func ResetAdmin(_ *cli.Context) error {
 
 	if len(admins.Items) > 0 {
 		adminName = admins.Items[0].GetName()
+		adminUser = admins.Items[0]
 	}
 
 	if _, err := configmapClient.Get(ctx, bootstrapAdminConfig, v1.GetOptions{}); err != nil {
@@ -93,12 +130,6 @@ func ResetAdmin(_ *cli.Context) error {
 		}
 	} else {
 		// if it is already bootstrapped, reset admin password
-		set := labels.Set(map[string]string{defaultAdminLabelKey: defaultAdminLabelValue})
-		admins, err := userClient.List(ctx, v1.ListOptions{LabelSelector: set.String()})
-		if err != nil {
-			return err
-		}
-
 		count := len(admins.Items)
 		if count != 1 {
 			var users []string
@@ -120,16 +151,13 @@ func ResetAdmin(_ *cli.Context) error {
 		if err != nil {
 			return err
 		}
+		printServerURL(ctx, nodeClient, settingClient)
 		logrus.Infof("Default admin reset. New username: %v, new Password: %v", admin.Object["username"], token)
 		return nil
 	}
 
-	users, err := userClient.List(ctx, v1.ListOptions{LabelSelector: set.String()})
-	if err != nil {
-		panic(err)
-	}
-
-	if len(users.Items) == 0 {
+	// make sure Admin user gets created
+	if len(admins.Items) == 0 {
 		// Config map does not exist and no users, attempt to create the default admin user
 		hash, _ := bcrypt.GenerateFromPassword([]byte(token), bcrypt.DefaultCost)
 		admin, err := userClient.Create(ctx,
@@ -144,83 +172,84 @@ func ResetAdmin(_ *cli.Context) error {
 					"displayName":        "Default Admin",
 					"username":           "admin",
 					"password":           string(hash),
-					"mustChangePassword": true,
+					"mustChangePassword": mustChangePassword,
 				},
 			}, v1.CreateOptions{})
 		if err != nil && !apierrors.IsAlreadyExists(err) {
 			return err
 		}
 		adminName = admin.GetName()
-		if err := setClusterAnnotation(ctx, clustersClient, adminName); err != nil {
-			return err
-		}
+		adminUser = *admin
+	}
 
-		bindings, err := grbClient.List(ctx, v1.ListOptions{LabelSelector: set.String()})
-		if err != nil {
-			return err
-		}
-		if len(bindings.Items) == 0 {
-			_, err = grbClient.Create(ctx,
-				&unstructured.Unstructured{
-					Object: map[string]interface{}{
-						"metadata": v1.ObjectMeta{
-							GenerateName: "globalrolebinding-",
-							Labels:       defaultAdminLabel,
-						},
-						"apiVersion":     "management.cattle.io/v3",
-						"kind":           "GlobalRoleBinding",
-						"userName":       adminName,
-						"globalRoleName": "admin",
+	// Make sure the admin user become the admin of system/default project of local cluster
+	if err := setClusterAnnotation(ctx, clustersClient, adminName); err != nil {
+		return err
+	}
+
+	// Make sure globalRolebinding is created with admin user
+	bindings, err := grbClient.List(ctx, v1.ListOptions{LabelSelector: set.String()})
+	if err != nil {
+		return err
+	}
+	if len(bindings.Items) == 0 {
+		_, err = grbClient.Create(ctx,
+			&unstructured.Unstructured{
+				Object: map[string]interface{}{
+					"metadata": v1.ObjectMeta{
+						GenerateName: "globalrolebinding-",
+						Labels:       defaultAdminLabel,
 					},
-				}, v1.CreateOptions{})
-			if err != nil {
-				return err
-			}
-		}
-
-		users, err := userClient.List(ctx, v1.ListOptions{
-			LabelSelector: set.String(),
-		})
-
-		crbBindings, err := crbClient.List(ctx, v1.ListOptions{LabelSelector: set.String()})
+					"apiVersion":     "management.cattle.io/v3",
+					"kind":           "GlobalRoleBinding",
+					"userName":       adminName,
+					"globalRoleName": "admin",
+				},
+			}, v1.CreateOptions{})
 		if err != nil {
 			return err
 		}
-		if len(crbBindings.Items) == 0 && len(users.Items) > 0 {
-			_, err = crbClient.Create(ctx,
-				&unstructured.Unstructured{
-					Object: map[string]interface{}{
-						"metadata": v1.ObjectMeta{
-							GenerateName: "default-admin-",
-							Labels:       defaultAdminLabel,
+	}
+
+	// Make sure admin user is the cluster-admin of local cluster
+	crbBindings, err := crbClient.List(ctx, v1.ListOptions{LabelSelector: set.String()})
+	if err != nil {
+		return err
+	}
+	if len(crbBindings.Items) == 0 && adminName != "" {
+		_, err = crbClient.Create(ctx,
+			&unstructured.Unstructured{
+				Object: map[string]interface{}{
+					"metadata": v1.ObjectMeta{
+						GenerateName: "default-admin-",
+						Labels:       defaultAdminLabel,
+					},
+					"apiVersion": "rbac.authorization.k8s.io/v1",
+					"kind":       "ClusterRoleBinding",
+					"ownerReferences": []v1.OwnerReference{
+						{
+							APIVersion: "management.cattle.io/v3",
+							Kind:       "user",
+							Name:       adminUser.GetName(),
+							UID:        adminUser.GetUID(),
 						},
-						"apiVersion": "rbac.authorization.k8s.io/v1",
-						"kind":       "ClusterRoleBinding",
-						"ownerReferences": []v1.OwnerReference{
-							{
-								APIVersion: "management.cattle.io/v3",
-								Kind:       "user",
-								Name:       users.Items[0].GetName(),
-								UID:        users.Items[0].GetUID(),
-							},
-						},
-						"subjects": []rbacv1.Subject{
-							{
-								Kind:     "User",
-								APIGroup: rbacv1.GroupName,
-								Name:     users.Items[0].GetName(),
-							},
-						},
-						"roleRef": rbacv1.RoleRef{
+					},
+					"subjects": []rbacv1.Subject{
+						{
+							Kind:     "User",
 							APIGroup: rbacv1.GroupName,
-							Kind:     "ClusterRole",
-							Name:     "cluster-admin",
+							Name:     adminUser.GetName(),
 						},
 					},
-				}, v1.CreateOptions{})
-			if err != nil {
-				return err
-			}
+					"roleRef": rbacv1.RoleRef{
+						APIGroup: rbacv1.GroupName,
+						Kind:     "ClusterRole",
+						Name:     "cluster-admin",
+					},
+				},
+			}, v1.CreateOptions{})
+		if err != nil {
+			return err
 		}
 	}
 
@@ -237,46 +266,73 @@ func ResetAdmin(_ *cli.Context) error {
 		}
 	}
 
-	serverURL := "https://%v:8443"
+	printServerURL(ctx, nodeClient, settingClient)
+	logrus.Infof("Default admin and password created. Username: admin, Password: %v", token)
+	return nil
+}
+
+func printServerURL(ctx context.Context, nodeClient corev1interface.NodeInterface, settingClient dynamic.NamespaceableResourceInterface) {
+	serverURL, err := getServerURL(ctx, nodeClient, settingClient)
+	if err != nil {
+		logrus.Warnf("Can't retrieve serverURL to reach rancher server. Error: %v", err)
+	}
+
+	if serverURL != "" {
+		logrus.Infof("Server URL: %v", serverURL)
+	} else {
+		logrus.Info("Rancher is listening on http/8080 and https/8443")
+	}
+}
+
+// getServerURL reads the possible serverUrl in following order
+// 1. First fetch from server-url setting from rancher
+// 2. Fetch From tls-san set in rke2 config
+// 3. Fetch the externalNodeIP then internalNodeIP
+func getServerURL(ctx context.Context, nodeClient corev1interface.NodeInterface, settingClient dynamic.NamespaceableResourceInterface) (string, error) {
+	serverURLSettings, err := settingClient.Get(ctx, "server-url", v1.GetOptions{})
+	if err != nil {
+		return "", err
+	}
+	value := serverURLSettings.Object["value"].(string)
+	defaultValue := serverURLSettings.Object["default"].(string)
+	if value != "" {
+		return value, nil
+	} else if defaultValue != "" {
+		return value, nil
+	}
+
+	tlsSan, err := readTLSSan()
+	if err != nil {
+		return "", err
+	}
+	if tlsSan != "" {
+		return fmt.Sprintf("https://%v:8443", tlsSan), nil
+	}
+
 	nodes, err := nodeClient.List(ctx, v1.ListOptions{})
 	if err != nil {
-		return err
+		return "", err
 	}
 	if len(nodes.Items) > 0 {
 		addresses := nodes.Items[0].Status.Addresses
 		// prefer external IP over internal IP
 		for _, address := range addresses {
 			if address.Type == corev1.NodeExternalIP {
-				serverURL = fmt.Sprintf(serverURL, address.Address)
-				break
+				return fmt.Sprintf("https://%v:8443", address.Address), nil
 			}
 			if address.Type == corev1.NodeInternalIP {
-				serverURL = fmt.Sprintf(serverURL, address.Address)
+				return fmt.Sprintf("https://%v:8443", address.Address), nil
 			}
 		}
 	}
 
-	serverURLSettings, err := settingClient.Get(ctx, "server-url", v1.GetOptions{})
-	if err != nil {
-		return err
-	}
-	value := serverURLSettings.Object["value"].(string)
-	defaultValue := serverURLSettings.Object["default"].(string)
-	if value != "" {
-		serverURL = value
-	} else if defaultValue != "" {
-		serverURL = defaultValue
-	}
-
-	logrus.Infof("Server URL: %v", serverURL)
-	logrus.Infof("Default admin and password created. Username: admin, Password: %v", token)
-	return nil
+	return "", nil
 }
 
 func setClusterAnnotation(ctx context.Context, clustersClient dynamic.NamespaceableResourceInterface, adminName string) error {
 	cluster, err := clustersClient.Get(ctx, "local", v1.GetOptions{})
 	if err != nil {
-		return errors.Errorf("Cluster %s is not ready yet", cluster.GetName())
+		return errors.Errorf("Local cluster is not ready yet")
 	}
 	if adminName == "" {
 		return errors.Errorf("User is not set yet")
@@ -316,4 +372,32 @@ func setConditionToFalse(object map[string]interface{}, cond string) {
 		}
 	}
 	return
+}
+
+func readTLSSan() (string, error) {
+	bytes, err := ioutil.ReadFile("/etc/rancher/rke2/config.yaml")
+	if err != nil && !os.IsNotExist(err) {
+		return "", err
+	}
+
+	if len(bytes) == 0 {
+		return "", nil
+	}
+
+	data := yaml.MapSlice{}
+	if err := yaml.Unmarshal(bytes, &data); err != nil {
+		return "", err
+	}
+
+	for _, item := range data {
+		if item.Key == "tls-san" {
+			if v, ok := item.Value.([]interface{}); ok {
+				if s, ok := v[0].(string); ok {
+					return s, nil
+				}
+			}
+		}
+	}
+
+	return "", nil
 }

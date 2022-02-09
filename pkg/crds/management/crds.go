@@ -3,21 +3,13 @@ package dashboard
 import (
 	"context"
 
-	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-
 	"github.com/rancher/wrangler/pkg/crd"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/rest"
 )
 
 func List() []crd.CRD {
-	return []crd.CRD{
-		// Add CRDs here in the same style as pkg/crds/dashboard
-		newCRD(v3.FleetWorkspace{}, func(c crd.CRD) crd.CRD {
-			c.NonNamespace = true
-			return c
-		}),
-	}
+	return nil
 }
 
 func Objects() (result []runtime.Object, err error) {
@@ -26,7 +18,7 @@ func Objects() (result []runtime.Object, err error) {
 		if err != nil {
 			return nil, err
 		}
-		result = append(result, &crd)
+		result = append(result, crd)
 	}
 	return
 }

@@ -135,7 +135,7 @@ MONITORING_OPERATOR_APP = "monitoring-operator"
 PROJECT_MONITORING_APP = "project-monitoring"
 GRAFANA_PROJECT_MONITORING = "grafana-project-monitoring"
 PROMETHEUS_PROJECT_MONITORING = "prometheus-project-monitoring"
-LONGHORN_APP_VERSION = os.environ.get('RANCHER_LONGHORN_VERSION', "1.0.0")
+LONGHORN_APP_VERSION = os.environ.get('RANCHER_LONGHORN_VERSION', "1.0.2")
 
 
 def test_monitoring_cluster_graph():
@@ -447,9 +447,10 @@ def test_rbac_cluster_owner_control_cluster_monitoring():
     if cluster["enableClusterMonitoring"] is True:
         assert "disableMonitoring" in cluster.actions.keys()
         user_client.action(cluster, "disableMonitoring")
-        # sleep 10 seconds to wait for all apps removed
-        time.sleep(10)
-
+    validate_app_deletion(namespace["system_project_client"],
+                          MONITORING_OPERATOR_APP)
+    validate_app_deletion(namespace["system_project_client"],
+                          CLUSTER_MONITORING_APP)
     cluster = user_client.reload(cluster)
     assert "enableMonitoring" in cluster.actions.keys()
     user_client.action(cluster, "enableMonitoring",
@@ -460,10 +461,10 @@ def test_rbac_cluster_owner_control_cluster_monitoring():
 
 @pytest.fixture(scope="module", autouse="True")
 def setup_monitoring(request):
-    '''
+    """
     Initialize projects, clients, install longhorn app and enable monitoring
     with persistence storageClass set to longhorn
-    '''
+    """
     global MONITORING_VERSION
     rancher_client, cluster = get_user_client_and_cluster()
     create_kubeconfig(cluster)
@@ -511,8 +512,8 @@ def setup_monitoring(request):
                               version=MONITORING_VERSION)
     validate_cluster_monitoring_apps()
 
-    # Wait 3 minutes for all graphs to be available
-    time.sleep(60 * 3)
+    # Wait 5 minutes for all graphs to be available
+    time.sleep(60 * 5)
 
     def fin():
         if ENABLE_STORAGE == "true":
@@ -520,11 +521,13 @@ def setup_monitoring(request):
             # otherwise the namespace longhorn-system will be stuck in removing
             project_client.delete(app)
             validate_app_deletion(project_client, app.id)
+            print("uninstalled the longhorn app")
         rancher_client.delete(project)
         # Disable monitoring
         cluster = rancher_client.reload(namespace["cluster"])
         if cluster["enableClusterMonitoring"] is True:
             rancher_client.action(cluster, "disableMonitoring")
+            print("disabled the cluster monitoring")
 
     request.addfinalizer(fin)
 

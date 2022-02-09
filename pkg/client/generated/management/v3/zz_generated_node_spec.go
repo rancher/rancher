@@ -18,6 +18,7 @@ const (
 	NodeSpecFieldPodCidrs                 = "podCidrs"
 	NodeSpecFieldProviderId               = "providerId"
 	NodeSpecFieldRequestedHostname        = "requestedHostname"
+	NodeSpecFieldScaledownTime            = "scaledownTime"
 	NodeSpecFieldTaints                   = "taints"
 	NodeSpecFieldUnschedulable            = "unschedulable"
 	NodeSpecFieldUpdateTaintsFromAPI      = "updateTaintsFromAPI"
@@ -41,6 +42,7 @@ type NodeSpec struct {
 	PodCidrs                 []string        `json:"podCidrs,omitempty" yaml:"podCidrs,omitempty"`
 	ProviderId               string          `json:"providerId,omitempty" yaml:"providerId,omitempty"`
 	RequestedHostname        string          `json:"requestedHostname,omitempty" yaml:"requestedHostname,omitempty"`
+	ScaledownTime            string          `json:"scaledownTime,omitempty" yaml:"scaledownTime,omitempty"`
 	Taints                   []Taint         `json:"taints,omitempty" yaml:"taints,omitempty"`
 	Unschedulable            bool            `json:"unschedulable,omitempty" yaml:"unschedulable,omitempty"`
 	UpdateTaintsFromAPI      *bool           `json:"updateTaintsFromAPI,omitempty" yaml:"updateTaintsFromAPI,omitempty"`

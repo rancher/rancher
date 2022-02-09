@@ -71,7 +71,7 @@ func SetPasswordStore(schemas *types.Schemas, secretStore v1.SecretInterface, ns
 		} else {
 			schema = schemas.Schema(&managementschema.Version, storeType)
 		}
-		if schema != nil {
+		if schema != nil && schema.Store != nil {
 			data := getFields(schema, schemas, map[string]bool{})
 			id := schema.ID
 			pwdStore.Stores[id] = schema.Store
@@ -138,10 +138,7 @@ func (p *PasswordStore) replacePasswords(sepData, data, existing map[string]inte
 	*/
 	if len(data) == 0 {
 		// nothing to put in data, delete existing secret for this path
-		if err := p.deleteExistingSecrets(sepData, existing); err != nil {
-			return err
-		}
-		return nil
+		return p.deleteExistingSecrets(sepData, existing)
 	}
 	for sepKey, sepVal := range sepData {
 		if convert.ToString(sepVal) == separator {

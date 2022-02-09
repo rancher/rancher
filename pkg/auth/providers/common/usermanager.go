@@ -25,7 +25,6 @@ import (
 	"github.com/sirupsen/logrus"
 	k8srbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	apitypes "k8s.io/apimachinery/pkg/types"
@@ -223,73 +222,35 @@ func (m *userManager) CheckAccess(accessMode string, allowedPrincipalIDs []strin
 }
 
 // creates tokens with 0 ttl and returns token in 'token.Name:token.Token' format
-func (m *userManager) EnsureToken(tokenName, description, kind, userName string) (string, error) {
-	return m.EnsureClusterToken("", tokenName, description, kind, userName)
+func (m *userManager) EnsureToken(tokenName, description, kind, userName string, ttl *int64, randomize bool) (string, error) {
+	return m.EnsureClusterToken("", tokenName, description, kind, userName, ttl, randomize)
 }
 
-func (m *userManager) EnsureClusterToken(clusterName, tokenName, description, kind, userName string) (string, error) {
+func (m *userManager) EnsureClusterToken(clusterName, tokenName, description, kind, userName string, ttl *int64, randomize bool) (string, error) {
 	if strings.HasPrefix(tokenName, "token-") {
 		return "", errors.New("token names can't start with token-")
 	}
 
-	token, err := m.tokenLister.Get("", tokenName)
-	if err != nil && !apierrors.IsNotFound(err) {
-		return "", err
-	}
-
-	if token == nil {
-		key, err := randomtoken.Generate()
-		if err != nil {
-			return "", fmt.Errorf("failed to generate token key")
+	var err error
+	var token *v3.Token
+	if !randomize {
+		token, err = m.tokenLister.Get("", tokenName)
+		if err != nil && !apierrors.IsNotFound(err) {
+			return "", err
 		}
-
-		token = &v3.Token{
-			ObjectMeta: v1.ObjectMeta{
-				Name: tokenName,
-				Labels: map[string]string{
-					tokens.UserIDLabel:    userName,
-					tokens.TokenKindLabel: kind,
-				},
-			},
-			TTLMillis:    0,
-			Description:  description,
-			UserID:       userName,
-			AuthProvider: "local",
-			IsDerived:    true,
-			Token:        key,
-			ClusterName:  clusterName,
-		}
-
-		logrus.Infof("Creating token for user %v", userName)
-		createdToken, err := m.tokens.Create(token)
-		if err != nil {
-			if !apierrors.IsAlreadyExists(err) {
+		if err == nil {
+			if err := m.tokens.Delete(token.Name, &v1.DeleteOptions{}); err != nil {
 				return "", err
 			}
-			token, err = m.tokens.Get(tokenName, v1.GetOptions{})
-			if err != nil {
-				return "", err
-			}
-		} else {
-			token = createdToken
 		}
 	}
 
-	return token.Name + ":" + token.Token, nil
-}
-
-func (m *userManager) newTokenForKubeconfig(clusterName, tokenName, description, kind, userName string, ttl time.Duration, useExisting bool) (*v3.Token, error) {
 	key, err := randomtoken.Generate()
 	if err != nil {
-		return nil, fmt.Errorf("failed to generate token key %v", err)
+		return "", errors.New("failed to generate token key")
 	}
 
-	tokenTTL, err := tokens.ValidateMaxTTL(ttl)
-	if err != nil {
-		return nil, fmt.Errorf("failed to validate token ttl %v", err)
-	}
-
-	token := &v3.Token{
+	token = &v3.Token{
 		ObjectMeta: v1.ObjectMeta{
 			Name: tokenName,
 			Labels: map[string]string{
@@ -297,6 +258,7 @@ func (m *userManager) newTokenForKubeconfig(clusterName, tokenName, description,
 				tokens.TokenKindLabel: kind,
 			},
 		},
+		TTLMillis:    0,
 		Description:  description,
 		UserID:       userName,
 		AuthProvider: "local",
@@ -304,74 +266,75 @@ func (m *userManager) newTokenForKubeconfig(clusterName, tokenName, description,
 		Token:        key,
 		ClusterName:  clusterName,
 	}
-
-	if tokenTTL.Minutes() > 0 {
-		token.TTLMillis = tokenTTL.Milliseconds()
+	if ttl != nil {
+		token.TTLMillis = *ttl
 	}
-
+	if randomize {
+		token.ObjectMeta.Name = ""
+		token.ObjectMeta.GenerateName = tokenName
+	}
+	err = tokens.ConvertTokenKeyToHash(token)
+	if err != nil {
+		return "", err
+	}
 	logrus.Infof("Creating token for user %v", userName)
-	createdToken, err := m.tokens.Create(token)
-	if err == nil {
-		return createdToken, nil
-	}
-	if !apierrors.IsAlreadyExists(err) {
-		return nil, err
-	}
-	if useExisting {
-		return m.tokens.Get(tokenName, v1.GetOptions{})
-	}
-	// retry if can't use existing token
 	err = wait.ExponentialBackoff(backoff, func() (bool, error) {
-		createdToken, err = m.tokens.Create(token)
+		// Backoff was added here because it is possible the token is the process of deleting.
+		// This should cause the create to retry until the delete is finished.
+		newToken, err := m.tokens.Create(token)
 		if err != nil {
 			if apierrors.IsAlreadyExists(err) {
 				return false, nil
 			}
 			return false, err
 		}
-		token = createdToken
+		token = newToken
 		return true, nil
 	})
+
 	if err != nil {
-		return nil, err
+		return "", err
 	}
-	return token, nil
+
+	return token.Name + ":" + key, nil
+}
+
+func (m *userManager) newTokenForKubeconfig(clusterName, tokenName, description, kind, userName string, ttl time.Duration) (string, error) {
+	tokenTTL, err := tokens.ValidateMaxTTL(ttl)
+	if err != nil {
+		return "", fmt.Errorf("failed to validate token ttl %v", err)
+	}
+
+	ttlMilli := tokenTTL.Milliseconds()
+	logrus.Infof("Creating token for user %v", userName)
+	key, err := m.EnsureClusterToken(clusterName, tokenName, description, kind, userName, &ttlMilli, false)
+	if err != nil {
+		return "", err
+	}
+	return key, nil
 }
 
 // creates kubeconfig tokens with KubeconfigTokenTTL and regenerates if existing token expired
-func (m *userManager) GetKubeconfigToken(clusterName, tokenName, description, kind, userName string) (*v3.Token, error) {
-	token, err := m.tokenLister.Get("", tokenName)
-	if err != nil && !apierrors.IsNotFound(err) {
-		return nil, err
-	}
+func (m *userManager) GetKubeconfigToken(clusterName, tokenName, description, kind, userName string) (*v3.Token, string, error) {
 
 	tokenTTL, err := tokens.ParseTokenTTL(settings.KubeconfigTokenTTLMinutes.Get())
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse setting [%s]: %v", settings.KubeconfigTokenTTLMinutes.Name, err)
+		return nil, "", fmt.Errorf("failed to parse setting [%s]: %v", settings.KubeconfigTokenTTLMinutes.Name, err)
 	}
 
-	if token == nil {
-		createdToken, err := m.newTokenForKubeconfig(clusterName, tokenName, description, kind, userName, tokenTTL, true)
-		if err != nil {
-			return nil, err
-		}
-		token = createdToken
+	fullCreatedToken, err := m.newTokenForKubeconfig(clusterName, tokenName, description, kind, userName, tokenTTL)
+	if err != nil {
+		return nil, "", err
 	}
 
-	if token != nil && tokenUtil.IsExpired(*token) {
-		logrus.Debugf("getToken: deleting expired token %s", tokenName)
-		err := m.tokens.Delete(tokenName, &metav1.DeleteOptions{})
-		if err != nil && !apierrors.IsNotFound(err) {
-			return nil, err
-		}
-		token, err = m.newTokenForKubeconfig(clusterName, tokenName, description, kind, userName, tokenTTL, false)
-		if err != nil {
-			return nil, err
-		}
+	_, createdTokenValue := tokens.SplitTokenParts(fullCreatedToken)
+	token, err := m.tokens.Get(tokenName, v1.GetOptions{})
+	if err != nil && !apierrors.IsNotFound(err) {
+		return nil, createdTokenValue, err
 	}
 
 	if token.ExpiresAt != "" {
-		return token, nil
+		return token, createdTokenValue, nil
 	}
 
 	// SetTokenExpiresAt requires creationTS, so can only be set post create
@@ -381,7 +344,7 @@ func (m *userManager) GetKubeconfigToken(clusterName, tokenName, description, ki
 	token, err = m.tokens.Update(tokenCopy)
 	if err != nil {
 		if !apierrors.IsConflict(err) {
-			return nil, fmt.Errorf("getToken: updating token [%s] failed [%v]", tokenName, err)
+			return nil, "", fmt.Errorf("getToken: updating token [%s] failed [%v]", tokenName, err)
 		}
 
 		err = wait.ExponentialBackoff(backoff, func() (bool, error) {
@@ -407,12 +370,12 @@ func (m *userManager) GetKubeconfigToken(clusterName, tokenName, description, ki
 		})
 
 		if err != nil {
-			return nil, fmt.Errorf("getToken: retry updating token [%s] failed [%v]", tokenName, err)
+			return nil, "", fmt.Errorf("getToken: retry updating token [%s] failed [%v]", tokenName, err)
 		}
 	}
 
 	logrus.Debugf("getToken: token %s expiresAt %s", token.Name, token.ExpiresAt)
-	return token, nil
+	return token, createdTokenValue, nil
 }
 
 func (m *userManager) EnsureUser(principalName, displayName string) (*v3.User, error) {
@@ -693,6 +656,10 @@ func (m *userManager) GetUserByPrincipalID(principalName string) (*v3.User, erro
 		}
 	}
 	return user, nil
+}
+
+func (m *userManager) DeleteToken(tokenName string) error {
+	return m.tokens.Delete(tokenName, &v1.DeleteOptions{})
 }
 
 func (m *userManager) checkCache(principalName string) (*v3.User, error) {

@@ -4,25 +4,32 @@ import (
 	"context"
 	"net/http"
 	"os"
+	"sync"
+	"time"
 
 	"github.com/pkg/errors"
+	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/pkg/auth/providerrefresh"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/tokens"
+	"github.com/rancher/rancher/pkg/catalog/manager"
 	"github.com/rancher/rancher/pkg/clustermanager"
 	managementController "github.com/rancher/rancher/pkg/controllers/management"
-	"github.com/rancher/rancher/pkg/controllers/management/eksupstreamrefresh"
+	"github.com/rancher/rancher/pkg/controllers/management/clusterupstreamrefresher"
 	managementcrds "github.com/rancher/rancher/pkg/crds/management"
 	"github.com/rancher/rancher/pkg/cron"
 	managementdata "github.com/rancher/rancher/pkg/data/management"
 	"github.com/rancher/rancher/pkg/dialer"
 	"github.com/rancher/rancher/pkg/jailer"
 	"github.com/rancher/rancher/pkg/metrics"
+	"github.com/rancher/rancher/pkg/namespace"
+	"github.com/rancher/rancher/pkg/systemtokens"
 	"github.com/rancher/rancher/pkg/telemetry"
-	"github.com/rancher/rancher/pkg/tunnelserver"
+	"github.com/rancher/rancher/pkg/tunnelserver/mcmauthorizer"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/sirupsen/logrus"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 type Options struct {
@@ -43,53 +50,64 @@ type mcm struct {
 	removeLocalCluster  bool
 	embedded            bool
 	httpsListenPort     int
+
+	startedChan chan struct{}
+	startLock   sync.Mutex
 }
 
-func buildScaledContext(ctx context.Context, wranglerContext *wrangler.Context, cfg *Options) (*config.ScaledContext, *clustermanager.Manager, error) {
+func buildScaledContext(ctx context.Context, wranglerContext *wrangler.Context, cfg *Options) (*config.ScaledContext,
+	*clustermanager.Manager, *mcmauthorizer.Authorizer, error) {
 	scaledContext, err := config.NewScaledContext(*wranglerContext.RESTConfig, &config.ScaleContextOptions{
 		ControllerFactory: wranglerContext.ControllerFactory,
 	})
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
+
+	scaledContext.Wrangler = wranglerContext
+
+	scaledContext.CatalogManager = manager.New(scaledContext.Management, scaledContext.Project, scaledContext.Core)
 
 	if err := managementcrds.Create(ctx, wranglerContext.RESTConfig); err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
-	dialerFactory, err := dialer.NewFactory(scaledContext)
+	dialerFactory, err := dialer.NewFactory(scaledContext, wranglerContext)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
-
 	scaledContext.Dialer = dialerFactory
-	scaledContext.PeerManager, err = tunnelserver.NewPeerManager(ctx, scaledContext, dialerFactory.TunnelServer)
-	if err != nil {
-		return nil, nil, err
-	}
 
 	userManager, err := common.NewUserManager(scaledContext)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	scaledContext.UserManager = userManager
 	scaledContext.RunContext = ctx
 
+	systemTokens := systemtokens.NewSystemTokensFromScale(scaledContext)
+	scaledContext.SystemTokens = systemTokens
+
 	manager := clustermanager.NewManager(cfg.HTTPSListenPort, scaledContext, wranglerContext.RBAC, wranglerContext.ASL)
+
 	scaledContext.AccessControl = manager
 	scaledContext.ClientGetter = manager
 
-	return scaledContext, manager, nil
+	authorizer := mcmauthorizer.NewAuthorizer(scaledContext)
+	wranglerContext.TunnelAuthorizer.Add(authorizer.AuthorizeTunnel)
+	scaledContext.PeerManager = wranglerContext.PeerManager
+
+	return scaledContext, manager, authorizer, nil
 }
 
 func newMCM(ctx context.Context, wranglerContext *wrangler.Context, cfg *Options) (*mcm, error) {
-	scaledContext, clusterManager, err := buildScaledContext(ctx, wranglerContext, cfg)
+	scaledContext, clusterManager, tunnelAuthorizer, err := buildScaledContext(ctx, wranglerContext, cfg)
 	if err != nil {
 		return nil, err
 	}
 
-	router, err := router(ctx, cfg.LocalClusterEnabled, scaledContext, clusterManager)
+	router, err := router(ctx, cfg.LocalClusterEnabled, tunnelAuthorizer, scaledContext, clusterManager)
 	if err != nil {
 		return nil, err
 	}
@@ -107,9 +125,44 @@ func newMCM(ctx context.Context, wranglerContext *wrangler.Context, cfg *Options
 		removeLocalCluster:  cfg.RemoveLocalCluster,
 		embedded:            cfg.Embedded,
 		httpsListenPort:     cfg.HTTPSListenPort,
+		startedChan:         make(chan struct{}),
 	}
 
+	go func() {
+		<-ctx.Done()
+		mcm.started(ctx)
+	}()
+
 	return mcm, nil
+}
+
+func (m *mcm) started(ctx context.Context) {
+	m.startLock.Lock()
+	defer m.startLock.Unlock()
+	select {
+	case <-m.startedChan:
+	default:
+		close(m.startedChan)
+	}
+}
+
+func (m *mcm) Wait(ctx context.Context) {
+	select {
+	case <-m.startedChan:
+		for {
+			if _, err := m.wranglerContext.Core.Namespace().Get(namespace.GlobalNamespace, metav1.GetOptions{}); err == nil {
+				return
+			}
+			logrus.Infof("Waiting for initial data to be populated")
+			time.Sleep(2 * time.Second)
+		}
+	case <-ctx.Done():
+	}
+}
+
+func (m *mcm) NormanSchemas() *types.Schemas {
+	<-m.startedChan
+	return m.ScaledContext.Schemas
 }
 
 func (m *mcm) Middleware(next http.Handler) http.Handler {
@@ -137,20 +190,16 @@ func (m *mcm) Start(ctx context.Context) error {
 				err error
 			)
 
-			if m.ScaledContext.PeerManager != nil {
-				m.ScaledContext.PeerManager.Leader()
-			}
-
 			management, err = m.ScaledContext.NewManagementContext()
 			if err != nil {
 				return errors.Wrap(err, "failed to create management context")
 			}
 
-			if err := managementdata.Add(m.wranglerContext, management, m.localClusterEnabled, m.removeLocalCluster, m.embedded); err != nil {
+			if err := managementdata.Add(ctx, m.wranglerContext, management); err != nil {
 				return errors.Wrap(err, "failed to add management data")
 			}
 
-			managementController.Register(ctx, management, m.ScaledContext.ClientGetter.(*clustermanager.Manager))
+			managementController.Register(ctx, management, m.ScaledContext.ClientGetter.(*clustermanager.Manager), m.wranglerContext)
 			if err := managementController.RegisterWrangler(ctx, m.wranglerContext, management, m.ScaledContext.ClientGetter.(*clustermanager.Manager)); err != nil {
 				return errors.Wrap(err, "failed to register wrangler controllers")
 			}
@@ -167,7 +216,8 @@ func (m *mcm) Start(ctx context.Context) error {
 		tokens.StartPurgeDaemon(ctx, management)
 		providerrefresh.StartRefreshDaemon(ctx, m.ScaledContext, management)
 		managementdata.CleanupOrphanedSystemUsers(ctx, management)
-		eksupstreamrefresh.StartEKSUpstreamCronJob(m.wranglerContext)
+		clusterupstreamrefresher.MigrateEksRefreshCronSetting(m.wranglerContext)
+		go managementdata.CleanupDuplicateBindings(m.ScaledContext, m.wranglerContext)
 		logrus.Infof("Rancher startup complete")
 		return nil
 	})
