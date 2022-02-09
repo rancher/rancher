@@ -3,8 +3,6 @@ module github.com/rancher/rancher
 go 1.16
 
 replace (
-	git.apache.org/thrift.git => github.com/apache/thrift v0.12.0
-
 	github.com/docker/distribution => github.com/docker/distribution v2.7.1+incompatible // oras dep requires a replace is set
 	github.com/docker/docker => github.com/docker/docker v20.10.9+incompatible // oras dep requires a replace is set
 
