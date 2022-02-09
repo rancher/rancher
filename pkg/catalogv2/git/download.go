@@ -3,6 +3,7 @@ package git
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/pem"
 	"fmt"
 	"net/url"
 	"os"
@@ -27,8 +28,8 @@ func gitDir(namespace, name, gitURL string) string {
 	return filepath.Join(stateDir, namespace, name, hash(gitURL))
 }
 
-func Head(secret *corev1.Secret, namespace, name, gitURL, branch string, insecureSkipTLS bool) (string, error) {
-	git, err := gitForRepo(secret, namespace, name, gitURL, insecureSkipTLS)
+func Head(secret *corev1.Secret, namespace, name, gitURL, branch string, insecureSkipTLS bool, caBundle []byte) (string, error) {
+	git, err := gitForRepo(secret, namespace, name, gitURL, insecureSkipTLS, caBundle)
 	if err != nil {
 		return "", err
 	}
@@ -36,28 +37,28 @@ func Head(secret *corev1.Secret, namespace, name, gitURL, branch string, insecur
 	return git.Head(branch)
 }
 
-func Update(secret *corev1.Secret, namespace, name, gitURL, branch string, insecureSkipTLS bool) (string, error) {
-	git, err := gitForRepo(secret, namespace, name, gitURL, insecureSkipTLS)
+func Update(secret *corev1.Secret, namespace, name, gitURL, branch string, insecureSkipTLS bool, caBundle []byte) (string, error) {
+	git, err := gitForRepo(secret, namespace, name, gitURL, insecureSkipTLS, caBundle)
 	if err != nil {
 		return "", err
 	}
 
 	if isBundled(git) && settings.SystemCatalog.Get() == "bundled" {
-		return Head(secret, namespace, name, gitURL, branch, insecureSkipTLS)
+		return Head(secret, namespace, name, gitURL, branch, insecureSkipTLS, caBundle)
 	}
 
 	commit, err := git.Update(branch)
 	if err != nil && isBundled(git) {
-		return Head(secret, namespace, name, gitURL, branch, insecureSkipTLS)
+		return Head(secret, namespace, name, gitURL, branch, insecureSkipTLS, caBundle)
 	}
 	return commit, err
 }
 
-func Ensure(secret *corev1.Secret, namespace, name, gitURL, commit string, insecureSkipTLS bool) error {
+func Ensure(secret *corev1.Secret, namespace, name, gitURL, commit string, insecureSkipTLS bool, caBundle []byte) error {
 	if commit == "" {
 		return nil
 	}
-	git, err := gitForRepo(secret, namespace, name, gitURL, insecureSkipTLS)
+	git, err := gitForRepo(secret, namespace, name, gitURL, insecureSkipTLS, caBundle)
 	if err != nil {
 		return err
 	}
@@ -69,7 +70,7 @@ func isBundled(git *git.Git) bool {
 	return strings.HasPrefix(git.Directory, staticDir)
 }
 
-func gitForRepo(secret *corev1.Secret, namespace, name, gitURL string, insecureSkipTLS bool) (*git.Git, error) {
+func gitForRepo(secret *corev1.Secret, namespace, name, gitURL string, insecureSkipTLS bool, caBundle []byte) (*git.Git, error) {
 	if !strings.HasPrefix(gitURL, "git@") {
 		u, err := url.Parse(gitURL)
 		if err != nil {
@@ -84,14 +85,29 @@ func gitForRepo(secret *corev1.Secret, namespace, name, gitURL string, insecureS
 	if settings.InstallUUID.Get() != "" {
 		headers["X-Install-Uuid"] = settings.InstallUUID.Get()
 	}
+	// convert caBundle to PEM format because git requires correct line breaks, header and footer.
+	if len(caBundle) > 0 {
+		caBundle = convertDERToPEM(caBundle)
+		insecureSkipTLS = false
+	}
 	return git.NewGit(dir, gitURL, &git.Options{
 		Credential:        secret,
 		Headers:           headers,
 		InsecureTLSVerify: insecureSkipTLS,
+		CABundle:          caBundle,
 	})
 }
 
 func hash(gitURL string) string {
 	b := sha256.Sum256([]byte(gitURL))
 	return hex.EncodeToString(b[:])
+}
+
+// convertDERToPEM converts a src DER certificate into PEM with line breaks, header, and footer.
+func convertDERToPEM(src []byte) []byte {
+	return pem.EncodeToMemory(&pem.Block{
+		Type:    "CERTIFICATE",
+		Headers: map[string]string{},
+		Bytes:   src,
+	})
 }
