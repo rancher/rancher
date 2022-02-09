@@ -224,6 +224,11 @@ func (m *Lifecycle) getNodePool(nodePoolName string) (*v3.NodePool, error) {
 }
 
 func (m *Lifecycle) Remove(obj *v3.Node) (runtime.Object, error) {
+	// skip remove nodes for non-custom cluster
+	if obj.Spec.NodeTemplateName == "" && obj.Spec.CustomConfig == nil {
+		return obj, nil
+	}
+
 	if obj.Status.NodeTemplateSpec == nil {
 		if err := m.cleanRKENode(obj); err != nil {
 			return obj, err
