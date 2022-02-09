@@ -88,6 +88,7 @@ func gitForRepo(secret *corev1.Secret, namespace, name, gitURL string, insecureS
 	// convert caBundle to PEM format because git requires correct line breaks, header and footer.
 	if len(caBundle) > 0 {
 		caBundle = convertDERToPEM(caBundle)
+		insecureSkipTLS = false
 	}
 	return git.NewGit(dir, gitURL, &git.Options{
 		Credential:        secret,
