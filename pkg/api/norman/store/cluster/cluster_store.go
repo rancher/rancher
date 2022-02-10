@@ -251,6 +251,7 @@ func (r *Store) Create(apiContext *types.APIContext, schema *types.Schema, data 
 	if err := validateS3Credentials(data, nil); err != nil {
 		return nil, err
 	}
+	cleanPrivateRegistry(data)
 
 	return r.Store.Create(apiContext, schema, data)
 }
@@ -601,6 +602,7 @@ func (r *Store) Update(apiContext *types.APIContext, schema *types.Schema, data 
 
 	setBackupConfigSecretKeyIfNotExists(existingCluster, data)
 	setPrivateRegistryPasswordIfNotExists(existingCluster, data)
+	cleanPrivateRegistry(data)
 	setCloudProviderPasswordFieldsIfNotExists(existingCluster, data)
 	setWeavePasswordFieldsIfNotExists(existingCluster, data)
 	dialer, err := r.DialerFactory.ClusterDialer(id)
@@ -1029,6 +1031,26 @@ func validateS3Credentials(data map[string]interface{}, dialer dialer.Dialer) er
 		return fmt.Errorf("Unable to validate S3 backup target configuration: bucket [%v] not found", bucket)
 	}
 	return nil
+}
+
+func cleanPrivateRegistry(data map[string]interface{}) {
+	registries, ok := values.GetSlice(data, "rancherKubernetesEngineConfig", "privateRegistries")
+	if !ok || registries == nil {
+		return
+	}
+	var updatedRegistries []map[string]interface{}
+	for _, registry := range registries {
+		if registry["ecrCredentialPlugin"] != nil {
+			awsAccessKeyID, _ := values.GetValue(registry, "ecrCredentialPlugin", "awsAccessKeyId")
+			awsSecretAccessKey, _ := values.GetValue(registry, "ecrCredentialPlugin", "awsSecretAccessKey")
+			awsAccessToken, _ := values.GetValue(registry, "ecrCredentialPlugin", "awsAccessToken")
+			if awsAccessKeyID == nil && awsSecretAccessKey == nil && awsAccessToken == nil {
+				delete(registry, "ecrCredentialPlugin")
+			}
+		}
+		updatedRegistries = append(updatedRegistries, registry)
+	}
+	values.PutValue(data, updatedRegistries, "rancherKubernetesEngineConfig", "privateRegistries")
 }
 
 func setPrivateRegistryPasswordIfNotExists(oldData, newData map[string]interface{}) {
