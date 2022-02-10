@@ -92,43 +92,36 @@ func GetImages(exportConfig ExportConfig, externalImages map[string][]string, im
 	return imagesList, imagesAndSourcesList, nil
 }
 
-func AddImagesToImageListConfigMap(cm *v1.ConfigMap, rancherVersion, systemChartsPath string) (err error) {
-	var windowsImages []string
-	var linuxImages []string
+func AddImagesToImageListConfigMap(cm *v1.ConfigMap, rancherVersion, systemChartsPath string) error {
 	exportConfig := ExportConfig{
 		SystemChartsPath: systemChartsPath,
 		OsType:           Windows,
 		RancherVersion:   rancherVersion,
 	}
-	windowsImages, _, err = GetImages(exportConfig, nil, []string{}, nil)
+	windowsImages, _, err := GetImages(exportConfig, nil, []string{}, nil)
 	if err != nil {
-		return
+		return err
 	}
 	exportConfig.OsType = Linux
-	linuxImages, _, err = GetImages(exportConfig, nil, []string{}, nil)
+	linuxImages, _, err := GetImages(exportConfig, nil, []string{}, nil)
 	if err != nil {
-		return
+		return err
 	}
-
 	cm.Data = make(map[string]string, 2)
 	cm.Data[osTypeImageListName[Windows]] = strings.Join(windowsImages, imageListDelimiter)
 	cm.Data[osTypeImageListName[Linux]] = strings.Join(linuxImages, imageListDelimiter)
-
-	return
+	return nil
 }
 
-func ParseCatalogImageListConfigMap(cm *v1.ConfigMap) (windowsImageList, linuxImageList []string) {
-	windowsImageList = strings.Split(cm.Data[osTypeImageListName[Windows]], imageListDelimiter)
-	linuxImageList = strings.Split(cm.Data[osTypeImageListName[Linux]], imageListDelimiter)
-
-	return
+func ParseCatalogImageListConfigMap(cm *v1.ConfigMap) ([]string, []string) {
+	windowsImages := strings.Split(cm.Data[osTypeImageListName[Windows]], imageListDelimiter)
+	linuxImages := strings.Split(cm.Data[osTypeImageListName[Linux]], imageListDelimiter)
+	return windowsImages, linuxImages
 }
 
 func IsValidSemver(version string) bool {
-	if _, err := semver.NewVersion(version); err != nil {
-		return false
-	}
-	return true
+	_, err := semver.NewVersion(version)
+	return err == nil
 }
 
 func setRequirementImages(osType OSType, imagesSet map[string]map[string]struct{}) {
