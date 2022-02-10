@@ -48,26 +48,23 @@ func (c Charts) FetchImages(imagesSet map[string]map[string]struct{}) error {
 	// Filter index entries based on their Rancher version constraint
 	var filteredVersions repo.ChartVersions
 	for _, versions := range index.Entries {
-		if len(versions) >= 1 {
-			// Always append the latest version of the chart
-			// Note: Selecting the correct latest version relies on the charts-build-scripts `make standardize` command
-			// sorting the versions in the index file in descending order correctly.
-			latestVersion := versions[0]
-			filteredVersions = append(filteredVersions, latestVersion)
+		if len(versions) == 0 {
+			continue
 		}
-		if len(versions) > 1 {
-			// Append the remaining versions of the chart if the chart exists in the chartsToCheckConstraints map
-			// and the given Rancher version satisfies the chart's Rancher version constraint annotation.
-			chartName := versions[0].Metadata.Name
-			if _, ok := chartsToCheckConstraints[chartName]; ok {
-				for _, version := range versions[1:] {
-					isConstraintSatisfied, err := c.checkChartVersionConstraint(*version)
-					if err != nil {
-						return errors.Wrapf(err, "failed to check constraint of chart")
-					}
-					if isConstraintSatisfied {
-						filteredVersions = append(filteredVersions, version)
-					}
+		// Always append the latest version of the chart
+		// Note: Selecting the correct latest version relies on the charts-build-scripts `make standardize` command
+		// sorting the versions in the index file in descending order correctly.
+		latestVersion := versions[0]
+		filteredVersions = append(filteredVersions, latestVersion)
+		// Append the remaining versions of the chart if the chart exists in the chartsToCheckConstraints map
+		// and the given Rancher version satisfies the chart's Rancher version constraint annotation.
+		chartName := versions[0].Metadata.Name
+		if _, ok := chartsToCheckConstraints[chartName]; ok {
+			for _, version := range versions[1:] {
+				if isConstraintSatisfied, err := c.checkChartVersionConstraint(*version); err != nil {
+					return errors.Wrapf(err, "failed to check constraint of chart")
+				} else if isConstraintSatisfied {
+					filteredVersions = append(filteredVersions, version)
 				}
 			}
 		}
@@ -82,8 +79,7 @@ func (c Charts) FetchImages(imagesSet map[string]map[string]struct{}) error {
 		}
 		chartNameAndVersion := fmt.Sprintf("%s:%s", version.Name, version.Version)
 		for _, values := range versionValues {
-			err = pickImagesFromValuesMap(imagesSet, values, chartNameAndVersion, c.Config.OsType)
-			if err != nil {
+			if err = pickImagesFromValuesMap(imagesSet, values, chartNameAndVersion, c.Config.OsType); err != nil {
 				return err
 			}
 		}
@@ -95,15 +91,10 @@ func (c Charts) FetchImages(imagesSet map[string]map[string]struct{}) error {
 // returns true if the Rancher version in the export configuration satisfies the chart's constraint, false otherwise.
 // If a chart does not have a Rancher version annotation defined, this function returns false.
 func (c Charts) checkChartVersionConstraint(version repo.ChartVersion) (bool, error) {
-	constraintStr, ok := version.Annotations[RancherVersionAnnotationKey]
-	if !ok {
-		return false, nil
+	if constraintStr, ok := version.Annotations[RancherVersionAnnotationKey]; ok {
+		return compareRancherVersionToConstraint(c.Config.RancherVersion, constraintStr)
 	}
-	isConstraintSatisfied, err := compareRancherVersionToConstraint(c.Config.RancherVersion, constraintStr)
-	if err != nil {
-		return false, err
-	}
-	return isConstraintSatisfied, nil
+	return false, nil
 }
 
 type SystemCharts struct {
@@ -135,30 +126,25 @@ func (sc SystemCharts) FetchImages(imagesSet map[string]map[string]struct{}) err
 	// Filter index entries based on their Rancher version constraint
 	var filteredVersions libhelm.ChartVersions
 	for _, versions := range virtualIndex.IndexFile.Entries {
-		if len(versions) >= 1 {
-			// Always append the latest version of the chart unless it has been intentionally hidden with constraints
-			latestVersion := versions[0]
-			isConstraintSatisfied, err := sc.checkChartVersionConstraint(*latestVersion)
-			if err != nil {
-				return errors.Wrapf(err, "failed to filter chart versions")
-			}
-			if isConstraintSatisfied {
-				filteredVersions = append(filteredVersions, latestVersion)
-			}
+		if len(versions) == 0 {
+			continue
 		}
-		if len(versions) > 1 {
-			// Append the remaining versions of the chart if the chart exists in the systemChartsToCheckConstraints map
-			// and the given Rancher version satisfies the chart's Rancher version constraint defined in its questions file
-			chartName := versions[0].ChartMetadata.Name
-			if _, ok := systemChartsToCheckConstraints[chartName]; ok {
-				for _, version := range versions[1:] {
-					isConstraintSatisfied, err := sc.checkChartVersionConstraint(*version)
-					if err != nil {
-						return errors.Wrapf(err, "failed to filter chart versions")
-					}
-					if isConstraintSatisfied {
-						filteredVersions = append(filteredVersions, version)
-					}
+		// Always append the latest version of the chart unless it has been intentionally hidden with constraints
+		latestVersion := versions[0]
+		if isConstraintSatisfied, err := sc.checkChartVersionConstraint(*latestVersion); err != nil {
+			return errors.Wrapf(err, "failed to filter chart versions")
+		} else if isConstraintSatisfied {
+			filteredVersions = append(filteredVersions, latestVersion)
+		}
+		// Append the remaining versions of the chart if the chart exists in the systemChartsToCheckConstraints map
+		// and the given Rancher version satisfies the chart's Rancher version constraint defined in its questions file
+		chartName := versions[0].ChartMetadata.Name
+		if _, ok := systemChartsToCheckConstraints[chartName]; ok {
+			for _, version := range versions[1:] {
+				if isConstraintSatisfied, err := sc.checkChartVersionConstraint(*version); err != nil {
+					return errors.Wrapf(err, "failed to filter chart versions")
+				} else if isConstraintSatisfied {
+					filteredVersions = append(filteredVersions, version)
 				}
 			}
 		}
@@ -174,8 +160,7 @@ func (sc SystemCharts) FetchImages(imagesSet map[string]map[string]struct{}) err
 				return err
 			}
 			chartNameAndVersion := fmt.Sprintf("%s:%s", version.Name, version.Version)
-			err = pickImagesFromValuesMap(imagesSet, values, chartNameAndVersion, sc.Config.OsType)
-			if err != nil {
+			if err = pickImagesFromValuesMap(imagesSet, values, chartNameAndVersion, sc.Config.OsType); err != nil {
 				return err
 			}
 		}
@@ -201,11 +186,7 @@ func (sc SystemCharts) checkChartVersionConstraint(version libhelm.ChartVersion)
 	if constraintStr == "" {
 		return false, nil
 	}
-	isConstraintSatisfied, err := compareRancherVersionToConstraint(sc.Config.RancherVersion, constraintStr)
-	if err != nil {
-		return false, err
-	}
-	return isConstraintSatisfied, nil
+	return compareRancherVersionToConstraint(sc.Config.RancherVersion, constraintStr)
 }
 
 // compareRancherVersionToConstraint returns true if the Rancher version satisfies constraintStr, false otherwise.
