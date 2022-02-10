@@ -55,14 +55,14 @@ func (r *rbaccontroller) ensureRestricedAdminForFleet(key string, obj *v3.Global
 		if fw.Name == fleetconst.ClustersLocalNamespace {
 			continue
 		}
-		if err := r.ensureRolebinding(fw.Name, obj.UserName, obj); err != nil {
+		if err := r.ensureRolebinding(fw.Name, rbac.GetGRBSubject(obj), obj); err != nil {
 			finalError = multierror.Append(finalError, err)
 		}
 	}
 	return obj, finalError
 }
 
-func (r *rbaccontroller) ensureRolebinding(namespace, userName string, grb *v3.GlobalRoleBinding) error {
+func (r *rbaccontroller) ensureRolebinding(namespace string, subject k8srbac.Subject, grb *v3.GlobalRoleBinding) error {
 	rbName := fmt.Sprintf("%s-fleetworkspace-%s", grb.Name, rbac.RestrictedAdminClusterRoleBinding)
 	rb := &k8srbac.RoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
@@ -83,10 +83,7 @@ func (r *rbaccontroller) ensureRolebinding(namespace, userName string, grb *v3.G
 			Kind: "ClusterRole",
 		},
 		Subjects: []k8srbac.Subject{
-			{
-				Kind: "User",
-				Name: userName,
-			},
+			subject,
 		},
 	}
 	_, err := r.rbLister.Get(namespace, rbName)
