@@ -66,28 +66,12 @@ if [ ! -d build/system-charts ]; then
 fi
 
 if [ ! -d $CHART_REPO_DIR ]; then
-    INDEX_PATH=$CHART_REPO_DIR/index.yaml
     git clone --branch $CHART_DEFAULT_BRANCH https://github.com/rancher/charts $CHART_REPO_DIR
-
-    # Get list of paths to tarballs of the latest version of each chart from Helm repo's index.yaml
-    LATEST_TGZ_PATHS=$(yq r $INDEX_PATH "entries.*.[0].urls[0]")
-
-    # Extract the tarballs in the list, skip extracting CRD charts
-    for TGZ_PATH in $LATEST_TGZ_PATHS; do
-        TGZ_REL_PATH=$CHART_REPO_DIR/$TGZ_PATH
-        TGZ_EXTRACT_PATH=$(dirname $CHART_REPO_DIR/${TGZ_PATH##released/})
-        echo "Extract: $TGZ_REL_PATH to $TGZ_EXTRACT_PATH"
-        mkdir -p $TGZ_EXTRACT_PATH
-        tar -xf $TGZ_REL_PATH -C $TGZ_EXTRACT_PATH
-    done
-
-    # Remove index to force building a virtual index like system charts
-    rm -f $INDEX_PATH $CHART_REPO_DIR/assets/index.yaml
 fi
 
 if [ ${ARCH} == amd64 ]; then
     # Move this out of ARCH check for local dev on non-amd64 hardware.
-    TAG=$TAG REPO=${REPO} go run ../pkg/image/export/main.go $SYSTEM_CHART_REPO_DIR $CHART_REPO_DIR/assets $IMAGE $AGENT_IMAGE $RUNTIME_IMAGE $SYSTEM_AGENT_UPGRADE_IMAGE ${SYSTEM_AGENT_INSTALLER_RKE2_IMAGES[@]} ${SYSTEM_AGENT_INSTALLER_K3S_IMAGES[@]}
+    TAG=$TAG REPO=${REPO} go run ../pkg/image/export/main.go $SYSTEM_CHART_REPO_DIR $CHART_REPO_DIR $IMAGE $AGENT_IMAGE $RUNTIME_IMAGE $SYSTEM_AGENT_UPGRADE_IMAGE ${SYSTEM_AGENT_INSTALLER_RKE2_IMAGES[@]} ${SYSTEM_AGENT_INSTALLER_K3S_IMAGES[@]}
 
     # rancherd tarball
     rm -rf build/rancherd/bundle

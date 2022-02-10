@@ -152,14 +152,16 @@ func (lh ListHandler) LinkHandler(apiContext *types.APIContext, next types.Reque
 	_, targetSysCatalogImages := image.ParseCatalogImageListConfigMap(catalogImageList)
 
 	var targetRkeSysImages []string
+	exportConfig := image.ExportConfig{OsType: image.Linux}
 	switch apiContext.ID {
 	case linuxImages:
-		targetRkeSysImages, _, err = image.GetImages("", "", nil, []string{}, rkeSysImages, image.Linux)
+		targetRkeSysImages, _, err = image.GetImages(exportConfig, nil, []string{}, rkeSysImages)
 		if err != nil {
 			return httperror.WrapAPIError(err, httperror.ServerError, "error getting image list for linux platform")
 		}
 	case windowsImages:
-		targetRkeSysImages, _, err = image.GetImages("", "", nil, []string{}, rkeSysImages, image.Windows)
+		exportConfig.OsType = image.Windows
+		targetRkeSysImages, _, err = image.GetImages(exportConfig, nil, []string{}, rkeSysImages)
 		if err != nil {
 			return httperror.WrapAPIError(err, httperror.ServerError, "error getting image list for windows platform")
 		}

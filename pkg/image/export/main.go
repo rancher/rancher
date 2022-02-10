@@ -13,6 +13,7 @@ import (
 	kd "github.com/rancher/rancher/pkg/controllers/management/kontainerdrivermetadata"
 	img "github.com/rancher/rancher/pkg/image"
 	ext "github.com/rancher/rancher/pkg/image/external"
+	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rke/types/image"
 	"github.com/rancher/rke/types/kdm"
 )
@@ -54,18 +55,15 @@ func main() {
 	}
 }
 
-func run(systemChartPath, chartPath string, imagesFromArgs []string) error {
-	tag, ok := os.LookupEnv("TAG")
+func run(systemChartsPath, chartsPath string, imagesFromArgs []string) error {
+	rancherVersion, ok := os.LookupEnv("TAG")
 	if !ok {
-		return fmt.Errorf("no tag %s", tag)
+		return fmt.Errorf("no tag %s", rancherVersion)
 	}
-	rancherVersion := tag
-	if strings.HasPrefix(rancherVersion, "dev") || strings.HasPrefix(rancherVersion, "master") {
-		rancherVersion = kd.RancherVersionDev
+	if !img.IsValidSemver(rancherVersion) || strings.HasPrefix(rancherVersion, "dev") || strings.HasPrefix(rancherVersion, "master") || strings.HasSuffix(rancherVersion, "-head") {
+		rancherVersion = settings.RancherVersionDev
 	}
-	if strings.HasPrefix(rancherVersion, "v") {
-		rancherVersion = rancherVersion[1:]
-	}
+	rancherVersion = strings.TrimPrefix(rancherVersion, "v")
 
 	// already downloaded in dapper
 	b, err := ioutil.ReadFile(filepath.Join("data.json"))
@@ -118,12 +116,19 @@ func run(systemChartPath, chartPath string, imagesFromArgs []string) error {
 		externalImages["rke2All"] = rke2AllImages
 	}
 
-	targetImages, targetImagesAndSources, err := img.GetImages(systemChartPath, chartPath, externalImages, imagesFromArgs, linuxInfo.RKESystemImages, img.Linux)
+	exportConfig := img.ExportConfig{
+		SystemChartsPath: systemChartsPath,
+		ChartsPath:       chartsPath,
+		OsType:           img.Linux,
+		RancherVersion:   rancherVersion,
+	}
+	targetImages, targetImagesAndSources, err := img.GetImages(exportConfig, externalImages, imagesFromArgs, linuxInfo.RKESystemImages)
 	if err != nil {
 		return err
 	}
 
-	targetWindowsImages, targetWindowsImagesAndSources, err := img.GetImages(systemChartPath, chartPath, nil, []string{getWindowsAgentImage()}, windowsInfo.RKESystemImages, img.Windows)
+	exportConfig.OsType = img.Windows
+	targetWindowsImages, targetWindowsImagesAndSources, err := img.GetImages(exportConfig, nil, []string{getWindowsAgentImage()}, windowsInfo.RKESystemImages)
 	if err != nil {
 		return err
 	}
@@ -253,8 +258,6 @@ func imagesText(arch string, targetImages []string) error {
 		if err != nil {
 			return err
 		}
-
-		log.Println("Image:", image)
 		fmt.Fprintln(save, image)
 	}
 

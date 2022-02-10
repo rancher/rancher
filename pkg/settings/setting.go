@@ -15,6 +15,8 @@ import (
 	v1 "k8s.io/api/core/v1"
 )
 
+const RancherVersionDev = "2.6.99"
+
 var (
 	releasePattern = regexp.MustCompile("^v[0-9]")
 	settings       = map[string]Setting{}
@@ -283,4 +285,12 @@ func DefaultAgentSettingsAsEnvVars() []v1.EnvVar {
 	}
 
 	return envVars
+}
+
+func GetRancherVersion() string {
+	rancherVersion := ServerVersion.Get()
+	if strings.HasPrefix(rancherVersion, "dev") || strings.HasPrefix(rancherVersion, "master") || strings.HasSuffix(rancherVersion, "-head") {
+		return RancherVersionDev
+	}
+	return strings.TrimPrefix(rancherVersion, "v")
 }
