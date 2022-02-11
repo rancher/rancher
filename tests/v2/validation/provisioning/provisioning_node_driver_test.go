@@ -11,7 +11,6 @@ import (
 	"github.com/rancher/rancher/tests/framework/extensions/machinepools"
 	"github.com/rancher/rancher/tests/framework/extensions/users"
 	"github.com/rancher/rancher/tests/framework/pkg/config"
-	"github.com/rancher/rancher/tests/framework/pkg/namegenerator"
 	"github.com/rancher/rancher/tests/framework/pkg/session"
 	"github.com/rancher/rancher/tests/framework/pkg/wait"
 	"github.com/rancher/rancher/tests/integration/pkg/defaults"
@@ -29,16 +28,6 @@ type RKE2NodeDriverProvisioningTestSuite struct {
 	kubernetesVersions []string
 	cnis               []string
 	providers          []string
-}
-
-const (
-	namespace               = "fleet-default"
-	defaultRandStringLength = 5
-)
-
-func AppendRandomString(baseClusterName string) string {
-	clusterName := "auto-" + baseClusterName + "-" + namegenerator.RandStringLower(5)
-	return clusterName
 }
 
 func (r *RKE2NodeDriverProvisioningTestSuite) TearDownSuite() {
@@ -80,7 +69,6 @@ func (r *RKE2NodeDriverProvisioningTestSuite) SetupSuite() {
 }
 
 func (r *RKE2NodeDriverProvisioningTestSuite) Provisioning_RKE2Cluster(provider Provider) {
-
 	subSession := r.session.NewSession()
 	defer subSession.Cleanup()
 
@@ -173,7 +161,6 @@ func (r *RKE2NodeDriverProvisioningTestSuite) Provisioning_RKE2Cluster(provider 
 }
 
 func (r *RKE2NodeDriverProvisioningTestSuite) Provisioning_RKE2ClusterDynamicInput(provider Provider, nodesAndRoles []map[string]bool) {
-
 	subSession := r.session.NewSession()
 	defer subSession.Cleanup()
 
@@ -237,9 +224,9 @@ func (r *RKE2NodeDriverProvisioningTestSuite) Provisioning_RKE2ClusterDynamicInp
 }
 
 func (r *RKE2NodeDriverProvisioningTestSuite) TestProvisioning() {
-	for provider_name := range r.providers {
-		provider_struct := CreateProvider(r.providers[provider_name])
-		r.Provisioning_RKE2Cluster(provider_struct)
+	for _, providerName := range r.providers {
+		provider := CreateProvider(providerName)
+		r.Provisioning_RKE2Cluster(provider)
 	}
 }
 
@@ -249,9 +236,9 @@ func (r *RKE2NodeDriverProvisioningTestSuite) TestProvisioningDynamicInput() {
 		r.T().Skip()
 	}
 
-	for provider_name := range r.providers {
-		provider_struct := CreateProvider(r.providers[provider_name])
-		r.Provisioning_RKE2ClusterDynamicInput(provider_struct, nodesAndRoles)
+	for _, providerName := range r.providers {
+		provider := CreateProvider(providerName)
+		r.Provisioning_RKE2ClusterDynamicInput(provider, nodesAndRoles)
 	}
 }
 
