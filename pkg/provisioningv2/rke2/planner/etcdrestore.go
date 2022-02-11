@@ -150,9 +150,9 @@ func generateCreateEtcdTombstoneInstruction(controlPlane *rkev1.RKEControlPlane)
 	}
 }
 
-// runControlPlaneEtcdServiceStop generates service stop plans for every etcd and controlplane node in the cluster and
+// runEtcdRestoreControlPlaneEtcdServiceStop generates service stop plans for every etcd and controlplane node in the cluster and
 // assigns/checks the plans to ensure they were successful
-func (p *Planner) runControlPlaneEtcdServiceStop(controlPlane *rkev1.RKEControlPlane, snapshot *rkev1.ETCDSnapshot, tokensSecret plan.Secret, clusterPlan *plan.Plan) error {
+func (p *Planner) runEtcdRestoreControlPlaneEtcdServiceStop(controlPlane *rkev1.RKEControlPlane, snapshot *rkev1.ETCDSnapshot, tokensSecret plan.Secret, clusterPlan *plan.Plan) error {
 	var joinServer string
 	var err error
 	isS3 := snapshot.SnapshotFile.S3 != nil
@@ -243,7 +243,7 @@ func (p *Planner) restoreEtcdSnapshot(controlPlane *rkev1.RKEControlPlane, token
 		if err != nil {
 			return err
 		}
-		if err := p.runControlPlaneEtcdServiceStop(controlPlane, snapshot, tokensSecret, clusterPlan); err != nil {
+		if err := p.runEtcdRestoreControlPlaneEtcdServiceStop(controlPlane, snapshot, tokensSecret, clusterPlan); err != nil {
 			return err
 		}
 		return p.setEtcdSnapshotRestoreState(controlPlane, controlPlane.Spec.ETCDSnapshotRestore, rkev1.ETCDSnapshotPhaseRestore)
