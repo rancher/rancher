@@ -664,9 +664,18 @@ def get_schedulable_nodes(cluster, client=None, os_type=TEST_OS):
     schedulable_nodes = []
     for node in nodes:
         if not node.unschedulable:
-            for tkey, tval in node.taints.items():
-                if tval == "NoExecute" or tval == "NoSchedule":
-                    break
+            shouldSchedule = True
+            # node.taints doesn't exist if the node has no taints. 
+            try:
+                for tval in node.taints:
+                    if str(tval).find("PreferNoSchedule") == -1:
+                        if str(tval).find("NoExecute") > -1 or str(tval).find("NoSchedule") > -1:
+                            shouldSchedule=False
+                            break
+            except AttributeError:
+                pass
+            if not shouldSchedule:
+                continue
             for key, val in node.labels.items():
                 # Either one of the labels should be present on the node
                 if key == 'kubernetes.io/os' or key == 'beta.kubernetes.io/os':
