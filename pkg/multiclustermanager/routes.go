@@ -24,6 +24,7 @@ import (
 	"github.com/rancher/rancher/pkg/clustermanager"
 	rancherdialer "github.com/rancher/rancher/pkg/dialer"
 	"github.com/rancher/rancher/pkg/httpproxy"
+	"github.com/rancher/rancher/pkg/jwt"
 	k8sProxyPkg "github.com/rancher/rancher/pkg/k8sproxy"
 	"github.com/rancher/rancher/pkg/metrics"
 	"github.com/rancher/rancher/pkg/multiclustermanager/whitelist"
@@ -38,11 +39,17 @@ import (
 
 func router(ctx context.Context, localClusterEnabled bool, tunnelAuthorizer *mcmauthorizer.Authorizer, scaledContext *config.ScaledContext, clusterManager *clustermanager.Manager) (func(http.Handler) http.Handler, error) {
 	var (
-		k8sProxy             = k8sProxyPkg.New(scaledContext, scaledContext.Dialer, clusterManager)
 		connectHandler       = scaledContext.Dialer.(*rancherdialer.Factory).TunnelServer
 		connectConfigHandler = rkenodeconfigserver.Handler(tunnelAuthorizer, scaledContext)
 		clusterImport        = clusterregistrationtokens.ClusterImport{Clusters: scaledContext.Management.Clusters("")}
 	)
+
+	jwt, err := jwt.New(ctx, scaledContext.K8sClient.CoreV1())
+	if err != nil {
+		return nil, err
+	}
+
+	k8sProxy := k8sProxyPkg.New(scaledContext, scaledContext.Dialer, clusterManager, jwt)
 
 	tokenAPI, err := tokens.NewAPIHandler(ctx, scaledContext, norman.ConfigureAPIUI)
 	if err != nil {
@@ -89,6 +96,7 @@ func router(ctx context.Context, localClusterEnabled bool, tunnelAuthorizer *mcm
 	unauthed.PathPrefix("/v1-{prefix}-release/release").Handler(channelserver)
 	unauthed.PathPrefix("/v1-saml").Handler(saml.AuthHandler())
 	unauthed.PathPrefix("/v3-public").Handler(publicAPI)
+	unauthed.Path("/openid/v1/jwks").Handler(http.HandlerFunc(jwt.ServeJWKS))
 
 	// Authenticated routes
 	authed := mux.NewRouter()

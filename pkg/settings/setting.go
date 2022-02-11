@@ -121,6 +121,7 @@ var (
 	HideLocalCluster                    = NewSetting("hide-local-cluster", "false")
 	MachineProvisionImage               = NewSetting("machine-provision-image", "rancher/machine:v0.15.0-rancher75")
 	SystemFeatureChartRefreshSeconds    = NewSetting("system-feature-chart-refresh-seconds", "900")
+	JWTProxyExpirationSeconds           = NewSetting("jwt-proxy-expiration-seconds", "300")
 
 	FleetMinVersion          = NewSetting("fleet-min-version", "")
 	RancherWebhookMinVersion = NewSetting("rancher-webhook-min-version", "")

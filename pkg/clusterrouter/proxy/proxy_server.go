@@ -16,9 +16,11 @@ import (
 	dialer2 "github.com/rancher/rancher/pkg/dialer"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/impersonation"
+	"github.com/rancher/rancher/pkg/jwt"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/types/config/dialer"
 	"github.com/rancher/wrangler/pkg/schemas/validation"
+	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/httpstream"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
@@ -45,6 +47,7 @@ type RemoteService struct {
 	localAuth            string
 	httpTransport        *http.Transport
 	clusterContextGetter ClusterContextGetter
+	jwt                  *jwt.Signer
 }
 
 var (
@@ -69,11 +72,11 @@ func prefix(cluster *v3.Cluster) string {
 	return "/k8s/clusters/" + cluster.Name
 }
 
-func New(localConfig *rest.Config, cluster *v3.Cluster, clusterLister v3.ClusterLister, factory dialer.Factory, clusterContextGetter ClusterContextGetter) (*RemoteService, error) {
+func New(localConfig *rest.Config, cluster *v3.Cluster, clusterLister v3.ClusterLister, factory dialer.Factory, clusterContextGetter ClusterContextGetter, jwt *jwt.Signer) (*RemoteService, error) {
 	if cluster.Spec.Internal {
 		return NewLocal(localConfig, cluster)
 	}
-	return NewRemote(cluster, clusterLister, factory, clusterContextGetter)
+	return NewRemote(cluster, clusterLister, factory, clusterContextGetter, jwt)
 }
 
 func NewLocal(localConfig *rest.Config, cluster *v3.Cluster) (*RemoteService, error) {
@@ -108,7 +111,7 @@ func NewLocal(localConfig *rest.Config, cluster *v3.Cluster) (*RemoteService, er
 	return rs, nil
 }
 
-func NewRemote(cluster *v3.Cluster, clusterLister v3.ClusterLister, factory dialer.Factory, clusterContextGetter ClusterContextGetter) (*RemoteService, error) {
+func NewRemote(cluster *v3.Cluster, clusterLister v3.ClusterLister, factory dialer.Factory, clusterContextGetter ClusterContextGetter, jwt *jwt.Signer) (*RemoteService, error) {
 	if !v32.ClusterConditionProvisioned.IsTrue(cluster) {
 		return nil, httperror.NewAPIError(httperror.ClusterUnavailable, "cluster not provisioned")
 	}
@@ -132,6 +135,7 @@ func NewRemote(cluster *v3.Cluster, clusterLister v3.ClusterLister, factory dial
 		clusterLister:        clusterLister,
 		factory:              factory,
 		clusterContextGetter: clusterContextGetter,
+		jwt:                  jwt,
 	}, nil
 }
 
@@ -239,6 +243,15 @@ func (r *RemoteService) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 			return
 		}
 		req.Header.Set("Authorization", "Bearer "+token)
+
+		if strings.Contains(req.URL.Path, "/proxy/") {
+			jwt, err := r.jwt.SignUser(userInfo, "service-proxy")
+			if err == nil {
+				req.Header.Set("X-Cattle-Auth-Jwt", jwt)
+			} else {
+				logrus.Errorf("Failed to create JWT for service proxy request: %v", err)
+			}
+		}
 	}
 
 	if httpstream.IsUpgradeRequest(req) {

@@ -7,6 +7,7 @@ import (
 	"github.com/moby/locker"
 	"github.com/rancher/rancher/pkg/clusterrouter/proxy"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/jwt"
 	"github.com/rancher/rancher/pkg/types/config/dialer"
 	"k8s.io/client-go/rest"
 )
@@ -20,9 +21,10 @@ type factory struct {
 	servers              sync.Map
 	localConfig          *rest.Config
 	clusterContextGetter proxy.ClusterContextGetter
+	jwt                  *jwt.Signer
 }
 
-func newFactory(localConfig *rest.Config, dialer dialer.Factory, lookup ClusterLookup, clusterLister v3.ClusterLister, clusterContextGetter proxy.ClusterContextGetter) *factory {
+func newFactory(localConfig *rest.Config, dialer dialer.Factory, lookup ClusterLookup, clusterLister v3.ClusterLister, clusterContextGetter proxy.ClusterContextGetter, jwt *jwt.Signer) *factory {
 	return &factory{
 		dialerFactory:        dialer,
 		serverLock:           locker.New(),
@@ -30,6 +32,7 @@ func newFactory(localConfig *rest.Config, dialer dialer.Factory, lookup ClusterL
 		clusterLister:        clusterLister,
 		localConfig:          localConfig,
 		clusterContextGetter: clusterContextGetter,
+		jwt:                  jwt,
 	}
 }
 
@@ -75,5 +78,5 @@ func (s *factory) get(req *http.Request) (*v3.Cluster, http.Handler, error) {
 }
 
 func (s *factory) newServer(c *v3.Cluster) (server, error) {
-	return proxy.New(s.localConfig, c, s.clusterLister, s.dialerFactory, s.clusterContextGetter)
+	return proxy.New(s.localConfig, c, s.clusterLister, s.dialerFactory, s.clusterContextGetter, s.jwt)
 }
