@@ -129,7 +129,6 @@ func (h *handler) OnChange(key string, configMap *corev1.ConfigMap) (*corev1.Con
 						if !apierrors.IsNotFound(err) {
 							return configMap, err
 						}
-						continue
 					}
 					continue
 				}
