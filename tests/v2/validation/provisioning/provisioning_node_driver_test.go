@@ -11,7 +11,6 @@ import (
 	"github.com/rancher/rancher/tests/framework/extensions/machinepools"
 	"github.com/rancher/rancher/tests/framework/extensions/users"
 	"github.com/rancher/rancher/tests/framework/pkg/config"
-	"github.com/rancher/rancher/tests/framework/pkg/namegenerator"
 	"github.com/rancher/rancher/tests/framework/pkg/session"
 	"github.com/rancher/rancher/tests/framework/pkg/wait"
 	"github.com/rancher/rancher/tests/integration/pkg/defaults"
@@ -29,16 +28,6 @@ type RKE2NodeDriverProvisioningTestSuite struct {
 	kubernetesVersions []string
 	cnis               []string
 	providers          []string
-}
-
-const (
-	namespace               = "fleet-default"
-	defaultRandStringLength = 5
-)
-
-func AppendRandomString(baseClusterName string) string {
-	clusterName := "auto-" + baseClusterName + "-" + namegenerator.RandStringLower(5)
-	return clusterName
 }
 
 func (r *RKE2NodeDriverProvisioningTestSuite) TearDownSuite() {
