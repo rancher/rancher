@@ -6,7 +6,7 @@ import (
 	"compress/gzip"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/url"
 	"sort"
 	"strconv"
@@ -217,7 +217,7 @@ func SecretToNode(secret *corev1.Secret) (*plan.Node, error) {
 		if err != nil {
 			return nil, err
 		}
-		output, err = ioutil.ReadAll(gz)
+		output, err = io.ReadAll(gz)
 		if err != nil {
 			return nil, err
 		}
@@ -232,7 +232,7 @@ func SecretToNode(secret *corev1.Secret) (*plan.Node, error) {
 		if err != nil {
 			return nil, err
 		}
-		output, err = ioutil.ReadAll(gz)
+		output, err = io.ReadAll(gz)
 		if err != nil {
 			return nil, err
 		}
@@ -275,6 +275,7 @@ func (p *PlanStore) getSecretFromMachine(machine *capi.Machine) (*corev1.Secret,
 	return p.secretsCache.Get(machine.Namespace, rke2.PlanSecretFromBootstrapName(machine.Spec.Bootstrap.ConfigRef.Name))
 }
 
+// UpdatePlan should not be called directly as it will not block further progress if the plan is not in sync
 func (p *PlanStore) UpdatePlan(entry *planEntry, plan plan.NodePlan, maxFailures int) error {
 	secret, err := p.getSecretFromMachine(entry.Machine)
 	if err != nil {
@@ -322,6 +323,10 @@ func (p *PlanStore) removePlanSecretLabel(entry *planEntry, key string) error {
 	secret, err := p.getSecretFromMachine(entry.Machine)
 	if err != nil {
 		return err
+	}
+
+	if _, ok := secret.Labels[key]; !ok {
+		return nil
 	}
 
 	secret = secret.DeepCopy()

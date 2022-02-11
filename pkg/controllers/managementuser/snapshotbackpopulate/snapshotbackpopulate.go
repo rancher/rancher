@@ -23,7 +23,6 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 )
 
 var (
@@ -114,7 +113,7 @@ func (h *handler) OnChange(key string, configMap *corev1.ConfigMap) (*corev1.Con
 		return configMap, fmt.Errorf("error while listing existing etcd snapshots for cluster %s: %w", cluster.Name, err)
 	}
 
-	currentEtcdSnapshotsToKeep := map[string]rkev1.ETCDSnapshot{}
+	currentEtcdSnapshotsToKeep := map[string]*rkev1.ETCDSnapshot{}
 	// iterate over the current etcd snapshots
 	// if the current etcd snapshot is NOT found in the actual etcd snapshots list, we delete it
 	// otherwise, we add it to the desired etcd snapshots map
@@ -122,7 +121,7 @@ func (h *handler) OnChange(key string, configMap *corev1.ConfigMap) (*corev1.Con
 		if _, ok := actualEtcdSnapshots[existingSnapshotCR.Name]; !ok {
 			if existingSnapshotCR.SnapshotFile.NodeName != "s3" {
 				// check to make sure the machine actually exists for the snapshot
-				listSuccessful, machine, err := h.retrieveMachineFromNode(existingSnapshotCR.SnapshotFile.NodeName, cluster)
+				listSuccessful, machine, err := rke2.GetMachineFromNode(h.machineCache, existingSnapshotCR.SnapshotFile.NodeName, cluster)
 				if listSuccessful && machine == nil && err != nil {
 					// delete the CR because we don't have a corresponding machine for it
 					logrus.Infof("[snapshotbackpopulate] rkecluster %s/%s: deleting snapshot %s as corresponding machine was not found", cluster.Namespace, cluster.Name, existingSnapshotCR.Name)
@@ -132,7 +131,6 @@ func (h *handler) OnChange(key string, configMap *corev1.ConfigMap) (*corev1.Con
 						}
 						continue
 					}
-					logrus.Errorf("error while retrieving machine for snapshot %s/%s node %s: %v", existingSnapshotCR.Namespace, existingSnapshotCR.Name, existingSnapshotCR.SnapshotFile.NodeName, err)
 					continue
 				}
 			}
@@ -140,14 +138,14 @@ func (h *handler) OnChange(key string, configMap *corev1.ConfigMap) (*corev1.Con
 			// don't delete the snapshots here because our configmap can be outdated. we will reconcile based on the system-agent output via the periodic output
 			logrus.Debugf("[snapshotbackpopulate] rkecluster %s/%s: updating status missing=true on etcd snapshot %s/%s as it was not found in the actual snapshot config map", cluster.Namespace, cluster.Name, existingSnapshotCR.Namespace, existingSnapshotCR.Name)
 			logrus.Tracef("[snapshotbackpopulate] rkecluster %s/%s: etcd snapshot was %s/%s: %+v", cluster.Namespace, cluster.Name, existingSnapshotCR.Namespace, existingSnapshotCR.Name, existingSnapshotCR)
-			missingSnapshot := existingSnapshotCR.DeepCopy()
-			missingSnapshot.Status.Missing = true
-			if _, err := h.etcdSnapshots.UpdateStatus(missingSnapshot); err != nil && !apierrors.IsNotFound(err) {
+			existingSnapshotCR = existingSnapshotCR.DeepCopy()
+			existingSnapshotCR.Status.Missing = true // a missing snapshot indicates that it was not found in the (rke2|k3s)-etcd-snapshots configmap. This could potentially be a transient situation after an etcd snapshot restore to an older/newer datastore, when new snapshots have not been taken.
+			if existingSnapshotCR, err = h.etcdSnapshots.UpdateStatus(existingSnapshotCR); err != nil && !apierrors.IsNotFound(err) {
 				return configMap, fmt.Errorf("rkecluster %s/%s: error while setting status missing=true on etcd snapshot %s/%s: %w", cluster.Namespace, cluster.Name, existingSnapshotCR.Namespace, existingSnapshotCR.Name, err)
 			}
 			continue
 		}
-		currentEtcdSnapshotsToKeep[existingSnapshotCR.Name] = *existingSnapshotCR
+		currentEtcdSnapshotsToKeep[existingSnapshotCR.Name] = existingSnapshotCR
 	}
 
 	// iterate over the actual etcd snapshots that are in the management cluster
@@ -158,7 +156,7 @@ func (h *handler) OnChange(key string, configMap *corev1.ConfigMap) (*corev1.Con
 			if !equality.Semantic.DeepEqual(cmGeneratedSnapshot.SnapshotFile, snapshot.SnapshotFile) || !equality.Semantic.DeepEqual(cmGeneratedSnapshot.Status, snapshot.Status) {
 				logrus.Debugf("[snapshotbackpopulate] rkecluster %s/%s: updating etcd snapshot %s/%s as it differed from the actual snapshot config map %v vs %v", cluster.Namespace, cluster.Name, snapshot.Namespace, snapshot.Name, cmGeneratedSnapshot.SnapshotFile, snapshot.SnapshotFile)
 				logrus.Tracef("[snapshotbackpopulate] rkecluster %s/%s: updating etcd snapshot %s/%s: %+v", cluster.Namespace, cluster.Name, cmGeneratedSnapshot.Namespace, cmGeneratedSnapshot.Name, cmGeneratedSnapshot)
-				snapshot := snapshot.DeepCopy()
+				snapshot = snapshot.DeepCopy()
 				// keep a copy of the metadata and message
 				md := snapshot.SnapshotFile.Metadata
 				msg := snapshot.SnapshotFile.Message
@@ -182,31 +180,13 @@ func (h *handler) OnChange(key string, configMap *corev1.ConfigMap) (*corev1.Con
 			// create the snapshot in the mgmt cluster
 			logrus.Debugf("[snapshotbackpopulate] rkecluster %s/%s: creating etcd snapshot %s/%s as it differed from the actual snapshot config map", cluster.Namespace, cluster.Name, cmGeneratedSnapshot.Namespace, cmGeneratedSnapshot.Name)
 			logrus.Tracef("[snapshotbackpopulate] rkecluster %s/%s: creating etcd snapshot %s/%s: %+v", cluster.Namespace, cluster.Name, cmGeneratedSnapshot.Namespace, cmGeneratedSnapshot.Name, cmGeneratedSnapshot)
-			_, err := h.etcdSnapshots.Create(&cmGeneratedSnapshot)
+			_, err = h.etcdSnapshots.Create(&cmGeneratedSnapshot)
 			if err != nil {
 				return configMap, fmt.Errorf("rkecluster %s/%s: error while creating etcd snapshot %s/%s: %w", cluster.Namespace, cluster.Name, cmGeneratedSnapshot.Namespace, cmGeneratedSnapshot.Name, err)
 			}
 		}
 	}
 	return configMap, nil
-}
-
-// retrieveMachineFromNode attempts to find the corresponding machine for an etcd snapshot that is found in the configmap. If the machine list is successful, it will return true on the boolean, otherwise, it can be assumed that a false, nil, and defined error indicate the machine does not exist.
-func (h *handler) retrieveMachineFromNode(nodeName string, cluster *provv1.Cluster) (bool, *capi.Machine, error) {
-	ls, err := labels.Parse(fmt.Sprintf("%s=%s", capi.ClusterLabelName, cluster.Name))
-	if err != nil {
-		return false, nil, err
-	}
-	machines, err := h.machineCache.List(cluster.Namespace, ls)
-	if err != nil {
-		return false, nil, err
-	}
-	for _, machine := range machines {
-		if machine.Status.NodeRef != nil && machine.Status.NodeRef.Name == nodeName {
-			return true, machine, nil
-		}
-	}
-	return true, nil, fmt.Errorf("unable to find node %s in machines", nodeName)
 }
 
 func (h *handler) configMapToSnapshots(configMap *corev1.ConfigMap, cluster *provv1.Cluster) (result map[string]rkev1.ETCDSnapshot, _ error) {
@@ -262,7 +242,7 @@ func (h *handler) configMapToSnapshots(configMap *corev1.ConfigMap, cluster *pro
 				BlockOwnerDeletion: &[]bool{true}[0],
 			})
 		} else {
-			listSuccessful, machine, err := h.retrieveMachineFromNode(file.NodeName, cluster)
+			listSuccessful, machine, err := rke2.GetMachineFromNode(h.machineCache, file.NodeName, cluster)
 			if listSuccessful && err != nil {
 				continue // don't add this snapshot to the list as we can't actually correlate it to an existing node
 			}

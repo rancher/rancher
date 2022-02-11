@@ -220,8 +220,8 @@ func (h *handler) OnRancherClusterChange(obj *rancherv1.Cluster, status rancherv
 		// If EtcdSnapshotRestore is not nil, we need to check to see if we need to update the cluster object it.
 		if obj.Spec.RKEConfig.ETCDSnapshotRestore != nil &&
 			obj.Spec.RKEConfig.ETCDSnapshotRestore.Name != "" &&
-			(obj.Spec.RKEConfig.ETCDSnapshotRestore.RestoreRKEConfig != "" &&
-				obj.Spec.RKEConfig.ETCDSnapshotRestore.RestoreRKEConfig != restoreRKEConfigNone) {
+			obj.Spec.RKEConfig.ETCDSnapshotRestore.RestoreRKEConfig != "" &&
+			obj.Spec.RKEConfig.ETCDSnapshotRestore.RestoreRKEConfig != restoreRKEConfigNone {
 			logrus.Debugf("rkecluster %s/%s: Reconciling rkeconfig against specified etcd restore snapshot metadata", obj.Namespace, obj.Name)
 			if !equality.Semantic.DeepEqual(rkeCP.Status.ETCDSnapshotRestore, obj.Spec.RKEConfig.ETCDSnapshotRestore) {
 				clusterSpec, err := h.findSnapshotClusterSpec(obj.Namespace, fmt.Sprintf("%s-%s", obj.Name, obj.Spec.RKEConfig.ETCDSnapshotRestore.Name))
@@ -289,7 +289,7 @@ func (h *handler) getRKEControlPlaneForCluster(cluster *rancherv1.Cluster) (*rke
 
 func (h *handler) updateClusterProvisioningStatus(cluster *rancherv1.Cluster, status rancherv1.ClusterStatus, cp *rkev1.RKEControlPlane) (rancherv1.ClusterStatus, error) {
 	if cp == nil {
-		return status, fmt.Errorf("rkecontrolplane was nil")
+		return status, fmt.Errorf("error while updating cluster provisioning status - rkecontrolplane was nil")
 	}
 	if cluster.DeletionTimestamp != nil && h.mgmtClusterCache != nil {
 		mgmtCluster, err := h.mgmtClusterCache.Get(cluster.Status.ClusterName)

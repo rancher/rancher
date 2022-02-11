@@ -485,14 +485,13 @@ func decompressClusterSpec(inputb64 string) (*rancherv1.ClusterSpec, error) {
 		return nil, err
 	}
 
-	var objectBuffer bytes.Buffer
-	_, err = io.Copy(&objectBuffer, gz)
+	csBytes, err := io.ReadAll(gz)
 	if err != nil {
 		return nil, err
 	}
 
 	c := rancherv1.ClusterSpec{}
-	err = json.Unmarshal(objectBuffer.Bytes(), &c)
+	err = json.Unmarshal(csBytes, &c)
 	if err != nil {
 		return nil, err
 	}

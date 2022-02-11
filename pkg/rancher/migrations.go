@@ -404,6 +404,13 @@ func migrateCAPIMachineLabelsAndAnnotationsToPlanSecret(configMapController cont
 					bootstrap = bootstrap.DeepCopy()
 					rke2.CopyMapWithExcludes(bootstrap.Labels, machine.Labels, bootstrapLabelExcludes)
 					rke2.CopyMapWithExcludes(bootstrap.Annotations, machine.Annotations, boostrapAnnotationExcludes)
+					if bootstrap.Spec.ClusterName == "" {
+						// If the bootstrap spec cluster name is blank, we need to update the bootstrap spec to the correct value
+						// This is to handle old rkebootstrap objects for unmanaged clusters that did not have the spec properly set
+						if v, ok := bootstrap.Labels[capi.ClusterLabelName]; ok && v != "" {
+							bootstrap.Spec.ClusterName = v
+						}
+					}
 					_, err = bootstrapClient.Update(bootstrap)
 					return err
 				}); err != nil {

@@ -49,8 +49,8 @@ func (h *handler) OnChange(key string, secret *corev1.Secret) (*corev1.Secret, e
 	}
 
 	if v, ok := node.PeriodicOutput["etcd-snapshot-list"]; ok && v.ExitCode == 0 && len(v.Stdout) > 0 {
-		cnl, ok := secret.Labels[rke2.ClusterNameLabel]
-		if !ok || len(cnl) == 0 {
+		cnl := secret.Labels[rke2.ClusterNameLabel]
+		if len(cnl) == 0 {
 			return secret, fmt.Errorf("node secret did not have label %s", rke2.ClusterNameLabel)
 		}
 
@@ -77,13 +77,11 @@ func (h *handler) OnChange(key string, secret *corev1.Secret) (*corev1.Secret, e
 			}
 
 			for _, v := range etcdSnapshots {
-				if v.Status.Missing {
-					if _, ok := etcdSnapshotsOnNode[v.Name]; !ok {
-						// delete the etcd snapshot as it is likely missing
-						logrus.Infof("Deleting etcd snapshot %s/%s", v.Namespace, v.Name)
-						if err := h.etcdSnapshotsClient.Delete(v.Namespace, v.Name, &metav1.DeleteOptions{}); err != nil {
-							return secret, err
-						}
+				if _, ok := etcdSnapshotsOnNode[v.Name]; !ok && v.Status.Missing {
+					// delete the etcd snapshot as it is likely missing
+					logrus.Infof("Deleting etcd snapshot %s/%s", v.Namespace, v.Name)
+					if err := h.etcdSnapshotsClient.Delete(v.Namespace, v.Name, &metav1.DeleteOptions{}); err != nil {
+						return secret, err
 					}
 				}
 			}
@@ -94,12 +92,10 @@ func (h *handler) OnChange(key string, secret *corev1.Secret) (*corev1.Secret, e
 	plan := secret.Data["plan"]
 	appliedPlan := secret.Data["appliedPlan"]
 
-	if appliedChecksum == hash(plan) {
-		if !bytes.Equal(plan, appliedPlan) {
-			secret = secret.DeepCopy()
-			secret.Data["appliedPlan"] = plan
-			return h.secrets.Update(secret)
-		}
+	if appliedChecksum == hash(plan) && !bytes.Equal(plan, appliedPlan) {
+		secret = secret.DeepCopy()
+		secret.Data["appliedPlan"] = plan
+		return h.secrets.Update(secret)
 	}
 
 	return secret, nil

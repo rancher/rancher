@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	provv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
 	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta1"
 	"github.com/rancher/wrangler/pkg/condition"
@@ -170,6 +171,24 @@ func GetMachineDeletionStatus(machineCache capicontrollers.MachineCache, cluster
 	}
 
 	return "", nil
+}
+
+// GetMachineFromNode attempts to find the corresponding machine for an etcd snapshot that is found in the configmap. If the machine list is successful, it will return true on the boolean, otherwise, it can be assumed that a false, nil, and defined error indicate the machine does not exist.
+func GetMachineFromNode(machineCache capicontrollers.MachineCache, nodeName string, cluster *provv1.Cluster) (bool, *capi.Machine, error) {
+	ls, err := labels.Parse(fmt.Sprintf("%s=%s", capi.ClusterLabelName, cluster.Name))
+	if err != nil {
+		return false, nil, err
+	}
+	machines, err := machineCache.List(cluster.Namespace, ls)
+	if err != nil {
+		return false, nil, err
+	}
+	for _, machine := range machines {
+		if machine.Status.NodeRef != nil && machine.Status.NodeRef.Name == nodeName {
+			return true, machine, nil
+		}
+	}
+	return true, nil, fmt.Errorf("unable to find node %s in machines", nodeName)
 }
 
 func CopyPlanMetadataToSecret(secret *corev1.Secret, metadata *plan.Metadata) {

@@ -69,8 +69,8 @@ func (h *handler) OnChange(cluster *rkev1.RKEControlPlane, status rkev1.RKEContr
 			h.controlPlanes.EnqueueAfter(cluster.Namespace, cluster.Name, 5*time.Second)
 		}
 	} else {
-		logrus.Infof("[planner] rkecluster %s/%s: objects changed, waiting for cache sync before finishing reconciliation", cluster.Namespace, cluster.Name)
+		logrus.Debugf("[planner] rkecluster %s/%s: objects changed, waiting for cache sync before finishing reconciliation", cluster.Namespace, cluster.Name)
 	}
-	logrus.Infof("[planner] rkecluster %s/%s: reconciliation complete", cluster.Namespace, cluster.Name)
+	logrus.Debugf("[planner] rkecluster %s/%s: reconciliation complete", cluster.Namespace, cluster.Name)
 	return status, nil
 }
