@@ -7,7 +7,6 @@ import (
 	"github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/httperror"
-	"github.com/rancher/norman/types/slice"
 	"github.com/rancher/rancher/pkg/clustermanager"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	rbacv1 "github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1"
@@ -32,11 +31,11 @@ const (
 	catalogTemplateVersionResourceRule = "catalogtemplateversions"
 	crbNameAnnotation                  = "authz.management.cattle.io/crb-name"
 	crbNamePrefix                      = "cattle-globalrolebinding-"
-	globalCatalogRole                  = "global-catalog"
+	GlobalCatalogRole                  = "global-catalog"
 	globalCatalogRoleBinding           = "global-catalog-binding"
 	grbController                      = "mgmt-auth-grb-controller"
-	templateResourceRule               = "templates"
-	templateVersionResourceRule        = "templateversions"
+	TemplateResourceRule               = "templates"
+	TemplateVersionResourceRule        = "templateversions"
 )
 
 func newGlobalRoleBindingLifecycle(management *config.ManagementContext, clusterManager *clustermanager.Manager) *globalRoleBindingLifecycle {
@@ -197,8 +196,8 @@ func (grb *globalRoleBindingLifecycle) reconcileGlobalRoleBinding(globalRoleBind
 			Name: crbName,
 			OwnerReferences: []metav1.OwnerReference{
 				{
-					APIVersion: globalRoleBinding.TypeMeta.APIVersion,
-					Kind:       globalRoleBinding.TypeMeta.Kind,
+					APIVersion: globalRoleBinding.APIVersion,
+					Kind:       globalRoleBinding.Kind,
 					Name:       globalRoleBinding.Name,
 					UID:        globalRoleBinding.UID,
 				},
@@ -224,78 +223,30 @@ func (grb *globalRoleBindingLifecycle) reconcileGlobalRoleBinding(globalRoleBind
 }
 
 func (grb *globalRoleBindingLifecycle) addRulesForTemplateAndTemplateVersions(globalRoleBinding *v3.GlobalRoleBinding, subject v1.Subject) error {
-	var catalogTemplateRule, catalogTemplateVersionRule *v1.PolicyRule
 	// Check if the current globalRole has rules for templates and templateversions
 	gr, err := grb.grLister.Get("", globalRoleBinding.GlobalRoleName)
 	if err != nil && !apierrors.IsNotFound(err) {
 		return err
 	}
+	isCatalogRole := false
 	if gr != nil {
 		for _, rule := range gr.Rules {
-			for _, resource := range rule.Resources {
-				if resource == templateResourceRule {
-					if catalogTemplateRule == nil {
-						catalogTemplateRule = &v1.PolicyRule{
-							APIGroups: rule.APIGroups,
-							Resources: []string{catalogTemplateResourceRule},
-							Verbs:     rule.Verbs,
-						}
-					} else {
-						for _, v := range rule.Verbs {
-							if !slice.ContainsString(catalogTemplateRule.Verbs, v) {
-								catalogTemplateRule.Verbs = append(catalogTemplateRule.Verbs, v)
-							}
-						}
-					}
-				} else if resource == templateVersionResourceRule {
-					if catalogTemplateVersionRule == nil {
-						catalogTemplateVersionRule = &v1.PolicyRule{
-							APIGroups: rule.APIGroups,
-							Resources: []string{catalogTemplateVersionResourceRule},
-							Verbs:     rule.Verbs,
-						}
-					} else {
-						for _, v := range rule.Verbs {
-							if !slice.ContainsString(catalogTemplateVersionRule.Verbs, v) {
-								catalogTemplateVersionRule.Verbs = append(catalogTemplateVersionRule.Verbs, v)
-							}
-						}
-					}
-				}
+			if rbac.RuleGivesResourceAccess(rule, TemplateResourceRule) || rbac.RuleGivesResourceAccess(rule, TemplateVersionResourceRule) {
+				isCatalogRole = true
+				break
 			}
 		}
 	}
-	// If rules for "templates and "templateversions" exists, create a role for the granting access to
-	// catalogtemplates and catalogtemplateversions in the global namespace
-	var rules []v1.PolicyRule
-	if catalogTemplateRule != nil {
-		rules = append(rules, *catalogTemplateRule)
-	}
-	if catalogTemplateVersionRule != nil {
-		rules = append(rules, *catalogTemplateVersionRule)
-	}
-	if len(rules) > 0 {
-		_, err := grb.roleLister.Get(namespace.GlobalNamespace, globalCatalogRole)
+	// Roles that give catalog access (i.e. that give access to template/templateversions in the management api group)
+	// are the only ones that need this special role/rolebinding created for them
+	if isCatalogRole {
+		roleName := gr.Name + "-" + GlobalCatalogRole
+		_, err := grb.roleLister.Get(namespace.GlobalNamespace, roleName)
 		if err != nil {
-			if apierrors.IsNotFound(err) {
-				role := &v1.Role{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      globalCatalogRole,
-						Namespace: namespace.GlobalNamespace,
-					},
-					Rules: rules,
-				}
-				_, err = grb.roles.Create(role)
-				if err != nil && !apierrors.IsAlreadyExists(err) {
-					return err
-				}
-			} else {
-				return err
-			}
+			return err
 		}
-		// Create a rolebinding, referring the above role, and using globalrole user.Username as the subject
-		// Check if rb exists first!
-		grbName := globalRoleBinding.UserName + "-" + globalCatalogRoleBinding
+		// create a binding to the namespaced role which corresponds to the GlobalRole this grb refers to
+		grbName := globalRoleBinding.Name + "-" + globalCatalogRoleBinding
 		_, err = grb.roleBindingLister.Get(namespace.GlobalNamespace, grbName)
 		if err != nil {
 			if apierrors.IsNotFound(err) {
@@ -303,11 +254,19 @@ func (grb *globalRoleBindingLifecycle) addRulesForTemplateAndTemplateVersions(gl
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      grbName,
 						Namespace: namespace.GlobalNamespace,
+						OwnerReferences: []metav1.OwnerReference{
+							{
+								APIVersion: globalRoleBinding.APIVersion,
+								Kind:       globalRoleBinding.Kind,
+								Name:       globalRoleBinding.Name,
+								UID:        globalRoleBinding.UID,
+							},
+						},
 					},
 					Subjects: []v1.Subject{subject},
 					RoleRef: v1.RoleRef{
 						Kind: "Role",
-						Name: globalCatalogRole,
+						Name: roleName,
 					},
 				}
 				_, err = grb.roleBindings.Create(rb)
@@ -391,8 +350,8 @@ func (grb *globalRoleBindingLifecycle) grantRestrictedAdminUserClusterPermission
 					Namespace: cluster.Name,
 					OwnerReferences: []metav1.OwnerReference{
 						{
-							APIVersion: globalRoleBinding.TypeMeta.APIVersion,
-							Kind:       globalRoleBinding.TypeMeta.Kind,
+							APIVersion: globalRoleBinding.APIVersion,
+							Kind:       globalRoleBinding.Kind,
 							UID:        globalRoleBinding.UID,
 							Name:       globalRoleBinding.Name,
 						},
@@ -427,8 +386,8 @@ func (grb *globalRoleBindingLifecycle) grantRestrictedAdminUserClusterPermission
 							Namespace: project.Name,
 							OwnerReferences: []metav1.OwnerReference{
 								{
-									APIVersion: globalRoleBinding.TypeMeta.APIVersion,
-									Kind:       globalRoleBinding.TypeMeta.Kind,
+									APIVersion: globalRoleBinding.APIVersion,
+									Kind:       globalRoleBinding.Kind,
 									UID:        globalRoleBinding.UID,
 									Name:       globalRoleBinding.Name,
 								},
