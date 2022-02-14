@@ -18,6 +18,7 @@ spec:
     spec:
       serviceAccountName: {{ template "rancher.fullname" . }}-post-delete
       restartPolicy: OnFailure
+      tolerations: {{- include "rancher-tolerations" . | trim | nindent 8 }}
       containers:
         - name: {{ template "rancher.name" . }}-post-delete
           image: "{{ include "system_default_registry" . }}{{ .Values.postDelete.image.repository }}:{{ .Values.postDelete.image.tag }}"

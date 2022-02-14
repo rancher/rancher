@@ -1,8 +1,13 @@
 package settings
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/rancher/rancher/pkg/namespace"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 	"os"
 	"regexp"
 	"strconv"
@@ -123,8 +128,54 @@ var (
 	RancherWebhookMinVersion = NewSetting("rancher-webhook-min-version", "")
 )
 
+const RancherDeploymentName = "rancher"
+
 func FullShellImage() string {
 	return PrefixPrivateRegistry(ShellImage.Get())
+}
+
+func GetRancherTolerations() []v1.Toleration {
+	config, err := rest.InClusterConfig()
+	if err != nil {
+		logrus.Info("rancher is not deployed in cluster, no tolerations will be used")
+		return []v1.Toleration{}
+	}
+	client, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		logrus.Info("unable to init client, no tolerations will be used")
+		return []v1.Toleration{}
+	}
+	rancherDeployment, err := client.AppsV1().Deployments(namespace.System).Get(context.TODO(), RancherDeploymentName, metav1.GetOptions{})
+	if err != nil {
+		logrus.Info("unable to retrieve information for rancher deployment, tolerations will be empty")
+		return []v1.Toleration{}
+	}
+	return rancherDeployment.Spec.Template.Spec.Tolerations
+}
+
+func GetFormattedRancherTolerations() []map[string]interface{} {
+	// formats the tolerations into something that can be passed into a helm chart
+	rancherTolerations := GetRancherTolerations()
+	rawTolerations := make([]map[string]interface{}, 0)
+	for _, toleration := range rancherTolerations {
+		rawToleration := map[string]interface{}{
+			"operator": toleration.Operator,
+		}
+		if toleration.Key != "" {
+			rawToleration["key"] = toleration.Key
+		}
+		if toleration.Value != "" {
+			rawToleration["value"] = toleration.Value
+		}
+		if toleration.Effect != "" {
+			rawToleration["effect"] = toleration.Effect
+		}
+		if toleration.TolerationSeconds != nil {
+			rawToleration["tolerationSeconds"] = *(toleration.TolerationSeconds)
+		}
+		rawTolerations = append(rawTolerations, rawToleration)
+	}
+	return rawTolerations
 }
 
 func PrefixPrivateRegistry(image string) string {

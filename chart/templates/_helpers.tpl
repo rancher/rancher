@@ -49,11 +49,14 @@ Windows cluster will add default taint for linux nodes,
 add below linux tolerations to workloads could be scheduled to those linux nodes
 */}}
 
-{{- define "linux-node-tolerations" -}}
+{{- define "rancher-tolerations" -}}
 - key: "cattle.io/os"
   value: "linux"
   effect: "NoSchedule"
   operator: "Equal"
+{{ if gt (len .Values.tolerations) 0 -}}
+  {{- toYaml .Values.tolerations -}}
+{{- end -}}
 {{- end -}}
 
 {{- define "linux-node-selector-terms" -}}

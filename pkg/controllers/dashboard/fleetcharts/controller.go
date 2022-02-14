@@ -98,6 +98,13 @@ func (h *handler) onSetting(key string, setting *v3.Setting) (*v3.Setting, error
 
 	gitjobChartValues := make(map[string]interface{})
 
+	rancherTolerations := settings.GetFormattedRancherTolerations()
+	if len(rancherTolerations) > 0 {
+		// if we have tolerations on the rancher deployment, persist them to fleet as well
+		gitjobChartValues["tolerations"] = rancherTolerations
+		fleetChartValues["tolerations"] = rancherTolerations
+	}
+
 	if envVal, ok := os.LookupEnv("HTTP_PROXY"); ok {
 		fleetChartValues["proxy"] = envVal
 		gitjobChartValues["proxy"] = envVal

@@ -281,6 +281,7 @@ func (c *ClusterLifecycleCleanup) createCleanupJob(userContext *config.UserConte
 			Template: coreV1.PodTemplateSpec{
 				Spec: coreV1.PodSpec{
 					ServiceAccountName: sa,
+					Tolerations:        settings.GetRancherTolerations(),
 					Containers: []coreV1.Container{
 						coreV1.Container{
 							Name:  "cleanup-agent",

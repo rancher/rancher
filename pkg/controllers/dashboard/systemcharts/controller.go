@@ -24,7 +24,7 @@ var (
 			ChartName:         "rancher-webhook",
 			MinVersionSetting: settings.RancherWebhookMinVersion,
 			Values: func() map[string]interface{} {
-				return map[string]interface{}{
+				values := map[string]interface{}{
 					"capi": map[string]interface{}{
 						"enabled": features.EmbeddedClusterAPI.Enabled(),
 					},
@@ -32,6 +32,11 @@ var (
 						"enabled": features.MCM.Enabled(),
 					},
 				}
+				rancherTolerations := settings.GetFormattedRancherTolerations()
+				if len(rancherTolerations) > 0 {
+					values["tolerations"] = rancherTolerations
+				}
+				return values
 			},
 			Enabled: func() bool {
 				return features.MCM.Enabled() || features.EmbeddedClusterAPI.Enabled()
