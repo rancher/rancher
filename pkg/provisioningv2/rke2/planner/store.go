@@ -260,8 +260,9 @@ func (p *PlanStore) getSecrets(machines []*capi.Machine) (map[string]*corev1.Sec
 		} else if err != nil {
 			return nil, err
 		}
-
-		result[machine.Name] = secret.DeepCopy()
+		if secret != nil {
+			result[machine.Name] = secret.DeepCopy()
+		}
 	}
 
 	return result, nil
