@@ -16,6 +16,7 @@ import (
 	"github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
 	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2"
 	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta1"
+	rkecontrollers "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
 	corecontrollers "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/pkg/generic"
 	corev1 "k8s.io/api/core/v1"
@@ -32,16 +33,20 @@ const (
 )
 
 type PlanStore struct {
-	secrets      corecontrollers.SecretClient
-	secretsCache corecontrollers.SecretCache
-	machineCache capicontrollers.MachineCache
+	secrets              corecontrollers.SecretClient
+	secretsCache         corecontrollers.SecretCache
+	machineCache         capicontrollers.MachineCache
+	serviceAccountsCache corecontrollers.ServiceAccountCache
+	rkeBootstrapCache    rkecontrollers.RKEBootstrapCache
 }
 
-func NewStore(secrets corecontrollers.SecretController, machineCache capicontrollers.MachineCache) *PlanStore {
+func NewStore(secrets corecontrollers.SecretController, machineCache capicontrollers.MachineCache, serviceAccountsCache corecontrollers.ServiceAccountCache, rkeBootstrapCache rkecontrollers.RKEBootstrapCache) *PlanStore {
 	return &PlanStore{
-		secrets:      secrets,
-		secretsCache: secrets.Cache(),
-		machineCache: machineCache,
+		secrets:              secrets,
+		secretsCache:         secrets.Cache(),
+		serviceAccountsCache: serviceAccountsCache,
+		machineCache:         machineCache,
+		rkeBootstrapCache:    rkeBootstrapCache,
 	}
 }
 
@@ -272,7 +277,21 @@ func (p *PlanStore) getSecretFromMachine(machine *capi.Machine) (*corev1.Secret,
 		return nil, fmt.Errorf("machine %s/%s is not using RKEBootstrap", machine.Namespace, machine.Name)
 	}
 
-	return p.secretsCache.Get(machine.Namespace, rke2.PlanSecretFromBootstrapName(machine.Spec.Bootstrap.ConfigRef.Name))
+	planSAs, err := p.serviceAccountsCache.List(machine.Namespace, labels.SelectorFromSet(map[string]string{
+		rke2.MachineNameLabel: machine.Name,
+		rke2.RoleLabel:        rke2.RolePlan,
+	}))
+	if err != nil {
+		return nil, err
+	}
+
+	if len(planSAs) != 1 {
+		// This is an unexpected state and there are too many service accounts
+		return nil, fmt.Errorf("error while retrieving plan secret for machine %s/%s service account list length was not 1", machine.Namespace, machine.Name)
+	}
+
+	_, secret, err := rke2.GetServiceAccountPlanSecret(p.secretsCache, p.rkeBootstrapCache, machine.Name, planSAs[0])
+	return secret, err
 }
 
 // UpdatePlan should not be called directly as it will not block further progress if the plan is not in sync
