@@ -18,8 +18,6 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-const refreshAction = "refresh"
-
 var (
 	configs     map[string]*config.Config
 	configsInit sync.Once
@@ -52,7 +50,9 @@ func getChannelServerArg() string {
 	return serverVersion
 }
 
-type DynamicInterval struct{}
+type DynamicInterval struct {
+	subKey string
+}
 
 func (d *DynamicInterval) Wait(ctx context.Context) bool {
 	start := time.Now()
@@ -65,10 +65,11 @@ func (d *DynamicInterval) Wait(ctx context.Context) bool {
 			}
 			continue
 		case msg := <-action:
-			if msg == refreshAction {
-				logrus.Infof("getReleaseConfig: reloading config for k3s/rke2")
+			if msg == d.subKey {
+				logrus.Infof("getReleaseConfig: reloading config for %s", d.subKey)
 				return true
 			}
+			action <- msg
 		case <-ctx.Done():
 			return false
 		}
@@ -76,7 +77,8 @@ func (d *DynamicInterval) Wait(ctx context.Context) bool {
 }
 
 func Refresh() {
-	action <- refreshAction
+	action <- "k3s"
+	action <- "rke2"
 }
 
 type DynamicSource struct{}
@@ -107,21 +109,20 @@ func GetReleaseConfigByRuntimeAndVersion(ctx context.Context, runtime, kubernete
 
 func GetReleaseConfigByRuntime(ctx context.Context, runtime string) *config.Config {
 	configsInit.Do(func() {
-		interval := &DynamicInterval{}
 		urls := []config.Source{
 			&DynamicSource{},
 			config.StringSource("/var/lib/rancher-data/driver-metadata/data.json"),
 		}
 		configs = map[string]*config.Config{
-			"k3s":  config.NewConfig(ctx, "k3s", interval, getChannelServerArg(), urls),
-			"rke2": config.NewConfig(ctx, "rke2", interval, getChannelServerArg(), urls),
+			"k3s":  config.NewConfig(ctx, "k3s", &DynamicInterval{"k3s"}, getChannelServerArg(), urls),
+			"rke2": config.NewConfig(ctx, "rke2", &DynamicInterval{"rke2"}, getChannelServerArg(), urls),
 		}
 	})
 	return configs[runtime]
 }
 
 func NewHandler(ctx context.Context) http.Handler {
-	action = make(chan string)
+	action = make(chan string, 2)
 	return server.NewHandler(map[string]*config.Config{
 		"v1-k3s-release":  GetReleaseConfigByRuntime(ctx, "k3s"),
 		"v1-rke2-release": GetReleaseConfigByRuntime(ctx, "rke2"),
