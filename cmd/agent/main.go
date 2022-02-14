@@ -75,6 +75,10 @@ func main() {
 			if err != nil {
 				bindingErr = multierror.Append(bindingErr, err)
 			}
+			err = clean.OrphanCatalogBindings(nil)
+			if err != nil {
+				bindingErr = multierror.Append(bindingErr, err)
+			}
 			err = bindingErr
 		} else {
 			err = run(ctx)
