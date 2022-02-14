@@ -1,6 +1,7 @@
 package rke2
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"regexp"
@@ -8,8 +9,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/rancher/channelserver/pkg/model"
 	provv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
+	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
+	"github.com/rancher/rancher/pkg/channelserver"
 	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta1"
 	rkecontroller "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
 	"github.com/rancher/wrangler/pkg/condition"
@@ -130,6 +134,33 @@ func GetRuntime(kubernetesVersion string) string {
 		return RuntimeK3S
 	}
 	return RuntimeRKE2
+}
+
+func GetKDMReleaseData(ctx context.Context, controlPlane *rkev1.RKEControlPlane) *model.Release {
+	if controlPlane == nil || controlPlane.Spec.KubernetesVersion == "" {
+		return nil
+	}
+	release := channelserver.GetReleaseConfigByRuntimeAndVersion(ctx, GetRuntime(controlPlane.Spec.KubernetesVersion), controlPlane.Spec.KubernetesVersion)
+	return &release
+}
+
+// GetFeatureVersion retrieves a feature version (string) for a given controlPlane based on the version/runtime of the project. It will return 0.0.0 (semver) if the KDM data is valid, but the featureVersion isn't defined.
+func GetFeatureVersion(ctx context.Context, controlPlane *rkev1.RKEControlPlane, featureKey string) (string, error) {
+	if controlPlane == nil {
+		return "", fmt.Errorf("error retrieving feature version as controlPlane was nil")
+	}
+
+	release := GetKDMReleaseData(ctx, controlPlane)
+	if release == nil {
+		return "", fmt.Errorf("KDM release data was nil for controlplane %s/%s", controlPlane.Namespace, controlPlane.Name)
+	}
+
+	version := release.FeatureVersions[featureKey]
+	if version == "" {
+		version = "0.0.0"
+	}
+
+	return version, nil
 }
 
 func GetRuntimeSupervisorPort(kubernetesVersion string) int {
