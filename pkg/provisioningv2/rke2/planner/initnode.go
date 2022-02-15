@@ -156,8 +156,8 @@ func (p *Planner) electInitNode(rkeControlPlane *rkev1.RKEControlPlane, plan *pl
 
 	possibleInitNodes := collect(plan, canBeInitNode)
 	if len(possibleInitNodes) == 0 {
-		logrus.Debugf("rkecluster %s/%s: no possible init nodes exist", rkeControlPlane.Namespace, rkeControlPlane.Spec.ClusterName)
-		return joinURL, generic.ErrSkip
+		logrus.Debugf("[planner] rkecluster %s/%s: no possible init nodes exist", rkeControlPlane.Namespace, rkeControlPlane.Spec.ClusterName)
+		return joinURL, nil
 	}
 
 	// keep track of whether we invalidate our machine cache when we clear init node marks across nodes.
@@ -211,14 +211,16 @@ func (p *Planner) electInitNode(rkeControlPlane *rkev1.RKEControlPlane, plan *pl
 // local etcd snapshot restore, where a snapshot may be contained on a specific node and that node needs to be the node that
 // the snapshot is restored on.
 func (p *Planner) designateInitNode(rkeControlPlane *rkev1.RKEControlPlane, plan *plan.Plan, nodeName string) (string, error) {
-	logrus.Infof("rkecluster %s/%s: designating init node: %s", rkeControlPlane.Namespace, rkeControlPlane.Spec.ClusterName, nodeName)
+	logrus.Infof("rkecluster %s/%s: ensuring designated init node: %s", rkeControlPlane.Namespace, rkeControlPlane.Spec.ClusterName, nodeName)
 	entries := collect(plan, isEtcd)
 	cacheInvalidated := false
 	joinURL := ""
+	initNodeFound := false
 	for _, entry := range entries {
 		if entry.Machine.Status.NodeRef != nil &&
 			entry.Machine.Status.NodeRef.Name == nodeName {
 			// this is our new initNode
+			initNodeFound = true
 			if err := p.setInitNodeMark(entry); err != nil {
 				if errors.Is(err, generic.ErrSkip) {
 					cacheInvalidated = true
@@ -236,6 +238,9 @@ func (p *Planner) designateInitNode(rkeControlPlane *rkev1.RKEControlPlane, plan
 				return "", err
 			}
 		}
+	}
+	if !initNodeFound {
+		return "", fmt.Errorf("rkecluster %s/%s: init node %s was not found during designation", rkeControlPlane.Namespace, rkeControlPlane.Name, nodeName)
 	}
 	if cacheInvalidated {
 		return joinURL, generic.ErrSkip

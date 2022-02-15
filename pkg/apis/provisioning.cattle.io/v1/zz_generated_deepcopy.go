@@ -151,13 +151,6 @@ func (in *ClusterStatus) DeepCopyInto(out *ClusterStatus) {
 		*out = make([]genericcondition.GenericCondition, len(*in))
 		copy(*out, *in)
 	}
-	if in.ETCDSnapshots != nil {
-		in, out := &in.ETCDSnapshots, &out.ETCDSnapshots
-		*out = make([]rkecattleiov1.ETCDSnapshot, len(*in))
-		for i := range *in {
-			(*in)[i].DeepCopyInto(&(*out)[i])
-		}
-	}
 	return
 }
 
@@ -194,12 +187,12 @@ func (in *RKEConfig) DeepCopyInto(out *RKEConfig) {
 	if in.ETCDSnapshotCreate != nil {
 		in, out := &in.ETCDSnapshotCreate, &out.ETCDSnapshotCreate
 		*out = new(rkecattleiov1.ETCDSnapshotCreate)
-		(*in).DeepCopyInto(*out)
+		**out = **in
 	}
 	if in.ETCDSnapshotRestore != nil {
 		in, out := &in.ETCDSnapshotRestore, &out.ETCDSnapshotRestore
 		*out = new(rkecattleiov1.ETCDSnapshotRestore)
-		(*in).DeepCopyInto(*out)
+		**out = **in
 	}
 	if in.RotateCertificates != nil {
 		in, out := &in.RotateCertificates, &out.RotateCertificates

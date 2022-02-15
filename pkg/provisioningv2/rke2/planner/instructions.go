@@ -10,8 +10,8 @@ import (
 )
 
 // generateInstallInstruction generates the instruction necessary to install the desired tool.
-func generateInstallInstruction(controlPlane *rkev1.RKEControlPlane, entry *planEntry, env []string) plan.Instruction {
-	var instruction plan.Instruction
+func generateInstallInstruction(controlPlane *rkev1.RKEControlPlane, entry *planEntry, env []string) plan.OneTimeInstruction {
+	var instruction plan.OneTimeInstruction
 	image := getInstallerImage(controlPlane)
 	cattleOS := entry.Metadata.Labels[rke2.CattleOSLabel]
 	for _, arg := range controlPlane.Spec.AgentEnvVars {
@@ -23,7 +23,7 @@ func generateInstallInstruction(controlPlane *rkev1.RKEControlPlane, entry *plan
 
 	switch cattleOS {
 	case windows:
-		instruction = plan.Instruction{
+		instruction = plan.OneTimeInstruction{
 			Name:    "install",
 			Image:   image,
 			Command: "powershell.exe",
@@ -31,7 +31,7 @@ func generateInstallInstruction(controlPlane *rkev1.RKEControlPlane, entry *plan
 			Env:     env,
 		}
 	default:
-		instruction = plan.Instruction{
+		instruction = plan.OneTimeInstruction{
 			Name:    "install",
 			Image:   image,
 			Command: "sh",
@@ -72,7 +72,7 @@ func (p *Planner) addInstallInstructionWithRestartStamp(nodePlan plan.NodePlan, 
 // generateInstallInstructionWithSkipStart will generate an instruction that executes the `run.sh` or `run.ps1`
 // from the installer image based on the control plane configuration. It will add a `SKIP_START` environment variable to prevent
 // the service from being started/restarted.
-func (p *Planner) generateInstallInstructionWithSkipStart(controlPlane *rkev1.RKEControlPlane, entry *planEntry) plan.Instruction {
+func (p *Planner) generateInstallInstructionWithSkipStart(controlPlane *rkev1.RKEControlPlane, entry *planEntry) plan.OneTimeInstruction {
 	var skipStartEnv string
 	switch entry.Metadata.Labels[rke2.CattleOSLabel] {
 	case windows:
@@ -84,11 +84,10 @@ func (p *Planner) generateInstallInstructionWithSkipStart(controlPlane *rkev1.RK
 	return generateInstallInstruction(controlPlane, entry, instEnv)
 }
 
-func (p *Planner) addInitNodeInstruction(nodePlan plan.NodePlan, controlPlane *rkev1.RKEControlPlane) (plan.NodePlan, error) {
-	nodePlan.Instructions = append(nodePlan.Instructions, plan.Instruction{
-		Name:       "capture-address",
-		Command:    "sh",
-		SaveOutput: true,
+func (p *Planner) addInitNodePeriodicInstruction(nodePlan plan.NodePlan, controlPlane *rkev1.RKEControlPlane) (plan.NodePlan, error) {
+	nodePlan.PeriodicInstructions = append(nodePlan.PeriodicInstructions, plan.PeriodicInstruction{
+		Name:    "capture-address",
+		Command: "sh",
 		Args: []string{
 			"-c",
 			// the grep here is to make the command fail if we don't get the output we expect, like empty string.
@@ -97,6 +96,22 @@ func (p *Planner) addInitNodeInstruction(nodePlan plan.NodePlan, controlPlane *r
 				rke2.GetRuntime(controlPlane.Spec.KubernetesVersion),
 				rke2.GetRuntimeSupervisorPort(controlPlane.Spec.KubernetesVersion)),
 		},
+		PeriodSeconds: 600,
+	})
+	return nodePlan, nil
+}
+
+func (p *Planner) addEtcdSnapshotListPeriodicInstruction(nodePlan plan.NodePlan, controlPlane *rkev1.RKEControlPlane) (plan.NodePlan, error) {
+	nodePlan.PeriodicInstructions = append(nodePlan.PeriodicInstructions, plan.PeriodicInstruction{
+		Name:    "etcd-snapshot-list",
+		Command: "sh",
+		Args: []string{
+			"-c",
+			// the grep here is to make the command fail if we don't get the output we expect, like empty string.
+			fmt.Sprintf("%s etcd-snapshot list",
+				rke2.GetRuntime(controlPlane.Spec.KubernetesVersion)),
+		},
+		PeriodSeconds: 600,
 	})
 	return nodePlan, nil
 }

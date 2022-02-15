@@ -2,7 +2,6 @@ package planner
 
 import (
 	"errors"
-	"fmt"
 
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
@@ -36,14 +35,7 @@ func (p *Planner) startOrRestartEtcdSnapshotCreate(controlPlane *rkev1.RKEContro
 }
 
 func (p *Planner) runEtcdSnapshotCreate(controlPlane *rkev1.RKEControlPlane, clusterPlan *plan.Plan, snapshot *rkev1.ETCDSnapshotCreate) []error {
-	servers := collect(clusterPlan, func(entry *planEntry) bool {
-		if !isEtcd(entry) || entry.Machine.Status.NodeRef == nil {
-			return false
-		}
-		return snapshot.NodeName == "" ||
-			entry.Machine.Status.NodeRef.Name == snapshot.NodeName
-	})
-
+	servers := collect(clusterPlan, isEtcd)
 	if len(servers) == 0 {
 		return []error{errors.New("failed to find node to perform etcd snapshot")}
 	}
@@ -51,7 +43,7 @@ func (p *Planner) runEtcdSnapshotCreate(controlPlane *rkev1.RKEControlPlane, clu
 	var errs []error
 
 	for _, server := range servers {
-		createPlan, err := p.generateEtcdSnapshotCreatePlan(controlPlane, snapshot, server.Machine.Status.NodeRef.Name)
+		createPlan, err := p.generateEtcdSnapshotCreatePlan(controlPlane, server)
 		if err != nil {
 			return []error{err}
 		}
@@ -62,39 +54,23 @@ func (p *Planner) runEtcdSnapshotCreate(controlPlane *rkev1.RKEControlPlane, clu
 	return errs
 }
 
-func (p *Planner) generateEtcdSnapshotCreatePlan(controlPlane *rkev1.RKEControlPlane, snapshot *rkev1.ETCDSnapshotCreate, nodeName string) (plan.NodePlan, error) {
+func (p *Planner) generateEtcdSnapshotCreatePlan(controlPlane *rkev1.RKEControlPlane, entry *planEntry) (plan.NodePlan, error) {
 	args := []string{
 		"etcd-snapshot",
 	}
 
-	if snapshot.Name != "" {
-		args = append(args, fmt.Sprintf("--name=%s", snapshot.Name))
-	}
-	if nodeName != "" {
-		args = append(args, fmt.Sprintf("--node-name=%s", nodeName))
-	}
-
-	s3Args, s3Env, s3Files, err := p.etcdS3Args.ToArgs(snapshot.S3, controlPlane)
-	if err != nil {
-		return plan.NodePlan{}, err
-	}
-
 	return p.commonNodePlan(controlPlane, plan.NodePlan{
-		Files: s3Files,
-		Instructions: []plan.Instruction{{
-			Name:    "create",
-			Command: rke2.GetRuntimeCommand(controlPlane.Spec.KubernetesVersion),
-			Env:     s3Env,
-			Args:    append(args, s3Args...),
-		}},
+		Instructions: []plan.OneTimeInstruction{
+			p.generateInstallInstructionWithSkipStart(controlPlane, entry),
+			{
+				Name:    "create",
+				Command: rke2.GetRuntimeCommand(controlPlane.Spec.KubernetesVersion),
+				Args:    args,
+			}},
 	})
 }
 
 func (p *Planner) createEtcdSnapshot(controlPlane *rkev1.RKEControlPlane, clusterPlan *plan.Plan) []error {
-	if !rke2.Provisioned.IsTrue(controlPlane) && controlPlane.Status.ETCDSnapshotCreatePhase == "" {
-		return nil
-	}
-
 	if controlPlane.Spec.ETCDSnapshotCreate == nil {
 		if err := p.resetEtcdSnapshotCreateState(controlPlane); err != nil {
 			return []error{err}

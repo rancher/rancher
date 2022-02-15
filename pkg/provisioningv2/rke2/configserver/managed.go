@@ -20,11 +20,11 @@ func (r *RKE2ConfigServer) findMachineByProvisioningSA(req *http.Request) (strin
 		return "", "", err
 	}
 
-	if sa.Labels[rke2.RoleLabel] != roleBootstrap || string(sa.UID) != secrets[0].Annotations[api.ServiceAccountUIDKey] {
+	if sa.Labels[rke2.RoleLabel] != rke2.RoleBootstrap || string(sa.UID) != secrets[0].Annotations[api.ServiceAccountUIDKey] {
 		return "", "", err
 	}
 
-	if foundParent, err := r.isOwnedByMachine(sa.Labels[rke2.MachineNameLabel], sa); err != nil || !foundParent {
+	if foundParent, err := rke2.IsOwnedByMachine(r.bootstrapCache, sa.Labels[rke2.MachineNameLabel], sa); err != nil || !foundParent {
 		return "", "", err
 	}
 

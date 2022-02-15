@@ -21,13 +21,22 @@ type ProbeStatus struct {
 }
 
 type Node struct {
-	Plan        NodePlan               `json:"plan,omitempty"`
-	AppliedPlan *NodePlan              `json:"appliedPlan,omitempty"`
-	Output      map[string][]byte      `json:"-"`
-	Failed      bool                   `json:"failed,omitempty"`
-	InSync      bool                   `json:"inSync,omitempty"`
-	Healthy     bool                   `json:"healthy,omitempty"`
-	ProbeStatus map[string]ProbeStatus `json:"probeStatus,omitempty"`
+	Plan           NodePlan                             `json:"plan,omitempty"`
+	AppliedPlan    *NodePlan                            `json:"appliedPlan,omitempty"`
+	Output         map[string][]byte                    `json:"-"`
+	PeriodicOutput map[string]PeriodicInstructionOutput `json:"-"`
+	Failed         bool                                 `json:"failed,omitempty"`
+	InSync         bool                                 `json:"inSync,omitempty"`
+	Healthy        bool                                 `json:"healthy,omitempty"`
+	ProbeStatus    map[string]ProbeStatus               `json:"probeStatus,omitempty"`
+}
+
+type PeriodicInstructionOutput struct {
+	Name                  string `json:"name"`
+	Stdout                []byte `json:"stdout"`                // Stdout is a byte array of the gzip+base64 stdout output
+	Stderr                []byte `json:"stderr"`                // Stderr is a byte array of the gzip+base64 stderr output
+	ExitCode              int    `json:"exitCode"`              // ExitCode is an int representing the exit code of the last run instruction
+	LastSuccessfulRunTime string `json:"lastSuccessfulRunTime"` // LastSuccessfulRunTime is a time.UnixDate formatted string of the last time the instruction was run
 }
 
 type Secret struct {
@@ -35,13 +44,22 @@ type Secret struct {
 	AgentToken  string `json:"agentToken,omitempty"`
 }
 
-type Instruction struct {
+type OneTimeInstruction struct {
 	Name       string   `json:"name,omitempty"`
 	Image      string   `json:"image,omitempty"`
 	Env        []string `json:"env,omitempty"`
 	Args       []string `json:"args,omitempty"`
 	Command    string   `json:"command,omitempty"`
 	SaveOutput bool     `json:"saveOutput,omitempty"`
+}
+
+type PeriodicInstruction struct {
+	Name          string   `json:"name,omitempty"`
+	Image         string   `json:"image,omitempty"`
+	Env           []string `json:"env,omitempty"`
+	Args          []string `json:"args,omitempty"`
+	Command       string   `json:"command,omitempty"`
+	PeriodSeconds int      `json:"periodSeconds,omitempty"` // default 600, i.e. 10 minutes
 }
 
 type File struct {
@@ -51,8 +69,9 @@ type File struct {
 }
 
 type NodePlan struct {
-	Files        []File           `json:"files,omitempty"`
-	Instructions []Instruction    `json:"instructions,omitempty"`
-	Error        string           `json:"error,omitempty"`
-	Probes       map[string]Probe `json:"probes,omitempty"`
+	Files                []File                `json:"files,omitempty"`
+	Instructions         []OneTimeInstruction  `json:"instructions,omitempty"`
+	PeriodicInstructions []PeriodicInstruction `json:"periodicInstructions,omitempty"`
+	Error                string                `json:"error,omitempty"`
+	Probes               map[string]Probe      `json:"probes,omitempty"`
 }
