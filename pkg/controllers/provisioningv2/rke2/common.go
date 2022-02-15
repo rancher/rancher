@@ -8,8 +8,10 @@ import (
 	"strings"
 	"time"
 
+	provv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
 	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta1"
+	rkecontroller "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
 	"github.com/rancher/wrangler/pkg/condition"
 	"github.com/rancher/wrangler/pkg/generic"
 	"github.com/rancher/wrangler/pkg/name"
@@ -68,6 +70,9 @@ const (
 
 	RuntimeK3S  = "k3s"
 	RuntimeRKE2 = "rke2"
+
+	RoleBootstrap = "bootstrap"
+	RolePlan      = "plan"
 )
 
 var (
@@ -116,6 +121,42 @@ func GetRuntimeSupervisorPort(kubernetesVersion string) int {
 		return 9345
 	}
 	return 6443
+}
+
+func IsOwnedByMachine(bootstrapCache rkecontroller.RKEBootstrapCache, machineName string, sa *corev1.ServiceAccount) (bool, error) {
+	for _, owner := range sa.OwnerReferences {
+		if owner.Kind == "RKEBootstrap" {
+			bootstrap, err := bootstrapCache.Get(sa.Namespace, owner.Name)
+			if err != nil {
+				return false, err
+			}
+			for _, owner := range bootstrap.OwnerReferences {
+				if owner.Kind == "Machine" && owner.Name == machineName {
+					return true, nil
+				}
+			}
+		}
+	}
+	return false, nil
+}
+
+// GetServiceAccountSecretNames will return the plan secret name and service account token names
+func GetServiceAccountSecretNames(bootstrapCache rkecontroller.RKEBootstrapCache, machineName string, planSA *corev1.ServiceAccount) (string, string, error) {
+	if planSA.Labels[MachineNameLabel] != machineName ||
+		planSA.Labels[RoleLabel] != RolePlan ||
+		planSA.Labels[PlanSecret] == "" {
+		return "", "", nil
+	}
+
+	if len(planSA.Secrets) == 0 {
+		return "", "", nil
+	}
+
+	if foundParent, err := IsOwnedByMachine(bootstrapCache, machineName, planSA); err != nil || !foundParent {
+		return "", "", err
+	}
+
+	return planSA.Labels[PlanSecret], planSA.Secrets[0].Name, nil
 }
 
 func PlanSecretFromBootstrapName(bootstrapName string) string {
@@ -170,6 +211,24 @@ func GetMachineDeletionStatus(machineCache capicontrollers.MachineCache, cluster
 	}
 
 	return "", nil
+}
+
+// GetMachineFromNode attempts to find the corresponding machine for an etcd snapshot that is found in the configmap. If the machine list is successful, it will return true on the boolean, otherwise, it can be assumed that a false, nil, and defined error indicate the machine does not exist.
+func GetMachineFromNode(machineCache capicontrollers.MachineCache, nodeName string, cluster *provv1.Cluster) (bool, *capi.Machine, error) {
+	ls, err := labels.Parse(fmt.Sprintf("%s=%s", capi.ClusterLabelName, cluster.Name))
+	if err != nil {
+		return false, nil, err
+	}
+	machines, err := machineCache.List(cluster.Namespace, ls)
+	if err != nil {
+		return false, nil, err
+	}
+	for _, machine := range machines {
+		if machine.Status.NodeRef != nil && machine.Status.NodeRef.Name == nodeName {
+			return true, machine, nil
+		}
+	}
+	return true, nil, fmt.Errorf("unable to find node %s in machines", nodeName)
 }
 
 func CopyPlanMetadataToSecret(secret *corev1.Secret, metadata *plan.Metadata) {

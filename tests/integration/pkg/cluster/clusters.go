@@ -133,8 +133,19 @@ func WaitForCreate(clients *clients.Clients, c *provisioningv1api.Cluster) (_ *p
 				if machine.Spec.Bootstrap.ConfigRef == nil {
 					continue
 				}
-				secretName := rke2.PlanSecretFromBootstrapName(machine.Spec.Bootstrap.ConfigRef.Name)
-				secret, err := clients.Core.Secret().Get(machine.Namespace, secretName, metav1.GetOptions{})
+
+				planSAs, err := clients.Core.ServiceAccount().List(machine.Namespace, metav1.ListOptions{LabelSelector: fmt.Sprintf("%s=%s,%s=%s", rke2.MachineNameLabel, machine.Name,
+					rke2.RoleLabel, rke2.RolePlan),
+				})
+				if err != nil {
+					continue
+				}
+
+				if len(planSAs.Items) != 1 {
+					continue
+				}
+
+				secret, err := clients.Core.Secret().Get(machine.Namespace, planSAs.Items[0].Labels[rke2.PlanSecret], metav1.GetOptions{})
 				if err == nil {
 					plans = append(plans, secret)
 				}

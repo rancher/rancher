@@ -32,8 +32,6 @@ import (
 )
 
 const (
-	roleBootstrap         = "bootstrap"
-	rolePlan              = "plan"
 	ConnectClusterInfo    = "/v3/connect/cluster-info"
 	ConnectConfigYamlPath = "/v3/connect/config-yaml"
 	ConnectAgent          = "/v3/connect/agent"
@@ -169,7 +167,7 @@ func (r *RKE2ConfigServer) connectConfigYaml(name, ns string, rw http.ResponseWr
 	}
 
 	config := make(map[string]interface{})
-	if err := json.Unmarshal(mpSecret.Data[rolePlan], &config); err != nil {
+	if err := json.Unmarshal(mpSecret.Data[rke2.RolePlan], &config); err != nil {
 		http.Error(rw, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -308,7 +306,11 @@ func (r *RKE2ConfigServer) findSA(req *http.Request) (string, *corev1.Secret, er
 	}
 
 	for _, planSA := range planSAs {
-		planSecret, secret, err := r.getServiceAccountSecret(machineName, planSA)
+		planSecret, tokenSecretName, err := rke2.GetServiceAccountSecretNames(r.bootstrapCache, machineName, planSA)
+		if err != nil {
+			return planSecret, nil, err
+		}
+		secret, err := r.secretsCache.Get(planSA.Namespace, tokenSecretName)
 		if err != nil || planSecret != "" {
 			return planSecret, secret, err
 		}
@@ -328,7 +330,11 @@ func (r *RKE2ConfigServer) findSA(req *http.Request) (string, *corev1.Secret, er
 
 	for event := range resp.ResultChan() {
 		if planSA, ok := event.Object.(*corev1.ServiceAccount); ok {
-			planSecret, secret, err := r.getServiceAccountSecret(machineName, planSA)
+			planSecret, tokenSecretName, err := rke2.GetServiceAccountSecretNames(r.bootstrapCache, machineName, planSA)
+			if err != nil {
+				return planSecret, nil, err
+			}
+			secret, err := r.secretsCache.Get(planSA.Namespace, tokenSecretName)
 			if err != nil || planSecret != "" {
 				return planSecret, secret, err
 			}
@@ -358,43 +364,6 @@ func (r *RKE2ConfigServer) setOrUpdateMachineID(machineNamespace, machineName, m
 	return err
 }
 
-func (r *RKE2ConfigServer) isOwnedByMachine(machineName string, sa *corev1.ServiceAccount) (bool, error) {
-	for _, owner := range sa.OwnerReferences {
-		if owner.Kind == "RKEBootstrap" {
-			bootstrap, err := r.bootstrapCache.Get(sa.Namespace, owner.Name)
-			if err != nil {
-				return false, err
-			}
-			for _, owner := range bootstrap.OwnerReferences {
-				if owner.Kind == "Machine" && owner.Name == machineName {
-					return true, nil
-				}
-			}
-		}
-	}
-
-	return false, nil
-}
-
-func (r *RKE2ConfigServer) getServiceAccountSecret(machineName string, planSA *corev1.ServiceAccount) (string, *corev1.Secret, error) {
-	if planSA.Labels[rke2.MachineNameLabel] != machineName ||
-		planSA.Labels[rke2.RoleLabel] != rolePlan ||
-		planSA.Labels[rke2.PlanSecret] == "" {
-		return "", nil, nil
-	}
-
-	if len(planSA.Secrets) == 0 {
-		return "", nil, nil
-	}
-
-	if foundParent, err := r.isOwnedByMachine(machineName, planSA); err != nil || !foundParent {
-		return "", nil, err
-	}
-
-	secret, err := r.secretsCache.Get(planSA.Namespace, planSA.Secrets[0].Name)
-	return planSA.Labels[rke2.PlanSecret], secret, err
-}
-
 func (r *RKE2ConfigServer) getMachinePlanSecret(ns, name string) (*v1.Secret, error) {
 	backoff := wait.Backoff{
 		Duration: 500 * time.Millisecond,
@@ -413,7 +382,7 @@ func (r *RKE2ConfigServer) getMachinePlanSecret(ns, name string) (*v1.Secret, er
 			return false, nil // retry if secret not found
 		}
 
-		if len(secret.Data) == 0 || string(secret.Data[rolePlan]) == "" {
+		if len(secret.Data) == 0 || string(secret.Data[rke2.RolePlan]) == "" {
 			return false, nil // retry if no secret Data or plan, backoff and wait for the controller
 		}
 

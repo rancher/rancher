@@ -79,7 +79,7 @@ func rotateCertificatesPlan(controlPlane *rkev1.RKEControlPlane, rotation *rkev1
 	}
 
 	return plan.NodePlan{
-		Instructions: []plan.Instruction{
+		Instructions: []plan.OneTimeInstruction{
 			{
 				Name:    "stop service",
 				Command: "systemctl",

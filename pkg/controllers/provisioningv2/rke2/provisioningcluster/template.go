@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
 	"strings"
 
 	"github.com/rancher/lasso/pkg/dynamic"
@@ -443,8 +444,8 @@ func rkeCluster(cluster *rancherv1.Cluster) *rkev1.RKECluster {
 	}
 }
 
-// b64GZInterface is a function that will gzip then base64 encode the provided interface.
-func b64GZInterface(v interface{}) (string, error) {
+// compressInterface is a function that will marshal, gzip, then base64 encode the provided interface.
+func compressInterface(v interface{}) (string, error) {
 	var b64GZCluster string
 	marshalledCluster, err := json.Marshal(v)
 	if err != nil {
@@ -465,11 +466,44 @@ func b64GZInterface(v interface{}) (string, error) {
 	return b64GZCluster, nil
 }
 
+// decompressClusterSpec accepts an input string that is a base64/compressed cluster spec and will return a pointer to the cluster spec decompressed
+func decompressClusterSpec(inputb64 string) (*rancherv1.ClusterSpec, error) {
+	if inputb64 == "" {
+		return nil, fmt.Errorf("empty base64 input")
+	}
+
+	decodedGzip, err := base64.StdEncoding.DecodeString(inputb64)
+	if err != nil {
+		return nil, fmt.Errorf("error base64.DecodeString: %v", err)
+	}
+
+	buffer := bytes.NewBuffer(decodedGzip)
+
+	var gz io.Reader
+	gz, err = gzip.NewReader(buffer)
+	if err != nil {
+		return nil, err
+	}
+
+	csBytes, err := io.ReadAll(gz)
+	if err != nil {
+		return nil, err
+	}
+
+	c := rancherv1.ClusterSpec{}
+	err = json.Unmarshal(csBytes, &c)
+	if err != nil {
+		return nil, err
+	}
+
+	return &c, nil
+}
+
 // rkeControlPlane generates the rkecontrolplane object for a provided cluster object
 func rkeControlPlane(cluster *rancherv1.Cluster) (*rkev1.RKEControlPlane, error) {
 	// We need to base64/gzip encode the spec of our rancherv1.Cluster object so that we can reference it from the
 	// downstream cluster
-	b64GZCluster, err := b64GZInterface(cluster.Spec)
+	b64GZCluster, err := compressInterface(cluster.Spec)
 	if err != nil {
 		logrus.Errorf("cluster: %s/%s : error while gz/b64 encoding cluster specification: %v", cluster.Namespace, cluster.ClusterName, err)
 		return nil, err

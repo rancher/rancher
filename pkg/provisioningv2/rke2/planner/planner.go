@@ -111,6 +111,7 @@ type Planner struct {
 	ctx                           context.Context
 	store                         *PlanStore
 	rkeControlPlanes              rkecontrollers.RKEControlPlaneClient
+	etcdSnapshotCache             rkecontrollers.ETCDSnapshotCache
 	secretClient                  corecontrollers.SecretClient
 	secretCache                   corecontrollers.SecretCache
 	machines                      capicontrollers.MachineClient
@@ -129,7 +130,9 @@ func New(ctx context.Context, clients *wrangler.Context) *Planner {
 		return []string{obj.Spec.ClusterName}, nil
 	})
 	store := NewStore(clients.Core.Secret(),
-		clients.CAPI.Machine().Cache())
+		clients.CAPI.Machine().Cache(),
+		clients.Core.ServiceAccount().Cache(),
+		clients.RKE.RKEBootstrap().Cache())
 	return &Planner{
 		ctx:                           ctx,
 		store:                         store,
@@ -140,6 +143,7 @@ func New(ctx context.Context, clients *wrangler.Context) *Planner {
 		capiClusters:                  clients.CAPI.Cluster().Cache(),
 		managementClusters:            clients.Mgmt.Cluster().Cache(),
 		rkeControlPlanes:              clients.RKE.RKEControlPlane(),
+		etcdSnapshotCache:             clients.RKE.ETCDSnapshot().Cache(),
 		kubeconfig:                    kubeconfig.New(clients),
 		etcdS3Args: s3Args{
 			prefix:      "etcd-",
@@ -725,12 +729,18 @@ func (p *Planner) desiredPlan(controlPlane *rkev1.RKEControlPlane, tokensSecret 
 	}
 
 	if isInitNode(entry) && IsOnlyEtcd(entry) {
-		nodePlan, err = p.addInitNodeInstruction(nodePlan, controlPlane)
+		nodePlan, err = p.addInitNodePeriodicInstruction(nodePlan, controlPlane)
 		if err != nil {
 			return nodePlan, err
 		}
 	}
 
+	if isEtcd(entry) {
+		nodePlan, err = p.addEtcdSnapshotListPeriodicInstruction(nodePlan, controlPlane)
+		if err != nil {
+			return nodePlan, err
+		}
+	}
 	return nodePlan, nil
 }
 
@@ -765,10 +775,12 @@ func isDeleting(entry *planEntry) bool {
 	return entry.Machine.DeletionTimestamp != nil
 }
 
+// isFailed returns true if the provided entry machine.status.phase is failed
 func isFailed(entry *planEntry) bool {
 	return entry.Machine.Status.Phase == string(capi.MachinePhaseFailed)
 }
 
+// canBeInitNode returns true if the provided entry is an etcd node, is not deleting, and is not failed
 func canBeInitNode(entry *planEntry) bool {
 	return isEtcd(entry) && !isDeleting(entry) && !isFailed(entry)
 }

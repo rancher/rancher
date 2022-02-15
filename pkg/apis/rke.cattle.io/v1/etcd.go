@@ -13,30 +13,44 @@ type ETCDSnapshotS3 struct {
 }
 
 type ETCDSnapshotCreate struct {
-	Name     string          `json:"name,omitempty"`
-	NodeName string          `json:"nodeName,omitempty"`
-	S3       *ETCDSnapshotS3 `json:"s3,omitempty"`
 	// Changing the Generation is the only thing required to initiate a snapshot creation.
 	Generation int `json:"generation,omitempty"`
 }
 
 type ETCDSnapshotRestore struct {
-	ETCDSnapshot
+	// Name refers to the name of the associated etcdsnapshot object
+	Name string `json:"name,omitempty"`
 
-	// Changing the Generation is the only thing required to initiate a snapshot creation.
+	// Changing the Generation is the only thing required to initiate a snapshot restore.
 	Generation int `json:"generation,omitempty"`
+	// Set to either none (or empty string), all, or kubernetesVersion
+	RestoreRKEConfig string `json:"restoreRKEConfig,omitempty"`
 }
 
+// +genclient
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 type ETCDSnapshot struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+	SnapshotFile      ETCDSnapshotFile   `json:"snapshotFile,omitempty"`
+	Status            ETCDSnapshotStatus `json:"status"`
+}
+
+type ETCDSnapshotFile struct {
 	Name      string          `json:"name,omitempty"`
+	NodeName  string          `json:"nodeName,omitempty"`
 	Location  string          `json:"location,omitempty"`
 	Metadata  string          `json:"metadata,omitempty"`
-	Message   string          `json:"message,omitempty"`
-	NodeName  string          `json:"nodeName,omitempty"`
 	CreatedAt *metav1.Time    `json:"createdAt,omitempty"`
 	Size      int64           `json:"size,omitempty"`
 	S3        *ETCDSnapshotS3 `json:"s3,omitempty"`
 	Status    string          `json:"status,omitempty"`
+	Message   string          `json:"message,omitempty"`
+}
+
+type ETCDSnapshotStatus struct {
+	Missing bool `json:"missing"`
 }
 
 type ETCD struct {
