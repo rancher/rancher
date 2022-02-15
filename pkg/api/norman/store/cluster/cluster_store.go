@@ -251,6 +251,9 @@ func (r *Store) Create(apiContext *types.APIContext, schema *types.Schema, data 
 	if err := validateS3Credentials(data, nil); err != nil {
 		return nil, err
 	}
+	if err := validateKeyRotation(data); err != nil {
+		return nil, err
+	}
 	cleanPrivateRegistry(data)
 
 	return r.Store.Create(apiContext, schema, data)
@@ -610,6 +613,9 @@ func (r *Store) Update(apiContext *types.APIContext, schema *types.Schema, data 
 		return nil, errors.Wrap(err, "error getting dialer")
 	}
 	if err := validateUpdatedS3Credentials(existingCluster, data, dialer); err != nil {
+		return nil, err
+	}
+	if err := validateKeyRotation(data); err != nil {
 		return nil, err
 	}
 	handleScheduledScan(data)
@@ -1216,6 +1222,17 @@ func canUpgrade(nodes []*v3.Node, upgradeStrategy *rketypes.NodeUpgradeStrategy)
 	if workerOnlyNotReady >= maxUnavailableWorker {
 		return fmt.Errorf("not enough worker nodes ready to upgrade, maxUnavailable: %v, notReady: %v, ready: %v",
 			maxUnavailableWorker, workerOnlyNotReady, workerOnlyReady)
+	}
+	return nil
+}
+
+func validateKeyRotation(data map[string]interface{}) error {
+	secretsEncryptionEnabled, _ := values.GetValue(data, "rancherKubernetesEngineConfig", "services", "kubeApi", "secretsEncryptionConfig", "enabled")
+	rotateEncryptionKeyEnabled, _ := values.GetValue(data, "rancherKubernetesEngineConfig", "rotateEncryptionKey")
+	if rotateEncryptionKeyEnabled != nil && rotateEncryptionKeyEnabled == true {
+		if secretsEncryptionEnabled != nil && secretsEncryptionEnabled == false {
+			return fmt.Errorf("unable to rotate encryption key when encryption configuration is disabled")
+		}
 	}
 	return nil
 }
