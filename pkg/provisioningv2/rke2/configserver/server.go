@@ -306,7 +306,11 @@ func (r *RKE2ConfigServer) findSA(req *http.Request) (string, *corev1.Secret, er
 	}
 
 	for _, planSA := range planSAs {
-		planSecret, secret, err := rke2.GetServiceAccountPlanSecret(r.secretsCache, r.bootstrapCache, machineName, planSA)
+		planSecret, tokenSecretName, err := rke2.GetServiceAccountSecretNames(r.bootstrapCache, machineName, planSA)
+		if err != nil {
+			return planSecret, nil, err
+		}
+		secret, err := r.secretsCache.Get(planSA.Namespace, tokenSecretName)
 		if err != nil || planSecret != "" {
 			return planSecret, secret, err
 		}
@@ -326,7 +330,11 @@ func (r *RKE2ConfigServer) findSA(req *http.Request) (string, *corev1.Secret, er
 
 	for event := range resp.ResultChan() {
 		if planSA, ok := event.Object.(*corev1.ServiceAccount); ok {
-			planSecret, secret, err := rke2.GetServiceAccountPlanSecret(r.secretsCache, r.bootstrapCache, machineName, planSA)
+			planSecret, tokenSecretName, err := rke2.GetServiceAccountSecretNames(r.bootstrapCache, machineName, planSA)
+			if err != nil {
+				return planSecret, nil, err
+			}
+			secret, err := r.secretsCache.Get(planSA.Namespace, tokenSecretName)
 			if err != nil || planSecret != "" {
 				return planSecret, secret, err
 			}

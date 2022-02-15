@@ -291,8 +291,16 @@ func (p *PlanStore) getSecretFromMachine(machine *capi.Machine) (*corev1.Secret,
 		return nil, fmt.Errorf("error while retrieving plan secret for machine %s/%s service account list length was not 1", machine.Namespace, machine.Name)
 	}
 
-	_, secret, err := rke2.GetServiceAccountPlanSecret(p.secretsCache, p.rkeBootstrapCache, machine.Name, planSAs[0])
-	return secret, err
+	planSecretName, _, err := rke2.GetServiceAccountSecretNames(p.rkeBootstrapCache, machine.Name, planSAs[0])
+	if err != nil {
+		return nil, err
+	}
+
+	if planSecretName == "" {
+		return nil, fmt.Errorf("plan secret was not yet assigned for service account %s/%s", planSAs[0].Namespace, planSAs[0].Name)
+	}
+
+	return p.secretsCache.Get(planSAs[0].Namespace, planSecretName)
 }
 
 // UpdatePlan should not be called directly as it will not block further progress if the plan is not in sync

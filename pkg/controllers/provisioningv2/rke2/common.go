@@ -13,7 +13,6 @@ import (
 	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta1"
 	rkecontroller "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
 	"github.com/rancher/wrangler/pkg/condition"
-	corecontrollers "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/pkg/generic"
 	"github.com/rancher/wrangler/pkg/name"
 	corev1 "k8s.io/api/core/v1"
@@ -141,23 +140,23 @@ func IsOwnedByMachine(bootstrapCache rkecontroller.RKEBootstrapCache, machineNam
 	return false, nil
 }
 
-func GetServiceAccountPlanSecret(secretsCache corecontrollers.SecretCache, bootstrapCache rkecontroller.RKEBootstrapCache, machineName string, planSA *corev1.ServiceAccount) (string, *corev1.Secret, error) {
+// GetServiceAccountSecretNames will return the plan secret name and service account token names
+func GetServiceAccountSecretNames(bootstrapCache rkecontroller.RKEBootstrapCache, machineName string, planSA *corev1.ServiceAccount) (string, string, error) {
 	if planSA.Labels[MachineNameLabel] != machineName ||
 		planSA.Labels[RoleLabel] != RolePlan ||
 		planSA.Labels[PlanSecret] == "" {
-		return "", nil, nil
+		return "", "", nil
 	}
 
 	if len(planSA.Secrets) == 0 {
-		return "", nil, nil
+		return "", "", nil
 	}
 
 	if foundParent, err := IsOwnedByMachine(bootstrapCache, machineName, planSA); err != nil || !foundParent {
-		return "", nil, err
+		return "", "", err
 	}
 
-	secret, err := secretsCache.Get(planSA.Namespace, planSA.Secrets[0].Name)
-	return planSA.Labels[PlanSecret], secret, err
+	return planSA.Labels[PlanSecret], planSA.Secrets[0].Name, nil
 }
 
 func PlanSecretFromBootstrapName(bootstrapName string) string {
