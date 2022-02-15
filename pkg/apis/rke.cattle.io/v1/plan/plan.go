@@ -59,7 +59,7 @@ type PeriodicInstruction struct {
 	Env           []string `json:"env,omitempty"`
 	Args          []string `json:"args,omitempty"`
 	Command       string   `json:"command,omitempty"`
-	PeriodSeconds int      `json:"periodSeconds,omitempty"` // default 600, i.e. 5 minutes
+	PeriodSeconds int      `json:"periodSeconds,omitempty"` // default 600, i.e. 10 minutes
 }
 
 type File struct {
