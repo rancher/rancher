@@ -77,7 +77,7 @@ func (p *PlanStore) Load(cluster *capi.Cluster, rkeControlPlane *rkev1.RKEContro
 
 	machines = onlyRKE(machines)
 
-	secrets, err := p.getSecrets(machines)
+	secrets, err := p.getPlanSecrets(machines)
 	if err != nil {
 		return nil, err
 	}
@@ -251,10 +251,11 @@ func SecretToNode(secret *corev1.Secret) (*plan.Node, error) {
 	return result, nil
 }
 
-func (p *PlanStore) getSecrets(machines []*capi.Machine) (map[string]*corev1.Secret, error) {
+// getPlanSecrets retrieves the plan secrets for the given list of machines
+func (p *PlanStore) getPlanSecrets(machines []*capi.Machine) (map[string]*corev1.Secret, error) {
 	result := map[string]*corev1.Secret{}
 	for _, machine := range machines {
-		secret, err := p.getSecretFromMachine(machine)
+		secret, err := p.getPlanSecretFromMachine(machine)
 		if apierror.IsNotFound(err) {
 			continue
 		} else if err != nil {
@@ -273,7 +274,8 @@ func isRKEBootstrap(machine *capi.Machine) bool {
 		machine.Spec.Bootstrap.ConfigRef.Kind == "RKEBootstrap"
 }
 
-func (p *PlanStore) getSecretFromMachine(machine *capi.Machine) (*corev1.Secret, error) {
+// getPlanSecretFromachine returns the plan secret from the secretsCache for the given machine, or an error if the plan secret is not available
+func (p *PlanStore) getPlanSecretFromMachine(machine *capi.Machine) (*corev1.Secret, error) {
 	if !isRKEBootstrap(machine) {
 		return nil, fmt.Errorf("machine %s/%s is not using RKEBootstrap", machine.Namespace, machine.Name)
 	}
@@ -305,7 +307,7 @@ func (p *PlanStore) getSecretFromMachine(machine *capi.Machine) (*corev1.Secret,
 
 // UpdatePlan should not be called directly as it will not block further progress if the plan is not in sync
 func (p *PlanStore) UpdatePlan(entry *planEntry, plan plan.NodePlan, maxFailures int) error {
-	secret, err := p.getSecretFromMachine(entry.Machine)
+	secret, err := p.getPlanSecretFromMachine(entry.Machine)
 	if err != nil {
 		return err
 	}
@@ -335,7 +337,7 @@ func (p *PlanStore) UpdatePlan(entry *planEntry, plan plan.NodePlan, maxFailures
 }
 
 func (p *PlanStore) updatePlanSecretLabelsAndAnnotations(entry *planEntry) error {
-	secret, err := p.getSecretFromMachine(entry.Machine)
+	secret, err := p.getPlanSecretFromMachine(entry.Machine)
 	if err != nil {
 		return err
 	}
@@ -348,7 +350,7 @@ func (p *PlanStore) updatePlanSecretLabelsAndAnnotations(entry *planEntry) error
 }
 
 func (p *PlanStore) removePlanSecretLabel(entry *planEntry, key string) error {
-	secret, err := p.getSecretFromMachine(entry.Machine)
+	secret, err := p.getPlanSecretFromMachine(entry.Machine)
 	if err != nil {
 		return err
 	}
@@ -432,7 +434,7 @@ func getJoinURLFromOutput(entry *planEntry, capiCluster *capi.Cluster, rkeContro
 	if ca, ok := entry.Plan.PeriodicOutput["capture-address"]; ok && ca.ExitCode == 0 {
 		address = ca.Stdout
 	} else {
-		return "", fmt.Errorf("error encountered while retrieving joinURL for machine %s", entry.Machine.Name)
+		return "", fmt.Errorf("could not scrape join URL from periodic output (exit code: %d, length: %d) for machine %s", ca.ExitCode, len(ca.Stdout), entry.Machine.Name)
 	}
 
 	var str string
