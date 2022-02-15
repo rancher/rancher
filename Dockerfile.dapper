@@ -1,7 +1,7 @@
 ARG K3S_BUILDER=rancher/k3s:v1.23.3-k3s1
 
 # Use binaries from k3s root for s390x as k3s is not available on s390x
-FROM registry.suse.com/suse/sle15:15.3 AS k3s_root
+FROM registry.suse.com/bci/golang:1.17 AS k3s_root
 ARG DAPPER_HOST_ARCH
 ENV ARCH=${DAPPER_HOST_ARCH}
 ENV K3S_ROOT_VERSION v0.11.0
@@ -12,7 +12,7 @@ ONBUILD RUN tar xvf /k3s-root.tar; \
 
 FROM ${K3S_BUILDER} as k3s_builder
 
-FROM registry.suse.com/suse/sle15:15.3
+FROM registry.suse.com/bci/golang:1.17
 
 ARG DAPPER_HOST_ARCH
 ENV HOST_ARCH=${DAPPER_HOST_ARCH} ARCH=${DAPPER_HOST_ARCH}
@@ -33,10 +33,10 @@ RUN zypper install -y -f docker
 
 RUN curl -sLf https://github.com/rancher/machine/releases/download/${CATTLE_MACHINE_VERSION}/rancher-machine-${ARCH}.tar.gz | tar xvzf - -C /usr/bin
 
-RUN zypper -n in go1.16
+RUN zypper -n in go1.17
 
 RUN if [ "${ARCH}" == "amd64" ]; then \
-        curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s v1.43.0; \
+        curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s v1.44.0; \
         curl -H 'Cache-Control: no-cache' https://raw.githubusercontent.com/fossas/spectrometer/master/install.sh | sh; \
     fi
 # workaround for https://bugzilla.suse.com/show_bug.cgi?id=1183043
@@ -83,6 +83,7 @@ COPY --from=k3s_builder \
     /bin/ethtool \
     /bin/ip \
     /bin/ipset \
+    /bin/k3s \
     /bin/losetup \
     /bin/pigz \
     /bin/runc \
@@ -99,13 +100,12 @@ RUN if [ "${ARCH}" != "s390x" ]; then \
         ln -s /usr/bin/cni /usr/bin/host-local && \
         ln -s /usr/bin/cni /usr/bin/loopback && \
         ln -s /usr/bin/cni /usr/bin/portmap && \
-        ln -s /usr/bin/containerd /usr/bin/crictl && \
-        ln -s /usr/bin/containerd /usr/bin/ctr && \
-        ln -s /usr/bin/containerd /usr/bin/k3s && \
-        ln -s /usr/bin/containerd /usr/bin/k3s-agent && \
-        ln -s /usr/bin/containerd /usr/bin/k3s-etcd-snapshot && \
-        ln -s /usr/bin/containerd /usr/bin/k3s-server && \
-        ln -s /usr/bin/containerd /usr/bin/kubectl && \
+        ln -s /usr/bin/k3s /usr/bin/crictl && \
+        ln -s /usr/bin/k3s /usr/bin/ctr && \
+        ln -s /usr/bin/k3s /usr/bin/k3s-agent && \
+        ln -s /usr/bin/k3s /usr/bin/k3s-etcd-snapshot && \
+        ln -s /usr/bin/k3s /usr/bin/k3s-server && \
+        ln -s /usr/bin/k3s /usr/bin/kubectl && \
         ln -s /usr/bin/pigz /usr/bin/unpigz && \
         ln -s /usr/bin/xtables-legacy-multi /usr/bin/iptables && \
         ln -s /usr/bin/xtables-legacy-multi /usr/bin/iptables-save && \
