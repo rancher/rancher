@@ -32,11 +32,11 @@ type Node struct {
 }
 
 type PeriodicInstructionOutput struct {
-	Name        string `json:"name"`
-	Stdout      []byte `json:"stdout"`      // Stdout is a byte array of the gzip+base64 stdout output
-	Stderr      []byte `json:"stderr"`      // Stderr is a byte array of the gzip+base64 stderr output
-	ExitCode    int    `json:"exitCode"`    // ExitCode is an int representing the exit code of the last run instruction
-	LastRunTime string `json:"lastRunTime"` // LastRunTime is a time.UnixDate formatted string of the last time the instruction was run
+	Name                  string `json:"name"`
+	Stdout                []byte `json:"stdout"`                // Stdout is a byte array of the gzip+base64 stdout output
+	Stderr                []byte `json:"stderr"`                // Stderr is a byte array of the gzip+base64 stderr output
+	ExitCode              int    `json:"exitCode"`              // ExitCode is an int representing the exit code of the last run instruction
+	LastSuccessfulRunTime string `json:"lastSuccessfulRunTime"` // LastSuccessfulRunTime is a time.UnixDate formatted string of the last time the instruction was run
 }
 
 type Secret struct {
