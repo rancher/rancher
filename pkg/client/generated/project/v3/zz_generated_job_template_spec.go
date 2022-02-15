@@ -22,6 +22,7 @@ const (
 	JobTemplateSpecFieldJobConfig                     = "jobConfig"
 	JobTemplateSpecFieldJobMetadata                   = "jobMetadata"
 	JobTemplateSpecFieldNodeID                        = "nodeId"
+	JobTemplateSpecFieldOS                            = "os"
 	JobTemplateSpecFieldObjectMeta                    = "metadata"
 	JobTemplateSpecFieldOverhead                      = "overhead"
 	JobTemplateSpecFieldPreemptionPolicy              = "preemptionPolicy"
@@ -68,6 +69,7 @@ type JobTemplateSpec struct {
 	JobConfig                     *JobConfig                     `json:"jobConfig,omitempty" yaml:"jobConfig,omitempty"`
 	JobMetadata                   *ObjectMeta                    `json:"jobMetadata,omitempty" yaml:"jobMetadata,omitempty"`
 	NodeID                        string                         `json:"nodeId,omitempty" yaml:"nodeId,omitempty"`
+	OS                            *PodOS                         `json:"os,omitempty" yaml:"os,omitempty"`
 	ObjectMeta                    *ObjectMeta                    `json:"metadata,omitempty" yaml:"metadata,omitempty"`
 	Overhead                      map[string]string              `json:"overhead,omitempty" yaml:"overhead,omitempty"`
 	PreemptionPolicy              string                         `json:"preemptionPolicy,omitempty" yaml:"preemptionPolicy,omitempty"`

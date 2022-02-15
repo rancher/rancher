@@ -19,6 +19,7 @@ const (
 	PodSpecFieldHostname                      = "hostname"
 	PodSpecFieldImagePullSecrets              = "imagePullSecrets"
 	PodSpecFieldNodeID                        = "nodeId"
+	PodSpecFieldOS                            = "os"
 	PodSpecFieldOverhead                      = "overhead"
 	PodSpecFieldPreemptionPolicy              = "preemptionPolicy"
 	PodSpecFieldReadinessGates                = "readinessGates"
@@ -58,6 +59,7 @@ type PodSpec struct {
 	Hostname                      string                         `json:"hostname,omitempty" yaml:"hostname,omitempty"`
 	ImagePullSecrets              []LocalObjectReference         `json:"imagePullSecrets,omitempty" yaml:"imagePullSecrets,omitempty"`
 	NodeID                        string                         `json:"nodeId,omitempty" yaml:"nodeId,omitempty"`
+	OS                            *PodOS                         `json:"os,omitempty" yaml:"os,omitempty"`
 	Overhead                      map[string]string              `json:"overhead,omitempty" yaml:"overhead,omitempty"`
 	PreemptionPolicy              string                         `json:"preemptionPolicy,omitempty" yaml:"preemptionPolicy,omitempty"`
 	ReadinessGates                []PodReadinessGate             `json:"readinessGates,omitempty" yaml:"readinessGates,omitempty"`
