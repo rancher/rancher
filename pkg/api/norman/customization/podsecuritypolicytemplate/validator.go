@@ -19,7 +19,7 @@ func Validator(request *types.APIContext, schema *types.Schema, data map[string]
 		return httperror.WrapAPIError(err, httperror.InvalidBodyContent, "Pod Security Policy spec conversion error")
 	}
 	var allErrs field.ErrorList
-	allErrs = validation.ValidatePodSecurityPolicySpec(&spec, validation.PodSecurityPolicyValidationOptions{}, &field.Path{})
+	allErrs = validation.ValidatePodSecurityPolicySpec(&spec, &field.Path{})
 	if len(allErrs) > 0 { // concatenate all errors to present in UI
 		strs := make([]string, len(allErrs))
 		for i, v := range allErrs {

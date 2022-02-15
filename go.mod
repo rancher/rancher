@@ -9,37 +9,37 @@ replace (
 	github.com/knative/pkg => github.com/rancher/pkg v0.0.0-20190514055449-b30ab9de040e
 	github.com/matryer/moq => github.com/rancher/moq v0.0.0-20200712062324-13d1f37d2d77
 	github.com/opencontainers/runc => github.com/opencontainers/runc v1.0.1
+
 	github.com/rancher/rancher/pkg/apis => ./pkg/apis
 	github.com/rancher/rancher/pkg/client => ./pkg/client
 	helm.sh/helm/v3 => github.com/rancher/helm/v3 v3.8.0-rancher1
-
-	k8s.io/api => k8s.io/api v0.22.3
-	k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.22.3
-	k8s.io/apimachinery => k8s.io/apimachinery v0.22.3
-	k8s.io/apiserver => k8s.io/apiserver v0.22.3
-	k8s.io/cli-runtime => k8s.io/cli-runtime v0.22.3
-	k8s.io/client-go => github.com/rancher/client-go v1.22.3-rancher.1
-	k8s.io/cloud-provider => k8s.io/cloud-provider v0.22.3
-	k8s.io/cluster-bootstrap => k8s.io/cluster-bootstrap v0.22.3
-	k8s.io/code-generator => k8s.io/code-generator v0.22.3
-	k8s.io/component-base => k8s.io/component-base v0.22.3
-	k8s.io/component-helpers => k8s.io/component-helpers v0.22.3
-	k8s.io/controller-manager => k8s.io/controller-manager v0.22.3
-	k8s.io/cri-api => k8s.io/cri-api v0.22.3
-	k8s.io/csi-translation-lib => k8s.io/csi-translation-lib v0.22.3
-	k8s.io/kube-aggregator => k8s.io/kube-aggregator v0.22.3
-	k8s.io/kube-controller-manager => k8s.io/kube-controller-manager v0.22.3
-	k8s.io/kube-proxy => k8s.io/kube-proxy v0.22.3
-	k8s.io/kube-scheduler => k8s.io/kube-scheduler v0.22.3
-	k8s.io/kubectl => k8s.io/kubectl v0.22.3
-	k8s.io/kubelet => k8s.io/kubelet v0.22.3
-	k8s.io/kubernetes => k8s.io/kubernetes v1.22.3
-	k8s.io/legacy-cloud-providers => k8s.io/legacy-cloud-providers v0.22.3
-	k8s.io/metrics => k8s.io/metrics v0.22.3
-	k8s.io/mount-utils => k8s.io/mount-utils v0.22.3
-	k8s.io/pod-security-admission => k8s.io/pod-security-admission v0.22.0
-	k8s.io/sample-apiserver => k8s.io/sample-apiserver v0.22.3
-	sigs.k8s.io/cluster-api => sigs.k8s.io/cluster-api v1.1.1
+	k8s.io/api => k8s.io/api v0.23.3
+	k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.23.3
+	k8s.io/apimachinery => k8s.io/apimachinery v0.23.3
+	k8s.io/apiserver => k8s.io/apiserver v0.23.3
+	k8s.io/cli-runtime => k8s.io/cli-runtime v0.23.3
+	k8s.io/client-go => github.com/rancher/client-go v1.23.3-rancher1
+	k8s.io/cloud-provider => k8s.io/cloud-provider v0.23.3
+	k8s.io/cluster-bootstrap => k8s.io/cluster-bootstrap v0.23.3
+	k8s.io/code-generator => k8s.io/code-generator v0.23.3
+	k8s.io/component-base => k8s.io/component-base v0.23.3
+	k8s.io/component-helpers => k8s.io/component-helpers v0.23.3
+	k8s.io/controller-manager => k8s.io/controller-manager v0.23.3
+	k8s.io/cri-api => k8s.io/cri-api v0.23.3
+	k8s.io/csi-translation-lib => k8s.io/csi-translation-lib v0.23.3
+	k8s.io/kube-aggregator => k8s.io/kube-aggregator v0.23.3
+	k8s.io/kube-controller-manager => k8s.io/kube-controller-manager v0.23.3
+	k8s.io/kube-proxy => k8s.io/kube-proxy v0.23.3
+	k8s.io/kube-scheduler => k8s.io/kube-scheduler v0.23.3
+	k8s.io/kubectl => k8s.io/kubectl v0.23.3
+	k8s.io/kubelet => k8s.io/kubelet v0.23.3
+	k8s.io/kubernetes => k8s.io/kubernetes v1.23.3
+	k8s.io/legacy-cloud-providers => k8s.io/legacy-cloud-providers v0.23.3
+	k8s.io/metrics => k8s.io/metrics v0.23.3
+	k8s.io/mount-utils => k8s.io/mount-utils v0.23.3
+	k8s.io/pod-security-admission => k8s.io/pod-security-admission v0.23.0
+	k8s.io/sample-apiserver => k8s.io/sample-apiserver v0.23.3
+	sigs.k8s.io/cluster-api => sigs.k8s.io/cluster-api v1.1.2
 )
 
 require (
@@ -97,15 +97,15 @@ require (
 	github.com/rancher/fleet/pkg/apis v0.0.0-20210918015053-5a141a6b18f0
 	github.com/rancher/gke-operator v1.1.3-rc1
 	github.com/rancher/kubernetes-provider-detector v0.1.5
-	github.com/rancher/lasso v0.0.0-20220301011447-104654f35025
-	github.com/rancher/lasso/controller-runtime v0.0.0-20220301011447-104654f35025
+	github.com/rancher/lasso v0.0.0-20220303220250-a429cb5cb9c9
+	github.com/rancher/lasso/controller-runtime v0.0.0-20220303220250-a429cb5cb9c9
 	github.com/rancher/machine v0.15.0-rancher79
 	github.com/rancher/norman v0.0.0-20220107203912-4feb41eafabd
 	github.com/rancher/rancher/pkg/apis v0.0.0
 	github.com/rancher/rancher/pkg/client v0.0.0
 	github.com/rancher/rdns-server v0.0.0-20180802070304-bf662911db6a
 	github.com/rancher/remotedialer v0.2.6-0.20220120012928-4ea2198e0966
-	github.com/rancher/rke v1.3.8-rc1
+	github.com/rancher/rke v1.3.8-rc4
 	github.com/rancher/security-scan v0.1.7-0.20200222041501-f7377f127168
 	github.com/rancher/steve v0.0.0-20220218171307-a91d90251ffa
 	github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20210727200656-10b094e30007
@@ -148,8 +148,8 @@ require (
 	k8s.io/kubernetes v1.21.0
 	k8s.io/utils v0.0.0-20211116205334-6203023598ed
 	sigs.k8s.io/aws-iam-authenticator v0.5.1
-	sigs.k8s.io/cluster-api v1.1.1
-	sigs.k8s.io/controller-runtime v0.11.0
+	sigs.k8s.io/cluster-api v1.1.2
+	sigs.k8s.io/controller-runtime v0.11.1
 	sigs.k8s.io/yaml v1.3.0
 )
 
@@ -180,6 +180,7 @@ require (
 	github.com/beevik/etree v1.1.0 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cespare/xxhash/v2 v2.1.2 // indirect
+	github.com/chai2010/gettext-go v0.0.0-20160711120539-c6fed771bfd5 // indirect
 	github.com/containerd/cgroups v1.0.2 // indirect
 	github.com/containerd/containerd v1.5.9 // indirect
 	github.com/coredns/caddy v1.1.0 // indirect
@@ -281,6 +282,7 @@ require (
 	github.com/russross/blackfriday v1.5.2 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/shopspring/decimal v1.2.0 // indirect
+	github.com/smartystreets/goconvey v1.7.2 // indirect
 	github.com/spf13/afero v1.6.0 // indirect
 	github.com/spf13/cast v1.4.1 // indirect
 	github.com/spf13/cobra v1.3.0 // indirect
@@ -333,15 +335,16 @@ require (
 	gopkg.in/square/go-jose.v2 v2.5.1 // indirect
 	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b // indirect
 	k8s.io/cluster-bootstrap v0.23.0 // indirect
-	k8s.io/code-generator v0.22.3 // indirect
+	k8s.io/code-generator v0.23.3 // indirect
 	k8s.io/component-base v0.23.3 // indirect
-	k8s.io/component-helpers v0.22.3 // indirect
+	k8s.io/component-helpers v0.23.3 // indirect
 	k8s.io/klog v1.0.0 // indirect
 	k8s.io/klog/v2 v2.30.0 // indirect
 	k8s.io/kube-openapi v0.0.0-20211115234752-e816edb12b65 // indirect
 	oras.land/oras-go v1.1.0 // indirect
-	sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.22 // indirect
+	sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.27 // indirect
 	sigs.k8s.io/cli-utils v0.16.0 // indirect
+	sigs.k8s.io/json v0.0.0-20211020170558-c049b76a60c6 // indirect
 	sigs.k8s.io/kustomize/api v0.10.1 // indirect
 	sigs.k8s.io/kustomize/kyaml v0.13.0 // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.2.1 // indirect

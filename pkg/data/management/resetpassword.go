@@ -59,7 +59,7 @@ func resetPassword() {
 			for _, u := range admins.Items {
 				users = append(users, u.Name)
 			}
-			return errors.Errorf("%v users were found with %v label. They are %v. Can only reset the default admin password when there is exactly one user with this label.",
+			return errors.Errorf("%v users were found with %v label. They are %v. Can only reset the default admin password when there is exactly one user with this label",
 				count, set, users)
 		}
 
