@@ -110,7 +110,7 @@ func (c *FakeClusterRepos) UpdateStatus(ctx context.Context, clusterRepo *catalo
 // Delete takes name of the clusterRepo and deletes it. Returns an error if one occurs.
 func (c *FakeClusterRepos) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewRootDeleteAction(clusterreposResource, name), &catalogcattleiov1.ClusterRepo{})
+		Invokes(testing.NewRootDeleteActionWithOptions(clusterreposResource, name, opts), &catalogcattleiov1.ClusterRepo{})
 	return err
 }
 

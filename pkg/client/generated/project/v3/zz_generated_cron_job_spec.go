@@ -21,6 +21,7 @@ const (
 	CronJobSpecFieldHostname                      = "hostname"
 	CronJobSpecFieldImagePullSecrets              = "imagePullSecrets"
 	CronJobSpecFieldNodeID                        = "nodeId"
+	CronJobSpecFieldOS                            = "os"
 	CronJobSpecFieldObjectMeta                    = "metadata"
 	CronJobSpecFieldOverhead                      = "overhead"
 	CronJobSpecFieldPreemptionPolicy              = "preemptionPolicy"
@@ -65,6 +66,7 @@ type CronJobSpec struct {
 	Hostname                      string                         `json:"hostname,omitempty" yaml:"hostname,omitempty"`
 	ImagePullSecrets              []LocalObjectReference         `json:"imagePullSecrets,omitempty" yaml:"imagePullSecrets,omitempty"`
 	NodeID                        string                         `json:"nodeId,omitempty" yaml:"nodeId,omitempty"`
+	OS                            *PodOS                         `json:"os,omitempty" yaml:"os,omitempty"`
 	ObjectMeta                    *ObjectMeta                    `json:"metadata,omitempty" yaml:"metadata,omitempty"`
 	Overhead                      map[string]string              `json:"overhead,omitempty" yaml:"overhead,omitempty"`
 	PreemptionPolicy              string                         `json:"preemptionPolicy,omitempty" yaml:"preemptionPolicy,omitempty"`

@@ -5,17 +5,17 @@ import (
 )
 
 const (
-	HandlerType             = "handler"
-	HandlerFieldCommand     = "command"
-	HandlerFieldHTTPHeaders = "httpHeaders"
-	HandlerFieldHost        = "host"
-	HandlerFieldPath        = "path"
-	HandlerFieldPort        = "port"
-	HandlerFieldScheme      = "scheme"
-	HandlerFieldTCP         = "tcp"
+	LifecycleHandlerType             = "lifecycleHandler"
+	LifecycleHandlerFieldCommand     = "command"
+	LifecycleHandlerFieldHTTPHeaders = "httpHeaders"
+	LifecycleHandlerFieldHost        = "host"
+	LifecycleHandlerFieldPath        = "path"
+	LifecycleHandlerFieldPort        = "port"
+	LifecycleHandlerFieldScheme      = "scheme"
+	LifecycleHandlerFieldTCP         = "tcp"
 )
 
-type Handler struct {
+type LifecycleHandler struct {
 	Command     []string           `json:"command,omitempty" yaml:"command,omitempty"`
 	HTTPHeaders []HTTPHeader       `json:"httpHeaders,omitempty" yaml:"httpHeaders,omitempty"`
 	Host        string             `json:"host,omitempty" yaml:"host,omitempty"`

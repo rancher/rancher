@@ -32,6 +32,7 @@ const (
 	CronJobFieldName                          = "name"
 	CronJobFieldNamespaceId                   = "namespaceId"
 	CronJobFieldNodeID                        = "nodeId"
+	CronJobFieldOS                            = "os"
 	CronJobFieldOverhead                      = "overhead"
 	CronJobFieldOwnerReferences               = "ownerReferences"
 	CronJobFieldPreemptionPolicy              = "preemptionPolicy"
@@ -94,6 +95,7 @@ type CronJob struct {
 	Name                          string                         `json:"name,omitempty" yaml:"name,omitempty"`
 	NamespaceId                   string                         `json:"namespaceId,omitempty" yaml:"namespaceId,omitempty"`
 	NodeID                        string                         `json:"nodeId,omitempty" yaml:"nodeId,omitempty"`
+	OS                            *PodOS                         `json:"os,omitempty" yaml:"os,omitempty"`
 	Overhead                      map[string]string              `json:"overhead,omitempty" yaml:"overhead,omitempty"`
 	OwnerReferences               []OwnerReference               `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
 	PreemptionPolicy              string                         `json:"preemptionPolicy,omitempty" yaml:"preemptionPolicy,omitempty"`

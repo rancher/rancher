@@ -30,6 +30,7 @@ const (
 	PodFieldName                          = "name"
 	PodFieldNamespaceId                   = "namespaceId"
 	PodFieldNodeID                        = "nodeId"
+	PodFieldOS                            = "os"
 	PodFieldOverhead                      = "overhead"
 	PodFieldOwnerReferences               = "ownerReferences"
 	PodFieldPreemptionPolicy              = "preemptionPolicy"
@@ -88,6 +89,7 @@ type Pod struct {
 	Name                          string                         `json:"name,omitempty" yaml:"name,omitempty"`
 	NamespaceId                   string                         `json:"namespaceId,omitempty" yaml:"namespaceId,omitempty"`
 	NodeID                        string                         `json:"nodeId,omitempty" yaml:"nodeId,omitempty"`
+	OS                            *PodOS                         `json:"os,omitempty" yaml:"os,omitempty"`
 	Overhead                      map[string]string              `json:"overhead,omitempty" yaml:"overhead,omitempty"`
 	OwnerReferences               []OwnerReference               `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
 	PreemptionPolicy              string                         `json:"preemptionPolicy,omitempty" yaml:"preemptionPolicy,omitempty"`
