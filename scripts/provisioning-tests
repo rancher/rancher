@@ -32,6 +32,7 @@ else
 fi
 
 export DIST=${DIST}
+export TEST_SET=${TEST_SET}
 export SOME_K8S_VERSION=${SOME_K8S_VERSION}
 export TB_ORG=${TB_ORG}
 
@@ -106,7 +107,7 @@ done
 
 echo Running provisioning-tests
 export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
-go test -v -timeout 60m ./tests/integration/pkg/tests/... || {
+go test -v -timeout 60m ./tests/integration/pkg/tests/${TEST_SET}/... || {
     cat /tmp/rancher.log | gzip | base64
     exit 1
 }

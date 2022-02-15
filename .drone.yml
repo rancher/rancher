@@ -1,6 +1,6 @@
 ---
 kind: pipeline
-name: provisioning-tests-k3s
+name: provisioning-tests-custom-k3s
 
 platform:
   os: linux
@@ -12,6 +12,8 @@ steps:
   commands:
   - dapper provisioning-tests
   privileged: true
+  environment:
+    TEST_SET: custom
   volumes:
   - name: docker
     path: /var/run/docker.sock
@@ -32,7 +34,41 @@ trigger:
     - promote
 ---
 kind: pipeline
-name: provisioning-tests-rke
+name: provisioning-tests-machineprovisioning-k3s
+
+platform:
+  os: linux
+  arch: amd64
+
+steps:
+  - name: provisioning-tests
+    image: rancher/dapper:v0.5.8
+    commands:
+      - dapper provisioning-tests
+    privileged: true
+    environment:
+      TEST_SET: machineprovisioning
+    volumes:
+      - name: docker
+        path: /var/run/docker.sock
+    when:
+      event:
+        - push
+        - pull_request
+        - tag
+
+volumes:
+  - name: docker
+    host:
+      path: /var/run/docker.sock
+
+trigger:
+  event:
+    exclude:
+      - promote
+---
+kind: pipeline
+name: provisioning-tests-custom-rke2
 
 platform:
   os: linux
@@ -44,6 +80,8 @@ steps:
   commands:
   - dapper provisioning-tests-rke
   privileged: true
+  environment:
+    TEST_SET: custom
   volumes:
   - name: docker
     path: /var/run/docker.sock
@@ -62,6 +100,40 @@ trigger:
   event:
     exclude:
     - promote
+---
+kind: pipeline
+name: provisioning-tests-machineprovisioning-rke2
+
+platform:
+  os: linux
+  arch: amd64
+
+steps:
+  - name: provisioning-tests
+    image: rancher/dapper:v0.5.8
+    commands:
+      - dapper provisioning-tests-rke
+    privileged: true
+    environment:
+      TEST_SET: machineprovisioning
+    volumes:
+      - name: docker
+        path: /var/run/docker.sock
+    when:
+      event:
+        - push
+        - pull_request
+        - tag
+
+volumes:
+  - name: docker
+    host:
+      path: /var/run/docker.sock
+
+trigger:
+  event:
+    exclude:
+      - promote
 ---
 kind: pipeline
 name: default-linux-amd64
