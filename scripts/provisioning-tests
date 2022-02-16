@@ -17,8 +17,6 @@ cleanup()
 
 cd $(dirname $0)/..
 
-# Due to https://github.com/k3s-io/k3s/issues/4784 we need to hardcode to an older version
-SOME_K8S_VERSION=v1.21.5+rke2r2
 TB_ORG=rancher
 
 if [ -z "${DIST}" ]; then
@@ -33,14 +31,12 @@ fi
 
 export DIST=${DIST}
 export TEST_SET=${TEST_SET}
-export SOME_K8S_VERSION=${SOME_K8S_VERSION}
 export TB_ORG=${TB_ORG}
 
 eval "$(grep '^ENV CATTLE_SYSTEM_AGENT' package/Dockerfile | awk '{print "export " $2 "=" $3}')"
 eval "$(grep '^ENV CATTLE_KDM_BRANCH' package/Dockerfile | awk '{print "export " $2 "=" $3}')"
 
-# One day, we should be able to pull the latest version of K3s/RKE2 out of KDM for the branch we have. We cannot currently due to https://github.com/k3s-io/k3s/issues/4784
-#export SOME_K8S_VERSION=$(curl https://raw.githubusercontent.com/rancher/kontainer-driver-metadata/$CATTLE_KDM_BRANCH/data/data.json | jq -r ".$DIST.channels[0].latest")
+export SOME_K8S_VERSION=$(curl https://raw.githubusercontent.com/rancher/kontainer-driver-metadata/$CATTLE_KDM_BRANCH/data/data.json | jq -r ".$DIST.channels[0].latest")
 
 echo Starting rancher server for provisioning-tests
 touch /tmp/rancher.log
