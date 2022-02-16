@@ -80,9 +80,13 @@ func (d *BaseDriver) Executable() error {
 	if err != nil {
 		return fmt.Errorf("Driver %s not found", binaryPath)
 	}
-	err = exec.Command(binaryPath).Start()
+	cmd := exec.Command(binaryPath)
+	err = cmd.Start()
 	if err != nil {
 		return errors.Wrapf(err, "Driver binary %s couldn't execute", binaryPath)
 	}
+
+	// We don't care about the exit code, just want to make sure we can execute the binary
+	_ = cmd.Wait()
 	return nil
 }

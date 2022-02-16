@@ -392,6 +392,7 @@ type RunningDriver struct {
 
 	listenAddress string
 	cancel        context.CancelFunc
+	cmd           *exec.Cmd
 }
 
 func (r *RunningDriver) Start() (string, error) {
@@ -458,6 +459,7 @@ func (r *RunningDriver) Start() (string, error) {
 		time.Sleep(5 * time.Second)
 
 		r.listenAddress = listenAddress
+		r.cmd = cmd
 	}
 
 	logrus.Infof("kontainerdriver %v listening on address %v", r.Name, r.listenAddress)
@@ -491,6 +493,11 @@ func (r *RunningDriver) Stop() {
 		r.Server.Stop()
 	} else {
 		r.cancel()
+	}
+
+	if r.cmd != nil {
+		_ = r.cmd.Wait()
+		r.cmd = nil
 	}
 
 	logrus.Infof("kontainerdriver %v stopped", r.Name)
