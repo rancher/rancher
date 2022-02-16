@@ -296,6 +296,9 @@ func machineDeployments(cluster *rancherv1.Cluster, capiCluster *capi.Cluster, d
 		if machinePool.MachineOS == "" {
 			machinePool.MachineOS = rke2.DefaultMachineOS
 		}
+		if machinePool.MachineDeploymentLabels == nil {
+			machinePool.MachineDeploymentLabels = make(map[string]string)
+		}
 		machinePool.MachineDeploymentLabels[rke2.CattleOSLabel] = machinePool.MachineOS
 
 		machineDeploymentLabels := map[string]string{}
