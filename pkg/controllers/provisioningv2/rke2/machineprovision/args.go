@@ -3,12 +3,15 @@ package machineprovision
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"regexp"
 	"sort"
 	"strings"
 
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
+	"github.com/rancher/rancher/pkg/controllers/management/drivers"
 	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	namespace2 "github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/wrangler/pkg/data"
@@ -68,14 +71,9 @@ func (h *handler) getArgsEnvAndStatus(infraObj *infraObject, args map[string]int
 		hash = infraObj.data.String("status", "driverHash")
 	} else if err != nil {
 		return driverArgs{}, err
-	} else {
-		url = nd.Spec.URL
+	} else if !strings.HasPrefix(nd.Spec.URL, "local://") {
+		url = getDriverDownloadURL(nd)
 		hash = nd.Spec.Checksum
-	}
-
-	if strings.HasPrefix(url, "local://") {
-		url = ""
-		hash = ""
 	}
 
 	envSecret := &corev1.Secret{
@@ -284,4 +282,23 @@ func toArgs(driverName string, args map[string]interface{}, clusterID string) (c
 
 func getNodeDriverName(typeMeta meta.Type) string {
 	return strings.ToLower(strings.TrimSuffix(typeMeta.GetKind(), "Machine"))
+}
+
+// getDriverDownloadURL checks for a local version of the driver to download for air-gapped installs.
+// If no local version is found or CATTLE_DEV_MODE is set, then the URL from the node driver is returned.
+func getDriverDownloadURL(nd *v3.NodeDriver) string {
+	if os.Getenv("CATTLE_DEV_MODE") != "" {
+		return nd.Spec.URL
+	}
+
+	driverName := nd.Name
+	if !strings.HasPrefix(driverName, drivers.DockerMachineDriverPrefix) {
+		driverName = drivers.DockerMachineDriverPrefix + driverName
+	}
+
+	if _, err := os.Stat(filepath.Join(settings.UIPath.Get(), "assets", driverName)); err != nil {
+		return nd.Spec.URL
+	}
+
+	return fmt.Sprintf("%s/assets/%s", settings.ServerURL.Get(), driverName)
 }

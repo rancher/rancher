@@ -22,7 +22,7 @@ const (
 
 var (
 	localAgentInstallScripts = []string{
-		"/usr/share/rancher/ui/assets" + SystemAgentInstallPath,
+		settings.UIPath.Get() + "/assets" + SystemAgentInstallPath,
 		"." + SystemAgentInstallPath,
 	}
 	localWindowsRke2InstallScripts = []string{
