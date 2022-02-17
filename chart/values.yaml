@@ -122,6 +122,10 @@ useBundledSystemChart: false
 certmanager: 
   version: ""
 
+# annotations to add to the pod container metadata
+podAnnotations: {}
+  # annotation: value
+
 # Rancher custom logos persistence
 customLogos:
   enabled: false
