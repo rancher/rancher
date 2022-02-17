@@ -200,9 +200,7 @@ def create_multiple_control_cluster():
     os.system(cmd)
     is_file = os.path.isfile(k3s_clusterfilepath)
     assert is_file
-    print(k3s_clusterfilepath)
-    with open(k3s_clusterfilepath, 'r') as f:
-        print(f.read())
+    print_kubeconfig(k3s_clusterfilepath)
     print("K3s Cluster Created")
     cmd = "kubectl get nodes -o wide --kubeconfig=" + k3s_clusterfilepath
     print(run_command(cmd))

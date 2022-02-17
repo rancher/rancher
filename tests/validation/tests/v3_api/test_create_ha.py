@@ -132,7 +132,7 @@ def test_install_rancher_ha(precheck_certificate_options):
         print("Error: {0}".format(e))
         assert False, "check the logs in console for details"
 
-    print_kubeconfig()
+    print_kubeconfig(kubeconfig_path)
     if RANCHER_HA_HARDENED and RANCHER_LOCAL_CLUSTER_TYPE == "RKE":
         prepare_hardened_cluster(profile, kubeconfig_path)
     if RANCHER_LOCAL_CLUSTER_TYPE == "RKE":
@@ -442,16 +442,6 @@ def check_rke_ingress_rollout():
             run_command_with_stderr(
                 export_cmd + " && " +
                 "kubectl -n ingress-nginx wait --for=condition=complete job/ingress-nginx-admission-patch")
-
-
-def print_kubeconfig():
-    kubeconfig_file = open(kubeconfig_path, "r")
-    kubeconfig_contents = kubeconfig_file.read()
-    kubeconfig_file.close()
-    kubeconfig_contents_encoded = base64.b64encode(
-        kubeconfig_contents.encode("utf-8")).decode("utf-8")
-    print("\n\n" + kubeconfig_contents + "\n\n")
-    print("\nBase64 encoded: \n\n" + kubeconfig_contents_encoded + "\n\n")
 
 
 def create_rke_cluster_config(aws_nodes):
