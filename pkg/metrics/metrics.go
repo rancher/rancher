@@ -222,10 +222,19 @@ func Register(ctx context.Context, scaledContext *config.ScaledContext) {
 	// Cluster Owner
 	prometheus.MustRegister(clusterOwner)
 
+	// node and node core metrics
+	prometheus.MustRegister(numNodes)
+	prometheus.MustRegister(numCores)
+
 	gc := metricGarbageCollector{
 		clusterLister:  scaledContext.Management.Clusters("").Controller().Lister(),
 		nodeLister:     scaledContext.Management.Nodes("").Controller().Lister(),
 		endpointLister: scaledContext.Core.Endpoints(settings.Namespace.Get()).Controller().Lister(),
+	}
+
+	nm := &nodeMetrics{
+		nodeCache:    scaledContext.Wrangler.Mgmt.Node().Cache(),
+		clusterCache: scaledContext.Wrangler.Mgmt.Cluster().Cache(),
 	}
 
 	go func(ctx context.Context) {
@@ -233,6 +242,8 @@ func Register(ctx context.Context, scaledContext *config.ScaledContext) {
 			gc.metricGarbageCollection()
 		}
 	}(ctx)
+
+	go nm.collect(ctx)
 }
 
 func SetClusterOwner(id, clusterID string) {
