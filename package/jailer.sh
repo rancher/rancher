@@ -66,7 +66,7 @@ fi
 cp -l /usr/bin/helm_v3 /opt/jail/$NAME/usr/bin
 
 # Hard link tiller into the jail
-if [[ -f /usr/bin/rancher-tiler ]]; then
+if [[ -f /usr/bin/rancher-tiller ]]; then
   cp -l /usr/bin/rancher-tiller /opt/jail/$NAME/usr/bin
 fi
 
