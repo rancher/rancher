@@ -293,6 +293,14 @@ func machineDeployments(cluster *rancherv1.Cluster, capiCluster *capi.Cluster, d
 			infraRef = *machinePool.NodeConfig
 		}
 
+		if machinePool.MachineOS == "" {
+			machinePool.MachineOS = rke2.DefaultMachineOS
+		}
+		if machinePool.MachineDeploymentLabels == nil {
+			machinePool.MachineDeploymentLabels = make(map[string]string)
+		}
+		machinePool.MachineDeploymentLabels[rke2.CattleOSLabel] = machinePool.MachineOS
+
 		machineDeploymentLabels := map[string]string{}
 		for k, v := range machinePool.Labels {
 			machineDeploymentLabels[k] = v
@@ -300,6 +308,7 @@ func machineDeployments(cluster *rancherv1.Cluster, capiCluster *capi.Cluster, d
 		for k, v := range machinePool.MachineDeploymentLabels {
 			machineDeploymentLabels[k] = v
 		}
+
 		machineSpecAnnotations := map[string]string{}
 		// Ignore drain if DrainBeforeDelete is unset or the pool is for etcd nodes
 		if !machinePool.DrainBeforeDelete || machinePool.EtcdRole {
@@ -364,6 +373,12 @@ func machineDeployments(cluster *rancherv1.Cluster, capiCluster *capi.Cluster, d
 
 		if machinePool.WorkerRole {
 			machineDeployment.Spec.Template.Labels[rke2.WorkerRoleLabel] = "true"
+		}
+
+		if len(machinePool.MachineOS) > 0 {
+			machineDeployment.Spec.Template.Labels[rke2.CattleOSLabel] = machinePool.MachineOS
+		} else {
+			machineDeployment.Spec.Template.Labels[rke2.CattleOSLabel] = rke2.DefaultMachineOS
 		}
 
 		if len(machinePool.Labels) > 0 {
