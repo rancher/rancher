@@ -141,9 +141,7 @@ def create_rke2_multiple_control_cluster(cluster_type, cluster_version):
     os.system(cmd)
     is_file = os.path.isfile(rke2_clusterfilepath)
     assert is_file
-    print(rke2_clusterfilepath)
-    with open(rke2_clusterfilepath, 'r') as f:
-        print(f.read())
+    print_kubeconfig(rke2_clusterfilepath)
     check_cluster_status(rke2_clusterfilepath)
     print("\n\nRKE2 Cluster Created\n")
     cmd = "kubectl get nodes --kubeconfig=" + rke2_clusterfilepath
