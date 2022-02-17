@@ -24,7 +24,7 @@ type RKEMachinePool struct {
 	MachineDeploymentAnnotations map[string]string            `json:"machineDeploymentAnnotations,omitempty"`
 	NodeStartupTimeout           *metav1.Duration             `json:"nodeStartupTimeout,omitempty"`
 	UnhealthyNodeTimeout         *metav1.Duration             `json:"unhealthyNodeTimeout,omitempty"`
-	MaxUnhealthy                 *intstr.IntOrString          `json:"maxUnhealthy,omitempty"`
+	MaxUnhealthy                 *string                      `json:"maxUnhealthy,omitempty"`
 	UnhealthyRange               *string                      `json:"unhealthyRange,omitempty"`
 	MachineOS                    string                       `json:"machineOS,omitempty"`
 }

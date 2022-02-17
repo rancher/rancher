@@ -269,7 +269,7 @@ func (in *RKEMachinePool) DeepCopyInto(out *RKEMachinePool) {
 	}
 	if in.MaxUnhealthy != nil {
 		in, out := &in.MaxUnhealthy, &out.MaxUnhealthy
-		*out = new(intstr.IntOrString)
+		*out = new(string)
 		**out = **in
 	}
 	if in.UnhealthyRange != nil {
