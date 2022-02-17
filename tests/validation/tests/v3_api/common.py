@@ -3006,3 +3006,13 @@ def prepare_hardened_cluster(profile, kubeconfig_path):
                                 ' -n {0} -p "$(cat {1})"'.
                                 format(ns, account_update_file), 
                                 kubeconfig=kubeconfig_path)
+
+
+def print_kubeconfig(kpath):
+    kubeconfig_file = open(kpath, "r")
+    kubeconfig_contents = kubeconfig_file.read()
+    kubeconfig_file.close()
+    kubeconfig_contents_encoded = base64.b64encode(
+        kubeconfig_contents.encode("utf-8")).decode("utf-8")
+    print("\n\n" + kubeconfig_contents + "\n\n")
+    print("\nBase64 encoded: \n\n" + kubeconfig_contents_encoded + "\n\n")
