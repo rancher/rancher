@@ -92,7 +92,7 @@ func Register(ctx context.Context, clients *wrangler.Context) {
 	}, clients.RKE.RKEBootstrap(), clients.Core.ServiceAccount(), clients.CAPI.Machine())
 }
 
-func (h *handler) getBootstrapSecret(namespace, name string, envVars []corev1.EnvVar) (*corev1.Secret, error) {
+func (h *handler) getBootstrapSecret(namespace, name string, envVars []corev1.EnvVar, machine *capi.Machine) (*corev1.Secret, error) {
 	sa, err := h.serviceAccountCache.Get(namespace, name)
 	if apierror.IsNotFound(err) {
 		return nil, nil
@@ -115,7 +115,11 @@ func (h *handler) getBootstrapSecret(namespace, name string, envVars []corev1.En
 			return nil, err
 		}
 
-		data, err := installer.LinuxInstallScript(context.WithValue(context.Background(), tls.InternalAPI, hasHostPort), base64.URLEncoding.EncodeToString(hash[:]), envVars, "")
+		is := installer.LinuxInstallScript
+		if os := machine.GetLabels()[rke2.CattleOSLabel]; os == rke2.WindowsMachineOS {
+			is = installer.WindowsInstallScript
+		}
+		data, err := is(context.WithValue(context.Background(), tls.InternalAPI, hasHostPort), base64.URLEncoding.EncodeToString(hash[:]), envVars, "")
 		if err != nil {
 			return nil, err
 		}
@@ -250,7 +254,7 @@ func (h *handler) assignBootStrapSecret(machine *capi.Machine, bootstrap *rkev1.
 		},
 	}
 
-	bootstrapSecret, err := h.getBootstrapSecret(sa.Namespace, sa.Name, envVars)
+	bootstrapSecret, err := h.getBootstrapSecret(sa.Namespace, sa.Name, envVars, machine)
 	if err != nil {
 		return nil, nil, err
 	}

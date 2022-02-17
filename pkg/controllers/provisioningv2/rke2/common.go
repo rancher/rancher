@@ -56,7 +56,9 @@ const (
 	MachineTemplateClonedFromKindAnn         = "rke.cattle.io/cloned-from-kind"
 	MachineTemplateClonedFromNameAnn         = "rke.cattle.io/cloned-from-name"
 
-	CattleOSLabel = "cattle.io/os"
+	CattleOSLabel    = "cattle.io/os"
+	DefaultMachineOS = "linux"
+	WindowsMachineOS = "windows"
 
 	DefaultMachineConfigAPIVersion = "rke-machine-config.cattle.io/v1"
 	RKEMachineAPIVersion           = "rke-machine.cattle.io/v1"
@@ -78,7 +80,17 @@ const (
 var (
 	ErrNoMachineOwnerRef = errors.New("no machine owner ref")
 	labelAnnotationMatch = regexp.MustCompile(`^((rke\.cattle\.io)|((?:machine\.)?cluster\.x-k8s\.io))/`)
+	windowsDrivers       = map[string]struct{}{
+		"vmwarevsphere": {},
+	}
 )
+
+// WindowsCheck return a bool based on if the driver is marked as
+// supporting Windows
+func WindowsCheck(driver string) bool {
+	_, ok := windowsDrivers[driver]
+	return ok
+}
 
 func MachineStateSecretName(machineName string) string {
 	return name.SafeConcatName(machineName, "machine", "state")
