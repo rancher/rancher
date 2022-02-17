@@ -32,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 )
 
@@ -410,6 +411,12 @@ func machineDeployments(cluster *rancherv1.Cluster, capiCluster *capi.Cluster, d
 
 // deploymentHealthChecks Health checks will mark a machine as failed if it has any of the conditions below for the duration of the given timeout. https://cluster-api.sigs.k8s.io/tasks/healthcheck.html#what-is-a-machinehealthcheck
 func deploymentHealthChecks(machineDeployment *capi.MachineDeployment, machinePool rancherv1.RKEMachinePool) *capi.MachineHealthCheck {
+	var maxUnhealthy *intstr.IntOrString
+	if machinePool.MaxUnhealthy != nil {
+		maxUnhealthy = new(intstr.IntOrString)
+		*maxUnhealthy = intstr.Parse(*machinePool.MaxUnhealthy)
+	}
+
 	return &capi.MachineHealthCheck{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      machineDeployment.Name,
@@ -434,7 +441,7 @@ func deploymentHealthChecks(machineDeployment *capi.MachineDeployment, machinePo
 					Timeout: *machinePool.UnhealthyNodeTimeout,
 				},
 			},
-			MaxUnhealthy:       machinePool.MaxUnhealthy,
+			MaxUnhealthy:       maxUnhealthy,
 			UnhealthyRange:     machinePool.UnhealthyRange,
 			NodeStartupTimeout: machinePool.NodeStartupTimeout,
 		},
