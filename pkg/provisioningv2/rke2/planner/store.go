@@ -431,10 +431,10 @@ func getJoinURLFromOutput(entry *planEntry, capiCluster *capi.Cluster, rkeContro
 	}
 
 	var address []byte
-	if ca, ok := entry.Plan.PeriodicOutput["capture-address"]; ok && ca.ExitCode == 0 {
+	if ca, ok := entry.Plan.PeriodicOutput["capture-address"]; ok && ca.ExitCode == 0 && ca.LastSuccessfulRunTime != "" {
 		address = ca.Stdout
 	} else {
-		return "", fmt.Errorf("could not scrape join URL from periodic output (exit code: %d, length: %d) for machine %s", ca.ExitCode, len(ca.Stdout), entry.Machine.Name)
+		return "", nil
 	}
 
 	var str string
