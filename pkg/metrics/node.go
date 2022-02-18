@@ -135,7 +135,7 @@ func getNodeCoreCount(node *v3.Node) int {
 	return int(cores)
 }
 
-// setMetrics uses a slice of nodeInfo to update prometheus metrics for nodes and node cores
+// setMetrics uses a slice of nodeInfo to set prometheus metrics for nodes and node cores
 func setMetrics(infos []*nodeInfo) {
 	// count nodes and node cores, bucketed by label values
 	nodeGauges := make(map[nodeLabelValues]int, 0)
@@ -156,6 +156,11 @@ func setMetrics(infos []*nodeInfo) {
 			nodeCoreGauges[key] = cores + info.coreCount
 		}
 	}
+
+	// there could be leftover metrics from previous calls to this method, so we need to clear
+	// the metrics just before we set them for the current node info
+	numNodes.Reset()
+	numCores.Reset()
 
 	// use the built nodeGagues map to update prometheus metrics for nodes
 	for k, v := range nodeGauges {
