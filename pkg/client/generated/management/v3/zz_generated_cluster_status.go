@@ -29,10 +29,13 @@ const (
 	ClusterStatusFieldMonitoringStatus                     = "monitoringStatus"
 	ClusterStatusFieldNodeCount                            = "nodeCount"
 	ClusterStatusFieldNodeVersion                          = "nodeVersion"
+	ClusterStatusFieldPrivateRegistrySecret                = "privateRegistrySecret"
 	ClusterStatusFieldProvider                             = "provider"
 	ClusterStatusFieldRequested                            = "requested"
+	ClusterStatusFieldS3CredentialSecret                   = "s3CredentialSecret"
 	ClusterStatusFieldScheduledClusterScanStatus           = "scheduledClusterScanStatus"
 	ClusterStatusFieldVersion                              = "version"
+	ClusterStatusFieldWeavePasswordSecret                  = "weavePasswordSecret"
 	ClusterStatusFieldWindowsWorkerCount                   = "windowsWorkerCount"
 )
 
@@ -64,9 +67,12 @@ type ClusterStatus struct {
 	MonitoringStatus                     *MonitoringStatus           `json:"monitoringStatus,omitempty" yaml:"monitoringStatus,omitempty"`
 	NodeCount                            int64                       `json:"nodeCount,omitempty" yaml:"nodeCount,omitempty"`
 	NodeVersion                          int64                       `json:"nodeVersion,omitempty" yaml:"nodeVersion,omitempty"`
+	PrivateRegistrySecret                string                      `json:"privateRegistrySecret,omitempty" yaml:"privateRegistrySecret,omitempty"`
 	Provider                             string                      `json:"provider,omitempty" yaml:"provider,omitempty"`
 	Requested                            map[string]string           `json:"requested,omitempty" yaml:"requested,omitempty"`
+	S3CredentialSecret                   string                      `json:"s3CredentialSecret,omitempty" yaml:"s3CredentialSecret,omitempty"`
 	ScheduledClusterScanStatus           *ScheduledClusterScanStatus `json:"scheduledClusterScanStatus,omitempty" yaml:"scheduledClusterScanStatus,omitempty"`
 	Version                              *Info                       `json:"version,omitempty" yaml:"version,omitempty"`
+	WeavePasswordSecret                  string                      `json:"weavePasswordSecret,omitempty" yaml:"weavePasswordSecret,omitempty"`
 	WindowsWorkerCount                   int64                       `json:"windowsWorkerCount,omitempty" yaml:"windowsWorkerCount,omitempty"`
 }

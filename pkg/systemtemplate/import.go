@@ -79,7 +79,7 @@ func toFeatureString(features map[string]bool) string {
 }
 
 func SystemTemplate(resp io.Writer, agentImage, authImage, namespace, token, url string, isWindowsCluster bool,
-	cluster *v3.Cluster, features map[string]bool, taints []corev1.Taint) error {
+	cluster *v3.Cluster, features map[string]bool, taints []corev1.Taint, privateRegistries *corev1.Secret) error {
 	var tolerations, agentEnvVars string
 	d := md5.Sum([]byte(url + token + namespace))
 	tokenKey := hex.EncodeToString(d[:])[:7]
@@ -89,7 +89,7 @@ func SystemTemplate(resp io.Writer, agentImage, authImage, namespace, token, url
 	}
 
 	privateRepo := util.GetPrivateRepo(cluster)
-	privateRegistryConfig, err := util.GeneratePrivateRegistryDockerConfig(privateRepo)
+	privateRegistryConfig, err := util.GeneratePrivateRegistryDockerConfig(privateRepo, privateRegistries)
 	if err != nil {
 		return err
 	}
@@ -147,7 +147,7 @@ func ForCluster(cluster *v3.Cluster, token string, taints []corev1.Taint) ([]byt
 	err := SystemTemplate(buf, GetDesiredAgentImage(cluster),
 		GetDesiredAuthImage(cluster),
 		cluster.Name, token, settings.ServerURL.Get(), cluster.Spec.WindowsPreferedCluster,
-		cluster, GetDesiredFeatures(cluster), taints)
+		cluster, GetDesiredFeatures(cluster), taints, nil)
 	return buf.Bytes(), err
 }
 

@@ -38,6 +38,7 @@ import (
 	"github.com/rancher/rancher/pkg/api/norman/customization/roletemplatebinding"
 	"github.com/rancher/rancher/pkg/api/norman/customization/secret"
 	"github.com/rancher/rancher/pkg/api/norman/customization/setting"
+	alertStore "github.com/rancher/rancher/pkg/api/norman/store/alert"
 	appStore "github.com/rancher/rancher/pkg/api/norman/store/app"
 	catalogStore "github.com/rancher/rancher/pkg/api/norman/store/catalog"
 	"github.com/rancher/rancher/pkg/api/norman/store/cert"
@@ -310,6 +311,7 @@ func Templates(ctx context.Context, schemas *types.Schemas, managementContext *c
 		ClusterCatalogLister:         managementContext.Management.ClusterCatalogs("").Controller().Lister(),
 		ProjectCatalogLister:         managementContext.Management.ProjectCatalogs("").Controller().Lister(),
 		CatalogTemplateVersionLister: managementContext.Management.CatalogTemplateVersions("").Controller().Lister(),
+		SecretLister:                 managementContext.Core.Secrets("").Controller().Lister(),
 	}
 	schema.Formatter = wrapper.TemplateFormatter
 	schema.LinkHandler = wrapper.TemplateIconHandler
@@ -334,6 +336,7 @@ func TemplateVersion(ctx context.Context, schemas *types.Schemas, managementCont
 		CatalogLister:        managementContext.Management.Catalogs("").Controller().Lister(),
 		ClusterCatalogLister: managementContext.Management.ClusterCatalogs("").Controller().Lister(),
 		ProjectCatalogLister: managementContext.Management.ProjectCatalogs("").Controller().Lister(),
+		SecretLister:         managementContext.Core.Secrets("").Controller().Lister(),
 	}
 	schema.Formatter = t.TemplateVersionFormatter
 	schema.LinkHandler = t.TemplateVersionReadmeHandler
@@ -363,7 +366,10 @@ func Catalog(schemas *types.Schemas, managementContext *config.ScaledContext) {
 	users := managementContext.Management.Users("")
 	grbLister := managementContext.Management.GlobalRoleBindings("").Controller().Lister()
 	grLister := managementContext.Management.GlobalRoles("").Controller().Lister()
-	schema.Store = catalogStore.Wrap(schema.Store, users, grbLister, grLister)
+	secretLister := managementContext.Core.Secrets("").Controller().Lister()
+	secrets := managementContext.Core.Secrets("")
+	clusterLister := managementContext.Management.Clusters("").Controller().Lister()
+	schema.Store = catalogStore.Wrap(schema.Store, users, grbLister, grLister, secretLister, secrets, clusterLister)
 }
 
 func ProjectCatalog(schemas *types.Schemas, managementContext *config.ScaledContext) {
@@ -378,7 +384,10 @@ func ProjectCatalog(schemas *types.Schemas, managementContext *config.ScaledCont
 	users := managementContext.Management.Users("")
 	grbLister := managementContext.Management.GlobalRoleBindings("").Controller().Lister()
 	grLister := managementContext.Management.GlobalRoles("").Controller().Lister()
-	schema.Store = catalogStore.Wrap(schema.Store, users, grbLister, grLister)
+	secretLister := managementContext.Core.Secrets("").Controller().Lister()
+	secrets := managementContext.Core.Secrets("")
+	clusterLister := managementContext.Management.Clusters("").Controller().Lister()
+	schema.Store = catalogStore.Wrap(schema.Store, users, grbLister, grLister, secretLister, secrets, clusterLister)
 }
 
 func ClusterCatalog(schemas *types.Schemas, managementContext *config.ScaledContext) {
@@ -393,7 +402,10 @@ func ClusterCatalog(schemas *types.Schemas, managementContext *config.ScaledCont
 	users := managementContext.Management.Users("")
 	grbLister := managementContext.Management.GlobalRoleBindings("").Controller().Lister()
 	grLister := managementContext.Management.GlobalRoles("").Controller().Lister()
-	schema.Store = catalogStore.Wrap(schema.Store, users, grbLister, grLister)
+	secretLister := managementContext.Core.Secrets("").Controller().Lister()
+	secrets := managementContext.Core.Secrets("")
+	clusterLister := managementContext.Management.Clusters("").Controller().Lister()
+	schema.Store = catalogStore.Wrap(schema.Store, users, grbLister, grLister, secretLister, secrets, clusterLister)
 }
 
 func ClusterRegistrationTokens(schemas *types.Schemas, management *config.ScaledContext) {
@@ -588,6 +600,7 @@ func Alert(schemas *types.Schemas, management *config.ScaledContext) {
 	schema.CollectionFormatter = alert.NotifierCollectionFormatter
 	schema.Formatter = alert.NotifierFormatter
 	schema.ActionHandler = handler.NotifierActionHandler
+	schema.Store = alertStore.NewNotifier(management, schema.Store)
 
 	schema = schemas.Schema(&managementschema.Version, client.ClusterAlertRuleType)
 	schema.Formatter = alert.RuleFormatter

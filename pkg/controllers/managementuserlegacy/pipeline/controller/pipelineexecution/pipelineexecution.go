@@ -506,7 +506,7 @@ func (l *Lifecycle) doNotify(obj *v3.PipelineExecution) (runtime.Object, error) 
 			notifierMessage.Content = strings.Replace(message, "\n", "<br>\n", -1)
 		}
 		g.Go(func() error {
-			return notifiers.SendMessage(l.ctx, toSendRecipient.Notifier, toSendRecipient.Recipient, notifierMessage, clusterDialer)
+			return notifiers.SendMessage(l.ctx, toSendRecipient.Notifier, toSendRecipient.Recipient, notifierMessage, clusterDialer, &l.secretLister)
 		})
 	}
 	return obj, g.Wait()

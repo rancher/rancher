@@ -62,11 +62,13 @@ const (
 	ClusterFieldNodeCount                            = "nodeCount"
 	ClusterFieldNodeVersion                          = "nodeVersion"
 	ClusterFieldOwnerReferences                      = "ownerReferences"
+	ClusterFieldPrivateRegistrySecret                = "privateRegistrySecret"
 	ClusterFieldProvider                             = "provider"
 	ClusterFieldRancherKubernetesEngineConfig        = "rancherKubernetesEngineConfig"
 	ClusterFieldRemoved                              = "removed"
 	ClusterFieldRequested                            = "requested"
 	ClusterFieldRke2Config                           = "rke2Config"
+	ClusterFieldS3CredentialSecret                   = "s3CredentialSecret"
 	ClusterFieldScheduledClusterScan                 = "scheduledClusterScan"
 	ClusterFieldScheduledClusterScanStatus           = "scheduledClusterScanStatus"
 	ClusterFieldState                                = "state"
@@ -74,6 +76,7 @@ const (
 	ClusterFieldTransitioningMessage                 = "transitioningMessage"
 	ClusterFieldUUID                                 = "uuid"
 	ClusterFieldVersion                              = "version"
+	ClusterFieldWeavePasswordSecret                  = "weavePasswordSecret"
 	ClusterFieldWindowsPreferedCluster               = "windowsPreferedCluster"
 	ClusterFieldWindowsWorkerCount                   = "windowsWorkerCount"
 )
@@ -136,11 +139,13 @@ type Cluster struct {
 	NodeCount                            int64                          `json:"nodeCount,omitempty" yaml:"nodeCount,omitempty"`
 	NodeVersion                          int64                          `json:"nodeVersion,omitempty" yaml:"nodeVersion,omitempty"`
 	OwnerReferences                      []OwnerReference               `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
+	PrivateRegistrySecret                string                         `json:"privateRegistrySecret,omitempty" yaml:"privateRegistrySecret,omitempty"`
 	Provider                             string                         `json:"provider,omitempty" yaml:"provider,omitempty"`
 	RancherKubernetesEngineConfig        *RancherKubernetesEngineConfig `json:"rancherKubernetesEngineConfig,omitempty" yaml:"rancherKubernetesEngineConfig,omitempty"`
 	Removed                              string                         `json:"removed,omitempty" yaml:"removed,omitempty"`
 	Requested                            map[string]string              `json:"requested,omitempty" yaml:"requested,omitempty"`
 	Rke2Config                           *Rke2Config                    `json:"rke2Config,omitempty" yaml:"rke2Config,omitempty"`
+	S3CredentialSecret                   string                         `json:"s3CredentialSecret,omitempty" yaml:"s3CredentialSecret,omitempty"`
 	ScheduledClusterScan                 *ScheduledClusterScan          `json:"scheduledClusterScan,omitempty" yaml:"scheduledClusterScan,omitempty"`
 	ScheduledClusterScanStatus           *ScheduledClusterScanStatus    `json:"scheduledClusterScanStatus,omitempty" yaml:"scheduledClusterScanStatus,omitempty"`
 	State                                string                         `json:"state,omitempty" yaml:"state,omitempty"`
@@ -148,6 +153,7 @@ type Cluster struct {
 	TransitioningMessage                 string                         `json:"transitioningMessage,omitempty" yaml:"transitioningMessage,omitempty"`
 	UUID                                 string                         `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 	Version                              *Info                          `json:"version,omitempty" yaml:"version,omitempty"`
+	WeavePasswordSecret                  string                         `json:"weavePasswordSecret,omitempty" yaml:"weavePasswordSecret,omitempty"`
 	WindowsPreferedCluster               bool                           `json:"windowsPreferedCluster,omitempty" yaml:"windowsPreferedCluster,omitempty"`
 	WindowsWorkerCount                   int64                          `json:"windowsWorkerCount,omitempty" yaml:"windowsWorkerCount,omitempty"`
 }

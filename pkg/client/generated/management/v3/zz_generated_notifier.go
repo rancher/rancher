@@ -5,57 +5,61 @@ import (
 )
 
 const (
-	NotifierType                      = "notifier"
-	NotifierFieldAnnotations          = "annotations"
-	NotifierFieldClusterID            = "clusterId"
-	NotifierFieldCreated              = "created"
-	NotifierFieldCreatorID            = "creatorId"
-	NotifierFieldDescription          = "description"
-	NotifierFieldDingtalkConfig       = "dingtalkConfig"
-	NotifierFieldLabels               = "labels"
-	NotifierFieldMSTeamsConfig        = "msteamsConfig"
-	NotifierFieldName                 = "name"
-	NotifierFieldNamespaceId          = "namespaceId"
-	NotifierFieldOwnerReferences      = "ownerReferences"
-	NotifierFieldPagerdutyConfig      = "pagerdutyConfig"
-	NotifierFieldRemoved              = "removed"
-	NotifierFieldSMTPConfig           = "smtpConfig"
-	NotifierFieldSendResolved         = "sendResolved"
-	NotifierFieldSlackConfig          = "slackConfig"
-	NotifierFieldState                = "state"
-	NotifierFieldStatus               = "status"
-	NotifierFieldTransitioning        = "transitioning"
-	NotifierFieldTransitioningMessage = "transitioningMessage"
-	NotifierFieldUUID                 = "uuid"
-	NotifierFieldWebhookConfig        = "webhookConfig"
-	NotifierFieldWechatConfig         = "wechatConfig"
+	NotifierType                          = "notifier"
+	NotifierFieldAnnotations              = "annotations"
+	NotifierFieldClusterID                = "clusterId"
+	NotifierFieldCreated                  = "created"
+	NotifierFieldCreatorID                = "creatorId"
+	NotifierFieldDescription              = "description"
+	NotifierFieldDingtalkConfig           = "dingtalkConfig"
+	NotifierFieldDingtalkCredentialSecret = "dingtalkCredentialSecret"
+	NotifierFieldLabels                   = "labels"
+	NotifierFieldMSTeamsConfig            = "msteamsConfig"
+	NotifierFieldName                     = "name"
+	NotifierFieldNamespaceId              = "namespaceId"
+	NotifierFieldOwnerReferences          = "ownerReferences"
+	NotifierFieldPagerdutyConfig          = "pagerdutyConfig"
+	NotifierFieldRemoved                  = "removed"
+	NotifierFieldSMTPConfig               = "smtpConfig"
+	NotifierFieldSMTPCredentialSecret     = "smtpCredentialSecret"
+	NotifierFieldSendResolved             = "sendResolved"
+	NotifierFieldSlackConfig              = "slackConfig"
+	NotifierFieldState                    = "state"
+	NotifierFieldTransitioning            = "transitioning"
+	NotifierFieldTransitioningMessage     = "transitioningMessage"
+	NotifierFieldUUID                     = "uuid"
+	NotifierFieldWebhookConfig            = "webhookConfig"
+	NotifierFieldWechatConfig             = "wechatConfig"
+	NotifierFieldWechatCredentialSecret   = "wechatCredentialSecret"
 )
 
 type Notifier struct {
 	types.Resource
-	Annotations          map[string]string `json:"annotations,omitempty" yaml:"annotations,omitempty"`
-	ClusterID            string            `json:"clusterId,omitempty" yaml:"clusterId,omitempty"`
-	Created              string            `json:"created,omitempty" yaml:"created,omitempty"`
-	CreatorID            string            `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
-	Description          string            `json:"description,omitempty" yaml:"description,omitempty"`
-	DingtalkConfig       *DingtalkConfig   `json:"dingtalkConfig,omitempty" yaml:"dingtalkConfig,omitempty"`
-	Labels               map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
-	MSTeamsConfig        *MSTeamsConfig    `json:"msteamsConfig,omitempty" yaml:"msteamsConfig,omitempty"`
-	Name                 string            `json:"name,omitempty" yaml:"name,omitempty"`
-	NamespaceId          string            `json:"namespaceId,omitempty" yaml:"namespaceId,omitempty"`
-	OwnerReferences      []OwnerReference  `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
-	PagerdutyConfig      *PagerdutyConfig  `json:"pagerdutyConfig,omitempty" yaml:"pagerdutyConfig,omitempty"`
-	Removed              string            `json:"removed,omitempty" yaml:"removed,omitempty"`
-	SMTPConfig           *SMTPConfig       `json:"smtpConfig,omitempty" yaml:"smtpConfig,omitempty"`
-	SendResolved         bool              `json:"sendResolved,omitempty" yaml:"sendResolved,omitempty"`
-	SlackConfig          *SlackConfig      `json:"slackConfig,omitempty" yaml:"slackConfig,omitempty"`
-	State                string            `json:"state,omitempty" yaml:"state,omitempty"`
-	Status               *NotifierStatus   `json:"status,omitempty" yaml:"status,omitempty"`
-	Transitioning        string            `json:"transitioning,omitempty" yaml:"transitioning,omitempty"`
-	TransitioningMessage string            `json:"transitioningMessage,omitempty" yaml:"transitioningMessage,omitempty"`
-	UUID                 string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
-	WebhookConfig        *WebhookConfig    `json:"webhookConfig,omitempty" yaml:"webhookConfig,omitempty"`
-	WechatConfig         *WechatConfig     `json:"wechatConfig,omitempty" yaml:"wechatConfig,omitempty"`
+	Annotations              map[string]string `json:"annotations,omitempty" yaml:"annotations,omitempty"`
+	ClusterID                string            `json:"clusterId,omitempty" yaml:"clusterId,omitempty"`
+	Created                  string            `json:"created,omitempty" yaml:"created,omitempty"`
+	CreatorID                string            `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
+	Description              string            `json:"description,omitempty" yaml:"description,omitempty"`
+	DingtalkConfig           *DingtalkConfig   `json:"dingtalkConfig,omitempty" yaml:"dingtalkConfig,omitempty"`
+	DingtalkCredentialSecret string            `json:"dingtalkCredentialSecret,omitempty" yaml:"dingtalkCredentialSecret,omitempty"`
+	Labels                   map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
+	MSTeamsConfig            *MSTeamsConfig    `json:"msteamsConfig,omitempty" yaml:"msteamsConfig,omitempty"`
+	Name                     string            `json:"name,omitempty" yaml:"name,omitempty"`
+	NamespaceId              string            `json:"namespaceId,omitempty" yaml:"namespaceId,omitempty"`
+	OwnerReferences          []OwnerReference  `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
+	PagerdutyConfig          *PagerdutyConfig  `json:"pagerdutyConfig,omitempty" yaml:"pagerdutyConfig,omitempty"`
+	Removed                  string            `json:"removed,omitempty" yaml:"removed,omitempty"`
+	SMTPConfig               *SMTPConfig       `json:"smtpConfig,omitempty" yaml:"smtpConfig,omitempty"`
+	SMTPCredentialSecret     string            `json:"smtpCredentialSecret,omitempty" yaml:"smtpCredentialSecret,omitempty"`
+	SendResolved             bool              `json:"sendResolved,omitempty" yaml:"sendResolved,omitempty"`
+	SlackConfig              *SlackConfig      `json:"slackConfig,omitempty" yaml:"slackConfig,omitempty"`
+	State                    string            `json:"state,omitempty" yaml:"state,omitempty"`
+	Transitioning            string            `json:"transitioning,omitempty" yaml:"transitioning,omitempty"`
+	TransitioningMessage     string            `json:"transitioningMessage,omitempty" yaml:"transitioningMessage,omitempty"`
+	UUID                     string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
+	WebhookConfig            *WebhookConfig    `json:"webhookConfig,omitempty" yaml:"webhookConfig,omitempty"`
+	WechatConfig             *WechatConfig     `json:"wechatConfig,omitempty" yaml:"wechatConfig,omitempty"`
+	WechatCredentialSecret   string            `json:"wechatCredentialSecret,omitempty" yaml:"wechatCredentialSecret,omitempty"`
 }
 
 type NotifierCollection struct {

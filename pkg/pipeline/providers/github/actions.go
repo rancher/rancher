@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"strings"
 
 	v33 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	v32 "github.com/rancher/rancher/pkg/apis/project.cattle.io/v3"
@@ -15,11 +16,14 @@ import (
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
+	auth "github.com/rancher/rancher/pkg/auth/providers/common"
 	mclient "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	client "github.com/rancher/rancher/pkg/client/generated/project/v3"
-	"github.com/rancher/rancher/pkg/pipeline/providers/common"
 	"github.com/rancher/rancher/pkg/pipeline/remote/model"
+	"github.com/rancher/rancher/pkg/pipeline/utils"
 	"github.com/rancher/rancher/pkg/ref"
+	"github.com/sirupsen/logrus"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 )
@@ -129,12 +133,29 @@ func (g *GhProvider) testAndApply(actionName string, action *types.Action, apiCo
 	}
 
 	toUpdate.Enabled = true
-	//when inherit from global auth, we don't store client secret to project scope
-	if toUpdate.Inherit {
-		toUpdate.ClientSecret = ""
+
+	var secret *corev1.Secret
+	if !toUpdate.Inherit {
+		// if auth is inherited, then there is already a secret
+		clusterID, _ := ref.Parse(apiContext.SubContext["/v3/schemas/project"])
+		cluster, err := g.ClusterLister.Get("", clusterID)
+		if err != nil {
+			return err
+		}
+		secret, err = g.SecretMigrator.CreateOrUpdateSourceCodeProviderConfigSecret("", toUpdate.ClientSecret, cluster, model.GithubType)
+		if err != nil {
+			return err
+		}
+		toUpdate.CredentialSecret = secret.Name
 	}
+	toUpdate.ClientSecret = ""
 	//update github pipeline config
 	if _, err = g.SourceCodeProviderConfigs.ObjectClient().Update(toUpdate.Name, toUpdate); err != nil {
+		if secret != nil {
+			if cleanupErr := g.SecretMigrator.Cleanup(secret.Name); cleanupErr != nil {
+				logrus.Errorf("github pipeline: encountered error while handling migration error: %v, original error: %v", cleanupErr, err)
+			}
+		}
 		return err
 	}
 
@@ -201,11 +222,28 @@ func (g *GhProvider) getGithubConfigCR() (*v33.GithubConfig, error) {
 		return nil, fmt.Errorf("failed to decode the config, error: %v", err)
 	}
 
-	objectMeta, err := common.ObjectMetaFromUnstructureContent(storedGithubConfigMap)
+	objectMeta, err := utils.ObjectMetaFromUnstructureContent(storedGithubConfigMap)
 	if err != nil {
 		return nil, err
 	}
 	storedGithubConfig.ObjectMeta = *objectMeta
+
+	if storedGithubConfig.ClientSecret != "" {
+		data, err := auth.ReadFromSecretData(g.Secrets, storedGithubConfig.ClientSecret)
+		if err != nil {
+			return nil, err
+		}
+		for k, v := range data {
+			if strings.EqualFold(k, mclient.GithubConfigFieldClientSecret) {
+				storedGithubConfig.ClientSecret = string(v)
+			} else {
+				if storedGithubConfig.AdditionalClientIDs == nil {
+					storedGithubConfig.AdditionalClientIDs = map[string]string{}
+				}
+				storedGithubConfig.AdditionalClientIDs[k] = strings.TrimSpace(string(v))
+			}
+		}
+	}
 
 	return storedGithubConfig, nil
 }
