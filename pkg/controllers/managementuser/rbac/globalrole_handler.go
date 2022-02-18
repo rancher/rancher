@@ -181,11 +181,8 @@ func (c *grbHandler) ensureProvisioningClusterAdminBinding(obj *v3.GlobalRoleBin
 
 	provCluster := pClusters[0]
 
-	subject := k8srbac.Subject{
-		Kind: "User",
-		Name: obj.UserName,
-	}
-	rbName := name.SafeConcatName(rbac.ProvisioningClusterAdminName(provCluster), subject.Name)
+	subject := rbac.GetGRBSubject(obj)
+	rbName := name.SafeConcatName(rbac.ProvisioningClusterAdminName(provCluster), rbac.GetGRBTargetKey(obj))
 
 	existingRb, err := c.rbLister.Get(provCluster.Namespace, rbName)
 	if err != nil && !apierrors.IsNotFound(err) {

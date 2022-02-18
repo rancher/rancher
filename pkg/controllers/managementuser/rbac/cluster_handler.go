@@ -96,10 +96,7 @@ func (h *clusterHandler) doSync(cluster *v3.Cluster) error {
 						Name: bindingName,
 					},
 					Subjects: []k8srbac.Subject{
-						{
-							Kind: "User",
-							Name: grb.UserName,
-						},
+						rbac.GetGRBSubject(grb),
 					},
 					RoleRef: k8srbac.RoleRef{
 						Name: "cluster-admin",
