@@ -15,9 +15,11 @@ import (
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	util "github.com/rancher/rancher/pkg/cluster"
 	"github.com/rancher/rancher/pkg/clustermanager"
+	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/image"
 	"github.com/rancher/rancher/pkg/kubectl"
+	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/systemaccount"
 	"github.com/rancher/rancher/pkg/systemtemplate"
@@ -27,7 +29,7 @@ import (
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
@@ -61,6 +63,7 @@ func Register(ctx context.Context, management *config.ManagementContext, cluster
 		clusters:             management.Management.Clusters(""),
 		nodeLister:           management.Management.Nodes("").Controller().Lister(),
 		clusterManager:       clusterManager,
+		secretLister:         management.Core.Secrets("").Controller().Lister(),
 	}
 
 	management.Management.Clusters("").AddHandler(ctx, "cluster-deploy", c.sync)
@@ -72,6 +75,7 @@ type clusterDeploy struct {
 	clusters             v3.ClusterInterface
 	clusterManager       *clustermanager.Manager
 	nodeLister           v3.NodeLister
+	secretLister         v1.SecretLister
 }
 
 func (cd *clusterDeploy) sync(key string, cluster *v3.Cluster) (runtime.Object, error) {
@@ -283,6 +287,14 @@ func (cd *clusterDeploy) deployAgent(cluster *v3.Cluster) error {
 	}
 	logrus.Tracef("clusterDeploy: deployAgent: desiredTaints is [%v] for cluster [%s]", desiredTaints, cluster.Name)
 
+	privateRegistries := &corev1.Secret{}
+	if cluster.Status.PrivateRegistrySecret != "" {
+		privateRegistries, err = cd.secretLister.Get(namespace.GlobalNamespace, cluster.Status.PrivateRegistrySecret)
+		if err != nil {
+			return err
+		}
+	}
+
 	if !redeployAgent(cluster, desiredAgent, desiredAuth, desiredFeatures, desiredTaints) {
 		return nil
 	}
@@ -293,7 +305,7 @@ func (cd *clusterDeploy) deployAgent(cluster *v3.Cluster) error {
 	}
 
 	if _, err = v32.ClusterConditionAgentDeployed.Do(cluster, func() (runtime.Object, error) {
-		yaml, err := cd.getYAML(cluster, desiredAgent, desiredAuth, desiredFeatures, desiredTaints)
+		yaml, err := cd.getYAML(cluster, desiredAgent, desiredAuth, desiredFeatures, desiredTaints, privateRegistries)
 		if err != nil {
 			return cluster, err
 		}
@@ -411,7 +423,7 @@ func (cd *clusterDeploy) getKubeConfig(cluster *v3.Cluster) (*clientcmdapi.Confi
 	return cd.clusterManager.KubeConfig(cluster.Name, token), nil
 }
 
-func (cd *clusterDeploy) getYAML(cluster *v3.Cluster, agentImage, authImage string, features map[string]bool, taints []corev1.Taint) ([]byte, error) {
+func (cd *clusterDeploy) getYAML(cluster *v3.Cluster, agentImage, authImage string, features map[string]bool, taints []corev1.Taint, privateRegistries *corev1.Secret) ([]byte, error) {
 	logrus.Tracef("clusterDeploy: getYAML: Desired agent image is [%s] for cluster [%s]", agentImage, cluster.Name)
 	logrus.Tracef("clusterDeploy: getYAML: Desired auth image is [%s] for cluster [%s]", authImage, cluster.Name)
 	logrus.Tracef("clusterDeploy: getYAML: Desired features are [%v] for cluster [%s]", features, cluster.Name)
@@ -430,7 +442,7 @@ func (cd *clusterDeploy) getYAML(cluster *v3.Cluster, agentImage, authImage stri
 
 	buf := &bytes.Buffer{}
 	err = systemtemplate.SystemTemplate(buf, agentImage, authImage, cluster.Name, token, url, cluster.Spec.WindowsPreferedCluster,
-		cluster, features, taints)
+		cluster, features, taints, privateRegistries)
 
 	return buf.Bytes(), err
 }
@@ -441,7 +453,7 @@ func (cd *clusterDeploy) getClusterAgentImage(name string) (string, error) {
 		return "", err
 	}
 
-	d, err := uc.Apps.Deployments("cattle-system").Get("cattle-cluster-agent", v1.GetOptions{})
+	d, err := uc.Apps.Deployments("cattle-system").Get("cattle-cluster-agent", metav1.GetOptions{})
 	if err != nil {
 		if !apierrors.IsNotFound(err) {
 			return "", err
@@ -464,7 +476,7 @@ func (cd *clusterDeploy) getNodeAgentImage(name string) (string, error) {
 		return "", err
 	}
 
-	ds, err := uc.Apps.DaemonSets("cattle-system").Get("cattle-node-agent", v1.GetOptions{})
+	ds, err := uc.Apps.DaemonSets("cattle-system").Get("cattle-node-agent", metav1.GetOptions{})
 	if err != nil {
 		if !apierrors.IsNotFound(err) {
 			return "", err

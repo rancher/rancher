@@ -12,6 +12,7 @@ const (
 	CatalogFieldConditions           = "conditions"
 	CatalogFieldCreated              = "created"
 	CatalogFieldCreatorID            = "creatorId"
+	CatalogFieldCredentialSecret     = "credentialSecret"
 	CatalogFieldDescription          = "description"
 	CatalogFieldHelmVersion          = "helmVersion"
 	CatalogFieldKind                 = "kind"
@@ -37,6 +38,7 @@ type Catalog struct {
 	Conditions           []CatalogCondition `json:"conditions,omitempty" yaml:"conditions,omitempty"`
 	Created              string             `json:"created,omitempty" yaml:"created,omitempty"`
 	CreatorID            string             `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
+	CredentialSecret     string             `json:"credentialSecret,omitempty" yaml:"credentialSecret,omitempty"`
 	Description          string             `json:"description,omitempty" yaml:"description,omitempty"`
 	HelmVersion          string             `json:"helmVersion,omitempty" yaml:"helmVersion,omitempty"`
 	Kind                 string             `json:"kind,omitempty" yaml:"kind,omitempty"`

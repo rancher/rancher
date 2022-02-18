@@ -73,6 +73,7 @@ type Lifecycle struct {
 	namespaceLister      v1.NamespaceLister
 	namespaces           v1.NamespaceInterface
 	secrets              v1.SecretInterface
+	secretLister         v1.SecretLister
 	serviceLister        v1.ServiceLister
 	managementSecrets    v1.SecretInterface
 	services             v1.ServiceInterface
@@ -137,6 +138,7 @@ func Register(ctx context.Context, cluster *config.UserContext) {
 		namespaces:                 namespaces,
 		namespaceLister:            namespaceLister,
 		secrets:                    secrets,
+		secretLister:               secretLister,
 		managementSecrets:          managementSecrets,
 		services:                   services,
 		serviceLister:              serviceLister,
@@ -502,7 +504,7 @@ func (l *Lifecycle) doNotify(obj *v3.PipelineExecution) (runtime.Object, error) 
 			notifierMessage.Content = strings.Replace(message, "\n", "<br>\n", -1)
 		}
 		g.Go(func() error {
-			return notifiers.SendMessage(l.ctx, toSendRecipient.Notifier, toSendRecipient.Recipient, notifierMessage, clusterDialer)
+			return notifiers.SendMessage(l.ctx, toSendRecipient.Notifier, toSendRecipient.Recipient, notifierMessage, clusterDialer, &l.secretLister)
 		})
 	}
 	return obj, g.Wait()

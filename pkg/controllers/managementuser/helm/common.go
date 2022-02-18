@@ -112,7 +112,7 @@ func (l *Lifecycle) generateTemplates(obj *v3.App) (string, *common.HelmPath, er
 			return "", nil, err
 		}
 
-		helm, err := helmlib.New(catalog)
+		helm, err := helmlib.New(catalog, l.SecretLister)
 		if err != nil {
 			return "", nil, err
 		}

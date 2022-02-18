@@ -16,6 +16,7 @@ import (
 	client "github.com/rancher/rancher/pkg/client/generated/project/v3"
 	"github.com/rancher/rancher/pkg/pipeline/remote/model"
 	"github.com/rancher/rancher/pkg/ref"
+	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -93,8 +94,24 @@ func (b *BcProvider) testAndApply(actionName string, action *types.Action, apiCo
 	}
 
 	toUpdate.Enabled = true
+	clusterID, _ := ref.Parse(apiContext.SubContext["/v3/schemas/project"])
+	cluster, err := b.ClusterLister.Get("", clusterID)
+	if err != nil {
+		return err
+	}
+	secret, err := b.SecretMigrator.CreateOrUpdateSourceCodeProviderConfigSecret("", toUpdate.ClientSecret, cluster, model.BitbucketCloudType)
+	if err != nil {
+		return err
+	}
+	toUpdate.CredentialSecret = secret.Name
+	toUpdate.ClientSecret = ""
 	//update bitbucket pipeline config
 	if _, err = b.SourceCodeProviderConfigs.ObjectClient().Update(toUpdate.Name, toUpdate); err != nil {
+		if secret != nil {
+			if cleanupErr := b.SecretMigrator.Cleanup(secret.Name); cleanupErr != nil {
+				logrus.Errorf("bitbucketcloud pipeline: encountered error while handling migration error: %v, original error: %v", cleanupErr, err)
+			}
+		}
 		return err
 	}
 

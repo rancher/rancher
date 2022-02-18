@@ -31,7 +31,7 @@ func (m *Manager) ProjectCatalogSync(key string, obj *v3.ProjectCatalog) (runtim
 		return nil, err
 	}
 
-	commit, helm, err := helmlib.NewForceUpdate(&projectCatalog.Catalog)
+	commit, helm, err := helmlib.NewForceUpdate(&projectCatalog.Catalog, m.SecretLister)
 	if err != nil {
 		return m.updateProjectCatalogError(projectCatalog, err)
 	}

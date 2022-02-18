@@ -70,6 +70,7 @@ const (
 	ClusterConditionPrometheusOperatorDeployed condition.Cond = "PrometheusOperatorDeployed"
 	ClusterConditionMonitoringEnabled          condition.Cond = "MonitoringEnabled"
 	ClusterConditionAlertingEnabled            condition.Cond = "AlertingEnabled"
+	ClusterConditionSecretsMigrated            condition.Cond = "SecretsMigrated"
 
 	ClusterDriverImported = "imported"
 	ClusterDriverLocal    = "local"
@@ -176,6 +177,9 @@ type ClusterStatus struct {
 	CurrentCisRunName                    string                      `json:"currentCisRunName,omitempty"`
 	EKSStatus                            EKSStatus                   `json:"eksStatus,omitempty" norman:"nocreate,noupdate"`
 	GKEStatus                            GKEStatus                   `json:"gkeStatus,omitempty" norman:"nocreate,noupdate"`
+	PrivateRegistrySecret                string                      `json:"privateRegistrySecret,omitempty" norman:"nocreate,noupdate"`
+	S3CredentialSecret                   string                      `json:"s3CredentialSecret,omitempty" norman:"nocreate,noupdate"`
+	WeavePasswordSecret                  string                      `json:"weavePasswordSecret,omitempty" norman:"nocreate,noupdate"`
 }
 
 type ClusterComponentStatus struct {
