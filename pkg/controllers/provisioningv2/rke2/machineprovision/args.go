@@ -65,6 +65,16 @@ func (h *handler) getArgsEnvAndStatus(infraObj *infraObject, args map[string]int
 		filesSecret                          *corev1.Secret
 	)
 
+	if infraObj.data.String("spec", "providerID") != "" && !infraObj.data.Bool("status", "jobComplete") {
+		// If the providerID is set, but jobComplete is false, then we need to re-enqueue the job so the proper status is set from that handler.
+		job, err := h.getJobFromInfraMachine(infraObj)
+		if err != nil {
+			return driverArgs{}, err
+		}
+		h.jobController.Enqueue(infraObj.meta.GetNamespace(), job.Name)
+		return driverArgs{}, generic.ErrSkip
+	}
+
 	nd, err := h.nodeDriverCache.Get(driver)
 	if !create && apierror.IsNotFound(err) {
 		url = infraObj.data.String("status", "driverURL")

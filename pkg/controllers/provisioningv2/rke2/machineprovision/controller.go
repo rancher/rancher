@@ -35,6 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
@@ -84,6 +85,7 @@ func newInfraObject(obj runtime.Object) (*infraObject, error) {
 type handler struct {
 	ctx                 context.Context
 	apply               apply.Apply
+	jobController       batchcontrollers.JobController
 	jobs                batchcontrollers.JobCache
 	pods                corecontrollers.PodCache
 	secrets             corecontrollers.SecretCache
@@ -104,6 +106,7 @@ func Register(ctx context.Context, clients *wrangler.Context) {
 			clients.RBAC.Role(),
 			clients.Batch.Job()),
 		pods:                clients.Core.Pod().Cache(),
+		jobController:       clients.Batch.Job(),
 		jobs:                clients.Batch.Job().Cache(),
 		secrets:             clients.Core.Secret().Cache(),
 		machines:            clients.CAPI.Machine().Cache(),
@@ -326,14 +329,13 @@ func (h *handler) OnRemove(key string, obj runtime.Object) (runtime.Object, erro
 	}
 
 	if cond := getCondition(infraObj.data, deleteJobConditionType); cond != nil {
-		job, err := h.jobs.Get(infraObj.meta.GetNamespace(), GetJobName(infraObj.meta.GetName()))
+		job, err := h.getJobFromInfraMachine(infraObj)
 		if apierrors.IsNotFound(err) {
 			// If the deletion job condition has been set on the infrastructure object and the deletion job has been removed,
 			// then we don't want to create another deletion job.
 			logrus.Infof("Machine %s %s has already been deleted", infraObj.obj.GetObjectKind().GroupVersionKind(), infraObj.meta.GetName())
 			return obj, nil
-		}
-		if err != nil {
+		} else if err != nil {
 			return obj, err
 		}
 
@@ -508,16 +510,35 @@ func (h *handler) patchStatus(obj runtime.Object, d data.Object, state rkev1.RKE
 	})
 }
 
+func (h *handler) getJobFromInfraMachine(infraObj *infraObject) (*batchv1.Job, error) {
+	gvk := infraObj.obj.GetObjectKind().GroupVersionKind()
+	jobs, err := h.jobs.List(infraObj.meta.GetNamespace(), labels.Set{
+		InfraMachineGroup:   gvk.Group,
+		InfraMachineVersion: gvk.Version,
+		InfraMachineKind:    gvk.Kind,
+		InfraMachineName:    infraObj.meta.GetName()}.AsSelector(),
+	)
+	if err != nil {
+		return nil, err
+	} else if len(jobs) == 0 {
+		// This is likely the name of the job, expect if the infra machine object has a very long name.
+		return nil, apierrors.NewNotFound(batchv1.Resource("jobs"), GetJobName(infraObj.meta.GetName()))
+	}
+
+	// There can be at most one job returned here because there can be at most one infra machine object with the given GVK and name.
+	return jobs[0], nil
+}
+
 func setCondition(dynamic *dynamic.Controller, obj runtime.Object, conditionType string, err error) (runtime.Object, error) {
+	if errors.Is(generic.ErrSkip, err) {
+		return obj, nil
+	}
+
 	var (
 		reason  = ""
 		status  = "True"
 		message = ""
 	)
-
-	if errors.Is(generic.ErrSkip, err) {
-		err = nil
-	}
 
 	if err != nil {
 		reason = "Error"
