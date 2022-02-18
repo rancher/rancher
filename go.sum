@@ -1158,8 +1158,8 @@ github.com/rancher/apiserver v0.0.0-20201023000256-1a0a904f9197/go.mod h1:8W0Ewa
 github.com/rancher/apiserver v0.0.0-20210922180056-297b6df8d714/go.mod h1:8W0EwaR9dH5NDFw6mpAX437D0q+EZqKWbZyX71+z2WI=
 github.com/rancher/apiserver v0.0.0-20220125032650-a2ef3682eca9 h1:AHt8OpSf9wrdetdplequ63uhFWmHcz9597GbAicayQc=
 github.com/rancher/apiserver v0.0.0-20220125032650-a2ef3682eca9/go.mod h1:cnLj3AnKR96wADHmJMS4msdCl1PMkXVbcSuPkfDbVWA=
-github.com/rancher/channelserver v0.5.1-0.20210618172430-5cbefd383369 h1:1FLFZrLqnI4oJSI9dLnQfPBQIYrXI4yvKRkfujVnqiQ=
-github.com/rancher/channelserver v0.5.1-0.20210618172430-5cbefd383369/go.mod h1:1/9aBa8mXEIinRiT6Qlv/zbt6Nv9uorv+kFVNYvpmiI=
+github.com/rancher/channelserver v0.5.1-0.20220217142715-90ef7d38f3f8 h1:vOhxMryJW8NkoCXUKHvYWHw4LpJ2OKYpDws4CdeN8Lw=
+github.com/rancher/channelserver v0.5.1-0.20220217142715-90ef7d38f3f8/go.mod h1:6hdl+500DWTtg4sKC7/CYJjRU7CFCsH+lnfxIle8JHM=
 github.com/rancher/client-go v1.22.3-rancher.1 h1:aNVLaIY5YGah1i9wRVXLOGRbLyekohjQAKHXeQm6Cxo=
 github.com/rancher/client-go v1.22.3-rancher.1/go.mod h1:ElDjYf8gvZsKDYexmsmnMQ0DYO8W9RwBjfQ1PI53yow=
 github.com/rancher/dynamiclistener v0.2.1-0.20200714201033-9c1939da3af9/go.mod h1:qr0QfhwzcVCR+Ao9WyfnE+jmOpfEAdRhXtNOZGJ3nCQ=
