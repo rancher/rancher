@@ -1,4 +1,5 @@
 resource "aws_db_parameter_group" "db-parameters" {
+  count                  = (var.cluster_type == "etcd" ? 0 : (var.external_db != "aurora-mysql" ? 1 : 0))
   name   = "${var.resource_name}-dbparameter"
   family = var.db_group_name
   parameter {
@@ -21,7 +22,7 @@ resource "aws_db_instance" "db" {
   username               = var.db_username
   password               = var.db_password
   availability_zone      = var.availability_zone
-  parameter_group_name   = "${aws_db_parameter_group.db-parameters.name}"
+  parameter_group_name   = "${aws_db_parameter_group.db-parameters[count.index].name}"
   tags = {
     Environment = var.environment
   }
