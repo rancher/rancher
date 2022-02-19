@@ -6,19 +6,15 @@ import (
 	"os/exec"
 
 	"github.com/pkg/errors"
-	"github.com/rancher/rancher/pkg/api/scheme"
-	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	apisV1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
-	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
 	"github.com/rancher/rancher/tests/framework/extensions/clusters"
 	"github.com/rancher/rancher/tests/framework/pkg/config"
 	"github.com/rancher/rancher/tests/framework/pkg/session"
 	"github.com/rancher/rancher/tests/framework/pkg/wait"
+	"github.com/rancher/rancher/tests/integration/pkg/defaults"
 	"github.com/rancher/wrangler/pkg/randomtoken"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -38,15 +34,15 @@ func CreateK3DCluster(ts *session.Session, name string) (*rest.Config, error) {
 
 	msg, err := exec.Command("k3d", "cluster", "create", name,
 		"--no-lb",
-		"--no-hostip",
-		"--no-image-volume",
 		"--kubeconfig-update-default=false",
 		"--kubeconfig-switch-context=false",
 		fmt.Sprintf("--timeout=%d", k3dConfig.createTimeout),
-		`--k3s-server-arg=--no-deploy=traefik`,
-		`--k3s-server-arg=--no-deploy=servicelb`,
-		`--k3s-server-arg=--no-deploy=metrics-serve`,
-		`--k3s-server-arg=--no-deploy=local-storage`).CombinedOutput()
+		`--k3s-arg=--kubelet-arg=eviction-hard=imagefs.available<1%,nodefs.available<1%`,
+		`--k3s-arg=--kubelet-arg=eviction-minimum-reclaim=imagefs.available=1%,nodefs.available=1%`,
+		`--k3s-arg=--no-deploy=traefik`,
+		`--k3s-arg=--no-deploy=servicelb`,
+		`--k3s-arg=--no-deploy=metrics-serve`,
+		`--k3s-arg=--no-deploy=local-storage`).CombinedOutput()
 	if err != nil {
 		return nil, errors.Wrap(err, "CreateK3DCluster: "+string(msg))
 	}
@@ -70,7 +66,7 @@ func DeleteK3DCluster(name string) error {
 }
 
 // CreateAndImportK3DCluster creates a new k3d cluster and imports it into rancher.
-func CreateAndImportK3DCluster(client *rancher.Client, name string) (*management.Cluster, error) {
+func CreateAndImportK3DCluster(client *rancher.Client, name string) (*apisV1.Cluster, error) {
 	var err error
 
 	name = defaultName(name)
@@ -93,18 +89,20 @@ func CreateAndImportK3DCluster(client *rancher.Client, name string) (*management
 		return nil, errors.Wrap(err, "CreateAndImportK3DCluster: failed to create k3d cluster")
 	}
 
-	// wait for the management cluster
-	mClusterWatch, err := client.GetManagementWatchInterface(management.ClusterType, metav1.ListOptions{})
+	// wait for the imported cluster
+	clusterWatch, err := client.Provisioning.Clusters("fleet-default").Watch(context.TODO(), metav1.ListOptions{
+		FieldSelector:  "metadata.name=" + name,
+		TimeoutSeconds: &defaults.WatchTimeoutSeconds,
+	})
 	if err != nil {
-		return nil, errors.Wrap(err, "CreateAndImportK3DCluster: failed to watch for management cluster")
+		return nil, errors.Wrap(err, "CreateAndImportK3DCluster: failed to watch for the imported cluster")
 	}
 
-	var mgmtCluster *management.Cluster
-	err = wait.WatchWait(mClusterWatch, func(event watch.Event) (bool, error) {
-		var mc v3.Cluster
-		err = runtime.DefaultUnstructuredConverter.FromUnstructured(event.Object.(*unstructured.Unstructured).Object, &mc)
-		if mc.Spec.DisplayName == name {
-			mgmtCluster, err = client.Management.Cluster.ByID(mc.Name)
+	var impCluster *apisV1.Cluster
+	err = wait.WatchWait(clusterWatch, func(event watch.Event) (bool, error) {
+		cluster := event.Object.(*apisV1.Cluster)
+		if cluster.Name == name {
+			impCluster, err = client.Provisioning.Clusters("fleet-default").Get(context.TODO(), name, metav1.GetOptions{})
 			return true, err
 		}
 
@@ -116,38 +114,25 @@ func CreateAndImportK3DCluster(client *rancher.Client, name string) (*management
 	}
 
 	// import the k3d cluster
-	err = clusters.ImportCluster(client, mgmtCluster, downRest)
+	err = clusters.ImportCluster(client, impCluster, downRest)
 	if err != nil {
 		return nil, errors.Wrap(err, "CreateAndImportK3DCluster: failed to import cluster")
 	}
 
-	// wait for cluster to be ready
-	mClusterWatch, err = client.GetManagementWatchInterface(management.ClusterType, metav1.ListOptions{})
-	if err != nil {
-		return nil, errors.Wrap(err, "CreateAndImportK3DCluster: failed to wait for management cluster ready")
-	}
-
-	err = wait.WatchWait(mClusterWatch, func(event watch.Event) (bool, error) {
-		var mc v3.Cluster
-		err = runtime.DefaultUnstructuredConverter.FromUnstructured(event.Object.(*unstructured.Unstructured).Object, &mc)
-
-		_ = scheme.Scheme.Convert(event.Object, mgmtCluster, nil)
-
-		for _, cond := range mc.Status.Conditions {
-			if cond.Type == "Ready" && cond.Status == "True" {
-				return true, nil
-			}
-
-			break
-		}
-
-		return false, nil
+	// wait for the imported cluster to be ready
+	clusterWatch, err = client.Provisioning.Clusters("fleet-default").Watch(context.TODO(), metav1.ListOptions{
+		FieldSelector:  "metadata.name=" + name,
+		TimeoutSeconds: &defaults.WatchTimeoutSeconds,
 	})
+
+	checkFunc := clusters.IsProvisioningClusterReady
+	err = wait.WatchWait(clusterWatch, checkFunc)
+
 	if err != nil {
-		return nil, errors.Wrap(err, "CreateAndImportK3DCluster: failed to wait for management cluster ready")
+		return nil, errors.Wrap(err, "CreateAndImportK3DCluster: failed to wait for imported cluster ready status")
 	}
 
-	return mgmtCluster, nil
+	return impCluster, nil
 }
 
 // defaultName returns a random string if name is empty, otherwise name is returned unmodified.
