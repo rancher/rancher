@@ -17,6 +17,7 @@ import (
 	rkev1controllers "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/types/config"
 	corecontrollers "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
+	"github.com/rancher/wrangler/pkg/name"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
@@ -30,6 +31,13 @@ var (
 		"k3s-etcd-snapshots":  true,
 		"rke2-etcd-snapshots": true,
 	}
+)
+
+const (
+	StorageLabelKey = "etcdsnapshot.rke.io/storage"
+	SnapshotNameKey = "etcdsnapshot.rke.io/snapshot-file-name"
+	StorageS3       = "s3"
+	StorageLocal    = "local"
 )
 
 type handler struct {
@@ -118,8 +126,16 @@ func (h *handler) OnChange(key string, configMap *corev1.ConfigMap) (*corev1.Con
 	// if the current etcd snapshot is NOT found in the actual etcd snapshots list, we delete it
 	// otherwise, we add it to the desired etcd snapshots map
 	for _, existingSnapshotCR := range currentEtcdSnapshots {
-		if _, ok := actualEtcdSnapshots[existingSnapshotCR.Name]; !ok {
-			if existingSnapshotCR.SnapshotFile.NodeName != "s3" {
+		storageLocation, ok := existingSnapshotCR.Labels[StorageLabelKey]
+		if !ok {
+			storageLocation = StorageLocal
+			if existingSnapshotCR.SnapshotFile.NodeName == StorageS3 {
+				storageLocation = StorageS3
+			}
+		}
+		snapshotKey := existingSnapshotCR.SnapshotFile.Name + storageLocation
+		if _, ok := actualEtcdSnapshots[snapshotKey]; !ok {
+			if storageLocation != StorageS3 {
 				// check to make sure the machine actually exists for the snapshot
 				listSuccessful, machine, err := rke2.GetMachineFromNode(h.machineCache, existingSnapshotCR.SnapshotFile.NodeName, cluster)
 				if listSuccessful && machine == nil && err != nil {
@@ -144,14 +160,14 @@ func (h *handler) OnChange(key string, configMap *corev1.ConfigMap) (*corev1.Con
 			}
 			continue
 		}
-		currentEtcdSnapshotsToKeep[existingSnapshotCR.Name] = existingSnapshotCR
+		currentEtcdSnapshotsToKeep[snapshotKey] = existingSnapshotCR
 	}
 
 	// iterate over the actual etcd snapshots that are in the management cluster
 	// if the snapshot is found in the desired etcd snapshots, check to see if an update needs to be made
 	// otherwise, create the etcd snapshot CR
-	for _, cmGeneratedSnapshot := range actualEtcdSnapshots {
-		if snapshot, ok := currentEtcdSnapshotsToKeep[cmGeneratedSnapshot.Name]; ok {
+	for snapshotKey, cmGeneratedSnapshot := range actualEtcdSnapshots {
+		if snapshot, ok := currentEtcdSnapshotsToKeep[snapshotKey]; ok {
 			if !equality.Semantic.DeepEqual(cmGeneratedSnapshot.SnapshotFile, snapshot.SnapshotFile) || !equality.Semantic.DeepEqual(cmGeneratedSnapshot.Status, snapshot.Status) {
 				logrus.Debugf("[snapshotbackpopulate] rkecluster %s/%s: updating etcd snapshot %s/%s as it differed from the actual snapshot config map %v vs %v", cluster.Namespace, cluster.Name, snapshot.Namespace, snapshot.Name, cmGeneratedSnapshot.SnapshotFile, snapshot.SnapshotFile)
 				logrus.Tracef("[snapshotbackpopulate] rkecluster %s/%s: updating etcd snapshot %s/%s: %+v", cluster.Namespace, cluster.Name, cmGeneratedSnapshot.Namespace, cmGeneratedSnapshot.Name, cmGeneratedSnapshot)
@@ -188,25 +204,23 @@ func (h *handler) OnChange(key string, configMap *corev1.ConfigMap) (*corev1.Con
 	return configMap, nil
 }
 
-func (h *handler) configMapToSnapshots(configMap *corev1.ConfigMap, cluster *provv1.Cluster) (result map[string]rkev1.ETCDSnapshot, _ error) {
-	clusterName := cluster.Name
-	clusterNamespace := cluster.Namespace
-	result = map[string]rkev1.ETCDSnapshot{}
+func (h *handler) configMapToSnapshots(configMap *corev1.ConfigMap, cluster *provv1.Cluster) (map[string]rkev1.ETCDSnapshot, error) {
+	result := map[string]rkev1.ETCDSnapshot{}
 	for k, v := range configMap.Data {
 		file := &snapshotFile{}
 		if err := json.Unmarshal([]byte(v), file); err != nil {
 			logrus.Errorf("invalid non-json value in %s/%s for key %s in cluster %s", configMap.Namespace, configMap.Name, k, h.clusterName)
 			return nil, nil
 		}
-		snapshotName := clusterName + "-" + file.Name
 		// Validate that the corresponding machine for the node exists before creating the snapshot
 		snapshot := rkev1.ETCDSnapshot{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      snapshotName,
-				Namespace: clusterNamespace,
+				Namespace: cluster.Namespace,
 				Labels: map[string]string{
-					rke2.ClusterNameLabel: clusterName,
+					rke2.ClusterNameLabel: cluster.Name,
 					rke2.NodeNameLabel:    file.NodeName,
+					SnapshotNameKey:       file.Name,
+					StorageLabelKey:       StorageLocal,
 				},
 				OwnerReferences: []metav1.OwnerReference{},
 			},
@@ -221,9 +235,9 @@ func (h *handler) configMapToSnapshots(configMap *corev1.ConfigMap, cluster *pro
 				Status:    file.Status,
 			},
 		}
-		fileSuffix := "-local"
+		fileSuffix := "-" + StorageLocal
 		if file.S3 != nil {
-			fileSuffix = "-s3"
+			fileSuffix = "-" + StorageS3
 			snapshot.SnapshotFile.S3 = &rkev1.ETCDSnapshotS3{
 				Endpoint:      file.S3.Endpoint,
 				EndpointCA:    file.S3.EndpointCA,
@@ -232,17 +246,11 @@ func (h *handler) configMapToSnapshots(configMap *corev1.ConfigMap, cluster *pro
 				Region:        file.S3.Region,
 				Folder:        file.S3.Folder,
 			}
-			snapshot.OwnerReferences = append(snapshot.OwnerReferences, metav1.OwnerReference{
-				APIVersion:         cluster.APIVersion,
-				Kind:               cluster.Kind,
-				Name:               cluster.Name,
-				UID:                cluster.UID,
-				Controller:         &[]bool{true}[0],
-				BlockOwnerDeletion: &[]bool{true}[0],
-			})
+			snapshot.Labels[StorageLabelKey] = StorageS3
 		} else {
 			listSuccessful, machine, err := rke2.GetMachineFromNode(h.machineCache, file.NodeName, cluster)
 			if listSuccessful && err != nil {
+				logrus.Errorf("error getting machine from node (%s) for snapshot (%s/%s): %v", file.NodeName, snapshot.Namespace, snapshot.Name, err)
 				continue // don't add this snapshot to the list as we can't actually correlate it to an existing node
 			}
 			snapshot.OwnerReferences = append(snapshot.OwnerReferences, metav1.OwnerReference{
@@ -254,9 +262,18 @@ func (h *handler) configMapToSnapshots(configMap *corev1.ConfigMap, cluster *pro
 				BlockOwnerDeletion: &[]bool{true}[0],
 			})
 		}
-		snapshotName = snapshotName + fileSuffix
-		snapshot.Name = snapshotName
-		result[snapshotName] = snapshot
+		if len(snapshot.OwnerReferences) == 0 {
+			snapshot.OwnerReferences = []metav1.OwnerReference{{
+				APIVersion:         cluster.APIVersion,
+				Kind:               cluster.Kind,
+				Name:               cluster.Name,
+				UID:                cluster.UID,
+				Controller:         &[]bool{true}[0],
+				BlockOwnerDeletion: &[]bool{true}[0],
+			}}
+		}
+		snapshot.Name = name.SafeConcatName(cluster.Name, snapshot.SnapshotFile.Name, fileSuffix)
+		result[snapshot.SnapshotFile.Name+fileSuffix] = snapshot
 	}
 	return result, nil
 }
