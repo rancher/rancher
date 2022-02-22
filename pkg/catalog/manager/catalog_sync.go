@@ -37,7 +37,7 @@ func (m *Manager) Sync(key string, obj *v3.Catalog) (runtime.Object, error) {
 		}
 	}
 
-	commit, helm, err := helmlib.NewForceUpdate(catalog)
+	commit, helm, err := helmlib.NewForceUpdate(catalog, m.SecretLister)
 	if err != nil {
 		return m.updateCatalogError(catalog, err)
 	}

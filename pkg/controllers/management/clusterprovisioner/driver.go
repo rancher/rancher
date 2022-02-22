@@ -6,6 +6,7 @@ import (
 
 	"github.com/rancher/kontainer-engine/service"
 	"github.com/rancher/rancher/pkg/clusterprovisioninglogger"
+	"github.com/rancher/rancher/pkg/controllers/management/secretmigrator"
 	"github.com/rancher/rke/services"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
@@ -20,6 +21,18 @@ func (p *Provisioner) driverCreate(cluster *v3.Cluster, spec v3.ClusterSpec) (ap
 	defer logger.Close()
 
 	spec = cleanRKE(spec)
+	spec, err = secretmigrator.AssembleS3Credential(cluster, spec, p.SecretLister)
+	if err != nil {
+		return "", "", "", err
+	}
+	spec, err = secretmigrator.AssemblePrivateRegistryCredential(cluster, spec, p.SecretLister)
+	if err != nil {
+		return "", "", "", err
+	}
+	spec, err = secretmigrator.AssembleWeaveCredential(cluster, spec, p.SecretLister)
+	if err != nil {
+		return "", "", "", err
+	}
 
 	if newCluster, err := p.Clusters.Update(cluster); err == nil {
 		cluster = newCluster

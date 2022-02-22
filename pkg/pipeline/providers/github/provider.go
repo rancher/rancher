@@ -6,8 +6,11 @@ import (
 	"github.com/mitchellh/mapstructure"
 	"github.com/rancher/norman/store/subtype"
 	"github.com/rancher/norman/types"
+	"github.com/rancher/rancher/pkg/controllers/management/secretmigrator"
 	"github.com/rancher/rancher/pkg/pipeline/providers/common"
 	"github.com/rancher/rancher/pkg/pipeline/remote/model"
+	"github.com/rancher/rancher/pkg/pipeline/utils"
+	v1 "github.com/rancher/types/apis/core/v1"
 	mv3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	v3 "github.com/rancher/types/apis/project.cattle.io/v3"
 	"github.com/rancher/types/apis/project.cattle.io/v3/schema"
@@ -18,7 +21,9 @@ import (
 
 type GhProvider struct {
 	common.BaseProvider
-	AuthConfigs mv3.AuthConfigInterface
+	AuthConfigs    mv3.AuthConfigInterface
+	Secrets        v1.SecretInterface
+	SecretMigrator *secretmigrator.Migrator
 }
 
 func (g *GhProvider) CustomizeSchemas(schemas *types.Schemas) {
@@ -57,8 +62,8 @@ func (g *GhProvider) GetProviderConfig(projectID string) (interface{}, error) {
 	}
 	storedGithubPipelineConfigMap := u.UnstructuredContent()
 
-	storedGithubPipelineConfig := &v3.GithubPipelineConfig{}
-	if err := mapstructure.Decode(storedGithubPipelineConfigMap, storedGithubPipelineConfig); err != nil {
+	storedGithubPipelineConfig := v3.GithubPipelineConfig{}
+	if err := mapstructure.Decode(storedGithubPipelineConfigMap, &storedGithubPipelineConfig); err != nil {
 		return nil, fmt.Errorf("failed to decode the config, error: %v", err)
 	}
 
@@ -68,14 +73,19 @@ func (g *GhProvider) GetProviderConfig(projectID string) (interface{}, error) {
 			return nil, err
 		}
 		storedGithubPipelineConfig.ClientSecret = globalConfig.ClientSecret
+	} else {
+		storedGithubPipelineConfig, err = g.SecretMigrator.AssembleGithubPipelineConfigCredential(storedGithubPipelineConfig)
+		if err != nil {
+			return nil, err
+		}
 	}
 
-	objectMeta, err := common.ObjectMetaFromUnstructureContent(storedGithubPipelineConfigMap)
+	objectMeta, err := utils.ObjectMetaFromUnstructureContent(storedGithubPipelineConfigMap)
 	if err != nil {
 		return nil, err
 	}
 	storedGithubPipelineConfig.ObjectMeta = *objectMeta
 	storedGithubPipelineConfig.APIVersion = "project.cattle.io/v3"
 	storedGithubPipelineConfig.Kind = v3.SourceCodeProviderConfigGroupVersionKind.Kind
-	return storedGithubPipelineConfig, nil
+	return &storedGithubPipelineConfig, nil
 }

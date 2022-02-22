@@ -158,7 +158,7 @@ func buildScaledContext(ctx context.Context, clientConfig clientcmd.ClientConfig
 
 	scaledContext.UserManager = userManager
 	scaledContext.RunContext = ctx
-	scaledContext.CatalogManager = manager.New(scaledContext.Management, scaledContext.Project)
+	scaledContext.CatalogManager = manager.New(scaledContext.Management, scaledContext.Project, scaledContext.Core)
 
 	manager := clustermanager.NewManager(cfg.HTTPSListenPort, scaledContext, wranglerContext.RBAC, wranglerContext.ASL)
 	scaledContext.AccessControl = manager

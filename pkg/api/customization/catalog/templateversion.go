@@ -14,6 +14,7 @@ import (
 	"github.com/rancher/norman/types"
 	helmlib "github.com/rancher/rancher/pkg/catalog/helm"
 	"github.com/rancher/rancher/pkg/controllers/user/helm/common"
+	v1 "github.com/rancher/types/apis/core/v1"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	managementschema "github.com/rancher/types/apis/management.cattle.io/v3/schema"
 	client "github.com/rancher/types/client/management/v3"
@@ -25,6 +26,7 @@ type TemplateVerionFormatterWrapper struct {
 	CatalogLister        v3.CatalogLister
 	ClusterCatalogLister v3.ClusterCatalogLister
 	ProjectCatalogLister v3.ProjectCatalogLister
+	SecretLister         v1.SecretLister
 }
 
 var supportedFiles = []string{"catalog.yml", "catalog.yaml", "questions.yml", "questions.yaml"}
@@ -144,7 +146,7 @@ func (t TemplateVerionFormatterWrapper) loadChart(templateVersion *client.Catalo
 		return nil, err
 	}
 
-	helm, err := helmlib.New(catalog)
+	helm, err := helmlib.New(catalog, t.SecretLister)
 	if err != nil {
 		return nil, err
 	}

@@ -9,6 +9,7 @@ import (
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/rancher/pkg/pipeline/providers/common"
 	"github.com/rancher/rancher/pkg/pipeline/remote/model"
+	"github.com/rancher/rancher/pkg/pipeline/utils"
 	v3 "github.com/rancher/types/apis/project.cattle.io/v3"
 	"github.com/rancher/types/apis/project.cattle.io/v3/schema"
 	client "github.com/rancher/types/client/project/v3"
@@ -56,19 +57,23 @@ func (g *GlProvider) GetProviderConfig(projectID string) (interface{}, error) {
 	}
 	storedGitlabPipelineConfigMap := u.UnstructuredContent()
 
-	storedGitlabPipelineConfig := &v3.GitlabPipelineConfig{}
-	if err := mapstructure.Decode(storedGitlabPipelineConfigMap, storedGitlabPipelineConfig); err != nil {
+	storedGitlabPipelineConfig := v3.GitlabPipelineConfig{}
+	if err := mapstructure.Decode(storedGitlabPipelineConfigMap, &storedGitlabPipelineConfig); err != nil {
 		return nil, fmt.Errorf("failed to decode the config, error: %v", err)
 	}
+	storedGitlabPipelineConfig, err = g.SecretMigrator.AssembleGitlabPipelineConfigCredential(storedGitlabPipelineConfig)
+	if err != nil {
+		return nil, err
+	}
 
-	objectMeta, err := common.ObjectMetaFromUnstructureContent(storedGitlabPipelineConfigMap)
+	objectMeta, err := utils.ObjectMetaFromUnstructureContent(storedGitlabPipelineConfigMap)
 	if err != nil {
 		return nil, err
 	}
 	storedGitlabPipelineConfig.ObjectMeta = *objectMeta
 	storedGitlabPipelineConfig.APIVersion = "project.cattle.io/v3"
 	storedGitlabPipelineConfig.Kind = v3.SourceCodeProviderConfigGroupVersionKind.Kind
-	return storedGitlabPipelineConfig, nil
+	return &storedGitlabPipelineConfig, nil
 }
 
 func formGitlabRedirectURLFromMap(config map[string]interface{}) string {

@@ -7,6 +7,8 @@ import (
 	"github.com/docker/docker/api/types"
 	"github.com/rancher/rancher/pkg/settings"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/kubernetes/pkg/credentialprovider"
 )
 
 func GetPrivateRepoURL(cluster *v3.Cluster) string {
@@ -34,12 +36,28 @@ func GenerateClusterPrivateRegistryDockerConfig(cluster *v3.Cluster) (string, er
 	if cluster == nil {
 		return "", nil
 	}
-	return GeneratePrivateRegistryDockerConfig(GetPrivateRepo(cluster))
+	return GeneratePrivateRegistryDockerConfig(GetPrivateRepo(cluster), nil)
 }
 
 // This method generates base64 encoded credentials for the registry
-func GeneratePrivateRegistryDockerConfig(privateRegistry *v3.PrivateRegistry) (string, error) {
-	if privateRegistry == nil || privateRegistry.User == "" || privateRegistry.Password == "" {
+func GeneratePrivateRegistryDockerConfig(privateRegistry *v3.PrivateRegistry, registrySecret *corev1.Secret) (string, error) {
+	if privateRegistry == nil {
+		return "", nil
+	}
+
+	if registrySecret != nil {
+		privateRegistry = privateRegistry.DeepCopy()
+		dockerCfg := credentialprovider.DockerConfigJson{}
+		err := json.Unmarshal(registrySecret.Data[".dockerconfigjson"], &dockerCfg)
+		if err != nil {
+			return "", err
+		}
+		if reg, ok := dockerCfg.Auths[privateRegistry.URL]; ok {
+			privateRegistry.User = reg.Username
+			privateRegistry.Password = reg.Password
+		}
+	}
+	if privateRegistry.User == "" || privateRegistry.Password == "" {
 		return "", nil
 	}
 	authConfig := types.AuthConfig{

@@ -23,6 +23,7 @@ import (
 	"github.com/rancher/rancher/pkg/rkedialerfactory"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rke/services"
+	corev1 "github.com/rancher/types/apis/core/v1"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
@@ -52,6 +53,7 @@ type Provisioner struct {
 	Backups               v3.EtcdBackupLister
 	RKESystemImages       v3.RKEK8sSystemImageInterface
 	RKESystemImagesLister v3.RKEK8sSystemImageLister
+	SecretLister          corev1.SecretLister
 }
 
 func Register(ctx context.Context, management *config.ManagementContext) {
@@ -67,6 +69,7 @@ func Register(ctx context.Context, management *config.ManagementContext) {
 		Backups:               management.Management.EtcdBackups("").Controller().Lister(),
 		RKESystemImagesLister: management.Management.RKEK8sSystemImages("").Controller().Lister(),
 		RKESystemImages:       management.Management.RKEK8sSystemImages(""),
+		SecretLister:          management.Core.Secrets("").Controller().Lister(),
 	}
 
 	// Add handlers
