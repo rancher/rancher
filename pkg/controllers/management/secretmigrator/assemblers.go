@@ -46,7 +46,7 @@ func AssemblePrivateRegistryCredential(cluster *apimgmtv3.Cluster, spec apimgmtv
 // AssembleS3Credential looks up the S3 backup config Secret and inserts the keys into the S3BackupConfig on the Cluster spec.
 // It returns a new copy of the spec without modifying the original. The Cluster is never updated.
 func AssembleS3Credential(cluster *apimgmtv3.Cluster, spec apimgmtv3.ClusterSpec, secretLister v1.SecretLister) (apimgmtv3.ClusterSpec, error) {
-	if cluster.Spec.RancherKubernetesEngineConfig == nil || cluster.Spec.RancherKubernetesEngineConfig.Services.Etcd.BackupConfig == nil {
+	if cluster.Spec.RancherKubernetesEngineConfig == nil || cluster.Spec.RancherKubernetesEngineConfig.Services.Etcd.BackupConfig == nil || cluster.Spec.RancherKubernetesEngineConfig.Services.Etcd.BackupConfig.S3BackupConfig == nil {
 		return spec, nil
 	}
 	if cluster.Status.S3CredentialSecret == "" {
