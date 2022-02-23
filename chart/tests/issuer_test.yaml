@@ -91,7 +91,10 @@ tests:
   - hasDocuments:
       count: 1
     template: issuer-rancher.yaml
-- it: should set letsEncrypt apiVersion with default cert-manager
+- it: should set letsEncrypt apiVersion with cert-manager >= 1.0.0 using capabilities
+  capabilities:
+    apiversions:
+    - cert-manager.io/v1
   set:
     ingress.tls.source: letsEncrypt
   asserts:
