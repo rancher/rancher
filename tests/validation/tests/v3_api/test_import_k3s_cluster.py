@@ -10,6 +10,7 @@ RANCHER_AWS_AMI = os.environ.get("AWS_AMI", "")
 RANCHER_AWS_USER = os.environ.get("AWS_USER", "ubuntu")
 HOST_NAME = os.environ.get('RANCHER_HOST_NAME', "sa")
 
+K3S_CHANNEL = os.environ.get("K3S_CHANNEL", "null")
 RANCHER_K3S_VERSION = os.environ.get("RANCHER_K3S_VERSION", "")
 RANCHER_K3S_VERSIONS = os.environ.get('RANCHER_K3S_VERSIONS', "").split(",")
 RANCHER_K3S_NO_OF_SERVER_NODES = \
@@ -152,6 +153,7 @@ def create_multiple_control_cluster():
                               'db_username': RANCHER_DB_USERNAME,
                               'db_password': RANCHER_DB_PASSWORD,
                               'k3s_version': RANCHER_K3S_VERSION,
+                              'k3s_channel': K3S_CHANNEL,
                               'no_of_server_nodes': no_of_servers,
                               'server_flags': RANCHER_K3S_SERVER_FLAGS,
                               'qa_space': RANCHER_QA_SPACE,
@@ -183,6 +185,7 @@ def create_multiple_control_cluster():
                                   'resource_name': RANCHER_HOSTNAME_PREFIX,
                                   'access_key': keyPath,
                                   'k3s_version': RANCHER_K3S_VERSION,
+                                  'k3s_channel': K3S_CHANNEL,
                                   'no_of_worker_nodes': int(RANCHER_K3S_NO_OF_WORKER_NODES),
                                   'node_os': RANCHER_NODE_OS,
                                   'username': RANCHER_RHEL_USERNAME,

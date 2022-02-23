@@ -36,6 +36,11 @@ then
     echo "curl -sfL https://get.k3s.io | sh -s - ${7} --node-external-ip=${6} --server https://${4}:6443 --token ${5} ${7}"
     curl -sfL https://get.k3s.io | sh -s - ${7} --node-external-ip=${6} --server https://"${4}":6443 --token "${5}"
 else
-    curl -sfL https://get.k3s.io | sh -s - agent --node-external-ip=${6}
+    if [ ${10} != "null" ]
+    then
+      curl -sfL https://get.k3s.io | INSTALL_K3S_CHANNEL=${10} sh -s - agent --node-external-ip=${6}
+    else
+      curl -sfL https://get.k3s.io | sh -s - agent --node-external-ip=${6}
+    fi
 fi
 sleep 20

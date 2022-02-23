@@ -17,6 +17,7 @@ variable "resource_name" {}
 variable "username" {}
 variable "password" {}
 variable "k3s_version" {}
+variable "k3s_channel" {}
 variable "no_of_worker_nodes" {}
 variable "worker_flags" {}
 variable "node_os" {}

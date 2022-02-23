@@ -48,13 +48,23 @@ then
     then
         curl -sfL https://get.k3s.io | INSTALL_K3S_TYPE='server' sh -s - server --server https://"${7}":6443 --token "${8}" --node-external-ip="${6}" --tls-san "${2}" --write-kubeconfig-mode "0644"
     else
-        curl -sfL https://get.k3s.io | INSTALL_K3S_TYPE='server' sh -s - server --server https://"${7}":6443 --node-external-ip="${6}"
+        if [ ${13} != "null" ]
+        then
+          curl -sfL https://get.k3s.io | INSTALL_K3S_CHANNEL=${13} INSTALL_K3S_TYPE='server' sh -s - server --server https://"${7}":6443 --node-external-ip="${6}"
+        else
+          curl -sfL https://get.k3s.io | INSTALL_K3S_TYPE='server' sh -s - server --server https://"${7}":6443 --node-external-ip="${6}"
+        fi
     fi
 else
    if [[ "${4}" == *"v1.18"* ]] || [["${4}" == *"v1.17"* ]] && [[ -n "${10}" ]]
     then
         curl -sfL https://get.k3s.io | INSTALL_K3S_TYPE='server' sh -s - server --node-external-ip="${6}" --datastore-endpoint="${9}" --tls-san "${2}" --write-kubeconfig-mode "0644"
     else
-        curl -sfL https://get.k3s.io | INSTALL_K3S_TYPE='server' sh -s - server --node-external-ip="${6}" --datastore-endpoint="${9}"
+        if [ ${13} != "null" ]
+        then
+          curl -sfL https://get.k3s.io | INSTALL_K3S_CHANNEL=${13} INSTALL_K3S_TYPE='server' sh -s - server --node-external-ip="${6}" --datastore-endpoint="${9}"
+        else
+          curl -sfL https://get.k3s.io | INSTALL_K3S_TYPE='server' sh -s - server --node-external-ip="${6}" --datastore-endpoint="${9}"
+        fi
     fi
 fi
