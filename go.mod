@@ -96,7 +96,7 @@ require (
 	github.com/prometheus/client_model v0.2.0
 	github.com/prometheus/common v0.32.0
 	github.com/rancher/aks-operator v1.0.4-rc3
-	github.com/rancher/apiserver v0.0.0-20220125032650-a2ef3682eca9
+	github.com/rancher/apiserver v0.0.0-20220223185512-c4e289f92e46
 	github.com/rancher/channelserver v0.5.1-0.20220217142715-90ef7d38f3f8
 	github.com/rancher/dynamiclistener v0.3.1-0.20210616080009-9865ae859c7f
 	github.com/rancher/eks-operator v1.1.3-rc3
