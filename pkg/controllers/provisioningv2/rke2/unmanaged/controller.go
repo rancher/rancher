@@ -105,9 +105,7 @@ func (h *handler) onSecretChange(key string, secret *corev1.Secret) (*corev1.Sec
 	}
 
 	capiCluster, err := h.getCAPICluster(secret)
-	if apierror.IsNotFound(err) || capiCluster == nil {
-		return secret, nil
-	} else if err != nil {
+	if err != nil {
 		return secret, err
 	}
 

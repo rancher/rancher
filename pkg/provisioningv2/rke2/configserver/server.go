@@ -21,6 +21,7 @@ import (
 	"github.com/rancher/rancher/pkg/tls"
 	"github.com/rancher/rancher/pkg/wrangler"
 	corecontrollers "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
+	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -43,10 +44,11 @@ var (
 
 type RKE2ConfigServer struct {
 	clusterTokenCache        mgmtcontroller.ClusterRegistrationTokenCache
+	clusterTokens            mgmtcontroller.ClusterRegistrationTokenController
 	serviceAccountsCache     corecontrollers.ServiceAccountCache
 	serviceAccounts          corecontrollers.ServiceAccountClient
 	secretsCache             corecontrollers.SecretCache
-	secrets                  corecontrollers.SecretClient
+	secrets                  corecontrollers.SecretController
 	settings                 mgmtcontroller.SettingCache
 	machineCache             capicontrollers.MachineCache
 	machines                 capicontrollers.MachineClient
@@ -74,6 +76,7 @@ func New(clients *wrangler.Context) *RKE2ConfigServer {
 		secretsCache:             clients.Core.Secret().Cache(),
 		secrets:                  clients.Core.Secret(),
 		clusterTokenCache:        clients.Mgmt.ClusterRegistrationToken().Cache(),
+		clusterTokens:            clients.Mgmt.ClusterRegistrationToken(),
 		machineCache:             clients.CAPI.Machine().Cache(),
 		machines:                 clients.CAPI.Machine(),
 		bootstrapCache:           clients.RKE.RKEBootstrap().Cache(),
@@ -82,6 +85,16 @@ func New(clients *wrangler.Context) *RKE2ConfigServer {
 }
 
 func (r *RKE2ConfigServer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
+	if !r.secrets.Informer().HasSynced() || !r.clusterTokens.Informer().HasSynced() {
+		if err := r.secrets.Informer().GetIndexer().Resync(); err != nil {
+			logrus.Errorf("error re-syncing secrets informer in rke2configserver: %v", err)
+		}
+		if err := r.clusterTokens.Informer().GetIndexer().Resync(); err != nil {
+			logrus.Errorf("error re-syncing clustertokens informer in rke2configserver: %v", err)
+		}
+		rw.WriteHeader(http.StatusUnauthorized)
+		return
+	}
 	planSecret, secret, err := r.findSA(req)
 	if apierrors.IsNotFound(err) {
 		rw.WriteHeader(http.StatusUnauthorized)
