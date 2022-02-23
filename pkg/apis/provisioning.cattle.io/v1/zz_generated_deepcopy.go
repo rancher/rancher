@@ -199,6 +199,11 @@ func (in *RKEConfig) DeepCopyInto(out *RKEConfig) {
 		*out = new(rkecattleiov1.RotateCertificates)
 		(*in).DeepCopyInto(*out)
 	}
+	if in.RotateEncryptionKeys != nil {
+		in, out := &in.RotateEncryptionKeys, &out.RotateEncryptionKeys
+		*out = new(rkecattleiov1.RotateEncryptionKeys)
+		**out = **in
+	}
 	if in.MachinePools != nil {
 		in, out := &in.MachinePools, &out.MachinePools
 		*out = make([]RKEMachinePool, len(*in))

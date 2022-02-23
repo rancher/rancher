@@ -39,19 +39,19 @@ func (p *Planner) setInitNodeMark(entry *planEntry) error {
 
 // findAndDesignateFixedInitNode is used for rancherd where an exact machine (determined by labeling the
 // rkecontrolplane object) is desired to be the init node
-func (p *Planner) findAndDesignateFixedInitNode(rkeControlPlane *rkev1.RKEControlPlane, plan *plan.Plan) (bool, string, error) {
+func (p *Planner) findAndDesignateFixedInitNode(rkeControlPlane *rkev1.RKEControlPlane, plan *plan.Plan) (bool, string, *planEntry, error) {
 	logrus.Debugf("rkecluster %s/%s: finding and designating fixed init node", rkeControlPlane.Namespace, rkeControlPlane.Spec.ClusterName)
 	fixedMachineID := rkeControlPlane.Labels[rke2.InitNodeMachineIDLabel]
 	if fixedMachineID == "" {
-		return false, "", fmt.Errorf("fixed machine ID label did not exist on rkecontrolplane")
+		return false, "", nil, fmt.Errorf("fixed machine ID label did not exist on rkecontrolplane")
 	}
 	entries := collect(plan, func(entry *planEntry) bool {
 		return entry.Metadata.Labels[rke2.MachineIDLabel] == fixedMachineID
 	})
 	if len(entries) > 1 {
-		return false, "", fmt.Errorf("multiple machines found with identical machine ID label %s=%s", rke2.MachineIDLabel, fixedMachineID)
+		return false, "", nil, fmt.Errorf("multiple machines found with identical machine ID label %s=%s", rke2.MachineIDLabel, fixedMachineID)
 	} else if len(entries) == 0 {
-		return false, "", fmt.Errorf("fixed machine with ID %s not found", fixedMachineID)
+		return false, "", nil, fmt.Errorf("fixed machine with ID %s not found", fixedMachineID)
 	}
 	if rkeControlPlane.Labels[rke2.InitNodeMachineIDDoneLabel] == "" {
 		logrus.Debugf("rkecluster %s/%s: setting designated init node to fixedMachineID: %s", rkeControlPlane.Namespace, rkeControlPlane.Spec.ClusterName, fixedMachineID)
@@ -65,35 +65,35 @@ func (p *Planner) findAndDesignateFixedInitNode(rkeControlPlane *rkev1.RKEContro
 			err := p.clearInitNodeMark(entry)
 			if err != nil && !errors.Is(err, generic.ErrSkip) {
 				// if we received a strange error attempting to clear the init node mark
-				return false, "", err
+				return false, "", nil, err
 			} else if errors.Is(err, generic.ErrSkip) {
 				cachesInvalidated = true
 			}
 		}
 		if cachesInvalidated {
-			return false, "", generic.ErrSkip
+			return false, "", nil, generic.ErrSkip
 		}
 		if err := p.setInitNodeMark(entries[0]); err != nil && !errors.Is(err, generic.ErrSkip) {
-			return false, "", err
+			return false, "", nil, err
 		}
 		rkeControlPlane = rkeControlPlane.DeepCopy()
 		rkeControlPlane.Labels[rke2.InitNodeMachineIDDoneLabel] = "true"
 		_, err := p.rkeControlPlanes.Update(rkeControlPlane)
 		if err != nil {
-			return false, "", err
+			return false, "", nil, err
 		}
 		// if we set the designated init node on this iteration, return an errSkip so we know our cache is invalidated
-		return true, entries[0].Metadata.Annotations[rke2.JoinURLAnnotation], generic.ErrSkip
+		return true, entries[0].Metadata.Annotations[rke2.JoinURLAnnotation], entries[0], generic.ErrSkip
 	}
 	logrus.Debugf("rkecluster %s/%s: designated init node %s found", rkeControlPlane.Namespace, rkeControlPlane.Spec.ClusterName, fixedMachineID)
-	return true, entries[0].Metadata.Annotations[rke2.JoinURLAnnotation], nil
+	return true, entries[0].Metadata.Annotations[rke2.JoinURLAnnotation], entries[0], nil
 }
 
 // findInitNode searches the given cluster for the init node. It returns a bool which is whether an init node was
 // found, the init node join URL, and an error for a few conditions, i.e. if multiple init nodes were found or if there
 // is a more suitable init node. Notably, if multiple init nodes are found, it will return false as it could not come to
 // consensus on a single init node
-func (p *Planner) findInitNode(rkeControlPlane *rkev1.RKEControlPlane, plan *plan.Plan) (bool, string, error) {
+func (p *Planner) findInitNode(rkeControlPlane *rkev1.RKEControlPlane, plan *plan.Plan) (bool, string, *planEntry, error) {
 	logrus.Debugf("rkecluster %s/%s searching for init node", rkeControlPlane.Namespace, rkeControlPlane.Spec.ClusterName)
 	// if the rkecontrolplane object has an InitNodeMachineID label, we need to find the fixedInitNode.
 	if rkeControlPlane.Labels[rke2.InitNodeMachineIDLabel] != "" {
@@ -105,7 +105,7 @@ func (p *Planner) findInitNode(rkeControlPlane *rkev1.RKEControlPlane, plan *pla
 
 	if len(currentInitNodes) > 1 {
 		// if multiple init nodes are found, we don't know which one to return so return false with an error to hopefully trigger a re-election
-		return false, "", fmt.Errorf("multiple init nodes found")
+		return false, "", nil, fmt.Errorf("multiple init nodes found")
 	}
 
 	initNodeFound := false
@@ -117,7 +117,7 @@ func (p *Planner) findInitNode(rkeControlPlane *rkev1.RKEControlPlane, plan *pla
 			joinURL = entry.Metadata.Annotations[rke2.JoinURLAnnotation]
 			logrus.Debugf("rkecluster %s/%s found current init node %s with joinURL: %s", rkeControlPlane.Namespace, rkeControlPlane.Spec.ClusterName, entry.Machine.Name, joinURL)
 			if joinURL != "" {
-				return true, joinURL, nil
+				return true, joinURL, entry, nil
 			}
 		}
 	}
@@ -130,15 +130,15 @@ func (p *Planner) findInitNode(rkeControlPlane *rkev1.RKEControlPlane, plan *pla
 		for _, entry := range possibleInitNodes {
 			if entry.Metadata.Annotations[rke2.JoinURLAnnotation] != "" {
 				// if a non-blank JoinURL was found, return that we found an init node but with an error
-				return true, "", fmt.Errorf("non-populated init node found, but more suitable alternative is available")
+				return true, "", entry, fmt.Errorf("non-populated init node found, but more suitable alternative is available")
 			}
 		}
 		// if we got through all possibleInitNodes (or there weren't any other possible init nodes), return true that we found an init node with no error.
 		logrus.Debugf("rkecluster %s/%s: init node with empty JoinURLAnnotation was found, no suitable alternatives exist", rkeControlPlane.Namespace, rkeControlPlane.Spec.ClusterName)
-		return true, "", nil
+		return true, "", nil, nil
 	}
 
-	return false, "", fmt.Errorf("init node not found")
+	return false, "", nil, fmt.Errorf("init node not found")
 }
 
 // electInitNode returns a joinURL and error (if one exists) of an init node. It will first search to see if an init node exists
@@ -146,7 +146,7 @@ func (p *Planner) findInitNode(rkeControlPlane *rkev1.RKEControlPlane, plan *pla
 // electing the first possible init node if no fully populated init node is found.
 func (p *Planner) electInitNode(rkeControlPlane *rkev1.RKEControlPlane, plan *plan.Plan) (string, error) {
 	logrus.Debugf("rkecluster %s/%s: determining if election of init node is necessary", rkeControlPlane.Namespace, rkeControlPlane.Spec.ClusterName)
-	initNodeFound, joinURL, err := p.findInitNode(rkeControlPlane, plan)
+	initNodeFound, joinURL, _, err := p.findInitNode(rkeControlPlane, plan)
 	if (initNodeFound && err == nil) || errors.Is(err, generic.ErrSkip) {
 		logrus.Debugf("rkecluster %s/%s: init node was already elected and found with joinURL: %s", rkeControlPlane.Namespace, rkeControlPlane.Spec.ClusterName, joinURL)
 		return joinURL, err

@@ -10,6 +10,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/moby/locker"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
@@ -18,6 +19,7 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2"
 	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta1"
 	mgmtcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
+	ranchercontrollers "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
 	rkecontrollers "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/provisioningv2/kubeconfig"
 	"github.com/rancher/rancher/pkg/settings"
@@ -99,6 +101,10 @@ func (e ErrWaiting) Error() string {
 	return string(e)
 }
 
+func ErrWaitingf(format string, a ...interface{}) ErrWaiting {
+	return ErrWaiting(fmt.Sprintf(format, a...))
+}
+
 type errIgnore string
 
 func (e errIgnore) Error() string {
@@ -110,18 +116,19 @@ type roleFilter func(*planEntry) bool
 type Planner struct {
 	ctx                           context.Context
 	store                         *PlanStore
-	rkeControlPlanes              rkecontrollers.RKEControlPlaneClient
+	rkeControlPlanes              rkecontrollers.RKEControlPlaneController
 	etcdSnapshotCache             rkecontrollers.ETCDSnapshotCache
 	secretClient                  corecontrollers.SecretClient
 	secretCache                   corecontrollers.SecretCache
 	machines                      capicontrollers.MachineClient
 	clusterRegistrationTokenCache mgmtcontrollers.ClusterRegistrationTokenCache
+	capiClient                    capicontrollers.ClusterClient
 	capiClusters                  capicontrollers.ClusterCache
 	managementClusters            mgmtcontrollers.ClusterCache
+	rancherClusterCache           ranchercontrollers.ClusterCache
 	kubeconfig                    *kubeconfig.Manager
 	locker                        locker.Locker
 	etcdS3Args                    s3Args
-	etcdArgs                      s3Args
 	certificateRotation           *certificateRotation
 }
 
@@ -140,8 +147,10 @@ func New(ctx context.Context, clients *wrangler.Context) *Planner {
 		secretClient:                  clients.Core.Secret(),
 		secretCache:                   clients.Core.Secret().Cache(),
 		clusterRegistrationTokenCache: clients.Mgmt.ClusterRegistrationToken().Cache(),
+		capiClient:                    clients.CAPI.Cluster(),
 		capiClusters:                  clients.CAPI.Cluster().Cache(),
 		managementClusters:            clients.Mgmt.Cluster().Cache(),
+		rancherClusterCache:           clients.Provisioning.Cluster().Cache(),
 		rkeControlPlanes:              clients.RKE.RKEControlPlane(),
 		etcdSnapshotCache:             clients.RKE.ETCDSnapshot().Cache(),
 		kubeconfig:                    kubeconfig.New(clients),
@@ -206,7 +215,7 @@ func (p *Planner) Process(controlPlane *rkev1.RKEControlPlane) error {
 		return ErrWaiting(errMsg)
 	}
 
-	if err := p.restoreEtcdSnapshot(controlPlane, clusterSecretTokens, plan); err != nil {
+	if err = p.restoreEtcdSnapshot(controlPlane, clusterSecretTokens, plan); err != nil {
 		return err
 	}
 
@@ -216,7 +225,11 @@ func (p *Planner) Process(controlPlane *rkev1.RKEControlPlane) error {
 		return err
 	}
 
-	if err := p.certificateRotation.RotateCertificates(controlPlane, plan); err != nil {
+	if err = p.certificateRotation.RotateCertificates(controlPlane, plan); err != nil {
+		return err
+	}
+
+	if err = p.rotateEncryptionKeys(controlPlane, plan); err != nil {
 		return err
 	}
 
@@ -230,7 +243,7 @@ func (p *Planner) Process(controlPlane *rkev1.RKEControlPlane) error {
 	}
 
 	if joinServer == "" {
-		_, joinServer, err = p.findInitNode(controlPlane, plan)
+		_, joinServer, _, err = p.findInitNode(controlPlane, plan)
 		if err != nil {
 			return err
 		} else if joinServer == "" && firstIgnoreError != nil {
@@ -271,6 +284,12 @@ func (p *Planner) Process(controlPlane *rkev1.RKEControlPlane) error {
 
 	if firstIgnoreError != nil {
 		return ErrWaiting(firstIgnoreError.Error())
+	}
+
+	if controlPlane.Spec.RotateEncryptionKeys != nil &&
+		controlPlane.Status.RotateEncryptionKeysGeneration != controlPlane.Spec.RotateEncryptionKeys.Generation {
+		logrus.Infof("Reenqueuing rotate encryption keys for cluster: [%s]", controlPlane.Spec.ClusterName)
+		p.rkeControlPlanes.EnqueueAfter(controlPlane.Namespace, controlPlane.Name, 20*time.Second)
 	}
 
 	return nil
@@ -789,6 +808,10 @@ func isControlPlane(entry *planEntry) bool {
 	return entry.Metadata != nil && entry.Metadata.Labels[rke2.ControlPlaneRoleLabel] == "true"
 }
 
+func isControlPlaneAndNotInitNode(entry *planEntry) bool {
+	return isControlPlane(entry) && !isInitNode(entry)
+}
+
 func isControlPlaneEtcd(entry *planEntry) bool {
 	return isControlPlane(entry) || isEtcd(entry)
 }
@@ -920,4 +943,24 @@ type helmChartConfigSpec struct {
 
 func (h *helmChartConfig) DeepCopyObject() runtime.Object {
 	panic("unsupported")
+}
+
+func (p *Planner) enqueueAndSkip(cp *rkev1.RKEControlPlane) error {
+	p.rkeControlPlanes.EnqueueAfter(cp.Namespace, cp.Name, 10*time.Second)
+	return generic.ErrSkip
+}
+
+// enqueueIfErrWaiting will enqueue the control plan if err is ErrWaiting, otherwise err is returned.
+// Some plan store functions as well as internal functions can return ErrWaiting, for instance when the plan has been
+// applied, but output is not yet available for periodic status.
+func (p *Planner) enqueueIfErrWaiting(cp *rkev1.RKEControlPlane, err error) error {
+	if err != nil {
+		w := ErrWaiting("")
+		if errors.As(err, &w) {
+			logrus.Debugf("Enqueuing [%s] because of ErrWaiting: %s", cp.Spec.ClusterName, w.Error())
+			return p.enqueueAndSkip(cp)
+		}
+		return err
+	}
+	return nil
 }
