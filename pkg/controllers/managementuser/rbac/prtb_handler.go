@@ -116,8 +116,10 @@ func (p *prtbLifecycle) syncPRTB(binding *v3.ProjectRoleTemplateBinding) error {
 		}
 	}
 
-	if err := p.m.ensureServiceAccountImpersonator(binding.UserName, binding.GroupName); err != nil {
-		return errors.Wrapf(err, "couldn't ensure service account impersonator")
+	if binding.UserName != "" {
+		if err := p.m.ensureServiceAccountImpersonator(binding.UserName); err != nil {
+			return errors.Wrapf(err, "couldn't ensure service account impersonator")
+		}
 	}
 
 	return p.reconcileProjectAccessToGlobalResources(binding, roles)
