@@ -32,13 +32,13 @@ type Impersonator struct {
 	userAttributeLister v3.UserAttributeLister
 }
 
-func New(userInfo user.Info, group string, clusterContext *config.UserContext) (Impersonator, error) {
+func New(userInfo user.Info, clusterContext *config.UserContext) (Impersonator, error) {
 	impersonator := Impersonator{
 		clusterContext:      clusterContext,
 		userLister:          clusterContext.Management.Management.Users("").Controller().Lister(),
 		userAttributeLister: clusterContext.Management.Management.UserAttributes("").Controller().Lister(),
 	}
-	user, err := impersonator.getUser(userInfo, group)
+	user, err := impersonator.getUser(userInfo)
 	impersonator.user = user
 	if err != nil {
 		return Impersonator{}, err
@@ -354,16 +354,13 @@ func (i *Impersonator) waitForServiceAccount(sa *corev1.ServiceAccount) (*corev1
 	return ret, nil
 }
 
-func (i *Impersonator) getUser(userInfo user.Info, groupName string) (user.Info, error) {
+func (i *Impersonator) getUser(userInfo user.Info) (user.Info, error) {
 	u, err := i.userLister.Get("", userInfo.GetUID())
 	if err != nil {
 		return &user.DefaultInfo{}, err
 	}
 
 	groups := []string{"system:authenticated", "system:cattle:authenticated"}
-	if groupName != "" {
-		groups = append(groups, groupName)
-	}
 	attribs, err := i.userAttributeLister.Get("", userInfo.GetUID())
 	if err != nil && !apierrors.IsNotFound(err) {
 		return &user.DefaultInfo{}, err

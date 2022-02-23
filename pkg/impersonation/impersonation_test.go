@@ -55,7 +55,6 @@ func Test_getUser(t *testing.T) {
 					},
 				},
 			},
-			groupName: "project:abc",
 			userGetFunc: func(_, _ string) (*v3.User, error) {
 				return &v3.User{
 					ObjectMeta: metav1.ObjectMeta{Name: "user-abcde"},
@@ -99,7 +98,6 @@ func Test_getUser(t *testing.T) {
 					"github_org://456",
 					"openldap_group://cn=group1,dc=example,dc=org",
 					"openldap_group://cn=group2,dc=example,dc=org",
-					"project:abc",
 					"system:authenticated",
 					"system:cattle:authenticated",
 				},
@@ -127,7 +125,7 @@ func Test_getUser(t *testing.T) {
 					GetFunc: tt.userAttribGetFunc,
 				},
 			}
-			got, err := impersonator.getUser(tt.userInfo, tt.groupName)
+			got, err := impersonator.getUser(tt.userInfo)
 			assert.Nil(t, err)
 			assert.Equal(t, tt.want, got)
 		})
