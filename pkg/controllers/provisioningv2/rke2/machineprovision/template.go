@@ -171,16 +171,26 @@ func objects(ready bool, args driverArgs) []runtime.Object {
 					Labels: labels,
 				},
 				Spec: corev1.PodSpec{
-					Volumes: append(volumes, corev1.Volume{
-						Name: "tls-ca-additional-volume",
-						VolumeSource: corev1.VolumeSource{
-							Secret: &corev1.SecretVolumeSource{
-								SecretName:  "tls-ca-additional",
-								DefaultMode: &[]int32{0444}[0],
-								Optional:    &[]bool{true}[0],
+					Volumes: append(volumes,
+						corev1.Volume{
+							Name: "tls-ca-additional-volume",
+							VolumeSource: corev1.VolumeSource{
+								Secret: &corev1.SecretVolumeSource{
+									SecretName:  "tls-ca-additional",
+									DefaultMode: &[]int32{0444}[0],
+									Optional:    &[]bool{true}[0],
+								},
 							},
-						},
-					}),
+						}, corev1.Volume{
+							Name: "tls-rancher-volume",
+							VolumeSource: corev1.VolumeSource{
+								Secret: &corev1.SecretVolumeSource{
+									SecretName:  "tls-rancher",
+									DefaultMode: &[]int32{0444}[0],
+									Optional:    &[]bool{true}[0],
+								},
+							},
+						}),
 					RestartPolicy: corev1.RestartPolicyNever,
 					Containers: []corev1.Container{
 						{
@@ -201,12 +211,18 @@ func objects(ready bool, args driverArgs) []runtime.Object {
 									},
 								},
 							},
-							VolumeMounts: append(volumeMounts, corev1.VolumeMount{
-								Name:      "tls-ca-additional-volume",
-								ReadOnly:  true,
-								MountPath: "/etc/ssl/certs/ca-additional.pem",
-								SubPath:   "ca-additional.pem",
-							}),
+							VolumeMounts: append(volumeMounts,
+								corev1.VolumeMount{
+									Name:      "tls-ca-additional-volume",
+									ReadOnly:  true,
+									MountPath: "/etc/rancher/ssl/ca-additional.pem",
+									SubPath:   "ca-additional.pem",
+								}, corev1.VolumeMount{
+									Name:      "tls-rancher-volume",
+									ReadOnly:  true,
+									MountPath: "/etc/rancher/ssl/rancher.crt",
+									SubPath:   "tls.crt",
+								}),
 						},
 					},
 					ServiceAccountName: saName,
