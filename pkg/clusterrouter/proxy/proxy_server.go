@@ -288,7 +288,7 @@ func (r *RemoteService) getImpersonatorAccountToken(user user.Info) (string, err
 		return "", err
 	}
 
-	i, err := impersonation.New(user, "", clusterContext)
+	i, err := impersonation.New(user, clusterContext)
 	if err != nil {
 		return "", fmt.Errorf("error creating impersonation for user %s: %w", user.GetUID(), err)
 	}
