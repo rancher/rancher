@@ -1,14 +1,11 @@
 package resourcequota
 
 import (
-	"sort"
-	"strings"
 	"sync"
 	"time"
 
-	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-
 	"github.com/rancher/norman/types/convert"
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	api "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/cache"
@@ -29,33 +26,35 @@ func GetProjectLock(projectID string) *sync.Mutex {
 	return mu
 }
 
-func IsQuotaFit(nsLimit *v32.ResourceQuotaLimit, nsLimits []*v32.ResourceQuotaLimit, projectLimit *v32.ResourceQuotaLimit) (bool, string, error) {
+func IsQuotaFit(nsLimit *v32.ResourceQuotaLimit, nsLimits []*v32.ResourceQuotaLimit, projectLimit *v32.ResourceQuotaLimit) (bool, api.ResourceList, error) {
 	nssResourceList := api.ResourceList{}
 	nsResourceList, err := ConvertLimitToResourceList(nsLimit)
 	if err != nil {
-		return false, "", err
+		return false, nil, err
 	}
 	nssResourceList = quota.Add(nssResourceList, nsResourceList)
 
 	for _, nsLimit := range nsLimits {
 		nsResourceList, err := ConvertLimitToResourceList(nsLimit)
 		if err != nil {
-			return false, "", err
+			return false, nil, err
 		}
 		nssResourceList = quota.Add(nssResourceList, nsResourceList)
 	}
 
 	projectResourceList, err := ConvertLimitToResourceList(projectLimit)
 	if err != nil {
-		return false, "", err
+		return false, nil, err
 	}
 
-	allowed, exceeded := quota.LessThanOrEqual(nssResourceList, projectResourceList)
-	if allowed {
-		return true, "", nil
+	_, exceeded := quota.LessThanOrEqual(nssResourceList, projectResourceList)
+	// Include resources with negative values among exceeded resources.
+	exceeded = append(exceeded, quota.IsNegative(nsResourceList)...)
+	if len(exceeded) == 0 {
+		return true, nil, nil
 	}
 	failedHard := quota.Mask(nssResourceList, exceeded)
-	return false, prettyPrint(failedHard), nil
+	return false, failedHard, nil
 }
 
 func ConvertLimitToResourceList(limit *v32.ResourceQuotaLimit) (api.ResourceList, error) {
@@ -72,19 +71,4 @@ func ConvertLimitToResourceList(limit *v32.ResourceQuotaLimit) (api.ResourceList
 		toReturn[api.ResourceName(key)] = q
 	}
 	return toReturn, nil
-}
-
-func prettyPrint(item api.ResourceList) string {
-	parts := []string{}
-	keys := []string{}
-	for key := range item {
-		keys = append(keys, string(key))
-	}
-	sort.Strings(keys)
-	for _, key := range keys {
-		value := item[api.ResourceName(key)]
-		constraint := key + "=" + value.String()
-		parts = append(parts, constraint)
-	}
-	return strings.Join(parts, ",")
 }
