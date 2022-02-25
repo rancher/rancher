@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/sirupsen/logrus"
 	"regexp"
 	"sort"
 	"strings"
@@ -219,6 +220,7 @@ func DoRemoveAndUpdateStatus(obj metav1.Object, doRemove func() (string, error),
 		Waiting.SetStatus(obj, "True")
 		Pending.SetStatus(obj, "True")
 	}
+	logrus.Infof("DoRemoveAndUpdateStatus: calling doRemove()")
 	message, err := doRemove()
 	if errors.Is(err, generic.ErrSkip) {
 		// If generic.ErrSkip is returned, we don't want to update the status.

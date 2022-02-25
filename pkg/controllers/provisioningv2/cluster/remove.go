@@ -8,6 +8,7 @@ import (
 	v1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2"
 	"github.com/rancher/wrangler/pkg/generic"
+	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -19,12 +20,16 @@ func (h *handler) OnMgmtClusterRemove(_ string, cluster *v3.Cluster) (*v3.Cluste
 		return nil, err
 	}
 
+	logrus.Infof("OnMgmtClusterRemove: %s, %v", cluster.Name, len(provisioningClusters))
 	var legacyCluster bool
 	for _, provisioningCluster := range provisioningClusters {
 		legacyCluster = legacyCluster || h.isLegacyCluster(provisioningCluster)
+		logrus.Infof("OnMgmtClusterRemove: %s deleting provisioning cluster %s %s", cluster.Name, provisioningCluster.Namespace, provisioningCluster.Name)
 		if err := h.clusters.Delete(provisioningCluster.Namespace, provisioningCluster.Name, nil); err != nil {
 			return nil, err
 		}
+		logrus.Infof("OnMgmtClusterRemove: %s legacyCluster %v deleting provisioning cluster %s %s", cluster.Name, legacyCluster,
+			provisioningCluster.Namespace, provisioningCluster.Name)
 	}
 
 	if len(provisioningClusters) == 0 || legacyCluster {
@@ -33,6 +38,7 @@ func (h *handler) OnMgmtClusterRemove(_ string, cluster *v3.Cluster) (*v3.Cluste
 		return cluster, nil
 	}
 
+	logrus.Infof("OnMgmtClusterRemove: %s enqueue cluster again and ErrSkip!", cluster.Name)
 	h.mgmtClusters.EnqueueAfter(cluster.Name, 5*time.Second)
 	// generic.ErrSkip will mark the cluster object as reconciled, but won't remove the finalizer.
 	// The finalizer should be removed after the provisioning cluster is gone.
@@ -54,16 +60,19 @@ func (h *handler) OnClusterRemove(_ string, cluster *v1.Cluster) (*v1.Cluster, e
 		return cluster, updateErr
 	}
 
+	logrus.Infof("OnClusterRemove: finished %s, %v", cluster.Status.ClusterName, err)
 	return cluster, err
 }
 
 func (h *handler) doClusterRemove(cluster *v1.Cluster) func() (string, error) {
 	return func() (string, error) {
 		if cluster.Status.ClusterName != "" {
+			logrus.Infof("cluster.Status.ClusterName %s", cluster.Status.ClusterName)
 			mgmtCluster, err := h.mgmtClusters.Get(cluster.Status.ClusterName, metav1.GetOptions{})
 			if err != nil {
 				// We do nothing if the management cluster does not exist (IsNotFound) because it's been deleted.
 				if !apierrors.IsNotFound(err) {
+					logrus.Infof("cluster.Status.ClusterName %s err %v", cluster.Status.ClusterName, err)
 					return "", err
 				}
 			} else if cluster.Namespace == mgmtCluster.Spec.FleetWorkspaceName {
@@ -71,8 +80,10 @@ func (h *handler) doClusterRemove(cluster *v1.Cluster) func() (string, error) {
 				// namespace. The reason: if there's a mismatch, we know that the provisioning cluster needs to be migrated
 				// because the user moved the Fleet cluster (and provisioning cluster, by extension) to another
 				// FleetWorkspace. Ultimately, the aforementioned cluster objects are re-created in another namespace.
+				logrus.Infof("cluster.Status.ClusterName %s calling delete mgmtCluster", cluster.Status.ClusterName)
 				err := h.mgmtClusters.Delete(cluster.Status.ClusterName, nil)
 				if err != nil && !apierrors.IsNotFound(err) {
+					logrus.Infof("cluster.Status.ClusterName %s err22 %v", cluster.Status.ClusterName, err)
 					return "", err
 				}
 
@@ -110,13 +121,17 @@ func (h *handler) doClusterRemove(cluster *v1.Cluster) func() (string, error) {
 				}
 			}
 
+			logrus.Infof("cluster.Status.ClusterName %s deleting rkeControlPlane controlPlaneRef %s", cluster.Status.ClusterName)
 			if err == nil {
 				// While the control plane is being deleted, the status of deletion will be copied from there.
+				logrus.Infof("cluster.Status.ClusterName %s "+
+					"While the control plane is being deleted, the status of deletion will be copied from there.!", cluster.Status.ClusterName)
 				return "", generic.ErrSkip
 			}
 		}
 
 		if capiCluster != nil {
+			logrus.Infof("cluster.Status.ClusterName %s capiCluster not nil!", cluster.Status.ClusterName)
 			if capiCluster.DeletionTimestamp == nil {
 				// Deleting the CAPI cluster will start the process of deleting Machines, Bootstraps, etc.
 				if err := h.capiClusters.Delete(capiCluster.Namespace, capiCluster.Name, &metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
@@ -133,6 +148,8 @@ func (h *handler) doClusterRemove(cluster *v1.Cluster) func() (string, error) {
 		if capiClusterError == nil {
 			return fmt.Sprintf("waiting for cluster-api cluster [%s] to delete", cluster.Name), nil
 		}
+
+		logrus.Infof("cluster.Status.ClusterName %s finished??", cluster.Status.ClusterName)
 
 		return "", h.kubeconfigManager.DeleteUser(cluster.Namespace, cluster.Name)
 	}
