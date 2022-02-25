@@ -358,5 +358,7 @@ func (h *handler) OnRemove(_ string, cluster *rancherv1.Cluster) (*rancherv1.Clu
 	if err != nil {
 		return cluster, err
 	}
+
+	logrus.Infof("OnRemove: Updated status after ControlPlane check %s", cluster.Status.ClusterName)
 	return cluster, generic.ErrSkip
 }
