@@ -142,10 +142,10 @@ func getPlanStatusReasonMessage(entry *planEntry) string {
 	switch {
 	case entry.Plan == nil:
 		return noPlanMessage(entry)
-	case entry.Plan.AppliedPlan == nil:
-		return NoAgentPlanStatusMessage
 	case len(entry.Plan.Plan.Instructions) == 0:
 		return noPlanMessage(entry)
+	case entry.Plan.AppliedPlan == nil:
+		return NoAgentPlanStatusMessage
 	case entry.Plan.Plan.Error != "":
 		return entry.Plan.Plan.Error
 	case !entry.Plan.Healthy:

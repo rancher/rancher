@@ -43,6 +43,8 @@ const (
 	LabelsAnnotation           = "rke.cattle.io/labels"
 	MachineIDLabel             = "rke.cattle.io/machine-id"
 	MachineNameLabel           = "rke.cattle.io/machine-name"
+	MachineTemplateHashLabel   = "rke.cattle.io/machine-template-hash"
+	RKEMachinePoolNameLabel    = "rke.cattle.io/rke-machine-pool-name"
 	MachineNamespaceLabel      = "rke.cattle.io/machine-namespace"
 	MachineRequestType         = "rke.cattle.io/machine-request"
 	MachineUIDLabel            = "rke.cattle.io/machine"

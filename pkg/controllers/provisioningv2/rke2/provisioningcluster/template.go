@@ -16,7 +16,9 @@ import (
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2"
 	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2/machineprovision"
+	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta1"
 	mgmtcontroller "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
+	rkev1controllers "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/provisioningv2/rke2/planner"
 	"github.com/rancher/wrangler/pkg/apply"
 	"github.com/rancher/wrangler/pkg/data"
@@ -30,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -47,7 +50,7 @@ func getInfraRef(rkeCluster *rkev1.RKECluster) *corev1.ObjectReference {
 
 // objects generates the corresponding rkecontrolplanes.rke.cattle.io, clusters.cluster.x-k8s.io, and
 // machinedeployments.cluster.x-k8s.io objects based on the passed in clusters.provisioning.cattle.io object
-func objects(cluster *rancherv1.Cluster, dynamic *dynamic.Controller, dynamicSchema mgmtcontroller.DynamicSchemaCache, secrets v1.SecretCache) (result []runtime.Object, _ error) {
+func objects(cluster *rancherv1.Cluster, dynamic *dynamic.Controller, dynamicSchema mgmtcontroller.DynamicSchemaCache, secrets v1.SecretCache, capiMachineDeployments capicontrollers.MachineDeploymentCache, rkeBootstrapTemplates rkev1controllers.RKEBootstrapTemplateCache) (result []runtime.Object, _ error) {
 	if !cluster.DeletionTimestamp.IsZero() {
 		return nil, nil
 	}
@@ -68,7 +71,7 @@ func objects(cluster *rancherv1.Cluster, dynamic *dynamic.Controller, dynamicSch
 	capiCluster := capiCluster(cluster, rkeControlPlane, infraRef)
 	result = append(result, capiCluster)
 
-	machineDeployments, err := machineDeployments(cluster, capiCluster, dynamic, dynamicSchema, secrets)
+	machineDeployments, err := machineDeployments(cluster, capiCluster, dynamic, dynamicSchema, secrets, capiMachineDeployments, rkeBootstrapTemplates)
 	if err != nil {
 		return nil, err
 	}
@@ -203,7 +206,13 @@ func toMachineTemplate(machinePoolName string, cluster *rancherv1.Cluster, machi
 			},
 		},
 	}
-	ustr.SetName(name.SafeConcatName(ustr.GetName(), createMachineTemplateHash(ustr.Object)))
+	// generating the mtHash is somewhat deterministic as this is pre-SafeConcatName.
+	// The hash should remain the same, even if SafeConcatName generates a 5 character randomizer.
+	mtHash := createMachineTemplateHash(ustr.Object)
+	ustr.SetName(name.SafeConcatName(ustr.GetName(), mtHash))
+	newLabels := ustr.GetLabels()
+	newLabels[rke2.MachineTemplateHashLabel] = mtHash
+	ustr.SetLabels(newLabels)
 	return ustr, nil
 }
 
@@ -229,7 +238,7 @@ func createMachineTemplateHash(dataMap map[string]interface{}) string {
 }
 
 func machineDeployments(cluster *rancherv1.Cluster, capiCluster *capi.Cluster, dynamic *dynamic.Controller,
-	dynamicSchema mgmtcontroller.DynamicSchemaCache, secrets v1.SecretCache) (result []runtime.Object, _ error) {
+	dynamicSchema mgmtcontroller.DynamicSchemaCache, secrets v1.SecretCache, capiMachineDeployments capicontrollers.MachineDeploymentCache, rkeBootstrapTemplates rkev1controllers.RKEBootstrapTemplateCache) (result []runtime.Object, _ error) {
 	bootstrapName := name.SafeConcatName(cluster.Name, "bootstrap", "template")
 
 	if dynamicSchema == nil {
@@ -237,20 +246,39 @@ func machineDeployments(cluster *rancherv1.Cluster, capiCluster *capi.Cluster, d
 	}
 
 	if len(cluster.Spec.RKEConfig.MachinePools) > 0 {
-		result = append(result, &rkev1.RKEBootstrapTemplate{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace: cluster.Namespace,
-				Name:      bootstrapName,
-			},
-			Spec: rkev1.RKEBootstrapTemplateSpec{
-				ClusterName: cluster.Name,
-				Template: rkev1.RKEBootstrap{
-					Spec: rkev1.RKEBootstrapSpec{
-						ClusterName: cluster.Name,
+		ls, err := labels.Parse(fmt.Sprintf("%s=%s", rke2.ClusterNameLabel, cluster.Name))
+		if err != nil {
+			return nil, err
+		}
+		rbt, err := rkeBootstrapTemplates.List(cluster.Namespace, ls)
+		if err != nil {
+			return nil, err
+		}
+		if len(rbt) > 1 {
+			return nil, fmt.Errorf("multiple rkebootstraptemplates found for cluster %s/%s", cluster.Namespace, cluster.Name)
+		}
+		if len(rbt) == 1 {
+			bootstrapName = rbt[0].Name
+		}
+		if len(rbt) == 0 {
+			result = append(result, &rkev1.RKEBootstrapTemplate{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: cluster.Namespace,
+					Name:      bootstrapName,
+					Labels: map[string]string{
+						rke2.ClusterNameLabel: cluster.Name,
 					},
 				},
-			},
-		})
+				Spec: rkev1.RKEBootstrapTemplateSpec{
+					ClusterName: cluster.Name,
+					Template: rkev1.RKEBootstrap{
+						Spec: rkev1.RKEBootstrapSpec{
+							ClusterName: cluster.Name,
+						},
+					},
+				},
+			})
+		}
 	}
 
 	machinePoolNames := map[string]bool{}
@@ -273,14 +301,57 @@ func machineDeployments(cluster *rancherv1.Cluster, capiCluster *capi.Cluster, d
 		machinePoolNames[machinePool.Name] = true
 
 		var (
-			machinePoolName = name.SafeConcatName(cluster.Name, machinePool.Name)
-			infraRef        corev1.ObjectReference
+			machineDeploymentName     = name.SafeConcatName(cluster.Name, machinePool.Name)
+			existingMachineDeployment = false
+			infraRef                  corev1.ObjectReference
 		)
 
+		ls, err := labels.Parse(fmt.Sprintf("%s=%s,%s=%s", capi.ClusterLabelName, cluster.Name, rke2.RKEMachinePoolNameLabel, machinePool.Name))
+		if err != nil {
+			return nil, err
+		}
+
+		md, err := capiMachineDeployments.List(cluster.Namespace, ls)
+		if err != nil {
+			return nil, err
+		}
+
+		if len(md) > 1 {
+			return nil, fmt.Errorf("multiple machinedeployments found with labels %s", fmt.Sprintf("%s=%s,%s=%s", capi.ClusterLabelName, cluster.Name, rke2.RKEMachinePoolNameLabel, machinePool.Name))
+		}
+
+		if len(md) == 1 {
+			machineDeploymentName = md[0].Name
+			existingMachineDeployment = true
+		}
+
 		if machinePool.NodeConfig.APIVersion == "" || machinePool.NodeConfig.APIVersion == "rke-machine-config.cattle.io/v1" {
-			machineTemplate, err := toMachineTemplate(machinePoolName, cluster, machinePool, dynamic, dynamicSchema, secrets)
+			machineTemplate, err := toMachineTemplate(machineDeploymentName, cluster, machinePool, dynamic, dynamicSchema, secrets)
 			if err != nil {
 				return nil, err
+			}
+
+			if existingMachineDeployment {
+				// retrieve the machine template
+				ls, err = labels.Parse(fmt.Sprintf("%s=%s", rke2.MachineTemplateHashLabel, machineTemplate.GetLabels()[rke2.MachineTemplateHashLabel]))
+				if err != nil {
+					return nil, err
+				}
+				mt, err := dynamic.List(machineTemplate.GroupVersionKind(), machineTemplate.GetNamespace(), ls)
+				if err != nil {
+					return nil, err
+				}
+				if len(mt) > 1 {
+					return nil, fmt.Errorf("multiple machinetemplates found with labels %s", fmt.Sprintf("%s=%s", rke2.MachineTemplateHashLabel, machineTemplate.GetLabels()[rke2.MachineTemplateHashLabel]))
+				}
+				if len(mt) == 1 {
+					// determine the name of the machineTemplate and set accordingly
+					mtData, err := data.Convert(mt[0].DeepCopyObject())
+					if err != nil {
+						return nil, err
+					}
+					machineTemplate.SetName(mtData.String("metadata", "name"))
+				}
 			}
 
 			result = append(result, machineTemplate)
@@ -319,7 +390,7 @@ func machineDeployments(cluster *rancherv1.Cluster, capiCluster *capi.Cluster, d
 		machineDeployment := &capi.MachineDeployment{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace:   cluster.Namespace,
-				Name:        machinePoolName,
+				Name:        machineDeploymentName,
 				Labels:      machineDeploymentLabels,
 				Annotations: machinePool.MachineDeploymentAnnotations,
 			},
@@ -338,7 +409,8 @@ func machineDeployments(cluster *rancherv1.Cluster, capiCluster *capi.Cluster, d
 					ObjectMeta: capi.ObjectMeta{
 						Labels: map[string]string{
 							capi.ClusterLabelName:           capiCluster.Name,
-							capi.MachineDeploymentLabelName: machinePoolName,
+							capi.MachineDeploymentLabelName: machineDeploymentName,
+							rke2.RKEMachinePoolNameLabel:    machinePool.Name,
 						},
 						Annotations: machineSpecAnnotations,
 					},
