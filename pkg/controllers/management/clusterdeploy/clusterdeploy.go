@@ -334,18 +334,33 @@ func (cd *clusterDeploy) deployAgent(cluster *v3.Cluster) error {
 			return cluster, errors.WithMessage(types.NewErrors(err, errors.New(formatKubectlApplyOutput(string(output)))), "Error while applying agent YAML, it will be retried automatically")
 		}
 		v32.ClusterConditionAgentDeployed.Message(cluster, string(output))
+
+		var restartKubeAPIAuth = true
+		dsNotFoundError := "daemonsets.apps \"kube-api-auth\" not found"
 		if !cluster.Spec.LocalClusterAuthEndpoint.Enabled && cluster.Status.AppliedSpec.LocalClusterAuthEndpoint.Enabled && cluster.Status.AuthImage != "" {
+			restartKubeAPIAuth = false
 			output, err = kubectl.Delete([]byte(systemtemplate.AuthDaemonSet), kubeConfig)
-		}
-		if err != nil {
-			logrus.Tracef("Output from kubectl delete kube-api-auth DaemonSet, output: %s, err: %v", string(output), err)
-			// Ignore if the resource does not exist and it returns 'daemonsets.apps "kube-api-auth" not found'
-			dsNotFoundError := "daemonsets.apps \"kube-api-auth\" not found"
-			if !strings.Contains(string(output), dsNotFoundError) {
-				return cluster, errors.WithMessage(types.NewErrors(err, errors.New(string(output))), "kubectl delete failed")
+			if err != nil {
+				logrus.Tracef("Output from kubectl delete kube-api-auth DaemonSet, output: %s, err: %v", string(output), err)
+				// Ignore if the resource does not exist and it returns 'daemonsets.apps "kube-api-auth" not found'
+				if !strings.Contains(string(output), dsNotFoundError) {
+					return cluster, errors.WithMessage(types.NewErrors(err, errors.New(string(output))), "kubectl delete failed")
+				}
+				logrus.Debugf("Ignored '%s' error during delete kube-api-auth DaemonSet", dsNotFoundError)
 			}
-			logrus.Debugf("Ignored '%s' error during delete kube-api-auth DaemonSet", dsNotFoundError)
 		}
+		if restartKubeAPIAuth {
+			output, err = kubectl.RolloutRestartWithNamespace("cattle-system", "daemonset/kube-api-auth", kubeConfig)
+			logrus.Infof("=== kubectl rollout restart kube-api-auth DaemonSet")
+			if err != nil {
+				logrus.Tracef("Output from kubectl rollout restart kube-api-auth DaemonSet, output: %s, err: %v", string(output), err)
+				if !strings.Contains(string(output), dsNotFoundError) {
+					return cluster, errors.WithMessage(types.NewErrors(err, errors.New(string(output))), "kubectl rollout restart failed")
+				}
+				logrus.Debugf("Ignored '%s' error during restarting kube-api-auth DaemonSet", dsNotFoundError)
+			}
+		}
+
 		if cluster.Status.Driver != v32.ClusterDriverRKE {
 			if output, err = kubectl.Delete([]byte(systemtemplate.NodeAgentDaemonSet), kubeConfig); err != nil {
 				logrus.Tracef("Output from kubectl delete cattle-node-agent DaemonSet, output: %s, err: %v", string(output), err)
