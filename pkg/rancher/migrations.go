@@ -1,8 +1,6 @@
 package rancher
 
 import (
-	"bytes"
-
 	"github.com/mcuadros/go-version"
 	"github.com/rancher/norman/condition"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
@@ -10,7 +8,6 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/provisioningv2/cluster"
 	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2"
 	"github.com/rancher/rancher/pkg/features"
-	fleetconst "github.com/rancher/rancher/pkg/fleet"
 	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta1"
 	v3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	provv1 "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
@@ -39,8 +36,6 @@ const (
 	rancherVersionKey                         = "rancherVersion"
 	projectsCreatedKey                        = "projectsCreated"
 	namespacesAssignedKey                     = "namespacesAssigned"
-	caSecretName                              = "tls-ca-additional"
-	caSecretField                             = "ca-additional.pem"
 	capiMigratedKey                           = "capiMigrated"
 )
 
@@ -78,7 +73,7 @@ func runMigrations(wranglerContext *wrangler.Context) error {
 		}
 	}
 
-	return copyCAAdditionalSecret(wranglerContext.Core.Secret())
+	return nil
 }
 
 func getConfigMap(configMapController controllerv1.ConfigMapController, configMapName string) (*v1.ConfigMap, error) {
@@ -194,43 +189,6 @@ func forceSystemAndDefaultProjectCreation(configMapController controllerv1.Confi
 
 	cm.Data[projectsCreatedKey] = "true"
 	return createOrUpdateConfigMap(configMapController, cm)
-}
-
-// copyCAAdditionalSecret will ensure that if a secret named tls-ca-additional exists in the cattle-system namespace
-// then this secret also exists in the fleet-default namespace. This is because the machine creation and deletion jobs
-// need to have access to this secret as well.
-func copyCAAdditionalSecret(secretClient controllerv1.SecretClient) error {
-	cattleSecret, err := secretClient.Get("cattle-system", caSecretName, metav1.GetOptions{})
-	if err != nil {
-		if k8serror.IsNotFound(err) {
-			return nil
-		}
-		return err
-	}
-
-	fleetSecret, err := secretClient.Get(fleetconst.ClustersDefaultNamespace, caSecretName, metav1.GetOptions{})
-	if err != nil {
-		if !k8serror.IsNotFound(err) {
-			return err
-		}
-		fleetSecret.Name = cattleSecret.Name
-		fleetSecret.Namespace = fleetconst.ClustersDefaultNamespace
-	} else if bytes.Equal(fleetSecret.Data[caSecretField], cattleSecret.Data[caSecretField]) {
-		// Both secrets contain the same data.
-		return nil
-	}
-
-	fleetSecret.Data = cattleSecret.Data
-
-	if err != nil {
-		// In this case, the fleetSecret doesn't exist yet.
-		_, err = secretClient.Create(fleetSecret)
-	} else {
-		_, err = secretClient.Update(fleetSecret)
-	}
-
-	return err
-
 }
 
 func forceSystemNamespaceAssignment(configMapController controllerv1.ConfigMapController, projectClient v3.ProjectClient) error {

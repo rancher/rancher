@@ -1,7 +1,10 @@
 package machineprovision
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -51,6 +54,7 @@ type driverArgs struct {
 	ImagePullPolicy     corev1.PullPolicy
 	EnvSecret           *corev1.Secret
 	FilesSecret         *corev1.Secret
+	CertsSecret         *corev1.Secret
 	StateSecretName     string
 	BootstrapSecretName string
 	BootstrapRequired   bool
@@ -82,8 +86,10 @@ func (h *handler) getArgsEnvAndStatus(infraObj *infraObject, args map[string]int
 	} else if err != nil {
 		return driverArgs{}, err
 	} else if !strings.HasPrefix(nd.Spec.URL, "local://") {
-		url = getDriverDownloadURL(nd)
-		hash = nd.Spec.Checksum
+		url, hash, err = getDriverDownloadURL(nd)
+		if err != nil {
+			return driverArgs{}, err
+		}
 	}
 
 	envSecret := &corev1.Secret{
@@ -143,6 +149,11 @@ func (h *handler) getArgsEnvAndStatus(infraObj *infraObject, args map[string]int
 		jobBackoffLimit = 3
 	}
 
+	certsSecret, err := h.constructCertsSecret(infraObj.meta.GetName(), infraObj.meta.GetNamespace())
+	if err != nil {
+		return driverArgs{}, err
+	}
+
 	// cloud-init will split the hostname on '.' and set the hostname to the first chunk. This causes an issue where all
 	// nodes in a machine pool may have the same node name in Kubernetes. Converting the '.' to '-' here prevents this.
 	cmd = append(cmd, strings.ReplaceAll(infraObj.meta.GetName(), ".", "-"))
@@ -156,6 +167,7 @@ func (h *handler) getArgsEnvAndStatus(infraObj *infraObject, args map[string]int
 		ImagePullPolicy:     corev1.PullAlways,
 		EnvSecret:           envSecret,
 		FilesSecret:         filesSecret,
+		CertsSecret:         certsSecret,
 		StateSecretName:     secretName,
 		BootstrapSecretName: bootstrapName,
 		BootstrapRequired:   create,
@@ -287,9 +299,9 @@ func getNodeDriverName(typeMeta meta.Type) string {
 
 // getDriverDownloadURL checks for a local version of the driver to download for air-gapped installs.
 // If no local version is found or CATTLE_DEV_MODE is set, then the URL from the node driver is returned.
-func getDriverDownloadURL(nd *v3.NodeDriver) string {
+func getDriverDownloadURL(nd *v3.NodeDriver) (string, string, error) {
 	if os.Getenv("CATTLE_DEV_MODE") != "" {
-		return nd.Spec.URL
+		return nd.Spec.URL, nd.Spec.Checksum, nil
 	}
 
 	driverName := nd.Name
@@ -297,9 +309,35 @@ func getDriverDownloadURL(nd *v3.NodeDriver) string {
 		driverName = drivers.DockerMachineDriverPrefix + driverName
 	}
 
-	if _, err := os.Stat(filepath.Join(settings.UIPath.Get(), "assets", driverName)); err != nil {
-		return nd.Spec.URL
+	path := filepath.Join(settings.UIPath.Get(), "assets", driverName)
+	if _, err := os.Stat(path); err != nil {
+		return nd.Spec.URL, nd.Spec.Checksum, nil
 	}
 
-	return fmt.Sprintf("%s/assets/%s", settings.ServerURL.Get(), driverName)
+	hash, err := hashFile(path)
+	if err != nil {
+		return "", "", err
+	}
+
+	return fmt.Sprintf("%s/assets/%s", settings.ServerURL.Get(), driverName), hash, nil
+}
+
+func hashName(name string) string {
+	b := sha256.Sum256([]byte(name))
+	return hex.EncodeToString(b[:16])
+}
+
+func hashFile(path string) (string, error) {
+	hasher := sha256.New()
+	f, err := os.Open(path)
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+
+	if _, err := io.Copy(hasher, f); err != nil {
+		return "", err
+	}
+
+	return hex.EncodeToString(hasher.Sum(nil)), nil
 }
