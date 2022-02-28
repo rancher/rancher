@@ -27,6 +27,7 @@ import (
 
 const (
 	secretNamespace             = namespace.GlobalNamespace
+	secretKey                   = "credential"
 	S3BackupAnswersPath         = "rancherKubernetesEngineConfig.services.etcd.backupConfig.s3BackupConfig.secretKey"
 	WeavePasswordAnswersPath    = "rancherKubernetesEngineConfig.network.weaveNetworkProvider.password"
 	RegistryPasswordAnswersPath = "rancherKubernetesEngineConfig.privateRegistries[%d].password"
@@ -653,7 +654,7 @@ func (m *Migrator) createOrUpdateSecretForCredential(secretName, secretValue str
 		return nil, nil
 	}
 	data := map[string]string{
-		"credential": secretValue,
+		secretKey: secretValue,
 	}
 	secret, err := m.createOrUpdateSecret(secretName, data, owner, kind, field)
 	if err != nil {
