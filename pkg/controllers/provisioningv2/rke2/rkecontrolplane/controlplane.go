@@ -11,6 +11,7 @@ import (
 	rkecontrollers "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/rancher/wrangler/pkg/relatedresource"
+	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -80,6 +81,7 @@ func (h *handler) OnRemove(_ string, cp *rkev1.RKEControlPlane) (*rkev1.RKEContr
 
 func (h *handler) doRemove(obj *rkev1.RKEControlPlane) func() (string, error) {
 	return func() (string, error) {
+		logrus.Debugf("[rkecontrolplane] (%s/%s) Peforming removal of rkecontrolplane", obj.Namespace, obj.Name)
 		machineDeployments, err := h.machineDeploymentCache.List(obj.Namespace, labels.SelectorFromSet(labels.Set{capi.ClusterLabelName: obj.Name}))
 		if err != nil {
 			return "", err
@@ -87,6 +89,7 @@ func (h *handler) doRemove(obj *rkev1.RKEControlPlane) func() (string, error) {
 
 		for _, md := range machineDeployments {
 			if md.DeletionTimestamp.IsZero() {
+				logrus.Debugf("[rkecontrolplane] (%s/%s) Performing delete of machinedeployment %s/%s", obj.Namespace, obj.Name, md.Namespace, md.Name)
 				if err := h.machineDeploymentClient.Delete(md.Namespace, md.Name, &metav1.DeleteOptions{}); err != nil {
 					return "", err
 				}
@@ -96,8 +99,10 @@ func (h *handler) doRemove(obj *rkev1.RKEControlPlane) func() (string, error) {
 		machines, err := h.machineCache.List(obj.Namespace, labels.SelectorFromSet(labels.Set{capi.ClusterLabelName: obj.Name}))
 		if err != nil {
 			return "", err
-
 		}
+
+		logrus.Debugf("[rkecontrolplane] (%s/%s) listed %d machines during removal", obj.Namespace, obj.Name, len(machines))
+		logrus.Tracef("[rkecontrolplane] (%s/%s) machine list: %+v", obj.Namespace, obj.Name, machines)
 
 		// CustomMachines are not associated to a MachineDeployment, so they have to be deleted manually.
 		for _, m := range machines {

@@ -3,6 +3,7 @@ package machineprovision
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -104,7 +105,7 @@ func (h *handler) getArgsEnvAndStatus(infraObj *infraObject, args map[string]int
 		},
 	}
 	machine, err := rke2.GetMachineByOwner(h.machines, infraObj.meta)
-	if err != nil {
+	if err != nil && (create || !errors.Is(err, rke2.ErrNoMachineOwnerRef)) {
 		return driverArgs{}, err
 	}
 
