@@ -109,7 +109,7 @@ resource "aws_instance" "master" {
   provisioner "remote-exec" {
     inline = [
       "chmod +x /tmp/install_k3s_master.sh",
-      "sudo /tmp/install_k3s_master.sh ${var.node_os} ${var.create_lb ? aws_route53_record.aws_route53[0].fqdn : "fake.fqdn.value"} ${var.install_mode} ${var.k3s_version} ${var.cluster_type} ${self.public_ip} \"${data.template_file.test.rendered}\" \"${var.server_flags}\"  ${var.username} ${var.password}",
+      "sudo /tmp/install_k3s_master.sh ${var.node_os} ${var.create_lb ? aws_route53_record.aws_route53[0].fqdn : "fake.fqdn.value"} ${var.install_mode} ${var.k3s_version} ${var.cluster_type} ${self.public_ip} \"${data.template_file.test.rendered}\" \"${var.server_flags}\"  ${var.username} ${var.password} ${var.k3s_channel}",
     ]
   }
 
@@ -198,7 +198,7 @@ resource "aws_instance" "master2-ha" {
   provisioner "remote-exec" {
     inline = [
       "chmod +x /tmp/join_k3s_master.sh",
-      "sudo /tmp/join_k3s_master.sh ${var.node_os} ${var.create_lb ? aws_route53_record.aws_route53[0].fqdn : aws_instance.master.public_ip} ${var.install_mode} ${var.k3s_version} ${var.cluster_type} ${self.public_ip} ${aws_instance.master.public_ip} ${local.node_token} \"${data.template_file.test.rendered}\" \"${var.server_flags}\" ${var.username} ${var.password}",
+      "sudo /tmp/join_k3s_master.sh ${var.node_os} ${var.create_lb ? aws_route53_record.aws_route53[0].fqdn : aws_instance.master.public_ip} ${var.install_mode} ${var.k3s_version} ${var.cluster_type} ${self.public_ip} ${aws_instance.master.public_ip} ${local.node_token} \"${data.template_file.test.rendered}\" \"${var.server_flags}\" ${var.username} ${var.password} ${var.k3s_channel}",
     ]
   }
 }

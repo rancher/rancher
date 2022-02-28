@@ -60,7 +60,12 @@ then
    then
        curl -sfL https://get.k3s.io | INSTALL_K3S_TYPE='server' sh -s - server --cluster-init --node-external-ip="${6}" ${8} --tls-san "${2}" --write-kubeconfig-mode "0644"
    else
-       curl -sfL https://get.k3s.io | INSTALL_K3S_TYPE='server' sh -s - server --cluster-init --node-external-ip="${6}"
+       if [ ${11} != "null" ]
+       then
+           curl -sfL https://get.k3s.io | INSTALL_K3S_CHANNEL=${11} INSTALL_K3S_TYPE='server' sh -s - server --cluster-init --node-external-ip="${6}"
+       else
+           curl -sfL https://get.k3s.io | INSTALL_K3S_TYPE='server' sh -s - server --cluster-init --node-external-ip="${6}"
+       fi
    fi
 else
   echo "CLUSTER TYPE is external db"
@@ -68,7 +73,12 @@ else
   then
       curl -sfL https://get.k3s.io | sh -s - server --node-external-ip="${6}" --datastore-endpoint="${7}" ${8} --tls-san "${2}" --write-kubeconfig-mode "0644"
   else
-      curl -sfL https://get.k3s.io | sh -s - server --node-external-ip="${6}" --datastore-endpoint="${7}"
+      if [ ${11} != "null" ]
+      then
+          curl -sfL https://get.k3s.io | INSTALL_K3S_CHANNEL=${11} sh -s - server --node-external-ip="${6}" --datastore-endpoint="${7}"
+      else
+          curl -sfL https://get.k3s.io | sh -s - server --node-external-ip="${6}" --datastore-endpoint="${7}"
+      fi
   fi
 fi
 
