@@ -256,7 +256,8 @@ func GetMachineDeletionStatus(machineCache capicontrollers.MachineCache, cluster
 	})
 	for _, machine := range machines {
 		if machine.Status.FailureReason != nil && *machine.Status.FailureReason == capierrors.DeleteMachineError {
-			return "", fmt.Errorf("error deleting machine [%s], machine must be deleted manually", machine.Name)
+			logrus.Infof("[rke2common] Error while deleting machine %s, machine must be deleted manually", machine.Name)
+			continue
 		}
 		return fmt.Sprintf("waiting for machine [%s] to delete", machine.Name), nil
 	}
