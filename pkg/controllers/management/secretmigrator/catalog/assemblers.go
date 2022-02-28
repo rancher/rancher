@@ -7,6 +7,8 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+const secretKey = "credential"
+
 // AssembleDingtalkCredential looks up the Dingtalk Secret and inserts the keys into the Notifier.
 // It returns a new copy of the Notifier without modifying the original. The Notifier is never updated.
 func AssembleCatalogCredential(catalog *apimgmtv3.Catalog, secretLister v1.SecretLister) (apimgmtv3.CatalogSpec, error) {
@@ -21,6 +23,6 @@ func AssembleCatalogCredential(catalog *apimgmtv3.Catalog, secretLister v1.Secre
 		return catalog.Spec, err
 	}
 	spec := catalog.Spec.DeepCopy()
-	spec.Password = string(secret.Data["credential"])
+	spec.Password = string(secret.Data[secretKey])
 	return *spec, nil
 }

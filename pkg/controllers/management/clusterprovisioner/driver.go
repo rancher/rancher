@@ -126,6 +126,10 @@ func (p *Provisioner) driverRestore(cluster *v3.Cluster, spec v32.ClusterSpec, s
 	defer logger.Close()
 
 	spec = cleanRKE(spec)
+	spec, err := secretmigrator.AssembleS3Credential(cluster, spec, p.SecretLister)
+	if err != nil {
+		return "", "", "", err
+	}
 
 	newCluster, err := p.Clusters.Update(cluster)
 	if err != nil {
