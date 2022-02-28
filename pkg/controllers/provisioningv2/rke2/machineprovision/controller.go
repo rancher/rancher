@@ -17,7 +17,9 @@ import (
 	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta1"
 	mgmtcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	ranchercontrollers "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
+	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/provisioningv2/kubeconfig"
+	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/rancher/wrangler/pkg/apply"
 	"github.com/rancher/wrangler/pkg/condition"
@@ -27,6 +29,7 @@ import (
 	corecontrollers "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/pkg/generic"
 	"github.com/rancher/wrangler/pkg/genericcondition"
+	"github.com/rancher/wrangler/pkg/name"
 	"github.com/rancher/wrangler/pkg/summary"
 	"github.com/sirupsen/logrus"
 	batchv1 "k8s.io/api/batch/v1"
@@ -644,6 +647,40 @@ func constructFilesSecret(driver string, config map[string]interface{}) *corev1.
 		return &corev1.Secret{Data: secretData}
 	}
 	return nil
+}
+
+func (h *handler) constructCertsSecret(machineName, machineNamespace string) (*corev1.Secret, error) {
+	certSecretData := make(map[string][]byte)
+
+	cert := settings.CACerts.Get()
+	if cert != "" {
+		certSecretData["tls.crt"] = []byte(cert)
+	}
+
+	cert = settings.InternalCACerts.Get()
+	if cert != "" {
+		certSecretData["internal-tls.crt"] = []byte(cert)
+	}
+
+	if secret, err := h.secrets.Get(namespace.System, "tls-additional"); err == nil {
+		for key, val := range secret.Data {
+			certSecretData[key] = val
+		}
+	} else if !apierrors.IsNotFound(err) {
+		return nil, err
+	}
+
+	if len(certSecretData) > 0 {
+		return &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      name.SafeConcatName("machine", "certs", hashName(machineName)),
+				Namespace: machineNamespace,
+			},
+			Data: certSecretData,
+		}, nil
+	}
+
+	return nil, nil
 }
 
 func shouldCleanupObjects(job *batchv1.Job, d data.Object) bool {
