@@ -68,7 +68,7 @@ func (c *CustomClusterProvisioningTestSuite) SetupSuite() {
 	c.standardUserClient = standardUserClient
 }
 
-func (c *CustomClusterProvisioningTestSuite) Provisioning_RKE2CustomCluster(externalNodeProvider ExternalNodeProvider) {
+func (c *CustomClusterProvisioningTestSuite) ProvisioningRKE2CustomCluster(externalNodeProvider ExternalNodeProvider) {
 	nodeRoles0 := []string{
 		"--etcd --controlplane --worker",
 	}
@@ -99,7 +99,7 @@ func (c *CustomClusterProvisioningTestSuite) Provisioning_RKE2CustomCluster(exte
 					testSession := session.NewSession(c.T())
 					defer testSession.Cleanup()
 
-					client, err := c.client.WithSession(testSession)
+					client, err := tt.client.WithSession(testSession)
 					require.NoError(c.T(), err)
 
 					numNodes := len(tt.nodeRoles)
@@ -144,7 +144,7 @@ func (c *CustomClusterProvisioningTestSuite) Provisioning_RKE2CustomCluster(exte
 	}
 }
 
-func (c *CustomClusterProvisioningTestSuite) Provisioning_RKE2CustomClusterDynamicInput(externalNodeProvider ExternalNodeProvider, nodesAndRoles []map[string]bool) {
+func (c *CustomClusterProvisioningTestSuite) ProvisioningRKE2CustomClusterDynamicInput(externalNodeProvider ExternalNodeProvider, nodesAndRoles []map[string]bool) {
 	rolesPerNode := []string{}
 
 	for _, nodes := range nodesAndRoles {
@@ -175,7 +175,7 @@ func (c *CustomClusterProvisioningTestSuite) Provisioning_RKE2CustomClusterDynam
 					testSession := session.NewSession(c.T())
 					defer testSession.Cleanup()
 
-					client, err := c.client.WithSession(testSession)
+					client, err := tt.client.WithSession(testSession)
 					require.NoError(c.T(), err)
 
 					nodes, err := externalNodeProvider.NodeCreationFunc(client, numOfNodes)
@@ -222,7 +222,7 @@ func (c *CustomClusterProvisioningTestSuite) Provisioning_RKE2CustomClusterDynam
 func (c *CustomClusterProvisioningTestSuite) TestProvisioningCustomCluster() {
 	for _, nodeProviderName := range c.nodeProviders {
 		externalNodeProvider := ExternalNodeProviderSetup(nodeProviderName)
-		c.Provisioning_RKE2CustomCluster(externalNodeProvider)
+		c.ProvisioningRKE2CustomCluster(externalNodeProvider)
 	}
 }
 
@@ -234,7 +234,7 @@ func (c *CustomClusterProvisioningTestSuite) TestProvisioningCustomClusterDynami
 
 	for _, nodeProviderName := range c.nodeProviders {
 		externalNodeProvider := ExternalNodeProviderSetup(nodeProviderName)
-		c.Provisioning_RKE2CustomClusterDynamicInput(externalNodeProvider, nodesAndRoles)
+		c.ProvisioningRKE2CustomClusterDynamicInput(externalNodeProvider, nodesAndRoles)
 	}
 }
 

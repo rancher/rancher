@@ -9,7 +9,7 @@ import (
 
 const harvesterCloudCredNameBase = "harvesterCloudCredential"
 
-// CreateHarvesterCloudCredentials is a helper function that takes the rancher Client as a prameter and creates
+// CreateHarvesterCloudCredentials is a helper function that takes the rancher Client as a parameter and creates
 // a harvester cloud credential, and returns the CloudCredential response
 func CreateHarvesterCloudCredentials(rancherClient *rancher.Client) (*cloudcredentials.CloudCredential, error) {
 	var harvesterCredentialConfig cloudcredentials.HarvesterCredentialConfig
