@@ -11,6 +11,8 @@ replace (
 	github.com/opencontainers/runc => github.com/opencontainers/runc v1.0.1
 	github.com/rancher/rancher/pkg/apis => ./pkg/apis
 	github.com/rancher/rancher/pkg/client => ./pkg/client
+
+	github.com/rancher/rke => github.com/aslafy-z/rke v0.0.0-1.3-2
 	helm.sh/helm/v3 => github.com/rancher/helm/v3 v3.7.1-rancher.1
 
 	k8s.io/api => k8s.io/api v0.22.3
