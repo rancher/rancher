@@ -133,12 +133,12 @@ def prepare_airgap_rke2(bastion_node, number_of_nodes, method):
             add_tarball_to_node(bastion_node, ag_node,
                                 'rke2-airgap-images.{}'.format(TARBALL_TYPE),
                                 'rke2')
-            if '--cni=calico' in RKE2_SERVER_OPTIONS:
+            if 'calico' in RKE2_SERVER_OPTIONS:
                 add_tarball_to_node(
                     bastion_node, ag_node,
                     'rke2-airgap-images-calico.{}'.format(TARBALL_TYPE),
                     'rke2')
-            elif '--cni=cilium' in RKE2_SERVER_OPTIONS:
+            if 'cilium' in RKE2_SERVER_OPTIONS:
                 add_tarball_to_node(
                     bastion_node, ag_node,
                     'rke2-airgap-images-cilium.{}'.format(TARBALL_TYPE),

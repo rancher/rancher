@@ -54,11 +54,11 @@ then
    then
        if [[ ${1} == *"rhel"* ]] || [[ ${1} == *"centos"* ]]
        then
-           cp -f /usr/share/rke2/rke2-cis-sysctl.conf /etc/sysctl.d/60-rke2-cis.conf
+           sudo cp -f /usr/share/rke2/rke2-cis-sysctl.conf /etc/sysctl.d/60-rke2-cis.conf
        else
-           cp -f /usr/local/share/rke2/rke2-cis-sysctl.conf /etc/sysctl.d/60-rke2-cis.conf
+           sudo cp -f /usr/local/share/rke2/rke2-cis-sysctl.conf /etc/sysctl.d/60-rke2-cis.conf
        fi
-       systemctl restart systemd-sysctl
+       sudo systemctl restart systemd-sysctl
    fi
    sudo systemctl enable rke2-agent
    sudo systemctl start rke2-agent
