@@ -126,7 +126,7 @@ func (h *handler) OnChange(key string, configMap *corev1.ConfigMap) (*corev1.Con
 	// if the current etcd snapshot is NOT found in the actual etcd snapshots list, we delete it
 	// otherwise, we add it to the desired etcd snapshots map
 	for _, existingSnapshotCR := range currentEtcdSnapshots {
-		storageLocation, ok := existingSnapshotCR.Labels[StorageLabelKey]
+		storageLocation, ok := existingSnapshotCR.GetAnnotations()[StorageLabelKey]
 		if !ok {
 			storageLocation = StorageLocal
 			if existingSnapshotCR.SnapshotFile.NodeName == StorageS3 {
@@ -219,8 +219,10 @@ func (h *handler) configMapToSnapshots(configMap *corev1.ConfigMap, cluster *pro
 				Labels: map[string]string{
 					rke2.ClusterNameLabel: cluster.Name,
 					rke2.NodeNameLabel:    file.NodeName,
-					SnapshotNameKey:       file.Name,
-					StorageLabelKey:       StorageLocal,
+				},
+				Annotations: map[string]string{
+					SnapshotNameKey: file.Name,
+					StorageLabelKey: StorageLocal,
 				},
 				OwnerReferences: []metav1.OwnerReference{},
 			},
@@ -235,9 +237,9 @@ func (h *handler) configMapToSnapshots(configMap *corev1.ConfigMap, cluster *pro
 				Status:    file.Status,
 			},
 		}
-		fileSuffix := "-" + StorageLocal
+		fileSuffix := StorageLocal
 		if file.S3 != nil {
-			fileSuffix = "-" + StorageS3
+			fileSuffix = StorageS3
 			snapshot.SnapshotFile.S3 = &rkev1.ETCDSnapshotS3{
 				Endpoint:      file.S3.Endpoint,
 				EndpointCA:    file.S3.EndpointCA,
@@ -246,7 +248,7 @@ func (h *handler) configMapToSnapshots(configMap *corev1.ConfigMap, cluster *pro
 				Region:        file.S3.Region,
 				Folder:        file.S3.Folder,
 			}
-			snapshot.Labels[StorageLabelKey] = StorageS3
+			snapshot.Annotations[StorageLabelKey] = StorageS3
 		} else {
 			listSuccessful, machine, err := rke2.GetMachineFromNode(h.machineCache, file.NodeName, cluster)
 			if listSuccessful && err != nil {
