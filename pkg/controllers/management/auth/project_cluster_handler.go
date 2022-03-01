@@ -21,6 +21,7 @@ import (
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/systemaccount"
 	"github.com/rancher/rancher/pkg/types/config"
+	"github.com/rancher/wrangler/pkg/generic"
 	"github.com/sirupsen/logrus"
 	v12 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -228,6 +229,11 @@ func (l *clusterLifecycle) Updated(obj *v3.Cluster) (runtime.Object, error) {
 }
 
 func (l *clusterLifecycle) Remove(obj *v3.Cluster) (runtime.Object, error) {
+	if len(obj.Finalizers) > 1 {
+		logrus.Debugf("Skipping rbac cleanup for cluster [%s] until all other finalizers are removed.", obj.Name)
+		return obj, generic.ErrSkip
+	}
+
 	var returnErr error
 	set := labels.Set{rbac.RestrictedAdminClusterRoleBinding: "true"}
 	rbs, err := l.mgr.rbLister.List(obj.Name, labels.SelectorFromSet(set))
