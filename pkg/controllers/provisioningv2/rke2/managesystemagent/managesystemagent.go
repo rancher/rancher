@@ -167,7 +167,7 @@ func installer(envs []rkev1.EnvVar, allWorkers bool, secretName, generation stri
 			Name:      "system-agent-upgrader",
 			Namespace: namespaces.System,
 			Annotations: map[string]string{
-				"upgrade.cattle.io/digest": "spec.upgrade.envs",
+				"upgrade.cattle.io/digest": "spec.upgrade.envs,spec.upgrade.envFrom",
 			},
 		},
 		Spec: upgradev1.PlanSpec{
