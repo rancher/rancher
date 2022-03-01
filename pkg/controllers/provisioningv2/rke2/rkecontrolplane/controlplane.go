@@ -103,7 +103,7 @@ func (h *handler) doRemove(obj *rkev1.RKEControlPlane) func() (string, error) {
 
 		logrus.Debugf("[rkecontrolplane] (%s/%s) listed %d machines during removal", obj.Namespace, obj.Name, len(machines))
 		logrus.Tracef("[rkecontrolplane] (%s/%s) machine list: %+v", obj.Namespace, obj.Name, machines)
-		
+
 		// CustomMachines are not associated to a MachineDeployment, so they have to be deleted manually.
 		for _, m := range machines {
 			if m.Spec.InfrastructureRef.APIVersion == rke2.RKEMachineAPIVersion && m.Spec.InfrastructureRef.Kind == "CustomMachine" && m.DeletionTimestamp.IsZero() {
