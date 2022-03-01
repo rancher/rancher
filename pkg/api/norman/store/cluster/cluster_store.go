@@ -1295,7 +1295,7 @@ func validateKeyRotation(data map[string]interface{}) error {
 	rotateEncryptionKeyEnabled, _ := values.GetValue(data, "rancherKubernetesEngineConfig", "rotateEncryptionKey")
 	if rotateEncryptionKeyEnabled != nil && rotateEncryptionKeyEnabled == true {
 		if secretsEncryptionEnabled != nil && secretsEncryptionEnabled == false {
-			return fmt.Errorf("unable to rotate encryption key when encryption configuration is disabled")
+			return fmt.Errorf("unable to rotate encryption key when secrets encryption is disabled")
 		}
 	}
 	return nil

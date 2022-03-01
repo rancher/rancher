@@ -465,7 +465,7 @@ func (p *Provisioner) backoffFailure(cluster *v3.Cluster, spec *apimgmtv3.Cluste
 	return false, 0
 }
 
-var errKeyRotationFailed = errors.New("encryption key rotation failed, please restore your cluster from backup")
+var errKeyRotationFailed = "encryption key rotation failed, please restore your cluster from backup if needed: "
 
 func (p *Provisioner) reconcileCluster(cluster *v3.Cluster, create bool) (*v3.Cluster, error) {
 	if skipLocalK3sImported(cluster) {
@@ -538,7 +538,7 @@ func (p *Provisioner) reconcileCluster(cluster *v3.Cluster, create bool) (*v3.Cl
 		// ensure restore does not get short-circuited by key rotation since RKE checks for key rotation before restore
 		spec.RancherKubernetesEngineConfig.RotateEncryptionKey = false
 		apiEndpoint, serviceAccountToken, caCert, err = p.restoreClusterBackup(cluster, *spec)
-	} else if strings.Contains(apimgmtv3.ClusterConditionUpdated.GetMessage(cluster), errKeyRotationFailed.Error()) {
+	} else if strings.Contains(apimgmtv3.ClusterConditionUpdated.GetMessage(cluster), errKeyRotationFailed) {
 		logrus.Infof("Key rotation failed, cluster needs to be restored. Skipping driver updates.")
 		return cluster, nil // prevent driver updates if the cluster needs to be restored
 	} else if spec.RancherKubernetesEngineConfig != nil && spec.RancherKubernetesEngineConfig.RotateCertificates != nil {
@@ -550,7 +550,7 @@ func (p *Provisioner) reconcileCluster(cluster *v3.Cluster, create bool) (*v3.Cl
 		if err != nil {
 			logrus.Errorf("[reconcileCluster] Encryption key rotation error: %v", err)
 			// an error during key rotation means the user has to restore their cluster
-			err = errKeyRotationFailed
+			err = errors.New(errKeyRotationFailed + err.Error())
 		}
 	} else {
 		logrus.Infof("Updating cluster [%s]", cluster.Name)
