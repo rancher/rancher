@@ -196,15 +196,12 @@ func (m *Lifecycle) waitUntilJobCompletes(userContext *config.UserContext, job *
 
 		logrus.Infof("[node-cleanup] job %s finished, continuing to delete v3 node", job.Name)
 		return true, nil
-	}); err != nil {
-		if err.Error() == "timed out waiting for the condition" {
-			return nil // gave it 30s and it timed out so move to delete v1 node
-		}
+	}); err != nil && err.Error() != "timed out waiting for the condition" {
 		return err
 	}
 
 	// remove the job to clean up
-	return userContext.K8sClient.BatchV1().Jobs(job.Namespace).Delete(m.ctx, job.Name, metav1.DeleteOptions{})
+	return userContext.K8sClient.BatchV1().Jobs(job.Namespace).Delete(m.ctx, job.Name, metav1.DeleteOptions{PropagationPolicy: &[]metav1.DeletionPropagation{metav1.DeletePropagationForeground}[0]})
 }
 
 func (m *Lifecycle) createCleanupJob(userContext *config.UserContext, node *v3.Node) (*batchV1.Job, error) {
