@@ -92,19 +92,19 @@ require (
 	github.com/pborman/uuid v1.2.0
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.52.0
-	github.com/prometheus/client_golang v1.11.0
+	github.com/prometheus/client_golang v1.12.1
 	github.com/prometheus/client_model v0.2.0
-	github.com/prometheus/common v0.32.0
+	github.com/prometheus/common v0.32.1
 	github.com/rancher/aks-operator v1.0.4-rc3
-	github.com/rancher/apiserver v0.0.0-20220125032650-a2ef3682eca9
+	github.com/rancher/apiserver v0.0.0-20220223185512-c4e289f92e46
 	github.com/rancher/channelserver v0.5.1-0.20220217142715-90ef7d38f3f8
 	github.com/rancher/dynamiclistener v0.3.1-0.20210616080009-9865ae859c7f
 	github.com/rancher/eks-operator v1.1.3-rc3
 	github.com/rancher/fleet/pkg/apis v0.0.0-20210918015053-5a141a6b18f0
 	github.com/rancher/gke-operator v1.1.3-rc1
 	github.com/rancher/kubernetes-provider-detector v0.1.5
-	github.com/rancher/lasso v0.0.0-20220110205840-98715bdd6b5b
-	github.com/rancher/lasso/controller-runtime v0.0.0-20220110204826-724e3e57c47d
+	github.com/rancher/lasso v0.0.0-20220301011447-104654f35025
+	github.com/rancher/lasso/controller-runtime v0.0.0-20220301011447-104654f35025
 	github.com/rancher/machine v0.15.0-rancher79
 	github.com/rancher/norman v0.0.0-20220107203912-4feb41eafabd
 	github.com/rancher/rancher/pkg/apis v0.0.0
@@ -113,7 +113,7 @@ require (
 	github.com/rancher/remotedialer v0.2.6-0.20220120012928-4ea2198e0966
 	github.com/rancher/rke v1.3.8-rc1
 	github.com/rancher/security-scan v0.1.7-0.20200222041501-f7377f127168
-	github.com/rancher/steve v0.0.0-20220126170519-376e30bba7be
+	github.com/rancher/steve v0.0.0-20220218171307-a91d90251ffa
 	github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20210727200656-10b094e30007
 	github.com/rancher/wrangler v0.8.11-0.20220217210408-3ecd23dfea3b
 	github.com/robfig/cron v1.1.0
@@ -139,7 +139,6 @@ require (
 	golang.org/x/net v0.0.0-20210805182204-aaa1db679c0d
 	golang.org/x/oauth2 v0.0.0-20210819190943-2bc19b11175f
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
-	golang.org/x/sys v0.0.0-20211013075003-97ac67df715c // indirect
 	golang.org/x/text v0.3.7 // indirect
 	golang.org/x/tools v0.1.7 // indirect
 	google.golang.org/api v0.56.0
