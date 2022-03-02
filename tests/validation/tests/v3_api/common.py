@@ -2249,6 +2249,8 @@ def validate_backup_create(namespace, backup_info, backup_mode=None):
     validate_ingress(p_client, cluster, [backup_info["workload"]], host, path)
 
     # Perform Backup
+    user_client = get_user_client()
+    cluster = user_client.reload(cluster)
     backup = cluster.backupEtcd()
     backup_info["backupname"] = backup['metadata']['name']
     wait_for_backup_to_active(cluster, backup_info["backupname"])

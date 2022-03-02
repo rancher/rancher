@@ -9,6 +9,7 @@ backup_info = {"backupname": None, "backup_id": None, "workload": None,
 
 rbac_roles = [CLUSTER_MEMBER, PROJECT_OWNER, PROJECT_MEMBER, PROJECT_READ_ONLY]
 
+
 def test_bkp_restore_local_create():
     validate_backup_create(namespace, backup_info)
 
@@ -50,6 +51,7 @@ def test_rbac_bkp_restore_create(role):
         user_cluster.backupEtcd()
     assert e.value.error.status == 403
     assert e.value.error.code == 'PermissionDenied'
+
 
 @if_test_rbac
 def test_rbac_bkp_restore_list_cluster_owner():
