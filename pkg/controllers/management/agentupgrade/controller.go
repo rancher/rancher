@@ -30,7 +30,7 @@ type handler struct {
 	daemonsetClient v1.DaemonSetInterface
 }
 
-func Register(ctx context.Context, context *config.ManagementContext) error {
+func Register(ctx context.Context, context *config.ManagementContext) {
 	h := &handler{
 		deployments:     context.Apps.Deployments(""),
 		daemonsetClient: context.Apps.DaemonSets(""),
@@ -38,7 +38,6 @@ func Register(ctx context.Context, context *config.ManagementContext) error {
 
 	context.Apps.Deployments("").Controller().AddHandler(ctx, "agent-upgrade", h.OnDeploymentChange)
 	context.Apps.DaemonSets("").Controller().AddHandler(ctx, "agent-upgrade", h.OnDaemonSetChange)
-	return nil
 }
 
 func (h *handler) OnDeploymentChange(key string, deploy *appsv1.Deployment) (runtime.Object, error) {
