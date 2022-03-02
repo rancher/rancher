@@ -13,6 +13,7 @@ import (
 	"github.com/rancher/rancher/pkg/systemaccount"
 	rkedefaults "github.com/rancher/rke/cluster"
 	"github.com/rancher/rke/util"
+	v1 "github.com/rancher/types/apis/core/v1"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
@@ -30,6 +31,7 @@ type upgradeHandler struct {
 	nodes                v3.NodeInterface
 	nodeLister           v3.NodeLister
 	clusterLister        v3.ClusterLister
+	secretLister         v1.SecretLister
 	lookup               *nodeserver.BundleLookup
 	systemAccountManager *systemaccount.Manager
 	serviceOptionsLister v3.RKEK8sServiceOptionLister
@@ -47,6 +49,7 @@ func Register(ctx context.Context, mgmt *config.ManagementContext, scaledContext
 		clusterLister:        mgmt.Management.Clusters("").Controller().Lister(),
 		nodes:                mgmt.Management.Nodes(""),
 		nodeLister:           mgmt.Management.Nodes("").Controller().Lister(),
+		secretLister:         mgmt.Core.Secrets("").Controller().Lister(),
 		lookup:               nodeserver.NewLookup(scaledContext.Core.Namespaces(""), scaledContext.Core),
 		systemAccountManager: systemaccount.NewManagerFromScale(scaledContext),
 		serviceOptionsLister: mgmt.Management.RKEK8sServiceOptions("").Controller().Lister(),
