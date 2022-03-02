@@ -288,6 +288,7 @@ func (r *RKE2ConfigServer) getClusterKubernetesVersion(clusterName, ns string) (
 
 func (r *RKE2ConfigServer) findSA(req *http.Request) (string, *corev1.Secret, error) {
 	machineID := req.Header.Get(machineIDHeader)
+	logrus.Debugf("[rke2configserver] parsed %s as machineID", machineID)
 	if machineID == "" {
 		return "", nil, nil
 	}
@@ -296,11 +297,13 @@ func (r *RKE2ConfigServer) findSA(req *http.Request) (string, *corev1.Secret, er
 	if err != nil {
 		return "", nil, err
 	}
+	logrus.Debugf("[rke2configserver] Got %s/%s machine from provisioning SA", machineNamespace, machineName)
 	if machineName == "" {
 		machineNamespace, machineName, err = r.findMachineByClusterToken(req)
 		if err != nil {
 			return "", nil, err
 		}
+		logrus.Debugf("[rke2configserver] Got %s/%s machine from cluster token", machineNamespace, machineName)
 	}
 
 	if machineName == "" {
@@ -318,16 +321,26 @@ func (r *RKE2ConfigServer) findSA(req *http.Request) (string, *corev1.Secret, er
 		return "", nil, err
 	}
 
+	logrus.Debugf("[rke2configserver] %s/%s listed %d planSAs", machineNamespace, machineName, len(planSAs))
+
 	for _, planSA := range planSAs {
 		planSecret, tokenSecretName, err := rke2.GetServiceAccountSecretNames(r.bootstrapCache, machineName, planSA)
 		if err != nil {
 			return planSecret, nil, err
 		}
+		if planSecret == "" || tokenSecretName == "" {
+			logrus.Debugf("[rke2configserver] %s/%s planSecret (%s) or tokenSecretName (%s) were empty, planSA %s/%s is not ready for consumption yet", machineNamespace, machineName, planSecret, tokenSecretName, planSA.Namespace, planSA.Name)
+			continue
+		}
+		logrus.Debugf("[rke2configserver] %s/%s plan secret was %s and token secret was %s", machineNamespace, machineName, planSecret, tokenSecretName)
 		secret, err := r.secretsCache.Get(planSA.Namespace, tokenSecretName)
 		if err != nil || planSecret != "" {
+			logrus.Infof("[rke2configserver] %s/%s machineID: %s delivered planSecret %s to system-agent directly", machineNamespace, machineName, machineID, planSecret)
 			return planSecret, secret, err
 		}
 	}
+
+	logrus.Debugf("[rke2configserver] %s/%s watching for plan secret to become ready for consumption", machineNamespace, machineName)
 
 	resp, err := r.serviceAccounts.Watch(machineNamespace, metav1.ListOptions{
 		LabelSelector: rke2.MachineNameLabel + "=" + machineName,
@@ -347,8 +360,14 @@ func (r *RKE2ConfigServer) findSA(req *http.Request) (string, *corev1.Secret, er
 			if err != nil {
 				return planSecret, nil, err
 			}
+			if planSecret == "" || tokenSecretName == "" {
+				logrus.Debugf("[rke2configserver] %s/%s planSecret (%s) or tokenSecretName (%s) were empty, planSA %s/%s is not ready for consumption yet", machineNamespace, machineName, planSecret, tokenSecretName, planSA.Namespace, planSA.Name)
+				continue
+			}
+			logrus.Debugf("[rke2configserver] %s/%s plan secret was %s and token secret was %s", machineNamespace, machineName, planSecret, tokenSecretName)
 			secret, err := r.secretsCache.Get(planSA.Namespace, tokenSecretName)
 			if err != nil || planSecret != "" {
+				logrus.Infof("[rke2configserver] %s/%s machineID: %s delivered planSecret %s to system-agent from watch", machineNamespace, machineName, machineID, planSecret)
 				return planSecret, secret, err
 			}
 		}
@@ -374,6 +393,7 @@ func (r *RKE2ConfigServer) setOrUpdateMachineID(machineNamespace, machineName, m
 
 	machine.Labels[rke2.MachineIDLabel] = machineID
 	_, err = r.machines.Update(machine)
+	logrus.Debugf("[rke2configserver] %s/%s updated machine ID to %s", machineNamespace, machineName, machineID)
 	return err
 }
 
