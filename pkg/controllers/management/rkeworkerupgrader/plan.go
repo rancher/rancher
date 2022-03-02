@@ -7,6 +7,7 @@ import (
 
 	"github.com/pkg/errors"
 	kd "github.com/rancher/rancher/pkg/controllers/management/kontainerdrivermetadata"
+	"github.com/rancher/rancher/pkg/controllers/management/secretmigrator"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/librke"
 	nodeserver "github.com/rancher/rancher/pkg/rkenodeconfigserver"
@@ -16,7 +17,11 @@ import (
 )
 
 func (uh *upgradeHandler) nonWorkerPlan(node *v3.Node, cluster *v3.Cluster) (*rketypes.RKEConfigNodePlan, error) {
-	rkeConfig := cluster.Status.AppliedSpec.RancherKubernetesEngineConfig.DeepCopy()
+	appliedSpec, err := secretmigrator.AssemblePrivateRegistryCredential(cluster, cluster.Status.AppliedSpec, uh.secretLister)
+	if err != nil {
+		return nil, err
+	}
+	rkeConfig := appliedSpec.RancherKubernetesEngineConfig
 	rkeConfig.Nodes = []rketypes.RKEConfigNode{
 		*node.Status.NodeConfig,
 	}
@@ -73,7 +78,12 @@ func (uh *upgradeHandler) workerPlan(node *v3.Node, cluster *v3.Cluster) (*rkety
 	hostAddress := node.Status.NodeConfig.Address
 	hostDockerInfo := infos[hostAddress]
 
-	rkeConfig := cluster.Status.AppliedSpec.RancherKubernetesEngineConfig.DeepCopy()
+	appliedSpec, err := secretmigrator.AssemblePrivateRegistryCredential(cluster, cluster.Status.AppliedSpec, uh.secretLister)
+	if err != nil {
+		return nil, err
+	}
+
+	rkeConfig := appliedSpec.RancherKubernetesEngineConfig
 	nodeserver.FilterHostForSpec(rkeConfig, node)
 
 	logrus.Debugf("The number of nodes sent to the plan: %v", len(rkeConfig.Nodes))
