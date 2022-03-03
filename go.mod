@@ -64,12 +64,12 @@ require (
 	github.com/docker/go-connections v0.4.0
 	github.com/docker/libtrust v0.0.0-20160708172513-aabc10ec26b7 // indirect
 	github.com/ehazlett/simplelog v0.0.0-20200226020431-d374894e92a4
-	github.com/evanphx/json-patch v4.11.0+incompatible
+	github.com/evanphx/json-patch v4.12.0+incompatible
 	github.com/garyburd/redigo v1.6.2 // indirect
 	github.com/ghodss/yaml v1.0.0
 	github.com/go-asn1-ber/asn1-ber v1.5.3 // indirect
 	github.com/go-ldap/ldap/v3 v3.4.1
-	github.com/go-logr/logr v0.4.0
+	github.com/go-logr/logr v1.2.0
 	github.com/golang-jwt/jwt v3.2.1+incompatible
 	github.com/golang/protobuf v1.5.2
 	github.com/google/go-github v17.0.0+incompatible
@@ -111,7 +111,7 @@ require (
 	github.com/rancher/rancher/pkg/client v0.0.0
 	github.com/rancher/rdns-server v0.0.0-20180802070304-bf662911db6a
 	github.com/rancher/remotedialer v0.2.6-0.20220120012928-4ea2198e0966
-	github.com/rancher/rke v1.3.8-rc1
+	github.com/rancher/rke v1.3.8-rc4
 	github.com/rancher/security-scan v0.1.7-0.20200222041501-f7377f127168
 	github.com/rancher/steve v0.0.0-20220218171307-a91d90251ffa
 	github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20210727200656-10b094e30007
@@ -136,10 +136,9 @@ require (
 	github.com/yvasiyarov/newrelic_platform_go v0.0.0-20160601141957-9c099fbc30e9 // indirect
 	golang.org/x/crypto v0.0.0-20210921155107-089bfa567519
 	golang.org/x/mod v0.5.0
-	golang.org/x/net v0.0.0-20210805182204-aaa1db679c0d
+	golang.org/x/net v0.0.0-20211209124913-491a49abca63
 	golang.org/x/oauth2 v0.0.0-20210819190943-2bc19b11175f
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
-	golang.org/x/text v0.3.7 // indirect
 	golang.org/x/tools v0.1.7 // indirect
 	google.golang.org/api v0.56.0
 	google.golang.org/grpc v1.40.0
@@ -147,18 +146,18 @@ require (
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
 	gopkg.in/yaml.v2 v2.4.0
 	helm.sh/helm/v3 v3.7.1
-	k8s.io/api v0.22.3
+	k8s.io/api v0.23.3
 	k8s.io/apiextensions-apiserver v0.22.3
-	k8s.io/apimachinery v0.22.3
-	k8s.io/apiserver v0.22.3
-	k8s.io/cli-runtime v0.22.3
+	k8s.io/apimachinery v0.23.3
+	k8s.io/apiserver v0.23.3
+	k8s.io/cli-runtime v0.23.3
 	k8s.io/client-go v12.0.0+incompatible
-	k8s.io/gengo v0.0.0-20201214224949-b6c5ce23f027
+	k8s.io/gengo v0.0.0-20210813121822-485abfe95c7c
 	k8s.io/helm v2.16.7+incompatible
 	k8s.io/kube-aggregator v0.21.0
-	k8s.io/kubectl v0.22.3
+	k8s.io/kubectl v0.23.3
 	k8s.io/kubernetes v1.21.0
-	k8s.io/utils v0.0.0-20210930125809-cb0fa318a74b
+	k8s.io/utils v0.0.0-20211116205334-6203023598ed
 	sigs.k8s.io/aws-iam-authenticator v0.5.1
 	sigs.k8s.io/cluster-api v1.0.2
 	sigs.k8s.io/controller-runtime v0.10.3
