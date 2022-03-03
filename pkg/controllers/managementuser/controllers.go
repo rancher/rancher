@@ -33,10 +33,10 @@ import (
 	"github.com/rancher/rancher/pkg/types/config"
 )
 
-func Register(ctx context.Context, cluster *config.UserContext, clusterRec *managementv3.Cluster, kubeConfigGetter common.KubeConfigGetter) error {
+func Register(ctx context.Context, mgmt *config.ScaledContext, cluster *config.UserContext, clusterRec *managementv3.Cluster, kubeConfigGetter common.KubeConfigGetter) error {
 	rbac.Register(ctx, cluster)
 	healthsyncer.Register(ctx, cluster)
-	helm.Register(ctx, cluster, kubeConfigGetter)
+	helm.Register(ctx, mgmt, cluster, kubeConfigGetter)
 	logging.Register(ctx, cluster)
 	networkpolicy.Register(ctx, cluster)
 	cis.Register(ctx, cluster)

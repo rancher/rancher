@@ -42,7 +42,7 @@ const (
 	defaultMaxRevisionCount   = 10
 )
 
-func Register(ctx context.Context, user *config.UserContext, kubeConfigGetter common.KubeConfigGetter) {
+func Register(ctx context.Context, mgmt *config.ScaledContext, user *config.UserContext, kubeConfigGetter common.KubeConfigGetter) {
 	appClient := user.Management.Project.Apps("")
 	stackLifecycle := &Lifecycle{
 		KubeConfigGetter:      kubeConfigGetter,
@@ -63,7 +63,7 @@ func Register(ctx context.Context, user *config.UserContext, kubeConfigGetter co
 		AppsLister:            user.Management.Project.Apps("").Controller().Lister(),
 		NsLister:              user.Core.Namespaces("").Controller().Lister(),
 		NsClient:              user.Core.Namespaces(""),
-		SecretLister:          user.Core.Secrets("").Controller().Lister(),
+		SecretLister:          mgmt.Core.Secrets("").Controller().Lister(),
 	}
 	appClient.AddClusterScopedLifecycle(ctx, "helm-controller", user.ClusterName, stackLifecycle)
 
