@@ -331,7 +331,7 @@ func (h *handler) OnRemove(key string, obj runtime.Object) (runtime.Object, erro
 		job, err := h.getJobFromInfraMachine(infraObj)
 		if apierrors.IsNotFound(err) {
 			// If the job is not found, go ahead and proceed with machine deletion
-			return obj, nil
+			return obj, h.apply.WithOwner(obj).ApplyObjects()
 		} else if err != nil {
 			return obj, err
 		}
@@ -350,7 +350,7 @@ func (h *handler) OnRemove(key string, obj runtime.Object) (runtime.Object, erro
 			// If the deletion job condition has been set on the infrastructure object and the deletion job has been removed,
 			// then we don't want to create another deletion job.
 			logrus.Infof("Machine %s %s has already been deleted", infraObj.obj.GetObjectKind().GroupVersionKind(), infraObj.meta.GetName())
-			return obj, nil
+			return obj, h.apply.WithOwner(obj).ApplyObjects()
 		} else if err != nil {
 			return obj, err
 		}
