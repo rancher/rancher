@@ -328,6 +328,19 @@ func (h *handler) OnRemove(key string, obj runtime.Object) (runtime.Object, erro
 	}
 
 	if !infraObj.data.Bool("status", "jobComplete") && infraObj.data.String("status", "failureReason") == "" {
+		job, err := h.getJobFromInfraMachine(infraObj)
+		if apierrors.IsNotFound(err) {
+			// If the job is not found, go ahead and proceed with machine deletion
+			return obj, h.apply.WithOwner(obj).ApplyObjects()
+		} else if err != nil {
+			return obj, err
+		}
+		logrus.Debugf("[MachineProvision] create job for %s not finished, job was found and the error was not nil and was not an isnotfound", key)
+		if job != nil {
+			// enqueue the job to force-reconcile the condition
+			h.jobController.Enqueue(job.Namespace, job.Name)
+			logrus.Tracef("[MachineProvision] create job object for %s was %+v", key, job)
+		}
 		return obj, fmt.Errorf("cannot delete machine %s because create job has not finished", infraObj.meta.GetName())
 	}
 
@@ -337,7 +350,7 @@ func (h *handler) OnRemove(key string, obj runtime.Object) (runtime.Object, erro
 			// If the deletion job condition has been set on the infrastructure object and the deletion job has been removed,
 			// then we don't want to create another deletion job.
 			logrus.Infof("Machine %s %s has already been deleted", infraObj.obj.GetObjectKind().GroupVersionKind(), infraObj.meta.GetName())
-			return obj, nil
+			return obj, h.apply.WithOwner(obj).ApplyObjects()
 		} else if err != nil {
 			return obj, err
 		}
@@ -365,7 +378,7 @@ func (h *handler) OnRemove(key string, obj runtime.Object) (runtime.Object, erro
 
 	if machine == nil || machine.Status.NodeRef == nil {
 		// Machine noderef is nil, we should just allow deletion.
-		logrus.Debugf("[MachineProvision] There was no associated K8s node with this etcd dynamicmachine %s. proceeding with deletion", key)
+		logrus.Debugf("[MachineProvision] There was no associated K8s node with this etcd dynamicmachine %s. Proceeding with deletion", key)
 		return h.doRemove(infraObj)
 	}
 
