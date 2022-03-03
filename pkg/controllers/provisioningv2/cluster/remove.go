@@ -11,6 +11,8 @@ import (
 	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 )
 
 func (h *handler) OnMgmtClusterRemove(_ string, cluster *v3.Cluster) (*v3.Cluster, error) {
@@ -90,30 +92,9 @@ func (h *handler) doClusterRemove(cluster *v1.Cluster) func() (string, error) {
 			}
 		}
 
-		capiCluster, capiClusterError := h.capiClustersCache.Get(cluster.Namespace, cluster.Name)
-		if capiClusterError != nil && !apierrors.IsNotFound(capiClusterError) {
-			return "", capiClusterError
-		}
-
-		if capiCluster != nil && capiCluster.Spec.ControlPlaneRef != nil {
-			// If the CAPI cluster has a control plane reference, we need to delete it first because the CAPI cluster controller
-			// doesn't consider control plane machines descendants of the CAPI cluster. This could cause issues if the CAPI
-			// cluster object is cleaned up before the control plane machines.
-			cp, err := h.rkeControlPlanesCache.Get(cluster.Namespace, cluster.Name)
-			if err != nil && !apierrors.IsNotFound(err) {
-				return "", err
-			}
-
-			if cp != nil && cp.DeletionTimestamp == nil {
-				if err := h.rkeControlPlanes.Delete(cluster.Namespace, cluster.Name, nil); err != nil && !apierrors.IsNotFound(err) {
-					return "", err
-				}
-			}
-
-			if err == nil {
-				// While the control plane is being deleted, the status of deletion will be copied from there.
-				return "", generic.ErrSkip
-			}
+		capiCluster, capiClusterErr := h.capiClustersCache.Get(cluster.Namespace, cluster.Name)
+		if capiClusterErr != nil && !apierrors.IsNotFound(capiClusterErr) {
+			return "", capiClusterErr
 		}
 
 		if capiCluster != nil {
@@ -124,13 +105,25 @@ func (h *handler) doClusterRemove(cluster *v1.Cluster) func() (string, error) {
 				}
 			}
 
-			if capiCluster.Spec.ControlPlaneRef == nil {
-				// If the CAPI cluster does not have a control plane reference, then we should track the deletion of the CAPI machines.
-				return rke2.GetMachineDeletionStatus(h.capiMachinesCache, capiCluster.Namespace, capiCluster.Name)
+			_, err := h.rkeControlPlanesCache.Get(cluster.Namespace, cluster.Name)
+			if err != nil && !apierrors.IsNotFound(err) {
+				return "", err
+			} else if err == nil {
+				return "", generic.ErrSkip
 			}
 		}
 
-		if capiClusterError == nil {
+		machines, err := h.capiMachinesCache.List(cluster.Namespace, labels.SelectorFromSet(labels.Set{capi.ClusterLabelName: cluster.Name}))
+		if err != nil {
+			return "", err
+		}
+
+		// Machines will delete first so report their status, if any exist.
+		if len(machines) > 0 {
+			return rke2.GetMachineDeletionStatus(machines)
+		}
+
+		if capiClusterErr == nil {
 			return fmt.Sprintf("waiting for cluster-api cluster [%s] to delete", cluster.Name), nil
 		}
 

@@ -13,7 +13,6 @@ import (
 	"github.com/rancher/wrangler/pkg/relatedresource"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/equality"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
@@ -82,21 +81,8 @@ func (h *handler) OnRemove(_ string, cp *rkev1.RKEControlPlane) (*rkev1.RKEContr
 func (h *handler) doRemove(obj *rkev1.RKEControlPlane) func() (string, error) {
 	return func() (string, error) {
 		logrus.Debugf("[rkecontrolplane] (%s/%s) Peforming removal of rkecontrolplane", obj.Namespace, obj.Name)
-		machineDeployments, err := h.machineDeploymentCache.List(obj.Namespace, labels.SelectorFromSet(labels.Set{capi.ClusterLabelName: obj.Name}))
-		if err != nil {
-			return "", err
-		}
-
-		for _, md := range machineDeployments {
-			if md.DeletionTimestamp.IsZero() {
-				logrus.Debugf("[rkecontrolplane] (%s/%s) Performing delete of machinedeployment %s/%s", obj.Namespace, obj.Name, md.Namespace, md.Name)
-				if err := h.machineDeploymentClient.Delete(md.Namespace, md.Name, &metav1.DeleteOptions{}); err != nil {
-					return "", err
-				}
-			}
-		}
-
-		machines, err := h.machineCache.List(obj.Namespace, labels.SelectorFromSet(labels.Set{capi.ClusterLabelName: obj.Name}))
+		// Control plane nodes are managed by the control plane object. Therefore, the control plane object shouldn't be cleaned up before the control plane nodes are removed.
+		machines, err := h.machineCache.List(obj.Namespace, labels.SelectorFromSet(labels.Set{capi.ClusterLabelName: obj.Name, rke2.ControlPlaneRoleLabel: "true"}))
 		if err != nil {
 			return "", err
 		}
@@ -104,15 +90,6 @@ func (h *handler) doRemove(obj *rkev1.RKEControlPlane) func() (string, error) {
 		logrus.Debugf("[rkecontrolplane] (%s/%s) listed %d machines during removal", obj.Namespace, obj.Name, len(machines))
 		logrus.Tracef("[rkecontrolplane] (%s/%s) machine list: %+v", obj.Namespace, obj.Name, machines)
 
-		// CustomMachines are not associated to a MachineDeployment, so they have to be deleted manually.
-		for _, m := range machines {
-			if m.Spec.InfrastructureRef.APIVersion == rke2.RKEAPIVersion && m.Spec.InfrastructureRef.Kind == "CustomMachine" && m.DeletionTimestamp.IsZero() {
-				if err := h.machineClient.Delete(m.Namespace, m.Name, &metav1.DeleteOptions{}); err != nil {
-					return "", err
-				}
-			}
-		}
-
-		return rke2.GetMachineDeletionStatus(h.machineCache, obj.Namespace, obj.Name)
+		return rke2.GetMachineDeletionStatus(machines)
 	}
 }
