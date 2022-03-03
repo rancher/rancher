@@ -15,6 +15,7 @@ import (
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 )
 
 type handler struct {
@@ -37,9 +38,17 @@ func Register(ctx context.Context, clients *wrangler.Context, planner *planner.P
 					Name:      clusterName,
 				}}, nil
 			}
+		} else if machine, ok := obj.(*capi.Machine); ok {
+			clusterName := machine.Labels[rke2.ClusterNameLabel]
+			if clusterName != "" {
+				return []relatedresource.Key{{
+					Namespace: machine.Namespace,
+					Name:      clusterName,
+				}}, nil
+			}
 		}
 		return nil, nil
-	}, clients.RKE.RKEControlPlane(), clients.Core.Secret())
+	}, clients.RKE.RKEControlPlane(), clients.Core.Secret(), clients.CAPI.Machine())
 }
 
 func (h *handler) OnChange(cluster *rkev1.RKEControlPlane, status rkev1.RKEControlPlaneStatus) (rkev1.RKEControlPlaneStatus, error) {
