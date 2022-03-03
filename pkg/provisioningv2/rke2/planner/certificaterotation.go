@@ -1,7 +1,9 @@
 package planner
 
 import (
+	"encoding/base64"
 	"fmt"
+	"strconv"
 
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
@@ -57,20 +59,33 @@ func shouldRotate(cp *rkev1.RKEControlPlane) bool {
 	return cp.Status.CertificateRotationGeneration != cp.Spec.RotateCertificates.Generation
 }
 
+const idempotentRotateScript = `
+#!/bin/sh
+
+currentGeneration=""
+targetGeneration=$2
+runtime=$1
+shift
+shift
+
+dataRoot="/var/lib/rancher/$runtime/certificate_rotation"
+generationFile="$dataRoot/generation"
+
+currentGeneration=$(cat "$generationFile" || echo "")
+
+if [ "$currentGeneration" != "$targetGeneration" ]; then
+  $runtime certificate rotate  $@
+else
+	echo "certificates have already been rotated to the current generation."
+fi
+
+mkdir -p $dataRoot
+echo $targetGeneration > "$generationFile"
+`
+
 // rotateCertificatesPlan rotates the certificates for the services specified, if any, and restarts the service.  If no services are specified
 // all certificates are rotated.
 func rotateCertificatesPlan(controlPlane *rkev1.RKEControlPlane, rotation *rkev1.RotateCertificates, entry *planEntry) plan.NodePlan {
-	args := []string{
-		"certificate",
-		"rotate",
-	}
-
-	if len(rotation.Services) > 0 {
-		for _, service := range rotation.Services {
-			args = append(args, "-s", service)
-		}
-	}
-
 	if isOnlyWorker(entry) {
 		return plan.NodePlan{
 			Instructions: []plan.OneTimeInstruction{
@@ -86,11 +101,32 @@ func rotateCertificatesPlan(controlPlane *rkev1.RKEControlPlane, rotation *rkev1
 		}
 	}
 
+	rotateScriptPath := "/var/lib/rancher/" + rke2.GetRuntime(controlPlane.Spec.KubernetesVersion) + "/certificate_rotation/bin/rotate.sh"
+
+	args := []string{
+		"-xe",
+		rotateScriptPath,
+		rke2.GetRuntime(controlPlane.Spec.KubernetesVersion),
+		strconv.FormatInt(rotation.Generation, 10),
+	}
+
+	if len(rotation.Services) > 0 {
+		for _, service := range rotation.Services {
+			args = append(args, "-s", service)
+		}
+	}
+
 	return plan.NodePlan{
+		Files: []plan.File{
+			{
+				Content: base64.StdEncoding.EncodeToString([]byte(idempotentRotateScript)),
+				Path:    rotateScriptPath,
+			},
+		},
 		Instructions: []plan.OneTimeInstruction{
 			{
 				Name:    "rotate certificates",
-				Command: rke2.GetRuntimeCommand(controlPlane.Spec.KubernetesVersion),
+				Command: "sh",
 				Args:    args,
 			},
 			{
