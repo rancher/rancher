@@ -216,7 +216,7 @@ func (m *Manager) doStart(rec *record, clusterOwner bool) (exit error) {
 
 	transaction := controller.NewHandlerTransaction(rec.ctx)
 	if clusterOwner {
-		if err := clusterController.Register(transaction, rec.cluster, rec.clusterRec, m); err != nil {
+		if err := clusterController.Register(transaction, m.ScaledContext, rec.cluster, rec.clusterRec, m); err != nil {
 			transaction.Rollback()
 			return err
 		}
