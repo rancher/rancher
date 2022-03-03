@@ -21,6 +21,7 @@ const (
 	ExoscaleDriver     = "exoscale"
 	HarvesterDriver    = "harvester"
 	Linodedriver       = "linode"
+	NutanixDriver      = "nutanix"
 	OCIDriver          = "oci"
 	OTCDriver          = "otc"
 	OpenstackDriver    = "openstack"
@@ -39,6 +40,7 @@ var DriverData = map[string]map[string][]string{
 	ExoscaleDriver:     {"privateCredentialFields": []string{"apiSecretKey"}},
 	HarvesterDriver:    {"publicCredentialFields": []string{"clusterType", "clusterId"}, "privateCredentialFields": []string{"kubeconfigContent"}, "optionalCredentialFields": []string{"clusterId"}},
 	Linodedriver:       {"privateCredentialFields": []string{"token"}, "passwordFields": []string{"rootPass"}},
+	NutanixDriver:      {"publicCredentialFields": []string{"endpoint", "username", "port"}, "privateCredentialFields": []string{"password"}},
 	OCIDriver:          {"publicCredentialFields": []string{"tenancyId", "userId", "fingerprint"}, "privateCredentialFields": []string{"privateKeyContents"}, "passwordFields": []string{"privateKeyPassphrase"}},
 	OTCDriver:          {"privateCredentialFields": []string{"accessKeySecret"}},
 	OpenstackDriver:    {"privateCredentialFields": []string{"password"}},
@@ -127,6 +129,9 @@ func addMachineDrivers(management *config.ManagementContext) error {
 		return err
 	}
 	if err := addMachineDriver(SoftLayerDriver, "local://", "", "", nil, false, true, false, management); err != nil {
+		return err
+	}
+	if err := addMachineDriver(NutanixDriver, "https://github.com/nutanix/docker-machine/releases/download/v3.1.0/docker-machine-driver-nutanix_v3.1.0_linux", "https://nutanix.github.io/rancher-ui-driver/v3.1.0/component.js", "e8f4f2e7ae7e927534884b5a3a45a38a5bd2c2872de1d65375f6e009bed75dba", []string{"nutanix.github.io"}, false, false, false, management); err != nil {
 		return err
 	}
 	return addMachineDriver(Vmwaredriver, "local://", "", "", nil, true, true, false, management)
