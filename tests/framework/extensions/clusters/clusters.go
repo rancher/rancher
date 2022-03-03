@@ -4,12 +4,15 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/rancher/rancher/pkg/api/scheme"
+	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	apisV1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	"github.com/rancher/rancher/tests/framework/pkg/wait"
 	"github.com/rancher/rancher/tests/integration/pkg/defaults"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/watch"
 )
 
@@ -20,6 +23,24 @@ func IsProvisioningClusterReady(event watch.Event) (ready bool, err error) {
 
 	ready = cluster.Status.Ready
 	return ready, nil
+}
+
+// IsHostedProvisioningClusterReady is basic check function that would be used for the wait.WatchWait func in pkg/wait.
+// This functions just waits until a hosted cluster becomes ready.
+func IsHostedProvisioningClusterReady(event watch.Event) (ready bool, err error) {
+	clusterUnstructured := event.Object.(*unstructured.Unstructured)
+	cluster := &v3.Cluster{}
+	err = scheme.Scheme.Convert(clusterUnstructured, cluster, clusterUnstructured.GroupVersionKind())
+	if err != nil {
+		return false, err
+	}
+	for _, cond := range cluster.Status.Conditions {
+		if cond.Type == "Ready" && cond.Status == "True" {
+			return true, nil
+		}
+	}
+
+	return false, nil
 }
 
 // NewRKE2ClusterConfig is a constructor for a apisV1.Cluster object, to be used by the rancher.Client.Provisioning client.
