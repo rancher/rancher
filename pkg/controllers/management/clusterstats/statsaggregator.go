@@ -80,7 +80,7 @@ func (s *StatsAggregator) aggregate(cluster *v3.Cluster, clusterName string) err
 	for _, m := range allMachines {
 		// if none are set, then nodes syncer has not completed
 		if !m.Spec.Worker && !m.Spec.ControlPlane && !m.Spec.Etcd {
-			return errors.Errorf("node role cannot be determined because node %s has not finished syncing. retrying...", m.Status.NodeName)
+			return errors.Errorf("node role cannot be determined because node %s has not finished syncing. retrying", m.Status.NodeName)
 		}
 		if isTaintedNoExecuteNoSchedule(m) && !m.Spec.Worker {
 			continue

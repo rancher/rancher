@@ -543,10 +543,10 @@ func podTypes(schemas *types.Schemas) *types.Schemas {
 		AddMapperForType(&Version, v1.ContainerPort{},
 			m.Move{From: "hostIP", To: "hostIp"},
 		).
-		AddMapperForType(&Version, v1.Handler{},
+		AddMapperForType(&Version, v1.LifecycleHandler{},
 			mapper.ContainerProbeHandler{}).
 		AddMapperForType(&Version, v1.Probe{}, mapper.ContainerProbeHandler{}).
-		AddMapperForType(&Version, v1.Handler{}, handlerMapper).
+		AddMapperForType(&Version, v1.LifecycleHandler{}, handlerMapper).
 		AddMapperForType(&Version, v1.Probe{}, handlerMapper).
 		AddMapperForType(&Version, v1.PodStatus{},
 			m.Move{From: "hostIP", To: "nodeIp"},
@@ -583,7 +583,7 @@ func podTypes(schemas *types.Schemas) *types.Schemas {
 		}{}).
 		MustImport(&Version, v3.PublicEndpoint{}).
 		MustImport(&Version, v3.WorkloadMetric{}).
-		MustImport(&Version, v1.Handler{}, handlerOverride{}).
+		MustImport(&Version, v1.LifecycleHandler{}, handlerOverride{}).
 		MustImport(&Version, v1.Probe{}, handlerOverride{}).
 		MustImport(&Version, v1.Container{}, struct {
 			Environment          map[string]string

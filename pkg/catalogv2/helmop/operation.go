@@ -1005,7 +1005,7 @@ func (s *Operations) createPod(secretData map[string][]byte, kustomize bool, ima
 			MountPath: helmRunPath,
 		})
 		pod.Spec.Containers[0].Lifecycle = &v1.Lifecycle{
-			PostStart: &v1.Handler{
+			PostStart: &v1.LifecycleHandler{
 				Exec: &v1.ExecAction{
 					Command: []string{"/bin/sh", "-c", fmt.Sprintf("cp -r %s/. %s", helmDataPath, helmRunPath)},
 				},

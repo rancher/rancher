@@ -1,4 +1,4 @@
-ARG K3S_BUILDER=rancher/k3s:v1.22.5-k3s1
+ARG K3S_BUILDER=rancher/k3s:v1.23.3-k3s1
 
 # Use binaries from k3s root for s390x as k3s is not available on s390x
 FROM registry.suse.com/suse/sle15:15.3 AS k3s_root
@@ -41,8 +41,8 @@ ENV CATTLE_CHART_DEFAULT_BRANCH=$CHART_DEFAULT_BRANCH
 ENV CATTLE_PARTNER_CHART_DEFAULT_BRANCH=$PARTNER_CHART_DEFAULT_BRANCH
 ENV CATTLE_RKE2_CHART_DEFAULT_BRANCH=$RKE2_CHART_DEFAULT_BRANCH
 ENV CATTLE_HELM_VERSION v2.16.8-rancher1
-ENV CATTLE_K3S_VERSION v1.22.5+k3s1
 ENV CATTLE_MACHINE_VERSION v0.15.0-rancher79
+ENV CATTLE_K3S_VERSION v1.23.3+k3s1
 ENV CATTLE_MACHINE_PROVISION_IMAGE rancher/machine:${CATTLE_MACHINE_VERSION}
 ENV CATTLE_ETCD_VERSION v3.5.1
 ENV LOGLEVEL_VERSION v0.1.5
@@ -53,7 +53,7 @@ ENV LINODE_UI_DRIVER_VERSION v0.3.0
 # make sure the version number is consistent with the one at Line 100 of pkg/data/management/machinedriver_data.go
 ENV DOCKER_MACHINE_HARVESTER_VERSION v0.3.4
 ENV CATTLE_KDM_BRANCH ${CATTLE_KDM_BRANCH}
-ENV HELM_VERSION v3.7.1
+ENV HELM_VERSION v3.8.0
 ENV KUSTOMIZE_VERSION v4.4.1
 ENV CATTLE_SYSTEM_AGENT_VERSION v0.2.0-beta5
 ENV CATTLE_SYSTEM_AGENT_UPGRADE_IMAGE rancher/system-agent:${CATTLE_SYSTEM_AGENT_VERSION}-suc
@@ -61,7 +61,7 @@ ENV CATTLE_SYSTEM_UPGRADE_CONTROLLER_CHART_VERSION 100.0.1+up0.3.1
 
 # System charts minimal version
 ENV CATTLE_FLEET_MIN_VERSION=100.0.3+up0.3.9-rc1
-ENV CATTLE_RANCHER_WEBHOOK_MIN_VERSION=1.0.3+up0.2.4-rc6
+ENV CATTLE_RANCHER_WEBHOOK_MIN_VERSION=1.0.4+up0.2.5-rc2
 
 RUN mkdir -p /var/lib/rancher-data/local-catalogs/system-library && \
     mkdir -p /var/lib/rancher-data/local-catalogs/library && \
@@ -129,6 +129,7 @@ COPY --from=k3s_builder \
     /bin/ethtool \
     /bin/ip \
     /bin/ipset \
+    /bin/k3s \
     /bin/losetup \
     /bin/pigz \
     /bin/runc \
@@ -143,13 +144,12 @@ RUN if [ "${ARCH}" != "s390x" ]; then \
         ln -s /usr/bin/cni /usr/bin/host-local && \
         ln -s /usr/bin/cni /usr/bin/loopback && \
         ln -s /usr/bin/cni /usr/bin/portmap && \
-        ln -s /usr/bin/containerd /usr/bin/crictl && \
-        ln -s /usr/bin/containerd /usr/bin/ctr && \
-        ln -s /usr/bin/containerd /usr/bin/k3s && \
-        ln -s /usr/bin/containerd /usr/bin/k3s-agent && \
-        ln -s /usr/bin/containerd /usr/bin/k3s-etcd-snapshot && \
-        ln -s /usr/bin/containerd /usr/bin/k3s-server && \
-        ln -s /usr/bin/containerd /usr/bin/kubectl && \
+        ln -s /usr/bin/k3s /usr/bin/crictl && \
+        ln -s /usr/bin/k3s /usr/bin/ctr && \
+        ln -s /usr/bin/k3s /usr/bin/k3s-agent && \
+        ln -s /usr/bin/k3s /usr/bin/k3s-etcd-snapshot && \
+        ln -s /usr/bin/k3s /usr/bin/k3s-server && \
+        ln -s /usr/bin/k3s /usr/bin/kubectl && \
         ln -s /usr/bin/pigz /usr/bin/unpigz && \
         ln -s /usr/bin/xtables-legacy-multi /usr/bin/iptables && \
         ln -s /usr/bin/xtables-legacy-multi /usr/bin/iptables-save && \

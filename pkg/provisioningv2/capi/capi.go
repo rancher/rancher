@@ -81,10 +81,11 @@ func Register(ctx context.Context, clients *wrangler.Context) (func(ctx context.
 }
 
 func reconcilers(mgr ctrl.Manager) ([]reconciler, error) {
+	l := ctrl.Log.WithName("remote").WithName("ClusterCacheTracker")
 	tracker, err := remote.NewClusterCacheTracker(
 		mgr,
 		remote.ClusterCacheTrackerOptions{
-			Log:     ctrl.Log.WithName("remote").WithName("ClusterCacheTracker"),
+			Log:     &l,
 			Indexes: remote.DefaultIndexes,
 		},
 	)
@@ -99,18 +100,22 @@ func reconcilers(mgr ctrl.Manager) ([]reconciler, error) {
 			Tracker: tracker,
 		},
 		&controllers.ClusterReconciler{
-			Client: mgr.GetClient(),
+			Client:    mgr.GetClient(),
+			APIReader: mgr.GetAPIReader(),
 		},
 		&controllers.MachineReconciler{
-			Client:  mgr.GetClient(),
-			Tracker: tracker,
+			Client:    mgr.GetClient(),
+			APIReader: mgr.GetAPIReader(),
+			Tracker:   tracker,
 		},
 		&controllers.MachineSetReconciler{
-			Client:  mgr.GetClient(),
-			Tracker: tracker,
+			Client:    mgr.GetClient(),
+			APIReader: mgr.GetAPIReader(),
+			Tracker:   tracker,
 		},
 		&controllers.MachineDeploymentReconciler{
-			Client: mgr.GetClient(),
+			Client:    mgr.GetClient(),
+			APIReader: mgr.GetAPIReader(),
 		},
 		&controllers.MachineHealthCheckReconciler{
 			Client:  mgr.GetClient(),

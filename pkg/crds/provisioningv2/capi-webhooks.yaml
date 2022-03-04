@@ -1,31 +1,10 @@
+---
 apiVersion: admissionregistration.k8s.io/v1
 kind: MutatingWebhookConfiguration
 metadata:
   creationTimestamp: null
   name: mutating-webhook-configuration
 webhooks:
-- admissionReviewVersions:
-  - v1
-  - v1beta1
-  clientConfig:
-    service:
-      name: webhook-service
-      namespace: cattle-system
-      path: /mutate-cluster-x-k8s-io-v1beta1-cluster
-  failurePolicy: Fail
-  matchPolicy: Equivalent
-  name: default.cluster.cluster.x-k8s.io
-  rules:
-  - apiGroups:
-    - cluster.x-k8s.io
-    apiVersions:
-    - v1beta1
-    operations:
-    - CREATE
-    - UPDATE
-    resources:
-    - clusters
-  sideEffects: None
 - admissionReviewVersions:
   - v1
   - v1beta1
@@ -121,13 +100,13 @@ webhooks:
     service:
       name: webhook-service
       namespace: cattle-system
-      path: /mutate-exp-cluster-x-k8s-io-v1beta1-machinepool
+      path: /mutate-cluster-x-k8s-io-v1beta1-machinepool
   failurePolicy: Fail
   matchPolicy: Equivalent
-  name: default.exp.machinepool.cluster.x-k8s.io
+  name: default.machinepool.cluster.x-k8s.io
   rules:
   - apiGroups:
-    - exp.cluster.x-k8s.io
+    - cluster.x-k8s.io
     apiVersions:
     - v1beta1
     operations:
@@ -135,6 +114,50 @@ webhooks:
     - UPDATE
     resources:
     - machinepools
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  - v1beta1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: cattle-system
+      path: /mutate-cluster-x-k8s-io-v1beta1-cluster
+  failurePolicy: Fail
+  matchPolicy: Equivalent
+  name: default.cluster.cluster.x-k8s.io
+  rules:
+  - apiGroups:
+    - cluster.x-k8s.io
+    apiVersions:
+    - v1beta1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - clusters
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  - v1beta1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: cattle-system
+      path: /mutate-cluster-x-k8s-io-v1beta1-clusterclass
+  failurePolicy: Fail
+  matchPolicy: Equivalent
+  name: default.clusterclass.cluster.x-k8s.io
+  rules:
+  - apiGroups:
+    - cluster.x-k8s.io
+    apiVersions:
+    - v1beta1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - clusterclasses
   sideEffects: None
 - admissionReviewVersions:
   - v1
@@ -165,28 +188,6 @@ metadata:
   creationTimestamp: null
   name: validating-webhook-configuration
 webhooks:
-- admissionReviewVersions:
-  - v1
-  - v1beta1
-  clientConfig:
-    service:
-      name: webhook-service
-      namespace: cattle-system
-      path: /validate-cluster-x-k8s-io-v1beta1-cluster
-  failurePolicy: Fail
-  matchPolicy: Equivalent
-  name: validation.cluster.cluster.x-k8s.io
-  rules:
-  - apiGroups:
-    - cluster.x-k8s.io
-    apiVersions:
-    - v1beta1
-    operations:
-    - CREATE
-    - UPDATE
-    resources:
-    - clusters
-  sideEffects: None
 - admissionReviewVersions:
   - v1
   - v1beta1
@@ -282,13 +283,13 @@ webhooks:
     service:
       name: webhook-service
       namespace: cattle-system
-      path: /validate-exp-cluster-x-k8s-io-v1beta1-machinepool
+      path: /validate-cluster-x-k8s-io-v1beta1-machinepool
   failurePolicy: Fail
   matchPolicy: Equivalent
-  name: validation.exp.machinepool.cluster.x-k8s.io
+  name: validation.machinepool.cluster.x-k8s.io
   rules:
   - apiGroups:
-    - exp.cluster.x-k8s.io
+    - cluster.x-k8s.io
     apiVersions:
     - v1beta1
     operations:
@@ -296,6 +297,52 @@ webhooks:
     - UPDATE
     resources:
     - machinepools
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  - v1beta1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: cattle-system
+      path: /validate-cluster-x-k8s-io-v1beta1-cluster
+  failurePolicy: Fail
+  matchPolicy: Equivalent
+  name: validation.cluster.cluster.x-k8s.io
+  rules:
+  - apiGroups:
+    - cluster.x-k8s.io
+    apiVersions:
+    - v1beta1
+    operations:
+    - CREATE
+    - UPDATE
+    - DELETE
+    resources:
+    - clusters
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  - v1beta1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: cattle-system
+      path: /validate-cluster-x-k8s-io-v1beta1-clusterclass
+  failurePolicy: Fail
+  matchPolicy: Equivalent
+  name: validation.clusterclass.cluster.x-k8s.io
+  rules:
+  - apiGroups:
+    - cluster.x-k8s.io
+    apiVersions:
+    - v1beta1
+    operations:
+    - CREATE
+    - UPDATE
+    - DELETE
+    resources:
+    - clusterclasses
   sideEffects: None
 - admissionReviewVersions:
   - v1

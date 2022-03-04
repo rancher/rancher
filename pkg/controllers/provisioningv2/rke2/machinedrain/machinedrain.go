@@ -216,7 +216,6 @@ func (h *handler) getHelper(machine *capi.Machine, drainOpts rkev1.DrainOptions)
 		Force:                           drainOpts.Force,
 		GracePeriodSeconds:              drainOpts.GracePeriod,
 		IgnoreAllDaemonSets:             drainOpts.IgnoreDaemonSets == nil || *drainOpts.IgnoreDaemonSets,
-		IgnoreErrors:                    drainOpts.IgnoreErrors,
 		Timeout:                         time.Duration(timeout) * time.Second,
 		DeleteEmptyDirData:              drainOpts.DeleteEmptyDirData,
 		DisableEviction:                 drainOpts.DisableEviction,
