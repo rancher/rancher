@@ -20,6 +20,7 @@ import (
 	"github.com/rancher/rancher/pkg/types/config"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/kubernetes/pkg/kubelet/util/format"
 )
 
 const roleTemplatesRequired = "authz.management.cattle.io/creator-role-bindings"
@@ -164,13 +165,13 @@ func (s *projectStore) validateResourceQuota(apiContext *types.APIContext, data 
 func (s *projectStore) isQuotaFit(apiContext *types.APIContext, nsQuotaLimit *v32.ResourceQuotaLimit,
 	projectQuotaLimit *v32.ResourceQuotaLimit, id string) error {
 	// check that namespace default quota is within project quota
-	isFit, msg, err := resourcequota.IsQuotaFit(nsQuotaLimit, []*v32.ResourceQuotaLimit{}, projectQuotaLimit)
+	isFit, exceeded, err := resourcequota.IsQuotaFit(nsQuotaLimit, []*v32.ResourceQuotaLimit{}, projectQuotaLimit)
 	if err != nil {
 		return err
 	}
 	if !isFit {
 		return httperror.NewFieldAPIError(httperror.MaxLimitExceeded, namespaceQuotaField, fmt.Sprintf("exceeds %s on fields: %s",
-			quotaField, msg))
+			quotaField, format.ResourceList(exceeded)))
 	}
 
 	if id == "" {
@@ -226,13 +227,13 @@ func (s *projectStore) isQuotaFit(apiContext *types.APIContext, nsQuotaLimit *v3
 	if err != nil {
 		return err
 	}
-	isFit, msg, err = resourcequota.IsQuotaFit(usedQuotaLimit, []*v32.ResourceQuotaLimit{}, projectQuotaLimit)
+	isFit, exceeded, err = resourcequota.IsQuotaFit(usedQuotaLimit, []*v32.ResourceQuotaLimit{}, projectQuotaLimit)
 	if err != nil {
 		return err
 	}
 	if !isFit {
 		return httperror.NewFieldAPIError(httperror.MaxLimitExceeded, quotaField, fmt.Sprintf("is below the used limit on fields: %s",
-			msg))
+			format.ResourceList(exceeded)))
 	}
 
 	if len(limitToAdd) == 0 && len(limitToRemove) == 0 {
@@ -261,14 +262,14 @@ func (s *projectStore) isQuotaFit(apiContext *types.APIContext, nsQuotaLimit *v3
 		nsLimits = append(nsLimits, converted)
 	}
 
-	isFit, msg, err = resourcequota.IsQuotaFit(&v32.ResourceQuotaLimit{}, nsLimits, projectQuotaLimit)
+	isFit, exceeded, err = resourcequota.IsQuotaFit(&v32.ResourceQuotaLimit{}, nsLimits, projectQuotaLimit)
 	if err != nil {
 		return err
 	}
 	if !isFit {
 		return httperror.NewFieldAPIError(httperror.MaxLimitExceeded, namespaceQuotaField,
 			fmt.Sprintf("exceeds project limit on fields %s when applied to all namespaces in a project",
-				msg))
+				format.ResourceList(exceeded)))
 	}
 
 	return nil

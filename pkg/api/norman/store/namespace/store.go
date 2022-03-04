@@ -3,18 +3,18 @@ package namespace
 import (
 	"fmt"
 
-	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-
 	"github.com/rancher/norman/api/access"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/store/transform"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/values"
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	clusterclient "github.com/rancher/rancher/pkg/client/generated/cluster/v3"
 	mgmtclient "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	"github.com/rancher/rancher/pkg/resourcequota"
 	mgmtschema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
+	"k8s.io/kubernetes/pkg/kubelet/util/format"
 )
 
 const quotaField = "resourceQuota"
@@ -161,12 +161,12 @@ func (p *Store) validateResourceQuota(apiContext *types.APIContext, schema *type
 		data[containerResourceLimitField] = project.ContainerDefaultResourceLimit
 	}
 
-	isFit, msg, err := resourcequota.IsQuotaFit(nsQuotaLimit, nsLimits, projectQuotaLimit)
+	isFit, exceeded, err := resourcequota.IsQuotaFit(nsQuotaLimit, nsLimits, projectQuotaLimit)
 	if err != nil || isFit {
 		return err
 	}
 
-	return httperror.NewFieldAPIError(httperror.MaxLimitExceeded, quotaField, fmt.Sprintf("exceeds projectLimit on fields: %s", msg))
+	return httperror.NewFieldAPIError(httperror.MaxLimitExceeded, quotaField, fmt.Sprintf("exceeds projectLimit on fields: %s", format.ResourceList(exceeded)))
 }
 
 func limitToLimit(from *mgmtclient.ResourceQuotaLimit) (*v32.ResourceQuotaLimit, error) {
