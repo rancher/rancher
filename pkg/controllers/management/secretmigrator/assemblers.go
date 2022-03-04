@@ -59,7 +59,7 @@ func AssembleS3Credential(cluster *apimgmtv3.Cluster, spec apimgmtv3.ClusterSpec
 	if err != nil {
 		return spec, err
 	}
-	spec.RancherKubernetesEngineConfig.Services.Etcd.BackupConfig.S3BackupConfig.SecretKey = string(s3Cred.Data["secretKey"])
+	spec.RancherKubernetesEngineConfig.Services.Etcd.BackupConfig.S3BackupConfig.SecretKey = string(s3Cred.Data[secretKey])
 	return spec, nil
 }
 
@@ -80,7 +80,7 @@ func AssembleWeaveCredential(cluster *apimgmtv3.Cluster, spec apimgmtv3.ClusterS
 	if err != nil {
 		return spec, err
 	}
-	spec.RancherKubernetesEngineConfig.Network.WeaveNetworkProvider.Password = string(registrySecret.Data["password"])
+	spec.RancherKubernetesEngineConfig.Network.WeaveNetworkProvider.Password = string(registrySecret.Data[secretKey])
 	return spec, nil
 }
 
@@ -101,7 +101,7 @@ func AssembleSMTPCredential(notifier *apimgmtv3.Notifier, secretLister v1.Secret
 		return &notifier.Spec, err
 	}
 	spec := notifier.Spec.DeepCopy()
-	spec.SMTPConfig.Password = string(smtpSecret.Data["password"])
+	spec.SMTPConfig.Password = string(smtpSecret.Data[secretKey])
 	return spec, nil
 }
 
@@ -122,7 +122,7 @@ func AssembleWechatCredential(notifier *apimgmtv3.Notifier, secretLister v1.Secr
 		return &notifier.Spec, err
 	}
 	spec := notifier.Spec.DeepCopy()
-	spec.WechatConfig.Secret = string(wechatSecret.Data["secret"])
+	spec.WechatConfig.Secret = string(wechatSecret.Data[secretKey])
 	return spec, nil
 }
 
@@ -143,7 +143,7 @@ func AssembleDingtalkCredential(notifier *apimgmtv3.Notifier, secretLister v1.Se
 		return &notifier.Spec, err
 	}
 	spec := notifier.Spec.DeepCopy()
-	spec.DingtalkConfig.Secret = string(secret.Data["credential"])
+	spec.DingtalkConfig.Secret = string(secret.Data[secretKey])
 	return spec, nil
 }
 
@@ -160,7 +160,7 @@ func (m *Migrator) AssembleGithubPipelineConfigCredential(config apiprjv3.Github
 	if err != nil {
 		return config, err
 	}
-	config.ClientSecret = string(secret.Data["credential"])
+	config.ClientSecret = string(secret.Data[secretKey])
 	return config, nil
 }
 
@@ -177,7 +177,7 @@ func (m *Migrator) AssembleGitlabPipelineConfigCredential(config apiprjv3.Gitlab
 	if err != nil {
 		return config, err
 	}
-	config.ClientSecret = string(secret.Data["credential"])
+	config.ClientSecret = string(secret.Data[secretKey])
 	return config, nil
 }
 
@@ -194,7 +194,7 @@ func (m *Migrator) AssembleBitbucketCloudPipelineConfigCredential(config apiprjv
 	if err != nil {
 		return config, err
 	}
-	config.ClientSecret = string(secret.Data["credential"])
+	config.ClientSecret = string(secret.Data[secretKey])
 	return config, nil
 }
 
@@ -211,6 +211,6 @@ func (m *Migrator) AssembleBitbucketServerPipelineConfigCredential(config apiprj
 	if err != nil {
 		return config, err
 	}
-	config.PrivateKey = string(secret.Data["credential"])
+	config.PrivateKey = string(secret.Data[secretKey])
 	return config, nil
 }
