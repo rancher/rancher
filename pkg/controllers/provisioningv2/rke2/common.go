@@ -244,11 +244,7 @@ func DoRemoveAndUpdateStatus(obj metav1.Object, doRemove func() (string, error),
 	return err
 }
 
-func GetMachineDeletionStatus(machineCache capicontrollers.MachineCache, clusterNamespace, clusterName string) (string, error) {
-	machines, err := machineCache.List(clusterNamespace, labels.SelectorFromSet(labels.Set{capi.ClusterLabelName: clusterName}))
-	if err != nil {
-		return "", err
-	}
+func GetMachineDeletionStatus(machines []*capi.Machine) (string, error) {
 	sort.Slice(machines, func(i, j int) bool {
 		return machines[i].Name < machines[j].Name
 	})
