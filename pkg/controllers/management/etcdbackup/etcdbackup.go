@@ -103,10 +103,6 @@ func (c *Controller) Create(b *v3.EtcdBackup) (runtime.Object, error) {
 	if !rketypes.BackupConditionCreated.IsTrue(b) {
 		b.Spec.Filename = generateBackupFilename(b.Name, cluster.Spec.RancherKubernetesEngineConfig.Services.Etcd.BackupConfig)
 		b.Spec.BackupConfig = *cluster.Spec.RancherKubernetesEngineConfig.Services.Etcd.BackupConfig
-		cluster.Spec, err = secretmigrator.AssembleS3Credential(cluster, cluster.Spec, c.secretLister)
-		if err != nil {
-			return b, err
-		}
 		rketypes.BackupConditionCreated.True(b)
 		// we set ConditionCompleted to Unknown to avoid incorrect "active" state
 		rketypes.BackupConditionCompleted.Unknown(b)
@@ -258,6 +254,11 @@ func (c *Controller) etcdSaveWithBackoff(b *v3.EtcdBackup) (runtime.Object, erro
 		if err != nil {
 			return b, err
 		}
+		cluster.Spec.RancherKubernetesEngineConfig.Services.Etcd.BackupConfig = b.Spec.BackupConfig.DeepCopy()
+		cluster.Spec, err = secretmigrator.AssembleS3Credential(cluster, cluster.Spec, c.secretLister)
+		if err != nil {
+			return b, err
+		}
 		var inErr error
 		err = wait.ExponentialBackoff(backoff, func() (bool, error) {
 			if inErr = c.backupDriver.ETCDSave(c.ctx, cluster.Name, kontainerDriver, cluster.Spec, snapshotName); inErr != nil {
@@ -285,6 +286,11 @@ func (c *Controller) etcdRemoveSnapshotWithBackoff(b *v3.EtcdBackup) error {
 		return err
 	}
 	cluster, err := c.clusterClient.Get(b.Spec.ClusterID, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+	cluster.Spec.RancherKubernetesEngineConfig.Services.Etcd.BackupConfig = b.Spec.BackupConfig.DeepCopy()
+	cluster.Spec, err = secretmigrator.AssembleS3Credential(cluster, cluster.Spec, c.secretLister)
 	if err != nil {
 		return err
 	}
