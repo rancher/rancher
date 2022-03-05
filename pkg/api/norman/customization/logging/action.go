@@ -187,7 +187,11 @@ func (h *Handler) dryRunLoggingTarget(apiContext *types.APIContext, level, clust
 	var dryRunConfigBuf []byte
 	var certificate, clientCert, clientKey, certificatePath, clientCertPath, clientKeyPath, certScretKeyName string
 
-	tmpCertDir := fmt.Sprintf("%s/%s", tmpCertDirPrefix, uuid.NewV4().String())
+	uuidv4, err := uuid.NewV4()
+	if err != nil {
+		return err
+	}
+	tmpCertDir := fmt.Sprintf("%s/%s", tmpCertDirPrefix, uuidv4.String())
 	if level == loggingconfig.ClusterLevel {
 		clusterLogging := &mgmtv3.ClusterLogging{
 			Spec: v33.ClusterLoggingSpec{

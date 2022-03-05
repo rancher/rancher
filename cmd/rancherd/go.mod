@@ -76,6 +76,7 @@ require (
 	github.com/rancher/k3s v1.21.1-rc1.0.20210514205428-fd4d226e3deb
 	github.com/rancher/rke2 v1.20.8-0.20210526012514-ea6514775f81 // v1.20.7+rke2r2 ... If you update this, also update RKE2_VERSION in rancher/package/Dockerfile.runtime
 	github.com/rancher/wrangler v0.6.2
+	github.com/satori/go.uuid v1.2.1-0.20181016170032-d91630c85102 // indirect
 	github.com/sirupsen/logrus v1.8.1
 	github.com/urfave/cli v1.22.2
 	golang.org/x/crypto v0.0.0-20210220033148-5ea612d1eb83
