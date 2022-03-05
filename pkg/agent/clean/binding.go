@@ -22,6 +22,7 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/management/auth"
 	"github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io"
 	v3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
+	v32 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	pkgrbac "github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/wrangler/pkg/generated/controllers/rbac"
 	v1 "github.com/rancher/wrangler/pkg/generated/controllers/rbac/v1"
@@ -30,7 +31,10 @@ import (
 	"github.com/sirupsen/logrus"
 	k8srbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/client-go/util/retry"
 )
 
 const (
@@ -76,6 +80,19 @@ func Bindings() error {
 	if err := start.All(ctx, 5, starters...); err != nil {
 		return err
 	}
+
+	l := labelMigrator{
+		crtbs:               rancherManagement.Management().V3().ClusterRoleTemplateBinding(),
+		prtbs:               rancherManagement.Management().V3().ProjectRoleTemplateBinding(),
+		clusterRoleBindings: k8srbac.Rbac().V1().ClusterRoleBinding(),
+		roleBindings:        k8srbac.Rbac().V1().RoleBinding(),
+	}
+
+	if err := l.migrateLabels(); err != nil {
+		return err
+	}
+
+	logrus.Info("migrated labels")
 
 	bc := bindingsCleanup{
 		crtbs:               rancherManagement.Management().V3().ClusterRoleTemplateBinding(),
@@ -296,4 +313,202 @@ func (n roleBindingByCreation) Less(i, j int) bool {
 	s := n[i].ObjectMeta.CreationTimestamp
 	t := n[j].ObjectMeta.CreationTimestamp
 	return s.Before(&t)
+}
+
+const (
+	rtbCrbRbLabelsUpdated = "authz.cluster.cattle.io/crb-rb-labels-updated"
+	rtbOwnerLabel         = "authz.cluster.cattle.io/rtb-owner-updated"
+	rtbLabelUpdated       = "authz.cluster.cattle.io/rtb-label-updated"
+	rtbOwnerLabelLegacy   = "authz.cluster.cattle.io/rtb-owner"
+	owner                 = "owner-user"
+)
+
+type labelMigrator struct {
+	crtbs               v3.ClusterRoleTemplateBindingClient
+	prtbs               v3.ProjectRoleTemplateBindingClient
+	clusterRoleBindings v1.ClusterRoleBindingClient
+	roleBindings        v1.RoleBindingClient
+}
+
+func (l labelMigrator) migrateLabels() error {
+	crtbs, err := l.crtbs.List("", metav1.ListOptions{})
+	if err != nil {
+		return err
+	}
+	for _, crtb := range crtbs.Items {
+		err := l.reconcileCRTBUserClusterLabels(&crtb)
+		if err != nil {
+			logrus.Infof("ERROR: %v", err)
+		}
+	}
+
+	logrus.Infof("migrated labels for crtbs")
+
+	prtbs, err := l.prtbs.List("", metav1.ListOptions{})
+	if err != nil {
+		return err
+	}
+	for _, prtb := range prtbs.Items {
+		err := l.reconcilePRTBUserClusterLabels(&prtb)
+		if err != nil {
+			logrus.Infof("ERROR: %v", err)
+		}
+	}
+
+	logrus.Infof("migrated labels for prtbs")
+
+	return nil
+}
+func (l labelMigrator) reconcileCRTBUserClusterLabels(binding *v32.ClusterRoleTemplateBinding) error {
+	/* Prior to 2.5, for every CRTB, following CRBs are created in the user clusters
+		1. CRTB.UID is the label value for a CRB, authz.cluster.cattle.io/rtb-owner=CRTB.UID
+	Using this labels, list the CRBs and update them to add a label with ns+name of CRTB
+	*/
+	if binding.Labels[rtbCrbRbLabelsUpdated] == "true" {
+		return nil
+	}
+
+	var returnErr error
+	set := labels.Set(map[string]string{rtbOwnerLabelLegacy: string(binding.UID)})
+	reqUpdatedLabel, err := labels.NewRequirement(rtbLabelUpdated, selection.DoesNotExist, []string{})
+	if err != nil {
+		return err
+	}
+	reqNsAndNameLabel, err := labels.NewRequirement(rtbOwnerLabel, selection.DoesNotExist, []string{})
+	if err != nil {
+		return err
+	}
+	set.AsSelector().Add(*reqUpdatedLabel, *reqNsAndNameLabel)
+	userCRBs, err := l.clusterRoleBindings.List(metav1.ListOptions{LabelSelector: set.AsSelector().Add(*reqUpdatedLabel, *reqNsAndNameLabel).String()})
+	if err != nil {
+		return err
+	}
+	bindingValue := pkgrbac.GetRTBLabel(binding.ObjectMeta)
+	for _, crb := range userCRBs.Items {
+		retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+			crbToUpdate, updateErr := l.clusterRoleBindings.Get(crb.Name, metav1.GetOptions{})
+			if updateErr != nil {
+				return updateErr
+			}
+			if crbToUpdate.Labels == nil {
+				crbToUpdate.Labels = make(map[string]string)
+			}
+			crbToUpdate.Labels[rtbOwnerLabel] = bindingValue
+			crbToUpdate.Labels[rtbLabelUpdated] = "true"
+			_, err := l.clusterRoleBindings.Update(crbToUpdate)
+			return err
+		})
+		if retryErr != nil {
+			returnErr = multierror.Append(returnErr, retryErr)
+		}
+	}
+	if returnErr != nil {
+		return returnErr
+	}
+
+	retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		crtbToUpdate, updateErr := l.crtbs.Get(binding.Namespace, binding.Name, metav1.GetOptions{})
+		if updateErr != nil {
+			return updateErr
+		}
+		if crtbToUpdate.Labels == nil {
+			crtbToUpdate.Labels = make(map[string]string)
+		}
+		crtbToUpdate.Labels[rtbCrbRbLabelsUpdated] = "true"
+		_, err := l.crtbs.Update(crtbToUpdate)
+		return err
+	})
+	return retryErr
+}
+
+func (l labelMigrator) reconcilePRTBUserClusterLabels(binding *v32.ProjectRoleTemplateBinding) error {
+	/* Prior to 2.5, for every PRTB, following CRBs are created in the user clusters
+		1. PRTB.UID is the label key for a CRB, PRTB.UID=owner-user
+		2. PRTB.UID is the label value for RBs with authz.cluster.cattle.io/rtb-owner: PRTB.UID
+	Using this labels, list the CRBs and update them to add a label with ns+name of CRTB
+	*/
+	if binding.Labels[rtbCrbRbLabelsUpdated] == "true" {
+		return nil
+	}
+
+	var returnErr error
+	reqUpdatedLabel, err := labels.NewRequirement(rtbLabelUpdated, selection.DoesNotExist, []string{})
+	if err != nil {
+		return err
+	}
+	reqNsAndNameLabel, err := labels.NewRequirement(binding.Namespace+"_"+binding.Name, selection.DoesNotExist, []string{})
+	if err != nil {
+		return err
+	}
+	set := labels.Set(map[string]string{string(binding.UID): owner})
+	userCRBs, err := l.clusterRoleBindings.List(metav1.ListOptions{LabelSelector: set.AsSelector().Add(*reqUpdatedLabel, *reqNsAndNameLabel).String()})
+	if err != nil {
+		return err
+	}
+	bindingLabel := pkgrbac.GetRTBLabel(binding.ObjectMeta)
+
+	for _, crb := range userCRBs.Items {
+		retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+			crbToUpdate, updateErr := l.clusterRoleBindings.Get(crb.Name, metav1.GetOptions{})
+			if updateErr != nil {
+				return updateErr
+			}
+			if crbToUpdate.Labels == nil {
+				crbToUpdate.Labels = make(map[string]string)
+			}
+			crbToUpdate.Labels[bindingLabel] = owner
+			crbToUpdate.Labels[rtbLabelUpdated] = "true"
+			_, err := l.clusterRoleBindings.Update(crbToUpdate)
+			return err
+		})
+		if retryErr != nil {
+			returnErr = multierror.Append(returnErr, retryErr)
+		}
+	}
+
+	reqUpdatedOwnerLabel, err := labels.NewRequirement(rtbOwnerLabel, selection.DoesNotExist, []string{})
+	if err != nil {
+		return err
+	}
+	set = map[string]string{rtbOwnerLabelLegacy: string(binding.UID)}
+	rbs, err := l.roleBindings.List("", metav1.ListOptions{LabelSelector: set.AsSelector().Add(*reqUpdatedLabel, *reqUpdatedOwnerLabel).String()})
+	if err != nil {
+		return err
+	}
+	for _, rb := range rbs.Items {
+		retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+			rbToUpdate, updateErr := l.roleBindings.Get(rb.Namespace, rb.Name, metav1.GetOptions{})
+			if updateErr != nil {
+				return updateErr
+			}
+			if rbToUpdate.Labels == nil {
+				rbToUpdate.Labels = make(map[string]string)
+			}
+			rbToUpdate.Labels[rtbOwnerLabel] = bindingLabel
+			rbToUpdate.Labels[rtbLabelUpdated] = "true"
+			_, err := l.roleBindings.Update(rbToUpdate)
+			return err
+		})
+		if retryErr != nil {
+			returnErr = multierror.Append(returnErr, retryErr)
+		}
+	}
+
+	if returnErr != nil {
+		return returnErr
+	}
+
+	retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		crtbToUpdate, updateErr := l.prtbs.Get(binding.Namespace, binding.Name, metav1.GetOptions{})
+		if updateErr != nil {
+			return updateErr
+		}
+		if crtbToUpdate.Labels == nil {
+			crtbToUpdate.Labels = make(map[string]string)
+		}
+		crtbToUpdate.Labels[rtbCrbRbLabelsUpdated] = "true"
+		_, err := l.prtbs.Update(crtbToUpdate)
+		return err
+	})
+	return retryErr
 }
