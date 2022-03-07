@@ -155,3 +155,6 @@ postDelete:
 
 # Set a bootstrap password. If leave empty, a random password will be generated.
 bootstrapPassword: ""
+
+# Configure a sleep duration on a preStop lifecycle hook.
+preStopSleepDuration: 0

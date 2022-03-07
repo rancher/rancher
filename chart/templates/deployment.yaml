@@ -142,6 +142,15 @@ spec:
 {{- if .Values.extraEnv }}
 {{ toYaml .Values.extraEnv | indent 8}}
 {{- end }}
+{{- if gt (int .Values.preStopSleepDuration) 0 }}
+        lifecycle:
+          preStop:
+            exec:
+              command:
+                - "/usr/bin/sh"
+                - "-c"
+                - "/usr/bin/sleep {{ .Values.preStopSleepDuration }}"
+{{- end }}
         livenessProbe:
           httpGet:
             path: /healthz
