@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2"
+	"github.com/rancher/rancher/pkg/settings"
 
 	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta1"
 	"github.com/rancher/rancher/pkg/namespace"
@@ -137,6 +138,9 @@ func Test_getBootstrapSecret(t *testing.T) {
 			}
 
 			//act
+			err := settings.ServerURL.Set("localhost")
+			a.Nil(err)
+
 			serviceAccount, err := handler.serviceAccountCache.Get(tt.args.namespaceName, tt.args.secretName)
 			machine, err := handler.machineCache.Get(tt.args.namespaceName, tt.args.os)
 			secret, err := handler.getBootstrapSecret(tt.args.namespaceName, tt.args.secretName, []v1.EnvVar{}, machine)
@@ -158,7 +162,6 @@ func Test_getBootstrapSecret(t *testing.T) {
 
 			a.Equal("rke.cattle.io/bootstrap", string(secret.Type))
 			data := string(secret.Data["value"])
-			a.Contains(data, "CATTLE_ROLE_NONE=true")
 			a.Contains(data, fmt.Sprintf("CATTLE_TOKEN=\"%s\"", expectEncodedHash))
 
 			switch tt.args.os {
@@ -170,6 +173,8 @@ func Test_getBootstrapSecret(t *testing.T) {
 				a.True(machine.GetLabels()[rke2.ControlPlaneRoleLabel] == "true")
 				a.True(machine.GetLabels()[rke2.EtcdRoleLabel] == "true")
 				a.True(machine.GetLabels()[rke2.WorkerRoleLabel] == "true")
+				a.Contains(data, "CATTLE_SERVER=localhost")
+				a.Contains(data, "CATTLE_ROLE_NONE=true")
 
 			case rke2.WindowsMachineOS:
 				a.Equal(tt.args.os, rke2.WindowsMachineOS)
@@ -178,6 +183,12 @@ func Test_getBootstrapSecret(t *testing.T) {
 				a.True(machine.GetLabels()[rke2.ControlPlaneRoleLabel] == "false")
 				a.True(machine.GetLabels()[rke2.EtcdRoleLabel] == "false")
 				a.True(machine.GetLabels()[rke2.WorkerRoleLabel] == "true")
+				a.Contains(data, "$env:CATTLE_SERVER=\"localhost\"")
+				a.Contains(data, "CATTLE_ROLE_NONE=\"true\"")
+				a.Contains(data, "$env:CSI_PROXY_URL")
+				a.Contains(data, "$env:CSI_PROXY_VERSION")
+				a.Contains(data, "$env:CSI_PROXY_KUBELET_PATH")
+
 			}
 		})
 	}
