@@ -8,7 +8,7 @@ ENV K3S_ROOT_VERSION v0.11.0
 ONBUILD RUN zypper -n in tar
 ONBUILD ADD https://github.com/rancher/k3s-root/releases/download/${K3S_ROOT_VERSION}/k3s-root-${ARCH}.tar /k3s-root.tar
 ONBUILD RUN tar xvf /k3s-root.tar; \
-  touch /bin/cni /bin/containerd /bin/containerd-shim-runc-v2 /bin/runc
+  touch /bin/cni /bin/containerd /bin/containerd-shim-runc-v2 /bin/runc /bin/k3s
 
 FROM ${K3S_BUILDER} as k3s_builder
 
