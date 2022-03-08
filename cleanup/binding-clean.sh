@@ -48,6 +48,9 @@ fi
 
 echo "$yaml" | kubectl apply -f -
 
+# allow some time for the job pod to come up
+sleep 1m
+
 # Get the pod ID to tail the logs
 pod_id=$(kubectl get pod -l job-name=cattle-cleanup-job -o jsonpath="{.items[0].metadata.name}")
 
