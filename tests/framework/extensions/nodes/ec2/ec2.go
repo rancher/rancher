@@ -13,7 +13,7 @@ const (
 	nodeBaseName = "rancherautomation"
 )
 
-// CreatedNodes creates `numOfInstances` number of ec2 instances
+// CreateNodes CreatedNodes creates `numOfInstances` number of ec2 instances
 func CreateNodes(client *rancher.Client, numOfInstances int) ([]*nodes.Node, error) {
 	ec2Client, err := client.GetEC2Client()
 	if err != nil {

@@ -3,6 +3,8 @@ package provisioning
 import (
 	"fmt"
 
+	"github.com/rancher/rancher/tests/framework/extensions/cloudcredentials/vmwarevsphere"
+
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	"github.com/rancher/rancher/tests/framework/extensions/cloudcredentials"
 	"github.com/rancher/rancher/tests/framework/extensions/cloudcredentials/aws"
@@ -20,6 +22,7 @@ const (
 	doProviderName        = "do"
 	harvesterProviderName = "harvester"
 	linodeProviderName    = "linode"
+	vsphereProviderName   = "vsphere"
 )
 
 type CloudCredFunc func(rancherClient *rancher.Client) (*cloudcredentials.CloudCredential, error)
@@ -75,6 +78,14 @@ func CreateProvider(name string) Provider {
 			MachineConfig:   machinepools.HarvesterResourceConfig,
 			MachinePoolFunc: machinepools.NewHarvesterMachineConfig,
 			CloudCredFunc:   harvester.CreateHarvesterCloudCredentials,
+		}
+		return provider
+	case name == vsphereProviderName:
+		provider := Provider{
+			Name:            name,
+			MachineConfig:   machinepools.VSphereResourceConfig,
+			MachinePoolFunc: machinepools.NewVsphereMachineConfig,
+			CloudCredFunc:   vmwarevsphere.CreateVSphereCloudCredentials,
 		}
 		return provider
 	default:

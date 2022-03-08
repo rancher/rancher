@@ -6,11 +6,8 @@ import (
 	"testing"
 
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
-	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
 	"github.com/rancher/rancher/tests/framework/extensions/clusters"
 	"github.com/rancher/rancher/tests/framework/extensions/machinepools"
-	"github.com/rancher/rancher/tests/framework/extensions/users"
-	"github.com/rancher/rancher/tests/framework/pkg/config"
 	"github.com/rancher/rancher/tests/framework/pkg/session"
 	"github.com/rancher/rancher/tests/framework/pkg/wait"
 	"github.com/rancher/rancher/tests/integration/pkg/defaults"
@@ -20,59 +17,23 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-type RKE2NodeDriverProvisioningTestSuite struct {
-	suite.Suite
-	client             *rancher.Client
-	session            *session.Session
-	standardUserClient *rancher.Client
-	kubernetesVersions []string
-	cnis               []string
-	providers          []string
+func (r *RKE2NodeDriverProvisioningTestSuite) setupMixed() {
+	r.SetupSuiteLinuxOnly()
 }
 
-func (r *RKE2NodeDriverProvisioningTestSuite) TearDownSuite() {
-	r.session.Cleanup()
-}
+func (r *RKE2NodeDriverProvisioningTestSuite) ProvisioningRKE2ClusterHybrid(provider Provider) {
+	subSession := r.session.NewSession()
+	defer subSession.Cleanup()
 
-func (r *RKE2NodeDriverProvisioningTestSuite) SetupSuite() {
-	testSession := session.NewSession(r.T())
-	r.session = testSession
-
-	clustersConfig := new(Config)
-	config.LoadConfig(ConfigurationFileKey, clustersConfig)
-
-	r.kubernetesVersions = clustersConfig.KubernetesVersions
-	r.cnis = clustersConfig.CNIs
-	r.providers = clustersConfig.Providers
-
-	client, err := rancher.NewClient("", testSession)
+	client, err := r.client.WithSession(subSession)
 	require.NoError(r.T(), err)
 
-	r.client = client
-
-	enabled := true
-	var testuser = AppendRandomString("testuser-")
-	user := &management.User{
-		Username: testuser,
-		Password: "rancherrancher123!",
-		Name:     testuser,
-		Enabled:  &enabled,
-	}
-
-	newUser, err := users.CreateUserWithRole(client, user, "clusters-create", "user")
+	cloudCredential, err := provider.CloudCredFunc(client)
 	require.NoError(r.T(), err)
 
-	newUser.Password = user.Password
-
-	standardUserClient, err := client.AsUser(newUser)
-	require.NoError(r.T(), err)
-
-	r.standardUserClient = standardUserClient
-}
-
-func (r *RKE2NodeDriverProvisioningTestSuite) ProvisioningRKE2Cluster(provider Provider) {
 	providerName := " Node Provider: " + provider.Name
-	nodeRoles0 := []map[string]bool{
+
+	allNodeRolesMixedOS := []map[string]bool{
 		{
 			"controlplane": true,
 			"etcd":         true,
@@ -80,7 +41,7 @@ func (r *RKE2NodeDriverProvisioningTestSuite) ProvisioningRKE2Cluster(provider P
 		},
 	}
 
-	nodeRoles1 := []map[string]bool{
+	uniqueNodeRolesMixedOS := []map[string]bool{
 		{
 			"controlplane": true,
 			"etcd":         false,
@@ -90,6 +51,11 @@ func (r *RKE2NodeDriverProvisioningTestSuite) ProvisioningRKE2Cluster(provider P
 			"controlplane": false,
 			"etcd":         true,
 			"worker":       false,
+		},
+		{
+			"controlplane": false,
+			"etcd":         false,
+			"worker":       true,
 		},
 		{
 			"controlplane": false,
@@ -99,26 +65,19 @@ func (r *RKE2NodeDriverProvisioningTestSuite) ProvisioningRKE2Cluster(provider P
 	}
 
 	tests := []struct {
-		name      string
-		nodeRoles []map[string]bool
-		client    *rancher.Client
+		name       string
+		nodeRoles  []map[string]bool
+		hasWindows bool
+		client     *rancher.Client
 	}{
-		{"1 Node all roles Admin User", nodeRoles0, r.client},
-		{"1 Node all roles Standard User", nodeRoles0, r.standardUserClient},
-		{"3 nodes - 1 role per node Admin User", nodeRoles1, r.client},
-		{"3 nodes - 1 role per node Standard User", nodeRoles1, r.standardUserClient},
+		{"1 Node all roles Admin User + 1 Windows Worker - MixedOS", allNodeRolesMixedOS, true, r.client},
+		{"1 Node all roles Standard User + 1 Windows Worker - MixedOS", allNodeRolesMixedOS, true, r.standardUserClient},
+		{"3 unique role nodes as Admin User + 1 Windows Worker - MixedOS", uniqueNodeRolesMixedOS, true, r.client},
+		{"3 unique role nodes as Standard User + 1 Windows Worker - MixedOS", uniqueNodeRolesMixedOS, true, r.standardUserClient},
 	}
 
 	var name string
 	for _, tt := range tests {
-		subSession := r.session.NewSession()
-		defer subSession.Cleanup()
-
-		client, err := tt.client.WithSession(subSession)
-		require.NoError(r.T(), err)
-
-		cloudCredential, err := provider.CloudCredFunc(client)
-		require.NoError(r.T(), err)
 		for _, kubeVersion := range r.kubernetesVersions {
 			name = tt.name + providerName + " Kubernetes version: " + kubeVersion
 			for _, cni := range r.cnis {
@@ -137,7 +96,7 @@ func (r *RKE2NodeDriverProvisioningTestSuite) ProvisioningRKE2Cluster(provider P
 					machineConfigResp, err := machinepools.CreateMachineConfig(provider.MachineConfig, machinePoolConfig, testSessionClient)
 					require.NoError(r.T(), err)
 
-					machinePools := machinepools.RKEMachinePoolSetup(tt.nodeRoles, machineConfigResp)
+					machinePools := machinepools.RKEMachinePoolSetup(tt.nodeRoles, tt.hasWindows, machineConfigResp)
 
 					cluster := clusters.NewRKE2ClusterConfig(clusterName, namespace, cni, cloudCredential.ID, kubeVersion, machinePools)
 
@@ -161,8 +120,18 @@ func (r *RKE2NodeDriverProvisioningTestSuite) ProvisioningRKE2Cluster(provider P
 	}
 }
 
-func (r *RKE2NodeDriverProvisioningTestSuite) ProvisioningRKE2ClusterDynamicInput(provider Provider, nodesAndRoles []map[string]bool) {
+func (r *RKE2NodeDriverProvisioningTestSuite) ProvisioningRKE2ClusterWithDynamicInputHybrid(provider Provider, nodesAndRoles []map[string]bool, hasWindows bool) {
 	providerName := " Node Provider: " + provider.Name
+
+	subSession := r.session.NewSession()
+	defer subSession.Cleanup()
+
+	client, err := r.client.WithSession(subSession)
+	require.NoError(r.T(), err)
+
+	cloudCredential, err := provider.CloudCredFunc(client)
+	require.NoError(r.T(), err)
+
 	tests := []struct {
 		name   string
 		client *rancher.Client
@@ -173,15 +142,6 @@ func (r *RKE2NodeDriverProvisioningTestSuite) ProvisioningRKE2ClusterDynamicInpu
 
 	var name string
 	for _, tt := range tests {
-		subSession := r.session.NewSession()
-		defer subSession.Cleanup()
-
-		client, err := tt.client.WithSession(subSession)
-		require.NoError(r.T(), err)
-
-		cloudCredential, err := provider.CloudCredFunc(client)
-		require.NoError(r.T(), err)
-
 		for _, kubeVersion := range r.kubernetesVersions {
 			name = tt.name + providerName + " Kubernetes version: " + kubeVersion
 			for _, cni := range r.cnis {
@@ -200,7 +160,7 @@ func (r *RKE2NodeDriverProvisioningTestSuite) ProvisioningRKE2ClusterDynamicInpu
 					machineConfigResp, err := machinepools.CreateMachineConfig(provider.MachineConfig, machinePoolConfig, testSessionClient)
 					require.NoError(r.T(), err)
 
-					machinePools := machinepools.RKEMachinePoolSetup(nodesAndRoles, machineConfigResp)
+					machinePools := machinepools.RKEMachinePoolSetup(nodesAndRoles, hasWindows, machineConfigResp)
 
 					cluster := clusters.NewRKE2ClusterConfig(clusterName, namespace, cni, cloudCredential.ID, kubeVersion, machinePools)
 
@@ -224,27 +184,33 @@ func (r *RKE2NodeDriverProvisioningTestSuite) ProvisioningRKE2ClusterDynamicInpu
 	}
 }
 
-func (r *RKE2NodeDriverProvisioningTestSuite) TestProvisioning() {
+func (r *RKE2NodeDriverProvisioningTestSuite) TestProvisioningHybrid() {
 	for _, providerName := range r.providers {
 		provider := CreateProvider(providerName)
-		r.ProvisioningRKE2Cluster(provider)
+
+		r.ProvisioningRKE2ClusterHybrid(provider)
 	}
 }
 
-func (r *RKE2NodeDriverProvisioningTestSuite) TestProvisioningDynamicInput() {
+func (r *RKE2NodeDriverProvisioningTestSuite) TestProvisioningDynamicInputHybrid() {
 	nodesAndRoles := NodesAndRolesInput()
+	hasWindows := ClusterHasWindowsInput()
 	if len(nodesAndRoles) == 0 {
+		r.T().Skip()
+	}
+	if !hasWindows {
+		r.T().Logf("mixedOS Windows + Linux test suite was chosen but hasWindows is set to %v, skipping", hasWindows)
 		r.T().Skip()
 	}
 
 	for _, providerName := range r.providers {
 		provider := CreateProvider(providerName)
-		r.ProvisioningRKE2ClusterDynamicInput(provider, nodesAndRoles)
+		r.ProvisioningRKE2ClusterWithDynamicInputHybrid(provider, nodesAndRoles, hasWindows)
 	}
 }
 
-// In order for 'go test' to run this suite, we need to create
+// TestProvisioningTestSuiteHybrid In order for 'go test' to run this suite, we need to create
 // a normal test function and pass our suite to suite.Run
-func TestProvisioningTestSuite(t *testing.T) {
+func TestProvisioningTestSuiteHybrid(t *testing.T) {
 	suite.Run(t, new(RKE2NodeDriverProvisioningTestSuite))
 }

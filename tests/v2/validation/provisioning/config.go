@@ -19,6 +19,7 @@ type Config struct {
 	CNIs               []string `json:"cni" yaml:"cni"`
 	Providers          []string `json:"providers" yaml:"providers"`
 	NodeProviders      []string `json:"nodeProviders" yaml:"nodeProviders"`
+	ClusterHasWindows  bool     `json:"clusterHasWindows" yaml:"clusterHasWindows"`
 }
 
 func AppendRandomString(baseClusterName string) string {
@@ -32,7 +33,7 @@ func NodesAndRolesInput() []map[string]bool {
 	clustersConfig := new(Config)
 
 	config.LoadConfig(ConfigurationFileKey, clustersConfig)
-	nodeRolesBoolSliceMap := []map[string]bool{}
+	var nodeRolesBoolSliceMap []map[string]bool
 
 	rolesSlice := strings.Split(clustersConfig.NodesAndRoles, "|")
 	for _, roles := range rolesSlice {
@@ -46,4 +47,11 @@ func NodesAndRolesInput() []map[string]bool {
 	}
 
 	return nodeRolesBoolSliceMap
+}
+
+func ClusterHasWindowsInput() bool {
+	clustersConfig := new(Config)
+
+	config.LoadConfig(ConfigurationFileKey, clustersConfig)
+	return clustersConfig.ClusterHasWindows
 }

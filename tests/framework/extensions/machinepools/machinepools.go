@@ -4,6 +4,8 @@ import (
 	"context"
 	"strconv"
 
+	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2"
+
 	apisV1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	corev1 "k8s.io/api/core/v1"
@@ -30,7 +32,7 @@ func CreateMachineConfig(resource string, machinePoolConfig *unstructured.Unstru
 }
 
 // NewRKEMachinePool is a constructor that sets up a apisV1.RKEMachinePool object to be used to provision a cluster.
-func NewRKEMachinePool(controlPlaneRole, etcdRole, workerRole bool, poolName string, quantity int32, machineConfig *unstructured.Unstructured) apisV1.RKEMachinePool {
+func NewRKEMachinePool(controlPlaneRole, etcdRole, workerRole bool, poolName string, machineOS string, quantity int32, machineConfig *unstructured.Unstructured) apisV1.RKEMachinePool {
 	machineConfigRef := &corev1.ObjectReference{
 		Kind: machineConfig.GetKind(),
 		Name: machineConfig.GetName(),
@@ -43,6 +45,7 @@ func NewRKEMachinePool(controlPlaneRole, etcdRole, workerRole bool, poolName str
 		NodeConfig:       machineConfigRef,
 		Name:             poolName,
 		Quantity:         &quantity,
+		MachineOS:        machineOS,
 	}
 }
 
@@ -61,10 +64,13 @@ func NewRKEMachinePool(controlPlaneRole, etcdRole, workerRole bool, poolName str
 // 	"worker":       false,
 // },
 // }
-func RKEMachinePoolSetup(nodeRoles []map[string]bool, machineConfig *unstructured.Unstructured) []apisV1.RKEMachinePool {
-	machinePools := []apisV1.RKEMachinePool{}
+func RKEMachinePoolSetup(nodeRoles []map[string]bool, hasWindows bool, machineConfig *unstructured.Unstructured) []apisV1.RKEMachinePool {
+	var machinePools []apisV1.RKEMachinePool
 	for index, roles := range nodeRoles {
-		machinePool := NewRKEMachinePool(roles["controlplane"], roles["etcd"], roles["worker"], "pool"+strconv.Itoa(index), 1, machineConfig)
+		machinePool := NewRKEMachinePool(roles["controlplane"], roles["etcd"], roles["worker"], "pool"+strconv.Itoa(index), rke2.DefaultMachineOS, 1, machineConfig)
+		if hasWindows {
+			machinePool = NewRKEMachinePool(false, false, true, "windows-pool"+strconv.Itoa(index), rke2.WindowsMachineOS, 1, machineConfig)
+		}
 		machinePools = append(machinePools, machinePool)
 	}
 
