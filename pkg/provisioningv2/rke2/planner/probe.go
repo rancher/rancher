@@ -74,10 +74,15 @@ func isCalico(controlPlane *rkev1.RKEControlPlane, runtime string) bool {
 	if runtime != rke2.RuntimeRKE2 {
 		return false
 	}
+
 	cni := convert.ToString(controlPlane.Spec.MachineGlobalConfig.Data["cni"])
 	return cni == "" ||
 		cni == "calico" ||
 		cni == "calico+multus"
+}
+
+func isWindows(entry *planEntry) bool {
+	return entry.Metadata.Labels[rke2.CattleOSLabel] == rke2.WindowsMachineOS
 }
 
 // renderSecureProbe takes the existing argument value and renders a secure probe using the argument values and an error
@@ -127,7 +132,7 @@ func (p *Planner) addProbes(nodePlan plan.NodePlan, controlPlane *rkev1.RKEContr
 		// k3s doesn't run the kubelet on etcd only nodes
 		probeNames = append(probeNames, "kubelet")
 	}
-	if !IsOnlyEtcd(entry) && isCalico(controlPlane, runtime) {
+	if !IsOnlyEtcd(entry) && isCalico(controlPlane, runtime) && !isWindows(entry) {
 		probeNames = append(probeNames, "calico")
 	}
 

@@ -128,3 +128,21 @@ func findEnv(s []string, v string) bool {
 	}
 	return false
 }
+
+func Test_IsWindows(t *testing.T) {
+	a := assert.New(t)
+	data := map[string]bool{
+		"windows": true,
+		"linux":   false,
+		"":        false,
+	}
+	for k, v := range data {
+		a.Equal(v, isWindows(&planEntry{
+			Metadata: &plan.Metadata{
+				Labels: map[string]string{
+					rke2.CattleOSLabel: k,
+				},
+			},
+		}))
+	}
+}
