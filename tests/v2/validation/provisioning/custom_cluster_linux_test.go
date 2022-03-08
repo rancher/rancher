@@ -6,11 +6,8 @@ import (
 	"testing"
 
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
-	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
 	"github.com/rancher/rancher/tests/framework/extensions/clusters"
 	"github.com/rancher/rancher/tests/framework/extensions/tokenregistration"
-	"github.com/rancher/rancher/tests/framework/extensions/users"
-	"github.com/rancher/rancher/tests/framework/pkg/config"
 	"github.com/rancher/rancher/tests/framework/pkg/session"
 	"github.com/rancher/rancher/tests/framework/pkg/wait"
 	"github.com/rancher/rancher/tests/integration/pkg/defaults"
@@ -20,55 +17,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-type CustomClusterProvisioningTestSuite struct {
-	suite.Suite
-	client             *rancher.Client
-	session            *session.Session
-	standardUserClient *rancher.Client
-	kubernetesVersions []string
-	cnis               []string
-	nodeProviders      []string
+func (c *CustomClusterProvisioningTestSuite) setupLinux() {
+	c.SetupSuiteLinuxOnly()
 }
 
-func (c *CustomClusterProvisioningTestSuite) TearDownSuite() {
-	c.session.Cleanup()
-}
-
-func (c *CustomClusterProvisioningTestSuite) SetupSuite() {
-	testSession := session.NewSession(c.T())
-	c.session = testSession
-
-	clustersConfig := new(Config)
-	config.LoadConfig(ConfigurationFileKey, clustersConfig)
-
-	c.kubernetesVersions = clustersConfig.KubernetesVersions
-	c.cnis = clustersConfig.CNIs
-	c.nodeProviders = clustersConfig.NodeProviders
-
-	client, err := rancher.NewClient("", testSession)
-	require.NoError(c.T(), err)
-
-	c.client = client
-
-	enabled := true
-	var testuser = AppendRandomString("testuser-")
-	user := &management.User{
-		Username: testuser,
-		Password: "rancherrancher123!",
-		Name:     testuser,
-		Enabled:  &enabled,
-	}
-
-	newUser, err := users.CreateUserWithRole(client, user, "user")
-	require.NoError(c.T(), err)
-
-	standardUserClient, err := client.AsUser(newUser)
-	require.NoError(c.T(), err)
-
-	c.standardUserClient = standardUserClient
-}
-
-func (c *CustomClusterProvisioningTestSuite) ProvisioningRKE2CustomCluster(externalNodeProvider ExternalNodeProvider) {
+func (c *CustomClusterProvisioningTestSuite) ProvisioningRKE2CustomClusterLinuxOnly(externalNodeProvider ExternalNodeProvider) {
 	nodeRoles0 := []string{
 		"--etcd --controlplane --worker",
 	}
@@ -144,8 +97,8 @@ func (c *CustomClusterProvisioningTestSuite) ProvisioningRKE2CustomCluster(exter
 	}
 }
 
-func (c *CustomClusterProvisioningTestSuite) ProvisioningRKE2CustomClusterDynamicInput(externalNodeProvider ExternalNodeProvider, nodesAndRoles []map[string]bool) {
-	rolesPerNode := []string{}
+func (c *CustomClusterProvisioningTestSuite) ProvisioningRKE2CustomClusterWithDynamicInputLinuxOnly(externalNodeProvider ExternalNodeProvider, nodesAndRoles []map[string]bool) {
+	var rolesPerNode []string
 
 	for _, nodes := range nodesAndRoles {
 		var finalRoleCommand string
@@ -219,14 +172,14 @@ func (c *CustomClusterProvisioningTestSuite) ProvisioningRKE2CustomClusterDynami
 	}
 }
 
-func (c *CustomClusterProvisioningTestSuite) TestProvisioningCustomCluster() {
+func (c *CustomClusterProvisioningTestSuite) TestProvisioningCustomClusterLinuxOnly() {
 	for _, nodeProviderName := range c.nodeProviders {
 		externalNodeProvider := ExternalNodeProviderSetup(nodeProviderName)
-		c.ProvisioningRKE2CustomCluster(externalNodeProvider)
+		c.ProvisioningRKE2CustomClusterLinuxOnly(externalNodeProvider)
 	}
 }
 
-func (c *CustomClusterProvisioningTestSuite) TestProvisioningCustomClusterDynamicInput() {
+func (c *CustomClusterProvisioningTestSuite) TestProvisioningCustomClusterDynamicInputLinuxOnly() {
 	nodesAndRoles := NodesAndRolesInput()
 	if len(nodesAndRoles) == 0 {
 		c.T().Skip()
@@ -234,12 +187,12 @@ func (c *CustomClusterProvisioningTestSuite) TestProvisioningCustomClusterDynami
 
 	for _, nodeProviderName := range c.nodeProviders {
 		externalNodeProvider := ExternalNodeProviderSetup(nodeProviderName)
-		c.ProvisioningRKE2CustomClusterDynamicInput(externalNodeProvider, nodesAndRoles)
+		c.ProvisioningRKE2CustomClusterWithDynamicInputLinuxOnly(externalNodeProvider, nodesAndRoles)
 	}
 }
 
 // In order for 'go test' to run this suite, we need to create
 // a normal test function and pass our suite to suite.Run
-func TestCustomClusterProvisioningTestSuite(t *testing.T) {
+func TestCustomClusterProvisioningTestSuiteLinuxOnly(t *testing.T) {
 	suite.Run(t, new(CustomClusterProvisioningTestSuite))
 }

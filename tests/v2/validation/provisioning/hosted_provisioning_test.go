@@ -53,7 +53,6 @@ func (h *HostesdClusterProvisioningTestSuite) SetupSuite() {
 
 	newUser, err := users.CreateUserWithRole(client, user, "user")
 	require.NoError(h.T(), err)
-
 	newUser.Password = user.Password
 
 	standardUserClient, err := client.AsUser(newUser)

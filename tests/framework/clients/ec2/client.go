@@ -13,7 +13,7 @@ type EC2Client struct {
 	Config *AWSEC2Config
 }
 
-// NewEC2Client is a constructor that creates an *EC2Client which a wrapper for an "github.com/aws/aws-sdk-go/service/ec2" session and
+// NewEC2Client is a constructor that creates an *EC2Client which a wrapper for a "github.com/aws/aws-sdk-go/service/ec2" session and
 // the aws ec2 confit.
 func NewEC2Client() (*EC2Client, error) {
 	awsEC2Config := new(AWSEC2Config)
