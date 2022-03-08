@@ -14,6 +14,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/prometheus/common/model"
 	"github.com/rancher/norman/controller"
+	"github.com/rancher/rancher/pkg/controllers/management/secretmigrator"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/alert/common"
 	alertconfig "github.com/rancher/rancher/pkg/controllers/managementuser/alert/config"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/alert/deployer"
@@ -60,11 +61,12 @@ type Receiver struct {
 	Provider string `yaml:"provider"`
 }
 
-func NewConfigSyncer(ctx context.Context, cluster *config.UserContext, alertManager *manager.AlertManager, operatorCRDManager *manager.PromOperatorCRDManager) *ConfigSyncer {
+func NewConfigSyncer(ctx context.Context, mgmt *config.ScaledContext, cluster *config.UserContext, alertManager *manager.AlertManager, operatorCRDManager *manager.PromOperatorCRDManager) *ConfigSyncer {
 	return &ConfigSyncer{
 		apps:                    cluster.Management.Project.Apps(metav1.NamespaceAll),
 		appLister:               cluster.Management.Project.Apps(metav1.NamespaceAll).Controller().Lister(),
 		secretsGetter:           cluster.Core,
+		secretLister:            mgmt.Core.Secrets("").Controller().Lister(),
 		clusterAlertGroupLister: cluster.Management.Management.ClusterAlertGroups(cluster.ClusterName).Controller().Lister(),
 		projectAlertGroupLister: cluster.Management.Management.ProjectAlertGroups("").Controller().Lister(),
 		clusterAlertRuleLister:  cluster.Management.Management.ClusterAlertRules(cluster.ClusterName).Controller().Lister(),
@@ -82,6 +84,7 @@ type ConfigSyncer struct {
 	apps                    projectv3.AppInterface
 	appLister               projectv3.AppLister
 	secretsGetter           v1.SecretsGetter
+	secretLister            v1.SecretLister
 	projectAlertGroupLister v3.ProjectAlertGroupLister
 	clusterAlertGroupLister v3.ClusterAlertGroupLister
 	projectAlertRuleLister  v3.ProjectAlertRuleLister
@@ -513,11 +516,16 @@ func (d *ConfigSyncer) addRecipients(notifiers []*v3.Notifier, receiver *alertco
 				receiverExist = true
 
 			} else if notifier.Spec.WechatConfig != nil {
+				notifierSpec, err := secretmigrator.AssembleWechatCredential(notifier, d.secretLister)
+				if err != nil {
+					logrus.Errorf("error getting Wechat credential: %v", err)
+					continue
+				}
 				wechat := &alertconfig.WechatConfig{
 					NotifierConfig: commonNotifierConfig,
-					APISecret:      alertconfig.Secret(notifier.Spec.WechatConfig.Secret),
-					AgentID:        notifier.Spec.WechatConfig.Agent,
-					CorpID:         notifier.Spec.WechatConfig.Corp,
+					APISecret:      alertconfig.Secret(notifierSpec.WechatConfig.Secret),
+					AgentID:        notifierSpec.WechatConfig.Agent,
+					CorpID:         notifierSpec.WechatConfig.Corp,
 					Message:        `{{ template "wechat.text" . }}`,
 				}
 
@@ -621,15 +629,20 @@ func (d *ConfigSyncer) addRecipients(notifiers []*v3.Notifier, receiver *alertco
 			} else if notifier.Spec.SMTPConfig != nil {
 				header := map[string]string{}
 				header["Subject"] = `{{ template "rancher.title" . }}`
+				notifierSpec, err := secretmigrator.AssembleSMTPCredential(notifier, d.secretLister)
+				if err != nil {
+					logrus.Errorf("error getting SMTP credential: %v", err)
+					continue
+				}
 				email := &alertconfig.EmailConfig{
 					NotifierConfig: commonNotifierConfig,
-					Smarthost:      notifier.Spec.SMTPConfig.Host + ":" + strconv.Itoa(notifier.Spec.SMTPConfig.Port),
-					AuthPassword:   alertconfig.Secret(notifier.Spec.SMTPConfig.Password),
-					AuthUsername:   notifier.Spec.SMTPConfig.Username,
-					RequireTLS:     notifier.Spec.SMTPConfig.TLS,
-					To:             notifier.Spec.SMTPConfig.DefaultRecipient,
+					Smarthost:      notifierSpec.SMTPConfig.Host + ":" + strconv.Itoa(notifierSpec.SMTPConfig.Port),
+					AuthPassword:   alertconfig.Secret(notifierSpec.SMTPConfig.Password),
+					AuthUsername:   notifierSpec.SMTPConfig.Username,
+					RequireTLS:     notifierSpec.SMTPConfig.TLS,
+					To:             notifierSpec.SMTPConfig.DefaultRecipient,
 					Headers:        header,
-					From:           notifier.Spec.SMTPConfig.Sender,
+					From:           notifierSpec.SMTPConfig.Sender,
 					HTML:           `{{ template "email.text" . }}`,
 				}
 				if r.Recipient != "" {
@@ -744,8 +757,12 @@ func (d *ConfigSyncer) syncWebhookConfig(notifiers []*v3.Notifier, cAlertGroupsM
 					Type:       DingTalk,
 					WebHookURL: notifier.Spec.DingtalkConfig.URL,
 				}
-				if notifier.Spec.DingtalkConfig.Secret != "" {
-					provider.Secret = notifier.Spec.DingtalkConfig.Secret
+				notifierSpec, err := secretmigrator.AssembleDingtalkCredential(notifier, d.secretLister)
+				if err != nil {
+					return err
+				}
+				if notifierSpec.DingtalkConfig.Secret != "" {
+					provider.Secret = notifierSpec.DingtalkConfig.Secret
 				}
 				if notifierutil.IsHTTPClientConfigSet(notifier.Spec.DingtalkConfig.HTTPClientConfig) {
 					provider.ProxyURL = notifier.Spec.DingtalkConfig.HTTPClientConfig.ProxyURL
