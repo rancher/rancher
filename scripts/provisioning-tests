@@ -57,6 +57,7 @@ gzip -d /image-assets/$DIST$AIRGAP-images$LINUX-amd64.tar.gz
 
 run_rancher()
 {
+    RESTART_COUNT=0
     while sleep 2; do
         if [ "$PID" != "-1" ] && [ ! -e /proc/$PID ]; then
             echo Rancher died
@@ -68,15 +69,16 @@ run_rancher()
             echo -e "-----K3S-LOG-DUMP-START-----"
             cat build/testdata/k3s.log | gzip | base64 -w 0
             echo -e "\n-----K3S-LOG-DUMP-END-----"
-            if [ "$INT_TESTS_STARTED" = "true" ]; then
-              echo Rancher died after tests started, aborting
-              exit 1
-            fi
             set +e
             echo Attempting to kill K3s
             pkill -e k3s
             set -e
             PID=-1
+            if [ "$RESTART_COUNT" = "2" ]; then
+                echo Rancher died 3 times, aborting
+                kill -42 $PWRAPPROC
+            fi
+            RESTART_COUNT=$((RESTART_COUNT + 1))
             sleep 5
         fi
         if [ "$PID" = "-1" ]; then
@@ -92,6 +94,10 @@ run_rancher()
 # much
 #tail -F /tmp/rancher.log &
 #TPID=$!
+
+trap "exit 1" 42
+PWRAPPROC="$$"
+
 PID=-1
 run_rancher &
 RANCHER_RUN_PID=$!
@@ -110,7 +116,6 @@ done
 
 echo Running provisioning-tests
 export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
-export INT_TESTS_STARTED=true
 go test -v -timeout 60m ./tests/integration/pkg/tests/... || {
     echo -e "-----RANCHER-LOG-DUMP-START-----"
     cat /tmp/rancher.log | gzip | base64 -w 0

@@ -107,6 +107,8 @@ func (h *handler) onSecretChange(key string, secret *corev1.Secret) (*corev1.Sec
 	capiCluster, err := h.getCAPICluster(secret)
 	if err != nil {
 		return secret, err
+	} else if capiCluster == nil {
+		return secret, nil
 	}
 
 	machineName, err := h.findMachine(capiCluster, secret.Name, data.String("id"))
