@@ -25,7 +25,7 @@ func Register(ctx context.Context, mgmt *config.ScaledContext, cluster *config.U
 	pipeline.Register(ctx, cluster)
 	systemimage.Register(ctx, cluster)
 	approuter.Register(ctx, cluster)
-	alert.Register(ctx, cluster)
+	alert.Register(ctx, mgmt, cluster)
 	globaldns.Register(ctx, cluster)
 	monitoring.Register(ctx, cluster)
 	istio.Register(ctx, cluster)
