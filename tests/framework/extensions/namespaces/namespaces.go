@@ -3,6 +3,7 @@ package namespaces
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/rancher/rancher/pkg/api/scheme"
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
@@ -11,10 +12,13 @@ import (
 	"github.com/rancher/rancher/tests/framework/pkg/wait"
 	"github.com/rancher/rancher/tests/integration/pkg/defaults"
 	coreV1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/watch"
+
+	kubeUnstructured "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 var NamespaceGroupVersionResource = schema.GroupVersionResource{
@@ -51,9 +55,53 @@ func CreateNamespace(client *rancher.Client, namespaceName, containerDefaultReso
 		return nil, err
 	}
 
+	adminClient, err := rancher.NewClient(client.RancherConfig.AdminToken, client.Session)
+	if err != nil {
+		return nil, err
+	}
+
+	adminDynamicClient, err := adminClient.GetDownStreamClusterClient(project.ClusterID)
+	if err != nil {
+		return nil, err
+	}
+
 	namespaceResource := dynamicClient.Resource(NamespaceGroupVersionResource).Namespace("")
 
 	unstructuredResp, err := namespaceResource.Create(context.TODO(), unstructured.MustToUnstructured(namespace), metav1.CreateOptions{})
+	if err != nil {
+		return nil, err
+	}
+
+	clusterRoleResource := adminDynamicClient.Resource(rbacv1.SchemeGroupVersion.WithResource("clusterroles"))
+	projectID := strings.Split(project.ID, ":")[1]
+
+	clusterRoleWatch, err := clusterRoleResource.Watch(context.TODO(), metav1.ListOptions{
+		FieldSelector:  "metadata.name=" + fmt.Sprintf("%s-namespaces-edit", projectID),
+		TimeoutSeconds: &defaults.WatchTimeoutSeconds,
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	err = wait.WatchWait(clusterRoleWatch, func(event watch.Event) (ready bool, err error) {
+		clusterRole := &rbacv1.ClusterRole{}
+		err = scheme.Scheme.Convert(event.Object.(*kubeUnstructured.Unstructured), clusterRole, event.Object.(*kubeUnstructured.Unstructured).GroupVersionKind())
+
+		if err != nil {
+			return false, err
+		}
+
+		for _, rule := range clusterRole.Rules {
+			for _, resourceName := range rule.ResourceNames {
+				if resourceName == namespaceName {
+					return true, nil
+				}
+			}
+		}
+		return false, nil
+	})
+
 	if err != nil {
 		return nil, err
 	}
@@ -67,7 +115,8 @@ func CreateNamespace(client *rancher.Client, namespaceName, containerDefaultReso
 			return err
 		}
 
-		watchInterface, err := namespaceResource.Watch(context.TODO(), metav1.ListOptions{
+		adminNamespaceResource := adminDynamicClient.Resource(NamespaceGroupVersionResource).Namespace("")
+		watchInterface, err := adminNamespaceResource.Watch(context.TODO(), metav1.ListOptions{
 			FieldSelector:  "metadata.name=" + unstructuredResp.GetName(),
 			TimeoutSeconds: &defaults.WatchTimeoutSeconds,
 		})
