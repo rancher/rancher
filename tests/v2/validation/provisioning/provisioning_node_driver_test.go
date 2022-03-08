@@ -59,8 +59,10 @@ func (r *RKE2NodeDriverProvisioningTestSuite) SetupSuite() {
 		Enabled:  &enabled,
 	}
 
-	newUser, err := users.CreateUserWithRole(client, user, "user")
+	newUser, err := users.CreateUserWithRole(client, user, "clusters-create", "user")
 	require.NoError(r.T(), err)
+
+	newUser.Password = user.Password
 
 	standardUserClient, err := client.AsUser(newUser)
 	require.NoError(r.T(), err)
@@ -68,7 +70,7 @@ func (r *RKE2NodeDriverProvisioningTestSuite) SetupSuite() {
 	r.standardUserClient = standardUserClient
 }
 
-func (r *RKE2NodeDriverProvisioningTestSuite) Provisioning_RKE2Cluster(provider Provider) {
+func (r *RKE2NodeDriverProvisioningTestSuite) ProvisioningRKE2Cluster(provider Provider) {
 	subSession := r.session.NewSession()
 	defer subSession.Cleanup()
 
@@ -154,13 +156,15 @@ func (r *RKE2NodeDriverProvisioningTestSuite) Provisioning_RKE2Cluster(provider 
 					assert.NoError(r.T(), err)
 					assert.Equal(r.T(), clusterName, clusterResp.Name)
 
+					// time.Sleep(2 * time.Minute)
+
 				})
 			}
 		}
 	}
 }
 
-func (r *RKE2NodeDriverProvisioningTestSuite) Provisioning_RKE2ClusterDynamicInput(provider Provider, nodesAndRoles []map[string]bool) {
+func (r *RKE2NodeDriverProvisioningTestSuite) ProvisioningRKE2ClusterDynamicInput(provider Provider, nodesAndRoles []map[string]bool) {
 	subSession := r.session.NewSession()
 	defer subSession.Cleanup()
 
@@ -226,7 +230,7 @@ func (r *RKE2NodeDriverProvisioningTestSuite) Provisioning_RKE2ClusterDynamicInp
 func (r *RKE2NodeDriverProvisioningTestSuite) TestProvisioning() {
 	for _, providerName := range r.providers {
 		provider := CreateProvider(providerName)
-		r.Provisioning_RKE2Cluster(provider)
+		r.ProvisioningRKE2Cluster(provider)
 	}
 }
 
@@ -238,7 +242,7 @@ func (r *RKE2NodeDriverProvisioningTestSuite) TestProvisioningDynamicInput() {
 
 	for _, providerName := range r.providers {
 		provider := CreateProvider(providerName)
-		r.Provisioning_RKE2ClusterDynamicInput(provider, nodesAndRoles)
+		r.ProvisioningRKE2ClusterDynamicInput(provider, nodesAndRoles)
 	}
 }
 
