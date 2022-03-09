@@ -14,6 +14,10 @@ import (
 // clearInitNodeMark removes the init node label on the given machine and updates the machine directly against the api
 // server, effectively immediately demoting it from being an init node
 func (p *Planner) clearInitNodeMark(entry *planEntry) error {
+	if entry.Metadata.Labels[rke2.InitNodeLabel] == "" {
+		return nil
+	}
+
 	if err := p.store.removePlanSecretLabel(entry, rke2.InitNodeLabel); err != nil {
 		return err
 	}
