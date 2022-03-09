@@ -99,13 +99,23 @@ func NewRKE2ClusterConfig(clusterName, namespace, cni, cloudCredentialSecretName
 // CreateRKE2Cluster is a "helper" functions that takes a rancher client, and the rke2 cluster config as parameters. This function
 // registers a delete cluster fuction with a wait.WatchWait to ensure the cluster is removed cleanly.
 func CreateRKE2Cluster(client *rancher.Client, rke2Cluster *apisV1.Cluster) (*apisV1.Cluster, error) {
+	cluster, err := client.Provisioning.Clusters(rke2Cluster.Namespace).Create(context.TODO(), rke2Cluster, metav1.CreateOptions{})
+	if err != nil {
+		return nil, err
+	}
+
 	client.Session.RegisterCleanupFunc(func() error {
 		err := client.Provisioning.Clusters(rke2Cluster.Namespace).Delete(context.TODO(), rke2Cluster.GetName(), metav1.DeleteOptions{})
 		if err != nil {
 			return err
 		}
 
-		watchInterface, err := client.Provisioning.Clusters(rke2Cluster.Namespace).Watch(context.TODO(), metav1.ListOptions{
+		adminClient, err := rancher.NewClient(client.RancherConfig.AdminToken, client.Session)
+		if err != nil {
+			return err
+		}
+
+		watchInterface, err := adminClient.Provisioning.Clusters(rke2Cluster.Namespace).Watch(context.TODO(), metav1.ListOptions{
 			FieldSelector:  "metadata.name=" + rke2Cluster.GetName(),
 			TimeoutSeconds: &defaults.WatchTimeoutSeconds,
 		})
@@ -124,5 +134,5 @@ func CreateRKE2Cluster(client *rancher.Client, rke2Cluster *apisV1.Cluster) (*ap
 		})
 	})
 
-	return client.Provisioning.Clusters(rke2Cluster.Namespace).Create(context.TODO(), rke2Cluster, metav1.CreateOptions{})
+	return cluster, nil
 }

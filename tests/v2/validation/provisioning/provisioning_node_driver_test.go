@@ -71,15 +71,7 @@ func (r *RKE2NodeDriverProvisioningTestSuite) SetupSuite() {
 }
 
 func (r *RKE2NodeDriverProvisioningTestSuite) ProvisioningRKE2Cluster(provider Provider) {
-	subSession := r.session.NewSession()
-	defer subSession.Cleanup()
-
-	client, err := r.client.WithSession(subSession)
-	require.NoError(r.T(), err)
-
-	cloudCredential, err := provider.CloudCredFunc(client)
-	require.NoError(r.T(), err)
-
+	providerName := " Node Provider: " + provider.Name
 	nodeRoles0 := []map[string]bool{
 		{
 			"controlplane": true,
@@ -119,8 +111,16 @@ func (r *RKE2NodeDriverProvisioningTestSuite) ProvisioningRKE2Cluster(provider P
 
 	var name string
 	for _, tt := range tests {
+		subSession := r.session.NewSession()
+		defer subSession.Cleanup()
+
+		client, err := tt.client.WithSession(subSession)
+		require.NoError(r.T(), err)
+
+		cloudCredential, err := provider.CloudCredFunc(client)
+		require.NoError(r.T(), err)
 		for _, kubeVersion := range r.kubernetesVersions {
-			name = tt.name + " Kubernetes version: " + kubeVersion
+			name = tt.name + providerName + " Kubernetes version: " + kubeVersion
 			for _, cni := range r.cnis {
 				name += " cni: " + cni
 				r.Run(name, func() {
@@ -144,7 +144,7 @@ func (r *RKE2NodeDriverProvisioningTestSuite) ProvisioningRKE2Cluster(provider P
 					clusterResp, err := clusters.CreateRKE2Cluster(testSessionClient, cluster)
 					require.NoError(r.T(), err)
 
-					result, err := testSessionClient.Provisioning.Clusters(namespace).Watch(context.TODO(), metav1.ListOptions{
+					result, err := r.client.Provisioning.Clusters(namespace).Watch(context.TODO(), metav1.ListOptions{
 						FieldSelector:  "metadata.name=" + clusterName,
 						TimeoutSeconds: &defaults.WatchTimeoutSeconds,
 					})
@@ -156,8 +156,6 @@ func (r *RKE2NodeDriverProvisioningTestSuite) ProvisioningRKE2Cluster(provider P
 					assert.NoError(r.T(), err)
 					assert.Equal(r.T(), clusterName, clusterResp.Name)
 
-					// time.Sleep(2 * time.Minute)
-
 				})
 			}
 		}
@@ -165,15 +163,7 @@ func (r *RKE2NodeDriverProvisioningTestSuite) ProvisioningRKE2Cluster(provider P
 }
 
 func (r *RKE2NodeDriverProvisioningTestSuite) ProvisioningRKE2ClusterDynamicInput(provider Provider, nodesAndRoles []map[string]bool) {
-	subSession := r.session.NewSession()
-	defer subSession.Cleanup()
-
-	client, err := r.client.WithSession(subSession)
-	require.NoError(r.T(), err)
-
-	cloudCredential, err := provider.CloudCredFunc(client)
-	require.NoError(r.T(), err)
-
+	providerName := " Node Provider: " + provider.Name
 	tests := []struct {
 		name   string
 		client *rancher.Client
@@ -184,8 +174,17 @@ func (r *RKE2NodeDriverProvisioningTestSuite) ProvisioningRKE2ClusterDynamicInpu
 
 	var name string
 	for _, tt := range tests {
+		subSession := r.session.NewSession()
+		defer subSession.Cleanup()
+
+		client, err := tt.client.WithSession(subSession)
+		require.NoError(r.T(), err)
+
+		cloudCredential, err := provider.CloudCredFunc(client)
+		require.NoError(r.T(), err)
+
 		for _, kubeVersion := range r.kubernetesVersions {
-			name = tt.name + " Kubernetes version: " + kubeVersion
+			name = tt.name + providerName + " Kubernetes version: " + kubeVersion
 			for _, cni := range r.cnis {
 				name += " cni: " + cni
 				r.Run(name, func() {
@@ -209,7 +208,7 @@ func (r *RKE2NodeDriverProvisioningTestSuite) ProvisioningRKE2ClusterDynamicInpu
 					clusterResp, err := clusters.CreateRKE2Cluster(testSessionClient, cluster)
 					require.NoError(r.T(), err)
 
-					result, err := testSessionClient.Provisioning.Clusters(namespace).Watch(context.TODO(), metav1.ListOptions{
+					result, err := r.client.Provisioning.Clusters(namespace).Watch(context.TODO(), metav1.ListOptions{
 						FieldSelector:  "metadata.name=" + clusterName,
 						TimeoutSeconds: &defaults.WatchTimeoutSeconds,
 					})
@@ -220,7 +219,6 @@ func (r *RKE2NodeDriverProvisioningTestSuite) ProvisioningRKE2ClusterDynamicInpu
 					err = wait.WatchWait(result, checkFunc)
 					assert.NoError(r.T(), err)
 					assert.Equal(r.T(), clusterName, clusterResp.Name)
-
 				})
 			}
 		}
