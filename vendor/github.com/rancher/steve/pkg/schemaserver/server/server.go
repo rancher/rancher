@@ -210,10 +210,17 @@ func (s *Server) CustomAPIUIResponseWriter(cssURL, jsURL, version writer.StringG
 	if !ok {
 		return
 	}
-	w, ok := wi.(*writer.HTMLResponseWriter)
+
+	gw, ok := wi.(*writer.GzipWriter)
 	if !ok {
 		return
 	}
+
+	w, ok := gw.ResponseWriter.(*writer.HTMLResponseWriter)
+	if !ok {
+		return
+	}
+
 	w.CSSURL = cssURL
 	w.JSURL = jsURL
 	w.APIUIVersion = version

@@ -97,21 +97,28 @@ func (c *Collection) schemasForSubject(access *accesscontrol.AccessSet) (*types.
 			}
 		}
 
+		allowed := func(method string) string {
+			if attributes.DisallowMethods(s)[method] {
+				return "blocked-" + method
+			}
+			return method
+		}
+
 		s = s.DeepCopy()
 		attributes.SetAccess(s, verbAccess)
 		if verbAccess.AnyVerb("list", "get") {
-			s.ResourceMethods = append(s.ResourceMethods, http.MethodGet)
-			s.CollectionMethods = append(s.CollectionMethods, http.MethodGet)
+			s.ResourceMethods = append(s.ResourceMethods, allowed(http.MethodGet))
+			s.CollectionMethods = append(s.CollectionMethods, allowed(http.MethodGet))
 		}
 		if verbAccess.AnyVerb("delete") {
-			s.ResourceMethods = append(s.ResourceMethods, http.MethodDelete)
+			s.ResourceMethods = append(s.ResourceMethods, allowed(http.MethodDelete))
 		}
 		if verbAccess.AnyVerb("update") {
-			s.ResourceMethods = append(s.ResourceMethods, http.MethodPut)
-			s.ResourceMethods = append(s.ResourceMethods, http.MethodPatch)
+			s.ResourceMethods = append(s.ResourceMethods, allowed(http.MethodPut))
+			s.ResourceMethods = append(s.ResourceMethods, allowed(http.MethodPatch))
 		}
 		if verbAccess.AnyVerb("create") {
-			s.CollectionMethods = append(s.CollectionMethods, http.MethodPost)
+			s.CollectionMethods = append(s.CollectionMethods, allowed(http.MethodPost))
 		}
 
 		if err := result.AddSchema(*s); err != nil {

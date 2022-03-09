@@ -182,7 +182,6 @@ func (r *RBACStore) Watch(apiOp *types.APIRequest, schema *types.APISchema, w ty
 	}
 
 	ctx, cancel := context.WithCancel(apiOp.Context())
-	defer cancel()
 	apiOp = apiOp.WithContext(ctx)
 
 	eg := errgroup.Group{}
@@ -218,6 +217,7 @@ func (r *RBACStore) Watch(apiOp *types.APIRequest, schema *types.APISchema, w ty
 		defer close(response)
 		<-ctx.Done()
 		eg.Wait()
+		cancel()
 	}()
 
 	return response, nil
