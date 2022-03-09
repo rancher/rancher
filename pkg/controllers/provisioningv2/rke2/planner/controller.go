@@ -52,12 +52,14 @@ func Register(ctx context.Context, clients *wrangler.Context, planner *planner.P
 }
 
 func (h *handler) OnChange(cluster *rkev1.RKEControlPlane, status rkev1.RKEControlPlaneStatus) (rkev1.RKEControlPlaneStatus, error) {
+	logrus.Debugf("[planner] rkecluster %s/%s: handler OnChange called", cluster.Namespace, cluster.Name)
 	if !cluster.DeletionTimestamp.IsZero() {
 		return status, nil
 	}
 
 	status.ObservedGeneration = cluster.Generation
 
+	logrus.Debugf("[planner] rkecluster %s/%s: calling planner process", cluster.Namespace, cluster.Name)
 	err := h.planner.Process(cluster)
 	var errWaiting planner.ErrWaiting
 	if errors.As(err, &errWaiting) {
