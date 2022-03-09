@@ -144,7 +144,8 @@ class AmazonWebServices(CloudProviderBase):
                 "Placement": {'AvailabilityZone': AWS_REGION_AZ},
                 "BlockDeviceMappings":
                     [{"DeviceName": "/dev/sda1",
-                      "Ebs": {"VolumeSize": int(volume_size)}
+                      "Ebs": {"VolumeSize": int(volume_size),
+                              "VolumeType": "gp3"}
                       }]
                 }
 
