@@ -38,33 +38,29 @@ const (
 )
 
 type handler struct {
-	dynamic                *dynamic.Controller
-	dynamicSchema          mgmtcontroller.DynamicSchemaCache
-	clusterCache           rocontrollers.ClusterCache
-	clusterController      rocontrollers.ClusterController
-	secretCache            corecontrollers.SecretCache
-	secretClient           corecontrollers.SecretClient
-	capiClusters           capicontrollers.ClusterCache
-	capiMachineDeployments capicontrollers.MachineDeploymentCache
-	mgmtClusterCache       mgmtcontroller.ClusterCache
-	mgmtClusterClient      mgmtcontroller.ClusterClient
-	rkeControlPlane        rkecontroller.RKEControlPlaneCache
-	etcdSnapshotCache      rkecontroller.ETCDSnapshotCache
-	rkeBootstrapTemplates  rkecontroller.RKEBootstrapTemplateCache
+	dynamic           *dynamic.Controller
+	dynamicSchema     mgmtcontroller.DynamicSchemaCache
+	clusterCache      rocontrollers.ClusterCache
+	clusterController rocontrollers.ClusterController
+	secretCache       corecontrollers.SecretCache
+	secretClient      corecontrollers.SecretClient
+	capiClusters      capicontrollers.ClusterCache
+	mgmtClusterCache  mgmtcontroller.ClusterCache
+	mgmtClusterClient mgmtcontroller.ClusterClient
+	rkeControlPlane   rkecontroller.RKEControlPlaneCache
+	etcdSnapshotCache rkecontroller.ETCDSnapshotCache
 }
 
 func Register(ctx context.Context, clients *wrangler.Context) {
 	h := handler{
-		dynamic:                clients.Dynamic,
-		secretCache:            clients.Core.Secret().Cache(),
-		secretClient:           clients.Core.Secret(),
-		clusterCache:           clients.Provisioning.Cluster().Cache(),
-		clusterController:      clients.Provisioning.Cluster(),
-		capiClusters:           clients.CAPI.Cluster().Cache(),
-		capiMachineDeployments: clients.CAPI.MachineDeployment().Cache(),
-		rkeControlPlane:        clients.RKE.RKEControlPlane().Cache(),
-		rkeBootstrapTemplates:  clients.RKE.RKEBootstrapTemplate().Cache(),
-		etcdSnapshotCache:      clients.RKE.ETCDSnapshot().Cache(),
+		dynamic:           clients.Dynamic,
+		secretCache:       clients.Core.Secret().Cache(),
+		secretClient:      clients.Core.Secret(),
+		clusterCache:      clients.Provisioning.Cluster().Cache(),
+		clusterController: clients.Provisioning.Cluster(),
+		capiClusters:      clients.CAPI.Cluster().Cache(),
+		rkeControlPlane:   clients.RKE.RKEControlPlane().Cache(),
+		etcdSnapshotCache: clients.RKE.ETCDSnapshot().Cache(),
 	}
 
 	if features.MCM.Enabled() {
@@ -265,7 +261,7 @@ func (h *handler) OnRancherClusterChange(obj *rancherv1.Cluster, status rancherv
 		}
 	}
 
-	objs, err := objects(obj, h.dynamic, h.dynamicSchema, h.secretCache, h.capiMachineDeployments, h.rkeBootstrapTemplates)
+	objs, err := objects(obj, h.dynamic, h.dynamicSchema, h.secretCache)
 	return objs, status, err
 }
 
