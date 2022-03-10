@@ -137,9 +137,7 @@ func New(ctx context.Context, clients *wrangler.Context) *Planner {
 		return []string{obj.Spec.ClusterName}, nil
 	})
 	store := NewStore(clients.Core.Secret(),
-		clients.CAPI.Machine().Cache(),
-		clients.Core.ServiceAccount().Cache(),
-		clients.RKE.RKEBootstrap().Cache())
+		clients.CAPI.Machine().Cache())
 	return &Planner{
 		ctx:                           ctx,
 		store:                         store,
