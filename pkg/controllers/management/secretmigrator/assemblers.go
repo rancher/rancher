@@ -76,11 +76,123 @@ func AssembleWeaveCredential(cluster *apimgmtv3.Cluster, spec apimgmtv3.ClusterS
 		return spec, nil
 
 	}
-	registrySecret, err := secretLister.Get(secretNamespace, cluster.Status.WeavePasswordSecret)
+	weaveSecret, err := secretLister.Get(secretNamespace, cluster.Status.WeavePasswordSecret)
 	if err != nil {
 		return spec, err
 	}
-	spec.RancherKubernetesEngineConfig.Network.WeaveNetworkProvider.Password = string(registrySecret.Data[secretKey])
+	spec.RancherKubernetesEngineConfig.Network.WeaveNetworkProvider.Password = string(weaveSecret.Data[secretKey])
+	return spec, nil
+}
+
+// AssembleVsphereGlobalCredential looks up the vsphere global Secret and inserts the keys into the cloud provider config on the Cluster spec.
+// It returns a new copy of the spec without modifying the original. The Cluster is never updated.
+func AssembleVsphereGlobalCredential(cluster *apimgmtv3.Cluster, spec apimgmtv3.ClusterSpec, secretLister v1.SecretLister) (apimgmtv3.ClusterSpec, error) {
+	if cluster.Spec.RancherKubernetesEngineConfig == nil || cluster.Spec.RancherKubernetesEngineConfig.CloudProvider.VsphereCloudProvider == nil {
+		return spec, nil
+	}
+	if cluster.Status.VsphereSecret == "" {
+		if cluster.Spec.RancherKubernetesEngineConfig.CloudProvider.VsphereCloudProvider.Global.Password != "" {
+			logrus.Warnf("[secretmigrator] secrets for cluster %s are not finished migrating", cluster.Name)
+		}
+		return spec, nil
+
+	}
+	vsphereSecret, err := secretLister.Get(secretNamespace, cluster.Status.VsphereSecret)
+	if err != nil {
+		return spec, err
+	}
+	spec.RancherKubernetesEngineConfig.CloudProvider.VsphereCloudProvider.Global.Password = string(vsphereSecret.Data[secretKey])
+	return spec, nil
+}
+
+// AssembleVsphereVirtualCenterCredential looks up the vsphere virtualcenter Secret and inserts the keys into the cloud provider config on the Cluster spec.
+// It returns a new copy of the spec without modifying the original. The Cluster is never updated.
+func AssembleVsphereVirtualCenterCredential(cluster *apimgmtv3.Cluster, spec apimgmtv3.ClusterSpec, secretLister v1.SecretLister) (apimgmtv3.ClusterSpec, error) {
+	if cluster.Spec.RancherKubernetesEngineConfig == nil || cluster.Spec.RancherKubernetesEngineConfig.CloudProvider.VsphereCloudProvider == nil {
+		return spec, nil
+	}
+	if cluster.Status.VirtualCenterSecret == "" {
+		for _, v := range cluster.Spec.RancherKubernetesEngineConfig.CloudProvider.VsphereCloudProvider.VirtualCenter {
+			if v.Password != "" {
+				logrus.Warnf("[secretmigrator] secrets for cluster %s are not finished migrating", cluster.Name)
+				break
+			}
+		}
+		return spec, nil
+
+	}
+	vcenterSecret, err := secretLister.Get(secretNamespace, cluster.Status.VirtualCenterSecret)
+	if err != nil {
+		return spec, err
+	}
+	for k, v := range vcenterSecret.Data {
+		vCenter := spec.RancherKubernetesEngineConfig.CloudProvider.VsphereCloudProvider.VirtualCenter[k]
+		vCenter.Password = string(v)
+		spec.RancherKubernetesEngineConfig.CloudProvider.VsphereCloudProvider.VirtualCenter[k] = vCenter
+	}
+	return spec, nil
+}
+
+// AssembleOpenStackCredential looks up the OpenStack Secret and inserts the keys into the cloud provider config on the Cluster spec.
+// It returns a new copy of the spec without modifying the original. The Cluster is never updated.
+func AssembleOpenStackCredential(cluster *apimgmtv3.Cluster, spec apimgmtv3.ClusterSpec, secretLister v1.SecretLister) (apimgmtv3.ClusterSpec, error) {
+	if cluster.Spec.RancherKubernetesEngineConfig == nil || cluster.Spec.RancherKubernetesEngineConfig.CloudProvider.OpenstackCloudProvider == nil {
+		return spec, nil
+	}
+	if cluster.Status.OpenStackSecret == "" {
+		if cluster.Spec.RancherKubernetesEngineConfig.CloudProvider.OpenstackCloudProvider.Global.Password != "" {
+			logrus.Warnf("[secretmigrator] secrets for cluster %s are not finished migrating", cluster.Name)
+		}
+		return spec, nil
+
+	}
+	openStackSecret, err := secretLister.Get(secretNamespace, cluster.Status.OpenStackSecret)
+	if err != nil {
+		return spec, err
+	}
+	spec.RancherKubernetesEngineConfig.CloudProvider.OpenstackCloudProvider.Global.Password = string(openStackSecret.Data[secretKey])
+	return spec, nil
+}
+
+// AssembleAADClientSecretCredential looks up the AAD client secret Secret and inserts the keys into the cloud provider config on the Cluster spec.
+// It returns a new copy of the spec without modifying the original. The Cluster is never updated.
+func AssembleAADClientSecretCredential(cluster *apimgmtv3.Cluster, spec apimgmtv3.ClusterSpec, secretLister v1.SecretLister) (apimgmtv3.ClusterSpec, error) {
+	if cluster.Spec.RancherKubernetesEngineConfig == nil || cluster.Spec.RancherKubernetesEngineConfig.CloudProvider.AzureCloudProvider == nil {
+		return spec, nil
+	}
+	if cluster.Status.AADClientSecret == "" {
+		if cluster.Spec.RancherKubernetesEngineConfig.CloudProvider.AzureCloudProvider.AADClientSecret != "" {
+			logrus.Warnf("[secretmigrator] secrets for cluster %s are not finished migrating", cluster.Name)
+		}
+		return spec, nil
+
+	}
+	aadClientSecret, err := secretLister.Get(secretNamespace, cluster.Status.AADClientSecret)
+	if err != nil {
+		return spec, err
+	}
+	spec.RancherKubernetesEngineConfig.CloudProvider.AzureCloudProvider.AADClientSecret = string(aadClientSecret.Data[secretKey])
+	return spec, nil
+}
+
+// AssembleAADCertCredential looks up the AAD client cert password Secret and inserts the keys into the cloud provider config on the Cluster spec.
+// It returns a new copy of the spec without modifying the original. The Cluster is never updated.
+func AssembleAADCertCredential(cluster *apimgmtv3.Cluster, spec apimgmtv3.ClusterSpec, secretLister v1.SecretLister) (apimgmtv3.ClusterSpec, error) {
+	if cluster.Spec.RancherKubernetesEngineConfig == nil || cluster.Spec.RancherKubernetesEngineConfig.CloudProvider.AzureCloudProvider == nil {
+		return spec, nil
+	}
+	if cluster.Status.AADClientCertSecret == "" {
+		if cluster.Spec.RancherKubernetesEngineConfig.CloudProvider.AzureCloudProvider.AADClientCertPassword != "" {
+			logrus.Warnf("[secretmigrator] secrets for cluster %s are not finished migrating", cluster.Name)
+		}
+		return spec, nil
+
+	}
+	aadCertSecret, err := secretLister.Get(secretNamespace, cluster.Status.AADClientCertSecret)
+	if err != nil {
+		return spec, err
+	}
+	spec.RancherKubernetesEngineConfig.CloudProvider.AzureCloudProvider.AADClientCertPassword = string(aadCertSecret.Data[secretKey])
 	return spec, nil
 }
 
