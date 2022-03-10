@@ -345,6 +345,7 @@ func machineDeployments(cluster *rancherv1.Cluster, capiCluster *capi.Cluster, d
 					ObjectMeta: capi.ObjectMeta{
 						Labels: map[string]string{
 							capi.ClusterLabelName:           capiCluster.Name,
+							rke2.ClusterNameLabel:           capiCluster.Name,
 							capi.MachineDeploymentLabelName: machineDeploymentName,
 							rke2.RKEMachinePoolNameLabel:    machinePool.Name,
 						},

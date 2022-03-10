@@ -168,6 +168,7 @@ func (h *handler) createMachineObjects(capiCluster *capi.Cluster, machineName st
 
 	labels[rke2.MachineIDLabel] = data.String("id")
 	labels[rke2.ClusterNameLabel] = capiCluster.Name
+	labels[capi.ClusterLabelName] = capiCluster.Name
 
 	labelsMap := map[string]string{}
 	for _, str := range strings.Split(data.String("labels"), ",") {
@@ -365,10 +366,11 @@ func (h *handler) onUnmanagedMachineOnRemove(key string, customMachine *rkev1.Cu
 	return customMachine, nil
 }
 
-func (h *handler) onUnmanagedMachineChange(key string, machine *rkev1.CustomMachine) (*rkev1.CustomMachine, error) {
+func (h *handler) onUnmanagedMachineChange(_ string, machine *rkev1.CustomMachine) (*rkev1.CustomMachine, error) {
 	if machine != nil && !machine.Status.Ready && machine.Spec.ProviderID != "" {
 		machine = machine.DeepCopy()
 		machine.Status.Ready = true
+		rke2.Ready.SetStatus(machine, "True")
 		return h.unmanagedMachine.UpdateStatus(machine)
 	}
 	return machine, nil

@@ -15,7 +15,7 @@ var allProbes = map[string]plan.Probe{
 		InitialDelaySeconds: 1,
 		TimeoutSeconds:      5,
 		SuccessThreshold:    1,
-		FailureThreshold:    2,
+		FailureThreshold:    1,
 		HTTPGetAction: plan.HTTPGetAction{
 			URL: "http://127.0.0.1:9099/liveness",
 		},
@@ -24,7 +24,7 @@ var allProbes = map[string]plan.Probe{
 		InitialDelaySeconds: 1,
 		TimeoutSeconds:      5,
 		SuccessThreshold:    1,
-		FailureThreshold:    2,
+		FailureThreshold:    1,
 		HTTPGetAction: plan.HTTPGetAction{
 			URL: "http://127.0.0.1:2381/health",
 		},
@@ -33,7 +33,7 @@ var allProbes = map[string]plan.Probe{
 		InitialDelaySeconds: 1,
 		TimeoutSeconds:      5,
 		SuccessThreshold:    1,
-		FailureThreshold:    2,
+		FailureThreshold:    1,
 		HTTPGetAction: plan.HTTPGetAction{
 			URL:        "https://127.0.0.1:6443/readyz",
 			CACert:     "/var/lib/rancher/%s/server/tls/server-ca.crt",
@@ -45,7 +45,7 @@ var allProbes = map[string]plan.Probe{
 		InitialDelaySeconds: 1,
 		TimeoutSeconds:      5,
 		SuccessThreshold:    1,
-		FailureThreshold:    2,
+		FailureThreshold:    1,
 		HTTPGetAction: plan.HTTPGetAction{
 			URL: "https://127.0.0.1:%s/healthz",
 		},
@@ -54,7 +54,7 @@ var allProbes = map[string]plan.Probe{
 		InitialDelaySeconds: 1,
 		TimeoutSeconds:      5,
 		SuccessThreshold:    1,
-		FailureThreshold:    2,
+		FailureThreshold:    1,
 		HTTPGetAction: plan.HTTPGetAction{
 			URL: "https://127.0.0.1:%s/healthz",
 		},
@@ -63,7 +63,7 @@ var allProbes = map[string]plan.Probe{
 		InitialDelaySeconds: 1,
 		TimeoutSeconds:      5,
 		SuccessThreshold:    1,
-		FailureThreshold:    2,
+		FailureThreshold:    1,
 		HTTPGetAction: plan.HTTPGetAction{
 			URL: "http://127.0.0.1:10248/healthz",
 		},

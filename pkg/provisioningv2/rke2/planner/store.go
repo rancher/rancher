@@ -26,8 +26,8 @@ import (
 )
 
 const (
-	NoAgentPlanStatusMessage = "agent to check in and apply initial plan"
-	WaitingPlanStatusMessage = "plan to be applied"
+	NoAgentPlanStatusMessage = "waiting for agent to check in and apply initial plan"
+	WaitingPlanStatusMessage = "waiting for plan to be applied"
 	FailedPlanStatusMessage  = "failure while applying plan"
 )
 
@@ -112,11 +112,11 @@ func (p *PlanStore) Load(cluster *capi.Cluster, rkeControlPlane *rkev1.RKEContro
 
 func noPlanMessage(entry *planEntry) string {
 	if isEtcd(entry) {
-		return "bootstrap etcd to be available"
+		return "waiting for bootstrap etcd to be available"
 	} else if isControlPlane(entry) {
-		return "etcd to be available"
+		return "waiting for etcd to be available"
 	} else {
-		return "control plane to be available"
+		return "waiting for control plane to be available"
 	}
 }
 
@@ -130,7 +130,7 @@ func probesMessage(plan *plan.Node) string {
 		}
 	}
 	sort.Strings(unhealthy)
-	return "probes: " + strings.Join(unhealthy, ", ")
+	return "waiting for probes: " + strings.Join(unhealthy, ", ")
 }
 
 func getPlanStatusReasonMessage(entry *planEntry) string {
@@ -269,7 +269,7 @@ func isRKEBootstrap(machine *capi.Machine) bool {
 		machine.Spec.Bootstrap.ConfigRef.Kind == "RKEBootstrap"
 }
 
-// getPlanSecretFromachine returns the plan secret from the secretsCache for the given machine, or an error if the plan secret is not available
+// getPlanSecretFromMachine returns the plan secret from the secretsCache for the given machine, or an error if the plan secret is not available
 func (p *PlanStore) getPlanSecretFromMachine(machine *capi.Machine) (*corev1.Secret, error) {
 	if machine == nil {
 		return nil, fmt.Errorf("machine was nil")

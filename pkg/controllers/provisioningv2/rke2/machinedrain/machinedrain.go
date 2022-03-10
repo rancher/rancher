@@ -3,12 +3,9 @@ package machinedrain
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"os"
 	"time"
 
-	"github.com/rancher/lasso/pkg/cache"
-	"github.com/rancher/lasso/pkg/controller"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2"
 	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta1"
@@ -20,7 +17,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
-	"k8s.io/client-go/util/workqueue"
+	"k8s.io/client-go/util/retry"
 	"k8s.io/kubectl/pkg/drain"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 )
@@ -40,30 +37,11 @@ func Register(ctx context.Context, clients *wrangler.Context) {
 		secretCache:  clients.Core.Secret().Cache(),
 	}
 
-	// It would be a bad idea to have this handler run for every secret. Therefore, a new cache factory is created just for secrets with the machine plan type.
-	cacheFactory := cache.NewSharedCachedFactory(clients.ControllerFactory.SharedCacheFactory().SharedClientFactory(), &cache.SharedCacheFactoryOptions{
-		DefaultTweakList: func(options *metav1.ListOptions) {
-			options.TypeMeta = metav1.TypeMeta{
-				APIVersion: "v1",
-				Kind:       "Secret",
-			}
-			options.FieldSelector = fmt.Sprintf("type=%s", rke2.SecretTypeMachinePlan)
-		},
-	})
-
-	controllerFactory := controller.NewSharedControllerFactory(cacheFactory, &controller.SharedControllerFactoryOptions{
-		DefaultRateLimiter: workqueue.NewItemExponentialFailureRateLimiter(1*time.Minute, 5*time.Minute),
-		DefaultWorkers:     1,
-	})
-
-	corecontrollers.New(controllerFactory).Secret().OnChange(ctx, "machine-drain", h.OnChange)
-	if err := controllerFactory.Start(ctx, 1); err != nil {
-		panic(err)
-	}
+	clients.Core.Secret().OnChange(ctx, "machine-drain", h.OnChange)
 }
 
 func (h *handler) OnChange(_ string, secret *corev1.Secret) (*corev1.Secret, error) {
-	if secret == nil || secret.DeletionTimestamp != nil || secret.Labels[rke2.MachineNameLabel] == "" {
+	if secret == nil || secret.DeletionTimestamp != nil || secret.Labels[rke2.MachineNameLabel] == "" || secret.Type != rke2.SecretTypeMachinePlan {
 		return secret, nil
 	}
 
@@ -72,21 +50,45 @@ func (h *handler) OnChange(_ string, secret *corev1.Secret) (*corev1.Secret, err
 		return secret, err
 	}
 
+	oldSecret := secret.DeepCopy()
+	defer func() {
+		if secret == nil || secret.Annotations == nil {
+			secret = oldSecret
+		}
+		drainErrorValue, ok := secret.Annotations[rke2.DrainErrorAnnotation]
+		if err == nil && !ok || err != nil && drainErrorValue == err.Error() {
+			// No need to update the machine if the annotation is already set to the correct value
+			return
+		}
+
+		secret = secret.DeepCopy()
+		if err != nil {
+			secret.Annotations[rke2.DrainErrorAnnotation] = err.Error()
+		} else {
+			delete(secret.Annotations, rke2.DrainErrorAnnotation)
+		}
+
+		var updateErr error
+		if secret, updateErr = h.secrets.Update(secret); updateErr != nil && err == nil {
+			err = updateErr
+		} else if updateErr != nil {
+			logrus.Errorf("Failed to update secret %s/%s with drain error annotation: %v", secret.Namespace, secret.Name, updateErr)
+		}
+	}()
+
 	drain := secret.Annotations[rke2.DrainAnnotation]
 	if drain != "" && secret.Annotations[rke2.DrainDoneAnnotation] != drain {
-		return h.drain(secret, machine, drain)
+		secret, err = h.drain(secret, machine, drain)
+	} else if secret.Annotations[rke2.UnCordonAnnotation] != "" {
+		// Only check that it's non-blank.  There is no correlation between the drain and unDrain options, meaning
+		// that the option values do not need to match.  For drain we track the status by doing the drain annotation
+		// and then adding a drain-done annotation with the same value when it's done.  Uncordon is different in that
+		// we want the final state to have no annotations.  So when UnCordonAnnotation is set we run and then when
+		// it's done we delete it.  So there is no knowledge of what the value should be except that it's set.
+		secret, err = h.unDrain(secret, machine, drain)
 	}
 
-	// Only check that it's non-blank.  There is no correlation between the drain and unDrain options, meaning
-	// that the option values do not need to match.  For drain we track the status by doing the drain annotation
-	// and then adding a drain-done annotation with the same value when it's done.  Uncordon is different in that
-	// we want the final state to have no annotations.  So when UnCordonAnnotation is set we run and then when
-	// it's done we delete it.  So there is no knowledge of what the value should be except that it's set.
-	if secret.Annotations[rke2.UnCordonAnnotation] != "" {
-		return h.unDrain(secret, machine, drain)
-	}
-
-	return secret, nil
+	return secret, err
 }
 
 func (h *handler) k8sClient(machine *capi.Machine) (kubernetes.Interface, error) {
@@ -116,9 +118,7 @@ func (h *handler) unDrain(secret *corev1.Secret, machine *capi.Machine, drainDat
 
 	if len(drainOpts.PostDrainHooks) > 0 {
 		if secret.Annotations[rke2.PostDrainAnnotation] != drainData {
-			secret = secret.DeepCopy()
-			secret.Annotations[rke2.PostDrainAnnotation] = drainData
-			return h.secrets.Update(secret)
+			return h.updateSecretAnnotation(secret, rke2.PostDrainAnnotation, drainData)
 		}
 		for _, hook := range drainOpts.PostDrainHooks {
 			if hook.Annotation != "" && secret.Annotations[hook.Annotation] != drainData {
@@ -164,9 +164,7 @@ func (h *handler) drain(secret *corev1.Secret, machine *capi.Machine, drainData 
 
 	if len(drainOpts.PreDrainHooks) > 0 {
 		if secret.Annotations[rke2.PreDrainAnnotation] != drainData {
-			secret = secret.DeepCopy()
-			secret.Annotations[rke2.PreDrainAnnotation] = drainData
-			return h.secrets.Update(secret)
+			return h.updateSecretAnnotation(secret, rke2.PreDrainAnnotation, drainData)
 		}
 		for _, hook := range drainOpts.PreDrainHooks {
 			if hook.Annotation != "" && secret.Annotations[hook.Annotation] != drainData {
@@ -181,9 +179,7 @@ func (h *handler) drain(secret *corev1.Secret, machine *capi.Machine, drainData 
 		}
 	}
 
-	secret = secret.DeepCopy()
-	secret.Annotations[rke2.DrainDoneAnnotation] = drainData
-	return h.secrets.Update(secret)
+	return h.updateSecretAnnotation(secret, rke2.DrainDoneAnnotation, drainData)
 }
 
 func (h *handler) cordon(machine *capi.Machine, drainOpts *rkev1.DrainOptions) error {
@@ -243,4 +239,18 @@ func (h *handler) performDrain(machine *capi.Machine, drainOpts *rkev1.DrainOpti
 	}
 
 	return drain.RunNodeDrain(helper, node.Name)
+}
+
+func (h *handler) updateSecretAnnotation(secret *corev1.Secret, annotation, value string) (*corev1.Secret, error) {
+	var err error
+	return secret, retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		secret, err = h.secrets.Get(secret.Namespace, secret.Name, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+		secret = secret.DeepCopy()
+		secret.Annotations[annotation] = value
+		_, err = h.secrets.Update(secret)
+		return err
+	})
 }
