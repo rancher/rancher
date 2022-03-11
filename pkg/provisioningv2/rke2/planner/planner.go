@@ -329,7 +329,7 @@ func (p *Planner) Process(controlPlane *rkev1.RKEControlPlane) error {
 	}
 
 	// select all etcd and then filter to just initNodes to that unavailable count is correct
-	err = p.reconcile(controlPlane, clusterSecretTokens, plan, "bootstrap", isEtcd, isNotInitNodeOrIsDeleting,
+	err = p.reconcile(controlPlane, clusterSecretTokens, plan, true, "bootstrap", isEtcd, isNotInitNodeOrIsDeleting,
 		"1", "",
 		controlPlane.Spec.UpgradeStrategy.ControlPlaneDrainOptions)
 	firstIgnoreError, err = ignoreErrors(firstIgnoreError, err)
@@ -348,7 +348,7 @@ func (p *Planner) Process(controlPlane *rkev1.RKEControlPlane) error {
 		}
 	}
 
-	err = p.reconcile(controlPlane, clusterSecretTokens, plan, "etcd", isEtcd, isInitNodeOrDeleting,
+	err = p.reconcile(controlPlane, clusterSecretTokens, plan, true, "etcd", isEtcd, isInitNodeOrDeleting,
 		"1", joinServer,
 		controlPlane.Spec.UpgradeStrategy.ControlPlaneDrainOptions)
 	firstIgnoreError, err = ignoreErrors(firstIgnoreError, err)
@@ -356,7 +356,7 @@ func (p *Planner) Process(controlPlane *rkev1.RKEControlPlane) error {
 		return err
 	}
 
-	err = p.reconcile(controlPlane, clusterSecretTokens, plan, "control plane", isControlPlane, isInitNodeOrDeleting,
+	err = p.reconcile(controlPlane, clusterSecretTokens, plan, true, "control plane", isControlPlane, isInitNodeOrDeleting,
 		controlPlane.Spec.UpgradeStrategy.ControlPlaneConcurrency, joinServer,
 		controlPlane.Spec.UpgradeStrategy.ControlPlaneDrainOptions)
 	firstIgnoreError, err = ignoreErrors(firstIgnoreError, err)
@@ -369,7 +369,7 @@ func (p *Planner) Process(controlPlane *rkev1.RKEControlPlane) error {
 		return ErrWaiting("waiting for control plane to be available")
 	}
 
-	err = p.reconcile(controlPlane, clusterSecretTokens, plan, "worker", isOnlyWorker, isInitNodeOrDeleting,
+	err = p.reconcile(controlPlane, clusterSecretTokens, plan, false, "worker", isOnlyWorker, isInitNodeOrDeleting,
 		controlPlane.Spec.UpgradeStrategy.WorkerConcurrency, joinServer,
 		controlPlane.Spec.UpgradeStrategy.WorkerDrainOptions)
 	firstIgnoreError, err = ignoreErrors(firstIgnoreError, err)
@@ -461,7 +461,7 @@ func calculateConcurrency(maxUnavailable string, entries []*planEntry, exclude r
 	return int(math.Ceil(max)), unavailable, nil
 }
 
-func (p *Planner) reconcile(controlPlane *rkev1.RKEControlPlane, tokensSecret plan.Secret, clusterPlan *plan.Plan,
+func (p *Planner) reconcile(controlPlane *rkev1.RKEControlPlane, tokensSecret plan.Secret, clusterPlan *plan.Plan, required bool,
 	tierName string, include, exclude roleFilter, maxUnavailable string, joinServer string, drainOptions rkev1.DrainOptions) error {
 	var (
 		ready, outOfSync, nonReady, errMachines, draining, uncordoned []string
@@ -561,7 +561,7 @@ func (p *Planner) reconcile(controlPlane *rkev1.RKEControlPlane, tokensSecret pl
 		}
 	}
 
-	if len(entries) == 0 && tierName != "worker" {
+	if required && len(entries) == 0 {
 		return ErrWaiting("waiting for at least one " + tierName + " node")
 	}
 
