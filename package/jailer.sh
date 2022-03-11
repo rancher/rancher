@@ -94,6 +94,9 @@ cp -l /bin/sh /opt/jail/$NAME/bin/
 # Hard link rm into the jail
 cp -l /bin/rm /opt/jail/$NAME/bin/
 
+# Hard link mkisofs into the jail
+cp -l /usr/bin/mkisofs /opt/jail/$NAME/bin/
+
 cd /dev
 # tar copy /dev excluding mqueue and shm
 tar cf - --exclude=mqueue --exclude=shm --exclude=pts . | (cd /opt/jail/${NAME}/dev; tar xfp -)
