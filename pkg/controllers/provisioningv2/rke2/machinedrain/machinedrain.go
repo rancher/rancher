@@ -3,6 +3,7 @@ package machinedrain
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"time"
 
@@ -72,7 +73,7 @@ func (h *handler) OnChange(_ string, secret *corev1.Secret) (*corev1.Secret, err
 		if secret, updateErr = h.secrets.Update(secret); updateErr != nil && err == nil {
 			err = updateErr
 		} else if updateErr != nil {
-			logrus.Errorf("Failed to update secret %s/%s with drain error annotation: %v", secret.Namespace, secret.Name, updateErr)
+			err = fmt.Errorf("failed to update secret (%v) after drain error: %v", updateErr, err)
 		}
 	}()
 

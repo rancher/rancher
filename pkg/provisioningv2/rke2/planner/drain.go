@@ -93,7 +93,7 @@ func (p *Planner) undrain(entry *planEntry) (bool, error) {
 	}
 
 	if err := checkForDrainError(entry, "undraining"); err != nil {
-		// This is the only place true and an error is returned to indicate that draining is ongoing, but there is an error.
+		// This is the only place true and an error is returned to indicate that undraining is ongoing, but there is an error.
 		return true, err
 	}
 
@@ -101,10 +101,10 @@ func (p *Planner) undrain(entry *planEntry) (bool, error) {
 	return entry.Metadata.Annotations[rke2.UnCordonAnnotation] == "", nil
 }
 
+// checkForDrainError checks if there is an error in the drain annotations. It ignores errors that contain "error trying to reach service"
+// because these indicate that the cluster is not reachable because the node is restarting or the cattle-cluster-agent is getting rescheduled.
+// These errors are expected during draining and it is not necessary to alert the user about them.
 func checkForDrainError(entry *planEntry, drainStep string) error {
-	// During draining, the cattle-cluster-agent could get rescheduled. This causes connection issues with the downstream cluster.
-	// Since these connection issues are expected, they aren't returned here as an error.
-	// The string will be in the annotation for debugging purposes.
 	if errStr := entry.Metadata.Annotations[rke2.DrainErrorAnnotation]; errStr != "" && !strings.Contains(errStr, "error trying to reach service") {
 		return fmt.Errorf("error %s machine %s: %s", drainStep, entry.Machine.Name, errStr)
 	}

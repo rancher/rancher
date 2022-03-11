@@ -208,7 +208,7 @@ func (p *Planner) applyToMachineCondition(clusterPlan *plan.Plan, machineNames [
 func atMostThree(names []string) string {
 	sort.Strings(names)
 	if len(names) > 3 {
-		return strings.Join(names[:3], ",")
+		return fmt.Sprintf("%s and %d more", strings.Join(names[:3], ","), len(names)-3)
 	}
 	return strings.Join(names, ",")
 }
