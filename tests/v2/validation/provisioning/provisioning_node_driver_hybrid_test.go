@@ -17,8 +17,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func (r *RKE2NodeDriverProvisioningTestSuite) setupMixed() {
-	r.SetupSuiteLinuxOnly()
+func (r *RKE2NodeDriverProvisioningTestSuite) setupHybrid() {
+	r.SetupSuiteHybrid()
 }
 
 func (r *RKE2NodeDriverProvisioningTestSuite) ProvisioningRKE2ClusterHybrid(provider Provider) {
@@ -30,10 +30,9 @@ func (r *RKE2NodeDriverProvisioningTestSuite) ProvisioningRKE2ClusterHybrid(prov
 
 	cloudCredential, err := provider.CloudCredFunc(client)
 	require.NoError(r.T(), err)
-
 	providerName := " Node Provider: " + provider.Name
 
-	allNodeRolesMixedOS := []map[string]bool{
+	allNodeRolesHybrid := []map[string]bool{
 		{
 			"controlplane": true,
 			"etcd":         true,
@@ -41,7 +40,7 @@ func (r *RKE2NodeDriverProvisioningTestSuite) ProvisioningRKE2ClusterHybrid(prov
 		},
 	}
 
-	uniqueNodeRolesMixedOS := []map[string]bool{
+	uniqueNodeRolesHybrid := []map[string]bool{
 		{
 			"controlplane": true,
 			"etcd":         false,
@@ -70,10 +69,10 @@ func (r *RKE2NodeDriverProvisioningTestSuite) ProvisioningRKE2ClusterHybrid(prov
 		hasWindows bool
 		client     *rancher.Client
 	}{
-		{"1 Node all roles Admin User + 1 Windows Worker - MixedOS", allNodeRolesMixedOS, true, r.client},
-		{"1 Node all roles Standard User + 1 Windows Worker - MixedOS", allNodeRolesMixedOS, true, r.standardUserClient},
-		{"3 unique role nodes as Admin User + 1 Windows Worker - MixedOS", uniqueNodeRolesMixedOS, true, r.client},
-		{"3 unique role nodes as Standard User + 1 Windows Worker - MixedOS", uniqueNodeRolesMixedOS, true, r.standardUserClient},
+		{"1 Node all roles Admin User + 1 Windows Worker - Hybrid", allNodeRolesHybrid, true, r.client},
+		{"1 Node all roles Standard User + 1 Windows Worker - Hybrid", allNodeRolesHybrid, true, r.standardUserClient},
+		{"3 unique role nodes as Admin User + 1 Windows Worker - Hybrid", uniqueNodeRolesHybrid, true, r.client},
+		{"3 unique role nodes as Standard User + 1 Windows Worker - Hybrid", uniqueNodeRolesHybrid, true, r.standardUserClient},
 	}
 
 	var name string
@@ -199,7 +198,7 @@ func (r *RKE2NodeDriverProvisioningTestSuite) TestProvisioningDynamicInputHybrid
 		r.T().Skip()
 	}
 	if !hasWindows {
-		r.T().Logf("mixedOS Windows + Linux test suite was chosen but hasWindows is set to %v, skipping", hasWindows)
+		r.T().Logf("hybrid Windows + Linux test suite was chosen but hasWindows is set to %v, skipping", hasWindows)
 		r.T().Skip()
 	}
 

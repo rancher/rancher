@@ -23,7 +23,7 @@ type ExternalNodeProvider struct {
 
 // ExternalNodeProviderSetup is a helper function that setups an ExternalNodeProvider object is a wrapper
 // for the specific outside node provider node creator function
-func ExternalNodeProviderSetup(providerType string) ExternalNodeProvider {
+func ExternalNodeProviderSetup(providerType string, hasWindows bool) ExternalNodeProvider {
 	switch providerType {
 	case ec2NodeProviderName:
 		return ExternalNodeProvider{
@@ -39,7 +39,7 @@ func ExternalNodeProviderSetup(providerType string) ExternalNodeProvider {
 
 				nodesList := nodeConfig.Nodes[numOfInstances]
 				for _, node := range nodesList {
-					sshKey, err := nodes.GetSSHKey(node.SSHKeyName)
+					sshKey, err := nodes.GetSSHKey(node.SSHKeyName, hasWindows)
 					if err != nil {
 						return nil, err
 					}
