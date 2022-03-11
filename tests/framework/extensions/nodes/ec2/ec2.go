@@ -1,10 +1,13 @@
 package ec2
 
 import (
+	"fmt"
 	"os"
 	"os/user"
 	"path/filepath"
 	"strings"
+
+	"github.com/aws/aws-sdk-go/aws/awserr"
 
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/rancher/tests/v2/validation/provisioning"
@@ -18,7 +21,7 @@ import (
 const (
 	nodeBaseName               = "rancherautomation"
 	LocalWindowsPEMKeyName     = "windows-ec2-key.pem"
-	WindowsPemKeyName          = "windows-pem-automation"
+	AutomationPemKeyName       = "automation-keypair"
 	sshPath                    = ".ssh"
 	defaultWindowsVolumeSize   = int(100)
 	defaultWindowsInstanceType = "m5a.xlarge"
@@ -163,12 +166,17 @@ func getSSHKeyName(sshKeyName string) string {
 }
 
 // create PEM for Windows Instances
-func generatePEM() (string, error) {
-	input := ec2.CreateKeyPairInput{}
-	keyName := provisioning.AppendRandomString(WindowsPemKeyName)
-	pemKey := input.SetKeyName(keyName)
-	output := ec2.CreateKeyPairOutput{KeyName: pemKey.KeyName}
-	sensitivePEM := output.KeyMaterial
+func generatePEMKey(client *rancher.Client) (string, error) {
+	ec2Client, err := client.GetEC2Client()
+	if err != nil {
+		return "", err
+	}
+	input := ec2.CreateKeyPairInput{KeyName: aws.String(provisioning.AppendRandomString(AutomationPemKeyName))}
+	newKey, err := ec2Client.SVC.CreateKeyPair(&input)
+	if err != nil {
+		return "", err
+	}
+	sensitivePEM := newKey.KeyMaterial
 	user, err := user.Current()
 	if err != nil {
 		return "", err
@@ -177,14 +185,58 @@ func generatePEM() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	localPEM := filepath.Join(user.HomeDir, sshPath, LocalWindowsPEMKeyName)
+	localPEM := filepath.Join(user.HomeDir, sshPath, aws.StringValue(input.KeyName), ".pem")
 	err = os.WriteFile(localPEM, []byte(convert.ToString(sensitivePEM)), 0400)
 	if err != nil {
 		os.Remove(localPEM)
 		return "", err
 	}
 
-	return keyName, nil
+	return aws.StringValue(input.KeyName), nil
+}
+
+func cleanupPEM(client *rancher.Client, keyName string) error {
+	var retries = 0
+	input := ec2.DeleteKeyPairInput{KeyName: aws.String(keyName)}
+	err := deleteKeyPair(client, &input, retries)
+	if err != nil {
+		// retry once more
+		retries++
+		err = deleteKeyPair(client, &input, retries)
+		return err
+	}
+	return nil
+}
+
+func deleteKeyPair(client *rancher.Client, input *ec2.DeleteKeyPairInput, retries int) error {
+	if retries == 1 {
+		return fmt.Errorf("unable to deleteKeyPair %s, maximum retries reached", aws.StringValue(input.KeyName))
+	}
+	ec2Client, err := client.GetEC2Client()
+	if err != nil {
+		return err
+	}
+	success := fmt.Sprintf("AWS KeyPair %s has been deleted successfully:\n", aws.StringValue(input.KeyName))
+	result, err := ec2Client.SVC.DeleteKeyPair(input)
+	if err != nil {
+		if awsErr, ok := err.(awserr.Error); ok {
+			// Prints out full error message, including original error if there was one.
+			fmt.Printf("error from AWS while trying to delete KeyPair: %s\n", awsErr.Error())
+			if origErr := awsErr.OrigErr(); origErr != nil {
+				// retry once more
+				retries++
+				fmt.Printf("retrying deletion of AWS KeyPAir %s\n", aws.StringValue(input.KeyName))
+				err = deleteKeyPair(client, input, retries)
+				if err == nil {
+					fmt.Printf(success + result.GoString())
+					return nil
+				}
+				return fmt.Errorf(err.Error())
+			}
+		}
+	}
+	fmt.Printf(success + result.GoString())
+	return nil
 }
 
 func createNodesCommon(client *rancher.Client, numOfInstances int, hasWindows bool) (*ec2.RunInstancesInput, error) {
@@ -192,31 +244,44 @@ func createNodesCommon(client *rancher.Client, numOfInstances int, hasWindows bo
 	if err != nil {
 		return nil, err
 	}
-	keyName := getSSHKeyName(ec2Client.Config.AWSSSHKeyName)
+	keyName, err := generatePEMKey(client)
+	if err != nil {
+		fmt.Printf("error: unable to generate runtime PEM key: %s\nattempting fallback of using AWSSSHKeyName configuration", err)
+		// attempt to fallback to local sshkey config
+		if getSSHKeyName(ec2Client.Config.AWSSSHKeyName) != "" {
+			return nil, fmt.Errorf("unable to parse AWSSSHKeyName configuration")
+		}
+		fmt.Printf("using fallback AWSSSHKeyName configuration")
+		keyName = getSSHKeyName(ec2Client.Config.AWSSSHKeyName)
+	}
 	imageID := ec2Client.Config.AWSLinuxAMI
 	instanceType := ec2Client.Config.InstanceTypeLinux
 	volumeSize := ec2Client.Config.VolumeSizeLinux
 
+	// # aws ec2 describe-images --owners amazon --filters "Name=platform,Values=windows" "Name=root-device-type,Values=ebs" "Name=name,Values=Windows*2019*Containers*"
+	// # aws ec2 describe-images --owners amazon --filters "Name=platform,Values=windows" "Name=root-device-type,Values=ebs" "Name=name,Values=Windows*2022*Containers*"
 	if hasWindows {
-		keyName, err = generatePEM()
-		if err != nil {
-			return nil, err
-		}
-		filterValues := []string{"platform=windows,architecture=x86_64,is-public=true"}
-		f := &ec2.Filter{
-			Name:   aws.String(""),
-			Values: aws.StringSlice(filterValues),
-		}
-		input := ec2.DescribeImagesInput{}
-		filters := ec2.DescribeImagesInput{}.Filters
-		filters = append(filters, f)
+		var (
+			windowsOwner            []string
+			windows2019FilterValues []string
+			windows2022FilterValues []string
+		)
+		windowsOwner = append(windowsOwner, "amazon")
+		windows2019FilterValues = append(windows2019FilterValues, "Name=platform,Values=windows", "Name=root-device-type,Values=ebs", "Name=name,Values=Windows*2019*Containers*")
+		windows2022FilterValues = append(windows2022FilterValues, "Name=platform,Values=windows", "Name=root-device-type,Values=ebs", "Name=name,Values=Windows*2022*Containers*")
+		win2019Filter := &ec2.Filter{}
+		win2019Filter.Values = aws.StringSlice(windows2019FilterValues)
+		win2022Filter := &ec2.Filter{}
+		win2022Filter.Values = aws.StringSlice(windows2022FilterValues)
+		input := ec2.DescribeImagesInput{Owners: aws.StringSlice(windowsOwner)}
 
-		imageFilters, err := ec2Client.SVC.DescribeImages(&input)
+		input.Filters = append(input.Filters, win2019Filter)
+		images, err := ec2Client.SVC.DescribeImages(&input)
 		if err != nil {
 			return nil, err
 		}
 		// todo: fix
-		imageID = imageFilters.GoString()
+		imageID = images.GoString()
 		instanceType = defaultWindowsInstanceType
 		volumeSize = defaultWindowsVolumeSize
 	}
