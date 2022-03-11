@@ -261,10 +261,10 @@ func (p *Planner) getCAPICluster(controlPlane *rkev1.RKEControlPlane) (*capi.Clu
 func (p *Planner) Process(controlPlane *rkev1.RKEControlPlane) error {
 	logrus.Debugf("[planner] rkecluster %s/%s: attempting to lock %s for processing", controlPlane.Namespace, controlPlane.Name, string(controlPlane.UID))
 	p.locker.Lock(string(controlPlane.UID))
-	defer func() error {
-		logrus.Debugf("[planner] rkecluster %s/%s: unlocking %s", controlPlane.Namespace, controlPlane.Name, string(controlPlane.UID))
-		return p.locker.Unlock(string(controlPlane.UID))
-	}()
+	defer func(namespace, name, uid string) error {
+		logrus.Debugf("[planner] rkecluster %s/%s: unlocking %s", namespace, name, uid)
+		return p.locker.Unlock(uid)
+	}(controlPlane.Namespace, controlPlane.Name, string(controlPlane.UID))
 
 	cluster, err := p.getCAPICluster(controlPlane)
 	if err != nil || !cluster.DeletionTimestamp.IsZero() {
