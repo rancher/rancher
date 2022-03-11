@@ -6,6 +6,8 @@ import (
 
 const (
 	ClusterType                                      = "cluster"
+	ClusterFieldAADClientCertSecret                  = "aadClientCertSecret"
+	ClusterFieldAADClientSecret                      = "aadClientSecret"
 	ClusterFieldAKSConfig                            = "aksConfig"
 	ClusterFieldAKSStatus                            = "aksStatus"
 	ClusterFieldAPIEndpoint                          = "apiEndpoint"
@@ -61,6 +63,7 @@ const (
 	ClusterFieldName                                 = "name"
 	ClusterFieldNodeCount                            = "nodeCount"
 	ClusterFieldNodeVersion                          = "nodeVersion"
+	ClusterFieldOpenStackSecret                      = "openStackSecret"
 	ClusterFieldOwnerReferences                      = "ownerReferences"
 	ClusterFieldPrivateRegistrySecret                = "privateRegistrySecret"
 	ClusterFieldProvider                             = "provider"
@@ -76,6 +79,8 @@ const (
 	ClusterFieldTransitioningMessage                 = "transitioningMessage"
 	ClusterFieldUUID                                 = "uuid"
 	ClusterFieldVersion                              = "version"
+	ClusterFieldVirtualCenterSecret                  = "virtualCenterSecret"
+	ClusterFieldVsphereSecret                        = "vsphereSecret"
 	ClusterFieldWeavePasswordSecret                  = "weavePasswordSecret"
 	ClusterFieldWindowsPreferedCluster               = "windowsPreferedCluster"
 	ClusterFieldWindowsWorkerCount                   = "windowsWorkerCount"
@@ -83,6 +88,8 @@ const (
 
 type Cluster struct {
 	types.Resource
+	AADClientCertSecret                  string                         `json:"aadClientCertSecret,omitempty" yaml:"aadClientCertSecret,omitempty"`
+	AADClientSecret                      string                         `json:"aadClientSecret,omitempty" yaml:"aadClientSecret,omitempty"`
 	AKSConfig                            *AKSClusterConfigSpec          `json:"aksConfig,omitempty" yaml:"aksConfig,omitempty"`
 	AKSStatus                            *AKSStatus                     `json:"aksStatus,omitempty" yaml:"aksStatus,omitempty"`
 	APIEndpoint                          string                         `json:"apiEndpoint,omitempty" yaml:"apiEndpoint,omitempty"`
@@ -138,6 +145,7 @@ type Cluster struct {
 	Name                                 string                         `json:"name,omitempty" yaml:"name,omitempty"`
 	NodeCount                            int64                          `json:"nodeCount,omitempty" yaml:"nodeCount,omitempty"`
 	NodeVersion                          int64                          `json:"nodeVersion,omitempty" yaml:"nodeVersion,omitempty"`
+	OpenStackSecret                      string                         `json:"openStackSecret,omitempty" yaml:"openStackSecret,omitempty"`
 	OwnerReferences                      []OwnerReference               `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
 	PrivateRegistrySecret                string                         `json:"privateRegistrySecret,omitempty" yaml:"privateRegistrySecret,omitempty"`
 	Provider                             string                         `json:"provider,omitempty" yaml:"provider,omitempty"`
@@ -153,6 +161,8 @@ type Cluster struct {
 	TransitioningMessage                 string                         `json:"transitioningMessage,omitempty" yaml:"transitioningMessage,omitempty"`
 	UUID                                 string                         `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 	Version                              *Info                          `json:"version,omitempty" yaml:"version,omitempty"`
+	VirtualCenterSecret                  string                         `json:"virtualCenterSecret,omitempty" yaml:"virtualCenterSecret,omitempty"`
+	VsphereSecret                        string                         `json:"vsphereSecret,omitempty" yaml:"vsphereSecret,omitempty"`
 	WeavePasswordSecret                  string                         `json:"weavePasswordSecret,omitempty" yaml:"weavePasswordSecret,omitempty"`
 	WindowsPreferedCluster               bool                           `json:"windowsPreferedCluster,omitempty" yaml:"windowsPreferedCluster,omitempty"`
 	WindowsWorkerCount                   int64                          `json:"windowsWorkerCount,omitempty" yaml:"windowsWorkerCount,omitempty"`
