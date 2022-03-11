@@ -172,6 +172,15 @@ func (p *Planner) applyToMachineCondition(clusterPlan *plan.Plan, machineNames [
 			return fmt.Errorf("found unexpected machine %s that is not in cluster plan", machineName)
 		}
 
+		if !condition.Cond(capi.InfrastructureReadyCondition).IsTrue(machine) {
+			// Don't wait for CustomMachines to be ready because the infrastructure should be ready.
+			// The CustomMachine is waiting for the providerID to be set which won't happen until the cluster is bootstrapped.
+			if clusterPlan.Machines[machineName].Spec.InfrastructureRef.Kind != "CustomMachine" {
+				waiting = true
+				continue
+			}
+		}
+
 		cond = rke2.Provisioned
 		if rke2.Provisioned.IsTrue(machine) {
 			cond = rke2.Updated
