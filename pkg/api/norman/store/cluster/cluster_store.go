@@ -60,6 +60,11 @@ const (
 	registrySecretKey          = "privateRegistrySecret"
 	s3SecretKey                = "s3CredentialSecret"
 	weaveSecretKey             = "weavePasswordSecret"
+	vsphereSecretKey           = "vsphereSecret"
+	virtualCenterSecretKey     = "virtualCenterSecret"
+	openStackSecretKey         = "openStackSecret"
+	aadClientSecretKey         = "aadClientSecret"
+	aadClientCertSecretKey     = "aadClientCertSecret"
 )
 
 type Store struct {
@@ -202,6 +207,17 @@ func (r *Store) ByID(apiContext *types.APIContext, schema *types.Schema, id stri
 	return r.Store.ByID(apiContext, schema, id)
 }
 
+type secrets struct {
+	regSecret       *corev1.Secret
+	s3Secret        *corev1.Secret
+	weaveSecret     *corev1.Secret
+	vsphereSecret   *corev1.Secret
+	vcenterSecret   *corev1.Secret
+	openStackSecret *corev1.Secret
+	aadClientSecret *corev1.Secret
+	aadCertSecret   *corev1.Secret
+}
+
 func (r *Store) Create(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}) (map[string]interface{}, error) {
 	name := convert.ToString(data["name"])
 	if name == "" {
@@ -266,25 +282,50 @@ func (r *Store) Create(apiContext *types.APIContext, schema *types.Schema, data 
 		return nil, err
 	}
 
-	regSecret, s3Secret, weaveSecret, err := r.migrateSecrets(data, "", "", "")
+	allSecrets, err := r.migrateSecrets(data, "", "", "", "", "", "", "", "")
 	if err != nil {
 		return nil, err
 	}
 
 	data, err = r.Store.Create(apiContext, schema, data)
 	if err != nil {
-		if regSecret != nil {
-			if cleanupErr := r.secretMigrator.Cleanup(regSecret.Name); cleanupErr != nil {
+		if allSecrets.regSecret != nil {
+			if cleanupErr := r.secretMigrator.Cleanup(allSecrets.regSecret.Name); cleanupErr != nil {
 				logrus.Errorf("cluster store: encountered error while handling migration error: %v, original error: %v", cleanupErr, err)
 			}
 		}
-		if s3Secret != nil {
-			if cleanupErr := r.secretMigrator.Cleanup(s3Secret.Name); cleanupErr != nil {
+		if allSecrets.s3Secret != nil {
+			if cleanupErr := r.secretMigrator.Cleanup(allSecrets.s3Secret.Name); cleanupErr != nil {
 				logrus.Errorf("cluster store: encountered error while handling migration error: %v, original error: %v", cleanupErr, err)
 			}
 		}
-		if weaveSecret != nil {
-			if cleanupErr := r.secretMigrator.Cleanup(weaveSecret.Name); cleanupErr != nil {
+		if allSecrets.weaveSecret != nil {
+			if cleanupErr := r.secretMigrator.Cleanup(allSecrets.weaveSecret.Name); cleanupErr != nil {
+				logrus.Errorf("cluster store: encountered error while handling migration error: %v, original error: %v", cleanupErr, err)
+			}
+		}
+		if allSecrets.vsphereSecret != nil {
+			if cleanupErr := r.secretMigrator.Cleanup(allSecrets.vsphereSecret.Name); cleanupErr != nil {
+				logrus.Errorf("cluster store: encountered error while handling migration error: %v, original error: %v", cleanupErr, err)
+			}
+		}
+		if allSecrets.vcenterSecret != nil {
+			if cleanupErr := r.secretMigrator.Cleanup(allSecrets.vcenterSecret.Name); cleanupErr != nil {
+				logrus.Errorf("cluster store: encountered error while handling migration error: %v, original error: %v", cleanupErr, err)
+			}
+		}
+		if allSecrets.openStackSecret != nil {
+			if cleanupErr := r.secretMigrator.Cleanup(allSecrets.openStackSecret.Name); cleanupErr != nil {
+				logrus.Errorf("cluster store: encountered error while handling migration error: %v, original error: %v", cleanupErr, err)
+			}
+		}
+		if allSecrets.aadClientSecret != nil {
+			if cleanupErr := r.secretMigrator.Cleanup(allSecrets.aadClientSecret.Name); cleanupErr != nil {
+				logrus.Errorf("cluster store: encountered error while handling migration error: %v, original error: %v", cleanupErr, err)
+			}
+		}
+		if allSecrets.aadCertSecret != nil {
+			if cleanupErr := r.secretMigrator.Cleanup(allSecrets.aadCertSecret.Name); cleanupErr != nil {
 				logrus.Errorf("cluster store: encountered error while handling migration error: %v, original error: %v", cleanupErr, err)
 			}
 		}
@@ -296,20 +337,50 @@ func (r *Store) Create(apiContext *types.APIContext, schema *types.Schema, data 
 		Name:       data["id"].(string),
 		UID:        k8sTypes.UID(data["uuid"].(string)),
 	}
-	if regSecret != nil {
-		err = r.secretMigrator.UpdateSecretOwnerReference(regSecret, owner)
+	if allSecrets.regSecret != nil {
+		err = r.secretMigrator.UpdateSecretOwnerReference(allSecrets.regSecret, owner)
 		if err != nil {
 			logrus.Errorf("cluster store: failed to set %s %s as secret owner", owner.Kind, owner.Name)
 		}
 	}
-	if s3Secret != nil {
-		err = r.secretMigrator.UpdateSecretOwnerReference(s3Secret, owner)
+	if allSecrets.s3Secret != nil {
+		err = r.secretMigrator.UpdateSecretOwnerReference(allSecrets.s3Secret, owner)
 		if err != nil {
 			logrus.Errorf("cluster store: failed to set %s %s as secret owner", owner.Kind, owner.Name)
 		}
 	}
-	if weaveSecret != nil {
-		err = r.secretMigrator.UpdateSecretOwnerReference(weaveSecret, owner)
+	if allSecrets.weaveSecret != nil {
+		err = r.secretMigrator.UpdateSecretOwnerReference(allSecrets.weaveSecret, owner)
+		if err != nil {
+			logrus.Errorf("cluster store: failed to set %s %s as secret owner", owner.Kind, owner.Name)
+		}
+	}
+	if allSecrets.vsphereSecret != nil {
+		err = r.secretMigrator.UpdateSecretOwnerReference(allSecrets.vsphereSecret, owner)
+		if err != nil {
+			logrus.Errorf("cluster store: failed to set %s %s as secret owner", owner.Kind, owner.Name)
+		}
+	}
+	if allSecrets.vcenterSecret != nil {
+		err = r.secretMigrator.UpdateSecretOwnerReference(allSecrets.vcenterSecret, owner)
+		if err != nil {
+			logrus.Errorf("cluster store: failed to set %s %s as secret owner", owner.Kind, owner.Name)
+		}
+	}
+	if allSecrets.openStackSecret != nil {
+		err = r.secretMigrator.UpdateSecretOwnerReference(allSecrets.openStackSecret, owner)
+		if err != nil {
+			logrus.Errorf("cluster store: failed to set %s %s as secret owner", owner.Kind, owner.Name)
+		}
+	}
+	if allSecrets.aadClientSecret != nil {
+		err = r.secretMigrator.UpdateSecretOwnerReference(allSecrets.aadClientSecret, owner)
+		if err != nil {
+			logrus.Errorf("cluster store: failed to set %s %s as secret owner", owner.Kind, owner.Name)
+		}
+	}
+	if allSecrets.aadCertSecret != nil {
+		err = r.secretMigrator.UpdateSecretOwnerReference(allSecrets.aadCertSecret, owner)
 		if err != nil {
 			logrus.Errorf("cluster store: failed to set %s %s as secret owner", owner.Kind, owner.Name)
 		}
@@ -603,7 +674,6 @@ func (r *Store) Update(apiContext *types.APIContext, schema *types.Schema, data 
 		return nil, httperror.NewFieldAPIError(httperror.InvalidOption, "enableNetworkPolicy", err.Error())
 	}
 
-	setCloudProviderPasswordFieldsIfNotExists(existingCluster, data)
 	dialer, err := r.DialerFactory.ClusterDialer(id)
 	if err != nil {
 		return nil, errors.Wrap(err, "error getting dialer")
@@ -635,24 +705,54 @@ func (r *Store) Update(apiContext *types.APIContext, schema *types.Schema, data 
 	currentRegSecret, _ := existingCluster[registrySecretKey].(string)
 	currentS3Secret, _ := existingCluster[s3SecretKey].(string)
 	currentWeaveSecret, _ := existingCluster[weaveSecretKey].(string)
-	regSecret, s3Secret, weaveSecret, err := r.migrateSecrets(data, currentRegSecret, currentS3Secret, currentWeaveSecret)
+	currentVsphereSecret, _ := existingCluster[vsphereSecretKey].(string)
+	currentVcenterSecret, _ := existingCluster[virtualCenterSecretKey].(string)
+	currentOpenStackSecret, _ := existingCluster[openStackSecretKey].(string)
+	currentAADClientSecret, _ := existingCluster[aadClientSecretKey].(string)
+	currentAADCertSecret, _ := existingCluster[aadClientCertSecretKey].(string)
+	allSecrets, err := r.migrateSecrets(data, currentRegSecret, currentS3Secret, currentWeaveSecret, currentVsphereSecret, currentVcenterSecret, currentOpenStackSecret, currentAADClientSecret, currentAADCertSecret)
 	if err != nil {
 		return nil, err
 	}
 	data, err = r.Store.Update(apiContext, schema, data, id)
 	if err != nil {
-		if regSecret != nil && currentRegSecret == "" {
-			if cleanupErr := r.secretMigrator.Cleanup(regSecret.Name); cleanupErr != nil {
+		if allSecrets.regSecret != nil && currentRegSecret == "" {
+			if cleanupErr := r.secretMigrator.Cleanup(allSecrets.regSecret.Name); cleanupErr != nil {
 				logrus.Errorf("cluster store: encountered error while handling migration error: %v, original error: %v", cleanupErr, err)
 			}
 		}
-		if s3Secret != nil && currentS3Secret == "" {
-			if cleanupErr := r.secretMigrator.Cleanup(s3Secret.Name); cleanupErr != nil {
+		if allSecrets.s3Secret != nil && currentS3Secret == "" {
+			if cleanupErr := r.secretMigrator.Cleanup(allSecrets.s3Secret.Name); cleanupErr != nil {
 				logrus.Errorf("cluster store: encountered error while handling migration error: %v, original error: %v", cleanupErr, err)
 			}
 		}
-		if weaveSecret != nil && currentWeaveSecret == "" {
-			if cleanupErr := r.secretMigrator.Cleanup(weaveSecret.Name); cleanupErr != nil {
+		if allSecrets.weaveSecret != nil && currentWeaveSecret == "" {
+			if cleanupErr := r.secretMigrator.Cleanup(allSecrets.weaveSecret.Name); cleanupErr != nil {
+				logrus.Errorf("cluster store: encountered error while handling migration error: %v, original error: %v", cleanupErr, err)
+			}
+		}
+		if allSecrets.vsphereSecret != nil && currentVsphereSecret == "" {
+			if cleanupErr := r.secretMigrator.Cleanup(allSecrets.vsphereSecret.Name); cleanupErr != nil {
+				logrus.Errorf("cluster store: encountered error while handling migration error: %v, original error: %v", cleanupErr, err)
+			}
+		}
+		if allSecrets.vcenterSecret != nil && currentVcenterSecret == "" {
+			if cleanupErr := r.secretMigrator.Cleanup(allSecrets.vcenterSecret.Name); cleanupErr != nil {
+				logrus.Errorf("cluster store: encountered error while handling migration error: %v, original error: %v", cleanupErr, err)
+			}
+		}
+		if allSecrets.openStackSecret != nil && currentOpenStackSecret == "" {
+			if cleanupErr := r.secretMigrator.Cleanup(allSecrets.openStackSecret.Name); cleanupErr != nil {
+				logrus.Errorf("cluster store: encountered error while handling migration error: %v, original error: %v", cleanupErr, err)
+			}
+		}
+		if allSecrets.aadClientSecret != nil && currentAADClientSecret == "" {
+			if cleanupErr := r.secretMigrator.Cleanup(allSecrets.aadClientSecret.Name); cleanupErr != nil {
+				logrus.Errorf("cluster store: encountered error while handling migration error: %v, original error: %v", cleanupErr, err)
+			}
+		}
+		if allSecrets.aadCertSecret != nil && currentAADCertSecret == "" {
+			if cleanupErr := r.secretMigrator.Cleanup(allSecrets.aadCertSecret.Name); cleanupErr != nil {
 				logrus.Errorf("cluster store: encountered error while handling migration error: %v, original error: %v", cleanupErr, err)
 			}
 		}
@@ -733,40 +833,85 @@ func (r *Store) updateClusterByK8sclient(ctx context.Context, id, name string, d
 	return object.Object["spec"].(map[string]interface{}), nil
 }
 
-func (r *Store) migrateSecrets(data map[string]interface{}, currentReg, currentS3, currentWeave string) (*corev1.Secret, *corev1.Secret, *corev1.Secret, error) {
+func (r *Store) migrateSecrets(data map[string]interface{}, currentReg, currentS3, currentWeave, currentVsphere, currentVCenter, currentOpenStack, currentAADClientSecret, currentAADCert string) (secrets, error) {
 	rkeConfig, err := getRkeConfig(data)
 	if err != nil || rkeConfig == nil {
-		return nil, nil, nil, err
+		return secrets{}, err
 	}
-	regSecret, err := r.secretMigrator.CreateOrUpdatePrivateRegistrySecret(currentReg, rkeConfig, nil)
+	var s secrets
+	s.regSecret, err = r.secretMigrator.CreateOrUpdatePrivateRegistrySecret(currentReg, rkeConfig, nil)
 	if err != nil {
-		return nil, nil, nil, err
+		return secrets{}, err
 	}
-	if regSecret != nil {
-		data[registrySecretKey] = regSecret.Name
+	if s.regSecret != nil {
+		data[registrySecretKey] = s.regSecret.Name
 		rkeConfig.PrivateRegistries = secretmigrator.CleanRegistries(rkeConfig.PrivateRegistries)
 	}
-	s3Secret, err := r.secretMigrator.CreateOrUpdateS3Secret(currentS3, rkeConfig, nil)
+	s.s3Secret, err = r.secretMigrator.CreateOrUpdateS3Secret(currentS3, rkeConfig, nil)
 	if err != nil {
-		return nil, nil, nil, err
+		return secrets{}, err
 	}
-	if s3Secret != nil {
-		data[s3SecretKey] = s3Secret.Name
+	if s.s3Secret != nil {
+		data[s3SecretKey] = s.s3Secret.Name
 		rkeConfig.Services.Etcd.BackupConfig.S3BackupConfig.SecretKey = ""
 	}
-	weaveSecret, err := r.secretMigrator.CreateOrUpdateWeaveSecret(currentWeave, rkeConfig, nil)
+	s.weaveSecret, err = r.secretMigrator.CreateOrUpdateWeaveSecret(currentWeave, rkeConfig, nil)
 	if err != nil {
-		return nil, nil, nil, err
+		return secrets{}, err
 	}
-	if weaveSecret != nil {
-		data[weaveSecretKey] = weaveSecret.Name
+	if s.weaveSecret != nil {
+		data[weaveSecretKey] = s.weaveSecret.Name
 		rkeConfig.Network.WeaveNetworkProvider.Password = ""
 	}
+	s.vsphereSecret, err = r.secretMigrator.CreateOrUpdateVsphereGlobalSecret(currentVsphere, rkeConfig, nil)
+	if err != nil {
+		return secrets{}, err
+	}
+	if s.vsphereSecret != nil {
+		data[vsphereSecretKey] = s.vsphereSecret.Name
+		rkeConfig.CloudProvider.VsphereCloudProvider.Global.Password = ""
+	}
+	s.vcenterSecret, err = r.secretMigrator.CreateOrUpdateVsphereVirtualCenterSecret(currentVCenter, rkeConfig, nil)
+	if err != nil {
+		return secrets{}, err
+	}
+	if s.vcenterSecret != nil {
+		data[virtualCenterSecretKey] = s.vcenterSecret.Name
+		for k, v := range rkeConfig.CloudProvider.VsphereCloudProvider.VirtualCenter {
+			v.Password = ""
+			rkeConfig.CloudProvider.VsphereCloudProvider.VirtualCenter[k] = v
+		}
+	}
+	s.openStackSecret, err = r.secretMigrator.CreateOrUpdateOpenStackSecret(currentOpenStack, rkeConfig, nil)
+	if err != nil {
+		return secrets{}, err
+	}
+	if s.openStackSecret != nil {
+		data[openStackSecretKey] = s.openStackSecret.Name
+		rkeConfig.CloudProvider.OpenstackCloudProvider.Global.Password = ""
+	}
+	s.aadClientSecret, err = r.secretMigrator.CreateOrUpdateAADClientSecret(currentAADClientSecret, rkeConfig, nil)
+	if err != nil {
+		return secrets{}, err
+	}
+	if s.aadClientSecret != nil {
+		data[aadClientSecretKey] = s.aadClientSecret.Name
+		rkeConfig.CloudProvider.AzureCloudProvider.AADClientSecret = ""
+	}
+	s.aadCertSecret, err = r.secretMigrator.CreateOrUpdateAADCertSecret(currentAADCert, rkeConfig, nil)
+	if err != nil {
+		return secrets{}, err
+	}
+	if s.aadCertSecret != nil {
+		data[aadClientCertSecretKey] = s.aadCertSecret.Name
+		rkeConfig.CloudProvider.AzureCloudProvider.AADClientCertPassword = ""
+	}
+
 	data["rancherKubernetesEngineConfig"], err = convert.EncodeToMap(rkeConfig)
 	if err != nil {
-		return nil, nil, nil, err
+		return secrets{}, err
 	}
-	return regSecret, s3Secret, weaveSecret, nil
+	return s, nil
 }
 
 func canUseClusterName(apiContext *types.APIContext, requestedName string) error {
@@ -1062,55 +1207,6 @@ func validateS3Credentials(data map[string]interface{}, dialer dialer.Dialer) er
 		return fmt.Errorf("Unable to validate S3 backup target configuration: bucket [%v] not found", bucket)
 	}
 	return nil
-}
-
-func setCloudProviderPasswordFieldsIfNotExists(oldData, newData map[string]interface{}) {
-	replaceWithOldSecretIfNotExists(oldData, newData, "openstackCloudProvider", "rancherKubernetesEngineConfig", "cloudProvider", "openstackCloudProvider", "global", "password")
-	replaceWithOldSecretIfNotExists(oldData, newData, "vsphereCloudProvider", "rancherKubernetesEngineConfig", "cloudProvider", "vsphereCloudProvider", "global", "password")
-	azureCloudProviderPasswordFields := []string{"aadClientSecret", "aadClientCertPassword"}
-	for _, secretField := range azureCloudProviderPasswordFields {
-		replaceWithOldSecretIfNotExists(oldData, newData, "azureCloudProvider", "rancherKubernetesEngineConfig", "cloudProvider", "azureCloudProvider", secretField)
-	}
-	vSphereCloudProviderConfig := values.GetValueN(newData, "rancherKubernetesEngineConfig", "cloudProvider", "vsphereCloudProvider")
-	if vSphereCloudProviderConfig == nil {
-		return
-	}
-	newVCenter := values.GetValueN(newData, "rancherKubernetesEngineConfig", "cloudProvider", "vsphereCloudProvider", "virtualCenter")
-	if newVCenter != nil {
-		oldVCenter := values.GetValueN(oldData, "rancherKubernetesEngineConfig", "cloudProvider", "vsphereCloudProvider", "virtualCenter")
-		newVCenterMap := convert.ToMapInterface(newVCenter)
-		oldVCenterMap := convert.ToMapInterface(oldVCenter)
-		for vCenterName, vCenterConfigInterface := range newVCenterMap {
-			vCenterConfig := convert.ToMapInterface(vCenterConfigInterface)
-			if vCenterConfig["password"] != nil {
-				continue
-			}
-			// new vcenter has no password provided
-			// see if this vcenter exists in oldData
-			if oldVCenterConfigInterface, ok := oldVCenterMap[vCenterName]; ok {
-				oldVCenterConfig := convert.ToMapInterface(oldVCenterConfigInterface)
-				if oldVCenterConfig["password"] != nil {
-					vCenterConfig["password"] = oldVCenterConfig["password"]
-					newVCenterMap[vCenterName] = vCenterConfig
-				}
-			}
-		}
-	}
-}
-
-func replaceWithOldSecretIfNotExists(oldData, newData map[string]interface{}, cloudProviderName string, keys ...string) {
-	cloudProviderConfig := values.GetValueN(newData, "rancherKubernetesEngineConfig", "cloudProvider", cloudProviderName)
-	if cloudProviderConfig == nil {
-		return
-	}
-	newSecret := convert.ToString(values.GetValueN(newData, keys...))
-	if newSecret != "" {
-		return
-	}
-	oldSecret := convert.ToString(values.GetValueN(oldData, keys...))
-	if oldSecret != "" {
-		values.PutValue(newData, oldSecret, keys...)
-	}
 }
 
 func (r *Store) validateUnavailableNodes(data, existingData map[string]interface{}, id string) error {

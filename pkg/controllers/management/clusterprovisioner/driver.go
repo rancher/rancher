@@ -35,6 +35,26 @@ func (p *Provisioner) driverCreate(cluster *v3.Cluster, spec v32.ClusterSpec) (a
 	if err != nil {
 		return "", "", "", err
 	}
+	spec, err = secretmigrator.AssembleVsphereGlobalCredential(cluster, spec, p.SecretLister)
+	if err != nil {
+		return "", "", "", err
+	}
+	spec, err = secretmigrator.AssembleVsphereVirtualCenterCredential(cluster, spec, p.SecretLister)
+	if err != nil {
+		return "", "", "", err
+	}
+	spec, err = secretmigrator.AssembleOpenStackCredential(cluster, spec, p.SecretLister)
+	if err != nil {
+		return "", "", "", err
+	}
+	spec, err = secretmigrator.AssembleAADClientSecretCredential(cluster, spec, p.SecretLister)
+	if err != nil {
+		return "", "", "", err
+	}
+	spec, err = secretmigrator.AssembleAADCertCredential(cluster, spec, p.SecretLister)
+	if err != nil {
+		return "", "", "", err
+	}
 
 	if newCluster, err := p.Clusters.Update(cluster); err == nil {
 		cluster = newCluster
