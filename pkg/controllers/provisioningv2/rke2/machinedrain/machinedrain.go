@@ -246,7 +246,7 @@ func (h *handler) updateSecretAnnotation(secret *corev1.Secret, annotation, valu
 	var err error
 	return secret, retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		secret, err = h.secrets.Get(secret.Namespace, secret.Name, metav1.GetOptions{})
-		if err != nil {
+		if err != nil || secret.Annotations[annotation] == value {
 			return err
 		}
 		secret = secret.DeepCopy()
