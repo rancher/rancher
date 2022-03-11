@@ -164,7 +164,6 @@ func New(ctx context.Context, clients *wrangler.Context) *Planner {
 }
 
 func (p *Planner) applyToMachineCondition(clusterPlan *plan.Plan, machineNames []string, messagePrefix string, messages map[string][]string) error {
-	var cond condition.Cond
 	var waiting bool
 	for _, machineName := range machineNames {
 		machine := clusterPlan.Machines[machineName]
@@ -181,26 +180,21 @@ func (p *Planner) applyToMachineCondition(clusterPlan *plan.Plan, machineNames [
 			}
 		}
 
-		cond = rke2.Provisioned
-		if rke2.Provisioned.IsTrue(machine) {
-			cond = rke2.Updated
-		}
-
 		machine = machine.DeepCopy()
 		if message := messages[machineName]; len(message) > 0 {
 			msg := strings.Join(message, ", ")
 			waiting = true
-			if cond.GetMessage(machine) == msg {
+			if rke2.Provisioned.GetMessage(machine) == msg {
 				continue
 			}
-			conditions.MarkUnknown(machine, capi.ConditionType(cond), "Waiting", msg)
-		} else if cond.IsTrue(machine) {
+			conditions.MarkUnknown(machine, capi.ConditionType(rke2.Provisioned), "Waiting", msg)
+		} else if rke2.Provisioned.IsTrue(machine) {
 			continue
 		} else {
 			// Even though we are technically not waiting for something, an error should be returned so that the planner will retry.
 			// The machine being updated will cause the planner to re-enqueue with the new data.
 			waiting = true
-			conditions.MarkTrue(machine, capi.ConditionType(cond))
+			conditions.MarkTrue(machine, capi.ConditionType(rke2.Provisioned))
 		}
 
 		if _, err := p.machines.UpdateStatus(machine); err != nil {
@@ -233,14 +227,14 @@ func detailMessage(machines []string, messages map[string][]string) string {
 	return ""
 }
 
-func removeProvisionedAndUpdatedConditions(machine *capi.Machine) *capi.Machine {
+func removeProvisionedCondition(machine *capi.Machine) *capi.Machine {
 	if machine == nil || len(machine.Status.Conditions) == 0 {
 		return machine
 	}
 
 	conds := make([]capi.Condition, 0, len(machine.Status.Conditions))
 	for _, c := range machine.Status.Conditions {
-		if string(c.Type) != string(rke2.Provisioned) && string(c.Type) != string(rke2.Updated) {
+		if string(c.Type) != string(rke2.Provisioned) {
 			conds = append(conds, c)
 		}
 	}
@@ -482,7 +476,7 @@ func (p *Planner) reconcile(controlPlane *rkev1.RKEControlPlane, tokensSecret pl
 		}
 
 		// The Provisioned and Updated conditions should be removed when summarizing so that the messages are not duplicated.
-		summary := summary.Summarize(removeProvisionedAndUpdatedConditions(entry.Machine))
+		summary := summary.Summarize(removeProvisionedCondition(entry.Machine))
 		if summary.Error {
 			errMachines = append(errMachines, entry.Machine.Name)
 		}

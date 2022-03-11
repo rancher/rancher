@@ -75,7 +75,6 @@ const (
 	Waiting     = condition.Cond("Waiting")
 	Pending     = condition.Cond("Pending")
 	Removed     = condition.Cond("Removed")
-	Updated     = condition.Cond("Updated")
 
 	RuntimeK3S  = "k3s"
 	RuntimeRKE2 = "rke2"
