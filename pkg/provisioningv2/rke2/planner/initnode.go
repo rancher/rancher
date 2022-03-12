@@ -57,7 +57,7 @@ func (p *Planner) findAndDesignateFixedInitNode(rkeControlPlane *rkev1.RKEContro
 	} else if len(entries) == 0 {
 		return false, "", nil, fmt.Errorf("fixed machine with ID %s not found", fixedMachineID)
 	}
-	if rkeControlPlane.Labels[rke2.InitNodeMachineIDDoneLabel] == "" {
+	if entries[0].Metadata.Labels[rke2.InitNodeLabel] != "true" {
 		logrus.Debugf("rkecluster %s/%s: setting designated init node to fixedMachineID: %s", rkeControlPlane.Namespace, rkeControlPlane.Spec.ClusterName, fixedMachineID)
 		allInitNodes := collect(plan, isEtcd)
 		// clear all init node marks and return a generic.ErrSkip if we invalidated caches during clearing
@@ -77,17 +77,8 @@ func (p *Planner) findAndDesignateFixedInitNode(rkeControlPlane *rkev1.RKEContro
 		if cachesInvalidated {
 			return false, "", nil, generic.ErrSkip
 		}
-		if err := p.setInitNodeMark(entries[0]); err != nil && !errors.Is(err, generic.ErrSkip) {
-			return false, "", nil, err
-		}
-		rkeControlPlane = rkeControlPlane.DeepCopy()
-		rkeControlPlane.Labels[rke2.InitNodeMachineIDDoneLabel] = "true"
-		_, err := p.rkeControlPlanes.Update(rkeControlPlane)
-		if err != nil {
-			return false, "", nil, err
-		}
-		// if we set the designated init node on this iteration, return an errSkip so we know our cache is invalidated
-		return true, entries[0].Metadata.Annotations[rke2.JoinURLAnnotation], entries[0], generic.ErrSkip
+
+		return true, entries[0].Metadata.Annotations[rke2.JoinURLAnnotation], entries[0], p.setInitNodeMark(entries[0])
 	}
 	logrus.Debugf("rkecluster %s/%s: designated init node %s found", rkeControlPlane.Namespace, rkeControlPlane.Spec.ClusterName, fixedMachineID)
 	return true, entries[0].Metadata.Annotations[rke2.JoinURLAnnotation], entries[0], nil

@@ -22,7 +22,6 @@ import (
 	"github.com/rancher/wrangler/pkg/data"
 	corecontrollers "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/pkg/generic"
-	"github.com/rancher/wrangler/pkg/genericcondition"
 	"github.com/rancher/wrangler/pkg/kv"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
@@ -220,14 +219,6 @@ func (h *handler) createMachineObjects(capiCluster *capi.Cluster, machineName st
 				Name:      machineName,
 				Namespace: capiCluster.Namespace,
 				Labels:    labels,
-			},
-			Status: rkev1.CustomMachineStatus{
-				Conditions: []genericcondition.GenericCondition{
-					{
-						Type:   "Ready",
-						Status: corev1.ConditionTrue,
-					},
-				},
 			},
 		},
 		&capi.Machine{
