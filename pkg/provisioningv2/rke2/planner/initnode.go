@@ -50,7 +50,7 @@ func (p *Planner) findAndDesignateFixedInitNode(rkeControlPlane *rkev1.RKEContro
 		return false, "", nil, fmt.Errorf("fixed machine ID label did not exist on rkecontrolplane")
 	}
 	entries := collect(plan, func(entry *planEntry) bool {
-		return entry.Metadata.Labels[rke2.MachineIDLabel] == fixedMachineID
+		return entry.Metadata != nil && entry.Metadata.Labels[rke2.MachineIDLabel] == fixedMachineID
 	})
 	if len(entries) > 1 {
 		return false, "", nil, fmt.Errorf("multiple machines found with identical machine ID label %s=%s", rke2.MachineIDLabel, fixedMachineID)
