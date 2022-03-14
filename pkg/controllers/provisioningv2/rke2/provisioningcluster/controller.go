@@ -260,7 +260,7 @@ func (h *handler) OnRancherClusterChange(obj *rancherv1.Cluster, status rancherv
 					}
 				case restoreRKEConfigAll:
 					newCluster := obj.DeepCopy()
-					if changed := reconcileClusterSpecEtcdRestore(newCluster, *clusterSpec); changed {
+					if reconcileClusterSpecEtcdRestore(newCluster, *clusterSpec) {
 						logrus.Infof("rkecluster %s/%s: restoring RKE config for etcd snapshot restore (snapshot: %s)", obj.Namespace, obj.Name, obj.Spec.RKEConfig.ETCDSnapshotRestore.Name)
 						_, err = h.clusterController.Update(newCluster)
 						if err == nil {
