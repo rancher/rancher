@@ -215,7 +215,7 @@ func (p *Planner) electInitNode(rkeControlPlane *rkev1.RKEControlPlane, plan *pl
 // local etcd snapshot restore, where a snapshot may be contained on a specific node and that node needs to be the node that
 // the snapshot is restored on.
 func (p *Planner) designateInitNode(rkeControlPlane *rkev1.RKEControlPlane, plan *plan.Plan, nodeName string) (string, error) {
-	logrus.Infof("rkecluster %s/%s: ensuring designated init node: %s", rkeControlPlane.Namespace, rkeControlPlane.Spec.ClusterName, nodeName)
+	logrus.Debugf("rkecluster %s/%s: ensuring designated init node: %s", rkeControlPlane.Namespace, rkeControlPlane.Spec.ClusterName, nodeName)
 	entries := collect(plan, isEtcd)
 	cacheInvalidated := false
 	joinURL := ""
