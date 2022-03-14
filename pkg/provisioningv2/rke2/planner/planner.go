@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Masterminds/semver/v3"
 	"github.com/moby/locker"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
@@ -547,7 +548,7 @@ func (p *Planner) reconcile(controlPlane *rkev1.RKEControlPlane, tokensSecret pl
 			} else {
 				messages[entry.Machine.Name] = append(messages[entry.Machine.Name], "waiting for uncordon to finish")
 			}
-		} else if entry.Machine.Status.NodeInfo != nil && !strings.HasPrefix(controlPlane.Spec.KubernetesVersion, entry.Machine.Status.NodeInfo.KubeletVersion) {
+		} else if !kubeletVersionUpToDate(controlPlane, entry.Machine) {
 			outOfSync = append(outOfSync, entry.Machine.Name)
 			messages[entry.Machine.Name] = append(messages[entry.Machine.Name], "waiting for kubelet to update")
 		} else {
@@ -594,6 +595,27 @@ func (p *Planner) reconcile(controlPlane *rkev1.RKEControlPlane, tokensSecret pl
 	}
 
 	return nil
+}
+
+func kubeletVersionUpToDate(controlPlane *rkev1.RKEControlPlane, machine *capi.Machine) bool {
+	if controlPlane == nil || machine == nil || machine.Status.NodeInfo == nil {
+		// If any of these things are nil, then provisioning is still happening.
+		// Return true so that provisioning is not slowed down.
+		return true
+	}
+
+	kubeletVersion, err := semver.NewVersion(strings.TrimPrefix(machine.Status.NodeInfo.KubeletVersion, "v"))
+	if err != nil {
+		return false
+	}
+
+	kubernetesVersion, err := semver.NewVersion(strings.TrimPrefix(controlPlane.Spec.KubernetesVersion, "v"))
+	if err != nil {
+		return false
+	}
+
+	// Compare and ignore pre-release and build metadata
+	return kubeletVersion.Major() == kubernetesVersion.Major() && kubeletVersion.Minor() == kubernetesVersion.Minor() && kubeletVersion.Patch() == kubernetesVersion.Patch()
 }
 
 // splitArgKeyVal takes a value and returns a pair (key, value) of the argument, or two empty strings if there was not
