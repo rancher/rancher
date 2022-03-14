@@ -762,25 +762,42 @@ func MatchesQuestionPath(variable string) bool {
 // cleanQuestions removes credentials from the questions and answers sections of the cluster object.
 // Answers are already substituted into the spec in norman, so they can be deleted without migration.
 func cleanQuestions(cluster *v3.Cluster) {
-	if cluster.Spec.ClusterTemplateQuestions != nil {
-		for i, q := range cluster.Spec.ClusterTemplateQuestions {
+	cleanQuestions := func(questions []v3.Question) {
+		for i, q := range questions {
 			if MatchesQuestionPath(q.Variable) {
-				cluster.Spec.ClusterTemplateQuestions[i].Default = ""
+				questions[i].Default = ""
 			}
 		}
 	}
-	if cluster.Spec.ClusterTemplateAnswers.Values != nil {
+	if len(cluster.Spec.ClusterTemplateQuestions) > 0 {
+		cleanQuestions(cluster.Spec.ClusterTemplateQuestions)
+	}
+	if len(cluster.Status.AppliedSpec.ClusterTemplateQuestions) > 0 {
+		cleanQuestions(cluster.Status.AppliedSpec.ClusterTemplateQuestions)
+	}
+	if cluster.Status.FailedSpec != nil && len(cluster.Status.FailedSpec.ClusterTemplateQuestions) > 0 {
+		cleanQuestions(cluster.Status.FailedSpec.ClusterTemplateQuestions)
+	}
+	cleanAnswers := func(answers *v3.Answer) {
 		for i := 0; ; i++ {
 			key := fmt.Sprintf(RegistryPasswordAnswersPath, i)
-			if _, ok := cluster.Spec.ClusterTemplateAnswers.Values[key]; !ok {
+			if _, ok := answers.Values[key]; !ok {
 				break
 			}
-			delete(cluster.Spec.ClusterTemplateAnswers.Values, key)
+			delete(answers.Values, key)
 		}
-		delete(cluster.Spec.ClusterTemplateAnswers.Values, S3BackupAnswersPath)
-		delete(cluster.Spec.ClusterTemplateAnswers.Values, WeavePasswordAnswersPath)
+		delete(answers.Values, S3BackupAnswersPath)
+		delete(answers.Values, WeavePasswordAnswersPath)
 	}
-
+	if cluster.Spec.ClusterTemplateAnswers.Values != nil {
+		cleanAnswers(&cluster.Spec.ClusterTemplateAnswers)
+	}
+	if cluster.Status.AppliedSpec.ClusterTemplateAnswers.Values != nil {
+		cleanAnswers(&cluster.Status.AppliedSpec.ClusterTemplateAnswers)
+	}
+	if cluster.Status.FailedSpec != nil && cluster.Status.FailedSpec.ClusterTemplateAnswers.Values != nil {
+		cleanAnswers(&cluster.Status.FailedSpec.ClusterTemplateAnswers)
+	}
 }
 
 func setSourceCodeProviderConfigMetadata(m map[string]interface{}) (metav1.ObjectMeta, string, string, error) {
