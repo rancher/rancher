@@ -127,7 +127,7 @@ func WindowsInstallScript(ctx context.Context, token string, envVars []corev1.En
 		ca = "$env:CATTLE_CA_CHECKSUM=\"" + ca + "\""
 	}
 	if token != "" {
-		token = "$env:CATTLE_ROLE_NONE=true\n$env:CATTLE_TOKEN=\"" + token + "\""
+		token = "$env:CATTLE_ROLE_NONE=\"true\"\n$env:CATTLE_TOKEN=\"" + token + "\""
 	}
 	envVarBuf := &strings.Builder{}
 	for _, envVar := range envVars {
