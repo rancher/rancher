@@ -66,7 +66,7 @@ func Register(ctx context.Context, mgmt *config.ScaledContext, cluster *config.U
 	approuter.Register(ctx, cluster)
 	resourcequota.Register(ctx, cluster)
 	globaldns.Register(ctx, cluster)
-	alert.Register(ctx, cluster)
+	alert.Register(ctx, mgmt, cluster)
 	monitoring.Register(ctx, cluster)
 	istio.Register(ctx, cluster)
 	certsexpiration.Register(ctx, cluster)
