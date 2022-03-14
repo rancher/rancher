@@ -185,14 +185,32 @@ func (h *handler) findSnapshotClusterSpec(snapshotNamespace, snapshotName string
 }
 
 // reconcileClusterSpecEtcdRestore reconciles the cluster against the desiredSpec, but only sets fields that should be set
-// during an etcd restore. It expects the cluster object to be writable without conflict (i.e. DeepCopy)
-func reconcileClusterSpecEtcdRestore(cluster *rancherv1.Cluster, desiredSpec rancherv1.ClusterSpec) {
+// during an etcd restore. It expects the cluster object to be writable without conflict (i.e. DeepCopy). It returns a bool which indicates
+// whether the cluster was changed
+func reconcileClusterSpecEtcdRestore(cluster *rancherv1.Cluster, desiredSpec rancherv1.ClusterSpec) bool {
 	// don't overwrite/change the cluster spec for certain entries
-	cluster.Spec.RKEConfig.MachineGlobalConfig = desiredSpec.RKEConfig.MachineGlobalConfig
-	cluster.Spec.RKEConfig.MachineSelectorConfig = desiredSpec.RKEConfig.MachineSelectorConfig
-	cluster.Spec.RKEConfig.ChartValues = desiredSpec.RKEConfig.ChartValues
-	cluster.Spec.RKEConfig.AdditionalManifest = desiredSpec.RKEConfig.AdditionalManifest
-	cluster.Spec.KubernetesVersion = desiredSpec.KubernetesVersion
+	changed := false
+	if !equality.Semantic.DeepEqual(cluster.Spec.RKEConfig.MachineGlobalConfig, desiredSpec.RKEConfig.MachineGlobalConfig) {
+		changed = true
+		cluster.Spec.RKEConfig.MachineGlobalConfig = desiredSpec.RKEConfig.MachineGlobalConfig
+	}
+	if !equality.Semantic.DeepEqual(cluster.Spec.RKEConfig.MachineSelectorConfig, desiredSpec.RKEConfig.MachineSelectorConfig) {
+		changed = true
+		cluster.Spec.RKEConfig.MachineSelectorConfig = desiredSpec.RKEConfig.MachineSelectorConfig
+	}
+	if !equality.Semantic.DeepEqual(cluster.Spec.RKEConfig.ChartValues, desiredSpec.RKEConfig.ChartValues) {
+		changed = true
+		cluster.Spec.RKEConfig.ChartValues = desiredSpec.RKEConfig.ChartValues
+	}
+	if cluster.Spec.RKEConfig.AdditionalManifest != desiredSpec.RKEConfig.AdditionalManifest {
+		changed = true
+		cluster.Spec.RKEConfig.AdditionalManifest = desiredSpec.RKEConfig.AdditionalManifest
+	}
+	if cluster.Spec.KubernetesVersion != desiredSpec.KubernetesVersion {
+		changed = true
+		cluster.Spec.KubernetesVersion = desiredSpec.KubernetesVersion
+	}
+	return changed
 }
 
 // OnRancherClusterChange is called when the `clusters.provisioning.cattle.io` object is changed and is responsible for generating runtime images for the purpose of performing reconciliation
@@ -234,7 +252,7 @@ func (h *handler) OnRancherClusterChange(obj *rancherv1.Cluster, status rancherv
 						logrus.Infof("rkecluster %s/%s: restoring Kubernetes version from %s to %s for etcd snapshot restore (snapshot: %s)", obj.Namespace, obj.Name, obj.Spec.KubernetesVersion, clusterSpec.KubernetesVersion, obj.Spec.RKEConfig.ETCDSnapshotRestore.Name)
 						obj = obj.DeepCopy()
 						obj.Spec.KubernetesVersion = clusterSpec.KubernetesVersion
-						_, err := h.clusterController.Update(obj)
+						_, err = h.clusterController.Update(obj)
 						if err == nil {
 							err = generic.ErrSkip // if update was successful, return ErrSkip waiting for caches to sync
 						}
@@ -242,10 +260,9 @@ func (h *handler) OnRancherClusterChange(obj *rancherv1.Cluster, status rancherv
 					}
 				case restoreRKEConfigAll:
 					newCluster := obj.DeepCopy()
-					reconcileClusterSpecEtcdRestore(newCluster, *clusterSpec)
-					if !equality.Semantic.DeepEqual(newCluster.Spec, clusterSpec) {
+					if reconcileClusterSpecEtcdRestore(newCluster, *clusterSpec) {
 						logrus.Infof("rkecluster %s/%s: restoring RKE config for etcd snapshot restore (snapshot: %s)", obj.Namespace, obj.Name, obj.Spec.RKEConfig.ETCDSnapshotRestore.Name)
-						_, err := h.clusterController.Update(newCluster)
+						_, err = h.clusterController.Update(newCluster)
 						if err == nil {
 							err = generic.ErrSkip // if update was successful, return ErrSkip waiting for caches to sync
 						}
