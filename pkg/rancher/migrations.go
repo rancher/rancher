@@ -284,9 +284,8 @@ func migrateCAPIMachineLabelsAndAnnotationsToPlanSecret(w *wrangler.Context) err
 	}
 
 	bootstrapLabelExcludes := map[string]struct{}{
-		rke2.InitNodeMachineIDLabel:     {},
-		rke2.InitNodeMachineIDDoneLabel: {},
-		rke2.InitNodeLabel:              {},
+		rke2.InitNodeMachineIDLabel: {},
+		rke2.InitNodeLabel:          {},
 	}
 
 	boostrapAnnotationExcludes := map[string]struct{}{
