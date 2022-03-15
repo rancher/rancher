@@ -6,6 +6,8 @@ import (
 
 const (
 	ClusterType                                      = "cluster"
+	ClusterFieldAADClientCertSecret                  = "aadClientCertSecret"
+	ClusterFieldAADClientSecret                      = "aadClientSecret"
 	ClusterFieldAPIEndpoint                          = "apiEndpoint"
 	ClusterFieldAgentFeatures                        = "agentFeatures"
 	ClusterFieldAgentImage                           = "agentImage"
@@ -51,6 +53,7 @@ const (
 	ClusterFieldName                                 = "name"
 	ClusterFieldNodeCount                            = "nodeCount"
 	ClusterFieldNodeVersion                          = "nodeVersion"
+	ClusterFieldOpenStackSecret                      = "openStackSecret"
 	ClusterFieldOwnerReferences                      = "ownerReferences"
 	ClusterFieldPrivateRegistrySecret                = "privateRegistrySecret"
 	ClusterFieldRancherKubernetesEngineConfig        = "rancherKubernetesEngineConfig"
@@ -64,12 +67,16 @@ const (
 	ClusterFieldTransitioningMessage                 = "transitioningMessage"
 	ClusterFieldUUID                                 = "uuid"
 	ClusterFieldVersion                              = "version"
+	ClusterFieldVirtualCenterSecret                  = "virtualCenterSecret"
+	ClusterFieldVsphereSecret                        = "vsphereSecret"
 	ClusterFieldWeavePasswordSecret                  = "weavePasswordSecret"
 	ClusterFieldWindowsPreferedCluster               = "windowsPreferedCluster"
 )
 
 type Cluster struct {
 	types.Resource
+	AADClientCertSecret                  string                         `json:"aadClientCertSecret,omitempty" yaml:"aadClientCertSecret,omitempty"`
+	AADClientSecret                      string                         `json:"aadClientSecret,omitempty" yaml:"aadClientSecret,omitempty"`
 	APIEndpoint                          string                         `json:"apiEndpoint,omitempty" yaml:"apiEndpoint,omitempty"`
 	AgentFeatures                        map[string]bool                `json:"agentFeatures,omitempty" yaml:"agentFeatures,omitempty"`
 	AgentImage                           string                         `json:"agentImage,omitempty" yaml:"agentImage,omitempty"`
@@ -115,6 +122,7 @@ type Cluster struct {
 	Name                                 string                         `json:"name,omitempty" yaml:"name,omitempty"`
 	NodeCount                            int64                          `json:"nodeCount,omitempty" yaml:"nodeCount,omitempty"`
 	NodeVersion                          int64                          `json:"nodeVersion,omitempty" yaml:"nodeVersion,omitempty"`
+	OpenStackSecret                      string                         `json:"openStackSecret,omitempty" yaml:"openStackSecret,omitempty"`
 	OwnerReferences                      []OwnerReference               `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
 	PrivateRegistrySecret                string                         `json:"privateRegistrySecret,omitempty" yaml:"privateRegistrySecret,omitempty"`
 	RancherKubernetesEngineConfig        *RancherKubernetesEngineConfig `json:"rancherKubernetesEngineConfig,omitempty" yaml:"rancherKubernetesEngineConfig,omitempty"`
@@ -128,6 +136,8 @@ type Cluster struct {
 	TransitioningMessage                 string                         `json:"transitioningMessage,omitempty" yaml:"transitioningMessage,omitempty"`
 	UUID                                 string                         `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 	Version                              *Info                          `json:"version,omitempty" yaml:"version,omitempty"`
+	VirtualCenterSecret                  string                         `json:"virtualCenterSecret,omitempty" yaml:"virtualCenterSecret,omitempty"`
+	VsphereSecret                        string                         `json:"vsphereSecret,omitempty" yaml:"vsphereSecret,omitempty"`
 	WeavePasswordSecret                  string                         `json:"weavePasswordSecret,omitempty" yaml:"weavePasswordSecret,omitempty"`
 	WindowsPreferedCluster               bool                           `json:"windowsPreferedCluster,omitempty" yaml:"windowsPreferedCluster,omitempty"`
 }
