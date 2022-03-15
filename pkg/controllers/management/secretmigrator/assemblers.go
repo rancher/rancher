@@ -196,6 +196,38 @@ func AssembleAADCertCredential(cluster *apimgmtv3.Cluster, spec apimgmtv3.Cluste
 	return spec, nil
 }
 
+func AssembleRKEConfigSpec(cluster *apimgmtv3.Cluster, spec apimgmtv3.ClusterSpec, secretLister v1.SecretLister) (apimgmtv3.ClusterSpec, error) {
+	spec, err := AssembleS3Credential(cluster, spec, secretLister)
+	if err != nil {
+		return spec, err
+	}
+	spec, err = AssemblePrivateRegistryCredential(cluster, spec, secretLister)
+	if err != nil {
+		return spec, err
+	}
+	spec, err = AssembleWeaveCredential(cluster, spec, secretLister)
+	if err != nil {
+		return spec, err
+	}
+	spec, err = AssembleVsphereGlobalCredential(cluster, spec, secretLister)
+	if err != nil {
+		return spec, err
+	}
+	spec, err = AssembleVsphereVirtualCenterCredential(cluster, spec, secretLister)
+	if err != nil {
+		return spec, err
+	}
+	spec, err = AssembleOpenStackCredential(cluster, spec, secretLister)
+	if err != nil {
+		return spec, err
+	}
+	spec, err = AssembleAADClientSecretCredential(cluster, spec, secretLister)
+	if err != nil {
+		return spec, err
+	}
+	return AssembleAADCertCredential(cluster, spec, secretLister)
+}
+
 // AssembleSMTPCredential looks up the SMTP Secret and inserts the keys into the Notifier.
 // It returns a new copy of the Notifier without modifying the original. The Notifier is never updated.
 func AssembleSMTPCredential(notifier *apimgmtv3.Notifier, secretLister v1.SecretLister) (*apimgmtv3.NotifierSpec, error) {
