@@ -1340,6 +1340,7 @@ trigger:
   event:
     exclude:
     - promote
+    - pull_request
 
 depends_on:
 - default-linux-amd64
@@ -1381,6 +1382,7 @@ trigger:
   event:
     exclude:
     - promote
+    - pull_request
 
 depends_on:
 - default-linux-amd64
@@ -1438,6 +1440,7 @@ trigger:
   event:
     exclude:
     - promote
+    - pull_request
 
 depends_on:
 - default-linux-amd64
@@ -1481,6 +1484,7 @@ trigger:
   event:
     exclude:
     - promote
+    - pull_request
 
 depends_on:
 - default-linux-amd64
@@ -1534,6 +1538,7 @@ trigger:
   event:
     exclude:
     - promote
+    - pull_request
 
 depends_on:
 - default-linux-amd64
@@ -1587,6 +1592,7 @@ trigger:
   event:
     exclude:
     - promote
+    - pull_request
 
 depends_on:
 - default-linux-amd64
