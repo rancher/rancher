@@ -163,6 +163,11 @@ type ClusterStatus struct {
 	PrivateRegistrySecret                string                      `json:"privateRegistrySecret,omitempty" norman:"nocreate,noupdate"`
 	S3CredentialSecret                   string                      `json:"s3CredentialSecret,omitempty" norman:"nocreate,noupdate"`
 	WeavePasswordSecret                  string                      `json:"weavePasswordSecret,omitempty" norman:"nocreate,noupdate"`
+	VsphereSecret                        string                      `json:"vsphereSecret,omitempty" norman:"nocreate,noupdate"`
+	VirtualCenterSecret                  string                      `json:"virtualCenterSecret,omitempty" norman:"nocreate,noupdate"`
+	OpenStackSecret                      string                      `json:"openStackSecret,omitempty" norman:"nocreate,noupdate"`
+	AADClientSecret                      string                      `json:"aadClientSecret,omitempty" norman:"nocreate,noupdate"`
+	AADClientCertSecret                  string                      `json:"aadClientCertSecret,omitempty" norman:"nocreate,noupdate"`
 }
 
 type ClusterComponentStatus struct {
