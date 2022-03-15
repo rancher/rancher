@@ -17,7 +17,7 @@ import (
 )
 
 func (uh *upgradeHandler) nonWorkerPlan(node *v3.Node, cluster *v3.Cluster) (*v3.RKEConfigNodePlan, error) {
-	appliedSpec, err := secretmigrator.AssemblePrivateRegistryCredential(cluster, cluster.Status.AppliedSpec, uh.secretLister)
+	appliedSpec, err := secretmigrator.AssembleRKEConfigSpec(cluster, cluster.Status.AppliedSpec, uh.secretLister)
 	if err != nil {
 		return nil, err
 	}
@@ -79,7 +79,7 @@ func (uh *upgradeHandler) workerPlan(node *v3.Node, cluster *v3.Cluster) (*v3.RK
 	hostAddress := node.Status.NodeConfig.Address
 	hostDockerInfo := infos[hostAddress]
 
-	appliedSpec, err := secretmigrator.AssemblePrivateRegistryCredential(cluster, cluster.Status.AppliedSpec, uh.secretLister)
+	appliedSpec, err := secretmigrator.AssembleRKEConfigSpec(cluster, cluster.Status.AppliedSpec, uh.secretLister)
 	if err != nil {
 		return nil, err
 	}
