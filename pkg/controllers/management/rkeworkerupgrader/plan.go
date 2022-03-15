@@ -21,7 +21,7 @@ func (uh *upgradeHandler) nonWorkerPlan(node *v3.Node, cluster *v3.Cluster) (*rk
 	if err != nil {
 		return nil, err
 	}
-	rkeConfig := appliedSpec.RancherKubernetesEngineConfig
+	rkeConfig := appliedSpec.RancherKubernetesEngineConfig.DeepCopy()
 	rkeConfig.Nodes = []rketypes.RKEConfigNode{
 		*node.Status.NodeConfig,
 	}
@@ -86,7 +86,7 @@ func (uh *upgradeHandler) workerPlan(node *v3.Node, cluster *v3.Cluster) (*rkety
 		return nil, err
 	}
 
-	rkeConfig := appliedSpec.RancherKubernetesEngineConfig
+	rkeConfig := appliedSpec.RancherKubernetesEngineConfig.DeepCopy()
 	nodeserver.FilterHostForSpec(rkeConfig, node)
 
 	logrus.Debugf("The number of nodes sent to the plan: %v", len(rkeConfig.Nodes))
