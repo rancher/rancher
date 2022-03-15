@@ -9,6 +9,7 @@ import (
 	"github.com/rancher/steve/pkg/auth"
 	"github.com/rancher/steve/pkg/client"
 	"github.com/rancher/steve/pkg/schema"
+	"github.com/rancher/steve/pkg/schemaserver/server"
 	"github.com/rancher/steve/pkg/schemaserver/types"
 	"github.com/rancher/steve/pkg/server/router"
 	"github.com/rancher/wrangler-api/pkg/generated/controllers/apiextensions.k8s.io"
@@ -32,6 +33,7 @@ type Server struct {
 
 	ClientFactory   *client.Factory
 	BaseSchemas     *types.APISchemas
+	APIServer       *server.Server
 	AccessSetLookup accesscontrol.AccessSetLookup
 	SchemaTemplates []schema.Template
 	AuthMiddleware  auth.Middleware

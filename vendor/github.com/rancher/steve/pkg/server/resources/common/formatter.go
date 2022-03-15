@@ -8,6 +8,7 @@ import (
 	"github.com/rancher/steve/pkg/schemaserver/types"
 	"github.com/rancher/steve/pkg/server/store/proxy"
 	"github.com/rancher/wrangler/pkg/data"
+	"github.com/rancher/wrangler/pkg/slice"
 	"github.com/rancher/wrangler/pkg/summary"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -36,6 +37,14 @@ func Formatter(request *types.APIRequest, resource *types.RawResource) {
 
 	if _, ok := resource.Links["update"]; !ok {
 		resource.Links["update"] = u
+	}
+
+	if _, ok := resource.Links["update"]; !ok && slice.ContainsString(resource.Schema.ResourceMethods, "blocked-PUT") {
+		resource.Links["update"] = "blocked"
+	}
+
+	if _, ok := resource.Links["remove"]; !ok && slice.ContainsString(resource.Schema.ResourceMethods, "blocked-DELETE") {
+		resource.Links["remove"] = "blocked"
 	}
 
 	if unstr, ok := resource.APIObject.Object.(*unstructured.Unstructured); ok {

@@ -16,15 +16,19 @@ import (
 	"k8s.io/client-go/rest"
 )
 
-func New(cfg *rest.Config, sf schema.Factory, authMiddleware auth.Middleware, next http.Handler, routerFunc router.RouterFunc) (http.Handler, error) {
+func New(cfg *rest.Config, sf schema.Factory, authMiddleware auth.Middleware, next http.Handler, routerFunc router.RouterFunc, schemaServer *server.Server) (http.Handler, error) {
 	var (
 		proxy http.Handler
 		err   error
 	)
 
+	if schemaServer == nil {
+		schemaServer = server.DefaultAPIServer()
+	}
+
 	a := &apiServer{
 		sf:     sf,
-		server: server.DefaultAPIServer(),
+		server: schemaServer,
 	}
 	a.server.AccessControl = accesscontrol.NewAccessControl()
 
