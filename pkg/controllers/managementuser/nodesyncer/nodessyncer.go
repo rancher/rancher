@@ -12,6 +12,7 @@ import (
 	cond "github.com/rancher/norman/condition"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	kd "github.com/rancher/rancher/pkg/controllers/management/kontainerdrivermetadata"
+	"github.com/rancher/rancher/pkg/controllers/management/secretmigrator"
 	"github.com/rancher/rancher/pkg/controllers/managementagent/podresources"
 	"github.com/rancher/rancher/pkg/controllers/managementlegacy/compose/common"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
@@ -55,6 +56,7 @@ type nodesSyncer struct {
 	serviceOptions       v3.RkeK8sServiceOptionInterface
 	sysImagesLister      v3.RkeK8sSystemImageLister
 	sysImages            v3.RkeK8sSystemImageInterface
+	secretLister         v1.SecretLister
 }
 
 type nodeDrain struct {
@@ -85,6 +87,7 @@ func Register(ctx context.Context, cluster *config.UserContext, kubeConfigGetter
 		serviceOptions:       cluster.Management.Management.RkeK8sServiceOptions(""),
 		sysImagesLister:      cluster.Management.Management.RkeK8sSystemImages("").Controller().Lister(),
 		sysImages:            cluster.Management.Management.RkeK8sSystemImages(""),
+		secretLister:         cluster.Management.Core.Secrets("").Controller().Lister(),
 	}
 
 	n := &nodeSyncer{
@@ -335,7 +338,11 @@ func (m *nodesSyncer) getNodePlan(node *v3.Node) (rketypes.RKEConfigNodePlan, er
 		return rketypes.RKEConfigNodePlan{}, err
 	}
 
-	plan, err := librke.New().GeneratePlan(context.Background(), cluster.Status.AppliedSpec.RancherKubernetesEngineConfig, dockerInfo, svcOptions)
+	appliedSpec, err := secretmigrator.AssemblePrivateRegistryCredential(cluster, cluster.Status.AppliedSpec, m.secretLister)
+	if err != nil {
+		return rketypes.RKEConfigNodePlan{}, err
+	}
+	plan, err := librke.New().GeneratePlan(context.Background(), appliedSpec.RancherKubernetesEngineConfig, dockerInfo, svcOptions)
 	if err != nil {
 		return rketypes.RKEConfigNodePlan{}, err
 	}
