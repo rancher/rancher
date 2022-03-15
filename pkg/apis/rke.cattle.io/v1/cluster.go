@@ -90,7 +90,7 @@ type DrainOptions struct {
 }
 
 type DrainHook struct {
-	// Annotation This annotation will need to be populated on the capi.Machine with the value from the annotation
+	// Annotation This annotation will need to be populated on the machine-plan secret with the value from the annotation
 	// "rke.cattle.io/pre-drain" before the planner will continue with drain the specific node.  The annotation
 	// "rke.cattle.io/pre-drain" is used for pre-drain and "rke.cattle.io/post-drain" is used for post drain.
 	Annotation string `json:"annotation,omitempty"`

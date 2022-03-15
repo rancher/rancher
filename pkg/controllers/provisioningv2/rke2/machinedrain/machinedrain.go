@@ -117,14 +117,13 @@ func (h *handler) unDrain(secret *corev1.Secret, machine *capi.Machine, drainDat
 		return secret, err
 	}
 
+	checkPostDrainHooks := checkHookAnnotations(drainData, drainOpts.PostDrainHooks)
 	if len(drainOpts.PostDrainHooks) > 0 {
-		if secret.Annotations[rke2.PostDrainAnnotation] != drainData {
-			return h.updateSecretAnnotation(secret, rke2.PostDrainAnnotation, drainData)
-		}
-		for _, hook := range drainOpts.PostDrainHooks {
-			if hook.Annotation != "" && secret.Annotations[hook.Annotation] != drainData {
-				return secret, nil
-			}
+		postDrainAnnDoesNotHaveValue := secretAnnotationDoesNotHaveValue(rke2.PostDrainAnnotation, drainData)
+		if postDrainAnnDoesNotHaveValue(secret) {
+			return h.updateSecretAnnotationIfCheckTrue(secret, rke2.PostDrainAnnotation, drainData, postDrainAnnDoesNotHaveValue)
+		} else if !checkPostDrainHooks(secret) {
+			return secret, nil
 		}
 	}
 
@@ -138,19 +137,7 @@ func (h *handler) unDrain(secret *corev1.Secret, machine *capi.Machine, drainDat
 	}
 
 	// Drain/Undrain operations are done so clear all annotations involved
-	secret = secret.DeepCopy()
-	delete(secret.Annotations, rke2.PreDrainAnnotation)
-	delete(secret.Annotations, rke2.PostDrainAnnotation)
-	delete(secret.Annotations, rke2.DrainAnnotation)
-	delete(secret.Annotations, rke2.DrainDoneAnnotation)
-	delete(secret.Annotations, rke2.UnCordonAnnotation)
-	for _, hook := range drainOpts.PreDrainHooks {
-		delete(secret.Annotations, hook.Annotation)
-	}
-	for _, hook := range drainOpts.PostDrainHooks {
-		delete(secret.Annotations, hook.Annotation)
-	}
-	return h.secrets.Update(secret)
+	return h.cleanSecretAnnotationsIfCheckTrue(secret, drainOpts, checkPostDrainHooks)
 }
 
 func (h *handler) drain(secret *corev1.Secret, machine *capi.Machine, drainData string) (*corev1.Secret, error) {
@@ -163,14 +150,13 @@ func (h *handler) drain(secret *corev1.Secret, machine *capi.Machine, drainData 
 		return secret, err
 	}
 
+	checkPreDrainHooks := checkHookAnnotations(drainData, drainOpts.PreDrainHooks)
 	if len(drainOpts.PreDrainHooks) > 0 {
-		if secret.Annotations[rke2.PreDrainAnnotation] != drainData {
-			return h.updateSecretAnnotation(secret, rke2.PreDrainAnnotation, drainData)
-		}
-		for _, hook := range drainOpts.PreDrainHooks {
-			if hook.Annotation != "" && secret.Annotations[hook.Annotation] != drainData {
-				return secret, nil
-			}
+		preDrainAnnDoesNotHaveValue := secretAnnotationDoesNotHaveValue(rke2.PreDrainAnnotation, drainData)
+		if preDrainAnnDoesNotHaveValue(secret) {
+			return h.updateSecretAnnotationIfCheckTrue(secret, rke2.PreDrainAnnotation, drainData, preDrainAnnDoesNotHaveValue)
+		} else if !checkPreDrainHooks(secret) {
+			return secret, nil
 		}
 	}
 
@@ -180,7 +166,7 @@ func (h *handler) drain(secret *corev1.Secret, machine *capi.Machine, drainData 
 		}
 	}
 
-	return h.updateSecretAnnotation(secret, rke2.DrainDoneAnnotation, drainData)
+	return h.updateSecretAnnotationIfCheckTrue(secret, rke2.DrainDoneAnnotation, drainData, checkPreDrainHooks)
 }
 
 func (h *handler) cordon(machine *capi.Machine, drainOpts *rkev1.DrainOptions) error {
@@ -242,11 +228,12 @@ func (h *handler) performDrain(machine *capi.Machine, drainOpts *rkev1.DrainOpti
 	return drain.RunNodeDrain(helper, node.Name)
 }
 
-func (h *handler) updateSecretAnnotation(secret *corev1.Secret, annotation, value string) (*corev1.Secret, error) {
+func (h *handler) updateSecretAnnotationIfCheckTrue(secret *corev1.Secret, annotation, value string, check func(*corev1.Secret) bool) (*corev1.Secret, error) {
 	var err error
 	return secret, retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		secret, err = h.secrets.Get(secret.Namespace, secret.Name, metav1.GetOptions{})
-		if err != nil || secret.Annotations[annotation] == value {
+		// If there is an error, the check function passes, or the annotation is already set, then return.
+		if err != nil || !check(secret) || secret.Annotations[annotation] == value {
 			return err
 		}
 		secret = secret.DeepCopy()
@@ -254,4 +241,46 @@ func (h *handler) updateSecretAnnotation(secret *corev1.Secret, annotation, valu
 		_, err = h.secrets.Update(secret)
 		return err
 	})
+}
+
+func (h *handler) cleanSecretAnnotationsIfCheckTrue(secret *corev1.Secret, drainOpts rkev1.DrainOptions, check func(*corev1.Secret) bool) (*corev1.Secret, error) {
+	var err error
+	return secret, retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		secret, err = h.secrets.Get(secret.Namespace, secret.Name, metav1.GetOptions{})
+		// If there is an error, the check function passes, or the annotation is already set, then return.
+		if err != nil || !check(secret) {
+			return err
+		}
+		secret = secret.DeepCopy()
+		delete(secret.Annotations, rke2.PreDrainAnnotation)
+		delete(secret.Annotations, rke2.PostDrainAnnotation)
+		delete(secret.Annotations, rke2.DrainAnnotation)
+		delete(secret.Annotations, rke2.DrainDoneAnnotation)
+		delete(secret.Annotations, rke2.UnCordonAnnotation)
+		for _, hook := range drainOpts.PreDrainHooks {
+			delete(secret.Annotations, hook.Annotation)
+		}
+		for _, hook := range drainOpts.PostDrainHooks {
+			delete(secret.Annotations, hook.Annotation)
+		}
+		_, err = h.secrets.Update(secret)
+		return err
+	})
+}
+
+func secretAnnotationDoesNotHaveValue(annotation, value string) func(*corev1.Secret) bool {
+	return func(secret *corev1.Secret) bool {
+		return secret.Annotations[annotation] != value
+	}
+}
+
+func checkHookAnnotations(drainData string, hooks []rkev1.DrainHook) func(secret *corev1.Secret) bool {
+	return func(secret *corev1.Secret) bool {
+		for _, hook := range hooks {
+			if hook.Annotation != "" && secret.Annotations[hook.Annotation] != drainData {
+				return false
+			}
+		}
+		return true
+	}
 }
