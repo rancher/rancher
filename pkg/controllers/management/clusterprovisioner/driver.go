@@ -23,7 +23,7 @@ func (p *Provisioner) driverCreate(cluster *v3.Cluster, spec v32.ClusterSpec) (a
 	defer logger.Close()
 
 	spec = cleanRKE(spec)
-	spec, err = p.assembleCreds(cluster, spec)
+	spec, err = secretmigrator.AssembleRKEConfigSpec(cluster, spec, p.SecretLister)
 	if err != nil {
 		return "", "", "", err
 	}
@@ -74,7 +74,7 @@ func (p *Provisioner) driverUpdate(cluster *v3.Cluster, spec v32.ClusterSpec) (a
 		cluster.Spec.RancherKubernetesEngineConfig.Services.Etcd.Snapshot = &_false
 	}
 
-	spec, err = p.assembleCreds(cluster, spec)
+	spec, err = secretmigrator.AssembleRKEConfigSpec(cluster, spec, p.SecretLister)
 	if err != nil {
 		return "", "", "", false, err
 	}
@@ -123,7 +123,7 @@ func (p *Provisioner) driverRestore(cluster *v3.Cluster, spec v32.ClusterSpec, s
 	defer logger.Close()
 
 	spec = cleanRKE(spec)
-	spec, err := p.assembleCreds(cluster, spec)
+	spec, err := secretmigrator.AssembleRKEConfigSpec(cluster, spec, p.SecretLister)
 	if err != nil {
 		return "", "", "", err
 	}
@@ -168,38 +168,6 @@ func (p *Provisioner) removeLegacyServiceAccount(cluster *v3.Cluster, spec v32.C
 	}
 
 	return p.engineService.RemoveLegacyServiceAccount(ctx, cluster.Name, kontainerDriver, spec)
-}
-
-func (p *Provisioner) assembleCreds(cluster *v3.Cluster, spec v32.ClusterSpec) (v32.ClusterSpec, error) {
-	spec, err := secretmigrator.AssembleS3Credential(cluster, spec, p.SecretLister)
-	if err != nil {
-		return spec, err
-	}
-	spec, err = secretmigrator.AssemblePrivateRegistryCredential(cluster, spec, p.SecretLister)
-	if err != nil {
-		return spec, err
-	}
-	spec, err = secretmigrator.AssembleWeaveCredential(cluster, spec, p.SecretLister)
-	if err != nil {
-		return spec, err
-	}
-	spec, err = secretmigrator.AssembleVsphereGlobalCredential(cluster, spec, p.SecretLister)
-	if err != nil {
-		return spec, err
-	}
-	spec, err = secretmigrator.AssembleVsphereVirtualCenterCredential(cluster, spec, p.SecretLister)
-	if err != nil {
-		return spec, err
-	}
-	spec, err = secretmigrator.AssembleOpenStackCredential(cluster, spec, p.SecretLister)
-	if err != nil {
-		return spec, err
-	}
-	spec, err = secretmigrator.AssembleAADClientSecretCredential(cluster, spec, p.SecretLister)
-	if err != nil {
-		return spec, err
-	}
-	return secretmigrator.AssembleAADCertCredential(cluster, spec, p.SecretLister)
 }
 
 func cleanRKE(spec v32.ClusterSpec) v32.ClusterSpec {
