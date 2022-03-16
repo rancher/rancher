@@ -210,6 +210,7 @@ RUN mkdir -p /usr/share/rancher/ui && \
     curl -sfL https://github.com/rancher/system-agent/releases/download/${CATTLE_SYSTEM_AGENT_VERSION}/rancher-system-agent-s390x -O && \
     curl -sfL https://github.com/rancher/system-agent/releases/download/${CATTLE_SYSTEM_AGENT_VERSION}/install.sh -o system-agent-install.sh && \
     curl -sfL https://raw.githubusercontent.com/rancher/rke2/master/windows/rke2-install.ps1 -o rke2-install.ps1 && \
+    curl -sfL https://github.com/rancher/wins/releases/download/${CATTLE_WINS_AGENT_VERSION}/wins.exe -O && \
     curl -sfL https://raw.githubusercontent.com/rancher/wins/main/install.ps1 -o wins-agent-install.ps1
 
 ENV CATTLE_CLI_URL_DARWIN  https://releases.rancher.com/cli2/${CATTLE_CLI_VERSION}/rancher-darwin-amd64-${CATTLE_CLI_VERSION}.tar.gz
