@@ -119,6 +119,17 @@ func WindowsInstallScript(ctx context.Context, token string, envVars []corev1.En
 		}
 	}
 
+	csiProxyURL := settings.CSIProxyAgentURL.Get()
+	csiProxyVersion := "v1.0.0"
+	if settings.CSIProxyAgentVersion.Get() != "" {
+		csiProxyVersion = settings.CSIProxyAgentVersion.Get()
+		if settings.ServerURL.Get() != "" {
+			csiProxyURL = fmt.Sprintf("$env:CSI_PROXY_URL=\"%s/assets/csi-proxy-%%[1]s.tar.gz\"", settings.ServerURL.Get())
+		} else if defaultHost != "" {
+			csiProxyURL = fmt.Sprintf("$env:CSI_PROXY_URL=\"https://%s/assets/csi-proxy-%%[1]s.tar.gz\"", defaultHost)
+		}
+	}
+
 	ca := systemtemplate.CAChecksum()
 	if v, ok := ctx.Value(tls.InternalAPI).(bool); ok && v {
 		ca = systemtemplate.InternalCAChecksum()
@@ -150,11 +161,11 @@ func WindowsInstallScript(ctx context.Context, token string, envVars []corev1.En
 %s
 
 # Enables CSI Proxy
-$env:CSI_PROXY_URL = "https://acs-mirror.azureedge.net/csi-proxy/%%[1]s/binaries/csi-proxy-%%[1]s.tar.gz"
-$env:CSI_PROXY_VERSION = "v1.0.0"
+$env:CSI_PROXY_URL = "%s"
+$env:CSI_PROXY_VERSION = "%s"
 $env:CSI_PROXY_KUBELET_PATH = "C:/var/lib/rancher/rke2/bin/kubelet.exe"
 
 Invoke-WinsInstaller @PSBoundParameters
 exit 0
-`, data, envVarBuf.String(), binaryURL, server, ca, token)), nil
+`, data, envVarBuf.String(), binaryURL, server, ca, token, csiProxyURL, csiProxyVersion)), nil
 }
