@@ -10,15 +10,18 @@ import (
 	v3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	rancherversion "github.com/rancher/rancher/pkg/version"
 	"github.com/rancher/rancher/pkg/wrangler"
+	"github.com/rancher/wrangler/pkg/data"
+	"github.com/rancher/wrangler/pkg/data/convert"
 	controllerapiextv1 "github.com/rancher/wrangler/pkg/generated/controllers/apiextensions.k8s.io/v1"
 	controllerv1 "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
-	"github.com/rancher/wrangler/pkg/unstructured"
+	"github.com/rancher/wrangler/pkg/summary"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/mod/semver"
 	v1 "k8s.io/api/core/v1"
 	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	k8serror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/util/retry"
@@ -389,35 +392,17 @@ func migrateCAPIMachineLabelsAndAnnotationsToPlanSecret(w *wrangler.Context) err
 							return err
 						}
 
-						unstr, err := unstructured.ToUnstructured(infraMachine)
+						d, err := data.Convert(infraMachine.DeepCopyObject())
 						if err != nil {
 							return err
 						}
 
-						if !rke2.Ready.IsTrue(unstr) {
-							rke2.Ready.True(unstr)
-							_, err = w.Dynamic.Update(unstr)
-						}
-						return err
-					}); err != nil {
-						return err
-					}
-				}
-
-				if machine.Annotations[capi.ClusterLabelName] == "" || machine.Annotations[rke2.ClusterNameLabel] == "" {
-					if err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
-						machine, err := w.CAPI.Machine().Get(machine.Namespace, machine.Name, metav1.GetOptions{})
-						if err != nil {
+						if changed, err := insertOrUpdateCondition(d, summary.NewCondition("Ready", "True", "", "")); err != nil {
+							return err
+						} else if changed {
+							_, err = w.Dynamic.Update(&unstructured.Unstructured{Object: d})
 							return err
 						}
-
-						machine = machine.DeepCopy()
-						if machine.Annotations == nil {
-							machine.Annotations = make(map[string]string)
-						}
-						machine.Annotations[capi.ClusterLabelName] = provCluster.Name
-						machine.Annotations[rke2.ClusterNameLabel] = provCluster.Name
-						_, err = w.CAPI.Machine().Update(machine)
 						return err
 					}); err != nil {
 						return err
@@ -429,4 +414,41 @@ func migrateCAPIMachineLabelsAndAnnotationsToPlanSecret(w *wrangler.Context) err
 
 	cm.Data[capiMigratedKey] = "true"
 	return createOrUpdateConfigMap(w.Core.ConfigMap(), cm)
+}
+
+func insertOrUpdateCondition(d data.Object, desiredCondition summary.Condition) (bool, error) {
+	for _, cond := range summary.GetUnstructuredConditions(d) {
+		if desiredCondition.Equals(cond) {
+			return false, nil
+		}
+	}
+
+	// The conditions must be converted to a map so that DeepCopyJSONValue will
+	// recognize it as a map instead of a data.Object.
+	newCond, err := convert.EncodeToMap(desiredCondition.Object)
+	if err != nil {
+		return false, err
+	}
+
+	dConditions := d.Slice("status", "conditions")
+	conditions := make([]interface{}, len(dConditions))
+	found := false
+	for i, cond := range dConditions {
+		if cond.String("type") == desiredCondition.Type() {
+			conditions[i] = newCond
+			found = true
+		} else {
+			conditions[i], err = convert.EncodeToMap(cond)
+			if err != nil {
+				return false, err
+			}
+		}
+	}
+
+	if !found {
+		conditions = append(conditions, newCond)
+	}
+	d.SetNested(conditions, "status", "conditions")
+
+	return true, nil
 }
