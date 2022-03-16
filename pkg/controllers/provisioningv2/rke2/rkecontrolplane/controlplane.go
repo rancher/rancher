@@ -87,9 +87,17 @@ func (h *handler) doRemove(obj *rkev1.RKEControlPlane) func() (string, error) {
 			return "", err
 		}
 
+		// Some machines may not have gotten the CAPI cluster-name label in previous versions in Rancher.
+		// Because of update issues with the conversion webhook in rancher-webhook, we can't use a "migration" to add the label (it will fail because the conversion webhook is not available).
+		// In addition, there is no way to "or" label selectors in the API, so we need to do this manually.
+		otherMachines, err := h.machineCache.List(obj.Namespace, labels.SelectorFromSet(labels.Set{rke2.ClusterNameLabel: obj.Name, rke2.ControlPlaneRoleLabel: "true"}))
+		if err != nil {
+			return "", err
+		}
+
 		logrus.Debugf("[rkecontrolplane] (%s/%s) listed %d machines during removal", obj.Namespace, obj.Name, len(machines))
 		logrus.Tracef("[rkecontrolplane] (%s/%s) machine list: %+v", obj.Namespace, obj.Name, machines)
 
-		return rke2.GetMachineDeletionStatus(machines)
+		return rke2.GetMachineDeletionStatus(append(machines, otherMachines...))
 	}
 }
