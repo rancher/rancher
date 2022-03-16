@@ -113,9 +113,9 @@ func WindowsInstallScript(ctx context.Context, token string, envVars []corev1.En
 	binaryURL := ""
 	if settings.WinsAgentVersion.Get() != "" {
 		if settings.ServerURL.Get() != "" {
-			binaryURL = fmt.Sprintf("CATTLE_AGENT_BINARY_BASE_URL=\"%s/assets\"", settings.ServerURL.Get())
+			binaryURL = fmt.Sprintf("$env:CATTLE_AGENT_BINARY_BASE_URL=\"%s/assets\"", settings.ServerURL.Get())
 		} else if defaultHost != "" {
-			binaryURL = fmt.Sprintf("CATTLE_AGENT_BINARY_BASE_URL=\"https://%s/assets\"", defaultHost)
+			binaryURL = fmt.Sprintf("$env:CATTLE_AGENT_BINARY_BASE_URL=\"https://%s/assets\"", defaultHost)
 		}
 	}
 

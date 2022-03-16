@@ -32,6 +32,22 @@ func TestSystemAgentVersion(t *testing.T) {
 	assert.True(t, setting.Value == os.Getenv("CATTLE_SYSTEM_AGENT_VERSION"))
 }
 
+func TestWinsAgentVersion(t *testing.T) {
+	clients, err := clients.New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer clients.Close()
+
+	setting, err := clients.Mgmt.Setting().Get("wins-agent-version", metav1.GetOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.NotEmpty(t, setting.Value)
+	assert.True(t, setting.Value == os.Getenv("CATTLE_WINS_AGENT_VERSION"))
+}
+
 func TestCustomOneNode(t *testing.T) {
 	if strings.ToLower(os.Getenv("DIST")) == "rke2" {
 		t.Skip()
