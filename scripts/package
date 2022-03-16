@@ -15,6 +15,9 @@ cd $(dirname $0)/../package
 
 cp ../bin/rancher.yaml ../bin/rancher-namespace.yaml ../bin/rancher ../bin/agent ../bin/data.json ../bin/k3s-airgap-images.tar .
 
+# Make sure the used data.json is a release artifact
+cp ../bin/data.json ../bin/rancher-data.json
+
 IMAGE=${REPO}/rancher:${TAG}
 AGENT_IMAGE=${REPO}/rancher-agent:${AGENT_TAG}
 RUNTIME_IMAGE=${REPO}/rancher-runtime:${TAG}
@@ -81,4 +84,5 @@ if [ ${ARCH} == amd64 ]; then
     tar czf rancherd-${ARCH}.tar.gz -C build/rancherd/bundle .
 fi
 
+# Create components file used for pre-release notes
 ../scripts/create-components-file.sh
