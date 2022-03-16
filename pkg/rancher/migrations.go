@@ -400,7 +400,7 @@ func migrateCAPIMachineLabelsAndAnnotationsToPlanSecret(w *wrangler.Context) err
 						if changed, err := insertOrUpdateCondition(d, summary.NewCondition("Ready", "True", "", "")); err != nil {
 							return err
 						} else if changed {
-							_, err = w.Dynamic.Update(&unstructured.Unstructured{Object: d})
+							_, err = w.Dynamic.UpdateStatus(&unstructured.Unstructured{Object: d})
 							return err
 						}
 						return err
