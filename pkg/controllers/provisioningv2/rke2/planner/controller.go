@@ -39,7 +39,7 @@ func Register(ctx context.Context, clients *wrangler.Context, planner *planner.P
 				}}, nil
 			}
 		} else if machine, ok := obj.(*capi.Machine); ok {
-			clusterName := machine.Labels[rke2.ClusterNameLabel]
+			clusterName := machine.Labels[capi.ClusterLabelName]
 			if clusterName != "" {
 				return []relatedresource.Key{{
 					Namespace: machine.Namespace,

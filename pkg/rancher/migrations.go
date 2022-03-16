@@ -12,6 +12,7 @@ import (
 	"github.com/rancher/rancher/pkg/wrangler"
 	controllerapiextv1 "github.com/rancher/wrangler/pkg/generated/controllers/apiextensions.k8s.io/v1"
 	controllerv1 "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
+	"github.com/rancher/wrangler/pkg/unstructured"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/mod/semver"
 	v1 "k8s.io/api/core/v1"
@@ -19,6 +20,7 @@ import (
 	k8serror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/util/retry"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 )
@@ -311,7 +313,14 @@ func migrateCAPIMachineLabelsAndAnnotationsToPlanSecret(w *wrangler.Context) err
 				return err
 			}
 
-			for _, machine := range machines.Items {
+			otherMachines, err := w.CAPI.Machine().List(provCluster.Namespace, metav1.ListOptions{LabelSelector: labels.Set{rke2.ClusterNameLabel: provCluster.Name}.String()})
+			if err != nil {
+				return err
+			}
+
+			allMachines := append(machines.Items, otherMachines.Items...)
+
+			for _, machine := range allMachines {
 				if machine.Spec.Bootstrap.ConfigRef == nil || machine.Spec.Bootstrap.ConfigRef.APIVersion != rke2.RKEAPIVersion {
 					continue
 				}
@@ -360,6 +369,59 @@ func migrateCAPIMachineLabelsAndAnnotationsToPlanSecret(w *wrangler.Context) err
 					return err
 				}); err != nil {
 					return err
+				}
+
+				if machine.Spec.InfrastructureRef.APIVersion == rke2.RKEAPIVersion || machine.Spec.InfrastructureRef.APIVersion == rke2.RKEMachineAPIVersion {
+					gv, err := schema.ParseGroupVersion(machine.Spec.InfrastructureRef.APIVersion)
+					if err != nil {
+						// This error should not occur because RKEAPIVersion and RKEMachineAPIVersion are valid
+						continue
+					}
+
+					gvk := schema.GroupVersionKind{
+						Group:   gv.Group,
+						Version: gv.Version,
+						Kind:    machine.Spec.InfrastructureRef.Kind,
+					}
+					if err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+						infraMachine, err := w.Dynamic.Get(gvk, machine.Spec.InfrastructureRef.Namespace, machine.Spec.InfrastructureRef.Name)
+						if err != nil {
+							return err
+						}
+
+						unstr, err := unstructured.ToUnstructured(infraMachine)
+						if err != nil {
+							return err
+						}
+
+						if !rke2.Ready.IsTrue(unstr) {
+							rke2.Ready.True(unstr)
+							_, err = w.Dynamic.Update(unstr)
+						}
+						return err
+					}); err != nil {
+						return err
+					}
+				}
+
+				if machine.Annotations[capi.ClusterLabelName] == "" || machine.Annotations[rke2.ClusterNameLabel] == "" {
+					if err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+						machine, err := w.CAPI.Machine().Get(machine.Namespace, machine.Name, metav1.GetOptions{})
+						if err != nil {
+							return err
+						}
+
+						machine = machine.DeepCopy()
+						if machine.Annotations == nil {
+							machine.Annotations = make(map[string]string)
+						}
+						machine.Annotations[capi.ClusterLabelName] = provCluster.Name
+						machine.Annotations[rke2.ClusterNameLabel] = provCluster.Name
+						_, err = w.CAPI.Machine().Update(machine)
+						return err
+					}); err != nil {
+						return err
+					}
 				}
 			}
 		}

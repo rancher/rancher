@@ -2,6 +2,8 @@ package planner
 
 import (
 	"encoding/json"
+	"fmt"
+	"strings"
 
 	"github.com/rancher/norman/types/convert"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
@@ -75,6 +77,11 @@ func (p *Planner) drain(oldPlan *plan.NodePlan, newPlan plan.NodePlan, entry *pl
 		return false, p.store.updatePlanSecretLabelsAndAnnotations(entry)
 	}
 
+	if err := checkForDrainError(entry, "draining"); err != nil {
+		// This is the only place true and an error is returned to indicate that draining is ongoing, but there is an error.
+		return true, err
+	}
+
 	return entry.Metadata.Annotations[rke2.DrainDoneAnnotation] == optionString, nil
 }
 
@@ -85,5 +92,21 @@ func (p *Planner) undrain(entry *planEntry) (bool, error) {
 		return false, p.store.updatePlanSecretLabelsAndAnnotations(entry)
 	}
 
+	if err := checkForDrainError(entry, "undraining"); err != nil {
+		// This is the only place true and an error is returned to indicate that undraining is ongoing, but there is an error.
+		return true, err
+	}
+
+	// The annotations will be removed when undrain is done
 	return entry.Metadata.Annotations[rke2.UnCordonAnnotation] == "", nil
+}
+
+// checkForDrainError checks if there is an error in the drain annotations. It ignores errors that contain "error trying to reach service"
+// because these indicate that the cluster is not reachable because the node is restarting or the cattle-cluster-agent is getting rescheduled.
+// These errors are expected during draining and it is not necessary to alert the user about them.
+func checkForDrainError(entry *planEntry, drainStep string) error {
+	if errStr := entry.Metadata.Annotations[rke2.DrainErrorAnnotation]; errStr != "" && !strings.Contains(errStr, "error trying to reach service") {
+		return fmt.Errorf("error %s machine %s: %s", drainStep, entry.Machine.Name, errStr)
+	}
+	return nil
 }

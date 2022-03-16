@@ -34,6 +34,7 @@ const (
 	ControlPlaneRoleLabel     = "rke.cattle.io/control-plane-role"
 	DrainAnnotation           = "rke.cattle.io/drain-options"
 	DrainDoneAnnotation       = "rke.cattle.io/drain-done"
+	DrainErrorAnnotation      = "rke.cattle.io/drain-error"
 	EtcdRoleLabel             = "rke.cattle.io/etcd-role"
 	InitNodeLabel             = "rke.cattle.io/init-node"
 	InitNodeMachineIDLabel    = "rke.cattle.io/init-node-machine-id"

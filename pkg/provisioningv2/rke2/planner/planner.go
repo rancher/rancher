@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Masterminds/semver/v3"
 	"github.com/moby/locker"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
@@ -24,6 +25,7 @@ import (
 	"github.com/rancher/rancher/pkg/provisioningv2/kubeconfig"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/wrangler"
+	"github.com/rancher/wrangler/pkg/condition"
 	corecontrollers "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/pkg/generic"
 	"github.com/rancher/wrangler/pkg/name"
@@ -37,6 +39,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
+	"sigs.k8s.io/cluster-api/util/conditions"
 )
 
 const (
@@ -161,6 +164,91 @@ func New(ctx context.Context, clients *wrangler.Context) *Planner {
 	}
 }
 
+func (p *Planner) applyToMachineCondition(clusterPlan *plan.Plan, machineNames []string, messagePrefix string, messages map[string][]string) error {
+	var waiting bool
+	for _, machineName := range machineNames {
+		machine := clusterPlan.Machines[machineName]
+		if machine == nil {
+			return fmt.Errorf("found unexpected machine %s that is not in cluster plan", machineName)
+		}
+
+		if !condition.Cond(capi.InfrastructureReadyCondition).IsTrue(machine) {
+			// Don't wait for CustomMachines to be ready because the infrastructure should be ready.
+			// The CustomMachine is waiting for the providerID to be set which won't happen until the cluster is bootstrapped.
+			if clusterPlan.Machines[machineName].Spec.InfrastructureRef.Kind != "CustomMachine" {
+				waiting = true
+				continue
+			}
+		}
+
+		machine = machine.DeepCopy()
+		if message := messages[machineName]; len(message) > 0 {
+			msg := strings.Join(message, ", ")
+			waiting = true
+			if rke2.Provisioned.GetMessage(machine) == msg {
+				continue
+			}
+			conditions.MarkUnknown(machine, capi.ConditionType(rke2.Provisioned), "Waiting", msg)
+		} else if rke2.Provisioned.IsTrue(machine) {
+			continue
+		} else {
+			// Even though we are technically not waiting for something, an error should be returned so that the planner will retry.
+			// The machine being updated will cause the planner to re-enqueue with the new data.
+			waiting = true
+			conditions.MarkTrue(machine, capi.ConditionType(rke2.Provisioned))
+		}
+
+		if _, err := p.machines.UpdateStatus(machine); err != nil {
+			return err
+		}
+	}
+
+	if waiting {
+		return ErrWaiting(messagePrefix + atMostThree(machineNames) + detailMessage(machineNames, messages))
+	}
+	return nil
+}
+
+func atMostThree(names []string) string {
+	sort.Strings(names)
+	if len(names) > 3 {
+		return fmt.Sprintf("%s and %d more", strings.Join(names[:3], ","), len(names)-3)
+	}
+	return strings.Join(names, ",")
+}
+
+func detailMessage(machines []string, messages map[string][]string) string {
+	if len(machines) != 1 {
+		return ""
+	}
+	message := messages[machines[0]]
+	if len(message) != 0 {
+		return fmt.Sprintf(": %s", strings.Join(message, ", "))
+	}
+	return ""
+}
+
+func removeProvisionedCondition(machine *capi.Machine) *capi.Machine {
+	if machine == nil || len(machine.Status.Conditions) == 0 {
+		return machine
+	}
+
+	conds := make([]capi.Condition, 0, len(machine.Status.Conditions))
+	for _, c := range machine.Status.Conditions {
+		if string(c.Type) != string(rke2.Provisioned) {
+			conds = append(conds, c)
+		}
+	}
+
+	if len(conds) == len(machine.Status.Conditions) {
+		return machine
+	}
+
+	machine = machine.DeepCopy()
+	machine.SetConditions(conds)
+	return machine
+}
+
 func (p *Planner) getCAPICluster(controlPlane *rkev1.RKEControlPlane) (*capi.Cluster, error) {
 	ref := metav1.GetControllerOf(controlPlane)
 	if ref == nil {
@@ -177,10 +265,10 @@ func (p *Planner) getCAPICluster(controlPlane *rkev1.RKEControlPlane) (*capi.Clu
 func (p *Planner) Process(controlPlane *rkev1.RKEControlPlane) error {
 	logrus.Debugf("[planner] rkecluster %s/%s: attempting to lock %s for processing", controlPlane.Namespace, controlPlane.Name, string(controlPlane.UID))
 	p.locker.Lock(string(controlPlane.UID))
-	defer func() error {
-		logrus.Debugf("[planner] rkecluster %s/%s: unlocking %s", controlPlane.Namespace, controlPlane.Name, string(controlPlane.UID))
-		return p.locker.Unlock(string(controlPlane.UID))
-	}()
+	defer func(namespace, name, uid string) error {
+		logrus.Debugf("[planner] rkecluster %s/%s: unlocking %s", namespace, name, uid)
+		return p.locker.Unlock(uid)
+	}(controlPlane.Namespace, controlPlane.Name, string(controlPlane.UID))
 
 	cluster, err := p.getCAPICluster(controlPlane)
 	if err != nil || !cluster.DeletionTimestamp.IsZero() {
@@ -236,8 +324,8 @@ func (p *Planner) Process(controlPlane *rkev1.RKEControlPlane) error {
 	}
 
 	// select all etcd and then filter to just initNodes to that unavailable count is correct
-	err = p.reconcile(controlPlane, clusterSecretTokens, plan, "bootstrap", true, isEtcd, isNotInitNodeOrIsDeleting,
-		controlPlane.Spec.UpgradeStrategy.ControlPlaneConcurrency, "",
+	err = p.reconcile(controlPlane, clusterSecretTokens, plan, true, "bootstrap", isEtcd, isNotInitNodeOrIsDeleting,
+		"1", "",
 		controlPlane.Spec.UpgradeStrategy.ControlPlaneDrainOptions)
 	firstIgnoreError, err = ignoreErrors(firstIgnoreError, err)
 	if err != nil {
@@ -255,15 +343,15 @@ func (p *Planner) Process(controlPlane *rkev1.RKEControlPlane) error {
 		}
 	}
 
-	err = p.reconcile(controlPlane, clusterSecretTokens, plan, "etcd", true, isEtcd, isInitNodeOrDeleting,
-		controlPlane.Spec.UpgradeStrategy.ControlPlaneConcurrency, joinServer,
+	err = p.reconcile(controlPlane, clusterSecretTokens, plan, true, "etcd", isEtcd, isInitNodeOrDeleting,
+		"1", joinServer,
 		controlPlane.Spec.UpgradeStrategy.ControlPlaneDrainOptions)
 	firstIgnoreError, err = ignoreErrors(firstIgnoreError, err)
 	if err != nil {
 		return err
 	}
 
-	err = p.reconcile(controlPlane, clusterSecretTokens, plan, "control plane", true, isControlPlane, isInitNodeOrDeleting,
+	err = p.reconcile(controlPlane, clusterSecretTokens, plan, true, "control plane", isControlPlane, isInitNodeOrDeleting,
 		controlPlane.Spec.UpgradeStrategy.ControlPlaneConcurrency, joinServer,
 		controlPlane.Spec.UpgradeStrategy.ControlPlaneDrainOptions)
 	firstIgnoreError, err = ignoreErrors(firstIgnoreError, err)
@@ -276,7 +364,7 @@ func (p *Planner) Process(controlPlane *rkev1.RKEControlPlane) error {
 		return ErrWaiting("waiting for control plane to be available")
 	}
 
-	err = p.reconcile(controlPlane, clusterSecretTokens, plan, "worker", false, isOnlyWorker, isInitNodeOrDeleting,
+	err = p.reconcile(controlPlane, clusterSecretTokens, plan, false, "worker", isOnlyWorker, isInitNodeOrDeleting,
 		controlPlane.Spec.UpgradeStrategy.WorkerConcurrency, joinServer,
 		controlPlane.Spec.UpgradeStrategy.WorkerDrainOptions)
 	firstIgnoreError, err = ignoreErrors(firstIgnoreError, err)
@@ -368,28 +456,11 @@ func calculateConcurrency(maxUnavailable string, entries []*planEntry, exclude r
 	return int(math.Ceil(max)), unavailable, nil
 }
 
-func detailMessage(messagePrefix string, machines []string, messages map[string]string) string {
-	if len(machines) != 1 {
-		return ""
-	}
-	message := messages[machines[0]]
-	if message != "" {
-		return fmt.Sprintf(":%s %s", messagePrefix, message)
-	}
-	return ""
-}
-
-func (p *Planner) reconcile(controlPlane *rkev1.RKEControlPlane, tokensSecret plan.Secret, clusterPlan *plan.Plan,
-	tierName string,
-	required bool,
-	include, exclude roleFilter, maxUnavailable string, joinServer string, drainOptions rkev1.DrainOptions) error {
+func (p *Planner) reconcile(controlPlane *rkev1.RKEControlPlane, tokensSecret plan.Secret, clusterPlan *plan.Plan, required bool,
+	tierName string, include, exclude roleFilter, maxUnavailable string, joinServer string, drainOptions rkev1.DrainOptions) error {
 	var (
-		outOfSync   []string
-		nonReady    []string
-		errMachines []string
-		draining    []string
-		uncordoned  []string
-		messages    = map[string]string{}
+		ready, outOfSync, nonReady, errMachines, draining, uncordoned []string
+		messages                                                      = map[string][]string{}
 	)
 
 	entries := collect(clusterPlan, include)
@@ -405,7 +476,8 @@ func (p *Planner) reconcile(controlPlane *rkev1.RKEControlPlane, tokensSecret pl
 			continue
 		}
 
-		summary := summary.Summarize(entry.Machine)
+		// The Provisioned and Updated conditions should be removed when summarizing so that the messages are not duplicated.
+		summary := summary.Summarize(removeProvisionedCondition(entry.Machine))
 		if summary.Error {
 			errMachines = append(errMachines, entry.Machine.Name)
 		}
@@ -413,7 +485,11 @@ func (p *Planner) reconcile(controlPlane *rkev1.RKEControlPlane, tokensSecret pl
 			nonReady = append(nonReady, entry.Machine.Name)
 		}
 
-		messages[entry.Machine.Name] = strings.Join(append(summary.Message, getPlanStatusReasonMessage(entry)), ", ")
+		planStatusMessage := getPlanStatusReasonMessage(entry)
+		if planStatusMessage != "" {
+			summary.Message = append(summary.Message, planStatusMessage)
+		}
+		messages[entry.Machine.Name] = summary.Message
 
 		plan, err := p.desiredPlan(controlPlane, tokensSecret, entry, joinServer)
 		if err != nil {
@@ -436,24 +512,47 @@ func (p *Planner) reconcile(controlPlane *rkev1.RKEControlPlane, tokensSecret pl
 				if !isUnavailable(entry) {
 					unavailable++
 				}
-				if ok, err := p.drain(entry.Plan.AppliedPlan, plan, entry, clusterPlan, drainOptions); err != nil {
+				if ok, err := p.drain(entry.Plan.AppliedPlan, plan, entry, clusterPlan, drainOptions); !ok && err != nil {
 					return err
-				} else if ok {
-					if err := p.store.UpdatePlan(entry, plan, 0); err != nil {
+				} else if ok && err == nil {
+					// Drain is done (or didn't need to be done) and there are no errors, so the plan should be updated to enact the reason the node was drained.
+					if err = p.store.UpdatePlan(entry, plan, 0); err != nil {
 						return err
+					} else if entry.Metadata.Annotations[rke2.DrainDoneAnnotation] != "" {
+						messages[entry.Machine.Name] = append(messages[entry.Machine.Name], "drain completed")
+					} else if planStatusMessage == "" {
+						messages[entry.Machine.Name] = append(messages[entry.Machine.Name], "waiting for plan to be applied")
 					}
 				} else {
+					// In this case, it is true that ((ok == true && err != nil) || (ok == false && err == nil))
+					// The first case indicates that there is an error trying to drain the node.
+					// The second case indicates that the node is draining.
 					draining = append(draining, entry.Machine.Name)
+					if err != nil {
+						messages[entry.Machine.Name] = append(messages[entry.Machine.Name], err.Error())
+					} else {
+						messages[entry.Machine.Name] = append(messages[entry.Machine.Name], "draining node")
+					}
 				}
 			}
-		} else if !entry.Plan.InSync || (entry.Machine.Status.NodeInfo != nil && entry.Machine.Status.NodeInfo.KubeletVersion != controlPlane.Spec.KubernetesVersion) {
+		} else if planStatusMessage != "" {
 			outOfSync = append(outOfSync, entry.Machine.Name)
-		} else {
-			if ok, err := p.undrain(entry); err != nil {
-				return err
-			} else if !ok {
-				uncordoned = append(uncordoned, entry.Machine.Name)
+		} else if ok, err := p.undrain(entry); !ok && err != nil {
+			return err
+		} else if !ok || err != nil {
+			// The uncordoning is happening or there was an error.
+			// Either way, the planner should wait for the result and display the message on the machine.
+			uncordoned = append(uncordoned, entry.Machine.Name)
+			if err != nil {
+				messages[entry.Machine.Name] = append(messages[entry.Machine.Name], err.Error())
+			} else {
+				messages[entry.Machine.Name] = append(messages[entry.Machine.Name], "waiting for uncordon to finish")
 			}
+		} else if !kubeletVersionUpToDate(controlPlane, entry.Machine) {
+			outOfSync = append(outOfSync, entry.Machine.Name)
+			messages[entry.Machine.Name] = append(messages[entry.Machine.Name], "waiting for kubelet to update")
+		} else {
+			ready = append(ready, entry.Machine.Name)
 		}
 	}
 
@@ -461,45 +560,62 @@ func (p *Planner) reconcile(controlPlane *rkev1.RKEControlPlane, tokensSecret pl
 		return ErrWaiting("waiting for at least one " + tierName + " node")
 	}
 
-	errMachines = atMostThree(errMachines)
+	// If multiple machines are changing status, then all of their statuses should be updated to avoid having stale conditions.
+	// However, only the first one will be returned so that status goes on the control plane and cluster objects.
+	var firstError error
+	if err := p.applyToMachineCondition(clusterPlan, uncordoned, fmt.Sprintf("uncordoning %s node(s) ", tierName), messages); err != nil && firstError == nil {
+		firstError = err
+	}
+
+	if err := p.applyToMachineCondition(clusterPlan, draining, fmt.Sprintf("draining %s node(s) ", tierName), messages); err != nil && firstError == nil {
+		firstError = err
+	}
+
+	if err := p.applyToMachineCondition(clusterPlan, outOfSync, fmt.Sprintf("provisioning %s node(s) ", tierName), messages); err != nil && firstError == nil {
+		firstError = err
+	}
+
+	// Ensure that the conditions that we control are updated.
+	if err := p.applyToMachineCondition(clusterPlan, ready, "", nil); err != nil && firstError == nil {
+		firstError = err
+	}
+
+	if firstError != nil {
+		return firstError
+	}
+
+	// The messages for these machines come from the machine itself, so nothing needs to be added.
+	// we want these errors to get reported, but not block the process
 	if len(errMachines) > 0 {
-		// we want these errors to get reported, but not block the process
-		return errIgnore("failing " + tierName + " machine(s) " + strings.Join(errMachines, ",") + detailMessage("", errMachines, messages))
+		return errIgnore("failing " + tierName + " machine(s) " + atMostThree(errMachines) + detailMessage(errMachines, messages))
 	}
 
-	outOfSync = atMostThree(outOfSync)
-	if len(outOfSync) > 0 {
-		return ErrWaiting("provisioning " + tierName + " node(s) " + strings.Join(outOfSync, ",") + detailMessage(" waiting for", outOfSync, messages))
-	}
-
-	draining = atMostThree(draining)
-	if len(draining) > 0 {
-		return ErrWaiting("draining " + tierName + " node(s) " + strings.Join(draining, ",") + detailMessage(" waiting for", draining, messages))
-	}
-
-	uncordoned = atMostThree(uncordoned)
-	if len(uncordoned) > 0 {
-		return ErrWaiting("uncordoning " + tierName + " node(s) " + strings.Join(uncordoned, ",") + detailMessage(" waiting for", uncordoned, messages))
-	}
-
-	nonReady = atMostThree(nonReady)
 	if len(nonReady) > 0 {
-		// we want these errors to get reported, but not block the process
-		return errIgnore("non-ready " + tierName + " machine(s) " + strings.Join(nonReady, ",") + detailMessage("", nonReady, messages))
+		return errIgnore("non-ready " + tierName + " machine(s) " + atMostThree(nonReady) + detailMessage(nonReady, messages))
 	}
 
 	return nil
 }
 
-func atMostThree(names []string) []string {
-	if len(names) == 0 {
-		return names
+func kubeletVersionUpToDate(controlPlane *rkev1.RKEControlPlane, machine *capi.Machine) bool {
+	if controlPlane == nil || machine == nil || machine.Status.NodeInfo == nil {
+		// If any of these things are nil, then provisioning is still happening.
+		// Return true so that provisioning is not slowed down.
+		return true
 	}
-	sort.Strings(names)
-	if len(names) > 3 {
-		names = names[:3]
+
+	kubeletVersion, err := semver.NewVersion(strings.TrimPrefix(machine.Status.NodeInfo.KubeletVersion, "v"))
+	if err != nil {
+		return false
 	}
-	return names
+
+	kubernetesVersion, err := semver.NewVersion(strings.TrimPrefix(controlPlane.Spec.KubernetesVersion, "v"))
+	if err != nil {
+		return false
+	}
+
+	// Compare and ignore pre-release and build metadata
+	return kubeletVersion.Major() == kubernetesVersion.Major() && kubeletVersion.Minor() == kubernetesVersion.Minor() && kubeletVersion.Patch() == kubernetesVersion.Patch()
 }
 
 // splitArgKeyVal takes a value and returns a pair (key, value) of the argument, or two empty strings if there was not
