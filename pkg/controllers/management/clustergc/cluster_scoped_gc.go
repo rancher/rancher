@@ -75,13 +75,18 @@ func (c *gcLifecycle) waitForNodeRemoval(cluster *v3.Cluster) error {
 	if err != nil && !errors.IsNotFound(err) {
 		return err
 	}
-
+	var waitForNodeDelete bool
 	for _, n := range nodes {
-		if n.Status.NodeTemplateSpec == nil {
-			logrus.Debugf("[cluster-scoped-gc] cluster %s still has rke1 node %s, checking again to delete in 15s", cluster.Name, n.Name)
-			c.mgmt.Management.Clusters("").Controller().EnqueueAfter(cluster.Namespace, cluster.Name, 15*time.Second)
-			return generic.ErrSkip
+		// trigger the deletion of node for a custom cluster
+		if n.Status.NodeTemplateSpec == nil && n.DeletionTimestamp == nil {
+			_ = c.mgmt.Management.Nodes(n.Namespace).Delete(n.Name, &metav1.DeleteOptions{})
+			waitForNodeDelete = true
 		}
+	}
+	if waitForNodeDelete {
+		logrus.Debugf("[cluster-scoped-gc] custom cluster %s still has rke1 nodes, checking again in 15s", cluster.Name)
+		c.mgmt.Management.Clusters("").Controller().EnqueueAfter(cluster.Namespace, cluster.Name, 15*time.Second)
+		return generic.ErrSkip
 	}
 
 	return nil
