@@ -104,7 +104,7 @@ func LinuxInstallScript(ctx context.Context, token string, envVars []corev1.EnvV
 
 func WindowsInstallScript(ctx context.Context, token string, envVars []corev1.EnvVar, defaultHost string) ([]byte, error) {
 	data, err := installScript(
-		settings.WindowsRke2InstallScript,
+		settings.WinsAgentInstallScript,
 		localWindowsRke2InstallScripts)
 	if err != nil {
 		return nil, err
