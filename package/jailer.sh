@@ -95,7 +95,7 @@ cp -l /bin/sh /opt/jail/$NAME/bin/
 cp -l /bin/rm /opt/jail/$NAME/bin/
 
 # Hard link mkisofs into the jail
-cp -l /usr/bin/mkisofs /opt/jail/$NAME/bin/
+cp -l /usr/bin/mkisofs /opt/jail/$NAME/usr/bin
 
 cd /dev
 # tar copy /dev excluding mqueue and shm
