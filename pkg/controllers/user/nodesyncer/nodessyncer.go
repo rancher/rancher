@@ -9,6 +9,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/rancher/rancher/pkg/controllers/management/compose/common"
+	"github.com/rancher/rancher/pkg/controllers/management/secretmigrator"
 	"github.com/rancher/rancher/pkg/librke"
 	nodehelper "github.com/rancher/rancher/pkg/node"
 	"github.com/rancher/rancher/pkg/systemaccount"
@@ -46,6 +47,7 @@ type nodesSyncer struct {
 	podLister        v1.PodLister
 	clusterNamespace string
 	clusterLister    v3.ClusterLister
+	secretLister     v1.SecretLister
 }
 
 type nodeDrain struct {
@@ -73,6 +75,7 @@ func Register(ctx context.Context, cluster *config.UserContext, kubeConfigGetter
 		nodeClient:       cluster.Core.Nodes(""),
 		podLister:        cluster.Core.Pods("").Controller().Lister(),
 		clusterLister:    cluster.Management.Management.Clusters("").Controller().Lister(),
+		secretLister:     cluster.Management.Core.Secrets("").Controller().Lister(),
 	}
 
 	n := &nodeSyncer{
@@ -319,7 +322,11 @@ func (m *nodesSyncer) getNodePlan(node *v3.Node) (v3.RKEConfigNodePlan, error) {
 		return v3.RKEConfigNodePlan{}, err
 	}
 
-	plan, err := librke.New().GeneratePlan(context.Background(), cluster.Status.AppliedSpec.RancherKubernetesEngineConfig, dockerInfo, map[string]interface{}{})
+	appliedSpec, err := secretmigrator.AssemblePrivateRegistryCredential(cluster, cluster.Status.AppliedSpec, m.secretLister)
+	if err != nil {
+		return v3.RKEConfigNodePlan{}, err
+	}
+	plan, err := librke.New().GeneratePlan(context.Background(), appliedSpec.RancherKubernetesEngineConfig, dockerInfo, map[string]interface{}{})
 	if err != nil {
 		return v3.RKEConfigNodePlan{}, err
 	}
