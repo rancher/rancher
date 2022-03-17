@@ -11,6 +11,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	_ "net/http/pprof"
 	"net/url"
 	"os"
 	"strings"
@@ -28,8 +29,6 @@ import (
 	"github.com/rancher/rancher/pkg/rkenodeconfigclient"
 	"github.com/rancher/remotedialer"
 	"github.com/sirupsen/logrus"
-
-	_ "net/http/pprof"
 )
 
 var (
@@ -57,6 +56,8 @@ func main() {
 
 	if os.Getenv("CLUSTER_CLEANUP") == "true" {
 		err = clean.Cluster()
+	} else if os.Getenv("BINDING_CLEANUP") == "true" {
+		err = clean.OrphanBindings(nil)
 	} else {
 		err = run()
 	}
