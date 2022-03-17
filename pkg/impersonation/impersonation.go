@@ -6,6 +6,7 @@ import (
 	"sort"
 	"time"
 
+	authcommon "github.com/rancher/rancher/pkg/auth/providers/common"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/sirupsen/logrus"
@@ -252,7 +253,7 @@ func (i *Impersonator) rulesForUser() []rbacv1.PolicyRule {
 		})
 	}
 	extras := i.user.GetExtra()
-	if principalids, ok := extras["principalid"]; ok {
+	if principalids, ok := extras[authcommon.UserAttributePrincipalID]; ok {
 		rules = append(rules, rbacv1.PolicyRule{
 			Verbs:         []string{"impersonate"},
 			APIGroups:     []string{"authentication.k8s.io"},
@@ -260,7 +261,7 @@ func (i *Impersonator) rulesForUser() []rbacv1.PolicyRule {
 			ResourceNames: principalids,
 		})
 	}
-	if usernames, ok := extras["username"]; ok {
+	if usernames, ok := extras[authcommon.UserAttributeUserName]; ok {
 		rules = append(rules, rbacv1.PolicyRule{
 			Verbs:         []string{"impersonate"},
 			APIGroups:     []string{"authentication.k8s.io"},
@@ -361,11 +362,21 @@ func (i *Impersonator) getUser(userInfo user.Info) (user.Info, error) {
 	}
 
 	groups := []string{"system:authenticated", "system:cattle:authenticated"}
+	extras := make(map[string][]string)
 	attribs, err := i.userAttributeLister.Get("", userInfo.GetUID())
 	if err != nil && !apierrors.IsNotFound(err) {
 		return &user.DefaultInfo{}, err
 	}
-	if attribs != nil {
+	if attribs == nil { // system users do not have userattributes, but principalid and username are on the user
+		// See https://github.com/rancher/rancher/blob/7ce603ea90ca656f5baa29b0149c19c8d7f73e8f/pkg/auth/requests/authenticate.go#L185-L194
+		// If the extras are not in userattributes, use displayName and principalIDs from the user.
+		if u.DisplayName != "" {
+			extras[authcommon.UserAttributeUserName] = []string{u.DisplayName}
+		}
+		if len(u.PrincipalIDs) > 0 {
+			extras[authcommon.UserAttributePrincipalID] = u.PrincipalIDs
+		}
+	} else { // real users have groups and extras in userattributes
 		for _, gps := range attribs.GroupPrincipals {
 			for _, groupPrincipal := range gps.Items {
 				if !isInList(groupPrincipal.Name, groups) {
@@ -373,17 +384,28 @@ func (i *Impersonator) getUser(userInfo user.Info) (user.Info, error) {
 				}
 			}
 		}
+		for _, exs := range attribs.ExtraByProvider {
+			if usernames, ok := exs[authcommon.UserAttributeUserName]; ok && len(usernames) > 0 {
+				if _, ok := extras[authcommon.UserAttributeUserName]; !ok {
+					extras[authcommon.UserAttributeUserName] = make([]string, 0)
+				}
+				extras[authcommon.UserAttributeUserName] = append(extras[authcommon.UserAttributeUserName], usernames...)
+			}
+			if principalids, ok := exs[authcommon.UserAttributePrincipalID]; ok && len(principalids) > 0 {
+				if _, ok := extras[authcommon.UserAttributePrincipalID]; !ok {
+					extras[authcommon.UserAttributePrincipalID] = make([]string, 0)
+				}
+				extras[authcommon.UserAttributePrincipalID] = append(extras[authcommon.UserAttributePrincipalID], principalids...)
+			}
+		}
 	}
 	// sort to make comparable
 	sort.Strings(groups)
-
-	extras := userInfo.GetExtra()
-	// sort to make comparable
-	if _, ok := extras["username"]; ok {
-		sort.Strings(extras["username"])
+	if _, ok := extras[authcommon.UserAttributeUserName]; ok {
+		sort.Strings(extras[authcommon.UserAttributeUserName])
 	}
-	if _, ok := extras["principalid"]; ok {
-		sort.Strings(extras["principalid"])
+	if _, ok := extras[authcommon.UserAttributePrincipalID]; ok {
+		sort.Strings(extras[authcommon.UserAttributePrincipalID])
 	}
 
 	user := &user.DefaultInfo{
