@@ -2,6 +2,9 @@ package jailer
 
 import (
 	"context"
+	"fmt"
+	"io"
+	"net/http"
 	"os"
 	"os/exec"
 	"path"
@@ -23,6 +26,14 @@ var lock = sync.Mutex{}
 func CreateJail(name string) error {
 	if os.Getenv("CATTLE_DEV_MODE") != "" {
 		return os.MkdirAll(path.Join(BaseJailPath, name), 0700)
+	}
+
+	if os.Getenv("MACHINE_REPO") != "rancher/machine" {
+		err := processCustomMachineTarball()
+		if err != nil {
+			logrus.Debugf("CreateJail: error returned when processing custom machine tarball: %s\n", err)
+			logrus.Debugf("CreateJail: using rancher/machine default version for jail [%s]", name)
+		}
 	}
 
 	logrus.Debugf("CreateJail: called for [%s]", name)
@@ -64,9 +75,9 @@ func CreateJail(name string) error {
 	cmd := exec.CommandContext(ctx, "/usr/bin/jailer.sh", name)
 	out, err := cmd.CombinedOutput()
 	if len(out) > 0 {
-		logrus.Tracef("CreateJail: output from jail script for [%s]: [%v]", name, string(out))
+		logrus.Debugf("CreateJail: output from jail script for [%s]: [%v]", name, string(out))
 	} else {
-		logrus.Tracef("CreateJail: no output from jail script for [%s]", name)
+		logrus.Debugf("CreateJail: no output from jail script for [%s]", name)
 	}
 	if err != nil {
 		if strings.HasSuffix(err.Error(), "signal: killed") {
@@ -93,4 +104,68 @@ func WhitelistEnvvars(envvars []string) []string {
 	}
 
 	return envvars
+}
+
+func downloadCustomMachineTarball(filepath string, url string) (err error) {
+	// Create the tarball
+	out, err := os.Create(filepath)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+
+	resp, err := http.Get(url)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("downloadCustomMachineTarball: bad http status returned when fetching tarball: %s", resp.Status)
+	}
+
+	_, err = io.Copy(out, resp.Body)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func processCustomMachineTarball() error {
+	customMachineVersion := fmt.Sprintf("rancher-machine-%s.tar.gz", os.Getenv("ARCH"))
+	customRepo := os.Getenv("MACHINE_REPO")
+	tarballPath := path.Join(BaseJailPath, customMachineVersion)
+	builtURL := fmt.Sprintf("https://github.com/%s/releases/download/%s/%s", os.Getenv("MACHINE_REPO"), os.Getenv("CATTLE_MACHINE_VERSION"), customMachineVersion)
+	// RUN curl -sLf https://github.com/${MACHINE_REPO}/releases/download/${CATTLE_MACHINE_VERSION}/rancher-machine-${ARCH}.tar.gz | tar xvzf - -C /usr/bin && \
+	err := downloadCustomMachineTarball(tarballPath, builtURL)
+	if err != nil {
+		logrus.Warnf("processCustomMachineTarball: failed to download custom machine tarball [%s] from [%s]", customMachineVersion, customRepo)
+		return err
+	}
+	// TODO: replace with golang native tarball extraction
+	tarArgs := []string{"xvzf", fmt.Sprintf(tarballPath), "-C", "/usr/bin"}
+	extract := exec.Command("tar", tarArgs...)
+	err = extract.Start()
+	if err != nil {
+		logrus.Warnf("processCustomMachineTarball: failed to start custom tarball extraction of %s, returned error: %s", tarballPath, err)
+		return nil
+	}
+	err = extract.Wait()
+	if err != nil {
+		logrus.Warnf("processCustomMachineTarball: failed to extract custom tarball %s, returned error: %s", tarballPath, err)
+		return err
+	}
+	customMachineBinaryPath := "/usr/bin/rancher-machine"
+	machineBinaryDest := fmt.Sprintf("%s/%s", BaseJailPath, "driver-jail/usr/bin/rancher-machine")
+	err = os.Remove(machineBinaryDest)
+	if err != nil {
+		logrus.Warnf("processCustomMachineTarball: failed to delete embedded rancher-machine binary from [%s]", machineBinaryDest)
+		return err
+	}
+	err = os.Link(customMachineBinaryPath, machineBinaryDest)
+	if err != nil {
+		logrus.Warnf("processCustomMachineTarball: failed to link custom rancher-machine binary from [%s] to [%s]", customMachineBinaryPath, machineBinaryDest)
+		return err
+	}
+	return nil
 }
