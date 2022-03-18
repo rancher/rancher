@@ -521,7 +521,7 @@ func (p *Planner) reconcile(controlPlane *rkev1.RKEControlPlane, tokensSecret pl
 					} else if entry.Metadata.Annotations[rke2.DrainDoneAnnotation] != "" {
 						messages[entry.Machine.Name] = append(messages[entry.Machine.Name], "drain completed")
 					} else if planStatusMessage == "" {
-						messages[entry.Machine.Name] = append(messages[entry.Machine.Name], "waiting for plan to be applied")
+						messages[entry.Machine.Name] = append(messages[entry.Machine.Name], WaitingPlanStatusMessage)
 					}
 				} else {
 					// In this case, it is true that ((ok == true && err != nil) || (ok == false && err == nil))
