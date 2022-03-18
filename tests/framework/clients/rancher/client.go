@@ -157,6 +157,19 @@ func (c *Client) WithSession(session *session.Session) (*Client, error) {
 	return NewClient(c.restConfig.BearerToken, session)
 }
 
+// GetClusterCatalogClient is a function that takes a clusterID and instanitates a catalog client to directly communicate with that specific cluster.
+func (c *Client) GetClusterCatalogClient(clusterID string) (*catalog.Client, error) {
+	restConfig := *c.restConfig
+	restConfig.Host = fmt.Sprintf("https://%s/k8s/clusters/%s", c.restConfig.Host, clusterID)
+
+	catalogClient, err := catalog.NewForConfig(&restConfig, c.Session)
+	if err != nil {
+		return nil, err
+	}
+
+	return catalogClient, nil
+}
+
 // GetRancherDynamicClient is a helper function that instantiates a dynamic client to communicate with the rancher host.
 func (c *Client) GetRancherDynamicClient() (dynamic.Interface, error) {
 	dynamic, err := frameworkDynamic.NewForConfig(c.Session, c.restConfig)
@@ -168,9 +181,10 @@ func (c *Client) GetRancherDynamicClient() (dynamic.Interface, error) {
 
 // GetDownStreamClusterClient is a helper function that instantiates a dynamic client to communicate with a specific cluster.
 func (c *Client) GetDownStreamClusterClient(clusterID string) (dynamic.Interface, error) {
-	c.restConfig.Host = fmt.Sprintf("https://%s/k8s/clusters/%s", c.restConfig.Host, clusterID)
+	restConfig := *c.restConfig
+	restConfig.Host = fmt.Sprintf("https://%s/k8s/clusters/%s", c.restConfig.Host, clusterID)
 
-	dynamic, err := frameworkDynamic.NewForConfig(c.Session, c.restConfig)
+	dynamic, err := frameworkDynamic.NewForConfig(c.Session, &restConfig)
 	if err != nil {
 		return nil, err
 	}
