@@ -124,9 +124,9 @@ func WindowsInstallScript(ctx context.Context, token string, envVars []corev1.En
 	if settings.CSIProxyAgentVersion.Get() != "" {
 		csiProxyVersion = settings.CSIProxyAgentVersion.Get()
 		if settings.ServerURL.Get() != "" {
-			csiProxyURL = fmt.Sprintf("$env:CSI_PROXY_URL=\"%s/assets/csi-proxy-%%[1]s.tar.gz\"", settings.ServerURL.Get())
+			csiProxyURL = fmt.Sprintf("%s/assets/csi-proxy-%%[1]s.tar.gz", settings.ServerURL.Get())
 		} else if defaultHost != "" {
-			csiProxyURL = fmt.Sprintf("$env:CSI_PROXY_URL=\"https://%s/assets/csi-proxy-%%[1]s.tar.gz\"", defaultHost)
+			csiProxyURL = fmt.Sprintf("https://%s/assets/csi-proxy-%%[1]s.tar.gz", defaultHost)
 		}
 	}
 
