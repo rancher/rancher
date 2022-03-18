@@ -14,7 +14,8 @@ from .test_create_ha import (
     set_url_and_password,
     RANCHER_HA_CERT_OPTION,
     RANCHER_VALID_TLS_CERT,
-    RANCHER_VALID_TLS_KEY
+    RANCHER_VALID_TLS_KEY,
+    KUBERNETES_VERSION
 )
 from lib.aws import AWS_USER
 
@@ -259,7 +260,10 @@ def setup_airgap_rancher(bastion_node, number_of_nodes=NUMBER_OF_INSTANCES):
               number_of_nodes)
     ag_nodes = prepare_airgap_node(bastion_node, number_of_nodes)
     # create RKE config based on number of nodes
-    rke_template_node = "nodes:"
+    rke_template_node = ""
+    if KUBERNETES_VERSION:
+        rke_template_node = f'kubernetes_version: {KUBERNETES_VERSION}\n'
+    rke_template_node += "nodes:"
     with open(RESOURCE_DIR+'/airgap/config_yamls/config_body.yaml') as f2:
         rke_template_node_body = f2.read()
 
@@ -272,7 +276,7 @@ def setup_airgap_rancher(bastion_node, number_of_nodes=NUMBER_OF_INSTANCES):
     rke_template_node +=\
         rke_template_node_end.format(REGISTRY_HOSTNAME)
     # write config, and run rke up
-    print("RKE Template: \n", rke_template_node)
+    print(f'RKE Template:\n{rke_template_node}')
     bastion_node.execute_command(
         "echo '{}' > config.yaml".format(rke_template_node))
     bastion_node.execute_command(
