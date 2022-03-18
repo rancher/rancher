@@ -8,12 +8,15 @@ import (
 
 	"github.com/rancher/rancher/pkg/agent/clean"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	util "github.com/rancher/rancher/pkg/cluster"
 	"github.com/rancher/rancher/pkg/dialer"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/batch/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/kubectl"
+	"github.com/rancher/rancher/pkg/namespace"
 	nodehelper "github.com/rancher/rancher/pkg/node"
 	"github.com/rancher/rancher/pkg/settings"
+	"github.com/rancher/rancher/pkg/systemtemplate"
 	"github.com/rancher/rancher/pkg/types/config"
 	rketypes "github.com/rancher/rke/types"
 	"github.com/sirupsen/logrus"
@@ -153,7 +156,7 @@ func (m *Lifecycle) cleanRKENode(node *v3.Node) error {
 		return nil
 	}
 
-	job, err := m.createCleanupJob(userContext, node)
+	job, err := m.createCleanupJob(userContext, cluster, node)
 	if err != nil {
 		return err
 	}
@@ -204,7 +207,7 @@ func (m *Lifecycle) waitUntilJobCompletes(userContext *config.UserContext, job *
 	return userContext.K8sClient.BatchV1().Jobs(job.Namespace).Delete(m.ctx, job.Name, metav1.DeleteOptions{PropagationPolicy: &[]metav1.DeletionPropagation{metav1.DeletePropagationForeground}[0]})
 }
 
-func (m *Lifecycle) createCleanupJob(userContext *config.UserContext, node *v3.Node) (*batchV1.Job, error) {
+func (m *Lifecycle) createCleanupJob(userContext *config.UserContext, cluster *v3.Cluster, node *v3.Node) (*batchV1.Job, error) {
 	nodeLabel := "cattle.io/node"
 
 	// find if someone else already kicked this job off
@@ -234,13 +237,6 @@ func (m *Lifecycle) createCleanupJob(userContext *config.UserContext, node *v3.N
 			"cattle.io/creator": "norman",
 			nodeLabel:           node.Name,
 		},
-	}
-
-	cluster, err := m.clusterLister.Get("", node.Namespace)
-	if err != nil {
-		if !kerror.IsNotFound(err) {
-			return nil, err
-		}
 	}
 
 	var tolerations []coreV1.Toleration
@@ -308,6 +304,18 @@ func (m *Lifecycle) createCleanupJob(userContext *config.UserContext, node *v3.N
 		)
 	}
 
+	var imagePullSecrets []coreV1.LocalObjectReference
+	if cluster.Status.PrivateRegistrySecret != "" {
+		privateRegistries, err := m.credLister.Get(namespace.GlobalNamespace, cluster.Status.PrivateRegistrySecret)
+		if err != nil {
+			return nil, err
+		} else if url, err := util.GeneratePrivateRegistryDockerConfig(util.GetPrivateRepo(cluster), privateRegistries); err != nil {
+			return nil, err
+		} else if url != "" {
+			imagePullSecrets = append(imagePullSecrets, coreV1.LocalObjectReference{Name: "cattle-private-registry"})
+		}
+	}
+
 	fiveMin := int32(5 * 60)
 	job := batchV1.Job{
 		ObjectMeta: meta,
@@ -315,7 +323,8 @@ func (m *Lifecycle) createCleanupJob(userContext *config.UserContext, node *v3.N
 			TTLSecondsAfterFinished: &fiveMin,
 			Template: coreV1.PodTemplateSpec{
 				Spec: coreV1.PodSpec{
-					RestartPolicy: "Never",
+					ImagePullSecrets: imagePullSecrets,
+					RestartPolicy:    "Never",
 					NodeSelector: map[string]string{
 						"kubernetes.io/hostname": node.Status.NodeName,
 					},
@@ -324,7 +333,7 @@ func (m *Lifecycle) createCleanupJob(userContext *config.UserContext, node *v3.N
 					Containers: []coreV1.Container{
 						{
 							Name:            clean.NodeCleanupContainerName,
-							Image:           settings.AgentImage.Get(),
+							Image:           systemtemplate.GetDesiredAgentImage(cluster),
 							Args:            []string{"--", "agent", "clean", "job"},
 							Env:             env,
 							VolumeMounts:    mounts,
