@@ -549,6 +549,7 @@ github.com/globalsign/mgo v0.0.0-20181015135952-eeefdecb41b8/go.mod h1:xkRDCp4j0
 github.com/go-asn1-ber/asn1-ber v1.5.1/go.mod h1:hEBeB/ic+5LoWskz+yKT7vGhhPYkProFKoKdwZRWMe0=
 github.com/go-asn1-ber/asn1-ber v1.5.3 h1:u7utq56RUFiynqUzgVMFDymapcOtQ/MZkh3H4QYkxag=
 github.com/go-asn1-ber/asn1-ber v1.5.3/go.mod h1:hEBeB/ic+5LoWskz+yKT7vGhhPYkProFKoKdwZRWMe0=
+github.com/go-bindata/go-bindata v3.1.2+incompatible h1:5vjJMVhowQdPzjE1LdxyFF7YFTXg5IgGVW4gBr5IbvE=
 github.com/go-bindata/go-bindata v3.1.2+incompatible/go.mod h1:xK8Dsgwmeed+BBsSy2XTopBn/8uK2HWuGSnA11C3Joo=
 github.com/go-errors/errors v1.0.1 h1:LUHzmkK3GUKUrL/1gfBUxAHzcev3apQlezX/+O7ma6w=
 github.com/go-errors/errors v1.0.1/go.mod h1:f4zRHt4oKfwPJE5k8C9vpYG+aDHdBFUsgrm6/TyX73Q=
@@ -1287,6 +1288,8 @@ github.com/rancher/remotedialer v0.2.6-0.20220120012928-4ea2198e0966 h1:AQPsdOLQ
 github.com/rancher/remotedialer v0.2.6-0.20220120012928-4ea2198e0966/go.mod h1:vq3LvyOFnLcwMiCE1KdW3foPd6g5kAjZOtOb7JqGHck=
 github.com/rancher/rke v1.3.8-rc9 h1:gf7zVNdOF6iIYLXvqE1t+3jmUsxGAQ2FOS1kavuL+qc=
 github.com/rancher/rke v1.3.8-rc9/go.mod h1:J5SV4k4RNHLqtDZbTm+xByz2k4j3nCdaDUgCJNTxJDo=
+github.com/rancher/rke v1.3.8-rc9.0.20220319025149-af90f70484e3 h1:PL4vMeZhFgfVMmBPYaVqCZCuSmCP04AFHMzSWZucgpk=
+github.com/rancher/rke v1.3.8-rc9.0.20220319025149-af90f70484e3/go.mod h1:J5SV4k4RNHLqtDZbTm+xByz2k4j3nCdaDUgCJNTxJDo=
 github.com/rancher/security-scan v0.1.7-0.20200222041501-f7377f127168 h1:SIshhsz0O71FYyyDmjUmbFGvmgp4ASm8J1zmhMK/UG0=
 github.com/rancher/security-scan v0.1.7-0.20200222041501-f7377f127168/go.mod h1:WlLAocVyVQs5J8r0IiQXsp0ajVZO6hYi/Vo6zxjo73s=
 github.com/rancher/steve v0.0.0-20220218171307-a91d90251ffa h1:i5Ngo1K9sv0MACsy9lqYreSiW/VqC1qz81ZGizeGUB8=
