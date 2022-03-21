@@ -244,11 +244,14 @@ rke_config_cis_1_5 = {
         "kubeController": {
             "extraArgs": {
                 "feature-gates": "RotateKubeletServerCertificate=true",
+                 "bind-address": "127.0.0.1"
             },
         },
         "scheduler": {
             "image": "",
-            "extraArgs": {},
+            "extraArgs": {
+                "bind-address": "127.0.0.1"
+            },
             "extraBinds": [],
             "extraEnv": []
         },
