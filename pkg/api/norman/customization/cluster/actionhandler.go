@@ -53,13 +53,13 @@ func canUpdateClusterWithValues(apiContext *types.APIContext, values map[string]
 	return apiContext.AccessControl.CanDo(v3.ClusterGroupVersionKind.Group, v3.ClusterResource.Name, "update", apiContext, values, apiContext.Schema) == nil
 }
 
-func canBackupEtcd(apiContext *types.APIContext) bool {
+func canBackupEtcd(apiContext *types.APIContext, namespace string) bool {
 	if apiContext == nil {
 		return false
 	}
 	etcdBackupSchema := types.Schema{ID: mgmtclient.EtcdBackupType}
 	backupMap := map[string]interface{}{
-		"namespaceId": apiContext.ID,
+		"namespaceId": namespace,
 	}
 	return apiContext.AccessControl.CanDo(v3.EtcdBackupGroupVersionKind.Group, v3.EtcdBackupResource.Name, "create", apiContext, backupMap, &etcdBackupSchema) == nil
 }
@@ -99,7 +99,7 @@ func (a ActionHandler) ClusterActionHandler(actionName string, action *types.Act
 		}
 		return a.disableMonitoring(actionName, action, apiContext)
 	case v32.ClusterActionBackupEtcd:
-		if !canBackupEtcd(apiContext) {
+		if !canBackupEtcd(apiContext, apiContext.ID) {
 			return httperror.NewAPIError(httperror.PermissionDenied, "can not backup etcd")
 		}
 		return a.BackupEtcdHandler(actionName, action, apiContext)
