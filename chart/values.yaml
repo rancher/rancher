@@ -94,6 +94,9 @@ rancherImage: rancher/rancher
 # Defaults to .Chart.appVersion
 # rancherImageTag: v2.0.7
 
+# Optional additional annotations to add to the rancher Pods
+# podAnnotations: {}
+
 # Override imagePullPolicy for rancher server images
 # options: Always, Never, IfNotPresent
 # Defaults to IfNotPresent
