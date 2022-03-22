@@ -1,3 +1,4 @@
+// Package impersonation sets up service accounts that are permitted to act on behalf of a Rancher user on a cluster.
 package impersonation
 
 import (
@@ -20,11 +21,14 @@ import (
 )
 
 const (
-	impersonationLabel     = "authz.cluster.cattle.io/impersonator"
+	impersonationLabel = "authz.cluster.cattle.io/impersonator"
+	// ImpersonationNamespace is the namespace where impersonation service accounts live.
 	ImpersonationNamespace = "cattle-impersonation-system"
-	ImpersonationPrefix    = "cattle-impersonation-"
+	// ImpersonationPrefix is the prefix for impersonation roles, bindings, and service accounts.
+	ImpersonationPrefix = "cattle-impersonation-"
 )
 
+// Impersonator contains data for the user being impersonated.
 type Impersonator struct {
 	user                user.Info
 	clusterContext      *config.UserContext
@@ -32,6 +36,7 @@ type Impersonator struct {
 	userAttributeLister v3.UserAttributeLister
 }
 
+// New creates an Impersonator from a kubernetes user.Info object and a UserContext for the cluster.
 func New(userInfo user.Info, clusterContext *config.UserContext) (Impersonator, error) {
 	impersonator := Impersonator{
 		clusterContext:      clusterContext,
@@ -47,6 +52,8 @@ func New(userInfo user.Info, clusterContext *config.UserContext) (Impersonator, 
 	return impersonator, nil
 }
 
+// SetUpImpersonation creates a service account on a cluster with a clusterrole and clusterrolebinding allowing it to impersonate a Rancher user.
+// Returns a reference to the service account, which can be used by GetToken to retrieve the account token, or an error if creating any of the resources failed.
 func (i *Impersonator) SetUpImpersonation() (*corev1.ServiceAccount, error) {
 	rules := i.rulesForUser()
 	logrus.Tracef("impersonation: checking role for user %s", i.user.GetName())
@@ -85,6 +92,7 @@ func (i *Impersonator) SetUpImpersonation() (*corev1.ServiceAccount, error) {
 	return i.waitForServiceAccount(sa)
 }
 
+// GetToken accepts a service account and returns the service account's token.
 func (i *Impersonator) GetToken(sa *corev1.ServiceAccount) (string, error) {
 	if len(sa.Secrets) == 0 {
 		return "", fmt.Errorf("service account is not ready")
@@ -185,6 +193,9 @@ func (i *Impersonator) createNamespace() error {
 	return err
 }
 
+// checkAndUpdateRole checks whether the impersonation clusterrole already exists and whether it has the correct rules.
+// If the role does not exist, the method returns nil for the role and createRole must be called.
+// If the role does exist, the rules are updated if necessary and a reference to the role is returned.
 func (i *Impersonator) checkAndUpdateRole(rules []rbacv1.PolicyRule) (*rbacv1.ClusterRole, error) {
 	name := ImpersonationPrefix + i.user.GetUID()
 	var role *rbacv1.ClusterRole
