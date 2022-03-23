@@ -1,4 +1,4 @@
-ARG K3S_BUILDER=rancher/k3s:v1.23.3-k3s1
+ARG K3S_BUILDER=rancher/k3s:v1.22.7-k3s1
 
 # Use binaries from k3s root for s390x as k3s is not available on s390x
 FROM registry.suse.com/suse/sle15:15.3 AS k3s_root
@@ -42,7 +42,7 @@ ENV CATTLE_PARTNER_CHART_DEFAULT_BRANCH=$PARTNER_CHART_DEFAULT_BRANCH
 ENV CATTLE_RKE2_CHART_DEFAULT_BRANCH=$RKE2_CHART_DEFAULT_BRANCH
 ENV CATTLE_HELM_VERSION v2.16.8-rancher1
 ENV CATTLE_MACHINE_VERSION v0.15.0-rancher81
-ENV CATTLE_K3S_VERSION v1.23.3+k3s1
+ENV CATTLE_K3S_VERSION v1.22.7+k3s1
 ENV CATTLE_MACHINE_PROVISION_IMAGE rancher/machine:${CATTLE_MACHINE_VERSION}
 ENV CATTLE_ETCD_VERSION v3.5.1
 ENV LOGLEVEL_VERSION v0.1.5
@@ -133,7 +133,6 @@ COPY --from=k3s_builder \
     /bin/ethtool \
     /bin/ip \
     /bin/ipset \
-    /bin/k3s \
     /bin/losetup \
     /bin/pigz \
     /bin/runc \
@@ -148,12 +147,13 @@ RUN if [ "${ARCH}" != "s390x" ]; then \
         ln -s /usr/bin/cni /usr/bin/host-local && \
         ln -s /usr/bin/cni /usr/bin/loopback && \
         ln -s /usr/bin/cni /usr/bin/portmap && \
-        ln -s /usr/bin/k3s /usr/bin/crictl && \
-        ln -s /usr/bin/k3s /usr/bin/ctr && \
-        ln -s /usr/bin/k3s /usr/bin/k3s-agent && \
-        ln -s /usr/bin/k3s /usr/bin/k3s-etcd-snapshot && \
-        ln -s /usr/bin/k3s /usr/bin/k3s-server && \
-        ln -s /usr/bin/k3s /usr/bin/kubectl && \
+        ln -s /usr/bin/containerd /usr/bin/crictl && \
+        ln -s /usr/bin/containerd /usr/bin/ctr && \
+        ln -s /usr/bin/containerd /usr/bin/k3s && \
+        ln -s /usr/bin/containerd /usr/bin/k3s-agent && \
+        ln -s /usr/bin/containerd /usr/bin/k3s-etcd-snapshot && \
+        ln -s /usr/bin/containerd /usr/bin/k3s-server && \
+        ln -s /usr/bin/containerd /usr/bin/kubectl && \
         ln -s /usr/bin/pigz /usr/bin/unpigz && \
         ln -s /usr/bin/xtables-legacy-multi /usr/bin/iptables && \
         ln -s /usr/bin/xtables-legacy-multi /usr/bin/iptables-save && \
