@@ -5,6 +5,7 @@ import (
 	"compress/gzip"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"io/ioutil"
 	"strings"
 
@@ -116,6 +117,10 @@ func decodeHelm3(data string) (*release.Release, error) {
 	b, err := base64.StdEncoding.DecodeString(data)
 	if err != nil {
 		return nil, err
+	}
+
+	if len(data) == 0 {
+		return nil, errors.New("secret is empty")
 	}
 
 	// For backwards compatibility with releases that were stored before
