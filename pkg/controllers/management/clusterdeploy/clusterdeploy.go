@@ -287,7 +287,7 @@ func (cd *clusterDeploy) deployAgent(cluster *v3.Cluster) error {
 	}
 	logrus.Tracef("clusterDeploy: deployAgent: desiredTaints is [%v] for cluster [%s]", desiredTaints, cluster.Name)
 
-	privateRegistries := &corev1.Secret{}
+	var privateRegistries *corev1.Secret
 	if cluster.Status.PrivateRegistrySecret != "" {
 		privateRegistries, err = cd.secretLister.Get(namespace.GlobalNamespace, cluster.Status.PrivateRegistrySecret)
 		if err != nil {
