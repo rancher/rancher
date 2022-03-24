@@ -2,6 +2,7 @@ package rkecontrolplane
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
@@ -13,6 +14,7 @@ import (
 	"github.com/rancher/wrangler/pkg/relatedresource"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/equality"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
@@ -97,7 +99,15 @@ func (h *handler) doRemove(obj *rkev1.RKEControlPlane) func() (string, error) {
 
 		logrus.Debugf("[rkecontrolplane] (%s/%s) listed %d machines during removal", obj.Namespace, obj.Name, len(machines))
 		logrus.Tracef("[rkecontrolplane] (%s/%s) machine list: %+v", obj.Namespace, obj.Name, machines)
+		allMachines := append(machines, otherMachines...)
+		for _, machine := range allMachines {
+			if machine.DeletionTimestamp == nil {
+				if err = h.machineClient.Delete(machine.Namespace, machine.Name, &metav1.DeleteOptions{}); err != nil {
+					return "", fmt.Errorf("error deleting machine %s/%s: %v", machine.Namespace, machine.Name, err)
+				}
+			}
+		}
 
-		return rke2.GetMachineDeletionStatus(append(machines, otherMachines...))
+		return rke2.GetMachineDeletionStatus(allMachines)
 	}
 }
