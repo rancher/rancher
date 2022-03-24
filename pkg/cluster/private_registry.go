@@ -1,12 +1,6 @@
 package cluster
 
 import (
-	"encoding/base64"
-	"encoding/json"
-
-	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
-	"github.com/rancher/rancher/pkg/settings"
-	rketypes "github.com/rancher/rke/types"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/credentialprovider"
 )
@@ -48,10 +42,14 @@ func GeneratePrivateRegistryDockerConfig(privateRegistry *rketypes.PrivateRegist
 	if registrySecret != nil {
 		privateRegistry = privateRegistry.DeepCopy()
 		dockerCfg := credentialprovider.DockerConfigJSON{}
-		err := json.Unmarshal(registrySecret.Data[".dockerconfigjson"], &dockerCfg)
-		if err != nil {
-			return "", err
+		if dockerConfigJSON := registrySecret.Data[".dockerconfigjson"]; len(dockerConfigJSON) > 0 {
+			err := json.Unmarshal(dockerConfigJSON, &dockerCfg)
+			if err != nil {
+				logrus.Debug("Failed to parse dockerconfig for registry secret: " + err.Error())
+				return "", err
+			}
 		}
+
 		if reg, ok := dockerCfg.Auths[privateRegistry.URL]; ok {
 			privateRegistry.User = reg.Username
 			privateRegistry.Password = reg.Password
