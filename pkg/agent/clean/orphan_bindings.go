@@ -17,6 +17,7 @@ import (
 	mgmt "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io"
 	v3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	rbacv1 "github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1"
+	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/wrangler/pkg/generated/controllers/core"
 	corev1 "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/pkg/generated/controllers/rbac"
@@ -32,7 +33,8 @@ import (
 )
 
 const (
-	orphanBindingsOperation = "clean-orphan-bindings"
+	orphanBindingsOperation        = "clean-orphan-bindings"
+	orphanCatalogBindingsOperation = "clean-catalog-orphan-bindings"
 )
 
 type orphanBindingsCleanup struct {
@@ -41,9 +43,29 @@ type orphanBindingsCleanup struct {
 	prtbs        v3.ProjectRoleTemplateBindingClient
 	prtbUIDs     map[string]struct{}
 	roleBindings v1.RoleBindingClient
+	roles        v1.RoleClient
 }
 
 func OrphanBindings(clientConfig *restclient.Config) error {
+	bc, err := newOrphanBindingsCleanup(clientConfig)
+	if err != nil {
+		return err
+	}
+
+	logrus.Infof("[%v] cleaning up orphaned bindings", orphanBindingsOperation)
+	return bc.cleanOrphans()
+}
+
+func OrphanCatalogBindings(clientConfig *restclient.Config) error {
+	bc, err := newOrphanBindingsCleanup(clientConfig)
+	if err != nil {
+		return err
+	}
+	logrus.Infof("[%v] cleaning up orphaned catalog bindings", orphanCatalogBindingsOperation)
+	return bc.cleanOrphanedCatalogRolesAndRolebindings()
+}
+
+func newOrphanBindingsCleanup(clientConfig *restclient.Config) (*orphanBindingsCleanup, error) {
 	if os.Getenv("DRY_RUN") == "true" {
 		logrus.Infof("[%v] DRY_RUN is true, no objects will be deleted/modified", orphanBindingsOperation)
 		dryRun = true
@@ -57,41 +79,39 @@ func OrphanBindings(clientConfig *restclient.Config) error {
 		config, err = clientcmd.BuildConfigFromFlags("", os.Getenv("KUBECONFIG"))
 		if err != nil {
 			logrus.Errorf("[%v] Error in building the cluster config %v", orphanBindingsOperation, err)
-			return err
+			return nil, err
 		}
 	}
 	config.RateLimiter = ratelimit.None
 
 	k8srbac, err := rbac.NewFactoryFromConfig(config)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	rancherManagement, err := mgmt.NewFactoryFromConfig(config)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	k8score, err := core.NewFactoryFromConfig(config)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	ctx := context.Background()
 	starters := []start.Starter{rancherManagement, k8srbac, k8score}
 	if err := start.All(ctx, 5, starters...); err != nil {
-		return err
+		return nil, err
 	}
-
 	bc := orphanBindingsCleanup{
 		namespaces:   k8score.Core().V1().Namespace(),
 		prtbs:        rancherManagement.Management().V3().ProjectRoleTemplateBinding(),
 		prtbUIDs:     make(map[string]struct{}),
 		roleBindings: k8srbac.Rbac().V1().RoleBinding(),
+		roles:        k8srbac.Rbac().V1().Role(),
 	}
-
-	logrus.Infof("[%v] cleaning up orphaned bindings", orphanBindingsOperation)
-	return bc.cleanOrphans()
+	return &bc, nil
 }
 
 // cleanOrphans finds and deletes orphaned bindings
@@ -188,4 +208,41 @@ func (bc *orphanBindingsCleanup) isOrphanBinding(rb rbacv1.RoleBinding) (bool, e
 	}
 
 	return false, nil // we have a prtb with this uid, so the binding is not an orphan
+}
+
+// Removes a specific role and bindings to that role, which are no longer valid, from the cattle-global-data namespace
+func (bc *orphanBindingsCleanup) cleanOrphanedCatalogRolesAndRolebindings() error {
+	rbs, err := bc.roleBindings.List(namespace.GlobalNamespace, metav1.ListOptions{})
+	if err != nil {
+		return err
+	}
+	logrus.Infof("[%v] Processing %d rolebindings", orphanCatalogBindingsOperation, len(rbs.Items))
+	for _, rb := range rbs.Items {
+		if rb.RoleRef.Name != auth.GlobalCatalogRole {
+			continue
+		}
+
+		if dryRun {
+			logrus.Infof("[%v] dryRun is enabled, skipping deletion for orphaned binding: %s/%s", orphanCatalogBindingsOperation, rb.Namespace, rb.Name)
+			continue
+		}
+		logrus.Infof("[%v] Deleting orphaned binding %s", orphanCatalogBindingsOperation, rb.Name)
+		err = bc.roleBindings.Delete(namespace.GlobalNamespace, rb.Name, &metav1.DeleteOptions{})
+		if err != nil {
+			logrus.Warnf("[%v] Error when deleting rolebinding %s, %s", orphanCatalogBindingsOperation, rb.Name, err.Error())
+		}
+	}
+
+	if dryRun {
+		logrus.Infof("[%v] dryRun is enabled, skipping deletion for orphaned role: %s/%s", orphanCatalogBindingsOperation, namespace.GlobalNamespace, auth.GlobalCatalogRole)
+	} else {
+		logrus.Infof("[%v] Deleting orphaned role %s", orphanCatalogBindingsOperation, auth.GlobalCatalogRole)
+		err = bc.roles.Delete(namespace.GlobalNamespace, auth.GlobalCatalogRole, &metav1.DeleteOptions{})
+		if err != nil {
+			logrus.Warnf("[%v] Error when deleting role %s, %s", orphanCatalogBindingsOperation, auth.GlobalCatalogRole, err.Error())
+			return err
+		}
+	}
+
+	return nil
 }

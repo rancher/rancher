@@ -7,6 +7,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/types"
+	mgmt "github.com/rancher/rancher/pkg/apis/management.cattle.io"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/ref"
 	"github.com/sirupsen/logrus"
@@ -193,4 +194,26 @@ func getBindingHash(namespace string, role rbacv1.RoleRef, subject rbacv1.Subjec
 	hasher.Write([]byte(input.String()))
 	digest := base32.StdEncoding.WithPadding(-1).EncodeToString(hasher.Sum(nil))
 	return strings.ToLower(digest[:10])
+}
+
+func RuleGivesResourceAccess(rule rbacv1.PolicyRule, resourceName string) bool {
+	if !isRuleInTargetAPIGroup(rule) {
+		// if we don't list the target api group, don't bother looking for the resources
+		return false
+	}
+	for _, resource := range rule.Resources {
+		if resource == resourceName || resource == "*" {
+			return true
+		}
+	}
+	return false
+}
+
+func isRuleInTargetAPIGroup(rule rbacv1.PolicyRule) bool {
+	for _, group := range rule.APIGroups {
+		if group == mgmt.GroupName || group == "*" {
+			return true
+		}
+	}
+	return false
 }
