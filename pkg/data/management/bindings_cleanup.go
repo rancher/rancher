@@ -12,8 +12,9 @@ import (
 )
 
 const (
-	dupeBindingsCleanupKey   = "DedupeBindingsDone"
-	orphanBindingsCleanupKey = "CleanupOrphanBindingsDone"
+	dupeBindingsCleanupKey          = "DedupeBindingsDone"
+	orphanBindingsCleanupKey        = "CleanupOrphanBindingsDone"
+	orphanCatalogBindingsCleanupKey = "CleanupOrphanCatalogBindingsDone"
 )
 
 func CleanupDuplicateBindings(scaledContext *config.ScaledContext, wContext *wrangler.Context) {
@@ -65,43 +66,60 @@ func CleanupDuplicateBindings(scaledContext *config.ScaledContext, wContext *wra
 }
 
 func CleanupOrphanBindings(scaledContext *config.ScaledContext, wContext *wrangler.Context) {
+	err := cleanupSpecificOrphanedBindings(scaledContext, wContext, orphanBindingsCleanupKey)
+	if err != nil {
+		logrus.Errorf("failed to cleanup orphan bindings")
+	}
+	err = cleanupSpecificOrphanedBindings(scaledContext, wContext, orphanCatalogBindingsCleanupKey)
+	if err != nil {
+		logrus.Errorf("failed to cleanup orphan catalog bindings")
+	}
+}
+
+// Runs the cleanup process for orphaned bindings given a cleanupKey specifying which cleanup job should be run (orphanBindings or orphanCatalogBindings)
+func cleanupSpecificOrphanedBindings(scaledContext *config.ScaledContext, wContext *wrangler.Context, cleanupKey string) error {
 	logrus.Infof("checking configmap %s/%s to determine if orphan bindings cleanup needs to run", cattleNamespace, bootstrapAdminConfig)
 	adminConfig, err := wContext.K8s.CoreV1().ConfigMaps(cattleNamespace).Get(scaledContext.RunContext, bootstrapAdminConfig, v1.GetOptions{})
 	if err != nil {
-		logrus.Warnf("unable to determine if bindings cleanup has ran, skipping: %v", err)
-		return
+		logrus.Warnf("[%v] unable to determine if bindings cleanup has ran, skipping: %v", cleanupKey, err)
+		return err
 	}
 
 	// config map exists, check if the cleanup key is found
-	if _, ok := adminConfig.Data[orphanBindingsCleanupKey]; ok {
-		logrus.Info("orphan bindings cleanup has already run, skipping")
-		return
+	if _, ok := adminConfig.Data[cleanupKey]; ok {
+		logrus.Infof("[%v] orphan bindings cleanup has already run, skipping", cleanupKey)
+		return nil
 	}
 
 	// run cleanup
-	err = clean.OrphanBindings(&scaledContext.RESTConfig)
+	if cleanupKey == orphanBindingsCleanupKey {
+		err = clean.OrphanBindings(&scaledContext.RESTConfig)
+	} else {
+		err = clean.OrphanCatalogBindings(&scaledContext.RESTConfig)
+	}
 	if err != nil {
-		logrus.Warnf("error during orphan binding cleanup: %v", err)
-		return
+		logrus.Warnf("[%v] error during orphan binding cleanup: %v", cleanupKey, err)
+		return err
 	}
 
 	// update configmap
 	reloadedConfig, err := wContext.K8s.CoreV1().ConfigMaps(cattleNamespace).Get(scaledContext.RunContext, bootstrapAdminConfig, v1.GetOptions{})
 	if err != nil {
-		logrus.Warnf("unable to get configmap %v: %v", bootstrapAdminConfig, err)
-		return
+		logrus.Warnf("[%v] unable to get configmap %v: %v", cleanupKey, bootstrapAdminConfig, err)
+		return err
 	}
 
 	adminConfigCopy := reloadedConfig.DeepCopy()
 	if adminConfigCopy.Data == nil {
 		adminConfigCopy.Data = make(map[string]string)
 	}
-	adminConfigCopy.Data[orphanBindingsCleanupKey] = "yes"
+	adminConfigCopy.Data[cleanupKey] = "yes"
 
 	_, err = wContext.K8s.CoreV1().ConfigMaps(cattleNamespace).Update(scaledContext.RunContext, adminConfigCopy, v1.UpdateOptions{})
 	if err != nil {
-		logrus.Warnf("error %v while updating configmap %v, unable to record completion of orphan binding cleanup", err, bootstrapAdminConfig)
+		logrus.Warnf("[%v] error %v while updating configmap %v, unable to record completion of orphan binding cleanup", cleanupKey, err, bootstrapAdminConfig)
 	}
 
-	logrus.Infof("successfully cleaned up orphan bindings")
+	logrus.Infof("[%v] successfully cleaned up orphan bindings", cleanupKey)
+	return nil
 }
