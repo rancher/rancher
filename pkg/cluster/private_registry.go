@@ -59,7 +59,7 @@ func GeneratePrivateRegistryDockerConfig(privateRegistry *rketypes.PrivateRegist
 		}
 		return base64.URLEncoding.EncodeToString(encodedJSON), nil
 	}
-	if registrySecret != nil {
+	if registrySecret != nil && len(registrySecret.Data[".dockerconfigjson"]) != 0 {
 		privateRegistry = privateRegistry.DeepCopy()
 		dockerCfg := credentialprovider.DockerConfigJSON{}
 		if dockerConfigJSON := registrySecret.Data[".dockerconfigjson"]; len(dockerConfigJSON) > 0 {
