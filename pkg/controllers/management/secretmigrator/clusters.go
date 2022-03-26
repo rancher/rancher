@@ -28,9 +28,15 @@ const (
 	S3BackupAnswersPath         = "rancherKubernetesEngineConfig.services.etcd.backupConfig.s3BackupConfig.secretKey"
 	WeavePasswordAnswersPath    = "rancherKubernetesEngineConfig.network.weaveNetworkProvider.password"
 	RegistryPasswordAnswersPath = "rancherKubernetesEngineConfig.privateRegistries[%d].password"
+	VsphereGlobalAnswersPath    = "rancherKubernetesEngineConfig.cloudProvider.vsphereCloudProvider.global.password"
+	VcenterAnswersPath          = "rancherKubernetesEngineConfig.cloudProvider.vsphereCloudProvider.virtualCenter[%s].password"
+	OpenStackAnswersPath        = "rancherKubernetesEngineConfig.cloudProvider.openstackCloudProvider.global.password"
+	AADClientAnswersPath        = "rancherKubernetesEngineConfig.cloudProvider.azureCloudProvider.aadClientSecret"
+	AADCertAnswersPath          = "rancherKubernetesEngineConfig.cloudProvider.azureCloudProvider.aadClientCertPassword"
 )
 
-var PrivateRegistryQuestion = regexp.MustCompile("rancherKubernetesEngineConfig.privateRegistries[[0-9]+].password")
+var PrivateRegistryQuestion = regexp.MustCompile(`rancherKubernetesEngineConfig.privateRegistries[[0-9]+].password`)
+var VcenterQuestion = regexp.MustCompile(`rancherKubernetesEngineConfig.cloudProvider.vsphereCloudProvider.virtualCenter\[.+\].password`)
 
 func (h *handler) sync(key string, cluster *v3.Cluster) (runtime.Object, error) {
 	if cluster == nil || cluster.DeletionTimestamp != nil {
@@ -649,7 +655,7 @@ func (h *handler) getUnstructuredPipelineConfig(namespace, pType string) (map[st
 // It returns a reference to the Secret if one was created. If the returned Secret is not nil and there is no error,
 // the caller is responsible for un-setting the secret data, setting a reference to the Secret, and
 // updating the Cluster object, if applicable.
-func (m *Migrator) CreateOrUpdatePrivateRegistrySecret(secretName string, rkeConfig *v3.RancherKubernetesEngineConfig, owner *v3.Cluster) (*corev1.Secret, error) {
+func (m *Migrator) CreateOrUpdatePrivateRegistrySecret(secretName string, rkeConfig *v3.RancherKubernetesEngineConfig, owner runtime.Object) (*corev1.Secret, error) {
 	if rkeConfig == nil {
 		return nil, nil
 	}
@@ -679,12 +685,17 @@ func (m *Migrator) CreateOrUpdatePrivateRegistrySecret(secretName string, rkeCon
 		Type: corev1.SecretTypeDockerConfigJson,
 	}
 	if owner != nil {
+		gvk := owner.GetObjectKind().GroupVersionKind()
+		accessor, err := meta.Accessor(owner)
+		if err != nil {
+			return nil, err
+		}
 		registrySecret.OwnerReferences = []metav1.OwnerReference{
 			{
-				APIVersion: owner.APIVersion,
-				Kind:       owner.Kind,
-				Name:       owner.Name,
-				UID:        owner.UID,
+				APIVersion: gvk.Group + "/" + gvk.Version,
+				Kind:       gvk.Kind,
+				Name:       accessor.GetName(),
+				UID:        accessor.GetUID(),
 			},
 		}
 	}
@@ -991,9 +1002,14 @@ func (m *Migrator) Cleanup(secretName string) error {
 // MatchesQuestionPath checks whether the given string matches the question-formatted path of the
 // s3 secret, weave password, or registry password.
 func MatchesQuestionPath(variable string) bool {
-	return variable == "rancherKubernetesEngineConfig.services.etcd.backupConfig.s3BackupConfig.secretKey" ||
-		variable == "rancherKubernetesEngineConfig.network.weaveNetworkProvider.password" ||
-		PrivateRegistryQuestion.MatchString(variable)
+	return variable == S3BackupAnswersPath ||
+		variable == WeavePasswordAnswersPath ||
+		PrivateRegistryQuestion.MatchString(variable) ||
+		variable == VsphereGlobalAnswersPath ||
+		VcenterQuestion.MatchString(variable) ||
+		variable == OpenStackAnswersPath ||
+		variable == AADClientAnswersPath ||
+		variable == AADCertAnswersPath
 }
 
 // cleanQuestions removes credentials from the questions and answers sections of the cluster object.

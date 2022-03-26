@@ -17,6 +17,7 @@ type Migrator struct {
 type handler struct {
 	migrator                  *Migrator
 	clusters                  v3.ClusterInterface
+	clusterTemplateRevisions  v3.ClusterTemplateRevisionInterface
 	notifierLister            v3.NotifierLister
 	notifiers                 v3.NotifierInterface
 	catalogLister             v3.CatalogLister
@@ -43,6 +44,7 @@ func Register(ctx context.Context, management *config.ManagementContext) {
 			management.Core.Secrets(""),
 		),
 		clusters:                  management.Management.Clusters(""),
+		clusterTemplateRevisions:  management.Management.ClusterTemplateRevisions(""),
 		notifierLister:            management.Management.Notifiers("").Controller().Lister(),
 		notifiers:                 management.Management.Notifiers(""),
 		catalogLister:             management.Management.Catalogs("").Controller().Lister(),
@@ -55,5 +57,6 @@ func Register(ctx context.Context, management *config.ManagementContext) {
 		sourceCodeProviderConfigs: management.Project.SourceCodeProviderConfigs(""),
 	}
 	management.Management.Clusters("").AddHandler(ctx, "cluster-secret-migrator", h.sync)
+	management.Management.ClusterTemplateRevisions("").AddHandler(ctx, "clustertemplaterevision-secret-migrator", h.syncTemplate)
 	management.Management.Catalogs("").AddHandler(ctx, "catalog-secret-migrator", h.syncCatalog)
 }
