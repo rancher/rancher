@@ -1,9 +1,30 @@
 package v3
 
 import (
+	"github.com/rancher/norman/condition"
 	"github.com/rancher/norman/types"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
+
+const ClusterTemplateRevisionConditionSecretsMigrated condition.Cond = "SecretsMigrated"
+
+type ClusterTemplateRevisionConditionType string
+
+type ClusterTemplateRevisionCondition struct {
+	// Type of cluster template revision condition.
+	Type ClusterTemplateRevisionConditionType `json:"type"`
+	// Status of the condition, one of True, False, Unknown.
+	Status v1.ConditionStatus `json:"status"`
+	// The last time this condition was updated.
+	LastUpdateTime string `json:"lastUpdateTime,omitempty"`
+	// Last time the condition transitioned from one status to another.
+	LastTransitionTime string `json:"lastTransitionTime,omitempty"`
+	// The reason for the condition's last transition.
+	Reason string `json:"reason,omitempty"`
+	// Human-readable message indicating details about last transition
+	Message string `json:"message,omitempty"`
+}
 
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -39,7 +60,8 @@ type ClusterTemplateRevision struct {
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 	// Specification of the desired behavior of the the cluster. More info:
 	// https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#spec-and-status
-	Spec ClusterTemplateRevisionSpec `json:"spec"`
+	Spec   ClusterTemplateRevisionSpec   `json:"spec"`
+	Status ClusterTemplateRevisionStatus `json:"status"`
 }
 
 type ClusterTemplateRevisionSpec struct {
@@ -49,6 +71,18 @@ type ClusterTemplateRevisionSpec struct {
 
 	Questions     []Question       `json:"questions,omitempty"`
 	ClusterConfig *ClusterSpecBase `json:"clusterConfig" norman:"required"`
+}
+
+type ClusterTemplateRevisionStatus struct {
+	PrivateRegistrySecret string                             `json:"privateRegistrySecret,omitempty" norman:"nocreate,noupdate"`
+	S3CredentialSecret    string                             `json:"s3CredentialSecret,omitempty" norman:"nocreate,noupdate"`
+	WeavePasswordSecret   string                             `json:"weavePasswordSecret,omitempty" norman:"nocreate,noupdate"`
+	VsphereSecret         string                             `json:"vsphereSecret,omitempty" norman:"nocreate,noupdate"`
+	VirtualCenterSecret   string                             `json:"virtualCenterSecret,omitempty" norman:"nocreate,noupdate"`
+	OpenStackSecret       string                             `json:"openStackSecret,omitempty" norman:"nocreate,noupdate"`
+	AADClientSecret       string                             `json:"aadClientSecret,omitempty" norman:"nocreate,noupdate"`
+	AADClientCertSecret   string                             `json:"aadClientCertSecret,omitempty" norman:"nocreate,noupdate"`
+	Conditions            []ClusterTemplateRevisionCondition `json:"conditions,omitempty"`
 }
 
 type ClusterTemplateQuestionsOutput struct {
