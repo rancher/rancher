@@ -124,7 +124,7 @@ func (l *Provider) AuthenticateUser(ctx context.Context, input interface{}) (v3.
 		return v3.Principal{}, nil, "", authFailedError
 	}
 
-	principalID := getLocalPrincipalID(user)
+	principalID := GetLocalPrincipalID(user)
 	userPrincipal := l.toPrincipal("user", user.DisplayName, user.Username, principalID, nil)
 	userPrincipal.Me = true
 
@@ -136,7 +136,7 @@ func (l *Provider) AuthenticateUser(ctx context.Context, input interface{}) (v3.
 	return userPrincipal, groupPrincipals, "", nil
 }
 
-func getLocalPrincipalID(user *v3.User) string {
+func GetLocalPrincipalID(user *v3.User) string {
 	// TODO error condition handling: no principal, more than one that would match
 	var principalID string
 	for _, p := range user.PrincipalIDs {
@@ -226,7 +226,7 @@ func (l *Provider) SearchPrincipalsDedupe(searchKey, principalType string, token
 					continue User
 				}
 			}
-			principalID := getLocalPrincipalID(user)
+			principalID := GetLocalPrincipalID(user)
 			userPrincipal := l.toPrincipal("user", user.DisplayName, user.Username, principalID, &token)
 			principals = append(principals, userPrincipal)
 		}
@@ -285,7 +285,7 @@ func (l *Provider) GetPrincipal(principalID string, token v3.Token) (v3.Principa
 		return v3.Principal{}, err
 	}
 
-	princID := getLocalPrincipalID(user)
+	princID := GetLocalPrincipalID(user)
 	princ := l.toPrincipal("user", user.DisplayName, user.Username, princID, &token)
 	return princ, nil
 }

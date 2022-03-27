@@ -11,6 +11,7 @@ import (
 	"github.com/urfave/cli"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/client-go/util/retry"
 )
 
 func RegisterEnsureDefaultAdminCommand() {
@@ -119,6 +120,22 @@ func createNewAdmin(client v3.Interface, length int) error {
 
 	fmt.Fprintf(os.Stdout, "New default admin user (%v):\n", admin.Name)
 	fmt.Fprintf(os.Stdout, "New password for default admin user (%v):\n%s\n", admin.Name, pass)
+
+	err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		refreshAdmin, err := client.Users("").Get(admin.Name, v1.GetOptions{})
+		if err != nil {
+			return err
+		}
+		userKey, userValue := getAdminPrincipalLabel(admin)
+		newAdmin := refreshAdmin.DeepCopy()
+		newAdmin.ObjectMeta.Labels[userKey] = userValue
+		_, err = client.Users("").Update(newAdmin)
+		return err
+	})
+	if err != nil {
+		return err
+	}
+
 	return err
 }
 
@@ -157,10 +174,19 @@ func ensureAdminIsLabeled(admin *v3.User) bool {
 		changed = current != defaultAdminLabelValue
 	}
 
+	userKey, userValue := getAdminPrincipalLabel(admin)
+	if currentValue, ok := admin.ObjectMeta.Labels[userKey]; ok {
+		// ensure that the admin user also has the labels which are assigned to each user
+		changed = changed || (currentValue != userValue)
+	} else {
+		changed = true
+	}
+
 	if changed {
 		fmt.Fprintf(os.Stdout, "Labeling existing default admin user (%v) as admin\n", admin.Name)
 
 		admin.ObjectMeta.Labels[defaultAdminLabelKey] = defaultAdminLabelValue
+		admin.ObjectMeta.Labels[userKey] = userValue
 	} else {
 		fmt.Fprintf(os.Stdout, "Existing default admin user (%v) already labeled as admin\n", admin.Name)
 	}

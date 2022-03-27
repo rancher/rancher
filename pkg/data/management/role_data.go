@@ -2,6 +2,7 @@ package management
 
 import (
 	"context"
+	"encoding/base32"
 	"reflect"
 	"sort"
 	"sync"
@@ -9,6 +10,7 @@ import (
 	"github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	localauth "github.com/rancher/rancher/pkg/auth/providers/local"
 	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/rancher/pkg/settings"
@@ -540,6 +542,10 @@ func BootstrapAdmin(management *wrangler.Context) (string, error) {
 		if err != nil && !apierrors.IsAlreadyExists(err) {
 			return "", errors.Wrap(err, "can not ensure admin user exists")
 		}
+		admin, err = addPrincipalLabelToAdmin(admin, management)
+		if err != nil {
+			logrus.Warnf("cannot add principal label to admin, %s", err.Error())
+		}
 		if err == nil {
 			var serverURL string
 			if settings.ServerURL.Get() != "" {
@@ -618,6 +624,28 @@ func BootstrapAdmin(management *wrangler.Context) (string, error) {
 				logrus.Info("Created default admin user and binding")
 			}
 		}
+	} else {
+		// if we have at least one user, grab the admin user to ensure that it has the Principal label
+		var adminUser *v3.User
+		for _, user := range users.Items {
+			// we could re-list using a label selector, but since we already have a full listing, just use that instead
+			if value, ok := user.Labels[defaultAdminLabelKey]; ok {
+				if value == defaultAdminLabelValue {
+					adminUser = &user
+					break
+				}
+			}
+		}
+		if adminUser == nil {
+			logrus.Warn("Have more than one user, but unable to locate admin user to adjust labels")
+		} else {
+			admin, err := addPrincipalLabelToAdmin(adminUser, management)
+			if err != nil {
+				logrus.Warnf("Unable to add label to adminUser %s", err.Error())
+			} else {
+				adminName = admin.Name
+			}
+		}
 	}
 
 	adminConfigMap := corev1.ConfigMap{
@@ -635,6 +663,28 @@ func BootstrapAdmin(management *wrangler.Context) (string, error) {
 
 	}
 	return adminName, nil
+}
+
+func addPrincipalLabelToAdmin(admin *v3.User, management *wrangler.Context) (*v3.User, error) {
+	// admin may not have a principal yet. To get around a complex wait loop, gen the principal name as the provider does
+	key, value := getAdminPrincipalLabel(admin)
+	var err error
+	if _, ok := admin.Labels[key]; !ok {
+		newAdmin := admin.DeepCopy()
+		newAdmin.Labels[key] = value
+		return management.Mgmt.User().Update(newAdmin)
+	}
+	return admin, err
+}
+
+func getAdminPrincipalLabel(admin *v3.User) (string, string) {
+	// admin may not have a principal yet. To get around a complex wait loop, gen the principal name as the provider does
+	principalName := localauth.GetLocalPrincipalID(admin)
+	encodedPrincipalID := base32.HexEncoding.WithPadding(base32.NoPadding).EncodeToString([]byte(principalName))
+	if len(encodedPrincipalID) > 63 {
+		encodedPrincipalID = encodedPrincipalID[:63]
+	}
+	return encodedPrincipalID, "hashed-principal-name"
 }
 
 // bootstrapDefaultRoles will set the default roles for user login, cluster create
