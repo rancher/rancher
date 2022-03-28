@@ -255,13 +255,14 @@ func (c *Controller) etcdSaveWithBackoff(b *v3.EtcdBackup) (runtime.Object, erro
 			return b, err
 		}
 		cluster.Spec.RancherKubernetesEngineConfig.Services.Etcd.BackupConfig = b.Spec.BackupConfig.DeepCopy()
-		cluster.Spec, err = secretmigrator.AssembleS3Credential(cluster, cluster.Spec, c.secretLister)
+		spec := *cluster.Spec.DeepCopy()
+		spec, err = secretmigrator.AssembleS3Credential(cluster, spec, c.secretLister)
 		if err != nil {
 			return b, err
 		}
 		var inErr error
 		err = wait.ExponentialBackoff(backoff, func() (bool, error) {
-			if inErr = c.backupDriver.ETCDSave(c.ctx, cluster.Name, kontainerDriver, cluster.Spec, snapshotName); inErr != nil {
+			if inErr = c.backupDriver.ETCDSave(c.ctx, cluster.Name, kontainerDriver, spec, snapshotName); inErr != nil {
 				logrus.Warnf("%v", inErr)
 				return false, nil
 			}
@@ -290,13 +291,14 @@ func (c *Controller) etcdRemoveSnapshotWithBackoff(b *v3.EtcdBackup) error {
 		return err
 	}
 	cluster.Spec.RancherKubernetesEngineConfig.Services.Etcd.BackupConfig = b.Spec.BackupConfig.DeepCopy()
-	cluster.Spec, err = secretmigrator.AssembleS3Credential(cluster, cluster.Spec, c.secretLister)
+	spec := *cluster.Spec.DeepCopy()
+	spec, err = secretmigrator.AssembleS3Credential(cluster, spec, c.secretLister)
 	if err != nil {
 		return err
 	}
 	snapshotName := clusterprovisioner.GetBackupFilename(b)
 	return wait.ExponentialBackoff(backoff, func() (bool, error) {
-		if inErr := c.backupDriver.ETCDRemoveSnapshot(c.ctx, cluster.Name, kontainerDriver, cluster.Spec, snapshotName); inErr != nil {
+		if inErr := c.backupDriver.ETCDRemoveSnapshot(c.ctx, cluster.Name, kontainerDriver, spec, snapshotName); inErr != nil {
 			logrus.Warnf("%v", inErr)
 			return false, nil
 		}
