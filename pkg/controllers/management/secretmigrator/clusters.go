@@ -1042,8 +1042,19 @@ func cleanQuestions(cluster *v3.Cluster) {
 			}
 			delete(answers.Values, key)
 		}
+		if cluster.Spec.RancherKubernetesEngineConfig.CloudProvider.VsphereCloudProvider != nil {
+			vcenters := cluster.Spec.RancherKubernetesEngineConfig.CloudProvider.VsphereCloudProvider.VirtualCenter
+			for k := range vcenters {
+				key := fmt.Sprintf(VcenterAnswersPath, k)
+				delete(answers.Values, key)
+			}
+		}
 		delete(answers.Values, S3BackupAnswersPath)
 		delete(answers.Values, WeavePasswordAnswersPath)
+		delete(answers.Values, VsphereGlobalAnswersPath)
+		delete(answers.Values, OpenStackAnswersPath)
+		delete(answers.Values, AADClientAnswersPath)
+		delete(answers.Values, AADCertAnswersPath)
 	}
 	if cluster.Spec.ClusterTemplateAnswers.Values != nil {
 		cleanAnswers(&cluster.Spec.ClusterTemplateAnswers)
