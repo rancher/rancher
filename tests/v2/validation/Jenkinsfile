@@ -75,7 +75,7 @@ node {
                       $class: 'GitSCM',
                       branches: [[name: "*/${branch}"]],
                       extensions: scm.extensions + [[$class: 'CleanCheckout']],
-                      userRemoteConfigs: scm.userRemoteConfigs
+                      userRemoteConfigs: [[url: "${env.REPO}"]]
                     ])
           }
           dir ("./") {
@@ -91,10 +91,7 @@ node {
 
                 dir("./tests/v2/validation") {
                   def filename = "config.yaml"
-                  def configContents = env.CONFIG + "\ndigitalOceanCredentials:\n  accessToken: " + "\"" + env.DO_ACCESSKEY + "\"" +
-                                        "\nawsCredentials:\n  secretKey: " + "\"" + env.AWS_SECRET_ACCESS_KEY + "\"" +
-                                        "\n  accessKey: " + "\"" + env.AWS_ACCESS_KEY_ID + "\"" +
-                                        "\n  defaultRegion: " + "\"" + env.AWS_REGION + "\""
+                  def configContents = env.CONFIG
 
                   writeFile file: filename, text: configContents
                   env.CATTLE_TEST_CONFIG = "/go/src/github.com/rancher/rancher/tests/v2/validation/"+filename
