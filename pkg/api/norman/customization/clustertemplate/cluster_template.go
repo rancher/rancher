@@ -24,6 +24,7 @@ import (
 	"github.com/sirupsen/logrus"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/util/retry"
 )
 
 const (
@@ -136,17 +137,21 @@ func (w Wrapper) updateEnabledFlagOnRevision(apiContext *types.APIContext, enabl
 	if err != nil {
 		//if conflict update, retry by loading from the store
 		if apierrors.IsConflict(err) {
-			revisionFromStore, err := w.ClusterTemplateRevisions.GetNamespaced(namespace.GlobalNamespace, revision.ObjectMeta.Name, v1.GetOptions{})
-			if err != nil {
-				return httperror.WrapAPIError(err, httperror.ServerError, "failed to load clusterTemplateRevision from store")
-			}
-			revisionStoreCopy := revisionFromStore.DeepCopy()
-			revisionStoreCopy.Spec.Enabled = &enabledFlag
+			err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+				revisionFromStore, err := w.ClusterTemplateRevisions.GetNamespaced(namespace.GlobalNamespace, revision.ObjectMeta.Name, v1.GetOptions{})
+				if err != nil {
+					return httperror.WrapAPIError(err, httperror.ServerError, "failed to load clusterTemplateRevision from store")
+				}
+				revisionStoreCopy := revisionFromStore.DeepCopy()
+				revisionStoreCopy.Spec.Enabled = &enabledFlag
 
-			_, err = w.ClusterTemplateRevisions.Update(revisionStoreCopy)
+				_, err = w.ClusterTemplateRevisions.Update(revisionStoreCopy)
+				return err
+			})
 			if err != nil {
 				return httperror.WrapAPIError(err, httperror.ServerError, fmt.Sprintf("failed to set enabled flag to %v on clusterTemplateRevision", enabledFlag))
 			}
+			return nil
 		}
 		return httperror.WrapAPIError(err, httperror.ServerError, fmt.Sprintf("failed to set enabled flag to %v on clusterTemplateRevision", enabledFlag))
 	}
