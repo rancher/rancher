@@ -23,7 +23,7 @@ fi
 cd $(dirname $0)/..
 
 #[ "${ARCH}" == "amd64" ] && RACE=-race
-go test -cover -tags=test ./pkg/...
+#go test -cover -tags=test ./pkg/...
 
 if [ ${ARCH} == arm64 ] || [ ${ARCH} == s390x ]; then
     export ETCD_UNSUPPORTED_ARCH=${ARCH}
@@ -63,8 +63,8 @@ run_rancher()
 
 # uncomment to get startup logs. Don't leave them on because it slows drone down too
 # much
-#tail -F /tmp/rancher.log &
-#TPID=$!
+tail -F /tmp/rancher.log &
+TPID=$!
 PID=-1
 run_rancher &
 RANCHER_RUN_PID=$!
