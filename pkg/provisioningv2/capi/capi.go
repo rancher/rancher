@@ -4,11 +4,14 @@ import (
 	"context"
 
 	controllerruntime "github.com/rancher/lasso/controller-runtime"
+	rkecontrollers "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/provisioningv2/capi/logger"
 	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/rancher/wrangler/pkg/schemes"
 	corev1 "k8s.io/api/core/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/record"
 	clusterv1alpha3 "sigs.k8s.io/cluster-api/api/v1alpha3"
@@ -42,6 +45,31 @@ func init() {
 	_ = apiextensionsv1.AddToScheme(schemes.All)
 }
 
+type connectedAgentClusterCacheClient struct {
+	client.Client
+	rkeControlPlanesCache rkecontrollers.RKEControlPlaneCache
+}
+
+func (t *connectedAgentClusterCacheClient) Get(ctx context.Context, key client.ObjectKey, obj client.Object) error {
+	rkeCP, err := t.rkeControlPlanesCache.Get(key.Namespace, key.Name)
+	if err != nil && !apierrors.IsNotFound(err) {
+		return err
+	}
+
+	// obj should be a CAPI cluster. If this cluster doesn't have an RKEControlPlane associated with it,
+	// then no agent check is required.
+	if err == nil && !rkeCP.Status.AgentConnected {
+		// If the agent is not connected, then returning a NotFound error will cause CAPI to stop its caches
+		// They will be refreshed once the agent reconnects.
+		return apierrors.NewNotFound(schema.GroupResource{
+			Group:    obj.GetObjectKind().GroupVersionKind().Group,
+			Resource: obj.GetObjectKind().GroupVersionKind().Kind,
+		}, key.Name)
+	}
+
+	return t.Client.Get(ctx, key, obj)
+}
+
 func Register(ctx context.Context, clients *wrangler.Context) (func(ctx context.Context) error, error) {
 	mgr, err := ctrl.NewManager(clients.RESTConfig, ctrl.Options{
 		MetricsBindAddress: "0",
@@ -66,7 +94,7 @@ func Register(ctx context.Context, clients *wrangler.Context) (func(ctx context.
 		return nil, err
 	}
 
-	reconcilers, err := reconcilers(mgr)
+	reconcilers, err := reconcilers(mgr, clients)
 	if err != nil {
 		return nil, err
 	}
@@ -80,7 +108,7 @@ func Register(ctx context.Context, clients *wrangler.Context) (func(ctx context.
 	return mgr.Start, nil
 }
 
-func reconcilers(mgr ctrl.Manager) ([]reconciler, error) {
+func reconcilers(mgr ctrl.Manager, clients *wrangler.Context) ([]reconciler, error) {
 	l := ctrl.Log.WithName("remote").WithName("ClusterCacheTracker")
 	tracker, err := remote.NewClusterCacheTracker(
 		mgr,
@@ -95,7 +123,10 @@ func reconcilers(mgr ctrl.Manager) ([]reconciler, error) {
 
 	return []reconciler{
 		&remote.ClusterCacheReconciler{
-			Client:  mgr.GetClient(),
+			// If the cluster agent gets disconnected, then the caches that CAPI uses could get out of sync.
+			// By using a connectedAgentClusterCacheClient (which returns a NotFound error if the agent is not connected), then
+			// we can force CAPI to refresh its caches once the agent is connected again.
+			Client:  &connectedAgentClusterCacheClient{Client: mgr.GetClient(), rkeControlPlanesCache: clients.RKE.RKEControlPlane().Cache()},
 			Log:     ctrl.Log.WithName("remote").WithName("ClusterCacheReconciler"),
 			Tracker: tracker,
 		},

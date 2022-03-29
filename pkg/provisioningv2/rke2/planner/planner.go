@@ -22,7 +22,6 @@ import (
 	mgmtcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	ranchercontrollers "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
 	rkecontrollers "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
-	"github.com/rancher/rancher/pkg/provisioningv2/kubeconfig"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/rancher/wrangler/pkg/condition"
@@ -129,7 +128,6 @@ type Planner struct {
 	capiClusters                  capicontrollers.ClusterCache
 	managementClusters            mgmtcontrollers.ClusterCache
 	rancherClusterCache           ranchercontrollers.ClusterCache
-	kubeconfig                    *kubeconfig.Manager
 	locker                        locker.Locker
 	etcdS3Args                    s3Args
 	certificateRotation           *certificateRotation
@@ -154,7 +152,6 @@ func New(ctx context.Context, clients *wrangler.Context) *Planner {
 		rancherClusterCache:           clients.Provisioning.Cluster().Cache(),
 		rkeControlPlanes:              clients.RKE.RKEControlPlane(),
 		etcdSnapshotCache:             clients.RKE.ETCDSnapshot().Cache(),
-		kubeconfig:                    kubeconfig.New(clients),
 		etcdS3Args: s3Args{
 			prefix:      "etcd-",
 			env:         true,
@@ -551,6 +548,9 @@ func (p *Planner) reconcile(controlPlane *rkev1.RKEControlPlane, tokensSecret pl
 		} else if !kubeletVersionUpToDate(controlPlane, entry.Machine) {
 			outOfSync = append(outOfSync, entry.Machine.Name)
 			messages[entry.Machine.Name] = append(messages[entry.Machine.Name], "waiting for kubelet to update")
+		} else if tierName == "control plane" && !controlPlane.Status.AgentConnected {
+			outOfSync = append(outOfSync, entry.Machine.Name)
+			messages[entry.Machine.Name] = append(messages[entry.Machine.Name], "waiting for cluster agent to connect")
 		} else {
 			ready = append(ready, entry.Machine.Name)
 		}
@@ -598,8 +598,9 @@ func (p *Planner) reconcile(controlPlane *rkev1.RKEControlPlane, tokensSecret pl
 }
 
 func kubeletVersionUpToDate(controlPlane *rkev1.RKEControlPlane, machine *capi.Machine) bool {
-	if controlPlane == nil || machine == nil || machine.Status.NodeInfo == nil {
-		// If any of these things are nil, then provisioning is still happening.
+	if controlPlane == nil || machine == nil || machine.Status.NodeInfo == nil || !controlPlane.Status.AgentConnected {
+		// If any of controlPlane, machine, or machine.Status.NodeInfo are nil, then provisioning is still happening.
+		// If controlPlane.Status.AgentConnected is false, then it cannot be reliably determined if the kubelet is up-to-date.
 		// Return true so that provisioning is not slowed down.
 		return true
 	}
@@ -950,8 +951,8 @@ func noRole(entry *planEntry) bool {
 	return !isEtcd(entry) && !isControlPlane(entry) && !isWorker(entry)
 }
 
-func anyRole(_ *planEntry) bool {
-	return true
+func anyRole(entry *planEntry) bool {
+	return !noRole(entry)
 }
 
 func isOnlyWorker(entry *planEntry) bool {

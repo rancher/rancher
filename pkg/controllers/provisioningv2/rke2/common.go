@@ -70,11 +70,13 @@ const (
 	RKEMachineAPIVersion           = "rke-machine.cattle.io/v1"
 	RKEAPIVersion                  = "rke.cattle.io/v1"
 
-	Provisioned = condition.Cond("Provisioned")
-	Ready       = condition.Cond("Ready")
-	Waiting     = condition.Cond("Waiting")
-	Pending     = condition.Cond("Pending")
-	Removed     = condition.Cond("Removed")
+	Provisioned    = condition.Cond("Provisioned")
+	Ready          = condition.Cond("Ready")
+	Waiting        = condition.Cond("Waiting")
+	Pending        = condition.Cond("Pending")
+	Removed        = condition.Cond("Removed")
+	AgentDeployed  = condition.Cond("AgentDeployed")
+	AgentConnected = condition.Cond("Connected")
 
 	RuntimeK3S  = "k3s"
 	RuntimeRKE2 = "rke2"

@@ -308,7 +308,7 @@ func (h *handler) updateClusterProvisioningStatus(cluster *rancherv1.Cluster, st
 	if cp == nil {
 		return status, fmt.Errorf("error while updating cluster provisioning status - rkecontrolplane was nil")
 	}
-	if cluster.DeletionTimestamp != nil && h.mgmtClusterCache != nil {
+	if h.mgmtClusterCache != nil {
 		mgmtCluster, err := h.mgmtClusterCache.Get(cluster.Status.ClusterName)
 		if err != nil {
 			return status, err

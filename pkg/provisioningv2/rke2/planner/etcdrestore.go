@@ -127,14 +127,15 @@ func (p *Planner) generateStopServiceAndKillAllPlan(controlPlane *rkev1.RKEContr
 	if err != nil {
 		return nodePlan, err
 	}
-	killAllScript := rke2.GetRuntimeCommand(controlPlane.Spec.KubernetesVersion) + "-killall.sh"
+	runtime := rke2.GetRuntime(controlPlane.Spec.KubernetesVersion)
+	killAllScript := runtime + "-killall.sh"
 	nodePlan.Instructions = append(nodePlan.Instructions,
 		plan.OneTimeInstruction{
 			Name:    "shutdown",
 			Command: "/bin/sh",
 			Args: []string{
 				"-c",
-				fmt.Sprintf("if [ -z $(command -v %s) ] && [ -z $(command -v %s) ]; then echo %s does not appear to be installed; exit 0; else %s; fi", rke2.GetRuntimeCommand(controlPlane.Spec.KubernetesVersion), killAllScript, rke2.GetRuntimeCommand(controlPlane.Spec.KubernetesVersion), killAllScript),
+				fmt.Sprintf("if [ -z $(command -v %s) ] && [ -z $(command -v %s) ]; then echo %s does not appear to be installed; exit 0; else %s; fi", runtime, killAllScript, runtime, killAllScript),
 			},
 		})
 	return nodePlan, nil
@@ -171,7 +172,7 @@ func (p *Planner) runEtcdRestoreControlPlaneEtcdServiceStop(controlPlane *rkev1.
 			return err
 		}
 	}
-	servers := collect(clusterPlan, isControlPlaneEtcd)
+	servers := collect(clusterPlan, anyRole)
 	updated := false
 	for _, server := range servers {
 		stopPlan, err := p.generateStopServiceAndKillAllPlan(controlPlane, tokensSecret, server, joinServer)

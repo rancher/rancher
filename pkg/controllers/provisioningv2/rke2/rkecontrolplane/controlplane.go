@@ -5,10 +5,13 @@ import (
 	"fmt"
 	"time"
 
+	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
+	provcluster "github.com/rancher/rancher/pkg/controllers/provisioningv2/cluster"
 	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2"
 	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta1"
 	mgmtcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
+	provcontrollers "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
 	rkecontrollers "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/rancher/wrangler/pkg/relatedresource"
@@ -23,6 +26,7 @@ import (
 func Register(ctx context.Context, clients *wrangler.Context) {
 	h := &handler{
 		clusterCache:              clients.Mgmt.Cluster().Cache(),
+		provClusterCache:          clients.Provisioning.Cluster().Cache(),
 		rkeControlPlaneController: clients.RKE.RKEControlPlane(),
 		machineDeploymentClient:   clients.CAPI.MachineDeployment(),
 		machineDeploymentCache:    clients.CAPI.MachineDeployment().Cache(),
@@ -32,23 +36,37 @@ func Register(ctx context.Context, clients *wrangler.Context) {
 
 	rkecontrollers.RegisterRKEControlPlaneStatusHandler(ctx, clients.RKE.RKEControlPlane(),
 		"", "rke-control-plane", h.OnChange)
-	relatedresource.Watch(ctx, "rke-control-plane-trigger", func(namespace, name string, obj runtime.Object) ([]relatedresource.Key, error) {
-		return []relatedresource.Key{{
-			Namespace: namespace,
-			Name:      name,
-		}}, nil
-	}, clients.RKE.RKEControlPlane(), clients.Mgmt.Cluster())
+	relatedresource.Watch(ctx, "rke-control-plane-trigger", h.clusterWatch, clients.RKE.RKEControlPlane(), clients.Mgmt.Cluster())
 
 	clients.RKE.RKEControlPlane().OnRemove(ctx, "rke-control-plane-remove", h.OnRemove)
 }
 
 type handler struct {
 	clusterCache              mgmtcontrollers.ClusterCache
+	provClusterCache          provcontrollers.ClusterCache
 	rkeControlPlaneController rkecontrollers.RKEControlPlaneController
 	machineDeploymentClient   capicontrollers.MachineDeploymentClient
 	machineDeploymentCache    capicontrollers.MachineDeploymentCache
 	machineCache              capicontrollers.MachineCache
 	machineClient             capicontrollers.MachineClient
+}
+
+func (h *handler) clusterWatch(_, _ string, obj runtime.Object) ([]relatedresource.Key, error) {
+	cluster, ok := obj.(*v3.Cluster)
+	if !ok {
+		return nil, nil
+	}
+
+	provClusters, err := h.provClusterCache.GetByIndex(provcluster.ByCluster, cluster.Name)
+	if err != nil || len(provClusters) == 0 {
+		return nil, err
+	}
+	return []relatedresource.Key{
+		{
+			Namespace: provClusters[0].Namespace,
+			Name:      provClusters[0].Name,
+		},
+	}, nil
 }
 
 func (h *handler) OnChange(obj *rkev1.RKEControlPlane, status rkev1.RKEControlPlaneStatus) (rkev1.RKEControlPlaneStatus, error) {
@@ -61,6 +79,7 @@ func (h *handler) OnChange(obj *rkev1.RKEControlPlane, status rkev1.RKEControlPl
 
 	status.Ready = rke2.Ready.IsTrue(cluster)
 	status.Initialized = rke2.Ready.IsTrue(cluster)
+	status.AgentConnected = rke2.AgentConnected.IsTrue(cluster)
 	return status, nil
 }
 
