@@ -18,7 +18,12 @@ func generateInstallInstruction(controlPlane *rkev1.RKEControlPlane, entry *plan
 		if arg.Value == "" {
 			continue
 		}
-		env = append(env, fmt.Sprintf("%s=%s", arg.Name, arg.Value))
+		switch cattleOS {
+		case windows:
+			env = append(env, fmt.Sprintf("$env:%s=\"%s\"", arg.Name, arg.Value))
+		default:
+			env = append(env, fmt.Sprintf("%s=%s", arg.Name, arg.Value))
+		}
 	}
 
 	switch cattleOS {
@@ -43,7 +48,7 @@ func generateInstallInstruction(controlPlane *rkev1.RKEControlPlane, entry *plan
 	if isOnlyWorker(entry) {
 		switch cattleOS {
 		case windows:
-			instruction.Env = append(instruction.Env, fmt.Sprintf("$env:INSTALL_%s_EXEC=agent", rke2.GetRuntimeEnv(controlPlane.Spec.KubernetesVersion)))
+			instruction.Env = append(instruction.Env, fmt.Sprintf("$env:INSTALL_%s_EXEC=\"agent\"", rke2.GetRuntimeEnv(controlPlane.Spec.KubernetesVersion)))
 		default:
 			instruction.Env = append(instruction.Env, fmt.Sprintf("INSTALL_%s_EXEC=agent", rke2.GetRuntimeEnv(controlPlane.Spec.KubernetesVersion)))
 		}
@@ -60,7 +65,7 @@ func (p *Planner) addInstallInstructionWithRestartStamp(nodePlan plan.NodePlan, 
 	stamp := restartStamp(nodePlan, controlPlane, getInstallerImage(controlPlane))
 	switch entry.Metadata.Labels[rke2.CattleOSLabel] {
 	case windows:
-		restartStampEnv = "$env:RESTART_STAMP=" + stamp
+		restartStampEnv = "$env:RESTART_STAMP=\"" + stamp + "\""
 	default:
 		restartStampEnv = "RESTART_STAMP=" + stamp
 	}
@@ -76,7 +81,7 @@ func (p *Planner) generateInstallInstructionWithSkipStart(controlPlane *rkev1.RK
 	var skipStartEnv string
 	switch entry.Metadata.Labels[rke2.CattleOSLabel] {
 	case windows:
-		skipStartEnv = fmt.Sprintf("$env:INSTALL_%s_SKIP_START=true", strings.ToUpper(rke2.GetRuntime(controlPlane.Spec.KubernetesVersion)))
+		skipStartEnv = fmt.Sprintf("$env:INSTALL_%s_SKIP_START=\"true\"", strings.ToUpper(rke2.GetRuntime(controlPlane.Spec.KubernetesVersion)))
 	default:
 		skipStartEnv = fmt.Sprintf("INSTALL_%s_SKIP_START=true", strings.ToUpper(rke2.GetRuntime(controlPlane.Spec.KubernetesVersion)))
 	}
