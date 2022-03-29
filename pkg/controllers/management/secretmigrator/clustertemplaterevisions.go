@@ -16,7 +16,7 @@ func (h *handler) syncTemplate(key string, clusterTemplateRevision *v3.ClusterTe
 		logrus.Tracef("[secretmigrator] clusterTemplateRevision %s already migrated", clusterTemplateRevision.Name)
 		return clusterTemplateRevision, nil
 	}
-	obj, err := apimgmtv3.ClusterConditionSecretsMigrated.Do(clusterTemplateRevision, func() (runtime.Object, error) {
+	obj, err := apimgmtv3.ClusterTemplateRevisionConditionSecretsMigrated.Do(clusterTemplateRevision, func() (runtime.Object, error) {
 		// privateRegistries
 		if clusterTemplateRevision.Status.PrivateRegistrySecret == "" {
 			logrus.Tracef("[secretmigrator] migrating private registry secrets for clusterTemplateRevision %s", clusterTemplateRevision.Name)
