@@ -649,7 +649,6 @@ def test_create_cluster_with_invalid_revision(admin_mc, remove_resource):
         assert e.error.status == 422
 
 
-@pytest.mark.skip(reason="rancher/rancher#37107")
 def test_disable_template_revision(admin_mc, list_remove_resource):
     cluster_template = create_cluster_template(admin_mc, [], admin_mc)
     remove_list = [cluster_template]
