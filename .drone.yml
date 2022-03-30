@@ -578,7 +578,6 @@ steps:
 
 - name: build
   image: rancher/dapper:v0.5.8
-  failure: ignore
   commands:
   - K3S_BUILDER=k3s_root dapper ci
   privileged: true
@@ -593,7 +592,6 @@ steps:
 
 - name: stage-binaries
   image: rancher/dapper:v0.5.8
-  failure: ignore
   commands:
   - "cp -r ./bin/* ./package/"
   when:
@@ -603,7 +601,6 @@ steps:
 
 - name: docker-publish-head
   image: rancher/drone-images:docker-s390x
-  failure: ignore
   volumes:
   - name: docker
     path: /var/run/docker.sock
@@ -632,7 +629,6 @@ steps:
 
 - name: docker-publish-head-installer
   image: rancher/drone-images:docker-s390x
-  failure: ignore
   volumes:
     - name: docker
       path: /var/run/docker.sock
@@ -661,7 +657,6 @@ steps:
 
 - name: docker-publish-head-agent
   image: rancher/drone-images:docker-s390x
-  failure: ignore
   volumes:
     - name: docker
       path: /var/run/docker.sock
@@ -690,7 +685,6 @@ steps:
 
 - name: docker-publish
   image: rancher/drone-images:docker-s390x
-  failure: ignore
   volumes:
     - name: docker
       path: /var/run/docker.sock
@@ -715,7 +709,6 @@ steps:
 
 - name: docker-publish-installer
   image: rancher/drone-images:docker-s390x
-  failure: ignore
   volumes:
     - name: docker
       path: /var/run/docker.sock
@@ -740,7 +733,6 @@ steps:
 
 - name: docker-publish-agent
   image: rancher/drone-images:docker-s390x
-  failure: ignore
   volumes:
     - name: docker
       path: /var/run/docker.sock
@@ -772,6 +764,7 @@ trigger:
   event:
     exclude:
     - promote
+
 ---
 kind: pipeline
 name: default-windows-1809
@@ -1150,7 +1143,6 @@ steps:
     password:
       from_secret: docker_password
     spec: manifest-installer.tmpl
-    ignore_missing: true
   when:
     instance:
       include:
@@ -1167,7 +1159,6 @@ steps:
     password:
       from_secret: docker_password
     spec: manifest-installer-head.tmpl
-    ignore_missing: true
   when:
     instance:
       include:
@@ -1183,7 +1174,6 @@ steps:
     password:
       from_secret: docker_password
     spec: manifest-agent.tmpl
-    ignore_missing: true
   when:
     instance:
       include:
@@ -1200,7 +1190,6 @@ steps:
     password:
       from_secret: docker_password
     spec: manifest-agent-head.tmpl
-    ignore_missing: true
   when:
     instance:
       include:
@@ -1216,7 +1205,6 @@ steps:
     password:
       from_secret: docker_password
     spec: manifest-head.tmpl
-    ignore_missing: true
   when:
     instance:
       include:
@@ -1232,7 +1220,6 @@ steps:
     password:
       from_secret: docker_password
     spec: manifest.tmpl
-    ignore_missing: true
   when:
     instance:
       include:
