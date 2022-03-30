@@ -29,12 +29,12 @@ WORKDIR /var/lib/rancher
 
 ARG ARCH=amd64
 ARG IMAGE_REPO=rancher
-ARG SYSTEM_CHART_DEFAULT_BRANCH=dev-v2.6
-ARG CHART_DEFAULT_BRANCH=dev-v2.6
+ARG SYSTEM_CHART_DEFAULT_BRANCH=release-v2.6
+ARG CHART_DEFAULT_BRANCH=release-v2.6
 ARG PARTNER_CHART_DEFAULT_BRANCH=main
 ARG RKE2_CHART_DEFAULT_BRANCH=main
 # kontainer-driver-metadata branch to be set for specific branch other than dev/master, logic at rancher/rancher/pkg/settings/setting.go
-ARG CATTLE_KDM_BRANCH=dev-v2.6
+ARG CATTLE_KDM_BRANCH=release-v2.6
 
 ENV CATTLE_SYSTEM_CHART_DEFAULT_BRANCH=$SYSTEM_CHART_DEFAULT_BRANCH
 ENV CATTLE_CHART_DEFAULT_BRANCH=$CHART_DEFAULT_BRANCH
@@ -64,8 +64,8 @@ ENV CATTLE_SYSTEM_AGENT_UPGRADE_IMAGE rancher/system-agent:${CATTLE_SYSTEM_AGENT
 ENV CATTLE_SYSTEM_UPGRADE_CONTROLLER_CHART_VERSION 100.0.2+up0.3.2
 
 # System charts minimal version
-ENV CATTLE_FLEET_MIN_VERSION=100.0.3+up0.3.9-rc1
-ENV CATTLE_RANCHER_WEBHOOK_MIN_VERSION=1.0.4+up0.2.5-rc3
+ENV CATTLE_FLEET_MIN_VERSION=100.0.3+up0.3.9
+ENV CATTLE_RANCHER_WEBHOOK_MIN_VERSION=1.0.4+up0.2.5
 
 RUN mkdir -p /var/lib/rancher-data/local-catalogs/system-library && \
     mkdir -p /var/lib/rancher-data/local-catalogs/library && \
@@ -177,8 +177,8 @@ RUN  if [ "${ARCH}" == "s390x" ]; then \
       chmod +x /usr/bin/kubectl; \
      fi
 
-ENV CATTLE_UI_VERSION 2.6.4-rc13
-ENV CATTLE_DASHBOARD_UI_VERSION v2.6.4-rc13
+ENV CATTLE_UI_VERSION 2.6.4
+ENV CATTLE_DASHBOARD_UI_VERSION v2.6.4
 ENV CATTLE_CLI_VERSION v2.6.4
 
 # Please update the api-ui-version in pkg/settings/settings.go when updating the version here.
