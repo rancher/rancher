@@ -2,6 +2,7 @@ package rkecontrolplane
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
@@ -13,6 +14,7 @@ import (
 	"github.com/rancher/wrangler/pkg/relatedresource"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/equality"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
@@ -87,9 +89,25 @@ func (h *handler) doRemove(obj *rkev1.RKEControlPlane) func() (string, error) {
 			return "", err
 		}
 
+		// Some machines may not have gotten the CAPI cluster-name label in previous versions in Rancher.
+		// Because of update issues with the conversion webhook in rancher-webhook, we can't use a "migration" to add the label (it will fail because the conversion webhook is not available).
+		// In addition, there is no way to "or" label selectors in the API, so we need to do this manually.
+		otherMachines, err := h.machineCache.List(obj.Namespace, labels.SelectorFromSet(labels.Set{rke2.ClusterNameLabel: obj.Name, rke2.ControlPlaneRoleLabel: "true"}))
+		if err != nil {
+			return "", err
+		}
+
 		logrus.Debugf("[rkecontrolplane] (%s/%s) listed %d machines during removal", obj.Namespace, obj.Name, len(machines))
 		logrus.Tracef("[rkecontrolplane] (%s/%s) machine list: %+v", obj.Namespace, obj.Name, machines)
+		allMachines := append(machines, otherMachines...)
+		for _, machine := range allMachines {
+			if machine.DeletionTimestamp == nil {
+				if err = h.machineClient.Delete(machine.Namespace, machine.Name, &metav1.DeleteOptions{}); err != nil {
+					return "", fmt.Errorf("error deleting machine %s/%s: %v", machine.Namespace, machine.Name, err)
+				}
+			}
+		}
 
-		return rke2.GetMachineDeletionStatus(machines)
+		return rke2.GetMachineDeletionStatus(allMachines)
 	}
 }

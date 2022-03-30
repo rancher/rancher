@@ -1,4 +1,4 @@
-FROM golang:1.16
+FROM golang:1.17
 
 # Configure Go
 ENV GOPATH /go
@@ -11,7 +11,6 @@ WORKDIR $WORKSPACE/tests/v2/validation
 COPY [".", "$WORKSPACE"]
 
 RUN go mod download && \
-    # cd $WORKSPACE/tests/v2/validation && \
     go get gotest.tools/gotestsum
 
 RUN CGO_ENABLED=0

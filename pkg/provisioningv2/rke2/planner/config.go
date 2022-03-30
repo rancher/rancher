@@ -203,8 +203,8 @@ func (p *Planner) addChartConfigs(nodePlan plan.NodePlan, controlPlane *rkev1.RK
 	}
 
 	var chartConfigs []runtime.Object
-	for chart, values := range chartValues {
-		valuesMap := convert.ToMapInterface(values)
+	for _, chart := range rke2.SortedKeys(chartValues) {
+		valuesMap := convert.ToMapInterface(chartValues[chart])
 		if valuesMap == nil {
 			valuesMap = map[string]interface{}{}
 		}

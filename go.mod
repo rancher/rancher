@@ -18,7 +18,7 @@ replace (
 	k8s.io/apimachinery => k8s.io/apimachinery v0.23.3
 	k8s.io/apiserver => k8s.io/apiserver v0.23.3
 	k8s.io/cli-runtime => k8s.io/cli-runtime v0.23.3
-	k8s.io/client-go => github.com/rancher/client-go v1.23.3-rancher1
+	k8s.io/client-go => github.com/rancher/client-go v1.23.3-rancher2
 	k8s.io/cloud-provider => k8s.io/cloud-provider v0.23.3
 	k8s.io/cluster-bootstrap => k8s.io/cluster-bootstrap v0.23.3
 	k8s.io/code-generator => k8s.io/code-generator v0.23.3
@@ -89,23 +89,23 @@ require (
 	github.com/prometheus/client_golang v1.12.1
 	github.com/prometheus/client_model v0.2.0
 	github.com/prometheus/common v0.32.1
-	github.com/rancher/aks-operator v1.0.4-rc3
+	github.com/rancher/aks-operator v1.0.4
 	github.com/rancher/apiserver v0.0.0-20220223185512-c4e289f92e46
 	github.com/rancher/channelserver v0.5.1-0.20220217142715-90ef7d38f3f8
 	github.com/rancher/dynamiclistener v0.3.1-0.20210616080009-9865ae859c7f
-	github.com/rancher/eks-operator v1.1.3-rc3
+	github.com/rancher/eks-operator v1.1.3
 	github.com/rancher/fleet/pkg/apis v0.0.0-20210918015053-5a141a6b18f0
-	github.com/rancher/gke-operator v1.1.3-rc1
+	github.com/rancher/gke-operator v1.1.3
 	github.com/rancher/kubernetes-provider-detector v0.1.5
 	github.com/rancher/lasso v0.0.0-20220303220250-a429cb5cb9c9
 	github.com/rancher/lasso/controller-runtime v0.0.0-20220303220250-a429cb5cb9c9
-	github.com/rancher/machine v0.15.0-rancher80
+	github.com/rancher/machine v0.15.0-rancher81
 	github.com/rancher/norman v0.0.0-20220107203912-4feb41eafabd
 	github.com/rancher/rancher/pkg/apis v0.0.0
 	github.com/rancher/rancher/pkg/client v0.0.0
 	github.com/rancher/rdns-server v0.0.0-20180802070304-bf662911db6a
 	github.com/rancher/remotedialer v0.2.6-0.20220120012928-4ea2198e0966
-	github.com/rancher/rke v1.3.8-rc6
+	github.com/rancher/rke v1.3.8-rc11
 	github.com/rancher/security-scan v0.1.7-0.20200222041501-f7377f127168
 	github.com/rancher/steve v0.0.0-20220218171307-a91d90251ffa
 	github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20210727200656-10b094e30007
