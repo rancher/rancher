@@ -11,6 +11,7 @@ import (
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	util "github.com/rancher/rancher/pkg/cluster"
 	"github.com/rancher/rancher/pkg/dialer"
+	"github.com/rancher/rancher/pkg/features"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/batch/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/kubectl"
@@ -136,6 +137,10 @@ func (m *Lifecycle) drainNode(node *v3.Node) error {
 }
 
 func (m *Lifecycle) cleanRKENode(node *v3.Node) error {
+	if !features.RKE1CustomNodeCleanup.Enabled() {
+		return nil
+	}
+
 	cluster, err := m.clusterLister.Get("", node.Namespace)
 	if err != nil {
 		if kerror.IsNotFound(err) {
