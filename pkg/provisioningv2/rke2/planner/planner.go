@@ -64,6 +64,11 @@ const (
 	ConfigYamlFileName   = "/etc/rancher/%s/config.yaml.d/50-rancher.yaml"
 
 	windows = "windows"
+
+	bootstrapTier    = "bootstrap"
+	etcdTier         = "etcd"
+	controlPlaneTier = "control plane"
+	workerTier       = "worker"
 )
 
 var (
@@ -321,7 +326,7 @@ func (p *Planner) Process(controlPlane *rkev1.RKEControlPlane) error {
 	}
 
 	// select all etcd and then filter to just initNodes to that unavailable count is correct
-	err = p.reconcile(controlPlane, clusterSecretTokens, plan, true, "bootstrap", isEtcd, isNotInitNodeOrIsDeleting,
+	err = p.reconcile(controlPlane, clusterSecretTokens, plan, true, bootstrapTier, isEtcd, isNotInitNodeOrIsDeleting,
 		"1", "",
 		controlPlane.Spec.UpgradeStrategy.ControlPlaneDrainOptions)
 	firstIgnoreError, err = ignoreErrors(firstIgnoreError, err)
@@ -340,7 +345,7 @@ func (p *Planner) Process(controlPlane *rkev1.RKEControlPlane) error {
 		}
 	}
 
-	err = p.reconcile(controlPlane, clusterSecretTokens, plan, true, "etcd", isEtcd, isInitNodeOrDeleting,
+	err = p.reconcile(controlPlane, clusterSecretTokens, plan, true, etcdTier, isEtcd, isInitNodeOrDeleting,
 		"1", joinServer,
 		controlPlane.Spec.UpgradeStrategy.ControlPlaneDrainOptions)
 	firstIgnoreError, err = ignoreErrors(firstIgnoreError, err)
@@ -348,7 +353,7 @@ func (p *Planner) Process(controlPlane *rkev1.RKEControlPlane) error {
 		return err
 	}
 
-	err = p.reconcile(controlPlane, clusterSecretTokens, plan, true, "control plane", isControlPlane, isInitNodeOrDeleting,
+	err = p.reconcile(controlPlane, clusterSecretTokens, plan, true, controlPlaneTier, isControlPlane, isInitNodeOrDeleting,
 		controlPlane.Spec.UpgradeStrategy.ControlPlaneConcurrency, joinServer,
 		controlPlane.Spec.UpgradeStrategy.ControlPlaneDrainOptions)
 	firstIgnoreError, err = ignoreErrors(firstIgnoreError, err)
@@ -361,7 +366,7 @@ func (p *Planner) Process(controlPlane *rkev1.RKEControlPlane) error {
 		return ErrWaiting("waiting for control plane to be available")
 	}
 
-	err = p.reconcile(controlPlane, clusterSecretTokens, plan, false, "worker", isOnlyWorker, isInitNodeOrDeleting,
+	err = p.reconcile(controlPlane, clusterSecretTokens, plan, false, workerTier, isOnlyWorker, isInitNodeOrDeleting,
 		controlPlane.Spec.UpgradeStrategy.WorkerConcurrency, joinServer,
 		controlPlane.Spec.UpgradeStrategy.WorkerDrainOptions)
 	firstIgnoreError, err = ignoreErrors(firstIgnoreError, err)
@@ -548,7 +553,7 @@ func (p *Planner) reconcile(controlPlane *rkev1.RKEControlPlane, tokensSecret pl
 		} else if !kubeletVersionUpToDate(controlPlane, entry.Machine) {
 			outOfSync = append(outOfSync, entry.Machine.Name)
 			messages[entry.Machine.Name] = append(messages[entry.Machine.Name], "waiting for kubelet to update")
-		} else if tierName == "control plane" && !controlPlane.Status.AgentConnected {
+		} else if tierName == controlPlaneTier && !controlPlane.Status.AgentConnected {
 			outOfSync = append(outOfSync, entry.Machine.Name)
 			messages[entry.Machine.Name] = append(messages[entry.Machine.Name], "waiting for cluster agent to connect")
 		} else {
