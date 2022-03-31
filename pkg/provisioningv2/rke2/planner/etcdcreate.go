@@ -2,6 +2,7 @@ package planner
 
 import (
 	"errors"
+	"fmt"
 
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
@@ -47,7 +48,11 @@ func (p *Planner) runEtcdSnapshotCreate(controlPlane *rkev1.RKEControlPlane, clu
 		if err != nil {
 			return []error{err}
 		}
-		if err := assignAndCheckPlan(p.store, "etcd snapshot", server, createPlan, 3); err != nil {
+		msg := fmt.Sprintf("etcd snapshot on machine %s/%s", server.Machine.Namespace, server.Machine.Name)
+		if server.Machine.Status.NodeRef != nil && server.Machine.Status.NodeRef.Name != "" {
+			msg = fmt.Sprintf("etcd snapshot on node %s", server.Machine.Status.NodeRef.Name)
+		}
+		if err := assignAndCheckPlan(p.store, msg, server, createPlan, 3); err != nil {
 			errs = append(errs, err)
 		}
 	}

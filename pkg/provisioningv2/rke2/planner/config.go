@@ -42,7 +42,7 @@ func (p *Planner) addETCD(config map[string]interface{}, controlPlane *rkev1.RKE
 		config["etcd-snapshot-schedule-cron"] = controlPlane.Spec.ETCD.SnapshotScheduleCron
 	}
 
-	args, _, files, err := p.etcdS3Args.ToArgs(controlPlane.Spec.ETCD.S3, controlPlane)
+	args, _, files, err := p.etcdS3Args.ToArgs(controlPlane.Spec.ETCD.S3, controlPlane, "etcd-", false)
 	if err != nil {
 		return nil, err
 	}
