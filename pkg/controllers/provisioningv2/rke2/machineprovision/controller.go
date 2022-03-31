@@ -405,8 +405,7 @@ func (h *handler) OnRemove(key string, obj runtime.Object) (runtime.Object, erro
 		}
 	}
 
-	if _, nodeDrainExcluded := machine.Annotations[capi.ExcludeNodeDrainingAnnotation]; !removed ||
-		(!nodeDrainExcluded && !drainingSucceededCondition.IsTrue(machine) && drainingSucceededCondition.GetReason(machine) != capi.DrainingFailedReason) {
+	if !removed {
 		if err = h.dynamic.EnqueueAfter(obj.GetObjectKind().GroupVersionKind(), infraObj.meta.GetNamespace(), infraObj.meta.GetName(), 5*time.Second); err != nil {
 			return obj, err
 		}

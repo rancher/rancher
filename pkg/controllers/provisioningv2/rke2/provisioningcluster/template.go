@@ -362,6 +362,7 @@ func machineDeployments(cluster *rancherv1.Cluster, capiCluster *capi.Cluster, d
 							},
 						},
 						InfrastructureRef: infraRef,
+						NodeDrainTimeout:  machinePool.DrainBeforeDeleteTimeout,
 					},
 				},
 				Paused: machinePool.Paused,
