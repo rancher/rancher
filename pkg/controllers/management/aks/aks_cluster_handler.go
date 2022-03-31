@@ -108,7 +108,8 @@ func (e *aksOperatorController) onClusterChange(key string, cluster *mgmtv3.Clus
 		}
 
 		// ensure empty availability zones are set to nil
-		if pruneAvailabilityZones(cluster) {
+		cluster, requiresUpdate := pruneAvailabilityZones(cluster)
+		if requiresUpdate {
 			return e.ClusterClient.Update(cluster)
 		}
 
@@ -379,9 +380,10 @@ func buildAKSCCCreateObject(cluster *mgmtv3.Cluster) (*unstructured.Unstructured
 }
 
 // pruneAvailabilityZones converts empty AvailabilityZone slices to nil,
-// ensuring that a basic AKS load balancer will be used. The return value
+// ensuring that a basic AKS load balancer will be used. The bool return value
 // indicates if the cluster has been modified and needs to be updated.
-func pruneAvailabilityZones(cluster *mgmtv3.Cluster) bool {
+func pruneAvailabilityZones(cluster *mgmtv3.Cluster) (*mgmtv3.Cluster, bool) {
+	cluster = cluster.DeepCopy()
 	clusterModified := false
 	for _, pool := range cluster.Spec.AKSConfig.NodePools {
 		if pool.AvailabilityZones == nil {
@@ -393,7 +395,7 @@ func pruneAvailabilityZones(cluster *mgmtv3.Cluster) bool {
 			*pool.AvailabilityZones = nil
 		}
 	}
-	return clusterModified
+	return cluster, clusterModified
 }
 
 // recordAppliedSpec sets the cluster's current spec as its appliedSpec
