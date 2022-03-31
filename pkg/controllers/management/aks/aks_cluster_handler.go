@@ -107,6 +107,11 @@ func (e *aksOperatorController) onClusterChange(key string, cluster *mgmtv3.Clus
 			return cluster, err
 		}
 
+		// ensure empty availability zones are set to nil
+		if pruneAvailabilityZones(cluster) {
+			return e.ClusterClient.Update(cluster)
+		}
+
 		aksClusterConfigDynamic, err = buildAKSCCCreateObject(cluster)
 		if err != nil {
 			return cluster, err
@@ -371,6 +376,24 @@ func buildAKSCCCreateObject(cluster *mgmtv3.Cluster) (*unstructured.Unstructured
 	return &unstructured.Unstructured{
 		Object: aksClusterConfigMap,
 	}, nil
+}
+
+// pruneAvailabilityZones converts empty AvailabilityZone slices to nil,
+// ensuring that a basic AKS load balancer will be used. The return value
+// indicates if the cluster has been modified and needs to be updated.
+func pruneAvailabilityZones(cluster *mgmtv3.Cluster) bool {
+	clusterModified := false
+	for _, pool := range cluster.Spec.AKSConfig.NodePools {
+		if pool.AvailabilityZones == nil {
+			continue
+		}
+
+		if len(*pool.AvailabilityZones) == 0 {
+			clusterModified = true
+			*pool.AvailabilityZones = nil
+		}
+	}
+	return clusterModified
 }
 
 // recordAppliedSpec sets the cluster's current spec as its appliedSpec
