@@ -126,6 +126,9 @@ var (
 
 	FleetMinVersion          = NewSetting("fleet-min-version", "")
 	RancherWebhookMinVersion = NewSetting("rancher-webhook-min-version", "")
+
+	Rke2DefaultVersion = NewSetting("rke2-default-version", "")
+	K3sDefaultVersion  = NewSetting("k3s-default-version", "")
 )
 
 func FullShellImage() string {
