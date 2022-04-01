@@ -30,6 +30,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 )
 
+const cleanupPodLabel = "rke.cattle.io/cleanup-node"
+
 func (m *Lifecycle) deleteV1Node(node *v3.Node) (runtime.Object, error) {
 	logrus.Debugf("Deleting v1.node for [%v] node", node.Status.NodeName)
 	if nodehelper.IgnoreNode(node.Status.NodeName, node.Status.NodeLabels) {
@@ -171,7 +173,7 @@ func (m *Lifecycle) cleanRKENode(node *v3.Node) error {
 		return err
 	}
 
-	return m.waitUntilJobDeletes(userContext, job)
+	return m.waitUntilJobDeletes(userContext, node.Name, job)
 }
 
 func (m *Lifecycle) waitForJobCondition(userContext *config.UserContext, job *v1.Job, condition func(*v1.Job, error) bool, logMessage string) error {
@@ -220,10 +222,20 @@ func (m *Lifecycle) waitUntilJobCompletes(userContext *config.UserContext, job *
 	)
 }
 
-func (m *Lifecycle) waitUntilJobDeletes(userContext *config.UserContext, job *v1.Job) error {
+func (m *Lifecycle) waitUntilJobDeletes(userContext *config.UserContext, nodeName string, job *v1.Job) error {
 	return m.waitForJobCondition(userContext, job, func(j *v1.Job, err error) bool {
-		if j.DeletionTimestamp.IsZero() {
-			err = userContext.BatchV1.Jobs(j.Namespace).Delete(j.Name, &metav1.DeleteOptions{PropagationPolicy: &[]metav1.DeletionPropagation{metav1.DeletePropagationForeground}[0]})
+		if err == nil {
+			if j.DeletionTimestamp.IsZero() {
+				err = userContext.BatchV1.Jobs(j.Namespace).Delete(j.Name, &metav1.DeleteOptions{PropagationPolicy: &[]metav1.DeletionPropagation{metav1.DeletePropagationForeground}[0]})
+			} else if pods, err := userContext.Core.Pods(j.Namespace).List(metav1.ListOptions{LabelSelector: fmt.Sprintf("%s=%s", cleanupPodLabel, nodeName)}); err != nil && !kerror.IsNotFound(err) {
+				logrus.Errorf("[node-cleanup] failed to list cleanup pods for node %s: %v", nodeName, err)
+				return false
+			} else if err == nil && len(pods.Items) > 0 {
+				if err = userContext.Core.Pods(j.Namespace).Delete(pods.Items[0].Name, &metav1.DeleteOptions{GracePeriodSeconds: &[]int64{0}[0]}); err != nil {
+					logrus.Errorf("[node-cleanup] failed to delete cleanup pod %s for node %s: %v", pods.Items[0].Name, nodeName, err)
+					return false
+				}
+			}
 		}
 		return kerror.IsNotFound(err)
 	},
@@ -257,7 +269,7 @@ func (m *Lifecycle) createCleanupJob(userContext *config.UserContext, cluster *v
 			}
 		}
 
-		return nil, m.waitUntilJobDeletes(userContext, &existingJob.Items[0])
+		return nil, m.waitUntilJobDeletes(userContext, node.Name, &existingJob.Items[0])
 	}
 
 	meta := metav1.ObjectMeta{
@@ -352,6 +364,11 @@ func (m *Lifecycle) createCleanupJob(userContext *config.UserContext, cluster *v
 		Spec: batchV1.JobSpec{
 			TTLSecondsAfterFinished: &fiveMin,
 			Template: coreV1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						cleanupPodLabel: node.Name,
+					},
+				},
 				Spec: coreV1.PodSpec{
 					ImagePullSecrets: imagePullSecrets,
 					RestartPolicy:    "Never",
