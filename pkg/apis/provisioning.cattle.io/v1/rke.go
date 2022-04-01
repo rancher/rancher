@@ -15,6 +15,7 @@ type RKEMachinePool struct {
 	ControlPlaneRole             bool                         `json:"controlPlaneRole,omitempty"`
 	WorkerRole                   bool                         `json:"workerRole,omitempty"`
 	DrainBeforeDelete            bool                         `json:"drainBeforeDelete,omitempty"`
+	DrainBeforeDeleteTimeout     *metav1.Duration             `json:"drainBeforeDeleteTimeout,omitempty"`
 	NodeConfig                   *corev1.ObjectReference      `json:"machineConfigRef,omitempty" wrangler:"required"`
 	Name                         string                       `json:"name,omitempty" wrangler:"required"`
 	DisplayName                  string                       `json:"displayName,omitempty"`
