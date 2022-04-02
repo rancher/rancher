@@ -106,7 +106,7 @@ def match_nodes(nodes, k8s_nodes):
         else:
             raise Exception(
                 "Did not find provisioned node's '{0}' corresponding nodes "
-                "resourse in cluster: {1}".format(
+                "resources in cluster: {1}".format(
                     node.node_name, k8s_node_names))
     return nodes_to_k8s_nodes
 
@@ -394,11 +394,11 @@ class PodIntercommunicationValidation(object):
 
     def setup(self):
         self.kubectl.create_ns(self.ns_out)
-        result = self.kubectl.create_resourse_from_yml(
+        result = self.kubectl.create_resources_from_yml(
             self.yml_file, namespace=self.ns_out)
 
         self.kubectl.create_ns(self.ns_in)
-        result = self.kubectl.create_resourse_from_yml(
+        result = self.kubectl.create_resources_from_yml(
             self.yml_file, namespace=self.ns_in)
 
     def validate(self):
@@ -465,12 +465,12 @@ class PodIntercommunicationValidation(object):
         """
         Deletes a daemonset of pods and namespace
         """
-        result = self.kubectl.delete_resourse_from_yml(
+        result = self.kubectl.delete_resources_from_yml(
             self.yml_file, namespace=self.ns_out)
-        result = self.kubectl.delete_resourse_from_yml(
+        result = self.kubectl.delete_resources_from_yml(
             self.yml_file, namespace=self.ns_in)
-        self.kubectl.delete_resourse('namespace', self.ns_out)
-        self.kubectl.delete_resourse('namespace', self.ns_in)
+        self.kubectl.delete_resources('namespace', self.ns_out)
+        self.kubectl.delete_resources('namespace', self.ns_in)
 
 
 class DNSServiceDiscoveryValidation(object):
@@ -499,10 +499,10 @@ class DNSServiceDiscoveryValidation(object):
             # create service
             result = self.kubectl.create_ns(service_info['namespace'])
 
-            result = self.kubectl.create_resourse_from_yml(
+            result = self.kubectl.create_resources_from_yml(
                 service_info['yml_file'], namespace=service_info['namespace'])
 
-        result = self.kubectl.create_resourse_from_yml(
+        result = self.kubectl.create_resources_from_yml(
             k8s_resource_dir + 'single_pod.yml',
             namespace=self.namespace)
 
@@ -549,13 +549,13 @@ class DNSServiceDiscoveryValidation(object):
                     dns_record))
 
     def teardown(self):
-        self.kubectl.delete_resourse(
+        self.kubectl.delete_resources(
             'pod', 'pod-test-util', namespace=self.namespace)
 
         for service_name, service_info in self.services.items():
-            self.kubectl.delete_resourse_from_yml(
+            self.kubectl.delete_resources_from_yml(
                 service_info['yml_file'], namespace=service_info['namespace'])
-            self.kubectl.delete_resourse(
+            self.kubectl.delete_resources(
                 'namespace', service_info['namespace'])
 
 

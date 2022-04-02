@@ -12,20 +12,20 @@ def test_install_rbac_1(test_name, cloud_provider, rke_client, kubectl):
     nodes = cloud_provider.create_multiple_nodes(3, test_name)
     create_rke_cluster(rke_client, kubectl, nodes, rke_template)
 
-    result = kubectl.create_resourse_from_yml(
+    result = kubectl.create_resources_from_yml(
         'resources/k8s_ymls/daemonset_pods_per_node.yml', namespace='default')
     assert result.ok, result.stderr
     kubectl.create_ns('outside-role')
-    result = kubectl.create_resourse_from_yml(
+    result = kubectl.create_resources_from_yml(
         'resources/k8s_ymls/daemonset_pods_per_node.yml',
         namespace='outside-role')
     assert result.ok, result.stderr
 
     # Create role and rolebinding to user1 in namespace 'default'
     # namespace is coded in role.yml and rolebinding.yml
-    result = kubectl.create_resourse_from_yml('resources/k8s_ymls/role.yml')
+    result = kubectl.create_resources_from_yml('resources/k8s_ymls/role.yml')
     assert result.ok, result.stderr
-    result = kubectl.create_resourse_from_yml(
+    result = kubectl.create_resources_from_yml(
         'resources/k8s_ymls/rolebinding.yml')
     assert result.ok, result.stderr
 

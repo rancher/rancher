@@ -25,7 +25,7 @@ def extract_file_results_path(logs):
 def delete_all_jobs(kubectl):
     namespaces = kubectl.list_namespaces()
     for namespace in namespaces:
-        result = kubectl.delete_resourse("jobs", namespace=namespace, all=True)
+        result = kubectl.delete_resources("jobs", namespace=namespace, all=True)
         assert result.ok, "{}".format(result)
 
 

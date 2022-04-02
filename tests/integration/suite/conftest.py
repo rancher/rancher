@@ -48,7 +48,7 @@ WAIT_HTTP_ERROR_CODES = [404, 405]
 
 
 class ManagementContext:
-    """Contains a client that is scoped to the managment plane APIs. That is,
+    """Contains a client that is scoped to the management plane APIs. That is,
     APIs that are not specific to a cluster or project."""
 
     def __init__(self, client, k8s_client=None, user=None):

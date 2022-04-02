@@ -125,13 +125,13 @@ class KubectlClient(object):
         result = self.execute_kubectl(command, **cli_options)
         return result
 
-    def create_resourse_from_yml(self, file_yml, namespace=None):
+    def create_resources_from_yml(self, file_yml, namespace=None):
         cmd = "create -f {0}".format(file_yml)
         if namespace:
             cmd += ' --namespace={0}'.format(namespace)
         return self.execute_kubectl_cmd(cmd)
 
-    def delete_resourse_from_yml(self, file_yml, namespace=None):
+    def delete_resources_from_yml(self, file_yml, namespace=None):
         cmd = "delete -f {0}".format(file_yml)
         if namespace:
             cmd += ' --namespace={0}'.format(namespace)
@@ -153,7 +153,7 @@ class KubectlClient(object):
         result = self.execute_kubectl(command, **cli_options)
         return self._load_json(result)
 
-    def delete_resourse(self, resource, name=None, **cli_options):
+    def delete_resources(self, resource, name=None, **cli_options):
         command = "delete {0}".format(resource)
         if name:
             command += ' {0}'.format(name)

@@ -49,7 +49,7 @@ AWS_SECRET_ACCESS_KEY=
 - run docker run --rm -v ~/path/to/rancher-validation:/src/rancher-validation rancher-validation-tests -c pytest -s rke_tests/
 
 
-## RKE Template Referenece
+## RKE Template Reference
 
 All other fields will be replaced if passed in to build_rke_template as key value pairs
 For Nodes, the 'N' should be replace with index starting at 0
