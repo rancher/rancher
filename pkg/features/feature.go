@@ -101,6 +101,12 @@ var (
 		true,
 		true,
 		true)
+	RKE1CustomNodeCleanup = newFeature(
+		"rke1-custom-node-cleanup",
+		"Enable cleanup RKE1 custom cluster nodes when they are deleted",
+		true,
+		true,
+		true)
 )
 
 type Feature struct {
