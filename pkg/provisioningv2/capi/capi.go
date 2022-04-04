@@ -61,6 +61,7 @@ func (t *connectedAgentClusterCacheClient) Get(ctx context.Context, key client.O
 	if err == nil && !rkeCP.Status.AgentConnected {
 		// If the agent is not connected, then returning a NotFound error will cause CAPI to stop its caches
 		// They will be refreshed once the agent reconnects.
+		// See the ClusterCacheReconciler: https://github.com/kubernetes-sigs/cluster-api/blob/5026786ee809c5def466049f5befd2a786fbcefa/controllers/remote/cluster_cache_reconciler.go#L60
 		return apierrors.NewNotFound(schema.GroupResource{
 			Group:    obj.GetObjectKind().GroupVersionKind().Group,
 			Resource: obj.GetObjectKind().GroupVersionKind().Kind,

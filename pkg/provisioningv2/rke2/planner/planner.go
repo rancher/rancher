@@ -554,6 +554,8 @@ func (p *Planner) reconcile(controlPlane *rkev1.RKEControlPlane, tokensSecret pl
 			outOfSync = append(outOfSync, entry.Machine.Name)
 			messages[entry.Machine.Name] = append(messages[entry.Machine.Name], "waiting for kubelet to update")
 		} else if tierName == controlPlaneTier && !controlPlane.Status.AgentConnected {
+			// If the control plane nodes are currently being provisioned/updated, then it should be ensured that cluster-agent is connected.
+			// Without the agent connected, the controllers running in Rancher, including CAPI, can't communicate with the downstream cluster.
 			outOfSync = append(outOfSync, entry.Machine.Name)
 			messages[entry.Machine.Name] = append(messages[entry.Machine.Name], "waiting for cluster agent to connect")
 		} else {
