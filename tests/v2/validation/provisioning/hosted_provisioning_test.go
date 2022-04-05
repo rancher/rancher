@@ -6,7 +6,9 @@ import (
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
 	"github.com/rancher/rancher/tests/framework/extensions/cloudcredentials/aws"
+	"github.com/rancher/rancher/tests/framework/extensions/cloudcredentials/azure"
 	"github.com/rancher/rancher/tests/framework/extensions/clusters"
+	"github.com/rancher/rancher/tests/framework/extensions/clusters/aks"
 	"github.com/rancher/rancher/tests/framework/extensions/clusters/eks"
 	"github.com/rancher/rancher/tests/framework/extensions/users"
 	"github.com/rancher/rancher/tests/framework/pkg/session"
@@ -56,6 +58,47 @@ func (h *HostesdClusterProvisioningTestSuite) SetupSuite() {
 	require.NoError(h.T(), err)
 
 	h.standardUserClient = standardUserClient
+}
+
+func (h *HostesdClusterProvisioningTestSuite) TestProvisioningHostedAKSCluster() {
+	tests := []struct {
+		name   string
+		client *rancher.Client
+	}{
+		{"Admin User", h.client},
+		{"Standard User", h.standardUserClient},
+	}
+
+	for _, tt := range tests {
+		h.Run(tt.name, func() {
+			subSession := h.session.NewSession()
+			defer subSession.Cleanup()
+
+			client, err := tt.client.WithSession(subSession)
+			require.NoError(h.T(), err)
+
+			cloudCredential, err := azure.CreateAzureCloudCredentials(client)
+			require.NoError(h.T(), err)
+
+			clusterName := AppendRandomString("ekshostcluster")
+			clusterResp, err := aks.CreateAKSHostedCluster(client, clusterName, cloudCredential.ID, false, false, false, false, map[string]string{})
+			require.NoError(h.T(), err)
+
+			opts := metav1.ListOptions{
+				FieldSelector:  "metadata.name=" + clusterResp.ID,
+				TimeoutSeconds: &defaults.WatchTimeoutSeconds,
+			}
+			watchInterface, err := h.client.GetManagementWatchInterface(management.ClusterType, opts)
+			require.NoError(h.T(), err)
+
+			checkFunc := clusters.IsHostedProvisioningClusterReady
+
+			err = wait.WatchWait(watchInterface, checkFunc)
+			require.NoError(h.T(), err)
+			assert.Equal(h.T(), clusterName, clusterResp.Name)
+
+		})
+	}
 }
 
 func (h *HostesdClusterProvisioningTestSuite) TestProvisioningHostedEKSCluster() {
