@@ -48,43 +48,15 @@ func (h *handler) OnChange(key string, secret *corev1.Secret) (*corev1.Secret, e
 		return secret, err
 	}
 
-	if v, ok := node.PeriodicOutput["etcd-snapshot-list"]; ok && v.ExitCode == 0 && len(v.Stdout) > 0 {
-		cnl := secret.Labels[rke2.ClusterNameLabel]
-		if len(cnl) == 0 {
-			return secret, fmt.Errorf("node secret did not have label %s", rke2.ClusterNameLabel)
-		}
-
-		machineName, ok := secret.Labels[rke2.MachineNameLabel]
-		if !ok {
-			return secret, fmt.Errorf("did not find machine label on secret %s/%s", secret.Namespace, secret.Name)
-		}
-
-		machine, err := h.machinesCache.Get(secret.Namespace, machineName)
-		if err != nil {
+	if v, ok := node.PeriodicOutput["etcd-snapshot-list-local"]; ok && v.ExitCode == 0 && len(v.Stdout) > 0 {
+		if err := h.reconcileEtcdSnapshotList(secret, false, v.Stdout); err != nil {
 			return secret, err
 		}
+	}
 
-		if machine.Status.NodeRef != nil && machine.Status.NodeRef.Name != "" {
-			etcdSnapshotsOnNode := outputToEtcdSnapshots(cnl, v.Stdout)
-			ls, err := labels.Parse(fmt.Sprintf("%s=%s,%s=%s", rke2.ClusterNameLabel, cnl, rke2.NodeNameLabel, machine.Status.NodeRef.Name))
-			if err != nil {
-				return secret, err
-			}
-
-			etcdSnapshots, err := h.etcdSnapshotsCache.List(secret.Namespace, ls)
-			if err != nil {
-				return secret, err
-			}
-
-			for _, v := range etcdSnapshots {
-				if _, ok := etcdSnapshotsOnNode[v.Name]; !ok && v.Status.Missing {
-					// delete the etcd snapshot as it is likely missing
-					logrus.Infof("Deleting etcd snapshot %s/%s", v.Namespace, v.Name)
-					if err := h.etcdSnapshotsClient.Delete(v.Namespace, v.Name, &metav1.DeleteOptions{}); err != nil {
-						return secret, err
-					}
-				}
-			}
+	if v, ok := node.PeriodicOutput["etcd-snapshot-list-s3"]; ok && v.ExitCode == 0 && len(v.Stdout) > 0 {
+		if err := h.reconcileEtcdSnapshotList(secret, true, v.Stdout); err != nil {
+			return secret, err
 		}
 	}
 
@@ -99,6 +71,54 @@ func (h *handler) OnChange(key string, secret *corev1.Secret) (*corev1.Secret, e
 	}
 
 	return secret, nil
+}
+
+func (h *handler) reconcileEtcdSnapshotList(secret *corev1.Secret, s3 bool, listStdout []byte) error {
+	cnl := secret.Labels[rke2.ClusterNameLabel]
+	if len(cnl) == 0 {
+		return fmt.Errorf("node secret did not have label %s", rke2.ClusterNameLabel)
+	}
+
+	machineName, ok := secret.Labels[rke2.MachineNameLabel]
+	if !ok {
+		return fmt.Errorf("did not find machine label on secret %s/%s", secret.Namespace, secret.Name)
+	}
+
+	nodeName := "s3"
+
+	if !s3 {
+		machine, err := h.machinesCache.Get(secret.Namespace, machineName)
+		if err != nil {
+			return err
+		}
+		if machine.Status.NodeRef != nil && machine.Status.NodeRef.Name != "" {
+			nodeName = machine.Status.NodeRef.Name
+		} else {
+			return fmt.Errorf("error finding corresponding node via noderef for machine %s/%s", machine.Namespace, machine.Name)
+		}
+	}
+
+	etcdSnapshotsOnNode := outputToEtcdSnapshots(cnl, listStdout)
+	ls, err := labels.Parse(fmt.Sprintf("%s=%s,%s=%s", rke2.ClusterNameLabel, cnl, rke2.NodeNameLabel, nodeName))
+	if err != nil {
+		return err
+	}
+
+	etcdSnapshots, err := h.etcdSnapshotsCache.List(secret.Namespace, ls)
+	if err != nil {
+		return err
+	}
+
+	for _, v := range etcdSnapshots {
+		if _, ok := etcdSnapshotsOnNode[v.Name]; !ok && v.Status.Missing {
+			// delete the etcd snapshot as it is likely missing
+			logrus.Infof("Deleting etcd snapshot %s/%s", v.Namespace, v.Name)
+			if err := h.etcdSnapshotsClient.Delete(v.Namespace, v.Name, &metav1.DeleteOptions{}); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 type snapshot struct {

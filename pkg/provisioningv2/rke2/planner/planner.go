@@ -156,8 +156,6 @@ func New(ctx context.Context, clients *wrangler.Context) *Planner {
 		etcdSnapshotCache:             clients.RKE.ETCDSnapshot().Cache(),
 		kubeconfig:                    kubeconfig.New(clients),
 		etcdS3Args: s3Args{
-			prefix:      "etcd-",
-			env:         true,
 			secretCache: clients.Core.Secret().Cache(),
 		},
 		certificateRotation: newCertificateRotation(clients, store),
@@ -873,9 +871,15 @@ func (p *Planner) desiredPlan(controlPlane *rkev1.RKEControlPlane, tokensSecret 
 	}
 
 	if isEtcd(entry) {
-		nodePlan, err = p.addEtcdSnapshotListPeriodicInstruction(nodePlan, controlPlane)
+		nodePlan, err = p.addEtcdSnapshotListLocalPeriodicInstruction(nodePlan, controlPlane)
 		if err != nil {
 			return nodePlan, err
+		}
+		if controlPlane != nil && controlPlane.Spec.ETCD != nil && controlPlane.Spec.ETCD.S3 != nil {
+			nodePlan, err = p.addEtcdSnapshotListS3PeriodicInstruction(nodePlan, controlPlane)
+			if err != nil {
+				return nodePlan, err
+			}
 		}
 	}
 	return nodePlan, nil
