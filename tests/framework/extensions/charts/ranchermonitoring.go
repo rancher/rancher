@@ -25,7 +25,7 @@ const (
 )
 
 //InstallRancherMonitoringChart is a helper function that installs the rancher-montitoring chart.
-func InstallRancherMonitoringChart(client *rancher.Client, projectID, clusterName, version string) error {
+func InstallRancherMonitoringChart(client *rancher.Client, projectID, clusterID, clusterName, version string) error {
 	chartInstallCRD := types.ChartInstall{
 		Annotations: map[string]string{
 			"catalog.cattle.io/ui-source-repo":      "rancher-charts",
@@ -37,7 +37,7 @@ func InstallRancherMonitoringChart(client *rancher.Client, projectID, clusterNam
 		Values: v3.MapStringInterface{
 			"global": map[string]interface{}{
 				"cattle": map[string]string{
-					"clusterId":             clusterName,
+					"clusterId":             clusterID,
 					"clusterName":           clusterName,
 					"rkePathPrefix":         "",
 					"rkeWindowsPathPrefix":  "",
@@ -65,7 +65,7 @@ func InstallRancherMonitoringChart(client *rancher.Client, projectID, clusterNam
 			},
 			"global": map[string]interface{}{
 				"cattle": map[string]string{
-					"clusterId":             clusterName,
+					"clusterId":             clusterID,
 					"clusterName":           clusterName,
 					"rkePathPrefix":         "",
 					"rkeWindowsPathPrefix":  "",
@@ -108,6 +108,11 @@ func InstallRancherMonitoringChart(client *rancher.Client, projectID, clusterNam
 		Charts:                   []types.ChartInstall{chartInstallCRD, chartInstall},
 	}
 
+	catalogClient, err := client.GetClusterCatalogClient(clusterID)
+	if err != nil {
+		return err
+	}
+
 	// Cleanup registration
 	client.Session.RegisterCleanupFunc(func() error {
 		//UninstallAction for when uninstalling the rancher-monitoring chart
@@ -119,12 +124,12 @@ func InstallRancherMonitoringChart(client *rancher.Client, projectID, clusterNam
 			Timeout:      nil,
 		}
 
-		err := client.Catalog.UninstallChart(RancherMonitoringName, RancherMonitoringNamespace, uninstallAction)
+		err = catalogClient.UninstallChart(RancherMonitoringName, RancherMonitoringNamespace, uninstallAction)
 		if err != nil {
 			return err
 		}
 
-		watchAppInterface, err := client.Catalog.Apps(RancherMonitoringNamespace).Watch(context.TODO(), metav1.ListOptions{
+		watchAppInterface, err := catalogClient.Apps(RancherMonitoringNamespace).Watch(context.TODO(), metav1.ListOptions{
 			FieldSelector:  "metadata.name=" + RancherMonitoringName,
 			TimeoutSeconds: &defaults.WatchTimeoutSeconds,
 		})
@@ -144,7 +149,12 @@ func InstallRancherMonitoringChart(client *rancher.Client, projectID, clusterNam
 			return err
 		}
 
-		dynamicClient, err := client.GetDownStreamClusterClient(clusterName)
+		adminClient, err := rancher.NewClient(client.RancherConfig.AdminToken, client.Session)
+		if err != nil {
+			return err
+		}
+
+		dynamicClient, err := adminClient.GetDownStreamClusterClient(clusterID)
 		if err != nil {
 			return err
 		}
@@ -176,13 +186,13 @@ func InstallRancherMonitoringChart(client *rancher.Client, projectID, clusterNam
 		})
 	})
 
-	err := client.Catalog.InstallChart(chartInstallAction)
+	err = catalogClient.InstallChart(chartInstallAction)
 	if err != nil {
 		return err
 	}
 
 	//wait for chart to be full deployed
-	watchAppInterface, err := client.Catalog.Apps(RancherMonitoringNamespace).Watch(context.TODO(), metav1.ListOptions{
+	watchAppInterface, err := catalogClient.Apps(RancherMonitoringNamespace).Watch(context.TODO(), metav1.ListOptions{
 		FieldSelector:  "metadata.name=" + RancherMonitoringName,
 		TimeoutSeconds: &defaults.WatchTimeoutSeconds,
 	})
