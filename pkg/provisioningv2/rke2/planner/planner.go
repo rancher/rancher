@@ -22,7 +22,6 @@ import (
 	mgmtcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	ranchercontrollers "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
 	rkecontrollers "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
-	"github.com/rancher/rancher/pkg/provisioningv2/kubeconfig"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/rancher/wrangler/pkg/condition"
@@ -65,6 +64,11 @@ const (
 	ConfigYamlFileName   = "/etc/rancher/%s/config.yaml.d/50-rancher.yaml"
 
 	windows = "windows"
+
+	bootstrapTier    = "bootstrap"
+	etcdTier         = "etcd"
+	controlPlaneTier = "control plane"
+	workerTier       = "worker"
 )
 
 var (
@@ -129,7 +133,6 @@ type Planner struct {
 	capiClusters                  capicontrollers.ClusterCache
 	managementClusters            mgmtcontrollers.ClusterCache
 	rancherClusterCache           ranchercontrollers.ClusterCache
-	kubeconfig                    *kubeconfig.Manager
 	locker                        locker.Locker
 	etcdS3Args                    s3Args
 	certificateRotation           *certificateRotation
@@ -154,7 +157,6 @@ func New(ctx context.Context, clients *wrangler.Context) *Planner {
 		rancherClusterCache:           clients.Provisioning.Cluster().Cache(),
 		rkeControlPlanes:              clients.RKE.RKEControlPlane(),
 		etcdSnapshotCache:             clients.RKE.ETCDSnapshot().Cache(),
-		kubeconfig:                    kubeconfig.New(clients),
 		etcdS3Args: s3Args{
 			secretCache: clients.Core.Secret().Cache(),
 		},
@@ -322,7 +324,7 @@ func (p *Planner) Process(controlPlane *rkev1.RKEControlPlane) error {
 	}
 
 	// select all etcd and then filter to just initNodes to that unavailable count is correct
-	err = p.reconcile(controlPlane, clusterSecretTokens, plan, true, "bootstrap", isEtcd, isNotInitNodeOrIsDeleting,
+	err = p.reconcile(controlPlane, clusterSecretTokens, plan, true, bootstrapTier, isEtcd, isNotInitNodeOrIsDeleting,
 		"1", "",
 		controlPlane.Spec.UpgradeStrategy.ControlPlaneDrainOptions)
 	firstIgnoreError, err = ignoreErrors(firstIgnoreError, err)
@@ -341,7 +343,7 @@ func (p *Planner) Process(controlPlane *rkev1.RKEControlPlane) error {
 		}
 	}
 
-	err = p.reconcile(controlPlane, clusterSecretTokens, plan, true, "etcd", isEtcd, isInitNodeOrDeleting,
+	err = p.reconcile(controlPlane, clusterSecretTokens, plan, true, etcdTier, isEtcd, isInitNodeOrDeleting,
 		"1", joinServer,
 		controlPlane.Spec.UpgradeStrategy.ControlPlaneDrainOptions)
 	firstIgnoreError, err = ignoreErrors(firstIgnoreError, err)
@@ -349,7 +351,7 @@ func (p *Planner) Process(controlPlane *rkev1.RKEControlPlane) error {
 		return err
 	}
 
-	err = p.reconcile(controlPlane, clusterSecretTokens, plan, true, "control plane", isControlPlane, isInitNodeOrDeleting,
+	err = p.reconcile(controlPlane, clusterSecretTokens, plan, true, controlPlaneTier, isControlPlane, isInitNodeOrDeleting,
 		controlPlane.Spec.UpgradeStrategy.ControlPlaneConcurrency, joinServer,
 		controlPlane.Spec.UpgradeStrategy.ControlPlaneDrainOptions)
 	firstIgnoreError, err = ignoreErrors(firstIgnoreError, err)
@@ -362,7 +364,7 @@ func (p *Planner) Process(controlPlane *rkev1.RKEControlPlane) error {
 		return ErrWaiting("waiting for control plane to be available")
 	}
 
-	err = p.reconcile(controlPlane, clusterSecretTokens, plan, false, "worker", isOnlyWorker, isInitNodeOrDeleting,
+	err = p.reconcile(controlPlane, clusterSecretTokens, plan, false, workerTier, isOnlyWorker, isInitNodeOrDeleting,
 		controlPlane.Spec.UpgradeStrategy.WorkerConcurrency, joinServer,
 		controlPlane.Spec.UpgradeStrategy.WorkerDrainOptions)
 	firstIgnoreError, err = ignoreErrors(firstIgnoreError, err)
@@ -549,6 +551,11 @@ func (p *Planner) reconcile(controlPlane *rkev1.RKEControlPlane, tokensSecret pl
 		} else if !kubeletVersionUpToDate(controlPlane, entry.Machine) {
 			outOfSync = append(outOfSync, entry.Machine.Name)
 			messages[entry.Machine.Name] = append(messages[entry.Machine.Name], "waiting for kubelet to update")
+		} else if tierName == controlPlaneTier && !controlPlane.Status.AgentConnected {
+			// If the control plane nodes are currently being provisioned/updated, then it should be ensured that cluster-agent is connected.
+			// Without the agent connected, the controllers running in Rancher, including CAPI, can't communicate with the downstream cluster.
+			outOfSync = append(outOfSync, entry.Machine.Name)
+			messages[entry.Machine.Name] = append(messages[entry.Machine.Name], "waiting for cluster agent to connect")
 		} else {
 			ready = append(ready, entry.Machine.Name)
 		}
@@ -596,8 +603,9 @@ func (p *Planner) reconcile(controlPlane *rkev1.RKEControlPlane, tokensSecret pl
 }
 
 func kubeletVersionUpToDate(controlPlane *rkev1.RKEControlPlane, machine *capi.Machine) bool {
-	if controlPlane == nil || machine == nil || machine.Status.NodeInfo == nil {
-		// If any of these things are nil, then provisioning is still happening.
+	if controlPlane == nil || machine == nil || machine.Status.NodeInfo == nil || !controlPlane.Status.AgentConnected {
+		// If any of controlPlane, machine, or machine.Status.NodeInfo are nil, then provisioning is still happening.
+		// If controlPlane.Status.AgentConnected is false, then it cannot be reliably determined if the kubelet is up-to-date.
 		// Return true so that provisioning is not slowed down.
 		return true
 	}
@@ -954,8 +962,8 @@ func noRole(entry *planEntry) bool {
 	return !isEtcd(entry) && !isControlPlane(entry) && !isWorker(entry)
 }
 
-func anyRole(_ *planEntry) bool {
-	return true
+func anyRole(entry *planEntry) bool {
+	return !noRole(entry)
 }
 
 func isOnlyWorker(entry *planEntry) bool {

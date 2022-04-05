@@ -519,7 +519,7 @@ func (m *Lifecycle) sync(key string, obj *v3.Node) (runtime.Object, error) {
 		return nil, nil
 	}
 
-	if cleanupAnnotation, ok := obj.Annotations[userNodeRemoveCleanupAnnotation]; !ok || cleanupAnnotation != "true" {
+	if obj.Annotations[userNodeRemoveCleanupAnnotation] != "true" {
 		// finalizer from user-node-remove has to be checked/cleaned
 		return m.userNodeRemoveCleanup(obj)
 	}
