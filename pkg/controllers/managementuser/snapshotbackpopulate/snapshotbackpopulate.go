@@ -171,6 +171,10 @@ func (h *handler) OnChange(key string, configMap *corev1.ConfigMap) (runtime.Obj
 			logrus.Tracef("[snapshotbackpopulate] rkecluster %s/%s: creating etcd snapshot %s/%s: %+v", cluster.Namespace, cluster.Name, cmGeneratedSnapshot.Namespace, cmGeneratedSnapshot.Name, cmGeneratedSnapshot)
 			_, err = h.etcdSnapshots.Create(&cmGeneratedSnapshot)
 			if err != nil {
+				if apierrors.IsAlreadyExists(err) {
+					logrus.Debugf("[snapshotbackpopulate] rkecluster %s/%s: duplicate snapshot found when creating snapshot %s/%s", cluster.Namespace, cluster.Name, cmGeneratedSnapshot.Namespace, cmGeneratedSnapshot.Name)
+					continue
+				}
 				return configMap, fmt.Errorf("rkecluster %s/%s: error while creating etcd snapshot %s/%s: %w", cluster.Namespace, cluster.Name, cmGeneratedSnapshot.Namespace, cmGeneratedSnapshot.Name, err)
 			}
 		}
