@@ -5,9 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/rancher/lasso/pkg/cache"
-	"github.com/rancher/lasso/pkg/client"
-	"github.com/rancher/lasso/pkg/controller"
 	provv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	cluster2 "github.com/rancher/rancher/pkg/controllers/provisioningv2/cluster"
@@ -16,7 +13,6 @@ import (
 	provisioningcontrollers "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
 	rkev1controllers "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/types/config"
-	corecontrollers "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/pkg/name"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
@@ -24,6 +20,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 var (
@@ -52,7 +49,7 @@ type handler struct {
 
 // Register sets up the v2provisioning snapshot backpopulate controller. This controller is responsible for monitoring
 // the downstream etcd-snapshots configmap and backpopulating snapshots into etcd snapshot objects in the management cluster.
-func Register(ctx context.Context, userContext *config.UserContext) error {
+func Register(ctx context.Context, userContext *config.UserContext) {
 	h := handler{
 		clusterName:       userContext.ClusterName,
 		clusterCache:      userContext.Management.Wrangler.Provisioning.Cluster().Cache(),
@@ -62,33 +59,10 @@ func Register(ctx context.Context, userContext *config.UserContext) error {
 		machineCache:      userContext.Management.Wrangler.CAPI.Machine().Cache(),
 	}
 
-	// We want to watch two specific objects, not all config maps.  So we setup a custom controller
-	// to just watch those names.
-	clientFactory, err := client.NewSharedClientFactory(&userContext.RESTConfig, nil)
-	if err != nil {
-		return err
-	}
-
-	for configMapName := range configMapNames {
-		cacheFactory := cache.NewSharedCachedFactory(clientFactory, &cache.SharedCacheFactoryOptions{
-			DefaultNamespace: "kube-system",
-			DefaultTweakList: func(options *metav1.ListOptions) {
-				options.FieldSelector = fmt.Sprintf("metadata.name=%s", configMapName)
-			},
-		})
-		controllerFactory := controller.NewSharedControllerFactory(cacheFactory, nil)
-
-		controller := corecontrollers.New(controllerFactory)
-		controller.ConfigMap().OnChange(ctx, "snapshotbackpopulate", h.OnChange)
-		if err := controllerFactory.Start(ctx, 1); err != nil {
-			return err
-		}
-	}
-
-	return nil
+	userContext.Core.ConfigMaps("kube-system").Controller().AddHandler(ctx, "snapshotbackpopulate", h.OnChange)
 }
 
-func (h *handler) OnChange(key string, configMap *corev1.ConfigMap) (*corev1.ConfigMap, error) {
+func (h *handler) OnChange(key string, configMap *corev1.ConfigMap) (runtime.Object, error) {
 	if configMap == nil {
 		return nil, nil
 	}

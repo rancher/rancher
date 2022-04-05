@@ -38,9 +38,7 @@ func Register(ctx context.Context, mgmt *config.ScaledContext, cluster *config.U
 	windows.Register(ctx, clusterRec, cluster)
 	nsserviceaccount.Register(ctx, cluster)
 	if features.RKE2.Enabled() {
-		if err := snapshotbackpopulate.Register(ctx, cluster); err != nil {
-			return err
-		}
+		snapshotbackpopulate.Register(ctx, cluster)
 		pspdelete.Register(ctx, cluster)
 		machinerole.Register(ctx, cluster)
 	}
