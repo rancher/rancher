@@ -25,9 +25,9 @@ else
   echo -e "node-external-ip: ${4}" >> /etc/rancher/rke2/config.yaml
 fi
 
-if [[ ${1} == *"rhel"* ]]
+if [[ ${1} = "rhel" ]]
 then
-   subscription-manager register --auto-attach --username=${8} --password=${9}
+   subscription-manager register --auto-attach --username=${9} --password=${10}
    subscription-manager repos --enable=rhel-7-server-extras-rpms
 fi
 
@@ -44,13 +44,19 @@ then
   sudo systemctl reload NetworkManager
 fi
 
+export "${8}"="${3}"
+if [ ! -z "${11}" ]
+then
+  export INSTALL_RKE2_METHOD="${11}"
+fi
+
 if [ ${6} = "rke2" ]
 then
    if [ ${5} != "null" ]
    then
-       curl -sfL https://get.rke2.io | INSTALL_RKE2_VERSION=${3}  INSTALL_RKE2_CHANNEL=${5} sh -
+       curl -sfL https://get.rke2.io | INSTALL_RKE2_CHANNEL=${5} sh -
    else
-       curl -sfL https://get.rke2.io | INSTALL_RKE2_VERSION=${3} sh -
+       curl -sfL https://get.rke2.io | sh -
    fi
    sleep 10
    if [ ! -z "${7}" ] && [[ "${7}" == *"cis"* ]]

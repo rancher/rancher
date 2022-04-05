@@ -18,6 +18,8 @@ variable "password" {
 variable "region" {}
 variable "resource_name" {}
 variable "rke2_version" {}
+variable "install_mode" {}
+variable "install_method" {}
 variable "rke2_channel" {}
 variable "sg_id" {}
 variable "subnets" {}

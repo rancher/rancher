@@ -29,6 +29,8 @@ AWS_VOLUME_SIZE = os.environ.get("AWS_VOLUME_SIZE", "20")
 RANCHER_RKE2_RHEL_USERNAME = os.environ.get("RANCHER_RKE2_RHEL_USERNAME", "")
 RANCHER_RKE2_RHEL_PASSWORD = os.environ.get("RANCHER_RKE2_RHEL_PASSWORD", "")
 RANCHER_RKE2_KUBECONFIG_PATH = DATA_SUBDIR + "/rke2_kubeconfig.yaml"
+RKE2_INSTALL_MODE = os.environ.get("RKE2_INSTALL_MODE", "INSTALL_RKE2_VERSION")
+RKE2_INSTALL_METHOD = os.environ.get("RKE2_INSTALL_METHOD", "")
 
 
 def test_create_rancherd_multiple_control_cluster():
@@ -93,6 +95,8 @@ def create_rke2_multiple_control_cluster(cluster_type, cluster_version):
                               'username': RANCHER_RKE2_RHEL_USERNAME,
                               'password': RANCHER_RKE2_RHEL_PASSWORD,
                               'rke2_version': cluster_version,
+                              'install_mode': RKE2_INSTALL_MODE,
+                              'install_method': RKE2_INSTALL_METHOD,
                               'rke2_channel': RANCHER_RKE2_CHANNEL,
                               'no_of_server_nodes': no_of_servers,
                               'server_flags': RANCHER_RKE2_SERVER_FLAGS,
@@ -121,6 +125,8 @@ def create_rke2_multiple_control_cluster(cluster_type, cluster_version):
                                   'resource_name': RANCHER_HOSTNAME_PREFIX,
                                   'access_key': keyPath,
                                   'rke2_version': cluster_version,
+                                  'install_mode': RKE2_INSTALL_MODE,
+                                  'install_method': RKE2_INSTALL_METHOD,
                                   'rke2_channel': RANCHER_RKE2_CHANNEL,
                                   'username': RANCHER_RKE2_RHEL_USERNAME,
                                   'password': RANCHER_RKE2_RHEL_PASSWORD,
