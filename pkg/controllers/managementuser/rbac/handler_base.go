@@ -2,6 +2,7 @@ package rbac
 
 import (
 	"context"
+	"encoding/json"
 	"reflect"
 	"strings"
 
@@ -336,6 +337,13 @@ func ToLowerRoleTemplates(roleTemplates map[string]*v3.RoleTemplate) {
 				verbs = append(verbs, strings.ToLower(v))
 			}
 			rule.Verbs = verbs
+			newRule, err := removeEmptyFields(rule)
+			if err == nil {
+				rule = newRule
+			} else {
+				// Removal of empty fields is not a critical process - we should continue even if this fails
+				logrus.Warnf("failed to remove empty fields for rules on %s, with error %v", rt.Name, err)
+			}
 			toLowerRules = append(toLowerRules, *rule)
 		}
 		rt.Rules = toLowerRules
@@ -647,4 +655,16 @@ func rtbByClusterAndUserNotDeleting(obj interface{}) ([]string, error) {
 		return []string{}, nil
 	}
 	return []string{idx}, nil
+}
+
+func removeEmptyFields(rule *rbacv1.PolicyRule) (*rbacv1.PolicyRule, error) {
+	// when creating a role template, the rules don't go through the same json encoding as they do for normal RBAC roles
+	// or cluster roles. So we marshal & unmarshal to force it to adhere to the schema k8s defines (only happens on encode)
+	newRule := new(rbacv1.PolicyRule)
+	marshaled, err := json.Marshal(rule)
+	if err != nil {
+		return nil, err
+	}
+	err = json.Unmarshal(marshaled, newRule)
+	return newRule, err
 }
