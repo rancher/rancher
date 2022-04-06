@@ -1,6 +1,7 @@
 package kontainerdrivermetadata
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -13,6 +14,7 @@ import (
 	mVersion "github.com/mcuadros/go-version"
 	"github.com/rancher/norman/types/convert"
 	setting2 "github.com/rancher/rancher/pkg/api/norman/store/setting"
+	"github.com/rancher/rancher/pkg/channelserver"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/settings"
@@ -59,6 +61,8 @@ var rancherUpdateSettingMap = map[string]settings.Setting{
 	settings.UIKubernetesSupportedVersions.Name:     settings.UIKubernetesSupportedVersions,
 	settings.KubernetesVersionToSystemImages.Name:   settings.KubernetesVersionToSystemImages,
 	settings.KubernetesVersionToServiceOptions.Name: settings.KubernetesVersionToServiceOptions,
+	settings.Rke2DefaultVersion.Name:                settings.Rke2DefaultVersion,
+	settings.K3sDefaultVersion.Name:                 settings.K3sDefaultVersion,
 }
 
 func (md *MetadataController) loadDataFromLocal() (kdm.Data, error) {
@@ -682,6 +686,9 @@ func toUpdate(maxVersionForMajorK8sVersion map[string]string, deprecated map[str
 	uiSupported := fmt.Sprintf(">=%s.x <=%s.x", minVersion, maxVersion)
 	uiDefaultRange := fmt.Sprintf("<=%s.x", maxVersion)
 
+	rke2DefaultVersion := channelserver.GetDefaultByRuntimeAndServerVersion(context.TODO(), "rke2", rancherVersion)
+	k3sDefaultVersion := channelserver.GetDefaultByRuntimeAndServerVersion(context.TODO(), "k3s", rancherVersion)
+
 	return map[string]string{
 		settings.KubernetesVersionsCurrent.Name:         strings.Join(k8sVersionsCurrent, ","),
 		settings.KubernetesVersion.Name:                 defaultK8sVersion,
@@ -690,6 +697,8 @@ func toUpdate(maxVersionForMajorK8sVersion map[string]string, deprecated map[str
 		settings.UIKubernetesSupportedVersions.Name:     uiSupported,
 		settings.KubernetesVersionToSystemImages.Name:   k8sCurrRKEdata,
 		settings.KubernetesVersionToServiceOptions.Name: k8sSvcOptionData,
+		settings.Rke2DefaultVersion.Name:                rke2DefaultVersion,
+		settings.K3sDefaultVersion.Name:                 k3sDefaultVersion,
 	}, nil
 }
 

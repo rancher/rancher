@@ -1243,8 +1243,8 @@ github.com/rancher/apiserver v0.0.0-20201023000256-1a0a904f9197/go.mod h1:8W0Ewa
 github.com/rancher/apiserver v0.0.0-20210922180056-297b6df8d714/go.mod h1:8W0EwaR9dH5NDFw6mpAX437D0q+EZqKWbZyX71+z2WI=
 github.com/rancher/apiserver v0.0.0-20220223185512-c4e289f92e46 h1:yUIRY3C0guO3qgWLojYSBZ+mbKMyjAVMNrWH7f7+APw=
 github.com/rancher/apiserver v0.0.0-20220223185512-c4e289f92e46/go.mod h1:cnLj3AnKR96wADHmJMS4msdCl1PMkXVbcSuPkfDbVWA=
-github.com/rancher/channelserver v0.5.1-0.20220217142715-90ef7d38f3f8 h1:vOhxMryJW8NkoCXUKHvYWHw4LpJ2OKYpDws4CdeN8Lw=
-github.com/rancher/channelserver v0.5.1-0.20220217142715-90ef7d38f3f8/go.mod h1:6hdl+500DWTtg4sKC7/CYJjRU7CFCsH+lnfxIle8JHM=
+github.com/rancher/channelserver v0.5.1-0.20220405170618-28c9b37deff1 h1:NMYQzCtLEEaJZ2xleLzDixN6Y+yO9ShzgsjHDg4zOrk=
+github.com/rancher/channelserver v0.5.1-0.20220405170618-28c9b37deff1/go.mod h1:dZ4saGTw1S0RwX8ivPijBIR+2obRpfFuO2NkDHUKKXg=
 github.com/rancher/client-go v1.23.3-rancher2 h1:99raSqSdtNF1aQCJ45r/1t8KZmld6AkA4+nsfalnA98=
 github.com/rancher/client-go v1.23.3-rancher2/go.mod h1:47oMd+YvAOqZM7pcQ6neJtBiFH7alOyfunYN48VsmwE=
 github.com/rancher/dynamiclistener v0.2.1-0.20200714201033-9c1939da3af9/go.mod h1:qr0QfhwzcVCR+Ao9WyfnE+jmOpfEAdRhXtNOZGJ3nCQ=
@@ -1453,7 +1453,7 @@ github.com/urfave/cli v1.22.1/go.mod h1:Gos4lmkARVdJ6EkW0WaNv/tZAAMe9V7XWyB60NtX
 github.com/urfave/cli v1.22.2 h1:gsqYFH8bb9ekPA12kRo0hfjngWQjkJPlN9R0N78BoUo=
 github.com/urfave/cli v1.22.2/go.mod h1:Gos4lmkARVdJ6EkW0WaNv/tZAAMe9V7XWyB60NtXRu0=
 github.com/urfave/cli/v2 v2.1.1/go.mod h1:SE9GqnLQmjVa0iPEY0f1w3ygNIYcIJ0OKPMoW2caLfQ=
-github.com/urfave/cli/v2 v2.2.0/go.mod h1:SE9GqnLQmjVa0iPEY0f1w3ygNIYcIJ0OKPMoW2caLfQ=
+github.com/urfave/cli/v2 v2.4.0/go.mod h1:NX9W0zmTvedE5oDoOMs2RTC8RvdK98NTYZE5LbaEYPg=
 github.com/urfave/negroni v1.0.0/go.mod h1:Meg73S6kFm/4PpbYdq35yYWoCZ9mS/YSx+lKnmiohz4=
 github.com/valyala/fastjson v1.6.3 h1:tAKFnnwmeMGPbwJ7IwxcTPCNr3uIzoIj3/Fh90ra4xc=
 github.com/valyala/fastjson v1.6.3/go.mod h1:CLCAqky6SMuOcxStkYQvblddUtoRxhYMGLrsQns1aXY=
