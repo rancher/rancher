@@ -48,6 +48,10 @@ def test_deploy_airgap_rancher(check_hostname_length):
         RANCHER_SERVER_VERSION) in save_res[0]
     assert "The push refers to repository [{}/rancher/rancher]".format(
         bastion_node.host_name) in load_res[0]
+
+    inspect_res = save_specific_arch_images(bastion_node)
+    assert "s390x" in inspect_res
+
     ag_node = deploy_airgap_rancher(bastion_node)
     public_dns = create_nlb_and_add_targets([ag_node])
     print(
@@ -282,6 +286,30 @@ def add_rancher_images_to_private_registry(bastion_node, push_images=True):
 
     return save_res, load_res
 
+def save_specific_arch_images(bastion_node):
+    get_images_command = \
+        'wget -O rancher-images.txt https://github.com/rancher/rancher/' \
+        'releases/download/{0}/rancher-images.txt && ' \
+        'wget -O rancher-save-images.sh https://github.com/rancher/rancher/' \
+        'releases/download/{0}/rancher-save-images.sh && ' \
+        'wget -O rancher-load-images.sh https://github.com/rancher/rancher/' \
+        'releases/download/{0}/rancher-load-images.sh'.format(
+            RANCHER_SERVER_VERSION)
+    bastion_node.execute_command(get_images_command)
+
+    # Remove the "docker save" and "docker load" lines to save time
+    edit_save_and_load_command = \
+        "sudo sed -i '58d' rancher-save-images.sh && " \
+        "sudo sed -i '76d' rancher-load-images.sh && " \
+        "chmod +x rancher-save-images.sh && chmod +x rancher-load-images.sh"
+    bastion_node.execute_command(edit_save_and_load_command)
+
+    save_images_command = \
+        "./rancher-save-images.sh --image-list ./rancher-images.txt --platform linux/s390x"
+    bastion_node.execute_command(save_images_command)
+    inspect_res = bastion_node.execute_command('docker manifest inspect rancher/rancher:{}'.format(
+        RANCHER_SERVER_VERSION))
+    return inspect_res
 
 def add_cleaned_images(bastion_node, images):
     failures = []
