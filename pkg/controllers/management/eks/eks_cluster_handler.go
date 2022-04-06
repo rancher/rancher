@@ -190,7 +190,11 @@ func (e *eksOperatorController) onClusterChange(key string, cluster *mgmtv3.Clus
 		// for rancher to validate its ability to do so.
 		addNgMessage := "Cluster must have at least one managed nodegroup."
 		noNodeGroupsOnSpec := len(cluster.Spec.EKSConfig.NodeGroups) == 0
-		noNodeGroupsOnUpstreamSpec := len(cluster.Status.EKSStatus.UpstreamSpec.NodeGroups) == 0
+		noNodeGroupsOnUpstreamSpec := true // default to true in case UpstreamSpec is nil
+		if nil != cluster.Status.EKSStatus.UpstreamSpec {
+			noNodeGroupsOnUpstreamSpec = len(cluster.Status.EKSStatus.UpstreamSpec.NodeGroups) == 0
+		}
+
 		if (cluster.Spec.EKSConfig.NodeGroups != nil && noNodeGroupsOnSpec) || (cluster.Spec.EKSConfig.NodeGroups == nil && noNodeGroupsOnUpstreamSpec) {
 			cluster, err = e.SetFalse(cluster, apimgmtv3.ClusterConditionWaiting, addNgMessage)
 			if err != nil {
