@@ -235,6 +235,7 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 	// Project roles
 	rb.addRoleTemplate("Project Owner", "project-owner", "project", false, false, false).
 		addRule().apiGroups("ui.cattle.io").resources("navlinks").verbs("get", "list", "watch").
+		addRule().apiGroups("").resources("nodes").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("projectroletemplatebindings").verbs("*").
 		addRule().apiGroups("project.cattle.io").resources("apps").verbs("*").
 		addRule().apiGroups("project.cattle.io").resources("apprevisions").verbs("*").
