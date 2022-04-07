@@ -52,7 +52,7 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 		addRule().apiGroups("").resources("secrets").verbs("create").
 		addRule().apiGroups("management.cattle.io").resources("cisconfigs").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("cisbenchmarkversions").verbs("get", "list", "watch").
-		addRule().apiGroups("rke-machine-config.cattle.io").resources("*").verbs("create").
+		addRule().apiGroups("rke-machine-config.cattle.io").resources("*").verbs("create", "get").
 		addRule().apiGroups("catalog.cattle.io").resources("clusterrepos").verbs("get", "list", "watch")
 
 	rb.addRole("Manage Node Drivers", "nodedrivers-manage").
@@ -477,7 +477,7 @@ func addUserRules(role *roleBuilder) *roleBuilder {
 		addRule().apiGroups("project.cattle.io").resources("sourcecodecredentials").verbs("*").
 		addRule().apiGroups("project.cattle.io").resources("sourcecoderepositories").verbs("*").
 		addRule().apiGroups("provisioning.cattle.io").resources("clusters").verbs("create").
-		addRule().apiGroups("rke-machine-config.cattle.io").resources("*").verbs("create")
+		addRule().apiGroups("rke-machine-config.cattle.io").resources("*").verbs("create", "get")
 
 	return role
 }
