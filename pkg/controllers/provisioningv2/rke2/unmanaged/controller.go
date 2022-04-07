@@ -369,16 +369,16 @@ func (h *handler) onUnmanagedMachineOnRemove(key string, customMachine *rkev1.Cu
 
 func (h *handler) onUnmanagedMachineChange(_ string, machine *rkev1.CustomMachine) (*rkev1.CustomMachine, error) {
 	if machine != nil {
-		if !machine.Status.Ready && machine.Spec.ProviderID != "" {
+		if !rke2.Ready.IsTrue(machine) {
+			// CustomMachines are provisioned already, so their Ready condition should be true.
 			machine = machine.DeepCopy()
-			machine.Status.Ready = true
 			rke2.Ready.SetStatus(machine, "True")
 			rke2.Ready.Message(machine, "")
 			return h.unmanagedMachine.UpdateStatus(machine)
-		} else if machine.Spec.ProviderID == "" && !rke2.Ready.IsFalse(machine) {
+		}
+		if !machine.Status.Ready && machine.Spec.ProviderID != "" {
 			machine = machine.DeepCopy()
-			rke2.Ready.SetStatus(machine, "False")
-			rke2.Ready.Message(machine, "waiting for providerID to be set")
+			machine.Status.Ready = true
 			return h.unmanagedMachine.UpdateStatus(machine)
 		}
 	}

@@ -71,6 +71,8 @@ const (
 	RKEAPIVersion                  = "rke.cattle.io/v1"
 
 	Provisioned    = condition.Cond("Provisioned")
+	Updated        = condition.Cond("Updated")
+	Reconciled     = condition.Cond("Reconciled")
 	Ready          = condition.Cond("Ready")
 	Waiting        = condition.Cond("Waiting")
 	Pending        = condition.Cond("Pending")

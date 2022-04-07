@@ -164,7 +164,7 @@ func New(ctx context.Context, clients *wrangler.Context) *Planner {
 	}
 }
 
-func (p *Planner) applyToMachineCondition(clusterPlan *plan.Plan, machineNames []string, messagePrefix string, messages map[string][]string) error {
+func (p *Planner) setMachineConditionStatus(clusterPlan *plan.Plan, machineNames []string, messagePrefix string, messages map[string][]string) error {
 	var waiting bool
 	for _, machineName := range machineNames {
 		machine := clusterPlan.Machines[machineName]
@@ -173,29 +173,27 @@ func (p *Planner) applyToMachineCondition(clusterPlan *plan.Plan, machineNames [
 		}
 
 		if !condition.Cond(capi.InfrastructureReadyCondition).IsTrue(machine) {
-			// Don't wait for CustomMachines to be ready because the infrastructure should be ready.
-			// The CustomMachine is waiting for the providerID to be set which won't happen until the cluster is bootstrapped.
-			if clusterPlan.Machines[machineName].Spec.InfrastructureRef.Kind != "CustomMachine" {
-				waiting = true
-				continue
-			}
+			waiting = true
+			continue
 		}
 
 		machine = machine.DeepCopy()
 		if message := messages[machineName]; len(message) > 0 {
 			msg := strings.Join(message, ", ")
 			waiting = true
-			if rke2.Provisioned.GetMessage(machine) == msg {
+			if rke2.Reconciled.GetMessage(machine) == msg {
 				continue
 			}
-			conditions.MarkUnknown(machine, capi.ConditionType(rke2.Provisioned), "Waiting", msg)
-		} else if rke2.Provisioned.IsTrue(machine) {
-			continue
-		} else {
+			conditions.MarkUnknown(machine, capi.ConditionType(rke2.Reconciled), "Waiting", msg)
+		} else if !rke2.Reconciled.IsTrue(machine) {
+			// Since there is no status message, then the condition should be set to true.
+			conditions.MarkTrue(machine, capi.ConditionType(rke2.Reconciled))
+
 			// Even though we are technically not waiting for something, an error should be returned so that the planner will retry.
 			// The machine being updated will cause the planner to re-enqueue with the new data.
 			waiting = true
-			conditions.MarkTrue(machine, capi.ConditionType(rke2.Provisioned))
+		} else {
+			continue
 		}
 
 		if _, err := p.machines.UpdateStatus(machine); err != nil {
@@ -228,14 +226,14 @@ func detailMessage(machines []string, messages map[string][]string) string {
 	return ""
 }
 
-func removeProvisionedCondition(machine *capi.Machine) *capi.Machine {
+func removeConfiguredCondition(machine *capi.Machine) *capi.Machine {
 	if machine == nil || len(machine.Status.Conditions) == 0 {
 		return machine
 	}
 
 	conds := make([]capi.Condition, 0, len(machine.Status.Conditions))
 	for _, c := range machine.Status.Conditions {
-		if string(c.Type) != string(rke2.Provisioned) {
+		if string(c.Type) != string(rke2.Reconciled) {
 			conds = append(conds, c)
 		}
 	}
@@ -476,8 +474,8 @@ func (p *Planner) reconcile(controlPlane *rkev1.RKEControlPlane, tokensSecret pl
 			continue
 		}
 
-		// The Provisioned and Updated conditions should be removed when summarizing so that the messages are not duplicated.
-		summary := summary.Summarize(removeProvisionedCondition(entry.Machine))
+		// The Reconciled condition should be removed when summarizing so that the messages are not duplicated.
+		summary := summary.Summarize(removeConfiguredCondition(entry.Machine))
 		if summary.Error {
 			errMachines = append(errMachines, entry.Machine.Name)
 		}
@@ -551,7 +549,7 @@ func (p *Planner) reconcile(controlPlane *rkev1.RKEControlPlane, tokensSecret pl
 		} else if !kubeletVersionUpToDate(controlPlane, entry.Machine) {
 			outOfSync = append(outOfSync, entry.Machine.Name)
 			messages[entry.Machine.Name] = append(messages[entry.Machine.Name], "waiting for kubelet to update")
-		} else if tierName == controlPlaneTier && !controlPlane.Status.AgentConnected {
+		} else if isControlPlane(entry) && !controlPlane.Status.AgentConnected {
 			// If the control plane nodes are currently being provisioned/updated, then it should be ensured that cluster-agent is connected.
 			// Without the agent connected, the controllers running in Rancher, including CAPI, can't communicate with the downstream cluster.
 			outOfSync = append(outOfSync, entry.Machine.Name)
@@ -568,20 +566,20 @@ func (p *Planner) reconcile(controlPlane *rkev1.RKEControlPlane, tokensSecret pl
 	// If multiple machines are changing status, then all of their statuses should be updated to avoid having stale conditions.
 	// However, only the first one will be returned so that status goes on the control plane and cluster objects.
 	var firstError error
-	if err := p.applyToMachineCondition(clusterPlan, uncordoned, fmt.Sprintf("uncordoning %s node(s) ", tierName), messages); err != nil && firstError == nil {
+	if err := p.setMachineConditionStatus(clusterPlan, uncordoned, fmt.Sprintf("uncordoning %s node(s) ", tierName), messages); err != nil && firstError == nil {
 		firstError = err
 	}
 
-	if err := p.applyToMachineCondition(clusterPlan, draining, fmt.Sprintf("draining %s node(s) ", tierName), messages); err != nil && firstError == nil {
+	if err := p.setMachineConditionStatus(clusterPlan, draining, fmt.Sprintf("draining %s node(s) ", tierName), messages); err != nil && firstError == nil {
 		firstError = err
 	}
 
-	if err := p.applyToMachineCondition(clusterPlan, outOfSync, fmt.Sprintf("provisioning %s node(s) ", tierName), messages); err != nil && firstError == nil {
+	if err := p.setMachineConditionStatus(clusterPlan, outOfSync, fmt.Sprintf("configuring %s node(s) ", tierName), messages); err != nil && firstError == nil {
 		firstError = err
 	}
 
 	// Ensure that the conditions that we control are updated.
-	if err := p.applyToMachineCondition(clusterPlan, ready, "", nil); err != nil && firstError == nil {
+	if err := p.setMachineConditionStatus(clusterPlan, ready, "", nil); err != nil && firstError == nil {
 		firstError = err
 	}
 

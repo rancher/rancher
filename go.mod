@@ -12,6 +12,7 @@ replace (
 
 	github.com/rancher/rancher/pkg/apis => ./pkg/apis
 	github.com/rancher/rancher/pkg/client => ./pkg/client
+	github.com/rancher/wrangler => /Users/donnieadams/code/wrangler
 	helm.sh/helm/v3 => github.com/rancher/helm/v3 v3.8.0-rancher1
 	k8s.io/api => k8s.io/api v0.23.3
 	k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.23.3
