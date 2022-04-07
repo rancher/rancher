@@ -49,7 +49,7 @@ def test_deploy_airgap_rancher(check_hostname_length):
     assert "The push refers to repository [{}/rancher/rancher]".format(
         bastion_node.host_name) in load_res[0]
 
-    inspect_res = save_specific_arch_images(bastion_node)
+    inspect_res = save_specific_platform_images(bastion_node)
     assert "s390x" in inspect_res
 
     ag_node = deploy_airgap_rancher(bastion_node)
@@ -263,8 +263,8 @@ def add_rancher_images_to_private_registry(bastion_node, push_images=True):
 
     # Remove the "docker save" and "docker load" lines to save time
     edit_save_and_load_command = \
-        "sudo sed -i '58d' rancher-save-images.sh && " \
-        "sudo sed -i '76d' rancher-load-images.sh && " \
+        "sudo sed '/^docker save/d' rancher-save-images.sh && " \
+        "sudo sed '/^docker load/d' rancher-load-images.sh && " \
         "chmod +x rancher-save-images.sh && chmod +x rancher-load-images.sh"
     bastion_node.execute_command(edit_save_and_load_command)
 
@@ -286,7 +286,7 @@ def add_rancher_images_to_private_registry(bastion_node, push_images=True):
 
     return save_res, load_res
 
-def save_specific_arch_images(bastion_node):
+def save_specific_platform_images(bastion_node):
     get_images_command = \
         'wget -O rancher-images.txt https://github.com/rancher/rancher/' \
         'releases/download/{0}/rancher-images.txt && ' \
@@ -299,15 +299,17 @@ def save_specific_arch_images(bastion_node):
 
     # Remove the "docker save" and "docker load" lines to save time
     edit_save_and_load_command = \
-        "sudo sed -i '58d' rancher-save-images.sh && " \
-        "sudo sed -i '76d' rancher-load-images.sh && " \
+        "sudo sed '/^docker save/d' rancher-save-images.sh && " \
+        "sudo sed '/^docker load/d' rancher-load-images.sh && " \
         "chmod +x rancher-save-images.sh && chmod +x rancher-load-images.sh"
     bastion_node.execute_command(edit_save_and_load_command)
 
+    # Remove all images except rancher/rancher and pull the image
     save_images_command = \
+        "sed -i -r '/rancher\/rancher:/!d' rancher-images.txt" \
         "./rancher-save-images.sh --image-list ./rancher-images.txt --platform linux/s390x"
     bastion_node.execute_command(save_images_command)
-    inspect_res = bastion_node.execute_command('docker manifest inspect rancher/rancher:{}'.format(
+    inspect_res = bastion_node.execute_command('docker inspect rancher/rancher:{}'.format(
         RANCHER_SERVER_VERSION))
     return inspect_res
 
