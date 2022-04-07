@@ -263,6 +263,7 @@ func TestGetImages(t *testing.T) {
 	bothImages := []string{
 		selectFirstEntry(linuxInfo.RKESystemImages).NginxProxy, // from system
 		"rancher/fluentd:v0.1.16",                              // from chart
+		"rancher/mirrored-pause:3.6",
 	}
 	bothSources := []string{
 		"rancher/fluentd:v0.1.16 rancher-logging:0.1.2",
