@@ -501,13 +501,15 @@ func (p *Planner) reconcile(controlPlane *rkev1.RKEControlPlane, tokensSecret pl
 				return err
 			}
 		} else if !equality.Semantic.DeepEqual(entry.Plan.Plan, plan) {
+			logrus.Debugf("[planner] rkecluster %s/%s reconcile tier %s - plan for machine %s/%s did not match, appending to outOfSync", controlPlane.Namespace, controlPlane.Name, tierName, entry.Machine.Namespace, entry.Machine.Name)
 			outOfSync = append(outOfSync, entry.Machine.Name)
 			// Conditions
 			// 1. If the node is already draining then the plan is out of sync.  There is no harm in updating it if
 			// the node is currently drained.
 			// 2. concurrency == 0 which means infinite concurrency.
 			// 3. unavailable < concurrency meaning we have capacity to make something unavailable
-			if isInDrain(entry) || concurrency == 0 || unavailable < concurrency {
+			logrus.Debugf("[planner] rkecluster %s/%s reconcile tier %s - concurrency: %d, unavailable: %d", controlPlane.Namespace, controlPlane.Name, tierName, concurrency, unavailable)
+			if isUnavailable(entry) || concurrency == 0 || unavailable < concurrency {
 				if !isUnavailable(entry) {
 					unavailable++
 				}
