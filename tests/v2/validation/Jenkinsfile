@@ -16,6 +16,14 @@ node {
     if ("${env.branch}" != "null" && "${env.branch}" != "") {
       branch = "${env.branch}"
     }
+    def repo = scm.userRemoteConfigs
+    if ("${env.REPO}" != "null" && "${env.REPO}" != "") {
+      repo = [[url: "${env.REPO}"]]
+    }
+    def timeout = "60m"
+    if ("${TIMEOUT}" != "null" && "${TIMEOUT}" != "") {
+      repo = [[url: "${TIMEOUT}"]]
+    }
     wrap([$class: 'AnsiColorBuildWrapper', 'colorMapName': 'XTerm', 'defaultFg': 2, 'defaultBg':1]) {
       withFolderProperties {
         paramsMap = []
@@ -75,7 +83,7 @@ node {
                       $class: 'GitSCM',
                       branches: [[name: "*/${branch}"]],
                       extensions: scm.extensions + [[$class: 'CleanCheckout']],
-                      userRemoteConfigs: [[url: "${env.REPO}"]]
+                      userRemoteConfigs: repo
                     ])
           }
           dir ("./") {
@@ -102,7 +110,7 @@ node {
               }
               stage('Run Validation Tests') {
                 sh "docker run --name ${testContainer} -t --env-file ${envFile} " +
-                  "${imageName} sh -c \"/go/bin/gotestsum --format standard-verbose --packages=${testsDir} --junitfile ${testResultsOut} -- ${GOTEST_TESTCASE} -timeout=60m -v\""
+                  "${imageName} sh -c \"/go/bin/gotestsum --format standard-verbose --packages=${testsDir} --junitfile ${testResultsOut} -- ${GOTEST_TESTCASE} -timeout=${timeout} -v\""
               }
             } finally {           
               stage('Test Report') {
