@@ -158,14 +158,13 @@ func TestFetchImagesFromSystem(t *testing.T) {
 
 	bothImages := []string{
 		selectFirstEntry(linuxInfo.RKESystemImages).NginxProxy,
+		"rancher/mirrored-pause:3.6",
 	}
 	linuxImagesOnly := []string{
 		selectFirstEntry(linuxInfo.RKESystemImages).CoreDNS,
 		toolsSystemImages.PipelineSystemImages.Jenkins, // from tools
 	}
-	windowsImagesOnly := []string{
-		selectFirstEntry(windowsInfo.RKESystemImages).WindowsPodInfraContainer,
-	}
+	windowsImagesOnly := []string{}
 
 	testCases := []struct {
 		caseName                  string
@@ -274,9 +273,9 @@ func TestGetImages(t *testing.T) {
 	sourcesToAdd := getImageSourcesList(imagesSet)
 	linuxRKEImage := selectFirstEntry(linuxInfo.RKESystemImages).CoreDNS
 	linuxImagesOnly := append(
-		imagesToAdd,                         // from requirement
-		linuxRKEImage,                       // from system
-		"rancher/prom-alertmanager:v0.17.0", // from chart
+		imagesToAdd,                                    // from requirement
+		linuxRKEImage,                                  // from system
+		"rancher/prom-alertmanager:v0.17.0",            // from chart
 		toolsSystemImages.PipelineSystemImages.Jenkins, // from tools
 	)
 	linuxSourcesOnly := append(
