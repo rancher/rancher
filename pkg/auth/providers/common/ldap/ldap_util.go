@@ -324,7 +324,7 @@ func NewCAPool(cert string) (*x509.CertPool, error) {
 }
 
 func ValidateLdapConfig(ldapConfig *v3.LdapConfig, certpool *x509.CertPool) (bool, error) {
-	if len(ldapConfig.Servers) != 1 {
+	if len(ldapConfig.Servers) < 1 {
 		return false, nil
 	}
 
@@ -334,6 +334,6 @@ func ValidateLdapConfig(ldapConfig *v3.LdapConfig, certpool *x509.CertPool) (boo
 	}
 	defer lConn.Close()
 
-	logrus.Debugf("validated ldap configuration: %s", ldapConfig.Servers[0])
+	logrus.Debugf("validated ldap configuration: %s", strings.Join(ldapConfig.Servers, ","))
 	return true, nil
 }
