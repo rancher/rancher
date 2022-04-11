@@ -2,10 +2,7 @@ module github.com/rancher/rancher/pkg/apis
 
 go 1.17
 
-replace (
-	github.com/rancher/wrangler => /Users/donnieadams/code/wrangler
-	k8s.io/client-go => k8s.io/client-go v0.23.3
-)
+replace k8s.io/client-go => k8s.io/client-go v0.23.3
 
 require (
 	github.com/pkg/errors v0.9.1
@@ -15,7 +12,7 @@ require (
 	github.com/rancher/gke-operator v1.1.3
 	github.com/rancher/norman v0.0.0-20220107203912-4feb41eafabd
 	github.com/rancher/rke v1.3.9
-	github.com/rancher/wrangler v0.8.11-0.20220217210408-3ecd23dfea3b
+	github.com/rancher/wrangler v0.8.11-0.20220411195911-c2b951ab3480
 	github.com/sirupsen/logrus v1.8.1
 	k8s.io/api v0.23.3
 	k8s.io/apimachinery v0.23.3
