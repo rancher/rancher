@@ -1237,8 +1237,8 @@ github.com/prometheus/tsdb v0.7.1/go.mod h1:qhTCs0VvXwvX/y3TZrWD7rabWM+ijKTux40T
 github.com/qri-io/starlib v0.4.2-0.20200213133954-ff2e8cd5ef8d/go.mod h1:7DPO4domFU579Ga6E61sB9VFNaniPVwJP5C4bBCu3wA=
 github.com/quobyte/api v0.1.8/go.mod h1:jL7lIHrmqQ7yh05OJ+eEEdHr0u/kmT1Ff9iHd+4H6VI=
 github.com/rackspace/gophercloud v0.0.0-20150408191457-ce0f487f6747/go.mod h1:4bJ1FwuaBZ6dt1VcDX5/O662mwR8GWqS4l68H6hkoYQ=
-github.com/rancher/aks-operator v1.0.4 h1:FatZfXgwNw3+W60Km2zrYkH/1IkZvJYzacDCBdG3f18=
-github.com/rancher/aks-operator v1.0.4/go.mod h1:4AAOJmPqW41ko6L6cy7BOWbHEko7Yjcho1YP+KPAt+Y=
+github.com/rancher/aks-operator v1.0.5-rc1 h1:1k7CP1NRE0wloLI6NXQmtCxlUoEz9LrfZvCw0QzXUDU=
+github.com/rancher/aks-operator v1.0.5-rc1/go.mod h1:4AAOJmPqW41ko6L6cy7BOWbHEko7Yjcho1YP+KPAt+Y=
 github.com/rancher/apiserver v0.0.0-20201023000256-1a0a904f9197/go.mod h1:8W0EwaR9dH5NDFw6mpAX437D0q+EZqKWbZyX71+z2WI=
 github.com/rancher/apiserver v0.0.0-20210922180056-297b6df8d714/go.mod h1:8W0EwaR9dH5NDFw6mpAX437D0q+EZqKWbZyX71+z2WI=
 github.com/rancher/apiserver v0.0.0-20220223185512-c4e289f92e46 h1:yUIRY3C0guO3qgWLojYSBZ+mbKMyjAVMNrWH7f7+APw=
