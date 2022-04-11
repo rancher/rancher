@@ -17,7 +17,6 @@ import (
 // The session.Session attributes is passed all way down to the ResourceClient to keep track of the resources created by the dynamic client
 type Client struct {
 	dynamic.Interface
-
 	ts *session.Session
 }
 
@@ -36,12 +35,12 @@ func NewForConfig(ts *session.Session, inConfig *rest.Config) (dynamic.Interface
 	}, nil
 }
 
-// Resource takes a schema.GroupVersionResource parameter to set the appropriate resource interface
-// ex) schema.GroupVersionResource{
-// 	Group:    "management.cattle.io",
-// 	Version:  "v3",
-// 	Resource: "users",
-// }
+// Resource takes a schema.GroupVersionResource parameter to set the appropriate resource interface e.g.
+//  schema.GroupVersionResource {
+// 	  Group:    "management.cattle.io",
+// 	  Version:  "v3",
+// 	  Resource: "users",
+//  }
 func (d *Client) Resource(resource schema.GroupVersionResource) dynamic.NamespaceableResourceInterface {
 	return &NamespaceableResourceClient{
 		NamespaceableResourceInterface: d.Interface.Resource(resource),
@@ -49,7 +48,7 @@ func (d *Client) Resource(resource schema.GroupVersionResource) dynamic.Namespac
 	}
 }
 
-// NamespaceableResourceClient is a structs that has dynamic.NamespaceableResourceInterface embedded, and has session.Session as an attribute.
+// NamespaceableResourceClient is a struct that has dynamic.NamespaceableResourceInterface embedded, and has session.Session as an attribute.
 // This is inorder to overwrite dynamic.NamespaceableResourceInterface's Namespace function.
 type NamespaceableResourceClient struct {
 	dynamic.NamespaceableResourceInterface

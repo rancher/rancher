@@ -11,6 +11,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
+// ConfigMapGroupVersionResource is the required Group Version Resource for accessing config maps in a cluster,
+// using the dynamic client.
 var ConfigMapGroupVersionResource = schema.GroupVersionResource{
 	Group:    "",
 	Version:  "v1",

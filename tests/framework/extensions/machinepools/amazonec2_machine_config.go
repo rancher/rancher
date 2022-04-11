@@ -12,6 +12,7 @@ const (
 	AWSMachingConfigConfigurationFileKey = "awsMachineConfig"
 )
 
+// AWSMachineConfig is configuration needed to create an rke-machine-config.cattle.io.amazonec2config
 type AWSMachineConfig struct {
 	Region        string   `json:"region" yaml:"region"`
 	InstanceType  string   `json:"instanceType" yaml:"instanceType"`

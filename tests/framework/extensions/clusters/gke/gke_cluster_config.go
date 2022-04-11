@@ -6,9 +6,11 @@ import (
 )
 
 const (
+	// The json/yaml config key for the GKE hosted cluster config
 	GKEClusterConfigConfigurationFileKey = "gkeClusterConfig"
 )
 
+// GKEClusterConfig is the configuration needed to create an GKE host cluster
 type GKEClusterConfig struct {
 	ClusterAddons                  *ClusterAddons                  `json:"clusterAddons,omitempty" yaml:"clusterAddons,omitempty"`
 	ClusterIpv4CidrBlock           *string                         `json:"clusterIpv4Cidr,omitempty" yaml:"clusterIpv4Cidr,omitempty"`
@@ -23,7 +25,7 @@ type GKEClusterConfig struct {
 	MonitoringService              *string                         `json:"monitoringService,omitempty" yaml:"monitoringService,omitempty"`
 	Network                        *string                         `json:"network,omitempty" yaml:"network,omitempty"`
 	NetworkPolicyEnabled           *bool                           `json:"networkPolicyEnabled,omitempty" yaml:"networkPolicyEnabled,omitempty"`
-	NodePools                      []NodePools                     `json:"nodePools,omitempty" yaml:"nodePools,omitempty"`
+	NodePools                      []NodePool                      `json:"nodePools,omitempty" yaml:"nodePools,omitempty"`
 	PrivateClusterConfig           *PrivateClusterConfig           `json:"privateClusterConfig,omitempty" yaml:"privateClusterConfig,omitempty"`
 	ProjectID                      string                          `json:"projectID,omitempty" yaml:"projectID,omitempty"`
 	Region                         string                          `json:"region,omitempty" yaml:"region,omitempty"`
@@ -31,12 +33,14 @@ type GKEClusterConfig struct {
 	Zone                           string                          `json:"zone,omitempty" yaml:"zone,omitempty"`
 }
 
+// ClusterAddons is the configuration for the GKEClusterConfig ClusterAddons
 type ClusterAddons struct {
 	HTTPLoadBalancing        bool `json:"httpLoadBalancing,omitempty" yaml:"httpLoadBalancing,omitempty"`
 	HorizontalPodAutoscaling bool `json:"horizontalPodAutoscaling,omitempty" yaml:"horizontalPodAutoscaling,omitempty"`
 	NetworkPolicyConfig      bool `json:"networkPolicyConfig,omitempty" yaml:"networkPolicyConfig,omitempty"`
 }
 
+// IPAllocationPolicy is the configuration for the GKEClusterConfig IPAllocationPolicy
 type IPAllocationPolicy struct {
 	ClusterIpv4CidrBlock       string `json:"clusterIpv4CidrBlock,omitempty" yaml:"clusterIpv4CidrBlock,omitempty"`
 	ClusterSecondaryRangeName  string `json:"clusterSecondaryRangeName,omitempty" yaml:"clusterSecondaryRangeName,omitempty"`
@@ -48,17 +52,20 @@ type IPAllocationPolicy struct {
 	UseIPAliases               bool   `json:"useIpAliases,omitempty" yaml:"useIpAliases,omitempty"`
 }
 
+// MasterAuthorizedNetworksConfig is the configuration for the GKEClusterConfig MasterAuthorizedNetworksConfig
 type MasterAuthorizedNetworksConfig struct {
 	CidrBlocks []CidrBlock `json:"cidrBlocks,omitempty" yaml:"cidrBlocks,omitempty"`
 	Enabled    bool        `json:"enabled,omitempty" yaml:"enabled,omitempty"`
 }
 
+// CidrBlock is the configuration needed for the MasterAuthorizedNetworksConfig CidrBlock
 type CidrBlock struct {
 	CidrBlock   string `json:"cidrBlock,omitempty" yaml:"cidrBlock,omitempty"`
 	DisplayName string `json:"displayName,omitempty" yaml:"displayName,omitempty"`
 }
 
-type NodePools struct {
+// NodePool is the configuration needed for the GKEClusterConfig NodePools
+type NodePool struct {
 	Autoscaling       *Autoscaling        `json:"autoscaling,omitempty" yaml:"autoscaling,omitempty"`
 	Config            *NodeConfig         `json:"config,omitempty" yaml:"config,omitempty"`
 	InitialNodeCount  *int64              `json:"initialNodeCount,omitempty" yaml:"initialNodeCount,omitempty"`
@@ -68,12 +75,14 @@ type NodePools struct {
 	Version           *string             `json:"version,omitempty" yaml:"version,omitempty"`
 }
 
+// Autoscaling is the configuration needed for the NodePool Autoscaling
 type Autoscaling struct {
 	Enabled      bool  `json:"enabled,omitempty" yaml:"enabled,omitempty"`
 	MaxNodeCount int64 `json:"maxNodeCount,omitempty" yaml:"maxNodeCount,omitempty"`
 	MinNodeCount int64 `json:"minNodeCount,omitempty" yaml:"minNodeCount,omitempty"`
 }
 
+// NodeConfig is the configuration needed for the NodePool NodeConfig
 type NodeConfig struct {
 	DiskSizeGb    int64             `json:"diskSizeGb,omitempty" yaml:"diskSizeGb,omitempty"`
 	DiskType      string            `json:"diskType,omitempty" yaml:"diskType,omitempty"`
@@ -87,17 +96,20 @@ type NodeConfig struct {
 	Taints        []NodeTaintConfig `json:"taints,omitempty" yaml:"taints,omitempty"`
 }
 
+// NodeTaintConfig is the configuration needed for the NodeConfig Taints
 type NodeTaintConfig struct {
 	Effect string `json:"effect,omitempty" yaml:"effect,omitempty"`
 	Key    string `json:"key,omitempty" yaml:"key,omitempty"`
 	Value  string `json:"value,omitempty" yaml:"value,omitempty"`
 }
 
+// NodePoolManagement is the configuration needed for the NodePool Management
 type NodePoolManagement struct {
 	AutoRepair  bool `json:"autoRepair,omitempty" yaml:"autoRepair,omitempty"`
 	AutoUpgrade bool `json:"autoUpgrade,omitempty" yaml:"autoUpgrade,omitempty"`
 }
 
+// PrivateClusterConfig is the configuration needed for the GKEClusterConfig PrivateClusterConfig
 type PrivateClusterConfig struct {
 	EnablePrivateEndpoint bool   `json:"enablePrivateEndpoint,omitempty" yaml:"enablePrivateEndpoint,omitempty"`
 	EnablePrivateNodes    bool   `json:"enablePrivateNodes,omitempty" yaml:"enablePrivateNodes,omitempty"`
@@ -145,7 +157,7 @@ func cidrBlocksBuilder(cidrBlocks []CidrBlock) []management.GKECidrBlock {
 	return newCidrBlocks
 }
 
-func nodePoolsBuilder(nodePools []NodePools, kubernetesVersion *string) []management.GKENodePoolConfig {
+func nodePoolsBuilder(nodePools []NodePool, kubernetesVersion *string) []management.GKENodePoolConfig {
 	var gkeNodePoolConfigs []management.GKENodePoolConfig
 	for _, nodePool := range nodePools {
 		gkeNodePoolConfig := management.GKENodePoolConfig{

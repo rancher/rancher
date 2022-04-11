@@ -5,6 +5,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+// NewBasicAuthSecret is a constructor for a Basic Auth secret type
 func NewBasicAuthSecret(name, namespace, username, password string) *coreV1.Secret {
 	return &coreV1.Secret{
 		ObjectMeta: metav1.ObjectMeta{

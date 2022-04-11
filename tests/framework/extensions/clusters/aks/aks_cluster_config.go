@@ -6,9 +6,11 @@ import (
 )
 
 const (
+	// The json/yaml config key for the AKS hosted cluster config
 	AKSClusterConfigConfigurationFileKey = "aksClusterConfig"
 )
 
+// AKSClusterConfig is the configuration needed to create an AKS host cluster
 type AKSClusterConfig struct {
 	AuthorizedIPRanges          *[]string          `json:"authorizedIpRanges,omitempty" yaml:"authorizedIpRanges,omitempty"`
 	AzureCredentialSecret       string             `json:"azureCredentialSecret,omitempty" yaml:"azureCredentialSecret,omitempty"`
@@ -36,6 +38,7 @@ type AKSClusterConfig struct {
 	VirtualNetworkResourceGroup *string            `json:"virtualNetworkResourceGroup,omitempty" yaml:"virtualNetworkResourceGroup,omitempty"`
 }
 
+// AKSNodePool is the configuration needed to an AKS node pool
 type AKSNodePool struct {
 	AvailabilityZones   *[]string `json:"availabilityZones,omitempty" yaml:"availabilityZones,omitempty"`
 	NodeCount           *int64    `json:"nodeCount,omitempty" yaml:"nodeCount,omitempty"`

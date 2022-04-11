@@ -6,9 +6,11 @@ import (
 )
 
 const (
+	// The json/yaml config key for the EKS hosted cluster config
 	EKSClusterConfigConfigurationFileKey = "eksClusterConfig"
 )
 
+// EKSClusterConfig is the configuration needed to create an EKS host cluster
 type EKSClusterConfig struct {
 	KmsKey              *string            `json:"kmsKey,omitempty" yaml:"kmsKey,omitempty"`
 	KubernetesVersion   *string            `json:"kubernetesVersion,omitempty" yaml:"kubernetesVersion,omitempty"`
@@ -25,6 +27,7 @@ type EKSClusterConfig struct {
 	Tags                *map[string]string `json:"tags,omitempty" yaml:"tags,omitempty"`
 }
 
+// NodeGroupConfig is the configuration need to create an EKS node group
 type NodeGroupConfig struct {
 	DesiredSize          *int64                `json:"desiredSize,omitempty" yaml:"desiredSize,omitempty"`
 	DiskSize             *int64                `json:"diskSize,omitempty" yaml:"diskSize,omitempty"`
@@ -45,6 +48,7 @@ type NodeGroupConfig struct {
 	UserData             *string               `json:"userData,omitempty" yaml:"userData,omitempty"`
 }
 
+// LaunchTemplateConfig is the configuration need for a node group launch template
 type LaunchTemplateConfig struct {
 	Name    *string `json:"name,omitempty" yaml:"name,omitempty"`
 	Version *int64  `json:"version,omitempty" yaml:"version,omitempty"`

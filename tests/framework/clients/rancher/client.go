@@ -29,12 +29,17 @@ import (
 // Client is the main rancher Client object that gives an end user access to the Provisioning and Management
 // clients in order to create resources on rancher
 type Client struct {
-	Management    *management.Client
-	Provisioning  *provisioning.Client
-	Catalog       *catalog.Client
+	// Client used to access management.cattle.io v3 API resources
+	Management *management.Client
+	// Client used to access provisioning.cattle.io v1 API resources (clusters)
+	Provisioning *provisioning.Client
+	// Client used to access catalog.cattle.io v1 API resources (apps, charts, etc.)
+	Catalog *catalog.Client
+	// Config used to test against a rancher instance
 	RancherConfig *Config
 	restConfig    *rest.Config
-	Session       *session.Session
+	// Session is the session object used by the client to track all the resources being created by the client.
+	Session *session.Session
 }
 
 // NewClient is the constructor to the initializing a rancher Client. It takes a bearer token and session.Session. If bearer token is not provided,
@@ -215,6 +220,7 @@ func (c *Client) SwitchContext(context string, clientConfig *clientcmd.ClientCon
 	return dynamic, nil
 }
 
+// GetEC2Client is a helper function that instantiates an aws ec2 client to communicate with the ec2 instances on aws.
 func (c *Client) GetEC2Client() (*ec2.EC2Client, error) {
 	return ec2.NewEC2Client()
 }

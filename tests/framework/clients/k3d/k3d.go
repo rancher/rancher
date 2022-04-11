@@ -21,7 +21,7 @@ import (
 )
 
 // CreateK3DCluster creates a minimal k3d cluster and returns a rest config for connecting to the newly created cluster.
-//  If a name is given a random one will be generated.
+// If a name is not given a random one will be generated.
 func CreateK3DCluster(ts *session.Session, name string) (*rest.Config, error) {
 	k3dConfig := new(Config)
 	config.LoadConfig(ConfigurationFileKey, k3dConfig)

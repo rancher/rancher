@@ -11,6 +11,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
+// SecretGroupVersionResource is the required Group Version Resource for accessing secrets in a cluster,
+// using the dynamic client.
 var SecretGroupVersionResource = schema.GroupVersionResource{
 	Group:    "",
 	Version:  "v1",

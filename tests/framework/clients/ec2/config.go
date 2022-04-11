@@ -1,7 +1,9 @@
 package ec2
 
+// The json/yaml config key for the AWSEConfig
 const ConfigurationFileKey = "awsEC2Config"
 
+// AWSEC2Config is configuration need to launch ec2 instances in AWS
 type AWSEC2Config struct {
 	Region             string   `json:"region" yaml:"region"`
 	InstanceType       string   `json:"instanceType" yaml:"instanceType"`

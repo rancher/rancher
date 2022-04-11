@@ -4,6 +4,7 @@ import (
 	"github.com/rancher/norman/types"
 )
 
+// CloudCredential is the main struct needed to create a cloud credential depending on the outside cloud service provider
 type CloudCredential struct {
 	types.Resource
 	Annotations                  map[string]string             `json:"annotations,omitempty"`

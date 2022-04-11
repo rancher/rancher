@@ -7,6 +7,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
+// StorageClassGroupVersionResource is the required Group Version Resource for accessing storage classes in a cluster,
+// using the dynamic client.
 var StorageClassGroupVersionResource = schema.GroupVersionResource{
 	Group:    "storage.k8s.io",
 	Version:  "v1",
