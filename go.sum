@@ -1199,6 +1199,7 @@ github.com/prometheus/client_golang v1.1.0/go.mod h1:I1FGZT9+L76gKKOs5djB6ezCbFQ
 github.com/prometheus/client_golang v1.4.0/go.mod h1:e9GMxYsXl05ICDXkRhurwBS4Q3OK1iX/F2sw+iXX5zU=
 github.com/prometheus/client_golang v1.7.1/go.mod h1:PY5Wy2awLA44sXw4AOSfFBetzPP4j5+D6mVACh+pe2M=
 github.com/prometheus/client_golang v1.11.0/go.mod h1:Z6t4BnS23TR94PD6BsDNk8yVqroYurpAkEiz0P2BEV0=
+github.com/prometheus/client_golang v1.11.1/go.mod h1:Z6t4BnS23TR94PD6BsDNk8yVqroYurpAkEiz0P2BEV0=
 github.com/prometheus/client_golang v1.12.1 h1:ZiaPsmm9uiBeaSMRznKsCDNtPCS0T3JVDGF+06gjBzk=
 github.com/prometheus/client_golang v1.12.1/go.mod h1:3Z9XVyYiZYEO+YQWt3RD2R3jrbd179Rt297l4aS6nDY=
 github.com/prometheus/client_model v0.0.0-20180712105110-5c3871d89910/go.mod h1:MbSGuTsp3dbXC40dX6PRTWyKYBIrTGTE9sqQNg2J8bo=
@@ -1286,8 +1287,8 @@ github.com/rancher/pkg v0.0.0-20190514055449-b30ab9de040e/go.mod h1:XbYHTPaXuw8Z
 github.com/rancher/rdns-server v0.0.0-20180802070304-bf662911db6a h1:6xqYlVz4uAXBa/AuNAG0bhMusIXVh74dc1bbYOAe+HY=
 github.com/rancher/rdns-server v0.0.0-20180802070304-bf662911db6a/go.mod h1:YW8wJ/coee2n9ed937uPBWQArBaVlxs+5wkkS9KiyDc=
 github.com/rancher/remotedialer v0.2.6-0.20220104192242-f3837f8d649a/go.mod h1:vq3LvyOFnLcwMiCE1KdW3foPd6g5kAjZOtOb7JqGHck=
-github.com/rancher/remotedialer v0.2.6-0.20220120012928-4ea2198e0966 h1:AQPsdOLQIHUJsUfJZG7hP+TruzDdkUFBKB/igAAdY6U=
-github.com/rancher/remotedialer v0.2.6-0.20220120012928-4ea2198e0966/go.mod h1:vq3LvyOFnLcwMiCE1KdW3foPd6g5kAjZOtOb7JqGHck=
+github.com/rancher/remotedialer v0.2.6-0.20220318232944-60e3994094da h1:lgWIKxaHc6oYGC21OOYyOW2/6yE7xOJ17szsL777gWg=
+github.com/rancher/remotedialer v0.2.6-0.20220318232944-60e3994094da/go.mod h1:BwwztuvViX2JrLLUwDlsYt5DiyUwHLlzynRwkZLAY0Q=
 github.com/rancher/rke v1.3.9 h1:vqXyB+hVAYO1Hz17DU5dsvB4zlrDIRfCFmRHLb2ZHzY=
 github.com/rancher/rke v1.3.9/go.mod h1:sa0/F2J4xh9XxTDNJdvBWTQ7U9XyXIE8pt3rSbvMfpI=
 github.com/rancher/security-scan v0.1.7-0.20200222041501-f7377f127168 h1:SIshhsz0O71FYyyDmjUmbFGvmgp4ASm8J1zmhMK/UG0=
