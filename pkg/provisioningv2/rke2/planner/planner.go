@@ -497,7 +497,7 @@ func (p *Planner) reconcile(controlPlane *rkev1.RKEControlPlane, tokensSecret pl
 
 		if entry.Plan == nil {
 			outOfSync = append(outOfSync, entry.Machine.Name)
-			if err := p.store.UpdatePlan(entry, plan, 0); err != nil {
+			if err := p.store.UpdatePlan(entry, plan, 1, -1); err != nil {
 				return err
 			}
 		} else if !equality.Semantic.DeepEqual(entry.Plan.Plan, plan) {
@@ -506,10 +506,11 @@ func (p *Planner) reconcile(controlPlane *rkev1.RKEControlPlane, tokensSecret pl
 			// Conditions
 			// 1. If the node is already draining then the plan is out of sync.  There is no harm in updating it if
 			// the node is currently drained.
-			// 2. concurrency == 0 which means infinite concurrency.
-			// 3. unavailable < concurrency meaning we have capacity to make something unavailable
+			// 2. If the plan has failed to apply. Note that the `Failed` will only be `true` if the max failure count has passed, or (if max-failures is not set) the plan has failed to apply at least once.
+			// 3. concurrency == 0 which means infinite concurrency.
+			// 4. unavailable < concurrency meaning we have capacity to make something unavailable
 			logrus.Debugf("[planner] rkecluster %s/%s reconcile tier %s - concurrency: %d, unavailable: %d", controlPlane.Namespace, controlPlane.Name, tierName, concurrency, unavailable)
-			if isUnavailable(entry) || concurrency == 0 || unavailable < concurrency {
+			if isInDrain(entry) || entry.Plan.Failed || concurrency == 0 || unavailable < concurrency {
 				if !isUnavailable(entry) {
 					unavailable++
 				}
@@ -517,7 +518,7 @@ func (p *Planner) reconcile(controlPlane *rkev1.RKEControlPlane, tokensSecret pl
 					return err
 				} else if ok && err == nil {
 					// Drain is done (or didn't need to be done) and there are no errors, so the plan should be updated to enact the reason the node was drained.
-					if err = p.store.UpdatePlan(entry, plan, 0); err != nil {
+					if err = p.store.UpdatePlan(entry, plan, 1, -1); err != nil {
 						return err
 					} else if entry.Metadata.Annotations[rke2.DrainDoneAnnotation] != "" {
 						messages[entry.Machine.Name] = append(messages[entry.Machine.Name], "drain completed")

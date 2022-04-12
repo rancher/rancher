@@ -63,7 +63,7 @@ func (p *Planner) runEtcdSnapshotRestorePlan(controlPlane *rkev1.RKEControlPlane
 			if err != nil {
 				return err
 			}
-			return assignAndCheckPlan(p.store, ETCDRestoreMessage, server, restorePlan, 0)
+			return assignAndCheckPlan(p.store, ETCDRestoreMessage, server, restorePlan, 0, 0)
 		}
 	}
 
@@ -183,7 +183,7 @@ func (p *Planner) runEtcdRestoreControlPlaneEtcdServiceStop(controlPlane *rkev1.
 			stopPlan.Instructions = append(stopPlan.Instructions, generateCreateEtcdTombstoneInstruction(controlPlane))
 		}
 		if server.Plan == nil || !equality.Semantic.DeepEqual(server.Plan.Plan, stopPlan) {
-			if err := p.store.UpdatePlan(server, stopPlan, 0); err != nil {
+			if err := p.store.UpdatePlan(server, stopPlan, 0, 0); err != nil {
 				return err
 			}
 			updated = true

@@ -4,8 +4,6 @@ import (
 	"bufio"
 	"bytes"
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"fmt"
 	"strings"
 
@@ -70,7 +68,7 @@ func (h *handler) OnChange(key string, secret *corev1.Secret) (*corev1.Secret, e
 	failedChecksum := string(secret.Data["failed-checksum"])
 	plan := secret.Data["plan"]
 
-	if appliedChecksum == hash(plan) && !bytes.Equal(plan, secret.Data["appliedPlan"]) {
+	if appliedChecksum == planner.PlanHash(plan) && !bytes.Equal(plan, secret.Data["appliedPlan"]) {
 		secret = secret.DeepCopy()
 		secret.Data["appliedPlan"] = plan
 		// don't return the secret at this point, we want to attempt to update the machine status later on
@@ -80,11 +78,13 @@ func (h *handler) OnChange(key string, secret *corev1.Secret) (*corev1.Secret, e
 		}
 	}
 
-	if failedChecksum == hash(plan) {
+	if failedChecksum == planner.PlanHash(plan) {
+		logrus.Debugf("[plansecret] %s/%s: rv: %s: Detected failed plan application, reconciling machine PlanApplied condition to error", secret.Namespace, secret.Name, secret.ResourceVersion)
 		err = h.reconcileMachinePlanAppliedCondition(secret, fmt.Errorf("error applying plan -- check rancher-system-agent.service logs on node for more information"))
 		return secret, err
 	}
 
+	logrus.Debugf("[plansecret] %s/%s: rv: %s: Reconciling machine PlanApplied condition to nil", secret.Namespace, secret.Name, secret.ResourceVersion)
 	err = h.reconcileMachinePlanAppliedCondition(secret, nil)
 	return secret, err
 }
@@ -110,19 +110,22 @@ func (h *handler) reconcileMachinePlanAppliedCondition(secret *corev1.Secret, pl
 	machine = machine.DeepCopy()
 
 	var needsUpdate bool
-
-	if planAppliedErr != nil && !conditions.IsFalse(machine, condition) &&
-		conditions.GetReason(machine, condition) != "Error" &&
-		*conditions.GetSeverity(machine, condition) != capi.ConditionSeverityError &&
-		conditions.GetMessage(machine, condition) != planAppliedErr.Error() {
+	if planAppliedErr != nil &&
+		(conditions.GetMessage(machine, condition) != planAppliedErr.Error() ||
+			*conditions.GetSeverity(machine, condition) != capi.ConditionSeverityError ||
+			!conditions.IsFalse(machine, condition) ||
+			conditions.GetReason(machine, condition) != "Error") {
+		logrus.Debugf("[plansecret] machine %s/%s: marking PlanApplied as false", machine.Namespace, machine.Name)
 		conditions.MarkFalse(machine, condition, "Error", capi.ConditionSeverityError, planAppliedErr.Error())
 		needsUpdate = true
-	} else if !conditions.IsTrue(machine, condition) {
+	} else if planAppliedErr == nil && !conditions.IsTrue(machine, condition) {
+		logrus.Debugf("[plansecret] machine %s/%s: marking PlanApplied as true", machine.Namespace, machine.Name)
 		conditions.MarkTrue(machine, condition)
 		needsUpdate = true
 	}
 
 	if needsUpdate {
+		logrus.Debugf("[plansecret] machine %s/%s: updating status of machine to reconcile for condition with error: %+v", machine.Namespace, machine.Name, planAppliedErr)
 		_, err = h.machinesClient.UpdateStatus(machine)
 	}
 
@@ -241,9 +244,4 @@ func generateEtcdSnapshotFromListOutput(input string) (*snapshot, error) {
 		}, nil
 	}
 	return nil, fmt.Errorf("input (%s) did not have 3 or 4 fields", input)
-}
-
-func hash(plan []byte) string {
-	result := sha256.Sum256(plan)
-	return hex.EncodeToString(result[:])
 }

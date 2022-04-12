@@ -124,7 +124,7 @@ func (p *Planner) encryptionKeyRotationRestartLeader(cp *rkev1.RKEControlPlane, 
 	nodePlan := plan.NodePlan{
 		Instructions: []plan.OneTimeInstruction{encryptionKeyRotationRestartInstruction(cp, leader, phase)},
 	}
-	err = assignAndCheckPlan(p.store, fmt.Sprintf("encryption key rotation: [%s]", cp.Status.RotateEncryptionKeysPhase), leader, nodePlan, 0)
+	err = assignAndCheckPlan(p.store, fmt.Sprintf("encryption key rotation: [%s]", cp.Status.RotateEncryptionKeysPhase), leader, nodePlan, 0, 0)
 	if err != nil {
 		return p.enqueueIfErrWaiting(cp, err)
 	}
@@ -157,7 +157,7 @@ func (p *Planner) encryptionKeyRotationRestartFollowers(cp *rkev1.RKEControlPlan
 			PeriodicInstructions: []plan.PeriodicInstruction{encryptionKeyRotationPeriodicStatusInstruction(cp)},
 		}
 
-		err := assignAndCheckPlan(p.store, fmt.Sprintf("encryption key rotation: [%s]", cp.Status.RotateEncryptionKeysPhase), entry, nodePlan, 0)
+		err := assignAndCheckPlan(p.store, fmt.Sprintf("encryption key rotation: [%s]", cp.Status.RotateEncryptionKeysPhase), entry, nodePlan, 0, 0)
 		if err != nil {
 			return p.enqueueIfErrWaiting(cp, err)
 		}
@@ -216,7 +216,7 @@ func (p *Planner) encryptionKeyRotationApplyLeader(cp *rkev1.RKEControlPlane, le
 			Instructions:         []plan.OneTimeInstruction{apply, encryptionKeyRotationStatusOneTimeInstruction(cp)},
 			PeriodicInstructions: []plan.PeriodicInstruction{encryptionKeyRotationPeriodicStatusInstruction(cp)},
 		}
-		err = assignAndCheckPlan(p.store, fmt.Sprintf("encryption key rotation: [%s]", cp.Status.RotateEncryptionKeysPhase), leader, nodePlan, 0)
+		err = assignAndCheckPlan(p.store, fmt.Sprintf("encryption key rotation: [%s]", cp.Status.RotateEncryptionKeysPhase), leader, nodePlan, 0, 0)
 		if err != nil {
 			return p.enqueueIfErrWaiting(cp, err)
 		}
@@ -231,7 +231,7 @@ func (p *Planner) encryptionKeyRotationApplyLeader(cp *rkev1.RKEControlPlane, le
 			Instructions:         []plan.OneTimeInstruction{encryptionKeyRotationStatusOneTimeInstruction(cp)},
 			PeriodicInstructions: []plan.PeriodicInstruction{encryptionKeyRotationPeriodicStatusInstruction(cp)},
 		}
-		err = assignAndCheckPlan(p.store, fmt.Sprintf("encryption key rotation: [%s]", cp.Status.RotateEncryptionKeysPhase), leader, nodePlan, 0)
+		err = assignAndCheckPlan(p.store, fmt.Sprintf("encryption key rotation: [%s]", cp.Status.RotateEncryptionKeysPhase), leader, nodePlan, 0, 0)
 		return p.enqueueIfErrWaiting(cp, err)
 	}
 	expected, err := encryptionKeyRotationPhaseIsExpectedFromCommand(phase, leader)
@@ -262,7 +262,7 @@ func (p *Planner) encryptionKeyRotationGetLeaderStatus(cp *rkev1.RKEControlPlane
 	nodePlan := plan.NodePlan{
 		PeriodicInstructions: []plan.PeriodicInstruction{encryptionKeyRotationPeriodicStatusInstruction(cp)},
 	}
-	err := assignAndCheckPlan(p.store, fmt.Sprintf("encryption key rotation: [%s]", cp.Status.RotateEncryptionKeysPhase), leader, nodePlan, 0)
+	err := assignAndCheckPlan(p.store, fmt.Sprintf("encryption key rotation: [%s]", cp.Status.RotateEncryptionKeysPhase), leader, nodePlan, 0, 0)
 	if err != nil {
 		return p.enqueueIfErrWaiting(cp, err)
 	}

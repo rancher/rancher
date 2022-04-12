@@ -113,7 +113,7 @@ func (p *Planner) addEtcdSnapshotListLocalPeriodicInstruction(nodePlan plan.Node
 		Args: []string{
 			"-c",
 			// the grep here is to make the command fail if we don't get the output we expect, like empty string.
-			fmt.Sprintf("%s etcd-snapshot list --etcd-s3=false",
+			fmt.Sprintf("%s etcd-snapshot list --etcd-s3=false 2>/dev/null",
 				rke2.GetRuntime(controlPlane.Spec.KubernetesVersion)),
 		},
 		PeriodSeconds: 600,
@@ -128,7 +128,7 @@ func (p *Planner) addEtcdSnapshotListS3PeriodicInstruction(nodePlan plan.NodePla
 		Args: []string{
 			"-c",
 			// the grep here is to make the command fail if we don't get the output we expect, like empty string.
-			fmt.Sprintf("%s etcd-snapshot list --etcd-s3",
+			fmt.Sprintf("%s etcd-snapshot list --etcd-s3 2>/dev/null",
 				rke2.GetRuntime(controlPlane.Spec.KubernetesVersion)),
 		},
 		PeriodSeconds: 600,
