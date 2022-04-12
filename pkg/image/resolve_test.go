@@ -155,6 +155,7 @@ func TestFetchImagesFromSystem(t *testing.T) {
 		t.Error(err)
 	}
 	toolsSystemImages := v32.ToolsSystemImages
+	windowsAndLinuxImages := []string{"rancher/mirrored-pause:3.6"}
 
 	bothImages := []string{
 		selectFirstEntry(linuxInfo.RKESystemImages).NginxProxy,
@@ -163,8 +164,16 @@ func TestFetchImagesFromSystem(t *testing.T) {
 		selectFirstEntry(linuxInfo.RKESystemImages).CoreDNS,
 		toolsSystemImages.PipelineSystemImages.Jenkins, // from tools
 	}
-	windowsImagesOnly := []string{
-		selectFirstEntry(windowsInfo.RKESystemImages).WindowsPodInfraContainer,
+	windowsRKEImage := selectFirstEntry(windowsInfo.RKESystemImages).WindowsPodInfraContainer
+	windowsRKEImageInBoth := false
+	for _, image := range windowsAndLinuxImages {
+		if image == windowsRKEImage {
+			windowsRKEImageInBoth = true
+		}
+	}
+	windowsImagesOnly := make([]string, 0)
+	if !windowsRKEImageInBoth {
+		windowsImagesOnly = append(windowsImagesOnly, windowsRKEImage)
 	}
 
 	testCases := []struct {
