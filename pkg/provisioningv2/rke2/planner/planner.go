@@ -22,6 +22,7 @@ import (
 	mgmtcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	ranchercontrollers "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
 	rkecontrollers "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
+	"github.com/rancher/rancher/pkg/provisioningv2/image"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/rancher/wrangler/pkg/condition"
@@ -895,9 +896,9 @@ func (p *Planner) desiredPlan(controlPlane *rkev1.RKEControlPlane, tokensSecret 
 
 func getInstallerImage(controlPlane *rkev1.RKEControlPlane) string {
 	runtime := rke2.GetRuntime(controlPlane.Spec.KubernetesVersion)
-	image := settings.SystemAgentInstallerImage.Get()
-	image = image + runtime + ":" + strings.ReplaceAll(controlPlane.Spec.KubernetesVersion, "+", "-")
-	return settings.PrefixPrivateRegistry(image)
+	installerImage := settings.SystemAgentInstallerImage.Get()
+	installerImage = installerImage + runtime + ":" + strings.ReplaceAll(controlPlane.Spec.KubernetesVersion, "+", "-")
+	return image.ResolveWithControlPlane(installerImage, controlPlane)
 }
 
 func isEtcd(entry *planEntry) bool {

@@ -15,7 +15,9 @@ import (
 	mgmtcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	rocontrollers "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
 	rkecontrollers "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
+	"github.com/rancher/rancher/pkg/provisioningv2/image"
 	"github.com/rancher/rancher/pkg/provisioningv2/kubeconfig"
+	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/rancher/wrangler/pkg/apply"
@@ -272,6 +274,8 @@ func (h *handler) createNewCluster(cluster *v1.Cluster, status v1.ClusterStatus,
 	spec.DefaultPodSecurityPolicyTemplateName = cluster.Spec.DefaultPodSecurityPolicyTemplateName
 	spec.DefaultClusterRoleForProjectMembers = cluster.Spec.DefaultClusterRoleForProjectMembers
 	spec.EnableNetworkPolicy = cluster.Spec.EnableNetworkPolicy
+	spec.DesiredAgentImage = image.ResolveWithCluster(settings.AgentImage.Get(), cluster)
+	spec.DesiredAuthImage = image.ResolveWithCluster(settings.AuthImage.Get(), cluster)
 
 	spec.AgentEnvVars = nil
 	for _, env := range cluster.Spec.AgentEnvVars {

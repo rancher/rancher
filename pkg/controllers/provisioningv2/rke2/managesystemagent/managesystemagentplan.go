@@ -5,6 +5,7 @@ import (
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	rancherv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	namespaces "github.com/rancher/rancher/pkg/namespace"
+	"github.com/rancher/rancher/pkg/provisioningv2/image"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/wrangler/pkg/name"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -30,7 +31,7 @@ func (h *handler) OnChangeInstallSUC(cluster *rancherv1.Cluster, status rancherv
 				Data: map[string]interface{}{
 					"global": map[string]interface{}{
 						"cattle": map[string]interface{}{
-							"systemDefaultRegistry": settings.SystemDefaultRegistry.Get(),
+							"systemDefaultRegistry": image.GetPrivateRepoURLFromCluster(cluster),
 						},
 					},
 				},
