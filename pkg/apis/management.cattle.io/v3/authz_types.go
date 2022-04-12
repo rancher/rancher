@@ -161,7 +161,7 @@ type ProjectRoleTemplateBinding struct {
 	GroupName          string `json:"groupName,omitempty" norman:"noupdate,type=reference[group]"`
 	GroupPrincipalName string `json:"groupPrincipalName,omitempty" norman:"noupdate,type=reference[principal]"`
 	ProjectName        string `json:"projectName,omitempty" norman:"required,noupdate,type=reference[project]"`
-	RoleTemplateName   string `json:"roleTemplateName,omitempty" norman:"required,type=reference[roleTemplate]"`
+	RoleTemplateName   string `json:"roleTemplateName,omitempty" norman:"required,noupdate,type=reference[roleTemplate]"`
 	ServiceAccount     string `json:"serviceAccount,omitempty" norman:"nocreate,noupdate"`
 }
 
@@ -185,7 +185,7 @@ type ClusterRoleTemplateBinding struct {
 	GroupName          string `json:"groupName,omitempty" norman:"noupdate,type=reference[group]"`
 	GroupPrincipalName string `json:"groupPrincipalName,omitempty" norman:"noupdate,type=reference[principal]"`
 	ClusterName        string `json:"clusterName,omitempty" norman:"required,noupdate,type=reference[cluster]"`
-	RoleTemplateName   string `json:"roleTemplateName,omitempty" norman:"required,type=reference[roleTemplate]"`
+	RoleTemplateName   string `json:"roleTemplateName,omitempty" norman:"required,noupdate,type=reference[roleTemplate]"`
 }
 
 func (c *ClusterRoleTemplateBinding) ObjClusterName() string {
