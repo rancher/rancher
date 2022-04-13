@@ -35,7 +35,7 @@ func (p *Planner) startOrRestartEtcdSnapshotCreate(controlPlane *rkev1.RKEContro
 	return nil
 }
 
-func (p *Planner) runEtcdSnapshotCreate(controlPlane *rkev1.RKEControlPlane, clusterPlan *plan.Plan, snapshot *rkev1.ETCDSnapshotCreate) []error {
+func (p *Planner) runEtcdSnapshotCreate(controlPlane *rkev1.RKEControlPlane, clusterPlan *plan.Plan) []error {
 	servers := collect(clusterPlan, isEtcd)
 	if len(servers) == 0 {
 		return []error{errors.New("failed to find node to perform etcd snapshot")}
@@ -93,7 +93,7 @@ func (p *Planner) createEtcdSnapshot(controlPlane *rkev1.RKEControlPlane, cluste
 	case rkev1.ETCDSnapshotPhaseStarted:
 		var stateSet bool
 		var finErrs []error
-		if errs := p.runEtcdSnapshotCreate(controlPlane, clusterPlan, snapshot); len(errs) > 0 {
+		if errs := p.runEtcdSnapshotCreate(controlPlane, clusterPlan); len(errs) > 0 {
 			for _, err := range errs {
 				if err == nil {
 					continue
