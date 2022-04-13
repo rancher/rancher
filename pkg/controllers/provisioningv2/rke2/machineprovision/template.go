@@ -18,6 +18,7 @@ const (
 	InfraMachineKind    = "rke.cattle.io/infra-machine-kind"
 	InfraMachineName    = "rke.cattle.io/infra-machine-name"
 	InfraJobRemove      = "rke.cattle.io/infra-remove"
+	CapiMachineName     = "rke.cattle.io/capi-machine-name"
 
 	pathToMachineFiles = "/path/to/machine/files"
 	sslCertDir         = "/etc/rancher/ssl"
@@ -190,6 +191,7 @@ func objects(ready bool, args driverArgs) []runtime.Object {
 		InfraMachineKind:    args.MachineGVK.Kind,
 		InfraMachineName:    args.MachineName,
 		InfraJobRemove:      strconv.FormatBool(!args.BootstrapRequired),
+		CapiMachineName:     args.CapiMachineName,
 	}
 
 	job := &batchv1.Job{
