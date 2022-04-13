@@ -126,7 +126,7 @@ func (q *Queries) Do(querys []*PrometheusQuery) (map[string][]*TimeSeries, error
 }
 
 func (q *Queries) GetLabelValues(labelName string) ([]string, error) {
-	value, _, err := q.api.LabelValues(q.ctx, labelName, time.Now().Add(-time.Hour), time.Now())
+	value, _, err := q.api.LabelValues(q.ctx, labelName, []string{}, time.Now().Add(-time.Hour), time.Now())
 	if err != nil {
 		return nil, fmt.Errorf("get prometheus metric list failed, %v", err)
 	}

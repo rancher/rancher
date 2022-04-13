@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"reflect"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -153,6 +154,7 @@ func GetClusterStore(schema *types.Schema, mgmt *config.ScaledContext, clusterMa
 		ClusterLister:                 mgmt.Management.Clusters("").Controller().Lister(),
 		NodeLister:                    mgmt.Management.Nodes("").Controller().Lister(),
 		DialerFactory:                 mgmt.Dialer,
+		SecretLister:                  mgmt.Core.Secrets("").Controller().Lister(),
 		secretMigrator: secretmigrator.NewMigrator(
 			mgmt.Core.Secrets("").Controller().Lister(),
 			mgmt.Core.Secrets(""),
@@ -238,7 +240,7 @@ func (r *Store) Create(apiContext *types.APIContext, schema *types.Schema, data 
 			return nil, err
 		}
 		clusterConfigSchema := apiContext.Schemas.Schema(&managementschema.Version, managementv3.ClusterSpecBaseType)
-		data, err = loadDataFromTemplate(clusterTemplateRevision, clusterTemplate, data, clusterConfigSchema, nil)
+		data, err = loadDataFromTemplate(clusterTemplateRevision, clusterTemplate, data, clusterConfigSchema, nil, r.SecretLister)
 		if err != nil {
 			return nil, err
 		}
@@ -403,8 +405,13 @@ func transposeNameFields(data map[string]interface{}, clusterConfigSchema *types
 	return data
 }
 
-func loadDataFromTemplate(clusterTemplateRevision *v3.ClusterTemplateRevision, clusterTemplate *v3.ClusterTemplate, data map[string]interface{}, clusterConfigSchema *types.Schema, existingCluster map[string]interface{}) (map[string]interface{}, error) {
-	dataFromTemplate, err := convert.EncodeToMap(clusterTemplateRevision.Spec.ClusterConfig)
+func loadDataFromTemplate(clusterTemplateRevision *v3.ClusterTemplateRevision, clusterTemplate *v3.ClusterTemplate, data map[string]interface{}, clusterConfigSchema *types.Schema, existingCluster map[string]interface{}, secretLister v1.SecretLister) (map[string]interface{}, error) {
+	clusterConfig := *clusterTemplateRevision.Spec.ClusterConfig.DeepCopy()
+	clusterConfigSpec, err := secretmigrator.AssembleRKEConfigTemplateSpec(clusterTemplateRevision, v32.ClusterSpec{ClusterSpecBase: clusterConfig}, secretLister)
+	if err != nil {
+		return nil, err
+	}
+	dataFromTemplate, err := convert.EncodeToMap(clusterConfigSpec)
 	if err != nil {
 		return nil, err
 	}
@@ -421,7 +428,41 @@ func loadDataFromTemplate(clusterTemplateRevision *v3.ClusterTemplateRevision, c
 
 	defaultedAnswers := make(map[string]string)
 
+	processingError := "Error processing clusterTemplate answers"
 	for _, question := range clusterTemplateRevision.Spec.Questions {
+		if question.Default == "" {
+			if secretmigrator.MatchesQuestionPath(question.Variable) {
+				if strings.HasPrefix(question.Variable, "rancherKubernetesEngineConfig.privateRegistries") {
+
+					registries, ok := values.GetSlice(dataFromTemplate, "rancherKubernetesEngineConfig", "privateRegistries")
+					if !ok {
+						return nil, httperror.WrapAPIError(err, httperror.ServerError, processingError)
+					}
+					index, err := getIndexFromQuestion(question.Variable)
+					if err != nil {
+						return nil, httperror.WrapAPIError(err, httperror.ServerError, processingError)
+					}
+					question.Default = registries[index]["password"].(string)
+				} else if strings.HasPrefix(question.Variable, "rancherKubernetesEngineConfig.cloudProvider.vsphereCloudProvider.virtualCenter") {
+					vcenters, ok := values.GetValue(dataFromTemplate, "rancherKubernetesEngineConfig", "cloudProvider", "vsphereCloudProvider", "virtualCenter")
+					if !ok {
+						return nil, httperror.WrapAPIError(err, httperror.ServerError, processingError)
+					}
+					key, err := getKeyFromQuestion(question.Variable)
+					if err != nil {
+						return nil, httperror.WrapAPIError(err, httperror.ServerError, processingError)
+					}
+					question.Default = vcenters.(map[string]interface{})[key].(map[string]interface{})["password"].(string)
+
+				} else {
+					keyParts := strings.Split(question.Variable, ".")
+					qDefault, ok := values.GetValue(dataFromTemplate, keyParts...)
+					if ok {
+						question.Default = qDefault.(string)
+					}
+				}
+			}
+		}
 		answer, ok := allAnswers[question.Variable]
 		if !ok {
 			if question.Required && question.Default == "" {
@@ -437,7 +478,7 @@ func loadDataFromTemplate(clusterTemplateRevision *v3.ClusterTemplateRevision, c
 		}
 		val, err := builder.ConvertSimple(question.Type, answer, builder.Create)
 		if err != nil {
-			return nil, httperror.WrapAPIError(err, httperror.ServerError, "Error processing clusterTemplate answers")
+			return nil, httperror.WrapAPIError(err, httperror.ServerError, processingError)
 		}
 		keyParts := strings.Split(question.Variable, ".")
 		values.PutValue(dataFromTemplate, val, keyParts...)
@@ -486,6 +527,30 @@ func loadDataFromTemplate(clusterTemplateRevision *v3.ClusterTemplateRevision, c
 	}
 
 	return dataFromTemplate, nil
+}
+
+func getIndexFromQuestion(question string) (int, error) {
+	re, err := regexp.Compile(`\[\d+\]`)
+	if err != nil {
+		return 0, err
+	}
+	target := re.FindString(question)
+	if target == "" {
+		return 0, fmt.Errorf("cannot get index from the question: %s", question)
+	}
+	return strconv.Atoi(target[1 : len(target)-1])
+}
+
+func getKeyFromQuestion(question string) (string, error) {
+	re, err := regexp.Compile(`\[.+\]`)
+	if err != nil {
+		return "", err
+	}
+	target := re.FindString(question)
+	if target == "" {
+		return "", fmt.Errorf("cannot get key from the question: %s", question)
+	}
+	return target[1 : len(target)-1], nil
 }
 
 func hasTemplate(data map[string]interface{}) bool {
@@ -638,7 +703,7 @@ func (r *Store) Update(apiContext *types.APIContext, schema *types.Schema, data 
 		}
 
 		clusterConfigSchema := apiContext.Schemas.Schema(&managementschema.Version, managementv3.ClusterSpecBaseType)
-		clusterUpdate, err := loadDataFromTemplate(clusterTemplateRevision, clusterTemplate, data, clusterConfigSchema, existingCluster)
+		clusterUpdate, err := loadDataFromTemplate(clusterTemplateRevision, clusterTemplate, data, clusterConfigSchema, existingCluster, r.SecretLister)
 		if err != nil {
 			return nil, err
 		}
@@ -1313,12 +1378,23 @@ func cleanQuestions(data map[string]interface{}) map[string]interface{} {
 	if _, ok := values.GetValue(data, "answers", "values"); ok {
 		values.RemoveValue(data, "answers", "values", secretmigrator.S3BackupAnswersPath)
 		values.RemoveValue(data, "answers", "values", secretmigrator.WeavePasswordAnswersPath)
+		values.RemoveValue(data, "answers", "values", secretmigrator.VsphereGlobalAnswersPath)
+		values.RemoveValue(data, "answers", "values", secretmigrator.OpenStackAnswersPath)
+		values.RemoveValue(data, "answers", "values", secretmigrator.AADClientAnswersPath)
+		values.RemoveValue(data, "answers", "values", secretmigrator.AADCertAnswersPath)
 		for i := 0; ; i++ {
 			key := fmt.Sprintf(secretmigrator.RegistryPasswordAnswersPath, i)
 			if _, ok := values.GetValue(data, "answers", "values", key); !ok {
 				break
 			}
 			values.RemoveValue(data, "answers", "values", key)
+		}
+		vcenters, ok := values.GetValue(data, "rancherKubernetesEngineConfig", "cloudProvider", "vsphereCloudProvider", "virtualCenter")
+		if ok {
+			for k := range vcenters.(map[string]interface{}) {
+				key := fmt.Sprintf(secretmigrator.VcenterAnswersPath, k)
+				values.RemoveValue(data, "answers", "values", key)
+			}
 		}
 	}
 	return data

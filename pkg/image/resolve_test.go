@@ -155,6 +155,7 @@ func TestFetchImagesFromSystem(t *testing.T) {
 		t.Error(err)
 	}
 	toolsSystemImages := v32.ToolsSystemImages
+	windowsAndLinuxImages := []string{"rancher/mirrored-pause:3.6"}
 
 	bothImages := []string{
 		selectFirstEntry(linuxInfo.RKESystemImages).NginxProxy,
@@ -163,8 +164,16 @@ func TestFetchImagesFromSystem(t *testing.T) {
 		selectFirstEntry(linuxInfo.RKESystemImages).CoreDNS,
 		toolsSystemImages.PipelineSystemImages.Jenkins, // from tools
 	}
-	windowsImagesOnly := []string{
-		selectFirstEntry(windowsInfo.RKESystemImages).WindowsPodInfraContainer,
+	windowsRKEImage := selectFirstEntry(windowsInfo.RKESystemImages).WindowsPodInfraContainer
+	windowsRKEImageInBoth := false
+	for _, image := range windowsAndLinuxImages {
+		if image == windowsRKEImage {
+			windowsRKEImageInBoth = true
+		}
+	}
+	windowsImagesOnly := make([]string, 0)
+	if !windowsRKEImageInBoth {
+		windowsImagesOnly = append(windowsImagesOnly, windowsRKEImage)
 	}
 
 	testCases := []struct {
@@ -263,6 +272,7 @@ func TestGetImages(t *testing.T) {
 	bothImages := []string{
 		selectFirstEntry(linuxInfo.RKESystemImages).NginxProxy, // from system
 		"rancher/fluentd:v0.1.16",                              // from chart
+		"rancher/mirrored-pause:3.6",
 	}
 	bothSources := []string{
 		"rancher/fluentd:v0.1.16 rancher-logging:0.1.2",
@@ -273,9 +283,9 @@ func TestGetImages(t *testing.T) {
 	sourcesToAdd := getImageSourcesList(imagesSet)
 	linuxRKEImage := selectFirstEntry(linuxInfo.RKESystemImages).CoreDNS
 	linuxImagesOnly := append(
-		imagesToAdd,                         // from requirement
-		linuxRKEImage,                       // from system
-		"rancher/prom-alertmanager:v0.17.0", // from chart
+		imagesToAdd,                                    // from requirement
+		linuxRKEImage,                                  // from system
+		"rancher/prom-alertmanager:v0.17.0",            // from chart
 		toolsSystemImages.PipelineSystemImages.Jenkins, // from tools
 	)
 	linuxSourcesOnly := append(
@@ -290,13 +300,19 @@ func TestGetImages(t *testing.T) {
 	windowsRKEImage := selectFirstEntry(windowsInfo.RKESystemImages).WindowsPodInfraContainer
 	windowsSourcesOnly := append(
 		sourcesToAdd,
-		fmt.Sprintf("%s system", windowsRKEImage),
 		"rancher/wmi_exporter-package:v0.0.2 rancher-monitoring:0.0.4",
 	)
-	windowsImagesOnly := append(
-		imagesToAdd,     // from requirement
-		windowsRKEImage, // from system
-	)
+	windowsRKEImageInBoth := false
+	for _, image := range bothImages {
+		if image == windowsRKEImage {
+			windowsRKEImageInBoth = true
+		}
+	}
+	windowsImagesOnly := imagesToAdd
+	if !windowsRKEImageInBoth {
+		windowsImagesOnly = append(windowsImagesOnly, windowsRKEImage)
+		windowsSourcesOnly = append(windowsSourcesOnly, fmt.Sprintf("%s system", windowsRKEImage))
+	}
 
 	testCases := []struct {
 		caseName                      string
