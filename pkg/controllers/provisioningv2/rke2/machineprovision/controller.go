@@ -50,8 +50,6 @@ const (
 	deleteJobConditionType = "DeleteJob"
 
 	forceRemoveMachineAnn = "provisioning.cattle.io/force-machine-remove"
-
-	drainingSucceededCondition = condition.Cond(capi.DrainingSucceededCondition)
 )
 
 type infraObject struct {
@@ -93,6 +91,7 @@ type handler struct {
 	pods                corecontrollers.PodCache
 	secrets             corecontrollers.SecretCache
 	machines            capicontrollers.MachineCache
+	machinesClient      capicontrollers.MachineClient
 	namespaces          corecontrollers.NamespaceCache
 	nodeDriverCache     mgmtcontrollers.NodeDriverCache
 	dynamic             *dynamic.Controller
@@ -113,6 +112,7 @@ func Register(ctx context.Context, clients *wrangler.Context) {
 		jobs:                clients.Batch.Job().Cache(),
 		secrets:             clients.Core.Secret().Cache(),
 		machines:            clients.CAPI.Machine().Cache(),
+		machinesClient:      clients.CAPI.Machine(),
 		nodeDriverCache:     clients.Mgmt.NodeDriver().Cache(),
 		namespaces:          clients.Core.Namespace().Cache(),
 		dynamic:             clients.Dynamic,
@@ -453,12 +453,24 @@ func (h *handler) run(infraObj *infraObject, create bool) (runtime.Object, error
 			h.dynamic.EnqueueAfter(infraObj.obj.GetObjectKind().GroupVersionKind(), infraObj.meta.GetNamespace(), infraObj.meta.GetName(), 2*time.Second)
 	}
 
-	if err := h.apply.WithOwner(infraObj.obj).ApplyObjects(objects(args.String("providerID") != "" && create, dArgs)...); err != nil {
+	failedCreate := infraObj.data.String("status", "failureReason") == string(capierrors.CreateMachineError)
+
+	if err := h.apply.WithOwner(infraObj.obj).ApplyObjects(objects((args.String("providerID") != "" || failedCreate) && create, dArgs)...); err != nil {
 		return nil, err
 	}
 
 	if create {
-		return h.patchStatus(infraObj.obj, infraObj.data, dArgs.RKEMachineStatus)
+		infraObj.obj, err = h.patchStatus(infraObj.obj, infraObj.data, dArgs.RKEMachineStatus)
+		if err != nil {
+			return nil, err
+		}
+
+		if failedCreate {
+			logrus.Infof("[MachineProvision] Failed to create infrastructure %s/%s for machine %s, deleting and recreating...", infraObj.meta.GetNamespace(), infraObj.meta.GetName(), dArgs.CapiMachineName)
+			if err = h.machinesClient.Delete(infraObj.meta.GetNamespace(), dArgs.CapiMachineName, &metav1.DeleteOptions{}); err != nil {
+				return infraObj.obj, fmt.Errorf("failed to delete CAPI machine %s: %w", dArgs.CapiMachineName, err)
+			}
+		}
 	}
 
 	return infraObj.obj, nil
