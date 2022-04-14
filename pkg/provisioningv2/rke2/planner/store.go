@@ -305,7 +305,7 @@ func (p *PlanStore) getPlanSecretFromMachine(machine *capi.Machine) (*corev1.Sec
 // UpdatePlan should not be called directly as it will not block further progress if the plan is not in sync
 // maxFailures is the number of attempts the system-agent will make to run the plan (in a failed state). failureThreshold is used to determine when the plan has failed.
 func (p *PlanStore) UpdatePlan(entry *planEntry, plan plan.NodePlan, maxFailures, failureThreshold int) error {
-	if maxFailures < failureThreshold && failureThreshold != -1 {
+	if maxFailures < failureThreshold && failureThreshold != -1 && maxFailures != -1 {
 		return fmt.Errorf("failureThreshold (%d) cannot be greater than maxFailures (%d)", failureThreshold, maxFailures)
 	}
 	secret, err := p.getPlanSecretFromMachine(entry.Machine)
