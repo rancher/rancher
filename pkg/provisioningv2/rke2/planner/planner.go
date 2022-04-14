@@ -497,7 +497,7 @@ func (p *Planner) reconcile(controlPlane *rkev1.RKEControlPlane, tokensSecret pl
 
 		if entry.Plan == nil {
 			outOfSync = append(outOfSync, entry.Machine.Name)
-			if err := p.store.UpdatePlan(entry, plan, 1, -1); err != nil {
+			if err := p.store.UpdatePlan(entry, plan, -1, 1); err != nil {
 				return err
 			}
 		} else if !equality.Semantic.DeepEqual(entry.Plan.Plan, plan) {
@@ -518,7 +518,7 @@ func (p *Planner) reconcile(controlPlane *rkev1.RKEControlPlane, tokensSecret pl
 					return err
 				} else if ok && err == nil {
 					// Drain is done (or didn't need to be done) and there are no errors, so the plan should be updated to enact the reason the node was drained.
-					if err = p.store.UpdatePlan(entry, plan, 1, -1); err != nil {
+					if err = p.store.UpdatePlan(entry, plan, -1, 1); err != nil {
 						return err
 					} else if entry.Metadata.Annotations[rke2.DrainDoneAnnotation] != "" {
 						messages[entry.Machine.Name] = append(messages[entry.Machine.Name], "drain completed")
@@ -885,7 +885,7 @@ func (p *Planner) desiredPlan(controlPlane *rkev1.RKEControlPlane, tokensSecret 
 		if err != nil {
 			return nodePlan, err
 		}
-		if controlPlane != nil && controlPlane.Spec.ETCD != nil && controlPlane.Spec.ETCD.S3 != nil {
+		if controlPlane != nil && controlPlane.Spec.ETCD != nil && S3Enabled(controlPlane.Spec.ETCD.S3) {
 			nodePlan, err = p.addEtcdSnapshotListS3PeriodicInstruction(nodePlan, controlPlane)
 			if err != nil {
 				return nodePlan, err
