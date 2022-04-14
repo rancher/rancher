@@ -340,6 +340,10 @@ func (h *handler) updateStatus(objs []runtime.Object, cluster *v1.Cluster, statu
 			ready = true
 		}
 		for _, messageCond := range existing.Status.Conditions {
+			if messageCond.Type == "Updated" || messageCond.Type == "Provisioned" || messageCond.Type == "Removed" {
+				continue
+			}
+
 			found := false
 			newCond := genericcondition.GenericCondition{
 				Type:               string(messageCond.Type),
