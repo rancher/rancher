@@ -33,8 +33,13 @@ type ETCDSnapshotRestore struct {
 type ETCDSnapshot struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
+	Spec              ETCDSnapshotSpec   `json:"spec,omitempty"`
 	SnapshotFile      ETCDSnapshotFile   `json:"snapshotFile,omitempty"`
 	Status            ETCDSnapshotStatus `json:"status"`
+}
+
+type ETCDSnapshotSpec struct {
+	ClusterName string `json:"clusterName,omitempty"`
 }
 
 type ETCDSnapshotFile struct {

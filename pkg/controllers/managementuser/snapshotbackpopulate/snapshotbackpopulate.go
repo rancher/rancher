@@ -204,6 +204,9 @@ func (h *handler) configMapToSnapshots(configMap *corev1.ConfigMap, cluster *pro
 				},
 				OwnerReferences: []metav1.OwnerReference{},
 			},
+			Spec: rkev1.ETCDSnapshotSpec{
+				ClusterName: cluster.Name,
+			},
 			SnapshotFile: rkev1.ETCDSnapshotFile{
 				Name:      file.Name,
 				Location:  file.Location,
