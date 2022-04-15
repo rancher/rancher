@@ -15,33 +15,49 @@ const (
 	rancherAppsURL   = "v1/catalog.cattle.io.apps/"
 )
 
-// GetLatestChartVersion is used to get the lastest version of `chartName`
-func (c *Client) GetLatestChartVersion(chartName string) (string, error) {
+//GetListChartVersions is used to get the list of versions of `chartName`
+func (c *Client) GetListChartVersions(chartName string) ([]string, error) {
 	result, err := c.RESTClient().Get().
 		AbsPath(rancherChartsURL).Param("link", "index").
 		VersionedParams(&metav1.GetOptions{}, scheme.ParameterCodec).
 		Do(context.TODO()).Raw()
 
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	var mapResponse map[string]interface{}
 	if err = json.Unmarshal(result, &mapResponse); err != nil {
-		return "", err
+		return nil, err
 	}
 
 	entries := mapResponse["entries"]
 	specifiedChartEntries := entries.(map[string]interface{})[chartName].([]interface{})
 	if len(specifiedChartEntries) < 1 {
-		return "", fmt.Errorf("failed to find chart %s from the chart repo", chartName)
+		return nil, fmt.Errorf("failed to find chart %s from the chart repo", chartName)
 	}
 
-	lastestVersion := specifiedChartEntries[0].(map[string]interface{})["version"].(string)
+	versionsList := []string{}
+	for _, entry := range specifiedChartEntries {
+		entryMap := entry.(map[string]interface{})
+		versionsList = append(versionsList, entryMap["version"].(string))
+	}
+
+	return versionsList, nil
+}
+
+// GetLatestChartVersion is used to get the lastest version of `chartName`
+func (c *Client) GetLatestChartVersion(chartName string) (string, error) {
+	versionsList, err := c.GetListChartVersions(chartName)
+	if err != nil {
+		return "", err
+	}
+	lastestVersion := versionsList[0]
+
 	return lastestVersion, nil
 }
 
-// InstallChart installs the chart according to the paratmeter `chart`
+// InstallChart installs the chart according to the parameter `chart`
 func (c *Client) InstallChart(chart *types.ChartInstallAction) error {
 	bodyContent, err := json.Marshal(chart)
 	if err != nil {
@@ -50,6 +66,22 @@ func (c *Client) InstallChart(chart *types.ChartInstallAction) error {
 
 	result := c.RESTClient().Post().
 		AbsPath(rancherChartsURL).Param("action", "install").
+		VersionedParams(&metav1.CreateOptions{}, scheme.ParameterCodec).
+		Body(bodyContent).
+		Do(context.TODO())
+
+	return result.Error()
+}
+
+// UpgradeChart upgrades the chart according to the parameter `chart`
+func (c *Client) UpgradeChart(chart *types.ChartUpgradeAction) error {
+	bodyContent, err := json.Marshal(chart)
+	if err != nil {
+		return err
+	}
+
+	result := c.RESTClient().Post().
+		AbsPath(rancherChartsURL).Param("action", "upgrade").
 		VersionedParams(&metav1.CreateOptions{}, scheme.ParameterCodec).
 		Body(bodyContent).
 		Do(context.TODO())

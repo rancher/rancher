@@ -1,0 +1,282 @@
+package charts
+
+import (
+	"context"
+	"fmt"
+
+	"github.com/rancher/rancher/pkg/api/steve/catalog/types"
+	catalogv1 "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
+	"github.com/rancher/rancher/tests/framework/clients/rancher"
+	"github.com/rancher/rancher/tests/framework/extensions/namespaces"
+	"github.com/rancher/rancher/tests/framework/pkg/wait"
+	"github.com/rancher/rancher/tests/integration/pkg/defaults"
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/watch"
+)
+
+const (
+	// Namespace that rancher istio chart is installed in
+	RancherIstioNamespace = "istio-system"
+	// Name of the rancher istio chart
+	RancherIstioName = "rancher-istio"
+)
+
+// InstallRancherIstioChart is a helper function that installs the rancher-istio chart.
+func InstallRancherIstioChart(client *rancher.Client, installOptions *InstallOptions, rancherIstioOpts *RancherIstioOpts) error {
+	istioChartInstallActionPayload := &payloadOpts{
+		InstallOptions: *installOptions,
+		Name:           RancherIstioName,
+		Host:           client.RancherConfig.Host,
+		Namespace:      RancherIstioNamespace,
+	}
+
+	chartInstallAction := newIstioChartInstallAction(istioChartInstallActionPayload, rancherIstioOpts)
+
+	catalogClient, err := client.GetClusterCatalogClient(installOptions.ClusterID)
+	if err != nil {
+		return err
+	}
+
+	// Cleanup registration
+	client.Session.RegisterCleanupFunc(func() error {
+		// UninstallAction for when uninstalling the rancher-istio chart
+		defaultChartUninstallAction := newChartUninstallAction()
+
+		err := catalogClient.UninstallChart(RancherIstioName, RancherIstioNamespace, defaultChartUninstallAction)
+		if err != nil {
+			return err
+		}
+
+		watchAppInterface, err := catalogClient.Apps(RancherIstioNamespace).Watch(context.TODO(), metav1.ListOptions{
+			FieldSelector:  "metadata.name=" + RancherIstioName,
+			TimeoutSeconds: &defaults.WatchTimeoutSeconds,
+		})
+		if err != nil {
+			return err
+		}
+
+		err = wait.WatchWait(watchAppInterface, func(event watch.Event) (ready bool, err error) {
+			if event.Type == watch.Error {
+				return false, fmt.Errorf("there was an error uninstalling rancher istio chart")
+			} else if event.Type == watch.Deleted {
+				return true, nil
+			}
+			return false, nil
+		})
+		if err != nil {
+			return err
+		}
+
+		dynamicClient, err := client.GetDownStreamClusterClient(installOptions.ClusterID)
+		if err != nil {
+			return err
+		}
+		namespaceResource := dynamicClient.Resource(namespaces.NamespaceGroupVersionResource).Namespace("")
+
+		err = namespaceResource.Delete(context.TODO(), RancherIstioNamespace, metav1.DeleteOptions{})
+		if errors.IsNotFound(err) {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+
+		adminClient, err := rancher.NewClient(client.RancherConfig.AdminToken, client.Session)
+		if err != nil {
+			return err
+		}
+		adminDynamicClient, err := adminClient.GetDownStreamClusterClient(installOptions.ClusterID)
+		if err != nil {
+			return err
+		}
+		adminNamespaceResource := adminDynamicClient.Resource(namespaces.NamespaceGroupVersionResource).Namespace("")
+
+		watchNamespaceInterface, err := adminNamespaceResource.Watch(context.TODO(), metav1.ListOptions{
+			FieldSelector:  "metadata.name=" + RancherIstioNamespace,
+			TimeoutSeconds: &defaults.WatchTimeoutSeconds,
+		})
+
+		if err != nil {
+			return err
+		}
+
+		return wait.WatchWait(watchNamespaceInterface, func(event watch.Event) (ready bool, err error) {
+			if event.Type == watch.Deleted {
+				return true, nil
+			}
+			return false, nil
+		})
+	})
+
+	err = catalogClient.InstallChart(chartInstallAction)
+	if err != nil {
+		return err
+	}
+
+	// wait for chart to be full deployed
+	watchAppInterface, err := catalogClient.Apps(RancherIstioNamespace).Watch(context.TODO(), metav1.ListOptions{
+		FieldSelector:  "metadata.name=" + RancherIstioName,
+		TimeoutSeconds: &defaults.WatchTimeoutSeconds,
+	})
+	if err != nil {
+		return err
+	}
+
+	err = wait.WatchWait(watchAppInterface, func(event watch.Event) (ready bool, err error) {
+		app := event.Object.(*catalogv1.App)
+
+		state := app.Status.Summary.State
+		if state == string(catalogv1.StatusDeployed) {
+			return true, nil
+		}
+		return false, nil
+	})
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// newIstioChartInstallAction is a private helper function that returns chart install action with istio and payload options.
+func newIstioChartInstallAction(p *payloadOpts, rancherIstioOpts *RancherIstioOpts) *types.ChartInstallAction {
+	istioValues := map[string]interface{}{
+		"tracing": map[string]interface{}{
+			"enabled": rancherIstioOpts.Tracing,
+		},
+		"kiali": map[string]interface{}{
+			"enabled": rancherIstioOpts.Kiali,
+		},
+		"ingressGateways": map[string]interface{}{
+			"enabled": rancherIstioOpts.IngressGateways,
+		},
+		"egressGateways": map[string]interface{}{
+			"enabled": rancherIstioOpts.EgressGateways,
+		},
+		"pilot": map[string]interface{}{
+			"enabled": rancherIstioOpts.Pilot,
+		},
+		"telemetry": map[string]interface{}{
+			"enabled": rancherIstioOpts.Telemetry,
+		},
+		"cni": map[string]interface{}{
+			"enabled": rancherIstioOpts.CNI,
+		},
+	}
+	chartInstall := newChartInstall(p.Name, p.InstallOptions.Version, p.InstallOptions.ClusterID, p.InstallOptions.ClusterName, p.Host, istioValues)
+	chartInstalls := []types.ChartInstall{*chartInstall}
+
+	chartInstallAction := newChartInstallAction(p.Namespace, p.InstallOptions.ProjectID, chartInstalls)
+
+	return chartInstallAction
+}
+
+// UpgradeRancherIstioChart is a helper function that upgrades the rancher-istio chart.
+func UpgradeRancherIstioChart(client *rancher.Client, installOptions *InstallOptions, rancherIstioOpts *RancherIstioOpts) error {
+	istioChartUpgradeActionPayload := &payloadOpts{
+		InstallOptions: *installOptions,
+		Name:           RancherIstioName,
+		Host:           client.RancherConfig.Host,
+		Namespace:      RancherIstioNamespace,
+	}
+
+	chartUpgradeAction := newIstioChartUpgradeAction(istioChartUpgradeActionPayload, rancherIstioOpts)
+
+	catalogClient, err := client.GetClusterCatalogClient(installOptions.ClusterID)
+	if err != nil {
+		return err
+	}
+
+	err = catalogClient.UpgradeChart(chartUpgradeAction)
+	if err != nil {
+		return err
+	}
+
+	adminClient, err := rancher.NewClient(client.RancherConfig.AdminToken, client.Session)
+	if err != nil {
+		return err
+	}
+	adminCatalogClient, err := adminClient.GetClusterCatalogClient(installOptions.ClusterID)
+	if err != nil {
+		return err
+	}
+
+	// wait for chart to be in status pending upgrade
+	watchAppInterface, err := adminCatalogClient.Apps(RancherIstioNamespace).Watch(context.TODO(), metav1.ListOptions{
+		FieldSelector:  "metadata.name=" + RancherIstioName,
+		TimeoutSeconds: &defaults.WatchTimeoutSeconds,
+	})
+	if err != nil {
+		return err
+	}
+
+	err = wait.WatchWait(watchAppInterface, func(event watch.Event) (ready bool, err error) {
+		app := event.Object.(*catalogv1.App)
+
+		state := app.Status.Summary.State
+		if state == string(catalogv1.StatusPendingUpgrade) {
+			return true, nil
+		}
+		return false, nil
+	})
+	if err != nil {
+		return err
+	}
+
+	// wait for chart to be full deployed
+	watchAppInterface, err = adminCatalogClient.Apps(RancherIstioNamespace).Watch(context.TODO(), metav1.ListOptions{
+		FieldSelector:  "metadata.name=" + RancherIstioName,
+		TimeoutSeconds: &defaults.WatchTimeoutSeconds,
+	})
+	if err != nil {
+		return err
+	}
+
+	err = wait.WatchWait(watchAppInterface, func(event watch.Event) (ready bool, err error) {
+		app := event.Object.(*catalogv1.App)
+
+		state := app.Status.Summary.State
+		if state == string(catalogv1.StatusDeployed) {
+			return true, nil
+		}
+		return false, nil
+	})
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// newIstioChartUpgradeAction is a private helper function that returns chart upgrade action with istio and payload options.
+func newIstioChartUpgradeAction(p *payloadOpts, rancherIstioOpts *RancherIstioOpts) *types.ChartUpgradeAction {
+	istioValues := map[string]interface{}{
+		"tracing": map[string]interface{}{
+			"enabled": rancherIstioOpts.Tracing,
+		},
+		"kiali": map[string]interface{}{
+			"enabled": rancherIstioOpts.Kiali,
+		},
+		"ingressGateways": map[string]interface{}{
+			"enabled": rancherIstioOpts.IngressGateways,
+		},
+		"egressGateways": map[string]interface{}{
+			"enabled": rancherIstioOpts.EgressGateways,
+		},
+		"pilot": map[string]interface{}{
+			"enabled": rancherIstioOpts.Pilot,
+		},
+		"telemetry": map[string]interface{}{
+			"enabled": rancherIstioOpts.Telemetry,
+		},
+		"cni": map[string]interface{}{
+			"enabled": rancherIstioOpts.CNI,
+		},
+	}
+	chartUpgrade := newChartUpgrade(p.Name, p.InstallOptions.Version, p.InstallOptions.ClusterID, p.InstallOptions.ClusterName, p.Host, istioValues)
+	chartUpgrades := []types.ChartUpgrade{*chartUpgrade}
+
+	chartUpgradeAction := newChartUpgradeAction(p.Namespace, chartUpgrades)
+
+	return chartUpgradeAction
+}

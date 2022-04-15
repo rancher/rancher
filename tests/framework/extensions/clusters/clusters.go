@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/pkg/api/scheme"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	apisV1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
@@ -15,6 +16,22 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/watch"
 )
+
+// GetClusterIDByName is a helper function that returns the cluster ID by name
+func GetClusterIDByName(client *rancher.Client, clusterName string) (string, error) {
+	clusterList, err := client.Management.Cluster.List(&types.ListOpts{})
+	if err != nil {
+		return "", err
+	}
+
+	for _, cluster := range clusterList.Data {
+		if cluster.Name == clusterName {
+			return cluster.ID, nil
+		}
+	}
+
+	return "", nil
+}
 
 // IsProvisioningClusterReady is basic check function that would be used for the wait.WatchWait func in pkg/wait.
 // This functions just waits until a cluster becomes ready.
