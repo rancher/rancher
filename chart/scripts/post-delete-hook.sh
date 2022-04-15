@@ -3,11 +3,17 @@
 set -e
 
 namespaces="${NAMESPACES}"
+rancher_namespace="${RANCHER_NAMESPACE}"
 timeout="${TIMEOUT}"
 ignoreTimeoutError="${IGNORETIMEOUTERROR}"
 
 if [[ -z ${namespaces} ]]; then
   echo "No namespace is provided."
+  exit 1
+fi
+
+if [[ -z ${rancher_namespace} ]]; then
+  echo "No rancher namespace is provided."
   exit 1
 fi
 
@@ -69,6 +75,9 @@ for namespace in ${namespaces}; do
     fi
   done
 done
+
+echo "Removing Rancher bootstrap secret in the following namespace: ${rancher_namespace}"
+kubectl --ignore-not-found=true delete secret bootstrap-secret -n "${rancher_namespace}"
 
 echo "------ Summary ------"
 if [[ ${#succeeded[@]} -ne 0 ]]; then
