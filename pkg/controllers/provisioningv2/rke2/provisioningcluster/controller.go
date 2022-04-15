@@ -329,16 +329,15 @@ func (h *handler) updateClusterProvisioningStatus(cluster *rancherv1.Cluster, st
 			clusterCondition.Reason(mgmtCluster, cpCondition.GetReason(cp))
 			clusterCondition.Message(mgmtCluster, cpCondition.GetMessage(cp))
 
-			_, err = h.mgmtClusterClient.Update(mgmtCluster)
-			// Conditions will be copied from the management cluster to the provisioning cluster in another controller,
-			// so it is safe to return here.
-			return status, err
+			if _, err = h.mgmtClusterClient.Update(mgmtCluster); err != nil {
+				return status, err
+			}
 		}
-	} else {
-		clusterCondition.SetStatus(&status, cpCondition.GetStatus(cp))
-		clusterCondition.Reason(&status, cpCondition.GetReason(cp))
-		clusterCondition.Message(&status, cpCondition.GetMessage(cp))
 	}
+
+	clusterCondition.SetStatus(&status, cpCondition.GetStatus(cp))
+	clusterCondition.Reason(&status, cpCondition.GetReason(cp))
+	clusterCondition.Message(&status, cpCondition.GetMessage(cp))
 
 	return status, nil
 }
@@ -386,23 +385,17 @@ func (h *handler) OnRemove(_ string, cluster *rancherv1.Cluster) (*rancherv1.Clu
 		return nil, nil
 	}
 
-	if _, err := h.capiClusters.Get(cluster.Namespace, cluster.Name); err != nil && apierror.IsNotFound(err) {
-		return cluster, nil
-	}
-
 	rkeCP, err := h.getRKEControlPlaneForCluster(cluster)
-	if err != nil {
+	if err != nil || rkeCP == nil {
 		return cluster, err
 	}
 
 	status := *cluster.Status.DeepCopy()
-	if rkeCP != nil {
-		status, err = h.updateClusterProvisioningStatus(cluster, status, rkeCP, rke2.Removed, rke2.Removed)
-		if apierror.IsNotFound(err) {
-			return cluster, nil
-		} else if err != nil {
-			return cluster, err
-		}
+	status, err = h.updateClusterProvisioningStatus(cluster, status, rkeCP, rke2.Removed, rke2.Removed)
+	if apierror.IsNotFound(err) {
+		return cluster, nil
+	} else if err != nil {
+		return cluster, err
 	}
 
 	cluster.Status = status
