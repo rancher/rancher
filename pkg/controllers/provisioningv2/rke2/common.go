@@ -79,6 +79,7 @@ const (
 	Removed        = condition.Cond("Removed")
 	AgentDeployed  = condition.Cond("AgentDeployed")
 	AgentConnected = condition.Cond("Connected")
+	PlanApplied    = condition.Cond("PlanApplied")
 
 	RuntimeK3S  = "k3s"
 	RuntimeRKE2 = "rke2"

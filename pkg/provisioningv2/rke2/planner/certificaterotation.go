@@ -32,7 +32,7 @@ func (r *certificateRotation) RotateCertificates(controlPlane *rkev1.RKEControlP
 
 	for _, node := range collect(clusterPlan, anyRole) {
 		rotatePlan := rotateCertificatesPlan(controlPlane, controlPlane.Spec.RotateCertificates, node)
-		err := assignAndCheckPlan(r.store, fmt.Sprintf("[%s] certificate rotation", node.Machine.Name), node, rotatePlan, 0)
+		err := assignAndCheckPlan(r.store, fmt.Sprintf("[%s] certificate rotation", node.Machine.Name), node, rotatePlan, 0, 0)
 		if err != nil {
 			return err
 		}
