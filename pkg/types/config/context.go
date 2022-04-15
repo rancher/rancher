@@ -10,6 +10,7 @@ import (
 	"github.com/rancher/norman/store/proxy"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/pkg/catalog/manager"
+	"github.com/rancher/rancher/pkg/controllers"
 	"github.com/rancher/rancher/pkg/generated/controllers/catalog.cattle.io"
 	apiregistrationv1 "github.com/rancher/rancher/pkg/generated/norman/apiregistration.k8s.io/v1"
 	appsv1 "github.com/rancher/rancher/pkg/generated/norman/apps/v1"
@@ -106,7 +107,8 @@ func NewScaledContext(config rest.Config, opts *ScaleContextOptions) (*ScaledCon
 	}
 
 	if opts.ControllerFactory == nil {
-		controllerFactory, err := controller.NewSharedControllerFactoryFromConfig(&context.RESTConfig, wrangler.Scheme)
+		controllerFactoryOpts := controllers.GetOptsFromEnv(controllers.Scaled)
+		controllerFactory, err := controller.NewSharedControllerFactoryFromConfigWithOptions(&context.RESTConfig, wrangler.Scheme, controllerFactoryOpts)
 		if err != nil {
 			return nil, err
 		}
@@ -358,7 +360,8 @@ func NewUserContext(scaledContext *ScaledContext, config rest.Config, clusterNam
 		return nil, err
 	}
 
-	controllerFactory, err := controller.NewSharedControllerFactoryFromConfig(&context.RESTConfig, wrangler.Scheme)
+	sharedOpts := controllers.GetOptsFromEnv(controllers.User)
+	controllerFactory, err := controller.NewSharedControllerFactoryFromConfigWithOptions(&context.RESTConfig, wrangler.Scheme, sharedOpts)
 	if err != nil {
 		return nil, err
 	}
@@ -493,7 +496,8 @@ func NewUserOnlyContext(config rest.Config) (*UserOnlyContext, error) {
 		RESTConfig: *steve.RestConfigDefaults(&config),
 	}
 
-	controllerFactory, err := controller.NewSharedControllerFactoryFromConfig(&config, wrangler.Scheme)
+	opts := controllers.GetOptsFromEnv(controllers.User)
+	controllerFactory, err := controller.NewSharedControllerFactoryFromConfigWithOptions(&config, wrangler.Scheme, opts)
 	if err != nil {
 		return nil, err
 	}

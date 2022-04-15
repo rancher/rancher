@@ -17,6 +17,7 @@ import (
 	"github.com/rancher/rancher/pkg/catalogv2/content"
 	"github.com/rancher/rancher/pkg/catalogv2/helmop"
 	"github.com/rancher/rancher/pkg/catalogv2/system"
+	"github.com/rancher/rancher/pkg/controllers"
 	"github.com/rancher/rancher/pkg/generated/controllers/catalog.cattle.io"
 	catalogcontrollers "github.com/rancher/rancher/pkg/generated/controllers/catalog.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io"
@@ -141,7 +142,8 @@ func (w *Context) Start(ctx context.Context) error {
 }
 
 func NewContext(ctx context.Context, lockID string, clientConfig clientcmd.ClientConfig, restConfig *rest.Config) (*Context, error) {
-	controllerFactory, err := controller.NewSharedControllerFactoryFromConfig(restConfig, Scheme)
+	sharedOpts := controllers.GetOptsFromEnv(controllers.Management)
+	controllerFactory, err := controller.NewSharedControllerFactoryFromConfigWithOptions(restConfig, Scheme, sharedOpts)
 	if err != nil {
 		return nil, err
 	}
