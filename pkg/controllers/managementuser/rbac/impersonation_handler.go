@@ -8,38 +8,6 @@ import (
 	"k8s.io/apiserver/pkg/authentication/user"
 )
 
-func (m *manager) getUser(username, groupname string) (user.Info, error) {
-	u, err := m.userLister.Get("", username)
-	if err != nil {
-		return &user.DefaultInfo{}, err
-	}
-	groups := []string{"system:authenticated", "system:cattle:authenticated"}
-	if groupname != "" {
-		groups = append(groups, groupname)
-	}
-	attribs, err := m.userAttributeLister.Get("", username)
-	if err != nil && !apierrors.IsNotFound(err) {
-		return &user.DefaultInfo{}, err
-	}
-	if attribs != nil {
-		for _, gps := range attribs.GroupPrincipals {
-			for _, principal := range gps.Items {
-				groups = append(groups, principal.Name)
-			}
-		}
-	}
-	user := &user.DefaultInfo{
-		UID:    u.GetName(),
-		Name:   u.Username,
-		Groups: groups,
-		Extra:  map[string][]string{"username": []string{u.Username}},
-	}
-	if len(u.PrincipalIDs) > 0 {
-		user.Extra["principalid"] = u.PrincipalIDs
-	}
-	return user, nil
-}
-
 func (m *manager) ensureServiceAccountImpersonator(username string) error {
 	logrus.Debugf("ensuring service account impersonator for %s", username)
 	i, err := impersonation.New(&user.DefaultInfo{UID: username}, m.workload)
