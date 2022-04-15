@@ -65,9 +65,7 @@ func Register(ctx context.Context, userContext *config.UserContext) {
 
 	userContext.Core.ConfigMaps("kube-system").Controller().AddHandler(ctx, "snapshotbackpopulate", h.OnChange)
 	relatedresource.Watch(ctx, "snapshot-reconcile-trigger", func(namespace, name string, obj runtime.Object) ([]relatedresource.Key, error) {
-		logrus.Tracef("[snapshotbackpopulate] triggering reconcile on object %s/%s - cluster: %s configmap: %s", namespace, name, h.v1ClusterName, h.activeConfigMap)
 		if snapshot, ok := obj.(*rkev1.ETCDSnapshot); ok && snapshot.Spec.ClusterName == h.v1ClusterName && h.activeConfigMap != "" {
-			logrus.Tracef("[snapshotbackpopulate] attempting to set related resource key %s", h.activeConfigMap)
 			return []relatedresource.Key{{
 				Namespace: "kube-system",
 				Name:      h.activeConfigMap,
@@ -163,7 +161,7 @@ func (h *handler) OnChange(key string, configMap *corev1.ConfigMap) (runtime.Obj
 			// indicate that it should be OK to delete the etcd snapshot object
 			// don't delete the snapshots here because our configmap can be outdated. we will reconcile based on the system-agent output via the periodic output
 			logrus.Debugf("[snapshotbackpopulate] rkecluster %s/%s: updating status missing=true on etcd snapshot %s/%s as it was not found in the actual snapshot config map", cluster.Namespace, cluster.Name, existingSnapshotCR.Namespace, existingSnapshotCR.Name)
-			logrus.Tracef("[snapshotbackpopulate] rkecluster %s/%s: etcd snapshot was %s/%s: %+v", cluster.Namespace, cluster.Name, existingSnapshotCR.Namespace, existingSnapshotCR.Name, existingSnapshotCR)
+			logrus.Tracef("[snapshotbackpopulate] rkecluster %s/%s: etcd snapshot was %s/%s: %v", cluster.Namespace, cluster.Name, existingSnapshotCR.Namespace, existingSnapshotCR.Name, existingSnapshotCR)
 			existingSnapshotCR = existingSnapshotCR.DeepCopy()
 			existingSnapshotCR.Status.Missing = true // a missing snapshot indicates that it was not found in the (rke2|k3s)-etcd-snapshots configmap. This could potentially be a transient situation after an etcd snapshot restore to an older/newer datastore, when new snapshots have not been taken.
 			if existingSnapshotCR, err = h.etcdSnapshots.UpdateStatus(existingSnapshotCR); err != nil && !apierrors.IsNotFound(err) {
@@ -181,7 +179,7 @@ func (h *handler) OnChange(key string, configMap *corev1.ConfigMap) (runtime.Obj
 		if snapshot, ok := currentEtcdSnapshotsToKeep[snapshotKey]; ok {
 			// the snapshot CR exists in the management cluster. check to see if the configmap data needs to be set on the snapshot.
 			logrus.Debugf("[snapshotbackpopulate] rkecluster %s/%s: checking to see if etcdsnapshot %s/%s needs to be updated", cluster.Namespace, cluster.Name, snapshot.Namespace, snapshot.Name)
-			logrus.Tracef("[snapshotbackpopulate] rkecluster %s/%s: comparing etcd snapshot %s/%s: %+v : %+v", cluster.Namespace, cluster.Name, snapshot.Namespace, snapshot.Name, cmGeneratedSnapshot, snapshot)
+			logrus.Tracef("[snapshotbackpopulate] rkecluster %s/%s: comparing etcd snapshot %s/%s: %v : %v", cluster.Namespace, cluster.Name, snapshot.Namespace, snapshot.Name, cmGeneratedSnapshot, snapshot)
 			snapshot = snapshot.DeepCopy()
 			var updated bool
 			if !equality.Semantic.DeepEqual(snapshot.SnapshotFile, cmGeneratedSnapshot.SnapshotFile) {
@@ -197,7 +195,7 @@ func (h *handler) OnChange(key string, configMap *corev1.ConfigMap) (runtime.Obj
 				if !equality.Semantic.DeepEqual(snapshot.SnapshotFile, originalSnapshotFile) {
 					updated = true
 					logrus.Debugf("[snapshotbackpopulate] rkecluster %s/%s: snapshot %s/%s SnapshotFile contents were different, triggering update", cluster.Namespace, cluster.Name, snapshot.Namespace, snapshot.Name)
-					logrus.Tracef("[snapshotbackpopulate] rkecluster %s/%s: snapshot %s/%s SnapshotFile contents %+v vs %+V", cluster.Namespace, cluster.Name, snapshot.Namespace, snapshot.Name, originalSnapshotFile, snapshot.SnapshotFile)
+					logrus.Tracef("[snapshotbackpopulate] rkecluster %s/%s: snapshot %s/%s SnapshotFile contents %v vs %v", cluster.Namespace, cluster.Name, snapshot.Namespace, snapshot.Name, originalSnapshotFile, snapshot.SnapshotFile)
 				}
 			}
 			if snapshot.Spec.ClusterName != cmGeneratedSnapshot.Spec.ClusterName {
@@ -205,14 +203,12 @@ func (h *handler) OnChange(key string, configMap *corev1.ConfigMap) (runtime.Obj
 				snapshot.Spec.ClusterName = cmGeneratedSnapshot.Spec.ClusterName
 				updated = true
 			}
-			if newLabels, labelsUpdated := reconcileStringMaps(snapshot.Labels, cmGeneratedSnapshot.Labels, []string{rke2.ClusterNameLabel, rke2.NodeNameLabel, rke2.MachineIDLabel}); labelsUpdated {
+			if labelsUpdated := reconcileStringMaps(snapshot.Labels, cmGeneratedSnapshot.Labels, []string{rke2.ClusterNameLabel, rke2.NodeNameLabel, rke2.MachineIDLabel}); labelsUpdated {
 				logrus.Debugf("[snapshotbackpopulate] rkecluster %s/%s: snapshot %s/%s labels did not match", cluster.Namespace, cluster.Name, snapshot.Namespace, snapshot.Name)
-				snapshot.Labels = newLabels
 				updated = true
 			}
-			if newAnnotations, annotationsUpdated := reconcileStringMaps(snapshot.Labels, cmGeneratedSnapshot.Labels, []string{SnapshotNameKey}); annotationsUpdated {
+			if annotationsUpdated := reconcileStringMaps(snapshot.Annotations, cmGeneratedSnapshot.Annotations, []string{SnapshotNameKey}); annotationsUpdated {
 				logrus.Debugf("[snapshotbackpopulate] rkecluster %s/%s: snapshot %s/%s annotations did not match", cluster.Namespace, cluster.Name, snapshot.Namespace, snapshot.Name)
-				snapshot.Annotations = newAnnotations
 				updated = true
 			}
 			if updated {
@@ -239,7 +235,7 @@ func (h *handler) OnChange(key string, configMap *corev1.ConfigMap) (runtime.Obj
 				continue
 			}
 			logrus.Debugf("[snapshotbackpopulate] rkecluster %s/%s: creating s3 etcd snapshot %s/%s as it differed from the actual snapshot config map", cluster.Namespace, cluster.Name, cmGeneratedSnapshot.Namespace, cmGeneratedSnapshot.Name)
-			logrus.Tracef("[snapshotbackpopulate] rkecluster %s/%s: creating s3 etcd snapshot %s/%s: %+v", cluster.Namespace, cluster.Name, cmGeneratedSnapshot.Namespace, cmGeneratedSnapshot.Name, cmGeneratedSnapshot)
+			logrus.Tracef("[snapshotbackpopulate] rkecluster %s/%s: creating s3 etcd snapshot %s/%s: %v", cluster.Namespace, cluster.Name, cmGeneratedSnapshot.Namespace, cmGeneratedSnapshot.Name, cmGeneratedSnapshot)
 			_, err = h.etcdSnapshots.Create(&cmGeneratedSnapshot)
 			if err != nil {
 				if apierrors.IsAlreadyExists(err) {
@@ -253,16 +249,15 @@ func (h *handler) OnChange(key string, configMap *corev1.ConfigMap) (runtime.Obj
 	return configMap, nil
 }
 
-func reconcileStringMaps(original map[string]string, new map[string]string, keys []string) (map[string]string, bool) {
-	ret := original
+func reconcileStringMaps(input map[string]string, new map[string]string, keys []string) bool {
 	var updated bool
 	for _, key := range keys {
-		if ret[key] == "" && new[key] != "" {
-			ret[key] = new[key]
+		if input[key] == "" && new[key] != "" {
+			input[key] = new[key]
 			updated = true
 		}
 	}
-	return ret, updated
+	return updated
 }
 
 // configMapToSnapshots parses the given configmap and returns a map of etcd snapshots. The snapshotbackpopulate controller will only create snapshots from this map that are located in S3.
@@ -272,7 +267,7 @@ func (h *handler) configMapToSnapshots(configMap *corev1.ConfigMap, cluster *pro
 	for k, v := range configMap.Data {
 		file := &snapshotFile{}
 		if err := json.Unmarshal([]byte(v), file); err != nil {
-			logrus.Errorf("invalid non-json value in %s/%s for key %s in cluster %s", configMap.Namespace, configMap.Name, k, cluster.Name)
+			logrus.Errorf("invalid non-json value in %s/%s for key %s in cluster %s: %v", configMap.Namespace, configMap.Name, k, cluster.Name, err)
 			return nil, nil
 		}
 		snapshot := rkev1.ETCDSnapshot{

@@ -204,7 +204,7 @@ func (h *handler) reconcileEtcdSnapshotList(secret *corev1.Secret, s3 bool, list
 		indexedEtcdSnapshots[v.Name] = v
 	}
 
-	if !s3 && machine != nil {
+	if !s3 {
 		for k, v := range etcdSnapshotsOnNode {
 			if _, ok := indexedEtcdSnapshots[k]; !ok {
 				// create the etcdsnapshot object as it was not in the list of etcdsnapshots and not an S3 snapshot
