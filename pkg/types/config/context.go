@@ -13,6 +13,7 @@ import (
 	"github.com/rancher/norman/store/proxy"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/pkg/catalog/manager"
+	"github.com/rancher/rancher/pkg/controllers"
 	"github.com/rancher/rancher/pkg/generated/controllers/catalog.cattle.io"
 	apiregistrationv1 "github.com/rancher/rancher/pkg/generated/norman/apiregistration.k8s.io/v1"
 	appsv1 "github.com/rancher/rancher/pkg/generated/norman/apps/v1"
@@ -122,7 +123,8 @@ func NewScaledContext(config rest.Config, opts *ScaleContextOptions) (*ScaledCon
 	}
 
 	if opts.ControllerFactory == nil {
-		controllerFactory, err := controller.NewSharedControllerFactoryFromConfig(enableProtobuf(&context.RESTConfig), wrangler.Scheme)
+		controllerFactoryOpts := controllers.GetOptsFromEnv(controllers.Scaled)
+		controllerFactory, err := controller.NewSharedControllerFactoryFromConfigWithOptions(enableProtobuf(&context.RESTConfig), wrangler.Scheme, controllerFactoryOpts)
 		if err != nil {
 			return nil, err
 		}
@@ -437,7 +439,7 @@ func NewUserContext(scaledContext *ScaledContext, config rest.Config, clusterNam
 		KindNamespace: context.KindNamespaces,
 	})
 
-	controllerFactory := controller.NewSharedControllerFactory(cacheFactory, nil)
+	controllerFactory := controller.NewSharedControllerFactory(cacheFactory, controllers.GetOptsFromEnv(controllers.User))
 	context.ControllerFactory = controllerFactory
 
 	context.K8sClient, err = kubernetes.NewForConfig(&config)
