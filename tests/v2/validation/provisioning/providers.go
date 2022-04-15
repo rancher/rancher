@@ -9,6 +9,7 @@ import (
 	"github.com/rancher/rancher/tests/framework/extensions/cloudcredentials/azure"
 	"github.com/rancher/rancher/tests/framework/extensions/cloudcredentials/digitalocean"
 	"github.com/rancher/rancher/tests/framework/extensions/cloudcredentials/harvester"
+	"github.com/rancher/rancher/tests/framework/extensions/cloudcredentials/linode"
 	"github.com/rancher/rancher/tests/framework/extensions/machinepools"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
@@ -18,6 +19,7 @@ const (
 	azureProviderName     = "azure"
 	doProviderName        = "do"
 	harvesterProviderName = "harvester"
+	linodeProviderName    = "linode"
 )
 
 type CloudCredFunc func(rancherClient *rancher.Client) (*cloudcredentials.CloudCredential, error)
@@ -32,7 +34,7 @@ type Provider struct {
 
 // CreateProvider returns all machine and cloud credential
 // configs in the form of a Provider struct. Accepts a
-// string of the name of the provider
+// string of the name of the provider.
 func CreateProvider(name string) Provider {
 	switch {
 	case name == awsProviderName:
@@ -57,6 +59,14 @@ func CreateProvider(name string) Provider {
 			MachineConfig:   machinepools.DOResourceConfig,
 			MachinePoolFunc: machinepools.NewDigitalOceanMachineConfig,
 			CloudCredFunc:   digitalocean.CreateDigitalOceanCloudCredentials,
+		}
+		return provider
+	case name == linodeProviderName:
+		provider := Provider{
+			Name:            name,
+			MachineConfig:   machinepools.LinodeResourceConfig,
+			MachinePoolFunc: machinepools.NewLinodeMachineConfig,
+			CloudCredFunc:   linode.CreateLinodeCloudCredentials,
 		}
 		return provider
 	case name == harvesterProviderName:
