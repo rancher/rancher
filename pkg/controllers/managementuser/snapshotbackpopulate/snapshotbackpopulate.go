@@ -142,7 +142,7 @@ func (h *handler) OnChange(key string, configMap *corev1.ConfigMap) (runtime.Obj
 	// otherwise, create the etcd snapshot CR
 	for snapshotKey, cmGeneratedSnapshot := range actualEtcdSnapshots {
 		if snapshot, ok := currentEtcdSnapshotsToKeep[snapshotKey]; ok {
-			if !equality.Semantic.DeepEqual(cmGeneratedSnapshot.SnapshotFile, snapshot.SnapshotFile) || !equality.Semantic.DeepEqual(cmGeneratedSnapshot.Status, snapshot.Status) {
+			if !equality.Semantic.DeepEqual(cmGeneratedSnapshot.SnapshotFile, snapshot.SnapshotFile) || !equality.Semantic.DeepEqual(cmGeneratedSnapshot.Status, snapshot.Status) || !equality.Semantic.DeepEqual(cmGeneratedSnapshot.Spec, snapshot.Spec) {
 				logrus.Debugf("[snapshotbackpopulate] rkecluster %s/%s: updating etcd snapshot %s/%s as it differed from the actual snapshot config map %v vs %v", cluster.Namespace, cluster.Name, snapshot.Namespace, snapshot.Name, cmGeneratedSnapshot.SnapshotFile, snapshot.SnapshotFile)
 				logrus.Tracef("[snapshotbackpopulate] rkecluster %s/%s: updating etcd snapshot %s/%s: %+v", cluster.Namespace, cluster.Name, cmGeneratedSnapshot.Namespace, cmGeneratedSnapshot.Name, cmGeneratedSnapshot)
 				snapshot = snapshot.DeepCopy()
@@ -203,6 +203,9 @@ func (h *handler) configMapToSnapshots(configMap *corev1.ConfigMap, cluster *pro
 					StorageLabelKey: StorageLocal,
 				},
 				OwnerReferences: []metav1.OwnerReference{},
+			},
+			Spec: rkev1.ETCDSnapshotSpec{
+				ClusterName: cluster.Name,
 			},
 			SnapshotFile: rkev1.ETCDSnapshotFile{
 				Name:      file.Name,

@@ -53,7 +53,8 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 		addRule().apiGroups("management.cattle.io").resources("cisconfigs").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("cisbenchmarkversions").verbs("get", "list", "watch").
 		addRule().apiGroups("rke-machine-config.cattle.io").resources("*").verbs("create").
-		addRule().apiGroups("catalog.cattle.io").resources("clusterrepos").verbs("get", "list", "watch")
+		addRule().apiGroups("catalog.cattle.io").resources("clusterrepos").verbs("get", "list", "watch").
+		addRule().apiGroups("rke.cattle.io").resources("etcdsnapshots").verbs("get", "list", "watch")
 
 	rb.addRole("Manage Node Drivers", "nodedrivers-manage").
 		addRule().apiGroups("management.cattle.io").resources("nodedrivers").verbs("*")
@@ -142,6 +143,7 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 		addRule().apiGroups("*").resources("*").verbs("*").
 		addRule().apiGroups("management.cattle.io").resources("clusters").verbs("own").
 		addRule().apiGroups("provisioning.cattle.io").resources("clusters").verbs("*").
+		addRule().apiGroups("rke.cattle.io").resources("etcdsnapshots").verbs("get", "list", "watch").
 		addRule().apiGroups("cluster.x-k8s.io").resources("machines").verbs("*").
 		addRule().apiGroups("rke-machine-config.cattle.io").resources("*").verbs("*").
 		addRule().apiGroups("rke-machine.cattle.io").resources("*").verbs("*").
