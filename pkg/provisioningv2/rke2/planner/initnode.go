@@ -125,7 +125,7 @@ func (p *Planner) findInitNode(rkeControlPlane *rkev1.RKEControlPlane, plan *pla
 		for _, entry := range possibleInitNodes {
 			if entry.Metadata.Annotations[rke2.JoinURLAnnotation] != "" {
 				// if a non-blank JoinURL was found, return that we found an init node but with an error
-				return true, "", entry, fmt.Errorf("non-populated init node found, but more suitable alternative is available")
+				return true, "", nil, fmt.Errorf("non-populated init node found, but more suitable alternative is available")
 			}
 		}
 		// if we got through all possibleInitNodes (or there weren't any other possible init nodes), return true that we found an init node with no error.

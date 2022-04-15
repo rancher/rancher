@@ -86,6 +86,8 @@ const (
 
 	RoleBootstrap = "bootstrap"
 	RolePlan      = "plan"
+
+	RotatingEncryptionKeysReason = "RotatingEncryptionKeys"
 )
 
 var (

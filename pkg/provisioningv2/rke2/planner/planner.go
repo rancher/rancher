@@ -375,9 +375,8 @@ func (p *Planner) Process(controlPlane *rkev1.RKEControlPlane) error {
 		return ErrWaiting(firstIgnoreError.Error())
 	}
 
-	if controlPlane.Spec.RotateEncryptionKeys != nil &&
-		controlPlane.Status.RotateEncryptionKeysGeneration != controlPlane.Spec.RotateEncryptionKeys.Generation {
-		logrus.Infof("Reenqueuing rotate encryption keys for cluster: [%s]", controlPlane.Spec.ClusterName)
+	if shouldRotateEncryptionKeys(controlPlane) {
+		logrus.Debugf("Reenqueuing rotate encryption keys for cluster: [%s]", controlPlane.Spec.ClusterName)
 		p.rkeControlPlanes.EnqueueAfter(controlPlane.Namespace, controlPlane.Name, 20*time.Second)
 	}
 
@@ -1087,12 +1086,16 @@ func (p *Planner) enqueueAndSkip(cp *rkev1.RKEControlPlane) error {
 // applied, but output is not yet available for periodic status.
 func (p *Planner) enqueueIfErrWaiting(cp *rkev1.RKEControlPlane, err error) error {
 	if err != nil {
-		w := ErrWaiting("")
-		if errors.As(err, &w) {
-			logrus.Debugf("Enqueuing [%s] because of ErrWaiting: %s", cp.Spec.ClusterName, w.Error())
+		if isErrWaiting(err) {
+			logrus.Tracef("Enqueuing [%s] because of ErrWaiting: %s", cp.Spec.ClusterName, err.Error())
 			return p.enqueueAndSkip(cp)
 		}
 		return err
 	}
 	return nil
+}
+
+func isErrWaiting(err error) bool {
+	var errWaiting ErrWaiting
+	return errors.As(err, &errWaiting)
 }
