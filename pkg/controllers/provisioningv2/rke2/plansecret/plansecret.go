@@ -204,7 +204,7 @@ func (h *handler) reconcileEtcdSnapshotList(secret *corev1.Secret, s3 bool, list
 		indexedEtcdSnapshots[v.Name] = v
 	}
 
-	if !s3 {
+	if !s3 && machine.Status.NodeRef != nil {
 		for k, v := range etcdSnapshotsOnNode {
 			if _, ok := indexedEtcdSnapshots[k]; !ok {
 				// create the etcdsnapshot object as it was not in the list of etcdsnapshots and not an S3 snapshot
@@ -231,9 +231,6 @@ func (h *handler) reconcileEtcdSnapshotList(secret *corev1.Secret, s3 bool, list
 						Location: v.Location,
 						NodeName: machine.Status.NodeRef.Name,
 					},
-				}
-				if machine.Status.NodeRef != nil {
-					snapshot.SnapshotFile.NodeName = machine.Status.NodeRef.Name
 				}
 				snapshot.Name = name.SafeConcatName(cnl, snapshot.SnapshotFile.Name, sb.StorageLocal)
 				logrus.Debugf("[plansecret] machine %s/%s: creating etcd snapshot %s for cluster %s", machine.Namespace, machine.Name, snapshot.Name, cnl)
