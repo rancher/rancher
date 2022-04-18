@@ -18,6 +18,7 @@ import (
 	"github.com/rancher/rancher/tests/integration/pkg/wait"
 	"github.com/rancher/wrangler/pkg/condition"
 	"github.com/sirupsen/logrus"
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -123,12 +124,18 @@ func WaitForCreate(clients *clients.Clients, c *provisioningv1api.Cluster) (_ *p
 				return
 			}
 
+			podMachines, newErr := PodInfraMachines(clients, c)
+			if newErr != nil {
+				logrus.Errorf("failed to get pod machines for %s/%s to print error: %v", c.Namespace, c.Name, err)
+			}
+
 			machines, newErr := Machines(clients, c)
 			if newErr != nil {
 				logrus.Errorf("failed to get machines for %s/%s to print error: %v", c.Namespace, c.Name, err)
 			}
 
 			var plans []*corev1.Secret
+			var createJobs []batchv1.Job
 			for _, machine := range machines.Items {
 				if machine.Spec.Bootstrap.ConfigRef == nil {
 					continue
@@ -149,12 +156,19 @@ func WaitForCreate(clients *clients.Clients, c *provisioningv1api.Cluster) (_ *p
 				if err == nil {
 					plans = append(plans, secret)
 				}
+
+				jobs, err := clients.Batch.Job().List(machine.Namespace, metav1.ListOptions{LabelSelector: fmt.Sprintf("%s=%s", machineprovision.CapiMachineName, machine.Name)})
+				if err == nil && len(jobs.Items) > 0 {
+					createJobs = append(createJobs, jobs.Items...)
+				}
 			}
 
 			data, _ := json.Marshal(map[string]interface{}{
-				"cluster":  c,
-				"machines": machines,
-				"plans":    plans,
+				"cluster":     c,
+				"machines":    machines,
+				"podMachines": podMachines,
+				"jobs":        createJobs,
+				"plans":       plans,
 			})
 			err = fmt.Errorf("creation wait failed on %s: %w", data, err)
 		}
