@@ -37,7 +37,7 @@ type RKEControlPlaneSpec struct {
 
 type ETCDSnapshotPhase string
 
-var (
+const (
 	ETCDSnapshotPhaseStarted  ETCDSnapshotPhase = "Started"
 	ETCDSnapshotPhaseShutdown ETCDSnapshotPhase = "Shutdown"
 	ETCDSnapshotPhaseRestore  ETCDSnapshotPhase = "Restore"
@@ -45,29 +45,33 @@ var (
 	ETCDSnapshotPhaseFailed   ETCDSnapshotPhase = "Failed"
 )
 
+type RotateEncryptionKeysStatus struct {
+	Generation  int64  `json:"generation,omitempty"`
+	LastRestart string `json:"restart,omitempty"`
+	Stage       string `json:"stage,omitempty"`
+}
+
 type RotateEncryptionKeysPhase string
 
 const (
-	RotateEncryptionKeysPhaseStart              RotateEncryptionKeysPhase = "Start"
-	RotateEncryptionKeysPhaseRestartLeader      RotateEncryptionKeysPhase = "RestartLeader"
-	RotateEncryptionKeysPhaseVerifyLeaderStatus RotateEncryptionKeysPhase = "VerifyLeaderStatus"
-	RotateEncryptionKeysPhaseRestartFollowers   RotateEncryptionKeysPhase = "RestartFollowers"
-	RotateEncryptionKeysPhaseApplyLeader        RotateEncryptionKeysPhase = "ApplyLeader"
-	RotateEncryptionKeysPhaseDone               RotateEncryptionKeysPhase = "Done"
+	RotateEncryptionKeysPhaseRestartNodes RotateEncryptionKeysPhase = "RestartNodes"
+	RotateEncryptionKeysPhaseApplyLeader  RotateEncryptionKeysPhase = "ApplyLeader"
+	RotateEncryptionKeysPhaseDone         RotateEncryptionKeysPhase = "Done"
+	RotateEncryptionKeysPhaseFailed       RotateEncryptionKeysPhase = "Failed"
 )
 
 type RKEControlPlaneStatus struct {
-	Conditions                     []genericcondition.GenericCondition `json:"conditions,omitempty"`
-	Ready                          bool                                `json:"ready,omitempty"`
-	ObservedGeneration             int64                               `json:"observedGeneration"`
-	CertificateRotationGeneration  int64                               `json:"certificateRotationGeneration"`
-	RotateEncryptionKeysGeneration int64                               `json:"rotateEncryptionKeysGeneration"`
-	RotateEncryptionKeysPhase      RotateEncryptionKeysPhase           `json:"rotateEncryptionKeysPhase"`
-	ETCDSnapshotRestore            *ETCDSnapshotRestore                `json:"etcdSnapshotRestore,omitempty"`
-	ETCDSnapshotRestorePhase       ETCDSnapshotPhase                   `json:"etcdSnapshotRestorePhase,omitempty"`
-	ETCDSnapshotCreate             *ETCDSnapshotCreate                 `json:"etcdSnapshotCreate,omitempty"`
-	ETCDSnapshotCreatePhase        ETCDSnapshotPhase                   `json:"etcdSnapshotCreatePhase,omitempty"`
-	ConfigGeneration               int64                               `json:"configGeneration,omitempty"`
-	Initialized                    bool                                `json:"initialized,omitempty"`
-	AgentConnected                 bool                                `json:"agentConnected,omitempty"`
+	Conditions                    []genericcondition.GenericCondition `json:"conditions,omitempty"`
+	Ready                         bool                                `json:"ready,omitempty"`
+	ObservedGeneration            int64                               `json:"observedGeneration"`
+	CertificateRotationGeneration int64                               `json:"certificateRotationGeneration"`
+	RotateEncryptionKeys          *RotateEncryptionKeysStatus         `json:"rotateEncryptionKeys,omitempty"`
+	RotateEncryptionKeysPhase     RotateEncryptionKeysPhase           `json:"rotateEncryptionKeysPhase,omitempty"`
+	ETCDSnapshotRestore           *ETCDSnapshotRestore                `json:"etcdSnapshotRestore,omitempty"`
+	ETCDSnapshotRestorePhase      ETCDSnapshotPhase                   `json:"etcdSnapshotRestorePhase,omitempty"`
+	ETCDSnapshotCreate            *ETCDSnapshotCreate                 `json:"etcdSnapshotCreate,omitempty"`
+	ETCDSnapshotCreatePhase       ETCDSnapshotPhase                   `json:"etcdSnapshotCreatePhase,omitempty"`
+	ConfigGeneration              int64                               `json:"configGeneration,omitempty"`
+	Initialized                   bool                                `json:"initialized,omitempty"`
+	AgentConnected                bool                                `json:"agentConnected,omitempty"`
 }

@@ -385,11 +385,11 @@ func assignAndCheckPlan(store *PlanStore, msg string, server *planEntry, newPlan
 		}
 		return ErrWaiting(fmt.Sprintf("starting %s", msg))
 	}
-	if !server.Plan.InSync {
-		return ErrWaiting(fmt.Sprintf("waiting for %s", msg))
-	}
 	if server.Plan.Failed {
 		return fmt.Errorf("operation %s failed", msg)
+	}
+	if !server.Plan.InSync {
+		return ErrWaiting(fmt.Sprintf("waiting for %s", msg))
 	}
 	return nil
 }
