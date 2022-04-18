@@ -283,6 +283,21 @@ func GetMachineFromNode(machineCache capicontrollers.MachineCache, nodeName stri
 	return true, nil, fmt.Errorf("unable to find node %s in machines", nodeName)
 }
 
+// GetMachineByID attempts to find the corresponding machine for an etcd snapshot that is found in the configmap. If the machine list is successful, it will return true on the boolean, otherwise, it can be assumed that a false, nil, and defined error indicate the machine does not exist.
+func GetMachineByID(machineCache capicontrollers.MachineCache, machineID string, cluster *provv1.Cluster) (bool, *capi.Machine, error) {
+	machines, err := machineCache.List(cluster.Namespace, labels.SelectorFromSet(map[string]string{
+		ClusterNameLabel: cluster.Name,
+		MachineIDLabel:   machineID,
+	}))
+	if err != nil || len(machines) > 1 {
+		return false, nil, err
+	}
+	if len(machines) == 1 {
+		return true, machines[0], nil
+	}
+	return true, nil, fmt.Errorf("unable to find machine by ID %s for cluster %s", machineID, cluster.Name)
+}
+
 func CopyPlanMetadataToSecret(secret *corev1.Secret, metadata *plan.Metadata) {
 	if metadata == nil {
 		return
