@@ -4,11 +4,13 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"time"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	v1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/rbac"
 	apiextcontrollers "github.com/rancher/wrangler/pkg/generated/controllers/apiextensions.k8s.io/v1"
+	"github.com/rancher/wrangler/pkg/generic"
 	"github.com/rancher/wrangler/pkg/name"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
@@ -18,6 +20,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/utils/pointer"
 )
 
 const (
@@ -115,6 +118,63 @@ func (h *handler) OnClusterObjectChanged(obj runtime.Object) (runtime.Object, er
 		h.roleTemplateController.Enqueue(fmt.Sprintf("cluster/%s/%s", objMeta.GetNamespace(), clusterName))
 	}
 	return obj, nil
+}
+
+func (h *handler) OnRemoveRole(key string, role *rbacv1.Role) (*rbacv1.Role, error) {
+	clusterName, cOK := role.Annotations[clusterNameLabel]
+	clusterNamespace, cnOK := role.Annotations[clusterNamespaceLabel]
+	if !cOK || !cnOK {
+		// if this role doesn't have a clustername/namespace label it isn't one of the protected roles, so move on
+		return role, nil
+	}
+	cluster, err := h.clusters.Get(clusterNamespace, clusterName)
+	if err != nil {
+		if apierror.IsNotFound(err) {
+			// when the cluster is not found, we can conclude it has been deleted and safely return
+			return role, nil
+		}
+		return role, err
+	}
+	if cluster == nil {
+		// cluster + err both being nil should not happen - but if it does, safe to delete the role
+		return role, nil
+	}
+	// if the err is nil, we can assume that the cluster is not nil
+	if cluster.DeletionTimestamp == nil {
+		// if the cluster isn't being deleted, it wasn't the source of the delete, so we can remove the role
+		return role, nil
+	}
+	// Enqueue to ensure perms remain until full delete. Err skips don't re-enqueue, so we do that manually
+	h.roleController.EnqueueAfter(role.Namespace, role.Name, time.Second*5)
+	return role, generic.ErrSkip
+}
+
+func (h *handler) OnRemoveRoleBinding(key string, roleBinding *rbacv1.RoleBinding) (*rbacv1.RoleBinding, error) {
+	clusterName, cOK := roleBinding.Annotations[clusterNameLabel]
+	clusterNamespace, cnOK := roleBinding.Annotations[clusterNamespaceLabel]
+	if !cOK || !cnOK {
+		// if this role doesn't have a clustername/namespace label it isn't one of the protected roles, so move on
+		return roleBinding, nil
+	}
+	cluster, err := h.clusters.Get(clusterNamespace, clusterName)
+	if err != nil {
+		if apierror.IsNotFound(err) {
+			// when the cluster is not found, we can conclude it has been deleted and safely return
+			return roleBinding, nil
+		}
+		return roleBinding, err
+	}
+	if cluster == nil {
+		// cluster + err both being nil should not happen - but if it does, safe to delete the rolebinding
+		return roleBinding, nil
+	}
+	if cluster.DeletionTimestamp == nil {
+		// if the cluster isn't being deleted, it wasn't the source of the delete, so we can remove the role binding
+		return roleBinding, nil
+	}
+	// Enqueue to ensure perms remain until full delete. Err skips don't re-enqueue, so we do that manually
+	h.roleBindingController.EnqueueAfter(roleBinding.Namespace, roleBinding.Name, time.Second*5)
+	return roleBinding, generic.ErrSkip
 }
 
 func (h *handler) OnChange(key string, rt *v3.RoleTemplate) (*v3.RoleTemplate, error) {
@@ -249,14 +309,16 @@ func (h *handler) createRoleForCluster(rt *v3.RoleTemplate, matches []match, clu
 	role := rbacv1.Role{
 		TypeMeta: metav1.TypeMeta{},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      roleTemplateRoleName(rt.Name, cluster.Name),
-			Namespace: cluster.Namespace,
+			Name:        roleTemplateRoleName(rt.Name, cluster.Name),
+			Namespace:   cluster.Namespace,
+			Annotations: createClusterRBACAnnotations(cluster),
 			OwnerReferences: []metav1.OwnerReference{
 				{
-					APIVersion: cluster.APIVersion,
-					Kind:       cluster.Kind,
-					Name:       cluster.Name,
-					UID:        cluster.UID,
+					APIVersion:         cluster.APIVersion,
+					Kind:               cluster.Kind,
+					Name:               cluster.Name,
+					UID:                cluster.UID,
+					BlockOwnerDeletion: pointer.Bool(false),
 				},
 			},
 		},

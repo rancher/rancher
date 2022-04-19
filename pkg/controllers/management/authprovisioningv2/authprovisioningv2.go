@@ -88,6 +88,8 @@ func Register(ctx context.Context, clients *wrangler.Context, management *config
 	clients.Mgmt.RoleTemplate().OnChange(ctx, "auth-prov-v2-roletemplate", h.OnChange)
 	clients.Mgmt.ClusterRoleTemplateBinding().OnChange(ctx, "auth-prov-v2-crtb", h.OnCRTB)
 	clients.Mgmt.ProjectRoleTemplateBinding().OnChange(ctx, "auth-prov-v2-prtb", h.OnPRTB)
+	clients.RBAC.Role().OnRemove(ctx, "auth-prov-v2-role", h.OnRemoveRole)
+	clients.RBAC.RoleBinding().OnRemove(ctx, "auth-prov-v2-rb", h.OnRemoveRoleBinding)
 	clients.Provisioning.Cluster().OnChange(ctx, "auth-prov-v2-cluster", h.OnCluster)
 	clients.CRD.CustomResourceDefinition().OnChange(ctx, "auth-prov-v2-crd", h.OnCRD)
 	if features.RKE2.Enabled() {
