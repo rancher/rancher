@@ -68,7 +68,7 @@ func (h *handler) refreshTokens() error {
 		return err
 	}
 	for _, token := range tokenList {
-		if token.Labels != nil && token.Labels[tokens.TokenHashed] == "true" {
+		if token.Labels[tokens.TokenHashed] == "true" {
 			continue
 		}
 		h.tokenEnqueue(token.Name, 10*time.Second)

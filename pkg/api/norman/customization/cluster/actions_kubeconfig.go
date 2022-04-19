@@ -10,6 +10,7 @@ import (
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	mgmtclient "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/clusterauthtoken/common"
+	"github.com/rancher/rancher/pkg/features"
 	mgmtv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/kubeconfig"
 	"github.com/rancher/rancher/pkg/settings"
@@ -64,26 +65,28 @@ func (a ActionHandler) GenerateKubeconfigActionHandler(actionName string, action
 	}
 
 	if endpointEnabled {
-		clusterName := apiContext.ID
-		clusterClient, err := a.ClusterManager.UserContextNoControllers(clusterName)
-		if err != nil {
-			return err
-		}
-
-		if tokenKey != "" {
-			tokenName, tokenValue := tokens.SplitTokenParts(tokenKey)
-			// a lister is not used here because the token was recently created, therefore the lister would likely miss
-			token, err := a.TokenClient.Get(tokenName, metav1.GetOptions{})
-			if err != nil {
-				return err
-			}
-			clusterAuthToken, err := common.NewClusterAuthToken(token, tokenValue)
+		if features.TokenHashing.Enabled() {
+			clusterName := apiContext.ID
+			clusterClient, err := a.ClusterManager.UserContextNoControllers(clusterName)
 			if err != nil {
 				return err
 			}
 
-			if _, err = clusterClient.Cluster.ClusterAuthTokens("cattle-system").Create(clusterAuthToken); err != nil {
-				return err
+			if tokenKey != "" {
+				tokenName, tokenValue := tokens.SplitTokenParts(tokenKey)
+				// a lister is not used here because the token was recently created, therefore the lister would likely miss
+				token, err := a.TokenClient.Get(tokenName, metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+				clusterAuthToken, err := common.NewClusterAuthToken(token, tokenValue)
+				if err != nil {
+					return err
+				}
+
+				if _, err = clusterClient.Cluster.ClusterAuthTokens("cattle-system").Create(clusterAuthToken); err != nil {
+					return err
+				}
 			}
 		}
 
