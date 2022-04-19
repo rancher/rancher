@@ -33,11 +33,11 @@ var (
 )
 
 const (
-	StorageAnnotationKey = "etcdsnapshot.rke.io/storage"
-	SnapshotNameKey      = "etcdsnapshot.rke.io/snapshot-file-name"
-	MetadataPopulatedKey = "etcdsnapshot.rke.io/metadata-populated"
-	StorageS3            = "s3"
-	StorageLocal         = "local"
+	StorageAnnotationKey              = "etcdsnapshot.rke.io/storage"
+	SnapshotNameKey                   = "etcdsnapshot.rke.io/snapshot-file-name"
+	SnapshotBackpopulateReconciledKey = "etcdsnapshot.rke.io/snapshotbackpopulate-reconciled"
+	StorageS3                         = "s3"
+	StorageLocal                      = "local"
 )
 
 type handler struct {
@@ -208,7 +208,7 @@ func (h *handler) OnChange(key string, configMap *corev1.ConfigMap) (runtime.Obj
 				logrus.Debugf("[snapshotbackpopulate] rkecluster %s/%s: snapshot %s/%s labels did not match", cluster.Namespace, cluster.Name, snapshot.Namespace, snapshot.Name)
 				updated = true
 			}
-			if annotationsUpdated := reconcileStringMaps(snapshot.Annotations, cmGeneratedSnapshot.Annotations, []string{SnapshotNameKey, StorageAnnotationKey, MetadataPopulatedKey}); annotationsUpdated {
+			if annotationsUpdated := reconcileStringMaps(snapshot.Annotations, cmGeneratedSnapshot.Annotations, []string{SnapshotNameKey, StorageAnnotationKey, SnapshotBackpopulateReconciledKey}); annotationsUpdated {
 				logrus.Debugf("[snapshotbackpopulate] rkecluster %s/%s: snapshot %s/%s annotations did not match", cluster.Namespace, cluster.Name, snapshot.Namespace, snapshot.Name)
 				updated = true
 			}
@@ -279,9 +279,9 @@ func (h *handler) configMapToSnapshots(configMap *corev1.ConfigMap, cluster *pro
 					rke2.NodeNameLabel:    file.NodeName,
 				},
 				Annotations: map[string]string{
-					SnapshotNameKey:      file.Name,
-					StorageAnnotationKey: StorageLocal,
-					MetadataPopulatedKey: "true",
+					SnapshotNameKey:                   file.Name,
+					StorageAnnotationKey:              StorageLocal,
+					SnapshotBackpopulateReconciledKey: "true",
 				},
 				OwnerReferences: []metav1.OwnerReference{},
 			},
