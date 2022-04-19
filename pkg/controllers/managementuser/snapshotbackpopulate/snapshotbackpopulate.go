@@ -207,7 +207,7 @@ func (h *handler) OnChange(key string, configMap *corev1.ConfigMap) (runtime.Obj
 				logrus.Debugf("[snapshotbackpopulate] rkecluster %s/%s: snapshot %s/%s labels did not match", cluster.Namespace, cluster.Name, snapshot.Namespace, snapshot.Name)
 				updated = true
 			}
-			if annotationsUpdated := reconcileStringMaps(snapshot.Annotations, cmGeneratedSnapshot.Annotations, []string{SnapshotNameKey}); annotationsUpdated {
+			if annotationsUpdated := reconcileStringMaps(snapshot.Annotations, cmGeneratedSnapshot.Annotations, []string{SnapshotNameKey, StorageAnnotationKey}); annotationsUpdated {
 				logrus.Debugf("[snapshotbackpopulate] rkecluster %s/%s: snapshot %s/%s annotations did not match", cluster.Namespace, cluster.Name, snapshot.Namespace, snapshot.Name)
 				updated = true
 			}
