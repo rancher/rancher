@@ -33,10 +33,11 @@ var (
 )
 
 const (
-	StorageAnnotationKey = "etcdsnapshot.rke.io/storage"
-	SnapshotNameKey      = "etcdsnapshot.rke.io/snapshot-file-name"
-	StorageS3            = "s3"
-	StorageLocal         = "local"
+	StorageAnnotationKey              = "etcdsnapshot.rke.io/storage"
+	SnapshotNameKey                   = "etcdsnapshot.rke.io/snapshot-file-name"
+	SnapshotBackpopulateReconciledKey = "etcdsnapshot.rke.io/snapshotbackpopulate-reconciled"
+	StorageS3                         = "s3"
+	StorageLocal                      = "local"
 )
 
 type handler struct {
@@ -207,7 +208,7 @@ func (h *handler) OnChange(key string, configMap *corev1.ConfigMap) (runtime.Obj
 				logrus.Debugf("[snapshotbackpopulate] rkecluster %s/%s: snapshot %s/%s labels did not match", cluster.Namespace, cluster.Name, snapshot.Namespace, snapshot.Name)
 				updated = true
 			}
-			if annotationsUpdated := reconcileStringMaps(snapshot.Annotations, cmGeneratedSnapshot.Annotations, []string{SnapshotNameKey, StorageAnnotationKey}); annotationsUpdated {
+			if annotationsUpdated := reconcileStringMaps(snapshot.Annotations, cmGeneratedSnapshot.Annotations, []string{SnapshotNameKey, StorageAnnotationKey, SnapshotBackpopulateReconciledKey}); annotationsUpdated {
 				logrus.Debugf("[snapshotbackpopulate] rkecluster %s/%s: snapshot %s/%s annotations did not match", cluster.Namespace, cluster.Name, snapshot.Namespace, snapshot.Name)
 				updated = true
 			}
@@ -230,7 +231,7 @@ func (h *handler) OnChange(key string, configMap *corev1.ConfigMap) (runtime.Obj
 			// create the snapshot in the mgmt cluster if it is an s3 snapshot
 			// we only create S3 snapshots in the snapshotbackpopulate controller.
 			// local snapshots are created by the `plansecret` controller based on real output of the snapshot data, and then updated by this controller.
-			if cmGeneratedSnapshot.SnapshotFile.Location != "s3" {
+			if cmGeneratedSnapshot.SnapshotFile.NodeName != "s3" {
 				logrus.Debugf("[snapshotbackpopulate] rkecluster %s/%s: not creating etcd snapshot %s/%s as it is on a local node", cluster.Namespace, cluster.Name, cmGeneratedSnapshot.Namespace, cmGeneratedSnapshot.Name)
 				continue
 			}
@@ -278,8 +279,9 @@ func (h *handler) configMapToSnapshots(configMap *corev1.ConfigMap, cluster *pro
 					rke2.NodeNameLabel:    file.NodeName,
 				},
 				Annotations: map[string]string{
-					SnapshotNameKey:      file.Name,
-					StorageAnnotationKey: StorageLocal,
+					SnapshotNameKey:                   file.Name,
+					StorageAnnotationKey:              StorageLocal,
+					SnapshotBackpopulateReconciledKey: "true",
 				},
 				OwnerReferences: []metav1.OwnerReference{},
 			},
