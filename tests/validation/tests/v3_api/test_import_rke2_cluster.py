@@ -32,6 +32,17 @@ RANCHER_RKE2_KUBECONFIG_PATH = DATA_SUBDIR + "/rke2_kubeconfig.yaml"
 RKE2_INSTALL_MODE = os.environ.get("RKE2_INSTALL_MODE", "INSTALL_RKE2_VERSION")
 RKE2_INSTALL_METHOD = os.environ.get("RKE2_INSTALL_METHOD", "")
 
+RKE2_SPLIT_ROLES = os.environ.get("RKE2_SPLIT_ROLES", False)
+RKE2_ETCD_ONLY_NODES = os.environ.get("RKE2_ETCD_ONLY_NODES", 0)
+RKE2_ETCD_CP_NODES = os.environ.get("RKE2_ETCD_CP_NODES", 0)
+RKE2_ETCD_WORKER_NODES = os.environ.get("RKE2_ETCD_WORKER_NODES", 0)
+RKE2_CP_ONLY_NODES = os.environ.get("RKE2_CP_ONLY_NODES", 0)
+RKE2_CP_WORKER_NODES = os.environ.get("RKE2_CP_WORKER_NODES", 0)
+# Role order corresponds to 1=RANCHER_RKE2_NO_OF_SERVER_NODES,
+# 2=RKE2_ETCD_ONLY_NODES 3=RKE2_ETCD_CP_NODES, 4=RKE2_ETCD_WORKER_NODES,
+# 5=RKE2_CP_ONLY_NODES, 6=RKE2_CP_WORKER_NODES
+RKE2_ROLE_ORDER = os.environ.get("RKE2_ROLE_ORDER", "1,2,3,4,5,6")
+
 
 def test_create_rancherd_multiple_control_cluster():
     cluster_version = RANCHER_RANCHERD_VERSION
@@ -79,7 +90,29 @@ def create_rke2_multiple_control_cluster(cluster_type, cluster_version):
     tf_dir = DATA_SUBDIR + "/" + "terraform/rke2/master"
     keyPath = os.path.abspath('.') + '/.ssh/' + AWS_SSH_KEY_NAME
     os.chmod(keyPath, 0o400)
-    no_of_servers = int(RANCHER_RKE2_NO_OF_SERVER_NODES) - 1
+
+    split_roles = str(RKE2_SPLIT_ROLES).lower()
+    if split_roles == "true":
+        no_of_servers = int(RANCHER_RKE2_NO_OF_SERVER_NODES) + \
+            int(RKE2_ETCD_ONLY_NODES) + int(RKE2_ETCD_CP_NODES) + \
+            int(RKE2_ETCD_WORKER_NODES) + int(RKE2_CP_ONLY_NODES) + \
+            int(RKE2_CP_WORKER_NODES) - 1
+
+        role_order = RKE2_ROLE_ORDER.split(",")
+        if int(RANCHER_RKE2_NO_OF_SERVER_NODES) > 0:
+            assert "1" in role_order
+        if int(RKE2_ETCD_ONLY_NODES) > 0:
+            assert "2" in role_order
+        if int(RKE2_ETCD_CP_NODES) > 0:
+            assert "3" in role_order
+        if int(RKE2_ETCD_WORKER_NODES) > 0:
+            assert "4" in role_order
+        if int(RKE2_CP_ONLY_NODES) > 0:
+            assert "5" in role_order
+        if int(RKE2_CP_WORKER_NODES) > 0:
+            assert "6" in role_order
+    else:
+        no_of_servers = int(RANCHER_RKE2_NO_OF_SERVER_NODES) - 1
 
     tf = Terraform(working_dir=tf_dir,
                    variables={'region': RANCHER_REGION,
@@ -105,7 +138,15 @@ def create_rke2_multiple_control_cluster(cluster_type, cluster_version):
                               'cluster_type': cluster_type,
                               'iam_role': RANCHER_IAM_ROLE,
                               'volume_size': AWS_VOLUME_SIZE,
-                              'create_lb': str(RKE2_CREATE_LB).lower()})
+                              'create_lb': str(RKE2_CREATE_LB).lower(),
+                              'split_roles': split_roles,
+                              'all_role_nodes': RANCHER_RKE2_NO_OF_SERVER_NODES,
+                              'etcd_only_nodes': RKE2_ETCD_ONLY_NODES,
+                              'etcd_cp_nodes': RKE2_ETCD_CP_NODES,
+                              'etcd_worker_nodes': RKE2_ETCD_WORKER_NODES,
+                              'cp_only_nodes': RKE2_CP_ONLY_NODES,
+                              'cp_worker_nodes': RKE2_CP_WORKER_NODES,
+                              'role_order': RKE2_ROLE_ORDER})
     print("Creating cluster")
     tf.init()
     tf.plan(out="plan_server.out")

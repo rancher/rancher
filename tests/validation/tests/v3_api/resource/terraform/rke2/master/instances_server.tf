@@ -21,6 +21,16 @@ resource "aws_instance" "master" {
     "kubernetes.io/cluster/clusterid" = "owned"
   }
   provisioner "file" {
+    source      = "define_node_role.sh"
+    destination = "/tmp/define_node_role.sh"
+  }
+  provisioner "remote-exec" {
+    inline = [
+      "chmod +x /tmp/define_node_role.sh",
+      "sudo /tmp/define_node_role.sh -1 \"${var.role_order}\" ${var.all_role_nodes} ${var.etcd_only_nodes} ${var.etcd_cp_nodes} ${var.etcd_worker_nodes} ${var.cp_only_nodes} ${var.cp_worker_nodes}",
+    ]
+  }
+  provisioner "file" {
     source      = "install_rke2_master.sh"
     destination = "/tmp/install_rke2_master.sh"
   }
@@ -72,6 +82,16 @@ resource "aws_instance" "master2" {
   }
   depends_on       = ["aws_instance.master"]
   provisioner "file" {
+    source      = "define_node_role.sh"
+    destination = "/tmp/define_node_role.sh"
+  }
+  provisioner "remote-exec" {
+    inline = [
+      "chmod +x /tmp/define_node_role.sh",
+      "sudo /tmp/define_node_role.sh ${count.index} \"${var.role_order}\" ${var.all_role_nodes} ${var.etcd_only_nodes} ${var.etcd_cp_nodes} ${var.etcd_worker_nodes} ${var.cp_only_nodes} ${var.cp_worker_nodes}",
+    ]
+  }
+  provisioner "file" {
     source      = "join_rke2_master.sh"
     destination = "/tmp/join_rke2_master.sh"
   }
@@ -85,7 +105,7 @@ resource "aws_instance" "master2" {
 
 data "local_file" "token" {
   filename = "/tmp/${var.resource_name}_nodetoken"
-  depends_on = ["aws_instance.master"]
+  depends_on = [aws_instance.master]
 }
 
 locals {
@@ -180,7 +200,7 @@ resource "aws_lb_target_group_attachment" "aws_tg_attachment_80" {
   target_group_arn = "${aws_lb_target_group.aws_tg_80[0].arn}"
   target_id        = "${aws_instance.master.id}"
   port             = 80
-  depends_on       = ["aws_instance.master"]
+  depends_on       = [aws_instance.master]
   count            = var.create_lb ? 1 : 0
 }
 
@@ -189,14 +209,14 @@ resource "aws_lb_target_group_attachment" "aws_tg_attachment_80_2" {
   count            = var.create_lb ? length(aws_instance.master2) : 0
   target_id        = "${aws_instance.master2[count.index].id}"
   port             = 80
-  depends_on       = ["aws_instance.master"]
+  depends_on       = [aws_instance.master]
 }
 
 resource "aws_lb_target_group_attachment" "aws_tg_attachment_443" {
   target_group_arn = "${aws_lb_target_group.aws_tg_443[0].arn}"
   target_id        = "${aws_instance.master.id}"
   port             = 443
-  depends_on       = ["aws_instance.master"]
+  depends_on       = [aws_instance.master]
   count            = var.create_lb ? 1 : 0
 }
 
@@ -205,7 +225,7 @@ resource "aws_lb_target_group_attachment" "aws_tg_attachment_443_2" {
   count            = var.create_lb ? length(aws_instance.master2) : 0
   target_id        = "${aws_instance.master2[count.index].id}"
   port             = 443
-  depends_on       = ["aws_instance.master"]
+  depends_on       = [aws_instance.master]
 }
 
 resource "aws_lb" "aws_nlb" {
@@ -278,12 +298,12 @@ resource "null_resource" "update_kubeconfig" {
   provisioner "local-exec" {
     command = "sed s/127.0.0.1/\"${var.create_lb ? aws_route53_record.aws_route53[0].fqdn : aws_instance.master.public_ip}\"/g /tmp/\"${var.resource_name}_config\" >/tmp/${var.resource_name}_kubeconfig"
   }
-  depends_on = ["aws_instance.master"]
+  depends_on = [aws_instance.master]
 }
 
 resource "null_resource" "store_fqdn" {
   provisioner "local-exec" {
     command = "echo \"${var.create_lb ? aws_route53_record.aws_route53[0].fqdn : aws_instance.master.public_ip}\" >/tmp/${var.resource_name}_fixed_reg_addr"
   }
-  depends_on = ["aws_instance.master"]
+  depends_on = [aws_instance.master]
 }
