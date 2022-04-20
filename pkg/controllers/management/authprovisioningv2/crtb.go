@@ -76,8 +76,9 @@ func (h *handler) OnCRTB(key string, crtb *v3.ClusterRoleTemplateBinding) (*v3.C
 		// Example: crt-cluster1-creator-cluster-owner-blxbujr34t
 		roleBinding := &rbacv1.RoleBinding{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      name.SafeConcatName("crt", cluster.Name, crtb.Name, hashedSubject),
-				Namespace: cluster.Namespace,
+				Name:        name.SafeConcatName("crt", cluster.Name, crtb.Name, hashedSubject),
+				Namespace:   cluster.Namespace,
+				Annotations: createClusterRBACAnnotations(cluster),
 			},
 			RoleRef: rbacv1.RoleRef{
 				APIGroup: rbacv1.GroupName,
@@ -94,8 +95,9 @@ func (h *handler) OnCRTB(key string, crtb *v3.ClusterRoleTemplateBinding) (*v3.C
 		// Example: r-cluster1-view-crtb-foo-wn5d5n7udr
 		roleBinding := &rbacv1.RoleBinding{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      name.SafeConcatName(clusterViewName(cluster), crtb.Name, hashedSubject),
-				Namespace: cluster.Namespace,
+				Name:        name.SafeConcatName(clusterViewName(cluster), crtb.Name, hashedSubject),
+				Namespace:   cluster.Namespace,
+				Annotations: createClusterRBACAnnotations(cluster),
 			},
 			RoleRef: rbacv1.RoleRef{
 				APIGroup: rbacv1.GroupName,
@@ -111,6 +113,7 @@ func (h *handler) OnCRTB(key string, crtb *v3.ClusterRoleTemplateBinding) (*v3.C
 		WithListerNamespace(cluster.Namespace).
 		WithSetID(CRTBRoleBindingID).
 		WithOwner(crtb).
+		WithSetOwnerReference(false, false).
 		ApplyObjects(bindings...)
 }
 
