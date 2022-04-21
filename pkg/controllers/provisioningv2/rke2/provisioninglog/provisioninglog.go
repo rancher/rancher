@@ -83,6 +83,12 @@ func (h *handler) recordMessage(provCluster *provv1.Cluster, cm *corev1.ConfigMa
 	error := rke2.Provisioned.IsFalse(provCluster)
 	done := rke2.Provisioned.IsTrue(provCluster)
 
+	if done && msg == "" {
+		done = rke2.Updated.IsTrue(provCluster)
+		msg = rke2.Updated.GetMessage(provCluster)
+		error = rke2.Updated.IsFalse(provCluster)
+	}
+
 	if done && msg == "" && provCluster.Status.Ready {
 		msg = "provisioning done"
 	}
