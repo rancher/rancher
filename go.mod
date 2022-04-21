@@ -122,7 +122,7 @@ require (
 	github.com/vmware/govmomi v0.26.0
 	github.com/vmware/kube-fluentd-operator v0.0.0-20190307154903-bf9de7e79eaf
 	github.com/xanzy/go-gitlab v0.0.0-20180830102804-feb856f4760f
-	golang.org/x/crypto v0.0.0-20211117183948-ae814b36b871
+	golang.org/x/crypto v0.0.0-20220411220226-7b82a4e95df4
 	golang.org/x/mod v0.5.0
 	golang.org/x/net v0.0.0-20220107192237-5cfca573fb4d
 	golang.org/x/oauth2 v0.0.0-20211104180415-d3ed0bb246c8
