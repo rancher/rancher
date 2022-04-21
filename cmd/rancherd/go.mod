@@ -79,7 +79,7 @@ require (
 	github.com/satori/go.uuid v1.2.1-0.20181016170032-d91630c85102 // indirect
 	github.com/sirupsen/logrus v1.8.1
 	github.com/urfave/cli v1.22.2
-	golang.org/x/crypto v0.0.0-20210220033148-5ea612d1eb83
+	golang.org/x/crypto v0.0.0-20220411220226-7b82a4e95df4
 	gopkg.in/yaml.v2 v2.4.0
 	k8s.io/api v1.20.5
 	k8s.io/apimachinery v1.20.5
