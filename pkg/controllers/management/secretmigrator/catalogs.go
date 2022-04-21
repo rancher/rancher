@@ -32,7 +32,7 @@ func (h *handler) syncCatalog(key string, catalog *v3.Catalog) (runtime.Object, 
 				catalogCopy, err := h.catalogs.Update(catalog)
 				if err != nil {
 					logrus.Errorf("[secretmigrator] failed to migrate secrets for global catalog %s, will retry: %v", catalog.Name, err)
-					deleteErr := h.migrator.secrets.DeleteNamespaced(secretNamespace, secret.Name, &metav1.DeleteOptions{})
+					deleteErr := h.migrator.secrets.DeleteNamespaced(SecretNamespace, secret.Name, &metav1.DeleteOptions{})
 					if deleteErr != nil {
 						logrus.Errorf("[secretmigrator] encountered error while handling migration error: %v", deleteErr)
 					}

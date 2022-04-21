@@ -19,6 +19,7 @@ import (
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	util "github.com/rancher/rancher/pkg/cluster"
 	kd "github.com/rancher/rancher/pkg/controllers/management/kontainerdrivermetadata"
+	"github.com/rancher/rancher/pkg/controllers/management/secretmigrator"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/apps/v1"
 	corev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
@@ -59,6 +60,7 @@ type Provisioner struct {
 	RKESystemImages       v3.RkeK8sSystemImageInterface
 	RKESystemImagesLister v3.RkeK8sSystemImageLister
 	SecretLister          corev1.SecretLister
+	Secrets               corev1.SecretInterface
 }
 
 func Register(ctx context.Context, management *config.ManagementContext) {
@@ -76,6 +78,7 @@ func Register(ctx context.Context, management *config.ManagementContext) {
 		RKESystemImages:       management.Management.RkeK8sSystemImages(""),
 		DaemonsetLister:       management.Apps.DaemonSets("").Controller().Lister(),
 		SecretLister:          management.Core.Secrets("").Controller().Lister(),
+		Secrets:               management.Core.Secrets(""),
 	}
 	// Add handlers
 	p.Clusters.AddLifecycle(ctx, "cluster-provisioner-controller", p)
@@ -466,7 +469,11 @@ func (p *Provisioner) reconcileCluster(cluster *v3.Cluster, create bool) (*v3.Cl
 			return nil, err
 		}
 
-		cluster.Status.ServiceAccountToken = serviceAccountToken
+		secret, err := secretmigrator.NewMigrator(p.SecretLister, p.Secrets).CreateOrUpdateServiceAccountTokenSecret(cluster.Status.ServiceAccountTokenSecret, serviceAccountToken, cluster)
+		if err != nil {
+			return nil, err
+		}
+		cluster.Status.ServiceAccountTokenSecret = secret.Name
 		apimgmtv3.ClusterConditionServiceAccountMigrated.True(cluster)
 
 		// Update the cluster in k8s
@@ -557,6 +564,11 @@ func (p *Provisioner) reconcileCluster(cluster *v3.Cluster, create bool) (*v3.Cl
 
 	apimgmtv3.ClusterConditionServiceAccountMigrated.True(cluster)
 
+	secret, err := secretmigrator.NewMigrator(p.SecretLister, p.Secrets).CreateOrUpdateServiceAccountTokenSecret(cluster.Status.ServiceAccountTokenSecret, serviceAccountToken, cluster)
+	if err != nil {
+		return nil, err
+	}
+
 	saved := false
 	for i := 0; i < 20; i++ {
 		cluster, err = p.Clusters.Get(cluster.Name, metav1.GetOptions{})
@@ -571,7 +583,7 @@ func (p *Provisioner) reconcileCluster(cluster *v3.Cluster, create bool) (*v3.Cl
 
 		cluster.Status.AppliedSpec = censoredSpec
 		cluster.Status.APIEndpoint = apiEndpoint
-		cluster.Status.ServiceAccountToken = serviceAccountToken
+		cluster.Status.ServiceAccountTokenSecret = secret.Name
 		cluster.Status.CACert = caCert
 		resetRkeConfigFlags(cluster, updateTriggered)
 

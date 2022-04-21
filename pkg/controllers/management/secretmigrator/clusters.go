@@ -26,8 +26,8 @@ import (
 )
 
 const (
-	secretNamespace             = namespace.GlobalNamespace
-	secretKey                   = "credential"
+	SecretNamespace             = namespace.GlobalNamespace
+	SecretKey                   = "credential"
 	S3BackupAnswersPath         = "rancherKubernetesEngineConfig.services.etcd.backupConfig.s3BackupConfig.secretKey"
 	WeavePasswordAnswersPath    = "rancherKubernetesEngineConfig.network.weaveNetworkProvider.password"
 	RegistryPasswordAnswersPath = "rancherKubernetesEngineConfig.privateRegistries[%d].password"
@@ -45,7 +45,7 @@ func (h *handler) sync(key string, cluster *v3.Cluster) (runtime.Object, error) 
 	if cluster == nil || cluster.DeletionTimestamp != nil {
 		return cluster, nil
 	}
-	if apimgmtv3.ClusterConditionSecretsMigrated.IsTrue(cluster) {
+	if apimgmtv3.ClusterConditionSecretsMigrated.IsTrue(cluster) && apimgmtv3.ClusterConditionServiceAccountSecretsMigrated.IsTrue(cluster) {
 		logrus.Tracef("[secretmigrator] cluster %s already migrated", cluster.Name)
 		return cluster, nil
 	}
@@ -71,7 +71,7 @@ func (h *handler) sync(key string, cluster *v3.Cluster) (runtime.Object, error) 
 				clusterCopy, err := h.clusters.Update(cluster)
 				if err != nil {
 					logrus.Errorf("[secretmigrator] failed to migrate private registry secrets for cluster %s, will retry: %v", cluster.Name, err)
-					deleteErr := h.migrator.secrets.DeleteNamespaced(secretNamespace, regSecret.Name, &metav1.DeleteOptions{})
+					deleteErr := h.migrator.secrets.DeleteNamespaced(SecretNamespace, regSecret.Name, &metav1.DeleteOptions{})
 					if deleteErr != nil {
 						logrus.Errorf("[secretmigrator] encountered error while handling migration error: %v", deleteErr)
 					}
@@ -102,7 +102,7 @@ func (h *handler) sync(key string, cluster *v3.Cluster) (runtime.Object, error) 
 				clusterCopy, err := h.clusters.Update(cluster)
 				if err != nil {
 					logrus.Errorf("[secretmigrator] failed to migrate S3 secrets for cluster %s, will retry: %v", cluster.Name, err)
-					deleteErr := h.migrator.secrets.DeleteNamespaced(secretNamespace, s3Secret.Name, &metav1.DeleteOptions{})
+					deleteErr := h.migrator.secrets.DeleteNamespaced(SecretNamespace, s3Secret.Name, &metav1.DeleteOptions{})
 					if deleteErr != nil {
 						logrus.Errorf("[secretmigrator] encountered error while handling migration error: %v", deleteErr)
 					}
@@ -133,7 +133,7 @@ func (h *handler) sync(key string, cluster *v3.Cluster) (runtime.Object, error) 
 				clusterCopy, err := h.clusters.Update(cluster)
 				if err != nil {
 					logrus.Errorf("[secretmigrator] failed to migrate weave CNI secrets for cluster %s, will retry: %v", cluster.Name, err)
-					deleteErr := h.migrator.secrets.DeleteNamespaced(secretNamespace, weaveSecret.Name, &metav1.DeleteOptions{})
+					deleteErr := h.migrator.secrets.DeleteNamespaced(SecretNamespace, weaveSecret.Name, &metav1.DeleteOptions{})
 					if deleteErr != nil {
 						logrus.Errorf("[secretmigrator] encountered error while handling migration error: %v", deleteErr)
 					}
@@ -166,7 +166,7 @@ func (h *handler) sync(key string, cluster *v3.Cluster) (runtime.Object, error) 
 				clusterCopy, err := h.clusters.Update(cluster)
 				if err != nil {
 					logrus.Errorf("[secretmigrator] failed to migrate vsphere global secret for cluster %s, will retry: %v", cluster.Name, err)
-					deleteErr := h.migrator.secrets.DeleteNamespaced(secretNamespace, vsphereSecret.Name, &metav1.DeleteOptions{})
+					deleteErr := h.migrator.secrets.DeleteNamespaced(SecretNamespace, vsphereSecret.Name, &metav1.DeleteOptions{})
 					if deleteErr != nil {
 						logrus.Errorf("[secretmigrator] encountered error while handling migration error: %v", deleteErr)
 					}
@@ -206,7 +206,7 @@ func (h *handler) sync(key string, cluster *v3.Cluster) (runtime.Object, error) 
 				clusterCopy, err := h.clusters.Update(cluster)
 				if err != nil {
 					logrus.Errorf("[secretmigrator] failed to migrate vsphere virtualcenter secret for cluster %s, will retry: %v", cluster.Name, err)
-					deleteErr := h.migrator.secrets.DeleteNamespaced(secretNamespace, vcenterSecret.Name, &metav1.DeleteOptions{})
+					deleteErr := h.migrator.secrets.DeleteNamespaced(SecretNamespace, vcenterSecret.Name, &metav1.DeleteOptions{})
 					if deleteErr != nil {
 						logrus.Errorf("[secretmigrator] encountered error while handling migration error: %v", deleteErr)
 					}
@@ -236,7 +236,7 @@ func (h *handler) sync(key string, cluster *v3.Cluster) (runtime.Object, error) 
 				clusterCopy, err := h.clusters.Update(cluster)
 				if err != nil {
 					logrus.Errorf("[secretmigrator] failed to migrate openstack secret for cluster %s, will retry: %v", cluster.Name, err)
-					deleteErr := h.migrator.secrets.DeleteNamespaced(secretNamespace, openStackSecret.Name, &metav1.DeleteOptions{})
+					deleteErr := h.migrator.secrets.DeleteNamespaced(SecretNamespace, openStackSecret.Name, &metav1.DeleteOptions{})
 					if deleteErr != nil {
 						logrus.Errorf("[secretmigrator] encountered error while handling migration error: %v", deleteErr)
 					}
@@ -266,7 +266,7 @@ func (h *handler) sync(key string, cluster *v3.Cluster) (runtime.Object, error) 
 				clusterCopy, err := h.clusters.Update(cluster)
 				if err != nil {
 					logrus.Errorf("[secretmigrator] failed to migrate aad client secret for cluster %s, will retry: %v", cluster.Name, err)
-					deleteErr := h.migrator.secrets.DeleteNamespaced(secretNamespace, aadClientSecret.Name, &metav1.DeleteOptions{})
+					deleteErr := h.migrator.secrets.DeleteNamespaced(SecretNamespace, aadClientSecret.Name, &metav1.DeleteOptions{})
 					if deleteErr != nil {
 						logrus.Errorf("[secretmigrator] encountered error while handling migration error: %v", deleteErr)
 					}
@@ -296,7 +296,7 @@ func (h *handler) sync(key string, cluster *v3.Cluster) (runtime.Object, error) 
 				clusterCopy, err := h.clusters.Update(cluster)
 				if err != nil {
 					logrus.Errorf("[secretmigrator] failed to migrate aad cert secret for cluster %s, will retry: %v", cluster.Name, err)
-					deleteErr := h.migrator.secrets.DeleteNamespaced(secretNamespace, aadCertSecret.Name, &metav1.DeleteOptions{})
+					deleteErr := h.migrator.secrets.DeleteNamespaced(SecretNamespace, aadCertSecret.Name, &metav1.DeleteOptions{})
 					if deleteErr != nil {
 						logrus.Errorf("[secretmigrator] encountered error while handling migration error: %v", deleteErr)
 					}
@@ -331,7 +331,7 @@ func (h *handler) sync(key string, cluster *v3.Cluster) (runtime.Object, error) 
 					_, err = h.notifiers.Update(n)
 					if err != nil {
 						logrus.Errorf("[secretmigrator] failed to migrate SMTP secrets for notifier %s in cluster %s, will retry: %v", n.Name, cluster.Name, err)
-						deleteErr := h.migrator.secrets.DeleteNamespaced(secretNamespace, smtpSecret.Name, &metav1.DeleteOptions{})
+						deleteErr := h.migrator.secrets.DeleteNamespaced(SecretNamespace, smtpSecret.Name, &metav1.DeleteOptions{})
 						if deleteErr != nil {
 							logrus.Errorf("[secretmigrator] encountered error while handling migration error: %v", deleteErr)
 						}
@@ -353,7 +353,7 @@ func (h *handler) sync(key string, cluster *v3.Cluster) (runtime.Object, error) 
 					_, err = h.notifiers.Update(n)
 					if err != nil {
 						logrus.Errorf("[secretmigrator] failed to migrate Wechat secrets for notifier %s in cluster %s, will retry: %v", n.Name, cluster.Name, err)
-						deleteErr := h.migrator.secrets.DeleteNamespaced(secretNamespace, wechatSecret.Name, &metav1.DeleteOptions{})
+						deleteErr := h.migrator.secrets.DeleteNamespaced(SecretNamespace, wechatSecret.Name, &metav1.DeleteOptions{})
 						if deleteErr != nil {
 							logrus.Errorf("[secretmigrator] encountered error while handling migration error: %v", deleteErr)
 						}
@@ -375,7 +375,7 @@ func (h *handler) sync(key string, cluster *v3.Cluster) (runtime.Object, error) 
 					_, err = h.notifiers.Update(n)
 					if err != nil {
 						logrus.Errorf("[secretmigrator] failed to migrate Dingtalk secrets for notifier %s in cluster %s, will retry: %v", n.Name, cluster.Name, err)
-						deleteErr := h.migrator.secrets.DeleteNamespaced(secretNamespace, dingtalkSecret.Name, &metav1.DeleteOptions{})
+						deleteErr := h.migrator.secrets.DeleteNamespaced(SecretNamespace, dingtalkSecret.Name, &metav1.DeleteOptions{})
 						if deleteErr != nil {
 							logrus.Errorf("[secretmigrator] encountered error while handling migration error: %v", deleteErr)
 						}
@@ -406,7 +406,7 @@ func (h *handler) sync(key string, cluster *v3.Cluster) (runtime.Object, error) 
 					_, err = h.clusterCatalogs.Update(c)
 					if err != nil {
 						logrus.Errorf("[secretmigrator] failed to migrate secrets for cluster catalog %s in cluster %s, will retry: %v", c.Name, cluster.Name, err)
-						deleteErr := h.migrator.secrets.DeleteNamespaced(secretNamespace, secret.Name, &metav1.DeleteOptions{})
+						deleteErr := h.migrator.secrets.DeleteNamespaced(SecretNamespace, secret.Name, &metav1.DeleteOptions{})
 						if deleteErr != nil {
 							logrus.Errorf("[secretmigrator] encountered error while handling migration error: %v", deleteErr)
 						}
@@ -444,7 +444,7 @@ func (h *handler) sync(key string, cluster *v3.Cluster) (runtime.Object, error) 
 						_, err = h.projectCatalogs.Update(c)
 						if err != nil {
 							logrus.Errorf("[secretmigrator] failed to migrate secrets for project catalog %s in cluster %s, will retry: %v", c.Name, cluster.Name, err)
-							deleteErr := h.migrator.secrets.DeleteNamespaced(secretNamespace, secret.Name, &metav1.DeleteOptions{})
+							deleteErr := h.migrator.secrets.DeleteNamespaced(SecretNamespace, secret.Name, &metav1.DeleteOptions{})
 							if deleteErr != nil {
 								logrus.Errorf("[secretmigrator] encountered error while handling migration error: %v", deleteErr)
 							}
@@ -484,7 +484,7 @@ func (h *handler) sync(key string, cluster *v3.Cluster) (runtime.Object, error) 
 					github.ObjectMeta, github.APIVersion, github.Kind, err = setSourceCodeProviderConfigMetadata(m)
 					if err != nil {
 						logrus.Errorf("[secretmigrator] failed to migrate secrets for %s pipeline config in cluster %s, will retry: %v", model.GithubType, cluster.Name, err)
-						deleteErr := h.migrator.secrets.DeleteNamespaced(secretNamespace, secret.Name, &metav1.DeleteOptions{})
+						deleteErr := h.migrator.secrets.DeleteNamespaced(SecretNamespace, secret.Name, &metav1.DeleteOptions{})
 						if deleteErr != nil {
 							logrus.Errorf("[secretmigrator] encountered error while handling migration error: %v", deleteErr)
 						}
@@ -492,7 +492,7 @@ func (h *handler) sync(key string, cluster *v3.Cluster) (runtime.Object, error) 
 					}
 					if _, err = h.sourceCodeProviderConfigs.ObjectClient().Update(github.Name, github); err != nil {
 						logrus.Errorf("[secretmigrator] failed to migrate secrets for %s pipeline config in cluster %s, will retry: %v", model.GithubType, cluster.Name, err)
-						deleteErr := h.migrator.secrets.DeleteNamespaced(secretNamespace, secret.Name, &metav1.DeleteOptions{})
+						deleteErr := h.migrator.secrets.DeleteNamespaced(SecretNamespace, secret.Name, &metav1.DeleteOptions{})
 						if deleteErr != nil {
 							logrus.Errorf("[secretmigrator] encountered error while handling migration error: %v", deleteErr)
 						}
@@ -527,7 +527,7 @@ func (h *handler) sync(key string, cluster *v3.Cluster) (runtime.Object, error) 
 					gitlab.ObjectMeta, gitlab.APIVersion, gitlab.Kind, err = setSourceCodeProviderConfigMetadata(m)
 					if err != nil {
 						logrus.Errorf("[secretmigrator] failed to migrate secrets for %s pipeline config in cluster %s, will retry: %v", model.GitlabType, cluster.Name, err)
-						deleteErr := h.migrator.secrets.DeleteNamespaced(secretNamespace, secret.Name, &metav1.DeleteOptions{})
+						deleteErr := h.migrator.secrets.DeleteNamespaced(SecretNamespace, secret.Name, &metav1.DeleteOptions{})
 						if deleteErr != nil {
 							logrus.Errorf("[secretmigrator] encountered error while handling migration error: %v", deleteErr)
 						}
@@ -535,7 +535,7 @@ func (h *handler) sync(key string, cluster *v3.Cluster) (runtime.Object, error) 
 					}
 					if _, err = h.sourceCodeProviderConfigs.ObjectClient().Update(gitlab.Name, gitlab); err != nil {
 						logrus.Errorf("[secretmigrator] failed to migrate secrets for %s pipeline config in cluster %s, will retry: %v", model.GitlabType, cluster.Name, err)
-						deleteErr := h.migrator.secrets.DeleteNamespaced(secretNamespace, secret.Name, &metav1.DeleteOptions{})
+						deleteErr := h.migrator.secrets.DeleteNamespaced(SecretNamespace, secret.Name, &metav1.DeleteOptions{})
 						if deleteErr != nil {
 							logrus.Errorf("[secretmigrator] encountered error while handling migration error: %v", deleteErr)
 						}
@@ -570,7 +570,7 @@ func (h *handler) sync(key string, cluster *v3.Cluster) (runtime.Object, error) 
 					bbcloud.ObjectMeta, bbcloud.APIVersion, bbcloud.Kind, err = setSourceCodeProviderConfigMetadata(m)
 					if err != nil {
 						logrus.Errorf("[secretmigrator] failed to migrate secrets for %s pipeline config in cluster %s, will retry: %v", model.BitbucketCloudType, cluster.Name, err)
-						deleteErr := h.migrator.secrets.DeleteNamespaced(secretNamespace, secret.Name, &metav1.DeleteOptions{})
+						deleteErr := h.migrator.secrets.DeleteNamespaced(SecretNamespace, secret.Name, &metav1.DeleteOptions{})
 						if deleteErr != nil {
 							logrus.Errorf("[secretmigrator] encountered error while handling migration error: %v", deleteErr)
 						}
@@ -578,7 +578,7 @@ func (h *handler) sync(key string, cluster *v3.Cluster) (runtime.Object, error) 
 					}
 					if _, err = h.sourceCodeProviderConfigs.ObjectClient().Update(bbcloud.Name, bbcloud); err != nil {
 						logrus.Errorf("[secretmigrator] failed to migrate secrets for %s pipeline config in cluster %s, will retry: %v", model.BitbucketCloudType, cluster.Name, err)
-						deleteErr := h.migrator.secrets.DeleteNamespaced(secretNamespace, secret.Name, &metav1.DeleteOptions{})
+						deleteErr := h.migrator.secrets.DeleteNamespaced(SecretNamespace, secret.Name, &metav1.DeleteOptions{})
 						if deleteErr != nil {
 							logrus.Errorf("[secretmigrator] encountered error while handling migration error: %v", deleteErr)
 						}
@@ -613,7 +613,7 @@ func (h *handler) sync(key string, cluster *v3.Cluster) (runtime.Object, error) 
 					bbserver.ObjectMeta, bbserver.APIVersion, bbserver.Kind, err = setSourceCodeProviderConfigMetadata(m)
 					if err != nil {
 						logrus.Errorf("[secretmigrator] failed to migrate secrets for %s pipeline config in cluster %s, will retry: %v", model.BitbucketServerType, cluster.Name, err)
-						deleteErr := h.migrator.secrets.DeleteNamespaced(secretNamespace, secret.Name, &metav1.DeleteOptions{})
+						deleteErr := h.migrator.secrets.DeleteNamespaced(SecretNamespace, secret.Name, &metav1.DeleteOptions{})
 						if deleteErr != nil {
 							logrus.Errorf("[secretmigrator] encountered error while handling migration error: %v", deleteErr)
 						}
@@ -622,7 +622,7 @@ func (h *handler) sync(key string, cluster *v3.Cluster) (runtime.Object, error) 
 					_, err = h.sourceCodeProviderConfigs.ObjectClient().Update(bbserver.Name, bbserver)
 					if err != nil {
 						logrus.Errorf("[secretmigrator] failed to migrate secrets for %s pipeline config in cluster %s, will retry: %v", model.BitbucketServerType, cluster.Name, err)
-						deleteErr := h.migrator.secrets.DeleteNamespaced(secretNamespace, secret.Name, &metav1.DeleteOptions{})
+						deleteErr := h.migrator.secrets.DeleteNamespaced(SecretNamespace, secret.Name, &metav1.DeleteOptions{})
 						if deleteErr != nil {
 							logrus.Errorf("[secretmigrator] encountered error while handling migration error: %v", deleteErr)
 						}
@@ -632,8 +632,37 @@ func (h *handler) sync(key string, cluster *v3.Cluster) (runtime.Object, error) 
 			}
 		}
 
-		logrus.Tracef("[secretmigrator] setting cluster condition and updating cluster %s", cluster.Name)
+		logrus.Tracef("[secretmigrator] setting cluster condition [%s] and updating cluster [%s]", apimgmtv3.ClusterConditionSecretsMigrated, cluster.Name)
 		apimgmtv3.ClusterConditionSecretsMigrated.True(cluster)
+		return h.clusters.Update(cluster)
+	})
+	obj, err = apimgmtv3.ClusterConditionServiceAccountSecretsMigrated.Do(obj, func() (runtime.Object, error) {
+		// serviceAccountToken
+		if cluster.Status.ServiceAccountTokenSecret == "" {
+			logrus.Tracef("[secretmigrator] migrating service account token secret for cluster %s", cluster.Name)
+			saSecret, err := h.migrator.CreateOrUpdateServiceAccountTokenSecret(cluster.Status.ServiceAccountTokenSecret, cluster.Status.ServiceAccountToken, cluster)
+			if err != nil {
+				logrus.Errorf("[secretmigrator] failed to migrate service account token secret for cluster %s, will retry: %v", cluster.Name, err)
+				return nil, err
+			}
+			if saSecret != nil {
+				logrus.Tracef("[secretmigrator] service account token secret found for cluster %s", cluster.Name)
+				cluster.Status.ServiceAccountTokenSecret = saSecret.Name
+				cluster.Status.ServiceAccountToken = ""
+				clusterCopy, err := h.clusters.Update(cluster)
+				if err != nil {
+					logrus.Errorf("[secretmigrator] failed to migrate service account token secret for cluster %s, will retry: %v", cluster.Name, err)
+					deleteErr := h.migrator.secrets.DeleteNamespaced(SecretNamespace, saSecret.Name, &metav1.DeleteOptions{})
+					if deleteErr != nil {
+						logrus.Errorf("[secretmigrator] encountered error while handling migration error: %v", deleteErr)
+					}
+					return nil, err
+				}
+				cluster = clusterCopy
+			}
+		}
+		logrus.Tracef("[secretmigrator] setting cluster condition [%s] and updating cluster [%s]", apimgmtv3.ClusterConditionServiceAccountSecretsMigrated, cluster.Name)
+		apimgmtv3.ClusterConditionServiceAccountSecretsMigrated.True(cluster)
 		return h.clusters.Update(cluster)
 	})
 	return obj.(*v3.Cluster), err
@@ -670,7 +699,8 @@ func (m *Migrator) CreateOrUpdatePrivateRegistrySecret(secretName string, rkeCon
 	var existing *corev1.Secret
 	var err error
 	if secretName != "" {
-		existing, err = m.secretLister.Get(secretNamespace, secretName)
+		var err error
+		existing, err = m.secretLister.Get(SecretNamespace, secretName)
 		if err != nil && !apierrors.IsNotFound(err) {
 			return nil, err
 		}
@@ -683,7 +713,7 @@ func (m *Migrator) CreateOrUpdatePrivateRegistrySecret(secretName string, rkeCon
 		ObjectMeta: metav1.ObjectMeta{
 			Name:         secretName, // if empty, the secret will be created with a generated name
 			GenerateName: "cluster-registry-",
-			Namespace:    secretNamespace,
+			Namespace:    SecretNamespace,
 		},
 		Data: map[string][]byte{},
 		Type: corev1.SecretTypeDockerConfigJson,
@@ -772,7 +802,7 @@ func (m *Migrator) createOrUpdateSecret(secretName string, data map[string]strin
 	var existing *corev1.Secret
 	var err error
 	if secretName != "" {
-		existing, err = m.secretLister.Get(secretNamespace, secretName)
+		existing, err = m.secretLister.Get(SecretNamespace, secretName)
 		if err != nil && !apierrors.IsNotFound(err) {
 			return nil, err
 		}
@@ -781,7 +811,7 @@ func (m *Migrator) createOrUpdateSecret(secretName string, data map[string]strin
 		ObjectMeta: metav1.ObjectMeta{
 			Name:         secretName,
 			GenerateName: fmt.Sprintf("%s-%s-", kind, field),
-			Namespace:    secretNamespace,
+			Namespace:    SecretNamespace,
 		},
 		StringData: data,
 		Type:       corev1.SecretTypeOpaque,
@@ -817,7 +847,7 @@ func (m *Migrator) createOrUpdateSecretForCredential(secretName, secretValue str
 		return nil, nil
 	}
 	data := map[string]string{
-		secretKey: secretValue,
+		SecretKey: secretValue,
 	}
 	secret, err := m.createOrUpdateSecret(secretName, data, owner, kind, field)
 	if err != nil {
@@ -989,6 +1019,16 @@ func (m *Migrator) Cleanup(secretName string) error {
 	}
 	err = m.secrets.DeleteNamespaced(namespace.GlobalNamespace, secretName, &metav1.DeleteOptions{})
 	return err
+}
+
+// CreateOrUpdateServiceAccountTokenSecret accepts an optional secret name and a token string
+// and creates a Secret for the cluster service account token if there is one.
+// If an owner is passed, the owner is set as an owner reference on the Secret.
+// It returns a reference to the Secret if one was created. If the returned Secret is not nil and there is no error,
+// the caller is responsible for un-setting the secret data, setting a reference to the Secret, and
+// updating the Cluster object, if applicable.
+func (m *Migrator) CreateOrUpdateServiceAccountTokenSecret(secretName string, credential string, owner runtime.Object) (*corev1.Secret, error) {
+	return m.createOrUpdateSecretForCredential(secretName, credential, owner, "cluster", "serviceaccounttoken")
 }
 
 // MatchesQuestionPath checks whether the given string matches the question-formatted path of the
