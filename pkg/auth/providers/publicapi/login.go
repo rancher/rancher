@@ -29,6 +29,7 @@ import (
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3public"
 	"github.com/rancher/rancher/pkg/clustermanager"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/clusterauthtoken/common"
+	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	schema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3public"
 	"github.com/rancher/rancher/pkg/types/config"
@@ -49,6 +50,7 @@ func newLoginHandler(ctx context.Context, mgmt *config.ScaledContext) *loginHand
 		userMGR:       mgmt.UserManager,
 		tokenMGR:      tokens.NewManager(ctx, mgmt),
 		clusterLister: mgmt.Management.Clusters("").Controller().Lister(),
+		secretLister:  mgmt.Core.Secrets("").Controller().Lister(),
 	}
 }
 
@@ -57,6 +59,7 @@ type loginHandler struct {
 	userMGR       user.Manager
 	tokenMGR      *tokens.Manager
 	clusterLister v3.ClusterLister
+	secretLister  v1.SecretLister
 }
 
 func (h *loginHandler) login(actionName string, action *types.Action, request *types.APIContext) error {
@@ -247,7 +250,7 @@ func (h *loginHandler) createClusterAuthTokenIfNeeded(token *v3.Token, tokenValu
 	if !cluster.Spec.LocalClusterAuthEndpoint.Enabled {
 		return nil
 	}
-	clusterConfig, err := clustermanager.ToRESTConfig(cluster, h.scaledContext)
+	clusterConfig, err := clustermanager.ToRESTConfig(cluster, h.scaledContext, h.secretLister)
 	if err != nil {
 		return err
 	}
