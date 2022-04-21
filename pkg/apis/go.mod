@@ -10,8 +10,8 @@ require (
 	github.com/rancher/eks-operator v1.1.3
 	github.com/rancher/fleet/pkg/apis v0.0.0-20210918015053-5a141a6b18f0
 	github.com/rancher/gke-operator v1.1.3
-	github.com/rancher/norman v0.0.0-20220107203912-4feb41eafabd
-	github.com/rancher/rke v1.3.10-rc3
+	github.com/rancher/norman v0.0.0-20220406153559-82478fb169cb
+	github.com/rancher/rke v1.3.10-rc4
 	github.com/rancher/wrangler v0.8.11-0.20220411195911-c2b951ab3480
 	github.com/sirupsen/logrus v1.8.1
 	k8s.io/api v0.23.3
@@ -40,7 +40,7 @@ require (
 	github.com/matttproud/golang_protobuf_extensions v1.0.2-0.20181231171920-c182affec369 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
-	github.com/prometheus/client_golang v1.11.0 // indirect
+	github.com/prometheus/client_golang v1.11.1 // indirect
 	github.com/prometheus/client_model v0.2.0 // indirect
 	github.com/prometheus/common v0.28.0 // indirect
 	github.com/prometheus/procfs v0.6.0 // indirect
