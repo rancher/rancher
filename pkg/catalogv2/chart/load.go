@@ -3,7 +3,6 @@ package chart
 import (
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 
@@ -60,7 +59,7 @@ func LoadArchive(path string) (*Archive, bool, error) {
 		return nil, false, err
 	}
 
-	tempDir, err := ioutil.TempDir("", "chart-archive-")
+	tempDir, err := os.MkdirTemp("", "chart-archive-")
 	if err != nil {
 		return nil, false, fmt.Errorf("creating archive for %s: %w", path, err)
 	}

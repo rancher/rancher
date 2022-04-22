@@ -3,7 +3,7 @@ package drivers
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 
 	v3 "github.com/rancher/rancher/pkg/generated/norman/project.cattle.io/v3"
@@ -41,7 +41,7 @@ func (b BitbucketCloudDriver) Execute(req *http.Request) (int, error) {
 	if err != nil {
 		return http.StatusInternalServerError, err
 	}
-	body, err := ioutil.ReadAll(req.Body)
+	body, err := io.ReadAll(req.Body)
 	if err != nil {
 		return http.StatusUnprocessableEntity, err
 	}

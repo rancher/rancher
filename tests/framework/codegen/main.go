@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -32,14 +31,14 @@ func replaceClientBasePackages() error {
 		}
 
 		if strings.HasPrefix(info.Name(), "zz_generated_client") {
-			input, err := ioutil.ReadFile(path)
+			input, err := os.ReadFile(path)
 			if err != nil {
 				return err
 			}
 
 			replacement := bytes.Replace(input, []byte("github.com/rancher/norman/clientbase"), []byte("github.com/rancher/rancher/tests/framework/pkg/clientbase"), -1)
 
-			if err = ioutil.WriteFile(path, replacement, 0666); err != nil {
+			if err = os.WriteFile(path, replacement, 0666); err != nil {
 				return err
 			}
 		}

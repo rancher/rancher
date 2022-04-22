@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"time"
 
@@ -37,7 +37,7 @@ func (a ActionHandler) runCisScan(actionName string, action *types.Action, apiCo
 		return httperror.NewAPIError(httperror.PermissionDenied, "can not run security scan")
 	}
 
-	data, err := ioutil.ReadAll(apiContext.Request.Body)
+	data, err := io.ReadAll(apiContext.Request.Body)
 	if err != nil {
 		return errors.Wrap(err, "reading request body error")
 	}

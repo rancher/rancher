@@ -2,7 +2,6 @@ package nodeconfig
 
 import (
 	"encoding/json"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 
@@ -180,7 +179,7 @@ func (m *NodeConfig) UpdateAmazonAuth(rawConfig interface{}) (bool, error) {
 
 	machines := filepath.Join(m.fullMachinePath, "machines")
 	logrus.Debugf("[UpdateAmazonAuth] machine path %v", machines)
-	files, err := ioutil.ReadDir(machines)
+	files, err := os.ReadDir(machines)
 	if err != nil {
 		// There aren't any machines, nothing to update
 		if os.IsNotExist(err) {
@@ -192,7 +191,7 @@ func (m *NodeConfig) UpdateAmazonAuth(rawConfig interface{}) (bool, error) {
 	for _, file := range files {
 		if file.IsDir() {
 			configPath := filepath.Join(machines, file.Name(), "config.json")
-			b, err := ioutil.ReadFile(configPath)
+			b, err := os.ReadFile(configPath)
 			if err != nil {
 				if os.IsNotExist(err) {
 					// config.json doesn't exist, no changes needed
@@ -242,7 +241,7 @@ func (m *NodeConfig) UpdateAmazonAuth(rawConfig interface{}) (bool, error) {
 					return update, errors.WithMessage(err, "error marshaling new machine config")
 				}
 
-				if err := ioutil.WriteFile(configPath, out, 0600); err != nil {
+				if err := os.WriteFile(configPath, out, 0600); err != nil {
 					return update, errors.WithMessage(err, "error writing  new machine config")
 				}
 			}

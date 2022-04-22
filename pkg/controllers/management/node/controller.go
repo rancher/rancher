@@ -6,7 +6,6 @@ import (
 	"encoding/base32"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path"
 	"strings"
@@ -386,7 +385,7 @@ func aliasToPath(driver string, config map[string]interface{}, ns string) error 
 					return err
 				}
 				fullPath := path.Join(fileDir, fileName)
-				err = ioutil.WriteFile(fullPath, []byte(fileContents), 0600)
+				err = os.WriteFile(fullPath, []byte(fileContents), 0600)
 				if err != nil {
 					return err
 				}

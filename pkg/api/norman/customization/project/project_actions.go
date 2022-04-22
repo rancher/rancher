@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"strings"
 	"time"
@@ -176,7 +176,7 @@ func (h *Handler) editMonitoring(actionName string, action *types.Action, apiCon
 		return httperror.NewAPIError(httperror.InvalidState, "disabling Monitoring")
 	}
 
-	data, err := ioutil.ReadAll(apiContext.Request.Body)
+	data, err := io.ReadAll(apiContext.Request.Body)
 	if err != nil {
 		return httperror.WrapAPIError(err, httperror.InvalidBodyContent, "unable to read request content")
 	}
@@ -212,7 +212,7 @@ func (h *Handler) enableMonitoring(actionName string, action *types.Action, apiC
 		return nil
 	}
 
-	data, err := ioutil.ReadAll(apiContext.Request.Body)
+	data, err := io.ReadAll(apiContext.Request.Body)
 	if err != nil {
 		return httperror.WrapAPIError(err, httperror.InvalidBodyContent, "unable to read request content")
 	}

@@ -2,7 +2,7 @@ package clusterconnected
 
 import (
 	"context"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"time"
 
@@ -79,7 +79,7 @@ func (c *checker) hasSession(cluster *v3.Cluster) bool {
 		return false
 	}
 	defer func() {
-		ioutil.ReadAll(resp.Body)
+		io.ReadAll(resp.Body)
 		resp.Body.Close()
 	}()
 	return resp.StatusCode == http.StatusOK

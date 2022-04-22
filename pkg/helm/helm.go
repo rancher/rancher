@@ -7,7 +7,6 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"io"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"net/url"
@@ -129,7 +128,7 @@ func (h *Helm) downloadIndex(indexURL string) (*RepoIndex, error) {
 	if resp.StatusCode != http.StatusOK {
 		return nil, errors.Errorf("Unexpected HTTP status code %d from [%s], expected 200", resp.StatusCode, indexURL)
 	}
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, errors.Errorf("Error while reading response from [%s], error: %s", indexURL, err)
 	}
@@ -155,7 +154,7 @@ func (h *Helm) saveIndex(index *RepoIndex) error {
 	}
 
 	indexPath := filepath.Join(h.LocalPath, "index.yaml")
-	return ioutil.WriteFile(indexPath, fileBytes, 0644)
+	return os.WriteFile(indexPath, fileBytes, 0644)
 }
 
 func (h *Helm) LoadIndex() (*RepoIndex, error) {
@@ -167,7 +166,7 @@ func (h *Helm) LoadIndex() (*RepoIndex, error) {
 
 	indexPath := filepath.Join(h.LocalPath, "index.yaml")
 
-	body, err := ioutil.ReadFile(indexPath)
+	body, err := os.ReadFile(indexPath)
 	if os.IsNotExist(err) {
 		return h.buildIndex()
 	}
@@ -225,7 +224,7 @@ func (h *Helm) fetchTgz(helmURL string) ([]v32.File, error) {
 			fallthrough
 		case tar.TypeRegA:
 			name := header.Name
-			contents, err := ioutil.ReadAll(tarReader)
+			contents, err := io.ReadAll(tarReader)
 			if err != nil {
 				return nil, err
 			}
@@ -279,7 +278,7 @@ func (h *Helm) loadChartFiles(versionDir, prefix string, filters []string) (map[
 			return nil
 		}
 
-		content, err := ioutil.ReadFile(filename)
+		content, err := os.ReadFile(filename)
 		if err != nil {
 			return err
 		}
@@ -332,7 +331,7 @@ func (h *Helm) fetchAndCacheURLs(versionPath, versionName string, versionURLs, f
 		if err := os.MkdirAll(filepath.Dir(fp), 0755); err != nil {
 			return nil, err
 		}
-		if err := ioutil.WriteFile(fp, []byte(file.Contents), 0644); err != nil {
+		if err := os.WriteFile(fp, []byte(file.Contents), 0644); err != nil {
 			return nil, err
 		}
 		if filterMatch(file.Name, filters) {
@@ -378,7 +377,7 @@ func (h *Helm) fetchURLs(urls []string) ([]v32.File, error) {
 }
 
 func (h *Helm) loadFile(version *ChartVersion, filename string) (*v32.File, error) {
-	data, err := ioutil.ReadFile(filename)
+	data, err := os.ReadFile(filename)
 	if err != nil {
 		return nil, err
 	}
@@ -411,7 +410,7 @@ func (h *Helm) buildIndex() (*RepoIndex, error) {
 		}
 
 		version := &ChartVersion{}
-		content, err := ioutil.ReadFile(path)
+		content, err := os.ReadFile(path)
 		if err != nil {
 			return err
 		}
@@ -481,7 +480,7 @@ func (h *Helm) loadCachedIcon(iconURL string) ([]byte, string, string, error) {
 		return nil, "", "", errors.New("Multiple icon cache matches")
 	}
 	filename := matches[0]
-	iconBytes, err := ioutil.ReadFile(filename)
+	iconBytes, err := os.ReadFile(filename)
 	if err != nil {
 		return nil, "", "", err
 	}
@@ -500,7 +499,7 @@ func (h *Helm) cacheIcon(iconURL, extension string, iconBytes []byte) (string, e
 		logrus.Debugf("No extension for: %s", hashName)
 	}
 	iconCacheFile := filepath.Join(h.IconPath, hashName)
-	if err := ioutil.WriteFile(iconCacheFile, iconBytes, 0644); err != nil {
+	if err := os.WriteFile(iconCacheFile, iconBytes, 0644); err != nil {
 		return "", err
 	}
 	return hashName, nil
@@ -533,7 +532,7 @@ func (h *Helm) iconFromFile(iconURL, versionDir string) ([]byte, string, string,
 		return nil, "", "", errors.Errorf("Won't read [%s], outside of tmp path [%s]", iconFile, h.LocalPath)
 	}
 
-	iconBytes, err := ioutil.ReadFile(iconFile)
+	iconBytes, err := os.ReadFile(iconFile)
 	if err != nil {
 		return nil, "", "", err
 	}
@@ -566,7 +565,7 @@ func (h *Helm) iconFromCache(cacheFile string) ([]byte, error) {
 	if !strings.HasPrefix(filename, h.IconPath) {
 		return nil, errors.Errorf("Icon file [%s] outside of icon path [%s]", filename, h.IconPath)
 	}
-	return ioutil.ReadFile(filename)
+	return os.ReadFile(filename)
 }
 
 func (h *Helm) LoadIcon(cacheFile, iconURL string) ([]byte, error) {

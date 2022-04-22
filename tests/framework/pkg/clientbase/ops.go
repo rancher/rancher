@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 	"reflect"
@@ -43,7 +42,7 @@ func (a *APIOperations) DoDelete(url string) error {
 		return err
 	}
 	defer func() {
-		io.Copy(ioutil.Discard, resp.Body)
+		io.Copy(io.Discard, resp.Body)
 		resp.Body.Close()
 	}()
 
@@ -85,7 +84,7 @@ func (a *APIOperations) DoGet(url string, opts *types.ListOpts, respObject inter
 		return NewAPIError(resp, url)
 	}
 
-	byteContent, err := ioutil.ReadAll(resp.Body)
+	byteContent, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return err
 	}
@@ -159,7 +158,7 @@ func (a *APIOperations) DoModify(method string, url string, createObj interface{
 		return NewAPIError(resp, url)
 	}
 
-	byteContent, err := ioutil.ReadAll(resp.Body)
+	byteContent, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return err
 	}
@@ -379,7 +378,7 @@ func (a *APIOperations) doAction(
 		return NewAPIError(resp, actionURL)
 	}
 
-	byteContent, err := ioutil.ReadAll(resp.Body)
+	byteContent, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return err
 	}

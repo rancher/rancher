@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"io/ioutil"
 	"math/rand"
 	"net"
 	"net/url"
@@ -290,7 +289,7 @@ func GenerateAnswerSetValues(app *v3.App, tempDir *HelmPath, extraArgs map[strin
 	if app.Spec.ValuesYaml != "" {
 		custom := "custom-values.yaml"
 		valuesYaml := filepath.Join(tempDir.FullPath, custom)
-		if err := ioutil.WriteFile(valuesYaml, []byte(app.Spec.ValuesYaml), 0755); err != nil {
+		if err := os.WriteFile(valuesYaml, []byte(app.Spec.ValuesYaml), 0755); err != nil {
 			return values, err
 		}
 		values = append(values, "--values", filepath.Join(tempDir.InJailPath, custom))
@@ -358,7 +357,7 @@ func createKustomizeFiles(tempDirs *HelmPath, labelValue string) error {
 		return err
 	}
 	kpath := filepath.Join(tempDirs.FullPath, "/kustomization.yaml")
-	err = ioutil.WriteFile(kpath, y, 0644)
+	err = os.WriteFile(kpath, y, 0644)
 	if err != nil {
 		return err
 	}
@@ -396,7 +395,7 @@ func createKustomizeTransformFile(tempDirs *HelmPath, value string) error {
 		return err
 	}
 	ktPath := filepath.Join(tempDirs.FullPath, "/"+kustomizeTransformFile)
-	err = ioutil.WriteFile(ktPath, result.Bytes(), 0644)
+	err = os.WriteFile(ktPath, result.Bytes(), 0644)
 	if err != nil {
 		return err
 	}

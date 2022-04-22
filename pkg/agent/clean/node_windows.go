@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -158,7 +157,7 @@ func writeScript() error {
 	hostScriptPath := strings.Replace(getScriptPath(), "c:\\", HostMount, 1)
 	if !fileExists(hostScriptPath) {
 		logrus.Infof("writing file to host: %s", hostScriptPath)
-		if err := ioutil.WriteFile(hostScriptPath, scriptBytes, 0777); err != nil {
+		if err := os.WriteFile(hostScriptPath, scriptBytes, 0777); err != nil {
 			return fmt.Errorf("error writing the cleanup script to the host: %s", err)
 		}
 	} else {

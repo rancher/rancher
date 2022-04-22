@@ -1,7 +1,6 @@
 package config
 
 import (
-	"io/ioutil"
 	"os"
 
 	"github.com/creasty/defaults"
@@ -18,7 +17,7 @@ func LoadConfig(key string, config interface{}) {
 		return
 	}
 
-	allString, err := ioutil.ReadFile(configPath)
+	allString, err := os.ReadFile(configPath)
 	if err != nil {
 		panic(err)
 	}

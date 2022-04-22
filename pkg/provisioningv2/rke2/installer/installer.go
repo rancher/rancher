@@ -3,7 +3,7 @@ package installer
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"os"
 	"strings"
@@ -34,7 +34,7 @@ func installScript(setting settings.Setting, files []string) ([]byte, error) {
 	if setting.Get() == setting.Default {
 		// no setting override, check for local file first
 		for _, f := range files {
-			script, err := ioutil.ReadFile(f)
+			script, err := os.ReadFile(f)
 			if err != nil {
 				if !os.IsNotExist(err) {
 					logrus.Debugf("error pulling system agent installation script %s: %s", f, err)
@@ -52,7 +52,7 @@ func installScript(setting settings.Setting, files []string) ([]byte, error) {
 	}
 	defer resp.Body.Close()
 
-	return ioutil.ReadAll(resp.Body)
+	return io.ReadAll(resp.Body)
 }
 
 func LinuxInstallScript(ctx context.Context, token string, envVars []corev1.EnvVar, defaultHost string) ([]byte, error) {
