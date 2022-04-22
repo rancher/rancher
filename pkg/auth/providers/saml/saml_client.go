@@ -318,7 +318,7 @@ func (s *Provider) HandleSamlAssertion(w http.ResponseWriter, r *http.Request, a
 		return
 	}
 	if !allowed {
-		log.Errorf("SAML: User does not have access %v", err)
+		log.Errorf("SAML: User [%s] is not an authorized user or is not a member of an authorized group", userPrincipal.Name)
 		http.Redirect(w, r, redirectURL+"errorCode=403", http.StatusFound)
 		return
 	}
