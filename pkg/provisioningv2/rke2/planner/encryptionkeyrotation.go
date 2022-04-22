@@ -3,56 +3,35 @@ package planner
 import (
 	"encoding/base64"
 	"fmt"
+	"strconv"
 	"strings"
-	"time"
 
+	"github.com/blang/semver"
+	"github.com/rancher/channelserver/pkg/model"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
 	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2"
 	"github.com/rancher/wrangler/pkg/generic"
 	"github.com/sirupsen/logrus"
+	"k8s.io/apimachinery/pkg/api/equality"
 )
 
 const (
-	encryptionKeyRotationStageStart             = "start"
-	encryptionKeyRotationStagePrepare           = "prepare"
-	encryptionKeyRotationStageRotate            = "rotate"
 	encryptionKeyRotationStageReencryptRequest  = "reencrypt_request"
 	encryptionKeyRotationStageReencryptActive   = "reencrypt_active"
 	encryptionKeyRotationStageReencryptFinished = "reencrypt_finished"
-	encryptionKeyRotationCommandPrepare         = "prepare"
-	encryptionKeyRotationCommandRotate          = "rotate"
-	encryptionKeyRotationCommandReencrypt       = "reencrypt"
+
+	encryptionKeyRotationCommandPrepare   = "prepare"
+	encryptionKeyRotationCommandRotate    = "rotate"
+	encryptionKeyRotationCommandReencrypt = "reencrypt"
 
 	encryptionKeyRotationSecretsEncryptApplyCommand  = "secrets-encrypt-apply"
 	encryptionKeyRotationSecretsEncryptStatusCommand = "secrets-encrypt-status"
-	encryptionKeyRotationRestartApiserverCommand     = "restart-apiserver"
-	encryptionKeyRotationApiserverStatusCommand      = "apiserver-status"
 
-	encryptionKeyRotationLeaderAnnotation      = "rke.cattle.io/encrypt-key-rotation-leader"
-	encryptionKeyRotationApiserverIDAnnotation = "rke.cattle.io/encrypt-key-apiserver-id"
+	encryptionKeyRotationLeaderAnnotation = "rke.cattle.io/encrypt-key-rotation-leader"
 
-	encryptionKeyRotationRestartAPIServerScriptPath            = "/var/lib/rancher/rke2/bin/restart_apiserver.sh"
-	encryptionKeyRotationGetAPIServerStatusScriptPath          = "/var/lib/rancher/rke2/bin/apiserver_status.sh"
-	encryptionKeyRotationWaitForSystemctlStatusPath            = "/var/lib/rancher/rke2/bin/wait_for_systemctl_status.sh"
-	encryptionKeyRotationWaitForSecretsEncryptStatusScriptPath = "/var/lib/rancher/rke2/bin/wait_for_secrets_encrypt_status.sh"
-
-	// This script finds the apiserver container and restarts it.
-	// Update to use --output json from https://github.com/k3s-io/k3s/issues/5138 when implemented in rke2
-	encryptionKeyRotationRestartAPIServerScript = `
-#!/bin/sh
-
-apiServer=$(/var/lib/rancher/rke2/bin/crictl ps --name kube-apiserver | sed "1 d" | awk '{print $1}')
-
-/var/lib/rancher/rke2/bin/crictl stop $apiServer
-`
-
-	// This script finds the apiserver pod and writes the container id to stdout.
-	encryptionKeyRotationGetAPIServerStatusScript = `
-#!/bin/sh
-
-/var/lib/rancher/rke2/bin/crictl ps --name kube-apiserver | sed "1 d" | awk '{print $1}'
-`
+	encryptionKeyRotationWaitForSystemctlStatusPath            = "/var/lib/rancher/rke2/rancher_v2prov_encryption_key_rotation/bin/wait_for_systemctl_status.sh"
+	encryptionKeyRotationWaitForSecretsEncryptStatusScriptPath = "/var/lib/rancher/rke2/rancher_v2prov_encryption_key_rotation/bin/wait_for_secrets_encrypt_status.sh"
 
 	encryptionKeyRotationWaitForSystemctlStatus = `
 #!/bin/sh
@@ -88,108 +67,194 @@ done
 exit 1
 `
 
+	idempotentActionScript = `
+#!/bin/sh
+
+currentGeneration=""
+key=$1
+targetGeneration=$2
+runtime=$3
+shift
+shift
+shift
+
+dataRoot="/var/lib/rancher/$runtime/$key"
+generationFile="$dataRoot/generation"
+
+currentGeneration=$(cat "$generationFile" || echo "")
+
+if [ "$currentGeneration" != "$targetGeneration" ]; then
+  $runtime $@
+else
+	echo "action has already been reconciled to the current generation."
+fi
+
+mkdir -p $dataRoot
+echo $targetGeneration > "$generationFile"
+`
+
 	encryptionKeyRotationEndpointEnv = "CONTAINER_RUNTIME_ENDPOINT=unix:///var/run/k3s/containerd/containerd.sock"
 )
 
-// rotateEncryptionKeys first checks if encryption keys are in need of rotation, then verifies that the control plane is
-// in a state where the next step can be derived. If this is not the case, the entire encryption key rotation sequence
-// is restarted. Otherwise, the next phase is moved to, first getting the secrets encrypt status from the init node,
-// restarting said node, getting the status again, restarting the control plane nodes and verifying that the phases
-// match the init node, and either finishing if the status is reencrypt_finished, or applying the next secrets-encrypt
-// command.
-func (p *Planner) rotateEncryptionKeys(cp *rkev1.RKEControlPlane, clusterPlan *plan.Plan) error {
-	if !shouldRotateEncryptionKeys(cp) {
+func (p *Planner) setEncryptionKeyRotateState(controlPlane *rkev1.RKEControlPlane, status *rkev1.RotateEncryptionKeys, phase rkev1.RotateEncryptionKeysPhase) error {
+	if equality.Semantic.DeepEqual(controlPlane.Status.RotateEncryptionKeys, status) && equality.Semantic.DeepEqual(controlPlane.Status.RotateEncryptionKeysPhase, phase) {
+		return nil
+	}
+	controlPlane = controlPlane.DeepCopy()
+	controlPlane.Status.RotateEncryptionKeys = status
+	controlPlane.Status.RotateEncryptionKeysPhase = phase
+	_, err := p.rkeControlPlanes.UpdateStatus(controlPlane)
+	if err != nil {
+		return err
+	}
+	return ErrWaiting("refreshing encryption key rotation state")
+}
+
+// rotateEncryptionKeys first verifies that the control plane is in a state where the next step can be derived. If encryption key rotation is required, the corresponding phase and status fields will be set.
+// The function is expected to be called multiple times throughout encryption key rotation, and will set the next corresponding phase based on previous output.
+func (p *Planner) rotateEncryptionKeys(cp *rkev1.RKEControlPlane, releaseData *model.Release, clusterPlan *plan.Plan) error {
+	if cp == nil || releaseData == nil || clusterPlan == nil {
+		return fmt.Errorf("cannot pass nil parameters to rotateEncryptionKeys")
+	}
+	if supported, err := encryptionKeyRotationSupported(releaseData); err != nil {
+		return err
+	} else if !supported {
+		logrus.Debugf("rkecluster %s/%s: marking encryption key rotation phase as failed as it was not supported by version: %s", cp.Namespace, cp.Name, cp.Spec.KubernetesVersion)
+		return p.setEncryptionKeyRotateState(cp, cp.Spec.RotateEncryptionKeys, rkev1.RotateEncryptionKeysPhaseFailed)
+	}
+
+	if !canRotateEncryptionKeys(cp) {
 		return nil
 	}
 
 	if shouldRestartEncryptionKeyRotation(cp) {
-		return p.restartEncryptionKeyRotation(cp)
+		logrus.Debugf("[planner] rkecluster %s/%s: starting/restarting encryption key rotation", cp.Namespace, cp.Name)
+		return p.setEncryptionKeyRotateState(cp, cp.Spec.RotateEncryptionKeys, rkev1.RotateEncryptionKeysPhasePrepare)
 	}
 
-	leader, init, err := p.encryptionKeyRotationElectLeader(cp, clusterPlan)
+	leader, err := p.encryptionKeyRotationElectLeader(cp, clusterPlan)
 	if err != nil {
 		return err
 	}
 
-	logrus.Debugf("rkecluster %s/%s: current encryption key rotation phase: [%s]", cp.Namespace, cp.Spec.ClusterName, cp.Status.RotateEncryptionKeysPhase)
+	logrus.Debugf("[planner] rkecluster %s/%s: current encryption key rotation phase: [%s]", cp.Namespace, cp.Spec.ClusterName, cp.Status.RotateEncryptionKeysPhase)
 
 	switch cp.Status.RotateEncryptionKeysPhase {
-	case rkev1.RotateEncryptionKeysPhaseRestartNodes:
-		return p.encryptionKeyRotationRestartNodes(cp, clusterPlan, leader, init)
-	case rkev1.RotateEncryptionKeysPhaseApplyLeader:
-		return p.encryptionKeyRotationApplyLeader(cp, clusterPlan, leader)
+	case rkev1.RotateEncryptionKeysPhasePrepare:
+		err = p.encryptionKeyRotationLeaderPhaseReconcile(cp, leader)
+		if err != nil {
+			return err
+		}
+		return p.setEncryptionKeyRotateState(cp, cp.Spec.RotateEncryptionKeys, rkev1.RotateEncryptionKeysPhasePostPrepareRestart)
+	case rkev1.RotateEncryptionKeysPhasePostPrepareRestart:
+		err = p.encryptionKeyRotationRestartNodes(cp, clusterPlan, leader)
+		if err != nil {
+			return err
+		}
+		return p.setEncryptionKeyRotateState(cp, cp.Spec.RotateEncryptionKeys, rkev1.RotateEncryptionKeysPhaseRotate)
+	case rkev1.RotateEncryptionKeysPhaseRotate:
+		err = p.encryptionKeyRotationLeaderPhaseReconcile(cp, leader)
+		if err != nil {
+			return err
+		}
+		return p.setEncryptionKeyRotateState(cp, cp.Spec.RotateEncryptionKeys, rkev1.RotateEncryptionKeysPhasePostRotateRestart)
+	case rkev1.RotateEncryptionKeysPhasePostRotateRestart:
+		err = p.encryptionKeyRotationRestartNodes(cp, clusterPlan, leader)
+		if err != nil {
+			return err
+		}
+		return p.setEncryptionKeyRotateState(cp, cp.Spec.RotateEncryptionKeys, rkev1.RotateEncryptionKeysPhaseReencrypt)
+	case rkev1.RotateEncryptionKeysPhaseReencrypt:
+		err = p.encryptionKeyRotationLeaderPhaseReconcile(cp, leader)
+		if err != nil {
+			return err
+		}
+		return p.setEncryptionKeyRotateState(cp, cp.Spec.RotateEncryptionKeys, rkev1.RotateEncryptionKeysPhasePostReencryptRestart)
+	case rkev1.RotateEncryptionKeysPhasePostReencryptRestart:
+		err = p.encryptionKeyRotationRestartNodes(cp, clusterPlan, leader)
+		if err != nil {
+			return err
+		}
+		return p.setEncryptionKeyRotateState(cp, cp.Spec.RotateEncryptionKeys, rkev1.RotateEncryptionKeysPhaseDone)
 	}
 
-	return p.enqueueAndSkip(cp)
+	return fmt.Errorf("encountered unknown encryption key rotation phase: %s", cp.Status.RotateEncryptionKeysPhase)
 }
 
-// shouldRotateEncryptionKeys `true` if encryption key rotation has been requested or has not finished.
-func shouldRotateEncryptionKeys(cp *rkev1.RKEControlPlane) bool {
-	// Do not stop rotating for any reason, except when encryption key rotation cannot be completed.
-	if rke2.Ready.IsUnknown(cp) && rke2.Ready.GetReason(cp) == rke2.RotatingEncryptionKeysReason {
-		return true
+// encryptionKeyRotationSupported returns a boolean indicating whether encryption key rotation is supported by the release,
+// and an error if one was encountered.
+func encryptionKeyRotationSupported(releaseData *model.Release) (bool, error) {
+	if releaseData == nil {
+		return false, fmt.Errorf("unable to find KDM release data for encryption key rotation support in release")
 	}
+	if featureVersion, ok := releaseData.FeatureVersions["encryption-key-rotation"]; ok {
+		version, err := semver.Make(featureVersion)
+		if err != nil {
+			return false, fmt.Errorf("unable to parse semver version for encryption key rotation: %s", featureVersion)
+		}
+		if version.Major == 1 { // we are looking for encryption key rotation 1.x.x
+			return true, nil
+		}
+	}
+	return false, nil
+}
 
-	// If we haven't started rotating yet, the cluster must be ready before we start.
-	if (!rke2.Ready.IsTrue(cp) &&
-		rke2.Ready.GetReason(cp) != rke2.RotatingEncryptionKeysReason) ||
+// canRotateEncryptionKeys returns false if the controlplane does not have a Ready: True condition and encryption key rotation is not already in progress, if the spec for
+// encryption key rotation is nil, or if the spec has been reconciled but the phase is done or failed.
+func canRotateEncryptionKeys(cp *rkev1.RKEControlPlane) bool {
+	if (!rke2.Ready.IsTrue(cp) && !rotateEncryptionKeyInProgress(cp)) ||
 		cp.Spec.RotateEncryptionKeys == nil ||
-		(cp.Status.RotateEncryptionKeys != nil && cp.Status.RotateEncryptionKeys.Generation == cp.Spec.RotateEncryptionKeys.Generation) {
+		(cp.Status.RotateEncryptionKeys != nil && cp.Status.RotateEncryptionKeys.Generation == cp.Spec.RotateEncryptionKeys.Generation &&
+			(cp.Status.RotateEncryptionKeysPhase == rkev1.RotateEncryptionKeysPhaseDone || cp.Status.RotateEncryptionKeysPhase == rkev1.RotateEncryptionKeysPhaseFailed)) {
 		return false
 	}
 
 	return true
 }
 
-// shouldRestartEncryptionKeyRotation `true` if the current phase is unknown, or finished
+// shouldRestartEncryptionKeyRotation returns `true` if encryption key rotation is necessary and the fields on the status object are not valid for an encryption key rotation procedure.
 func shouldRestartEncryptionKeyRotation(cp *rkev1.RKEControlPlane) bool {
+	if !rke2.Ready.IsTrue(cp) {
+		return false
+	}
 	if cp.Spec.RotateEncryptionKeys.Generation > 0 && cp.Status.RotateEncryptionKeys == nil {
 		return true
 	}
-	if cp.Status.RotateEncryptionKeysPhase == rkev1.RotateEncryptionKeysPhaseDone &&
+	if (cp.Status.RotateEncryptionKeysPhase == rkev1.RotateEncryptionKeysPhaseDone ||
+		cp.Status.RotateEncryptionKeysPhase == rkev1.RotateEncryptionKeysPhaseFailed ||
+		cp.Status.RotateEncryptionKeysPhase == "") &&
 		cp.Spec.RotateEncryptionKeys.Generation != cp.Status.RotateEncryptionKeys.Generation {
 		return true
 	}
-	if !hasValidRotateEncryptionKeyStatus(cp) {
+	if !hasValidNonFailedRotateEncryptionKeyStatus(cp) {
 		return true
 	}
 	return false
 }
 
-// hasValidRotateEncryptionKeyStatus verifies that the control plane encryption key status is an expected value
-func hasValidRotateEncryptionKeyStatus(cp *rkev1.RKEControlPlane) bool {
-	return cp.Status.RotateEncryptionKeysPhase == rkev1.RotateEncryptionKeysPhaseRestartNodes ||
-		cp.Status.RotateEncryptionKeysPhase == rkev1.RotateEncryptionKeysPhaseApplyLeader ||
+// hasValidNonFailedRotateEncryptionKeyStatus verifies that the control plane encryption key status is an expected value and is not failed.
+func hasValidNonFailedRotateEncryptionKeyStatus(cp *rkev1.RKEControlPlane) bool {
+	return rotateEncryptionKeyInProgress(cp) ||
 		cp.Status.RotateEncryptionKeysPhase == rkev1.RotateEncryptionKeysPhaseDone
 }
 
-// restartEncryptionKeyRotation restarts encryption key rotation if it is required, by resetting all related control
-// plane statuses.
-func (p *Planner) restartEncryptionKeyRotation(cp *rkev1.RKEControlPlane) error {
-	logrus.Infof("rkecluster %s/%s: restarting encryption key rotation, current phase: [%s]", cp.Namespace, cp.Spec.ClusterName, cp.Status.RotateEncryptionKeysPhase)
-
-	cp = cp.DeepCopy()
-	rke2.Ready.Unknown(cp)
-	rke2.Ready.Message(cp, "encryption key rotation: restarting nodes")
-	rke2.Ready.Reason(cp, rke2.RotatingEncryptionKeysReason)
-	if cp.Status.RotateEncryptionKeys == nil {
-		cp.Status.RotateEncryptionKeys = &rkev1.RotateEncryptionKeysStatus{}
-	}
-	cp.Status.RotateEncryptionKeys.LastRestart = time.Now().Format(time.RFC3339)
-	cp.Status.RotateEncryptionKeysPhase = rkev1.RotateEncryptionKeysPhaseRestartNodes
-	_, err := p.rkeControlPlanes.UpdateStatus(cp)
-	if err != nil {
-		return err
-	}
-	return generic.ErrSkip
+// rotateEncryptionKeyInProgress returns true if the phase of the rotate encryption key is during the rotate procedure.
+func rotateEncryptionKeyInProgress(cp *rkev1.RKEControlPlane) bool {
+	return cp.Status.RotateEncryptionKeysPhase == rkev1.RotateEncryptionKeysPhasePrepare ||
+		cp.Status.RotateEncryptionKeysPhase == rkev1.RotateEncryptionKeysPhasePostPrepareRestart ||
+		cp.Status.RotateEncryptionKeysPhase == rkev1.RotateEncryptionKeysPhaseRotate ||
+		cp.Status.RotateEncryptionKeysPhase == rkev1.RotateEncryptionKeysPhasePostRotateRestart ||
+		cp.Status.RotateEncryptionKeysPhase == rkev1.RotateEncryptionKeysPhaseReencrypt ||
+		cp.Status.RotateEncryptionKeysPhase == rkev1.RotateEncryptionKeysPhasePostReencryptRestart
 }
 
-// encryptionKeyRotationElectLeader returns the current leader if it is valid, otherwise it selects the first suitable
-// control plane it can find.
-func (p *Planner) encryptionKeyRotationElectLeader(cp *rkev1.RKEControlPlane, clusterPlan *plan.Plan) (*planEntry, *planEntry, error) {
+// encryptionKeyRotationElectLeader returns the current encryption rotation leader if it is valid, otherwise, if the phase is prepare, it will re-elect a new leader.
+// It will look for the init node, and if the init node is not valid (etcd-only), it will elect the first suitable control plane node. If the phase is not in
+// Prepare and a re-election of the leader is necessary, the phase will be set to failed as this is unexpected.
+func (p *Planner) encryptionKeyRotationElectLeader(cp *rkev1.RKEControlPlane, clusterPlan *plan.Plan) (*planEntry, error) {
 	_, _, init, _ := p.findInitNode(cp, clusterPlan)
 	if init == nil {
-		return nil, nil, p.encryptionKeyRotationFailed(cp)
+		return nil, p.encryptionKeyRotationFailed(cp)
 	}
 
 	if machineName, ok := cp.Annotations[encryptionKeyRotationLeaderAnnotation]; ok {
@@ -200,30 +265,33 @@ func (p *Planner) encryptionKeyRotationElectLeader(cp *rkev1.RKEControlPlane, cl
 				Metadata: clusterPlan.Metadata[machineName],
 			}
 			if encryptionKeyRotationIsSuitableControlPlane(entry) {
-				return entry, init, nil
+				return entry, nil
 			}
 		}
+	}
+
+	if cp.Status.RotateEncryptionKeysPhase != rkev1.RotateEncryptionKeysPhasePrepare {
+		// if we are electing a leader and are not in the prepare phase, something is wrong.
+		logrus.Errorf("rkecluster %s/%s re-election of encryption key rotation leader occurred when phase was %s", cp.Namespace, cp.Name, cp.Status.RotateEncryptionKeysPhase)
+		return nil, p.encryptionKeyRotationFailed(cp)
 	}
 
 	leader := init
 	if !isControlPlane(init) {
 		machines := collect(clusterPlan, encryptionKeyRotationIsSuitableControlPlane)
 		if len(machines) == 0 {
-			return nil, nil, p.encryptionKeyRotationFailed(cp)
-		}
-		if cp.Status.RotateEncryptionKeysPhase != rkev1.RotateEncryptionKeysPhaseRestartNodes {
-			return nil, nil, p.restartEncryptionKeyRotation(cp)
+			return nil, p.encryptionKeyRotationFailed(cp)
 		}
 		leader = machines[0]
 	}
 
+	cp = cp.DeepCopy()
 	cp.Annotations[encryptionKeyRotationLeaderAnnotation] = leader.Machine.Name
 	_, err := p.rkeControlPlanes.Update(cp)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
-	// a new leader was chosen, must restart
-	return nil, nil, generic.ErrSkip
+	return nil, generic.ErrSkip
 }
 
 // encryptionKeyRotationIsSuitableControlPlane ensures that a control plane node has not been deleted and has a valid
@@ -232,151 +300,82 @@ func encryptionKeyRotationIsSuitableControlPlane(entry *planEntry) bool {
 	return isControlPlane(entry) && entry.Machine.DeletionTimestamp == nil && entry.Machine.Status.NodeRef != nil && rke2.Ready.IsTrue(entry.Machine)
 }
 
-// encryptionKeyRotationRestartNodes will restart the leader to ensure that the current encryption key rotation status
-// is persisted to the datastore. With a single node control plane, the apiserver container needs to be restarted,
-// however with an HA control plane, the leader must first be restarted then all the followers, as the followers will
-// update their status when reading from the datastore on startup of the rke2/k3s services.
-func (p *Planner) encryptionKeyRotationRestartNodes(cp *rkev1.RKEControlPlane, clusterPlan *plan.Plan, leader *planEntry, init *planEntry) error {
-	// If leader is not the init, it must be restarted first or the datastore update fails.
-	if init != nil && leader.Machine.Name != init.Machine.Name {
-		_, err := p.encryptionKeyRotationRestartService(cp, init, "", false)
-		if err != nil {
-			return err
-		}
-	}
-	var (
-		leaderStage string
-		err         error
-	)
-	if rke2.GetRuntime(cp.Spec.KubernetesVersion) == rke2.RuntimeRKE2 && len(collect(clusterPlan, encryptionKeyRotationIsSuitableControlPlane)) == 1 {
-		leaderStage, err = p.encryptionKeyRotationRestartSingleNodeAPIServer(cp, leader)
-	} else {
-		leaderStage, err = p.encryptionKeyRotationRestartServices(cp, clusterPlan, leader)
-	}
-	if err != nil {
-		return err
-	}
-
-	// a phase has been completed at least once for this generation
-	if leaderStage == encryptionKeyRotationStageReencryptFinished &&
-		cp.Status.RotateEncryptionKeys.Stage != "" {
-		return p.encryptionKeyRotationFinished(cp)
-	}
-
-	cp.Status.RotateEncryptionKeys.Stage = leaderStage
-	err = p.encryptionKeyRotationUpdateControlPlanePhase(cp, rkev1.RotateEncryptionKeysPhaseApplyLeader)
-	if err != nil {
-		return err
-	}
-	return generic.ErrSkip
-}
-
-// encryptionKeyRotationIsControlPlaneAndNotLeader allows us to filter cluster plans to restart healthy follower nodes.
-func encryptionKeyRotationIsControlPlaneAndNotLeader(cp *rkev1.RKEControlPlane) roleFilter {
+// encryptionKeyRotationIsControlPlaneAndNotLeaderAndInit allows us to filter cluster plans to restart healthy follower nodes.
+func encryptionKeyRotationIsControlPlaneAndNotLeaderAndInit(cp *rkev1.RKEControlPlane) roleFilter {
 	return func(entry *planEntry) bool {
-		return encryptionKeyRotationIsSuitableControlPlane(entry) &&
+		return isControlPlaneAndNotInitNode(entry) &&
 			cp.Annotations[encryptionKeyRotationLeaderAnnotation] != entry.Machine.Name
 	}
 }
 
-// encryptionKeyRotationRestartServices restarts the leader's server service, extracting the current stage afterwards.
-// The followers (if any exist) are subsequently restarted.
-func (p *Planner) encryptionKeyRotationRestartServices(cp *rkev1.RKEControlPlane, clusterPlan *plan.Plan, leader *planEntry) (string, error) {
-	leaderStage, err := p.encryptionKeyRotationRestartService(cp, leader, "", true)
-	if err != nil {
-		return "", err
+// encryptionKeyRotationIsEtcdAndNotControlPlaneAndNotLeaderAndInit allows us to filter cluster plans to restart healthy follower nodes.
+func encryptionKeyRotationIsEtcdAndNotControlPlaneAndNotLeaderAndInit(cp *rkev1.RKEControlPlane) roleFilter {
+	return func(entry *planEntry) bool {
+		return isEtcd(entry) && !isControlPlane(entry) &&
+			cp.Annotations[encryptionKeyRotationLeaderAnnotation] != entry.Machine.Name &&
+			!isInitNode(entry)
+	}
+}
+
+// encryptionKeyRotationRestartNodes restarts the leader's server service, extracting the current stage afterwards.
+// The followers (if any exist) are subsequently restarted. Notably, if the encryption key rotation leader is not the init node,
+// it will restart the init node, then restart the encryption key rotation leader,
+// then finalize walking through etcd nodes (that are not controlplane), then finally controlplane nodes.
+func (p *Planner) encryptionKeyRotationRestartNodes(cp *rkev1.RKEControlPlane, clusterPlan *plan.Plan, leader *planEntry) error {
+	// in certain cases with multi-node setups, we must restart the init node before we can proceed to restarting the leader.
+	if !isInitNode(leader) {
+		logrus.Debugf("[planner] rkecluster %s/%s: leader %s was not the init node, finding and restarting services on init node", cp.Namespace, cp.Name, leader.Machine.Name)
+		// find init node and restart service on the init node first.
+		initNodeFound, _, initNode, err := p.findInitNode(cp, clusterPlan)
+		if err != nil {
+			return err
+		}
+		if !initNodeFound {
+			return fmt.Errorf("unable to find init node")
+		}
+		_, err = p.encryptionKeyRotationRestartService(cp, initNode, "", false)
+		if err != nil {
+			return err
+		}
 	}
 
-	for _, entry := range collect(clusterPlan, encryptionKeyRotationIsControlPlaneAndNotLeader(cp)) {
+	leaderStage, err := p.encryptionKeyRotationRestartService(cp, leader, "", true)
+	if err != nil {
+		return err
+	}
+
+	logrus.Debugf("[planner] rkecluster %s/%s: collecting etcd and not control plane and not leader and init nodes", cp.Namespace, cp.Name)
+	for _, entry := range collect(clusterPlan, encryptionKeyRotationIsEtcdAndNotControlPlaneAndNotLeaderAndInit(cp)) {
+		_, err = p.encryptionKeyRotationRestartService(cp, entry, leaderStage, false)
+		if err != nil {
+			return err
+		}
+	}
+
+	logrus.Debugf("[planner] rkecluster %s/%s: collecting control plane and not leader and init nodes", cp.Namespace, cp.Name)
+	for _, entry := range collect(clusterPlan, encryptionKeyRotationIsControlPlaneAndNotLeaderAndInit(cp)) {
 		stage, err := p.encryptionKeyRotationRestartService(cp, entry, leaderStage, true)
 		if err != nil {
-			return "", err
+			return err
 		}
 
 		if stage != leaderStage {
-			// secrets-encrypt command was run on another node, restart
-			logrus.Infof("rkecluster %s/%s: leader [%s] with %s stage and follower [%s] with %s stage", cp.Namespace, cp.Spec.ClusterName, leader.Machine.Status.NodeRef.Name, leaderStage, entry.Machine.Status.NodeRef.Name, stage)
-			return "", p.restartEncryptionKeyRotation(cp)
+			// secrets-encrypt command was run on another node. this is considered a failure, but might be a bit too sensitive. to be tested.
+			logrus.Errorf("[planner] rkecluster %s/%s: leader [%s] with %s stage and follower [%s] with %s stage", cp.Namespace, cp.Spec.ClusterName, leader.Machine.Status.NodeRef.Name, leaderStage, entry.Machine.Status.NodeRef.Name, stage)
+			return p.encryptionKeyRotationFailed(cp)
 		}
 	}
 
-	return leaderStage, nil
-}
-
-// encryptionKeyRotationRestartSingleNodeAPIServer restarts the apiserver container on the server, waits until it is
-// healthy again, and then waits until secrets-encrypt status can be successfully queried.
-func (p *Planner) encryptionKeyRotationRestartSingleNodeAPIServer(cp *rkev1.RKEControlPlane, leader *planEntry) (string, error) {
-	nodePlan := plan.NodePlan{
-		Files: []plan.File{
-			{
-				Content: base64.StdEncoding.EncodeToString([]byte(encryptionKeyRotationRestartAPIServerScript)),
-				Path:    encryptionKeyRotationRestartAPIServerScriptPath,
-			},
-			{
-				Content: base64.StdEncoding.EncodeToString([]byte(encryptionKeyRotationGetAPIServerStatusScript)),
-				Path:    encryptionKeyRotationGetAPIServerStatusScriptPath,
-			},
-			{
-				Content: base64.StdEncoding.EncodeToString([]byte(encryptionKeyRotationWaitForSecretsEncryptStatusScript)),
-				Path:    encryptionKeyRotationWaitForSecretsEncryptStatusScriptPath,
-			},
-		},
-		Instructions: []plan.OneTimeInstruction{
-			p.encryptionKeyRotationRestartApiserver(cp),
-			encryptionKeyRotationWaitForSecretsEncryptStatus(cp, ""),
-			encryptionKeyRotationSecretsEncryptStatusOneTimeInstruction(cp, ""),
-		},
-		PeriodicInstructions: []plan.PeriodicInstruction{
-			p.encryptionKeyRotationApiserverStatus(cp),
-		},
-	}
-	err := assignAndCheckPlan(p.store, fmt.Sprintf("encryption key rotation: [%s]", cp.Status.RotateEncryptionKeysPhase), leader, nodePlan, 0, 0)
-	if isErrWaiting(err) {
-		if strings.HasPrefix(err.Error(), "starting") {
-			logrus.Infof("rkecluster %s/%s: restarting apiserver on %s", cp.Namespace, cp.Spec.ClusterName, leader.Machine.Name)
-			rke2.Ready.Message(cp, fmt.Sprintf("encryption key rotation: restarting apiserver for %s", leader.Machine.Name))
-			cp, err = p.rkeControlPlanes.UpdateStatus(cp)
-			if err != nil {
-				return "", p.enqueueAndSkip(cp)
-			}
-		}
-		return "", p.enqueueAndSkip(cp)
-	} else if err != nil {
-		return "", err
-	}
-
-	if _, ok := cp.Annotations[encryptionKeyRotationApiserverIDAnnotation]; !ok {
-		apiserverID := strings.TrimSuffix(string(leader.Plan.Output[encryptionKeyRotationRestartApiserverCommand]), "\n")
-		if len(apiserverID) != 13 { // not a valid container id
-			return "", p.enqueueAndSkip(cp)
-		}
-		cp.Annotations[encryptionKeyRotationApiserverIDAnnotation] = apiserverID
-		cp, err = p.rkeControlPlanes.Update(cp)
-		if err != nil {
-			return "", err
-		}
-		return "", p.enqueueAndSkip(cp)
-	}
-
-	apiserverStatus := strings.TrimSuffix(string(leader.Plan.PeriodicOutput[encryptionKeyRotationApiserverStatusCommand].Stdout), "\n")
-	if apiserverStatus == "" || cp.Annotations[encryptionKeyRotationApiserverIDAnnotation] == apiserverStatus || len(apiserverStatus) != 13 { // not a valid container id
-		return "", p.enqueueAndSkip(cp)
-	}
-
-	return encryptionKeyRotationSecretsEncryptStageFromOneTimeStatus(leader)
+	return nil
 }
 
 // encryptionKeyRotationRestartService restarts the server unit on the downstream node, waits until secrets-encrypt
 // status can be successfully queried, and then gets the status. leaderStage is allowed to be empty if entry is the
 // leader.
-func (p *Planner) encryptionKeyRotationRestartService(cp *rkev1.RKEControlPlane, entry *planEntry, leaderStage string, getStatus bool) (string, error) {
+func (p *Planner) encryptionKeyRotationRestartService(cp *rkev1.RKEControlPlane, entry *planEntry, leaderStage string, scrapeStage bool) (string, error) {
+	runtime := rke2.GetRuntime(cp.Spec.KubernetesVersion)
 	nodePlan := plan.NodePlan{
-		Instructions: []plan.OneTimeInstruction{
-			encryptionKeyRotationRestartInstruction(cp, leaderStage),
-		},
-	}
-	if getStatus {
-		nodePlan.Files = []plan.File{
+		Files: []plan.File{
 			{
 				Content: base64.StdEncoding.EncodeToString([]byte(encryptionKeyRotationWaitForSystemctlStatus)),
 				Path:    encryptionKeyRotationWaitForSystemctlStatusPath,
@@ -385,30 +384,25 @@ func (p *Planner) encryptionKeyRotationRestartService(cp *rkev1.RKEControlPlane,
 				Content: base64.StdEncoding.EncodeToString([]byte(encryptionKeyRotationWaitForSecretsEncryptStatusScript)),
 				Path:    encryptionKeyRotationWaitForSecretsEncryptStatusScriptPath,
 			},
-		}
-		nodePlan.Instructions = []plan.OneTimeInstruction{
+		},
+		Instructions: []plan.OneTimeInstruction{
 			encryptionKeyRotationWaitForSystemctlStatusInstruction(cp, leaderStage),
+			generateKillAllInstruction(runtime),
 			encryptionKeyRotationRestartInstruction(cp, leaderStage),
+		},
+	}
+
+	if isControlPlane(entry) {
+		nodePlan.Instructions = append(nodePlan.Instructions,
 			encryptionKeyRotationWaitForSecretsEncryptStatus(cp, leaderStage),
-			encryptionKeyRotationSecretsEncryptStatusOneTimeInstruction(cp, leaderStage),
-		}
+			encryptionKeyRotationSecretsEncryptStatusOneTimeInstruction(cp, leaderStage))
 	}
 	err := assignAndCheckPlan(p.store, fmt.Sprintf("encryption key rotation: [%s]", cp.Status.RotateEncryptionKeysPhase), entry, nodePlan, 0, 0)
-	if isErrWaiting(err) {
-		if strings.HasPrefix(err.Error(), "starting") {
-			logrus.Infof("rkecluster %s/%s: restarting %s on %s", cp.Namespace, cp.Spec.ClusterName, rke2.GetRuntimeServerUnit(cp.Spec.KubernetesVersion), entry.Machine.Name)
-			rke2.Ready.Message(cp, fmt.Sprintf("encryption key rotation: restarting %s", entry.Machine.Name))
-			cp, err = p.rkeControlPlanes.UpdateStatus(cp)
-			if err != nil {
-				return "", p.enqueueAndSkip(cp)
-			}
-		}
-		return "", p.enqueueAndSkip(cp)
-	} else if err != nil {
+	if err != nil {
 		return "", err
 	}
 
-	if !getStatus {
+	if !scrapeStage || !isControlPlane(entry) {
 		return "", nil
 	}
 
@@ -419,28 +413,21 @@ func (p *Planner) encryptionKeyRotationRestartService(cp *rkev1.RKEControlPlane,
 	return stage, nil
 }
 
-// encryptionKeyRotationApplyLeader will run the next secrets-encrypt command, and scrape output to ensure that it was
-// successful. If the secrets-encrypt command does not exist on the plan, that means this is the first entrypoint, and
+// encryptionKeyRotationLeaderPhaseReconcile will run the secrets-encrypt command that corresponds to the phase, and scrape output to ensure that it was
+// successful. If the secrets-encrypt command does not exist on the plan, that means this is the first reconciliation, and
 // it must be added, otherwise reenqueue until the plan is in sync.
-func (p *Planner) encryptionKeyRotationApplyLeader(cp *rkev1.RKEControlPlane, clusterPlan *plan.Plan, leader *planEntry) error {
-	if _, ok := cp.Annotations[encryptionKeyRotationApiserverIDAnnotation]; ok {
-		delete(cp.Annotations, encryptionKeyRotationApiserverIDAnnotation)
-		return p.enqueueIfErrWaiting(p.rkeControlPlanes.Update(cp))
-	}
-
-	apply, err := encryptionKeyRotationSecretsEncryptInstruction(cp, cp.Status.RotateEncryptionKeys.Stage)
+func (p *Planner) encryptionKeyRotationLeaderPhaseReconcile(cp *rkev1.RKEControlPlane, leader *planEntry) error {
+	apply, err := encryptionKeyRotationSecretsEncryptInstruction(cp)
 	if err != nil {
-		return p.restartEncryptionKeyRotation(cp)
-	}
-
-	rke2.Ready.Message(cp, fmt.Sprintf("encryption key rotation: running secrets-encrypt %s", apply.Args[1]))
-	cp, err = p.rkeControlPlanes.UpdateStatus(cp)
-	if err != nil {
-		return p.enqueueAndSkip(cp)
+		return p.encryptionKeyRotationFailed(cp)
 	}
 
 	nodePlan := plan.NodePlan{
 		Files: []plan.File{
+			{
+				Content: base64.StdEncoding.EncodeToString([]byte(idempotentActionScript)),
+				Path:    "/var/lib/rancher/" + rke2.GetRuntime(cp.Spec.KubernetesVersion) + "/rancher_v2prov_encryption_key_rotation/bin/action.sh",
+			},
 			{
 				Content: base64.StdEncoding.EncodeToString([]byte(encryptionKeyRotationWaitForSecretsEncryptStatusScript)),
 				Path:    encryptionKeyRotationWaitForSecretsEncryptStatusScriptPath,
@@ -458,59 +445,41 @@ func (p *Planner) encryptionKeyRotationApplyLeader(cp *rkev1.RKEControlPlane, cl
 	if err != nil {
 		if isErrWaiting(err) {
 			if strings.HasPrefix(err.Error(), "starting") {
-				logrus.Infof("rkecluster %s/%s: applying encryption key rotation stage command: [%s]", cp.Namespace, cp.Spec.ClusterName, apply.Args[1])
+				logrus.Infof("[planner] rkecluster %s/%s: applying encryption key rotation stage command: [%s]", cp.Namespace, cp.Spec.ClusterName, apply.Args[1])
 			}
-			return p.enqueueAndSkip(cp)
+			return err
 		}
-		return p.restartEncryptionKeyRotation(cp)
+		return p.encryptionKeyRotationFailed(cp)
 	}
-	stage, err := encryptionKeyRotationSecretsEncryptStageFromOneTimeStatus(leader)
+	scrapedStageFromOneTimeInstructions, err := encryptionKeyRotationSecretsEncryptStageFromOneTimeStatus(leader)
 	if err != nil {
-		if isErrWaiting(err) {
-			return p.enqueueAndSkip(cp)
-		}
-		return p.restartEncryptionKeyRotation(cp)
+		return err
 	}
 	periodic, err := encryptionKeyRotationSecretsEncryptStageFromPeriodic(leader)
 	if err != nil {
-		if isErrWaiting(err) {
-			return p.enqueueAndSkip(cp)
-		}
-		return p.restartEncryptionKeyRotation(cp)
+		return err
 	}
-	allowed := encryptionKeyRotationIsCurrentStageAllowed(stage, leader)
+	allowed := encryptionKeyRotationIsCurrentStageAllowed(scrapedStageFromOneTimeInstructions, cp.Status.RotateEncryptionKeysPhase)
 	if allowed {
-		if stage == encryptionKeyRotationStageReencryptRequest || stage == encryptionKeyRotationStageReencryptActive {
+		if scrapedStageFromOneTimeInstructions == encryptionKeyRotationStageReencryptRequest || scrapedStageFromOneTimeInstructions == encryptionKeyRotationStageReencryptActive {
 			if periodic != encryptionKeyRotationStageReencryptFinished {
-				return p.enqueueAndSkip(cp)
+				return ErrWaitingf("waiting for encryption key rotation stage to be finished")
 			}
 		}
-
 		// successful restart, complete same phases for rotate & reencrypt
-		logrus.Infof("rkecluster %s/%s: successfully applied encryption key rotation stage command: [%s]", cp.Namespace, cp.Spec.ClusterName, leader.Plan.Plan.Instructions[0].Args[1])
-
-		nodes := collect(clusterPlan, encryptionKeyRotationIsSuitableControlPlane)
-		// it is not necessary to restart a leader node after single node rotation
-		if rke2.GetRuntime(cp.Spec.KubernetesVersion) == rke2.RuntimeRKE2 && len(nodes) == 1 {
-			// a phase has been completed at least once for this generation
-			if periodic == encryptionKeyRotationStageReencryptFinished &&
-				cp.Status.RotateEncryptionKeys.Stage != "" {
-				return p.encryptionKeyRotationFinished(cp)
-			}
-		}
+		logrus.Infof("[planner] rkecluster %s/%s: successfully applied encryption key rotation stage command: [%s]", cp.Namespace, cp.Spec.ClusterName, leader.Plan.Plan.Instructions[0].Args[1])
+		return nil
 	}
 
-	return p.restartEncryptionKeyRotation(cp)
+	return p.encryptionKeyRotationFailed(cp)
 }
 
 // encryptionKeyRotationUpdateControlPlanePhase updates the control plane status if it has not been done yet.
 func (p *Planner) encryptionKeyRotationUpdateControlPlanePhase(cp *rkev1.RKEControlPlane, phase rkev1.RotateEncryptionKeysPhase) error {
 	if cp.Status.RotateEncryptionKeysPhase != phase {
 		cp = cp.DeepCopy()
-		logrus.Infof("rkecluster %s/%s: applying encryption key rotation phase: [%s]", cp.Namespace, cp.Spec.ClusterName, phase)
+		logrus.Infof("[planner] rkecluster %s/%s: applying encryption key rotation phase: [%s]", cp.Namespace, cp.Spec.ClusterName, phase)
 		cp.Status.RotateEncryptionKeysPhase = phase
-		rke2.Ready.Message(cp, fmt.Sprintf("applying encryption key rotation phase: [%s]", phase))
-		rke2.Ready.Reason(cp, rke2.RotatingEncryptionKeysReason)
 		_, err := p.rkeControlPlanes.UpdateStatus(cp)
 		if err != nil {
 			return err
@@ -540,7 +509,7 @@ func encryptionKeyRotationSecretsEncryptStageFromPeriodic(plan *planEntry) (stri
 func encryptionKeyRotationSecretsEncryptStageFromOneTimeStatus(plan *planEntry) (string, error) {
 	output, ok := plan.Plan.Output[encryptionKeyRotationSecretsEncryptStatusCommand]
 	if !ok {
-		return "", ErrWaitingf("Could not extract current status from plan for [%s]: no output for status", plan.Machine.Name)
+		return "", ErrWaitingf("could not extract current status from plan for [%s]: no output for status", plan.Machine.Name)
 	}
 	status, err := encryptionKeyRotationStageFromOutput(plan, string(output))
 	return status, err
@@ -550,35 +519,47 @@ func encryptionKeyRotationSecretsEncryptStageFromOneTimeStatus(plan *planEntry) 
 func encryptionKeyRotationStageFromOutput(plan *planEntry, output string) (string, error) {
 	a := strings.Split(output, "\n")
 	if len(a) < 2 {
-		return "", ErrWaitingf("Could not extract current stage from plan for [%s]: status output is incomplete", plan.Machine.Name)
+		return "", ErrWaitingf("could not extract current stage from plan for [%s]: status output is incomplete", plan.Machine.Name)
 	}
-	a = strings.Split(a[1], ": ")
-	if len(a) < 2 {
-		return "", ErrWaitingf("Could not extract current stage from plan for [%s]: status output is partially complete", plan.Machine.Name)
+	for _, v := range a {
+		a = strings.Split(v, ": ")
+		if a[0] != "Current Rotation Stage" {
+			continue
+		}
+		status := a[1]
+		return status, nil
 	}
-	status := a[1]
-	return status, nil
+	return "", ErrWaitingf("unable to parse rotation stage from output")
 }
 
 // encryptionKeyRotationSecretsEncryptInstruction generates a secrets-encrypt command to run on the leader node given
-// the current secrets-encrypt status.
-func encryptionKeyRotationSecretsEncryptInstruction(cp *rkev1.RKEControlPlane, stage string) (plan.OneTimeInstruction, error) {
+// the current secrets-encrypt phase.
+func encryptionKeyRotationSecretsEncryptInstruction(cp *rkev1.RKEControlPlane) (plan.OneTimeInstruction, error) {
+	if cp == nil {
+		return plan.OneTimeInstruction{}, fmt.Errorf("controlplane cannot be nil")
+	}
+
 	var command string
-	switch stage {
-	case encryptionKeyRotationStageStart, encryptionKeyRotationStageReencryptFinished:
+	switch cp.Status.RotateEncryptionKeysPhase {
+	case rkev1.RotateEncryptionKeysPhasePrepare:
 		command = encryptionKeyRotationCommandPrepare
-	case encryptionKeyRotationStagePrepare:
+	case rkev1.RotateEncryptionKeysPhaseRotate:
 		command = encryptionKeyRotationCommandRotate
-	case encryptionKeyRotationStageRotate:
+	case rkev1.RotateEncryptionKeysPhaseReencrypt:
 		command = encryptionKeyRotationCommandReencrypt
 	default:
-		return plan.OneTimeInstruction{}, fmt.Errorf("cannot determine next desired secrets-encrypt status for node with status: [%s]", stage)
+		return plan.OneTimeInstruction{}, fmt.Errorf("cannot determine desired secrets-encrypt command for phase: [%s]", cp.Status.RotateEncryptionKeysPhase)
 	}
 
 	return plan.OneTimeInstruction{
 		Name:    encryptionKeyRotationSecretsEncryptApplyCommand,
-		Command: rke2.GetRuntimeCommand(cp.Spec.KubernetesVersion),
+		Command: "sh",
 		Args: []string{
+			"-xe",
+			"/var/lib/rancher/" + rke2.GetRuntime(cp.Spec.KubernetesVersion) + "/rancher_v2prov_encryption_key_rotation/bin/action.sh",
+			strings.ToLower(fmt.Sprintf("rancher_v2prov_encryption_key_rotation/%s", cp.Status.RotateEncryptionKeysPhase)),
+			strconv.FormatInt(cp.Spec.RotateEncryptionKeys.Generation, 10),
+			rke2.GetRuntimeCommand(cp.Spec.KubernetesVersion),
 			"secrets-encrypt",
 			command,
 		},
@@ -590,13 +571,6 @@ func encryptionKeyRotationSecretsEncryptInstruction(cp *rkev1.RKEControlPlane, s
 // secrets-encrypt commands on a node that was not the leader before requesting rancher to do the rotation.
 func encryptionKeyRotationLeaderStageEnv(stage string) string {
 	return fmt.Sprintf("LAST_KNOWN_LEADER_STAGE=%s", stage)
-}
-
-// lastUpdateEnv returns an environment variable in order to force followers to rerun their plans in the vent that a
-// follower must restart however the leader status didn't change. This is possible when a follower has a state "further"
-// than the leader, however it hasn't been restarted.
-func lastUpdateEnv(cp *rkev1.RKEControlPlane) string {
-	return fmt.Sprintf("LAST_UPDATED=%s", cp.Status.RotateEncryptionKeys.LastRestart)
 }
 
 // encryptionKeyRotationSecretsEncryptStatusOneTimeInstruction generates a one time instruction which will scrape the secrets-encrypt
@@ -611,7 +585,6 @@ func encryptionKeyRotationSecretsEncryptStatusOneTimeInstruction(cp *rkev1.RKECo
 		},
 		Env: []string{
 			encryptionKeyRotationLeaderStageEnv(leaderStage),
-			lastUpdateEnv(cp),
 		},
 		SaveOutput: true,
 	}
@@ -628,9 +601,6 @@ func encryptionKeyRotationSecretsEncryptStatusPeriodicInstruction(cp *rkev1.RKEC
 			"status",
 		},
 		PeriodSeconds: 5,
-		Env: []string{
-			lastUpdateEnv(cp),
-		},
 	}
 }
 
@@ -644,7 +614,6 @@ func encryptionKeyRotationWaitForSystemctlStatusInstruction(cp *rkev1.RKEControl
 			"-x", encryptionKeyRotationWaitForSystemctlStatusPath, rke2.GetRuntimeServerUnit(cp.Spec.KubernetesVersion),
 		},
 		Env: []string{
-			lastUpdateEnv(cp),
 			encryptionKeyRotationEndpointEnv,
 			encryptionKeyRotationLeaderStageEnv(leaderStage),
 		},
@@ -666,7 +635,6 @@ func encryptionKeyRotationRestartInstruction(cp *rkev1.RKEControlPlane, leaderSt
 		},
 		Env: []string{
 			encryptionKeyRotationLeaderStageEnv(leaderStage),
-			lastUpdateEnv(cp),
 		},
 	}
 }
@@ -682,7 +650,6 @@ func encryptionKeyRotationWaitForSecretsEncryptStatus(cp *rkev1.RKEControlPlane,
 			"-x", encryptionKeyRotationWaitForSecretsEncryptStatusScriptPath, rke2.GetRuntimeCommand(cp.Spec.KubernetesVersion),
 		},
 		Env: []string{
-			lastUpdateEnv(cp),
 			encryptionKeyRotationEndpointEnv,
 			encryptionKeyRotationLeaderStageEnv(leaderStage),
 		},
@@ -690,74 +657,17 @@ func encryptionKeyRotationWaitForSecretsEncryptStatus(cp *rkev1.RKEControlPlane,
 	}
 }
 
-// encryptionKeyRotationRestartApiserver returns an instruction for restarting the apiserver during single node
-// encryption key rotation, with the path to the crictl binary as its argument.
-func (p *Planner) encryptionKeyRotationRestartApiserver(cp *rkev1.RKEControlPlane) plan.OneTimeInstruction {
-	return plan.OneTimeInstruction{
-		Name:    encryptionKeyRotationRestartApiserverCommand,
-		Command: "sh",
-		Args: []string{
-			"-xe", encryptionKeyRotationRestartAPIServerScriptPath,
-		},
-		Env: []string{
-			lastUpdateEnv(cp),
-			encryptionKeyRotationEndpointEnv,
-		},
-		SaveOutput: true,
-	}
-}
-
-// encryptionKeyRotationApiserverStatus returns an instruction for querying the apiserver during single node
-// encryption key rotation, with the path to the crictl binary as its argument.
-func (p *Planner) encryptionKeyRotationApiserverStatus(cp *rkev1.RKEControlPlane) plan.PeriodicInstruction {
-	return plan.PeriodicInstruction{
-		Name:    encryptionKeyRotationApiserverStatusCommand,
-		Command: "sh",
-		Args: []string{
-			"-xe", encryptionKeyRotationGetAPIServerStatusScriptPath,
-		},
-		Env: []string{
-			lastUpdateEnv(cp),
-			encryptionKeyRotationEndpointEnv,
-		},
-		PeriodSeconds: 5,
-	}
-}
-
-// encryptionKeyRotationExtractApplyFromPlan will traverse the nodePlan in search of the last `secrets-encrypt` command
-// that applies a new encryption phase, which can be used to verify that the current phase matches the expected phase
-// from running said command.
-func encryptionKeyRotationExtractApplyFromPlan(entry *planEntry) (plan.OneTimeInstruction, error) {
-	if entry.Plan == nil {
-		return plan.OneTimeInstruction{}, fmt.Errorf("could not find apply command for [%s]: plan is empty", entry.Machine.Name)
-	}
-	for _, i := range entry.Plan.Plan.Instructions {
-		if i.Name == encryptionKeyRotationSecretsEncryptApplyCommand {
-			return i, nil
-		}
-	}
-	return plan.OneTimeInstruction{}, fmt.Errorf("could not find apply command for [%s]", entry.Machine.Name)
-}
-
-// encryptionKeyRotationIsCurrentStageAllowed returns the expected secrets-encrypt stage extracted from the
-// leader's apply command present in the plan. Since reencrypt can be any of three statuses (reencrypt_request,
-// reencrypt_active, and reencrypt_finished), any of these stages are valid, however the first two (request & active) do
+// encryptionKeyRotationIsCurrentStageAllowed returns a boolean that indicates whether the scraped stage from the leader is allowed in comparison with the current phase.
+// Since reencrypt can be any of three statuses (reencrypt_request, reencrypt_active, and reencrypt_finished), any of these stages are valid, however the first two (request & active) do
 // not explicitly indicate that the current command was successful, just that it hasn't failed yet. In certain cases, a
 // cluster may never move beyond request and active.
-func encryptionKeyRotationIsCurrentStageAllowed(leaderStage string, leader *planEntry) bool {
-	applyCommand, err := encryptionKeyRotationExtractApplyFromPlan(leader)
-	if err != nil {
-		return false
-	}
-	if len(applyCommand.Args) < 2 {
-		return false
-	}
-	command := applyCommand.Args[1]
-
-	switch command {
-	case encryptionKeyRotationCommandPrepare, encryptionKeyRotationCommandRotate:
-		return leaderStage == command
-	case encryptionKeyRotationCommandReencrypt:
+func encryptionKeyRotationIsCurrentStageAllowed(leaderStage string, currentPhase rkev1.RotateEncryptionKeysPhase) bool {
+	switch currentPhase {
+	case rkev1.RotateEncryptionKeysPhasePrepare:
+		return leaderStage == encryptionKeyRotationCommandPrepare
+	case rkev1.RotateEncryptionKeysPhaseRotate:
+		return leaderStage == encryptionKeyRotationCommandRotate
+	case rkev1.RotateEncryptionKeysPhaseReencrypt:
 		if leaderStage == encryptionKeyRotationStageReencryptRequest ||
 			leaderStage == encryptionKeyRotationStageReencryptActive ||
 			leaderStage == encryptionKeyRotationStageReencryptFinished {
@@ -765,37 +675,17 @@ func encryptionKeyRotationIsCurrentStageAllowed(leaderStage string, leader *plan
 		}
 		return false
 	}
-
 	return false
-}
-
-// encryptionKeyRotationFinished updates the various status objects on the control plane indicating a successful encryption key rotation.
-func (p *Planner) encryptionKeyRotationFinished(cp *rkev1.RKEControlPlane) error {
-	rke2.Ready.True(cp)
-	cp.Status.RotateEncryptionKeys.Generation = cp.Spec.RotateEncryptionKeys.Generation
-	cp.Status.RotateEncryptionKeys.Stage = ""
-	cp.Status.RotateEncryptionKeysPhase = rkev1.RotateEncryptionKeysPhaseDone
-
-	_, err := p.rkeControlPlanes.UpdateStatus(cp)
-	if err != nil {
-		return err
-	}
-
-	logrus.Infof("rkecluster %s/%s: finished encryption key rotation", cp.Namespace, cp.Spec.ClusterName)
-	return generic.ErrSkip
 }
 
 // encryptionKeyRotationFailed updates the various status objects on the control plane, allowing the cluster to
 // continue the reconciliation loop. Encryption key rotation will not be restarted again until requested.
 func (p *Planner) encryptionKeyRotationFailed(cp *rkev1.RKEControlPlane) error {
-	rke2.Ready.False(cp)
-	cp.Status.RotateEncryptionKeysPhase = rkev1.RotateEncryptionKeysPhaseFailed
-
-	_, err := p.rkeControlPlanes.UpdateStatus(cp)
+	err := p.setEncryptionKeyRotateState(cp, cp.Spec.RotateEncryptionKeys, rkev1.RotateEncryptionKeysPhaseFailed)
 	if err != nil {
 		return err
 	}
 
-	logrus.Errorf("rkecluster %s/%s: failed encryption key rotation", cp.Namespace, cp.Spec.ClusterName)
+	logrus.Errorf("[planner] rkecluster %s/%s: failed encryption key rotation", cp.Namespace, cp.Spec.ClusterName)
 	return fmt.Errorf("encryption key rotation failed")
 }

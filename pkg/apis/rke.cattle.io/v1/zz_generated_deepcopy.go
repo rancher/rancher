@@ -943,6 +943,11 @@ func (in *RKEControlPlaneStatus) DeepCopyInto(out *RKEControlPlaneStatus) {
 		*out = make([]genericcondition.GenericCondition, len(*in))
 		copy(*out, *in)
 	}
+	if in.RotateEncryptionKeys != nil {
+		in, out := &in.RotateEncryptionKeys, &out.RotateEncryptionKeys
+		*out = new(RotateEncryptionKeys)
+		**out = **in
+	}
 	if in.ETCDSnapshotRestore != nil {
 		in, out := &in.ETCDSnapshotRestore, &out.ETCDSnapshotRestore
 		*out = new(ETCDSnapshotRestore)

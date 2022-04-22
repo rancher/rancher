@@ -45,19 +45,17 @@ const (
 	ETCDSnapshotPhaseFailed   ETCDSnapshotPhase = "Failed"
 )
 
-type RotateEncryptionKeysStatus struct {
-	Generation  int64  `json:"generation,omitempty"`
-	LastRestart string `json:"restart,omitempty"`
-	Stage       string `json:"stage,omitempty"`
-}
-
 type RotateEncryptionKeysPhase string
 
 const (
-	RotateEncryptionKeysPhaseRestartNodes RotateEncryptionKeysPhase = "RestartNodes"
-	RotateEncryptionKeysPhaseApplyLeader  RotateEncryptionKeysPhase = "ApplyLeader"
-	RotateEncryptionKeysPhaseDone         RotateEncryptionKeysPhase = "Done"
-	RotateEncryptionKeysPhaseFailed       RotateEncryptionKeysPhase = "Failed"
+	RotateEncryptionKeysPhasePrepare              RotateEncryptionKeysPhase = "Prepare"
+	RotateEncryptionKeysPhasePostPrepareRestart   RotateEncryptionKeysPhase = "PostPrepareRestartNodes"
+	RotateEncryptionKeysPhaseRotate               RotateEncryptionKeysPhase = "Rotate"
+	RotateEncryptionKeysPhasePostRotateRestart    RotateEncryptionKeysPhase = "PostRotateRestartNodes"
+	RotateEncryptionKeysPhaseReencrypt            RotateEncryptionKeysPhase = "Reencrypt"
+	RotateEncryptionKeysPhasePostReencryptRestart RotateEncryptionKeysPhase = "PostReencryptRestart"
+	RotateEncryptionKeysPhaseDone                 RotateEncryptionKeysPhase = "Done"
+	RotateEncryptionKeysPhaseFailed               RotateEncryptionKeysPhase = "Failed"
 )
 
 type RKEControlPlaneStatus struct {
@@ -65,7 +63,7 @@ type RKEControlPlaneStatus struct {
 	Ready                         bool                                `json:"ready,omitempty"`
 	ObservedGeneration            int64                               `json:"observedGeneration"`
 	CertificateRotationGeneration int64                               `json:"certificateRotationGeneration"`
-	RotateEncryptionKeys          *RotateEncryptionKeysStatus         `json:"rotateEncryptionKeys,omitempty"`
+	RotateEncryptionKeys          *RotateEncryptionKeys               `json:"rotateEncryptionKeys,omitempty"`
 	RotateEncryptionKeysPhase     RotateEncryptionKeysPhase           `json:"rotateEncryptionKeysPhase,omitempty"`
 	ETCDSnapshotRestore           *ETCDSnapshotRestore                `json:"etcdSnapshotRestore,omitempty"`
 	ETCDSnapshotRestorePhase      ETCDSnapshotPhase                   `json:"etcdSnapshotRestorePhase,omitempty"`
