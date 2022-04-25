@@ -177,7 +177,7 @@ RUN  if [ "${ARCH}" == "s390x" ]; then \
       chmod +x /usr/bin/kubectl; \
      fi
 
-ENV CATTLE_UI_VERSION 2.6.5-rc2
+ENV CATTLE_UI_VERSION 2.6.5-rc3
 ENV CATTLE_DASHBOARD_UI_VERSION v2.6.5-rc2
 ENV CATTLE_CLI_VERSION v2.6.5-rc1
 
