@@ -64,9 +64,6 @@ func addDefaults(config map[string]interface{}, controlPlane *rkev1.RKEControlPl
 	if rke2.GetRuntime(controlPlane.Spec.KubernetesVersion) == rke2.RuntimeRKE2 {
 		config["cni"] = "calico"
 	}
-	if settings.SystemDefaultRegistry.Get() != "" {
-		config["system-default-registry"] = settings.SystemDefaultRegistry.Get()
-	}
 }
 
 func addUserConfig(config map[string]interface{}, controlPlane *rkev1.RKEControlPlane, entry *planEntry) error {
@@ -109,6 +106,10 @@ func addRoleConfig(config map[string]interface{}, controlPlane *rkev1.RKEControl
 		config["disable-controller-manager"] = true
 	} else if isOnlyControlPlane(entry) {
 		config["disable-etcd"] = true
+	}
+
+	if sdr := settings.SystemDefaultRegistry.Get(); sdr != "" && !isOnlyWorker(entry) {
+		config["system-default-registry"] = sdr
 	}
 
 	// If this is a control-plane node, then we need to set arguments/(and for RKE2, volume mounts) to allow probes
