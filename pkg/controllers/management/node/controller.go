@@ -21,6 +21,7 @@ import (
 	"github.com/rancher/rancher/pkg/clustermanager"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/clusterregistrationtoken"
 	"github.com/rancher/rancher/pkg/controllers/management/drivers/nodedriver"
+	secretmigrator "github.com/rancher/rancher/pkg/controllers/management/secretmigrator"
 	"github.com/rancher/rancher/pkg/encryptedstore"
 	corev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
@@ -413,6 +414,10 @@ func (m *Lifecycle) deployAgent(nodeDir string, obj *v3.Node) error {
 		return err
 	}
 
+	cluster.Spec, err = secretmigrator.AssembleRKEConfigSpec(cluster, cluster.Spec, m.credLister)
+	if err != nil {
+		return err
+	}
 	err = m.authenticateRegistry(nodeDir, obj, cluster)
 	if err != nil {
 		return err
