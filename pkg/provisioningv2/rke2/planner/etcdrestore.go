@@ -70,7 +70,7 @@ func (p *Planner) runEtcdSnapshotRestorePlan(controlPlane *rkev1.RKEControlPlane
 	return ErrWaiting("failed to find etcd node to restore on")
 }
 
-// generateRestoreEtcdSnapshotPlan returns a node plan that contains instructions to stop etcd, remove the tombstone file (if one exists), then restore etcd in that order.
+// generateEtcdSnapshotRestorePlan returns a node plan that contains instructions to stop etcd, remove the tombstone file (if one exists), then restore etcd in that order.
 func (p *Planner) generateEtcdSnapshotRestorePlan(controlPlane *rkev1.RKEControlPlane, snapshot *rkev1.ETCDSnapshot, tokensSecret plan.Secret, server *planEntry, joinServer string) (plan.NodePlan, error) {
 	if controlPlane.Spec.ETCDSnapshotRestore == nil {
 		return plan.NodePlan{}, fmt.Errorf("ETCD Snapshot restore was not defined")
@@ -151,9 +151,9 @@ func generateCreateEtcdTombstoneInstruction(controlPlane *rkev1.RKEControlPlane)
 	}
 }
 
-// runEtcdRestoreControlPlaneEtcdServiceStop generates service stop plans for every etcd and controlplane node in the cluster and
+// runEtcdRestoreServiceStop generates service stop plans for every etcd/controlplane and all nodes running a cluster agent in the cluster and
 // assigns/checks the plans to ensure they were successful
-func (p *Planner) runEtcdRestoreControlPlaneEtcdServiceStop(controlPlane *rkev1.RKEControlPlane, snapshot *rkev1.ETCDSnapshot, tokensSecret plan.Secret, clusterPlan *plan.Plan) error {
+func (p *Planner) runEtcdRestoreServiceStop(controlPlane *rkev1.RKEControlPlane, snapshot *rkev1.ETCDSnapshot, tokensSecret plan.Secret, clusterPlan *plan.Plan) error {
 	var joinServer string
 	var err error
 	isS3 := snapshot.SnapshotFile.S3 != nil
@@ -172,7 +172,7 @@ func (p *Planner) runEtcdRestoreControlPlaneEtcdServiceStop(controlPlane *rkev1.
 			return err
 		}
 	}
-	servers := collect(clusterPlan, anyRole)
+	servers := collect(clusterPlan, anyRoleWithoutWindows)
 	updated := false
 	for _, server := range servers {
 		stopPlan, err := p.generateStopServiceAndKillAllPlan(controlPlane, tokensSecret, server, joinServer)
@@ -244,7 +244,7 @@ func (p *Planner) restoreEtcdSnapshot(controlPlane *rkev1.RKEControlPlane, token
 		if err != nil {
 			return err
 		}
-		if err := p.runEtcdRestoreControlPlaneEtcdServiceStop(controlPlane, snapshot, tokensSecret, clusterPlan); err != nil {
+		if err := p.runEtcdRestoreServiceStop(controlPlane, snapshot, tokensSecret, clusterPlan); err != nil {
 			return err
 		}
 		return p.setEtcdSnapshotRestoreState(controlPlane, controlPlane.Spec.ETCDSnapshotRestore, rkev1.ETCDSnapshotPhaseRestore)
