@@ -2,6 +2,16 @@ package v1
 
 import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+type ETCDSnapshotPhase string
+
+const (
+	ETCDSnapshotPhaseStarted  ETCDSnapshotPhase = "Started"
+	ETCDSnapshotPhaseShutdown ETCDSnapshotPhase = "Shutdown"
+	ETCDSnapshotPhaseRestore  ETCDSnapshotPhase = "Restore"
+	ETCDSnapshotPhaseFinished ETCDSnapshotPhase = "Finished"
+	ETCDSnapshotPhaseFailed   ETCDSnapshotPhase = "Failed"
+)
+
 type ETCDSnapshotS3 struct {
 	Endpoint            string `json:"endpoint,omitempty"`
 	EndpointCA          string `json:"endpointCA,omitempty"`

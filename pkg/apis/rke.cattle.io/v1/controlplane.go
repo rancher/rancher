@@ -35,29 +35,6 @@ type RKEControlPlaneSpec struct {
 	UnmanagedConfig          bool                     `json:"unmanagedConfig,omitempty"`
 }
 
-type ETCDSnapshotPhase string
-
-const (
-	ETCDSnapshotPhaseStarted  ETCDSnapshotPhase = "Started"
-	ETCDSnapshotPhaseShutdown ETCDSnapshotPhase = "Shutdown"
-	ETCDSnapshotPhaseRestore  ETCDSnapshotPhase = "Restore"
-	ETCDSnapshotPhaseFinished ETCDSnapshotPhase = "Finished"
-	ETCDSnapshotPhaseFailed   ETCDSnapshotPhase = "Failed"
-)
-
-type RotateEncryptionKeysPhase string
-
-const (
-	RotateEncryptionKeysPhasePrepare              RotateEncryptionKeysPhase = "Prepare"
-	RotateEncryptionKeysPhasePostPrepareRestart   RotateEncryptionKeysPhase = "PostPrepareRestartNodes"
-	RotateEncryptionKeysPhaseRotate               RotateEncryptionKeysPhase = "Rotate"
-	RotateEncryptionKeysPhasePostRotateRestart    RotateEncryptionKeysPhase = "PostRotateRestartNodes"
-	RotateEncryptionKeysPhaseReencrypt            RotateEncryptionKeysPhase = "Reencrypt"
-	RotateEncryptionKeysPhasePostReencryptRestart RotateEncryptionKeysPhase = "PostReencryptRestart"
-	RotateEncryptionKeysPhaseDone                 RotateEncryptionKeysPhase = "Done"
-	RotateEncryptionKeysPhaseFailed               RotateEncryptionKeysPhase = "Failed"
-)
-
 type RKEControlPlaneStatus struct {
 	Conditions                    []genericcondition.GenericCondition `json:"conditions,omitempty"`
 	Ready                         bool                                `json:"ready,omitempty"`
