@@ -38,7 +38,7 @@ func (p *Planner) getControlPlaneManifests(controlPlane *rkev1.RKEControlPlane, 
 	// if we have a nil snapshotMetadata object, it's probably because the annotation didn't exist on the controlplane object. this is not breaking though so don't block.
 	snapshotMetadata := getEtcdSnapshotExtraMetadata(controlPlane, rke2.GetRuntime(controlPlane.Spec.KubernetesVersion))
 	if snapshotMetadata == nil {
-		logrus.Errorf("Error while generating etcd snapshot extra metadata manifest for cluster %s: %v", controlPlane.ClusterName, err)
+		logrus.Errorf("Error while generating etcd snapshot extra metadata manifest for cluster %s", controlPlane.ClusterName)
 	} else {
 		result = append(result, *snapshotMetadata)
 	}
