@@ -269,6 +269,11 @@ func (p *Planner) Process(controlPlane *rkev1.RKEControlPlane) error {
 		return p.locker.Unlock(uid)
 	}(controlPlane.Namespace, controlPlane.Name, string(controlPlane.UID))
 
+	releaseData := rke2.GetKDMReleaseData(p.ctx, controlPlane)
+	if releaseData == nil {
+		return ErrWaitingf("rkecluster %s/%s: releaseData nil for version %s", controlPlane.Namespace, controlPlane.Name, controlPlane.Spec.KubernetesVersion)
+	}
+
 	cluster, err := p.getCAPICluster(controlPlane)
 	if err != nil || !cluster.DeletionTimestamp.IsZero() {
 		return err
@@ -318,7 +323,7 @@ func (p *Planner) Process(controlPlane *rkev1.RKEControlPlane) error {
 		return err
 	}
 
-	if err = p.rotateEncryptionKeys(controlPlane, plan); err != nil {
+	if err = p.rotateEncryptionKeys(controlPlane, releaseData, plan); err != nil {
 		return err
 	}
 
@@ -373,11 +378,6 @@ func (p *Planner) Process(controlPlane *rkev1.RKEControlPlane) error {
 
 	if firstIgnoreError != nil {
 		return ErrWaiting(firstIgnoreError.Error())
-	}
-
-	if shouldRotateEncryptionKeys(controlPlane) {
-		logrus.Debugf("Reenqueuing rotate encryption keys for cluster: [%s]", controlPlane.Spec.ClusterName)
-		p.rkeControlPlanes.EnqueueAfter(controlPlane.Namespace, controlPlane.Name, 20*time.Second)
 	}
 
 	return nil

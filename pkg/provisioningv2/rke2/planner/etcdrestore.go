@@ -128,17 +128,21 @@ func (p *Planner) generateStopServiceAndKillAllPlan(controlPlane *rkev1.RKEContr
 		return nodePlan, err
 	}
 	runtime := rke2.GetRuntime(controlPlane.Spec.KubernetesVersion)
-	killAllScript := runtime + "-killall.sh"
 	nodePlan.Instructions = append(nodePlan.Instructions,
-		plan.OneTimeInstruction{
-			Name:    "shutdown",
-			Command: "/bin/sh",
-			Args: []string{
-				"-c",
-				fmt.Sprintf("if [ -z $(command -v %s) ] && [ -z $(command -v %s) ]; then echo %s does not appear to be installed; exit 0; else %s; fi", runtime, killAllScript, runtime, killAllScript),
-			},
-		})
+		generateKillAllInstruction(runtime))
 	return nodePlan, nil
+}
+
+func generateKillAllInstruction(runtime string) plan.OneTimeInstruction {
+	killAllScript := runtime + "-killall.sh"
+	return plan.OneTimeInstruction{
+		Name:    "shutdown",
+		Command: "/bin/sh",
+		Args: []string{
+			"-c",
+			fmt.Sprintf("if [ -z $(command -v %s) ] && [ -z $(command -v %s) ]; then echo %s does not appear to be installed; exit 0; else %s; fi", runtime, killAllScript, runtime, killAllScript),
+		},
+	}
 }
 
 func generateCreateEtcdTombstoneInstruction(controlPlane *rkev1.RKEControlPlane) plan.OneTimeInstruction {

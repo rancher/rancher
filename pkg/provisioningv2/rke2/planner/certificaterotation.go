@@ -101,7 +101,7 @@ func rotateCertificatesPlan(controlPlane *rkev1.RKEControlPlane, rotation *rkev1
 		}
 	}
 
-	rotateScriptPath := "/var/lib/rancher/" + rke2.GetRuntime(controlPlane.Spec.KubernetesVersion) + "/certificate_rotation/bin/rotate.sh"
+	rotateScriptPath := "/var/lib/rancher/" + rke2.GetRuntime(controlPlane.Spec.KubernetesVersion) + "/rancher_v2prov_certificate_rotation/bin/rotate.sh"
 
 	args := []string{
 		"-xe",
