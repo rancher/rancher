@@ -39,10 +39,6 @@ RUN if [ "${ARCH}" == "amd64" ]; then \
         curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s v1.44.0; \
         curl -H 'Cache-Control: no-cache' https://raw.githubusercontent.com/fossas/spectrometer/master/install.sh | sh; \
     fi
-# workaround for https://bugzilla.suse.com/show_bug.cgi?id=1183043
-RUN if [ "${ARCH}" == "arm64" ]; then \
-        zypper -n install binutils-gold ; \
-    fi
 
 ENV HELM_URL_V2_amd64=https://github.com/rancher/helm/releases/download/${CATTLE_HELM_VERSION}/rancher-helm \
     HELM_URL_V2_arm64=https://github.com/rancher/helm/releases/download/${CATTLE_HELM_VERSION}/rancher-helm-arm64 \
