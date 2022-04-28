@@ -160,9 +160,20 @@ fi
 export CATTLE_ADDRESS=$(get_address $CATTLE_ADDRESS)
 export CATTLE_INTERNAL_ADDRESS=$(get_address $CATTLE_INTERNAL_ADDRESS)
 
+# Extract hostname from URL
+CATTLE_SERVER_HOSTNAME=$(echo $CATTLE_SERVER | sed -e 's/[^/]*\/\/\([^@]*@\)\?\([^:/]*\).*/\2/')
+CATTLE_SERVER_HOSTNAME_WITH_PORT=$(echo $CATTLE_SERVER | sed -e 's/[^/]*\/\/\([^@]*@\)\?\(.*\).*/\2/')
+# Resolve IPv4 address(es) from hostname
+RESOLVED_ADDR=$(getent ahostsv4 $CATTLE_SERVER_HOSTNAME | sed -n 's/ *STREAM.*//p')
+
+# If CATTLE_SERVER_HOSTNAME equals RESOLVED_ADDR, its an IP address and there is nothing to resolve
+if [ "${CATTLE_SERVER_HOSTNAME}" != "${RESOLVED_ADDR}" ]; then
+  info "${CATTLE_SERVER_HOSTNAME} resolves to $(echo $RESOLVED_ADDR)"
+fi
+
 if [ -z "$CATTLE_ADDRESS" ]; then
     # Example output: '8.8.8.8 via 10.128.0.1 dev ens4 src 10.128.0.34 uid 0'
-    CATTLE_ADDRESS=$(ip -o route get 8.8.8.8 | sed -n 's/.*src \([0-9.]\+\).*/\1/p')
+    CATTLE_ADDRESS=$(ip -o route get $RESOLVED_ADDR | sed -n 's/.*src \([0-9.]\+\).*/\1/p')
 fi
 
 if [ "$CATTLE_K8S_MANAGED" != "true" ]; then
@@ -211,16 +222,7 @@ else
     info "${CATTLE_SERVER_PING} is accessible"
 fi
 
-# Extract hostname from URL
-CATTLE_SERVER_HOSTNAME=$(echo $CATTLE_SERVER | sed -e 's/[^/]*\/\/\([^@]*@\)\?\([^:/]*\).*/\2/')
-CATTLE_SERVER_HOSTNAME_WITH_PORT=$(echo $CATTLE_SERVER | sed -e 's/[^/]*\/\/\([^@]*@\)\?\(.*\).*/\2/')
-# Resolve IPv4 address(es) from hostname
-RESOLVED_ADDR=$(getent ahostsv4 $CATTLE_SERVER_HOSTNAME | sed -n 's/ *STREAM.*//p')
 
-# If CATTLE_SERVER_HOSTNAME equals RESOLVED_ADDR, its an IP address and there is nothing to resolve
-if [ "${CATTLE_SERVER_HOSTNAME}" != "${RESOLVED_ADDR}" ]; then
-  info "${CATTLE_SERVER_HOSTNAME} resolves to $(echo $RESOLVED_ADDR)"
-fi
 
 if [ -n "$CATTLE_CA_CHECKSUM" ]; then
     temp=$(mktemp)
