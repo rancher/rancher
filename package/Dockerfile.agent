@@ -2,7 +2,7 @@ ARG RANCHER_TAG=dev
 ARG RANCHER_REPO=rancher
 FROM ${RANCHER_REPO}/rancher:${RANCHER_TAG} as rancher
 
-FROM registry.suse.com/bci/golang:1.17
+FROM registry.suse.com/suse/sle15:15.3
 ARG ARCH=amd64
 
 ENV KUBECTL_VERSION v1.22.7
