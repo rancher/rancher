@@ -967,8 +967,16 @@ func anyRole(entry *planEntry) bool {
 	return !noRole(entry)
 }
 
+func anyRoleWithoutWindows(entry *planEntry) bool {
+	return !noRole(entry) && notWindows(entry)
+}
+
 func isOnlyWorker(entry *planEntry) bool {
 	return !isEtcd(entry) && !isControlPlane(entry) && isWorker(entry)
+}
+
+func notWindows(entry *planEntry) bool {
+	return entry.Machine.Status.NodeInfo.OperatingSystem != windows
 }
 
 type planEntry struct {
