@@ -155,7 +155,7 @@ func generateCreateEtcdTombstoneInstruction(controlPlane *rkev1.RKEControlPlane)
 	}
 }
 
-// runEtcdRestoreServiceStop generates service stop plans for every etcd/controlplane and all nodes running a cluster agent in the cluster and
+// runEtcdRestoreServiceStop generates service stop plans for every non-windows node in the cluster and
 // assigns/checks the plans to ensure they were successful
 func (p *Planner) runEtcdRestoreServiceStop(controlPlane *rkev1.RKEControlPlane, snapshot *rkev1.ETCDSnapshot, tokensSecret plan.Secret, clusterPlan *plan.Plan) error {
 	var joinServer string
@@ -211,6 +211,59 @@ func (p *Planner) runEtcdRestoreServiceStop(controlPlane *rkev1.RKEControlPlane,
 	return nil
 }
 
+// runEtcdRestoreServiceStart walks through the reconciliation process for the entire cluster.
+// Notably, this function will blatantly ignore drain and concurrency options, as during an etcd snapshot restore, there is no necessity to drain nodes.
+func (p *Planner) runEtcdRestoreServiceStart(controlPlane *rkev1.RKEControlPlane, tokensSecret plan.Secret, clusterPlan *plan.Plan) error {
+	_, joinServer, initNode, err := p.findInitNode(controlPlane, clusterPlan)
+	if err != nil {
+		return err
+	}
+	if joinServer == "" {
+		return fmt.Errorf("error encountered restarting cluster during etcd restore, joinServer was empty")
+	}
+
+	plan, err := p.desiredPlan(controlPlane, tokensSecret, initNode, "")
+	if err != nil {
+		return err
+	}
+
+	if err = assignAndCheckPlan(p.store, "etcd snapshot restore bootstrap restart", initNode, plan, 1, -1); err != nil {
+		return err
+	}
+
+	for _, entry := range collect(clusterPlan, isControlPlaneEtcd) {
+		if isInitNodeOrDeleting(entry) {
+			continue
+		}
+		plan, err = p.desiredPlan(controlPlane, tokensSecret, entry, joinServer)
+		if err != nil {
+			return err
+		}
+		if err = assignAndCheckPlan(p.store, "etcd snapshot restore controlplane/etcd restart", entry, plan, 1, -1); err != nil {
+			return err
+		}
+	}
+
+	joinServer = getControlPlaneJoinURL(clusterPlan)
+	if joinServer == "" {
+		return ErrWaiting("waiting for control plane to be available")
+	}
+
+	for _, entry := range collect(clusterPlan, isOnlyWorker) {
+		if isInitNodeOrDeleting(entry) {
+			continue
+		}
+		plan, err = p.desiredPlan(controlPlane, tokensSecret, entry, joinServer)
+		if err != nil {
+			return err
+		}
+		if err = assignAndCheckPlan(p.store, "etcd snapshot restore worker restart", entry, plan, 1, -1); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (p *Planner) retrieveEtcdSnapshot(controlPlane *rkev1.RKEControlPlane) (*rkev1.ETCDSnapshot, error) {
 	if controlPlane == nil {
 		return nil, fmt.Errorf("controlplane was nil")
@@ -262,6 +315,11 @@ func (p *Planner) restoreEtcdSnapshot(controlPlane *rkev1.RKEControlPlane, token
 		}
 		controlPlane := controlPlane.DeepCopy()
 		controlPlane.Status.ConfigGeneration++
+		return p.setEtcdSnapshotRestoreState(controlPlane, controlPlane.Spec.ETCDSnapshotRestore, rkev1.ETCDSnapshotPhaseRestartCluster)
+	case rkev1.ETCDSnapshotPhaseRestartCluster:
+		if err := p.runEtcdRestoreServiceStart(controlPlane, tokensSecret, clusterPlan); err != nil {
+			return err
+		}
 		return p.setEtcdSnapshotRestoreState(controlPlane, controlPlane.Spec.ETCDSnapshotRestore, rkev1.ETCDSnapshotPhaseFinished)
 	case rkev1.ETCDSnapshotPhaseFinished:
 		return nil
