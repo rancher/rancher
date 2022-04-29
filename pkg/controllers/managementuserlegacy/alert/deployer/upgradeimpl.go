@@ -149,6 +149,9 @@ func (l *AlertService) Upgrade(currentVersion string) (string, error) {
 	}
 	newApp := app.DeepCopy()
 	newApp.Spec.ExternalID = newExternalID
+	if newApp.Spec.Answers == nil {
+		newApp.Spec.Answers = make(map[string]string)
+	}
 	newApp.Spec.Answers["operator.enabled"] = "false"
 
 	if !reflect.DeepEqual(newApp, app) {
