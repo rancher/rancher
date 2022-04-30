@@ -326,10 +326,8 @@ func (p *PlanStore) UpdatePlan(entry *planEntry, plan plan.NodePlan, maxFailures
 
 	rke2.CopyPlanMetadataToSecret(secret, entry.Metadata)
 
-	// if there are no probes, clear the statuses of the probes to prevent false positives
-	if len(plan.Probes) == 0 {
-		delete(secret.Data, "probe-statuses")
-	}
+	// If the plan is being updated, then delete the probe-statuses so their healthy status will be reported as healthy only when they pass.
+	delete(secret.Data, "probe-statuses")
 
 	secret.Data["plan"] = data
 	if maxFailures > 0 || maxFailures == -1 {
