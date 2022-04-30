@@ -95,7 +95,6 @@ func (p *Planner) findInitNode(rkeControlPlane *rkev1.RKEControlPlane, plan *pla
 		return p.findAndDesignateFixedInitNode(rkeControlPlane, plan)
 	}
 
-	joinURL := ""
 	currentInitNodes := collect(plan, isInitNode)
 
 	if len(currentInitNodes) > 1 {
@@ -104,12 +103,11 @@ func (p *Planner) findInitNode(rkeControlPlane *rkev1.RKEControlPlane, plan *pla
 	}
 
 	initNodeFound := false
-
 	// this loop should never execute more than once
 	for _, entry := range currentInitNodes {
 		if canBeInitNode(entry) {
 			initNodeFound = true
-			joinURL = entry.Metadata.Annotations[rke2.JoinURLAnnotation]
+			joinURL := entry.Metadata.Annotations[rke2.JoinURLAnnotation]
 			logrus.Debugf("rkecluster %s/%s found current init node %s with joinURL: %s", rkeControlPlane.Namespace, rkeControlPlane.Spec.ClusterName, entry.Machine.Name, joinURL)
 			if joinURL != "" {
 				return true, joinURL, entry, nil
@@ -141,34 +139,26 @@ func (p *Planner) findInitNode(rkeControlPlane *rkev1.RKEControlPlane, plan *pla
 // electing the first possible init node if no fully populated init node is found.
 func (p *Planner) electInitNode(rkeControlPlane *rkev1.RKEControlPlane, plan *plan.Plan) (string, error) {
 	logrus.Debugf("rkecluster %s/%s: determining if election of init node is necessary", rkeControlPlane.Namespace, rkeControlPlane.Spec.ClusterName)
-	initNodeFound, joinURL, _, err := p.findInitNode(rkeControlPlane, plan)
-	if (initNodeFound && err == nil) || errors.Is(err, generic.ErrSkip) {
+	if initNodeFound, joinURL, _, err := p.findInitNode(rkeControlPlane, plan); (initNodeFound && err == nil) || errors.Is(err, generic.ErrSkip) {
 		logrus.Debugf("rkecluster %s/%s: init node was already elected and found with joinURL: %s", rkeControlPlane.Namespace, rkeControlPlane.Spec.ClusterName, joinURL)
 		return joinURL, err
 	}
 	// If the joinURL (or an errSkip) was not found, re-elect the init node.
 	logrus.Debugf("rkecluster %s/%s: performing election of init node", rkeControlPlane.Namespace, rkeControlPlane.Spec.ClusterName)
 
-	possibleInitNodes := collect(plan, canBeInitNode)
-	if len(possibleInitNodes) == 0 {
-		logrus.Debugf("[planner] rkecluster %s/%s: no possible init nodes exist", rkeControlPlane.Namespace, rkeControlPlane.Spec.ClusterName)
-		return joinURL, nil
-	}
-
 	// keep track of whether we invalidate our machine cache when we clear init node marks across nodes.
 	cachesInvalidated := false
 	// clear all etcd init node marks because we are re-electing our init node
-	etcdEntries := collect(plan, isEtcd)
-	for _, entry := range etcdEntries {
+	for _, entry := range collect(plan, isEtcd) {
 		// Ignore all etcd nodes that are not init nodes
 		if !isInitNode(entry) {
 			continue
 		}
 		logrus.Debugf("rkecluster %s/%s: clearing init node mark on machine %s", rkeControlPlane.Namespace, rkeControlPlane.Spec.ClusterName, entry.Machine.Name)
-		if err := p.clearInitNodeMark(entry); err != nil && !errors.Is(err, generic.ErrSkip) {
-			return "", err
-		} else if errors.Is(err, generic.ErrSkip) {
+		if err := p.clearInitNodeMark(entry); errors.Is(err, generic.ErrSkip) {
 			cachesInvalidated = true
+		} else if err != nil {
+			return "", err
 		}
 	}
 
@@ -176,24 +166,18 @@ func (p *Planner) electInitNode(rkeControlPlane *rkev1.RKEControlPlane, plan *pl
 		return "", generic.ErrSkip
 	}
 
-	var fallbackInitNode *planEntry
-	fallbackInitNodeSet := false
-
+	possibleInitNodes := collect(plan, canBeInitNode)
 	// Mark the first init node that has a joinURL as our new init node.
 	for _, entry := range possibleInitNodes {
-		if !fallbackInitNodeSet {
-			// set the falbackInitNode to the first possible init node we encounter
-			fallbackInitNode = entry
-			fallbackInitNodeSet = true
-		}
-		if entry.Metadata.Annotations[rke2.JoinURLAnnotation] != "" {
-			logrus.Debugf("rkecluster %s/%s: found %s as fully suitable init node with joinURL: %s", rkeControlPlane.Namespace, rkeControlPlane.Spec.ClusterName, entry.Machine.Name, entry.Metadata.Annotations[rke2.JoinURLAnnotation])
+		if joinURL := entry.Metadata.Annotations[rke2.JoinURLAnnotation]; joinURL != "" {
+			logrus.Debugf("rkecluster %s/%s: found %s as fully suitable init node with joinURL: %s", rkeControlPlane.Namespace, rkeControlPlane.Spec.ClusterName, entry.Machine.Name, joinURL)
 			// it is likely that the error returned by `electInitNode` is going to be `generic.ErrSkip`
-			return entry.Metadata.Annotations[rke2.JoinURLAnnotation], p.setInitNodeMark(entry)
+			return joinURL, p.setInitNodeMark(entry)
 		}
 	}
 
-	if fallbackInitNodeSet {
+	if len(possibleInitNodes) > 0 {
+		fallbackInitNode := possibleInitNodes[0]
 		logrus.Debugf("rkecluster %s/%s: no fully suitable init node was found, marking %s as init node as fallback", rkeControlPlane.Namespace, rkeControlPlane.Spec.ClusterName, fallbackInitNode.Machine.Name)
 		return "", p.setInitNodeMark(fallbackInitNode)
 	}

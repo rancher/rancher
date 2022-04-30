@@ -359,7 +359,7 @@ func (h *handler) setProvisionedStatusFromMachineInfra(cluster *rancherv1.Cluste
 	}
 
 	for _, machine := range machines {
-		if !machine.DeletionTimestamp.IsZero() || condition.Cond(capi.InfrastructureReadyCondition).IsTrue(machine) {
+		if !machine.DeletionTimestamp.IsZero() || rke2.InfrastructureReady.IsTrue(machine) {
 			continue
 		}
 

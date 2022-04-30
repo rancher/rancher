@@ -25,7 +25,6 @@ import (
 	"github.com/rancher/rancher/pkg/provisioningv2/image"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/wrangler"
-	"github.com/rancher/wrangler/pkg/condition"
 	corecontrollers "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/pkg/generic"
 	"github.com/rancher/wrangler/pkg/name"
@@ -173,7 +172,7 @@ func (p *Planner) setMachineConditionStatus(clusterPlan *plan.Plan, machineNames
 			return fmt.Errorf("found unexpected machine %s that is not in cluster plan", machineName)
 		}
 
-		if !condition.Cond(capi.InfrastructureReadyCondition).IsTrue(machine) {
+		if !rke2.InfrastructureReady.IsTrue(machine) {
 			waiting = true
 			continue
 		}
@@ -400,13 +399,11 @@ func ignoreErrors(firstIgnoreError error, err error) (error, error) {
 // marked as control plane nodes
 func getControlPlaneJoinURL(plan *plan.Plan) string {
 	entries := collect(plan, isControlPlane)
-	for _, entry := range entries {
-		if entry.Metadata.Annotations[rke2.JoinURLAnnotation] != "" {
-			return entry.Metadata.Annotations[rke2.JoinURLAnnotation]
-		}
+	if len(entries) == 0 {
+		return ""
 	}
 
-	return ""
+	return entries[0].Metadata.Annotations[rke2.JoinURLAnnotation]
 }
 
 // isUnavailable returns a boolean indicating whether the machine/node corresponding to the planEntry is available
@@ -457,8 +454,8 @@ func calculateConcurrency(maxUnavailable string, entries []*planEntry, exclude r
 func (p *Planner) reconcile(controlPlane *rkev1.RKEControlPlane, tokensSecret plan.Secret, clusterPlan *plan.Plan, required bool,
 	tierName string, include, exclude roleFilter, maxUnavailable string, joinServer string, drainOptions rkev1.DrainOptions) error {
 	var (
-		ready, outOfSync, nonReady, errMachines, draining, uncordoned []string
-		messages                                                      = map[string][]string{}
+		ready, outOfSync, reconciling, nonReady, errMachines, draining, uncordoned []string
+		messages                                                                   = map[string][]string{}
 	)
 
 	entries := collect(clusterPlan, include)
@@ -510,6 +507,7 @@ func (p *Planner) reconcile(controlPlane *rkev1.RKEControlPlane, tokensSecret pl
 			// 4. unavailable < concurrency meaning we have capacity to make something unavailable
 			logrus.Debugf("[planner] rkecluster %s/%s reconcile tier %s - concurrency: %d, unavailable: %d", controlPlane.Namespace, controlPlane.Name, tierName, concurrency, unavailable)
 			if isInDrain(entry) || entry.Plan.Failed || concurrency == 0 || unavailable < concurrency {
+				reconciling = append(reconciling, entry.Machine.Name)
 				if !isUnavailable(entry) {
 					unavailable++
 				}
@@ -574,6 +572,10 @@ func (p *Planner) reconcile(controlPlane *rkev1.RKEControlPlane, tokensSecret pl
 	}
 
 	if err := p.setMachineConditionStatus(clusterPlan, draining, fmt.Sprintf("draining %s node(s) ", tierName), messages); err != nil && firstError == nil {
+		firstError = err
+	}
+
+	if err := p.setMachineConditionStatus(clusterPlan, reconciling, fmt.Sprintf("configuring %s node(s) ", tierName), messages); err != nil && firstError == nil {
 		firstError = err
 	}
 
@@ -930,9 +932,10 @@ func isFailed(entry *planEntry) bool {
 	return entry.Machine.Status.Phase == string(capi.MachinePhaseFailed)
 }
 
-// canBeInitNode returns true if the provided entry is an etcd node, is not deleting, and is not failed
+// canBeInitNode returns true if the provided entry is an etcd node, is not deleting, is not failed, and has its infrastructure ready
+// We should wait for the infrastructure condition to be marked as ready because we need the IP address(es) set prior to bootstrapping the node.
 func canBeInitNode(entry *planEntry) bool {
-	return isEtcd(entry) && !isDeleting(entry) && !isFailed(entry)
+	return isEtcd(entry) && !isDeleting(entry) && !isFailed(entry) && rke2.InfrastructureReady.IsTrue(entry.Machine)
 }
 
 func isControlPlane(entry *planEntry) bool {
