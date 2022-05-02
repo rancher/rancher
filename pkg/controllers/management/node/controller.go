@@ -414,11 +414,13 @@ func (m *Lifecycle) deployAgent(nodeDir string, obj *v3.Node) error {
 		return err
 	}
 
-	cluster.Spec, err = secretmigrator.AssembleRKEConfigSpec(cluster, cluster.Spec, m.credLister)
+	// make a deep copy of the cluster, so we are not modifying the original cluster object
+	clusterCopy := cluster.DeepCopy()
+	clusterCopy.Spec, err = secretmigrator.AssembleRKEConfigSpec(clusterCopy, clusterCopy.Spec, m.credLister)
 	if err != nil {
 		return err
 	}
-	err = m.authenticateRegistry(nodeDir, obj, cluster)
+	err = m.authenticateRegistry(nodeDir, obj, clusterCopy)
 	if err != nil {
 		return err
 	}
