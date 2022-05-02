@@ -319,17 +319,15 @@ func (p *PlanStore) UpdatePlan(entry *planEntry, plan plan.NodePlan, maxFailures
 	}
 
 	secret = secret.DeepCopy()
-
 	if secret.Data == nil {
-		secret.Data = map[string][]byte{}
+		// Create the map with enough storage for what is needed.
+		secret.Data = make(map[string][]byte, 6)
 	}
 
 	rke2.CopyPlanMetadataToSecret(secret, entry.Metadata)
 
-	// if there are no probes, clear the statuses of the probes to prevent false positives
-	if len(plan.Probes) == 0 {
-		delete(secret.Data, "probe-statuses")
-	}
+	// If the plan is being updated, then delete the probe-statuses so their healthy status will be reported as healthy only when they pass.
+	delete(secret.Data, "probe-statuses")
 
 	secret.Data["plan"] = data
 	if maxFailures > 0 || maxFailures == -1 {
@@ -438,15 +436,19 @@ func (p *PlanStore) setMachineJoinURL(entry *planEntry, capiCluster *capi.Cluste
 }
 
 func getJoinURLFromOutput(entry *planEntry, capiCluster *capi.Cluster, rkeControlPlane *rkev1.RKEControlPlane) (string, error) {
-	if entry.Plan == nil || !IsEtcdOnlyInitNode(entry) {
+	if entry.Plan == nil || !IsEtcdOnlyInitNode(entry) || capiCluster.Spec.ControlPlaneRef == nil || rkeControlPlane == nil {
 		return "", nil
 	}
 
 	var address []byte
-	if ca, ok := entry.Plan.PeriodicOutput["capture-address"]; ok && ca.ExitCode == 0 && ca.LastSuccessfulRunTime != "" {
-		address = ca.Stdout
-	} else {
+	var name string
+	if ca := entry.Plan.PeriodicOutput[captureAddressInstructionName]; ca.ExitCode != 0 || ca.LastSuccessfulRunTime == "" {
 		return "", nil
+	} else if etcdNameOutput := entry.Plan.PeriodicOutput[etcdNameInstructionName]; etcdNameOutput.ExitCode != 0 || etcdNameOutput.LastSuccessfulRunTime == "" {
+		return "", nil
+	} else {
+		address = ca.Stdout
+		name = string(bytes.TrimSpace(etcdNameOutput.Stdout))
 	}
 
 	var str string
@@ -468,29 +470,27 @@ func getJoinURLFromOutput(entry *planEntry, capiCluster *capi.Cluster, rkeContro
 		return "", err
 	}
 
-	if len(dbInfo.Members) == 0 {
-		return "", nil
+	for _, member := range dbInfo.Members {
+		if member.Name != name {
+			continue
+		}
+
+		u, err := url.Parse(member.ClientURLs[0])
+		if err != nil {
+			return "", err
+		}
+
+		return fmt.Sprintf("https://%s:%d", u.Hostname(), rke2.GetRuntimeSupervisorPort(rkeControlPlane.Spec.KubernetesVersion)), nil
 	}
 
-	if len(dbInfo.Members[0].ClientURLs) == 0 {
-		return "", nil
-	}
-
-	u, err := url.Parse(dbInfo.Members[0].ClientURLs[0])
-	if err != nil {
-		return "", err
-	}
-
-	if capiCluster.Spec.ControlPlaneRef == nil || rkeControlPlane == nil {
-		return "", nil
-	}
-
-	return fmt.Sprintf("https://%s:%d", u.Hostname(), rke2.GetRuntimeSupervisorPort(rkeControlPlane.Spec.KubernetesVersion)), nil
+	// No need to error here because once the plan secret is updated, then this will be retried.
+	return "", nil
 }
 
 type dbinfo struct {
 	Members []member `json:"members,omitempty"`
 }
 type member struct {
+	Name       string   `json:"name,omitempty"`
 	ClientURLs []string `json:"clientURLs,omitempty"`
 }
