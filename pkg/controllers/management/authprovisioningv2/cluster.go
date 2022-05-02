@@ -9,12 +9,6 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/utils/pointer"
-)
-
-const (
-	clusterNameLabel      = "cluster.cattle.io/name"
-	clusterNamespaceLabel = "cluster.cattle.io/namespace"
 )
 
 // OnCluster creates the roles required for users to be able to see/manage the
@@ -36,16 +30,14 @@ func (h *handler) createClusterViewRole(cluster *v1.Cluster) error {
 	role := &rbacv1.Role{
 		TypeMeta: metav1.TypeMeta{},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        roleName,
-			Namespace:   cluster.Namespace,
-			Annotations: createClusterRBACAnnotations(cluster),
+			Name:      roleName,
+			Namespace: cluster.Namespace,
 			OwnerReferences: []metav1.OwnerReference{
 				{
-					APIVersion:         cluster.APIVersion,
-					Kind:               cluster.Kind,
-					Name:               cluster.Name,
-					UID:                cluster.UID,
-					BlockOwnerDeletion: pointer.Bool(false),
+					APIVersion: cluster.APIVersion,
+					Kind:       cluster.Kind,
+					Name:       cluster.Name,
+					UID:        cluster.UID,
 				},
 			},
 		},
@@ -108,11 +100,4 @@ func (h *handler) cleanClusterAdminRoleBindings(cluster *v1.Cluster) error {
 		return fmt.Errorf("errors deleting cluster admin role binding: %v", allErrors)
 	}
 	return nil
-}
-
-func createClusterRBACAnnotations(cluster *v1.Cluster) map[string]string {
-	return map[string]string{
-		clusterNameLabel:      cluster.Name,
-		clusterNamespaceLabel: cluster.Namespace,
-	}
 }
