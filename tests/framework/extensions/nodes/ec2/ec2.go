@@ -7,15 +7,13 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/aws/aws-sdk-go/aws/awserr"
-
-	"github.com/rancher/norman/types/convert"
-	"github.com/rancher/rancher/tests/v2/validation/provisioning"
-
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/ec2"
+	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	"github.com/rancher/rancher/tests/framework/pkg/nodes"
+	"github.com/rancher/rancher/tests/v2/validation/provisioning"
 )
 
 const (
