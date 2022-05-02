@@ -57,6 +57,7 @@ ingress:
   # Defaults to true
   # options: true, false
   enabled: true
+  ingressClassName: ""
   includeDefaultExtraAnnotations: true
   extraAnnotations: {}
 
