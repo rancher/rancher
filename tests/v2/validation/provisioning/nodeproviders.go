@@ -23,7 +23,7 @@ type ExternalNodeProvider struct {
 
 // ExternalNodeProviderSetup is a helper function that setups an ExternalNodeProvider object is a wrapper
 // for the specific outside node provider node creator function
-func ExternalNodeProviderSetup(providerType string, hasWindows bool) ExternalNodeProvider {
+func ExternalNodeProviderSetup(providerType string, hasWindows bool, clusterID string) ExternalNodeProvider {
 	switch providerType {
 	case ec2NodeProviderName:
 		return ExternalNodeProvider{

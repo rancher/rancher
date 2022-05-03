@@ -17,6 +17,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+var ClusterID string
+
 func (c *CustomClusterProvisioningTestSuite) setupHybrid() {
 	c.SetupSuiteHybrid()
 }
@@ -70,7 +72,9 @@ func (c *CustomClusterProvisioningTestSuite) ProvisioningRKE2CustomClusterHybrid
 					customCluster, err := client.Provisioning.Clusters(namespace).Get(context.TODO(), clusterResp.Name, metav1.GetOptions{})
 					require.NoError(c.T(), err)
 
-					token, err := tokenregistration.GetRegistrationToken(client, customCluster.Status.ClusterName)
+					ClusterID = customCluster.Status.ClusterName
+
+					token, err := tokenregistration.GetRegistrationToken(client, ClusterID)
 					require.NoError(c.T(), err)
 
 					for key, node := range nodes {
@@ -145,7 +149,8 @@ func (c *CustomClusterProvisioningTestSuite) ProvisioningRKE2CustomClusterWithDy
 					customCluster, err := client.Provisioning.Clusters(namespace).Get(context.TODO(), clusterResp.Name, metav1.GetOptions{})
 					require.NoError(c.T(), err)
 
-					token, err := tokenregistration.GetRegistrationToken(client, customCluster.Status.ClusterName)
+					ClusterID = customCluster.Status.ClusterName
+					token, err := tokenregistration.GetRegistrationToken(client, ClusterID)
 					require.NoError(c.T(), err)
 
 					for key, node := range nodes {
@@ -175,7 +180,7 @@ func (c *CustomClusterProvisioningTestSuite) ProvisioningRKE2CustomClusterWithDy
 
 func (c *CustomClusterProvisioningTestSuite) TestProvisioningCustomClusterHybrid() {
 	for _, nodeProviderName := range c.nodeProviders {
-		externalNodeProvider := ExternalNodeProviderSetup(nodeProviderName, c.hasWindows)
+		externalNodeProvider := ExternalNodeProviderSetup(nodeProviderName, c.hasWindows, ClusterID)
 		c.ProvisioningRKE2CustomClusterHybrid(externalNodeProvider)
 	}
 }
@@ -187,7 +192,7 @@ func (c *CustomClusterProvisioningTestSuite) TestProvisioningCustomClusterDynami
 	}
 
 	for _, nodeProviderName := range c.nodeProviders {
-		externalNodeProvider := ExternalNodeProviderSetup(nodeProviderName, c.hasWindows)
+		externalNodeProvider := ExternalNodeProviderSetup(nodeProviderName, c.hasWindows, ClusterID)
 		c.ProvisioningRKE2CustomClusterWithDynamicInputHybrid(externalNodeProvider, nodesAndRoles, c.hasWindows)
 	}
 }

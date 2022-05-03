@@ -1,11 +1,16 @@
 package ec2
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/user"
 	"path/filepath"
 	"strings"
+
+	"github.com/rancher/rancher/tests/framework/extensions/tokenregistration"
+	"github.com/stretchr/testify/require"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
@@ -37,9 +42,13 @@ func CreateNodes(client *rancher.Client, numOfInstances int) ([]*nodes.Node, err
 		hasWindows = true
 	}
 
+	customCluster, err := client.Provisioning.Clusters("fleet-default").Get(context.TODO(), clusterResp.Name, metav1.GetOptions{})
+	require.NoError(c.T(), err)
+
 	var listOfInstanceIds []*string
 
 	// Create Linux Nodes
+	linuxJoinToken := tokenregistration.GetRegistrationToken(client)
 	runInstancesInput, err := createNodesCommon(client, numOfInstances, false)
 	if err != nil {
 		return nil, err
@@ -55,7 +64,7 @@ func CreateNodes(client *rancher.Client, numOfInstances int) ([]*nodes.Node, err
 
 	// Create Windows Nodes
 	var windowsInstanceID string
-	var windowsUserData = `<powershell>\nAdd-WindowsCapability -Online -Name OpenSSH.Server~~~~0.0.1.0\nStart-Service ssh-agent; Start-Service sshd\nSet-Service -Name sshd -StartupType 'Automatic'\nSet-Service docker -StartUpType Disabled -Status Stopped\nStop-Process dockerd\n</powershell>"`
+	windowsUserData := `<powershell>\nAdd-WindowsCapability -Online -Name OpenSSH.Server~~~~0.0.1.0\nStart-Service ssh-agent; Start-Service sshd\nSet-Service -Name sshd -StartupType 'Automatic'\nSet-Service docker -StartUpType Disabled -Status Stopped\nStop-Process dockerd\n</powershell>"`
 	if hasWindows {
 		runInstancesInput.UserData = aws.String(windowsUserData)
 		runInstancesInput, err = createNodesCommon(client, 1, hasWindows)
