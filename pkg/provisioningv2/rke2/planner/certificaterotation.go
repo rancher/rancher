@@ -31,6 +31,10 @@ func (r *certificateRotation) RotateCertificates(controlPlane *rkev1.RKEControlP
 	}
 
 	for _, node := range collect(clusterPlan, anyRole) {
+		if !shouldRotateEntry(controlPlane.Spec.RotateCertificates, node) {
+			continue
+		}
+
 		rotatePlan := rotateCertificatesPlan(controlPlane, controlPlane.Spec.RotateCertificates, node)
 		err := assignAndCheckPlan(r.store, fmt.Sprintf("[%s] certificate rotation", node.Machine.Name), node, rotatePlan, 0, 0)
 		if err != nil {
@@ -139,4 +143,52 @@ func rotateCertificatesPlan(controlPlane *rkev1.RKEControlPlane, rotation *rkev1
 			},
 		},
 	}
+}
+
+// shouldRotateEntry returns true if the rotated services are applicable to the entry's roles.
+func shouldRotateEntry(rotation *rkev1.RotateCertificates, entry *planEntry) bool {
+	relevantServices := map[string]struct{}{}
+
+	if len(rotation.Services) == 0 {
+		return true
+	}
+
+	if isWorker(entry) {
+		relevantServices["rke2-server"] = struct{}{}
+		relevantServices["k3s-server"] = struct{}{}
+		relevantServices["api-server"] = struct{}{}
+		relevantServices["kubelet"] = struct{}{}
+		relevantServices["kube-proxy"] = struct{}{}
+		relevantServices["auth-proxy"] = struct{}{}
+	}
+
+	if isControlPlane(entry) {
+		relevantServices["rke2-server"] = struct{}{}
+		relevantServices["k3s-server"] = struct{}{}
+		relevantServices["api-server"] = struct{}{}
+		relevantServices["kubelet"] = struct{}{}
+		relevantServices["kube-proxy"] = struct{}{}
+		relevantServices["auth-proxy"] = struct{}{}
+		relevantServices["controller-manager"] = struct{}{}
+		relevantServices["scheduler"] = struct{}{}
+		relevantServices["rke2-controller"] = struct{}{}
+		relevantServices["k3s-controller"] = struct{}{}
+		relevantServices["admin"] = struct{}{}
+		relevantServices["cloud-controller"] = struct{}{}
+	}
+
+	if isEtcd(entry) {
+		relevantServices["etcd"] = struct{}{}
+		relevantServices["kubelet"] = struct{}{}
+		relevantServices["k3s-server"] = struct{}{}
+		relevantServices["rke2-server"] = struct{}{}
+	}
+
+	for i := range rotation.Services {
+		if _, ok := relevantServices[rotation.Services[i]]; ok {
+			return true
+		}
+	}
+
+	return false
 }
