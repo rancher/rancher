@@ -6084,6 +6084,20 @@ func (in *NodeCommonParams) DeepCopyInto(out *NodeCommonParams) {
 			(*out)[key] = val
 		}
 	}
+	if in.StorageOpt != nil {
+		in, out := &in.StorageOpt, &out.StorageOpt
+		*out = make(map[string]string, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	}
+	if in.LogOpt != nil {
+		in, out := &in.LogOpt, &out.LogOpt
+		*out = make(map[string]string, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	}
 	if in.EngineInsecureRegistry != nil {
 		in, out := &in.EngineInsecureRegistry, &out.EngineInsecureRegistry
 		*out = make([]string, len(*in))
