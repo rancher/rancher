@@ -63,6 +63,11 @@ type RKEMachinePoolRollingUpdate struct {
 	MaxSurge *intstr.IntOrString `json:"maxSurge,omitempty"`
 }
 
+// Note: if you add new fields to the RKEConfig, please ensure that you check
+// `pkg/controllers/provisioningv2/rke2/provisioningcluster/template.go` file and
+// drop the fields when saving a copy of the cluster spec on etcd snapshots, otherwise,
+// operations using the new fields will cause unnecessary plan thrashing.
+
 type RKEConfig struct {
 	rkev1.RKEClusterSpecCommon
 
