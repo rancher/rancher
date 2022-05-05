@@ -9,6 +9,7 @@ import (
 
 	"github.com/coreos/go-semver/semver"
 	"github.com/rancher/rancher/pkg/controllers/management/k3sbasedupgrade"
+	"github.com/rancher/rancher/pkg/settings"
 	"github.com/sirupsen/logrus"
 )
 
@@ -90,8 +91,10 @@ func GetExternalImages(rancherVersion string, externalData map[string]interface{
 
 	for _, release := range compatibleReleases {
 		// Registries don't allow "+", so image names will have these substituted.
-		upgradeImage := fmt.Sprintf("rancher/%s-upgrade:%s", source, strings.Replace(release, "+", "-", -1))
+		upgradeImage := fmt.Sprintf("rancher/%s-upgrade:%s", source, strings.ReplaceAll(release, "+", "-"))
 		externalImagesMap[upgradeImage] = true
+		systemAgentInstallerImage := fmt.Sprintf("%s%s:%s", settings.SystemAgentInstallerImage.Default, source, strings.ReplaceAll(release, "+", "-"))
+		externalImagesMap[systemAgentInstallerImage] = true
 
 		images, err := downloadExternalSupportingImages(release, source)
 		if err != nil {
@@ -122,19 +125,32 @@ func GetExternalImages(rancherVersion string, externalData map[string]interface{
 }
 
 func downloadExternalSupportingImages(release string, source Source) (string, error) {
-	var url string
 	switch source {
 	case RKE2:
 		// The "images-all" file is only provided for RKE2 amd64 images. This may be subject to change.
-		url = fmt.Sprintf("https://github.com/rancher/rke2/releases/download/%s/rke2-images-all.linux-amd64.txt", release)
+		linuxImages, err := downloadExternalImageListFromURL(fmt.Sprintf("https://github.com/rancher/rke2/releases/download/%s/rke2-images-all.linux-amd64.txt", release))
+		if err != nil {
+			return "", err
+		}
+		windowsImages, err := downloadExternalImageListFromURL(fmt.Sprintf("https://github.com/rancher/rke2/releases/download/%s/rke2-images.windows-amd64.txt", release))
+		if err != nil {
+			return "", err
+		}
+		builder := strings.Builder{}
+		builder.WriteString(linuxImages)
+		builder.WriteString("\n")
+		builder.WriteString(windowsImages)
+		return builder.String(), nil
 	case K3S:
-		url = fmt.Sprintf("https://github.com/k3s-io/k3s/releases/download/%s/k3s-images.txt", release)
+		return downloadExternalImageListFromURL(fmt.Sprintf("https://github.com/k3s-io/k3s/releases/download/%s/k3s-images.txt", release))
 	default:
 		// This function should never be called with an invalid source, but we will anticipate this
 		// error for safety.
 		return "", fmt.Errorf("invalid source provided for download: %s", source)
 	}
+}
 
+func downloadExternalImageListFromURL(url string) (string, error) {
 	resp, err := http.Get(url)
 	if err != nil {
 		return "", err
