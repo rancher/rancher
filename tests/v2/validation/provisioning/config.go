@@ -4,7 +4,6 @@ import (
 	"strings"
 
 	"github.com/rancher/rancher/tests/framework/pkg/config"
-	"github.com/rancher/rancher/tests/framework/pkg/namegenerator"
 )
 
 const (
@@ -22,10 +21,10 @@ type Config struct {
 	ClusterHasWindows  bool     `json:"clusterHasWindows" yaml:"clusterHasWindows"`
 }
 
-func AppendRandomString(baseClusterName string) string {
-	clusterName := "auto-" + baseClusterName + "-" + namegenerator.RandStringLower(defaultRandStringLength)
-	return clusterName
-}
+//func AppendRandomString(baseClusterName string) string {
+//	clusterName := "auto-" + baseClusterName + "-" + namegenerator.RandStringLower(defaultRandStringLength)
+//	return clusterName
+//}
 
 // NodesAndRolesInput is a helper function that reads the nodesAndRoles entry in the config file and returns it in the form
 // of a list of map[string]bool

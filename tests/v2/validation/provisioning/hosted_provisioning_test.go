@@ -12,6 +12,7 @@ import (
 	"github.com/rancher/rancher/tests/framework/extensions/clusters/aks"
 	"github.com/rancher/rancher/tests/framework/extensions/clusters/eks"
 	"github.com/rancher/rancher/tests/framework/extensions/clusters/gke"
+	"github.com/rancher/rancher/tests/framework/extensions/nodes/ec2"
 	"github.com/rancher/rancher/tests/framework/extensions/users"
 	"github.com/rancher/rancher/tests/framework/pkg/session"
 	"github.com/rancher/rancher/tests/framework/pkg/wait"
@@ -43,7 +44,7 @@ func (h *HostesdClusterProvisioningTestSuite) SetupSuite() {
 	h.client = client
 
 	enabled := true
-	var testuser = AppendRandomString("testuser-")
+	var testuser = ec2.AppendRandomString("testuser-")
 	user := &management.User{
 		Username: testuser,
 		Password: "rancherrancher123!",
@@ -82,7 +83,7 @@ func (h *HostesdClusterProvisioningTestSuite) TestProvisioningHostedGKECluster()
 			cloudCredential, err := google.CreateGoogleCloudCredentials(client)
 			require.NoError(h.T(), err)
 
-			clusterName := AppendRandomString("gkehostcluster")
+			clusterName := ec2.AppendRandomString("gkehostcluster")
 			clusterResp, err := gke.CreateGKEHostedCluster(client, clusterName, cloudCredential.ID, false, false, false, false, map[string]string{})
 			require.NoError(h.T(), err)
 
@@ -123,7 +124,7 @@ func (h *HostesdClusterProvisioningTestSuite) TestProvisioningHostedAKSCluster()
 			cloudCredential, err := azure.CreateAzureCloudCredentials(client)
 			require.NoError(h.T(), err)
 
-			clusterName := AppendRandomString("ekshostcluster")
+			clusterName := ec2.AppendRandomString("ekshostcluster")
 			clusterResp, err := aks.CreateAKSHostedCluster(client, clusterName, cloudCredential.ID, false, false, false, false, map[string]string{})
 			require.NoError(h.T(), err)
 
@@ -164,7 +165,7 @@ func (h *HostesdClusterProvisioningTestSuite) TestProvisioningHostedEKSCluster()
 			cloudCredential, err := aws.CreateAWSCloudCredentials(client)
 			require.NoError(h.T(), err)
 
-			clusterName := AppendRandomString("ekshostcluster")
+			clusterName := ec2.AppendRandomString("ekshostcluster")
 			clusterResp, err := eks.CreateEKSHostedCluster(client, clusterName, cloudCredential.ID, false, false, false, false, map[string]string{})
 			require.NoError(h.T(), err)
 

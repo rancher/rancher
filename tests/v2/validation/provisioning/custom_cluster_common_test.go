@@ -3,6 +3,7 @@ package provisioning
 import (
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
+	"github.com/rancher/rancher/tests/framework/extensions/nodes/ec2"
 	"github.com/rancher/rancher/tests/framework/extensions/users"
 	"github.com/rancher/rancher/tests/framework/pkg/config"
 	"github.com/rancher/rancher/tests/framework/pkg/session"
@@ -43,7 +44,7 @@ func (c *CustomClusterProvisioningTestSuite) SetupSuiteLinuxOnly() {
 	c.client = client
 
 	enabled := true
-	var testuser = AppendRandomString("testuser-")
+	var testuser = ec2.AppendRandomString("testuser-")
 	user := &management.User{
 		Username: testuser,
 		Password: "rancherrancher123!",
@@ -78,7 +79,7 @@ func (c *CustomClusterProvisioningTestSuite) SetupSuiteHybrid() {
 	c.client = client
 
 	enabled := true
-	var testuser = AppendRandomString("testuser-")
+	var testuser = ec2.AppendRandomString("testuser-")
 	user := &management.User{
 		Username: testuser,
 		Password: "rancherrancher123!",

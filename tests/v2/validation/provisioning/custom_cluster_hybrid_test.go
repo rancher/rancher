@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/rancher/rancher/tests/framework/extensions/nodes/ec2"
+
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	"github.com/rancher/rancher/tests/framework/extensions/clusters"
 	"github.com/rancher/rancher/tests/framework/extensions/tokenregistration"
@@ -62,7 +64,7 @@ func (c *CustomClusterProvisioningTestSuite) ProvisioningRKE2CustomClusterHybrid
 					nodes, err := externalNodeProvider.NodeCreationFunc(client, numNodes)
 					require.NoError(c.T(), err)
 
-					clusterName := AppendRandomString(externalNodeProvider.Name)
+					clusterName := ec2.AppendRandomString(externalNodeProvider.Name)
 
 					cluster := clusters.NewRKE2ClusterConfig(clusterName, namespace, cni, "", kubeVersion, nil)
 
@@ -139,7 +141,7 @@ func (c *CustomClusterProvisioningTestSuite) ProvisioningRKE2CustomClusterWithDy
 					nodes, err := externalNodeProvider.NodeCreationFunc(client, numOfNodes)
 					require.NoError(c.T(), err)
 
-					clusterName := AppendRandomString(externalNodeProvider.Name)
+					clusterName := ec2.AppendRandomString(externalNodeProvider.Name)
 
 					cluster := clusters.NewRKE2ClusterConfig(clusterName, namespace, cni, "", kubeVersion, nil)
 

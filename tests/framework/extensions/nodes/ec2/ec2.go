@@ -9,22 +9,23 @@ import (
 	"strings"
 	"time"
 
+	"github.com/rancher/rancher/tests/framework/pkg/namegenerator"
+
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	"github.com/rancher/rancher/tests/framework/pkg/nodes"
-	"github.com/rancher/rancher/tests/v2/validation/provisioning"
 )
 
 const (
 	nodeBaseName               = "rancherautomation"
-	LocalWindowsPEMKeyName     = "windows-ec2-key.pem"
 	AutomationPemKeyName       = "automation-keypair"
 	sshPath                    = ".ssh"
 	defaultWindowsVolumeSize   = int(100)
 	defaultWindowsInstanceType = "m5a.xlarge"
+	defaultRandStringLength    = 5
 )
 
 // CreateNodes CreatedNodes creates `numOfInstances` number of ec2 instances
@@ -185,7 +186,7 @@ func generatePEMKey(client *rancher.Client) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	input := ec2.CreateKeyPairInput{KeyName: aws.String(provisioning.AppendRandomString(AutomationPemKeyName))}
+	input := ec2.CreateKeyPairInput{KeyName: aws.String(AppendRandomString(AutomationPemKeyName))}
 	newKey, err := ec2Client.SVC.CreateKeyPair(&input)
 	if err != nil {
 		return "", err
@@ -372,4 +373,9 @@ func createNodesCommon(client *rancher.Client, numOfInstances int, hasWindows bo
 			},
 		},
 	}, nil
+}
+
+func AppendRandomString(baseClusterName string) string {
+	clusterName := "auto-" + baseClusterName + "-" + namegenerator.RandStringLower(defaultRandStringLength)
+	return clusterName
 }

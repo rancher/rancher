@@ -8,6 +8,7 @@ import (
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	"github.com/rancher/rancher/tests/framework/extensions/clusters"
 	"github.com/rancher/rancher/tests/framework/extensions/machinepools"
+	"github.com/rancher/rancher/tests/framework/extensions/nodes/ec2"
 	"github.com/rancher/rancher/tests/framework/pkg/session"
 	"github.com/rancher/rancher/tests/framework/pkg/wait"
 	"github.com/rancher/rancher/tests/integration/pkg/defaults"
@@ -83,7 +84,7 @@ func (r *RKE2NodeDriverProvisioningTestSuite) ProvisioningRKE2ClusterHybrid(prov
 					testSessionClient, err := tt.client.WithSession(testSession)
 					require.NoError(r.T(), err)
 
-					clusterName := AppendRandomString(provider.Name)
+					clusterName := ec2.AppendRandomString(provider.Name)
 					generatedPoolName := fmt.Sprintf("nc-%s-pool1-", clusterName)
 					machinePoolConfig := provider.MachinePoolFunc(generatedPoolName, namespace)
 
@@ -147,7 +148,7 @@ func (r *RKE2NodeDriverProvisioningTestSuite) ProvisioningRKE2ClusterWithDynamic
 					testSessionClient, err := tt.client.WithSession(testSession)
 					require.NoError(r.T(), err)
 
-					clusterName := AppendRandomString(provider.Name)
+					clusterName := ec2.AppendRandomString(provider.Name)
 					generatedPoolName := fmt.Sprintf("nc-%s-pool1-", clusterName)
 					machinePoolConfig := provider.MachinePoolFunc(generatedPoolName, namespace)
 
