@@ -5,10 +5,6 @@ VERSION=$GOGET_VERSION
 
 SUBDIRS="pkg/apis pkg/client"
 
-go get -d "${MODULE}@${VERSION}"
-go mod tidy
-go mod verify
-
 for SUBDIR in $SUBDIRS; do
     if grep -q $MODULE "${SUBDIR}/go.mod"; then
         cd $SUBDIR
@@ -18,3 +14,7 @@ for SUBDIR in $SUBDIRS; do
         cd -
     fi
 done
+
+go get -d "${MODULE}@${VERSION}"
+go mod tidy
+go mod verify
