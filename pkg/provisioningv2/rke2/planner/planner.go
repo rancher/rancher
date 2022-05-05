@@ -293,7 +293,7 @@ func (p *Planner) Process(controlPlane *rkev1.RKEControlPlane) error {
 		joinServer       string
 	)
 
-	if errs := p.createEtcdSnapshot(controlPlane, plan); len(errs) > 0 {
+	if errs := p.createEtcdSnapshot(controlPlane, clusterSecretTokens, plan); len(errs) > 0 {
 		var errMsg string
 		for i, err := range errs {
 			if err == nil {
