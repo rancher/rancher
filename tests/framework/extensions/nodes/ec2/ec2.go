@@ -133,7 +133,7 @@ func CreateNodes(client *rancher.Client, numOfInstances int) ([]*nodes.Node, err
 
 	readyInstances := describe.Reservations[0].Instances
 
-	sshKey, err := nodes.GetSSHKey(ec2Client.Config.AWSSSHKeyName, hasWindows)
+	sshKey, err := nodes.GetSSHKey(ec2Client.Config.AWSSSHKeyName)
 	if err != nil {
 		return nil, err
 	}

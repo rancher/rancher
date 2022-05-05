@@ -39,7 +39,7 @@ func ExternalNodeProviderSetup(providerType string, hasWindows bool, clusterID s
 
 				nodesList := nodeConfig.Nodes[numOfInstances]
 				for _, node := range nodesList {
-					sshKey, err := nodes.GetSSHKey(node.SSHKeyName, hasWindows)
+					sshKey, err := nodes.GetSSHKey(node.SSHKeyName)
 					if err != nil {
 						return nil, err
 					}
