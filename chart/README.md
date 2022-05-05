@@ -139,7 +139,7 @@ In a web browser, go to the DNS name that forwards traffic to your load balancer
 
 Doesn’t work? Take a look at the [Troubleshooting Page](https://rancher.com/docs/rancher/v2.x/en/installation/options/troubleshooting/)
 
-***All of these intructions are defined in detailed in the [Rancher Documentation](https://rancher.com/docs/rancher/v2.x/en/installation/k8s-install/helm-rancher/).***
+***All of these instructions are defined in detailed in the [Rancher Documentation](https://rancher.com/docs/rancher/v2.x/en/installation/k8s-install/helm-rancher/).***
 
 ### Helm Chart Options for Kubernetes Installations
 
