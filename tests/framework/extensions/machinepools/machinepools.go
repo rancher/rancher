@@ -69,7 +69,10 @@ func RKEMachinePoolSetup(nodeRoles []map[string]bool, hasWindows bool, machineCo
 	for index, roles := range nodeRoles {
 		machinePool := NewRKEMachinePool(roles["controlplane"], roles["etcd"], roles["worker"], "pool"+strconv.Itoa(index), rke2.DefaultMachineOS, 1, machineConfig)
 		if hasWindows {
-			machinePool = NewRKEMachinePool(false, false, true, "windows-pool"+strconv.Itoa(index), rke2.WindowsMachineOS, 1, machineConfig)
+			machinePool2019 := NewRKEMachinePool(false, false, true, "windows-pool-2019"+strconv.Itoa(index), rke2.WindowsMachineOS, 1, machineConfig)
+			machinePool2022 := NewRKEMachinePool(false, false, true, "windows-pool-2022"+strconv.Itoa(index), rke2.WindowsMachineOS, 1, machineConfig)
+			machinePools = append(machinePools, machinePool2019, machinePool2022)
+
 		}
 		machinePools = append(machinePools, machinePool)
 	}

@@ -56,11 +56,6 @@ func (r *RKE2NodeDriverProvisioningTestSuite) ProvisioningRKE2ClusterHybrid(prov
 			"etcd":         false,
 			"worker":       true,
 		},
-		{
-			"controlplane": false,
-			"etcd":         false,
-			"worker":       true,
-		},
 	}
 
 	tests := []struct {
@@ -69,10 +64,10 @@ func (r *RKE2NodeDriverProvisioningTestSuite) ProvisioningRKE2ClusterHybrid(prov
 		hasWindows bool
 		client     *rancher.Client
 	}{
-		{"1 Node all roles Admin User + 1 Windows Worker - Hybrid", allNodeRolesHybrid, true, r.client},
-		{"1 Node all roles Standard User + 1 Windows Worker - Hybrid", allNodeRolesHybrid, true, r.standardUserClient},
-		{"3 unique role nodes as Admin User + 1 Windows Worker - Hybrid", uniqueNodeRolesHybrid, true, r.client},
-		{"3 unique role nodes as Standard User + 1 Windows Worker - Hybrid", uniqueNodeRolesHybrid, true, r.standardUserClient},
+		{"1 Node all roles Admin User + 2 Windows Worker - Hybrid", allNodeRolesHybrid, true, r.client},
+		{"1 Node all roles Standard User + 2 Windows Worker - Hybrid", allNodeRolesHybrid, true, r.standardUserClient},
+		{"3 unique role nodes as Admin User + 2 Windows Worker - Hybrid", uniqueNodeRolesHybrid, true, r.client},
+		{"3 unique role nodes as Standard User + 2 Windows Worker - Hybrid", uniqueNodeRolesHybrid, true, r.standardUserClient},
 	}
 
 	var name string

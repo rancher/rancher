@@ -1,16 +1,13 @@
 package ec2
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"os/user"
 	"path/filepath"
+	"sort"
 	"strings"
-
-	"github.com/rancher/rancher/tests/framework/extensions/tokenregistration"
-	"github.com/stretchr/testify/require"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
@@ -42,14 +39,10 @@ func CreateNodes(client *rancher.Client, numOfInstances int) ([]*nodes.Node, err
 		hasWindows = true
 	}
 
-	customCluster, err := client.Provisioning.Clusters("fleet-default").Get(context.TODO(), clusterResp.Name, metav1.GetOptions{})
-	require.NoError(c.T(), err)
-
 	var listOfInstanceIds []*string
 
 	// Create Linux Nodes
-	linuxJoinToken := tokenregistration.GetRegistrationToken(client)
-	runInstancesInput, err := createNodesCommon(client, numOfInstances, false)
+	runInstancesInput, err := createNodesCommon(client, numOfInstances, false, "")
 	if err != nil {
 		return nil, err
 	}
@@ -67,7 +60,21 @@ func CreateNodes(client *rancher.Client, numOfInstances int) ([]*nodes.Node, err
 	windowsUserData := `<powershell>\nAdd-WindowsCapability -Online -Name OpenSSH.Server~~~~0.0.1.0\nStart-Service ssh-agent; Start-Service sshd\nSet-Service -Name sshd -StartupType 'Automatic'\nSet-Service docker -StartUpType Disabled -Status Stopped\nStop-Process dockerd\n</powershell>"`
 	if hasWindows {
 		runInstancesInput.UserData = aws.String(windowsUserData)
-		runInstancesInput, err = createNodesCommon(client, 1, hasWindows)
+		runInstancesInput, err = createNodesCommon(client, 1, hasWindows, "2019")
+		if err != nil {
+			return nil, err
+		}
+
+		reservation, err = ec2Client.SVC.RunInstances(runInstancesInput)
+		if err != nil {
+			return nil, err
+		}
+		for _, instance := range reservation.Instances {
+			windowsInstanceID = aws.StringValue(instance.InstanceId)
+			listOfInstanceIds = append(listOfInstanceIds, instance.InstanceId)
+		}
+
+		runInstancesInput, err = createNodesCommon(client, 1, hasWindows, "2022")
 		if err != nil {
 			return nil, err
 		}
@@ -82,7 +89,7 @@ func CreateNodes(client *rancher.Client, numOfInstances int) ([]*nodes.Node, err
 		}
 	}
 
-	//wait until instance is running
+	// wait until instance is running
 	err = ec2Client.SVC.WaitUntilInstanceRunning(&ec2.DescribeInstancesInput{
 		InstanceIds: listOfInstanceIds,
 	})
@@ -246,7 +253,7 @@ func deleteKeyPair(client *rancher.Client, input *ec2.DeleteKeyPairInput, retrie
 	return nil
 }
 
-func createNodesCommon(client *rancher.Client, numOfInstances int, hasWindows bool) (*ec2.RunInstancesInput, error) {
+func createNodesCommon(client *rancher.Client, numOfInstances int, hasWindows bool, windowsVersion string) (*ec2.RunInstancesInput, error) {
 	ec2Client, err := client.GetEC2Client()
 	if err != nil {
 		return nil, err
@@ -261,6 +268,7 @@ func createNodesCommon(client *rancher.Client, numOfInstances int, hasWindows bo
 		fmt.Printf("using fallback AWSSSHKeyName configuration")
 		keyName = getSSHKeyName(ec2Client.Config.AWSSSHKeyName)
 	}
+
 	imageID := ec2Client.Config.AWSLinuxAMI
 	instanceType := ec2Client.Config.InstanceTypeLinux
 	volumeSize := ec2Client.Config.VolumeSizeLinux
@@ -274,21 +282,47 @@ func createNodesCommon(client *rancher.Client, numOfInstances int, hasWindows bo
 			windows2022FilterValues []string
 		)
 		windowsOwner = append(windowsOwner, "amazon")
-		windows2019FilterValues = append(windows2019FilterValues, "Name=platform,Values=windows", "Name=root-device-type,Values=ebs", "Name=name,Values=Windows*2019*Containers*")
-		windows2022FilterValues = append(windows2022FilterValues, "Name=platform,Values=windows", "Name=root-device-type,Values=ebs", "Name=name,Values=Windows*2022*Containers*")
-		win2019Filter := &ec2.Filter{}
-		win2019Filter.Values = aws.StringSlice(windows2019FilterValues)
-		win2022Filter := &ec2.Filter{}
-		win2022Filter.Values = aws.StringSlice(windows2022FilterValues)
-		input := ec2.DescribeImagesInput{Owners: aws.StringSlice(windowsOwner)}
+		windowsFilter := &ec2.Filter{}
 
-		input.Filters = append(input.Filters, win2019Filter)
-		images, err := ec2Client.SVC.DescribeImages(&input)
-		if err != nil {
-			return nil, err
+		switch windowsVersion {
+		case "2019":
+			windows2019FilterValues = append(windows2019FilterValues, "Name=platform,Values=windows", "Name=root-device-type,Values=ebs", "Name=name,Values=Windows*2019*Containers*")
+			windowsFilter.Values = aws.StringSlice(windows2019FilterValues)
+			input := ec2.DescribeImagesInput{Owners: aws.StringSlice(windowsOwner)}
+			input.Filters = append(input.Filters, windowsFilter)
+			images, err := ec2Client.SVC.DescribeImages(&input)
+			if err != nil {
+				return nil, err
+			}
+			img := images.Images
+			sort.SliceStable(img, func(i, j int) bool {
+				iCreateDate, _ := time.Parse(time.RFC3339, aws.StringValue(img[i].CreationDate))
+				jCreateDate, _ := time.Parse(time.RFC3339, aws.StringValue(img[j].CreationDate))
+				return iCreateDate.After(jCreateDate)
+			})
+			imageID = aws.StringValue(img[0].ImageId)
+
+		case "2022":
+			windows2022FilterValues = append(windows2022FilterValues, "Name=platform,Values=windows", "Name=root-device-type,Values=ebs", "Name=name,Values=Windows*2022*Containers*")
+			windowsFilter.Values = aws.StringSlice(windows2022FilterValues)
+			input := ec2.DescribeImagesInput{Owners: aws.StringSlice(windowsOwner)}
+			input.Filters = append(input.Filters, windowsFilter)
+			images, err := ec2Client.SVC.DescribeImages(&input)
+			if err != nil {
+				return nil, err
+			}
+			img := images.Images
+			sort.SliceStable(img, func(i, j int) bool {
+				iCreateDate, _ := time.Parse(time.RFC3339, aws.StringValue(img[i].CreationDate))
+				jCreateDate, _ := time.Parse(time.RFC3339, aws.StringValue(img[j].CreationDate))
+				return iCreateDate.After(jCreateDate)
+			})
+			imageID = aws.StringValue(img[0].ImageId)
+
+		default:
+			return nil, fmt.Errorf("windows version %s is not valid", windowsVersion)
 		}
-		// todo: fix
-		imageID = images.GoString()
+
 		instanceType = defaultWindowsInstanceType
 		volumeSize = defaultWindowsVolumeSize
 	}

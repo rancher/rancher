@@ -19,3 +19,6 @@ type AWSEC2Config struct {
 	VolumeSizeLinux     int      `json:"volumeSizeLinux" yaml:"volumeSizeLinux"`
 	VolumeSizeWindows   int      `json:"volumeSizeWindows" yaml:"volumeSizeWindows"`
 }
+
+type WindowsConfig struct {
+}
