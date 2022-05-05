@@ -75,7 +75,7 @@ func (p *Planner) generateEtcdSnapshotCreatePlan(controlPlane *rkev1.RKEControlP
 	})
 }
 
-func (p *Planner) createEtcdSnapshot(controlPlane *rkev1.RKEControlPlane, clusterPlan *plan.Plan) []error {
+func (p *Planner) createEtcdSnapshot(controlPlane *rkev1.RKEControlPlane, tokensSecret plan.Secret, clusterPlan *plan.Plan) []error {
 	if controlPlane.Spec.ETCDSnapshotCreate == nil {
 		if err := p.resetEtcdSnapshotCreateState(controlPlane); err != nil {
 			return []error{err}
@@ -112,6 +112,14 @@ func (p *Planner) createEtcdSnapshot(controlPlane *rkev1.RKEControlPlane, cluste
 				}
 			}
 			return finErrs
+		}
+		if err := p.setEtcdSnapshotCreateState(controlPlane, snapshot, rkev1.ETCDSnapshotPhaseRestartCluster); err != nil {
+			return []error{err}
+		}
+		return nil
+	case rkev1.ETCDSnapshotPhaseRestartCluster:
+		if err := p.runEtcdSnapshotManagementServiceStart(controlPlane, tokensSecret, clusterPlan, isEtcd, "etcd snapshot creation"); err != nil {
+			return []error{err}
 		}
 		if err := p.setEtcdSnapshotCreateState(controlPlane, snapshot, rkev1.ETCDSnapshotPhaseFinished); err != nil {
 			return []error{err}

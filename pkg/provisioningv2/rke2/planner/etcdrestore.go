@@ -214,12 +214,21 @@ func (p *Planner) runEtcdRestoreServiceStop(controlPlane *rkev1.RKEControlPlane,
 // runEtcdRestoreServiceStart walks through the reconciliation process for the entire cluster.
 // Notably, this function will blatantly ignore drain and concurrency options, as during an etcd snapshot restore, there is no necessity to drain nodes.
 func (p *Planner) runEtcdRestoreServiceStart(controlPlane *rkev1.RKEControlPlane, tokensSecret plan.Secret, clusterPlan *plan.Plan) error {
+	if err := p.runEtcdSnapshotManagementServiceStart(controlPlane, tokensSecret, clusterPlan, isControlPlaneEtcd, "etcd restore"); err != nil {
+		return err
+	}
+	return p.runEtcdSnapshotWorkerServiceStart(controlPlane, tokensSecret, clusterPlan, "etcd restore")
+}
+
+// runEtcdSnapshotManagementServiceStart walks through the reconciliation process for the controlplane and etcd nodes.
+// Notably, this function will blatantly ignore drain and concurrency options, as during an etcd snapshot operation, there is no necessity to drain nodes.
+func (p *Planner) runEtcdSnapshotManagementServiceStart(controlPlane *rkev1.RKEControlPlane, tokensSecret plan.Secret, clusterPlan *plan.Plan, include roleFilter, operation string) error {
 	_, joinServer, initNode, err := p.findInitNode(controlPlane, clusterPlan)
 	if err != nil {
 		return err
 	}
 	if joinServer == "" {
-		return fmt.Errorf("error encountered restarting cluster during etcd restore, joinServer was empty")
+		return fmt.Errorf("error encountered restarting cluster during %s, joinServer was empty", operation)
 	}
 
 	plan, err := p.desiredPlan(controlPlane, tokensSecret, initNode, "")
@@ -227,11 +236,11 @@ func (p *Planner) runEtcdRestoreServiceStart(controlPlane *rkev1.RKEControlPlane
 		return err
 	}
 
-	if err = assignAndCheckPlan(p.store, "etcd snapshot restore bootstrap restart", initNode, plan, 1, -1); err != nil {
+	if err = assignAndCheckPlan(p.store, fmt.Sprintf("%s bootstrap restart", operation), initNode, plan, 1, -1); err != nil {
 		return err
 	}
 
-	for _, entry := range collect(clusterPlan, isControlPlaneEtcd) {
+	for _, entry := range collect(clusterPlan, include) {
 		if isInitNodeOrDeleting(entry) {
 			continue
 		}
@@ -239,12 +248,17 @@ func (p *Planner) runEtcdRestoreServiceStart(controlPlane *rkev1.RKEControlPlane
 		if err != nil {
 			return err
 		}
-		if err = assignAndCheckPlan(p.store, "etcd snapshot restore controlplane/etcd restart", entry, plan, 1, -1); err != nil {
+		if err = assignAndCheckPlan(p.store, fmt.Sprintf("%s management plane restart", operation), entry, plan, 1, -1); err != nil {
 			return err
 		}
 	}
+	return nil
+}
 
-	joinServer = getControlPlaneJoinURL(clusterPlan)
+// runEtcdSnapshotControlPlaneEtcdServiceStart walks through the reconciliation process for the worker nodes.
+// Notably, this function will blatantly ignore drain and concurrency options, as during an etcd snapshot operation, there is no necessity to drain nodes.
+func (p *Planner) runEtcdSnapshotWorkerServiceStart(controlPlane *rkev1.RKEControlPlane, tokensSecret plan.Secret, clusterPlan *plan.Plan, operation string) error {
+	joinServer := getControlPlaneJoinURL(clusterPlan)
 	if joinServer == "" {
 		return ErrWaiting("waiting for control plane to be available")
 	}
@@ -253,11 +267,11 @@ func (p *Planner) runEtcdRestoreServiceStart(controlPlane *rkev1.RKEControlPlane
 		if isInitNodeOrDeleting(entry) {
 			continue
 		}
-		plan, err = p.desiredPlan(controlPlane, tokensSecret, entry, joinServer)
+		plan, err := p.desiredPlan(controlPlane, tokensSecret, entry, joinServer)
 		if err != nil {
 			return err
 		}
-		if err = assignAndCheckPlan(p.store, "etcd snapshot restore worker restart", entry, plan, 1, -1); err != nil {
+		if err = assignAndCheckPlan(p.store, fmt.Sprintf("%s worker restart", operation), entry, plan, 1, -1); err != nil {
 			return err
 		}
 	}
