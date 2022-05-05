@@ -5,7 +5,10 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
+	"strings"
 	"testing"
+
+	"github.com/rancher/rancher/pkg/settings"
 
 	"github.com/coreos/go-semver/semver"
 	"github.com/rancher/rke/types/kdm"
@@ -39,6 +42,7 @@ func TestGetExternalImages(t *testing.T) {
 		image1                   string
 		image2                   string
 		image3                   string
+		version                  string
 	}
 
 	tests := []struct {
@@ -53,6 +57,7 @@ func TestGetExternalImages(t *testing.T) {
 				rancherVersion:           rancherVersion,
 				externalData:             map[string]interface{}{},
 				source:                   k3s,
+				version:                  k3sWebVersion,
 				minimumKubernetesVersion: kubeSemVer,
 				kdmUrl:                   devKDM,
 				image1:                   "rancher/klipper-lb:v0.3.5",
@@ -67,6 +72,7 @@ func TestGetExternalImages(t *testing.T) {
 				rancherVersion:           rancherVersion,
 				externalData:             map[string]interface{}{},
 				source:                   rke2,
+				version:                  rke2WebVersion,
 				minimumKubernetesVersion: kubeSemVer,
 				kdmUrl:                   releaseKDM,
 				image1:                   "rancher/pause:3.6",
@@ -108,12 +114,15 @@ func TestGetExternalImages(t *testing.T) {
 			case k3s:
 				tt.args.externalData = data.K3S
 			}
+			systemAgentInstallerImage := fmt.Sprintf("%s%s:%s", settings.SystemAgentInstallerImage.Default, tt.args.source, strings.ReplaceAll(tt.args.version, "+", "-"))
+
 			got, err := GetExternalImages(tt.args.rancherVersion, tt.args.externalData, tt.args.source, tt.args.minimumKubernetesVersion)
 			if err != nil {
 				a.Equal(tt.wantErr, true, "GetExternalImages() errored as expected")
 			}
 			if !tt.wantErr {
 				a.NotEmpty(got)
+				a.Contains(got, systemAgentInstallerImage)
 				a.Contains(got, tt.args.image1)
 				a.Contains(got, tt.args.image2)
 				a.Contains(got, tt.args.image3)
