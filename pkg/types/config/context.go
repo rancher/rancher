@@ -1,3 +1,6 @@
+/*
+Package config contains functions for creating management, scaled, and user contexts that user norman controllers.
+*/
 package config
 
 import (

@@ -1,3 +1,6 @@
+/*
+Package wrangler contains functions for creating a management context with wrangler controllers.
+*/
 package wrangler
 
 import (
