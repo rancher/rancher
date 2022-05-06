@@ -102,6 +102,7 @@ func (h *handler) OnCRD(key string, crd *apiextv1.CustomResourceDefinition) (*ap
 	return crd, nil
 }
 
+//test2
 func (h *handler) OnClusterObjectChanged(obj runtime.Object) (runtime.Object, error) {
 	clusterNames, err := getObjectClusterNames(obj)
 	if err != nil {

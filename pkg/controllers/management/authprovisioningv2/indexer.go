@@ -30,6 +30,7 @@ func getObjectClusterNames(obj runtime.Object) ([]string, error) {
 		return []string{o.Name}, nil
 	}
 
+	//test
 	gvk := obj.GetObjectKind().GroupVersionKind()
 	if gvk.Group == dynamicschema.MachineConfigAPIGroup {
 		objMeta, err := meta.Accessor(obj)
