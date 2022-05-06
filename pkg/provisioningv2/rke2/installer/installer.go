@@ -26,8 +26,8 @@ var (
 		"." + SystemAgentInstallPath,
 	}
 	localWindowsRke2InstallScripts = []string{
-		"./wins-install.ps1",
-	}
+		settings.UIPath.Get() + "/assets" + WindowsRke2InstallPath,
+		"." + WindowsRke2InstallPath}
 )
 
 func installScript(setting settings.Setting, files []string) ([]byte, error) {

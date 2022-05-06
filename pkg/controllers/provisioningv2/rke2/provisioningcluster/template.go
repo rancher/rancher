@@ -535,7 +535,13 @@ func decompressClusterSpec(inputb64 string) (*rancherv1.ClusterSpec, error) {
 func rkeControlPlane(cluster *rancherv1.Cluster) (*rkev1.RKEControlPlane, error) {
 	// We need to base64/gzip encode the spec of our rancherv1.Cluster object so that we can reference it from the
 	// downstream cluster
-	b64GZCluster, err := compressInterface(cluster.Spec)
+	filteredClusterSpec := cluster.Spec.DeepCopy()
+	// set the corresponding specification for various operations to nil as these cause unnecessary reconciliation.
+	filteredClusterSpec.RKEConfig.ETCDSnapshotRestore = nil
+	filteredClusterSpec.RKEConfig.ETCDSnapshotCreate = nil
+	filteredClusterSpec.RKEConfig.RotateEncryptionKeys = nil
+	filteredClusterSpec.RKEConfig.RotateCertificates = nil
+	b64GZCluster, err := compressInterface(filteredClusterSpec)
 	if err != nil {
 		logrus.Errorf("cluster: %s/%s : error while gz/b64 encoding cluster specification: %v", cluster.Namespace, cluster.ClusterName, err)
 		return nil, err

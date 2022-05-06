@@ -1,4 +1,4 @@
-ARG K3S_BUILDER=rancher/k3s:v1.22.7-k3s1
+ARG K3S_BUILDER=rancher/k3s:v1.23.6-k3s1
 
 # Use binaries from k3s root for s390x as k3s is not available on s390x
 FROM registry.suse.com/bci/golang:1.17 AS k3s_root
@@ -17,8 +17,8 @@ FROM registry.suse.com/bci/golang:1.17
 ARG DAPPER_HOST_ARCH
 ENV HOST_ARCH=${DAPPER_HOST_ARCH} ARCH=${DAPPER_HOST_ARCH}
 ENV CATTLE_HELM_VERSION v2.16.8-rancher1
-ENV CATTLE_MACHINE_VERSION v0.15.0-rancher81
-ENV CATTLE_K3S_VERSION v1.22.7+k3s1
+ENV CATTLE_MACHINE_VERSION v0.15.0-rancher85
+ENV CATTLE_K3S_VERSION v1.23.6+k3s1
 # version used by helm plugin install script
 ENV CATTLE_HELM_UNITTEST_VERSION v0.1.7-rancher3
 # helm 3 version
@@ -38,10 +38,6 @@ RUN zypper -n in go1.17
 RUN if [ "${ARCH}" == "amd64" ]; then \
         curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s v1.44.0; \
         curl -H 'Cache-Control: no-cache' https://raw.githubusercontent.com/fossas/spectrometer/master/install.sh | sh; \
-    fi
-# workaround for https://bugzilla.suse.com/show_bug.cgi?id=1183043
-RUN if [ "${ARCH}" == "arm64" ]; then \
-        zypper -n install binutils-gold ; \
     fi
 
 ENV HELM_URL_V2_amd64=https://github.com/rancher/helm/releases/download/${CATTLE_HELM_VERSION}/rancher-helm \
@@ -83,6 +79,7 @@ COPY --from=k3s_builder \
     /bin/ethtool \
     /bin/ip \
     /bin/ipset \
+    /bin/k3s \
     /bin/losetup \
     /bin/pigz \
     /bin/runc \
@@ -99,13 +96,12 @@ RUN if [ "${ARCH}" != "s390x" ]; then \
         ln -s /usr/bin/cni /usr/bin/host-local && \
         ln -s /usr/bin/cni /usr/bin/loopback && \
         ln -s /usr/bin/cni /usr/bin/portmap && \
-        ln -s /usr/bin/containerd /usr/bin/crictl && \
-        ln -s /usr/bin/containerd /usr/bin/ctr && \
-        ln -s /usr/bin/containerd /usr/bin/k3s && \
-        ln -s /usr/bin/containerd /usr/bin/k3s-agent && \
-        ln -s /usr/bin/containerd /usr/bin/k3s-etcd-snapshot && \
-        ln -s /usr/bin/containerd /usr/bin/k3s-server && \
-        ln -s /usr/bin/containerd /usr/bin/kubectl && \
+        ln -s /usr/bin/k3s /usr/bin/crictl && \
+        ln -s /usr/bin/k3s /usr/bin/ctr && \
+        ln -s /usr/bin/k3s /usr/bin/k3s-agent && \
+        ln -s /usr/bin/k3s /usr/bin/k3s-etcd-snapshot && \
+        ln -s /usr/bin/k3s /usr/bin/k3s-server && \
+        ln -s /usr/bin/k3s /usr/bin/kubectl && \
         ln -s /usr/bin/pigz /usr/bin/unpigz && \
         ln -s /usr/bin/xtables-legacy-multi /usr/bin/iptables && \
         ln -s /usr/bin/xtables-legacy-multi /usr/bin/iptables-save && \
@@ -135,9 +131,9 @@ RUN curl -sLf ${YQ_URL} -o /usr/bin/yq && chmod +x /usr/bin/yq
 RUN zypper install -y python3-tox python3-base python3 libffi-devel libopenssl-devel
 
 ENV HELM_HOME /root/.helm
-ENV DAPPER_ENV REPO TAG DRONE_TAG DRONE_COMMIT DRONE_BRANCH SYSTEM_CHART_DEFAULT_BRANCH FOSSA_API_KEY
+ENV DAPPER_ENV REPO TAG DRONE_TAG DRONE_COMMIT DRONE_BRANCH SYSTEM_CHART_DEFAULT_BRANCH FOSSA_API_KEY GOGET_MODULE GOGET_VERSION
 ENV DAPPER_SOURCE /go/src/github.com/rancher/rancher/
-ENV DAPPER_OUTPUT ./bin ./dist
+ENV DAPPER_OUTPUT ./bin ./dist ./go.mod ./go.sum ./pkg/apis/go.mod ./pkg/apis/go.sum ./pkg/client/go.mod ./pkg/client/go.sum
 ENV DAPPER_DOCKER_SOCKET true
 ENV DAPPER_RUN_ARGS "-v rancher2-go16-pkg-1:/go/pkg -v rancher2-go16-cache-1:/root/.cache/go-build --privileged"
 ENV TRASH_CACHE ${DAPPER_SOURCE}/.trash-cache

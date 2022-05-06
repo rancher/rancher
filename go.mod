@@ -58,8 +58,8 @@ require (
 	github.com/creasty/defaults v1.5.2
 	github.com/crewjam/saml v0.4.5
 	github.com/davecgh/go-spew v1.1.1
-	github.com/docker/distribution v2.7.1+incompatible
-	github.com/docker/docker v20.10.12+incompatible
+	github.com/docker/distribution v2.8.1+incompatible
+	github.com/docker/docker v20.10.14+incompatible
 	github.com/docker/go-connections v0.4.0
 	github.com/ehazlett/simplelog v0.0.0-20200226020431-d374894e92a4
 	github.com/evanphx/json-patch v4.12.0+incompatible
@@ -89,7 +89,7 @@ require (
 	github.com/prometheus/client_golang v1.12.1
 	github.com/prometheus/client_model v0.2.0
 	github.com/prometheus/common v0.32.1
-	github.com/rancher/aks-operator v1.0.4
+	github.com/rancher/aks-operator v1.0.5-rc1
 	github.com/rancher/apiserver v0.0.0-20220223185512-c4e289f92e46
 	github.com/rancher/channelserver v0.5.1-0.20220405170618-28c9b37deff1
 	github.com/rancher/dynamiclistener v0.3.1-0.20210616080009-9865ae859c7f
@@ -97,19 +97,19 @@ require (
 	github.com/rancher/fleet/pkg/apis v0.0.0-20210918015053-5a141a6b18f0
 	github.com/rancher/gke-operator v1.1.3
 	github.com/rancher/kubernetes-provider-detector v0.1.5
-	github.com/rancher/lasso v0.0.0-20220303220250-a429cb5cb9c9
+	github.com/rancher/lasso v0.0.0-20220412224715-5f3517291ad4
 	github.com/rancher/lasso/controller-runtime v0.0.0-20220303220250-a429cb5cb9c9
-	github.com/rancher/machine v0.15.0-rancher81
-	github.com/rancher/norman v0.0.0-20220107203912-4feb41eafabd
+	github.com/rancher/machine v0.15.0-rancher85
+	github.com/rancher/norman v0.0.0-20220406153559-82478fb169cb
 	github.com/rancher/rancher/pkg/apis v0.0.0
 	github.com/rancher/rancher/pkg/client v0.0.0
 	github.com/rancher/rdns-server v0.0.0-20180802070304-bf662911db6a
-	github.com/rancher/remotedialer v0.2.6-0.20220120012928-4ea2198e0966
-	github.com/rancher/rke v1.3.8-rc11
+	github.com/rancher/remotedialer v0.2.6-0.20220318232944-60e3994094da
+	github.com/rancher/rke v1.3.11-rc2
 	github.com/rancher/security-scan v0.1.7-0.20200222041501-f7377f127168
-	github.com/rancher/steve v0.0.0-20220218171307-a91d90251ffa
+	github.com/rancher/steve v0.0.0-20220415184129-b23977e7f1b5
 	github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20210727200656-10b094e30007
-	github.com/rancher/wrangler v0.8.11-0.20220217210408-3ecd23dfea3b
+	github.com/rancher/wrangler v0.8.11-0.20220411195911-c2b951ab3480
 	github.com/robfig/cron v1.1.0
 	github.com/satori/go.uuid v1.2.1-0.20181016170032-d91630c85102
 	github.com/segmentio/kafka-go v0.0.0-20190411192201-218fd49cff39
@@ -122,7 +122,7 @@ require (
 	github.com/vmware/govmomi v0.26.0
 	github.com/vmware/kube-fluentd-operator v0.0.0-20190307154903-bf9de7e79eaf
 	github.com/xanzy/go-gitlab v0.0.0-20180830102804-feb856f4760f
-	golang.org/x/crypto v0.0.0-20211117183948-ae814b36b871
+	golang.org/x/crypto v0.0.0-20220411220226-7b82a4e95df4
 	golang.org/x/mod v0.5.0
 	golang.org/x/net v0.0.0-20220107192237-5cfca573fb4d
 	golang.org/x/oauth2 v0.0.0-20211104180415-d3ed0bb246c8
@@ -269,7 +269,7 @@ require (
 	github.com/onsi/gomega v1.17.0 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/opencontainers/image-spec v1.0.2 // indirect
-	github.com/opencontainers/runc v1.0.3 // indirect
+	github.com/opencontainers/runc v1.1.1 // indirect
 	github.com/pelletier/go-toml v1.9.4 // indirect
 	github.com/peterbourgon/diskv v2.0.1+incompatible // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect

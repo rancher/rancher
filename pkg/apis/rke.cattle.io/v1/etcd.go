@@ -2,6 +2,17 @@ package v1
 
 import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+type ETCDSnapshotPhase string
+
+const (
+	ETCDSnapshotPhaseStarted        ETCDSnapshotPhase = "Started"
+	ETCDSnapshotPhaseShutdown       ETCDSnapshotPhase = "Shutdown"
+	ETCDSnapshotPhaseRestore        ETCDSnapshotPhase = "Restore"
+	ETCDSnapshotPhaseRestartCluster ETCDSnapshotPhase = "RestartCluster"
+	ETCDSnapshotPhaseFinished       ETCDSnapshotPhase = "Finished"
+	ETCDSnapshotPhaseFailed         ETCDSnapshotPhase = "Failed"
+)
+
 type ETCDSnapshotS3 struct {
 	Endpoint            string `json:"endpoint,omitempty"`
 	EndpointCA          string `json:"endpointCA,omitempty"`
@@ -33,8 +44,13 @@ type ETCDSnapshotRestore struct {
 type ETCDSnapshot struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
+	Spec              ETCDSnapshotSpec   `json:"spec,omitempty"`
 	SnapshotFile      ETCDSnapshotFile   `json:"snapshotFile,omitempty"`
 	Status            ETCDSnapshotStatus `json:"status"`
+}
+
+type ETCDSnapshotSpec struct {
+	ClusterName string `json:"clusterName,omitempty"`
 }
 
 type ETCDSnapshotFile struct {

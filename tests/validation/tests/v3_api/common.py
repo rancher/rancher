@@ -1000,8 +1000,21 @@ def validate_dns_record(pod, record, expected, port=TEST_IMAGE_PORT):
         record["name"], record["namespaceId"])
     validate_dns_entry(pod, host, expected, port=port)
 
+def retry_dig(host, pod, expected, retry_count=3):
+    for i in range(0, retry_count):
+        dig_cmd = 'dig {0} +short'.format(host)
+        dig_output = kubectl_pod_exec(pod, dig_cmd)
+        decode_dig = dig_output.decode('utf-8')
+        split_dig = decode_dig.splitlines()
+        dig_length = len(split_dig)
+        expected_length = len(expected)
+        if dig_length >= expected_length:
+            return dig_output
+        elif dig_length < expected_length:
+            time.sleep(3)
+    pytest.fail(f"failed to get the expected number of dns hosts from dig")
 
-def validate_dns_entry(pod, host, expected, port=TEST_IMAGE_PORT):
+def validate_dns_entry(pod, host, expected, port=TEST_IMAGE_PORT, retry_count=3):
     if is_windows():
         validate_dns_entry_windows(pod, host, expected)
         return
@@ -1012,6 +1025,14 @@ def validate_dns_entry(pod, host, expected, port=TEST_IMAGE_PORT):
     else:
         cmd = 'ping -c 1 -W 1 {0}'.format(host)
     cmd_output = kubectl_pod_exec(pod, cmd)
+
+    if str(pod.name) not in str(cmd_output):
+        for i in range(0, retry_count):
+            cmd_output = kubectl_pod_exec(pod, cmd)
+            if str(pod.name) in str(cmd_output):
+                break
+            else:
+                time.sleep(5)
 
     connectivity_validation_pass = False
     for expected_value in expected:
@@ -1025,8 +1046,7 @@ def validate_dns_entry(pod, host, expected, port=TEST_IMAGE_PORT):
     else:
         assert " 0% packet loss" in str(cmd_output)
 
-    dig_cmd = 'dig {0} +short'.format(host)
-    dig_output = kubectl_pod_exec(pod, dig_cmd)
+    dig_output = retry_dig(host, pod, expected)
 
     for expected_value in expected:
         assert expected_value in str(dig_output), \

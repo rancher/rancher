@@ -30,6 +30,9 @@ var globalResourceRulesNeededInProjects = map[string]rbacv1.PolicyRule{
 	"navlinks": rbacv1.PolicyRule{
 		APIGroups: []string{"ui.cattle.io"},
 	},
+	"nodes": rbacv1.PolicyRule{
+		APIGroups: []string{""},
+	},
 	"persistentvolumes": rbacv1.PolicyRule{
 		APIGroups: []string{"", "core"},
 	},

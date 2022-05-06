@@ -5,7 +5,6 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"errors"
-	"fmt"
 
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2"
@@ -336,31 +335,10 @@ func getLabelsAndAnnotationsForPlanSecret(bootstrap *rkev1.RKEBootstrap, machine
 		labels[k] = v
 	}
 
-	annotations := make(map[string]string, len(bootstrap.Annotations)+1)
-	annotations[rke2.JoinURLAnnotation] = getMachineJoinURL(machine)
+	annotations := make(map[string]string, len(bootstrap.Annotations))
 	for k, v := range bootstrap.Annotations {
 		annotations[k] = v
 	}
 
 	return labels, annotations
-}
-
-func getMachineJoinURL(machine *capi.Machine) string {
-	if machine.Status.NodeInfo == nil {
-		return ""
-	}
-
-	address := ""
-	for _, machineAddress := range machine.Status.Addresses {
-		switch machineAddress.Type {
-		case capi.MachineInternalIP:
-			address = machineAddress.Address
-		case capi.MachineExternalIP:
-			if address == "" {
-				address = machineAddress.Address
-			}
-		}
-	}
-
-	return fmt.Sprintf("https://%s:%d", address, rke2.GetRuntimeSupervisorPort(machine.Status.NodeInfo.KubeletVersion))
 }

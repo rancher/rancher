@@ -50,8 +50,6 @@ const (
 	deleteJobConditionType = "DeleteJob"
 
 	forceRemoveMachineAnn = "provisioning.cattle.io/force-machine-remove"
-
-	drainingSucceededCondition = condition.Cond(capi.DrainingSucceededCondition)
 )
 
 type infraObject struct {
@@ -93,6 +91,7 @@ type handler struct {
 	pods                corecontrollers.PodCache
 	secrets             corecontrollers.SecretCache
 	machines            capicontrollers.MachineCache
+	machinesClient      capicontrollers.MachineClient
 	namespaces          corecontrollers.NamespaceCache
 	nodeDriverCache     mgmtcontrollers.NodeDriverCache
 	dynamic             *dynamic.Controller
@@ -113,6 +112,7 @@ func Register(ctx context.Context, clients *wrangler.Context) {
 		jobs:                clients.Batch.Job().Cache(),
 		secrets:             clients.Core.Secret().Cache(),
 		machines:            clients.CAPI.Machine().Cache(),
+		machinesClient:      clients.CAPI.Machine(),
 		nodeDriverCache:     clients.Mgmt.NodeDriver().Cache(),
 		namespaces:          clients.Core.Namespace().Cache(),
 		dynamic:             clients.Dynamic,
@@ -170,7 +170,7 @@ func (h *handler) OnJobChange(key string, job *batchv1.Job) (*batchv1.Job, error
 		return job, err
 	}
 
-	newStatus, err := h.getMachineStatus(job, job.Spec.Template.Labels[InfraJobRemove] == "true")
+	newStatus, err := h.getMachineStatus(job)
 	if err != nil {
 		return job, err
 	}
@@ -189,9 +189,9 @@ func (h *handler) OnJobChange(key string, job *batchv1.Job) (*batchv1.Job, error
 	return job, nil
 }
 
-func (h *handler) getMachineStatus(job *batchv1.Job, remove bool) (rkev1.RKEMachineStatus, error) {
+func (h *handler) getMachineStatus(job *batchv1.Job) (rkev1.RKEMachineStatus, error) {
 	condType := createJobConditionType
-	if remove {
+	if job.Spec.Template.Labels[InfraJobRemove] == "true" {
 		condType = deleteJobConditionType
 	}
 	if !job.Status.CompletionTime.IsZero() {
@@ -232,25 +232,20 @@ func (h *handler) getMachineStatus(job *batchv1.Job, remove bool) (rkev1.RKEMach
 		}
 
 		if lastPod != nil {
-			return getMachineStatusFromPod(lastPod, job.Spec.Template.Labels[InfraMachineKind], condType), nil
+			return getMachineStatusFromPod(lastPod, condType), nil
 		}
-	}
-
-	message := CreatingMachineMessage(job.Spec.Template.Labels[InfraMachineKind])
-	if condType != createJobConditionType {
-		message = DeletingMachineMessage(job.Spec.Template.Labels[InfraMachineKind])
 	}
 
 	return rkev1.RKEMachineStatus{Conditions: []genericcondition.GenericCondition{
 		{
 			Type:    "Ready",
 			Status:  corev1.ConditionFalse,
-			Message: message,
+			Message: ExecutingMachineMessage(job.Spec.Template.Labels, job.Namespace),
 		},
 	}}, nil
 }
 
-func getMachineStatusFromPod(pod *corev1.Pod, kind, condType string) rkev1.RKEMachineStatus {
+func getMachineStatusFromPod(pod *corev1.Pod, condType string) rkev1.RKEMachineStatus {
 	reason := string(capierrors.CreateMachineError)
 	if condType == deleteJobConditionType {
 		reason = string(capierrors.DeleteMachineError)
@@ -275,10 +270,7 @@ func getMachineStatusFromPod(pod *corev1.Pod, kind, condType string) rkev1.RKEMa
 	for _, containerStatus := range pod.Status.ContainerStatuses {
 		if containerStatus.State.Terminated != nil && containerStatus.State.Terminated.ExitCode != 0 {
 			failureMessage := strings.TrimSpace(containerStatus.State.Terminated.Message)
-			message := FailedMachineCreateMessage(kind, reason, failureMessage)
-			if condType != createJobConditionType {
-				message = FailedMachineDeleteMessage(kind, reason, failureMessage)
-			}
+			message := FailedMachineMessage(pod.Labels, pod.Namespace, reason, failureMessage)
 			return rkev1.RKEMachineStatus{
 				Conditions: []genericcondition.GenericCondition{
 					{
@@ -461,12 +453,24 @@ func (h *handler) run(infraObj *infraObject, create bool) (runtime.Object, error
 			h.dynamic.EnqueueAfter(infraObj.obj.GetObjectKind().GroupVersionKind(), infraObj.meta.GetNamespace(), infraObj.meta.GetName(), 2*time.Second)
 	}
 
-	if err := h.apply.WithOwner(infraObj.obj).ApplyObjects(objects(args.String("providerID") != "" && create, dArgs)...); err != nil {
+	failedCreate := infraObj.data.String("status", "failureReason") == string(capierrors.CreateMachineError)
+
+	if err := h.apply.WithOwner(infraObj.obj).ApplyObjects(objects((args.String("providerID") != "" || failedCreate) && create, dArgs)...); err != nil {
 		return nil, err
 	}
 
 	if create {
-		return h.patchStatus(infraObj.obj, infraObj.data, dArgs.RKEMachineStatus)
+		infraObj.obj, err = h.patchStatus(infraObj.obj, infraObj.data, dArgs.RKEMachineStatus)
+		if err != nil {
+			return nil, err
+		}
+
+		if failedCreate {
+			logrus.Infof("[MachineProvision] Failed to create infrastructure %s/%s for machine %s, deleting and recreating...", infraObj.meta.GetNamespace(), infraObj.meta.GetName(), dArgs.CapiMachineName)
+			if err = h.machinesClient.Delete(infraObj.meta.GetNamespace(), dArgs.CapiMachineName, &metav1.DeleteOptions{}); err != nil {
+				return infraObj.obj, fmt.Errorf("failed to delete CAPI machine %s: %w", dArgs.CapiMachineName, err)
+			}
+		}
 	}
 
 	return infraObj.obj, nil
@@ -714,18 +718,32 @@ func shouldCleanupObjects(job *batchv1.Job, d data.Object) bool {
 	return false
 }
 
-func FailedMachineDeleteMessage(kind, failureReason, failureMessage string) string {
-	return fmt.Sprintf("failed deleting server (%s) in infrastructure provider: %s: %s", kind, failureReason, failureMessage)
+func FailedMachineMessage(podLabels map[string]string, namespace, failureReason, failureMessage string) string {
+	verb := "creating"
+	if podLabels[InfraJobRemove] == "true" {
+		verb = "deleting"
+	}
+	return fmt.Sprintf("failed %s server [%s/%s] of kind (%s) for machine %s in infrastructure provider: %s: %s",
+		verb,
+		namespace,
+		podLabels[InfraMachineName],
+		podLabels[InfraMachineKind],
+		podLabels[CapiMachineName],
+		failureReason,
+		failureMessage,
+	)
 }
 
-func FailedMachineCreateMessage(kind, failureReason, failureMessage string) string {
-	return fmt.Sprintf("failed creating server (%s) in infrastructure provider: %s: %s", kind, failureReason, failureMessage)
-}
-
-func CreatingMachineMessage(kind string) string {
-	return fmt.Sprintf("creating server (%s) in infrastructure provider", kind)
-}
-
-func DeletingMachineMessage(kind string) string {
-	return fmt.Sprintf("deleting server (%s) in infrastructure provider", kind)
+func ExecutingMachineMessage(podLabels map[string]string, namespace string) string {
+	verb := "creating"
+	if podLabels[InfraJobRemove] == "true" {
+		verb = "deleting"
+	}
+	return fmt.Sprintf("%s server [%s/%s] of kind (%s) for machine %s in infrastructure provider",
+		verb,
+		namespace,
+		podLabels[InfraMachineName],
+		podLabels[InfraMachineKind],
+		podLabels[CapiMachineName],
+	)
 }

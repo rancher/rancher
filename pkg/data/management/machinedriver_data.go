@@ -3,6 +3,7 @@ package management
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"reflect"
 	"strings"
 
@@ -105,7 +106,7 @@ func addMachineDrivers(management *config.ManagementContext) error {
 	}
 	linodeBuiltin := true
 	if dl := os.Getenv("CATTLE_DEV_MODE"); dl != "" {
-		linodeBuiltin = false
+		linodeBuiltin = isCommandAvailable("docker-machine-driver-linode")
 	}
 	if err := addMachineDriver(Linodedriver, "https://github.com/linode/docker-machine-driver-linode/releases/download/v0.1.8/docker-machine-driver-linode_linux-amd64.zip", "/assets/rancher-ui-driver-linode/component.js", "b31b6a504c59ee758d2dda83029fe4a85b3f5601e22dfa58700a5e6c8f450dc7", []string{"api.linode.com"}, linodeBuiltin, linodeBuiltin, false, management); err != nil {
 		return err
@@ -214,4 +215,8 @@ func addMachineDriver(name, url, uiURL, checksum string, whitelist []string, act
 	})
 
 	return err
+}
+
+func isCommandAvailable(name string) bool {
+	return exec.Command("command", "-v", name).Run() == nil
 }

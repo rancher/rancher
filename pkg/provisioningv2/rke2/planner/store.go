@@ -4,6 +4,8 @@ import (
 	"bufio"
 	"bytes"
 	"compress/gzip"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -160,28 +162,33 @@ func SecretToNode(secret *corev1.Secret) (*plan.Node, error) {
 	}
 	planData := secret.Data["plan"]
 	appliedPlanData := secret.Data["appliedPlan"]
+	failedChecksum := string(secret.Data["failed-checksum"])
 	output := secret.Data["applied-output"]
 	appliedPeriodicOutput := secret.Data["applied-periodic-output"]
 	probes := secret.Data["probe-statuses"]
 	failureCount := secret.Data["failure-count"]
-	maxFailures := secret.Data["max-failures"]
 
-	if len(failureCount) > 0 && len(maxFailures) > 0 {
+	if len(failureCount) > 0 && PlanHash(planData) == failedChecksum {
 		failureCount, err := strconv.Atoi(string(failureCount))
 		if err != nil {
 			return nil, err
 		}
-		maxFailures, err := strconv.Atoi(string(maxFailures))
-		if err != nil {
-			return nil, err
-		}
-		if failureCount >= maxFailures {
+		if failureCount > 0 {
 			result.Failed = true
-		} else {
-			result.Failed = false
+			// failure-threshold is set by Rancher when the plan is updated. If it is not set, then it essentially
+			// defaults to 1, and any failure causes the plan to be marked as failed
+			rawFailureThreshold := secret.Data["failure-threshold"]
+			if len(rawFailureThreshold) > 0 {
+				failureThreshold, err := strconv.Atoi(string(rawFailureThreshold))
+				if err != nil {
+					return nil, err
+				}
+				if failureCount < failureThreshold || failureThreshold == -1 {
+					// the plan hasn't actually failed to be applied because we haven't passed the failure threshold or failure threshold is set to -1.
+					result.Failed = false
+				}
+			}
 		}
-	} else {
-		result.Failed = false
 	}
 
 	if len(probes) > 0 {
@@ -246,6 +253,11 @@ func SecretToNode(secret *corev1.Secret) (*plan.Node, error) {
 	return result, nil
 }
 
+func PlanHash(plan []byte) string {
+	result := sha256.Sum256(plan)
+	return hex.EncodeToString(result[:])
+}
+
 // getPlanSecrets retrieves the plan secrets for the given list of machines
 func (p *PlanStore) getPlanSecrets(machines []*capi.Machine) (map[string]*corev1.Secret, error) {
 	result := map[string]*corev1.Secret{}
@@ -291,7 +303,11 @@ func (p *PlanStore) getPlanSecretFromMachine(machine *capi.Machine) (*corev1.Sec
 }
 
 // UpdatePlan should not be called directly as it will not block further progress if the plan is not in sync
-func (p *PlanStore) UpdatePlan(entry *planEntry, plan plan.NodePlan, maxFailures int) error {
+// maxFailures is the number of attempts the system-agent will make to run the plan (in a failed state). failureThreshold is used to determine when the plan has failed.
+func (p *PlanStore) UpdatePlan(entry *planEntry, plan plan.NodePlan, maxFailures, failureThreshold int) error {
+	if maxFailures < failureThreshold && failureThreshold != -1 && maxFailures != -1 {
+		return fmt.Errorf("failureThreshold (%d) cannot be greater than maxFailures (%d)", failureThreshold, maxFailures)
+	}
 	secret, err := p.getPlanSecretFromMachine(entry.Machine)
 	if err != nil {
 		return err
@@ -303,22 +319,29 @@ func (p *PlanStore) UpdatePlan(entry *planEntry, plan plan.NodePlan, maxFailures
 	}
 
 	secret = secret.DeepCopy()
-
 	if secret.Data == nil {
-		secret.Data = map[string][]byte{}
+		// Create the map with enough storage for what is needed.
+		secret.Data = make(map[string][]byte, 6)
 	}
 
 	rke2.CopyPlanMetadataToSecret(secret, entry.Metadata)
 
-	// if there are no probes, clear the statuses of the probes so as to prevent false positives
-	if len(plan.Probes) == 0 {
-		delete(secret.Data, "probe-statuses")
-	}
+	// If the plan is being updated, then delete the probe-statuses so their healthy status will be reported as healthy only when they pass.
+	delete(secret.Data, "probe-statuses")
 
 	secret.Data["plan"] = data
-	if maxFailures > 0 {
+	if maxFailures > 0 || maxFailures == -1 {
 		secret.Data["max-failures"] = []byte(strconv.Itoa(maxFailures))
+	} else {
+		delete(secret.Data, "max-failures")
 	}
+
+	if failureThreshold > 0 || failureThreshold == -1 {
+		secret.Data["failure-threshold"] = []byte(strconv.Itoa(failureThreshold))
+	} else {
+		delete(secret.Data, "failure-threshold")
+	}
+
 	_, err = p.secrets.Update(secret)
 	return err
 }
@@ -353,18 +376,18 @@ func (p *PlanStore) removePlanSecretLabel(entry *planEntry, key string) error {
 }
 
 // assignAndCheckPlan assigns the given newPlan to the designated server in the planEntry, and will return nil if the plan is assigned and in sync.
-func assignAndCheckPlan(store *PlanStore, msg string, server *planEntry, newPlan plan.NodePlan, maxFailures int) error {
+func assignAndCheckPlan(store *PlanStore, msg string, server *planEntry, newPlan plan.NodePlan, failureThreshold, maxRetries int) error {
 	if server.Plan == nil || !equality.Semantic.DeepEqual(server.Plan.Plan, newPlan) {
-		if err := store.UpdatePlan(server, newPlan, maxFailures); err != nil {
+		if err := store.UpdatePlan(server, newPlan, failureThreshold, maxRetries); err != nil {
 			return err
 		}
 		return ErrWaiting(fmt.Sprintf("starting %s", msg))
 	}
-	if !server.Plan.InSync {
-		return ErrWaiting(fmt.Sprintf("waiting for %s", msg))
-	}
 	if server.Plan.Failed {
 		return fmt.Errorf("operation %s failed", msg)
+	}
+	if !server.Plan.InSync {
+		return ErrWaiting(fmt.Sprintf("waiting for %s", msg))
 	}
 	return nil
 }
@@ -413,15 +436,19 @@ func (p *PlanStore) setMachineJoinURL(entry *planEntry, capiCluster *capi.Cluste
 }
 
 func getJoinURLFromOutput(entry *planEntry, capiCluster *capi.Cluster, rkeControlPlane *rkev1.RKEControlPlane) (string, error) {
-	if entry.Plan == nil || !IsEtcdOnlyInitNode(entry) {
+	if entry.Plan == nil || !IsEtcdOnlyInitNode(entry) || capiCluster.Spec.ControlPlaneRef == nil || rkeControlPlane == nil {
 		return "", nil
 	}
 
 	var address []byte
-	if ca, ok := entry.Plan.PeriodicOutput["capture-address"]; ok && ca.ExitCode == 0 && ca.LastSuccessfulRunTime != "" {
-		address = ca.Stdout
-	} else {
+	var name string
+	if ca := entry.Plan.PeriodicOutput[captureAddressInstructionName]; ca.ExitCode != 0 || ca.LastSuccessfulRunTime == "" {
 		return "", nil
+	} else if etcdNameOutput := entry.Plan.PeriodicOutput[etcdNameInstructionName]; etcdNameOutput.ExitCode != 0 || etcdNameOutput.LastSuccessfulRunTime == "" {
+		return "", nil
+	} else {
+		address = ca.Stdout
+		name = string(bytes.TrimSpace(etcdNameOutput.Stdout))
 	}
 
 	var str string
@@ -443,29 +470,27 @@ func getJoinURLFromOutput(entry *planEntry, capiCluster *capi.Cluster, rkeContro
 		return "", err
 	}
 
-	if len(dbInfo.Members) == 0 {
-		return "", nil
+	for _, member := range dbInfo.Members {
+		if member.Name != name {
+			continue
+		}
+
+		u, err := url.Parse(member.ClientURLs[0])
+		if err != nil {
+			return "", err
+		}
+
+		return fmt.Sprintf("https://%s:%d", u.Hostname(), rke2.GetRuntimeSupervisorPort(rkeControlPlane.Spec.KubernetesVersion)), nil
 	}
 
-	if len(dbInfo.Members[0].ClientURLs) == 0 {
-		return "", nil
-	}
-
-	u, err := url.Parse(dbInfo.Members[0].ClientURLs[0])
-	if err != nil {
-		return "", err
-	}
-
-	if capiCluster.Spec.ControlPlaneRef == nil || rkeControlPlane == nil {
-		return "", nil
-	}
-
-	return fmt.Sprintf("https://%s:%d", u.Hostname(), rke2.GetRuntimeSupervisorPort(rkeControlPlane.Spec.KubernetesVersion)), nil
+	// No need to error here because once the plan secret is updated, then this will be retried.
+	return "", nil
 }
 
 type dbinfo struct {
 	Members []member `json:"members,omitempty"`
 }
 type member struct {
+	Name       string   `json:"name,omitempty"`
 	ClientURLs []string `json:"clientURLs,omitempty"`
 }

@@ -24,8 +24,12 @@ func Test_getUser(t *testing.T) {
 			userInfo: &user.DefaultInfo{Name: "user-abcde"},
 			userGetFunc: func(_, _ string) (*v3.User, error) {
 				return &v3.User{
-					ObjectMeta: metav1.ObjectMeta{Name: "user-abcde"},
-					Username:   "admin",
+					ObjectMeta:  metav1.ObjectMeta{Name: "user-abcde"},
+					Username:    "admin",
+					DisplayName: "Default Admin",
+					PrincipalIDs: []string{
+						"local://user-abcde",
+					},
 				}, nil
 			},
 			userAttribGetFunc: func(_, _ string) (*v3.UserAttribute, error) {
@@ -38,22 +42,68 @@ func Test_getUser(t *testing.T) {
 					"system:authenticated",
 					"system:cattle:authenticated",
 				},
+				Extra: map[string][]string{
+					"username":    {"Default Admin"},
+					"principalid": {"local://user-abcde"},
+				},
+			},
+		},
+		{
+			name:     "local system cluster user",
+			userInfo: &user.DefaultInfo{Name: "u-system"},
+			userGetFunc: func(_, _ string) (*v3.User, error) {
+				return &v3.User{
+					ObjectMeta:  metav1.ObjectMeta{Name: "u-system"},
+					DisplayName: "System account for Cluster c-abcde",
+					PrincipalIDs: []string{
+						"local://u-system",
+					},
+				}, nil
+			},
+			userAttribGetFunc: func(_, _ string) (*v3.UserAttribute, error) {
+				return nil, nil
+			},
+			want: &user.DefaultInfo{
+				UID: "u-system",
+				Groups: []string{
+					"system:authenticated",
+					"system:cattle:authenticated",
+				},
+				Extra: map[string][]string{
+					"username":    {"System account for Cluster c-abcde"},
+					"principalid": {"local://u-system"},
+				},
+			},
+		},
+		{
+			name:     "local system nonspecific user",
+			userInfo: &user.DefaultInfo{Name: "u-system"},
+			userGetFunc: func(_, _ string) (*v3.User, error) {
+				return &v3.User{
+					ObjectMeta: metav1.ObjectMeta{Name: "u-system"},
+					PrincipalIDs: []string{
+						"local://u-system",
+					},
+				}, nil
+			},
+			userAttribGetFunc: func(_, _ string) (*v3.UserAttribute, error) {
+				return nil, nil
+			},
+			want: &user.DefaultInfo{
+				UID: "u-system",
+				Groups: []string{
+					"system:authenticated",
+					"system:cattle:authenticated",
+				},
+				Extra: map[string][]string{
+					"principalid": {"local://u-system"},
+				},
 			},
 		},
 		{
 			name: "multi auth provider user",
 			userInfo: &user.DefaultInfo{
 				Name: "user-abcde",
-				Extra: map[string][]string{
-					"username": []string{
-						"user1",
-						"admin",
-					},
-					"principalid": []string{
-						"openldap_user://uid=user1,dc=example,dc=org",
-						"github_user://890",
-					},
-				},
 			},
 			userGetFunc: func(_, _ string) (*v3.User, error) {
 				return &v3.User{
@@ -64,7 +114,7 @@ func Test_getUser(t *testing.T) {
 			userAttribGetFunc: func(_, _ string) (*v3.UserAttribute, error) {
 				return &v3.UserAttribute{
 					GroupPrincipals: map[string]v3.Principals{
-						"github": v3.Principals{
+						"github": {
 							Items: []v3.Principal{
 								{
 									ObjectMeta: metav1.ObjectMeta{Name: "github_org://456"},
@@ -74,7 +124,7 @@ func Test_getUser(t *testing.T) {
 								},
 							},
 						},
-						"openldap": v3.Principals{
+						"openldap": {
 							Items: []v3.Principal{
 								{
 									ObjectMeta: metav1.ObjectMeta{Name: "openldap_group://cn=group1,dc=example,dc=org"},
@@ -85,6 +135,24 @@ func Test_getUser(t *testing.T) {
 								{
 									ObjectMeta: metav1.ObjectMeta{Name: "openldap_group://cn=group2,dc=example,dc=org"},
 								},
+							},
+						},
+					},
+					ExtraByProvider: map[string]map[string][]string{
+						"github": {
+							"username": []string{
+								"user1",
+							},
+							"principalid": []string{
+								"github_user://890",
+							},
+						},
+						"openldap": {
+							"username": []string{
+								"admin",
+							},
+							"principalid": []string{
+								"openldap_user://uid=user1,dc=example,dc=org",
 							},
 						},
 					},

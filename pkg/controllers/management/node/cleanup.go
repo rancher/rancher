@@ -187,7 +187,7 @@ func (m *Lifecycle) waitForJobCondition(userContext *config.UserContext, job *v1
 		Steps:    10,
 	}
 
-	logrus.Infof("[node-cleanup] validating cleanup job %s %sd, retrying up to 10 times", logMessage, job.Name)
+	logrus.Infof("[node-cleanup] validating cleanup job %s %sd, retrying up to 10 times", job.Name, logMessage)
 	// purposefully ignoring error, if the drain fails this falls back to deleting the node as usual
 	return wait.ExponentialBackoff(backoff, func() (bool, error) {
 		ctx, cancel := context.WithTimeout(m.ctx, backoff.Duration)

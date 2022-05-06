@@ -10,6 +10,7 @@ import (
 	"time"
 
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/controllers/management/imported"
 
 	"github.com/ghodss/yaml"
 	"github.com/pkg/errors"
@@ -285,7 +286,8 @@ func (h *Handler) setPodSecurityPolicyTemplate(actionName string, action *types.
 			return fmt.Errorf("error retrieving cluster [%s]: %v", clusterName, err)
 		}
 
-		if !cluster.Status.Capabilities.PspEnabled {
+		// rke2 provisioned clusters always have PSP enabled
+		if !cluster.Status.Capabilities.PspEnabled && !isProvisionedRke2Cluster(cluster) {
 			return httperror.NewAPIError(httperror.InvalidAction,
 				fmt.Sprintf("cluster [%s] does not have Pod Security Policies enabled", clusterName))
 		}
@@ -442,4 +444,9 @@ func getID(id interface{}) (string, error) {
 
 	split := strings.Split(s, ":")
 	return split[0] + ":" + split[len(split)-1], nil
+}
+
+// isProvisionedRke2Cluster check to see if this is a rancher provisioned rke2 cluster
+func isProvisionedRke2Cluster(cluster *v3.Cluster) bool {
+	return cluster.Status.Provider == v32.ClusterDriverRke2 && imported.IsAdministratedByProvisioningCluster(cluster)
 }

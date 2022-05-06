@@ -176,7 +176,7 @@ func (p *Provisioner) Remove(cluster *v3.Cluster) (runtime.Object, error) {
 }
 
 func (p *Provisioner) Updated(cluster *v3.Cluster) (runtime.Object, error) {
-	if skipOperatorCluster("update", cluster) {
+	if skipOperatorCluster("update", cluster) || imported.IsAdministratedByProvisioningCluster(cluster) {
 		return cluster, nil
 	}
 
@@ -352,7 +352,7 @@ func setVersion(cluster *v3.Cluster) {
 
 func (p *Provisioner) update(cluster *v3.Cluster, create bool) (*v3.Cluster, error) {
 	cluster, err := p.reconcileCluster(cluster, create)
-	if err != nil {
+	if err != nil || imported.IsAdministratedByProvisioningCluster(cluster) {
 		return cluster, err
 	}
 
@@ -385,7 +385,7 @@ func (p *Provisioner) machineChanged(key string, machine *v3.Node) (runtime.Obje
 }
 
 func (p *Provisioner) Create(cluster *v3.Cluster) (runtime.Object, error) {
-	if skipOperatorCluster("create", cluster) {
+	if skipOperatorCluster("create", cluster) || imported.IsAdministratedByProvisioningCluster(cluster) {
 		return cluster, nil
 	}
 
@@ -417,7 +417,6 @@ func (p *Provisioner) provision(cluster *v3.Cluster) (*v3.Cluster, error) {
 }
 
 func (p *Provisioner) pending(cluster *v3.Cluster) (*v3.Cluster, error) {
-
 	if skipLocalK3sImported(cluster) {
 		return cluster, nil
 	}

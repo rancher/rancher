@@ -234,6 +234,11 @@ func (in *RKEConfig) DeepCopy() *RKEConfig {
 func (in *RKEMachinePool) DeepCopyInto(out *RKEMachinePool) {
 	*out = *in
 	in.RKECommonNodeConfig.DeepCopyInto(&out.RKECommonNodeConfig)
+	if in.DrainBeforeDeleteTimeout != nil {
+		in, out := &in.DrainBeforeDeleteTimeout, &out.DrainBeforeDeleteTimeout
+		*out = new(metav1.Duration)
+		**out = **in
+	}
 	if in.NodeConfig != nil {
 		in, out := &in.NodeConfig, &out.NodeConfig
 		*out = new(corev1.ObjectReference)

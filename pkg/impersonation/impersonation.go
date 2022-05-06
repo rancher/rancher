@@ -1,3 +1,4 @@
+// Package impersonation sets up service accounts that are permitted to act on behalf of a Rancher user on a cluster.
 package impersonation
 
 import (
@@ -6,6 +7,7 @@ import (
 	"sort"
 	"time"
 
+	authcommon "github.com/rancher/rancher/pkg/auth/providers/common"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/sirupsen/logrus"
@@ -20,11 +22,14 @@ import (
 )
 
 const (
-	impersonationLabel     = "authz.cluster.cattle.io/impersonator"
+	impersonationLabel = "authz.cluster.cattle.io/impersonator"
+	// ImpersonationNamespace is the namespace where impersonation service accounts live.
 	ImpersonationNamespace = "cattle-impersonation-system"
-	ImpersonationPrefix    = "cattle-impersonation-"
+	// ImpersonationPrefix is the prefix for impersonation roles, bindings, and service accounts.
+	ImpersonationPrefix = "cattle-impersonation-"
 )
 
+// Impersonator contains data for the user being impersonated.
 type Impersonator struct {
 	user                user.Info
 	clusterContext      *config.UserContext
@@ -32,6 +37,7 @@ type Impersonator struct {
 	userAttributeLister v3.UserAttributeLister
 }
 
+// New creates an Impersonator from a kubernetes user.Info object and a UserContext for the cluster.
 func New(userInfo user.Info, clusterContext *config.UserContext) (Impersonator, error) {
 	impersonator := Impersonator{
 		clusterContext:      clusterContext,
@@ -47,6 +53,8 @@ func New(userInfo user.Info, clusterContext *config.UserContext) (Impersonator, 
 	return impersonator, nil
 }
 
+// SetUpImpersonation creates a service account on a cluster with a clusterrole and clusterrolebinding allowing it to impersonate a Rancher user.
+// Returns a reference to the service account, which can be used by GetToken to retrieve the account token, or an error if creating any of the resources failed.
 func (i *Impersonator) SetUpImpersonation() (*corev1.ServiceAccount, error) {
 	rules := i.rulesForUser()
 	logrus.Tracef("impersonation: checking role for user %s", i.user.GetName())
@@ -85,6 +93,7 @@ func (i *Impersonator) SetUpImpersonation() (*corev1.ServiceAccount, error) {
 	return i.waitForServiceAccount(sa)
 }
 
+// GetToken accepts a service account and returns the service account's token.
 func (i *Impersonator) GetToken(sa *corev1.ServiceAccount) (string, error) {
 	if len(sa.Secrets) == 0 {
 		return "", fmt.Errorf("service account is not ready")
@@ -185,6 +194,9 @@ func (i *Impersonator) createNamespace() error {
 	return err
 }
 
+// checkAndUpdateRole checks whether the impersonation clusterrole already exists and whether it has the correct rules.
+// If the role does not exist, the method returns nil for the role and createRole must be called.
+// If the role does exist, the rules are updated if necessary and a reference to the role is returned.
 func (i *Impersonator) checkAndUpdateRole(rules []rbacv1.PolicyRule) (*rbacv1.ClusterRole, error) {
 	name := ImpersonationPrefix + i.user.GetUID()
 	var role *rbacv1.ClusterRole
@@ -252,7 +264,7 @@ func (i *Impersonator) rulesForUser() []rbacv1.PolicyRule {
 		})
 	}
 	extras := i.user.GetExtra()
-	if principalids, ok := extras["principalid"]; ok {
+	if principalids, ok := extras[authcommon.UserAttributePrincipalID]; ok {
 		rules = append(rules, rbacv1.PolicyRule{
 			Verbs:         []string{"impersonate"},
 			APIGroups:     []string{"authentication.k8s.io"},
@@ -260,7 +272,7 @@ func (i *Impersonator) rulesForUser() []rbacv1.PolicyRule {
 			ResourceNames: principalids,
 		})
 	}
-	if usernames, ok := extras["username"]; ok {
+	if usernames, ok := extras[authcommon.UserAttributeUserName]; ok {
 		rules = append(rules, rbacv1.PolicyRule{
 			Verbs:         []string{"impersonate"},
 			APIGroups:     []string{"authentication.k8s.io"},
@@ -361,11 +373,21 @@ func (i *Impersonator) getUser(userInfo user.Info) (user.Info, error) {
 	}
 
 	groups := []string{"system:authenticated", "system:cattle:authenticated"}
+	extras := make(map[string][]string)
 	attribs, err := i.userAttributeLister.Get("", userInfo.GetUID())
 	if err != nil && !apierrors.IsNotFound(err) {
 		return &user.DefaultInfo{}, err
 	}
-	if attribs != nil {
+	if attribs == nil { // system users do not have userattributes, but principalid and username are on the user
+		// See https://github.com/rancher/rancher/blob/7ce603ea90ca656f5baa29b0149c19c8d7f73e8f/pkg/auth/requests/authenticate.go#L185-L194
+		// If the extras are not in userattributes, use displayName and principalIDs from the user.
+		if u.DisplayName != "" {
+			extras[authcommon.UserAttributeUserName] = []string{u.DisplayName}
+		}
+		if len(u.PrincipalIDs) > 0 {
+			extras[authcommon.UserAttributePrincipalID] = u.PrincipalIDs
+		}
+	} else { // real users have groups and extras in userattributes
 		for _, gps := range attribs.GroupPrincipals {
 			for _, groupPrincipal := range gps.Items {
 				if !isInList(groupPrincipal.Name, groups) {
@@ -373,17 +395,28 @@ func (i *Impersonator) getUser(userInfo user.Info) (user.Info, error) {
 				}
 			}
 		}
+		for _, exs := range attribs.ExtraByProvider {
+			if usernames, ok := exs[authcommon.UserAttributeUserName]; ok && len(usernames) > 0 {
+				if _, ok := extras[authcommon.UserAttributeUserName]; !ok {
+					extras[authcommon.UserAttributeUserName] = make([]string, 0)
+				}
+				extras[authcommon.UserAttributeUserName] = append(extras[authcommon.UserAttributeUserName], usernames...)
+			}
+			if principalids, ok := exs[authcommon.UserAttributePrincipalID]; ok && len(principalids) > 0 {
+				if _, ok := extras[authcommon.UserAttributePrincipalID]; !ok {
+					extras[authcommon.UserAttributePrincipalID] = make([]string, 0)
+				}
+				extras[authcommon.UserAttributePrincipalID] = append(extras[authcommon.UserAttributePrincipalID], principalids...)
+			}
+		}
 	}
 	// sort to make comparable
 	sort.Strings(groups)
-
-	extras := userInfo.GetExtra()
-	// sort to make comparable
-	if _, ok := extras["username"]; ok {
-		sort.Strings(extras["username"])
+	if _, ok := extras[authcommon.UserAttributeUserName]; ok {
+		sort.Strings(extras[authcommon.UserAttributeUserName])
 	}
-	if _, ok := extras["principalid"]; ok {
-		sort.Strings(extras["principalid"])
+	if _, ok := extras[authcommon.UserAttributePrincipalID]; ok {
+		sort.Strings(extras[authcommon.UserAttributePrincipalID])
 	}
 
 	user := &user.DefaultInfo{

@@ -49,6 +49,7 @@ type driverArgs struct {
 
 	DriverName          string
 	ImageName           string
+	CapiMachineName     string
 	MachineName         string
 	MachineNamespace    string
 	MachineGVK          schema.GroupVersionKind
@@ -161,6 +162,7 @@ func (h *handler) getArgsEnvAndStatus(infraObj *infraObject, args map[string]int
 
 	return driverArgs{
 		DriverName:          driver,
+		CapiMachineName:     machine.Name,
 		MachineName:         infraObj.meta.GetName(),
 		MachineNamespace:    infraObj.meta.GetNamespace(),
 		MachineGVK:          infraObj.obj.GetObjectKind().GroupVersionKind(),

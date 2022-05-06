@@ -35,39 +35,18 @@ type RKEControlPlaneSpec struct {
 	UnmanagedConfig          bool                     `json:"unmanagedConfig,omitempty"`
 }
 
-type ETCDSnapshotPhase string
-
-var (
-	ETCDSnapshotPhaseStarted  ETCDSnapshotPhase = "Started"
-	ETCDSnapshotPhaseShutdown ETCDSnapshotPhase = "Shutdown"
-	ETCDSnapshotPhaseRestore  ETCDSnapshotPhase = "Restore"
-	ETCDSnapshotPhaseFinished ETCDSnapshotPhase = "Finished"
-	ETCDSnapshotPhaseFailed   ETCDSnapshotPhase = "Failed"
-)
-
-type RotateEncryptionKeysPhase string
-
-const (
-	RotateEncryptionKeysPhaseStart              RotateEncryptionKeysPhase = "Start"
-	RotateEncryptionKeysPhaseRestartLeader      RotateEncryptionKeysPhase = "RestartLeader"
-	RotateEncryptionKeysPhaseVerifyLeaderStatus RotateEncryptionKeysPhase = "VerifyLeaderStatus"
-	RotateEncryptionKeysPhaseRestartFollowers   RotateEncryptionKeysPhase = "RestartFollowers"
-	RotateEncryptionKeysPhaseApplyLeader        RotateEncryptionKeysPhase = "ApplyLeader"
-	RotateEncryptionKeysPhaseDone               RotateEncryptionKeysPhase = "Done"
-)
-
 type RKEControlPlaneStatus struct {
-	Conditions                     []genericcondition.GenericCondition `json:"conditions,omitempty"`
-	Ready                          bool                                `json:"ready,omitempty"`
-	ObservedGeneration             int64                               `json:"observedGeneration"`
-	CertificateRotationGeneration  int64                               `json:"certificateRotationGeneration"`
-	RotateEncryptionKeysGeneration int64                               `json:"rotateEncryptionKeysGeneration"`
-	RotateEncryptionKeysPhase      RotateEncryptionKeysPhase           `json:"rotateEncryptionKeysPhase"`
-	ETCDSnapshotRestore            *ETCDSnapshotRestore                `json:"etcdSnapshotRestore,omitempty"`
-	ETCDSnapshotRestorePhase       ETCDSnapshotPhase                   `json:"etcdSnapshotRestorePhase,omitempty"`
-	ETCDSnapshotCreate             *ETCDSnapshotCreate                 `json:"etcdSnapshotCreate,omitempty"`
-	ETCDSnapshotCreatePhase        ETCDSnapshotPhase                   `json:"etcdSnapshotCreatePhase,omitempty"`
-	ConfigGeneration               int64                               `json:"configGeneration,omitempty"`
-	Initialized                    bool                                `json:"initialized,omitempty"`
-	AgentConnected                 bool                                `json:"agentConnected,omitempty"`
+	Conditions                    []genericcondition.GenericCondition `json:"conditions,omitempty"`
+	Ready                         bool                                `json:"ready,omitempty"`
+	ObservedGeneration            int64                               `json:"observedGeneration"`
+	CertificateRotationGeneration int64                               `json:"certificateRotationGeneration"`
+	RotateEncryptionKeys          *RotateEncryptionKeys               `json:"rotateEncryptionKeys,omitempty"`
+	RotateEncryptionKeysPhase     RotateEncryptionKeysPhase           `json:"rotateEncryptionKeysPhase,omitempty"`
+	ETCDSnapshotRestore           *ETCDSnapshotRestore                `json:"etcdSnapshotRestore,omitempty"`
+	ETCDSnapshotRestorePhase      ETCDSnapshotPhase                   `json:"etcdSnapshotRestorePhase,omitempty"`
+	ETCDSnapshotCreate            *ETCDSnapshotCreate                 `json:"etcdSnapshotCreate,omitempty"`
+	ETCDSnapshotCreatePhase       ETCDSnapshotPhase                   `json:"etcdSnapshotCreatePhase,omitempty"`
+	ConfigGeneration              int64                               `json:"configGeneration,omitempty"`
+	Initialized                   bool                                `json:"initialized,omitempty"`
+	AgentConnected                bool                                `json:"agentConnected,omitempty"`
 }

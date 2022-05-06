@@ -9,6 +9,11 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2"
 )
 
+const (
+	captureAddressInstructionName = "capture-address"
+	etcdNameInstructionName       = "etcd-name"
+)
+
 // generateInstallInstruction generates the instruction necessary to install the desired tool.
 func generateInstallInstruction(controlPlane *rkev1.RKEControlPlane, entry *planEntry, env []string) plan.OneTimeInstruction {
 	var instruction plan.OneTimeInstruction
@@ -90,19 +95,30 @@ func (p *Planner) generateInstallInstructionWithSkipStart(controlPlane *rkev1.RK
 }
 
 func (p *Planner) addInitNodePeriodicInstruction(nodePlan plan.NodePlan, controlPlane *rkev1.RKEControlPlane) (plan.NodePlan, error) {
-	nodePlan.PeriodicInstructions = append(nodePlan.PeriodicInstructions, plan.PeriodicInstruction{
-		Name:    "capture-address",
-		Command: "sh",
-		Args: []string{
-			"-c",
-			// the grep here is to make the command fail if we don't get the output we expect, like empty string.
-			fmt.Sprintf("curl -f --retry 100 --retry-delay 5 --cacert "+
-				"/var/lib/rancher/%s/server/tls/server-ca.crt https://localhost:%d/db/info | grep 'clientURLs'",
-				rke2.GetRuntime(controlPlane.Spec.KubernetesVersion),
-				rke2.GetRuntimeSupervisorPort(controlPlane.Spec.KubernetesVersion)),
+	nodePlan.PeriodicInstructions = append(nodePlan.PeriodicInstructions, []plan.PeriodicInstruction{
+		{
+			Name:    captureAddressInstructionName,
+			Command: "sh",
+			Args: []string{
+				"-c",
+				// the grep here is to make the command fail if we don't get the output we expect, like empty string.
+				fmt.Sprintf("curl -f --retry 100 --retry-delay 5 --cacert "+
+					"/var/lib/rancher/%s/server/tls/server-ca.crt https://localhost:%d/db/info | grep 'clientURLs'",
+					rke2.GetRuntime(controlPlane.Spec.KubernetesVersion),
+					rke2.GetRuntimeSupervisorPort(controlPlane.Spec.KubernetesVersion)),
+			},
+			PeriodSeconds: 600,
 		},
-		PeriodSeconds: 600,
-	})
+		{
+			Name:    etcdNameInstructionName,
+			Command: "sh",
+			Args: []string{
+				"-c",
+				fmt.Sprintf("cat /var/lib/rancher/%s/server/db/etcd/name", rke2.GetRuntime(controlPlane.Spec.KubernetesVersion)),
+			},
+			PeriodSeconds: 600,
+		},
+	}...)
 	return nodePlan, nil
 }
 
@@ -113,7 +129,7 @@ func (p *Planner) addEtcdSnapshotListLocalPeriodicInstruction(nodePlan plan.Node
 		Args: []string{
 			"-c",
 			// the grep here is to make the command fail if we don't get the output we expect, like empty string.
-			fmt.Sprintf("%s etcd-snapshot list --etcd-s3=false",
+			fmt.Sprintf("%s etcd-snapshot list --etcd-s3=false 2>/dev/null",
 				rke2.GetRuntime(controlPlane.Spec.KubernetesVersion)),
 		},
 		PeriodSeconds: 600,
@@ -128,7 +144,7 @@ func (p *Planner) addEtcdSnapshotListS3PeriodicInstruction(nodePlan plan.NodePla
 		Args: []string{
 			"-c",
 			// the grep here is to make the command fail if we don't get the output we expect, like empty string.
-			fmt.Sprintf("%s etcd-snapshot list --etcd-s3",
+			fmt.Sprintf("%s etcd-snapshot list --etcd-s3 2>/dev/null",
 				rke2.GetRuntime(controlPlane.Spec.KubernetesVersion)),
 		},
 		PeriodSeconds: 600,

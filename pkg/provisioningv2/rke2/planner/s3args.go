@@ -25,9 +25,24 @@ func first(one, two string) string {
 	return one
 }
 
+// S3Enabled returns a boolean indicating whether S3 is enabled for the passed in ETCDSnapshotS3 struct.
+func S3Enabled(s3 *rkev1.ETCDSnapshotS3) bool {
+	if s3 == nil {
+		return false
+	}
+	if s3.Bucket != "" || s3.Endpoint != "" || s3.Folder != "" || s3.CloudCredentialName != "" || s3.Region != "" {
+		return true
+	}
+	return false
+}
+
 // ToArgs renders a slice of arguments and environment variables, as well as files (if S3 endpoints are required). If secretKeyInEnv is set to true, it will set the AWS_SECRET_ACCESS_KEY as an environment variable rather than as an argument.
 func (s *s3Args) ToArgs(s3 *rkev1.ETCDSnapshotS3, controlPlane *rkev1.RKEControlPlane, prefix string, secretKeyInEnv bool) (args []string, env []string, files []plan.File, err error) {
 	if s3 == nil {
+		return
+	}
+
+	if !S3Enabled(s3) {
 		return
 	}
 

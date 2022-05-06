@@ -60,8 +60,9 @@ func (f *Formatter) Formatter(request *types.APIContext, resource *types.RawReso
 	if _, ok := resource.Values["rancherKubernetesEngineConfig"]; ok {
 		resource.AddAction(request, v32.ClusterActionExportYaml)
 
-		// If a user has the backupetcd role/privilege, add it
-		if _, ok := values.GetValue(resource.Values, "rancherKubernetesEngineConfig", "services", "etcd", "backupConfig"); ok && canBackupEtcd(request) {
+		// If a user has the backupetcd role/privilege, add it- In this case, the resource is the cluster, so use
+		// the ID as the namespace for the ETCD check since that's where the backups live
+		if _, ok := values.GetValue(resource.Values, "rancherKubernetesEngineConfig", "services", "etcd", "backupConfig"); ok && canBackupEtcd(request, resource.ID) {
 			resource.AddAction(request, v32.ClusterActionBackupEtcd)
 		}
 

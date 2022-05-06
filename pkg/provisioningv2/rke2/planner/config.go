@@ -22,6 +22,7 @@ import (
 	"github.com/rancher/wrangler/pkg/kv"
 	"github.com/rancher/wrangler/pkg/yaml"
 	"github.com/sirupsen/logrus"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -63,9 +64,6 @@ func (p *Planner) addETCD(config map[string]interface{}, controlPlane *rkev1.RKE
 func addDefaults(config map[string]interface{}, controlPlane *rkev1.RKEControlPlane) {
 	if rke2.GetRuntime(controlPlane.Spec.KubernetesVersion) == rke2.RuntimeRKE2 {
 		config["cni"] = "calico"
-	}
-	if settings.SystemDefaultRegistry.Get() != "" {
-		config["system-default-registry"] = settings.SystemDefaultRegistry.Get()
 	}
 }
 
@@ -109,6 +107,10 @@ func addRoleConfig(config map[string]interface{}, controlPlane *rkev1.RKEControl
 		config["disable-controller-manager"] = true
 	} else if isOnlyControlPlane(entry) {
 		config["disable-etcd"] = true
+	}
+
+	if sdr := settings.SystemDefaultRegistry.Get(); sdr != "" && !isOnlyWorker(entry) {
+		config["system-default-registry"] = sdr
 	}
 
 	// If this is a control-plane node, then we need to set arguments/(and for RKE2, volume mounts) to allow probes
@@ -275,21 +277,30 @@ func addToken(config map[string]interface{}, entry *planEntry, tokensSecret plan
 	}
 }
 
-func addAddresses(secrets corecontrollers.SecretCache, config map[string]interface{}, entry *planEntry) {
+func addAddresses(secrets corecontrollers.SecretCache, config map[string]interface{}, entry *planEntry) error {
 	internalIPAddress := entry.Metadata.Annotations[rke2.InternalAddressAnnotation]
 	ipAddress := entry.Metadata.Annotations[rke2.AddressAnnotation]
 	internalAddressProvided, addressProvided := internalIPAddress != "", ipAddress != ""
 
-	secret, err := secrets.Get(entry.Machine.Spec.InfrastructureRef.Namespace, rke2.MachineStateSecretName(entry.Machine.Spec.InfrastructureRef.Name))
-	if err == nil && len(secret.Data["extractedConfig"]) != 0 {
+	// If this is a provisioned node (not a custom node), then get the IP addresses from the machine driver config.
+	if entry.Machine.Spec.InfrastructureRef.APIVersion == rke2.RKEMachineAPIVersion && (!internalAddressProvided || !addressProvided) {
+		secret, err := secrets.Get(entry.Machine.Spec.InfrastructureRef.Namespace, rke2.MachineStateSecretName(entry.Machine.Spec.InfrastructureRef.Name))
+		if apierrors.IsNotFound(err) || (secret != nil && len(secret.Data["extractedConfig"]) == 0) {
+			return errIgnore(fmt.Sprintf("waiting for machine %s/%s driver config to be saved", entry.Machine.Namespace, entry.Machine.Name))
+		} else if err != nil {
+			return fmt.Errorf("error getting machine state secret for machine %s/%s: %w", entry.Machine.Namespace, entry.Machine.Name, err)
+		}
+
 		driverConfig, err := nodeconfig.ExtractConfigJSON(base64.StdEncoding.EncodeToString(secret.Data["extractedConfig"]))
-		if err == nil && len(driverConfig) != 0 {
-			if !addressProvided {
-				ipAddress = convert.ToString(values.GetValueN(driverConfig, "Driver", "IPAddress"))
-			}
-			if !internalAddressProvided {
-				internalIPAddress = convert.ToString(values.GetValueN(driverConfig, "Driver", "PrivateIPAddress"))
-			}
+		if err != nil || len(driverConfig) == 0 {
+			return fmt.Errorf("error getting machine state JSON for machine %s/%s: %w", entry.Machine.Namespace, entry.Machine.Name, err)
+		}
+
+		if !addressProvided {
+			ipAddress = convert.ToString(values.GetValueN(driverConfig, "Driver", "IPAddress"))
+		}
+		if !internalAddressProvided {
+			internalIPAddress = convert.ToString(values.GetValueN(driverConfig, "Driver", "PrivateIPAddress"))
 		}
 	}
 
@@ -308,6 +319,8 @@ func addAddresses(secrets corecontrollers.SecretCache, config map[string]interfa
 	if convert.ToString(config["cloud-provider-name"]) == "" && (addressProvided || setNodeExternalIP) {
 		config["node-external-ip"] = append(convert.ToStringSlice(config["node-external-ip"]), ipAddress)
 	}
+
+	return nil
 }
 
 func addLabels(config map[string]interface{}, entry *planEntry) error {
@@ -393,8 +406,9 @@ func (p *Planner) addConfigFile(nodePlan plan.NodePlan, controlPlane *rkev1.RKEC
 	addRoleConfig(config, controlPlane, entry, initNode, joinServer)
 	addLocalClusterAuthenticationEndpointConfig(config, controlPlane, entry)
 	addToken(config, entry, tokensSecret)
-	addAddresses(p.secretCache, config, entry)
-
+	if err := addAddresses(p.secretCache, config, entry); err != nil {
+		return nodePlan, config, err
+	}
 	if err := addLabels(config, entry); err != nil {
 		return nodePlan, config, err
 	}

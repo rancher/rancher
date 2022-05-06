@@ -155,7 +155,6 @@ func (r *RKE2NodeDriverProvisioningTestSuite) ProvisioningRKE2Cluster(provider P
 					err = wait.WatchWait(result, checkFunc)
 					assert.NoError(r.T(), err)
 					assert.Equal(r.T(), clusterName, clusterResp.Name)
-
 				})
 			}
 		}

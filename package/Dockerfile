@@ -1,4 +1,4 @@
-ARG K3S_BUILDER=rancher/k3s:v1.22.7-k3s1
+ARG K3S_BUILDER=rancher/k3s:v1.23.6-k3s1
 
 # Use binaries from k3s root for s390x as k3s is not available on s390x
 FROM registry.suse.com/suse/sle15:15.3 AS k3s_root
@@ -41,8 +41,8 @@ ENV CATTLE_CHART_DEFAULT_BRANCH=$CHART_DEFAULT_BRANCH
 ENV CATTLE_PARTNER_CHART_DEFAULT_BRANCH=$PARTNER_CHART_DEFAULT_BRANCH
 ENV CATTLE_RKE2_CHART_DEFAULT_BRANCH=$RKE2_CHART_DEFAULT_BRANCH
 ENV CATTLE_HELM_VERSION v2.16.8-rancher1
-ENV CATTLE_MACHINE_VERSION v0.15.0-rancher81
-ENV CATTLE_K3S_VERSION v1.22.7+k3s1
+ENV CATTLE_MACHINE_VERSION v0.15.0-rancher85
+ENV CATTLE_K3S_VERSION v1.23.6+k3s1
 ENV CATTLE_MACHINE_PROVISION_IMAGE rancher/machine:${CATTLE_MACHINE_VERSION}
 ENV CATTLE_ETCD_VERSION v3.5.1
 ENV LOGLEVEL_VERSION v0.1.5
@@ -55,10 +55,10 @@ ENV DOCKER_MACHINE_HARVESTER_VERSION v0.3.4
 ENV CATTLE_KDM_BRANCH ${CATTLE_KDM_BRANCH}
 ENV HELM_VERSION v3.8.0
 ENV KUSTOMIZE_VERSION v4.4.1
-ENV CATTLE_WINS_AGENT_VERSION v0.2.0
+ENV CATTLE_WINS_AGENT_VERSION v0.2.6
 ENV CATTLE_WINS_AGENT_INSTALL_SCRIPT https://raw.githubusercontent.com/rancher/wins/${CATTLE_WINS_AGENT_VERSION}/install.ps1
-ENV CATTLE_CSI_PROXY_AGENT_VERSION v1.0.0
-ENV CATTLE_SYSTEM_AGENT_VERSION v0.2.3
+ENV CATTLE_CSI_PROXY_AGENT_VERSION v1.1.1
+ENV CATTLE_SYSTEM_AGENT_VERSION v0.2.6
 ENV CATTLE_SYSTEM_AGENT_INSTALL_SCRIPT https://raw.githubusercontent.com/rancher/system-agent/${CATTLE_SYSTEM_AGENT_VERSION}/install.sh
 ENV CATTLE_SYSTEM_AGENT_UPGRADE_IMAGE rancher/system-agent:${CATTLE_SYSTEM_AGENT_VERSION}-suc
 ENV CATTLE_SYSTEM_UPGRADE_CONTROLLER_CHART_VERSION 100.0.2+up0.3.2
@@ -133,6 +133,7 @@ COPY --from=k3s_builder \
     /bin/ethtool \
     /bin/ip \
     /bin/ipset \
+    /bin/k3s \
     /bin/losetup \
     /bin/pigz \
     /bin/runc \
@@ -147,13 +148,12 @@ RUN if [ "${ARCH}" != "s390x" ]; then \
         ln -s /usr/bin/cni /usr/bin/host-local && \
         ln -s /usr/bin/cni /usr/bin/loopback && \
         ln -s /usr/bin/cni /usr/bin/portmap && \
-        ln -s /usr/bin/containerd /usr/bin/crictl && \
-        ln -s /usr/bin/containerd /usr/bin/ctr && \
-        ln -s /usr/bin/containerd /usr/bin/k3s && \
-        ln -s /usr/bin/containerd /usr/bin/k3s-agent && \
-        ln -s /usr/bin/containerd /usr/bin/k3s-etcd-snapshot && \
-        ln -s /usr/bin/containerd /usr/bin/k3s-server && \
-        ln -s /usr/bin/containerd /usr/bin/kubectl && \
+        ln -s /usr/bin/k3s /usr/bin/crictl && \
+        ln -s /usr/bin/k3s /usr/bin/ctr && \
+        ln -s /usr/bin/k3s /usr/bin/k3s-agent && \
+        ln -s /usr/bin/k3s /usr/bin/k3s-etcd-snapshot && \
+        ln -s /usr/bin/k3s /usr/bin/k3s-server && \
+        ln -s /usr/bin/k3s /usr/bin/kubectl && \
         ln -s /usr/bin/pigz /usr/bin/unpigz && \
         ln -s /usr/bin/xtables-legacy-multi /usr/bin/iptables && \
         ln -s /usr/bin/xtables-legacy-multi /usr/bin/iptables-save && \
@@ -177,9 +177,9 @@ RUN  if [ "${ARCH}" == "s390x" ]; then \
       chmod +x /usr/bin/kubectl; \
      fi
 
-ENV CATTLE_UI_VERSION 2.6.4
-ENV CATTLE_DASHBOARD_UI_VERSION v2.6.4
-ENV CATTLE_CLI_VERSION v2.6.4
+ENV CATTLE_UI_VERSION 2.6.5-rc5
+ENV CATTLE_DASHBOARD_UI_VERSION v2.6.5-rc5
+ENV CATTLE_CLI_VERSION v2.6.5-rc1
 
 # Please update the api-ui-version in pkg/settings/settings.go when updating the version here.
 ENV CATTLE_API_UI_VERSION 1.1.9
