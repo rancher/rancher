@@ -128,6 +128,7 @@ type Planner struct {
 	secretClient                  corecontrollers.SecretClient
 	secretCache                   corecontrollers.SecretCache
 	machines                      capicontrollers.MachineClient
+	machinesCache                 capicontrollers.MachineCache
 	clusterRegistrationTokenCache mgmtcontrollers.ClusterRegistrationTokenCache
 	capiClient                    capicontrollers.ClusterClient
 	capiClusters                  capicontrollers.ClusterCache
@@ -148,6 +149,7 @@ func New(ctx context.Context, clients *wrangler.Context) *Planner {
 		ctx:                           ctx,
 		store:                         store,
 		machines:                      clients.CAPI.Machine(),
+		machinesCache:                 clients.CAPI.Machine().Cache(),
 		secretClient:                  clients.Core.Secret(),
 		secretCache:                   clients.Core.Secret().Cache(),
 		clusterRegistrationTokenCache: clients.Mgmt.ClusterRegistrationToken().Cache(),

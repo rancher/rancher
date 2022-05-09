@@ -146,7 +146,7 @@ func (h *handler) OnChange(key string, configMap *corev1.ConfigMap) (runtime.Obj
 					// If the machineID label was not set, fall back to looking up the machine by node name, as this may be a snapshot from an earlier version of Rancher that created local snapshots using the snapshotbackpopulate controller, which means the snapshot should not have the machine ID label.
 					listSuccessful, machine, err = rke2.GetMachineFromNode(h.machineCache, existingSnapshotCR.SnapshotFile.NodeName, cluster)
 				} else {
-					listSuccessful, machine, err = rke2.GetMachineByID(h.machineCache, existingSnapshotCR.Labels[rke2.MachineIDLabel], cluster)
+					listSuccessful, machine, err = rke2.GetMachineByID(h.machineCache, existingSnapshotCR.Labels[rke2.MachineIDLabel], cluster.Namespace, cluster.Name)
 				}
 				if listSuccessful && machine == nil && err != nil {
 					// delete the CR because we don't have a corresponding machine for it
