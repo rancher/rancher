@@ -174,7 +174,8 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 		addRule().apiGroups("cluster.x-k8s.io").resources("machinedeployments").verbs("get", "watch").
 		addRule().apiGroups("rke-machine-config.cattle.io").resources("*").verbs("get", "watch").
 		addRule().apiGroups("rke-machine.cattle.io").resources("*").verbs("get", "watch").
-		addRule().apiGroups("metrics.k8s.io").resources("nodemetrics", "nodes").verbs("get", "list", "watch")
+		addRule().apiGroups("metrics.k8s.io").resources("nodemetrics", "nodes").verbs("get", "list", "watch").
+		addRule().apiGroups("rke.cattle.io").resources("etcdsnapshots").verbs("get", "list", "watch")
 
 	rb.addRoleTemplate("Create Projects", "projects-create", "cluster", false, false, false).
 		addRule().apiGroups("management.cattle.io").resources("projects").verbs("create")
