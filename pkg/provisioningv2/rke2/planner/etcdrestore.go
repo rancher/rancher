@@ -50,7 +50,7 @@ func (p *Planner) runEtcdSnapshotRestorePlan(controlPlane *rkev1.RKEControlPlane
 		logrus.Infof("rkecluster %s/%s re-electing specific init node for etcd snapshot restore", controlPlane.Namespace, controlPlane.Spec.ClusterName)
 		listSuccessful, machine, err := rke2.GetMachineByID(p.machinesCache, snapshot.Labels[rke2.MachineIDLabel], controlPlane.Namespace, controlPlane.Name)
 		if !listSuccessful || machine == nil || machine.Spec.InfrastructureRef.Name == "" || err != nil {
-			return fmt.Errorf("unable to retrieve nodeName for machine on snapshot: %s/%s", snapshot.Namespace, snapshot.Name)
+			return fmt.Errorf("unable to retrieve nodeName for machine on snapshot: %s/%s err: %v", snapshot.Namespace, snapshot.Name, err)
 		}
 		joinServer, err = p.designateInitNode(controlPlane, clusterPlan, machine.Spec.InfrastructureRef.Name)
 		if err != nil {
