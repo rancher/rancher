@@ -183,21 +183,23 @@ func (p *Planner) electInitNode(rkeControlPlane *rkev1.RKEControlPlane, plan *pl
 	}
 
 	logrus.Debugf("rkecluster %s/%s: failed to elect init node, no suitable init nodes were found", rkeControlPlane.Namespace, rkeControlPlane.Spec.ClusterName)
-	return "", ErrWaiting("waiting for possible init node")
+	return "", ErrWaiting("waiting for viable init node")
 }
 
-// designateInitNode is used to force-designate an init node in the cluster. This is especially useful for things like
+// designateInitNodeByID is used to force-designate an init node in the cluster. This is especially useful for things like
 // local etcd snapshot restore, where a snapshot may be contained on a specific node and that node needs to be the node that
 // the snapshot is restored on.
-func (p *Planner) designateInitNode(rkeControlPlane *rkev1.RKEControlPlane, plan *plan.Plan, nodeName string) (string, error) {
-	logrus.Debugf("rkecluster %s/%s: ensuring designated init node: %s", rkeControlPlane.Namespace, rkeControlPlane.Spec.ClusterName, nodeName)
+func (p *Planner) designateInitNodeByMachineID(rkeControlPlane *rkev1.RKEControlPlane, plan *plan.Plan, machineID string) (string, error) {
+	if machineID == "" {
+		return "", fmt.Errorf("machineID cannot be empty when designating init node")
+	}
+	logrus.Debugf("rkecluster %s/%s: ensuring designated init node for machine ID: %s", rkeControlPlane.Namespace, rkeControlPlane.Spec.ClusterName, machineID)
 	entries := collect(plan, isEtcd)
 	cacheInvalidated := false
 	joinURL := ""
 	initNodeFound := false
 	for _, entry := range entries {
-		if entry.Machine.Status.NodeRef != nil &&
-			entry.Machine.Status.NodeRef.Name == nodeName {
+		if entry.Machine.Labels[rke2.MachineIDLabel] == machineID {
 			// this is our new initNode
 			initNodeFound = true
 			if err := p.setInitNodeMark(entry); err != nil {
@@ -219,7 +221,7 @@ func (p *Planner) designateInitNode(rkeControlPlane *rkev1.RKEControlPlane, plan
 		}
 	}
 	if !initNodeFound {
-		return "", fmt.Errorf("rkecluster %s/%s: init node %s was not found during designation", rkeControlPlane.Namespace, rkeControlPlane.Name, nodeName)
+		return "", fmt.Errorf("rkecluster %s/%s: init node with machine ID %s was not found during designation", rkeControlPlane.Namespace, rkeControlPlane.Name, machineID)
 	}
 	if cacheInvalidated {
 		return joinURL, generic.ErrSkip
