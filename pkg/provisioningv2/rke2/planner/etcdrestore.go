@@ -166,13 +166,13 @@ func (p *Planner) runEtcdRestoreServiceStop(controlPlane *rkev1.RKEControlPlane,
 	var err error
 	isS3 := snapshot.SnapshotFile.S3 != nil
 	if !isS3 { // In the event that we are restoring a local snapshot, we need to reset our initNode
-		if snapshot.SnapshotFile.NodeName != "" && snapshot.SnapshotFile.NodeName != "s3" {
-			joinServer, err = p.designateInitNode(controlPlane, clusterPlan, snapshot.SnapshotFile.NodeName)
-			if err != nil {
-				return fmt.Errorf("error while designating init node during control plane/etcd stop: %w", err)
-			}
-		} else {
-			return fmt.Errorf("error attempting to run etcd snapshot restore plan: either s3 info or nodename must be designated (was: %s)", snapshot.SnapshotFile.NodeName)
+		listSuccessful, machine, err := rke2.GetMachineByID(p.machinesCache, snapshot.Labels[rke2.MachineIDLabel], controlPlane.Namespace, controlPlane.Name)
+		if !listSuccessful || machine == nil || machine.Spec.InfrastructureRef.Name == "" || err != nil {
+			return fmt.Errorf("unable to retrieve nodeName for machine on snapshot: %s/%s err: %v", snapshot.Namespace, snapshot.Name, err)
+		}
+		joinServer, err = p.designateInitNode(controlPlane, clusterPlan, machine.Spec.InfrastructureRef.Name)
+		if err != nil {
+			return fmt.Errorf("error while designating init node during control plane/etcd stop: %w", err)
 		}
 	} else {
 		joinServer, err = p.electInitNode(controlPlane, clusterPlan)
