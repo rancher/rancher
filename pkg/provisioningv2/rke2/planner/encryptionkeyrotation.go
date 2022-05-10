@@ -110,12 +110,24 @@ func (p *Planner) setEncryptionKeyRotateState(controlPlane *rkev1.RKEControlPlan
 	return ErrWaiting("refreshing encryption key rotation state")
 }
 
+func (p *Planner) resetEncryptionKeyRotateState(controlPlane *rkev1.RKEControlPlane) error {
+	if controlPlane.Status.RotateEncryptionKeys == nil && controlPlane.Status.RotateEncryptionKeysPhase == "" {
+		return nil
+	}
+	return p.setEncryptionKeyRotateState(controlPlane, nil, "")
+}
+
 // rotateEncryptionKeys first verifies that the control plane is in a state where the next step can be derived. If encryption key rotation is required, the corresponding phase and status fields will be set.
 // The function is expected to be called multiple times throughout encryption key rotation, and will set the next corresponding phase based on previous output.
 func (p *Planner) rotateEncryptionKeys(cp *rkev1.RKEControlPlane, releaseData *model.Release, clusterPlan *plan.Plan) error {
 	if cp == nil || releaseData == nil || clusterPlan == nil {
 		return fmt.Errorf("cannot pass nil parameters to rotateEncryptionKeys")
 	}
+
+	if cp.Spec.RotateEncryptionKeys == nil {
+		return p.resetEncryptionKeyRotateState(cp)
+	}
+
 	if supported, err := encryptionKeyRotationSupported(releaseData); err != nil {
 		return err
 	} else if !supported {
