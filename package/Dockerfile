@@ -34,7 +34,7 @@ ARG CHART_DEFAULT_BRANCH=dev-v2.6
 ARG PARTNER_CHART_DEFAULT_BRANCH=main
 ARG RKE2_CHART_DEFAULT_BRANCH=main
 # kontainer-driver-metadata branch to be set for specific branch other than dev/master, logic at rancher/rancher/pkg/settings/setting.go
-ARG CATTLE_KDM_BRANCH=dev-v2.6
+ARG CATTLE_KDM_BRANCH=release-v2.6
 
 ENV CATTLE_SYSTEM_CHART_DEFAULT_BRANCH=$SYSTEM_CHART_DEFAULT_BRANCH
 ENV CATTLE_CHART_DEFAULT_BRANCH=$CHART_DEFAULT_BRANCH
@@ -179,7 +179,7 @@ RUN  if [ "${ARCH}" == "s390x" ]; then \
 
 ENV CATTLE_UI_VERSION 2.6.5-rc9
 ENV CATTLE_DASHBOARD_UI_VERSION v2.6.5-rc9
-ENV CATTLE_CLI_VERSION v2.6.5-rc1
+ENV CATTLE_CLI_VERSION v2.6.5
 
 # Please update the api-ui-version in pkg/settings/settings.go when updating the version here.
 ENV CATTLE_API_UI_VERSION 1.1.9

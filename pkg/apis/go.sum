@@ -728,8 +728,8 @@ github.com/prometheus/procfs v0.6.0/go.mod h1:cz+aTbrPOrUb4q7XlbU9ygM+/jj0fzG6c1
 github.com/prometheus/tsdb v0.7.1/go.mod h1:qhTCs0VvXwvX/y3TZrWD7rabWM+ijKTux40TwIPHuXU=
 github.com/qri-io/starlib v0.4.2-0.20200213133954-ff2e8cd5ef8d/go.mod h1:7DPO4domFU579Ga6E61sB9VFNaniPVwJP5C4bBCu3wA=
 github.com/rackspace/gophercloud v0.0.0-20150408191457-ce0f487f6747/go.mod h1:4bJ1FwuaBZ6dt1VcDX5/O662mwR8GWqS4l68H6hkoYQ=
-github.com/rancher/aks-operator v1.0.5-rc1 h1:1k7CP1NRE0wloLI6NXQmtCxlUoEz9LrfZvCw0QzXUDU=
-github.com/rancher/aks-operator v1.0.5-rc1/go.mod h1:4AAOJmPqW41ko6L6cy7BOWbHEko7Yjcho1YP+KPAt+Y=
+github.com/rancher/aks-operator v1.0.5 h1:O0pLGdXuQWtBbnqtzUi/H5sN4nIQZgz/d547eDv8br0=
+github.com/rancher/aks-operator v1.0.5/go.mod h1:4AAOJmPqW41ko6L6cy7BOWbHEko7Yjcho1YP+KPAt+Y=
 github.com/rancher/eks-operator v1.1.3 h1:x1c0T0mXjKA3HHbbQsfx9k8xFHsNo0GSYGO/5yQOgjo=
 github.com/rancher/eks-operator v1.1.3/go.mod h1:N0zzDJ+xvv6BkXRMjIBlFObOmud5H1sSOccG0FS+DJM=
 github.com/rancher/fleet/pkg/apis v0.0.0-20210918015053-5a141a6b18f0 h1:2A92uT1+4GUdZolQg5wfOSLa6RFRkfpnc3Iw7+Z/Bk8=
@@ -744,8 +744,8 @@ github.com/rancher/lasso v0.0.0-20210616224652-fc3ebd901c08/go.mod h1:9qZd/S8DqW
 github.com/rancher/machine v0.15.0-rancher63/go.mod h1:qXYNumxy0J08MO/mh/jNjyRuEc2QKDLUOZIBE5vxaZE=
 github.com/rancher/norman v0.0.0-20220406153559-82478fb169cb h1:Tr5rialcd0u13TPRFekmCzwZNalLs5lbg6JSliUD0gY=
 github.com/rancher/norman v0.0.0-20220406153559-82478fb169cb/go.mod h1:gDEwYUxOknJaOG1jjcH40PQ8U8xnvB+sHph5VirKINY=
-github.com/rancher/rke v1.3.11-rc3 h1:Zkh3qQx9EsRs+P8yYy5BPCCMd9UKqjk3SsNMkbW8Ysk=
-github.com/rancher/rke v1.3.11-rc3/go.mod h1:t+VWWY6Cxs1OjRXRFQv+gZNWSfmFor9UReReDjYOnWs=
+github.com/rancher/rke v1.3.11 h1:GqH7SeSBlFdjaTp4OaFZDkYkfPJjMwuT2QDw5FgP9ps=
+github.com/rancher/rke v1.3.11/go.mod h1:t+VWWY6Cxs1OjRXRFQv+gZNWSfmFor9UReReDjYOnWs=
 github.com/rancher/wrangler v0.6.2-0.20200427172034-da9b142ae061/go.mod h1:n5Du/gGD7WoiqnEo0SHnPirDIp1V9Zu+6guc8lXS2dk=
 github.com/rancher/wrangler v0.6.2-0.20200820173016-2068de651106/go.mod h1:iKqQcYs4YSDjsme52OZtQU4jHPmLlIiM93aj2c8c/W8=
 github.com/rancher/wrangler v0.6.2-0.20200829053106-7e1dd4260224/go.mod h1:I7qe4DZNMOLKVa9ax7DJdBZ0XtKOppLF/dalhPX3vaE=
