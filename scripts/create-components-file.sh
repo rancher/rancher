@@ -20,6 +20,10 @@ printf '%s\n' "$(grep "_VERSION" ./package/Dockerfile | grep ENV | egrep -v "htt
 
 printf '%s\n' "$(grep "rancher/" ./go.mod | egrep -v "\./"  | egrep -v "\/pkg\/apis|\/pkg\/client|^module" | grep -v "=>" | awk -F'/' '{ print $NF }' | awk '$1 = toupper($1)' | sort | grep "\-rc")" >> $COMPONENTSFILE
 
+echo "# Min version components with -rc" >> $COMPONENTSFILE
+
+printf '%s\n' "$(grep "_MIN_VERSION" ./package/Dockerfile | grep ENV | grep CATTLE |sed 's/CATTLE_//g' | sed 's/=/ /g' |  awk '{ print $2,$3 }' | sort | grep "\-rc")" >> $COMPONENTSFILE
+
 K8SVERSIONSFILE=./bin/rancher-rke-k8s-versions.txt
 
 if [[ -f "$K8SVERSIONSFILE" ]]; then
