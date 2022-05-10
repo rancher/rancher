@@ -668,16 +668,17 @@ func (m *Migrator) CreateOrUpdatePrivateRegistrySecret(secretName string, rkeCon
 		return nil, nil
 	}
 	var existing *corev1.Secret
+	var err error
 	if secretName != "" {
-		var err error
 		existing, err = m.secretLister.Get(secretNamespace, secretName)
 		if err != nil && !apierrors.IsNotFound(err) {
 			return nil, err
 		}
 	}
-	existingRegistry := credentialprovider.DockerConfigJSON{}
+	registry := credentialprovider.DockerConfigJSON{
+		Auths: map[string]credentialprovider.DockerConfigEntry{},
+	}
 	active := make(map[string]struct{})
-	needsUpdate := false
 	registrySecret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:         secretName, // if empty, the secret will be created with a generated name
@@ -702,60 +703,48 @@ func (m *Migrator) CreateOrUpdatePrivateRegistrySecret(secretName string, rkeCon
 			},
 		}
 	}
+	if existing != nil {
+		err = json.Unmarshal(existing.Data[corev1.DockerConfigJsonKey], &registry)
+		if err != nil {
+			return nil, err
+		}
+	}
 	for _, privateRegistry := range privateRegistries {
 		active[privateRegistry.URL] = struct{}{}
 		if privateRegistry.Password == "" {
 			continue
 		}
-		registry := credentialprovider.DockerConfigJSON{
-			Auths: credentialprovider.DockerConfig{
-				privateRegistry.URL: credentialprovider.DockerConfigEntry{
-					Username: privateRegistry.User,
-					Password: privateRegistry.Password,
-				},
-			},
+		// limitation: if a URL is repeated in the privateRegistries list, it will be overwritten in the registry secret
+		registry.Auths[privateRegistry.URL] = credentialprovider.DockerConfigEntry{
+			Username: privateRegistry.User,
+			Password: privateRegistry.Password,
 		}
-		registryJSON, err := json.Marshal(registry)
+	}
+	registryJSON, err := json.Marshal(registry)
+	if err != nil {
+		return nil, err
+	}
+	registrySecret.Data = map[string][]byte{
+		corev1.DockerConfigJsonKey: registryJSON,
+	}
+	if existing == nil {
+		registrySecret, err = m.secrets.Create(registrySecret)
 		if err != nil {
 			return nil, err
 		}
-		registrySecret.Data = map[string][]byte{
-			corev1.DockerConfigJsonKey: registryJSON,
-		}
-		if existing == nil {
-			registrySecret, err = m.secrets.Create(registrySecret)
-			if err != nil {
-				return nil, err
-			}
-		} else if !reflect.DeepEqual(existing.Data, registrySecret.Data) {
-			err = json.Unmarshal(existing.Data[corev1.DockerConfigJsonKey], &existingRegistry)
-			if err != nil {
-				return nil, err
-			}
-			// limitation: if a URL is repeated in the privateRegistries list, it will be overwritten in the registry secret
-			existingRegistry.Auths[privateRegistry.URL] = registry.Auths[privateRegistry.URL]
-			registrySecret.Data[corev1.DockerConfigJsonKey], err = json.Marshal(existingRegistry)
-			if err != nil {
-				return nil, err
-			}
-			needsUpdate = true
-		}
-	}
-	if existing != nil {
-		for url := range existingRegistry.Auths {
+	} else {
+		for url := range registry.Auths {
 			if _, ok := active[url]; !ok {
-				delete(existingRegistry.Auths, url)
-				var err error
-				registrySecret.Data[corev1.DockerConfigJsonKey], err = json.Marshal(existingRegistry)
-				if err != nil {
-					return nil, err
-				}
-				needsUpdate = true
+				delete(registry.Auths, url)
 			}
 		}
-	}
-	if needsUpdate {
-		return m.secrets.Update(registrySecret)
+		registrySecret.Data[corev1.DockerConfigJsonKey], err = json.Marshal(registry)
+		if err != nil {
+			return nil, err
+		}
+		if !reflect.DeepEqual(existing.Data, registrySecret.Data) {
+			return m.secrets.Update(registrySecret)
+		}
 	}
 	return registrySecret, nil
 }
