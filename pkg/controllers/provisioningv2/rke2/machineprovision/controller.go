@@ -60,24 +60,25 @@ type infraObject struct {
 }
 
 func newInfraObject(obj runtime.Object) (*infraObject, error) {
-	objMeta, err := meta.Accessor(obj)
+	copiedObj := obj.DeepCopyObject()
+	objMeta, err := meta.Accessor(copiedObj)
 	if err != nil {
 		return nil, err
 	}
 
-	data, err := data.Convert(obj.DeepCopyObject())
+	data, err := data.Convert(copiedObj)
 	if err != nil {
 		return nil, err
 	}
 
-	typeMeta, err := meta.TypeAccessor(obj)
+	typeMeta, err := meta.TypeAccessor(copiedObj)
 	if err != nil {
 		return nil, err
 	}
 
 	return &infraObject{
 		data:     data,
-		obj:      obj,
+		obj:      copiedObj,
 		meta:     objMeta,
 		typeMeta: typeMeta,
 	}, nil
@@ -134,7 +135,7 @@ func validGVK(gvk schema.GroupVersionKind) bool {
 		gvk.Kind != "CustomMachine"
 }
 
-func (h *handler) OnJobChange(key string, job *batchv1.Job) (*batchv1.Job, error) {
+func (h *handler) OnJobChange(_ string, job *batchv1.Job) (*batchv1.Job, error) {
 	if job == nil {
 		return nil, nil
 	}
@@ -160,14 +161,9 @@ func (h *handler) OnJobChange(key string, job *batchv1.Job) (*batchv1.Job, error
 		return job, err
 	}
 
-	meta, err := meta.Accessor(infraMachine)
+	infraObj, err := newInfraObject(infraMachine)
 	if err != nil {
 		return nil, err
-	}
-
-	d, err := data.Convert(infraMachine)
-	if err != nil {
-		return job, err
 	}
 
 	newStatus, err := h.getMachineStatus(job)
@@ -176,13 +172,13 @@ func (h *handler) OnJobChange(key string, job *batchv1.Job) (*batchv1.Job, error
 	}
 	newStatus.JobName = job.Name
 
-	if _, err := h.patchStatus(infraMachine, d, newStatus); err != nil {
+	if _, err := h.patchStatus(infraObj.obj, infraObj.data, newStatus); err != nil {
 		return job, err
 	}
 
 	// Re-evaluate the infra-machine after this
 	if err := h.dynamic.Enqueue(infraMachine.GetObjectKind().GroupVersionKind(),
-		meta.GetNamespace(), meta.GetName()); err != nil {
+		infraObj.meta.GetNamespace(), infraObj.meta.GetName()); err != nil {
 		return nil, err
 	}
 
