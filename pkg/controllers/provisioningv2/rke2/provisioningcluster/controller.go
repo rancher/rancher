@@ -207,6 +207,14 @@ func reconcileClusterSpecEtcdRestore(cluster *rancherv1.Cluster, desiredSpec ran
 		changed = true
 		cluster.Spec.RKEConfig.ChartValues = desiredSpec.RKEConfig.ChartValues
 	}
+	if !equality.Semantic.DeepEqual(cluster.Spec.RKEConfig.Registries, desiredSpec.RKEConfig.Registries) {
+		changed = true
+		cluster.Spec.RKEConfig.Registries = desiredSpec.RKEConfig.Registries
+	}
+	if !equality.Semantic.DeepEqual(cluster.Spec.RKEConfig.UpgradeStrategy, desiredSpec.RKEConfig.UpgradeStrategy) {
+		changed = true
+		cluster.Spec.RKEConfig.UpgradeStrategy = desiredSpec.RKEConfig.UpgradeStrategy
+	}
 	if cluster.Spec.RKEConfig.AdditionalManifest != desiredSpec.RKEConfig.AdditionalManifest {
 		changed = true
 		cluster.Spec.RKEConfig.AdditionalManifest = desiredSpec.RKEConfig.AdditionalManifest
