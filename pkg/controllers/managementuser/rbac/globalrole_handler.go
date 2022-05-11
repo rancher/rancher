@@ -1,7 +1,6 @@
 package rbac
 
 import (
-	"context"
 	"time"
 
 	"github.com/rancher/norman/types/slice"
@@ -25,7 +24,7 @@ const (
 	grbByUserAndRoleIndex = "authz.cluster.cattle.io/grb-by-user-and-role"
 )
 
-func RegisterIndexers(ctx context.Context, scaledContext *config.ScaledContext) error {
+func RegisterIndexers(scaledContext *config.ScaledContext) error {
 	informer := scaledContext.Management.GlobalRoleBindings("").Controller().Informer()
 	indexers := map[string]cache.IndexFunc{
 		grbByUserAndRoleIndex: grbByUserAndRole,

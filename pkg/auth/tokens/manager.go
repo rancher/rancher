@@ -48,7 +48,7 @@ var (
 	toDeleteCookies = []string{CookieName, CSRFCookie}
 )
 
-func RegisterIndexer(ctx context.Context, apiContext *config.ScaledContext) error {
+func RegisterIndexer(apiContext *config.ScaledContext) error {
 	informer := apiContext.Management.Users("").Controller().Informer()
 	return informer.AddIndexers(map[string]cache.IndexFunc{userPrincipalIndex: userPrincipalIndexer})
 }
