@@ -29,8 +29,8 @@ WORKDIR /var/lib/rancher
 
 ARG ARCH=amd64
 ARG IMAGE_REPO=rancher
-ARG SYSTEM_CHART_DEFAULT_BRANCH=dev-v2.6
-ARG CHART_DEFAULT_BRANCH=dev-v2.6
+ARG SYSTEM_CHART_DEFAULT_BRANCH=release-v2.6
+ARG CHART_DEFAULT_BRANCH=release-v2.6
 ARG PARTNER_CHART_DEFAULT_BRANCH=main
 ARG RKE2_CHART_DEFAULT_BRANCH=main
 # kontainer-driver-metadata branch to be set for specific branch other than dev/master, logic at rancher/rancher/pkg/settings/setting.go
@@ -177,8 +177,8 @@ RUN  if [ "${ARCH}" == "s390x" ]; then \
       chmod +x /usr/bin/kubectl; \
      fi
 
-ENV CATTLE_UI_VERSION 2.6.5-rc10
-ENV CATTLE_DASHBOARD_UI_VERSION v2.6.5-rc10
+ENV CATTLE_UI_VERSION 2.6.5
+ENV CATTLE_DASHBOARD_UI_VERSION v2.6.5
 ENV CATTLE_CLI_VERSION v2.6.5
 
 # Please update the api-ui-version in pkg/settings/settings.go when updating the version here.
