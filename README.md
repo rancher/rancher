@@ -10,9 +10,9 @@ Rancher is an open source container management platform built for organizations 
 
 ## Latest Release
 
-* Latest - v2.6.4 - `rancher/rancher:latest` - Read the full release [notes](https://github.com/rancher/rancher/releases/tag/v2.6.4).
+* Latest - v2.6.5 - `rancher/rancher:latest` - Read the full release [notes](https://github.com/rancher/rancher/releases/tag/v2.6.5).
 
-* Stable - v2.6.4 - `rancher/rancher:stable` - Read the full release [notes](https://github.com/rancher/rancher/releases/tag/v2.6.4).
+* Stable - v2.6.5 - `rancher/rancher:stable` - Read the full release [notes](https://github.com/rancher/rancher/releases/tag/v2.6.5).
 
 To get automated notifications of our latest release, you can watch the announcements category in our [forums](http://forums.rancher.com/c/announcements), or subscribe to the RSS feed `https://forums.rancher.com/c/announcements.rss`.
 
@@ -34,10 +34,8 @@ Rancher can be deployed in either a single node or multi-node setup.  Please ref
 
 * Operating Systems
   * Please see [Support Matrix](https://rancher.com/support-matrix/) for specific OS versions for each Rancher version. Note that the link will default to the support matrix for the latest version of Rancher. Use the left navigation menu to select a different Rancher version. 
-* Hardware
-  * 4 GB of Memory
-* Software
-  * Docker v1.12.6, 1.13.1, 17.03.2
+* Hardware & Software
+  * Please see [Installation Requirements](https://rancher.com/docs/rancher/v2.6/en/installation/requirements/) for hardware and software requirements.
 
 ### Using Rancher
 
