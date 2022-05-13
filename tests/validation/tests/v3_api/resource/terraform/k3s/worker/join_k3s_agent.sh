@@ -43,4 +43,9 @@ else
       curl -sfL https://get.k3s.io | sh -s - agent --node-external-ip=${6}
     fi
 fi
+
+if [ "${1}" = "*micro*" ]; then
+    systemctl enable k3s-agent --now
+fi
+
 sleep 20

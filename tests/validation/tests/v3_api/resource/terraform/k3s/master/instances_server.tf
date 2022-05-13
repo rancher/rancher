@@ -1,3 +1,7 @@
+locals {
+  user_home = "/home/${var.aws_user}"
+}
+
 resource "aws_db_parameter_group" "db-parameters" {
   count                  = (var.cluster_type == "etcd" ? 0 : (var.external_db != "aurora-mysql" ? 1 : 0))
   name   = "${var.resource_name}-dbparameter"
@@ -63,6 +67,7 @@ resource "aws_instance" "master" {
     user                 = var.aws_user
     host                 = self.public_ip
     private_key          = file(var.access_key)
+    script_path          = "${local.user_home}/terraform_caller.sh"
   }
   root_block_device {
     volume_size          = var.volume_size
@@ -78,7 +83,7 @@ resource "aws_instance" "master" {
 
   provisioner "file" {
     source = "install_k3s_master.sh"
-    destination = "/tmp/install_k3s_master.sh"
+    destination = "${local.user_home}/install_k3s_master.sh"
   }
 
   provisioner "file" {
@@ -107,9 +112,20 @@ resource "aws_instance" "master" {
   }
 
   provisioner "remote-exec" {
-    inline = [
-      "chmod +x /tmp/install_k3s_master.sh",
-      "sudo /tmp/install_k3s_master.sh ${var.node_os} ${var.create_lb ? aws_route53_record.aws_route53[0].fqdn : "fake.fqdn.value"} ${var.install_mode} ${var.k3s_version} ${var.cluster_type} ${self.public_ip} \"${data.template_file.test.rendered}\" \"${var.server_flags}\"  ${var.username} ${var.password} ${var.k3s_channel}",
+    inline = [ <<-EOT
+        sudo chmod +x ${local.user_home}/install_k3s_master.sh
+        sudo ${local.user_home}/install_k3s_master.sh ${var.node_os} \
+                                                      ${var.create_lb ? aws_route53_record.aws_route53[0].fqdn : "fake.fqdn.value"} \
+                                                      ${var.install_mode} \
+                                                      ${var.k3s_version} \
+                                                      ${var.cluster_type} \
+                                                      ${self.public_ip} \
+                                                      "${data.template_file.test.rendered}" \
+                                                      "${var.server_flags}" \
+                                                      ${var.username} \
+                                                      "${var.password}" \
+                                                      ${var.k3s_channel}
+      EOT
     ]
   }
 
@@ -158,6 +174,7 @@ resource "aws_instance" "master2-ha" {
     user                 = var.aws_user
     host                 = self.public_ip
     private_key          = file(var.access_key)
+    script_path          = "${local.user_home}/terraform_caller.sh"
   }
   root_block_device {
     volume_size          = var.volume_size
@@ -173,9 +190,8 @@ resource "aws_instance" "master2-ha" {
   }
   provisioner "file" {
     source               = "join_k3s_master.sh"
-    destination          = "/tmp/join_k3s_master.sh"
+    destination          = "${local.user_home}/join_k3s_master.sh"
   }
-
   provisioner "file" {
     source = "cis_masterconfig.yaml"
     destination = "/tmp/cis_masterconfig.yaml"
@@ -184,21 +200,32 @@ resource "aws_instance" "master2-ha" {
     source = "policy.yaml"
     destination = "/tmp/policy.yaml"
   }
-
   provisioner "file" {
     source = "v120ingresspolicy.yaml"
     destination = "/tmp/v120ingresspolicy.yaml"
   }
-
   provisioner "file" {
     source = "v121ingresspolicy.yaml"
     destination = "/tmp/v121ingresspolicy.yaml"
   }
 
   provisioner "remote-exec" {
-    inline = [
-      "chmod +x /tmp/join_k3s_master.sh",
-      "sudo /tmp/join_k3s_master.sh ${var.node_os} ${var.create_lb ? aws_route53_record.aws_route53[0].fqdn : aws_instance.master.public_ip} ${var.install_mode} ${var.k3s_version} ${var.cluster_type} ${self.public_ip} ${aws_instance.master.public_ip} ${local.node_token} \"${data.template_file.test.rendered}\" \"${var.server_flags}\" ${var.username} ${var.password} ${var.k3s_channel}",
+    inline = [ <<-EOT
+        sudo chmod +x ${local.user_home}/join_k3s_master.sh
+        sudo ${local.user_home}/join_k3s_master.sh ${var.node_os} \
+                                                   ${var.create_lb ? aws_route53_record.aws_route53[0].fqdn : aws_instance.master.public_ip} \
+                                                   ${var.install_mode} \
+                                                   ${var.k3s_version} \
+                                                   ${var.cluster_type} \
+                                                   ${self.public_ip} \
+                                                   ${aws_instance.master.public_ip} \
+                                                   ${local.node_token} \
+                                                   "${data.template_file.test.rendered}" \
+                                                   "${var.server_flags}" \
+                                                   ${var.username} \
+                                                   "${var.password}" \
+                                                   ${var.k3s_channel}
+      EOT
     ]
   }
 }

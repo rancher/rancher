@@ -1,3 +1,7 @@
+locals {
+  user_home = "/home/${var.aws_user}"
+}
+
 resource "aws_instance" "worker" {
   depends_on = [
     var.dependency
@@ -10,6 +14,7 @@ resource "aws_instance" "worker" {
     user                 = var.aws_user
     host                 = self.public_ip
     private_key          = file(var.access_key)
+    script_path          = "${local.user_home}/terraform_caller.sh"
   }
   root_block_device {
     volume_size          = var.volume_size
@@ -24,18 +29,27 @@ resource "aws_instance" "worker" {
   }
   provisioner "file" {
     source = "join_k3s_agent.sh"
-    destination = "/tmp/join_k3s_agent.sh"
+    destination = "${local.user_home}/join_k3s_agent.sh"
   }
   provisioner "file" {
     source = "cis_workerconfig.yaml"
     destination = "/tmp/cis_workerconfig.yaml"
   }
 
-
   provisioner "remote-exec" {
-    inline = [
-      "chmod +x /tmp/join_k3s_agent.sh",
-      "sudo /tmp/join_k3s_agent.sh ${var.node_os} ${var.install_mode} ${var.k3s_version} ${local.master_ip} ${local.node_token} ${self.public_ip} \"${var.worker_flags}\" ${var.username} ${var.password} ${var.k3s_channel} ",
+    inline = [ <<-EOT
+        sudo chmod +x ${local.user_home}/join_k3s_agent.sh
+        sudo ${local.user_home}/join_k3s_agent.sh ${var.node_os} \
+                                                  ${var.install_mode} \
+                                                  ${var.k3s_version} \
+                                                  ${local.master_ip} \
+                                                  ${local.node_token} \
+                                                  ${self.public_ip} \
+                                                  "${var.worker_flags}" \
+                                                  ${var.username} \
+                                                  "${var.password}" \
+                                                  ${var.k3s_channel}
+      EOT
     ]
   }
 }

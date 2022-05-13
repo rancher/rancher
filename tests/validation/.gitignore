@@ -102,3 +102,12 @@ ENV/
 # Local test generation
 .DS_store
 .ssh
+
+# Terraform
+.terraform
+*.terraform.*
+*.terraform
+.terraform.*
+*.tfstate
+*.tfstate.*
+.tfstate.*

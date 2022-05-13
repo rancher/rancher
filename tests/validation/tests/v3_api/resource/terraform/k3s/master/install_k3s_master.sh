@@ -82,6 +82,10 @@ else
   fi
 fi
 
+if [ "${1}" = "*micro*" ]; then
+    systemctl enable k3s --now
+fi
+
 export PATH=$PATH:/usr/local/bin
 timeElapsed=0
 while ! $(kubectl get nodes >/dev/null 2>&1) && [[ $timeElapsed -lt 300 ]]

@@ -68,3 +68,7 @@ else
         fi
     fi
 fi
+
+if [ "${1}" = "*micro*" ]; then
+    systemctl enable k3s --now
+fi

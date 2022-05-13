@@ -149,7 +149,6 @@ def create_rke2_multiple_control_cluster(cluster_type, cluster_version):
                               'role_order': RKE2_ROLE_ORDER})
     print("Creating cluster")
     tf.init()
-    tf.plan(out="plan_server.out")
     print(tf.apply("--auto-approve"))
     print("\n\n")
     if int(RANCHER_RKE2_NO_OF_WORKER_NODES) > 0:
@@ -180,7 +179,6 @@ def create_rke2_multiple_control_cluster(cluster_type, cluster_version):
 
         print("Joining worker nodes")
         tf.init()
-        tf.plan(out="plan_worker.out")
         print(tf.apply("--auto-approve"))
         print("\n\n")
     cmd = "cp /tmp/" + RANCHER_HOSTNAME_PREFIX + "_kubeconfig " + \

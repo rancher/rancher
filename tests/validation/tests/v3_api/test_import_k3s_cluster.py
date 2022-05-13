@@ -168,7 +168,6 @@ def create_multiple_control_cluster():
                               'create_lb': str(K3S_CREATE_LB).lower()})
     print("Creating cluster")
     tf.init()
-    tf.plan(out="plan_server.out")
     print(tf.apply("--auto-approve"))
 
     if int(RANCHER_K3S_NO_OF_WORKER_NODES) > 0:
@@ -196,7 +195,6 @@ def create_multiple_control_cluster():
 
         print("Joining worker nodes")
         tf.init()
-        tf.plan(out="plan_worker.out")
         print(tf.apply("--auto-approve"))
 
     cmd = "cp /tmp/" + RANCHER_HOSTNAME_PREFIX + "_kubeconfig " + k3s_clusterfilepath

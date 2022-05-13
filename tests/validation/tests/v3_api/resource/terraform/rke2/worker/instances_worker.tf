@@ -1,3 +1,7 @@
+locals {
+  user_home = "/home/${var.aws_user}"
+}
+
 resource "aws_instance" "worker" {
   depends_on = [
     var.dependency
@@ -11,6 +15,7 @@ resource "aws_instance" "worker" {
     user = var.aws_user
     host = self.public_ip
     private_key = "${file(var.access_key)}"
+    script_path = "${local.user_home}/terraform_caller.sh"
   }
   root_block_device {
     volume_size = var.volume_size
@@ -28,12 +33,25 @@ resource "aws_instance" "worker" {
   }
   provisioner "file" {
     source = "join_rke2_agent.sh"
-    destination = "/tmp/join_rke2_agent.sh"
+    destination = "${local.user_home}/join_rke2_agent.sh"
   }
   provisioner "remote-exec" {
-    inline = [
-      "chmod +x /tmp/join_rke2_agent.sh",
-      "sudo /tmp/join_rke2_agent.sh ${var.node_os} ${local.master_fixed_reg_addr} ${local.master_ip} \"${local.node_token}\" ${var.rke2_version} ${self.public_ip} ${var.rke2_channel} ${var.cluster_type} \"${var.worker_flags}\" ${var.install_mode} ${var.username} ${var.password} \"${var.install_method}\"",
+    inline = [ <<-EOT
+        sudo chmod +x ${local.user_home}/join_rke2_agent.sh
+        sudo ${local.user_home}/join_rke2_agent.sh ${var.node_os} \
+                                                   ${local.master_fixed_reg_addr} \
+                                                   ${local.master_ip} \
+                                                   ${local.node_token} \
+                                                   ${var.rke2_version} \
+                                                   ${self.public_ip} \
+                                                   ${var.rke2_channel} \
+                                                   ${var.cluster_type} \
+                                                   "${var.worker_flags}" \
+                                                   ${var.install_mode} \
+                                                   ${var.username} \
+                                                   "${var.password}" \
+                                                   ${var.install_method}
+      EOT
     ]
   }
 }
