@@ -210,6 +210,7 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 		Handler: responsewriter.Chain{
 			auth.SetXAPICattleAuthHeader,
 			responsewriter.ContentTypeOptions,
+			responsewriter.NoCache,
 			websocket.NewWebsocketHandler,
 			proxy.RewriteLocalCluster,
 			clusterProxy,
