@@ -4,8 +4,6 @@ vendor
 /dist
 /build
 *.swp
-/.trash-cache
-/trash.lock
 /.idea
 /cmd/agent/agent
 /package/data.json

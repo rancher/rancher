@@ -136,7 +136,6 @@ ENV DAPPER_SOURCE /go/src/github.com/rancher/rancher/
 ENV DAPPER_OUTPUT ./bin ./dist ./go.mod ./go.sum ./pkg/apis/go.mod ./pkg/apis/go.sum ./pkg/client/go.mod ./pkg/client/go.sum ./scripts/package ./pkg/settings/setting.go ./package/Dockerfile
 ENV DAPPER_DOCKER_SOCKET true
 ENV DAPPER_RUN_ARGS "-v rancher2-go16-pkg-1:/go/pkg -v rancher2-go16-cache-1:/root/.cache/go-build --privileged"
-ENV TRASH_CACHE ${DAPPER_SOURCE}/.trash-cache
 ENV GOCACHE /root/.cache/go-build
 ENV HOME ${DAPPER_SOURCE}
 VOLUME /var/lib/rancher
