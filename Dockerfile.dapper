@@ -26,7 +26,7 @@ ENV HELM_VERSION v3.8.0
 ENV KUSTOMIZE_VERSION v4.4.1
 
 # kontainer-driver-metadata branch to be set for specific branch other than dev/master, logic at rancher/rancher/pkg/settings/setting.go
-ENV CATTLE_KDM_BRANCH=release-v2.6
+ENV CATTLE_KDM_BRANCH=dev-v2.6
 
 RUN zypper -n install gcc binutils glibc-devel-static ca-certificates git-core wget curl unzip tar vim less file xz gzip sed gawk iproute2 iptables jq
 RUN zypper install -y -f docker
@@ -133,7 +133,7 @@ RUN zypper install -y python3-tox python3-base python3 libffi-devel libopenssl-d
 ENV HELM_HOME /root/.helm
 ENV DAPPER_ENV REPO TAG DRONE_TAG DRONE_COMMIT DRONE_BRANCH SYSTEM_CHART_DEFAULT_BRANCH FOSSA_API_KEY GOGET_MODULE GOGET_VERSION RELEASE_ACTION
 ENV DAPPER_SOURCE /go/src/github.com/rancher/rancher/
-ENV DAPPER_OUTPUT ./bin ./dist ./go.mod ./go.sum ./pkg/apis/go.mod ./pkg/apis/go.sum ./pkg/client/go.mod ./pkg/client/go.sum ./scripts/package ./pkg/settings/setting.go ./package/Dockerfile
+ENV DAPPER_OUTPUT ./bin ./dist ./go.mod ./go.sum ./pkg/apis/go.mod ./pkg/apis/go.sum ./pkg/client/go.mod ./pkg/client/go.sum ./scripts/package ./pkg/settings/setting.go ./package/Dockerfile ./Dockerfile.dapper
 ENV DAPPER_DOCKER_SOCKET true
 ENV DAPPER_RUN_ARGS "-v rancher2-go16-pkg-1:/go/pkg -v rancher2-go16-cache-1:/root/.cache/go-build --privileged"
 ENV GOCACHE /root/.cache/go-build
