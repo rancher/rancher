@@ -851,12 +851,7 @@ func (p *Planner) ensureInstalledPlan(controlPlane *rkev1.RKEControlPlane, token
 	}
 
 	// Add instruction last because it hashes config content
-	nodePlan, err = p.addInstallInstructionWithRestartStamp(nodePlan, controlPlane, entry)
-	if err != nil {
-		return nodePlan, err
-	}
-
-	return nodePlan, nil
+	return p.addInstallInstructionWithRestartStamp(nodePlan, controlPlane, entry), nil
 }
 
 func (p *Planner) desiredPlan(controlPlane *rkev1.RKEControlPlane, tokensSecret plan.Secret, entry *planEntry, joinServer string) (nodePlan plan.NodePlan, err error) {
@@ -871,30 +866,24 @@ func (p *Planner) desiredPlan(controlPlane *rkev1.RKEControlPlane, tokensSecret 
 	}
 
 	// Add instruction last because it hashes config content
-	nodePlan, err = p.addInstallInstructionWithRestartStamp(nodePlan, controlPlane, entry)
+	nodePlan = p.addInstallInstructionWithRestartStamp(nodePlan, controlPlane, entry)
+
+	if isInitNode(entry) && IsOnlyEtcd(entry) {
+		nodePlan = p.addInitNodePeriodicInstruction(nodePlan, controlPlane)
+	}
+
+	if isEtcd(entry) {
+		nodePlan = p.addEtcdSnapshotListLocalPeriodicInstruction(nodePlan, controlPlane)
+		if controlPlane != nil && controlPlane.Spec.ETCD != nil && S3Enabled(controlPlane.Spec.ETCD.S3) && isInitNode(entry) {
+			nodePlan = p.addEtcdSnapshotListS3PeriodicInstruction(nodePlan, controlPlane)
+		}
+	}
+
+	nodePlan, err = p.addApplyClusterAgentPeriodicInstruction(controlPlane, nodePlan, entry)
 	if err != nil {
 		return nodePlan, err
 	}
 
-	if isInitNode(entry) && IsOnlyEtcd(entry) {
-		nodePlan, err = p.addInitNodePeriodicInstruction(nodePlan, controlPlane)
-		if err != nil {
-			return nodePlan, err
-		}
-	}
-
-	if isEtcd(entry) {
-		nodePlan, err = p.addEtcdSnapshotListLocalPeriodicInstruction(nodePlan, controlPlane)
-		if err != nil {
-			return nodePlan, err
-		}
-		if controlPlane != nil && controlPlane.Spec.ETCD != nil && S3Enabled(controlPlane.Spec.ETCD.S3) && isInitNode(entry) {
-			nodePlan, err = p.addEtcdSnapshotListS3PeriodicInstruction(nodePlan, controlPlane)
-			if err != nil {
-				return nodePlan, err
-			}
-		}
-	}
 	return nodePlan, nil
 }
 

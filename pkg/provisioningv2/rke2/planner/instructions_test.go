@@ -144,10 +144,9 @@ func TestPlanner_addInstallInstructionWithRestartStamp(t *testing.T) {
 			entry := createTestPlanEntry(tt.args.os)
 
 			// act
-			p, err := planner.addInstallInstructionWithRestartStamp(plan.NodePlan{}, controlPlane, entry)
+			p := planner.addInstallInstructionWithRestartStamp(plan.NodePlan{}, controlPlane, entry)
 
 			// assert
-			a.Nil(err)
 			a.NotNil(p)
 			a.Equal(entry.Metadata.Labels[rke2.CattleOSLabel], tt.args.os)
 			a.NotZero(len(p.Instructions))

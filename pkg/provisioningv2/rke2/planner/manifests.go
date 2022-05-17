@@ -29,12 +29,6 @@ func (p *Planner) getControlPlaneManifests(controlPlane *rkev1.RKEControlPlane, 
 		return nil, nil
 	}
 
-	clusterAgent, err := p.getClusterAgentManifestFile(controlPlane, rke2.GetRuntime(controlPlane.Spec.KubernetesVersion), entry)
-	if err != nil {
-		return nil, err
-	}
-	result = append(result, clusterAgent)
-
 	// if we have a nil snapshotMetadata object, it's probably because the annotation didn't exist on the controlplane object. this is not breaking though so don't block.
 	snapshotMetadata := getEtcdSnapshotExtraMetadata(controlPlane, rke2.GetRuntime(controlPlane.Spec.KubernetesVersion))
 	if snapshotMetadata == nil {
@@ -62,20 +56,6 @@ func getEtcdSnapshotExtraMetadata(controlPlane *rkev1.RKEControlPlane, runtime s
 	}
 	logrus.Errorf("rkecluster %s/%s: unable to find cluster spec annotation for control plane", controlPlane.Spec.ClusterName, controlPlane.Namespace)
 	return nil
-}
-
-// getClusterAgentManifestFile returns a plan.File that contains the cluster agent manifest.
-func (p *Planner) getClusterAgentManifestFile(controlPlane *rkev1.RKEControlPlane, runtime string, entry *planEntry) (plan.File, error) {
-	data, err := p.generateClusterAgentManifest(controlPlane, entry)
-	if err != nil {
-		return plan.File{}, err
-	}
-
-	return plan.File{
-		Content: base64.StdEncoding.EncodeToString(data),
-		Path:    fmt.Sprintf("/var/lib/rancher/%s/server/manifests/rancher/cluster-agent.yaml", runtime),
-		Dynamic: true,
-	}, nil
 }
 
 // getAddons returns a plan.File that contains the content of the defined additional manifests.

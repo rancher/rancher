@@ -49,4 +49,5 @@ type RKEControlPlaneStatus struct {
 	ConfigGeneration              int64                               `json:"configGeneration,omitempty"`
 	Initialized                   bool                                `json:"initialized,omitempty"`
 	AgentConnected                bool                                `json:"agentConnected,omitempty"`
+	AgentDeployed                 bool                                `json:"agentDeployed,omitempty"`
 }

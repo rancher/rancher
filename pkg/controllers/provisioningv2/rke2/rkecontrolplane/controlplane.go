@@ -80,6 +80,7 @@ func (h *handler) OnChange(obj *rkev1.RKEControlPlane, status rkev1.RKEControlPl
 	status.Ready = rke2.Ready.IsTrue(cluster)
 	status.Initialized = rke2.Ready.IsTrue(cluster)
 	status.AgentConnected = rke2.AgentConnected.IsTrue(cluster)
+	status.AgentDeployed = rke2.AgentDeployed.IsTrue(cluster)
 	return status, nil
 }
 
