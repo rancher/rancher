@@ -381,18 +381,22 @@ def test_rke_az_host_with_provider_2(node_template_az):
     validate_rke_dm_host_2(node_template_az, rke_config_azure_provider)
 
 
+@pytest.mark.skip(reason="https://github.com/rancher/qa-tasks/issues/318")
 def test_rke_do_host_1(node_template_do):
     validate_rke_dm_host_1(node_template_do, rke_config)
 
 
+@pytest.mark.skip(reason="https://github.com/rancher/qa-tasks/issues/318")
 def test_rke_do_host_2(node_template_do):
     validate_rke_dm_host_2(node_template_do, rke_config)
 
 
+@pytest.mark.skip(reason="https://github.com/rancher/qa-tasks/issues/318")
 def test_rke_do_host_3(node_template_do):
     validate_rke_dm_host_3(node_template_do, rke_config)
 
 
+@pytest.mark.skip(reason="https://github.com/rancher/qa-tasks/issues/318")
 def test_rke_do_host_4(node_template_do):
     validate_rke_dm_host_4(node_template_do, rke_config)
 
@@ -990,6 +994,7 @@ def node_template_az():
     return node_template
 
 
+@pytest.mark.skip(reason="https://github.com/rancher/qa-tasks/issues/318")
 @pytest.fixture(scope='session')
 def node_template_do():
     client = get_user_client()
