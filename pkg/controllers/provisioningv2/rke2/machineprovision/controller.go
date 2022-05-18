@@ -315,22 +315,15 @@ func (h *handler) OnRemove(key string, obj runtime.Object) (runtime.Object, erro
 		return obj, err
 	}
 
-	if !infraObj.data.Bool("status", "jobComplete") && infraObj.data.String("status", "failureReason") == "" {
-		job, err := h.getJobFromInfraMachine(infraObj)
-		if apierrors.IsNotFound(err) {
-			// If the job is not found, go ahead and proceed with machine deletion
-			return obj, h.apply.WithOwner(obj).ApplyObjects()
-		} else if err != nil {
-			return obj, err
-		}
-		logrus.Debugf("[MachineProvision] create job for %s not finished, job was found and the error was not nil and was not an isnotfound", key)
-		if job != nil {
-			// enqueue the job to force-reconcile the condition
-			h.jobController.Enqueue(job.Namespace, job.Name)
-			logrus.Tracef("[MachineProvision] create job object for %s was %+v", key, job)
-		}
-		return obj, fmt.Errorf("cannot delete machine %s because create job has not finished", infraObj.meta.GetName())
+	_, err = h.getJobFromInfraMachine(infraObj)
+	if apierrors.IsNotFound(err) {
+		// If the job is not found, go ahead and proceed with machine deletion
+		return obj, h.apply.WithOwner(obj).ApplyObjects()
+	} else if err != nil {
+		return obj, err
 	}
+
+	logrus.Debugf("[MachineProvision] create job for '%s' not finished, job was found and the error was not nil and was not an isnotfound", key)
 
 	if cond := getCondition(infraObj.data, deleteJobConditionType); cond != nil {
 		job, err := h.getJobFromInfraMachine(infraObj)
