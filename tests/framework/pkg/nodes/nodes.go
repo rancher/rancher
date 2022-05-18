@@ -19,6 +19,7 @@ type Node struct {
 	SSHUser         string `json:"sshUser" yaml:"sshUser"`
 	SSHKeyName      string `json:"sshKeyName" yaml:"sshKeyName"`
 	SSHKey          []byte
+	NodePassword    string `json:"nodePassword,omitempty" yaml:"nodePassword,omitempty"`
 }
 
 type ExternalNodeConfig struct {
@@ -59,7 +60,6 @@ func GetSSHKey(sshKeyname string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	keyPath := filepath.Join(user.HomeDir, sshPath, sshKeyname)
 	content, err := ioutil.ReadFile(keyPath)
 	if err != nil {

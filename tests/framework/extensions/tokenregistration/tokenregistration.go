@@ -9,7 +9,8 @@ import (
 	kwait "k8s.io/apimachinery/pkg/util/wait"
 )
 
-// GetTokenRegistration is function thatm gets a specific ClusterRegistrationToken using a Client object with a specified clusterStatusName and token name.
+// GetRegistrationToken is function that gets a specific ClusterRegistrationToken
+// using a Client object with a specified clusterStatusName and token name.
 // It is done using a poll wait to make sure the tokens have been created by rancher.
 func GetRegistrationToken(client *rancher.Client, clusterId string) (*management.ClusterRegistrationToken, error) {
 	var clusterRegistrationTokens []management.ClusterRegistrationToken

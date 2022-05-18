@@ -135,7 +135,7 @@ func NewRKE2ClusterConfig(clusterName, namespace, cni, cloudCredentialSecretName
 }
 
 // CreateRKE2Cluster is a "helper" functions that takes a rancher client, and the rke2 cluster config as parameters. This function
-// registers a delete cluster fuction with a wait.WatchWait to ensure the cluster is removed cleanly.
+// registers a delete cluster function with a wait.WatchWait to ensure the cluster is removed cleanly.
 func CreateRKE2Cluster(client *rancher.Client, rke2Cluster *apisV1.Cluster) (*apisV1.Cluster, error) {
 	cluster, err := client.Provisioning.Clusters(rke2Cluster.Namespace).Create(context.TODO(), rke2Cluster, metav1.CreateOptions{})
 	if err != nil {

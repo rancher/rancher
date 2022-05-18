@@ -4,7 +4,6 @@ import (
 	"strings"
 
 	"github.com/rancher/rancher/tests/framework/pkg/config"
-	"github.com/rancher/rancher/tests/framework/pkg/namegenerator"
 )
 
 const (
@@ -19,12 +18,13 @@ type Config struct {
 	CNIs               []string `json:"cni" yaml:"cni"`
 	Providers          []string `json:"providers" yaml:"providers"`
 	NodeProviders      []string `json:"nodeProviders" yaml:"nodeProviders"`
+	ClusterHasWindows  bool     `json:"clusterHasWindows" yaml:"clusterHasWindows"`
 }
 
-func AppendRandomString(baseClusterName string) string {
-	clusterName := "auto-" + baseClusterName + "-" + namegenerator.RandStringLower(defaultRandStringLength)
-	return clusterName
-}
+//func AppendRandomString(baseClusterName string) string {
+//	clusterName := "auto-" + baseClusterName + "-" + namegenerator.RandStringLower(defaultRandStringLength)
+//	return clusterName
+//}
 
 // NodesAndRolesInput is a helper function that reads the nodesAndRoles entry in the config file and returns it in the form
 // of a list of map[string]bool
@@ -32,7 +32,7 @@ func NodesAndRolesInput() []map[string]bool {
 	clustersConfig := new(Config)
 
 	config.LoadConfig(ConfigurationFileKey, clustersConfig)
-	nodeRolesBoolSliceMap := []map[string]bool{}
+	var nodeRolesBoolSliceMap []map[string]bool
 
 	rolesSlice := strings.Split(clustersConfig.NodesAndRoles, "|")
 	for _, roles := range rolesSlice {
@@ -46,4 +46,11 @@ func NodesAndRolesInput() []map[string]bool {
 	}
 
 	return nodeRolesBoolSliceMap
+}
+
+func ClusterHasWindowsInput() bool {
+	clustersConfig := new(Config)
+
+	config.LoadConfig(ConfigurationFileKey, clustersConfig)
+	return clustersConfig.ClusterHasWindows
 }

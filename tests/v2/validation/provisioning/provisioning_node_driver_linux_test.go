@@ -6,11 +6,9 @@ import (
 	"testing"
 
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
-	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
 	"github.com/rancher/rancher/tests/framework/extensions/clusters"
 	"github.com/rancher/rancher/tests/framework/extensions/machinepools"
-	"github.com/rancher/rancher/tests/framework/extensions/users"
-	"github.com/rancher/rancher/tests/framework/pkg/config"
+	"github.com/rancher/rancher/tests/framework/extensions/nodes/ec2"
 	"github.com/rancher/rancher/tests/framework/pkg/session"
 	"github.com/rancher/rancher/tests/framework/pkg/wait"
 	"github.com/rancher/rancher/tests/integration/pkg/defaults"
@@ -20,59 +18,21 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-type RKE2NodeDriverProvisioningTestSuite struct {
-	suite.Suite
-	client             *rancher.Client
-	session            *session.Session
-	standardUserClient *rancher.Client
-	kubernetesVersions []string
-	cnis               []string
-	providers          []string
+func (r *RKE2NodeDriverProvisioningTestSuite) setupLinux() {
+	r.SetupSuiteLinuxOnly()
 }
 
-func (r *RKE2NodeDriverProvisioningTestSuite) TearDownSuite() {
-	r.session.Cleanup()
-}
+func (r *RKE2NodeDriverProvisioningTestSuite) ProvisioningRKE2ClusterLinuxOnly(provider Provider) {
+	subSession := r.session.NewSession()
+	defer subSession.Cleanup()
 
-func (r *RKE2NodeDriverProvisioningTestSuite) SetupSuite() {
-	testSession := session.NewSession(r.T())
-	r.session = testSession
-
-	clustersConfig := new(Config)
-	config.LoadConfig(ConfigurationFileKey, clustersConfig)
-
-	r.kubernetesVersions = clustersConfig.KubernetesVersions
-	r.cnis = clustersConfig.CNIs
-	r.providers = clustersConfig.Providers
-
-	client, err := rancher.NewClient("", testSession)
+	client, err := r.client.WithSession(subSession)
 	require.NoError(r.T(), err)
 
-	r.client = client
-
-	enabled := true
-	var testuser = AppendRandomString("testuser-")
-	user := &management.User{
-		Username: testuser,
-		Password: "rancherrancher123!",
-		Name:     testuser,
-		Enabled:  &enabled,
-	}
-
-	newUser, err := users.CreateUserWithRole(client, user, "clusters-create", "user")
+	cloudCredential, err := provider.CloudCredFunc(client)
 	require.NoError(r.T(), err)
 
-	newUser.Password = user.Password
-
-	standardUserClient, err := client.AsUser(newUser)
-	require.NoError(r.T(), err)
-
-	r.standardUserClient = standardUserClient
-}
-
-func (r *RKE2NodeDriverProvisioningTestSuite) ProvisioningRKE2Cluster(provider Provider) {
-	providerName := " Node Provider: " + provider.Name
-	nodeRoles0 := []map[string]bool{
+	allNodeRolesLinux := []map[string]bool{
 		{
 			"controlplane": true,
 			"etcd":         true,
@@ -80,7 +40,7 @@ func (r *RKE2NodeDriverProvisioningTestSuite) ProvisioningRKE2Cluster(provider P
 		},
 	}
 
-	nodeRoles1 := []map[string]bool{
+	uniqueNodeRolesLinux := []map[string]bool{
 		{
 			"controlplane": true,
 			"etcd":         false,
@@ -99,28 +59,21 @@ func (r *RKE2NodeDriverProvisioningTestSuite) ProvisioningRKE2Cluster(provider P
 	}
 
 	tests := []struct {
-		name      string
-		nodeRoles []map[string]bool
-		client    *rancher.Client
+		name       string
+		nodeRoles  []map[string]bool
+		hasWindows bool
+		client     *rancher.Client
 	}{
-		{"1 Node all roles Admin User", nodeRoles0, r.client},
-		{"1 Node all roles Standard User", nodeRoles0, r.standardUserClient},
-		{"3 nodes - 1 role per node Admin User", nodeRoles1, r.client},
-		{"3 nodes - 1 role per node Standard User", nodeRoles1, r.standardUserClient},
+		{"1 Node all roles Admin User - Linux", allNodeRolesLinux, false, r.client},
+		{"1 Node all roles Standard User - Linux", allNodeRolesLinux, false, r.standardUserClient},
+		{"3 nodes - 1 role per node Admin User - Linux", uniqueNodeRolesLinux, false, r.client},
+		{"3 nodes - 1 role per node Standard User - Linux", uniqueNodeRolesLinux, false, r.standardUserClient},
 	}
 
 	var name string
 	for _, tt := range tests {
-		subSession := r.session.NewSession()
-		defer subSession.Cleanup()
-
-		client, err := tt.client.WithSession(subSession)
-		require.NoError(r.T(), err)
-
-		cloudCredential, err := provider.CloudCredFunc(client)
-		require.NoError(r.T(), err)
 		for _, kubeVersion := range r.kubernetesVersions {
-			name = tt.name + providerName + " Kubernetes version: " + kubeVersion
+			name = tt.name + " Kubernetes version: " + kubeVersion
 			for _, cni := range r.cnis {
 				name += " cni: " + cni
 				r.Run(name, func() {
@@ -130,21 +83,21 @@ func (r *RKE2NodeDriverProvisioningTestSuite) ProvisioningRKE2Cluster(provider P
 					testSessionClient, err := tt.client.WithSession(testSession)
 					require.NoError(r.T(), err)
 
-					clusterName := AppendRandomString(provider.Name)
+					clusterName := ec2.AppendRandomString(provider.Name)
 					generatedPoolName := fmt.Sprintf("nc-%s-pool1-", clusterName)
 					machinePoolConfig := provider.MachinePoolFunc(generatedPoolName, namespace)
 
 					machineConfigResp, err := machinepools.CreateMachineConfig(provider.MachineConfig, machinePoolConfig, testSessionClient)
 					require.NoError(r.T(), err)
 
-					machinePools := machinepools.RKEMachinePoolSetup(tt.nodeRoles, machineConfigResp)
+					machinePools := machinepools.RKEMachinePoolSetup(tt.nodeRoles, tt.hasWindows, machineConfigResp)
 
 					cluster := clusters.NewRKE2ClusterConfig(clusterName, namespace, cni, cloudCredential.ID, kubeVersion, machinePools)
 
 					clusterResp, err := clusters.CreateRKE2Cluster(testSessionClient, cluster)
 					require.NoError(r.T(), err)
 
-					result, err := r.client.Provisioning.Clusters(namespace).Watch(context.TODO(), metav1.ListOptions{
+					result, err := testSessionClient.Provisioning.Clusters(namespace).Watch(context.TODO(), metav1.ListOptions{
 						FieldSelector:  "metadata.name=" + clusterName,
 						TimeoutSeconds: &defaults.WatchTimeoutSeconds,
 					})
@@ -155,14 +108,23 @@ func (r *RKE2NodeDriverProvisioningTestSuite) ProvisioningRKE2Cluster(provider P
 					err = wait.WatchWait(result, checkFunc)
 					assert.NoError(r.T(), err)
 					assert.Equal(r.T(), clusterName, clusterResp.Name)
+
 				})
 			}
 		}
 	}
 }
 
-func (r *RKE2NodeDriverProvisioningTestSuite) ProvisioningRKE2ClusterDynamicInput(provider Provider, nodesAndRoles []map[string]bool) {
-	providerName := " Node Provider: " + provider.Name
+func (r *RKE2NodeDriverProvisioningTestSuite) ProvisioningRKE2ClusterWithDynamicInputLinuxOnly(provider Provider, nodesAndRoles []map[string]bool) {
+	subSession := r.session.NewSession()
+	defer subSession.Cleanup()
+
+	client, err := r.client.WithSession(subSession)
+	require.NoError(r.T(), err)
+
+	cloudCredential, err := provider.CloudCredFunc(client)
+	require.NoError(r.T(), err)
+
 	tests := []struct {
 		name   string
 		client *rancher.Client
@@ -173,17 +135,8 @@ func (r *RKE2NodeDriverProvisioningTestSuite) ProvisioningRKE2ClusterDynamicInpu
 
 	var name string
 	for _, tt := range tests {
-		subSession := r.session.NewSession()
-		defer subSession.Cleanup()
-
-		client, err := tt.client.WithSession(subSession)
-		require.NoError(r.T(), err)
-
-		cloudCredential, err := provider.CloudCredFunc(client)
-		require.NoError(r.T(), err)
-
 		for _, kubeVersion := range r.kubernetesVersions {
-			name = tt.name + providerName + " Kubernetes version: " + kubeVersion
+			name = tt.name + " Kubernetes version: " + kubeVersion
 			for _, cni := range r.cnis {
 				name += " cni: " + cni
 				r.Run(name, func() {
@@ -193,21 +146,21 @@ func (r *RKE2NodeDriverProvisioningTestSuite) ProvisioningRKE2ClusterDynamicInpu
 					testSessionClient, err := tt.client.WithSession(testSession)
 					require.NoError(r.T(), err)
 
-					clusterName := AppendRandomString(provider.Name)
+					clusterName := ec2.AppendRandomString(provider.Name)
 					generatedPoolName := fmt.Sprintf("nc-%s-pool1-", clusterName)
 					machinePoolConfig := provider.MachinePoolFunc(generatedPoolName, namespace)
 
 					machineConfigResp, err := machinepools.CreateMachineConfig(provider.MachineConfig, machinePoolConfig, testSessionClient)
 					require.NoError(r.T(), err)
 
-					machinePools := machinepools.RKEMachinePoolSetup(nodesAndRoles, machineConfigResp)
+					machinePools := machinepools.RKEMachinePoolSetup(nodesAndRoles, false, machineConfigResp)
 
 					cluster := clusters.NewRKE2ClusterConfig(clusterName, namespace, cni, cloudCredential.ID, kubeVersion, machinePools)
 
 					clusterResp, err := clusters.CreateRKE2Cluster(testSessionClient, cluster)
 					require.NoError(r.T(), err)
 
-					result, err := r.client.Provisioning.Clusters(namespace).Watch(context.TODO(), metav1.ListOptions{
+					result, err := testSessionClient.Provisioning.Clusters(namespace).Watch(context.TODO(), metav1.ListOptions{
 						FieldSelector:  "metadata.name=" + clusterName,
 						TimeoutSeconds: &defaults.WatchTimeoutSeconds,
 					})
@@ -218,20 +171,21 @@ func (r *RKE2NodeDriverProvisioningTestSuite) ProvisioningRKE2ClusterDynamicInpu
 					err = wait.WatchWait(result, checkFunc)
 					assert.NoError(r.T(), err)
 					assert.Equal(r.T(), clusterName, clusterResp.Name)
+
 				})
 			}
 		}
 	}
 }
 
-func (r *RKE2NodeDriverProvisioningTestSuite) TestProvisioning() {
+func (r *RKE2NodeDriverProvisioningTestSuite) TestProvisioningLinuxOnly() {
 	for _, providerName := range r.providers {
 		provider := CreateProvider(providerName)
-		r.ProvisioningRKE2Cluster(provider)
+		r.ProvisioningRKE2ClusterLinuxOnly(provider)
 	}
 }
 
-func (r *RKE2NodeDriverProvisioningTestSuite) TestProvisioningDynamicInput() {
+func (r *RKE2NodeDriverProvisioningTestSuite) TestProvisioningDynamicInputLinuxOnly() {
 	nodesAndRoles := NodesAndRolesInput()
 	if len(nodesAndRoles) == 0 {
 		r.T().Skip()
@@ -239,12 +193,12 @@ func (r *RKE2NodeDriverProvisioningTestSuite) TestProvisioningDynamicInput() {
 
 	for _, providerName := range r.providers {
 		provider := CreateProvider(providerName)
-		r.ProvisioningRKE2ClusterDynamicInput(provider, nodesAndRoles)
+		r.ProvisioningRKE2ClusterWithDynamicInputLinuxOnly(provider, nodesAndRoles)
 	}
 }
 
-// In order for 'go test' to run this suite, we need to create
+// TestProvisioningTestSuiteLinuxOnly In order for 'go test' to run this suite, we need to create
 // a normal test function and pass our suite to suite.Run
-func TestProvisioningTestSuite(t *testing.T) {
+func TestProvisioningTestSuiteLinuxOnly(t *testing.T) {
 	suite.Run(t, new(RKE2NodeDriverProvisioningTestSuite))
 }
