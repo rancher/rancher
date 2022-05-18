@@ -884,7 +884,7 @@ func (p *Planner) desiredPlan(controlPlane *rkev1.RKEControlPlane, tokensSecret 
 		return nodePlan, err
 	}
 
-	return nodePlan, nil
+	return addRemoveOldClusterAgentManifestInstruction(controlPlane, nodePlan, entry), nil
 }
 
 func getInstallerImage(controlPlane *rkev1.RKEControlPlane) string {

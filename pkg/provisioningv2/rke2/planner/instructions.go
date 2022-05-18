@@ -113,6 +113,25 @@ func (p *Planner) addApplyClusterAgentPeriodicInstruction(controlPlane *rkev1.RK
 	return nodePlan, nil
 }
 
+// addRemoveOldClusterAgentManifestInstruction will add an instruction to the plan of a control plane node after the agent is deployed to remove the old
+// manifest file on the downstream node. This is to ensure that the old agent version isn't redeployed when the node is restarted.
+func addRemoveOldClusterAgentManifestInstruction(controlPlane *rkev1.RKEControlPlane, nodePlan plan.NodePlan, entry *planEntry) plan.NodePlan {
+	runtime := rke2.GetRuntime(controlPlane.Spec.KubernetesVersion)
+	if controlPlane.Status.AgentDeployed && isControlPlane(entry) {
+		nodePlan.Instructions = append(nodePlan.Instructions, plan.OneTimeInstruction{
+			Name:    "remove-old-cluster-agent-manifest",
+			Command: "sh",
+			Args: []string{
+				"-c",
+				fmt.Sprintf("rm -f /var/lib/rancher/%s/server/manifests/rancher/cluster-agent.yaml", runtime),
+			},
+			Env: []string{fmt.Sprintf("KUBECONFIG=/etc/rancher/%s/%[1]s.yaml", runtime)},
+		})
+	}
+
+	return nodePlan
+}
+
 // generateInstallInstructionWithSkipStart will generate an instruction that executes the `run.sh` or `run.ps1`
 // from the installer image based on the control plane configuration. It will add a `SKIP_START` environment variable to prevent
 // the service from being started/restarted.
