@@ -9,10 +9,12 @@ import (
 )
 
 const (
+	// The json/yaml config key for the config of nodes of outside cloud provider e.g. linode or ec2
 	ExternalNodeConfigConfigurationFileKey = "externalNodes"
 	sshPath                                = ".ssh"
 )
 
+// Node is a configuration of node that is from an oudise cloud provider
 type Node struct {
 	NodeID          string `json:"nodeID" yaml:"nodeID"`
 	PublicIPAddress string `json:"publicIPAddress" yaml:"publicIPAddress"`
@@ -21,6 +23,7 @@ type Node struct {
 	SSHKey          []byte
 }
 
+// ExternalNodeConfig is a struct that is a collection of the node configurations
 type ExternalNodeConfig struct {
 	Nodes map[int][]*Node `json:"nodes" yaml:"nodes"`
 }
@@ -54,6 +57,7 @@ func (n *Node) ExecuteCommand(command string) error {
 	return session.Run(command)
 }
 
+// GetSSHKey reads in the ssh file from the .ssh directory, returns the key in []byte format
 func GetSSHKey(sshKeyname string) ([]byte, error) {
 	user, err := user.Current()
 	if err != nil {

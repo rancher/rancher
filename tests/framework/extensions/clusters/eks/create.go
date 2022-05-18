@@ -5,6 +5,7 @@ import (
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
 )
 
+// CreateEKSHostedCluster is a helper function that creates an EKS hosted cluster
 func CreateEKSHostedCluster(client *rancher.Client, displayName, cloudCredentialID string, enableClusterAlerting, enableClusterMonitoring, enableNetworkPolicy, windowsPreferedCluster bool, labels map[string]string) (*management.Cluster, error) {
 	eksHostCluster := eksHostClusterConfig(displayName, cloudCredentialID)
 	cluster := &management.Cluster{

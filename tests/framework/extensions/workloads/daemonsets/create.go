@@ -13,6 +13,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
+// DaemonSetGroupVersionResource is the required Group Version Resource for accessing daemon sets in a cluster,
+// using the dynamic client.
 var DaemonSetGroupVersionResource = schema.GroupVersionResource{
 	Group:    "apps",
 	Version:  "v1",

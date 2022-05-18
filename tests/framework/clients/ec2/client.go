@@ -8,6 +8,7 @@ import (
 	"github.com/rancher/rancher/tests/framework/pkg/config"
 )
 
+// EC2Client is a struct that wraps the needed AWSEC2Config object, and ec2.EC2 which makes the actual calls to aws.
 type EC2Client struct {
 	SVC    *ec2.EC2
 	Config *AWSEC2Config

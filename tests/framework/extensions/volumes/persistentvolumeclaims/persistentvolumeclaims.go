@@ -14,6 +14,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
+// PersistentVolumeClaimGroupVersionResource is the required Group Version Resource for accessing persistent volume claims in a cluster,
+// using the dynamic client.
 var PersistentVolumeClaimGroupVersionResource = schema.GroupVersionResource{
 	Group:    "",
 	Version:  "v1",

@@ -7,6 +7,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
+// PersistentVolumesGroupVersionResource is the required Group Version Resource for accessing persistent volumes in a cluster,
+// using the dynamic client.
 var PersistentVolumesGroupVersionResource = schema.GroupVersionResource{
 	Group:    "",
 	Version:  "v1",

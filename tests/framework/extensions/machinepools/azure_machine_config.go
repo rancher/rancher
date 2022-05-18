@@ -12,6 +12,7 @@ const (
 	AzureMachingConfigConfigurationFileKey = "azureMachineConfig"
 )
 
+// AzureMachineConfig is configuration needed to create an rke-machine-config.cattle.io.azureconfig
 type AzureMachineConfig struct {
 	AvailabilitySet   string   `json:"availabilitySet" yaml:"availabilitySet"`
 	DiskSize          string   `json:"diskSize" yaml:"diskSize"`

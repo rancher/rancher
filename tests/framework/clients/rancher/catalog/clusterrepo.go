@@ -89,7 +89,7 @@ func (c *Client) UpgradeChart(chart *types.ChartUpgradeAction) error {
 	return result.Error()
 }
 
-// UninstallChart uninstalls the chart according to `chartNamespace` and `chartName`
+// UninstallChart uninstalls the chart according to `chartNamespace`, `chartName`, and `uninstallAction`
 func (c *Client) UninstallChart(chartName, chartNamespace string, uninstallAction *types.ChartUninstallAction) error {
 	bodyContent, err := json.Marshal(uninstallAction)
 	if err != nil {

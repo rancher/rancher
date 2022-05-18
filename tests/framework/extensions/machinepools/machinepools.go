@@ -12,7 +12,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
-// CreateMachineConfig is a helper method that creates the rke-machine-config, from any service provider available on rancher ex) amazonec2configs
+// CreateMachineConfig is a helper method that creates the rke-machine-config, from any service provider available on rancher e.g. amazonec2configs
 // This function uses the dynamic client create the rke-machine-config
 func CreateMachineConfig(resource string, machinePoolConfig *unstructured.Unstructured, client *rancher.Client) (*unstructured.Unstructured, error) {
 	groupVersionResource := schema.GroupVersionResource{
@@ -49,18 +49,18 @@ func NewRKEMachinePool(controlPlaneRole, etcdRole, workerRole bool, poolName str
 // RKEMachinePoolSetup is a helper method that will loop and setup muliple node pools with the defined node roles from the `nodeRoles` parameter
 // `machineConfig` is the *unstructured.Unstructured created by CreateMachineConfig
 // `nodeRoles` would be in this format
-// []map[string]bool{
-// {
-// 	"controlplane": true,
-// 	"etcd":         false,
-// 	"worker":       false,
-// },
-// {
-// 	"controlplane": false,
-// 	"etcd":         true,
-// 	"worker":       false,
-// },
-// }
+//   []map[string]bool{
+//   {
+// 	   "controlplane": true,
+// 	   "etcd":         false,
+//     "worker":       false,
+//   },
+//   {
+// 	   "controlplane": false,
+// 	   "etcd":         true,
+// 	   "worker":       false,
+//   },
+//  }
 func RKEMachinePoolSetup(nodeRoles []map[string]bool, machineConfig *unstructured.Unstructured) []apisV1.RKEMachinePool {
 	machinePools := []apisV1.RKEMachinePool{}
 	for index, roles := range nodeRoles {

@@ -21,6 +21,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
+// NamespaceGroupVersionResource is the required Group Version Resource for accessing namespaces in a cluster,
+// using the dynamic client.
 var NamespaceGroupVersionResource = schema.GroupVersionResource{
 	Group:    "",
 	Version:  "v1",

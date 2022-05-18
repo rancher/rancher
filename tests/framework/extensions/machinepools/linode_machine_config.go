@@ -12,6 +12,7 @@ const (
 	LinodeMachingConfigConfigurationFileKey = "linodeMachineConfig"
 )
 
+// LinodeMachineConfig is configuration needed to create an rke-machine-config.cattle.io.linodeconfig
 type LinodeMachineConfig struct {
 	AuthorizedUsers string `json:"authorizedUsers" yaml:"authorizedUsers"`
 	DockerPort      string `json:"dockerPort" yaml:"dockerPort"`
