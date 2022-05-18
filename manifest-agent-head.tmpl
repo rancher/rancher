@@ -17,12 +17,6 @@ manifests:
       os: windows
       version: 1809
   -
-    image: rancher/rancher-agent:{{#if build.tag}}{{build.tag}}{{else}}{{replace "release/" "" build.branch }}-{{build.commit}}{{/if}}-windows-20H2
-    platform:
-      architecture: amd64
-      os: windows
-      version: 20H2
-  -
     image: rancher/rancher-agent:{{#if build.tag}}{{build.tag}}{{else}}{{replace "release/" "" build.branch }}-{{build.commit}}{{/if}}-windows-ltsc2022
     platform:
       architecture: amd64
