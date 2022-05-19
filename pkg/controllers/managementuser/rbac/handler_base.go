@@ -79,6 +79,7 @@ func Register(ctx context.Context, workload *config.UserContext) {
 		crIndexer:           crInformer.GetIndexer(),
 		crbIndexer:          crbInformer.GetIndexer(),
 		rtLister:            workload.Management.Management.RoleTemplates("").Controller().Lister(),
+		roleTemplates:       workload.Management.Management.RoleTemplates(""),
 		rLister:             workload.Management.RBAC.Roles("").Controller().Lister(),
 		roles:               workload.Management.RBAC.Roles(""),
 		rbLister:            workload.RBAC.RoleBindings("").Controller().Lister(),
@@ -122,6 +123,7 @@ func Register(ctx context.Context, workload *config.UserContext) {
 type manager struct {
 	workload            *config.UserContext
 	rtLister            v3.RoleTemplateLister
+	roleTemplates       v3.RoleTemplateInterface
 	prtbIndexer         cache.Indexer
 	crtbIndexer         cache.Indexer
 	nsIndexer           cache.Indexer
@@ -199,8 +201,11 @@ func (m *manager) createClusterRole(rt *v3.RoleTemplate) error {
 	logrus.Infof("Creating clusterRole for roleTemplate %v (%v).", rt.DisplayName, rt.Name)
 	_, err := m.clusterRoles.Create(&rbacv1.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        rt.Name,
-			Annotations: map[string]string{clusterRoleOwner: rt.Name},
+			Name: rt.Name,
+			Annotations: map[string]string{
+				clusterRoleOwner:        rt.Name,
+				rulesChecksumAnnotation: rt.GetAnnotations()[rulesChecksumAnnotation],
+			},
 		},
 		Rules: rt.Rules,
 	})
@@ -299,12 +304,34 @@ func (m *manager) updateRole(rt *v3.RoleTemplate, namespace string) error {
 	return nil
 }
 
+// compareAndUpdateNamespacedRole checks whether the rules on the role match the rules in the role template, and update the role if needed.
+// It does not directly compare the list of rules for each object, rather it checks for a checksum annotation on both objects that represent the rules and performs the update if the checksum does not match.
 func (m *manager) compareAndUpdateNamespacedRole(role *rbacv1.Role, rt *v3.RoleTemplate, namespace string) error {
+	roleAnnotations := role.GetAnnotations()
+	if roleAnnotations == nil {
+		roleAnnotations = make(map[string]string)
+	}
+	rtAnnotations := rt.GetAnnotations()
+	if rtAnnotations == nil {
+		rtAnnotations = make(map[string]string)
+	}
+	rtChecksum, ok := rtAnnotations[rulesChecksumAnnotation]
+	if !ok { // the hash annotation may not be set yet on a new role template or one that existed before upgrade
+		var err error
+		if rtChecksum, err = m.setChecksum(rt); err != nil {
+			return err
+		}
+	}
+	if roleAnnotations[rulesChecksumAnnotation] == rtChecksum {
+		return nil
+	}
 	if reflect.DeepEqual(role.Rules, rt.Rules) {
 		return nil
 	}
 	role = role.DeepCopy()
 	role.Rules = rt.Rules
+	roleAnnotations[rulesChecksumAnnotation] = rtChecksum
+	role.SetAnnotations(roleAnnotations)
 	logrus.Infof("Updating role %v in %v because of rules difference with roleTemplate %v (%v).", role.Name, namespace, rt.DisplayName, rt.Name)
 	_, err := m.roles.Update(role)
 	if err != nil {

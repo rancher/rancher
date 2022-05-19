@@ -1,6 +1,10 @@
 package rbac
 
 import (
+	"bytes"
+	"crypto/sha256"
+	"encoding/gob"
+
 	"github.com/pkg/errors"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/rbac"
@@ -8,6 +12,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+)
+
+const (
+	rulesChecksumAnnotation = "authz.cluster.cattle.io/rules-sum"
 )
 
 func newRTLifecycle(m *manager) v3.RoleTemplateHandlerFunc {
@@ -28,6 +36,12 @@ func (c *rtSync) sync(key string, obj *v3.RoleTemplate) (runtime.Object, error) 
 	if obj == nil || obj.DeletionTimestamp != nil {
 		return nil, nil
 	}
+
+	_, err := c.m.setChecksum(obj)
+	if err != nil {
+		return obj, err
+	}
+
 	// check if there are any PRTBs/CRTBs referencing this RoleTemplate for this cluster
 	prtbs, err := c.m.prtbIndexer.ByIndex(rtbByClusterAndRoleTemplateIndex, c.m.workload.ClusterName+"-"+obj.Name)
 	if err != nil {
@@ -133,4 +147,29 @@ func (c *rtSync) syncRT(template *v3.RoleTemplate, usedInProjects bool, prtbs []
 		}
 	}
 	return nil
+}
+
+// setChecksum takes a hash of the rules on a role template and sets it as an annotation on the object, and updates the object.
+// It returns the hash as a string for ease of use, or an error if there is an issue performing the encoding or the update.
+func (m *manager) setChecksum(rt *v3.RoleTemplate) (string, error) {
+	rules := rt.Rules
+	var ruleBytes bytes.Buffer
+	enc := gob.NewEncoder(&ruleBytes)
+	err := enc.Encode(rules)
+	if err != nil {
+		return "", err
+	}
+	sum := sha256.Sum256(ruleBytes.Bytes())
+	rt = rt.DeepCopy()
+	rtAnnotations := rt.GetAnnotations()
+	if currentSum, ok := rtAnnotations[rulesChecksumAnnotation]; ok && currentSum == string(sum[:]) {
+		return currentSum, nil
+	}
+	rtAnnotations[rulesChecksumAnnotation] = string(sum[:])
+	rt.SetAnnotations(rtAnnotations)
+	_, err = m.roleTemplates.Update(rt)
+	if err != nil {
+		return "", err
+	}
+	return rtAnnotations[rulesChecksumAnnotation], nil
 }
