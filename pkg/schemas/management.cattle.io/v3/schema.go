@@ -56,7 +56,8 @@ var (
 		Init(driverMetadataTypes).
 		Init(driverMetadataCisTypes).
 		Init(encryptionTypes).
-		Init(fleetTypes)
+		Init(fleetTypes).
+		Init(notificationTypes)
 
 	TokenSchemas = factory.Schemas(&Version).
 			Init(tokens)
@@ -994,4 +995,8 @@ func encryptionTypes(schemas *types.Schemas) *types.Schemas {
 		}{}).MustImport(&Version, apiserverconfig.KMSConfiguration{}, struct {
 		Timeout string
 	}{})
+}
+
+func notificationTypes(schemas *types.Schemas) *types.Schemas {
+	return schemas.MustImport(&Version, v3.RancherUserNotification{})
 }

@@ -94,6 +94,7 @@ type Interface interface {
 	ProjectMonitorGraph() ProjectMonitorGraphController
 	ProjectNetworkPolicy() ProjectNetworkPolicyController
 	ProjectRoleTemplateBinding() ProjectRoleTemplateBindingController
+	RancherUserNotification() RancherUserNotificationController
 	RkeAddon() RkeAddonController
 	RkeK8sServiceOption() RkeK8sServiceOptionController
 	RkeK8sSystemImage() RkeK8sSystemImageController
@@ -310,6 +311,9 @@ func (c *version) ProjectNetworkPolicy() ProjectNetworkPolicyController {
 }
 func (c *version) ProjectRoleTemplateBinding() ProjectRoleTemplateBindingController {
 	return NewProjectRoleTemplateBindingController(schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "ProjectRoleTemplateBinding"}, "projectroletemplatebindings", true, c.controllerFactory)
+}
+func (c *version) RancherUserNotification() RancherUserNotificationController {
+	return NewRancherUserNotificationController(schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "RancherUserNotification"}, "rancherusernotifications", false, c.controllerFactory)
 }
 func (c *version) RkeAddon() RkeAddonController {
 	return NewRkeAddonController(schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "RkeAddon"}, "rkeaddons", true, c.controllerFactory)

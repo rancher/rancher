@@ -148,6 +148,7 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 		client.TemplateContentType,
 		client.GlobalDnsType,
 		client.GlobalDnsProviderType,
+		client.RancherUserNotificationType,
 	)
 
 	factory.BatchCreateCRDs(ctx, config.ManagementStorageContext, scheme.Scheme, schemas, &projectschema.Version,
@@ -186,6 +187,7 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 	ClusterTemplates(schemas, apiContext)
 	SystemImages(schemas, apiContext)
 	EtcdBackups(schemas, apiContext)
+	RancherUserNotifications(schemas, apiContext)
 
 	Templates(ctx, schemas, apiContext)
 	TemplateVersion(ctx, schemas, apiContext)
@@ -897,4 +899,8 @@ func SystemImages(schemas *types.Schemas, management *config.ScaledContext) {
 func EtcdBackups(schemas *types.Schemas, management *config.ScaledContext) {
 	schema := schemas.Schema(&managementschema.Version, client.EtcdBackupType)
 	schema.Formatter = etcdbackup.Formatter
+}
+
+func RancherUserNotifications(schemas *types.Schemas, management *config.ScaledContext) {
+	schemas.Schema(&managementschema.Version, client.RancherUserNotificationType)
 }
