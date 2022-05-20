@@ -35,14 +35,14 @@ func NewAccessControlHandler() auth.Middleware {
 	}
 }
 
-func newUserLookupAccess(ctx *types.APIContext, accessStore accesscontrol.AccessSetLookup) types.AccessControl {
+func newUserLookupAccess(ctx *types.APIContext, schema *types.Schema, accessStore accesscontrol.AccessSetForSchemaLookup) types.AccessControl {
 	userName := ctx.Request.Header.Get(transport.ImpersonateUserHeader)
 	groups := ctx.Request.Header[transport.ImpersonateGroupHeader]
 	user := &user2.DefaultInfo{
 		Name:   userName,
 		Groups: groups,
 	}
-	accessSet := accessStore.AccessFor(user)
+	accessSet := accessStore.AccessForSchema(user, schema)
 	return &userCachedAccess{
 		access: accessSet,
 	}

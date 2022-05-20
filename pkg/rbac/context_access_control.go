@@ -12,7 +12,7 @@ type contextBased struct {
 	lookup contextLookup
 }
 
-type contextLookup func(ctx *types.APIContext) (types.AccessControl, bool)
+type contextLookup func(ctx *types.APIContext, schema *types.Schema) (types.AccessControl, bool)
 
 func newContextBased(lookup contextLookup) types.AccessControl {
 	return &contextBased{
@@ -21,7 +21,7 @@ func newContextBased(lookup contextLookup) types.AccessControl {
 }
 
 func (c *contextBased) Expire(apiContext *types.APIContext, schema *types.Schema) {
-	ac, ok := c.lookup(apiContext)
+	ac, ok := c.lookup(apiContext, schema)
 	if !ok {
 		return
 	}
@@ -31,7 +31,7 @@ func (c *contextBased) Expire(apiContext *types.APIContext, schema *types.Schema
 }
 
 func (c *contextBased) CanCreate(apiContext *types.APIContext, schema *types.Schema) error {
-	ac, ok := c.lookup(apiContext)
+	ac, ok := c.lookup(apiContext, schema)
 	if ok {
 		return ac.CanCreate(apiContext, schema)
 	}
@@ -39,7 +39,7 @@ func (c *contextBased) CanCreate(apiContext *types.APIContext, schema *types.Sch
 }
 
 func (c *contextBased) CanList(apiContext *types.APIContext, schema *types.Schema) error {
-	ac, ok := c.lookup(apiContext)
+	ac, ok := c.lookup(apiContext, schema)
 	if ok {
 		return ac.CanList(apiContext, schema)
 	}
@@ -47,7 +47,7 @@ func (c *contextBased) CanList(apiContext *types.APIContext, schema *types.Schem
 }
 
 func (c *contextBased) CanGet(apiContext *types.APIContext, schema *types.Schema) error {
-	ac, ok := c.lookup(apiContext)
+	ac, ok := c.lookup(apiContext, schema)
 	if ok {
 		return ac.CanGet(apiContext, schema)
 	}
@@ -55,7 +55,7 @@ func (c *contextBased) CanGet(apiContext *types.APIContext, schema *types.Schema
 }
 
 func (c *contextBased) CanUpdate(apiContext *types.APIContext, obj map[string]interface{}, schema *types.Schema) error {
-	ac, ok := c.lookup(apiContext)
+	ac, ok := c.lookup(apiContext, schema)
 	if ok {
 		return ac.CanUpdate(apiContext, obj, schema)
 	}
@@ -63,7 +63,7 @@ func (c *contextBased) CanUpdate(apiContext *types.APIContext, obj map[string]in
 }
 
 func (c *contextBased) CanDelete(apiContext *types.APIContext, obj map[string]interface{}, schema *types.Schema) error {
-	ac, ok := c.lookup(apiContext)
+	ac, ok := c.lookup(apiContext, schema)
 	if ok {
 		return ac.CanDelete(apiContext, obj, schema)
 	}
@@ -71,7 +71,7 @@ func (c *contextBased) CanDelete(apiContext *types.APIContext, obj map[string]in
 }
 
 func (c *contextBased) CanDo(apiGroup, resource, verb string, apiContext *types.APIContext, obj map[string]interface{}, schema *types.Schema) error {
-	ac, ok := c.lookup(apiContext)
+	ac, ok := c.lookup(apiContext, schema)
 	if ok {
 		return ac.CanDo(apiGroup, resource, verb, apiContext, obj, schema)
 	}
@@ -79,7 +79,7 @@ func (c *contextBased) CanDo(apiGroup, resource, verb string, apiContext *types.
 }
 
 func (c *contextBased) Filter(apiContext *types.APIContext, schema *types.Schema, obj map[string]interface{}, context map[string]string) map[string]interface{} {
-	ac, ok := c.lookup(apiContext)
+	ac, ok := c.lookup(apiContext, schema)
 	if ok {
 		return ac.Filter(apiContext, schema, obj, context)
 	}
@@ -87,7 +87,7 @@ func (c *contextBased) Filter(apiContext *types.APIContext, schema *types.Schema
 }
 
 func (c *contextBased) FilterList(apiContext *types.APIContext, schema *types.Schema, obj []map[string]interface{}, context map[string]string) []map[string]interface{} {
-	ac, ok := c.lookup(apiContext)
+	ac, ok := c.lookup(apiContext, schema)
 	if ok {
 		return ac.FilterList(apiContext, schema, obj, context)
 	}

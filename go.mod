@@ -9,9 +9,10 @@ replace (
 	github.com/knative/pkg => github.com/rancher/pkg v0.0.0-20190514055449-b30ab9de040e
 	github.com/matryer/moq => github.com/rancher/moq v0.0.0-20200712062324-13d1f37d2d77
 	github.com/opencontainers/runc => github.com/opencontainers/runc v1.1.2
-
 	github.com/rancher/rancher/pkg/apis => ./pkg/apis
 	github.com/rancher/rancher/pkg/client => ./pkg/client
+
+	github.com/rancher/steve => github.com/cmurphy/steve v0.0.0-20220520222108-78aeca15ab90
 	helm.sh/helm/v3 => github.com/rancher/helm/v3 v3.8.0-rancher1
 	k8s.io/api => k8s.io/api v0.23.3
 	k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.23.3

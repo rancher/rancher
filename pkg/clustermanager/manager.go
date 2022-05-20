@@ -62,7 +62,7 @@ type record struct {
 	cancel        context.CancelFunc
 }
 
-func NewManager(httpsPort int, context *config.ScaledContext, asl accesscontrol.AccessSetLookup) *Manager {
+func NewManager(httpsPort int, context *config.ScaledContext, asl accesscontrol.AccessSetForSchemaLookup) *Manager {
 	return &Manager{
 		httpsPort:     httpsPort,
 		ScaledContext: context,

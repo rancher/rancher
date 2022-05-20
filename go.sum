@@ -276,6 +276,8 @@ github.com/circonus-labs/circonus-gometrics v2.3.1+incompatible/go.mod h1:nmEj6D
 github.com/circonus-labs/circonusllhist v0.1.3/go.mod h1:kMXHVDlOchFAehlya5ePtbp5jckzBHf4XRpQvBOLI+I=
 github.com/client9/misspell v0.3.4/go.mod h1:qj6jICC3Q7zFZvVWo7KLAzC3yx5G7kyvSDkc90ppPyw=
 github.com/clusterhq/flocker-go v0.0.0-20160920122132-2b8b7259d313/go.mod h1:P1wt9Z3DP8O6W3rvwCt0REIlshg1InHImaLW0t3ObY0=
+github.com/cmurphy/steve v0.0.0-20220520222108-78aeca15ab90 h1:ivo7hP3HqINE64iCkHXJ6ydNnwBRGaJN+A2BjTNqrtw=
+github.com/cmurphy/steve v0.0.0-20220520222108-78aeca15ab90/go.mod h1:C5mNeTSJN1wOfcZ83JkJGgsNu3Lbwl7uiZBu8/IseWc=
 github.com/cncf/udpa/go v0.0.0-20191209042840-269d4d468f6f/go.mod h1:M8M6+tZqaGXZJjfX53e64911xZQV5JYwmTeXPW+k8Sc=
 github.com/cncf/udpa/go v0.0.0-20200629203442-efcf912fb354/go.mod h1:WmhPx2Nbnhtbo57+VJT5O0JRkEi1Wbu0z5j0R8u5Hbk=
 github.com/cncf/udpa/go v0.0.0-20201120205902-5459f2c99403/go.mod h1:WmhPx2Nbnhtbo57+VJT5O0JRkEi1Wbu0z5j0R8u5Hbk=
@@ -1295,8 +1297,6 @@ github.com/rancher/rke v1.3.12-0.20220520141546-b42ebdc40272 h1:MqkMm5oVsoRgcDoL
 github.com/rancher/rke v1.3.12-0.20220520141546-b42ebdc40272/go.mod h1:t+VWWY6Cxs1OjRXRFQv+gZNWSfmFor9UReReDjYOnWs=
 github.com/rancher/security-scan v0.1.7-0.20200222041501-f7377f127168 h1:SIshhsz0O71FYyyDmjUmbFGvmgp4ASm8J1zmhMK/UG0=
 github.com/rancher/security-scan v0.1.7-0.20200222041501-f7377f127168/go.mod h1:WlLAocVyVQs5J8r0IiQXsp0ajVZO6hYi/Vo6zxjo73s=
-github.com/rancher/steve v0.0.0-20220415184129-b23977e7f1b5 h1:+1shpXAvnskvlMtcjse8oOi2tyPNNDO3LtThjfRoSt0=
-github.com/rancher/steve v0.0.0-20220415184129-b23977e7f1b5/go.mod h1:C5mNeTSJN1wOfcZ83JkJGgsNu3Lbwl7uiZBu8/IseWc=
 github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20210727200656-10b094e30007 h1:ru+mqGnxMmKeU0Q3XIDxkARvInDIqT1hH2amTcsjxI4=
 github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20210727200656-10b094e30007/go.mod h1:Ja346o44aTPWADc/5Jm93+KgctT6KtftuOosgz0F2AM=
 github.com/rancher/wrangler v0.6.1/go.mod h1:L4HtjPeX8iqLgsxfJgz+JjKMcX2q3qbRXSeTlC/CSd4=

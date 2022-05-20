@@ -119,6 +119,7 @@ type Context struct {
 	Provisioning        provisioningv1.Interface
 
 	ASL                     accesscontrol.AccessSetLookup
+	ASLForSchema            accesscontrol.AccessSetForSchemaLookup
 	ClientConfig            clientcmd.ClientConfig
 	CachedDiscovery         discovery.CachedDiscoveryInterface
 	RESTMapper              meta.RESTMapper
@@ -337,6 +338,7 @@ func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restCo
 		Batch:                   batch.Batch().V1(),
 		ControllerFactory:       controllerFactory,
 		ASL:                     asl,
+		ASLForSchema:            asl,
 		ClientConfig:            clientConfig,
 		MultiClusterManager:     noopMCM{},
 		CachedDiscovery:         cache,

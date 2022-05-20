@@ -13,8 +13,8 @@ func NewAccessControl(ctx context.Context, clusterName string, rbacClient v1.Int
 	return NewAccessControlWithASL(clusterName, asl)
 }
 
-func NewAccessControlWithASL(clusterName string, asl accesscontrol.AccessSetLookup) types.AccessControl {
-	return newContextBased(func(ctx *types.APIContext) (types.AccessControl, bool) {
+func NewAccessControlWithASL(clusterName string, asl accesscontrol.AccessSetForSchemaLookup) types.AccessControl {
+	return newContextBased(func(ctx *types.APIContext, schema *types.Schema) (types.AccessControl, bool) {
 		cache, ok := ctx.Request.Context().Value(contextKey{}).(*accessControlCache)
 		if !ok {
 			return nil, false
@@ -32,7 +32,7 @@ func NewAccessControlWithASL(clusterName string, asl accesscontrol.AccessSetLook
 
 		cache.Lock()
 		defer cache.Unlock()
-		ac = newUserLookupAccess(ctx, asl)
+		ac = newUserLookupAccess(ctx, schema, asl)
 		cache.cache[clusterName] = ac
 		return ac, true
 	})
