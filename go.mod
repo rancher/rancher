@@ -92,7 +92,7 @@ require (
 	github.com/rancher/aks-operator v1.0.5
 	github.com/rancher/apiserver v0.0.0-20220223185512-c4e289f92e46
 	github.com/rancher/channelserver v0.5.1-0.20220405170618-28c9b37deff1
-	github.com/rancher/dynamiclistener v0.3.2
+	github.com/rancher/dynamiclistener v0.3.3
 	github.com/rancher/eks-operator v1.1.3
 	github.com/rancher/fleet/pkg/apis v0.0.0-20210918015053-5a141a6b18f0
 	github.com/rancher/gke-operator v1.1.3
