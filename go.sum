@@ -1299,8 +1299,8 @@ github.com/rancher/moq v0.0.0-20200712062324-13d1f37d2d77/go.mod h1:wpITyDPTi/Na
 github.com/rancher/norman v0.0.0-20210423002317-8e6ffc77a819/go.mod h1:hhnf77V2lmZD7cvUqi4vTBpIs3KpHNL/AmuN0MqEClI=
 github.com/rancher/norman v0.0.0-20211201154850-abe17976423e/go.mod h1:hhnf77V2lmZD7cvUqi4vTBpIs3KpHNL/AmuN0MqEClI=
 github.com/rancher/norman v0.0.0-20220406153559-82478fb169cb/go.mod h1:gDEwYUxOknJaOG1jjcH40PQ8U8xnvB+sHph5VirKINY=
-github.com/rancher/norman v0.0.0-20220517230400-5a324b6fc6b1 h1:ZzKTdVYDi4o/6F3v7nWL3b1q+0kEyNxHMvhMHN6YQQ8=
-github.com/rancher/norman v0.0.0-20220517230400-5a324b6fc6b1/go.mod h1:gDEwYUxOknJaOG1jjcH40PQ8U8xnvB+sHph5VirKINY=
+github.com/rancher/norman v0.0.0-20220520225714-4cc2f5a97011 h1:pqU6ZASMjF/jXF1VH/e+WTtzO6W/dbbD+mxP2Sp2Y3A=
+github.com/rancher/norman v0.0.0-20220520225714-4cc2f5a97011/go.mod h1:1G96Zmvnx1FSzCwr/9I6weg/247dH5mDyT2ng/cR7ug=
 github.com/rancher/pkg v0.0.0-20190514055449-b30ab9de040e h1:j6+HqCET/NLPBtew2m5apL7jWw/PStQ7iGwXjgAqdvo=
 github.com/rancher/pkg v0.0.0-20190514055449-b30ab9de040e/go.mod h1:XbYHTPaXuw8ZY9bylhYKQh/nJxDaTKk3YhAxPl4Qy/k=
 github.com/rancher/rdns-server v0.0.0-20180802070304-bf662911db6a h1:6xqYlVz4uAXBa/AuNAG0bhMusIXVh74dc1bbYOAe+HY=

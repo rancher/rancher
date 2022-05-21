@@ -10,7 +10,7 @@ require (
 	github.com/rancher/eks-operator v1.1.3
 	github.com/rancher/fleet/pkg/apis v0.0.0-20210918015053-5a141a6b18f0
 	github.com/rancher/gke-operator v1.1.3
-	github.com/rancher/norman v0.0.0-20220517230400-5a324b6fc6b1
+	github.com/rancher/norman v0.0.0-20220520225714-4cc2f5a97011
 	github.com/rancher/rke v1.3.12-0.20220520141546-b42ebdc40272
 	github.com/rancher/wrangler v0.8.11-0.20220411195911-c2b951ab3480
 	github.com/sirupsen/logrus v1.8.1
