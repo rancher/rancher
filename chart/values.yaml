@@ -155,3 +155,6 @@ postDelete:
 
 # Set a bootstrap password. If leave empty, a random password will be generated.
 bootstrapPassword: ""
+
+# Set a bootstrap password existing secret name.
+# bootstrapPasswordExistingSecret: "secret-name"
