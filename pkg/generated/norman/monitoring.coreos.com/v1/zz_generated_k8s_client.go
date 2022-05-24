@@ -4,6 +4,7 @@ import (
 	"github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	"github.com/rancher/lasso/pkg/client"
 	"github.com/rancher/lasso/pkg/controller"
+	"github.com/rancher/norman/generator"
 	"github.com/rancher/norman/objectclient"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/rest"
@@ -26,7 +27,10 @@ func NewForConfig(cfg rest.Config) (Interface, error) {
 	if err := v1.AddToScheme(scheme); err != nil {
 		return nil, err
 	}
-	controllerFactory, err := controller.NewSharedControllerFactoryFromConfig(&cfg, scheme)
+	sharedOpts := &controller.SharedControllerFactoryOptions{
+		SyncOnlyChangedObjects: generator.SyncOnlyChangedObjects(),
+	}
+	controllerFactory, err := controller.NewSharedControllerFactoryFromConfigWithOptions(&cfg, scheme, sharedOpts)
 	if err != nil {
 		return nil, err
 	}

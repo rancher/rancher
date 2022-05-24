@@ -543,7 +543,7 @@ func rkeControlPlane(cluster *rancherv1.Cluster) (*rkev1.RKEControlPlane, error)
 	filteredClusterSpec.RKEConfig.RotateCertificates = nil
 	b64GZCluster, err := compressInterface(filteredClusterSpec)
 	if err != nil {
-		logrus.Errorf("cluster: %s/%s : error while gz/b64 encoding cluster specification: %v", cluster.Namespace, cluster.ClusterName, err)
+		logrus.Errorf("cluster: %s/%s : error while gz/b64 encoding cluster specification: %v", cluster.Namespace, cluster.Name, err)
 		return nil, err
 	}
 	rkeConfig := cluster.Spec.RKEConfig.DeepCopy()

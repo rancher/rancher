@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"k8s.io/utils/pointer"
 	"os"
 	"strings"
 	"sync"
@@ -18,6 +19,7 @@ import (
 	"github.com/rancher/wrangler/pkg/data"
 	corecontrollers "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
 	"github.com/sirupsen/logrus"
+	authenticationv1 "k8s.io/api/authentication/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/net"
@@ -76,16 +78,30 @@ func getTokenFromToken(ctx context.Context, tokenBytes []byte) ([]byte, error) {
 		return nil, err
 	}
 
-	if len(sa.Secrets) == 0 {
-		return nil, fmt.Errorf("no secret assigned to service account %s/%s", ns, name)
+	svcAccountClient := client.CoreV1().ServiceAccounts(ns)
+
+	req := authenticationv1.TokenRequest{
+		Spec: authenticationv1.TokenRequestSpec{
+			ExpirationSeconds: pointer.Int64(60 * 60 * 24 * 365),
+		},
 	}
 
-	secret, err := client.CoreV1().Secrets(ns).Get(ctx, sa.Secrets[0].Name, metav1.GetOptions{})
+	token, err := svcAccountClient.CreateToken(ctx, sa.Name, &req, metav1.CreateOptions{})
 	if err != nil {
 		return nil, err
 	}
 
-	return secret.Data["token"], nil
+	return []byte(token.Status.Token), nil
+
+	//if len(sa.Secrets) == 0 {
+	//	return nil, fmt.Errorf("no secret assigned to service account %s/%s", ns, name)
+	//}
+	//
+	//secret, err := client.CoreV1().Secrets(ns).Get(ctx, sa.Secrets[0].Name, metav1.GetOptions{})
+	//if err != nil {
+	//	return nil, err
+	//}
+	//return secret.Data["token"], nil
 }
 
 func startPeerManager(ctx context.Context, endpoints corecontrollers.EndpointsController, server *remotedialer.Server) (peermanager.PeerManager, error) {

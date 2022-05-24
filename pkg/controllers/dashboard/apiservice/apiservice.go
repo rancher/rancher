@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/base64"
+	authenticationv1 "k8s.io/api/authentication/v1"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	mgmtcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
@@ -19,10 +20,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	v1client "k8s.io/client-go/kubernetes/typed/core/v1"
 )
 
 type handler struct {
 	serviceAccounts corev1controllers.ServiceAccountCache
+	serviceAccountClient v1client.ServiceAccountInterface
 	deploymentCache appscontrollers.DeploymentCache
 	daemonSetCache  appscontrollers.DaemonSetCache
 	secrets         corev1controllers.SecretCache
@@ -30,11 +33,13 @@ type handler struct {
 	apiServices     mgmtcontrollers.APIServiceCache
 	services        corev1controllers.ServiceCache
 	embedded        bool
+	ctx context.Context
 }
 
 func Register(ctx context.Context, context *wrangler.Context, embedded bool) {
 	h := &handler{
 		serviceAccounts: context.Core.ServiceAccount().Cache(),
+		serviceAccountClient: context.K8s.CoreV1().ServiceAccounts(""),
 		deploymentCache: context.Apps.Deployment().Cache(),
 		daemonSetCache:  context.Apps.DaemonSet().Cache(),
 		secrets:         context.Core.Secret().Cache(),
@@ -42,6 +47,7 @@ func Register(ctx context.Context, context *wrangler.Context, embedded bool) {
 		apiServices:     context.Mgmt.APIService().Cache(),
 		services:        context.Core.Service().Cache(),
 		embedded:        embedded,
+		ctx: ctx,
 	}
 
 	relatedresource.WatchClusterScoped(ctx, "apiservice-watch-owner",
@@ -137,20 +143,25 @@ func (h *handler) getToken(sa *corev1.ServiceAccount) (string, error) {
 		return "", err
 	}
 
-	if len(sa.Secrets) == 0 {
-		return "", nil
-	}
-
-	secret, err := h.secrets.Get(sa.Namespace, sa.Secrets[0].Name)
+	token, err := h.serviceAccountClient.CreateToken(h.ctx, sa.Name, &authenticationv1.TokenRequest{}, metav1.CreateOptions{})
 	if err != nil {
 		return "", err
 	}
 
-	token := secret.Data["token"]
-	if len(token) == 0 {
-		return "", nil
-	}
+	//if len(sa.Secrets) == 0 {
+	//	return "", nil
+	//}
+	//
+	//secret, err := h.secrets.Get(sa.Namespace, sa.Secrets[0].Name)
+	//if err != nil {
+	//	return "", err
+	//}
+	//
+	//token := secret.Data["token"]
+	//if len(token) == 0 {
+	//	return "", nil
+	//}
 
-	hash := sha256.Sum256(token)
+	hash := sha256.Sum256([]byte(token.Status.Token))
 	return base64.StdEncoding.EncodeToString(hash[:]), nil
 }
