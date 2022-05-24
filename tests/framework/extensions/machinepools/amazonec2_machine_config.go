@@ -15,6 +15,7 @@ const (
 // AWSMachineConfig is configuration needed to create an rke-machine-config.cattle.io.amazonec2config
 type AWSMachineConfig struct {
 	Region        string   `json:"region" yaml:"region"`
+	AMI           string   `json:"ami" yaml:"ami"`
 	InstanceType  string   `json:"instanceType" yaml:"instanceType"`
 	SSHUser       string   `json:"sshUser" yaml:"sshUser"`
 	VPCID         string   `json:"vpcId" yaml:"vpcId"`
@@ -37,6 +38,7 @@ func NewAWSMachineConfig(generatedPoolName, namespace string) *unstructured.Unst
 	machineConfig.SetGenerateName(generatedPoolName)
 	machineConfig.SetNamespace(namespace)
 	machineConfig.Object["region"] = awsMachineConfig.Region
+	machineConfig.Object["ami"] = awsMachineConfig.AMI
 	machineConfig.Object["instanceType"] = awsMachineConfig.InstanceType
 	machineConfig.Object["sshUser"] = awsMachineConfig.SSHUser
 	machineConfig.Object["type"] = AWSPoolType

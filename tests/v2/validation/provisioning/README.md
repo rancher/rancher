@@ -91,6 +91,7 @@ Machine RKE pool config is the last thing need for the RKE2 provisioning tests
 ```json
 "awsMachineConfig": {
     "region": "us-east-2",
+    "ami": "",
     "instanceType": "t3a.medium",
     "sshUser": "ubuntu",
     "vpcId": "",
