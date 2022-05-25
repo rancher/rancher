@@ -32,7 +32,7 @@ replace (
 	github.com/k3s-io/helm-controller => github.com/k3s-io/helm-controller v0.9.2
 	github.com/kubernetes-sigs/cri-tools => github.com/k3s-io/cri-tools v1.21.0-k3s1
 	github.com/matryer/moq => github.com/rancher/moq v0.0.0-20190404221404-ee5226d43009
-	github.com/opencontainers/runc => github.com/opencontainers/runc v1.0.0-rc93.0.20210414171415-3397a09ee932
+	github.com/opencontainers/runc => github.com/opencontainers/runc v1.1.2
 	github.com/opencontainers/runtime-spec => github.com/opencontainers/runtime-spec v1.0.3-0.20210316141917-a8c4a9ee0f6b
 	github.com/rancher/wharfie => github.com/rancher/wharfie v0.3.5
 	go.etcd.io/etcd => github.com/k3s-io/etcd v0.5.0-alpha.5.0.20201208200253-50621aee4aea
@@ -72,6 +72,7 @@ replace (
 )
 
 require (
+	github.com/containernetworking/cni v0.8.1 // indirect
 	github.com/pkg/errors v0.9.1
 	github.com/rancher/k3s v1.21.1-rc1.0.20210514205428-fd4d226e3deb
 	github.com/rancher/rke2 v1.20.8-0.20210526012514-ea6514775f81 // v1.20.7+rke2r2 ... If you update this, also update RKE2_VERSION in rancher/package/Dockerfile.runtime
