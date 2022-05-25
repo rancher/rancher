@@ -72,6 +72,7 @@ replace (
 )
 
 require (
+	github.com/containernetworking/cni v0.8.1 // indirect
 	github.com/pkg/errors v0.9.1
 	github.com/rancher/k3s v1.21.1-rc1.0.20210514205428-fd4d226e3deb
 	github.com/rancher/rke2 v1.20.8-0.20210526012514-ea6514775f81 // v1.20.7+rke2r2 ... If you update this, also update RKE2_VERSION in rancher/package/Dockerfile.runtime
