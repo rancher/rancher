@@ -23,7 +23,7 @@ import (
 const (
 	// Endpoint The endpoint that this URL is accessible at - used for routing and for SARs
 	Endpoint            = "/v1/generateSUSERancherSupportConfig"
-	cspAdapterNamespace = "cattle-csp-system"
+	cspAdapterNamespace = "cattle-csp-adapter-system"
 	cspAdapterConfigmap = "csp-config"
 	tarContentType      = "application/x-tar"
 	logPrefix           = "support-config-generator"
