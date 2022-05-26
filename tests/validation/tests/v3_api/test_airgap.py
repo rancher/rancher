@@ -270,7 +270,7 @@ def add_rancher_images_to_private_registry(bastion_node, push_images=True):
 
     if push_images:
         load_images_command = \
-            "docker login {} -u {} -p {} && " \
+            "docker login {} -u \"{}\" -p \"{}\" && " \
             "./rancher-load-images.sh --image-list ./rancher-images.txt " \
             "--registry {}".format(
                 bastion_node.host_name, PRIVATE_REGISTRY_USERNAME,
@@ -323,7 +323,7 @@ def tag_image(bastion_node, image):
 
 def push_image(bastion_node, image):
     push_image_command = \
-        "docker login {} -u {} -p {} && docker push {}/{}".format(
+        "docker login {} -u \"{}\" -p \"{}\" && docker push {}/{}".format(
             bastion_node.host_name, PRIVATE_REGISTRY_USERNAME,
             PRIVATE_REGISTRY_PASSWORD, bastion_node.host_name, image)
     bastion_node.execute_command(push_image_command)
@@ -596,7 +596,7 @@ def deploy_airgap_rancher(bastion_node):
 
 def run_docker_command_on_airgap_node(bastion_node, ag_node, cmd,
                                       log_out=False):
-    docker_login_command = "docker login {} -u {} -p {}".format(
+    docker_login_command = "docker login {} -u \\\"{}\\\" -p \\\"{}\\\"".format(
         bastion_node.host_name,
         PRIVATE_REGISTRY_USERNAME, PRIVATE_REGISTRY_PASSWORD)
     if cmd.startswith("sudo"):
