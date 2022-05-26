@@ -215,7 +215,7 @@ def deploy_bastion_server():
 
     # Add credentials for private registry
     store_creds_command = \
-        'docker run --rm melsayed/htpasswd {} {} >> ' \
+        'docker run --rm melsayed/htpasswd "{}" "{}" >> ' \
         'basic-registry/nginx_config/registry.password'.format(
             PRIVATE_REGISTRY_USERNAME, PRIVATE_REGISTRY_PASSWORD)
     bastion_node.execute_command(store_creds_command)
