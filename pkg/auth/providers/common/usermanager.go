@@ -309,10 +309,11 @@ func (m *userManager) EnsureClusterToken(clusterName string, input user.TokenInp
 	return token.Name + ":" + key, nil
 }
 
+// newTokenForKubeconfig creates a new token for a generated kubeconfig.
 func (m *userManager) newTokenForKubeconfig(clusterName, tokenName, description, kind, userName string, ttl time.Duration, userPrincipal v3.Principal) (string, error) {
 	tokenTTL, err := tokens.ValidateMaxTTL(ttl)
 	if err != nil {
-		return "", fmt.Errorf("failed to validate token ttl %v", err)
+		return "", fmt.Errorf("failed to validate token ttl %w", err)
 	}
 
 	ttlMilli := tokenTTL.Milliseconds()
@@ -324,17 +325,17 @@ func (m *userManager) newTokenForKubeconfig(clusterName, tokenName, description,
 		UserName:      userName,
 		AuthProvider:  userPrincipal.Provider,
 		TTL:           &ttlMilli,
-		Randomize:     false,
+		Randomize:     true,
 		UserPrincipal: userPrincipal,
 	}
-	key, err := m.EnsureClusterToken(clusterName, input)
+	fullToken, err := m.EnsureClusterToken(clusterName, input)
 	if err != nil {
 		return "", err
 	}
-	return key, nil
+	return fullToken, nil
 }
 
-// creates kubeconfig tokens with KubeconfigTokenTTL and regenerates if existing token expired
+// GetKubeconfigToken creates a new token for use in a kubeconfig generated through the CLI.
 func (m *userManager) GetKubeconfigToken(clusterName, tokenName, description, kind, userName string, userPrincipal v3.Principal) (*v3.Token, string, error) {
 
 	tokenTTL, err := tokens.ParseTokenTTL(settings.KubeconfigTokenTTLMinutes.Get())
@@ -347,8 +348,9 @@ func (m *userManager) GetKubeconfigToken(clusterName, tokenName, description, ki
 		return nil, "", err
 	}
 
-	_, createdTokenValue := tokens.SplitTokenParts(fullCreatedToken)
-	token, err := m.tokens.Get(tokenName, v1.GetOptions{})
+	randomizedTokenName, createdTokenValue := tokens.SplitTokenParts(fullCreatedToken)
+
+	token, err := m.tokens.Get(randomizedTokenName, v1.GetOptions{})
 	if err != nil && !apierrors.IsNotFound(err) {
 		return nil, createdTokenValue, err
 	}
@@ -364,11 +366,11 @@ func (m *userManager) GetKubeconfigToken(clusterName, tokenName, description, ki
 	token, err = m.tokens.Update(tokenCopy)
 	if err != nil {
 		if !apierrors.IsConflict(err) {
-			return nil, "", fmt.Errorf("getToken: updating token [%s] failed [%v]", tokenName, err)
+			return nil, "", fmt.Errorf("getToken: updating token [%s] failed [%v]", randomizedTokenName, err)
 		}
 
 		err = wait.ExponentialBackoff(backoff, func() (bool, error) {
-			token, err = m.tokens.Get(tokenName, v1.GetOptions{})
+			token, err = m.tokens.Get(randomizedTokenName, v1.GetOptions{})
 			if err != nil {
 				return false, err
 			}
@@ -379,7 +381,7 @@ func (m *userManager) GetKubeconfigToken(clusterName, tokenName, description, ki
 
 				token, err = m.tokens.Update(tokenCopy)
 				if err != nil {
-					logrus.Debugf("getToken: updating token [%s] failed [%v]", tokenName, err)
+					logrus.Debugf("getToken: updating token [%s] failed [%v]", randomizedTokenName, err)
 					if apierrors.IsConflict(err) {
 						return false, nil
 					}
@@ -390,7 +392,7 @@ func (m *userManager) GetKubeconfigToken(clusterName, tokenName, description, ki
 		})
 
 		if err != nil {
-			return nil, "", fmt.Errorf("getToken: retry updating token [%s] failed [%v]", tokenName, err)
+			return nil, "", fmt.Errorf("getToken: retry updating token [%s] failed [%v]", randomizedTokenName, err)
 		}
 	}
 
