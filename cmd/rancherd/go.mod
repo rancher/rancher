@@ -82,6 +82,7 @@ require (
 	github.com/urfave/cli v1.22.2
 	golang.org/x/crypto v0.0.0-20220411220226-7b82a4e95df4
 	gopkg.in/yaml.v2 v2.4.0
+	gopkg.in/yaml.v3 v3.0.0 // indirect
 	k8s.io/api v1.20.5
 	k8s.io/apimachinery v1.20.5
 	k8s.io/apiserver v1.20.0 // indirect
