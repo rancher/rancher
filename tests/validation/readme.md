@@ -135,7 +135,7 @@ At first we tried rebooting in rancher validation/lib/aws.py:
         return nodes
 ```
 After a while I still ran into the issue. If you need to get around this, the setting the ENV variable: DOCKER_INSTALLED=false will instead use
-the base ubuntu-16.04 image provided by AWS and install the version of docker specificed by DOCKER_VERSION
+the base ubuntu-16.04 image provided by AWS and install the version of docker specified by DOCKER_VERSION
 
 ## Docker image container-util
 I added files images/container-utils as tool to test DNS and Intercommunication between pods/containers. It is a simple flask application, but the image also includes cli tools like 'curl', 'dig', and 'ping'

@@ -32,7 +32,7 @@ Extensions are functions that complete common operations used by tests.  Extensi
 
 ### Clients
 
-Clients are used to create the resources in the tests. The advantage of the cients is they register the cleanups with sessions, making resource cleanup trivial. There are three clients; the rancher client, dynamic client, and the k3d client. The rancher client is used to create resources on a rancher instance. Given a host url, and a bearer token the rancher client communicates directly with the rancher instance. The dynamic client is used as means of communication on a downstream cluster, and used for kubernete resource management on that cluster. The k3d client is used to create a minimal k3d cluster, this is to give the integration tests the ability to test against a downstream cluster.
+Clients are used to create the resources in the tests. The advantage of clients is they register the cleanups with sessions, making resource cleanup trivial. There are three clients; the rancher client, dynamic client, and the k3d client. The rancher client is used to create resources on a rancher instance. Given a host url, and a bearer token the rancher client communicates directly with the rancher instance. The dynamic client is used as means of communication on a downstream cluster, and used for kubernetes resource management on that cluster. The k3d client is used to create a minimal k3d cluster, this is to give the integration tests the ability to test against a downstream cluster.
 
 ### Wait
 

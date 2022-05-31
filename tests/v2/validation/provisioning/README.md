@@ -39,7 +39,7 @@ For custom clusters the below config is needed, only AWS/EC2
 ```
 
 ### Cloud Credentials
-These are the inputs needed for the different node provider cloud credentials, inlcuding linode, aws, digital ocean, harvester, azure, and google.
+These are the inputs needed for the different node provider cloud credentials. Providers include: linode, aws, digital ocean, harvester, azure, and google.
 
 #### Digital Ocean
 ```json
