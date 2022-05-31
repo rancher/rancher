@@ -106,6 +106,8 @@ func init() {
 	Scheme.ExcludeGVK(management.SchemeGroupVersion.WithKind("NodeTemplateList"))
 	Scheme.ExcludeGVK(management.SchemeGroupVersion.WithKind("ClusterMonitorGraphList"))
 	Scheme.ExcludeGVK(management.SchemeGroupVersion.WithKind("ProjectMonitorGraphList"))
+	Scheme.ExcludeGVK(management.SchemeGroupVersion.WithKind("ClusterLogging"))
+	Scheme.ExcludeGVK(management.SchemeGroupVersion.WithKind("ProjectLogging"))
 }
 
 func addKnownTypes(scheme *runtime.Scheme) error {
