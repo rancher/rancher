@@ -52,7 +52,9 @@ var (
 	IsRKE                               = NewSetting("is-rke", "")
 	JailerTimeout                       = NewSetting("jailer-timeout", "60")
 	KubeconfigGenerateToken             = NewSetting("kubeconfig-generate-token", "true")
+	// Deprecated: On removal use kubeconfig-default-ttl-minutes for all kubeconfigs
 	KubeconfigTokenTTLMinutes           = NewSetting("kubeconfig-token-ttl-minutes", "960") // 16 hours
+	KubeconfigDefaultTokenTTLMinutes    = NewSetting("kubeconfig-default-ttl-minutes", "0") // 0 TTL = Forever
 	KubernetesVersion                   = NewSetting("k8s-version", "")
 	KubernetesVersionToServiceOptions   = NewSetting("k8s-version-to-service-options", "")
 	KubernetesVersionToSystemImages     = NewSetting("k8s-version-to-images", "")

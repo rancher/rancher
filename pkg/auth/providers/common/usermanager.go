@@ -310,8 +310,14 @@ func (m *userManager) EnsureClusterToken(clusterName string, input user.TokenInp
 }
 
 // newTokenForKubeconfig creates a new token for a generated kubeconfig.
-func (m *userManager) newTokenForKubeconfig(clusterName, tokenName, description, kind, userName string, ttl time.Duration, userPrincipal v3.Principal) (string, error) {
-	tokenTTL, err := tokens.ValidateMaxTTL(ttl)
+func (m *userManager) newTokenForKubeconfig(clusterName, tokenName, description, kind, userName string, userPrincipal v3.Principal) (string, error) {
+	// settings.KubeconfigTokenTTLMinutes is deprecated use tokens.GetKubeconfigDefaultTokenTTLInMilliSeconds() when the setting is removed
+	tokenTTL, err := tokens.ParseTokenTTL(settings.KubeconfigTokenTTLMinutes.Get())
+	if err != nil {
+		return "", fmt.Errorf("failed to parse setting '%s': %w", settings.KubeconfigTokenTTLMinutes.Name, err)
+	}
+
+	tokenTTL, err = tokens.ClampToMaxTTL(tokenTTL)
 	if err != nil {
 		return "", fmt.Errorf("failed to validate token ttl %w", err)
 	}
@@ -337,19 +343,12 @@ func (m *userManager) newTokenForKubeconfig(clusterName, tokenName, description,
 
 // GetKubeconfigToken creates a new token for use in a kubeconfig generated through the CLI.
 func (m *userManager) GetKubeconfigToken(clusterName, tokenName, description, kind, userName string, userPrincipal v3.Principal) (*v3.Token, string, error) {
-
-	tokenTTL, err := tokens.ParseTokenTTL(settings.KubeconfigTokenTTLMinutes.Get())
-	if err != nil {
-		return nil, "", fmt.Errorf("failed to parse setting [%s]: %v", settings.KubeconfigTokenTTLMinutes.Name, err)
-	}
-
-	fullCreatedToken, err := m.newTokenForKubeconfig(clusterName, tokenName, description, kind, userName, tokenTTL, userPrincipal)
+	fullCreatedToken, err := m.newTokenForKubeconfig(clusterName, tokenName, description, kind, userName, userPrincipal)
 	if err != nil {
 		return nil, "", err
 	}
 
 	randomizedTokenName, createdTokenValue := tokens.SplitTokenParts(fullCreatedToken)
-
 	token, err := m.tokens.Get(randomizedTokenName, v1.GetOptions{})
 	if err != nil && !apierrors.IsNotFound(err) {
 		return nil, createdTokenValue, err
