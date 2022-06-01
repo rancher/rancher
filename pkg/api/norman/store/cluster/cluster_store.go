@@ -435,6 +435,7 @@ func loadDataFromTemplate(clusterTemplateRevision *v3.ClusterTemplateRevision, c
 	// The key in the map is used to preserve the order of registries
 	registryMap := make(map[int]map[string]interface{})
 	existingRegistries := convert.ToMapSlice(convert.ToMapInterface(existingCluster[managementv3.ClusterSpecFieldRancherKubernetesEngineConfig])[managementv3.RancherKubernetesEngineConfigFieldPrivateRegistries])
+	privateRegistryOverride := false
 	for i, registry := range existingRegistries {
 		registryMap[i] = registry
 	}
@@ -492,6 +493,7 @@ func loadDataFromTemplate(clusterTemplateRevision *v3.ClusterTemplateRevision, c
 		}
 		keyParts := strings.Split(question.Variable, ".")
 		if strings.HasPrefix(question.Variable, "rancherKubernetesEngineConfig.privateRegistries") {
+			privateRegistryOverride = true
 			// for example: question.Variable = rancherKubernetesEngineConfig.privateRegistries[0].url
 			index, err := getIndexFromQuestion(question.Variable)
 			if err != nil {
@@ -515,7 +517,7 @@ func loadDataFromTemplate(clusterTemplateRevision *v3.ClusterTemplateRevision, c
 		}
 		revisionQuestions = append(revisionQuestions, questionMap)
 	}
-	if len(registryMap) > 0 {
+	if len(registryMap) > 0 && privateRegistryOverride {
 		registries, err := convertRegistryMapToSliceInOrder(registryMap)
 		if err != nil {
 			return nil, httperror.WrapAPIError(err, httperror.ServerError, "Error processing clusterTemplate answers to private registry")
