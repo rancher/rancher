@@ -54,11 +54,9 @@ This repo is a meta-repo used for packaging and contains the majority of rancher
 Rancher also includes other open source libraries and projects, [see go.mod](https://github.com/rancher/rancher/blob/master/go.mod) for the full list.
 
 ## Support, Discussion, and Community
-If you need any help with Rancher or RancherOS, please join us at either our [Rancher forums](http://forums.rancher.com/), [#rancher IRC channel](http://webchat.freenode.net/?channels=rancher) or [Slack](https://slack.rancher.io/) where most of our team hangs out at.
+If you need any help with Rancher, please join us at either our [Rancher forums](http://forums.rancher.com/) or [Slack](https://slack.rancher.io/) where most of our team hangs out at.
 
-Please submit any **Rancher** bugs, issues, and feature requests to [rancher/rancher](//github.com/rancher/rancher/issues). 
-
-Please submit any **RancherOS** bugs, issues, and feature requests to [rancher/os](//github.com/rancher/os/issues).
+Please submit any Rancher bugs, issues, and feature requests to [rancher/rancher](//github.com/rancher/rancher/issues). 
 
 For security issues, please first check our [security policy](SECURITY.md) and email security-rancher@suse.com instead of posting a public issue in GitHub.  You may (but are not required to) use the GPG key located on [Keybase](https://keybase.io/rancher).
 
