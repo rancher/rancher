@@ -91,6 +91,7 @@ var (
 	UIPath                              = NewSetting("ui-path", "/usr/share/rancher/ui")
 	UIDashboardIndex                    = NewSetting("ui-dashboard-index", "https://releases.rancher.com/dashboard/latest/index.html")
 	UIDashboardPath                     = NewSetting("ui-dashboard-path", "/usr/share/rancher/ui-dashboard")
+	UIFavicon                           = NewSetting("ui-favicon", "")
 	UIPreferred                         = NewSetting("ui-preferred", "vue")
 	UIOfflinePreferred                  = NewSetting("ui-offline-preferred", "dynamic")
 	UIIssues                            = NewSetting("ui-issues", "")
