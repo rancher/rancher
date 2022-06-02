@@ -13,16 +13,16 @@ node {
     def envFile = ".env"
     def rancherConfig = "rancher_env.config"
     def branch = "release/v2.6"
-    if ("${env.branch}" != "null" && "${env.branch}" != "") {
-      branch = "${env.branch}"
+    if ("${env.BRANCH}" != "null" && "${env.BRANCH}" != "") {
+      branch = "${env.BRANCH}"
     }
     def repo = scm.userRemoteConfigs
     if ("${env.REPO}" != "null" && "${env.REPO}" != "") {
       repo = [[url: "${env.REPO}"]]
     }
     def timeout = "60m"
-    if ("${TIMEOUT}" != "null" && "${TIMEOUT}" != "") {
-      repo = [[url: "${TIMEOUT}"]]
+    if ("${env.TIMEOUT}" != "null" && "${env.TIMEOUT}" != "") {
+      timeout = "${env.TIMEOUT}" 
     }
     wrap([$class: 'AnsiColorBuildWrapper', 'colorMapName': 'XTerm', 'defaultFg': 2, 'defaultBg':1]) {
       withFolderProperties {
