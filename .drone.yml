@@ -19,7 +19,6 @@ steps:
     event:
     - push
     - pull_request
-    - tag
 
 volumes:
 - name: docker
@@ -51,7 +50,6 @@ steps:
     event:
     - push
     - pull_request
-    - tag
 
 volumes:
 - name: docker
@@ -71,7 +69,7 @@ platform:
   arch: amd64
 
 steps:
-- name: build
+- name: build-pr
   image: rancher/dapper:v0.5.8
   commands:
   - dapper ci
@@ -81,8 +79,26 @@ steps:
     path: /var/run/docker.sock
   when:
     event:
-    - push
     - pull_request
+
+- name: build-push-tag
+  image: rancher/dapper:v0.5.8
+  commands:
+  - dapper ci
+  privileged: true
+  volumes:
+  - name: docker
+    path: /var/run/docker.sock
+  when:
+    instance:
+      - drone-publish.rancher.io
+    ref:
+      include:
+        - "refs/heads/master"
+        - "refs/heads/release/v*"
+        - "refs/tags/v*"
+    event:
+    - push
     - tag
 
 - name: fossa-amd64
@@ -369,7 +385,7 @@ platform:
   arch: arm64
 
 steps:
-- name: build
+- name: build-pr
   image: rancher/dapper:v0.5.8
   commands:
   - dapper ci
@@ -379,8 +395,26 @@ steps:
     path: /var/run/docker.sock
   when:
     event:
-    - push
     - pull_request
+
+- name: build-push-tag
+  image: rancher/dapper:v0.5.8
+  commands:
+  - dapper ci
+  privileged: true
+  volumes:
+  - name: docker
+    path: /var/run/docker.sock
+  when:
+    instance:
+      - drone-publish.rancher.io
+    ref:
+      include:
+        - "refs/heads/master"
+        - "refs/heads/release/v*"
+        - "refs/tags/v*"
+    event:
+    - push
     - tag
 
 - name: stage-binaries
@@ -576,7 +610,7 @@ steps:
   - git fetch origin $DRONE_COMMIT_REF
   - git checkout $DRONE_COMMIT -b origin/$DRONE_TARGET_BRANCH
 
-- name: build
+- name: build-pr
   image: rancher/dapper:v0.5.8
   failure: ignore
   commands:
@@ -587,8 +621,27 @@ steps:
     path: /var/run/docker.sock
   when:
     event:
-    - push
     - pull_request
+
+- name: build-push-tag
+  image: rancher/dapper:v0.5.8
+  failure: ignore
+  commands:
+  - K3S_BUILDER=k3s_root dapper ci
+  privileged: true
+  volumes:
+  - name: docker
+    path: /var/run/docker.sock
+  when:
+    instance:
+      - drone-publish.rancher.io
+    ref:
+      include:
+        - "refs/heads/master"
+        - "refs/heads/release/v*"
+        - "refs/tags/v*"
+    event:
+    - push
     - tag
 
 - name: stage-binaries
@@ -782,7 +835,7 @@ platform:
   version: 1809
 
 steps:
-  - name: build
+  - name: build-pr
     pull: always
     image: rancher/dapper:v0.5.8
     commands:
@@ -792,8 +845,26 @@ steps:
         path: \\\\.\\pipe\\docker_engine
     when:
       event:
-        - push
         - pull_request
+
+  - name: build-push-tag
+    pull: always
+    image: rancher/dapper:v0.5.8
+    commands:
+      - dapper.exe -f Dockerfile-windows.dapper -d ci
+    volumes:
+      - name: docker_pipe
+        path: \\\\.\\pipe\\docker_engine
+    when:
+      instance:
+        - drone-publish.rancher.io
+      ref:
+        include:
+          - "refs/heads/master"
+          - "refs/heads/release/v*"
+          - "refs/tags/v*"
+      event:
+        - push
         - tag
 
   - name: stage-binaries
@@ -901,7 +972,7 @@ steps:
     image: rancher/drone-images:git-amd64-ltsc2022
     settings:
       depth: 20
-  - name: build
+  - name: build-pr
     pull: always
     image: rancher/dapper:v0.5.8
     commands:
@@ -911,8 +982,26 @@ steps:
         path: \\\\.\\pipe\\docker_engine
     when:
       event:
-        - push
         - pull_request
+
+  - name: build-push-tag
+    pull: always
+    image: rancher/dapper:v0.5.8
+    commands:
+      - dapper.exe -f Dockerfile-windows.dapper -d ci
+    volumes:
+      - name: docker_pipe
+        path: \\\\.\\pipe\\docker_engine
+    when:
+      instance:
+        - drone-publish.rancher.io
+      ref:
+        include:
+          - "refs/heads/master"
+          - "refs/heads/release/v*"
+          - "refs/tags/v*"
+      event:
+        - push
         - tag
 
   - name: stage-binaries
@@ -1019,6 +1108,11 @@ steps:
     instance:
       include:
       - drone-publish.rancher.io
+    ref:
+      include:
+        - "refs/heads/master"
+        - "refs/heads/release/v*"
+        - "refs/tags/v*"
     event:
     - push
     - tag
@@ -1036,6 +1130,11 @@ steps:
     instance:
       include:
       - drone-publish.rancher.io
+    ref:
+      include:
+        - "refs/heads/master"
+        - "refs/heads/release/v*"
+        - "refs/tags/v*"
     event:
     - push
     - tag
@@ -1053,6 +1152,11 @@ steps:
     instance:
       include:
       - drone-publish.rancher.io
+    ref:
+      include:
+        - "refs/heads/master"
+        - "refs/heads/release/v*"
+        - "refs/tags/v*"
     event:
     - push
 
@@ -1069,6 +1173,11 @@ steps:
     instance:
       include:
       - drone-publish.rancher.io
+    ref:
+      include:
+        - "refs/heads/master"
+        - "refs/heads/release/v*"
+        - "refs/tags/v*"
     event:
     - push
     - tag
@@ -1086,6 +1195,11 @@ steps:
     instance:
       include:
       - drone-publish.rancher.io
+    ref:
+      include:
+        - "refs/heads/master"
+        - "refs/heads/release/v*"
+        - "refs/tags/v*"
     event:
     - push
 
@@ -1102,6 +1216,11 @@ steps:
     instance:
       include:
       - drone-publish.rancher.io
+    ref:
+      include:
+        - "refs/heads/master"
+        - "refs/heads/release/v*"
+        - "refs/tags/v*"
     event:
     - push
 
@@ -1118,6 +1237,11 @@ steps:
     instance:
       include:
       - drone-publish.rancher.io
+    ref:
+      include:
+        - "refs/heads/master"
+        - "refs/heads/release/v*"
+        - "refs/tags/v*"
     event:
     - push
     - tag
@@ -1131,6 +1255,13 @@ steps:
   - name: docker
     path: /var/run/docker.sock
   when:
+    instance:
+      - drone-publish.rancher.io
+    ref:
+      include:
+        - "refs/heads/master"
+        - "refs/heads/release/v*"
+        - "refs/tags/v*"
     event:
     - push
     - tag
@@ -1541,4 +1672,3 @@ volumes:
 trigger:
   event:
   - promote
-...
