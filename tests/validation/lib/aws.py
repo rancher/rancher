@@ -15,7 +15,7 @@ logging.getLogger('botocore').setLevel(logging.CRITICAL)
 AWS_REGION = os.environ.get("AWS_REGION", "us-east-2")
 AWS_REGION_AZ = os.environ.get("AWS_REGION_AZ", "us-east-2a")
 AWS_SECURITY_GROUP = os.environ.get("AWS_SECURITY_GROUPS",
-                                    'sg-0e753fd5550206e55')
+                                    'sg-04f28c5d02555da26')
 AWS_SUBNET = os.environ.get("AWS_SUBNET", "subnet-ee8cac86")
 AWS_HOSTED_ZONE_ID = os.environ.get("AWS_HOSTED_ZONE_ID", "")
 AWS_VPC_ID = os.environ.get("AWS_VPC_ID", "vpc-bfccf4d7")
