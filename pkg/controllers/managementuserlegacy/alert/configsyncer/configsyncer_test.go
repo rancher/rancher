@@ -134,7 +134,7 @@ var (
 	projectID   = clusterName + ":" + projectName
 	groupID     = "testcluster:testGroup"
 	displayName = "test"
-	serverity   = "critical"
+	severity    = "critical"
 	inherited   = false
 
 	defaultTimingField = v32.TimingField{
@@ -145,7 +145,7 @@ var (
 
 	commonRuleField = v32.CommonRuleField{
 		DisplayName: displayName,
-		Severity:    serverity,
+		Severity:    severity,
 		Inherited:   &inherited,
 		TimingField: defaultTimingField,
 	}
@@ -231,7 +231,7 @@ var (
 
 	eventCommonRuleField = v32.CommonRuleField{
 		DisplayName: displayName,
-		Severity:    serverity,
+		Severity:    severity,
 		Inherited:   &inherited,
 		TimingField: eventTimingField,
 	}
