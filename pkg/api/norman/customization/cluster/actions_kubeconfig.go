@@ -42,7 +42,7 @@ func (a ActionHandler) GenerateKubeconfigActionHandler(actionName string, action
 
 	generateToken := strings.EqualFold(settings.KubeconfigGenerateToken.Get(), "true")
 	if generateToken {
-		// generate token and place it in kubeconfig, token doesn't expire
+		// generate token and place it in kubeconfig
 		if endpointEnabled {
 			tokenKey, err = a.ensureClusterToken(cluster.ID, apiContext)
 		} else {

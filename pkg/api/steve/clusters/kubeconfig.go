@@ -8,6 +8,7 @@ import (
 
 	"github.com/rancher/apiserver/pkg/types"
 	"github.com/rancher/rancher/pkg/auth/requests"
+	"github.com/rancher/rancher/pkg/auth/tokens"
 	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/kubeconfig"
 	"github.com/rancher/rancher/pkg/settings"
@@ -80,13 +81,18 @@ func (k kubeconfigDownload) ensureToken(userName string, req *http.Request) (str
 		return "", err
 	}
 	tokenNamePrefix := fmt.Sprintf("kubeconfig-%s", userName)
+	ttl, err := tokens.ParseTokenTTL(settings.KubeconfigTokenTTLMinutes.Get())
+	if err != nil {
+		return "", fmt.Errorf("failed to parse setting [%s]: %v", settings.KubeconfigTokenTTLMinutes.Name, err)
+	}
+	ttlMillis := ttl.Milliseconds()
 	input := user.TokenInput{
 		TokenName:     tokenNamePrefix,
 		Description:   "Kubeconfig token",
 		Kind:          "kubeconfig",
 		UserName:      userName,
 		AuthProvider:  authToken.AuthProvider,
-		TTL:           nil,
+		TTL:           &ttlMillis,
 		Randomize:     true,
 		UserPrincipal: authToken.UserPrincipal,
 	}

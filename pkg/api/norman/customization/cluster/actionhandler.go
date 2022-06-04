@@ -2,16 +2,17 @@ package cluster
 
 import (
 	"fmt"
-
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	gaccess "github.com/rancher/rancher/pkg/api/norman/customization/globalnamespaceaccess"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/requests"
+	"github.com/rancher/rancher/pkg/auth/tokens"
 	"github.com/rancher/rancher/pkg/catalog/manager"
 	mgmtclient "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	"github.com/rancher/rancher/pkg/clustermanager"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/user"
 	v1 "k8s.io/client-go/kubernetes/typed/authorization/v1"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
@@ -139,13 +140,18 @@ func (a ActionHandler) ensureClusterToken(clusterID string, apiContext *types.AP
 	if err != nil {
 		return "", err
 	}
+	ttl, err := tokens.ParseTokenTTL(settings.KubeconfigTokenTTLMinutes.Get())
+	if err != nil {
+		return "", fmt.Errorf("failed to parse setting [%s]: %v", settings.KubeconfigTokenTTLMinutes.Name, err)
+	}
+	ttlMillis := ttl.Milliseconds()
 	input := user.TokenInput{
 		TokenName:     tokenNamePrefix,
 		Description:   "Kubeconfig token",
 		Kind:          "kubeconfig",
 		UserName:      userName,
 		AuthProvider:  authToken.AuthProvider,
-		TTL:           nil,
+		TTL:           &ttlMillis,
 		Randomize:     true,
 		UserPrincipal: authToken.UserPrincipal,
 	}
@@ -160,13 +166,18 @@ func (a ActionHandler) ensureToken(apiContext *types.APIContext) (string, error)
 		return "", err
 	}
 	tokenNamePrefix := fmt.Sprintf("kubeconfig-%s", userName)
+	ttl, err := tokens.ParseTokenTTL(settings.KubeconfigTokenTTLMinutes.Get())
+	if err != nil {
+		return "", fmt.Errorf("failed to parse setting [%s]: %v", settings.KubeconfigTokenTTLMinutes.Name, err)
+	}
+	ttlMillis := ttl.Milliseconds()
 	input := user.TokenInput{
 		TokenName:     tokenNamePrefix,
 		Description:   "Kubeconfig token",
 		Kind:          "kubeconfig",
 		UserName:      userName,
 		AuthProvider:  authToken.AuthProvider,
-		TTL:           nil,
+		TTL:           &ttlMillis,
 		Randomize:     true,
 		UserPrincipal: authToken.UserPrincipal,
 	}
