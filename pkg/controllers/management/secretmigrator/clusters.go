@@ -636,6 +636,9 @@ func (h *handler) sync(key string, cluster *v3.Cluster) (runtime.Object, error) 
 		apimgmtv3.ClusterConditionSecretsMigrated.True(cluster)
 		return h.clusters.Update(cluster)
 	})
+	if err != nil {
+		return obj, err
+	}
 	obj, err = apimgmtv3.ClusterConditionServiceAccountSecretsMigrated.Do(obj, func() (runtime.Object, error) {
 		// serviceAccountToken
 		if cluster.Status.ServiceAccountTokenSecret == "" {
@@ -665,7 +668,7 @@ func (h *handler) sync(key string, cluster *v3.Cluster) (runtime.Object, error) 
 		apimgmtv3.ClusterConditionServiceAccountSecretsMigrated.True(cluster)
 		return h.clusters.Update(cluster)
 	})
-	return obj.(*v3.Cluster), err
+	return obj, err
 }
 
 func (h *handler) getUnstructuredPipelineConfig(namespace, pType string) (map[string]interface{}, error) {

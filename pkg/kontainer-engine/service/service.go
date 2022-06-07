@@ -242,7 +242,7 @@ func (e *EngineService) Create(ctx context.Context, name string, kontainerDriver
 
 	defer cls.Driver.Close()
 
-	if err := cls.Create(ctx); err != nil {
+	if err = cls.Create(ctx); err != nil {
 		return "", "", "", err
 	}
 	endpoint := cls.Endpoint
@@ -281,7 +281,7 @@ func (e *EngineService) Update(ctx context.Context, name string, kontainerDriver
 
 	defer cls.Driver.Close()
 
-	if err := cls.Update(ctx); err != nil {
+	if err = cls.Update(ctx); err != nil {
 		return "", "", "", err
 	}
 	endpoint := cls.Endpoint
@@ -405,7 +405,7 @@ func (r *RunningDriver) Start() (string, error) {
 	}
 
 	listenAddress := p.Addr().String()
-	if err := p.Close(); err != nil {
+	if err = p.Close(); err != nil {
 		return "", fmt.Errorf("failed to close port before starting driver: %v", err)
 	}
 
