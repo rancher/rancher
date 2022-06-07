@@ -257,7 +257,7 @@ func (c AccessTokenCache) Export(cache cache.Marshaler, key string) {
 // NewMSGraphClient returns a client of the Microsoft Graph API. It attempts to get an access token to the API.
 // It first tries to fetch the token from the refresh token, if the access token is found in the database.
 // If that fails, it tries to acquire it directly from the auth provider with the credential (application secret in Azure).
-func NewMSGraphClient(config *v32.AzureADConfig, secrets corev1.SecretInterface) (*azureMSGraphClient, error) {
+func NewMSGraphClient(config *v32.AzureADConfig, secrets corev1.SecretInterface) (AzureClient, error) {
 	c := &azureMSGraphClient{}
 	cred, err := confidential.NewCredFromSecret(config.ApplicationSecret)
 	if err != nil {
