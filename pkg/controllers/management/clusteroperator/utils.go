@@ -37,6 +37,7 @@ const (
 type OperatorController struct {
 	ClusterEnqueueAfter  func(name string, duration time.Duration)
 	SecretsCache         wranglerv1.SecretCache
+	Secrets              corev1.SecretInterface
 	TemplateCache        v3.CatalogTemplateCache
 	ProjectCache         v3.ProjectCache
 	AppLister            projectv3.AppLister

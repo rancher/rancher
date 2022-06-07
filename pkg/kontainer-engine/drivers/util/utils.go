@@ -106,9 +106,7 @@ func GenerateServiceAccountToken(clientset kubernetes.Interface) (string, error)
 			if err != nil {
 				return "", fmt.Errorf("error getting secret: %v", err)
 			}
-			if token, ok := secretObj.Data["token"]; ok {
-				return string(token), nil
-			}
+			return string(secretObj.Data["token"]), nil
 		}
 		start = start * 2
 	}
