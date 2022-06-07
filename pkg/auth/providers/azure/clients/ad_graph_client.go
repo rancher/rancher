@@ -120,7 +120,7 @@ func (c *azureADGraphClient) LoginUser(_ *v32.AzureADConfig, _ *v32.AzureADLogin
 }
 
 // NewADGraphClientFromCredential configures the SPT, user, and group clients using a credential.
-func NewADGraphClientFromCredential(config *v32.AzureADConfig, credential *v32.AzureADLogin) (*azureADGraphClient, error) {
+func NewADGraphClientFromCredential(config *v32.AzureADConfig, credential *v32.AzureADLogin) (AzureClient, error) {
 	var c azureADGraphClient
 	logrus.Debug("[AZURE_PROVIDER] Started token swap with AzureAD")
 	oauthConfig, err := adal.NewOAuthConfig(config.Endpoint, config.TenantID)
@@ -160,7 +160,7 @@ func NewADGraphClientFromCredential(config *v32.AzureADConfig, credential *v32.A
 
 // NewAzureADGraphClientFromADALToken returns an Azure AD Graph client.
 // It sets up the SPT, user and group client using an access token to Azure AD Graph API.
-func NewAzureADGraphClientFromADALToken(config *v32.AzureADConfig, adalTokenSecret string) (*azureADGraphClient, error) {
+func NewAzureADGraphClientFromADALToken(config *v32.AzureADConfig, adalTokenSecret string) (AzureClient, error) {
 	adalToken, err := unmarshalADALToken(adalTokenSecret)
 	if err != nil {
 		return nil, err
