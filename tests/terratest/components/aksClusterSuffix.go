@@ -1,0 +1,5 @@
+package components
+
+var AKSClusterSuffix = `  }
+}
+`
