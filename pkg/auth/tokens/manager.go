@@ -40,7 +40,7 @@ const (
 	TokenHashed            = "authn.management.cattle.io/token-hashed"
 	tokenKeyIndex          = "authn.management.cattle.io/token-key-index"
 	secretNameEnding       = "-secret"
-	secretNamespace        = "cattle-system"
+	SecretNamespace        = "cattle-system"
 	KubeconfigResponseType = "kubeconfig"
 )
 
@@ -469,7 +469,7 @@ func (m *Manager) removeToken(request *types.APIContext) error {
 // CreateSecret saves the secret in k8s. Secret is saved under the userID-secret with
 // key being the provider and data being the providers secret
 func (m *Manager) CreateSecret(userID, provider, secret string) error {
-	_, err := m.secretLister.Get(secretNamespace, userID+secretNameEnding)
+	_, err := m.secretLister.Get(SecretNamespace, userID+secretNameEnding)
 	// An error either means it already exists or something bad happened
 	if err != nil {
 		if !apierrors.IsNotFound(err) {
@@ -484,7 +484,7 @@ func (m *Manager) CreateSecret(userID, provider, secret string) error {
 		}
 		s.ObjectMeta = metav1.ObjectMeta{
 			Name:      userID + secretNameEnding,
-			Namespace: secretNamespace,
+			Namespace: SecretNamespace,
 		}
 		_, err = m.secrets.Create(&s)
 		return err
@@ -495,7 +495,7 @@ func (m *Manager) CreateSecret(userID, provider, secret string) error {
 }
 
 func (m *Manager) GetSecret(userID string, provider string, fallbackTokens []*v3.Token) (string, error) {
-	cachedSecret, err := m.secretLister.Get(secretNamespace, userID+secretNameEnding)
+	cachedSecret, err := m.secretLister.Get(SecretNamespace, userID+secretNameEnding)
 	if err != nil && !apierrors.IsNotFound(err) {
 		return "", err
 	}
@@ -515,7 +515,7 @@ func (m *Manager) GetSecret(userID string, provider string, fallbackTokens []*v3
 }
 
 func (m *Manager) UpdateSecret(userID, provider, secret string) error {
-	cachedSecret, err := m.secretLister.Get(secretNamespace, userID+secretNameEnding)
+	cachedSecret, err := m.secretLister.Get(SecretNamespace, userID+secretNameEnding)
 	if err != nil {
 		return err
 	}
