@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/rancher/rancher/pkg/settings"
@@ -71,7 +72,11 @@ func isBundled(git *git.Git) bool {
 }
 
 func gitForRepo(secret *corev1.Secret, namespace, name, gitURL string, insecureSkipTLS bool, caBundle []byte) (*git.Git, error) {
-	if !strings.HasPrefix(gitURL, "git@") {
+	isGitSSH, err := isGitSSH(gitURL)
+	if err != nil {
+		return nil, fmt.Errorf("failed to verify the type of URL %s: %w", gitURL, err)
+	}
+	if !isGitSSH {
 		u, err := url.Parse(gitURL)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse URL %s: %w", gitURL, err)
@@ -96,6 +101,11 @@ func gitForRepo(secret *corev1.Secret, namespace, name, gitURL string, insecureS
 		InsecureTLSVerify: insecureSkipTLS,
 		CABundle:          caBundle,
 	})
+}
+
+func isGitSSH(gitURL string) (bool, error) {
+	// Matches URLs with the format [anything]@[anything]:[anything]
+	return regexp.MatchString("(.+)@(.+):(.+)", gitURL)
 }
 
 func hash(gitURL string) string {
