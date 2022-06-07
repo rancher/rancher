@@ -1,6 +1,133 @@
 # Provisioning Configs
 These are the examples of the configurations needed to run the provisioning packages tests. Which includes; RKE2 node driver and custom cluster provisioning, and hosted provider provisioning tests. The examples below are written in JSON, but thee framework also supports YAML.
 
+## RKE1 Provisioning Configs
+
+---
+
+### Provisioning Input
+provisioningInput is needed to the run the RKE1 tests, specifically kubernetesVersion, cni, and providers. nodeProviders is only needed for custom cluster test; the framework only supports custom clusters through aws/ec2 instances.
+
+```json
+"provisioningInput": {
+    "kubernetesVersion": ["v1.21.6+rke2r1"],
+    "cni": ["calico"],
+    "providers": ["linode", "aws", "do", "harvester"],
+    "nodeProviders": ["ec2"]
+  }
+```
+
+## Node Template Configs
+RKE1 specifically needs a node template config to run properly. These are the inputs needed for the different node providers.
+
+### AWS
+```json
+  "awsNodeTemplate": {
+    "accessKey": "",
+    "ami": "",
+    "blockDurationMinutes": "0",
+    "encryptEbsVolume": false,
+    "endpoint": "",
+    "httpEndpoint": "enabled",
+    "httpTokens": "optional",
+    "iamInstanceProfile": "EngineeringUsersUS",
+    "insecureTransport": false,
+    "instanceType": "t2.2xlarge",
+    "keypairName": "jenkins-rke-validation",
+    "kmsKey": "",
+    "monitoring": false,
+    "privateAddressOnly": false,
+    "region": "us-east-2",
+    "requestSpotInstance": true,
+    "retries": "5",
+    "rootSize": "16",
+    "secretKey": "",
+    "securityGroup": "open-all",
+    "securityGroupReadonly": false,
+    "sessionToken": "",
+    "spotPrice": "0.50",
+    "sshKeyContents": "",
+    "sshUser": "ec2-user",
+    "subnetId": "subnet-ee8cac86",
+    "tags": "",
+    "type": "amazonec2Config",
+    "useEbsOptimizedInstance": false,
+    "usePrivateAddress": false,
+    "userdata": "",
+    "volumeType": "gp2",
+    "vpcId": "vpc-bfccf4d7",
+    "zone": "a"
+  }
+```
+
+### Azure
+```json
+  "azureNodeTemplate": {
+    "availabilitySet": "docker-machine",
+    "clientId": "",
+    "clientSecret": "",
+    "customData": "",
+    "diskSize": "30",
+    "dns": "",
+    "dockerPort": "2376",
+    "environment": "AzurePublicCloud",
+    "faultDomainCount": "3",
+    "image": "canonical:UbuntuServer:18.04-LTS:latest",
+    "location": "eastus2",
+    "managedDisks": false,
+    "noPublicIp": false,
+    "openPort": [
+      "6443/tcp",
+      "2379/tcp",
+      "2380/tcp",
+      "8472/udp",
+      "4789/udp",
+      "9796/tcp",
+      "10256/tcp",
+      "10250/tcp",
+      "10251/tcp",
+      "10252/tcp"
+    ],
+    "plan": "",
+    "privateIpAddress": "",
+    "resourceGroup": "",
+    "size": "Standard_D2_v2",
+    "sshUser": "azureuser",
+    "staticPublicIp": false,
+    "storageType": "Standard_LRS",
+    "subnet": "docker-machine",
+    "subnetPrefix": "192.168.0.0/16",
+    "subscriptionId": "",
+    "tenantId": "",
+    "type": "azureConfig",
+    "updateDomainCount": "5",
+    "vnet": "docker-machine-vnet"
+}
+```
+
+### Linode
+```json
+"linodeNodeTemplate:" { 
+    "authorizedUsers": "",
+    "createPrivateIp": true,
+    "dockerPort": "2376",
+    "image": "linode/ubuntu20.04",
+    "instanceType": "g6-dedicated-8",
+    "label": "",
+    "region": "us-east",
+    "rootPass": "",
+    "sshPort": "22",
+    "sshUser": "root",
+    "stackscript": "",
+    "stackscriptData": "",
+    "swapSize": "512",
+    "tags": "",
+    "token": "",
+    "type": "linodeConfig",
+    "uaPrefix": "Rancher",
+}
+```
+
 ## RKE2 Provisioning Configs
 
 ---
