@@ -571,7 +571,7 @@ def deploy_airgap_rancher(bastion_node):
             '-v ${{PWD}}/privkey.pem:/etc/rancher/ssl/key.pem ' \
             '-e CATTLE_SYSTEM_DEFAULT_REGISTRY={} ' \
             '-e CATTLE_SYSTEM_CATALOG=bundled ' \
-            '-e CATTLE_BOOTSTRAP_PASSWORD=\\\"{}\\\" ' \
+            '-e CATTLE_BOOTSTRAP_PASSWORD={} ' \
             '{}/rancher/rancher:{} --no-cacerts --trace'.format(
                 privileged, bastion_node.host_name, ADMIN_PASSWORD,
                 bastion_node.host_name, RANCHER_SERVER_VERSION)
@@ -580,7 +580,7 @@ def deploy_airgap_rancher(bastion_node):
             'sudo docker run -d {} --restart=unless-stopped ' \
             '-p 80:80 -p 443:443 ' \
             '-e CATTLE_SYSTEM_DEFAULT_REGISTRY={} ' \
-            '-e CATTLE_BOOTSTRAP_PASSWORD=\\\"{}\\\" ' \
+            '-e CATTLE_BOOTSTRAP_PASSWORD={} ' \
             '-e CATTLE_SYSTEM_CATALOG=bundled {}/rancher/rancher:{} --trace'.format(
                 privileged, bastion_node.host_name, 
                 ADMIN_PASSWORD,
