@@ -73,8 +73,16 @@ def test_deploy_rancher_server():
 
     token = set_url_password_token(RANCHER_SERVER_URL,
                                    version=RANCHER_SERVER_VERSION)
-    admin_client = rancher.Client(url=RANCHER_SERVER_URL + "/v3",
-                                  token=token, verify=False)
+    t_end = time.time() + 30
+    while time.time() < t_end:
+        try:
+            admin_client = rancher.Client(url=RANCHER_SERVER_URL + "/v3",
+                                          token=token, verify=False)
+        except requests.exceptions:
+            print("Got exception while creating admin client - retry")
+        else:
+            break
+
     if AUTH_PROVIDER:
         enable_url = \
             RANCHER_SERVER_URL + "/v3/" + AUTH_PROVIDER + \
