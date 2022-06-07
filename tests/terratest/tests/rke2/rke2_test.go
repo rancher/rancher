@@ -4,8 +4,8 @@ import (
 	"testing"
 
 	"github.com/gruntwork-io/terratest/modules/terraform"
-	"github.com/josh-diamond/rancher-terratest/config"
-	"github.com/josh-diamond/rancher-terratest/functions"
+	"github.com/rancher/rancher/tests/terratest/config"
+	"github.com/rancher/rancher/tests/terratest/functions"
 	"github.com/stretchr/testify/assert"
 )
 

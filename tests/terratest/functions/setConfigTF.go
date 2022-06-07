@@ -5,8 +5,8 @@ import (
 	"os"
 	"strconv"
 
-	"github.com/josh-diamond/rancher-terratest/components"
-	"github.com/josh-diamond/rancher-terratest/models"
+	"github.com/rancher/rancher/tests/terratest/components"
+	"github.com/rancher/rancher/tests/terratest/models"
 )
 
 func SetConfigTF(module string, k8sVersion string, nodePools []models.Nodepool) bool {

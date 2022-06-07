@@ -1,7 +1,7 @@
 package config
 
 import (
-	"github.com/josh-diamond/rancher-terratest/models"
+	"github.com/rancher/rancher/tests/terratest/models"
 )
 
 // Modules
