@@ -114,7 +114,7 @@ def deploy_bastion_server():
     node_name = AG_HOST_NAME + "-bastion"
     node_name = REG_HOST_NAME
     # Create Registry Server in AWS
-    registry_node = AmazonWebServices().create_node(node_name)
+    registry_node = AmazonWebServices().create_node(node_name, for_bastion=True)
     setup_ssh_key(registry_node)
     # update a record if it exists
     AmazonWebServices().upsert_route_53_record_a(

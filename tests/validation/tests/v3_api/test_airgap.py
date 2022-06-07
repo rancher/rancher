@@ -148,7 +148,7 @@ def setup_rancher_server():
 def deploy_noauth_bastion_server():
     node_name = AG_HOST_NAME + "-noauthbastion"
     # Create Bastion Server in AWS
-    bastion_node = AmazonWebServices().create_node(node_name)
+    bastion_node = AmazonWebServices().create_node(node_name, for_bastion=True)
     setup_ssh_key(bastion_node)
 
     # Generate self signed certs
@@ -185,7 +185,7 @@ def deploy_noauth_bastion_server():
 def deploy_bastion_server():
     node_name = AG_HOST_NAME + "-bastion"
     # Create Bastion Server in AWS
-    bastion_node = AmazonWebServices().create_node(node_name)
+    bastion_node = AmazonWebServices().create_node(node_name, for_bastion=True)
     setup_ssh_key(bastion_node)
 
     # Get resources for private registry and generate self signed certs
@@ -265,7 +265,8 @@ def add_rancher_images_to_private_registry(bastion_node, push_images=True):
     bastion_node.execute_command(edit_save_and_load_command)
 
     save_images_command = \
-        "./rancher-save-images.sh --image-list ./rancher-images.txt"
+        "./rancher-save-images.sh --image-list ./rancher-images.txt" \
+
     save_res = bastion_node.execute_command(save_images_command)
 
     if push_images:
