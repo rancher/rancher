@@ -1,17 +1,3 @@
-ARG K3S_BUILDER=rancher/k3s:v1.23.6-k3s1
-
-# Use binaries from k3s root for s390x as k3s is not available on s390x
-FROM registry.suse.com/bci/golang:1.17 AS k3s_root
-ARG DAPPER_HOST_ARCH
-ENV ARCH=${DAPPER_HOST_ARCH}
-ENV K3S_ROOT_VERSION v0.11.0
-ONBUILD RUN zypper -n in tar
-ONBUILD ADD https://github.com/rancher/k3s-root/releases/download/${K3S_ROOT_VERSION}/k3s-root-${ARCH}.tar /k3s-root.tar
-ONBUILD RUN tar xvf /k3s-root.tar; \
-  touch /bin/cni /bin/containerd /bin/containerd-shim-runc-v2 /bin/runc /bin/k3s
-
-FROM ${K3S_BUILDER} as k3s_builder
-
 FROM registry.suse.com/bci/golang:1.17
 
 ARG DAPPER_HOST_ARCH
@@ -69,7 +55,7 @@ RUN mkdir /usr/tmp && \
     chmod +x /usr/bin/kustomize
 
 # Set up K3s: copy the necessary binaries from the K3s image.
-COPY --from=k3s_builder \
+COPY --from=rancher/k3s:v1.23.6-k3s1 \
     /bin/blkid \
     /bin/charon \
     /bin/cni \
@@ -90,39 +76,30 @@ COPY --from=k3s_builder \
 
 RUN mkdir -p /go/src/github.com/rancher/rancher/.kube
 
-RUN if [ "${ARCH}" != "s390x" ]; then \
-        ln -s /usr/bin/cni /usr/bin/bridge && \
-        ln -s /usr/bin/cni /usr/bin/flannel && \
-        ln -s /usr/bin/cni /usr/bin/host-local && \
-        ln -s /usr/bin/cni /usr/bin/loopback && \
-        ln -s /usr/bin/cni /usr/bin/portmap && \
-        ln -s /usr/bin/k3s /usr/bin/crictl && \
-        ln -s /usr/bin/k3s /usr/bin/ctr && \
-        ln -s /usr/bin/k3s /usr/bin/k3s-agent && \
-        ln -s /usr/bin/k3s /usr/bin/k3s-etcd-snapshot && \
-        ln -s /usr/bin/k3s /usr/bin/k3s-server && \
-        ln -s /usr/bin/k3s /usr/bin/kubectl && \
-        ln -s /usr/bin/pigz /usr/bin/unpigz && \
-        ln -s /usr/bin/xtables-legacy-multi /usr/bin/iptables && \
-        ln -s /usr/bin/xtables-legacy-multi /usr/bin/iptables-save && \
-        ln -s /usr/bin/xtables-legacy-multi /usr/bin/iptables-restore && \
-        ln -s /usr/bin/xtables-legacy-multi /usr/bin/iptables-translate && \
-        ln -s /usr/bin/xtables-legacy-multi /usr/bin/ip6tables && \
-        ln -s /usr/bin/xtables-legacy-multi /usr/bin/ip6tables-save && \
-        ln -s /usr/bin/xtables-legacy-multi /usr/bin/ip6tables-restore && \
-        ln -s /usr/bin/xtables-legacy-multi /usr/bin/ip6tables-translate && \
-        ln -s /etc/rancher/k3s/k3s.yaml /go/src/github.com/rancher/rancher/.kube/k3s.yaml; \
-    else  \
-        # Download kubectl for s390x since k3s is not available
-        KUBECTL_URL=https://storage.googleapis.com/kubernetes-release/release/v1.21.7/bin/linux/${ARCH}/kubectl; \
-        curl -sLf ${KUBECTL_URL} -o /usr/bin/kubectl && chmod +x /usr/bin/kubectl; \
-    fi
+RUN ln -s /usr/bin/cni /usr/bin/bridge && \
+    ln -s /usr/bin/cni /usr/bin/flannel && \
+    ln -s /usr/bin/cni /usr/bin/host-local && \
+    ln -s /usr/bin/cni /usr/bin/loopback && \
+    ln -s /usr/bin/cni /usr/bin/portmap && \
+    ln -s /usr/bin/k3s /usr/bin/crictl && \
+    ln -s /usr/bin/k3s /usr/bin/ctr && \
+    ln -s /usr/bin/k3s /usr/bin/k3s-agent && \
+    ln -s /usr/bin/k3s /usr/bin/k3s-etcd-snapshot && \
+    ln -s /usr/bin/k3s /usr/bin/k3s-server && \
+    ln -s /usr/bin/k3s /usr/bin/kubectl && \
+    ln -s /usr/bin/pigz /usr/bin/unpigz && \
+    ln -s /usr/bin/xtables-legacy-multi /usr/bin/iptables && \
+    ln -s /usr/bin/xtables-legacy-multi /usr/bin/iptables-save && \
+    ln -s /usr/bin/xtables-legacy-multi /usr/bin/iptables-restore && \
+    ln -s /usr/bin/xtables-legacy-multi /usr/bin/iptables-translate && \
+    ln -s /usr/bin/xtables-legacy-multi /usr/bin/ip6tables && \
+    ln -s /usr/bin/xtables-legacy-multi /usr/bin/ip6tables-save && \
+    ln -s /usr/bin/xtables-legacy-multi /usr/bin/ip6tables-restore && \
+    ln -s /usr/bin/xtables-legacy-multi /usr/bin/ip6tables-translate && \
+    ln -s /etc/rancher/k3s/k3s.yaml /go/src/github.com/rancher/rancher/.kube/k3s.yaml
 
 
-# Add k3s for all archs except s390x since k3s doesn't support s390x
-RUN if [ "${ARCH}" != "s390x" ]; then \
-        curl -sLf https://github.com/rancher/k3s/releases/download/${CATTLE_K3S_VERSION}/k3s-images.txt -o /usr/tmp/k3s-images.txt; \
-    fi
+RUN curl -sLf https://github.com/rancher/k3s/releases/download/${CATTLE_K3S_VERSION}/k3s-images.txt -o /usr/tmp/k3s-images.txt
 
 ENV YQ_URL=https://github.com/mikefarah/yq/releases/download/3.4.1/yq_linux_${ARCH}
 RUN curl -sLf ${YQ_URL} -o /usr/bin/yq && chmod +x /usr/bin/yq
