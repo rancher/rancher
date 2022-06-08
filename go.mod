@@ -104,10 +104,9 @@ require (
 	github.com/rancher/rancher/pkg/apis v0.0.0
 	github.com/rancher/rancher/pkg/client v0.0.0
 	github.com/rancher/rdns-server v0.0.0-20180802070304-bf662911db6a
-	github.com/rancher/remotedialer v0.2.6-0.20220120012928-4ea2198e0966
+	github.com/rancher/remotedialer v0.2.6-0.20220104192242-f3837f8d649a
 	github.com/rancher/rke v1.3.8
 	github.com/rancher/security-scan v0.1.7-0.20200222041501-f7377f127168
-	github.com/rancher/steve v0.0.0-20220218171307-a91d90251ffa
 	github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20210727200656-10b094e30007
 	github.com/rancher/wrangler v0.8.11-0.20220217210408-3ecd23dfea3b
 	github.com/robfig/cron v1.1.0
@@ -152,6 +151,8 @@ require (
 	sigs.k8s.io/controller-runtime v0.11.1
 	sigs.k8s.io/yaml v1.3.0
 )
+
+require github.com/rancher/steve v0.0.0-20220503004032-53511a06ff37
 
 require (
 	cloud.google.com/go v0.99.0 // indirect
