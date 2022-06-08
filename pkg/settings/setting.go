@@ -71,7 +71,7 @@ var (
 	WinsAgentVersion                    = NewSetting("wins-agent-version", "")
 	CSIProxyAgentVersion                = NewSetting("csi-proxy-agent-version", "")
 	CSIProxyAgentURL                    = NewSetting("csi-proxy-agent-url", "https://acs-mirror.azureedge.net/csi-proxy/%[1]s/binaries/csi-proxy-%[1]s.tar.gz")
-	SystemAgentInstallScript            = NewSetting("system-agent-install-script", "https://raw.githubusercontent.com/rancher/system-agent/v0.2.7/install.sh")
+	SystemAgentInstallScript            = NewSetting("system-agent-install-script", "https://raw.githubusercontent.com/rancher/system-agent/v0.2.8/install.sh")
 	WinsAgentInstallScript              = NewSetting("wins-agent-install-script", "https://raw.githubusercontent.com/rancher/wins/v0.2.10/install.ps1")
 	SystemAgentInstallerImage           = NewSetting("system-agent-installer-image", "rancher/system-agent-installer-")
 	SystemAgentUpgradeImage             = NewSetting("system-agent-upgrade-image", "")
