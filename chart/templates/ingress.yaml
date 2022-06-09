@@ -1,5 +1,5 @@
 {{- if .Values.ingress.enabled }}
-{{- if .Capabilities.APIVersions.Has "networking.k8s.io/v1/Ingress" }}
+{{- if or (.Capabilities.APIVersions.Has "networking.k8s.io/v1/Ingress") (not (.Capabilities.APIVersions.Has "networking.k8s.io/v1beta1/Ingress")) }}
 apiVersion: networking.k8s.io/v1
 {{- else }}
 apiVersion: networking.k8s.io/v1beta1
@@ -8,10 +8,7 @@ kind: Ingress
 metadata:
   name: {{ template "rancher.fullname" . }}
   labels:
-    app: {{ template "rancher.fullname" . }}
-    chart: {{ .Chart.Name }}-{{ .Chart.Version }}
-    heritage: {{ .Release.Service }}
-    release: {{ .Release.Name }}
+{{ include "rancher.labels" . | indent 4 }}
   annotations:
 {{- if .Values.ingress.configurationSnippet }}
     nginx.ingress.kubernetes.io/configuration-snippet: |
@@ -30,6 +27,11 @@ metadata:
     {{- end }}
   {{- end }}
 {{- end }}
+{{- if .Values.ingress.includeDefaultExtraAnnotations }}
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "30"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "1800"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "1800"
+{{- end }}
 {{- if .Values.ingress.extraAnnotations }}
 {{ toYaml .Values.ingress.extraAnnotations | indent 4 }}
 {{- end }}
@@ -39,7 +41,7 @@ spec:
     http:
       paths:
       - backend:
-          {{- if .Capabilities.APIVersions.Has "networking.k8s.io/v1/Ingress" }}
+          {{- if or (.Capabilities.APIVersions.Has "networking.k8s.io/v1/Ingress") (not (.Capabilities.APIVersions.Has "networking.k8s.io/v1beta1/Ingress")) }}
           service:
             name: {{ template "rancher.fullname" . }}
             port:
@@ -48,13 +50,13 @@ spec:
           serviceName: {{ template "rancher.fullname" . }}
           servicePort: 80
           {{- end }}
-        {{- if .Capabilities.APIVersions.Has "networking.k8s.io/v1/Ingress" }}
+        {{- if or (.Capabilities.APIVersions.Has "networking.k8s.io/v1/Ingress") (not (.Capabilities.APIVersions.Has "networking.k8s.io/v1beta1/Ingress")) }}
         pathType: ImplementationSpecific
         {{- end }}
 {{- if eq .Values.tls "ingress" }}
   tls:
   - hosts:
     - {{ .Values.hostname }}
-    secretName: tls-rancher-ingress
+    secretName: {{ .Values.ingress.tls.secretName }}
 {{- end }}
 {{- end }}

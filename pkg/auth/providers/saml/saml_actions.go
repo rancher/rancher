@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"net/http"
 
-	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
+	"github.com/sirupsen/logrus"
 )
 
 func (s *Provider) formatter(apiContext *types.APIContext, resource *types.RawResource) {
@@ -47,13 +47,18 @@ func (s *Provider) testAndEnable(actionName string, action *types.Action, reques
 		return err
 	}
 
+	logrus.Debug("SAML [testAndEnable]: Initializing SAML service provider")
 	err = InitializeSamlServiceProvider(samlConfig, s.name)
 	if err != nil {
 		return err
 	}
 
-	provider := SamlProviders[s.name]
+	provider, ok := SamlProviders[s.name]
+	if !ok {
+		return fmt.Errorf("SAML [testAndEnable]: Provider %v not configured", s.name)
+	}
 
+	logrus.Debugf("SAML [testAndEnable]: Setting clientState for SAML service provider %v", s.name)
 	finalRedirectURL := samlLogin.FinalRedirectURL
 	provider.clientState.SetState(request.Response, request.Request, "Rancher_UserID", provider.userMGR.GetUser(request))
 	provider.clientState.SetState(request.Response, request.Request, "Rancher_FinalRedirectURL", finalRedirectURL)
@@ -62,6 +67,7 @@ func (s *Provider) testAndEnable(actionName string, action *types.Action, reques
 	if err != nil {
 		return err
 	}
+	logrus.Debugf("SAML [testAndEnable]: Redirecting to the identity provider login page at %v", idpRedirectURL)
 	data := map[string]interface{}{
 		"idpRedirectUrl": idpRedirectURL,
 		"type":           "samlConfigTestOutput",

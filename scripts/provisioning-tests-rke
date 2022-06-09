@@ -1,0 +1,6 @@
+#!/bin/bash
+set -e
+
+cd $(dirname $0)/..
+
+DIST=rke2 ./scripts/provisioning-tests

@@ -1,0 +1,15 @@
+{{- if .Values.postDelete.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ template "rancher.fullname" . }}-post-delete
+  namespace: {{ .Release.Namespace }}
+  labels: {{ include "rancher.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": post-delete
+    "helm.sh/hook-weight": "1"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded,hook-failed
+data:
+  post-delete-hook.sh: |-
+{{ $.Files.Get "scripts/post-delete-hook.sh" | indent 4 }}
+{{- end }}

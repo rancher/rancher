@@ -2,18 +2,20 @@ package proxy
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"net/http"
 	"strings"
 	"time"
 
 	gmux "github.com/gorilla/mux"
-	"github.com/rancher/rancher/pkg/features"
 	v3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	managementv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/settings"
+	"github.com/rancher/remotedialer"
 	"github.com/rancher/steve/pkg/auth"
 	"github.com/rancher/steve/pkg/proxy"
+	"github.com/sirupsen/logrus"
 	authzv1 "k8s.io/api/authorization/v1"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
@@ -26,12 +28,9 @@ import (
 type Handler struct {
 	authorizer    authorizer.Authorizer
 	dialerFactory ClusterDialerFactory
-	clusters      v3.ClusterCache
 }
 
-type ClusterDialerFactory interface {
-	ClusterDialer(clusterID string) func(ctx context.Context, network, address string) (net.Conn, error)
-}
+type ClusterDialerFactory func(clusterID string) remotedialer.Dialer
 
 func RewriteLocalCluster(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
@@ -45,7 +44,7 @@ func RewriteLocalCluster(next http.Handler) http.Handler {
 	})
 }
 
-func NewProxyMiddleware(sar v1.SubjectAccessReviewInterface,
+func NewProxyMiddleware(sar v1.AuthorizationV1Interface,
 	dialerFactory ClusterDialerFactory,
 	clusters v3.ClusterCache,
 	localSupport bool,
@@ -66,10 +65,10 @@ func NewProxyMiddleware(sar v1.SubjectAccessReviewInterface,
 
 	mux := gmux.NewRouter()
 	mux.UseEncodedPath()
-	mux.Path("/v1/management.cattle.io.clusters/{clusterID}").Queries("link", "shell").HandlerFunc(routeToShellProxy(localSupport, localCluster, mux, proxyHandler))
-	mux.Path("/v3/clusters/{clusterID}").Queries("shell", "true").HandlerFunc(routeToShellProxy(localSupport, localCluster, mux, proxyHandler))
-	mux.Path("/{prefix:k8s/clusters/[^/]+}{suffix:/v1.*}").MatcherFunc(proxyHandler.MatchNonLegacy("/k8s/clusters/", true)).Handler(proxyHandler)
-	mux.Path("/{prefix:k8s/clusters/[^/]+}{suffix:.*}").MatcherFunc(proxyHandler.MatchNonLegacy("/k8s/clusters/", false)).Handler(proxyHandler)
+	mux.Path("/v1/management.cattle.io.clusters/{clusterID}").Queries("link", "shell").HandlerFunc(routeToShellProxy("link", "shell", localSupport, localCluster, mux, proxyHandler))
+	mux.Path("/v1/management.cattle.io.clusters/{clusterID}").Queries("action", "apply").HandlerFunc(routeToShellProxy("action", "apply", localSupport, localCluster, mux, proxyHandler))
+	mux.Path("/v3/clusters/{clusterID}").Queries("shell", "true").HandlerFunc(routeToShellProxy("link", "shell", localSupport, localCluster, mux, proxyHandler))
+	mux.Path("/{prefix:k8s/clusters/[^/]+}{suffix:/v1.*}").MatcherFunc(proxyHandler.MatchNonLegacy("/k8s/clusters/")).Handler(proxyHandler)
 
 	return func(handler http.Handler) http.Handler {
 		return http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
@@ -79,14 +78,14 @@ func NewProxyMiddleware(sar v1.SubjectAccessReviewInterface,
 	}, nil
 }
 
-func routeToShellProxy(localSupport bool, localCluster http.Handler, mux *gmux.Router, proxyHandler *Handler) func(rw http.ResponseWriter, r *http.Request) {
+func routeToShellProxy(key, value string, localSupport bool, localCluster http.Handler, mux *gmux.Router, proxyHandler *Handler) func(rw http.ResponseWriter, r *http.Request) {
 	return func(rw http.ResponseWriter, r *http.Request) {
 		vars := gmux.Vars(r)
 		cluster := vars["clusterID"]
 		if cluster == "local" {
 			if localSupport {
 				q := r.URL.Query()
-				q.Set("link", "shell")
+				q.Set(key, value)
 				r.URL.RawQuery = q.Encode()
 				r.URL.Path = "/v1/management.cattle.io.clusters/local"
 				localCluster.ServeHTTP(rw, r)
@@ -97,9 +96,8 @@ func routeToShellProxy(localSupport bool, localCluster http.Handler, mux *gmux.R
 		}
 		vars["prefix"] = "k8s/clusters/" + cluster
 		vars["suffix"] = "/v1/management.cattle.io.clusters/local"
-		// Ensure shell link is set
 		q := r.URL.Query()
-		q.Set("link", "shell")
+		q.Set(key, value)
 		r.URL.RawQuery = q.Encode()
 		r.URL.Path = "/k8s/clusters/" + cluster + "/v1/management.cattle.io.clusters/local"
 		proxyHandler.ServeHTTP(rw, r)
@@ -112,16 +110,11 @@ func NewProxyHandler(authorizer authorizer.Authorizer,
 	return &Handler{
 		authorizer:    authorizer,
 		dialerFactory: dialerFactory,
-		clusters:      clusters,
 	}
 }
 
-func (h *Handler) MatchNonLegacy(prefix string, force bool) gmux.MatcherFunc {
+func (h *Handler) MatchNonLegacy(prefix string) gmux.MatcherFunc {
 	return func(req *http.Request, match *gmux.RouteMatch) bool {
-		if !features.SteveProxy.Enabled() && !force {
-			return false
-		}
-
 		clusterID := strings.TrimPrefix(req.URL.Path, prefix)
 		clusterID = strings.SplitN(clusterID, "/", 2)[0]
 		if match.Vars == nil {
@@ -163,8 +156,25 @@ func (h *Handler) dialer(ctx context.Context, network, address string) (net.Conn
 	if err != nil {
 		return nil, err
 	}
-	dialer := h.dialerFactory.ClusterDialer(host)
-	return dialer(ctx, network, "127.0.0.1:6080")
+	dialer := h.dialerFactory("stv-cluster-" + host)
+	var conn net.Conn
+	for i := 0; i < 15; i++ {
+		conn, err = dialer(ctx, network, "127.0.0.1:6080")
+		if err != nil && strings.Contains(err.Error(), "failed to find Session for client") {
+			if i < 14 {
+				logrus.Tracef("steve.proxy.dialer: lost connection, retrying")
+				time.Sleep(time.Second)
+			} else {
+				logrus.Tracef("steve.proxy.dialer: lost connection, failed to reconnect after 15 attempts")
+			}
+		} else {
+			break
+		}
+	}
+	if err != nil {
+		return conn, fmt.Errorf("lost connection to cluster: %w", err)
+	}
+	return conn, nil
 }
 
 func (h *Handler) next(clusterID, prefix string) (http.Handler, error) {

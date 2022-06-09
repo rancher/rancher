@@ -8,6 +8,7 @@ variable "dependency" {
   default = null
 }
 variable "ec2_instance_class" {}
+variable "volume_size" {}
 variable "iam_role" {}
 variable "node_os" {}
 variable "no_of_worker_nodes" {}
@@ -17,6 +18,8 @@ variable "password" {
 variable "region" {}
 variable "resource_name" {}
 variable "rke2_version" {}
+variable "install_mode" {}
+variable "install_method" {}
 variable "rke2_channel" {}
 variable "sg_id" {}
 variable "subnets" {}

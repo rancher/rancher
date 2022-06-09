@@ -94,7 +94,11 @@ func RefreshReposByCredential(sourceCodeRepositories v3.SourceCodeRepositoryInte
 		repo.Spec.SourceCodeCredentialName = credentialID
 		repo.Spec.UserName = credential.Spec.UserName
 		repo.Spec.SourceCodeType = credential.Spec.SourceCodeType
-		repo.Name = uuid.NewV4().String()
+		uuidv4, err := uuid.NewV4()
+		if err != nil {
+			return nil, err
+		}
+		repo.Name = uuidv4.String()
 		repo.Namespace = namespace
 		repo.Spec.ProjectName = credential.Spec.ProjectName
 		if _, err := sourceCodeRepositories.Create(&repo); err != nil {

@@ -2,20 +2,24 @@ package app
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/pkg/errors"
 	"github.com/rancher/rancher/pkg/controllers/managementagent/nslabels"
-	"github.com/rancher/rancher/pkg/controllers/managementuser/helm/common"
+	"github.com/rancher/rancher/pkg/controllers/managementuser/rbac"
+	"github.com/rancher/rancher/pkg/controllers/managementuserlegacy/helm/common"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	projv3 "github.com/rancher/rancher/pkg/generated/norman/project.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/project"
+	"github.com/rancher/rancher/pkg/settings"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/kubectl/pkg/util/slice"
 )
 
 const (
@@ -47,19 +51,21 @@ func EnsureAppProjectName(userNSClient v1.NamespaceInterface, ownedProjectID, cl
 		}
 	}
 
-	// move Namespace into a project
 	expectedAppProjectName := fmt.Sprintf("%s:%s", clusterName, ownedProjectID)
-	appProjectName := ""
-	if projectName, ok := deployNamespace.Annotations[nslabels.ProjectIDFieldLabel]; ok {
-		appProjectName = projectName
+	appProjectID := deployNamespace.Annotations[nslabels.ProjectIDFieldLabel]
+	if appProjectID != "" && isKnownSystemNamespace(deployNamespace) {
+		// Don't reassign the system namespaces to another project.
+		return expectedAppProjectName, nil
 	}
-	if appProjectName != expectedAppProjectName {
-		appProjectName = expectedAppProjectName
+
+	// move Namespace into a project
+	if appProjectID != expectedAppProjectName {
+		appProjectID = expectedAppProjectName
 		if deployNamespace.Annotations == nil {
 			deployNamespace.Annotations = make(map[string]string, 2)
 		}
 
-		deployNamespace.Annotations[nslabels.ProjectIDFieldLabel] = appProjectName
+		deployNamespace.Annotations[nslabels.ProjectIDFieldLabel] = appProjectID
 
 		_, err := userNSClient.Update(deployNamespace)
 		if err != nil {
@@ -67,7 +73,7 @@ func EnsureAppProjectName(userNSClient v1.NamespaceInterface, ownedProjectID, cl
 		}
 	}
 
-	return appProjectName, nil
+	return appProjectID, nil
 }
 
 func GetSystemProjectID(clusterName string, cattleProjectsLister v3.ProjectLister) (string, error) {
@@ -112,6 +118,7 @@ func DeployApp(mgmtAppClient projv3.AppInterface, projectID string, createOrUpda
 	} else {
 		app = app.DeepCopy()
 		app.Spec.Answers = createOrUpdateApp.Spec.Answers
+		app.Spec.AnswersSetString = createOrUpdateApp.Spec.AnswersSetString
 
 		// clean up status
 		if forceRedeploy {
@@ -157,4 +164,9 @@ func DeleteApp(mgmtAppClient projv3.AppInterface, projectID, appName string) err
 	}
 
 	return nil
+}
+
+func isKnownSystemNamespace(ns *v1.Namespace) bool {
+	return slice.ContainsString(strings.Split(settings.SystemNamespaces.Get(), ","), ns.Name, nil) ||
+		rbac.IsFleetNamespace(ns)
 }

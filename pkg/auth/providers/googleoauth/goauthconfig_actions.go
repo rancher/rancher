@@ -6,10 +6,9 @@ import (
 	"net/http"
 	"strings"
 
-	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	"golang.org/x/oauth2"
@@ -110,7 +109,9 @@ func (g *googleOauthProvider) testAndApply(actionName string, action *types.Acti
 		return httperror.NewAPIError(httperror.ServerError, fmt.Sprintf("testAndApply: Failed to save google oauth config: %v", err))
 	}
 
-	return g.tokenMGR.CreateTokenAndSetCookie(user.Name, userPrincipal, groupPrincipals, providerInfo, 0, "Token via Google OAuth Configuration", request)
+	userExtraInfo := g.GetUserExtraAttributes(userPrincipal)
+
+	return g.tokenMGR.CreateTokenAndSetCookie(user.Name, userPrincipal, groupPrincipals, providerInfo, 0, "Token via Google OAuth Configuration", request, userExtraInfo)
 
 }
 

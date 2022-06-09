@@ -108,11 +108,7 @@ func (u *userControllersController) setPeers(peers *tpeermanager.Peers) error {
 		sort.Strings(u.peers.IDs)
 	}
 
-	if err := u.peersSync(); err != nil {
-		return err
-	}
-
-	return nil
+	return u.peersSync()
 }
 
 func (u *userControllersController) peersSync() error {

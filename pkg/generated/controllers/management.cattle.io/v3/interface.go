@@ -1,5 +1,5 @@
 /*
-Copyright 2020 Rancher Labs, Inc.
+Copyright 2022 Rancher Labs, Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -30,6 +30,7 @@ func init() {
 }
 
 type Interface interface {
+	APIService() APIServiceController
 	ActiveDirectoryProvider() ActiveDirectoryProviderController
 	AuthConfig() AuthConfigController
 	AuthProvider() AuthProviderController
@@ -69,6 +70,7 @@ type Interface interface {
 	GroupMember() GroupMemberController
 	KontainerDriver() KontainerDriverController
 	LocalProvider() LocalProviderController
+	ManagedChart() ManagedChartController
 	MonitorMetric() MonitorMetricController
 	MultiClusterApp() MultiClusterAppController
 	MultiClusterAppRevision() MultiClusterAppRevisionController
@@ -77,6 +79,7 @@ type Interface interface {
 	NodePool() NodePoolController
 	NodeTemplate() NodeTemplateController
 	Notifier() NotifierController
+	OIDCProvider() OIDCProviderController
 	OpenLdapProvider() OpenLdapProviderController
 	PodSecurityPolicyTemplate() PodSecurityPolicyTemplateController
 	PodSecurityPolicyTemplateProjectBinding() PodSecurityPolicyTemplateProjectBindingController
@@ -91,6 +94,7 @@ type Interface interface {
 	ProjectMonitorGraph() ProjectMonitorGraphController
 	ProjectNetworkPolicy() ProjectNetworkPolicyController
 	ProjectRoleTemplateBinding() ProjectRoleTemplateBindingController
+	RancherUserNotification() RancherUserNotificationController
 	RkeAddon() RkeAddonController
 	RkeK8sServiceOption() RkeK8sServiceOptionController
 	RkeK8sSystemImage() RkeK8sSystemImageController
@@ -116,6 +120,9 @@ type version struct {
 	controllerFactory controller.SharedControllerFactory
 }
 
+func (c *version) APIService() APIServiceController {
+	return NewAPIServiceController(schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "APIService"}, "apiservices", false, c.controllerFactory)
+}
 func (c *version) ActiveDirectoryProvider() ActiveDirectoryProviderController {
 	return NewActiveDirectoryProviderController(schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "ActiveDirectoryProvider"}, "activedirectoryproviders", false, c.controllerFactory)
 }
@@ -233,6 +240,9 @@ func (c *version) KontainerDriver() KontainerDriverController {
 func (c *version) LocalProvider() LocalProviderController {
 	return NewLocalProviderController(schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "LocalProvider"}, "localproviders", false, c.controllerFactory)
 }
+func (c *version) ManagedChart() ManagedChartController {
+	return NewManagedChartController(schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "ManagedChart"}, "managedcharts", true, c.controllerFactory)
+}
 func (c *version) MonitorMetric() MonitorMetricController {
 	return NewMonitorMetricController(schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "MonitorMetric"}, "monitormetrics", true, c.controllerFactory)
 }
@@ -256,6 +266,9 @@ func (c *version) NodeTemplate() NodeTemplateController {
 }
 func (c *version) Notifier() NotifierController {
 	return NewNotifierController(schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "Notifier"}, "notifiers", true, c.controllerFactory)
+}
+func (c *version) OIDCProvider() OIDCProviderController {
+	return NewOIDCProviderController(schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "OIDCProvider"}, "oidcproviders", false, c.controllerFactory)
 }
 func (c *version) OpenLdapProvider() OpenLdapProviderController {
 	return NewOpenLdapProviderController(schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "OpenLdapProvider"}, "openldapproviders", false, c.controllerFactory)
@@ -298,6 +311,9 @@ func (c *version) ProjectNetworkPolicy() ProjectNetworkPolicyController {
 }
 func (c *version) ProjectRoleTemplateBinding() ProjectRoleTemplateBindingController {
 	return NewProjectRoleTemplateBindingController(schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "ProjectRoleTemplateBinding"}, "projectroletemplatebindings", true, c.controllerFactory)
+}
+func (c *version) RancherUserNotification() RancherUserNotificationController {
+	return NewRancherUserNotificationController(schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "RancherUserNotification"}, "rancherusernotifications", false, c.controllerFactory)
 }
 func (c *version) RkeAddon() RkeAddonController {
 	return NewRkeAddonController(schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "RkeAddon"}, "rkeaddons", true, c.controllerFactory)

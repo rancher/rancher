@@ -8,6 +8,7 @@ const (
 	AppType                      = "app"
 	AppFieldAnnotations          = "annotations"
 	AppFieldAnswers              = "answers"
+	AppFieldAnswersSetString     = "answersSetString"
 	AppFieldAppRevisionID        = "appRevisionId"
 	AppFieldAppliedFiles         = "appliedFiles"
 	AppFieldConditions           = "conditions"
@@ -19,6 +20,7 @@ const (
 	AppFieldHelmVersion          = "helmVersion"
 	AppFieldLabels               = "labels"
 	AppFieldLastAppliedTemplates = "lastAppliedTemplate"
+	AppFieldMaxRevisionCount     = "maxRevisionCount"
 	AppFieldMultiClusterAppID    = "multiClusterAppId"
 	AppFieldName                 = "name"
 	AppFieldNamespaceId          = "namespaceId"
@@ -41,6 +43,7 @@ type App struct {
 	types.Resource
 	Annotations          map[string]string `json:"annotations,omitempty" yaml:"annotations,omitempty"`
 	Answers              map[string]string `json:"answers,omitempty" yaml:"answers,omitempty"`
+	AnswersSetString     map[string]string `json:"answersSetString,omitempty" yaml:"answersSetString,omitempty"`
 	AppRevisionID        string            `json:"appRevisionId,omitempty" yaml:"appRevisionId,omitempty"`
 	AppliedFiles         map[string]string `json:"appliedFiles,omitempty" yaml:"appliedFiles,omitempty"`
 	Conditions           []AppCondition    `json:"conditions,omitempty" yaml:"conditions,omitempty"`
@@ -52,6 +55,7 @@ type App struct {
 	HelmVersion          string            `json:"helmVersion,omitempty" yaml:"helmVersion,omitempty"`
 	Labels               map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
 	LastAppliedTemplates string            `json:"lastAppliedTemplate,omitempty" yaml:"lastAppliedTemplate,omitempty"`
+	MaxRevisionCount     int64             `json:"maxRevisionCount,omitempty" yaml:"maxRevisionCount,omitempty"`
 	MultiClusterAppID    string            `json:"multiClusterAppId,omitempty" yaml:"multiClusterAppId,omitempty"`
 	Name                 string            `json:"name,omitempty" yaml:"name,omitempty"`
 	NamespaceId          string            `json:"namespaceId,omitempty" yaml:"namespaceId,omitempty"`

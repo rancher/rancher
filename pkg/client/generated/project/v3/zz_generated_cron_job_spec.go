@@ -4,6 +4,7 @@ const (
 	CronJobSpecType                               = "cronJobSpec"
 	CronJobSpecFieldActiveDeadlineSeconds         = "activeDeadlineSeconds"
 	CronJobSpecFieldAutomountServiceAccountToken  = "automountServiceAccountToken"
+	CronJobSpecFieldCompletionMode                = "completionMode"
 	CronJobSpecFieldContainers                    = "containers"
 	CronJobSpecFieldCronJobConfig                 = "cronJobConfig"
 	CronJobSpecFieldDNSConfig                     = "dnsConfig"
@@ -20,6 +21,7 @@ const (
 	CronJobSpecFieldHostname                      = "hostname"
 	CronJobSpecFieldImagePullSecrets              = "imagePullSecrets"
 	CronJobSpecFieldNodeID                        = "nodeId"
+	CronJobSpecFieldOS                            = "os"
 	CronJobSpecFieldObjectMeta                    = "metadata"
 	CronJobSpecFieldOverhead                      = "overhead"
 	CronJobSpecFieldPreemptionPolicy              = "preemptionPolicy"
@@ -47,6 +49,7 @@ const (
 type CronJobSpec struct {
 	ActiveDeadlineSeconds         *int64                         `json:"activeDeadlineSeconds,omitempty" yaml:"activeDeadlineSeconds,omitempty"`
 	AutomountServiceAccountToken  *bool                          `json:"automountServiceAccountToken,omitempty" yaml:"automountServiceAccountToken,omitempty"`
+	CompletionMode                string                         `json:"completionMode,omitempty" yaml:"completionMode,omitempty"`
 	Containers                    []Container                    `json:"containers,omitempty" yaml:"containers,omitempty"`
 	CronJobConfig                 *CronJobConfig                 `json:"cronJobConfig,omitempty" yaml:"cronJobConfig,omitempty"`
 	DNSConfig                     *PodDNSConfig                  `json:"dnsConfig,omitempty" yaml:"dnsConfig,omitempty"`
@@ -63,6 +66,7 @@ type CronJobSpec struct {
 	Hostname                      string                         `json:"hostname,omitempty" yaml:"hostname,omitempty"`
 	ImagePullSecrets              []LocalObjectReference         `json:"imagePullSecrets,omitempty" yaml:"imagePullSecrets,omitempty"`
 	NodeID                        string                         `json:"nodeId,omitempty" yaml:"nodeId,omitempty"`
+	OS                            *PodOS                         `json:"os,omitempty" yaml:"os,omitempty"`
 	ObjectMeta                    *ObjectMeta                    `json:"metadata,omitempty" yaml:"metadata,omitempty"`
 	Overhead                      map[string]string              `json:"overhead,omitempty" yaml:"overhead,omitempty"`
 	PreemptionPolicy              string                         `json:"preemptionPolicy,omitempty" yaml:"preemptionPolicy,omitempty"`

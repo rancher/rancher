@@ -3,16 +3,21 @@ package clustergc
 import (
 	"context"
 	"strings"
+	"time"
 
 	"github.com/rancher/norman/lifecycle"
 	"github.com/rancher/norman/resource"
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
+	"github.com/rancher/wrangler/pkg/generic"
+	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/dynamic"
 )
@@ -61,9 +66,39 @@ func cleanFinalizers(clusterName string, object *unstructured.Unstructured, dyna
 	return object, nil
 }
 
+func (c *gcLifecycle) waitForNodeRemoval(cluster *v3.Cluster) error {
+	if cluster.Status.Driver != v32.ClusterDriverRKE {
+		return nil // not an rke1 node, no need to pause
+	}
+
+	nodes, err := c.mgmt.Management.Nodes("").Controller().Lister().List(cluster.Name, labels.Everything())
+	if err != nil && !errors.IsNotFound(err) {
+		return err
+	}
+	var waitForNodeDelete bool
+	for _, n := range nodes {
+		// trigger the deletion of node for a custom cluster
+		if n.Status.NodeTemplateSpec == nil && n.DeletionTimestamp == nil {
+			_ = c.mgmt.Management.Nodes(n.Namespace).Delete(n.Name, &metav1.DeleteOptions{})
+			waitForNodeDelete = true
+		}
+	}
+	if waitForNodeDelete {
+		logrus.Debugf("[cluster-scoped-gc] custom cluster %s still has rke1 nodes, checking again in 15s", cluster.Name)
+		c.mgmt.Management.Clusters("").Controller().EnqueueAfter(cluster.Namespace, cluster.Name, 15*time.Second)
+		return generic.ErrSkip
+	}
+
+	return nil
+}
+
 // Remove check all objects that have had a cluster scoped finalizer added to them to ensure dangling finalizers do not
 // remain on objects that no longer have handlers associated with them
 func (c *gcLifecycle) Remove(cluster *v3.Cluster) (runtime.Object, error) {
+	if err := c.waitForNodeRemoval(cluster); err != nil {
+		return cluster, err // ErrSkip if we still need to wait
+	}
+
 	RESTconfig := c.mgmt.RESTConfig
 	// due to the large number of api calls, temporary raise the burst limit in order to reduce client throttling
 	RESTconfig.Burst = 25

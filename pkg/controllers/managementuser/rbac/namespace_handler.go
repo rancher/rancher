@@ -5,21 +5,22 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/apimachinery/pkg/runtime"
-
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/slice"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/resourcequota"
+	fleetconst "github.com/rancher/rancher/pkg/fleet"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	namespaceutil "github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/project"
+	projectpkg "github.com/rancher/rancher/pkg/project"
 	"github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 const (
@@ -87,6 +88,30 @@ func (n *nsLifecycle) Remove(obj *v1.Namespace) (runtime.Object, error) {
 }
 
 func (n *nsLifecycle) syncNS(obj *v1.Namespace) (bool, error) {
+	// add fleet namespace to system project
+	if IsFleetNamespace(obj) &&
+		// If this is the local cluster, then only move the namespace to ths system project if the projectIDAnnotation is
+		// empty or beings with "local" (i.e. not c-). If the projectIDAnnotation begins with something other than "local"
+		// then it is likely that local cluster is the tenant cluster in a hosted Rancher setup and the namespace belongs to
+		// the system project for the cluster in the host cluster. Moving it here would only cause the namespace to be
+		// continually moved between projects forever.
+		(n.m.clusterName != "local" || obj.Annotations[projectIDAnnotation] == "" || strings.HasPrefix(obj.Annotations[projectIDAnnotation], "local")) {
+
+		systemProjectName, err := n.GetSystemProjectName()
+		if err != nil {
+			return false, errors.Wrapf(err, "failed to add namespace %s to system project", obj.Name)
+		}
+
+		// When there is no system project, we should not set this annotation as a result because the project name
+		// is empty. If the annotation already exists, and there is no system project, then we need to delete the
+		// annotation.
+		if systemProjectName != "" {
+			obj.Annotations[projectIDAnnotation] = fmt.Sprintf("%v:%v", n.m.clusterName, systemProjectName)
+		} else {
+			delete(obj.Annotations, projectIDAnnotation)
+		}
+	}
+
 	hasPRTBs, err := n.ensurePRTBAddToNamespace(obj)
 	if err != nil {
 		return false, err
@@ -131,7 +156,29 @@ func (n *nsLifecycle) assignToInitialProject(ns *v1.Namespace) error {
 			}
 		}
 	}
+
 	return nil
+}
+
+func (n *nsLifecycle) GetSystemProjectName() (string, error) {
+	projects, err := n.m.projectLister.List(n.m.clusterName, initialProjectToLabels[projectpkg.System].AsSelector())
+	if err != nil {
+		return "", err
+	}
+	if len(projects) == 0 {
+		return "", nil
+	}
+	if len(projects) > 1 {
+		return "", fmt.Errorf("cluster [%s] contains more than 1 [%s] project", n.m.clusterName, projectpkg.System)
+	}
+	if projects[0] == nil {
+		return "", nil
+	}
+	return projects[0].Name, nil
+}
+
+func IsFleetNamespace(ns *v1.Namespace) bool {
+	return ns.Name == fleetconst.ClustersLocalNamespace || ns.Name == fleetconst.ClustersDefaultNamespace || ns.Name == fleetconst.ReleaseClustersNamespace || ns.Labels["fleet.cattle.io/managed"] == "true"
 }
 
 func (n *nsLifecycle) ensurePRTBAddToNamespace(ns *v1.Namespace) (bool, error) {
@@ -487,7 +534,9 @@ func updateStatusAnnotation(hasPRTBs bool, namespace *v1.Namespace, mgr *manager
 		if err == nil {
 			break
 		}
-		logrus.Warnf("error updating ns %v status: %v", ns.Name, err)
+		if !apierrors.IsConflict(err) {
+			logrus.Warnf("error updating ns %v status: %v", ns.Name, err)
+		}
 	}
 
 }

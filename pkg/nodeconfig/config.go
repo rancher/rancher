@@ -32,7 +32,7 @@ type NodeConfig struct {
 }
 
 func NewStore(namespaceInterface v1.NamespaceInterface, secretsGetter v1.SecretsGetter) (*encryptedstore.GenericEncryptedStore, error) {
-	return encryptedstore.NewGenericEncrypedStore("mc-", "", namespaceInterface, secretsGetter)
+	return encryptedstore.NewGenericEncryptedStore("mc-", "", namespaceInterface, secretsGetter)
 }
 
 func NewNodeConfig(store *encryptedstore.GenericEncryptedStore, node *v3.Node) (*NodeConfig, error) {
@@ -293,7 +293,7 @@ func (m *NodeConfig) getConfig() (map[string]interface{}, error) {
 		return nil, nil
 	}
 
-	return extractConfigJSON(data)
+	return ExtractConfigJSON(data)
 }
 
 func buildBaseHostDir(nodeName string, clusterID string) (string, string, error) {

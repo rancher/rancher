@@ -8,23 +8,48 @@ import (
 	"net"
 	"net/http"
 	"reflect"
+	"regexp"
+	"strings"
 
 	"github.com/rancher/rancher/pkg/auth/util"
+	"github.com/rancher/rancher/pkg/data/management"
 	"github.com/sirupsen/logrus"
 )
 
-func NewAuditLogMiddleware(auditWriter *LogWriter) func(http.Handler) http.Handler {
+func NewAuditLogMiddleware(auditWriter *LogWriter) (func(http.Handler) http.Handler, error) {
+	sensitiveRegex, err := constructKeyConcealRegex()
 	return func(next http.Handler) http.Handler {
 		return &auditHandler{
-			next:        next,
-			auditWriter: auditWriter,
+			next:            next,
+			auditWriter:     auditWriter,
+			sanitizingRegex: sensitiveRegex,
+		}
+	}, err
+}
+
+// constructKeyConcealRegex builds a regex for matching non-public fields from management.DriverData as well as fields that end with [pP]assword or [tT]oken.
+func constructKeyConcealRegex() (*regexp.Regexp, error) {
+	s := strings.Builder{}
+	s.WriteRune('(')
+	for _, v := range management.DriverData {
+		for key, value := range v {
+			if strings.HasPrefix(key, "public") || strings.HasPrefix(key, "optional") {
+				continue
+			}
+			for _, item := range value {
+				s.WriteString(item + "|")
+			}
 		}
 	}
+	s.WriteString(`[pP]assword|[tT]oken)`)
+
+	return regexp.Compile(s.String())
 }
 
 type auditHandler struct {
-	next        http.Handler
-	auditWriter *LogWriter
+	next            http.Handler
+	auditWriter     *LogWriter
+	sanitizingRegex *regexp.Regexp
 }
 
 func (h auditHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
@@ -38,7 +63,7 @@ func (h auditHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	context := context.WithValue(req.Context(), userKey, user)
 	req = req.WithContext(context)
 
-	auditLog, err := newAuditLog(h.auditWriter, req)
+	auditLog, err := newAuditLog(h.auditWriter, req, h.sanitizingRegex)
 	if err != nil {
 		util.ReturnHTTPError(rw, req, 500, err.Error())
 		return

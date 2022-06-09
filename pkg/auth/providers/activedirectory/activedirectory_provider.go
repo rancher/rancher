@@ -228,3 +228,14 @@ func (p *adProvider) getDNAndScopeFromPrincipalID(principalID string) (string, s
 	externalID := strings.TrimPrefix(parts[1], "//")
 	return externalID, scope, nil
 }
+
+func (p *adProvider) GetUserExtraAttributes(userPrincipal v3.Principal) map[string][]string {
+	extras := make(map[string][]string)
+	if userPrincipal.Name != "" {
+		extras[common.UserAttributePrincipalID] = []string{userPrincipal.Name}
+	}
+	if userPrincipal.LoginName != "" {
+		extras[common.UserAttributeUserName] = []string{userPrincipal.LoginName}
+	}
+	return extras
+}

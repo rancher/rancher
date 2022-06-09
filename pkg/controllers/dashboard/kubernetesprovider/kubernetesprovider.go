@@ -10,6 +10,10 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
+const (
+	providerKey = "provider.cattle.io"
+)
+
 type handler struct {
 	ctx                context.Context
 	clusters           v32.ClusterClient
@@ -32,7 +36,7 @@ func Register(ctx context.Context,
 }
 
 func (h *handler) OnChange(key string, cluster *v3.Cluster) (*v3.Cluster, error) {
-	if cluster == nil || cluster.Status.Provider != "" {
+	if cluster == nil || (cluster.Status.Provider != "" && cluster.Labels[providerKey] != "") {
 		// if cluster has windows enabled and provider is not rke.windows, continue to detect if it has windows nodes
 		if cluster == nil || !cluster.Spec.WindowsPreferedCluster || cluster.Status.Provider == "rke.windows" {
 			return cluster, nil
@@ -65,6 +69,10 @@ func (h *handler) OnChange(key string, cluster *v3.Cluster) (*v3.Cluster, error)
 		return cluster, err
 	}
 	cluster = cluster.DeepCopy()
+	if cluster.Labels == nil {
+		cluster.Labels = map[string]string{}
+	}
+	cluster.Labels[providerKey] = provider
 	cluster.Status.Provider = provider
 	return h.clusters.Update(cluster)
 }

@@ -41,6 +41,7 @@ type Engine struct {
 	JenkinsClient    *Client
 	HTTPClient       *http.Client
 	ServiceLister    v1.ServiceLister
+	Services         v1.ServiceInterface
 	PodLister        v1.PodLister
 	DeploymentLister appsv1.DeploymentLister
 
@@ -57,10 +58,21 @@ type Engine struct {
 }
 
 func (j *Engine) getJenkinsURL(execution *v3.PipelineExecution) (string, error) {
-	ns := utils.GetPipelineCommonName(execution.Spec.ProjectName)
-	service, err := j.ServiceLister.Get(ns, utils.JenkinsName)
-	if err != nil {
-		return "", err
+	var (
+		ns      = utils.GetPipelineCommonName(execution.Spec.ProjectName)
+		err     error
+		service *corev1.Service
+	)
+	if j.UseCache {
+		service, err = j.ServiceLister.Get(ns, utils.JenkinsName)
+		if err != nil {
+			return "", err
+		}
+	} else {
+		service, err = j.Services.GetNamespaced(ns, utils.JenkinsName, metav1.GetOptions{})
+		if err != nil {
+			return "", err
+		}
 	}
 	ip := service.Spec.ClusterIP
 	return fmt.Sprintf("http://%s:%d", ip, utils.JenkinsPort), nil
@@ -161,11 +173,11 @@ func (j *Engine) RunPipelineExecution(execution *v3.PipelineExecution) error {
 }
 
 func (j *Engine) preparePipeline(execution *v3.PipelineExecution) error {
+	var registry string
 	for _, stage := range execution.Spec.PipelineConfig.Stages {
 		for _, step := range stage.Steps {
 			if step.PublishImageConfig != nil {
 				//prepare docker credential for publishimage step
-				registry := utils.DefaultRegistry
 				if step.PublishImageConfig.PushRemote && step.PublishImageConfig.Registry != "" {
 					registry = step.PublishImageConfig.Registry
 				} else {
@@ -454,10 +466,7 @@ func (j *Engine) successStep(execution *v3.PipelineExecution, stage int, step in
 		}
 	}
 
-	if err := j.saveStepLogToMinio(execution, stage, step); err != nil {
-		return err
-	}
-	return nil
+	return j.saveStepLogToMinio(execution, stage, step)
 }
 
 func (j *Engine) failStep(execution *v3.PipelineExecution, stage int, step int, jenkinsStage Stage) error {

@@ -9,7 +9,7 @@ import (
 	v3 "github.com/rancher/rke/types"
 	"gopkg.in/yaml.v2"
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/api/rbac/v1beta1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -47,11 +47,11 @@ func GenerateServiceAccountToken(clientset kubernetes.Interface) (string, error)
 		return "", fmt.Errorf("error creating service account: %v", err)
 	}
 
-	adminRole := &v1beta1.ClusterRole{
+	adminRole := &rbacv1.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: clusterAdmin,
 		},
-		Rules: []v1beta1.PolicyRule{
+		Rules: []rbacv1.PolicyRule{
 			{
 				APIGroups: []string{"*"},
 				Resources: []string{"*"},
@@ -63,19 +63,19 @@ func GenerateServiceAccountToken(clientset kubernetes.Interface) (string, error)
 			},
 		},
 	}
-	clusterAdminRole, err := clientset.RbacV1beta1().ClusterRoles().Get(context.TODO(), clusterAdmin, metav1.GetOptions{})
+	clusterAdminRole, err := clientset.RbacV1().ClusterRoles().Get(context.TODO(), clusterAdmin, metav1.GetOptions{})
 	if err != nil {
-		clusterAdminRole, err = clientset.RbacV1beta1().ClusterRoles().Create(context.TODO(), adminRole, metav1.CreateOptions{})
+		clusterAdminRole, err = clientset.RbacV1().ClusterRoles().Create(context.TODO(), adminRole, metav1.CreateOptions{})
 		if err != nil {
 			return "", fmt.Errorf("error creating admin role: %v", err)
 		}
 	}
 
-	clusterRoleBinding := &v1beta1.ClusterRoleBinding{
+	clusterRoleBinding := &rbacv1.ClusterRoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: newClusterRoleBindingName,
 		},
-		Subjects: []v1beta1.Subject{
+		Subjects: []rbacv1.Subject{
 			{
 				Kind:      "ServiceAccount",
 				Name:      serviceAccount.Name,
@@ -83,13 +83,13 @@ func GenerateServiceAccountToken(clientset kubernetes.Interface) (string, error)
 				APIGroup:  v1.GroupName,
 			},
 		},
-		RoleRef: v1beta1.RoleRef{
+		RoleRef: rbacv1.RoleRef{
 			Kind:     "ClusterRole",
 			Name:     clusterAdminRole.Name,
-			APIGroup: v1beta1.GroupName,
+			APIGroup: rbacv1.GroupName,
 		},
 	}
-	if _, err = clientset.RbacV1beta1().ClusterRoleBindings().Create(context.TODO(), clusterRoleBinding, metav1.CreateOptions{}); err != nil && !errors.IsAlreadyExists(err) {
+	if _, err = clientset.RbacV1().ClusterRoleBindings().Create(context.TODO(), clusterRoleBinding, metav1.CreateOptions{}); err != nil && !errors.IsAlreadyExists(err) {
 		return "", fmt.Errorf("error creating role bindings: %v", err)
 	}
 
@@ -125,9 +125,9 @@ func DeleteLegacyServiceAccountAndRoleBinding(clientset kubernetes.Interface) er
 		}
 	}
 
-	_, err = clientset.RbacV1beta1().ClusterRoleBindings().Get(context.TODO(), oldClusterRoleBindingName, metav1.GetOptions{})
+	_, err = clientset.RbacV1().ClusterRoleBindings().Get(context.TODO(), oldClusterRoleBindingName, metav1.GetOptions{})
 	if !errors.IsNotFound(err) {
-		err = clientset.RbacV1beta1().ClusterRoleBindings().Delete(context.TODO(), oldClusterRoleBindingName, metav1.DeleteOptions{})
+		err = clientset.RbacV1().ClusterRoleBindings().Delete(context.TODO(), oldClusterRoleBindingName, metav1.DeleteOptions{})
 		if err != nil {
 			return err
 		}

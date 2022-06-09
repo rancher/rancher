@@ -27,7 +27,7 @@ node {
   def LINUX_PYTEST_OPTIONS = "-k \"" + TESTS_TO_RUN.join(" or ") +"\""
   def PYTEST_OPTIONS = LINUX_PYTEST_OPTIONS
 
-  def branch = "master"
+  def branch = "release/v2.6"
   if ("${env.branch}" != "null" && "${env.branch}" != "") {
     branch = "${env.branch}"
   }

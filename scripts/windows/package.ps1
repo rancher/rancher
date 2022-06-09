@@ -33,6 +33,7 @@ $RELEASE_ID = $env:RELEASE_ID
 if (-not $RELEASE_ID) {
     $RELEASE_ID = $HOST_RELEASE_ID
 }
+
 $AGENT_IMAGE = ('{0}/rancher-agent:{1}-windows-{2}' -f $REPO, $TAG, $RELEASE_ID)
 
 $ARCH = $env:ARCH

@@ -11,6 +11,7 @@ import (
 	"github.com/rancher/norman/types"
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/user"
 	"github.com/sirupsen/logrus"
@@ -107,6 +108,20 @@ func HashPasswordString(password string) (string, error) {
 }
 
 func (s *userStore) Create(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}) (map[string]interface{}, error) {
+	username, ok := data[client.UserFieldUsername].(string)
+	if !ok {
+		return nil, errors.New("invalid username")
+	}
+
+	password, ok := data[client.UserFieldPassword].(string)
+	if !ok {
+		return nil, errors.New("invalid password")
+	}
+
+	if err := validatePassword(username, password, settings.PasswordMinLength.GetInt()); err != nil {
+		return nil, httperror.NewAPIError(httperror.InvalidBodyContent, err.Error())
+	}
+
 	if err := hashPassword(data); err != nil {
 		return nil, err
 	}

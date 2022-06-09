@@ -3,11 +3,10 @@ package cluster
 import (
 	"strings"
 
-	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/values"
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	managementschema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
@@ -20,6 +19,7 @@ import (
 type Formatter struct {
 	KontainerDriverLister     v3.KontainerDriverLister
 	nodeLister                v3.NodeLister
+	clusterLister             v3.ClusterLister
 	clusterSpecPwdFields      map[string]interface{}
 	SubjectAccessReviewClient v1.SubjectAccessReviewInterface
 }
@@ -28,26 +28,11 @@ func NewFormatter(schemas *types.Schemas, managementContext *config.ScaledContex
 	clusterFormatter := Formatter{
 		KontainerDriverLister:     managementContext.Management.KontainerDrivers("").Controller().Lister(),
 		nodeLister:                managementContext.Management.Nodes("").Controller().Lister(),
+		clusterLister:             managementContext.Management.Clusters("").Controller().Lister(),
 		clusterSpecPwdFields:      gatherClusterSpecPwdFields(schemas, schemas.Schema(&managementschema.Version, client.ClusterSpecBaseType)),
 		SubjectAccessReviewClient: managementContext.K8sClient.AuthorizationV1().SubjectAccessReviews(),
 	}
 	return &clusterFormatter
-}
-
-func canUserUpdateCluster(request *types.APIContext, resource *types.RawResource) bool {
-	if request == nil || resource == nil {
-		return false
-	}
-	cluster := map[string]interface{}{
-		"id": resource.ID,
-	}
-	return request.AccessControl.CanDo(
-		v3.ClusterGroupVersionKind.Group,
-		v3.ClusterResource.Name,
-		"update",
-		request,
-		cluster,
-		resource.Schema) == nil
 }
 
 func (f *Formatter) Formatter(request *types.APIContext, resource *types.RawResource) {
@@ -60,14 +45,44 @@ func (f *Formatter) Formatter(request *types.APIContext, resource *types.RawReso
 	resource.Links["shell"] = shellLink
 	resource.AddAction(request, v32.ClusterActionGenerateKubeconfig)
 	resource.AddAction(request, v32.ClusterActionImportYaml)
+
+	// If user has permissions to update the cluster (regardless of RKE1 or not)
+	if canUpdateClusterWithValues(request, resource.Values) {
+		if convert.ToBool(resource.Values["enableClusterMonitoring"]) {
+			resource.AddAction(request, v32.ClusterActionDisableMonitoring)
+			resource.AddAction(request, v32.ClusterActionEditMonitoring)
+		} else {
+			resource.AddAction(request, v32.ClusterActionEnableMonitoring)
+		}
+	}
+
+	// If this is an RKE1 cluster only
 	if _, ok := resource.Values["rancherKubernetesEngineConfig"]; ok {
 		resource.AddAction(request, v32.ClusterActionExportYaml)
-		resource.AddAction(request, v32.ClusterActionRotateCertificates)
-		resource.AddAction(request, v32.ClusterActionRotateEncryptionKey)
-		if _, ok := values.GetValue(resource.Values, "rancherKubernetesEngineConfig", "services", "etcd", "backupConfig"); ok {
+
+		// If a user has the backupetcd role/privilege, add it- In this case, the resource is the cluster, so use
+		// the ID as the namespace for the ETCD check since that's where the backups live
+		if _, ok := values.GetValue(resource.Values, "rancherKubernetesEngineConfig", "services", "etcd", "backupConfig"); ok && canBackupEtcd(request, resource.ID) {
 			resource.AddAction(request, v32.ClusterActionBackupEtcd)
-			resource.AddAction(request, v32.ClusterActionRestoreFromEtcdBackup)
 		}
+
+		// If user has permissions to update the cluster
+		if canUpdateClusterWithValues(request, resource.Values) {
+			if _, ok := values.GetValue(resource.Values, "rancherKubernetesEngineConfig", "services", "etcd", "backupConfig"); ok {
+				resource.AddAction(request, v32.ClusterActionRestoreFromEtcdBackup)
+			}
+			resource.AddAction(request, v32.ClusterActionRotateCertificates)
+			if rotateEncryptionKeyEnabled(f.clusterLister, resource.ID) {
+				resource.AddAction(request, v32.ClusterActionRotateEncryptionKey)
+			}
+
+			if val, ok := values.GetValue(resource.Values, "clusterTemplateRevisionId"); ok && val == nil {
+				if err := request.AccessControl.CanDo(v3.ClusterTemplateGroupVersionKind.Group, v3.ClusterTemplateResource.Name, "create", request, resource.Values, request.Schema); err == nil {
+					resource.AddAction(request, v32.ClusterActionSaveAsTemplate)
+				}
+			}
+		}
+
 		isActiveCluster := false
 		if resource.Values["state"] == "active" {
 			isActiveCluster = true
@@ -77,26 +92,10 @@ func (f *Formatter) Formatter(request *types.APIContext, resource *types.RawReso
 			isWindowsCluster = true
 		}
 		if isActiveCluster && !isWindowsCluster {
-			canUpdateCluster := canUserUpdateCluster(request, resource)
+			canUpdateCluster := canUpdateCluster(request)
 			logrus.Debugf("isActiveCluster: %v isWindowsCluster: %v user: %v, canUpdateCluster: %v", isActiveCluster, isWindowsCluster, request.Request.Header.Get("Impersonate-User"), canUpdateCluster)
 			if canUpdateCluster {
 				resource.AddAction(request, v32.ClusterActionRunSecurityScan)
-			}
-		}
-	}
-
-	if err := request.AccessControl.CanDo(v3.ClusterGroupVersionKind.Group, v3.ClusterResource.Name, "update", request, resource.Values, request.Schema); err == nil {
-		if convert.ToBool(resource.Values["enableClusterMonitoring"]) {
-			resource.AddAction(request, v32.ClusterActionDisableMonitoring)
-			resource.AddAction(request, v32.ClusterActionEditMonitoring)
-		} else {
-			resource.AddAction(request, v32.ClusterActionEnableMonitoring)
-		}
-		if _, ok := resource.Values["rancherKubernetesEngineConfig"]; ok {
-			if val, ok := values.GetValue(resource.Values, "clusterTemplateRevisionId"); ok && val == nil {
-				if err := request.AccessControl.CanDo(v3.ClusterTemplateGroupVersionKind.Group, v3.ClusterTemplateResource.Name, "create", request, resource.Values, request.Schema); err == nil {
-					resource.AddAction(request, v32.ClusterActionSaveAsTemplate)
-				}
 			}
 		}
 	}
@@ -105,7 +104,7 @@ func (f *Formatter) Formatter(request *types.APIContext, resource *types.RawReso
 		resource.AddAction(request, v32.ClusterActionViewMonitoring)
 	}
 
-	if gkeConfig, ok := resource.Values["googleKubernetesEngineConfig"]; ok {
+	if gkeConfig, ok := resource.Values["googleKubernetesEngineConfig"]; ok && gkeConfig != nil {
 		configMap, ok := gkeConfig.(map[string]interface{})
 		if !ok {
 			logrus.Errorf("could not convert gke config to map")
@@ -119,7 +118,7 @@ func (f *Formatter) Formatter(request *types.APIContext, resource *types.RawReso
 		setTrueIfNil(configMap, "enableNetworkPolicyConfig")
 	}
 
-	if eksConfig, ok := resource.Values["amazonElasticContainerServiceConfig"]; ok {
+	if eksConfig, ok := resource.Values["amazonElasticContainerServiceConfig"]; ok && eksConfig != nil {
 		configMap, ok := eksConfig.(map[string]interface{})
 		if !ok {
 			logrus.Errorf("could not convert eks config to map")
@@ -155,6 +154,24 @@ func (f *Formatter) Formatter(request *types.APIContext, resource *types.RawReso
 	} else {
 		resource.Values["nodeCount"] = len(nodes)
 	}
+}
+
+// rotateEncryptionKeyEnabled returns true if the rotateEncryptionKey action should be enabled in the API view, otherwise, it returns false.
+func rotateEncryptionKeyEnabled(clusterLister v3.ClusterLister, clusterName string) bool {
+	cluster, err := clusterLister.Get("", clusterName)
+	if err != nil {
+		return false
+	}
+
+	// check that encryption is enabled on cluster
+	if cluster.Spec.RancherKubernetesEngineConfig == nil ||
+		cluster.Spec.RancherKubernetesEngineConfig.Services.KubeAPI.SecretsEncryptionConfig == nil ||
+		!cluster.Spec.RancherKubernetesEngineConfig.Services.KubeAPI.SecretsEncryptionConfig.Enabled {
+		return false
+	}
+
+	// Cluster should not be in updating
+	return v32.ClusterConditionUpdated.IsTrue(cluster)
 }
 
 func setTrueIfNil(configMap map[string]interface{}, fieldName string) {

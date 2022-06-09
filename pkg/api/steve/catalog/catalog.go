@@ -20,7 +20,7 @@ import (
 func Register(ctx context.Context, server *steve.Server,
 	helmop *helmop.Operations,
 	contentManager *content.Manager) error {
-	ops := newOperation(helmop)
+	ops := newOperation(helmop, server.ClusterRegistry)
 	server.ClusterCache.OnAdd(ctx, ops.OnAdd)
 	server.ClusterCache.OnChange(ctx, ops.OnChange)
 

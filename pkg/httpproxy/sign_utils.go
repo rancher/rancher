@@ -4,11 +4,11 @@ import (
 	"fmt"
 	"strings"
 
-	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	"github.com/rancher/rancher/pkg/namespace"
+	"github.com/rancher/wrangler/pkg/kv"
 )
 
-func getAuthData(auth string, secrets v1.SecretInterface, fields []string) (map[string]string, map[string]string, error) {
+func getAuthData(auth string, secrets SecretGetter, fields []string) (map[string]string, map[string]string, error) {
 	data := getRequestParams(auth)
 	if !requiredFieldsExist(data, fields) {
 		return data, nil, fmt.Errorf("required fields %s not set", fields)
@@ -44,12 +44,17 @@ func requiredFieldsExist(data map[string]string, fields []string) bool {
 	return true
 }
 
-func getCredential(credentialID string, credentials v1.SecretInterface) (map[string]string, error) {
-	split := strings.SplitN(credentialID, ":", 2)
-	if len(split) != 2 || split[0] == "" || split[1] == "" {
-		return nil, fmt.Errorf("invalid credential id %s", credentialID)
+func getCredential(credentialID string, credentials SecretGetter) (map[string]string, error) {
+	ns, name := kv.Split(credentialID, "/")
+	if name == "" {
+		split := strings.SplitN(credentialID, ":", 2)
+		if len(split) != 2 || split[0] == "" || split[1] == "" {
+			return nil, fmt.Errorf("invalid credential id %s", credentialID)
+		}
+		ns = namespace.GlobalNamespace
+		name = split[1]
 	}
-	cred, err := credentials.Controller().Lister().Get(namespace.GlobalNamespace, split[1])
+	cred, err := credentials(ns, name)
 	if err != nil {
 		return nil, err
 	}
@@ -58,6 +63,8 @@ func getCredential(credentialID string, credentials v1.SecretInterface) (map[str
 		splitKeys := strings.Split(key, "-")
 		if len(splitKeys) == 2 && strings.HasSuffix(splitKeys[0], "Config") {
 			ans[splitKeys[1]] = string(val)
+		} else {
+			ans[key] = string(val)
 		}
 	}
 	return ans, nil

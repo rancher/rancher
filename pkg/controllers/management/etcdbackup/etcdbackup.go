@@ -11,25 +11,26 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"sort"
 	"strings"
 	"time"
 
+	"github.com/minio/minio-go/v7"
+	"github.com/minio/minio-go/v7/pkg/credentials"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-
-	rketypes "github.com/rancher/rke/types"
-
-	minio "github.com/minio/minio-go"
-	"github.com/minio/minio-go/pkg/credentials"
 	"github.com/rancher/rancher/pkg/controllers/management/clusterprovisioner"
+	"github.com/rancher/rancher/pkg/controllers/management/secretmigrator"
+	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/kontainer-engine/drivers/rke"
 	"github.com/rancher/rancher/pkg/kontainer-engine/service"
 	"github.com/rancher/rancher/pkg/rkedialerfactory"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/types/config/dialer"
+	rkecluster "github.com/rancher/rke/cluster"
+	rketypes "github.com/rancher/rke/types"
 	"github.com/rancher/wrangler/pkg/ticker"
-	"github.com/sirupsen/logrus"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	log "github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -50,6 +51,7 @@ type Controller struct {
 	backupLister          v3.EtcdBackupLister
 	backupDriver          *service.EngineService
 	KontainerDriverLister v3.KontainerDriverLister
+	secretLister          v1.SecretLister
 }
 
 func Register(ctx context.Context, management *config.ManagementContext) {
@@ -60,6 +62,7 @@ func Register(ctx context.Context, management *config.ManagementContext) {
 		backupClient:          management.Management.EtcdBackups(""),
 		backupLister:          management.Management.EtcdBackups("").Controller().Lister(),
 		backupDriver:          service.NewEngineService(clusterprovisioner.NewPersistentStore(management.Core.Namespaces(""), management.Core)),
+		secretLister:          management.Core.Secrets("").Controller().Lister(),
 		KontainerDriverLister: management.Management.KontainerDrivers("").Controller().Lister(),
 	}
 
@@ -96,7 +99,178 @@ func (c *Controller) Create(b *v3.EtcdBackup) (runtime.Object, error) {
 		return b, fmt.Errorf("[etcd-backup] cluster doesn't have a backup config")
 	}
 
+	rketypes.BackupConditionCreated.Unknown(b)
+	b, err = c.backupClient.Update(b)
+	if err != nil {
+		return b, err
+	}
+
+	log.Infof("[etcd-backup] cluster [%s] backup added to queue: %s", cluster.Name, b.Name)
+
+	backups, err := c.getBackupsList(cluster)
+	if err != nil {
+		return b, err
+	}
+
+	if anyBackupsRunning(cluster, backups) {
+		return b, nil
+	}
+
+	if next := nextBackup(backups); next == nil || next.Name == b.Name {
+		bObj, err := c.createBackupForCluster(b, cluster)
+		if err != nil {
+			return bObj, fmt.Errorf("[etcd-backup] failed to perform etcd backup: %v", err)
+		}
+		return bObj, nil
+	}
+
+	return b, nil
+}
+
+func (c *Controller) Remove(b *v3.EtcdBackup) (runtime.Object, error) {
 	if !rketypes.BackupConditionCreated.IsTrue(b) {
+		return b, nil
+	}
+	log.Debugf("[etcd-backup] deleting backup %s ", b.Name)
+	if err := c.etcdRemoveSnapshotWithBackoff(b); err != nil {
+		log.Errorf("[etcd-backup] unable to delete backup backup [%s]: %v", b.Name, err)
+	}
+	return b, nil
+}
+
+func (c *Controller) Updated(b *v3.EtcdBackup) (runtime.Object, error) {
+	return b, nil
+}
+
+func (c *Controller) clusterBackupSync(ctx context.Context, interval time.Duration) error {
+	for range ticker.Context(ctx, interval) {
+		clusters, err := c.clusterLister.List("", labels.NewSelector())
+		if err != nil {
+			log.Error(fmt.Errorf("[etcd-backup] error while listing clusters: %v", err))
+			return err
+		}
+		for _, cluster := range clusters {
+			log.Debugf("[etcd-backup] checking backups for cluster [%s]", cluster.Name)
+			if err = c.runWaitingBackups(cluster); err != nil {
+				log.Error(fmt.Errorf("[etcd-backup] error running waiting cluster backups for cluster [%s]: %v", cluster.Name, err))
+			}
+			if err = c.createRecurringBackup(cluster); err != nil {
+				log.Error(fmt.Errorf("[etcd-backup] error while syncing cluster backups for for cluster [%s]: %v", cluster.Name, err))
+			}
+		}
+	}
+	return nil
+}
+
+type FilterFunc = func(backup *v3.EtcdBackup) bool
+
+// filterBackups will test each backup within backups to determine if the filter validates (i.e. returns true) for the
+// given backup. If any filter is false, the backup is considered invalid.
+func filterBackups(backups []*v3.EtcdBackup, filter ...FilterFunc) []*v3.EtcdBackup {
+	ret := make([]*v3.EtcdBackup, 0)
+OUTER:
+	for _, backup := range backups {
+		for _, f := range filter {
+			if !f(backup) {
+				continue OUTER
+			}
+		}
+		ret = append(ret, backup)
+	}
+	return ret
+}
+
+func (c *Controller) runWaitingBackups(cluster *v3.Cluster) error {
+	if cluster == nil || cluster.DeletionTimestamp != nil {
+		return nil
+	}
+	// check if the cluster is eligible for backup.
+	if !shouldBackup(cluster) {
+		return nil
+	}
+
+	backups, err := c.getBackupsList(cluster)
+	if err != nil {
+		return err
+	}
+
+	if anyBackupsRunning(cluster, backups) {
+		return nil
+	}
+
+	var next *v3.EtcdBackup
+	if next = nextBackup(backups); next != nil {
+		log.Infof("[etcd-backup] cluster [%s] backup starting from queue: %s", cluster.Name, next.Name)
+		if _, err := c.createBackupForCluster(next, cluster); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (c *Controller) createRecurringBackup(cluster *v3.Cluster) error {
+	if cluster == nil || cluster.DeletionTimestamp != nil {
+		return nil
+	}
+	// check if the cluster is eligible for backup.
+	if !shouldBackup(cluster) {
+		return nil
+	}
+
+	backups, err := c.getBackupsList(cluster)
+	if err != nil {
+		return err
+	}
+
+	recurringBackups := filterBackups(backups, IsBackupRecurring)
+	chronologicalSort(recurringBackups)
+
+	// cluster has no recurring backups, we need to create initial backup
+	if len(recurringBackups) == 0 {
+		log.Debugf("[etcd-backup] cluster [%s] has no backups, creating first backup", cluster.Name)
+		newBackup, err := c.createNewBackup(cluster)
+		if err != nil {
+			return fmt.Errorf("error while creating backup for cluster [%s]: %v", cluster.Name, err)
+		}
+		log.Debugf("[etcd-backup] cluster [%s] new backup is created: %s", cluster.Name, newBackup.Name)
+		return nil
+	}
+
+	if anyBackupsRunning(cluster, recurringBackups) || anyBackupsQueued(recurringBackups) {
+		return nil
+	}
+
+	newestBackup := recurringBackups[0]
+	for _, clusterBackup := range recurringBackups[1:] {
+		if getBackupCompletedTime(clusterBackup).After(getBackupCompletedTime(newestBackup)) {
+			newestBackup = clusterBackup
+		}
+	}
+
+	// this cluster has backups, lets see if the last one is old enough
+	// a new backup is due if this is true
+	intervalHours := cluster.Spec.RancherKubernetesEngineConfig.Services.Etcd.BackupConfig.IntervalHours
+	backupIntervalHours := time.Duration(intervalHours) * time.Hour
+
+	if time.Since(getBackupCompletedTime(newestBackup)) > backupIntervalHours {
+		newBackup, err := c.createNewBackup(cluster)
+		if err != nil {
+			return fmt.Errorf("error while create new backup for cluster [%s]: %v", cluster.Name, err)
+		}
+		log.Debugf("[etcd-backup] new backup created: %s", newBackup.Name)
+	}
+
+	return nil
+}
+
+func IsBackupRecurring(backup *v3.EtcdBackup) bool {
+	return !backup.Spec.Manual
+}
+
+func (c *Controller) createBackupForCluster(b *v3.EtcdBackup, cluster *v3.Cluster) (runtime.Object, error) {
+	var err error
+	if b.DeletionTimestamp != nil || rketypes.BackupConditionCreated.IsUnknown(b) {
 		b.Spec.Filename = generateBackupFilename(b.Name, cluster.Spec.RancherKubernetesEngineConfig.Services.Etcd.BackupConfig)
 		b.Spec.BackupConfig = *cluster.Spec.RancherKubernetesEngineConfig.Services.Etcd.BackupConfig
 		rketypes.BackupConditionCreated.True(b)
@@ -114,87 +288,65 @@ func (c *Controller) Create(b *v3.EtcdBackup) (runtime.Object, error) {
 	}
 
 	if saveErr != nil {
-		return b, fmt.Errorf("[etcd-backup] failed to perform etcd backup: %v", saveErr)
+		if !b.Spec.Manual {
+			_ = c.rotateFailedBackups(cluster)
+		}
+		return b, fmt.Errorf("failed to perform etcd backup: %v", saveErr)
+	}
+
+	if !b.Spec.Manual {
+		_ = c.rotateSuccessfulBackups(cluster)
 	}
 	return b, nil
 }
 
-func (c *Controller) Remove(b *v3.EtcdBackup) (runtime.Object, error) {
-	logrus.Infof("[etcd-backup] Deleting backup %s ", b.Name)
-	if err := c.etcdRemoveSnapshotWithBackoff(b); err != nil {
-		logrus.Warnf("giving up on deleting backup [%s]: %v", b.Name, err)
+func anyBackupsRunning(cluster *v3.Cluster, backups []*v3.EtcdBackup) bool {
+	clusterTimeout := getTimeout(cluster)
+	for _, backup := range backups {
+		if !rketypes.BackupConditionCreated.IsTrue(backup) {
+			continue
+		}
+		// cluster backup is younger than its timeout and completion is unknown
+		// therefore, it's currently running
+		if time.Since(getBackupCreatedTime(backup)) < clusterTimeout && rketypes.BackupConditionCompleted.IsUnknown(backup) {
+			log.Debugf("[etcd-backup] cluster [%s] is currently creating a backup, skipping", cluster.Name)
+			return true
+		}
 	}
-	return b, nil
+	return false
 }
 
-func (c *Controller) Updated(b *v3.EtcdBackup) (runtime.Object, error) {
-	return b, nil
+func anyBackupsQueued(backups []*v3.EtcdBackup) bool {
+	for _, backup := range backups {
+		if rketypes.BackupConditionCreated.IsTrue(backup) &&
+			!rketypes.BackupConditionCompleted.IsTrue(backup) &&
+			!rketypes.BackupConditionCompleted.IsFalse(backup) {
+			return true
+		}
+	}
+	return false
 }
 
-func (c *Controller) clusterBackupSync(ctx context.Context, interval time.Duration) error {
-	for range ticker.Context(ctx, interval) {
-		clusters, err := c.clusterLister.List("", labels.NewSelector())
-		if err != nil {
-			logrus.Error(fmt.Errorf("[etcd-backup] clusterBackupSync faild: %v", err))
-			return err
-		}
-		for _, cluster := range clusters {
-			logrus.Debugf("[etcd-backup] Checking backups for cluster: %s", cluster.Name)
-			if err := c.doClusterBackupSync(cluster); err != nil && !apierrors.IsConflict(err) {
-				logrus.Error(fmt.Errorf("[etcd-backup] clusterBackupSync faild: %v", err))
-			}
-		}
+func getTimeout(cluster *v3.Cluster) time.Duration {
+	if rkeCfg := cluster.Spec.RancherKubernetesEngineConfig; rkeCfg != nil && rkeCfg.Services.Etcd.BackupConfig.Timeout > 0 {
+		return time.Duration(rkeCfg.Services.Etcd.BackupConfig.Timeout) * time.Second
 	}
-	return nil
+	return time.Duration(rkecluster.DefaultEtcdBackupConfigTimeout) * time.Second
 }
 
-func (c *Controller) doClusterBackupSync(cluster *v3.Cluster) error {
-	if cluster == nil || cluster.DeletionTimestamp != nil {
-		return nil
-	}
-	// check if the cluster is eligible for backup.
-	if !shouldBackup(cluster) {
-		return nil
-	}
+func nextBackup(backups []*v3.EtcdBackup) *v3.EtcdBackup {
+	var next *v3.EtcdBackup
 
-	clusterBackups, err := c.getRecuringBackupsList(cluster)
-	if err != nil {
-		return err
-	}
-
-	// cluster has no backups, we need to kick a new one.
-	if len(clusterBackups) == 0 {
-		logrus.Infof("[etcd-backup] Cluster [%s] has no backups, creating first backup", cluster.Name)
-		newBackup, err := c.createNewBackup(cluster)
-		if err != nil {
-			return fmt.Errorf("[etcd-backup] Backup create failed:%v", err)
+	// check for backups in queue
+	for _, backup := range backups {
+		if !rketypes.BackupConditionCreated.IsUnknown(backup) {
+			continue
 		}
-		logrus.Infof("[etcd-backup] Cluster [%s] new backup is created: %s", cluster.Name, newBackup.Name)
-		return nil
-	}
-
-	newestBackup := clusterBackups[0]
-	for _, clusterBackup := range clusterBackups[1:] {
-		if getBackupCompletedTime(clusterBackup).After(getBackupCompletedTime(newestBackup)) {
-			newestBackup = clusterBackup
+		if next == nil || backup.CreationTimestamp.Time.Before(next.CreationTimestamp.Time) {
+			next = backup
 		}
 	}
-
-	// this cluster has backups, lets see if the last one is old enough
-	// a new backup is due if this is true
-	intervalHours := cluster.Spec.RancherKubernetesEngineConfig.Services.Etcd.BackupConfig.IntervalHours
-	backupIntervalHours := time.Duration(intervalHours) * time.Hour
-
-	if time.Since(getBackupCompletedTime(newestBackup)) > backupIntervalHours {
-		newBackup, err := c.createNewBackup(cluster)
-		if err != nil {
-			return fmt.Errorf("[etcd-backup] Backup create failed:%v", err)
-		}
-		logrus.Infof("[etcd-backup] New backup created: %s", newBackup.Name)
-	}
-
-	// rotate old backups
-	return c.rotateExpiredBackups(cluster, clusterBackups)
+	return next
 }
 
 func (c *Controller) createNewBackup(cluster *v3.Cluster) (*v3.EtcdBackup, error) {
@@ -204,7 +356,6 @@ func (c *Controller) createNewBackup(cluster *v3.Cluster) (*v3.EtcdBackup, error
 	}
 	rketypes.BackupConditionCreated.CreateUnknownIfNotExists(newBackup)
 	return c.backupClient.Create(newBackup)
-
 }
 
 func (c *Controller) etcdSaveWithBackoff(b *v3.EtcdBackup) (runtime.Object, error) {
@@ -220,15 +371,23 @@ func (c *Controller) etcdSaveWithBackoff(b *v3.EtcdBackup) (runtime.Object, erro
 		if err != nil {
 			return b, err
 		}
+		cluster.Spec.RancherKubernetesEngineConfig.Services.Etcd.BackupConfig = b.Spec.BackupConfig.DeepCopy()
+		spec := *cluster.Spec.DeepCopy()
+		spec, err = secretmigrator.AssembleS3Credential(cluster.Status.S3CredentialSecret, secretmigrator.ClusterType, cluster.Name, spec, c.secretLister)
+		if err != nil {
+			return b, err
+		}
 		var inErr error
 		err = wait.ExponentialBackoff(backoff, func() (bool, error) {
-			if inErr = c.backupDriver.ETCDSave(c.ctx, cluster.Name, kontainerDriver, cluster.Spec, snapshotName); inErr != nil {
-				logrus.Warnf("%v", inErr)
+			if inErr = c.backupDriver.ETCDSave(c.ctx, cluster.Name, kontainerDriver, spec, snapshotName); inErr != nil {
+				log.Warnf("%v", inErr)
 				return false, nil
 			}
 			return true, nil
 		})
-
+		if err != nil {
+			return b, err
+		}
 		return b, inErr
 	})
 	if err != nil {
@@ -250,24 +409,60 @@ func (c *Controller) etcdRemoveSnapshotWithBackoff(b *v3.EtcdBackup) error {
 	if err != nil {
 		return err
 	}
+	cluster.Spec.RancherKubernetesEngineConfig.Services.Etcd.BackupConfig = b.Spec.BackupConfig.DeepCopy()
+	spec := *cluster.Spec.DeepCopy()
+	spec, err = secretmigrator.AssembleS3Credential(cluster.Status.S3CredentialSecret, secretmigrator.ClusterType, cluster.Name, spec, c.secretLister)
+	if err != nil {
+		return err
+	}
 	snapshotName := clusterprovisioner.GetBackupFilename(b)
 	return wait.ExponentialBackoff(backoff, func() (bool, error) {
-		if inErr := c.backupDriver.ETCDRemoveSnapshot(c.ctx, cluster.Name, kontainerDriver, cluster.Spec, snapshotName); inErr != nil {
-			logrus.Warnf("%v", inErr)
+		if inErr := c.backupDriver.ETCDRemoveSnapshot(c.ctx, cluster.Name, kontainerDriver, spec, snapshotName); inErr != nil {
+			log.Warnf("%v", inErr)
 			return false, nil
 		}
 		return true, nil
 	})
 }
 
-func (c *Controller) rotateExpiredBackups(cluster *v3.Cluster, clusterBackups []*v3.EtcdBackup) error {
+func (c *Controller) rotateSuccessfulBackups(cluster *v3.Cluster) error {
+	log.Infof("[etcd-backup] Rotating successful recurring backups")
+	return c.rotateBackups(cluster, IsBackupCompleted)
+}
+
+func IsBackupCompleted(backup *v3.EtcdBackup) bool {
+	return rketypes.BackupConditionCompleted.IsTrue(backup)
+}
+
+func (c *Controller) rotateFailedBackups(cluster *v3.Cluster) error {
+	log.Infof("[etcd-backup] Rotating failed recurring backups")
+	return c.rotateBackups(cluster, IsBackupFailed)
+}
+
+func IsBackupFailed(backup *v3.EtcdBackup) bool {
+	return rketypes.BackupConditionCompleted.IsFalse(backup)
+}
+
+func (c *Controller) rotateBackups(cluster *v3.Cluster, filter FilterFunc) error {
 	retention := cluster.Spec.RancherKubernetesEngineConfig.Services.Etcd.BackupConfig.Retention
-	intervalHours := cluster.Spec.RancherKubernetesEngineConfig.Services.Etcd.BackupConfig.IntervalHours
-	expiredBackups := getExpiredBackups(retention, intervalHours, clusterBackups)
-	for _, backup := range expiredBackups {
-		if backup.Spec.Manual {
-			continue
-		}
+	backups, err := c.getBackupsList(cluster)
+	if err != nil {
+		return err
+	}
+	backups = filterBackups(backups, IsBackupRecurring, filter)
+	if len(backups) <= retention {
+		return nil
+	}
+	chronologicalSort(backups)
+
+	if err = c.removeBackups(backups[retention:]); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (c *Controller) removeBackups(backups []*v3.EtcdBackup) error {
+	for _, backup := range backups {
 		if err := c.backupClient.DeleteNamespaced(backup.Namespace, backup.Name, &metav1.DeleteOptions{}); err != nil {
 			return err
 		}
@@ -395,7 +590,6 @@ func GetS3Client(sbc *rketypes.S3BackupConfig, timeout int, dialer dialer.Dialer
 	if sbc == nil {
 		return nil, fmt.Errorf("Can't find S3 backup target configuration")
 	}
-	var s3Client = &minio.Client{}
 	var creds *credentials.Credentials
 	var tr http.RoundTripper = &http.Transport{
 		Proxy:                 http.ProxyFromEnvironment,
@@ -420,34 +614,32 @@ func GetS3Client(sbc *rketypes.S3BackupConfig, timeout int, dialer dialer.Dialer
 	}
 
 	bucketLookup := getBucketLookupType(endpoint)
-	s3Client, err := minio.NewWithOptions(endpoint, &minio.Options{
+	opt := minio.Options{
 		Creds:        creds,
 		Region:       sbc.Region,
 		Secure:       true,
 		BucketLookup: bucketLookup,
-	})
+		Transport:    tr,
+	}
+	if sbc.CustomCA != "" {
+		opt.Transport = getCustomCATransport(tr, sbc.CustomCA)
+	}
+	s3Client, err := minio.New(endpoint, &opt)
 	if err != nil {
 		return nil, err
 	}
-	if sbc.CustomCA != "" {
-		tr = getCustomCATransport(tr, sbc.CustomCA)
-	}
-	s3Client.SetCustomTransport(tr)
 	return s3Client, nil
 }
 
-func (c *Controller) getRecuringBackupsList(cluster *v3.Cluster) ([]*v3.EtcdBackup, error) {
-	retList := []*v3.EtcdBackup{}
+func chronologicalSort(backups []*v3.EtcdBackup) {
+	sort.Slice(backups, func(i, j int) bool {
+		return getBackupCreatedTime(backups[i]).After(getBackupCreatedTime(backups[j]))
+	})
+}
+
+func (c *Controller) getBackupsList(cluster *v3.Cluster) ([]*v3.EtcdBackup, error) {
 	backups, err := c.backupLister.List(cluster.Name, labels.NewSelector())
-	if err != nil {
-		return nil, err
-	}
-	for _, backup := range backups {
-		if !backup.Spec.Manual {
-			retList = append(retList, backup)
-		}
-	}
-	return retList, nil
+	return backups, err
 }
 
 func getBucketLookupType(endpoint string) minio.BucketLookupType {
@@ -465,26 +657,20 @@ func getBackupCompletedTime(o runtime.Object) time.Time {
 	return t
 }
 
-func getExpiredBackups(retention, intervalHours int, backups []*v3.EtcdBackup) []*v3.EtcdBackup {
-	expiredList := []*v3.EtcdBackup{}
-	toKeepDuration := time.Duration(retention*intervalHours) * time.Hour
-	for _, backup := range backups {
-		if time.Since(getBackupCompletedTime(backup)) > toKeepDuration {
-			expiredList = append(expiredList, backup)
-		}
-	}
-	return expiredList
+func getBackupCreatedTime(o runtime.Object) time.Time {
+	t, _ := time.Parse(time.RFC3339, rketypes.BackupConditionCreated.GetLastUpdated(o))
+	return t
 }
 
 func shouldBackup(cluster *v3.Cluster) bool {
 	// not an rke cluster, we do nothing
 	if cluster.Spec.RancherKubernetesEngineConfig == nil {
-		logrus.Debugf("[etcd-backup] [%s] is not an rke cluster, skipping..", cluster.Name)
+		log.Debugf("[etcd-backup] [%s] is not an rke cluster, skipping..", cluster.Name)
 		return false
 	}
 	if !isBackupSet(cluster.Spec.RancherKubernetesEngineConfig) {
 		// no backend backup config
-		logrus.Debugf("[etcd-backup] No backup config for cluster [%s]", cluster.Name)
+		log.Debugf("[etcd-backup] no backup config for cluster [%s]", cluster.Name)
 		return false
 	}
 	// we only work with ready clusters
@@ -493,7 +679,7 @@ func shouldBackup(cluster *v3.Cluster) bool {
 	}
 
 	if !isRecurringBackupEnabled(cluster.Spec.RancherKubernetesEngineConfig) {
-		logrus.Debugf("[etcd-backup] Recurring backup is disabled cluster [%s]", cluster.Name)
+		log.Debugf("[etcd-backup] recurring backup is disabled cluster [%s]", cluster.Name)
 		return false
 	}
 	return true

@@ -49,6 +49,7 @@ func NewWorkloadAggregateStore(schemas *types.Schemas, manager *clustermanager.M
 	workloadSchema.Store = store
 	workloadSchema.ActionHandler = workloadConfig.ActionHandler
 	workloadSchema.LinkHandler = workload.Handler{}.LinkHandler
+	workloadSchema.Validator = workload.Validator
 }
 
 func NewCustomizeStore(store types.Store) types.Store {

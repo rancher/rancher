@@ -4,18 +4,18 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
-	"net/http"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
 
-	"github.com/rancher/rancher/pkg/controllers/management/k3sbasedupgrade"
+	"github.com/coreos/go-semver/semver"
 	kd "github.com/rancher/rancher/pkg/controllers/management/kontainerdrivermetadata"
 	img "github.com/rancher/rancher/pkg/image"
+	ext "github.com/rancher/rancher/pkg/image/external"
+	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rke/types/image"
 	"github.com/rancher/rke/types/kdm"
-	"github.com/sirupsen/logrus"
 )
 
 var (
@@ -39,6 +39,10 @@ var (
 		"linux":   "rancher-images.txt",
 		"windows": "rancher-windows-images.txt",
 	}
+	sourcesFilenameMap = map[string]string{
+		"linux":   "rancher-images-sources.txt",
+		"windows": "rancher-windows-images-sources.txt",
+	}
 )
 
 func main() {
@@ -51,18 +55,15 @@ func main() {
 	}
 }
 
-func run(systemChartPath, chartPath string, imagesFromArgs []string) error {
-	tag, ok := os.LookupEnv("TAG")
+func run(systemChartsPath, chartsPath string, imagesFromArgs []string) error {
+	rancherVersion, ok := os.LookupEnv("TAG")
 	if !ok {
-		return fmt.Errorf("no tag %s", tag)
+		return fmt.Errorf("no tag %s", rancherVersion)
 	}
-	rancherVersion := tag
-	if strings.HasPrefix(rancherVersion, "dev") || strings.HasPrefix(rancherVersion, "master") {
-		rancherVersion = kd.RancherVersionDev
+	if !img.IsValidSemver(rancherVersion) || strings.HasPrefix(rancherVersion, "dev") || strings.HasPrefix(rancherVersion, "master") || strings.HasSuffix(rancherVersion, "-head") {
+		rancherVersion = settings.RancherVersionDev
 	}
-	if strings.HasPrefix(rancherVersion, "v") {
-		rancherVersion = rancherVersion[1:]
-	}
+	rancherVersion = strings.TrimPrefix(rancherVersion, "v")
 
 	// already downloaded in dapper
 	b, err := ioutil.ReadFile(filepath.Join("data.json"))
@@ -85,38 +86,80 @@ func run(systemChartPath, chartPath string, imagesFromArgs []string) error {
 		data.K8sVersionInfo,
 	)
 
-	k3sUpgradeImages := getK3sUpgradeImages(rancherVersion, data.K3S)
+	var k8sVersions []string
+	for k := range linuxInfo.RKESystemImages {
+		k8sVersions = append(k8sVersions, k)
+	}
+	sort.Strings(k8sVersions)
+	writeSliceToFile(filepath.Join(os.Getenv("HOME"), "bin", "rancher-rke-k8s-versions.txt"), k8sVersions)
 
-	targetImages, err := img.GetImages(systemChartPath, chartPath, k3sUpgradeImages, imagesFromArgs, linuxInfo.RKESystemImages, img.Linux)
+	externalImages := make(map[string][]string)
+	k3sUpgradeImages, err := ext.GetExternalImages(rancherVersion, data.K3S, ext.K3S, nil)
+	if err != nil {
+		return err
+	}
+	if k3sUpgradeImages != nil {
+		externalImages["k3sUpgrade"] = k3sUpgradeImages
+	}
+
+	// RKE2 Provisioning will only be supported on Kubernetes v1.21+. In addition, only RKE2
+	// releases corresponding to Kubernetes v1.21+ include the "rke2-images-all" file that we need.
+	rke2AllImages, err := ext.GetExternalImages(rancherVersion, data.RKE2, ext.RKE2, &semver.Version{
+		Major: 1,
+		Minor: 21,
+		Patch: 0,
+	})
+	if err != nil {
+		return err
+	}
+	if rke2AllImages != nil {
+		externalImages["rke2All"] = rke2AllImages
+	}
+
+	exportConfig := img.ExportConfig{
+		SystemChartsPath: systemChartsPath,
+		ChartsPath:       chartsPath,
+		OsType:           img.Linux,
+		RancherVersion:   rancherVersion,
+	}
+	targetImages, targetImagesAndSources, err := img.GetImages(exportConfig, externalImages, imagesFromArgs, linuxInfo.RKESystemImages)
 	if err != nil {
 		return err
 	}
 
-	targetWindowsImages, err := img.GetImages(systemChartPath, chartPath, []string{}, []string{getWindowsAgentImage()}, windowsInfo.RKESystemImages, img.Windows)
+	exportConfig.OsType = img.Windows
+	targetWindowsImages, targetWindowsImagesAndSources, err := img.GetImages(exportConfig, nil, []string{getWindowsAgentImage()}, windowsInfo.RKESystemImages)
 	if err != nil {
 		return err
 	}
 
-	for arch, images := range map[string][]string{
-		"linux":   targetImages,
-		"windows": targetWindowsImages,
+	type imageTextLists struct {
+		images           []string
+		imagesAndSources []string
+	}
+	for arch, imageLists := range map[string]imageTextLists{
+		"linux":   {images: targetImages, imagesAndSources: targetImagesAndSources},
+		"windows": {images: targetWindowsImages, imagesAndSources: targetWindowsImagesAndSources},
 	} {
-		err = imagesText(arch, images)
+		err = imagesText(arch, imageLists.images)
 		if err != nil {
 			return err
 		}
 
-		err = mirrorScript(arch, images)
+		if err := imagesAndSourcesText(arch, imageLists.imagesAndSources); err != nil {
+			return err
+		}
+		err = mirrorScript(arch, imageLists.images)
 		if err != nil {
 			return err
 		}
 
-		err = saveScript(arch, images)
+		err = saveScript(arch, imageLists.images)
 		if err != nil {
 			return err
 		}
 
-		err = loadScript(arch, images)
+		err = loadScript(arch, imageLists.images)
 		if err != nil {
 			return err
 		}
@@ -150,6 +193,20 @@ func saveImages(targetImages []string) []string {
 		saveImages = append(saveImages, targetImage)
 	}
 	return saveImages
+}
+
+func saveImagesAndSources(imagesAndSources []string) []string {
+	var saveImagesAndSources []string
+	for _, imageAndSources := range imagesAndSources {
+		targetImage := strings.Split(imageAndSources, " ")[0]
+		_, ok := image.Mirrors[targetImage]
+		if !ok {
+			continue
+		}
+
+		saveImagesAndSources = append(saveImagesAndSources, imageAndSources)
+	}
+	return saveImagesAndSources
 }
 
 func checkImage(image string) error {
@@ -201,9 +258,45 @@ func imagesText(arch string, targetImages []string) error {
 		if err != nil {
 			return err
 		}
-
-		log.Println("Image:", image)
 		fmt.Fprintln(save, image)
+	}
+
+	return nil
+}
+
+func writeSliceToFile(filename string, versions []string) error {
+	log.Printf("Creating %s\n", filename)
+	save, err := os.Create(filename)
+	if err != nil {
+		return err
+	}
+	defer save.Close()
+	save.Chmod(0755)
+
+	for _, version := range versions {
+		fmt.Fprintln(save, version)
+	}
+
+	return nil
+}
+
+// imagesAndSourcesText writes data of the format "image source1,..." to the filename
+// designated for the given arch
+func imagesAndSourcesText(arch string, targetImagesAndSources []string) error {
+	filename := sourcesFilenameMap[arch]
+	log.Printf("Creating %s\n", filename)
+	save, err := os.Create(filename)
+	if err != nil {
+		return err
+	}
+	defer save.Close()
+	save.Chmod(0755)
+
+	for _, imageAndSources := range saveImagesAndSources(targetImagesAndSources) {
+		if err := checkImage(strings.Split(imageAndSources, " ")[0]); err != nil {
+			return err
+		}
+		fmt.Fprintln(save, imageAndSources)
 	}
 
 	return nil
@@ -252,110 +345,6 @@ func getWindowsAgentImage() string {
 	return fmt.Sprintf("%s/rancher-agent:%s", repo, tag)
 }
 
-// getK3sUpgradeImages returns k3s-upgrade images for every k3s release that supports
-// current rancher version
-func getK3sUpgradeImages(rancherVersion string, k3sData map[string]interface{}) []string {
-	logrus.Infof("generating k3s image list...")
-	k3sImagesMap := make(map[string]bool)
-	releases, _ := k3sData["releases"].([]interface{})
-	var compatibleReleases []string
-
-	for _, release := range releases {
-		releaseMap, _ := release.(map[string]interface{})
-		version, _ := releaseMap["version"].(string)
-		if version == "" {
-			continue
-		}
-
-		if rancherVersion != "dev" {
-			maxVersion, _ := releaseMap["maxChannelServerVersion"].(string)
-			maxVersion = strings.TrimPrefix(maxVersion, "v")
-			if maxVersion == "" {
-				continue
-			}
-			minVersion, _ := releaseMap["minChannelServerVersion"].(string)
-			minVersion = strings.Trim(minVersion, "v")
-			if minVersion == "" {
-				continue
-			}
-
-			versionGTMin, err := k3sbasedupgrade.IsNewerVersion(minVersion, rancherVersion)
-			if err != nil {
-				continue
-			}
-			if rancherVersion != minVersion && !versionGTMin {
-				// rancher version not equal to or greater than minimum supported rancher version
-				continue
-			}
-
-			versionLTMax, err := k3sbasedupgrade.IsNewerVersion(rancherVersion, maxVersion)
-			if err != nil {
-				continue
-			}
-			if rancherVersion != maxVersion && !versionLTMax {
-				// rancher version not equal to or greater than maximum supported rancher version
-				continue
-			}
-		}
-
-		compatibleReleases = append(compatibleReleases, version)
-	}
-
-	for _, release := range compatibleReleases {
-		// registries don't allow +, so image names will have these substituted
-		upgradeImage := fmt.Sprintf("rancher/k3s-upgrade:%s", strings.Replace(release, "+", "-", -1))
-		k3sImagesMap[upgradeImage] = true
-
-		images, err := downloadK3sSupportingImages(release)
-		if err != nil {
-			logrus.Infof("could not find supporting images for k3s release [%s]: %v", release, err)
-			continue
-		}
-
-		supportingImages := strings.Split(images, "\n")
-		if supportingImages[len(supportingImages)-1] == "" {
-			supportingImages = supportingImages[:len(supportingImages)-1]
-		}
-
-		for _, imageName := range supportingImages {
-			imageName = strings.TrimPrefix(imageName, "docker.io/")
-			k3sImagesMap[imageName] = true
-		}
-	}
-
-	var k3sImages []string
-	for imageName := range k3sImagesMap {
-		k3sImages = append(k3sImages, imageName)
-	}
-
-	sort.Strings(k3sImages)
-	logrus.Infof("finished generating k3s image list...")
-	return k3sImages
-}
-
-// DownloadK3s supporting images attempt to download k3s-images.txt files that contains a list
-// of its dependencies.
-func downloadK3sSupportingImages(release string) (string, error) {
-	url := fmt.Sprintf("https://github.com/rancher/k3s/releases/download/%s/k3s-images.txt", release)
-
-	resp, err := http.Get(url)
-	if err != nil {
-		return "", err
-	}
-
-	body, err := ioutil.ReadAll(resp.Body)
-	if resp.StatusCode != 200 {
-		return "", fmt.Errorf("failed to get url: %v", string(body))
-	}
-	defer resp.Body.Close()
-
-	if err != nil {
-		return "", err
-	}
-
-	return string(body), nil
-}
-
 func getScript(arch, fileType string) string {
 	return scriptMap[fmt.Sprintf("%s-%s", arch, fileType)]
 }
@@ -369,14 +358,14 @@ const (
 images="rancher-images.tar.gz"
 list="rancher-images.txt"
 windows_image_list=""
-windows_versions="1903"
+windows_versions="1809"
 usage () {
     echo "USAGE: $0 [--images rancher-images.tar.gz] --registry my.registry.com:5000"
     echo "  [-l|--image-list path] text file with list of images; one image per line."
     echo "  [-i|--images path] tar.gz generated by docker save."
     echo "  [-r|--registry registry:port] target private registry:port."
     echo "  [--windows-image-list path] text file with list of images used in Windows. Windows image mirroring is skipped when this is empty"
-    echo "  [--windows-versions version] Comma separated Windows versions. e.g., \"1809,1903\". (Default \"1903\")"
+    echo "  [--windows-versions version] Comma separated Windows versions. e.g., \"1809,ltsc2022\". (Default \"1809\")"
     echo "  [-h|--help] Usage message"
 }
 
@@ -572,6 +561,7 @@ $script_name = $MyInvocation.InvocationName
 $image_list = "rancher-windows-images.txt"
 $images = "rancher-windows-images.tar.gz"
 $os_release_id = $(Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\' | Select-Object -ExpandProperty ReleaseId)
+
 $registry = $null
 $help = $false
 
@@ -580,7 +570,7 @@ function usage {
     echo "  [-l|--image-list path] text file with list of images; one image per line."
     echo "  [-i|--images path] tar.gz generated by docker save."
     echo "  [-r|--registry registry:port] target private registry:port."
-    echo "  [-o|--os-release-id (1809|1903|...)] release id of OS, gets detected automatically if not passed."
+    echo "  [-o|--os-release-id (1809|lstc2022|...)] release id of OS, gets detected automatically if not passed."
     echo "  [-h|--help] Usage message."
 }
 
@@ -683,13 +673,14 @@ $script_name = $MyInvocation.InvocationName
 $image_list = "rancher-windows-images.txt"
 $images = "rancher-windows-images.tar.gz"
 $os_release_id = $(Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\' | Select-Object -ExpandProperty ReleaseId)
+
 $help = $false
 
 function usage {
     echo "USAGE: $script_name [--image-list rancher-windows-images.txt] [--images rancher-windows-images.tar.gz]"
     echo "  [-l|--image-list path] text file with list of images; one image per line."
     echo "  [-i|--images path] tar.gz generated by docker save."
-    echo "  [-o|--os-release-id (1809|1903|...)] release id of OS, gets detected automatically if not passed."
+    echo "  [-o|--os-release-id (1809|ltsc2022|...)] release id of OS, gets detected automatically if not passed."
     echo "  [-h|--help] Usage message."
 }
 
@@ -743,12 +734,11 @@ $fullname_images = @()
 Get-Content -Force -Path $image_list | ForEach-Object {
     if ($_) {
         $fullname_image = ('{0}-windows-{1}' -f $_, $os_release_id)
-		echo "Pulling $fullname_image"
-		
-		docker pull $fullname_image
-		if ($?) {
-			$fullname_images += @($fullname_image)
-		}
+        echo "Pulling $fullname_image"
+        docker pull $fullname_image
+        if ($?) {
+            $fullname_images += @($fullname_image)
+        }
     }
 }
 

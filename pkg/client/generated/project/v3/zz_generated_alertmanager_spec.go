@@ -22,6 +22,7 @@ const (
 	AlertmanagerSpecFieldListenLocal                         = "listenLocal"
 	AlertmanagerSpecFieldLogFormat                           = "logFormat"
 	AlertmanagerSpecFieldLogLevel                            = "logLevel"
+	AlertmanagerSpecFieldMinReadySeconds                     = "minReadySeconds"
 	AlertmanagerSpecFieldNodeSelector                        = "nodeSelector"
 	AlertmanagerSpecFieldPaused                              = "paused"
 	AlertmanagerSpecFieldPodMetadata                         = "podMetadata"
@@ -65,6 +66,7 @@ type AlertmanagerSpec struct {
 	ListenLocal                         bool                       `json:"listenLocal,omitempty" yaml:"listenLocal,omitempty"`
 	LogFormat                           string                     `json:"logFormat,omitempty" yaml:"logFormat,omitempty"`
 	LogLevel                            string                     `json:"logLevel,omitempty" yaml:"logLevel,omitempty"`
+	MinReadySeconds                     *int64                     `json:"minReadySeconds,omitempty" yaml:"minReadySeconds,omitempty"`
 	NodeSelector                        map[string]string          `json:"nodeSelector,omitempty" yaml:"nodeSelector,omitempty"`
 	Paused                              bool                       `json:"paused,omitempty" yaml:"paused,omitempty"`
 	PodMetadata                         *EmbeddedObjectMetadata    `json:"podMetadata,omitempty" yaml:"podMetadata,omitempty"`

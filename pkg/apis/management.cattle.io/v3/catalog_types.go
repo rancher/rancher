@@ -35,18 +35,22 @@ type CatalogSpec struct {
 }
 
 type CatalogStatus struct {
-	LastRefreshTimestamp string `json:"lastRefreshTimestamp,omitempty"`
-	Commit               string `json:"commit,omitempty"`
-	// helmVersionCommits records hash of each helm template version
+	LastRefreshTimestamp string             `json:"lastRefreshTimestamp,omitempty"`
+	Commit               string             `json:"commit,omitempty"`
+	Conditions           []CatalogCondition `json:"conditions,omitempty"`
+
+	// Deprecated: should no longer be in use. If a Catalog CR is encountered with this field
+	// populated, it will be set to nil.
 	HelmVersionCommits map[string]VersionCommits `json:"helmVersionCommits,omitempty"`
-	Conditions         []CatalogCondition        `json:"conditions,omitempty"`
+	CredentialSecret   string                    `json:"credentialSecret,omitempty" norman:"nocreate,noupdate"`
 }
 
 var (
-	CatalogConditionRefreshed  condition.Cond = "Refreshed"
-	CatalogConditionUpgraded   condition.Cond = "Upgraded"
-	CatalogConditionDiskCached condition.Cond = "DiskCached"
-	CatalogConditionProcessed  condition.Cond = "Processed"
+	CatalogConditionRefreshed       condition.Cond = "Refreshed"
+	CatalogConditionUpgraded        condition.Cond = "Upgraded"
+	CatalogConditionDiskCached      condition.Cond = "DiskCached"
+	CatalogConditionProcessed       condition.Cond = "Processed"
+	CatalogConditionSecretsMigrated condition.Cond = "SecretsMigrated"
 )
 
 type CatalogCondition struct {
@@ -64,6 +68,7 @@ type CatalogCondition struct {
 	Message string `json:"message,omitempty"`
 }
 
+// Deprecated: CatalogStatus.HelmVersionCommits has been deprecated, which is the only consumer of this type.
 type VersionCommits struct {
 	Value map[string]string `json:"Value,omitempty"`
 }
@@ -95,7 +100,8 @@ type CatalogTemplate struct {
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 	// Specification of the desired behavior of the the cluster. More info:
 	// https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#spec-and-status
-	Template
+	Spec   TemplateSpec   `json:"spec"`
+	Status TemplateStatus `json:"status"`
 }
 
 type TemplateSpec struct {
@@ -156,7 +162,8 @@ type CatalogTemplateVersion struct {
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 	// Specification of the desired behavior of the the cluster. More info:
 	// https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#spec-and-status
-	TemplateVersion
+	Spec   TemplateVersionSpec   `json:"spec"`
+	Status TemplateVersionStatus `json:"status"`
 }
 
 type TemplateVersionSpec struct {

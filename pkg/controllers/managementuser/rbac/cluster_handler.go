@@ -45,7 +45,7 @@ type clusterHandler struct {
 }
 
 func (h *clusterHandler) sync(key string, obj *v3.Cluster) (runtime.Object, error) {
-	// We recieve clusters with no data, when that happens no checks will work so just ignore them
+	// We receive clusters with no data, when that happens no checks will work so just ignore them
 	if key == "" || obj == nil || obj.Name == "" {
 		return nil, nil
 	}
@@ -96,10 +96,7 @@ func (h *clusterHandler) doSync(cluster *v3.Cluster) error {
 						Name: bindingName,
 					},
 					Subjects: []k8srbac.Subject{
-						{
-							Kind: "User",
-							Name: grb.UserName,
-						},
+						rbac.GetGRBSubject(grb),
 					},
 					RoleRef: k8srbac.RoleRef{
 						Name: "cluster-admin",

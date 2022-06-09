@@ -8,10 +8,13 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/rancher/pkg/auth/providerrefresh"
+	"github.com/rancher/rancher/pkg/auth/providers"
+	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/steve/pkg/auth"
+	"github.com/sirupsen/logrus"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/authentication/user"
@@ -23,18 +26,30 @@ var (
 )
 
 type Authenticator interface {
-	Authenticate(req *http.Request) (authed bool, user string, groups []string, err error)
+	Authenticate(req *http.Request) (*AuthenticatorResponse, error)
 	TokenFromRequest(req *http.Request) (*v3.Token, error)
+}
+
+type AuthenticatorResponse struct {
+	IsAuthed      bool
+	User          string
+	UserPrincipal string
+	Groups        []string
+	Extras        map[string][]string
 }
 
 func ToAuthMiddleware(a Authenticator) auth.Middleware {
 	f := func(req *http.Request) (user.Info, bool, error) {
-		authed, u, groups, err := a.Authenticate(req)
+		authResp, err := a.Authenticate(req)
+		if err != nil {
+			return nil, false, err
+		}
 		return &user.DefaultInfo{
-			Name:   u,
-			UID:    u,
-			Groups: groups,
-		}, authed, err
+			Name:   authResp.User,
+			UID:    authResp.User,
+			Groups: authResp.Groups,
+			Extra:  authResp.Extras,
+		}, authResp.IsAuthed, err
 	}
 	return auth.ToMiddleware(auth.AuthenticatorFunc(f))
 }
@@ -81,31 +96,34 @@ func tokenKeyIndexer(obj interface{}) ([]string, error) {
 	return []string{token.Token}, nil
 }
 
-func (a *tokenAuthenticator) Authenticate(req *http.Request) (bool, string, []string, error) {
+func (a *tokenAuthenticator) Authenticate(req *http.Request) (*AuthenticatorResponse, error) {
+	authResp := &AuthenticatorResponse{
+		Extras: make(map[string][]string),
+	}
 	token, err := a.TokenFromRequest(req)
 	if err != nil {
-		return false, "", []string{}, err
+		return nil, err
 	}
 
 	if token.Enabled != nil && !*token.Enabled {
-		return false, "", []string{}, errors.Wrapf(ErrMustAuthenticate, "user's token is not enabled")
+		return nil, errors.Wrapf(ErrMustAuthenticate, "user's token is not enabled")
 	}
 	if token.ClusterName != "" && token.ClusterName != a.clusterRouter(req) {
-		return false, "", []string{}, errors.Wrapf(ErrMustAuthenticate, "clusterID does not match")
+		return nil, errors.Wrapf(ErrMustAuthenticate, "clusterID does not match")
 	}
 
 	attribs, err := a.userAttributeLister.Get("", token.UserID)
 	if err != nil && !apierrors.IsNotFound(err) {
-		return false, "", []string{}, err
+		return nil, err
 	}
 
 	u, err := a.userLister.Get("", token.UserID)
 	if err != nil {
-		return false, "", []string{}, err
+		return nil, err
 	}
 
 	if u.Enabled != nil && !*u.Enabled {
-		return false, "", []string{}, errors.Wrap(ErrMustAuthenticate, "user is not enabled")
+		return nil, errors.Wrap(ErrMustAuthenticate, "user is not enabled")
 	}
 
 	var groups []string
@@ -130,14 +148,52 @@ func (a *tokenAuthenticator) Authenticate(req *http.Request) (bool, string, []st
 			groups = append(groups, name)
 		}
 	}
-
 	groups = append(groups, user.AllAuthenticated, "system:cattle:authenticated")
-
 	if !strings.HasPrefix(token.UserID, "system:") {
 		go a.userAuthRefresher.TriggerUserRefresh(token.UserID, false)
 	}
 
-	return true, token.UserID, groups, nil
+	authResp.IsAuthed = true
+	authResp.User = token.UserID
+	authResp.UserPrincipal = token.UserPrincipal.Name
+	authResp.Groups = groups
+	authResp.Extras = getUserExtraInfo(token, u, attribs)
+	logrus.Debugf("Extras returned %v", authResp.Extras)
+
+	return authResp, nil
+}
+
+func getUserExtraInfo(token *v3.Token, u *v3.User, attribs *v3.UserAttribute) map[string][]string {
+	extraInfo := make(map[string][]string)
+
+	if attribs != nil && attribs.ExtraByProvider != nil && len(attribs.ExtraByProvider) != 0 {
+		if token.AuthProvider == "local" || token.AuthProvider == "" {
+			//gather all extraInfo for all external auth providers present in the userAttributes
+			for _, extra := range attribs.ExtraByProvider {
+				for key, value := range extra {
+					extraInfo[key] = append(extraInfo[key], value...)
+				}
+			}
+			return extraInfo
+		}
+		//authProvider is set in token
+		if extraInfo, ok := attribs.ExtraByProvider[token.AuthProvider]; ok {
+			return extraInfo
+		}
+	}
+
+	extraInfo = providers.GetUserExtraAttributes(token.AuthProvider, token.UserPrincipal)
+	//if principalid is not set in extra, read from user
+	if extraInfo != nil {
+		if len(extraInfo[common.UserAttributePrincipalID]) == 0 {
+			extraInfo[common.UserAttributePrincipalID] = u.PrincipalIDs
+		}
+		if len(extraInfo[common.UserAttributeUserName]) == 0 {
+			extraInfo[common.UserAttributeUserName] = []string{u.DisplayName}
+		}
+	}
+
+	return extraInfo
 }
 
 func (a *tokenAuthenticator) TokenFromRequest(req *http.Request) (*v3.Token, error) {
@@ -163,7 +219,7 @@ func (a *tokenAuthenticator) TokenFromRequest(req *http.Request) (*v3.Token, err
 		lookupUsingClient = true
 	}
 
-	storedToken := &v3.Token{}
+	var storedToken *v3.Token
 	if lookupUsingClient {
 		storedToken, err = a.tokenClient.Get(tokenName, metav1.GetOptions{})
 		if err != nil {

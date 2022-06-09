@@ -15,7 +15,7 @@ AZURE_CLIENT_SECRET = os.environ.get("AZURE_CLIENT_SECRET")
 AZURE_TENANT_ID = os.environ.get("AZURE_TENANT_ID")
 worker_count = int(os.environ.get('RANCHER_STRESS_TEST_WORKER_COUNT', 1))
 HOST_NAME = os.environ.get('RANCHER_HOST_NAME', "testcustom")
-engine_install_url = "https://releases.rancher.com/install-docker/19.03.sh"
+engine_install_url = "https://releases.rancher.com/install-docker/20.10.sh"
 
 rke_config = {
     "addonJobTimeout": 30,
@@ -345,6 +345,7 @@ def test_cis_complaint():
         name=evaluate_clustername(),
         driver="rancherKubernetesEngine",
         rancherKubernetesEngineConfig=rke_config_cis,
+        enableNetworkPolicy=True,
         defaultPodSecurityPolicyTemplateId=POD_SECURITY_POLICY_TEMPLATE)
     assert cluster.state == "provisioning"
     configure_cis_requirements(aws_nodes,
@@ -380,18 +381,22 @@ def test_rke_az_host_with_provider_2(node_template_az):
     validate_rke_dm_host_2(node_template_az, rke_config_azure_provider)
 
 
+@pytest.mark.skip(reason="https://github.com/rancher/qa-tasks/issues/318")
 def test_rke_do_host_1(node_template_do):
     validate_rke_dm_host_1(node_template_do, rke_config)
 
 
+@pytest.mark.skip(reason="https://github.com/rancher/qa-tasks/issues/318")
 def test_rke_do_host_2(node_template_do):
     validate_rke_dm_host_2(node_template_do, rke_config)
 
 
+@pytest.mark.skip(reason="https://github.com/rancher/qa-tasks/issues/318")
 def test_rke_do_host_3(node_template_do):
     validate_rke_dm_host_3(node_template_do, rke_config)
 
 
+@pytest.mark.skip(reason="https://github.com/rancher/qa-tasks/issues/318")
 def test_rke_do_host_4(node_template_do):
     validate_rke_dm_host_4(node_template_do, rke_config)
 
@@ -989,6 +994,7 @@ def node_template_az():
     return node_template
 
 
+@pytest.mark.skip(reason="https://github.com/rancher/qa-tasks/issues/318")
 @pytest.fixture(scope='session')
 def node_template_do():
     client = get_user_client()
@@ -998,7 +1004,7 @@ def node_template_do():
     )
     node_template = client.create_node_template(
         digitaloceanConfig={"region": "nyc3",
-                            "size": "2gb",
+                            "size": "s-2vcpu-2gb-intel",
                             "image": "ubuntu-18-04-x64"},
         name=random_name(),
         driver="digitalocean",

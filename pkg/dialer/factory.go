@@ -2,6 +2,7 @@ package dialer
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"net/url"
@@ -12,9 +13,9 @@ import (
 	"github.com/rancher/norman/types/slice"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
-	"github.com/rancher/rancher/pkg/tunnelserver"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/types/config/dialer"
+	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/rancher/remotedialer"
 	"github.com/rancher/rke/k8s"
 	"github.com/rancher/rke/services"
@@ -28,29 +29,27 @@ const (
 	WaitForAgentError = "waiting for cluster [%s] agent to connect"
 )
 
-func NewFactory(apiContext *config.ScaledContext) (*Factory, error) {
-	authorizer := tunnelserver.NewAuthorizer(apiContext)
-	tunneler := tunnelserver.NewTunnelServer(authorizer)
+var ErrAgentDisconnected = errors.New("cluster agent disconnected")
 
+func NewFactory(apiContext *config.ScaledContext, wrangler *wrangler.Context) (*Factory, error) {
 	return &Factory{
-		clusterLister:    apiContext.Management.Clusters("").Controller().Lister(),
-		nodeLister:       apiContext.Management.Nodes("").Controller().Lister(),
-		TunnelServer:     tunneler,
-		TunnelAuthorizer: authorizer,
+		clusterLister: apiContext.Management.Clusters("").Controller().Lister(),
+		nodeLister:    apiContext.Management.Nodes("").Controller().Lister(),
+		TunnelServer:  wrangler.TunnelServer,
 	}, nil
 }
 
 type Factory struct {
-	nodeLister       v3.NodeLister
-	clusterLister    v3.ClusterLister
-	TunnelServer     *remotedialer.Server
-	TunnelAuthorizer *tunnelserver.Authorizer
+	nodeLister    v3.NodeLister
+	clusterLister v3.ClusterLister
+	TunnelServer  *remotedialer.Server
 }
 
 func (f *Factory) ClusterDialer(clusterName string) (dialer.Dialer, error) {
 	return func(ctx context.Context, network, address string) (net.Conn, error) {
 		d, err := f.clusterDialer(clusterName, address)
 		if err != nil {
+			logrus.Debugf(WaitForAgentError, clusterName)
 			return nil, err
 		}
 		return d(ctx, network, address)
@@ -74,6 +73,14 @@ func IsPublicCloudDriver(cluster *v3.Cluster) bool {
 
 func HasOnlyPrivateAPIEndpoint(cluster *v3.Cluster) bool {
 	switch cluster.Status.Driver {
+	case v32.ClusterDriverAKS:
+		if cluster.Status.AKSStatus.UpstreamSpec != nil &&
+			cluster.Status.AKSStatus.UpstreamSpec.PrivateCluster != nil &&
+			!*cluster.Status.AKSStatus.UpstreamSpec.PrivateCluster {
+			return false
+		}
+		return cluster.Status.AKSStatus.PrivateRequiresTunnel != nil &&
+			*cluster.Status.AKSStatus.PrivateRequiresTunnel
 	case v32.ClusterDriverEKS:
 		if cluster.Status.EKSStatus.UpstreamSpec != nil &&
 			cluster.Status.EKSStatus.UpstreamSpec.PublicAccess != nil &&
@@ -82,6 +89,14 @@ func HasOnlyPrivateAPIEndpoint(cluster *v3.Cluster) bool {
 		}
 		return cluster.Status.EKSStatus.PrivateRequiresTunnel != nil &&
 			*cluster.Status.EKSStatus.PrivateRequiresTunnel
+	case v32.ClusterDriverGKE:
+		if cluster.Status.GKEStatus.UpstreamSpec != nil &&
+			cluster.Status.GKEStatus.UpstreamSpec.PrivateClusterConfig != nil &&
+			!cluster.Status.GKEStatus.UpstreamSpec.PrivateClusterConfig.EnablePrivateEndpoint {
+			return false
+		}
+		return cluster.Status.GKEStatus.PrivateRequiresTunnel != nil &&
+			*cluster.Status.GKEStatus.PrivateRequiresTunnel
 	default:
 		return false
 	}
@@ -236,7 +251,7 @@ func (f *Factory) clusterDialer(clusterName, address string) (dialer.Dialer, err
 		time.Sleep(wait.Jitter(5*time.Second, 1))
 	}
 
-	return nil, fmt.Errorf(WaitForAgentError, cluster.Name)
+	return nil, ErrAgentDisconnected
 }
 
 func hostPort(cluster *v3.Cluster) string {

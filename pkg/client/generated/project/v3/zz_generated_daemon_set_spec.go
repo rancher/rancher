@@ -1,5 +1,9 @@
 package client
 
+import (
+	"k8s.io/apimachinery/pkg/util/intstr"
+)
+
 const (
 	DaemonSetSpecType                               = "daemonSetSpec"
 	DaemonSetSpecFieldActiveDeadlineSeconds         = "activeDeadlineSeconds"
@@ -19,7 +23,9 @@ const (
 	DaemonSetSpecFieldHostPID                       = "hostPID"
 	DaemonSetSpecFieldHostname                      = "hostname"
 	DaemonSetSpecFieldImagePullSecrets              = "imagePullSecrets"
+	DaemonSetSpecFieldMaxSurge                      = "maxSurge"
 	DaemonSetSpecFieldNodeID                        = "nodeId"
+	DaemonSetSpecFieldOS                            = "os"
 	DaemonSetSpecFieldObjectMeta                    = "metadata"
 	DaemonSetSpecFieldOverhead                      = "overhead"
 	DaemonSetSpecFieldPreemptionPolicy              = "preemptionPolicy"
@@ -61,7 +67,9 @@ type DaemonSetSpec struct {
 	HostPID                       bool                           `json:"hostPID,omitempty" yaml:"hostPID,omitempty"`
 	Hostname                      string                         `json:"hostname,omitempty" yaml:"hostname,omitempty"`
 	ImagePullSecrets              []LocalObjectReference         `json:"imagePullSecrets,omitempty" yaml:"imagePullSecrets,omitempty"`
+	MaxSurge                      intstr.IntOrString             `json:"maxSurge,omitempty" yaml:"maxSurge,omitempty"`
 	NodeID                        string                         `json:"nodeId,omitempty" yaml:"nodeId,omitempty"`
+	OS                            *PodOS                         `json:"os,omitempty" yaml:"os,omitempty"`
 	ObjectMeta                    *ObjectMeta                    `json:"metadata,omitempty" yaml:"metadata,omitempty"`
 	Overhead                      map[string]string              `json:"overhead,omitempty" yaml:"overhead,omitempty"`
 	PreemptionPolicy              string                         `json:"preemptionPolicy,omitempty" yaml:"preemptionPolicy,omitempty"`

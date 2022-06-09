@@ -1,15 +1,21 @@
 package feature
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/rancher/norman/api/access"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	v3client "github.com/rancher/rancher/pkg/client/generated/management/v3"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 )
 
-func Validator(request *types.APIContext, schema *types.Schema, data map[string]interface{}) error {
+type Validator struct {
+	FeatureLister v3.FeatureLister
+}
+
+func (v *Validator) Validator(request *types.APIContext, schema *types.Schema, data map[string]interface{}) error {
 	if request.Method == http.MethodPost {
 		return httperror.NewAPIError(httperror.MethodNotAllowed, "cannot create new features")
 	}
@@ -26,6 +32,15 @@ func Validator(request *types.APIContext, schema *types.Schema, data map[string]
 	newValue, ok := data["value"]
 	if !ok {
 		return httperror.NewAPIError(httperror.InvalidBodyContent, "must contain value")
+	}
+
+	obj, err := v.FeatureLister.Get("", id)
+	if err != nil {
+		return err
+	}
+
+	if obj.Status.LockedValue != nil {
+		return httperror.NewAPIError(httperror.InvalidBodyContent, fmt.Sprintf("feature flag cannot be changed from current value: %v", *obj.Status.LockedValue))
 	}
 
 	_, ok = newValue.(bool)

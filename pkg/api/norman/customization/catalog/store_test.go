@@ -108,11 +108,9 @@ func newClusterListerWithVersion(kubernetesVersion string) *fakes.ClusterListerM
 
 func newCatalogTemplateVersion(maxRancherVersion, kubeVersion string) *apimgmtv3.CatalogTemplateVersion {
 	catalogTemplateVersion := &apimgmtv3.CatalogTemplateVersion{
-		TemplateVersion: apimgmtv3.TemplateVersion{
-			Spec: apimgmtv3.TemplateVersionSpec{
-				KubeVersion:       kubeVersion,
-				RancherMaxVersion: maxRancherVersion,
-			},
+		Spec: apimgmtv3.TemplateVersionSpec{
+			KubeVersion:       kubeVersion,
+			RancherMaxVersion: maxRancherVersion,
 		},
 	}
 	return catalogTemplateVersion

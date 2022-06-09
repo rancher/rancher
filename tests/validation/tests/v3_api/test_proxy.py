@@ -2,7 +2,7 @@ import os
 import time
 from lib.aws import AWS_USER
 from .common import (
-    AmazonWebServices, run_command
+    ADMIN_PASSWORD, AmazonWebServices, run_command
 )
 from .test_airgap import get_bastion_node
 from .test_custom_host_reg import (
@@ -145,9 +145,10 @@ def deploy_proxy_rancher(bastion_node):
         '-e HTTPS_PROXY={} ' \
         '-e NO_PROXY="localhost,127.0.0.1,0.0.0.0,10.0.0.0/8,' \
         'cattle-system.svc" ' \
-        'rancher/rancher:{}'.format(
+        '-e CATTLE_BOOTSTRAP_PASSWORD={} ' \
+        'rancher/rancher:{} --trace'.format(
             proxy_url, proxy_url,
-            RANCHER_SERVER_VERSION)
+            ADMIN_PASSWORD, RANCHER_SERVER_VERSION)
 
     deploy_result = run_command_on_proxy_node(bastion_node, ag_node,
                                               deploy_rancher_command,

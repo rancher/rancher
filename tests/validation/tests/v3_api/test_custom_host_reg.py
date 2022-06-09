@@ -44,17 +44,20 @@ def test_delete_keypair():
 
 
 def test_deploy_rancher_server():
-    if "v2.5" in  RANCHER_SERVER_VERSION or "master" in RANCHER_SERVER_VERSION:
+    if "v2.5" in  RANCHER_SERVER_VERSION or \
+        "master" in RANCHER_SERVER_VERSION or \
+        "v2.6" in RANCHER_SERVER_VERSION:
         RANCHER_SERVER_CMD = \
             'sudo docker run -d --privileged --name="rancher-server" ' \
             '--restart=unless-stopped -p 80:80 -p 443:443  ' \
-            'rancher/rancher'
+            '-e CATTLE_BOOTSTRAP_PASSWORD={} ' \
+            'rancher/rancher'.format(ADMIN_PASSWORD)
     else:
         RANCHER_SERVER_CMD = \
             'sudo docker run -d --name="rancher-server" ' \
             '--restart=unless-stopped -p 80:80 -p 443:443  ' \
             'rancher/rancher'
-    RANCHER_SERVER_CMD += ":" + RANCHER_SERVER_VERSION
+    RANCHER_SERVER_CMD += ":" + RANCHER_SERVER_VERSION + " --trace"
     print(RANCHER_SERVER_CMD)
     aws_nodes = AmazonWebServices().create_multiple_nodes(
         1, random_test_name("testsa" + HOST_NAME))
@@ -68,7 +71,8 @@ def test_deploy_rancher_server():
         "sudo docker exec rancher-server loglevel --set debug"
     aws_nodes[0].execute_command(RANCHER_SET_DEBUG_CMD)
 
-    token = set_url_password_token(RANCHER_SERVER_URL)
+    token = set_url_password_token(RANCHER_SERVER_URL,
+                                   version=RANCHER_SERVER_VERSION)
     admin_client = rancher.Client(url=RANCHER_SERVER_URL + "/v3",
                                   token=token, verify=False)
     if AUTH_PROVIDER:

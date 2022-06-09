@@ -10,10 +10,10 @@ import (
 
 func NewAccessControl(ctx context.Context, clusterName string, rbacClient v1.Interface) types.AccessControl {
 	asl := accesscontrol.NewAccessStore(ctx, true, rbacClient)
-	return NewAccessControlWithASL(clusterName, rbacClient, asl)
+	return NewAccessControlWithASL(clusterName, asl)
 }
 
-func NewAccessControlWithASL(clusterName string, rbacClient v1.Interface, asl accesscontrol.AccessSetLookup) types.AccessControl {
+func NewAccessControlWithASL(clusterName string, asl accesscontrol.AccessSetLookup) types.AccessControl {
 	return newContextBased(func(ctx *types.APIContext) (types.AccessControl, bool) {
 		cache, ok := ctx.Request.Context().Value(contextKey{}).(*accessControlCache)
 		if !ok {

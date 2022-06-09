@@ -7,25 +7,29 @@ import (
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/catalogv2/system"
+	"github.com/rancher/rancher/pkg/controllers/dashboard/chart"
+	"github.com/rancher/rancher/pkg/features"
+	fleetconst "github.com/rancher/rancher/pkg/fleet"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/wrangler"
+	"github.com/rancher/wrangler/pkg/relatedresource"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 var (
-	fleetCRDChart = chartDef{
-		ReleaseNamespace: "fleet-system",
-		ChartName:        "fleet-crd",
+	fleetCRDChart = chart.Definition{
+		ReleaseNamespace: fleetconst.ReleaseNamespace,
+		ChartName:        fleetconst.CRDChartName,
 	}
-	fleetChart = chartDef{
-		ReleaseNamespace: "fleet-system",
-		ChartName:        "fleet",
+	fleetChart = chart.Definition{
+		ReleaseNamespace: fleetconst.ReleaseNamespace,
+		ChartName:        fleetconst.ChartName,
+	}
+	fleetUninstallChart = chart.Definition{
+		ReleaseNamespace: fleetconst.ReleaseLegacyNamespace,
+		ChartName:        fleetconst.ChartName,
 	}
 )
-
-type chartDef struct {
-	ReleaseNamespace string
-	ChartName        string
-}
 
 func Register(ctx context.Context, wContext *wrangler.Context) error {
 	h := &handler{
@@ -33,6 +37,15 @@ func Register(ctx context.Context, wContext *wrangler.Context) error {
 	}
 
 	wContext.Mgmt.Setting().OnChange(ctx, "fleet-install", h.onSetting)
+	// watch cluster repo `rancher-charts` and enqueue the setting to make sure the latest fleet is installed after catalog refresh
+	relatedresource.WatchClusterScoped(ctx, "bootstrap-fleet-charts", func(namespace, name string, obj runtime.Object) ([]relatedresource.Key, error) {
+		if name == "rancher-charts" {
+			return []relatedresource.Key{{
+				Name: settings.ServerURL.Name,
+			}}, nil
+		}
+		return nil, nil
+	}, wContext.Mgmt.Setting(), wContext.Catalog.ClusterRepo())
 	return nil
 }
 
@@ -52,7 +65,14 @@ func (h *handler) onSetting(key string, setting *v3.Setting) (*v3.Setting, error
 		return setting, nil
 	}
 
-	err := h.manager.Ensure(fleetCRDChart.ReleaseNamespace, fleetCRDChart.ChartName, nil)
+	h.Lock()
+	if err := h.manager.Uninstall(fleetUninstallChart.ReleaseNamespace, fleetUninstallChart.ChartName); err != nil {
+		h.Unlock()
+		return nil, err
+	}
+	h.Unlock()
+
+	err := h.manager.Ensure(fleetCRDChart.ReleaseNamespace, fleetCRDChart.ChartName, settings.FleetMinVersion.Get(), nil, true)
 	if err != nil {
 		return setting, err
 	}
@@ -67,14 +87,23 @@ func (h *handler) onSetting(key string, setting *v3.Setting) (*v3.Setting, error
 		"apiServerURL": settings.ServerURL.Get(),
 		"apiServerCA":  settings.CACerts.Get(),
 		"global":       systemGlobalRegistry,
+		"bootstrap": map[string]interface{}{
+			"agentNamespace": fleetconst.ReleaseLocalNamespace,
+		},
+	}
+
+	fleetChartValues["gitops"] = map[string]interface{}{
+		"enabled": features.Gitops.Enabled(),
 	}
 
 	gitjobChartValues := make(map[string]interface{})
 
 	if envVal, ok := os.LookupEnv("HTTP_PROXY"); ok {
+		fleetChartValues["proxy"] = envVal
 		gitjobChartValues["proxy"] = envVal
 	}
 	if envVal, ok := os.LookupEnv("NO_PROXY"); ok {
+		fleetChartValues["noProxy"] = envVal
 		gitjobChartValues["noProxy"] = envVal
 	}
 
@@ -82,5 +111,5 @@ func (h *handler) onSetting(key string, setting *v3.Setting) (*v3.Setting, error
 		fleetChartValues["gitjob"] = gitjobChartValues
 	}
 
-	return setting, h.manager.Ensure(fleetChart.ReleaseNamespace, fleetChart.ChartName, fleetChartValues)
+	return setting, h.manager.Ensure(fleetChart.ReleaseNamespace, fleetChart.ChartName, settings.FleetMinVersion.Get(), fleetChartValues, true)
 }

@@ -15,13 +15,22 @@ import (
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	dialer2 "github.com/rancher/rancher/pkg/dialer"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/impersonation"
+	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/types/config/dialer"
+	"github.com/rancher/wrangler/pkg/schemas/validation"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/httpstream"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/proxy"
+	"k8s.io/apiserver/pkg/authentication/user"
+	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/client-go/rest"
 )
+
+type ClusterContextGetter interface {
+	UserContext(string) (*config.UserContext, error)
+}
 
 type RemoteService struct {
 	sync.Mutex
@@ -29,12 +38,13 @@ type RemoteService struct {
 	cluster   *v3.Cluster
 	transport transportGetter
 	url       urlGetter
-	auth      authGetter
 
-	factory       dialer.Factory
-	clusterLister v3.ClusterLister
-	caCert        string
-	httpTransport *http.Transport
+	factory              dialer.Factory
+	clusterLister        v3.ClusterLister
+	caCert               string
+	localAuth            string
+	httpTransport        *http.Transport
+	clusterContextGetter ClusterContextGetter
 }
 
 var (
@@ -59,11 +69,11 @@ func prefix(cluster *v3.Cluster) string {
 	return "/k8s/clusters/" + cluster.Name
 }
 
-func New(localConfig *rest.Config, cluster *v3.Cluster, clusterLister v3.ClusterLister, factory dialer.Factory) (*RemoteService, error) {
+func New(localConfig *rest.Config, cluster *v3.Cluster, clusterLister v3.ClusterLister, factory dialer.Factory, clusterContextGetter ClusterContextGetter) (*RemoteService, error) {
 	if cluster.Spec.Internal {
 		return NewLocal(localConfig, cluster)
 	}
-	return NewRemote(cluster, clusterLister, factory)
+	return NewRemote(cluster, clusterLister, factory, clusterContextGetter)
 }
 
 func NewLocal(localConfig *rest.Config, cluster *v3.Cluster) (*RemoteService, error) {
@@ -90,17 +100,15 @@ func NewLocal(localConfig *rest.Config, cluster *v3.Cluster) (*RemoteService, er
 		transport: transportGetter,
 	}
 	if localConfig.BearerToken != "" {
-		rs.auth = func() (string, error) { return "Bearer " + localConfig.BearerToken, nil }
+		rs.localAuth = "Bearer " + localConfig.BearerToken
 	} else if localConfig.Password != "" {
-		rs.auth = func() (string, error) {
-			return "Basic " + base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%s:%s", localConfig.Username, localConfig.Password))), nil
-		}
+		rs.localAuth = "Basic " + base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%s:%s", localConfig.Username, localConfig.Password)))
 	}
 
 	return rs, nil
 }
 
-func NewRemote(cluster *v3.Cluster, clusterLister v3.ClusterLister, factory dialer.Factory) (*RemoteService, error) {
+func NewRemote(cluster *v3.Cluster, clusterLister v3.ClusterLister, factory dialer.Factory, clusterContextGetter ClusterContextGetter) (*RemoteService, error) {
 	if !v32.ClusterConditionProvisioned.IsTrue(cluster) {
 		return nil, httperror.NewAPIError(httperror.ClusterUnavailable, "cluster not provisioned")
 	}
@@ -118,21 +126,12 @@ func NewRemote(cluster *v3.Cluster, clusterLister v3.ClusterLister, factory dial
 		return *u, nil
 	}
 
-	authGetter := func() (string, error) {
-		newCluster, err := clusterLister.Get("", cluster.Name)
-		if err != nil {
-			return "", err
-		}
-
-		return "Bearer " + newCluster.Status.ServiceAccountToken, nil
-	}
-
 	return &RemoteService{
-		cluster:       cluster,
-		url:           urlGetter,
-		auth:          authGetter,
-		clusterLister: clusterLister,
-		factory:       factory,
+		cluster:              cluster,
+		url:                  urlGetter,
+		clusterLister:        clusterLister,
+		factory:              factory,
+		clusterContextGetter: clusterContextGetter,
 	}, nil
 }
 
@@ -220,20 +219,26 @@ func (r *RemoteService) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	}
 
 	req.URL.Host = req.Host
-	if r.auth == nil {
-		req.Header.Del("Authorization")
-	} else {
-		token, err := r.auth()
-		if err != nil {
-			er.Error(rw, req, err)
-			return
-		}
-		req.Header.Set("Authorization", token)
-	}
 	transport, err := r.getTransport()
 	if err != nil {
 		er.Error(rw, req, err)
 		return
+	}
+
+	if r.cluster.Spec.Internal && r.localAuth == "" {
+		req.Header.Del("Authorization")
+	} else {
+		userInfo, authed := request.UserFrom(req.Context())
+		if !authed {
+			er.Error(rw, req, validation.Unauthorized)
+			return
+		}
+		token, err := r.getImpersonatorAccountToken(userInfo)
+		if err != nil && !strings.Contains(err.Error(), dialer2.ErrAgentDisconnected.Error()) {
+			er.Error(rw, req, fmt.Errorf("unable to create impersonator account: %w", err))
+			return
+		}
+		req.Header.Set("Authorization", "Bearer "+token)
 	}
 
 	if httpstream.IsUpgradeRequest(req) {
@@ -273,4 +278,29 @@ func (p *UpgradeProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	httpProxy := httputil.NewSingleHostReverseProxy(&url.URL{Scheme: p.Location.Scheme, Host: p.Location.Host})
 	httpProxy.Transport = p.Transport
 	httpProxy.ServeHTTP(rw, newReq)
+}
+
+// getImpersonatorAccountToken creates, if not already present, a service account and role bindings
+// whose only permission is to impersonate the given user, and returns the bearer token for the account.
+func (r *RemoteService) getImpersonatorAccountToken(user user.Info) (string, error) {
+	clusterContext, err := r.clusterContextGetter.UserContext(r.cluster.Name)
+	if err != nil {
+		return "", err
+	}
+
+	i, err := impersonation.New(user, clusterContext)
+	if err != nil {
+		return "", fmt.Errorf("error creating impersonation for user %s: %w", user.GetUID(), err)
+	}
+
+	sa, err := i.SetUpImpersonation()
+	if err != nil {
+		return "", fmt.Errorf("error setting up impersonation for user %s: %w", user.GetUID(), err)
+	}
+	saToken, err := i.GetToken(sa)
+	if err != nil {
+		return "", fmt.Errorf("error getting service account token: %w", err)
+	}
+
+	return saToken, nil
 }

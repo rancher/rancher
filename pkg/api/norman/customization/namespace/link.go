@@ -50,7 +50,7 @@ func (s *yamlLinkHandler) LinkHandler(apiContext *types.APIContext, next types.R
 
 	clusterName := s.clusterManagement.ClusterName(apiContext)
 
-	userContext, err := s.clusterManagement.UserContext(clusterName)
+	userContext, err := s.clusterManagement.UserContextNoControllers(clusterName)
 	if err != nil {
 		return err
 	}

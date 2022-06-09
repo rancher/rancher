@@ -8,10 +8,10 @@ import (
 
 	"github.com/rancher/norman/types/convert"
 	util "github.com/rancher/rancher/pkg/controllers/managementagent/workload"
+	"github.com/rancher/rancher/pkg/ingresswrapper"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/api/extensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
@@ -29,8 +29,8 @@ func GetStateKey(name, namespace, host string, path string, port string) string 
 	return base64.URLEncoding.EncodeToString([]byte(key))
 }
 
-func GetIngressState(obj *v1beta1.Ingress) map[string]string {
-	annotations := obj.Annotations
+func GetIngressState(obj ingresswrapper.Ingress) map[string]string {
+	annotations := obj.GetAnnotations()
 	if annotations == nil {
 		return nil
 	}
@@ -64,7 +64,7 @@ func generateIngressService(name string, port int32, workloadIDs string) (ingres
 	return rtn, nil
 }
 
-func (i *ingressService) generateNewService(obj *v1beta1.Ingress, serviceType corev1.ServiceType) *corev1.Service {
+func (i *ingressService) generateNewService(obj *ingresswrapper.CompatIngress, serviceType corev1.ServiceType) (*corev1.Service, error) {
 	controller := true
 	return &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
@@ -72,9 +72,9 @@ func (i *ingressService) generateNewService(obj *v1beta1.Ingress, serviceType co
 			OwnerReferences: []metav1.OwnerReference{
 				{
 					Name:       obj.Name,
-					APIVersion: "v1beta1/extensions",
+					APIVersion: obj.APIVersion,
 					UID:        obj.UID,
-					Kind:       "Ingress",
+					Kind:       obj.Kind,
 					Controller: &controller,
 				},
 			},
@@ -93,14 +93,14 @@ func (i *ingressService) generateNewService(obj *v1beta1.Ingress, serviceType co
 				},
 			},
 		},
-	}
+	}, nil
 }
 
-func IsServiceOwnedByIngress(ingress *v1beta1.Ingress, service *corev1.Service) bool {
+func IsServiceOwnedByIngress(obj *ingresswrapper.CompatIngress, service *corev1.Service) (bool, error) {
 	for i, owners := 0, service.GetOwnerReferences(); owners != nil && i < len(owners); i++ {
-		if owners[i].UID == ingress.UID && owners[i].Kind == ingress.Kind {
-			return true
+		if owners[i].UID == obj.UID && owners[i].Kind == obj.Kind {
+			return true, nil
 		}
 	}
-	return false
+	return false, nil
 }

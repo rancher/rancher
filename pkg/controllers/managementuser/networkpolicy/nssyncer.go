@@ -65,8 +65,9 @@ func (nss *nsSyncer) syncOnMove(nsName string, projectID string, movedToNone boo
 		return fmt.Errorf("nsSyncer: error getting systemNamespaces %v", err)
 	}
 	if movedToNone {
-		nss.npmgr.delete(nsName, "np-default")
-		nss.npmgr.delete(nsName, "hn-nodes")
+		nss.npmgr.delete(nsName, defaultNamespacePolicyName)
+		nss.npmgr.delete(nsName, hostNetworkPolicyName)
+		nss.npmgr.delete(nsName, defaultSystemProjectNamespacePolicyName)
 	}
 	if err = nss.syncNodePortServices(systemNamespaces, nsName, movedToNone); err != nil {
 		return fmt.Errorf("nsSyncer: error syncing services %v", err)

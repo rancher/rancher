@@ -1,5 +1,5 @@
 /*
-Copyright 2020 Rancher Labs, Inc.
+Copyright 2022 Rancher Labs, Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -360,6 +360,10 @@ func (a *fleetWorkspaceGeneratingHandler) Remove(key string, obj *v3.FleetWorksp
 }
 
 func (a *fleetWorkspaceGeneratingHandler) Handle(obj *v3.FleetWorkspace, status v3.FleetWorkspaceStatus) (v3.FleetWorkspaceStatus, error) {
+	if !obj.DeletionTimestamp.IsZero() {
+		return status, nil
+	}
+
 	objs, newStatus, err := a.FleetWorkspaceGeneratingHandler(obj, status)
 	if err != nil {
 		return newStatus, err

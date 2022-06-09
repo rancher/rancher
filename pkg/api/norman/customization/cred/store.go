@@ -10,13 +10,15 @@ import (
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/rancher/pkg/api/norman/customization/namespacedresource"
+	"github.com/rancher/rancher/pkg/controllers/provisioningv2/cluster"
+	provv1 "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/namespace"
 	"k8s.io/apimachinery/pkg/labels"
 )
 
-func Wrap(store types.Store, ns v1.NamespaceInterface, nodeTemplateLister v3.NodeTemplateLister) types.Store {
+func Wrap(store types.Store, ns v1.NamespaceInterface, nodeTemplateLister v3.NodeTemplateLister, provClusterCache provv1.ClusterCache) types.Store {
 	transformStore := &transform.Store{
 		Store: store,
 		Transformer: func(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}, opt *types.QueryOptions) (map[string]interface{}, error) {
@@ -32,8 +34,9 @@ func Wrap(store types.Store, ns v1.NamespaceInterface, nodeTemplateLister v3.Nod
 	}
 
 	newStore := &Store{
-		transformStore,
-		nodeTemplateLister,
+		Store:              transformStore,
+		NodeTemplateLister: nodeTemplateLister,
+		ProvClusterCache:   provClusterCache,
 	}
 
 	return namespacedresource.Wrap(newStore, ns, namespace.GlobalNamespace)
@@ -77,9 +80,16 @@ func Validator(request *types.APIContext, schema *types.Schema, data map[string]
 type Store struct {
 	types.Store
 	NodeTemplateLister v3.NodeTemplateLister
+	ProvClusterCache   provv1.ClusterCache
 }
 
 func (s *Store) Delete(apiContext *types.APIContext, schema *types.Schema, id string) (map[string]interface{}, error) {
+	if provClusters, err := s.ProvClusterCache.GetByIndex(cluster.ByCloudCred, id); err != nil {
+		return nil, err
+	} else if len(provClusters) > 0 {
+		return nil, httperror.NewAPIError(httperror.InvalidAction, fmt.Sprintf("cloud credential is currently referenced by provisioning cluster %s", provClusters[0].Name))
+	}
+
 	nodeTemplates, err := s.NodeTemplateLister.List("", labels.NewSelector())
 	if err != nil {
 		return nil, err

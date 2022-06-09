@@ -2,6 +2,8 @@ package tunnelserver
 
 import (
 	"context"
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -12,16 +14,19 @@ import (
 	"github.com/rancher/norman/types/set"
 	"github.com/rancher/rancher/pkg/peermanager"
 	"github.com/rancher/rancher/pkg/settings"
-	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/remotedialer"
+	"github.com/rancher/wrangler/pkg/data"
+	corecontrollers "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
 	"github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/runtime"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/net"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 )
 
-func NewPeerManager(ctx context.Context, context *config.ScaledContext, dialer *remotedialer.Server) (peermanager.PeerManager, error) {
-	return startPeerManager(ctx, context, dialer)
+func NewPeerManager(ctx context.Context, endpoints corecontrollers.EndpointsController, dialer *remotedialer.Server) (peermanager.PeerManager, error) {
+	return startPeerManager(ctx, endpoints, dialer)
 }
 
 type peerManager struct {
@@ -35,12 +40,65 @@ type peerManager struct {
 	listeners map[chan<- peermanager.Peers]bool
 }
 
-func startPeerManager(ctx context.Context, context *config.ScaledContext, server *remotedialer.Server) (peermanager.PeerManager, error) {
+func getTokenFromToken(ctx context.Context, tokenBytes []byte) ([]byte, error) {
+	// detect and handle 1.21+ token
+	parts := strings.Split(string(tokenBytes), ".")
+	if len(parts) != 3 {
+		return nil, fmt.Errorf("invalid token, not jwt format")
+	}
+	newBytes, err := base64.RawStdEncoding.DecodeString(parts[1])
+	if err != nil {
+		return nil, fmt.Errorf("decoding service token: %w", err)
+	}
+	data := data.Object{}
+	if err := json.Unmarshal(newBytes, &data); err != nil {
+		return nil, fmt.Errorf("unmarshal service token: %w", err)
+	}
+	ns := data.String("kubernetes.io", "namespace")
+	name := data.String("kubernetes.io", "serviceaccount", "name")
+
+	if name == "" || ns == "" {
+		return tokenBytes, nil
+	}
+
+	cfg, err := rest.InClusterConfig()
+	if err != nil {
+		return nil, err
+	}
+
+	client, err := kubernetes.NewForConfig(cfg)
+	if err != nil {
+		return nil, err
+	}
+
+	sa, err := client.CoreV1().ServiceAccounts(ns).Get(ctx, name, metav1.GetOptions{})
+	if err != nil {
+		return nil, err
+	}
+
+	if len(sa.Secrets) == 0 {
+		return nil, fmt.Errorf("no secret assigned to service account %s/%s", ns, name)
+	}
+
+	secret, err := client.CoreV1().Secrets(ns).Get(ctx, sa.Secrets[0].Name, metav1.GetOptions{})
+	if err != nil {
+		return nil, err
+	}
+
+	return secret.Data["token"], nil
+}
+
+func startPeerManager(ctx context.Context, endpoints corecontrollers.EndpointsController, server *remotedialer.Server) (peermanager.PeerManager, error) {
 	tokenBytes, err := ioutil.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/token")
 	if os.IsNotExist(err) || settings.Namespace.Get() == "" || settings.PeerServices.Get() == "" {
 		logrus.Infof("Running in single server mode, will not peer connections")
 		return nil, nil
 	} else if err != nil {
+		return nil, err
+	}
+
+	tokenBytes, err = getTokenFromToken(ctx, tokenBytes)
+	if err != nil {
 		return nil, err
 	}
 
@@ -62,13 +120,17 @@ func startPeerManager(ctx context.Context, context *config.ScaledContext, server
 		listeners: map[chan<- peermanager.Peers]bool{},
 	}
 
-	context.Core.Endpoints(settings.Namespace.Get()).AddHandler(ctx, "peer-manager-controller", pm.syncService)
+	endpoints.OnChange(ctx, "peer-manager-controller", pm.syncService)
 	return pm, nil
 }
 
-func (p *peerManager) syncService(key string, endpoint *v1.Endpoints) (runtime.Object, error) {
+func (p *peerManager) syncService(key string, endpoint *v1.Endpoints) (*v1.Endpoints, error) {
 	if endpoint == nil {
 		return nil, nil
+	}
+
+	if endpoint.Namespace != settings.Namespace.Get() {
+		return endpoint, nil
 	}
 
 	parts := strings.SplitN(key, "/", 2)

@@ -3,6 +3,7 @@ package providers
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 
 	"github.com/rancher/rancher/pkg/auth/providers/activedirectory"
@@ -10,8 +11,10 @@ import (
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/providers/github"
 	"github.com/rancher/rancher/pkg/auth/providers/googleoauth"
+	"github.com/rancher/rancher/pkg/auth/providers/keycloakoidc"
 	"github.com/rancher/rancher/pkg/auth/providers/ldap"
 	"github.com/rancher/rancher/pkg/auth/providers/local"
+	"github.com/rancher/rancher/pkg/auth/providers/oidc"
 	"github.com/rancher/rancher/pkg/auth/providers/saml"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
@@ -28,6 +31,7 @@ var (
 	LocalProvider          = "local"
 	providersByType        = make(map[string]common.AuthProvider)
 	confMu                 sync.Mutex
+	userExtraAttributesMap = map[string]bool{common.UserAttributePrincipalID: true, common.UserAttributeUserName: true}
 )
 
 func GetProvider(providerName string) (common.AuthProvider, error) {
@@ -129,6 +133,27 @@ func Configure(ctx context.Context, mgmt *config.ScaledContext) {
 	providers[googleoauth.Name] = p
 	providersByType[client.GoogleOauthConfigType] = p
 	providersByType[publicclient.GoogleOAuthProviderType] = p
+
+	p = oidc.Configure(ctx, mgmt, userMGR, tokenMGR)
+	ProviderNames[oidc.Name] = true
+	ProvidersWithSecrets[oidc.Name] = true
+	providers[oidc.Name] = p
+	providersByType[client.OIDCConfigType] = p
+	providersByType[publicclient.OIDCProviderType] = p
+
+	p = keycloakoidc.Configure(ctx, mgmt, userMGR, tokenMGR)
+	ProviderNames[keycloakoidc.Name] = true
+	ProvidersWithSecrets[keycloakoidc.Name] = true
+	providers[keycloakoidc.Name] = p
+	providersByType[client.KeyCloakOIDCConfigType] = p
+	providersByType[publicclient.KeyCloakOIDCProviderType] = p
+}
+
+func IsValidUserExtraAttribute(key string) bool {
+	if _, ok := userExtraAttributesMap[strings.ToLower(key)]; ok {
+		return true
+	}
+	return false
 }
 
 func AuthenticateUser(ctx context.Context, input interface{}, providerName string) (v3.Principal, []v3.Principal, string, error) {
@@ -178,4 +203,8 @@ func CanAccessWithGroupProviders(providerName string, userPrincipalID string, gr
 
 func RefetchGroupPrincipals(principalID string, providerName string, secret string) ([]v3.Principal, error) {
 	return providers[providerName].RefetchGroupPrincipals(principalID, secret)
+}
+
+func GetUserExtraAttributes(providerName string, userPrincipal v3.Principal) map[string][]string {
+	return providers[providerName].GetUserExtraAttributes(userPrincipal)
 }

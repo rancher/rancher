@@ -58,7 +58,7 @@ func (h *ProjectGraphHandler) QuerySeriesAction(actionName string, action *types
 	}
 
 	clusterName := inputParser.ClusterName
-	userContext, err := h.clustermanager.UserContext(clusterName)
+	userContext, err := h.clustermanager.UserContextNoControllers(clusterName)
 	if err != nil {
 		return fmt.Errorf("get usercontext failed, %v", err)
 	}

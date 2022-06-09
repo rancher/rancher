@@ -10,4 +10,4 @@ $CONTAINER_NAME | Out-File -Encoding ascii -Force -FilePath "$STATIC_CONTENT_PAT
 $CONTAINER_NAME | Out-File -Encoding ascii -Force -FilePath "$STATIC_CONTENT_PATH\service1.html"
 $CONTAINER_NAME | Out-File -Encoding ascii -Force -FilePath "$STATIC_CONTENT_PATH\service2.html"
 
-Start-Process -NoNewWindow -Wait -FilePath $Args[0] -ArgumentList $Args[1..$Args.Length]
+c:\svcm.exe w3svc

@@ -75,6 +75,7 @@ type Interface interface {
 	CisConfigsGetter
 	CisBenchmarkVersionsGetter
 	FleetWorkspacesGetter
+	RancherUserNotificationsGetter
 }
 
 type Client struct {
@@ -1005,6 +1006,20 @@ func (c *Client) FleetWorkspaces(namespace string) FleetWorkspaceInterface {
 	sharedClient := c.clientFactory.ForResourceKind(FleetWorkspaceGroupVersionResource, FleetWorkspaceGroupVersionKind.Kind, false)
 	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &FleetWorkspaceResource, FleetWorkspaceGroupVersionKind, fleetWorkspaceFactory{})
 	return &fleetWorkspaceClient{
+		ns:           namespace,
+		client:       c,
+		objectClient: objectClient,
+	}
+}
+
+type RancherUserNotificationsGetter interface {
+	RancherUserNotifications(namespace string) RancherUserNotificationInterface
+}
+
+func (c *Client) RancherUserNotifications(namespace string) RancherUserNotificationInterface {
+	sharedClient := c.clientFactory.ForResourceKind(RancherUserNotificationGroupVersionResource, RancherUserNotificationGroupVersionKind.Kind, false)
+	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &RancherUserNotificationResource, RancherUserNotificationGroupVersionKind, rancherUserNotificationFactory{})
+	return &rancherUserNotificationClient{
 		ns:           namespace,
 		client:       c,
 		objectClient: objectClient,

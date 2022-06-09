@@ -7,6 +7,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Azure/azure-sdk-for-go/services/containerservice/mgmt/2020-11-01/containerservice"
+	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/rancher/norman/api/access"
 	"github.com/rancher/norman/httperror"
@@ -16,7 +18,7 @@ import (
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	mgmtclient "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	"github.com/rancher/rancher/pkg/controllers/management/k3sbasedupgrade"
-	"github.com/rancher/rancher/pkg/controllers/managementuser/cis"
+	"github.com/rancher/rancher/pkg/controllers/managementuserlegacy/cis"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/kontainer-engine/service"
 	"github.com/rancher/rancher/pkg/namespace"
@@ -71,11 +73,15 @@ func (v *Validator) Validator(request *types.APIContext, schema *types.Schema, d
 		return err
 	}
 
+	if err := v.validateAKSConfig(request, data, &clusterSpec); err != nil {
+		return err
+	}
+
 	if err := v.validateEKSConfig(request, data, &clusterSpec); err != nil {
 		return err
 	}
 
-	return nil
+	return v.validateGKEConfig(request, data, &clusterSpec)
 }
 
 func (v *Validator) validateScheduledClusterScan(spec *mgmtclient.Cluster) error {
@@ -158,10 +164,12 @@ func (v *Validator) validateLocalClusterAuthEndpoint(request *types.APIContext, 
 		}
 		isValidCluster = cluster.Status.Driver == "" ||
 			cluster.Status.Driver == v32.ClusterDriverRKE ||
-			cluster.Status.Driver == v32.ClusterDriverImported
+			cluster.Status.Driver == v32.ClusterDriverImported ||
+			cluster.Status.Driver == v32.ClusterDriverK3s ||
+			cluster.Status.Driver == v32.ClusterDriverRke2
 	}
 	if !isValidCluster {
-		return httperror.NewFieldAPIError(httperror.InvalidState, "LocalClusterAuthEndpoint.Enabled", "Can only enable LocalClusterAuthEndpoint with RKE")
+		return httperror.NewFieldAPIError(httperror.InvalidState, "LocalClusterAuthEndpoint.Enabled", "Can only enable LocalClusterAuthEndpoint with RKE, RKE2, or K3s")
 	}
 
 	if spec.LocalClusterAuthEndpoint.CACerts != "" && spec.LocalClusterAuthEndpoint.FQDN == "" {
@@ -244,6 +252,12 @@ func (v *Validator) validateK3sBasedVersionUpgrade(request *types.APIContext, sp
 		return err
 	}
 
+	if isK3s && cluster.Spec.K3sConfig == nil {
+		// prevents embedded cluster from have k3sConfig set. Embedded cluster cannot be upgraded. Non-embedded
+		// clusters' config will be set my controller.
+		return httperror.NewAPIError(httperror.InvalidBodyContent, "k3sConfig cannot be changed from nil")
+	}
+
 	// must wait for original status version to be set
 	if cluster.Status.Version == nil {
 		return upgradeNotReadyErr
@@ -300,11 +314,7 @@ func (v *Validator) accessTemplate(request *types.APIContext, spec *mgmtclient.C
 	}
 
 	var ctMap map[string]interface{}
-	if err := access.ByID(request, &mgmtSchema.Version, mgmtclient.ClusterTemplateType, clusterTempRev.Spec.ClusterTemplateName, &ctMap); err != nil {
-		return err
-	}
-
-	return nil
+	return access.ByID(request, &mgmtSchema.Version, mgmtclient.ClusterTemplateType, clusterTempRev.Spec.ClusterTemplateName, &ctMap)
 }
 
 // validateGenericEngineConfig allows for additional validation of clusters that depend on Kontainer Engine or Rancher Machine driver
@@ -332,6 +342,151 @@ func (v *Validator) validateGenericEngineConfig(request *types.APIContext, spec 
 
 }
 
+func (v *Validator) validateAKSConfig(request *types.APIContext, cluster map[string]interface{}, clusterSpec *v32.ClusterSpec) error {
+	aksConfig, ok := cluster["aksConfig"].(map[string]interface{})
+	if !ok {
+		return nil
+	}
+
+	var prevCluster *v3.Cluster
+
+	if request.Method == http.MethodPut {
+		var err error
+		prevCluster, err = v.ClusterLister.Get("", request.ID)
+		if err != nil {
+			return err
+		}
+	}
+
+	// check user's access to cloud credential
+	if azureCredential, ok := aksConfig["azureCredentialSecret"].(string); ok && (prevCluster == nil || azureCredential != prevCluster.Spec.AKSConfig.AzureCredentialSecret) {
+		// Only check that the user has access to the credential if the credential is being changed.
+		if err := validateCredentialAuth(request, azureCredential); err != nil {
+			return err
+		}
+	}
+
+	if err := v.validateAKSNetworkPolicy(clusterSpec, prevCluster); err != nil {
+		return err
+	}
+
+	createFromImport := request.Method == http.MethodPost && aksConfig["imported"] == true
+
+	if !createFromImport {
+		if err := validateAKSKubernetesVersion(clusterSpec, prevCluster); err != nil {
+			return err
+		}
+		if err := validateAKSNodePools(clusterSpec); err != nil {
+			return err
+		}
+	}
+
+	if request.Method != http.MethodPost {
+		return nil
+	}
+
+	// validation for creates only
+	if err := validateAKSClusterName(v.ClusterClient, clusterSpec); err != nil {
+		return err
+	}
+
+	region, regionOk := aksConfig["resourceLocation"]
+	if !regionOk || region == "" {
+		return httperror.NewAPIError(httperror.InvalidBodyContent, "must provide region")
+	}
+
+	return nil
+}
+
+// validateAKSKubernetesVersion checks whether a kubernetes version is provided
+func validateAKSKubernetesVersion(spec *v32.ClusterSpec, prevCluster *v3.Cluster) error {
+	clusterVersion := spec.AKSConfig.KubernetesVersion
+	if clusterVersion == nil {
+		return nil
+	}
+
+	if to.String(clusterVersion) == "" {
+		return httperror.NewAPIError(httperror.InvalidBodyContent, "cluster kubernetes version cannot be empty string")
+	}
+
+	return nil
+}
+
+// validateAKSNodePools checks whether a given NodePool version is empty or not supported.
+// More involved validation is performed in the aks-operator.
+func validateAKSNodePools(spec *v32.ClusterSpec) error {
+	nodePools := spec.AKSConfig.NodePools
+	if nodePools == nil {
+		return nil
+	}
+	if len(nodePools) == 0 {
+		return httperror.NewAPIError(httperror.InvalidBodyContent, "must have at least one nodepool")
+	}
+
+	for _, np := range nodePools {
+		name := np.Name
+		if to.String(name) == "" {
+			return httperror.NewAPIError(httperror.InvalidBodyContent, "nodePool Name cannot be an empty string")
+		}
+		if np.OsType == "Windows" {
+			return httperror.NewAPIError(httperror.InvalidBodyContent, "windows node pools are not supported")
+		}
+	}
+
+	return nil
+}
+
+func validateAKSClusterName(client v3.ClusterInterface, spec *v32.ClusterSpec) error {
+	// validate cluster does not reference an AKS cluster that is already backed by a Rancher cluster
+	name := spec.AKSConfig.ClusterName
+	region := spec.AKSConfig.ResourceLocation
+	msgSuffix := fmt.Sprintf("in region [%s]", region)
+
+	// cluster client is being used instead of lister to avoid the use of an outdated cache
+	clusters, err := client.List(metav1.ListOptions{})
+	if err != nil {
+		return httperror.NewAPIError(httperror.ServerError, "failed to confirm clusterName is unique among Rancher AKS clusters "+msgSuffix)
+	}
+
+	for _, cluster := range clusters.Items {
+		if cluster.Spec.AKSConfig == nil {
+			continue
+		}
+		if name != cluster.Spec.AKSConfig.ClusterName {
+			continue
+		}
+		if region != "" && region != cluster.Spec.AKSConfig.ResourceLocation {
+			continue
+		}
+
+		return httperror.NewAPIError(httperror.InvalidBodyContent, fmt.Sprintf("cluster already exists for AKS cluster [%s] "+msgSuffix, name))
+	}
+	return nil
+}
+
+// validateAKSNetworkPolicy performs validation around setting enableNetworkPolicy on AKS clusters which turns on Project Network Isolation
+func (v *Validator) validateAKSNetworkPolicy(clusterSpec *v32.ClusterSpec, prevCluster *v3.Cluster) error {
+	// determine if network policy is enabled on the AKS cluster by checking the cluster spec and then the upstream spec if the field is nil (unmanaged)
+	var networkPolicy string
+	if clusterSpec.AKSConfig != nil && clusterSpec.AKSConfig.NetworkPolicy != nil {
+		networkPolicy = *clusterSpec.AKSConfig.NetworkPolicy
+	} else if prevCluster != nil && prevCluster.Status.AKSStatus.UpstreamSpec != nil && prevCluster.Status.AKSStatus.UpstreamSpec.NetworkPolicy != nil {
+		networkPolicy = *prevCluster.Status.AKSStatus.UpstreamSpec.NetworkPolicy
+	} else {
+		return nil
+	}
+
+	// network policy enabled on the AKS cluster is a prerequisite for PNI
+	if to.Bool(clusterSpec.EnableNetworkPolicy) && networkPolicy != string(containerservice.NetworkPolicyAzure) && networkPolicy != string(containerservice.NetworkPolicyCalico) {
+		return httperror.NewAPIError(
+			httperror.InvalidBodyContent,
+			"Network Policy support must be enabled on AKS cluster in order to enable Project Network Isolation",
+		)
+	}
+
+	return nil
+}
+
 func (v *Validator) validateEKSConfig(request *types.APIContext, cluster map[string]interface{}, clusterSpec *v32.ClusterSpec) error {
 	eksConfig, ok := cluster["eksConfig"].(map[string]interface{})
 	if !ok {
@@ -349,8 +504,9 @@ func (v *Validator) validateEKSConfig(request *types.APIContext, cluster map[str
 	}
 
 	// check user's access to cloud credential
-	if amazonCredential, ok := eksConfig["amazonCredentialSecret"].(string); ok {
-		if err := validateEKSCredentialAuth(request, amazonCredential, prevCluster); err != nil {
+	if amazonCredential, ok := eksConfig["amazonCredentialSecret"].(string); ok && (prevCluster == nil || amazonCredential != prevCluster.Spec.EKSConfig.AmazonCredentialSecret) {
+		// Only check that the user has access to the credential if the credential is being changed.
+		if err := validateCredentialAuth(request, amazonCredential); err != nil {
 			return err
 		}
 	}
@@ -446,36 +602,13 @@ func validateEKSKubernetesVersion(spec *v32.ClusterSpec, prevCluster *v3.Cluster
 	return nil
 }
 
-// validateEKSCredentialAuth validates that a user has access to the credential they are setting and the credential
-// they are overwriting. If there is no previous credential such as during a create or the old credential cannot
-// be found, the auth check will succeed as long as the user can access the new credential.
-func validateEKSCredentialAuth(request *types.APIContext, credential string, prevCluster *v3.Cluster) error {
+// validateCredentialAuth validates that a user has access to the credential they are setting.
+func validateCredentialAuth(request *types.APIContext, credential string) error {
 	var accessCred mgmtclient.CloudCredential
 	credentialErr := "error accessing cloud credential"
 	if err := access.ByID(request, &mgmtSchema.Version, mgmtclient.CloudCredentialType, credential, &accessCred); err != nil {
 		return httperror.NewAPIError(httperror.NotFound, credentialErr)
 	}
-
-	if prevCluster == nil {
-		return nil
-	}
-
-	if prevCluster.Spec.EKSConfig == nil {
-		return nil
-	}
-
-	// validate the user has access to the old cloud credential before allowing them to change it
-	credential = prevCluster.Spec.EKSConfig.AmazonCredentialSecret
-	if err := access.ByID(request, &mgmtSchema.Version, mgmtclient.CloudCredentialType, credential, &accessCred); err != nil {
-		if apiError, ok := err.(*httperror.APIError); ok {
-			if apiError.Code.Status == httperror.NotFound.Status {
-				// old cloud credential doesn't exist anymore, anyone can change it
-				return nil
-			}
-		}
-		return httperror.NewAPIError(httperror.NotFound, credentialErr)
-	}
-
 	return nil
 }
 
@@ -531,6 +664,184 @@ func validateEKS(prevCluster, newCluster map[string]interface{}) error {
 	}
 	if !reflect.DeepEqual(prev, new) {
 		return httperror.NewAPIError(httperror.InvalidBodyContent, "cannot modify EKS subnets after creation")
+	}
+	return nil
+}
+
+func (v *Validator) validateGKEConfig(request *types.APIContext, cluster map[string]interface{}, clusterSpec *v32.ClusterSpec) error {
+	gkeConfig, ok := cluster["gkeConfig"].(map[string]interface{})
+	if !ok {
+		return nil
+	}
+
+	var prevCluster *v3.Cluster
+	if request.Method == http.MethodPut {
+		var err error
+		prevCluster, err = v.ClusterLister.Get("", request.ID)
+		if err != nil {
+			return err
+		}
+	}
+
+	// check user's access to cloud credential
+	if googleCredential, ok := gkeConfig["googleCredentialSecret"].(string); ok && (prevCluster == nil || googleCredential != prevCluster.Spec.GKEConfig.GoogleCredentialSecret) {
+		// Only check that the user has access to the credential if the credential is being changed.
+		if err := validateCredentialAuth(request, googleCredential); err != nil {
+			return err
+		}
+	}
+
+	if err := v.validateGKENetworkPolicy(clusterSpec, prevCluster); err != nil {
+		return err
+	}
+
+	createFromImport := request.Method == http.MethodPost && gkeConfig["imported"] == true
+	if !createFromImport {
+		if err := validateGKEKubernetesVersion(clusterSpec, prevCluster); err != nil {
+			return err
+		}
+		if err := validateGKENodePools(clusterSpec); err != nil {
+			return err
+		}
+	}
+
+	if request.Method != http.MethodPost {
+		return nil
+	}
+
+	// validation for creates only
+
+	if err := validateGKEClusterName(v.ClusterClient, clusterSpec); err != nil {
+		return err
+	}
+
+	if err := validateGKEPrivateClusterConfig(clusterSpec); err != nil {
+		return err
+	}
+
+	region, regionOk := gkeConfig["region"]
+	zone, zoneOk := gkeConfig["zone"]
+	if (!regionOk || region == "") && (!zoneOk || zone == "") {
+		return httperror.NewAPIError(httperror.InvalidBodyContent, "must provide region or zone")
+	}
+
+	return nil
+}
+
+// validateGKENetworkPolicy performs validation around setting enableNetworkPolicy on GKE clusters which turns on Project Network Isolation
+func (v *Validator) validateGKENetworkPolicy(clusterSpec *v32.ClusterSpec, prevCluster *v3.Cluster) error {
+	// determine if network policy is enabled on the GKE cluster by checking the cluster spec and then the upstream spec if the field is nil (unmanaged)
+	var netPolEnabled bool
+	if clusterSpec.GKEConfig != nil && clusterSpec.GKEConfig.NetworkPolicyEnabled != nil {
+		netPolEnabled = *clusterSpec.GKEConfig.NetworkPolicyEnabled
+	} else if prevCluster != nil && prevCluster.Status.GKEStatus.UpstreamSpec != nil && prevCluster.Status.GKEStatus.UpstreamSpec.NetworkPolicyEnabled != nil {
+		netPolEnabled = *prevCluster.Status.GKEStatus.UpstreamSpec.NetworkPolicyEnabled
+	} else {
+		return nil
+	}
+
+	// network policy enabled on the GKE cluster is a prerequisite for PNI
+	if to.Bool(clusterSpec.EnableNetworkPolicy) && !netPolEnabled {
+		return httperror.NewAPIError(
+			httperror.InvalidBodyContent,
+			"Network Policy support must be enabled on GKE cluster in order to enable Project Network Isolation",
+		)
+	}
+
+	return nil
+}
+
+// validateGKEKubernetesVersion checks whether a kubernetes version is provided and if it is supported
+func validateGKEKubernetesVersion(spec *v32.ClusterSpec, prevCluster *v3.Cluster) error {
+	clusterVersion := spec.GKEConfig.KubernetesVersion
+	if clusterVersion == nil {
+		return nil
+	}
+
+	if *clusterVersion == "" {
+		return httperror.NewAPIError(httperror.InvalidBodyContent, "cluster kubernetes version cannot be empty string")
+	}
+
+	return nil
+}
+
+// validateGKENodePools checks whether a given node pool version is empty or not supported.
+func validateGKENodePools(spec *v32.ClusterSpec) error {
+	nodepools := spec.GKEConfig.NodePools
+	if nodepools == nil {
+		return nil
+	}
+	if len(nodepools) == 0 {
+		return httperror.NewAPIError(httperror.InvalidBodyContent, fmt.Sprintf("must have at least one node pool"))
+	}
+
+	var errors []string
+	hasRequiredLinuxPool := false
+
+	for _, np := range nodepools {
+		if np.Name == nil || *np.Name == "" {
+			return httperror.NewAPIError(httperror.InvalidBodyContent, fmt.Sprintf("node pool name cannot be empty"))
+		}
+
+		version := np.Version
+		if version == nil || *version == "" {
+			errors = append(errors, fmt.Sprintf("node pool [%s] version cannot be empty", *np.Name))
+			continue
+		}
+
+		// Windows images are WINDOWS_LTSC or WINDOWS_SAC. The cluster must have at least one non-Windows node pool.
+		if !hasRequiredLinuxPool && !strings.Contains(strings.ToLower(np.Config.ImageType), "windows") {
+			hasRequiredLinuxPool = true
+		}
+	}
+
+	if !hasRequiredLinuxPool {
+		errors = append(errors, fmt.Sprintf("at least 1 Linux node pool is required"))
+	}
+
+	if len(errors) != 0 {
+		return httperror.NewAPIError(httperror.InvalidBodyContent, fmt.Sprintf(strings.Join(errors, ";")))
+	}
+	return nil
+}
+
+func validateGKEClusterName(client v3.ClusterInterface, spec *v32.ClusterSpec) error {
+	// validate cluster does not reference an GKE cluster that is already backed by a Rancher cluster
+	name := spec.GKEConfig.ClusterName
+	region := spec.GKEConfig.Region
+	zone := spec.GKEConfig.Zone
+	msgSuffix := fmt.Sprintf("in region [%s]", region)
+	if region == "" {
+		msgSuffix = fmt.Sprintf("in zone [%s]", spec.GKEConfig.Zone)
+	}
+
+	// cluster client is being used instead of lister to avoid the use of an outdated cache
+	clusters, err := client.List(metav1.ListOptions{})
+	if err != nil {
+		return httperror.NewAPIError(httperror.ServerError, "failed to confirm clusterName is unique among Rancher GKE clusters "+msgSuffix)
+	}
+
+	for _, cluster := range clusters.Items {
+		if cluster.Spec.GKEConfig == nil {
+			continue
+		}
+		if name != cluster.Spec.GKEConfig.ClusterName {
+			continue
+		}
+		if region != "" && region != cluster.Spec.GKEConfig.Region {
+			continue
+		}
+		if zone != "" && zone != cluster.Spec.GKEConfig.Zone {
+			continue
+		}
+		return httperror.NewAPIError(httperror.InvalidBodyContent, fmt.Sprintf("cluster already exists for GKE cluster [%s] "+msgSuffix, name))
+	}
+	return nil
+}
+
+func validateGKEPrivateClusterConfig(spec *v32.ClusterSpec) error {
+	if spec.GKEConfig.PrivateClusterConfig != nil && spec.GKEConfig.PrivateClusterConfig.EnablePrivateEndpoint && !spec.GKEConfig.PrivateClusterConfig.EnablePrivateNodes {
+		return httperror.NewAPIError(httperror.InvalidBodyContent, fmt.Sprintf("private endpoint requires private nodes"))
 	}
 	return nil
 }

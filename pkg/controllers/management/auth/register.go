@@ -23,7 +23,7 @@ func RegisterWranglerIndexers(config *wrangler.Context) {
 	})
 }
 
-func RegisterIndexers(ctx context.Context, scaledContext *config.ScaledContext) error {
+func RegisterIndexers(scaledContext *config.ScaledContext) error {
 	prtbInformer := scaledContext.Management.ProjectRoleTemplateBindings("").Controller().Informer()
 	prtbIndexers := map[string]cache.IndexFunc{
 		prtbByRoleTemplateIndex: prtbByRoleTemplate,

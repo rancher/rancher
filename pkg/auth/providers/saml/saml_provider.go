@@ -9,7 +9,6 @@ import (
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 
 	"github.com/crewjam/saml"
-	"github.com/crewjam/saml/samlsp"
 	"github.com/mitchellh/mapstructure"
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/types"
@@ -49,7 +48,7 @@ type Provider struct {
 	name            string
 	userType        string
 	groupType       string
-	clientState     samlsp.ClientState
+	clientState     ClientState
 	ldapProvider    common.AuthProvider
 }
 
@@ -115,6 +114,15 @@ func PerformSamlLogin(name string, apiContext *types.APIContext, input interface
 	finalRedirectURL := login.FinalRedirectURL
 
 	if provider, ok := SamlProviders[name]; ok {
+		if provider == nil {
+			logrus.Errorf("SAML: Provider %v not initialized", name)
+			return fmt.Errorf("SAML: Provider %v not initialized", name)
+		}
+		if provider.clientState == nil {
+			logrus.Errorf("SAML: Provider %v clientState not set", name)
+			return fmt.Errorf("SAML: Provider %v clientState not set", name)
+		}
+		logrus.Debugf("SAML [PerformSamlLogin]: Setting clientState for SAML service provider %v", name)
 		provider.clientState.SetState(apiContext.Response, apiContext.Request, "Rancher_FinalRedirectURL", finalRedirectURL)
 		provider.clientState.SetState(apiContext.Response, apiContext.Request, "Rancher_Action", loginAction)
 		provider.clientState.SetState(apiContext.Response, apiContext.Request, "Rancher_PublicKey", login.PublicKey)
@@ -125,6 +133,7 @@ func PerformSamlLogin(name string, apiContext *types.APIContext, input interface
 		if err != nil {
 			return err
 		}
+		logrus.Debugf("SAML [PerformSamlLogin]: Redirecting to the identity provider login page at %v", idpRedirectURL)
 		data := map[string]interface{}{
 			"idpRedirectUrl": idpRedirectURL,
 			"type":           "samlLoginOutput",
@@ -385,4 +394,15 @@ func (s *Provider) hasLdapGroupSearch() bool {
 		return true
 	}
 	return false
+}
+
+func (s *Provider) GetUserExtraAttributes(userPrincipal v3.Principal) map[string][]string {
+	extras := make(map[string][]string)
+	if userPrincipal.Name != "" {
+		extras[common.UserAttributePrincipalID] = []string{userPrincipal.Name}
+	}
+	if userPrincipal.LoginName != "" {
+		extras[common.UserAttributeUserName] = []string{userPrincipal.LoginName}
+	}
+	return extras
 }

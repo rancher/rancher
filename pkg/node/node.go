@@ -83,6 +83,29 @@ func GetNodeInternalAddress(node *corev1.Node) string {
 	return ""
 }
 
+func GetEndpointV1NodeIP(node *v1.Node) string {
+	externalIP := ""
+	internalIP := ""
+	for _, ip := range node.Status.Addresses {
+		if ip.Type == "ExternalIP" && ip.Address != "" {
+			externalIP = ip.Address
+			break
+		} else if ip.Type == "InternalIP" && ip.Address != "" {
+			internalIP = ip.Address
+		}
+	}
+	if externalIP != "" {
+		return externalIP
+	}
+	if node.Annotations != nil {
+		externalIP = node.Annotations[externalAddressAnnotation]
+		if externalIP != "" {
+			return externalIP
+		}
+	}
+	return internalIP
+}
+
 func GetEndpointNodeIP(node *v3.Node) string {
 	externalIP := ""
 	internalIP := ""
@@ -170,6 +193,15 @@ func GetMachineForNode(node *corev1.Node, clusterNamespace string, machineLister
 	return nil, nil
 }
 
+func IsNodeReady(node *v1.Node) bool {
+	for _, cond := range node.Status.Conditions {
+		if cond.Type == corev1.NodeReady {
+			return cond.Status == corev1.ConditionTrue
+		}
+	}
+	return false
+}
+
 func IsMachineReady(machine *v3.Node) bool {
 	for _, cond := range machine.Status.InternalNodeStatus.Conditions {
 		if cond.Type == corev1.NodeReady {
@@ -179,7 +211,7 @@ func IsMachineReady(machine *v3.Node) bool {
 	return false
 }
 
-func DrainBeforeDelete(node *v3.Node, cluster *v3.Cluster) bool {
+func DrainBeforeDelete(node *v3.Node, cluster *v3.Cluster, nodePool *v3.NodePool) bool {
 	if node.Status.NodeConfig == nil {
 		return false
 	}
@@ -190,6 +222,10 @@ func DrainBeforeDelete(node *v3.Node, cluster *v3.Cluster) bool {
 
 	// vsphere nodes with cloud providers need to be drained to unmount vmdk files as vsphere deletes them automatically
 	if nil != cluster.Spec.RancherKubernetesEngineConfig.CloudProvider.VsphereCloudProvider {
+		return true
+	}
+
+	if nodePool != nil && nodePool.Spec.DrainBeforeDelete {
 		return true
 	}
 

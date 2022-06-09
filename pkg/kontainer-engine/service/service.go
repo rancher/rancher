@@ -62,15 +62,13 @@ func (c controllerConfigGetter) GetConfig() (types.DriverOptions, error) {
 		IntOptions:         make(map[string]int64),
 		StringSliceOptions: make(map[string]*types.StringSlice),
 	}
-	data := map[string]interface{}{}
 	switch c.driverName {
 	case ImportDriverName:
 		config, err := toMap(c.clusterSpec.ImportedConfig, "json")
 		if err != nil {
 			return driverOptions, err
 		}
-		data = config
-		flatten(data, &driverOptions)
+		flatten(config, &driverOptions)
 	case RancherKubernetesEngineDriverName:
 		config, err := yaml.Marshal(c.clusterSpec.RancherKubernetesEngineConfig)
 		if err != nil {
@@ -82,10 +80,8 @@ func (c controllerConfigGetter) GetConfig() (types.DriverOptions, error) {
 		if err != nil {
 			return driverOptions, err
 		}
-		data = config
-		flatten(data, &driverOptions)
+		flatten(config, &driverOptions)
 	}
-
 	driverOptions.StringOptions["name"] = c.clusterName
 	displayName := c.clusterSpec.DisplayName
 	if displayName == "" {
@@ -396,6 +392,7 @@ type RunningDriver struct {
 
 	listenAddress string
 	cancel        context.CancelFunc
+	cmd           *exec.Cmd
 }
 
 func (r *RunningDriver) Start() (string, error) {
@@ -462,6 +459,7 @@ func (r *RunningDriver) Start() (string, error) {
 		time.Sleep(5 * time.Second)
 
 		r.listenAddress = listenAddress
+		r.cmd = cmd
 	}
 
 	logrus.Infof("kontainerdriver %v listening on address %v", r.Name, r.listenAddress)
@@ -495,6 +493,11 @@ func (r *RunningDriver) Stop() {
 		r.Server.Stop()
 	} else {
 		r.cancel()
+	}
+
+	if r.cmd != nil {
+		_ = r.cmd.Wait()
+		r.cmd = nil
 	}
 
 	logrus.Infof("kontainerdriver %v stopped", r.Name)

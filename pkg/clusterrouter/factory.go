@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"sync"
 
-	"github.com/docker/docker/pkg/locker"
+	"github.com/moby/locker"
 	"github.com/rancher/rancher/pkg/clusterrouter/proxy"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config/dialer"
@@ -12,22 +12,24 @@ import (
 )
 
 type factory struct {
-	dialerFactory dialer.Factory
-	clusterLookup ClusterLookup
-	clusterLister v3.ClusterLister
-	clusters      sync.Map
-	serverLock    *locker.Locker
-	servers       sync.Map
-	localConfig   *rest.Config
+	dialerFactory        dialer.Factory
+	clusterLookup        ClusterLookup
+	clusterLister        v3.ClusterLister
+	clusters             sync.Map
+	serverLock           *locker.Locker
+	servers              sync.Map
+	localConfig          *rest.Config
+	clusterContextGetter proxy.ClusterContextGetter
 }
 
-func newFactory(localConfig *rest.Config, dialer dialer.Factory, lookup ClusterLookup, clusterLister v3.ClusterLister) *factory {
+func newFactory(localConfig *rest.Config, dialer dialer.Factory, lookup ClusterLookup, clusterLister v3.ClusterLister, clusterContextGetter proxy.ClusterContextGetter) *factory {
 	return &factory{
-		dialerFactory: dialer,
-		serverLock:    locker.New(),
-		clusterLookup: lookup,
-		clusterLister: clusterLister,
-		localConfig:   localConfig,
+		dialerFactory:        dialer,
+		serverLock:           locker.New(),
+		clusterLookup:        lookup,
+		clusterLister:        clusterLister,
+		localConfig:          localConfig,
+		clusterContextGetter: clusterContextGetter,
 	}
 }
 
@@ -73,5 +75,5 @@ func (s *factory) get(req *http.Request) (*v3.Cluster, http.Handler, error) {
 }
 
 func (s *factory) newServer(c *v3.Cluster) (server, error) {
-	return proxy.New(s.localConfig, c, s.clusterLister, s.dialerFactory)
+	return proxy.New(s.localConfig, c, s.clusterLister, s.dialerFactory, s.clusterContextGetter)
 }

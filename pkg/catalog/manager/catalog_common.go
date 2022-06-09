@@ -201,6 +201,16 @@ func setTraverseCompleted(catalog *v3.Catalog) {
 	v32.CatalogConditionProcessed.Reason(catalog, "")
 }
 
+// getChartName returns the chart name with a given catalogTemplate name and a given catalog name.
+// It does not check for correctness, but an empty string will be returned the catalogName input is invalid.
+func getChartName(catalogName, templateName string) string {
+	temp := strings.Split(templateName, catalogName)
+	if len(temp) < 2 || catalogName == "" {
+		return ""
+	}
+	return strings.TrimPrefix(temp[1], "-")
+}
+
 // Using Helm standards to make a qualified name to be used for template name, see link below
 // General Helm Chart conventions should be followed as we will not correct all potential issues
 // https://github.com/helm/helm/blob/9b42702a4bced339ff424a78ad68dd6be6e1a80a/cmd/helm/testdata/testcharts/chart-with-template-lib-dep/charts/common/templates/_fullname.tpl

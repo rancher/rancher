@@ -14,4 +14,5 @@ RUN wget https://github.com/rancher/rke/releases/download/$RKE_VERSION/rke_linux
     mv kubectl /bin/kubectl && \
     chmod +x /bin/kubectl  && \
     cd $WORKSPACE && \
+    pip install --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt

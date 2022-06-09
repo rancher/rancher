@@ -27,7 +27,7 @@ func lsCluster(ctx *cli.Context) error {
 	writer := utils.NewTableWriter([][]string{
 		{"NAME", "Name"},
 		{"DRIVER", "DriverName"},
-		{"VERISON", "Version"},
+		{"VERSION", "Version"},
 		{"ENDPOINT", "Endpoint"},
 		{"NODE_COUNT", "NodeCount"},
 		{"STATUS", "Status"},

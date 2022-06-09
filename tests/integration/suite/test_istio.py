@@ -10,6 +10,7 @@ istio_crd_url = "https://raw.githubusercontent.com/istio/istio/1.1.5" \
                 "/install/kubernetes/helm/istio-init/files/crd-10.yaml"
 
 
+@pytest.mark.skip(reason='skipping for now, enable with istio 1.22 fix')
 @pytest.mark.nonparallel
 def test_virtual_service(admin_pc):
     client = admin_pc.client
@@ -40,6 +41,7 @@ def test_virtual_service(admin_pc):
     client.delete(ns)
 
 
+@pytest.mark.skip(reason='skipping for now, enable with istio 1.22 fix')
 @pytest.mark.nonparallel
 def test_destination_rule(admin_pc):
     client = admin_pc.client
@@ -70,6 +72,7 @@ def test_destination_rule(admin_pc):
 # and our types were passing multiple options which failed.
 # This test ensures you can pass a single option.
 # See: https://github.com/rancher/rancher/issues/25515
+@pytest.mark.skip(reason='skipping for now, enable with istio 1.22 fix')
 @pytest.mark.nonparallel
 def test_destination_rule_on_cookie(admin_pc, remove_resource):
     client = admin_pc.client
@@ -109,6 +112,7 @@ def test_destination_rule_on_cookie(admin_pc, remove_resource):
         .consistentHash.httpCookie.name == cookie_name
 
 
+@pytest.mark.skip(reason='skipping for now, enable with istio 1.22 fix')
 @pytest.mark.nonparallel
 def test_gateway(admin_pc):
     client = admin_pc.client

@@ -85,7 +85,7 @@ def test_cluster_node_count(admin_mc, remove_resource,
     # Delete a node
     k8s_dynamic_client.delete_namespaced_custom_object(
         "management.cattle.io", "v3", cluster.id, 'nodes',
-        dynamic_nt1['metadata']['name'], {})
+        dynamic_nt1['metadata']['name'])
 
     node_count = 1
     wait_for(lambda: _check_node_count(cluster, node_count),

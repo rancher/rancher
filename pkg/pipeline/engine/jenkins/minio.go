@@ -1,13 +1,15 @@
 package jenkins
 
 import (
+	"context"
 	"fmt"
 	"io/ioutil"
 	"net/http"
 	"strings"
 	"time"
 
-	"github.com/minio/minio-go"
+	"github.com/minio/minio-go/v7"
+	"github.com/minio/minio-go/v7/pkg/credentials"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/project.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/pipeline/utils"
 	"github.com/sirupsen/logrus"
@@ -20,10 +22,21 @@ type minioClient struct {
 }
 
 func (j *Engine) getMinioURL(ns string) (string, error) {
-	MinioName := utils.MinioName
-	svc, err := j.ServiceLister.Get(ns, MinioName)
-	if err != nil {
-		return "", err
+	var (
+		MinioName = utils.MinioName
+		svc       *corev1.Service
+		err       error
+	)
+	if j.UseCache {
+		svc, err = j.ServiceLister.Get(ns, MinioName)
+		if err != nil {
+			return "", err
+		}
+	} else {
+		svc, err = j.Services.GetNamespaced(ns, MinioName, metav1.GetOptions{})
+		if err != nil {
+			return "", err
+		}
 	}
 
 	ip := svc.Spec.ClusterIP
@@ -49,16 +62,19 @@ func (j *Engine) getMinioClient(ns string) (*minio.Client, error) {
 	}
 	token := string(secret.Data[utils.PipelineSecretTokenKey])
 
-	client, err := minio.New(url, user, token, false)
-	if err != nil {
-		return nil, err
+	// https://github.com/minio/minio-go/blob/0be3a44757352b6e617ef00eb47829bce29baab1/api.go#L153
+	opt := minio.Options{
+		Creds:        credentials.NewStaticV4(user, token, ""),
+		Secure:       false,
+		Region:       "",
+		BucketLookup: minio.BucketLookupAuto,
 	}
+
 	if j.HTTPClient == nil {
 		dial, err := j.Dialer.ClusterDialer(j.ClusterName)
 		if err != nil {
 			return nil, err
 		}
-
 		j.HTTPClient = &http.Client{
 			Transport: &http.Transport{
 				DialContext: dial,
@@ -66,8 +82,11 @@ func (j *Engine) getMinioClient(ns string) (*minio.Client, error) {
 			Timeout: 15 * time.Second,
 		}
 	}
-	client.SetCustomTransport(j.HTTPClient.Transport)
-
+	opt.Transport = j.HTTPClient.Transport
+	client, err := minio.New(url, &opt)
+	if err != nil {
+		return nil, err
+	}
 	return client, nil
 }
 
@@ -80,7 +99,7 @@ func (j Engine) getStepLogFromMinioStore(execution *v3.PipelineExecution, stage 
 		return "", err
 	}
 
-	reader, err := client.GetObject(bucketName, logName, minio.GetObjectOptions{})
+	reader, err := client.GetObject(context.TODO(), bucketName, logName, minio.GetObjectOptions{})
 
 	//stat, err := reader.Stat()
 	if err != nil {
@@ -103,12 +122,13 @@ func (j *Engine) saveStepLogToMinio(execution *v3.PipelineExecution, stage int, 
 		return err
 	}
 	//Make Bucket
-	exists, err := client.BucketExists(bucketName)
+	exists, err := client.BucketExists(context.TODO(), bucketName)
 	if err != nil {
 		logrus.Error(err)
 	}
 	if !exists {
-		if err := client.MakeBucket(bucketName, utils.MinioBucketLocation); err != nil {
+		makeBucketOpt := minio.MakeBucketOptions{Region: utils.MinioBucketLocation}
+		if err := client.MakeBucket(context.TODO(), bucketName, makeBucketOpt); err != nil {
 			return err
 		}
 	}
@@ -118,6 +138,6 @@ func (j *Engine) saveStepLogToMinio(execution *v3.PipelineExecution, stage int, 
 		return err
 	}
 
-	_, err = client.PutObject(bucketName, logName, strings.NewReader(message), int64(len(message)), minio.PutObjectOptions{})
+	_, err = client.PutObject(context.TODO(), bucketName, logName, strings.NewReader(message), int64(len(message)), minio.PutObjectOptions{})
 	return err
 }

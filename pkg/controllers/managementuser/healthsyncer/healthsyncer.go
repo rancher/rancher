@@ -4,19 +4,21 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"regexp"
 	"sort"
 	"time"
 
+	"github.com/blang/semver"
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/condition"
+	"github.com/rancher/norman/types/slice"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/controllers/management/clusterconnected"
 	corev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
-	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/wrangler/pkg/ticker"
 	"github.com/sirupsen/logrus"
-	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -27,6 +29,18 @@ import (
 const (
 	syncInterval = 15 * time.Second
 )
+
+// kubernetes/apimachinery/pkg/util/version/version.go
+var versionMatchRE = regexp.MustCompile(`^\s*v?([0-9]+(?:\.[0-9]+)*)(.*)*$`)
+
+var excludedComponentMap = map[string][]string{
+	"aks":     {"controller-manager", "scheduler"},
+	"tencent": {"controller-manager", "scheduler"},
+	"lke":     {"controller-manager", "scheduler"},
+}
+
+// ComponentStatus is disabled with k8s v1.22
+var componentStatusDisabledRange, _ = semver.ParseRange(">=1.22.0")
 
 type ClusterControllerLifecycle interface {
 	Stop(cluster *v3.Cluster)
@@ -73,21 +87,46 @@ func (h *HealthSyncer) getComponentStatus(cluster *v3.Cluster) error {
 	// As of k8s v1.14, kubeapi returns a successful ComponentStatuses response even if etcd is not available.
 	// To work around this, now we try to get a namespace from the API, even if not found, it means the API is up.
 	if _, err := h.k8s.CoreV1().Namespaces().Get(ctx, "kube-system", metav1.GetOptions{}); err != nil && !apierrors.IsNotFound(err) {
-		return condition.Error("ComponentStatsFetchingFailure", errors.Wrap(err, "Failed to communicate with API server"))
+		return condition.Error("ComponentStatusFetchingFailure", errors.Wrap(err, "Failed to communicate with API server during namespace check"))
 	}
 
+	cluster.Status.ComponentStatuses = []v32.ClusterComponentStatus{}
+	if cluster.Status.Version == nil {
+		return nil
+	}
+	parts := versionMatchRE.FindStringSubmatch(cluster.Status.Version.String())
+	if parts == nil || len(parts) < 2 {
+		return condition.Error("ComponentStatusFetchingFailure", fmt.Errorf("Failed to parse cluster status version %s",
+			cluster.Status.Version.String()))
+	}
+	k8sVersion, err := semver.Parse(parts[1])
+	if err != nil {
+		return condition.Error("ComponentStatusFetchingFailure", fmt.Errorf("Failed to parse cluster k8s version %s",
+			cluster.Status.Version.String()))
+	}
+	if componentStatusDisabledRange(k8sVersion) {
+		return nil
+	}
 	cses, err := h.componentStatuses.List(metav1.ListOptions{})
 	if err != nil {
-		return condition.Error("ComponentStatsFetchingFailure", errors.Wrap(err, "Failed to communicate with API server"))
+		return condition.Error("ComponentStatusFetchingFailure", errors.Wrap(err, "Failed to communicate with API server"))
 	}
-	cluster.Status.ComponentStatuses = []v32.ClusterComponentStatus{}
+	clusterType := cluster.Status.Provider // the provider detector is more accurate but we can fall back on the driver in some cases
+	if clusterType == "" {
+		clusterType = cluster.Status.Driver
+	}
+	excludedComponents, ok := excludedComponentMap[clusterType]
 	for _, cs := range cses.Items {
+		if ok && slice.ContainsString(excludedComponents, cs.Name) {
+			continue
+		}
 		clusterCS := convertToClusterComponentStatus(&cs)
 		cluster.Status.ComponentStatuses = append(cluster.Status.ComponentStatuses, *clusterCS)
 	}
 	sort.Slice(cluster.Status.ComponentStatuses, func(i, j int) bool {
 		return cluster.Status.ComponentStatuses[i].Name < cluster.Status.ComponentStatuses[j].Name
 	})
+
 	return nil
 }
 
@@ -102,13 +141,15 @@ func (h *HealthSyncer) updateClusterHealth() error {
 		return nil
 	}
 
-	wasReady := v32.ClusterConditionReady.IsTrue(cluster)
+	// cluster condition ready is set to false if connected is false, return to avoid setting it to true incorrectly
+	if clusterconnected.Connected.IsFalse(cluster) {
+		logrus.Debugf("Skip updating cluster condition ready - cluster agent for [%s] isn't connected yet", h.clusterName)
+		return nil
+	}
+
 	newObj, err := v32.ClusterConditionReady.Do(cluster, func() (runtime.Object, error) {
 		for i := 0; ; i++ {
 			err := h.getComponentStatus(cluster)
-			if err == nil && !wasReady {
-				err = h.checkClusterAgent()
-			}
 			if err == nil || i > 1 {
 				return cluster, errors.Wrap(err, "cluster health check failed")
 			}
@@ -134,21 +175,6 @@ func (h *HealthSyncer) updateClusterHealth() error {
 	// Purposefully not return error.  This is so when the cluster goes unavailable we don't just keep failing
 	// which will essentially keep the controller alive forever, instead of shutting down.
 	return nil
-}
-
-func (h *HealthSyncer) checkClusterAgent() error {
-	if c, err := h.clusterLister.Get("", h.clusterName); err == nil && c.Spec.Internal {
-		return nil
-	}
-
-	deployment, err := h.k8s.AppsV1().Deployments(namespace.System).Get(h.ctx, "cattle-cluster-agent", metav1.GetOptions{})
-	if err != nil {
-		return err
-	}
-	if condition.Cond(appsv1.DeploymentAvailable).IsTrue(deployment) {
-		return nil
-	}
-	return fmt.Errorf("cluster agent is not ready")
 }
 
 func (h *HealthSyncer) getCluster() (*v3.Cluster, error) {

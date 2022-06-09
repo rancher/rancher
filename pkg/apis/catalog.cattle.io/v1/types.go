@@ -61,6 +61,9 @@ type RepoSpec struct {
 
 	// If disabled the repo clone will not be updated or allowed to be installed from
 	Enabled *bool `json:"enabled,omitempty"`
+
+	// DisableSameOriginCheck attaches the Basic Auth Header to all helm client API calls, regardless of whether the destination of the API call matches the origin of the repository's URL
+	DisableSameOriginCheck bool `json:"disableSameOriginCheck,omitempty"`
 }
 
 type RepoCondition string

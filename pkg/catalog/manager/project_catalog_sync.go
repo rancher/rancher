@@ -1,8 +1,8 @@
 package manager
 
 import (
-	helmlib "github.com/rancher/rancher/pkg/catalog/helm"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	helmlib "github.com/rancher/rancher/pkg/helm"
 	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -31,7 +31,7 @@ func (m *Manager) ProjectCatalogSync(key string, obj *v3.ProjectCatalog) (runtim
 		return nil, err
 	}
 
-	commit, helm, err := helmlib.NewForceUpdate(&projectCatalog.Catalog)
+	commit, helm, err := helmlib.NewForceUpdate(&projectCatalog.Catalog, m.SecretLister)
 	if err != nil {
 		return m.updateProjectCatalogError(projectCatalog, err)
 	}

@@ -2,16 +2,17 @@ package ingress
 
 import (
 	"context"
+	"reflect"
 
 	"k8s.io/apimachinery/pkg/runtime"
 
 	"github.com/rancher/norman/types/convert"
 	util "github.com/rancher/rancher/pkg/controllers/managementagent/workload"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
+	"github.com/rancher/rancher/pkg/ingresswrapper"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/api/extensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 )
@@ -33,12 +34,21 @@ func Register(ctx context.Context, workload *config.UserOnlyContext) {
 		serviceLister: workload.Core.Services("").Controller().Lister(),
 		nodeLister:    workload.Core.Nodes("").Controller().Lister(),
 	}
-	workload.Extensions.Ingresses("").AddHandler(ctx, "ingressWorkloadController", c.sync)
+	if ingresswrapper.ServerSupportsIngressV1(workload.K8sClient) {
+		workload.Networking.Ingresses("").AddHandler(ctx, "ingressWorkloadController", ingresswrapper.CompatSyncV1(c.sync))
+	} else {
+		workload.Extensions.Ingresses("").AddHandler(ctx, "ingressWorkloadController", ingresswrapper.CompatSyncV1Beta1(c.sync))
+	}
 }
 
-func (c *Controller) sync(key string, obj *v1beta1.Ingress) (runtime.Object, error) {
-	if obj == nil || obj.DeletionTimestamp != nil {
+func (c *Controller) sync(key string, ingress ingresswrapper.Ingress) (runtime.Object, error) {
+	if ingress == nil || reflect.ValueOf(ingress).IsNil() || ingress.GetDeletionTimestamp() != nil {
 		return nil, nil
+	}
+
+	obj, err := ingresswrapper.ToCompatIngress(ingress)
+	if err != nil {
+		return obj, err
 	}
 	state := GetIngressState(obj)
 	if state == nil {
@@ -59,9 +69,12 @@ func (c *Controller) sync(key string, obj *v1beta1.Ingress) (runtime.Object, err
 
 	// 1. clean up first, delete or update the service is existing
 	for _, service := range existingServices {
-		shouldDelete, toUpdate := updateOrDelete(obj, service, expectedServices, needNodePort)
+		shouldDelete, toUpdate, err := updateOrDelete(obj, service, expectedServices, needNodePort)
+		if err != nil {
+			return nil, err
+		}
 		if shouldDelete {
-			if err := c.services.DeleteNamespaced(obj.Namespace, service.Name, &metav1.DeleteOptions{}); err != nil {
+			if err := c.services.DeleteNamespaced(obj.GetNamespace(), service.Name, &metav1.DeleteOptions{}); err != nil {
 				return nil, err
 			}
 			continue
@@ -78,10 +91,14 @@ func (c *Controller) sync(key string, obj *v1beta1.Ingress) (runtime.Object, err
 	// 2. create the new services
 	for _, ingressService := range expectedServices {
 		var toCreate *corev1.Service
+		var err error
 		if needNodePort {
-			toCreate = ingressService.generateNewService(obj, corev1.ServiceTypeNodePort)
+			toCreate, err = ingressService.generateNewService(obj, corev1.ServiceTypeNodePort)
 		} else {
-			toCreate = ingressService.generateNewService(obj, corev1.ServiceTypeClusterIP)
+			toCreate, err = ingressService.generateNewService(obj, corev1.ServiceTypeClusterIP)
+		}
+		if err != nil {
+			return nil, err
 		}
 		logrus.Infof("Creating %s service %s for ingress %s, port %d", ingressService.serviceName, toCreate.Spec.Type, key, ingressService.servicePort)
 		if _, err := c.services.Create(toCreate); err != nil {
@@ -92,7 +109,7 @@ func (c *Controller) sync(key string, obj *v1beta1.Ingress) (runtime.Object, err
 	return nil, nil
 }
 
-func generateExpectedServices(state map[string]string, obj *v1beta1.Ingress) (map[string]ingressService, error) {
+func generateExpectedServices(state map[string]string, obj *ingresswrapper.CompatIngress) (map[string]ingressService, error) {
 	var err error
 	rtn := map[string]ingressService{}
 	for _, r := range obj.Spec.Rules {
@@ -101,19 +118,19 @@ func generateExpectedServices(state map[string]string, obj *v1beta1.Ingress) (ma
 			continue
 		}
 		for _, b := range r.HTTP.Paths {
-			key := GetStateKey(obj.Name, obj.Namespace, host, b.Path, convert.ToString(b.Backend.ServicePort.IntVal))
+			key := GetStateKey(obj.GetName(), obj.GetNamespace(), host, b.Path, convert.ToString(b.Backend.Service.Port.Number))
 			if workloadIDs, ok := state[key]; ok {
-				rtn[b.Backend.ServiceName], err = generateIngressService(b.Backend.ServiceName, b.Backend.ServicePort.IntVal, workloadIDs)
+				rtn[b.Backend.Service.Name], err = generateIngressService(b.Backend.Service.Name, b.Backend.Service.Port.Number, workloadIDs)
 				if err != nil {
 					return nil, err
 				}
 			}
 		}
 	}
-	if obj.Spec.Backend != nil {
-		key := GetStateKey(obj.Name, obj.Namespace, "", "/", convert.ToString(obj.Spec.Backend.ServicePort.IntVal))
+	if obj.Spec.DefaultBackend != nil {
+		key := GetStateKey(obj.GetName(), obj.GetNamespace(), "", "/", convert.ToString(obj.Spec.DefaultBackend.Service.Port.Number))
 		if workloadIDs, ok := state[key]; ok {
-			rtn[obj.Spec.Backend.ServiceName], err = generateIngressService(obj.Spec.Backend.ServiceName, obj.Spec.Backend.ServicePort.IntVal, workloadIDs)
+			rtn[obj.Spec.DefaultBackend.Service.Name], err = generateIngressService(obj.Spec.DefaultBackend.Service.Name, obj.Spec.DefaultBackend.Service.Port.Number, workloadIDs)
 			if err != nil {
 				return nil, err
 			}
@@ -122,9 +139,9 @@ func generateExpectedServices(state map[string]string, obj *v1beta1.Ingress) (ma
 	return rtn, nil
 }
 
-func getIngressRelatedServices(serviceLister v1.ServiceLister, obj *v1beta1.Ingress, expectedServices map[string]ingressService) (map[string]*corev1.Service, error) {
+func getIngressRelatedServices(serviceLister v1.ServiceLister, obj *ingresswrapper.CompatIngress, expectedServices map[string]ingressService) (map[string]*corev1.Service, error) {
 	rtn := map[string]*corev1.Service{}
-	services, err := serviceLister.List(obj.Namespace, labels.NewSelector())
+	services, err := serviceLister.List(obj.GetNamespace(), labels.NewSelector())
 	if err != nil {
 		return nil, err
 	}
@@ -135,16 +152,24 @@ func getIngressRelatedServices(serviceLister v1.ServiceLister, obj *v1beta1.Ingr
 			continue
 		}
 		//mark the service which own by ingress but not related to ingress
-		if IsServiceOwnedByIngress(obj, service) {
+		ok, err := IsServiceOwnedByIngress(obj, service)
+		if err != nil {
+			return nil, err
+		}
+		if ok {
 			rtn[service.Name] = service
 		}
 	}
 	return rtn, nil
 }
 
-func updateOrDelete(obj *v1beta1.Ingress, service *corev1.Service, expectedServices map[string]ingressService, isNeedNodePort bool) (bool, *corev1.Service) {
+func updateOrDelete(obj *ingresswrapper.CompatIngress, service *corev1.Service, expectedServices map[string]ingressService, isNeedNodePort bool) (bool, *corev1.Service, error) {
 	shouldDelete := false
 	var toUpdate *corev1.Service
+	serviceIsOwnedByIngress, err := IsServiceOwnedByIngress(obj, service)
+	if err != nil {
+		return false, nil, err
+	}
 	s, ok := expectedServices[service.Name]
 	if ok {
 		if service.Annotations == nil {
@@ -152,7 +177,7 @@ func updateOrDelete(obj *v1beta1.Ingress, service *corev1.Service, expectedServi
 		}
 		// handling issue https://github.com/rancher/rancher/issues/13717.
 		// if node port is using by non-GKE for ingress service, we should replace them.
-		if service.Spec.Type == corev1.ServiceTypeNodePort && !isNeedNodePort && IsServiceOwnedByIngress(obj, service) {
+		if service.Spec.Type == corev1.ServiceTypeNodePort && !isNeedNodePort && serviceIsOwnedByIngress {
 			shouldDelete = true
 		} else {
 			if service.Annotations[util.WorkloadAnnotation] != s.workloadIDs && s.workloadIDs != "" {
@@ -162,11 +187,11 @@ func updateOrDelete(obj *v1beta1.Ingress, service *corev1.Service, expectedServi
 		}
 	} else {
 		//delete those service owned by ingress
-		if IsServiceOwnedByIngress(obj, service) {
+		if serviceIsOwnedByIngress {
 			shouldDelete = true
 		}
 	}
-	return shouldDelete, toUpdate
+	return shouldDelete, toUpdate, nil
 }
 
 func (c *Controller) needNodePort() bool {

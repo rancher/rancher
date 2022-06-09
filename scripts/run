@@ -6,7 +6,7 @@ cd $(dirname $0)/..
 
 CMD=bin/rancher
 if [ ! -x $CMD ]; then
-    ./scripts/build
+    ./scripts/build-server
 fi
 
 rm -rf build/testdata
@@ -14,4 +14,6 @@ mkdir -p build/testdata
 cd build/testdata
 export KUBECONFIG=
 export CATTLE_DEV_MODE=yes
-exec ../../$CMD --add-local=true --features=multi-cluster-management=true
+export CATTLE_SERVER_URL="https://$(ip route get 8.8.8.8 | awk '{print $7}'):8443"
+export CATTLE_BOOTSTRAP_PASSWORD="admin"
+exec ../../$CMD

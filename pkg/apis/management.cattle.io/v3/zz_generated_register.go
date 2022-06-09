@@ -1,5 +1,5 @@
 /*
-Copyright 2020 Rancher Labs, Inc.
+Copyright 2022 Rancher Labs, Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -28,6 +28,7 @@ import (
 )
 
 var (
+	APIServiceResourceName                              = "apiservices"
 	ActiveDirectoryProviderResourceName                 = "activedirectoryproviders"
 	AuthConfigResourceName                              = "authconfigs"
 	AuthProviderResourceName                            = "authproviders"
@@ -67,6 +68,7 @@ var (
 	GroupMemberResourceName                             = "groupmembers"
 	KontainerDriverResourceName                         = "kontainerdrivers"
 	LocalProviderResourceName                           = "localproviders"
+	ManagedChartResourceName                            = "managedcharts"
 	MonitorMetricResourceName                           = "monitormetrics"
 	MultiClusterAppResourceName                         = "multiclusterapps"
 	MultiClusterAppRevisionResourceName                 = "multiclusterapprevisions"
@@ -75,6 +77,7 @@ var (
 	NodePoolResourceName                                = "nodepools"
 	NodeTemplateResourceName                            = "nodetemplates"
 	NotifierResourceName                                = "notifiers"
+	OIDCProviderResourceName                            = "oidcproviders"
 	OpenLdapProviderResourceName                        = "openldapproviders"
 	PodSecurityPolicyTemplateResourceName               = "podsecuritypolicytemplates"
 	PodSecurityPolicyTemplateProjectBindingResourceName = "podsecuritypolicytemplateprojectbindings"
@@ -89,6 +92,7 @@ var (
 	ProjectMonitorGraphResourceName                     = "projectmonitorgraphs"
 	ProjectNetworkPolicyResourceName                    = "projectnetworkpolicies"
 	ProjectRoleTemplateBindingResourceName              = "projectroletemplatebindings"
+	RancherUserNotificationResourceName                 = "rancherusernotifications"
 	RkeAddonResourceName                                = "rkeaddons"
 	RkeK8sServiceOptionResourceName                     = "rkek8sserviceoptions"
 	RkeK8sSystemImageResourceName                       = "rkek8ssystemimages"
@@ -125,6 +129,8 @@ var (
 // Adds the list of known types to Scheme.
 func addKnownTypes(scheme *runtime.Scheme) error {
 	scheme.AddKnownTypes(SchemeGroupVersion,
+		&APIService{},
+		&APIServiceList{},
 		&ActiveDirectoryProvider{},
 		&ActiveDirectoryProviderList{},
 		&AuthConfig{},
@@ -203,6 +209,8 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&KontainerDriverList{},
 		&LocalProvider{},
 		&LocalProviderList{},
+		&ManagedChart{},
+		&ManagedChartList{},
 		&MonitorMetric{},
 		&MonitorMetricList{},
 		&MultiClusterApp{},
@@ -219,6 +227,8 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&NodeTemplateList{},
 		&Notifier{},
 		&NotifierList{},
+		&OIDCProvider{},
+		&OIDCProviderList{},
 		&OpenLdapProvider{},
 		&OpenLdapProviderList{},
 		&PodSecurityPolicyTemplate{},
@@ -247,6 +257,8 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&ProjectNetworkPolicyList{},
 		&ProjectRoleTemplateBinding{},
 		&ProjectRoleTemplateBindingList{},
+		&RancherUserNotification{},
+		&RancherUserNotificationList{},
 		&RkeAddon{},
 		&RkeAddonList{},
 		&RkeK8sServiceOption{},

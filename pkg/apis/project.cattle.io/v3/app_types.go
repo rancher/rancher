@@ -32,12 +32,14 @@ type AppSpec struct {
 	ExternalID          string            `json:"externalId,omitempty"`
 	Files               map[string]string `json:"files,omitempty"`
 	Answers             map[string]string `json:"answers,omitempty"`
+	AnswersSetString    map[string]string `json:"answersSetString,omitempty"`
 	Wait                bool              `json:"wait,omitempty"`
 	Timeout             int               `json:"timeout,omitempty" norman:"min=1,default=300"`
 	AppRevisionName     string            `json:"appRevisionName,omitempty" norman:"type=reference[/v3/project/schemas/apprevision]"`
 	Prune               bool              `json:"prune,omitempty"`
 	MultiClusterAppName string            `json:"multiClusterAppName,omitempty" norman:"type=reference[/v3/schemas/multiclusterapp]"`
 	ValuesYaml          string            `json:"valuesYaml,omitempty"`
+	MaxRevisionCount    int               `json:"maxRevisionCount,omitempty"`
 }
 
 func (a *AppSpec) ObjClusterName() string {
@@ -103,12 +105,13 @@ func (a *AppRevisionSpec) ObjClusterName() string {
 }
 
 type AppRevisionStatus struct {
-	ProjectName string            `json:"projectName,omitempty" norman:"type=reference[/v3/schemas/project]"`
-	ExternalID  string            `json:"externalId"`
-	Answers     map[string]string `json:"answers"`
-	Digest      string            `json:"digest"`
-	ValuesYaml  string            `json:"valuesYaml,omitempty"`
-	Files       map[string]string `json:"files,omitempty"`
+	ProjectName      string            `json:"projectName,omitempty" norman:"type=reference[/v3/schemas/project]"`
+	ExternalID       string            `json:"externalId"`
+	Answers          map[string]string `json:"answers"`
+	AnswersSetString map[string]string `json:"answersSetString"`
+	Digest           string            `json:"digest"`
+	ValuesYaml       string            `json:"valuesYaml,omitempty"`
+	Files            map[string]string `json:"files,omitempty"`
 }
 
 func (a *AppRevisionStatus) ObjClusterName() string {
@@ -119,11 +122,12 @@ func (a *AppRevisionStatus) ObjClusterName() string {
 }
 
 type AppUpgradeConfig struct {
-	ExternalID   string            `json:"externalId,omitempty"`
-	Answers      map[string]string `json:"answers,omitempty"`
-	ForceUpgrade bool              `json:"forceUpgrade,omitempty"`
-	Files        map[string]string `json:"files,omitempty"`
-	ValuesYaml   string            `json:"valuesYaml,omitempty"`
+	ExternalID       string            `json:"externalId,omitempty"`
+	Answers          map[string]string `json:"answers,omitempty"`
+	AnswersSetString map[string]string `json:"answersSetString,omitempty"`
+	ForceUpgrade     bool              `json:"forceUpgrade,omitempty"`
+	Files            map[string]string `json:"files,omitempty"`
+	ValuesYaml       string            `json:"valuesYaml,omitempty"`
 }
 
 type RollbackRevision struct {

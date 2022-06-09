@@ -3,6 +3,7 @@ package podsecuritypolicy
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"k8s.io/apimachinery/pkg/runtime"
 
@@ -75,6 +76,13 @@ func (m *clusterManager) sync(key string, obj *v3.Cluster) (runtime.Object, erro
 				objectMeta.Annotations = make(map[string]string)
 				objectMeta.Annotations[podSecurityPolicyTemplateParentAnnotation] = template.Name
 				objectMeta.Annotations[podSecurityPolicyTemplateVersionAnnotation] = template.ResourceVersion
+
+				// Setting annotations that doesn't contains podSecurityPolicyTemplateFilterAnnotation
+				for k, v := range template.Annotations {
+					if !strings.Contains(k, podSecurityPolicyTemplateFilterAnnotation) {
+						objectMeta.Annotations[k] = v
+					}
+				}
 
 				psp := &v1beta13.PodSecurityPolicy{
 					TypeMeta: metav1.TypeMeta{

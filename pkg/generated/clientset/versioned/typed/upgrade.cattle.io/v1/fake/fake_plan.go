@@ -1,5 +1,5 @@
 /*
-Copyright 2020 Rancher Labs, Inc.
+Copyright 2022 Rancher Labs, Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -117,7 +117,7 @@ func (c *FakePlans) UpdateStatus(ctx context.Context, plan *upgradecattleiov1.Pl
 // Delete takes name of the plan and deletes it. Returns an error if one occurs.
 func (c *FakePlans) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(plansResource, c.ns, name), &upgradecattleiov1.Plan{})
+		Invokes(testing.NewDeleteActionWithOptions(plansResource, c.ns, name, opts), &upgradecattleiov1.Plan{})
 
 	return err
 }

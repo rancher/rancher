@@ -8,6 +8,7 @@ import (
 	"io"
 	"io/ioutil"
 	"net/url"
+	"strings"
 	"sync"
 
 	"github.com/Masterminds/semver/v3"
@@ -101,7 +102,7 @@ func (c *Manager) readBytes(cm *corev1.ConfigMap) ([]byte, error) {
 	return bytes, nil
 }
 
-func (c *Manager) Index(namespace, name string) (*repo.IndexFile, error) {
+func (c *Manager) Index(namespace, name string, skipFilter bool) (*repo.IndexFile, error) {
 	r, err := c.getRepo(namespace, name)
 	if err != nil {
 		return nil, err
@@ -121,7 +122,7 @@ func (c *Manager) Index(namespace, name string) (*repo.IndexFile, error) {
 	if cache, ok := c.IndexCache[fmt.Sprintf("%s/%s", r.status.IndexConfigMapNamespace, r.status.IndexConfigMapName)]; ok {
 		if cm.ResourceVersion == cache.revision {
 			c.lock.RUnlock()
-			return c.filterReleases(deepCopyIndex(cache.index), k8sVersion), nil
+			return c.filterReleases(deepCopyIndex(cache.index), k8sVersion, skipFilter), nil
 		}
 	}
 	c.lock.RUnlock()
@@ -158,7 +159,7 @@ func (c *Manager) Index(namespace, name string) (*repo.IndexFile, error) {
 	}
 	c.lock.Unlock()
 
-	return c.filterReleases(deepCopyIndex(index), k8sVersion), nil
+	return c.filterReleases(deepCopyIndex(index), k8sVersion, skipFilter), nil
 }
 
 func (c *Manager) k8sVersion() (*semver.Version, error) {
@@ -195,8 +196,8 @@ func deepCopyIndex(src *repo.IndexFile) *repo.IndexFile {
 	return &deepcopy
 }
 
-func (c *Manager) filterReleases(index *repo.IndexFile, k8sVersion *semver.Version) *repo.IndexFile {
-	if !settings.IsRelease() {
+func (c *Manager) filterReleases(index *repo.IndexFile, k8sVersion *semver.Version, skipFilter bool) *repo.IndexFile {
+	if !settings.IsRelease() || skipFilter {
 		return index
 	}
 
@@ -205,20 +206,46 @@ func (c *Manager) filterReleases(index *repo.IndexFile, k8sVersion *semver.Versi
 		logrus.Errorf("failed to parse server version %s: %v", settings.ServerVersion.Get(), err)
 		return index
 	}
+	rancherVersionWithoutPrerelease, err := rancherVersion.SetPrerelease("")
+	if err != nil {
+		logrus.Errorf("failed to remove prerelease from %s: %v", settings.ServerVersion.Get(), err)
+		return index
+	}
 
 	for rel, versions := range index.Entries {
 		newVersions := make([]*repo.ChartVersion, 0, len(versions))
 		for _, version := range versions {
 			if constraintStr, ok := version.Annotations["catalog.cattle.io/rancher-version"]; ok {
 				if constraint, err := semver.NewConstraint(constraintStr); err == nil {
-					if !constraint.Check(rancherVersion) {
+					satisfiesConstraint, errs := constraint.Validate(rancherVersion)
+					// Check if the reason for failure is because it is ignroing prereleases
+					constraintDoesNotMatchPrereleases := false
+					for _, err := range errs {
+						// Comes from error in https://github.com/Masterminds/semver/blob/60c7ae8a99210a90a9457d5de5f6dcbc4dab8e64/constraints.go#L93
+						if strings.Contains(err.Error(), "the constraint is only looking for release versions") {
+							constraintDoesNotMatchPrereleases = true
+							break
+						}
+					}
+					if constraintDoesNotMatchPrereleases {
+						satisfiesConstraint = constraint.Check(&rancherVersionWithoutPrerelease)
+					}
+					if !satisfiesConstraint {
 						continue
 					}
 				} else {
 					logrus.Errorf("failed to parse constraint version %s: %v", constraintStr, err)
 				}
 			}
-
+			if constraintStr, ok := version.Annotations["catalog.cattle.io/kube-version"]; ok {
+				if constraint, err := semver.NewConstraint(constraintStr); err == nil {
+					if !constraint.Check(k8sVersion) {
+						continue
+					}
+				} else {
+					logrus.Errorf("failed to parse constraint kube-version %s from annotation: %v", constraintStr, err)
+				}
+			}
 			if version.KubeVersion != "" {
 				if constraint, err := semver.NewConstraint(version.KubeVersion); err == nil {
 					if !constraint.Check(k8sVersion) {
@@ -243,7 +270,7 @@ func (c *Manager) filterReleases(index *repo.IndexFile, k8sVersion *semver.Versi
 }
 
 func (c *Manager) Icon(namespace, name, chartName, version string) (io.ReadCloser, string, error) {
-	index, err := c.Index(namespace, name)
+	index, err := c.Index(namespace, name, true)
 	if err != nil {
 		return nil, "", err
 	}
@@ -267,7 +294,7 @@ func (c *Manager) Icon(namespace, name, chartName, version string) (io.ReadClose
 		return nil, "", err
 	}
 
-	return helmhttp.Icon(secret, repo.status.URL, repo.spec.CABundle, repo.spec.InsecureSkipTLSverify, chart)
+	return helmhttp.Icon(secret, repo.status.URL, repo.spec.CABundle, repo.spec.InsecureSkipTLSverify, repo.spec.DisableSameOriginCheck, chart)
 }
 
 func isHTTP(iconURL string) bool {
@@ -275,8 +302,8 @@ func isHTTP(iconURL string) bool {
 	return err == nil && (u.Scheme == "http" || u.Scheme == "https")
 }
 
-func (c *Manager) Chart(namespace, name, chartName, version string) (io.ReadCloser, error) {
-	index, err := c.Index(namespace, name)
+func (c *Manager) Chart(namespace, name, chartName, version string, skipFilter bool) (io.ReadCloser, error) {
+	index, err := c.Index(namespace, name, skipFilter)
 	if err != nil {
 		return nil, err
 	}
@@ -300,11 +327,11 @@ func (c *Manager) Chart(namespace, name, chartName, version string) (io.ReadClos
 		return nil, err
 	}
 
-	return helmhttp.Chart(secret, repo.status.URL, repo.spec.CABundle, repo.spec.InsecureSkipTLSverify, chart)
+	return helmhttp.Chart(secret, repo.status.URL, repo.spec.CABundle, repo.spec.InsecureSkipTLSverify, repo.spec.DisableSameOriginCheck, chart)
 }
 
 func (c *Manager) Info(namespace, name, chartName, version string) (*types.ChartInfo, error) {
-	chart, err := c.Chart(namespace, name, chartName, version)
+	chart, err := c.Chart(namespace, name, chartName, version, true)
 	if err != nil {
 		return nil, err
 	}

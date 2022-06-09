@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ""
+  annotations:
+    "field.cattle.io/projectId": ""
+  labels:
+    "field.cattle.io/projectId": ""

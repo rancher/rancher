@@ -20,9 +20,6 @@ func (c *Cluster) ETCDRestore(ctx context.Context, snapshotName string) error {
 	if err != nil {
 		return err
 	}
-	if err := c.PersistStore.PersistStatus(*c, Updating); err != nil {
-		return err
-	}
 	info, err := c.Driver.ETCDRestore(ctx, toInfo(c), driverOpts, snapshotName)
 	if err != nil {
 		return err

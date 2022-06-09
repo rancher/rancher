@@ -7,6 +7,8 @@ const (
 	ContainerFieldCapDrop                  = "capDrop"
 	ContainerFieldCommand                  = "command"
 	ContainerFieldEntrypoint               = "entrypoint"
+	ContainerFieldEnv                      = "env"
+	ContainerFieldEnvFrom                  = "envFrom"
 	ContainerFieldEnvironment              = "environment"
 	ContainerFieldEnvironmentFrom          = "environmentFrom"
 	ContainerFieldExitCode                 = "exitCode"
@@ -49,6 +51,8 @@ type Container struct {
 	CapDrop                  []string                       `json:"capDrop,omitempty" yaml:"capDrop,omitempty"`
 	Command                  []string                       `json:"command,omitempty" yaml:"command,omitempty"`
 	Entrypoint               []string                       `json:"entrypoint,omitempty" yaml:"entrypoint,omitempty"`
+	Env                      []EnvVar                       `json:"env,omitempty" yaml:"env,omitempty"`
+	EnvFrom                  []EnvFromSource                `json:"envFrom,omitempty" yaml:"envFrom,omitempty"`
 	Environment              map[string]string              `json:"environment,omitempty" yaml:"environment,omitempty"`
 	EnvironmentFrom          []EnvironmentFrom              `json:"environmentFrom,omitempty" yaml:"environmentFrom,omitempty"`
 	ExitCode                 *int64                         `json:"exitCode,omitempty" yaml:"exitCode,omitempty"`
@@ -58,8 +62,8 @@ type Container struct {
 	LivenessProbe            *Probe                         `json:"livenessProbe,omitempty" yaml:"livenessProbe,omitempty"`
 	Name                     string                         `json:"name,omitempty" yaml:"name,omitempty"`
 	Ports                    []ContainerPort                `json:"ports,omitempty" yaml:"ports,omitempty"`
-	PostStart                *Handler                       `json:"postStart,omitempty" yaml:"postStart,omitempty"`
-	PreStop                  *Handler                       `json:"preStop,omitempty" yaml:"preStop,omitempty"`
+	PostStart                *LifecycleHandler              `json:"postStart,omitempty" yaml:"postStart,omitempty"`
+	PreStop                  *LifecycleHandler              `json:"preStop,omitempty" yaml:"preStop,omitempty"`
 	Privileged               *bool                          `json:"privileged,omitempty" yaml:"privileged,omitempty"`
 	ProcMount                string                         `json:"procMount,omitempty" yaml:"procMount,omitempty"`
 	ReadOnly                 *bool                          `json:"readOnly,omitempty" yaml:"readOnly,omitempty"`

@@ -38,4 +38,5 @@ type FeatureStatus struct {
 	Dynamic     bool   `json:"dynamic"`
 	Default     bool   `json:"default"`
 	Description string `json:"description"`
+	LockedValue *bool  `json:"lockedValue"`
 }

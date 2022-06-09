@@ -7,6 +7,7 @@ import (
 
 	"github.com/pkg/errors"
 	kd "github.com/rancher/rancher/pkg/controllers/management/kontainerdrivermetadata"
+	"github.com/rancher/rancher/pkg/controllers/management/secretmigrator"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/librke"
 	nodeserver "github.com/rancher/rancher/pkg/rkenodeconfigserver"
@@ -16,7 +17,13 @@ import (
 )
 
 func (uh *upgradeHandler) nonWorkerPlan(node *v3.Node, cluster *v3.Cluster) (*rketypes.RKEConfigNodePlan, error) {
-	rkeConfig := cluster.Status.AppliedSpec.RancherKubernetesEngineConfig.DeepCopy()
+	appliedSpec := *cluster.Status.AppliedSpec.DeepCopy()
+	var err error
+	appliedSpec, err = secretmigrator.AssembleRKEConfigSpec(cluster, appliedSpec, uh.secretLister)
+	if err != nil {
+		return nil, err
+	}
+	rkeConfig := appliedSpec.RancherKubernetesEngineConfig.DeepCopy()
 	rkeConfig.Nodes = []rketypes.RKEConfigNode{
 		*node.Status.NodeConfig,
 	}
@@ -52,8 +59,11 @@ func (uh *upgradeHandler) nonWorkerPlan(node *v3.Node, cluster *v3.Cluster) (*rk
 	for _, tempNode := range plan.Nodes {
 		if tempNode.Address == hostAddress {
 
-			np.Processes = nodeserver.AugmentProcesses(token, tempNode.Processes, false,
+			np.Processes, err = nodeserver.AugmentProcesses(token, tempNode.Processes, false,
 				node.Status.NodeConfig.HostnameOverride, cluster)
+			if err != nil {
+				return np, err
+			}
 
 			np.Processes = nodeserver.AppendTaintsToKubeletArgs(np.Processes, node.Status.NodeConfig.Taints)
 
@@ -73,7 +83,13 @@ func (uh *upgradeHandler) workerPlan(node *v3.Node, cluster *v3.Cluster) (*rkety
 	hostAddress := node.Status.NodeConfig.Address
 	hostDockerInfo := infos[hostAddress]
 
-	rkeConfig := cluster.Status.AppliedSpec.RancherKubernetesEngineConfig.DeepCopy()
+	appliedSpec := *cluster.Status.AppliedSpec.DeepCopy()
+	appliedSpec, err = secretmigrator.AssembleRKEConfigSpec(cluster, appliedSpec, uh.secretLister)
+	if err != nil {
+		return nil, err
+	}
+
+	rkeConfig := appliedSpec.RancherKubernetesEngineConfig.DeepCopy()
 	nodeserver.FilterHostForSpec(rkeConfig, node)
 
 	logrus.Debugf("The number of nodes sent to the plan: %v", len(rkeConfig.Nodes))
@@ -100,8 +116,11 @@ func (uh *upgradeHandler) workerPlan(node *v3.Node, cluster *v3.Cluster) (*rkety
 			if hostDockerInfo.OSType == "windows" { // compatible with Windows
 				np.Processes = nodeserver.EnhanceWindowsProcesses(tempNode.Processes)
 			} else {
-				np.Processes = nodeserver.AugmentProcesses(token, tempNode.Processes, true,
+				np.Processes, err = nodeserver.AugmentProcesses(token, tempNode.Processes, true,
 					node.Status.NodeConfig.HostnameOverride, cluster)
+				if err != nil {
+					return np, err
+				}
 			}
 			np.Processes = nodeserver.AppendTaintsToKubeletArgs(np.Processes, node.Status.NodeConfig.Taints)
 			np.Files = tempNode.Files

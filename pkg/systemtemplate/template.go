@@ -44,7 +44,7 @@ metadata:
 
 ---
 
-apiVersion: rbac.authorization.k8s.io/v1beta1
+apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
   name: cattle-admin-binding
@@ -113,6 +113,8 @@ kind: Deployment
 metadata:
   name: cattle-cluster-agent
   namespace: cattle-system
+  annotations:
+    management.cattle.io/scale-available: "2"
 spec:
   selector:
     matchLabels:
@@ -123,6 +125,17 @@ spec:
         app: cattle-cluster-agent
     spec:
       affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - cattle-cluster-agent
+              topologyKey: kubernetes.io/hostname
         nodeAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:
             nodeSelectorTerms:
@@ -181,8 +194,10 @@ spec:
         - name: cluster-register
           imagePullPolicy: IfNotPresent
           env:
+          {{- if ne .Features "" }}
           - name: CATTLE_FEATURES
             value: "{{.Features}}"
+          {{- end }}
           - name: CATTLE_IS_RKE
             value: "{{.IsRKE}}"
           - name: CATTLE_SERVER
@@ -193,17 +208,16 @@ spec:
             value: "true"
           - name: CATTLE_K8S_MANAGED
             value: "true"
+          - name: CATTLE_CLUSTER_REGISTRY
+            value: "{{.ClusterRegistry}}"
+      {{- if .AgentEnvVars}}
+{{ .AgentEnvVars | indent 10 }}
+      {{- end }}
           image: {{.AgentImage}}
           volumeMounts:
           - name: cattle-credentials
             mountPath: /cattle-credentials
             readOnly: true
-          readinessProbe:
-            initialDelaySeconds: 2
-            periodSeconds: 5
-            httpGet:
-              path: /health
-              port: 8080
       {{- if .PrivateRegistryConfig}}
       imagePullSecrets:
       - name: cattle-private-registry
@@ -213,10 +227,14 @@ spec:
         secret:
           secretName: cattle-credentials-{{.TokenKey}}
           defaultMode: 320
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+{{ if .IsRKE }}
 
 ---
-
-{{ if .IsRKE }}
 
 apiVersion: apps/v1
 kind: DaemonSet
@@ -264,6 +282,9 @@ spec:
           value: "true"
         - name: CATTLE_AGENT_CONNECT
           value: "true"
+      {{- if .AgentEnvVars}}
+{{ .AgentEnvVars | indent 8 }}
+      {{- end }}
         volumeMounts:
         - name: cattle-credentials
           mountPath: /cattle-credentials
@@ -308,7 +329,7 @@ spec:
   updateStrategy:
     type: RollingUpdate
     rollingUpdate:
-      maxUnavailable: 25%
+      maxUnavailable: 50%
 
 {{- end }}
 
@@ -406,7 +427,7 @@ spec:
   updateStrategy:
     type: RollingUpdate
     rollingUpdate:
-      maxUnavailable: 25%
+      maxUnavailable: 50%
 {{- end }}
 
 {{- if .AuthImage}}
@@ -440,6 +461,24 @@ spec:
                   operator: In
                   values:
                     - "true"
+              - matchExpressions:
+                - key: beta.kubernetes.io/os
+                  operator: NotIn
+                  values:
+                    - windows
+                - key: node-role.kubernetes.io/control-plane
+                  operator: In
+                  values:
+                    - "true"
+              - matchExpressions:
+                - key: beta.kubernetes.io/os
+                  operator: NotIn
+                  values:
+                    - windows
+                - key: node-role.kubernetes.io/master
+                  operator: In
+                  values:
+                    - "true"
       hostNetwork: true
       serviceAccountName: cattle
       tolerations:
@@ -467,6 +506,24 @@ spec:
     rollingUpdate:
       maxUnavailable: 25%
 {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cattle-cluster-agent
+  namespace: cattle-system
+spec:
+  ports:
+  - port: 80
+    targetPort: 80
+    protocol: TCP
+    name: http
+  - port: 443
+    targetPort: 444
+    protocol: TCP
+    name: https-internal
+  selector:
+    app: cattle-cluster-agent
 `
 
 var (

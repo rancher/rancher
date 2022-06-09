@@ -2,6 +2,7 @@ package clusterprovisioner
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/url"
 	"path"
@@ -10,7 +11,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mitchellh/mapstructure"
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/controller"
 	"github.com/rancher/norman/types/convert"
@@ -18,11 +18,14 @@ import (
 	"github.com/rancher/norman/types/values"
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	util "github.com/rancher/rancher/pkg/cluster"
+	"github.com/rancher/rancher/pkg/controllers/management/imported"
 	kd "github.com/rancher/rancher/pkg/controllers/management/kontainerdrivermetadata"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/apps/v1"
+	corev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/kontainer-engine/drivers/rke"
 	"github.com/rancher/rancher/pkg/kontainer-engine/service"
+	"github.com/rancher/rancher/pkg/kontainerdriver"
 	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/rancher/pkg/rkedialerfactory"
 	"github.com/rancher/rancher/pkg/settings"
@@ -47,6 +50,7 @@ const (
 type Provisioner struct {
 	ClusterController     v3.ClusterController
 	Clusters              v3.ClusterInterface
+	ConfigMaps            corev1.ConfigMapInterface
 	NodeLister            v3.NodeLister
 	Nodes                 v3.NodeInterface
 	engineService         *service.EngineService
@@ -57,12 +61,14 @@ type Provisioner struct {
 	Backups               v3.EtcdBackupLister
 	RKESystemImages       v3.RkeK8sSystemImageInterface
 	RKESystemImagesLister v3.RkeK8sSystemImageLister
+	SecretLister          corev1.SecretLister
 }
 
 func Register(ctx context.Context, management *config.ManagementContext) {
 	p := &Provisioner{
 		engineService:         service.NewEngineService(NewPersistentStore(management.Core.Namespaces(""), management.Core)),
 		Clusters:              management.Management.Clusters(""),
+		ConfigMaps:            management.Core.ConfigMaps(""),
 		ClusterController:     management.Management.Clusters("").Controller(),
 		NodeLister:            management.Management.Nodes("").Controller().Lister(),
 		Nodes:                 management.Management.Nodes(""),
@@ -73,6 +79,7 @@ func Register(ctx context.Context, management *config.ManagementContext) {
 		RKESystemImagesLister: management.Management.RkeK8sSystemImages("").Controller().Lister(),
 		RKESystemImages:       management.Management.RkeK8sSystemImages(""),
 		DaemonsetLister:       management.Apps.DaemonSets("").Controller().Lister(),
+		SecretLister:          management.Core.Secrets("").Controller().Lister(),
 	}
 	// Add handlers
 	p.Clusters.AddLifecycle(ctx, "cluster-provisioner-controller", p)
@@ -102,9 +109,36 @@ func Register(ctx context.Context, management *config.ManagementContext) {
 		mgmt.RkeK8sSystemImages(""))
 }
 
+func skipOperatorCluster(action string, cluster *v3.Cluster) bool {
+	msgFmt := "%s cluster [%s] will be managed by %s-operator-controller, skipping %s"
+	switch {
+	case cluster.Spec.AKSConfig != nil:
+		logrus.Debugf(msgFmt, "AKS", cluster.Name, "aks", action)
+		return true
+	case cluster.Spec.EKSConfig != nil:
+		logrus.Debugf(msgFmt, "EKS", cluster.Name, "eks", action)
+		return true
+	case cluster.Spec.GKEConfig != nil:
+		logrus.Debugf(msgFmt, "GKE", cluster.Name, "gke", action)
+		return true
+	default:
+		return false
+	}
+}
+
+func isRke1CustomCluster(cluster *v3.Cluster, nodes []*v3.Node) bool {
+	if cluster.Status.Driver == apimgmtv3.ClusterDriverRKE {
+		for _, n := range nodes {
+			if n.Status.NodeTemplateSpec == nil {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 func (p *Provisioner) Remove(cluster *v3.Cluster) (runtime.Object, error) {
-	if cluster.Spec.EKSConfig != nil {
-		logrus.Debugf("EKS cluster [%s] will be managed by eks-operator-controller, skipping remove", cluster.Name)
+	if skipOperatorCluster("remove", cluster) {
 		return cluster, nil
 	}
 
@@ -112,6 +146,16 @@ func (p *Provisioner) Remove(cluster *v3.Cluster) (runtime.Object, error) {
 	if skipLocalK3sImported(cluster) ||
 		cluster.Status.Driver == "" {
 		return nil, nil
+	}
+
+	nodes, err := p.NodeLister.List(cluster.Name, labels.Everything())
+	if err != nil {
+		return cluster, err
+	}
+
+	if isRke1CustomCluster(cluster, nodes) {
+		logrus.Debugf("Skipping RKE1 Custom Cluster in favor of node-cleanup logic [%s] ", cluster.Name)
+		return cluster, nil
 	}
 
 	for i := 0; i < 4; i++ {
@@ -132,8 +176,7 @@ func (p *Provisioner) Remove(cluster *v3.Cluster) (runtime.Object, error) {
 }
 
 func (p *Provisioner) Updated(cluster *v3.Cluster) (runtime.Object, error) {
-	if cluster.Spec.EKSConfig != nil {
-		logrus.Debugf("EKS cluster [%s] will be managed by eks-operator-controller, skipping update", cluster.Name)
+	if skipOperatorCluster("update", cluster) || imported.IsAdministratedByProvisioningCluster(cluster) {
 		return cluster, nil
 	}
 
@@ -309,7 +352,7 @@ func setVersion(cluster *v3.Cluster) {
 
 func (p *Provisioner) update(cluster *v3.Cluster, create bool) (*v3.Cluster, error) {
 	cluster, err := p.reconcileCluster(cluster, create)
-	if err != nil {
+	if err != nil || imported.IsAdministratedByProvisioningCluster(cluster) {
 		return cluster, err
 	}
 
@@ -342,8 +385,7 @@ func (p *Provisioner) machineChanged(key string, machine *v3.Node) (runtime.Obje
 }
 
 func (p *Provisioner) Create(cluster *v3.Cluster) (runtime.Object, error) {
-	if cluster.Spec.EKSConfig != nil {
-		logrus.Debugf("EKS cluster [%s] will be managed by eks-operator-controller, skipping create", cluster.Name)
+	if skipOperatorCluster("create", cluster) || imported.IsAdministratedByProvisioningCluster(cluster) {
 		return cluster, nil
 	}
 
@@ -375,7 +417,6 @@ func (p *Provisioner) provision(cluster *v3.Cluster) (*v3.Cluster, error) {
 }
 
 func (p *Provisioner) pending(cluster *v3.Cluster) (*v3.Cluster, error) {
-
 	if skipLocalK3sImported(cluster) {
 		return cluster, nil
 	}
@@ -427,6 +468,7 @@ var errKeyRotationFailed = errors.New("encryption key rotation failed, please re
 
 func (p *Provisioner) reconcileCluster(cluster *v3.Cluster, create bool) (*v3.Cluster, error) {
 	if skipLocalK3sImported(cluster) {
+		reconcileACE(cluster)
 		return cluster, nil
 	}
 
@@ -723,10 +765,15 @@ func (p *Provisioner) getConfig(reconcileRKE bool, spec apimgmtv3.ClusterSpec, d
 		v = *spec.GenericEngineConfig
 	}
 
-	if driverName == apimgmtv3.ClusterDriverRKE && reconcileRKE {
-		nodes, err := p.reconcileRKENodes(clusterName)
-		if err != nil {
-			return nil, nil, err
+	if driverName == apimgmtv3.ClusterDriverRKE && spec.RancherKubernetesEngineConfig != nil {
+		spec.RancherKubernetesEngineConfig = spec.RancherKubernetesEngineConfig.DeepCopy()
+
+		if reconcileRKE {
+			nodes, err := p.reconcileRKENodes(clusterName)
+			if err != nil {
+				return nil, nil, err
+			}
+			spec.RancherKubernetesEngineConfig.Nodes = nodes
 		}
 
 		systemImages, err := p.getSystemImages(spec)
@@ -734,43 +781,12 @@ func (p *Provisioner) getConfig(reconcileRKE bool, spec apimgmtv3.ClusterSpec, d
 			return nil, nil, err
 		}
 
-		rkeCopy := *spec.RancherKubernetesEngineConfig
-		spec.RancherKubernetesEngineConfig = &rkeCopy
-		spec.RancherKubernetesEngineConfig.Nodes = nodes
 		spec.RancherKubernetesEngineConfig.SystemImages = *systemImages
-
 		data, _ := convert.EncodeToMap(spec)
 		v, _ = data[RKEDriverKey]
 	}
 
 	return &spec, v, nil
-}
-
-func GetDriver(cluster *v3.Cluster, driverLister v3.KontainerDriverLister) (string, error) {
-	var driver *v3.KontainerDriver
-	var err error
-
-	if cluster.Spec.GenericEngineConfig != nil {
-		kontainerDriverName := (*cluster.Spec.GenericEngineConfig)["driverName"].(string)
-		driver, err = driverLister.Get("", kontainerDriverName)
-		if err != nil {
-			return "", err
-		}
-	}
-
-	if cluster.Spec.EKSConfig != nil {
-		return apimgmtv3.ClusterDriverEKS, nil
-	}
-
-	if cluster.Spec.RancherKubernetesEngineConfig != nil {
-		return apimgmtv3.ClusterDriverRKE, nil
-	}
-
-	if driver == nil {
-		return "", nil
-	}
-
-	return driver.Status.DisplayName, nil
 }
 
 func (p *Provisioner) validateDriver(cluster *v3.Cluster) (string, error) {
@@ -780,7 +796,7 @@ func (p *Provisioner) validateDriver(cluster *v3.Cluster) (string, error) {
 		return apimgmtv3.ClusterDriverImported, nil
 	}
 
-	newDriver, err := GetDriver(cluster, p.KontainerDriverLister)
+	newDriver, err := kontainerdriver.GetDriver(cluster, p.KontainerDriverLister)
 	if err != nil {
 		return "", err
 	}
@@ -833,9 +849,16 @@ func (p *Provisioner) getSystemImages(spec apimgmtv3.ClusterSpec) (*rketypes.RKE
 		newValue := fmt.Sprintf("%s/%s", privateRegistry, value)
 		updatedMap[key] = newValue
 	}
-	if err := mapstructure.Decode(updatedMap, &systemImages); err != nil {
+	// Decoding updateMap to systemImages using json marshal/unmarshal to honor field names
+	updatedByte, err := json.Marshal(updatedMap)
+	if err != nil {
 		return nil, err
 	}
+	err = json.Unmarshal(updatedByte, &systemImages)
+	if err != nil {
+		return nil, err
+	}
+	logrus.Debugf("Updated system images to use private registry [%s]: %#v", privateRegistry, systemImages)
 	return &systemImages, nil
 }
 
@@ -860,7 +883,7 @@ func (p *Provisioner) getSpec(cluster *v3.Cluster) (*apimgmtv3.ClusterSpec, erro
 		return nil, err
 	}
 
-	newSpec, newConfig, err := p.getConfig(true, censoredSpec, driverName, cluster.Name)
+	_, newConfig, err := p.getConfig(true, censoredSpec, driverName, cluster.Name)
 	if err != nil {
 		return nil, err
 	}
@@ -869,7 +892,7 @@ func (p *Provisioner) getSpec(cluster *v3.Cluster) (*apimgmtv3.ClusterSpec, erro
 		return nil, nil
 	}
 
-	newSpec, _, err = p.getConfig(true, cluster.Spec, driverName, cluster.Name)
+	newSpec, _, err := p.getConfig(true, cluster.Spec, driverName, cluster.Name)
 
 	return newSpec, err
 }
@@ -880,8 +903,7 @@ func (p *Provisioner) reconcileRKENodes(clusterName string) ([]rketypes.RKEConfi
 		return nil, err
 	}
 
-	etcd := false
-	controlplane := false
+	var etcd, controlplane, worker bool
 	var nodes []rketypes.RKEConfigNode
 	for _, machine := range machines {
 		if machine.DeletionTimestamp != nil {
@@ -913,6 +935,9 @@ func (p *Provisioner) reconcileRKENodes(clusterName string) ([]rketypes.RKEConfi
 		if slice.ContainsString(machine.Status.NodeConfig.Role, services.ControlRole) {
 			controlplane = true
 		}
+		if slice.ContainsString(machine.Status.NodeConfig.Role, services.WorkerRole) {
+			worker = true
+		}
 
 		node := *machine.Status.NodeConfig
 		if node.User == "" {
@@ -927,9 +952,9 @@ func (p *Provisioner) reconcileRKENodes(clusterName string) ([]rketypes.RKEConfi
 		nodes = append(nodes, node)
 	}
 
-	if !etcd || !controlplane {
+	if !etcd || !controlplane || !worker {
 		return nil, &controller.ForgetError{
-			Err:    fmt.Errorf("waiting for etcd and controlplane nodes to be registered"),
+			Err:    fmt.Errorf("waiting for etcd, controlplane and worker nodes to be registered"),
 			Reason: "Provisioning",
 		}
 	}
@@ -1034,7 +1059,8 @@ func (p *Provisioner) k3sBasedClusterConfig(cluster *v3.Cluster, nodes []*v3.Nod
 	if cluster.Status.Driver == apimgmtv3.ClusterDriverK3s ||
 		cluster.Status.Driver == apimgmtv3.ClusterDriverK3os ||
 		cluster.Status.Driver == apimgmtv3.ClusterDriverRke2 ||
-		cluster.Status.Driver == apimgmtv3.ClusterDriverRancherD {
+		cluster.Status.Driver == apimgmtv3.ClusterDriverRancherD ||
+		imported.IsAdministratedByProvisioningCluster(cluster) {
 		return nil //no-op
 	}
 	isEmbedded := cluster.Status.Driver == apimgmtv3.ClusterDriverLocal
@@ -1075,4 +1101,10 @@ func (p *Provisioner) k3sBasedClusterConfig(cluster *v3.Cluster, nodes []*v3.Nod
 		}
 	}
 	return nil
+}
+
+func reconcileACE(cluster *v3.Cluster) {
+	if imported.IsAdministratedByProvisioningCluster(cluster) || cluster.Status.Driver == apimgmtv3.ClusterDriverRke2 || cluster.Status.Driver == apimgmtv3.ClusterDriverK3s {
+		cluster.Status.AppliedSpec.LocalClusterAuthEndpoint = cluster.Spec.LocalClusterAuthEndpoint
+	}
 }

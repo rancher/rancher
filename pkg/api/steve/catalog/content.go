@@ -93,12 +93,18 @@ func (i *contentDownload) serveIcon(apiContext *types.APIRequest, rw http.Respon
 	}
 	defer chart.Close()
 
+	setIconHeaders(rw, suffix)
+	_, err = io.Copy(rw, chart)
+	return err
+}
+
+func setIconHeaders(rw http.ResponseWriter, suffix string) {
 	if suffix == ".svg" {
 		rw.Header().Set("Content-Type", "image/svg+xml")
 	}
 	rw.Header().Set("Cache-Control", "max-age=31536000, public")
-	_, err = io.Copy(rw, chart)
-	return err
+	rw.Header().Set("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'; sandbox")
+	rw.Header().Set("X-Content-Type-Options", "nosniff")
 }
 
 func (i *contentDownload) serveChart(apiContext *types.APIRequest, rw http.ResponseWriter, req *http.Request) error {
@@ -111,7 +117,7 @@ func (i *contentDownload) serveChart(apiContext *types.APIRequest, rw http.Respo
 	}
 
 	namespace, name := nsAndName(apiContext)
-	chart, err := i.contentManager.Chart(namespace, name, chartName, version)
+	chart, err := i.contentManager.Chart(namespace, name, chartName, version, true)
 	if err != nil {
 		return err
 	}
@@ -124,7 +130,8 @@ func (i *contentDownload) serveChart(apiContext *types.APIRequest, rw http.Respo
 }
 
 func (i *contentDownload) getIndex(apiContext *types.APIRequest) (*repo.IndexFile, error) {
-	return i.contentManager.Index(nsAndName(apiContext))
+	namespace, name := nsAndName(apiContext)
+	return i.contentManager.Index(namespace, name, false)
 }
 
 func nsAndName(apiContext *types.APIRequest) (string, string) {

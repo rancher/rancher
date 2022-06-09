@@ -14,10 +14,10 @@ import (
 
 func TestAliasMaps(t *testing.T) {
 	assert := assert.New(t)
-	assert.Len(aliases, len(nodedriver.Aliases), "Alias maps are not equal")
-	for driver, fields := range aliases {
-		assert.Contains(nodedriver.Aliases, driver)
-		nodeAliases := nodedriver.Aliases[driver]
+	assert.Len(SchemaToDriverFields, len(nodedriver.DriverToSchemaFields), "Alias maps are not equal")
+	for driver, fields := range SchemaToDriverFields {
+		assert.Contains(nodedriver.DriverToSchemaFields, driver)
+		nodeAliases := nodedriver.DriverToSchemaFields[driver]
 		for k, v := range fields {
 			// check that the value from the first map is the key to the 2nd map
 			val, ok := nodeAliases[v]
@@ -34,12 +34,12 @@ func TestAliasToPath(t *testing.T) {
 	os.Setenv("CATTLE_DEV_MODE", "true")
 	defer os.Unsetenv("CATTLE_DEV_MODE")
 
-	for driver, fields := range aliases {
+	for driver, fields := range SchemaToDriverFields {
 		testData, _ := createFakeConfig(fields)
 
 		err := aliasToPath(driver, testData, "fake")
 		assert.Nil(err)
-		for alias := range nodedriver.Aliases[driver] {
+		for alias := range nodedriver.DriverToSchemaFields[driver] {
 			assert.Contains(testData, alias)
 		}
 		tempdir := os.TempDir()

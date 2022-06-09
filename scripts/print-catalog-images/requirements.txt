@@ -1,3 +1,0 @@
-pyyaml==5.1b1
-semver==2.7.7
-flake8==3.5.0

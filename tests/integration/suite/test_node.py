@@ -46,6 +46,7 @@ def test_node_fields(admin_mc):
         'sshUser': 'r',
         'imported': 'cru',
         'dockerInfo': 'r',
+        'scaledownTime': 'cru'
     }
 
     for name in cclient.schema.types['node'].resourceFields.keys():
@@ -77,14 +78,18 @@ def test_node_template_delete(admin_mc, remove_resource):
 
     assert node_pool.nodeTemplateId == node_template.id
 
+    def _wait_for_no_remove_link():
+        nt = client.reload(node_template)
+        if not hasattr(nt.links, "remove"):
+            return True
+        return False
+
+    wait_for(_wait_for_no_remove_link)
+
     # Attempting to delete the template should raise an ApiError
     with pytest.raises(ApiError) as e:
         client.delete(node_template)
     assert e.value.error.status == 405
-
-    # remove link should not be available
-    node_template = client.reload(node_template)
-    assert 'remove' not in node_template.links
 
     client.delete(node_pool)
 

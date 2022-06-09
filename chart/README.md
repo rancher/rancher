@@ -79,7 +79,7 @@ helm install rancher rancher-latest/rancher \
 ```
 
 - [Let’s Encrypt](https://rancher.com/docs/rancher/v2.x/en/installation/k8s-install/helm-rancher/#6-install-rancher-with-helm-and-your-chosen-certificate-option)
-  
+
 ```bash
 helm install rancher rancher-latest/rancher \
   --namespace cattle-system \
@@ -139,7 +139,7 @@ In a web browser, go to the DNS name that forwards traffic to your load balancer
 
 Doesn’t work? Take a look at the [Troubleshooting Page](https://rancher.com/docs/rancher/v2.x/en/installation/options/troubleshooting/)
 
-***All of these intructions are defined in detailed in the [Rancher Documentation](https://rancher.com/docs/rancher/v2.x/en/installation/k8s-install/helm-rancher/).***
+***All of these instructions are defined in detailed in the [Rancher Documentation](https://rancher.com/docs/rancher/v2.x/en/installation/k8s-install/helm-rancher/).***
 
 ### Helm Chart Options for Kubernetes Installations
 
@@ -169,7 +169,7 @@ Specify each parameter using the `--set key=value[,key=value]` argument to `helm
 | `auditLog.hostPath`            | "/var/log/rancher/audit"                              | ***string*** - log file destination on host (only applies when **auditLog.destination** is set to **hostPath**)                                                                                              |
 | `auditLog.level`               | 0                                                     | ***int*** - set the [API Audit Log level](https://rancher.com/docs/rancher/v2.x/en/installation/api-auditing). 0 is off. [0-3]                                                                               |
 | `auditLog.maxAge`              | 1                                                     | ***int*** - maximum number of days to retain old audit log files (only applies when **auditLog.destination** is set to **hostPath**)                                                                         |
-| `auditLog.maxBackups`          | 1                                                     | int - maximum number of audit log files to retain (only applies when **auditLog.destination** is set to **hostPath**)                                                                                        |
+| `auditLog.maxBackup`           | 1                                                     | int - maximum number of audit log files to retain (only applies when **auditLog.destination** is set to **hostPath**)                                                                                        |
 | `auditLog.maxSize`             | 100                                                   | ***int*** - maximum size in megabytes of the audit log file before it gets rotated (only applies when **auditLog.destination** is set to **hostPath**)                                                       |
 | `busyboxImage`                 | "busybox"                                             | ***string*** - Image location for busybox image used to collect audit logs *Note: Available as of v2.2.0*                                                                                                    |
 | `busyboxImagePullPolicy`       | "IfNotPresent"                                        | ***string*** - Override imagePullPolicy for busybox images - *"Always", "Never", "IfNotPresent"*                                                                                                      |
@@ -178,11 +178,12 @@ Specify each parameter using the `--set key=value[,key=value]` argument to `helm
 | `extraEnv`                     | []                                                    | ***list*** - set additional environment variables for Rancher Note: *Available as of v2.2.0*                                                                                                                 |
 | `imagePullSecrets`             | []                                                    | ***list*** - list of names of Secret resource containing private registry credentials                                                                                                                        |
 | `ingress.enabled`              | true                                                  | ***bool*** - install ingress resource
+| `ingress.includeDefaultExtraAnnotations` | true                                        | ***bool*** - Add default nginx annotations
 | `ingress.extraAnnotations`     | {}                                                    | ***map*** - additional annotations to customize the ingress                                                                                                                                                  |
 | `ingress.configurationSnippet` | " "                                                   | ***string*** - Add additional Nginx configuration. Can be used for proxy configuration. Note: *Available as of v2.0.15, v2.1.10 and v2.2.4*                                                                  |
 | `letsEncrypt.ingress.class`    | " "                                                   | ***string*** - optional ingress class for the cert-manager acmesolver ingress that responds to the Let’s *Encrypt ACME challenges*                                                                           |
 | `proxy`                        | " "                                                   | ***string** - HTTP[S] proxy server for Rancher                                                                                                                                                               |
-| `noProxy`                      | "127.0.0.0/8,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16" | ***string*** - comma separated list of hostnames or ip address not to use the proxy                                                                                                                          |
+| `noProxy`                      | "127.0.0.0/8,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,.svc,.cluster.local" | ***string*** - comma separated list of hostnames or ip address not to use the proxy                                                                                                      |
 | `resources`                    | {}                                                    | ***map*** - rancher pod resource requests & limits                                                                                                                                                           |
 | `rancherImage`                 | "rancher/rancher"                                     | ***string*** - rancher image source                                                                                                                                                                          |
 | `rancherImageTag`              | same as chart version                                 | ***string*** - rancher/rancher image tag                                                                                                                                                                     |

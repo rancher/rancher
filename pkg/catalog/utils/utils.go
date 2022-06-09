@@ -1,21 +1,19 @@
 package utils
 
 import (
-	"regexp"
+	"fmt"
+	"path/filepath"
 
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v2"
+
+	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	helmlib "github.com/rancher/rancher/pkg/helm"
 )
 
 const (
 	CatalogExternalIDFormat = "catalog://?catalog=%s&template=%s&version=%s"
 	SystemLibraryName       = "system-library"
-)
-
-var (
-	controlChars   = regexp.MustCompile("[[:cntrl:]]")
-	controlEncoded = regexp.MustCompile("%[0-1][0-9,a-f,A-F]")
 )
 
 // Config holds libcompose top level configuration
@@ -82,10 +80,20 @@ func Contains(collection []string, key string) bool {
 	return false
 }
 
-func ValidateURL(pathURL string) error {
-	// Don't allow a URL containing control characters, standard or url-encoded
-	if controlChars.FindStringIndex(pathURL) != nil || controlEncoded.FindStringIndex(pathURL) != nil {
-		return errors.New("Invalid characters in url")
+func GetCatalogImageCacheName(catalogName string) string {
+	return fmt.Sprintf("%s-catalog-image-list", catalogName)
+}
+
+func GetCatalogChartPath(catalog *v3.Catalog, bundledMode bool) (string, error) {
+	if bundledMode {
+		switch catalog.Name {
+		case "helm3-library", "library", "system-library":
+			return filepath.Join(helmlib.InternalCatalog, catalog.Name), nil
+		case "rancher-charts", "rancher-partner-charts", "rancher-rke2-charts":
+			return filepath.Join(helmlib.InternalCatalog, "v2", catalog.Name), nil
+		default:
+			return "", fmt.Errorf("cannot find bundled catalog chart path for catalog %s", catalog.Name)
+		}
 	}
-	return nil
+	return filepath.Join(helmlib.CatalogCache, helmlib.CatalogSHA256Hash(catalog)), nil
 }

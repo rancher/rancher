@@ -81,10 +81,13 @@ func (h *impersonatingAuth) Authenticate(req *http.Request) (k8sUser.Info, bool,
 		groups = append(groups, k8sUser.AllAuthenticated)
 	}
 
+	extra := userInfo.GetExtra()
+
 	return &k8sUser.DefaultInfo{
 		Name:   user,
 		UID:    user,
 		Groups: groups,
+		Extra:  extra,
 	}, true, nil
 }
 

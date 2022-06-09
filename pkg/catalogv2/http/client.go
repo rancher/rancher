@@ -3,13 +3,16 @@ package http
 import (
 	"crypto/tls"
 	"crypto/x509"
+	"net"
 	"net/http"
+	"net/url"
+	"strings"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
 )
 
-func HelmClient(secret *corev1.Secret, caBundle []byte, insecureSkipTLSVerify bool) (*http.Client, error) {
+func HelmClient(secret *corev1.Secret, caBundle []byte, insecureSkipTLSVerify bool, disableSameOriginCheck bool, repoURL string) (*http.Client, error) {
 	var (
 		username  string
 		password  string
@@ -53,9 +56,11 @@ func HelmClient(secret *corev1.Secret, caBundle []byte, insecureSkipTLSVerify bo
 	}
 	if username != "" || password != "" {
 		client.Transport = &basicRoundTripper{
-			username: username,
-			password: password,
-			next:     client.Transport,
+			username:               username,
+			password:               password,
+			disableSameOriginCheck: disableSameOriginCheck,
+			repoURL:                repoURL,
+			next:                   client.Transport,
 		}
 	}
 
@@ -63,12 +68,68 @@ func HelmClient(secret *corev1.Secret, caBundle []byte, insecureSkipTLSVerify bo
 }
 
 type basicRoundTripper struct {
-	username string
-	password string
-	next     http.RoundTripper
+	username               string
+	password               string
+	disableSameOriginCheck bool
+	repoURL                string
+	next                   http.RoundTripper
 }
 
 func (b *basicRoundTripper) RoundTrip(request *http.Request) (*http.Response, error) {
-	request.SetBasicAuth(b.username, b.password)
+	attachHeader, err := shouldAttachBasicAuthHeader(b.repoURL, b.disableSameOriginCheck, request)
+	if err != nil {
+		return nil, err
+	}
+	if attachHeader {
+		request.SetBasicAuth(b.username, b.password)
+	}
 	return b.next.RoundTrip(request)
+}
+
+// Return bool for if the Basic Auth Header should be attached to the request
+func shouldAttachBasicAuthHeader(repoURL string, disableSameOriginCheck bool, request *http.Request) (bool, error) {
+	if disableSameOriginCheck {
+		return true, nil
+	}
+	parsedRepoURL, err := url.Parse(repoURL)
+	if err != nil {
+		return false, err
+	}
+	// check to see if request is being made to the same domain or subdomain as the repo url
+	// to determine if it is the same origin, if it is not, then do not attach the auth header
+	return isDomainOrSubdomain(request.URL, parsedRepoURL), nil
+}
+
+// Using isDomainOrSubdomain from http.client go library
+// this is to ensure that we are using as close to the upstream as possible for same origin checks
+func isDomainOrSubdomain(reqURL, repoURL *url.URL) bool {
+	parent := canonicalAddr(repoURL)
+	sub := canonicalAddr(reqURL)
+	if sub == parent {
+		return true
+	}
+	// If sub is "foo.example.com" and parent is "example.com",
+	// that means sub must end in "."+parent.
+	// Do it without allocating.
+	if !strings.HasSuffix(sub, parent) {
+		return false
+	}
+	return sub[len(sub)-len(parent)-1] == '.'
+}
+
+// Using canonicalAddr from http.client go library
+// canonicalAddr returns url.Host but always with a ":port" suffix
+// the idnaASCII checks have been removed
+func canonicalAddr(url *url.URL) string {
+	var portMap = map[string]string{
+		"http":   "80",
+		"https":  "443",
+		"socks5": "1080",
+	}
+	addr := url.Hostname()
+	port := url.Port()
+	if port == "" {
+		port = portMap[url.Scheme]
+	}
+	return net.JoinHostPort(addr, port)
 }

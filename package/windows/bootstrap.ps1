@@ -89,7 +89,6 @@ try
 {
     Copy-Item -Force -Destination "$($hostPrefixPath)etc\rancher" -Path @(
         "c:\etc\rancher\utils.psm1"
-        "c:\etc\rancher\cleanup.ps1"
         "c:\Windows\wins.exe"
     )
 } catch { }
@@ -276,6 +275,9 @@ catch
     Log-Warn "Could not clean: `$(`$_.Exception.Message)"
 }
 
+# make a powershell copy for wins to use
+Copy-Item $($(Get-Command powershell).Source) $($CATTLE_PREFIX_PATH)etc\rancher\powershell.exe
+
 # output wins config
 @{
     whiteList = @{
@@ -285,6 +287,12 @@ catch
             "$($CATTLE_PREFIX_PATH)etc\kubernetes\bin\kubelet.exe"
             "$($CATTLE_PREFIX_PATH)etc\nginx\nginx.exe"
             "$($CATTLE_PREFIX_PATH)opt\bin\flanneld.exe"
+            "$($CATTLE_PREFIX_PATH)etc\rancher\wins\wins-upgrade.exe"
+            "$($CATTLE_PREFIX_PATH)etc\rancher\powershell.exe"
+            "$($CATTLE_PREFIX_PATH)etc\windows-exporter\windows-exporter.exe"
+        )
+        proxyPorts = @(
+            9796
         )
     }
 } | ConvertTo-Json -Compress -Depth 32 | Out-File -NoNewline -Encoding utf8 -Force -FilePath "$($CATTLE_PREFIX_PATH)etc\rancher\wins\config"

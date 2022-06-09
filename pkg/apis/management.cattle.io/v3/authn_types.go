@@ -92,6 +92,7 @@ type UserAttribute struct {
 	GroupPrincipals map[string]Principals // the value is a []Principal, but code generator cannot handle slice as a value
 	LastRefresh     string
 	NeedsRefresh    bool
+	ExtraByProvider map[string]map[string][]string // extra information for the user to print in audit logs, stored per authProvider. example: map[openldap:map[principalid:[openldap_user://uid=testuser1,ou=dev,dc=us-west-2,dc=compute,dc=internal]]]
 }
 
 type Principals struct {
@@ -248,7 +249,7 @@ type AzureADConfig struct {
 	AuthEndpoint      string `json:"authEndpoint,omitempty" norman:"required,notnullable"`
 	TenantID          string `json:"tenantId,omitempty" norman:"required,notnullable"`
 	ApplicationID     string `json:"applicationId,omitempty" norman:"required,notnullable"`
-	ApplicationSecret string `json:"applicationSecret,omitempty" norman:"required,notnullable,type=password"`
+	ApplicationSecret string `json:"applicationSecret,omitempty" norman:"required,type=password"`
 	RancherURL        string `json:"rancherUrl,omitempty" norman:"required,notnullable"`
 }
 
@@ -406,4 +407,34 @@ type ShibbolethConfig struct {
 
 type AuthSystemImages struct {
 	KubeAPIAuth string `json:"kubeAPIAuth,omitempty"`
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+type OIDCConfig struct {
+	AuthConfig `json:",inline" mapstructure:",squash"`
+
+	ClientID           string `json:"clientId" norman:"required"`
+	ClientSecret       string `json:"clientSecret,omitempty" norman:"required,type=password"`
+	Scopes             string `json:"scope", norman:"required,notnullable"`
+	AuthEndpoint       string `json:"authEndpoint,omitempty" norman:"required,notnullable"`
+	Issuer             string `json:"issuer" norman:"required,notnullable"`
+	Certificate        string `json:"certificate,omitempty"`
+	PrivateKey         string `json:"privateKey" norman:"type=password"`
+	RancherURL         string `json:"rancherUrl" norman:"required,notnullable"`
+	GroupSearchEnabled *bool  `json:"groupSearchEnabled"`
+}
+
+type OIDCTestOutput struct {
+	RedirectURL string `json:"redirectUrl"`
+}
+
+type OIDCApplyInput struct {
+	OIDCConfig OIDCConfig `json:"oidcConfig,omitempty"`
+	Code       string     `json:"code,omitempty"`
+	Enabled    bool       `json:"enabled,omitempty"`
+}
+
+type KeyCloakOIDCConfig struct {
+	OIDCConfig `json:",inline" mapstructure:",squash"`
 }

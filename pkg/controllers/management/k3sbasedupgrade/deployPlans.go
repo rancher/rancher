@@ -8,8 +8,10 @@ import (
 	"time"
 
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/controllers/management/clusterdeploy"
 	planClientset "github.com/rancher/rancher/pkg/generated/clientset/versioned/typed/upgrade.cattle.io/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/settings"
 	planv1 "github.com/rancher/system-upgrade-controller/pkg/apis/upgrade.cattle.io/v1"
 	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -29,20 +31,20 @@ func (h *handler) deployPlans(cluster *v3.Cluster, isK3s, isRke2 bool) error {
 	)
 	switch {
 	case isRke2:
-		upgradeImage = rke2upgradeImage
+		upgradeImage = settings.PrefixPrivateRegistry(rke2upgradeImage)
 		masterPlanName = rke2MasterPlanName
 		workerPlanName = rke2WorkerPlanName
 		Version = cluster.Spec.Rke2Config.Version
 		strategy = cluster.Spec.Rke2Config.ClusterUpgradeStrategy
 	case isK3s:
-		upgradeImage = k3supgradeImage
+		upgradeImage = settings.PrefixPrivateRegistry(k3supgradeImage)
 		masterPlanName = k3sMasterPlanName
 		workerPlanName = k3sWorkerPlanName
 		Version = cluster.Spec.K3sConfig.Version
 		strategy = cluster.Spec.K3sConfig.ClusterUpgradeStrategy
 	}
 	// access downstream cluster
-	clusterCtx, err := h.manager.UserContext(cluster.Name)
+	clusterCtx, err := h.manager.UserContextNoControllers(cluster.Name)
 	if err != nil {
 		return err
 
@@ -71,7 +73,7 @@ func (h *handler) deployPlans(cluster *v3.Cluster, isK3s, isRke2 bool) error {
 			}
 			plan.Spec.NodeSelector.MatchExpressions = append(plan.Spec.NodeSelector.MatchExpressions, lsr)
 
-			_, err = planClient.Update(context.TODO(), &plan, metav1.UpdateOptions{})
+			_, err = planConfig.Plans(plan.Namespace).Update(context.TODO(), &plan, metav1.UpdateOptions{})
 			if err != nil {
 				return err
 			}
@@ -215,6 +217,10 @@ func (h *handler) modifyClusterCondition(cluster *v3.Cluster, masterPlan, worker
 	// if we made it this far nothing is applying
 	// see k3supgrade_handler also
 	v32.ClusterConditionUpgraded.True(cluster)
+	if cluster.Spec.LocalClusterAuthEndpoint.Enabled {
+		// If ACE is enabled, the force a re-deploy of the cluster-agent and kube-api-auth
+		cluster.Annotations[clusterdeploy.AgentForceDeployAnn] = "true"
+	}
 	return h.clusterClient.Update(cluster)
 
 }

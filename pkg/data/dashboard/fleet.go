@@ -3,12 +3,22 @@ package dashboard
 import (
 	"reflect"
 
+	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/features"
+	fleetconst "github.com/rancher/rancher/pkg/fleet"
+	mngtv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/wrangler"
 	rbacv1 "github.com/rancher/wrangler/pkg/generated/controllers/rbac/v1"
 	v1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
+
+var (
+	adminRole      = "fleetworkspace-admin"
+	memberRole     = "fleetworkspace-member"
+	readonlyRole   = "fleetworkspace-readonly"
+	apiServiceName = "git-webhook"
 )
 
 func AddFleetRoles(wrangler *wrangler.Context) error {
@@ -18,10 +28,62 @@ func AddFleetRoles(wrangler *wrangler.Context) error {
 	}
 
 	if !features.IsEnabled(f) {
+		toDeleteClusterRole := []string{
+			adminRole,
+			memberRole,
+			readonlyRole,
+		}
+		for _, name := range toDeleteClusterRole {
+			if err := wrangler.RBAC.ClusterRole().Delete(name, &metav1.DeleteOptions{}); err != nil && !errors.IsNotFound(err) {
+				return err
+			}
+		}
+
+		if err := wrangler.Mgmt.APIService().Delete(apiServiceName, &metav1.DeleteOptions{}); err != nil && !errors.IsNotFound(err) {
+			return err
+		}
+
 		return nil
 	}
 
+	if err := ensureWebhookAPIService(wrangler.Mgmt.APIService()); err != nil {
+		return err
+	}
+
 	return ensureFleetRoles(wrangler.RBAC)
+}
+
+func ensureWebhookAPIService(apiservices mngtv3.APIServiceClient) error {
+	apiService := &v3.APIService{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: apiServiceName,
+		},
+
+		Spec: v3.APIServiceSpec{
+			SecretName:      "stv-aggregation",
+			SecretNamespace: fleetconst.ReleaseNamespace,
+			Paths: []string{
+				"/fleet/webhook",
+			},
+		},
+	}
+
+	existing, err := apiservices.Get(apiService.Name, metav1.GetOptions{})
+	if err != nil && !errors.IsNotFound(err) {
+		return err
+	} else if errors.IsNotFound(err) {
+		if _, err := apiservices.Create(apiService); err != nil {
+			return err
+		}
+	} else {
+		if !reflect.DeepEqual(existing.Spec, apiService.Spec) {
+			existing.Spec = apiService.Spec
+			if _, err := apiservices.Update(existing); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 func ensureFleetRoles(rbac rbacv1.Interface) error {
@@ -30,7 +92,7 @@ func ensureFleetRoles(rbac rbacv1.Interface) error {
 	}
 	fleetWorkspaceAdminRole := v1.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:   "fleetworkspace-admin",
+			Name:   adminRole,
 			Labels: uiLabels,
 		},
 		Rules: []v1.PolicyRule{
@@ -67,7 +129,7 @@ func ensureFleetRoles(rbac rbacv1.Interface) error {
 
 	fleetWorkspaceMemberRole := v1.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:   "fleetworkspace-member",
+			Name:   memberRole,
 			Labels: uiLabels,
 		},
 		Rules: []v1.PolicyRule{
@@ -105,7 +167,7 @@ func ensureFleetRoles(rbac rbacv1.Interface) error {
 
 	fleetWorkspaceReadonlyRole := v1.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:   "fleetworkspace-readonly",
+			Name:   readonlyRole,
 			Labels: uiLabels,
 		},
 		Rules: []v1.PolicyRule{

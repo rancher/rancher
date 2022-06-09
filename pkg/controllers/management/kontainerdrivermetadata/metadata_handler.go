@@ -10,6 +10,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/types/convert"
+	"github.com/rancher/rancher/pkg/channelserver"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/namespace"
@@ -66,20 +67,21 @@ func Register(ctx context.Context, management *config.ManagementContext) {
 	mgmt := management.Management
 
 	m := &MetadataController{
-		SystemImagesLister:        mgmt.RkeK8sSystemImages("").Controller().Lister(),
-		SystemImages:              mgmt.RkeK8sSystemImages(""),
-		ServiceOptionsLister:      mgmt.RkeK8sServiceOptions("").Controller().Lister(),
-		ServiceOptions:            mgmt.RkeK8sServiceOptions(""),
-		NamespacesLister:          management.Core.Namespaces("").Controller().Lister(),
-		AddonsLister:              mgmt.RkeAddons("").Controller().Lister(),
-		Addons:                    mgmt.RkeAddons(""),
-		SettingLister:             mgmt.Settings("").Controller().Lister(),
-		Settings:                  mgmt.Settings(""),
-		CisConfigLister:           mgmt.CisConfigs("").Controller().Lister(),
-		CisConfig:                 mgmt.CisConfigs(""),
-		CisBenchmarkVersionLister: mgmt.CisBenchmarkVersions("").Controller().Lister(),
-		CisBenchmarkVersion:       mgmt.CisBenchmarkVersions(""),
+		SystemImagesLister:   mgmt.RkeK8sSystemImages("").Controller().Lister(),
+		SystemImages:         mgmt.RkeK8sSystemImages(""),
+		ServiceOptionsLister: mgmt.RkeK8sServiceOptions("").Controller().Lister(),
+		ServiceOptions:       mgmt.RkeK8sServiceOptions(""),
+		NamespacesLister:     management.Core.Namespaces("").Controller().Lister(),
+		AddonsLister:         mgmt.RkeAddons("").Controller().Lister(),
+		Addons:               mgmt.RkeAddons(""),
+		SettingLister:        mgmt.Settings("").Controller().Lister(),
+		Settings:             mgmt.Settings(""),
 	}
+
+	m.CisConfigLister = mgmt.CisConfigs("").Controller().Lister()
+	m.CisConfig = mgmt.CisConfigs("")
+	m.CisBenchmarkVersionLister = mgmt.CisBenchmarkVersions("").Controller().Lister()
+	m.CisBenchmarkVersion = mgmt.CisBenchmarkVersions("")
 
 	mgmt.Settings("").AddHandler(ctx, "rke-metadata-handler", m.sync)
 	mgmt.Settings("").Controller().Enqueue("", rkeMetadataConfig)
@@ -119,6 +121,8 @@ func (m *MetadataController) sync(key string, setting *v3.Setting) (runtime.Obje
 		m.Settings.Controller().EnqueueAfter(setting.Namespace, setting.Name, time.Minute*time.Duration(interval))
 	}
 
+	// refresh to sync k3s/rke2 releases
+	channelserver.Refresh()
 	return setting, m.refresh()
 }
 

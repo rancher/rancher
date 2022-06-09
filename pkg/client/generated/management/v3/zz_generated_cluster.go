@@ -6,12 +6,18 @@ import (
 
 const (
 	ClusterType                                      = "cluster"
+	ClusterFieldAADClientCertSecret                  = "aadClientCertSecret"
+	ClusterFieldAADClientSecret                      = "aadClientSecret"
+	ClusterFieldAKSConfig                            = "aksConfig"
+	ClusterFieldAKSStatus                            = "aksStatus"
 	ClusterFieldAPIEndpoint                          = "apiEndpoint"
+	ClusterFieldAgentEnvVars                         = "agentEnvVars"
 	ClusterFieldAgentFeatures                        = "agentFeatures"
 	ClusterFieldAgentImage                           = "agentImage"
 	ClusterFieldAgentImageOverride                   = "agentImageOverride"
 	ClusterFieldAllocatable                          = "allocatable"
 	ClusterFieldAnnotations                          = "annotations"
+	ClusterFieldAppliedAgentEnvVars                  = "appliedAgentEnvVars"
 	ClusterFieldAppliedEnableNetworkPolicy           = "appliedEnableNetworkPolicy"
 	ClusterFieldAppliedPodSecurityPolicyTemplateName = "appliedPodSecurityPolicyTemplateId"
 	ClusterFieldAppliedSpec                          = "appliedSpec"
@@ -43,23 +49,29 @@ const (
 	ClusterFieldEnableNetworkPolicy                  = "enableNetworkPolicy"
 	ClusterFieldFailedSpec                           = "failedSpec"
 	ClusterFieldFleetWorkspaceName                   = "fleetWorkspaceName"
+	ClusterFieldGKEConfig                            = "gkeConfig"
+	ClusterFieldGKEStatus                            = "gkeStatus"
 	ClusterFieldImportedConfig                       = "importedConfig"
 	ClusterFieldInternal                             = "internal"
 	ClusterFieldIstioEnabled                         = "istioEnabled"
 	ClusterFieldK3sConfig                            = "k3sConfig"
 	ClusterFieldLabels                               = "labels"
 	ClusterFieldLimits                               = "limits"
+	ClusterFieldLinuxWorkerCount                     = "linuxWorkerCount"
 	ClusterFieldLocalClusterAuthEndpoint             = "localClusterAuthEndpoint"
 	ClusterFieldMonitoringStatus                     = "monitoringStatus"
 	ClusterFieldName                                 = "name"
 	ClusterFieldNodeCount                            = "nodeCount"
 	ClusterFieldNodeVersion                          = "nodeVersion"
+	ClusterFieldOpenStackSecret                      = "openStackSecret"
 	ClusterFieldOwnerReferences                      = "ownerReferences"
+	ClusterFieldPrivateRegistrySecret                = "privateRegistrySecret"
 	ClusterFieldProvider                             = "provider"
 	ClusterFieldRancherKubernetesEngineConfig        = "rancherKubernetesEngineConfig"
 	ClusterFieldRemoved                              = "removed"
 	ClusterFieldRequested                            = "requested"
 	ClusterFieldRke2Config                           = "rke2Config"
+	ClusterFieldS3CredentialSecret                   = "s3CredentialSecret"
 	ClusterFieldScheduledClusterScan                 = "scheduledClusterScan"
 	ClusterFieldScheduledClusterScanStatus           = "scheduledClusterScanStatus"
 	ClusterFieldState                                = "state"
@@ -67,17 +79,27 @@ const (
 	ClusterFieldTransitioningMessage                 = "transitioningMessage"
 	ClusterFieldUUID                                 = "uuid"
 	ClusterFieldVersion                              = "version"
+	ClusterFieldVirtualCenterSecret                  = "virtualCenterSecret"
+	ClusterFieldVsphereSecret                        = "vsphereSecret"
+	ClusterFieldWeavePasswordSecret                  = "weavePasswordSecret"
 	ClusterFieldWindowsPreferedCluster               = "windowsPreferedCluster"
+	ClusterFieldWindowsWorkerCount                   = "windowsWorkerCount"
 )
 
 type Cluster struct {
 	types.Resource
+	AADClientCertSecret                  string                         `json:"aadClientCertSecret,omitempty" yaml:"aadClientCertSecret,omitempty"`
+	AADClientSecret                      string                         `json:"aadClientSecret,omitempty" yaml:"aadClientSecret,omitempty"`
+	AKSConfig                            *AKSClusterConfigSpec          `json:"aksConfig,omitempty" yaml:"aksConfig,omitempty"`
+	AKSStatus                            *AKSStatus                     `json:"aksStatus,omitempty" yaml:"aksStatus,omitempty"`
 	APIEndpoint                          string                         `json:"apiEndpoint,omitempty" yaml:"apiEndpoint,omitempty"`
+	AgentEnvVars                         []EnvVar                       `json:"agentEnvVars,omitempty" yaml:"agentEnvVars,omitempty"`
 	AgentFeatures                        map[string]bool                `json:"agentFeatures,omitempty" yaml:"agentFeatures,omitempty"`
 	AgentImage                           string                         `json:"agentImage,omitempty" yaml:"agentImage,omitempty"`
 	AgentImageOverride                   string                         `json:"agentImageOverride,omitempty" yaml:"agentImageOverride,omitempty"`
 	Allocatable                          map[string]string              `json:"allocatable,omitempty" yaml:"allocatable,omitempty"`
 	Annotations                          map[string]string              `json:"annotations,omitempty" yaml:"annotations,omitempty"`
+	AppliedAgentEnvVars                  []EnvVar                       `json:"appliedAgentEnvVars,omitempty" yaml:"appliedAgentEnvVars,omitempty"`
 	AppliedEnableNetworkPolicy           bool                           `json:"appliedEnableNetworkPolicy,omitempty" yaml:"appliedEnableNetworkPolicy,omitempty"`
 	AppliedPodSecurityPolicyTemplateName string                         `json:"appliedPodSecurityPolicyTemplateId,omitempty" yaml:"appliedPodSecurityPolicyTemplateId,omitempty"`
 	AppliedSpec                          *ClusterSpec                   `json:"appliedSpec,omitempty" yaml:"appliedSpec,omitempty"`
@@ -109,23 +131,29 @@ type Cluster struct {
 	EnableNetworkPolicy                  *bool                          `json:"enableNetworkPolicy,omitempty" yaml:"enableNetworkPolicy,omitempty"`
 	FailedSpec                           *ClusterSpec                   `json:"failedSpec,omitempty" yaml:"failedSpec,omitempty"`
 	FleetWorkspaceName                   string                         `json:"fleetWorkspaceName,omitempty" yaml:"fleetWorkspaceName,omitempty"`
+	GKEConfig                            *GKEClusterConfigSpec          `json:"gkeConfig,omitempty" yaml:"gkeConfig,omitempty"`
+	GKEStatus                            *GKEStatus                     `json:"gkeStatus,omitempty" yaml:"gkeStatus,omitempty"`
 	ImportedConfig                       *ImportedConfig                `json:"importedConfig,omitempty" yaml:"importedConfig,omitempty"`
 	Internal                             bool                           `json:"internal,omitempty" yaml:"internal,omitempty"`
 	IstioEnabled                         bool                           `json:"istioEnabled,omitempty" yaml:"istioEnabled,omitempty"`
 	K3sConfig                            *K3sConfig                     `json:"k3sConfig,omitempty" yaml:"k3sConfig,omitempty"`
 	Labels                               map[string]string              `json:"labels,omitempty" yaml:"labels,omitempty"`
 	Limits                               map[string]string              `json:"limits,omitempty" yaml:"limits,omitempty"`
+	LinuxWorkerCount                     int64                          `json:"linuxWorkerCount,omitempty" yaml:"linuxWorkerCount,omitempty"`
 	LocalClusterAuthEndpoint             *LocalClusterAuthEndpoint      `json:"localClusterAuthEndpoint,omitempty" yaml:"localClusterAuthEndpoint,omitempty"`
 	MonitoringStatus                     *MonitoringStatus              `json:"monitoringStatus,omitempty" yaml:"monitoringStatus,omitempty"`
 	Name                                 string                         `json:"name,omitempty" yaml:"name,omitempty"`
 	NodeCount                            int64                          `json:"nodeCount,omitempty" yaml:"nodeCount,omitempty"`
 	NodeVersion                          int64                          `json:"nodeVersion,omitempty" yaml:"nodeVersion,omitempty"`
+	OpenStackSecret                      string                         `json:"openStackSecret,omitempty" yaml:"openStackSecret,omitempty"`
 	OwnerReferences                      []OwnerReference               `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
+	PrivateRegistrySecret                string                         `json:"privateRegistrySecret,omitempty" yaml:"privateRegistrySecret,omitempty"`
 	Provider                             string                         `json:"provider,omitempty" yaml:"provider,omitempty"`
 	RancherKubernetesEngineConfig        *RancherKubernetesEngineConfig `json:"rancherKubernetesEngineConfig,omitempty" yaml:"rancherKubernetesEngineConfig,omitempty"`
 	Removed                              string                         `json:"removed,omitempty" yaml:"removed,omitempty"`
 	Requested                            map[string]string              `json:"requested,omitempty" yaml:"requested,omitempty"`
 	Rke2Config                           *Rke2Config                    `json:"rke2Config,omitempty" yaml:"rke2Config,omitempty"`
+	S3CredentialSecret                   string                         `json:"s3CredentialSecret,omitempty" yaml:"s3CredentialSecret,omitempty"`
 	ScheduledClusterScan                 *ScheduledClusterScan          `json:"scheduledClusterScan,omitempty" yaml:"scheduledClusterScan,omitempty"`
 	ScheduledClusterScanStatus           *ScheduledClusterScanStatus    `json:"scheduledClusterScanStatus,omitempty" yaml:"scheduledClusterScanStatus,omitempty"`
 	State                                string                         `json:"state,omitempty" yaml:"state,omitempty"`
@@ -133,7 +161,11 @@ type Cluster struct {
 	TransitioningMessage                 string                         `json:"transitioningMessage,omitempty" yaml:"transitioningMessage,omitempty"`
 	UUID                                 string                         `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 	Version                              *Info                          `json:"version,omitempty" yaml:"version,omitempty"`
+	VirtualCenterSecret                  string                         `json:"virtualCenterSecret,omitempty" yaml:"virtualCenterSecret,omitempty"`
+	VsphereSecret                        string                         `json:"vsphereSecret,omitempty" yaml:"vsphereSecret,omitempty"`
+	WeavePasswordSecret                  string                         `json:"weavePasswordSecret,omitempty" yaml:"weavePasswordSecret,omitempty"`
 	WindowsPreferedCluster               bool                           `json:"windowsPreferedCluster,omitempty" yaml:"windowsPreferedCluster,omitempty"`
+	WindowsWorkerCount                   int64                          `json:"windowsWorkerCount,omitempty" yaml:"windowsWorkerCount,omitempty"`
 }
 
 type ClusterCollection struct {

@@ -3,20 +3,20 @@ package kontainerdriver
 import (
 	"fmt"
 	"net/http"
-	"path/filepath"
 	"strconv"
 	"strings"
-	"time"
 
 	mVersion "github.com/mcuadros/go-version"
 	"github.com/rancher/norman/api/handler"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
-	helmlib "github.com/rancher/rancher/pkg/catalog/helm"
 	"github.com/rancher/rancher/pkg/catalog/utils"
+	"github.com/rancher/rancher/pkg/channelserver"
 	kd "github.com/rancher/rancher/pkg/controllers/management/kontainerdrivermetadata"
+	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/image"
+	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/settings"
 	rketypes "github.com/rancher/rke/types"
 	img "github.com/rancher/rke/types/image"
@@ -37,9 +37,10 @@ type ActionHandler struct {
 }
 
 type ListHandler struct {
-	SysImageLister v3.RkeK8sSystemImageLister
-	SysImages      v3.RkeK8sSystemImageInterface
-	CatalogLister  v3.CatalogLister
+	SysImageLister  v3.RkeK8sSystemImageLister
+	SysImages       v3.RkeK8sSystemImageInterface
+	CatalogLister   v3.CatalogLister
+	ConfigMapLister v1.ConfigMapLister
 }
 
 func (a ActionHandler) ActionHandler(actionName string, action *types.Action, apiContext *types.APIContext) error {
@@ -79,17 +80,8 @@ func (a ActionHandler) refresh(apiContext *types.APIContext) error {
 		return httperror.WrapAPIError(err, httperror.ServerError, msg)
 	}
 
-	setting, err := a.MetadataHandler.SettingLister.Get("", rkeMetadataConfig)
-	if err != nil {
-		return err
-	}
-
-	if setting.Annotations == nil {
-		setting.Annotations = make(map[string]string)
-	}
-
-	setting.Annotations[forceRefreshAnnotation] = strconv.FormatInt(time.Now().Unix(), 10)
-	_, err = a.MetadataHandler.Settings.Update(setting)
+	// refresh to sync k3s/rke2 releases
+	channelserver.Refresh()
 	apiContext.WriteResponse(http.StatusOK, response)
 	return nil
 }
@@ -107,7 +99,7 @@ func (a ActionHandler) setDriverActiveStatus(apiContext *types.APIContext, statu
 	return err
 }
 
-func (lh ListHandler) LinkHandler(apiContext *types.APIContext, next types.RequestHandler) error {
+func (lh ListHandler) LinkHandler(apiContext *types.APIContext, next types.RequestHandler) (err error) {
 	k8sCurr := strings.Split(settings.KubernetesVersionsCurrent.Get(), ",")
 	rkeSysImages := map[string]rketypes.RKESystemImages{}
 	if apiContext.ID != linuxImages && apiContext.ID != windowsImages {
@@ -125,6 +117,15 @@ func (lh ListHandler) LinkHandler(apiContext *types.APIContext, next types.Reque
 			// removing weave images since it's not supported
 			rkeSysImgCopy.WeaveNode = ""
 			rkeSysImgCopy.WeaveCNI = ""
+			// removing noiro (Cisco ACI) since it's not supported
+			rkeSysImgCopy.AciCniDeployContainer = ""
+			rkeSysImgCopy.AciHostContainer = ""
+			rkeSysImgCopy.AciOpflexContainer = ""
+			rkeSysImgCopy.AciMcastContainer = ""
+			rkeSysImgCopy.AciOpenvSwitchContainer = ""
+			rkeSysImgCopy.AciControllerContainer = ""
+			rkeSysImgCopy.AciOpflexServerContainer = ""
+			rkeSysImgCopy.AciGbpServerContainer = ""
 		case windowsImages:
 			majorVersion := util.GetTagMajorVersion(k8sVersion)
 			if mVersion.Compare(majorVersion, "v1.13", "<=") {
@@ -142,30 +143,35 @@ func (lh ListHandler) LinkHandler(apiContext *types.APIContext, next types.Reque
 		rkeSysImages[k8sVersion] = *rkeSysImgCopy
 	}
 
-	// get system charts path
-	systemCatalog, err := lh.CatalogLister.Get("", utils.SystemLibraryName)
+	var catalogImageList *v1.ConfigMap
+	catalogImageList, err = lh.ConfigMapLister.Get(namespace.System, utils.GetCatalogImageCacheName(utils.SystemLibraryName))
 	if err != nil {
-		return httperror.WrapAPIError(err, httperror.ServerError, "error getting system catalog")
+		return httperror.WrapAPIError(err, httperror.ServerError, "failed to get image list for system catalog")
 	}
-	systemCatalogHash := helmlib.CatalogSHA256Hash(systemCatalog)
-	systemCatalogChartPath := filepath.Join(helmlib.CatalogCache, systemCatalogHash)
 
-	var targetImages []string
+	_, targetSysCatalogImages := image.ParseCatalogImageListConfigMap(catalogImageList)
+
+	var targetRkeSysImages []string
+	exportConfig := image.ExportConfig{OsType: image.Linux}
 	switch apiContext.ID {
 	case linuxImages:
-		targetImages, err = image.GetImages(systemCatalogChartPath, "", []string{}, []string{}, rkeSysImages, image.Linux)
+		targetRkeSysImages, _, err = image.GetImages(exportConfig, nil, []string{}, rkeSysImages)
 		if err != nil {
 			return httperror.WrapAPIError(err, httperror.ServerError, "error getting image list for linux platform")
 		}
 	case windowsImages:
-		targetImages, err = image.GetImages(systemCatalogChartPath, "", []string{}, []string{}, rkeSysImages, image.Windows)
+		exportConfig.OsType = image.Windows
+		targetRkeSysImages, _, err = image.GetImages(exportConfig, nil, []string{}, rkeSysImages)
 		if err != nil {
 			return httperror.WrapAPIError(err, httperror.ServerError, "error getting image list for windows platform")
 		}
 	}
 
+	var targetImages []string
 	agentImage := settings.AgentImage.Get()
 	targetImages = append(targetImages, img.Mirror(agentImage))
+	targetImages = append(targetImages, targetRkeSysImages...)
+	targetImages = append(targetImages, targetSysCatalogImages...)
 
 	b := []byte(strings.Join(targetImages, "\n"))
 	apiContext.Response.Header().Set("Content-Length", strconv.Itoa(len(b)))

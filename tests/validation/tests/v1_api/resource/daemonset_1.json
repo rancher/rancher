@@ -1,0 +1,43 @@
+{
+  "type": "apps.daemonset",
+  "metadata": {
+    "namespace": "",
+    "name": ""
+  },
+  "metadata.annotations": {
+  },
+  "metadata.labels": {
+  },
+  "spec": {
+    "template": {
+      "spec": {
+        "restartPolicy": "Always",
+        "containers": [
+          {
+            "imagePullPolicy": "Always",
+            "volumeMounts": [
+            ],
+            "image": "",
+            "name": ""
+          }
+        ],
+        "imagePullSecrets": [
+        ],
+        "volumes": [
+        ],
+        "affinity": {
+        }
+      },
+      "metadata": {
+        "labels": {
+          "workload.user.cattle.io/workloadselector": ""
+        }
+      }
+    },
+    "selector": {
+      "matchLabels": {
+        "workload.user.cattle.io/workloadselector": ""
+      }
+    }
+  }
+}

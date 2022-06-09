@@ -87,6 +87,9 @@ func generateServiceNetworkPolicy(service *corev1.Service, policyName string) *k
 		ObjectMeta: v1.ObjectMeta{
 			Name:      policyName,
 			Namespace: service.Namespace,
+			Labels: map[string]string{
+				creatorLabel: creatorNorman,
+			},
 			OwnerReferences: []v1.OwnerReference{
 				{
 					APIVersion: "v1",

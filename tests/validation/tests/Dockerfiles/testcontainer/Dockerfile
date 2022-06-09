@@ -1,5 +1,4 @@
 FROM nginx
-MAINTAINER Sangeetha Hariharan "https://github.com/sangeethah"
 
 RUN apt-get update
 
@@ -12,6 +11,8 @@ RUN apt-get install -y iputils-ping
 COPY ./run.sh /scripts/run.sh
 RUN chmod 777 /scripts/run.sh
 
+COPY ./nginx.conf /etc/nginx/conf.d/default.conf
+RUN chmod 644 /etc/nginx/conf.d/default.conf
 
 ENTRYPOINT [ "/scripts/run.sh" ]
 CMD ["nginx", "-g", "daemon off;"]

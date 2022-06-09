@@ -1,0 +1,197 @@
+#!groovy
+
+def needs_cluster(py_options, upgrade_check, create_resource_prefix) {
+    try {
+      jobs = [:]
+      cluster_arr = env.RANCHER_CLUSTER_NAMES.split(",")
+      version_arr = env.RANCHER_CLUSTER_UPGRADE_VERSIONS.split(",")
+      cluster_count = cluster_arr.size()
+      RANCHER_UPGRADE_CHECK = "upgrade_cluster"
+      RANCHER_VALIDATE_RESOURCES_PREFIX = "mystep1"
+      for (int i = 0; i < cluster_count; i++) {
+        def params = [
+          string(name: 'CATTLE_TEST_URL', value: "${CATTLE_TEST_URL}"),
+          string(name: 'ADMIN_TOKEN', value: "${ADMIN_TOKEN}"),
+          string(name: 'USER_TOKEN', value: "${USER_TOKEN}"),
+          string(name: 'RANCHER_CLUSTER_NAME', value: "${cluster_arr[i]}", trim: true),
+          string(name: 'PYTEST_OPTIONS', value: "-k ${py_options}"),
+          string(name: 'RANCHER_UPGRADE_CHECK', value: "${upgrade_check}"),
+          string(name: 'RANCHER_CLUSTER_UPGRADE_VERSION', value: "${version_arr[i]}", trim: true),
+          string(name: 'RANCHER_VALIDATE_RESOURCES_PREFIX', value: "${RANCHER_VALIDATE_RESOURCES_PREFIX}"),
+          string(name: 'RANCHER_CREATE_RESOURCES_PREFIX', value: "${create_resource_prefix}"),
+          string(name: 'RANCHER_TEST_IMAGE', value: "${RANCHER_TEST_IMAGE}"),
+          string(name: 'RANCHER_TEST_IMAGE_PORT', value: "${RANCHER_TEST_IMAGE_PORT}"),
+          string(name: 'RANCHER_HARDENED_CLUSTER', value: "${RANCHER_HARDENED_CLUSTER}"),
+          string(name: 'RANCHER_TEST_IMAGE_NGINX', value: "${RANCHER_TEST_IMAGE_NGINX}"),
+        ]
+        echo "Params are: ${params}"
+        jobs["test-${i}"] = { build job: 'rancher-v3_needs_cluster', parameters: params }
+      }
+      parallel jobs
+  } catch(err) {
+      echo "Error: " + err
+      currentBuild.result = 'UNSTABLE'
+  }
+}
+
+node {
+  def rootPath = "/src/rancher-validation/"
+  def job_name = "${JOB_NAME}"
+  if (job_name.contains('/')) { 
+    job_names = job_name.split('/')
+    job_name = job_names[job_names.size() - 1] 
+  }
+
+  def setupContainer = "${job_name}${env.BUILD_NUMBER}_setup"
+  def clusterSetupContainer = "${job_name}${env.BUILD_NUMBER}_cluster_setup"
+
+  def deployPytestOptions = "-k test_deploy_rancher_server"
+
+  def setupResultsOut = "setup-results.xml"
+  def imageName = "rancher-validation-${job_name}${env.BUILD_NUMBER}"
+  def testsDir = "tests/v3_api/"
+
+  def envFile = ".env"
+  def rancherConfig = "rancher_env.config"
+
+  def branch = "release/v2.6"
+  if ("${env.branch}" != "null" && "${env.branch}" != "") {
+    branch = "${env.branch}"
+  }
+
+  wrap([$class: 'AnsiColorBuildWrapper', 'colorMapName': 'XTerm', 'defaultFg': 2, 'defaultBg':1]) {
+    withFolderProperties {
+      paramsMap = []
+      params.each {
+        paramsMap << "$it.key=$it.value"
+      }
+      withEnv(paramsMap) {
+      withCredentials([ string(credentialsId: 'AWS_ACCESS_KEY_ID', variable: 'AWS_ACCESS_KEY_ID'),
+                        string(credentialsId: 'AWS_SECRET_ACCESS_KEY', variable: 'AWS_SECRET_ACCESS_KEY'),
+                        string(credentialsId: 'AWS_SSH_PEM_KEY', variable: 'AWS_SSH_PEM_KEY'),
+                        string(credentialsId: 'RANCHER_SSH_KEY', variable: 'RANCHER_SSH_KEY'),
+                        string(credentialsId: 'ADMIN_PASSWORD', variable: 'ADMIN_PASSWORD'),
+                        string(credentialsId: 'USER_PASSWORD', variable: 'USER_PASSWORD')]) {
+        stage('Checkout') {
+          deleteDir()
+          checkout([
+                    $class: 'GitSCM',
+                    branches: [[name: "*/${branch}"]],
+                    extensions: scm.extensions + [[$class: 'CleanCheckout']],
+                    userRemoteConfigs: scm.userRemoteConfigs
+                  ])
+        }
+
+        dir ("tests/validation") {
+          try {
+            stage('Configure and Build') {
+              if (env.AWS_SSH_PEM_KEY && env.AWS_SSH_KEY_NAME) {
+                dir(".ssh") {
+                  def decoded = new String(AWS_SSH_PEM_KEY.decodeBase64())
+                  writeFile file: AWS_SSH_KEY_NAME, text: decoded
+                }
+              }
+
+              sh "./tests/v3_api/scripts/configure.sh"
+              sh "./tests/v3_api/scripts/build.sh"
+            }
+
+            stage('Deploy Rancher Server') {
+              try {
+                if (!env.CATTLE_TEST_URL.trim() && !env.ADMIN_TOKEN.trim() && !env.USER_TOKEN.trim()) {
+                  // deploy rancher server
+                  sh "docker run --name ${setupContainer} -t --env-file ${envFile} " +
+                    "${imageName} /bin/bash -c \'export RANCHER_AUTO_DEPLOY_CUSTOM_CLUSTER=False " +
+                    "&& pytest -v -s --junit-xml=${setupResultsOut} " +
+                    "${deployPytestOptions} ${testsDir}\'"
+                  RANCHER_DEPLOYED = true
+
+                  // copy file containing CATTLE_TEST_URL, ADMIN_TOKEN, USER_TOKEN and load into environment variables
+                  sh "docker cp ${setupContainer}:${rootPath}${testsDir}${rancherConfig} ."
+                  load rancherConfig
+                }
+                else {
+                  echo "User Provided Rancher Server"
+                  RANCHER_DEPLOYED = false
+                }
+
+              } catch(err) {
+                echo "Error: " + err
+                RANCHER_DEPLOYED = false
+              }
+            }
+
+            stage('Deploy rke2 Clusters') {
+              try {
+                  echo "Deploying rke2 clusters. Versions: ${RANCHER_RKE2_VERSIONS}. Names: ${RANCHER_CLUSTER_NAMES}"
+                  jobs = [:]
+                  rke2_versions = RANCHER_RKE2_VERSIONS.split(",")
+                  cluster_arr = RANCHER_CLUSTER_NAMES.split(",")
+                  cluster_count = cluster_arr.size()
+                  for (int i = 0; i < cluster_count; i++) {
+                    def params = [
+                      string(name: 'RANCHER_HOSTNAME_PREFIX', value: "${cluster_arr[i]}", trim: true),
+                      string(name: 'RANCHER_CLUSTER_NAME', value: "${cluster_arr[i]}", trim: true),
+                      string(name: 'RANCHER_RKE2_VERSION', value: "${rke2_versions[i]}", trim: true),
+                      string(name: 'CATTLE_TEST_URL', value: "${CATTLE_TEST_URL}"),
+                      string(name: 'ADMIN_TOKEN', value: "${ADMIN_TOKEN}"),
+                      string(name: 'USER_TOKEN', value: "${USER_TOKEN}"),
+                      string(name: 'RANCHER_RKE2_NO_OF_SERVER_NODES', value: "${RANCHER_RKE2_NO_OF_SERVER_NODES}"),
+                      string(name: 'RANCHER_RKE2_NO_OF_WORKER_NODES', value: "${RANCHER_RKE2_NO_OF_WORKER_NODES}"),
+                      string(name: 'AWS_AMI', value: "${RKE2_AWS_AMI}"),
+                      string(name: 'AWS_USER', value: "${RKE2_AWS_USER}"),
+                      string(name: 'RANCHER_RKE2_OPERATING_SYSTEM', value: "${RANCHER_RKE2_OPERATING_SYSTEM}"),
+                      string(name: 'RANCHER_RKE2_SERVER_FLAGS', value: "${RANCHER_RKE2_SERVER_FLAGS}"),
+                      string(name: 'RANCHER_RKE2_WORKER_FLAGS', value: "${RANCHER_RKE2_WORKER_FLAGS}"),
+                      string(name: 'RANCHER_RKE2_INSTALLATION_MODE', value: "${RANCHER_RKE2_INSTALLATION_MODE}"),
+                      string(name: 'RANCHER_RKE2_CHANNEL', value: "${RANCHER_RKE2_CHANNEL}"),
+                      string(name: 'RANCHER_TEST_IMAGE', value: "${RANCHER_TEST_IMAGE}"),
+                      string(name: 'RANCHER_TEST_IMAGE_PORT', value: "${RANCHER_TEST_IMAGE_PORT}"),
+                      string(name: 'AWS_VOLUME_SIZE', value: "${AWS_VOLUME_SIZE}"),
+                    ]
+                    echo "Params are: ${params}"
+                    jobs["test-${i}"] = { build job: 'import_rke2_cluster', parameters: params }
+                  }
+                  parallel jobs
+                  CLUSTERS_CREATED = true
+              } catch(err) {
+                  echo "Error: " + err
+                  currentBuild.result = 'UNSTABLE'
+              }
+            }
+
+            stage('Run Preupgrade Tests in Parallel') {
+              needs_cluster("test_upgrade", "preupgrade", "mystep1")
+            }
+
+            stage('Upgrade Clusters') {
+              echo "Upgrading clusters from versions: ${RANCHER_RKE2_VERSIONS} to ${RANCHER_CLUSTER_UPGRADE_VERSIONS}"
+              needs_cluster("test_cluster_upgrade", "upgrade_cluster", "mystep1")
+            }
+
+            stage('Run Postupgrade Tests in Parallel') {
+              needs_cluster("test_upgrade", "postupgrade", "mystep2")
+            }
+
+          } catch(err) {
+            echo "Error: " + err
+          } finally {
+
+            stage('Test Report') {
+              // copy and archive test results
+              if (RANCHER_DEPLOYED) {
+                sh "docker cp ${setupContainer}:${rootPath}${setupResultsOut} ."
+                sh "docker stop ${setupContainer}"
+                sh "docker rm -v ${setupContainer}"
+                step([$class: 'JUnitResultArchiver', testResults: "**/${setupResultsOut}"])
+              }
+            }
+
+            sh "docker rmi ${imageName}"
+          } // finally
+        } // dir
+      } // creds
+      } // env
+    } // folder properties
+  } // wrap
+} // node

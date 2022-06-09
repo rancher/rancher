@@ -9,6 +9,7 @@ const (
 	CronJobFieldActiveDeadlineSeconds         = "activeDeadlineSeconds"
 	CronJobFieldAnnotations                   = "annotations"
 	CronJobFieldAutomountServiceAccountToken  = "automountServiceAccountToken"
+	CronJobFieldCompletionMode                = "completionMode"
 	CronJobFieldContainers                    = "containers"
 	CronJobFieldCreated                       = "created"
 	CronJobFieldCreatorID                     = "creatorId"
@@ -31,6 +32,7 @@ const (
 	CronJobFieldName                          = "name"
 	CronJobFieldNamespaceId                   = "namespaceId"
 	CronJobFieldNodeID                        = "nodeId"
+	CronJobFieldOS                            = "os"
 	CronJobFieldOverhead                      = "overhead"
 	CronJobFieldOwnerReferences               = "ownerReferences"
 	CronJobFieldPreemptionPolicy              = "preemptionPolicy"
@@ -70,6 +72,7 @@ type CronJob struct {
 	ActiveDeadlineSeconds         *int64                         `json:"activeDeadlineSeconds,omitempty" yaml:"activeDeadlineSeconds,omitempty"`
 	Annotations                   map[string]string              `json:"annotations,omitempty" yaml:"annotations,omitempty"`
 	AutomountServiceAccountToken  *bool                          `json:"automountServiceAccountToken,omitempty" yaml:"automountServiceAccountToken,omitempty"`
+	CompletionMode                string                         `json:"completionMode,omitempty" yaml:"completionMode,omitempty"`
 	Containers                    []Container                    `json:"containers,omitempty" yaml:"containers,omitempty"`
 	Created                       string                         `json:"created,omitempty" yaml:"created,omitempty"`
 	CreatorID                     string                         `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
@@ -92,6 +95,7 @@ type CronJob struct {
 	Name                          string                         `json:"name,omitempty" yaml:"name,omitempty"`
 	NamespaceId                   string                         `json:"namespaceId,omitempty" yaml:"namespaceId,omitempty"`
 	NodeID                        string                         `json:"nodeId,omitempty" yaml:"nodeId,omitempty"`
+	OS                            *PodOS                         `json:"os,omitempty" yaml:"os,omitempty"`
 	Overhead                      map[string]string              `json:"overhead,omitempty" yaml:"overhead,omitempty"`
 	OwnerReferences               []OwnerReference               `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
 	PreemptionPolicy              string                         `json:"preemptionPolicy,omitempty" yaml:"preemptionPolicy,omitempty"`

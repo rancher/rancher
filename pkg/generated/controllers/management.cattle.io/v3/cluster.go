@@ -1,5 +1,5 @@
 /*
-Copyright 2020 Rancher Labs, Inc.
+Copyright 2022 Rancher Labs, Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -360,6 +360,10 @@ func (a *clusterGeneratingHandler) Remove(key string, obj *v3.Cluster) (*v3.Clus
 }
 
 func (a *clusterGeneratingHandler) Handle(obj *v3.Cluster, status v3.ClusterStatus) (v3.ClusterStatus, error) {
+	if !obj.DeletionTimestamp.IsZero() {
+		return status, nil
+	}
+
 	objs, newStatus, err := a.ClusterGeneratingHandler(obj, status)
 	if err != nil {
 		return newStatus, err

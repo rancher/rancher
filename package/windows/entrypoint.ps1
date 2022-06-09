@@ -9,6 +9,11 @@ $VerbosePreference = 'SilentlyContinue'
 $DebugPreference = 'SilentlyContinue'
 $InformationPreference = 'SilentlyContinue'
 
+# to support functionality in linux agent to bypass run.sh using --
+if ($args[0] -eq "--") {
+    $args = $args[1..($args.Length-1)]
+}
+
 function Run-PowerShell
 {
     param (

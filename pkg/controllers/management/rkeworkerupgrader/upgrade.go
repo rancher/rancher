@@ -6,9 +6,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/docker/docker/pkg/locker"
+	"github.com/moby/locker"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/controllers/management/clusterprovisioner"
+	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	nodehelper "github.com/rancher/rancher/pkg/node"
 	nodeserver "github.com/rancher/rancher/pkg/rkenodeconfigserver"
@@ -32,6 +33,7 @@ type upgradeHandler struct {
 	nodes                v3.NodeInterface
 	nodeLister           v3.NodeLister
 	clusterLister        v3.ClusterLister
+	secretLister         v1.SecretLister
 	lookup               *nodeserver.BundleLookup
 	systemAccountManager *systemaccount.Manager
 	serviceOptionsLister v3.RkeK8sServiceOptionLister
@@ -49,6 +51,7 @@ func Register(ctx context.Context, mgmt *config.ManagementContext, scaledContext
 		clusterLister:        mgmt.Management.Clusters("").Controller().Lister(),
 		nodes:                mgmt.Management.Nodes(""),
 		nodeLister:           mgmt.Management.Nodes("").Controller().Lister(),
+		secretLister:         mgmt.Core.Secrets("").Controller().Lister(),
 		lookup:               nodeserver.NewLookup(scaledContext.Core.Namespaces(""), scaledContext.Core),
 		systemAccountManager: systemaccount.NewManagerFromScale(scaledContext),
 		serviceOptionsLister: mgmt.Management.RkeK8sServiceOptions("").Controller().Lister(),
@@ -286,8 +289,8 @@ func (uh *upgradeHandler) upgradeCluster(cluster *v3.Cluster, nodeName string, p
 	}
 
 	logrus.Debugf("cluster [%s] worker-upgrade: workerNodeInfo: nodes %v maxAllowed %v upgrading %v notReady %v "+
-		"toProcess %v toPrepare %v done %v", cluster.Name, status.filtered, maxAllowed, status.upgrading,
-		keys(status.notReady), keys(status.toProcess), keys(status.toPrepare), keys(status.upgraded))
+		"toProcess %v toPrepare %v done %v toUncordon %v", cluster.Name, status.filtered, maxAllowed, status.upgrading,
+		keys(status.notReady), keys(status.toProcess), keys(status.toPrepare), keys(status.upgraded), keys(status.toUncordon))
 
 	for _, node := range status.upgraded {
 		if v32.NodeConditionUpgraded.IsTrue(node) {
@@ -298,6 +301,13 @@ func (uh *upgradeHandler) upgradeCluster(cluster *v3.Cluster, nodeName string, p
 			return err
 		}
 
+		logrus.Infof("cluster [%s] worker-upgrade: updated node [%s] to uncordon", clusterName, node.Name)
+	}
+
+	for _, node := range status.toUncordon {
+		if err := uh.updateNodeActive(node); err != nil {
+			return err
+		}
 		logrus.Infof("cluster [%s] worker-upgrade: updated node [%s] to uncordon", clusterName, node.Name)
 	}
 

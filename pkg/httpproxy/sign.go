@@ -23,6 +23,8 @@ import (
 const (
 	defaultAWSRegion      = "us-east-1"
 	defaultUSGovAWSRegion = "us-gov-west-1"
+	cnNorth1AWSRegion     = "cn-north-1"
+	cnNorthwest1AWSRegion = "cn-northwest-1"
 )
 
 var requiredHeadersForAws = map[string]bool{"host": true,
@@ -30,8 +32,10 @@ var requiredHeadersForAws = map[string]bool{"host": true,
 	"x-amz-date":           true,
 	"x-amz-user-agent":     true}
 
+type SecretGetter func(namespace, name string) (*v1.Secret, error)
+
 type Signer interface {
-	sign(*http.Request, v1.SecretInterface, string) error
+	sign(*http.Request, SecretGetter, string) error
 }
 
 func newSigner(auth string) Signer {
@@ -51,7 +55,7 @@ func newSigner(auth string) Signer {
 	return nil
 }
 
-func (br bearer) sign(req *http.Request, secrets v1.SecretInterface, auth string) error {
+func (br bearer) sign(req *http.Request, secrets SecretGetter, auth string) error {
 	data, secret, err := getAuthData(auth, secrets, []string{"passwordField", "credID"})
 	if err != nil {
 		return err
@@ -60,7 +64,7 @@ func (br bearer) sign(req *http.Request, secrets v1.SecretInterface, auth string
 	return nil
 }
 
-func (b basic) sign(req *http.Request, secrets v1.SecretInterface, auth string) error {
+func (b basic) sign(req *http.Request, secrets SecretGetter, auth string) error {
 	data, secret, err := getAuthData(auth, secrets, []string{"usernameField", "passwordField", "credID"})
 	if err != nil {
 		return err
@@ -71,7 +75,7 @@ func (b basic) sign(req *http.Request, secrets v1.SecretInterface, auth string) 
 	return nil
 }
 
-func (a awsv4) sign(req *http.Request, secrets v1.SecretInterface, auth string) error {
+func (a awsv4) sign(req *http.Request, secrets SecretGetter, auth string) error {
 	_, secret, err := getAuthData(auth, secrets, []string{"credID"})
 	if err != nil {
 		return err
@@ -115,7 +119,25 @@ func (a awsv4) getServiceAndRegion(host string) (string, string) {
 			return service, region
 		}
 	}
-
+	if strings.EqualFold(service, "iam") {
+		// This conditional is meant to cover a discrepancy in the IAM service for the China regions.
+		// The following doc states that IAM uses a globally unique endpoint, and the default
+		// region "us-east-1" should be used as part of the Credential authentication parameter
+		// (Current backend behavior). However, using "us-east-1" with any of the China regions will throw
+		// the error "SignatureDoesNotMatch: Credential should be scoped to a valid region, not 'us-east-1'.".
+		// https://docs.aws.amazon.com/general/latest/gr/sigv4_elements.html
+		//
+		// This other doc states the region value for China services should be "cn-north-1" or "cn-northwest-1"
+		// including IAM (See IAM endpoints in the tables). So they need to be set manually to prevent the error
+		// caused by the "us-east-1" default.
+		// https://docs.amazonaws.cn/en_us/aws/latest/userguide/endpoints-Beijing.html
+		if strings.Contains(host, cnNorth1AWSRegion) {
+			return service, cnNorth1AWSRegion
+		}
+		if strings.Contains(host, cnNorthwest1AWSRegion) {
+			return service, cnNorthwest1AWSRegion
+		}
+	}
 	// if no region is found, global endpoint is assumed.
 	// https://docs.aws.amazon.com/general/latest/gr/sigv4_elements.html
 	if strings.Contains(host, "us-gov") {
@@ -149,7 +171,7 @@ func partitionServiceAndRegion(partition endpoints.Partition, host string) (stri
 	return service, ""
 }
 
-func (d digest) sign(req *http.Request, secrets v1.SecretInterface, auth string) error {
+func (d digest) sign(req *http.Request, secrets SecretGetter, auth string) error {
 	data, secret, err := getAuthData(auth, secrets, []string{"usernameField", "passwordField", "credID"})
 	if err != nil {
 		return err
@@ -262,7 +284,7 @@ func getCnonce() string {
 	return fmt.Sprintf("%x", b)[:16]
 }
 
-func (a arbitrary) sign(req *http.Request, secrets v1.SecretInterface, auth string) error {
+func (a arbitrary) sign(req *http.Request, secrets SecretGetter, auth string) error {
 	data, _, err := getAuthData(auth, secrets, []string{})
 	if err != nil {
 		return err

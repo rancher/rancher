@@ -40,6 +40,10 @@ func (a ActionHandler) RotateEncryptionKey(actionName string, action *types.Acti
 		return httperror.NewAPIError(httperror.InvalidAction, err.Error())
 	}
 
+	if !v3.ClusterConditionUpdated.IsTrue(cluster) {
+		return httperror.NewAPIError(httperror.InvalidAction, "cluster is in updating state")
+	}
+
 	cluster.Spec.RancherKubernetesEngineConfig.RotateEncryptionKey = true
 	if _, err := a.ClusterClient.Update(cluster); err != nil {
 		response[v3client.RotateEncryptionKeyOutputFieldMessage] = "failed to update cluster object"

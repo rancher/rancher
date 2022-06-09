@@ -30,17 +30,22 @@ func (a ActionHandler) viewMonitoring(actionName string, action *types.Action, a
 	}
 
 	// need to support `map[string]string` as entry value type in norman Builder.convertMap
-	answers, version := monitoring.GetOverwroteAppAnswersAndVersion(cluster.Annotations)
-	encodeAnswers, err := convert.EncodeToMap(answers)
+	monitoringInput := monitoring.GetMonitoringInput(cluster.Annotations)
+	encodedAnswers, err := convert.EncodeToMap(monitoringInput.Answers)
+	if err != nil {
+		return httperror.WrapAPIError(err, httperror.ServerError, "failed to parse response")
+	}
+	encodedAnswersSetString, err := convert.EncodeToMap(monitoringInput.AnswersSetString)
 	if err != nil {
 		return httperror.WrapAPIError(err, httperror.ServerError, "failed to parse response")
 	}
 	resp := map[string]interface{}{
-		"answers": encodeAnswers,
-		"type":    "monitoringOutput",
+		"answers":          encodedAnswers,
+		"answersSetString": encodedAnswersSetString,
+		"type":             "monitoringOutput",
 	}
-	if version != "" {
-		resp["version"] = version
+	if monitoringInput.Version != "" {
+		resp["version"] = monitoringInput.Version
 	}
 
 	apiContext.WriteResponse(http.StatusOK, resp)
@@ -160,5 +165,5 @@ func (a ActionHandler) validateChartCompatibility(version, clusterName string) e
 	if err != nil {
 		return err
 	}
-	return a.CatalogManager.ValidateChartCompatibility(templateVersion, clusterName)
+	return a.CatalogManager.ValidateChartCompatibility(templateVersion, clusterName, "")
 }

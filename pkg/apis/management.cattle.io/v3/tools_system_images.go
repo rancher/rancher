@@ -2,28 +2,25 @@ package v3
 
 import (
 	projectv3 "github.com/rancher/rancher/pkg/apis/project.cattle.io/v3"
-	"github.com/rancher/rke/types/image"
 )
 
 var (
-	m = image.Mirror
-
 	ToolsSystemImages = struct {
 		PipelineSystemImages projectv3.PipelineSystemImages
 		AuthSystemImages     AuthSystemImages
 	}{
 		PipelineSystemImages: projectv3.PipelineSystemImages{
-			Jenkins:       m("rancher/pipeline-jenkins-server:v0.1.4"),
-			JenkinsJnlp:   m("jenkins/jnlp-slave:3.35-4"),
-			AlpineGit:     m("rancher/pipeline-tools:v0.1.15"),
-			PluginsDocker: m("plugins/docker:18.09"),
-			Minio:         m("minio/minio:RELEASE.2020-07-13T18-09-56Z"),
-			Registry:      m("registry:2"),
-			RegistryProxy: m("rancher/pipeline-tools:v0.1.15"),
-			KubeApply:     m("rancher/pipeline-tools:v0.1.15"),
+			Jenkins:       "rancher/pipeline-jenkins-server:v0.1.4",
+			JenkinsJnlp:   "rancher/mirrored-jenkins-jnlp-slave:4.7-1",
+			AlpineGit:     "rancher/pipeline-tools:v0.1.16",
+			PluginsDocker: "rancher/mirrored-plugins-docker:19.03.8",
+			Minio:         "rancher/mirrored-minio-minio:RELEASE.2020-07-13T18-09-56Z",
+			Registry:      "registry:2",
+			RegistryProxy: "rancher/pipeline-tools:v0.1.16",
+			KubeApply:     "rancher/pipeline-tools:v0.1.16",
 		},
 		AuthSystemImages: AuthSystemImages{
-			KubeAPIAuth: m("rancher/kube-api-auth:v0.1.4"),
+			KubeAPIAuth: "rancher/kube-api-auth:v0.1.8",
 		},
 	}
 )

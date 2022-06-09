@@ -1,0 +1,8 @@
+ARG RANCHER_TAG=dev
+ARG RANCHER_REPO=rancher
+FROM ${RANCHER_REPO}/rancher:${RANCHER_TAG} as rancher
+
+FROM scratch
+COPY --from=rancher /usr/bin/helm_v3 /helm
+COPY chart/*/*.tgz /
+COPY installer-run.sh /run.sh

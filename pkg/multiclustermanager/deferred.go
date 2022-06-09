@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/wrangler"
 	"k8s.io/client-go/kubernetes"
@@ -49,6 +50,14 @@ func (s *DeferredServer) Wait(ctx context.Context) {
 	}
 }
 
+func (s *DeferredServer) NormanSchemas() *types.Schemas {
+	mcm := s.getMCM()
+	if mcm == nil {
+		return nil
+	}
+	return mcm.NormanSchemas()
+}
+
 func (s *DeferredServer) Start(ctx context.Context) error {
 	s.Lock()
 	defer s.Unlock()
@@ -70,6 +79,10 @@ func (s *DeferredServer) Start(ctx context.Context) error {
 
 		return mcm.Start(ctx)
 	})
+	if mcm != nil {
+		// always start, even on error
+		mcm.started(ctx)
+	}
 	if err != nil {
 		return err
 	}
@@ -120,7 +133,7 @@ func (s *DeferredServer) K8sClient(clusterName string) (kubernetes.Interface, er
 	if mcm == nil {
 		return nil, nil
 	}
-	clusterContext, err := mcm.clusterManager.UserContext(clusterName)
+	clusterContext, err := mcm.clusterManager.UserContextNoControllers(clusterName)
 	if err != nil {
 		return nil, err
 	}

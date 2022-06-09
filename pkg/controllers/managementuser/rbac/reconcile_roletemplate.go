@@ -40,13 +40,13 @@ func (m *manager) reconcileProjectAccessToGlobalResources(binding *v3.ProjectRol
 		roles = append(roles, role)
 
 		for _, rt := range rts {
-			for resource := range globalResourcesNeededInProjects {
-				verbs, err := m.checkForGlobalResourceRules(rt, resource)
+			for resource, baseRule := range globalResourceRulesNeededInProjects {
+				verbs, err := m.checkForGlobalResourceRules(rt, resource, baseRule)
 				if err != nil {
 					return nil, err
 				}
 				if len(verbs) > 0 {
-					roleName, err := m.reconcileRoleForProjectAccessToGlobalResource(resource, rt, verbs)
+					roleName, err := m.reconcileRoleForProjectAccessToGlobalResource(resource, rt, verbs, baseRule)
 					if err != nil {
 						return nil, err
 					}
@@ -86,50 +86,64 @@ func (m *manager) reconcileProjectAccessToGlobalResources(binding *v3.ProjectRol
 		crbs, _ := m.crbIndexer.ByIndex(crbByRoleAndSubjectIndex, crbKey)
 		if len(crbs) == 0 {
 			logrus.Infof("Creating clusterRoleBinding for project access to global resource for subject %v role %v.", subject.Name, role)
+			roleRef := rbacv1.RoleRef{
+				Kind: "ClusterRole",
+				Name: role,
+			}
+			crbName := pkgrbac.NameForClusterRoleBinding(roleRef, subject)
 			createdCRB, err := bindingCli.Create(&rbacv1.ClusterRoleBinding{
 				ObjectMeta: metav1.ObjectMeta{
-					GenerateName: "clusterrolebinding-",
+					Name: crbName,
 					Labels: map[string]string{
 						rtbUID: owner,
 					},
 				},
 				Subjects: []rbacv1.Subject{subject},
-				RoleRef: rbacv1.RoleRef{
-					Kind: "ClusterRole",
-					Name: role,
-				},
+				RoleRef:  roleRef,
 			})
+			if err == nil {
+				crbsToKeep[createdCRB.Name] = true
+				continue
+			}
+			if !apierrors.IsAlreadyExists(err) {
+				return nil, err
+			}
+
+			// the binding exists but was not found in the index, manually retrieve it so that we can add appropriate labels
+			crb, err := bindingCli.Get(crbName, metav1.GetOptions{})
 			if err != nil {
 				return nil, err
 			}
-			crbsToKeep[createdCRB.Name] = true
-		} else {
-		CRBs:
-			for _, obj := range crbs {
-				crb, ok := obj.(*rbacv1.ClusterRoleBinding)
-				if !ok {
-					continue
-				}
-				crbsToKeep[crb.Name] = true
-				for owner := range crb.Labels {
-					if rtbUID == owner {
-						continue CRBs
-					}
-				}
 
-				crb = crb.DeepCopy()
-				if crb.Labels == nil {
-					crb.Labels = map[string]string{}
-				}
-				crb.Labels[rtbUID] = owner
-				logrus.Infof("Updating clusterRoleBinding %v for project access to global resource for subject %v role %v.", crb.Name, subject.Name, role)
-				_, err := bindingCli.Update(crb)
-				if err != nil {
-					return nil, err
-				}
-			}
+			crbs = append(crbs, crb)
 		}
 
+	CRBs:
+		for _, obj := range crbs {
+			crb, ok := obj.(*rbacv1.ClusterRoleBinding)
+			if !ok {
+				continue
+			}
+
+			crbsToKeep[crb.Name] = true
+			for owner := range crb.Labels {
+				if rtbUID == owner {
+					continue CRBs
+				}
+			}
+
+			crb = crb.DeepCopy()
+			if crb.Labels == nil {
+				crb.Labels = map[string]string{}
+			}
+			crb.Labels[rtbUID] = owner
+			logrus.Infof("Updating clusterRoleBinding %v for project access to global resource for subject %v role %v.", crb.Name, subject.Name, role)
+			_, err := bindingCli.Update(crb)
+			if err != nil {
+				return nil, err
+			}
+		}
 	}
+
 	return crbsToKeep, nil
 }

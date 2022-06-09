@@ -51,7 +51,7 @@ func CreateRoleAndRoleBinding(resource, kind, name, namespace, apiVersion, creat
 		return err
 	}
 
-	// Create a roleBinding referring the role with everything access, and containing creator of the resouce, along with
+	// Create a roleBinding referring the role with everything access, and containing creator of the resource, along with
 	// any members that have everything access
 	var ownerAccessSubjects, readOnlyAccessSubjects, memberAccessSubjects []k8srbacv1.Subject
 	ownerAccessSubjects = append(ownerAccessSubjects, k8srbacv1.Subject{Kind: "User", Name: creatorID, APIGroup: rbacv1.GroupName})
@@ -234,7 +234,7 @@ func GetRoleNameAndVerbs(roleAccess string, resourceName string, resourceType st
 	case NodeTemplateResource:
 		resourceName += "-nt-"
 	default:
-		resourceName += "-" + resourceName + "-"
+		resourceName += "-" + resourceType + "-"
 	}
 	switch roleAccess {
 	case OwnerAccess:
@@ -288,7 +288,7 @@ func buildSubjectForMember(member v32.Member, managementContext *config.Manageme
 	}
 
 	if name == "*" {
-		//member.GroupPrincipalName = subjectWithAllUsers.Name
+		// member.GroupPrincipalName = subjectWithAllUsers.Name
 		return subjectWithAllUsers, nil
 	}
 

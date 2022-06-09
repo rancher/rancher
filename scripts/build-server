@@ -13,15 +13,15 @@ RKE_VERSION="$(grep -m1 'github.com/rancher/rke' go.mod | awk '{print $2}')"
 # Inject Setting values
 DEFAULT_VALUES="{\"rke-version\":\"${RKE_VERSION}\"}"
 
-CGO_ENABLED=0 go build -i -tags k8s \
+CGO_ENABLED=0 go build -tags k8s \
   -ldflags \
   "-X github.com/rancher/rancher/pkg/version.Version=$VERSION
    -X github.com/rancher/rancher/pkg/version.GitCommit=$COMMIT
    -X github.com/rancher/rancher/pkg/settings.InjectDefaults=$DEFAULT_VALUES $LINKFLAGS" \
   -o bin/rancher
 
-if  [ -n "$RANCHER_METADATA_BRANCH" ]; then
-    curl -sLf https://releases.rancher.com/kontainer-driver-metadata/${RANCHER_METADATA_BRANCH}/data.json > bin/data.json
-else
-    echo '{}' > bin/data.json
+if  [ -n "$CATTLE_KDM_BRANCH" ]; then
+    curl -sLf https://releases.rancher.com/kontainer-driver-metadata/${CATTLE_KDM_BRANCH}/data.json > bin/data.json
+elif [ ! -e bin/data.json ] && [ -e ../kontainer-driver-metadata/data/data.json ]; then
+    cp ../kontainer-driver-metadata/data/data.json bin/data.json
 fi

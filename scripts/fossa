@@ -1,0 +1,4 @@
+#!/bin/bash
+
+fossa analyze
+fossa test

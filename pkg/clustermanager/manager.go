@@ -13,13 +13,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/rancher/wrangler/pkg/ratelimit"
-
-	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-
 	"github.com/rancher/lasso/pkg/controller"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/clusterrouter"
 	clusterController "github.com/rancher/rancher/pkg/controllers/managementuser"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
@@ -31,8 +28,8 @@ import (
 	"github.com/rancher/rke/pki/cert"
 	"github.com/rancher/steve/pkg/accesscontrol"
 	rbacv1 "github.com/rancher/wrangler/pkg/generated/controllers/rbac/v1"
+	"github.com/rancher/wrangler/pkg/ratelimit"
 	"github.com/sirupsen/logrus"
-	"golang.org/x/oauth2"
 	"golang.org/x/sync/semaphore"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -65,11 +62,11 @@ type record struct {
 	cancel        context.CancelFunc
 }
 
-func NewManager(httpsPort int, context *config.ScaledContext, rbacControllers rbacv1.Interface, asl accesscontrol.AccessSetLookup) *Manager {
+func NewManager(httpsPort int, context *config.ScaledContext, asl accesscontrol.AccessSetLookup) *Manager {
 	return &Manager{
 		httpsPort:     httpsPort,
 		ScaledContext: context,
-		accessControl: rbac.NewAccessControlWithASL("", rbacControllers, asl),
+		accessControl: rbac.NewAccessControlWithASL("", asl),
 		clusterLister: context.Management.Clusters("").Controller().Lister(),
 		clusters:      context.Management.Clusters(""),
 		startSem:      semaphore.NewWeighted(int64(settings.ClusterControllerStartCount.GetInt())),
@@ -120,6 +117,9 @@ func (m *Manager) markUnavailable(clusterName string) {
 }
 
 func (m *Manager) start(ctx context.Context, cluster *v3.Cluster, controllers, clusterOwner bool) (*record, error) {
+	if cluster.DeletionTimestamp != nil {
+		return nil, nil
+	}
 	obj, ok := m.controllers.Load(cluster.UID)
 	if ok {
 		if !m.changed(obj.(*record), cluster, controllers, clusterOwner) {
@@ -216,7 +216,7 @@ func (m *Manager) doStart(rec *record, clusterOwner bool) (exit error) {
 
 	transaction := controller.NewHandlerTransaction(rec.ctx)
 	if clusterOwner {
-		if err := clusterController.Register(transaction, rec.cluster, rec.clusterRec, m); err != nil {
+		if err := clusterController.Register(transaction, m.ScaledContext, rec.cluster, rec.clusterRec, m); err != nil {
 			transaction.Rollback()
 			return err
 		}
@@ -232,7 +232,7 @@ func (m *Manager) doStart(rec *record, clusterOwner bool) (exit error) {
 		defer close(done)
 
 		logrus.Debugf("[clustermanager] creating AccessControl for cluster %v", rec.cluster.ClusterName)
-		rec.accessControl = rbac.NewAccessControl(rec.ctx, rec.cluster.ClusterName, rec.cluster.RBACw)
+		rec.accessControl = rbac.NewAccessControl(transaction, rec.cluster.ClusterName, rec.cluster.RBACw)
 
 		err := rec.cluster.Start(rec.ctx)
 		if err == nil {
@@ -254,10 +254,6 @@ func (m *Manager) doStart(rec *record, clusterOwner bool) (exit error) {
 
 func ToRESTConfig(cluster *v3.Cluster, context *config.ScaledContext) (*rest.Config, error) {
 	if cluster == nil {
-		return nil, nil
-	}
-
-	if cluster.DeletionTimestamp != nil {
 		return nil, nil
 	}
 
@@ -319,14 +315,10 @@ func ToRESTConfig(cluster *v3.Cluster, context *config.ScaledContext) (*rest.Con
 			}
 			if cluster.Status.Driver == "googleKubernetesEngine" && cluster.Spec.GenericEngineConfig != nil {
 				cred, _ := (*cluster.Spec.GenericEngineConfig)["credential"].(string)
-				ts, err := gke.GetTokenSource(context.RunContext, cred)
-				if err == nil {
-					return &oauth2.Transport{
-						Source: ts,
-						Base:   rt,
-					}
+				rt, err = gke.Oauth2Transport(context.RunContext, rt, cred)
+				if err != nil {
+					logrus.Errorf("unable to retrieve token source for GKE oauth2: %v", err)
 				}
-				logrus.Errorf("unable to retrieve token source for GKE oauth2: %v", err)
 			}
 			return rt
 		},
@@ -455,6 +447,22 @@ func (m *Manager) APIExtClient(apiContext *types.APIContext, storageContext type
 	return m.ScaledContext.APIExtClient, nil
 }
 
+// UserContextNoControllers accepts a cluster name and returns a client for that cluster,
+// no controllers are started for that cluster in the process.
+func (m *Manager) UserContextNoControllers(clusterName string) (*config.UserContext, error) {
+	cluster, err := m.clusterLister.Get("", clusterName)
+	if err != nil {
+		return nil, err
+	}
+	ctx, err := m.UserContextFromCluster(cluster)
+	if ctx == nil && err == nil {
+		return nil, fmt.Errorf("cluster context %s is unavaiblable", clusterName)
+	}
+	return ctx, err
+}
+
+// UserContext accepts a cluster name and returns a client for that cluster,
+// starting all controllers for that cluster in the process.
 func (m *Manager) UserContext(clusterName string) (*config.UserContext, error) {
 	cluster, err := m.clusterLister.Get("", clusterName)
 	if err != nil {
@@ -471,6 +479,20 @@ func (m *Manager) UserContext(clusterName string) (*config.UserContext, error) {
 	}
 
 	return record.cluster, nil
+}
+
+// UserContextFromCluster accepts a pointer to a Cluster and returns a client
+// for that cluster. It does not start any controllers.
+func (m *Manager) UserContextFromCluster(cluster *v3.Cluster) (*config.UserContext, error) {
+	kubeConfig, err := ToRESTConfig(cluster, m.ScaledContext)
+	if err != nil {
+		return nil, err
+	}
+	if kubeConfig == nil {
+		logrus.Debugf("could not get kubeconfig for cluster %s", cluster.Name)
+		return nil, nil
+	}
+	return config.NewUserContext(m.ScaledContext, *kubeConfig, cluster.Name)
 }
 
 func (m *Manager) record(apiContext *types.APIContext, storageContext types.StorageContext) (*record, error) {
@@ -557,7 +579,7 @@ func (m *Manager) GetHTTPSPort() int {
 
 func (m *Manager) SubjectAccessReviewForCluster(req *http.Request) (authv1.SubjectAccessReviewInterface, error) {
 	clusterID := clusterrouter.GetClusterID(req)
-	userContext, err := m.UserContext(clusterID)
+	userContext, err := m.UserContextNoControllers(clusterID)
 	if err != nil {
 		return nil, err
 	}

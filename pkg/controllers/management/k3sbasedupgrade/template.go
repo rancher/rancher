@@ -5,13 +5,14 @@ import (
 
 	"github.com/rancher/system-upgrade-controller/pkg/apis/upgrade.cattle.io"
 	planv1 "github.com/rancher/system-upgrade-controller/pkg/apis/upgrade.cattle.io/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubectl/pkg/describe"
 )
 
 const k3sMasterPlanName = "k3s-master-plan"
 const k3sWorkerPlanName = "k3s-worker-plan"
-const systemUpgradeServiceAccount = "system-upgrade"
+const systemUpgradeServiceAccount = "system-upgrade-controller"
 const k3supgradeImage = "rancher/k3s-upgrade"
 const rke2upgradeImage = "rancher/rke2-upgrade"
 const rke2MasterPlanName = "rke2-master-plan"
@@ -58,6 +59,10 @@ func generateMasterPlan(version string, concurrency int, drain bool, upgradeImag
 		}},
 	}
 
+	masterPlan.Spec.Tolerations = []corev1.Toleration{{
+		Operator: corev1.TolerationOpExists,
+	}}
+
 	return masterPlan
 }
 
@@ -87,6 +92,10 @@ func generateWorkerPlan(version string, concurrency int, drain bool, upgradeImag
 		}},
 	}
 
+	workerPlan.Spec.Tolerations = []corev1.Toleration{{
+		Operator: corev1.TolerationOpExists,
+	}}
+
 	return workerPlan
 }
 
@@ -110,6 +119,13 @@ func configureMasterPlan(masterPlan planv1.Plan, version string, concurrency int
 			Values:   []string{"true"},
 		}},
 	}
+
+	masterPlan.Spec.Tolerations = []corev1.Toleration{{
+		Operator: corev1.TolerationOpExists,
+	}}
+
+	masterPlan.Spec.ServiceAccountName = genericPlan.Spec.ServiceAccountName
+
 	return masterPlan
 }
 
@@ -136,6 +152,12 @@ func configureWorkerPlan(workerPlan planv1.Plan, version string, concurrency int
 			Operator: metav1.LabelSelectorOpDoesNotExist,
 		}},
 	}
+
+	workerPlan.Spec.Tolerations = []corev1.Toleration{{
+		Operator: corev1.TolerationOpExists,
+	}}
+
+	workerPlan.Spec.ServiceAccountName = genericPlan.Spec.ServiceAccountName
 
 	return workerPlan
 }

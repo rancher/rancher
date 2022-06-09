@@ -30,6 +30,7 @@ const (
 	AlertmanagerFieldListenLocal                         = "listenLocal"
 	AlertmanagerFieldLogFormat                           = "logFormat"
 	AlertmanagerFieldLogLevel                            = "logLevel"
+	AlertmanagerFieldMinReadySeconds                     = "minReadySeconds"
 	AlertmanagerFieldName                                = "name"
 	AlertmanagerFieldNamespaceId                         = "namespaceId"
 	AlertmanagerFieldNodeSelector                        = "nodeSelector"
@@ -87,6 +88,7 @@ type Alertmanager struct {
 	ListenLocal                         bool                       `json:"listenLocal,omitempty" yaml:"listenLocal,omitempty"`
 	LogFormat                           string                     `json:"logFormat,omitempty" yaml:"logFormat,omitempty"`
 	LogLevel                            string                     `json:"logLevel,omitempty" yaml:"logLevel,omitempty"`
+	MinReadySeconds                     *int64                     `json:"minReadySeconds,omitempty" yaml:"minReadySeconds,omitempty"`
 	Name                                string                     `json:"name,omitempty" yaml:"name,omitempty"`
 	NamespaceId                         string                     `json:"namespaceId,omitempty" yaml:"namespaceId,omitempty"`
 	NodeSelector                        map[string]string          `json:"nodeSelector,omitempty" yaml:"nodeSelector,omitempty"`

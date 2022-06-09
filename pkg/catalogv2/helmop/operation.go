@@ -31,9 +31,12 @@ import (
 	data2 "github.com/rancher/wrangler/pkg/data"
 	"github.com/rancher/wrangler/pkg/data/convert"
 	corev1controllers "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
+	rbacv1controllers "github.com/rancher/wrangler/pkg/generated/controllers/rbac/v1"
+	"github.com/rancher/wrangler/pkg/name"
 	"github.com/rancher/wrangler/pkg/schemas/validation"
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/authentication/user"
@@ -46,6 +49,7 @@ import (
 
 const (
 	helmDataPath = "/home/shell/helm"
+	helmRunPath  = "/home/shell/helm-run"
 )
 
 var (
@@ -64,6 +68,73 @@ var (
 	podOptionsCodec  = runtime.NewParameterCodec(podOptionsScheme)
 )
 
+var kustomization = `apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+transformers:
+- /home/shell/helm-run/transform%s.yaml
+resources:
+- /home/shell/helm-run/all.yaml`
+
+var transform = `apiVersion: builtin
+kind: LabelTransformer
+metadata:
+  name: common-labels
+labels:
+  io.cattle.field/appId: %s
+fieldSpecs:
+- path: metadata/labels
+  create: true
+- path: spec/selector
+  create: true
+  version: v1
+  kind: ReplicationController
+- path: spec/template/metadata/labels
+  create: true
+  version: v1
+  kind: ReplicationController
+- path: spec/selector/matchLabels
+  create: true
+  kind: Deployment
+- path: spec/template/metadata/labels
+  create: true
+  kind: Deployment
+- path: spec/selector/matchLabels
+  create: true
+  kind: ReplicaSet
+- path: spec/template/metadata/labels
+  create: true
+  kind: ReplicaSet
+- path: spec/selector/matchLabels
+  create: true
+  kind: DaemonSet
+- path: spec/template/metadata/labels
+  create: true
+  kind: DaemonSet
+- path: spec/selector/matchLabels
+  create: true
+  group: apps
+  kind: StatefulSet
+- path: spec/template/metadata/labels
+  create: true
+  group: apps
+  kind: StatefulSet
+- path: spec/volumeClaimTemplates[]/metadata/labels
+  create: true
+  group: apps
+  kind: StatefulSet
+- path: spec/template/metadata/labels
+  create: true
+  group: batch
+  kind: Job
+- path: spec/jobTemplate/metadata/labels
+  create: true
+  group: batch
+  kind: CronJob
+- path: spec/jobTemplate/spec/template/metadata/labels
+  create: true
+  group: batch
+  kind: CronJob`
+
 func init() {
 	v1internal.AddToScheme(podOptionsScheme)
 }
@@ -76,12 +147,15 @@ type Operations struct {
 	ops            catalogcontrollers.OperationClient
 	pods           corev1controllers.PodClient
 	apps           catalogcontrollers.AppClient
+	roles          rbacv1controllers.RoleClient
+	roleBindings   rbacv1controllers.RoleBindingClient
 	cg             proxy.ClientGetter
 }
 
 func NewOperations(
 	cg proxy.ClientGetter,
 	catalog catalogcontrollers.Interface,
+	rbac rbacv1controllers.Interface,
 	contentManager *content.Manager,
 	pods corev1controllers.PodClient) *Operations {
 	return &Operations{
@@ -93,10 +167,12 @@ func NewOperations(
 		clusterRepos:   catalog.ClusterRepo(),
 		ops:            catalog.Operation(),
 		apps:           catalog.App(),
+		roleBindings:   rbac.RoleBinding(),
+		roles:          rbac.Role(),
 	}
 }
 
-func (s *Operations) Uninstall(ctx context.Context, user user.Info, namespace, name string, options io.Reader) (*catalog.Operation, error) {
+func (s *Operations) Uninstall(ctx context.Context, user user.Info, namespace, name string, options io.Reader, imageOverride string) (*catalog.Operation, error) {
 	status, cmds, err := s.getUninstallArgs(namespace, name, options)
 	if err != nil {
 		return nil, err
@@ -107,10 +183,10 @@ func (s *Operations) Uninstall(ctx context.Context, user user.Info, namespace, n
 		return nil, err
 	}
 
-	return s.createOperation(ctx, user, status, cmds)
+	return s.createOperation(ctx, user, status, cmds, imageOverride)
 }
 
-func (s *Operations) Upgrade(ctx context.Context, user user.Info, namespace, name string, options io.Reader) (*catalog.Operation, error) {
+func (s *Operations) Upgrade(ctx context.Context, user user.Info, namespace, name string, options io.Reader, imageOverride string) (*catalog.Operation, error) {
 	status, cmds, err := s.getUpgradeCommand(namespace, name, options)
 	if err != nil {
 		return nil, err
@@ -121,10 +197,10 @@ func (s *Operations) Upgrade(ctx context.Context, user user.Info, namespace, nam
 		return nil, err
 	}
 
-	return s.createOperation(ctx, user, status, cmds)
+	return s.createOperation(ctx, user, status, cmds, imageOverride)
 }
 
-func (s *Operations) Install(ctx context.Context, user user.Info, namespace, name string, options io.Reader) (*catalog.Operation, error) {
+func (s *Operations) Install(ctx context.Context, user user.Info, namespace, name string, options io.Reader, imageOverride string) (*catalog.Operation, error) {
 	status, cmds, err := s.getInstallCommand(namespace, name, options)
 	if err != nil {
 		return nil, err
@@ -135,7 +211,7 @@ func (s *Operations) Install(ctx context.Context, user user.Info, namespace, nam
 		return nil, err
 	}
 
-	return s.createOperation(ctx, user, status, cmds)
+	return s.createOperation(ctx, user, status, cmds, imageOverride)
 }
 
 func decodeParams(req *http.Request, target runtime.Object) error {
@@ -162,6 +238,11 @@ func (s *Operations) proxyLogRequest(rw http.ResponseWriter, req *http.Request, 
 		Director: func(req *http.Request) {
 			req.URL = logURL
 			req.Host = logURL.Host
+			for key := range req.Header {
+				if strings.HasPrefix(key, "Impersonate-Extra-") {
+					delete(req.Header, key)
+				}
+			}
 			delete(req.Header, "Impersonate-Group")
 			delete(req.Header, "Impersonate-User")
 			delete(req.Header, "Authorization")
@@ -310,7 +391,7 @@ func (s *Operations) getUpgradeCommand(repoNamespace, repoName string, body io.R
 	}
 
 	for _, chartUpgrade := range upgradeArgs.Charts {
-		cmd, err := s.getChartCommand(repoNamespace, repoName, chartUpgrade.ChartName, chartUpgrade.Version, chartUpgrade.Annotations, chartUpgrade.Values)
+		cmd, err := s.getChartCommand(repoNamespace, repoName, chartUpgrade.ChartName, chartUpgrade.Version, true, chartUpgrade.Annotations, chartUpgrade.Values)
 		if err != nil {
 			return status, nil, err
 		}
@@ -337,6 +418,7 @@ type Command struct {
 	Chart            []byte
 	ReleaseName      string
 	ReleaseNamespace string
+	Kustomize        bool
 }
 
 type Commands []Command
@@ -380,8 +462,9 @@ func (c Command) Render(index int) (map[string][]byte, error) {
 		return nil, err
 	}
 
+	fileNumID := fmt.Sprintf("%03d", index)
 	data := map[string][]byte{
-		fmt.Sprintf("operation%03d", index): []byte(strings.Join(args, "\x00")),
+		fmt.Sprintf("operation%s", fileNumID): []byte(strings.Join(args, "\x00")),
 	}
 	if len(c.ValuesFile) > 0 {
 		data[c.ValuesFile] = c.Values
@@ -389,6 +472,12 @@ func (c Command) Render(index int) (map[string][]byte, error) {
 	if len(c.ChartFile) > 0 {
 		data[c.ChartFile] = c.Chart
 	}
+
+	if c.Kustomize {
+		data[fmt.Sprintf("kustomization%s.yaml", fileNumID)] = []byte(fmt.Sprintf(kustomization, fileNumID))
+		data[fmt.Sprintf("transform%s.yaml", fileNumID)] = []byte(fmt.Sprintf(transform, c.ReleaseName))
+	}
+
 	return data, nil
 }
 
@@ -430,8 +519,17 @@ func (c Command) renderArgs() ([]string, error) {
 		args = append(args, fmt.Sprintf("%s=%s", k, s))
 	}
 
+	runPath := helmDataPath
+	if c.Kustomize {
+		// Run path when using kustomize.sh will be different. Original cannot be used
+		// because write permissions are necessary and the helmDataPath cannot be
+		// written to due to it having a SecretVolumeSource.
+		runPath = helmRunPath
+		args = append(args, "--post-renderer=/home/shell/kustomize.sh")
+	}
+
 	if len(c.Values) > 0 {
-		args = append(args, "--values="+filepath.Join(helmDataPath, c.ValuesFile))
+		args = append(args, "--values="+filepath.Join(runPath, c.ValuesFile))
 	}
 
 	if c.ReleaseNamespace != "" {
@@ -443,7 +541,7 @@ func (c Command) renderArgs() ([]string, error) {
 		args = append(args, c.ReleaseName)
 	}
 	if len(c.Chart) > 0 {
-		args = append(args, filepath.Join(helmDataPath, c.ChartFile))
+		args = append(args, filepath.Join(runPath, c.ChartFile))
 	}
 
 	return append([]string{c.Operation}, args...), nil
@@ -529,8 +627,26 @@ func addAnnotations(data []byte, annotations map[string]string) ([]byte, error) 
 	return yaml.Marshal(chartData)
 }
 
-func (s *Operations) getChartCommand(namespace, name, chartName, chartVersion string, annotations map[string]string, values map[string]interface{}) (Command, error) {
-	chart, err := s.contentManager.Chart(namespace, name, chartName, chartVersion)
+// enableKustomize returns whether kustomize should be used. If the helm operation is
+// an upgrade and the migrated annotation is present, true will be returned.
+func (s *Operations) enableKustomize(annotations map[string]string, upgrade bool) bool {
+	if !upgrade {
+		return false
+	}
+
+	if len(annotations) == 0 {
+		return false
+	}
+
+	if val, _ := annotations["apps.cattle.io/migrated"]; val != "true" {
+		return false
+	}
+
+	return true
+}
+
+func (s *Operations) getChartCommand(namespace, name, chartName, chartVersion string, upgrade bool, annotations map[string]string, values map[string]interface{}) (Command, error) {
+	chart, err := s.contentManager.Chart(namespace, name, chartName, chartVersion, true)
 	if err != nil {
 		return Command{}, err
 	}
@@ -549,6 +665,7 @@ func (s *Operations) getChartCommand(namespace, name, chartName, chartVersion st
 		ValuesFile: fmt.Sprintf("values-%s-%s.yaml", chartName, sanitizeVersion(chartVersion)),
 		ChartFile:  fmt.Sprintf("%s-%s.tgz", chartName, sanitizeVersion(chartVersion)),
 		Chart:      chartData,
+		Kustomize:  s.enableKustomize(annotations, upgrade),
 	}
 
 	if len(values) > 0 {
@@ -576,7 +693,7 @@ func (s *Operations) getInstallCommand(repoNamespace, repoName string, body io.R
 	)
 
 	for _, chartInstall := range installArgs.Charts {
-		cmd, err := s.getChartCommand(repoNamespace, repoName, chartInstall.ChartName, chartInstall.Version, chartInstall.Annotations, chartInstall.Values)
+		cmd, err := s.getChartCommand(repoNamespace, repoName, chartInstall.ChartName, chartInstall.Version, false, chartInstall.Annotations, chartInstall.Values)
 		if err != nil {
 			return status, nil, err
 		}
@@ -618,7 +735,7 @@ func namespace(ns string) string {
 	return ns
 }
 
-func (s *Operations) createOperation(ctx context.Context, user user.Info, status catalog.OperationStatus, cmds Commands) (*catalog.Operation, error) {
+func (s *Operations) createOperation(ctx context.Context, user user.Info, status catalog.OperationStatus, cmds Commands, imageOverride string) (*catalog.Operation, error) {
 	if status.Action != "uninstall" {
 		_, err := s.createNamespace(ctx, status.Namespace, status.ProjectID)
 		if err != nil {
@@ -631,7 +748,15 @@ func (s *Operations) createOperation(ctx context.Context, user user.Info, status
 		return nil, err
 	}
 
-	pod, podOptions := s.createPod(secretData)
+	var kustomize bool
+	for _, cmd := range cmds {
+		if !cmd.Kustomize {
+			continue
+		}
+		kustomize = true
+		break
+	}
+	pod, podOptions := s.createPod(secretData, kustomize, imageOverride)
 	pod, err = s.Impersonator.CreatePod(ctx, user, pod, podOptions)
 	if err != nil {
 		return nil, err
@@ -658,8 +783,66 @@ func (s *Operations) createOperation(ctx context.Context, user user.Info, status
 		return nil, err
 	}
 
+	if err := s.createRoleAndRoleBindings(op, user.GetName()); err != nil {
+		return nil, err
+	}
+
 	op.Status = status
 	return s.ops.UpdateStatus(op)
+}
+
+func (s *Operations) createRoleAndRoleBindings(op *catalog.Operation, user string) error {
+	ownerRef := metav1.OwnerReference{
+		APIVersion: op.APIVersion,
+		Kind:       op.Kind,
+		Name:       op.Name,
+		UID:        op.UID,
+	}
+	role := &rbacv1.Role{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            name.SafeConcatName(op.GetName(), user, "role"),
+			Namespace:       op.Namespace,
+			OwnerReferences: []metav1.OwnerReference{ownerRef},
+		},
+		Rules: []rbacv1.PolicyRule{
+			{
+				Verbs:         []string{"get"},
+				Resources:     []string{"operations"},
+				APIGroups:     []string{"catalog.cattle.io"},
+				ResourceNames: []string{op.Name},
+			},
+		},
+	}
+
+	roleBinding := &rbacv1.RoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            name.SafeConcatName(op.GetName(), user, "rolebinding"),
+			Namespace:       op.Namespace,
+			OwnerReferences: []metav1.OwnerReference{ownerRef},
+		},
+		Subjects: []rbacv1.Subject{
+			{
+				APIGroup: rbacv1.GroupName,
+				Kind:     rbacv1.UserKind,
+				Name:     user,
+			},
+		},
+		RoleRef: rbacv1.RoleRef{
+			APIGroup: rbacv1.GroupName,
+			Kind:     "Role",
+			Name:     role.Name,
+		},
+	}
+
+	if _, err := s.roles.Create(role); err != nil {
+		return err
+	}
+
+	if _, err := s.roleBindings.Create(roleBinding); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (s *Operations) createNamespace(ctx context.Context, namespace, projectID string) (*v1.Namespace, error) {
@@ -718,7 +901,11 @@ func (s *Operations) createNamespace(ctx context.Context, namespace, projectID s
 	return nil, fmt.Errorf("failed to wait for roles to be populated")
 }
 
-func (s *Operations) createPod(secretData map[string][]byte) (*v1.Pod, *podimpersonation.PodOptions) {
+func (s *Operations) createPod(secretData map[string][]byte, kustomize bool, imageOverride string) (*v1.Pod, *podimpersonation.PodOptions) {
+	image := imageOverride
+	if image == "" {
+		image = settings.FullShellImage()
+	}
 	secret := &v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: "helm-operation-",
@@ -750,8 +937,26 @@ func (s *Operations) createPod(secretData map[string][]byte) (*v1.Pod, *podimper
 			Tolerations: []v1.Toleration{
 				{
 					Key:      "cattle.io/os",
-					Operator: "Equal",
+					Operator: corev1.TolerationOpEqual,
 					Value:    "linux",
+					Effect:   "NoSchedule",
+				},
+				{
+					Key:      "node-role.kubernetes.io/controlplane",
+					Operator: corev1.TolerationOpEqual,
+					Value:    "true",
+					Effect:   "NoSchedule",
+				},
+				{
+					Key:      "node-role.kubernetes.io/etcd",
+					Operator: corev1.TolerationOpEqual,
+					Value:    "true",
+					Effect:   "NoExecute",
+				},
+				{
+					Key:      "node.cloudprovider.kubernetes.io/uninitialized",
+					Operator: corev1.TolerationOpEqual,
+					Value:    "true",
 					Effect:   "NoSchedule",
 				},
 			},
@@ -767,7 +972,7 @@ func (s *Operations) createPod(secretData map[string][]byte) (*v1.Pod, *podimper
 					Stdin:           true,
 					TTY:             true,
 					StdinOnce:       true,
-					Image:           settings.FullShellImage(),
+					Image:           image,
 					ImagePullPolicy: v1.PullIfNotPresent,
 					Command:         []string{"helm-cmd"},
 					WorkingDir:      helmDataPath,
@@ -775,6 +980,7 @@ func (s *Operations) createPod(secretData map[string][]byte) (*v1.Pod, *podimper
 						{
 							Name:      "data",
 							MountPath: helmDataPath,
+							ReadOnly:  true,
 						},
 					},
 				},
@@ -782,9 +988,35 @@ func (s *Operations) createPod(secretData map[string][]byte) (*v1.Pod, *podimper
 		},
 	}
 
+	// if kustomize is false then helmDataPath is an acceptable path for helm to run. If it is true,
+	// files are copied from helmDataPath to helmRunPath. This is because the kustomize.sh script
+	// needs write permissions but volumes using a SecretVolumeSource are readOnly. This can not be
+	// changed with the readOnly field or the defaultMode field.
+	// See: https://github.com/kubernetes/kubernetes/issues/62099.
+	if kustomize {
+		pod.Spec.Volumes = append(pod.Spec.Volumes, v1.Volume{
+			Name: "helm-run",
+			VolumeSource: v1.VolumeSource{
+				EmptyDir: &v1.EmptyDirVolumeSource{},
+			},
+		})
+		pod.Spec.Containers[0].VolumeMounts = append(pod.Spec.Containers[0].VolumeMounts, v1.VolumeMount{
+			Name:      "helm-run",
+			MountPath: helmRunPath,
+		})
+		pod.Spec.Containers[0].Lifecycle = &v1.Lifecycle{
+			PostStart: &v1.LifecycleHandler{
+				Exec: &v1.ExecAction{
+					Command: []string{"/bin/sh", "-c", fmt.Sprintf("cp -r %s/. %s", helmDataPath, helmRunPath)},
+				},
+			},
+		}
+		pod.Spec.Containers[0].WorkingDir = helmRunPath
+	}
 	return pod, &podimpersonation.PodOptions{
 		SecretsToCreate: []*v1.Secret{
 			secret,
 		},
+		ImageOverride: imageOverride,
 	}
 }

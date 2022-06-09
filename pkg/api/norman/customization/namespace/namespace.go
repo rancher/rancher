@@ -11,7 +11,8 @@ import (
 	"github.com/rancher/norman/types/convert"
 	client "github.com/rancher/rancher/pkg/client/generated/cluster/v3"
 	"github.com/rancher/rancher/pkg/clustermanager"
-	"github.com/rancher/rancher/pkg/controllers/managementuser/helm"
+	"github.com/rancher/rancher/pkg/controllers/managementagent/nslabels"
+	"github.com/rancher/rancher/pkg/controllers/managementuserlegacy/helm"
 	"github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/rancher/pkg/ref"
 	schema "github.com/rancher/rancher/pkg/schemas/cluster.cattle.io/v3"
@@ -21,8 +22,7 @@ import (
 )
 
 var (
-	projectIDFieldLabel = "field.cattle.io/projectId"
-	namespaceOwnerMap   = cache.NewLRUExpireCache(1000)
+	namespaceOwnerMap = cache.NewLRUExpireCache(1000)
 )
 
 func updateNamespaceOwnerMap(apiContext *types.APIContext) error {
@@ -74,7 +74,7 @@ func (w ActionWrapper) ActionHandler(actionName string, action *types.Action, ap
 	case "move":
 		clusterID := w.ClusterManager.ClusterName(apiContext)
 		_, projectID := ref.Parse(convert.ToString(actionInput["projectId"]))
-		userContext, err := w.ClusterManager.UserContext(clusterID)
+		userContext, err := w.ClusterManager.UserContextNoControllers(clusterID)
 		if err != nil {
 			if !kerrors.IsNotFound(err) {
 				return err
@@ -102,9 +102,10 @@ func (w ActionWrapper) ActionHandler(actionName string, action *types.Action, ap
 			return errors.New("namespace is currently being used")
 		}
 		if projectID == "" {
-			delete(ns.Annotations, projectIDFieldLabel)
+			delete(ns.Annotations, nslabels.ProjectIDFieldLabel)
+			delete(ns.Labels, nslabels.ProjectIDFieldLabel)
 		} else {
-			ns.Annotations[projectIDFieldLabel] = convert.ToString(actionInput["projectId"])
+			ns.Annotations[nslabels.ProjectIDFieldLabel] = convert.ToString(actionInput["projectId"])
 		}
 		if _, err := nsClient.Update(ns); err != nil {
 			return err

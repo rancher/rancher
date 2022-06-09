@@ -3,9 +3,8 @@ package networkpolicy
 import (
 	"fmt"
 
-	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-
 	"github.com/rancher/norman/types/convert"
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/nodesyncer"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
@@ -129,8 +128,12 @@ func (ch *clusterHandler) createNetworkPolicies(cluster *v3.Cluster) error {
 	//skipping nssyncer, projectSyncer + nodehandler would result into handling nssyncer as well
 }
 
+// deleteNetworkPolicies removes Rancher created NetworkPolicy resources from the downstream cluster and
+// removes ProjectNetworkPolicy resources from the management cluster
 func (ch *clusterHandler) deleteNetworkPolicies(cluster *v3.Cluster) error {
-	nps, err := ch.npmgr.npLister.List("", labels.NewSelector())
+	// consider nps for deletion if they were created by Rancher, i.e. they have a label: "cattle.io/creator": "norman"
+	set := labels.Set(map[string]string{creatorLabel: creatorNorman})
+	nps, err := ch.npmgr.npLister.List("", set.AsSelector())
 	if err != nil {
 		return fmt.Errorf("npLister: %v", err)
 	}

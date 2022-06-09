@@ -12,4 +12,4 @@ repo_index=${1}
 echo "Getting current index from ${repo_index}"
 curl -f -H 'Cache-Control: max-age=0,no-cache' -H 'Host: releases.rancher.com' "https://c.storage.googleapis.com/server-charts/${repo_index}/index.yaml?$(date +%s%N)" -o build/index.yaml
 
-helm repo index --merge build/index.yaml ./bin/chart/${repo_index}
+helm_v3 repo index --merge build/index.yaml ./bin/chart/${repo_index}

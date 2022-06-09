@@ -1,5 +1,6 @@
 import base64
 import pytest
+from .test_ingress import get_ingress_ip_domain
 
 
 from .common import *  # NOQA
@@ -124,6 +125,7 @@ def test_validate_existing_wl_with_secret():
 # It's hard to find an App to support Windows case for now.
 # Could we make an App to support both Windows and Linux?
 @skip_test_windows_os
+@skip_test_hardened
 @if_post_upgrade
 @pytest.mark.run(order=2)
 def test_validate_existing_catalog_app():
@@ -134,7 +136,7 @@ def test_validate_existing_catalog_app():
 @if_validate_ingress
 @pytest.mark.run(order=2)
 def test_validate_existing_ingress_daemon():
-    validate_ingress_xip_io(ingress_name1_validate,
+    validate_ingress_io(ingress_name1_validate,
                             ingress_wlname1_validate)
 
 
@@ -142,7 +144,7 @@ def test_validate_existing_ingress_daemon():
 @if_validate_ingress
 @pytest.mark.run(order=2)
 def test_validate_existing_ingress_wl():
-    validate_ingress_xip_io(ingress_name2_validate,
+    validate_ingress_io(ingress_name2_validate,
                             ingress_wlname2_validate)
 
 
@@ -167,6 +169,7 @@ def test_modify_workload_validate_secret():
 # It's hard to find an App to support Windows case for now.
 # Could we make an App to support both Windows and Linux?
 @skip_test_windows_os
+@skip_test_hardened
 @if_post_upgrade
 @pytest.mark.run(order=3)
 def test_modify_catalog_app():
@@ -202,19 +205,19 @@ def test_create_validate_wokloads_with_secret():
 
 @if_validate_ingress
 @pytest.mark.run(order=5)
-def test_create_and_validate_ingress_xip_io_daemon():
-    create_and_validate_ingress_xip_io_daemon()
+def test_create_and_validate_ingress_io_daemon():
+    create_and_validate_ingress_io_daemon()
 
 
 @if_validate_ingress
 @pytest.mark.run(order=5)
-def test_create_and_validate_ingress_xip_io_wl():
-    create_and_validate_ingress_xip_io_wl()
+def test_create_and_validate_ingress_io_wl():
+    create_and_validate_ingress_io_wl()
 
 
 # It's hard to find an App to support Windows case for now.
 # Could we make an App to support both Windows and Linux?
-@skip_test_windows_os
+@skip_test_hardened
 @pytest.mark.run(order=5)
 def test_create_and_validate_catalog_app():
     create_and_validate_catalog_app()
@@ -267,7 +270,7 @@ def validate_wl(workload_name, pod_count=2):
     validate_service_discovery_upgrade(workload_name, [workload_name])
 
 
-def create_and_validate_ingress_xip_io_daemon():
+def create_and_validate_ingress_io_daemon():
     p_client = namespace["p_client"]
     ns = namespace["ns"]
     cluster = namespace["cluster"]
@@ -282,17 +285,17 @@ def create_and_validate_ingress_xip_io_daemon():
     validate_workload(p_client, workload, "daemonSet", ns.name,
                       len(get_schedulable_nodes(cluster)))
     path = "/name.html"
-    rule = {"host": "xip.io",
+    rule = {"host": get_ingress_ip_domain(),
             "paths":
                 [{"workloadIds": [workload.id], "targetPort": TEST_IMAGE_PORT,
                   "path": path}]}
     p_client.create_ingress(name=ingress_name1_create,
                             namespaceId=ns.id,
                             rules=[rule])
-    validate_ingress_xip_io(ingress_name1_create, ingress_wlname1_create)
+    validate_ingress_io(ingress_name1_create, ingress_wlname1_create)
 
 
-def create_and_validate_ingress_xip_io_wl():
+def create_and_validate_ingress_io_wl():
     p_client = namespace["p_client"]
     ns = namespace["ns"]
     con = [{"name": "test1",
@@ -304,14 +307,14 @@ def create_and_validate_ingress_xip_io_wl():
                                         namespaceId=ns.id, scale=2)
     validate_wl(ingress_wlname2_create, 2)
     path = "/name.html"
-    rule = {"host": "xip.io",
+    rule = {"host": get_ingress_ip_domain(),
             "paths":
                 [{"workloadIds": [workload.id], "targetPort": TEST_IMAGE_PORT,
                   "path": path}]}
     p_client.create_ingress(name=ingress_name2_create,
                             namespaceId=ns.id,
                             rules=[rule])
-    validate_ingress_xip_io(ingress_name2_create, ingress_wlname2_create)
+    validate_ingress_io(ingress_name2_create, ingress_wlname2_create)
 
 
 def modify_workload_validate_deployment():
@@ -344,7 +347,7 @@ def modify_workload_validate_ingress():
     validate_wl(ing_workload.name, 4)
 
     # Validate ingress after workload scale up
-    validate_ingress_xip_io(ingress_name2_validate, ingress_wlname2_validate)
+    validate_ingress_io(ingress_name2_validate, ingress_wlname2_validate)
 
 
 def modify_workload_validate_sd():
@@ -392,7 +395,7 @@ def modify_workload_validate_secret():
         keyvaluepair, workloadwithsecretasenvvar=True, podcount=3)
 
 
-def validate_ingress_xip_io(ing_name, workload_name):
+def validate_ingress_io(ing_name, workload_name):
     p_client = namespace["p_client"]
     ns = namespace["ns"]
     workloads = p_client.list_workload(name=workload_name,
@@ -633,7 +636,8 @@ def upgrade_rancher_server(serverIp,
 
     runCommand = "docker run -d --volumes-from rancher-data " \
                  "--restart=unless-stopped " \
-                 "-p 80:80 -p 443:443 " + upgradeImage + ":" + upgradeVersion
+                 "-p 80:80 -p 443:443 " + upgradeImage + ":" + upgradeVersion + \
+                 " --trace"
     print(exec_shell_command(serverIp, 22, runCommand, "",
           sshUser, sshKeyPath))
 
@@ -644,13 +648,21 @@ def upgrade_cluster():
     print("Upgrading cluster {} to version {}".format(
         CLUSTER_NAME, CLUSTER_VERSION))
     client, cluster = get_user_client_and_cluster()
-    if cluster.k3sConfig:
+    if "k3sConfig" in cluster:
         k3s_config = cluster.k3sConfig
         k3s_updated_config = k3s_config.copy()
         k3s_updated_config["kubernetesVersion"] = CLUSTER_VERSION
         client.update(cluster, name=cluster.name, k3sConfig=k3s_updated_config)
         cluster = get_cluster_by_name(client, CLUSTER_NAME)
         assert cluster.k3sConfig["kubernetesVersion"] == CLUSTER_VERSION
+    elif "rke2Config" in cluster:
+        rke2_config = cluster.rke2Config
+        rke2_updated_config = rke2_config.copy()
+        rke2_updated_config["kubernetesVersion"] = CLUSTER_VERSION
+        client.update(cluster, name=cluster.name,
+                      rke2Config=rke2_updated_config)
+        cluster = get_cluster_by_name(client, CLUSTER_NAME)
+        assert cluster.rke2Config["kubernetesVersion"] == CLUSTER_VERSION
 
 
 def wait_for_ready_nodes():

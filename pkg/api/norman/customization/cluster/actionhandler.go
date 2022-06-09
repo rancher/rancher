@@ -7,6 +7,7 @@ import (
 	"github.com/rancher/norman/types"
 	gaccess "github.com/rancher/rancher/pkg/api/norman/customization/globalnamespaceaccess"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/auth/requests"
 	"github.com/rancher/rancher/pkg/catalog/manager"
 	mgmtclient "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	"github.com/rancher/rancher/pkg/clustermanager"
@@ -18,6 +19,7 @@ import (
 
 type ActionHandler struct {
 	NodepoolGetter                v3.NodePoolsGetter
+	NodeLister                    v3.NodeLister
 	ClusterClient                 v3.ClusterInterface
 	CatalogManager                manager.CatalogManager
 	NodeTemplateGetter            v3.NodeTemplatesGetter
@@ -34,31 +36,44 @@ type ActionHandler struct {
 	CisConfigClient               v3.CisConfigInterface
 	CisConfigLister               v3.CisConfigLister
 	TokenClient                   v3.TokenInterface
+	Auth                          requests.Authenticator
+}
+
+func canUpdateCluster(apiContext *types.APIContext) bool {
+	if apiContext == nil {
+		return false
+	}
+	cluster := map[string]interface{}{
+		"id": apiContext.ID,
+	}
+	return canUpdateClusterWithValues(apiContext, cluster)
+}
+
+func canUpdateClusterWithValues(apiContext *types.APIContext, values map[string]interface{}) bool {
+	return apiContext.AccessControl.CanDo(v3.ClusterGroupVersionKind.Group, v3.ClusterResource.Name, "update", apiContext, values, apiContext.Schema) == nil
+}
+
+func canBackupEtcd(apiContext *types.APIContext, namespace string) bool {
+	if apiContext == nil {
+		return false
+	}
+	etcdBackupSchema := types.Schema{ID: mgmtclient.EtcdBackupType}
+	backupMap := map[string]interface{}{
+		"namespaceId": namespace,
+	}
+	return apiContext.AccessControl.CanDo(v3.EtcdBackupGroupVersionKind.Group, v3.EtcdBackupResource.Name, "create", apiContext, backupMap, &etcdBackupSchema) == nil
+}
+
+func canCreateClusterTemplate(sar v1.SubjectAccessReviewInterface, apiContext *types.APIContext) bool {
+	if apiContext == nil {
+		return false
+	}
+	callerID := apiContext.Request.Header.Get(gaccess.ImpersonateUserHeader)
+	canCreateTemplates, _ := CanCreateRKETemplate(callerID, sar)
+	return canCreateTemplates
 }
 
 func (a ActionHandler) ClusterActionHandler(actionName string, action *types.Action, apiContext *types.APIContext) error {
-	canUpdateCluster := func() bool {
-		cluster := map[string]interface{}{
-			"id": apiContext.ID,
-		}
-		return apiContext.AccessControl.CanDo(v3.ClusterGroupVersionKind.Group, v3.ClusterResource.Name, "update", apiContext, cluster, apiContext.Schema) == nil
-	}
-
-	canBackupEtcd := func() bool {
-		etcdBackupSchema := types.Schema{ID: mgmtclient.EtcdBackupType}
-		// pkg/rbac/access_control.go:55 canAccess checks for the object's ID or namespace. The ns for etcdbackup will be the clusterID
-		backupMap := map[string]interface{}{
-			"namespaceId": apiContext.ID,
-		}
-		return apiContext.AccessControl.CanDo(v3.EtcdBackupGroupVersionKind.Group, v3.EtcdBackupResource.Name, "create", apiContext, backupMap, &etcdBackupSchema) == nil
-	}
-
-	canCreateClusterTemplate := func() bool {
-		callerID := apiContext.Request.Header.Get(gaccess.ImpersonateUserHeader)
-		canCreateTemplates, _ := CanCreateRKETemplate(callerID, a.SubjectAccessReviewClient)
-		return canCreateTemplates
-	}
-
 	switch actionName {
 	case v32.ClusterActionGenerateKubeconfig:
 		return a.GenerateKubeconfigActionHandler(actionName, action, apiContext)
@@ -69,47 +84,47 @@ func (a ActionHandler) ClusterActionHandler(actionName string, action *types.Act
 	case v32.ClusterActionViewMonitoring:
 		return a.viewMonitoring(actionName, action, apiContext)
 	case v32.ClusterActionEditMonitoring:
-		if !canUpdateCluster() {
+		if !canUpdateCluster(apiContext) {
 			return httperror.NewAPIError(httperror.PermissionDenied, "can not access")
 		}
 		return a.editMonitoring(actionName, action, apiContext)
 	case v32.ClusterActionEnableMonitoring:
-		if !canUpdateCluster() {
+		if !canUpdateCluster(apiContext) {
 			return httperror.NewAPIError(httperror.PermissionDenied, "can not access")
 		}
 		return a.enableMonitoring(actionName, action, apiContext)
 	case v32.ClusterActionDisableMonitoring:
-		if !canUpdateCluster() {
+		if !canUpdateCluster(apiContext) {
 			return httperror.NewAPIError(httperror.PermissionDenied, "can not access")
 		}
 		return a.disableMonitoring(actionName, action, apiContext)
 	case v32.ClusterActionBackupEtcd:
-		if !canBackupEtcd() {
+		if !canBackupEtcd(apiContext, apiContext.ID) {
 			return httperror.NewAPIError(httperror.PermissionDenied, "can not backup etcd")
 		}
 		return a.BackupEtcdHandler(actionName, action, apiContext)
 	case v32.ClusterActionRestoreFromEtcdBackup:
-		if !canUpdateCluster() {
+		if !canUpdateCluster(apiContext) {
 			return httperror.NewAPIError(httperror.PermissionDenied, "can not restore etcd backup")
 		}
 		return a.RestoreFromEtcdBackupHandler(actionName, action, apiContext)
 	case v32.ClusterActionRotateCertificates:
-		if !canUpdateCluster() {
+		if !canUpdateCluster(apiContext) {
 			return httperror.NewAPIError(httperror.PermissionDenied, "can not rotate certificates")
 		}
 		return a.RotateCertificates(actionName, action, apiContext)
 	case v32.ClusterActionRotateEncryptionKey:
-		if !canUpdateCluster() {
+		if !canUpdateCluster(apiContext) {
 			return httperror.NewAPIError(httperror.PermissionDenied, "can not rotate encryption key")
 		}
 		return a.RotateEncryptionKey(actionName, action, apiContext)
 	case v32.ClusterActionRunSecurityScan:
 		return a.runCisScan(actionName, action, apiContext)
 	case v32.ClusterActionSaveAsTemplate:
-		if !canUpdateCluster() {
+		if !canUpdateCluster(apiContext) {
 			return httperror.NewAPIError(httperror.PermissionDenied, "can not save the cluster as an RKETemplate")
 		}
-		if !canCreateClusterTemplate() {
+		if !canCreateClusterTemplate(a.SubjectAccessReviewClient, apiContext) {
 			return httperror.NewAPIError(httperror.PermissionDenied, "can not save the cluster as an RKETemplate")
 		}
 		return a.saveAsTemplate(actionName, action, apiContext)
@@ -120,15 +135,42 @@ func (a ActionHandler) ClusterActionHandler(actionName string, action *types.Act
 func (a ActionHandler) ensureClusterToken(clusterID string, apiContext *types.APIContext) (string, error) {
 	userName := a.UserMgr.GetUser(apiContext)
 	tokenNamePrefix := fmt.Sprintf("kubeconfig-%s", userName)
-
-	token, err := a.UserMgr.EnsureClusterToken(clusterID, tokenNamePrefix, "Kubeconfig token", "kubeconfig", userName, nil, true)
+	authToken, err := a.Auth.TokenFromRequest(apiContext.Request)
+	if err != nil {
+		return "", err
+	}
+	input := user.TokenInput{
+		TokenName:     tokenNamePrefix,
+		Description:   "Kubeconfig token",
+		Kind:          "kubeconfig",
+		UserName:      userName,
+		AuthProvider:  authToken.AuthProvider,
+		TTL:           nil,
+		Randomize:     true,
+		UserPrincipal: authToken.UserPrincipal,
+	}
+	token, err := a.UserMgr.EnsureClusterToken(clusterID, input)
 	return token, err
 }
 
 func (a ActionHandler) ensureToken(apiContext *types.APIContext) (string, error) {
 	userName := a.UserMgr.GetUser(apiContext)
+	authToken, err := a.Auth.TokenFromRequest(apiContext.Request)
+	if err != nil {
+		return "", err
+	}
 	tokenNamePrefix := fmt.Sprintf("kubeconfig-%s", userName)
-	token, err := a.UserMgr.EnsureToken(tokenNamePrefix, "Kubeconfig token", "kubeconfig", userName, nil, true)
+	input := user.TokenInput{
+		TokenName:     tokenNamePrefix,
+		Description:   "Kubeconfig token",
+		Kind:          "kubeconfig",
+		UserName:      userName,
+		AuthProvider:  authToken.AuthProvider,
+		TTL:           nil,
+		Randomize:     true,
+		UserPrincipal: authToken.UserPrincipal,
+	}
+	token, err := a.UserMgr.EnsureToken(input)
 	return token, err
 }
 

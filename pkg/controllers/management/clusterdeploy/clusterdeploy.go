@@ -16,9 +16,12 @@ import (
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	util "github.com/rancher/rancher/pkg/cluster"
 	"github.com/rancher/rancher/pkg/clustermanager"
+	"github.com/rancher/rancher/pkg/features"
+	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/image"
 	"github.com/rancher/rancher/pkg/kubectl"
+	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/systemaccount"
 	"github.com/rancher/rancher/pkg/systemtemplate"
@@ -28,7 +31,7 @@ import (
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
@@ -63,6 +66,7 @@ func Register(ctx context.Context, management *config.ManagementContext, cluster
 		clusters:             management.Management.Clusters(""),
 		nodeLister:           management.Management.Nodes("").Controller().Lister(),
 		clusterManager:       clusterManager,
+		secretLister:         management.Core.Secrets("").Controller().Lister(),
 	}
 
 	management.Management.Clusters("").AddHandler(ctx, "cluster-deploy", c.sync)
@@ -75,6 +79,7 @@ type clusterDeploy struct {
 	clusterManager       *clustermanager.Manager
 	mgmt                 *config.ManagementContext
 	nodeLister           v3.NodeLister
+	secretLister         v1.SecretLister
 }
 
 func (cd *clusterDeploy) sync(key string, cluster *v3.Cluster) (runtime.Object, error) {
@@ -237,6 +242,11 @@ func redeployAgent(cluster *v3.Cluster, desiredAgent, desiredAuth string, desire
 		return true
 	}
 
+	if !reflect.DeepEqual(append(settings.DefaultAgentSettingsAsEnvVars(), cluster.Spec.AgentEnvVars...), cluster.Status.AppliedAgentEnvVars) {
+		logrus.Infof("clusterDeploy: redeployAgent: redeploy Rancher agents due to agent env vars mismatched for [%s], was [%v] and will be [%v]", cluster.Name, cluster.Status.AppliedAgentEnvVars, cluster.Spec.AgentEnvVars)
+		return true
+	}
+
 	logrus.Tracef("clusterDeploy: redeployAgent: returning false for redeployAgent")
 
 	return false
@@ -250,28 +260,26 @@ func getDesiredImage(cluster *v3.Cluster) string {
 	return cluster.Spec.DesiredAgentImage
 }
 
+func (cd *clusterDeploy) getDesiredFeatures(cluster *v3.Cluster) map[string]bool {
+	return map[string]bool{
+		features.MCM.Name():                false,
+		features.MCMAgent.Name():           true,
+		features.Fleet.Name():              false,
+		features.RKE2.Name():               false,
+		features.ProvisioningV2.Name():     false,
+		features.EmbeddedClusterAPI.Name(): false,
+		features.MonitoringV1.Name():       cluster.Spec.EnableClusterMonitoring,
+	}
+}
+
 func (cd *clusterDeploy) deployAgent(cluster *v3.Cluster) error {
 	if cluster.Spec.Internal {
 		return nil
 	}
 
-	logrus.Tracef("clusterDeploy: deployAgent called for [%s]", cluster.Name)
-	desiredAgent := getDesiredImage(cluster)
-	if desiredAgent == "" || desiredAgent == "fixed" {
-		desiredAgent = image.ResolveWithCluster(settings.AgentImage.Get(), cluster)
-	}
-	logrus.Tracef("clusterDeploy: deployAgent: desiredAgent is [%s] for cluster [%s]", desiredAgent, cluster.Name)
-
-	var desiredAuth string
-	if cluster.Spec.LocalClusterAuthEndpoint.Enabled {
-		desiredAuth = cluster.Spec.DesiredAuthImage
-		if desiredAuth == "" || desiredAuth == "fixed" {
-			desiredAuth = image.ResolveWithCluster(settings.AuthImage.Get(), cluster)
-		}
-	}
-	logrus.Tracef("clusterDeploy: deployAgent: desiredAuth is [%s] for cluster [%s]", desiredAuth, cluster.Name)
-
-	desiredFeatures := map[string]bool{}
+	desiredAgent := systemtemplate.GetDesiredAgentImage(cluster)
+	desiredAuth := systemtemplate.GetDesiredAuthImage(cluster)
+	desiredFeatures := systemtemplate.GetDesiredFeatures(cluster)
 
 	logrus.Tracef("clusterDeploy: deployAgent: desiredFeatures is [%v] for cluster [%s]", desiredFeatures, cluster.Name)
 
@@ -280,6 +288,14 @@ func (cd *clusterDeploy) deployAgent(cluster *v3.Cluster) error {
 		return err
 	}
 	logrus.Tracef("clusterDeploy: deployAgent: desiredTaints is [%v] for cluster [%s]", desiredTaints, cluster.Name)
+
+	var privateRegistries *corev1.Secret
+	if cluster.Status.PrivateRegistrySecret != "" {
+		privateRegistries, err = cd.secretLister.Get(namespace.GlobalNamespace, cluster.Status.PrivateRegistrySecret)
+		if err != nil {
+			return err
+		}
+	}
 
 	if !redeployAgent(cluster, desiredAgent, desiredAuth, desiredFeatures, desiredTaints) {
 		return nil
@@ -296,7 +312,7 @@ func (cd *clusterDeploy) deployAgent(cluster *v3.Cluster) error {
 	}()
 
 	if _, err = v32.ClusterConditionAgentDeployed.Do(cluster, func() (runtime.Object, error) {
-		yaml, err := cd.getYAML(cluster, desiredAgent, desiredAuth, desiredFeatures, desiredTaints)
+		yaml, err := cd.getYAML(cluster, desiredAgent, desiredAuth, desiredFeatures, desiredTaints, privateRegistries)
 		if err != nil {
 			return cluster, err
 		}
@@ -308,7 +324,7 @@ func (cd *clusterDeploy) deployAgent(cluster *v3.Cluster) error {
 			logrus.Tracef("clusterDeploy: deployAgent: applying agent YAML for cluster [%s], try #%d: %v", cluster.Name, i+1, string(output))
 			output, err = kubectl.Apply(yaml, kubeConfig)
 			if err == nil {
-				logrus.Tracef("clusterDeploy: deployAgent: successfully applied agent YAML for cluster [%s], try #%d", cluster.Name, i+1)
+				logrus.Debugf("clusterDeploy: deployAgent: successfully applied agent YAML for cluster [%s], try #%d", cluster.Name, i+1)
 				break
 			}
 			logrus.Debugf("clusterDeploy: deployAgent: error while applying agent YAML for cluster [%s], try #%d", cluster.Name, i+1)
@@ -340,6 +356,22 @@ func (cd *clusterDeploy) deployAgent(cluster *v3.Cluster) error {
 				}
 				logrus.Debugf("Ignored '%s' error during delete cattle-node-agent DaemonSet", dsNotFoundError)
 			}
+		} else if strings.ToLower(settings.AgentRolloutWait.Get()) == "true" {
+			// Check for agent daemonset rollout if parameter is set and driverv32.ClusterDriverRKE
+			timeout := settings.AgentRolloutTimeout.Get()
+			_, err = time.ParseDuration(timeout)
+			if err != nil {
+				logrus.Warnf("[deployAgent] agent-rollout-timeout setting must be in Duration format. Using default: 300s")
+				timeout = "300s"
+			}
+			logrus.Debugf("clusterDeploy: deployAgent: waiting rollout agent daemonset for cluster [%s]", cluster.Name)
+			output, err := kubectl.RolloutStatusWithNamespace("cattle-system", "ds/cattle-node-agent", timeout, kubeConfig)
+			if err != nil {
+				logrus.Debugf("clusterDeploy: deployAgent: timeout waiting rollout agent daemonset for cluster [%s]: %v", cluster.Name, err)
+				return cluster, errors.WithMessage(types.NewErrors(err, errors.New(formatKubectlApplyOutput(string(output)))), "Timeout waiting rollout agent daemonset")
+			}
+			logrus.Debugf("clusterDeploy: deployAgent: successfully rollout agent daemonset for cluster [%s]", cluster.Name)
+			v32.ClusterConditionAgentDeployed.Message(cluster, "Successfully rollout agent daemonset")
 		}
 		v32.ClusterConditionAgentDeployed.Message(cluster, string(output))
 		return cluster, nil
@@ -363,6 +395,8 @@ func (cd *clusterDeploy) deployAgent(cluster *v3.Cluster) error {
 	if cluster.Annotations[AgentForceDeployAnn] == "true" {
 		cluster.Annotations[AgentForceDeployAnn] = "false"
 	}
+
+	cluster.Status.AppliedAgentEnvVars = append(settings.DefaultAgentSettingsAsEnvVars(), cluster.Spec.AgentEnvVars...)
 
 	return nil
 }
@@ -398,7 +432,7 @@ func (cd *clusterDeploy) getKubeConfig(cluster *v3.Cluster) (*clientcmdapi.Confi
 	return cd.clusterManager.KubeConfig(cluster.Name, token), tokenName, nil
 }
 
-func (cd *clusterDeploy) getYAML(cluster *v3.Cluster, agentImage, authImage string, features map[string]bool, taints []corev1.Taint) ([]byte, error) {
+func (cd *clusterDeploy) getYAML(cluster *v3.Cluster, agentImage, authImage string, features map[string]bool, taints []corev1.Taint, privateRegistries *corev1.Secret) ([]byte, error) {
 	logrus.Tracef("clusterDeploy: getYAML: Desired agent image is [%s] for cluster [%s]", agentImage, cluster.Name)
 	logrus.Tracef("clusterDeploy: getYAML: Desired auth image is [%s] for cluster [%s]", authImage, cluster.Name)
 	logrus.Tracef("clusterDeploy: getYAML: Desired features are [%v] for cluster [%s]", features, cluster.Name)
@@ -417,18 +451,18 @@ func (cd *clusterDeploy) getYAML(cluster *v3.Cluster, agentImage, authImage stri
 
 	buf := &bytes.Buffer{}
 	err = systemtemplate.SystemTemplate(buf, agentImage, authImage, cluster.Name, token, url, cluster.Spec.WindowsPreferedCluster,
-		cluster, features, taints)
+		cluster, features, taints, privateRegistries)
 
 	return buf.Bytes(), err
 }
 
 func (cd *clusterDeploy) getClusterAgentImage(name string) (string, error) {
-	uc, err := cd.clusterManager.UserContext(name)
+	uc, err := cd.clusterManager.UserContextNoControllers(name)
 	if err != nil {
 		return "", err
 	}
 
-	d, err := uc.Apps.Deployments("cattle-system").Get("cattle-cluster-agent", v1.GetOptions{})
+	d, err := uc.Apps.Deployments("cattle-system").Get("cattle-cluster-agent", metav1.GetOptions{})
 	if err != nil {
 		if !apierrors.IsNotFound(err) {
 			return "", err
@@ -446,12 +480,12 @@ func (cd *clusterDeploy) getClusterAgentImage(name string) (string, error) {
 }
 
 func (cd *clusterDeploy) getNodeAgentImage(name string) (string, error) {
-	uc, err := cd.clusterManager.UserContext(name)
+	uc, err := cd.clusterManager.UserContextNoControllers(name)
 	if err != nil {
 		return "", err
 	}
 
-	ds, err := uc.Apps.DaemonSets("cattle-system").Get("cattle-node-agent", v1.GetOptions{})
+	ds, err := uc.Apps.DaemonSets("cattle-system").Get("cattle-node-agent", metav1.GetOptions{})
 	if err != nil {
 		if !apierrors.IsNotFound(err) {
 			return "", err

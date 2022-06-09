@@ -8,15 +8,18 @@ tox -e flake8
 
 cd ../..
 
-if ! command -v golangci-lint; then	echo Running: go fmt	
-    echo Skipping validation: no golangci-lint available	test -z "$(go fmt ./... | tee /dev/stderr)"
-    exit	
-fi	
+if ! command -v golangci-lint; then
+    echo "Skipping validation on ARCH's other than linux amd64"
+    exit
+fi
 
 echo Running: golangci-lint
 golangci-lint run
 
 echo Tidying up modules
+cd pkg/apis/
+go mod tidy
+cd ../..
 go mod tidy
 
 echo Verifying modules
@@ -31,7 +34,7 @@ fi
 badmodule="false"
 while read -r module tag; do
   # Get tag from module in ./go.mod
-  roottag=$(cat go.mod | sed '1,/require/d' | grep "${module} " | awk '{ print $2 }')
+  roottag=$(cat go.mod | sed '1,/^require/d' | grep "${module} " | awk '{ print $2 }')
   echo "${module}:"
   echo "${tag} (./pkg/apis/go.mod)"
   echo "${roottag} (./go.mod)"

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"reflect"
+	"strings"
 
 	"github.com/rancher/norman/api/access"
 	"github.com/rancher/norman/httperror"
@@ -15,8 +16,8 @@ import (
 	"github.com/rancher/rancher/pkg/catalog/manager"
 	clusterv3 "github.com/rancher/rancher/pkg/client/generated/cluster/v3"
 	projectv3 "github.com/rancher/rancher/pkg/client/generated/project/v3"
-	"github.com/rancher/rancher/pkg/controllers/management/compose/common"
-	hcommon "github.com/rancher/rancher/pkg/controllers/managementuser/helm/common"
+	"github.com/rancher/rancher/pkg/clustermanager"
+	hcommon "github.com/rancher/rancher/pkg/controllers/managementuserlegacy/helm/common"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	pv3 "github.com/rancher/rancher/pkg/generated/norman/project.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/ref"
@@ -29,10 +30,10 @@ import (
 
 type Wrapper struct {
 	Clusters              v3.ClusterInterface
+	ClusterManager        *clustermanager.Manager
 	CatalogManager        manager.CatalogManager
 	TemplateVersionClient v3.CatalogTemplateVersionInterface
 	TemplateVersionLister v3.CatalogTemplateVersionLister
-	KubeConfigGetter      common.KubeConfigGetter
 	AppGetter             pv3.AppsGetter
 	UserLister            v3.UserLister
 	UserManager           user.Manager
@@ -63,6 +64,14 @@ func Formatter(apiContext *types.APIContext, resource *types.RawResource) {
 }
 
 func (w Wrapper) Validator(request *types.APIContext, schema *types.Schema, data map[string]interface{}) error {
+	projectID := convert.ToString(data["projectId"])
+	clusterID := strings.Split(projectID, ":")[0]
+	targetNamespace := convert.ToString(data["targetNamespace"])
+	appID := convert.ToString(data["name"])
+	if err := w.ValidateDashboardAppDoesNotExist(clusterID, appID, targetNamespace, request); err != nil {
+		return err
+	}
+
 	externalID := convert.ToString(data["externalId"])
 	if externalID == "" {
 		return nil
@@ -75,7 +84,6 @@ func (w Wrapper) Validator(request *types.APIContext, schema *types.Schema, data
 	if err != nil {
 		return err
 	}
-	targetNamespace := convert.ToString(data["targetNamespace"])
 	if templateVersion.Spec.RequiredNamespace != "" && templateVersion.Spec.RequiredNamespace != targetNamespace {
 		return httperror.NewAPIError(httperror.InvalidType, "template's requiredNamespace doesn't match catalog app's target namespace")
 	}
@@ -90,6 +98,42 @@ func (w Wrapper) Validator(request *types.APIContext, schema *types.Schema, data
 	}
 
 	return nil
+}
+
+// ValidateDashboardAppDoesNotExist validates that a request is not attempting
+// to create an apps.project.cattle.io with an ID that matches an
+// apps.catalog.cattle.io in a namespace that matches its targetNamespace.
+func (w Wrapper) ValidateDashboardAppDoesNotExist(clusterName, appID, ns string, request *types.APIContext) error {
+	if request.Method != http.MethodPost {
+		return nil
+	}
+
+	couldNotValidateErrFormat := "could not determine whether an apps.catalog.cattle.io with same ID and namespace currently exists: %v"
+	clusterContext, err := w.ClusterManager.UserContext(clusterName)
+	if err != nil {
+		return httperror.NewAPIError(httperror.ServerError, fmt.Sprintf(couldNotValidateErrFormat, err))
+	}
+
+	appClient := clusterContext.Catalog.V1().App()
+	if _, err := appClient.Get(ns, appID, metav1.GetOptions{}); err != nil {
+		if !apierrors.IsNotFound(err) {
+			return httperror.NewAPIError(httperror.ServerError, fmt.Sprintf(couldNotValidateErrFormat, err))
+		}
+	} else {
+		return httperror.NewAPIError(httperror.Conflict, fmt.Sprintf("an apps.catalog.cattle.io already exists with"+
+			" ID [%s] in namespace [%s]", appID, ns))
+	}
+
+	return nil
+}
+
+func copyAnswers(specAnswers map[string]string, answers interface{}) {
+	m, ok := answers.(map[string]interface{})
+	if ok {
+		for k, v := range m {
+			specAnswers[k] = convert.ToString(v)
+		}
+	}
 }
 
 func (w Wrapper) ActionHandler(actionName string, action *types.Action, apiContext *types.APIContext) error {
@@ -125,26 +169,25 @@ func (w Wrapper) ActionHandler(actionName string, action *types.Action, apiConte
 	case "upgrade":
 		externalID := convert.ToString(actionInput["externalId"])
 
-		if err := w.validateChartCompatibility(externalID, clusterName); err != nil {
+		_, _, _, _, currentAppVersion, err := hcommon.SplitExternalID(obj.Spec.ExternalID)
+		if err != nil {
+			httperror.NewAPIError(httperror.InvalidBodyContent, fmt.Sprintf("could not parse current externalID [%s]: %s",
+				obj.Spec.ExternalID, err.Error()))
+		}
+		if err := w.validateChartCompatibility(externalID, clusterName, currentAppVersion); err != nil {
 			return httperror.NewAPIError(httperror.InvalidBodyContent, err.Error())
 		}
 
 		answers := actionInput["answers"]
+		answersSetString := actionInput["answersSetString"]
 		forceUpgrade := actionInput["forceUpgrade"]
 		files := actionInput["files"]
 		valuesYaml := actionInput["valuesYaml"]
+		obj.Spec.Answers = make(map[string]string)
+		obj.Spec.AnswersSetString = make(map[string]string)
 
-		if answers != nil {
-			m, ok := answers.(map[string]interface{})
-			if ok {
-				obj.Spec.Answers = make(map[string]string)
-				for k, v := range m {
-					obj.Spec.Answers[k] = convert.ToString(v)
-				}
-			}
-		} else {
-			obj.Spec.Answers = make(map[string]string)
-		}
+		copyAnswers(obj.Spec.Answers, answers)
+		copyAnswers(obj.Spec.AnswersSetString, answersSetString)
 		obj.Spec.ExternalID = externalID
 		if convert.ToBool(forceUpgrade) {
 			v32.AppConditionForceUpgrade.Unknown(obj)
@@ -189,7 +232,12 @@ func (w Wrapper) ActionHandler(actionName string, action *types.Action, apiConte
 			return err
 		}
 
-		if err := w.validateChartCompatibility(appRevision.Status.ExternalID, clusterName); err != nil {
+		_, _, _, _, currentAppVersion, err := hcommon.SplitExternalID(obj.Spec.ExternalID)
+		if err != nil {
+			httperror.NewAPIError(httperror.InvalidBodyContent, fmt.Sprintf("could not parse current externalID [%s]: %s",
+				obj.Spec.ExternalID, err.Error()))
+		}
+		if err := w.validateChartCompatibility(appRevision.Status.ExternalID, clusterName, currentAppVersion); err != nil {
 			return httperror.NewAPIError(httperror.InvalidBodyContent, err.Error())
 		}
 
@@ -199,6 +247,7 @@ func (w Wrapper) ActionHandler(actionName string, action *types.Action, apiConte
 			return err
 		}
 		obj.Spec.Answers = appRevision.Status.Answers
+		obj.Spec.AnswersSetString = appRevision.Status.AnswersSetString
 		obj.Spec.ExternalID = appRevision.Status.ExternalID
 		obj.Spec.ValuesYaml = appRevision.Status.ValuesYaml
 		if convert.ToBool(forceUpgrade) {
@@ -243,7 +292,7 @@ func (w Wrapper) LinkHandler(apiContext *types.APIContext, next types.RequestHan
 	return nil
 }
 
-func (w Wrapper) validateChartCompatibility(externalID, clusterName string) error {
+func (w Wrapper) validateChartCompatibility(externalID, clusterName, currentAppVersion string) error {
 	if externalID == "" {
 		return nil
 	}
@@ -255,5 +304,5 @@ func (w Wrapper) validateChartCompatibility(externalID, clusterName string) erro
 	if err != nil {
 		return err
 	}
-	return w.CatalogManager.ValidateChartCompatibility(template, clusterName)
+	return w.CatalogManager.ValidateChartCompatibility(template, clusterName, currentAppVersion)
 }

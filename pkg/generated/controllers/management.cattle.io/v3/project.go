@@ -1,5 +1,5 @@
 /*
-Copyright 2020 Rancher Labs, Inc.
+Copyright 2022 Rancher Labs, Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -360,6 +360,10 @@ func (a *projectGeneratingHandler) Remove(key string, obj *v3.Project) (*v3.Proj
 }
 
 func (a *projectGeneratingHandler) Handle(obj *v3.Project, status v3.ProjectStatus) (v3.ProjectStatus, error) {
+	if !obj.DeletionTimestamp.IsZero() {
+		return status, nil
+	}
+
 	objs, newStatus, err := a.ProjectGeneratingHandler(obj, status)
 	if err != nil {
 		return newStatus, err

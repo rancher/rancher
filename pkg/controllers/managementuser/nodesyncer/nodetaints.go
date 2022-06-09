@@ -28,7 +28,7 @@ func (m *nodesSyncer) syncTaints(key string, obj *v3.Node) (runtime.Object, erro
 		return obj, nil
 	}
 	node, err := nodehelper.GetNodeForMachine(obj, m.nodeLister)
-	if err != nil {
+	if err != nil || node == nil {
 		return obj, err
 	}
 	toAdd, toDel := taints.GetToDiffTaints(node.Spec.Taints, obj.Spec.DesiredNodeTaints)

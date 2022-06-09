@@ -181,11 +181,12 @@ type NodePoolSpec struct {
 	Worker           bool   `json:"worker"`
 	NodeTemplateName string `json:"nodeTemplateName,omitempty" norman:"type=reference[nodeTemplate],required,notnullable"`
 
-	HostnamePrefix  string            `json:"hostnamePrefix" norman:"required,notnullable"`
-	Quantity        int               `json:"quantity" norman:"required,default=1"`
-	NodeLabels      map[string]string `json:"nodeLabels"`
-	NodeAnnotations map[string]string `json:"nodeAnnotations"`
-	NodeTaints      []v1.Taint        `json:"nodeTaints,omitempty"`
+	HostnamePrefix    string            `json:"hostnamePrefix" norman:"required,notnullable"`
+	Quantity          int               `json:"quantity" norman:"required,default=1"`
+	DrainBeforeDelete bool              `json:"drainBeforeDelete" norman:"default=false"`
+	NodeLabels        map[string]string `json:"nodeLabels"`
+	NodeAnnotations   map[string]string `json:"nodeAnnotations"`
+	NodeTaints        []v1.Taint        `json:"nodeTaints,omitempty"`
 
 	DisplayName string `json:"displayName"`
 	ClusterName string `json:"clusterName,omitempty" norman:"type=reference[cluster],noupdate,required"`
@@ -238,6 +239,7 @@ type NodeSpec struct {
 	DesiredNodeUnschedulable string          `json:"desiredNodeUnschedulable,omitempty"`
 	NodeDrainInput           *NodeDrainInput `json:"nodeDrainInput,omitempty"`
 	MetadataUpdate           MetadataUpdate  `json:"metadataUpdate,omitempty"`
+	ScaledownTime            string          `json:"scaledownTime,omitempty"`
 }
 
 type NodePlan struct {
@@ -253,6 +255,8 @@ type NodeCommonParams struct {
 	EngineInstallURL         string            `json:"engineInstallURL,omitempty"`
 	DockerVersion            string            `json:"dockerVersion,omitempty"`
 	EngineOpt                map[string]string `json:"engineOpt,omitempty"`
+	StorageOpt               map[string]string `json:"storageOpt,omitempty"`
+	LogOpt                   map[string]string `json:"logOpt,omitempty"`
 	EngineInsecureRegistry   []string          `json:"engineInsecureRegistry,omitempty"`
 	EngineRegistryMirror     []string          `json:"engineRegistryMirror,omitempty"`
 	EngineLabel              map[string]string `json:"engineLabel,omitempty"`
@@ -308,15 +312,18 @@ type Condition struct {
 }
 
 type NodeDriverSpec struct {
-	DisplayName      string   `json:"displayName"`
-	Description      string   `json:"description"`
-	URL              string   `json:"url" norman:"required"`
-	ExternalID       string   `json:"externalId"`
-	Builtin          bool     `json:"builtin"`
-	Active           bool     `json:"active"`
-	Checksum         string   `json:"checksum"`
-	UIURL            string   `json:"uiUrl"`
-	WhitelistDomains []string `json:"whitelistDomains,omitempty"`
+	DisplayName string `json:"displayName"`
+	Description string `json:"description"`
+	URL         string `json:"url" norman:"required"`
+	ExternalID  string `json:"externalId"`
+	Builtin     bool   `json:"builtin"`
+	Active      bool   `json:"active"`
+	// If AddCloudCredential is true, then the cloud credential schema is created
+	// regardless of whether the node driver is active.
+	AddCloudCredential bool     `json:"addCloudCredential"`
+	Checksum           string   `json:"checksum"`
+	UIURL              string   `json:"uiUrl"`
+	WhitelistDomains   []string `json:"whitelistDomains,omitempty"`
 }
 
 type PublicEndpoint struct {
@@ -352,6 +359,18 @@ type CloudCredential struct {
 }
 
 type CloudCredentialSpec struct {
-	DisplayName string `json:"displayName"`
-	Description string `json:"description,omitempty"`
+	DisplayName        string              `json:"displayName"`
+	Description        string              `json:"description,omitempty"`
+	S3CredentialConfig *S3CredentialConfig `json:"s3credentialConfig,omitempty"`
+}
+
+type S3CredentialConfig struct {
+	AccessKey            string `norman:"required"`
+	SecretKey            string `norman:"required,type=password"`
+	DefaultRegion        string
+	DefaultEndpoint      string
+	DefaultEndpointCA    string
+	DefaultSkipSSLVerify string
+	DefaultBucket        string
+	DefaultFolder        string
 }

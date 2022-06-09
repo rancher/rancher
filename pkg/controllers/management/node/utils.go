@@ -41,9 +41,15 @@ const (
 
 func buildAgentCommand(node *v3.Node, dockerRun string) []string {
 	drun := strings.Fields(dockerRun)
-	cmd := []string{"--native-ssh", "ssh", node.Spec.RequestedHostname}
+	cmd := []string{"ssh", node.Spec.RequestedHostname}
 	cmd = append(cmd, drun...)
 	cmd = append(cmd, "-r", "-n", node.Name)
+	return cmd
+}
+
+func buildLoginCommand(node *v3.Node, login string) []string {
+	cmd := []string{"ssh", node.Spec.RequestedHostname}
+	cmd = append(cmd, strings.Fields(login)...)
 	return cmd
 }
 
@@ -53,6 +59,8 @@ func buildCreateCommand(node *v3.Node, configMap map[string]interface{}) []strin
 
 	cmd = append(cmd, buildEngineOpts("--engine-install-url", []string{node.Status.NodeTemplateSpec.EngineInstallURL})...)
 	cmd = append(cmd, buildEngineOpts("--engine-opt", mapToSlice(node.Status.NodeTemplateSpec.EngineOpt))...)
+	cmd = append(cmd, buildEngineOpts("--engine-opt", storageOptMapToSlice(node.Status.NodeTemplateSpec.StorageOpt))...)
+	cmd = append(cmd, buildEngineOpts("--engine-opt", logOptMapToSlice(node.Status.NodeTemplateSpec.LogOpt))...)
 	cmd = append(cmd, buildEngineOpts("--engine-env", mapToSlice(node.Status.NodeTemplateSpec.EngineEnv))...)
 	cmd = append(cmd, buildEngineOpts("--engine-insecure-registry", node.Status.NodeTemplateSpec.EngineInsecureRegistry)...)
 	cmd = append(cmd, buildEngineOpts("--engine-label", mapToSlice(node.Status.NodeTemplateSpec.EngineLabel))...)
@@ -101,9 +109,25 @@ func buildEngineOpts(name string, values []string) []string {
 }
 
 func mapToSlice(m map[string]string) []string {
-	var ret []string
+	ret := make([]string, len(m))
 	for k, v := range m {
 		ret = append(ret, fmt.Sprintf("%s=%s", k, v))
+	}
+	return ret
+}
+
+func storageOptMapToSlice(m map[string]string) []string {
+	ret := make([]string, len(m))
+	for k, v := range m {
+		ret = append(ret, fmt.Sprintf("storage-opt %s=%s", k, v))
+	}
+	return ret
+}
+
+func logOptMapToSlice(m map[string]string) []string {
+	ret := make([]string, len(m))
+	for k, v := range m {
+		ret = append(ret, fmt.Sprintf("log-opt %s=%s", k, v))
 	}
 	return ret
 }

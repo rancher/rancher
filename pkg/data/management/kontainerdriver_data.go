@@ -92,8 +92,8 @@ func addKontainerDrivers(management *config.ManagementContext) error {
 	}
 	if err := creator.addCustomDriver(
 		"oraclecontainerengine",
-		"https://github.com/rancher-plugins/kontainer-engine-driver-oke/releases/download/v1.4.2/kontainer-engine-driver-oke-linux",
-		"6cfdecfdafe229b695746af6773b79643dbedba2f690e5e14ef47d5813250805",
+		"https://github.com/rancher-plugins/kontainer-engine-driver-oke/releases/download/v1.7.1/kontainer-engine-driver-oke-linux",
+		"5a708bfc01c67558adc887258615900082263ca7d6f4160efb1a58501b0cc608",
 		"",
 		false,
 		"*.oraclecloud.com",
@@ -102,8 +102,8 @@ func addKontainerDrivers(management *config.ManagementContext) error {
 	}
 	if err := creator.addCustomDriver(
 		"linodekubernetesengine",
-		"https://github.com/linode/kontainer-engine-driver-lke/releases/download/v0.0.3/kontainer-engine-driver-lke-linux-amd64",
-		"02fa95d24a1c6f9c520307e24a543c1777ed21fc3a4f060434e067806578e647",
+		"https://github.com/linode/kontainer-engine-driver-lke/releases/download/v0.0.4/kontainer-engine-driver-lke-linux-amd64",
+		"5609314fe7ff7339a7c8292738d36ccf5a25460f79ca094db72eb6ccf722bc27",
 		"",
 		false,
 		"api.linode.com",
@@ -111,18 +111,14 @@ func addKontainerDrivers(management *config.ManagementContext) error {
 		return err
 	}
 
-	if err := creator.addCustomDriver(
+	return creator.addCustomDriver(
 		"opentelekomcloudcontainerengine",
 		"https://otc-rancher.obs.eu-de.otc.t-systems.com/cluster/driver/1.0.2/kontainer-engine-driver-otccce_linux_amd64.tar.gz",
 		"f2c0a8d1195cd51ae1ccdeb4a8defd2c3147b9a2c7510b091be0c12028740f5f",
-		"https://otc-rancher.obs.eu-de.otc.t-systems.com/cluster/ui/v1.0.3/component.js",
+		"https://otc-rancher.obs.eu-de.otc.t-systems.com/cluster/ui/v1.1.0/component.js",
 		false,
 		"*.otc.t-systems.com",
-	); err != nil {
-		return err
-	}
-
-	return nil
+	)
 }
 
 func cleanupImportDriver(creator driverCreator) error {

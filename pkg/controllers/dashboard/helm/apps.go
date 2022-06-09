@@ -3,7 +3,7 @@ package helm
 import (
 	"context"
 
-	"github.com/docker/docker/pkg/locker"
+	"github.com/moby/locker"
 	"github.com/rancher/lasso/pkg/client"
 	v1 "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/catalogv2/helm"
@@ -44,8 +44,8 @@ func RegisterApps(ctx context.Context,
 		secretCache:         secrets.Cache(),
 		configMapCache:      configMap.Cache(),
 	}
-	configMap.OnChange(ctx, "helm-app", r.OnConfigMapChange)
-	secrets.OnChange(ctx, "helm-app", r.OnSecretChange)
+	configMap.OnChange(ctx, "helm-app-configmap", r.OnConfigMapChange)
+	secrets.OnChange(ctx, "helm-app-secret", r.OnSecretChange)
 	catalogv1.RegisterAppStatusHandler(ctx, apps, "", "helm-app-status", r.appStatus)
 	relatedresource.Watch(ctx, "helm-app",
 		relatedresource.OwnerResolver(true, "v1", "ConfigMap"),
@@ -84,12 +84,20 @@ func (a *appHandler) appStatus(app *v1.App, status v1.ReleaseStatus) (v1.Release
 	return status, nil
 }
 
-func (a *appHandler) isLatestSecret(spec *v1.ReleaseSpec) (bool, error) {
-	others, err := a.secretCache.List(spec.Namespace, labels.SelectorFromSet(labels.Set{
+func (a *appHandler) isLatestSecret(ns string, spec *v1.ReleaseSpec) (bool, error) {
+	others, err := a.secretCache.List(ns, labels.SelectorFromSet(labels.Set{
 		"owner": "helm",
 	}))
 	if err != nil {
 		return false, err
+	}
+
+	// TODO: If we find nothing here we didn't even find the original. That's bad and can
+	// indicate that this is a helm v2 release using secrets which we currently
+	// aren't expecting.
+	// https://github.com/rancher/rancher/issues/31297
+	if len(others) == 0 {
+		return false, nil
 	}
 
 	othersRuntime := make([]runtime.Object, 0, len(others))
@@ -100,12 +108,20 @@ func (a *appHandler) isLatestSecret(spec *v1.ReleaseSpec) (bool, error) {
 	return helm.IsLatest(spec, othersRuntime), nil
 }
 
-func (a *appHandler) isLatestConfigMap(spec *v1.ReleaseSpec) (bool, error) {
-	others, err := a.configMapCache.List(spec.Namespace, labels.SelectorFromSet(labels.Set{
+func (a *appHandler) isLatestConfigMap(ns string, spec *v1.ReleaseSpec) (bool, error) {
+	others, err := a.configMapCache.List(ns, labels.SelectorFromSet(labels.Set{
 		"OWNER": "TILLER",
 	}))
 	if err != nil {
 		return false, err
+	}
+
+	// TODO: If we find nothing here we didn't even find the original. That's bad and can
+	// indicate that this is a helm v2 release using configMaps which we currently
+	// aren't expecting.
+	// https://github.com/rancher/rancher/issues/31297
+	if len(others) == 0 {
+		return false, nil
 	}
 
 	othersRuntime := make([]runtime.Object, 0, len(others))
@@ -129,11 +145,16 @@ func (a *appHandler) OnConfigMapChange(key string, configMap *corev1.ConfigMap) 
 	a.locker.Lock(spec.Name)
 	defer a.locker.Unlock(spec.Name)
 
-	if latest, err := a.isLatestConfigMap(spec); err != nil {
+	if latest, err := a.isLatestConfigMap(configMap.Namespace, spec); err != nil {
 		return nil, err
 	} else if !latest {
 		// Don't delete if we create an App before as it's probably owned by something else now
 		return nil, generic.ErrSkip
+	}
+
+	if spec.HelmMajorVersion == 2 {
+		// no longer support helm 2
+		return configMap, a.apply.WithOwner(configMap).ApplyObjects()
 	}
 
 	return configMap, a.apply.WithOwner(configMap).ApplyObjects(&v1.App{
@@ -158,7 +179,7 @@ func (a *appHandler) OnSecretChange(key string, secret *corev1.Secret) (*corev1.
 	a.locker.Lock(spec.Name)
 	defer a.locker.Unlock(spec.Name)
 
-	if latest, err := a.isLatestSecret(spec); err != nil {
+	if latest, err := a.isLatestSecret(secret.Namespace, spec); err != nil {
 		return nil, err
 	} else if !latest {
 		// Don't delete if we create an App before as it's probably owned by something else now

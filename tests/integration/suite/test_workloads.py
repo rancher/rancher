@@ -385,29 +385,40 @@ def test_perform_workload_action_read_only(admin_mc, admin_pc, remove_resource,
         scale=1,
         containers=[{
             'name': 'foo',
-            'image': 'nginx:1.18',
+            'image': 'rancher/mirrored-library-nginx:1.21.1-alpine',
+            'env': [{
+                'name': 'FOO_KEY',
+                'value': 'FOO_VALUE',
+            }]
         }])
     remove_resource(workload)
-    wait_for_workload(client, workload.id)
+    wait_for_workload(client, workload.id, ns.id)
 
-    # Admin user updates the workload to yield a rollback option. We change the
-    # name below.
+    # Admin user updates the workload to yield a rollback option.
     workload.containers = [{
         'name': 'foo',
-        'image': 'nginx:1.19',
+        'image': 'rancher/mirrored-library-nginx:1.21.1-alpine',
+        'env': [{
+            'name': 'BAR_KEY',
+            'value': 'BAR_VALUE',
+        }]
     }]
-    workload = client.update_by_id_workload(workload.id, workload)
-    wait_for_workload(client, workload.id)
     workload = client.reload(workload)
+    workload = client.update_by_id_workload(workload.id, workload)
+
+    workload = client.reload(workload)
+    wait_for_workload(client, workload.id, ns.id)
     original_rev_id = workload.revisions().data[0].id
 
     # Read-only users should receive a 404 error.
     with pytest.raises(ApiError) as e:
+        workload = client.reload(workload)
         user_pc.action(obj=workload, action_name="rollback",
                        replicaSetId=original_rev_id)
     assert e.value.error.status == 404
 
     # Member users will be able to perform the rollback.
+    workload = client.reload(workload)
     user_member_pc.action(obj=workload, action_name="rollback",
                           replicaSetId=original_rev_id)
 
@@ -445,15 +456,15 @@ def wait_for_service_cluserip_reset(client, name, timeout=30):
     return services.data[0]
 
 
-def wait_for_workload(client, workload_id, timeout=30):
-    """Wait for a given workload to be active."""
-    def _get_result():
-        try:
-            return client.by_id_workload(workload_id)["state"]
-        except KeyError:
-            return ""
+def wait_for_workload(client, workload_id, workload_ns, timeout=30):
+    def _is_found():
+        workloads = client.list_workload(namespaceId=workload_ns)
+        for workload in workloads.data:
+            if workload.id == workload_id:
+                return True
+        return False
     start = time.time()
-    while _get_result() != "active":
+    while not _is_found():
         time.sleep(.5)
         if time.time() - start > timeout:
             raise Exception("Timeout waiting for workload")

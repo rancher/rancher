@@ -1,5 +1,5 @@
 /*
-Copyright 2020 Rancher Labs, Inc.
+Copyright 2022 Rancher Labs, Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -360,6 +360,10 @@ func (a *multiClusterAppGeneratingHandler) Remove(key string, obj *v3.MultiClust
 }
 
 func (a *multiClusterAppGeneratingHandler) Handle(obj *v3.MultiClusterApp, status v3.MultiClusterAppStatus) (v3.MultiClusterAppStatus, error) {
+	if !obj.DeletionTimestamp.IsZero() {
+		return status, nil
+	}
+
 	objs, newStatus, err := a.MultiClusterAppGeneratingHandler(obj, status)
 	if err != nil {
 		return newStatus, err

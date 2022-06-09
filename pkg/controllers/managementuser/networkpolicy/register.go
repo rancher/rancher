@@ -3,12 +3,31 @@ package networkpolicy
 import (
 	"context"
 
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/sirupsen/logrus"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 // Register initializes the controllers and registers
 func Register(ctx context.Context, cluster *config.UserContext) {
+	starter := cluster.DeferredStart(ctx, func(ctx context.Context) error {
+		registerDeferred(ctx, cluster)
+		return nil
+	})
+	clusters := cluster.Management.Management.Clusters("")
+	clusters.AddHandler(ctx, "networkpolicy-deferred", func(key string, obj *v3.Cluster) (runtime.Object, error) {
+		if obj != nil &&
+			obj.Name == cluster.ClusterName &&
+			obj.Spec.EnableNetworkPolicy != nil &&
+			*obj.Spec.EnableNetworkPolicy {
+			return obj, starter()
+		}
+		return obj, nil
+	})
+}
+
+func registerDeferred(ctx context.Context, cluster *config.UserContext) {
 	logrus.Infof("Registering project network policy")
 
 	pnpLister := cluster.Management.Management.ProjectNetworkPolicies("").Controller().Lister()
@@ -16,7 +35,8 @@ func Register(ctx context.Context, cluster *config.UserContext) {
 	projectLister := cluster.Management.Management.Projects(cluster.ClusterName).Controller().Lister()
 	projects := cluster.Management.Management.Projects(cluster.ClusterName)
 	clusterLister := cluster.Management.Management.Clusters("").Controller().Lister()
-	clusters := cluster.Management.Management.Clusters("")
+	mgmtClusters := cluster.Management.Management.Clusters("")
+	clusters := cluster.Management.Wrangler.Provisioning.Cluster().Cache()
 
 	nodeLister := cluster.Core.Nodes("").Controller().Lister()
 	nsLister := cluster.Core.Namespaces("").Controller().Lister()
@@ -29,7 +49,7 @@ func Register(ctx context.Context, cluster *config.UserContext) {
 	npLister := cluster.Networking.NetworkPolicies("").Controller().Lister()
 	npClient := cluster.Networking
 
-	npmgr := &netpolMgr{nsLister, nodeLister, pods, projects,
+	npmgr := &netpolMgr{clusterLister, clusters, nsLister, nodeLister, pods, projects,
 		npLister, npClient, projectLister, cluster.ClusterName}
 	ps := &projectSyncer{pnpLister, pnps, projects, clusterLister, cluster.ClusterName}
 	nss := &nsSyncer{npmgr, clusterLister, serviceLister, podLister,
@@ -39,9 +59,9 @@ func Register(ctx context.Context, cluster *config.UserContext) {
 	serviceHandler := &serviceHandler{npmgr, clusterLister, cluster.ClusterName}
 	nodeHandler := &nodeHandler{npmgr, clusterLister, cluster.ClusterName}
 	clusterHandler := &clusterHandler{cluster, pnpLister, podLister,
-		serviceLister, projectLister, clusters, pnps, npmgr, cluster.ClusterName}
+		serviceLister, projectLister, mgmtClusters, pnps, npmgr, cluster.ClusterName}
 
-	clusterNetAnnHandler := &clusterNetAnnHandler{clusters, cluster.ClusterName}
+	clusterNetAnnHandler := &clusterNetAnnHandler{mgmtClusters, cluster.ClusterName}
 
 	projects.Controller().AddClusterScopedHandler(ctx, "projectSyncer", cluster.ClusterName, ps.Sync)
 	pnps.AddClusterScopedHandler(ctx, "projectNetworkPolicySyncer", cluster.ClusterName, pnpsyncer.Sync)
@@ -50,7 +70,7 @@ func Register(ctx context.Context, cluster *config.UserContext) {
 	services.AddHandler(ctx, "serviceHandler", serviceHandler.Sync)
 
 	cluster.Management.Management.Nodes(cluster.ClusterName).Controller().AddHandler(ctx, "nodeHandler", nodeHandler.Sync)
-	clusters.AddHandler(ctx, "clusterHandler", clusterHandler.Sync)
+	mgmtClusters.AddHandler(ctx, "clusterHandler", clusterHandler.Sync)
 
-	clusters.AddHandler(ctx, "clusterNetAnnHandler", clusterNetAnnHandler.Sync)
+	mgmtClusters.AddHandler(ctx, "clusterNetAnnHandler", clusterNetAnnHandler.Sync)
 }

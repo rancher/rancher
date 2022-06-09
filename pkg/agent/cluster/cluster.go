@@ -1,6 +1,7 @@
 package cluster
 
 import (
+	"context"
 	"encoding/base64"
 	"fmt"
 	"io/ioutil"
@@ -9,6 +10,11 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
+	"github.com/rancher/rancher/pkg/namespace"
+	"github.com/rancher/wrangler/pkg/kubeconfig"
+	coreV1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
 )
 
 const (
@@ -19,9 +25,6 @@ const (
 
 	kubernetesServiceHostKey = "KUBERNETES_SERVICE_HOST"
 	kubernetesServicePortKey = "KUBERNETES_SERVICE_PORT"
-
-	tokenFile  = "/var/run/secrets/kubernetes.io/serviceaccount/token"
-	rootCAFile = "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
 )
 
 func Namespace() (string, error) {
@@ -41,15 +44,37 @@ func TokenAndURL() (string, string, error) {
 	return token, url, err
 }
 
-func Params() (map[string]interface{}, error) {
-	caData, err := ioutil.ReadFile(rootCAFile)
-	if err != nil {
-		return nil, errors.Wrapf(err, "reading %s", rootCAFile)
-	}
+func CAChecksum() string {
+	return os.Getenv("CATTLE_CA_CHECKSUM")
+}
 
-	token, err := ioutil.ReadFile(tokenFile)
+func getTokenFromAPI() ([]byte, []byte, error) {
+	cfg, err := kubeconfig.GetNonInteractiveClientConfig("").ClientConfig()
 	if err != nil {
-		return nil, errors.Wrapf(err, "reading %s", tokenFile)
+		return nil, nil, err
+	}
+	k8s, err := kubernetes.NewForConfig(cfg)
+	if err != nil {
+		return nil, nil, err
+	}
+	sa, err := k8s.CoreV1().ServiceAccounts(namespace.System).Get(context.Background(), "cattle", metav1.GetOptions{})
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to find service account %s/%s: %w", namespace.System, "cattle", err)
+	}
+	if len(sa.Secrets) == 0 {
+		return nil, nil, fmt.Errorf("no secret exists for service account %s/%s", namespace.System, "cattle")
+	}
+	secret, err := k8s.CoreV1().Secrets(namespace.System).Get(context.Background(), sa.Secrets[0].Name, metav1.GetOptions{})
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to find secret for service account %s/%s: %w", namespace.System, "cattle", err)
+	}
+	return secret.Data[coreV1.ServiceAccountRootCAKey], secret.Data[coreV1.ServiceAccountTokenKey], nil
+}
+
+func Params() (map[string]interface{}, error) {
+	caData, token, err := getTokenFromAPI()
+	if err != nil {
+		return nil, errors.Wrapf(err, "looking up %s/%s ca/token", namespace.System, "cattle")
 	}
 
 	kubernetesServiceHost, err := getenv(kubernetesServiceHostKey)

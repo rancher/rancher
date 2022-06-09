@@ -1,0 +1,8 @@
+apiVersion: management.cattle.io/v3
+kind: Project
+metadata:
+  name: ""
+  namespace: ""
+spec:
+  clusterName: ""
+  displayName: ""

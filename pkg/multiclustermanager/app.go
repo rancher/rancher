@@ -8,13 +8,14 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/pkg/auth/providerrefresh"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	"github.com/rancher/rancher/pkg/catalog/manager"
 	"github.com/rancher/rancher/pkg/clustermanager"
 	managementController "github.com/rancher/rancher/pkg/controllers/management"
-	"github.com/rancher/rancher/pkg/controllers/management/eksupstreamrefresh"
+	"github.com/rancher/rancher/pkg/controllers/management/clusterupstreamrefresher"
 	managementcrds "github.com/rancher/rancher/pkg/crds/management"
 	"github.com/rancher/rancher/pkg/cron"
 	managementdata "github.com/rancher/rancher/pkg/data/management"
@@ -24,7 +25,7 @@ import (
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/systemtokens"
 	"github.com/rancher/rancher/pkg/telemetry"
-	"github.com/rancher/rancher/pkg/tunnelserver"
+	"github.com/rancher/rancher/pkg/tunnelserver/mcmauthorizer"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/sirupsen/logrus"
@@ -54,34 +55,32 @@ type mcm struct {
 	startLock   sync.Mutex
 }
 
-func buildScaledContext(ctx context.Context, wranglerContext *wrangler.Context, cfg *Options) (*config.ScaledContext, *clustermanager.Manager, error) {
+func buildScaledContext(ctx context.Context, wranglerContext *wrangler.Context, cfg *Options) (*config.ScaledContext,
+	*clustermanager.Manager, *mcmauthorizer.Authorizer, error) {
 	scaledContext, err := config.NewScaledContext(*wranglerContext.RESTConfig, &config.ScaleContextOptions{
 		ControllerFactory: wranglerContext.ControllerFactory,
 	})
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
-	scaledContext.CatalogManager = manager.New(scaledContext.Management, scaledContext.Project)
+	scaledContext.Wrangler = wranglerContext
+
+	scaledContext.CatalogManager = manager.New(scaledContext.Management, scaledContext.Project, scaledContext.Core)
 
 	if err := managementcrds.Create(ctx, wranglerContext.RESTConfig); err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
-	dialerFactory, err := dialer.NewFactory(scaledContext)
+	dialerFactory, err := dialer.NewFactory(scaledContext, wranglerContext)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
-
 	scaledContext.Dialer = dialerFactory
-	scaledContext.PeerManager, err = tunnelserver.NewPeerManager(ctx, scaledContext, dialerFactory.TunnelServer)
-	if err != nil {
-		return nil, nil, err
-	}
 
 	userManager, err := common.NewUserManager(scaledContext)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	scaledContext.UserManager = userManager
@@ -90,21 +89,25 @@ func buildScaledContext(ctx context.Context, wranglerContext *wrangler.Context, 
 	systemTokens := systemtokens.NewSystemTokensFromScale(scaledContext)
 	scaledContext.SystemTokens = systemTokens
 
-	manager := clustermanager.NewManager(cfg.HTTPSListenPort, scaledContext, wranglerContext.RBAC, wranglerContext.ASL)
+	manager := clustermanager.NewManager(cfg.HTTPSListenPort, scaledContext, wranglerContext.ASL)
 
 	scaledContext.AccessControl = manager
 	scaledContext.ClientGetter = manager
 
-	return scaledContext, manager, nil
+	authorizer := mcmauthorizer.NewAuthorizer(scaledContext)
+	wranglerContext.TunnelAuthorizer.Add(authorizer.AuthorizeTunnel)
+	scaledContext.PeerManager = wranglerContext.PeerManager
+
+	return scaledContext, manager, authorizer, nil
 }
 
 func newMCM(ctx context.Context, wranglerContext *wrangler.Context, cfg *Options) (*mcm, error) {
-	scaledContext, clusterManager, err := buildScaledContext(ctx, wranglerContext, cfg)
+	scaledContext, clusterManager, tunnelAuthorizer, err := buildScaledContext(ctx, wranglerContext, cfg)
 	if err != nil {
 		return nil, err
 	}
 
-	router, err := router(ctx, cfg.LocalClusterEnabled, scaledContext, clusterManager)
+	router, err := router(ctx, cfg.LocalClusterEnabled, tunnelAuthorizer, scaledContext, clusterManager)
 	if err != nil {
 		return nil, err
 	}
@@ -127,13 +130,13 @@ func newMCM(ctx context.Context, wranglerContext *wrangler.Context, cfg *Options
 
 	go func() {
 		<-ctx.Done()
-		mcm.started()
+		mcm.started(ctx)
 	}()
 
 	return mcm, nil
 }
 
-func (m *mcm) started() {
+func (m *mcm) started(ctx context.Context) {
 	m.startLock.Lock()
 	defer m.startLock.Unlock()
 	select {
@@ -157,6 +160,11 @@ func (m *mcm) Wait(ctx context.Context) {
 	}
 }
 
+func (m *mcm) NormanSchemas() *types.Schemas {
+	<-m.startedChan
+	return m.ScaledContext.Schemas
+}
+
 func (m *mcm) Middleware(next http.Handler) http.Handler {
 	return m.router(next)
 }
@@ -165,8 +173,6 @@ func (m *mcm) Start(ctx context.Context) error {
 	var (
 		management *config.ManagementContext
 	)
-
-	defer m.started()
 
 	if dm := os.Getenv("CATTLE_DEV_MODE"); dm == "" {
 		if err := jailer.CreateJail("driver-jail"); err != nil {
@@ -184,20 +190,16 @@ func (m *mcm) Start(ctx context.Context) error {
 				err error
 			)
 
-			if m.ScaledContext.PeerManager != nil {
-				m.ScaledContext.PeerManager.Leader()
-			}
-
 			management, err = m.ScaledContext.NewManagementContext()
 			if err != nil {
 				return errors.Wrap(err, "failed to create management context")
 			}
 
-			if err := managementdata.Add(m.wranglerContext, management); err != nil {
+			if err := managementdata.Add(ctx, m.wranglerContext, management); err != nil {
 				return errors.Wrap(err, "failed to add management data")
 			}
 
-			managementController.Register(ctx, management, m.ScaledContext.ClientGetter.(*clustermanager.Manager))
+			managementController.Register(ctx, management, m.ScaledContext.ClientGetter.(*clustermanager.Manager), m.wranglerContext)
 			if err := managementController.RegisterWrangler(ctx, m.wranglerContext, management, m.ScaledContext.ClientGetter.(*clustermanager.Manager)); err != nil {
 				return errors.Wrap(err, "failed to register wrangler controllers")
 			}
@@ -214,7 +216,9 @@ func (m *mcm) Start(ctx context.Context) error {
 		tokens.StartPurgeDaemon(ctx, management)
 		providerrefresh.StartRefreshDaemon(ctx, m.ScaledContext, management)
 		managementdata.CleanupOrphanedSystemUsers(ctx, management)
-		eksupstreamrefresh.StartEKSUpstreamCronJob(m.wranglerContext)
+		clusterupstreamrefresher.MigrateEksRefreshCronSetting(m.wranglerContext)
+		go managementdata.CleanupDuplicateBindings(m.ScaledContext, m.wranglerContext)
+		go managementdata.CleanupOrphanBindings(m.ScaledContext, m.wranglerContext)
 		logrus.Infof("Rancher startup complete")
 		return nil
 	})

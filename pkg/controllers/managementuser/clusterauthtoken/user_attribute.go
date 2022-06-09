@@ -15,6 +15,7 @@ type userAttributeCompare struct {
 	lastRefresh  string
 	needsRefresh bool
 	enabled      bool
+	extra        map[string]map[string][]string
 }
 
 type userAttributeHandler struct {
@@ -42,6 +43,7 @@ func (h *userAttributeHandler) Sync(key string, userAttribute *managementv3.User
 	}
 	clusterUserAttribute = clusterUserAttribute.DeepCopy()
 	clusterUserAttribute.Groups = groups
+	clusterUserAttribute.ExtraByProvider = userAttribute.ExtraByProvider
 	clusterUserAttribute.LastRefresh = userAttribute.LastRefresh
 	clusterUserAttribute.NeedsRefresh = userAttribute.NeedsRefresh
 
@@ -62,11 +64,13 @@ func compareUserAttributeClusterUserAttribute(userAttribute managementv3.UserAtt
 		groups:       groups,
 		lastRefresh:  userAttribute.LastRefresh,
 		needsRefresh: userAttribute.NeedsRefresh,
+		extra:        userAttribute.ExtraByProvider,
 	}
 	old := userAttributeCompare{
 		groups:       clusterUserAttribute.Groups,
 		lastRefresh:  clusterUserAttribute.LastRefresh,
 		needsRefresh: clusterUserAttribute.NeedsRefresh,
+		extra:        clusterUserAttribute.ExtraByProvider,
 	}
 	return groups, reflect.DeepEqual(current, old)
 }

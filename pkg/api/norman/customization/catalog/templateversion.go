@@ -14,10 +14,11 @@ import (
 	"github.com/rancher/norman/api/access"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
-	helmlib "github.com/rancher/rancher/pkg/catalog/helm"
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
-	"github.com/rancher/rancher/pkg/controllers/managementuser/helm/common"
+	"github.com/rancher/rancher/pkg/controllers/managementuserlegacy/helm/common"
+	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	helmlib "github.com/rancher/rancher/pkg/helm"
 	managementschema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v2"
@@ -27,6 +28,7 @@ type TemplateVerionFormatterWrapper struct {
 	CatalogLister        v3.CatalogLister
 	ClusterCatalogLister v3.ClusterCatalogLister
 	ProjectCatalogLister v3.ProjectCatalogLister
+	SecretLister         v1.SecretLister
 }
 
 var supportedFiles = []string{"catalog.yml", "catalog.yaml", "questions.yml", "questions.yaml"}
@@ -146,7 +148,7 @@ func (t TemplateVerionFormatterWrapper) loadChart(templateVersion *client.Catalo
 		return nil, err
 	}
 
-	helm, err := helmlib.New(catalog)
+	helm, err := helmlib.New(catalog, t.SecretLister)
 	if err != nil {
 		return nil, err
 	}

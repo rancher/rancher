@@ -12,6 +12,7 @@ import (
 
 	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/pkg/rkecerts"
+	"github.com/sirupsen/logrus"
 )
 
 func ExecutePlan(ctx context.Context, nodeConfig *NodeConfig, writeCertOnly bool) error {
@@ -29,9 +30,11 @@ func ExecutePlan(ctx context.Context, nodeConfig *NodeConfig, writeCertOnly bool
 
 	f := fileWriter{}
 	for _, file := range nodeConfig.Files {
+		logrus.Debugf("writing file %s", file.Name)
 		f.write(file.Name, file.Contents)
 	}
 	if writeCertOnly {
+		logrus.Debug("writing certificates only, no need to continue executing plan")
 		return nil
 	}
 

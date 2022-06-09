@@ -11,7 +11,8 @@ func Register(ctx context.Context, wrangler *wrangler.Context) {
 		wrangler.Apply,
 		wrangler.Core.Secret().Cache(),
 		wrangler.Catalog.ClusterRepo(),
-		wrangler.Core.ConfigMap())
+		wrangler.Core.ConfigMap(),
+		wrangler.Core.ConfigMap().Cache())
 	RegisterApps(ctx,
 		wrangler.Apply,
 		wrangler.ControllerFactory.SharedCacheFactory().SharedClientFactory(),
