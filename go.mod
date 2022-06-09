@@ -13,7 +13,7 @@ replace (
 	github.com/rancher/norman => github.com/cmurphy/norman v0.0.0-20220607034221-57ba232d48d4
 	github.com/rancher/rancher/pkg/apis => ./pkg/apis
 	github.com/rancher/rancher/pkg/client => ./pkg/client
-	github.com/rancher/steve => github.com/cmurphy/steve v0.0.0-20220520222108-78aeca15ab90
+	github.com/rancher/steve => github.com/cmurphy/steve v0.0.0-20220610001841-b0067c4241d0
 	helm.sh/helm/v3 => github.com/rancher/helm/v3 v3.8.0-rancher1
 	k8s.io/api => k8s.io/api v0.23.3
 	k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.23.3

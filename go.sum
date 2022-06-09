@@ -278,8 +278,8 @@ github.com/client9/misspell v0.3.4/go.mod h1:qj6jICC3Q7zFZvVWo7KLAzC3yx5G7kyvSDk
 github.com/clusterhq/flocker-go v0.0.0-20160920122132-2b8b7259d313/go.mod h1:P1wt9Z3DP8O6W3rvwCt0REIlshg1InHImaLW0t3ObY0=
 github.com/cmurphy/norman v0.0.0-20220607034221-57ba232d48d4 h1:Um5v0OB9BjWAF/yPmu4xbRydbHWHR07uEww24yxmHks=
 github.com/cmurphy/norman v0.0.0-20220607034221-57ba232d48d4/go.mod h1:1G96Zmvnx1FSzCwr/9I6weg/247dH5mDyT2ng/cR7ug=
-github.com/cmurphy/steve v0.0.0-20220520222108-78aeca15ab90 h1:ivo7hP3HqINE64iCkHXJ6ydNnwBRGaJN+A2BjTNqrtw=
-github.com/cmurphy/steve v0.0.0-20220520222108-78aeca15ab90/go.mod h1:C5mNeTSJN1wOfcZ83JkJGgsNu3Lbwl7uiZBu8/IseWc=
+github.com/cmurphy/steve v0.0.0-20220610001841-b0067c4241d0 h1:E6yMZQHMElSQPGgNj7NHDAoQsmDe+TQdJZaBpjsKr6w=
+github.com/cmurphy/steve v0.0.0-20220610001841-b0067c4241d0/go.mod h1:C5mNeTSJN1wOfcZ83JkJGgsNu3Lbwl7uiZBu8/IseWc=
 github.com/cncf/udpa/go v0.0.0-20191209042840-269d4d468f6f/go.mod h1:M8M6+tZqaGXZJjfX53e64911xZQV5JYwmTeXPW+k8Sc=
 github.com/cncf/udpa/go v0.0.0-20200629203442-efcf912fb354/go.mod h1:WmhPx2Nbnhtbo57+VJT5O0JRkEi1Wbu0z5j0R8u5Hbk=
 github.com/cncf/udpa/go v0.0.0-20201120205902-5459f2c99403/go.mod h1:WmhPx2Nbnhtbo57+VJT5O0JRkEi1Wbu0z5j0R8u5Hbk=
