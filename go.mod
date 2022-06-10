@@ -18,7 +18,7 @@ replace (
 	k8s.io/apimachinery => k8s.io/apimachinery v0.23.3
 	k8s.io/apiserver => k8s.io/apiserver v0.23.3
 	k8s.io/cli-runtime => k8s.io/cli-runtime v0.23.3
-	k8s.io/client-go => github.com/rancher/client-go v1.23.3-rancher2
+	k8s.io/client-go => github.com/rmweir/client-go v0.0.0-20220609234546-88c862a4547e
 	k8s.io/cloud-provider => k8s.io/cloud-provider v0.23.3
 	k8s.io/cluster-bootstrap => k8s.io/cluster-bootstrap v0.23.3
 	k8s.io/code-generator => k8s.io/code-generator v0.23.3
@@ -134,9 +134,9 @@ require (
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
 	gopkg.in/yaml.v2 v2.4.0
 	helm.sh/helm/v3 v3.8.0
-	k8s.io/api v0.23.3
+	k8s.io/api v0.23.7
 	k8s.io/apiextensions-apiserver v0.23.1
-	k8s.io/apimachinery v0.23.3
+	k8s.io/apimachinery v0.23.7
 	k8s.io/apiserver v0.23.3
 	k8s.io/cli-runtime v0.23.3
 	k8s.io/client-go v12.0.0+incompatible

@@ -2,7 +2,7 @@ module github.com/rancher/rancher/pkg/apis
 
 go 1.17
 
-replace k8s.io/client-go => k8s.io/client-go v0.23.3
+replace k8s.io/client-go => github.com/rmweir/client-go v0.0.0-20220609234546-88c862a4547e
 
 require (
 	github.com/pkg/errors v0.9.1
@@ -14,8 +14,8 @@ require (
 	github.com/rancher/rke v1.3.8
 	github.com/rancher/wrangler v0.8.11-0.20220217210408-3ecd23dfea3b
 	github.com/sirupsen/logrus v1.8.1
-	k8s.io/api v0.23.3
-	k8s.io/apimachinery v0.23.3
+	k8s.io/api v0.23.7
+	k8s.io/apimachinery v0.23.7
 	sigs.k8s.io/cluster-api v1.1.2
 )
 
