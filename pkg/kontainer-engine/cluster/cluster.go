@@ -337,10 +337,6 @@ func (c *Cluster) GetDriverUpdateOptions(ctx context.Context) (*types.DriverFlag
 	return c.Driver.GetDriverUpdateOptions(ctx)
 }
 
-func (c *Cluster) getState() (string, error) {
-	return c.PersistStore.GetStatus(c.Name)
-}
-
 // Store persists cluster information
 func (c *Cluster) Store() error {
 	return c.PersistStore.Store(*c)
