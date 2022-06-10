@@ -13,10 +13,12 @@ type Client struct {
 	ts *session.Session
 }
 
-// Cluster is a struct that embedds ClusterInterface and has session.Session as an attribute to keep track of the resources created by ClusterInterface
-type Cluster struct {
+// Clusters is a struct that embedds the RESTClient and has session.Session and the namespace as an attribute to keep track of the resources created by the RESTClient
+type Clusters struct {
 	provisionClientV1.ClusterInterface
-	ts *session.Session
+	client rest.Interface
+	ts     *session.Session
+	ns     string
 }
 
 // NewForConfig creates a new ProvisioningV1Client for the given config. It also takes session.Session as parameter to track the resources
@@ -31,6 +33,6 @@ func NewForConfig(c *rest.Config, ts *session.Session) (*Client, error) {
 }
 
 // Clusters takes a namespace a returns a Cluster object that is used for the CRUD of a pkg/apis/provisioning.cattle.io/v1 Cluster
-func (p *Client) Clusters(namespace string) *Cluster {
-	return &Cluster{p.ProvisioningV1Interface.Clusters(namespace), p.ts}
+func (p *Client) Clusters(namespace string) *Clusters {
+	return &Clusters{p.ProvisioningV1Interface.Clusters(namespace), p.RESTClient(), p.ts, namespace}
 }
