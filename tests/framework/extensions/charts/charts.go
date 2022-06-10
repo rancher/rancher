@@ -160,6 +160,45 @@ func WatchAndWaitDeployments(client *rancher.Client, clusterID, namespace string
 	return nil
 }
 
+// WatchAndWaitDeploymentForAnnotation is a helper function that watches the deployment
+// in a specific namespace and waits until expected annotation key and its value.
+func WatchAndWaitDeploymentForAnnotation(client *rancher.Client, clusterID, namespace, deploymentName, annotationKey, annotationValue string) error {
+	adminClient, err := rancher.NewClient(client.RancherConfig.AdminToken, client.Session)
+	if err != nil {
+		return err
+	}
+	adminDynamicClient, err := adminClient.GetDownStreamClusterClient(clusterID)
+	if err != nil {
+		return err
+	}
+	adminDeploymentResource := adminDynamicClient.Resource(deployments.DeploymentGroupVersionResource).Namespace(namespace)
+
+	watchAppInterface, err := adminDeploymentResource.Watch(context.TODO(), metav1.ListOptions{
+		FieldSelector:  "metadata.name=" + deploymentName,
+		TimeoutSeconds: &defaults.WatchTimeoutSeconds,
+	})
+	if err != nil {
+		return err
+	}
+
+	wait.WatchWait(watchAppInterface, func(event watch.Event) (ready bool, err error) {
+		deploymentsUnstructured := event.Object.(*unstructured.Unstructured)
+		deployment := &appv1.Deployment{}
+
+		err = scheme.Scheme.Convert(deploymentsUnstructured, deployment, deploymentsUnstructured.GroupVersionKind())
+		if err != nil {
+			return false, err
+		}
+
+		if deployment.ObjectMeta.Annotations[annotationKey] == annotationValue {
+			return true, nil
+		}
+		return false, nil
+	})
+
+	return nil
+}
+
 // WatchAndWaitDaemonSets is a helper function that watches the DaemonSets
 // sequentially in a specific namespace and waits until number of available DeamonSets is equal to number of desired scheduled Daemonsets.
 func WatchAndWaitDaemonSets(client *rancher.Client, clusterID, namespace string, listOptions metav1.ListOptions) error {
@@ -209,6 +248,64 @@ func WatchAndWaitDaemonSets(client *rancher.Client, clusterID, namespace string,
 			}
 
 			if daemonset.Status.DesiredNumberScheduled == daemonset.Status.NumberAvailable {
+				return true, nil
+			}
+			return false, nil
+		})
+	}
+
+	return nil
+}
+
+// WatchAndWaitStatefulSets is a helper function that watches the StatefulSets
+// sequentially in a specific namespace and waits until number of expected replicas is equal to number of ready replicas.
+func WatchAndWaitStatefulSets(client *rancher.Client, clusterID, namespace string, listOptions metav1.ListOptions) error {
+	adminClient, err := rancher.NewClient(client.RancherConfig.AdminToken, client.Session)
+	if err != nil {
+		return err
+	}
+	adminDynamicClient, err := adminClient.GetDownStreamClusterClient(clusterID)
+	if err != nil {
+		return err
+	}
+	adminStatefulSetResource := adminDynamicClient.Resource(appv1.SchemeGroupVersion.WithResource("statefulsets")).Namespace(namespace)
+
+	statefulSets, err := adminStatefulSetResource.List(context.TODO(), listOptions)
+	if err != nil {
+		return err
+	}
+
+	var statefulSetList []appv1.StatefulSet
+
+	for _, unstructuredStatefulSet := range statefulSets.Items {
+		newStatefulSet := &appv1.StatefulSet{}
+		err := scheme.Scheme.Convert(&unstructuredStatefulSet, newStatefulSet, unstructuredStatefulSet.GroupVersionKind())
+		if err != nil {
+			return err
+		}
+
+		statefulSetList = append(statefulSetList, *newStatefulSet)
+	}
+
+	for _, statefulSet := range statefulSetList {
+		watchAppInterface, err := adminStatefulSetResource.Watch(context.TODO(), metav1.ListOptions{
+			FieldSelector:  "metadata.name=" + statefulSet.Name,
+			TimeoutSeconds: &defaults.WatchTimeoutSeconds,
+		})
+		if err != nil {
+			return err
+		}
+
+		wait.WatchWait(watchAppInterface, func(event watch.Event) (ready bool, err error) {
+			statefulSetsUnstructured := event.Object.(*unstructured.Unstructured)
+			statefulSet := &appv1.StatefulSet{}
+
+			err = scheme.Scheme.Convert(statefulSetsUnstructured, statefulSet, statefulSetsUnstructured.GroupVersionKind())
+			if err != nil {
+				return false, err
+			}
+
+			if *statefulSet.Spec.Replicas == statefulSet.Status.ReadyReplicas {
 				return true, nil
 			}
 			return false, nil
