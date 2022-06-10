@@ -37,9 +37,6 @@ import (
 const (
 	aksAPIGroup         = "aks.cattle.io"
 	aksV1               = "aks.cattle.io/v1"
-	aksOperatorTemplate = "system-library-rancher-aks-operator"
-	aksOperator         = "rancher-aks-operator"
-	aksShortName        = "AKS"
 	enqueueTime         = time.Second * 5
 )
 
@@ -95,7 +92,7 @@ func (e *aksOperatorController) onClusterChange(key string, cluster *mgmtv3.Clus
 		return cluster, err
 	}
 
-	// get aks Cluster Config, if it does not exist, create it
+	// Get the AKSClusterConfig. If it does not exist, create it.
 	aksClusterConfigDynamic, err := e.DynamicClient.Namespace(namespace.GlobalNamespace).Get(context.TODO(), cluster.Name, v1.GetOptions{})
 	if err != nil {
 		if !errors.IsNotFound(err) {
@@ -123,13 +120,13 @@ func (e *aksOperatorController) onClusterChange(key string, cluster *mgmtv3.Clus
 		return cluster, err
 	}
 
-	// check for changes between aks spec on cluster and the aks spec on the aksClusterConfig object
+	// Check for changes between the spec on the cluster and the spec on the AKSClusterConfig object
 	if !reflect.DeepEqual(aksClusterConfigMap, aksClusterConfigDynamic.Object["spec"]) {
 		logrus.Infof("change detected for cluster [%s], updating AKSClusterConfig", cluster.Name)
 		return e.updateAKSClusterConfig(cluster, aksClusterConfigDynamic, aksClusterConfigMap)
 	}
 
-	// get aks Cluster Config's phase
+	// Get the AKSClusterConfig's phase
 	status, _ := aksClusterConfigDynamic.Object["status"].(map[string]interface{})
 	phase, _ := status["phase"]
 	failureMessage, _ := status["failureMessage"].(string)
@@ -148,10 +145,17 @@ func (e *aksOperatorController) onClusterChange(key string, cluster *mgmtv3.Clus
 		logrus.Infof("waiting for cluster AKS [%s] create failure to be resolved", cluster.Name)
 		return e.SetFalse(cluster, apimgmtv3.ClusterConditionProvisioned, failureMessage)
 	case "active":
+		// If an imported cluster, set the upstream spec and update the AKSClusterConfig object with fields from the
+		// cluster state. This will prevent configuration in Azure from getting overwritten in later updates. Non
+		// imported clusters will already have upstream spec set.
 		if cluster.Spec.AKSConfig.Imported {
 			if cluster.Status.AKSStatus.UpstreamSpec == nil {
-				// non imported clusters will have already had upstream spec set
 				return e.setInitialUpstreamSpec(cluster)
+			}
+			if !reflect.DeepEqual(cluster.Status.AKSStatus.UpstreamSpec, &cluster.Spec.AKSConfig) {
+				logrus.Infof("found imported cluster [%s], copying upstream state to AKSConfig", cluster.Name)
+				cluster = cluster.DeepCopy()
+				cluster.Spec.AKSConfig = cluster.Status.AKSStatus.UpstreamSpec
 			}
 
 			if apimgmtv3.ClusterConditionPending.IsUnknown(cluster) {
@@ -181,9 +185,9 @@ func (e *aksOperatorController) onClusterChange(key string, cluster *mgmtv3.Clus
 
 		if cluster.Status.AKSStatus.PrivateRequiresTunnel == nil &&
 			to.Bool(cluster.Status.AKSStatus.UpstreamSpec.PrivateCluster) {
-			// In this case, the API endpoint is private and it has not been determined if Rancher must tunnel to communicate with it.
-			// Check to see if we can still use the control plane endpoint even though
-			// the cluster has private-only access
+			// In this case, the API endpoint is private, and it has not been determined if Rancher must tunnel to communicate
+			// with it. Check to see if we can still use the control plane endpoint even though the cluster has
+			// private-only access.
 			serviceToken, mustTunnel, err := e.generateSATokenWithPublicAPI(cluster)
 			if err != nil {
 				return cluster, err
@@ -264,6 +268,8 @@ func (e *aksOperatorController) onClusterChange(key string, cluster *mgmtv3.Clus
 	}
 }
 
+// setInitialUpstreamSpec builds an initial upstream spec with the cluster state and sets that upstream spec on the
+// cluster AKSStatus.
 func (e *aksOperatorController) setInitialUpstreamSpec(cluster *mgmtv3.Cluster) (*mgmtv3.Cluster, error) {
 	logrus.Infof("setting initial upstreamSpec on cluster [%s]", cluster.Name)
 	upstreamSpec, err := clusterupstreamrefresher.BuildAKSUpstreamSpec(e.SecretsCache, e.secretClient, cluster)
@@ -275,7 +281,7 @@ func (e *aksOperatorController) setInitialUpstreamSpec(cluster *mgmtv3.Cluster) 
 	return e.ClusterClient.Update(cluster)
 }
 
-// updateAKSClusterConfig updates the AKSClusterConfig object's spec with the cluster's AKSConfig if they are not equal..
+// updateAKSClusterConfig updates the AKSClusterConfig object's spec with the cluster's AKSConfig if they are not equal.
 func (e *aksOperatorController) updateAKSClusterConfig(cluster *mgmtv3.Cluster, aksClusterConfigDynamic *unstructured.Unstructured, spec map[string]interface{}) (*mgmtv3.Cluster, error) {
 	list, err := e.DynamicClient.Namespace(namespace.GlobalNamespace).List(context.TODO(), v1.ListOptions{})
 	if err != nil {

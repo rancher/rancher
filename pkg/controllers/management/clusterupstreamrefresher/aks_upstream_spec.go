@@ -9,6 +9,8 @@ import (
 	wranglerv1 "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
 )
 
+// BuildAKSUpstreamSpec calls the AKS operator to build an upstream spec with all the data from the upstream cluster
+// and return it.
 func BuildAKSUpstreamSpec(secretsCache wranglerv1.SecretCache, secretClient wranglerv1.SecretClient, cluster *mgmtv3.Cluster) (*aksv1.AKSClusterConfigSpec, error) {
 	ctx := context.Background()
 	upstreamSpec, err := akscontroller.BuildUpstreamClusterState(ctx, secretsCache, secretClient, cluster.Spec.AKSConfig)
