@@ -10,16 +10,7 @@ import (
 	appv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 )
-
-// DaemonSetGroupVersionResource is the required Group Version Resource for accessing daemon sets in a cluster,
-// using the dynamic client.
-var DaemonSetGroupVersionResource = schema.GroupVersionResource{
-	Group:    "apps",
-	Version:  "v1",
-	Resource: "daemonsets",
-}
 
 // CreateDaemonSet is a helper function that uses the dynamic client to create a daemon set on a namespace for a specific cluster.
 func CreateDaemonSet(client *rancher.Client, clusterName, daemonSetName, namespace string, template corev1.PodTemplateSpec) (*appv1.DaemonSet, error) {
