@@ -269,9 +269,9 @@ func (i *IstioTestSuite) TestUpgradeIstioChart() {
 		TimeoutSeconds: &defaults.WatchTimeoutSeconds,
 	})
 	require.NoError(i.T(), err)
-	require.Equalf(i.T(), 2, len(deploymentListPreUpgrade), "Pilot & Ingressgateways deployments don't have the correct istio version labels")
+	require.Equalf(i.T(), 2, len(deploymentListPreUpgrade.Items), "Pilot & Ingressgateways deployments don't have the correct istio version labels")
 
-	for _, deployment := range deploymentListPreUpgrade {
+	for _, deployment := range deploymentListPreUpgrade.Items {
 		imageVersion := strings.Split(deployment.Spec.Template.Spec.Containers[0].Image, ":")[1]
 		i.T().Logf("Comparing image and app versions: \n container image version: %v \n istio version: %v and actual: %v\n", deployment.Spec.Template.Spec.Containers[0].Image, istioVersionPreUpgrade, imageVersion)
 		require.Equalf(i.T(), istioVersionPreUpgrade, imageVersion, "Pilot & Ingressgateways images don't use the correct istio image version")
@@ -306,9 +306,9 @@ func (i *IstioTestSuite) TestUpgradeIstioChart() {
 		TimeoutSeconds: &defaults.WatchTimeoutSeconds,
 	})
 	require.NoError(i.T(), err)
-	require.Equalf(i.T(), 2, len(deploymentListPostUpgrade), "Pilot & Ingressgateways deployments don't have the correct istio version labels")
+	require.Equalf(i.T(), 2, len(deploymentListPostUpgrade.Items), "Pilot & Ingressgateways deployments don't have the correct istio version labels")
 
-	for _, deployment := range deploymentListPostUpgrade {
+	for _, deployment := range deploymentListPostUpgrade.Items {
 		imageVersion := strings.Split(deployment.Spec.Template.Spec.Containers[0].Image, ":")[1]
 		i.T().Logf("Comparing image and app versions: \n container image: %v \n istio version: %v and actual: %v\n", deployment.Spec.Template.Spec.Containers[0].Image, istioVersionPostUpgrade, imageVersion)
 		require.Equalf(i.T(), istioVersionPostUpgrade, imageVersion, "Pilot & Ingressgateways images don't use the correct istio image version")

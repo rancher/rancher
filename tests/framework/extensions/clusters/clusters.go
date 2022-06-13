@@ -35,6 +35,22 @@ func GetClusterIDByName(client *rancher.Client, clusterName string) (string, err
 	return "", nil
 }
 
+// GetClusterNameByID is a helper function that returns the cluster ID by name
+func GetClusterNameByID(client *rancher.Client, clusterID string) (string, error) {
+	clusterList, err := client.Management.Cluster.List(&types.ListOpts{})
+	if err != nil {
+		return "", err
+	}
+
+	for _, cluster := range clusterList.Data {
+		if cluster.ID == clusterID {
+			return cluster.Name, nil
+		}
+	}
+
+	return "", nil
+}
+
 // IsProvisioningClusterReady is basic check function that would be used for the wait.WatchWait func in pkg/wait.
 // This functions just waits until a cluster becomes ready.
 func IsProvisioningClusterReady(event watch.Event) (ready bool, err error) {
