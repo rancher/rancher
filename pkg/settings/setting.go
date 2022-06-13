@@ -1,3 +1,4 @@
+// Package settings is used to access various server settings
 package settings
 
 import (
@@ -27,7 +28,6 @@ var (
 	AgentRolloutTimeout                 = NewSetting("agent-rollout-timeout", "300s")
 	AgentRolloutWait                    = NewSetting("agent-rollout-wait", "true")
 	AuthImage                           = NewSetting("auth-image", v32.ToolsSystemImages.AuthSystemImages.KubeAPIAuth)
-	AuthTokenMaxTTLMinutes              = NewSetting("auth-token-max-ttl-minutes", "0") // never expire
 	AuthorizationCacheTTLSeconds        = NewSetting("authorization-cache-ttl-seconds", "10")
 	AuthorizationDenyCacheTTLSeconds    = NewSetting("authorization-deny-cache-ttl-seconds", "10")
 	AzureGroupCacheSize                 = NewSetting("azure-group-cache-size", "10000")
@@ -51,8 +51,6 @@ var (
 	InternalCACerts                     = NewSetting("internal-cacerts", "")
 	IsRKE                               = NewSetting("is-rke", "")
 	JailerTimeout                       = NewSetting("jailer-timeout", "60")
-	KubeconfigGenerateToken             = NewSetting("kubeconfig-generate-token", "true")
-	KubeconfigTokenTTLMinutes           = NewSetting("kubeconfig-token-ttl-minutes", "960") // 16 hours
 	KubernetesVersion                   = NewSetting("k8s-version", "")
 	KubernetesVersionToServiceOptions   = NewSetting("k8s-version-to-service-options", "")
 	KubernetesVersionToSystemImages     = NewSetting("k8s-version-to-images", "")
@@ -102,10 +100,8 @@ var (
 	WhitelistDomain                     = NewSetting("whitelist-domain", "forums.rancher.com")
 	WhitelistEnvironmentVars            = NewSetting("whitelist-envvars", "HTTP_PROXY,HTTPS_PROXY,NO_PROXY")
 	AuthUserInfoResyncCron              = NewSetting("auth-user-info-resync-cron", "0 0 * * *")
-	AuthUserSessionTTLMinutes           = NewSetting("auth-user-session-ttl-minutes", "960")   // 16 hours
-	AuthUserInfoMaxAgeSeconds           = NewSetting("auth-user-info-max-age-seconds", "3600") // 1 hour
-	APIUIVersion                        = NewSetting("api-ui-version", "1.1.6")                // Please update the CATTLE_API_UI_VERSION in package/Dockerfile when updating the version here.
-	RotateCertsIfExpiringInDays         = NewSetting("rotate-certs-if-expiring-in-days", "7")  // 7 days
+	APIUIVersion                        = NewSetting("api-ui-version", "1.1.6")               // Please update the CATTLE_API_UI_VERSION in package/Dockerfile when updating the version here.
+	RotateCertsIfExpiringInDays         = NewSetting("rotate-certs-if-expiring-in-days", "7") // 7 days
 	ClusterTemplateEnforcement          = NewSetting("cluster-template-enforcement", "false")
 	InitialDockerRootDir                = NewSetting("initial-docker-root-dir", "/var/lib/docker")
 	SystemCatalog                       = NewSetting("system-catalog", "external") // Options are 'external' or 'bundled'
@@ -130,12 +126,37 @@ var (
 
 	Rke2DefaultVersion = NewSetting("rke2-default-version", "")
 	K3sDefaultVersion  = NewSetting("k3s-default-version", "")
+
+	// AuthTokenMaxTTLMinutes is the max allowable time to live for tokens. Excluding those created for UI sessions which is controlled by AuthUserSessionTTLMinutes.
+	AuthTokenMaxTTLMinutes = NewSetting("auth-token-max-ttl-minutes", "0") // never expire
+
+	// AuthUserInfoMaxAgeSeconds represents the maximum age of a users auth tokens before an auth provider group membership sync will be performed.
+	AuthUserInfoMaxAgeSeconds = NewSetting("auth-user-info-max-age-seconds", "3600") // 1 hour
+
+	// AuthUserSessionTTLMinutes represents the time to live for tokens used for login sessions in minutes.
+	AuthUserSessionTTLMinutes = NewSetting("auth-user-session-ttl-minutes", "960") // 16 hours
+
+	// KubeconfigDefaultTokenTTLMinutes is the default time to live applied to kubeconfigs created for users.
+	// This setting will take effect regardless of the kubeconfig-generate-token status.
+	KubeconfigDefaultTokenTTLMinutes = NewSetting("kubeconfig-default-ttl-minutes", "0") // 0 TTL = never expire
+
+	// KubeconfigGenerateToken determines whether the UI will return a generate token with kubeconfigs.
+	// If set to false the kubeconfig will contain a command to login to Rancher.
+	KubeconfigGenerateToken = NewSetting("kubeconfig-generate-token", "true")
+
+	// Deprecated: On removal use kubeconfig-default-ttl-minutes for all kubeconfigs.
+	// KubeconfigTokenTTLMinutes currently is used to set the TTL for kubeconfigs created through the CLI.
+	// This can be done with the token command or via kubectl when kubeconfig-generate-token is false.
+	// This TTL is used regardless of the value of kubeconfig-default-ttl-minutes.
+	KubeconfigTokenTTLMinutes = NewSetting("kubeconfig-token-ttl-minutes", "960") // 16 hours
 )
 
+// FullShellImage returns the full private registry name of the rancher shell image.
 func FullShellImage() string {
 	return PrefixPrivateRegistry(ShellImage.Get())
 }
 
+// PrefixPrivateRegistry prefixes the given image name with the stored private registry path.
 func PrefixPrivateRegistry(image string) string {
 	private := SystemDefaultRegistry.Get()
 	if private == "" {
@@ -144,6 +165,7 @@ func PrefixPrivateRegistry(image string) string {
 	return private + "/" + image
 }
 
+// IsRelease returns true if the running server is a released version of rancher.
 func IsRelease() bool {
 	return !strings.Contains(ServerVersion.Get(), "head") && releasePattern.MatchString(ServerVersion.Get())
 }
@@ -172,6 +194,7 @@ func init() {
 	}
 }
 
+// Provider is an interfaced used to get and set Settings.
 type Provider interface {
 	Get(name string) string
 	Set(name, value string) error
@@ -179,12 +202,14 @@ type Provider interface {
 	SetAll(settings map[string]Setting) error
 }
 
+// Setting stores information about a specific server setting.
 type Setting struct {
 	Name     string
 	Default  string
 	ReadOnly bool
 }
 
+// SetIfUnset will store the given value of the setting if it was not already stored.
 func (s Setting) SetIfUnset(value string) error {
 	if provider == nil {
 		return s.Set(value)
@@ -192,6 +217,7 @@ func (s Setting) SetIfUnset(value string) error {
 	return provider.SetIfUnset(s.Name, value)
 }
 
+// Set will store the given value for the setting
 func (s Setting) Set(value string) error {
 	if provider == nil {
 		s, ok := settings[s.Name]
@@ -205,6 +231,7 @@ func (s Setting) Set(value string) error {
 	return nil
 }
 
+// Get will return the currently stored value of the setting.
 func (s Setting) Get() string {
 	if provider == nil {
 		s := settings[s.Name]
@@ -213,6 +240,9 @@ func (s Setting) Get() string {
 	return provider.Get(s.Name)
 }
 
+// GetInt will return the currently stored value of the setting as an integer.
+// If the stored value is not an integer then the default value will be returned as an integer.
+// If the default value is not an integer then the function will return 0
 func (s Setting) GetInt() int {
 	v := s.Get()
 	i, err := strconv.Atoi(v)
@@ -227,6 +257,7 @@ func (s Setting) GetInt() int {
 	return i
 }
 
+// SetProvider will set the given provider as the global provider for all settings
 func SetProvider(p Provider) error {
 	if err := p.SetAll(settings); err != nil {
 		return err
@@ -235,6 +266,7 @@ func SetProvider(p Provider) error {
 	return nil
 }
 
+// NewSetting will create and store a new server setting.
 func NewSetting(name, def string) Setting {
 	s := Setting{
 		Name:    name,
@@ -244,6 +276,7 @@ func NewSetting(name, def string) Setting {
 	return s
 }
 
+// GetEnvKey will return the given string formatted as a rancher environmental variable
 func GetEnvKey(key string) string {
 	return "CATTLE_" + strings.ToUpper(strings.Replace(key, "-", "_", -1))
 }
@@ -262,7 +295,7 @@ func getMetadataConfig() string {
 	return string(ans)
 }
 
-// GetSettingByID returns a setting that is stored with the given id
+// GetSettingByID returns a setting that is stored with the given id.
 func GetSettingByID(id string) string {
 	if provider == nil {
 		s := settings[id]
@@ -271,6 +304,7 @@ func GetSettingByID(id string) string {
 	return provider.Get(id)
 }
 
+// DefaultAgentSettings will return a list of default agent settings
 func DefaultAgentSettings() []Setting {
 	return []Setting{
 		ServerVersion,
@@ -279,6 +313,7 @@ func DefaultAgentSettings() []Setting {
 	}
 }
 
+// DefaultAgentSettings will return a list of default agent settings as environmental variables
 func DefaultAgentSettingsAsEnvVars() []v1.EnvVar {
 	defaultAgentSettings := DefaultAgentSettings()
 	envVars := make([]v1.EnvVar, 0, len(defaultAgentSettings))
@@ -293,6 +328,7 @@ func DefaultAgentSettingsAsEnvVars() []v1.EnvVar {
 	return envVars
 }
 
+// GetRancherVersion will return a the stored server version without the 'v' prefix.
 func GetRancherVersion() string {
 	rancherVersion := ServerVersion.Get()
 	if strings.HasPrefix(rancherVersion, "dev") || strings.HasPrefix(rancherVersion, "master") || strings.HasSuffix(rancherVersion, "-head") {

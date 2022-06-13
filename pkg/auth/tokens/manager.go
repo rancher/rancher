@@ -100,7 +100,7 @@ func (m *Manager) createDerivedToken(jsonInput clientv3.Token, tokenAuthValue st
 		return v3.Token{}, "", 401, err
 	}
 
-	tokenTTL, err := ValidateMaxTTL(time.Duration(int64(jsonInput.TTLMillis)) * time.Millisecond)
+	tokenTTL, err := ClampToMaxTTL(time.Duration(int64(jsonInput.TTLMillis)) * time.Millisecond)
 	if err != nil {
 		return v3.Token{}, "", 500, fmt.Errorf("error validating max-ttl %v", err)
 	}
@@ -801,6 +801,7 @@ func (m *Manager) TokenStreamTransformer(
 	}), nil
 }
 
+// ParseTokenTTL parses an integer representing minutes as a string and returns its duration.
 func ParseTokenTTL(ttl string) (time.Duration, error) {
 	durString := fmt.Sprintf("%vm", ttl)
 	dur, err := time.ParseDuration(durString)
@@ -810,10 +811,11 @@ func ParseTokenTTL(ttl string) (time.Duration, error) {
 	return dur, nil
 }
 
-func ValidateMaxTTL(ttl time.Duration) (time.Duration, error) {
+// ClampToMaxTTL will return the duration of the provided TTL or the duration of settings.AuthTokenMaxTTLMinutes whichever is smaller.
+func ClampToMaxTTL(ttl time.Duration) (time.Duration, error) {
 	maxTTL, err := ParseTokenTTL(settings.AuthTokenMaxTTLMinutes.Get())
 	if err != nil {
-		return 0, fmt.Errorf("error getting auth-token-max-ttl %v", err)
+		return 0, fmt.Errorf("failed to parse setting '%s': %w", settings.AuthTokenMaxTTLMinutes.Name, err)
 	}
 	if maxTTL == 0 {
 		return ttl, nil
@@ -826,4 +828,19 @@ func ValidateMaxTTL(ttl time.Duration) (time.Duration, error) {
 		return ttl, nil
 	}
 	return maxTTL, nil
+}
+
+// GetKubeconfigDefaultTokenTTLInMilliSeconds will return the default TTL for kubeconfig tokens
+func GetKubeconfigDefaultTokenTTLInMilliSeconds() (*int64, error) {
+	defaultTokenTTL, err := ParseTokenTTL(settings.KubeconfigDefaultTokenTTLMinutes.Get())
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse setting '%s': %w", settings.KubeconfigDefaultTokenTTLMinutes.Name, err)
+	}
+
+	tokenTTL, err := ClampToMaxTTL(defaultTokenTTL)
+	if err != nil {
+		return nil, fmt.Errorf("failed to validate token ttl: %w", err)
+	}
+	ttlMilli := tokenTTL.Milliseconds()
+	return &ttlMilli, nil
 }

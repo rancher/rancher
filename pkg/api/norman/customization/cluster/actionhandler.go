@@ -8,6 +8,7 @@ import (
 	gaccess "github.com/rancher/rancher/pkg/api/norman/customization/globalnamespaceaccess"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/requests"
+	"github.com/rancher/rancher/pkg/auth/tokens"
 	"github.com/rancher/rancher/pkg/catalog/manager"
 	mgmtclient "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	"github.com/rancher/rancher/pkg/clustermanager"
@@ -17,6 +18,7 @@ import (
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )
 
+// ActionHandler used for performing various cluster actions.
 type ActionHandler struct {
 	NodepoolGetter                v3.NodePoolsGetter
 	NodeLister                    v3.NodeLister
@@ -73,6 +75,7 @@ func canCreateClusterTemplate(sar v1.SubjectAccessReviewInterface, apiContext *t
 	return canCreateTemplates
 }
 
+// ClusterActionHandler runs the handler for the provided cluster action in the given context.
 func (a ActionHandler) ClusterActionHandler(actionName string, action *types.Action, apiContext *types.APIContext) error {
 	switch actionName {
 	case v32.ClusterActionGenerateKubeconfig:
@@ -132,46 +135,51 @@ func (a ActionHandler) ClusterActionHandler(actionName string, action *types.Act
 	return httperror.NewAPIError(httperror.NotFound, "not found")
 }
 
+// ensureClusterToken will create a new kubeconfig token for the user in the provided context with the default TTL.
 func (a ActionHandler) ensureClusterToken(clusterID string, apiContext *types.APIContext) (string, error) {
-	userName := a.UserMgr.GetUser(apiContext)
-	tokenNamePrefix := fmt.Sprintf("kubeconfig-%s", userName)
-	authToken, err := a.Auth.TokenFromRequest(apiContext.Request)
+	input, err := a.createTokenInput(apiContext)
 	if err != nil {
 		return "", err
 	}
-	input := user.TokenInput{
-		TokenName:     tokenNamePrefix,
-		Description:   "Kubeconfig token",
-		Kind:          "kubeconfig",
-		UserName:      userName,
-		AuthProvider:  authToken.AuthProvider,
-		TTL:           nil,
-		Randomize:     true,
-		UserPrincipal: authToken.UserPrincipal,
-	}
-	token, err := a.UserMgr.EnsureClusterToken(clusterID, input)
-	return token, err
+
+	return a.UserMgr.EnsureClusterToken(clusterID, input)
 }
 
+// ensureToken will create a new kubeconfig token for the user in the provided context with the default TTL.
 func (a ActionHandler) ensureToken(apiContext *types.APIContext) (string, error) {
-	userName := a.UserMgr.GetUser(apiContext)
-	authToken, err := a.Auth.TokenFromRequest(apiContext.Request)
+	input, err := a.createTokenInput(apiContext)
 	if err != nil {
 		return "", err
 	}
+
+	return a.UserMgr.EnsureToken(input)
+}
+
+// createTokenInput will create the input for a new kubeconfig token with the default TTL.
+func (a ActionHandler) createTokenInput(apiContext *types.APIContext) (user.TokenInput, error) {
+	userName := a.UserMgr.GetUser(apiContext)
 	tokenNamePrefix := fmt.Sprintf("kubeconfig-%s", userName)
-	input := user.TokenInput{
+
+	authToken, err := a.Auth.TokenFromRequest(apiContext.Request)
+	if err != nil {
+		return user.TokenInput{}, err
+	}
+
+	defaultTokenTTL, err := tokens.GetKubeconfigDefaultTokenTTLInMilliSeconds()
+	if err != nil {
+		return user.TokenInput{}, fmt.Errorf("failed to get default token TTL: %w", err)
+	}
+
+	return user.TokenInput{
 		TokenName:     tokenNamePrefix,
 		Description:   "Kubeconfig token",
 		Kind:          "kubeconfig",
 		UserName:      userName,
 		AuthProvider:  authToken.AuthProvider,
-		TTL:           nil,
+		TTL:           defaultTokenTTL,
 		Randomize:     true,
 		UserPrincipal: authToken.UserPrincipal,
-	}
-	token, err := a.UserMgr.EnsureToken(input)
-	return token, err
+	}, nil
 }
 
 func (a ActionHandler) generateKubeConfig(apiContext *types.APIContext, cluster *mgmtclient.Cluster) (*clientcmdapi.Config, error) {

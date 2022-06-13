@@ -8,6 +8,7 @@ import (
 
 	"github.com/rancher/apiserver/pkg/types"
 	"github.com/rancher/rancher/pkg/auth/requests"
+	"github.com/rancher/rancher/pkg/auth/tokens"
 	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/kubeconfig"
 	"github.com/rancher/rancher/pkg/settings"
@@ -74,11 +75,16 @@ func (k kubeconfigDownload) ServeHTTP(rw http.ResponseWriter, req *http.Request)
 }
 
 func (k kubeconfigDownload) ensureToken(userName string, req *http.Request) (string, error) {
+	defaultTokenTTL, err := tokens.GetKubeconfigDefaultTokenTTLInMilliSeconds()
+	if err != nil {
+		return "", fmt.Errorf("failed to get default token TTL: %w", err)
+	}
 
 	authToken, err := k.auth.TokenFromRequest(req)
 	if err != nil {
 		return "", err
 	}
+
 	tokenNamePrefix := fmt.Sprintf("kubeconfig-%s", userName)
 	input := user.TokenInput{
 		TokenName:     tokenNamePrefix,
@@ -86,10 +92,10 @@ func (k kubeconfigDownload) ensureToken(userName string, req *http.Request) (str
 		Kind:          "kubeconfig",
 		UserName:      userName,
 		AuthProvider:  authToken.AuthProvider,
-		TTL:           nil,
+		TTL:           defaultTokenTTL,
 		Randomize:     true,
 		UserPrincipal: authToken.UserPrincipal,
 	}
-	token, err := k.userMgr.EnsureToken(input)
-	return token, err
+
+	return k.userMgr.EnsureToken(input)
 }
