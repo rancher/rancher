@@ -42,7 +42,7 @@ RKE1 specifically needs a node template config to run properly. These are the in
     "retries": "5",
     "rootSize": "16",
     "secretKey": "",
-    "securityGroup": "open-all",
+    "securityGroup": ["open-all"],
     "securityGroupReadonly": false,
     "sessionToken": "",
     "spotPrice": "0.50",

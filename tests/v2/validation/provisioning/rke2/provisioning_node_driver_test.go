@@ -245,6 +245,6 @@ func (r *RKE2NodeDriverProvisioningTestSuite) TestProvisioningDynamicInput() {
 
 // In order for 'go test' to run this suite, we need to create
 // a normal test function and pass our suite to suite.Run
-func TestProvisioningTestSuite(t *testing.T) {
+func TestRKE2ProvisioningTestSuite(t *testing.T) {
 	suite.Run(t, new(RKE2NodeDriverProvisioningTestSuite))
 }
