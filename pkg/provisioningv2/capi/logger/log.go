@@ -28,11 +28,11 @@ func (l *Logger) Enabled(level int) bool {
 }
 
 func (l *Logger) Info(level int, msg string, keysAndValues ...interface{}) {
-	l.withValues(keysAndValues...).Debug(msg)
+	l.withValues(keysAndValues...).Debug("[CAPI] " + msg)
 }
 
 func (l *Logger) Error(err error, msg string, keysAndValues ...interface{}) {
-	l.withValues(keysAndValues...).Errorf("%s: %v", msg, err)
+	l.withValues(keysAndValues...).Errorf("[CAPI] %s: %v", msg, err)
 }
 
 func (l *Logger) WithValues(keysAndValues ...interface{}) logr.LogSink {
