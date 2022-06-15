@@ -35,9 +35,9 @@ import (
 )
 
 const (
-	aksAPIGroup         = "aks.cattle.io"
-	aksV1               = "aks.cattle.io/v1"
-	enqueueTime         = time.Second * 5
+	aksAPIGroup = "aks.cattle.io"
+	aksV1       = "aks.cattle.io/v1"
+	enqueueTime = time.Second * 5
 )
 
 type aksOperatorController struct {
