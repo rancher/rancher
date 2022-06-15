@@ -16,10 +16,13 @@ import (
 	"github.com/rancher/rancher/pkg/channelserver"
 	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta1"
 	rkecontroller "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
+	"github.com/rancher/rancher/pkg/serviceaccounttoken"
 	"github.com/rancher/wrangler/pkg/condition"
+	corecontrollers "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/pkg/generic"
 	"github.com/rancher/wrangler/pkg/name"
 	corev1 "k8s.io/api/core/v1"
+	apierror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
@@ -196,22 +199,37 @@ func IsOwnedByMachine(bootstrapCache rkecontroller.RKEBootstrapCache, machineNam
 }
 
 // GetServiceAccountSecretNames will return the plan secret name and service account token names
-func GetServiceAccountSecretNames(bootstrapCache rkecontroller.RKEBootstrapCache, machineName string, planSA *corev1.ServiceAccount) (string, string, error) {
+func GetServiceAccountSecretNames(bootstrapCache rkecontroller.RKEBootstrapCache, secretClient corecontrollers.SecretController, machineName string, planSA *corev1.ServiceAccount) (string, string, error) {
 	if planSA.Labels[MachineNameLabel] != machineName ||
 		planSA.Labels[RoleLabel] != RolePlan ||
 		planSA.Labels[PlanSecret] == "" {
 		return "", "", nil
 	}
 
-	if len(planSA.Secrets) == 0 {
-		return "", "", nil
+	sName := planSA.Name + "-token"
+	secret, err := secretClient.Cache().Get(planSA.Namespace, sName)
+	if err != nil {
+		if !apierror.IsNotFound(err) {
+			return "", "", err
+		}
+		sc := serviceaccounttoken.SecretTemplate(planSA)
+		secret, err = secretClient.Create(sc)
+		if err != nil {
+			if !apierror.IsAlreadyExists(err) {
+				return "", "", err
+			}
+			secret, err = secretClient.Cache().Get(planSA.Namespace, sName)
+			if err != nil {
+				return "", "", err
+			}
+		}
 	}
 
 	if foundParent, err := IsOwnedByMachine(bootstrapCache, machineName, planSA); err != nil || !foundParent {
 		return "", "", err
 	}
 
-	return planSA.Labels[PlanSecret], planSA.Secrets[0].Name, nil
+	return planSA.Labels[PlanSecret], secret.Name, nil
 }
 
 func PlanSecretFromBootstrapName(bootstrapName string) string {
