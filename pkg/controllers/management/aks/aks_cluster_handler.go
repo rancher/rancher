@@ -152,8 +152,8 @@ func (e *aksOperatorController) onClusterChange(key string, cluster *mgmtv3.Clus
 			if cluster.Status.AKSStatus.UpstreamSpec == nil {
 				return e.setInitialUpstreamSpec(cluster)
 			}
-			if !reflect.DeepEqual(cluster.Status.AKSStatus.UpstreamSpec, &cluster.Spec.AKSConfig) {
-				logrus.Infof("found imported cluster [%s], copying upstream state to AKSConfig", cluster.Name)
+			if !reflect.DeepEqual(cluster.Status.AKSStatus.UpstreamSpec, cluster.Spec.AKSConfig) {
+				logrus.Infof("Found imported cluster [%s], copying upstream state to AKSConfig", cluster.Name)
 				cluster = cluster.DeepCopy()
 				cluster.Spec.AKSConfig = cluster.Status.AKSStatus.UpstreamSpec
 			}
