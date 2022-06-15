@@ -67,7 +67,7 @@ func (h *GeneratorHandler) ServeHTTP(writer http.ResponseWriter, request *http.R
 		return
 	}
 	writer.Header().Set("Content-Type", tarContentType)
-	writer.Header().Set("Content-Disposition", "attachment; filename=\"supportconfig.tar\"")
+	writer.Header().Set("Content-Disposition", "attachment; filename=\"supportconfig_rancher.tar\"")
 	n, err := io.Copy(writer, archive)
 	logrus.Debugf("[%s] wrote %v bytes in archive response", logPrefix, n)
 }
@@ -136,7 +136,8 @@ func (h *GeneratorHandler) generateSupportConfig() (io.Reader, error) {
 		}
 	}
 
-	return &buf, nil
+	err = tw.Close()
+	return &buf, err
 }
 
 // getCSPConfig gets the configmap produced by the csp-adapter returns an error if not able to produce the map. Will return
