@@ -4,11 +4,11 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/base64"
-	authenticationv1 "k8s.io/api/authentication/v1"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	mgmtcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/namespace"
+	"github.com/rancher/rancher/pkg/serviceaccounttoken"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/wrangler"
 	appscontrollers "github.com/rancher/wrangler/pkg/generated/controllers/apps/v1"
@@ -24,30 +24,32 @@ import (
 )
 
 type handler struct {
-	serviceAccounts corev1controllers.ServiceAccountCache
+	serviceAccounts      corev1controllers.ServiceAccountCache
 	serviceAccountClient v1client.ServiceAccountInterface
-	deploymentCache appscontrollers.DeploymentCache
-	daemonSetCache  appscontrollers.DaemonSetCache
-	secrets         corev1controllers.SecretCache
-	settings        mgmtcontrollers.SettingClient
-	apiServices     mgmtcontrollers.APIServiceCache
-	services        corev1controllers.ServiceCache
-	embedded        bool
-	ctx context.Context
+	deploymentCache      appscontrollers.DeploymentCache
+	daemonSetCache       appscontrollers.DaemonSetCache
+	secretsCache         corev1controllers.SecretCache
+	secretsClient        corev1controllers.SecretClient
+	settings             mgmtcontrollers.SettingClient
+	apiServices          mgmtcontrollers.APIServiceCache
+	services             corev1controllers.ServiceCache
+	embedded             bool
+	ctx                  context.Context
 }
 
 func Register(ctx context.Context, context *wrangler.Context, embedded bool) {
 	h := &handler{
-		serviceAccounts: context.Core.ServiceAccount().Cache(),
+		serviceAccounts:      context.Core.ServiceAccount().Cache(),
 		serviceAccountClient: context.K8s.CoreV1().ServiceAccounts(""),
-		deploymentCache: context.Apps.Deployment().Cache(),
-		daemonSetCache:  context.Apps.DaemonSet().Cache(),
-		secrets:         context.Core.Secret().Cache(),
-		settings:        context.Mgmt.Setting(),
-		apiServices:     context.Mgmt.APIService().Cache(),
-		services:        context.Core.Service().Cache(),
-		embedded:        embedded,
-		ctx: ctx,
+		deploymentCache:      context.Apps.Deployment().Cache(),
+		daemonSetCache:       context.Apps.DaemonSet().Cache(),
+		secretsCache:         context.Core.Secret().Cache(),
+		secretsClient:        context.Core.Secret(),
+		settings:             context.Mgmt.Setting(),
+		apiServices:          context.Mgmt.APIService().Cache(),
+		services:             context.Core.Service().Cache(),
+		embedded:             embedded,
+		ctx:                  ctx,
 	}
 
 	relatedresource.WatchClusterScoped(ctx, "apiservice-watch-owner",
@@ -143,25 +145,31 @@ func (h *handler) getToken(sa *corev1.ServiceAccount) (string, error) {
 		return "", err
 	}
 
-	token, err := h.serviceAccountClient.CreateToken(h.ctx, sa.Name, &authenticationv1.TokenRequest{}, metav1.CreateOptions{})
+	// create a secret-based token for the service account
+	sName := sa.Name + "-token"
+	secret, err := h.secretsCache.Get(sa.Namespace, sName)
 	if err != nil {
-		return "", err
+		if !apierror.IsNotFound(err) {
+			return "", err
+		}
+		sc := serviceaccounttoken.SecretTemplate(sa)
+		secret, err = h.secretsClient.Create(sc)
+		if err != nil {
+			if !apierror.IsAlreadyExists(err) {
+				return "", err
+			}
+			secret, err = h.secretsCache.Get(sa.Namespace, sName)
+			if err != nil {
+				return "", err
+			}
+		}
 	}
 
-	//if len(sa.Secrets) == 0 {
-	//	return "", nil
-	//}
-	//
-	//secret, err := h.secrets.Get(sa.Namespace, sa.Secrets[0].Name)
-	//if err != nil {
-	//	return "", err
-	//}
-	//
-	//token := secret.Data["token"]
-	//if len(token) == 0 {
-	//	return "", nil
-	//}
+	token := secret.Data["token"]
+	if len(token) == 0 {
+		return "", nil
+	}
 
-	hash := sha256.Sum256([]byte(token.Status.Token))
+	hash := sha256.Sum256(token)
 	return base64.StdEncoding.EncodeToString(hash[:]), nil
 }

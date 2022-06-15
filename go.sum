@@ -966,8 +966,8 @@ github.com/kinarashah/lasso v0.0.0-20220524091619-0f0b92e5262c h1:vH/335wYBKbvLz
 github.com/kinarashah/lasso v0.0.0-20220524091619-0f0b92e5262c/go.mod h1:liRAiIrAe541JpEkA0bxl1rmoptK3vgq6HPxwBJkVkg=
 github.com/kinarashah/norman v0.0.0-20220524092520-ccd3fac7c977 h1:3m5SMo5CYid4irlgCsvSpNUiVD5HYMQjm1Rfd7LHy5w=
 github.com/kinarashah/norman v0.0.0-20220524092520-ccd3fac7c977/go.mod h1:9zlHK0aLVQManRI6bpzRmuxAlTE70JKsN3JJ+PonHVk=
-github.com/kinarashah/steve v0.0.0-20220616223909-bdd639c520f0 h1:iJIdYD5BYz8wgZx5Jlkv4r08mhYiGOmzh1wVQHZXbZ4=
-github.com/kinarashah/steve v0.0.0-20220616223909-bdd639c520f0/go.mod h1:/FP26CeQyyFXybf6mZbB/O/qV6/HmZEhHC+iRk7zdUY=
+github.com/kinarashah/steve v0.0.0-20220621185831-50a0d511396b h1:Sv27vSRlwmFr/vQSbUYpB+h8i6XlpHepDWDKOyemtRY=
+github.com/kinarashah/steve v0.0.0-20220621185831-50a0d511396b/go.mod h1:/FP26CeQyyFXybf6mZbB/O/qV6/HmZEhHC+iRk7zdUY=
 github.com/kisielk/errcheck v1.1.0/go.mod h1:EZBBE59ingxPouuu3KfxchcWSUPOHkagtvWXihfKN4Q=
 github.com/kisielk/errcheck v1.2.0/go.mod h1:/BMXB+zMLi60iA8Vv6Ksmxu/1UDYcXs4uQLJ+jE2L00=
 github.com/kisielk/errcheck v1.5.0/go.mod h1:pFxgyoBC7bSaBwPgfKdkLd5X25qrDl4LWUI2bnpBCr8=
