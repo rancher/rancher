@@ -376,7 +376,7 @@ func formAzureRedirectURL(config map[string]interface{}) string {
 		if !graphEndpointDeprecated(ac.GraphEndpoint) {
 			// Return the redirect URL for Microsoft Graph.
 			return fmt.Sprintf(
-				"%s?client_id=%s&redirect_uri=%s&response_type=code&scope=user.read",
+				"%s?client_id=%s&redirect_uri=%s&response_type=code&scope=openid",
 				ac.AuthEndpoint,
 				ac.ApplicationID,
 				ac.RancherURL,
@@ -387,7 +387,7 @@ func formAzureRedirectURL(config map[string]interface{}) string {
 	}
 	// Return the redirect URL for the deprecated Azure AD Graph.
 	return fmt.Sprintf(
-		"%s?client_id=%s&redirect_uri=%s&resource=%s",
+		"%s?client_id=%s&redirect_uri=%s&resource=%s&scope=openid",
 		config["authEndpoint"],
 		config["applicationId"],
 		config["rancherUrl"],
