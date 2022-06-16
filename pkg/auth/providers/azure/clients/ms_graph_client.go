@@ -92,7 +92,7 @@ func (c azureMSGraphClient) ListGroupMemberships(id string) ([]string, error) {
 	}
 	var names []string
 	for _, g := range *groups {
-		if g.ID != nil && g.DisplayName != nil {
+		if g.ID != nil && g.DisplayName != nil && g.SecurityEnabled != nil {
 			names = append(names, *g.ID)
 		}
 	}
