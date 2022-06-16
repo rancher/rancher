@@ -230,7 +230,7 @@ func (p *ldapProvider) getLDAPConfig() (*v3.LdapConfig, *x509.CertPool, error) {
 
 		storedLdapConfigMap = subLdapConfig.(map[string]interface{})
 		mapstructure.Decode(storedLdapConfigMap, storedLdapConfig)
-		if len(storedLdapConfig.Servers) != 1 {
+		if len(storedLdapConfig.Servers) < 1 {
 			return storedLdapConfig, nil, errNotConfigured
 		}
 	} else {

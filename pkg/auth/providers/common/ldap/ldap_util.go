@@ -39,35 +39,36 @@ func NewLDAPConn(servers []string, TLS, startTLS bool, port int64, connectionTim
 	var err error
 	var tlsConfig *tls.Config
 	ldapv3.DefaultTimeout = time.Duration(connectionTimeout) * time.Millisecond
-	// TODO implment multi-server support
-	if len(servers) != 1 {
-		return nil, errors.New("invalid server config. only exactly 1 server is currently supported")
+	if len(servers) < 1 {
+		return nil, errors.New("invalid server config. at least 1 server needs to be configured")
 	}
-	server := servers[0]
-	tlsConfig = &tls.Config{RootCAs: caPool, InsecureSkipVerify: false, ServerName: server}
-	if TLS {
-		lConn, err = ldapv3.DialTLS("tcp", fmt.Sprintf("%s:%d", server, port), tlsConfig)
-		if err != nil {
-			return nil, fmt.Errorf("Error creating ssl connection: %v", err)
+	for _, server := range servers {
+		tlsConfig = &tls.Config{RootCAs: caPool, InsecureSkipVerify: false, ServerName: server}
+		if TLS {
+			lConn, err = ldapv3.DialTLS("tcp", fmt.Sprintf("%s:%d", server, port), tlsConfig)
+			if err != nil {
+				err = fmt.Errorf("Error creating ssl connection: %v", err)
+			}
+		} else if startTLS {
+			lConn, err = ldapv3.Dial("tcp", fmt.Sprintf("%s:%d", server, port))
+			if err != nil {
+				err = fmt.Errorf("Error creating connection for startTLS: %v", err)
+			} else if err = lConn.StartTLS(tlsConfig); err != nil {
+				err = fmt.Errorf("Error upgrading startTLS connection: %v", err)
+			}
+		} else {
+			lConn, err = ldapv3.Dial("tcp", fmt.Sprintf("%s:%d", server, port))
+			if err != nil {
+				err = fmt.Errorf("Error creating connection: %v", err)
+			}
 		}
-	} else if startTLS {
-		lConn, err = ldapv3.Dial("tcp", fmt.Sprintf("%s:%d", server, port))
-		if err != nil {
-			return nil, fmt.Errorf("Error creating connection for startTLS: %v", err)
-		}
-		if err := lConn.StartTLS(tlsConfig); err != nil {
-			return nil, fmt.Errorf("Error upgrading startTLS connection: %v", err)
-		}
-	} else {
-		lConn, err = ldapv3.Dial("tcp", fmt.Sprintf("%s:%d", server, port))
-		if err != nil {
-			return nil, fmt.Errorf("Error creating connection: %v", err)
+		if err == nil {
+			lConn.SetTimeout(time.Duration(connectionTimeout) * time.Millisecond)
+			return lConn, nil
 		}
 	}
 
-	lConn.SetTimeout(time.Duration(connectionTimeout) * time.Millisecond)
-
-	return lConn, nil
+	return nil, err
 }
 
 func GetUserExternalID(username string, loginDomain string) string {
@@ -323,7 +324,7 @@ func NewCAPool(cert string) (*x509.CertPool, error) {
 }
 
 func ValidateLdapConfig(ldapConfig *v3.LdapConfig, certpool *x509.CertPool) (bool, error) {
-	if len(ldapConfig.Servers) != 1 {
+	if len(ldapConfig.Servers) < 1 {
 		return false, nil
 	}
 
@@ -333,6 +334,6 @@ func ValidateLdapConfig(ldapConfig *v3.LdapConfig, certpool *x509.CertPool) (boo
 	}
 	defer lConn.Close()
 
-	logrus.Debugf("validated ldap configuration: %s", ldapConfig.Servers[0])
+	logrus.Debugf("validated ldap configuration: %s", strings.Join(ldapConfig.Servers, ","))
 	return true, nil
 }
