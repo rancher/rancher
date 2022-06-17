@@ -31,7 +31,7 @@ AWS_DEFAULT_USER = "ubuntu"
 AWS_AMI = os.environ.get("AWS_AMI", AWS_DEFAULT_AMI)
 AWS_USER = os.environ.get("AWS_USER", AWS_DEFAULT_USER)
 AWS_VOLUME_SIZE = os.environ.get("AWS_VOLUME_SIZE", "50")
-AWS_INSTANCE_TYPE = os.environ.get("AWS_INSTANCE_TYPE", 't3a.medium')
+AWS_INSTANCE_TYPE = os.environ.get("AWS_INSTANCE_TYPE", 't3a.large')
 AWS_BASTION_INSTANCE_TYPE = os.environ.get("AWS_INSTANCE_TYPE", 'c5.2xlarge')
 
 AWS_WINDOWS_VOLUME_SIZE = os.environ.get("AWS_WINDOWS_VOLUME_SIZE", "100")
