@@ -9,6 +9,7 @@ import (
 
 	"github.com/AzureAD/microsoft-authentication-library-for-go/apps/cache"
 	"github.com/AzureAD/microsoft-authentication-library-for-go/apps/confidential"
+	"github.com/manicminer/hamilton/environments"
 	"github.com/manicminer/hamilton/msgraph"
 	"github.com/manicminer/hamilton/odata"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
@@ -285,11 +286,13 @@ func NewMSGraphClient(config *v32.AzureADConfig, secrets corev1.SecretInterface)
 	authorizer := authorizer{authResult: authResult}
 
 	userClient := msgraph.NewUsersClient(config.TenantID)
+	userClient.BaseClient.Endpoint = environments.ApiEndpoint(config.GraphEndpoint)
 	userClient.BaseClient.Authorizer = &authorizer
 	userClient.BaseClient.ApiVersion = msgraph.Version10
 	userClient.BaseClient.DisableRetries = true
 
 	groupClient := msgraph.NewGroupsClient(config.TenantID)
+	groupClient.BaseClient.Endpoint = environments.ApiEndpoint(config.GraphEndpoint)
 	groupClient.BaseClient.Authorizer = &authorizer
 	groupClient.BaseClient.ApiVersion = msgraph.Version10
 	groupClient.BaseClient.DisableRetries = true
