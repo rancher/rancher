@@ -582,7 +582,7 @@ steps:
   image: rancher/dapper:v0.5.8
   failure: ignore
   commands:
-  - K3S_BUILDER=k3s_root dapper ci
+  - dapper ci
   privileged: true
   volumes:
   - name: docker
@@ -633,7 +633,6 @@ steps:
     build_args:
     - ARCH=s390x
     - VERSION=${DRONE_BRANCH/release\//}-${DRONE_COMMIT}-head
-    - K3S_BUILDER=k3s_root
     context: package/
     custom_dns: 1.1.1.1
     dockerfile: package/Dockerfile
@@ -720,7 +719,6 @@ steps:
     build_args:
     - ARCH=s390x
     - "VERSION=${DRONE_TAG}"
-    - K3S_BUILDER=k3s_root
     context: package/
     custom_dns: 1.1.1.1
     dockerfile: package/Dockerfile

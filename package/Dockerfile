@@ -1,17 +1,3 @@
-ARG K3S_BUILDER=rancher/k3s:v1.24.2-k3s1
-
-# Use binaries from k3s root for s390x as k3s is not available on s390x
-FROM registry.suse.com/bci/bci-base:15.3 AS k3s_root
-ARG ARCH
-ENV ARCH=${ARCH}
-ENV K3S_ROOT_VERSION v0.11.0
-ONBUILD RUN zypper -n in tar
-ONBUILD ADD https://github.com/rancher/k3s-root/releases/download/${K3S_ROOT_VERSION}/k3s-root-${ARCH}.tar /k3s-root.tar
-ONBUILD RUN tar xvf /k3s-root.tar; \
-  touch /bin/cni /bin/containerd /bin/containerd-shim-runc-v2 /bin/runc /bin/k3s
-
-FROM ${K3S_BUILDER} as k3s_builder
-
 FROM registry.suse.com/bci/bci-base:15.3
 
 RUN zypper -n install git-core curl ca-certificates unzip xz gzip sed tar shadow gawk vim netcat-openbsd mkisofs && \
@@ -127,7 +113,7 @@ RUN curl ${HELM_URL_V3} | tar xvzf - --strip-components=1 -C /usr/bin && \
     chmod +x /usr/bin/kustomize
 
 # Set up K3s: copy the necessary binaries from the K3s image.
-COPY --from=k3s_builder \
+COPY --from=rancher/k3s:v1.24.2-k3s1 \
     /bin/blkid \
     /bin/charon \
     /bin/cni \
@@ -146,28 +132,26 @@ COPY --from=k3s_builder \
     /bin/aux/xtables-legacy-multi \
 /usr/bin/
 
-RUN if [ "${ARCH}" != "s390x" ]; then \
-        ln -s /usr/bin/cni /usr/bin/bridge && \
-        ln -s /usr/bin/cni /usr/bin/flannel && \
-        ln -s /usr/bin/cni /usr/bin/host-local && \
-        ln -s /usr/bin/cni /usr/bin/loopback && \
-        ln -s /usr/bin/cni /usr/bin/portmap && \
-        ln -s /usr/bin/k3s /usr/bin/crictl && \
-        ln -s /usr/bin/k3s /usr/bin/ctr && \
-        ln -s /usr/bin/k3s /usr/bin/k3s-agent && \
-        ln -s /usr/bin/k3s /usr/bin/k3s-etcd-snapshot && \
-        ln -s /usr/bin/k3s /usr/bin/k3s-server && \
-        ln -s /usr/bin/k3s /usr/bin/kubectl && \
-        ln -s /usr/bin/pigz /usr/bin/unpigz && \
-        ln -s /usr/bin/xtables-legacy-multi /usr/bin/iptables && \
-        ln -s /usr/bin/xtables-legacy-multi /usr/bin/iptables-save && \
-        ln -s /usr/bin/xtables-legacy-multi /usr/bin/iptables-restore && \
-        ln -s /usr/bin/xtables-legacy-multi /usr/bin/iptables-translate && \
-        ln -s /usr/bin/xtables-legacy-multi /usr/bin/ip6tables && \
-        ln -s /usr/bin/xtables-legacy-multi /usr/bin/ip6tables-save && \
-        ln -s /usr/bin/xtables-legacy-multi /usr/bin/ip6tables-restore && \
-        ln -s /usr/bin/xtables-legacy-multi /usr/bin/ip6tables-translate; \
-    fi
+RUN ln -s /usr/bin/cni /usr/bin/bridge && \
+    ln -s /usr/bin/cni /usr/bin/flannel && \
+    ln -s /usr/bin/cni /usr/bin/host-local && \
+    ln -s /usr/bin/cni /usr/bin/loopback && \
+    ln -s /usr/bin/cni /usr/bin/portmap && \
+    ln -s /usr/bin/k3s /usr/bin/crictl && \
+    ln -s /usr/bin/k3s /usr/bin/ctr && \
+    ln -s /usr/bin/k3s /usr/bin/k3s-agent && \
+    ln -s /usr/bin/k3s /usr/bin/k3s-etcd-snapshot && \
+    ln -s /usr/bin/k3s /usr/bin/k3s-server && \
+    ln -s /usr/bin/k3s /usr/bin/kubectl && \
+    ln -s /usr/bin/pigz /usr/bin/unpigz && \
+    ln -s /usr/bin/xtables-legacy-multi /usr/bin/iptables && \
+    ln -s /usr/bin/xtables-legacy-multi /usr/bin/iptables-save && \
+    ln -s /usr/bin/xtables-legacy-multi /usr/bin/iptables-restore && \
+    ln -s /usr/bin/xtables-legacy-multi /usr/bin/iptables-translate && \
+    ln -s /usr/bin/xtables-legacy-multi /usr/bin/ip6tables && \
+    ln -s /usr/bin/xtables-legacy-multi /usr/bin/ip6tables-save && \
+    ln -s /usr/bin/xtables-legacy-multi /usr/bin/ip6tables-restore && \
+    ln -s /usr/bin/xtables-legacy-multi /usr/bin/ip6tables-translate
 
 RUN curl -sLf ${!TINI_URL} > /usr/bin/tini && \
     mkdir -p /var/lib/rancher/k3s/agent/images/ && \
@@ -175,11 +159,6 @@ RUN curl -sLf ${!TINI_URL} > /usr/bin/tini && \
     curl -sLf https://github.com/rancher/telemetry/releases/download/${TELEMETRY_VERSION}/telemetry-${ARCH} > /usr/bin/telemetry && \
     chmod +x /usr/bin/tini /usr/bin/telemetry && \
     mkdir -p /var/lib/rancher-data/driver-metadata
-
-RUN  if [ "${ARCH}" == "s390x" ]; then \
-      curl -sLf https://storage.googleapis.com/kubernetes-release/release/${CATTLE_K3S_VERSION%+*}/bin/linux/${ARCH}/kubectl > /usr/bin/kubectl && \
-      chmod +x /usr/bin/kubectl; \
-     fi
 
 ENV CATTLE_UI_VERSION 2.6.7-rc1
 ENV CATTLE_DASHBOARD_UI_VERSION v2.6.7-rc1
