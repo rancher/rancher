@@ -1,3 +1,4 @@
+// Package azure provides functions and types to register and use Azure AD as the auth provider in Rancher.
 package azure
 
 import (

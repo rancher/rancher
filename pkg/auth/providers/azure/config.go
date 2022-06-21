@@ -1,10 +1,12 @@
 package azure
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/rancher/norman/types/slice"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -12,6 +14,9 @@ const (
 	globalMSGraphEndpoint      = "https://graph.microsoft.com"
 	chinaAzureADGraphEndpoint  = "https://graph.chinacloudapi.cn/"
 	chinaMSGraphEndpoint       = "https://microsoftgraph.chinacloudapi.cn"
+
+	chinaAzureADLoginEndpoint = "https://login.chinacloudapi.cn/"
+	chinaAzureMSLoginEndpoint = "https://login.partner.microsoftonline.cn/"
 )
 
 func authProviderEnabled(config *v32.AzureADConfig) bool {
@@ -24,17 +29,41 @@ func graphEndpointDeprecated(endpoint string) bool {
 }
 
 func updateAzureADConfig(c *v32.AzureADConfig) {
-	// Update the Graph Endpoint.
-	graphEndpointMigration := map[string]string{
-		globalAzureADGraphEndpoint: globalMSGraphEndpoint,
-		chinaAzureADGraphEndpoint:  chinaMSGraphEndpoint,
+	if isConfigForChina(c) {
+		updateConfigForChina(c)
+	} else {
+		updateConfigForGlobal(c)
 	}
-	// This will be a no-op if the config already uses the new endpoint.
-	if newEndpoint, oldUsed := graphEndpointMigration[c.GraphEndpoint]; oldUsed {
-		c.GraphEndpoint = newEndpoint
-	}
+}
 
+func isConfigForChina(c *v32.AzureADConfig) bool {
+	return strings.HasSuffix(c.GraphEndpoint, ".cn") || strings.HasSuffix(c.GraphEndpoint, ".cn/")
+}
+
+func updateConfigForGlobal(c *v32.AzureADConfig) {
+	if c.GraphEndpoint != globalAzureADGraphEndpoint {
+		logrus.Infoln("Refusing to upgrade because the Graph Endpoint is not deprecated.")
+		return
+	}
+	// Update the Graph Endpoint.
+	c.GraphEndpoint = globalMSGraphEndpoint
 	// Update the Auth Endpoint and Token Endpoint.
-	c.AuthEndpoint = strings.Replace(c.AuthEndpoint, "/oauth2/authorize", "/oauth2/v2.0/authorize", 1)
-	c.TokenEndpoint = strings.Replace(c.TokenEndpoint, "/oauth2/token", "/oauth2/v2.0/token", 1)
+	c.AuthEndpoint = fmt.Sprintf("%s%s/oauth2/v2.0/authorize", c.Endpoint, c.TenantID)
+	c.TokenEndpoint = fmt.Sprintf("%s%s/oauth2/v2.0/token", c.Endpoint, c.TenantID)
+}
+
+func updateConfigForChina(c *v32.AzureADConfig) {
+	if c.GraphEndpoint != chinaAzureADGraphEndpoint {
+		logrus.Infoln("Refusing to upgrade because the Graph Endpoint is not deprecated.")
+		return
+	}
+	// Update the Graph Endpoint.
+	c.GraphEndpoint = chinaMSGraphEndpoint
+	// Update the login endpoint.
+	if c.Endpoint == chinaAzureADLoginEndpoint {
+		c.Endpoint = chinaAzureMSLoginEndpoint
+	}
+	// Update the Auth Endpoint and Token Endpoint.
+	c.AuthEndpoint = fmt.Sprintf("%s%s/oauth2/v2.0/authorize", c.Endpoint, c.TenantID)
+	c.TokenEndpoint = fmt.Sprintf("%s%s/oauth2/v2.0/token", c.Endpoint, c.TenantID)
 }
