@@ -50,7 +50,7 @@ def test_deploy_rancher_server():
         RANCHER_SERVER_CMD = \
             'sudo docker run -d --privileged --name="rancher-server" ' \
             '--restart=unless-stopped -p 80:80 -p 443:443  ' \
-            '-e CATTLE_BOOTSTRAP_PASSWORD={} ' \
+            '-e CATTLE_BOOTSTRAP_PASSWORD="{}" ' \
             'rancher/rancher'.format(ADMIN_PASSWORD)
     else:
         RANCHER_SERVER_CMD = \
@@ -61,7 +61,8 @@ def test_deploy_rancher_server():
     print(RANCHER_SERVER_CMD)
     aws_nodes = AmazonWebServices().create_multiple_nodes(
         1, random_test_name("testsa" + HOST_NAME))
-    aws_nodes[0].execute_command(RANCHER_SERVER_CMD)
+    result = aws_nodes[0].execute_command(RANCHER_SERVER_CMD)
+    print(result)
     time.sleep(120)
     RANCHER_SERVER_URL = "https://" + aws_nodes[0].public_ip_address
     print(RANCHER_SERVER_URL)
