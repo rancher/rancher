@@ -1,7 +1,7 @@
 ARG K3S_BUILDER=rancher/k3s:v1.23.6-k3s1
 
 # Use binaries from k3s root for s390x as k3s is not available on s390x
-FROM registry.suse.com/suse/sle15:15.3 AS k3s_root
+FROM registry.suse.com/bci/bci-base:15.3 AS k3s_root
 ARG ARCH
 ENV ARCH=${ARCH}
 ENV K3S_ROOT_VERSION v0.11.0
@@ -12,7 +12,7 @@ ONBUILD RUN tar xvf /k3s-root.tar; \
 
 FROM ${K3S_BUILDER} as k3s_builder
 
-FROM registry.suse.com/suse/sle15:15.3
+FROM registry.suse.com/bci/bci-base:15.3
 
 RUN zypper -n install git-core curl ca-certificates unzip xz gzip sed tar shadow gawk vim netcat-openbsd mkisofs && \
     zypper -n clean -a && rm -rf /tmp/* /var/tmp/* /usr/share/doc/packages/* && \
@@ -53,7 +53,7 @@ ENV LINODE_UI_DRIVER_VERSION v0.3.0
 # make sure the version number is consistent with the one at Line 100 of pkg/data/management/machinedriver_data.go
 ENV DOCKER_MACHINE_HARVESTER_VERSION v0.4.0
 ENV CATTLE_KDM_BRANCH ${CATTLE_KDM_BRANCH}
-ENV HELM_VERSION v3.8.0
+ENV HELM_VERSION v3.9.0
 ENV KUSTOMIZE_VERSION v4.4.1
 ENV CATTLE_WINS_AGENT_VERSION v0.2.10
 ENV CATTLE_WINS_AGENT_INSTALL_SCRIPT https://raw.githubusercontent.com/rancher/wins/${CATTLE_WINS_AGENT_VERSION}/install.ps1
