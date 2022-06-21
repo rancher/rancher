@@ -1,0 +1,6 @@
+package components
+
+var EKSClusterSuffix = `
+  }
+}
+`

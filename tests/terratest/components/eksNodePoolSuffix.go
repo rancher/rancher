@@ -1,0 +1,4 @@
+package components
+
+var EKSNodePoolSuffix = `
+    }`
