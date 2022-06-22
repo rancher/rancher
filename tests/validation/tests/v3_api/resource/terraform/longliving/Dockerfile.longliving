@@ -1,0 +1,19 @@
+FROM ubuntu:22.04
+
+ARG TERRAFORM_VERSION=1.0.11
+ARG KUBECTL_VERSION=v1.24.0
+ENV WORKSPACE /src/rancher-longliving
+WORKDIR $WORKSPACE
+
+COPY [".", "$WORKSPACE"]
+
+RUN apt-get update && \
+    apt-get install unzip wget curl -y && \
+    wget https://releases.hashicorp.com/terraform/$TERRAFORM_VERSION/terraform_"$TERRAFORM_VERSION"_linux_amd64.zip && \
+    unzip terraform_"$TERRAFORM_VERSION"_linux_amd64.zip && \
+    chmod u+x terraform && \
+    mv terraform /usr/local/bin && \
+    wget https://storage.googleapis.com/kubernetes-release/release/$KUBECTL_VERSION/bin/linux/amd64/kubectl && \
+    mv kubectl /bin/kubectl && \
+    chmod +x /bin/kubectl  && \
+    cd $WORKSPACE
