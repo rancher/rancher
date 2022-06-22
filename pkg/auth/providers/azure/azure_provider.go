@@ -86,7 +86,11 @@ func (ap *azureProvider) RefetchGroupPrincipals(principalID, secret string) ([]v
 
 	logrus.Debug("[AZURE_PROVIDER] Started getting user info from AzureAD")
 
-	userPrincipal, err := azureClient.GetUser(principalID)
+	parsed, err := clients.ParsePrincipalID(principalID)
+	if err != nil {
+		return nil, err
+	}
+	userPrincipal, err := azureClient.GetUser(parsed["ID"])
 	if err != nil {
 		return nil, err
 	}
