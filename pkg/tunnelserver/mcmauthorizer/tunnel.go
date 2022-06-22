@@ -51,12 +51,6 @@ type cluster struct {
 	CACert  string `json:"caCert"`
 }
 
-type input struct {
-	Node        *client.Node `json:"node"`
-	Cluster     *cluster     `json:"cluster"`
-	NodeVersion int          `json:"nodeVersion"`
-}
-
 func NewAuthorizer(context *config.ScaledContext) *Authorizer {
 	auth := &Authorizer{
 		crtIndexer:            context.Management.ClusterRegistrationTokens("").Controller().Informer().GetIndexer(),
@@ -108,14 +102,18 @@ func (t *Authorizer) AuthorizeTunnel(req *http.Request) (string, bool, error) {
 func (t *Authorizer) Authorize(req *http.Request) (*Client, bool, error) {
 	token := req.Header.Get(Token)
 	if token == "" {
-		logrus.Debugf("Authorize: Token header [%s] is empty", Token)
+		logrus.Infof("Authorize: Token header [%s] is empty", Token)
 		return nil, false, nil
 	}
+
+	logrus.Infof("Authorize: token: %s", token)
 
 	cluster, err := t.getClusterByToken(token)
 	if err != nil || cluster == nil {
 		return nil, false, err
 	}
+
+	logrus.Infof("Authorize: getClusterByToken: %s %s", cluster.Spec.DisplayName, token)
 
 	input, err := t.readInput(cluster, req)
 	if err != nil {
@@ -322,14 +320,18 @@ func (t *Authorizer) readInput(cluster *v3.Cluster, req *http.Request) (*input, 
 	params := req.Header.Get(Params)
 	var input input
 
+	logrus.Infof("Authorize: readInput, reading from params %s", params)
 	bytes, err := base64.StdEncoding.DecodeString(params)
 	if err != nil {
 		return nil, err
 	}
 
+	logrus.Infof("Authorize: readInput, unmarshaling from bytes")
 	if err := json.Unmarshal(bytes, &input); err != nil {
 		return nil, err
 	}
+
+	logrus.Infof("Authorize: readInput, unmarshaling from bytes %#v %#v", input.Cluster, input.Node)
 
 	if input.Node == nil && input.Cluster == nil {
 		return nil, errors.New("missing node or cluster registration info")

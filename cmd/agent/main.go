@@ -192,6 +192,7 @@ func run(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	logrus.Infof("GETTING PARAMS! %v", params)
 	writeCertsOnly := os.Getenv("CATTLE_WRITE_CERT_ONLY") == "true"
 	bytes, err := json.Marshal(params)
 	if err != nil {

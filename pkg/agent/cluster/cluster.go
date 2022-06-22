@@ -4,10 +4,12 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
+	"github.com/sirupsen/logrus"
 	"io/ioutil"
 	"os"
 	"path"
 	"strings"
+	"time"
 
 	"github.com/pkg/errors"
 	"github.com/rancher/rancher/pkg/namespace"
@@ -62,13 +64,28 @@ func getTokenFromAPI() ([]byte, []byte, error) {
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to find service account %s/%s: %w", namespace.System, "cattle", err)
 	}
-	secret, err := serviceaccounttoken.CreateSecretForServiceAccount(context.Background(), k8s, sa)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to create secret for service account %s/%s: %w", namespace.System, "cattle", err)
-	}
 	cm, err := k8s.CoreV1().ConfigMaps(namespace.System).Get(context.Background(), "kube-root-ca.crt", metav1.GetOptions{})
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to find configmap containing the CA crt: %w", err)
+	}
+	secret, err := serviceaccounttoken.CreateSecretForServiceAccount(context.Background(), k8s, sa)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to create secret for service account %s/%s: %w", namespace.System, sa.Name, err)
+	}
+	logrus.Infof("Waiting for service account token key to be populated for secret %s/%s", secret.Namespace, secret.Name)
+	for {
+		if tokenBytes, ok := secret.Data[coreV1.ServiceAccountTokenKey]; !ok || len(tokenBytes) == 0 {
+			time.Sleep(2 * time.Second)
+			secret, err = serviceaccounttoken.CreateSecretForServiceAccount(context.Background(), k8s, sa)
+			if err != nil {
+				return nil, nil, fmt.Errorf("failed to create secret for service account %s/%s: %w", namespace.System, "cattle", err)
+			}
+		} else {
+			break
+		}
+	}
+	if len(secret.Data[coreV1.ServiceAccountTokenKey]) == 0 {
+		logrus.Infof("WHY STILL EMPTY?!!")
 	}
 	return []byte(cm.Data["ca.crt"]), []byte(secret.Data[coreV1.ServiceAccountTokenKey]), nil
 }
