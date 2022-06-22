@@ -121,9 +121,6 @@ var (
 	MachineProvisionImage               = NewSetting("machine-provision-image", "rancher/machine:v0.15.0-rancher88")
 	SystemFeatureChartRefreshSeconds    = NewSetting("system-feature-chart-refresh-seconds", "900")
 
-	FleetMinVersion          = NewSetting("fleet-min-version", "")
-	RancherWebhookMinVersion = NewSetting("rancher-webhook-min-version", "")
-
 	Rke2DefaultVersion = NewSetting("rke2-default-version", "")
 	K3sDefaultVersion  = NewSetting("k3s-default-version", "")
 
@@ -136,6 +133,13 @@ var (
 	// AuthUserSessionTTLMinutes represents the time to live for tokens used for login sessions in minutes.
 	AuthUserSessionTTLMinutes = NewSetting("auth-user-session-ttl-minutes", "960") // 16 hours
 
+	// CSPAdapterMinVersion is used to determine if an existing installation of the CSP adapter should be upgraded to a new version
+	// has no effect if the csp adapter is not installed
+	CSPAdapterMinVersion = NewSetting("csp-adapter-min-version", "")
+
+	// FleetMinVersion is the minimum version of the fleet chart that rancher will install
+	FleetMinVersion = NewSetting("fleet-min-version", "")
+
 	// KubeconfigDefaultTokenTTLMinutes is the default time to live applied to kubeconfigs created for users.
 	// This setting will take effect regardless of the kubeconfig-generate-token status.
 	KubeconfigDefaultTokenTTLMinutes = NewSetting("kubeconfig-default-ttl-minutes", "0") // 0 TTL = never expire
@@ -144,11 +148,15 @@ var (
 	// If set to false the kubeconfig will contain a command to login to Rancher.
 	KubeconfigGenerateToken = NewSetting("kubeconfig-generate-token", "true")
 
-	// Deprecated: On removal use kubeconfig-default-ttl-minutes for all kubeconfigs.
 	// KubeconfigTokenTTLMinutes currently is used to set the TTL for kubeconfigs created through the CLI.
 	// This can be done with the token command or via kubectl when kubeconfig-generate-token is false.
 	// This TTL is used regardless of the value of kubeconfig-default-ttl-minutes.
+	//
+	// Deprecated: On removal use kubeconfig-default-ttl-minutes for all kubeconfigs.
 	KubeconfigTokenTTLMinutes = NewSetting("kubeconfig-token-ttl-minutes", "960") // 16 hours
+
+	// RancherWebhookMinVersion is the minimum version of the webhook that rancher will install
+	RancherWebhookMinVersion = NewSetting("rancher-webhook-min-version", "")
 )
 
 // FullShellImage returns the full private registry name of the rancher shell image.
