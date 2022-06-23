@@ -142,13 +142,11 @@ func NewADGraphClientFromCredential(config *v32.AzureADConfig, credential *v32.A
 		credential.Code,
 		config.RancherURL,
 		config.GraphEndpoint,
-		nil,
 	)
 	if err != nil {
 		return nil, err
 	}
 
-	spt.SetRefreshCallbacks(nil)
 	if err := spt.Refresh(); err != nil {
 		return nil, err
 	}
@@ -181,8 +179,7 @@ func NewAzureADGraphClientFromADALToken(config *v32.AzureADConfig, adalTokenSecr
 		config.ApplicationID,
 		config.GraphEndpoint,
 		adalToken,
-		secret,
-		nil)
+		secret)
 
 	if err != nil {
 		return nil, err
