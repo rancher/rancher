@@ -453,6 +453,53 @@ func calculateConcurrency(maxUnavailable string, entries []*planEntry, exclude r
 	return int(math.Ceil(max)), unavailable, nil
 }
 
+func minorPlanChangeDetected(old, new plan.NodePlan) bool {
+	if !equality.Semantic.DeepEqual(old.Instructions, new.Instructions) ||
+		!equality.Semantic.DeepEqual(old.PeriodicInstructions, new.PeriodicInstructions) ||
+		!equality.Semantic.DeepEqual(old.Probes, new.Probes) ||
+		old.Error != new.Error {
+		return false
+	}
+
+	if len(old.Files) == 0 && len(new.Files) == 0 {
+		// if the old plan had no files and no new files were found, there was no plan change detected
+		return false
+	}
+
+	newFiles := make(map[string]plan.File)
+	for _, newFile := range new.Files {
+		newFiles[newFile.Path] = newFile
+	}
+
+	for _, oldFile := range old.Files {
+		if newFile, ok := newFiles[oldFile.Path]; ok {
+			if oldFile.Content == newFile.Content {
+				// If the file already exists, we don't care if it is minor
+				delete(newFiles, oldFile.Path)
+			}
+		} else {
+			// the old file didn't exist in the new file map,
+			// so check to see if the old file is major and if it is, this is not a minor change.
+			if !oldFile.Minor {
+				return false
+			}
+		}
+	}
+
+	if len(newFiles) > 0 {
+		// If we still have new files in the list, check to see if any of them are major, and if they are, this is not a major change
+		for _, newFile := range newFiles {
+			// if we find a new major file, there is not a minor change
+			if !newFile.Minor {
+				return false
+			}
+		}
+		// There were new files and all were not major
+		return true
+	}
+	return false
+}
+
 func (p *Planner) reconcile(controlPlane *rkev1.RKEControlPlane, tokensSecret plan.Secret, clusterPlan *plan.Plan, required bool,
 	tierName string, include, exclude roleFilter, maxUnavailable string, joinServer string, drainOptions rkev1.DrainOptions) error {
 	var (
@@ -468,8 +515,10 @@ func (p *Planner) reconcile(controlPlane *rkev1.RKEControlPlane, tokensSecret pl
 	}
 
 	for _, entry := range entries {
+		logrus.Tracef("[planner] rkecluster %s/%s reconcile tier %s - processing machine entry: %s/%s", controlPlane.Namespace, controlPlane.Name, tierName, entry.Machine.Namespace, entry.Machine.Name)
 		// we exclude here and not in collect to ensure that include matched at least one node
 		if exclude(entry) {
+			logrus.Tracef("[planner] rkecluster %s/%s reconcile tier %s - excluding machine entry: %s/%s", controlPlane.Namespace, controlPlane.Name, tierName, entry.Machine.Namespace, entry.Machine.Name)
 			continue
 		}
 
@@ -494,6 +543,15 @@ func (p *Planner) reconcile(controlPlane *rkev1.RKEControlPlane, tokensSecret pl
 		}
 
 		if entry.Plan == nil {
+			logrus.Debugf("[planner] rkecluster %s/%s reconcile tier %s - setting initial plan for machine %s/%s", controlPlane.Namespace, controlPlane.Name, tierName, entry.Machine.Namespace, entry.Machine.Name)
+			logrus.Tracef("[planner] rkecluster %s/%s reconcile tier %s - initial plan for machine %s/%s new: %+v", controlPlane.Namespace, controlPlane.Name, tierName, entry.Machine.Namespace, entry.Machine.Name, plan)
+			outOfSync = append(outOfSync, entry.Machine.Name)
+			if err := p.store.UpdatePlan(entry, plan, -1, 1); err != nil {
+				return err
+			}
+		} else if minorPlanChangeDetected(entry.Plan.Plan, plan) {
+			logrus.Debugf("[planner] rkecluster %s/%s reconcile tier %s - minor plan change detected for machine %s/%s, updating plan immediately", controlPlane.Namespace, controlPlane.Name, tierName, entry.Machine.Namespace, entry.Machine.Name)
+			logrus.Tracef("[planner] rkecluster %s/%s reconcile tier %s - minor plan change for machine %s/%s old: %+v, new: %+v", controlPlane.Namespace, controlPlane.Name, tierName, entry.Machine.Namespace, entry.Machine.Name, entry.Plan.Plan, plan)
 			outOfSync = append(outOfSync, entry.Machine.Name)
 			if err := p.store.UpdatePlan(entry, plan, -1, 1); err != nil {
 				return err
@@ -517,6 +575,8 @@ func (p *Planner) reconcile(controlPlane *rkev1.RKEControlPlane, tokensSecret pl
 					return err
 				} else if ok && err == nil {
 					// Drain is done (or didn't need to be done) and there are no errors, so the plan should be updated to enact the reason the node was drained.
+					logrus.Debugf("[planner] rkecluster %s/%s reconcile tier %s - major plan change for machine %s/%s", controlPlane.Namespace, controlPlane.Name, tierName, entry.Machine.Namespace, entry.Machine.Name)
+					logrus.Tracef("[planner] rkecluster %s/%s reconcile tier %s - major plan change for machine %s/%s old: %+v, new: %+v", controlPlane.Namespace, controlPlane.Name, tierName, entry.Machine.Namespace, entry.Machine.Name, entry.Plan.Plan, plan)
 					if err = p.store.UpdatePlan(entry, plan, -1, 1); err != nil {
 						return err
 					} else if entry.Metadata.Annotations[rke2.DrainDoneAnnotation] != "" {
