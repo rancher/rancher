@@ -61,17 +61,18 @@ const (
 	ClusterConditionDefaultNamespaceAssigned condition.Cond = "DefaultNamespaceAssigned"
 	// Deprecated: ClusterConditionSystemNamespacesAssigned true when cluster's system namespaces has been initially assigned to
 	// a system project
-	ClusterConditionSystemNamespacesAssigned   condition.Cond = "SystemNamespacesAssigned"
-	ClusterConditionAddonDeploy                condition.Cond = "AddonDeploy"
-	ClusterConditionSystemAccountCreated       condition.Cond = "SystemAccountCreated"
-	ClusterConditionAgentDeployed              condition.Cond = "AgentDeployed"
-	ClusterConditionGlobalAdminsSynced         condition.Cond = "GlobalAdminsSynced"
-	ClusterConditionInitialRolesPopulated      condition.Cond = "InitialRolesPopulated"
-	ClusterConditionServiceAccountMigrated     condition.Cond = "ServiceAccountMigrated"
-	ClusterConditionPrometheusOperatorDeployed condition.Cond = "PrometheusOperatorDeployed"
-	ClusterConditionMonitoringEnabled          condition.Cond = "MonitoringEnabled"
-	ClusterConditionAlertingEnabled            condition.Cond = "AlertingEnabled"
-	ClusterConditionSecretsMigrated            condition.Cond = "SecretsMigrated"
+	ClusterConditionSystemNamespacesAssigned      condition.Cond = "SystemNamespacesAssigned"
+	ClusterConditionAddonDeploy                   condition.Cond = "AddonDeploy"
+	ClusterConditionSystemAccountCreated          condition.Cond = "SystemAccountCreated"
+	ClusterConditionAgentDeployed                 condition.Cond = "AgentDeployed"
+	ClusterConditionGlobalAdminsSynced            condition.Cond = "GlobalAdminsSynced"
+	ClusterConditionInitialRolesPopulated         condition.Cond = "InitialRolesPopulated"
+	ClusterConditionServiceAccountMigrated        condition.Cond = "ServiceAccountMigrated"
+	ClusterConditionPrometheusOperatorDeployed    condition.Cond = "PrometheusOperatorDeployed"
+	ClusterConditionMonitoringEnabled             condition.Cond = "MonitoringEnabled"
+	ClusterConditionAlertingEnabled               condition.Cond = "AlertingEnabled"
+	ClusterConditionSecretsMigrated               condition.Cond = "SecretsMigrated"
+	ClusterConditionServiceAccountSecretsMigrated condition.Cond = "ServiceAccountSecretsMigrated"
 
 	ClusterDriverImported = "imported"
 	ClusterDriverLocal    = "local"
@@ -160,6 +161,7 @@ type ClusterStatus struct {
 	ComponentStatuses                    []ClusterComponentStatus    `json:"componentStatuses,omitempty"`
 	APIEndpoint                          string                      `json:"apiEndpoint,omitempty"`
 	ServiceAccountToken                  string                      `json:"serviceAccountToken,omitempty"`
+	ServiceAccountTokenSecret            string                      `json:"serviceAccountTokenSecret,omitempty"`
 	CACert                               string                      `json:"caCert,omitempty"`
 	Capacity                             v1.ResourceList             `json:"capacity,omitempty"`
 	Allocatable                          v1.ResourceList             `json:"allocatable,omitempty"`

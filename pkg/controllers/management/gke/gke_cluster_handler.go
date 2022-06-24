@@ -18,6 +18,7 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/management/clusteroperator"
 	"github.com/rancher/rancher/pkg/controllers/management/clusterupstreamrefresher"
 	"github.com/rancher/rancher/pkg/controllers/management/rbac"
+	"github.com/rancher/rancher/pkg/controllers/management/secretmigrator"
 	"github.com/rancher/rancher/pkg/dialer"
 	mgmtv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/namespace"
@@ -59,6 +60,7 @@ func Register(ctx context.Context, wContext *wrangler.Context, mgmtCtx *config.M
 	gkeCCDynamicClient := mgmtCtx.DynamicClient.Resource(gkeClusterConfigResource)
 	e := &gkeOperatorController{clusteroperator.OperatorController{
 		ClusterEnqueueAfter:  wContext.Mgmt.Cluster().EnqueueAfter,
+		Secrets:              mgmtCtx.Core.Secrets(""),
 		SecretsCache:         wContext.Core.Secret().Cache(),
 		TemplateCache:        wContext.Mgmt.CatalogTemplate().Cache(),
 		ProjectCache:         wContext.Mgmt.Project().Cache(),
@@ -196,12 +198,16 @@ func (e *gkeOperatorController) onClusterChange(key string, cluster *mgmtv3.Clus
 			if mustTunnel != nil {
 				cluster = cluster.DeepCopy()
 				cluster.Status.GKEStatus.PrivateRequiresTunnel = mustTunnel
-				cluster.Status.ServiceAccountToken = serviceToken
+				secret, err := secretmigrator.NewMigrator(e.SecretsCache, e.Secrets).CreateOrUpdateServiceAccountTokenSecret(cluster.Status.ServiceAccountTokenSecret, serviceToken, cluster)
+				if err != nil {
+					return nil, err
+				}
+				cluster.Status.ServiceAccountTokenSecret = secret.Name
 				return e.ClusterClient.Update(cluster)
 			}
 		}
 
-		if cluster.Status.ServiceAccountToken == "" {
+		if cluster.Status.ServiceAccountTokenSecret == "" {
 			cluster, err = e.generateAndSetServiceAccount(cluster)
 			if err != nil {
 				var statusErr error
@@ -353,7 +359,11 @@ func (e *gkeOperatorController) generateAndSetServiceAccount(cluster *mgmtv3.Clu
 	}
 
 	cluster = cluster.DeepCopy()
-	cluster.Status.ServiceAccountToken = saToken
+	secret, err := secretmigrator.NewMigrator(e.SecretsCache, e.Secrets).CreateOrUpdateServiceAccountTokenSecret(cluster.Status.ServiceAccountTokenSecret, saToken, cluster)
+	if err != nil {
+		return nil, err
+	}
+	cluster.Status.ServiceAccountTokenSecret = secret.Name
 	return e.ClusterClient.Update(cluster)
 }
 

@@ -30,7 +30,7 @@ func AssemblePrivateRegistryCredential(secretRef, objType, objName string, spec 
 		return spec, nil
 
 	}
-	registrySecret, err := secretLister.Get(secretNamespace, secretRef)
+	registrySecret, err := secretLister.Get(SecretNamespace, secretRef)
 	if err != nil {
 		return spec, err
 	}
@@ -64,7 +64,7 @@ func AssembleS3Credential(secretRef, objType, objName string, spec apimgmtv3.Clu
 	if err != nil {
 		return spec, err
 	}
-	spec.RancherKubernetesEngineConfig.Services.Etcd.BackupConfig.S3BackupConfig.SecretKey = string(s3Cred.Data[secretKey])
+	spec.RancherKubernetesEngineConfig.Services.Etcd.BackupConfig.S3BackupConfig.SecretKey = string(s3Cred.Data[SecretKey])
 	return spec, nil
 }
 
@@ -81,11 +81,11 @@ func AssembleWeaveCredential(secretRef, objType, objName string, spec apimgmtv3.
 		return spec, nil
 
 	}
-	weaveSecret, err := secretLister.Get(secretNamespace, secretRef)
+	weaveSecret, err := secretLister.Get(SecretNamespace, secretRef)
 	if err != nil {
 		return spec, err
 	}
-	spec.RancherKubernetesEngineConfig.Network.WeaveNetworkProvider.Password = string(weaveSecret.Data[secretKey])
+	spec.RancherKubernetesEngineConfig.Network.WeaveNetworkProvider.Password = string(weaveSecret.Data[SecretKey])
 	return spec, nil
 }
 
@@ -102,11 +102,11 @@ func AssembleVsphereGlobalCredential(secretRef, objType, objName string, spec ap
 		return spec, nil
 
 	}
-	vsphereSecret, err := secretLister.Get(secretNamespace, secretRef)
+	vsphereSecret, err := secretLister.Get(SecretNamespace, secretRef)
 	if err != nil {
 		return spec, err
 	}
-	spec.RancherKubernetesEngineConfig.CloudProvider.VsphereCloudProvider.Global.Password = string(vsphereSecret.Data[secretKey])
+	spec.RancherKubernetesEngineConfig.CloudProvider.VsphereCloudProvider.Global.Password = string(vsphereSecret.Data[SecretKey])
 	return spec, nil
 }
 
@@ -126,7 +126,7 @@ func AssembleVsphereVirtualCenterCredential(secretRef, objType, objName string, 
 		return spec, nil
 
 	}
-	vcenterSecret, err := secretLister.Get(secretNamespace, secretRef)
+	vcenterSecret, err := secretLister.Get(SecretNamespace, secretRef)
 	if err != nil {
 		return spec, err
 	}
@@ -151,11 +151,11 @@ func AssembleOpenStackCredential(secretRef, objType, objName string, spec apimgm
 		return spec, nil
 
 	}
-	openStackSecret, err := secretLister.Get(secretNamespace, secretRef)
+	openStackSecret, err := secretLister.Get(SecretNamespace, secretRef)
 	if err != nil {
 		return spec, err
 	}
-	spec.RancherKubernetesEngineConfig.CloudProvider.OpenstackCloudProvider.Global.Password = string(openStackSecret.Data[secretKey])
+	spec.RancherKubernetesEngineConfig.CloudProvider.OpenstackCloudProvider.Global.Password = string(openStackSecret.Data[SecretKey])
 	return spec, nil
 }
 
@@ -172,11 +172,11 @@ func AssembleAADClientSecretCredential(secretRef, objType, objName string, spec 
 		return spec, nil
 
 	}
-	aadClientSecret, err := secretLister.Get(secretNamespace, secretRef)
+	aadClientSecret, err := secretLister.Get(SecretNamespace, secretRef)
 	if err != nil {
 		return spec, err
 	}
-	spec.RancherKubernetesEngineConfig.CloudProvider.AzureCloudProvider.AADClientSecret = string(aadClientSecret.Data[secretKey])
+	spec.RancherKubernetesEngineConfig.CloudProvider.AzureCloudProvider.AADClientSecret = string(aadClientSecret.Data[SecretKey])
 	return spec, nil
 }
 
@@ -193,11 +193,11 @@ func AssembleAADCertCredential(secretRef, objType, objName string, spec apimgmtv
 		return spec, nil
 
 	}
-	aadCertSecret, err := secretLister.Get(secretNamespace, secretRef)
+	aadCertSecret, err := secretLister.Get(SecretNamespace, secretRef)
 	if err != nil {
 		return spec, err
 	}
-	spec.RancherKubernetesEngineConfig.CloudProvider.AzureCloudProvider.AADClientCertPassword = string(aadCertSecret.Data[secretKey])
+	spec.RancherKubernetesEngineConfig.CloudProvider.AzureCloudProvider.AADClientCertPassword = string(aadCertSecret.Data[SecretKey])
 	return spec, nil
 }
 
@@ -284,7 +284,7 @@ func AssembleSMTPCredential(notifier *apimgmtv3.Notifier, secretLister v1.Secret
 		return &notifier.Spec, err
 	}
 	spec := notifier.Spec.DeepCopy()
-	spec.SMTPConfig.Password = string(smtpSecret.Data[secretKey])
+	spec.SMTPConfig.Password = string(smtpSecret.Data[SecretKey])
 	return spec, nil
 }
 
@@ -305,7 +305,7 @@ func AssembleWechatCredential(notifier *apimgmtv3.Notifier, secretLister v1.Secr
 		return &notifier.Spec, err
 	}
 	spec := notifier.Spec.DeepCopy()
-	spec.WechatConfig.Secret = string(wechatSecret.Data[secretKey])
+	spec.WechatConfig.Secret = string(wechatSecret.Data[SecretKey])
 	return spec, nil
 }
 
@@ -326,7 +326,7 @@ func AssembleDingtalkCredential(notifier *apimgmtv3.Notifier, secretLister v1.Se
 		return &notifier.Spec, err
 	}
 	spec := notifier.Spec.DeepCopy()
-	spec.DingtalkConfig.Secret = string(secret.Data[secretKey])
+	spec.DingtalkConfig.Secret = string(secret.Data[SecretKey])
 	return spec, nil
 }
 
@@ -343,7 +343,7 @@ func (m *Migrator) AssembleGithubPipelineConfigCredential(config apiprjv3.Github
 	if err != nil {
 		return config, err
 	}
-	config.ClientSecret = string(secret.Data[secretKey])
+	config.ClientSecret = string(secret.Data[SecretKey])
 	return config, nil
 }
 
@@ -360,7 +360,7 @@ func (m *Migrator) AssembleGitlabPipelineConfigCredential(config apiprjv3.Gitlab
 	if err != nil {
 		return config, err
 	}
-	config.ClientSecret = string(secret.Data[secretKey])
+	config.ClientSecret = string(secret.Data[SecretKey])
 	return config, nil
 }
 
@@ -377,7 +377,7 @@ func (m *Migrator) AssembleBitbucketCloudPipelineConfigCredential(config apiprjv
 	if err != nil {
 		return config, err
 	}
-	config.ClientSecret = string(secret.Data[secretKey])
+	config.ClientSecret = string(secret.Data[SecretKey])
 	return config, nil
 }
 
@@ -394,6 +394,6 @@ func (m *Migrator) AssembleBitbucketServerPipelineConfigCredential(config apiprj
 	if err != nil {
 		return config, err
 	}
-	config.PrivateKey = string(secret.Data[secretKey])
+	config.PrivateKey = string(secret.Data[SecretKey])
 	return config, nil
 }
