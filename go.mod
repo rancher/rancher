@@ -93,7 +93,7 @@ require (
 	github.com/rancher/eks-operator v1.0.9
 	github.com/rancher/gke-operator v1.1.1
 	github.com/rancher/kubernetes-provider-detector v0.1.2
-	github.com/rancher/lasso v0.0.0-20220506212308-e3ef9b77cc49
+	github.com/rancher/lasso v0.0.0-20220624163232-22c7bcc940dd
 	github.com/rancher/machine v0.15.0-rancher25
 	github.com/rancher/norman v0.0.0-20220506233651-5759ec2c76de
 	github.com/rancher/rancher/pkg/apis v0.0.0
