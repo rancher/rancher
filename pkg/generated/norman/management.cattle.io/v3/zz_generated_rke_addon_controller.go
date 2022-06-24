@@ -43,7 +43,7 @@ func init() {
 	resource.Put(RkeAddonGroupVersionResource)
 }
 
-// Deprecated use v3.RkeAddon instead
+// Deprecated: use v3.RkeAddon instead
 type RkeAddon = v3.RkeAddon
 
 func NewRkeAddon(namespace, name string, obj v3.RkeAddon) *v3.RkeAddon {

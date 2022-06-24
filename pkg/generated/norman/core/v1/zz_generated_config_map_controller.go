@@ -43,7 +43,7 @@ func init() {
 	resource.Put(ConfigMapGroupVersionResource)
 }
 
-// Deprecated use v1.ConfigMap instead
+// Deprecated: use v1.ConfigMap instead
 type ConfigMap = v1.ConfigMap
 
 func NewConfigMap(namespace, name string, obj v1.ConfigMap) *v1.ConfigMap {

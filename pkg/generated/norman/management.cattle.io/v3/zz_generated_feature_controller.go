@@ -42,7 +42,7 @@ func init() {
 	resource.Put(FeatureGroupVersionResource)
 }
 
-// Deprecated use v3.Feature instead
+// Deprecated: use v3.Feature instead
 type Feature = v3.Feature
 
 func NewFeature(namespace, name string, obj v3.Feature) *v3.Feature {

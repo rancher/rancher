@@ -43,7 +43,7 @@ func init() {
 	resource.Put(ClusterLoggingGroupVersionResource)
 }
 
-// Deprecated use v3.ClusterLogging instead
+// Deprecated: use v3.ClusterLogging instead
 type ClusterLogging = v3.ClusterLogging
 
 func NewClusterLogging(namespace, name string, obj v3.ClusterLogging) *v3.ClusterLogging {

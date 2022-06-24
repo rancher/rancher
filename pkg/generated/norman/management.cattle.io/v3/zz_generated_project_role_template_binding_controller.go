@@ -43,7 +43,7 @@ func init() {
 	resource.Put(ProjectRoleTemplateBindingGroupVersionResource)
 }
 
-// Deprecated use v3.ProjectRoleTemplateBinding instead
+// Deprecated: use v3.ProjectRoleTemplateBinding instead
 type ProjectRoleTemplateBinding = v3.ProjectRoleTemplateBinding
 
 func NewProjectRoleTemplateBinding(namespace, name string, obj v3.ProjectRoleTemplateBinding) *v3.ProjectRoleTemplateBinding {

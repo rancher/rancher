@@ -43,7 +43,7 @@ func init() {
 	resource.Put(PersistentVolumeClaimGroupVersionResource)
 }
 
-// Deprecated use v1.PersistentVolumeClaim instead
+// Deprecated: use v1.PersistentVolumeClaim instead
 type PersistentVolumeClaim = v1.PersistentVolumeClaim
 
 func NewPersistentVolumeClaim(namespace, name string, obj v1.PersistentVolumeClaim) *v1.PersistentVolumeClaim {

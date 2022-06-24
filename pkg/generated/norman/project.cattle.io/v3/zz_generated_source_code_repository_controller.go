@@ -43,7 +43,7 @@ func init() {
 	resource.Put(SourceCodeRepositoryGroupVersionResource)
 }
 
-// Deprecated use v3.SourceCodeRepository instead
+// Deprecated: use v3.SourceCodeRepository instead
 type SourceCodeRepository = v3.SourceCodeRepository
 
 func NewSourceCodeRepository(namespace, name string, obj v3.SourceCodeRepository) *v3.SourceCodeRepository {

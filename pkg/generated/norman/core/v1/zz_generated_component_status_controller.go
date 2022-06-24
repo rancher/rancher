@@ -42,7 +42,7 @@ func init() {
 	resource.Put(ComponentStatusGroupVersionResource)
 }
 
-// Deprecated use v1.ComponentStatus instead
+// Deprecated: use v1.ComponentStatus instead
 type ComponentStatus = v1.ComponentStatus
 
 func NewComponentStatus(namespace, name string, obj v1.ComponentStatus) *v1.ComponentStatus {

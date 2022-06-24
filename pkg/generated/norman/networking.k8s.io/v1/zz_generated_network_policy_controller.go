@@ -43,7 +43,7 @@ func init() {
 	resource.Put(NetworkPolicyGroupVersionResource)
 }
 
-// Deprecated use v1.NetworkPolicy instead
+// Deprecated: use v1.NetworkPolicy instead
 type NetworkPolicy = v1.NetworkPolicy
 
 func NewNetworkPolicy(namespace, name string, obj v1.NetworkPolicy) *v1.NetworkPolicy {

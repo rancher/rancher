@@ -43,7 +43,7 @@ func init() {
 	resource.Put(PodGroupVersionResource)
 }
 
-// Deprecated use v1.Pod instead
+// Deprecated: use v1.Pod instead
 type Pod = v1.Pod
 
 func NewPod(namespace, name string, obj v1.Pod) *v1.Pod {

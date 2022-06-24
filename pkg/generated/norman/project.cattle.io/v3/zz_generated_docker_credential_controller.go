@@ -43,7 +43,7 @@ func init() {
 	resource.Put(DockerCredentialGroupVersionResource)
 }
 
-// Deprecated use v3.DockerCredential instead
+// Deprecated: use v3.DockerCredential instead
 type DockerCredential = v3.DockerCredential
 
 func NewDockerCredential(namespace, name string, obj v3.DockerCredential) *v3.DockerCredential {

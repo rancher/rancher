@@ -42,7 +42,7 @@ func init() {
 	resource.Put(TemplateGroupVersionResource)
 }
 
-// Deprecated use v3.Template instead
+// Deprecated: use v3.Template instead
 type Template = v3.Template
 
 func NewTemplate(namespace, name string, obj v3.Template) *v3.Template {

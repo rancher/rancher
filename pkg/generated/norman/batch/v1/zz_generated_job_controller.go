@@ -43,7 +43,7 @@ func init() {
 	resource.Put(JobGroupVersionResource)
 }
 
-// Deprecated use v1.Job instead
+// Deprecated: use v1.Job instead
 type Job = v1.Job
 
 func NewJob(namespace, name string, obj v1.Job) *v1.Job {

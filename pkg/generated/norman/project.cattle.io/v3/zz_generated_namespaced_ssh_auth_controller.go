@@ -43,7 +43,7 @@ func init() {
 	resource.Put(NamespacedSSHAuthGroupVersionResource)
 }
 
-// Deprecated use v3.NamespacedSSHAuth instead
+// Deprecated: use v3.NamespacedSSHAuth instead
 type NamespacedSSHAuth = v3.NamespacedSSHAuth
 
 func NewNamespacedSSHAuth(namespace, name string, obj v3.NamespacedSSHAuth) *v3.NamespacedSSHAuth {

@@ -43,7 +43,7 @@ func init() {
 	resource.Put(AppGroupVersionResource)
 }
 
-// Deprecated use v3.App instead
+// Deprecated: use v3.App instead
 type App = v3.App
 
 func NewApp(namespace, name string, obj v3.App) *v3.App {

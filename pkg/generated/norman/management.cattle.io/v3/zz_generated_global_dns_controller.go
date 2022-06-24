@@ -43,7 +43,7 @@ func init() {
 	resource.Put(GlobalDnsGroupVersionResource)
 }
 
-// Deprecated use v3.GlobalDns instead
+// Deprecated: use v3.GlobalDns instead
 type GlobalDns = v3.GlobalDns
 
 func NewGlobalDns(namespace, name string, obj v3.GlobalDns) *v3.GlobalDns {

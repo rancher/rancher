@@ -43,7 +43,7 @@ func init() {
 	resource.Put(ClusterTemplateRevisionGroupVersionResource)
 }
 
-// Deprecated use v3.ClusterTemplateRevision instead
+// Deprecated: use v3.ClusterTemplateRevision instead
 type ClusterTemplateRevision = v3.ClusterTemplateRevision
 
 func NewClusterTemplateRevision(namespace, name string, obj v3.ClusterTemplateRevision) *v3.ClusterTemplateRevision {
