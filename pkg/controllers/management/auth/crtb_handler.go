@@ -52,7 +52,8 @@ var clusterManagmentPlaneResources = map[string]string{
 	"nodepools":                   "management.cattle.io",
 	"notifiers":                   "management.cattle.io",
 	"podsecuritypolicytemplateprojectbindings": "management.cattle.io",
-	"projects": "management.cattle.io",
+	"projects":      "management.cattle.io",
+	"etcdsnapshots": "rke.cattle.io",
 }
 
 type crtbLifecycle struct {
