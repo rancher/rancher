@@ -43,7 +43,7 @@ func init() {
 	resource.Put(RkeK8sServiceOptionGroupVersionResource)
 }
 
-// Deprecated use v3.RkeK8sServiceOption instead
+// Deprecated: use v3.RkeK8sServiceOption instead
 type RkeK8sServiceOption = v3.RkeK8sServiceOption
 
 func NewRkeK8sServiceOption(namespace, name string, obj v3.RkeK8sServiceOption) *v3.RkeK8sServiceOption {

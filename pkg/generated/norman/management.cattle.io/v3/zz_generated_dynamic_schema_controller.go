@@ -42,7 +42,7 @@ func init() {
 	resource.Put(DynamicSchemaGroupVersionResource)
 }
 
-// Deprecated use v3.DynamicSchema instead
+// Deprecated: use v3.DynamicSchema instead
 type DynamicSchema = v3.DynamicSchema
 
 func NewDynamicSchema(namespace, name string, obj v3.DynamicSchema) *v3.DynamicSchema {

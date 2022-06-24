@@ -43,7 +43,7 @@ func init() {
 	resource.Put(ClusterUserAttributeGroupVersionResource)
 }
 
-// Deprecated use v3.ClusterUserAttribute instead
+// Deprecated: use v3.ClusterUserAttribute instead
 type ClusterUserAttribute = v3.ClusterUserAttribute
 
 func NewClusterUserAttribute(namespace, name string, obj v3.ClusterUserAttribute) *v3.ClusterUserAttribute {

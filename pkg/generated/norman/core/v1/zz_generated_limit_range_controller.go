@@ -43,7 +43,7 @@ func init() {
 	resource.Put(LimitRangeGroupVersionResource)
 }
 
-// Deprecated use v1.LimitRange instead
+// Deprecated: use v1.LimitRange instead
 type LimitRange = v1.LimitRange
 
 func NewLimitRange(namespace, name string, obj v1.LimitRange) *v1.LimitRange {

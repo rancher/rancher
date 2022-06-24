@@ -42,7 +42,7 @@ func init() {
 	resource.Put(PrincipalGroupVersionResource)
 }
 
-// Deprecated use v3.Principal instead
+// Deprecated: use v3.Principal instead
 type Principal = v3.Principal
 
 func NewPrincipal(namespace, name string, obj v3.Principal) *v3.Principal {

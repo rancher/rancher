@@ -42,7 +42,7 @@ func init() {
 	resource.Put(APIServiceGroupVersionResource)
 }
 
-// Deprecated use v1.APIService instead
+// Deprecated: use v1.APIService instead
 type APIService = v1.APIService
 
 func NewAPIService(namespace, name string, obj v1.APIService) *v1.APIService {

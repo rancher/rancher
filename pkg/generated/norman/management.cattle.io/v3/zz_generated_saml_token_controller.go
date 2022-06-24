@@ -43,7 +43,7 @@ func init() {
 	resource.Put(SamlTokenGroupVersionResource)
 }
 
-// Deprecated use v3.SamlToken instead
+// Deprecated: use v3.SamlToken instead
 type SamlToken = v3.SamlToken
 
 func NewSamlToken(namespace, name string, obj v3.SamlToken) *v3.SamlToken {

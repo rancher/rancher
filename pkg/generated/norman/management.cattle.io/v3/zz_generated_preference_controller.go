@@ -43,7 +43,7 @@ func init() {
 	resource.Put(PreferenceGroupVersionResource)
 }
 
-// Deprecated use v3.Preference instead
+// Deprecated: use v3.Preference instead
 type Preference = v3.Preference
 
 func NewPreference(namespace, name string, obj v3.Preference) *v3.Preference {

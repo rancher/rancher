@@ -42,7 +42,7 @@ func init() {
 	resource.Put(UserAttributeGroupVersionResource)
 }
 
-// Deprecated use v3.UserAttribute instead
+// Deprecated: use v3.UserAttribute instead
 type UserAttribute = v3.UserAttribute
 
 func NewUserAttribute(namespace, name string, obj v3.UserAttribute) *v3.UserAttribute {

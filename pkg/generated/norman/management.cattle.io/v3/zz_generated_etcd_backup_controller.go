@@ -43,7 +43,7 @@ func init() {
 	resource.Put(EtcdBackupGroupVersionResource)
 }
 
-// Deprecated use v3.EtcdBackup instead
+// Deprecated: use v3.EtcdBackup instead
 type EtcdBackup = v3.EtcdBackup
 
 func NewEtcdBackup(namespace, name string, obj v3.EtcdBackup) *v3.EtcdBackup {

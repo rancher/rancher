@@ -42,7 +42,7 @@ func init() {
 	resource.Put(CatalogGroupVersionResource)
 }
 
-// Deprecated use v3.Catalog instead
+// Deprecated: use v3.Catalog instead
 type Catalog = v3.Catalog
 
 func NewCatalog(namespace, name string, obj v3.Catalog) *v3.Catalog {
