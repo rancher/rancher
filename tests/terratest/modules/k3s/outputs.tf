@@ -2,16 +2,6 @@ output "cluster_name" {
   value = rancher2_cluster_v2.rancher2_cluster_v2.name
 }
 
-# output "host_url" {
-#   value = var.rancher_api_url
-#   sensitive = true
-# }
-
-# output "token" {
-#   value = var.rancher_admin_bearer_token
-#   sensitive = true
-# }
-
 output "expected_node_count_3" {
   value = var.expected_node_count_3
 }
