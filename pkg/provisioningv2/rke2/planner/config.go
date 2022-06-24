@@ -10,6 +10,10 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/rancher/rancher/pkg/controllers/management/secretmigrator"
+
+	v1 "k8s.io/api/core/v1"
+
 	"github.com/rancher/norman/types/values"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
@@ -365,6 +369,34 @@ func addTaints(config map[string]interface{}, entry *planEntry, runtime string) 
 	return nil
 }
 
+// retrieveClusterAuthorizedSecret accepts a secret and a cluster name, and checks if a cluster is authorized to use the secret
+// by looking at the 'v2prov-secret-authorized-for-cluster' annotation and determining if it is equal to the cluster name.
+// if the cluster is authorized to use the secret, the contents of the 'credential' key are returned as a byte slice
+func retrieveClusterAuthorizedSecret(secret *v1.Secret, clusterName string) ([]byte, error) {
+	specifiedClusterName, ownerFound := secret.Annotations[secretmigrator.AuthorizedSecretAnnotation]
+	if !ownerFound || specifiedClusterName != clusterName {
+		return nil, fmt.Errorf("the secret 'secret://%s:%s' provided within the cloud-provider-config does not belong to cluster '%s'", secret.Namespace, secret.Name, clusterName)
+	}
+
+	secretContent, configFound := secret.Data["credential"]
+	if !configFound {
+		return nil, fmt.Errorf("the cloud-provider-config specified a secret, but no config could be found within the secret 'secret://%s:%s'", secret.Namespace, secret.Name)
+	}
+	return secretContent, nil
+}
+
+func checkForSecretFormat(configValue string) (bool, string, string, error) {
+	if strings.HasPrefix(configValue, "secret://") {
+		configValue = strings.ReplaceAll(configValue, "secret://", "")
+		namespaceAndName := strings.Split(configValue, ":")
+		if len(namespaceAndName) != 2 || namespaceAndName[0] == "" || namespaceAndName[1] == "" {
+			return true, "", "", fmt.Errorf("provided value for cloud-provider-config secret is malformed, must be of the format secret://namespace:name")
+		}
+		return true, namespaceAndName[0], namespaceAndName[1], nil
+	}
+	return false, "", "", nil
+}
+
 // configFile renders the full path to a config file based on the passed in filename and controlPlane
 // If the desired filename does not have a defined path template in the `filePaths` map, the function will fall back
 // to rendering a filepath based on `/var/lib/rancher/%s/etc/config-files/%s` where the first %s is the runtime and
@@ -423,6 +455,35 @@ func (p *Planner) addConfigFile(nodePlan plan.NodePlan, controlPlane *rkev1.RKEC
 		if !ok {
 			continue
 		}
+
+		if fileParam == "cloud-provider-config" {
+			isSecretFormat, namespace, name, err := checkForSecretFormat(convert.ToString(content))
+			if err != nil {
+				// provided secret for cloud-provider-config does not follow the format of
+				// secret://namespace:name
+				return nodePlan, config, err
+			}
+			if isSecretFormat {
+				secret, err := p.secretCache.Get(namespace, name)
+				if err != nil {
+					return nodePlan, config, err
+				}
+
+				secretContent, err := retrieveClusterAuthorizedSecret(secret, controlPlane.Name)
+				if err != nil {
+					return nodePlan, config, err
+				}
+
+				filePath := configFile(controlPlane, fileParam)
+				config[fileParam] = filePath
+				nodePlan.Files = append(nodePlan.Files, plan.File{
+					Content: base64.StdEncoding.EncodeToString(secretContent),
+					Path:    filePath,
+				})
+				continue
+			}
+		}
+
 		filePath := configFile(controlPlane, fileParam)
 		config[fileParam] = filePath
 

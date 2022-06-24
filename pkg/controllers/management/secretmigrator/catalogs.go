@@ -56,5 +56,5 @@ func (h *handler) syncCatalog(key string, catalog *v3.Catalog) (runtime.Object, 
 // the caller is responsible for un-setting the secret data, setting a reference to the Secret, and
 // updating the Cluster object, if applicable.
 func (m *Migrator) CreateOrUpdateCatalogSecret(secretName, password string, owner runtime.Object) (*corev1.Secret, error) {
-	return m.createOrUpdateSecretForCredential(secretName, password, owner, "catalog", "password")
+	return m.createOrUpdateSecretForCredential(secretName, SecretNamespace, password, nil, owner, "catalog", "password")
 }

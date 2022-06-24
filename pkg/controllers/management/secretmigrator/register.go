@@ -3,6 +3,8 @@ package secretmigrator
 import (
 	"context"
 
+	provv1 "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
+
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	pv3 "github.com/rancher/rancher/pkg/generated/norman/project.cattle.io/v3"
@@ -17,6 +19,7 @@ type Migrator struct {
 type handler struct {
 	migrator                  *Migrator
 	clusters                  v3.ClusterInterface
+	provisioningClusters      provv1.ClusterController
 	clusterTemplateRevisions  v3.ClusterTemplateRevisionInterface
 	notifierLister            v3.NotifierLister
 	notifiers                 v3.NotifierInterface
@@ -44,6 +47,7 @@ func Register(ctx context.Context, management *config.ManagementContext) {
 			management.Core.Secrets(""),
 		),
 		clusters:                  management.Management.Clusters(""),
+		provisioningClusters:      management.Wrangler.Provisioning.Cluster(),
 		clusterTemplateRevisions:  management.Management.ClusterTemplateRevisions(""),
 		notifierLister:            management.Management.Notifiers("").Controller().Lister(),
 		notifiers:                 management.Management.Notifiers(""),
@@ -59,4 +63,5 @@ func Register(ctx context.Context, management *config.ManagementContext) {
 	management.Management.Clusters("").AddHandler(ctx, "cluster-secret-migrator", h.sync)
 	management.Management.ClusterTemplateRevisions("").AddHandler(ctx, "clustertemplaterevision-secret-migrator", h.syncTemplate)
 	management.Management.Catalogs("").AddHandler(ctx, "catalog-secret-migrator", h.syncCatalog)
+	management.Wrangler.Provisioning.Cluster().OnChange(ctx, "harvester-secret-migrator", h.syncHarvesterCloudConfig)
 }
