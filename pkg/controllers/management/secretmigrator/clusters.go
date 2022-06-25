@@ -5,6 +5,12 @@ import (
 	"fmt"
 	"reflect"
 	"regexp"
+	"strings"
+
+	"github.com/rancher/rancher/pkg/fleet"
+
+	"github.com/rancher/norman/types/convert"
+	v1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 
 	"github.com/mitchellh/mapstructure"
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
@@ -800,12 +806,13 @@ func (m *Migrator) UpdateSecretOwnerReference(secret *corev1.Secret, owner metav
 }
 
 // createOrUpdateSecret accepts an optional secret name and tries to update it with the provided data if it exists, or creates it.
-// If an owner is provided, it sets it as an owner reference before creating or updating it.
-func (m *Migrator) createOrUpdateSecret(secretName string, data map[string]string, owner runtime.Object, kind, field string) (*corev1.Secret, error) {
+// If an owner is provided, it sets it as an owner reference before creating it. If annotations are provided, they are added
+// before the secret is created.
+func (m *Migrator) createOrUpdateSecret(secretName, secretNamespace string, data, annotations map[string]string, owner runtime.Object, kind, field string) (*corev1.Secret, error) {
 	var existing *corev1.Secret
 	var err error
 	if secretName != "" {
-		existing, err = m.secretLister.Get(SecretNamespace, secretName)
+		existing, err = m.secretLister.Get(secretNamespace, secretName)
 		if err != nil && !apierrors.IsNotFound(err) {
 			return nil, err
 		}
@@ -814,7 +821,7 @@ func (m *Migrator) createOrUpdateSecret(secretName string, data map[string]strin
 		ObjectMeta: metav1.ObjectMeta{
 			Name:         secretName,
 			GenerateName: fmt.Sprintf("%s-%s-", kind, field),
-			Namespace:    SecretNamespace,
+			Namespace:    secretNamespace,
 		},
 		StringData: data,
 		Type:       corev1.SecretTypeOpaque,
@@ -834,6 +841,9 @@ func (m *Migrator) createOrUpdateSecret(secretName string, data map[string]strin
 			},
 		}
 	}
+	if annotations != nil {
+		secret.Annotations = annotations
+	}
 	if existing == nil {
 		return m.secrets.Create(secret)
 	} else if !reflect.DeepEqual(existing.StringData, secret.StringData) {
@@ -845,14 +855,14 @@ func (m *Migrator) createOrUpdateSecret(secretName string, data map[string]strin
 
 // createOrUpdateSecretForCredential accepts an optional secret name and a value containing the data that needs to be sanitized,
 // and creates a secret to hold the sanitized data. If an owner is passed, the owner is set as an owner reference on the secret.
-func (m *Migrator) createOrUpdateSecretForCredential(secretName, secretValue string, owner runtime.Object, kind, field string) (*corev1.Secret, error) {
+func (m *Migrator) createOrUpdateSecretForCredential(secretName, secretNamespace, secretValue string, annotations map[string]string, owner runtime.Object, kind, field string) (*corev1.Secret, error) {
 	if secretValue == "" {
 		return nil, nil
 	}
 	data := map[string]string{
 		SecretKey: secretValue,
 	}
-	secret, err := m.createOrUpdateSecret(secretName, data, owner, kind, field)
+	secret, err := m.createOrUpdateSecret(secretName, secretNamespace, data, annotations, owner, kind, field)
 	if err != nil {
 		return nil, fmt.Errorf("error creating secret for credential: %w", err)
 	}
@@ -869,7 +879,7 @@ func (m *Migrator) CreateOrUpdateS3Secret(secretName string, rkeConfig *rketypes
 	if rkeConfig == nil || rkeConfig.Services.Etcd.BackupConfig == nil || rkeConfig.Services.Etcd.BackupConfig.S3BackupConfig == nil {
 		return nil, nil
 	}
-	return m.createOrUpdateSecretForCredential(secretName, rkeConfig.Services.Etcd.BackupConfig.S3BackupConfig.SecretKey, owner, "cluster", "s3backup")
+	return m.createOrUpdateSecretForCredential(secretName, SecretNamespace, rkeConfig.Services.Etcd.BackupConfig.S3BackupConfig.SecretKey, nil, owner, "cluster", "s3backup")
 }
 
 // CreateOrUpdateWeaveSecret accepts an optional secret name and a RancherKubernetesEngineConfig object
@@ -882,7 +892,7 @@ func (m *Migrator) CreateOrUpdateWeaveSecret(secretName string, rkeConfig *rkety
 	if rkeConfig == nil || rkeConfig.Network.WeaveNetworkProvider == nil {
 		return nil, nil
 	}
-	return m.createOrUpdateSecretForCredential(secretName, rkeConfig.Network.WeaveNetworkProvider.Password, owner, "cluster", "weave")
+	return m.createOrUpdateSecretForCredential(secretName, SecretNamespace, rkeConfig.Network.WeaveNetworkProvider.Password, nil, owner, "cluster", "weave")
 }
 
 // CreateOrUpdateVsphereGlobalSecret accepts an optional secret name and a RancherKubernetesEngineConfig object
@@ -895,7 +905,7 @@ func (m *Migrator) CreateOrUpdateVsphereGlobalSecret(secretName string, rkeConfi
 	if rkeConfig == nil || rkeConfig.CloudProvider.VsphereCloudProvider == nil {
 		return nil, nil
 	}
-	return m.createOrUpdateSecretForCredential(secretName, rkeConfig.CloudProvider.VsphereCloudProvider.Global.Password, owner, "cluster", "vsphereglobal")
+	return m.createOrUpdateSecretForCredential(secretName, SecretNamespace, rkeConfig.CloudProvider.VsphereCloudProvider.Global.Password, nil, owner, "cluster", "vsphereglobal")
 }
 
 // CreateOrUpdateVsphereVirtualCenterSecret accepts an optional secret name and a RancherKubernetesEngineConfig object
@@ -917,7 +927,7 @@ func (m *Migrator) CreateOrUpdateVsphereVirtualCenterSecret(secretName string, r
 	if len(data) == 0 {
 		return nil, nil
 	}
-	return m.createOrUpdateSecret(secretName, data, owner, "cluster", "vspherevcenter")
+	return m.createOrUpdateSecret(secretName, SecretNamespace, data, nil, owner, "cluster", "vspherevcenter")
 }
 
 // CreateOrUpdateOpenStackSecret accepts an optional secret name and a RancherKubernetesEngineConfig object
@@ -930,7 +940,7 @@ func (m *Migrator) CreateOrUpdateOpenStackSecret(secretName string, rkeConfig *r
 	if rkeConfig == nil || rkeConfig.CloudProvider.OpenstackCloudProvider == nil {
 		return nil, nil
 	}
-	return m.createOrUpdateSecretForCredential(secretName, rkeConfig.CloudProvider.OpenstackCloudProvider.Global.Password, owner, "cluster", "openstack")
+	return m.createOrUpdateSecretForCredential(secretName, SecretNamespace, rkeConfig.CloudProvider.OpenstackCloudProvider.Global.Password, nil, owner, "cluster", "openstack")
 }
 
 // CreateOrUpdateAADClientSecret accepts an optional secret name and a RancherKubernetesEngineConfig object
@@ -943,7 +953,7 @@ func (m *Migrator) CreateOrUpdateAADClientSecret(secretName string, rkeConfig *r
 	if rkeConfig == nil || rkeConfig.CloudProvider.AzureCloudProvider == nil {
 		return nil, nil
 	}
-	return m.createOrUpdateSecretForCredential(secretName, rkeConfig.CloudProvider.AzureCloudProvider.AADClientSecret, owner, "cluster", "aadclientsecret")
+	return m.createOrUpdateSecretForCredential(secretName, SecretNamespace, rkeConfig.CloudProvider.AzureCloudProvider.AADClientSecret, nil, owner, "cluster", "aadclientsecret")
 }
 
 // CreateOrUpdateAADCertSecret accepts an optional secret name and a RancherKubernetesEngineConfig object
@@ -956,7 +966,7 @@ func (m *Migrator) CreateOrUpdateAADCertSecret(secretName string, rkeConfig *rke
 	if rkeConfig == nil || rkeConfig.CloudProvider.AzureCloudProvider == nil {
 		return nil, nil
 	}
-	return m.createOrUpdateSecretForCredential(secretName, rkeConfig.CloudProvider.AzureCloudProvider.AADClientCertPassword, owner, "cluster", "aadcert")
+	return m.createOrUpdateSecretForCredential(secretName, SecretNamespace, rkeConfig.CloudProvider.AzureCloudProvider.AADClientCertPassword, nil, owner, "cluster", "aadcert")
 }
 
 // CreateOrUpdateSMTPSecret accepts an optional secret name and an SMTPConfig object
@@ -969,7 +979,7 @@ func (m *Migrator) CreateOrUpdateSMTPSecret(secretName string, smtpConfig *apimg
 	if smtpConfig == nil {
 		return nil, nil
 	}
-	return m.createOrUpdateSecretForCredential(secretName, smtpConfig.Password, owner, "notifier", "smtpconfig")
+	return m.createOrUpdateSecretForCredential(secretName, SecretNamespace, smtpConfig.Password, nil, owner, "notifier", "smtpconfig")
 }
 
 // CreateOrUpdateWechatSecret accepts an optional secret name and a WechatConfig object
@@ -982,7 +992,7 @@ func (m *Migrator) CreateOrUpdateWechatSecret(secretName string, wechatConfig *a
 	if wechatConfig == nil {
 		return nil, nil
 	}
-	return m.createOrUpdateSecretForCredential(secretName, wechatConfig.Secret, owner, "notifier", "wechatconfig")
+	return m.createOrUpdateSecretForCredential(secretName, SecretNamespace, wechatConfig.Secret, nil, owner, "notifier", "wechatconfig")
 }
 
 // CreateOrUpdateDingtalkSecret accepts an optional secret name and a DingtalkConfig object
@@ -995,7 +1005,7 @@ func (m *Migrator) CreateOrUpdateDingtalkSecret(secretName string, dingtalkConfi
 	if dingtalkConfig == nil {
 		return nil, nil
 	}
-	return m.createOrUpdateSecretForCredential(secretName, dingtalkConfig.Secret, owner, "notifier", "dingtalkconfig")
+	return m.createOrUpdateSecretForCredential(secretName, SecretNamespace, dingtalkConfig.Secret, nil, owner, "notifier", "dingtalkconfig")
 }
 
 // CreateOrUpdateSourceCodeProviderConfigSecret accepts an optional secret name and a client secret or
@@ -1005,7 +1015,17 @@ func (m *Migrator) CreateOrUpdateDingtalkSecret(secretName string, dingtalkConfi
 // the caller is responsible for un-setting the secret data, setting a reference to the Secret, and
 // updating the Cluster object, if applicable.
 func (m *Migrator) CreateOrUpdateSourceCodeProviderConfigSecret(secretName string, credential string, owner runtime.Object, provider string) (*corev1.Secret, error) {
-	return m.createOrUpdateSecretForCredential(secretName, credential, owner, "sourcecodeproviderconfig", provider)
+	return m.createOrUpdateSecretForCredential(secretName, SecretNamespace, credential, nil, owner, "sourcecodeproviderconfig", provider)
+}
+
+// CreateOrUpdateHarvesterCloudConfigSecret accepts an optional secret name and a client secret or
+// harvester cloud-provider-config and creates a Secret for the credential if there is one.
+// If an owner is passed, the owner is set as an owner reference on the Secret.
+// It returns a reference to the Secret if one was created. If the returned Secret is not nil and there is no error,
+// the caller is responsible for un-setting the secret data, setting a reference to the Secret, and
+// updating the Cluster object, if applicable.
+func (m *Migrator) CreateOrUpdateHarvesterCloudConfigSecret(secretName string, credential string, annotations map[string]string, owner runtime.Object, provider string) (*corev1.Secret, error) {
+	return m.createOrUpdateSecretForCredential(secretName, fleet.ClustersDefaultNamespace, credential, annotations, owner, "harvester", provider)
 }
 
 // Cleanup deletes a secret if provided a secret name, otherwise does nothing.
@@ -1024,6 +1044,31 @@ func (m *Migrator) Cleanup(secretName string) error {
 	return err
 }
 
+// CleanupKnownSecrets deletes a slice of secrets and logs any encountered errors at a WARNING level.
+func (m *Migrator) CleanupKnownSecrets(secrets []*corev1.Secret) {
+	for _, secret := range secrets {
+		cleanUpErr := m.secrets.DeleteNamespaced(secret.Namespace, secret.Name, &metav1.DeleteOptions{})
+		if cleanUpErr != nil {
+			logrus.Warnf("[secretmigrator] error encountered while handling secrets cleanup for migration error; secret %s:%s may not have been cleaned up: %s", secret.Namespace, secret.Name, cleanUpErr)
+		}
+	}
+}
+
+// isHarvesterCluster determines if a v1.Cluster represents a harvester cluster
+func (m *Migrator) isHarvesterCluster(cluster *v1.Cluster) bool {
+	if cluster == nil || cluster.Spec.RKEConfig == nil {
+		return false
+	}
+
+	for _, selectorConfig := range cluster.Spec.RKEConfig.MachineSelectorConfig {
+		if strings.ToLower(convert.ToString(selectorConfig.Config.Data["cloud-provider-name"])) == "harvester" {
+			return true
+		}
+	}
+
+	return false
+}
+
 // CreateOrUpdateServiceAccountTokenSecret accepts an optional secret name and a token string
 // and creates a Secret for the cluster service account token if there is one.
 // If an owner is passed, the owner is set as an owner reference on the Secret.
@@ -1031,7 +1076,7 @@ func (m *Migrator) Cleanup(secretName string) error {
 // the caller is responsible for un-setting the secret data, setting a reference to the Secret, and
 // updating the Cluster object, if applicable.
 func (m *Migrator) CreateOrUpdateServiceAccountTokenSecret(secretName string, credential string, owner runtime.Object) (*corev1.Secret, error) {
-	return m.createOrUpdateSecretForCredential(secretName, credential, owner, "cluster", "serviceaccounttoken")
+	return m.createOrUpdateSecretForCredential(secretName, SecretNamespace, credential, nil, owner, "cluster", "serviceaccounttoken")
 }
 
 // MatchesQuestionPath checks whether the given string matches the question-formatted path of the
