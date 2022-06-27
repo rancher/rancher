@@ -149,7 +149,7 @@ func (h *handler) getToken(sa *corev1.ServiceAccount) (string, error) {
 		if !apierror.IsNotFound(err) {
 			return "", err
 		}
-		sc := serviceaccounttoken.SecretTemplate(sa)
+		sc := serviceaccounttoken.SecretTemplate(sa, sName)
 		secret, err = h.secretsClient.Create(sc)
 		if err != nil {
 			if !apierror.IsAlreadyExists(err) {

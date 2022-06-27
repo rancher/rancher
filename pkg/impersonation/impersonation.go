@@ -104,7 +104,7 @@ func (i *Impersonator) GetToken(sa *corev1.ServiceAccount) (string, error) {
 			return "", fmt.Errorf("error getting secret: %w", err)
 		}
 		// create the secret
-		sc := serviceaccounttoken.SecretTemplate(sa)
+		sc := serviceaccounttoken.SecretTemplate(sa, name)
 		secret, err = i.clusterContext.Core.Secrets(ImpersonationNamespace).Create(sc)
 		if err != nil {
 			if !apierrors.IsAlreadyExists(err) {

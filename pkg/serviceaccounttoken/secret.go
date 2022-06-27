@@ -20,7 +20,7 @@ func CreateSecretForServiceAccount(ctx context.Context, clientSet kubernetes.Int
 		if !apierror.IsNotFound(err) {
 			return nil, err
 		}
-		sc := SecretTemplate(sa)
+		sc := SecretTemplate(sa, secretName)
 		secret, err = secretClient.Create(ctx, sc, metav1.CreateOptions{})
 		if err != nil {
 			if !apierror.IsAlreadyExists(err) {
@@ -37,10 +37,13 @@ func CreateSecretForServiceAccount(ctx context.Context, clientSet kubernetes.Int
 }
 
 // SecretTemplate generate a template of service-account-token Secret for the provided Service Account.
-func SecretTemplate(sa *v1.ServiceAccount) *v1.Secret {
+func SecretTemplate(sa *v1.ServiceAccount, secretName string) *v1.Secret {
+	if secretName == "" {
+		secretName = sa.Name + "-token"
+	}
 	return &v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      sa.Name + "-token",
+			Name:      secretName,
 			Namespace: sa.Namespace,
 			OwnerReferences: []metav1.OwnerReference{
 				{
