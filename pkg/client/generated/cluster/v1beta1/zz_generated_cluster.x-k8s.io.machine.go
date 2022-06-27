@@ -15,6 +15,7 @@ const (
 	MachineFieldInfrastructureRef    = "infrastructureRef"
 	MachineFieldLabels               = "labels"
 	MachineFieldName                 = "name"
+	MachineFieldNodeDeletionTimeout  = "nodeDeletionTimeout"
 	MachineFieldNodeDrainTimeout     = "nodeDrainTimeout"
 	MachineFieldOwnerReferences      = "ownerReferences"
 	MachineFieldProviderID           = "providerID"
@@ -38,6 +39,7 @@ type Machine struct {
 	InfrastructureRef    *ObjectReference  `json:"infrastructureRef,omitempty" yaml:"infrastructureRef,omitempty"`
 	Labels               map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
 	Name                 string            `json:"name,omitempty" yaml:"name,omitempty"`
+	NodeDeletionTimeout  *Duration         `json:"nodeDeletionTimeout,omitempty" yaml:"nodeDeletionTimeout,omitempty"`
 	NodeDrainTimeout     *Duration         `json:"nodeDrainTimeout,omitempty" yaml:"nodeDrainTimeout,omitempty"`
 	OwnerReferences      []OwnerReference  `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
 	ProviderID           string            `json:"providerID,omitempty" yaml:"providerID,omitempty"`

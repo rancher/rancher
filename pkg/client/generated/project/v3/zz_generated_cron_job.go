@@ -55,6 +55,7 @@ const (
 	CronJobFieldSysctls                       = "sysctls"
 	CronJobFieldTTLSecondsAfterFinished       = "ttlSecondsAfterFinished"
 	CronJobFieldTerminationGracePeriodSeconds = "terminationGracePeriodSeconds"
+	CronJobFieldTimeZone                      = "timeZone"
 	CronJobFieldTopologySpreadConstraints     = "topologySpreadConstraints"
 	CronJobFieldTransitioning                 = "transitioning"
 	CronJobFieldTransitioningMessage          = "transitioningMessage"
@@ -118,6 +119,7 @@ type CronJob struct {
 	Sysctls                       []Sysctl                       `json:"sysctls,omitempty" yaml:"sysctls,omitempty"`
 	TTLSecondsAfterFinished       *int64                         `json:"ttlSecondsAfterFinished,omitempty" yaml:"ttlSecondsAfterFinished,omitempty"`
 	TerminationGracePeriodSeconds *int64                         `json:"terminationGracePeriodSeconds,omitempty" yaml:"terminationGracePeriodSeconds,omitempty"`
+	TimeZone                      string                         `json:"timeZone,omitempty" yaml:"timeZone,omitempty"`
 	TopologySpreadConstraints     []TopologySpreadConstraint     `json:"topologySpreadConstraints,omitempty" yaml:"topologySpreadConstraints,omitempty"`
 	Transitioning                 string                         `json:"transitioning,omitempty" yaml:"transitioning,omitempty"`
 	TransitioningMessage          string                         `json:"transitioningMessage,omitempty" yaml:"transitioningMessage,omitempty"`
