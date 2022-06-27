@@ -1,4 +1,4 @@
-ARG K3S_BUILDER=rancher/k3s:v1.23.6-k3s1
+ARG K3S_BUILDER=rancher/k3s:v1.24.2-k3s1
 
 # Use binaries from k3s root for s390x as k3s is not available on s390x
 FROM registry.suse.com/bci/golang:1.17 AS k3s_root
@@ -18,7 +18,7 @@ ARG DAPPER_HOST_ARCH
 ENV HOST_ARCH=${DAPPER_HOST_ARCH} ARCH=${DAPPER_HOST_ARCH}
 ENV CATTLE_HELM_VERSION v2.16.8-rancher1
 ENV CATTLE_MACHINE_VERSION v0.15.0-rancher88
-ENV CATTLE_K3S_VERSION v1.23.6+k3s1
+ENV CATTLE_K3S_VERSION v1.24.2+k3s1
 # version used by helm plugin install script
 ENV CATTLE_HELM_UNITTEST_VERSION v0.1.7-rancher3
 # helm 3 version
