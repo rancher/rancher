@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/rancher/norman/types/slice"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 )
@@ -19,20 +18,34 @@ const (
 	chinaAzureMSLoginEndpoint = "https://login.partner.microsoftonline.cn/"
 )
 
+// GraphEndpointMigratedAnnotation is the main piece of data based on which Rancher decides to use either the
+// deprecated authentication flow via Azure AD Graph or the new one via Microsoft Graph.
+// If the annotation is missing on the Auth Config object, or is present with a value of anything other than "true",
+// then Rancher uses the old, deprecated flow. If the annotation is present and set to "true", Rancher uses the new flow.
+const GraphEndpointMigratedAnnotation = "auth.cattle.io/azuread-endpoint-migrated"
+
 func authProviderEnabled(config *v32.AzureADConfig) bool {
 	return config.Enabled && config.GraphEndpoint != ""
 }
 
-func graphEndpointDeprecated(endpoint string) bool {
-	deprecatedEndpoints := []string{globalAzureADGraphEndpoint, chinaAzureADGraphEndpoint}
-	return slice.ContainsString(deprecatedEndpoints, endpoint)
+func isConfigDeprecated(cfg *v32.AzureADConfig) bool {
+	if !cfg.Enabled {
+		return false
+	}
+	v, ok := cfg.ObjectMeta.Annotations[GraphEndpointMigratedAnnotation]
+	if !ok || v != "true" {
+		logrus.Tracef("Could not find the %s annotation that specifies whether the Graph Endpoint has been migrated, or its value is not \"true\" - Rancher will use the old endpoint.",
+			GraphEndpointMigratedAnnotation)
+		return true
+	}
+	return false
 }
 
-func updateAzureADConfig(c *v32.AzureADConfig) {
+func updateAzureADEndpoints(c *v32.AzureADConfig) {
 	if isConfigForChina(c) {
-		updateConfigForChina(c)
+		updateEndpointsForChina(c)
 	} else {
-		updateConfigForGlobal(c)
+		updateEndpointsForGlobal(c)
 	}
 }
 
@@ -40,9 +53,9 @@ func isConfigForChina(c *v32.AzureADConfig) bool {
 	return strings.HasSuffix(c.GraphEndpoint, ".cn") || strings.HasSuffix(c.GraphEndpoint, ".cn/")
 }
 
-func updateConfigForGlobal(c *v32.AzureADConfig) {
+func updateEndpointsForGlobal(c *v32.AzureADConfig) {
 	if c.GraphEndpoint != globalAzureADGraphEndpoint {
-		logrus.Infoln("Refusing to upgrade because the Graph Endpoint is not deprecated.")
+		logrus.Infof("Refusing to upgrade because the Graph Endpoint %s is not deprecated.", c.GraphEndpoint)
 		return
 	}
 	// Update the Graph Endpoint.
@@ -52,9 +65,9 @@ func updateConfigForGlobal(c *v32.AzureADConfig) {
 	c.TokenEndpoint = fmt.Sprintf("%s%s/oauth2/v2.0/token", c.Endpoint, c.TenantID)
 }
 
-func updateConfigForChina(c *v32.AzureADConfig) {
+func updateEndpointsForChina(c *v32.AzureADConfig) {
 	if c.GraphEndpoint != chinaAzureADGraphEndpoint {
-		logrus.Infoln("Refusing to upgrade because the Graph Endpoint is not deprecated.")
+		logrus.Infof("Refusing to upgrade because the Graph Endpoint %s is not deprecated.", c.GraphEndpoint)
 		return
 	}
 	// Update the Graph Endpoint.

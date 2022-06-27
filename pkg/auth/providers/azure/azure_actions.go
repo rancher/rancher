@@ -72,6 +72,16 @@ func (ap *azureProvider) testAndApply(actionName string, action *types.Action, r
 	}
 
 	azureADConfig := &azureADConfigApplyInput.Config
+
+	// This covers the case where users upgrade Rancher to v2.6.7+ without having used Azure AD as the auth provider.
+	// In 2.6.7+, whether Azure AD is later registered or not, Rancher on startup creates the annotation on the template auth config.
+	// But in the case where the auth config had been created on Rancher startup prior to v2.6.7, the annotation would be missing.
+	// This ensures the annotation is set on next auth provider setup attempt.
+	if azureADConfig.ObjectMeta.Annotations == nil {
+		azureADConfig.ObjectMeta.Annotations = make(map[string]string)
+	}
+	azureADConfig.ObjectMeta.Annotations[GraphEndpointMigratedAnnotation] = "true"
+
 	azureLogin := &v32.AzureADLogin{
 		Code: azureADConfigApplyInput.Code,
 	}
@@ -110,7 +120,8 @@ func (ap *azureProvider) testAndApply(actionName string, action *types.Action, r
 
 // migrateToMicrosoftGraph represents the migration of the registered Azure AD auth provider
 // from the deprecated Azure AD Graph API to the Microsoft Graph API.
-// It modifies the existing auth config value in the database, so that it has a new endpoint to the new API.
+// It modifies the existing auth config value in the database, so that it has up-to-date endpoints to the new API.
+// Most importantly, it sets the annotation that specifies that the auth config has been migrated to use the new auth flow.
 func (ap *azureProvider) migrateToMicrosoftGraph() error {
 	defer ap.deleteUserAccessTokens()
 	defer clients.GroupCache.Purge()
@@ -120,7 +131,13 @@ func (ap *azureProvider) migrateToMicrosoftGraph() error {
 		return err
 	}
 	if authProviderEnabled(cfg) {
-		updateAzureADConfig(cfg)
+		updateAzureADEndpoints(cfg)
+
+		if cfg.ObjectMeta.Annotations == nil {
+			cfg.ObjectMeta.Annotations = make(map[string]string)
+		}
+		cfg.ObjectMeta.Annotations[GraphEndpointMigratedAnnotation] = "true"
+
 		err = ap.saveAzureConfigK8s(cfg)
 		if err != nil {
 			return err
