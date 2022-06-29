@@ -121,6 +121,7 @@ func GrbCRBName(grb *v3.GlobalRoleBinding) string {
 func GetGRBSubject(grb *v3.GlobalRoleBinding) rbacv1.Subject {
 	kind := "User"
 	name := grb.UserName
+	logrus.Infof("grb %#v", grb)
 	if grb.ClusterName == "" && grb.GroupPrincipalName != "" {
 		kind = "Group"
 		name = grb.GroupPrincipalName
