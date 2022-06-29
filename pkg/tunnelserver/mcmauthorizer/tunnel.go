@@ -11,14 +11,13 @@ import (
 	"reflect"
 	"strings"
 
+	"github.com/rancher/norman/types/convert"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	"github.com/rancher/rancher/pkg/controllers/management/secretmigrator"
 	corev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
-	"github.com/rancher/rancher/pkg/kontainerdriver"
-
-	"github.com/rancher/norman/types/convert"
-	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/kontainerdriver"
 	"github.com/rancher/rancher/pkg/taints"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/sirupsen/logrus"
@@ -71,12 +70,22 @@ func NewAuthorizer(context *config.ScaledContext) *Authorizer {
 		Secrets:               context.Core.Secrets(""),
 		SecretLister:          context.Core.Secrets("").Controller().Lister(),
 	}
-	context.Management.ClusterRegistrationTokens("").Controller().Informer().AddIndexers(map[string]cache.IndexFunc{
+	err := context.Management.ClusterRegistrationTokens("").Controller().Informer().AddIndexers(map[string]cache.IndexFunc{
 		crtKeyIndex: auth.crtIndex,
 	})
-	context.Management.Nodes("").Controller().Informer().AddIndexers(map[string]cache.IndexFunc{
+	if err != nil {
+		logrus.Error("[NewAuthorizer]unexpected error returned when adding Indexers " +
+			"for the management context of cluster registration tokens")
+		return nil
+	}
+	err = context.Management.Nodes("").Controller().Informer().AddIndexers(map[string]cache.IndexFunc{
 		nodeKeyIndex: auth.nodeIndex,
 	})
+	if err != nil {
+		logrus.Error("[NewAuthorizer]unexpected error returned when adding Indexers " +
+			"for the management context of nodes")
+		return nil
+	}
 	return auth
 }
 
@@ -93,8 +102,8 @@ type Authorizer struct {
 }
 
 type Client struct {
-	Cluster     *v3.Cluster
-	Node        *v3.Node
+	Cluster     *v32.Cluster
+	Node        *v32.Node
 	Token       string
 	Server      string
 	NodeVersion int
@@ -162,14 +171,14 @@ func (t *Authorizer) Authorize(req *http.Request) (*Client, bool, error) {
 	return nil, false, nil
 }
 
-func (t *Authorizer) getMachine(cluster *v3.Cluster, inNode *client.Node) (*v3.Node, error) {
+func (t *Authorizer) getMachine(cluster *v32.Cluster, inNode *client.Node) (*v32.Node, error) {
 	machineName := machineName(inNode)
 	logrus.Tracef("getMachine: looking up machine [%s] in cluster [%s]", machineName, cluster.Name)
 	machine, err := t.machineLister.Get(cluster.Name, machineName)
 	if apierrors.IsNotFound(err) {
 		if objs, err := t.nodeIndexer.ByIndex(nodeKeyIndex, fmt.Sprintf("%s/%s", cluster.Name, inNode.RequestedHostname)); err == nil {
 			for _, obj := range objs {
-				return obj.(*v3.Node), err
+				return obj.(*v32.Node), err
 			}
 		}
 
@@ -193,7 +202,7 @@ func (t *Authorizer) getMachine(cluster *v3.Cluster, inNode *client.Node) (*v3.N
 	return machine, err
 }
 
-func (t *Authorizer) authorizeNode(register bool, cluster *v3.Cluster, inNode *client.Node, req *http.Request) (*v3.Node, bool, error) {
+func (t *Authorizer) authorizeNode(register bool, cluster *v32.Cluster, inNode *client.Node, req *http.Request) (*v32.Node, bool, error) {
 	machine, err := t.getMachine(cluster, inNode)
 	if apierrors.IsNotFound(err) {
 		if !register {
@@ -219,7 +228,7 @@ func (t *Authorizer) authorizeNode(register bool, cluster *v3.Cluster, inNode *c
 	return machine, true, err
 }
 
-func (t *Authorizer) createNode(inNode *client.Node, cluster *v3.Cluster, req *http.Request) (*v3.Node, error) {
+func (t *Authorizer) createNode(inNode *client.Node, cluster *v32.Cluster, req *http.Request) (*v32.Node, error) {
 	customConfig := t.toCustomConfig(inNode)
 	if customConfig == nil {
 		return nil, errors.New("invalid input, missing custom config")
@@ -231,7 +240,7 @@ func (t *Authorizer) createNode(inNode *client.Node, cluster *v3.Cluster, req *h
 
 	name := machineName(inNode)
 
-	machine := &v3.Node{
+	machine := &v32.Node{
 		ObjectMeta: v1.ObjectMeta{
 			Name:      name,
 			Namespace: cluster.Name,
@@ -249,7 +258,7 @@ func (t *Authorizer) createNode(inNode *client.Node, cluster *v3.Cluster, req *h
 	return t.machines.Create(machine)
 }
 
-func (t *Authorizer) updateDockerInfo(machine *v3.Node, inNode *client.Node) (*v3.Node, error) {
+func (t *Authorizer) updateDockerInfo(machine *v32.Node, inNode *client.Node) (*v32.Node, error) {
 	if inNode.DockerInfo == nil {
 		return machine, nil
 	}
@@ -268,7 +277,7 @@ func (t *Authorizer) updateDockerInfo(machine *v3.Node, inNode *client.Node) (*v
 	return machine, nil
 }
 
-func (t *Authorizer) updateNode(machine *v3.Node, inNode *client.Node, cluster *v3.Cluster) (*v3.Node, error) {
+func (t *Authorizer) updateNode(machine *v32.Node, inNode *client.Node, cluster *v32.Cluster) (*v32.Node, error) {
 	newMachine := machine.DeepCopy()
 	newMachine.Spec.Etcd = inNode.Etcd
 	newMachine.Spec.ControlPlane = inNode.ControlPlane
@@ -279,7 +288,7 @@ func (t *Authorizer) updateNode(machine *v3.Node, inNode *client.Node, cluster *
 	return machine, nil
 }
 
-func (t *Authorizer) authorizeCluster(cluster *v3.Cluster, inCluster *cluster, req *http.Request) (*v3.Cluster, bool, error) {
+func (t *Authorizer) authorizeCluster(cluster *v32.Cluster, inCluster *cluster, req *http.Request) (*v32.Cluster, bool, error) {
 	var (
 		err error
 	)
@@ -328,7 +337,7 @@ func (t *Authorizer) authorizeCluster(cluster *v3.Cluster, inCluster *cluster, r
 	return cluster, true, err
 }
 
-func (t *Authorizer) readInput(cluster *v3.Cluster, req *http.Request) (*input, error) {
+func (t *Authorizer) readInput(cluster *v32.Cluster, req *http.Request) (*input, error) {
 	params := req.Header.Get(Params)
 	var input input
 
@@ -371,14 +380,14 @@ func machineName(machine *client.Node) string {
 	return machineNameMD5
 }
 
-func (t *Authorizer) getClusterByToken(token string) (*v3.Cluster, error) {
+func (t *Authorizer) getClusterByToken(token string) (*v32.Cluster, error) {
 	keys, err := t.crtIndexer.ByIndex(crtKeyIndex, token)
 	if err != nil {
 		return nil, err
 	}
 
 	for _, obj := range keys {
-		crt := obj.(*v3.ClusterRegistrationToken)
+		crt := obj.(*v32.ClusterRegistrationToken)
 		return t.clusterLister.Get("", crt.Spec.ClusterName)
 	}
 
@@ -386,7 +395,7 @@ func (t *Authorizer) getClusterByToken(token string) (*v3.Cluster, error) {
 }
 
 func (t *Authorizer) crtIndex(obj interface{}) ([]string, error) {
-	crt := obj.(*v3.ClusterRegistrationToken)
+	crt := obj.(*v32.ClusterRegistrationToken)
 	if crt.Status.Token == "" {
 		return nil, nil
 	}
@@ -394,7 +403,7 @@ func (t *Authorizer) crtIndex(obj interface{}) ([]string, error) {
 }
 
 func (t *Authorizer) nodeIndex(obj interface{}) ([]string, error) {
-	node := obj.(*v3.Node)
+	node := obj.(*v32.Node)
 	return []string{fmt.Sprintf("%s/%s", node.Namespace, node.Status.NodeName)}, nil
 }
 

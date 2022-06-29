@@ -61,7 +61,7 @@ type Manager struct {
 	users        v3.UserInterface
 }
 
-func (s *Manager) CreateSystemAccount(cluster *v3.Cluster) error {
+func (s *Manager) CreateSystemAccount(cluster *v32.Cluster) error {
 	user, err := s.GetSystemUser(cluster.Name)
 	if err != nil {
 		return err
@@ -73,7 +73,7 @@ func (s *Manager) CreateSystemAccount(cluster *v3.Cluster) error {
 		return nil
 	}
 
-	_, err = s.crtbs.Create(&v3.ClusterRoleTemplateBinding{
+	_, err = s.crtbs.Create(&v32.ClusterRoleTemplateBinding{
 		ObjectMeta: v1.ObjectMeta{
 			Name:      bindingName,
 			Namespace: cluster.Name,
@@ -86,7 +86,7 @@ func (s *Manager) CreateSystemAccount(cluster *v3.Cluster) error {
 	return err
 }
 
-func (s *Manager) GetSystemUser(clusterName string) (*v3.User, error) {
+func (s *Manager) GetSystemUser(clusterName string) (*v32.User, error) {
 	return s.userManager.EnsureUser(fmt.Sprintf("system://%s", clusterName), ClusterSystemAccountPrefix+clusterName)
 }
 
@@ -99,7 +99,7 @@ func (s *Manager) GetOrCreateSystemClusterToken(clusterName string) (string, err
 		if err != nil {
 			return "", err
 		}
-		crt = &v3.ClusterRegistrationToken{
+		crt = &v32.ClusterRegistrationToken{
 			ObjectMeta: v1.ObjectMeta{
 				Name:      "system",
 				Namespace: clusterName,
@@ -139,7 +139,7 @@ func (s *Manager) GetOrCreateProjectSystemAccount(projectID string) error {
 			return err
 		}
 		// prtb does not exist in cache, attempt to create it
-		prtb := &v3.ProjectRoleTemplateBinding{
+		prtb := &v32.ProjectRoleTemplateBinding{
 			ObjectMeta: v1.ObjectMeta{
 				Name:      bindingName,
 				Namespace: projectName,
@@ -155,11 +155,11 @@ func (s *Manager) GetOrCreateProjectSystemAccount(projectID string) error {
 	return nil
 }
 
-func (s *Manager) GetProjectSystemUser(projectName string) (*v3.User, error) {
+func (s *Manager) GetProjectSystemUser(projectName string) (*v32.User, error) {
 	return s.userManager.EnsureUser(fmt.Sprintf("system://%s", projectName), ProjectSystemAccountPrefix+projectName)
 }
 
-func (s *Manager) GetProjectPipelineSystemToken(projectName string) (*v3.Token, error) {
+func (s *Manager) GetProjectPipelineSystemToken(projectName string) (*v32.Token, error) {
 	return s.tokenLister.Get("", projectName+"-pipeline")
 }
 

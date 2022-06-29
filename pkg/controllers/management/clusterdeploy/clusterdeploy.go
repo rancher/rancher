@@ -120,7 +120,7 @@ func (cd *clusterDeploy) sync(key string, cluster *v3.Cluster) (runtime.Object, 
 	return nil, updateErr
 }
 
-func (cd *clusterDeploy) doSync(cluster *v3.Cluster) error {
+func (cd *clusterDeploy) doSync(cluster *v32.Cluster) error {
 	logrus.Tracef("clusterDeploy: doSync called for cluster [%s]", cluster.Name)
 
 	if !v32.ClusterConditionProvisioned.IsTrue(cluster) {
@@ -185,7 +185,7 @@ func agentFeaturesChanged(desired, actual map[string]bool) bool {
 	return false
 }
 
-func redeployAgent(cluster *v3.Cluster, desiredAgent, desiredAuth string, desiredFeatures map[string]bool, desiredTaints []corev1.Taint) bool {
+func redeployAgent(cluster *v32.Cluster, desiredAgent, desiredAuth string, desiredFeatures map[string]bool, desiredTaints []corev1.Taint) bool {
 	logrus.Tracef("clusterDeploy: redeployAgent called for cluster [%s]", cluster.Name)
 	if !v32.ClusterConditionAgentDeployed.IsTrue(cluster) {
 		return true
@@ -252,7 +252,7 @@ func redeployAgent(cluster *v3.Cluster, desiredAgent, desiredAuth string, desire
 	return false
 }
 
-func getDesiredImage(cluster *v3.Cluster) string {
+func getDesiredImage(cluster *v32.Cluster) string {
 	if cluster.Spec.AgentImageOverride != "" {
 		return cluster.Spec.AgentImageOverride
 	}
@@ -260,7 +260,7 @@ func getDesiredImage(cluster *v3.Cluster) string {
 	return cluster.Spec.DesiredAgentImage
 }
 
-func (cd *clusterDeploy) getDesiredFeatures(cluster *v3.Cluster) map[string]bool {
+func (cd *clusterDeploy) getDesiredFeatures(cluster *v32.Cluster) map[string]bool {
 	return map[string]bool{
 		features.MCM.Name():                false,
 		features.MCMAgent.Name():           true,
@@ -272,7 +272,7 @@ func (cd *clusterDeploy) getDesiredFeatures(cluster *v3.Cluster) map[string]bool
 	}
 }
 
-func (cd *clusterDeploy) deployAgent(cluster *v3.Cluster) error {
+func (cd *clusterDeploy) deployAgent(cluster *v32.Cluster) error {
 	if cluster.Spec.Internal {
 		return nil
 	}
@@ -401,7 +401,7 @@ func (cd *clusterDeploy) deployAgent(cluster *v3.Cluster) error {
 	return nil
 }
 
-func (cd *clusterDeploy) setNetworkPolicyAnn(cluster *v3.Cluster) error {
+func (cd *clusterDeploy) setNetworkPolicyAnn(cluster *v32.Cluster) error {
 	if cluster.Spec.EnableNetworkPolicy != nil {
 		return nil
 	}
@@ -415,7 +415,7 @@ func (cd *clusterDeploy) setNetworkPolicyAnn(cluster *v3.Cluster) error {
 	return nil
 }
 
-func (cd *clusterDeploy) getKubeConfig(cluster *v3.Cluster) (*clientcmdapi.Config, string, error) {
+func (cd *clusterDeploy) getKubeConfig(cluster *v32.Cluster) (*clientcmdapi.Config, string, error) {
 	logrus.Tracef("clusterDeploy: getKubeConfig called for cluster [%s]", cluster.Name)
 	systemUser, err := cd.systemAccountManager.GetSystemUser(cluster.Name)
 	if err != nil {
@@ -432,7 +432,7 @@ func (cd *clusterDeploy) getKubeConfig(cluster *v3.Cluster) (*clientcmdapi.Confi
 	return cd.clusterManager.KubeConfig(cluster.Name, token), tokenName, nil
 }
 
-func (cd *clusterDeploy) getYAML(cluster *v3.Cluster, agentImage, authImage string, features map[string]bool, taints []corev1.Taint, privateRegistries *corev1.Secret) ([]byte, error) {
+func (cd *clusterDeploy) getYAML(cluster *v32.Cluster, agentImage, authImage string, features map[string]bool, taints []corev1.Taint, privateRegistries *corev1.Secret) ([]byte, error) {
 	logrus.Tracef("clusterDeploy: getYAML: Desired agent image is [%s] for cluster [%s]", agentImage, cluster.Name)
 	logrus.Tracef("clusterDeploy: getYAML: Desired auth image is [%s] for cluster [%s]", authImage, cluster.Name)
 	logrus.Tracef("clusterDeploy: getYAML: Desired features are [%v] for cluster [%s]", features, cluster.Name)
