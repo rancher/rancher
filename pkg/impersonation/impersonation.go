@@ -9,6 +9,7 @@ import (
 
 	authcommon "github.com/rancher/rancher/pkg/auth/providers/common"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/serviceaccounttoken"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
@@ -95,29 +96,30 @@ func (i *Impersonator) SetUpImpersonation() (*corev1.ServiceAccount, error) {
 
 // GetToken accepts a service account and returns the service account's token.
 func (i *Impersonator) GetToken(sa *corev1.ServiceAccount) (string, error) {
-	if len(sa.Secrets) == 0 {
-		return "", fmt.Errorf("service account is not ready")
-	}
-	secret := sa.Secrets[0]
-	secretObj, err := i.clusterContext.Core.Secrets("").Controller().Lister().Get(ImpersonationNamespace, secret.Name)
+	name := sa.Name + "-token"
+	secret, err := i.clusterContext.Core.Secrets(ImpersonationNamespace).Get(name, metav1.GetOptions{})
 	if err != nil {
-		if logrus.GetLevel() >= logrus.TraceLevel {
-			logrus.Tracef("impersonation: error getting service account token %s: %v", secret.Name, err)
-			if i.clusterContext == nil {
-				logrus.Tracef("impersonation: cluster context is empty")
-			} else {
+		if !apierrors.IsNotFound(err) {
+			logrus.Tracef("impersonation: using context for cluster %s", i.clusterContext.ClusterName)
+			return "", fmt.Errorf("error getting secret: %w", err)
+		}
+		// create the secret
+		sc := serviceaccounttoken.SecretTemplate(sa, name)
+		secret, err = i.clusterContext.Core.Secrets(ImpersonationNamespace).Create(sc)
+		if err != nil {
+			if !apierrors.IsAlreadyExists(err) {
 				logrus.Tracef("impersonation: using context for cluster %s", i.clusterContext.ClusterName)
+				return "", fmt.Errorf("error creating secret: %w", err)
 			}
-			sas, debugErr := i.clusterContext.Core.Secrets("").Controller().Lister().List(ImpersonationNamespace, labels.NewSelector())
-			if debugErr != nil {
-				logrus.Tracef("impersonation: encountered error listing cached secrets: %v", debugErr)
-			} else {
-				logrus.Tracef("impersonation: cached secrets: %+v", sas)
+			secret, err = i.clusterContext.Core.Secrets(ImpersonationNamespace).Get(name, metav1.GetOptions{})
+			if err != nil {
+				logrus.Tracef("impersonation: using context for cluster %s", i.clusterContext.ClusterName)
+				logrus.Tracef("impersonation: secrret already exists")
+				return "", fmt.Errorf("error getting secret: %w", err)
 			}
 		}
-		return "", fmt.Errorf("error getting secret: %w", err)
 	}
-	token, ok := secretObj.Data["token"]
+	token, ok := secret.Data["token"]
 	if !ok {
 		return "", fmt.Errorf("error getting token: invalid secret object")
 	}

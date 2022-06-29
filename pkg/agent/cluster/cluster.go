@@ -8,10 +8,13 @@ import (
 	"os"
 	"path"
 	"strings"
+	"time"
 
 	"github.com/pkg/errors"
 	"github.com/rancher/rancher/pkg/namespace"
+	"github.com/rancher/rancher/pkg/serviceaccounttoken"
 	"github.com/rancher/wrangler/pkg/kubeconfig"
+	"github.com/sirupsen/logrus"
 	coreV1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -61,14 +64,27 @@ func getTokenFromAPI() ([]byte, []byte, error) {
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to find service account %s/%s: %w", namespace.System, "cattle", err)
 	}
-	if len(sa.Secrets) == 0 {
-		return nil, nil, fmt.Errorf("no secret exists for service account %s/%s", namespace.System, "cattle")
-	}
-	secret, err := k8s.CoreV1().Secrets(namespace.System).Get(context.Background(), sa.Secrets[0].Name, metav1.GetOptions{})
+	cm, err := k8s.CoreV1().ConfigMaps(namespace.System).Get(context.Background(), "kube-root-ca.crt", metav1.GetOptions{})
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to find secret for service account %s/%s: %w", namespace.System, "cattle", err)
+		return nil, nil, fmt.Errorf("failed to find configmap containing the CA crt: %w", err)
 	}
-	return secret.Data[coreV1.ServiceAccountRootCAKey], secret.Data[coreV1.ServiceAccountTokenKey], nil
+	secret, err := serviceaccounttoken.CreateSecretForServiceAccount(context.Background(), k8s, sa)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to create secret for service account %s/%s: %w", namespace.System, "cattle", err)
+	}
+	logrus.Infof("Waiting for service account token key to be populated for secret %s/%s", secret.Namespace, secret.Name)
+	for {
+		if tokenBytes, ok := secret.Data[coreV1.ServiceAccountTokenKey]; !ok || len(tokenBytes) == 0 {
+			time.Sleep(2 * time.Second)
+			secret, err = serviceaccounttoken.CreateSecretForServiceAccount(context.Background(), k8s, sa)
+			if err != nil {
+				return nil, nil, fmt.Errorf("failed to create secret for service account %s/%s: %w", namespace.System, "cattle", err)
+			}
+		} else {
+			break
+		}
+	}
+	return []byte(cm.Data["ca.crt"]), []byte(secret.Data[coreV1.ServiceAccountTokenKey]), nil
 }
 
 func Params() (map[string]interface{}, error) {

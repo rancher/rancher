@@ -7,6 +7,7 @@ import (
 	"time"
 
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/serviceaccounttoken"
 
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
@@ -186,14 +187,9 @@ func getAuthToken(userContext *config.UserContext, appName, namespace string) (s
 		return "", fmt.Errorf("get service account %s:%s for monitor failed, %v", namespace, appName, err)
 	}
 
-	var secretName string
-	if secretName = sa.Secrets[0].Name; secretName == "" {
-		return "", fmt.Errorf("get secret from service account %s:%s for monitor failed, secret name is empty", namespace, appName)
-	}
-
-	secret, err := userContext.Core.Secrets(namespace).Get(secretName, metav1.GetOptions{})
+	secret, err := serviceaccounttoken.CreateSecretForServiceAccount(context.TODO(), userContext.K8sClient, sa)
 	if err != nil {
-		return "", fmt.Errorf("get secret %s:%s for monitor failed, %v", namespace, secretName, err)
+		return "", fmt.Errorf("get secret from service account %s:%s for monitor failed: %v", namespace, appName, err)
 	}
 
 	return string(secret.Data["token"]), nil

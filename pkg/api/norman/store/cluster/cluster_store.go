@@ -12,6 +12,7 @@ import (
 	"sync"
 
 	"github.com/blang/semver"
+	mVersion "github.com/mcuadros/go-version"
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/api/access"
 	"github.com/rancher/norman/httperror"
@@ -251,6 +252,7 @@ func (r *Store) Create(apiContext *types.APIContext, schema *types.Schema, data 
 	if err != nil {
 		return nil, err
 	}
+	enableCRIDockerd(data)
 	// enable local backups for rke clusters by default
 	enableLocalBackup(data)
 	if err := setNodeUpgradeStrategy(data, nil); err != nil {
@@ -1235,6 +1237,17 @@ func enableLocalBackup(data map[string]interface{}) {
 			}
 			// enable rancher etcd backup
 			values.PutValue(data, backupConfig, "rancherKubernetesEngineConfig", "services", "etcd", "backupConfig")
+		}
+	}
+}
+
+func enableCRIDockerd(data map[string]interface{}) {
+	rkeConfig, ok := values.GetValue(data, "rancherKubernetesEngineConfig")
+	if ok && rkeConfig != nil {
+		k8sVersion := convert.ToString(values.GetValueN(data, "rancherKubernetesEngineConfig", "kubernetesVersion"))
+		if mVersion.Compare(k8sVersion, "v1.24.0-rancher1-1", ">=") {
+			enableCRIDockerd124 := true
+			values.PutValue(data, enableCRIDockerd124, "rancherKubernetesEngineConfig", "enableCriDockerd")
 		}
 	}
 }

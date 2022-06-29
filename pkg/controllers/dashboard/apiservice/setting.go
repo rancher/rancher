@@ -57,7 +57,7 @@ func (h *handler) getInternalServerAndURL() (string, string, error) {
 	serverURL := settings.ServerURL.Get()
 	ca := settings.CACerts.Get()
 
-	tlsSecret, err := h.secrets.Get(namespace.System, "tls-rancher-internal-ca")
+	tlsSecret, err := h.secretsCache.Get(namespace.System, "tls-rancher-internal-ca")
 	if err != nil {
 		return "", "", err
 	}

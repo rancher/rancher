@@ -12,6 +12,7 @@ import (
 	rkecontroller "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/provisioningv2/rke2/installer"
+	"github.com/rancher/rancher/pkg/serviceaccounttoken"
 	"github.com/rancher/rancher/pkg/tls"
 	"github.com/rancher/rancher/pkg/wrangler"
 	appcontrollers "github.com/rancher/wrangler/pkg/generated/controllers/apps/v1"
@@ -36,6 +37,7 @@ const (
 type handler struct {
 	serviceAccountCache corecontrollers.ServiceAccountCache
 	secretCache         corecontrollers.SecretCache
+	secretClient        corecontrollers.SecretClient
 	machineCache        capicontrollers.MachineCache
 	capiClusters        capicontrollers.ClusterCache
 	deploymentCache     appcontrollers.DeploymentCache
@@ -47,6 +49,7 @@ func Register(ctx context.Context, clients *wrangler.Context) {
 	h := &handler{
 		serviceAccountCache: clients.Core.ServiceAccount().Cache(),
 		secretCache:         clients.Core.Secret().Cache(),
+		secretClient:        clients.Core.Secret(),
 		machineCache:        clients.CAPI.Machine().Cache(),
 		capiClusters:        clients.CAPI.Cluster().Cache(),
 		deploymentCache:     clients.Apps.Deployment().Cache(),
@@ -101,41 +104,50 @@ func (h *handler) getBootstrapSecret(namespace, name string, envVars []corev1.En
 		return nil, err
 
 	}
-	for _, secretRef := range sa.Secrets {
-		secret, err := h.secretCache.Get(sa.Namespace, secretRef.Name)
-		if err != nil {
+	sName := sa.Name
+	secret, err := h.secretCache.Get(sa.Namespace, sName)
+	if err != nil {
+		if !apierror.IsNotFound(err) {
 			return nil, err
 		}
-
-		hash := sha256.Sum256(secret.Data["token"])
-
-		hasHostPort, err := h.rancherDeploymentHasHostPort()
+		sc := serviceaccounttoken.SecretTemplate(sa, sName)
+		secret, err = h.secretClient.Create(sc)
 		if err != nil {
-			return nil, err
+			if !apierror.IsAlreadyExists(err) {
+				return nil, err
+			}
+			secret, err = h.secretClient.Get(sa.Namespace, sName, metav1.GetOptions{})
+			if err != nil {
+				return nil, err
+			}
 		}
+	}
+	hash := sha256.Sum256(secret.Data["token"])
 
-		is := installer.LinuxInstallScript
-		if os := machine.GetLabels()[rke2.CattleOSLabel]; os == rke2.WindowsMachineOS {
-			is = installer.WindowsInstallScript
-		}
-		data, err := is(context.WithValue(context.Background(), tls.InternalAPI, hasHostPort), base64.URLEncoding.EncodeToString(hash[:]), envVars, "")
-		if err != nil {
-			return nil, err
-		}
-
-		return &corev1.Secret{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      name,
-				Namespace: namespace,
-			},
-			Data: map[string][]byte{
-				"value": data,
-			},
-			Type: "rke.cattle.io/bootstrap",
-		}, nil
+	hasHostPort, err := h.rancherDeploymentHasHostPort()
+	if err != nil {
+		return nil, err
 	}
 
-	return nil, nil
+	is := installer.LinuxInstallScript
+	if os := machine.GetLabels()[rke2.CattleOSLabel]; os == rke2.WindowsMachineOS {
+		is = installer.WindowsInstallScript
+	}
+	data, err := is(context.WithValue(context.Background(), tls.InternalAPI, hasHostPort), base64.URLEncoding.EncodeToString(hash[:]), envVars, "")
+	if err != nil {
+		return nil, err
+	}
+
+	return &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		},
+		Data: map[string][]byte{
+			"value": data,
+		},
+		Type: "rke.cattle.io/bootstrap",
+	}, nil
 }
 
 func (h *handler) assignPlanSecret(machine *capi.Machine, bootstrap *rkev1.RKEBootstrap) []runtime.Object {

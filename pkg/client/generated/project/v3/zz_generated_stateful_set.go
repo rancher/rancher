@@ -2,6 +2,8 @@ package client
 
 import (
 	"github.com/rancher/norman/types"
+
+	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
 const (
@@ -26,6 +28,7 @@ const (
 	StatefulSetFieldHostname                             = "hostname"
 	StatefulSetFieldImagePullSecrets                     = "imagePullSecrets"
 	StatefulSetFieldLabels                               = "labels"
+	StatefulSetFieldMaxUnavailable                       = "maxUnavailable"
 	StatefulSetFieldMinReadySeconds                      = "minReadySeconds"
 	StatefulSetFieldName                                 = "name"
 	StatefulSetFieldNamespaceId                          = "namespaceId"
@@ -90,6 +93,7 @@ type StatefulSet struct {
 	Hostname                             string                                           `json:"hostname,omitempty" yaml:"hostname,omitempty"`
 	ImagePullSecrets                     []LocalObjectReference                           `json:"imagePullSecrets,omitempty" yaml:"imagePullSecrets,omitempty"`
 	Labels                               map[string]string                                `json:"labels,omitempty" yaml:"labels,omitempty"`
+	MaxUnavailable                       intstr.IntOrString                               `json:"maxUnavailable,omitempty" yaml:"maxUnavailable,omitempty"`
 	MinReadySeconds                      int64                                            `json:"minReadySeconds,omitempty" yaml:"minReadySeconds,omitempty"`
 	Name                                 string                                           `json:"name,omitempty" yaml:"name,omitempty"`
 	NamespaceId                          string                                           `json:"namespaceId,omitempty" yaml:"namespaceId,omitempty"`
