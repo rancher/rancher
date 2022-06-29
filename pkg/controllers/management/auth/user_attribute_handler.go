@@ -1,6 +1,7 @@
 package auth
 
 import (
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/providerrefresh"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
@@ -23,7 +24,7 @@ func newUserAttributeController(mgmt *config.ManagementContext) *UserAttributeCo
 }
 
 //sync is called periodically and on real updates
-func (ua *UserAttributeController) sync(key string, obj *v3.UserAttribute) (runtime.Object, error) {
+func (ua *UserAttributeController) sync(key string, obj *v32.UserAttribute) (runtime.Object, error) {
 	if obj == nil || obj.DeletionTimestamp != nil {
 		return nil, nil
 	}

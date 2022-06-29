@@ -2,6 +2,7 @@ package auth
 
 import (
 	"fmt"
+	v33 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"strings"
 
 	"github.com/hashicorp/go-multierror"
@@ -61,7 +62,7 @@ type crtbLifecycle struct {
 	clusterLister v3.ClusterLister
 }
 
-func (c *crtbLifecycle) Create(obj *v3.ClusterRoleTemplateBinding) (runtime.Object, error) {
+func (c *crtbLifecycle) Create(obj *v33.ClusterRoleTemplateBinding) (runtime.Object, error) {
 	obj, err := c.reconcileSubject(obj)
 	if err != nil {
 		return nil, err
@@ -71,7 +72,7 @@ func (c *crtbLifecycle) Create(obj *v3.ClusterRoleTemplateBinding) (runtime.Obje
 	return obj, err
 }
 
-func (c *crtbLifecycle) Updated(obj *v3.ClusterRoleTemplateBinding) (runtime.Object, error) {
+func (c *crtbLifecycle) Updated(obj *v33.ClusterRoleTemplateBinding) (runtime.Object, error) {
 	obj, err := c.reconcileSubject(obj)
 	if err != nil {
 		return nil, err
@@ -83,7 +84,7 @@ func (c *crtbLifecycle) Updated(obj *v3.ClusterRoleTemplateBinding) (runtime.Obj
 	return obj, err
 }
 
-func (c *crtbLifecycle) Remove(obj *v3.ClusterRoleTemplateBinding) (runtime.Object, error) {
+func (c *crtbLifecycle) Remove(obj *v33.ClusterRoleTemplateBinding) (runtime.Object, error) {
 	if err := c.mgr.reconcileClusterMembershipBindingForDelete("", pkgrbac.GetRTBLabel(obj.ObjectMeta)); err != nil {
 		return nil, err
 	}
@@ -95,7 +96,7 @@ func (c *crtbLifecycle) Remove(obj *v3.ClusterRoleTemplateBinding) (runtime.Obje
 	return nil, err
 }
 
-func (c *crtbLifecycle) reconcileSubject(binding *v3.ClusterRoleTemplateBinding) (*v3.ClusterRoleTemplateBinding, error) {
+func (c *crtbLifecycle) reconcileSubject(binding *v33.ClusterRoleTemplateBinding) (*v33.ClusterRoleTemplateBinding, error) {
 	if binding.GroupName != "" || binding.GroupPrincipalName != "" || (binding.UserPrincipalName != "" && binding.UserName != "") {
 		return binding, nil
 	}
@@ -133,7 +134,7 @@ func (c *crtbLifecycle) reconcileSubject(binding *v3.ClusterRoleTemplateBinding)
 // - ensure the subject can see the cluster in the mgmt API
 // - if the subject was granted owner permissions for the clsuter, ensure they can create/update/delete the cluster
 // - if the subject was granted privileges to mgmt plane resources that are scoped to the cluster, enforce those rules in the cluster's mgmt plane namespace
-func (c *crtbLifecycle) reconcileBindings(binding *v3.ClusterRoleTemplateBinding) error {
+func (c *crtbLifecycle) reconcileBindings(binding *v33.ClusterRoleTemplateBinding) error {
 	if binding.UserName == "" && binding.GroupPrincipalName == "" && binding.GroupName == "" {
 		return nil
 	}
@@ -183,7 +184,7 @@ func (c *crtbLifecycle) reconcileBindings(binding *v3.ClusterRoleTemplateBinding
 	return nil
 }
 
-func (c *crtbLifecycle) removeMGMTClusterScopedPrivilegesInProjectNamespace(binding *v3.ClusterRoleTemplateBinding) error {
+func (c *crtbLifecycle) removeMGMTClusterScopedPrivilegesInProjectNamespace(binding *v33.ClusterRoleTemplateBinding) error {
 	projects, err := c.mgr.projectLister.List(binding.Namespace, labels.Everything())
 	if err != nil {
 		return err
@@ -205,7 +206,7 @@ func (c *crtbLifecycle) removeMGMTClusterScopedPrivilegesInProjectNamespace(bind
 	return nil
 }
 
-func (c *crtbLifecycle) reconcileLabels(binding *v3.ClusterRoleTemplateBinding) error {
+func (c *crtbLifecycle) reconcileLabels(binding *v33.ClusterRoleTemplateBinding) error {
 	/* Prior to 2.5, for every CRTB, following CRBs and RBs are created in the management clusters
 		1. CRTB.UID is the label key for a CRB, CRTB.UID=memberhsip-binding-owner
 	    2. CRTB.UID is label key for the RB, CRTB.UID=crtb-in-project-binding-owner (in the namespace of each project in the cluster that the user has access to)

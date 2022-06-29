@@ -2,6 +2,7 @@ package auth
 
 import (
 	"fmt"
+	v33 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 
 	"github.com/hashicorp/go-multierror"
 	"github.com/rancher/rancher/pkg/clustermanager"
@@ -49,16 +50,16 @@ func newRoleTemplateLifecycle(management *config.ManagementContext, clusterManag
 	return rtl
 }
 
-func (rtl *roleTemplateLifecycle) Create(obj *v3.RoleTemplate) (runtime.Object, error) {
+func (rtl *roleTemplateLifecycle) Create(obj *v33.RoleTemplate) (runtime.Object, error) {
 	return rtl.enqueueRtbs(obj)
 }
 
-func (rtl *roleTemplateLifecycle) Updated(obj *v3.RoleTemplate) (runtime.Object, error) {
+func (rtl *roleTemplateLifecycle) Updated(obj *v33.RoleTemplate) (runtime.Object, error) {
 	return rtl.enqueueRtbs(obj)
 }
 
 // enqueueRtbs enqueues crtbs and prtbs associated to the role template.
-func (rtl *roleTemplateLifecycle) enqueueRtbs(obj *v3.RoleTemplate) (runtime.Object, error) {
+func (rtl *roleTemplateLifecycle) enqueueRtbs(obj *v33.RoleTemplate) (runtime.Object, error) {
 	if err := rtl.enqueuePrtbs(obj); err != nil {
 		return nil, err
 	}
@@ -70,7 +71,7 @@ func (rtl *roleTemplateLifecycle) enqueueRtbs(obj *v3.RoleTemplate) (runtime.Obj
 	return nil, nil
 }
 
-func (rtl *roleTemplateLifecycle) Remove(obj *v3.RoleTemplate) (runtime.Object, error) {
+func (rtl *roleTemplateLifecycle) Remove(obj *v33.RoleTemplate) (runtime.Object, error) {
 	clusters, err := rtl.clusters.List(metav1.ListOptions{})
 	if err != nil {
 		return obj, err
@@ -117,7 +118,7 @@ func (rtl *roleTemplateLifecycle) Remove(obj *v3.RoleTemplate) (runtime.Object, 
 
 // removeAuthV2Roles finds any roles based off the owner annotation from the incoming roleTemplate.
 // This is similar to an ownerReference but this is used across namespaces which ownerReferences does not support.
-func (rtl *roleTemplateLifecycle) removeAuthV2Roles(roleTemplate *v3.RoleTemplate) error {
+func (rtl *roleTemplateLifecycle) removeAuthV2Roles(roleTemplate *v33.RoleTemplate) error {
 	// Get the selector for the dependent roles
 	selector, err := apply.GetSelectorFromOwner("auth-prov-v2-roletemplate", roleTemplate)
 	if err != nil {
@@ -142,13 +143,13 @@ func (rtl *roleTemplateLifecycle) removeAuthV2Roles(roleTemplate *v3.RoleTemplat
 }
 
 // enqueue any prtbs linked to this roleTemplate in order to re-sync them via reconcileBindings
-func (rtl *roleTemplateLifecycle) enqueuePrtbs(updatedRT *v3.RoleTemplate) error {
+func (rtl *roleTemplateLifecycle) enqueuePrtbs(updatedRT *v33.RoleTemplate) error {
 	prtbs, err := rtl.prtbIndexer.ByIndex(prtbByRoleTemplateIndex, updatedRT.Name)
 	if err != nil {
 		return err
 	}
 	for _, x := range prtbs {
-		if prtb, ok := x.(*v3.ProjectRoleTemplateBinding); ok {
+		if prtb, ok := x.(*v33.ProjectRoleTemplateBinding); ok {
 			rtl.prtbClient.Controller().Enqueue(prtb.Namespace, prtb.Name)
 		}
 	}
@@ -156,13 +157,13 @@ func (rtl *roleTemplateLifecycle) enqueuePrtbs(updatedRT *v3.RoleTemplate) error
 }
 
 // enqueue any crtbs linked to this roleTemplate in order to re-sync them via reconcileBindings
-func (rtl *roleTemplateLifecycle) enqueueCrtbs(updatedRT *v3.RoleTemplate) error {
+func (rtl *roleTemplateLifecycle) enqueueCrtbs(updatedRT *v33.RoleTemplate) error {
 	crtbs, err := rtl.crtbIndexer.ByIndex(crtbByRoleTemplateIndex, updatedRT.Name)
 	if err != nil {
 		return err
 	}
 	for _, x := range crtbs {
-		if crtb, ok := x.(*v3.ClusterRoleTemplateBinding); ok {
+		if crtb, ok := x.(*v33.ClusterRoleTemplateBinding); ok {
 			rtl.crtbClient.Controller().Enqueue(crtb.Namespace, crtb.Name)
 		}
 	}
@@ -170,7 +171,7 @@ func (rtl *roleTemplateLifecycle) enqueueCrtbs(updatedRT *v3.RoleTemplate) error
 }
 
 func prtbByRoleTemplate(obj interface{}) ([]string, error) {
-	prtb, ok := obj.(*v3.ProjectRoleTemplateBinding)
+	prtb, ok := obj.(*v33.ProjectRoleTemplateBinding)
 	if !ok {
 		return []string{}, nil
 	}
@@ -178,7 +179,7 @@ func prtbByRoleTemplate(obj interface{}) ([]string, error) {
 }
 
 func crtbByRoleTemplate(obj interface{}) ([]string, error) {
-	crtb, ok := obj.(*v3.ClusterRoleTemplateBinding)
+	crtb, ok := obj.(*v33.ClusterRoleTemplateBinding)
 	if !ok {
 		return []string{}, nil
 	}

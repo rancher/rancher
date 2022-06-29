@@ -2,6 +2,7 @@ package auth
 
 import (
 	"fmt"
+	v33 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"reflect"
 
 	"github.com/hashicorp/go-multierror"
@@ -72,17 +73,17 @@ type globalRoleBindingLifecycle struct {
 	roleBindingLister rbacv1.RoleBindingLister
 }
 
-func (grb *globalRoleBindingLifecycle) Create(obj *v3.GlobalRoleBinding) (runtime.Object, error) {
+func (grb *globalRoleBindingLifecycle) Create(obj *v33.GlobalRoleBinding) (runtime.Object, error) {
 	err := grb.reconcileGlobalRoleBinding(obj)
 	return obj, err
 }
 
-func (grb *globalRoleBindingLifecycle) Updated(obj *v3.GlobalRoleBinding) (runtime.Object, error) {
+func (grb *globalRoleBindingLifecycle) Updated(obj *v33.GlobalRoleBinding) (runtime.Object, error) {
 	err := grb.reconcileGlobalRoleBinding(obj)
 	return obj, err
 }
 
-func (grb *globalRoleBindingLifecycle) Remove(obj *v3.GlobalRoleBinding) (runtime.Object, error) {
+func (grb *globalRoleBindingLifecycle) Remove(obj *v33.GlobalRoleBinding) (runtime.Object, error) {
 	if obj.GlobalRoleName == rbac.GlobalAdmin || obj.GlobalRoleName == rbac.GlobalRestrictedAdmin {
 		return obj, grb.deleteAdminBinding(obj)
 	}
@@ -90,7 +91,7 @@ func (grb *globalRoleBindingLifecycle) Remove(obj *v3.GlobalRoleBinding) (runtim
 	return obj, nil
 }
 
-func (grb *globalRoleBindingLifecycle) deleteAdminBinding(obj *v3.GlobalRoleBinding) error {
+func (grb *globalRoleBindingLifecycle) deleteAdminBinding(obj *v33.GlobalRoleBinding) error {
 	// Explicit API call to ensure we have the most recent cluster info when deleting admin bindings
 	clusters, err := grb.clusters.List(metav1.ListOptions{})
 	if err != nil {
@@ -137,7 +138,7 @@ func (grb *globalRoleBindingLifecycle) deleteAdminBinding(obj *v3.GlobalRoleBind
 	return nil
 }
 
-func (grb *globalRoleBindingLifecycle) reconcileGlobalRoleBinding(globalRoleBinding *v3.GlobalRoleBinding) error {
+func (grb *globalRoleBindingLifecycle) reconcileGlobalRoleBinding(globalRoleBinding *v33.GlobalRoleBinding) error {
 	crbName, ok := globalRoleBinding.Annotations[crbNameAnnotation]
 	if !ok {
 		crbName = crbNamePrefix + globalRoleBinding.Name
@@ -222,7 +223,7 @@ func (grb *globalRoleBindingLifecycle) reconcileGlobalRoleBinding(globalRoleBind
 	return grb.addRulesForTemplateAndTemplateVersions(globalRoleBinding, subject)
 }
 
-func (grb *globalRoleBindingLifecycle) addRulesForTemplateAndTemplateVersions(globalRoleBinding *v3.GlobalRoleBinding, subject v1.Subject) error {
+func (grb *globalRoleBindingLifecycle) addRulesForTemplateAndTemplateVersions(globalRoleBinding *v33.GlobalRoleBinding, subject v1.Subject) error {
 	// Check if the current globalRole has rules for templates and templateversions
 	gr, err := grb.grLister.Get("", globalRoleBinding.GlobalRoleName)
 	if err != nil && !apierrors.IsNotFound(err) {
@@ -281,7 +282,7 @@ func (grb *globalRoleBindingLifecycle) addRulesForTemplateAndTemplateVersions(gl
 	return nil
 }
 
-func (grb *globalRoleBindingLifecycle) syncDownstreamClusterPermissions(subject v1.Subject, globalRoleBinding *v3.GlobalRoleBinding) error {
+func (grb *globalRoleBindingLifecycle) syncDownstreamClusterPermissions(subject v1.Subject, globalRoleBinding *v33.GlobalRoleBinding) error {
 	if err := grb.createRestrictedAdminCRBsForUserClusters(subject, globalRoleBinding); err != nil {
 		return err
 	}
@@ -289,7 +290,7 @@ func (grb *globalRoleBindingLifecycle) syncDownstreamClusterPermissions(subject 
 	return grb.grantRestrictedAdminUserClusterPermissions(subject, globalRoleBinding)
 }
 
-func (grb *globalRoleBindingLifecycle) createRestrictedAdminCRBsForUserClusters(subject v1.Subject, globalRoleBinding *v3.GlobalRoleBinding) error {
+func (grb *globalRoleBindingLifecycle) createRestrictedAdminCRBsForUserClusters(subject v1.Subject, globalRoleBinding *v33.GlobalRoleBinding) error {
 	// Get CR for each downstream cluster, create CRB with this subject for each such CR
 	r, _ := labels.NewRequirement(rbac.RestrictedAdminCRForClusters, selection.Exists, []string{})
 	crs, err := grb.crLister.List("", labels.NewSelector().Add(*r))
@@ -327,7 +328,7 @@ func (grb *globalRoleBindingLifecycle) createRestrictedAdminCRBsForUserClusters(
 	return returnErr
 }
 
-func (grb *globalRoleBindingLifecycle) grantRestrictedAdminUserClusterPermissions(subject v1.Subject, globalRoleBinding *v3.GlobalRoleBinding) error {
+func (grb *globalRoleBindingLifecycle) grantRestrictedAdminUserClusterPermissions(subject v1.Subject, globalRoleBinding *v33.GlobalRoleBinding) error {
 	var returnErr error
 	clusters, err := grb.clusterLister.List("", labels.NewSelector())
 	if err != nil {

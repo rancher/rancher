@@ -1,6 +1,7 @@
 package auth
 
 import (
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"testing"
 
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
@@ -15,7 +16,7 @@ const testNamespace = "test-cluster"
 const testRoleTemplateName = "fake-role-template"
 
 func TestEnqueuePrtbsOnRoleTemplateUpdate(t *testing.T) {
-	existingPrtbs := []*v3.ProjectRoleTemplateBinding{
+	existingPrtbs := []*v32.ProjectRoleTemplateBinding{
 		{
 			ObjectMeta: v1.ObjectMeta{
 				Name:      "prtb-1",
@@ -49,9 +50,9 @@ func TestEnqueuePrtbsOnRoleTemplateUpdate(t *testing.T) {
 		prtbByRoleTemplateIndex: prtbByRoleTemplate,
 	}
 	mockIndexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
-	mockIndexer.AddIndexers(indexers)
+	assert.NoError(t, mockIndexer.AddIndexers(indexers))
 	for _, obj := range existingPrtbs {
-		mockIndexer.Add(obj)
+		assert.NoError(t, mockIndexer.Add(obj))
 	}
 
 	rtl := roleTemplateLifecycle{
@@ -63,7 +64,7 @@ func TestEnqueuePrtbsOnRoleTemplateUpdate(t *testing.T) {
 		},
 	}
 
-	updatedRT := v3.RoleTemplate{
+	updatedRT := v32.RoleTemplate{
 		ObjectMeta: v1.ObjectMeta{
 			Name:      testRoleTemplateName,
 			Namespace: testNamespace,
@@ -76,7 +77,7 @@ func TestEnqueuePrtbsOnRoleTemplateUpdate(t *testing.T) {
 }
 
 func TestEnqueueCrtbsOnRoleTemplateUpdate(t *testing.T) {
-	existingCrtbs := []*v3.ClusterRoleTemplateBinding{
+	existingCrtbs := []*v32.ClusterRoleTemplateBinding{
 		{
 			ObjectMeta: v1.ObjectMeta{
 				Name:      "crtb-1",
@@ -110,9 +111,9 @@ func TestEnqueueCrtbsOnRoleTemplateUpdate(t *testing.T) {
 		crtbByRoleTemplateIndex: crtbByRoleTemplate,
 	}
 	mockIndexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
-	mockIndexer.AddIndexers(indexers)
+	assert.NoError(t, mockIndexer.AddIndexers(indexers))
 	for _, obj := range existingCrtbs {
-		mockIndexer.Add(obj)
+		assert.NoError(t, mockIndexer.Add(obj))
 	}
 
 	rtl := roleTemplateLifecycle{
@@ -124,14 +125,13 @@ func TestEnqueueCrtbsOnRoleTemplateUpdate(t *testing.T) {
 		},
 	}
 
-	updatedRT := v3.RoleTemplate{
+	updatedRT := v32.RoleTemplate{
 		ObjectMeta: v1.ObjectMeta{
 			Name:      testRoleTemplateName,
 			Namespace: testNamespace,
 		},
 	}
 	// Now pass in a roleTemplate with name that matches a subset of test objects
-	err := rtl.enqueueCrtbs(&updatedRT)
-	assert.Nil(t, err)
+	assert.NoError(t, rtl.enqueueCrtbs(&updatedRT))
 	assert.Equal(t, 2, len(mockCrtbController.EnqueueCalls()))
 }

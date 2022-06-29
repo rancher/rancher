@@ -1,6 +1,7 @@
 package auth
 
 import (
+	v33 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	tokenUtil "github.com/rancher/rancher/pkg/auth/tokens"
 	"github.com/rancher/rancher/pkg/features"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
@@ -24,7 +25,7 @@ func newTokenController(mgmt *config.ManagementContext) *TokenController {
 }
 
 //sync is called periodically and on real updates
-func (n *TokenController) sync(key string, obj *v3.Token) (runtime.Object, error) {
+func (n *TokenController) sync(key string, obj *v33.Token) (runtime.Object, error) {
 	if obj == nil {
 		return nil, nil
 	}

@@ -2,6 +2,7 @@ package auth
 
 import (
 	"github.com/rancher/rancher/pkg/api/norman/store/roletemplate"
+	v33 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -20,7 +21,7 @@ func newLegacyRTCleaner(mgmt *config.ManagementContext) *rtCleaner {
 }
 
 // sync cleans up all roleTemplates to drop cluster-scoped lifecycle handler finalizers
-func (p *rtCleaner) sync(key string, obj *v3.RoleTemplate) (runtime.Object, error) {
+func (p *rtCleaner) sync(key string, obj *v33.RoleTemplate) (runtime.Object, error) {
 	if key == "" || obj == nil {
 		return nil, nil
 	}

@@ -2,6 +2,7 @@ package auth
 
 import (
 	"fmt"
+	v33 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"strings"
 
 	"github.com/hashicorp/go-multierror"
@@ -52,7 +53,7 @@ type prtbLifecycle struct {
 	clusterLister v3.ClusterLister
 }
 
-func (p *prtbLifecycle) Create(obj *v3.ProjectRoleTemplateBinding) (runtime.Object, error) {
+func (p *prtbLifecycle) Create(obj *v33.ProjectRoleTemplateBinding) (runtime.Object, error) {
 	if obj.ServiceAccount != "" {
 		return obj, nil
 	}
@@ -64,7 +65,7 @@ func (p *prtbLifecycle) Create(obj *v3.ProjectRoleTemplateBinding) (runtime.Obje
 	return obj, err
 }
 
-func (p *prtbLifecycle) Updated(obj *v3.ProjectRoleTemplateBinding) (runtime.Object, error) {
+func (p *prtbLifecycle) Updated(obj *v33.ProjectRoleTemplateBinding) (runtime.Object, error) {
 	if obj.ServiceAccount != "" {
 		return obj, nil
 	}
@@ -79,7 +80,7 @@ func (p *prtbLifecycle) Updated(obj *v3.ProjectRoleTemplateBinding) (runtime.Obj
 	return obj, err
 }
 
-func (p *prtbLifecycle) Remove(obj *v3.ProjectRoleTemplateBinding) (runtime.Object, error) {
+func (p *prtbLifecycle) Remove(obj *v33.ProjectRoleTemplateBinding) (runtime.Object, error) {
 	parts := strings.SplitN(obj.ProjectName, ":", 2)
 	if len(parts) < 2 {
 		return nil, errors.Errorf("cannot determine project and cluster from %v", obj.ProjectName)
@@ -103,7 +104,7 @@ func (p *prtbLifecycle) Remove(obj *v3.ProjectRoleTemplateBinding) (runtime.Obje
 	return nil, err
 }
 
-func (p *prtbLifecycle) reconcileSubject(binding *v3.ProjectRoleTemplateBinding) (*v3.ProjectRoleTemplateBinding, error) {
+func (p *prtbLifecycle) reconcileSubject(binding *v33.ProjectRoleTemplateBinding) (*v33.ProjectRoleTemplateBinding, error) {
 	if binding.GroupName != "" || binding.GroupPrincipalName != "" || (binding.UserPrincipalName != "" && binding.UserName != "") {
 		return binding, nil
 	}
@@ -141,7 +142,7 @@ func (p *prtbLifecycle) reconcileSubject(binding *v3.ProjectRoleTemplateBinding)
 // - ensure the subject can see the project and its parent cluster in the mgmt API
 // - if the subject was granted owner permissions for the project, ensure they can create/update/delete the project
 // - if the subject was granted privileges to mgmt plane resources that are scoped to the project, enforce those rules in the project's mgmt plane namespace
-func (p *prtbLifecycle) reconcileBindings(binding *v3.ProjectRoleTemplateBinding) error {
+func (p *prtbLifecycle) reconcileBindings(binding *v33.ProjectRoleTemplateBinding) error {
 	if binding.UserName == "" && binding.GroupPrincipalName == "" && binding.GroupName == "" {
 		return nil
 	}
@@ -201,7 +202,7 @@ func (p *prtbLifecycle) reconcileBindings(binding *v3.ProjectRoleTemplateBinding
 
 // removeMGMTProjectScopedPrivilegesInClusterNamespace revokes access that project roles were granted to certain cluster scoped resources like
 // catalogtemplates, when the prtb is deleted, by deleting the rolebinding created for this prtb in the cluster's namespace
-func (p *prtbLifecycle) removeMGMTProjectScopedPrivilegesInClusterNamespace(binding *v3.ProjectRoleTemplateBinding, clusterName string) error {
+func (p *prtbLifecycle) removeMGMTProjectScopedPrivilegesInClusterNamespace(binding *v33.ProjectRoleTemplateBinding, clusterName string) error {
 	set := labels.Set(map[string]string{pkgrbac.GetRTBLabel(binding.ObjectMeta): PrtbInClusterBindingOwner})
 	rbs, err := p.mgr.rbLister.List(clusterName, set.AsSelector())
 	if err != nil {
@@ -229,7 +230,7 @@ func (p *prtbLifecycle) removeMGMTProjectScopedPrivilegesInClusterNamespace(bind
 	return nil
 }
 
-func (p *prtbLifecycle) reconcileLabels(binding *v3.ProjectRoleTemplateBinding) error {
+func (p *prtbLifecycle) reconcileLabels(binding *v33.ProjectRoleTemplateBinding) error {
 	/* Prior to 2.5, for every PRTB, following CRBs and RBs are created in the management clusters
 		1. PRTB.UID is the label key for a CRB, PRTB.UID=memberhsip-binding-owner
 	    2. PRTB.UID is label key for the RB, PRTB.UID=memberhsip-binding-owner

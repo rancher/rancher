@@ -73,7 +73,7 @@ type projectLifecycle struct {
 	mgr *mgr
 }
 
-func (l *projectLifecycle) sync(key string, orig *v3.Project) (runtime.Object, error) {
+func (l *projectLifecycle) sync(key string, orig *v32.Project) (runtime.Object, error) {
 	if orig == nil || orig.DeletionTimestamp != nil {
 		projectID := ""
 		splits := strings.Split(key, "/")
@@ -119,7 +119,7 @@ func (l *projectLifecycle) sync(key string, orig *v3.Project) (runtime.Object, e
 	return nil, nil
 }
 
-func (l *projectLifecycle) enqueueCrtbs(project *v3.Project) error {
+func (l *projectLifecycle) enqueueCrtbs(project *v32.Project) error {
 	// get all crtbs in current project's cluster
 	clusterID := project.Namespace
 	crtbs, err := l.mgr.crtbLister.List(clusterID, labels.Everything())
@@ -133,17 +133,17 @@ func (l *projectLifecycle) enqueueCrtbs(project *v3.Project) error {
 	return nil
 }
 
-func (l *projectLifecycle) Create(obj *v3.Project) (runtime.Object, error) {
+func (l *projectLifecycle) Create(obj *v32.Project) (runtime.Object, error) {
 	// no-op because the sync function will take care of it
 	return obj, nil
 }
 
-func (l *projectLifecycle) Updated(obj *v3.Project) (runtime.Object, error) {
+func (l *projectLifecycle) Updated(obj *v32.Project) (runtime.Object, error) {
 	// no-op because the sync function will take care of it
 	return obj, nil
 }
 
-func (l *projectLifecycle) Remove(obj *v3.Project) (runtime.Object, error) {
+func (l *projectLifecycle) Remove(obj *v32.Project) (runtime.Object, error) {
 	var returnErr error
 	set := labels.Set{rbac.RestrictedAdminProjectRoleBinding: "true"}
 	rbs, err := l.mgr.rbLister.List(obj.Name, labels.SelectorFromSet(set))
@@ -167,7 +167,7 @@ type clusterLifecycle struct {
 	mgr *mgr
 }
 
-func (l *clusterLifecycle) sync(key string, orig *v3.Cluster) (runtime.Object, error) {
+func (l *clusterLifecycle) sync(key string, orig *v32.Cluster) (runtime.Object, error) {
 	if orig == nil || !orig.DeletionTimestamp.IsZero() {
 		return orig, nil
 	}
@@ -218,17 +218,17 @@ func (l *clusterLifecycle) sync(key string, orig *v3.Cluster) (runtime.Object, e
 	return nil, nil
 }
 
-func (l *clusterLifecycle) Create(obj *v3.Cluster) (runtime.Object, error) {
+func (l *clusterLifecycle) Create(obj *v32.Cluster) (runtime.Object, error) {
 	// no-op because the sync function will take care of it
 	return obj, nil
 }
 
-func (l *clusterLifecycle) Updated(obj *v3.Cluster) (runtime.Object, error) {
+func (l *clusterLifecycle) Updated(obj *v32.Cluster) (runtime.Object, error) {
 	// no-op because the sync function will take care of it
 	return obj, nil
 }
 
-func (l *clusterLifecycle) Remove(obj *v3.Cluster) (runtime.Object, error) {
+func (l *clusterLifecycle) Remove(obj *v32.Cluster) (runtime.Object, error) {
 	if len(obj.Finalizers) > 1 {
 		logrus.Debugf("Skipping rbac cleanup for cluster [%s] until all other finalizers are removed.", obj.Name)
 		return obj, generic.ErrSkip
@@ -310,7 +310,7 @@ func (m *mgr) createProject(name string, cond condition.Cond, obj runtime.Object
 			annotation[project.SystemImageVersionAnn] = latestSystemVersion
 		}
 
-		project := &v3.Project{
+		project := &v32.Project{
 			ObjectMeta: v1.ObjectMeta{
 				GenerateName: "p-",
 				Annotations:  annotation,
@@ -326,7 +326,7 @@ func (m *mgr) createProject(name string, cond condition.Cond, obj runtime.Object
 		if err != nil {
 			return obj, err
 		}
-		project = updated.(*v3.Project)
+		project = updated.(*v32.Project)
 		logrus.Infof("[%v] Creating %s project for cluster %v", clusterCreateController, name, metaAccessor.GetName())
 		if _, err = m.mgmt.Management.Projects(metaAccessor.GetName()).Create(project); err != nil {
 			return obj, err
@@ -355,7 +355,7 @@ func (m *mgr) reconcileCreatorRTB(obj runtime.Object) (runtime.Object, error) {
 
 		switch typeAccessor.GetKind() {
 		case v3.ProjectGroupVersionKind.Kind:
-			project := obj.(*v3.Project)
+			project := obj.(*v32.Project)
 
 			if v32.ProjectConditionInitialRolesPopulated.IsTrue(project) {
 				// The projectRoleBindings are already completed, no need to check
@@ -394,7 +394,7 @@ func (m *mgr) reconcileCreatorRTB(obj runtime.Object) (runtime.Object, error) {
 				}
 
 				logrus.Infof("[%v] Creating creator projectRoleTemplateBinding for user %v for project %v", projectCreateController, creatorID, metaAccessor.GetName())
-				if _, err := m.mgmt.Management.ProjectRoleTemplateBindings(metaAccessor.GetName()).Create(&v3.ProjectRoleTemplateBinding{
+				if _, err := m.mgmt.Management.ProjectRoleTemplateBindings(metaAccessor.GetName()).Create(&v32.ProjectRoleTemplateBinding{
 					ObjectMeta:       om,
 					ProjectName:      metaAccessor.GetNamespace() + ":" + metaAccessor.GetName(),
 					RoleTemplateName: role,
@@ -424,7 +424,7 @@ func (m *mgr) reconcileCreatorRTB(obj runtime.Object) (runtime.Object, error) {
 			}
 
 		case v3.ClusterGroupVersionKind.Kind:
-			cluster := obj.(*v3.Cluster)
+			cluster := obj.(*v32.Cluster)
 
 			if v32.ClusterConditionInitialRolesPopulated.IsTrue(cluster) {
 				// The clusterRoleBindings are already completed, no need to check
@@ -461,7 +461,7 @@ func (m *mgr) reconcileCreatorRTB(obj runtime.Object) (runtime.Object, error) {
 				om.Annotations = crtbCreatorOwnerAnnotations
 
 				logrus.Infof("[%v] Creating creator clusterRoleTemplateBinding for user %v for cluster %v", projectCreateController, creatorID, metaAccessor.GetName())
-				if _, err := m.mgmt.Management.ClusterRoleTemplateBindings(metaAccessor.GetName()).Create(&v3.ClusterRoleTemplateBinding{
+				if _, err := m.mgmt.Management.ClusterRoleTemplateBindings(metaAccessor.GetName()).Create(&v32.ClusterRoleTemplateBinding{
 					ObjectMeta:       om,
 					ClusterName:      metaAccessor.GetName(),
 					RoleTemplateName: role,
@@ -574,7 +574,7 @@ func (m *mgr) addRTAnnotation(obj runtime.Object, context string) (runtime.Objec
 		// If we are in restricted mode, ensure the default projects are not granting
 		// permissions to the restricted-admin
 		if restrictedAdmin {
-			proj := obj.(*v3.Project)
+			proj := obj.(*v32.Project)
 			if proj.Spec.ClusterName == "local" && (proj.Spec.DisplayName == "Default" || proj.Spec.DisplayName == "System") {
 				break
 			}
@@ -612,7 +612,7 @@ func (m *mgr) addRTAnnotation(obj runtime.Object, context string) (runtime.Objec
 	return obj, nil
 }
 
-func (m *mgr) updateClusterAnnotationandCondition(cluster *v3.Cluster, anno string, updateCondition bool) error {
+func (m *mgr) updateClusterAnnotationandCondition(cluster *v32.Cluster, anno string, updateCondition bool) error {
 	sleep := 100
 	for i := 0; i <= 3; i++ {
 		c, err := m.mgmt.Management.Clusters("").Get(cluster.Name, v1.GetOptions{})

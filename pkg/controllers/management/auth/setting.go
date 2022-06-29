@@ -1,6 +1,7 @@
 package auth
 
 import (
+	v33 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/providerrefresh"
 	"github.com/rancher/rancher/pkg/auth/providers/azure"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
@@ -24,7 +25,7 @@ func newAuthSettingController(mgmt *config.ManagementContext) *SettingController
 }
 
 //sync is called periodically and on real updates
-func (n *SettingController) sync(key string, obj *v3.Setting) (runtime.Object, error) {
+func (n *SettingController) sync(key string, obj *v33.Setting) (runtime.Object, error) {
 	if obj == nil || obj.DeletionTimestamp != nil {
 		return nil, nil
 	}
