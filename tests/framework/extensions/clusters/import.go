@@ -139,7 +139,7 @@ func ImportCluster(client *rancher.Client, cluster *apisV1.Cluster, rest *rest.C
 					Containers: []corev1.Container{
 						{
 							Name:    "kubectl",
-							Image:   "rancher/shell:v0.1.18-rc4",
+							Image:   "rancher/shell:v0.1.18-rc5",
 							Command: []string{"/bin/sh", "-c"},
 							Args: []string{
 								fmt.Sprintf("wget -qO- --tries=10 --no-check-certificate %s | kubectl apply -f - ;", token.ManifestURL),
