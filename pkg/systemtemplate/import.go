@@ -15,7 +15,6 @@ import (
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	util "github.com/rancher/rancher/pkg/cluster"
 	"github.com/rancher/rancher/pkg/features"
-	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/image"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rke/templates"
@@ -130,7 +129,7 @@ func SystemTemplate(resp io.Writer, agentImage, authImage, namespace, token, url
 	return t.Execute(resp, context)
 }
 
-func GetDesiredFeatures(cluster *v3.Cluster) map[string]bool {
+func GetDesiredFeatures(cluster *apimgmtv3.Cluster) map[string]bool {
 	return map[string]bool{
 		features.MCM.Name():                false,
 		features.MCMAgent.Name():           true,
@@ -142,7 +141,7 @@ func GetDesiredFeatures(cluster *v3.Cluster) map[string]bool {
 	}
 }
 
-func ForCluster(cluster *v3.Cluster, token string, taints []corev1.Taint) ([]byte, error) {
+func ForCluster(cluster *apimgmtv3.Cluster, token string, taints []corev1.Taint) ([]byte, error) {
 	buf := &bytes.Buffer{}
 	err := SystemTemplate(buf, GetDesiredAgentImage(cluster),
 		GetDesiredAuthImage(cluster),
