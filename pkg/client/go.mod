@@ -21,6 +21,6 @@ require (
 	github.com/sirupsen/logrus v1.6.0 // indirect
 	golang.org/x/sys v0.0.0-20220114195835-da31bd327af9 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
-	gopkg.in/yaml.v3 v3.0.0 // indirect
+	gopkg.in/yaml.v3 v3.0.1 // indirect
 	k8s.io/klog/v2 v2.30.0 // indirect
 )
