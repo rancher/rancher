@@ -74,7 +74,7 @@ func NewAuthorizer(context *config.ScaledContext) *Authorizer {
 		crtKeyIndex: auth.crtIndex,
 	})
 	if err != nil {
-		logrus.Error("[NewAuthorizer]unexpected error returned when adding Indexers " +
+		logrus.Error("[NewAuthorizer] unexpected error returned when adding Indexers " +
 			"for the management context of cluster registration tokens")
 		return nil
 	}
@@ -82,7 +82,7 @@ func NewAuthorizer(context *config.ScaledContext) *Authorizer {
 		nodeKeyIndex: auth.nodeIndex,
 	})
 	if err != nil {
-		logrus.Error("[NewAuthorizer]unexpected error returned when adding Indexers " +
+		logrus.Error("[NewAuthorizer] unexpected error returned when adding Indexers " +
 			"for the management context of nodes")
 		return nil
 	}
