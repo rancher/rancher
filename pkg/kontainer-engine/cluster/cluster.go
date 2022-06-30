@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	errors2 "errors"
 	"fmt"
+	"github.com/rancher/rke/log"
 	"reflect"
 
 	"github.com/rancher/rancher/pkg/kontainer-engine/logstream"
@@ -86,14 +87,29 @@ type ConfigGetter interface {
 // Create creates a cluster
 func (c *Cluster) Create(ctx context.Context) error {
 	if c.RootCACert != "" && c.Status == "" {
-		c.PersistStore.PersistStatus(*c, Init)
+		err := c.PersistStore.PersistStatus(*c, Init)
+		if err != nil {
+			log.Warnf(ctx, "[Create] unexpected error occurred while attempting to persist status"+
+				"of cluster (%s) with status (%s)", c.Name, Init)
+			return nil
+		}
 	}
 	err := c.createInner(ctx)
 	if err != nil {
 		if err == ErrClusterExists {
-			c.PersistStore.PersistStatus(*c, Running)
+			err := c.PersistStore.PersistStatus(*c, Running)
+			if err != nil {
+				log.Warnf(ctx, "[Create] unexpected error occurred while attempting to persist status"+
+					"of existing cluster (%s) with status (%s)", c.Name, Running)
+				return nil
+			}
 		} else {
-			c.PersistStore.PersistStatus(*c, Error)
+			err := c.PersistStore.PersistStatus(*c, Error)
+			if err != nil {
+				log.Warnf(ctx, "[Create] unexpected error occurred while attempting to persist status"+
+					"of existing cluster (%s) with status (%s)", c.Name, Error)
+				return nil
+			}
 		}
 		return err
 	}
@@ -176,7 +192,11 @@ func (c *Cluster) RemoveLegacyServiceAccount(ctx context.Context) error {
 
 func (c *Cluster) createInner(ctx context.Context) error {
 	// check if it is already created
-	c.restore()
+	err := c.restore()
+	if err != nil {
+		log.Warnf(ctx, "[createInner] Unexpected error encountered when checking if cluster (%s) already exists", c.Name)
+		return nil
+	}
 
 	var info *types.ClusterInfo
 	if c.Status == Error {
@@ -343,6 +363,7 @@ func (c *Cluster) restore() error {
 	if err != nil {
 		return err
 	}
+	logrus.Debugf("[restore] retrieving ClusterInfo for cluster (%s)", c.Name)
 	info := toInfo(&cluster)
 	transformClusterInfo(c, info)
 	return nil
