@@ -206,13 +206,13 @@ func GetServiceAccountSecretNames(bootstrapCache rkecontroller.RKEBootstrapCache
 		return "", "", nil
 	}
 
-	sName := planSA.Name
+	sName := serviceaccounttoken.ServiceAccountSecretName(planSA)
 	secret, err := secretClient.Cache().Get(planSA.Namespace, sName)
 	if err != nil {
 		if !apierror.IsNotFound(err) {
 			return "", "", err
 		}
-		sc := serviceaccounttoken.SecretTemplate(planSA, sName)
+		sc := serviceaccounttoken.SecretTemplate(planSA)
 		secret, err = secretClient.Create(sc)
 		if err != nil {
 			if !apierror.IsAlreadyExists(err) {

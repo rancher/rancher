@@ -143,13 +143,13 @@ func (h *handler) getToken(sa *corev1.ServiceAccount) (string, error) {
 	}
 
 	// create a secret-based token for the service account
-	sName := sa.Name + "-token"
+	sName := serviceaccounttoken.ServiceAccountSecretName(sa)
 	secret, err := h.secretsCache.Get(sa.Namespace, sName)
 	if err != nil {
 		if !apierror.IsNotFound(err) {
 			return "", err
 		}
-		sc := serviceaccounttoken.SecretTemplate(sa, sName)
+		sc := serviceaccounttoken.SecretTemplate(sa)
 		secret, err = h.secretsClient.Create(sc)
 		if err != nil {
 			if !apierror.IsAlreadyExists(err) {
@@ -160,7 +160,7 @@ func (h *handler) getToken(sa *corev1.ServiceAccount) (string, error) {
 				if !apierror.IsNotFound(err) {
 					return "", err
 				}
-				secret, err = h.secretsClient.Get(sa.Namespace, sa.Name, metav1.GetOptions{})
+				secret, err = h.secretsClient.Get(sa.Namespace, sName, metav1.GetOptions{})
 				if err != nil {
 					return "", err
 				}
