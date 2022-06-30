@@ -55,11 +55,14 @@ ENV DOCKER_MACHINE_HARVESTER_VERSION v0.4.0
 ENV CATTLE_KDM_BRANCH ${CATTLE_KDM_BRANCH}
 ENV HELM_VERSION v3.9.0
 ENV KUSTOMIZE_VERSION v4.4.1
-ENV CATTLE_WINS_AGENT_VERSION v0.2.10
+ENV CATTLE_WINS_AGENT_VERSION v0.3.1
 ENV CATTLE_WINS_AGENT_INSTALL_SCRIPT https://raw.githubusercontent.com/rancher/wins/${CATTLE_WINS_AGENT_VERSION}/install.ps1
+ENV CATTLE_WINS_AGENT_UNINSTALL_SCRIPT https://raw.githubusercontent.com/rancher/wins/${CATTLE_WINS_AGENT_VERSION}/uninstall.ps1
+ENV CATTLE_WINS_AGENT_UPGRADE_IMAGE rancher/wins:${CATTLE_WINS_AGENT_VERSION}
 ENV CATTLE_CSI_PROXY_AGENT_VERSION v1.1.1
-ENV CATTLE_SYSTEM_AGENT_VERSION v0.2.7
+ENV CATTLE_SYSTEM_AGENT_VERSION v0.2.8
 ENV CATTLE_SYSTEM_AGENT_INSTALL_SCRIPT https://raw.githubusercontent.com/rancher/system-agent/${CATTLE_SYSTEM_AGENT_VERSION}/install.sh
+ENV CATTLE_SYSTEM_AGENT_UNINSTALL_SCRIPT https://raw.githubusercontent.com/rancher/system-agent/${CATTLE_SYSTEM_AGENT_VERSION}/system-agent-uninstall.sh
 ENV CATTLE_SYSTEM_AGENT_UPGRADE_IMAGE rancher/system-agent:${CATTLE_SYSTEM_AGENT_VERSION}-suc
 ENV CATTLE_SYSTEM_UPGRADE_CONTROLLER_CHART_VERSION 100.0.3+up0.3.2
 
@@ -213,9 +216,11 @@ RUN mkdir -p /usr/share/rancher/ui && \
     curl -sfL https://github.com/rancher/system-agent/releases/download/${CATTLE_SYSTEM_AGENT_VERSION}/rancher-system-agent-amd64 -O && \
     curl -sfL https://github.com/rancher/system-agent/releases/download/${CATTLE_SYSTEM_AGENT_VERSION}/rancher-system-agent-s390x -O && \
     curl -sfL ${CATTLE_SYSTEM_AGENT_INSTALL_SCRIPT} -o system-agent-install.sh && \
+    curl -sfL ${CATTLE_SYSTEM_AGENT_UNINSTALL_SCRIPT} -o system-agent-uninstall.sh && \
     curl -sfL https://github.com/rancher/wins/releases/download/${CATTLE_WINS_AGENT_VERSION}/wins.exe -O && \
     curl -sfL https://acs-mirror.azureedge.net/csi-proxy/${CATTLE_CSI_PROXY_AGENT_VERSION}/binaries/csi-proxy-${CATTLE_CSI_PROXY_AGENT_VERSION}.tar.gz -O && \
-    curl -sfL ${CATTLE_WINS_AGENT_INSTALL_SCRIPT} -o wins-agent-install.ps1
+    curl -sfL ${CATTLE_WINS_AGENT_INSTALL_SCRIPT} -o wins-agent-install.ps1 \
+    curl -sfL ${CATTLE_WINS_AGENT_UNINSTALL_SCRIPT} -o wins-agent-uninstall.ps1
 
 ENV CATTLE_CLI_URL_DARWIN  https://releases.rancher.com/cli2/${CATTLE_CLI_VERSION}/rancher-darwin-amd64-${CATTLE_CLI_VERSION}.tar.gz
 ENV CATTLE_CLI_URL_LINUX   https://releases.rancher.com/cli2/${CATTLE_CLI_VERSION}/rancher-linux-amd64-${CATTLE_CLI_VERSION}.tar.gz
