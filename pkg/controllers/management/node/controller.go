@@ -403,7 +403,7 @@ func aliasToPath(driver string, config map[string]interface{}, ns string) error 
 	return nil
 }
 
-func (m *Lifecycle) deployAgent(nodeDir string, obj *v3.Node) error {
+func (m *Lifecycle) deployAgent(nodeDir string, obj *v32.Node) error {
 	token, err := m.systemAccountManager.GetOrCreateSystemClusterToken(obj.Namespace)
 	if err != nil {
 		return err
@@ -445,7 +445,7 @@ func (m *Lifecycle) deployAgent(nodeDir string, obj *v3.Node) error {
 
 // authenticateRegistry authenticates the machine to a private registry if one is defined on the cluster
 // this enables the agent image to be pulled from the private registry
-func (m *Lifecycle) authenticateRegistry(nodeDir string, node *v3.Node, cluster *v3.Cluster) error {
+func (m *Lifecycle) authenticateRegistry(nodeDir string, node *v32.Node, cluster *v32.Cluster) error {
 	reg := util.GetPrivateRepo(cluster)
 	// if there is no private registry defined or there is a registry without credentials, return since auth is not needed
 	if reg == nil || reg.User == "" || reg.Password == "" {
@@ -471,7 +471,7 @@ func (m *Lifecycle) authenticateRegistry(nodeDir string, node *v3.Node, cluster 
 	return nil
 }
 
-func (m *Lifecycle) ready(obj *v3.Node) (*v3.Node, error) {
+func (m *Lifecycle) ready(obj *v32.Node) (*v32.Node, error) {
 	config, err := nodeconfig.NewNodeConfig(m.secretStore, obj)
 	if err != nil {
 		return obj, err

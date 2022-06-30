@@ -132,7 +132,7 @@ func logOptMapToSlice(m map[string]string) []string {
 	return ret
 }
 
-func buildCommand(nodeDir string, node *v3.Node, cmdArgs []string) (*exec.Cmd, error) {
+func buildCommand(nodeDir string, node *v32.Node, cmdArgs []string) (*exec.Cmd, error) {
 	// only in trace because machine has sensitive details and we can't control who debugs what in there easily
 	if logrus.GetLevel() >= logrus.TraceLevel {
 		// prepend --debug to pass directly to machine

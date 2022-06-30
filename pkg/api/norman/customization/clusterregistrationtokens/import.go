@@ -1,6 +1,7 @@
 package clusterregistrationtokens
 
 import (
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"net/http"
 
 	"github.com/gorilla/mux"
@@ -40,7 +41,7 @@ func (ch *ClusterImport) ClusterImportHandler(resp http.ResponseWriter, req *htt
 		authImage = authImages[0]
 	}
 
-	var cluster *v3.Cluster
+	var cluster *v32.Cluster
 	if clusterID != "" {
 		cluster, _ = ch.Clusters.Get(clusterID, metav1.GetOptions{})
 	}

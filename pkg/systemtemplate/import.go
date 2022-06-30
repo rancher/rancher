@@ -79,7 +79,7 @@ func toFeatureString(features map[string]bool) string {
 }
 
 func SystemTemplate(resp io.Writer, agentImage, authImage, namespace, token, url string, isWindowsCluster bool,
-	cluster *v3.Cluster, features map[string]bool, taints []corev1.Taint, privateRegistries *corev1.Secret) error {
+	cluster *apimgmtv3.Cluster, features map[string]bool, taints []corev1.Taint, privateRegistries *corev1.Secret) error {
 	var tolerations, agentEnvVars string
 	d := md5.Sum([]byte(url + token + namespace))
 	tokenKey := hex.EncodeToString(d[:])[:7]
@@ -175,7 +175,7 @@ func CAChecksum() string {
 	return ""
 }
 
-func GetDesiredAgentImage(cluster *v3.Cluster) string {
+func GetDesiredAgentImage(cluster *apimgmtv3.Cluster) string {
 	logrus.Tracef("clusterDeploy: deployAgent called for [%s]", cluster.Name)
 	desiredAgent := cluster.Spec.DesiredAgentImage
 	if cluster.Spec.AgentImageOverride != "" {
@@ -188,7 +188,7 @@ func GetDesiredAgentImage(cluster *v3.Cluster) string {
 	return desiredAgent
 }
 
-func GetDesiredAuthImage(cluster *v3.Cluster) string {
+func GetDesiredAuthImage(cluster *apimgmtv3.Cluster) string {
 	var desiredAuth string
 	if cluster.Spec.LocalClusterAuthEndpoint.Enabled {
 		desiredAuth = cluster.Spec.DesiredAuthImage

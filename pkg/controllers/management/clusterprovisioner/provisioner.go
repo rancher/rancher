@@ -801,7 +801,7 @@ func (p *Provisioner) getConfig(reconcileRKE bool, spec apimgmtv3.ClusterSpec, d
 	return &spec, v, nil
 }
 
-func (p *Provisioner) validateDriver(cluster *v3.Cluster) (string, error) {
+func (p *Provisioner) validateDriver(cluster *apimgmtv3.Cluster) (string, error) {
 	oldDriver := cluster.Status.Driver
 
 	if oldDriver == apimgmtv3.ClusterDriverImported {
@@ -846,7 +846,7 @@ func (p *Provisioner) getSystemImages(spec apimgmtv3.ClusterSpec) (*rketypes.RKE
 		return nil, fmt.Errorf("failed to find system images for version %s: %v", version, err)
 	}
 
-	privateRegistry := util.GetPrivateRepoURL(&v3.Cluster{Spec: spec})
+	privateRegistry := util.GetPrivateRepoURL(&apimgmtv3.Cluster{Spec: spec})
 	if privateRegistry == "" {
 		return &systemImages, nil
 	}
