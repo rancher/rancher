@@ -16,24 +16,25 @@ import (
 	"github.com/rancher/rancher/tests/framework/pkg/session"
 	"github.com/rancher/rancher/tests/framework/pkg/wait"
 	"github.com/rancher/rancher/tests/integration/pkg/defaults"
+	hostedconfig "github.com/rancher/rancher/tests/v2/validation/provisioning/rke2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-type HostesdClusterProvisioningTestSuite struct {
+type HostedClusterProvisioningTestSuite struct {
 	suite.Suite
 	client             *rancher.Client
 	session            *session.Session
 	standardUserClient *rancher.Client
 }
 
-func (h *HostesdClusterProvisioningTestSuite) TearDownSuite() {
+func (h *HostedClusterProvisioningTestSuite) TearDownSuite() {
 	h.session.Cleanup()
 }
 
-func (h *HostesdClusterProvisioningTestSuite) SetupSuite() {
+func (h *HostedClusterProvisioningTestSuite) SetupSuite() {
 	testSession := session.NewSession(h.T())
 	h.session = testSession
 
@@ -43,7 +44,7 @@ func (h *HostesdClusterProvisioningTestSuite) SetupSuite() {
 	h.client = client
 
 	enabled := true
-	var testuser = AppendRandomString("testuser-")
+	var testuser = hostedconfig.AppendRandomString("testuser-")
 	user := &management.User{
 		Username: testuser,
 		Password: "rancherrancher123!",
@@ -62,7 +63,7 @@ func (h *HostesdClusterProvisioningTestSuite) SetupSuite() {
 	h.standardUserClient = standardUserClient
 }
 
-func (h *HostesdClusterProvisioningTestSuite) TestProvisioningHostedGKECluster() {
+func (h *HostedClusterProvisioningTestSuite) TestProvisioningHostedGKECluster() {
 	tests := []struct {
 		name   string
 		client *rancher.Client
@@ -82,7 +83,7 @@ func (h *HostesdClusterProvisioningTestSuite) TestProvisioningHostedGKECluster()
 			cloudCredential, err := google.CreateGoogleCloudCredentials(client)
 			require.NoError(h.T(), err)
 
-			clusterName := AppendRandomString("gkehostcluster")
+			clusterName := hostedconfig.AppendRandomString("gkehostcluster")
 			clusterResp, err := gke.CreateGKEHostedCluster(client, clusterName, cloudCredential.ID, false, false, false, false, map[string]string{})
 			require.NoError(h.T(), err)
 
@@ -103,7 +104,7 @@ func (h *HostesdClusterProvisioningTestSuite) TestProvisioningHostedGKECluster()
 	}
 }
 
-func (h *HostesdClusterProvisioningTestSuite) TestProvisioningHostedAKSCluster() {
+func (h *HostedClusterProvisioningTestSuite) TestProvisioningHostedAKSCluster() {
 	tests := []struct {
 		name   string
 		client *rancher.Client
@@ -123,7 +124,7 @@ func (h *HostesdClusterProvisioningTestSuite) TestProvisioningHostedAKSCluster()
 			cloudCredential, err := azure.CreateAzureCloudCredentials(client)
 			require.NoError(h.T(), err)
 
-			clusterName := AppendRandomString("ekshostcluster")
+			clusterName := hostedconfig.AppendRandomString("ekshostcluster")
 			clusterResp, err := aks.CreateAKSHostedCluster(client, clusterName, cloudCredential.ID, false, false, false, false, map[string]string{})
 			require.NoError(h.T(), err)
 
@@ -144,7 +145,7 @@ func (h *HostesdClusterProvisioningTestSuite) TestProvisioningHostedAKSCluster()
 	}
 }
 
-func (h *HostesdClusterProvisioningTestSuite) TestProvisioningHostedEKSCluster() {
+func (h *HostedClusterProvisioningTestSuite) TestProvisioningHostedEKSCluster() {
 	tests := []struct {
 		name   string
 		client *rancher.Client
@@ -164,7 +165,7 @@ func (h *HostesdClusterProvisioningTestSuite) TestProvisioningHostedEKSCluster()
 			cloudCredential, err := aws.CreateAWSCloudCredentials(client)
 			require.NoError(h.T(), err)
 
-			clusterName := AppendRandomString("ekshostcluster")
+			clusterName := hostedconfig.AppendRandomString("ekshostcluster")
 			clusterResp, err := eks.CreateEKSHostedCluster(client, clusterName, cloudCredential.ID, false, false, false, false, map[string]string{})
 			require.NoError(h.T(), err)
 
@@ -188,5 +189,5 @@ func (h *HostesdClusterProvisioningTestSuite) TestProvisioningHostedEKSCluster()
 // In order for 'go test' to run this suite, we need to create
 // a normal test function and pass our suite to suite.Run
 func TestHostesdClusterProvisioningTestSuite(t *testing.T) {
-	suite.Run(t, new(HostesdClusterProvisioningTestSuite))
+	suite.Run(t, new(HostedClusterProvisioningTestSuite))
 }

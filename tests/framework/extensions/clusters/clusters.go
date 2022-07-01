@@ -10,6 +10,8 @@ import (
 	apisV1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
+	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
+	"github.com/rancher/rancher/tests/framework/pkg/namegenerator"
 	"github.com/rancher/rancher/tests/framework/pkg/wait"
 	"github.com/rancher/rancher/tests/integration/pkg/defaults"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -58,6 +60,45 @@ func IsHostedProvisioningClusterReady(event watch.Event) (ready bool, err error)
 	}
 
 	return false, nil
+}
+
+func RKE1AppendRandomString(baseClusterName string) string {
+	const defaultRandStringLength = 5
+	clusterName := "auto-" + baseClusterName + "-" + namegenerator.RandStringLower(defaultRandStringLength)
+	return clusterName
+}
+
+// NewRKE1lusterConfig is a constructor for a v3.Cluster object, to be used by the rancher.Client.Provisioning client.
+func NewRKE1ClusterConfig(clusterName, cni, kubernetesVersion string, client *rancher.Client) *management.Cluster {
+	clusterConfig := &management.Cluster{
+		DockerRootDir:           "/var/lib/docker",
+		EnableClusterAlerting:   false,
+		EnableClusterMonitoring: false,
+		LocalClusterAuthEndpoint: &management.LocalClusterAuthEndpoint{
+			Enabled: true,
+		},
+		Name: clusterName,
+		RancherKubernetesEngineConfig: &management.RancherKubernetesEngineConfig{
+			DNS: &management.DNSConfig{
+				Provider: "coredns",
+				Options: map[string]string{
+					"stubDomains": "cluster.local",
+				},
+			},
+			Ingress: &management.IngressConfig{
+				Provider: "nginx",
+			},
+			Monitoring: &management.MonitoringConfig{
+				Provider: "metrics-server",
+			},
+			Network: &management.NetworkConfig{
+				MTU:     0,
+				Options: map[string]string{},
+			},
+		},
+	}
+
+	return clusterConfig
 }
 
 // NewRKE2ClusterConfig is a constructor for a apisV1.Cluster object, to be used by the rancher.Client.Provisioning client.
