@@ -3,7 +3,6 @@ package provisioning
 import (
 	"context"
 	"time"
-
 	v1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	scheme "github.com/rancher/rancher/pkg/generated/clientset/versioned/scheme"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -14,6 +13,7 @@ import (
 const (
 	rancherProvisioningClustersURL = "v1/provisioning.cattle.io.clusters/"
 )
+
 
 // Get takes name of the cluster, and returns the corresponding cluster object, and an error if there is any.
 func (c *Clusters) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.Cluster, err error) {
@@ -30,12 +30,15 @@ func (c *Clusters) Get(ctx context.Context, name string, options metav1.GetOptio
 }
 
 // List takes label and field selectors, and returns the list of Clusters that match those selectors.
-func (c *Clusters) List(ctx context.Context, opts metav1.ListOptions) (result *v1.ClusterList, err error) {
+func (c *Clusters) List(ctx context.Context, opts metav1.ListOptions) (result *ClusterList, err error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
 	}
-	result = &v1.ClusterList{}
+
+	result = &ClusterList{}
+
+
 	url := rancherProvisioningClustersURL + c.ns
 
 	err = c.client.Get().

@@ -96,3 +96,62 @@ func RemoveProjectMember(rancherClient *rancher.Client, user *management.User) e
 	}
 	return rancherClient.Management.ProjectRoleTemplateBinding.Delete(&roleToDelete)
 }
+
+
+// AddClusterMember is a helper function that adds a cluster role to `user`. It uses the watch.WatchWait ensure BackingNamespaceCreated is true
+func AddClusterMember(rancherClient *rancher.Client, cluster *management.Cluster, user *management.User, clusterRole string) error {
+	role := &management.ClusterRoleTemplateBinding{
+		ClusterID:       cluster.Resource.ID,
+		UserPrincipalID: user.PrincipalIDs[0],
+		RoleTemplateID:  clusterRole,
+	}
+
+	opts := metav1.ListOptions{
+		FieldSelector:  "metadata.name=" + cluster.ID,
+		TimeoutSeconds: &defaults.WatchTimeoutSeconds,
+	}
+	watchInterface, err := rancherClient.GetManagementWatchInterface(management.ClusterType, opts)
+	if err != nil {
+		return err
+	}
+
+	checkFunc := func(event watch.Event) (ready bool, err error) {
+		clusterUnstructured := event.Object.(*unstructured.Unstructured)
+		cluster := &v3.Cluster{}
+		err = scheme.Scheme.Convert(clusterUnstructured, cluster, clusterUnstructured.GroupVersionKind())
+		if err != nil {
+			return false, err
+		}
+		if v3.NamespaceBackedResource.IsTrue(cluster) {
+			return true, nil
+		}
+
+		return false, nil
+	}
+
+	err = wait.WatchWait(watchInterface, checkFunc)
+	if err != nil {
+		return err
+	}
+
+	_, err = rancherClient.Management.ClusterRoleTemplateBinding.Create(role)
+	return err
+}
+
+// RemoveClusterMember is a helper function that removes the user from cluster
+func RemoveClusterMember(rancherClient *rancher.Client, user *management.User) error {
+	roles, err := rancherClient.Management.ClusterRoleTemplateBinding.List(&types.ListOpts{})
+	if err != nil {
+		return err
+	}
+
+	var roleToDelete management.ClusterRoleTemplateBinding
+
+	for _, role := range roles.Data {
+		if role.UserID == user.ID {
+			roleToDelete = role
+			break
+		}
+	}
+	return rancherClient.Management.ClusterRoleTemplateBinding.Delete(&roleToDelete)
+}

@@ -16,7 +16,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/watch"
-
 	kubeUnstructured "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
@@ -142,3 +141,43 @@ func CreateNamespace(client *rancher.Client, namespaceName, containerDefaultReso
 	}
 	return newNamespace, nil
 }
+
+
+// ListNamespace is a helper function that uses the dynamic client to get a list of all namespaces from a cluster from all projects.
+func ListNamespace(client *rancher.Client, clusterID string) (*kubeUnstructured.UnstructuredList, error) {
+	var namespacelist *kubeUnstructured.UnstructuredList
+
+	dynamicClient, err := client.GetDownStreamClusterClient(clusterID)
+	if err != nil {
+		return namespacelist, err
+	}
+
+	namespaceResource := dynamicClient.Resource(NamespaceGroupVersionResource)
+	unstructuredResp, err := namespaceResource.List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		return nil, err
+	}
+
+	return unstructuredResp, err
+	
+}
+
+
+// DeleteNamespace is a helper function to delete  a namespaces from a cluster from a given project.
+func DeleteNamespace(client *rancher.Client, namespace string, clusterID string) ( error) {
+
+	dynamicClient, err := client.GetDownStreamClusterClient(clusterID)
+	if err != nil {
+		return  err
+	}
+	namespaceResource := dynamicClient.Resource(NamespaceGroupVersionResource)
+	err = namespaceResource.Delete(context.TODO(), namespace, metav1.DeleteOptions{})
+	if err != nil {
+		return  err
+	}
+
+	return  err
+	
+}
+
+
