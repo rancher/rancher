@@ -2,11 +2,11 @@ package rkeworkerupgrader
 
 import (
 	"fmt"
-	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"reflect"
 	"strings"
 
 	"github.com/pkg/errors"
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	kd "github.com/rancher/rancher/pkg/controllers/management/kontainerdrivermetadata"
 	"github.com/rancher/rancher/pkg/controllers/management/secretmigrator"
 	"github.com/rancher/rancher/pkg/librke"

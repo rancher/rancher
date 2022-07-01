@@ -5,7 +5,6 @@ import (
 	"sort"
 
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	nodehelper "github.com/rancher/rancher/pkg/node"
 	nodeserver "github.com/rancher/rancher/pkg/rkenodeconfigserver"

@@ -2,11 +2,11 @@ package auth
 
 import (
 	"fmt"
-	v33 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"strings"
 
 	"github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
+	v33 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/controllers/management/authprovisioningv2"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	pkgrbac "github.com/rancher/rancher/pkg/rbac"

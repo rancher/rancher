@@ -1,12 +1,12 @@
 package clusterregistrationtokens
 
 import (
-	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"net/http"
 
 	"github.com/gorilla/mux"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/urlbuilder"
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/image"
 	schema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
