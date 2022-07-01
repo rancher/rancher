@@ -2,13 +2,13 @@ package image
 
 import (
 	"fmt"
-	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"path"
 	"sort"
 	"strings"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/pkg/errors"
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	util "github.com/rancher/rancher/pkg/cluster"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	"github.com/rancher/rancher/pkg/settings"

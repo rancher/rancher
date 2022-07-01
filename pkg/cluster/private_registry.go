@@ -3,8 +3,8 @@ package cluster
 import (
 	"encoding/base64"
 	"encoding/json"
-	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/settings"
 	rketypes "github.com/rancher/rke/types"
 	"github.com/rancher/rke/util"

@@ -5,11 +5,11 @@ import (
 	"encoding/json"
 	errors2 "errors"
 	"fmt"
-	"github.com/rancher/rke/log"
 	"reflect"
 
 	"github.com/rancher/rancher/pkg/kontainer-engine/logstream"
 	"github.com/rancher/rancher/pkg/kontainer-engine/types"
+	"github.com/rancher/rke/log"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/errors"
 )

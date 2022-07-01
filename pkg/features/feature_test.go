@@ -33,7 +33,7 @@ func TestApplyArgumentDefaults(t *testing.T) {
 
 func TestInitializeNil(t *testing.T) {
 	assert := assert.New(t)
-	assert.False(IsDefFalse.Enabled())
-	InitializeFeatures(nil, "isfalse=true")
-	assert.True(IsDefFalse.Enabled())
+	assert.False(Legacy.Enabled())
+	InitializeFeatures(nil, "legacy=true")
+	assert.True(Legacy.Enabled())
 }
