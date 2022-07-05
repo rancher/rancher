@@ -1,8 +1,7 @@
 pytest==3.8.1
 pytest-repeat==0.7.0
 pytest-xdist==1.23.0
-boto3==1.10.6
-botocore==1.13.6
+boto3==1.21.33
 cryptography==3.4.7
 flake8==3.5.0
 invoke==1.2.0
