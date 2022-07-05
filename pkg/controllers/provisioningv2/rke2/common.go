@@ -229,6 +229,11 @@ func GetServiceAccountSecretNames(bootstrapCache rkecontroller.RKEBootstrapCache
 		return "", "", err
 	}
 
+	// wait for token to be populated
+	if secret.Data[corev1.ServiceAccountTokenKey] == nil {
+		return "", "", nil
+	}
+
 	return planSA.Labels[PlanSecret], secret.Name, nil
 }
 
