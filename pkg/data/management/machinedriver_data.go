@@ -32,6 +32,7 @@ const (
 	SoftLayerDriver    = "softlayer"
 	Vmwaredriver       = "vmwarevsphere"
 	GoogleDriver       = "google"
+	OutscaleDriver     = "outscale"
 )
 
 var DriverData = map[string]map[string][]string{
@@ -51,6 +52,7 @@ var DriverData = map[string]map[string][]string{
 	SoftLayerDriver:    {"privateCredentialFields": []string{"apiKey"}},
 	Vmwaredriver:       {"publicCredentialFields": []string{"username", "vcenter", "vcenterPort"}, "privateCredentialFields": []string{"password"}},
 	GoogleDriver:       {"privateCredentialFields": []string{"authEncodedJson"}},
+	OutscaleDriver:     {"publicCredentialFields": []string{"accessKey", "region"}, "privateCredentialFields": []string{"secretKey"}},
 }
 
 var driverDefaults = map[string]map[string]string{
@@ -133,6 +135,9 @@ func addMachineDrivers(management *config.ManagementContext) error {
 		return err
 	}
 	if err := addMachineDriver(NutanixDriver, "https://github.com/nutanix/docker-machine/releases/download/v3.1.0/docker-machine-driver-nutanix_v3.1.0_linux", "https://nutanix.github.io/rancher-ui-driver/v3.1.0/component.js", "e8f4f2e7ae7e927534884b5a3a45a38a5bd2c2872de1d65375f6e009bed75dba", []string{"nutanix.github.io"}, false, false, false, management); err != nil {
+		return err
+	}
+	if err := addMachineDriver(OutscaleDriver, "https://github.com/outscale-dev/docker-machine-driver-outscale/releases/download/v0.0.2/docker-machine-driver-outscale_0.0.2_linux_amd64.zip", "https://oos.eu-west-2.outscale.com/rancher-ui-driver-outscale/v0.0.2/component.js", "66c12f81c2e578ba0a8d8ca056047d57b0523fda32a8371c1ae086014a50a43d", []string{"oos.eu-west-2.outscale.com"}, false, false, false, management); err != nil {
 		return err
 	}
 	return addMachineDriver(Vmwaredriver, "local://", "", "", nil, true, true, false, management)
