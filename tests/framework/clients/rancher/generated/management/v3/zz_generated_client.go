@@ -72,6 +72,7 @@ type Client struct {
 	CisConfig                               CisConfigOperations
 	CisBenchmarkVersion                     CisBenchmarkVersionOperations
 	FleetWorkspace                          FleetWorkspaceOperations
+	RancherUserNotification                 RancherUserNotificationOperations
 }
 
 func NewClient(opts *clientbase.ClientOpts) (*Client, error) {
@@ -149,6 +150,7 @@ func NewClient(opts *clientbase.ClientOpts) (*Client, error) {
 	client.CisConfig = newCisConfigClient(client)
 	client.CisBenchmarkVersion = newCisBenchmarkVersionClient(client)
 	client.FleetWorkspace = newFleetWorkspaceClient(client)
+	client.RancherUserNotification = newRancherUserNotificationClient(client)
 
 	return client, nil
 }

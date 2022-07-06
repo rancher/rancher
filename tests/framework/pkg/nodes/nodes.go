@@ -5,14 +5,22 @@ import (
 	"os/user"
 	"path/filepath"
 
+	"github.com/rancher/rancher/tests/framework/pkg/config"
 	"golang.org/x/crypto/ssh"
 )
 
 const (
 	// The json/yaml config key for the config of nodes of outside cloud provider e.g. linode or ec2
 	ExternalNodeConfigConfigurationFileKey = "externalNodes"
-	sshPath                                = ".ssh"
+	SSHPathConfigurationKey                = "sshPath"
+	defaultSSHPath                         = ".ssh"
 )
+
+// SSHPath is the path to the ssh key used in external node functionality. This be used if the ssh keys exists
+// in a location not in /.ssh
+type SSHPath struct {
+	SSHPath string `json:"sshPath" yaml:"sshPath"`
+}
 
 // Node is a configuration of node that is from an oudise cloud provider
 type Node struct {
@@ -59,12 +67,21 @@ func (n *Node) ExecuteCommand(command string) error {
 
 // GetSSHKey reads in the ssh file from the .ssh directory, returns the key in []byte format
 func GetSSHKey(sshKeyname string) ([]byte, error) {
-	user, err := user.Current()
-	if err != nil {
-		return nil, err
-	}
+	var keyPath string
 
-	keyPath := filepath.Join(user.HomeDir, sshPath, sshKeyname)
+	sshPathConfig := new(SSHPath)
+
+	config.LoadConfig(SSHPathConfigurationKey, sshPathConfig)
+	if sshPathConfig.SSHPath == "" {
+		user, err := user.Current()
+		if err != nil {
+			return nil, err
+		}
+
+		keyPath = filepath.Join(user.HomeDir, defaultSSHPath, sshKeyname)
+	} else {
+		keyPath = filepath.Join(sshPathConfig.SSHPath, sshKeyname)
+	}
 	content, err := ioutil.ReadFile(keyPath)
 	if err != nil {
 		return []byte{}, err
