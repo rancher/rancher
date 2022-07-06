@@ -66,6 +66,7 @@ type File struct {
 	Content string `json:"content,omitempty"`
 	Path    string `json:"path,omitempty"`
 	Dynamic bool   `json:"dynamic,omitempty"`
+	Minor   bool   `json:"minor,omitempty"` // minor signifies that the file can be changed on a node without having to cause a full-blown drain/cordon operation
 }
 
 type NodePlan struct {

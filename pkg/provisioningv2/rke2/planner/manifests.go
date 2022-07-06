@@ -58,6 +58,7 @@ func getEtcdSnapshotExtraMetadata(controlPlane *rkev1.RKEControlPlane, runtime s
 			Content: base64.StdEncoding.EncodeToString([]byte(cm)),
 			Path:    fmt.Sprintf("/var/lib/rancher/%s/server/manifests/rancher/%s-etcd-snapshot-extra-metadata.yaml", runtime, runtime),
 			Dynamic: true,
+			Minor:   true,
 		}
 	}
 	logrus.Errorf("rkecluster %s/%s: unable to find cluster spec annotation for control plane", controlPlane.Spec.ClusterName, controlPlane.Namespace)
@@ -75,6 +76,7 @@ func (p *Planner) getClusterAgentManifestFile(controlPlane *rkev1.RKEControlPlan
 		Content: base64.StdEncoding.EncodeToString(data),
 		Path:    fmt.Sprintf("/var/lib/rancher/%s/server/manifests/rancher/cluster-agent.yaml", runtime),
 		Dynamic: true,
+		Minor:   true,
 	}, nil
 }
 
