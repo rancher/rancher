@@ -104,13 +104,13 @@ func (h *handler) getBootstrapSecret(namespace, name string, envVars []corev1.En
 		return nil, err
 
 	}
-	sName := sa.Name
+	sName := serviceaccounttoken.ServiceAccountSecretName(sa)
 	secret, err := h.secretCache.Get(sa.Namespace, sName)
 	if err != nil {
 		if !apierror.IsNotFound(err) {
 			return nil, err
 		}
-		sc := serviceaccounttoken.SecretTemplate(sa, sName)
+		sc := serviceaccounttoken.SecretTemplate(sa)
 		secret, err = h.secretClient.Create(sc)
 		if err != nil {
 			if !apierror.IsAlreadyExists(err) {

@@ -206,13 +206,13 @@ func GetServiceAccountSecretNames(bootstrapCache rkecontroller.RKEBootstrapCache
 		return "", "", nil
 	}
 
-	sName := planSA.Name
+	sName := serviceaccounttoken.ServiceAccountSecretName(planSA)
 	secret, err := secretClient.Cache().Get(planSA.Namespace, sName)
 	if err != nil {
 		if !apierror.IsNotFound(err) {
 			return "", "", err
 		}
-		sc := serviceaccounttoken.SecretTemplate(planSA, sName)
+		sc := serviceaccounttoken.SecretTemplate(planSA)
 		secret, err = secretClient.Create(sc)
 		if err != nil {
 			if !apierror.IsAlreadyExists(err) {
@@ -227,6 +227,11 @@ func GetServiceAccountSecretNames(bootstrapCache rkecontroller.RKEBootstrapCache
 
 	if foundParent, err := IsOwnedByMachine(bootstrapCache, machineName, planSA); err != nil || !foundParent {
 		return "", "", err
+	}
+
+	// wait for token to be populated
+	if secret.Data[corev1.ServiceAccountTokenKey] == nil {
+		return "", "", nil
 	}
 
 	return planSA.Labels[PlanSecret], secret.Name, nil
