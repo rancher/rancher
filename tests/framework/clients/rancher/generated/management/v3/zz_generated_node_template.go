@@ -23,12 +23,14 @@ const (
 	NodeTemplateFieldEngineRegistryMirror     = "engineRegistryMirror"
 	NodeTemplateFieldEngineStorageDriver      = "engineStorageDriver"
 	NodeTemplateFieldLabels                   = "labels"
+	NodeTemplateFieldLogOpt                   = "logOpt"
 	NodeTemplateFieldName                     = "name"
 	NodeTemplateFieldNodeTaints               = "nodeTaints"
 	NodeTemplateFieldOwnerReferences          = "ownerReferences"
 	NodeTemplateFieldRemoved                  = "removed"
 	NodeTemplateFieldState                    = "state"
 	NodeTemplateFieldStatus                   = "status"
+	NodeTemplateFieldStorageOpt               = "storageOpt"
 	NodeTemplateFieldTransitioning            = "transitioning"
 	NodeTemplateFieldTransitioningMessage     = "transitioningMessage"
 	NodeTemplateFieldUUID                     = "uuid"
@@ -54,12 +56,14 @@ type NodeTemplate struct {
 	EngineRegistryMirror     []string            `json:"engineRegistryMirror,omitempty" yaml:"engineRegistryMirror,omitempty"`
 	EngineStorageDriver      string              `json:"engineStorageDriver,omitempty" yaml:"engineStorageDriver,omitempty"`
 	Labels                   map[string]string   `json:"labels,omitempty" yaml:"labels,omitempty"`
+	LogOpt                   map[string]string   `json:"logOpt,omitempty" yaml:"logOpt,omitempty"`
 	Name                     string              `json:"name,omitempty" yaml:"name,omitempty"`
 	NodeTaints               []Taint             `json:"nodeTaints,omitempty" yaml:"nodeTaints,omitempty"`
 	OwnerReferences          []OwnerReference    `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
 	Removed                  string              `json:"removed,omitempty" yaml:"removed,omitempty"`
 	State                    string              `json:"state,omitempty" yaml:"state,omitempty"`
 	Status                   *NodeTemplateStatus `json:"status,omitempty" yaml:"status,omitempty"`
+	StorageOpt               map[string]string   `json:"storageOpt,omitempty" yaml:"storageOpt,omitempty"`
 	Transitioning            string              `json:"transitioning,omitempty" yaml:"transitioning,omitempty"`
 	TransitioningMessage     string              `json:"transitioningMessage,omitempty" yaml:"transitioningMessage,omitempty"`
 	UUID                     string              `json:"uuid,omitempty" yaml:"uuid,omitempty"`

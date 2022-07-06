@@ -8,6 +8,7 @@ import (
 	"github.com/pkg/errors"
 	apisV1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
+	provisioning "github.com/rancher/rancher/tests/framework/clients/rancher/generated/provisioning/v1"
 	"github.com/rancher/rancher/tests/framework/extensions/clusters"
 	"github.com/rancher/rancher/tests/framework/pkg/config"
 	"github.com/rancher/rancher/tests/framework/pkg/session"
@@ -72,13 +73,13 @@ func CreateAndImportK3DCluster(client *rancher.Client, name string) (*apisV1.Clu
 	name = defaultName(name)
 
 	// create the provisioning cluster
-	cluster := &apisV1.Cluster{
-		ObjectMeta: metav1.ObjectMeta{
+	cluster := &provisioning.Cluster{
+		ObjectMeta: &provisioning.ObjectMeta{
 			Name:      name,
 			Namespace: "fleet-default",
 		},
 	}
-	_, err = client.Provisioning.Clusters("fleet-default").Create(context.TODO(), cluster, metav1.CreateOptions{})
+	_, err = client.Provisioning.Cluster.Create(cluster)
 	if err != nil {
 		return nil, errors.Wrap(err, "CreateAndImportK3DCluster: failed to create provisioning cluster")
 	}
@@ -89,8 +90,12 @@ func CreateAndImportK3DCluster(client *rancher.Client, name string) (*apisV1.Clu
 		return nil, errors.Wrap(err, "CreateAndImportK3DCluster: failed to create k3d cluster")
 	}
 
+	kubeProvisioningClient, err := client.GetKubeAPIProvisioningClient()
+	if err != nil {
+		return nil, errors.Wrap(err, "CreateAndImportK3DCluster: failed to instantiate kube api provisioning client")
+	}
 	// wait for the imported cluster
-	clusterWatch, err := client.Provisioning.Clusters("fleet-default").Watch(context.TODO(), metav1.ListOptions{
+	clusterWatch, err := kubeProvisioningClient.Clusters("fleet-default").Watch(context.TODO(), metav1.ListOptions{
 		FieldSelector:  "metadata.name=" + name,
 		TimeoutSeconds: &defaults.WatchTimeoutSeconds,
 	})
@@ -102,7 +107,7 @@ func CreateAndImportK3DCluster(client *rancher.Client, name string) (*apisV1.Clu
 	err = wait.WatchWait(clusterWatch, func(event watch.Event) (bool, error) {
 		cluster := event.Object.(*apisV1.Cluster)
 		if cluster.Name == name {
-			impCluster, err = client.Provisioning.Clusters("fleet-default").Get(context.TODO(), name, metav1.GetOptions{})
+			impCluster, err = kubeProvisioningClient.Clusters("fleet-default").Get(context.TODO(), name, metav1.GetOptions{})
 			return true, err
 		}
 
@@ -120,7 +125,7 @@ func CreateAndImportK3DCluster(client *rancher.Client, name string) (*apisV1.Clu
 	}
 
 	// wait for the imported cluster to be ready
-	clusterWatch, err = client.Provisioning.Clusters("fleet-default").Watch(context.TODO(), metav1.ListOptions{
+	clusterWatch, err = kubeProvisioningClient.Clusters("fleet-default").Watch(context.TODO(), metav1.ListOptions{
 		FieldSelector:  "metadata.name=" + name,
 		TimeoutSeconds: &defaults.WatchTimeoutSeconds,
 	})

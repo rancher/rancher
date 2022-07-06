@@ -5,6 +5,7 @@ const (
 	IngressConfigFieldDNSPolicy                               = "dnsPolicy"
 	IngressConfigFieldDefaultBackend                          = "defaultBackend"
 	IngressConfigFieldDefaultHTTPBackendPriorityClassName     = "defaultHttpBackendPriorityClassName"
+	IngressConfigFieldDefaultIngressClass                     = "defaultIngressClass"
 	IngressConfigFieldExtraArgs                               = "extraArgs"
 	IngressConfigFieldExtraEnvs                               = "extraEnvs"
 	IngressConfigFieldExtraVolumeMounts                       = "extraVolumeMounts"
@@ -24,6 +25,7 @@ type IngressConfig struct {
 	DNSPolicy                               string                   `json:"dnsPolicy,omitempty" yaml:"dnsPolicy,omitempty"`
 	DefaultBackend                          *bool                    `json:"defaultBackend,omitempty" yaml:"defaultBackend,omitempty"`
 	DefaultHTTPBackendPriorityClassName     string                   `json:"defaultHttpBackendPriorityClassName,omitempty" yaml:"defaultHttpBackendPriorityClassName,omitempty"`
+	DefaultIngressClass                     *bool                    `json:"defaultIngressClass,omitempty" yaml:"defaultIngressClass,omitempty"`
 	ExtraArgs                               map[string]string        `json:"extraArgs,omitempty" yaml:"extraArgs,omitempty"`
 	ExtraEnvs                               []interface{}            `json:"extraEnvs,omitempty" yaml:"extraEnvs,omitempty"`
 	ExtraVolumeMounts                       []interface{}            `json:"extraVolumeMounts,omitempty" yaml:"extraVolumeMounts,omitempty"`

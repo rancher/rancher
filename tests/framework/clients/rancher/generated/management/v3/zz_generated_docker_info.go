@@ -10,6 +10,7 @@ const (
 	DockerInfoFieldExperimentalBuild  = "experimentalBuild"
 	DockerInfoFieldHTTPProxy          = "httpProxy"
 	DockerInfoFieldHTTPSProxy         = "httpsProxy"
+	DockerInfoFieldID                 = "id"
 	DockerInfoFieldIndexServerAddress = "indexServerAddress"
 	DockerInfoFieldInitBinary         = "initBinary"
 	DockerInfoFieldKernelVersion      = "kernelVersion"
@@ -32,6 +33,7 @@ type DockerInfo struct {
 	ExperimentalBuild  bool     `json:"experimentalBuild,omitempty" yaml:"experimentalBuild,omitempty"`
 	HTTPProxy          string   `json:"httpProxy,omitempty" yaml:"httpProxy,omitempty"`
 	HTTPSProxy         string   `json:"httpsProxy,omitempty" yaml:"httpsProxy,omitempty"`
+	ID                 string   `json:"id,omitempty" yaml:"id,omitempty"`
 	IndexServerAddress string   `json:"indexServerAddress,omitempty" yaml:"indexServerAddress,omitempty"`
 	InitBinary         string   `json:"initBinary,omitempty" yaml:"initBinary,omitempty"`
 	KernelVersion      string   `json:"kernelVersion,omitempty" yaml:"kernelVersion,omitempty"`
