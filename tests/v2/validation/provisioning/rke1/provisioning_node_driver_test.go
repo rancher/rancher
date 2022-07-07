@@ -1,12 +1,12 @@
-package provisioning
+package rke1
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
 	"github.com/rancher/rancher/tests/framework/extensions/clusters"
+	nodepools "github.com/rancher/rancher/tests/framework/extensions/rke1/nodepools"
 	"github.com/rancher/rancher/tests/framework/extensions/users"
 	"github.com/rancher/rancher/tests/framework/pkg/config"
 	"github.com/rancher/rancher/tests/framework/pkg/session"
@@ -22,6 +22,7 @@ import (
 type RKE1NodeDriverProvisioningTestSuite struct {
 	suite.Suite
 	client             *rancher.Client
+	standardUserClient *rancher.Client
 	session            *session.Session
 	kubernetesVersions []string
 	cnis               []string
@@ -61,6 +62,11 @@ func (r *RKE1NodeDriverProvisioningTestSuite) SetupSuite() {
 	require.NoError(r.T(), err)
 
 	newUser.Password = user.Password
+
+	standardUserClient, err := client.AsUser(newUser)
+	require.NoError(r.T(), err)
+
+	r.standardUserClient = standardUserClient
 }
 
 func (r *RKE1NodeDriverProvisioningTestSuite) ProvisioningRKE1Cluster(provider Provider) {
@@ -70,6 +76,7 @@ func (r *RKE1NodeDriverProvisioningTestSuite) ProvisioningRKE1Cluster(provider P
 		client *rancher.Client
 	}{
 		{"Admin User", r.client},
+		{"Standard User", r.standardUserClient},
 	}
 
 	var name string
@@ -85,56 +92,27 @@ func (r *RKE1NodeDriverProvisioningTestSuite) ProvisioningRKE1Cluster(provider P
 			for _, cni := range r.cnis {
 				name += " cni: " + cni
 				r.Run(name, func() {
-					cluster := &management.Cluster{
-						DockerRootDir:           "/var/lib/docker",
-						EnableClusterAlerting:   false,
-						EnableClusterMonitoring: false,
-						LocalClusterAuthEndpoint: &management.LocalClusterAuthEndpoint{
-							Enabled: true,
-						},
-						Name:     rkeconfig.AppendRandomString("rke1"),
-						Provider: provider.Name,
-						RancherKubernetesEngineConfig: &management.RancherKubernetesEngineConfig{
-							DNS: &management.DNSConfig{
-								Provider: "coredns",
-								Options: map[string]string{
-									"stubDomains": "cluster.local",
-								},
-							},
-							Ingress: &management.IngressConfig{
-								Provider: "nginx",
-							},
-							Monitoring: &management.MonitoringConfig{
-								Provider: "metrics-server",
-							},
-							Network: &management.NetworkConfig{
-								MTU:     0,
-								Options: map[string]string{},
-							},
-						},
-					}
+					testSession := session.NewSession(r.T())
+					defer testSession.Cleanup()
+
+					testSessionClient, err := tt.client.WithSession(testSession)
+					require.NoError(r.T(), err)
+
+					clusterName := clusters.RKE1AppendRandomString("rke1")
+
+					cluster := clusters.NewRKE1ClusterConfig(clusterName, cni, kubeVersion, testSessionClient)
 
 					clusterResp, err := client.Management.Cluster.Create(cluster)
 					require.NoError(r.T(), err)
 
 					nodeTemplateResp, err := provider.NodeTemplateFunc(client)
 
-					nodePool := &management.NodePool{
-						ClusterID:               clusterResp.ID,
-						ControlPlane:            true,
-						DeleteNotReadyAfterSecs: 0,
-						Etcd:                    true,
-						HostnamePrefix:          rkeconfig.AppendRandomString("rke1"),
-						NodeTemplateID:          nodeTemplateResp.ID,
-						Quantity:                1,
-						Worker:                  true,
-					}
+					nodePool := nodepools.NewRKE1NodePoolConfig(clusterResp.ID, nodeTemplateResp.ID)
 
-					nodePoolResp, err := client.Management.NodePool.Create(nodePool)
+					nodePoolResp, err := r.client.Management.NodePool.Create(nodePool)
 					require.NoError(r.T(), err)
-					fmt.Printf(nodePoolResp.ClusterID)
 
-					clusterName := clusterResp.Name
+					nodePoolName := nodePoolResp.Name
 
 					opts := metav1.ListOptions{
 						FieldSelector:  "metadata.name=" + clusterResp.ID,
@@ -148,6 +126,7 @@ func (r *RKE1NodeDriverProvisioningTestSuite) ProvisioningRKE1Cluster(provider P
 					err = wait.WatchWait(watchInterface, checkFunc)
 					require.NoError(r.T(), err)
 					assert.Equal(r.T(), clusterName, clusterResp.Name)
+					assert.Equal(r.T(), nodePoolName, nodePoolResp.Name)
 				})
 			}
 		}

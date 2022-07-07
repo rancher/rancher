@@ -1,4 +1,4 @@
-package provisioning
+package rke1
 
 import (
 	"fmt"
