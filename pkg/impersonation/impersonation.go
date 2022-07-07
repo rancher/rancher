@@ -63,7 +63,11 @@ func (i *Impersonator) SetUpImpersonation() (*corev1.ServiceAccount, error) {
 	if err != nil {
 		return nil, err
 	}
-	if role != nil {
+	roleBinding, err := i.getRoleBinding()
+	if err != nil && !apierrors.IsNotFound(err) {
+		return nil, err
+	}
+	if role != nil && roleBinding != nil {
 		sa, err := i.getServiceAccount()
 		// in case the role exists but we were interrupted before creating the service account, proceed to create resources
 		if err == nil || !apierrors.IsNotFound(err) {
@@ -291,6 +295,11 @@ func (i *Impersonator) rulesForUser() []rbacv1.PolicyRule {
 		})
 	}
 	return rules
+}
+
+func (i *Impersonator) getRoleBinding() (*rbacv1.ClusterRoleBinding, error) {
+	name := ImpersonationPrefix + i.user.GetUID()
+	return i.clusterContext.RBAC.ClusterRoleBindings("").Controller().Lister().Get("", name)
 }
 
 func (i *Impersonator) createRoleBinding(role *rbacv1.ClusterRole, sa *corev1.ServiceAccount) error {
