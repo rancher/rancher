@@ -72,35 +72,39 @@ func (r *RKE2NodeDriverProvisioningTestSuite) SetupSuite() {
 
 func (r *RKE2NodeDriverProvisioningTestSuite) ProvisioningRKE2Cluster(provider Provider) {
 	providerName := " Node Provider: " + provider.Name
-	nodeRoles0 := []map[string]bool{
+	nodeRoles0 := []machinepools.NodeRoles{
 		{
-			"controlplane": true,
-			"etcd":         true,
-			"worker":       true,
+			ControlPlane: true,
+			Etcd:         true,
+			Worker:       true,
+			Quantity:     1,
 		},
 	}
 
-	nodeRoles1 := []map[string]bool{
+	nodeRoles1 := []machinepools.NodeRoles{
 		{
-			"controlplane": true,
-			"etcd":         false,
-			"worker":       false,
+			ControlPlane: true,
+			Etcd:         false,
+			Worker:       false,
+			Quantity:     1,
 		},
 		{
-			"controlplane": false,
-			"etcd":         true,
-			"worker":       false,
+			ControlPlane: false,
+			Etcd:         true,
+			Worker:       false,
+			Quantity:     1,
 		},
 		{
-			"controlplane": false,
-			"etcd":         false,
-			"worker":       true,
+			ControlPlane: false,
+			Etcd:         false,
+			Worker:       true,
+			Quantity:     1,
 		},
 	}
 
 	tests := []struct {
 		name      string
-		nodeRoles []map[string]bool
+		nodeRoles []machinepools.NodeRoles
 		client    *rancher.Client
 	}{
 		{"1 Node all roles Admin User", nodeRoles0, r.client},
@@ -161,7 +165,7 @@ func (r *RKE2NodeDriverProvisioningTestSuite) ProvisioningRKE2Cluster(provider P
 	}
 }
 
-func (r *RKE2NodeDriverProvisioningTestSuite) ProvisioningRKE2ClusterDynamicInput(provider Provider, nodesAndRoles []map[string]bool) {
+func (r *RKE2NodeDriverProvisioningTestSuite) ProvisioningRKE2ClusterDynamicInput(provider Provider, nodesAndRoles []machinepools.NodeRoles) {
 	providerName := " Node Provider: " + provider.Name
 	tests := []struct {
 		name   string
@@ -232,7 +236,10 @@ func (r *RKE2NodeDriverProvisioningTestSuite) TestProvisioning() {
 }
 
 func (r *RKE2NodeDriverProvisioningTestSuite) TestProvisioningDynamicInput() {
-	nodesAndRoles := NodesAndRolesInput()
+	clustersConfig := new(Config)
+	config.LoadConfig(ConfigurationFileKey, clustersConfig)
+	nodesAndRoles := clustersConfig.NodesAndRoles
+
 	if len(nodesAndRoles) == 0 {
 		r.T().Skip()
 	}

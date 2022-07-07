@@ -46,25 +46,35 @@ func NewRKEMachinePool(controlPlaneRole, etcdRole, workerRole bool, poolName str
 	}
 }
 
+type NodeRoles struct {
+	ControlPlane bool  `json:"controlplane,omitempty" yaml:"controlplane,omitempty"`
+	Etcd         bool  `json:"etcd,omitempty" yaml:"etcd,omitempty"`
+	Worker       bool  `json:"worker,omitempty" yaml:"worker,omitempty"`
+	Quantity     int32 `json:"quantity" yaml:"quantity"`
+}
+
 // RKEMachinePoolSetup is a helper method that will loop and setup muliple node pools with the defined node roles from the `nodeRoles` parameter
 // `machineConfig` is the *unstructured.Unstructured created by CreateMachineConfig
 // `nodeRoles` would be in this format
 //   []map[string]bool{
 //   {
-// 	   "controlplane": true,
-// 	   "etcd":         false,
-//     "worker":       false,
+// 	   ControlPlane: true,
+// 	   Etcd:         false,
+// 	   Worker:       false,
+//	   Quantity:     1,
 //   },
 //   {
-// 	   "controlplane": false,
-// 	   "etcd":         true,
-// 	   "worker":       false,
+// 	   ControlPlane: false,
+// 	   Etcd:         true,
+// 	   Worker:       false,
+//	   Quantity:     1,
 //   },
 //  }
-func RKEMachinePoolSetup(nodeRoles []map[string]bool, machineConfig *unstructured.Unstructured) []apisV1.RKEMachinePool {
+
+func RKEMachinePoolSetup(nodeRoles []NodeRoles, machineConfig *unstructured.Unstructured) []apisV1.RKEMachinePool {
 	machinePools := []apisV1.RKEMachinePool{}
 	for index, roles := range nodeRoles {
-		machinePool := NewRKEMachinePool(roles["controlplane"], roles["etcd"], roles["worker"], "pool"+strconv.Itoa(index), 1, machineConfig)
+		machinePool := NewRKEMachinePool(roles.ControlPlane, roles.Etcd, roles.Worker, "pool"+strconv.Itoa(index), roles.Quantity, machineConfig)
 		machinePools = append(machinePools, machinePool)
 	}
 

@@ -133,11 +133,22 @@ RKE1 specifically needs a node template config to run properly. These are the in
 ---
 
 ### Provisioning Input
-provisioningInput is needed to the run the RKE2 tests, specifically kubernetesVersion, cni, and providers. nodesAndRoles is only needed for the TestProvisioningDynamicInput test, nodes are divided by "|". nodeProviders is only needed for custom cluster test; the framework only supports custom clusters through aws/ec2 instances.
+provisioningInput is needed to the run the RKE2 tests, specifically kubernetesVersion, cni, and providers. nodesAndRoles is only needed for the TestProvisioningDynamicInput test, node pools are divided by "{nodepool},". nodeProviders is only needed for node provider cluster tests; the framework only supports custom clusters through aws/ec2 instances.
 
 ```json
 "provisioningInput": {
-    "nodesAndRoles": "etcd,controlplane,worker|etcd,controlplane",
+    "nodesAndRoles": [
+      {
+        "etcd": true,
+        "controlplane": true,
+        "worker": true,
+        "quantity": 1,
+      },
+      {
+        "worker": true,
+        "quantity": 2,
+      }
+    ],
     "kubernetesVersion": ["v1.21.6+rke2r1"],
     "cni": ["calico"],
     "providers": ["linode", "aws", "do", "harvester"],

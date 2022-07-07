@@ -8,6 +8,7 @@ import (
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
 	"github.com/rancher/rancher/tests/framework/extensions/clusters"
+	"github.com/rancher/rancher/tests/framework/extensions/machinepools"
 	"github.com/rancher/rancher/tests/framework/extensions/tokenregistration"
 	"github.com/rancher/rancher/tests/framework/extensions/users"
 	"github.com/rancher/rancher/tests/framework/pkg/config"
@@ -144,13 +145,19 @@ func (c *CustomClusterProvisioningTestSuite) ProvisioningRKE2CustomCluster(exter
 	}
 }
 
-func (c *CustomClusterProvisioningTestSuite) ProvisioningRKE2CustomClusterDynamicInput(externalNodeProvider ExternalNodeProvider, nodesAndRoles []map[string]bool) {
+func (c *CustomClusterProvisioningTestSuite) ProvisioningRKE2CustomClusterDynamicInput(externalNodeProvider ExternalNodeProvider, nodesAndRoles []machinepools.NodeRoles) {
 	rolesPerNode := []string{}
 
 	for _, nodes := range nodesAndRoles {
 		var finalRoleCommand string
-		for role := range nodes {
-			finalRoleCommand += fmt.Sprintf(" --%s", role)
+		if nodes.ControlPlane {
+			finalRoleCommand += " --controlplane"
+		}
+		if nodes.Etcd {
+			finalRoleCommand += " --etcd"
+		}
+		if nodes.Worker {
+			finalRoleCommand += " --worker"
 		}
 		rolesPerNode = append(rolesPerNode, finalRoleCommand)
 	}
@@ -227,7 +234,10 @@ func (c *CustomClusterProvisioningTestSuite) TestProvisioningCustomCluster() {
 }
 
 func (c *CustomClusterProvisioningTestSuite) TestProvisioningCustomClusterDynamicInput() {
-	nodesAndRoles := NodesAndRolesInput()
+	clustersConfig := new(Config)
+	config.LoadConfig(ConfigurationFileKey, clustersConfig)
+	nodesAndRoles := clustersConfig.NodesAndRoles
+
 	if len(nodesAndRoles) == 0 {
 		c.T().Skip()
 	}
