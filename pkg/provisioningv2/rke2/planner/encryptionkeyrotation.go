@@ -204,7 +204,12 @@ func encryptionKeyRotationSupported(releaseData *model.Release) (bool, error) {
 		if err != nil {
 			return false, fmt.Errorf("unable to parse semver version for encryption key rotation: %s", featureVersion)
 		}
-		if version.Major == 1 { // we are looking for encryption key rotation 1.x.x
+		// v2.6.4 - v2.6.6 are looking for 1.x.x, but encryption key rotation does not work in those versions. Rather than
+		// enable it retroactively, those versions will not be able to rotate encryption keys since some cluster
+		// configurations can break in such a way that they become unrecoverable. Additionally, we want to be careful
+		// updating the encryption-key-rotation feature gate in KDM in the future, so as not to break backwards
+		// compatibility for existing clusters.
+		if version.Major == 2 {
 			return true, nil
 		}
 	}
