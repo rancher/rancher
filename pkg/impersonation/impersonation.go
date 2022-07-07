@@ -360,7 +360,15 @@ func (i *Impersonator) waitForServiceAccount(sa *corev1.ServiceAccount) (*corev1
 		if err != nil {
 			return false, err
 		}
-		if len(ret.Secrets) > 0 {
+		secretName := serviceaccounttoken.ServiceAccountSecretName(sa)
+		secret, err := i.clusterContext.Core.Secrets(ImpersonationNamespace).Get(secretName, metav1.GetOptions{})
+		if apierrors.IsNotFound(err) {
+			return false, nil
+		}
+		if err != nil {
+			return false, err
+		}
+		if _, found := secret.Data[corev1.ServiceAccountTokenKey]; found {
 			return true, nil
 		}
 		return false, nil
