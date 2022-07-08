@@ -1,17 +1,3 @@
-ARG K3S_BUILDER=rancher/k3s:v1.24.2-k3s1
-
-# Use binaries from k3s root for s390x as k3s is not available on s390x
-FROM registry.suse.com/bci/bci-base:15.3 AS k3s_root
-ARG ARCH
-ENV ARCH=${ARCH}
-ENV K3S_ROOT_VERSION v0.11.0
-ONBUILD RUN zypper -n in tar
-ONBUILD ADD https://github.com/rancher/k3s-root/releases/download/${K3S_ROOT_VERSION}/k3s-root-${ARCH}.tar /k3s-root.tar
-ONBUILD RUN tar xvf /k3s-root.tar; \
-  touch /bin/cni /bin/containerd /bin/containerd-shim-runc-v2 /bin/runc /bin/k3s
-
-FROM ${K3S_BUILDER} as k3s_builder
-
 FROM registry.suse.com/bci/bci-base:15.3
 
 RUN zypper -n install git-core curl ca-certificates unzip xz gzip sed tar shadow gawk vim netcat-openbsd mkisofs && \
@@ -40,7 +26,7 @@ ENV CATTLE_SYSTEM_CHART_DEFAULT_BRANCH=$SYSTEM_CHART_DEFAULT_BRANCH
 ENV CATTLE_CHART_DEFAULT_BRANCH=$CHART_DEFAULT_BRANCH
 ENV CATTLE_PARTNER_CHART_DEFAULT_BRANCH=$PARTNER_CHART_DEFAULT_BRANCH
 ENV CATTLE_RKE2_CHART_DEFAULT_BRANCH=$RKE2_CHART_DEFAULT_BRANCH
-ENV CATTLE_HELM_VERSION v2.16.8-rancher1
+ENV CATTLE_HELM_VERSION v2.16.8-rancher2
 ENV CATTLE_MACHINE_VERSION v0.15.0-rancher88
 ENV CATTLE_K3S_VERSION v1.24.2+k3s1
 ENV CATTLE_MACHINE_PROVISION_IMAGE rancher/machine:${CATTLE_MACHINE_VERSION}
@@ -103,23 +89,24 @@ ENV TINI_URL_amd64=https://github.com/krallin/tini/releases/download/${TINI_VERS
 
 ENV HELM_URL_V2_amd64=https://github.com/rancher/helm/releases/download/${CATTLE_HELM_VERSION}/rancher-helm \
     HELM_URL_V2_arm64=https://github.com/rancher/helm/releases/download/${CATTLE_HELM_VERSION}/rancher-helm-arm64 \
+    HELM_URL_V2_s390x=https://github.com/rancher/helm/releases/download/${CATTLE_HELM_VERSION}/rancher-helm-s390x \
     HELM_URL_V2=HELM_URL_V2_${ARCH} \
     HELM_URL_V3=https://get.helm.sh/helm-${HELM_VERSION}-linux-${ARCH}.tar.gz \
     TILLER_URL_amd64=https://github.com/rancher/helm/releases/download/${CATTLE_HELM_VERSION}/rancher-tiller \
     TILLER_URL_arm64=https://github.com/rancher/helm/releases/download/${CATTLE_HELM_VERSION}/rancher-tiller-arm64 \
+    TILLER_URL_s390x=https://github.com/rancher/helm/releases/download/${CATTLE_HELM_VERSION}/rancher-tiller-s390x \
     TILLER_URL=TILLER_URL_${ARCH} \
     ETCD_URL=https://github.com/etcd-io/etcd/releases/download/${CATTLE_ETCD_VERSION}/etcd-${CATTLE_ETCD_VERSION}-linux-${ARCH}.tar.gz \
     KUSTOMIZE_URL=https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize/${KUSTOMIZE_VERSION}/kustomize_${KUSTOMIZE_VERSION}_linux_${ARCH}.tar.gz
 
 RUN curl -sLf ${KUSTOMIZE_URL} | tar -xzf - -C /usr/bin
 
-RUN if [ "${ARCH}" != "s390x" ]; then \
-        curl -sLf ${!HELM_URL_V2} > /usr/bin/rancher-helm && \
-        curl -sLf ${!TILLER_URL} > /usr/bin/rancher-tiller && \
-        ln -s /usr/bin/rancher-helm /usr/bin/helm && \
-        ln -s /usr/bin/rancher-tiller /usr/bin/tiller && \
-        chmod +x /usr/bin/rancher-helm /usr/bin/rancher-tiller; \
-    fi
+# set up helm 2
+RUN curl -sLf ${!HELM_URL_V2} > /usr/bin/rancher-helm && \
+    curl -sLf ${!TILLER_URL} > /usr/bin/rancher-tiller && \
+    ln -s /usr/bin/rancher-helm /usr/bin/helm && \
+    ln -s /usr/bin/rancher-tiller /usr/bin/tiller && \
+    chmod +x /usr/bin/rancher-helm /usr/bin/rancher-tiller
 
 # set up helm 3
 RUN curl ${HELM_URL_V3} | tar xvzf - --strip-components=1 -C /usr/bin && \
@@ -127,7 +114,7 @@ RUN curl ${HELM_URL_V3} | tar xvzf - --strip-components=1 -C /usr/bin && \
     chmod +x /usr/bin/kustomize
 
 # Set up K3s: copy the necessary binaries from the K3s image.
-COPY --from=k3s_builder \
+COPY --from=rancher/k3s:v1.24.2-k3s1 \
     /bin/blkid \
     /bin/charon \
     /bin/cni \
@@ -146,28 +133,26 @@ COPY --from=k3s_builder \
     /bin/aux/xtables-legacy-multi \
 /usr/bin/
 
-RUN if [ "${ARCH}" != "s390x" ]; then \
-        ln -s /usr/bin/cni /usr/bin/bridge && \
-        ln -s /usr/bin/cni /usr/bin/flannel && \
-        ln -s /usr/bin/cni /usr/bin/host-local && \
-        ln -s /usr/bin/cni /usr/bin/loopback && \
-        ln -s /usr/bin/cni /usr/bin/portmap && \
-        ln -s /usr/bin/k3s /usr/bin/crictl && \
-        ln -s /usr/bin/k3s /usr/bin/ctr && \
-        ln -s /usr/bin/k3s /usr/bin/k3s-agent && \
-        ln -s /usr/bin/k3s /usr/bin/k3s-etcd-snapshot && \
-        ln -s /usr/bin/k3s /usr/bin/k3s-server && \
-        ln -s /usr/bin/k3s /usr/bin/kubectl && \
-        ln -s /usr/bin/pigz /usr/bin/unpigz && \
-        ln -s /usr/bin/xtables-legacy-multi /usr/bin/iptables && \
-        ln -s /usr/bin/xtables-legacy-multi /usr/bin/iptables-save && \
-        ln -s /usr/bin/xtables-legacy-multi /usr/bin/iptables-restore && \
-        ln -s /usr/bin/xtables-legacy-multi /usr/bin/iptables-translate && \
-        ln -s /usr/bin/xtables-legacy-multi /usr/bin/ip6tables && \
-        ln -s /usr/bin/xtables-legacy-multi /usr/bin/ip6tables-save && \
-        ln -s /usr/bin/xtables-legacy-multi /usr/bin/ip6tables-restore && \
-        ln -s /usr/bin/xtables-legacy-multi /usr/bin/ip6tables-translate; \
-    fi
+RUN ln -s /usr/bin/cni /usr/bin/bridge && \
+    ln -s /usr/bin/cni /usr/bin/flannel && \
+    ln -s /usr/bin/cni /usr/bin/host-local && \
+    ln -s /usr/bin/cni /usr/bin/loopback && \
+    ln -s /usr/bin/cni /usr/bin/portmap && \
+    ln -s /usr/bin/k3s /usr/bin/crictl && \
+    ln -s /usr/bin/k3s /usr/bin/ctr && \
+    ln -s /usr/bin/k3s /usr/bin/k3s-agent && \
+    ln -s /usr/bin/k3s /usr/bin/k3s-etcd-snapshot && \
+    ln -s /usr/bin/k3s /usr/bin/k3s-server && \
+    ln -s /usr/bin/k3s /usr/bin/kubectl && \
+    ln -s /usr/bin/pigz /usr/bin/unpigz && \
+    ln -s /usr/bin/xtables-legacy-multi /usr/bin/iptables && \
+    ln -s /usr/bin/xtables-legacy-multi /usr/bin/iptables-save && \
+    ln -s /usr/bin/xtables-legacy-multi /usr/bin/iptables-restore && \
+    ln -s /usr/bin/xtables-legacy-multi /usr/bin/iptables-translate && \
+    ln -s /usr/bin/xtables-legacy-multi /usr/bin/ip6tables && \
+    ln -s /usr/bin/xtables-legacy-multi /usr/bin/ip6tables-save && \
+    ln -s /usr/bin/xtables-legacy-multi /usr/bin/ip6tables-restore && \
+    ln -s /usr/bin/xtables-legacy-multi /usr/bin/ip6tables-translate
 
 RUN curl -sLf ${!TINI_URL} > /usr/bin/tini && \
     mkdir -p /var/lib/rancher/k3s/agent/images/ && \
@@ -175,11 +160,6 @@ RUN curl -sLf ${!TINI_URL} > /usr/bin/tini && \
     curl -sLf https://github.com/rancher/telemetry/releases/download/${TELEMETRY_VERSION}/telemetry-${ARCH} > /usr/bin/telemetry && \
     chmod +x /usr/bin/tini /usr/bin/telemetry && \
     mkdir -p /var/lib/rancher-data/driver-metadata
-
-RUN  if [ "${ARCH}" == "s390x" ]; then \
-      curl -sLf https://storage.googleapis.com/kubernetes-release/release/${CATTLE_K3S_VERSION%+*}/bin/linux/${ARCH}/kubectl > /usr/bin/kubectl && \
-      chmod +x /usr/bin/kubectl; \
-     fi
 
 ENV CATTLE_UI_VERSION 2.6.7-rc1
 ENV CATTLE_DASHBOARD_UI_VERSION v2.6.7-rc1
