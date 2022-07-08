@@ -2,7 +2,6 @@ package auth
 
 import (
 	"fmt"
-	v33 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"reflect"
 	"sort"
 
@@ -10,6 +9,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/objectclient"
 	"github.com/rancher/norman/types/slice"
+	v33 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/clustermanager"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/rbac"
 	v13 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
@@ -112,7 +112,7 @@ type manager struct {
 // When a CRTB is created that gives a subject some permissions in a project or cluster, we need to create a "membership" binding
 // that gives the subject access to the the cluster custom resource itself
 // This is painfully similar to ensureProjectMemberBinding, but making one function that handles both is overly complex
-func (m *manager) ensureClusterMembershipBinding(roleName, rtbNsAndName string, cluster *v3.Cluster, makeOwner bool, subject v1.Subject) error {
+func (m *manager) ensureClusterMembershipBinding(roleName, rtbNsAndName string, cluster *v33.Cluster, makeOwner bool, subject v1.Subject) error {
 	if err := m.createClusterMembershipRole(roleName, cluster, makeOwner); err != nil {
 		return err
 	}

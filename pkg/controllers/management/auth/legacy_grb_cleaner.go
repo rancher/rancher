@@ -1,10 +1,10 @@
 package auth
 
 import (
-	v33 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"strings"
 
 	grbstore "github.com/rancher/rancher/pkg/api/norman/store/globalrolebindings"
+	v33 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"k8s.io/apimachinery/pkg/runtime"
 )
