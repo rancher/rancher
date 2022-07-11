@@ -857,6 +857,10 @@ func (m *Migrator) createOrUpdateSecret(secretName, secretNamespace string, data
 // and creates a secret to hold the sanitized data. If an owner is passed, the owner is set as an owner reference on the secret.
 func (m *Migrator) createOrUpdateSecretForCredential(secretName, secretNamespace, secretValue string, annotations map[string]string, owner runtime.Object, kind, field string) (*corev1.Secret, error) {
 	if secretValue == "" {
+		if secretName == "" {
+			logrus.Warnf("Secret name is empty")
+		}
+		logrus.Warnf("Refusing to create empty secret [%s]/[%s]", secretNamespace, secretName)
 		return nil, nil
 	}
 	data := map[string]string{
