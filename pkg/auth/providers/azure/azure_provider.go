@@ -79,7 +79,7 @@ func (ap *azureProvider) RefetchGroupPrincipals(principalID, secret string) ([]v
 	if err != nil {
 		return nil, err
 	}
-	var useDeprecatedAzureADClient = graphEndpointDeprecated(cfg.GraphEndpoint)
+	var useDeprecatedAzureADClient = isConfigDeprecated(cfg)
 	azureClient, err := clients.NewAzureClientFromSecret(cfg, useDeprecatedAzureADClient, secret, ap.secrets)
 	if err != nil {
 		return nil, err
@@ -195,7 +195,7 @@ func (ap *azureProvider) TransformToAuthProvider(
 }
 
 func (ap *azureProvider) loginUser(config *v32.AzureADConfig, azureCredential *v32.AzureADLogin, test bool) (v3.Principal, []v3.Principal, string, error) {
-	var useDeprecatedAzureADClient = graphEndpointDeprecated(config.GraphEndpoint)
+	var useDeprecatedAzureADClient = isConfigDeprecated(config)
 	azureClient, err := clients.NewAzureClientFromCredential(config, useDeprecatedAzureADClient, azureCredential, ap.secrets)
 	if err != nil {
 		return v3.Principal{}, nil, "", err
@@ -264,7 +264,7 @@ func (ap *azureProvider) searchGroupPrincipalsByName(client clients.AzureClient,
 
 func (ap *azureProvider) newAzureClientFromToken(cfg *v32.AzureADConfig, token *v32.Token) (clients.AzureClient, error) {
 	var secret string
-	var deprecated = graphEndpointDeprecated(cfg.GraphEndpoint)
+	var deprecated = isConfigDeprecated(cfg)
 	if deprecated {
 		var err error
 		secret, err = ap.tokenMGR.GetSecret(token.UserID, Name, []*v3.Token{token})
@@ -276,6 +276,8 @@ func (ap *azureProvider) newAzureClientFromToken(cfg *v32.AzureADConfig, token *
 }
 
 func (ap *azureProvider) saveAzureConfigK8s(config *v32.AzureADConfig) error {
+	// Copy the annotations.
+	annotations := config.ObjectMeta.Annotations
 	storedAzureConfig, err := ap.getAzureConfigK8s()
 	if err != nil {
 		return err
@@ -284,6 +286,14 @@ func (ap *azureProvider) saveAzureConfigK8s(config *v32.AzureADConfig) error {
 	config.Kind = v3.AuthConfigGroupVersionKind.Kind
 	config.Type = client.AzureADConfigType
 	config.ObjectMeta = storedAzureConfig.ObjectMeta
+
+	// Ensure the passed in config's annotations are applied to the object to be persisted.
+	if config.ObjectMeta.Annotations == nil {
+		config.ObjectMeta.Annotations = map[string]string{}
+	}
+	for k, v := range annotations {
+		config.ObjectMeta.Annotations[k] = v
+	}
 
 	field := strings.ToLower(client.AzureADConfigFieldApplicationSecret)
 	if err := common.CreateOrUpdateSecrets(ap.secrets, config.ApplicationSecret, field, strings.ToLower(config.Type)); err != nil {
@@ -347,7 +357,7 @@ func (ap *azureProvider) updateToken(client clients.AzureClient, token *v3.Token
 	if err != nil {
 		return err
 	}
-	if !graphEndpointDeprecated(cfg.GraphEndpoint) {
+	if !isConfigDeprecated(cfg) {
 		return nil
 	}
 
@@ -377,8 +387,13 @@ func (ap *azureProvider) updateToken(client clients.AzureClient, token *v3.Token
 
 func formAzureRedirectURL(config map[string]interface{}) string {
 	var ac v32.AzureADConfig
-	if err := mapstructure.Decode(config, &ac); err == nil {
-		if !graphEndpointDeprecated(ac.GraphEndpoint) {
+	err := mapstructure.Decode(config, &ac)
+	if err == nil {
+		// Extract the annotations from the map. This is needed because of the type structure of
+		// the Azure config and the Auth config it embeds. Full deserialization does not work for
+		// fields of the embedded Kubernetes types in this case.
+		ac.ObjectMeta.Annotations = extractAnnotations(config)
+		if !isConfigDeprecated(&ac) {
 			// Return the redirect URL for Microsoft Graph.
 			return fmt.Sprintf(
 				"%s?client_id=%s&redirect_uri=%s&response_type=code&scope=openid",
@@ -398,6 +413,28 @@ func formAzureRedirectURL(config map[string]interface{}) string {
 		config["rancherUrl"],
 		config["graphEndpoint"],
 	)
+}
+
+func extractAnnotations(config map[string]interface{}) map[string]string {
+	annotations := make(map[string]string)
+	metadata, ok := config["metadata"].(map[string]interface{})
+	if !ok {
+		logrus.Info("Failed to decode the 'metadata' field of the auth config.")
+		return annotations
+	}
+	rawAnnotations, ok := metadata["annotations"].(map[string]interface{})
+	if !ok {
+		logrus.Info("Failed to decode the 'annotations' field of the auth config.")
+		return annotations
+	}
+	for k, v := range rawAnnotations {
+		if stringValue, ok := v.(string); ok {
+			annotations[k] = stringValue
+		} else {
+			logrus.Infof("Failed to decode the annotation value of the key %q as a string (%v of type %T) on the auth config.", k, v, v)
+		}
+	}
+	return annotations
 }
 
 func (ap *azureProvider) CanAccessWithGroupProviders(userPrincipalID string, groupPrincipals []v3.Principal) (bool, error) {
