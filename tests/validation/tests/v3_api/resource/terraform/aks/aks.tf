@@ -35,18 +35,8 @@ resource "azurerm_kubernetes_cluster" "default" {
   }
 
   service_principal {
-    client_id     = var.client_id
-    client_secret = var.client_secret
-  }
-
-  role_based_access_control {
-    enabled = true
-  }
-
-  addon_profile {
-    kube_dashboard {
-      enabled = false
-    }
+    client_id     = "id_placeholder"
+    client_secret = "secret_placeholder"
   }
 
   tags = {
@@ -56,4 +46,5 @@ resource "azurerm_kubernetes_cluster" "default" {
 
 output "kube_config" {
   value = azurerm_kubernetes_cluster.default.kube_config_raw
+  sensitive = true
 }
