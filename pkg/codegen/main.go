@@ -106,7 +106,8 @@ func main() {
 				Types: []interface{}{
 					"./pkg/apis/rke.cattle.io/v1",
 				},
-				GenerateTypes: true,
+				GenerateTypes:   true,
+				GenerateClients: true,
 			},
 			"cluster.x-k8s.io": {
 				Types: []interface{}{

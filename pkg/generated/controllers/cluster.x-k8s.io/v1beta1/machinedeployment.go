@@ -28,6 +28,7 @@ import (
 	"github.com/rancher/wrangler/pkg/condition"
 	"github.com/rancher/wrangler/pkg/generic"
 	"github.com/rancher/wrangler/pkg/kv"
+	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -128,11 +129,17 @@ func UpdateMachineDeploymentDeepCopyOnChange(client MachineDeploymentClient, obj
 
 	copyObj := obj.DeepCopy()
 	newObj, err := handler(copyObj)
+	if err != nil {
+		logrus.Error(err)
+	}
 	if newObj != nil {
 		copyObj = newObj
 	}
 	if obj.ResourceVersion == copyObj.ResourceVersion && !equality.Semantic.DeepEqual(obj, copyObj) {
-		return client.Update(copyObj)
+		copyObj, err = client.Update(copyObj)
+		if err != nil {
+			logrus.Error(err)
+		}
 	}
 
 	return copyObj, err
@@ -326,7 +333,7 @@ func (a *machineDeploymentStatusHandler) sync(key string, obj *v1beta1.MachineDe
 		var newErr error
 		obj.Status = newStatus
 		newObj, newErr := a.client.UpdateStatus(obj)
-		if err == nil {
+		if err == nil && newErr != nil {
 			err = newErr
 		}
 		if newErr == nil {
