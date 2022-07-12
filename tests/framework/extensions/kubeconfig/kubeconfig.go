@@ -5,7 +5,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 )
 
-// GetKubeconfig generates a kubeconfig froma specific cluster, and returns it in the form of a *clientcmd.ClientConfig
+// GetKubeconfig generates a kubeconfig from a specific cluster, and returns it in the form of a *clientcmd.ClientConfig
 func GetKubeconfig(client *rancher.Client, clusterID string) (*clientcmd.ClientConfig, error) {
 	cluster, err := client.Management.Cluster.ByID(clusterID)
 	if err != nil {

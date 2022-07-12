@@ -9,6 +9,7 @@ import (
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	apisV1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
+	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2"
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
 	"github.com/rancher/rancher/tests/framework/pkg/namegenerator"
@@ -41,6 +42,9 @@ func IsProvisioningClusterReady(event watch.Event) (ready bool, err error) {
 	cluster := event.Object.(*apisV1.Cluster)
 
 	ready = cluster.Status.Ready
+	if ready {
+		ready = rke2.Updated.IsTrue(cluster)
+	}
 	return ready, nil
 }
 

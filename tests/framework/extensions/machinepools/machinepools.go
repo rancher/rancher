@@ -2,7 +2,9 @@ package machinepools
 
 import (
 	"context"
+	"fmt"
 	"strconv"
+	"strings"
 
 	apisV1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
@@ -53,7 +55,25 @@ type NodeRoles struct {
 	Quantity     int32 `json:"quantity" yaml:"quantity"`
 }
 
-// RKEMachinePoolSetup is a helper method that will loop and setup muliple node pools with the defined node roles from the `nodeRoles` parameter
+func (n NodeRoles) String() string {
+	result := make([]string, 0, 3)
+	if n.Quantity < 1 {
+		return ""
+	}
+	if n.ControlPlane {
+		result = append(result, "controlplane")
+	}
+	if n.Etcd {
+		result = append(result, "etcd")
+	}
+	if n.Worker {
+		result = append(result, "worker")
+	}
+
+	return fmt.Sprintf("%d %s", n.Quantity, strings.Join(result, "+"))
+}
+
+// RKEMachinePoolSetup is a helper method that will loop and setup multiple node pools with the defined node roles from the `nodeRoles` parameter
 // `machineConfig` is the *unstructured.Unstructured created by CreateMachineConfig
 // `nodeRoles` would be in this format
 //   []map[string]bool{
@@ -70,9 +90,8 @@ type NodeRoles struct {
 //	   Quantity:     1,
 //   },
 //  }
-
 func RKEMachinePoolSetup(nodeRoles []NodeRoles, machineConfig *unstructured.Unstructured) []apisV1.RKEMachinePool {
-	machinePools := []apisV1.RKEMachinePool{}
+	machinePools := make([]apisV1.RKEMachinePool, 0, len(nodeRoles))
 	for index, roles := range nodeRoles {
 		machinePool := NewRKEMachinePool(roles.ControlPlane, roles.Etcd, roles.Worker, "pool"+strconv.Itoa(index), roles.Quantity, machineConfig)
 		machinePools = append(machinePools, machinePool)

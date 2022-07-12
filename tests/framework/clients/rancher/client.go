@@ -15,6 +15,7 @@ import (
 	"github.com/rancher/rancher/tests/framework/clients/rancher/catalog"
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
 	"github.com/rancher/rancher/tests/framework/clients/rancher/provisioning"
+	"github.com/rancher/rancher/tests/framework/clients/rancher/rke"
 	"github.com/rancher/rancher/tests/framework/pkg/clientbase"
 	"github.com/rancher/rancher/tests/framework/pkg/config"
 	"github.com/rancher/rancher/tests/framework/pkg/session"
@@ -33,6 +34,8 @@ type Client struct {
 	Management *management.Client
 	// Client used to access provisioning.cattle.io v1 API resources (clusters)
 	Provisioning *provisioning.Client
+	// Client used to access rke.cattle.io v1 API resources (CAPI)
+	RKE *rke.Client
 	// Client used to access catalog.cattle.io v1 API resources (apps, charts, etc.)
 	Catalog *catalog.Client
 	// Config used to test against a rancher instance
@@ -75,6 +78,13 @@ func NewClient(bearerToken string, session *session.Session) (*Client, error) {
 	}
 
 	c.Provisioning = provClient
+
+	rkeClient, err := rke.NewForConfig(restConfig, session)
+	if err != nil {
+		return nil, err
+	}
+
+	c.RKE = rkeClient
 
 	catalogClient, err := catalog.NewForConfig(restConfig, session)
 	if err != nil {
