@@ -67,6 +67,7 @@ const (
 	openStackSecretKey         = "openStackSecret"
 	aadClientSecretKey         = "aadClientSecret"
 	aadClientCertSecretKey     = "aadClientCertSecret"
+	clusterCRIDockerdAnn       = "io.cattle.cluster.cridockerd.enable"
 )
 
 type Store struct {
@@ -782,6 +783,7 @@ func (r *Store) Update(apiContext *types.APIContext, schema *types.Schema, data 
 	if err != nil {
 		return nil, err
 	}
+	enableCRIDockerd(data)
 	if err := setNodeUpgradeStrategy(data, existingCluster); err != nil {
 		return nil, err
 	}
@@ -1246,7 +1248,14 @@ func enableCRIDockerd(data map[string]interface{}) {
 	if ok && rkeConfig != nil {
 		k8sVersion := convert.ToString(values.GetValueN(data, "rancherKubernetesEngineConfig", "kubernetesVersion"))
 		if mVersion.Compare(k8sVersion, "v1.24.0-rancher1-1", ">=") {
-			enableCRIDockerd124 := true
+			annotation, _ := values.GetValue(data, managementv3.ClusterFieldAnnotations)
+			m := toMap(annotation)
+			var enableCRIDockerd124 bool
+			if enable, ok := m[clusterCRIDockerdAnn]; ok && convert.ToString(enable) == "false" {
+				values.PutValue(data, enableCRIDockerd124, "rancherKubernetesEngineConfig", "enableCriDockerd")
+				return
+			}
+			enableCRIDockerd124 = true
 			values.PutValue(data, enableCRIDockerd124, "rancherKubernetesEngineConfig", "enableCriDockerd")
 		}
 	}
