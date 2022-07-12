@@ -21,6 +21,7 @@ package fake
 import (
 	catalogv1 "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
 	provisioningv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
+	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	upgradev1 "github.com/rancher/system-upgrade-controller/pkg/apis/upgrade.cattle.io/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
@@ -35,6 +36,7 @@ var codecs = serializer.NewCodecFactory(scheme)
 var localSchemeBuilder = runtime.SchemeBuilder{
 	catalogv1.AddToScheme,
 	provisioningv1.AddToScheme,
+	rkev1.AddToScheme,
 	upgradev1.AddToScheme,
 }
 
