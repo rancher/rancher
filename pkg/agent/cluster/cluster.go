@@ -66,15 +66,23 @@ func getTokenFromAPI() ([]byte, []byte, error) {
 	}
 	cm, err := k8s.CoreV1().ConfigMaps(namespace.System).Get(context.Background(), "kube-root-ca.crt", metav1.GetOptions{})
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to find configmap containing the CA crt: %w", err)
+		// kube-root-ca configmap is not created by upstream for k8s <1.20, read from secret as before
+		if len(sa.Secrets) == 0 {
+			return nil, nil, fmt.Errorf("no secret exists for service account %s/%s", namespace.System, "cattle")
+		}
+		secret, err := k8s.CoreV1().Secrets(namespace.System).Get(context.Background(), sa.Secrets[0].Name, metav1.GetOptions{})
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to find secret for service account %s/%s: %w", namespace.System, "cattle", err)
+		}
+		return secret.Data[coreV1.ServiceAccountRootCAKey], secret.Data[coreV1.ServiceAccountTokenKey], nil
 	}
 	secret, err := serviceaccounttoken.CreateSecretForServiceAccount(context.Background(), k8s, sa)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to create secret for service account %s/%s: %w", namespace.System, "cattle", err)
 	}
-	logrus.Infof("Waiting for service account token key to be populated for secret %s/%s", secret.Namespace, secret.Name)
 	for {
 		if tokenBytes, ok := secret.Data[coreV1.ServiceAccountTokenKey]; !ok || len(tokenBytes) == 0 {
+			logrus.Infof("Waiting for service account token key to be populated for secret %s/%s", secret.Namespace, secret.Name)
 			time.Sleep(2 * time.Second)
 			secret, err = serviceaccounttoken.CreateSecretForServiceAccount(context.Background(), k8s, sa)
 			if err != nil {
