@@ -43,6 +43,7 @@ type Capabilities struct {
 	ClientSecret     string `json:"clientSecret"`
 	ResourceLocation string `json:"region"`
 	ClusterID        string `json:"clusterId"`
+	Environment      string `json:"environment"`
 }
 
 // AKS handler lists available resources in Azure API
@@ -156,11 +157,9 @@ func (h *handler) checkCredentials(req *http.Request) (int, error) {
 	if err != nil {
 		return http.StatusBadRequest, fmt.Errorf("cannot read request body: %v", err)
 	}
-
 	if err = json.Unmarshal(raw, &cred); err != nil {
 		return http.StatusBadRequest, fmt.Errorf("cannot parse request body: %v", err)
 	}
-
 	if cred.SubscriptionID == "" {
 		return http.StatusBadRequest, fmt.Errorf("must provide subscriptionId")
 	}
@@ -170,19 +169,20 @@ func (h *handler) checkCredentials(req *http.Request) (int, error) {
 	if cred.ClientSecret == "" {
 		return http.StatusBadRequest, fmt.Errorf("must provide clientSecret")
 	}
+	azureEnvironment := aks.GetEnvironment(cred.Environment)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	if cred.TenantID == "" {
-		cred.TenantID, err = azureutil.FindTenantID(ctx, azure.PublicCloud, cred.SubscriptionID)
+		cred.TenantID, err = azureutil.FindTenantID(ctx, azureEnvironment, cred.SubscriptionID)
 		if err != nil {
 			return http.StatusBadRequest, fmt.Errorf("could not find tenant ID: %w", err)
 		}
 	}
 	if cred.BaseURL == "" {
-		cred.BaseURL = azure.PublicCloud.ResourceManagerEndpoint
+		cred.BaseURL = azureEnvironment.ResourceManagerEndpoint
 	}
 	if cred.AuthBaseURL == "" {
-		cred.AuthBaseURL = azure.PublicCloud.ActiveDirectoryEndpoint
+		cred.AuthBaseURL = azureEnvironment.ActiveDirectoryEndpoint
 	}
 	client, err := NewSubscriptionServiceClient(cred)
 	if err != nil {
@@ -233,9 +233,11 @@ func (h *handler) getCloudCredential(req *http.Request, cap *Capabilities, credI
 	cap.SubscriptionID = string(cc.Data["azurecredentialConfig-subscriptionId"])
 	cap.ClientID = string(cc.Data["azurecredentialConfig-clientId"])
 	cap.ClientSecret = string(cc.Data["azurecredentialConfig-clientSecret"])
+	cap.Environment = string(cc.Data["azurecredentialConfig-environment"])
+	azureEnvironment := aks.GetEnvironment(cap.Environment)
 
 	if cap.TenantID == "" {
-		cap.TenantID, err = aks.GetCachedTenantID(h.secretClient, cap.SubscriptionID, cc)
+		cap.TenantID, err = aks.GetCachedTenantID(h.secretClient, cap.SubscriptionID, cc, azureEnvironment)
 		if err != nil {
 			return httperror.ServerError.Status, err
 		}
@@ -243,11 +245,11 @@ func (h *handler) getCloudCredential(req *http.Request, cap *Capabilities, credI
 
 	cap.BaseURL = req.URL.Query().Get("baseUrl")
 	if cap.BaseURL == "" {
-		cap.BaseURL = azure.PublicCloud.ResourceManagerEndpoint
+		cap.BaseURL = azureEnvironment.ResourceManagerEndpoint
 	}
 	cap.AuthBaseURL = req.URL.Query().Get("authBaseUrl")
 	if cap.AuthBaseURL == "" {
-		cap.AuthBaseURL = azure.PublicCloud.ActiveDirectoryEndpoint
+		cap.AuthBaseURL = azureEnvironment.ActiveDirectoryEndpoint
 	}
 
 	cap.ResourceLocation = req.URL.Query().Get("region")
