@@ -49,7 +49,7 @@ replace (
 	k8s.io/pod-security-admission => k8s.io/pod-security-admission v0.24.2
 	k8s.io/sample-apiserver => k8s.io/sample-apiserver v0.24.2
 
-	sigs.k8s.io/aws-iam-authenticator => github.com/rancher/aws-iam-authenticator v0.5.8-0.20220627182452-0c10ccba0af4
+	sigs.k8s.io/aws-iam-authenticator => github.com/rancher/aws-iam-authenticator v0.5.9-0.20220713170329-78acb8c83863
 	sigs.k8s.io/cluster-api => sigs.k8s.io/cluster-api v1.2.0-beta.0
 )
 
@@ -160,7 +160,7 @@ require (
 	k8s.io/kubectl v0.24.2
 	k8s.io/kubernetes v1.21.0
 	k8s.io/utils v0.0.0-20220210201930-3a6ce19ff2f9
-	sigs.k8s.io/aws-iam-authenticator v0.5.1
+	sigs.k8s.io/aws-iam-authenticator v0.5.9
 	sigs.k8s.io/cluster-api v1.2.0-beta.0
 	sigs.k8s.io/controller-runtime v0.12.1
 	sigs.k8s.io/yaml v1.3.0
