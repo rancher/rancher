@@ -10,6 +10,7 @@ import (
 	"github.com/rancher/rancher/tests/framework/extensions/clusters"
 	"github.com/rancher/rancher/tests/framework/extensions/machinepools"
 	"github.com/rancher/rancher/tests/framework/extensions/users"
+	"github.com/rancher/rancher/tests/framework/extensions/workloads"
 	"github.com/rancher/rancher/tests/framework/pkg/config"
 	"github.com/rancher/rancher/tests/framework/pkg/session"
 	"github.com/rancher/rancher/tests/framework/pkg/wait"
@@ -239,6 +240,97 @@ func (r *RKE2NodeDriverProvisioningTestSuite) ProvisioningRKE2ClusterDynamicInpu
 	}
 }
 
+func (r *RKE2NodeDriverProvisioningTestSuite) ProvisioningRKE2CNICluster(provider Provider) {
+	providerName := " Node Provider: " + provider.Name
+	nodeRoles1 := []machinepools.NodeRoles{
+		{
+			ControlPlane: true,
+			Etcd:         false,
+			Worker:       false,
+			Quantity:     2,
+		},
+		{
+			ControlPlane: false,
+			Etcd:         true,
+			Worker:       false,
+			Quantity:     3,
+		},
+		{
+			ControlPlane: false,
+			Etcd:         false,
+			Worker:       true,
+			Quantity:     3,
+		},
+	}
+
+	tests := []struct {
+		name      string
+		nodeRoles []machinepools.NodeRoles
+		client    *rancher.Client
+	}{
+		{"3 etcd 2 cp 3 worker nodes Admin User", nodeRoles1, r.client},
+		{"3 etcd 2 cp 3 worker nodes Standard User", nodeRoles1, r.standardUserClient},
+	}
+
+	var name string
+	for _, tt := range tests {
+		subSession := r.session.NewSession()
+		defer subSession.Cleanup()
+
+		client, err := tt.client.WithSession(subSession)
+		require.NoError(r.T(), err)
+
+		cloudCredential, err := provider.CloudCredFunc(client)
+		require.NoError(r.T(), err)
+		for _, kubeVersion := range r.kubernetesVersions {
+			name = tt.name + providerName + " Kubernetes version: " + kubeVersion
+			for _, cni := range r.cnis {
+				name += " cni: " + cni
+				r.Run(name, func() {
+					testSession := session.NewSession(r.T())
+
+					testSessionClient, err := tt.client.WithSession(testSession)
+					require.NoError(r.T(), err)
+
+					clusterName := provisioning.AppendRandomString(provider.Name)
+					generatedPoolName := fmt.Sprintf("nc-%s-pool1-", clusterName)
+					machinePoolConfig := provider.MachinePoolFunc(generatedPoolName, namespace)
+
+					machineConfigResp, err := machinepools.CreateMachineConfig(provider.MachineConfig, machinePoolConfig, testSessionClient)
+					require.NoError(r.T(), err)
+
+					machinePools := machinepools.RKEMachinePoolSetup(tt.nodeRoles, machineConfigResp)
+
+					cluster := clusters.NewRKE2ClusterConfig(clusterName, namespace, cni, cloudCredential.ID, kubeVersion, machinePools)
+
+					clusterResp, err := clusters.CreateRKE2Cluster(testSessionClient, cluster)
+					require.NoError(r.T(), err)
+
+					kubeProvisioningClient, err := r.client.GetKubeAPIProvisioningClient()
+					require.NoError(r.T(), err)
+
+					result, err := kubeProvisioningClient.Clusters(namespace).Watch(context.TODO(), metav1.ListOptions{
+						FieldSelector:  "metadata.name=" + clusterName,
+						TimeoutSeconds: &defaults.WatchTimeoutSeconds,
+					})
+					require.NoError(r.T(), err)
+
+					checkFunc := clusters.IsProvisioningClusterReady
+
+					err = wait.WatchWait(result, checkFunc)
+					assert.NoError(r.T(), err)
+					assert.Equal(r.T(), clusterName, clusterResp.ObjectMeta.Name)
+
+					clusterID, err := clusters.GetClusterIDByName(r.client, clusterName)
+					assert.NoError(r.T(), err)
+					podResults, podErrors := workloads.StatusPods(client, clusterID, metav1.ListOptions{})
+					fmt.Print(podResults, podErrors)
+				})
+			}
+		}
+	}
+}
+
 func (r *RKE2NodeDriverProvisioningTestSuite) TestProvisioning() {
 	for _, providerName := range r.providers {
 		provider := CreateProvider(providerName)
@@ -258,6 +350,13 @@ func (r *RKE2NodeDriverProvisioningTestSuite) TestProvisioningDynamicInput() {
 	for _, providerName := range r.providers {
 		provider := CreateProvider(providerName)
 		r.ProvisioningRKE2ClusterDynamicInput(provider, nodesAndRoles)
+	}
+}
+
+func (r *RKE2NodeDriverProvisioningTestSuite) TestCNIProvisioning() {
+	for _, providerName := range r.providers {
+		provider := CreateProvider(providerName)
+		r.ProvisioningRKE2CNICluster(provider)
 	}
 }
 
