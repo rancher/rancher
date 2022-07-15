@@ -97,7 +97,11 @@ func run(systemChartsPath, chartsPath string, imagesFromArgs []string) error {
 	}
 
 	externalImages := make(map[string][]string)
-	k3sUpgradeImages, err := ext.GetExternalImages(rancherVersion, data.K3S, ext.K3S, nil)
+	k3sUpgradeImages, err := ext.GetExternalImages(rancherVersion, data.K3S, ext.K3S, &semver.Version{
+		Major: 1,
+		Minor: 21,
+		Patch: 0,
+	})
 	if err != nil {
 		return err
 	}
