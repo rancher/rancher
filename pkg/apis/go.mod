@@ -11,7 +11,7 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/rancher/eks-operator v1.0.9
 	github.com/rancher/gke-operator v1.1.1
-	github.com/rancher/norman v0.0.0-20220506233651-5759ec2c76de
+	github.com/rancher/norman v0.0.0-20220712163932-620fef760449
 	github.com/rancher/rke v1.2.20
 	github.com/rancher/wrangler v0.7.3-0.20210331224822-5bd357588083
 	github.com/sirupsen/logrus v1.6.0
