@@ -81,8 +81,7 @@ func getTokenFromToken(ctx context.Context, tokenBytes []byte) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	return secret.Data["token"], nil
+	return secret.Data[v1.ServiceAccountTokenKey], nil
 }
 
 func startPeerManager(ctx context.Context, endpoints corecontrollers.EndpointsController, server *remotedialer.Server) (peermanager.PeerManager, error) {

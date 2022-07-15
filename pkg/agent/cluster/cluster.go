@@ -8,13 +8,11 @@ import (
 	"os"
 	"path"
 	"strings"
-	"time"
 
 	"github.com/pkg/errors"
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/serviceaccounttoken"
 	"github.com/rancher/wrangler/pkg/kubeconfig"
-	"github.com/sirupsen/logrus"
 	coreV1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -79,18 +77,6 @@ func getTokenFromAPI() ([]byte, []byte, error) {
 	secret, err := serviceaccounttoken.CreateSecretForServiceAccount(context.Background(), k8s, sa)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to create secret for service account %s/%s: %w", namespace.System, "cattle", err)
-	}
-	for {
-		if tokenBytes, ok := secret.Data[coreV1.ServiceAccountTokenKey]; !ok || len(tokenBytes) == 0 {
-			logrus.Infof("Waiting for service account token key to be populated for secret %s/%s", secret.Namespace, secret.Name)
-			time.Sleep(2 * time.Second)
-			secret, err = serviceaccounttoken.CreateSecretForServiceAccount(context.Background(), k8s, sa)
-			if err != nil {
-				return nil, nil, fmt.Errorf("failed to create secret for service account %s/%s: %w", namespace.System, "cattle", err)
-			}
-		} else {
-			break
-		}
 	}
 	return []byte(cm.Data["ca.crt"]), []byte(secret.Data[coreV1.ServiceAccountTokenKey]), nil
 }

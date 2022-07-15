@@ -3,7 +3,9 @@ package serviceaccounttoken
 import (
 	"context"
 	"fmt"
+	"time"
 
+	"github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
 	apierror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -31,9 +33,21 @@ func CreateSecretForServiceAccount(ctx context.Context, clientSet kubernetes.Int
 				return nil, err
 			}
 		}
+	}
+	if len(secret.Data[v1.ServiceAccountTokenKey]) > 0 {
 		return secret, nil
 	}
-	return secret, nil
+	logrus.Infof("createSecretForServiceAccount: waiting for secret [%s] to be populated with token", secretName)
+	for {
+		if len(secret.Data[v1.ServiceAccountTokenKey]) > 0 {
+			return secret, nil
+		}
+		time.Sleep(2 * time.Second)
+		secret, err = secretClient.Get(ctx, secretName, metav1.GetOptions{})
+		if err != nil {
+			return nil, err
+		}
+	}
 }
 
 // SecretTemplate generate a template of service-account-token Secret for the provided Service Account.
