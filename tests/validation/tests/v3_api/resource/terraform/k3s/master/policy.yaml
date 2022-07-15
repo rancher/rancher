@@ -19,7 +19,7 @@ spec:
 apiVersion: policy/v1beta1
 kind: PodSecurityPolicy
 metadata:
-  name: cis1.5-compliant-psp
+  name: restricted-psp
 spec:
   privileged: false
   allowPrivilegeEscalation: false
@@ -31,7 +31,9 @@ spec:
     - 'projected'
     - 'secret'
     - 'downwardAPI'
+    - 'csi'
     - 'persistentVolumeClaim'
+    - 'ephemeral'
   hostNetwork: false
   hostIPC: false
   hostPID: false
@@ -54,7 +56,7 @@ spec:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: psp:restricted
+  name: psp:restricted-psp
   labels:
     addonmanager.kubernetes.io/mode: EnsureExists
 rules:
@@ -62,18 +64,18 @@ rules:
   resources: ['podsecuritypolicies']
   verbs:     ['use']
   resourceNames:
-  - cis1.5-compliant-psp
+  - restricted-psp
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: default:restricted
+  name: default:restricted-psp
   labels:
     addonmanager.kubernetes.io/mode: EnsureExists
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: psp:restricted
+  name: psp:restricted-psp
 subjects:
 - kind: Group
   name: system:authenticated
@@ -194,7 +196,7 @@ metadata:
 spec:
   podSelector:
     matchLabels:
-      app: svclb-traefik
+      svccontroller.k3s.cattle.io/svcname: traefik
   ingress:
   - {}
   policyTypes:

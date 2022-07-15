@@ -24,10 +24,12 @@ then
   echo -e "vm.overcommit_memory=1" >>/etc/sysctl.d/90-kubelet.conf
   echo -e "kernel.panic=10" >>/etc/sysctl.d/90-kubelet.conf
   echo -e "kernel.panic_on_oops=1" >>/etc/sysctl.d/90-kubelet.conf
+  echo -e "kernel.keys.root_maxbytes=25000000" >>/etc/sysctl.d/90-kubelet.conf
   sysctl -p /etc/sysctl.d/90-kubelet.conf
   systemctl restart systemd-sysctl
   mkdir -p /var/lib/rancher/k3s/server/manifests
   cat /tmp/policy.yaml > /var/lib/rancher/k3s/server/manifests/policy.yaml
+  cat /tmp/audit.yaml > /var/lib/rancher/k3s/server/audit.yaml
   if [[ "${4}" == *"v1.18"* ]] || [[ "${4}" == *"v1.19"* ]] || [[ "${4}" == *"v1.20"* ]]
   then
     cat /tmp/v120ingresspolicy.yaml > /var/lib/rancher/k3s/server/manifests/v120ingresspolicy.yaml
