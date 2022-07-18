@@ -21,7 +21,7 @@ from lib.aws import AWS_USER
 
 AWS_AMI = os.environ.get("AWS_AMI", "ami-012fd49f6b0c404c7")
 DOCKER_COMPOSE_VERSION = os.environ.get("DOCKER_COMPOSE_VERSION", "1.24.1")
-RKE_VERSION = os.environ.get("RKE_VERSION", "v1.3.0")
+RKE_VERSION = os.environ.get("RKE_VERSION", "v1.3.11")
 
 # airgap variables
 NUMBER_OF_INSTANCES = int(os.environ.get("RANCHER_AIRGAP_INSTANCE_COUNT", "3"))
@@ -29,8 +29,6 @@ HOST_NAME = os.environ.get('RANCHER_HOST_NAME', "testsa")
 AG_HOST_NAME = HOST_NAME
 RANCHER_AG_INTERNAL_HOSTNAME = AG_HOST_NAME + "-internal.qa.rancher.space"
 RANCHER_AG_HOSTNAME = AG_HOST_NAME + ".qa.rancher.space"
-RANCHER_HELM_EXTRA_SETTINGS = os.environ.get("RANCHER_HELM_EXTRA_SETTINGS")
-
 
 RESOURCE_DIR = os.path.join(os.path.dirname(os.path.realpath(__file__)),
                             'resource')
@@ -44,9 +42,9 @@ PRIVATE_REGISTRY_PASSWORD = \
 RANCHER_EXTERNAL_BASTION = os.environ.get("RANCHER_EXTERNAL_BASTION", "")
 RANCHER_EXTERNAL_HOST_NAME = os.environ.get(
     "RANCHER_EXTERNAL_HOST_NAME", AG_HOST_NAME)
-REG_HOST_NAME = RANCHER_EXTERNAL_HOST_NAME + "-registry"
-REGISTRY_HOSTNAME = os.environ.get(
-    "REGISTRY_HOSTNAME", REG_HOST_NAME + ".qa.rancher.space")
+REG_HOST_NAME = RANCHER_EXTERNAL_HOST_NAME + "-registry" + ".qa.rancher.space"
+REGISTRY_HOSTNAME = os.environ.get("RANCHER_BASTION_REGISTRY", REG_HOST_NAME)
+INSTALL_DEPENDENCIES_FLAG=os.environ.get("INSTALL_DEPENDENCIES_FLAG", "True")
 
 
 def test_deploy_airgap_ha_rancher(check_hostname_length):
@@ -55,16 +53,16 @@ def test_deploy_airgap_ha_rancher(check_hostname_length):
         bastion_node = AmazonWebServices().get_node(
             RANCHER_EXTERNAL_BASTION,
             ssh_access=True)
-        print("using external node for private registry")
+        print("using external node for private registry", REGISTRY_HOSTNAME)
     else:
         bastion_node = deploy_bastion_server()
         add_rancher_images_to_private_registry(
                                         bastion_node,
                                         noauth_reg_name=REGISTRY_HOSTNAME)
-        install_rke_helm_kubectl(bastion_node)
         print("using new node for private registry")
 
-    # check for registry, kubectl, helm, images, rke
+    kube_config = 'export KUBECONFIG="kube_config_config.yaml && '
+    # check for registry, images, private IP
     assert len(bastion_node.private_ip_address) > 5, \
         "the bastion node does not have a private IP"
     assert bastion_node.execute_command("docker pull {}/{}:{}".format(
@@ -72,13 +70,29 @@ def test_deploy_airgap_ha_rancher(check_hostname_length):
         "rancher/rancher-agent",
         RANCHER_SERVER_VERSION))[1].find("not found") < 0, \
         "registry is missing rancher-agent image"
+    
+    # checks for and installs dependencies if missing from bastion node
+    if INSTALL_DEPENDENCIES_FLAG.lower() != "false":
+        if bastion_node.execute_command(
+        "rke --version")[0].find("version") == -1:
+            install_rke(bastion_node)
+        if bastion_node.execute_command(
+        '/snap/bin/helm')[0].find("Flags:") == -1:
+            install_helm(bastion_node)
+        if bastion_node.execute_command(
+        kube_config+"/snap/bin/kubectl version")[0].find("Version") == -1:
+            install_kubectl(bastion_node)
+
+    # check kubectl, helm, rke
     assert bastion_node.execute_command(
         "rke --version")[1].find("not found") < 0, \
         "registry does not have RKE installed"
     assert bastion_node.execute_command(
         "/snap/bin/helm version")[1].find("not found") < 0, \
         "registry does not have helm installed"
-    kube_config = 'export KUBECONFIG="kube_config_config.yaml && '
+    assert bastion_node.execute_command(
+        '/snap/bin/helm')[0].find("Flags:") > -1, \
+        "helm is not installed correctly"
     assert bastion_node.execute_command(
         kube_config+"/snap/bin/kubectl version")[1].find("not found") < 0, \
         "registry does not have kubectl installed"
@@ -97,17 +111,23 @@ def test_deploy_airgap_ha_rancher(check_hostname_length):
             bastion_node.ssh_key_name, AWS_USER,
             ag_nodes[0].private_ip_address,
             public_dns, RANCHER_AG_INTERNAL_HOSTNAME,
-            RANCHER_AG_HOSTNAME))
+            REGISTRY_HOSTNAME))
     time.sleep(180)
-    setup_rancher_server()
+    setup_rancher_server(bastion_node)
 
 
-def setup_rancher_server():
+def setup_rancher_server(bastion_node):
     base_url = "https://" + RANCHER_AG_HOSTNAME
     wait_for_status_code(url=base_url + "/v3", expected_code=401)
     auth_url = base_url + "/v3-public/localproviders/local?action=login"
     wait_for_status_code(url=auth_url, expected_code=200)
-    set_url_and_password(base_url, "https://" + RANCHER_AG_INTERNAL_HOSTNAME)
+    get_bootstrap_passwd = "export KUBECONFIG=~/kube_config_config.yaml && " \
+    "/snap/bin/kubectl get secret --namespace cattle-system bootstrap-secret -o " \
+    """go-template='{{.data.bootstrapPassword|base64decode}}{{"\\n"}}'"""
+    bootstrap_passwd = bastion_node.execute_command(get_bootstrap_passwd)[0]
+    print("bootstrap password:", bootstrap_passwd.replace(" ", ""))
+    # currently can't set password in airgap setup without reworking below function
+    # set_url_and_password(base_url, "https://" + RANCHER_AG_INTERNAL_HOSTNAME)
 
 
 def deploy_bastion_server():
@@ -159,17 +179,25 @@ def get_registry_resources(external_node):
     run_command(get_resources_command, log_out=False)
 
 
-def install_rke_helm_kubectl(external_node):
+def install_rke(external_node):
     docker_compose_command = \
         'cd ~/ && sudo wget ' \
         'https://github.com/rancher/rke/releases/download/{}' \
         '/rke_linux-amd64 && ' \
         'sudo mv rke_linux-amd64 rke && ' \
         'sudo chmod +x rke && ' \
-        'sudo mv rke /usr/local/bin && ' \
-        'sudo snap install helm --classic && ' \
-        'sudo snap install kubectl --classic'.format(RKE_VERSION)
+        'sudo mv rke /usr/local/bin'.format(RKE_VERSION)
     return external_node.execute_command(docker_compose_command)
+
+
+def install_helm(external_node):
+    return external_node.execute_command(
+        'sudo snap install helm --classic')
+
+
+def install_kubectl(external_node):
+    return external_node.execute_command(
+        'sudo snap install kubectl --classic')
 
 
 def run_docker_registry(external_node):
@@ -242,7 +270,22 @@ def prepare_airgap_node(bastion_node, number_of_nodes):
                 bastion_node.ssh_key_name, AWS_USER,
                 ag_node.private_ip_address, AWS_USER)
         bastion_node.execute_command(ag_node_update_docker)
-
+        if PRIVATE_REGISTRY_USERNAME is not None:
+            # assuming that we setup the auth-enabled registry from the other
+            # airgap job, which uses self signed certs on the registry. We 
+            # now need to login and move the certs to each downstream node. 
+            ss_certs_command = \
+            'scp -i "{}.pem" ~/certs/ca.pem {}@{}:/home/{}/ca.pem && ' \
+            'ssh -i "{}.pem" -o StrictHostKeyChecking=no {}@{} ' \
+            '"sudo mkdir -p /etc/docker/certs.d/{} && ' \
+            'sudo cp ~/ca.pem /etc/docker/certs.d/{}/ca.crt && ' \
+            'sudo service docker restart"'.format(
+                bastion_node.ssh_key_name, AWS_USER,
+                ag_node.private_ip_address, AWS_USER,
+                bastion_node.ssh_key_name, AWS_USER,
+                ag_node.private_ip_address, bastion_node.host_name, 
+                bastion_node.host_name)
+            bastion_node.execute_command(ss_certs_command)
     return ag_nodes
 
 
@@ -273,8 +316,14 @@ def setup_airgap_rancher(bastion_node, number_of_nodes=NUMBER_OF_INSTANCES):
 
     with open(RESOURCE_DIR+'/airgap/config_yamls/config_end.yaml') as f3:
         rke_template_node_end = f3.read()
+    registry_credentials=REGISTRY_HOSTNAME
+    if PRIVATE_REGISTRY_USERNAME is not None:
+        registry_credentials+='\n  user: {}\n' \
+            '  password: {}'.format(
+                PRIVATE_REGISTRY_USERNAME, 
+                PRIVATE_REGISTRY_PASSWORD)
     rke_template_node +=\
-        rke_template_node_end.format(REGISTRY_HOSTNAME)
+        rke_template_node_end.format(registry_credentials)
     # write config, and run rke up
     print(f'RKE Template:\n{rke_template_node}')
     bastion_node.execute_command(
@@ -282,17 +331,17 @@ def setup_airgap_rancher(bastion_node, number_of_nodes=NUMBER_OF_INSTANCES):
     bastion_node.execute_command(
         'cd ~/ && /usr/local/bin/rke up --config config.yaml && sleep 240')
     assert bastion_node.execute_command(
-        "cd ~ && cat kube_config_config.yaml")[0].find(".") > 0, \
+        "cd ~ && cat kube_config_config.yaml")[0].find(".") > -1, \
         "rke up failed, config file likely incorrect"
     # setup helm and rancher template
     assert bastion_node.execute_command(
-        '/snap/bin/helm')[0].find("Flags:") > 0, \
+        '/snap/bin/helm')[0].find("Flags:") > -1, \
         "helm is not installed correctly"
     bastion_node.execute_command(
         '/snap/bin/helm repo add rancher-latest'
         ' https://releases.rancher.com/server-charts/latest')
     assert bastion_node.execute_command(
-        "/snap/bin/helm repo list")[0].find("rancher") > 0, \
+        "/snap/bin/helm repo list")[0].find("rancher") > -1, \
         "helm was unable to add rancher repo"
     bastion_node.execute_command(
         "/snap/bin/helm fetch rancher-latest/rancher")
@@ -303,9 +352,6 @@ def setup_airgap_rancher(bastion_node, number_of_nodes=NUMBER_OF_INSTANCES):
     new_rancher_version = RANCHER_SERVER_VERSION
     if RANCHER_SERVER_VERSION[0] == 'v':
         new_rancher_version = RANCHER_SERVER_VERSION[1:]
-    extra_settings = []
-    if RANCHER_HELM_EXTRA_SETTINGS:
-        extra_settings.append(RANCHER_HELM_EXTRA_SETTINGS)
     helm_template = \
         "cd ~/ && /snap/bin/helm template rancher ./rancher-{3}.tgz " \
         "--output-dir . --namespace cattle-system --set hostname={1} " \
@@ -317,9 +363,6 @@ def setup_airgap_rancher(bastion_node, number_of_nodes=NUMBER_OF_INSTANCES):
             RANCHER_AG_INTERNAL_HOSTNAME,
             REGISTRY_HOSTNAME,
             new_rancher_version)
-    if extra_settings:
-        for setting in extra_settings:
-            helm_template = helm_template + " " + setting
     print("Executing helm install: \n", helm_template)
     print("\nUsing the following kube config: \n")
     print(bastion_node.execute_command("cat ~/kube_config_config.yaml")[0])
