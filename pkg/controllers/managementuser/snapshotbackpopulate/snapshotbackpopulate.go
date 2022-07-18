@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"regexp"
 
 	provv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
@@ -30,6 +31,7 @@ var (
 		"k3s-etcd-snapshots":  true,
 		"rke2-etcd-snapshots": true,
 	}
+	InvalidKeyChars = regexp.MustCompile(`[^-.a-zA-Z0-9]`)
 )
 
 const (
@@ -102,10 +104,7 @@ func (h *handler) OnChange(key string, configMap *corev1.ConfigMap) (runtime.Obj
 
 	logrus.Infof("[snapshotbackpopulate] rkecluster %s/%s: processing configmap %s/%s", cluster.Namespace, cluster.Name, configMap.Namespace, configMap.Name)
 
-	actualEtcdSnapshots, err := h.configMapToSnapshots(configMap, cluster)
-	if err != nil {
-		return configMap, fmt.Errorf("error while converting configmap to snapshot map for cluster %s: %w", cluster.Name, err)
-	}
+	actualEtcdSnapshots := h.configMapToSnapshots(configMap, cluster)
 
 	ls, err := labels.Parse(fmt.Sprintf("%s=%s", rke2.ClusterNameLabel, cluster.Name))
 	if err != nil {
@@ -243,7 +242,7 @@ func (h *handler) OnChange(key string, configMap *corev1.ConfigMap) (runtime.Obj
 					logrus.Debugf("[snapshotbackpopulate] rkecluster %s/%s: duplicate snapshot found when creating s3 snapshot %s/%s", cluster.Namespace, cluster.Name, cmGeneratedSnapshot.Namespace, cmGeneratedSnapshot.Name)
 					continue
 				}
-				return configMap, fmt.Errorf("rkecluster %s/%s: error while creating s3 etcd snapshot %s/%s: %w", cluster.Namespace, cluster.Name, cmGeneratedSnapshot.Namespace, cmGeneratedSnapshot.Name, err)
+				logrus.Errorf("rkecluster %s/%s: error while creating s3 etcd snapshot %s/%s: %s", cluster.Namespace, cluster.Name, cmGeneratedSnapshot.Namespace, cmGeneratedSnapshot.Name, err.Error())
 			}
 		}
 	}
@@ -263,13 +262,13 @@ func reconcileStringMaps(input map[string]string, new map[string]string, keys []
 
 // configMapToSnapshots parses the given configmap and returns a map of etcd snapshots. The snapshotbackpopulate controller will only create snapshots from this map that are located in S3.
 // The snapshots will have 2 or 3 labels, 2 if they are S3 snapshots (cluster name and node name), and 3 if they are local snapshots. They will always have 2 annotations.
-func (h *handler) configMapToSnapshots(configMap *corev1.ConfigMap, cluster *provv1.Cluster) (map[string]rkev1.ETCDSnapshot, error) {
+func (h *handler) configMapToSnapshots(configMap *corev1.ConfigMap, cluster *provv1.Cluster) map[string]rkev1.ETCDSnapshot {
 	result := map[string]rkev1.ETCDSnapshot{}
 	for k, v := range configMap.Data {
 		file := &snapshotFile{}
 		if err := json.Unmarshal([]byte(v), file); err != nil {
-			logrus.Errorf("invalid non-json value in %s/%s for key %s in cluster %s: %v", configMap.Namespace, configMap.Name, k, cluster.Name, err)
-			return nil, nil
+			logrus.Errorf("rkecluster %s/%s: invalid non-json value in %s/%s for key %s: %v", cluster.Namespace, cluster.Name, configMap.Namespace, configMap.Name, k, err)
+			continue
 		}
 		snapshot := rkev1.ETCDSnapshot{
 			ObjectMeta: metav1.ObjectMeta{
@@ -330,10 +329,10 @@ func (h *handler) configMapToSnapshots(configMap *corev1.ConfigMap, cluster *pro
 				snapshot.Labels[rke2.MachineIDLabel] = machine.Labels[rke2.MachineIDLabel]
 			}
 		}
-		snapshot.Name = name.SafeConcatName(cluster.Name, snapshot.SnapshotFile.Name, fileSuffix)
+		snapshot.Name = name.SafeConcatName(cluster.Name, InvalidKeyChars.ReplaceAllString(snapshot.SnapshotFile.Name, "-"), fileSuffix)
 		result[snapshot.SnapshotFile.Name+fileSuffix] = snapshot
 	}
-	return result, nil
+	return result
 }
 
 type s3Config struct {
