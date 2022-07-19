@@ -3,6 +3,7 @@ package v3
 import (
 	"bytes"
 	"encoding/gob"
+	"reflect"
 	"strings"
 
 	eksv1 "github.com/rancher/eks-operator/pkg/apis/eks.cattle.io/v1"
@@ -115,6 +116,7 @@ type ClusterSpecBase struct {
 	WindowsPreferedCluster               bool                                    `json:"windowsPreferedCluster" norman:"noupdate"`
 	LocalClusterAuthEndpoint             LocalClusterAuthEndpoint                `json:"localClusterAuthEndpoint,omitempty"`
 	ScheduledClusterScan                 *ScheduledClusterScan                   `json:"scheduledClusterScan,omitempty"`
+	ClusterSecrets                       ClusterSecrets                          `json:"clusterSecrets" norman:"nocreate,noupdate"`
 }
 
 type ClusterSpec struct {
@@ -177,14 +179,14 @@ type ClusterStatus struct {
 	CurrentCisRunName                    string                      `json:"currentCisRunName,omitempty"`
 	EKSStatus                            EKSStatus                   `json:"eksStatus,omitempty" norman:"nocreate,noupdate"`
 	GKEStatus                            GKEStatus                   `json:"gkeStatus,omitempty" norman:"nocreate,noupdate"`
-	PrivateRegistrySecret                string                      `json:"privateRegistrySecret,omitempty" norman:"nocreate,noupdate"`
-	S3CredentialSecret                   string                      `json:"s3CredentialSecret,omitempty" norman:"nocreate,noupdate"`
-	WeavePasswordSecret                  string                      `json:"weavePasswordSecret,omitempty" norman:"nocreate,noupdate"`
-	VsphereSecret                        string                      `json:"vsphereSecret,omitempty" norman:"nocreate,noupdate"`
-	VirtualCenterSecret                  string                      `json:"virtualCenterSecret,omitempty" norman:"nocreate,noupdate"`
-	OpenStackSecret                      string                      `json:"openStackSecret,omitempty" norman:"nocreate,noupdate"`
-	AADClientSecret                      string                      `json:"aadClientSecret,omitempty" norman:"nocreate,noupdate"`
-	AADClientCertSecret                  string                      `json:"aadClientCertSecret,omitempty" norman:"nocreate,noupdate"`
+	PrivateRegistrySecret                string                      `json:"privateRegistrySecret,omitempty" norman:"nocreate,noupdate"` // Deprecated: use ClusterSpec.ClusterSecrets.PrivateRegistrySecret instead
+	S3CredentialSecret                   string                      `json:"s3CredentialSecret,omitempty" norman:"nocreate,noupdate"`    // Deprecated: use ClusterSpec.ClusterSecrets.S3CredentialSecret instead
+	WeavePasswordSecret                  string                      `json:"weavePasswordSecret,omitempty" norman:"nocreate,noupdate"`   // Deprecated: use ClusterSpec.ClusterSecrets.WeavePasswordSecret instead
+	VsphereSecret                        string                      `json:"vsphereSecret,omitempty" norman:"nocreate,noupdate"`         // Deprecated: use ClusterSpec.ClusterSecrets.VsphereSecret instead
+	VirtualCenterSecret                  string                      `json:"virtualCenterSecret,omitempty" norman:"nocreate,noupdate"`   // Deprecated: use ClusterSpec.ClusterSecrets.VirtualCenterSecret instead
+	OpenStackSecret                      string                      `json:"openStackSecret,omitempty" norman:"nocreate,noupdate"`       // Deprecated: use ClusterSpec.ClusterSecrets.OpenStackSecret instead
+	AADClientSecret                      string                      `json:"aadClientSecret,omitempty" norman:"nocreate,noupdate"`       // Deprecated: use ClusterSpec.ClusterSecrets.AADClientSecret instead
+	AADClientCertSecret                  string                      `json:"aadClientCertSecret,omitempty" norman:"nocreate,noupdate"`   // Deprecated: use ClusterSpec.ClusterSecrets.AADClientCertSecret instead
 }
 
 type ClusterComponentStatus struct {
@@ -376,4 +378,31 @@ type EKSStatus struct {
 type GKEStatus struct {
 	UpstreamSpec          *gkev1.GKEClusterConfigSpec `json:"upstreamSpec"`
 	PrivateRequiresTunnel *bool                       `json:"privateRequiresTunnel"`
+}
+
+type ClusterSecrets struct {
+	PrivateRegistrySecret string `json:"privateRegistrySecret,omitempty" norman:"nocreate,noupdate"`
+	S3CredentialSecret    string `json:"s3CredentialSecret,omitempty" norman:"nocreate,noupdate"`
+	WeavePasswordSecret   string `json:"weavePasswordSecret,omitempty" norman:"nocreate,noupdate"`
+	VsphereSecret         string `json:"vsphereSecret,omitempty" norman:"nocreate,noupdate"`
+	VirtualCenterSecret   string `json:"virtualCenterSecret,omitempty" norman:"nocreate,noupdate"`
+	OpenStackSecret       string `json:"openStackSecret,omitempty" norman:"nocreate,noupdate"`
+	AADClientSecret       string `json:"aadClientSecret,omitempty" norman:"nocreate,noupdate"`
+	AADClientCertSecret   string `json:"aadClientCertSecret,omitempty" norman:"nocreate,noupdate"`
+}
+
+// GetSecret gets a reference to a secret by its field name, either from the ClusterSecrets field or the Status field.
+// Spec.ClusterSecrets.* is preferred because the secret fields on Status are deprecated.
+func (c *Cluster) GetSecret(key string) string {
+	clusterSecrets := reflect.ValueOf(&c.Spec.ClusterSecrets).Elem()
+	secret := clusterSecrets.FieldByName(key)
+	if secret.IsValid() && secret.String() != "" {
+		return secret.String()
+	}
+	status := reflect.ValueOf(&c.Status).Elem()
+	secret = status.FieldByName(key)
+	if secret.IsValid() {
+		return secret.String()
+	}
+	return ""
 }
