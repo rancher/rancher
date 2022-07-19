@@ -10,9 +10,10 @@ replace (
 	github.com/matryer/moq => github.com/rancher/moq v0.0.0-20200712062324-13d1f37d2d77
 
 	github.com/opencontainers/runc => github.com/opencontainers/runc v1.1.2
+
+	github.com/rancher/norman => github.com/cmurphy/norman v0.0.0-20220719193602-2cbb79707024
 	github.com/rancher/rancher/pkg/apis => ./pkg/apis
 	github.com/rancher/rancher/pkg/client => ./pkg/client
-
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc => go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.20.0
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp => go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.20.0
 	go.opentelemetry.io/otel => go.opentelemetry.io/otel v0.20.0
