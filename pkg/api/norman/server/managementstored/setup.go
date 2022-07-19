@@ -371,7 +371,7 @@ func Catalog(schemas *types.Schemas, managementContext *config.ScaledContext) {
 	secretLister := managementContext.Core.Secrets("").Controller().Lister()
 	secrets := managementContext.Core.Secrets("")
 	clusterLister := managementContext.Management.Clusters("").Controller().Lister()
-	schema.Store = catalogStore.Wrap(schema.Store, users, grbLister, grLister, secretLister, secrets, clusterLister)
+	schema.Store = catalogStore.Wrap(schema.Store, managementContext, users, grbLister, grLister, secretLister, secrets, clusterLister)
 }
 
 func ProjectCatalog(schemas *types.Schemas, managementContext *config.ScaledContext) {
@@ -389,7 +389,7 @@ func ProjectCatalog(schemas *types.Schemas, managementContext *config.ScaledCont
 	secretLister := managementContext.Core.Secrets("").Controller().Lister()
 	secrets := managementContext.Core.Secrets("")
 	clusterLister := managementContext.Management.Clusters("").Controller().Lister()
-	schema.Store = catalogStore.Wrap(schema.Store, users, grbLister, grLister, secretLister, secrets, clusterLister)
+	schema.Store = catalogStore.Wrap(schema.Store, managementContext, users, grbLister, grLister, secretLister, secrets, clusterLister)
 }
 
 func ClusterCatalog(schemas *types.Schemas, managementContext *config.ScaledContext) {
@@ -407,7 +407,7 @@ func ClusterCatalog(schemas *types.Schemas, managementContext *config.ScaledCont
 	secretLister := managementContext.Core.Secrets("").Controller().Lister()
 	secrets := managementContext.Core.Secrets("")
 	clusterLister := managementContext.Management.Clusters("").Controller().Lister()
-	schema.Store = catalogStore.Wrap(schema.Store, users, grbLister, grLister, secretLister, secrets, clusterLister)
+	schema.Store = catalogStore.Wrap(schema.Store, managementContext, users, grbLister, grLister, secretLister, secrets, clusterLister)
 }
 
 func ClusterRegistrationTokens(schemas *types.Schemas, management *config.ScaledContext) {

@@ -13,6 +13,7 @@ func (h *handler) syncCatalog(key string, catalog *v3.Catalog) (runtime.Object, 
 	if catalog == nil || catalog.DeletionTimestamp != nil {
 		return catalog, nil
 	}
+
 	if apimgmtv3.CatalogConditionSecretsMigrated.IsTrue(catalog) {
 		logrus.Tracef("[secretmigrator] catalog %s already migrated", catalog.Name)
 		return catalog, nil

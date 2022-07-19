@@ -203,35 +203,35 @@ func AssembleAADCertCredential(secretRef, objType, objName string, spec apimgmtv
 
 // AssembleRKEConfigSpec is a wrapper assembler for assembling configs on Clusters.
 func AssembleRKEConfigSpec(cluster *apimgmtv3.Cluster, spec apimgmtv3.ClusterSpec, secretLister v1.SecretLister) (apimgmtv3.ClusterSpec, error) {
-	spec, err := AssembleS3Credential(cluster.Status.S3CredentialSecret, ClusterType, cluster.Name, spec, secretLister)
+	spec, err := AssembleS3Credential(cluster.GetSecret("S3CredentialSecret"), ClusterType, cluster.Name, spec, secretLister)
 	if err != nil {
 		return spec, err
 	}
-	spec, err = AssemblePrivateRegistryCredential(cluster.Status.PrivateRegistrySecret, ClusterType, cluster.Name, spec, secretLister)
+	spec, err = AssemblePrivateRegistryCredential(cluster.GetSecret("PrivateRegistrySecret"), ClusterType, cluster.Name, spec, secretLister)
 	if err != nil {
 		return spec, err
 	}
-	spec, err = AssembleWeaveCredential(cluster.Status.WeavePasswordSecret, ClusterType, cluster.Name, spec, secretLister)
+	spec, err = AssembleWeaveCredential(cluster.GetSecret("WeavePasswordSecret"), ClusterType, cluster.Name, spec, secretLister)
 	if err != nil {
 		return spec, err
 	}
-	spec, err = AssembleVsphereGlobalCredential(cluster.Status.VsphereSecret, ClusterType, cluster.Name, spec, secretLister)
+	spec, err = AssembleVsphereGlobalCredential(cluster.GetSecret("VsphereSecret"), ClusterType, cluster.Name, spec, secretLister)
 	if err != nil {
 		return spec, err
 	}
-	spec, err = AssembleVsphereVirtualCenterCredential(cluster.Status.VirtualCenterSecret, ClusterType, cluster.Name, spec, secretLister)
+	spec, err = AssembleVsphereVirtualCenterCredential(cluster.GetSecret("VirtualCenterSecret"), ClusterType, cluster.Name, spec, secretLister)
 	if err != nil {
 		return spec, err
 	}
-	spec, err = AssembleOpenStackCredential(cluster.Status.OpenStackSecret, ClusterType, cluster.Name, spec, secretLister)
+	spec, err = AssembleOpenStackCredential(cluster.GetSecret("OpenStackSecret"), ClusterType, cluster.Name, spec, secretLister)
 	if err != nil {
 		return spec, err
 	}
-	spec, err = AssembleAADClientSecretCredential(cluster.Status.AADClientSecret, ClusterType, cluster.Name, spec, secretLister)
+	spec, err = AssembleAADClientSecretCredential(cluster.GetSecret("AADClientSecret"), ClusterType, cluster.Name, spec, secretLister)
 	if err != nil {
 		return spec, err
 	}
-	return AssembleAADCertCredential(cluster.Status.AADClientCertSecret, ClusterType, cluster.Name, spec, secretLister)
+	return AssembleAADCertCredential(cluster.GetSecret("AADClientCertSecret"), ClusterType, cluster.Name, spec, secretLister)
 }
 
 // AssembleRKEConfigTemplateSpec is a wrapper assembler for assembling configs on ClusterTemplateRevisions. It returns a ClusterSpec.

@@ -12,13 +12,13 @@ const secretKey = "credential"
 // AssembleDingtalkCredential looks up the Dingtalk Secret and inserts the keys into the Notifier.
 // It returns a new copy of the Notifier without modifying the original. The Notifier is never updated.
 func AssembleCatalogCredential(catalog *apimgmtv3.Catalog, secretLister v1.SecretLister) (apimgmtv3.CatalogSpec, error) {
-	if catalog.Status.CredentialSecret == "" {
+	if catalog.GetSecret() == "" {
 		if catalog.Spec.Password != "" {
 			logrus.Warnf("[secretmigrator] secrets for catalog %s are not finished migrating", catalog.Name)
 		}
 		return catalog.Spec, nil
 	}
-	secret, err := secretLister.Get(namespace.GlobalNamespace, catalog.Status.CredentialSecret)
+	secret, err := secretLister.Get(namespace.GlobalNamespace, catalog.GetSecret())
 	if err != nil {
 		return catalog.Spec, err
 	}
