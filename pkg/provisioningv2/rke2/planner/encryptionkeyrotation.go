@@ -408,8 +408,7 @@ func (p *Planner) encryptionKeyRotationRestartNodes(cp *rkev1.RKEControlPlane, c
 
 		if stage != leaderStage {
 			// secrets-encrypt command was run on another node. this is considered a failure, but might be a bit too sensitive. to be tested.
-			err = fmt.Errorf("leader [%s] with %s stage and follower [%s] with %s stage", leader.Machine.Status.NodeRef.Name, leaderStage, entry.Machine.Status.NodeRef.Name, stage)
-			return p.encryptionKeyRotationFailed(cp, err)
+			return p.encryptionKeyRotationFailed(cp, fmt.Errorf("leader [%s] with %s stage and follower [%s] with %s stage", leader.Machine.Status.NodeRef.Name, leaderStage, entry.Machine.Status.NodeRef.Name, stage))
 		}
 	}
 
@@ -425,11 +424,11 @@ func (p *Planner) encryptionKeyRotationRestartService(cp *rkev1.RKEControlPlane,
 		Files: []plan.File{
 			{
 				Content: base64.StdEncoding.EncodeToString([]byte(encryptionKeyRotationWaitForSystemctlStatus)),
-				Path:    scriptPath(cp, encryptionKeyRotationWaitForSystemctlStatusPath),
+				Path:    encryptionKeyRotationScriptPath(cp, encryptionKeyRotationWaitForSystemctlStatusPath),
 			},
 			{
 				Content: base64.StdEncoding.EncodeToString([]byte(encryptionKeyRotationWaitForSecretsEncryptStatusScript)),
-				Path:    scriptPath(cp, encryptionKeyRotationWaitForSecretsEncryptStatusPath),
+				Path:    encryptionKeyRotationScriptPath(cp, encryptionKeyRotationWaitForSecretsEncryptStatusPath),
 			},
 		},
 		Instructions: []plan.OneTimeInstruction{
@@ -443,7 +442,7 @@ func (p *Planner) encryptionKeyRotationRestartService(cp *rkev1.RKEControlPlane,
 		nodePlan.Files = append(nodePlan.Files,
 			plan.File{
 				Content: base64.StdEncoding.EncodeToString([]byte(encryptionKeyRotationSecretsEncryptStatusScript)),
-				Path:    scriptPath(cp, encryptionKeyRotationSecretsEncryptStatusPath),
+				Path:    encryptionKeyRotationScriptPath(cp, encryptionKeyRotationSecretsEncryptStatusPath),
 			},
 		)
 		nodePlan.Instructions = append(nodePlan.Instructions,
@@ -489,15 +488,15 @@ func (p *Planner) encryptionKeyRotationLeaderPhaseReconcile(cp *rkev1.RKEControl
 		Files: []plan.File{
 			{
 				Content: base64.StdEncoding.EncodeToString([]byte(idempotentActionScript)),
-				Path:    scriptPath(cp, encryptionKeyRotationActionPath),
+				Path:    encryptionKeyRotationScriptPath(cp, encryptionKeyRotationActionPath),
 			},
 			{
 				Content: base64.StdEncoding.EncodeToString([]byte(encryptionKeyRotationWaitForSecretsEncryptStatusScript)),
-				Path:    scriptPath(cp, encryptionKeyRotationWaitForSecretsEncryptStatusPath),
+				Path:    encryptionKeyRotationScriptPath(cp, encryptionKeyRotationWaitForSecretsEncryptStatusPath),
 			},
 			{
 				Content: base64.StdEncoding.EncodeToString([]byte(encryptionKeyRotationSecretsEncryptStatusScript)),
-				Path:    scriptPath(cp, encryptionKeyRotationSecretsEncryptStatusPath),
+				Path:    encryptionKeyRotationScriptPath(cp, encryptionKeyRotationSecretsEncryptStatusPath),
 			},
 		},
 		Instructions: []plan.OneTimeInstruction{
@@ -623,7 +622,7 @@ func encryptionKeyRotationSecretsEncryptInstruction(cp *rkev1.RKEControlPlane) (
 		Command: "sh",
 		Args: []string{
 			"-xe",
-			scriptPath(cp, encryptionKeyRotationActionPath),
+			encryptionKeyRotationScriptPath(cp, encryptionKeyRotationActionPath),
 			strings.ToLower(fmt.Sprintf("rancher_v2prov_encryption_key_rotation/%s", cp.Status.RotateEncryptionKeysPhase)),
 			strconv.FormatInt(cp.Spec.RotateEncryptionKeys.Generation, 10),
 			rke2.GetRuntimeCommand(cp.Spec.KubernetesVersion),
@@ -655,7 +654,7 @@ func encryptionKeyRotationSecretsEncryptStatusScriptOneTimeInstruction(cp *rkev1
 		Command: "sh",
 		Args: []string{
 			"-x",
-			scriptPath(cp, encryptionKeyRotationSecretsEncryptStatusPath),
+			encryptionKeyRotationScriptPath(cp, encryptionKeyRotationSecretsEncryptStatusPath),
 			rke2.GetRuntimeCommand(cp.Spec.KubernetesVersion),
 		},
 		Env: []string{
@@ -710,7 +709,7 @@ func encryptionKeyRotationWaitForSystemctlStatusInstruction(cp *rkev1.RKEControl
 		Name:    "wait-for-systemctl-status",
 		Command: "sh",
 		Args: []string{
-			"-x", scriptPath(cp, encryptionKeyRotationWaitForSystemctlStatusPath), rke2.GetRuntimeServerUnit(cp.Spec.KubernetesVersion),
+			"-x", encryptionKeyRotationScriptPath(cp, encryptionKeyRotationWaitForSystemctlStatusPath), rke2.GetRuntimeServerUnit(cp.Spec.KubernetesVersion),
 		},
 		Env: []string{
 			encryptionKeyRotationEndpointEnv,
@@ -748,7 +747,7 @@ func encryptionKeyRotationWaitForSecretsEncryptStatus(cp *rkev1.RKEControlPlane)
 		Name:    "wait-for-secrets-encrypt-status",
 		Command: "sh",
 		Args: []string{
-			"-x", scriptPath(cp, encryptionKeyRotationWaitForSecretsEncryptStatusPath), rke2.GetRuntimeCommand(cp.Spec.KubernetesVersion),
+			"-x", encryptionKeyRotationScriptPath(cp, encryptionKeyRotationWaitForSecretsEncryptStatusPath), rke2.GetRuntimeCommand(cp.Spec.KubernetesVersion),
 		},
 		Env: []string{
 			encryptionKeyRotationEndpointEnv,
@@ -790,11 +789,11 @@ func (p *Planner) encryptionKeyRotationFailed(cp *rkev1.RKEControlPlane, err err
 		return err
 	}
 
-	err = errors.Wrap(err, "encryption key rotation failed")
-	logrus.Errorf("[planner] rkecluster %s/%s: failed %v", cp.Namespace, cp.Spec.ClusterName, err)
+	err = errors.Wrap(err, "encryption key rotation failed, please perform an etcd restore")
+	logrus.Errorf("[planner] rkecluster %s/%s: %v", cp.Namespace, cp.Spec.ClusterName, err)
 	return err
 }
 
-func scriptPath(cp *rkev1.RKEControlPlane, file string) string {
+func encryptionKeyRotationScriptPath(cp *rkev1.RKEControlPlane, file string) string {
 	return fmt.Sprintf("%s/%s/%s/%s", encryptionKeyRotationInstallRoot, rke2.GetRuntime(cp.Spec.KubernetesVersion), encryptionKeyRotationBinPrefix, file)
 }
