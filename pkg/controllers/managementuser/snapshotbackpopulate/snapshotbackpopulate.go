@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"regexp"
+	"strings"
 
 	provv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
@@ -329,7 +330,7 @@ func (h *handler) configMapToSnapshots(configMap *corev1.ConfigMap, cluster *pro
 				snapshot.Labels[rke2.MachineIDLabel] = machine.Labels[rke2.MachineIDLabel]
 			}
 		}
-		snapshot.Name = name.SafeConcatName(cluster.Name, InvalidKeyChars.ReplaceAllString(snapshot.SnapshotFile.Name, "-"), fileSuffix)
+		snapshot.Name = name.SafeConcatName(cluster.Name, strings.ToLower(InvalidKeyChars.ReplaceAllString(snapshot.SnapshotFile.Name, "-")), fileSuffix)
 		result[snapshot.SnapshotFile.Name+fileSuffix] = snapshot
 	}
 	return result
