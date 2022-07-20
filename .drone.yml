@@ -129,6 +129,13 @@ steps:
   commands:
   - "cp -r ./bin/* ./package/"
   when:
+    instance:
+      - drone-publish.rancher.io
+    ref:
+      include:
+        - "refs/heads/master"
+        - "refs/heads/release/v*"
+        - "refs/tags/v*"
     event:
     - push
     - tag
@@ -406,6 +413,13 @@ steps:
   commands:
   - "cp -r ./bin/* ./package/"
   when:
+    instance:
+      - drone-publish.rancher.io
+    ref:
+      include:
+        - "refs/heads/master"
+        - "refs/heads/release/v*"
+        - "refs/tags/v*"
     event:
     - push
     - tag
@@ -618,6 +632,13 @@ steps:
   commands:
   - "cp -r ./bin/* ./package/"
   when:
+    instance:
+      - drone-publish.rancher.io
+    ref:
+      include:
+        - "refs/heads/master"
+        - "refs/heads/release/v*"
+        - "refs/tags/v*"
     event:
     - push
     - tag
@@ -838,6 +859,13 @@ steps:
     commands:
       - "cp -r ./bin/* ./package/windows/"
     when:
+      instance:
+        - drone-publish.rancher.io
+      ref:
+        include:
+          - "refs/heads/master"
+          - "refs/heads/release/v*"
+          - "refs/tags/v*"
       event:
         - push
         - tag
@@ -959,6 +987,13 @@ steps:
     commands:
       - "cp -r ./bin/* ./package/windows/"
     when:
+      instance:
+        - drone-publish.rancher.io
+      ref:
+        include:
+          - "refs/heads/master"
+          - "refs/heads/release/v*"
+          - "refs/tags/v*"
       event:
         - push
         - tag
