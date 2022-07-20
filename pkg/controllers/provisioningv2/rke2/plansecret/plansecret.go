@@ -294,14 +294,14 @@ func generateEtcdSnapshotFromListOutput(input string) (*snapshot, error) {
 	switch len(snapshotData) {
 	case 3:
 		return &snapshot{
-			Name:    sb.InvalidKeyChars.ReplaceAllString(snapshotData[0], "-"),
+			Name:    strings.ToLower(sb.InvalidKeyChars.ReplaceAllString(snapshotData[0], "-")),
 			Size:    snapshotData[1],
 			Created: snapshotData[2],
 			S3:      true,
 		}, nil
 	case 4:
 		return &snapshot{
-			Name:     sb.InvalidKeyChars.ReplaceAllString(snapshotData[0], "-"),
+			Name:     strings.ToLower(sb.InvalidKeyChars.ReplaceAllString(snapshotData[0], "-")),
 			Location: snapshotData[1],
 			Size:     snapshotData[2],
 			Created:  snapshotData[3],
