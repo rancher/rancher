@@ -785,8 +785,8 @@ func encryptionKeyRotationIsCurrentStageAllowed(leaderStage string, currentPhase
 // encryptionKeyRotationFailed updates the various status objects on the control plane, allowing the cluster to
 // continue the reconciliation loop. Encryption key rotation will not be restarted again until requested.
 func (p *Planner) encryptionKeyRotationFailed(cp *rkev1.RKEControlPlane, err error) error {
-	if err := p.setEncryptionKeyRotateState(cp, cp.Spec.RotateEncryptionKeys, rkev1.RotateEncryptionKeysPhaseFailed); err != nil {
-		return err
+	if err2 := p.setEncryptionKeyRotateState(cp, cp.Spec.RotateEncryptionKeys, rkev1.RotateEncryptionKeysPhaseFailed); err2 != nil {
+		return err2
 	}
 
 	err = errors.Wrap(err, "encryption key rotation failed, please perform an etcd restore")
