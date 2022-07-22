@@ -1,4 +1,4 @@
-FROM rancher/golang:1.14-windowsservercore-1809
+FROM rancher/golang:1.16-windowsservercore-1809
 SHELL ["powershell", "-NoLogo", "-Command", "$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue';"]
 
 ARG DAPPER_HOST_ARCH
