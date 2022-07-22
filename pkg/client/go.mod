@@ -19,7 +19,7 @@ require (
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/rancher/wrangler v0.6.2-0.20200820173016-2068de651106 // indirect
 	github.com/sirupsen/logrus v1.6.0 // indirect
-	golang.org/x/sys v0.0.0-20220114195835-da31bd327af9 // indirect
+	golang.org/x/sys v0.0.0-20220721230656-c6bc011c0c49 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	k8s.io/klog/v2 v2.30.0 // indirect

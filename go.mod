@@ -126,7 +126,7 @@ require (
 	github.com/robfig/cron v1.1.0
 	github.com/satori/go.uuid v1.2.1-0.20181016170032-d91630c85102
 	github.com/segmentio/kafka-go v0.0.0-20190411192201-218fd49cff39
-	github.com/sirupsen/logrus v1.8.1
+	github.com/sirupsen/logrus v1.9.0
 	github.com/stretchr/testify v1.7.1
 	github.com/tomnomnom/linkheader v0.0.0-20180905144013-02ca5825eb80
 	github.com/urfave/cli v1.22.2
@@ -196,7 +196,7 @@ require (
 	github.com/cespare/xxhash/v2 v2.1.2 // indirect
 	github.com/chai2010/gettext-go v0.0.0-20160711120539-c6fed771bfd5 // indirect
 	github.com/containerd/cgroups v1.0.4 // indirect
-	github.com/containerd/containerd v1.6.3 // indirect
+	github.com/containerd/containerd v1.6.6 // indirect
 	github.com/coredns/caddy v1.1.0 // indirect
 	github.com/coredns/corefile-migration v1.0.17 // indirect
 	github.com/coreos/go-systemd/v22 v22.3.2 // indirect
@@ -208,7 +208,7 @@ require (
 	github.com/docker/go-metrics v0.0.1 // indirect
 	github.com/docker/go-units v0.4.0 // indirect
 	github.com/docker/libtrust v0.0.0-20160708172513-aabc10ec26b7 // indirect
-	github.com/emicklei/go-restful v2.15.0+incompatible // indirect
+	github.com/emicklei/go-restful v2.16.0+incompatible // indirect
 	github.com/emicklei/go-restful/v3 v3.8.0 // indirect
 	github.com/evanphx/json-patch/v5 v5.6.0 // indirect
 	github.com/exponent-io/jsonpath v0.0.0-20151013193312-d6023ce2651d // indirect
@@ -256,7 +256,7 @@ require (
 	github.com/jonboulle/clockwork v0.2.2 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
-	github.com/klauspost/compress v1.13.6 // indirect
+	github.com/klauspost/compress v1.15.9 // indirect
 	github.com/klauspost/cpuid v1.3.1 // indirect
 	github.com/kr/pretty v0.3.0 // indirect
 	github.com/kr/text v0.2.0 // indirect
@@ -344,13 +344,13 @@ require (
 	go.uber.org/atomic v1.7.0 // indirect
 	go.uber.org/multierr v1.6.0 // indirect
 	go.uber.org/zap v1.19.1 // indirect
-	golang.org/x/sys v0.0.0-20220715151400-c0bba94af5f8 // indirect
+	golang.org/x/sys v0.0.0-20220721230656-c6bc011c0c49 // indirect
 	golang.org/x/term v0.0.0-20210927222741-03fcf44c2211 // indirect
 	golang.org/x/time v0.0.0-20220210224613-90d013bbcef8 // indirect
 	golang.org/x/xerrors v0.0.0-20220517211312-f3a8303e98df // indirect
 	gomodules.xyz/jsonpatch/v2 v2.2.0 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
-	google.golang.org/genproto v0.0.0-20220714211235-042d03aeabc9 // indirect
+	google.golang.org/genproto v0.0.0-20220720214146-176da50484ac // indirect
 	google.golang.org/protobuf v1.28.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/ini.v1 v1.66.4 // indirect
