@@ -14,7 +14,9 @@ import (
 
 	"github.com/rancher/norman/httperror"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/controllers/management/secretmigrator"
 	dialer2 "github.com/rancher/rancher/pkg/dialer"
+	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/kontainer-engine/drivers/gke"
 	"github.com/rancher/rancher/pkg/types/config/dialer"
@@ -61,11 +63,11 @@ func prefix(cluster *v3.Cluster) string {
 	return "/k8s/clusters/" + cluster.Name
 }
 
-func New(localConfig *rest.Config, cluster *v3.Cluster, clusterLister v3.ClusterLister, factory dialer.Factory) (*RemoteService, error) {
+func New(localConfig *rest.Config, cluster *v3.Cluster, clusterLister v3.ClusterLister, secretLister v1.SecretLister, factory dialer.Factory) (*RemoteService, error) {
 	if cluster.Spec.Internal {
 		return NewLocal(localConfig, cluster)
 	}
-	return NewRemote(cluster, clusterLister, factory)
+	return NewRemote(cluster, clusterLister, secretLister, factory)
 }
 
 func NewLocal(localConfig *rest.Config, cluster *v3.Cluster) (*RemoteService, error) {
@@ -102,7 +104,7 @@ func NewLocal(localConfig *rest.Config, cluster *v3.Cluster) (*RemoteService, er
 	return rs, nil
 }
 
-func NewRemote(cluster *v3.Cluster, clusterLister v3.ClusterLister, factory dialer.Factory) (*RemoteService, error) {
+func NewRemote(cluster *v3.Cluster, clusterLister v3.ClusterLister, secretLister v1.SecretLister, factory dialer.Factory) (*RemoteService, error) {
 	if !v32.ClusterConditionProvisioned.IsTrue(cluster) {
 		return nil, httperror.NewAPIError(httperror.ClusterUnavailable, "cluster not provisioned")
 	}
@@ -126,7 +128,12 @@ func NewRemote(cluster *v3.Cluster, clusterLister v3.ClusterLister, factory dial
 			return "", err
 		}
 
-		return "Bearer " + newCluster.Status.ServiceAccountToken, nil
+		secret, err := secretLister.Get(secretmigrator.SecretNamespace, newCluster.Status.ServiceAccountTokenSecret)
+		if err != nil {
+			return "", err
+		}
+
+		return "Bearer " + string(secret.Data[secretmigrator.SecretKey]), nil
 	}
 
 	return &RemoteService{
