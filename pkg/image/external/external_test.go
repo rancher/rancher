@@ -175,7 +175,7 @@ func Test_downloadExternalImageListFromURL(t *testing.T) {
 			name: "rancher-url",
 			args: args{
 				url:    fmt.Sprintf("https://github.com/rancher/rancher/releases/download/%s/rancher-images.txt", rancherVersion),
-				image1: "fleet-agent:v0.3.10-rc5",
+				image1: "fleet-agent:v0.3.9",
 				image2: "rancher/system-agent-installer-rke2:v1.23.4-rke2r2",
 				image3: "rancher/rancher-agent:" + rancherVersion,
 			},
