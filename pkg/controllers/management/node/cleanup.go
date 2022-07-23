@@ -347,8 +347,8 @@ func (m *Lifecycle) createCleanupJob(userContext *config.UserContext, cluster *v
 	}
 
 	var imagePullSecrets []coreV1.LocalObjectReference
-	if cluster.Status.PrivateRegistrySecret != "" {
-		privateRegistries, err := m.credLister.Get(namespace.GlobalNamespace, cluster.Status.PrivateRegistrySecret)
+	if cluster.GetSecret("PrivateRegistrySecret") != "" {
+		privateRegistries, err := m.credLister.Get(namespace.GlobalNamespace, cluster.GetSecret("PrivateRegistrySecret"))
 		if err != nil {
 			return nil, err
 		} else if url, err := util.GeneratePrivateRegistryDockerConfig(util.GetPrivateRepo(cluster), privateRegistries); err != nil {
