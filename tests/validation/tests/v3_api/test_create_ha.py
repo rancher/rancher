@@ -7,7 +7,7 @@ from .test_import_k3s_cluster import create_multiple_control_cluster
 from .test_import_rke2_cluster import (
     RANCHER_RKE2_VERSION, create_rke2_multiple_control_cluster
 )
-from .test_rke_cluster_provisioning import rke_config
+from .test_rke_cluster_provisioning import AZURE_CLIENT_ID, AZURE_CLIENT_SECRET, rke_config
 
 # RANCHER_HA_KUBECONFIG and RANCHER_HA_HOSTNAME are provided
 # when installing Rancher into a k3s setup
@@ -484,16 +484,24 @@ def create_aks_cluster():
     tf_dir = DATA_SUBDIR + "/" + "terraform/aks"
     aks_k8_s_version = os.environ.get('RANCHER_AKS_K8S_VERSION', '')
     aks_location = os.environ.get('RANCHER_AKS_LOCATION', '')
-    client_id = os.environ.get('ARM_CLIENT_ID', '')
-    client_secret = os.environ.get('ARM_CLIENT_SECRET', '')
+    client_id = os.environ.get('AZURE_CLIENT_ID', '')
+    client_secret = os.environ.get('AZURE_CLIENT_SECRET', '')
 
     tf = Terraform(working_dir=tf_dir,
                    variables={'kubernetes_version': aks_k8_s_version,
                               'location': aks_location,
-                              'client_id': client_id,
-                              'client_secret': client_secret,
                               'cluster_name': resource_prefix})
-
+    
+    tffile = tf_dir + "/aks.tf"
+    
+    config = readDataFile(DATA_SUBDIR, tffile)
+    config = config.replace('id_placeholder', AZURE_CLIENT_ID)
+    config = config.replace('secret_placeholder', AZURE_CLIENT_SECRET)
+    
+    f = open(tffile, "w")
+    f.write(config)
+    f.close()
+    
     print("Creating cluster")
     tf.init()
     print(tf.plan(out="aks_plan_server.out"))
