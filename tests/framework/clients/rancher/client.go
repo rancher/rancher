@@ -17,6 +17,7 @@ import (
 	"github.com/rancher/rancher/tests/framework/clients/rancher/provisioning"
 	"github.com/rancher/rancher/tests/framework/pkg/clientbase"
 	"github.com/rancher/rancher/tests/framework/pkg/config"
+	"github.com/rancher/rancher/tests/framework/pkg/environmentflag"
 	"github.com/rancher/rancher/tests/framework/pkg/session"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -37,9 +38,11 @@ type Client struct {
 	Catalog *catalog.Client
 	// Config used to test against a rancher instance
 	RancherConfig *Config
-	restConfig    *rest.Config
 	// Session is the session object used by the client to track all the resources being created by the client.
 	Session *session.Session
+	// Flags is the environment flags used by the client to test selectively against a rancher instance.
+	Flags      *environmentflag.EnvironmentFlags
+	restConfig *rest.Config
 }
 
 // NewClient is the constructor to the initializing a rancher Client. It takes a bearer token and session.Session. If bearer token is not provided,
@@ -48,12 +51,16 @@ func NewClient(bearerToken string, session *session.Session) (*Client, error) {
 	rancherConfig := new(Config)
 	config.LoadConfig(ConfigurationFileKey, rancherConfig)
 
+	environmentFlags := environmentflag.NewEnvironmentFlags()
+	environmentflag.LoadEnvironmentFlags(environmentflag.ConfigurationFileKey, environmentFlags)
+
 	if bearerToken == "" {
 		bearerToken = rancherConfig.AdminToken
 	}
 
 	c := &Client{
 		RancherConfig: rancherConfig,
+		Flags:         &environmentFlags,
 	}
 
 	session.CleanupEnabled = *rancherConfig.Cleanup
