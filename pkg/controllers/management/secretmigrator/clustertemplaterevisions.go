@@ -32,7 +32,7 @@ func (h *handler) syncTemplate(key string, clusterTemplateRevision *v3.ClusterTe
 				clusterTemplateRevisionCopy, err := h.clusterTemplateRevisions.Update(clusterTemplateRevision)
 				if err != nil {
 					logrus.Errorf("[secretmigrator] failed to migrate private registry secrets for clusterTemplateRevision %s, will retry: %v", clusterTemplateRevision.Name, err)
-					deleteErr := h.migrator.secrets.DeleteNamespaced(secretNamespace, regSecret.Name, &metav1.DeleteOptions{})
+					deleteErr := h.migrator.secrets.DeleteNamespaced(SecretNamespace, regSecret.Name, &metav1.DeleteOptions{})
 					if deleteErr != nil {
 						logrus.Errorf("[secretmigrator] encountered error while handling migration error: %v", deleteErr)
 					}
@@ -57,7 +57,7 @@ func (h *handler) syncTemplate(key string, clusterTemplateRevision *v3.ClusterTe
 				clusterTemplateRevisionCopy, err := h.clusterTemplateRevisions.Update(clusterTemplateRevision)
 				if err != nil {
 					logrus.Errorf("[secretmigrator] failed to migrate S3 secrets for clusterTemplateRevision %s, will retry: %v", clusterTemplateRevision.Name, err)
-					deleteErr := h.migrator.secrets.DeleteNamespaced(secretNamespace, s3Secret.Name, &metav1.DeleteOptions{})
+					deleteErr := h.migrator.secrets.DeleteNamespaced(SecretNamespace, s3Secret.Name, &metav1.DeleteOptions{})
 					if deleteErr != nil {
 						logrus.Errorf("[secretmigrator] encountered error while handling migration error: %v", deleteErr)
 					}
@@ -82,7 +82,7 @@ func (h *handler) syncTemplate(key string, clusterTemplateRevision *v3.ClusterTe
 				clusterTemplateRevisionCopy, err := h.clusterTemplateRevisions.Update(clusterTemplateRevision)
 				if err != nil {
 					logrus.Errorf("[secretmigrator] failed to migrate weave CNI secrets for clusterTemplateRevision %s, will retry: %v", clusterTemplateRevision.Name, err)
-					deleteErr := h.migrator.secrets.DeleteNamespaced(secretNamespace, weaveSecret.Name, &metav1.DeleteOptions{})
+					deleteErr := h.migrator.secrets.DeleteNamespaced(SecretNamespace, weaveSecret.Name, &metav1.DeleteOptions{})
 					if deleteErr != nil {
 						logrus.Errorf("[secretmigrator] encountered error while handling migration error: %v", deleteErr)
 					}
@@ -109,7 +109,7 @@ func (h *handler) syncTemplate(key string, clusterTemplateRevision *v3.ClusterTe
 				clusterTemplateRevisionCopy, err := h.clusterTemplateRevisions.Update(clusterTemplateRevision)
 				if err != nil {
 					logrus.Errorf("[secretmigrator] failed to migrate vsphere global secret for clusterTemplateRevision %s, will retry: %v", clusterTemplateRevision.Name, err)
-					deleteErr := h.migrator.secrets.DeleteNamespaced(secretNamespace, vsphereSecret.Name, &metav1.DeleteOptions{})
+					deleteErr := h.migrator.secrets.DeleteNamespaced(SecretNamespace, vsphereSecret.Name, &metav1.DeleteOptions{})
 					if deleteErr != nil {
 						logrus.Errorf("[secretmigrator] encountered error while handling migration error: %v", deleteErr)
 					}
@@ -136,7 +136,7 @@ func (h *handler) syncTemplate(key string, clusterTemplateRevision *v3.ClusterTe
 				clusterTemplateRevisionCopy, err := h.clusterTemplateRevisions.Update(clusterTemplateRevision)
 				if err != nil {
 					logrus.Errorf("[secretmigrator] failed to migrate vsphere virtualcenter secret for clusterTemplateRevision %s, will retry: %v", clusterTemplateRevision.Name, err)
-					deleteErr := h.migrator.secrets.DeleteNamespaced(secretNamespace, vcenterSecret.Name, &metav1.DeleteOptions{})
+					deleteErr := h.migrator.secrets.DeleteNamespaced(SecretNamespace, vcenterSecret.Name, &metav1.DeleteOptions{})
 					if deleteErr != nil {
 						logrus.Errorf("[secretmigrator] encountered error while handling migration error: %v", deleteErr)
 					}
@@ -160,7 +160,7 @@ func (h *handler) syncTemplate(key string, clusterTemplateRevision *v3.ClusterTe
 				clusterTemplateRevisionCopy, err := h.clusterTemplateRevisions.Update(clusterTemplateRevision)
 				if err != nil {
 					logrus.Errorf("[secretmigrator] failed to migrate openstack secret for clusterTemplateRevision %s, will retry: %v", clusterTemplateRevision.Name, err)
-					deleteErr := h.migrator.secrets.DeleteNamespaced(secretNamespace, openStackSecret.Name, &metav1.DeleteOptions{})
+					deleteErr := h.migrator.secrets.DeleteNamespaced(SecretNamespace, openStackSecret.Name, &metav1.DeleteOptions{})
 					if deleteErr != nil {
 						logrus.Errorf("[secretmigrator] encountered error while handling migration error: %v", deleteErr)
 					}
@@ -184,7 +184,7 @@ func (h *handler) syncTemplate(key string, clusterTemplateRevision *v3.ClusterTe
 				clusterTemplateRevisionCopy, err := h.clusterTemplateRevisions.Update(clusterTemplateRevision)
 				if err != nil {
 					logrus.Errorf("[secretmigrator] failed to migrate aad client secret for clusterTemplateRevision %s, will retry: %v", clusterTemplateRevision.Name, err)
-					deleteErr := h.migrator.secrets.DeleteNamespaced(secretNamespace, aadClientSecret.Name, &metav1.DeleteOptions{})
+					deleteErr := h.migrator.secrets.DeleteNamespaced(SecretNamespace, aadClientSecret.Name, &metav1.DeleteOptions{})
 					if deleteErr != nil {
 						logrus.Errorf("[secretmigrator] encountered error while handling migration error: %v", deleteErr)
 					}
@@ -208,7 +208,7 @@ func (h *handler) syncTemplate(key string, clusterTemplateRevision *v3.ClusterTe
 				clusterTemplateRevisionCopy, err := h.clusterTemplateRevisions.Update(clusterTemplateRevision)
 				if err != nil {
 					logrus.Errorf("[secretmigrator] failed to migrate aad cert secret for clusterTemplateRevision %s, will retry: %v", clusterTemplateRevision.Name, err)
-					deleteErr := h.migrator.secrets.DeleteNamespaced(secretNamespace, aadCertSecret.Name, &metav1.DeleteOptions{})
+					deleteErr := h.migrator.secrets.DeleteNamespaced(SecretNamespace, aadCertSecret.Name, &metav1.DeleteOptions{})
 					if deleteErr != nil {
 						logrus.Errorf("[secretmigrator] encountered error while handling migration error: %v", deleteErr)
 					}

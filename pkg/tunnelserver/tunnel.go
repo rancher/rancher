@@ -12,6 +12,8 @@ import (
 	"strings"
 
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/controllers/management/secretmigrator"
+	corev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 
 	"github.com/rancher/norman/types/convert"
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
@@ -64,6 +66,8 @@ func NewAuthorizer(context *config.ScaledContext) *Authorizer {
 		machines:              context.Management.Nodes(""),
 		clusters:              context.Management.Clusters(""),
 		KontainerDriverLister: context.Management.KontainerDrivers("").Controller().Lister(),
+		Secrets:               context.Core.Secrets(""),
+		SecretLister:          context.Core.Secrets("").Controller().Lister(),
 	}
 	context.Management.ClusterRegistrationTokens("").Controller().Informer().AddIndexers(map[string]cache.IndexFunc{
 		crtKeyIndex: auth.crtIndex,
@@ -82,6 +86,8 @@ type Authorizer struct {
 	machines              v3.NodeInterface
 	clusters              v3.ClusterInterface
 	KontainerDriverLister v3.KontainerDriverLister
+	Secrets               corev1.SecretInterface
+	SecretLister          corev1.SecretLister
 }
 
 type Client struct {
@@ -297,10 +303,14 @@ func (t *Authorizer) authorizeCluster(cluster *v3.Cluster, inCluster *cluster, r
 
 	if cluster.Status.Driver == v32.ClusterDriverImported {
 		if cluster.Status.APIEndpoint != apiEndpoint ||
-			cluster.Status.ServiceAccountToken != token ||
+			cluster.Status.ServiceAccountTokenSecret == "" ||
 			cluster.Status.CACert != caCert {
+			secret, err := secretmigrator.NewMigrator(t.SecretLister, t.Secrets).CreateOrUpdateServiceAccountTokenSecret(cluster.Status.ServiceAccountTokenSecret, token, cluster)
+			if err != nil {
+				return cluster, true, err
+			}
 			cluster.Status.APIEndpoint = apiEndpoint
-			cluster.Status.ServiceAccountToken = token
+			cluster.Status.ServiceAccountTokenSecret = secret.Name
 			cluster.Status.CACert = caCert
 			changed = true
 		}

@@ -14,6 +14,7 @@ import (
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	mgmtclient "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	"github.com/rancher/rancher/pkg/clustermanager"
+	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/resourcequota"
 	mgmtschema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
@@ -32,6 +33,7 @@ type projectStore struct {
 	roleTemplateLister v3.RoleTemplateLister
 	scaledContext      *config.ScaledContext
 	clusterLister      v3.ClusterLister
+	secretLister       v1.SecretLister
 }
 
 func SetProjectStore(schema *types.Schema, mgmt *config.ScaledContext) {
@@ -41,6 +43,7 @@ func SetProjectStore(schema *types.Schema, mgmt *config.ScaledContext) {
 		roleTemplateLister: mgmt.Management.RoleTemplates("").Controller().Lister(),
 		scaledContext:      mgmt,
 		clusterLister:      mgmt.Management.Clusters("").Controller().Lister(),
+		secretLister:       mgmt.Core.Secrets("").Controller().Lister(),
 	}
 	schema.Store = store
 }
@@ -280,7 +283,7 @@ func (s *projectStore) getNamespacesCount(apiContext *types.APIContext, project 
 		return 0, err
 	}
 
-	kubeConfig, err := clustermanager.ToRESTConfig(cluster, s.scaledContext)
+	kubeConfig, err := clustermanager.ToRESTConfig(cluster, s.scaledContext, s.secretLister)
 	if kubeConfig == nil || err != nil {
 		return 0, err
 	}

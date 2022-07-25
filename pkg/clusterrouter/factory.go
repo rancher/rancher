@@ -6,6 +6,7 @@ import (
 
 	"github.com/docker/docker/pkg/locker"
 	"github.com/rancher/rancher/pkg/clusterrouter/proxy"
+	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config/dialer"
 	"k8s.io/client-go/rest"
@@ -15,18 +16,20 @@ type factory struct {
 	dialerFactory dialer.Factory
 	clusterLookup ClusterLookup
 	clusterLister v3.ClusterLister
+	secretLister  v1.SecretLister
 	clusters      sync.Map
 	serverLock    *locker.Locker
 	servers       sync.Map
 	localConfig   *rest.Config
 }
 
-func newFactory(localConfig *rest.Config, dialer dialer.Factory, lookup ClusterLookup, clusterLister v3.ClusterLister) *factory {
+func newFactory(localConfig *rest.Config, dialer dialer.Factory, lookup ClusterLookup, clusterLister v3.ClusterLister, secretLister v1.SecretLister) *factory {
 	return &factory{
 		dialerFactory: dialer,
 		serverLock:    locker.New(),
 		clusterLookup: lookup,
 		clusterLister: clusterLister,
+		secretLister:  secretLister,
 		localConfig:   localConfig,
 	}
 }
@@ -73,5 +76,5 @@ func (s *factory) get(req *http.Request) (*v3.Cluster, http.Handler, error) {
 }
 
 func (s *factory) newServer(c *v3.Cluster) (server, error) {
-	return proxy.New(s.localConfig, c, s.clusterLister, s.dialerFactory)
+	return proxy.New(s.localConfig, c, s.clusterLister, s.secretLister, s.dialerFactory)
 }
