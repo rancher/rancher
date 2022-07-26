@@ -40,7 +40,7 @@ ENV KUSTOMIZE_VERSION v3.5.4
 # System charts minimal version
 ENV CATTLE_FLEET_MIN_VERSION=0.3.900
 ENV CATTLE_RANCHER_OPERATOR_MIN_VERSION=0.1.400
-ENV CATTLE_RANCHER_WEBHOOK_MIN_VERSION=0.1.400
+ENV CATTLE_RANCHER_WEBHOOK_MIN_VERSION=0.1.500-rc1
 
 RUN mkdir -p /var/lib/rancher-data/local-catalogs/system-library && \
     mkdir -p /var/lib/rancher-data/local-catalogs/library && \
