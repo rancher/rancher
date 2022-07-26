@@ -13,7 +13,6 @@ import (
 	k8sappv1 "k8s.io/api/apps/v1"
 	autoscaling "k8s.io/api/autoscaling/v2beta2"
 	batchv1 "k8s.io/api/batch/v1"
-	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	v1 "k8s.io/api/core/v1"
 	kextv1beta1 "k8s.io/api/extensions/v1beta1"
 	knetworkingv1 "k8s.io/api/networking/v1"
@@ -372,14 +371,14 @@ func jobTypes(schemas *types.Schemas) *types.Schemas {
 
 func cronJobTypes(schemas *types.Schemas) *types.Schemas {
 	return schemas.
-		AddMapperForType(&Version, batchv1beta1.JobTemplateSpec{},
+		AddMapperForType(&Version, batchv1.JobTemplateSpec{},
 			&m.Move{
 				From: "metadata",
 				To:   "jobMetadata",
 			},
 			&m.Embed{Field: "spec"},
 		).
-		AddMapperForType(&Version, batchv1beta1.CronJobSpec{},
+		AddMapperForType(&Version, batchv1.CronJobSpec{},
 			&m.Drop{
 				Field: "suspend",
 			},
@@ -419,16 +418,16 @@ func cronJobTypes(schemas *types.Schemas) *types.Schemas {
 			&m.Drop{Field: "jobMetadata"},
 		).
 		MustImport(&Version, v3.WorkloadMetric{}).
-		AddMapperForType(&Version, batchv1beta1.CronJob{},
+		AddMapperForType(&Version, batchv1.CronJob{},
 			&m.Move{
 				From: "status",
 				To:   "cronJobStatus",
 			},
 			NewWorkloadTypeMapper(),
 		).
-		MustImport(&Version, batchv1beta1.CronJobSpec{}, cronJobOverride{}).
-		MustImport(&Version, batchv1beta1.JobTemplateSpec{}).
-		MustImportAndCustomize(&Version, batchv1beta1.CronJob{}, func(schema *types.Schema) {
+		MustImport(&Version, batchv1.CronJobSpec{}, cronJobOverride{}).
+		MustImport(&Version, batchv1.JobTemplateSpec{}).
+		MustImportAndCustomize(&Version, batchv1.CronJob{}, func(schema *types.Schema) {
 			schema.BaseType = "workload"
 			schema.ResourceActions = map[string]types.Action{
 				"redeploy": {},

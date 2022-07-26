@@ -19,7 +19,6 @@ import (
 	appsv1beta1 "k8s.io/api/apps/v1beta1"
 	scalingv2beta2 "k8s.io/api/autoscaling/v2beta2"
 	batchv1 "k8s.io/api/batch/v1"
-	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	v1 "k8s.io/api/core/v1"
 	extv1beta1 "k8s.io/api/extensions/v1beta1"
 	knetworkingv1 "k8s.io/api/networking/v1"
@@ -70,7 +69,6 @@ var builders = []runtime.SchemeBuilder{
 	appsv1beta1.SchemeBuilder,
 	scalingv2beta2.SchemeBuilder,
 	batchv1.SchemeBuilder,
-	batchv1beta1.SchemeBuilder,
 	v1.SchemeBuilder,
 	v1beta1.SchemeBuilder,
 	extv1beta1.SchemeBuilder,
