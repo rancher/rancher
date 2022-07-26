@@ -24,6 +24,7 @@ const (
 	ClusterFieldCapabilities                         = "capabilities"
 	ClusterFieldCapacity                             = "capacity"
 	ClusterFieldCertificatesExpiration               = "certificatesExpiration"
+	ClusterFieldClusterSecrets                       = "clusterSecrets"
 	ClusterFieldClusterTemplateAnswers               = "answers"
 	ClusterFieldClusterTemplateID                    = "clusterTemplateId"
 	ClusterFieldClusterTemplateQuestions             = "questions"
@@ -102,6 +103,7 @@ type Cluster struct {
 	Capabilities                         *Capabilities                  `json:"capabilities,omitempty" yaml:"capabilities,omitempty"`
 	Capacity                             map[string]string              `json:"capacity,omitempty" yaml:"capacity,omitempty"`
 	CertificatesExpiration               map[string]CertExpiration      `json:"certificatesExpiration,omitempty" yaml:"certificatesExpiration,omitempty"`
+	ClusterSecrets                       *ClusterSecrets                `json:"clusterSecrets,omitempty" yaml:"clusterSecrets,omitempty"`
 	ClusterTemplateAnswers               *Answer                        `json:"answers,omitempty" yaml:"answers,omitempty"`
 	ClusterTemplateID                    string                         `json:"clusterTemplateId,omitempty" yaml:"clusterTemplateId,omitempty"`
 	ClusterTemplateQuestions             []Question                     `json:"questions,omitempty" yaml:"questions,omitempty"`
