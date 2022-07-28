@@ -13,7 +13,11 @@ TARGETS := $(shell ls scripts)
 	fi
 
 $(TARGETS): .dapper
-	./.dapper $@
+	@if [[ "$@" = "post-release-checks" ]] || [[ "$@" = "list-gomod-updates" ]] || [[ "$@" = "check-chart-kdm-source-values" ]]; then\
+		./.dapper -q --no-out $@;\
+	else\
+		./.dapper $@;\
+	fi
 
 .DEFAULT_GOAL := ci
 

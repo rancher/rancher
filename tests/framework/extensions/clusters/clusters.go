@@ -8,12 +8,20 @@ import (
 	"github.com/rancher/rancher/pkg/api/scheme"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	apisV1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
-	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
+<<<<<<< HEAD
+<<<<<<< HEAD
+=======
+	provisioning "github.com/rancher/rancher/tests/framework/clients/rancher/generated/provisioning/v1"
 	"github.com/rancher/rancher/tests/framework/pkg/namegenerator"
+>>>>>>> 629c762dc (Moved the the Kube API provisiong package outside of rancher, but kept it in the clients package. This way integration tests can use the provisioning Kube API provisioning client if needed.)
+=======
+	provisioning "github.com/rancher/rancher/tests/framework/clients/rancher/generated/provisioning/v1"
+>>>>>>> 48f4a52ee (Include back removed libraries)
 	"github.com/rancher/rancher/tests/framework/pkg/wait"
 	"github.com/rancher/rancher/tests/integration/pkg/defaults"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/watch"
@@ -39,9 +47,15 @@ func GetClusterIDByName(client *rancher.Client, clusterName string) (string, err
 // This functions just waits until a cluster becomes ready.
 func IsProvisioningClusterReady(event watch.Event) (ready bool, err error) {
 	cluster := event.Object.(*apisV1.Cluster)
-
+	var updated bool
 	ready = cluster.Status.Ready
-	return ready, nil
+	for _, condition := range cluster.Status.Conditions {
+		if condition.Type == "Updated" && condition.Status == corev1.ConditionTrue {
+			updated = true
+		}
+	}
+
+	return ready && updated, nil
 }
 
 // IsHostedProvisioningClusterReady is basic check function that would be used for the wait.WatchWait func in pkg/wait.
@@ -60,12 +74,6 @@ func IsHostedProvisioningClusterReady(event watch.Event) (ready bool, err error)
 	}
 
 	return false, nil
-}
-
-func RKE1AppendRandomString(baseClusterName string) string {
-	const defaultRandStringLength = 5
-	clusterName := "auto-" + baseClusterName + "-" + namegenerator.RandStringLower(defaultRandStringLength)
-	return clusterName
 }
 
 // NewRKE1lusterConfig is a constructor for a v3.Cluster object, to be used by the rancher.Client.Provisioning client.
@@ -102,63 +110,44 @@ func NewRKE1ClusterConfig(clusterName, cni, kubernetesVersion string, client *ra
 }
 
 // NewRKE2ClusterConfig is a constructor for a apisV1.Cluster object, to be used by the rancher.Client.Provisioning client.
-func NewRKE2ClusterConfig(clusterName, namespace, cni, cloudCredentialSecretName, kubernetesVersion string, machinePools []apisV1.RKEMachinePool) *apisV1.Cluster {
-	typeMeta := metav1.TypeMeta{
-		Kind:       "Cluster",
-		APIVersion: "provisioning.cattle.io/v1",
-	}
-
+func NewRKE2ClusterConfig(clusterName, namespace, cni, cloudCredentialSecretName, kubernetesVersion string, machinePools []provisioning.RKEMachinePool) *provisioning.Cluster {
 	//metav1.ObjectMeta
-	objectMeta := metav1.ObjectMeta{
+	objectMeta := &provisioning.ObjectMeta{
 		Name:      clusterName,
 		Namespace: namespace,
 	}
 
-	etcd := &rkev1.ETCD{
+	etcd := &provisioning.ETCD{
 		SnapshotRetention:    5,
 		SnapshotScheduleCron: "0 */5 * * *",
 	}
 
-	chartValuesMap := rkev1.GenericMap{
-		Data: map[string]interface{}{},
+	machineGlobalConfigMap := &provisioning.MachineGlobalConfig{
+		CNI: cni,
 	}
 
-	machineGlobalConfigMap := rkev1.GenericMap{
-		Data: map[string]interface{}{
-			"cni":                 cni,
-			"disable-kube-proxy":  false,
-			"etcd-expose-metrics": false,
-			"profile":             nil,
-		},
-	}
-
-	localClusterAuthEndpoint := rkev1.LocalClusterAuthEndpoint{
+	localClusterAuthEndpoint := &provisioning.LocalClusterAuthEndpoint{
 		CACerts: "",
 		Enabled: false,
 		FQDN:    "",
 	}
 
-	upgradeStrategy := rkev1.ClusterUpgradeStrategy{
+	upgradeStrategy := &provisioning.ClusterUpgradeStrategy{
 		ControlPlaneConcurrency:  "10%",
-		ControlPlaneDrainOptions: rkev1.DrainOptions{},
+		ControlPlaneDrainOptions: nil,
 		WorkerConcurrency:        "10%",
-		WorkerDrainOptions:       rkev1.DrainOptions{},
+		WorkerDrainOptions:       nil,
 	}
 
-	rkeSpecCommon := rkev1.RKEClusterSpecCommon{
-		ChartValues:           chartValuesMap,
+	rkeConfig := &provisioning.RKEConfig{
 		MachineGlobalConfig:   machineGlobalConfigMap,
 		ETCD:                  etcd,
 		UpgradeStrategy:       upgradeStrategy,
-		MachineSelectorConfig: []rkev1.RKESystemConfig{},
+		MachineSelectorConfig: []provisioning.RKESystemConfig{},
+		MachinePools:          machinePools,
 	}
 
-	rkeConfig := &apisV1.RKEConfig{
-		RKEClusterSpecCommon: rkeSpecCommon,
-		MachinePools:         machinePools,
-	}
-
-	spec := apisV1.ClusterSpec{
+	spec := &provisioning.ClusterSpec{
 		CloudCredentialSecretName: cloudCredentialSecretName,
 		KubernetesVersion:         kubernetesVersion,
 		LocalClusterAuthEndpoint:  localClusterAuthEndpoint,
@@ -166,8 +155,7 @@ func NewRKE2ClusterConfig(clusterName, namespace, cni, cloudCredentialSecretName
 		RKEConfig: rkeConfig,
 	}
 
-	v1Cluster := &apisV1.Cluster{
-		TypeMeta:   typeMeta,
+	v1Cluster := &provisioning.Cluster{
 		ObjectMeta: objectMeta,
 		Spec:       spec,
 	}
@@ -175,16 +163,21 @@ func NewRKE2ClusterConfig(clusterName, namespace, cni, cloudCredentialSecretName
 	return v1Cluster
 }
 
-// CreateRKE2Cluster is a "helper" functions that takes a rancher client, and the rke2 cluster config as parameters. This function
+// CreateRKE1Cluster is a "helper" functions that takes a rancher client, and the rke1 cluster config as parameters. This function
 // registers a delete cluster fuction with a wait.WatchWait to ensure the cluster is removed cleanly.
-func CreateRKE2Cluster(client *rancher.Client, rke2Cluster *apisV1.Cluster) (*apisV1.Cluster, error) {
-	cluster, err := client.Provisioning.Clusters(rke2Cluster.Namespace).Create(context.TODO(), rke2Cluster, metav1.CreateOptions{})
+func CreateRKE1Cluster(client *rancher.Client, rke1Cluster *management.Cluster) (*management.Cluster, error) {
+	opts := metav1.ListOptions{
+		FieldSelector:  "metadata.name=",
+		TimeoutSeconds: &defaults.WatchTimeoutSeconds,
+	}
+
+	cluster, err := client.Management.Cluster.Create(rke1Cluster)
 	if err != nil {
 		return nil, err
 	}
 
 	client.Session.RegisterCleanupFunc(func() error {
-		err := client.Provisioning.Clusters(rke2Cluster.Namespace).Delete(context.TODO(), rke2Cluster.GetName(), metav1.DeleteOptions{})
+		err := client.Management.Cluster.Delete(rke1Cluster)
 		if err != nil {
 			return err
 		}
@@ -194,10 +187,7 @@ func CreateRKE2Cluster(client *rancher.Client, rke2Cluster *apisV1.Cluster) (*ap
 			return err
 		}
 
-		watchInterface, err := adminClient.Provisioning.Clusters(rke2Cluster.Namespace).Watch(context.TODO(), metav1.ListOptions{
-			FieldSelector:  "metadata.name=" + rke2Cluster.GetName(),
-			TimeoutSeconds: &defaults.WatchTimeoutSeconds,
-		})
+		watchInterface, err := adminClient.GetManagementWatchInterface(management.ClusterType, opts)
 
 		if err != nil {
 			return err
@@ -207,6 +197,61 @@ func CreateRKE2Cluster(client *rancher.Client, rke2Cluster *apisV1.Cluster) (*ap
 			if event.Type == watch.Error {
 				return false, fmt.Errorf("there was an error deleting cluster")
 			} else if event.Type == watch.Deleted {
+				return true, nil
+			}
+			return false, nil
+		})
+	})
+
+	return cluster, nil
+}
+
+// CreateRKE2Cluster is a "helper" functions that takes a rancher client, and the rke2 cluster config as parameters. This function
+// registers a delete cluster fuction with a wait.WatchWait to ensure the cluster is removed cleanly.
+func CreateRKE2Cluster(client *rancher.Client, rke2Cluster *provisioning.Cluster) (*provisioning.Cluster, error) {
+	cluster, err := client.Provisioning.Cluster.Create(rke2Cluster)
+	if err != nil {
+		return nil, err
+	}
+
+	client.Session.RegisterCleanupFunc(func() error {
+		adminClient, err := rancher.NewClient(client.RancherConfig.AdminToken, client.Session)
+		if err != nil {
+			return err
+		}
+
+		provKubeClient, err := adminClient.GetKubeAPIProvisioningClient()
+		if err != nil {
+			return err
+		}
+
+		watchInterface, err := provKubeClient.Clusters(cluster.ObjectMeta.Namespace).Watch(context.TODO(), metav1.ListOptions{
+			FieldSelector:  "metadata.name=" + cluster.ObjectMeta.Name,
+			TimeoutSeconds: &defaults.WatchTimeoutSeconds,
+		})
+
+		if err != nil {
+			return err
+		}
+
+		client, err = client.ReLogin()
+		if err != nil {
+			return err
+		}
+
+		err = client.Provisioning.Cluster.Delete(cluster)
+		if err != nil {
+			fmt.Println("in cluster cleanup in create")
+			return err
+		}
+
+		return wait.WatchWait(watchInterface, func(event watch.Event) (ready bool, err error) {
+			cluster := event.Object.(*apisV1.Cluster)
+			if event.Type == watch.Error {
+				return false, fmt.Errorf("there was an error deleting cluster")
+			} else if event.Type == watch.Deleted {
+				return true, nil
+			} else if cluster == nil {
 				return true, nil
 			}
 			return false, nil

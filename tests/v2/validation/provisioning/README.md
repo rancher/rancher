@@ -6,13 +6,44 @@ These are the examples of the configurations needed to run the provisioning pack
 ---
 
 ### Provisioning Input
-provisioningInput is needed to the run the RKE1 tests, specifically kubernetesVersion, cni, and providers. nodeProviders is only needed for custom cluster test; the framework only supports custom clusters through aws/ec2 instances.
+<<<<<<< HEAD
+provisioningInput is needed to the run the RKE1 tests, specifically kubernetesVersion, cni, and providers. nodesAndRoles is only needed for the TestProvisioningDynamicInput test, node pools are divided by "{nodepool},". nodeProviders is only needed for node provider cluster tests.
+=======
+provisioningInput is needed to the run the RKE2 tests, specifically kubernetesVersion, cni, and providers. nodesAndRoles is only needed for the TestProvisioningDynamicInput test, node pools are divided by "{nodepool},". nodeProviders is only needed for node provider cluster tests; the framework only supports custom clusters through aws/ec2 instances.
+>>>>>>> 629c762dc (Moved the the Kube API provisiong package outside of rancher, but kept it in the clients package. This way integration tests can use the provisioning Kube API provisioning client if needed.)
 
 ```json
 "provisioningInput": {
+    "nodesAndRoles": [
+<<<<<<< HEAD
+      {
+        "etcd": true,
+        "controlplane": true,
+        "worker": true,
+        "quantity": 1,
+      },
+      {
+        "worker": true,
+        "quantity": 2,
+      }
+    ],
+    "kubernetesVersion": ["v1.24.2-rancher1-1"],
+=======
+       {
+         "etcd": true,
+         "controlplane": true,
+         "worker": true,
+         "quantity": 1,
+       },
+       {
+         "worker": true,
+         "quantity": 2,
+       }
+     ],
     "kubernetesVersion": ["v1.21.6+rke2r1"],
+>>>>>>> 629c762dc (Moved the the Kube API provisiong package outside of rancher, but kept it in the clients package. This way integration tests can use the provisioning Kube API provisioning client if needed.)
     "cni": ["calico"],
-    "providers": ["linode", "aws", "do", "harvester"],
+    "providers": ["linode", "aws", "azure", "harvester"],
     "nodeProviders": ["ec2"]
   }
 ```

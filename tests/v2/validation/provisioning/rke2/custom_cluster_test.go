@@ -63,6 +63,8 @@ func (c *CustomClusterProvisioningTestSuite) SetupSuite() {
 	newUser, err := users.CreateUserWithRole(client, user, "user")
 	require.NoError(c.T(), err)
 
+	newUser.Password = user.Password
+
 	standardUserClient, err := client.AsUser(newUser)
 	require.NoError(c.T(), err)
 
@@ -114,7 +116,10 @@ func (c *CustomClusterProvisioningTestSuite) ProvisioningRKE2CustomCluster(exter
 					clusterResp, err := clusters.CreateRKE2Cluster(client, cluster)
 					require.NoError(c.T(), err)
 
-					customCluster, err := client.Provisioning.Clusters(namespace).Get(context.TODO(), clusterResp.Name, metav1.GetOptions{})
+					client, err = client.ReLogin()
+					require.NoError(c.T(), err)
+
+					customCluster, err := client.Provisioning.Cluster.ByID(clusterResp.ID)
 					require.NoError(c.T(), err)
 
 					token, err := tokenregistration.GetRegistrationToken(client, customCluster.Status.ClusterName)
@@ -128,7 +133,10 @@ func (c *CustomClusterProvisioningTestSuite) ProvisioningRKE2CustomCluster(exter
 						require.NoError(c.T(), err)
 					}
 
-					result, err := client.Provisioning.Clusters(namespace).Watch(context.TODO(), metav1.ListOptions{
+					kubeProvisioningClient, err := c.client.GetKubeAPIProvisioningClient()
+					require.NoError(c.T(), err)
+
+					result, err := kubeProvisioningClient.Clusters(namespace).Watch(context.TODO(), metav1.ListOptions{
 						FieldSelector:  "metadata.name=" + clusterName,
 						TimeoutSeconds: &defaults.WatchTimeoutSeconds,
 					})
@@ -138,7 +146,7 @@ func (c *CustomClusterProvisioningTestSuite) ProvisioningRKE2CustomCluster(exter
 
 					err = wait.WatchWait(result, checkFunc)
 					assert.NoError(c.T(), err)
-					assert.Equal(c.T(), clusterName, clusterResp.Name)
+					assert.Equal(c.T(), clusterName, clusterResp.ObjectMeta.Name)
 				})
 			}
 		}
@@ -195,7 +203,10 @@ func (c *CustomClusterProvisioningTestSuite) ProvisioningRKE2CustomClusterDynami
 					clusterResp, err := clusters.CreateRKE2Cluster(client, cluster)
 					require.NoError(c.T(), err)
 
-					customCluster, err := client.Provisioning.Clusters(namespace).Get(context.TODO(), clusterResp.Name, metav1.GetOptions{})
+					client, err = client.ReLogin()
+					require.NoError(c.T(), err)
+
+					customCluster, err := client.Provisioning.Cluster.ByID(clusterResp.ID)
 					require.NoError(c.T(), err)
 
 					token, err := tokenregistration.GetRegistrationToken(client, customCluster.Status.ClusterName)
@@ -209,7 +220,10 @@ func (c *CustomClusterProvisioningTestSuite) ProvisioningRKE2CustomClusterDynami
 						require.NoError(c.T(), err)
 					}
 
-					result, err := client.Provisioning.Clusters(namespace).Watch(context.TODO(), metav1.ListOptions{
+					kubeProvisioningClient, err := c.client.GetKubeAPIProvisioningClient()
+					require.NoError(c.T(), err)
+
+					result, err := kubeProvisioningClient.Clusters(namespace).Watch(context.TODO(), metav1.ListOptions{
 						FieldSelector:  "metadata.name=" + clusterName,
 						TimeoutSeconds: &defaults.WatchTimeoutSeconds,
 					})
@@ -219,7 +233,7 @@ func (c *CustomClusterProvisioningTestSuite) ProvisioningRKE2CustomClusterDynami
 
 					err = wait.WatchWait(result, checkFunc)
 					assert.NoError(c.T(), err)
-					assert.Equal(c.T(), clusterName, clusterResp.Name)
+					assert.Equal(c.T(), clusterName, clusterResp.ObjectMeta.Name)
 				})
 			}
 		}

@@ -59,7 +59,7 @@ func (r *RKE2NodeDriverProvisioningTestSuite) SetupSuite() {
 		Enabled:  &enabled,
 	}
 
-	newUser, err := users.CreateUserWithRole(client, user, "clusters-create", "user")
+	newUser, err := users.CreateUserWithRole(client, user, "user")
 	require.NoError(r.T(), err)
 
 	newUser.Password = user.Password
@@ -148,7 +148,10 @@ func (r *RKE2NodeDriverProvisioningTestSuite) ProvisioningRKE2Cluster(provider P
 					clusterResp, err := clusters.CreateRKE2Cluster(testSessionClient, cluster)
 					require.NoError(r.T(), err)
 
-					result, err := r.client.Provisioning.Clusters(namespace).Watch(context.TODO(), metav1.ListOptions{
+					kubeProvisioningClient, err := r.client.GetKubeAPIProvisioningClient()
+					require.NoError(r.T(), err)
+
+					result, err := kubeProvisioningClient.Clusters(namespace).Watch(context.TODO(), metav1.ListOptions{
 						FieldSelector:  "metadata.name=" + clusterName,
 						TimeoutSeconds: &defaults.WatchTimeoutSeconds,
 					})
@@ -158,7 +161,7 @@ func (r *RKE2NodeDriverProvisioningTestSuite) ProvisioningRKE2Cluster(provider P
 
 					err = wait.WatchWait(result, checkFunc)
 					assert.NoError(r.T(), err)
-					assert.Equal(r.T(), clusterName, clusterResp.Name)
+					assert.Equal(r.T(), clusterName, clusterResp.ObjectMeta.Name)
 				})
 			}
 		}
@@ -211,7 +214,10 @@ func (r *RKE2NodeDriverProvisioningTestSuite) ProvisioningRKE2ClusterDynamicInpu
 					clusterResp, err := clusters.CreateRKE2Cluster(testSessionClient, cluster)
 					require.NoError(r.T(), err)
 
-					result, err := r.client.Provisioning.Clusters(namespace).Watch(context.TODO(), metav1.ListOptions{
+					kubeProvisioningClient, err := r.client.GetKubeAPIProvisioningClient()
+					require.NoError(r.T(), err)
+
+					result, err := kubeProvisioningClient.Clusters(namespace).Watch(context.TODO(), metav1.ListOptions{
 						FieldSelector:  "metadata.name=" + clusterName,
 						TimeoutSeconds: &defaults.WatchTimeoutSeconds,
 					})
@@ -221,7 +227,7 @@ func (r *RKE2NodeDriverProvisioningTestSuite) ProvisioningRKE2ClusterDynamicInpu
 
 					err = wait.WatchWait(result, checkFunc)
 					assert.NoError(r.T(), err)
-					assert.Equal(r.T(), clusterName, clusterResp.Name)
+					assert.Equal(r.T(), clusterName, clusterResp.ObjectMeta.Name)
 				})
 			}
 		}

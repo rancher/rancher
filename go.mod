@@ -105,14 +105,14 @@ require (
 	github.com/rancher/aks-operator v1.0.6
 	github.com/rancher/apiserver v0.0.0-20220610164457-643f1d19e3fc
 	github.com/rancher/channelserver v0.5.1-0.20220405170618-28c9b37deff1
-	github.com/rancher/dynamiclistener v0.3.3
+	github.com/rancher/dynamiclistener v0.3.4
 	github.com/rancher/eks-operator v1.1.4-rc4
 	github.com/rancher/fleet/pkg/apis v0.0.0-20220722201012-fe5f76e3c1e0
 	github.com/rancher/gke-operator v1.1.4-rc2
 	github.com/rancher/kubernetes-provider-detector v0.1.5
 	github.com/rancher/lasso v0.0.0-20220627205005-00d9c8e9dda6
 	github.com/rancher/lasso/controller-runtime v0.0.0-20220627205005-00d9c8e9dda6
-	github.com/rancher/machine v0.15.0-rancher92
+	github.com/rancher/machine v0.15.0-rancher93
 	github.com/rancher/norman v0.0.0-20220627222520-b74009fac3ff
 	github.com/rancher/rancher/pkg/apis v0.0.0
 	github.com/rancher/rancher/pkg/client v0.0.0
