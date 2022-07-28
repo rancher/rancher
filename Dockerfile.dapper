@@ -16,7 +16,7 @@ ENV KUSTOMIZE_VERSION v4.4.1
 # kontainer-driver-metadata branch to be set for specific branch other than dev/master, logic at rancher/rancher/pkg/settings/setting.go
 ENV CATTLE_KDM_BRANCH=dev-v2.6
 
-RUN zypper -n install -y \
+RUN zypper -n install -y --replacefiles \
     gcc \
     binutils \
     glibc-devel-static \
