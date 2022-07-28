@@ -12,8 +12,6 @@ import (
 	util "github.com/rancher/rancher/pkg/cluster"
 	"github.com/rancher/rancher/pkg/dialer"
 	"github.com/rancher/rancher/pkg/features"
-	v1 "github.com/rancher/rancher/pkg/generated/norman/batch/v1"
-	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/kubectl"
 	"github.com/rancher/rancher/pkg/namespace"
 	nodehelper "github.com/rancher/rancher/pkg/node"
@@ -22,8 +20,8 @@ import (
 	"github.com/rancher/rancher/pkg/types/config"
 	rketypes "github.com/rancher/rke/types"
 	"github.com/sirupsen/logrus"
-	batchV1 "k8s.io/api/batch/v1"
-	coreV1 "k8s.io/api/core/v1"
+	batchv1 "k8s.io/api/batch/v1"
+	corev1 "k8s.io/api/core/v1"
 	kerror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -32,7 +30,7 @@ import (
 
 const cleanupPodLabel = "rke.cattle.io/cleanup-node"
 
-func (m *Lifecycle) deleteV1Node(node *v3.Node) (runtime.Object, error) {
+func (m *Lifecycle) deleteV1Node(node *v32.Node) (runtime.Object, error) {
 	logrus.Debugf("Deleting v1.node for [%v] node", node.Status.NodeName)
 	if nodehelper.IgnoreNode(node.Status.NodeName, node.Status.NodeLabels) {
 		logrus.Debugf("Skipping v1.node removal for [%v] node", node.Status.NodeName)
@@ -73,7 +71,7 @@ func (m *Lifecycle) deleteV1Node(node *v3.Node) (runtime.Object, error) {
 	return node, nil
 }
 
-func (m *Lifecycle) drainNode(node *v3.Node) error {
+func (m *Lifecycle) drainNode(node *v32.Node) error {
 	nodeCopy := node.DeepCopy() // copy for cache protection as we do no updating but need things set for the drain
 	cluster, err := m.clusterLister.Get("", nodeCopy.Namespace)
 	if err != nil {
@@ -138,7 +136,7 @@ func (m *Lifecycle) drainNode(node *v3.Node) error {
 	})
 }
 
-func (m *Lifecycle) cleanRKENode(node *v3.Node) error {
+func (m *Lifecycle) cleanRKENode(node *v32.Node) error {
 	if !features.RKE1CustomNodeCleanup.Enabled() {
 		return nil
 	}
@@ -176,7 +174,7 @@ func (m *Lifecycle) cleanRKENode(node *v3.Node) error {
 	return m.waitUntilJobDeletes(userContext, node.Name, job)
 }
 
-func (m *Lifecycle) waitForJobCondition(userContext *config.UserContext, job *v1.Job, condition func(*v1.Job, error) bool, logMessage string) error {
+func (m *Lifecycle) waitForJobCondition(userContext *config.UserContext, job *batchv1.Job, condition func(*batchv1.Job, error) bool, logMessage string) error {
 	if job == nil {
 		return nil
 	}
@@ -213,17 +211,17 @@ func (m *Lifecycle) waitForJobCondition(userContext *config.UserContext, job *v1
 	})
 }
 
-func (m *Lifecycle) waitUntilJobCompletes(userContext *config.UserContext, job *v1.Job) error {
+func (m *Lifecycle) waitUntilJobCompletes(userContext *config.UserContext, job *batchv1.Job) error {
 	return m.waitForJobCondition(
 		userContext,
 		job,
-		func(j *v1.Job, err error) bool { return err == nil && j.Status.Succeeded > 0 },
+		func(j *batchv1.Job, err error) bool { return err == nil && j.Status.Succeeded > 0 },
 		"complete",
 	)
 }
 
-func (m *Lifecycle) waitUntilJobDeletes(userContext *config.UserContext, nodeName string, job *v1.Job) error {
-	return m.waitForJobCondition(userContext, job, func(j *v1.Job, err error) bool {
+func (m *Lifecycle) waitUntilJobDeletes(userContext *config.UserContext, nodeName string, job *batchv1.Job) error {
+	return m.waitForJobCondition(userContext, job, func(j *batchv1.Job, err error) bool {
 		if err == nil {
 			if j.DeletionTimestamp.IsZero() {
 				err = userContext.BatchV1.Jobs(j.Namespace).Delete(j.Name, &metav1.DeleteOptions{PropagationPolicy: &[]metav1.DeletionPropagation{metav1.DeletePropagationForeground}[0]})
@@ -242,7 +240,7 @@ func (m *Lifecycle) waitUntilJobDeletes(userContext *config.UserContext, nodeNam
 		"delete")
 }
 
-func (m *Lifecycle) createCleanupJob(userContext *config.UserContext, cluster *v3.Cluster, node *v3.Node) (*batchV1.Job, error) {
+func (m *Lifecycle) createCleanupJob(userContext *config.UserContext, cluster *v32.Cluster, node *v32.Node) (*batchv1.Job, error) {
 	nodeLabel := "cattle.io/node"
 
 	// find if someone else already kicked this job off
@@ -281,52 +279,52 @@ func (m *Lifecycle) createCleanupJob(userContext *config.UserContext, cluster *v
 		},
 	}
 
-	var tolerations []coreV1.Toleration
+	var tolerations []corev1.Toleration
 
 	for _, taint := range node.Spec.InternalNodeSpec.Taints {
-		tolerations = append(tolerations, coreV1.Toleration{
+		tolerations = append(tolerations, corev1.Toleration{
 			Effect:   taint.Effect,
 			Key:      taint.Key,
 			Operator: "Exists",
 		})
 	}
 
-	var mounts []coreV1.VolumeMount
-	var volumes []coreV1.Volume
+	var mounts []corev1.VolumeMount
+	var volumes []corev1.Volume
 
 	if os, ok := node.Status.NodeLabels["kubernetes.io/os"]; ok && os == "windows" {
-		t := coreV1.HostPathType("")
-		volumes = append(volumes, coreV1.Volume{
+		t := corev1.HostPathType("")
+		volumes = append(volumes, corev1.Volume{
 			Name: "docker",
-			VolumeSource: coreV1.VolumeSource{
-				HostPath: &coreV1.HostPathVolumeSource{
+			VolumeSource: corev1.VolumeSource{
+				HostPath: &corev1.HostPathVolumeSource{
 					Path: "\\\\.\\pipe\\docker_engine",
 					Type: &t,
 				},
 			},
 		})
-		mounts = append(mounts, coreV1.VolumeMount{
+		mounts = append(mounts, corev1.VolumeMount{
 			MountPath: "\\\\.\\pipe\\docker_engine",
 			Name:      "docker",
 		})
 	} else {
-		socket := coreV1.HostPathType("Socket")
-		volumes = append(volumes, coreV1.Volume{
+		socket := corev1.HostPathType("Socket")
+		volumes = append(volumes, corev1.Volume{
 			Name: "docker",
-			VolumeSource: coreV1.VolumeSource{
-				HostPath: &coreV1.HostPathVolumeSource{
+			VolumeSource: corev1.VolumeSource{
+				HostPath: &corev1.HostPathVolumeSource{
 					Path: "/var/run/docker.sock",
 					Type: &socket,
 				},
 			},
 		})
-		mounts = append(mounts, coreV1.VolumeMount{
+		mounts = append(mounts, corev1.VolumeMount{
 			MountPath: "/var/run/docker.sock",
 			Name:      "docker",
 		})
 	}
 
-	env := []coreV1.EnvVar{
+	env := []corev1.EnvVar{
 		{
 			Name:  "AGENT_IMAGE",
 			Value: settings.AgentImage.Get(),
@@ -335,18 +333,18 @@ func (m *Lifecycle) createCleanupJob(userContext *config.UserContext, cluster *v
 
 	if cluster.Spec.RancherKubernetesEngineConfig != nil {
 		env = append(env,
-			coreV1.EnvVar{
+			corev1.EnvVar{
 				Name:  "PREFIX_PATH",
 				Value: cluster.Spec.RancherKubernetesEngineConfig.PrefixPath,
 			},
-			coreV1.EnvVar{
+			corev1.EnvVar{
 				Name:  "WINDOWS_PREFIX_PATH",
 				Value: cluster.Spec.RancherKubernetesEngineConfig.WindowsPrefixPath,
 			},
 		)
 	}
 
-	var imagePullSecrets []coreV1.LocalObjectReference
+	var imagePullSecrets []corev1.LocalObjectReference
 	if cluster.GetSecret("PrivateRegistrySecret") != "" {
 		privateRegistries, err := m.credLister.Get(namespace.GlobalNamespace, cluster.GetSecret("PrivateRegistrySecret"))
 		if err != nil {
@@ -354,22 +352,22 @@ func (m *Lifecycle) createCleanupJob(userContext *config.UserContext, cluster *v
 		} else if url, err := util.GeneratePrivateRegistryDockerConfig(util.GetPrivateRepo(cluster), privateRegistries); err != nil {
 			return nil, err
 		} else if url != "" {
-			imagePullSecrets = append(imagePullSecrets, coreV1.LocalObjectReference{Name: "cattle-private-registry"})
+			imagePullSecrets = append(imagePullSecrets, corev1.LocalObjectReference{Name: "cattle-private-registry"})
 		}
 	}
 
 	fiveMin := int32(5 * 60)
-	job := batchV1.Job{
+	job := batchv1.Job{
 		ObjectMeta: meta,
-		Spec: batchV1.JobSpec{
+		Spec: batchv1.JobSpec{
 			TTLSecondsAfterFinished: &fiveMin,
-			Template: coreV1.PodTemplateSpec{
+			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
 						cleanupPodLabel: node.Name,
 					},
 				},
-				Spec: coreV1.PodSpec{
+				Spec: corev1.PodSpec{
 					ImagePullSecrets: imagePullSecrets,
 					RestartPolicy:    "Never",
 					NodeSelector: map[string]string{
@@ -377,14 +375,14 @@ func (m *Lifecycle) createCleanupJob(userContext *config.UserContext, cluster *v
 					},
 					Tolerations: tolerations,
 					Volumes:     volumes,
-					Containers: []coreV1.Container{
+					Containers: []corev1.Container{
 						{
 							Name:            clean.NodeCleanupContainerName,
 							Image:           systemtemplate.GetDesiredAgentImage(cluster),
 							Args:            []string{"--", "agent", "clean", "job"},
 							Env:             env,
 							VolumeMounts:    mounts,
-							ImagePullPolicy: coreV1.PullIfNotPresent,
+							ImagePullPolicy: corev1.PullIfNotPresent,
 						},
 					},
 				},
@@ -393,34 +391,6 @@ func (m *Lifecycle) createCleanupJob(userContext *config.UserContext, cluster *v
 	}
 
 	return userContext.K8sClient.BatchV1().Jobs("default").Create(context.TODO(), &job, metav1.CreateOptions{})
-}
-
-func createCleanupServiceAccount(userContext *config.UserContext) (*coreV1.ServiceAccount, error) {
-	meta := metav1.ObjectMeta{
-		GenerateName: "cattle-cleanup-node-",
-		Namespace:    "default",
-	}
-	serviceAccount := coreV1.ServiceAccount{
-		ObjectMeta: meta,
-	}
-	return userContext.K8sClient.CoreV1().ServiceAccounts("default").Create(context.TODO(), &serviceAccount, metav1.CreateOptions{})
-}
-
-func (m *Lifecycle) userNodeRemoveCleanup(obj *v3.Node) (runtime.Object, error) {
-	newObj := obj.DeepCopy()
-	newObj.SetFinalizers(removeFinalizerWithPrefix(newObj.GetFinalizers(), userNodeRemoveFinalizerPrefix))
-
-	annos := newObj.GetAnnotations()
-	if annos == nil {
-		annos = make(map[string]string)
-	} else {
-		annos = removeAnnotationWithPrefix(annos, userNodeRemoveAnnotationPrefix)
-		delete(annos, userNodeRemoveCleanupAnnotationOld)
-	}
-
-	annos[userNodeRemoveCleanupAnnotation] = "true"
-	newObj.SetAnnotations(annos)
-	return m.nodeClient.Update(newObj)
 }
 
 func removeFinalizerWithPrefix(finalizers []string, prefix string) []string {
