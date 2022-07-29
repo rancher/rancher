@@ -35,6 +35,7 @@ const (
 
 	rolesCircularSoftLimit = 100
 	rolesCircularHardLimit = 500
+	clusterNameLabel       = "cluster.cattle.io/name"
 )
 
 var commonClusterAndProjectMgmtPlaneResources = map[string]bool{
@@ -159,7 +160,8 @@ func (m *manager) ensureClusterMembershipBinding(roleName, rtbNsAndName string, 
 		crbName := pkgrbac.NameForClusterRoleBinding(roleRef, subject) // use deterministic name for crb
 		_, err = m.mgmt.RBAC.ClusterRoleBindings("").Create(&v1.ClusterRoleBinding{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: crbName,
+				Name:        crbName,
+				Annotations: map[string]string{clusterNameLabel: cluster.Name},
 				Labels: map[string]string{
 					rtbNsAndName: MembershipBindingOwner,
 				},
@@ -336,6 +338,7 @@ func (m *manager) createMembershipRole(resourceType, roleName string, makeOwner 
 		},
 	}
 	if clusterRole {
+		objectMeta.Annotations = map[string]string{clusterNameLabel: metaObj.GetName()}
 		toCreate = &v1.ClusterRole{
 			ObjectMeta: objectMeta,
 			Rules:      rules,
