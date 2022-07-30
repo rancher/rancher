@@ -1,3 +1,5 @@
+import sys
+from base64 import b64decode
 from python_terraform import * # NOQA
 from pkg_resources import packaging
 
@@ -68,25 +70,33 @@ def test_remove_rancher_ha():
 def test_install_rancher_ha(precheck_certificate_options):
     cm_install = True
     extra_settings = []
-    if "byo-" in RANCHER_HA_CERT_OPTION:
+    if "byo-" or "external" in RANCHER_HA_CERT_OPTION:
         cm_install = False
     print("The hostname is: {}".format(RANCHER_HA_HOSTNAME))
 
     # prepare an RKE cluster and other resources
     # if no kubeconfig file is provided
+    profile = ''
     if RANCHER_HA_KUBECONFIG is None:
         if RANCHER_LOCAL_CLUSTER_TYPE == "RKE":
-            print("RKE cluster is provisioning for the local cluster")
-            nodes = create_resources()
-            if RANCHER_HA_HARDENED:
-                profile = 'rke-cis-1.5'
-                node_role = [["worker", "controlplane", "etcd"]]
-                node_roles =[]
-                for role in node_role:
-                    node_roles.extend([role, role, role])
-                prepare_hardened_nodes(nodes, profile, node_roles)
-            config_path = create_rke_cluster_config(nodes)
-            create_rke_cluster(config_path)
+            if 'external' not in RANCHER_HA_CERT_OPTION:
+                print("RKE cluster is provisioning for the local cluster")
+                nodes = create_resources()
+                if RANCHER_HA_HARDENED:
+                    profile = 'rke-cis-1.5'
+                    node_role = [["worker", "controlplane", "etcd"]]
+                    node_roles = []
+                    for role in node_role:
+                        node_roles.extend([role, role, role])
+                    prepare_hardened_nodes(nodes, profile, node_roles)
+                config_path = create_rke_cluster_config(nodes)
+                create_rke_cluster(config_path)
+            else:
+                print("Rancher HA with External TLS Termination")
+                print("RKE cluster is provisioning for the local cluster")
+                nodes = create_resources_for_external_tls()
+                config_path = create_rke_cluster_config(nodes)
+                create_rke_cluster(config_path)
         elif RANCHER_LOCAL_CLUSTER_TYPE == "K3S":
             print("K3S cluster is provisioning for the local cluster")
             k3s_kubeconfig_path = \
@@ -244,6 +254,55 @@ def create_resources():
     return aws_nodes
 
 
+def create_resources_for_external_tls():
+    nginx_node = AmazonWebServices(). \
+        create_node(resource_prefix + "-nginx", wait_for_ready=True)
+
+    AmazonWebServices().upsert_route_53_record_cname(RANCHER_HA_HOSTNAME,
+                                                     record_type='A',
+                                                     record_value=nginx_node.get_public_ip(),
+                                                     record_ttl=30)
+
+    AmazonWebServices().set_node_tag(nginx_node, 'node_type', 'nginx-nlb')
+
+    aws_nodes = AmazonWebServices(). \
+        create_multiple_nodes(3, resource_prefix + "-server", wait_for_ready=True)
+    assert len(aws_nodes) == 3
+
+    cluster_nodes_ips = []
+    for node in aws_nodes:
+        cluster_nodes_ips.append(node.get_public_ip())
+
+    prepare_nginx_load_balancer(nginx_node, cluster_nodes_ips)
+
+    return aws_nodes
+
+
+def prepare_nginx_load_balancer(node, cluster_ips):
+    node.execute_command("mkdir ~/certs && mkdir ~/nginx")
+    nginx_template = None
+    print('NGINX TEMPLATE')
+    print(DATA_SUBDIR + '/external_tls/nginx.conf.template')
+    with open(DATA_SUBDIR + '/external_tls/nginx.conf.template', 'r') as f:
+        nginx_template = f.read()
+    for i, cip in enumerate(cluster_ips, 1):
+        nginx_template = nginx_template.replace('<host{0}>'.format(i), cip)
+    modified_nginx = nginx_template.replace('<FQDN>', RANCHER_HA_HOSTNAME)
+    print('MODIFIED NGINX')
+    print(modified_nginx)
+    node.execute_command('echo \"{}\" >> ~/certs/fullchain.pem'
+                         .format(b64decode(RANCHER_VALID_TLS_CERT).decode("utf-8")))
+    node.execute_command('echo \"{}\" >> ~/certs/privkey.pem'
+                         .format(b64decode(RANCHER_VALID_TLS_KEY).decode("utf-8")))
+    node.execute_command('echo \"{}\" >> ~/nginx/nginx.conf'
+                         .format(modified_nginx))
+    nginx_docker_cmd = 'sudo docker run --name docker-nginx -p 80:80 -p 443:443 ' \
+                       '-v $(pwd)/certs/:/certs/ ' \
+                       '-v $(pwd)/nginx/nginx.conf:/etc/nginx/nginx.conf ' \
+                       '-d nginx'
+    node.execute_command(nginx_docker_cmd)
+
+
 def install_cert_manager():
     manifests = "https://github.com/jetstack/cert-manager/releases/download/" \
                 "{0}/cert-manager.crds.yaml".format(CERT_MANAGER_VERSION)
@@ -336,6 +395,10 @@ def install_rancher(type=RANCHER_HA_CERT_OPTION, repo=RANCHER_HELM_REPO,
         helm_rancher_cmd = \
             helm_rancher_cmd + \
             " --set ingress.tls.source=secret"
+    elif type == 'external-tls':
+        helm_rancher_cmd = \
+            helm_rancher_cmd + \
+            " --set tls=external"
 
     if RANCHER_IMAGE_TAG != "" and RANCHER_IMAGE_TAG is not None:
         helm_rancher_cmd = \
@@ -465,7 +528,12 @@ def create_rke_cluster_config(aws_nodes):
 
     rkeconfig = rkeconfig.replace("$AWS_SSH_KEY_NAME", AWS_SSH_KEY_NAME)
     rkeconfig = rkeconfig.replace("$KUBERNETES_VERSION", KUBERNETES_VERSION)
-    
+    if 'external' in RANCHER_HA_CERT_OPTION:
+        external_tls_rke_options = '\ningress:\n  ' \
+                                   'provider: nginx\n  options:\n    ' \
+                                   'use-forwarded-headers: "true"'
+        rkeconfig = rkeconfig + external_tls_rke_options
+
     if RANCHER_HA_HARDENED:
         rkeconfig_hardened = readDataFile(DATA_SUBDIR, "hardened-cluster.yml")
         rkeconfig += "\n"

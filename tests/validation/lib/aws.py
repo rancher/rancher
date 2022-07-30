@@ -520,16 +520,7 @@ class AmazonWebServices(CloudProviderBase):
         )
 
     def delete_route_53_record(self, record_name):
-        record = None
-        try:
-            res = self._route53_client.list_resource_record_sets(
-                HostedZoneId=AWS_HOSTED_ZONE_ID,
-                StartRecordName=record_name,
-                MaxItems='1')
-            if len(res["ResourceRecordSets"]) > 0:
-                record = res["ResourceRecordSets"][0]
-        except ClientError as e:
-            print(e.response)
+        record = self.get_route_53_record(record_name)
 
         if record is not None and record["Name"] == record_name:
             self._route53_client.change_resource_record_sets(
@@ -541,6 +532,17 @@ class AmazonWebServices(CloudProviderBase):
                         'ResourceRecordSet': record}]
                 }
             )
+
+    def get_route_53_record(self, record_name):
+        try:
+            res = self._route53_client.list_resource_record_sets(
+                HostedZoneId=AWS_HOSTED_ZONE_ID,
+                StartRecordName=record_name,
+                MaxItems='1')
+            if len(res["ResourceRecordSets"]) > 0:
+                return res["ResourceRecordSets"][0]
+        except ClientError as e:
+            print(e.response)
 
     def decrypt_windows_password(self, instance_id):
         password = ""
@@ -690,6 +692,21 @@ class AmazonWebServices(CloudProviderBase):
                 }
             ]
         )
+
+    def set_node_tag(self, node, key, value):
+        node = self._ec2_resource.Instance(node.provider_node_id)
+        node.create_tags(
+            Tags=[
+                {
+                    'Key': key,
+                    'Value': value
+                }
+            ]
+        )
+
+    def get_node_tags(self, node):
+        instance = self._ec2_resource.Instance(node.provider_node_id)
+        return instance.tags
 
     def wait_for_eks_cluster_state(self, name, target_state, timeout=1200):
         start = time.time()

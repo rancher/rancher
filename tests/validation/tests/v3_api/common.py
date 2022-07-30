@@ -2705,6 +2705,12 @@ def delete_resource_in_AWS_by_prefix(resource_prefix):
         'Values': [resource_prefix + "-*"]
     }]
     nodes = AmazonWebServices().get_nodes(filters=node_filter)
+
+    tag = None
+    for node in nodes:
+        tags = AmazonWebServices().get_node_tags(node)
+        tag = [tag for tag in tags if tag['Value'] == 'nginx-nlb']
+
     if nodes is None:
         print("deleting the following instances: None")
     else:
@@ -2712,30 +2718,33 @@ def delete_resource_in_AWS_by_prefix(resource_prefix):
               .format([node.public_ip_address for node in nodes]))
         AmazonWebServices().delete_nodes(nodes)
 
-    # delete load balancer and target groups
-    tg_list = []
-    lb_list = []
-    lb_names = [resource_prefix + '-nlb',
-                resource_prefix + '-k3s-nlb',
-                resource_prefix + '-internal-nlb']
-    for name in lb_names:
-        lb_arn = AmazonWebServices().get_lb(name)
-        if lb_arn is not None:
-            lb_list.append(lb_arn)
-            res = AmazonWebServices().get_target_groups(lb_arn)
-            tg_list.extend(res)
+    # If we don't find an nginx-nlb tag we're using an AWS NLB
+    if len(tag) < 1:
 
-    print("deleting the following load balancers: {}".format(lb_list))
-    print("deleting the following target groups: {}".format(tg_list))
-    for lb in lb_list:
-        AmazonWebServices().delete_lb(lb)
-    for tg in tg_list:
-        AmazonWebServices().delete_target_group(tg)
+        # delete load balancer and target groups
+        tg_list = []
+        lb_list = []
+        lb_names = [resource_prefix + '-nlb',
+                    resource_prefix + '-k3s-nlb',
+                    resource_prefix + '-internal-nlb']
+        for name in lb_names:
+            lb_arn = AmazonWebServices().get_lb(name)
+            if lb_arn is not None:
+                lb_list.append(lb_arn)
+                res = AmazonWebServices().get_target_groups(lb_arn)
+                tg_list.extend(res)
 
-    # delete rds
-    db_name = resource_prefix + "-db"
-    print("deleting the database (if it exists): {}".format(db_name))
-    AmazonWebServices().delete_db(db_name)
+        print("deleting the following load balancers: {}".format(lb_list))
+        print("deleting the following target groups: {}".format(tg_list))
+        for lb in lb_list:
+            AmazonWebServices().delete_lb(lb)
+        for tg in tg_list:
+            AmazonWebServices().delete_target_group(tg)
+
+        # delete rds
+        db_name = resource_prefix + "-db"
+        print("deleting the database (if it exists): {}".format(db_name))
+        AmazonWebServices().delete_db(db_name)
 
     # delete the route 53 record
     route53_names = [resource_prefix + ".qa.rancher.space.",
