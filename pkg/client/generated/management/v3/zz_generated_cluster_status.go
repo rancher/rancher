@@ -35,6 +35,7 @@ const (
 	ClusterStatusFieldRequested                            = "requested"
 	ClusterStatusFieldS3CredentialSecret                   = "s3CredentialSecret"
 	ClusterStatusFieldScheduledClusterScanStatus           = "scheduledClusterScanStatus"
+	ClusterStatusFieldServiceAccountTokenSecret            = "serviceAccountTokenSecret"
 	ClusterStatusFieldVersion                              = "version"
 	ClusterStatusFieldVirtualCenterSecret                  = "virtualCenterSecret"
 	ClusterStatusFieldVsphereSecret                        = "vsphereSecret"
@@ -75,6 +76,7 @@ type ClusterStatus struct {
 	Requested                            map[string]string           `json:"requested,omitempty" yaml:"requested,omitempty"`
 	S3CredentialSecret                   string                      `json:"s3CredentialSecret,omitempty" yaml:"s3CredentialSecret,omitempty"`
 	ScheduledClusterScanStatus           *ScheduledClusterScanStatus `json:"scheduledClusterScanStatus,omitempty" yaml:"scheduledClusterScanStatus,omitempty"`
+	ServiceAccountTokenSecret            string                      `json:"serviceAccountTokenSecret,omitempty" yaml:"serviceAccountTokenSecret,omitempty"`
 	Version                              *Info                       `json:"version,omitempty" yaml:"version,omitempty"`
 	VirtualCenterSecret                  string                      `json:"virtualCenterSecret,omitempty" yaml:"virtualCenterSecret,omitempty"`
 	VsphereSecret                        string                      `json:"vsphereSecret,omitempty" yaml:"vsphereSecret,omitempty"`
