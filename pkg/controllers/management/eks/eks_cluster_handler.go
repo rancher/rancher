@@ -257,6 +257,7 @@ func (e *eksOperatorController) onClusterChange(key string, cluster *mgmtv3.Clus
 					return nil, err
 				}
 				cluster.Status.ServiceAccountTokenSecret = secret.Name
+				cluster.Status.ServiceAccountToken = ""
 				return e.ClusterClient.Update(cluster)
 			}
 			if err != nil {
@@ -433,6 +434,7 @@ func (e *eksOperatorController) generateAndSetServiceAccount(cluster *mgmtv3.Clu
 		return nil, err
 	}
 	cluster.Status.ServiceAccountTokenSecret = secret.Name
+	cluster.Status.ServiceAccountToken = ""
 	return e.ClusterClient.Update(cluster)
 }
 
