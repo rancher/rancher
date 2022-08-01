@@ -5,6 +5,7 @@ if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
     DIRTY="-dirty"
 fi
 
+PROG=${PROG:-rancher}
 COMMIT=$(git rev-parse --short HEAD)
 COMMIT_DATE=$(git --no-pager log -1 --format='%ct')
 COMMIT_BRANCH=$(git rev-parse --abbrev-ref HEAD | sed -E 's/[^a-zA-Z0-9]+/-/g')

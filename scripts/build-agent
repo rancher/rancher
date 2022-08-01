@@ -7,4 +7,11 @@ cd $(dirname $0)/..
 
 mkdir -p bin
 [ "$(uname)" != "Darwin" ] && LINKFLAGS="-extldflags -static -s"
-CGO_ENABLED=0 go build -tags k8s -ldflags "-X main.VERSION=$VERSION $LINKFLAGS" -o bin/agent ./cmd/agent
+
+BINARY="agent-$PROG"
+
+CGO_ENABLED=0 go build -tags k8s \
+    -ldflags \
+    "-X github.com/rancher/rancher/pkg/version.Program=$BINARY
+     -X main.VERSION=$VERSION $LINKFLAGS" \
+    -o bin/$BINARY ./cmd/agent

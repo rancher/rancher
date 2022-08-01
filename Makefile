@@ -1,7 +1,7 @@
 TARGETS := $(shell ls scripts)
 
 .dapper:
-	@if [[ `uname -s` = "Darwin" && `uname -m` = "arm64" ]]; then\
+	@if [ `uname -s` = "Darwin" && `uname -m` = "arm64" ]; then\
 		echo "Dapper download is not supported on ARM Macs, you need to build it and add it as .dapper in this directory";\
 		exit 0;\
 	else\

@@ -1,10 +1,15 @@
 package version
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 var (
-	Version   = "dev"
-	GitCommit = "HEAD"
+	Program      = "rancher"
+	ProgramUpper = strings.ToUpper(Program)
+	Version      = "dev"
+	GitCommit    = "HEAD"
 )
 
 func FriendlyVersion() string {
