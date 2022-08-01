@@ -502,6 +502,7 @@ func (p *Provisioner) reconcileCluster(cluster *v3.Cluster, create bool) (*v3.Cl
 			return nil, err
 		}
 		cluster.Status.ServiceAccountTokenSecret = secret.Name
+		cluster.Status.ServiceAccountToken = ""
 		apimgmtv3.ClusterConditionServiceAccountMigrated.True(cluster)
 
 		// Update the cluster in k8s
@@ -612,6 +613,7 @@ func (p *Provisioner) reconcileCluster(cluster *v3.Cluster, create bool) (*v3.Cl
 		cluster.Status.AppliedSpec = censoredSpec
 		cluster.Status.APIEndpoint = apiEndpoint
 		cluster.Status.ServiceAccountTokenSecret = secret.Name
+		cluster.Status.ServiceAccountToken = ""
 		cluster.Status.CACert = caCert
 		resetRkeConfigFlags(cluster, updateTriggered)
 
