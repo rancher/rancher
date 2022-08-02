@@ -99,6 +99,7 @@ func (e *aksOperatorController) onClusterChange(key string, cluster *mgmtv3.Clus
 
 	// get aks Cluster Config, if it does not exist, create it
 	aksClusterConfigDynamic, err := e.DynamicClient.Namespace(namespace.GlobalNamespace).Get(context.TODO(), cluster.Name, v1.GetOptions{})
+
 	if err != nil {
 		if !errors.IsNotFound(err) {
 			return cluster, err
@@ -125,6 +126,10 @@ func (e *aksOperatorController) onClusterChange(key string, cluster *mgmtv3.Clus
 		return cluster, err
 	}
 
+	//test
+	//bytes, _ := json.Marshal(aksClusterConfigDynamic)
+	//println(string(bytes))
+
 	// check for changes between aks spec on cluster and the aks spec on the aksClusterConfig object
 	if !reflect.DeepEqual(aksClusterConfigMap, aksClusterConfigDynamic.Object["spec"]) {
 		logrus.Infof("change detected for cluster [%s], updating AKSClusterConfig", cluster.Name)
@@ -135,6 +140,10 @@ func (e *aksOperatorController) onClusterChange(key string, cluster *mgmtv3.Clus
 	status, _ := aksClusterConfigDynamic.Object["status"].(map[string]interface{})
 	phase, _ := status["phase"]
 	failureMessage, _ := status["failureMessage"].(string)
+
+	//test
+	//bytes, _ = json.Marshal(aksClusterConfigDynamic)
+	//println(string(bytes))
 
 	switch phase {
 	case "creating":
@@ -286,6 +295,11 @@ func (e *aksOperatorController) setInitialUpstreamSpec(cluster *mgmtv3.Cluster) 
 
 // updateAKSClusterConfig updates the AKSClusterConfig object's spec with the cluster's AKSConfig if they are not equal..
 func (e *aksOperatorController) updateAKSClusterConfig(cluster *mgmtv3.Cluster, aksClusterConfigDynamic *unstructured.Unstructured, spec map[string]interface{}) (*mgmtv3.Cluster, error) {
+
+	//test
+	//bytes, _ := json.Marshal(aksClusterConfigDynamic)
+	//println(string(bytes))
+
 	list, err := e.DynamicClient.Namespace(namespace.GlobalNamespace).List(context.TODO(), v1.ListOptions{})
 	if err != nil {
 		return cluster, err
@@ -300,6 +314,11 @@ func (e *aksOperatorController) updateAKSClusterConfig(cluster *mgmtv3.Cluster, 
 	if err != nil {
 		return cluster, err
 	}
+
+	//test
+	//bytes, _ = json.Marshal(aksClusterConfigDynamic)
+	//println(string(bytes))
+
 
 	// AKS cluster and node pool statuses are not always immediately updated. This cause the AKSConfig to
 	// stay in "active" for a few seconds, causing the cluster to go back to "active".
@@ -330,7 +349,7 @@ func (e *aksOperatorController) updateAKSClusterConfig(cluster *mgmtv3.Cluster, 
 func (e *aksOperatorController) generateAndSetServiceAccount(cluster *mgmtv3.Cluster) (*mgmtv3.Cluster, error) {
 	restConfig, err := e.getRestConfig(cluster)
 	if err != nil {
-		return cluster, fmt.Errorf("error getting service account token: %v", err)
+		return cluster, fmt.Errorf("error getting kube config: %v", err)
 	}
 
 	clusterDialer, err := e.ClientDialer.ClusterDialer(cluster.Name)
@@ -341,7 +360,7 @@ func (e *aksOperatorController) generateAndSetServiceAccount(cluster *mgmtv3.Clu
 	restConfig.Dial = clusterDialer
 	saToken, err := clusteroperator.GenerateSAToken(restConfig)
 	if err != nil {
-		return cluster, fmt.Errorf("error getting service account token: %v", err)
+		return cluster, fmt.Errorf("error generating service account token: %v", err)
 	}
 
 	cluster = cluster.DeepCopy()

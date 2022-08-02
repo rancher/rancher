@@ -1,0 +1,193 @@
+{
+    "apiVersion": "aks.cattle.io/v1",
+    "kind": "AKSClusterConfig",
+    "metadata": {
+        "creationTimestamp": "2022-08-09T12:48:01Z",
+        "finalizers": [
+            "wrangler.cattle.io/aks-controller-remove"
+        ],
+        "generation": 3,
+        "managedFields": [
+            {
+                "apiVersion": "aks.cattle.io/v1",
+                "fieldsType": "FieldsV1",
+                "fieldsV1": {
+                    "f:metadata": {
+                        "f:finalizers": {
+                            ".": {
+                            },
+                            "v:\"wrangler.cattle.io/aks-controller-remove\"": {
+                            }
+                        }
+                    }
+                },
+                "manager": "aks-operator",
+                "operation": "Update",
+                "time": "2022-08-09T12:48:35Z"
+            },
+            {
+                "apiVersion": "aks.cattle.io/v1",
+                "fieldsType": "FieldsV1",
+                "fieldsV1": {
+                    "f:status": {
+                        ".": {
+                        },
+                        "f:failureMessage": {
+                        },
+                        "f:phase": {
+                        },
+                        "f:rbacEnabled": {
+                        }
+                    }
+                },
+                "manager": "aks-operator",
+                "operation": "Update",
+                "subresource": "status",
+                "time": "2022-08-09T12:48:35Z"
+            },
+            {
+                "apiVersion": "aks.cattle.io/v1",
+                "fieldsType": "FieldsV1",
+                "fieldsV1": {
+                    "f:metadata": {
+                        "f:ownerReferences": {
+                            ".": {
+                            },
+                            "k:{\"uid\":\"31938fdf-abc8-4a45-932a-7ed3cb2c142e\"}": {
+                            }
+                        }
+                    },
+                    "f:spec": {
+                        ".": {
+                        },
+                        "f:authBaseUrl": {
+                        },
+                        "f:authorizedIpRanges": {
+                        },
+                        "f:azureCredentialSecret": {
+                        },
+                        "f:baseUrl": {
+                        },
+                        "f:clusterName": {
+                        },
+                        "f:dnsPrefix": {
+                        },
+                        "f:dnsServiceIp": {
+                        },
+                        "f:dockerBridgeCidr": {
+                        },
+                        "f:httpApplicationRouting": {
+                        },
+                        "f:imported": {
+                        },
+                        "f:kubernetesVersion": {
+                        },
+                        "f:linuxAdminUsername": {
+                        },
+                        "f:loadBalancerSku": {
+                        },
+                        "f:logAnalyticsWorkspaceGroup": {
+                        },
+                        "f:logAnalyticsWorkspaceName": {
+                        },
+                        "f:monitoring": {
+                        },
+                        "f:networkPlugin": {
+                        },
+                        "f:networkPolicy": {
+                        },
+                        "f:nodePools": {
+                        },
+                        "f:podCidr": {
+                        },
+                        "f:privateCluster": {
+                        },
+                        "f:resourceGroup": {
+                        },
+                        "f:resourceLocation": {
+                        },
+                        "f:serviceCidr": {
+                        },
+                        "f:subnet": {
+                        },
+                        "f:tags": {
+                        },
+                        "f:virtualNetwork": {
+                        },
+                        "f:virtualNetworkResourceGroup": {
+                        }
+                    }
+                },
+                "manager": "___go_build_main_go",
+                "operation": "Update",
+                "time": "2022-08-09T13:26:23Z"
+            }
+        ],
+        "name": "c-m2ltq",
+        "namespace": "cattle-global-data",
+        "ownerReferences": [
+            {
+                "apiVersion": "management.cattle.io/v3",
+                "kind": "Cluster",
+                "name": "c-m2ltq",
+                "uid": "31938fdf-abc8-4a45-932a-7ed3cb2c142e"
+            }
+        ],
+        "resourceVersion": "16379",
+        "uid": "e07c6062-0356-407c-b11b-17a42e30442f"
+    },
+    "spec": {
+        "authBaseUrl": null,
+        "authorizedIpRanges": null,
+        "azureCredentialSecret": "cattle-global-data:cc-swhf7",
+        "baseUrl": null,
+        "clusterName": "aks-clusterconfig-test",
+        "dnsPrefix": "aks-dns-88999",
+        "dnsServiceIp": null,
+        "dockerBridgeCidr": null,
+        "httpApplicationRouting": null,
+        "imported": false,
+        "kubernetesVersion": "1.23.8",
+        "linuxAdminUsername": "azureuser",
+        "loadBalancerSku": "Standard",
+        "logAnalyticsWorkspaceGroup": null,
+        "logAnalyticsWorkspaceName": null,
+        "monitoring": null,
+        "networkPlugin": "kubenet",
+        "networkPolicy": null,
+        "nodePools": [
+            {
+                "availabilityZones": [
+                    "1",
+                    "2",
+                    "3"
+                ],
+                "count": 1,
+                "maxPods": 110,
+                "mode": "System",
+                "name": "agentpool",
+                "orchestratorVersion": "1.23.8",
+                "osDiskSizeGB": 128,
+                "osDiskType": "Managed",
+                "osType": "Linux",
+                "vmSize": "Standard_DS2_v2"
+            }
+        ],
+        "podCidr": null,
+        "privateCluster": false,
+        "resourceGroup": "aks-resource-group",
+        "resourceLocation": "eastus",
+        "serviceCidr": null,
+        "subnet": null,
+        "tags": {
+        },
+        "virtualNetwork": null,
+        "virtualNetworkResourceGroup": null
+    },
+    "status": {
+        "failureMessage": "",
+        "phase": "active",
+        "rbacEnabled": true
+    }
+}
+

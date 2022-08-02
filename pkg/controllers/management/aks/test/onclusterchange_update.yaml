@@ -1,0 +1,344 @@
+apiVersion: management.cattle.io/v3
+kind: Cluster
+metadata:
+  annotations:
+    authz.management.cattle.io/creator-role-bindings: '{"created":["cluster-owner"],"required":["cluster-owner"]}'
+    clusters.management.cattle.io/ke-last-refresh: "1659970968"
+    field.cattle.io/creatorId: user-lgw7g
+    lifecycle.cattle.io/create.cluster-agent-controller-cleanup: "true"
+    lifecycle.cattle.io/create.cluster-provisioner-controller: "true"
+    lifecycle.cattle.io/create.cluster-scoped-gc: "true"
+    lifecycle.cattle.io/create.mgmt-cluster-rbac-remove: "true"
+  creationTimestamp: "2022-08-08T14:26:21Z"
+  finalizers:
+  - wrangler.cattle.io/mgmt-cluster-remove
+  - controller.cattle.io/cluster-agent-controller-cleanup
+  - controller.cattle.io/cluster-scoped-gc
+  - controller.cattle.io/cluster-provisioner-controller
+  - controller.cattle.io/mgmt-cluster-rbac-remove
+  generateName: c-
+  generation: 40
+  labels:
+    cattle.io/creator: norman
+    provider.cattle.io: aks
+  name: c-k4mnv
+  resourceVersion: "16503"
+  uid: 75f1abf6-dab3-40d4-a0a5-bf9df4e42271
+spec:
+  agentImageOverride: ""
+  aksConfig:
+    authBaseUrl: null
+    authorizedIpRanges: null
+    azureCredentialSecret: cattle-global-data:cc-26b5h
+    baseUrl: null
+    clusterName: aks-monday
+    dnsPrefix: aks-dns-99922
+    dnsServiceIp: null
+    dockerBridgeCidr: null
+    httpApplicationRouting: null
+    imported: false
+    kubernetesVersion: 1.23.8
+    linuxAdminUsername: azureuser
+    loadBalancerSku: Standard
+    logAnalyticsWorkspaceGroup: null
+    logAnalyticsWorkspaceName: null
+    monitoring: null
+    networkPlugin: kubenet
+    networkPolicy: null
+    nodePools:
+    - availabilityZones:
+      - "1"
+      - "2"
+      - "3"
+      count: 1
+      maxPods: 110
+      mode: System
+      name: agentpool
+      orchestratorVersion: 1.23.8
+      osDiskSizeGB: 128
+      osDiskType: Managed
+      osType: Linux
+      vmSize: Standard_DS2_v2
+    - availabilityZones:
+      - "1"
+      - "2"
+      - "3"
+      count: 1
+      enableAutoScaling: false
+      maxPods: 110
+      mode: User
+      name: agentpool2
+      orchestratorVersion: 1.23.8
+      osDiskSizeGB: 128
+      osDiskType: Managed
+      osType: Linux
+      vmSize: Standard_DS2_v2
+    podCidr: null
+    privateCluster: false
+    resourceGroup: aks-resource-group
+    resourceLocation: eastus
+    serviceCidr: null
+    subnet: null
+    tags:
+      Cost Center: "211699999"
+      Department: EI
+      Environment: Test
+      Finance Business Partner: geoff.guest@suse.com
+      General Ledger Code: "200000119"
+      Group: Container Platform
+      Owner: denise.schannon@suse.com
+      Stakeholder: jeff.hobbs@suse.com
+    virtualNetwork: null
+    virtualNetworkResourceGroup: null
+  answers: {}
+  clusterSecrets: {}
+  description: ""
+  desiredAgentImage: ""
+  desiredAuthImage: ""
+  displayName: aks-monday
+  dockerRootDir: /var/lib/docker
+  enableClusterAlerting: false
+  enableClusterMonitoring: false
+  enableNetworkPolicy: false
+  fleetWorkspaceName: fleet-default
+  internal: false
+  localClusterAuthEndpoint:
+    enabled: false
+  windowsPreferedCluster: false
+status:
+  agentFeatures:
+    embedded-cluster-api: false
+    fleet: false
+    monitoringv1: false
+    multi-cluster-management: false
+    multi-cluster-management-agent: true
+    provisioningv2: false
+    rke2: false
+  agentImage: rancher/rancher-agent:v2.6-head
+  aksStatus:
+    privateRequiresTunnel: null
+    rbacEnabled: true
+    upstreamSpec:
+      authBaseUrl: null
+      authorizedIpRanges: null
+      azureCredentialSecret: cattle-global-data:cc-26b5h
+      baseUrl: null
+      clusterName: aks-monday
+      dnsPrefix: aks-dns-99922
+      dnsServiceIp: 10.0.0.10
+      dockerBridgeCidr: 172.17.0.1/16
+      httpApplicationRouting: false
+      imported: false
+      kubernetesVersion: 1.23.8
+      loadBalancerSku: Standard
+      logAnalyticsWorkspaceGroup: null
+      logAnalyticsWorkspaceName: null
+      monitoring: null
+      networkPlugin: kubenet
+      networkPolicy: ""
+      nodePools:
+      - availabilityZones:
+        - "1"
+        - "2"
+        - "3"
+        count: 1
+        maxPods: 110
+        mode: System
+        name: agentpool
+        orchestratorVersion: 1.23.8
+        osDiskSizeGB: 128
+        osDiskType: Managed
+        osType: Linux
+        vmSize: Standard_DS2_v2
+      podCidr: 10.244.0.0/16
+      privateCluster: false
+      resourceGroup: aks-resource-group
+      resourceLocation: eastus
+      serviceCidr: 10.0.0.0/16
+      subnet: null
+      tags:
+        Cost Center: "211699999"
+        Department: EI
+        Environment: Test
+        Finance Business Partner: geoff.guest@suse.com
+        General Ledger Code: "200000119"
+        Group: Container Platform
+        Owner: denise.schannon@suse.com
+        Stakeholder: jeff.hobbs@suse.com
+      virtualNetwork: null
+      virtualNetworkResourceGroup: null
+  allocatable:
+    cpu: 1900m
+    memory: 4670932Ki
+    pods: "110"
+  apiEndpoint: https://aks-dns-99922-0e39a04c.hcp.eastus.azmk8s.io:443
+  appliedAgentEnvVars:
+  - name: CATTLE_SERVER_VERSION
+    value: dev
+  - name: CATTLE_INSTALL_UUID
+    value: c4b14566-ca9e-4efc-aa81-bf9ea81a39a7
+  - name: CATTLE_INGRESS_IP_DOMAIN
+    value: sslip.io
+  appliedEnableNetworkPolicy: false
+  appliedPodSecurityPolicyTemplateId: ""
+  appliedSpec:
+    agentImageOverride: ""
+    aksConfig:
+      authBaseUrl: null
+      authorizedIpRanges: null
+      azureCredentialSecret: cattle-global-data:cc-26b5h
+      baseUrl: null
+      clusterName: aks-monday
+      dnsPrefix: aks-dns-99922
+      dnsServiceIp: null
+      dockerBridgeCidr: null
+      httpApplicationRouting: null
+      imported: false
+      kubernetesVersion: 1.23.8
+      linuxAdminUsername: azureuser
+      loadBalancerSku: Standard
+      logAnalyticsWorkspaceGroup: null
+      logAnalyticsWorkspaceName: null
+      monitoring: null
+      networkPlugin: kubenet
+      networkPolicy: null
+      nodePools:
+      - availabilityZones:
+        - "1"
+        - "2"
+        - "3"
+        count: 1
+        maxPods: 110
+        mode: System
+        name: agentpool
+        orchestratorVersion: 1.23.8
+        osDiskSizeGB: 128
+        osDiskType: Managed
+        osType: Linux
+        vmSize: Standard_DS2_v2
+      podCidr: null
+      privateCluster: false
+      resourceGroup: aks-resource-group
+      resourceLocation: eastus
+      serviceCidr: null
+      subnet: null
+      tags:
+        Cost Center: "211699999"
+        Department: EI
+        Environment: Test
+        Finance Business Partner: geoff.guest@suse.com
+        General Ledger Code: "200000119"
+        Group: Container Platform
+        Owner: denise.schannon@suse.com
+        Stakeholder: jeff.hobbs@suse.com
+      virtualNetwork: null
+      virtualNetworkResourceGroup: null
+    answers: {}
+    clusterSecrets: {}
+    description: ""
+    desiredAgentImage: ""
+    desiredAuthImage: ""
+    displayName: ""
+    enableClusterAlerting: false
+    enableClusterMonitoring: false
+    enableNetworkPolicy: null
+    internal: false
+    localClusterAuthEndpoint:
+      enabled: false
+    windowsPreferedCluster: false
+  authImage: ""
+  caCert: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSUU2VENDQXRHZ0F3SUJBZ0lSQUxXZFVqcDNMYm9QNmYzbWRXMVVEc2N3RFFZSktvWklodmNOQVFFTEJRQXcKRFRFTE1Ba0dBMVVFQXhNQ1kyRXdJQmNOTWpJd09EQTRNVFF6TXpRMVdoZ1BNakExTWpBNE1EZ3hORFF6TkRWYQpNQTB4Q3pBSkJnTlZCQU1UQW1OaE1JSUNJakFOQmdrcWhraUc5dzBCQVFFRkFBT0NBZzhBTUlJQ0NnS0NBZ0VBCnIwL25wdW1tWGl6SGxxK2FTbFpmSFJTNTNhWUR6U3Q1V084RS8yb1k4WHJrQzBiU2NLL0hublBaWWhBOURnM0IKTjhBcEt2SjlOZndOQ01scEFrY3pwano1NFFjWnBtb3ZOQ0QzdTBuNVl0WXZWTVF0Znd5cXRDZ3NBM1FEWmJnZwpvNUZwckt1LzJpcWl5Y1BVb3QvUjUzNEY5SW5nUFRRaU5KVkVBMEViSE5aTVZVcWtMUlhoaG1WUzZocDNPRy9YCm5VOWhjcUtNcWt3KzlaN1lpcC9WWnZTbHVyZE11ZWgwV1pBR1kvd0FpTVVyYzVORzY3NndkblkwT1hZTW5RUFoKNDhnMlUzZUxjdHNvQURJUkxwbkx2ZGRhVUcwRXVNbG0wNFRzYVFvZmMxaUp1Z1FyTys1ZnBIK0lQT040UjB6dAorZENlekhLVWpJTStvUkhiUjRMam5UUVJ3b2pRcjRFMGZqUUVUWWo0TXhyaWpWeHV0Q2hSSEdVVEZEUjhaWncwClFGNUdDc3UzTkRjSCtUcGk4V05oWnJTbFl0MEtLVjlJZmdNWVNyVC9TQndETGlDTmMyWmNQWjZGb0h6UEJJaVAKZ2RleHE1aWlCaDZCSkZoOXFnZlBiUmhFV1FDY2d1ZU44T2tYSFh5elNwZjYwYmE1UkRHZjE1S2RjaWxxTUdFZApIY2p1ODhSWHZVSDdiWHpYZ2ROL3l4aDJMdUd6dlpLNHEraFhpeG8rSHo3ekFsUnQ2VVZRcDlzcWZZL2NFV2lHCjVaQW56UjVBSE05bnhRYmpHMUlGM2N3dTZRRTNhaFlDcVQ4cVFCY3dWOXpEOG1jandBWEo1dTY3NUs5c0pDdjYKUmV4K3k1dFVsUThrTmQ4bzl5MVpxR1laQWpGZGcxYlpJcHRPeGJyUlNpVUNBd0VBQWFOQ01FQXdEZ1lEVlIwUApBUUgvQkFRREFnS2tNQThHQTFVZEV3RUIvd1FGTUFNQkFmOHdIUVlEVlIwT0JCWUVGTnZZckNkYVNzU000eEJQCjRta1dMTTEzU2tIak1BMEdDU3FHU0liM0RRRUJDd1VBQTRJQ0FRQkZEaHJFQkh6RXJYTUNYRUdjcU9UQ2pmemoKenZtakdBY3pCdkF3cFFHNEI3RGxDTnd6K3pUNGQ0WVNQa1hkV21CenIxd3VnVzNORHBLWVU0NGEvNHYwdS96dQp3aTYzTVgyWkdlZFIvQTJkaFk5VGY4THZOZTZIcTkzMEcvN0pVMUxSOU5CWTlmNXRkU2N3RVczTjhGZFI5Qi9ICnFFQ29WSUdsV0E1dG5rdkE2YkVwVTJxNHNmSzI3UTFlY3hsUkI5VzBhUEdQTWgxZHRHY0Fjcno5UkhoMHYwU0QKWEJ6LzZOcnVwSnFyTHpFdnJtanNlQXFTUFNCQmtLNllnaTU4Rnp3d1N0R0hlRFpnZFdMNEFKdGc0bkVPbXZLQQp4WGQvc0NNakJTbU41UHlhMWhKdlFoeEVXTkZaaElEWE1WUzFFbVRpNWMzb2xqQkJlOGdEWnlmOXVCeTRPL1JCCjgrQVlSdDVEQlZHZjlUMHNjb2tJVktMNVoxaWRpY3NNL1lTSG9rbFhSMHJxTEQzRkJOVjJPNk1BN25qWGFBTzYKRi9BOTM2QjVJL2oxa3JkSURZUFNDR1RpS1JXNnBXTmpWRFZWZkp0YWNvclVnWTF3Q00wVDBZbG8vTWdKVEd0egpRYzJvSTRoa3V3SUZqVzRTc3EzOHdLMEpOQmo1eitjWDNkeU9aQ3EveWZ2WjY1Q0lqK012Y1hwZ3hZVDVnSUFaCnhqd1k4ZHFYWXJSdmpQUTNqTXVRbHZrTEkzdjBVKzFUOGZPQnVGSlhDMVZBL0FOYk0ydUpMbjBaMW0rRU9KRjcKVGpOQkFNYTJJVUt1cVZySkVqdGVGQTJjMEVmc1dOOGNSdzVGSVNZMVdRK3QwQWtFdHljR3l0d1ZlK0tMYXlNWQpiaXNOZU5XcC9CVWgyUWtXR3c9PQotLS0tLUVORCBDRVJUSUZJQ0FURS0tLS0tCg==
+  capabilities:
+    loadBalancerCapabilities: {}
+  capacity:
+    cpu: "2"
+    memory: 7116244Ki
+    pods: "110"
+  conditions:
+  - status: "True"
+    type: Pending
+  - lastUpdateTime: "2022-08-08T10:54:05-04:00"
+    status: "True"
+    type: Provisioned
+  - lastUpdateTime: "2022-08-08T10:55:06-04:00"
+    status: "True"
+    type: Waiting
+  - lastUpdateTime: "2022-08-08T10:26:22-04:00"
+    status: "True"
+    type: BackingNamespaceCreated
+  - lastUpdateTime: "2022-08-08T10:26:22-04:00"
+    status: "True"
+    type: DefaultProjectCreated
+  - lastUpdateTime: "2022-08-08T10:26:22-04:00"
+    status: "True"
+    type: SystemProjectCreated
+  - lastUpdateTime: "2022-08-08T10:26:22-04:00"
+    status: "True"
+    type: InitialRolesPopulated
+  - lastUpdateTime: "2022-08-08T10:26:23-04:00"
+    status: "True"
+    type: CreatorMadeOwner
+  - lastUpdateTime: "2022-08-08T10:26:24-04:00"
+    status: "True"
+    type: NoDiskPressure
+  - lastUpdateTime: "2022-08-08T10:26:24-04:00"
+    status: "True"
+    type: NoMemoryPressure
+  - lastUpdateTime: "2022-08-08T10:26:25-04:00"
+    status: "True"
+    type: SecretsMigrated
+  - lastUpdateTime: "2022-08-08T10:26:25-04:00"
+    status: "True"
+    type: ServiceAccountSecretsMigrated
+  - lastUpdateTime: "2022-08-08T15:02:36Z"
+    status: "True"
+    type: Connected
+  - lastUpdateTime: "2022-08-08T11:02:36-04:00"
+    status: "True"
+    type: Ready
+  - lastUpdateTime: "2022-08-08T11:05:13-04:00"
+    status: Unknown
+    type: Updated
+  - lastUpdateTime: "2022-08-08T10:54:22-04:00"
+    status: "True"
+    type: GlobalAdminsSynced
+  - lastUpdateTime: "2022-08-08T10:54:26-04:00"
+    status: "True"
+    type: SystemAccountCreated
+  - lastUpdateTime: "2022-08-08T10:54:30-04:00"
+    status: "True"
+    type: AgentDeployed
+  driver: AKS
+  eksStatus:
+    managedLaunchTemplateID: ""
+    managedLaunchTemplateVersions: null
+    privateRequiresTunnel: null
+    securityGroups: null
+    subnets: null
+    upstreamSpec: null
+    virtualNetwork: ""
+  gkeStatus:
+    privateRequiresTunnel: null
+    upstreamSpec: null
+  limits:
+    cpu: 11312m
+    memory: 7774Mi
+    pods: "0"
+  linuxWorkerCount: 1
+  nodeCount: 1
+  provider: aks
+  requested:
+    cpu: 658m
+    memory: 776Mi
+    pods: "14"
+  serviceAccountTokenSecret: cluster-serviceaccounttoken-2sjch
+  version:
+    buildDate: "2022-06-21T17:15:16Z"
+    compiler: gc
+    gitCommit: bd30c9fbc8dc9668d7ab4b0bd4fdab5c929c1ad7
+    gitTreeState: clean
+    gitVersion: v1.23.8
+    goVersion: go1.17.11
+    major: "1"
+    minor: "23"
+    platform: linux/amd64

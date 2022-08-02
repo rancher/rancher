@@ -1,0 +1,180 @@
+apiVersion: management.cattle.io/v3
+kind: Cluster
+metadata:
+  annotations:
+    authz.management.cattle.io/creator-role-bindings: '{"created":["cluster-owner"],"required":["cluster-owner"]}'
+    field.cattle.io/creatorId: user-lgw7g
+    lifecycle.cattle.io/create.cluster-agent-controller-cleanup: "true"
+    lifecycle.cattle.io/create.cluster-provisioner-controller: "true"
+    lifecycle.cattle.io/create.cluster-scoped-gc: "true"
+    lifecycle.cattle.io/create.mgmt-cluster-rbac-remove: "true"
+  creationTimestamp: "2022-08-08T14:26:21Z"
+  finalizers:
+  - wrangler.cattle.io/mgmt-cluster-remove
+  - controller.cattle.io/cluster-agent-controller-cleanup
+  - controller.cattle.io/cluster-scoped-gc
+  - controller.cattle.io/cluster-provisioner-controller
+  - controller.cattle.io/mgmt-cluster-rbac-remove
+  generateName: c-
+  generation: 15
+  labels:
+    cattle.io/creator: norman
+  name: c-k4mnv
+  resourceVersion: "12364"
+  uid: 75f1abf6-dab3-40d4-a0a5-bf9df4e42271
+spec:
+  agentImageOverride: ""
+  aksConfig:
+    authBaseUrl: null
+    authorizedIpRanges: null
+    azureCredentialSecret: cattle-global-data:cc-26b5h
+    baseUrl: null
+    clusterName: aks-monday
+    dnsPrefix: aks-dns-99922
+    dnsServiceIp: null
+    dockerBridgeCidr: null
+    httpApplicationRouting: null
+    imported: false
+    kubernetesVersion: 1.23.8
+    linuxAdminUsername: azureuser
+    loadBalancerSku: Standard
+    logAnalyticsWorkspaceGroup: null
+    logAnalyticsWorkspaceName: null
+    monitoring: null
+    networkPlugin: kubenet
+    networkPolicy: null
+    nodePools:
+    - availabilityZones:
+      - "1"
+      - "2"
+      - "3"
+      count: 1
+      enableAutoScaling: false
+      maxPods: 110
+      mode: System
+      name: agentpool
+      orchestratorVersion: 1.23.8
+      osDiskSizeGB: 128
+      osDiskType: Managed
+      osType: Linux
+      vmSize: Standard_DS2_v2
+    podCidr: null
+    privateCluster: false
+    resourceGroup: aks-resource-group
+    resourceLocation: eastus
+    serviceCidr: null
+    subnet: null
+    tags: {}
+    virtualNetwork: null
+    virtualNetworkResourceGroup: null
+  answers: {}
+  clusterSecrets: {}
+  description: ""
+  desiredAgentImage: ""
+  desiredAuthImage: ""
+  displayName: aks-monday
+  dockerRootDir: /var/lib/docker
+  enableClusterAlerting: false
+  enableClusterMonitoring: false
+  enableNetworkPolicy: false
+  fleetWorkspaceName: fleet-default
+  internal: false
+  localClusterAuthEndpoint:
+    enabled: false
+  windowsPreferedCluster: false
+status:
+  agentImage: ""
+  aksStatus:
+    privateRequiresTunnel: null
+    rbacEnabled: null
+    upstreamSpec:
+      mockTestField: "upstreamSpec is already set"
+  allocatable:
+    cpu: "0"
+    memory: "0"
+    pods: "0"
+  appliedEnableNetworkPolicy: false
+  appliedPodSecurityPolicyTemplateId: ""
+  appliedSpec:
+    agentImageOverride: ""
+    answers: {}
+    clusterSecrets: {}
+    description: ""
+    desiredAgentImage: ""
+    desiredAuthImage: ""
+    displayName: ""
+    enableClusterAlerting: false
+    enableClusterMonitoring: false
+    enableNetworkPolicy: null
+    internal: false
+    localClusterAuthEndpoint:
+      enabled: false
+    windowsPreferedCluster: false
+  authImage: ""
+  capabilities:
+    loadBalancerCapabilities: {}
+  capacity:
+    cpu: "0"
+    memory: "0"
+    pods: "0"
+  conditions:
+  - status: "True"
+    type: Pending
+  - lastUpdateTime: "2022-08-08T10:42:00-04:00"
+    status: Unknown
+    type: Provisioned
+  - lastUpdateTime: "2022-08-08T10:26:29-04:00"
+    message: Waiting for API to be available
+    status: Unknown
+    type: Waiting
+  - lastUpdateTime: "2022-08-08T10:26:22-04:00"
+    status: "True"
+    type: BackingNamespaceCreated
+  - lastUpdateTime: "2022-08-08T10:26:22-04:00"
+    status: "True"
+    type: DefaultProjectCreated
+  - lastUpdateTime: "2022-08-08T10:26:22-04:00"
+    status: "True"
+    type: SystemProjectCreated
+  - lastUpdateTime: "2022-08-08T10:26:22-04:00"
+    status: "True"
+    type: InitialRolesPopulated
+  - lastUpdateTime: "2022-08-08T10:26:23-04:00"
+    status: "True"
+    type: CreatorMadeOwner
+  - lastUpdateTime: "2022-08-08T10:26:24-04:00"
+    status: "True"
+    type: NoDiskPressure
+  - lastUpdateTime: "2022-08-08T10:26:24-04:00"
+    status: "True"
+    type: NoMemoryPressure
+  - lastUpdateTime: "2022-08-08T10:26:25-04:00"
+    status: "True"
+    type: SecretsMigrated
+  - lastUpdateTime: "2022-08-08T10:26:25-04:00"
+    status: "True"
+    type: ServiceAccountSecretsMigrated
+  - lastUpdateTime: "2022-08-08T14:42:17Z"
+    status: "False"
+    type: Connected
+  driver: AKS
+  eksStatus:
+    managedLaunchTemplateID: ""
+    managedLaunchTemplateVersions: null
+    privateRequiresTunnel: null
+    securityGroups: null
+    subnets: null
+    upstreamSpec: null
+    virtualNetwork: ""
+  gkeStatus:
+    privateRequiresTunnel: null
+    upstreamSpec: null
+  limits:
+    cpu: "0"
+    memory: "0"
+    pods: "0"
+  provider: ""
+  requested:
+    cpu: "0"
+    memory: "0"
+    pods: "0"

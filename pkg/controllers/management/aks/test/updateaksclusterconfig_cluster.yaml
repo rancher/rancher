@@ -1,0 +1,364 @@
+apiVersion: management.cattle.io/v3
+kind: Cluster
+metadata:
+  annotations:
+    authz.management.cattle.io/creator-role-bindings: '{"created":["cluster-owner"],"required":["cluster-owner"]}'
+    clusters.management.cattle.io/ke-last-refresh: "1660052876"
+    field.cattle.io/creatorId: user-rgtsq
+    lifecycle.cattle.io/create.cluster-agent-controller-cleanup: "true"
+    lifecycle.cattle.io/create.cluster-provisioner-controller: "true"
+    lifecycle.cattle.io/create.cluster-scoped-gc: "true"
+    lifecycle.cattle.io/create.mgmt-cluster-rbac-remove: "true"
+    provisioner.cattle.io/encrypt-migrated: "true"
+  creationTimestamp: "2022-08-09T12:47:51Z"
+  finalizers:
+  - wrangler.cattle.io/mgmt-cluster-remove
+  - controller.cattle.io/cluster-agent-controller-cleanup
+  - controller.cattle.io/cluster-scoped-gc
+  - controller.cattle.io/cluster-provisioner-controller
+  - controller.cattle.io/mgmt-cluster-rbac-remove
+  generateName: c-
+  generation: 32
+  labels:
+    cattle.io/creator: norman
+  managedFields:
+  - apiVersion: management.cattle.io/v3
+    fieldsType: FieldsV1
+    fieldsV1:
+      f:metadata:
+        f:annotations:
+          .: {}
+          f:field.cattle.io/creatorId: {}
+        f:generateName: {}
+        f:labels:
+          .: {}
+          f:cattle.io/creator: {}
+    manager: Go-http-client
+    operation: Update
+    time: "2022-08-09T13:33:45Z"
+  - apiVersion: management.cattle.io/v3
+    fieldsType: FieldsV1
+    fieldsV1:
+      f:metadata:
+        f:annotations:
+          f:authz.management.cattle.io/creator-role-bindings: {}
+          f:clusters.management.cattle.io/ke-last-refresh: {}
+          f:lifecycle.cattle.io/create.cluster-agent-controller-cleanup: {}
+          f:lifecycle.cattle.io/create.cluster-provisioner-controller: {}
+          f:lifecycle.cattle.io/create.cluster-scoped-gc: {}
+          f:lifecycle.cattle.io/create.mgmt-cluster-rbac-remove: {}
+          f:provisioner.cattle.io/encrypt-migrated: {}
+        f:finalizers:
+          .: {}
+          v:"controller.cattle.io/cluster-agent-controller-cleanup": {}
+          v:"controller.cattle.io/cluster-provisioner-controller": {}
+          v:"controller.cattle.io/cluster-scoped-gc": {}
+          v:"controller.cattle.io/mgmt-cluster-rbac-remove": {}
+          v:"wrangler.cattle.io/mgmt-cluster-remove": {}
+      f:spec: {}
+      f:status: {}
+    manager: ___go_build_main_go
+    operation: Update
+    time: "2022-08-09T13:47:56Z"
+  name: c-m2ltq
+  resourceVersion: "18638"
+  uid: 31938fdf-abc8-4a45-932a-7ed3cb2c142e
+spec:
+  agentImageOverride: ""
+  aksConfig:
+    authBaseUrl: null
+    authorizedIpRanges: null
+    azureCredentialSecret: cattle-global-data:cc-swhf7
+    baseUrl: null
+    clusterName: aks-clusterconfig-test
+    dnsPrefix: aks-dns-88999
+    dnsServiceIp: null
+    dockerBridgeCidr: null
+    httpApplicationRouting: null
+    imported: false
+    kubernetesVersion: 1.23.8
+    linuxAdminUsername: azureuser
+    loadBalancerSku: Standard
+    logAnalyticsWorkspaceGroup: null
+    logAnalyticsWorkspaceName: null
+    monitoring: null
+    networkPlugin: kubenet
+    networkPolicy: null
+    nodePools:
+    - availabilityZones:
+      - "1"
+      - "2"
+      - "3"
+      count: 1
+      maxPods: 110
+      mode: System
+      name: agentpool
+      orchestratorVersion: 1.23.8
+      osDiskSizeGB: 128
+      osDiskType: Managed
+      osType: Linux
+      vmSize: Standard_DS2_v2
+    podCidr: null
+    privateCluster: false
+    resourceGroup: aks-resource-group
+    resourceLocation: eastus
+    serviceCidr: null
+    subnet: null
+    tags: null
+    virtualNetwork: null
+    virtualNetworkResourceGroup: null
+  answers: {}
+  clusterSecrets: {}
+  description: ""
+  desiredAgentImage: ""
+  desiredAuthImage: ""
+  displayName: aks-clusterconfig-test
+  dockerRootDir: /var/lib/docker
+  enableClusterAlerting: false
+  enableClusterMonitoring: false
+  enableNetworkPolicy: false
+  fleetWorkspaceName: fleet-default
+  internal: false
+  localClusterAuthEndpoint:
+    enabled: false
+  windowsPreferedCluster: false
+status:
+  agentFeatures:
+    embedded-cluster-api: false
+    fleet: false
+    monitoringv1: false
+    multi-cluster-management: false
+    multi-cluster-management-agent: true
+    provisioningv2: false
+    rke2: false
+  agentImage: rancher/rancher-agent:v2.6-head
+  aksStatus:
+    privateRequiresTunnel: null
+    rbacEnabled: true
+    upstreamSpec:
+      authBaseUrl: null
+      authorizedIpRanges: null
+      azureCredentialSecret: cattle-global-data:cc-swhf7
+      baseUrl: null
+      clusterName: aks-clusterconfig-test
+      dnsPrefix: aks-dns-88999
+      dnsServiceIp: 10.0.0.10
+      dockerBridgeCidr: 172.17.0.1/16
+      httpApplicationRouting: false
+      imported: false
+      kubernetesVersion: 1.23.8
+      loadBalancerSku: Standard
+      logAnalyticsWorkspaceGroup: null
+      logAnalyticsWorkspaceName: null
+      monitoring: null
+      networkPlugin: kubenet
+      networkPolicy: ""
+      nodePools:
+      - availabilityZones:
+        - "1"
+        - "2"
+        - "3"
+        count: 1
+        maxPods: 110
+        mode: System
+        name: agentpool
+        orchestratorVersion: 1.23.8
+        osDiskSizeGB: 128
+        osDiskType: Managed
+        osType: Linux
+        vmSize: Standard_DS2_v2
+      podCidr: 10.244.0.0/16
+      privateCluster: false
+      resourceGroup: aks-resource-group
+      resourceLocation: eastus
+      serviceCidr: 10.0.0.0/16
+      subnet: null
+      tags:
+        Cost Center: "211699999"
+        Department: ecm
+        Environment: test
+        Finance Business Partner: geoff.guest@suse.com
+        General Ledger Code: "200000119"
+        Group: container-platform
+        Owner: denise.schannon@suse.com
+        Stakeholder: jeff.hobbs@suse.com
+      virtualNetwork: null
+      virtualNetworkResourceGroup: null
+  allocatable:
+    cpu: 1900m
+    memory: 4670932Ki
+    pods: "110"
+  apiEndpoint: https://aks-dns-88999-dc3103d7.hcp.eastus.azmk8s.io:443
+  appliedAgentEnvVars:
+  - name: CATTLE_SERVER_VERSION
+    value: dev
+  - name: CATTLE_INSTALL_UUID
+    value: 3573e14c-efce-425e-ae8a-7ddc80578c5e
+  - name: CATTLE_INGRESS_IP_DOMAIN
+    value: sslip.io
+  appliedEnableNetworkPolicy: false
+  appliedPodSecurityPolicyTemplateId: ""
+  appliedSpec:
+    agentImageOverride: ""
+    aksConfig:
+      authBaseUrl: null
+      authorizedIpRanges: null
+      azureCredentialSecret: cattle-global-data:cc-swhf7
+      baseUrl: null
+      clusterName: aks-clusterconfig-test
+      dnsPrefix: aks-dns-88999
+      dnsServiceIp: null
+      dockerBridgeCidr: null
+      httpApplicationRouting: null
+      imported: false
+      kubernetesVersion: 1.23.8
+      linuxAdminUsername: azureuser
+      loadBalancerSku: Standard
+      logAnalyticsWorkspaceGroup: null
+      logAnalyticsWorkspaceName: null
+      monitoring: null
+      networkPlugin: kubenet
+      networkPolicy: null
+      nodePools:
+      - availabilityZones:
+        - "1"
+        - "2"
+        - "3"
+        count: 1
+        maxPods: 110
+        mode: System
+        name: agentpool
+        orchestratorVersion: 1.23.8
+        osDiskSizeGB: 128
+        osDiskType: Managed
+        osType: Linux
+        vmSize: Standard_DS2_v2
+      podCidr: null
+      privateCluster: false
+      resourceGroup: aks-resource-group
+      resourceLocation: eastus
+      serviceCidr: null
+      subnet: null
+      tags:
+        Cost Center: "211699999"
+        Department: ecm
+        Environment: test
+        Finance Business Partner: geoff.guest@suse.com
+        General Ledger Code: "200000119"
+        Group: container-platform
+        Owner: denise.schannon@suse.com
+        Stakeholder: jeff.hobbs@suse.com
+      virtualNetwork: null
+      virtualNetworkResourceGroup: null
+    answers: {}
+    clusterSecrets: {}
+    description: ""
+    desiredAgentImage: ""
+    desiredAuthImage: ""
+    displayName: ""
+    enableClusterAlerting: false
+    enableClusterMonitoring: false
+    enableNetworkPolicy: null
+    internal: false
+    localClusterAuthEndpoint:
+      enabled: false
+    windowsPreferedCluster: false
+  authImage: ""
+  caCert: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSUU2VENDQXRHZ0F3SUJBZ0lSQUxxam1hblFSOUJXWmpxWlhsMDhDOHN3RFFZSktvWklodmNOQVFFTEJRQXcKRFRFTE1Ba0dBMVVFQXhNQ1kyRXdJQmNOTWpJd09EQTVNVEl6T1RBM1doZ1BNakExTWpBNE1Ea3hNalE1TURkYQpNQTB4Q3pBSkJnTlZCQU1UQW1OaE1JSUNJakFOQmdrcWhraUc5dzBCQVFFRkFBT0NBZzhBTUlJQ0NnS0NBZ0VBCnZmeEFzNCtqZzYwOFJTSzhqUlJ4R1NiM0U5eWU2UU9QNmFiUGdGcTcxUFZuUUtFZEwzR1hZS2xyWHJkU0dET2YKc0FWRElMNHB6ZzF0Yml3bGlOWjM2WHBPVllRR1lYTDgvZUcxOXQwd0lkTDRXTFZ5bHZBalFkcVQvOTFPRG9SQQo3T1NESTNsbm1GakF6VFpWMVVOcFZIa0FmQjJBeks0T2RiQ1MvSm1VSlE0ZWFlR1pKaG1sRHFENlkzdXMrcGg3CkkxMnVYd3ZEdUpkSE05Z09pL2NDb0VVUWNlNlpQVEx2UmVNZkpCNWJiejJiSmx2cHdURWVhWFIxQWYvT0pobHIKNlZaazg5cG1xQlIrM1phaHJNTTFjU3ZnOURwUFlxN0lKUVVEc3JXV2RJTGdzajJiR21iUzhOeXZjOUtsQ0crVgpib0pKaW9kdjY4Rk4yZUpHVlNSWFpRRS83elBsWjZDTlBmdTVrTk9wL05KcFJNRGlNMTRrNFkya2FjYk0weGtyCmxSSGRyaXY1QUYyNFlDcU53N082cmtEVVJDcVYwcVROMWpJNXYvK1J4M2pkaXduOGthN2wvVDdoS09lTGxQT2oKdlFzMU9XdHRzcXlQZ1o3emE1Yjg0RWc5dHdjYnd5TTVWMHd5OTRiWjBPMklhazl1eDhRbVhvaTNsbi9sS0JkaApHajhtQVRpcmJnVHBEVUdXTnB6SzlndUlNS1llYVlxR3V6NnRuS3NXOUYrZE42QTJFTjZlOXExTDRQNHVBSmxDCllPbi9BUUxaMUpZRjVaZ3Zvc2xIclNKVmhvaWxEMXk2U0F1WjlVanpyemVISjI3MWxXZ0JOay9Tb2d1NzVjbWgKN0JXNFVIQzVxOHYzUDBKOVZnc1ZRK0lGQldGbmxkcXU2Qm0wRzMrR3VuOENBd0VBQWFOQ01FQXdEZ1lEVlIwUApBUUgvQkFRREFnS2tNQThHQTFVZEV3RUIvd1FGTUFNQkFmOHdIUVlEVlIwT0JCWUVGRUg3OTI5SGtlbVdCM3F2ClFTazdEV2RUcnFUYk1BMEdDU3FHU0liM0RRRUJDd1VBQTRJQ0FRQ0ljTy9sbWVra2E5S3RHTGZTK0xvVmNtTC8KelFqRnNnNTZZN3UxV0VzMXhjK3ZQTjlrMnJoTHFkSE1QT2h2ZU1na0gvUC9DL2c3WUpsc0hHTkRiYUI2N0htbwpXOGcwdEpQYzFmRlh3UDQwQzBCSnp4TVN0N0NsV3IvMWVsZktVck1kblZNMG42L3p5alpKdTZpV24yYWkxUjdnCkFHL1BkWUJ1OXRPZlhEZ1Q4QStnalhJd1lQVW8raFFqRUlMQWJxaEo1RFcvaXMzVDNrYUpuWUMydFI5OWJqdVUKZ3dFbytqdFB5WElxUmZiOUJTQVRldmpnREhvc3FvVUIyNlcvUmMxTzYxR0YyWmJ1RWcxdC9Nc3orT2MzTWdkMQpWdUEzcnVPamsrNXArNmtxVnZHQWFERUpld3A1dUFUbGJlZUQwNCtWUE5qcjNuZUtjcG1tT25EMCtCVXZmRFh0ClNxYVFocmVnc0RyUXpQMGhaWFZ2NkNnTFA5TmR3TC93UFMyMnd1MHVWVTlhelVQT3dCenpPN3pOTEw0NVpnQ1kKVmlkQUZlVFBpajZoRWNiN2V2UG1TR1A1ellNNnYxcHJWV0R6bmZGcHo3dUltV1ZQZWk3TW1ZRU9rTHRQaUl5ZApnRDBaOWRqUmVRc0szUnpBaGJuZ0xNRW45Mm9GNUp1U2lUdmMyeFJFREN1QWcwT0x4YVBkNG9XUlAvQnUzb0o3CjJGVEw2M1VLN0tDSVQrY1FPSGVUMVZta1FPM3dpVVUzUzZBNkFIc09PSVpUZkJnUWNvNC9uWTdTOXlyZnp1aisKUEhJUzlHdXczaVJTY2FNdXFLdlJESGEycVNDZkJlOWMzRWUrSGJDTTRQVHVSYnh4eDNOU0JXVmJXSzhNMnl4Swp4dFNEaS9JbUtOVVpKOWlYbkE9PQotLS0tLUVORCBDRVJUSUZJQ0FURS0tLS0tCg==
+  capabilities:
+    loadBalancerCapabilities: {}
+  capacity:
+    cpu: "2"
+    memory: 7116244Ki
+    pods: "110"
+  conditions:
+  - status: "True"
+    type: Pending
+  - lastUpdateTime: "2022-08-09T08:52:47-04:00"
+    status: "True"
+    type: Provisioned
+  - lastUpdateTime: "2022-08-09T08:48:00-04:00"
+    message: Waiting for API to be available
+    status: Unknown
+    type: Waiting
+  - lastUpdateTime: "2022-08-09T08:47:52-04:00"
+    status: "True"
+    type: BackingNamespaceCreated
+  - lastUpdateTime: "2022-08-09T08:47:52-04:00"
+    status: "True"
+    type: DefaultProjectCreated
+  - lastUpdateTime: "2022-08-09T08:47:53-04:00"
+    status: "True"
+    type: SystemProjectCreated
+  - lastUpdateTime: "2022-08-09T08:47:53-04:00"
+    status: "True"
+    type: InitialRolesPopulated
+  - lastUpdateTime: "2022-08-09T08:47:56-04:00"
+    status: "True"
+    type: CreatorMadeOwner
+  - lastUpdateTime: "2022-08-09T08:47:57-04:00"
+    status: "True"
+    type: NoDiskPressure
+  - lastUpdateTime: "2022-08-09T08:47:57-04:00"
+    status: "True"
+    type: NoMemoryPressure
+  - lastUpdateTime: "2022-08-09T08:47:57-04:00"
+    status: "True"
+    type: SecretsMigrated
+  - lastUpdateTime: "2022-08-09T08:47:57-04:00"
+    status: "True"
+    type: ServiceAccountSecretsMigrated
+  - lastUpdateTime: "2022-08-09T12:48:04Z"
+    status: "False"
+    type: Connected
+  - lastUpdateTime: "2022-08-09T08:52:48-04:00"
+    message: Cluster agent is not connected
+    reason: Disconnected
+    status: "False"
+    type: Ready
+  - lastUpdateTime: "2022-08-09T08:52:52-04:00"
+    status: "True"
+    type: Updated
+  - lastUpdateTime: "2022-08-09T08:53:04-04:00"
+    status: "True"
+    type: GlobalAdminsSynced
+  - lastUpdateTime: "2022-08-09T08:53:04-04:00"
+    status: "True"
+    type: SystemAccountCreated
+  - lastUpdateTime: "2022-08-09T08:53:09-04:00"
+    status: "True"
+    type: AgentDeployed
+  driver: AKS
+  eksStatus:
+    managedLaunchTemplateID: ""
+    managedLaunchTemplateVersions: null
+    privateRequiresTunnel: null
+    securityGroups: null
+    subnets: null
+    upstreamSpec: null
+    virtualNetwork: ""
+  gkeStatus:
+    privateRequiresTunnel: null
+    upstreamSpec: null
+  limits:
+    cpu: "0"
+    memory: "0"
+    pods: "0"
+  linuxWorkerCount: 1
+  nodeCount: 1
+  provider: ""
+  requested:
+    cpu: "0"
+    memory: "0"
+    pods: "0"
+  serviceAccountTokenSecret: cluster-serviceaccounttoken-cjgqx
+  version:
+    buildDate: "2022-06-21T17:15:16Z"
+    compiler: gc
+    gitCommit: bd30c9fbc8dc9668d7ab4b0bd4fdab5c929c1ad7
+    gitTreeState: clean
+    gitVersion: v1.23.8
+    goVersion: go1.17.11
+    major: "1"
+    minor: "23"
+    platform: linux/amd64
