@@ -7,7 +7,7 @@ cleanup()
 {
     EXIT=$?
     set +ex
-    echo Stopping rancher server
+    echo Stopping ${SERVER_NAME} server
     kill $RANCHER_RUN_PID
     wait $RANCHER_RUN_PID
     if [ $PID != -1 ]; then
@@ -72,13 +72,13 @@ run_rancher &
 RANCHER_RUN_PID=$!
 trap cleanup exit
 
-echo Sleeping for 5 seconds before checking Rancher health
+echo Sleeping for 5 seconds before checking ${SERVER_NAME} health
 sleep 5
 
 while ! curl -sf http://localhost:8080/ping; do
     sleep 2
 done
-while ! kubectl --kubeconfig /etc/${SERVER_NAME}/k3s/k3s.yaml rollout status -w -n cattle-system deploy/rancher-webhook; do
+while ! kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml rollout status -w -n cattle-system deploy/rancher-webhook; do
     sleep 2
 done
 #kill $TPID
