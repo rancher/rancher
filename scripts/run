@@ -6,7 +6,7 @@ source $(dirname $0)/version
 echo Starting rancher server
 cd $(dirname $0)/..
 
-if [ ! -x ${PROG} ]; then
+if [ ! -x ${SERVER_NAME} ]; then
     ./scripts/build-server
 fi
 
@@ -18,4 +18,4 @@ export CATTLE_DEV_MODE=yes
 export CATTLE_SERVER_URL="https://$(ip route get 8.8.8.8 | awk '{print $7}'):8443"
 export CATTLE_BOOTSTRAP_PASSWORD="admin"
 export CATTLE_FEATURES="harvester=false"
-exec ../../${PROG}
+exec ../../${SERVER_NAME}

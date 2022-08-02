@@ -13,7 +13,7 @@ RKE_VERSION="$(grep -m1 'github.com/rancher/rke' go.mod | awk '{print $2}')"
 # Inject Setting values
 DEFAULT_VALUES="{\"rke-version\":\"${RKE_VERSION}\"}"
 
-BINARY="rancher-${PROG}"
+BINARY="${SERVER_NAME}"
 
 if [ -z "${GODEBUG}" ]; then
     EXTRA_LDFLAGS="${EXTRA_LDFLAGS} -w"

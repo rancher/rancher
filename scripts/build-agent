@@ -8,7 +8,7 @@ cd $(dirname $0)/..
 mkdir -p bin
 [ "$(uname)" != "Darwin" ] && LINKFLAGS="-extldflags -static -s"
 
-BINARY="agent-${PROG}"
+BINARY="${AGENT_NAME}"
 
 if [ -z "${GODEBUG}" ]; then
     EXTRA_LDFLAGS="${EXTRA_LDFLAGS} -w"
