@@ -32,15 +32,15 @@ if [ ${ARCH} == arm64 ] || [ ${ARCH} == s390x ]; then
 fi
 
 echo Starting ${SERVER_NAME} server for test
-touch /tmp/rancher.log
+touch /tmp/${SERVER_NAME}.log
 
 run_rancher()
 {
     while sleep 2; do
         if [ "$PID" != "-1" ] && [ ! -e /proc/$PID ]; then
-            echo Rancher died
-            echo Rancher logs were
-            tail -n 25 /tmp/rancher.log
+            echo ${SERVER_NAME} died
+            echo ${SERVER_NAME} logs were
+            tail -n 25 /tmp/${SERVER_NAME}.log
             echo K3s logs were:
             tail -n 25 build/testdata/k3s.log
             if [ "$INT_TESTS_STARTED" = "true" ]; then
