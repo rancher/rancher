@@ -12,7 +12,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
-const AuthorizedSecretAnnotation = "v2prov-secret-authorized-for-cluster"
+const (
+	AuthorizedSecretAnnotation                        = "v2prov-secret-authorized-for-cluster"
+	AuthorizedSecretDeletesOnClusterRemovalAnnotation = "v2prov-authorized-secret-deletes-on-cluster-removal"
+)
 
 func (h *handler) syncHarvesterCloudConfig(_ string, cluster *v1.Cluster) (*v1.Cluster, error) {
 	if cluster == nil || cluster.DeletionTimestamp != nil || cluster.Spec.RKEConfig == nil || cluster.Name == "local" {
@@ -86,6 +89,11 @@ func (m *Migrator) createOrUpdateHarvesterCloudProviderConfigSecret(clusterName 
 
 	cloudConfig, cloudProviderConfigFound := machineSelectorConfig.Config.Data["cloud-provider-config"]
 	if !cloudProviderConfigFound {
+		return nil, nil
+	}
+
+	// don't create a new secret if one has already been provided.
+	if strings.HasPrefix(convert.ToString(cloudConfig), "secret://") {
 		return nil, nil
 	}
 
