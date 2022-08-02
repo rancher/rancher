@@ -214,6 +214,7 @@ func (e *gkeOperatorController) onClusterChange(key string, cluster *mgmtv3.Clus
 					return nil, err
 				}
 				cluster.Status.ServiceAccountTokenSecret = secret.Name
+				cluster.Status.ServiceAccountToken = ""
 				return e.ClusterClient.Update(cluster)
 			}
 		}
@@ -375,6 +376,7 @@ func (e *gkeOperatorController) generateAndSetServiceAccount(cluster *mgmtv3.Clu
 		return nil, err
 	}
 	cluster.Status.ServiceAccountTokenSecret = secret.Name
+	cluster.Status.ServiceAccountToken = ""
 	return e.ClusterClient.Update(cluster)
 }
 

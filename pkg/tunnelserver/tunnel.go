@@ -311,6 +311,7 @@ func (t *Authorizer) authorizeCluster(cluster *v3.Cluster, inCluster *cluster, r
 			}
 			cluster.Status.APIEndpoint = apiEndpoint
 			cluster.Status.ServiceAccountTokenSecret = secret.Name
+			cluster.Status.ServiceAccountToken = ""
 			cluster.Status.CACert = caCert
 			changed = true
 		}
