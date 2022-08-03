@@ -129,8 +129,9 @@ func (c *CustomClusterProvisioningTestSuite) ProvisioningRKE2CustomCluster(exter
 						c.T().Logf("Execute Registration Command for node %s", node.NodeID)
 						command := fmt.Sprintf("%s %s", token.InsecureNodeCommand, tt.nodeRoles[key])
 
-						err = node.ExecuteCommand(command)
+						output, err := node.ExecuteCommand(command)
 						require.NoError(c.T(), err)
+						c.T().Logf(output)
 					}
 
 					kubeProvisioningClient, err := c.client.GetKubeAPIProvisioningClient()
@@ -216,8 +217,9 @@ func (c *CustomClusterProvisioningTestSuite) ProvisioningRKE2CustomClusterDynami
 						c.T().Logf("Execute Registration Command for node %s", node.NodeID)
 						command := fmt.Sprintf("%s %s", token.InsecureNodeCommand, rolesPerNode[key])
 
-						err = node.ExecuteCommand(command)
+						output, err := node.ExecuteCommand(command)
 						require.NoError(c.T(), err)
+						c.T().Logf(output)
 					}
 
 					kubeProvisioningClient, err := c.client.GetKubeAPIProvisioningClient()
