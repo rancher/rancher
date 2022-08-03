@@ -5,6 +5,7 @@ const (
 	CloudProviderFieldAWSCloudProvider       = "awsCloudProvider"
 	CloudProviderFieldAzureCloudProvider     = "azureCloudProvider"
 	CloudProviderFieldCustomCloudProvider    = "customCloudProvider"
+	CloudProviderFieldHarvesterCloudProvider = "harvesterCloudProvider"
 	CloudProviderFieldName                   = "name"
 	CloudProviderFieldOpenstackCloudProvider = "openstackCloudProvider"
 	CloudProviderFieldVsphereCloudProvider   = "vsphereCloudProvider"
@@ -14,6 +15,7 @@ type CloudProvider struct {
 	AWSCloudProvider       *AWSCloudProvider       `json:"awsCloudProvider,omitempty" yaml:"awsCloudProvider,omitempty"`
 	AzureCloudProvider     *AzureCloudProvider     `json:"azureCloudProvider,omitempty" yaml:"azureCloudProvider,omitempty"`
 	CustomCloudProvider    string                  `json:"customCloudProvider,omitempty" yaml:"customCloudProvider,omitempty"`
+	HarvesterCloudProvider *HarvesterCloudProvider `json:"harvesterCloudProvider,omitempty" yaml:"harvesterCloudProvider,omitempty"`
 	Name                   string                  `json:"name,omitempty" yaml:"name,omitempty"`
 	OpenstackCloudProvider *OpenstackCloudProvider `json:"openstackCloudProvider,omitempty" yaml:"openstackCloudProvider,omitempty"`
 	VsphereCloudProvider   *VsphereCloudProvider   `json:"vsphereCloudProvider,omitempty" yaml:"vsphereCloudProvider,omitempty"`

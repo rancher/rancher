@@ -12,30 +12,30 @@ const (
 
 // AKSClusterConfig is the configuration needed to create an AKS host cluster
 type AKSClusterConfig struct {
-	AuthorizedIPRanges          *[]string          `json:"authorizedIpRanges,omitempty" yaml:"authorizedIpRanges,omitempty"`
-	AzureCredentialSecret       string             `json:"azureCredentialSecret,omitempty" yaml:"azureCredentialSecret,omitempty"`
-	DNSPrefix                   *string            `json:"dnsPrefix,omitempty" yaml:"dnsPrefix,omitempty"`
-	KubernetesVersion           *string            `json:"kubernetesVersion,omitempty" yaml:"kubernetesVersion,omitempty"`
-	LinuxAdminUsername          *string            `json:"linuxAdminUsername,omitempty" yaml:"linuxAdminUsername,omitempty"`
-	LinuxSSHPublicKey           *string            `json:"sshPublicKey,omitempty" yaml:"sshPublicKey,omitempty"`
-	LoadBalancerSKU             *string            `json:"loadBalancerSku,omitempty" yaml:"loadBalancerSku,omitempty"`
-	LogAnalyticsWorkspaceGroup  *string            `json:"logAnalyticsWorkspaceGroup,omitempty" yaml:"logAnalyticsWorkspaceGroup,omitempty"`
-	LogAnalyticsWorkspaceName   *string            `json:"logAnalyticsWorkspaceName,omitempty" yaml:"logAnalyticsWorkspaceName,omitempty"`
-	Monitoring                  *bool              `json:"monitoring,omitempty" yaml:"monitoring,omitempty"`
-	NetworkDNSServiceIP         *string            `json:"dnsServiceIp,omitempty" yaml:"dnsServiceIp,omitempty"`
-	NetworkDockerBridgeCIDR     *string            `json:"dockerBridgeCidr,omitempty" yaml:"dockerBridgeCidr,omitempty"`
-	NetworkPlugin               *string            `json:"networkPlugin,omitempty" yaml:"networkPlugin,omitempty"`
-	NetworkPodCIDR              *string            `json:"podCidr,omitempty" yaml:"podCidr,omitempty"`
-	NetworkPolicy               *string            `json:"networkPolicy,omitempty" yaml:"networkPolicy,omitempty"`
-	NetworkServiceCIDR          *string            `json:"serviceCidr,omitempty" yaml:"serviceCidr,omitempty"`
-	NodePools                   *[]AKSNodePool     `json:"nodePools,omitempty" yaml:"nodePools,omitempty"`
-	PrivateCluster              *bool              `json:"privateCluster,omitempty" yaml:"privateCluster,omitempty"`
-	ResourceGroup               string             `json:"resourceGroup,omitempty" yaml:"resourceGroup,omitempty"`
-	ResourceLocation            string             `json:"resourceLocation,omitempty" yaml:"resourceLocation,omitempty"`
-	Subnet                      *string            `json:"subnet,omitempty" yaml:"subnet,omitempty"`
-	Tags                        *map[string]string `json:"tags,omitempty" yaml:"tags,omitempty"`
-	VirtualNetwork              *string            `json:"virtualNetwork,omitempty" yaml:"virtualNetwork,omitempty"`
-	VirtualNetworkResourceGroup *string            `json:"virtualNetworkResourceGroup,omitempty" yaml:"virtualNetworkResourceGroup,omitempty"`
+	AuthorizedIPRanges          *[]string         `json:"authorizedIpRanges,omitempty" yaml:"authorizedIpRanges,omitempty"`
+	AzureCredentialSecret       string            `json:"azureCredentialSecret,omitempty" yaml:"azureCredentialSecret,omitempty"`
+	DNSPrefix                   *string           `json:"dnsPrefix,omitempty" yaml:"dnsPrefix,omitempty"`
+	KubernetesVersion           *string           `json:"kubernetesVersion,omitempty" yaml:"kubernetesVersion,omitempty"`
+	LinuxAdminUsername          *string           `json:"linuxAdminUsername,omitempty" yaml:"linuxAdminUsername,omitempty"`
+	LinuxSSHPublicKey           *string           `json:"sshPublicKey,omitempty" yaml:"sshPublicKey,omitempty"`
+	LoadBalancerSKU             *string           `json:"loadBalancerSku,omitempty" yaml:"loadBalancerSku,omitempty"`
+	LogAnalyticsWorkspaceGroup  *string           `json:"logAnalyticsWorkspaceGroup,omitempty" yaml:"logAnalyticsWorkspaceGroup,omitempty"`
+	LogAnalyticsWorkspaceName   *string           `json:"logAnalyticsWorkspaceName,omitempty" yaml:"logAnalyticsWorkspaceName,omitempty"`
+	Monitoring                  *bool             `json:"monitoring,omitempty" yaml:"monitoring,omitempty"`
+	NetworkDNSServiceIP         *string           `json:"dnsServiceIp,omitempty" yaml:"dnsServiceIp,omitempty"`
+	NetworkDockerBridgeCIDR     *string           `json:"dockerBridgeCidr,omitempty" yaml:"dockerBridgeCidr,omitempty"`
+	NetworkPlugin               *string           `json:"networkPlugin,omitempty" yaml:"networkPlugin,omitempty"`
+	NetworkPodCIDR              *string           `json:"podCidr,omitempty" yaml:"podCidr,omitempty"`
+	NetworkPolicy               *string           `json:"networkPolicy,omitempty" yaml:"networkPolicy,omitempty"`
+	NetworkServiceCIDR          *string           `json:"serviceCidr,omitempty" yaml:"serviceCidr,omitempty"`
+	NodePools                   *[]AKSNodePool    `json:"nodePools,omitempty" yaml:"nodePools,omitempty"`
+	PrivateCluster              *bool             `json:"privateCluster,omitempty" yaml:"privateCluster,omitempty"`
+	ResourceGroup               string            `json:"resourceGroup,omitempty" yaml:"resourceGroup,omitempty"`
+	ResourceLocation            string            `json:"resourceLocation,omitempty" yaml:"resourceLocation,omitempty"`
+	Subnet                      *string           `json:"subnet,omitempty" yaml:"subnet,omitempty"`
+	Tags                        map[string]string `json:"tags,omitempty" yaml:"tags,omitempty"`
+	VirtualNetwork              *string           `json:"virtualNetwork,omitempty" yaml:"virtualNetwork,omitempty"`
+	VirtualNetworkResourceGroup *string           `json:"virtualNetworkResourceGroup,omitempty" yaml:"virtualNetworkResourceGroup,omitempty"`
 }
 
 // AKSNodePool is the configuration needed to an AKS node pool
@@ -53,7 +53,7 @@ type AKSNodePool struct {
 	VMSize              string    `json:"vmSize,omitempty" yaml:"vmSize,omitempty"`
 }
 
-func aksNodePoolConstructor(aksNodePoolConfigs *[]AKSNodePool, kubernetesVersion string) *[]management.AKSNodePool {
+func aksNodePoolConstructor(aksNodePoolConfigs *[]AKSNodePool, kubernetesVersion string) []management.AKSNodePool {
 	var aksNodePools []management.AKSNodePool
 	for _, aksNodePoolConfig := range *aksNodePoolConfigs {
 		aksNodePool := management.AKSNodePool{
@@ -71,7 +71,7 @@ func aksNodePoolConstructor(aksNodePoolConfigs *[]AKSNodePool, kubernetesVersion
 		}
 		aksNodePools = append(aksNodePools, aksNodePool)
 	}
-	return &aksNodePools
+	return aksNodePools
 }
 
 func aksHostClusterConfig(displayName, cloudCredentialID string) *management.AKSClusterConfigSpec {

@@ -4,9 +4,8 @@ import (
 	"context"
 	"strconv"
 
-	apisV1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
-	corev1 "k8s.io/api/core/v1"
+	provisioning "github.com/rancher/rancher/tests/framework/clients/rancher/generated/provisioning/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -30,13 +29,13 @@ func CreateMachineConfig(resource string, machinePoolConfig *unstructured.Unstru
 }
 
 // NewRKEMachinePool is a constructor that sets up a apisV1.RKEMachinePool object to be used to provision a cluster.
-func NewRKEMachinePool(controlPlaneRole, etcdRole, workerRole bool, poolName string, quantity int32, machineConfig *unstructured.Unstructured) apisV1.RKEMachinePool {
-	machineConfigRef := &corev1.ObjectReference{
+func NewRKEMachinePool(controlPlaneRole, etcdRole, workerRole bool, poolName string, quantity int64, machineConfig *unstructured.Unstructured) provisioning.RKEMachinePool {
+	machineConfigRef := &provisioning.ObjectReference{
 		Kind: machineConfig.GetKind(),
 		Name: machineConfig.GetName(),
 	}
 
-	return apisV1.RKEMachinePool{
+	return provisioning.RKEMachinePool{
 		ControlPlaneRole: controlPlaneRole,
 		EtcdRole:         etcdRole,
 		WorkerRole:       workerRole,
@@ -50,13 +49,13 @@ type NodeRoles struct {
 	ControlPlane bool  `json:"controlplane,omitempty" yaml:"controlplane,omitempty"`
 	Etcd         bool  `json:"etcd,omitempty" yaml:"etcd,omitempty"`
 	Worker       bool  `json:"worker,omitempty" yaml:"worker,omitempty"`
-	Quantity     int32 `json:"quantity" yaml:"quantity"`
+	Quantity     int64 `json:"quantity" yaml:"quantity"`
 }
 
 // RKEMachinePoolSetup is a helper method that will loop and setup muliple node pools with the defined node roles from the `nodeRoles` parameter
 // `machineConfig` is the *unstructured.Unstructured created by CreateMachineConfig
 // `nodeRoles` would be in this format
-//   []map[string]bool{
+//   []NodeRoles{
 //   {
 // 	   ControlPlane: true,
 // 	   Etcd:         false,
@@ -71,8 +70,8 @@ type NodeRoles struct {
 //   },
 //  }
 
-func RKEMachinePoolSetup(nodeRoles []NodeRoles, machineConfig *unstructured.Unstructured) []apisV1.RKEMachinePool {
-	machinePools := []apisV1.RKEMachinePool{}
+func RKEMachinePoolSetup(nodeRoles []NodeRoles, machineConfig *unstructured.Unstructured) []provisioning.RKEMachinePool {
+	machinePools := []provisioning.RKEMachinePool{}
 	for index, roles := range nodeRoles {
 		machinePool := NewRKEMachinePool(roles.ControlPlane, roles.Etcd, roles.Worker, "pool"+strconv.Itoa(index), roles.Quantity, machineConfig)
 		machinePools = append(machinePools, machinePool)

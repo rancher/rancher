@@ -14,7 +14,9 @@ import (
 	"github.com/rancher/rancher/tests/framework/clients/ec2"
 	"github.com/rancher/rancher/tests/framework/clients/rancher/catalog"
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
-	"github.com/rancher/rancher/tests/framework/clients/rancher/provisioning"
+	provisioning "github.com/rancher/rancher/tests/framework/clients/rancher/generated/provisioning/v1"
+
+	kubeProvisioning "github.com/rancher/rancher/tests/framework/clients/provisioning"
 	"github.com/rancher/rancher/tests/framework/pkg/clientbase"
 	"github.com/rancher/rancher/tests/framework/pkg/config"
 	"github.com/rancher/rancher/tests/framework/pkg/session"
@@ -69,12 +71,12 @@ func NewClient(bearerToken string, session *session.Session) (*Client, error) {
 
 	c.Management.Ops.Session = session
 
-	provClient, err := provisioning.NewForConfig(restConfig, session)
+	c.Provisioning, err = provisioning.NewClient(clientOptsV1(restConfig, c.RancherConfig))
 	if err != nil {
 		return nil, err
 	}
 
-	c.Provisioning = provClient
+	c.Provisioning.Ops.Session = session
 
 	catalogClient, err := catalog.NewForConfig(restConfig, session)
 	if err != nil {
@@ -102,6 +104,16 @@ func newRestConfig(bearerToken string, rancherConfig *Config) *rest.Config {
 func clientOpts(restConfig *rest.Config, rancherConfig *Config) *clientbase.ClientOpts {
 	return &clientbase.ClientOpts{
 		URL:      fmt.Sprintf("https://%s/v3", rancherConfig.Host),
+		TokenKey: restConfig.BearerToken,
+		Insecure: restConfig.Insecure,
+		CACerts:  rancherConfig.CACerts,
+	}
+}
+
+// clientOptsV1 is a constructor that sets ups clientbase.ClientOpts the configuration used by the v1 Rancher clients.
+func clientOptsV1(restConfig *rest.Config, rancherConfig *Config) *clientbase.ClientOpts {
+	return &clientbase.ClientOpts{
+		URL:      fmt.Sprintf("https://%s/v1", rancherConfig.Host),
 		TokenKey: restConfig.BearerToken,
 		Insecure: restConfig.Insecure,
 		CACerts:  rancherConfig.CACerts,
@@ -156,6 +168,12 @@ func (c *Client) AsUser(user *management.User) (*Client, error) {
 	return NewClient(returnedToken.Token, c.Session)
 }
 
+// ReLogin reinstantiates a Client to update it's API schema. This function would be used for a non admin user that needs to be
+// "reloaded" inorder to have updated permissions for certain resources.
+func (c *Client) ReLogin() (*Client, error) {
+	return NewClient(c.restConfig.BearerToken, c.Session)
+}
+
 // WithSession accepts a session.Session and instantiates a new Client to reference this new session.Session. The main purpose is to use it
 // when created "sub sessions" when tracking resources created at a test case scope.
 func (c *Client) WithSession(session *session.Session) (*Client, error) {
@@ -182,6 +200,16 @@ func (c *Client) GetRancherDynamicClient() (dynamic.Interface, error) {
 		return nil, err
 	}
 	return dynamic, nil
+}
+
+// GetKubeAPIProvisioningClient is a function that instantiates a provisioning client that communicates with the Kube API of a cluster
+func (c *Client) GetKubeAPIProvisioningClient() (*kubeProvisioning.Client, error) {
+	provClient, err := kubeProvisioning.NewForConfig(c.restConfig, c.Session)
+	if err != nil {
+		return nil, err
+	}
+
+	return provClient, nil
 }
 
 // GetDownStreamClusterClient is a helper function that instantiates a dynamic client to communicate with a specific cluster.
@@ -260,7 +288,7 @@ func (c *Client) login(user *management.User) (*management.Token, error) {
 	if err != nil {
 		return nil, err
 	}
-	err = c.doAction("/v3-public/localproviders/local", "login", bodyContent, token)
+	err = c.doAction("/v3-public/localProviders/local", "login", bodyContent, token)
 	if err != nil {
 		return nil, err
 	}
