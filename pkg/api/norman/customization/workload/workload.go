@@ -37,7 +37,7 @@ const (
 )
 
 var (
-	allowRedeployTypes     = map[string]bool{"cronJob": true, "deployment": true, "replicationController": true, "statefulSet": true, "daemonSet": true, "replicaSet": true}
+	allowRedeployTypes     = map[string]struct{}{"cronJob": {}, "deployment": {}, "replicationController": {}, "statefulSet": {}, "daemonSet": {}, "replicaSet": {}}
 	errInvalidWorkloadType = errors.New("invalid workload type")
 )
 
