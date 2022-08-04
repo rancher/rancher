@@ -10,6 +10,7 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2"
 	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta1"
 	rkecontroller "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
+	managementv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/provisioningv2/rke2/installer"
 	"github.com/rancher/rancher/pkg/serviceaccounttoken"
@@ -189,7 +190,21 @@ func (h *handler) assignPlanSecret(machine *capi.Machine, bootstrap *rkev1.RKEBo
 			},
 		},
 	}
-	rolebinding := &rbacv1.RoleBinding{
+	localClusterRoleName := name.SafeConcatName(secretName, "local-cluster-role")
+	localClusterRole := &rbacv1.ClusterRole{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: localClusterRoleName,
+		},
+		Rules: []rbacv1.PolicyRule{
+			{
+				Verbs:         []string{"get"},
+				APIGroups:     []string{managementv3.GroupName},
+				Resources:     []string{"clusters"},
+				ResourceNames: []string{"local"},
+			},
+		},
+	}
+	roleBinding := &rbacv1.RoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      secretName,
 			Namespace: bootstrap.Namespace,
@@ -207,8 +222,25 @@ func (h *handler) assignPlanSecret(machine *capi.Machine, bootstrap *rkev1.RKEBo
 			Name:     secretName,
 		},
 	}
+	localClusterRolebinding := &rbacv1.ClusterRoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name.SafeConcatName(secretName, "local-cluster-role-binding"),
+		},
+		Subjects: []rbacv1.Subject{
+			{
+				Kind:      "ServiceAccount",
+				Name:      sa.Name,
+				Namespace: sa.Namespace,
+			},
+		},
+		RoleRef: rbacv1.RoleRef{
+			APIGroup: rbacv1.GroupName,
+			Kind:     "ClusterRole",
+			Name:     localClusterRoleName,
+		},
+	}
 
-	return []runtime.Object{sa, secret, role, rolebinding}
+	return []runtime.Object{sa, secret, role, roleBinding, localClusterRole, localClusterRolebinding}
 }
 
 func (h *handler) getEnvVar(bootstrap *rkev1.RKEBootstrap) (result []corev1.EnvVar, _ error) {
