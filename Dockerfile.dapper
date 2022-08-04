@@ -16,6 +16,10 @@ ENV KUSTOMIZE_VERSION v4.4.1
 # kontainer-driver-metadata branch to be set for specific branch other than dev/master, logic at rancher/rancher/pkg/settings/setting.go
 ENV CATTLE_KDM_BRANCH=dev-v2.6
 
+# --replacefiles is used to account for file 
+# conflicts that arise with some of the packages
+# installed below and the base image used for 
+# FIPS compliance.
 RUN zypper -n install -y --replacefiles \
     gcc \
     binutils \
@@ -39,7 +43,7 @@ RUN zypper -n install -y --replacefiles \
 # use containerd from k3s image, not from bci
 RUN zypper install -y -f docker && rpm -e --nodeps --noscripts containerd
 
-RUN curl -sLf https://github.com/rancher/machine/releases/download/${CATTLE_MACHINE_VERSION}/rancher-machine-${DAPPER_HOST_ARCH}.tar.gz | tar xvzf - -C /usr/bin
+RUN curl -sLf https://github.com/rancher/machine/releases/download/${CATTLE_MACHINE_VERSION}/rancher-machine-${ARCH}.tar.gz | tar xvzf - -C /usr/bin
 
 RUN zypper -n in go1.17
 
@@ -127,8 +131,15 @@ RUN curl -sLf https://github.com/rancher/k3s/releases/download/${CATTLE_K3S_VERS
 ENV YQ_URL=https://github.com/mikefarah/yq/releases/download/3.4.1/yq_linux_${ARCH}
 RUN curl -sLf ${YQ_URL} -o /usr/bin/yq && chmod +x /usr/bin/yq
 
-
-RUN zypper install -y python3-tox python3-base python3 libffi-devel #libopenssl-devel
+# The standard build will not have a BUILD_IMAGE given
+# and will follow the else path. If a BUILD_IMAGE is
+# give, the assumption is that it will be the FIPS 
+# enabled image and libopenssl-devel won't be needed.
+RUN if [ "${BUILD_IMAGE}" != "" ]; then \
+        zypper install -y python3-tox python3-base python3 libffi-devel; \
+    else \
+        zypper install -y python3-tox python3-base python3 libffi-devel libopenssl-devel; \
+    fi
 
 ENV HELM_HOME /root/.helm
 ENV DAPPER_ENV REPO TAG DRONE_TAG DRONE_COMMIT DRONE_BRANCH SYSTEM_CHART_DEFAULT_BRANCH FOSSA_API_KEY GOGET_MODULE GOGET_VERSION RELEASE_ACTION RELEASE_TYPE POSTRELEASE_RANCHER_VERSION POSTRELEASE_RANCHER_STABLE BUILD_IMAGE SERVER_NAME AGENT_NAME
