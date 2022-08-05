@@ -64,7 +64,7 @@ func NewProxyMiddleware(sar v1.SubjectAccessReviewInterface,
 
 	mux := gmux.NewRouter()
 	mux.UseEncodedPath()
-	mux.PathPrefix("/api").HandlerFunc(proxyHandler.authLocalCluster(mux))
+	mux.PathPrefix("/api").HandlerFunc(proxyHandler.authLocalCluster(localCluster))
 	mux.Path("/v1/management.cattle.io.clusters/{clusterID}").Queries("link", "shell").HandlerFunc(routeToShellProxy("link", "shell", localSupport, localCluster, mux, proxyHandler))
 	mux.Path("/v1/management.cattle.io.clusters/{clusterID}").Queries("action", "apply").HandlerFunc(routeToShellProxy("action", "apply", localSupport, localCluster, mux, proxyHandler))
 	mux.Path("/v3/clusters/{clusterID}").Queries("shell", "true").HandlerFunc(routeToShellProxy("link", "shell", localSupport, localCluster, mux, proxyHandler))
@@ -86,8 +86,10 @@ func routeToShellProxy(key, value string, localSupport bool, localCluster http.H
 			if localSupport {
 				authed := proxyHandler.userCanAccessCluster(r, cluster)
 				if !authed {
-					rw.WriteHeader(http.StatusUnauthorized)
-					return
+					if r.Context().Value(auth.CattleAuthFailed) == nil {
+						rw.WriteHeader(http.StatusUnauthorized)
+						return
+					}
 				}
 				q := r.URL.Query()
 				q.Set(key, value)
@@ -131,14 +133,16 @@ func (h *Handler) MatchNonLegacy(prefix string) gmux.MatcherFunc {
 	}
 }
 
-func (h *Handler) authLocalCluster(router *gmux.Router) func(rw http.ResponseWriter, r *http.Request) {
+func (h *Handler) authLocalCluster(localCluster http.Handler) func(rw http.ResponseWriter, r *http.Request) {
 	return func(rw http.ResponseWriter, req *http.Request) {
 		authed := h.userCanAccessCluster(req, "local")
 		if !authed {
-			rw.WriteHeader(http.StatusUnauthorized)
-			return
+			if req.Context().Value(auth.CattleAuthFailed) == nil {
+				rw.WriteHeader(http.StatusUnauthorized)
+				return
+			}
 		}
-		router.NotFoundHandler.ServeHTTP(rw, req)
+		localCluster.ServeHTTP(rw, req)
 	}
 }
 
@@ -162,11 +166,8 @@ func (h *Handler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 
 func (h *Handler) userCanAccessCluster(req *http.Request, clusterID string) bool {
 	requestUser, ok := request.UserFrom(req.Context())
-	if !ok {
-		return false
-	}
-	if !h.canAccess(req.Context(), requestUser, clusterID) {
-		return false
+	if ok {
+		return h.canAccess(req.Context(), requestUser, clusterID)
 	}
 	return true
 }
