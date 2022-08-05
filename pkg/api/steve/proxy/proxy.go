@@ -136,8 +136,10 @@ func (h *Handler) authLocalCluster(router *gmux.Router) func(rw http.ResponseWri
 	return func(rw http.ResponseWriter, req *http.Request) {
 		authed := h.userCanAccessCluster(req, "local")
 		if !authed {
-			rw.WriteHeader(http.StatusUnauthorized)
-			return
+			if req.Context().Value(auth.CattleAuthFailed) != "true" {
+				rw.WriteHeader(http.StatusUnauthorized)
+				return
+			}
 		}
 		router.NotFoundHandler.ServeHTTP(rw, req)
 	}
@@ -163,13 +165,10 @@ func (h *Handler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 
 func (h *Handler) userCanAccessCluster(req *http.Request, clusterID string) bool {
 	requestUser, ok := request.UserFrom(req.Context())
-	if !ok {
-		return false
+	if ok {
+		return h.canAccess(req.Context(), requestUser, clusterID)
 	}
-	if !h.canAccess(req.Context(), requestUser, clusterID) {
-		return false
-	}
-	return true
+	return false
 }
 
 func (h *Handler) dialer(ctx context.Context, network, address string) (net.Conn, error) {
