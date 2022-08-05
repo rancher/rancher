@@ -6,25 +6,24 @@ These are the examples of the configurations needed to run the provisioning pack
 ---
 
 ### Provisioning Input
-provisioningInput is needed to the run the RKE2 tests, specifically kubernetesVersion, cni, and providers. nodesAndRoles is only needed for the TestProvisioningDynamicInput test, node pools are divided by "{nodepool},". nodeProviders is only needed for node provider cluster tests; the framework only supports custom clusters through aws/ec2 instances.
+provisioningInput is needed to the run the RKE1 tests, specifically kubernetesVersion, cni, and providers. nodesAndRoles is only needed for the TestProvisioningDynamicInput test, node pools are divided by "{nodepool},". nodeProviders is only needed for node provider cluster tests.
 
 ```json
 "provisioningInput": {
-    "nodesAndRoles": [
-       {
-         "etcd": true,
-         "controlplane": true,
-         "worker": true,
-         "quantity": 1,
-       },
-       {
-         "worker": true,
-         "quantity": 2,
-       }
-     ],
-    "kubernetesVersion": ["v1.21.6+rke2r1"],
-    "cni": ["calico"],
-    "providers": ["linode", "aws", "do", "harvester"],
+    "nodesAndRoles": [ 
+      {
+        "etcd": true,
+        "controlplane": true,
+        "worker": true,
+        "quantity": 1,
+      },
+      {
+        "worker": true,
+        "quantity": 2,
+      }
+    ],
+    "kubernetesVersion": ["v1.24.2-rancher1-1"],
+    "providers": ["linode", "aws", "azure", "harvester"],
     "nodeProviders": ["ec2"]
   }
 ```

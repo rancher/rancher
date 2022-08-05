@@ -8,7 +8,6 @@ import (
 	aws "github.com/rancher/rancher/tests/framework/extensions/rke1/nodetemplates/aws"
 	azure "github.com/rancher/rancher/tests/framework/extensions/rke1/nodetemplates/azure"
 	linode "github.com/rancher/rancher/tests/framework/extensions/rke1/nodetemplates/linode"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
 const (
@@ -18,7 +17,6 @@ const (
 )
 
 type NodeTemplateFunc func(rancherClient *rancher.Client) (*nodetemplates.NodeTemplate, error)
-type MachinePoolFunc func(generatedPoolName, namespace string) *unstructured.Unstructured
 
 type Provider struct {
 	Name             string
