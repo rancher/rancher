@@ -6,7 +6,7 @@ These are the examples of the configurations needed to run the provisioning pack
 ---
 
 ### Provisioning Input
-provisioningInput is needed to the run the RKE1 tests, specifically kubernetesVersion, cni, and providers. nodesAndRoles is only needed for the TestProvisioningDynamicInput test, node pools are divided by "{nodepool},". nodeProviders is only needed for node provider cluster tests.
+provisioningInput is needed to the run the RKE1 tests, specifically kubernetesVersion, cni, and providers. nodesAndRoles is only needed for the TestProvisioningDynamicInput test, node pools are divided by "{nodepool},". nodeProviders is only needed for node provider cluster tests; the framework only supports custom clusters through aws/ec2 instances.
 
 ```json
 "provisioningInput": {
@@ -26,6 +26,26 @@ provisioningInput is needed to the run the RKE1 tests, specifically kubernetesVe
     "providers": ["linode", "aws", "azure", "harvester"],
     "nodeProviders": ["ec2"]
   }
+```
+
+### AWS/EC2 Config
+For custom clusters, the below config is needed, only AWS/EC2. It is important to note that you MUST use an AMI that already has Docker installed and the service is enabled on boot; otherwise, this will not work.
+
+```json
+ "awsEC2Config": {
+    "region": "us-east-2",
+    "instanceType": "t3a.medium",
+    "awsRegionAZ": "",
+    "awsAMI": "",
+    "awsSecurityGroups": [""],
+    "awsAccessKeyID": "",
+    "awsSecretAccessKey": "",
+    "awsSSHKeyName": "",
+    "awsCICDInstanceTag": "",
+    "awsIAMProfile": "",
+    "awsUser": "ubuntu",
+    "volumeSize": 50
+  },
 ```
 
 ## Node Template Configs
@@ -116,6 +136,34 @@ RKE1 specifically needs a node template config to run properly. These are the in
 }
 ```
 
+### Harvester
+```json
+"harvesterNodeTemplate": {
+    "cloudConfig": "",
+    "clusterId": "",
+    "clusterType": "",
+    "cpuCount": "2",
+    "diskBus": "virtio",
+    "diskSize": "40",
+    "imageName": "default/image-gchq8",
+    "keyPairName": "",
+    "kubeconfigContent": "",
+    "memorySize": "4",
+    "networkData": "",
+    "networkModel": "virtio",
+    "networkName": "",
+    "networkType": "dhcp",
+    "sshPassword": "",
+    "sshPort": "22",
+    "sshPrivateKeyPath": "",
+    "sshUser": "ubuntu",
+    "type": "harvesterConfig",
+    "userData": "",
+    "vmAffinity": "",
+    "vmNamespace": "default"
+}
+```
+
 ### Linode
 ```json
 "linodeNodeTemplate:" { 
@@ -168,7 +216,7 @@ provisioningInput is needed to the run the RKE2 tests, specifically kubernetesVe
 ```
 
 ### AWS/EC2 Config
-For custom clusters the below config is needed, only AWS/EC2 
+For custom clusters, the below config is needed, only AWS/EC2 will work.
 
 ```json
  "awsEC2Config": {
