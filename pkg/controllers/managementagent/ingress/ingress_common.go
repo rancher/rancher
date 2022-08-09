@@ -72,7 +72,7 @@ func (i *ingressService) generateNewService(obj *v1beta1.Ingress, serviceType co
 			OwnerReferences: []metav1.OwnerReference{
 				{
 					Name:       obj.Name,
-					APIVersion: "v1beta1/extensions",
+					APIVersion: obj.APIVersion,
 					UID:        obj.UID,
 					Kind:       "Ingress",
 					Controller: &controller,
