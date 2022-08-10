@@ -360,6 +360,7 @@ steps:
 
 - name: check-release-images-exists
   image: rancher/dapper:v0.5.8
+  failure: ignore
   commands:
   - dapper check-release-images-exist
   privileged: true
