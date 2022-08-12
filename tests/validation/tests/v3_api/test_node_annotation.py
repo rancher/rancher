@@ -634,7 +634,7 @@ def test_rbac_node_annotation_add_kubectl(role):
                                         annotation_value)
         # cleanup annotation
         delete_node_annotation(annotation_key, node, client)
-    elif role == CLUSTER_MEMBER:
+    elif role == CLUSTER_MEMBER or role == PROJECT_OWNER:
         result = execute_kubectl_cmd(command, False, stderr=True)
         result = result.decode('ascii')
         assert "cannot patch resource \"nodes\"" in result
@@ -683,7 +683,7 @@ def test_rbac_node_annotation_delete_kubectl(role):
         time.sleep(2)
         # annotation should be deleted
         validate_annotation_deleted_on_node(user_client, node, annotation_key)
-    elif role == CLUSTER_MEMBER:
+    elif role == CLUSTER_MEMBER or role == PROJECT_OWNER:
         result = execute_kubectl_cmd(command, False, stderr=True)
         result = result.decode('ascii')
         assert "cannot patch resource \"nodes\"" in result
@@ -740,7 +740,7 @@ def test_rbac_node_annotation_edit_kubectl(role):
         validate_annotation_set_on_node(user_client, node,
                                         annotation_key,
                                         annotation_value_new)
-    elif role == CLUSTER_MEMBER:
+    elif role == CLUSTER_MEMBER or role == PROJECT_OWNER:
         result = execute_kubectl_cmd(command, False, stderr=True)
         result = result.decode('ascii')
         assert "cannot patch resource \"nodes\"" in result
