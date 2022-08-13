@@ -50,11 +50,6 @@ mkdir -p /usr/share/rancher/ui/assets
 curl -sLf https://github.com/rancher/system-agent/releases/download/${CATTLE_SYSTEM_AGENT_VERSION}/rancher-system-agent-amd64 -o /usr/share/rancher/ui/assets/rancher-system-agent-amd64
 curl -sLf https://github.com/rancher/system-agent/releases/download/${CATTLE_SYSTEM_AGENT_VERSION}/system-agent-uninstall.sh -o /usr/share/rancher/ui/assets/system-agent-uninstall.sh
 
-mkdir -p /image-assets
-curl -sLf https://github.com/$TB_ORG/$DIST/releases/download/$SOME_K8S_VERSION/$DIST$AIRGAP-images$LINUX-amd64.tar.gz -o /image-assets/$DIST$AIRGAP-images$LINUX-amd64.tar.gz
-echo Decompressing airgap tarball
-gzip -d /image-assets/$DIST$AIRGAP-images$LINUX-amd64.tar.gz
-
 run_rancher()
 {
     RESTART_COUNT=0
