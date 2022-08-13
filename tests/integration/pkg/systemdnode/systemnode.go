@@ -1,9 +1,6 @@
 package systemdnode
 
 import (
-	"fmt"
-	"os"
-
 	"github.com/rancher/rancher/tests/integration/pkg/clients"
 	"github.com/rancher/rancher/tests/integration/pkg/defaults"
 	corev1 "k8s.io/api/core/v1"
