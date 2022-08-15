@@ -1678,6 +1678,7 @@ def wait_for_app_to_active(client, app_id,
     @return: app object
     """
     start = time.time()
+    timeout = start + timeout
     app_data = client.list_app(id=app_id).data
     while len(app_data) == 0:
         if time.time() - start > timeout / 10:
@@ -2218,6 +2219,7 @@ def generate_template_global_role(name, new_user_default=False, template=None):
 def wait_for_backup_to_active(cluster, backupname,
                               timeout=DEFAULT_TIMEOUT):
     start = time.time()
+    timeout = start + timeout
     etcdbackups = cluster.etcdBackups(name=backupname)
     assert len(etcdbackups) == 1
     etcdbackupdata = etcdbackups['data']
