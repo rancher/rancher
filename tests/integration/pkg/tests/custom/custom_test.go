@@ -195,14 +195,20 @@ func TestCustomUniqueRoles(t *testing.T) {
 	}
 	defer clients.Close()
 
-	c, err := cluster.New(clients, &provisioningv1.Cluster{
+	clusterObject := provisioningv1.Cluster{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-custom-unique-roles",
 		},
 		Spec: provisioningv1.ClusterSpec{
 			RKEConfig: &provisioningv1.RKEConfig{},
 		},
-	})
+	}
+
+	clusterObject.Spec.RKEConfig.MachineGlobalConfig.Data = map[string]interface{}{
+		"kubelet-arg": "cgroups-per-qos=false enforce-node-allocatable=",
+	}
+
+	c, err := cluster.New(clients, &clusterObject)
 	if err != nil {
 		t.Fatal(err)
 	}
