@@ -2,18 +2,14 @@ package aks
 
 import (
 	"context"
-	"io/ioutil"
-	"time"
+	"net"
 
-	"github.com/ghodss/yaml"
 	openapi2 "github.com/google/gnostic/openapiv2"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	"github.com/rancher/rancher/pkg/controllers/management/clusteroperator"
-	mgmt3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/types/config/dialer"
 	meta1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/dynamic"
@@ -21,14 +17,16 @@ import (
 	"k8s.io/client-go/rest"
 )
 
-const MockDefaultAKSClusterConfigFilename = "./test/onclusterchange_akscc_default.json"
-const MockCreateAKSClusterConfigFilename = "./test/onclusterchange_akscc_create.json"
-const MockActiveAKSClusterConfigFilename = "./test/onclusterchange_akscc_active.json"
-const MockUpdateAKSClusterConfigFilename = "./test/onclusterchange_akscc_update.json"
+const (
+	MockDefaultAKSClusterConfigFilename = "./test/onclusterchange_akscc_default.json"
+	MockCreateAKSClusterConfigFilename = "./test/onclusterchange_akscc_create.json"
+	MockActiveAKSClusterConfigFilename = "./test/onclusterchange_akscc_active.json"
+	MockUpdateAKSClusterConfigFilename = "./test/onclusterchange_akscc_update.json"
+	MockAKSClusterConfigUpdatedFilename = "./test/updateaksclusterconfig_updated.json"
+)
 
-const MockAKSClusterConfigUpdatedFilename = "./test/updateaksclusterconfig_updated.json"
+// mock interfaces
 
-// utility
 
 // mock cluster client
 
@@ -65,6 +63,7 @@ func (m MockClusterClient) Watch(opts meta1.ListOptions) (watch.Interface, error
 func (m MockClusterClient) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v3.Cluster, err error) {
 	panic("implement me")
 }
+
 
 // mock dynamic client (to return a mock AKSClusterConfig)
 
@@ -137,7 +136,7 @@ func (m MockResourceInterfaceDefault) DeleteCollection(ctx context.Context, opti
 }
 
 func (m MockResourceInterfaceDefault) Get(ctx context.Context, name string, options meta1.GetOptions, subresources ...string) (*unstructured.Unstructured, error) {
-	return getMockAKSClusterConfig(MockDefaultAKSClusterConfigFilename)
+	return getMockAksClusterConfig(MockDefaultAKSClusterConfigFilename)
 }
 
 func (m MockResourceInterfaceDefault) List(ctx context.Context, opts meta1.ListOptions) (*unstructured.UnstructuredList, error) {
@@ -219,7 +218,7 @@ func (m MockResourceInterfaceCreate) DeleteCollection(ctx context.Context, optio
 }
 
 func (m MockResourceInterfaceCreate) Get(ctx context.Context, name string, options meta1.GetOptions, subresources ...string) (*unstructured.Unstructured, error) {
-	return getMockAKSClusterConfig(MockCreateAKSClusterConfigFilename)
+	return getMockAksClusterConfig(MockCreateAKSClusterConfigFilename)
 }
 
 func (m MockResourceInterfaceCreate) List(ctx context.Context, opts meta1.ListOptions) (*unstructured.UnstructuredList, error) {
@@ -301,7 +300,7 @@ func (m MockResourceInterfaceActive) DeleteCollection(ctx context.Context, optio
 }
 
 func (m MockResourceInterfaceActive) Get(ctx context.Context, name string, options meta1.GetOptions, subresources ...string) (*unstructured.Unstructured, error) {
-	return getMockAKSClusterConfig(MockActiveAKSClusterConfigFilename)
+	return getMockAksClusterConfig(MockActiveAKSClusterConfigFilename)
 }
 
 func (m MockResourceInterfaceActive) List(ctx context.Context, opts meta1.ListOptions) (*unstructured.UnstructuredList, error) {
@@ -383,7 +382,7 @@ func (m MockResourceInterfaceUpdate) DeleteCollection(ctx context.Context, optio
 }
 
 func (m MockResourceInterfaceUpdate) Get(ctx context.Context, name string, options meta1.GetOptions, subresources ...string) (*unstructured.Unstructured, error) {
-	return getMockAKSClusterConfig(MockUpdateAKSClusterConfigFilename)
+	return getMockAksClusterConfig(MockUpdateAKSClusterConfigFilename)
 }
 
 func (m MockResourceInterfaceUpdate) List(ctx context.Context, opts meta1.ListOptions) (*unstructured.UnstructuredList, error) {
@@ -449,7 +448,7 @@ func (m MockResourceInterfaceAKSCC) Create(ctx context.Context, obj *unstructure
 }
 
 func (m MockResourceInterfaceAKSCC) Update(ctx context.Context, obj *unstructured.Unstructured, options meta1.UpdateOptions, subresources ...string) (*unstructured.Unstructured, error) {
-	return getMockAKSClusterConfig(MockAKSClusterConfigUpdatedFilename)
+	return getMockAksClusterConfig(MockAKSClusterConfigUpdatedFilename)
 }
 
 func (m MockResourceInterfaceAKSCC) UpdateStatus(ctx context.Context, obj *unstructured.Unstructured, options meta1.UpdateOptions) (*unstructured.Unstructured, error) {
@@ -465,7 +464,7 @@ func (m MockResourceInterfaceAKSCC) DeleteCollection(ctx context.Context, option
 }
 
 func (m MockResourceInterfaceAKSCC) Get(ctx context.Context, name string, options meta1.GetOptions, subresources ...string) (*unstructured.Unstructured, error) {
-	return getMockAKSClusterConfig(MockAKSClusterConfigUpdatedFilename)
+	return getMockAksClusterConfig(MockAKSClusterConfigUpdatedFilename)
 }
 
 func (m MockResourceInterfaceAKSCC) List(ctx context.Context, opts meta1.ListOptions) (*unstructured.UnstructuredList, error) {
@@ -496,6 +495,28 @@ func (m MockResourceInterfaceAKSCC) Watch(ctx context.Context, opts meta1.ListOp
 func (m MockResourceInterfaceAKSCC) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, options meta1.PatchOptions, subresources ...string) (*unstructured.Unstructured, error) {
 	panic("implement me")
 }
+
+// mock cluster dialer
+
+type MockFactory struct {}
+
+func (m MockFactory) ClusterDialer(clusterName string) (dialer.Dialer, error) {
+	// pass a dialer func to the client
+	dialer := func(ctx context.Context, network, address string) (net.Conn, error){
+		return nil, nil
+	}
+	return dialer, nil
+}
+
+func (m MockFactory) DockerDialer(clusterName, machineName string) (dialer.Dialer, error) {
+	panic("implement me")
+}
+
+func (m MockFactory) NodeDialer(clusterName, machineName string) (dialer.Dialer, error) {
+	panic("implement me")
+}
+
+type Dialer func(ctx context.Context, network, address string) (net.Conn, error)
 
 // mock discovery
 
@@ -542,79 +563,4 @@ func (m MockDiscovery) OpenAPISchema() (*openapi2.Document, error) {
 
 func (m MockDiscovery) OpenAPIV3() openapi.Client {
 	panic("implement me")
-}
-
-// mock AKS operator controller
-
-func getMockAksOperatorController(clusterState string) (aksOperatorController) {
-	var dynamicClient dynamic.NamespaceableResourceInterface
-
-	switch clusterState {
-	case "default":
-		dynamicClient = MockNamespaceableResourceInterfaceDefault{}
-	case "create":
-		dynamicClient = MockNamespaceableResourceInterfaceCreate{}
-	case "active":
-		dynamicClient = MockNamespaceableResourceInterfaceActive{}
-	case "update":
-		dynamicClient = MockNamespaceableResourceInterfaceUpdate{}
-	case "akscc":
-		dynamicClient = MockNamespaceableResourceInterfaceAKSCC{}
-	default:
-		dynamicClient = nil
-	}
-
-	return aksOperatorController{
-		OperatorController: clusteroperator.OperatorController{
-			ClusterEnqueueAfter:  func(name string, duration time.Duration){},
-			SecretsCache:         nil,
-			Secrets:              nil,
-			TemplateCache:        nil,
-			ProjectCache:         nil,
-			AppLister:            nil,
-			AppClient:            nil,
-			NsClient:             nil,
-			ClusterClient:        MockClusterClient{},
-			CatalogManager:       nil,
-			SystemAccountManager: nil,
-			DynamicClient:        dynamicClient,
-			ClientDialer:         nil,
-			Discovery:            MockDiscovery{},
-		},
-		secretClient: nil,
-	}
-}
-
-// mock cluster state
-
-func getMockV3Cluster(filename string) (mgmt3.Cluster, error) {
-	var mockCluster mgmt3.Cluster
-
-	// Read the file
-	cluster, err := ioutil.ReadFile(filename); if err != nil {
-		return mockCluster, err
-	}
-	// Unmarshal cluster yaml into a management v3 cluster object
-	err = yaml.Unmarshal(cluster, &mockCluster); if err != nil {
-		return mockCluster, err
-	}
-
-	return mockCluster, nil
-}
-
-// mock AKS cluster config
-
-func getMockAKSClusterConfig(filename string) (*unstructured.Unstructured, error) {
-	var aksClusterConfig *unstructured.Unstructured
-
-	// Read the file
-	bytes, err := ioutil.ReadFile(filename); if err != nil {
-		return aksClusterConfig, err
-	}
-	// Unmarshal json into an unstructured cluster config object
-	err = json.Unmarshal(bytes, &aksClusterConfig); if err != nil {
-		return aksClusterConfig, err
-	}
-
-	return aksClusterConfig, nil
 }
