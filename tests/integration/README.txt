@@ -1,1 +1,0 @@
-Integration scripts for Rancher
