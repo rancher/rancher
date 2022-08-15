@@ -1,0 +1,172 @@
+apiVersion: management.cattle.io/v3
+kind: Cluster
+metadata:
+  annotations:
+    authz.management.cattle.io/creator-role-bindings: '{"created":["cluster-owner"],"required":["cluster-owner"]}'
+    field.cattle.io/creatorId: user-rgtsq
+    lifecycle.cattle.io/create.cluster-agent-controller-cleanup: "true"
+    lifecycle.cattle.io/create.cluster-provisioner-controller: "true"
+    lifecycle.cattle.io/create.cluster-scoped-gc: "true"
+    lifecycle.cattle.io/create.mgmt-cluster-rbac-remove: "true"
+  creationTimestamp: "2022-08-15T21:51:40Z"
+  finalizers:
+  - wrangler.cattle.io/mgmt-cluster-remove
+  - controller.cattle.io/cluster-agent-controller-cleanup
+  - controller.cattle.io/cluster-scoped-gc
+  - controller.cattle.io/cluster-provisioner-controller
+  - controller.cattle.io/mgmt-cluster-rbac-remove
+  generateName: c-
+  generation: 14
+  labels:
+    cattle.io/creator: norman
+  name: c-r64vb
+  resourceVersion: "362818"
+  uid: ced870a2-50a7-4c12-ba8c-ef84e6616fbf
+spec:
+  agentImageOverride: ""
+  answers: {}
+  clusterSecrets: {}
+  description: ""
+  desiredAgentImage: ""
+  desiredAuthImage: ""
+  displayName: eks-test
+  dockerRootDir: /var/lib/docker
+  eksConfig:
+    amazonCredentialSecret: cattle-global-data:cc-kxfmx
+    displayName: eks-test
+    imported: false
+    kmsKey: ""
+    kubernetesVersion: "1.22"
+    loggingTypes: []
+    nodeGroups:
+    - desiredSize: 2
+      diskSize: 20
+      ec2SshKey: ""
+      gpu: false
+      imageId: ""
+      instanceType: t3.medium
+      labels: {}
+      launchTemplate: null
+      maxSize: 2
+      minSize: 2
+      nodegroupName: nodegroup
+      requestSpotInstances: false
+      resourceTags: {}
+      spotInstanceTypes: []
+      subnets: []
+      tags: {}
+      userData: ""
+      version: "1.22"
+    privateAccess: false
+    publicAccess: true
+    publicAccessSources: []
+    region: us-east-2
+    secretsEncryption: false
+    securityGroups: []
+    serviceRole: ""
+    subnets: []
+    tags: {}
+  enableClusterAlerting: false
+  enableClusterMonitoring: false
+  enableNetworkPolicy: false
+  fleetWorkspaceName: fleet-default
+  internal: false
+  localClusterAuthEndpoint:
+    enabled: false
+  windowsPreferedCluster: false
+status:
+  agentImage: ""
+  aksStatus:
+    privateRequiresTunnel: null
+    rbacEnabled: null
+    upstreamSpec: null
+  allocatable:
+    cpu: "0"
+    memory: "0"
+    pods: "0"
+  appliedEnableNetworkPolicy: false
+  appliedPodSecurityPolicyTemplateId: ""
+  appliedSpec:
+    agentImageOverride: ""
+    answers: {}
+    clusterSecrets: {}
+    description: ""
+    desiredAgentImage: ""
+    desiredAuthImage: ""
+    displayName: ""
+    enableClusterAlerting: false
+    enableClusterMonitoring: false
+    enableNetworkPolicy: null
+    internal: false
+    localClusterAuthEndpoint:
+      enabled: false
+    windowsPreferedCluster: false
+  authImage: ""
+  capabilities:
+    loadBalancerCapabilities: {}
+  capacity:
+    cpu: "0"
+    memory: "0"
+    pods: "0"
+  conditions:
+  - status: "True"
+    type: Pending
+  - lastUpdateTime: "2022-08-15T17:55:31-04:00"
+    status: Unknown
+    type: Provisioned
+  - lastUpdateTime: "2022-08-15T17:51:51-04:00"
+    message: Waiting for API to be available
+    status: Unknown
+    type: Waiting
+  - lastUpdateTime: "2022-08-15T17:51:41-04:00"
+    status: "True"
+    type: BackingNamespaceCreated
+  - lastUpdateTime: "2022-08-15T17:51:41-04:00"
+    status: "True"
+    type: DefaultProjectCreated
+  - lastUpdateTime: "2022-08-15T17:51:42-04:00"
+    status: "True"
+    type: SystemProjectCreated
+  - lastUpdateTime: "2022-08-15T17:51:42-04:00"
+    status: "True"
+    type: InitialRolesPopulated
+  - lastUpdateTime: "2022-08-15T17:51:44-04:00"
+    status: "True"
+    type: CreatorMadeOwner
+  - lastUpdateTime: "2022-08-15T17:51:46-04:00"
+    status: "True"
+    type: NoDiskPressure
+  - lastUpdateTime: "2022-08-15T17:51:46-04:00"
+    status: "True"
+    type: NoMemoryPressure
+  - lastUpdateTime: "2022-08-15T17:51:47-04:00"
+    status: "True"
+    type: SecretsMigrated
+  - lastUpdateTime: "2022-08-15T17:51:47-04:00"
+    status: "True"
+    type: ServiceAccountSecretsMigrated
+  - lastUpdateTime: "2022-08-15T21:51:50Z"
+    status: "False"
+    type: Connected
+  driver: EKS
+  eksStatus:
+    managedLaunchTemplateID: ""
+    managedLaunchTemplateVersions: null
+    privateRequiresTunnel: null
+    securityGroups: null
+    subnets: null
+    upstreamSpec:
+      mockTestField: "upstreamSpec is already set"
+    virtualNetwork: ""
+  gkeStatus:
+    privateRequiresTunnel: null
+    upstreamSpec: null
+  limits:
+    cpu: "0"
+    memory: "0"
+    pods: "0"
+  provider: ""
+  requested:
+    cpu: "0"
+    memory: "0"
+    pods: "0"

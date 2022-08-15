@@ -1,7 +1,6 @@
 package aks
 
 import (
-	"os"
 	"reflect"
 	"testing"
 
@@ -14,29 +13,14 @@ const (
 	MockCreateClusterFilename = "./test/onclusterchange_create.yaml"
 	MockActiveClusterFilename = "./test/onclusterchange_active.yaml"
 	MockUpdateClusterFilename = "./test/onclusterchange_update.yaml"
-
 	MockAKSClusterConfigFilename = "./test/updateaksclusterconfig.json"
-	MockAKSClusterConfigClusterFilename = "./test/updateaksclusterconfig_cluster.yaml"
-
+	MockAKSClusterConfigClusterFilename = "./test/updateaksclusterconfig.yaml"
 	MockBuildAKSCCCreateObjectFilename = "./test/buildakscccreateobject.json"
 )
 
 
-var mockOperatorController mockAksOperatorController	// AKS operator controller with mock interfaces & sibling funcs
+var mockOperatorController mockAksOperatorController	// Operator controller with mock interfaces & sibling funcs
 
-// test setup
-
-func TestMain(m *testing.M) {
-	// Code to run before the tests
-
-	// Run tests
-	exitVal := m.Run()
-
-	// Code to run after the tests
-
-	// Exit with exit value from tests
-	os.Exit(exitVal)
-}
 
 /** Test_onClusterChange
 	- cluster == nil. Return (nil nil)
@@ -201,7 +185,10 @@ func Test_buildAKSCCCreateObject(t *testing.T) {
 
 	akscc, err := buildAKSCCCreateObject(&mockCluster)
 
-	if !reflect.DeepEqual(akscc, expected) || err != nil {
+	if !reflect.DeepEqual(akscc, expected) {
+		t.Error("AKS cluster config object was not built as expected")
+	}
+	if err != nil {
 		t.Error("AKS cluster config object should have been returned successfully: " + err.Error())
 	}
 }

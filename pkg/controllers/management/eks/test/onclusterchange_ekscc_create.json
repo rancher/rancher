@@ -1,0 +1,140 @@
+{
+  "apiVersion": "eks.cattle.io/v1",
+  "kind": "EKSClusterConfig",
+  "metadata": {
+    "creationTimestamp": "2022-08-15T21:51:51Z",
+    "finalizers": [
+      "wrangler.cattle.io/eks-controller-remove"
+    ],
+    "generation": 1,
+    "managedFields": [
+      {
+        "apiVersion": "eks.cattle.io/v1",
+        "fieldsType": "FieldsV1",
+        "fieldsV1": {
+          "f:metadata": {
+            "f:ownerReferences": {
+              ".": {},
+              "k:{\"uid\":\"ced870a2-50a7-4c12-ba8c-ef84e6616fbf\"}": {}
+            }
+          },
+          "f:spec": {
+            ".": {},
+            "f:amazonCredentialSecret": {},
+            "f:displayName": {},
+            "f:imported": {},
+            "f:kmsKey": {},
+            "f:kubernetesVersion": {},
+            "f:loggingTypes": {},
+            "f:nodeGroups": {},
+            "f:privateAccess": {},
+            "f:publicAccess": {},
+            "f:publicAccessSources": {},
+            "f:region": {},
+            "f:secretsEncryption": {},
+            "f:securityGroups": {},
+            "f:serviceRole": {},
+            "f:subnets": {},
+            "f:tags": {}
+          }
+        },
+        "manager": "___go_build_main_go",
+        "operation": "Update",
+        "time": "2022-08-15T21:51:51Z"
+      },
+      {
+        "apiVersion": "eks.cattle.io/v1",
+        "fieldsType": "FieldsV1",
+        "fieldsV1": {
+          "f:metadata": {
+            "f:finalizers": {
+              ".": {},
+              "v:\"wrangler.cattle.io/eks-controller-remove\"": {}
+            }
+          },
+          "f:status": {
+            ".": {},
+            "f:failureMessage": {},
+            "f:managedLaunchTemplateID": {},
+            "f:managedLaunchTemplateVersions": {},
+            "f:networkFieldsSource": {},
+            "f:phase": {},
+            "f:securityGroups": {},
+            "f:subnets": {},
+            "f:templateVersionsToDelete": {},
+            "f:virtualNetwork": {}
+          }
+        },
+        "manager": "eks-operator",
+        "operation": "Update",
+        "time": "2022-08-15T21:57:22Z"
+      }
+    ],
+    "name": "c-r64vb",
+    "namespace": "cattle-global-data",
+    "ownerReferences": [
+      {
+        "apiVersion": "management.cattle.io/v3",
+        "kind": "Cluster",
+        "name": "c-r64vb",
+        "uid": "ced870a2-50a7-4c12-ba8c-ef84e6616fbf"
+      }
+    ],
+    "resourceVersion": "363194",
+    "uid": "94341fca-b417-4834-a3e3-61bcbe18d01d"
+  },
+  "spec": {
+    "amazonCredentialSecret": "cattle-global-data:cc-kxfmx",
+    "displayName": "eks-test",
+    "imported": false,
+    "kmsKey": "",
+    "kubernetesVersion": "1.22",
+    "loggingTypes": [],
+    "nodeGroups": [
+      {
+        "desiredSize": 2,
+        "diskSize": 20,
+        "ec2SshKey": "",
+        "gpu": false,
+        "imageId": "",
+        "instanceType": "t3.medium",
+        "labels": {},
+        "launchTemplate": null,
+        "maxSize": 2,
+        "minSize": 2,
+        "nodegroupName": "nodegroup",
+        "requestSpotInstances": false,
+        "resourceTags": {},
+        "spotInstanceTypes": [],
+        "subnets": [],
+        "tags": {},
+        "userData": "",
+        "version": "1.22"
+      }
+    ],
+    "privateAccess": false,
+    "publicAccess": true,
+    "publicAccessSources": [],
+    "region": "us-east-2",
+    "secretsEncryption": false,
+    "securityGroups": [],
+    "serviceRole": "",
+    "subnets": [],
+    "tags": {}
+  },
+  "status": {
+    "failureMessage": "",
+    "managedLaunchTemplateID": "",
+    "managedLaunchTemplateVersions": null,
+    "networkFieldsSource": "generated",
+    "phase": "creating",
+    "securityGroups": null,
+    "subnets": [
+      "subnet-08ccb4afdb065a5ae",
+      "subnet-03121df4ef3937d28",
+      "subnet-059fd38298f08064a"
+    ],
+    "templateVersionsToDelete": null,
+    "virtualNetwork": "vpc-0d54378891c31bd13"
+  }
+}

@@ -126,10 +126,6 @@ func (e *aksOperatorController) onClusterChange(key string, cluster *mgmtv3.Clus
 		return cluster, err
 	}
 
-	//test
-	//bytes, _ := json.Marshal(aksClusterConfigDynamic)
-	//println(string(bytes))
-
 	// check for changes between aks spec on cluster and the aks spec on the aksClusterConfig object
 	if !reflect.DeepEqual(aksClusterConfigMap, aksClusterConfigDynamic.Object["spec"]) {
 		logrus.Infof("change detected for cluster [%s], updating AKSClusterConfig", cluster.Name)
@@ -140,10 +136,6 @@ func (e *aksOperatorController) onClusterChange(key string, cluster *mgmtv3.Clus
 	status, _ := aksClusterConfigDynamic.Object["status"].(map[string]interface{})
 	phase, _ := status["phase"]
 	failureMessage, _ := status["failureMessage"].(string)
-
-	//test
-	//bytes, _ = json.Marshal(aksClusterConfigDynamic)
-	//println(string(bytes))
 
 	switch phase {
 	case "creating":
