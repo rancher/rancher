@@ -43,7 +43,7 @@ func init() {
 	resource.Put(RoleGroupVersionResource)
 }
 
-// Deprecated use v1.Role instead
+// Deprecated: use v1.Role instead
 type Role = v1.Role
 
 func NewRole(namespace, name string, obj v1.Role) *v1.Role {

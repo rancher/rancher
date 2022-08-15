@@ -20,6 +20,7 @@ then
   echo -e "vm.overcommit_memory=1" >>/etc/sysctl.d/90-kubelet.conf
   echo -e "kernel.panic=10" >>/etc/sysctl.d/90-kubelet.conf
   echo -e "kernel.panic_on_oops=1" >>/etc/sysctl.d/90-kubelet.conf
+  echo -e "kernel.keys.root_maxbytes=25000000" >>/etc/sysctl.d/90-kubelet.conf
   sysctl -p /etc/sysctl.d/90-kubelet.conf
   systemctl restart systemd-sysctl
 fi

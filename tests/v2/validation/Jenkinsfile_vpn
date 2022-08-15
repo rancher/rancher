@@ -76,6 +76,8 @@ node {
                           string(credentialsId: 'RANCHER_VALID_TLS_KEY', variable: 'RANCHER_VALID_TLS_KEY'),
                           string(credentialsId: 'RANCHER_BYO_TLS_CERT', variable: 'RANCHER_BYO_TLS_CERT'),
                           string(credentialsId: 'RANCHER_BYO_TLS_KEY', variable: 'RANCHER_BYO_TLS_KEY'),
+                          string(credentialsId: 'EXTERNAL_ENCODED_VPN', variable: 'EXTERNAL_ENCODED_VPN'),
+                          string(credentialsId: 'VPN_ENCODED_LOGIN', variable: 'VPN_ENCODED_LOGIN'),
                           string(credentialsId: 'RANCHER_LINODE_ACCESSKEY', variable: "RANCHER_LINODE_ACCESSKEY")]) {
           stage('Checkout') {
             deleteDir()

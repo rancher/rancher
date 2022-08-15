@@ -42,7 +42,7 @@ func init() {
 	resource.Put(AuthConfigGroupVersionResource)
 }
 
-// Deprecated use v3.AuthConfig instead
+// Deprecated: use v3.AuthConfig instead
 type AuthConfig = v3.AuthConfig
 
 func NewAuthConfig(namespace, name string, obj v3.AuthConfig) *v3.AuthConfig {

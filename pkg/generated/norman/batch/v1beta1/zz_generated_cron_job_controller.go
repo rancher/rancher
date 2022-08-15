@@ -43,7 +43,7 @@ func init() {
 	resource.Put(CronJobGroupVersionResource)
 }
 
-// Deprecated use v1beta1.CronJob instead
+// Deprecated: use v1beta1.CronJob instead
 type CronJob = v1beta1.CronJob
 
 func NewCronJob(namespace, name string, obj v1beta1.CronJob) *v1beta1.CronJob {

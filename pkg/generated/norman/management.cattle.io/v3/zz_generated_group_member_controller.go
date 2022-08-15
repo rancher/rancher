@@ -42,7 +42,7 @@ func init() {
 	resource.Put(GroupMemberGroupVersionResource)
 }
 
-// Deprecated use v3.GroupMember instead
+// Deprecated: use v3.GroupMember instead
 type GroupMember = v3.GroupMember
 
 func NewGroupMember(namespace, name string, obj v3.GroupMember) *v3.GroupMember {

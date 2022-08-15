@@ -43,7 +43,7 @@ func init() {
 	resource.Put(ResourceQuotaGroupVersionResource)
 }
 
-// Deprecated use v1.ResourceQuota instead
+// Deprecated: use v1.ResourceQuota instead
 type ResourceQuota = v1.ResourceQuota
 
 func NewResourceQuota(namespace, name string, obj v1.ResourceQuota) *v1.ResourceQuota {

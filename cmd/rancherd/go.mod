@@ -73,7 +73,10 @@ replace (
 
 require (
 	github.com/containernetworking/cni v0.8.1 // indirect
+	github.com/emicklei/go-restful v2.16.0+incompatible // indirect
+	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/pkg/errors v0.9.1
+	github.com/prometheus/client_golang v1.11.1 // indirect
 	github.com/rancher/k3s v1.21.1-rc1.0.20210514205428-fd4d226e3deb
 	github.com/rancher/rke2 v1.20.8-0.20210526012514-ea6514775f81 // v1.20.7+rke2r2 ... If you update this, also update RKE2_VERSION in rancher/package/Dockerfile.runtime
 	github.com/rancher/wrangler v0.6.2
@@ -81,8 +84,10 @@ require (
 	github.com/sirupsen/logrus v1.8.1
 	github.com/urfave/cli v1.22.2
 	golang.org/x/crypto v0.0.0-20220411220226-7b82a4e95df4
+	golang.org/x/net v0.0.0-20220708220712-1185a9018129 // indirect
+	golang.org/x/sys v0.0.0-20220721230656-c6bc011c0c49 // indirect
 	gopkg.in/yaml.v2 v2.4.0
-	gopkg.in/yaml.v3 v3.0.0 // indirect
+	gopkg.in/yaml.v3 v3.0.1 // indirect
 	k8s.io/api v1.20.5
 	k8s.io/apimachinery v1.20.5
 	k8s.io/apiserver v1.20.0 // indirect

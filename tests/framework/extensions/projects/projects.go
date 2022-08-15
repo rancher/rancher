@@ -37,12 +37,7 @@ func GetProjectByName(client *rancher.Client, clusterID, projectName string) (*m
 func GetProjectList(client *rancher.Client, clusterID string) (*management.ProjectCollection, error) {
 	var project *management.ProjectCollection
 
-	adminClient, err := rancher.NewClient(client.RancherConfig.AdminToken, client.Session)
-	if err != nil {
-		return project, err
-	}
-
-	projectsList, err := adminClient.Management.Project.List(&types.ListOpts{
+	projectsList, err := client.Management.Project.List(&types.ListOpts{
 		Filters: map[string]interface{}{
 			"clusterId": clusterID,
 		},
@@ -59,11 +54,7 @@ func GetProjectList(client *rancher.Client, clusterID string) (*management.Proje
 // GetProjectList is a helper function that deletes a project in a specific cluster
 func DeleteProject(client *rancher.Client, project *management.Project) (error) {
 
-	adminClient, err := rancher.NewClient(client.RancherConfig.AdminToken, client.Session)
-	if err != nil {
-		return  err
-	}
-	err = adminClient.Management.Project.Delete(project)
+	err := client.Management.Project.Delete(project)
 	if err != nil {
 		return err
 	}

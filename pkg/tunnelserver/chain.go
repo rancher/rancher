@@ -18,7 +18,7 @@ func ErrorWriter(rw http.ResponseWriter, req *http.Request, code int, err error)
 	if forwardedFor != "" {
 		fullAddress = fmt.Sprintf("%s (X-Forwarded-For: %s)", req.RemoteAddr, forwardedFor)
 	}
-	logrus.Errorf("Failed to handling tunnel request from remote address %s: response %d: %v", fullAddress, code, err)
+	logrus.Errorf("Failed to handle tunnel request from remote address %s: response %d: %v", fullAddress, code, err)
 	logrus.Tracef("ErrorWriter: response code: %d, request: %v", code, req)
 	remotedialer.DefaultErrorWriter(rw, req, code, err)
 }

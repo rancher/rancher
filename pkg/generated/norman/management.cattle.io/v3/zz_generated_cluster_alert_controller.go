@@ -43,7 +43,7 @@ func init() {
 	resource.Put(ClusterAlertGroupVersionResource)
 }
 
-// Deprecated use v3.ClusterAlert instead
+// Deprecated: use v3.ClusterAlert instead
 type ClusterAlert = v3.ClusterAlert
 
 func NewClusterAlert(namespace, name string, obj v3.ClusterAlert) *v3.ClusterAlert {

@@ -43,7 +43,7 @@ func init() {
 	resource.Put(NotifierGroupVersionResource)
 }
 
-// Deprecated use v3.Notifier instead
+// Deprecated: use v3.Notifier instead
 type Notifier = v3.Notifier
 
 func NewNotifier(namespace, name string, obj v3.Notifier) *v3.Notifier {

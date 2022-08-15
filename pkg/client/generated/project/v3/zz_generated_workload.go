@@ -38,6 +38,7 @@ const (
 	WorkloadFieldJobStatus                            = "jobStatus"
 	WorkloadFieldLabels                               = "labels"
 	WorkloadFieldMaxSurge                             = "maxSurge"
+	WorkloadFieldMaxUnavailable                       = "maxUnavailable"
 	WorkloadFieldMinReadySeconds                      = "minReadySeconds"
 	WorkloadFieldName                                 = "name"
 	WorkloadFieldNamespaceId                          = "namespaceId"
@@ -75,6 +76,7 @@ const (
 	WorkloadFieldSysctls                              = "sysctls"
 	WorkloadFieldTTLSecondsAfterFinished              = "ttlSecondsAfterFinished"
 	WorkloadFieldTerminationGracePeriodSeconds        = "terminationGracePeriodSeconds"
+	WorkloadFieldTimeZone                             = "timeZone"
 	WorkloadFieldTopologySpreadConstraints            = "topologySpreadConstraints"
 	WorkloadFieldTransitioning                        = "transitioning"
 	WorkloadFieldTransitioningMessage                 = "transitioningMessage"
@@ -119,6 +121,7 @@ type Workload struct {
 	JobStatus                            *JobStatus                                       `json:"jobStatus,omitempty" yaml:"jobStatus,omitempty"`
 	Labels                               map[string]string                                `json:"labels,omitempty" yaml:"labels,omitempty"`
 	MaxSurge                             intstr.IntOrString                               `json:"maxSurge,omitempty" yaml:"maxSurge,omitempty"`
+	MaxUnavailable                       intstr.IntOrString                               `json:"maxUnavailable,omitempty" yaml:"maxUnavailable,omitempty"`
 	MinReadySeconds                      int64                                            `json:"minReadySeconds,omitempty" yaml:"minReadySeconds,omitempty"`
 	Name                                 string                                           `json:"name,omitempty" yaml:"name,omitempty"`
 	NamespaceId                          string                                           `json:"namespaceId,omitempty" yaml:"namespaceId,omitempty"`
@@ -156,6 +159,7 @@ type Workload struct {
 	Sysctls                              []Sysctl                                         `json:"sysctls,omitempty" yaml:"sysctls,omitempty"`
 	TTLSecondsAfterFinished              *int64                                           `json:"ttlSecondsAfterFinished,omitempty" yaml:"ttlSecondsAfterFinished,omitempty"`
 	TerminationGracePeriodSeconds        *int64                                           `json:"terminationGracePeriodSeconds,omitempty" yaml:"terminationGracePeriodSeconds,omitempty"`
+	TimeZone                             string                                           `json:"timeZone,omitempty" yaml:"timeZone,omitempty"`
 	TopologySpreadConstraints            []TopologySpreadConstraint                       `json:"topologySpreadConstraints,omitempty" yaml:"topologySpreadConstraints,omitempty"`
 	Transitioning                        string                                           `json:"transitioning,omitempty" yaml:"transitioning,omitempty"`
 	TransitioningMessage                 string                                           `json:"transitioningMessage,omitempty" yaml:"transitioningMessage,omitempty"`

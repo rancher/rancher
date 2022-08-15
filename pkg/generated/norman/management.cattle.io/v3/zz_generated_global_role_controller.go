@@ -42,7 +42,7 @@ func init() {
 	resource.Put(GlobalRoleGroupVersionResource)
 }
 
-// Deprecated use v3.GlobalRole instead
+// Deprecated: use v3.GlobalRole instead
 type GlobalRole = v3.GlobalRole
 
 func NewGlobalRole(namespace, name string, obj v3.GlobalRole) *v3.GlobalRole {

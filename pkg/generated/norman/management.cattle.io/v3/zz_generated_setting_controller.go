@@ -42,7 +42,7 @@ func init() {
 	resource.Put(SettingGroupVersionResource)
 }
 
-// Deprecated use v3.Setting instead
+// Deprecated: use v3.Setting instead
 type Setting = v3.Setting
 
 func NewSetting(namespace, name string, obj v3.Setting) *v3.Setting {

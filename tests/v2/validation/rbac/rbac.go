@@ -59,13 +59,24 @@ func GetListProjects(client *rancher.Client, clusterID string) (projectNames []s
 //Gets the list of namespaces and return the names of the namespaces as a slice
 func GetListNamespaces(client *rancher.Client, clusterID string) (namespace []string, err error) {
 	namespaceList, err := namespaces.ListNamespace(client, clusterID)
-	namespace = make([]string, len(namespaceList.Items))
 	if err != nil {
 		return namespace, err
 	}
 
+	namespace = make([]string, len(namespaceList.Items))
 	for idx, ns := range namespaceList.Items {
 		namespace[idx] = ns.GetName()
 	}
 	return namespace, err
+}
+
+func CreateProject(client *rancher.Client, clusterID string) (project *management.Project, err error){
+	projectName := AppendRandomString("testproject-CO-")
+	projectConfig := &management.Project{
+		ClusterID: clusterID,
+		Name:      projectName,
+	}
+	createProject, err := client.Management.Project.Create(projectConfig)
+	return createProject, err	
+
 }

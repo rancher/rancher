@@ -43,7 +43,7 @@ func init() {
 	resource.Put(ClusterRegistrationTokenGroupVersionResource)
 }
 
-// Deprecated use v3.ClusterRegistrationToken instead
+// Deprecated: use v3.ClusterRegistrationToken instead
 type ClusterRegistrationToken = v3.ClusterRegistrationToken
 
 func NewClusterRegistrationToken(namespace, name string, obj v3.ClusterRegistrationToken) *v3.ClusterRegistrationToken {

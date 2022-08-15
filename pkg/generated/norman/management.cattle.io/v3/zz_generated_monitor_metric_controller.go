@@ -43,7 +43,7 @@ func init() {
 	resource.Put(MonitorMetricGroupVersionResource)
 }
 
-// Deprecated use v3.MonitorMetric instead
+// Deprecated: use v3.MonitorMetric instead
 type MonitorMetric = v3.MonitorMetric
 
 func NewMonitorMetric(namespace, name string, obj v3.MonitorMetric) *v3.MonitorMetric {

@@ -324,7 +324,7 @@ func (r *RKE2ConfigServer) findSA(req *http.Request) (string, *corev1.Secret, er
 	logrus.Debugf("[rke2configserver] %s/%s listed %d planSAs", machineNamespace, machineName, len(planSAs))
 
 	for _, planSA := range planSAs {
-		planSecret, tokenSecretName, err := rke2.GetServiceAccountSecretNames(r.bootstrapCache, machineName, planSA)
+		planSecret, tokenSecretName, err := rke2.GetServiceAccountSecretNames(r.bootstrapCache, r.secrets, machineName, planSA)
 		if err != nil {
 			return planSecret, nil, err
 		}
@@ -356,7 +356,7 @@ func (r *RKE2ConfigServer) findSA(req *http.Request) (string, *corev1.Secret, er
 
 	for event := range resp.ResultChan() {
 		if planSA, ok := event.Object.(*corev1.ServiceAccount); ok {
-			planSecret, tokenSecretName, err := rke2.GetServiceAccountSecretNames(r.bootstrapCache, machineName, planSA)
+			planSecret, tokenSecretName, err := rke2.GetServiceAccountSecretNames(r.bootstrapCache, r.secrets, machineName, planSA)
 			if err != nil {
 				return planSecret, nil, err
 			}

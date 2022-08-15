@@ -42,7 +42,7 @@ func init() {
 	resource.Put(RancherUserNotificationGroupVersionResource)
 }
 
-// Deprecated use v3.RancherUserNotification instead
+// Deprecated: use v3.RancherUserNotification instead
 type RancherUserNotification = v3.RancherUserNotification
 
 func NewRancherUserNotification(namespace, name string, obj v3.RancherUserNotification) *v3.RancherUserNotification {

@@ -40,7 +40,7 @@ func (h *handler) OnPRTB(key string, prtb *v3.ProjectRoleTemplateBinding) (*v3.P
 		// the provisioning cluster to be created. If we don't try again
 		// permissions for the provisioning objects won't be created until an
 		// update to the PRTB happens again.
-		logrus.Debugf("[auth-prov-v2-prtb] No provisioning cluster found for cluster %v, enqueuing PRTB %v ", prtb.ClusterName, prtb.Name)
+		logrus.Debugf("[auth-prov-v2-prtb] No provisioning cluster found for cluster %v, enqueuing PRTB %v ", clusterName, prtb.Name)
 		h.projectRoleTemplateBindingController.EnqueueAfter(prtb.Namespace, prtb.Name, 10*time.Second)
 		return prtb, nil
 	}

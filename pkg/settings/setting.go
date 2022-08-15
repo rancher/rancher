@@ -71,12 +71,13 @@ var (
 	WinsAgentVersion                    = NewSetting("wins-agent-version", "")
 	CSIProxyAgentVersion                = NewSetting("csi-proxy-agent-version", "")
 	CSIProxyAgentURL                    = NewSetting("csi-proxy-agent-url", "https://acs-mirror.azureedge.net/csi-proxy/%[1]s/binaries/csi-proxy-%[1]s.tar.gz")
-	SystemAgentInstallScript            = NewSetting("system-agent-install-script", "https://raw.githubusercontent.com/rancher/system-agent/v0.2.7/install.sh")
-	WinsAgentInstallScript              = NewSetting("wins-agent-install-script", "https://raw.githubusercontent.com/rancher/wins/v0.2.10/install.ps1")
+	SystemAgentInstallScript            = NewSetting("system-agent-install-script", "https://raw.githubusercontent.com/rancher/system-agent/v0.2.10/install.sh")
+	WinsAgentInstallScript              = NewSetting("wins-agent-install-script", "https://raw.githubusercontent.com/rancher/wins/v0.4.5/install.ps1")
 	SystemAgentInstallerImage           = NewSetting("system-agent-installer-image", "rancher/system-agent-installer-")
 	SystemAgentUpgradeImage             = NewSetting("system-agent-upgrade-image", "")
+	WinsAgentUpgradeImage               = NewSetting("wins-agent-upgrade-image", "")
 	SystemDefaultRegistry               = NewSetting("system-default-registry", "")
-	SystemNamespaces                    = NewSetting("system-namespaces", "kube-system,kube-public,cattle-system,cattle-alerting,cattle-logging,cattle-pipeline,cattle-prometheus,ingress-nginx,cattle-global-data,cattle-istio,kube-node-lease,cert-manager,cattle-global-nt,security-scan,cattle-fleet-system,cattle-fleet-local-system,calico-system,tigera-operator,cattle-impersonation-system,rancher-operator-system,cattle-csp-adapter-system")
+	SystemNamespaces                    = NewSetting("system-namespaces", "kube-system,kube-public,cattle-system,cattle-alerting,cattle-logging,cattle-pipeline,cattle-prometheus,ingress-nginx,cattle-global-data,cattle-istio,kube-node-lease,cert-manager,cattle-global-nt,security-scan,cattle-fleet-system,cattle-fleet-local-system,calico-system,tigera-operator,cattle-impersonation-system,rancher-operator-system,cattle-csp-adapter-system,calico-apiserver")
 	SystemUpgradeControllerChartVersion = NewSetting("system-upgrade-controller-chart-version", "")
 	TelemetryOpt                        = NewSetting("telemetry-opt", "")
 	TLSMinVersion                       = NewSetting("tls-min-version", "1.2")
@@ -90,6 +91,7 @@ var (
 	UIDashboardIndex                    = NewSetting("ui-dashboard-index", "https://releases.rancher.com/dashboard/latest/index.html")
 	UIDashboardPath                     = NewSetting("ui-dashboard-path", "/usr/share/rancher/ui-dashboard")
 	UIFavicon                           = NewSetting("ui-favicon", "")
+	UIPerformance                       = NewSetting("ui-performance", "") // Experimental settings for UI functionality to improve the UX with large nunbers of resources
 	UIPreferred                         = NewSetting("ui-preferred", "vue")
 	UIOfflinePreferred                  = NewSetting("ui-offline-preferred", "dynamic")
 	UIIssues                            = NewSetting("ui-issues", "")
@@ -109,7 +111,7 @@ var (
 	PartnerChartDefaultBranch           = NewSetting("partner-chart-default-branch", "main")
 	RKE2ChartDefaultBranch              = NewSetting("rke2-chart-default-branch", "main")
 	FleetDefaultWorkspaceName           = NewSetting("fleet-default-workspace-name", fleetconst.ClustersDefaultNamespace) // fleetWorkspaceName to assign to clusters with none
-	ShellImage                          = NewSetting("shell-image", "rancher/shell:v0.1.16")
+	ShellImage                          = NewSetting("shell-image", "rancher/shell:v0.1.18-rc8")
 	IgnoreNodeName                      = NewSetting("ignore-node-name", "") // nodes to ignore when syncing v1.node to v3.node
 	NoDefaultAdmin                      = NewSetting("no-default-admin", "")
 	RestrictedDefaultAdmin              = NewSetting("restricted-default-admin", "false") // When bootstrapping the admin for the first time, give them the global role restricted-admin
@@ -118,11 +120,8 @@ var (
 	EKSUpstreamRefresh                  = NewSetting("eks-refresh", "300")
 	GKEUpstreamRefresh                  = NewSetting("gke-refresh", "300")
 	HideLocalCluster                    = NewSetting("hide-local-cluster", "false")
-	MachineProvisionImage               = NewSetting("machine-provision-image", "rancher/machine:v0.15.0-rancher88")
+	MachineProvisionImage               = NewSetting("machine-provision-image", "rancher/machine:v0.15.0-rancher93")
 	SystemFeatureChartRefreshSeconds    = NewSetting("system-feature-chart-refresh-seconds", "900")
-
-	FleetMinVersion          = NewSetting("fleet-min-version", "")
-	RancherWebhookMinVersion = NewSetting("rancher-webhook-min-version", "")
 
 	Rke2DefaultVersion = NewSetting("rke2-default-version", "")
 	K3sDefaultVersion  = NewSetting("k3s-default-version", "")
@@ -136,19 +135,30 @@ var (
 	// AuthUserSessionTTLMinutes represents the time to live for tokens used for login sessions in minutes.
 	AuthUserSessionTTLMinutes = NewSetting("auth-user-session-ttl-minutes", "960") // 16 hours
 
+	// CSPAdapterMinVersion is used to determine if an existing installation of the CSP adapter should be upgraded to a new version
+	// has no effect if the csp adapter is not installed
+	CSPAdapterMinVersion = NewSetting("csp-adapter-min-version", "")
+
+	// FleetMinVersion is the minimum version of the fleet chart that rancher will install
+	FleetMinVersion = NewSetting("fleet-min-version", "")
+
 	// KubeconfigDefaultTokenTTLMinutes is the default time to live applied to kubeconfigs created for users.
 	// This setting will take effect regardless of the kubeconfig-generate-token status.
-	KubeconfigDefaultTokenTTLMinutes = NewSetting("kubeconfig-default-ttl-minutes", "0") // 0 TTL = never expire
+	KubeconfigDefaultTokenTTLMinutes = NewSetting("kubeconfig-default-token-ttl-minutes", "0") // 0 TTL = never expire
 
 	// KubeconfigGenerateToken determines whether the UI will return a generate token with kubeconfigs.
 	// If set to false the kubeconfig will contain a command to login to Rancher.
 	KubeconfigGenerateToken = NewSetting("kubeconfig-generate-token", "true")
 
-	// Deprecated: On removal use kubeconfig-default-ttl-minutes for all kubeconfigs.
 	// KubeconfigTokenTTLMinutes currently is used to set the TTL for kubeconfigs created through the CLI.
 	// This can be done with the token command or via kubectl when kubeconfig-generate-token is false.
 	// This TTL is used regardless of the value of kubeconfig-default-ttl-minutes.
+	//
+	// Deprecated: On removal use kubeconfig-default-ttl-minutes for all kubeconfigs.
 	KubeconfigTokenTTLMinutes = NewSetting("kubeconfig-token-ttl-minutes", "960") // 16 hours
+
+	// RancherWebhookMinVersion is the minimum version of the webhook that rancher will install
+	RancherWebhookMinVersion = NewSetting("rancher-webhook-min-version", "")
 )
 
 // FullShellImage returns the full private registry name of the rancher shell image.

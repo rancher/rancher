@@ -43,7 +43,7 @@ func init() {
 	resource.Put(ServiceGroupVersionResource)
 }
 
-// Deprecated use v1.Service instead
+// Deprecated: use v1.Service instead
 type Service = v1.Service
 
 func NewService(namespace, name string, obj v1.Service) *v1.Service {

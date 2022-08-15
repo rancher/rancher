@@ -65,6 +65,7 @@ func NewProxyMiddleware(sar v1.AuthorizationV1Interface,
 
 	mux := gmux.NewRouter()
 	mux.UseEncodedPath()
+	mux.PathPrefix("/api").HandlerFunc(proxyHandler.authLocalCluster(mux))
 	mux.Path("/v1/management.cattle.io.clusters/{clusterID}").Queries("link", "shell").HandlerFunc(routeToShellProxy("link", "shell", localSupport, localCluster, mux, proxyHandler))
 	mux.Path("/v1/management.cattle.io.clusters/{clusterID}").Queries("action", "apply").HandlerFunc(routeToShellProxy("action", "apply", localSupport, localCluster, mux, proxyHandler))
 	mux.Path("/v3/clusters/{clusterID}").Queries("shell", "true").HandlerFunc(routeToShellProxy("link", "shell", localSupport, localCluster, mux, proxyHandler))
@@ -84,6 +85,11 @@ func routeToShellProxy(key, value string, localSupport bool, localCluster http.H
 		cluster := vars["clusterID"]
 		if cluster == "local" {
 			if localSupport {
+				authed := proxyHandler.userCanAccessCluster(r, cluster)
+				if !authed {
+					rw.WriteHeader(http.StatusUnauthorized)
+					return
+				}
 				q := r.URL.Query()
 				q.Set(key, value)
 				r.URL.RawQuery = q.Encode()
@@ -126,21 +132,27 @@ func (h *Handler) MatchNonLegacy(prefix string) gmux.MatcherFunc {
 	}
 }
 
+func (h *Handler) authLocalCluster(router *gmux.Router) func(rw http.ResponseWriter, r *http.Request) {
+	return func(rw http.ResponseWriter, req *http.Request) {
+		authed := h.userCanAccessCluster(req, "local")
+		if !authed {
+			if req.Context().Value(auth.CattleAuthFailed) != "true" {
+				rw.WriteHeader(http.StatusUnauthorized)
+				return
+			}
+		}
+		router.NotFoundHandler.ServeHTTP(rw, req)
+	}
+}
+
 func (h *Handler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
-	user, ok := request.UserFrom(req.Context())
-	if !ok {
-		rw.WriteHeader(http.StatusUnauthorized)
-		return
-	}
-
-	prefix := "/" + gmux.Vars(req)["prefix"]
 	clusterID := gmux.Vars(req)["clusterID"]
-
-	if !h.canAccess(req.Context(), user, clusterID) {
+	authed := h.userCanAccessCluster(req, clusterID)
+	if !authed {
 		rw.WriteHeader(http.StatusUnauthorized)
 		return
 	}
-
+	prefix := "/" + gmux.Vars(req)["prefix"]
 	handler, err := h.next(clusterID, prefix)
 	if err != nil {
 		rw.WriteHeader(http.StatusInternalServerError)
@@ -149,6 +161,14 @@ func (h *Handler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	}
 
 	handler.ServeHTTP(rw, req)
+}
+
+func (h *Handler) userCanAccessCluster(req *http.Request, clusterID string) bool {
+	requestUser, ok := request.UserFrom(req.Context())
+	if ok {
+		return h.canAccess(req.Context(), requestUser, clusterID)
+	}
+	return false
 }
 
 func (h *Handler) dialer(ctx context.Context, network, address string) (net.Conn, error) {

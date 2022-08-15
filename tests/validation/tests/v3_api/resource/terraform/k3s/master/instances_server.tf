@@ -92,6 +92,11 @@ resource "aws_instance" "master" {
   }
 
   provisioner "file" {
+    source = "audit.yaml"
+    destination = "/tmp/audit.yaml"
+  }
+
+  provisioner "file" {
     source = "v120ingresspolicy.yaml"
     destination = "/tmp/v120ingresspolicy.yaml"
   }
@@ -183,6 +188,10 @@ resource "aws_instance" "master2-ha" {
   provisioner "file" {
     source = "policy.yaml"
     destination = "/tmp/policy.yaml"
+  }
+  provisioner "file" {
+    source = "audit.yaml"
+    destination = "/tmp/audit.yaml"
   }
 
   provisioner "file" {

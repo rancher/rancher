@@ -42,7 +42,7 @@ func init() {
 	resource.Put(GlobalRoleBindingGroupVersionResource)
 }
 
-// Deprecated use v3.GlobalRoleBinding instead
+// Deprecated: use v3.GlobalRoleBinding instead
 type GlobalRoleBinding = v3.GlobalRoleBinding
 
 func NewGlobalRoleBinding(namespace, name string, obj v3.GlobalRoleBinding) *v3.GlobalRoleBinding {

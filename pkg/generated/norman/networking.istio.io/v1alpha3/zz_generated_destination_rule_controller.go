@@ -43,7 +43,7 @@ func init() {
 	resource.Put(DestinationRuleGroupVersionResource)
 }
 
-// Deprecated use v1alpha3.DestinationRule instead
+// Deprecated: use v1alpha3.DestinationRule instead
 type DestinationRule = v1alpha3.DestinationRule
 
 func NewDestinationRule(namespace, name string, obj v1alpha3.DestinationRule) *v1alpha3.DestinationRule {

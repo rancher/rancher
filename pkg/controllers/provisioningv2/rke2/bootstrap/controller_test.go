@@ -248,7 +248,7 @@ func getDeploymentCacheMock() *deploymentCacheMock {
 
 func getSecretCacheMock(namespace, secretName string) *secretCacheMock {
 	mockSecretCache := new(secretCacheMock)
-	mockSecretCache.On("Get", namespace, secretName).Return(&v1.Secret{
+	mockSecretCache.On("Get", namespace, secretName+"-token").Return(&v1.Secret{
 		TypeMeta: metav1.TypeMeta{},
 		ObjectMeta: metav1.ObjectMeta{
 			Name: secretName,
@@ -260,6 +260,7 @@ func getSecretCacheMock(namespace, secretName string) *secretCacheMock {
 		StringData: nil,
 		Type:       "",
 	}, nil)
+
 	return mockSecretCache
 }
 

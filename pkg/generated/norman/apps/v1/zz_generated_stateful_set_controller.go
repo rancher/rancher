@@ -43,7 +43,7 @@ func init() {
 	resource.Put(StatefulSetGroupVersionResource)
 }
 
-// Deprecated use v1.StatefulSet instead
+// Deprecated: use v1.StatefulSet instead
 type StatefulSet = v1.StatefulSet
 
 func NewStatefulSet(namespace, name string, obj v1.StatefulSet) *v1.StatefulSet {

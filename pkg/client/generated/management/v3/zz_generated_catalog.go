@@ -8,6 +8,7 @@ const (
 	CatalogType                      = "catalog"
 	CatalogFieldAnnotations          = "annotations"
 	CatalogFieldBranch               = "branch"
+	CatalogFieldCatalogSecrets       = "catalogSecrets"
 	CatalogFieldCommit               = "commit"
 	CatalogFieldConditions           = "conditions"
 	CatalogFieldCreated              = "created"
@@ -34,6 +35,7 @@ type Catalog struct {
 	types.Resource
 	Annotations          map[string]string  `json:"annotations,omitempty" yaml:"annotations,omitempty"`
 	Branch               string             `json:"branch,omitempty" yaml:"branch,omitempty"`
+	CatalogSecrets       *CatalogSecrets    `json:"catalogSecrets,omitempty" yaml:"catalogSecrets,omitempty"`
 	Commit               string             `json:"commit,omitempty" yaml:"commit,omitempty"`
 	Conditions           []CatalogCondition `json:"conditions,omitempty" yaml:"conditions,omitempty"`
 	Created              string             `json:"created,omitempty" yaml:"created,omitempty"`

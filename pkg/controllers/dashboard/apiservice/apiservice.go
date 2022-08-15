@@ -8,6 +8,7 @@ import (
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	mgmtcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/namespace"
+	"github.com/rancher/rancher/pkg/serviceaccounttoken"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/wrangler"
 	appscontrollers "github.com/rancher/wrangler/pkg/generated/controllers/apps/v1"
@@ -25,11 +26,13 @@ type handler struct {
 	serviceAccounts corev1controllers.ServiceAccountCache
 	deploymentCache appscontrollers.DeploymentCache
 	daemonSetCache  appscontrollers.DaemonSetCache
-	secrets         corev1controllers.SecretCache
+	secretsCache    corev1controllers.SecretCache
+	secretsClient   corev1controllers.SecretClient
 	settings        mgmtcontrollers.SettingClient
 	apiServices     mgmtcontrollers.APIServiceCache
 	services        corev1controllers.ServiceCache
 	embedded        bool
+	ctx             context.Context
 }
 
 func Register(ctx context.Context, context *wrangler.Context, embedded bool) {
@@ -37,11 +40,13 @@ func Register(ctx context.Context, context *wrangler.Context, embedded bool) {
 		serviceAccounts: context.Core.ServiceAccount().Cache(),
 		deploymentCache: context.Apps.Deployment().Cache(),
 		daemonSetCache:  context.Apps.DaemonSet().Cache(),
-		secrets:         context.Core.Secret().Cache(),
+		secretsCache:    context.Core.Secret().Cache(),
+		secretsClient:   context.Core.Secret(),
 		settings:        context.Mgmt.Setting(),
 		apiServices:     context.Mgmt.APIService().Cache(),
 		services:        context.Core.Service().Cache(),
 		embedded:        embedded,
+		ctx:             ctx,
 	}
 
 	relatedresource.WatchClusterScoped(ctx, "apiservice-watch-owner",
@@ -137,15 +142,31 @@ func (h *handler) getToken(sa *corev1.ServiceAccount) (string, error) {
 		return "", err
 	}
 
-	if len(sa.Secrets) == 0 {
-		return "", nil
-	}
-
-	secret, err := h.secrets.Get(sa.Namespace, sa.Secrets[0].Name)
+	// create a secret-based token for the service account
+	sName := serviceaccounttoken.ServiceAccountSecretName(sa)
+	secret, err := h.secretsCache.Get(sa.Namespace, sName)
 	if err != nil {
-		return "", err
+		if !apierror.IsNotFound(err) {
+			return "", err
+		}
+		sc := serviceaccounttoken.SecretTemplate(sa)
+		secret, err = h.secretsClient.Create(sc)
+		if err != nil {
+			if !apierror.IsAlreadyExists(err) {
+				return "", err
+			}
+			secret, err = h.secretsCache.Get(sa.Namespace, sName)
+			if err != nil {
+				if !apierror.IsNotFound(err) {
+					return "", err
+				}
+				secret, err = h.secretsClient.Get(sa.Namespace, sName, metav1.GetOptions{})
+				if err != nil {
+					return "", err
+				}
+			}
+		}
 	}
-
 	token := secret.Data["token"]
 	if len(token) == 0 {
 		return "", nil

@@ -117,11 +117,10 @@ func (c *Controller) Create(b *v3.EtcdBackup) (runtime.Object, error) {
 	}
 
 	if next := nextBackup(backups); next == nil || next.Name == b.Name {
-		bObj, err := c.createBackupForCluster(b, cluster)
+		b, err = c.createBackupForCluster(b, cluster)
 		if err != nil {
-			return bObj, fmt.Errorf("[etcd-backup] failed to perform etcd backup: %v", err)
+			return b, fmt.Errorf("[etcd-backup] failed to perform etcd backup: %v", err)
 		}
-		return bObj, nil
 	}
 
 	return b, nil
@@ -268,7 +267,7 @@ func IsBackupRecurring(backup *v3.EtcdBackup) bool {
 	return !backup.Spec.Manual
 }
 
-func (c *Controller) createBackupForCluster(b *v3.EtcdBackup, cluster *v3.Cluster) (runtime.Object, error) {
+func (c *Controller) createBackupForCluster(b *v3.EtcdBackup, cluster *v3.Cluster) (*v3.EtcdBackup, error) {
 	var err error
 	if b.DeletionTimestamp != nil || rketypes.BackupConditionCreated.IsUnknown(b) {
 		b.Spec.Filename = generateBackupFilename(b.Name, cluster.Spec.RancherKubernetesEngineConfig.Services.Etcd.BackupConfig)
@@ -281,8 +280,8 @@ func (c *Controller) createBackupForCluster(b *v3.EtcdBackup, cluster *v3.Cluste
 			return b, err
 		}
 	}
-	bObj, saveErr := c.etcdSaveWithBackoff(b)
-	b, err = c.backupClient.Update(bObj.(*v3.EtcdBackup))
+	b, saveErr := c.etcdSave(b)
+	b, err = c.backupClient.Update(b)
 	if err != nil {
 		return b, err
 	}
@@ -291,7 +290,7 @@ func (c *Controller) createBackupForCluster(b *v3.EtcdBackup, cluster *v3.Cluste
 		if !b.Spec.Manual {
 			_ = c.rotateFailedBackups(cluster)
 		}
-		return b, fmt.Errorf("failed to perform etcd backup: %v", saveErr)
+		return b, saveErr
 	}
 
 	if !b.Spec.Manual {
@@ -358,8 +357,8 @@ func (c *Controller) createNewBackup(cluster *v3.Cluster) (*v3.EtcdBackup, error
 	return c.backupClient.Create(newBackup)
 }
 
-func (c *Controller) etcdSaveWithBackoff(b *v3.EtcdBackup) (runtime.Object, error) {
-	backoff := getBackoff()
+// etcdSave will utilize RKE to take a snapshot on each of the nodes.
+func (c *Controller) etcdSave(b *v3.EtcdBackup) (*v3.EtcdBackup, error) {
 	kontainerDriver, err := c.KontainerDriverLister.Get("", service.RancherKubernetesEngineDriverName)
 	if err != nil {
 		return b, err
@@ -373,29 +372,23 @@ func (c *Controller) etcdSaveWithBackoff(b *v3.EtcdBackup) (runtime.Object, erro
 		}
 		cluster.Spec.RancherKubernetesEngineConfig.Services.Etcd.BackupConfig = b.Spec.BackupConfig.DeepCopy()
 		spec := *cluster.Spec.DeepCopy()
-		spec, err = secretmigrator.AssembleS3Credential(cluster.Status.S3CredentialSecret, secretmigrator.ClusterType, cluster.Name, spec, c.secretLister)
+		spec, err = secretmigrator.AssembleS3Credential(cluster.GetSecret("S3CredentialSecret"), secretmigrator.ClusterType, cluster.Name, spec, c.secretLister)
 		if err != nil {
 			return b, err
 		}
-		var inErr error
-		err = wait.ExponentialBackoff(backoff, func() (bool, error) {
-			if inErr = c.backupDriver.ETCDSave(c.ctx, cluster.Name, kontainerDriver, spec, snapshotName); inErr != nil {
-				log.Warnf("%v", inErr)
-				return false, nil
-			}
-			return true, nil
-		})
-		if err != nil {
-			return b, err
+		// no need to retry, RKE will retry for us
+		if err = c.backupDriver.ETCDSave(c.ctx, cluster.Name, kontainerDriver, spec, snapshotName); err != nil {
+			log.Warnf("%v", err)
 		}
-		return b, inErr
+		return b, err
 	})
+	b = bObj.(*v3.EtcdBackup)
 	if err != nil {
-		rketypes.BackupConditionCompleted.False(bObj)
-		rketypes.BackupConditionCompleted.ReasonAndMessageFromError(bObj, err)
-		return bObj, err
+		rketypes.BackupConditionCompleted.False(b)
+		rketypes.BackupConditionCompleted.ReasonAndMessageFromError(b, err)
+		return b, err
 	}
-	return bObj, nil
+	return b, nil
 }
 
 func (c *Controller) etcdRemoveSnapshotWithBackoff(b *v3.EtcdBackup) error {
@@ -411,7 +404,7 @@ func (c *Controller) etcdRemoveSnapshotWithBackoff(b *v3.EtcdBackup) error {
 	}
 	cluster.Spec.RancherKubernetesEngineConfig.Services.Etcd.BackupConfig = b.Spec.BackupConfig.DeepCopy()
 	spec := *cluster.Spec.DeepCopy()
-	spec, err = secretmigrator.AssembleS3Credential(cluster.Status.S3CredentialSecret, secretmigrator.ClusterType, cluster.Name, spec, c.secretLister)
+	spec, err = secretmigrator.AssembleS3Credential(cluster.GetSecret("S3CredentialSecret"), secretmigrator.ClusterType, cluster.Name, spec, c.secretLister)
 	if err != nil {
 		return err
 	}

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -91,10 +92,16 @@ func run(systemChartsPath, chartsPath string, imagesFromArgs []string) error {
 		k8sVersions = append(k8sVersions, k)
 	}
 	sort.Strings(k8sVersions)
-	writeSliceToFile(filepath.Join(os.Getenv("HOME"), "bin", "rancher-rke-k8s-versions.txt"), k8sVersions)
+	if err := writeSliceToFile(filepath.Join(os.Getenv("HOME"), "bin", "rancher-rke-k8s-versions.txt"), k8sVersions); err != nil {
+		return err
+	}
 
 	externalImages := make(map[string][]string)
-	k3sUpgradeImages, err := ext.GetExternalImages(rancherVersion, data.K3S, ext.K3S, nil)
+	k3sUpgradeImages, err := ext.GetExternalImages(rancherVersion, data.K3S, ext.K3S, &semver.Version{
+		Major: 1,
+		Minor: 21,
+		Patch: 0,
+	})
 	if err != nil {
 		return err
 	}
@@ -116,19 +123,28 @@ func run(systemChartsPath, chartsPath string, imagesFromArgs []string) error {
 		externalImages["rke2All"] = rke2AllImages
 	}
 
+	sort.Strings(imagesFromArgs)
+	winsIndex := sort.SearchStrings(imagesFromArgs, "rancher/wins")
+	if winsIndex > len(imagesFromArgs)-1 {
+		return errors.New("rancher/wins upgrade image not found")
+	}
+
+	winsAgentUpdateImage := imagesFromArgs[winsIndex]
+	linuxImagesFromArgs := append(imagesFromArgs[:winsIndex], imagesFromArgs[winsIndex+1:]...)
+
 	exportConfig := img.ExportConfig{
 		SystemChartsPath: systemChartsPath,
 		ChartsPath:       chartsPath,
 		OsType:           img.Linux,
 		RancherVersion:   rancherVersion,
 	}
-	targetImages, targetImagesAndSources, err := img.GetImages(exportConfig, externalImages, imagesFromArgs, linuxInfo.RKESystemImages)
+	targetImages, targetImagesAndSources, err := img.GetImages(exportConfig, externalImages, linuxImagesFromArgs, linuxInfo.RKESystemImages)
 	if err != nil {
 		return err
 	}
 
 	exportConfig.OsType = img.Windows
-	targetWindowsImages, targetWindowsImagesAndSources, err := img.GetImages(exportConfig, nil, []string{getWindowsAgentImage()}, windowsInfo.RKESystemImages)
+	targetWindowsImages, targetWindowsImagesAndSources, err := img.GetImages(exportConfig, nil, []string{getWindowsAgentImage(), winsAgentUpdateImage}, windowsInfo.RKESystemImages)
 	if err != nil {
 		return err
 	}
@@ -218,6 +234,9 @@ func checkImage(image string) error {
 	imageNameTag := strings.Split(image, ":")
 	if len(imageNameTag) != 2 {
 		return fmt.Errorf("Can't extract tag from image [%s]", image)
+	}
+	if imageNameTag[1] == "" {
+		return fmt.Errorf("Extracted tag from image [%s] is empty", image)
 	}
 	if !strings.HasPrefix(imageNameTag[0], "rancher/") {
 		return fmt.Errorf("Image [%s] does not start with rancher/", image)

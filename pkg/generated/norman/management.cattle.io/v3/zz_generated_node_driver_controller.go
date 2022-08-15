@@ -42,7 +42,7 @@ func init() {
 	resource.Put(NodeDriverGroupVersionResource)
 }
 
-// Deprecated use v3.NodeDriver instead
+// Deprecated: use v3.NodeDriver instead
 type NodeDriver = v3.NodeDriver
 
 func NewNodeDriver(namespace, name string, obj v3.NodeDriver) *v3.NodeDriver {

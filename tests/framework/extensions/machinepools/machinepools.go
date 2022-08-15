@@ -57,21 +57,23 @@ type NodeRoles struct {
 // `nodeRoles` would be in this format
 //   []NodeRoles{
 //   {
-// 	   "controlplane": true,
-// 	   "etcd":         false,
-//     "worker":       false,
+// 	   ControlPlane: true,
+// 	   Etcd:         false,
+// 	   Worker:       false,
+//	   Quantity:     1,
 //   },
 //   {
-// 	   "controlplane": false,
-// 	   "etcd":         true,
-// 	   "worker":       false,
+// 	   ControlPlane: false,
+// 	   Etcd:         true,
+// 	   Worker:       false,
+//	   Quantity:     1,
 //   },
 //  }
 
 func RKEMachinePoolSetup(nodeRoles []NodeRoles, machineConfig *unstructured.Unstructured) []provisioning.RKEMachinePool {
 	machinePools := []provisioning.RKEMachinePool{}
 	for index, roles := range nodeRoles {
-		machinePool := NewRKEMachinePool(roles["controlplane"], roles["etcd"], roles["worker"], "pool"+strconv.Itoa(index), 1, machineConfig)
+		machinePool := NewRKEMachinePool(roles.ControlPlane, roles.Etcd, roles.Worker, "pool"+strconv.Itoa(index), roles.Quantity, machineConfig)
 		machinePools = append(machinePools, machinePool)
 	}
 

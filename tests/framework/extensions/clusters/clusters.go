@@ -1,4 +1,5 @@
 package clusters
+package clusters
 
 import (
 	"context"
@@ -11,7 +12,6 @@ import (
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
 	provisioning "github.com/rancher/rancher/tests/framework/clients/rancher/generated/provisioning/v1"
-	"github.com/rancher/rancher/tests/framework/pkg/namegenerator"
 	"github.com/rancher/rancher/tests/framework/pkg/wait"
 	"github.com/rancher/rancher/tests/integration/pkg/defaults"
 	corev1 "k8s.io/api/core/v1"
@@ -69,6 +69,39 @@ func IsHostedProvisioningClusterReady(event watch.Event) (ready bool, err error)
 	return false, nil
 }
 
+// NewRKE1lusterConfig is a constructor for a v3.Cluster object, to be used by the rancher.Client.Provisioning client.
+func NewRKE1ClusterConfig(clusterName, cni, kubernetesVersion string, client *rancher.Client) *management.Cluster {
+	clusterConfig := &management.Cluster{
+		DockerRootDir:           "/var/lib/docker",
+		EnableClusterAlerting:   false,
+		EnableClusterMonitoring: false,
+		LocalClusterAuthEndpoint: &management.LocalClusterAuthEndpoint{
+			Enabled: true,
+		},
+		Name: clusterName,
+		RancherKubernetesEngineConfig: &management.RancherKubernetesEngineConfig{
+			DNS: &management.DNSConfig{
+				Provider: "coredns",
+				Options: map[string]string{
+					"stubDomains": "cluster.local",
+				},
+			},
+			Ingress: &management.IngressConfig{
+				Provider: "nginx",
+			},
+			Monitoring: &management.MonitoringConfig{
+				Provider: "metrics-server",
+			},
+			Network: &management.NetworkConfig{
+				MTU:     0,
+				Options: map[string]string{},
+			},
+		},
+	}
+
+	return clusterConfig
+}
+
 // NewRKE2ClusterConfig is a constructor for a apisV1.Cluster object, to be used by the rancher.Client.Provisioning client.
 func NewRKE2ClusterConfig(clusterName, namespace, cni, cloudCredentialSecretName, kubernetesVersion string, machinePools []provisioning.RKEMachinePool) *provisioning.Cluster {
 	//metav1.ObjectMeta
@@ -121,6 +154,49 @@ func NewRKE2ClusterConfig(clusterName, namespace, cni, cloudCredentialSecretName
 	}
 
 	return v1Cluster
+}
+
+// CreateRKE1Cluster is a "helper" functions that takes a rancher client, and the rke1 cluster config as parameters. This function
+// registers a delete cluster fuction with a wait.WatchWait to ensure the cluster is removed cleanly.
+func CreateRKE1Cluster(client *rancher.Client, rke1Cluster *management.Cluster) (*management.Cluster, error) {
+	opts := metav1.ListOptions{
+		FieldSelector:  "metadata.name=",
+		TimeoutSeconds: &defaults.WatchTimeoutSeconds,
+	}
+
+	cluster, err := client.Management.Cluster.Create(rke1Cluster)
+	if err != nil {
+		return nil, err
+	}
+
+	client.Session.RegisterCleanupFunc(func() error {
+		err := client.Management.Cluster.Delete(rke1Cluster)
+		if err != nil {
+			return err
+		}
+
+		adminClient, err := rancher.NewClient(client.RancherConfig.AdminToken, client.Session)
+		if err != nil {
+			return err
+		}
+
+		watchInterface, err := adminClient.GetManagementWatchInterface(management.ClusterType, opts)
+
+		if err != nil {
+			return err
+		}
+
+		return wait.WatchWait(watchInterface, func(event watch.Event) (ready bool, err error) {
+			if event.Type == watch.Error {
+				return false, fmt.Errorf("there was an error deleting cluster")
+			} else if event.Type == watch.Deleted {
+				return true, nil
+			}
+			return false, nil
+		})
+	})
+
+	return cluster, nil
 }
 
 // CreateRKE2Cluster is a "helper" functions that takes a rancher client, and the rke2 cluster config as parameters. This function

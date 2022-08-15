@@ -1,0 +1,77 @@
+#!/bin/bash
+# Without RELEASE_TYPE set, it will show the values for each.
+# With RELEASE_TYPE set to 'rc' or 'final-rc', it will compare the values to the expected ones and report CORRECT or INCORRECT
+
+case $RELEASE_TYPE in
+  rc)
+    REQUIRED_VALUE="dev-v2.6"
+    ;;
+  final-rc)
+    REQUIRED_VALUE="release-v2.6"
+    ;;
+esac
+
+if [ -n "${RELEASE_TYPE}" ]; then
+   echo "RELEASE_TYPE is ${RELEASE_TYPE}"
+   echo "Going to check for ${REQUIRED_VALUE}"
+fi
+
+# scripts/package
+for PKGENV in SYSTEM_CHART_DEFAULT_BRANCH CHART_DEFAULT_BRANCH; do
+   FOUND_VALUE=$(grep ^${PKGENV} scripts/package | awk -F':-' '{ print $2 }' | sed 's/.$//' | sed 's/"//g')
+   if [ -n "${RELEASE_TYPE}" ]; then
+      echo -n "${PKGENV}: ${FOUND_VALUE} in scripts/package: "
+      if [ "${FOUND_VALUE}" != "${REQUIRED_VALUE}" ]; then
+        echo "INCORRECT (should be ${REQUIRED_VALUE})"
+      else
+        echo "CORRECT"
+      fi
+   else
+      echo "* ${PKGENV}: ${FOUND_VALUE} (\`scripts/package\`)"
+   fi
+done
+
+# package/Dockerfile
+for DFARG in SYSTEM_CHART_DEFAULT_BRANCH CHART_DEFAULT_BRANCH CATTLE_KDM_BRANCH; do
+   FOUND_VALUE=$(grep ^"ARG ${DFARG}" package/Dockerfile | awk -F'=' '{ print $2 }')
+   if [ -n "${RELEASE_TYPE}" ]; then
+      echo -n "${DFARG}: ${FOUND_VALUE} in package/Dockerfile: "
+      if [ "${FOUND_VALUE}" != "${REQUIRED_VALUE}" ]; then
+        echo "INCORRECT (should be ${REQUIRED_VALUE})"
+      else
+        echo "CORRECT"
+      fi
+   else
+      echo "* ${DFARG}: ${FOUND_VALUE} (\`package/Dockerfile\`)"
+   fi
+done
+
+# Dockerfile.dapper
+for DFDENV in CATTLE_KDM_BRANCH; do
+   FOUND_VALUE=$(grep ^"ENV ${DFDENV}" Dockerfile.dapper| awk -F'=' '{ print $2 }')
+   if [ -n "${RELEASE_TYPE}" ]; then
+      echo -n "${DFDENV}: ${FOUND_VALUE} in Dockerfile.dapper: "
+      if [ "${FOUND_VALUE}" != "${REQUIRED_VALUE}" ]; then
+        echo "INCORRECT (should be ${REQUIRED_VALUE})"
+      else
+        echo "CORRECT"
+      fi
+   else
+      echo "* ${DFDENV}: ${FOUND_VALUE} (\`Dockerfile.dapper\`)"
+   fi
+done
+
+# pkg/settings/setting.go
+for PKGSETTING in KDMBranch ChartDefaultBranch; do
+   FOUND_VALUE=$(grep ^"\\s*${PKGSETTING}" pkg/settings/setting.go | awk -F', ' '{ print $2 }' | sed 's/)//' | sed 's/"//g')
+   if [ -n "${RELEASE_TYPE}" ]; then
+      echo -n "${PKGSETTING}: ${FOUND_VALUE} in pkg/settings/setting.go: "
+      if [ "${FOUND_VALUE}" != "${REQUIRED_VALUE}" ]; then
+        echo "INCORRECT (should be ${REQUIRED_VALUE})"
+      else
+        echo "CORRECT"
+      fi
+   else
+      echo "* ${PKGSETTING}: ${FOUND_VALUE} (\`pkg/settings/setting.go\`)"
+   fi
+done

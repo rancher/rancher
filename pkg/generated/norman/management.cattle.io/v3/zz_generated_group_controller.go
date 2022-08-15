@@ -42,7 +42,7 @@ func init() {
 	resource.Put(GroupGroupVersionResource)
 }
 
-// Deprecated use v3.Group instead
+// Deprecated: use v3.Group instead
 type Group = v3.Group
 
 func NewGroup(namespace, name string, obj v3.Group) *v3.Group {

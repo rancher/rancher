@@ -42,7 +42,7 @@ func init() {
 	resource.Put(KontainerDriverGroupVersionResource)
 }
 
-// Deprecated use v3.KontainerDriver instead
+// Deprecated: use v3.KontainerDriver instead
 type KontainerDriver = v3.KontainerDriver
 
 func NewKontainerDriver(namespace, name string, obj v3.KontainerDriver) *v3.KontainerDriver {

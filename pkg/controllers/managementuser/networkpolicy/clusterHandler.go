@@ -122,7 +122,7 @@ func (ch *clusterHandler) createNetworkPolicies(cluster *v3.Cluster) error {
 	}
 
 	ch.cluster.Management.Management.Nodes(ch.cluster.ClusterName).Controller().Enqueue(
-		cluster.ClusterName, fmt.Sprintf("%s/%s", ch.cluster.ClusterName, nodesyncer.AllNodeKey))
+		cluster.Name, fmt.Sprintf("%s/%s", ch.cluster.ClusterName, nodesyncer.AllNodeKey))
 
 	return nil
 	//skipping nssyncer, projectSyncer + nodehandler would result into handling nssyncer as well

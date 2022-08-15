@@ -42,7 +42,7 @@ func init() {
 	resource.Put(ComposeConfigGroupVersionResource)
 }
 
-// Deprecated use v3.ComposeConfig instead
+// Deprecated: use v3.ComposeConfig instead
 type ComposeConfig = v3.ComposeConfig
 
 func NewComposeConfig(namespace, name string, obj v3.ComposeConfig) *v3.ComposeConfig {

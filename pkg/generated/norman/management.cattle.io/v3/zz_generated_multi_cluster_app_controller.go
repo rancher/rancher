@@ -43,7 +43,7 @@ func init() {
 	resource.Put(MultiClusterAppGroupVersionResource)
 }
 
-// Deprecated use v3.MultiClusterApp instead
+// Deprecated: use v3.MultiClusterApp instead
 type MultiClusterApp = v3.MultiClusterApp
 
 func NewMultiClusterApp(namespace, name string, obj v3.MultiClusterApp) *v3.MultiClusterApp {

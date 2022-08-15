@@ -636,7 +636,7 @@ func (m *mgr) updateClusterAnnotationandCondition(cluster *v3.Cluster, anno stri
 		}
 		// Only log if we successfully updated the cluster
 		if updateCondition {
-			logrus.Infof("[%v] Setting InitialRolesPopulated condition on cluster %v", ctrbMGMTController, c.ClusterName)
+			logrus.Infof("[%v] Setting InitialRolesPopulated condition on cluster %v", ctrbMGMTController, cluster.Name)
 		}
 		return nil
 	}

@@ -43,7 +43,7 @@ func init() {
 	resource.Put(ClusterCatalogGroupVersionResource)
 }
 
-// Deprecated use v3.ClusterCatalog instead
+// Deprecated: use v3.ClusterCatalog instead
 type ClusterCatalog = v3.ClusterCatalog
 
 func NewClusterCatalog(namespace, name string, obj v3.ClusterCatalog) *v3.ClusterCatalog {

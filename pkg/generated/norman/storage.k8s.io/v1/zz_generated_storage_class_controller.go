@@ -42,7 +42,7 @@ func init() {
 	resource.Put(StorageClassGroupVersionResource)
 }
 
-// Deprecated use v1.StorageClass instead
+// Deprecated: use v1.StorageClass instead
 type StorageClass = v1.StorageClass
 
 func NewStorageClass(namespace, name string, obj v1.StorageClass) *v1.StorageClass {

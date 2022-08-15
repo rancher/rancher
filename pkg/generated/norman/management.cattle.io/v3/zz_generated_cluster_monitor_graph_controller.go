@@ -43,7 +43,7 @@ func init() {
 	resource.Put(ClusterMonitorGraphGroupVersionResource)
 }
 
-// Deprecated use v3.ClusterMonitorGraph instead
+// Deprecated: use v3.ClusterMonitorGraph instead
 type ClusterMonitorGraph = v3.ClusterMonitorGraph
 
 func NewClusterMonitorGraph(namespace, name string, obj v3.ClusterMonitorGraph) *v3.ClusterMonitorGraph {

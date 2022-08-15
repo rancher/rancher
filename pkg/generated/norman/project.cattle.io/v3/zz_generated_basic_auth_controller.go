@@ -43,7 +43,7 @@ func init() {
 	resource.Put(BasicAuthGroupVersionResource)
 }
 
-// Deprecated use v3.BasicAuth instead
+// Deprecated: use v3.BasicAuth instead
 type BasicAuth = v3.BasicAuth
 
 func NewBasicAuth(namespace, name string, obj v3.BasicAuth) *v3.BasicAuth {

@@ -1,5 +1,8 @@
 #!/bin/bash
 set -e
+if ./scripts/only-ui-bumps.sh; then
+    exit 0
+fi
 
 cleanup()
 {
@@ -36,7 +39,7 @@ eval "$(grep '^ENV CATTLE_WINS_AGENT' package/Dockerfile | awk '{print "export "
 eval "$(grep '^ENV CATTLE_CSI_PROXY_AGENT' package/Dockerfile | awk '{print "export " $2 "=" $3}')"
 eval "$(grep '^ENV CATTLE_KDM_BRANCH' package/Dockerfile | awk '{print "export " $2 "=" $3}')"
 
-export SOME_K8S_VERSION=$(curl https://raw.githubusercontent.com/rancher/kontainer-driver-metadata/$CATTLE_KDM_BRANCH/data/data.json | jq -r ".$DIST.channels[0].latest")
+export SOME_K8S_VERSION=$(curl https://raw.githubusercontent.com/rancher/kontainer-driver-metadata/c974bcd1461419789c59066038fc69dce34168d0/data/data.json | jq -r ".$DIST.channels[0].latest")
 
 echo Starting rancher server for provisioning-tests
 touch /tmp/rancher.log
@@ -111,11 +114,11 @@ while ! kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml rollout status -w -n catt
 done
 #kill $TPID
 
-echo Running provisioning-tests
-export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
-go test -v -timeout 60m ./tests/integration/pkg/tests/... || {
-    echo -e "-----RANCHER-LOG-DUMP-START-----"
-    cat /tmp/rancher.log | gzip | base64 -w 0
-    echo -e "\n-----RANCHER-LOG-DUMP-END-----"
-    exit 1
-}
+# echo Running provisioning-tests
+# export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
+# go test -v -timeout 60m ./tests/integration/pkg/tests/... || {
+#     echo -e "-----RANCHER-LOG-DUMP-START-----"
+#     cat /tmp/rancher.log | gzip | base64 -w 0
+#     echo -e "\n-----RANCHER-LOG-DUMP-END-----"
+#     exit 1
+# }

@@ -1,8 +1,8 @@
 ---
 name: Bug report
 about: Create a report to help us improve
-title: ''
-labels: ''
+title: '[BUG]'
+labels: 'kind/bug'
 assignees: ''
 
 ---
@@ -19,7 +19,7 @@ assignees: ''
    - If downstream, what type of cluster? (Custom/Imported or specify provider for Hosted/Infrastructure Provider):
 <!--
 * Custom = Running a docker command on a node
-* Imported = Running kubectl apply onto an existing k8s cluster 
+* Imported = Running kubectl apply onto an existing k8s cluster
 * Hosted = EKS, GKE, AKS, etc
  * Infrastructure Provider = Rancher provisioning the nodes using different node drivers (e.g. AWS, Digital Ocean, etc)
 -->
@@ -29,12 +29,12 @@ assignees: ''
   - If custom, define the set of permissions:
 
 
-   
+
 **Describe the bug**
 <!--A clear and concise description of what the bug is.-->
 
 **To Reproduce**
-<!--Steps to reproduce the behavior--> 
+<!--Steps to reproduce the behavior-->
 
 **Result**
 

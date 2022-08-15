@@ -37,10 +37,13 @@ type ExternalNodeConfig struct {
 }
 
 // ExecuteCommand executes `command` in the specific node created.
-func (n *Node) ExecuteCommand(command string) error {
+func (n *Node) ExecuteCommand(command string) (string, error) {
 	signer, err := ssh.ParsePrivateKey(n.SSHKey)
+	var output []byte
+	var output_string string
+
 	if err != nil {
-		return err
+		return output_string, err
 	}
 
 	auths := []ssh.AuthMethod{ssh.PublicKeys([]ssh.Signer{signer}...)}
@@ -54,15 +57,17 @@ func (n *Node) ExecuteCommand(command string) error {
 
 	client, err := ssh.Dial("tcp", n.PublicIPAddress+":22", cfg)
 	if err != nil {
-		return err
+		return output_string, err
 	}
 
 	session, err := client.NewSession()
 	if err != nil {
-		return err
+		return output_string, err
 	}
 
-	return session.Run(command)
+	output, err = session.Output(command)
+	output_string = string(output)
+	return output_string, err
 }
 
 // GetSSHKey reads in the ssh file from the .ssh directory, returns the key in []byte format

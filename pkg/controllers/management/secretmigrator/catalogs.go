@@ -13,6 +13,7 @@ func (h *handler) syncCatalog(key string, catalog *v3.Catalog) (runtime.Object, 
 	if catalog == nil || catalog.DeletionTimestamp != nil {
 		return catalog, nil
 	}
+
 	if apimgmtv3.CatalogConditionSecretsMigrated.IsTrue(catalog) {
 		logrus.Tracef("[secretmigrator] catalog %s already migrated", catalog.Name)
 		return catalog, nil
@@ -32,7 +33,7 @@ func (h *handler) syncCatalog(key string, catalog *v3.Catalog) (runtime.Object, 
 				catalogCopy, err := h.catalogs.Update(catalog)
 				if err != nil {
 					logrus.Errorf("[secretmigrator] failed to migrate secrets for global catalog %s, will retry: %v", catalog.Name, err)
-					deleteErr := h.migrator.secrets.DeleteNamespaced(secretNamespace, secret.Name, &metav1.DeleteOptions{})
+					deleteErr := h.migrator.secrets.DeleteNamespaced(SecretNamespace, secret.Name, &metav1.DeleteOptions{})
 					if deleteErr != nil {
 						logrus.Errorf("[secretmigrator] encountered error while handling migration error: %v", deleteErr)
 					}
@@ -56,5 +57,5 @@ func (h *handler) syncCatalog(key string, catalog *v3.Catalog) (runtime.Object, 
 // the caller is responsible for un-setting the secret data, setting a reference to the Secret, and
 // updating the Cluster object, if applicable.
 func (m *Migrator) CreateOrUpdateCatalogSecret(secretName, password string, owner runtime.Object) (*corev1.Secret, error) {
-	return m.createOrUpdateSecretForCredential(secretName, password, owner, "catalog", "password")
+	return m.createOrUpdateSecretForCredential(secretName, SecretNamespace, password, nil, owner, "catalog", "password")
 }

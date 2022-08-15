@@ -101,7 +101,7 @@ func addMachineDrivers(management *config.ManagementContext) error {
 	}
 	harvesterEnabled := features.GetFeatureByName(HarvesterDriver).Enabled()
 	// make sure the version number is consistent with the one at Line 40 of package/Dockerfile
-	if err := addMachineDriver(HarvesterDriver, "https://releases.rancher.com/harvester-node-driver/v0.4.0/docker-machine-driver-harvester-amd64.tar.gz", "", "9bf5a6817757064abbc2eb97b0ed20fd18c66e851b1615a49cd29ae07ce6d9b0", []string{"releases.rancher.com"}, harvesterEnabled, harvesterEnabled, false, management); err != nil {
+	if err := addMachineDriver(HarvesterDriver, "https://releases.rancher.com/harvester-node-driver/v0.5.0/docker-machine-driver-harvester-amd64.tar.gz", "", "10944c040a056e939e2cdaeeaa9652365a0547e4d1397499420295437e95e75c", []string{"releases.rancher.com"}, harvesterEnabled, harvesterEnabled, false, management); err != nil {
 		return err
 	}
 	linodeBuiltin := true

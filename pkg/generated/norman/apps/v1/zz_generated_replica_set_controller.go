@@ -43,7 +43,7 @@ func init() {
 	resource.Put(ReplicaSetGroupVersionResource)
 }
 
-// Deprecated use v1.ReplicaSet instead
+// Deprecated: use v1.ReplicaSet instead
 type ReplicaSet = v1.ReplicaSet
 
 func NewReplicaSet(namespace, name string, obj v1.ReplicaSet) *v1.ReplicaSet {

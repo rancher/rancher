@@ -31,4 +31,8 @@ if [[ -f "$K8SVERSIONSFILE" ]]; then
     cat $K8SVERSIONSFILE >> $COMPONENTSFILE
 fi
 
+echo "# Chart/KDM sources" >> $COMPONENTSFILE
+
+bash ./scripts/check-chart-kdm-source-values >> $COMPONENTSFILE
+
 echo "Done creating ./bin/rancher-components.txt"

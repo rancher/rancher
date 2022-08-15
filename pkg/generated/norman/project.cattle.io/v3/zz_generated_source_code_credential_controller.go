@@ -43,7 +43,7 @@ func init() {
 	resource.Put(SourceCodeCredentialGroupVersionResource)
 }
 
-// Deprecated use v3.SourceCodeCredential instead
+// Deprecated: use v3.SourceCodeCredential instead
 type SourceCodeCredential = v3.SourceCodeCredential
 
 func NewSourceCodeCredential(namespace, name string, obj v3.SourceCodeCredential) *v3.SourceCodeCredential {

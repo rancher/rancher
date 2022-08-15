@@ -42,7 +42,7 @@ func init() {
 	resource.Put(EventGroupVersionResource)
 }
 
-// Deprecated use v1.Event instead
+// Deprecated: use v1.Event instead
 type Event = v1.Event
 
 func NewEvent(namespace, name string, obj v1.Event) *v1.Event {
