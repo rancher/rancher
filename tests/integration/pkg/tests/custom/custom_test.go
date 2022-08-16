@@ -205,7 +205,7 @@ func TestCustomUniqueRoles(t *testing.T) {
 	}
 
 	clusterObject.Spec.RKEConfig.MachineGlobalConfig.Data = map[string]interface{}{
-		"kubelet-arg": []string{"cgroup-root=/kipid"},
+		"kubelet-arg": []string{"cgroup-root=/kipid", "alsologtostderr=true", "stderrthreshold=2", "v=6"},
 	}
 
 	c, err := cluster.New(clients, &clusterObject)
