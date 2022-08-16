@@ -5,14 +5,22 @@ import (
 	"os/user"
 	"path/filepath"
 
+	"github.com/rancher/rancher/tests/framework/pkg/config"
 	"golang.org/x/crypto/ssh"
 )
 
 const (
 	// The json/yaml config key for the config of nodes of outside cloud provider e.g. linode or ec2
 	ExternalNodeConfigConfigurationFileKey = "externalNodes"
-	sshPath                                = ".ssh"
+	SSHPathConfigurationKey                = "sshPath"
+	defaultSSHPath                         = ".ssh"
 )
+
+// SSHPath is the path to the ssh key used in external node functionality. This be used if the ssh keys exists
+// in a location not in /.ssh
+type SSHPath struct {
+	SSHPath string `json:"sshPath" yaml:"sshPath"`
+}
 
 // Node is a configuration of node that is from an oudise cloud provider
 type Node struct {
@@ -29,10 +37,13 @@ type ExternalNodeConfig struct {
 }
 
 // ExecuteCommand executes `command` in the specific node created.
-func (n *Node) ExecuteCommand(command string) error {
+func (n *Node) ExecuteCommand(command string) (string, error) {
 	signer, err := ssh.ParsePrivateKey(n.SSHKey)
+	var output []byte
+	var output_string string
+
 	if err != nil {
-		return err
+		return output_string, err
 	}
 
 	auths := []ssh.AuthMethod{ssh.PublicKeys([]ssh.Signer{signer}...)}
@@ -46,25 +57,36 @@ func (n *Node) ExecuteCommand(command string) error {
 
 	client, err := ssh.Dial("tcp", n.PublicIPAddress+":22", cfg)
 	if err != nil {
-		return err
+		return output_string, err
 	}
 
 	session, err := client.NewSession()
 	if err != nil {
-		return err
+		return output_string, err
 	}
 
-	return session.Run(command)
+	output, err = session.Output(command)
+	output_string = string(output)
+	return output_string, err
 }
 
 // GetSSHKey reads in the ssh file from the .ssh directory, returns the key in []byte format
 func GetSSHKey(sshKeyname string) ([]byte, error) {
-	user, err := user.Current()
-	if err != nil {
-		return nil, err
-	}
+	var keyPath string
 
-	keyPath := filepath.Join(user.HomeDir, sshPath, sshKeyname)
+	sshPathConfig := new(SSHPath)
+
+	config.LoadConfig(SSHPathConfigurationKey, sshPathConfig)
+	if sshPathConfig.SSHPath == "" {
+		user, err := user.Current()
+		if err != nil {
+			return nil, err
+		}
+
+		keyPath = filepath.Join(user.HomeDir, defaultSSHPath, sshKeyname)
+	} else {
+		keyPath = filepath.Join(sshPathConfig.SSHPath, sshKeyname)
+	}
 	content, err := ioutil.ReadFile(keyPath)
 	if err != nil {
 		return []byte{}, err

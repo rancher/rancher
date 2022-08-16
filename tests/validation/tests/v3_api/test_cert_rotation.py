@@ -61,10 +61,13 @@ def test_rbac_cert_rotation(role):
         certs2 = get_certs()
         compare_changed(certs2, now, changed)
         return None
-    with pytest.raises(ApiError) as e:
-        user_cluster.rotateCertificates()
-    assert e.value.error.status == 403
-    assert e.value.error.code == 'PermissionDenied'
+    if not hasattr(user_cluster, 'rotateCertificates'):
+        assert hasattr(user_cluster, 'rotateCertificates') == False
+    else:
+        with pytest.raises(ApiError) as e:
+            user_cluster.rotateCertificates()
+        assert e.value.error.status == 403
+        assert e.value.error.code == 'PermissionDenied'
 
 
 def test_rotate_all_certs():

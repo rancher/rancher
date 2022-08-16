@@ -358,6 +358,24 @@ steps:
       exclude:
       - "refs/tags/*-*"
 
+- name: check-release-images-exists
+  image: rancher/dapper:v0.5.8
+  failure: ignore
+  commands:
+  - dapper check-release-images-exist
+  privileged: true
+  volumes:
+  - name: docker
+    path: /var/run/docker.sock
+  when:
+    instance:
+      - drone-publish.rancher.io
+    ref:
+      include:
+        - "refs/tags/v*"
+    event:
+    - tag
+
 volumes:
 - name: docker
   host:

@@ -2,7 +2,7 @@
 name: Feature request
 about: Suggest an idea for this project
 title: '[RFE] '
-labels: 'kind/feature'
+labels: 'kind/enhancement'
 assignees: ''
 
 ---

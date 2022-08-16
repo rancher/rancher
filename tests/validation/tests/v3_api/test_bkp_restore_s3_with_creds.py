@@ -42,7 +42,7 @@ def create_project_client_and_cluster_s3_with_creds(node_template_linode,
             "bucketName": AWS_S3_BUCKET_NAME,
             "folder": AWS_S3_BUCKET_FOLDER_NAME,
             "region": AWS_REGION,
-            "endpoint": "s3.amazonaws.com"
+            "endpoint": "s3.us-east-2.amazonaws.com"
         }
     }
     cluster_name = random_name()

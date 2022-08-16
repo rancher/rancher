@@ -510,7 +510,9 @@ def create_and_validate_workload_with_configmap_as_env_variable(p_client,
     }]
     con = [{"name": "test",
             "image": TEST_IMAGE,
-            "environmentFrom": environmentdata}]
+            "envFrom": [{"configMapRef": {
+                "name": configmapname}}]
+            }]
 
     workload = p_client.create_workload(name=workload_name,
                                         containers=con,

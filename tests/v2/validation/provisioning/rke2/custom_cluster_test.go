@@ -15,6 +15,7 @@ import (
 	"github.com/rancher/rancher/tests/framework/pkg/session"
 	"github.com/rancher/rancher/tests/framework/pkg/wait"
 	"github.com/rancher/rancher/tests/integration/pkg/defaults"
+	provisioning "github.com/rancher/rancher/tests/v2/validation/provisioning"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -39,8 +40,8 @@ func (c *CustomClusterProvisioningTestSuite) SetupSuite() {
 	testSession := session.NewSession(c.T())
 	c.session = testSession
 
-	clustersConfig := new(Config)
-	config.LoadConfig(ConfigurationFileKey, clustersConfig)
+	clustersConfig := new(provisioning.Config)
+	config.LoadConfig(provisioning.ConfigurationFileKey, clustersConfig)
 
 	c.kubernetesVersions = clustersConfig.KubernetesVersions
 	c.cnis = clustersConfig.CNIs
@@ -52,7 +53,7 @@ func (c *CustomClusterProvisioningTestSuite) SetupSuite() {
 	c.client = client
 
 	enabled := true
-	var testuser = AppendRandomString("testuser-")
+	var testuser = provisioning.AppendRandomString("testuser-")
 	user := &management.User{
 		Username: testuser,
 		Password: "rancherrancher123!",
@@ -63,6 +64,8 @@ func (c *CustomClusterProvisioningTestSuite) SetupSuite() {
 	newUser, err := users.CreateUserWithRole(client, user, "user")
 	require.NoError(c.T(), err)
 
+	newUser.Password = user.Password
+
 	standardUserClient, err := client.AsUser(newUser)
 	require.NoError(c.T(), err)
 
@@ -70,6 +73,8 @@ func (c *CustomClusterProvisioningTestSuite) SetupSuite() {
 }
 
 func (c *CustomClusterProvisioningTestSuite) ProvisioningRKE2CustomCluster(externalNodeProvider ExternalNodeProvider) {
+	namespace := "fleet-default"
+
 	nodeRoles0 := []string{
 		"--etcd --controlplane --worker",
 	}
@@ -107,14 +112,17 @@ func (c *CustomClusterProvisioningTestSuite) ProvisioningRKE2CustomCluster(exter
 					nodes, err := externalNodeProvider.NodeCreationFunc(client, numNodes)
 					require.NoError(c.T(), err)
 
-					clusterName := AppendRandomString(externalNodeProvider.Name)
+					clusterName := provisioning.AppendRandomString(externalNodeProvider.Name)
 
 					cluster := clusters.NewRKE2ClusterConfig(clusterName, namespace, cni, "", kubeVersion, nil)
 
 					clusterResp, err := clusters.CreateRKE2Cluster(client, cluster)
 					require.NoError(c.T(), err)
 
-					customCluster, err := client.Provisioning.Clusters(namespace).Get(context.TODO(), clusterResp.Name, metav1.GetOptions{})
+					client, err = client.ReLogin()
+					require.NoError(c.T(), err)
+
+					customCluster, err := client.Provisioning.Cluster.ByID(clusterResp.ID)
 					require.NoError(c.T(), err)
 
 					token, err := tokenregistration.GetRegistrationToken(client, customCluster.Status.ClusterName)
@@ -124,11 +132,15 @@ func (c *CustomClusterProvisioningTestSuite) ProvisioningRKE2CustomCluster(exter
 						c.T().Logf("Execute Registration Command for node %s", node.NodeID)
 						command := fmt.Sprintf("%s %s", token.InsecureNodeCommand, tt.nodeRoles[key])
 
-						err = node.ExecuteCommand(command)
+						output, err := node.ExecuteCommand(command)
 						require.NoError(c.T(), err)
+						c.T().Logf(output)
 					}
 
-					result, err := client.Provisioning.Clusters(namespace).Watch(context.TODO(), metav1.ListOptions{
+					kubeProvisioningClient, err := c.client.GetKubeAPIProvisioningClient()
+					require.NoError(c.T(), err)
+
+					result, err := kubeProvisioningClient.Clusters(namespace).Watch(context.TODO(), metav1.ListOptions{
 						FieldSelector:  "metadata.name=" + clusterName,
 						TimeoutSeconds: &defaults.WatchTimeoutSeconds,
 					})
@@ -138,7 +150,7 @@ func (c *CustomClusterProvisioningTestSuite) ProvisioningRKE2CustomCluster(exter
 
 					err = wait.WatchWait(result, checkFunc)
 					assert.NoError(c.T(), err)
-					assert.Equal(c.T(), clusterName, clusterResp.Name)
+					assert.Equal(c.T(), clusterName, clusterResp.ObjectMeta.Name)
 				})
 			}
 		}
@@ -146,6 +158,8 @@ func (c *CustomClusterProvisioningTestSuite) ProvisioningRKE2CustomCluster(exter
 }
 
 func (c *CustomClusterProvisioningTestSuite) ProvisioningRKE2CustomClusterDynamicInput(externalNodeProvider ExternalNodeProvider, nodesAndRoles []machinepools.NodeRoles) {
+	namespace := "fleet-default"
+
 	rolesPerNode := []string{}
 
 	for _, nodes := range nodesAndRoles {
@@ -188,14 +202,17 @@ func (c *CustomClusterProvisioningTestSuite) ProvisioningRKE2CustomClusterDynami
 					nodes, err := externalNodeProvider.NodeCreationFunc(client, numOfNodes)
 					require.NoError(c.T(), err)
 
-					clusterName := AppendRandomString(externalNodeProvider.Name)
+					clusterName := provisioning.AppendRandomString(externalNodeProvider.Name)
 
 					cluster := clusters.NewRKE2ClusterConfig(clusterName, namespace, cni, "", kubeVersion, nil)
 
 					clusterResp, err := clusters.CreateRKE2Cluster(client, cluster)
 					require.NoError(c.T(), err)
 
-					customCluster, err := client.Provisioning.Clusters(namespace).Get(context.TODO(), clusterResp.Name, metav1.GetOptions{})
+					client, err = client.ReLogin()
+					require.NoError(c.T(), err)
+
+					customCluster, err := client.Provisioning.Cluster.ByID(clusterResp.ID)
 					require.NoError(c.T(), err)
 
 					token, err := tokenregistration.GetRegistrationToken(client, customCluster.Status.ClusterName)
@@ -205,11 +222,15 @@ func (c *CustomClusterProvisioningTestSuite) ProvisioningRKE2CustomClusterDynami
 						c.T().Logf("Execute Registration Command for node %s", node.NodeID)
 						command := fmt.Sprintf("%s %s", token.InsecureNodeCommand, rolesPerNode[key])
 
-						err = node.ExecuteCommand(command)
+						output, err := node.ExecuteCommand(command)
 						require.NoError(c.T(), err)
+						c.T().Logf(output)
 					}
 
-					result, err := client.Provisioning.Clusters(namespace).Watch(context.TODO(), metav1.ListOptions{
+					kubeProvisioningClient, err := c.client.GetKubeAPIProvisioningClient()
+					require.NoError(c.T(), err)
+
+					result, err := kubeProvisioningClient.Clusters(namespace).Watch(context.TODO(), metav1.ListOptions{
 						FieldSelector:  "metadata.name=" + clusterName,
 						TimeoutSeconds: &defaults.WatchTimeoutSeconds,
 					})
@@ -219,7 +240,7 @@ func (c *CustomClusterProvisioningTestSuite) ProvisioningRKE2CustomClusterDynami
 
 					err = wait.WatchWait(result, checkFunc)
 					assert.NoError(c.T(), err)
-					assert.Equal(c.T(), clusterName, clusterResp.Name)
+					assert.Equal(c.T(), clusterName, clusterResp.ObjectMeta.Name)
 				})
 			}
 		}
@@ -234,8 +255,8 @@ func (c *CustomClusterProvisioningTestSuite) TestProvisioningCustomCluster() {
 }
 
 func (c *CustomClusterProvisioningTestSuite) TestProvisioningCustomClusterDynamicInput() {
-	clustersConfig := new(Config)
-	config.LoadConfig(ConfigurationFileKey, clustersConfig)
+	clustersConfig := new(provisioning.Config)
+	config.LoadConfig(provisioning.ConfigurationFileKey, clustersConfig)
 	nodesAndRoles := clustersConfig.NodesAndRoles
 
 	if len(nodesAndRoles) == 0 {

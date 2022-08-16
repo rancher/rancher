@@ -93,7 +93,6 @@ node {
                   dir("./tests/v2/validation/.ssh") {
                     def decoded = new String(AWS_SSH_PEM_KEY.decodeBase64())
                     writeFile file: AWS_SSH_KEY_NAME, text: decoded
-                    env.SSH_PATH = "/go/src/github.com/rancher/rancher/tests/v2/validation/.ssh"
                   }
                 }
 

@@ -14,10 +14,15 @@ import (
 	"github.com/rancher/rancher/tests/framework/pkg/session"
 	"github.com/rancher/rancher/tests/framework/pkg/wait"
 	"github.com/rancher/rancher/tests/integration/pkg/defaults"
+	provisioning "github.com/rancher/rancher/tests/v2/validation/provisioning"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
+
+const (
+	namespace = "fleet-default"
 )
 
 type RKE2NodeDriverProvisioningTestSuite struct {
@@ -38,8 +43,8 @@ func (r *RKE2NodeDriverProvisioningTestSuite) SetupSuite() {
 	testSession := session.NewSession(r.T())
 	r.session = testSession
 
-	clustersConfig := new(Config)
-	config.LoadConfig(ConfigurationFileKey, clustersConfig)
+	clustersConfig := new(provisioning.Config)
+	config.LoadConfig(provisioning.ConfigurationFileKey, clustersConfig)
 
 	r.kubernetesVersions = clustersConfig.KubernetesVersions
 	r.cnis = clustersConfig.CNIs
@@ -51,7 +56,7 @@ func (r *RKE2NodeDriverProvisioningTestSuite) SetupSuite() {
 	r.client = client
 
 	enabled := true
-	var testuser = AppendRandomString("testuser-")
+	var testuser = provisioning.AppendRandomString("testuser-")
 	user := &management.User{
 		Username: testuser,
 		Password: "rancherrancher123!",
@@ -59,7 +64,7 @@ func (r *RKE2NodeDriverProvisioningTestSuite) SetupSuite() {
 		Enabled:  &enabled,
 	}
 
-	newUser, err := users.CreateUserWithRole(client, user, "clusters-create", "user")
+	newUser, err := users.CreateUserWithRole(client, user, "user")
 	require.NoError(r.T(), err)
 
 	newUser.Password = user.Password
@@ -134,7 +139,7 @@ func (r *RKE2NodeDriverProvisioningTestSuite) ProvisioningRKE2Cluster(provider P
 					testSessionClient, err := tt.client.WithSession(testSession)
 					require.NoError(r.T(), err)
 
-					clusterName := AppendRandomString(provider.Name)
+					clusterName := provisioning.AppendRandomString(provider.Name)
 					generatedPoolName := fmt.Sprintf("nc-%s-pool1-", clusterName)
 					machinePoolConfig := provider.MachinePoolFunc(generatedPoolName, namespace)
 
@@ -148,7 +153,10 @@ func (r *RKE2NodeDriverProvisioningTestSuite) ProvisioningRKE2Cluster(provider P
 					clusterResp, err := clusters.CreateRKE2Cluster(testSessionClient, cluster)
 					require.NoError(r.T(), err)
 
-					result, err := r.client.Provisioning.Clusters(namespace).Watch(context.TODO(), metav1.ListOptions{
+					kubeProvisioningClient, err := r.client.GetKubeAPIProvisioningClient()
+					require.NoError(r.T(), err)
+
+					result, err := kubeProvisioningClient.Clusters(namespace).Watch(context.TODO(), metav1.ListOptions{
 						FieldSelector:  "metadata.name=" + clusterName,
 						TimeoutSeconds: &defaults.WatchTimeoutSeconds,
 					})
@@ -158,7 +166,7 @@ func (r *RKE2NodeDriverProvisioningTestSuite) ProvisioningRKE2Cluster(provider P
 
 					err = wait.WatchWait(result, checkFunc)
 					assert.NoError(r.T(), err)
-					assert.Equal(r.T(), clusterName, clusterResp.Name)
+					assert.Equal(r.T(), clusterName, clusterResp.ObjectMeta.Name)
 				})
 			}
 		}
@@ -197,7 +205,7 @@ func (r *RKE2NodeDriverProvisioningTestSuite) ProvisioningRKE2ClusterDynamicInpu
 					testSessionClient, err := tt.client.WithSession(testSession)
 					require.NoError(r.T(), err)
 
-					clusterName := AppendRandomString(provider.Name)
+					clusterName := provisioning.AppendRandomString(provider.Name)
 					generatedPoolName := fmt.Sprintf("nc-%s-pool1-", clusterName)
 					machinePoolConfig := provider.MachinePoolFunc(generatedPoolName, namespace)
 
@@ -211,7 +219,10 @@ func (r *RKE2NodeDriverProvisioningTestSuite) ProvisioningRKE2ClusterDynamicInpu
 					clusterResp, err := clusters.CreateRKE2Cluster(testSessionClient, cluster)
 					require.NoError(r.T(), err)
 
-					result, err := r.client.Provisioning.Clusters(namespace).Watch(context.TODO(), metav1.ListOptions{
+					kubeProvisioningClient, err := r.client.GetKubeAPIProvisioningClient()
+					require.NoError(r.T(), err)
+
+					result, err := kubeProvisioningClient.Clusters(namespace).Watch(context.TODO(), metav1.ListOptions{
 						FieldSelector:  "metadata.name=" + clusterName,
 						TimeoutSeconds: &defaults.WatchTimeoutSeconds,
 					})
@@ -221,7 +232,7 @@ func (r *RKE2NodeDriverProvisioningTestSuite) ProvisioningRKE2ClusterDynamicInpu
 
 					err = wait.WatchWait(result, checkFunc)
 					assert.NoError(r.T(), err)
-					assert.Equal(r.T(), clusterName, clusterResp.Name)
+					assert.Equal(r.T(), clusterName, clusterResp.ObjectMeta.Name)
 				})
 			}
 		}
@@ -236,8 +247,8 @@ func (r *RKE2NodeDriverProvisioningTestSuite) TestProvisioning() {
 }
 
 func (r *RKE2NodeDriverProvisioningTestSuite) TestProvisioningDynamicInput() {
-	clustersConfig := new(Config)
-	config.LoadConfig(ConfigurationFileKey, clustersConfig)
+	clustersConfig := new(provisioning.Config)
+	config.LoadConfig(provisioning.ConfigurationFileKey, clustersConfig)
 	nodesAndRoles := clustersConfig.NodesAndRoles
 
 	if len(nodesAndRoles) == 0 {

@@ -2,6 +2,8 @@ package client
 
 const (
 	ClusterStatusType                                      = "clusterStatus"
+	ClusterStatusFieldAADClientCertSecret                  = "aadClientCertSecret"
+	ClusterStatusFieldAADClientSecret                      = "aadClientSecret"
 	ClusterStatusFieldAKSStatus                            = "aksStatus"
 	ClusterStatusFieldAPIEndpoint                          = "apiEndpoint"
 	ClusterStatusFieldAgentFeatures                        = "agentFeatures"
@@ -29,14 +31,23 @@ const (
 	ClusterStatusFieldMonitoringStatus                     = "monitoringStatus"
 	ClusterStatusFieldNodeCount                            = "nodeCount"
 	ClusterStatusFieldNodeVersion                          = "nodeVersion"
+	ClusterStatusFieldOpenStackSecret                      = "openStackSecret"
+	ClusterStatusFieldPrivateRegistrySecret                = "privateRegistrySecret"
 	ClusterStatusFieldProvider                             = "provider"
 	ClusterStatusFieldRequested                            = "requested"
+	ClusterStatusFieldS3CredentialSecret                   = "s3CredentialSecret"
 	ClusterStatusFieldScheduledClusterScanStatus           = "scheduledClusterScanStatus"
+	ClusterStatusFieldServiceAccountTokenSecret            = "serviceAccountTokenSecret"
 	ClusterStatusFieldVersion                              = "version"
+	ClusterStatusFieldVirtualCenterSecret                  = "virtualCenterSecret"
+	ClusterStatusFieldVsphereSecret                        = "vsphereSecret"
+	ClusterStatusFieldWeavePasswordSecret                  = "weavePasswordSecret"
 	ClusterStatusFieldWindowsWorkerCount                   = "windowsWorkerCount"
 )
 
 type ClusterStatus struct {
+	AADClientCertSecret                  string                      `json:"aadClientCertSecret,omitempty" yaml:"aadClientCertSecret,omitempty"`
+	AADClientSecret                      string                      `json:"aadClientSecret,omitempty" yaml:"aadClientSecret,omitempty"`
 	AKSStatus                            *AKSStatus                  `json:"aksStatus,omitempty" yaml:"aksStatus,omitempty"`
 	APIEndpoint                          string                      `json:"apiEndpoint,omitempty" yaml:"apiEndpoint,omitempty"`
 	AgentFeatures                        map[string]bool             `json:"agentFeatures,omitempty" yaml:"agentFeatures,omitempty"`
@@ -64,9 +75,16 @@ type ClusterStatus struct {
 	MonitoringStatus                     *MonitoringStatus           `json:"monitoringStatus,omitempty" yaml:"monitoringStatus,omitempty"`
 	NodeCount                            int64                       `json:"nodeCount,omitempty" yaml:"nodeCount,omitempty"`
 	NodeVersion                          int64                       `json:"nodeVersion,omitempty" yaml:"nodeVersion,omitempty"`
+	OpenStackSecret                      string                      `json:"openStackSecret,omitempty" yaml:"openStackSecret,omitempty"`
+	PrivateRegistrySecret                string                      `json:"privateRegistrySecret,omitempty" yaml:"privateRegistrySecret,omitempty"`
 	Provider                             string                      `json:"provider,omitempty" yaml:"provider,omitempty"`
 	Requested                            map[string]string           `json:"requested,omitempty" yaml:"requested,omitempty"`
+	S3CredentialSecret                   string                      `json:"s3CredentialSecret,omitempty" yaml:"s3CredentialSecret,omitempty"`
 	ScheduledClusterScanStatus           *ScheduledClusterScanStatus `json:"scheduledClusterScanStatus,omitempty" yaml:"scheduledClusterScanStatus,omitempty"`
+	ServiceAccountTokenSecret            string                      `json:"serviceAccountTokenSecret,omitempty" yaml:"serviceAccountTokenSecret,omitempty"`
 	Version                              *Info                       `json:"version,omitempty" yaml:"version,omitempty"`
+	VirtualCenterSecret                  string                      `json:"virtualCenterSecret,omitempty" yaml:"virtualCenterSecret,omitempty"`
+	VsphereSecret                        string                      `json:"vsphereSecret,omitempty" yaml:"vsphereSecret,omitempty"`
+	WeavePasswordSecret                  string                      `json:"weavePasswordSecret,omitempty" yaml:"weavePasswordSecret,omitempty"`
 	WindowsWorkerCount                   int64                       `json:"windowsWorkerCount,omitempty" yaml:"windowsWorkerCount,omitempty"`
 }
