@@ -205,8 +205,8 @@ func TestCustomUniqueRoles(t *testing.T) {
 	}
 
 	clusterObject.Spec.RKEConfig.MachineGlobalConfig.Data = map[string]interface{}{
-		"kubelet-arg":   []string{"alsologtostderr=true", "stderrthreshold=2", "v=6"},
-		"runtime-image": "rancher/rke2-runtime/v1.22.9-rke2r2",
+		"kubelet-arg": []string{"alsologtostderr=true", "stderrthreshold=2", "v=6"},
+		//"runtime-image": "rancher/rke2-runtime:v1.22.9-rke2r2",
 	}
 
 	c, err := cluster.New(clients, &clusterObject)
