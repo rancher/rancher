@@ -204,9 +204,12 @@ func TestCustomUniqueRoles(t *testing.T) {
 		},
 	}
 
-	clusterObject.Spec.RKEConfig.MachineGlobalConfig.Data = map[string]interface{}{
-		"kubelet-arg": []string{"cgroups-per-qos=false", "enforce-node-allocatable="},
-	}
+	/*
+			clusterObject.Spec.RKEConfig.MachineGlobalConfig.Data = map[string]interface{}{
+			"kubelet-arg": []string{"cgroups-per-qos=false", "enforce-node-allocatable="},
+		}
+	
+	*/
 
 	c, err := cluster.New(clients, &clusterObject)
 	if err != nil {
@@ -220,20 +223,20 @@ func TestCustomUniqueRoles(t *testing.T) {
 
 	assert.NotEmpty(t, command)
 
-	for i := 0; i < 3; i++ {
-		_, err = systemdnode.New(clients, c.Namespace, "#!/usr/bin/env sh\n"+command+" --etcd")
-		if err != nil {
-			t.Fatal(err)
-		}
-	}
-
 	for i := 0; i < 1; i++ {
-		_, err = systemdnode.New(clients, c.Namespace, "#!/usr/bin/env sh\n"+command+" --controlplane")
+		_, err = systemdnode.New(clients, c.Namespace, "#!/usr/bin/env sh\n"+command+" --etcd --controlplane")
 		if err != nil {
 			t.Fatal(err)
 		}
 	}
-
+	/*
+		for i := 0; i < 1; i++ {
+			_, err = systemdnode.New(clients, c.Namespace, "#!/usr/bin/env sh\n"+command+" --controlplane")
+			if err != nil {
+				t.Fatal(err)
+			}
+		}
+	*/
 	_, err = systemdnode.New(clients, c.Namespace, "#!/usr/bin/env sh\n"+command+" --worker")
 	if err != nil {
 		t.Fatal(err)
