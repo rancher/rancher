@@ -208,7 +208,7 @@ func TestCustomUniqueRoles(t *testing.T) {
 			clusterObject.Spec.RKEConfig.MachineGlobalConfig.Data = map[string]interface{}{
 			"kubelet-arg": []string{"cgroups-per-qos=false", "enforce-node-allocatable="},
 		}
-	
+
 	*/
 
 	c, err := cluster.New(clients, &clusterObject)
