@@ -39,7 +39,7 @@ ENV KUSTOMIZE_VERSION v3.5.4
 
 # System charts minimal version
 ENV CATTLE_FLEET_MIN_VERSION=0.3.900
-ENV CATTLE_RANCHER_OPERATOR_MIN_VERSION=0.1.500-rc1
+ENV CATTLE_RANCHER_OPERATOR_MIN_VERSION=0.1.500
 ENV CATTLE_RANCHER_WEBHOOK_MIN_VERSION=0.1.500
 
 RUN mkdir -p /var/lib/rancher-data/local-catalogs/system-library && \
@@ -113,8 +113,8 @@ RUN curl -sLf ${!TINI_URL} > /usr/bin/tini && \
     chmod +x /usr/bin/tini /usr/bin/telemetry /usr/bin/k3s /usr/bin/kubectl /usr/bin/channelserver && \
     mkdir -p /var/lib/rancher-data/driver-metadata
 
-ENV CATTLE_UI_VERSION 2.5.16-rc3
-ENV CATTLE_DASHBOARD_UI_VERSION v2.5.16-rc3
+ENV CATTLE_UI_VERSION 2.5.16
+ENV CATTLE_DASHBOARD_UI_VERSION v2.5.16
 ENV CATTLE_CLI_VERSION v2.4.14
 # Please update the api-ui-version in pkg/settings/settings.go when updating the version here.
 ENV CATTLE_API_UI_VERSION 1.1.9
