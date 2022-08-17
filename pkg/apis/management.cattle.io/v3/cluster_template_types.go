@@ -7,7 +7,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-const ClusterTemplateRevisionConditionSecretsMigrated condition.Cond = "SecretsMigrated"
+const (
+	ClusterTemplateRevisionConditionSecretsMigrated    condition.Cond = "SecretsMigrated"
+	ClusterTemplateRevisionConditionACISecretsMigrated condition.Cond = "ACISecretsMigrated"
+)
 
 type ClusterTemplateRevisionConditionType string
 
@@ -74,15 +77,18 @@ type ClusterTemplateRevisionSpec struct {
 }
 
 type ClusterTemplateRevisionStatus struct {
-	PrivateRegistrySecret string                             `json:"privateRegistrySecret,omitempty" norman:"nocreate,noupdate"`
-	S3CredentialSecret    string                             `json:"s3CredentialSecret,omitempty" norman:"nocreate,noupdate"`
-	WeavePasswordSecret   string                             `json:"weavePasswordSecret,omitempty" norman:"nocreate,noupdate"`
-	VsphereSecret         string                             `json:"vsphereSecret,omitempty" norman:"nocreate,noupdate"`
-	VirtualCenterSecret   string                             `json:"virtualCenterSecret,omitempty" norman:"nocreate,noupdate"`
-	OpenStackSecret       string                             `json:"openStackSecret,omitempty" norman:"nocreate,noupdate"`
-	AADClientSecret       string                             `json:"aadClientSecret,omitempty" norman:"nocreate,noupdate"`
-	AADClientCertSecret   string                             `json:"aadClientCertSecret,omitempty" norman:"nocreate,noupdate"`
-	Conditions            []ClusterTemplateRevisionCondition `json:"conditions,omitempty"`
+	PrivateRegistrySecret   string                             `json:"privateRegistrySecret,omitempty" norman:"nocreate,noupdate"`
+	S3CredentialSecret      string                             `json:"s3CredentialSecret,omitempty" norman:"nocreate,noupdate"`
+	WeavePasswordSecret     string                             `json:"weavePasswordSecret,omitempty" norman:"nocreate,noupdate"`
+	VsphereSecret           string                             `json:"vsphereSecret,omitempty" norman:"nocreate,noupdate"`
+	VirtualCenterSecret     string                             `json:"virtualCenterSecret,omitempty" norman:"nocreate,noupdate"`
+	OpenStackSecret         string                             `json:"openStackSecret,omitempty" norman:"nocreate,noupdate"`
+	AADClientSecret         string                             `json:"aadClientSecret,omitempty" norman:"nocreate,noupdate"`
+	AADClientCertSecret     string                             `json:"aadClientCertSecret,omitempty" norman:"nocreate,noupdate"`
+	ACIAPICUserKeySecret    string                             `json:"aciAPICUserKeySecret,omitempty" norman:"nocreate,noupdate"`
+	ACITokenSecret          string                             `json:"aciTokenSecret,omitempty" norman:"nocreate,noupdate"`
+	ACIKafkaClientKeySecret string                             `json:"aciKafkaClientKeySecret,omitempty" norman:"nocreate,noupdate"`
+	Conditions              []ClusterTemplateRevisionCondition `json:"conditions,omitempty"`
 }
 
 type ClusterTemplateQuestionsOutput struct {
