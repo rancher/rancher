@@ -199,6 +199,69 @@ func AssembleAADCertCredential(secretRef, objType, objName string, spec apimgmtv
 	return spec, nil
 }
 
+// AssembleACIAPICUserKeyCredential looks up the aci apic user key Secret and inserts the keys into the AciNetworkProvider on the Cluster spec.
+// It returns a new copy of the spec without modifying the original. The Cluster is never updated.
+func AssembleACIAPICUserKeyCredential(secretRef, objType, objName string, spec apimgmtv3.ClusterSpec, secretLister v1.SecretLister) (apimgmtv3.ClusterSpec, error) {
+	if spec.RancherKubernetesEngineConfig == nil || spec.RancherKubernetesEngineConfig.Network.AciNetworkProvider == nil {
+		return spec, nil
+	}
+	if secretRef == "" {
+		if spec.RancherKubernetesEngineConfig.Network.AciNetworkProvider.ApicUserKey != "" {
+			logrus.Warnf("[secretmigrator] secrets for %s %s are not finished migrating", objType, objName)
+		}
+		return spec, nil
+
+	}
+	aciUserKeySecret, err := secretLister.Get(SecretNamespace, secretRef)
+	if err != nil {
+		return spec, err
+	}
+	spec.RancherKubernetesEngineConfig.Network.AciNetworkProvider.ApicUserKey = string(aciUserKeySecret.Data[SecretKey])
+	return spec, nil
+}
+
+// AssembleACITokenCredential looks up the aci token Secret and inserts the keys into the AciNetworkProvider on the Cluster spec.
+// It returns a new copy of the spec without modifying the original. The Cluster is never updated.
+func AssembleACITokenCredential(secretRef, objType, objName string, spec apimgmtv3.ClusterSpec, secretLister v1.SecretLister) (apimgmtv3.ClusterSpec, error) {
+	if spec.RancherKubernetesEngineConfig == nil || spec.RancherKubernetesEngineConfig.Network.AciNetworkProvider == nil {
+		return spec, nil
+	}
+	if secretRef == "" {
+		if spec.RancherKubernetesEngineConfig.Network.AciNetworkProvider.Token != "" {
+			logrus.Warnf("[secretmigrator] secrets for %s %s are not finished migrating", objType, objName)
+		}
+		return spec, nil
+
+	}
+	aciTokenSecret, err := secretLister.Get(SecretNamespace, secretRef)
+	if err != nil {
+		return spec, err
+	}
+	spec.RancherKubernetesEngineConfig.Network.AciNetworkProvider.Token = string(aciTokenSecret.Data[SecretKey])
+	return spec, nil
+}
+
+// AssembleACIKafkaClientKeyCredential looks up the aci kafka client key Secret and inserts the keys into the AciNetworkProvider on the Cluster spec.
+// It returns a new copy of the spec without modifying the original. The Cluster is never updated.
+func AssembleACIKafkaClientKeyCredential(secretRef, objType, objName string, spec apimgmtv3.ClusterSpec, secretLister v1.SecretLister) (apimgmtv3.ClusterSpec, error) {
+	if spec.RancherKubernetesEngineConfig == nil || spec.RancherKubernetesEngineConfig.Network.AciNetworkProvider == nil {
+		return spec, nil
+	}
+	if secretRef == "" {
+		if spec.RancherKubernetesEngineConfig.Network.AciNetworkProvider.KafkaClientKey != "" {
+			logrus.Warnf("[secretmigrator] secrets for %s %s are not finished migrating", objType, objName)
+		}
+		return spec, nil
+
+	}
+	aciKafkaClientKeySecret, err := secretLister.Get(SecretNamespace, secretRef)
+	if err != nil {
+		return spec, err
+	}
+	spec.RancherKubernetesEngineConfig.Network.AciNetworkProvider.KafkaClientKey = string(aciKafkaClientKeySecret.Data[SecretKey])
+	return spec, nil
+}
+
 // AssembleRKEConfigSpec is a wrapper assembler for assembling configs on Clusters.
 func AssembleRKEConfigSpec(cluster *apimgmtv3.Cluster, spec apimgmtv3.ClusterSpec, secretLister v1.SecretLister) (apimgmtv3.ClusterSpec, error) {
 	spec, err := AssembleS3Credential(cluster.GetSecret("S3CredentialSecret"), ClusterType, cluster.Name, spec, secretLister)
@@ -229,7 +292,19 @@ func AssembleRKEConfigSpec(cluster *apimgmtv3.Cluster, spec apimgmtv3.ClusterSpe
 	if err != nil {
 		return spec, err
 	}
-	return AssembleAADCertCredential(cluster.GetSecret("AADClientCertSecret"), ClusterType, cluster.Name, spec, secretLister)
+	spec, err = AssembleAADCertCredential(cluster.GetSecret("AADClientCertSecret"), ClusterType, cluster.Name, spec, secretLister)
+	if err != nil {
+		return spec, err
+	}
+	spec, err = AssembleACIAPICUserKeyCredential(cluster.Spec.ClusterSecrets.ACIAPICUserKeySecret, ClusterType, cluster.Name, spec, secretLister)
+	if err != nil {
+		return spec, err
+	}
+	spec, err = AssembleACITokenCredential(cluster.Spec.ClusterSecrets.ACITokenSecret, ClusterType, cluster.Name, spec, secretLister)
+	if err != nil {
+		return spec, err
+	}
+	return AssembleACIKafkaClientKeyCredential(cluster.Spec.ClusterSecrets.ACIKafkaClientKeySecret, ClusterType, cluster.Name, spec, secretLister)
 }
 
 // AssembleRKEConfigTemplateSpec is a wrapper assembler for assembling configs on ClusterTemplateRevisions. It returns a ClusterSpec.
@@ -262,7 +337,19 @@ func AssembleRKEConfigTemplateSpec(template *apimgmtv3.ClusterTemplateRevision, 
 	if err != nil {
 		return spec, err
 	}
-	return AssembleAADCertCredential(template.Status.AADClientCertSecret, ClusterTemplateRevisionType, template.Name, spec, secretLister)
+	spec, err = AssembleAADCertCredential(template.Status.AADClientCertSecret, ClusterTemplateRevisionType, template.Name, spec, secretLister)
+	if err != nil {
+		return spec, err
+	}
+	spec, err = AssembleACIAPICUserKeyCredential(template.Status.ACIAPICUserKeySecret, ClusterTemplateRevisionType, template.Name, spec, secretLister)
+	if err != nil {
+		return spec, err
+	}
+	spec, err = AssembleACITokenCredential(template.Status.ACITokenSecret, ClusterTemplateRevisionType, template.Name, spec, secretLister)
+	if err != nil {
+		return spec, err
+	}
+	return AssembleACIKafkaClientKeyCredential(template.Status.ACIKafkaClientKeySecret, ClusterTemplateRevisionType, template.Name, spec, secretLister)
 }
 
 // AssembleSMTPCredential looks up the SMTP Secret and inserts the keys into the Notifier.
