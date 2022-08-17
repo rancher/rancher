@@ -240,5 +240,109 @@ func (h *handler) syncTemplate(key string, clusterTemplateRevision *v3.ClusterTe
 		return clusterTemplateRevision, err
 	}
 	clusterTemplateRevision = clusterTemplateRevisionCopy.DeepCopy()
+	if doErr != nil {
+		return clusterTemplateRevision, doErr
+	}
+
+	obj, doErr = apimgmtv3.ClusterTemplateRevisionConditionACISecretsMigrated.DoUntilTrue(clusterTemplateRevisionCopy, func() (runtime.Object, error) {
+		// aci apic user key
+		if clusterTemplateRevisionCopy.Status.ACIAPICUserKeySecret == "" {
+			logrus.Tracef("[secretmigrator] migrating aci apic user key secret for clusterTemplateRevision %s", clusterTemplateRevisionCopy.Name)
+			aciAPICUserKeySecret, err := h.migrator.CreateOrUpdateACIAPICUserKeySecret("", clusterTemplateRevisionCopy.Spec.ClusterConfig.RancherKubernetesEngineConfig, clusterTemplateRevisionCopy)
+			if err != nil {
+				logrus.Errorf("[secretmigrator] failed to migrate aci apic user key secret for clusterTemplateRevision %s, will retry: %v", clusterTemplateRevisionCopy.Name, err)
+				return clusterTemplateRevision, err
+			}
+			if aciAPICUserKeySecret != nil {
+				logrus.Tracef("[secretmigrator] aci apic user key secret found for clusterTemplateRevision %s", clusterTemplateRevisionCopy.Name)
+				clusterTemplateRevisionCopy.Status.ACIAPICUserKeySecret = aciAPICUserKeySecret.Name
+				clusterTemplateRevisionCopy.Spec.ClusterConfig.RancherKubernetesEngineConfig.Network.AciNetworkProvider.ApicUserKey = ""
+				clusterTemplateRevisionCopy, err := h.clusterTemplateRevisions.Update(clusterTemplateRevisionCopy)
+				if err != nil {
+					logrus.Errorf("[secretmigrator] failed to migrate aci apic user key secret for clusterTemplateRevision %s, will retry: %v", clusterTemplateRevision.Name, err)
+					deleteErr := h.migrator.secrets.DeleteNamespaced(SecretNamespace, aciAPICUserKeySecret.Name, &metav1.DeleteOptions{})
+					if deleteErr != nil {
+						logrus.Errorf("[secretmigrator] encountered error while handling migration error: %v", deleteErr)
+					}
+					return clusterTemplateRevision, err
+				}
+				clusterTemplateRevision = clusterTemplateRevisionCopy
+			}
+		}
+
+		// aci token
+		if clusterTemplateRevisionCopy.Status.ACITokenSecret == "" {
+			logrus.Tracef("[secretmigrator] migrating aci token secret for clusterTemplateRevision %s", clusterTemplateRevisionCopy.Name)
+			aciTokenSecret, err := h.migrator.CreateOrUpdateACITokenSecret("", clusterTemplateRevisionCopy.Spec.ClusterConfig.RancherKubernetesEngineConfig, clusterTemplateRevisionCopy)
+			if err != nil {
+				logrus.Errorf("[secretmigrator] failed to migrate aci token secret for clusterTemplateRevision %s, will retry: %v", clusterTemplateRevisionCopy.Name, err)
+				return clusterTemplateRevision, err
+			}
+			if aciTokenSecret != nil {
+				logrus.Tracef("[secretmigrator] aci token secret found for clusterTemplateRevision %s", clusterTemplateRevisionCopy.Name)
+				clusterTemplateRevisionCopy.Status.ACITokenSecret = aciTokenSecret.Name
+				clusterTemplateRevisionCopy.Spec.ClusterConfig.RancherKubernetesEngineConfig.Network.AciNetworkProvider.Token = ""
+				clusterTemplateRevisionCopy, err = h.clusterTemplateRevisions.Update(clusterTemplateRevisionCopy)
+				if err != nil {
+					logrus.Errorf("[secretmigrator] failed to migrate aci token secret for clusterTemplateRevision %s, will retry: %v", clusterTemplateRevision.Name, err)
+					deleteErr := h.migrator.secrets.DeleteNamespaced(SecretNamespace, aciTokenSecret.Name, &metav1.DeleteOptions{})
+					if deleteErr != nil {
+						logrus.Errorf("[secretmigrator] encountered error while handling migration error: %v", deleteErr)
+					}
+					return clusterTemplateRevision, err
+				}
+				clusterTemplateRevision = clusterTemplateRevisionCopy
+			}
+		}
+
+		// aci kafka client key
+		if clusterTemplateRevisionCopy.Status.ACIKafkaClientKeySecret == "" {
+			logrus.Tracef("[secretmigrator] migrating aci kafka client key secret for clusterTemplateRevision %s", clusterTemplateRevisionCopy.Name)
+			aciKafkaClientKeySecret, err := h.migrator.CreateOrUpdateACIKafkaClientKeySecret("", clusterTemplateRevisionCopy.Spec.ClusterConfig.RancherKubernetesEngineConfig, clusterTemplateRevisionCopy)
+			if err != nil {
+				logrus.Errorf("[secretmigrator] failed to migrate aci kafka client key secret for clusterTemplateRevision %s, will retry: %v", clusterTemplateRevisionCopy.Name, err)
+				return clusterTemplateRevision, err
+			}
+			if aciKafkaClientKeySecret != nil {
+				logrus.Tracef("[secretmigrator] aci kafka client key secret found for clusterTemplateRevision %s", clusterTemplateRevisionCopy.Name)
+				clusterTemplateRevisionCopy.Status.ACIKafkaClientKeySecret = aciKafkaClientKeySecret.Name
+				clusterTemplateRevisionCopy.Spec.ClusterConfig.RancherKubernetesEngineConfig.Network.AciNetworkProvider.KafkaClientKey = ""
+				clusterTemplateRevisionCopy, err := h.clusterTemplateRevisions.Update(clusterTemplateRevisionCopy)
+				if err != nil {
+					logrus.Errorf("[secretmigrator] failed to migrate aci kafka client key secret for clusterTemplateRevision %s, will retry: %v", clusterTemplateRevision.Name, err)
+					deleteErr := h.migrator.secrets.DeleteNamespaced(SecretNamespace, aciKafkaClientKeySecret.Name, &metav1.DeleteOptions{})
+					if deleteErr != nil {
+						logrus.Errorf("[secretmigrator] encountered error while handling migration error: %v", deleteErr)
+					}
+					return clusterTemplateRevision, err
+				}
+				clusterTemplateRevision = clusterTemplateRevisionCopy
+			}
+		}
+
+		// cluster template questions and answers
+		// The cluster store will look up defaults in the ClusterConfig after assembling it.
+		logrus.Tracef("[secretmigrator] cleaning questions and answers from clusterTemplateRevision %s", clusterTemplateRevisionCopy.Name)
+		for i, q := range clusterTemplateRevisionCopy.Spec.Questions {
+			if MatchesQuestionPath(q.Variable) {
+				clusterTemplateRevisionCopy.Spec.Questions[i].Default = ""
+			}
+		}
+
+		var err error
+		clusterTemplateRevisionCopy, err = h.clusterTemplateRevisions.Update(clusterTemplateRevisionCopy)
+		if err != nil {
+			return clusterTemplateRevision, err
+		}
+		clusterTemplateRevision = clusterTemplateRevisionCopy
+		return clusterTemplateRevisionCopy, nil
+	})
+	clusterTemplateRevisionCopy, _ = obj.(*v3.ClusterTemplateRevision)
+	logrus.Tracef("[secretmigrator] setting clusterTemplateRevision [%s] condition and updating clusterTemplateRevision [%s]", apimgmtv3.ClusterConditionACISecretsMigrated, clusterTemplateRevisionCopy.Name)
+	clusterTemplateRevisionCopy, err = h.clusterTemplateRevisions.Update(clusterTemplateRevisionCopy)
+	if err != nil {
+		return clusterTemplateRevision, err
+	}
+	clusterTemplateRevision = clusterTemplateRevisionCopy.DeepCopy()
 	return clusterTemplateRevision, doErr
 }
