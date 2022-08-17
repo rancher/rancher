@@ -73,6 +73,7 @@ const (
 	ClusterConditionAlertingEnabled               condition.Cond = "AlertingEnabled"
 	ClusterConditionSecretsMigrated               condition.Cond = "SecretsMigrated"
 	ClusterConditionServiceAccountSecretsMigrated condition.Cond = "ServiceAccountSecretsMigrated"
+	ClusterConditionACISecretsMigrated            condition.Cond = "ACISecretsMigrated"
 
 	ClusterDriverImported = "imported"
 	ClusterDriverLocal    = "local"
@@ -383,14 +384,17 @@ type GKEStatus struct {
 }
 
 type ClusterSecrets struct {
-	PrivateRegistrySecret string `json:"privateRegistrySecret,omitempty" norman:"nocreate,noupdate"`
-	S3CredentialSecret    string `json:"s3CredentialSecret,omitempty" norman:"nocreate,noupdate"`
-	WeavePasswordSecret   string `json:"weavePasswordSecret,omitempty" norman:"nocreate,noupdate"`
-	VsphereSecret         string `json:"vsphereSecret,omitempty" norman:"nocreate,noupdate"`
-	VirtualCenterSecret   string `json:"virtualCenterSecret,omitempty" norman:"nocreate,noupdate"`
-	OpenStackSecret       string `json:"openStackSecret,omitempty" norman:"nocreate,noupdate"`
-	AADClientSecret       string `json:"aadClientSecret,omitempty" norman:"nocreate,noupdate"`
-	AADClientCertSecret   string `json:"aadClientCertSecret,omitempty" norman:"nocreate,noupdate"`
+	PrivateRegistrySecret   string `json:"privateRegistrySecret,omitempty" norman:"nocreate,noupdate"`
+	S3CredentialSecret      string `json:"s3CredentialSecret,omitempty" norman:"nocreate,noupdate"`
+	WeavePasswordSecret     string `json:"weavePasswordSecret,omitempty" norman:"nocreate,noupdate"`
+	VsphereSecret           string `json:"vsphereSecret,omitempty" norman:"nocreate,noupdate"`
+	VirtualCenterSecret     string `json:"virtualCenterSecret,omitempty" norman:"nocreate,noupdate"`
+	OpenStackSecret         string `json:"openStackSecret,omitempty" norman:"nocreate,noupdate"`
+	AADClientSecret         string `json:"aadClientSecret,omitempty" norman:"nocreate,noupdate"`
+	AADClientCertSecret     string `json:"aadClientCertSecret,omitempty" norman:"nocreate,noupdate"`
+	ACIAPICUserKeySecret    string `json:"aciAPICUserKeySecret,omitempty" norman:"nocreate,noupdate"`
+	ACITokenSecret          string `json:"aciTokenSecret,omitempty" norman:"nocreate,noupdate"`
+	ACIKafkaClientKeySecret string `json:"aciKafkaClientKeySecret,omitempty" norman:"nocreate,noupdate"`
 }
 
 // GetSecret gets a reference to a secret by its field name, either from the ClusterSecrets field or the Status field.
