@@ -6,6 +6,7 @@ import (
 	"github.com/rancher/norman/generator"
 	"github.com/rancher/norman/objectclient"
 	"github.com/rancher/rancher/pkg/apis/project.cattle.io/v3"
+	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/rest"
 )
@@ -34,6 +35,7 @@ type Interface interface {
 }
 
 type Client struct {
+	userAgent         string
 	controllerFactory controller.SharedControllerFactory
 	clientFactory     client.SharedClientFactory
 }
@@ -50,14 +52,22 @@ func NewForConfig(cfg rest.Config) (Interface, error) {
 	if err != nil {
 		return nil, err
 	}
-	return NewFromControllerFactory(controllerFactory)
+	return NewFromControllerFactory(controllerFactory), nil
 }
 
-func NewFromControllerFactory(factory controller.SharedControllerFactory) (Interface, error) {
+func NewFromControllerFactory(factory controller.SharedControllerFactory) Interface {
 	return &Client{
 		controllerFactory: factory,
 		clientFactory:     factory.SharedCacheFactory().SharedClientFactory(),
-	}, nil
+	}
+}
+
+func NewFromControllerFactoryWithAgent(userAgent string, factory controller.SharedControllerFactory) Interface {
+	return &Client{
+		userAgent:         userAgent,
+		controllerFactory: factory,
+		clientFactory:     factory.SharedCacheFactory().SharedClientFactory(),
+	}
 }
 
 type ServiceAccountTokensGetter interface {
@@ -66,7 +76,12 @@ type ServiceAccountTokensGetter interface {
 
 func (c *Client) ServiceAccountTokens(namespace string) ServiceAccountTokenInterface {
 	sharedClient := c.clientFactory.ForResourceKind(ServiceAccountTokenGroupVersionResource, ServiceAccountTokenGroupVersionKind.Kind, true)
-	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &ServiceAccountTokenResource, ServiceAccountTokenGroupVersionKind, serviceAccountTokenFactory{})
+	client, err := sharedClient.WithAgent(c.userAgent)
+	if err != nil {
+		logrus.Errorf("Failed to add user agent to [ServiceAccountTokens] client: %v", err)
+		client = sharedClient
+	}
+	objectClient := objectclient.NewObjectClient(namespace, client, &ServiceAccountTokenResource, ServiceAccountTokenGroupVersionKind, serviceAccountTokenFactory{})
 	return &serviceAccountTokenClient{
 		ns:           namespace,
 		client:       c,
@@ -80,7 +95,12 @@ type DockerCredentialsGetter interface {
 
 func (c *Client) DockerCredentials(namespace string) DockerCredentialInterface {
 	sharedClient := c.clientFactory.ForResourceKind(DockerCredentialGroupVersionResource, DockerCredentialGroupVersionKind.Kind, true)
-	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &DockerCredentialResource, DockerCredentialGroupVersionKind, dockerCredentialFactory{})
+	client, err := sharedClient.WithAgent(c.userAgent)
+	if err != nil {
+		logrus.Errorf("Failed to add user agent to [DockerCredentials] client: %v", err)
+		client = sharedClient
+	}
+	objectClient := objectclient.NewObjectClient(namespace, client, &DockerCredentialResource, DockerCredentialGroupVersionKind, dockerCredentialFactory{})
 	return &dockerCredentialClient{
 		ns:           namespace,
 		client:       c,
@@ -94,7 +114,12 @@ type CertificatesGetter interface {
 
 func (c *Client) Certificates(namespace string) CertificateInterface {
 	sharedClient := c.clientFactory.ForResourceKind(CertificateGroupVersionResource, CertificateGroupVersionKind.Kind, true)
-	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &CertificateResource, CertificateGroupVersionKind, certificateFactory{})
+	client, err := sharedClient.WithAgent(c.userAgent)
+	if err != nil {
+		logrus.Errorf("Failed to add user agent to [Certificates] client: %v", err)
+		client = sharedClient
+	}
+	objectClient := objectclient.NewObjectClient(namespace, client, &CertificateResource, CertificateGroupVersionKind, certificateFactory{})
 	return &certificateClient{
 		ns:           namespace,
 		client:       c,
@@ -108,7 +133,12 @@ type BasicAuthsGetter interface {
 
 func (c *Client) BasicAuths(namespace string) BasicAuthInterface {
 	sharedClient := c.clientFactory.ForResourceKind(BasicAuthGroupVersionResource, BasicAuthGroupVersionKind.Kind, true)
-	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &BasicAuthResource, BasicAuthGroupVersionKind, basicAuthFactory{})
+	client, err := sharedClient.WithAgent(c.userAgent)
+	if err != nil {
+		logrus.Errorf("Failed to add user agent to [BasicAuths] client: %v", err)
+		client = sharedClient
+	}
+	objectClient := objectclient.NewObjectClient(namespace, client, &BasicAuthResource, BasicAuthGroupVersionKind, basicAuthFactory{})
 	return &basicAuthClient{
 		ns:           namespace,
 		client:       c,
@@ -122,7 +152,12 @@ type SSHAuthsGetter interface {
 
 func (c *Client) SSHAuths(namespace string) SSHAuthInterface {
 	sharedClient := c.clientFactory.ForResourceKind(SSHAuthGroupVersionResource, SSHAuthGroupVersionKind.Kind, true)
-	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &SSHAuthResource, SSHAuthGroupVersionKind, sshAuthFactory{})
+	client, err := sharedClient.WithAgent(c.userAgent)
+	if err != nil {
+		logrus.Errorf("Failed to add user agent to [SSHAuths] client: %v", err)
+		client = sharedClient
+	}
+	objectClient := objectclient.NewObjectClient(namespace, client, &SSHAuthResource, SSHAuthGroupVersionKind, sshAuthFactory{})
 	return &sshAuthClient{
 		ns:           namespace,
 		client:       c,
@@ -136,7 +171,12 @@ type NamespacedServiceAccountTokensGetter interface {
 
 func (c *Client) NamespacedServiceAccountTokens(namespace string) NamespacedServiceAccountTokenInterface {
 	sharedClient := c.clientFactory.ForResourceKind(NamespacedServiceAccountTokenGroupVersionResource, NamespacedServiceAccountTokenGroupVersionKind.Kind, true)
-	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &NamespacedServiceAccountTokenResource, NamespacedServiceAccountTokenGroupVersionKind, namespacedServiceAccountTokenFactory{})
+	client, err := sharedClient.WithAgent(c.userAgent)
+	if err != nil {
+		logrus.Errorf("Failed to add user agent to [NamespacedServiceAccountTokens] client: %v", err)
+		client = sharedClient
+	}
+	objectClient := objectclient.NewObjectClient(namespace, client, &NamespacedServiceAccountTokenResource, NamespacedServiceAccountTokenGroupVersionKind, namespacedServiceAccountTokenFactory{})
 	return &namespacedServiceAccountTokenClient{
 		ns:           namespace,
 		client:       c,
@@ -150,7 +190,12 @@ type NamespacedDockerCredentialsGetter interface {
 
 func (c *Client) NamespacedDockerCredentials(namespace string) NamespacedDockerCredentialInterface {
 	sharedClient := c.clientFactory.ForResourceKind(NamespacedDockerCredentialGroupVersionResource, NamespacedDockerCredentialGroupVersionKind.Kind, true)
-	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &NamespacedDockerCredentialResource, NamespacedDockerCredentialGroupVersionKind, namespacedDockerCredentialFactory{})
+	client, err := sharedClient.WithAgent(c.userAgent)
+	if err != nil {
+		logrus.Errorf("Failed to add user agent to [NamespacedDockerCredentials] client: %v", err)
+		client = sharedClient
+	}
+	objectClient := objectclient.NewObjectClient(namespace, client, &NamespacedDockerCredentialResource, NamespacedDockerCredentialGroupVersionKind, namespacedDockerCredentialFactory{})
 	return &namespacedDockerCredentialClient{
 		ns:           namespace,
 		client:       c,
@@ -164,7 +209,12 @@ type NamespacedCertificatesGetter interface {
 
 func (c *Client) NamespacedCertificates(namespace string) NamespacedCertificateInterface {
 	sharedClient := c.clientFactory.ForResourceKind(NamespacedCertificateGroupVersionResource, NamespacedCertificateGroupVersionKind.Kind, true)
-	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &NamespacedCertificateResource, NamespacedCertificateGroupVersionKind, namespacedCertificateFactory{})
+	client, err := sharedClient.WithAgent(c.userAgent)
+	if err != nil {
+		logrus.Errorf("Failed to add user agent to [NamespacedCertificates] client: %v", err)
+		client = sharedClient
+	}
+	objectClient := objectclient.NewObjectClient(namespace, client, &NamespacedCertificateResource, NamespacedCertificateGroupVersionKind, namespacedCertificateFactory{})
 	return &namespacedCertificateClient{
 		ns:           namespace,
 		client:       c,
@@ -178,7 +228,12 @@ type NamespacedBasicAuthsGetter interface {
 
 func (c *Client) NamespacedBasicAuths(namespace string) NamespacedBasicAuthInterface {
 	sharedClient := c.clientFactory.ForResourceKind(NamespacedBasicAuthGroupVersionResource, NamespacedBasicAuthGroupVersionKind.Kind, true)
-	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &NamespacedBasicAuthResource, NamespacedBasicAuthGroupVersionKind, namespacedBasicAuthFactory{})
+	client, err := sharedClient.WithAgent(c.userAgent)
+	if err != nil {
+		logrus.Errorf("Failed to add user agent to [NamespacedBasicAuths] client: %v", err)
+		client = sharedClient
+	}
+	objectClient := objectclient.NewObjectClient(namespace, client, &NamespacedBasicAuthResource, NamespacedBasicAuthGroupVersionKind, namespacedBasicAuthFactory{})
 	return &namespacedBasicAuthClient{
 		ns:           namespace,
 		client:       c,
@@ -192,7 +247,12 @@ type NamespacedSSHAuthsGetter interface {
 
 func (c *Client) NamespacedSSHAuths(namespace string) NamespacedSSHAuthInterface {
 	sharedClient := c.clientFactory.ForResourceKind(NamespacedSSHAuthGroupVersionResource, NamespacedSSHAuthGroupVersionKind.Kind, true)
-	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &NamespacedSSHAuthResource, NamespacedSSHAuthGroupVersionKind, namespacedSshAuthFactory{})
+	client, err := sharedClient.WithAgent(c.userAgent)
+	if err != nil {
+		logrus.Errorf("Failed to add user agent to [NamespacedSSHAuths] client: %v", err)
+		client = sharedClient
+	}
+	objectClient := objectclient.NewObjectClient(namespace, client, &NamespacedSSHAuthResource, NamespacedSSHAuthGroupVersionKind, namespacedSshAuthFactory{})
 	return &namespacedSshAuthClient{
 		ns:           namespace,
 		client:       c,
@@ -206,7 +266,12 @@ type WorkloadsGetter interface {
 
 func (c *Client) Workloads(namespace string) WorkloadInterface {
 	sharedClient := c.clientFactory.ForResourceKind(WorkloadGroupVersionResource, WorkloadGroupVersionKind.Kind, true)
-	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &WorkloadResource, WorkloadGroupVersionKind, workloadFactory{})
+	client, err := sharedClient.WithAgent(c.userAgent)
+	if err != nil {
+		logrus.Errorf("Failed to add user agent to [Workloads] client: %v", err)
+		client = sharedClient
+	}
+	objectClient := objectclient.NewObjectClient(namespace, client, &WorkloadResource, WorkloadGroupVersionKind, workloadFactory{})
 	return &workloadClient{
 		ns:           namespace,
 		client:       c,
@@ -220,7 +285,12 @@ type AppsGetter interface {
 
 func (c *Client) Apps(namespace string) AppInterface {
 	sharedClient := c.clientFactory.ForResourceKind(AppGroupVersionResource, AppGroupVersionKind.Kind, true)
-	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &AppResource, AppGroupVersionKind, appFactory{})
+	client, err := sharedClient.WithAgent(c.userAgent)
+	if err != nil {
+		logrus.Errorf("Failed to add user agent to [Apps] client: %v", err)
+		client = sharedClient
+	}
+	objectClient := objectclient.NewObjectClient(namespace, client, &AppResource, AppGroupVersionKind, appFactory{})
 	return &appClient{
 		ns:           namespace,
 		client:       c,
@@ -234,7 +304,12 @@ type AppRevisionsGetter interface {
 
 func (c *Client) AppRevisions(namespace string) AppRevisionInterface {
 	sharedClient := c.clientFactory.ForResourceKind(AppRevisionGroupVersionResource, AppRevisionGroupVersionKind.Kind, true)
-	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &AppRevisionResource, AppRevisionGroupVersionKind, appRevisionFactory{})
+	client, err := sharedClient.WithAgent(c.userAgent)
+	if err != nil {
+		logrus.Errorf("Failed to add user agent to [AppRevisions] client: %v", err)
+		client = sharedClient
+	}
+	objectClient := objectclient.NewObjectClient(namespace, client, &AppRevisionResource, AppRevisionGroupVersionKind, appRevisionFactory{})
 	return &appRevisionClient{
 		ns:           namespace,
 		client:       c,
@@ -248,7 +323,12 @@ type SourceCodeProvidersGetter interface {
 
 func (c *Client) SourceCodeProviders(namespace string) SourceCodeProviderInterface {
 	sharedClient := c.clientFactory.ForResourceKind(SourceCodeProviderGroupVersionResource, SourceCodeProviderGroupVersionKind.Kind, false)
-	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &SourceCodeProviderResource, SourceCodeProviderGroupVersionKind, sourceCodeProviderFactory{})
+	client, err := sharedClient.WithAgent(c.userAgent)
+	if err != nil {
+		logrus.Errorf("Failed to add user agent to [SourceCodeProviders] client: %v", err)
+		client = sharedClient
+	}
+	objectClient := objectclient.NewObjectClient(namespace, client, &SourceCodeProviderResource, SourceCodeProviderGroupVersionKind, sourceCodeProviderFactory{})
 	return &sourceCodeProviderClient{
 		ns:           namespace,
 		client:       c,
@@ -262,7 +342,12 @@ type SourceCodeProviderConfigsGetter interface {
 
 func (c *Client) SourceCodeProviderConfigs(namespace string) SourceCodeProviderConfigInterface {
 	sharedClient := c.clientFactory.ForResourceKind(SourceCodeProviderConfigGroupVersionResource, SourceCodeProviderConfigGroupVersionKind.Kind, true)
-	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &SourceCodeProviderConfigResource, SourceCodeProviderConfigGroupVersionKind, sourceCodeProviderConfigFactory{})
+	client, err := sharedClient.WithAgent(c.userAgent)
+	if err != nil {
+		logrus.Errorf("Failed to add user agent to [SourceCodeProviderConfigs] client: %v", err)
+		client = sharedClient
+	}
+	objectClient := objectclient.NewObjectClient(namespace, client, &SourceCodeProviderConfigResource, SourceCodeProviderConfigGroupVersionKind, sourceCodeProviderConfigFactory{})
 	return &sourceCodeProviderConfigClient{
 		ns:           namespace,
 		client:       c,
@@ -276,7 +361,12 @@ type SourceCodeCredentialsGetter interface {
 
 func (c *Client) SourceCodeCredentials(namespace string) SourceCodeCredentialInterface {
 	sharedClient := c.clientFactory.ForResourceKind(SourceCodeCredentialGroupVersionResource, SourceCodeCredentialGroupVersionKind.Kind, true)
-	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &SourceCodeCredentialResource, SourceCodeCredentialGroupVersionKind, sourceCodeCredentialFactory{})
+	client, err := sharedClient.WithAgent(c.userAgent)
+	if err != nil {
+		logrus.Errorf("Failed to add user agent to [SourceCodeCredentials] client: %v", err)
+		client = sharedClient
+	}
+	objectClient := objectclient.NewObjectClient(namespace, client, &SourceCodeCredentialResource, SourceCodeCredentialGroupVersionKind, sourceCodeCredentialFactory{})
 	return &sourceCodeCredentialClient{
 		ns:           namespace,
 		client:       c,
@@ -290,7 +380,12 @@ type PipelinesGetter interface {
 
 func (c *Client) Pipelines(namespace string) PipelineInterface {
 	sharedClient := c.clientFactory.ForResourceKind(PipelineGroupVersionResource, PipelineGroupVersionKind.Kind, true)
-	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &PipelineResource, PipelineGroupVersionKind, pipelineFactory{})
+	client, err := sharedClient.WithAgent(c.userAgent)
+	if err != nil {
+		logrus.Errorf("Failed to add user agent to [Pipelines] client: %v", err)
+		client = sharedClient
+	}
+	objectClient := objectclient.NewObjectClient(namespace, client, &PipelineResource, PipelineGroupVersionKind, pipelineFactory{})
 	return &pipelineClient{
 		ns:           namespace,
 		client:       c,
@@ -304,7 +399,12 @@ type PipelineExecutionsGetter interface {
 
 func (c *Client) PipelineExecutions(namespace string) PipelineExecutionInterface {
 	sharedClient := c.clientFactory.ForResourceKind(PipelineExecutionGroupVersionResource, PipelineExecutionGroupVersionKind.Kind, true)
-	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &PipelineExecutionResource, PipelineExecutionGroupVersionKind, pipelineExecutionFactory{})
+	client, err := sharedClient.WithAgent(c.userAgent)
+	if err != nil {
+		logrus.Errorf("Failed to add user agent to [PipelineExecutions] client: %v", err)
+		client = sharedClient
+	}
+	objectClient := objectclient.NewObjectClient(namespace, client, &PipelineExecutionResource, PipelineExecutionGroupVersionKind, pipelineExecutionFactory{})
 	return &pipelineExecutionClient{
 		ns:           namespace,
 		client:       c,
@@ -318,7 +418,12 @@ type PipelineSettingsGetter interface {
 
 func (c *Client) PipelineSettings(namespace string) PipelineSettingInterface {
 	sharedClient := c.clientFactory.ForResourceKind(PipelineSettingGroupVersionResource, PipelineSettingGroupVersionKind.Kind, true)
-	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &PipelineSettingResource, PipelineSettingGroupVersionKind, pipelineSettingFactory{})
+	client, err := sharedClient.WithAgent(c.userAgent)
+	if err != nil {
+		logrus.Errorf("Failed to add user agent to [PipelineSettings] client: %v", err)
+		client = sharedClient
+	}
+	objectClient := objectclient.NewObjectClient(namespace, client, &PipelineSettingResource, PipelineSettingGroupVersionKind, pipelineSettingFactory{})
 	return &pipelineSettingClient{
 		ns:           namespace,
 		client:       c,
@@ -332,7 +437,12 @@ type SourceCodeRepositoriesGetter interface {
 
 func (c *Client) SourceCodeRepositories(namespace string) SourceCodeRepositoryInterface {
 	sharedClient := c.clientFactory.ForResourceKind(SourceCodeRepositoryGroupVersionResource, SourceCodeRepositoryGroupVersionKind.Kind, true)
-	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &SourceCodeRepositoryResource, SourceCodeRepositoryGroupVersionKind, sourceCodeRepositoryFactory{})
+	client, err := sharedClient.WithAgent(c.userAgent)
+	if err != nil {
+		logrus.Errorf("Failed to add user agent to [SourceCodeRepositories] client: %v", err)
+		client = sharedClient
+	}
+	objectClient := objectclient.NewObjectClient(namespace, client, &SourceCodeRepositoryResource, SourceCodeRepositoryGroupVersionKind, sourceCodeRepositoryFactory{})
 	return &sourceCodeRepositoryClient{
 		ns:           namespace,
 		client:       c,

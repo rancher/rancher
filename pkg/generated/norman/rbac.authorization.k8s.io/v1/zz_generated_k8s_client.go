@@ -5,6 +5,7 @@ import (
 	"github.com/rancher/lasso/pkg/controller"
 	"github.com/rancher/norman/generator"
 	"github.com/rancher/norman/objectclient"
+	"github.com/sirupsen/logrus"
 	"k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/rest"
@@ -18,6 +19,7 @@ type Interface interface {
 }
 
 type Client struct {
+	userAgent         string
 	controllerFactory controller.SharedControllerFactory
 	clientFactory     client.SharedClientFactory
 }
@@ -34,14 +36,22 @@ func NewForConfig(cfg rest.Config) (Interface, error) {
 	if err != nil {
 		return nil, err
 	}
-	return NewFromControllerFactory(controllerFactory)
+	return NewFromControllerFactory(controllerFactory), nil
 }
 
-func NewFromControllerFactory(factory controller.SharedControllerFactory) (Interface, error) {
+func NewFromControllerFactory(factory controller.SharedControllerFactory) Interface {
 	return &Client{
 		controllerFactory: factory,
 		clientFactory:     factory.SharedCacheFactory().SharedClientFactory(),
-	}, nil
+	}
+}
+
+func NewFromControllerFactoryWithAgent(userAgent string, factory controller.SharedControllerFactory) Interface {
+	return &Client{
+		userAgent:         userAgent,
+		controllerFactory: factory,
+		clientFactory:     factory.SharedCacheFactory().SharedClientFactory(),
+	}
 }
 
 type ClusterRoleBindingsGetter interface {
@@ -50,7 +60,12 @@ type ClusterRoleBindingsGetter interface {
 
 func (c *Client) ClusterRoleBindings(namespace string) ClusterRoleBindingInterface {
 	sharedClient := c.clientFactory.ForResourceKind(ClusterRoleBindingGroupVersionResource, ClusterRoleBindingGroupVersionKind.Kind, false)
-	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &ClusterRoleBindingResource, ClusterRoleBindingGroupVersionKind, clusterRoleBindingFactory{})
+	client, err := sharedClient.WithAgent(c.userAgent)
+	if err != nil {
+		logrus.Errorf("Failed to add user agent to [ClusterRoleBindings] client: %v", err)
+		client = sharedClient
+	}
+	objectClient := objectclient.NewObjectClient(namespace, client, &ClusterRoleBindingResource, ClusterRoleBindingGroupVersionKind, clusterRoleBindingFactory{})
 	return &clusterRoleBindingClient{
 		ns:           namespace,
 		client:       c,
@@ -64,7 +79,12 @@ type ClusterRolesGetter interface {
 
 func (c *Client) ClusterRoles(namespace string) ClusterRoleInterface {
 	sharedClient := c.clientFactory.ForResourceKind(ClusterRoleGroupVersionResource, ClusterRoleGroupVersionKind.Kind, false)
-	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &ClusterRoleResource, ClusterRoleGroupVersionKind, clusterRoleFactory{})
+	client, err := sharedClient.WithAgent(c.userAgent)
+	if err != nil {
+		logrus.Errorf("Failed to add user agent to [ClusterRoles] client: %v", err)
+		client = sharedClient
+	}
+	objectClient := objectclient.NewObjectClient(namespace, client, &ClusterRoleResource, ClusterRoleGroupVersionKind, clusterRoleFactory{})
 	return &clusterRoleClient{
 		ns:           namespace,
 		client:       c,
@@ -78,7 +98,12 @@ type RoleBindingsGetter interface {
 
 func (c *Client) RoleBindings(namespace string) RoleBindingInterface {
 	sharedClient := c.clientFactory.ForResourceKind(RoleBindingGroupVersionResource, RoleBindingGroupVersionKind.Kind, true)
-	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &RoleBindingResource, RoleBindingGroupVersionKind, roleBindingFactory{})
+	client, err := sharedClient.WithAgent(c.userAgent)
+	if err != nil {
+		logrus.Errorf("Failed to add user agent to [RoleBindings] client: %v", err)
+		client = sharedClient
+	}
+	objectClient := objectclient.NewObjectClient(namespace, client, &RoleBindingResource, RoleBindingGroupVersionKind, roleBindingFactory{})
 	return &roleBindingClient{
 		ns:           namespace,
 		client:       c,
@@ -92,7 +117,12 @@ type RolesGetter interface {
 
 func (c *Client) Roles(namespace string) RoleInterface {
 	sharedClient := c.clientFactory.ForResourceKind(RoleGroupVersionResource, RoleGroupVersionKind.Kind, true)
-	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &RoleResource, RoleGroupVersionKind, roleFactory{})
+	client, err := sharedClient.WithAgent(c.userAgent)
+	if err != nil {
+		logrus.Errorf("Failed to add user agent to [Roles] client: %v", err)
+		client = sharedClient
+	}
+	objectClient := objectclient.NewObjectClient(namespace, client, &RoleResource, RoleGroupVersionKind, roleFactory{})
 	return &roleClient{
 		ns:           namespace,
 		client:       c,

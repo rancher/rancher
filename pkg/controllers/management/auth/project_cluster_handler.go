@@ -50,7 +50,7 @@ func newPandCLifecycles(management *config.ManagementContext) (*projectLifecycle
 	m := &mgr{
 		mgmt:                 management,
 		nsLister:             management.Core.Namespaces("").Controller().Lister(),
-		prtbLister:           management.Management.ProjectRoleTemplateBindings("").Controller().Lister(),
+		prtbLister:           management.ManagementWithAgent(":)").ProjectRoleTemplateBindings("").Controller().Lister(),
 		crtbLister:           management.Management.ClusterRoleTemplateBindings("").Controller().Lister(),
 		crtbClient:           management.Management.ClusterRoleTemplateBindings(""),
 		projectLister:        management.Management.Projects("").Controller().Lister(),

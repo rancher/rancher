@@ -6,6 +6,7 @@ import (
 	"github.com/rancher/lasso/pkg/controller"
 	"github.com/rancher/norman/generator"
 	"github.com/rancher/norman/objectclient"
+	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/rest"
 )
@@ -16,6 +17,7 @@ type Interface interface {
 }
 
 type Client struct {
+	userAgent         string
 	controllerFactory controller.SharedControllerFactory
 	clientFactory     client.SharedClientFactory
 }
@@ -32,14 +34,22 @@ func NewForConfig(cfg rest.Config) (Interface, error) {
 	if err != nil {
 		return nil, err
 	}
-	return NewFromControllerFactory(controllerFactory)
+	return NewFromControllerFactory(controllerFactory), nil
 }
 
-func NewFromControllerFactory(factory controller.SharedControllerFactory) (Interface, error) {
+func NewFromControllerFactory(factory controller.SharedControllerFactory) Interface {
 	return &Client{
 		controllerFactory: factory,
 		clientFactory:     factory.SharedCacheFactory().SharedClientFactory(),
-	}, nil
+	}
+}
+
+func NewFromControllerFactoryWithAgent(userAgent string, factory controller.SharedControllerFactory) Interface {
+	return &Client{
+		userAgent:         userAgent,
+		controllerFactory: factory,
+		clientFactory:     factory.SharedCacheFactory().SharedClientFactory(),
+	}
 }
 
 type VirtualServicesGetter interface {
@@ -48,7 +58,12 @@ type VirtualServicesGetter interface {
 
 func (c *Client) VirtualServices(namespace string) VirtualServiceInterface {
 	sharedClient := c.clientFactory.ForResourceKind(VirtualServiceGroupVersionResource, VirtualServiceGroupVersionKind.Kind, true)
-	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &VirtualServiceResource, VirtualServiceGroupVersionKind, virtualServiceFactory{})
+	client, err := sharedClient.WithAgent(c.userAgent)
+	if err != nil {
+		logrus.Errorf("Failed to add user agent to [VirtualServices] client: %v", err)
+		client = sharedClient
+	}
+	objectClient := objectclient.NewObjectClient(namespace, client, &VirtualServiceResource, VirtualServiceGroupVersionKind, virtualServiceFactory{})
 	return &virtualServiceClient{
 		ns:           namespace,
 		client:       c,
@@ -62,7 +77,12 @@ type DestinationRulesGetter interface {
 
 func (c *Client) DestinationRules(namespace string) DestinationRuleInterface {
 	sharedClient := c.clientFactory.ForResourceKind(DestinationRuleGroupVersionResource, DestinationRuleGroupVersionKind.Kind, true)
-	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &DestinationRuleResource, DestinationRuleGroupVersionKind, destinationRuleFactory{})
+	client, err := sharedClient.WithAgent(c.userAgent)
+	if err != nil {
+		logrus.Errorf("Failed to add user agent to [DestinationRules] client: %v", err)
+		client = sharedClient
+	}
+	objectClient := objectclient.NewObjectClient(namespace, client, &DestinationRuleResource, DestinationRuleGroupVersionKind, destinationRuleFactory{})
 	return &destinationRuleClient{
 		ns:           namespace,
 		client:       c,

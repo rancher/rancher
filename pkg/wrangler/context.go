@@ -122,6 +122,11 @@ type Context struct {
 	PeerManager         peermanager.PeerManager
 	Provisioning        provisioningv1.Interface
 
+	MGMTWithAgent   func(string) managementv3.Interface
+	BatchWithAgent  func(string) batchv1.Interface
+	ProjectWithAgent func(string) projectv3.Interface
+	CatalogWithAgent func(string) catalogcontrollers.Interface
+
 	ASL                     accesscontrol.AccessSetLookup
 	ClientConfig            clientcmd.ClientConfig
 	CachedDiscovery         discovery.CachedDiscoveryInterface
@@ -326,6 +331,7 @@ func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restCo
 	})
 
 	return &Context{
+<<<<<<< HEAD
 		Controllers:             steveControllers,
 		Apply:                   apply,
 		SharedControllerFactory: controllerFactory,
@@ -340,6 +346,15 @@ func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restCo
 		Provisioning:            provisioning.Provisioning().V1(),
 		Catalog:                 helm.Catalog().V1(),
 		Batch:                   batch.Batch().V1(),
+		MGMTWithAgent:         func(userAgent string) managementv3.Interface {
+			return mgmt.WithAgent(userAgent).Management().V3()
+		},
+		BatchWithAgent:        func(userAgent string) batchv1.Interface {
+			return batch.WithAgent(userAgent)
+		},
+		ProjectWithAgent:      func(userAgent string) projectv3.Interface{
+			return project.WithAgent(userAgent).Project().V3()
+		},
 		ControllerFactory:       controllerFactory,
 		ASL:                     asl,
 		ClientConfig:            clientConfig,

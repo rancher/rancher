@@ -6,6 +6,7 @@ import (
 	"github.com/rancher/norman/generator"
 	"github.com/rancher/norman/objectclient"
 	"github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/rest"
 )
@@ -80,6 +81,7 @@ type Interface interface {
 }
 
 type Client struct {
+	userAgent         string
 	controllerFactory controller.SharedControllerFactory
 	clientFactory     client.SharedClientFactory
 }
@@ -96,14 +98,22 @@ func NewForConfig(cfg rest.Config) (Interface, error) {
 	if err != nil {
 		return nil, err
 	}
-	return NewFromControllerFactory(controllerFactory)
+	return NewFromControllerFactory(controllerFactory), nil
 }
 
-func NewFromControllerFactory(factory controller.SharedControllerFactory) (Interface, error) {
+func NewFromControllerFactory(factory controller.SharedControllerFactory) Interface {
 	return &Client{
 		controllerFactory: factory,
 		clientFactory:     factory.SharedCacheFactory().SharedClientFactory(),
-	}, nil
+	}
+}
+
+func NewFromControllerFactoryWithAgent(userAgent string, factory controller.SharedControllerFactory) Interface {
+	return &Client{
+		userAgent:         userAgent,
+		controllerFactory: factory,
+		clientFactory:     factory.SharedCacheFactory().SharedClientFactory(),
+	}
 }
 
 type NodePoolsGetter interface {
@@ -112,7 +122,12 @@ type NodePoolsGetter interface {
 
 func (c *Client) NodePools(namespace string) NodePoolInterface {
 	sharedClient := c.clientFactory.ForResourceKind(NodePoolGroupVersionResource, NodePoolGroupVersionKind.Kind, true)
-	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &NodePoolResource, NodePoolGroupVersionKind, nodePoolFactory{})
+	client, err := sharedClient.WithAgent(c.userAgent)
+	if err != nil {
+		logrus.Errorf("Failed to add user agent to [NodePools] client: %v", err)
+		client = sharedClient
+	}
+	objectClient := objectclient.NewObjectClient(namespace, client, &NodePoolResource, NodePoolGroupVersionKind, nodePoolFactory{})
 	return &nodePoolClient{
 		ns:           namespace,
 		client:       c,
@@ -126,7 +141,12 @@ type NodesGetter interface {
 
 func (c *Client) Nodes(namespace string) NodeInterface {
 	sharedClient := c.clientFactory.ForResourceKind(NodeGroupVersionResource, NodeGroupVersionKind.Kind, true)
-	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &NodeResource, NodeGroupVersionKind, nodeFactory{})
+	client, err := sharedClient.WithAgent(c.userAgent)
+	if err != nil {
+		logrus.Errorf("Failed to add user agent to [Nodes] client: %v", err)
+		client = sharedClient
+	}
+	objectClient := objectclient.NewObjectClient(namespace, client, &NodeResource, NodeGroupVersionKind, nodeFactory{})
 	return &nodeClient{
 		ns:           namespace,
 		client:       c,
@@ -140,7 +160,12 @@ type NodeDriversGetter interface {
 
 func (c *Client) NodeDrivers(namespace string) NodeDriverInterface {
 	sharedClient := c.clientFactory.ForResourceKind(NodeDriverGroupVersionResource, NodeDriverGroupVersionKind.Kind, false)
-	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &NodeDriverResource, NodeDriverGroupVersionKind, nodeDriverFactory{})
+	client, err := sharedClient.WithAgent(c.userAgent)
+	if err != nil {
+		logrus.Errorf("Failed to add user agent to [NodeDrivers] client: %v", err)
+		client = sharedClient
+	}
+	objectClient := objectclient.NewObjectClient(namespace, client, &NodeDriverResource, NodeDriverGroupVersionKind, nodeDriverFactory{})
 	return &nodeDriverClient{
 		ns:           namespace,
 		client:       c,
@@ -154,7 +179,12 @@ type NodeTemplatesGetter interface {
 
 func (c *Client) NodeTemplates(namespace string) NodeTemplateInterface {
 	sharedClient := c.clientFactory.ForResourceKind(NodeTemplateGroupVersionResource, NodeTemplateGroupVersionKind.Kind, true)
-	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &NodeTemplateResource, NodeTemplateGroupVersionKind, nodeTemplateFactory{})
+	client, err := sharedClient.WithAgent(c.userAgent)
+	if err != nil {
+		logrus.Errorf("Failed to add user agent to [NodeTemplates] client: %v", err)
+		client = sharedClient
+	}
+	objectClient := objectclient.NewObjectClient(namespace, client, &NodeTemplateResource, NodeTemplateGroupVersionKind, nodeTemplateFactory{})
 	return &nodeTemplateClient{
 		ns:           namespace,
 		client:       c,
@@ -168,7 +198,12 @@ type ProjectsGetter interface {
 
 func (c *Client) Projects(namespace string) ProjectInterface {
 	sharedClient := c.clientFactory.ForResourceKind(ProjectGroupVersionResource, ProjectGroupVersionKind.Kind, true)
-	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &ProjectResource, ProjectGroupVersionKind, projectFactory{})
+	client, err := sharedClient.WithAgent(c.userAgent)
+	if err != nil {
+		logrus.Errorf("Failed to add user agent to [Projects] client: %v", err)
+		client = sharedClient
+	}
+	objectClient := objectclient.NewObjectClient(namespace, client, &ProjectResource, ProjectGroupVersionKind, projectFactory{})
 	return &projectClient{
 		ns:           namespace,
 		client:       c,
@@ -182,7 +217,12 @@ type GlobalRolesGetter interface {
 
 func (c *Client) GlobalRoles(namespace string) GlobalRoleInterface {
 	sharedClient := c.clientFactory.ForResourceKind(GlobalRoleGroupVersionResource, GlobalRoleGroupVersionKind.Kind, false)
-	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &GlobalRoleResource, GlobalRoleGroupVersionKind, globalRoleFactory{})
+	client, err := sharedClient.WithAgent(c.userAgent)
+	if err != nil {
+		logrus.Errorf("Failed to add user agent to [GlobalRoles] client: %v", err)
+		client = sharedClient
+	}
+	objectClient := objectclient.NewObjectClient(namespace, client, &GlobalRoleResource, GlobalRoleGroupVersionKind, globalRoleFactory{})
 	return &globalRoleClient{
 		ns:           namespace,
 		client:       c,
@@ -196,7 +236,12 @@ type GlobalRoleBindingsGetter interface {
 
 func (c *Client) GlobalRoleBindings(namespace string) GlobalRoleBindingInterface {
 	sharedClient := c.clientFactory.ForResourceKind(GlobalRoleBindingGroupVersionResource, GlobalRoleBindingGroupVersionKind.Kind, false)
-	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &GlobalRoleBindingResource, GlobalRoleBindingGroupVersionKind, globalRoleBindingFactory{})
+	client, err := sharedClient.WithAgent(c.userAgent)
+	if err != nil {
+		logrus.Errorf("Failed to add user agent to [GlobalRoleBindings] client: %v", err)
+		client = sharedClient
+	}
+	objectClient := objectclient.NewObjectClient(namespace, client, &GlobalRoleBindingResource, GlobalRoleBindingGroupVersionKind, globalRoleBindingFactory{})
 	return &globalRoleBindingClient{
 		ns:           namespace,
 		client:       c,
@@ -210,7 +255,12 @@ type RoleTemplatesGetter interface {
 
 func (c *Client) RoleTemplates(namespace string) RoleTemplateInterface {
 	sharedClient := c.clientFactory.ForResourceKind(RoleTemplateGroupVersionResource, RoleTemplateGroupVersionKind.Kind, false)
-	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &RoleTemplateResource, RoleTemplateGroupVersionKind, roleTemplateFactory{})
+	client, err := sharedClient.WithAgent(c.userAgent)
+	if err != nil {
+		logrus.Errorf("Failed to add user agent to [RoleTemplates] client: %v", err)
+		client = sharedClient
+	}
+	objectClient := objectclient.NewObjectClient(namespace, client, &RoleTemplateResource, RoleTemplateGroupVersionKind, roleTemplateFactory{})
 	return &roleTemplateClient{
 		ns:           namespace,
 		client:       c,
@@ -224,7 +274,12 @@ type PodSecurityPolicyTemplatesGetter interface {
 
 func (c *Client) PodSecurityPolicyTemplates(namespace string) PodSecurityPolicyTemplateInterface {
 	sharedClient := c.clientFactory.ForResourceKind(PodSecurityPolicyTemplateGroupVersionResource, PodSecurityPolicyTemplateGroupVersionKind.Kind, false)
-	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &PodSecurityPolicyTemplateResource, PodSecurityPolicyTemplateGroupVersionKind, podSecurityPolicyTemplateFactory{})
+	client, err := sharedClient.WithAgent(c.userAgent)
+	if err != nil {
+		logrus.Errorf("Failed to add user agent to [PodSecurityPolicyTemplates] client: %v", err)
+		client = sharedClient
+	}
+	objectClient := objectclient.NewObjectClient(namespace, client, &PodSecurityPolicyTemplateResource, PodSecurityPolicyTemplateGroupVersionKind, podSecurityPolicyTemplateFactory{})
 	return &podSecurityPolicyTemplateClient{
 		ns:           namespace,
 		client:       c,
@@ -238,7 +293,12 @@ type PodSecurityPolicyTemplateProjectBindingsGetter interface {
 
 func (c *Client) PodSecurityPolicyTemplateProjectBindings(namespace string) PodSecurityPolicyTemplateProjectBindingInterface {
 	sharedClient := c.clientFactory.ForResourceKind(PodSecurityPolicyTemplateProjectBindingGroupVersionResource, PodSecurityPolicyTemplateProjectBindingGroupVersionKind.Kind, true)
-	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &PodSecurityPolicyTemplateProjectBindingResource, PodSecurityPolicyTemplateProjectBindingGroupVersionKind, podSecurityPolicyTemplateProjectBindingFactory{})
+	client, err := sharedClient.WithAgent(c.userAgent)
+	if err != nil {
+		logrus.Errorf("Failed to add user agent to [PodSecurityPolicyTemplateProjectBindings] client: %v", err)
+		client = sharedClient
+	}
+	objectClient := objectclient.NewObjectClient(namespace, client, &PodSecurityPolicyTemplateProjectBindingResource, PodSecurityPolicyTemplateProjectBindingGroupVersionKind, podSecurityPolicyTemplateProjectBindingFactory{})
 	return &podSecurityPolicyTemplateProjectBindingClient{
 		ns:           namespace,
 		client:       c,
@@ -252,7 +312,12 @@ type ClusterRoleTemplateBindingsGetter interface {
 
 func (c *Client) ClusterRoleTemplateBindings(namespace string) ClusterRoleTemplateBindingInterface {
 	sharedClient := c.clientFactory.ForResourceKind(ClusterRoleTemplateBindingGroupVersionResource, ClusterRoleTemplateBindingGroupVersionKind.Kind, true)
-	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &ClusterRoleTemplateBindingResource, ClusterRoleTemplateBindingGroupVersionKind, clusterRoleTemplateBindingFactory{})
+	client, err := sharedClient.WithAgent(c.userAgent)
+	if err != nil {
+		logrus.Errorf("Failed to add user agent to [ClusterRoleTemplateBindings] client: %v", err)
+		client = sharedClient
+	}
+	objectClient := objectclient.NewObjectClient(namespace, client, &ClusterRoleTemplateBindingResource, ClusterRoleTemplateBindingGroupVersionKind, clusterRoleTemplateBindingFactory{})
 	return &clusterRoleTemplateBindingClient{
 		ns:           namespace,
 		client:       c,
@@ -266,7 +331,12 @@ type ProjectRoleTemplateBindingsGetter interface {
 
 func (c *Client) ProjectRoleTemplateBindings(namespace string) ProjectRoleTemplateBindingInterface {
 	sharedClient := c.clientFactory.ForResourceKind(ProjectRoleTemplateBindingGroupVersionResource, ProjectRoleTemplateBindingGroupVersionKind.Kind, true)
-	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &ProjectRoleTemplateBindingResource, ProjectRoleTemplateBindingGroupVersionKind, projectRoleTemplateBindingFactory{})
+	client, err := sharedClient.WithAgent(c.userAgent)
+	if err != nil {
+		logrus.Errorf("Failed to add user agent to [ProjectRoleTemplateBindings] client: %v", err)
+		client = sharedClient
+	}
+	objectClient := objectclient.NewObjectClient(namespace, client, &ProjectRoleTemplateBindingResource, ProjectRoleTemplateBindingGroupVersionKind, projectRoleTemplateBindingFactory{})
 	return &projectRoleTemplateBindingClient{
 		ns:           namespace,
 		client:       c,
@@ -280,7 +350,12 @@ type ClustersGetter interface {
 
 func (c *Client) Clusters(namespace string) ClusterInterface {
 	sharedClient := c.clientFactory.ForResourceKind(ClusterGroupVersionResource, ClusterGroupVersionKind.Kind, false)
-	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &ClusterResource, ClusterGroupVersionKind, clusterFactory{})
+	client, err := sharedClient.WithAgent(c.userAgent)
+	if err != nil {
+		logrus.Errorf("Failed to add user agent to [Clusters] client: %v", err)
+		client = sharedClient
+	}
+	objectClient := objectclient.NewObjectClient(namespace, client, &ClusterResource, ClusterGroupVersionKind, clusterFactory{})
 	return &clusterClient{
 		ns:           namespace,
 		client:       c,
@@ -294,7 +369,12 @@ type ClusterRegistrationTokensGetter interface {
 
 func (c *Client) ClusterRegistrationTokens(namespace string) ClusterRegistrationTokenInterface {
 	sharedClient := c.clientFactory.ForResourceKind(ClusterRegistrationTokenGroupVersionResource, ClusterRegistrationTokenGroupVersionKind.Kind, true)
-	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &ClusterRegistrationTokenResource, ClusterRegistrationTokenGroupVersionKind, clusterRegistrationTokenFactory{})
+	client, err := sharedClient.WithAgent(c.userAgent)
+	if err != nil {
+		logrus.Errorf("Failed to add user agent to [ClusterRegistrationTokens] client: %v", err)
+		client = sharedClient
+	}
+	objectClient := objectclient.NewObjectClient(namespace, client, &ClusterRegistrationTokenResource, ClusterRegistrationTokenGroupVersionKind, clusterRegistrationTokenFactory{})
 	return &clusterRegistrationTokenClient{
 		ns:           namespace,
 		client:       c,
@@ -308,7 +388,12 @@ type CatalogsGetter interface {
 
 func (c *Client) Catalogs(namespace string) CatalogInterface {
 	sharedClient := c.clientFactory.ForResourceKind(CatalogGroupVersionResource, CatalogGroupVersionKind.Kind, false)
-	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &CatalogResource, CatalogGroupVersionKind, catalogFactory{})
+	client, err := sharedClient.WithAgent(c.userAgent)
+	if err != nil {
+		logrus.Errorf("Failed to add user agent to [Catalogs] client: %v", err)
+		client = sharedClient
+	}
+	objectClient := objectclient.NewObjectClient(namespace, client, &CatalogResource, CatalogGroupVersionKind, catalogFactory{})
 	return &catalogClient{
 		ns:           namespace,
 		client:       c,
@@ -322,7 +407,12 @@ type TemplatesGetter interface {
 
 func (c *Client) Templates(namespace string) TemplateInterface {
 	sharedClient := c.clientFactory.ForResourceKind(TemplateGroupVersionResource, TemplateGroupVersionKind.Kind, false)
-	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &TemplateResource, TemplateGroupVersionKind, templateFactory{})
+	client, err := sharedClient.WithAgent(c.userAgent)
+	if err != nil {
+		logrus.Errorf("Failed to add user agent to [Templates] client: %v", err)
+		client = sharedClient
+	}
+	objectClient := objectclient.NewObjectClient(namespace, client, &TemplateResource, TemplateGroupVersionKind, templateFactory{})
 	return &templateClient{
 		ns:           namespace,
 		client:       c,
@@ -336,7 +426,12 @@ type CatalogTemplatesGetter interface {
 
 func (c *Client) CatalogTemplates(namespace string) CatalogTemplateInterface {
 	sharedClient := c.clientFactory.ForResourceKind(CatalogTemplateGroupVersionResource, CatalogTemplateGroupVersionKind.Kind, true)
-	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &CatalogTemplateResource, CatalogTemplateGroupVersionKind, catalogTemplateFactory{})
+	client, err := sharedClient.WithAgent(c.userAgent)
+	if err != nil {
+		logrus.Errorf("Failed to add user agent to [CatalogTemplates] client: %v", err)
+		client = sharedClient
+	}
+	objectClient := objectclient.NewObjectClient(namespace, client, &CatalogTemplateResource, CatalogTemplateGroupVersionKind, catalogTemplateFactory{})
 	return &catalogTemplateClient{
 		ns:           namespace,
 		client:       c,
@@ -350,7 +445,12 @@ type CatalogTemplateVersionsGetter interface {
 
 func (c *Client) CatalogTemplateVersions(namespace string) CatalogTemplateVersionInterface {
 	sharedClient := c.clientFactory.ForResourceKind(CatalogTemplateVersionGroupVersionResource, CatalogTemplateVersionGroupVersionKind.Kind, true)
-	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &CatalogTemplateVersionResource, CatalogTemplateVersionGroupVersionKind, catalogTemplateVersionFactory{})
+	client, err := sharedClient.WithAgent(c.userAgent)
+	if err != nil {
+		logrus.Errorf("Failed to add user agent to [CatalogTemplateVersions] client: %v", err)
+		client = sharedClient
+	}
+	objectClient := objectclient.NewObjectClient(namespace, client, &CatalogTemplateVersionResource, CatalogTemplateVersionGroupVersionKind, catalogTemplateVersionFactory{})
 	return &catalogTemplateVersionClient{
 		ns:           namespace,
 		client:       c,
@@ -364,7 +464,12 @@ type TemplateVersionsGetter interface {
 
 func (c *Client) TemplateVersions(namespace string) TemplateVersionInterface {
 	sharedClient := c.clientFactory.ForResourceKind(TemplateVersionGroupVersionResource, TemplateVersionGroupVersionKind.Kind, false)
-	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &TemplateVersionResource, TemplateVersionGroupVersionKind, templateVersionFactory{})
+	client, err := sharedClient.WithAgent(c.userAgent)
+	if err != nil {
+		logrus.Errorf("Failed to add user agent to [TemplateVersions] client: %v", err)
+		client = sharedClient
+	}
+	objectClient := objectclient.NewObjectClient(namespace, client, &TemplateVersionResource, TemplateVersionGroupVersionKind, templateVersionFactory{})
 	return &templateVersionClient{
 		ns:           namespace,
 		client:       c,
@@ -378,7 +483,12 @@ type TemplateContentsGetter interface {
 
 func (c *Client) TemplateContents(namespace string) TemplateContentInterface {
 	sharedClient := c.clientFactory.ForResourceKind(TemplateContentGroupVersionResource, TemplateContentGroupVersionKind.Kind, false)
-	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &TemplateContentResource, TemplateContentGroupVersionKind, templateContentFactory{})
+	client, err := sharedClient.WithAgent(c.userAgent)
+	if err != nil {
+		logrus.Errorf("Failed to add user agent to [TemplateContents] client: %v", err)
+		client = sharedClient
+	}
+	objectClient := objectclient.NewObjectClient(namespace, client, &TemplateContentResource, TemplateContentGroupVersionKind, templateContentFactory{})
 	return &templateContentClient{
 		ns:           namespace,
 		client:       c,
@@ -392,7 +502,12 @@ type GroupsGetter interface {
 
 func (c *Client) Groups(namespace string) GroupInterface {
 	sharedClient := c.clientFactory.ForResourceKind(GroupGroupVersionResource, GroupGroupVersionKind.Kind, false)
-	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &GroupResource, GroupGroupVersionKind, groupFactory{})
+	client, err := sharedClient.WithAgent(c.userAgent)
+	if err != nil {
+		logrus.Errorf("Failed to add user agent to [Groups] client: %v", err)
+		client = sharedClient
+	}
+	objectClient := objectclient.NewObjectClient(namespace, client, &GroupResource, GroupGroupVersionKind, groupFactory{})
 	return &groupClient{
 		ns:           namespace,
 		client:       c,
@@ -406,7 +521,12 @@ type GroupMembersGetter interface {
 
 func (c *Client) GroupMembers(namespace string) GroupMemberInterface {
 	sharedClient := c.clientFactory.ForResourceKind(GroupMemberGroupVersionResource, GroupMemberGroupVersionKind.Kind, false)
-	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &GroupMemberResource, GroupMemberGroupVersionKind, groupMemberFactory{})
+	client, err := sharedClient.WithAgent(c.userAgent)
+	if err != nil {
+		logrus.Errorf("Failed to add user agent to [GroupMembers] client: %v", err)
+		client = sharedClient
+	}
+	objectClient := objectclient.NewObjectClient(namespace, client, &GroupMemberResource, GroupMemberGroupVersionKind, groupMemberFactory{})
 	return &groupMemberClient{
 		ns:           namespace,
 		client:       c,
@@ -420,7 +540,12 @@ type SamlTokensGetter interface {
 
 func (c *Client) SamlTokens(namespace string) SamlTokenInterface {
 	sharedClient := c.clientFactory.ForResourceKind(SamlTokenGroupVersionResource, SamlTokenGroupVersionKind.Kind, true)
-	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &SamlTokenResource, SamlTokenGroupVersionKind, samlTokenFactory{})
+	client, err := sharedClient.WithAgent(c.userAgent)
+	if err != nil {
+		logrus.Errorf("Failed to add user agent to [SamlTokens] client: %v", err)
+		client = sharedClient
+	}
+	objectClient := objectclient.NewObjectClient(namespace, client, &SamlTokenResource, SamlTokenGroupVersionKind, samlTokenFactory{})
 	return &samlTokenClient{
 		ns:           namespace,
 		client:       c,
@@ -434,7 +559,12 @@ type PrincipalsGetter interface {
 
 func (c *Client) Principals(namespace string) PrincipalInterface {
 	sharedClient := c.clientFactory.ForResourceKind(PrincipalGroupVersionResource, PrincipalGroupVersionKind.Kind, false)
-	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &PrincipalResource, PrincipalGroupVersionKind, principalFactory{})
+	client, err := sharedClient.WithAgent(c.userAgent)
+	if err != nil {
+		logrus.Errorf("Failed to add user agent to [Principals] client: %v", err)
+		client = sharedClient
+	}
+	objectClient := objectclient.NewObjectClient(namespace, client, &PrincipalResource, PrincipalGroupVersionKind, principalFactory{})
 	return &principalClient{
 		ns:           namespace,
 		client:       c,
@@ -448,7 +578,12 @@ type UsersGetter interface {
 
 func (c *Client) Users(namespace string) UserInterface {
 	sharedClient := c.clientFactory.ForResourceKind(UserGroupVersionResource, UserGroupVersionKind.Kind, false)
-	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &UserResource, UserGroupVersionKind, userFactory{})
+	client, err := sharedClient.WithAgent(c.userAgent)
+	if err != nil {
+		logrus.Errorf("Failed to add user agent to [Users] client: %v", err)
+		client = sharedClient
+	}
+	objectClient := objectclient.NewObjectClient(namespace, client, &UserResource, UserGroupVersionKind, userFactory{})
 	return &userClient{
 		ns:           namespace,
 		client:       c,
@@ -462,7 +597,12 @@ type AuthConfigsGetter interface {
 
 func (c *Client) AuthConfigs(namespace string) AuthConfigInterface {
 	sharedClient := c.clientFactory.ForResourceKind(AuthConfigGroupVersionResource, AuthConfigGroupVersionKind.Kind, false)
-	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &AuthConfigResource, AuthConfigGroupVersionKind, authConfigFactory{})
+	client, err := sharedClient.WithAgent(c.userAgent)
+	if err != nil {
+		logrus.Errorf("Failed to add user agent to [AuthConfigs] client: %v", err)
+		client = sharedClient
+	}
+	objectClient := objectclient.NewObjectClient(namespace, client, &AuthConfigResource, AuthConfigGroupVersionKind, authConfigFactory{})
 	return &authConfigClient{
 		ns:           namespace,
 		client:       c,
@@ -476,7 +616,12 @@ type LdapConfigsGetter interface {
 
 func (c *Client) LdapConfigs(namespace string) LdapConfigInterface {
 	sharedClient := c.clientFactory.ForResourceKind(LdapConfigGroupVersionResource, LdapConfigGroupVersionKind.Kind, false)
-	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &LdapConfigResource, LdapConfigGroupVersionKind, ldapConfigFactory{})
+	client, err := sharedClient.WithAgent(c.userAgent)
+	if err != nil {
+		logrus.Errorf("Failed to add user agent to [LdapConfigs] client: %v", err)
+		client = sharedClient
+	}
+	objectClient := objectclient.NewObjectClient(namespace, client, &LdapConfigResource, LdapConfigGroupVersionKind, ldapConfigFactory{})
 	return &ldapConfigClient{
 		ns:           namespace,
 		client:       c,
@@ -490,7 +635,12 @@ type TokensGetter interface {
 
 func (c *Client) Tokens(namespace string) TokenInterface {
 	sharedClient := c.clientFactory.ForResourceKind(TokenGroupVersionResource, TokenGroupVersionKind.Kind, false)
-	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &TokenResource, TokenGroupVersionKind, tokenFactory{})
+	client, err := sharedClient.WithAgent(c.userAgent)
+	if err != nil {
+		logrus.Errorf("Failed to add user agent to [Tokens] client: %v", err)
+		client = sharedClient
+	}
+	objectClient := objectclient.NewObjectClient(namespace, client, &TokenResource, TokenGroupVersionKind, tokenFactory{})
 	return &tokenClient{
 		ns:           namespace,
 		client:       c,
@@ -504,7 +654,12 @@ type DynamicSchemasGetter interface {
 
 func (c *Client) DynamicSchemas(namespace string) DynamicSchemaInterface {
 	sharedClient := c.clientFactory.ForResourceKind(DynamicSchemaGroupVersionResource, DynamicSchemaGroupVersionKind.Kind, false)
-	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &DynamicSchemaResource, DynamicSchemaGroupVersionKind, dynamicSchemaFactory{})
+	client, err := sharedClient.WithAgent(c.userAgent)
+	if err != nil {
+		logrus.Errorf("Failed to add user agent to [DynamicSchemas] client: %v", err)
+		client = sharedClient
+	}
+	objectClient := objectclient.NewObjectClient(namespace, client, &DynamicSchemaResource, DynamicSchemaGroupVersionKind, dynamicSchemaFactory{})
 	return &dynamicSchemaClient{
 		ns:           namespace,
 		client:       c,
@@ -518,7 +673,12 @@ type PreferencesGetter interface {
 
 func (c *Client) Preferences(namespace string) PreferenceInterface {
 	sharedClient := c.clientFactory.ForResourceKind(PreferenceGroupVersionResource, PreferenceGroupVersionKind.Kind, true)
-	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &PreferenceResource, PreferenceGroupVersionKind, preferenceFactory{})
+	client, err := sharedClient.WithAgent(c.userAgent)
+	if err != nil {
+		logrus.Errorf("Failed to add user agent to [Preferences] client: %v", err)
+		client = sharedClient
+	}
+	objectClient := objectclient.NewObjectClient(namespace, client, &PreferenceResource, PreferenceGroupVersionKind, preferenceFactory{})
 	return &preferenceClient{
 		ns:           namespace,
 		client:       c,
@@ -532,7 +692,12 @@ type UserAttributesGetter interface {
 
 func (c *Client) UserAttributes(namespace string) UserAttributeInterface {
 	sharedClient := c.clientFactory.ForResourceKind(UserAttributeGroupVersionResource, UserAttributeGroupVersionKind.Kind, false)
-	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &UserAttributeResource, UserAttributeGroupVersionKind, userAttributeFactory{})
+	client, err := sharedClient.WithAgent(c.userAgent)
+	if err != nil {
+		logrus.Errorf("Failed to add user agent to [UserAttributes] client: %v", err)
+		client = sharedClient
+	}
+	objectClient := objectclient.NewObjectClient(namespace, client, &UserAttributeResource, UserAttributeGroupVersionKind, userAttributeFactory{})
 	return &userAttributeClient{
 		ns:           namespace,
 		client:       c,
@@ -546,7 +711,12 @@ type ProjectNetworkPoliciesGetter interface {
 
 func (c *Client) ProjectNetworkPolicies(namespace string) ProjectNetworkPolicyInterface {
 	sharedClient := c.clientFactory.ForResourceKind(ProjectNetworkPolicyGroupVersionResource, ProjectNetworkPolicyGroupVersionKind.Kind, true)
-	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &ProjectNetworkPolicyResource, ProjectNetworkPolicyGroupVersionKind, projectNetworkPolicyFactory{})
+	client, err := sharedClient.WithAgent(c.userAgent)
+	if err != nil {
+		logrus.Errorf("Failed to add user agent to [ProjectNetworkPolicies] client: %v", err)
+		client = sharedClient
+	}
+	objectClient := objectclient.NewObjectClient(namespace, client, &ProjectNetworkPolicyResource, ProjectNetworkPolicyGroupVersionKind, projectNetworkPolicyFactory{})
 	return &projectNetworkPolicyClient{
 		ns:           namespace,
 		client:       c,
@@ -560,7 +730,12 @@ type ClusterLoggingsGetter interface {
 
 func (c *Client) ClusterLoggings(namespace string) ClusterLoggingInterface {
 	sharedClient := c.clientFactory.ForResourceKind(ClusterLoggingGroupVersionResource, ClusterLoggingGroupVersionKind.Kind, true)
-	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &ClusterLoggingResource, ClusterLoggingGroupVersionKind, clusterLoggingFactory{})
+	client, err := sharedClient.WithAgent(c.userAgent)
+	if err != nil {
+		logrus.Errorf("Failed to add user agent to [ClusterLoggings] client: %v", err)
+		client = sharedClient
+	}
+	objectClient := objectclient.NewObjectClient(namespace, client, &ClusterLoggingResource, ClusterLoggingGroupVersionKind, clusterLoggingFactory{})
 	return &clusterLoggingClient{
 		ns:           namespace,
 		client:       c,
@@ -574,7 +749,12 @@ type ProjectLoggingsGetter interface {
 
 func (c *Client) ProjectLoggings(namespace string) ProjectLoggingInterface {
 	sharedClient := c.clientFactory.ForResourceKind(ProjectLoggingGroupVersionResource, ProjectLoggingGroupVersionKind.Kind, true)
-	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &ProjectLoggingResource, ProjectLoggingGroupVersionKind, projectLoggingFactory{})
+	client, err := sharedClient.WithAgent(c.userAgent)
+	if err != nil {
+		logrus.Errorf("Failed to add user agent to [ProjectLoggings] client: %v", err)
+		client = sharedClient
+	}
+	objectClient := objectclient.NewObjectClient(namespace, client, &ProjectLoggingResource, ProjectLoggingGroupVersionKind, projectLoggingFactory{})
 	return &projectLoggingClient{
 		ns:           namespace,
 		client:       c,
@@ -588,7 +768,12 @@ type SettingsGetter interface {
 
 func (c *Client) Settings(namespace string) SettingInterface {
 	sharedClient := c.clientFactory.ForResourceKind(SettingGroupVersionResource, SettingGroupVersionKind.Kind, false)
-	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &SettingResource, SettingGroupVersionKind, settingFactory{})
+	client, err := sharedClient.WithAgent(c.userAgent)
+	if err != nil {
+		logrus.Errorf("Failed to add user agent to [Settings] client: %v", err)
+		client = sharedClient
+	}
+	objectClient := objectclient.NewObjectClient(namespace, client, &SettingResource, SettingGroupVersionKind, settingFactory{})
 	return &settingClient{
 		ns:           namespace,
 		client:       c,
@@ -602,7 +787,12 @@ type FeaturesGetter interface {
 
 func (c *Client) Features(namespace string) FeatureInterface {
 	sharedClient := c.clientFactory.ForResourceKind(FeatureGroupVersionResource, FeatureGroupVersionKind.Kind, false)
-	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &FeatureResource, FeatureGroupVersionKind, featureFactory{})
+	client, err := sharedClient.WithAgent(c.userAgent)
+	if err != nil {
+		logrus.Errorf("Failed to add user agent to [Features] client: %v", err)
+		client = sharedClient
+	}
+	objectClient := objectclient.NewObjectClient(namespace, client, &FeatureResource, FeatureGroupVersionKind, featureFactory{})
 	return &featureClient{
 		ns:           namespace,
 		client:       c,
@@ -616,7 +806,12 @@ type ClusterAlertsGetter interface {
 
 func (c *Client) ClusterAlerts(namespace string) ClusterAlertInterface {
 	sharedClient := c.clientFactory.ForResourceKind(ClusterAlertGroupVersionResource, ClusterAlertGroupVersionKind.Kind, true)
-	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &ClusterAlertResource, ClusterAlertGroupVersionKind, clusterAlertFactory{})
+	client, err := sharedClient.WithAgent(c.userAgent)
+	if err != nil {
+		logrus.Errorf("Failed to add user agent to [ClusterAlerts] client: %v", err)
+		client = sharedClient
+	}
+	objectClient := objectclient.NewObjectClient(namespace, client, &ClusterAlertResource, ClusterAlertGroupVersionKind, clusterAlertFactory{})
 	return &clusterAlertClient{
 		ns:           namespace,
 		client:       c,
@@ -630,7 +825,12 @@ type ProjectAlertsGetter interface {
 
 func (c *Client) ProjectAlerts(namespace string) ProjectAlertInterface {
 	sharedClient := c.clientFactory.ForResourceKind(ProjectAlertGroupVersionResource, ProjectAlertGroupVersionKind.Kind, true)
-	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &ProjectAlertResource, ProjectAlertGroupVersionKind, projectAlertFactory{})
+	client, err := sharedClient.WithAgent(c.userAgent)
+	if err != nil {
+		logrus.Errorf("Failed to add user agent to [ProjectAlerts] client: %v", err)
+		client = sharedClient
+	}
+	objectClient := objectclient.NewObjectClient(namespace, client, &ProjectAlertResource, ProjectAlertGroupVersionKind, projectAlertFactory{})
 	return &projectAlertClient{
 		ns:           namespace,
 		client:       c,
@@ -644,7 +844,12 @@ type NotifiersGetter interface {
 
 func (c *Client) Notifiers(namespace string) NotifierInterface {
 	sharedClient := c.clientFactory.ForResourceKind(NotifierGroupVersionResource, NotifierGroupVersionKind.Kind, true)
-	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &NotifierResource, NotifierGroupVersionKind, notifierFactory{})
+	client, err := sharedClient.WithAgent(c.userAgent)
+	if err != nil {
+		logrus.Errorf("Failed to add user agent to [Notifiers] client: %v", err)
+		client = sharedClient
+	}
+	objectClient := objectclient.NewObjectClient(namespace, client, &NotifierResource, NotifierGroupVersionKind, notifierFactory{})
 	return &notifierClient{
 		ns:           namespace,
 		client:       c,
@@ -658,7 +863,12 @@ type ClusterAlertGroupsGetter interface {
 
 func (c *Client) ClusterAlertGroups(namespace string) ClusterAlertGroupInterface {
 	sharedClient := c.clientFactory.ForResourceKind(ClusterAlertGroupGroupVersionResource, ClusterAlertGroupGroupVersionKind.Kind, true)
-	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &ClusterAlertGroupResource, ClusterAlertGroupGroupVersionKind, clusterAlertGroupFactory{})
+	client, err := sharedClient.WithAgent(c.userAgent)
+	if err != nil {
+		logrus.Errorf("Failed to add user agent to [ClusterAlertGroups] client: %v", err)
+		client = sharedClient
+	}
+	objectClient := objectclient.NewObjectClient(namespace, client, &ClusterAlertGroupResource, ClusterAlertGroupGroupVersionKind, clusterAlertGroupFactory{})
 	return &clusterAlertGroupClient{
 		ns:           namespace,
 		client:       c,
@@ -672,7 +882,12 @@ type ProjectAlertGroupsGetter interface {
 
 func (c *Client) ProjectAlertGroups(namespace string) ProjectAlertGroupInterface {
 	sharedClient := c.clientFactory.ForResourceKind(ProjectAlertGroupGroupVersionResource, ProjectAlertGroupGroupVersionKind.Kind, true)
-	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &ProjectAlertGroupResource, ProjectAlertGroupGroupVersionKind, projectAlertGroupFactory{})
+	client, err := sharedClient.WithAgent(c.userAgent)
+	if err != nil {
+		logrus.Errorf("Failed to add user agent to [ProjectAlertGroups] client: %v", err)
+		client = sharedClient
+	}
+	objectClient := objectclient.NewObjectClient(namespace, client, &ProjectAlertGroupResource, ProjectAlertGroupGroupVersionKind, projectAlertGroupFactory{})
 	return &projectAlertGroupClient{
 		ns:           namespace,
 		client:       c,
@@ -686,7 +901,12 @@ type ClusterAlertRulesGetter interface {
 
 func (c *Client) ClusterAlertRules(namespace string) ClusterAlertRuleInterface {
 	sharedClient := c.clientFactory.ForResourceKind(ClusterAlertRuleGroupVersionResource, ClusterAlertRuleGroupVersionKind.Kind, true)
-	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &ClusterAlertRuleResource, ClusterAlertRuleGroupVersionKind, clusterAlertRuleFactory{})
+	client, err := sharedClient.WithAgent(c.userAgent)
+	if err != nil {
+		logrus.Errorf("Failed to add user agent to [ClusterAlertRules] client: %v", err)
+		client = sharedClient
+	}
+	objectClient := objectclient.NewObjectClient(namespace, client, &ClusterAlertRuleResource, ClusterAlertRuleGroupVersionKind, clusterAlertRuleFactory{})
 	return &clusterAlertRuleClient{
 		ns:           namespace,
 		client:       c,
@@ -700,7 +920,12 @@ type ProjectAlertRulesGetter interface {
 
 func (c *Client) ProjectAlertRules(namespace string) ProjectAlertRuleInterface {
 	sharedClient := c.clientFactory.ForResourceKind(ProjectAlertRuleGroupVersionResource, ProjectAlertRuleGroupVersionKind.Kind, true)
-	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &ProjectAlertRuleResource, ProjectAlertRuleGroupVersionKind, projectAlertRuleFactory{})
+	client, err := sharedClient.WithAgent(c.userAgent)
+	if err != nil {
+		logrus.Errorf("Failed to add user agent to [ProjectAlertRules] client: %v", err)
+		client = sharedClient
+	}
+	objectClient := objectclient.NewObjectClient(namespace, client, &ProjectAlertRuleResource, ProjectAlertRuleGroupVersionKind, projectAlertRuleFactory{})
 	return &projectAlertRuleClient{
 		ns:           namespace,
 		client:       c,
@@ -714,7 +939,12 @@ type ComposeConfigsGetter interface {
 
 func (c *Client) ComposeConfigs(namespace string) ComposeConfigInterface {
 	sharedClient := c.clientFactory.ForResourceKind(ComposeConfigGroupVersionResource, ComposeConfigGroupVersionKind.Kind, false)
-	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &ComposeConfigResource, ComposeConfigGroupVersionKind, composeConfigFactory{})
+	client, err := sharedClient.WithAgent(c.userAgent)
+	if err != nil {
+		logrus.Errorf("Failed to add user agent to [ComposeConfigs] client: %v", err)
+		client = sharedClient
+	}
+	objectClient := objectclient.NewObjectClient(namespace, client, &ComposeConfigResource, ComposeConfigGroupVersionKind, composeConfigFactory{})
 	return &composeConfigClient{
 		ns:           namespace,
 		client:       c,
@@ -728,7 +958,12 @@ type ProjectCatalogsGetter interface {
 
 func (c *Client) ProjectCatalogs(namespace string) ProjectCatalogInterface {
 	sharedClient := c.clientFactory.ForResourceKind(ProjectCatalogGroupVersionResource, ProjectCatalogGroupVersionKind.Kind, true)
-	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &ProjectCatalogResource, ProjectCatalogGroupVersionKind, projectCatalogFactory{})
+	client, err := sharedClient.WithAgent(c.userAgent)
+	if err != nil {
+		logrus.Errorf("Failed to add user agent to [ProjectCatalogs] client: %v", err)
+		client = sharedClient
+	}
+	objectClient := objectclient.NewObjectClient(namespace, client, &ProjectCatalogResource, ProjectCatalogGroupVersionKind, projectCatalogFactory{})
 	return &projectCatalogClient{
 		ns:           namespace,
 		client:       c,
@@ -742,7 +977,12 @@ type ClusterCatalogsGetter interface {
 
 func (c *Client) ClusterCatalogs(namespace string) ClusterCatalogInterface {
 	sharedClient := c.clientFactory.ForResourceKind(ClusterCatalogGroupVersionResource, ClusterCatalogGroupVersionKind.Kind, true)
-	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &ClusterCatalogResource, ClusterCatalogGroupVersionKind, clusterCatalogFactory{})
+	client, err := sharedClient.WithAgent(c.userAgent)
+	if err != nil {
+		logrus.Errorf("Failed to add user agent to [ClusterCatalogs] client: %v", err)
+		client = sharedClient
+	}
+	objectClient := objectclient.NewObjectClient(namespace, client, &ClusterCatalogResource, ClusterCatalogGroupVersionKind, clusterCatalogFactory{})
 	return &clusterCatalogClient{
 		ns:           namespace,
 		client:       c,
@@ -756,7 +996,12 @@ type MultiClusterAppsGetter interface {
 
 func (c *Client) MultiClusterApps(namespace string) MultiClusterAppInterface {
 	sharedClient := c.clientFactory.ForResourceKind(MultiClusterAppGroupVersionResource, MultiClusterAppGroupVersionKind.Kind, true)
-	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &MultiClusterAppResource, MultiClusterAppGroupVersionKind, multiClusterAppFactory{})
+	client, err := sharedClient.WithAgent(c.userAgent)
+	if err != nil {
+		logrus.Errorf("Failed to add user agent to [MultiClusterApps] client: %v", err)
+		client = sharedClient
+	}
+	objectClient := objectclient.NewObjectClient(namespace, client, &MultiClusterAppResource, MultiClusterAppGroupVersionKind, multiClusterAppFactory{})
 	return &multiClusterAppClient{
 		ns:           namespace,
 		client:       c,
@@ -770,7 +1015,12 @@ type MultiClusterAppRevisionsGetter interface {
 
 func (c *Client) MultiClusterAppRevisions(namespace string) MultiClusterAppRevisionInterface {
 	sharedClient := c.clientFactory.ForResourceKind(MultiClusterAppRevisionGroupVersionResource, MultiClusterAppRevisionGroupVersionKind.Kind, true)
-	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &MultiClusterAppRevisionResource, MultiClusterAppRevisionGroupVersionKind, multiClusterAppRevisionFactory{})
+	client, err := sharedClient.WithAgent(c.userAgent)
+	if err != nil {
+		logrus.Errorf("Failed to add user agent to [MultiClusterAppRevisions] client: %v", err)
+		client = sharedClient
+	}
+	objectClient := objectclient.NewObjectClient(namespace, client, &MultiClusterAppRevisionResource, MultiClusterAppRevisionGroupVersionKind, multiClusterAppRevisionFactory{})
 	return &multiClusterAppRevisionClient{
 		ns:           namespace,
 		client:       c,
@@ -784,7 +1034,12 @@ type GlobalDnsesGetter interface {
 
 func (c *Client) GlobalDnses(namespace string) GlobalDnsInterface {
 	sharedClient := c.clientFactory.ForResourceKind(GlobalDnsGroupVersionResource, GlobalDnsGroupVersionKind.Kind, true)
-	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &GlobalDnsResource, GlobalDnsGroupVersionKind, globalDnsFactory{})
+	client, err := sharedClient.WithAgent(c.userAgent)
+	if err != nil {
+		logrus.Errorf("Failed to add user agent to [GlobalDnses] client: %v", err)
+		client = sharedClient
+	}
+	objectClient := objectclient.NewObjectClient(namespace, client, &GlobalDnsResource, GlobalDnsGroupVersionKind, globalDnsFactory{})
 	return &globalDnsClient{
 		ns:           namespace,
 		client:       c,
@@ -798,7 +1053,12 @@ type GlobalDnsProvidersGetter interface {
 
 func (c *Client) GlobalDnsProviders(namespace string) GlobalDnsProviderInterface {
 	sharedClient := c.clientFactory.ForResourceKind(GlobalDnsProviderGroupVersionResource, GlobalDnsProviderGroupVersionKind.Kind, true)
-	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &GlobalDnsProviderResource, GlobalDnsProviderGroupVersionKind, globalDnsProviderFactory{})
+	client, err := sharedClient.WithAgent(c.userAgent)
+	if err != nil {
+		logrus.Errorf("Failed to add user agent to [GlobalDnsProviders] client: %v", err)
+		client = sharedClient
+	}
+	objectClient := objectclient.NewObjectClient(namespace, client, &GlobalDnsProviderResource, GlobalDnsProviderGroupVersionKind, globalDnsProviderFactory{})
 	return &globalDnsProviderClient{
 		ns:           namespace,
 		client:       c,
@@ -812,7 +1072,12 @@ type KontainerDriversGetter interface {
 
 func (c *Client) KontainerDrivers(namespace string) KontainerDriverInterface {
 	sharedClient := c.clientFactory.ForResourceKind(KontainerDriverGroupVersionResource, KontainerDriverGroupVersionKind.Kind, false)
-	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &KontainerDriverResource, KontainerDriverGroupVersionKind, kontainerDriverFactory{})
+	client, err := sharedClient.WithAgent(c.userAgent)
+	if err != nil {
+		logrus.Errorf("Failed to add user agent to [KontainerDrivers] client: %v", err)
+		client = sharedClient
+	}
+	objectClient := objectclient.NewObjectClient(namespace, client, &KontainerDriverResource, KontainerDriverGroupVersionKind, kontainerDriverFactory{})
 	return &kontainerDriverClient{
 		ns:           namespace,
 		client:       c,
@@ -826,7 +1091,12 @@ type EtcdBackupsGetter interface {
 
 func (c *Client) EtcdBackups(namespace string) EtcdBackupInterface {
 	sharedClient := c.clientFactory.ForResourceKind(EtcdBackupGroupVersionResource, EtcdBackupGroupVersionKind.Kind, true)
-	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &EtcdBackupResource, EtcdBackupGroupVersionKind, etcdBackupFactory{})
+	client, err := sharedClient.WithAgent(c.userAgent)
+	if err != nil {
+		logrus.Errorf("Failed to add user agent to [EtcdBackups] client: %v", err)
+		client = sharedClient
+	}
+	objectClient := objectclient.NewObjectClient(namespace, client, &EtcdBackupResource, EtcdBackupGroupVersionKind, etcdBackupFactory{})
 	return &etcdBackupClient{
 		ns:           namespace,
 		client:       c,
@@ -840,7 +1110,12 @@ type ClusterScansGetter interface {
 
 func (c *Client) ClusterScans(namespace string) ClusterScanInterface {
 	sharedClient := c.clientFactory.ForResourceKind(ClusterScanGroupVersionResource, ClusterScanGroupVersionKind.Kind, true)
-	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &ClusterScanResource, ClusterScanGroupVersionKind, clusterScanFactory{})
+	client, err := sharedClient.WithAgent(c.userAgent)
+	if err != nil {
+		logrus.Errorf("Failed to add user agent to [ClusterScans] client: %v", err)
+		client = sharedClient
+	}
+	objectClient := objectclient.NewObjectClient(namespace, client, &ClusterScanResource, ClusterScanGroupVersionKind, clusterScanFactory{})
 	return &clusterScanClient{
 		ns:           namespace,
 		client:       c,
@@ -854,7 +1129,12 @@ type MonitorMetricsGetter interface {
 
 func (c *Client) MonitorMetrics(namespace string) MonitorMetricInterface {
 	sharedClient := c.clientFactory.ForResourceKind(MonitorMetricGroupVersionResource, MonitorMetricGroupVersionKind.Kind, true)
-	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &MonitorMetricResource, MonitorMetricGroupVersionKind, monitorMetricFactory{})
+	client, err := sharedClient.WithAgent(c.userAgent)
+	if err != nil {
+		logrus.Errorf("Failed to add user agent to [MonitorMetrics] client: %v", err)
+		client = sharedClient
+	}
+	objectClient := objectclient.NewObjectClient(namespace, client, &MonitorMetricResource, MonitorMetricGroupVersionKind, monitorMetricFactory{})
 	return &monitorMetricClient{
 		ns:           namespace,
 		client:       c,
@@ -868,7 +1148,12 @@ type ClusterMonitorGraphsGetter interface {
 
 func (c *Client) ClusterMonitorGraphs(namespace string) ClusterMonitorGraphInterface {
 	sharedClient := c.clientFactory.ForResourceKind(ClusterMonitorGraphGroupVersionResource, ClusterMonitorGraphGroupVersionKind.Kind, true)
-	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &ClusterMonitorGraphResource, ClusterMonitorGraphGroupVersionKind, clusterMonitorGraphFactory{})
+	client, err := sharedClient.WithAgent(c.userAgent)
+	if err != nil {
+		logrus.Errorf("Failed to add user agent to [ClusterMonitorGraphs] client: %v", err)
+		client = sharedClient
+	}
+	objectClient := objectclient.NewObjectClient(namespace, client, &ClusterMonitorGraphResource, ClusterMonitorGraphGroupVersionKind, clusterMonitorGraphFactory{})
 	return &clusterMonitorGraphClient{
 		ns:           namespace,
 		client:       c,
@@ -882,7 +1167,12 @@ type ProjectMonitorGraphsGetter interface {
 
 func (c *Client) ProjectMonitorGraphs(namespace string) ProjectMonitorGraphInterface {
 	sharedClient := c.clientFactory.ForResourceKind(ProjectMonitorGraphGroupVersionResource, ProjectMonitorGraphGroupVersionKind.Kind, true)
-	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &ProjectMonitorGraphResource, ProjectMonitorGraphGroupVersionKind, projectMonitorGraphFactory{})
+	client, err := sharedClient.WithAgent(c.userAgent)
+	if err != nil {
+		logrus.Errorf("Failed to add user agent to [ProjectMonitorGraphs] client: %v", err)
+		client = sharedClient
+	}
+	objectClient := objectclient.NewObjectClient(namespace, client, &ProjectMonitorGraphResource, ProjectMonitorGraphGroupVersionKind, projectMonitorGraphFactory{})
 	return &projectMonitorGraphClient{
 		ns:           namespace,
 		client:       c,
@@ -896,7 +1186,12 @@ type CloudCredentialsGetter interface {
 
 func (c *Client) CloudCredentials(namespace string) CloudCredentialInterface {
 	sharedClient := c.clientFactory.ForResourceKind(CloudCredentialGroupVersionResource, CloudCredentialGroupVersionKind.Kind, true)
-	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &CloudCredentialResource, CloudCredentialGroupVersionKind, cloudCredentialFactory{})
+	client, err := sharedClient.WithAgent(c.userAgent)
+	if err != nil {
+		logrus.Errorf("Failed to add user agent to [CloudCredentials] client: %v", err)
+		client = sharedClient
+	}
+	objectClient := objectclient.NewObjectClient(namespace, client, &CloudCredentialResource, CloudCredentialGroupVersionKind, cloudCredentialFactory{})
 	return &cloudCredentialClient{
 		ns:           namespace,
 		client:       c,
@@ -910,7 +1205,12 @@ type ClusterTemplatesGetter interface {
 
 func (c *Client) ClusterTemplates(namespace string) ClusterTemplateInterface {
 	sharedClient := c.clientFactory.ForResourceKind(ClusterTemplateGroupVersionResource, ClusterTemplateGroupVersionKind.Kind, true)
-	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &ClusterTemplateResource, ClusterTemplateGroupVersionKind, clusterTemplateFactory{})
+	client, err := sharedClient.WithAgent(c.userAgent)
+	if err != nil {
+		logrus.Errorf("Failed to add user agent to [ClusterTemplates] client: %v", err)
+		client = sharedClient
+	}
+	objectClient := objectclient.NewObjectClient(namespace, client, &ClusterTemplateResource, ClusterTemplateGroupVersionKind, clusterTemplateFactory{})
 	return &clusterTemplateClient{
 		ns:           namespace,
 		client:       c,
@@ -924,7 +1224,12 @@ type ClusterTemplateRevisionsGetter interface {
 
 func (c *Client) ClusterTemplateRevisions(namespace string) ClusterTemplateRevisionInterface {
 	sharedClient := c.clientFactory.ForResourceKind(ClusterTemplateRevisionGroupVersionResource, ClusterTemplateRevisionGroupVersionKind.Kind, true)
-	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &ClusterTemplateRevisionResource, ClusterTemplateRevisionGroupVersionKind, clusterTemplateRevisionFactory{})
+	client, err := sharedClient.WithAgent(c.userAgent)
+	if err != nil {
+		logrus.Errorf("Failed to add user agent to [ClusterTemplateRevisions] client: %v", err)
+		client = sharedClient
+	}
+	objectClient := objectclient.NewObjectClient(namespace, client, &ClusterTemplateRevisionResource, ClusterTemplateRevisionGroupVersionKind, clusterTemplateRevisionFactory{})
 	return &clusterTemplateRevisionClient{
 		ns:           namespace,
 		client:       c,
@@ -938,7 +1243,12 @@ type RkeK8sSystemImagesGetter interface {
 
 func (c *Client) RkeK8sSystemImages(namespace string) RkeK8sSystemImageInterface {
 	sharedClient := c.clientFactory.ForResourceKind(RkeK8sSystemImageGroupVersionResource, RkeK8sSystemImageGroupVersionKind.Kind, true)
-	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &RkeK8sSystemImageResource, RkeK8sSystemImageGroupVersionKind, rkeK8sSystemImageFactory{})
+	client, err := sharedClient.WithAgent(c.userAgent)
+	if err != nil {
+		logrus.Errorf("Failed to add user agent to [RkeK8sSystemImages] client: %v", err)
+		client = sharedClient
+	}
+	objectClient := objectclient.NewObjectClient(namespace, client, &RkeK8sSystemImageResource, RkeK8sSystemImageGroupVersionKind, rkeK8sSystemImageFactory{})
 	return &rkeK8sSystemImageClient{
 		ns:           namespace,
 		client:       c,
@@ -952,7 +1262,12 @@ type RkeK8sServiceOptionsGetter interface {
 
 func (c *Client) RkeK8sServiceOptions(namespace string) RkeK8sServiceOptionInterface {
 	sharedClient := c.clientFactory.ForResourceKind(RkeK8sServiceOptionGroupVersionResource, RkeK8sServiceOptionGroupVersionKind.Kind, true)
-	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &RkeK8sServiceOptionResource, RkeK8sServiceOptionGroupVersionKind, rkeK8sServiceOptionFactory{})
+	client, err := sharedClient.WithAgent(c.userAgent)
+	if err != nil {
+		logrus.Errorf("Failed to add user agent to [RkeK8sServiceOptions] client: %v", err)
+		client = sharedClient
+	}
+	objectClient := objectclient.NewObjectClient(namespace, client, &RkeK8sServiceOptionResource, RkeK8sServiceOptionGroupVersionKind, rkeK8sServiceOptionFactory{})
 	return &rkeK8sServiceOptionClient{
 		ns:           namespace,
 		client:       c,
@@ -966,7 +1281,12 @@ type RkeAddonsGetter interface {
 
 func (c *Client) RkeAddons(namespace string) RkeAddonInterface {
 	sharedClient := c.clientFactory.ForResourceKind(RkeAddonGroupVersionResource, RkeAddonGroupVersionKind.Kind, true)
-	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &RkeAddonResource, RkeAddonGroupVersionKind, rkeAddonFactory{})
+	client, err := sharedClient.WithAgent(c.userAgent)
+	if err != nil {
+		logrus.Errorf("Failed to add user agent to [RkeAddons] client: %v", err)
+		client = sharedClient
+	}
+	objectClient := objectclient.NewObjectClient(namespace, client, &RkeAddonResource, RkeAddonGroupVersionKind, rkeAddonFactory{})
 	return &rkeAddonClient{
 		ns:           namespace,
 		client:       c,
@@ -980,7 +1300,12 @@ type CisConfigsGetter interface {
 
 func (c *Client) CisConfigs(namespace string) CisConfigInterface {
 	sharedClient := c.clientFactory.ForResourceKind(CisConfigGroupVersionResource, CisConfigGroupVersionKind.Kind, true)
-	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &CisConfigResource, CisConfigGroupVersionKind, cisConfigFactory{})
+	client, err := sharedClient.WithAgent(c.userAgent)
+	if err != nil {
+		logrus.Errorf("Failed to add user agent to [CisConfigs] client: %v", err)
+		client = sharedClient
+	}
+	objectClient := objectclient.NewObjectClient(namespace, client, &CisConfigResource, CisConfigGroupVersionKind, cisConfigFactory{})
 	return &cisConfigClient{
 		ns:           namespace,
 		client:       c,
@@ -994,7 +1319,12 @@ type CisBenchmarkVersionsGetter interface {
 
 func (c *Client) CisBenchmarkVersions(namespace string) CisBenchmarkVersionInterface {
 	sharedClient := c.clientFactory.ForResourceKind(CisBenchmarkVersionGroupVersionResource, CisBenchmarkVersionGroupVersionKind.Kind, true)
-	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &CisBenchmarkVersionResource, CisBenchmarkVersionGroupVersionKind, cisBenchmarkVersionFactory{})
+	client, err := sharedClient.WithAgent(c.userAgent)
+	if err != nil {
+		logrus.Errorf("Failed to add user agent to [CisBenchmarkVersions] client: %v", err)
+		client = sharedClient
+	}
+	objectClient := objectclient.NewObjectClient(namespace, client, &CisBenchmarkVersionResource, CisBenchmarkVersionGroupVersionKind, cisBenchmarkVersionFactory{})
 	return &cisBenchmarkVersionClient{
 		ns:           namespace,
 		client:       c,
@@ -1008,7 +1338,12 @@ type FleetWorkspacesGetter interface {
 
 func (c *Client) FleetWorkspaces(namespace string) FleetWorkspaceInterface {
 	sharedClient := c.clientFactory.ForResourceKind(FleetWorkspaceGroupVersionResource, FleetWorkspaceGroupVersionKind.Kind, false)
-	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &FleetWorkspaceResource, FleetWorkspaceGroupVersionKind, fleetWorkspaceFactory{})
+	client, err := sharedClient.WithAgent(c.userAgent)
+	if err != nil {
+		logrus.Errorf("Failed to add user agent to [FleetWorkspaces] client: %v", err)
+		client = sharedClient
+	}
+	objectClient := objectclient.NewObjectClient(namespace, client, &FleetWorkspaceResource, FleetWorkspaceGroupVersionKind, fleetWorkspaceFactory{})
 	return &fleetWorkspaceClient{
 		ns:           namespace,
 		client:       c,
