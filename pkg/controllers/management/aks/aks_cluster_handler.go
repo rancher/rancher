@@ -287,11 +287,6 @@ func (e *aksOperatorController) setInitialUpstreamSpec(cluster *mgmtv3.Cluster) 
 
 // updateAKSClusterConfig updates the AKSClusterConfig object's spec with the cluster's AKSConfig if they are not equal..
 func (e *aksOperatorController) updateAKSClusterConfig(cluster *mgmtv3.Cluster, aksClusterConfigDynamic *unstructured.Unstructured, spec map[string]interface{}) (*mgmtv3.Cluster, error) {
-
-	//test
-	//bytes, _ := json.Marshal(aksClusterConfigDynamic)
-	//println(string(bytes))
-
 	list, err := e.DynamicClient.Namespace(namespace.GlobalNamespace).List(context.TODO(), v1.ListOptions{})
 	if err != nil {
 		return cluster, err
@@ -306,11 +301,6 @@ func (e *aksOperatorController) updateAKSClusterConfig(cluster *mgmtv3.Cluster, 
 	if err != nil {
 		return cluster, err
 	}
-
-	//test
-	//bytes, _ = json.Marshal(aksClusterConfigDynamic)
-	//println(string(bytes))
-
 
 	// AKS cluster and node pool statuses are not always immediately updated. This cause the AKSConfig to
 	// stay in "active" for a few seconds, causing the cluster to go back to "active".

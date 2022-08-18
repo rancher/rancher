@@ -19,7 +19,7 @@ const (
 )
 
 
-var mockOperatorController mockEksOperatorController	// Operator controller with mock interfaces & sibling funcs
+var mockOperatorController mockEksOperatorController // Operator controller with mock interfaces & sibling funcs
 
 
 /** Test_onClusterChange
@@ -230,7 +230,7 @@ func Test_recordAppliedSpec_NoUpdate(t *testing.T) {
 
 
 func Test_getAccessToken(t *testing.T) {
-	t.Error()
+	t.Error("not implemented: requires EKS controller")
 }
 
 
@@ -260,5 +260,5 @@ func Test_generateSATokenWithPublicAPI(t *testing.T) {
 /** Test_getRestConfig
  */
 func Test_getRestConfig(t *testing.T) {
-	t.Error("not implemented: API call does not need to be tested")
+	t.Error("not implemented: requires EKS controller")
 }

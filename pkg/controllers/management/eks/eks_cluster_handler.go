@@ -134,10 +134,6 @@ func (e *eksOperatorController) onClusterChange(key string, cluster *mgmtv3.Clus
 		return cluster, err
 	}
 
-	//test
-	//bytes, _ := json.Marshal(eksClusterConfigDynamic)
-	//println(string(bytes))
-
 	// check for changes between EKS spec on cluster and the EKS spec on the EKSClusterConfig object
 	if !reflect.DeepEqual(eksClusterConfigMap, eksClusterConfigDynamic.Object["spec"]) {
 		logrus.Infof("change detected for cluster [%s], updating EKSClusterConfig", cluster.Name)

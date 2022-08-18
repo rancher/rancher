@@ -5,8 +5,8 @@
 package eks
 
 import (
+	"encoding/base64"
 	stderrors "errors"
-	"fmt"
 	"io/ioutil"
 	"net"
 	"net/url"
@@ -16,6 +16,7 @@ import (
 	v1 "github.com/rancher/eks-operator/pkg/apis/eks.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/controllers/management/clusteroperator"
 	mgmtv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	typesDialer "github.com/rancher/rancher/pkg/types/config/dialer"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/mock"
 	secretv1 "k8s.io/api/core/v1"
@@ -63,7 +64,7 @@ func getMockEksOperatorController(clusterState string) mockEksOperatorController
 				CatalogManager:       nil,
 				SystemAccountManager: nil,
 				DynamicClient:        dynamicClient,
-				ClientDialer: 		  MockFactory{},
+				ClientDialer:         MockFactory{},
 				Discovery:            MockDiscovery{},
 			},
 		},
@@ -84,32 +85,27 @@ func (m *mockEksOperatorController) setInitialUpstreamSpec(cluster *mgmtv3.Clust
 	return m.ClusterClient.Update(cluster)
 }
 
-// test generateAndSetServiceAccount with mock sibling func (getRestConfig)
+// test generateAndSetServiceAccount with mock sibling func (getAccessToken)
 
 func (m *mockEksOperatorController) generateAndSetServiceAccount(cluster *mgmtv3.Cluster) (*mgmtv3.Cluster, error) {
-	// mock
-	m.Mock.On("getRestConfig", cluster).Return(&rest.Config{}, nil)
-
-	restConfig, err := m.getRestConfig(cluster)
-	if err != nil {
-		return cluster, fmt.Errorf("error getting kube config: %v", err)
-	}
-
 	clusterDialer, err := m.ClientDialer.ClusterDialer(cluster.Name)
 	if err != nil {
 		return cluster, err
 	}
 
-	restConfig.Dial = clusterDialer
-	cluster = cluster.DeepCopy()
+	// mock
+	m.Mock.On("getRestConfig", cluster).Return(&rest.Config{}, nil)
+
+	_, err = m.getRestConfig(cluster, clusterDialer)
+	if err != nil {
+		return cluster, err
+	}
 
 	// mock
 	secret := secretv1.Secret{}
 	secret.Name = "cluster-serviceaccounttoken-sl7wm"
 
-	if err != nil {
-		return nil, err
-	}
+	cluster = cluster.DeepCopy()
 	cluster.Status.ServiceAccountTokenSecret = secret.Name
 	cluster.Status.ServiceAccountToken = ""
 	return m.ClusterClient.Update(cluster)
@@ -121,12 +117,15 @@ func (m *mockEksOperatorController) generateSATokenWithPublicAPI(cluster *mgmtv3
 	// mock
 	m.Mock.On("getRestConfig", cluster).Return(&rest.Config{}, nil)
 
-	restConfig, err := m.getRestConfig(cluster)
+	_, err := m.getRestConfig(cluster, (&net.Dialer{
+		Timeout:   30 * time.Second,
+		KeepAlive: 30 * time.Second,
+	}).DialContext)
 	if err != nil {
 		return "", nil, err
 	}
+
 	requiresTunnel := new(bool)
-	restConfig.Dial = (&net.Dialer{Timeout: 30 * time.Second, KeepAlive: 30 * time.Second}).DialContext
 
 	// mock serviceToken
 	serviceToken, err := "testtoken12345", nil
@@ -137,26 +136,32 @@ func (m *mockEksOperatorController) generateSATokenWithPublicAPI(cluster *mgmtv3
 		if stderrors.As(err, &dnsError) && !dnsError.IsTemporary {
 			return "", requiresTunnel, nil
 		}
+
+		// In the existence of a proxy, it may be the case that the following error occurs,
+		// in which case rancher should use the tunnel connection to communicate with the cluster.
 		var urlError *url.Error
 		if stderrors.As(err, &urlError) && urlError.Timeout() {
 			return "", requiresTunnel, nil
 		}
+
+		// Not able to determine if tunneling is required.
 		requiresTunnel = nil
 	}
+
 	return serviceToken, requiresTunnel, err
 }
 
-func (m *mockEksOperatorController) getRestConfig(cluster *mgmtv3.Cluster) (*rest.Config, error) {
+func (m *mockEksOperatorController) getAccessToken(cluster *mgmtv3.Cluster) (string, error) {
 
 	_mc_ret := m.Called(cluster)
 
-	var _r0 *rest.Config
+	var _r0 string
 
-	if _rfn, ok := _mc_ret.Get(0).(func(*mgmtv3.Cluster) *rest.Config); ok {
+	if _rfn, ok := _mc_ret.Get(0).(func(*mgmtv3.Cluster) string); ok {
 		_r0 = _rfn(cluster)
 	} else {
 		if _mc_ret.Get(0) != nil {
-			_r0 = _mc_ret.Get(0).(*rest.Config)
+			_r0 = _mc_ret.Get(0).(string)
 		}
 	}
 
@@ -170,6 +175,21 @@ func (m *mockEksOperatorController) getRestConfig(cluster *mgmtv3.Cluster) (*res
 
 	return _r0, _r1
 
+}
+
+func (m *mockEksOperatorController) getRestConfig(cluster *mgmtv3.Cluster, dialer typesDialer.Dialer) (*rest.Config, error) {
+	// mock
+	m.Mock.On("getAccessToken", cluster).Return("testaccesstoken", nil)
+
+	accessToken, err := m.getAccessToken(cluster)
+	if err != nil {
+		return nil, err
+	}
+	decodedCA, err := base64.StdEncoding.DecodeString(cluster.Status.CACert)
+	if err != nil {
+		return nil, err
+	}
+	return &rest.Config{Host: cluster.Status.APIEndpoint, TLSClientConfig: rest.TLSClientConfig{CAData: decodedCA}, BearerToken: accessToken, Dial: dialer}, nil
 }
 
 // utility
