@@ -8,7 +8,7 @@ metadata:
     lifecycle.cattle.io/create.cluster-provisioner-controller: "true"
     lifecycle.cattle.io/create.cluster-scoped-gc: "true"
     lifecycle.cattle.io/create.mgmt-cluster-rbac-remove: "true"
-  creationTimestamp: "2022-08-15T21:51:40Z"
+  creationTimestamp: "2022-08-22T19:19:00Z"
   finalizers:
   - wrangler.cattle.io/mgmt-cluster-remove
   - controller.cattle.io/cluster-agent-controller-cleanup
@@ -16,12 +16,12 @@ metadata:
   - controller.cattle.io/cluster-provisioner-controller
   - controller.cattle.io/mgmt-cluster-rbac-remove
   generateName: c-
-  generation: 14
+  generation: 12
   labels:
     cattle.io/creator: norman
-  name: c-r64vb
-  resourceVersion: "362818"
-  uid: ced870a2-50a7-4c12-ba8c-ef84e6616fbf
+  name: c-5tzkk
+  resourceVersion: "688695"
+  uid: 53cd1838-e5ea-4d12-bb5c-9ecab9d8631b
 spec:
   agentImageOverride: ""
   answers: {}
@@ -29,47 +29,59 @@ spec:
   description: ""
   desiredAgentImage: ""
   desiredAuthImage: ""
-  displayName: eks-test
+  displayName: gke-test
   dockerRootDir: /var/lib/docker
-  eksConfig:
-    amazonCredentialSecret: cattle-global-data:cc-kxfmx
-    displayName: eks-test
-    imported: false
-    kmsKey: ""
-    kubernetesVersion: "1.22"
-    loggingTypes: []
-    nodeGroups:
-    - desiredSize: 2
-      diskSize: 20
-      ec2SshKey: ""
-      gpu: false
-      imageId: ""
-      instanceType: t3.medium
-      labels: {}
-      launchTemplate: null
-      maxSize: 2
-      minSize: 2
-      nodegroupName: nodegroup
-      requestSpotInstances: false
-      resourceTags: {}
-      spotInstanceTypes: []
-      subnets: []
-      tags: {}
-      userData: ""
-      version: "1.22"
-    privateAccess: false
-    publicAccess: true
-    publicAccessSources: []
-    region: us-east-2
-    secretsEncryption: false
-    securityGroups: []
-    serviceRole: ""
-    subnets: []
-    tags: {}
   enableClusterAlerting: false
   enableClusterMonitoring: false
   enableNetworkPolicy: false
   fleetWorkspaceName: fleet-default
+  gkeConfig:
+    clusterAddons:
+      horizontalPodAutoscaling: true
+      httpLoadBalancing: true
+    clusterIpv4Cidr: ""
+    clusterName: gke-test
+    description: ""
+    enableKubernetesAlpha: false
+    googleCredentialSecret: cattle-global-data:cc-swv64
+    imported: false
+    ipAllocationPolicy:
+      useIpAliases: true
+    kubernetesVersion: 1.22.11-gke.400
+    labels: {}
+    locations: []
+    loggingService: logging.googleapis.com/kubernetes
+    maintenanceWindow: ""
+    masterAuthorizedNetworks: {}
+    monitoringService: monitoring.googleapis.com/kubernetes
+    network: default
+    networkPolicyEnabled: false
+    nodePools:
+    - autoscaling: {}
+      config:
+        diskSizeGb: 100
+        diskType: pd-standard
+        imageType: COS
+        machineType: n1-standard-2
+        oauthScopes:
+        - https://www.googleapis.com/auth/devstorage.read_only
+        - https://www.googleapis.com/auth/logging.write
+        - https://www.googleapis.com/auth/monitoring
+        - https://www.googleapis.com/auth/servicecontrol
+        - https://www.googleapis.com/auth/service.management.readonly
+        - https://www.googleapis.com/auth/trace.append
+      initialNodeCount: 3
+      management:
+        autoRepair: true
+        autoUpgrade: true
+      maxPodsConstraint: 110
+      name: nodegroup
+      version: 1.22.11-gke.400
+    privateClusterConfig: {}
+    projectID: ei-container-platform-dev
+    region: ""
+    subnetwork: default
+    zone: us-central1-c
   internal: false
   localClusterAuthEndpoint:
     enabled: false
@@ -111,52 +123,50 @@ status:
   conditions:
   - status: "True"
     type: Pending
-  - lastUpdateTime: "2022-08-15T17:55:31-04:00"
-    status: Unknown
+  - status: Unknown
     type: Provisioned
-  - lastUpdateTime: "2022-08-15T17:51:51-04:00"
+  - lastUpdateTime: "2022-08-22T15:19:10-04:00"
     message: Waiting for API to be available
     status: Unknown
     type: Waiting
-  - lastUpdateTime: "2022-08-15T17:51:41-04:00"
+  - lastUpdateTime: "2022-08-22T15:19:01-04:00"
     status: "True"
     type: BackingNamespaceCreated
-  - lastUpdateTime: "2022-08-15T17:51:41-04:00"
+  - lastUpdateTime: "2022-08-22T15:19:01-04:00"
     status: "True"
     type: DefaultProjectCreated
-  - lastUpdateTime: "2022-08-15T17:51:42-04:00"
+  - lastUpdateTime: "2022-08-22T15:19:01-04:00"
     status: "True"
     type: SystemProjectCreated
-  - lastUpdateTime: "2022-08-15T17:51:42-04:00"
+  - lastUpdateTime: "2022-08-22T15:19:02-04:00"
     status: "True"
     type: InitialRolesPopulated
-  - lastUpdateTime: "2022-08-15T17:51:44-04:00"
+  - lastUpdateTime: "2022-08-22T15:19:06-04:00"
     status: "True"
     type: CreatorMadeOwner
-  - lastUpdateTime: "2022-08-15T17:51:46-04:00"
+  - lastUpdateTime: "2022-08-22T15:19:08-04:00"
     status: "True"
     type: NoDiskPressure
-  - lastUpdateTime: "2022-08-15T17:51:46-04:00"
+  - lastUpdateTime: "2022-08-22T15:19:08-04:00"
     status: "True"
     type: NoMemoryPressure
-  - lastUpdateTime: "2022-08-15T17:51:47-04:00"
+  - lastUpdateTime: "2022-08-22T15:19:09-04:00"
     status: "True"
     type: SecretsMigrated
-  - lastUpdateTime: "2022-08-15T17:51:47-04:00"
+  - lastUpdateTime: "2022-08-22T15:19:10-04:00"
     status: "True"
     type: ServiceAccountSecretsMigrated
-  - lastUpdateTime: "2022-08-15T21:51:50Z"
+  - lastUpdateTime: "2022-08-22T19:19:13Z"
     status: "False"
     type: Connected
-  driver: EKS
+  driver: GKE
   eksStatus:
     managedLaunchTemplateID: ""
     managedLaunchTemplateVersions: null
     privateRequiresTunnel: null
     securityGroups: null
     subnets: null
-    upstreamSpec:
-      testField: "upstreamSpec is already set"
+    upstreamSpec: null
     virtualNetwork: ""
   gkeStatus:
     privateRequiresTunnel: null

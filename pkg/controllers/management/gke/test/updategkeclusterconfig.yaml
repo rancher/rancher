@@ -1,0 +1,382 @@
+apiVersion: management.cattle.io/v3
+kind: Cluster
+metadata:
+  annotations:
+    authz.management.cattle.io/creator-role-bindings: '{"created":["cluster-owner"],"required":["cluster-owner"]}'
+    clusters.management.cattle.io/ke-last-refresh: "1661206338"
+    field.cattle.io/creatorId: user-rgtsq
+    lifecycle.cattle.io/create.cluster-agent-controller-cleanup: "true"
+    lifecycle.cattle.io/create.cluster-provisioner-controller: "true"
+    lifecycle.cattle.io/create.cluster-scoped-gc: "true"
+    lifecycle.cattle.io/create.mgmt-cluster-rbac-remove: "true"
+    provisioner.cattle.io/encrypt-migrated: "true"
+  creationTimestamp: "2022-08-22T19:19:00Z"
+  finalizers:
+  - wrangler.cattle.io/mgmt-cluster-remove
+  - controller.cattle.io/cluster-agent-controller-cleanup
+  - controller.cattle.io/cluster-scoped-gc
+  - controller.cattle.io/cluster-provisioner-controller
+  - controller.cattle.io/mgmt-cluster-rbac-remove
+  generateName: c-
+  generation: 46
+  labels:
+    cattle.io/creator: norman
+    provider.cattle.io: gke
+  name: c-5tzkk
+  resourceVersion: "703242"
+  uid: 53cd1838-e5ea-4d12-bb5c-9ecab9d8631b
+spec:
+  agentImageOverride: ""
+  answers: {}
+  clusterSecrets: {}
+  description: ""
+  desiredAgentImage: ""
+  desiredAuthImage: ""
+  displayName: gke-test
+  dockerRootDir: /var/lib/docker
+  enableClusterAlerting: false
+  enableClusterMonitoring: false
+  enableNetworkPolicy: false
+  fleetWorkspaceName: fleet-default
+  gkeConfig:
+    clusterAddons:
+      horizontalPodAutoscaling: true
+      httpLoadBalancing: true
+    clusterIpv4Cidr: 10.124.0.0/14
+    clusterName: gke-test
+    description: ""
+    enableKubernetesAlpha: false
+    googleCredentialSecret: cattle-global-data:cc-swv64
+    imported: false
+    ipAllocationPolicy:
+      clusterIpv4CidrBlock: 10.124.0.0/14
+      clusterSecondaryRangeName: gke-gke-test-pods-f86e3af0
+      servicesIpv4CidrBlock: 10.0.0.0/20
+      servicesSecondaryRangeName: gke-gke-test-services-f86e3af0
+      useIpAliases: true
+    kubernetesVersion: 1.22.11-gke.400
+    labels:
+      TESTKEY: TESTVALUE
+    locations: []
+    loggingService: logging.googleapis.com/kubernetes
+    maintenanceWindow: ""
+    masterAuthorizedNetworks: {}
+    monitoringService: monitoring.googleapis.com/kubernetes
+    network: default
+    networkPolicyEnabled: false
+    nodePools:
+    - autoscaling:
+        enabled: false
+        maxNodeCount: 0
+        minNodeCount: 0
+      config:
+        diskSizeGb: 100
+        diskType: pd-standard
+        imageType: COS
+        labels: {}
+        localSsdCount: 0
+        machineType: n1-standard-2
+        oauthScopes:
+        - https://www.googleapis.com/auth/devstorage.read_only
+        - https://www.googleapis.com/auth/logging.write
+        - https://www.googleapis.com/auth/monitoring
+        - https://www.googleapis.com/auth/servicecontrol
+        - https://www.googleapis.com/auth/service.management.readonly
+        - https://www.googleapis.com/auth/trace.append
+        preemptible: false
+      initialNodeCount: 3
+      management:
+        autoRepair: true
+        autoUpgrade: true
+      maxPodsConstraint: 110
+      name: nodegroup
+      version: 1.22.11-gke.400
+    - autoscaling:
+        enabled: false
+        maxNodeCount: 0
+        minNodeCount: 0
+      config:
+        diskSizeGb: 100
+        diskType: pd-standard
+        imageType: COS
+        labels: {}
+        localSsdCount: 0
+        machineType: n1-standard-2
+        oauthScopes:
+        - https://www.googleapis.com/auth/devstorage.read_only
+        - https://www.googleapis.com/auth/logging.write
+        - https://www.googleapis.com/auth/monitoring
+        - https://www.googleapis.com/auth/servicecontrol
+        - https://www.googleapis.com/auth/service.management.readonly
+        - https://www.googleapis.com/auth/trace.append
+        preemptible: false
+      initialNodeCount: 3
+      management:
+        autoRepair: true
+        autoUpgrade: true
+      maxPodsConstraint: 110
+      name: nodegroup2
+      version: 1.22.11-gke.400
+    privateClusterConfig: {}
+    projectID: ei-container-platform-dev
+    region: ""
+    subnetwork: default
+    zone: us-central1-c
+  internal: false
+  localClusterAuthEndpoint:
+    enabled: false
+  windowsPreferedCluster: false
+status:
+  agentFeatures:
+    embedded-cluster-api: false
+    fleet: false
+    monitoringv1: false
+    multi-cluster-management: false
+    multi-cluster-management-agent: true
+    provisioningv2: false
+    rke2: false
+  agentImage: rancher/rancher-agent:v2.6-head
+  aksStatus:
+    privateRequiresTunnel: null
+    rbacEnabled: null
+    upstreamSpec: null
+  allocatable:
+    cpu: 11580m
+    memory: 34513328Ki
+    pods: "660"
+  apiEndpoint: https://34.135.149.246
+  appliedAgentEnvVars:
+  - name: CATTLE_SERVER_VERSION
+    value: dev
+  - name: CATTLE_INSTALL_UUID
+    value: 3573e14c-efce-425e-ae8a-7ddc80578c5e
+  - name: CATTLE_INGRESS_IP_DOMAIN
+    value: sslip.io
+  appliedEnableNetworkPolicy: false
+  appliedPodSecurityPolicyTemplateId: ""
+  appliedSpec:
+    agentImageOverride: ""
+    answers: {}
+    clusterSecrets: {}
+    description: ""
+    desiredAgentImage: ""
+    desiredAuthImage: ""
+    displayName: ""
+    enableClusterAlerting: false
+    enableClusterMonitoring: false
+    enableNetworkPolicy: null
+    gkeConfig:
+      clusterAddons:
+        horizontalPodAutoscaling: true
+        httpLoadBalancing: true
+      clusterIpv4Cidr: 10.124.0.0/14
+      clusterName: gke-test
+      description: ""
+      enableKubernetesAlpha: false
+      googleCredentialSecret: cattle-global-data:cc-swv64
+      imported: false
+      ipAllocationPolicy:
+        clusterIpv4CidrBlock: 10.124.0.0/14
+        clusterSecondaryRangeName: gke-gke-test-pods-f86e3af0
+        servicesIpv4CidrBlock: 10.0.0.0/20
+        servicesSecondaryRangeName: gke-gke-test-services-f86e3af0
+        useIpAliases: true
+      kubernetesVersion: 1.22.11-gke.400
+      labels: {}
+      locations:
+      - us-central1-c
+      loggingService: logging.googleapis.com/kubernetes
+      maintenanceWindow: ""
+      masterAuthorizedNetworks: {}
+      monitoringService: monitoring.googleapis.com/kubernetes
+      network: default
+      networkPolicyEnabled: false
+      nodePools:
+      - autoscaling: {}
+        config:
+          diskSizeGb: 100
+          diskType: pd-standard
+          imageType: COS
+          machineType: n1-standard-2
+        initialNodeCount: 3
+        management:
+          autoRepair: true
+          autoUpgrade: true
+        maxPodsConstraint: 110
+        name: nodegroup
+        version: 1.22.11-gke.400
+      - autoscaling: {}
+        config:
+          diskSizeGb: 100
+          diskType: pd-standard
+          imageType: COS
+          machineType: n1-standard-2
+        initialNodeCount: 3
+        management:
+          autoRepair: true
+          autoUpgrade: true
+        maxPodsConstraint: 110
+        name: nodegroup2
+        version: 1.22.11-gke.400
+      privateClusterConfig: {}
+      projectID: ei-container-platform-dev
+      region: ""
+      subnetwork: default
+      zone: us-central1-c
+    internal: false
+    localClusterAuthEndpoint:
+      enabled: false
+    windowsPreferedCluster: false
+  authImage: ""
+  caCert: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSUVMRENDQXBTZ0F3SUJBZ0lRS0N3eGxKaW1HUXFKUm5rWUlvNHo5VEFOQmdrcWhraUc5dzBCQVFzRkFEQXYKTVMwd0t3WURWUVFERXlRNE56YzRaVEkxTXkwMFpUVmhMVFF6TlRjdFlXWmxOQzA1T0RNNU1EWmtZbUZrWm1FdwpJQmNOTWpJd09ESXlNVGd4T1RFMFdoZ1BNakExTWpBNE1UUXhPVEU1TVRSYU1DOHhMVEFyQmdOVkJBTVRKRGczCk56aGxNalV6TFRSbE5XRXRORE0xTnkxaFptVTBMVGs0TXprd05tUmlZV1JtWVRDQ0FhSXdEUVlKS29aSWh2Y04KQVFFQkJRQURnZ0dQQURDQ0FZb0NnZ0dCQUxBcmZ2TmhqMm9LcWJ1U1lhaWhiRU94amd6OC9WakQ4TUVUbDUxYgpuWVJGRzVIa1VVZU9WbnFwWVdINjJnMDJJYmZuT2ViZkdTV3hXcEpIckdkWDNpQVFpVllEZXI4K1BTSmkzSzdoCnVqRlljYm1CMnlJQ0hLNUVHUnhnTG9odldWbGdiZUVTdUdVdFF0c0sxaFNOcTRBZVlOYmhlL0VuYVc1US92a0IKdHBRY3R2WC9IOFNUU3BuS1Bjc1hXWjVxY0NiTUNic0FLZGlBWXJCeHpGVG1lc3BuZVBnTlpIdDZSa3JvTG5PTApoYlR1dFRRUUJ4TnVlRGh2RzdHM0ppY3FrcUtBWXlRT1VPa2FMZGVRTlptVVdiS0RxZXpoQXFsRmVQV2lUejV1CjFENzlrSlg5cTY2dWE1NzVqV0xXVjVTYWQrQjJQYnRFV2NjTi9JazIzVGNUV0NzT1BKYjRYSVUrTkIxWFVNWkkKcGl6dmpJRVdBYVd4NkFzTUxCRXQ5SUp4N3UxQllnbGZFTXBOUEMyd3h3R3h3M3NadHBab3NvazNySHdHNjNzVwpkbFZtcVRrQ2ZUbENpMG9SL2lIR0ZscWYwdmhWSUErTmZETkgySVRYRHNDajE5Wi9rYitUU1JOZTFtSEJZV3VkCkN5bVF4MUdPdllzT1kxNkFsRkVKYS9CUDFRSURBUUFCbzBJd1FEQU9CZ05WSFE4QkFmOEVCQU1DQWdRd0R3WUQKVlIwVEFRSC9CQVV3QXdFQi96QWRCZ05WSFE0RUZnUVU3emNndG5qcE9pc0RXdWVkOWh0Qi9UZmpLell3RFFZSgpLb1pJaHZjTkFRRUxCUUFEZ2dHQkFKV05qSzlTTStuUFNDMzhnUzRXdUVmR3grTzZXZVBpbTdEc2JOV1ZQZVB0Cnh5VHIrUXl2Z05xSm1mdHlnNUV6MGVUZy9ja1Y3MGJQa3dYWUxEcDB6UkRqb091ano1UkhVYWRMbllYVGdQQXcKVFBGUWU3d2FsZ1dHY05TQWU0MDZRUDY5U0NLVktMLzdWZzF2Y2U5Y0tPWE5WdWU3Tk9SNXlQbG44WmRVNldESQpOOU9UeStpdWlKby9yNnplb3JQT1VYaWpwSkY1S2dEZndsdHI2MU1OWGsxcEZ5M0F6akM3MWpqb3JLTzg3QjVECmtvV0IwZFl5Q1lWTVhUTldIcDMyZkROVU9reDRzU0RoODdTL3BsOFRBSUtOWjlENktWMUdJYUpKYVdBQ3RzZHMKYVNycDQwN1h3dnV0andzMk9mZlJmSng1dTdiNmxvQngvckU1TzJoOU1NUGlTT0tCRURsd0dZUFdqbXJFRzJUWgp3RHhDZ3dVL281b2h1bHBiVEYzV0R3cDBZd3RhV2Z5MS9VTnZVNklFUGZqNEZsLzRJUGFCOHpvL3hsWmllbW9ZCjFYTzFHR3BaanZqaWoyekFJSUVnL3VsS3UxREJ0OUdhSnNLZFh6d0VIbi94bFZUc0VvODdmQTA2T3dod1lDVkYKNmlPbW1GeVVIMCsrMW5rNlZqb1V0dz09Ci0tLS0tRU5EIENFUlRJRklDQVRFLS0tLS0K
+  capabilities:
+    loadBalancerCapabilities: {}
+  capacity:
+    cpu: "12"
+    memory: 45793712Ki
+    pods: "660"
+  conditions:
+  - status: "True"
+    type: Pending
+  - lastUpdateTime: "2022-08-22T15:25:19-04:00"
+    status: "True"
+    type: Provisioned
+  - lastUpdateTime: "2022-08-22T15:26:39-04:00"
+    status: "True"
+    type: Waiting
+  - lastUpdateTime: "2022-08-22T15:19:01-04:00"
+    status: "True"
+    type: BackingNamespaceCreated
+  - lastUpdateTime: "2022-08-22T15:19:01-04:00"
+    status: "True"
+    type: DefaultProjectCreated
+  - lastUpdateTime: "2022-08-22T15:19:01-04:00"
+    status: "True"
+    type: SystemProjectCreated
+  - lastUpdateTime: "2022-08-22T15:19:02-04:00"
+    status: "True"
+    type: InitialRolesPopulated
+  - lastUpdateTime: "2022-08-22T15:19:06-04:00"
+    status: "True"
+    type: CreatorMadeOwner
+  - lastUpdateTime: "2022-08-22T15:19:08-04:00"
+    status: "True"
+    type: NoDiskPressure
+  - lastUpdateTime: "2022-08-22T15:19:08-04:00"
+    status: "True"
+    type: NoMemoryPressure
+  - lastUpdateTime: "2022-08-22T15:19:09-04:00"
+    status: "True"
+    type: SecretsMigrated
+  - lastUpdateTime: "2022-08-22T15:19:10-04:00"
+    status: "True"
+    type: ServiceAccountSecretsMigrated
+  - lastUpdateTime: "2022-08-22T21:52:32Z"
+    status: "True"
+    type: Connected
+  - lastUpdateTime: "2022-08-22T17:52:48-04:00"
+    status: "True"
+    type: Ready
+  - lastUpdateTime: "2022-08-22T16:56:11-04:00"
+    status: "True"
+    type: Updated
+  - lastUpdateTime: "2022-08-22T15:25:26-04:00"
+    status: "True"
+    type: GlobalAdminsSynced
+  - lastUpdateTime: "2022-08-22T15:25:30-04:00"
+    status: "True"
+    type: SystemAccountCreated
+  - lastUpdateTime: "2022-08-22T15:25:41-04:00"
+    status: "True"
+    type: AgentDeployed
+  driver: GKE
+  eksStatus:
+    managedLaunchTemplateID: ""
+    managedLaunchTemplateVersions: null
+    privateRequiresTunnel: null
+    securityGroups: null
+    subnets: null
+    upstreamSpec: null
+    virtualNetwork: ""
+  gkeStatus:
+    privateRequiresTunnel: null
+    upstreamSpec:
+      clusterAddons:
+        horizontalPodAutoscaling: true
+        httpLoadBalancing: true
+      clusterIpv4Cidr: 10.124.0.0/14
+      clusterName: gke-test
+      description: ""
+      enableKubernetesAlpha: false
+      googleCredentialSecret: cattle-global-data:cc-swv64
+      imported: false
+      ipAllocationPolicy:
+        clusterIpv4CidrBlock: 10.124.0.0/14
+        clusterSecondaryRangeName: gke-gke-test-pods-f86e3af0
+        servicesIpv4CidrBlock: 10.0.0.0/20
+        servicesSecondaryRangeName: gke-gke-test-services-f86e3af0
+        useIpAliases: true
+      kubernetesVersion: 1.22.11-gke.400
+      labels: {}
+      locations:
+      - us-central1-c
+      loggingService: logging.googleapis.com/kubernetes
+      maintenanceWindow: ""
+      masterAuthorizedNetworks: {}
+      monitoringService: monitoring.googleapis.com/kubernetes
+      network: default
+      networkPolicyEnabled: false
+      nodePools:
+      - autoscaling: {}
+        config:
+          diskSizeGb: 100
+          diskType: pd-standard
+          imageType: COS
+          machineType: n1-standard-2
+        initialNodeCount: 3
+        management:
+          autoRepair: true
+          autoUpgrade: true
+        maxPodsConstraint: 110
+        name: nodegroup
+        version: 1.22.11-gke.400
+      - autoscaling: {}
+        config:
+          diskSizeGb: 100
+          diskType: pd-standard
+          imageType: COS
+          machineType: n1-standard-2
+        initialNodeCount: 3
+        management:
+          autoRepair: true
+          autoUpgrade: true
+        maxPodsConstraint: 110
+        name: nodegroup2
+        version: 1.22.11-gke.400
+      privateClusterConfig: {}
+      projectID: ei-container-platform-dev
+      region: ""
+      subnetwork: default
+      zone: us-central1-c
+  limits:
+    cpu: 287m
+    memory: 5433Mi
+    pods: "0"
+  linuxWorkerCount: 6
+  nodeCount: 6
+  provider: gke
+  requested:
+    cpu: 1947m
+    memory: "2278069888"
+    pods: "40"
+  serviceAccountTokenSecret: cluster-serviceaccounttoken-rhs87
+  version:
+    buildDate: "2022-06-24T09:27:38Z"
+    compiler: gc
+    gitCommit: b4e1ab06be827438def8aee0021791b413a0961d
+    gitTreeState: clean
+    gitVersion: v1.22.11-gke.400
+    goVersion: go1.16.15b7
+    major: "1"
+    minor: "22"
+    platform: linux/amd64

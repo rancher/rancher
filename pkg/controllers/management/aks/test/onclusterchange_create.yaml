@@ -88,7 +88,7 @@ status:
     privateRequiresTunnel: null
     rbacEnabled: null
     upstreamSpec:
-      mockTestField: "upstreamSpec is already set"
+      testField: "upstreamSpec is already set"
   allocatable:
     cpu: "0"
     memory: "0"
