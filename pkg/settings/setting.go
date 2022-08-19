@@ -56,7 +56,7 @@ var (
 	KubernetesVersionToSystemImages     = NewSetting("k8s-version-to-images", "")
 	KubernetesVersionsCurrent           = NewSetting("k8s-versions-current", "")
 	KubernetesVersionsDeprecated        = NewSetting("k8s-versions-deprecated", "")
-	KDMBranch                           = NewSetting("kdm-branch", "dev-v2.6")
+	KDMBranch                           = NewSetting("kdm-branch", "release-v2.6")
 	MachineVersion                      = NewSetting("machine-version", "dev")
 	Namespace                           = NewSetting("namespace", os.Getenv("CATTLE_NAMESPACE"))
 	PasswordMinLength                   = NewSetting("password-min-length", "12")
@@ -72,7 +72,7 @@ var (
 	CSIProxyAgentVersion                = NewSetting("csi-proxy-agent-version", "")
 	CSIProxyAgentURL                    = NewSetting("csi-proxy-agent-url", "https://acs-mirror.azureedge.net/csi-proxy/%[1]s/binaries/csi-proxy-%[1]s.tar.gz")
 	SystemAgentInstallScript            = NewSetting("system-agent-install-script", "https://raw.githubusercontent.com/rancher/system-agent/v0.2.10/install.sh")
-	WinsAgentInstallScript              = NewSetting("wins-agent-install-script", "https://raw.githubusercontent.com/rancher/wins/v0.4.5/install.ps1")
+	WinsAgentInstallScript              = NewSetting("wins-agent-install-script", "https://raw.githubusercontent.com/rancher/wins/v0.4.7/install.ps1")
 	SystemAgentInstallerImage           = NewSetting("system-agent-installer-image", "rancher/system-agent-installer-")
 	SystemAgentUpgradeImage             = NewSetting("system-agent-upgrade-image", "")
 	WinsAgentUpgradeImage               = NewSetting("wins-agent-upgrade-image", "")
@@ -107,11 +107,11 @@ var (
 	ClusterTemplateEnforcement          = NewSetting("cluster-template-enforcement", "false")
 	InitialDockerRootDir                = NewSetting("initial-docker-root-dir", "/var/lib/docker")
 	SystemCatalog                       = NewSetting("system-catalog", "external") // Options are 'external' or 'bundled'
-	ChartDefaultBranch                  = NewSetting("chart-default-branch", "dev-v2.6")
+	ChartDefaultBranch                  = NewSetting("chart-default-branch", "release-v2.6")
 	PartnerChartDefaultBranch           = NewSetting("partner-chart-default-branch", "main")
 	RKE2ChartDefaultBranch              = NewSetting("rke2-chart-default-branch", "main")
 	FleetDefaultWorkspaceName           = NewSetting("fleet-default-workspace-name", fleetconst.ClustersDefaultNamespace) // fleetWorkspaceName to assign to clusters with none
-	ShellImage                          = NewSetting("shell-image", "rancher/shell:v0.1.18-rc8")
+	ShellImage                          = NewSetting("shell-image", "rancher/shell:v0.1.18")
 	IgnoreNodeName                      = NewSetting("ignore-node-name", "") // nodes to ignore when syncing v1.node to v3.node
 	NoDefaultAdmin                      = NewSetting("no-default-admin", "")
 	RestrictedDefaultAdmin              = NewSetting("restricted-default-admin", "false") // When bootstrapping the admin for the first time, give them the global role restricted-admin

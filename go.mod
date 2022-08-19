@@ -106,9 +106,9 @@ require (
 	github.com/rancher/apiserver v0.0.0-20220610164457-643f1d19e3fc
 	github.com/rancher/channelserver v0.5.1-0.20220405170618-28c9b37deff1
 	github.com/rancher/dynamiclistener v0.3.4
-	github.com/rancher/eks-operator v1.1.4-rc4
+	github.com/rancher/eks-operator v1.1.4
 	github.com/rancher/fleet/pkg/apis v0.0.0-20220722201012-fe5f76e3c1e0
-	github.com/rancher/gke-operator v1.1.4-rc2
+	github.com/rancher/gke-operator v1.1.4
 	github.com/rancher/kubernetes-provider-detector v0.1.5
 	github.com/rancher/lasso v0.0.0-20220627205005-00d9c8e9dda6
 	github.com/rancher/lasso/controller-runtime v0.0.0-20220627205005-00d9c8e9dda6
@@ -118,7 +118,7 @@ require (
 	github.com/rancher/rancher/pkg/client v0.0.0
 	github.com/rancher/rdns-server v0.0.0-20180802070304-bf662911db6a
 	github.com/rancher/remotedialer v0.2.6-0.20220624190122-ea57207bf2b8
-	github.com/rancher/rke v1.3.13-rc7
+	github.com/rancher/rke v1.3.13
 	github.com/rancher/security-scan v0.1.7-0.20200222041501-f7377f127168
 	github.com/rancher/steve v0.0.0-20220805200026-647cba2be744
 	github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20210727200656-10b094e30007

@@ -4,7 +4,7 @@ ARG DAPPER_HOST_ARCH
 ENV HOST_ARCH=${DAPPER_HOST_ARCH} ARCH=${DAPPER_HOST_ARCH}
 ENV CATTLE_HELM_VERSION v2.16.8-rancher2
 ENV CATTLE_MACHINE_VERSION v0.15.0-rancher93
-ENV CATTLE_K3S_VERSION v1.24.2+k3s1
+ENV CATTLE_K3S_VERSION v1.24.1+k3s1
 # version used by helm plugin install script
 ENV CATTLE_HELM_UNITTEST_VERSION v0.1.7-rancher4
 # helm 3 version
@@ -12,7 +12,7 @@ ENV HELM_VERSION v3.9.0
 ENV KUSTOMIZE_VERSION v4.4.1
 
 # kontainer-driver-metadata branch to be set for specific branch other than dev/master, logic at rancher/rancher/pkg/settings/setting.go
-ENV CATTLE_KDM_BRANCH=dev-v2.6
+ENV CATTLE_KDM_BRANCH=release-v2.6
 
 RUN zypper -n install gcc binutils glibc-devel-static ca-certificates git-core wget curl unzip tar vim less file xz gzip sed gawk iproute2 iptables jq
 # use containerd from k3s image, not from bci
@@ -56,7 +56,7 @@ RUN mkdir /usr/tmp && \
     chmod +x /usr/bin/kustomize
 
 # Set up K3s: copy the necessary binaries from the K3s image.
-COPY --from=rancher/k3s:v1.24.2-k3s1 \
+COPY --from=rancher/k3s:v1.24.1-k3s1 \
     /bin/blkid \
     /bin/charon \
     /bin/cni \
