@@ -1,4 +1,4 @@
-package custom
+package rke2
 
 import (
 	"context"
@@ -6,24 +6,76 @@ import (
 	"testing"
 
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
+	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
 	"github.com/rancher/rancher/tests/framework/extensions/clusters"
+	"github.com/rancher/rancher/tests/framework/extensions/machinepools"
 	"github.com/rancher/rancher/tests/framework/extensions/tokenregistration"
+	"github.com/rancher/rancher/tests/framework/extensions/users"
+	"github.com/rancher/rancher/tests/framework/pkg/config"
 	"github.com/rancher/rancher/tests/framework/pkg/session"
 	"github.com/rancher/rancher/tests/framework/pkg/wait"
 	"github.com/rancher/rancher/tests/integration/pkg/defaults"
+	provisioning "github.com/rancher/rancher/tests/v2/validation/provisioning"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-var ClusterID string
-
-func (c *CustomClusterProvisioningTestSuite) setupHybrid() {
-	c.SetupSuiteHybrid()
+type CustomClusterProvisioningTestSuite struct {
+	suite.Suite
+	client             *rancher.Client
+	session            *session.Session
+	standardUserClient *rancher.Client
+	kubernetesVersions []string
+	hasWindows         bool
+	cnis               []string
+	nodeProviders      []string
 }
 
-func (c *CustomClusterProvisioningTestSuite) ProvisioningRKE2CustomClusterHybrid(externalNodeProvider ExternalNodeProvider) {
+func (c *CustomClusterProvisioningTestSuite) TearDownSuite() {
+	c.session.Cleanup()
+}
+
+func (c *CustomClusterProvisioningTestSuite) SetupSuite() {
+	testSession := session.NewSession(c.T())
+	c.session = testSession
+
+	clustersConfig := new(provisioning.Config)
+	config.LoadConfig(provisioning.ConfigurationFileKey, clustersConfig)
+
+	c.kubernetesVersions = clustersConfig.KubernetesVersions
+	c.cnis = clustersConfig.CNIs
+	c.nodeProviders = clustersConfig.NodeProviders
+
+	client, err := rancher.NewClient("", testSession)
+	require.NoError(c.T(), err)
+
+	c.client = client
+
+	enabled := true
+	var testuser = provisioning.AppendRandomString("testuser-")
+	user := &management.User{
+		Username: testuser,
+		Password: "rancherrancher123!",
+		Name:     testuser,
+		Enabled:  &enabled,
+	}
+
+	newUser, err := users.CreateUserWithRole(client, user, "user")
+	require.NoError(c.T(), err)
+
+	newUser.Password = user.Password
+
+	standardUserClient, err := client.AsUser(newUser)
+	require.NoError(c.T(), err)
+
+	c.standardUserClient = standardUserClient
+}
+
+func (c *CustomClusterProvisioningTestSuite) ProvisioningRKE2CustomCluster(externalNodeProvider ExternalNodeProvider) {
+	namespace := "fleet-default"
+
 	nodeRoles0 := []string{
 		"--etcd --controlplane --worker",
 	}
@@ -40,6 +92,10 @@ func (c *CustomClusterProvisioningTestSuite) ProvisioningRKE2CustomClusterHybrid
 		hasWindows bool
 		client     *rancher.Client
 	}{
+		{"1 Node all roles Admin User", nodeRoles0, false, c.client},
+		{"1 Node all roles Standard User", nodeRoles0, false, c.standardUserClient},
+		{"3 nodes - 1 role per node Admin User", nodeRoles1, false, c.client},
+		{"3 nodes - 1 role per node Standard User", nodeRoles1, false, c.standardUserClient},
 		{"1 Node all roles Admin User + 1 Windows Worker - Hybrid", nodeRoles0, true, c.client},
 		{"1 Node all roles Standard User + 1 Windows Worker - Hybrid", nodeRoles0, true, c.standardUserClient},
 		{"3 unique role nodes as Admin User + 1 Windows Worker - Hybrid", nodeRoles1, true, c.client},
@@ -55,37 +111,42 @@ func (c *CustomClusterProvisioningTestSuite) ProvisioningRKE2CustomClusterHybrid
 					testSession := session.NewSession(c.T())
 					defer testSession.Cleanup()
 
-					client, err := c.client.WithSession(testSession)
+					client, err := tt.client.WithSession(testSession)
 					require.NoError(c.T(), err)
 
 					numNodes := len(tt.nodeRoles)
 					nodes, err := externalNodeProvider.NodeCreationFunc(client, numNodes)
 					require.NoError(c.T(), err)
 
-					clusterName := AppendRandomString(externalNodeProvider.Name)
+					clusterName := provisioning.AppendRandomString(externalNodeProvider.Name)
 
 					cluster := clusters.NewRKE2ClusterConfig(clusterName, namespace, cni, "", kubeVersion, nil)
 
 					clusterResp, err := clusters.CreateRKE2Cluster(client, cluster)
 					require.NoError(c.T(), err)
 
-					customCluster, err := client.Provisioning.Clusters(namespace).Get(context.TODO(), clusterResp.Name, metav1.GetOptions{})
+					client, err = client.ReLogin()
 					require.NoError(c.T(), err)
 
-					ClusterID = customCluster.Status.ClusterName
+					customCluster, err := client.Provisioning.Cluster.ByID(clusterResp.ID)
+					require.NoError(c.T(), err)
 
-					token, err := tokenregistration.GetRegistrationToken(client, ClusterID)
+					token, err := tokenregistration.GetRegistrationToken(client, customCluster.Status.ClusterName)
 					require.NoError(c.T(), err)
 
 					for key, node := range nodes {
 						c.T().Logf("Execute Registration Command for node %s", node.NodeID)
 						command := fmt.Sprintf("%s %s", token.InsecureNodeCommand, tt.nodeRoles[key])
 
-						err = node.ExecuteCommand(command)
+						output, err := node.ExecuteCommand(command)
 						require.NoError(c.T(), err)
+						c.T().Logf(output)
 					}
 
-					result, err := client.Provisioning.Clusters(namespace).Watch(context.TODO(), metav1.ListOptions{
+					kubeProvisioningClient, err := c.client.GetKubeAPIProvisioningClient()
+					require.NoError(c.T(), err)
+
+					result, err := kubeProvisioningClient.Clusters(namespace).Watch(context.TODO(), metav1.ListOptions{
 						FieldSelector:  "metadata.name=" + clusterName,
 						TimeoutSeconds: &defaults.WatchTimeoutSeconds,
 					})
@@ -95,20 +156,28 @@ func (c *CustomClusterProvisioningTestSuite) ProvisioningRKE2CustomClusterHybrid
 
 					err = wait.WatchWait(result, checkFunc)
 					assert.NoError(c.T(), err)
-					assert.Equal(c.T(), clusterName, clusterResp.Name)
+					assert.Equal(c.T(), clusterName, clusterResp.ObjectMeta.Name)
 				})
 			}
 		}
 	}
 }
 
-func (c *CustomClusterProvisioningTestSuite) ProvisioningRKE2CustomClusterWithDynamicInputHybrid(externalNodeProvider ExternalNodeProvider, nodesAndRoles []map[string]bool) {
-	var rolesPerNode []string
+func (c *CustomClusterProvisioningTestSuite) ProvisioningRKE2CustomClusterDynamicInput(externalNodeProvider ExternalNodeProvider, nodesAndRoles []machinepools.NodeRoles) {
+	namespace := "fleet-default"
+
+	rolesPerNode := []string{}
 
 	for _, nodes := range nodesAndRoles {
 		var finalRoleCommand string
-		for role := range nodes {
-			finalRoleCommand += fmt.Sprintf(" --%s", role)
+		if nodes.ControlPlane {
+			finalRoleCommand += " --controlplane"
+		}
+		if nodes.Etcd {
+			finalRoleCommand += " --etcd"
+		}
+		if nodes.Worker {
+			finalRoleCommand += " --worker"
 		}
 		rolesPerNode = append(rolesPerNode, finalRoleCommand)
 	}
@@ -133,35 +202,41 @@ func (c *CustomClusterProvisioningTestSuite) ProvisioningRKE2CustomClusterWithDy
 					testSession := session.NewSession(c.T())
 					defer testSession.Cleanup()
 
-					client, err := c.client.WithSession(testSession)
+					client, err := tt.client.WithSession(testSession)
 					require.NoError(c.T(), err)
 
 					nodes, err := externalNodeProvider.NodeCreationFunc(client, numOfNodes)
 					require.NoError(c.T(), err)
 
-					clusterName := AppendRandomString(externalNodeProvider.Name)
+					clusterName := provisioning.AppendRandomString(externalNodeProvider.Name)
 
 					cluster := clusters.NewRKE2ClusterConfig(clusterName, namespace, cni, "", kubeVersion, nil)
 
 					clusterResp, err := clusters.CreateRKE2Cluster(client, cluster)
 					require.NoError(c.T(), err)
 
-					customCluster, err := client.Provisioning.Clusters(namespace).Get(context.TODO(), clusterResp.Name, metav1.GetOptions{})
+					client, err = client.ReLogin()
 					require.NoError(c.T(), err)
 
-					ClusterID = customCluster.Status.ClusterName
-					token, err := tokenregistration.GetRegistrationToken(client, ClusterID)
+					customCluster, err := client.Provisioning.Cluster.ByID(clusterResp.ID)
+					require.NoError(c.T(), err)
+
+					token, err := tokenregistration.GetRegistrationToken(client, customCluster.Status.ClusterName)
 					require.NoError(c.T(), err)
 
 					for key, node := range nodes {
 						c.T().Logf("Execute Registration Command for node %s", node.NodeID)
 						command := fmt.Sprintf("%s %s", token.InsecureNodeCommand, rolesPerNode[key])
 
-						err = node.ExecuteCommand(command)
+						output, err := node.ExecuteCommand(command)
 						require.NoError(c.T(), err)
+						c.T().Logf(output)
 					}
 
-					result, err := client.Provisioning.Clusters(namespace).Watch(context.TODO(), metav1.ListOptions{
+					kubeProvisioningClient, err := c.client.GetKubeAPIProvisioningClient()
+					require.NoError(c.T(), err)
+
+					result, err := kubeProvisioningClient.Clusters(namespace).Watch(context.TODO(), metav1.ListOptions{
 						FieldSelector:  "metadata.name=" + clusterName,
 						TimeoutSeconds: &defaults.WatchTimeoutSeconds,
 					})
@@ -171,34 +246,37 @@ func (c *CustomClusterProvisioningTestSuite) ProvisioningRKE2CustomClusterWithDy
 
 					err = wait.WatchWait(result, checkFunc)
 					assert.NoError(c.T(), err)
-					assert.Equal(c.T(), clusterName, clusterResp.Name)
+					assert.Equal(c.T(), clusterName, clusterResp.ObjectMeta.Name)
 				})
 			}
 		}
 	}
 }
 
-func (c *CustomClusterProvisioningTestSuite) TestProvisioningCustomClusterHybrid() {
+func (c *CustomClusterProvisioningTestSuite) TestProvisioningCustomCluster() {
 	for _, nodeProviderName := range c.nodeProviders {
 		externalNodeProvider := ExternalNodeProviderSetup(nodeProviderName)
-		c.ProvisioningRKE2CustomClusterHybrid(externalNodeProvider)
+		c.ProvisioningRKE2CustomCluster(externalNodeProvider)
 	}
 }
 
-func (c *CustomClusterProvisioningTestSuite) TestProvisioningCustomClusterDynamicInputHybrid() {
-	nodesAndRoles := NodesAndRolesInput()
+func (c *CustomClusterProvisioningTestSuite) TestProvisioningCustomClusterDynamicInput() {
+	clustersConfig := new(provisioning.Config)
+	config.LoadConfig(provisioning.ConfigurationFileKey, clustersConfig)
+	nodesAndRoles := clustersConfig.NodesAndRoles
+
 	if len(nodesAndRoles) == 0 {
 		c.T().Skip()
 	}
 
 	for _, nodeProviderName := range c.nodeProviders {
 		externalNodeProvider := ExternalNodeProviderSetup(nodeProviderName)
-		c.ProvisioningRKE2CustomClusterWithDynamicInputHybrid(externalNodeProvider, nodesAndRoles)
+		c.ProvisioningRKE2CustomClusterDynamicInput(externalNodeProvider, nodesAndRoles)
 	}
 }
 
 // In order for 'go test' to run this suite, we need to create
 // a normal test function and pass our suite to suite.Run
-func TestCustomClusterProvisioningTestSuiteHybrid(t *testing.T) {
+func TestCustomClusterProvisioningTestSuite(t *testing.T) {
 	suite.Run(t, new(CustomClusterProvisioningTestSuite))
 }

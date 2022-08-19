@@ -7,6 +7,7 @@ import (
 )
 
 const (
+	namespace               = "fleet-default"
 	defaultRandStringLength = 5
 	ConfigurationFileKey    = "provisioningInput"
 )
