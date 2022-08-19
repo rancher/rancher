@@ -1,11 +1,13 @@
 #!/bin/bash
 set -e
 
+source $(dirname $0)/version
+
 cleanup()
 {
     EXIT=$?
     set +ex
-    echo Stopping rancher server
+    echo Stopping ${SERVER_NAME} server
     kill $RANCHER_RUN_PID
     wait $RANCHER_RUN_PID
     if [ $PID != -1 ]; then
@@ -29,16 +31,16 @@ if [ ${ARCH} == arm64 ] || [ ${ARCH} == s390x ]; then
     export ETCD_UNSUPPORTED_ARCH=${ARCH}
 fi
 
-echo Starting rancher server for test
-touch /tmp/rancher.log
+echo Starting ${SERVER_NAME} server for test
+touch /tmp/${SERVER_NAME}.log
 
 run_rancher()
 {
     while sleep 2; do
         if [ "$PID" != "-1" ] && [ ! -e /proc/$PID ]; then
-            echo Rancher died
-            echo Rancher logs were
-            tail -n 25 /tmp/rancher.log
+            echo ${SERVER_NAME} died
+            echo ${SERVER_NAME} logs were
+            tail -n 25 /tmp/${SERVER_NAME}.log
             echo K3s logs were:
             tail -n 25 build/testdata/k3s.log
             if [ "$INT_TESTS_STARTED" = "true" ]; then
@@ -53,8 +55,8 @@ run_rancher()
             sleep 5
         fi
         if [ "$PID" = "-1" ]; then
-          echo Starting rancher server using run
-          ./scripts/run >/tmp/rancher.log 2>&1 &
+          echo Starting ${SERVER_NAME} server using run
+          ./scripts/run >/tmp/${SERVER_NAME}.log 2>&1 &
           PID=$!
         fi
         sleep 2
@@ -63,14 +65,14 @@ run_rancher()
 
 # uncomment to get startup logs. Don't leave them on because it slows drone down too
 # much
-#tail -F /tmp/rancher.log &
+#tail -F /tmp/${SERVER_NAME}.log &
 #TPID=$!
 PID=-1
 run_rancher &
 RANCHER_RUN_PID=$!
 trap cleanup exit
 
-echo Sleeping for 5 seconds before checking Rancher health
+echo Sleeping for 5 seconds before checking ${SERVER_NAME} health
 sleep 5
 
 while ! curl -sf http://localhost:8080/ping; do

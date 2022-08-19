@@ -13,14 +13,27 @@ RKE_VERSION="$(grep -m1 'github.com/rancher/rke' go.mod | awk '{print $2}')"
 # Inject Setting values
 DEFAULT_VALUES="{\"rke-version\":\"${RKE_VERSION}\"}"
 
-CGO_ENABLED=0 go build -tags k8s \
-  -ldflags \
-  "-X github.com/rancher/rancher/pkg/version.Version=$VERSION
-   -X github.com/rancher/rancher/pkg/version.GitCommit=$COMMIT
-   -X github.com/rancher/rancher/pkg/settings.InjectDefaults=$DEFAULT_VALUES $LINKFLAGS" \
-  -o bin/rancher
+BINARY="${SERVER_NAME}"
 
-if  [ -n "$CATTLE_KDM_BRANCH" ]; then
+if [ -z "${GODEBUG}" ]; then
+    EXTRA_LDFLAGS="${EXTRA_LDFLAGS} -w"
+    DEBUG_GO_GCFLAGS=""
+    DEBUG_TAGS=""
+else
+    DEBUG_GO_GCFLAGS='-gcflags=all=-N -l'
+fi
+
+BUILDTAGS="k8s netgo osusergo no_stage static_build"
+CGO_ENABLED=1 go build \
+  -tags "${BUILDTAGS}" ${GO_GCFLAGS} ${GO_BUILD_FLAGS} \
+  -ldflags \
+  "-X github.com/rancher/rancher/pkg/version.Program=${BINARY}
+   -X github.com/rancher/rancher/pkg/version.Version=${VERSION}
+   -X github.com/rancher/rancher/pkg/version.GitCommit=${COMMIT}
+   -X github.com/rancher/rancher/pkg/settings.InjectDefaults=${DEFAULT_VALUES} ${LINKFLAGS}" \
+  -o bin/${BINARY}
+
+if  [ -n "${CATTLE_KDM_BRANCH}" ]; then
     curl -sLf https://releases.rancher.com/kontainer-driver-metadata/${CATTLE_KDM_BRANCH}/data.json > bin/data.json
 elif [ ! -e bin/data.json ] && [ -e ../kontainer-driver-metadata/data/data.json ]; then
     cp ../kontainer-driver-metadata/data/data.json bin/data.json

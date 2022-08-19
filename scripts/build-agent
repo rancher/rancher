@@ -7,4 +7,21 @@ cd $(dirname $0)/..
 
 mkdir -p bin
 [ "$(uname)" != "Darwin" ] && LINKFLAGS="-extldflags -static -s"
-CGO_ENABLED=0 go build -tags k8s -ldflags "-X main.VERSION=$VERSION $LINKFLAGS" -o bin/agent ./cmd/agent
+
+BINARY="${AGENT_NAME}"
+
+if [ -z "${GODEBUG}" ]; then
+    EXTRA_LDFLAGS="${EXTRA_LDFLAGS} -w"
+    DEBUG_GO_GCFLAGS=""
+    DEBUG_TAGS=""
+else
+    DEBUG_GO_GCFLAGS='-gcflags=all=-N -l'
+fi
+
+BUILDTAGS="k8s netgo osusergo no_stage static_build"
+CGO_ENABLED=1 go build \
+    -tags "${BUILDTAGS}" ${GO_GCFLAGS} ${GO_BUILD_FLAGS} \
+    -ldflags \
+    "-X github.com/rancher/rancher/pkg/version.Program=${BINARY}
+     -X main.VERSION=${VERSION} ${LINKFLAGS}" \
+    -o bin/${BINARY} ./cmd/agent

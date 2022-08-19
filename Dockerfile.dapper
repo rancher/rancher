@@ -1,5 +1,7 @@
-FROM registry.suse.com/bci/golang:1.17
+ARG BUILD_IMAGE=registry.suse.com/bci/golang:1.17
+FROM ${BUILD_IMAGE}
 
+ARG BUILD_IMAGE
 ARG DAPPER_HOST_ARCH
 ENV HOST_ARCH=${DAPPER_HOST_ARCH} ARCH=${DAPPER_HOST_ARCH}
 ENV CATTLE_HELM_VERSION v2.16.8-rancher2
@@ -14,7 +16,30 @@ ENV KUSTOMIZE_VERSION v4.4.1
 # kontainer-driver-metadata branch to be set for specific branch other than dev/master, logic at rancher/rancher/pkg/settings/setting.go
 ENV CATTLE_KDM_BRANCH=release-v2.6
 
-RUN zypper -n install gcc binutils glibc-devel-static ca-certificates git-core wget curl unzip tar vim less file xz gzip sed gawk iproute2 iptables jq
+# --replacefiles is used to account for file 
+# conflicts that arise with some of the packages
+# installed below and the base image used for 
+# FIPS compliance.
+RUN zypper -n install -y --replacefiles \
+    gcc \
+    binutils \
+    glibc-devel-static \
+    ca-certificates \
+    git-core \
+    wget \
+    curl \
+    unzip \
+    tar \
+    vim \
+    less \
+    file \
+    xz \
+    gzip \
+    sed \
+    gawk \
+    iproute2 \
+    iptables \
+    jq
 # use containerd from k3s image, not from bci
 RUN zypper install -y -f docker && rpm -e --nodeps --noscripts containerd
 
@@ -23,8 +48,9 @@ RUN curl -sLf https://github.com/rancher/machine/releases/download/${CATTLE_MACH
 RUN zypper -n in go1.17
 
 RUN if [ "${ARCH}" == "amd64" ]; then \
-        curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s v1.44.0; \
-        curl -H 'Cache-Control: no-cache' https://raw.githubusercontent.com/fossas/spectrometer/master/install.sh | sh; \
+    curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s v1.44.0; \
+    curl -H 'Cache-Control: no-cache' https://raw.githubusercontent.com/fossas/spectrometer/master/install.sh | sh; \
+    curl -sSfL https://raw.githubusercontent.com/fossas/spectrometer/master/install.sh | sh; \
     fi
 
 ENV HELM_URL_V2_amd64=https://github.com/rancher/helm/releases/download/${CATTLE_HELM_VERSION}/rancher-helm \
@@ -73,7 +99,7 @@ COPY --from=rancher/k3s:v1.24.1-k3s1 \
     /bin/swanctl \
     /bin/which \
     /bin/aux/xtables-legacy-multi \
-/usr/bin/
+    /usr/bin/
 
 RUN mkdir -p /go/src/github.com/rancher/rancher/.kube
 
@@ -105,11 +131,18 @@ RUN curl -sLf https://github.com/rancher/k3s/releases/download/${CATTLE_K3S_VERS
 ENV YQ_URL=https://github.com/mikefarah/yq/releases/download/3.4.1/yq_linux_${ARCH}
 RUN curl -sLf ${YQ_URL} -o /usr/bin/yq && chmod +x /usr/bin/yq
 
-
-RUN zypper install -y python3-tox python3-base python3 libffi-devel libopenssl-devel
+# The standard build will not have a BUILD_IMAGE given
+# and will follow the else path. If a BUILD_IMAGE is
+# give, the assumption is that it will be the FIPS 
+# enabled image and libopenssl-devel won't be needed.
+RUN if [ "${BUILD_IMAGE}" != "" ]; then \
+        zypper install -y python3-tox python3-base python3 libffi-devel; \
+    else \
+        zypper install -y python3-tox python3-base python3 libffi-devel libopenssl-devel; \
+    fi
 
 ENV HELM_HOME /root/.helm
-ENV DAPPER_ENV REPO TAG DRONE_TAG DRONE_COMMIT DRONE_BRANCH DRONE_BUILD_EVENT SYSTEM_CHART_DEFAULT_BRANCH FOSSA_API_KEY GOGET_MODULE GOGET_VERSION RELEASE_ACTION RELEASE_TYPE POSTRELEASE_RANCHER_VERSION POSTRELEASE_RANCHER_STABLE
+ENV DAPPER_ENV REPO TAG DRONE_TAG DRONE_COMMIT DRONE_BRANCH DRONE_BUILD_EVENT SYSTEM_CHART_DEFAULT_BRANCH FOSSA_API_KEY GOGET_MODULE GOGET_VERSION RELEASE_ACTION RELEASE_TYPE POSTRELEASE_RANCHER_VERSION POSTRELEASE_RANCHER_STABLE BUILD_IMAGE SERVER_NAME AGENT_NAME
 ENV DAPPER_SOURCE /go/src/github.com/rancher/rancher/
 ENV DAPPER_OUTPUT ./bin ./dist ./go.mod ./go.sum ./pkg/apis/go.mod ./pkg/apis/go.sum ./pkg/client/go.mod ./pkg/client/go.sum ./scripts/package ./pkg/settings/setting.go ./package/Dockerfile ./Dockerfile.dapper
 ENV DAPPER_DOCKER_SOCKET true
