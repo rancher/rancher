@@ -39,9 +39,8 @@ eval "$(grep '^ENV CATTLE_WINS_AGENT' package/Dockerfile | awk '{print "export "
 eval "$(grep '^ENV CATTLE_CSI_PROXY_AGENT' package/Dockerfile | awk '{print "export " $2 "=" $3}')"
 eval "$(grep '^ENV CATTLE_KDM_BRANCH' package/Dockerfile | awk '{print "export " $2 "=" $3}')"
 
-export SOME_K8S_VERSION=$(curl https://raw.githubusercontent.com/rancher/kontainer-driver-metadata/c974bcd1461419789c59066038fc69dce34168d0/data/data.json | jq -r ".$DIST.channels[0].latest")
-
-echo Starting rancher server for provisioning-tests
+export SOME_K8S_VERSION=$(curl https://raw.githubusercontent.com/rancher/kontainer-driver-metadata/dev-v2.6/data/data.json | jq -r ".$DIST.channels[0].latest")
+echo "Starting rancher server for provisioning-tests using $SOME_K8S_VERSION"
 touch /tmp/rancher.log
 
 mkdir -p /var/lib/rancher/$DIST/agent/images
@@ -49,11 +48,7 @@ grep PodTestImage ./tests/integration/pkg/defaults/defaults.go | cut -f2 -d'"' >
 grep MachineProvisionImage ./pkg/settings/setting.go | cut -f4 -d'"' >> /var/lib/rancher/$DIST/agent/images/pull.txt
 mkdir -p /usr/share/rancher/ui/assets
 curl -sLf https://github.com/rancher/system-agent/releases/download/${CATTLE_SYSTEM_AGENT_VERSION}/rancher-system-agent-amd64 -o /usr/share/rancher/ui/assets/rancher-system-agent-amd64
-
-mkdir -p /image-assets
-curl -sLf https://github.com/$TB_ORG/$DIST/releases/download/$SOME_K8S_VERSION/$DIST$AIRGAP-images$LINUX-amd64.tar.gz -o /image-assets/$DIST$AIRGAP-images$LINUX-amd64.tar.gz
-echo Decompressing airgap tarball
-gzip -d /image-assets/$DIST$AIRGAP-images$LINUX-amd64.tar.gz
+curl -sLf https://github.com/rancher/system-agent/releases/download/${CATTLE_SYSTEM_AGENT_VERSION}/system-agent-uninstall.sh -o /usr/share/rancher/ui/assets/system-agent-uninstall.sh
 
 run_rancher()
 {
@@ -114,11 +109,11 @@ while ! kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml rollout status -w -n catt
 done
 #kill $TPID
 
-# echo Running provisioning-tests
-# export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
-# go test -v -timeout 60m ./tests/integration/pkg/tests/... || {
-#     echo -e "-----RANCHER-LOG-DUMP-START-----"
-#     cat /tmp/rancher.log | gzip | base64 -w 0
-#     echo -e "\n-----RANCHER-LOG-DUMP-END-----"
-#     exit 1
-# }
+echo Running provisioning-tests
+export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
+go test -v -timeout 60m ./tests/integration/pkg/tests/... || {
+    echo -e "-----RANCHER-LOG-DUMP-START-----"
+    cat /tmp/rancher.log | gzip | base64 -w 0
+    echo -e "\n-----RANCHER-LOG-DUMP-END-----"
+    exit 1
+}

@@ -65,6 +65,7 @@ var SchemaToDriverFields = map[string]map[string]string{
 	"openstack":     {"cacert": "cacert", "privateKeyFile": "privateKeyFile", "userDataFile": "userDataFile"},
 	"otc":           {"privateKeyFile": "privateKeyFile"},
 	"packet":        {"userdata": "userdata"},
+	"pod":           {"userdata": "userdata"},
 	"vmwarevsphere": {"cloudConfig": "cloud-config"},
 	"google":        {"authEncodedJson": "authEncodedJson"},
 }
