@@ -8,7 +8,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 	"os"
@@ -93,7 +92,7 @@ func IsNotFound(err error) bool {
 }
 
 func NewAPIError(resp *http.Response, url string) *APIError {
-	contents, err := ioutil.ReadAll(resp.Body)
+	contents, err := io.ReadAll(resp.Body)
 	var body string
 	if err != nil {
 		body = "Unreadable body."
@@ -273,7 +272,7 @@ func NewAPIClient(opts *ClientOpts) (APIBaseClient, error) {
 	}
 
 	var schemas types.SchemaCollection
-	bytes, err := ioutil.ReadAll(resp.Body)
+	bytes, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return result, err
 	}

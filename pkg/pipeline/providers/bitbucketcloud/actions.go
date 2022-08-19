@@ -3,7 +3,7 @@ package bitbucketcloud
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 
 	v32 "github.com/rancher/rancher/pkg/apis/project.cattle.io/v3"
@@ -121,7 +121,7 @@ func (b *BcProvider) testAndApply(actionName string, action *types.Action, apiCo
 
 func (b *BcProvider) authuser(apiContext *types.APIContext) error {
 	authUserInput := v32.AuthUserInput{}
-	requestBytes, err := ioutil.ReadAll(apiContext.Request.Body)
+	requestBytes, err := io.ReadAll(apiContext.Request.Body)
 	if err != nil {
 		return err
 	}

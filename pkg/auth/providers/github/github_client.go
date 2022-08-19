@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 	"strings"
@@ -21,7 +20,7 @@ const (
 	githubDefaultHostName = "https://github.com"
 )
 
-//GClient implements a httpclient for github
+// GClient implements a httpclient for github
 type GClient struct {
 	httpClient *http.Client
 }
@@ -257,7 +256,7 @@ func (g *GClient) getUserOrgByID(id string, githubAccessToken string, config *v3
 	return githubAcct, nil
 }
 
-//URLEncoded encodes the string
+// URLEncoded encodes the string
 func URLEncoded(str string) string {
 	u, err := url.Parse(str)
 	if err != nil {
@@ -292,7 +291,7 @@ func (g *GClient) postToGithub(url string, form url.Values) ([]byte, error) {
 		return nil, fmt.Errorf("Request failed, got status code: %d. Response: %s",
 			resp.StatusCode, body.Bytes())
 	}
-	return ioutil.ReadAll(resp.Body)
+	return io.ReadAll(resp.Body)
 }
 
 func (g *GClient) getFromGithub(githubAccessToken string, url string) ([]byte, string, error) {
@@ -321,7 +320,7 @@ func (g *GClient) getFromGithub(githubAccessToken string, url string) ([]byte, s
 	}
 
 	nextURL := g.nextGithubPage(resp)
-	b, err := ioutil.ReadAll(resp.Body)
+	b, err := io.ReadAll(resp.Body)
 	return b, nextURL, err
 }
 

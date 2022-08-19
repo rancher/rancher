@@ -3,7 +3,7 @@ package oci
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 
 	"github.com/gorilla/mux"
@@ -189,7 +189,7 @@ func (handler *handler) extractCreds(req *http.Request, creds *Credentials) (int
 		}
 	} else if req.Method == http.MethodPost {
 		// Get credentials from body
-		raw, err := ioutil.ReadAll(req.Body)
+		raw, err := io.ReadAll(req.Body)
 		if err != nil {
 			logrus.Debugf("[oci-handler] cannot read request body: " + err.Error())
 			return httperror.InvalidBodyContent.Status, fmt.Errorf("cannot read request body: " + err.Error())

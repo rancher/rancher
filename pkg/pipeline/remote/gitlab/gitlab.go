@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -129,7 +128,7 @@ func (c *client) CreateHook(pipeline *v3.Pipeline, accessToken string) (string, 
 		return "", err
 	}
 	defer resp.Body.Close()
-	respData, err := ioutil.ReadAll(resp.Body)
+	respData, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return "", err
 	}
@@ -175,7 +174,7 @@ func (c *client) getHook(pipeline *v3.Pipeline, accessToken string) (*gitlab.Pro
 		return nil, err
 	}
 	defer resp.Body.Close()
-	b, err := ioutil.ReadAll(resp.Body)
+	b, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
 	}
@@ -200,7 +199,7 @@ func (c *client) getFileFromRepo(filename string, project string, ref string, ac
 	defer resp.Body.Close()
 	file := &gitlab.File{}
 
-	b, err := ioutil.ReadAll(resp.Body)
+	b, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
 	}
@@ -331,7 +330,7 @@ func (c *client) GetDefaultBranch(repoURL string, accessToken string) (string, e
 	defer resp.Body.Close()
 	p := &gitlab.Project{}
 
-	b, err := ioutil.ReadAll(resp.Body)
+	b, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return "", err
 	}
@@ -363,7 +362,7 @@ func (c *client) GetHeadInfo(repoURL string, branch string, accessToken string) 
 	defer resp.Body.Close()
 	commits := []gitlab.Commit{}
 
-	b, err := ioutil.ReadAll(resp.Body)
+	b, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
 	}
@@ -412,7 +411,7 @@ func (c *client) getGitlabUser(gitlabAccessToken string) (*gitlab.User, error) {
 	defer resp.Body.Close()
 	gitlabAcct := &gitlab.User{}
 
-	b, err := ioutil.ReadAll(resp.Body)
+	b, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
 	}
@@ -479,7 +478,7 @@ func paginateGitlab(gitlabAccessToken string, url string) ([][]byte, error) {
 		if err != nil {
 			return nil, err
 		}
-		body, err := ioutil.ReadAll(response.Body)
+		body, err := io.ReadAll(response.Body)
 		if err != nil {
 			response.Body.Close()
 			return nil, err

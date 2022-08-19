@@ -2,12 +2,9 @@ package kubeimport
 
 import (
 	"context"
-
-	"io/ioutil"
-
 	"encoding/base64"
-
 	"fmt"
+	"os"
 
 	"github.com/rancher/rancher/pkg/kontainer-engine/drivers/util"
 	"github.com/rancher/rancher/pkg/kontainer-engine/store"
@@ -71,7 +68,7 @@ func (d *Driver) Create(ctx context.Context, opts *types.DriverOptions, _ *types
 	if configPath == "" {
 		raw = []byte(opts.StringOptions["kubeConfig"])
 	} else {
-		raw, err = ioutil.ReadFile(configPath)
+		raw, err = os.ReadFile(configPath)
 
 		if err != nil {
 			return nil, fmt.Errorf("failed to open kubeconfig file: %v", err)

@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"encoding/pem"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 
 	"github.com/mrjones/oauth"
@@ -218,7 +218,7 @@ func (b *BsProvider) testAndApply(apiContext *types.APIContext) error {
 
 func (b *BsProvider) login(apiContext *types.APIContext) error {
 	loginInput := v32.AuthUserInput{}
-	requestBytes, err := ioutil.ReadAll(apiContext.Request.Body)
+	requestBytes, err := io.ReadAll(apiContext.Request.Body)
 	if err != nil {
 		return err
 	}

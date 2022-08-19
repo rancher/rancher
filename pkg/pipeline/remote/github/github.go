@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"regexp"
 	"strconv"
@@ -132,7 +131,7 @@ func (c *client) CreateHook(pipeline *v3.Pipeline, accessToken string) (string, 
 		return "", err
 	}
 	defer resp.Body.Close()
-	respData, err := ioutil.ReadAll(resp.Body)
+	respData, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return "", err
 	}
@@ -180,7 +179,7 @@ func (c *client) getHook(pipeline *v3.Pipeline, accessToken string) (*github.Hoo
 		return nil, err
 	}
 	defer resp.Body.Close()
-	b, err := ioutil.ReadAll(resp.Body)
+	b, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
 	}
@@ -225,7 +224,7 @@ func (c *client) getGithubUser(githubAccessToken string) (*github.User, error) {
 	defer resp.Body.Close()
 	githubAcct := &github.User{}
 
-	b, err := ioutil.ReadAll(resp.Body)
+	b, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
 	}
@@ -286,7 +285,7 @@ func (c *client) getFileContent(filename string, owner string, repo string, ref 
 	defer resp.Body.Close()
 	fileContent := &github.RepositoryContent{}
 
-	b, err := ioutil.ReadAll(resp.Body)
+	b, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
 	}
@@ -392,7 +391,7 @@ func (c *client) GetDefaultBranch(repoURL string, accessToken string) (string, e
 	defer resp.Body.Close()
 	repository := &github.Repository{}
 
-	b, err := ioutil.ReadAll(resp.Body)
+	b, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return "", err
 	}
@@ -458,7 +457,7 @@ func (c *client) GetHeadInfo(repoURL string, branch string, accessToken string) 
 	defer resp.Body.Close()
 	commit := github.RepositoryCommit{}
 
-	b, err := ioutil.ReadAll(resp.Body)
+	b, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
 	}
@@ -506,7 +505,7 @@ func paginateGithub(githubAccessToken string, url string) ([][]byte, error) {
 		if err != nil {
 			return nil, err
 		}
-		body, err := ioutil.ReadAll(response.Body)
+		body, err := io.ReadAll(response.Body)
 		if err != nil {
 			response.Body.Close()
 			return nil, err

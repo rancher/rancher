@@ -5,13 +5,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 )
 
-//GClient implements a httpclient for google oauth
+// GClient implements a httpclient for google oauth
 type GClient struct {
 	httpClient *http.Client
 }
@@ -54,6 +53,6 @@ func (g *GClient) getFromGoogle(accessToken string, url string) ([]byte, int, er
 			resp.StatusCode, body.Bytes())
 	}
 
-	b, err := ioutil.ReadAll(resp.Body)
+	b, err := io.ReadAll(resp.Body)
 	return b, statusCode, err
 }

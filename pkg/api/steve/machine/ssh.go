@@ -9,7 +9,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"path/filepath"
 	"time"
@@ -203,7 +202,7 @@ func (s *sshClient) getSSHKey(machineNamespace, machineName string) (*machineInf
 			return nil, err
 		}
 
-		data, err := ioutil.ReadAll(tar)
+		data, err := io.ReadAll(tar)
 		if err != nil {
 			return nil, err
 		}

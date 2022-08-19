@@ -7,7 +7,6 @@ import (
 	"encoding/pem"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"mime/multipart"
 	"net/http"
 	"regexp"
@@ -543,7 +542,7 @@ func (c *client) doRequestToBitbucket(method string, url string, accessToken str
 		io.Copy(&body, resp.Body)
 		return nil, httperror.NewAPIErrorLong(resp.StatusCode, "", body.String())
 	}
-	r, err := ioutil.ReadAll(resp.Body)
+	r, err := io.ReadAll(resp.Body)
 	return r, err
 }
 

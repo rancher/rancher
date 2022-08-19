@@ -3,7 +3,7 @@ package pipeline
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 
 	v32 "github.com/rancher/rancher/pkg/apis/project.cattle.io/v3"
@@ -91,7 +91,7 @@ func (h *Handler) run(apiContext *types.APIContext) error {
 		return err
 	}
 	runPipelineInput := v32.RunPipelineInput{}
-	requestBytes, err := ioutil.ReadAll(apiContext.Request.Body)
+	requestBytes, err := io.ReadAll(apiContext.Request.Body)
 	if err != nil {
 		return err
 	}
@@ -148,7 +148,7 @@ func (h *Handler) pushConfig(apiContext *types.APIContext) error {
 	}
 
 	pushConfigInput := v32.PushPipelineConfigInput{}
-	requestBytes, err := ioutil.ReadAll(apiContext.Request.Body)
+	requestBytes, err := io.ReadAll(apiContext.Request.Body)
 	if err != nil {
 		return err
 	}
@@ -387,7 +387,7 @@ func (h *Handler) updatePipelineConfigYaml(apiContext *types.APIContext) error {
 		return err
 	}
 
-	content, err := ioutil.ReadAll(apiContext.Request.Body)
+	content, err := io.ReadAll(apiContext.Request.Body)
 	if err != nil {
 		return err
 	}

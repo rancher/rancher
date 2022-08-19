@@ -3,7 +3,6 @@ package auth
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"strings"
 
@@ -64,7 +63,7 @@ func resetAdmin(clx *cli.Context) error {
 		mustChangePassword = false
 	}
 	if clx.String("password-file") != "" {
-		passwordFromFile, err := ioutil.ReadFile(clx.String("password-file"))
+		passwordFromFile, err := os.ReadFile(clx.String("password-file"))
 		if err != nil {
 			return err
 		}
@@ -375,7 +374,7 @@ func setConditionToFalse(object map[string]interface{}, cond string) {
 }
 
 func readTLSSan() (string, error) {
-	bytes, err := ioutil.ReadFile("/etc/rancher/rke2/config.yaml")
+	bytes, err := os.ReadFile("/etc/rancher/rke2/config.yaml")
 	if err != nil && !os.IsNotExist(err) {
 		return "", err
 	}

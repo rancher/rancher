@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -430,7 +429,7 @@ func doRequestToBitbucket(method string, url string, accessToken string, header 
 		io.Copy(&body, resp.Body)
 		return nil, httperror.NewAPIErrorLong(resp.StatusCode, "", body.String())
 	}
-	r, err := ioutil.ReadAll(resp.Body)
+	r, err := io.ReadAll(resp.Body)
 	return r, err
 }
 

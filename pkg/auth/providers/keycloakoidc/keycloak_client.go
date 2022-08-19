@@ -3,7 +3,7 @@ package keycloakoidc
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/url"
 	"strings"
@@ -14,7 +14,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-//account defines properties an account in keycloak has
+// account defines properties an account in keycloak has
 type account struct {
 	ID            string `json:"id,omitempty"`
 	Email         string `json:"email,omitempty"`
@@ -26,14 +26,14 @@ type account struct {
 	Type          string
 }
 
-//Group defines properties a group in keycloak has
+// Group defines properties a group in keycloak has
 type Group struct {
 	ID        string  `json:"id,omitempty"`
 	Name      string  `json:"name,omitempty"`
 	Subgroups []Group `json:"subGroups,omitempty"`
 }
 
-//KeyCloakClient implements a httpclient for keycloak
+// KeyCloakClient implements a httpclient for keycloak
 type KeyCloakClient struct {
 	httpClient *http.Client
 }
@@ -173,7 +173,7 @@ func getSearchURL(issuer string) (string, error) {
 	), nil
 }
 
-//URLEncoded encodes the string
+// URLEncoded encodes the string
 func URLEncoded(str string) string {
 	u, err := url.Parse(str)
 	if err != nil {
@@ -195,7 +195,7 @@ func (k *KeyCloakClient) getFromKeyCloak(url string) ([]byte, error) {
 		return nil, err
 	}
 	defer resp.Body.Close()
-	b, err := ioutil.ReadAll(resp.Body)
+	b, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return b, err
 	}

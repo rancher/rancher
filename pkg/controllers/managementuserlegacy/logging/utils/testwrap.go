@@ -7,7 +7,7 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"math/rand"
 	"net"
 	"net/http"
@@ -76,7 +76,7 @@ func testReachableHTTP(dial dialer.Dialer, req *http.Request, tlsConfig *tls.Con
 	}
 
 	if res.StatusCode < http.StatusOK || res.StatusCode >= http.StatusMultipleChoices {
-		body, err := ioutil.ReadAll(res.Body)
+		body, err := io.ReadAll(res.Body)
 		if err != nil {
 			return errors.Wrapf(err, "couldn't read response body from %s, response code is %v", req.URL.String(), res.StatusCode)
 		}

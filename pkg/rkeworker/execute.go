@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/base64"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -77,7 +76,7 @@ func (f *fileWriter) write(path string, base64Content string) {
 		return
 	}
 
-	existing, err := ioutil.ReadFile(path)
+	existing, err := os.ReadFile(path)
 	if err == nil && bytes.Equal(existing, content) {
 		return
 	}
@@ -86,7 +85,7 @@ func (f *fileWriter) write(path string, base64Content string) {
 	if err := os.MkdirAll(dir, 0700); err != nil {
 		f.errs = append(f.errs, err)
 	}
-	if err := ioutil.WriteFile(path, content, 0600); err != nil {
+	if err := os.WriteFile(path, content, 0600); err != nil {
 		f.errs = append(f.errs, err)
 	}
 }

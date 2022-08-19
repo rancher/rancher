@@ -3,7 +3,7 @@ package gitlab
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/url"
 
@@ -122,7 +122,7 @@ func (g *GlProvider) testAndApply(actionName string, action *types.Action, apiCo
 
 func (g *GlProvider) authuser(apiContext *types.APIContext) error {
 	authUserInput := v32.AuthUserInput{}
-	requestBytes, err := ioutil.ReadAll(apiContext.Request.Body)
+	requestBytes, err := io.ReadAll(apiContext.Request.Body)
 	if err != nil {
 		return err
 	}

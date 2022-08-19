@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"reflect"
 	"sort"
@@ -46,7 +45,7 @@ const (
 
 var existLabel = map[string]string{sendRKELabel: "false"}
 
-//settings corresponding to keys in setting2.MetadataSettings
+// settings corresponding to keys in setting2.MetadataSettings
 var userUpdateSettingMap = map[string]settings.Setting{
 	settings.KubernetesVersion.Name:            settings.KubernetesVersion,
 	settings.KubernetesVersionsCurrent.Name:    settings.KubernetesVersionsCurrent,
@@ -70,7 +69,7 @@ func (md *MetadataController) loadDataFromLocal() (kdm.Data, error) {
 		return kdm.Data{}, nil
 	}
 	logrus.Infof("Retrieve data.json from local path %v", DataJSONLocation)
-	data, err := ioutil.ReadFile(DataJSONLocation)
+	data, err := os.ReadFile(DataJSONLocation)
 	if err != nil {
 		return kdm.Data{}, err
 	}

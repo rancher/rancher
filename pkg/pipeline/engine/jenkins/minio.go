@@ -3,7 +3,7 @@ package jenkins
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"strings"
 	"time"
@@ -106,7 +106,7 @@ func (j Engine) getStepLogFromMinioStore(execution *v3.PipelineExecution, stage 
 		return "", err
 	}
 
-	content, err := ioutil.ReadAll(reader)
+	content, err := io.ReadAll(reader)
 	if err != nil {
 		return "", err
 	}

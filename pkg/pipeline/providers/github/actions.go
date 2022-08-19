@@ -3,7 +3,7 @@ package github
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"strings"
 
@@ -165,7 +165,7 @@ func (g *GhProvider) testAndApply(actionName string, action *types.Action, apiCo
 
 func (g *GhProvider) authuser(apiContext *types.APIContext) error {
 	authUserInput := v32.AuthUserInput{}
-	requestBytes, err := ioutil.ReadAll(apiContext.Request.Body)
+	requestBytes, err := io.ReadAll(apiContext.Request.Body)
 	if err != nil {
 		return err
 	}

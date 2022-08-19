@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"regexp"
 	"time"
@@ -138,7 +138,7 @@ func getConfig(client *http.Client, url string, header http.Header) (*rkeworker.
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		respBytes, _ := ioutil.ReadAll(resp.Body)
+		respBytes, _ := io.ReadAll(resp.Body)
 		errMsg := fmt.Sprintf("invalid response %d: %s", resp.StatusCode, string(respBytes))
 
 		if nodeNotFoundRegexp.Match(respBytes) {

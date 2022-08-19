@@ -2,7 +2,7 @@ package cron
 
 import (
 	"fmt"
-	"io/ioutil"
+	"io/fs"
 	"os"
 	"path"
 
@@ -55,13 +55,23 @@ func (j *jailSync) syncJails() {
 		clusterMap[cluster.Name] = cluster
 	}
 
-	files, err := ioutil.ReadDir(jailPath)
+	entries, err := os.ReadDir(jailPath)
+
 	if err != nil {
 		if !os.IsNotExist(err) {
 			logrus.Warnf("Error attempting to get files for jail cleanup: %v", err)
 		}
 		// The dir doesn't exist, nothing to do
 		return
+	}
+	files := make([]fs.FileInfo, 0)
+	for _, entry := range entries {
+		info, err := entry.Info()
+		if err != nil {
+			logrus.Warn(err)
+			return
+		}
+		files = append(files, info)
 	}
 
 	for _, file := range files {

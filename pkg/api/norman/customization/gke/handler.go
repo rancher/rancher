@@ -3,7 +3,7 @@ package gke
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 
 	"github.com/gorilla/mux"
@@ -225,7 +225,7 @@ func (h *handler) clusterCheck(apiContext *types.APIContext, clusterID, cloudCre
 }
 
 func (h *handler) getCredentialsFromBody(writer http.ResponseWriter, req *http.Request, cap *Capabilities) (int, error) {
-	raw, err := ioutil.ReadAll(req.Body)
+	raw, err := io.ReadAll(req.Body)
 	if err != nil {
 		return http.StatusBadRequest, fmt.Errorf("cannot read request body: %v", err)
 	}

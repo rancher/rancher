@@ -3,7 +3,6 @@ package main
 import (
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
@@ -67,9 +66,9 @@ func run(systemChartsPath, chartsPath string, imagesFromArgs []string) error {
 	rancherVersion = strings.TrimPrefix(rancherVersion, "v")
 
 	// already downloaded in dapper
-	b, err := ioutil.ReadFile(filepath.Join("data.json"))
+	b, err := os.ReadFile(filepath.Join("data.json"))
 	if os.IsNotExist(err) {
-		b, err = ioutil.ReadFile(filepath.Join(os.Getenv("HOME"), "bin", "data.json"))
+		b, err = os.ReadFile(filepath.Join(os.Getenv("HOME"), "bin", "data.json"))
 	}
 	if err != nil {
 		return err

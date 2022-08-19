@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"reflect"
 	"sort"
@@ -188,7 +188,7 @@ func (m *Manager) getToken(tokenAuthValue string) (*v3.Token, int, error) {
 	return storedToken, 0, nil
 }
 
-//GetTokens will list all(login and derived, and even expired) tokens of the authenticated user
+// GetTokens will list all(login and derived, and even expired) tokens of the authenticated user
 func (m *Manager) getTokens(tokenAuthValue string) ([]v3.Token, int, error) {
 	logrus.Debug("LIST Tokens Invoked")
 	tokens := make([]v3.Token, 0)
@@ -241,7 +241,7 @@ func (m *Manager) deleteTokenByName(tokenName string) (int, error) {
 	return 0, nil
 }
 
-//getToken will get the token by ID
+// getToken will get the token by ID
 func (m *Manager) getTokenByID(tokenAuthValue string, tokenID string) (v3.Token, int, error) {
 	logrus.Debug("GET Token Invoked")
 	token := &v3.Token{}
@@ -277,7 +277,7 @@ func (m *Manager) deriveToken(request *types.APIContext) error {
 		return httperror.NewAPIErrorLong(http.StatusUnauthorized, util.GetHTTPErrorCode(http.StatusUnauthorized), "No valid token cookie or auth header")
 	}
 
-	bytes, err := ioutil.ReadAll(r.Body)
+	bytes, err := io.ReadAll(r.Body)
 	if err != nil {
 		return httperror.NewAPIError(httperror.InvalidBodyContent, fmt.Sprintf("%s", err))
 	}

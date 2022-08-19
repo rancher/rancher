@@ -5,7 +5,6 @@ import (
 	"crypto/md5"
 	"crypto/rsa"
 	"crypto/x509"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 
@@ -162,7 +161,7 @@ func (b *Bundle) SaveLocal() error {
 		return err
 	}
 
-	f, err := ioutil.TempFile(bundlePath, "bundle-")
+	f, err := os.CreateTemp(bundlePath, "bundle-")
 	if err != nil {
 		return err
 	}
@@ -203,7 +202,7 @@ func (b *Bundle) Changed() bool {
 		if item.Name == "" {
 			continue
 		}
-		oldCertPEM, err := ioutil.ReadFile(item.Path)
+		oldCertPEM, err := os.ReadFile(item.Path)
 		if err != nil {
 			logrus.Warnf("Unable to read certificate %s: %v", item.Name, err)
 			return false
@@ -271,7 +270,7 @@ func (f *fileWriter) write(path string, content []byte, x509cert *x509.Certifica
 		return
 	}
 
-	existing, err := ioutil.ReadFile(path)
+	existing, err := os.ReadFile(path)
 	if err == nil && bytes.Equal(existing, content) {
 		return
 	}
@@ -280,7 +279,7 @@ func (f *fileWriter) write(path string, content []byte, x509cert *x509.Certifica
 	if err := os.MkdirAll(dir, 0700); err != nil {
 		f.errs = append(f.errs, err)
 	}
-	if err := ioutil.WriteFile(path, content, 0600); err != nil {
+	if err := os.WriteFile(path, content, 0600); err != nil {
 		f.errs = append(f.errs, err)
 	}
 }

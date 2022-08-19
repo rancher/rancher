@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -51,7 +51,7 @@ func (c *Client) getCSRF() error {
 		return err
 	}
 	defer resp.Body.Close()
-	data, _ := ioutil.ReadAll(resp.Body)
+	data, _ := io.ReadAll(resp.Body)
 	Crumbs := strings.Split(string(data), ":")
 	if len(Crumbs) != 2 {
 		return errors.New("error get crumbs, Jenkins is probably not ready yet")
@@ -61,7 +61,7 @@ func (c *Client) getCSRF() error {
 	return nil
 }
 
-//deleteBuild deletes the last build of a job
+// deleteBuild deletes the last build of a job
 func (c *Client) deleteBuild(jobname string, buildNumber int) error {
 	deleteBuildURI := fmt.Sprintf(DeleteBuildURI, jobname, buildNumber)
 	var targetURL *url.URL
@@ -108,7 +108,7 @@ func (c *Client) execScript(script string) (string, error) {
 	if err := checkHTTPError(resp, "exec script"); err != nil {
 		return "", err
 	}
-	data, err := ioutil.ReadAll(resp.Body)
+	data, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return "", err
 	}
@@ -207,7 +207,7 @@ func (c *Client) getBuildInfo(jobname string) (*BuildInfo, error) {
 		return nil, err
 	}
 	buildInfo := &BuildInfo{}
-	respBytes, err := ioutil.ReadAll(resp.Body)
+	respBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
 	}
@@ -243,7 +243,7 @@ func (c *Client) getJobInfo(jobname string) (*JobInfo, error) {
 		return nil, err
 	}
 	jobInfo := &JobInfo{}
-	respBytes, err := ioutil.ReadAll(resp.Body)
+	respBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
 	}
@@ -281,7 +281,7 @@ func (c *Client) getBuildRawOutput(jobname string, buildNumber int, startLine in
 	if err := checkHTTPError(resp, "get build output"); err != nil {
 		return "", err
 	}
-	respBytes, err := ioutil.ReadAll(resp.Body)
+	respBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return "", err
 	}
@@ -360,7 +360,7 @@ func (c *Client) getWFBuildInfo(jobname string) (*WFBuildInfo, error) {
 		return nil, err
 	}
 	buildInfo := &WFBuildInfo{}
-	respBytes, err := ioutil.ReadAll(resp.Body)
+	respBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
 	}
@@ -397,7 +397,7 @@ func (c *Client) getWFNodeInfo(jobname string, nodeID string) (*WFNodeInfo, erro
 		return nil, err
 	}
 	nodeInfo := &WFNodeInfo{}
-	respBytes, err := ioutil.ReadAll(resp.Body)
+	respBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
 	}
@@ -434,7 +434,7 @@ func (c *Client) getWFNodeLog(jobname string, nodeID string) (*WFNodeLog, error)
 		return nil, err
 	}
 	nodeLog := &WFNodeLog{}
-	respBytes, err := ioutil.ReadAll(resp.Body)
+	respBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
 	}
@@ -492,7 +492,7 @@ func checkHTTPError(resp *http.Response, event string) error {
 		return nil
 	}
 	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusBadRequest {
-		data, _ := ioutil.ReadAll(resp.Body)
+		data, _ := io.ReadAll(resp.Body)
 		return httperror.NewAPIErrorLong(resp.StatusCode, fmt.Sprintf("%s got %d", event, resp.StatusCode), string(data))
 	}
 	return nil
