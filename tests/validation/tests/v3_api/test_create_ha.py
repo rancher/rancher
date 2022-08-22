@@ -312,9 +312,7 @@ def set_route53_with_ingress():
         AmazonWebServices().upsert_route_53_record_cname(RANCHER_HA_HOSTNAME,
                                                          ingress_address,
                                                          record_type='A')
-    elif RANCHER_LOCAL_CLUSTER_TYPE == "RKE":
-        return
-    elif RANCHER_LOCAL_CLUSTER_TYPE == "K3S":
+    elif RANCHER_LOCAL_CLUSTER_TYPE in ["RKE", "K3S", "RKE2"]:
         return
     else:
         pytest.fail("Wrong RANCHER_LOCAL_CLUSTER_TYPE: {}"
