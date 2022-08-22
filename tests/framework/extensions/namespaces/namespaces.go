@@ -1,6 +1,7 @@
 package namespaces
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
@@ -43,4 +44,21 @@ func GetNamespaceByName(client *rancher.Client, clusterID, namespaceName string)
 	}
 
 	return namespace, nil
+}
+
+// DeleteNamespace is a helper function to delete  a namespaces from a cluster from a given project.
+func DeleteNamespace(client *rancher.Client, namespace string, clusterID string) error {
+
+	dynamicClient, err := client.GetDownStreamClusterClient(clusterID)
+	if err != nil {
+		return err
+	}
+	namespaceResource := dynamicClient.Resource(NamespaceGroupVersionResource)
+	err = namespaceResource.Delete(context.TODO(), namespace, metav1.DeleteOptions{})
+	if err != nil {
+		return err
+	}
+
+	return err
+
 }
