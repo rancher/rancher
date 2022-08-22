@@ -144,6 +144,8 @@ def test_install_rancher_ha(precheck_certificate_options):
         prepare_hardened_cluster(profile, kubeconfig_path)
     if RANCHER_LOCAL_CLUSTER_TYPE == "RKE":
         check_rke_ingress_rollout()
+    elif RANCHER_LOCAL_CLUSTER_TYPE in ["K3S", "RKE2"]:
+        print("Skipping ingress rollout check for k3s and rke2 clusters")
     else:
         check_ingress_rollout()
     if cm_install:
