@@ -1,6 +1,6 @@
 #!/bin/bash
 set -e
-if ./scripts/only-ui-bumps.sh; then
+if ./scripts/skip-ci.sh; then
     exit 0
 fi
 
