@@ -136,10 +136,6 @@ status:
     provisioningv2: false
     rke2: false
   agentImage: rancher/rancher-agent:v2.6-head
-  aksStatus:
-    privateRequiresTunnel: null
-    rbacEnabled: null
-    upstreamSpec: null
   allocatable:
     cpu: 11580m
     memory: 34513328Ki
@@ -290,14 +286,6 @@ status:
     status: "True"
     type: AgentDeployed
   driver: GKE
-  eksStatus:
-    managedLaunchTemplateID: ""
-    managedLaunchTemplateVersions: null
-    privateRequiresTunnel: null
-    securityGroups: null
-    subnets: null
-    upstreamSpec: null
-    virtualNetwork: ""
   gkeStatus:
     privateRequiresTunnel: null
     upstreamSpec:

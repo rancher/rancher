@@ -88,10 +88,6 @@ spec:
   windowsPreferedCluster: false
 status:
   agentImage: ""
-  aksStatus:
-    privateRequiresTunnel: null
-    rbacEnabled: null
-    upstreamSpec: null
   allocatable:
     cpu: "0"
     memory: "0"
@@ -160,14 +156,6 @@ status:
     status: "False"
     type: Connected
   driver: GKE
-  eksStatus:
-    managedLaunchTemplateID: ""
-    managedLaunchTemplateVersions: null
-    privateRequiresTunnel: null
-    securityGroups: null
-    subnets: null
-    upstreamSpec: null
-    virtualNetwork: ""
   gkeStatus:
     privateRequiresTunnel: null
     upstreamSpec: null

@@ -76,10 +76,6 @@ spec:
   windowsPreferedCluster: false
 status:
   agentImage: ""
-  aksStatus:
-    privateRequiresTunnel: null
-    rbacEnabled: null
-    upstreamSpec: null
   allocatable:
     cpu: "0"
     memory: "0"
@@ -158,9 +154,6 @@ status:
     subnets: null
     upstreamSpec: null
     virtualNetwork: ""
-  gkeStatus:
-    privateRequiresTunnel: null
-    upstreamSpec: null
   limits:
     cpu: "0"
     memory: "0"

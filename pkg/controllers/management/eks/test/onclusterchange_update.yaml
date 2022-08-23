@@ -109,10 +109,6 @@ status:
     provisioningv2: false
     rke2: false
   agentImage: rancher/rancher-agent:v2.6-head
-  aksStatus:
-    privateRequiresTunnel: null
-    rbacEnabled: null
-    upstreamSpec: null
   allocatable:
     cpu: 3860m
     memory: 6824936Ki
@@ -294,9 +290,6 @@ status:
       subnets: []
       tags: {}
     virtualNetwork: vpc-0d54378891c31bd13
-  gkeStatus:
-    privateRequiresTunnel: null
-    upstreamSpec: null
   limits:
     cpu: "0"
     memory: 340Mi

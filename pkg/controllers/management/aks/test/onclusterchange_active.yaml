@@ -281,17 +281,6 @@ status:
     status: "True"
     type: AgentDeployed
   driver: AKS
-  eksStatus:
-    managedLaunchTemplateID: ""
-    managedLaunchTemplateVersions: null
-    privateRequiresTunnel: null
-    securityGroups: null
-    subnets: null
-    upstreamSpec: null
-    virtualNetwork: ""
-  gkeStatus:
-    privateRequiresTunnel: null
-    upstreamSpec: null
   limits:
     cpu: 11312m
     memory: 7774Mi

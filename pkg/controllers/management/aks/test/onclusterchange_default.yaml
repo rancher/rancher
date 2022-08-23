@@ -155,17 +155,6 @@ status:
     status: "True"
     type: ServiceAccountSecretsMigrated
   driver: AKS
-  eksStatus:
-    managedLaunchTemplateID: ""
-    managedLaunchTemplateVersions: null
-    privateRequiresTunnel: null
-    securityGroups: null
-    subnets: null
-    upstreamSpec: null
-    virtualNetwork: ""
-  gkeStatus:
-    privateRequiresTunnel: null
-    upstreamSpec: null
   limits:
     cpu: "0"
     memory: "0"
