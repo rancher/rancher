@@ -19,18 +19,17 @@ import (
 
 const (
 	MockDefaultEksClusterConfigFilename = "./test/onclusterchange_ekscc_default.json"
-	MockCreateEksClusterConfigFilename = "./test/onclusterchange_ekscc_create.json"
-	MockActiveEksClusterConfigFilename = "./test/onclusterchange_ekscc_active.json"
-	MockUpdateEksClusterConfigFilename = "./test/onclusterchange_ekscc_update.json"
+	MockCreateEksClusterConfigFilename  = "./test/onclusterchange_ekscc_create.json"
+	MockActiveEksClusterConfigFilename  = "./test/onclusterchange_ekscc_active.json"
+	MockUpdateEksClusterConfigFilename  = "./test/onclusterchange_ekscc_update.json"
 	MockEksClusterConfigUpdatedFilename = "./test/updateeksclusterconfig_updated.json"
 )
 
 // mock interfaces
 
-
 // mock cluster client
 
-type MockClusterClient struct {}
+type MockClusterClient struct{}
 
 func (m MockClusterClient) Create(cluster *v3.Cluster) (*v3.Cluster, error) {
 	panic("implement me")
@@ -64,14 +63,13 @@ func (m MockClusterClient) Patch(name string, pt types.PatchType, data []byte, s
 	panic("implement me")
 }
 
-
 // mock dynamic client (to return a mock EksClusterConfig)
 
 // Test 1 - cluster in default/unknown state. Get will return an EksClusterConfig with an unknown provisioning phase.
 // The rest of the method signatures have to be implemented to mock the interface. There will be one mock of this
 // interface for each test.
 
-type MockNamespaceableResourceInterfaceDefault struct {}
+type MockNamespaceableResourceInterfaceDefault struct{}
 
 func (m MockNamespaceableResourceInterfaceDefault) Namespace(s string) dynamic.ResourceInterface {
 	return MockResourceInterfaceDefault{}
@@ -113,7 +111,7 @@ func (m MockNamespaceableResourceInterfaceDefault) Patch(ctx context.Context, na
 	panic("implement me")
 }
 
-type MockResourceInterfaceDefault struct {}
+type MockResourceInterfaceDefault struct{}
 
 func (m MockResourceInterfaceDefault) Create(ctx context.Context, obj *unstructured.Unstructured, options meta1.CreateOptions, subresources ...string) (*unstructured.Unstructured, error) {
 	panic("implement me")
@@ -153,7 +151,7 @@ func (m MockResourceInterfaceDefault) Patch(ctx context.Context, name string, pt
 
 // Test 2 - cluster in creating state
 
-type MockNamespaceableResourceInterfaceCreate struct {}
+type MockNamespaceableResourceInterfaceCreate struct{}
 
 func (m MockNamespaceableResourceInterfaceCreate) Namespace(s string) dynamic.ResourceInterface {
 	return MockResourceInterfaceCreate{}
@@ -195,7 +193,7 @@ func (m MockNamespaceableResourceInterfaceCreate) Patch(ctx context.Context, nam
 	panic("implement me")
 }
 
-type MockResourceInterfaceCreate struct {}
+type MockResourceInterfaceCreate struct{}
 
 func (m MockResourceInterfaceCreate) Create(ctx context.Context, obj *unstructured.Unstructured, options meta1.CreateOptions, subresources ...string) (*unstructured.Unstructured, error) {
 	panic("implement me")
@@ -235,7 +233,7 @@ func (m MockResourceInterfaceCreate) Patch(ctx context.Context, name string, pt 
 
 // Test 3 - cluster in active state
 
-type MockNamespaceableResourceInterfaceActive struct {}
+type MockNamespaceableResourceInterfaceActive struct{}
 
 func (m MockNamespaceableResourceInterfaceActive) Namespace(s string) dynamic.ResourceInterface {
 	return MockResourceInterfaceActive{}
@@ -277,7 +275,7 @@ func (m MockNamespaceableResourceInterfaceActive) Patch(ctx context.Context, nam
 	panic("implement me")
 }
 
-type MockResourceInterfaceActive struct {}
+type MockResourceInterfaceActive struct{}
 
 func (m MockResourceInterfaceActive) Create(ctx context.Context, obj *unstructured.Unstructured, options meta1.CreateOptions, subresources ...string) (*unstructured.Unstructured, error) {
 	panic("implement me")
@@ -317,7 +315,7 @@ func (m MockResourceInterfaceActive) Patch(ctx context.Context, name string, pt 
 
 // Test 4 - cluster in update node pool state
 
-type MockNamespaceableResourceInterfaceUpdate struct {}
+type MockNamespaceableResourceInterfaceUpdate struct{}
 
 func (m MockNamespaceableResourceInterfaceUpdate) Namespace(s string) dynamic.ResourceInterface {
 	return MockResourceInterfaceUpdate{}
@@ -359,7 +357,7 @@ func (m MockNamespaceableResourceInterfaceUpdate) Patch(ctx context.Context, nam
 	panic("implement me")
 }
 
-type MockResourceInterfaceUpdate struct {}
+type MockResourceInterfaceUpdate struct{}
 
 func (m MockResourceInterfaceUpdate) Create(ctx context.Context, obj *unstructured.Unstructured, options meta1.CreateOptions, subresources ...string) (*unstructured.Unstructured, error) {
 	panic("implement me")
@@ -399,7 +397,7 @@ func (m MockResourceInterfaceUpdate) Patch(ctx context.Context, name string, pt 
 
 // Test UpdateEksClusterConfig
 
-type MockNamespaceableResourceInterfaceEksCC struct {}
+type MockNamespaceableResourceInterfaceEksCC struct{}
 
 func (m MockNamespaceableResourceInterfaceEksCC) Namespace(s string) dynamic.ResourceInterface {
 	return MockResourceInterfaceEksCC{}
@@ -441,7 +439,7 @@ func (m MockNamespaceableResourceInterfaceEksCC) Patch(ctx context.Context, name
 	panic("implement me")
 }
 
-type MockResourceInterfaceEksCC struct {}
+type MockResourceInterfaceEksCC struct{}
 
 func (m MockResourceInterfaceEksCC) Create(ctx context.Context, obj *unstructured.Unstructured, options meta1.CreateOptions, subresources ...string) (*unstructured.Unstructured, error) {
 	panic("implement me")
@@ -471,20 +469,20 @@ func (m MockResourceInterfaceEksCC) List(ctx context.Context, opts meta1.ListOpt
 	return &unstructured.UnstructuredList{
 		Object: map[string]interface{}{
 			"apiVersion": "Eks.cattle.io/v1",
-			"kind": "EksClusterConfigList",
-			"metadata": map[string]interface{}{ "resourceVersion": "142650" },
+			"kind":       "EksClusterConfigList",
+			"metadata":   map[string]interface{}{"resourceVersion": "142650"},
 		},
-		Items:  nil,
+		Items: nil,
 	}, nil
 }
 
 // mock interface that returns a watch event (for updateEksClusterConfig test)
 
-type MockInterface struct {}
+type MockInterface struct{}
 
 func (m MockInterface) Stop() {}
 
-func (m MockInterface) ResultChan () <-chan watch.Event {
+func (m MockInterface) ResultChan() <-chan watch.Event {
 	return make(chan watch.Event)
 }
 
@@ -498,11 +496,11 @@ func (m MockResourceInterfaceEksCC) Patch(ctx context.Context, name string, pt t
 
 // mock cluster dialer
 
-type MockFactory struct {}
+type MockFactory struct{}
 
 func (m MockFactory) ClusterDialer(clusterName string) (dialer.Dialer, error) {
 	// pass a dialer func to the client
-	dialer := func(ctx context.Context, network, address string) (net.Conn, error){
+	dialer := func(ctx context.Context, network, address string) (net.Conn, error) {
 		return nil, nil
 	}
 	return dialer, nil
@@ -520,7 +518,7 @@ type Dialer func(ctx context.Context, network, address string) (net.Conn, error)
 
 // mock discovery
 
-type MockDiscovery struct {}
+type MockDiscovery struct{}
 
 func (m MockDiscovery) RESTClient() rest.Interface {
 	panic("implement me")
@@ -535,9 +533,9 @@ func (m MockDiscovery) ServerResourcesForGroupVersion(groupVersion string) (*met
 	return &meta1.APIResourceList{
 		TypeMeta:     meta1.TypeMeta{},
 		GroupVersion: "",
-		APIResources:  []meta1.APIResource{
-			{ Name: "EksClusterConfig" },
-			{ Name: "status" }},
+		APIResources: []meta1.APIResource{
+			{Name: "EksClusterConfig"},
+			{Name: "status"}},
 	}, nil
 }
 

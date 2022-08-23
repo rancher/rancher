@@ -254,5 +254,5 @@ func Test_generateSATokenWithPublicAPI(t *testing.T) {
 /** Test_getRestConfig
  */
 func Test_getRestConfig(t *testing.T) {
-	t.Error("not implemented: requires AKS controller")
+	t.Skip("not implemented: requires AKS controller")
 }
