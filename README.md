@@ -12,11 +12,11 @@ Rancher is an open source container management platform built for organizations 
 
 ## Latest Release
 * v2.6
-  * Latest - v2.6.6 - `rancher/rancher:v2.6.6` / `rancher/rancher:latest` - Read the full release [notes](https://github.com/rancher/rancher/releases/tag/v2.6.6).
-  * Stable - v2.6.6 - `rancher/rancher:v2.6.6` / `rancher/rancher:stable` - Read the full release [notes](https://github.com/rancher/rancher/releases/tag/v2.6.6).
+  * Latest - v2.6.7 - `rancher/rancher:v2.6.7` / `rancher/rancher:latest` - Read the full release [notes](https://github.com/rancher/rancher/releases/tag/v2.6.7).
+  * Stable - v2.6.7 - `rancher/rancher:v2.6.7` / `rancher/rancher:stable` - Read the full release [notes](https://github.com/rancher/rancher/releases/tag/v2.6.7).
 * v2.5
-  * Latest - v2.5.15 - `rancher/rancher:v2.5.15` - Read the full release [notes](https://github.com/rancher/rancher/releases/tag/v2.5.15).
-  * Stable - v2.5.15 - `rancher/rancher:v2.5.15` - Read the full release [notes](https://github.com/rancher/rancher/releases/tag/v2.5.15).
+  * Latest - v2.5.16 - `rancher/rancher:v2.5.16` - Read the full release [notes](https://github.com/rancher/rancher/releases/tag/v2.5.16).
+  * Stable - v2.5.16 - `rancher/rancher:v2.5.16` - Read the full release [notes](https://github.com/rancher/rancher/releases/tag/v2.5.16).
 
 To get automated notifications of our latest release, you can watch the announcements category in our [forums](http://forums.rancher.com/c/announcements), or subscribe to the RSS feed `https://forums.rancher.com/c/announcements.rss`.
 

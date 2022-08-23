@@ -38,6 +38,7 @@ var (
 		"openstack":     {"cacert": "cacert", "privateKeyFile": "privateKeyFile", "userDataFile": "userDataFile"},
 		"otc":           {"privateKeyFile": "privateKeyFile"},
 		"packet":        {"userdata": "userdata"},
+		"pod":           {"userdata": "userdata"},
 		"vmwarevsphere": {"cloud-config": "cloudConfig"},
 		"google":        {"authEncodedJson": "authEncodedJson"},
 	}
