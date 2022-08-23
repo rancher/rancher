@@ -18,11 +18,11 @@ import (
 )
 
 const (
-	MockDefaultgkeClusterConfigFilename = "./test/onclusterchange_gkecc_default.json"
-	MockCreategkeClusterConfigFilename  = "./test/onclusterchange_gkecc_create.json"
-	MockActivegkeClusterConfigFilename  = "./test/onclusterchange_gkecc_active.json"
-	MockUpdategkeClusterConfigFilename  = "./test/onclusterchange_gkecc_update.json"
-	MockgkeClusterConfigUpdatedFilename = "./test/updategkeclusterconfig_updated.json"
+	MockDefaultgkeClusterConfigFilename = "test/onclusterchange_gkecc_default.json"
+	MockCreategkeClusterConfigFilename  = "test/onclusterchange_gkecc_create.json"
+	MockActivegkeClusterConfigFilename  = "test/onclusterchange_gkecc_active.json"
+	MockUpdategkeClusterConfigFilename  = "test/onclusterchange_gkecc_update.json"
+	MockgkeClusterConfigUpdatedFilename = "test/updategkeclusterconfig_updated.json"
 )
 
 // mock interfaces

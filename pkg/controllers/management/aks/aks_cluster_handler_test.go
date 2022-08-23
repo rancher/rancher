@@ -8,14 +8,15 @@ import (
 	"github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 )
 
+
 const (
-	MockDefaultClusterFilename = "./test/onclusterchange_default.yaml"
-	MockCreateClusterFilename = "./test/onclusterchange_create.yaml"
-	MockActiveClusterFilename = "./test/onclusterchange_active.yaml"
-	MockUpdateClusterFilename = "./test/onclusterchange_update.yaml"
-	MockAKSClusterConfigFilename = "./test/updateaksclusterconfig.json"
-	MockAKSClusterConfigClusterFilename = "./test/updateaksclusterconfig.yaml"
-	MockBuildAKSCCCreateObjectFilename = "./test/buildakscccreateobject.json"
+	MockDefaultClusterFilename = "test/onclusterchange_default.yaml"
+	MockCreateClusterFilename = "test/onclusterchange_create.yaml"
+	MockActiveClusterFilename = "test/onclusterchange_active.yaml"
+	MockUpdateClusterFilename = "test/onclusterchange_update.yaml"
+	MockAKSClusterConfigFilename = "test/updateaksclusterconfig.json"
+	MockAKSClusterConfigClusterFilename = "test/updateaksclusterconfig.yaml"
+	MockBuildAKSCCCreateObjectFilename = "test/buildakscccreateobject.json"
 )
 
 

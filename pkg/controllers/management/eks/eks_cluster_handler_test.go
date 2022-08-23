@@ -9,13 +9,13 @@ import (
 )
 
 const (
-	MockDefaultClusterFilename = "./test/onclusterchange_default.yaml"
-	MockCreateClusterFilename = "./test/onclusterchange_create.yaml"
-	MockActiveClusterFilename = "./test/onclusterchange_active.yaml"
-	MockUpdateClusterFilename = "./test/onclusterchange_update.yaml"
-	MockEksClusterConfigFilename = "./test/updateeksclusterconfig.json"
-	MockEksClusterConfigClusterFilename = "./test/updateeksclusterconfig.yaml"
-	MockBuildEksCCCreateObjectFilename = "./test/buildekscccreateobject.json"
+	MockDefaultClusterFilename = "test/onclusterchange_default.yaml"
+	MockCreateClusterFilename = "test/onclusterchange_create.yaml"
+	MockActiveClusterFilename = "test/onclusterchange_active.yaml"
+	MockUpdateClusterFilename = "test/onclusterchange_update.yaml"
+	MockEksClusterConfigFilename = "test/updateeksclusterconfig.json"
+	MockEksClusterConfigClusterFilename = "test/updateeksclusterconfig.yaml"
+	MockBuildEksCCCreateObjectFilename = "test/buildekscccreateobject.json"
 )
 
 

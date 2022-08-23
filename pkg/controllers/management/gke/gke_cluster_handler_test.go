@@ -10,13 +10,13 @@ import (
 )
 
 const (
-	MockDefaultClusterFilename = "./test/onclusterchange_default.yaml"
-	MockCreateClusterFilename = "./test/onclusterchange_create.yaml"
-	MockActiveClusterFilename = "./test/onclusterchange_active.yaml"
-	MockUpdateClusterFilename = "./test/onclusterchange_update.yaml"
-	MockGkeClusterConfigFilename = "./test/updategkeclusterconfig.json"
-	MockGkeClusterConfigClusterFilename = "./test/updategkeclusterconfig.yaml"
-	MockBuildGkeCCCreateObjectFilename = "./test/buildgkecccreateobject.json"
+	MockDefaultClusterFilename = "test/onclusterchange_default.yaml"
+	MockCreateClusterFilename = "test/onclusterchange_create.yaml"
+	MockActiveClusterFilename = "test/onclusterchange_active.yaml"
+	MockUpdateClusterFilename = "test/onclusterchange_update.yaml"
+	MockGkeClusterConfigFilename = "test/updategkeclusterconfig.json"
+	MockGkeClusterConfigClusterFilename = "test/updategkeclusterconfig.yaml"
+	MockBuildGkeCCCreateObjectFilename = "test/buildgkecccreateobject.json"
 )
 
 

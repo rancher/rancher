@@ -400,7 +400,6 @@ func (e *eksOperatorController) updateEKSClusterConfig(cluster *mgmtv3.Cluster, 
 
 			// this enqueue is necessary to ensure that the controller is reentered with the updating phase
 			e.ClusterEnqueueAfter(cluster.Name, enqueueTime)
-
 			return e.SetUnknown(cluster, apimgmtv3.ClusterConditionUpdated, "")
 		case <-timeout.C:
 			cluster, err = e.recordAppliedSpec(cluster)

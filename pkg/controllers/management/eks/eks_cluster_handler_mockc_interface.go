@@ -18,11 +18,11 @@ import (
 )
 
 const (
-	MockDefaultEksClusterConfigFilename = "./test/onclusterchange_ekscc_default.json"
-	MockCreateEksClusterConfigFilename  = "./test/onclusterchange_ekscc_create.json"
-	MockActiveEksClusterConfigFilename  = "./test/onclusterchange_ekscc_active.json"
-	MockUpdateEksClusterConfigFilename  = "./test/onclusterchange_ekscc_update.json"
-	MockEksClusterConfigUpdatedFilename = "./test/updateeksclusterconfig_updated.json"
+	MockDefaultEksClusterConfigFilename = "test/onclusterchange_ekscc_default.json"
+	MockCreateEksClusterConfigFilename  = "test/onclusterchange_ekscc_create.json"
+	MockActiveEksClusterConfigFilename  = "test/onclusterchange_ekscc_active.json"
+	MockUpdateEksClusterConfigFilename  = "test/onclusterchange_ekscc_update.json"
+	MockEksClusterConfigUpdatedFilename = "test/updateeksclusterconfig_updated.json"
 )
 
 // mock interfaces

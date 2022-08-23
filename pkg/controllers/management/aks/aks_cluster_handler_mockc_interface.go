@@ -18,11 +18,11 @@ import (
 )
 
 const (
-	MockDefaultAKSClusterConfigFilename = "./test/onclusterchange_akscc_default.json"
-	MockCreateAKSClusterConfigFilename  = "./test/onclusterchange_akscc_create.json"
-	MockActiveAKSClusterConfigFilename  = "./test/onclusterchange_akscc_active.json"
-	MockUpdateAKSClusterConfigFilename  = "./test/onclusterchange_akscc_update.json"
-	MockAKSClusterConfigUpdatedFilename = "./test/updateaksclusterconfig_updated.json"
+	MockDefaultAKSClusterConfigFilename = "test/onclusterchange_akscc_default.json"
+	MockCreateAKSClusterConfigFilename  = "test/onclusterchange_akscc_create.json"
+	MockActiveAKSClusterConfigFilename  = "test/onclusterchange_akscc_active.json"
+	MockUpdateAKSClusterConfigFilename  = "test/onclusterchange_akscc_update.json"
+	MockAKSClusterConfigUpdatedFilename = "test/updateaksclusterconfig_updated.json"
 )
 
 // mock interfaces

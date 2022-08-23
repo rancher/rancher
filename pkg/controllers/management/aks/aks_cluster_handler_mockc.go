@@ -5,9 +5,9 @@
 package aks
 
 import (
+	"embed"
 	stderrors "errors"
 	"fmt"
-	"io/ioutil"
 	"net"
 	"net/url"
 	"time"
@@ -24,6 +24,9 @@ import (
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/rest"
 )
+
+//go:embed test/*
+var testFs embed.FS
 
 type mockAksOperatorController struct {
 	aksOperatorController
@@ -178,8 +181,8 @@ func (m *mockAksOperatorController) getRestConfig(cluster *mgmtv3.Cluster) (*res
 func getMockV3Cluster(filename string) (mgmtv3.Cluster, error) {
 	var mockCluster mgmtv3.Cluster
 
-	// Read the file
-	cluster, err := ioutil.ReadFile(filename); if err != nil {
+	// Read the embedded file
+	cluster, err := testFs.ReadFile(filename); if err != nil {
 		return mockCluster, err
 	}
 	// Unmarshal cluster yaml into a management v3 cluster object
@@ -193,8 +196,8 @@ func getMockV3Cluster(filename string) (mgmtv3.Cluster, error) {
 func getMockAksClusterConfig(filename string) (*unstructured.Unstructured, error) {
 	var aksClusterConfig *unstructured.Unstructured
 
-	// Read the file
-	bytes, err := ioutil.ReadFile(filename); if err != nil {
+	// Read the embedded file
+	bytes, err := testFs.ReadFile(filename); if err != nil {
 		return aksClusterConfig, err
 	}
 	// Unmarshal json into an unstructured cluster config object
