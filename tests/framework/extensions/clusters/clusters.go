@@ -13,6 +13,7 @@ import (
 	provisioning "github.com/rancher/rancher/tests/framework/clients/rancher/generated/provisioning/v1"
 	"github.com/rancher/rancher/tests/framework/pkg/wait"
 	"github.com/rancher/rancher/tests/integration/pkg/defaults"
+	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -66,6 +67,27 @@ func IsHostedProvisioningClusterReady(event watch.Event) (ready bool, err error)
 	}
 
 	return false, nil
+}
+
+// Verify if a serviceAccountTokenSecret exists or not in the cluster.
+func CheckServiceAccountTokenSecret(client *rancher.Client, clusterName string) (success bool, err error) {
+	clusterID, err := GetClusterIDByName(client, clusterName)
+	if err != nil {
+		return false, err
+	}
+
+	cluster, err := client.Management.Cluster.ByID(clusterID)
+	if err != nil {
+		return false, err
+	}
+
+	if cluster.ServiceAccountTokenSecret != "" {
+		logrus.Infof("serviceAccountTokenSecret in this cluster is: %s", cluster.ServiceAccountTokenSecret)
+		return true, nil
+	} else {
+		logrus.Infof("serviceAccountTokenSecret does not exist in this cluster!")
+		return false, nil
+	}
 }
 
 // NewRKE1lusterConfig is a constructor for a v3.Cluster object, to be used by the rancher.Client.Provisioning client.

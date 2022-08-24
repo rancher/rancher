@@ -8,6 +8,7 @@ import (
 	"github.com/rancher/rancher/tests/framework/extensions/clusters"
 	nodepools "github.com/rancher/rancher/tests/framework/extensions/rke1/nodepools"
 	"github.com/rancher/rancher/tests/framework/extensions/users"
+	password "github.com/rancher/rancher/tests/framework/extensions/users/passwordgenerator"
 	"github.com/rancher/rancher/tests/framework/pkg/config"
 	"github.com/rancher/rancher/tests/framework/pkg/session"
 	"github.com/rancher/rancher/tests/framework/pkg/wait"
@@ -51,9 +52,10 @@ func (r *RKE1NodeDriverProvisioningTestSuite) SetupSuite() {
 
 	enabled := true
 	var testuser = provisioning.AppendRandomString("testuser-")
+	var testpassword = password.GenerateUserPassword("testpass-")
 	user := &management.User{
 		Username: testuser,
-		Password: "rancherrancher123!",
+		Password: testpassword,
 		Name:     testuser,
 		Enabled:  &enabled,
 	}
@@ -162,6 +164,10 @@ func (r *RKE1NodeDriverProvisioningTestSuite) ProvisioningRKE1Cluster(provider P
 					require.NoError(r.T(), err)
 					assert.Equal(r.T(), clusterName, clusterResp.Name)
 					assert.Equal(r.T(), nodePoolName, nodePool.Name)
+
+					clusterToken, err := clusters.CheckServiceAccountTokenSecret(client, clusterName)
+					require.NoError(r.T(), err)
+					assert.NotEmpty(r.T(), clusterToken)
 				})
 			}
 		}
@@ -228,6 +234,10 @@ func (r *RKE1NodeDriverProvisioningTestSuite) ProvisioningRKE1ClusterDynamicInpu
 					require.NoError(r.T(), err)
 					assert.Equal(r.T(), clusterName, clusterResp.Name)
 					assert.Equal(r.T(), nodePoolName, nodePool.Name)
+
+					clusterToken, err := clusters.CheckServiceAccountTokenSecret(client, clusterName)
+					require.NoError(r.T(), err)
+					assert.NotEmpty(r.T(), clusterToken)
 				})
 			}
 		}
