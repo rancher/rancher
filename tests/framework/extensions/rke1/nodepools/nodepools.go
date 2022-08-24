@@ -30,7 +30,7 @@ type NodeRoles struct {
 //	   Quantity:     1,
 //   },
 //  }
-func RKE1NodePoolSetup(client *rancher.Client, nodeRoles []NodeRoles, ClusterID, NodeTemplateID string) *management.NodePool {
+func RKE1NodePoolSetup(client *rancher.Client, nodeRoles []NodeRoles, ClusterID, NodeTemplateID string) (*management.NodePool, error) {
 	nodePoolConfig := management.NodePool{
 		ClusterID:               ClusterID,
 		DeleteNotReadyAfterSecs: 0,
@@ -47,9 +47,9 @@ func RKE1NodePoolSetup(client *rancher.Client, nodeRoles []NodeRoles, ClusterID,
 		_, err := client.Management.NodePool.Create(&nodePoolConfig)
 
 		if err != nil {
-			return nil
+			return nil, err
 		}
 	}
 
-	return &nodePoolConfig
+	return &nodePoolConfig, nil
 }
