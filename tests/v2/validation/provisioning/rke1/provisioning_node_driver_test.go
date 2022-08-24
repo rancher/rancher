@@ -142,8 +142,10 @@ func (r *RKE1NodeDriverProvisioningTestSuite) ProvisioningRKE1Cluster(provider P
 					require.NoError(r.T(), err)
 
 					nodeTemplateResp, err := provider.NodeTemplateFunc(client)
+					require.NoError(r.T(), err)
 
-					nodePool := nodepools.RKE1NodePoolSetup(testSessionClient, tt.nodeRoles, clusterResp.ID, nodeTemplateResp.ID)
+					nodePool, err := nodepools.RKE1NodePoolSetup(testSessionClient, tt.nodeRoles, clusterResp.ID, nodeTemplateResp.ID)
+					require.NoError(r.T(), err)
 
 					nodePoolName := nodePool.Name
 
@@ -206,8 +208,10 @@ func (r *RKE1NodeDriverProvisioningTestSuite) ProvisioningRKE1ClusterDynamicInpu
 					require.NoError(r.T(), err)
 
 					nodeTemplateResp, err := provider.NodeTemplateFunc(client)
+					require.NoError(r.T(), err)
 
-					nodePool := nodepools.RKE1NodePoolSetup(testSessionClient, nodesAndRoles, clusterResp.ID, nodeTemplateResp.ID)
+					nodePool, err := nodepools.RKE1NodePoolSetup(testSessionClient, nodesAndRoles, clusterResp.ID, nodeTemplateResp.ID)
+					require.NoError(r.T(), err)
 
 					nodePoolName := nodePool.Name
 

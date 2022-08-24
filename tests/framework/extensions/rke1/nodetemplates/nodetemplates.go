@@ -26,6 +26,7 @@ type NodeTemplate struct {
 	Label                       map[string]string            `json:"label,omitempty" yaml:"label,omitempty"`
 	AmazonEC2NodeTemplateConfig *AmazonEC2NodeTemplateConfig `json:"amazonec2Config" yaml:"amazonec2Config,omitempty"`
 	AzureNodeTemplateConfig     *AzureNodeTemplateConfig     `json:"azureConfig" yaml:"azureConfig,omitempty"`
+	HarvesterNodeTemplateConfig *HarvesterNodeTemplateConfig `json:"harvesterConfig" yaml:"harvesterConfig,omitempty"`
 	LinodeNodeTemplateConfig    *LinodeNodeTemplateConfig    `json:"linodeConfig" yaml:"linodeConfig,omitempty"`
 	Name                        string                       `json:"name,omitempty" yaml:"name,omitempty"`
 	NamespaceId                 string                       `json:"namespaceId,omitempty" yaml:"namespaceId,omitempty"`

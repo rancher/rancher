@@ -7,13 +7,15 @@ import (
 	"github.com/rancher/rancher/tests/framework/extensions/rke1/nodetemplates"
 	aws "github.com/rancher/rancher/tests/framework/extensions/rke1/nodetemplates/aws"
 	azure "github.com/rancher/rancher/tests/framework/extensions/rke1/nodetemplates/azure"
+	harvester "github.com/rancher/rancher/tests/framework/extensions/rke1/nodetemplates/harvester"
 	linode "github.com/rancher/rancher/tests/framework/extensions/rke1/nodetemplates/linode"
 )
 
 const (
-	awsProviderName    = "aws"
-	azureProviderName  = "azure"
-	linodeProviderName = "linode"
+	awsProviderName       = "aws"
+	azureProviderName     = "azure"
+	harvesterProviderName = "harvester"
+	linodeProviderName    = "linode"
 )
 
 type NodeTemplateFunc func(rancherClient *rancher.Client) (*nodetemplates.NodeTemplate, error)
@@ -38,6 +40,12 @@ func CreateProvider(name string) Provider {
 		provider := Provider{
 			Name:             name,
 			NodeTemplateFunc: azure.CreateAzureNodeTemplate,
+		}
+		return provider
+	case name == harvesterProviderName:
+		provider := Provider{
+			Name:             name,
+			NodeTemplateFunc: harvester.CreateHarvesterNodeTemplate,
 		}
 		return provider
 	case name == linodeProviderName:
