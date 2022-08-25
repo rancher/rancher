@@ -55,7 +55,7 @@ func (c *rtSync) sync(key string, obj *v3.RoleTemplate) (runtime.Object, error) 
 
 func (c *rtSync) syncRT(template *v3.RoleTemplate, usedInProjects bool, prtbs []interface{}, crtbs []interface{}) error {
 	roles := map[string]*v3.RoleTemplate{}
-	if err := c.m.gatherRoles(template, roles); err != nil {
+	if err := c.m.gatherRoles(template, roles, 0); err != nil {
 		return err
 	}
 

@@ -32,6 +32,9 @@ import (
 const (
 	clusterContext = "cluster"
 	projectContext = "project"
+
+	rolesCircularSoftLimit = 100
+	rolesCircularHardLimit = 500
 )
 
 var commonClusterAndProjectMgmtPlaneResources = map[string]bool{
@@ -846,7 +849,13 @@ func buildRule(resource string, verbs map[string]string) v1.PolicyRule {
 	}
 }
 
-func (m *manager) checkReferencedRoles(roleTemplateName, roleTemplateContext string) (bool, error) {
+func (m *manager) checkReferencedRoles(roleTemplateName, roleTemplateContext string, depthCounter int) (bool, error) {
+	if depthCounter == rolesCircularSoftLimit {
+		logrus.Warnf("roletemplate has caused %v recursive function calls", rolesCircularSoftLimit)
+	}
+	if depthCounter >= rolesCircularHardLimit {
+		return false, fmt.Errorf("roletemplate '%s' has caused %d recursive function calls, possible circular dependency", roleTemplateName, rolesCircularHardLimit)
+	}
 	roleTemplate, err := m.rtLister.Get("", roleTemplateName)
 	if err != nil {
 		return false, err
@@ -876,9 +885,10 @@ func (m *manager) checkReferencedRoles(roleTemplateName, roleTemplateContext str
 	}
 	isOwnerRole := false
 	if len(roleTemplate.RoleTemplateNames) > 0 {
+		depthCounter++
 		// get referenced roletemplate
 		for _, rtName := range roleTemplate.RoleTemplateNames {
-			isOwnerRole, err = m.checkReferencedRoles(rtName, roleTemplateContext)
+			isOwnerRole, err = m.checkReferencedRoles(rtName, roleTemplateContext, depthCounter)
 			if err != nil {
 				return false, err
 			}
