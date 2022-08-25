@@ -4,7 +4,7 @@ package ec2
 const ConfigurationFileKey = "awsEC2Configs"
 
 type AWSEC2Configs struct {
-	AWSEC2Config       []AWSEC2Config `json:"awsEC2Config" yaml:"instanceType"`
+	AWSEC2Config       []AWSEC2Config `json:"awsEC2Config" yaml:"awsEC2Config"`
 	AWSAccessKeyID     string         `json:"awsAccessKeyID" yaml:"awsAccessKeyID"`
 	AWSSecretAccessKey string         `json:"awsSecretAccessKey" yaml:"awsSecretAccessKey"`
 	Region             string         `json:"region" yaml:"region"`

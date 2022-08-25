@@ -21,7 +21,7 @@ func CreateNodes(client *rancher.Client, numOfInstances int) ([]*nodes.Node, err
 	}
 	var ec2Nodes []*nodes.Node
 	for _, config := range ec2Client.ClientConfig.AWSEC2Config {
-		sshName := getSSHKeyName(ec2Client.InstanceConfig.AWSSSHKeyName)
+		sshName := getSSHKeyName(config.AWSSSHKeyName)
 
 		runInstancesInput := &ec2.RunInstancesInput{
 			ImageId:      aws.String(config.AWSAMI),
@@ -33,21 +33,21 @@ func CreateNodes(client *rancher.Client, numOfInstances int) ([]*nodes.Node, err
 				{
 					DeviceName: aws.String("/dev/sda1"),
 					Ebs: &ec2.EbsBlockDevice{
-						VolumeSize: aws.Int64(int64(ec2Client.InstanceConfig.VolumeSize)),
+						VolumeSize: aws.Int64(int64(config.VolumeSize)),
 					},
 				},
 			},
 			IamInstanceProfile: &ec2.IamInstanceProfileSpecification{
-				Name: aws.String(ec2Client.InstanceConfig.AWSIAMProfile),
+				Name: aws.String(config.AWSIAMProfile),
 			},
 			Placement: &ec2.Placement{
-				AvailabilityZone: aws.String(ec2Client.InstanceConfig.AWSRegionAZ),
+				AvailabilityZone: aws.String(config.AWSRegionAZ),
 			},
 			NetworkInterfaces: []*ec2.InstanceNetworkInterfaceSpecification{
 				{
 					DeviceIndex:              aws.Int64(0),
 					AssociatePublicIpAddress: aws.Bool(true),
-					Groups:                   aws.StringSlice(ec2Client.InstanceConfig.AWSSecurityGroups),
+					Groups:                   aws.StringSlice(config.AWSSecurityGroups),
 				},
 			},
 			TagSpecifications: []*ec2.TagSpecification{
@@ -60,7 +60,7 @@ func CreateNodes(client *rancher.Client, numOfInstances int) ([]*nodes.Node, err
 						},
 						{
 							Key:   aws.String("CICD"),
-							Value: aws.String(ec2Client.InstanceConfig.AWSCICDInstanceTag),
+							Value: aws.String(config.AWSCICDInstanceTag),
 						},
 					},
 				},
@@ -104,7 +104,7 @@ func CreateNodes(client *rancher.Client, numOfInstances int) ([]*nodes.Node, err
 
 		readyInstances := describe.Reservations[0].Instances
 
-		sshKey, err := nodes.GetSSHKey(ec2Client.InstanceConfig.AWSSSHKeyName)
+		sshKey, err := nodes.GetSSHKey(config.AWSSSHKeyName)
 		if err != nil {
 			return nil, err
 		}
@@ -116,7 +116,7 @@ func CreateNodes(client *rancher.Client, numOfInstances int) ([]*nodes.Node, err
 			ec2Node := &nodes.Node{
 				NodeID:          *readyInstance.InstanceId,
 				PublicIPAddress: *readyInstance.PublicIpAddress,
-				SSHUser:         ec2Client.InstanceConfig.AWSUser,
+				SSHUser:         config.AWSUser,
 				SSHKey:          sshKey,
 			}
 			ec2Nodes = append(ec2Nodes, ec2Node)

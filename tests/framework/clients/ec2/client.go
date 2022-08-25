@@ -1,6 +1,8 @@
 package ec2
 
 import (
+	"fmt"
+
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/session"
@@ -10,18 +12,17 @@ import (
 
 // EC2Client is a struct that wraps the needed AWSEC2Config object, and ec2.EC2 which makes the actual calls to aws.
 type EC2Client struct {
-	SVC            *ec2.EC2
-	ClientConfig   *AWSEC2Configs
-	InstanceConfig *AWSEC2Config
+	SVC          *ec2.EC2
+	ClientConfig *AWSEC2Configs
 }
 
 // NewEC2Client is a constructor that creates an *EC2Client which a wrapper for an "github.com/aws/aws-sdk-go/service/ec2" session and
 // the aws ec2 confit.
 func NewEC2Client() (*EC2Client, error) {
 	awsEC2ClientConfig := new(AWSEC2Configs)
-	awsEC2InstanceConfig := new(AWSEC2Config)
 
 	config.LoadConfig(ConfigurationFileKey, awsEC2ClientConfig)
+	fmt.Print("AWS EC2 Client Config: ", awsEC2ClientConfig.AWSEC2Config[0].AWSAMI)
 
 	credential := credentials.NewStaticCredentials(awsEC2ClientConfig.AWSAccessKeyID, awsEC2ClientConfig.AWSSecretAccessKey, "")
 	sess, err := session.NewSession(&aws.Config{
@@ -35,8 +36,7 @@ func NewEC2Client() (*EC2Client, error) {
 	// Create EC2 service client
 	svc := ec2.New(sess)
 	return &EC2Client{
-		SVC:            svc,
-		ClientConfig:   awsEC2ClientConfig,
-		InstanceConfig: awsEC2InstanceConfig,
+		SVC:          svc,
+		ClientConfig: awsEC2ClientConfig,
 	}, nil
 }
