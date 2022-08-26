@@ -66,67 +66,80 @@ func (c *Controller) Create(nodePool *v3.NodePool) (runtime.Object, error) {
 func (c *Controller) needsReconcile(nodePool *v3.NodePool, nodes []*v3.Node) bool {
 	changed, _, err := c.createOrCheckNodes(nodePool, nodes, true)
 	if err != nil {
-		logrus.Debugf("[nodepoool] error checking pool for reconciliation: %s", err)
+		logrus.Debugf("[nodepool] error checking pool for reconciliation: %s", err)
 	}
 
 	return changed
 }
 
-func (c *Controller) reconcile(nodePool *v3.NodePool, nodes []*v3.Node) {
+func (c *Controller) reconcile(nodePool *v3.NodePool, nodes []*v3.Node) (runtime.Object, error) {
 	_, qty, err := c.createOrCheckNodes(nodePool, nodes, false)
 	if err != nil {
-		logrus.Errorf("[nodepool] reconcile error, create or check nodes: %s", err)
+		return nodePool, fmt.Errorf("[nodepool] reconcile error, create or check nodes: %s", err)
 	}
 
+	// In certain cases, the nodepool quantity can actually decrease through a `createOrCheckNodes` call, like
+	// for scaling down a specific node. In this case, we need to update the nodePool object with the latest
+	// quantity so that on a future reconciliation loop, we do not recreate the node that was specifically scaled down.
 	if qty != nodePool.Spec.Quantity {
 		nodePool.Spec.Quantity = qty
 	}
 
-	_, err = c.setReconcileAnnotation(nodePool, "")
+	nodePool, err = c.updateNodePoolAnnotationAndSpec(nodePool, "", true)
 	if err != nil {
-		logrus.Errorf("[nodepool] error updating reconcile annotation to updated: %s", err)
+		return nodePool, fmt.Errorf("[nodepool] error updating reconcile annotation to updated: %s", err)
 	}
+	return nodePool, nil
 }
 
 func (c *Controller) Updated(nodePool *v3.NodePool) (runtime.Object, error) {
+	if nodePool != nil {
+		logrus.Tracef("[nodepool] Updated called for nodepool %s: %+v", nodePool, nodePool)
+	}
 	obj, err := v32.NodePoolConditionUpdated.Do(nodePool, func() (runtime.Object, error) {
 		anno, _ := nodePool.Annotations[ReconcileAnnotation]
+		logrus.Debugf("[nodepool] nodepool %s reconcile annotation value was: %s", nodePool.Name, anno)
 		if anno == "" {
-			nodes, err := c.NodeLister.List(nodePool.Namespace, labels.Everything())
+			nodeList, err := c.Nodes.ListNamespaced(nodePool.Namespace, metav1.ListOptions{})
 			if err != nil {
 				return nodePool, err
 			}
-			go c.deleteBadNodes(nodes)
+			var nodes []*v3.Node
+			for i := range nodeList.Items {
+				nodes = append(nodes, &nodeList.Items[i])
+			}
 			if c.needsReconcile(nodePool, nodes) {
 				logrus.Debugf("[nodepool] reconcile needed for %s", nodePool.Name)
-				np, err := c.setReconcileAnnotation(nodePool, "updating")
+				np, err := c.updateNodePoolAnnotationAndSpec(nodePool, "updating", false)
 				if err != nil {
 					return nodePool, err
 				}
-				go c.reconcile(np, nodes)
-				return nil, nil
+				logrus.Debugf("[nodepool] calling reconcile for %s", nodePool.Name)
+				return c.reconcile(np, nodes)
 			}
 		} else if strings.HasPrefix(anno, "updating/") {
 			// gate updating the node pool to every 20s
 			pieces := strings.Split(anno, "/")
 			t, err := time.Parse(time.RFC3339, pieces[1])
 			if err != nil || int(time.Since(t)/time.Second) > 20 {
+				logrus.Debugf("[nodepool] attempting to clear reconcile annotation for %s", nodePool.Name)
 				nodePool.Annotations[ReconcileAnnotation] = ""
 				return c.NodePools.Update(nodePool)
 			}
-			// go routine is already running to update the cluster so wait
-			return nil, nil
+			logrus.Debugf("[nodepool] reconcile annotation was already set for %s", nodePool.Name)
+			return nodePool, nil
 		}
 
 		// pool doesn't need to reconcile, nothing to do
-		return nil, nil
+		return nodePool, nil
 	})
 
+	logrus.Tracef("[nodepool] Updated handler for nodepool %s finished", obj.(*v3.NodePool).Name)
 	return obj.(*v3.NodePool), err
 }
 
 func (c *Controller) Remove(nodePool *v3.NodePool) (runtime.Object, error) {
-	logrus.Infof("[nodepool] deleting %s", nodePool.Name)
+	logrus.Infof("[nodepool] deleting nodepool %s", nodePool.Name)
 
 	logrus.Debugf("[nodepool] listing nodes for pool %s", nodePool.Name)
 	nodeList, err := c.Nodes.ListNamespaced(nodePool.Namespace, metav1.ListOptions{})
@@ -140,7 +153,7 @@ func (c *Controller) Remove(nodePool *v3.NodePool) (runtime.Object, error) {
 			continue
 		}
 
-		if err := c.deleteNode(&node, 0); err != nil {
+		if err := c.deleteNodeBackoffAndRetry(&node); err != nil {
 			return nodePool, err
 		}
 	}
@@ -148,7 +161,9 @@ func (c *Controller) Remove(nodePool *v3.NodePool) (runtime.Object, error) {
 	return nodePool, nil
 }
 
-func (c *Controller) setReconcileAnnotation(nodePool *v3.NodePool, anno string) (*v3.NodePool, error) {
+// updateNodePoolAnnotationAndSpec will update the latest version retrieved from API of the nodepool provided.
+// It will set the annotation and spec.quantity (if reconcileQuantity is true)
+func (c *Controller) updateNodePoolAnnotationAndSpec(nodePool *v3.NodePool, anno string, reconcileQuantity bool) (*v3.NodePool, error) {
 	backoff := wait.Backoff{
 		Duration: 500 * time.Millisecond,
 		Factor:   1,
@@ -171,10 +186,13 @@ func (c *Controller) setReconcileAnnotation(nodePool *v3.NodePool, anno string) 
 		}
 
 		newPool.Annotations[ReconcileAnnotation] = anno
-		newPool.Spec.Quantity = nodePool.Spec.Quantity // incase the pool size changed during reconcile
+		if reconcileQuantity {
+			newPool.Spec.Quantity = nodePool.Spec.Quantity // in case the pool size changed during reconcile
+		}
 		newPool, err = c.NodePools.Update(newPool)
 		if err != nil {
 			if apierrors.IsConflict(err) {
+				logrus.Debugf("[nodepool] received conflict on nodepool reconcile annotation set attempt to %s on nodepool %s", anno, nodePool.Name)
 				return false, nil
 			}
 			return false, err
@@ -185,41 +203,8 @@ func (c *Controller) setReconcileAnnotation(nodePool *v3.NodePool, anno string) 
 	if err != nil {
 		return nodePool, fmt.Errorf("[nodepool] Failed to update nodePool annotation [%s]: %v", nodePool.Name, err)
 	}
+	logrus.Debugf("[nodepool] reconcile annotation set for nodePool %s to %s", nodePool.Name, anno)
 	return nodePool, nil
-}
-
-func (c *Controller) setDeleteNodeAnnotation(node *v3.Node) (*v3.Node, error) {
-	backoff := wait.Backoff{
-		Duration: 500 * time.Millisecond,
-		Factor:   1,
-		Jitter:   0,
-		Steps:    6,
-	}
-
-	err := wait.ExponentialBackoff(backoff, func() (bool, error) {
-		newNode, err := c.Nodes.GetNamespaced(node.Namespace, node.Name, metav1.GetOptions{})
-		if err != nil {
-			if !apierrors.IsNotFound(err) {
-				return false, err
-			}
-			return false, nil
-		}
-
-		newNode.Annotations[DeleteNodeAnnotation] = "true"
-		newNode, err = c.Nodes.Update(newNode)
-		if err != nil {
-			if apierrors.IsConflict(err) {
-				return false, nil
-			}
-			return false, err
-		}
-		node = newNode
-		return true, nil
-	})
-	if err != nil {
-		return node, fmt.Errorf("[nodeprool] Failed to update node delete annotation [%s]: %v", node.Name, err)
-	}
-	return node, nil
 }
 
 func (c *Controller) machineChanged(key string, machine *v3.Node) (runtime.Object, error) {
@@ -257,7 +242,7 @@ func (c *Controller) createNode(name string, nodePool *v3.NodePool, simulate boo
 		},
 	}
 
-	delete(newNode.Annotations, ReconcileAnnotation)
+	delete(newNode.Annotations, ReconcileAnnotation) // don't set the reconcile annotation on the node being created.
 	if simulate {
 		return newNode, nil
 	}
@@ -269,23 +254,6 @@ func (c *Controller) createNode(name string, nodePool *v3.NodePool, simulate boo
 
 	logrus.Debugf("[nodepool] node created %s", n.Name)
 	return n, nil
-}
-
-func (c *Controller) deleteNode(node *v3.Node, duration time.Duration) error {
-	newNode, err := c.setDeleteNodeAnnotation(node)
-	if err != nil {
-		return err
-	}
-
-	if duration > time.Duration(0) {
-		go func() {
-			time.Sleep(duration)
-			c.deleteNodeBackoffAndRetry(newNode)
-		}()
-		return nil
-	}
-
-	return c.deleteNodeBackoffAndRetry(newNode)
 }
 
 func (c *Controller) deleteNodeBackoffAndRetry(node *v3.Node) error {
@@ -322,18 +290,11 @@ func parsePrefix(fullPrefix string) (prefix string, minLength, start int) {
 	return prefix, len(m[2]), start
 }
 
-func (c *Controller) deleteBadNodes(nodes []*v3.Node) {
-	for _, node := range nodes {
-		if anno, ok := node.Annotations[DeleteNodeAnnotation]; ok && anno == "true" {
-			return
-		}
-		if v32.NodeConditionProvisioned.IsFalse(node) || v32.NodeConditionInitialized.IsFalse(node) || v32.NodeConditionConfigSaved.IsFalse(node) {
-			logrus.Debugf("[nodepool] bad node found: %s", node.Name)
-			_ = c.deleteNode(node, 2*time.Minute)
-		}
-	}
-}
-
+// createOrCheckNodes will filter the nodes passed in for nodes that belong to the nodepool, and reconcile the nodes
+// (creating or deleting them as necessary). The function accepts a nodepool, a slice of node pointers, and a simulate
+// boolean that will disable node deletion if set to true. The function returns a boolean that indicates whether a
+// change was made, an int indicating the new desired quantity of the nodepool, and an error if one exists. Notably,
+// createOrCheckNodes does not mutate the passed in nodePool object.
 func (c *Controller) createOrCheckNodes(nodePool *v3.NodePool, allNodes []*v3.Node, simulate bool) (bool, int, error) {
 	var (
 		err                 error
@@ -352,9 +313,27 @@ func (c *Controller) createOrCheckNodes(nodePool *v3.NodePool, allNodes []*v3.No
 			continue
 		}
 
+		// If it has been more than 2 minutes since node creation and the Provisioned, Initialized, or ConfigSaved
+		// conditions are not set, go ahead and delete the node. Note this is a change in behavior from before,
+		// when we used to put a sleep in a goroutine and let it delete the node eventually, which could
+		// cause race conditions
+		if v32.NodeConditionProvisioned.IsFalse(node) || v32.NodeConditionInitialized.IsFalse(node) || v32.NodeConditionConfigSaved.IsFalse(node) {
+			if time.Now().After(node.CreationTimestamp.Add(2 * time.Minute)) {
+				changed = true
+				if !simulate {
+					logrus.Debugf("[nodepool] node %s in nodepool %s didn't have required conditions in time, deleting", node.Name, nodePool.Name)
+					if err = c.deleteNodeBackoffAndRetry(node); err != nil {
+						return false, quantity, err
+					}
+				}
+				continue
+			}
+		}
+
+		// handle nodes that have a defined scaledown time.
 		if node.Spec.ScaledownTime != "" {
-			logrus.Debugf("[nodepool] scaledown time detected for %s: %s and now it is %s",
-				node.Name, node.Spec.ScaledownTime, time.Now().Format(time.RFC3339))
+			logrus.Debugf("[nodepool] (simulate: %t) %s scaledown time detected for %s: %s and now it is %s",
+				simulate, node.Name, node.Spec.ScaledownTime, time.Now().Format(time.RFC3339))
 			scaledown, err := time.Parse(time.RFC3339, node.Spec.ScaledownTime)
 			if err != nil {
 				logrus.Errorf("[nodepool] failed to parse scaledown time, is it in RFC3339? %s: %s", node.Spec.ScaledownTime, err)
@@ -363,7 +342,7 @@ func (c *Controller) createOrCheckNodes(nodePool *v3.NodePool, allNodes []*v3.No
 					changed = true
 					if !simulate {
 						logrus.Debugf("[nodepool] scaling down, removing node %s", node.Name)
-						if err = c.deleteNode(node, 0); err != nil {
+						if err = c.deleteNodeBackoffAndRetry(node); err != nil {
 							return false, quantity, err
 						}
 					}
@@ -383,7 +362,7 @@ func (c *Controller) createOrCheckNodes(nodePool *v3.NodePool, allNodes []*v3.No
 			if isNodeReadyUnknown(node) && !simulate {
 				start := q.TimeAdded.Time
 				if time.Since(start) > deleteNotReadyAfter {
-					err = c.deleteNode(node, 0)
+					err = c.deleteNodeBackoffAndRetry(node)
 					if err != nil {
 						return false, quantity, err
 					}
@@ -434,7 +413,7 @@ func (c *Controller) createOrCheckNodes(nodePool *v3.NodePool, allNodes []*v3.No
 
 		changed = true
 		if !simulate {
-			c.deleteNode(toDelete, 0)
+			c.deleteNodeBackoffAndRetry(toDelete)
 		}
 
 		nodes = nodes[:len(nodes)-1]
@@ -516,7 +495,6 @@ func (c *Controller) updateNodeRoles(existing *v3.Node, nodePool *v3.NodePool, s
 
 // requeue checks every 5 seconds if the node is still unreachable with one goroutine per node
 func (c *Controller) requeue(timeout time.Duration, np *v3.NodePool, node *v3.Node) {
-
 	t := getUnreachableTaint(node.Spec.InternalNodeSpec.Taints)
 	for t != nil {
 		time.Sleep(5 * time.Second)
@@ -526,7 +504,7 @@ func (c *Controller) requeue(timeout time.Duration, np *v3.NodePool, node *v3.No
 		}
 		t = getUnreachableTaint(exist.Spec.InternalNodeSpec.Taints)
 		if t != nil && time.Since(t.TimeAdded.Time) > timeout {
-			logrus.Debugf("Enqueue nodepool controller: %s %s", np.Namespace, np.Name)
+			logrus.Debugf("[nodepool] requeue is now enqueuing nodepool as node is still unreachable for longer than timeout: %s/%s", np.Namespace, np.Name)
 			c.NodePoolController.Enqueue(np.Namespace, np.Name)
 			break
 		}
@@ -536,6 +514,8 @@ func (c *Controller) requeue(timeout time.Duration, np *v3.NodePool, node *v3.No
 	c.mutex.Unlock()
 }
 
+// getUnreachableTaint searches the provided taint slice for the v1.TaintNodeUnreachable taint, and if it exists,
+// returns the taint.
 func getUnreachableTaint(taints []v1.Taint) *v1.Taint {
 	for _, taint := range taints {
 		if taint.Key == v1.TaintNodeUnreachable {
