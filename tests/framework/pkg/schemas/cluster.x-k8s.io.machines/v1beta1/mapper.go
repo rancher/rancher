@@ -7,9 +7,9 @@ import (
 	"github.com/rancher/rancher/pkg/schemas/mapper"
 )
 
-// ProvisioningSchemas is a schema that defines a mapper so the Provisioning Client can
+// ClusterMachineSchemas is a schema that defines a mapper so the Clusters Client can
 // be generated in the correct structure
-func ProvisioningSchemas(version *types.APIVersion) *types.Schemas {
+func ClusterMachineSchemas(version *types.APIVersion) *types.Schemas {
 	schemas := factory.Schemas(version)
 	schemas.DefaultMappers = func() []types.Mapper {
 		mappers := []types.Mapper{
