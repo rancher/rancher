@@ -10,6 +10,7 @@ import (
 	"github.com/rancher/rancher/tests/framework/extensions/clusters"
 	"github.com/rancher/rancher/tests/framework/extensions/machinepools"
 	"github.com/rancher/rancher/tests/framework/extensions/users"
+	password "github.com/rancher/rancher/tests/framework/extensions/users/passwordgenerator"
 	"github.com/rancher/rancher/tests/framework/extensions/workloads"
 	"github.com/rancher/rancher/tests/framework/pkg/config"
 	"github.com/rancher/rancher/tests/framework/pkg/session"
@@ -58,9 +59,10 @@ func (r *RKE2NodeDriverProvisioningTestSuite) SetupSuite() {
 
 	enabled := true
 	var testuser = provisioning.AppendRandomString("testuser-")
+	var testpassword = password.GenerateUserPassword("testpass-")
 	user := &management.User{
 		Username: testuser,
-		Password: "rancherrancher123!",
+		Password: testpassword,
 		Name:     testuser,
 		Enabled:  &enabled,
 	}
@@ -168,6 +170,10 @@ func (r *RKE2NodeDriverProvisioningTestSuite) ProvisioningRKE2Cluster(provider P
 					err = wait.WatchWait(result, checkFunc)
 					assert.NoError(r.T(), err)
 					assert.Equal(r.T(), clusterName, clusterResp.ObjectMeta.Name)
+
+					clusterToken, err := clusters.CheckServiceAccountTokenSecret(client, clusterName)
+					require.NoError(r.T(), err)
+					assert.NotEmpty(r.T(), clusterToken)
 				})
 			}
 		}
@@ -234,6 +240,10 @@ func (r *RKE2NodeDriverProvisioningTestSuite) ProvisioningRKE2ClusterDynamicInpu
 					err = wait.WatchWait(result, checkFunc)
 					assert.NoError(r.T(), err)
 					assert.Equal(r.T(), clusterName, clusterResp.ObjectMeta.Name)
+
+					clusterToken, err := clusters.CheckServiceAccountTokenSecret(client, clusterName)
+					require.NoError(r.T(), err)
+					assert.NotEmpty(r.T(), clusterToken)
 				})
 			}
 		}
@@ -320,6 +330,10 @@ func (r *RKE2NodeDriverProvisioningTestSuite) ProvisioningRKE2CNICluster(provide
 					err = wait.WatchWait(result, checkFunc)
 					assert.NoError(r.T(), err)
 					assert.Equal(r.T(), clusterName, clusterResp.ObjectMeta.Name)
+
+					clusterToken, err := clusters.CheckServiceAccountTokenSecret(client, clusterName)
+					require.NoError(r.T(), err)
+					assert.NotEmpty(r.T(), clusterToken)
 
 					clusterID, err := clusters.GetClusterIDByName(r.client, clusterName)
 					assert.NoError(r.T(), err)
