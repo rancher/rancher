@@ -566,7 +566,7 @@ func (h *handler) migrateClusterSecrets(cluster *v3.Cluster) (*v3.Cluster, error
 
 				clusterCopy, err = h.clusters.Update(clusterCopy)
 				if err != nil {
-					logrus.Errorf("[secretmigrator] failed to migrate private registry secrets for cluster %s, will retry: %v", clusterCopy.Name, err)
+					logrus.Errorf("[secretmigrator] failed to migrate private registry secrets for cluster %s, will retry: %v", cluster.Name, err)
 					deleteErr := h.migrator.secrets.DeleteNamespaced(SecretNamespace, regSecret.Name, &metav1.DeleteOptions{})
 					if deleteErr != nil {
 						logrus.Errorf("[secretmigrator] encountered error while handling migration error: %v", deleteErr)
@@ -597,7 +597,7 @@ func (h *handler) migrateClusterSecrets(cluster *v3.Cluster) (*v3.Cluster, error
 				}
 				clusterCopy, err = h.clusters.Update(clusterCopy)
 				if err != nil {
-					logrus.Errorf("[secretmigrator] failed to migrate S3 secrets for cluster %s, will retry: %v", clusterCopy.Name, err)
+					logrus.Errorf("[secretmigrator] failed to migrate S3 secrets for cluster %s, will retry: %v", cluster.Name, err)
 					deleteErr := h.migrator.secrets.DeleteNamespaced(SecretNamespace, s3Secret.Name, &metav1.DeleteOptions{})
 					if deleteErr != nil {
 						logrus.Errorf("[secretmigrator] encountered error while handling migration error: %v", deleteErr)
@@ -628,7 +628,7 @@ func (h *handler) migrateClusterSecrets(cluster *v3.Cluster) (*v3.Cluster, error
 				}
 				clusterCopy, err = h.clusters.Update(clusterCopy)
 				if err != nil {
-					logrus.Errorf("[secretmigrator] failed to migrate weave CNI secrets for cluster %s, will retry: %v", clusterCopy.Name, err)
+					logrus.Errorf("[secretmigrator] failed to migrate weave CNI secrets for cluster %s, will retry: %v", cluster.Name, err)
 					deleteErr := h.migrator.secrets.DeleteNamespaced(SecretNamespace, weaveSecret.Name, &metav1.DeleteOptions{})
 					if deleteErr != nil {
 						logrus.Errorf("[secretmigrator] encountered error while handling migration error: %v", deleteErr)
@@ -661,7 +661,7 @@ func (h *handler) migrateClusterSecrets(cluster *v3.Cluster) (*v3.Cluster, error
 				}
 				clusterCopy, err = h.clusters.Update(clusterCopy)
 				if err != nil {
-					logrus.Errorf("[secretmigrator] failed to migrate vsphere global secret for cluster %s, will retry: %v", clusterCopy.Name, err)
+					logrus.Errorf("[secretmigrator] failed to migrate vsphere global secret for cluster %s, will retry: %v", cluster.Name, err)
 					deleteErr := h.migrator.secrets.DeleteNamespaced(SecretNamespace, vsphereSecret.Name, &metav1.DeleteOptions{})
 					if deleteErr != nil {
 						logrus.Errorf("[secretmigrator] encountered error while handling migration error: %v", deleteErr)
@@ -701,7 +701,7 @@ func (h *handler) migrateClusterSecrets(cluster *v3.Cluster) (*v3.Cluster, error
 				}
 				clusterCopy, err = h.clusters.Update(clusterCopy)
 				if err != nil {
-					logrus.Errorf("[secretmigrator] failed to migrate vsphere virtualcenter secret for cluster %s, will retry: %v", clusterCopy.Name, err)
+					logrus.Errorf("[secretmigrator] failed to migrate vsphere virtualcenter secret for cluster %s, will retry: %v", cluster.Name, err)
 					deleteErr := h.migrator.secrets.DeleteNamespaced(SecretNamespace, vcenterSecret.Name, &metav1.DeleteOptions{})
 					if deleteErr != nil {
 						logrus.Errorf("[secretmigrator] encountered error while handling migration error: %v", deleteErr)
@@ -731,7 +731,7 @@ func (h *handler) migrateClusterSecrets(cluster *v3.Cluster) (*v3.Cluster, error
 				}
 				clusterCopy, err = h.clusters.Update(clusterCopy)
 				if err != nil {
-					logrus.Errorf("[secretmigrator] failed to migrate openstack secret for cluster %s, will retry: %v", clusterCopy.Name, err)
+					logrus.Errorf("[secretmigrator] failed to migrate openstack secret for cluster %s, will retry: %v", cluster.Name, err)
 					deleteErr := h.migrator.secrets.DeleteNamespaced(SecretNamespace, openStackSecret.Name, &metav1.DeleteOptions{})
 					if deleteErr != nil {
 						logrus.Errorf("[secretmigrator] encountered error while handling migration error: %v", deleteErr)
@@ -761,7 +761,7 @@ func (h *handler) migrateClusterSecrets(cluster *v3.Cluster) (*v3.Cluster, error
 				}
 				clusterCopy, err = h.clusters.Update(clusterCopy)
 				if err != nil {
-					logrus.Errorf("[secretmigrator] failed to migrate aad client secret for cluster %s, will retry: %v", clusterCopy.Name, err)
+					logrus.Errorf("[secretmigrator] failed to migrate aad client secret for cluster %s, will retry: %v", cluster.Name, err)
 					deleteErr := h.migrator.secrets.DeleteNamespaced(SecretNamespace, aadClientSecret.Name, &metav1.DeleteOptions{})
 					if deleteErr != nil {
 						logrus.Errorf("[secretmigrator] encountered error while handling migration error: %v", deleteErr)
@@ -791,7 +791,7 @@ func (h *handler) migrateClusterSecrets(cluster *v3.Cluster) (*v3.Cluster, error
 				}
 				clusterCopy, err = h.clusters.Update(clusterCopy)
 				if err != nil {
-					logrus.Errorf("[secretmigrator] failed to migrate aad cert secret for cluster %s, will retry: %v", clusterCopy.Name, err)
+					logrus.Errorf("[secretmigrator] failed to migrate aad cert secret for cluster %s, will retry: %v", cluster.Name, err)
 					deleteErr := h.migrator.secrets.DeleteNamespaced(SecretNamespace, aadCertSecret.Name, &metav1.DeleteOptions{})
 					if deleteErr != nil {
 						logrus.Errorf("[secretmigrator] encountered error while handling migration error: %v", deleteErr)
@@ -1166,7 +1166,7 @@ func (h *handler) migrateServiceAccountSecrets(cluster *v3.Cluster) (*v3.Cluster
 				clusterCopy.Status.ServiceAccountToken = ""
 				clusterCopy, err = h.clusters.Update(clusterCopy)
 				if err != nil {
-					logrus.Errorf("[secretmigrator] failed to migrate service account token secret for cluster %s, will retry: %v", clusterCopy.Name, err)
+					logrus.Errorf("[secretmigrator] failed to migrate service account token secret for cluster %s, will retry: %v", cluster.Name, err)
 					deleteErr := h.migrator.secrets.DeleteNamespaced(SecretNamespace, saSecret.Name, &metav1.DeleteOptions{})
 					if deleteErr != nil {
 						logrus.Errorf("[secretmigrator] encountered error while handling migration error: %v", deleteErr)
