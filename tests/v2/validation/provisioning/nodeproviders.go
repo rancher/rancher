@@ -15,10 +15,12 @@ const (
 )
 
 type NodeCreationFunc func(client *rancher.Client, numOfInstances int) ([]*nodes.Node, error)
+type WinNodeCreationFunc func(client *rancher.Client, numOfInstances int, testWindows bool) ([]*nodes.Node, error)
 
 type ExternalNodeProvider struct {
-	Name             string
-	NodeCreationFunc NodeCreationFunc
+	Name                string
+	NodeCreationFunc    NodeCreationFunc
+	WinNodeCreationFunc WinNodeCreationFunc
 }
 
 // ExternalNodeProviderSetup is a helper function that setups an ExternalNodeProvider object is a wrapper
@@ -27,8 +29,9 @@ func ExternalNodeProviderSetup(providerType string) ExternalNodeProvider {
 	switch providerType {
 	case ec2NodeProviderName:
 		return ExternalNodeProvider{
-			Name:             providerType,
-			NodeCreationFunc: ec2.CreateNodes,
+			Name:                providerType,
+			NodeCreationFunc:    ec2.CreateNodes,
+			WinNodeCreationFunc: ec2.CreateWindowsNodes,
 		}
 	case fromConfig:
 		return ExternalNodeProvider{
@@ -38,6 +41,21 @@ func ExternalNodeProviderSetup(providerType string) ExternalNodeProvider {
 				config.LoadConfig(nodes.ExternalNodeConfigConfigurationFileKey, &nodeConfig)
 
 				nodesList := nodeConfig.Nodes[numOfInstances]
+				for _, node := range nodesList {
+					sshKey, err := nodes.GetSSHKey(node.SSHKeyName)
+					if err != nil {
+						return nil, err
+					}
+
+					node.SSHKey = sshKey
+				}
+				return nodesList, nil
+			},
+			WinNodeCreationFunc: func(client *rancher.Client, numOfInstanceWin int, testWindows bool) ([]*nodes.Node, error) {
+				var nodeConfig nodes.ExternalNodeConfig
+				config.LoadConfig(nodes.ExternalNodeConfigConfigurationFileKey, &nodeConfig)
+
+				nodesList := nodeConfig.Nodes[numOfInstanceWin]
 				for _, node := range nodesList {
 					sshKey, err := nodes.GetSSHKey(node.SSHKeyName)
 					if err != nil {

@@ -1,8 +1,6 @@
 package ec2
 
 import (
-	"fmt"
-
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/session"
@@ -22,7 +20,6 @@ func NewEC2Client() (*EC2Client, error) {
 	awsEC2ClientConfig := new(AWSEC2Configs)
 
 	config.LoadConfig(ConfigurationFileKey, awsEC2ClientConfig)
-	fmt.Print("AWS EC2 Client Config: ", awsEC2ClientConfig.AWSEC2Config[0].AWSAMI)
 
 	credential := credentials.NewStaticCredentials(awsEC2ClientConfig.AWSAccessKeyID, awsEC2ClientConfig.AWSSecretAccessKey, "")
 	sess, err := session.NewSession(&aws.Config{

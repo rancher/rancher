@@ -28,7 +28,6 @@ type CustomClusterProvisioningTestSuite struct {
 	session            *session.Session
 	standardUserClient *rancher.Client
 	kubernetesVersions []string
-	hasWindows         bool
 	cnis               []string
 	nodeProviders      []string
 }
@@ -86,20 +85,25 @@ func (c *CustomClusterProvisioningTestSuite) ProvisioningRKE2CustomCluster(exter
 		"--worker",
 	}
 
+	nodeRoles2 := []string{
+		"--worker",
+	}
+
 	tests := []struct {
-		name       string
-		nodeRoles  []string
-		hasWindows bool
-		client     *rancher.Client
+		name         string
+		nodeRoles    []string
+		nodeRolesWin []string
+		hasWindows   bool
+		client       *rancher.Client
 	}{
-		{"1 Node all roles Admin User", nodeRoles0, false, c.client},
-		{"1 Node all roles Standard User", nodeRoles0, false, c.standardUserClient},
-		{"3 nodes - 1 role per node Admin User", nodeRoles1, false, c.client},
-		{"3 nodes - 1 role per node Standard User", nodeRoles1, false, c.standardUserClient},
-		{"1 Node all roles Admin User + 1 Windows Worker - Hybrid", nodeRoles0, true, c.client},
-		{"1 Node all roles Standard User + 1 Windows Worker - Hybrid", nodeRoles0, true, c.standardUserClient},
-		{"3 unique role nodes as Admin User + 1 Windows Worker - Hybrid", nodeRoles1, true, c.client},
-		{"3 unique role nodes as Standard User + 1 Windows Worker - Hybrid", nodeRoles1, true, c.standardUserClient},
+		{"1 Node all roles Admin User", nodeRoles0, nil, false, c.client},
+		{"1 Node all roles Standard User", nodeRoles0, nil, false, c.standardUserClient},
+		{"3 nodes - 1 role per node Admin User", nodeRoles1, nil, false, c.client},
+		{"3 nodes - 1 role per node Standard User", nodeRoles1, nil, false, c.standardUserClient},
+		{"1 Node all roles Admin User + 1 Windows Worker", nodeRoles0, nodeRoles2, true, c.client},
+		{"1 Node all roles Standard User + 1 Windows Worker", nodeRoles0, nodeRoles2, true, c.standardUserClient},
+		{"3 unique role nodes as Admin User + 1 Windows Worker", nodeRoles1, nodeRoles2, true, c.client},
+		{"3 unique role nodes as Standard User + 1 Windows Worker", nodeRoles1, nodeRoles2, true, c.standardUserClient},
 	}
 	var name string
 	for _, tt := range tests {
@@ -112,33 +116,44 @@ func (c *CustomClusterProvisioningTestSuite) ProvisioningRKE2CustomCluster(exter
 					defer testSession.Cleanup()
 
 					client, err := tt.client.WithSession(testSession)
+					fmt.Print("client: ", client, "\n")
 					require.NoError(c.T(), err)
 
-					numNodes := len(tt.nodeRoles)
-					nodes, err := externalNodeProvider.NodeCreationFunc(client, numNodes)
+					numNodesLin := len(tt.nodeRoles)
+					numNodesWin := len(tt.nodeRolesWin)
+					linuxNodes, err := externalNodeProvider.NodeCreationFunc(client, numNodesLin)
+					require.NoError(c.T(), err)
+					winNodes, err := externalNodeProvider.WinNodeCreationFunc(client, numNodesWin, tt.hasWindows)
 					require.NoError(c.T(), err)
 
 					clusterName := provisioning.AppendRandomString(externalNodeProvider.Name)
+					fmt.Print("clusterName: ", clusterName, "\n")
 
 					cluster := clusters.NewRKE2ClusterConfig(clusterName, namespace, cni, "", kubeVersion, nil)
+					fmt.Print("cluster: ", cluster, "\n")
 
 					clusterResp, err := clusters.CreateRKE2Cluster(client, cluster)
+					fmt.Print("clusterResp: ", clusterResp, "\n")
 					require.NoError(c.T(), err)
 
 					client, err = client.ReLogin()
+					fmt.Print("client: ", client, "\n")
 					require.NoError(c.T(), err)
 
 					customCluster, err := client.Provisioning.Cluster.ByID(clusterResp.ID)
+					fmt.Print("customCluster: ", customCluster, "\n")
 					require.NoError(c.T(), err)
 
 					token, err := tokenregistration.GetRegistrationToken(client, customCluster.Status.ClusterName)
 					require.NoError(c.T(), err)
+					fmt.Print("token: ", token, "\n")
 
-					for key, node := range nodes {
-						c.T().Logf("Execute Registration Command for node %s", node.NodeID)
+					for key, linuxNode := range linuxNodes {
+						fmt.Print("linNode: ", linuxNode, "\n")
+						c.T().Logf("Execute Registration Command for node %s", linuxNode.NodeID)
 						command := fmt.Sprintf("%s %s", token.InsecureNodeCommand, tt.nodeRoles[key])
-
-						output, err := node.ExecuteCommand(command)
+						fmt.Print("Executing Linux Command: ", command, "\n")
+						output, err := linuxNode.ExecuteCommand(command)
 						require.NoError(c.T(), err)
 						c.T().Logf(output)
 					}
@@ -154,9 +169,34 @@ func (c *CustomClusterProvisioningTestSuite) ProvisioningRKE2CustomCluster(exter
 
 					checkFunc := clusters.IsProvisioningClusterReady
 
-					err = wait.WatchWait(result, checkFunc)
-					assert.NoError(c.T(), err)
-					assert.Equal(c.T(), clusterName, clusterResp.ObjectMeta.Name)
+					if tt.hasWindows {
+						for key, winNode := range winNodes {
+							c.T().Logf("Execute Registration Command for node %s", winNode.NodeID)
+							winCommand := fmt.Sprintf("%s %s", token.InsecureWindowsNodeCommand, tt.nodeRoles[key])
+							fmt.Print("Executing Windows Command: ", winCommand, "\n")
+							_, err := winNode.ExecuteCommand("powershell")
+							require.NoError(c.T(), err)
+							output, err := winNode.ExecuteCommand(winCommand)
+							require.NoError(c.T(), err)
+							c.T().Logf(output)
+						}
+						kubeProvisioningClient, err := c.client.GetKubeAPIProvisioningClient()
+						require.NoError(c.T(), err)
+						result, err := kubeProvisioningClient.Clusters(namespace).Watch(context.TODO(), metav1.ListOptions{
+							FieldSelector:  "metadata.name=" + clusterName,
+							TimeoutSeconds: &defaults.WatchTimeoutSeconds,
+						})
+						require.NoError(c.T(), err)
+						checkFunc := clusters.IsProvisioningClusterReady
+						err = wait.WatchWait(result, checkFunc)
+						assert.NoError(c.T(), err)
+						assert.Equal(c.T(), clusterName, clusterResp.ObjectMeta.Name)
+					} else {
+						err = wait.WatchWait(result, checkFunc)
+						assert.NoError(c.T(), err)
+						assert.Equal(c.T(), clusterName, clusterResp.ObjectMeta.Name)
+					}
+
 				})
 			}
 		}
@@ -185,11 +225,12 @@ func (c *CustomClusterProvisioningTestSuite) ProvisioningRKE2CustomClusterDynami
 	numOfNodes := len(rolesPerNode)
 
 	tests := []struct {
-		name   string
-		client *rancher.Client
+		name       string
+		client     *rancher.Client
+		hasWindows bool
 	}{
-		{"Admin User", c.client},
-		{"Standard User", c.standardUserClient},
+		{"Admin User", c.client, false},
+		{"Standard User", c.standardUserClient, false},
 	}
 
 	var name string
