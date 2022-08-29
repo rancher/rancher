@@ -24,6 +24,7 @@ import (
 	"github.com/rancher/wrangler/pkg/generic"
 	"github.com/rancher/wrangler/pkg/kv"
 	name2 "github.com/rancher/wrangler/pkg/name"
+	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	apierror "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -131,6 +132,12 @@ func (h *handler) getArgsEnvAndStatus(infraObj *infraObject, args map[string]int
 		fmt.Sprintf("--driver-hash=%s", hash),
 		fmt.Sprintf("--secret-namespace=%s", infraObj.meta.GetNamespace()),
 		fmt.Sprintf("--secret-name=%s", secretName),
+	}
+
+	// only in trace because machine has sensitive details and we can't control who debugs what in there easily
+	if logrus.GetLevel() >= logrus.TraceLevel {
+		// add --debug to pass directly to machine
+		cmd = append(cmd, "--debug")
 	}
 
 	if create {
