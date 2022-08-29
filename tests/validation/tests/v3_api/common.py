@@ -1683,7 +1683,6 @@ def wait_for_app_to_active(client, app_id,
     @return: app object
     """
     start = time.time()
-    timeout = start + timeout
     app_data = client.list_app(id=app_id).data
     while len(app_data) == 0:
         if time.time() - start > timeout / 10:
