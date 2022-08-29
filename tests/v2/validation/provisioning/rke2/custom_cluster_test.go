@@ -11,6 +11,7 @@ import (
 	"github.com/rancher/rancher/tests/framework/extensions/machinepools"
 	"github.com/rancher/rancher/tests/framework/extensions/tokenregistration"
 	"github.com/rancher/rancher/tests/framework/extensions/users"
+	password "github.com/rancher/rancher/tests/framework/extensions/users/passwordgenerator"
 	"github.com/rancher/rancher/tests/framework/pkg/config"
 	"github.com/rancher/rancher/tests/framework/pkg/session"
 	"github.com/rancher/rancher/tests/framework/pkg/wait"
@@ -55,9 +56,10 @@ func (c *CustomClusterProvisioningTestSuite) SetupSuite() {
 
 	enabled := true
 	var testuser = provisioning.AppendRandomString("testuser-")
+	var testpassword = password.GenerateUserPassword("testpass-")
 	user := &management.User{
 		Username: testuser,
-		Password: "rancherrancher123!",
+		Password: testpassword,
 		Name:     testuser,
 		Enabled:  &enabled,
 	}
@@ -157,6 +159,10 @@ func (c *CustomClusterProvisioningTestSuite) ProvisioningRKE2CustomCluster(exter
 					err = wait.WatchWait(result, checkFunc)
 					assert.NoError(c.T(), err)
 					assert.Equal(c.T(), clusterName, clusterResp.ObjectMeta.Name)
+
+					clusterToken, err := clusters.CheckServiceAccountTokenSecret(client, clusterName)
+					require.NoError(c.T(), err)
+					assert.NotEmpty(c.T(), clusterToken)
 				})
 			}
 		}
@@ -247,6 +253,10 @@ func (c *CustomClusterProvisioningTestSuite) ProvisioningRKE2CustomClusterDynami
 					err = wait.WatchWait(result, checkFunc)
 					assert.NoError(c.T(), err)
 					assert.Equal(c.T(), clusterName, clusterResp.ObjectMeta.Name)
+
+					clusterToken, err := clusters.CheckServiceAccountTokenSecret(client, clusterName)
+					require.NoError(c.T(), err)
+					assert.NotEmpty(c.T(), clusterToken)
 				})
 			}
 		}

@@ -1421,6 +1421,7 @@ def validate_cluster_state(client, cluster,
                            nodes_not_in_active_state=[],
                            timeout=MACHINE_TIMEOUT):
     start_time = time.time()
+    timeout = start_time + timeout
     if check_intermediate_state:
         cluster = wait_for_condition(
             client, cluster,
@@ -1481,7 +1482,11 @@ def delete_node(aws_nodes):
 
 def cluster_cleanup(client, cluster, aws_nodes=None):
     if RANCHER_CLEANUP_CLUSTER:
+        start = time.time()
         client.delete(cluster)
+        if cluster.rancherKubernetesEngineConfig.cloudProvider.name == "azure":
+            time.sleep(20)
+            print("-------sleep time after cluster deletion--------", time.time() - start)
         if aws_nodes is not None:
             delete_node(aws_nodes)
     else:
@@ -1678,7 +1683,6 @@ def wait_for_app_to_active(client, app_id,
     @return: app object
     """
     start = time.time()
-    timeout = start + timeout
     app_data = client.list_app(id=app_id).data
     while len(app_data) == 0:
         if time.time() - start > timeout / 10:
