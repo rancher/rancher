@@ -13,6 +13,7 @@ import (
 	"github.com/rancher/rancher/tests/framework/extensions/clusters/eks"
 	"github.com/rancher/rancher/tests/framework/extensions/clusters/gke"
 	"github.com/rancher/rancher/tests/framework/extensions/users"
+	password "github.com/rancher/rancher/tests/framework/extensions/users/passwordgenerator"
 	"github.com/rancher/rancher/tests/framework/pkg/session"
 	"github.com/rancher/rancher/tests/framework/pkg/wait"
 	"github.com/rancher/rancher/tests/integration/pkg/defaults"
@@ -45,9 +46,10 @@ func (h *HostedClusterProvisioningTestSuite) SetupSuite() {
 
 	enabled := true
 	var testuser = provisioning.AppendRandomString("testuser-")
+	var testpassword = password.GenerateUserPassword("testpass-")
 	user := &management.User{
 		Username: testuser,
-		Password: "rancherrancher123!",
+		Password: testpassword,
 		Name:     testuser,
 		Enabled:  &enabled,
 	}
@@ -100,6 +102,9 @@ func (h *HostedClusterProvisioningTestSuite) TestProvisioningHostedGKECluster() 
 			require.NoError(h.T(), err)
 			assert.Equal(h.T(), clusterName, clusterResp.Name)
 
+			clusterToken, err := clusters.CheckServiceAccountTokenSecret(client, clusterName)
+			require.NoError(h.T(), err)
+			assert.NotEmpty(h.T(), clusterToken)
 		})
 	}
 }
@@ -141,6 +146,9 @@ func (h *HostedClusterProvisioningTestSuite) TestProvisioningHostedAKSCluster() 
 			require.NoError(h.T(), err)
 			assert.Equal(h.T(), clusterName, clusterResp.Name)
 
+			clusterToken, err := clusters.CheckServiceAccountTokenSecret(client, clusterName)
+			require.NoError(h.T(), err)
+			assert.NotEmpty(h.T(), clusterToken)
 		})
 	}
 }
@@ -182,6 +190,9 @@ func (h *HostedClusterProvisioningTestSuite) TestProvisioningHostedEKSCluster() 
 			require.NoError(h.T(), err)
 			assert.Equal(h.T(), clusterName, clusterResp.Name)
 
+			clusterToken, err := clusters.CheckServiceAccountTokenSecret(client, clusterName)
+			require.NoError(h.T(), err)
+			assert.NotEmpty(h.T(), clusterToken)
 		})
 	}
 }
