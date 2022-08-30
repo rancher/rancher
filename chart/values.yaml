@@ -73,8 +73,8 @@ ingress:
 
 ### service ###
 # Override to use NodePort or LoadBalancer service type - default is ClusterIP
-# service:
-#   type: NodePort
+service:
+  type: ""
 
 ### LetsEncrypt config ###
 # ProTip: The production environment only allows you to register a name 5 times a week.
