@@ -1,0 +1,22 @@
+suite: Test Service
+templates:
+- service.yaml
+tests:
+- it: should set NodePort service type
+  set:
+    service.type: NodePort
+  asserts:
+  - equal:
+      path: spec.type
+      value: NodePort
+- it: should set LoadBalancer service type
+  set:
+    service.type: LoadBalancer
+  asserts:
+  - equal:
+      path: spec.type
+      value: LoadBalancer
+- it: should default to ClusterIP service type
+  asserts:
+  - isNull:
+      path: spec.type
