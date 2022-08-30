@@ -19,7 +19,6 @@ RUN curl -sLf https://github.com/rancher/loglevel/releases/download/${LOGLEVEL_V
 ARG VERSION=dev
 LABEL io.cattle.agent true
 ENV AGENT_IMAGE rancher/rancher-agent:${VERSION}
-ENV SSL_CERT_DIR /etc/kubernetes/ssl/certs
 COPY --from=rancher /var/lib/rancher-data /var/lib/rancher-data
 COPY --from=rancher /usr/bin/tini /usr/bin/
 COPY agent run.sh kubectl-shell.sh shell-setup.sh /usr/bin/
