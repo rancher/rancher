@@ -41,6 +41,9 @@ func (ap *azureProvider) actionHandler(actionName string, action *types.Action, 
 	} else if actionName == "testAndApply" {
 		return ap.testAndApply(actionName, action, request)
 	} else if actionName == "upgrade" {
+		if err := ap.checkConfigurationBeforeMigration(); err != nil {
+			return err
+		}
 		return ap.migrateToMicrosoftGraph()
 	}
 
@@ -116,6 +119,28 @@ func (ap *azureProvider) testAndApply(actionName string, action *types.Action, r
 	userExtraInfo := ap.GetUserExtraAttributes(userPrincipal)
 
 	return ap.tokenMGR.CreateTokenAndSetCookie(user.Name, userPrincipal, groupPrincipals, providerToken, 0, "Token via Azure Configuration", request, userExtraInfo)
+}
+
+// checkConfigurationBeforeMigration verifies that admins have properly configured an existing app registration's permissions
+// in the Azure portal before they update their Azure AD auth config to use the new authentication flow.
+// The method fetches the current AuthConfig from the database, then updates it in-memory to use the new endpoints,
+// and creates a new test Azure client, thereby getting an access token to the Graph API.
+// Then it parses the JWT and inspects the permissions contained within. If the admins had not set those as per docs,
+// then Rancher won't find the permissions in the test token and will return an error.
+func (ap *azureProvider) checkConfigurationBeforeMigration() error {
+	cfg, err := ap.getAzureConfigK8s()
+	if err != nil {
+		return err
+	}
+	// Use the future, post-migration, endpoints. This temporarily updated config won't be persisted to the database in this method.
+	updateAzureADEndpoints(cfg)
+
+	azureClient, err := clients.NewMSGraphClient(cfg, ap.secrets)
+	if err != nil {
+		return err
+	}
+	token := azureClient.AccessToken()
+	return clients.EnsureMSGraphTokenHasPermissions(token)
 }
 
 // migrateToMicrosoftGraph represents the migration of the registered Azure AD auth provider
