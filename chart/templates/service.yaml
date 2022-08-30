@@ -5,6 +5,12 @@ metadata:
   labels:
 {{ include "rancher.labels" . | indent 4 }}
 spec:
+  {{- /*
+  If service.type is not provided this attribute is ommitted and k8s default of ClusterIP is used.
+  */}} 
+  {{- if .Values.service.type }}
+  type: {{ .Values.service.type }}
+  {{- end }}
   ports:
   - port: 80
     targetPort: 80
