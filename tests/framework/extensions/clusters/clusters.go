@@ -3,8 +3,10 @@ package clusters
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
+	"github.com/pkg/errors"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/pkg/api/scheme"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
@@ -15,6 +17,7 @@ import (
 	v1 "github.com/rancher/rancher/tests/framework/clients/rancher/v1"
 	"github.com/rancher/rancher/tests/framework/pkg/wait"
 	"github.com/rancher/rancher/tests/integration/pkg/defaults"
+	"github.com/rancher/wrangler/pkg/summary"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -411,4 +414,97 @@ func UpdateK3SRKE2Cluster(client *rancher.Client, cluster *v1.SteveAPIObject, up
 	}
 
 	return cluster, nil
+}
+
+// WaitForClusterToBeUpgraded is a "helper" functions that takes a rancher client, and the cluster id as parameters. This function
+// contains two stages. First stage is to wait to be cluster in upgrade state. And the other is to wait until cluster is ready.
+// Cluster error states that declare control plane is inaccessible and cluster object modified are ignored.
+// Same cluster summary information logging is ignored.
+func WaitClusterToBeUpgraded(client *rancher.Client, clusterID string) (err error) {
+	clusterStateUpgrading := "upgrading" // For imported RKE2 and K3s clusters
+	clusterStateUpdating := "updating"   // For all clusters except imported K3s and RKE2
+
+	clusterErrorStateMessage := "cluster is in error state"
+
+	var clusterInfo string
+	opts := metav1.ListOptions{
+		FieldSelector:  "metadata.name=" + clusterID,
+		TimeoutSeconds: &defaults.WatchTimeoutSeconds,
+	}
+
+	watchInterface, err := client.GetManagementWatchInterface(management.ClusterType, opts)
+	if err != nil {
+		return
+	}
+	checkFuncWaitToBeInUpgrade := func(event watch.Event) (bool, error) {
+		clusterUnstructured := event.Object.(*unstructured.Unstructured)
+		summerizedCluster := summary.Summarize(clusterUnstructured)
+
+		clusterInfo = logClusterInfoWithChanges(clusterID, clusterInfo, summerizedCluster)
+
+		if summerizedCluster.Transitioning && !summerizedCluster.Error && (summerizedCluster.State == clusterStateUpdating || summerizedCluster.State == clusterStateUpgrading) {
+			return true, nil
+		} else if summerizedCluster.Error && isClusterInaccessible(summerizedCluster.Message) {
+			return false, nil
+		} else if summerizedCluster.Error && !isClusterInaccessible(summerizedCluster.Message) {
+			return false, errors.Wrap(err, clusterErrorStateMessage)
+		}
+
+		return false, nil
+	}
+	err = wait.WatchWait(watchInterface, checkFuncWaitToBeInUpgrade)
+	if err != nil {
+		return
+	}
+
+	watchInterfaceWaitUpgrade, err := client.GetManagementWatchInterface(management.ClusterType, opts)
+	checkFuncWaitUpgrade := func(event watch.Event) (bool, error) {
+		clusterUnstructured := event.Object.(*unstructured.Unstructured)
+		summerizedCluster := summary.Summarize(clusterUnstructured)
+
+		clusterInfo = logClusterInfoWithChanges(clusterID, clusterInfo, summerizedCluster)
+
+		if summerizedCluster.IsReady() {
+			return true, nil
+		} else if summerizedCluster.Error && isClusterInaccessible(summerizedCluster.Message) {
+			return false, nil
+		} else if summerizedCluster.Error && !isClusterInaccessible(summerizedCluster.Message) {
+			return false, errors.Wrap(err, clusterErrorStateMessage)
+
+		}
+
+		return false, nil
+	}
+
+	err = wait.WatchWait(watchInterfaceWaitUpgrade, checkFuncWaitUpgrade)
+	if err != nil {
+		return err
+	}
+
+	return
+}
+
+func isClusterInaccessible(messages []string) (isInaccessible bool) {
+	clusterCPErrorMessage := "Cluster health check failed: Failed to communicate with API server during namespace check" // For GKE
+	clusterModifiedErrorMessage := "the object has been modified"                                                        // For provisioning node driver K3s and RKE2
+
+	for _, message := range messages {
+		if strings.Contains(message, clusterCPErrorMessage) || strings.Contains(message, clusterModifiedErrorMessage) {
+			isInaccessible = true
+			break
+		}
+	}
+
+	return
+}
+
+func logClusterInfoWithChanges(clusterID, clusterInfo string, summary summary.Summary) string {
+	newClusterInfo := fmt.Sprintf("ClusterID: %v, Message: %v, Error: %v, State: %v, Transiationing: %v", clusterID, summary.Message, summary.Error, summary.State, summary.Transitioning)
+
+	if clusterInfo != newClusterInfo {
+		logrus.Infof(newClusterInfo)
+		clusterInfo = newClusterInfo
+	}
+
+	return clusterInfo
 }
