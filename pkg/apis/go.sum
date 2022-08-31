@@ -150,8 +150,8 @@ github.com/asaskevich/govalidator v0.0.0-20190424111038-f61b66f89f4a/go.mod h1:l
 github.com/aws/aws-sdk-go v1.8.39/go.mod h1:ZRmQr0FajVIyZ4ZzBYKG5P3ZqPz9IHG41ZoMu1ADI3k=
 github.com/aws/aws-sdk-go v1.15.11/go.mod h1:mFuSZ37Z9YOHbQEwBWztmVzqXrEkub65tZoCYDt7FT0=
 github.com/aws/aws-sdk-go v1.33.14/go.mod h1:5zCpMtNQVjRREroY7sYe8lOMRSxkhG6MZveU8YkpAk0=
-github.com/aws/aws-sdk-go v1.36.7/go.mod h1:hcU610XS61/+aQV88ixoOzUoG7v3b31pl2zKMmprdro=
 github.com/aws/aws-sdk-go v1.38.65/go.mod h1:hcU610XS61/+aQV88ixoOzUoG7v3b31pl2zKMmprdro=
+github.com/aws/aws-sdk-go v1.44.83/go.mod h1:y4AeaBuwd2Lk+GepC1E9v0qOiTws0MIWAX4oIKwKHZo=
 github.com/benbjohnson/clock v1.0.3/go.mod h1:bGMdMPoPVvcYyt1gHDf4J2KE153Yf9BuiUKYMaxlTDM=
 github.com/benbjohnson/clock v1.1.0/go.mod h1:J11/hYXuz8f4ySSvYwY0FKfm+ezbsZBKZxNJlLklBHA=
 github.com/beorn7/perks v0.0.0-20160804104726-4c0e84591b9a/go.mod h1:Dwedo/Wpr24TaqPxmxbtue+5NUziq4I4S80YR8gNf3Q=
@@ -999,8 +999,8 @@ github.com/qri-io/starlib v0.4.2-0.20200213133954-ff2e8cd5ef8d/go.mod h1:7DPO4do
 github.com/rackspace/gophercloud v0.0.0-20150408191457-ce0f487f6747/go.mod h1:4bJ1FwuaBZ6dt1VcDX5/O662mwR8GWqS4l68H6hkoYQ=
 github.com/rancher/aks-operator v1.0.6 h1:A/haordC1lv2TIUV8A2tMo2XP+ckZRFfex8b3igWZVA=
 github.com/rancher/aks-operator v1.0.6/go.mod h1:CP6mTWZL2mc19kdavUe5jOK9LT+k0/nDw76UOLYpFJU=
-github.com/rancher/eks-operator v1.1.4 h1:0DlgF+RTHcS1KW6xUSjCyIirWMioF8bKWQ6xEuPi7xM=
-github.com/rancher/eks-operator v1.1.4/go.mod h1:N0zzDJ+xvv6BkXRMjIBlFObOmud5H1sSOccG0FS+DJM=
+github.com/rancher/eks-operator v1.1.5-rc1 h1:Jgn9tIcxNc9L7YZOkGjAbulUOk4jhmrps+9m7f4ceOY=
+github.com/rancher/eks-operator v1.1.5-rc1/go.mod h1:mx3fp0rFzDX7gEXJtisHWDFeDJHpDsAjwDkmbSf1BKs=
 github.com/rancher/fleet/pkg/apis v0.0.0-20220722201012-fe5f76e3c1e0 h1:2ha3Zn/ywk5B/5ptJP3TA9bowEM881Z5aah8tW23u80=
 github.com/rancher/fleet/pkg/apis v0.0.0-20220722201012-fe5f76e3c1e0/go.mod h1:9WPJL9oAAekV8cUFC88YIdxKkw5vtI2uyvhgvadTbEQ=
 github.com/rancher/gke-operator v1.1.4 h1:M42t+UmXVZyYPF60ex5U1FpvxXEKhBBMA0OJ9xdzrKQ=
