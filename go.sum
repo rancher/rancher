@@ -235,11 +235,11 @@ github.com/aws/aws-sdk-go v1.33.14/go.mod h1:5zCpMtNQVjRREroY7sYe8lOMRSxkhG6MZve
 github.com/aws/aws-sdk-go v1.34.0/go.mod h1:5zCpMtNQVjRREroY7sYe8lOMRSxkhG6MZveU8YkpAk0=
 github.com/aws/aws-sdk-go v1.34.9/go.mod h1:5zCpMtNQVjRREroY7sYe8lOMRSxkhG6MZveU8YkpAk0=
 github.com/aws/aws-sdk-go v1.35.24/go.mod h1:tlPOdRjfxPBpNIwqDj61rmsnA85v9jc0Ps9+muhnW+k=
-github.com/aws/aws-sdk-go v1.36.7/go.mod h1:hcU610XS61/+aQV88ixoOzUoG7v3b31pl2zKMmprdro=
 github.com/aws/aws-sdk-go v1.38.49/go.mod h1:hcU610XS61/+aQV88ixoOzUoG7v3b31pl2zKMmprdro=
 github.com/aws/aws-sdk-go v1.38.65/go.mod h1:hcU610XS61/+aQV88ixoOzUoG7v3b31pl2zKMmprdro=
-github.com/aws/aws-sdk-go v1.43.28 h1:HrBUf2pYEMRB3GDkSa/bZ2lkZIe8gSUOz/IEupG1Te0=
 github.com/aws/aws-sdk-go v1.43.28/go.mod h1:y4AeaBuwd2Lk+GepC1E9v0qOiTws0MIWAX4oIKwKHZo=
+github.com/aws/aws-sdk-go v1.44.83 h1:7+Rtc2Eio6EKUNoZeMV/IVxzVrY5oBQcNPtCcgIHYJA=
+github.com/aws/aws-sdk-go v1.44.83/go.mod h1:y4AeaBuwd2Lk+GepC1E9v0qOiTws0MIWAX4oIKwKHZo=
 github.com/beevik/etree v1.1.0 h1:T0xke/WvNtMoCqgzPhkX2r4rjY3GDZFi+FjpRZY2Jbs=
 github.com/beevik/etree v1.1.0/go.mod h1:r8Aw8JqVegEf0w2fDnATrX9VpkMcyFeM0FhwO62wh+A=
 github.com/benbjohnson/clock v1.0.3/go.mod h1:bGMdMPoPVvcYyt1gHDf4J2KE153Yf9BuiUKYMaxlTDM=
@@ -1362,8 +1362,8 @@ github.com/rancher/client-go v1.24.0-rancher1/go.mod h1:J+jC4WE19J7G2gTyKYvlGroI
 github.com/rancher/dynamiclistener v0.2.1-0.20200714201033-9c1939da3af9/go.mod h1:qr0QfhwzcVCR+Ao9WyfnE+jmOpfEAdRhXtNOZGJ3nCQ=
 github.com/rancher/dynamiclistener v0.3.4 h1:URGBzqGYD6zfFTy4WQ4w1zNm+B+1XVkwcSu61DXq5XY=
 github.com/rancher/dynamiclistener v0.3.4/go.mod h1:QwTpy+drx4gvPMefrrUUKpVaWiy74O7vNvkwBXJ+s3E=
-github.com/rancher/eks-operator v1.1.4 h1:0DlgF+RTHcS1KW6xUSjCyIirWMioF8bKWQ6xEuPi7xM=
-github.com/rancher/eks-operator v1.1.4/go.mod h1:N0zzDJ+xvv6BkXRMjIBlFObOmud5H1sSOccG0FS+DJM=
+github.com/rancher/eks-operator v1.1.5-rc1 h1:Jgn9tIcxNc9L7YZOkGjAbulUOk4jhmrps+9m7f4ceOY=
+github.com/rancher/eks-operator v1.1.5-rc1/go.mod h1:mx3fp0rFzDX7gEXJtisHWDFeDJHpDsAjwDkmbSf1BKs=
 github.com/rancher/fleet/pkg/apis v0.0.0-20220722201012-fe5f76e3c1e0 h1:2ha3Zn/ywk5B/5ptJP3TA9bowEM881Z5aah8tW23u80=
 github.com/rancher/fleet/pkg/apis v0.0.0-20220722201012-fe5f76e3c1e0/go.mod h1:9WPJL9oAAekV8cUFC88YIdxKkw5vtI2uyvhgvadTbEQ=
 github.com/rancher/gke-operator v1.1.4 h1:M42t+UmXVZyYPF60ex5U1FpvxXEKhBBMA0OJ9xdzrKQ=
