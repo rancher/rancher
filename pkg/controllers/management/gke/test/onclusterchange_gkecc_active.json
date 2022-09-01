@@ -1,111 +1,6 @@
 {
   "apiVersion": "gke.cattle.io/v1",
   "kind": "GKEClusterConfig",
-  "metadata": {
-    "creationTimestamp": "2022-08-22T19:19:12Z",
-    "finalizers": [
-      "wrangler.cattle.io/gke-controller-remove"
-    ],
-    "generation": 3,
-    "managedFields": [
-      {
-        "apiVersion": "gke.cattle.io/v1",
-        "fieldsType": "FieldsV1",
-        "fieldsV1": {
-          "f:metadata": {
-            "f:finalizers": {
-              ".": {},
-              "v:\"wrangler.cattle.io/gke-controller-remove\"": {}
-            }
-          },
-          "f:status": {
-            ".": {},
-            "f:failureMessage": {}
-          }
-        },
-        "manager": "gke-operator",
-        "operation": "Update",
-        "time": "2022-08-22T19:19:15Z"
-      },
-      {
-        "apiVersion": "gke.cattle.io/v1",
-        "fieldsType": "FieldsV1",
-        "fieldsV1": {
-          "f:status": {
-            "f:phase": {}
-          }
-        },
-        "manager": "gke-operator",
-        "operation": "Update",
-        "subresource": "status",
-        "time": "2022-08-22T19:24:17Z"
-      },
-      {
-        "apiVersion": "gke.cattle.io/v1",
-        "fieldsType": "FieldsV1",
-        "fieldsV1": {
-          "f:metadata": {
-            "f:ownerReferences": {
-              ".": {},
-              "k:{\"uid\":\"53cd1838-e5ea-4d12-bb5c-9ecab9d8631b\"}": {}
-            }
-          },
-          "f:spec": {
-            ".": {},
-            "f:clusterAddons": {
-              ".": {},
-              "f:horizontalPodAutoscaling": {},
-              "f:httpLoadBalancing": {}
-            },
-            "f:clusterIpv4Cidr": {},
-            "f:clusterName": {},
-            "f:description": {},
-            "f:enableKubernetesAlpha": {},
-            "f:googleCredentialSecret": {},
-            "f:imported": {},
-            "f:ipAllocationPolicy": {
-              ".": {},
-              "f:clusterIpv4CidrBlock": {},
-              "f:clusterSecondaryRangeName": {},
-              "f:servicesIpv4CidrBlock": {},
-              "f:servicesSecondaryRangeName": {},
-              "f:useIpAliases": {}
-            },
-            "f:kubernetesVersion": {},
-            "f:labels": {},
-            "f:locations": {},
-            "f:loggingService": {},
-            "f:maintenanceWindow": {},
-            "f:masterAuthorizedNetworks": {},
-            "f:monitoringService": {},
-            "f:network": {},
-            "f:networkPolicyEnabled": {},
-            "f:nodePools": {},
-            "f:privateClusterConfig": {},
-            "f:projectID": {},
-            "f:region": {},
-            "f:subnetwork": {},
-            "f:zone": {}
-          }
-        },
-        "manager": "___go_build_main_go",
-        "operation": "Update",
-        "time": "2022-08-22T20:56:11Z"
-      }
-    ],
-    "name": "c-5tzkk",
-    "namespace": "cattle-global-data",
-    "ownerReferences": [
-      {
-        "apiVersion": "management.cattle.io/v3",
-        "kind": "Cluster",
-        "name": "c-5tzkk",
-        "uid": "53cd1838-e5ea-4d12-bb5c-9ecab9d8631b"
-      }
-    ],
-    "resourceVersion": "692117",
-    "uid": "ed5c7142-d132-48e2-867d-0c116280315d"
-  },
   "spec": {
     "clusterAddons": {
       "horizontalPodAutoscaling": true,
@@ -119,9 +14,9 @@
     "imported": false,
     "ipAllocationPolicy": {
       "clusterIpv4CidrBlock": "10.124.0.0/14",
-      "clusterSecondaryRangeName": "gke-gke-test-pods-f86e3af0",
+      "clusterSecondaryRangeName": "gke-gke-test-pods-fedcba98",
       "servicesIpv4CidrBlock": "10.0.0.0/20",
-      "servicesSecondaryRangeName": "gke-gke-test-services-f86e3af0",
+      "servicesSecondaryRangeName": "gke-gke-test-services-fedcba98",
       "useIpAliases": true
     },
     "kubernetesVersion": "1.22.11-gke.400",
@@ -172,7 +67,7 @@
       }
     ],
     "privateClusterConfig": {},
-    "projectID": "ei-container-platform-dev",
+    "projectID": "test-project-id",
     "region": "",
     "subnetwork": "default",
     "zone": "us-central1-c"

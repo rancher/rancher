@@ -1,68 +1,5 @@
 apiVersion: management.cattle.io/v3
 kind: Cluster
-metadata:
-  annotations:
-    authz.management.cattle.io/creator-role-bindings: '{"created":["cluster-owner"],"required":["cluster-owner"]}'
-    clusters.management.cattle.io/ke-last-refresh: "1660052876"
-    field.cattle.io/creatorId: user-rgtsq
-    lifecycle.cattle.io/create.cluster-agent-controller-cleanup: "true"
-    lifecycle.cattle.io/create.cluster-provisioner-controller: "true"
-    lifecycle.cattle.io/create.cluster-scoped-gc: "true"
-    lifecycle.cattle.io/create.mgmt-cluster-rbac-remove: "true"
-    provisioner.cattle.io/encrypt-migrated: "true"
-  creationTimestamp: "2022-08-09T12:47:51Z"
-  finalizers:
-  - wrangler.cattle.io/mgmt-cluster-remove
-  - controller.cattle.io/cluster-agent-controller-cleanup
-  - controller.cattle.io/cluster-scoped-gc
-  - controller.cattle.io/cluster-provisioner-controller
-  - controller.cattle.io/mgmt-cluster-rbac-remove
-  generateName: c-
-  generation: 32
-  labels:
-    cattle.io/creator: norman
-  managedFields:
-  - apiVersion: management.cattle.io/v3
-    fieldsType: FieldsV1
-    fieldsV1:
-      f:metadata:
-        f:annotations:
-          .: {}
-          f:field.cattle.io/creatorId: {}
-        f:generateName: {}
-        f:labels:
-          .: {}
-          f:cattle.io/creator: {}
-    manager: Go-http-client
-    operation: Update
-    time: "2022-08-09T13:33:45Z"
-  - apiVersion: management.cattle.io/v3
-    fieldsType: FieldsV1
-    fieldsV1:
-      f:metadata:
-        f:annotations:
-          f:authz.management.cattle.io/creator-role-bindings: {}
-          f:clusters.management.cattle.io/ke-last-refresh: {}
-          f:lifecycle.cattle.io/create.cluster-agent-controller-cleanup: {}
-          f:lifecycle.cattle.io/create.cluster-provisioner-controller: {}
-          f:lifecycle.cattle.io/create.cluster-scoped-gc: {}
-          f:lifecycle.cattle.io/create.mgmt-cluster-rbac-remove: {}
-          f:provisioner.cattle.io/encrypt-migrated: {}
-        f:finalizers:
-          .: {}
-          v:"controller.cattle.io/cluster-agent-controller-cleanup": {}
-          v:"controller.cattle.io/cluster-provisioner-controller": {}
-          v:"controller.cattle.io/cluster-scoped-gc": {}
-          v:"controller.cattle.io/mgmt-cluster-rbac-remove": {}
-          v:"wrangler.cattle.io/mgmt-cluster-remove": {}
-      f:spec: {}
-      f:status: {}
-    manager: ___go_build_main_go
-    operation: Update
-    time: "2022-08-09T13:47:56Z"
-  name: c-m2ltq
-  resourceVersion: "18638"
-  uid: 31938fdf-abc8-4a45-932a-7ed3cb2c142e
 spec:
   agentImageOverride: ""
   aksConfig:
@@ -71,7 +8,7 @@ spec:
     azureCredentialSecret: cattle-global-data:cc-swhf7
     baseUrl: null
     clusterName: aks-clusterconfig-test
-    dnsPrefix: aks-dns-88999
+    dnsPrefix: aks-dns-prefix
     dnsServiceIp: null
     dockerBridgeCidr: null
     httpApplicationRouting: null
@@ -141,7 +78,7 @@ status:
       azureCredentialSecret: cattle-global-data:cc-swhf7
       baseUrl: null
       clusterName: aks-clusterconfig-test
-      dnsPrefix: aks-dns-88999
+      dnsPrefix: aks-dns-prefix
       dnsServiceIp: 10.0.0.10
       dockerBridgeCidr: 172.17.0.1/16
       httpApplicationRouting: false
@@ -174,14 +111,14 @@ status:
       serviceCidr: 10.0.0.0/16
       subnet: null
       tags:
-        Cost Center: "211699999"
-        Department: ecm
+        Cost Center: "000000000"
+        Department: test
         Environment: test
-        Finance Business Partner: geoff.guest@suse.com
-        General Ledger Code: "200000119"
-        Group: container-platform
-        Owner: denise.schannon@suse.com
-        Stakeholder: jeff.hobbs@suse.com
+        Finance Business Partner: financebusinesspartner@suse.com
+        General Ledger Code: "000000000"
+        Group: test
+        Owner: owner@suse.com
+        Stakeholder: stakeholder@suse.com
       virtualNetwork: null
       virtualNetworkResourceGroup: null
   allocatable:

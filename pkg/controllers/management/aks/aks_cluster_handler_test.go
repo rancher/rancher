@@ -34,7 +34,7 @@ var mockOperatorController mockAksOperatorController	// Operator controller with
 func Test_onClusterChange_ClusterIsNil(t *testing.T) {
 	cluster, _ := mockOperatorController.onClusterChange("", nil)
 	if cluster != nil {
-		t.Error("cluster should have returned nil")
+		t.Errorf("cluster should have returned nil")
 	}
 }
 
@@ -47,7 +47,7 @@ func Test_onClusterChange_AKSConfigIsNil(t *testing.T) {
 
 	cluster, _ := mockOperatorController.onClusterChange("", mockCluster)
 	if cluster != mockCluster {
-		t.Error("cluster should have returned with no update")
+		t.Errorf("cluster should have returned with no update")
 	}
 }
 
@@ -60,15 +60,18 @@ func Test_onClusterChange_Default(t *testing.T) {
 
 	mockCluster, err := getMockV3Cluster(MockDefaultClusterFilename)
 	if err != nil {
-		t.Error("error getting mock v3 cluster: ", err.Error())
+		t.Errorf("error getting mock v3 cluster: %s", err)
 	}
 
 	// run test
 	cluster, err := mockOperatorController.onClusterChange("", &mockCluster)
 
 	// validate results
-	if cluster.Status.Conditions[1].Status != "Unknown" || err != nil {
-		t.Error("status should be Unknown and cluster returned successfully: " + err.Error())
+	if err != nil {
+		t.Errorf("error running onClusterChange: %s", err)
+	}
+	if cluster.Status.Conditions[0].Status != "Unknown" {
+		t.Errorf("status should be Unknown and cluster returned successfully")
 	}
 }
 
@@ -76,13 +79,16 @@ func Test_onClusterChange_Create(t *testing.T) {
 	mockOperatorController = getMockAksOperatorController("create")
 	mockCluster, err := getMockV3Cluster(MockCreateClusterFilename)
 	if err != nil {
-		t.Error("error getting mock v3 cluster: ", err.Error())
+		t.Errorf("error getting mock v3 cluster: %s", err)
 	}
 
 	cluster, err := mockOperatorController.onClusterChange("", &mockCluster)
 
-	if cluster.Status.Conditions[1].Status != "Unknown" || err != nil {
-		t.Error("provisioned status should be Unknown and cluster returned successfully: " + err.Error())
+	if err != nil {
+		t.Errorf("error running onClusterChange: %s", err)
+	}
+	if cluster.Status.Conditions[0].Status != "Unknown" {
+		t.Errorf("provisioned status should be Unknown and cluster returned successfully")
 	}
 }
 
@@ -90,14 +96,16 @@ func Test_onClusterChange_Active(t *testing.T) {
 	mockOperatorController = getMockAksOperatorController("active")
 	mockCluster, err := getMockV3Cluster(MockActiveClusterFilename)
 	if err != nil {
-		t.Error("error getting mock v3 cluster: ", err.Error())
+		t.Errorf("error getting mock v3 cluster: %s", err)
 	}
 
 	cluster, err := mockOperatorController.onClusterChange("", &mockCluster)
 
-	if cluster.Status.Conditions[1].Status != "True" ||
-		cluster.Status.Conditions[14].Status != "True" || err != nil {
-		t.Error("provisioned and updated status should be True and cluster returned successfully: " + err.Error())
+	if err != nil {
+		t.Errorf("error running onClusterChange: %s", err)
+	}
+	if cluster.Status.Conditions[0].Status != "True" || cluster.Status.Conditions[1].Status != "True" {
+		t.Errorf("provisioned and updated status should be True and cluster returned successfully")
 	}
 }
 
@@ -105,15 +113,17 @@ func Test_onClusterChange_UpdateNodePool(t *testing.T) {
 	mockOperatorController = getMockAksOperatorController("update")
 	mockCluster, err := getMockV3Cluster(MockUpdateClusterFilename)
 	if err != nil {
-		t.Error("error getting mock v3 cluster: ", err.Error())
+		t.Errorf("error getting mock v3 cluster: %s", err)
 	}
 
 	cluster, err := mockOperatorController.onClusterChange("", &mockCluster)
 
 	// check that cluster is updating node pool
-	if cluster.Status.Conditions[1].Status != "True" ||
-		cluster.Status.Conditions[14].Status != "Unknown" || err != nil {
-		t.Error("provisioned status should be True, updated status should be Unknown and cluster returned successfully: " + err.Error())
+	if err != nil {
+		t.Errorf("error running onClusterChange: %s", err)
+	}
+	if cluster.Status.Conditions[0].Status != "True" || cluster.Status.Conditions[1].Status != "Unknown" {
+		t.Errorf("provisioned status should be True, updated status should be Unknown and cluster returned successfully")
 	}
 }
 
@@ -125,17 +135,21 @@ func Test_setInitialUpstreamSpec(t *testing.T) {
 	mockOperatorController = getMockAksOperatorController("create")
 	mockCluster, err := getMockV3Cluster(MockCreateClusterFilename)
 	if err != nil {
-		t.Error("error getting mock v3 cluster: ", err.Error())
+		t.Errorf("error getting mock v3 cluster: %s", err)
 	}
 
 	cluster, err := mockOperatorController.setInitialUpstreamSpec(&mockCluster)
-	if cluster.Status.AKSStatus.UpstreamSpec == nil || err != nil {
-		t.Error("upstreamSpec should have been set and cluster returned successfully")
+
+	if err != nil {
+		t.Errorf("error running setInitialUpstreamSpec: %s", err)
+	}
+	if cluster.Status.AKSStatus.UpstreamSpec == nil {
+		t.Errorf("upstreamSpec should have been set and cluster returned successfully")
 	}
 }
 
 
-/** Test_updateAKSClusterConfig
+/** Test_updateAksClusterConfig
 	- success: AKS cluster tags are removed. AKS cluster is not immediately updated. Cluster sits in active for a few
       seconds, return (cluster nil)
  */
@@ -143,7 +157,7 @@ func Test_updateAKSClusterConfig(t *testing.T) {
 	mockOperatorController = getMockAksOperatorController("akscc")
 	mockCluster, err := getMockV3Cluster(MockAKSClusterConfigClusterFilename)
 	if err != nil {
-		t.Error("error getting mock v3 cluster: ", err.Error())
+		t.Errorf("error getting mock v3 cluster: %s", err)
 	}
 	mockAksClusterConfig, err := getMockAksClusterConfig(MockAKSClusterConfigFilename)
 
@@ -151,7 +165,7 @@ func Test_updateAKSClusterConfig(t *testing.T) {
 	_, err = mockOperatorController.updateAKSClusterConfig(&mockCluster, mockAksClusterConfig, nil)
 
 	if err != nil {
-		t.Error("AKSClusterConfig should have been updated and cluster returned successfully: " + err.Error())
+		t.Errorf("error running updateAKSClusterConfig: %s", err)
 	}
 }
 
@@ -164,12 +178,17 @@ func Test_generateAndSetServiceAccount(t *testing.T) {
 	mockOperatorController = getMockAksOperatorController("active")
 	mockCluster, err := getMockV3Cluster(MockActiveClusterFilename)
 	if err != nil {
-		t.Error("error getting mock v3 cluster: ", err.Error())
+		t.Errorf("error getting mock v3 cluster: %s", err)
 	}
 
 	cluster, err := mockOperatorController.generateAndSetServiceAccount(&mockCluster)
-	if cluster.Status.ServiceAccountTokenSecret == "" && err != nil {
-		t.Error("service account token and secret should have been set on Status and cluster returned successfully")
+
+	// check that serviceAccountToken name and token are set
+	if err != nil {
+		t.Errorf("error running generateAndSetServiceAccount: %s", err)
+	}
+	if cluster.Status.ServiceAccountTokenSecret == "" {
+		t.Errorf("service account token secret should have been set on Status and cluster returned successfully")
 	}
 }
 
@@ -180,17 +199,17 @@ func Test_generateAndSetServiceAccount(t *testing.T) {
 func Test_buildAKSCCCreateObject(t *testing.T) {
 	mockCluster, err := getMockV3Cluster(MockDefaultClusterFilename)
 	if err != nil {
-		t.Error("error getting mock v3 cluster: ", err.Error())
+		t.Errorf("error getting mock v3 cluster: %s", err)
 	}
 	expected, err := getMockAksClusterConfig(MockBuildAKSCCCreateObjectFilename)
 
 	akscc, err := buildAKSCCCreateObject(&mockCluster)
 
-	if !reflect.DeepEqual(akscc, expected) {
-		t.Error("AKS cluster config object was not built as expected")
-	}
 	if err != nil {
-		t.Error("AKS cluster config object should have been returned successfully: " + err.Error())
+		t.Errorf("error running buildAKSCCCreateObject: %s", err)
+	}
+	if !reflect.DeepEqual(akscc, expected) {
+		t.Errorf("AKSClusterConfig object was not built as expected")
 	}
 }
 
@@ -205,12 +224,16 @@ func Test_recordAppliedSpec_Updated(t *testing.T) {
 	mockOperatorController = getMockAksOperatorController("default")
 	mockCluster, err := getMockV3Cluster(MockDefaultClusterFilename)
 	if err != nil {
-		t.Error("error getting mock v3 cluster: ", err.Error())
+		t.Errorf("error getting mock v3 cluster: %s", err)
 	}
 
 	cluster, err := mockOperatorController.recordAppliedSpec(&mockCluster)
-	if cluster.Status.AppliedSpec.AKSConfig == nil || err != nil {
-		t.Error("cluster Status.AppliedSpec should have been updated with AKSConfig: " + err.Error())
+
+	if err != nil {
+		t.Errorf("error running recordAppliedSpec: %s", err)
+	}
+	if cluster.Status.AppliedSpec.AKSConfig == nil {
+		t.Errorf("cluster Status.AppliedSpec should have been updated with AKSConfig")
 	}
 }
 
@@ -219,12 +242,16 @@ func Test_recordAppliedSpec_NoUpdate(t *testing.T) {
 	mockOperatorController = getMockAksOperatorController("active")
 	mockCluster, err := getMockV3Cluster(MockActiveClusterFilename)
 	if err != nil {
-		t.Error("error getting mock v3 cluster: ", err.Error())
+		t.Errorf("error getting mock v3 cluster: %s", err)
 	}
 
 	cluster, err := mockOperatorController.recordAppliedSpec(&mockCluster)
-	if cluster != &mockCluster || err != nil {
-		t.Error("cluster should have successfully returned with no applied spec update " + err.Error())
+
+	if err != nil {
+		t.Errorf("error running recordAppliedSpec: %s", err)
+	}
+	if !reflect.DeepEqual(cluster.Status.AppliedSpec, mockCluster.Status.AppliedSpec) {
+		t.Errorf("cluster Status.AppliedSpec should have no update and cluster returned successfully")
 	}
 }
 
@@ -239,15 +266,19 @@ func Test_generateSATokenWithPublicAPI(t *testing.T) {
 	mockOperatorController = getMockAksOperatorController("active")
 	mockCluster, err := getMockV3Cluster(MockActiveClusterFilename)
 	if err != nil {
-		t.Error("error getting mock v3 cluster: ", err.Error())
+		t.Errorf("error getting mock v3 cluster: %s", err)
 	}
 	input := mockCluster.DeepCopy()
 	isPrivate := true
 	input.Status.AKSStatus.UpstreamSpec.PrivateCluster = &isPrivate
 
 	token, requiresTunnel, err := mockOperatorController.generateSATokenWithPublicAPI(input)
-	if token == "" || to.Bool(requiresTunnel) != false || err != nil {
-		t.Error("values (token, false, nil) should have been returned successfully")
+
+	if err != nil {
+		t.Errorf("error running generateSATokenWithPublicAPI: %s", err)
+	}
+	if token == "" || to.Bool(requiresTunnel) != false {
+		t.Errorf("values (token, requiresTunnel=false, nil) should have been returned successfully")
 	}
 }
 

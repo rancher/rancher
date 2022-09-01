@@ -1,30 +1,5 @@
 apiVersion: management.cattle.io/v3
 kind: Cluster
-metadata:
-  annotations:
-    authz.management.cattle.io/creator-role-bindings: '{"created":["cluster-owner"],"required":["cluster-owner"]}'
-    clusters.management.cattle.io/ke-last-refresh: "1661206338"
-    field.cattle.io/creatorId: user-rgtsq
-    lifecycle.cattle.io/create.cluster-agent-controller-cleanup: "true"
-    lifecycle.cattle.io/create.cluster-provisioner-controller: "true"
-    lifecycle.cattle.io/create.cluster-scoped-gc: "true"
-    lifecycle.cattle.io/create.mgmt-cluster-rbac-remove: "true"
-    provisioner.cattle.io/encrypt-migrated: "true"
-  creationTimestamp: "2022-08-22T19:19:00Z"
-  finalizers:
-  - wrangler.cattle.io/mgmt-cluster-remove
-  - controller.cattle.io/cluster-agent-controller-cleanup
-  - controller.cattle.io/cluster-scoped-gc
-  - controller.cattle.io/cluster-provisioner-controller
-  - controller.cattle.io/mgmt-cluster-rbac-remove
-  generateName: c-
-  generation: 46
-  labels:
-    cattle.io/creator: norman
-    provider.cattle.io: gke
-  name: c-5tzkk
-  resourceVersion: "703242"
-  uid: 53cd1838-e5ea-4d12-bb5c-9ecab9d8631b
 spec:
   agentImageOverride: ""
   answers: {}
@@ -50,9 +25,9 @@ spec:
     imported: false
     ipAllocationPolicy:
       clusterIpv4CidrBlock: 10.124.0.0/14
-      clusterSecondaryRangeName: gke-gke-test-pods-f86e3af0
+      clusterSecondaryRangeName: gke-gke-test-pods-fedcba98
       servicesIpv4CidrBlock: 10.0.0.0/20
-      servicesSecondaryRangeName: gke-gke-test-services-f86e3af0
+      servicesSecondaryRangeName: gke-gke-test-services-fedcba98
       useIpAliases: true
     kubernetesVersion: 1.22.11-gke.400
     labels:
@@ -118,7 +93,7 @@ spec:
       name: nodegroup2
       version: 1.22.11-gke.400
     privateClusterConfig: {}
-    projectID: ei-container-platform-dev
+    projectID: test-project-id
     region: ""
     subnetwork: default
     zone: us-central1-c
@@ -140,7 +115,7 @@ status:
     cpu: 11580m
     memory: 34513328Ki
     pods: "660"
-  apiEndpoint: https://34.135.149.246
+  apiEndpoint: https://apiendpoint
   appliedAgentEnvVars:
   - name: CATTLE_SERVER_VERSION
     value: dev
@@ -173,9 +148,9 @@ status:
       imported: false
       ipAllocationPolicy:
         clusterIpv4CidrBlock: 10.124.0.0/14
-        clusterSecondaryRangeName: gke-gke-test-pods-f86e3af0
+        clusterSecondaryRangeName: gke-gke-test-pods-fedcba98
         servicesIpv4CidrBlock: 10.0.0.0/20
-        servicesSecondaryRangeName: gke-gke-test-services-f86e3af0
+        servicesSecondaryRangeName: gke-gke-test-services-fedcba98
         useIpAliases: true
       kubernetesVersion: 1.22.11-gke.400
       labels: {}
@@ -215,7 +190,7 @@ status:
         name: nodegroup2
         version: 1.22.11-gke.400
       privateClusterConfig: {}
-      projectID: ei-container-platform-dev
+      projectID: test-project-id
       region: ""
       subnetwork: default
       zone: us-central1-c
@@ -224,7 +199,7 @@ status:
       enabled: false
     windowsPreferedCluster: false
   authImage: ""
-  caCert: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSUVMRENDQXBTZ0F3SUJBZ0lRS0N3eGxKaW1HUXFKUm5rWUlvNHo5VEFOQmdrcWhraUc5dzBCQVFzRkFEQXYKTVMwd0t3WURWUVFERXlRNE56YzRaVEkxTXkwMFpUVmhMVFF6TlRjdFlXWmxOQzA1T0RNNU1EWmtZbUZrWm1FdwpJQmNOTWpJd09ESXlNVGd4T1RFMFdoZ1BNakExTWpBNE1UUXhPVEU1TVRSYU1DOHhMVEFyQmdOVkJBTVRKRGczCk56aGxNalV6TFRSbE5XRXRORE0xTnkxaFptVTBMVGs0TXprd05tUmlZV1JtWVRDQ0FhSXdEUVlKS29aSWh2Y04KQVFFQkJRQURnZ0dQQURDQ0FZb0NnZ0dCQUxBcmZ2TmhqMm9LcWJ1U1lhaWhiRU94amd6OC9WakQ4TUVUbDUxYgpuWVJGRzVIa1VVZU9WbnFwWVdINjJnMDJJYmZuT2ViZkdTV3hXcEpIckdkWDNpQVFpVllEZXI4K1BTSmkzSzdoCnVqRlljYm1CMnlJQ0hLNUVHUnhnTG9odldWbGdiZUVTdUdVdFF0c0sxaFNOcTRBZVlOYmhlL0VuYVc1US92a0IKdHBRY3R2WC9IOFNUU3BuS1Bjc1hXWjVxY0NiTUNic0FLZGlBWXJCeHpGVG1lc3BuZVBnTlpIdDZSa3JvTG5PTApoYlR1dFRRUUJ4TnVlRGh2RzdHM0ppY3FrcUtBWXlRT1VPa2FMZGVRTlptVVdiS0RxZXpoQXFsRmVQV2lUejV1CjFENzlrSlg5cTY2dWE1NzVqV0xXVjVTYWQrQjJQYnRFV2NjTi9JazIzVGNUV0NzT1BKYjRYSVUrTkIxWFVNWkkKcGl6dmpJRVdBYVd4NkFzTUxCRXQ5SUp4N3UxQllnbGZFTXBOUEMyd3h3R3h3M3NadHBab3NvazNySHdHNjNzVwpkbFZtcVRrQ2ZUbENpMG9SL2lIR0ZscWYwdmhWSUErTmZETkgySVRYRHNDajE5Wi9rYitUU1JOZTFtSEJZV3VkCkN5bVF4MUdPdllzT1kxNkFsRkVKYS9CUDFRSURBUUFCbzBJd1FEQU9CZ05WSFE4QkFmOEVCQU1DQWdRd0R3WUQKVlIwVEFRSC9CQVV3QXdFQi96QWRCZ05WSFE0RUZnUVU3emNndG5qcE9pc0RXdWVkOWh0Qi9UZmpLell3RFFZSgpLb1pJaHZjTkFRRUxCUUFEZ2dHQkFKV05qSzlTTStuUFNDMzhnUzRXdUVmR3grTzZXZVBpbTdEc2JOV1ZQZVB0Cnh5VHIrUXl2Z05xSm1mdHlnNUV6MGVUZy9ja1Y3MGJQa3dYWUxEcDB6UkRqb091ano1UkhVYWRMbllYVGdQQXcKVFBGUWU3d2FsZ1dHY05TQWU0MDZRUDY5U0NLVktMLzdWZzF2Y2U5Y0tPWE5WdWU3Tk9SNXlQbG44WmRVNldESQpOOU9UeStpdWlKby9yNnplb3JQT1VYaWpwSkY1S2dEZndsdHI2MU1OWGsxcEZ5M0F6akM3MWpqb3JLTzg3QjVECmtvV0IwZFl5Q1lWTVhUTldIcDMyZkROVU9reDRzU0RoODdTL3BsOFRBSUtOWjlENktWMUdJYUpKYVdBQ3RzZHMKYVNycDQwN1h3dnV0andzMk9mZlJmSng1dTdiNmxvQngvckU1TzJoOU1NUGlTT0tCRURsd0dZUFdqbXJFRzJUWgp3RHhDZ3dVL281b2h1bHBiVEYzV0R3cDBZd3RhV2Z5MS9VTnZVNklFUGZqNEZsLzRJUGFCOHpvL3hsWmllbW9ZCjFYTzFHR3BaanZqaWoyekFJSUVnL3VsS3UxREJ0OUdhSnNLZFh6d0VIbi94bFZUc0VvODdmQTA2T3dod1lDVkYKNmlPbW1GeVVIMCsrMW5rNlZqb1V0dz09Ci0tLS0tRU5EIENFUlRJRklDQVRFLS0tLS0K
+  caCert: testcacertvalue12345678910
   capabilities:
     loadBalancerCapabilities: {}
   capacity:
@@ -300,9 +275,9 @@ status:
       imported: false
       ipAllocationPolicy:
         clusterIpv4CidrBlock: 10.124.0.0/14
-        clusterSecondaryRangeName: gke-gke-test-pods-f86e3af0
+        clusterSecondaryRangeName: gke-gke-test-pods-fedcba98
         servicesIpv4CidrBlock: 10.0.0.0/20
-        servicesSecondaryRangeName: gke-gke-test-services-f86e3af0
+        servicesSecondaryRangeName: gke-gke-test-services-fedcba98
         useIpAliases: true
       kubernetesVersion: 1.22.11-gke.400
       labels: {}
@@ -342,7 +317,7 @@ status:
         name: nodegroup2
         version: 1.22.11-gke.400
       privateClusterConfig: {}
-      projectID: ei-container-platform-dev
+      projectID: test-project-id
       region: ""
       subnetwork: default
       zone: us-central1-c
@@ -357,14 +332,4 @@ status:
     cpu: 1947m
     memory: "2278069888"
     pods: "40"
-  serviceAccountTokenSecret: cluster-serviceaccounttoken-rhs87
-  version:
-    buildDate: "2022-06-24T09:27:38Z"
-    compiler: gc
-    gitCommit: b4e1ab06be827438def8aee0021791b413a0961d
-    gitTreeState: clean
-    gitVersion: v1.22.11-gke.400
-    goVersion: go1.16.15b7
-    major: "1"
-    minor: "22"
-    platform: linux/amd64
+  serviceAccountTokenSecret: cluster-serviceaccounttoken-secret

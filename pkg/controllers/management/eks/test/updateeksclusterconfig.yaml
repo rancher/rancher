@@ -1,29 +1,5 @@
 apiVersion: management.cattle.io/v3
 kind: Cluster
-metadata:
-  annotations:
-    authz.management.cattle.io/creator-role-bindings: '{"created":["cluster-owner"],"required":["cluster-owner"]}'
-    clusters.management.cattle.io/ke-last-refresh: "1660777214"
-    field.cattle.io/creatorId: user-rgtsq
-    lifecycle.cattle.io/create.cluster-agent-controller-cleanup: "true"
-    lifecycle.cattle.io/create.cluster-provisioner-controller: "true"
-    lifecycle.cattle.io/create.cluster-scoped-gc: "true"
-    lifecycle.cattle.io/create.mgmt-cluster-rbac-remove: "true"
-  creationTimestamp: "2022-08-17T22:43:43Z"
-  finalizers:
-  - wrangler.cattle.io/mgmt-cluster-remove
-  - controller.cattle.io/cluster-agent-controller-cleanup
-  - controller.cattle.io/cluster-scoped-gc
-  - controller.cattle.io/cluster-provisioner-controller
-  - controller.cattle.io/mgmt-cluster-rbac-remove
-  generateName: c-
-  generation: 38
-  labels:
-    cattle.io/creator: norman
-    provider.cattle.io: eks
-  name: c-mrbwn
-  resourceVersion: "542551"
-  uid: abc51d84-5782-482b-bd49-0a29451e3207
 spec:
   agentImageOverride: ""
   answers: {}
@@ -56,9 +32,9 @@ spec:
       resourceTags: {}
       spotInstanceTypes: []
       subnets:
-      - subnet-00f59bf7ad65bf846
-      - subnet-0a514df7938c06144
-      - subnet-04084503cbd70c66f
+      - subnet-01
+      - subnet-02
+      - subnet-03
       tags:
         TESTKEY: TESTVALUE
       userData: ""
@@ -95,7 +71,7 @@ status:
     cpu: 3860m
     memory: 6824936Ki
     pods: "34"
-  apiEndpoint: https://CFDD27DA2D58C2CE5B0F2A2C971E412F.gr7.us-east-2.eks.amazonaws.com
+  apiEndpoint: https://apiendpoint.us-east-2.eks.amazonaws.com
   appliedAgentEnvVars:
   - name: CATTLE_SERVER_VERSION
     value: dev
@@ -136,9 +112,9 @@ status:
         resourceTags: {}
         spotInstanceTypes: null
         subnets:
-        - subnet-00f59bf7ad65bf846
-        - subnet-0a514df7938c06144
-        - subnet-04084503cbd70c66f
+        - subnet-01
+        - subnet-02
+        - subnet-03
         tags: {}
         userData: null
         version: "1.22"
@@ -160,7 +136,7 @@ status:
       enabled: false
     windowsPreferedCluster: false
   authImage: ""
-  caCert: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSUMvakNDQWVhZ0F3SUJBZ0lCQURBTkJna3Foa2lHOXcwQkFRc0ZBREFWTVJNd0VRWURWUVFERXdwcmRXSmwKY201bGRHVnpNQjRYRFRJeU1EZ3hOekl5TlRBMU1Gb1hEVE15TURneE5ESXlOVEExTUZvd0ZURVRNQkVHQTFVRQpBeE1LYTNWaVpYSnVaWFJsY3pDQ0FTSXdEUVlKS29aSWh2Y05BUUVCQlFBRGdnRVBBRENDQVFvQ2dnRUJBTUJnCkVZUERGak1iOUwzUVNiOERDSlhEeEZCR3JyM2xHUVJrYnN4RzVZZXR2MGpyUTlZZXl0eVUwQXhmRGx4UWFUejcKcXFpb1JiemxOcHpPUm9mM1NFVnFES05jQVlPZzY5ZmI0QU15Uk9jck1hK0lLVkFZUFZGRVRTaVJZZFFFaWhJOApxT2VjQXJlYWRHYU9TUnlTbkNHRDNtQUxMN0k1dUdoRmh0eXpGTlpDdnFhLzJtcmtnN2tGVlMzY3dTQnRCTmljCkRhRDdKMHFzNW5RcG5CMzRRSXNaa0hER0VtNkhHOUxJZ2twSjRnSW1qNzFhb1pEQ3NNT2o4ZEVYU2lYMWN5R04Kc3VRQkxsWDRkWXArbjhWeHlYZWhkakpjU2kreUVTQ21taitmc21sU0ZCSldXVG1yYzIxSWtZT2pKUGx1bndnRgo1TTFPKzBhb3NUK3htd0YvZ2FrQ0F3RUFBYU5aTUZjd0RnWURWUjBQQVFIL0JBUURBZ0trTUE4R0ExVWRFd0VCCi93UUZNQU1CQWY4d0hRWURWUjBPQkJZRUZQYk5ycW5sTkNxeTZ4eWZMMGlKUThUS2U3WVdNQlVHQTFVZEVRUU8KTUF5Q0NtdDFZbVZ5Ym1WMFpYTXdEUVlKS29aSWh2Y05BUUVMQlFBRGdnRUJBSG5XNFRGUUo5SEg1Q0g0K0xsSApJSlQvZUJ2Q3pieDE3MmMyanFXRXBuVWN0Skx3SHRHL0hFOFFtOHh2R3JOZTg0dmx6dmIrWFJZbEJpQndKR0NFClRIaHY5M2l4UGxKQmcwL05RbWJHTE5Jc0JDcDR6T1l2WEVReU5FTStTT0lGK2VqZW03OFREK1ZtYmt4eDhZOUkKdEQ1SkpieTJ6eFc2VUIxSVZXeEpFVld2TXN5bnM3djFxbVI3MDhJRURGQ1g1bTZRZ2thQmZoNWR1QWtKRXg2NQpPNTd4S2tWakZkajF2akcvdWhDaEl2S2ViY0EvcFFrRjRkdGh1ei9LSXhjUFVQdjBYSWhMbWFmQkVHMy9sc2s4CklPTHhLQWdhNU9UTXBKQTc4bHRHeVhiSmtTM3FLQi9Uc3I5ZHJBWFUrdW5ESEY3U1JNRFdheEU1MWFuVm1oWU4KbVJJPQotLS0tLUVORCBDRVJUSUZJQ0FURS0tLS0tCg==
+  caCert: testcacertvalue12345678910
   capabilities:
     loadBalancerCapabilities: {}
   capacity:
@@ -223,15 +199,15 @@ status:
     type: AgentDeployed
   driver: EKS
   eksStatus:
-    managedLaunchTemplateID: lt-0bcd7a3611866b055
+    managedLaunchTemplateID: lt-id
     managedLaunchTemplateVersions:
       nodegroup: "2"
     privateRequiresTunnel: null
     securityGroups: null
     subnets:
-    - subnet-00f59bf7ad65bf846
-    - subnet-0a514df7938c06144
-    - subnet-04084503cbd70c66f
+    - subnet-01
+    - subnet-02
+    - subnet-03
     upstreamSpec:
       amazonCredentialSecret: cattle-global-data:cc-kxfmx
       displayName: ekscc-test
@@ -255,9 +231,9 @@ status:
         resourceTags: {}
         spotInstanceTypes: null
         subnets:
-        - subnet-00f59bf7ad65bf846
-        - subnet-0a514df7938c06144
-        - subnet-04084503cbd70c66f
+        - subnet-01
+        - subnet-02
+        - subnet-03
         tags: {}
         userData: null
         version: "1.22"
@@ -271,7 +247,7 @@ status:
       serviceRole: ""
       subnets: []
       tags: {}
-    virtualNetwork: vpc-01e319f766136faf0
+    virtualNetwork: vpc-network
   limits:
     cpu: "0"
     memory: 340Mi
@@ -283,7 +259,7 @@ status:
     cpu: 450m
     memory: 140Mi
     pods: "9"
-  serviceAccountTokenSecret: cluster-serviceaccounttoken-vszf9
+  serviceAccountTokenSecret: cluster-serviceaccounttoken-secret
   version:
     buildDate: "2022-07-06T18:06:23Z"
     compiler: gc

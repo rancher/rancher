@@ -10,11 +10,11 @@ metadata:
     lifecycle.cattle.io/create.mgmt-cluster-rbac-remove: "true"
   creationTimestamp: "2022-08-22T19:19:00Z"
   finalizers:
-  - wrangler.cattle.io/mgmt-cluster-remove
-  - controller.cattle.io/cluster-agent-controller-cleanup
-  - controller.cattle.io/cluster-scoped-gc
-  - controller.cattle.io/cluster-provisioner-controller
-  - controller.cattle.io/mgmt-cluster-rbac-remove
+    - wrangler.cattle.io/mgmt-cluster-remove
+    - controller.cattle.io/cluster-agent-controller-cleanup
+    - controller.cattle.io/cluster-scoped-gc
+    - controller.cattle.io/cluster-provisioner-controller
+    - controller.cattle.io/mgmt-cluster-rbac-remove
   generateName: c-
   generation: 12
   labels:
@@ -57,28 +57,28 @@ spec:
     network: default
     networkPolicyEnabled: false
     nodePools:
-    - autoscaling: {}
-      config:
-        diskSizeGb: 100
-        diskType: pd-standard
-        imageType: COS
-        machineType: n1-standard-2
-        oauthScopes:
-        - https://www.googleapis.com/auth/devstorage.read_only
-        - https://www.googleapis.com/auth/logging.write
-        - https://www.googleapis.com/auth/monitoring
-        - https://www.googleapis.com/auth/servicecontrol
-        - https://www.googleapis.com/auth/service.management.readonly
-        - https://www.googleapis.com/auth/trace.append
-      initialNodeCount: 3
-      management:
-        autoRepair: true
-        autoUpgrade: true
-      maxPodsConstraint: 110
-      name: nodegroup
-      version: 1.22.11-gke.400
+      - autoscaling: {}
+        config:
+          diskSizeGb: 100
+          diskType: pd-standard
+          imageType: COS
+          machineType: n1-standard-2
+          oauthScopes:
+            - https://www.googleapis.com/auth/devstorage.read_only
+            - https://www.googleapis.com/auth/logging.write
+            - https://www.googleapis.com/auth/monitoring
+            - https://www.googleapis.com/auth/servicecontrol
+            - https://www.googleapis.com/auth/service.management.readonly
+            - https://www.googleapis.com/auth/trace.append
+        initialNodeCount: 3
+        management:
+          autoRepair: true
+          autoUpgrade: true
+        maxPodsConstraint: 110
+        name: nodegroup
+        version: 1.22.11-gke.400
     privateClusterConfig: {}
-    projectID: ei-container-platform-dev
+    projectID: test-project-id
     region: ""
     subnetwork: default
     zone: us-central1-c
@@ -87,84 +87,6 @@ spec:
     enabled: false
   windowsPreferedCluster: false
 status:
-  agentImage: ""
-  allocatable:
-    cpu: "0"
-    memory: "0"
-    pods: "0"
-  appliedEnableNetworkPolicy: false
-  appliedPodSecurityPolicyTemplateId: ""
-  appliedSpec:
-    agentImageOverride: ""
-    answers: {}
-    clusterSecrets: {}
-    description: ""
-    desiredAgentImage: ""
-    desiredAuthImage: ""
-    displayName: ""
-    enableClusterAlerting: false
-    enableClusterMonitoring: false
-    enableNetworkPolicy: null
-    internal: false
-    localClusterAuthEndpoint:
-      enabled: false
-    windowsPreferedCluster: false
-  authImage: ""
-  capabilities:
-    loadBalancerCapabilities: {}
-  capacity:
-    cpu: "0"
-    memory: "0"
-    pods: "0"
   conditions:
-  - status: "True"
-    type: Pending
-  - status: Unknown
-    type: Provisioned
-  - lastUpdateTime: "2022-08-22T15:19:10-04:00"
-    message: Waiting for API to be available
-    status: Unknown
-    type: Waiting
-  - lastUpdateTime: "2022-08-22T15:19:01-04:00"
-    status: "True"
-    type: BackingNamespaceCreated
-  - lastUpdateTime: "2022-08-22T15:19:01-04:00"
-    status: "True"
-    type: DefaultProjectCreated
-  - lastUpdateTime: "2022-08-22T15:19:01-04:00"
-    status: "True"
-    type: SystemProjectCreated
-  - lastUpdateTime: "2022-08-22T15:19:02-04:00"
-    status: "True"
-    type: InitialRolesPopulated
-  - lastUpdateTime: "2022-08-22T15:19:06-04:00"
-    status: "True"
-    type: CreatorMadeOwner
-  - lastUpdateTime: "2022-08-22T15:19:08-04:00"
-    status: "True"
-    type: NoDiskPressure
-  - lastUpdateTime: "2022-08-22T15:19:08-04:00"
-    status: "True"
-    type: NoMemoryPressure
-  - lastUpdateTime: "2022-08-22T15:19:09-04:00"
-    status: "True"
-    type: SecretsMigrated
-  - lastUpdateTime: "2022-08-22T15:19:10-04:00"
-    status: "True"
-    type: ServiceAccountSecretsMigrated
-  - lastUpdateTime: "2022-08-22T19:19:13Z"
-    status: "False"
-    type: Connected
-  driver: GKE
-  gkeStatus:
-    privateRequiresTunnel: null
-    upstreamSpec: null
-  limits:
-    cpu: "0"
-    memory: "0"
-    pods: "0"
-  provider: ""
-  requested:
-    cpu: "0"
-    memory: "0"
-    pods: "0"
+    - status: Unknown
+      type: Provisioned

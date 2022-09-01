@@ -25,7 +25,7 @@
       "horizontalPodAutoscaling": true
     },
     "clusterIpv4Cidr": "",
-    "projectID": "ei-container-platform-dev",
+    "projectID": "test-project-id",
     "googleCredentialSecret": "cattle-global-data:cc-swv64",
     "clusterName": "gke-test",
     "kubernetesVersion": "1.22.11-gke.400",

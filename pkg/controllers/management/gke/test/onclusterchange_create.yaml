@@ -1,27 +1,5 @@
 apiVersion: management.cattle.io/v3
 kind: Cluster
-metadata:
-  annotations:
-    authz.management.cattle.io/creator-role-bindings: '{"created":["cluster-owner"],"required":["cluster-owner"]}'
-    field.cattle.io/creatorId: user-rgtsq
-    lifecycle.cattle.io/create.cluster-agent-controller-cleanup: "true"
-    lifecycle.cattle.io/create.cluster-provisioner-controller: "true"
-    lifecycle.cattle.io/create.cluster-scoped-gc: "true"
-    lifecycle.cattle.io/create.mgmt-cluster-rbac-remove: "true"
-  creationTimestamp: "2022-08-22T19:19:00Z"
-  finalizers:
-  - wrangler.cattle.io/mgmt-cluster-remove
-  - controller.cattle.io/cluster-agent-controller-cleanup
-  - controller.cattle.io/cluster-scoped-gc
-  - controller.cattle.io/cluster-provisioner-controller
-  - controller.cattle.io/mgmt-cluster-rbac-remove
-  generateName: c-
-  generation: 12
-  labels:
-    cattle.io/creator: norman
-  name: c-5tzkk
-  resourceVersion: "688695"
-  uid: 53cd1838-e5ea-4d12-bb5c-9ecab9d8631b
 spec:
   agentImageOverride: ""
   answers: {}
@@ -78,7 +56,7 @@ spec:
       name: nodegroup
       version: 1.22.11-gke.400
     privateClusterConfig: {}
-    projectID: ei-container-platform-dev
+    projectID: test-project-id
     region: ""
     subnetwork: default
     zone: us-central1-c
@@ -87,85 +65,9 @@ spec:
     enabled: false
   windowsPreferedCluster: false
 status:
-  agentImage: ""
-  allocatable:
-    cpu: "0"
-    memory: "0"
-    pods: "0"
-  appliedEnableNetworkPolicy: false
-  appliedPodSecurityPolicyTemplateId: ""
-  appliedSpec:
-    agentImageOverride: ""
-    answers: {}
-    clusterSecrets: {}
-    description: ""
-    desiredAgentImage: ""
-    desiredAuthImage: ""
-    displayName: ""
-    enableClusterAlerting: false
-    enableClusterMonitoring: false
-    enableNetworkPolicy: null
-    internal: false
-    localClusterAuthEndpoint:
-      enabled: false
-    windowsPreferedCluster: false
-  authImage: ""
-  capabilities:
-    loadBalancerCapabilities: {}
-  capacity:
-    cpu: "0"
-    memory: "0"
-    pods: "0"
   conditions:
-  - status: "True"
-    type: Pending
   - status: Unknown
     type: Provisioned
-  - lastUpdateTime: "2022-08-22T15:19:10-04:00"
-    message: Waiting for API to be available
-    status: Unknown
-    type: Waiting
-  - lastUpdateTime: "2022-08-22T15:19:01-04:00"
-    status: "True"
-    type: BackingNamespaceCreated
-  - lastUpdateTime: "2022-08-22T15:19:01-04:00"
-    status: "True"
-    type: DefaultProjectCreated
-  - lastUpdateTime: "2022-08-22T15:19:01-04:00"
-    status: "True"
-    type: SystemProjectCreated
-  - lastUpdateTime: "2022-08-22T15:19:02-04:00"
-    status: "True"
-    type: InitialRolesPopulated
-  - lastUpdateTime: "2022-08-22T15:19:06-04:00"
-    status: "True"
-    type: CreatorMadeOwner
-  - lastUpdateTime: "2022-08-22T15:19:08-04:00"
-    status: "True"
-    type: NoDiskPressure
-  - lastUpdateTime: "2022-08-22T15:19:08-04:00"
-    status: "True"
-    type: NoMemoryPressure
-  - lastUpdateTime: "2022-08-22T15:19:09-04:00"
-    status: "True"
-    type: SecretsMigrated
-  - lastUpdateTime: "2022-08-22T15:19:10-04:00"
-    status: "True"
-    type: ServiceAccountSecretsMigrated
-  - lastUpdateTime: "2022-08-22T19:19:13Z"
-    status: "False"
-    type: Connected
-  driver: GKE
   gkeStatus:
-    privateRequiresTunnel: null
     upstreamSpec:
       testField: "upstreamSpec is already set"
-  limits:
-    cpu: "0"
-    memory: "0"
-    pods: "0"
-  provider: ""
-  requested:
-    cpu: "0"
-    memory: "0"
-    pods: "0"

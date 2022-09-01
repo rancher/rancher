@@ -1,30 +1,5 @@
 apiVersion: management.cattle.io/v3
 kind: Cluster
-metadata:
-  annotations:
-    authz.management.cattle.io/creator-role-bindings: '{"created":["cluster-owner"],"required":["cluster-owner"]}'
-    clusters.management.cattle.io/ke-last-refresh: "1660663247"
-    field.cattle.io/creatorId: user-rgtsq
-    lifecycle.cattle.io/create.cluster-agent-controller-cleanup: "true"
-    lifecycle.cattle.io/create.cluster-provisioner-controller: "true"
-    lifecycle.cattle.io/create.cluster-scoped-gc: "true"
-    lifecycle.cattle.io/create.mgmt-cluster-rbac-remove: "true"
-    provisioner.cattle.io/encrypt-migrated: "true"
-  creationTimestamp: "2022-08-15T21:51:40Z"
-  finalizers:
-  - wrangler.cattle.io/mgmt-cluster-remove
-  - controller.cattle.io/cluster-agent-controller-cleanup
-  - controller.cattle.io/cluster-scoped-gc
-  - controller.cattle.io/cluster-provisioner-controller
-  - controller.cattle.io/mgmt-cluster-rbac-remove
-  generateName: c-
-  generation: 119
-  labels:
-    cattle.io/creator: norman
-    provider.cattle.io: eks
-  name: c-r64vb
-  resourceVersion: "399969"
-  uid: ced870a2-50a7-4c12-ba8c-ef84e6616fbf
 spec:
   agentImageOverride: ""
   answers: {}
@@ -57,9 +32,9 @@ spec:
       resourceTags: {}
       spotInstanceTypes: null
       subnets:
-      - subnet-08ccb4afdb065a5ae
-      - subnet-03121df4ef3937d28
-      - subnet-059fd38298f08064a
+      - subnet-01
+      - subnet-02
+      - subnet-03
       tags: {}
       userData: null
       version: "1.22"
@@ -82,29 +57,7 @@ spec:
     enabled: false
   windowsPreferedCluster: false
 status:
-  agentFeatures:
-    embedded-cluster-api: false
-    fleet: false
-    monitoringv1: false
-    multi-cluster-management: false
-    multi-cluster-management-agent: true
-    provisioningv2: false
-    rke2: false
-  agentImage: rancher/rancher-agent:v2.6-head
-  allocatable:
-    cpu: 3860m
-    memory: 6824936Ki
-    pods: "34"
-  apiEndpoint: https://C1AA947128EA78DA0E7552960017B3EA.gr7.us-east-2.eks.amazonaws.com
-  appliedAgentEnvVars:
-  - name: CATTLE_SERVER_VERSION
-    value: dev
-  - name: CATTLE_INSTALL_UUID
-    value: 3573e14c-efce-425e-ae8a-7ddc80578c5e
-  - name: CATTLE_INGRESS_IP_DOMAIN
-    value: sslip.io
-  appliedEnableNetworkPolicy: false
-  appliedPodSecurityPolicyTemplateId: ""
+  apiEndpoint: https://apiendpoint.us-east-2.eks.amazonaws.com
   appliedSpec:
     agentImageOverride: ""
     answers: {}
@@ -136,9 +89,9 @@ status:
         resourceTags: {}
         spotInstanceTypes: null
         subnets:
-        - subnet-08ccb4afdb065a5ae
-        - subnet-03121df4ef3937d28
-        - subnet-059fd38298f08064a
+        - subnet-01
+        - subnet-02
+        - subnet-03
         tags: {}
         userData: null
         version: "1.22"
@@ -159,138 +112,14 @@ status:
     localClusterAuthEndpoint:
       enabled: false
     windowsPreferedCluster: false
-  authImage: ""
-  caCert: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSUMvakNDQWVhZ0F3SUJBZ0lCQURBTkJna3Foa2lHOXcwQkFRc0ZBREFWTVJNd0VRWURWUVFERXdwcmRXSmwKY201bGRHVnpNQjRYRFRJeU1EZ3hOVEl5TURJMU5sb1hEVE15TURneE1qSXlNREkxTmxvd0ZURVRNQkVHQTFVRQpBeE1LYTNWaVpYSnVaWFJsY3pDQ0FTSXdEUVlKS29aSWh2Y05BUUVCQlFBRGdnRVBBRENDQVFvQ2dnRUJBTXAzCndmL0pOSk1md0NZSFNGSDVrVVJFaHdpbWExL01UcHhFQ093c1d3T21oMzZBdWRka2tLN3RNdEtXd3JMTWNjNDIKWG5vd3BwSnUxd2FtbjhRUlNNNGRPN0JYQzZNcnZyRU5zdDhoU25OUUx5cW5wQkpEQTg2VTM0N3pPb29ZMHY0MgpiY2NDSk5QdmhyRTY2Um53VE8rOEJGYjRKK0RoYjJzU2dKckY1RjBiVXN6RjhyTDNRM3NhYzhLRk9ld3hneWxrCmhyc29zYitnbWlvMy9weEkvcHNMV3FVa1A5bnRETmxvZDRIcGRxSzUxbnVVOFBMYXFNWWpRVHZGVUdES2VROFEKRXEzdFUwUUQwRThVQTlCVnZGS1hGK2dSODBNZXJDSWJMNTRLUWZmVVJla1JielV0WjMxOXloZWY0TVNSdkt1VwpOTkd3d0JkUnFXNDFId1M1Rm1rQ0F3RUFBYU5aTUZjd0RnWURWUjBQQVFIL0JBUURBZ0trTUE4R0ExVWRFd0VCCi93UUZNQU1CQWY4d0hRWURWUjBPQkJZRUZPTWV2YWdLZXc1a3Vza1BTeVBHRk1qRDkxTEFNQlVHQTFVZEVRUU8KTUF5Q0NtdDFZbVZ5Ym1WMFpYTXdEUVlKS29aSWh2Y05BUUVMQlFBRGdnRUJBQzVkb2lqRitTdlB0UzZCWXVSMQprbGZJeVlCWlJkekUzQVArVWd0YjUzUUZ2aGM4VVZEMmtvc3dHWkNkY2ZTSVUzcVh4Mm9SOGdqQk05UlBOeWNICnMrT0N6UWJhRFozQ1JJVHRIODFYVUJTWWJ3alhETXZmNmRqMWFRdWVWdUorcmFZNW9FQWxjR2M3enNGSk01Rk8KbTR6NE96SjNnM1lZT2pJTG10SFNJM2t0c0d1SXRXQjJlWDYrUU5yYlYwT1BsdGxIOHFZQ0YxSzVESEZ5WDdCWgpXTm9WZW9SZVFVUC8rRzhKdTlUNEpobkhxbktPOEU1YWVzYnVmMHgrVFJxU1VTcVltRGtxejJFekpQRTd0ZnBYCmY2UkxPNGh3YUtBdzZ4MC9PblZFam9DOXNTT3Y3STcvMEFVeWROaHhqQXlnMVFzMFBzV20vNkVnMW1WeEpiVnMKVXNJPQotLS0tLUVORCBDRVJUSUZJQ0FURS0tLS0tCg==
-  capabilities:
-    loadBalancerCapabilities: {}
-  capacity:
-    cpu: "4"
-    memory: 7934952Ki
-    pods: "34"
   conditions:
-  - status: "True"
-    type: Pending
   - lastUpdateTime: "2022-08-15T18:08:55-04:00"
     status: "True"
     type: Provisioned
-  - lastUpdateTime: "2022-08-15T18:12:39-04:00"
-    status: "True"
-    type: Waiting
-  - lastUpdateTime: "2022-08-15T17:51:41-04:00"
-    status: "True"
-    type: BackingNamespaceCreated
-  - lastUpdateTime: "2022-08-15T17:51:41-04:00"
-    status: "True"
-    type: DefaultProjectCreated
-  - lastUpdateTime: "2022-08-15T17:51:42-04:00"
-    status: "True"
-    type: SystemProjectCreated
-  - lastUpdateTime: "2022-08-15T17:51:42-04:00"
-    status: "True"
-    type: InitialRolesPopulated
-  - lastUpdateTime: "2022-08-15T17:51:44-04:00"
-    status: "True"
-    type: CreatorMadeOwner
-  - lastUpdateTime: "2022-08-15T17:51:46-04:00"
-    status: "True"
-    type: NoDiskPressure
-  - lastUpdateTime: "2022-08-15T17:51:46-04:00"
-    status: "True"
-    type: NoMemoryPressure
-  - lastUpdateTime: "2022-08-15T17:51:47-04:00"
-    status: "True"
-    type: SecretsMigrated
-  - lastUpdateTime: "2022-08-15T17:51:47-04:00"
-    status: "True"
-    type: ServiceAccountSecretsMigrated
-  - lastUpdateTime: "2022-08-16T15:20:46Z"
-    status: "True"
-    type: Connected
   - lastUpdateTime: "2022-08-16T11:20:47-04:00"
     status: "True"
     type: Updated
-  - lastUpdateTime: "2022-08-16T11:20:54-04:00"
-    status: "True"
-    type: Ready
-  - lastUpdateTime: "2022-08-15T18:11:56-04:00"
-    status: "True"
-    type: GlobalAdminsSynced
-  - lastUpdateTime: "2022-08-15T18:11:57-04:00"
-    status: "True"
-    type: SystemAccountCreated
-  - lastUpdateTime: "2022-08-15T18:12:01-04:00"
-    status: "True"
-    type: AgentDeployed
-  driver: EKS
   eksStatus:
-    managedLaunchTemplateID: lt-02473d566a15901ef
-    managedLaunchTemplateVersions:
-      nodegroup: "2"
-    privateRequiresTunnel: null
-    securityGroups: null
-    subnets:
-    - subnet-08ccb4afdb065a5ae
-    - subnet-03121df4ef3937d28
-    - subnet-059fd38298f08064a
     upstreamSpec:
-      amazonCredentialSecret: cattle-global-data:cc-kxfmx
-      displayName: eks-test
-      imported: false
-      kmsKey: ""
-      kubernetesVersion: "1.22"
-      loggingTypes: []
-      nodeGroups:
-      - desiredSize: 2
-        diskSize: 20
-        ec2SshKey: null
-        gpu: false
-        imageId: null
-        instanceType: t3.medium
-        labels: {}
-        launchTemplate: null
-        maxSize: 2
-        minSize: 2
-        nodegroupName: nodegroup
-        requestSpotInstances: false
-        resourceTags: {}
-        spotInstanceTypes: null
-        subnets:
-        - subnet-08ccb4afdb065a5ae
-        - subnet-03121df4ef3937d28
-        - subnet-059fd38298f08064a
-        tags: {}
-        userData: null
-        version: "1.22"
-      privateAccess: false
       publicAccess: true
-      publicAccessSources:
-      - 0.0.0.0/0
-      region: us-east-2
-      secretsEncryption: false
-      securityGroups: []
-      serviceRole: ""
-      subnets: []
-      tags: {}
-    virtualNetwork: vpc-0d54378891c31bd13
-  limits:
-    cpu: "0"
-    memory: 340Mi
-    pods: "0"
-  linuxWorkerCount: 2
-  nodeCount: 2
-  provider: eks
-  requested:
-    cpu: 450m
-    memory: 140Mi
-    pods: "9"
-  serviceAccountTokenSecret: cluster-serviceaccounttoken-r28vc
-  version:
-    buildDate: "2022-07-06T18:06:23Z"
-    compiler: gc
-    gitCommit: b9628d6d3867ffd84c704af0befd31c7451cdc37
-    gitTreeState: clean
-    gitVersion: v1.22.11-eks-18ef993
-    goVersion: go1.16.15
-    major: "1"
-    minor: 22+
-    platform: linux/amd64
+  serviceAccountTokenSecret: cluster-serviceaccounttoken-secret

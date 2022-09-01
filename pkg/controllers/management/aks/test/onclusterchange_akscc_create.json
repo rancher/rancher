@@ -1,111 +1,13 @@
 {
   "apiVersion": "aks.cattle.io/v1",
   "kind": "AKSClusterConfig",
-  "metadata": {
-    "creationTimestamp": "2022-08-08T14:26:31Z",
-    "finalizers": [
-      "wrangler.cattle.io/aks-controller-remove"
-    ],
-    "generation": 1,
-    "managedFields": [
-      {
-        "apiVersion": "aks.cattle.io/v1",
-        "fieldsType": "FieldsV1",
-        "fieldsV1": {
-          "f:metadata": {
-            "f:ownerReferences": {
-              ".": {},
-              "k:{\"uid\":\"75f1abf6-dab3-40d4-a0a5-bf9df4e42271\"}": {}
-            }
-          },
-          "f:spec": {
-            ".": {},
-            "f:authBaseUrl": {},
-            "f:authorizedIpRanges": {},
-            "f:azureCredentialSecret": {},
-            "f:baseUrl": {},
-            "f:clusterName": {},
-            "f:dnsPrefix": {},
-            "f:dnsServiceIp": {},
-            "f:dockerBridgeCidr": {},
-            "f:httpApplicationRouting": {},
-            "f:imported": {},
-            "f:kubernetesVersion": {},
-            "f:linuxAdminUsername": {},
-            "f:loadBalancerSku": {},
-            "f:logAnalyticsWorkspaceGroup": {},
-            "f:logAnalyticsWorkspaceName": {},
-            "f:monitoring": {},
-            "f:networkPlugin": {},
-            "f:networkPolicy": {},
-            "f:nodePools": {},
-            "f:podCidr": {},
-            "f:privateCluster": {},
-            "f:resourceGroup": {},
-            "f:resourceLocation": {},
-            "f:serviceCidr": {},
-            "f:subnet": {},
-            "f:tags": {},
-            "f:virtualNetwork": {},
-            "f:virtualNetworkResourceGroup": {}
-          }
-        },
-        "manager": "___go_build_main_go",
-        "operation": "Update",
-        "time": "2022-08-08T14:26:31Z"
-      },
-      {
-        "apiVersion": "aks.cattle.io/v1",
-        "fieldsType": "FieldsV1",
-        "fieldsV1": {
-          "f:metadata": {
-            "f:finalizers": {
-              ".": {},
-              "v:\"wrangler.cattle.io/aks-controller-remove\"": {}
-            }
-          }
-        },
-        "manager": "aks-operator",
-        "operation": "Update",
-        "time": "2022-08-08T14:43:20Z"
-      },
-      {
-        "apiVersion": "aks.cattle.io/v1",
-        "fieldsType": "FieldsV1",
-        "fieldsV1": {
-          "f:status": {
-            ".": {},
-            "f:failureMessage": {},
-            "f:phase": {},
-            "f:rbacEnabled": {}
-          }
-        },
-        "manager": "aks-operator",
-        "operation": "Update",
-        "subresource": "status",
-        "time": "2022-08-08T14:43:20Z"
-      }
-    ],
-    "name": "c-k4mnv",
-    "namespace": "cattle-global-data",
-    "ownerReferences": [
-      {
-        "apiVersion": "management.cattle.io/v3",
-        "kind": "Cluster",
-        "name": "c-k4mnv",
-        "uid": "75f1abf6-dab3-40d4-a0a5-bf9df4e42271"
-      }
-    ],
-    "resourceVersion": "12598",
-    "uid": "f73c406a-765d-4ff9-bb2c-1dc78f247a6d"
-  },
   "spec": {
     "authBaseUrl": null,
     "authorizedIpRanges": null,
     "azureCredentialSecret": "cattle-global-data:cc-26b5h",
     "baseUrl": null,
-    "clusterName": "aks-monday",
-    "dnsPrefix": "aks-dns-99922",
+    "clusterName": "aks-test",
+    "dnsPrefix": "aks-dns-prefix",
     "dnsServiceIp": null,
     "dockerBridgeCidr": null,
     "httpApplicationRouting": null,

@@ -122,9 +122,9 @@
         "resourceTags": {},
         "spotInstanceTypes": null,
         "subnets": [
-          "subnet-08ccb4afdb065a5ae",
-          "subnet-03121df4ef3937d28",
-          "subnet-059fd38298f08064a"
+          "subnet-01",
+          "subnet-02",
+          "subnet-03"
         ],
         "tags": {},
         "userData": null,
@@ -145,7 +145,7 @@
   },
   "status": {
     "failureMessage": "",
-    "managedLaunchTemplateID": "lt-02473d566a15901ef",
+    "managedLaunchTemplateID": "lt-id",
     "managedLaunchTemplateVersions": {
       "nodegroup": "2"
     },
@@ -153,11 +153,11 @@
     "phase": "active",
     "securityGroups": null,
     "subnets": [
-      "subnet-08ccb4afdb065a5ae",
-      "subnet-03121df4ef3937d28",
-      "subnet-059fd38298f08064a"
+      "subnet-01",
+      "subnet-02",
+      "subnet-03"
     ],
     "templateVersionsToDelete": null,
-    "virtualNetwork": "vpc-0d54378891c31bd13"
+    "virtualNetwork": "vpc-network"
   }
 }
