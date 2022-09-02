@@ -179,3 +179,7 @@ func CanAccessWithGroupProviders(providerName string, userPrincipalID string, gr
 func RefetchGroupPrincipals(principalID string, providerName string, secret string) ([]v3.Principal, error) {
 	return providers[providerName].RefetchGroupPrincipals(principalID, secret)
 }
+
+func IsDisabledProvider(providerName string) (bool, error) {
+	return providers[providerName].IsDisabledProvider()
+}

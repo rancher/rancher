@@ -31,6 +31,7 @@ import (
 	apitypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/utils/pointer"
 )
 
 const (
@@ -272,6 +273,15 @@ func (m *userManager) EnsureClusterToken(clusterName, tokenName, description, ki
 			}
 		} else {
 			token = createdToken
+		}
+	}
+	if token.Enabled != nil && !*token.Enabled {
+		// if the kubeconfig was disabled, re-enable it
+		token = token.DeepCopy()
+		token.Enabled = pointer.BoolPtr(true)
+		token, err = m.tokens.Update(token)
+		if err != nil {
+			return "", err
 		}
 	}
 

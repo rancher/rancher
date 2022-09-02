@@ -228,3 +228,11 @@ func (p *adProvider) getDNAndScopeFromPrincipalID(principalID string) (string, s
 	externalID := strings.TrimPrefix(parts[1], "//")
 	return externalID, scope, nil
 }
+
+func (p *adProvider) IsDisabledProvider() (bool, error) {
+	adConfig, _, err := p.getActiveDirectoryConfig()
+	if err != nil {
+		return false, err
+	}
+	return !adConfig.Enabled, nil
+}

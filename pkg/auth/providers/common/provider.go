@@ -16,4 +16,5 @@ type AuthProvider interface {
 	TransformToAuthProvider(authConfig map[string]interface{}) (map[string]interface{}, error)
 	RefetchGroupPrincipals(principalID string, secret string) ([]v3.Principal, error)
 	CanAccessWithGroupProviders(userPrincipalID string, groups []v3.Principal) (bool, error)
+	IsDisabledProvider() (bool, error)
 }

@@ -395,3 +395,11 @@ func (s *Provider) hasLdapGroupSearch() bool {
 	}
 	return false
 }
+
+func (s *Provider) IsDisabledProvider() (bool, error) {
+	samlConfig, err := s.getSamlConfig()
+	if err != nil {
+		return false, err
+	}
+	return !samlConfig.Enabled, nil
+}
