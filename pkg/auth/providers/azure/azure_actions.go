@@ -41,9 +41,6 @@ func (ap *azureProvider) actionHandler(actionName string, action *types.Action, 
 	} else if actionName == "testAndApply" {
 		return ap.testAndApply(actionName, action, request)
 	} else if actionName == "upgrade" {
-		if err := ap.checkConfigurationBeforeMigration(); err != nil {
-			return err
-		}
 		return ap.migrateToMicrosoftGraph()
 	}
 
@@ -121,54 +118,58 @@ func (ap *azureProvider) testAndApply(actionName string, action *types.Action, r
 	return ap.tokenMGR.CreateTokenAndSetCookie(user.Name, userPrincipal, groupPrincipals, providerToken, 0, "Token via Azure Configuration", request, userExtraInfo)
 }
 
-// checkConfigurationBeforeMigration verifies that admins have properly configured an existing app registration's permissions
-// in the Azure portal before they update their Azure AD auth config to use the new authentication flow.
-// The method fetches the current AuthConfig from the database, then updates it in-memory to use the new endpoints,
-// and creates a new test Azure client, thereby getting an access token to the Graph API.
-// Then it parses the JWT and inspects the permissions contained within. If the admins had not set those as per docs,
-// then Rancher won't find the permissions in the test token and will return an error.
-func (ap *azureProvider) checkConfigurationBeforeMigration() error {
-	cfg, err := ap.getAzureConfigK8s()
-	if err != nil {
-		return err
-	}
-	// Use the future, post-migration, endpoints. This temporarily updated config won't be persisted to the database in this method.
-	updateAzureADEndpoints(cfg)
-
-	azureClient, err := clients.NewMSGraphClient(cfg, ap.secrets)
-	if err != nil {
-		return err
-	}
-	token := azureClient.AccessToken()
-	return clients.EnsureMSGraphTokenHasPermissions(token)
-}
-
-// migrateToMicrosoftGraph represents the migration of the registered Azure AD auth provider
+// migrateToMicrosoftGraph performs the migration of the registered Azure AD auth provider
 // from the deprecated Azure AD Graph API to the Microsoft Graph API.
 // It modifies the existing auth config value in the database, so that it has up-to-date endpoints to the new API.
 // Most importantly, it sets the annotation that specifies that the auth config has been migrated to use the new auth flow.
-func (ap *azureProvider) migrateToMicrosoftGraph() error {
-	defer ap.deleteUserAccessTokens()
-	defer clients.GroupCache.Purge()
 
-	cfg, err := ap.getAzureConfigK8s()
+// It also verifies that admins have properly configured an existing app registration's permissions
+// in the Azure portal before they update their Azure AD auth config to use the new authentication flow.
+// The method receives the current AuthConfig from the database, then updates it in-memory to use the new endpoints,
+// and creates a new test Azure client, thereby getting an access token to the Graph API.
+// Then it parses the JWT and inspects the permissions contained within. If the admins had not set those as per docs,
+// then Rancher won't find the permissions in the test token and will return an error.
+
+// If validation and applying work, then migrateToMicrosoftGraph deletes all secrets with access tokens to the
+// deprecated Azure AD Graph API.
+func (ap *azureProvider) migrateToMicrosoftGraph() error {
+	cfg, err := ap.updateConfigAndValidatePermissions()
 	if err != nil {
 		return err
 	}
-	if authProviderEnabled(cfg) {
-		updateAzureADEndpoints(cfg)
-
-		if cfg.ObjectMeta.Annotations == nil {
-			cfg.ObjectMeta.Annotations = make(map[string]string)
-		}
-		cfg.ObjectMeta.Annotations[GraphEndpointMigratedAnnotation] = "true"
-
-		err = ap.saveAzureConfigK8s(cfg)
-		if err != nil {
-			return err
-		}
+	if err = ap.applyUpdatedConfig(cfg); err != nil {
+		return err
 	}
+	ap.deleteUserAccessTokens()
+	clients.GroupCache.Purge()
 	return nil
+}
+
+func (ap *azureProvider) updateConfigAndValidatePermissions() (*v32.AzureADConfig, error) {
+	cfg, err := ap.getAzureConfigK8s()
+	if err != nil {
+		return nil, err
+	}
+	if !authProviderEnabled(cfg) {
+		return nil, httperror.NewAPIError(httperror.InvalidState, "the Azure AD auth provider is not enabled")
+	}
+
+	updateAzureADEndpoints(cfg)
+
+	// Try to get a new client, which will fetch a new access token and validate its permissions.
+	_, err = clients.NewMSGraphClient(cfg, ap.secrets)
+	if err != nil {
+		return nil, err
+	}
+	return cfg, nil
+}
+
+func (ap *azureProvider) applyUpdatedConfig(cfg *v32.AzureADConfig) error {
+	if cfg.ObjectMeta.Annotations == nil {
+		cfg.ObjectMeta.Annotations = make(map[string]string)
+	}
+	cfg.ObjectMeta.Annotations[GraphEndpointMigratedAnnotation] = "true"
+	return ap.saveAzureConfigK8s(cfg)
 }
 
 // deleteUserAccessTokens attempts to delete all secrets that contain users' access tokens used for working with
