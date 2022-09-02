@@ -1,6 +1,7 @@
 package settings
 
 import (
+	"encoding/json"
 	"fmt"
 	"testing"
 
@@ -28,4 +29,28 @@ func TestIsRelease(t *testing.T) {
 		result := IsRelease()
 		a.Equal(value, result, fmt.Sprintf("Expected value [%t] for key [%s]. Got value [%t]", value, key, result))
 	}
+}
+
+// TestSystemDefaultRegistryDefault tests that the default registry is either
+// "" (an empty string) or the build time value to ensure backward compatibility.
+// Note, if CATTLE_BASE_REGISTRY is set this test in the testing environment
+// this test will fail.
+func TestSystemDefaultRegistryDefault(t *testing.T) {
+	var expect string
+	if InjectDefaults != "" {
+		defaults := map[string]string{}
+		if err := json.Unmarshal([]byte(InjectDefaults), &defaults); err != nil {
+			t.Errorf("Unable to parse InjectDefaults: %v", err)
+		}
+
+		if value, ok := settings["system-default-registry"]; ok {
+			expect = value.Get()
+		}
+	}
+
+	got := SystemDefaultRegistry.Get()
+	if got != expect {
+		t.Errorf("The System Default Registry of %q is not the expected value %q", got, expect)
+	}
+
 }
