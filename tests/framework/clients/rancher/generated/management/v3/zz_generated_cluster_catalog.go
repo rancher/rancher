@@ -8,6 +8,7 @@ const (
 	ClusterCatalogType                      = "clusterCatalog"
 	ClusterCatalogFieldAnnotations          = "annotations"
 	ClusterCatalogFieldBranch               = "branch"
+	ClusterCatalogFieldCatalogSecrets       = "catalogSecrets"
 	ClusterCatalogFieldClusterID            = "clusterId"
 	ClusterCatalogFieldCommit               = "commit"
 	ClusterCatalogFieldConditions           = "conditions"
@@ -36,6 +37,7 @@ type ClusterCatalog struct {
 	types.Resource
 	Annotations          map[string]string  `json:"annotations,omitempty" yaml:"annotations,omitempty"`
 	Branch               string             `json:"branch,omitempty" yaml:"branch,omitempty"`
+	CatalogSecrets       *CatalogSecrets    `json:"catalogSecrets,omitempty" yaml:"catalogSecrets,omitempty"`
 	ClusterID            string             `json:"clusterId,omitempty" yaml:"clusterId,omitempty"`
 	Commit               string             `json:"commit,omitempty" yaml:"commit,omitempty"`
 	Conditions           []CatalogCondition `json:"conditions,omitempty" yaml:"conditions,omitempty"`

@@ -23,8 +23,8 @@ func clusterTypes(schemas *types.Schemas) *types.Schemas {
 		m.Drop{Field: "chartValues"},
 		&m.ChangeType{Field: "machineGlobalConfig", Type: "MachineGlobalConfig"}).
 		MustImport(&Version, MachineGlobalConfig{}).
-		MustImportAndCustomize(&Version, v1.RKEConfig{}, func(schema *types.Schema) {}).
 		MustImportAndCustomize(&Version, metav1.Duration{}, func(schema *types.Schema) {}, Duration{}).
+		MustImportAndCustomize(&Version, v1.RKEConfig{}, func(schema *types.Schema) {}).
 		MustImportAndCustomize(&Version, v1.Cluster{}, func(schema *types.Schema) {
 			schema.ID = "provisioning.cattle.io.cluster"
 		})
