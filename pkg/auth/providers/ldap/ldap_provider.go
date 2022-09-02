@@ -369,3 +369,11 @@ func (p *ldapProvider) samlSearchGetPrincipal(
 		config.GroupObjectClass,
 		config.GroupNameAttribute)
 }
+
+func (p *ldapProvider) IsDisabledProvider() (bool, error) {
+	ldapConfig, _, err := p.getLDAPConfig()
+	if err != nil {
+		return false, err
+	}
+	return !ldapConfig.Enabled, nil
+}

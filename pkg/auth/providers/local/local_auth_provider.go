@@ -445,3 +445,8 @@ func (l *Provider) CanAccessWithGroupProviders(userPrincipalID string, groupPrin
 
 	return false, nil
 }
+
+func (l *Provider) IsDisabledProvider() (bool, error) {
+	// as of now, local provider can't be disabled, so this always returns false
+	return false, nil
+}

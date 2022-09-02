@@ -408,3 +408,11 @@ func (g *ghProvider) CanAccessWithGroupProviders(userPrincipalID string, groupPr
 	}
 	return allowed, nil
 }
+
+func (g *ghProvider) IsDisabledProvider() (bool, error) {
+	ghConfig, err := g.getGithubConfigCR()
+	if err != nil {
+		return false, err
+	}
+	return !ghConfig.Enabled, nil
+}

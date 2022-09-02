@@ -470,3 +470,11 @@ func UpdateGroupCacheSize(size string) {
 	}
 	clients.GroupCache.Resize(i)
 }
+
+func (ap *azureProvider) IsDisabledProvider() (bool, error) {
+	azureConfig, err := ap.getAzureConfigK8s()
+	if err != nil {
+		return false, err
+	}
+	return !azureConfig.Enabled, nil
+}
