@@ -2,6 +2,7 @@ package rbac
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 	"strings"
 
@@ -43,6 +44,9 @@ const (
 	rtbLabelUpdated                  = "authz.cluster.cattle.io/rtb-label-updated"
 	rtbCrbRbLabelsUpdated            = "authz.cluster.cattle.io/crb-rb-labels-updated"
 	impersonationLabel               = "authz.cluster.cattle.io/impersonator"
+
+	rolesCircularSoftLimit = 100
+	rolesCircularHardLimit = 500
 )
 
 func Register(ctx context.Context, workload *config.UserContext) {
@@ -343,8 +347,14 @@ func ToLowerRoleTemplates(roleTemplates map[string]*v3.RoleTemplate) {
 	}
 }
 
-func (m *manager) gatherRoles(rt *v3.RoleTemplate, roleTemplates map[string]*v3.RoleTemplate) error {
-	err := m.gatherRolesRecurse(rt, roleTemplates)
+func (m *manager) gatherRoles(rt *v3.RoleTemplate, roleTemplates map[string]*v3.RoleTemplate, depthCounter int) error {
+	if depthCounter == rolesCircularSoftLimit {
+		logrus.Warnf("roletemplate has caused %v recursive function calls", rolesCircularSoftLimit)
+	}
+	if depthCounter >= rolesCircularHardLimit {
+		return fmt.Errorf("roletemplate '%s' has caused %d recursive function calls, possible circular dependency", rt.Name, rolesCircularHardLimit)
+	}
+	err := m.gatherRolesRecurse(rt, roleTemplates, depthCounter)
 	if err != nil {
 		return err
 	}
@@ -352,15 +362,16 @@ func (m *manager) gatherRoles(rt *v3.RoleTemplate, roleTemplates map[string]*v3.
 	return nil
 }
 
-func (m *manager) gatherRolesRecurse(rt *v3.RoleTemplate, roleTemplates map[string]*v3.RoleTemplate) error {
+func (m *manager) gatherRolesRecurse(rt *v3.RoleTemplate, roleTemplates map[string]*v3.RoleTemplate, depthCounter int) error {
 	roleTemplates[rt.Name] = rt
+	depthCounter++
 
 	for _, rtName := range rt.RoleTemplateNames {
 		subRT, err := m.rtLister.Get("", rtName)
 		if err != nil {
 			return errors.Wrapf(err, "couldn't get RoleTemplate %s", rtName)
 		}
-		if err := m.gatherRoles(subRT, roleTemplates); err != nil {
+		if err := m.gatherRoles(subRT, roleTemplates, depthCounter); err != nil {
 			return errors.Wrapf(err, "couldn't gather RoleTemplate %s", rtName)
 		}
 	}
