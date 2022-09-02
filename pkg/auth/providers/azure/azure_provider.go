@@ -428,9 +428,9 @@ func extractAnnotationsFromAuthConfig(config map[string]interface{}) map[string]
 	return parseAnnotations(config)
 }
 
-func parseAnnotations(m map[string]interface{}) map[string]string {
+func parseAnnotations(metadata map[string]interface{}) map[string]string {
 	annotations := make(map[string]string)
-	rawAnnotations, ok := m["annotations"].(map[string]interface{})
+	rawAnnotations, ok := metadata["annotations"].(map[string]interface{})
 	if !ok {
 		logrus.Info("Failed to decode the 'annotations' field of the AuthConfig.")
 		return annotations
