@@ -79,7 +79,7 @@ func (p *ldapProvider) loginUser(credential *v32.BasicLogin, config *v3.LdapConf
 		// Re-bind SA
 		err = ldap.AuthenticateServiceAccountUser(serviceAccountPassword, serviceAccountUserName, "", lConn)
 		if err != nil {
-			return v3.Principal{}, nil, err
+			return v3.Principal{}, nil, httperror.WrapAPIError(err, httperror.Unauthorized, "authentication failed")
 		}
 
 		// Re-execute the search
