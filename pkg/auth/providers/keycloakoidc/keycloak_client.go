@@ -165,7 +165,10 @@ func (k *KeyCloakClient) getFromKeyCloakByID(principalID, principalType string, 
 }
 
 func getSearchURL(issuer string) (string, error) {
-	splitIssuer := strings.SplitAfter(issuer, "/auth/")
+	splitIssuer := strings.SplitAfterN(issuer, "/auth/", 2)
+	if len(splitIssuer) != 2 {
+		return "", errors.Errorf("invalid issuer %v", issuer)
+	}
 	return fmt.Sprintf(
 		"%sadmin/%s",
 		splitIssuer[0],
