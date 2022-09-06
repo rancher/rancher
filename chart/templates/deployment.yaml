@@ -190,7 +190,7 @@ spec:
 {{- if eq .Values.auditLog.destination "sidecar" }}
   {{- if gt (int .Values.auditLog.level) 0 }}
       # Make audit logs available for Rancher log collector tools.
-      - image: {{ .Values.busyboxImage }}
+      - image: {{ .Values.busyboxImage }}:{{.Values.busyboxImageTag}}
         imagePullPolicy: {{ default "IfNotPresent" .Values.busyboxImagePullPolicy }}
         name: {{ template "rancher.name" . }}-audit-log
         command: ["tail"]

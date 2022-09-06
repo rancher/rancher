@@ -70,13 +70,14 @@ tests:
   asserts:
   - equal:
       path: spec.template.spec.containers[1].image
-      value: busybox
-- it: should override busybox image when auditLog.destination is sidecar and auditLog.level > 0 and busyboxImage is set
+      value: rancher/mirrored-library-busybox:1.34.1
+- it: should override busybox image when auditLog.destination is sidecar and auditLog.level > 0 and both busyboxImage and busyboxImageTag are set
   set:
     auditLog:
       destination: sidecar
       level: 1
-    busyboxImage: my.private.repo:5000/rancher/busybox:1.0.1
+    busyboxImage: my.private.repo:5000/rancher/busybox
+    busyboxImageTag: 1.0.1
   asserts:
   - equal:
       path: spec.template.spec.containers[1].image
