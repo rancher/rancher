@@ -6,7 +6,7 @@ import (
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
 )
 
-// GetProjectByName is a helper function that returns the project by name in a specific cluster
+// GetProjectByName is a helper function that returns the project by name in a specific cluster.
 func GetProjectByName(client *rancher.Client, clusterID, projectName string) (*management.Project, error) {
 	var project *management.Project
 
@@ -24,9 +24,10 @@ func GetProjectByName(client *rancher.Client, clusterID, projectName string) (*m
 		return project, err
 	}
 
-	for _, p := range projectsList.Data {
+	for i, p := range projectsList.Data {
 		if p.Name == projectName {
-			project = &p
+			project = &projectsList.Data[i]
+			break
 		}
 	}
 

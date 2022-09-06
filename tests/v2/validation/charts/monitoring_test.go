@@ -179,7 +179,7 @@ func (m *MonitoringTestSuite) TestMonitoringChart() {
 	require.NoError(m.T(), err)
 
 	m.T().Logf("Getting alert manager secret")
-	alertManagerSecret, err := secrets.GetSecret(client, m.project.ClusterID, charts.RancherMonitoringNamespace, charts.RancherMonitoringAlertSecret, metav1.GetOptions{})
+	alertManagerSecret, err := secrets.GetSecretByName(client, m.project.ClusterID, charts.RancherMonitoringNamespace, charts.RancherMonitoringAlertSecret, metav1.GetOptions{})
 	require.NoError(m.T(), err)
 
 	m.T().Logf("Editing alert manager secret receivers")
@@ -195,7 +195,7 @@ func (m *MonitoringTestSuite) TestMonitoringChart() {
 	require.NoError(m.T(), err)
 
 	m.T().Logf("Getting alert manager secret")
-	alertManagerSecret, err = secrets.GetSecret(client, m.project.ClusterID, charts.RancherMonitoringNamespace, charts.RancherMonitoringAlertSecret, metav1.GetOptions{})
+	alertManagerSecret, err = secrets.GetSecretByName(client, m.project.ClusterID, charts.RancherMonitoringNamespace, charts.RancherMonitoringAlertSecret, metav1.GetOptions{})
 	require.NoError(m.T(), err)
 
 	m.T().Logf("Editing alert manager secret routes")

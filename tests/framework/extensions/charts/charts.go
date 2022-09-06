@@ -56,6 +56,11 @@ type RancherMonitoringOpts struct {
 	RKEScheduler         bool
 }
 
+// RancherLoggingOpts is a struct of the required options to install Rancher Logging with desired chart values.
+type RancherLoggingOpts struct {
+	AdditionalLoggingSources bool
+}
+
 // GetChartCaseEndpointResult is a struct that GetChartCaseEndpoint helper function returns.
 // It contains the boolean for healthy response and the request body.
 type GetChartCaseEndpointResult struct {
