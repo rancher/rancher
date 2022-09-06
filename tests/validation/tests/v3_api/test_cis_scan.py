@@ -25,6 +25,9 @@ from .common import wait_for_cluster_node_count
 from .test_rke_cluster_provisioning import HOST_NAME, \
     POD_SECURITY_POLICY_TEMPLATE, get_cis_rke_config  # NOQA
 
+# Skipping all the tests from this module since CIS 1.5 and CIS 1.4 profile are not supported on latest k8s versions.
+pytest.skip(allow_module_level=True)
+
 scan_results = {
     "rke-cis-1.4": {
         "permissive": {"pass": 63, "skip": 15},
