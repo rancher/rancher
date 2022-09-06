@@ -15,6 +15,10 @@ from .common import get_user_client_and_cluster
 from .common import random_test_name
 from .common import wait_for_app_to_active
 
+# Skipping this test module because library-fluentd-aggregator from library catalog is not supported on latest
+# rancher versions
+pytest.skip(allow_module_level=True)
+
 namespace = {"p_client": None, "ns": None, "cluster": None, "project": None,
              "name_prefix": None, "admin_client": None, "sys_p_client": None,
              "pod": None}
