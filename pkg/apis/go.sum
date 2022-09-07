@@ -997,8 +997,8 @@ github.com/prometheus/procfs v0.7.3/go.mod h1:cz+aTbrPOrUb4q7XlbU9ygM+/jj0fzG6c1
 github.com/prometheus/tsdb v0.7.1/go.mod h1:qhTCs0VvXwvX/y3TZrWD7rabWM+ijKTux40TwIPHuXU=
 github.com/qri-io/starlib v0.4.2-0.20200213133954-ff2e8cd5ef8d/go.mod h1:7DPO4domFU579Ga6E61sB9VFNaniPVwJP5C4bBCu3wA=
 github.com/rackspace/gophercloud v0.0.0-20150408191457-ce0f487f6747/go.mod h1:4bJ1FwuaBZ6dt1VcDX5/O662mwR8GWqS4l68H6hkoYQ=
-github.com/rancher/aks-operator v1.0.6 h1:A/haordC1lv2TIUV8A2tMo2XP+ckZRFfex8b3igWZVA=
-github.com/rancher/aks-operator v1.0.6/go.mod h1:CP6mTWZL2mc19kdavUe5jOK9LT+k0/nDw76UOLYpFJU=
+github.com/rancher/aks-operator v1.0.7-rc1 h1:/+MsntuNqLjRZe1rMSp1atlJ0AEG12R7mSJebP9Ll0Q=
+github.com/rancher/aks-operator v1.0.7-rc1/go.mod h1:qK59c7DFxpYn14sXHbbPkNl7zUNyuN0qkFUUHXsQ0jA=
 github.com/rancher/eks-operator v1.1.5-rc1 h1:Jgn9tIcxNc9L7YZOkGjAbulUOk4jhmrps+9m7f4ceOY=
 github.com/rancher/eks-operator v1.1.5-rc1/go.mod h1:mx3fp0rFzDX7gEXJtisHWDFeDJHpDsAjwDkmbSf1BKs=
 github.com/rancher/fleet/pkg/apis v0.0.0-20220722201012-fe5f76e3c1e0 h1:2ha3Zn/ywk5B/5ptJP3TA9bowEM881Z5aah8tW23u80=
@@ -1259,6 +1259,7 @@ golang.org/x/crypto v0.0.0-20210817164053-32db794688a5/go.mod h1:GvvjBRRGRdwPK5y
 golang.org/x/crypto v0.0.0-20210921155107-089bfa567519/go.mod h1:GvvjBRRGRdwPK5ydBHafDWAxML/pGHZbMvKqRZ5+Abc=
 golang.org/x/crypto v0.0.0-20220214200702-86341886e292/go.mod h1:IxCIyHEi3zRg3s0A5j5BB6A9Jmi73HwBIUl50j+osU4=
 golang.org/x/crypto v0.0.0-20220411220226-7b82a4e95df4/go.mod h1:IxCIyHEi3zRg3s0A5j5BB6A9Jmi73HwBIUl50j+osU4=
+golang.org/x/crypto v0.0.0-20220622213112-05595931fe9d/go.mod h1:IxCIyHEi3zRg3s0A5j5BB6A9Jmi73HwBIUl50j+osU4=
 golang.org/x/exp v0.0.0-20190121172915-509febef88a4/go.mod h1:CJ0aWSM057203Lf6IL+f9T1iT9GByDxfZKAQTCR3kQA=
 golang.org/x/exp v0.0.0-20190125153040-c74c464bbbf2/go.mod h1:CJ0aWSM057203Lf6IL+f9T1iT9GByDxfZKAQTCR3kQA=
 golang.org/x/exp v0.0.0-20190306152737-a1d7652674e8/go.mod h1:CJ0aWSM057203Lf6IL+f9T1iT9GByDxfZKAQTCR3kQA=
