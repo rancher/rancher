@@ -102,7 +102,7 @@ require (
 	github.com/prometheus/client_golang v1.12.1
 	github.com/prometheus/client_model v0.2.0
 	github.com/prometheus/common v0.32.1
-	github.com/rancher/aks-operator v1.0.6
+	github.com/rancher/aks-operator v1.0.7-rc1
 	github.com/rancher/apiserver v0.0.0-20220610164457-643f1d19e3fc
 	github.com/rancher/channelserver v0.5.1-0.20220405170618-28c9b37deff1
 	github.com/rancher/dynamiclistener v0.3.4
@@ -135,7 +135,7 @@ require (
 	github.com/vmware/govmomi v0.26.0
 	github.com/vmware/kube-fluentd-operator v0.0.0-20190307154903-bf9de7e79eaf
 	github.com/xanzy/go-gitlab v0.0.0-20180830102804-feb856f4760f
-	golang.org/x/crypto v0.0.0-20220411220226-7b82a4e95df4
+	golang.org/x/crypto v0.0.0-20220622213112-05595931fe9d
 	golang.org/x/mod v0.6.0-dev.0.20220106191415-9b9b3d81d5e3
 	golang.org/x/net v0.0.0-20220708220712-1185a9018129
 	golang.org/x/oauth2 v0.0.0-20220608161450-d0670ef3b1eb
