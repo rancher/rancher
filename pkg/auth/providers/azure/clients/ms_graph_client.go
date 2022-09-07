@@ -21,7 +21,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-var errMSGraphNoPermissions = fmt.Errorf("missing required permissions from Microsoft Graph: need %s",
+var errMSGraphNoPermissions = fmt.Errorf("missing required Application type permissions from Microsoft Graph: need %s",
 	strings.Join(msGraphRequiredPermissions, ", "))
 
 type azureMSGraphClient struct {

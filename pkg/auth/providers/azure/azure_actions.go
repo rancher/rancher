@@ -37,7 +37,7 @@ func (ap *azureProvider) actionHandler(actionName string, action *types.Action, 
 	}
 
 	if actionName == "configureTest" {
-		return ap.configureTest(actionName, action, request)
+		return ap.ConfigureTest(actionName, action, request)
 	} else if actionName == "testAndApply" {
 		return ap.testAndApply(actionName, action, request)
 	} else if actionName == "upgrade" {
@@ -47,7 +47,7 @@ func (ap *azureProvider) actionHandler(actionName string, action *types.Action, 
 	return httperror.NewAPIError(httperror.ActionNotAvailable, "")
 }
 
-func (ap *azureProvider) configureTest(actionName string, action *types.Action, request *types.APIContext) error {
+func (ap *azureProvider) ConfigureTest(actionName string, action *types.Action, request *types.APIContext) error {
 	// Verify the body has all required fields
 	input, err := handler.ParseAndValidateActionBody(request, request.Schemas.Schema(&managementschema.Version,
 		client.AzureADConfigType))
