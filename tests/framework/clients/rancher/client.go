@@ -13,6 +13,7 @@ import (
 	frameworkDynamic "github.com/rancher/rancher/tests/framework/clients/dynamic"
 	"github.com/rancher/rancher/tests/framework/clients/ec2"
 	"github.com/rancher/rancher/tests/framework/clients/rancher/catalog"
+	cluster "github.com/rancher/rancher/tests/framework/clients/rancher/generated/cluster/v1beta1"
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
 	provisioning "github.com/rancher/rancher/tests/framework/clients/rancher/generated/provisioning/v1"
 
@@ -37,6 +38,8 @@ type Client struct {
 	Provisioning *provisioning.Client
 	// Client used to access catalog.cattle.io v1 API resources (apps, charts, etc.)
 	Catalog *catalog.Client
+	// Client used to access cluster.x-k8s.io.machine v1 API
+	Cluster *cluster.Client
 	// Config used to test against a rancher instance
 	RancherConfig *Config
 	restConfig    *rest.Config
@@ -77,6 +80,13 @@ func NewClient(bearerToken string, session *session.Session) (*Client, error) {
 	}
 
 	c.Provisioning.Ops.Session = session
+
+	c.Cluster, err = cluster.NewClient(clientOptsV1(restConfig, c.RancherConfig))
+	if err != nil {
+		return nil, err
+	}
+
+	c.Cluster.Ops.Session = session
 
 	catalogClient, err := catalog.NewForConfig(restConfig, session)
 	if err != nil {
