@@ -90,6 +90,7 @@ var (
 	UIPath                              = NewSetting("ui-path", "/usr/share/rancher/ui")
 	UIDashboardIndex                    = NewSetting("ui-dashboard-index", "https://releases.rancher.com/dashboard/latest/index.html")
 	UIDashboardPath                     = NewSetting("ui-dashboard-path", "/usr/share/rancher/ui-dashboard")
+	UIDashboardHarvesterLegacyPlugin    = NewSetting("ui-dashboard-harvester-legacy-plugin", "https://releases.rancher.com/harvester-ui/plugin/harvester-1.0.3-head/harvester-1.0.3-head.umd.min.js")
 	UIFavicon                           = NewSetting("ui-favicon", "")
 	UIPerformance                       = NewSetting("ui-performance", "") // Experimental settings for UI functionality to improve the UX with large nunbers of resources
 	UIPreferred                         = NewSetting("ui-preferred", "vue")
