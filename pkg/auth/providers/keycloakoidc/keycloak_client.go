@@ -165,12 +165,12 @@ func (k *KeyCloakClient) getFromKeyCloakByID(principalID, principalType string, 
 }
 
 func getSearchURL(issuer string) (string, error) {
-	splitIssuer := strings.SplitAfterN(issuer, "/auth/", 2)
+	splitIssuer := strings.SplitN(issuer, "/realms/", 2)
 	if len(splitIssuer) != 2 {
 		return "", errors.Errorf("invalid issuer %v", issuer)
 	}
 	return fmt.Sprintf(
-		"%sadmin/%s",
+		"%s/admin/realms/%s",
 		splitIssuer[0],
 		splitIssuer[1],
 	), nil
