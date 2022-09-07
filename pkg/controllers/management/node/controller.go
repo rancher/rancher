@@ -46,9 +46,10 @@ import (
 )
 
 const (
-	defaultEngineInstallURL       = "https://releases.rancher.com/install-docker/17.03.2.sh"
-	amazonec2                     = "amazonec2"
-	userNodeRemoveFinalizerPrefix = "clusterscoped.controller.cattle.io/user-node-remove_"
+	defaultEngineInstallURL         = "https://releases.rancher.com/install-docker/17.03.2.sh"
+	amazonec2                       = "amazonec2"
+	userNodeRemoveCleanupAnnotation = "cleanup.cattle.io/user-node-remove"
+	userNodeRemoveFinalizerPrefix   = "clusterscoped.controller.cattle.io/user-node-remove_"
 )
 
 // SchemaToDriverFields maps Schema field => driver field
@@ -95,6 +96,7 @@ func Register(ctx context.Context, management *config.ManagementContext, cluster
 	}
 
 	nodeClient.AddLifecycle(ctx, "node-controller", nodeLifecycle)
+	nodeClient.AddHandler(ctx, "node-controller-sync", nodeLifecycle.sync)
 }
 
 type Lifecycle struct {
@@ -222,8 +224,6 @@ func (m *Lifecycle) getNodePool(nodePoolName string) (*v32.NodePool, error) {
 }
 
 func (m *Lifecycle) Remove(obj *v32.Node) (runtime.Object, error) {
-	obj.SetFinalizers(removeFinalizerWithPrefix(obj.GetFinalizers(), userNodeRemoveFinalizerPrefix))
-
 	if obj.Status.NodeTemplateSpec == nil {
 		if err := m.cleanRKENode(obj); err != nil {
 			return obj, err
@@ -506,7 +506,7 @@ outer:
 		case err = <-done:
 			break outer
 		case <-time.After(5 * time.Second):
-			config.Save()
+			_ = config.Save()
 		}
 	}
 
@@ -518,6 +518,19 @@ outer:
 		return obj, saveError
 	}
 	return obj, err
+}
+
+func (m *Lifecycle) sync(_ string, obj *v32.Node) (runtime.Object, error) {
+	if obj == nil {
+		return nil, nil
+	}
+
+	if obj.Annotations[userNodeRemoveCleanupAnnotation] != "true" {
+		// finalizer from user-node-remove has to be checked/cleaned
+		return m.userNodeRemoveCleanup(obj)
+	}
+
+	return obj, nil
 }
 
 func (m *Lifecycle) Updated(obj *v32.Node) (runtime.Object, error) {

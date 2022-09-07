@@ -34,10 +34,7 @@ import (
 const (
 	AllNodeKey     = "_machine_all_"
 	annotationName = "management.cattle.io/nodesyncer"
-	apiUpdate      = "management.cattle.io/apiUpdate"
 )
-
-var apiUpdateMap = map[string]string{apiUpdate: "true"}
 
 type nodeSyncer struct {
 	machines         v3.NodeInterface
@@ -130,7 +127,7 @@ func (n *nodeSyncer) sync(key string, node *corev1.Node) (runtime.Object, error)
 	return nil, nil
 }
 
-func (n *nodeSyncer) needUpdate(key string, node *corev1.Node) (bool, error) {
+func (n *nodeSyncer) needUpdate(_ string, node *corev1.Node) (bool, error) {
 	if node == nil || node.DeletionTimestamp != nil {
 		return true, nil
 	}
@@ -164,17 +161,17 @@ func (n *nodeSyncer) needUpdate(key string, node *corev1.Node) (bool, error) {
 	return true, nil
 }
 
-func (m *nodesSyncer) sync(key string, machine *v3.Node) (runtime.Object, error) {
+func (m *nodesSyncer) sync(key string, _ *v32.Node) (runtime.Object, error) {
 	if key == fmt.Sprintf("%s/%s", m.clusterNamespace, AllNodeKey) {
 		return nil, m.reconcileAll()
 	}
 	return nil, nil
 }
 
-func (m *nodesSyncer) updateNodeAndNode(node *corev1.Node, obj *v3.Node) (*corev1.Node, *v3.Node, error) {
+func (m *nodesSyncer) updateNodeAndNode(node *corev1.Node, obj *v32.Node) (*corev1.Node, *v32.Node, error) {
 	node, err := m.nodeClient.Update(node)
 	if err != nil {
-		// Return v3.Node is nil because it hasn't been persisted and therefor out of sync with cache
+		// Return v32.Node is nil because it hasn't been persisted and therefor out of sync with cache
 		// so we don't want to return it from the handler
 		return node, nil, err
 	}
@@ -188,7 +185,7 @@ func (m *nodesSyncer) updateNodeAndNode(node *corev1.Node, obj *v3.Node) (*corev
 	return node, obj, nil
 }
 
-func (m *nodesSyncer) updateLabels(node *corev1.Node, obj *v3.Node, nodePlan rketypes.RKEConfigNodePlan) (*corev1.Node, *v3.Node, error) {
+func (m *nodesSyncer) updateLabels(node *corev1.Node, obj *v32.Node, nodePlan rketypes.RKEConfigNodePlan) (*corev1.Node, *v32.Node, error) {
 	finalMap, changed := computeDelta(node.Labels, nodePlan.Labels, obj.Spec.MetadataUpdate.Labels, onlyKubeLabels)
 	if !changed {
 		return node, obj, nil
@@ -229,7 +226,7 @@ func computePlanDelta(planValues map[string]string, delta v32.MapDelta) (map[str
 
 }
 
-func (m *nodesSyncer) updateAnnotations(node *corev1.Node, obj *v3.Node, nodePlan rketypes.RKEConfigNodePlan) (*corev1.Node, *v3.Node, error) {
+func (m *nodesSyncer) updateAnnotations(node *corev1.Node, obj *v32.Node, nodePlan rketypes.RKEConfigNodePlan) (*corev1.Node, *v32.Node, error) {
 	finalMap, changed := computeDelta(node.Annotations, nodePlan.Annotations, obj.Spec.MetadataUpdate.Annotations, allowAllPolicy)
 	if !changed {
 		return node, obj, nil
@@ -242,7 +239,7 @@ func (m *nodesSyncer) updateAnnotations(node *corev1.Node, obj *v3.Node, nodePla
 	return m.updateNodeAndNode(node, obj)
 }
 
-func (m *nodesSyncer) syncLabels(key string, obj *v3.Node) (runtime.Object, error) {
+func (m *nodesSyncer) syncLabels(_ string, obj *v32.Node) (runtime.Object, error) {
 	if obj == nil {
 		return nil, nil
 	}
@@ -311,7 +308,7 @@ func computeDelta(currentState map[string]string, planValues map[string]string, 
 	return result, changed
 }
 
-func (m *nodesSyncer) getNodePlan(node *v3.Node) (rketypes.RKEConfigNodePlan, error) {
+func (m *nodesSyncer) getNodePlan(node *v32.Node) (rketypes.RKEConfigNodePlan, error) {
 	cluster, err := m.clusterLister.Get("", node.Namespace)
 	if err != nil {
 		return rketypes.RKEConfigNodePlan{}, err
@@ -406,8 +403,8 @@ func (m *nodesSyncer) reconcileAll() error {
 	if err != nil {
 		return err
 	}
-	machineMap := make(map[string]*v3.Node)
-	toDelete := make(map[string]*v3.Node)
+	machineMap := make(map[string]*v32.Node)
+	toDelete := make(map[string]*v32.Node)
 	for _, machine := range machines {
 		node, err := nodehelper.GetNodeForMachine(machine, m.nodeLister)
 		if err != nil {
@@ -448,14 +445,18 @@ func (m *nodesSyncer) reconcileAll() error {
 	return nil
 }
 
-func (m *nodesSyncer) reconcileNodeForNode(machine *v3.Node, node *corev1.Node, nodeCache *NodeCache) error {
+func (m *nodesSyncer) reconcileNodeForNode(machine *v32.Node, node *corev1.Node, nodeCache *NodeCache) error {
 	if machine == nil {
 		return m.createNode(node, nodeCache)
 	}
 	return m.updateNode(machine, node)
 }
 
-func (m *nodesSyncer) removeNode(machine *v3.Node) error {
+func (m *nodesSyncer) removeNode(machine *v32.Node) error {
+	if machine.DeletionTimestamp != nil {
+
+		return nil
+	}
 	if machine.Annotations == nil {
 		return nil
 	}
@@ -472,7 +473,7 @@ func (m *nodesSyncer) removeNode(machine *v3.Node) error {
 	return nil
 }
 
-func (m *nodesSyncer) updateNode(existing *v3.Node, node *corev1.Node) error {
+func (m *nodesSyncer) updateNode(existing *v32.Node, node *corev1.Node) error {
 	toUpdate, err := m.convertNodeToMachine(node, existing)
 	if err != nil {
 		return err
@@ -493,7 +494,7 @@ func (m *nodesSyncer) updateNode(existing *v3.Node, node *corev1.Node) error {
 func (m *nodesSyncer) createNode(node *corev1.Node, nodeCache *NodeCache) error {
 	// respect user defined name or label
 	if nodehelper.IgnoreNode(node.Name, node.Labels) {
-		logrus.Debugf("Skipping v3.node creation for [%v] node", node.Name)
+		logrus.Debugf("Skipping v32.Node creation for [%v] node", node.Name)
 		return nil
 	}
 
@@ -523,18 +524,18 @@ func (m *nodesSyncer) createNode(node *corev1.Node, nodeCache *NodeCache) error 
 	return nil
 }
 
-func (m *nodesSyncer) getMachineForNodeFromCache(node *corev1.Node) (*v3.Node, error) {
+func (m *nodesSyncer) getMachineForNodeFromCache(node *corev1.Node) (*v32.Node, error) {
 	return nodehelper.GetMachineForNode(node, m.clusterNamespace, m.machineLister)
 }
 
 type NodeCache struct {
-	all    []*v3.Node
-	byName map[string][]*v3.Node
+	all    []*v32.Node
+	byName map[string][]*v32.Node
 }
 
-func (n *NodeCache) Add(machine *v3.Node) {
+func (n *NodeCache) Add(machine *v32.Node) {
 	if n.byName == nil {
-		n.byName = map[string][]*v3.Node{}
+		n.byName = map[string][]*v32.Node{}
 	}
 	if name, ok := machine.Labels[nodehelper.LabelNodeName]; ok {
 		n.byName[name] = append(n.byName[name], machine)
@@ -542,7 +543,7 @@ func (n *NodeCache) Add(machine *v3.Node) {
 	n.all = append(n.all, machine)
 }
 
-func (m *nodesSyncer) getMachineForNode(node *corev1.Node, nodeCache *NodeCache) (*v3.Node, error) {
+func (m *nodesSyncer) getMachineForNode(node *corev1.Node, nodeCache *NodeCache) (*v32.Node, error) {
 	if len(nodeCache.all) == 0 {
 		machines, err := m.machines.List(metav1.ListOptions{})
 		if err != nil {
@@ -569,7 +570,7 @@ func (m *nodesSyncer) getMachineForNode(node *corev1.Node, nodeCache *NodeCache)
 	return nil, nil
 }
 
-func resetConditions(machine *v3.Node) *v3.Node {
+func resetConditions(machine *v32.Node) *v32.Node {
 	if machine.Status.InternalNodeStatus.Conditions == nil {
 		return machine
 	}
@@ -588,7 +589,7 @@ func resetConditions(machine *v3.Node) *v3.Node {
 	return updated
 }
 
-func objectsAreEqual(existing *v3.Node, toUpdate *v3.Node) bool {
+func objectsAreEqual(existing *v32.Node, toUpdate *v32.Node) bool {
 	// we are updating spec and status only, so compare them
 	toUpdateToCompare := resetConditions(toUpdate)
 	existingToCompare := resetConditions(existing)
@@ -681,7 +682,7 @@ func statusEqualTest(proposed, existing corev1.NodeStatus) bool {
 	return true
 }
 
-func cleanStatus(machine *v3.Node) {
+func cleanStatus(machine *v32.Node) {
 	var conditions []corev1.NodeCondition
 	for _, condition := range machine.Status.InternalNodeStatus.Conditions {
 		if condition.Type == "Ready" {
@@ -737,10 +738,10 @@ func getResourceList(annotation string, node *corev1.Node) corev1.ResourceList {
 	return result
 }
 
-func (m *nodesSyncer) convertNodeToMachine(node *corev1.Node, existing *v3.Node) (*v3.Node, error) {
-	var machine *v3.Node
+func (m *nodesSyncer) convertNodeToMachine(node *corev1.Node, existing *v32.Node) (*v32.Node, error) {
+	var machine *v32.Node
 	if existing == nil {
-		machine = &v3.Node{
+		machine = &v32.Node{
 			Spec:   v32.NodeSpec{},
 			Status: v32.NodeStatus{},
 			ObjectMeta: metav1.ObjectMeta{
@@ -826,7 +827,7 @@ func (m *nodesSyncer) isClusterRestoring() (bool, error) {
 	return false, nil
 }
 
-func determineNodeRoles(machine *v3.Node) {
+func determineNodeRoles(machine *v32.Node) {
 	if machine.Status.NodeLabels != nil {
 		_, etcd := machine.Status.NodeLabels["node-role.kubernetes.io/etcd"]
 		_, control := machine.Status.NodeLabels["node-role.kubernetes.io/controlplane"]
