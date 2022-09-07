@@ -1,9 +1,14 @@
+// Package audit is used to preform audit logging.
 package audit
 
 import (
 	"bytes"
+	"compress/gzip"
+	"compress/zlib"
 	"context"
 	"encoding/json"
+	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"regexp"
@@ -11,7 +16,6 @@ import (
 	"time"
 
 	"github.com/pborman/uuid"
-	"github.com/pkg/errors"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	k8stypes "k8s.io/apimachinery/pkg/types"
@@ -19,15 +23,24 @@ import (
 )
 
 const (
-	contentTypeJSON = "application/json"
-	redacted        = "[redacted]"
+	contentTypeJSON     = "application/json"
+	contentEncodingGZIP = "gzip"
+	contentEncodingZLib = "deflate"
+	redacted            = "[redacted]"
 )
 
+// Level represents a desired logging level.
+type Level int
+
 const (
-	levelNull = iota
-	levelMetadata
-	levelRequest
-	levelRequestResponse
+	// LevelNull default value.
+	LevelNull Level = iota
+	// LevelMetadata log request header information.
+	LevelMetadata
+	// LevelRequest log metadata and request body.
+	LevelRequest
+	// LevelRequestResponse log metadata request body and response header and body.
+	LevelRequestResponse
 )
 
 var (
@@ -37,6 +50,8 @@ var (
 	}
 	sensitiveRequestHeader  = []string{"Cookie", "Authorization"}
 	sensitiveResponseHeader = []string{"Cookie", "Set-Cookie"}
+	// ErrUnsupportedEncoding is returned when the response encoding is unsupported
+	ErrUnsupportedEncoding = fmt.Errorf("unsupported encoding")
 )
 
 type auditLog struct {
@@ -64,6 +79,7 @@ type log struct {
 
 var userKey struct{}
 
+// User holds information about the user who caused the audit log
 type User struct {
 	Name  string              `json:"name,omitempty"`
 	Group []string            `json:"group,omitempty"`
@@ -93,6 +109,7 @@ func getUserNameForBasicLogin(body []byte) string {
 	return input.Username
 }
 
+// FromContext gets the user information from the given context.
 func FromContext(ctx context.Context) (*User, bool) {
 	u, ok := ctx.Value(userKey).(*User)
 	return u, ok
@@ -113,7 +130,7 @@ func newAuditLog(writer *LogWriter, req *http.Request, keysToConcealRegex *regex
 
 	contentType := req.Header.Get("Content-Type")
 	loginReq := isLoginRequest(req.RequestURI)
-	if writer.Level >= levelRequest || loginReq {
+	if writer.Level >= LevelRequest || loginReq {
 		if bodyMethods[req.Method] && strings.HasPrefix(contentType, contentTypeJSON) {
 			reqBody, err := readBodyWithoutLosingContent(req)
 			if err != nil {
@@ -125,7 +142,7 @@ func newAuditLog(writer *LogWriter, req *http.Request, keysToConcealRegex *regex
 					auditLog.log.UserLoginName = loginName
 				}
 			}
-			if writer.Level >= levelRequest {
+			if writer.Level >= LevelRequest {
 				auditLog.reqBody = reqBody
 			}
 		}
@@ -139,6 +156,7 @@ func (a *auditLog) write(userInfo *User, reqHeaders, resHeaders http.Header, res
 	a.log.RequestHeader = filterOutHeaders(reqHeaders, sensitiveRequestHeader)
 	a.log.ResponseHeader = filterOutHeaders(resHeaders, sensitiveResponseHeader)
 	a.log.ResponseCode = resCode
+
 	if a.log.UserLoginName != "" {
 		if a.log.User.Extra == nil {
 			a.log.User.Extra = make(map[string][]string)
@@ -148,31 +166,75 @@ func (a *auditLog) write(userInfo *User, reqHeaders, resHeaders http.Header, res
 	}
 
 	var buffer bytes.Buffer
+
 	alByte, err := json.Marshal(a.log)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to marshal log message: %w", err)
 	}
 
 	buffer.Write(bytes.TrimSuffix(alByte, []byte("}")))
-	if a.writer.Level >= levelRequest && len(a.reqBody) > 0 {
-		buffer.WriteString(`,"requestBody":`)
-		buffer.Write(bytes.TrimSuffix(a.concealSensitiveData(a.log.RequestURI, a.reqBody), []byte("\n")))
+	a.writeRequest(&buffer)
+
+	if err = a.writeResponse(&buffer, resHeaders, resBody); err != nil {
+		return err
 	}
-	if a.writer.Level >= levelRequestResponse && resHeaders.Get("Content-Type") == contentTypeJSON && len(resBody) > 0 {
-		buffer.WriteString(`,"responseBody":`)
-		buffer.Write(bytes.TrimSuffix(a.concealSensitiveData(a.log.RequestURI, resBody), []byte("\n")))
-	}
+
 	buffer.WriteString("}")
 
 	var compactBuffer bytes.Buffer
 	err = json.Compact(&compactBuffer, buffer.Bytes())
 	if err != nil {
-		return errors.Wrap(err, "compact audit log json failed")
+
+		return fmt.Errorf("failed to compact audit log: %w", err)
 	}
 
 	compactBuffer.WriteString("\n")
+
 	_, err = a.writer.Output.Write(compactBuffer.Bytes())
-	return err
+	if err != nil {
+		return fmt.Errorf("failed to write log to output: %w", err)
+	}
+
+	return nil
+}
+
+// writeRequest attempts to write the API request to the log message.
+func (a *auditLog) writeRequest(buf *bytes.Buffer) {
+	if a.writer.Level < LevelRequest || len(a.reqBody) == 0 {
+		return
+	}
+
+	buf.WriteString(`,"requestBody":`)
+	buf.Write(bytes.TrimSuffix(a.concealSensitiveData(a.log.RequestURI, a.reqBody), []byte("\n")))
+}
+
+// writeResponse attempt to write the API response to the log message.
+func (a *auditLog) writeResponse(buf *bytes.Buffer, resHeaders http.Header, resBody []byte) (err error) {
+	if a.writer.Level < LevelRequestResponse || resHeaders.Get("Content-Type") != contentTypeJSON || len(resBody) == 0 {
+		return nil
+	}
+
+	switch resHeaders.Get("Content-Encoding") {
+	case contentEncodingGZIP:
+		resBody, err = decompressGZIP(resBody)
+	case contentEncodingZLib:
+		resBody, err = decompressZLib(resBody)
+	case "none":
+		// do nothing message is not encoded
+	case "":
+		// do nothing message is not encoded
+	default:
+		err = fmt.Errorf("%w '%s' in response header", ErrUnsupportedEncoding, resHeaders.Get("Content-Encoding"))
+	}
+
+	if err != nil {
+		return fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	buf.WriteString(`,"responseBody":`)
+	buf.Write(bytes.TrimSuffix(a.concealSensitiveData(a.log.RequestURI, resBody), []byte("\n")))
+
+	return nil
 }
 
 func isLoginRequest(uri string) bool {
@@ -186,7 +248,7 @@ func readBodyWithoutLosingContent(req *http.Request) ([]byte, error) {
 
 	bodyBytes, err := ioutil.ReadAll(req.Body)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to read request body: %w", err)
 	}
 	req.Body = ioutil.NopCloser(bytes.NewBuffer(bodyBytes))
 
@@ -265,4 +327,42 @@ func (a *auditLog) concealMap(m map[string]interface{}) bool {
 	}
 
 	return changed
+}
+
+func decompressGZIP(data []byte) ([]byte, error) {
+	gz, err := gzip.NewReader(bytes.NewReader(data))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create gzip reader: %w", err)
+	}
+
+	return decompress(gz)
+}
+
+func decompressZLib(data []byte) ([]byte, error) {
+	zr, err := zlib.NewReader(bytes.NewReader(data))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create zlib reader: %w", err)
+	}
+
+	return decompress(zr)
+}
+
+func decompress(readCloser io.ReadCloser) ([]byte, error) {
+	rawData, err := ioutil.ReadAll(readCloser)
+	if err != nil {
+		retErr := fmt.Errorf("failed to read compressed response: %w", err)
+		closeErr := readCloser.Close()
+		if closeErr != nil {
+			// Using %v for close error because you can currently only wrap one error.
+			// The read error is more important to the caller in this instance.
+			retErr = fmt.Errorf("%w; failed to close readCloser: %v", retErr, closeErr)
+		}
+		return nil, retErr
+	}
+
+	if err = readCloser.Close(); err != nil {
+		return rawData, fmt.Errorf("failed to close reader: %w", err)
+	}
+
+	return rawData, nil
 }

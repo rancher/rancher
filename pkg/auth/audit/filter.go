@@ -10,11 +10,15 @@ import (
 	"reflect"
 	"regexp"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/rancher/rancher/pkg/auth/util"
 	"github.com/rancher/rancher/pkg/data/management"
 	"github.com/sirupsen/logrus"
 )
+
+var errorDebounceTime = time.Second * 30
 
 func NewAuditLogMiddleware(auditWriter *LogWriter) (func(http.Handler) http.Handler, error) {
 	sensitiveRegex, err := constructKeyConcealRegex()
@@ -23,6 +27,8 @@ func NewAuditLogMiddleware(auditWriter *LogWriter) (func(http.Handler) http.Hand
 			next:            next,
 			auditWriter:     auditWriter,
 			sanitizingRegex: sensitiveRegex,
+			errMap:          make(map[string]time.Time),
+			errLock:         &sync.Mutex{},
 		}
 	}, err
 }
@@ -50,6 +56,8 @@ type auditHandler struct {
 	next            http.Handler
 	auditWriter     *LogWriter
 	sanitizingRegex *regexp.Regexp
+	errMap          map[string]time.Time
+	errLock         *sync.Mutex
 }
 
 func (h auditHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
@@ -65,14 +73,29 @@ func (h auditHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 
 	auditLog, err := newAuditLog(h.auditWriter, req, h.sanitizingRegex)
 	if err != nil {
-		util.ReturnHTTPError(rw, req, 500, err.Error())
+		util.ReturnHTTPError(rw, req, http.StatusInternalServerError, err.Error())
 		return
 	}
 
 	wr := &wrapWriter{ResponseWriter: rw, auditWriter: h.auditWriter, statusCode: http.StatusOK}
 	h.next.ServeHTTP(wr, req)
 
-	auditLog.write(user, req.Header, wr.Header(), wr.statusCode, wr.buf.Bytes())
+	err = auditLog.write(user, req.Header, wr.Header(), wr.statusCode, wr.buf.Bytes())
+	if err == nil {
+		return
+	}
+
+	// Locking after next is called to avoid performance hits on the request.
+	h.errLock.Lock()
+	defer h.errLock.Unlock()
+
+	// Only log duplicate error messages at most every errorDebounceTime.
+	// This is to prevent the rancher logs from being flooded with error messages
+	// when the log path is invalid or any other error that will always cause a write to fail.
+	if lastSeen, ok := h.errMap[err.Error()]; !ok || time.Since(lastSeen) > errorDebounceTime {
+		logrus.Warnf("Failed to write audit log: %s", err)
+		h.errMap[err.Error()] = time.Now()
+	}
 }
 
 type wrapWriter struct {
