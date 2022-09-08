@@ -82,23 +82,6 @@ var (
 	TelemetryOpt                        = NewSetting("telemetry-opt", "")
 	TLSMinVersion                       = NewSetting("tls-min-version", "1.2")
 	TLSCiphers                          = NewSetting("tls-ciphers", "TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305")
-	UIBanners                           = NewSetting("ui-banners", "{}")
-	UIBrand                             = NewSetting("ui-brand", "")
-	UIDefaultLanding                    = NewSetting("ui-default-landing", "vue")
-	UIFeedBackForm                      = NewSetting("ui-feedback-form", "")
-	UIIndex                             = NewSetting("ui-index", "https://releases.rancher.com/ui/latest2/index.html")
-	UIPath                              = NewSetting("ui-path", "/usr/share/rancher/ui")
-	UIDashboardIndex                    = NewSetting("ui-dashboard-index", "https://releases.rancher.com/dashboard/latest/index.html")
-	UIDashboardPath                     = NewSetting("ui-dashboard-path", "/usr/share/rancher/ui-dashboard")
-	UIFavicon                           = NewSetting("ui-favicon", "")
-	UIPerformance                       = NewSetting("ui-performance", "") // Experimental settings for UI functionality to improve the UX with large nunbers of resources
-	UIPreferred                         = NewSetting("ui-preferred", "vue")
-	UIOfflinePreferred                  = NewSetting("ui-offline-preferred", "dynamic")
-	UIIssues                            = NewSetting("ui-issues", "")
-	UIPL                                = NewSetting("ui-pl", "rancher")
-	UICommunityLinks                    = NewSetting("ui-community-links", "true")
-	UIKubernetesSupportedVersions       = NewSetting("ui-k8s-supported-versions-range", ">= 1.11.0 <=1.14.x")
-	UIKubernetesDefaultVersion          = NewSetting("ui-k8s-default-version-range", "<=1.14.x")
 	WhitelistDomain                     = NewSetting("whitelist-domain", "forums.rancher.com")
 	WhitelistEnvironmentVars            = NewSetting("whitelist-envvars", "HTTP_PROXY,HTTPS_PROXY,NO_PROXY")
 	AuthUserInfoResyncCron              = NewSetting("auth-user-info-resync-cron", "0 0 * * *")
@@ -159,6 +142,61 @@ var (
 
 	// RancherWebhookMinVersion is the minimum version of the webhook that rancher will install
 	RancherWebhookMinVersion = NewSetting("rancher-webhook-min-version", "")
+
+	// Configuration to display a custom fixed banner in the header, footer, or both
+	UIBanners = NewSetting("ui-banners", "{}")
+
+	// High level 'brand' value, for example `suse`
+	UIBrand = NewSetting("ui-brand", "")
+
+	// Display community links in the UI
+	UICommunityLinks = NewSetting("ui-community-links", "true")
+
+	// Path within Rancher Manager where the dashboard files are found
+	UIDashboardPath = NewSetting("ui-dashboard-path", "/usr/share/rancher/ui-dashboard")
+
+	// Depending on ui-offline-preferred, use this version of the dashboard instead of the one contained in Rancher Manager
+	UIDashboardIndex = NewSetting("ui-dashboard-index", "https://releases.rancher.com/dashboard/latest/index.html")
+
+	// Depending on ui-offline-preferred and if a Harvester Cluster does not contain it's own Harvester plugin, use this version of the plugin instead
+	UIDashboardHarvesterLegacyPlugin = NewSetting("ui-dashboard-harvester-legacy-plugin", "https://releases.rancher.com/harvester-ui/plugin/harvester-1.0.3-head/harvester-1.0.3-head.umd.min.js")
+
+	// The default page users land on after login
+	UIDefaultLanding = NewSetting("ui-default-landing", "vue")
+
+	// Custom favicon
+	UIFavicon = NewSetting("ui-favicon", "")
+
+	// Ember UI specific
+	UIFeedBackForm = NewSetting("ui-feedback-form", "")
+
+	// Depending on ui-offline-preferred, use this version of the old ember UI instead of the one contained in Rancher Manager
+	UIIndex = NewSetting("ui-index", "https://releases.rancher.com/ui/latest2/index.html")
+
+	// Use a url address to send new 'File an Issue' reports instead of sending users to the Github issues page
+	UIIssues = NewSetting("ui-issues", "")
+
+	// Ember UI specific
+	UIKubernetesDefaultVersion = NewSetting("ui-k8s-default-version-range", "<=1.14.x")
+
+	// Ember UI specific
+	UIKubernetesSupportedVersions = NewSetting("ui-k8s-supported-versions-range", ">= 1.11.0 <=1.14.x")
+
+	// Controls whether UI assets are served locally by the server container ('true') or from the remote URL defined in the ui-index and ui-dashboard-index settings ('false).
+	// The `dynamic` option will use remote assets for `-head` builds, otherwise the local assets for production builds
+	UIOfflinePreferred = NewSetting("ui-offline-preferred", "dynamic")
+
+	// Path within Rancher Manager where the old ember UI files are found
+	UIPath = NewSetting("ui-path", "/usr/share/rancher/ui")
+
+	// Experimental settings for UI functionality to improve the UX with large numbers of resources
+	UIPerformance = NewSetting("ui-performance", "")
+
+	// The vendor/company name
+	UIPL = NewSetting("ui-pl", "rancher")
+
+	// Ensure that the new Dashboard is the default UI
+	UIPreferred = NewSetting("ui-preferred", "vue")
 )
 
 // FullShellImage returns the full private registry name of the rancher shell image.
