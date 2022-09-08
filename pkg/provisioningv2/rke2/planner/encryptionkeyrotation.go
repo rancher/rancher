@@ -26,8 +26,7 @@ const (
 	encryptionKeyRotationCommandRotate    = "rotate"
 	encryptionKeyRotationCommandReencrypt = "reencrypt"
 
-	encryptionKeyRotationSecretsEncryptApplyCommand  = "secrets-encrypt-apply"
-	encryptionKeyRotationSecretsEncryptStatusCommand = "secrets-encrypt-status"
+	encryptionKeyRotationSecretsEncryptApplyCommand = "secrets-encrypt-apply"
 
 	encryptionKeyRotationLeaderAnnotation = "rke.cattle.io/encrypt-key-rotation-leader"
 
@@ -393,7 +392,6 @@ func (p *Planner) encryptionKeyRotationRestartNodes(cp *rkev1.RKEControlPlane, c
 // status can be successfully queried, and then gets the status. leaderStage is allowed to be empty if entry is the
 // leader.
 func (p *Planner) encryptionKeyRotationRestartService(cp *rkev1.RKEControlPlane, entry *planEntry) error {
-	//runtime := rke2.GetRuntime(cp.Spec.KubernetesVersion)
 	nodePlan := plan.NodePlan{
 		Files: []plan.File{
 			{
@@ -486,34 +484,6 @@ func (p *Planner) encryptionKeyRotationUpdateControlPlanePhase(cp *rkev1.RKECont
 		}
 	}
 	return nil
-}
-
-// encryptionKeyRotationSecretsEncryptStageFromOneTimeStatus will attempt to extract the current stage (secrets-encrypt status) from the
-// plan by parsing the one time output.
-func encryptionKeyRotationSecretsEncryptStageFromOneTimeStatus(plan *planEntry) (string, error) {
-	output, ok := plan.Plan.Output[encryptionKeyRotationSecretsEncryptStatusCommand]
-	if !ok {
-		return "", ErrWaitingf("could not extract current status from plan for [%s]: no output for status", plan.Machine.Name)
-	}
-	status, err := encryptionKeyRotationStageFromOutput(plan, string(output))
-	return status, err
-}
-
-// encryptionKeyRotationStageFromOutput parses the output of a secrets-encrypt status command.
-func encryptionKeyRotationStageFromOutput(plan *planEntry, output string) (string, error) {
-	a := strings.Split(output, "\n")
-	if len(a) < 2 {
-		return "", ErrWaitingf("could not extract current stage from plan for [%s]: status output is incomplete", plan.Machine.Name)
-	}
-	for _, v := range a {
-		a = strings.Split(v, ": ")
-		if a[0] != "Current Rotation Stage" {
-			continue
-		}
-		status := a[1]
-		return status, nil
-	}
-	return "", ErrWaitingf("unable to parse rotation stage from output")
 }
 
 // encryptionKeyRotationSecretsEncryptInstruction generates a secrets-encrypt command to run on the leader node given
@@ -640,8 +610,8 @@ func encryptionKeyRotationWaitForSecretsEncryptStatus(cp *rkev1.RKEControlPlane)
 // encryptionKeyRotationFailed updates the various status objects on the control plane, allowing the cluster to
 // continue the reconciliation loop. Encryption key rotation will not be restarted again until requested.
 func (p *Planner) encryptionKeyRotationFailed(cp *rkev1.RKEControlPlane, err error) error {
-	if err2 := p.setEncryptionKeyRotateState(cp, cp.Spec.RotateEncryptionKeys, rkev1.RotateEncryptionKeysPhaseFailed); err2 != nil && !isErrWaiting(err) {
-		return err2
+	if setErr := p.setEncryptionKeyRotateState(cp, cp.Spec.RotateEncryptionKeys, rkev1.RotateEncryptionKeysPhaseFailed); setErr != nil && !isErrWaiting(setErr) {
+		return setErr
 	}
 
 	err = errors.Wrap(err, "encryption key rotation failed, please perform an etcd restore")
