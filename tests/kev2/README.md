@@ -48,7 +48,7 @@ If you want to run all tests
 go test -v ./pkg/controllers/management/aks ./pkg/controllers/management/eks ./pkg/controllers/management/gke
 ```
 
-If you want to check test coverage (current coverage of AKS: 34.8%)
+If you want to check test coverage (example: 72.5% of statements)
 
 ```
 go test (or alias command) -coverprofile=coverage.out

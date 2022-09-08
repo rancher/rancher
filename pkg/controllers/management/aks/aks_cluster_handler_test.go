@@ -8,19 +8,26 @@ import (
 	"github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 )
 
-
 const (
-	MockDefaultClusterFilename = "test/onclusterchange_default.yaml"
-	MockCreateClusterFilename = "test/onclusterchange_create.yaml"
-	MockActiveClusterFilename = "test/onclusterchange_active.yaml"
-	MockUpdateClusterFilename = "test/onclusterchange_update.yaml"
-	MockAKSClusterConfigFilename = "test/updateaksclusterconfig.json"
-	MockAKSClusterConfigClusterFilename = "test/updateaksclusterconfig.yaml"
-	MockBuildAKSCCCreateObjectFilename = "test/buildakscccreateobject.json"
+	MockDefaultClusterFilename 			= "test/onclusterchange_default.yaml"
+	MockCreateClusterFilename 			= "test/onclusterchange_create.yaml"
+	MockActiveClusterFilename 			= "test/onclusterchange_active.yaml"
+	MockUpdateClusterFilename 			= "test/onclusterchange_update.yaml"
+	MockAksClusterConfigFilename 		= "test/updateaksclusterconfig.json"
+	MockAksClusterConfigClusterFilename = "test/updateaksclusterconfig.yaml"
+	MockBuildAksCCCreateObjectFilename 	= "test/buildakscccreateobject.json"
 )
 
+var (
+	mockOperatorController mockAksOperatorController // Operator controller with mock interfaces & sibling funcs
 
-var mockOperatorController mockAksOperatorController	// Operator controller with mock interfaces & sibling funcs
+	mockConditionUnknown = v3.ClusterCondition{		 // Mock conditions
+		Status: "Unknown",
+	}
+	mockConditionTrue = v3.ClusterCondition{
+		Status: "True",
+	}
+)
 
 
 /** Test_onClusterChange
@@ -46,7 +53,7 @@ func Test_onClusterChange_AKSConfigIsNil(t *testing.T) {
 	}
 
 	cluster, _ := mockOperatorController.onClusterChange("", mockCluster)
-	if cluster != mockCluster {
+	if !reflect.DeepEqual(cluster, mockCluster) {
 		t.Errorf("cluster should have returned with no update")
 	}
 }
@@ -70,8 +77,8 @@ func Test_onClusterChange_Default(t *testing.T) {
 	if err != nil {
 		t.Errorf("error running onClusterChange: %s", err)
 	}
-	if cluster.Status.Conditions[0].Status != "Unknown" {
-		t.Errorf("status should be Unknown and cluster returned successfully")
+	if cluster.Status.Conditions[0].Status != mockConditionUnknown.Status {
+		t.Errorf("provisioned status should be Unknown and cluster returned successfully")
 	}
 }
 
@@ -87,7 +94,7 @@ func Test_onClusterChange_Create(t *testing.T) {
 	if err != nil {
 		t.Errorf("error running onClusterChange: %s", err)
 	}
-	if cluster.Status.Conditions[0].Status != "Unknown" {
+	if cluster.Status.Conditions[0].Status != mockConditionUnknown.Status {
 		t.Errorf("provisioned status should be Unknown and cluster returned successfully")
 	}
 }
@@ -104,7 +111,7 @@ func Test_onClusterChange_Active(t *testing.T) {
 	if err != nil {
 		t.Errorf("error running onClusterChange: %s", err)
 	}
-	if cluster.Status.Conditions[0].Status != "True" || cluster.Status.Conditions[1].Status != "True" {
+	if cluster.Status.Conditions[0].Status != mockConditionTrue.Status || cluster.Status.Conditions[1].Status != mockConditionTrue.Status {
 		t.Errorf("provisioned and updated status should be True and cluster returned successfully")
 	}
 }
@@ -122,7 +129,7 @@ func Test_onClusterChange_UpdateNodePool(t *testing.T) {
 	if err != nil {
 		t.Errorf("error running onClusterChange: %s", err)
 	}
-	if cluster.Status.Conditions[0].Status != "True" || cluster.Status.Conditions[1].Status != "Unknown" {
+	if cluster.Status.Conditions[0].Status != mockConditionTrue.Status || cluster.Status.Conditions[1].Status != mockConditionUnknown.Status {
 		t.Errorf("provisioned status should be True, updated status should be Unknown and cluster returned successfully")
 	}
 }
@@ -155,11 +162,11 @@ func Test_setInitialUpstreamSpec(t *testing.T) {
  */
 func Test_updateAKSClusterConfig(t *testing.T) {
 	mockOperatorController = getMockAksOperatorController("akscc")
-	mockCluster, err := getMockV3Cluster(MockAKSClusterConfigClusterFilename)
+	mockCluster, err := getMockV3Cluster(MockAksClusterConfigClusterFilename)
 	if err != nil {
 		t.Errorf("error getting mock v3 cluster: %s", err)
 	}
-	mockAksClusterConfig, err := getMockAksClusterConfig(MockAKSClusterConfigFilename)
+	mockAksClusterConfig, err := getMockAksClusterConfig(MockAksClusterConfigFilename)
 
 	// test remove tags from the cluster
 	_, err = mockOperatorController.updateAKSClusterConfig(&mockCluster, mockAksClusterConfig, nil)
@@ -201,7 +208,7 @@ func Test_buildAKSCCCreateObject(t *testing.T) {
 	if err != nil {
 		t.Errorf("error getting mock v3 cluster: %s", err)
 	}
-	expected, err := getMockAksClusterConfig(MockBuildAKSCCCreateObjectFilename)
+	expected, err := getMockAksClusterConfig(MockBuildAksCCCreateObjectFilename)
 
 	akscc, err := buildAKSCCCreateObject(&mockCluster)
 
