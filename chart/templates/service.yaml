@@ -1,6 +1,9 @@
 apiVersion: v1
 kind: Service
 metadata:
+{{- if .Values.service.annotations }}
+{{ toYaml .Values.service.annotations | indent 2 }}
+{{- end }}
   name: {{ template "rancher.fullname" . }}
   labels:
 {{ include "rancher.labels" . | indent 4 }}
