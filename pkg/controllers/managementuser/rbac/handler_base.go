@@ -372,7 +372,7 @@ func (m *manager) gatherRolesRecurse(rt *v3.RoleTemplate, roleTemplates map[stri
 			return errors.Wrapf(err, "couldn't get RoleTemplate %s", rtName)
 		}
 		if err := m.gatherRoles(subRT, roleTemplates, depthCounter); err != nil {
-			return errors.Wrapf(err, "couldn't gather RoleTemplate %s", rtName)
+			return err
 		}
 	}
 
