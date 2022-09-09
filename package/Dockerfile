@@ -15,9 +15,7 @@ WORKDIR /var/lib/rancher
 
 ARG ARCH=amd64
 ARG IMAGE_REPO=rancher
-# System-charts will continue to point to dev-v2.6 branch since eventually in 2.7.x the plan is
-# to remove the v1 tools and remove this dependency
-ARG SYSTEM_CHART_DEFAULT_BRANCH=dev-v2.6
+ARG SYSTEM_CHART_DEFAULT_BRANCH=dev-v2.7
 ARG CHART_DEFAULT_BRANCH=dev-v2.7
 ARG PARTNER_CHART_DEFAULT_BRANCH=main
 ARG RKE2_CHART_DEFAULT_BRANCH=main

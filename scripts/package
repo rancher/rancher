@@ -5,9 +5,7 @@ source $(dirname $0)/version
 
 ARCH=${ARCH:-"amd64"}
 SYSTEM_CHART_REPO_DIR=build/system-charts
-# System-charts will continue to point to dev-v2.6 branch since eventually in 2.7.x the plan is
-# to remove the v1 tools and remove this dependency
-SYSTEM_CHART_DEFAULT_BRANCH=${SYSTEM_CHART_DEFAULT_BRANCH:-"dev-v2.6"}
+SYSTEM_CHART_DEFAULT_BRANCH=${SYSTEM_CHART_DEFAULT_BRANCH:-"dev-v2.7"}
 CHART_REPO_DIR=build/charts
 CHART_DEFAULT_BRANCH=${CHART_DEFAULT_BRANCH:-"dev-v2.7"}
 
