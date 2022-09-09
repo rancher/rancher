@@ -62,8 +62,9 @@ func (h *handler) ensureClusterViewBinding(cluster *v1.Cluster, prtb *v3.Project
 	// Example: r-cluster1-view-prtb-bar-foo-wn5d5n7udr
 	roleBinding := &rbacv1.RoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      name.SafeConcatName(clusterViewName(cluster), prtb.Namespace, prtb.Name, hashSubject(subject)),
-			Namespace: cluster.Namespace,
+			Name:        name.SafeConcatName(clusterViewName(cluster), prtb.Namespace, prtb.Name, hashSubject(subject)),
+			Namespace:   cluster.Namespace,
+			Annotations: map[string]string{clusterNameLabel: cluster.GetName(), clusterNamespaceLabel: cluster.GetNamespace()},
 			OwnerReferences: []metav1.OwnerReference{
 				{
 					APIVersion: cluster.APIVersion,
