@@ -157,6 +157,7 @@ status:
   - lastUpdateTime: "2022-08-22T16:56:11-04:00"
     status: "True"
     type: Updated
+  driver: GKE
   gkeStatus:
     upstreamSpec:
       privateClusterConfig: {}

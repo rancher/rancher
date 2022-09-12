@@ -7,6 +7,7 @@ import (
 	"github.com/Azure/go-autorest/autorest/to"
 	v1 "github.com/rancher/gke-operator/pkg/apis/gke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2"
 )
 
 const (
@@ -19,16 +20,7 @@ const (
 	MockBuildGkeCCCreateObjectFilename 	= "test/buildgkecccreateobject.json"
 )
 
-var (
-	mockOperatorController mockGkeOperatorController // Operator controller with mock interfaces & sibling funcs
-
-	mockConditionUnknown = v3.ClusterCondition{		 // Mock conditions
-		Status: "Unknown",
-	}
-	mockConditionTrue = v3.ClusterCondition{
-		Status: "True",
-	}
-)
+var mockOperatorController mockGkeOperatorController // Operator controller with mock interfaces & sibling funcs
 
 
 /** Test_onClusterChange
@@ -78,7 +70,7 @@ func Test_onClusterChange_Default(t *testing.T) {
 	if err != nil {
 		t.Errorf("error running onClusterChange: %s", err)
 	}
-	if cluster.Status.Conditions[0].Status != mockConditionUnknown.Status {
+	if !rke2.Provisioned.IsUnknown(cluster) {
 		t.Errorf("provisioned status should be Unknown and cluster returned successfully")
 	}
 }
@@ -95,7 +87,7 @@ func Test_onClusterChange_Create(t *testing.T) {
 	if err != nil {
 		t.Errorf("error running onClusterChange: %s", err)
 	}
-	if cluster.Status.Conditions[0].Status != mockConditionUnknown.Status {
+	if !rke2.Provisioned.IsUnknown(cluster) {
 		t.Errorf("provisioned status should be Unknown and cluster returned successfully")
 	}
 }
@@ -112,7 +104,7 @@ func Test_onClusterChange_Active(t *testing.T) {
 	if err != nil {
 		t.Errorf("error running onClusterChange: %s", err)
 	}
-	if cluster.Status.Conditions[0].Status != mockConditionTrue.Status || cluster.Status.Conditions[1].Status != mockConditionTrue.Status {
+	if !rke2.Provisioned.IsTrue(cluster) || !rke2.Updated.IsTrue(cluster) {
 		t.Errorf("provisioned and updated status should be True and cluster returned successfully")
 	}
 }
@@ -130,7 +122,7 @@ func Test_onClusterChange_UpdateNodePool(t *testing.T) {
 	if err != nil {
 		t.Errorf("error running onClusterChange: %s", err)
 	}
-	if cluster.Status.Conditions[0].Status != mockConditionTrue.Status || cluster.Status.Conditions[1].Status != mockConditionUnknown.Status {
+	if !rke2.Provisioned.IsTrue(cluster) || !rke2.Updated.IsUnknown(cluster) {
 		t.Errorf("provisioned status should be True, updated status should be Unknown and cluster returned successfully")
 	}
 }

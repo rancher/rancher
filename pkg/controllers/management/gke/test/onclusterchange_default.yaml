@@ -90,3 +90,4 @@ status:
   conditions:
     - status: Unknown
       type: Provisioned
+  driver: GKE

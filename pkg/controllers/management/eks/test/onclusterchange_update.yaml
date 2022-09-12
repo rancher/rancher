@@ -82,3 +82,4 @@ status:
   - lastUpdateTime: "2022-08-16T11:32:29-04:00"
     status: Unknown
     type: Updated
+  driver: EKS

@@ -80,3 +80,4 @@ status:
       message: Waiting on eks crd to be initialized
       status: Unknown
       type: Provisioned
+  driver: EKS

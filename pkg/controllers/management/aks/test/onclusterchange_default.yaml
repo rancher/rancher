@@ -88,3 +88,4 @@ status:
       message: Waiting on aks crd to be initialized
       status: Unknown
       type: Provisioned
+  driver: AKS

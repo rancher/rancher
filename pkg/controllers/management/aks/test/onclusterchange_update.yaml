@@ -89,3 +89,4 @@ status:
   - lastUpdateTime: "2022-08-08T11:05:13-04:00"
     status: Unknown
     type: Updated
+  driver: AKS

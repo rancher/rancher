@@ -57,6 +57,7 @@ status:
   - lastUpdateTime: "2022-08-15T17:55:31-04:00"
     status: Unknown
     type: Provisioned
+  driver: EKS
   eksStatus:
     upstreamSpec:
-      testField: "upstreamSpec is already set"
+      testField: "upstream spec is already set"

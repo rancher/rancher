@@ -61,7 +61,11 @@ spec:
     enabled: false
   windowsPreferedCluster: false
 status:
+  aksStatus:
+    upstreamSpec:
+      testfield: "upstream spec is already set"
   conditions:
   - lastUpdateTime: "2022-08-08T10:42:00-04:00"
     status: Unknown
     type: Provisioned
+  driver: AKS

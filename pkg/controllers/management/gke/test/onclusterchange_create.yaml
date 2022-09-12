@@ -68,6 +68,7 @@ status:
   conditions:
   - status: Unknown
     type: Provisioned
+  driver: GKE
   gkeStatus:
     upstreamSpec:
-      testField: "upstreamSpec is already set"
+      testField: "upstream spec is already set"
