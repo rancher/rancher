@@ -134,7 +134,7 @@ func addMachineDrivers(management *config.ManagementContext) error {
 	if err := addMachineDriver(SoftLayerDriver, "local://", "", "", nil, false, true, false, management); err != nil {
 		return err
 	}
-	if err := addMachineDriver(NutanixDriver, "https://github.com/nutanix/docker-machine/releases/download/v3.1.0/docker-machine-driver-nutanix_v3.1.0_linux", "https://nutanix.github.io/rancher-ui-driver/v3.1.0/component.js", "e8f4f2e7ae7e927534884b5a3a45a38a5bd2c2872de1d65375f6e009bed75dba", []string{"nutanix.github.io"}, false, false, false, management); err != nil {
+	if err := addMachineDriver(NutanixDriver, "https://github.com/nutanix/docker-machine/releases/download/v3.3.0/docker-machine-driver-nutanix_v3.3.0_linux", "https://nutanix.github.io/rancher-ui-driver/v3.3.0/component.js", "036182e3d0d6807c9763f737ebf79a6e2367e39d777d09c9ef8adc9d58779b9d", []string{"nutanix.github.io"}, false, false, false, management); err != nil {
 		return err
 	}
 	if err := addMachineDriver(OutscaleDriver, "https://github.com/outscale-dev/docker-machine-driver-outscale/releases/download/v0.1.1/docker-machine-driver-outscale_0.1.1_linux_amd64.zip", "https://oos.eu-west-2.outscale.com/rancher-ui-driver-outscale/v0.1.1/component.js", "20422e37000286462c15d592bdb4ab3e2502970e11d7b963c0acf76858606531", []string{"oos.eu-west-2.outscale.com"}, false, false, false, management); err != nil {
