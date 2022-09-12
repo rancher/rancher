@@ -9,9 +9,9 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/values"
+	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/encryptedstore"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
-	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/jailer"
 	"github.com/sirupsen/logrus"
 	k8serror "k8s.io/apimachinery/pkg/api/errors"
@@ -94,7 +94,7 @@ func (m *NodeConfig) Cleanup() error {
 }
 
 func (m *NodeConfig) Remove() error {
-	m.Cleanup()
+	_ = m.Cleanup()
 	logrus.Debugf("Removing [%v]", m.id)
 	return m.store.Remove(m.id)
 }
