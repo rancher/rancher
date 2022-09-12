@@ -420,7 +420,7 @@ func removeFinalizerWithPrefix(finalizers []string, prefix string) []string {
 	var nf []string
 	for _, finalizer := range finalizers {
 		if strings.HasPrefix(finalizer, prefix) {
-			logrus.Debugf("finalizer with prefix %s will be removed", prefix)
+			logrus.Debugf("finalizer with prefix [%s] will be removed", prefix)
 			continue
 		}
 		nf = append(nf, finalizer)
@@ -431,7 +431,7 @@ func removeFinalizerWithPrefix(finalizers []string, prefix string) []string {
 func removeAnnotationWithPrefix(annotations map[string]string, prefix string) map[string]string {
 	for k := range annotations {
 		if strings.HasPrefix(k, prefix) {
-			logrus.Debugf("annotation with prefix %s will be removed", prefix)
+			logrus.Debugf("annotation with prefix [%s] will be removed", prefix)
 			delete(annotations, k)
 		}
 	}
