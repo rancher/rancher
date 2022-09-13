@@ -3,6 +3,7 @@ package settings
 import (
 	"encoding/json"
 	"fmt"
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -32,19 +33,18 @@ func TestIsRelease(t *testing.T) {
 }
 
 // TestSystemDefaultRegistryDefault tests that the default registry is either
-// "" (an empty string) or the build time value to ensure backward compatibility.
-// Note, if CATTLE_BASE_REGISTRY is set this test in the testing environment
-// this test will fail.
+// the value set by the environment variable CATTLE_BASE_REGISTRY or the build
+// time value set through InjectDefaults.
 func TestSystemDefaultRegistryDefault(t *testing.T) {
-	var expect string
+	expect := os.Getenv("CATTLE_BASE_REGISTRY")
 	if InjectDefaults != "" {
 		defaults := map[string]string{}
 		if err := json.Unmarshal([]byte(InjectDefaults), &defaults); err != nil {
 			t.Errorf("Unable to parse InjectDefaults: %v", err)
 		}
 
-		if value, ok := settings["system-default-registry"]; ok {
-			expect = value.Get()
+		if value, ok := defaults["system-default-registry"]; ok {
+			expect = value
 		}
 	}
 

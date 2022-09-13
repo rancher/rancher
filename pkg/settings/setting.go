@@ -142,8 +142,8 @@ var (
 	// RancherWebhookMinVersion is the minimum version of the webhook that rancher will install
 	RancherWebhookMinVersion = NewSetting("rancher-webhook-min-version", "")
 
-	// SystemDefaultRegistry is the default registry set by users when the environment variable CATTLE_SYSTEM_DEFAULT_REGISTRY
-	// is set. The environment variable CATTLE_BASE_REGISTRY is internal and used to set the base registry as set by SUSE.
+	// SystemDefaultRegistry is the default contrainer registry used for images.
+	// The environmental variable "CATTLE_BASE_REGISTRY" controls the default value of this setting.
 	SystemDefaultRegistry = NewSetting("system-default-registry", os.Getenv("CATTLE_BASE_REGISTRY"))
 
 	// Configuration to display a custom fixed banner in the header, footer, or both
