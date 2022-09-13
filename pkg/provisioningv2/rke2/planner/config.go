@@ -114,7 +114,7 @@ func addRoleConfig(config map[string]interface{}, controlPlane *rkev1.RKEControl
 	}
 
 	if sdr := settings.SystemDefaultRegistry.Get(); sdr != "" && !isOnlyWorker(entry) {
-		// only pass the global system-default-registry if we have not defined a different registry for system-images within the UI.
+		// only pass the global system-default-registry if we have not defined a different registry under the cluster configuration within the UI.
 		// registries.yaml should take precedence over the global default registry.
 		clusterRegistries := controlPlane.Spec.RKEClusterSpecCommon.Registries
 		if clusterRegistries == nil || (clusterRegistries != nil && len(clusterRegistries.Configs) == 0) {
