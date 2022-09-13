@@ -114,7 +114,12 @@ func addRoleConfig(config map[string]interface{}, controlPlane *rkev1.RKEControl
 	}
 
 	if sdr := settings.SystemDefaultRegistry.Get(); sdr != "" && !isOnlyWorker(entry) {
-		config["system-default-registry"] = sdr
+		// only pass the global system-default-registry if we have not defined a different registry for system-images within the UI.
+		// registries.yaml should take precedence over the global default registry.
+		clusterRegistries := controlPlane.Spec.RKEClusterSpecCommon.Registries
+		if clusterRegistries == nil || (clusterRegistries != nil && len(clusterRegistries.Configs) == 0) {
+			config["system-default-registry"] = sdr
+		}
 	}
 
 	// If this is a control-plane node, then we need to set arguments/(and for RKE2, volume mounts) to allow probes
