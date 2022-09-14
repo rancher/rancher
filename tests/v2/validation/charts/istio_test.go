@@ -13,6 +13,7 @@ import (
 	"github.com/rancher/rancher/tests/framework/extensions/charts"
 	"github.com/rancher/rancher/tests/framework/extensions/clusters"
 	"github.com/rancher/rancher/tests/framework/extensions/namespaces"
+	"github.com/rancher/rancher/tests/framework/extensions/workloads"
 	"github.com/rancher/rancher/tests/framework/extensions/workloads/deployments"
 	"github.com/rancher/rancher/tests/framework/pkg/session"
 	"github.com/rancher/rancher/tests/integration/pkg/defaults"
@@ -313,6 +314,18 @@ func (i *IstioTestSuite) TestUpgradeIstioChart() {
 		i.T().Logf("Comparing image and app versions: \n container image: %v \n istio version: %v and actual: %v\n", deployment.Spec.Template.Spec.Containers[0].Image, istioVersionPostUpgrade, imageVersion)
 		require.Equalf(i.T(), istioVersionPostUpgrade, imageVersion, "Pilot & Ingressgateways images don't use the correct istio image version")
 	}
+}
+
+func (i *IstioTestSuite) TestVerifyNoPendingHelmOp() {
+	subSession := i.session.NewSession()
+	defer subSession.Cleanup()
+
+	client, err := i.client.WithSession(subSession)
+	require.NoError(i.T(), err)
+
+	i.T().Log("Asserting that all helm-operation-xxxx pods terminated")
+	done := workloads.WaitPodTerminated(client, i.project.ClusterID, "helm-operation-")
+	require.True(i.T(), done)
 }
 
 func TestIstioTestSuite(t *testing.T) {
