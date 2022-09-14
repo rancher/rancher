@@ -149,8 +149,11 @@ var (
 	// High level 'brand' value, for example `suse`
 	UIBrand = NewSetting("ui-brand", "")
 
-	// Display community links in the UI
+	// Deprecated in favour of UICustomLinks = NewSetting("ui-custom-links", {})
 	UICommunityLinks = NewSetting("ui-community-links", "true")
+	
+	// Key(display text), value(url) for user customisable links to display in homepage and support pages.
+	UICustomLinks = NewSetting("ui-custom-links", {})
 
 	// Path within Rancher Manager where the dashboard files are found
 	UIDashboardPath = NewSetting("ui-dashboard-path", "/usr/share/rancher/ui-dashboard")
@@ -173,7 +176,7 @@ var (
 	// Depending on ui-offline-preferred, use this version of the old ember UI instead of the one contained in Rancher Manager
 	UIIndex = NewSetting("ui-index", "https://releases.rancher.com/ui/latest2/index.html")
 
-	// Use a url address to send new 'File an Issue' reports instead of sending users to the Github issues page
+	// Deprecated in favour of UICustomLinks = NewSetting("ui-custom-links", {})
 	UIIssues = NewSetting("ui-issues", "")
 
 	// Ember UI specific
