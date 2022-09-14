@@ -37,7 +37,6 @@ const (
 	ClusterActionRestoreFromEtcdBackup = "restoreFromEtcdBackup"
 	ClusterActionRotateCertificates    = "rotateCertificates"
 	ClusterActionRotateEncryptionKey   = "rotateEncryptionKey"
-	ClusterActionRunSecurityScan       = "runSecurityScan"
 	ClusterActionSaveAsTemplate        = "saveAsTemplate"
 
 	// ClusterConditionReady Cluster ready to serve API (healthy when true, unhealthy when false)
