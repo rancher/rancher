@@ -7,6 +7,7 @@ import (
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
 	"github.com/rancher/rancher/tests/framework/extensions/namespaces"
 	"github.com/rancher/rancher/tests/framework/extensions/users"
+	password "github.com/rancher/rancher/tests/framework/extensions/users/passwordgenerator"
 	"github.com/rancher/rancher/tests/framework/pkg/session"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -49,10 +50,12 @@ func (p *ProjectUserTestSuite) SetupSuite() {
 	p.project = testProject
 
 	enabled := true
+	var testuser = "testuser"
+	var testpassword = password.GenerateUserPassword("testpass-")
 	user := &management.User{
-		Username: "testusername",
-		Password: "passwordpasswordd",
-		Name:     "displayname",
+		Username: testuser,
+		Password: testpassword,
+		Name:     testuser,
 		Enabled:  &enabled,
 	}
 
