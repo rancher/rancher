@@ -22,6 +22,7 @@ SSH_KEY_DIR = os.path.join(os.path.dirname(os.path.realpath(__file__)),
                            '.ssh')
 
 RANCHER_PROXY_PORT = os.environ.get("RANCHER_PROXY_PORT", "3131")
+RANCHER_CIDR_OVERRIDE = os.environ.get("RANCHER_CIDR_OVERRIDE", "")
 
 
 def deploy_proxy_server():
@@ -98,8 +99,8 @@ def prepare_airgap_proxy_node(bastion_node, number_of_nodes):
         proxy_info = '[Service]\nEnvironment=\"HTTP_PROXY={}\" ' \
                      '\"HTTPS_PROXY={}\" ' \
                      '\"NO_PROXY=localhost,127.0.0.1,0.0.0.0,10.0.0.0/8,' \
-                     'cattle-system.svc\"' \
-                     .format(proxy_url, proxy_url)
+                     'cattle-system.svc,{}\"' \
+                     .format(proxy_url, proxy_url, RANCHER_CIDR_OVERRIDE)
 
         bastion_node.execute_command('echo "{}" > http-proxy.conf'
                                      .format(proxy_info))
@@ -137,17 +138,16 @@ def prepare_airgap_proxy_node(bastion_node, number_of_nodes):
 def deploy_proxy_rancher(bastion_node):
     ag_node = prepare_airgap_proxy_node(bastion_node, 1)[0]
     proxy_url = bastion_node.host_name + ":" + RANCHER_PROXY_PORT
-
     deploy_rancher_command = \
         'sudo docker run -d --privileged --restart=unless-stopped ' \
         '-p 80:80 -p 443:443 ' \
         '-e HTTP_PROXY={} ' \
         '-e HTTPS_PROXY={} ' \
         '-e NO_PROXY="localhost,127.0.0.1,0.0.0.0,10.0.0.0/8,' \
-        'cattle-system.svc" ' \
-        '-e CATTLE_BOOTSTRAP_PASSWORD={} ' \
+        'cattle-system.svc,{}" ' \
+        '-e CATTLE_BOOTSTRAP_PASSWORD=\\\"{}\\\" ' \
         'rancher/rancher:{} --trace'.format(
-            proxy_url, proxy_url,
+            proxy_url, proxy_url, RANCHER_CIDR_OVERRIDE,
             ADMIN_PASSWORD, RANCHER_SERVER_VERSION)
 
     deploy_result = run_command_on_proxy_node(bastion_node, ag_node,

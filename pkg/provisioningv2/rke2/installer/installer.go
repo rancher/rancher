@@ -22,12 +22,12 @@ const (
 
 var (
 	localAgentInstallScripts = []string{
-		"/usr/share/rancher/ui/assets" + SystemAgentInstallPath,
+		settings.UIPath.Get() + "/assets" + SystemAgentInstallPath,
 		"." + SystemAgentInstallPath,
 	}
 	localWindowsRke2InstallScripts = []string{
-		"./wins-install.ps1",
-	}
+		settings.UIPath.Get() + "/assets" + WindowsRke2InstallPath,
+		"." + WindowsRke2InstallPath}
 )
 
 func installScript(setting settings.Setting, files []string) ([]byte, error) {
@@ -104,7 +104,7 @@ func LinuxInstallScript(ctx context.Context, token string, envVars []corev1.EnvV
 
 func WindowsInstallScript(ctx context.Context, token string, envVars []corev1.EnvVar, defaultHost string) ([]byte, error) {
 	data, err := installScript(
-		settings.WindowsRke2InstallScript,
+		settings.WinsAgentInstallScript,
 		localWindowsRke2InstallScripts)
 	if err != nil {
 		return nil, err
@@ -113,9 +113,20 @@ func WindowsInstallScript(ctx context.Context, token string, envVars []corev1.En
 	binaryURL := ""
 	if settings.WinsAgentVersion.Get() != "" {
 		if settings.ServerURL.Get() != "" {
-			binaryURL = fmt.Sprintf("CATTLE_AGENT_BINARY_BASE_URL=\"%s/assets\"", settings.ServerURL.Get())
+			binaryURL = fmt.Sprintf("$env:CATTLE_AGENT_BINARY_BASE_URL=\"%s/assets\"", settings.ServerURL.Get())
 		} else if defaultHost != "" {
-			binaryURL = fmt.Sprintf("CATTLE_AGENT_BINARY_BASE_URL=\"https://%s/assets\"", defaultHost)
+			binaryURL = fmt.Sprintf("$env:CATTLE_AGENT_BINARY_BASE_URL=\"https://%s/assets\"", defaultHost)
+		}
+	}
+
+	csiProxyURL := settings.CSIProxyAgentURL.Get()
+	csiProxyVersion := "v1.0.0"
+	if settings.CSIProxyAgentVersion.Get() != "" {
+		csiProxyVersion = settings.CSIProxyAgentVersion.Get()
+		if settings.ServerURL.Get() != "" {
+			csiProxyURL = fmt.Sprintf("%s/assets/csi-proxy-%%[1]s.tar.gz", settings.ServerURL.Get())
+		} else if defaultHost != "" {
+			csiProxyURL = fmt.Sprintf("https://%s/assets/csi-proxy-%%[1]s.tar.gz", defaultHost)
 		}
 	}
 
@@ -127,7 +138,7 @@ func WindowsInstallScript(ctx context.Context, token string, envVars []corev1.En
 		ca = "$env:CATTLE_CA_CHECKSUM=\"" + ca + "\""
 	}
 	if token != "" {
-		token = "$env:CATTLE_ROLE_NONE=true\n$env:CATTLE_TOKEN=\"" + token + "\""
+		token = "$env:CATTLE_ROLE_NONE=\"true\"\n$env:CATTLE_TOKEN=\"" + token + "\""
 	}
 	envVarBuf := &strings.Builder{}
 	for _, envVar := range envVars {
@@ -150,11 +161,11 @@ func WindowsInstallScript(ctx context.Context, token string, envVars []corev1.En
 %s
 
 # Enables CSI Proxy
-$env:CSI_PROXY_URL = "https://acs-mirror.azureedge.net/csi-proxy/%%[1]s/binaries/csi-proxy-%%[1]s.tar.gz"
-$env:CSI_PROXY_VERSION = "v1.0.0"
+$env:CSI_PROXY_URL = "%s"
+$env:CSI_PROXY_VERSION = "%s"
 $env:CSI_PROXY_KUBELET_PATH = "C:/var/lib/rancher/rke2/bin/kubelet.exe"
 
 Invoke-WinsInstaller @PSBoundParameters
 exit 0
-`, data, envVarBuf.String(), binaryURL, server, ca, token)), nil
+`, data, envVarBuf.String(), binaryURL, server, ca, token, csiProxyURL, csiProxyVersion)), nil
 }

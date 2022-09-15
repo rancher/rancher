@@ -43,7 +43,7 @@ func init() {
 	resource.Put(PodSecurityPolicyTemplateProjectBindingGroupVersionResource)
 }
 
-// Deprecated use v3.PodSecurityPolicyTemplateProjectBinding instead
+// Deprecated: use v3.PodSecurityPolicyTemplateProjectBinding instead
 type PodSecurityPolicyTemplateProjectBinding = v3.PodSecurityPolicyTemplateProjectBinding
 
 func NewPodSecurityPolicyTemplateProjectBinding(namespace, name string, obj v3.PodSecurityPolicyTemplateProjectBinding) *v3.PodSecurityPolicyTemplateProjectBinding {

@@ -74,14 +74,14 @@ def add_rke2_tarball_to_bastion(bastion_node, rke2_version):
         'wget -O rke2 https://github.com/rancher/rke2/releases/' \
         'download/{0}/rke2.linux-amd64'.format(rke2_version, TARBALL_TYPE)
     bastion_node.execute_command(get_tarball_command)
-    if '--cni=calico' in RKE2_SERVER_OPTIONS:
+    if 'calico' in RKE2_SERVER_OPTIONS:
         get_calico_tarball_command = \
             'wget -O rke2-airgap-images-calico.{1} ' \
             'https://github.com/rancher/rke2/releases/download/{0}/' \
             'rke2-images-calico.linux-amd64.{1}'.format(rke2_version,
                                                         TARBALL_TYPE)
         bastion_node.execute_command(get_calico_tarball_command)
-    elif '--cni=cilium' in RKE2_SERVER_OPTIONS:
+    if 'cilium' in RKE2_SERVER_OPTIONS:
         get_cilium_tarball_command = \
             'wget -O rke2-airgap-images-cilium.{1} ' \
             'https://github.com/rancher/rke2/releases/download/{0}/' \
@@ -133,12 +133,12 @@ def prepare_airgap_rke2(bastion_node, number_of_nodes, method):
             add_tarball_to_node(bastion_node, ag_node,
                                 'rke2-airgap-images.{}'.format(TARBALL_TYPE),
                                 'rke2')
-            if '--cni=calico' in RKE2_SERVER_OPTIONS:
+            if 'calico' in RKE2_SERVER_OPTIONS:
                 add_tarball_to_node(
                     bastion_node, ag_node,
                     'rke2-airgap-images-calico.{}'.format(TARBALL_TYPE),
                     'rke2')
-            elif '--cni=cilium' in RKE2_SERVER_OPTIONS:
+            if 'cilium' in RKE2_SERVER_OPTIONS:
                 add_tarball_to_node(
                     bastion_node, ag_node,
                     'rke2-airgap-images-cilium.{}'.format(TARBALL_TYPE),

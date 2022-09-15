@@ -56,7 +56,7 @@ func ensureDefaultAdmin() {
 			for _, u := range admins {
 				adminNames = append(adminNames, u.Name)
 			}
-			return errors.Errorf("%v users were found with the name \"admin\". They are %v. Can only reset the default admin password when there is exactly one user with this label.",
+			return errors.Errorf("%v users were found with the name \"admin\". They are %v. Can only reset the default admin password when there is exactly one user with this label",
 				count, adminNames)
 		} else if count == 1 {
 			admin := admins[0]

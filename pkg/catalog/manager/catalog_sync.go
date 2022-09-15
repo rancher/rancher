@@ -7,6 +7,7 @@ import (
 	helmlib "github.com/rancher/rancher/pkg/helm"
 	"github.com/rancher/rancher/pkg/image"
 	"github.com/rancher/rancher/pkg/namespace"
+	"github.com/rancher/rancher/pkg/settings"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -41,7 +42,7 @@ func (m *Manager) Sync(key string, obj *v3.Catalog) (runtime.Object, error) {
 		}
 	}
 
-	commit, helm, err := helmlib.NewForceUpdate(catalog)
+	commit, helm, err := helmlib.NewForceUpdate(catalog, m.SecretLister)
 	if err != nil {
 		return m.updateCatalogError(catalog, err)
 	}
@@ -74,8 +75,8 @@ func (m *Manager) Sync(key string, obj *v3.Catalog) (runtime.Object, error) {
 }
 
 func CreateOrUpdateSystemCatalogImageCache(systemCatalog *v3.Catalog, configMapInterface v1.ConfigMapInterface, configMapLister v1.ConfigMapLister, bundledMode bool, forceUpdate bool) (err error) {
-	var catalogChartPath string
-	catalogChartPath, err = utils.GetCatalogChartPath(systemCatalog, bundledMode)
+	var systemCatalogChartPath string
+	systemCatalogChartPath, err = utils.GetCatalogChartPath(systemCatalog, bundledMode)
 	if err != nil {
 		return err
 	}
@@ -85,6 +86,10 @@ func CreateOrUpdateSystemCatalogImageCache(systemCatalog *v3.Catalog, configMapI
 
 	systemCatalogImageCacheName := utils.GetCatalogImageCacheName(systemCatalog.Name)
 	systemCatalogImageCache, err = configMapLister.Get(namespace.System, systemCatalogImageCacheName)
+	rancherVersion := settings.GetRancherVersion()
+	if !image.IsValidSemver(rancherVersion) {
+		rancherVersion = settings.RancherVersionDev
+	}
 
 	// if the cache does not exist generate it
 	if err != nil && errors.IsNotFound(err) {
@@ -94,7 +99,7 @@ func CreateOrUpdateSystemCatalogImageCache(systemCatalog *v3.Catalog, configMapI
 		systemCatalogImageCache.Name = systemCatalogImageCacheName
 		systemCatalogImageCache.Namespace = namespace.System
 
-		err = image.AddImagesToImageListConfigMap(systemCatalogImageCache, catalogChartPath)
+		err = image.AddImagesToImageListConfigMap(systemCatalogImageCache, rancherVersion, systemCatalogChartPath)
 		if err != nil {
 			return
 		}
@@ -115,7 +120,7 @@ func CreateOrUpdateSystemCatalogImageCache(systemCatalog *v3.Catalog, configMapI
 		if err != nil {
 			return err
 		}
-		err = image.AddImagesToImageListConfigMap(systemCatalogImageCache, catalogChartPath)
+		err = image.AddImagesToImageListConfigMap(systemCatalogImageCache, rancherVersion, systemCatalogChartPath)
 		if err != nil {
 			return
 		}

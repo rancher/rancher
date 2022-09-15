@@ -1,6 +1,7 @@
 package rke2
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"regexp"
@@ -8,12 +9,20 @@ import (
 	"strings"
 	"time"
 
+	"github.com/rancher/channelserver/pkg/model"
+	provv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
+	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
+	"github.com/rancher/rancher/pkg/channelserver"
 	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta1"
+	rkecontroller "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
+	"github.com/rancher/rancher/pkg/serviceaccounttoken"
 	"github.com/rancher/wrangler/pkg/condition"
+	corecontrollers "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/pkg/generic"
 	"github.com/rancher/wrangler/pkg/name"
 	corev1 "k8s.io/api/core/v1"
+	apierror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
@@ -24,56 +33,79 @@ const (
 	AddressAnnotation = "rke.cattle.io/address"
 	ClusterNameLabel  = "rke.cattle.io/cluster-name"
 	// ClusterSpecAnnotation is used to define the cluster spec used to generate the rkecontrolplane object as an annotation on the object
-	ClusterSpecAnnotation      = "rke.cattle.io/cluster-spec"
-	ControlPlaneRoleLabel      = "rke.cattle.io/control-plane-role"
-	DrainAnnotation            = "rke.cattle.io/drain-options"
-	DrainDoneAnnotation        = "rke.cattle.io/drain-done"
-	EtcdRoleLabel              = "rke.cattle.io/etcd-role"
-	InitNodeLabel              = "rke.cattle.io/init-node"
-	InitNodeMachineIDDoneLabel = "rke.cattle.io/init-node-machine-id-done"
-	InitNodeMachineIDLabel     = "rke.cattle.io/init-node-machine-id"
-	InternalAddressAnnotation  = "rke.cattle.io/internal-address"
-	JoinURLAnnotation          = "rke.cattle.io/join-url"
-	LabelsAnnotation           = "rke.cattle.io/labels"
-	MachineIDLabel             = "rke.cattle.io/machine-id"
-	MachineNameLabel           = "rke.cattle.io/machine-name"
-	MachineNamespaceLabel      = "rke.cattle.io/machine-namespace"
-	MachineRequestType         = "rke.cattle.io/machine-request"
-	MachineUIDLabel            = "rke.cattle.io/machine"
-	NodeNameLabel              = "rke.cattle.io/node-name"
-	PlanSecret                 = "rke.cattle.io/plan-secret-name"
-	PostDrainAnnotation        = "rke.cattle.io/post-drain"
-	PreDrainAnnotation         = "rke.cattle.io/pre-drain"
-	RoleLabel                  = "rke.cattle.io/service-account-role"
-	SecretTypeMachinePlan      = "rke.cattle.io/machine-plan"
-	TaintsAnnotation           = "rke.cattle.io/taints"
-	UnCordonAnnotation         = "rke.cattle.io/uncordon"
-	WorkerRoleLabel            = "rke.cattle.io/worker-role"
+	ClusterSpecAnnotation     = "rke.cattle.io/cluster-spec"
+	ControlPlaneRoleLabel     = "rke.cattle.io/control-plane-role"
+	DrainAnnotation           = "rke.cattle.io/drain-options"
+	DrainDoneAnnotation       = "rke.cattle.io/drain-done"
+	DrainErrorAnnotation      = "rke.cattle.io/drain-error"
+	EtcdRoleLabel             = "rke.cattle.io/etcd-role"
+	InitNodeLabel             = "rke.cattle.io/init-node"
+	InitNodeMachineIDLabel    = "rke.cattle.io/init-node-machine-id"
+	InternalAddressAnnotation = "rke.cattle.io/internal-address"
+	JoinURLAnnotation         = "rke.cattle.io/join-url"
+	LabelsAnnotation          = "rke.cattle.io/labels"
+	MachineIDLabel            = "rke.cattle.io/machine-id"
+	MachineNameLabel          = "rke.cattle.io/machine-name"
+	MachineTemplateHashLabel  = "rke.cattle.io/machine-template-hash"
+	RKEMachinePoolNameLabel   = "rke.cattle.io/rke-machine-pool-name"
+	MachineNamespaceLabel     = "rke.cattle.io/machine-namespace"
+	MachineRequestType        = "rke.cattle.io/machine-request"
+	MachineUIDLabel           = "rke.cattle.io/machine"
+	NodeNameLabel             = "rke.cattle.io/node-name"
+	PlanSecret                = "rke.cattle.io/plan-secret-name"
+	PostDrainAnnotation       = "rke.cattle.io/post-drain"
+	PreDrainAnnotation        = "rke.cattle.io/pre-drain"
+	RoleLabel                 = "rke.cattle.io/service-account-role"
+	SecretTypeMachinePlan     = "rke.cattle.io/machine-plan"
+	TaintsAnnotation          = "rke.cattle.io/taints"
+	UnCordonAnnotation        = "rke.cattle.io/uncordon"
+	WorkerRoleLabel           = "rke.cattle.io/worker-role"
 
 	MachineTemplateClonedFromGroupVersionAnn = "rke.cattle.io/cloned-from-group-version"
 	MachineTemplateClonedFromKindAnn         = "rke.cattle.io/cloned-from-kind"
 	MachineTemplateClonedFromNameAnn         = "rke.cattle.io/cloned-from-name"
 
-	CattleOSLabel = "cattle.io/os"
+	CattleOSLabel    = "cattle.io/os"
+	DefaultMachineOS = "linux"
+	WindowsMachineOS = "windows"
 
 	DefaultMachineConfigAPIVersion = "rke-machine-config.cattle.io/v1"
 	RKEMachineAPIVersion           = "rke-machine.cattle.io/v1"
 	RKEAPIVersion                  = "rke.cattle.io/v1"
 
-	Provisioned = condition.Cond("Provisioned")
-	Ready       = condition.Cond("Ready")
-	Waiting     = condition.Cond("Waiting")
-	Pending     = condition.Cond("Pending")
-	Removed     = condition.Cond("Removed")
+	Provisioned         = condition.Cond("Provisioned")
+	Updated             = condition.Cond("Updated")
+	Reconciled          = condition.Cond("Reconciled")
+	Ready               = condition.Cond("Ready")
+	Waiting             = condition.Cond("Waiting")
+	Pending             = condition.Cond("Pending")
+	Removed             = condition.Cond("Removed")
+	AgentDeployed       = condition.Cond("AgentDeployed")
+	AgentConnected      = condition.Cond("Connected")
+	PlanApplied         = condition.Cond("PlanApplied")
+	InfrastructureReady = condition.Cond(capi.InfrastructureReadyCondition)
 
 	RuntimeK3S  = "k3s"
 	RuntimeRKE2 = "rke2"
+
+	RoleBootstrap = "bootstrap"
+	RolePlan      = "plan"
 )
 
 var (
 	ErrNoMachineOwnerRef = errors.New("no machine owner ref")
 	labelAnnotationMatch = regexp.MustCompile(`^((rke\.cattle\.io)|((?:machine\.)?cluster\.x-k8s\.io))/`)
+	windowsDrivers       = map[string]struct{}{
+		"vmwarevsphere": {},
+	}
 )
+
+// WindowsCheck return a bool based on if the driver is marked as
+// supporting Windows
+func WindowsCheck(driver string) bool {
+	_, ok := windowsDrivers[driver]
+	return ok
+}
 
 func MachineStateSecretName(machineName string) string {
 	return name.SafeConcatName(machineName, "machine", "state")
@@ -100,6 +132,10 @@ func GetRuntimeServerUnit(kubernetesVersion string) string {
 	return RuntimeRKE2 + "-server"
 }
 
+func GetRuntimeAgentUnit(kubernetesVersion string) string {
+	return GetRuntimeCommand(kubernetesVersion) + "-agent"
+}
+
 func GetRuntimeEnv(kubernetesVersion string) string {
 	return strings.ToUpper(GetRuntime(kubernetesVersion))
 }
@@ -111,11 +147,94 @@ func GetRuntime(kubernetesVersion string) string {
 	return RuntimeRKE2
 }
 
+func GetKDMReleaseData(ctx context.Context, controlPlane *rkev1.RKEControlPlane) *model.Release {
+	if controlPlane == nil || controlPlane.Spec.KubernetesVersion == "" {
+		return nil
+	}
+	release := channelserver.GetReleaseConfigByRuntimeAndVersion(ctx, GetRuntime(controlPlane.Spec.KubernetesVersion), controlPlane.Spec.KubernetesVersion)
+	return &release
+}
+
+// GetFeatureVersion retrieves a feature version (string) for a given controlPlane based on the version/runtime of the project. It will return 0.0.0 (semver) if the KDM data is valid, but the featureVersion isn't defined.
+func GetFeatureVersion(ctx context.Context, controlPlane *rkev1.RKEControlPlane, featureKey string) (string, error) {
+	if controlPlane == nil {
+		return "", fmt.Errorf("error retrieving feature version as controlPlane was nil")
+	}
+
+	release := GetKDMReleaseData(ctx, controlPlane)
+	if release == nil {
+		return "", fmt.Errorf("KDM release data was nil for controlplane %s/%s", controlPlane.Namespace, controlPlane.Name)
+	}
+
+	version := release.FeatureVersions[featureKey]
+	if version == "" {
+		version = "0.0.0"
+	}
+
+	return version, nil
+}
+
 func GetRuntimeSupervisorPort(kubernetesVersion string) int {
 	if GetRuntime(kubernetesVersion) == RuntimeRKE2 {
 		return 9345
 	}
 	return 6443
+}
+
+func IsOwnedByMachine(bootstrapCache rkecontroller.RKEBootstrapCache, machineName string, sa *corev1.ServiceAccount) (bool, error) {
+	for _, owner := range sa.OwnerReferences {
+		if owner.Kind == "RKEBootstrap" {
+			bootstrap, err := bootstrapCache.Get(sa.Namespace, owner.Name)
+			if err != nil {
+				return false, err
+			}
+			for _, owner := range bootstrap.OwnerReferences {
+				if owner.Kind == "Machine" && owner.Name == machineName {
+					return true, nil
+				}
+			}
+		}
+	}
+	return false, nil
+}
+
+// GetServiceAccountSecretNames will return the plan secret name and service account token names
+func GetServiceAccountSecretNames(bootstrapCache rkecontroller.RKEBootstrapCache, secretClient corecontrollers.SecretController, machineName string, planSA *corev1.ServiceAccount) (string, string, error) {
+	if planSA.Labels[MachineNameLabel] != machineName ||
+		planSA.Labels[RoleLabel] != RolePlan ||
+		planSA.Labels[PlanSecret] == "" {
+		return "", "", nil
+	}
+
+	sName := serviceaccounttoken.ServiceAccountSecretName(planSA)
+	secret, err := secretClient.Cache().Get(planSA.Namespace, sName)
+	if err != nil {
+		if !apierror.IsNotFound(err) {
+			return "", "", err
+		}
+		sc := serviceaccounttoken.SecretTemplate(planSA)
+		secret, err = secretClient.Create(sc)
+		if err != nil {
+			if !apierror.IsAlreadyExists(err) {
+				return "", "", err
+			}
+			secret, err = secretClient.Cache().Get(planSA.Namespace, sName)
+			if err != nil {
+				return "", "", err
+			}
+		}
+	}
+
+	if foundParent, err := IsOwnedByMachine(bootstrapCache, machineName, planSA); err != nil || !foundParent {
+		return "", "", err
+	}
+
+	// wait for token to be populated
+	if secret.Data[corev1.ServiceAccountTokenKey] == nil {
+		return "", "", nil
+	}
+
+	return planSA.Labels[PlanSecret], secret.Name, nil
 }
 
 func PlanSecretFromBootstrapName(bootstrapName string) string {
@@ -154,11 +273,7 @@ func DoRemoveAndUpdateStatus(obj metav1.Object, doRemove func() (string, error),
 	return err
 }
 
-func GetMachineDeletionStatus(machineCache capicontrollers.MachineCache, clusterNamespace, clusterName string) (string, error) {
-	machines, err := machineCache.List(clusterNamespace, labels.SelectorFromSet(labels.Set{capi.ClusterLabelName: clusterName}))
-	if err != nil {
-		return "", err
-	}
+func GetMachineDeletionStatus(machines []*capi.Machine) (string, error) {
 	sort.Slice(machines, func(i, j int) bool {
 		return machines[i].Name < machines[j].Name
 	})
@@ -170,6 +285,39 @@ func GetMachineDeletionStatus(machineCache capicontrollers.MachineCache, cluster
 	}
 
 	return "", nil
+}
+
+// GetMachineFromNode attempts to find the corresponding machine for an etcd snapshot that is found in the configmap. If the machine list is successful, it will return true on the boolean, otherwise, it can be assumed that a false, nil, and defined error indicate the machine does not exist.
+func GetMachineFromNode(machineCache capicontrollers.MachineCache, nodeName string, cluster *provv1.Cluster) (bool, *capi.Machine, error) {
+	ls, err := labels.Parse(fmt.Sprintf("%s=%s", capi.ClusterLabelName, cluster.Name))
+	if err != nil {
+		return false, nil, err
+	}
+	machines, err := machineCache.List(cluster.Namespace, ls)
+	if err != nil {
+		return false, nil, err
+	}
+	for _, machine := range machines {
+		if machine.Status.NodeRef != nil && machine.Status.NodeRef.Name == nodeName {
+			return true, machine, nil
+		}
+	}
+	return true, nil, fmt.Errorf("unable to find node %s in machines", nodeName)
+}
+
+// GetMachineByID attempts to find the corresponding machine for an etcd snapshot that is found in the configmap. If the machine list is successful, it will return true on the boolean, otherwise, it can be assumed that a false, nil, and defined error indicate the machine does not exist.
+func GetMachineByID(machineCache capicontrollers.MachineCache, machineID, clusterNamespace, clusterName string) (bool, *capi.Machine, error) {
+	machines, err := machineCache.List(clusterNamespace, labels.SelectorFromSet(map[string]string{
+		ClusterNameLabel: clusterName,
+		MachineIDLabel:   machineID,
+	}))
+	if err != nil || len(machines) > 1 {
+		return false, nil, err
+	}
+	if len(machines) == 1 {
+		return true, machines[0], nil
+	}
+	return true, nil, fmt.Errorf("unable to find machine by ID %s for cluster %s", machineID, clusterName)
 }
 
 func CopyPlanMetadataToSecret(secret *corev1.Secret, metadata *plan.Metadata) {
@@ -205,4 +353,13 @@ func CopyMapWithExcludes(destination map[string]string, source map[string]string
 			destination[k] = v
 		}
 	}
+}
+
+func SortedKeys(m map[string]interface{}) []string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	return keys
 }

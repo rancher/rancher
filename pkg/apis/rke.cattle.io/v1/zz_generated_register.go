@@ -29,6 +29,7 @@ import (
 
 var (
 	CustomMachineResourceName        = "custommachines"
+	ETCDSnapshotResourceName         = "etcdsnapshots"
 	RKEBootstrapResourceName         = "rkebootstraps"
 	RKEBootstrapTemplateResourceName = "rkebootstraptemplates"
 	RKEClusterResourceName           = "rkeclusters"
@@ -58,6 +59,8 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 	scheme.AddKnownTypes(SchemeGroupVersion,
 		&CustomMachine{},
 		&CustomMachineList{},
+		&ETCDSnapshot{},
+		&ETCDSnapshotList{},
 		&RKEBootstrap{},
 		&RKEBootstrapList{},
 		&RKEBootstrapTemplate{},

@@ -16,6 +16,7 @@ import (
 	client "github.com/rancher/rancher/pkg/client/generated/project/v3"
 	"github.com/rancher/rancher/pkg/pipeline/remote/model"
 	"github.com/rancher/rancher/pkg/ref"
+	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -94,8 +95,24 @@ func (g *GlProvider) testAndApply(actionName string, action *types.Action, apiCo
 		return err
 	}
 	toUpdate.Enabled = true
+	clusterID, _ := ref.Parse(apiContext.SubContext["/v3/schemas/project"])
+	cluster, err := g.ClusterLister.Get("", clusterID)
+	if err != nil {
+		return err
+	}
+	secret, err := g.SecretMigrator.CreateOrUpdateSourceCodeProviderConfigSecret("", toUpdate.ClientSecret, cluster, model.GitlabType)
+	if err != nil {
+		return err
+	}
+	toUpdate.CredentialSecret = secret.Name
+	toUpdate.ClientSecret = ""
 	//update gitlab pipeline config
 	if _, err = g.SourceCodeProviderConfigs.ObjectClient().Update(toUpdate.Name, toUpdate); err != nil {
+		if secret != nil {
+			if cleanupErr := g.SecretMigrator.Cleanup(secret.Name); cleanupErr != nil {
+				logrus.Errorf("gitlab pipeline: encountered error while handling migration error: %v, original error: %v", cleanupErr, err)
+			}
+		}
 		return err
 	}
 

@@ -43,7 +43,7 @@ func init() {
 	resource.Put(RoleBindingGroupVersionResource)
 }
 
-// Deprecated use v1.RoleBinding instead
+// Deprecated: use v1.RoleBinding instead
 type RoleBinding = v1.RoleBinding
 
 func NewRoleBinding(namespace, name string, obj v1.RoleBinding) *v1.RoleBinding {

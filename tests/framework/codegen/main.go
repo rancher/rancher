@@ -9,6 +9,8 @@ import (
 
 	managementSchema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
 	"github.com/rancher/rancher/tests/framework/codegen/generator"
+	clusterMachineSchema "github.com/rancher/rancher/tests/framework/pkg/schemas/cluster.x-k8s.io.machines/v1beta1"
+	provisioningSchema "github.com/rancher/rancher/tests/framework/pkg/schemas/provisioning.cattle.io/v1"
 )
 
 func main() {
@@ -16,6 +18,10 @@ func main() {
 	generator.GenerateClient(managementSchema.Schemas, map[string]bool{
 		"userAttribute": true,
 	})
+
+	generator.GenerateClient(clusterMachineSchema.Schemas, map[string]bool{})
+
+	generator.GenerateClient(provisioningSchema.Schemas, map[string]bool{})
 
 	if err := replaceClientBasePackages(); err != nil {
 		panic(err)

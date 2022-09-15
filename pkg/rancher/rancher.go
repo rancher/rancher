@@ -197,7 +197,7 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 		return nil, err
 	}
 
-	auditLogWriter := audit.NewLogWriter(opts.AuditLogPath, opts.AuditLevel, opts.AuditLogMaxage, opts.AuditLogMaxbackup, opts.AuditLogMaxsize)
+	auditLogWriter := audit.NewLogWriter(opts.AuditLogPath, audit.Level(opts.AuditLevel), opts.AuditLogMaxage, opts.AuditLogMaxbackup, opts.AuditLogMaxsize)
 	auditFilter, err := audit.NewAuditLogMiddleware(auditLogWriter)
 	if err != nil {
 		return nil, err
@@ -210,6 +210,7 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 		Handler: responsewriter.Chain{
 			auth.SetXAPICattleAuthHeader,
 			responsewriter.ContentTypeOptions,
+			responsewriter.NoCache,
 			websocket.NewWebsocketHandler,
 			proxy.RewriteLocalCluster,
 			clusterProxy,

@@ -3,11 +3,9 @@ package charts
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/rancher/rancher/pkg/api/steve/catalog/types"
 	catalogv1 "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
-	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	"github.com/rancher/rancher/tests/framework/extensions/namespaces"
 	"github.com/rancher/rancher/tests/framework/pkg/wait"
@@ -18,113 +16,42 @@ import (
 )
 
 const (
-	RancherMonitoringNamespace    = "cattle-monitoring-system"
-	RancherMonitoringName         = "rancher-monitoring"
-	RancherMonitoringCRDName      = "rancher-monitoring-crd"
-	RancherMonitoringConfigSecret = "alertmanager-rancher-monitoring-alertmanager"
+	// Namespace that rancher monitoring chart is installed in
+	RancherMonitoringNamespace = "cattle-monitoring-system"
+	// Name of the rancher monitoring chart
+	RancherMonitoringName = "rancher-monitoring"
+	// Name of the rancher monitoring alert config secret
+	RancherMonitoringAlertSecret = "alertmanager-rancher-monitoring-alertmanager"
 )
 
-//InstallRancherMonitoringChart is a helper function that installs the rancher-montitoring chart.
-func InstallRancherMonitoringChart(client *rancher.Client, projectID, clusterName, version string) error {
-	chartInstallCRD := types.ChartInstall{
-		Annotations: map[string]string{
-			"catalog.cattle.io/ui-source-repo":      "rancher-charts",
-			"catalog.cattle.io/ui-source-repo-type": "cluster",
-		},
-		ChartName:   RancherMonitoringCRDName,
-		ReleaseName: RancherMonitoringCRDName,
-		Version:     version,
-		Values: v3.MapStringInterface{
-			"global": map[string]interface{}{
-				"cattle": map[string]string{
-					"clusterId":             clusterName,
-					"clusterName":           clusterName,
-					"rkePathPrefix":         "",
-					"rkeWindowsPathPrefix":  "",
-					"systemDefaultRegistry": "",
-					"url":                   client.RancherConfig.Host,
-				},
-				"systemDefaultRegistry": "",
-			},
-		},
+// InstallRancherMonitoringChart is a helper function that installs the rancher-monitoring chart.
+func InstallRancherMonitoringChart(client *rancher.Client, installOptions *InstallOptions, rancherMonitoringOpts *RancherMonitoringOpts) error {
+	hostWithProtocol := fmt.Sprintf("https://%s", client.RancherConfig.Host)
+	monitoringChartInstallActionPayload := &payloadOpts{
+		InstallOptions: *installOptions,
+		Name:           RancherMonitoringName,
+		Host:           hostWithProtocol,
+		Namespace:      RancherMonitoringNamespace,
 	}
-	chartInstall := types.ChartInstall{
-		Annotations: map[string]string{
-			"catalog.cattle.io/ui-source-repo":      "rancher-charts",
-			"catalog.cattle.io/ui-source-repo-type": "cluster",
-		},
-		ChartName:   RancherMonitoringName,
-		ReleaseName: RancherMonitoringName,
-		Version:     version,
-		Values: v3.MapStringInterface{
-			"alertmanager": map[string]interface{}{
-				"alertmanagerSpec": map[string]interface{}{
-					"configSecret":      RancherMonitoringConfigSecret,
-					"useExistingSecret": true,
-				},
-			},
-			"global": map[string]interface{}{
-				"cattle": map[string]string{
-					"clusterId":             clusterName,
-					"clusterName":           clusterName,
-					"rkePathPrefix":         "",
-					"rkeWindowsPathPrefix":  "",
-					"systemDefaultRegistry": "",
-					"url":                   client.RancherConfig.Host,
-				},
-				"systemDefaultRegistry": "",
-			},
-			"ingressNgnix": map[string]interface{}{
-				"enabled": true,
-			},
-			"prometheus": map[string]interface{}{
-				"prometheusSpec": map[string]interface{}{
-					"evaluationInterval": "1m",
-					"retentionSize":      "50GiB",
-					"scrapeInterval":     "1m",
-				},
-			},
-			"rkeControllerManager": map[string]interface{}{
-				"enabled": true,
-			},
-			"rkeEtcd": map[string]interface{}{
-				"enabled": true,
-			},
-			"rkeProxy": map[string]interface{}{
-				"enabled": true,
-			},
-			"rkeScheduler": map[string]interface{}{
-				"enabled": true,
-			},
-		},
-	}
-	chartInstallAction := &types.ChartInstallAction{
-		DisableHooks:             false,
-		Timeout:                  &metav1.Duration{Duration: 600 * time.Second},
-		Wait:                     true,
-		Namespace:                RancherMonitoringNamespace,
-		ProjectID:                projectID,
-		DisableOpenAPIValidation: false,
-		Charts:                   []types.ChartInstall{chartInstallCRD, chartInstall},
+
+	chartInstallAction := newMonitoringChartInstallAction(monitoringChartInstallActionPayload, rancherMonitoringOpts)
+
+	catalogClient, err := client.GetClusterCatalogClient(installOptions.ClusterID)
+	if err != nil {
+		return err
 	}
 
 	// Cleanup registration
 	client.Session.RegisterCleanupFunc(func() error {
-		//UninstallAction for when uninstalling the rancher-monitoring chart
-		uninstallAction := &types.ChartUninstallAction{
-			Description:  "",
-			DryRun:       false,
-			KeepHistory:  false,
-			DisableHooks: false,
-			Timeout:      nil,
-		}
+		// UninstallAction for when uninstalling the rancher-monitoring chart
+		defaultChartUninstallAction := newChartUninstallAction()
 
-		err := client.Catalog.UninstallChart(RancherMonitoringName, RancherMonitoringNamespace, uninstallAction)
+		err = catalogClient.UninstallChart(RancherMonitoringName, RancherMonitoringNamespace, defaultChartUninstallAction)
 		if err != nil {
 			return err
 		}
 
-		watchAppInterface, err := client.Catalog.Apps(RancherMonitoringNamespace).Watch(context.TODO(), metav1.ListOptions{
+		watchAppInterface, err := catalogClient.Apps(RancherMonitoringNamespace).Watch(context.TODO(), metav1.ListOptions{
 			FieldSelector:  "metadata.name=" + RancherMonitoringName,
 			TimeoutSeconds: &defaults.WatchTimeoutSeconds,
 		})
@@ -144,11 +71,10 @@ func InstallRancherMonitoringChart(client *rancher.Client, projectID, clusterNam
 			return err
 		}
 
-		dynamicClient, err := client.GetDownStreamClusterClient(clusterName)
+		dynamicClient, err := client.GetDownStreamClusterClient(installOptions.ClusterID)
 		if err != nil {
 			return err
 		}
-
 		namespaceResource := dynamicClient.Resource(namespaces.NamespaceGroupVersionResource).Namespace("")
 
 		err = namespaceResource.Delete(context.TODO(), RancherMonitoringNamespace, metav1.DeleteOptions{})
@@ -159,7 +85,17 @@ func InstallRancherMonitoringChart(client *rancher.Client, projectID, clusterNam
 			return err
 		}
 
-		watchNamespaceInterface, err := namespaceResource.Watch(context.TODO(), metav1.ListOptions{
+		adminClient, err := rancher.NewClient(client.RancherConfig.AdminToken, client.Session)
+		if err != nil {
+			return err
+		}
+		adminDynamicClient, err := adminClient.GetDownStreamClusterClient(installOptions.ClusterID)
+		if err != nil {
+			return err
+		}
+		adminNamespaceResource := adminDynamicClient.Resource(namespaces.NamespaceGroupVersionResource).Namespace("")
+
+		watchNamespaceInterface, err := adminNamespaceResource.Watch(context.TODO(), metav1.ListOptions{
 			FieldSelector:  "metadata.name=" + RancherMonitoringNamespace,
 			TimeoutSeconds: &defaults.WatchTimeoutSeconds,
 		})
@@ -176,13 +112,13 @@ func InstallRancherMonitoringChart(client *rancher.Client, projectID, clusterNam
 		})
 	})
 
-	err := client.Catalog.InstallChart(chartInstallAction)
+	err = catalogClient.InstallChart(chartInstallAction)
 	if err != nil {
 		return err
 	}
 
-	//wait for chart to be full deployed
-	watchAppInterface, err := client.Catalog.Apps(RancherMonitoringNamespace).Watch(context.TODO(), metav1.ListOptions{
+	// wait for chart to be full deployed
+	watchAppInterface, err := catalogClient.Apps(RancherMonitoringNamespace).Watch(context.TODO(), metav1.ListOptions{
 		FieldSelector:  "metadata.name=" + RancherMonitoringName,
 		TimeoutSeconds: &defaults.WatchTimeoutSeconds,
 	})
@@ -203,4 +139,153 @@ func InstallRancherMonitoringChart(client *rancher.Client, projectID, clusterNam
 		return err
 	}
 	return nil
+}
+
+// newMonitoringChartInstallAction is a private helper function that returns chart install action with monitoring and payload options.
+func newMonitoringChartInstallAction(p *payloadOpts, rancherMonitoringOpts *RancherMonitoringOpts) *types.ChartInstallAction {
+	monitoringValues := map[string]interface{}{
+		"ingressNgnix": map[string]interface{}{
+			"enabled": rancherMonitoringOpts.IngressNginx,
+		},
+		"prometheus": map[string]interface{}{
+			"prometheusSpec": map[string]interface{}{
+				"evaluationInterval": "1m",
+				"retentionSize":      "50GiB",
+				"scrapeInterval":     "1m",
+			},
+		},
+		"rkeControllerManager": map[string]interface{}{
+			"enabled": rancherMonitoringOpts.RKEControllerManager,
+		},
+		"rkeEtcd": map[string]interface{}{
+			"enabled": rancherMonitoringOpts.RKEEtcd,
+		},
+		"rkeProxy": map[string]interface{}{
+			"enabled": rancherMonitoringOpts.RKEProxy,
+		},
+		"rkeScheduler": map[string]interface{}{
+			"enabled": rancherMonitoringOpts.RKEScheduler,
+		},
+	}
+
+	chartInstall := newChartInstall(p.Name, p.InstallOptions.Version, p.InstallOptions.ClusterID, p.InstallOptions.ClusterName, p.Host, monitoringValues)
+	chartInstallCRD := newChartInstall(p.Name+"-crd", p.Version, p.InstallOptions.ClusterID, p.InstallOptions.ClusterName, p.Host, nil)
+	chartInstalls := []types.ChartInstall{*chartInstallCRD, *chartInstall}
+
+	chartInstallAction := newChartInstallAction(p.Namespace, p.ProjectID, chartInstalls)
+
+	return chartInstallAction
+}
+
+// UpgradeMonitoringChart is a helper function that upgrades the rancher-monitoring chart.
+func UpgradeRancherMonitoringChart(client *rancher.Client, installOptions *InstallOptions, rancherMonitoringOpts *RancherMonitoringOpts) error {
+	hostWithProtocol := fmt.Sprintf("https://%s", client.RancherConfig.Host)
+	monitoringChartUpgradeActionPayload := &payloadOpts{
+		InstallOptions: *installOptions,
+		Name:           RancherMonitoringName,
+		Host:           hostWithProtocol,
+		Namespace:      RancherMonitoringNamespace,
+	}
+
+	chartUpgradeAction := newMonitoringChartUpgradeAction(monitoringChartUpgradeActionPayload, rancherMonitoringOpts)
+
+	catalogClient, err := client.GetClusterCatalogClient(installOptions.ClusterID)
+	if err != nil {
+		return err
+	}
+
+	err = catalogClient.UpgradeChart(chartUpgradeAction)
+	if err != nil {
+		return err
+	}
+
+	adminClient, err := rancher.NewClient(client.RancherConfig.AdminToken, client.Session)
+	if err != nil {
+		return err
+	}
+	adminCatalogClient, err := adminClient.GetClusterCatalogClient(installOptions.ClusterID)
+	if err != nil {
+		return err
+	}
+
+	// wait for chart to be in status pending upgrade
+	watchAppInterface, err := adminCatalogClient.Apps(RancherMonitoringNamespace).Watch(context.TODO(), metav1.ListOptions{
+		FieldSelector:  "metadata.name=" + RancherMonitoringName,
+		TimeoutSeconds: &defaults.WatchTimeoutSeconds,
+	})
+	if err != nil {
+		return err
+	}
+
+	err = wait.WatchWait(watchAppInterface, func(event watch.Event) (ready bool, err error) {
+		app := event.Object.(*catalogv1.App)
+
+		state := app.Status.Summary.State
+		if state == string(catalogv1.StatusPendingUpgrade) {
+			return true, nil
+		}
+		return false, nil
+	})
+	if err != nil {
+		return err
+	}
+
+	// wait for chart to be full deployed
+	watchAppInterface, err = adminCatalogClient.Apps(RancherMonitoringNamespace).Watch(context.TODO(), metav1.ListOptions{
+		FieldSelector:  "metadata.name=" + RancherMonitoringName,
+		TimeoutSeconds: &defaults.WatchTimeoutSeconds,
+	})
+	if err != nil {
+		return err
+	}
+
+	err = wait.WatchWait(watchAppInterface, func(event watch.Event) (ready bool, err error) {
+		app := event.Object.(*catalogv1.App)
+
+		state := app.Status.Summary.State
+		if state == string(catalogv1.StatusDeployed) {
+			return true, nil
+		}
+		return false, nil
+	})
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// newMonitoringChartUpgradeAction is a private helper function that returns chart upgrade action with monitoring and payload options.
+func newMonitoringChartUpgradeAction(p *payloadOpts, rancherMonitoringOpts *RancherMonitoringOpts) *types.ChartUpgradeAction {
+	monitoringValues := map[string]interface{}{
+		"ingressNgnix": map[string]interface{}{
+			"enabled": rancherMonitoringOpts.IngressNginx,
+		},
+		"prometheus": map[string]interface{}{
+			"prometheusSpec": map[string]interface{}{
+				"evaluationInterval": "1m",
+				"retentionSize":      "50GiB",
+				"scrapeInterval":     "1m",
+			},
+		},
+		"rkeControllerManager": map[string]interface{}{
+			"enabled": rancherMonitoringOpts.RKEControllerManager,
+		},
+		"rkeEtcd": map[string]interface{}{
+			"enabled": rancherMonitoringOpts.RKEEtcd,
+		},
+		"rkeProxy": map[string]interface{}{
+			"enabled": rancherMonitoringOpts.RKEProxy,
+		},
+		"rkeScheduler": map[string]interface{}{
+			"enabled": rancherMonitoringOpts.RKEScheduler,
+		},
+	}
+	chartUpgrade := newChartUpgrade(p.Name, p.InstallOptions.Version, p.InstallOptions.ClusterID, p.InstallOptions.ClusterName, p.Host, monitoringValues)
+	chartUpgradeCRD := newChartUpgrade(p.Name+"-crd", p.InstallOptions.Version, p.InstallOptions.ClusterID, p.InstallOptions.ClusterName, p.Host, monitoringValues)
+	chartUpgrades := []types.ChartUpgrade{*chartUpgradeCRD, *chartUpgrade}
+
+	chartUpgradeAction := newChartUpgradeAction(p.Namespace, chartUpgrades)
+
+	return chartUpgradeAction
 }

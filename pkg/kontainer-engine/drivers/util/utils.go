@@ -6,6 +6,7 @@ import (
 	"time"
 
 	errs "github.com/pkg/errors"
+	"github.com/rancher/rancher/pkg/serviceaccounttoken"
 	v3 "github.com/rancher/rke/types"
 	"gopkg.in/yaml.v2"
 	v1 "k8s.io/api/core/v1"
@@ -99,16 +100,12 @@ func GenerateServiceAccountToken(clientset kubernetes.Interface) (string, error)
 		if serviceAccount, err = clientset.CoreV1().ServiceAccounts(cattleNamespace).Get(context.TODO(), serviceAccount.Name, metav1.GetOptions{}); err != nil {
 			return "", fmt.Errorf("error getting service account: %v", err)
 		}
-
-		if len(serviceAccount.Secrets) > 0 {
-			secret := serviceAccount.Secrets[0]
-			secretObj, err := clientset.CoreV1().Secrets(cattleNamespace).Get(context.TODO(), secret.Name, metav1.GetOptions{})
-			if err != nil {
-				return "", fmt.Errorf("error getting secret: %v", err)
-			}
-			if token, ok := secretObj.Data["token"]; ok {
-				return string(token), nil
-			}
+		secret, err := serviceaccounttoken.CreateSecretForServiceAccount(context.TODO(), clientset, serviceAccount)
+		if err != nil {
+			return "", fmt.Errorf("error creating secret for service account: %v", err)
+		}
+		if token, ok := secret.Data["token"]; ok {
+			return string(token), nil
 		}
 		start = start * 2
 	}

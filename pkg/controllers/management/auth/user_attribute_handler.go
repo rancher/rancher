@@ -28,6 +28,10 @@ func (ua *UserAttributeController) sync(key string, obj *v3.UserAttribute) (runt
 		return nil, nil
 	}
 
+	if obj.ExtraByProvider == nil {
+		obj.NeedsRefresh = true
+	}
+
 	if !obj.NeedsRefresh {
 		return obj, nil
 	}

@@ -1,4 +1,4 @@
-FROM rancher/golang:1.16-windowsservercore
+FROM library/golang:1.17.7
 SHELL ["powershell", "-NoLogo", "-Command", "$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue';"]
 
 ARG DAPPER_HOST_ARCH
@@ -14,7 +14,7 @@ RUN pushd c:\; \
     popd;
 
 RUN pushd c:\; \
-    $URL = 'https://github.com/golangci/golangci-lint/releases/download/v1.43.0/golangci-lint-1.43.0-windows-amd64.zip'; \
+    $URL = 'https://github.com/golangci/golangci-lint/releases/download/v1.44.0/golangci-lint-1.44.0-windows-amd64.zip'; \
     \
     Write-Host ('Downloading golangci from {0} ...' -f $URL); \
     curl.exe -sfL $URL -o c:\golangci-lint.zip; \
@@ -51,7 +51,6 @@ ENV DAPPER_ENV REPO TAG DRONE_TAG FOSSA_API_KEY
 ENV DAPPER_SOURCE /gopath/src/github.com/rancher/rancher
 ENV DAPPER_OUTPUT ./bin
 ENV DAPPER_DOCKER_SOCKET true
-ENV TRASH_CACHE ${DAPPER_SOURCE}/.trash-cache
 ENV HOME ${DAPPER_SOURCE}
 
 WORKDIR ${DAPPER_SOURCE}

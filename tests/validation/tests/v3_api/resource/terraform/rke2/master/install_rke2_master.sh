@@ -25,9 +25,9 @@ else
   echo -e "node-external-ip: ${4}" >> /etc/rancher/rke2/config.yaml
 fi
 
-if [[ ${1} == *"rhel"* ]]
+if [[ ${1} = "rhel" ]]
 then
-   subscription-manager register --auto-attach --username=${8} --password=${9}
+   subscription-manager register --auto-attach --username=${9} --password=${10}
    subscription-manager repos --enable=rhel-7-server-extras-rpms
 fi
 
@@ -44,13 +44,19 @@ then
   sudo systemctl reload NetworkManager
 fi
 
+export "${8}"="${3}"
+if [ ! -z "${11}" ]
+then
+  export INSTALL_RKE2_METHOD="${11}"
+fi
+
 if [ ${6} = "rke2" ]
 then
    if [ ${5} != "null" ]
    then
-       curl -sfL https://get.rke2.io | INSTALL_RKE2_VERSION=${3}  INSTALL_RKE2_CHANNEL=${5} sh -
+       curl -sfL https://get.rke2.io | INSTALL_RKE2_CHANNEL=${5} sh -
    else
-       curl -sfL https://get.rke2.io | INSTALL_RKE2_VERSION=${3} sh -
+       curl -sfL https://get.rke2.io | sh -
    fi
    sleep 10
    if [ ! -z "${7}" ] && [[ "${7}" == *"cis"* ]]
@@ -72,60 +78,20 @@ else
    sudo systemctl start rancherd-server
 fi
 
-export KUBECONFIG=/etc/rancher/rke2/rke2.yaml PATH=$PATH:/var/lib/rancher/rke2/bin
-
 timeElapsed=0
-while ! `kubectl get nodes >/dev/null 2>&1` && [[ $timeElapsed -lt 300 ]]
+while [[ $timeElapsed -lt 600 ]]
 do
-   sleep 5
-   timeElapsed=`expr $timeElapsed + 5`
-done
-
-IFS=$'\n'
-timeElapsed=0
-while [[ $timeElapsed -lt 540 ]]
-do
-   notready=false
-   for rec in `kubectl get nodes`
-   do
-      if [[ "$rec" == *"NotReady"* ]]
-      then
-         notready=true
-      fi
-  done
+  notready=false
+  if [[ ! -f /var/lib/rancher/rke2/server/node-token ]] || [[ ! -f /etc/rancher/rke2/rke2.yaml ]]
+  then
+    notready=true
+  fi
   if [[ $notready == false ]]
   then
-     break
+    break
   fi
-  sleep 20
-  timeElapsed=`expr $timeElapsed + 20`
-done
-
-IFS=$'\n'
-timeElapsed=0
-while [[ $timeElapsed -lt 540 ]]
-do
-   helmPodsNR=false
-   systemPodsNR=false
-   for rec in `kubectl get pods -A --no-headers`
-   do
-      if [[ "$rec" == *"helm-install"* ]] && [[ "$rec" != *"Completed"* ]]
-      then
-         helmPodsNR=true
-      elif [[ "$rec" != *"helm-install"* ]] && [[ "$rec" != *"Running"* ]]
-      then
-         systemPodsNR=true
-      else
-         echo ""
-      fi
-   done
-
-   if [[ $systemPodsNR == false ]] && [[ $helmPodsNR == false ]]
-   then
-      break
-   fi
-   sleep 20
-   timeElapsed=`expr $timeElapsed + 20`
+  sleep 5
+  timeElapsed=`expr $timeElapsed + 5`
 done
 
 cat /etc/rancher/rke2/config.yaml> /tmp/joinflags

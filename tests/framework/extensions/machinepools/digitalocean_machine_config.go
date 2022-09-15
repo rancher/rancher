@@ -12,6 +12,7 @@ const (
 	DOMachingConfigConfigurationFileKey = "doMachineConfig"
 )
 
+// DOMachineConfig is configuration needed to create an rke-machine-config.cattle.io.digitaloceanconfig
 type DOMachineConfig struct {
 	Image             string `json:"image" yaml:"image"`
 	Backups           bool   `json:"backups" yaml:"backups"`

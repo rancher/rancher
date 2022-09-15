@@ -43,7 +43,7 @@ func init() {
 	resource.Put(CertificateGroupVersionResource)
 }
 
-// Deprecated use v3.Certificate instead
+// Deprecated: use v3.Certificate instead
 type Certificate = v3.Certificate
 
 func NewCertificate(namespace, name string, obj v3.Certificate) *v3.Certificate {

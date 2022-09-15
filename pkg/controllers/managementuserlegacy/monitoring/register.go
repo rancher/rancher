@@ -13,7 +13,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 )
 
-func RegisterIndexers(ctx context.Context, scaledContext *config.ScaledContext) error {
+func RegisterIndexers(scaledContext *config.ScaledContext) error {
 	prtbInformer := scaledContext.Management.ProjectRoleTemplateBindings("").Controller().Informer()
 	return prtbInformer.AddIndexers(map[string]cache.IndexFunc{
 		prtbBySA: prtbBySAFunc,

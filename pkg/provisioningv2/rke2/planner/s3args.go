@@ -9,16 +9,15 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2/machineprovision"
 	corecontrollers "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/pkg/kv"
+	"github.com/rancher/wrangler/pkg/name"
 )
 
 // s3Args is a struct that contains functions used to generate arguments for etcd snapshots stored in S3
-// If env is set to true, it will set the AWS_SECRET_ACCESS_KEY as an environment variable rather than as an argument.
 type s3Args struct {
-	prefix      string
 	secretCache corecontrollers.SecretCache
-	env         bool
 }
 
+// first returns the first non-blank string from the two passed in arguments (left to right)
 func first(one, two string) string {
 	if one == "" {
 		return two
@@ -26,8 +25,24 @@ func first(one, two string) string {
 	return one
 }
 
-func (s *s3Args) ToArgs(s3 *rkev1.ETCDSnapshotS3, controlPlane *rkev1.RKEControlPlane) (args []string, env []string, files []plan.File, err error) {
+// S3Enabled returns a boolean indicating whether S3 is enabled for the passed in ETCDSnapshotS3 struct.
+func S3Enabled(s3 *rkev1.ETCDSnapshotS3) bool {
 	if s3 == nil {
+		return false
+	}
+	if s3.Bucket != "" || s3.Endpoint != "" || s3.Folder != "" || s3.CloudCredentialName != "" || s3.Region != "" {
+		return true
+	}
+	return false
+}
+
+// ToArgs renders a slice of arguments and environment variables, as well as files (if S3 endpoints are required). If secretKeyInEnv is set to true, it will set the AWS_SECRET_ACCESS_KEY as an environment variable rather than as an argument.
+func (s *s3Args) ToArgs(s3 *rkev1.ETCDSnapshotS3, controlPlane *rkev1.RKEControlPlane, prefix string, secretKeyInEnv bool) (args []string, env []string, files []plan.File, err error) {
+	if s3 == nil {
+		return
+	}
+
+	if !S3Enabled(s3) {
 		return
 	}
 
@@ -46,43 +61,44 @@ func (s *s3Args) ToArgs(s3 *rkev1.ETCDSnapshotS3, controlPlane *rkev1.RKEControl
 	}
 
 	if s3.Bucket != "" || s3Cred.Bucket != "" {
-		args = append(args, fmt.Sprintf("--%ss3-bucket=%s", s.prefix, first(s3.Bucket, s3Cred.Bucket)))
+		args = append(args, fmt.Sprintf("--%ss3-bucket=%s", prefix, first(s3.Bucket, s3Cred.Bucket)))
 	}
 
 	if s3Cred.AccessKey != "" {
-		args = append(args, fmt.Sprintf("--%ss3-access-key=%s", s.prefix, s3Cred.AccessKey))
+		args = append(args, fmt.Sprintf("--%ss3-access-key=%s", prefix, s3Cred.AccessKey))
 	}
 	if s3Cred.SecretKey != "" {
-		if s.env {
+		if secretKeyInEnv {
 			env = append(env, fmt.Sprintf("AWS_SECRET_ACCESS_KEY=%s", s3Cred.SecretKey))
 		} else {
-			args = append(args, fmt.Sprintf("--%ss3-secret-key=%s", s.prefix, s3Cred.SecretKey))
+			args = append(args, fmt.Sprintf("--%ss3-secret-key=%s", prefix, s3Cred.SecretKey))
 		}
 	}
 	if v := first(s3.Region, s3Cred.Region); v != "" {
-		args = append(args, fmt.Sprintf("--%ss3-region=%s", s.prefix, v))
+		args = append(args, fmt.Sprintf("--%ss3-region=%s", prefix, v))
 	}
 	if v := first(s3.Folder, s3Cred.Folder); v != "" {
-		args = append(args, fmt.Sprintf("--%ss3-folder=%s", s.prefix, v))
+		args = append(args, fmt.Sprintf("--%ss3-folder=%s", prefix, v))
 	}
 	if v := first(s3.Endpoint, s3Cred.Endpoint); v != "" {
-		args = append(args, fmt.Sprintf("--%ss3-endpoint=%s", s.prefix, v))
+		args = append(args, fmt.Sprintf("--%ss3-endpoint=%s", prefix, v))
 	}
 	if s3.SkipSSLVerify || s3Cred.SkipSSLVerify {
-		args = append(args, fmt.Sprintf("--%ss3-skip-ssl-verify", s.prefix))
+		args = append(args, fmt.Sprintf("--%ss3-skip-ssl-verify", prefix))
 	}
 	if v := first(s3.EndpointCA, s3Cred.EndpointCA); v != "" {
-		filePath := configFile(controlPlane, "s3-endpoint-ca.crt")
+		s3CAName := fmt.Sprintf("s3-endpoint-ca-%s.crt", name.Hex(v, 5))
+		filePath := configFile(controlPlane, s3CAName)
 		files = append(files, plan.File{
 			Content: base64.StdEncoding.EncodeToString([]byte(v)),
 			Path:    filePath,
 		})
-		args = append(args, fmt.Sprintf("--%ss3-endpoint-ca=%s", s.prefix, filePath))
+		args = append(args, fmt.Sprintf("--%ss3-endpoint-ca=%s", prefix, filePath))
 	}
 
 	if len(args) > 0 {
 		args = append(args,
-			fmt.Sprintf("--%ss3", s.prefix))
+			fmt.Sprintf("--%ss3", prefix))
 	}
 
 	return

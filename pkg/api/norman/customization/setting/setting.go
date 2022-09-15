@@ -2,7 +2,6 @@ package setting
 
 import (
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/rancher/norman/api/access"
@@ -82,12 +81,6 @@ func Validator(request *types.APIContext, schema *types.Schema, data map[string]
 	case "auth-user-info-resync-cron":
 		_, err = providerrefresh.ParseCron(newValueString)
 	case "kubeconfig-token-ttl-minutes":
-		generateToken := strings.EqualFold(settings.KubeconfigGenerateToken.Get(), "true")
-		if generateToken {
-			return httperror.NewAPIError(httperror.ActionNotAvailable, fmt.Sprintf("kubeconfig-token-ttl-minutes can be set only if rancher doesn't generate token, "+
-				"disable kubeconfig-generate-token"))
-		}
-
 		var tokenTTL time.Duration
 		tokenTTL, err = tokens.ParseTokenTTL(newValueString)
 		if err == nil {

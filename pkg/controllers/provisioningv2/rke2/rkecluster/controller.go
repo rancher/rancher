@@ -54,12 +54,12 @@ func (h *handler) UpdateSpec(_ string, cluster *v1.RKECluster) (*v1.RKECluster, 
 	return cluster, nil
 }
 
-func (h *handler) OnChange(obj *v1.RKECluster, status v1.RKEClusterStatus) (v1.RKEClusterStatus, error) {
+func (h *handler) OnChange(rkeCluster *v1.RKECluster, status v1.RKEClusterStatus) (v1.RKEClusterStatus, error) {
 	conditionToUpdate := rke2.Ready
-	if !obj.DeletionTimestamp.IsZero() {
+	if !rkeCluster.DeletionTimestamp.IsZero() {
 		conditionToUpdate = rke2.Removed
 	}
-	cp, err := h.rkeControlPlanes.Get(obj.Namespace, obj.Name)
+	cp, err := h.rkeControlPlanes.Get(rkeCluster.Namespace, rkeCluster.Name)
 	if err == nil {
 		conditionToUpdate.SetStatus(&status, conditionToUpdate.GetStatus(cp))
 		conditionToUpdate.Reason(&status, conditionToUpdate.GetReason(cp))
@@ -69,6 +69,6 @@ func (h *handler) OnChange(obj *v1.RKECluster, status v1.RKEClusterStatus) (v1.R
 	}
 
 	status.Ready = rke2.Ready.IsTrue(&status)
-	status.ObservedGeneration = obj.Generation
+	status.ObservedGeneration = rkeCluster.Generation
 	return status, nil
 }

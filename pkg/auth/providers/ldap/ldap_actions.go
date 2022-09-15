@@ -79,9 +79,6 @@ func (p *ldapProvider) testAndApply(actionName string, action *types.Action, req
 	if len(config.Servers) < 1 {
 		return httperror.NewAPIError(httperror.InvalidBodyContent, "must supply a server")
 	}
-	if len(config.Servers) > 1 {
-		return httperror.NewAPIError(httperror.InvalidBodyContent, "multiple servers not yet supported")
-	}
 	userPrincipal, groupPrincipals, err := p.loginUser(login, config, caPool)
 	if err != nil {
 		return err

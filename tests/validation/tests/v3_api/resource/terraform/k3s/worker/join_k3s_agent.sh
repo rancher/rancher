@@ -20,6 +20,7 @@ then
   echo -e "vm.overcommit_memory=1" >>/etc/sysctl.d/90-kubelet.conf
   echo -e "kernel.panic=10" >>/etc/sysctl.d/90-kubelet.conf
   echo -e "kernel.panic_on_oops=1" >>/etc/sysctl.d/90-kubelet.conf
+  echo -e "kernel.keys.root_maxbytes=25000000" >>/etc/sysctl.d/90-kubelet.conf
   sysctl -p /etc/sysctl.d/90-kubelet.conf
   systemctl restart systemd-sysctl
 fi
@@ -36,6 +37,11 @@ then
     echo "curl -sfL https://get.k3s.io | sh -s - ${7} --node-external-ip=${6} --server https://${4}:6443 --token ${5} ${7}"
     curl -sfL https://get.k3s.io | sh -s - ${7} --node-external-ip=${6} --server https://"${4}":6443 --token "${5}"
 else
-    curl -sfL https://get.k3s.io | sh -s - agent --node-external-ip=${6}
+    if [ ${10} != "null" ]
+    then
+      curl -sfL https://get.k3s.io | INSTALL_K3S_CHANNEL=${10} sh -s - agent --node-external-ip=${6}
+    else
+      curl -sfL https://get.k3s.io | sh -s - agent --node-external-ip=${6}
+    fi
 fi
 sleep 20

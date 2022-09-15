@@ -3,6 +3,7 @@ package providers
 import (
 	"github.com/rancher/norman/types"
 	client "github.com/rancher/rancher/pkg/client/generated/project/v3"
+	"github.com/rancher/rancher/pkg/controllers/management/secretmigrator"
 	"github.com/rancher/rancher/pkg/pipeline/providers/bitbucketcloud"
 	"github.com/rancher/rancher/pkg/pipeline/providers/bitbucketserver"
 	"github.com/rancher/rancher/pkg/pipeline/providers/common"
@@ -65,6 +66,11 @@ func configure(management *config.ScaledContext) {
 		PipelineExecutions:         management.Project.PipelineExecutions(""),
 		NamespaceLister:            management.Core.Namespaces("").Controller().Lister(),
 		Namespaces:                 management.Core.Namespaces(""),
+		ClusterLister:              management.Management.Clusters("").Controller().Lister(),
+		SecretMigrator: secretmigrator.NewMigrator(
+			management.Core.Secrets("").Controller().Lister(),
+			management.Core.Secrets(""),
+		),
 
 		PipelineIndexer:             pipelineInformer.GetIndexer(),
 		PipelineExecutionIndexer:    executionInformer.GetIndexer(),
@@ -75,6 +81,11 @@ func configure(management *config.ScaledContext) {
 	ghProvider := &github.GhProvider{
 		BaseProvider: baseProvider,
 		AuthConfigs:  management.Management.AuthConfigs(""),
+		Secrets:      management.Core.Secrets(""),
+		SecretMigrator: secretmigrator.NewMigrator(
+			management.Core.Secrets("").Controller().Lister(),
+			management.Core.Secrets(""),
+		),
 	}
 	glProvider := &gitlab.GlProvider{
 		BaseProvider: baseProvider,

@@ -3,6 +3,7 @@ package management
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"reflect"
 	"strings"
 
@@ -21,6 +22,7 @@ const (
 	ExoscaleDriver     = "exoscale"
 	HarvesterDriver    = "harvester"
 	Linodedriver       = "linode"
+	NutanixDriver      = "nutanix"
 	OCIDriver          = "oci"
 	OTCDriver          = "otc"
 	OpenstackDriver    = "openstack"
@@ -30,6 +32,7 @@ const (
 	SoftLayerDriver    = "softlayer"
 	Vmwaredriver       = "vmwarevsphere"
 	GoogleDriver       = "google"
+	OutscaleDriver     = "outscale"
 )
 
 var DriverData = map[string]map[string][]string{
@@ -39,6 +42,7 @@ var DriverData = map[string]map[string][]string{
 	ExoscaleDriver:     {"privateCredentialFields": []string{"apiSecretKey"}},
 	HarvesterDriver:    {"publicCredentialFields": []string{"clusterType", "clusterId"}, "privateCredentialFields": []string{"kubeconfigContent"}, "optionalCredentialFields": []string{"clusterId"}},
 	Linodedriver:       {"privateCredentialFields": []string{"token"}, "passwordFields": []string{"rootPass"}},
+	NutanixDriver:      {"publicCredentialFields": []string{"endpoint", "username", "port"}, "privateCredentialFields": []string{"password"}},
 	OCIDriver:          {"publicCredentialFields": []string{"tenancyId", "userId", "fingerprint"}, "privateCredentialFields": []string{"privateKeyContents"}, "passwordFields": []string{"privateKeyPassphrase"}},
 	OTCDriver:          {"privateCredentialFields": []string{"accessKeySecret"}},
 	OpenstackDriver:    {"privateCredentialFields": []string{"password"}},
@@ -48,6 +52,7 @@ var DriverData = map[string]map[string][]string{
 	SoftLayerDriver:    {"privateCredentialFields": []string{"apiKey"}},
 	Vmwaredriver:       {"publicCredentialFields": []string{"username", "vcenter", "vcenterPort"}, "privateCredentialFields": []string{"password"}},
 	GoogleDriver:       {"privateCredentialFields": []string{"authEncodedJson"}},
+	OutscaleDriver:     {"publicCredentialFields": []string{"accessKey", "region"}, "privateCredentialFields": []string{"secretKey"}},
 }
 
 var driverDefaults = map[string]map[string]string{
@@ -98,12 +103,12 @@ func addMachineDrivers(management *config.ManagementContext) error {
 	}
 	harvesterEnabled := features.GetFeatureByName(HarvesterDriver).Enabled()
 	// make sure the version number is consistent with the one at Line 40 of package/Dockerfile
-	if err := addMachineDriver(HarvesterDriver, "https://releases.rancher.com/harvester-node-driver/v0.3.4/docker-machine-driver-harvester-amd64.tar.gz", "", "e214c5ba38b83febce25863215f887239afee9b4477aa70b4f76695d53378632", []string{"releases.rancher.com"}, harvesterEnabled, harvesterEnabled, false, management); err != nil {
+	if err := addMachineDriver(HarvesterDriver, "https://releases.rancher.com/harvester-node-driver/v0.5.0/docker-machine-driver-harvester-amd64.tar.gz", "", "10944c040a056e939e2cdaeeaa9652365a0547e4d1397499420295437e95e75c", []string{"releases.rancher.com"}, harvesterEnabled, harvesterEnabled, false, management); err != nil {
 		return err
 	}
 	linodeBuiltin := true
 	if dl := os.Getenv("CATTLE_DEV_MODE"); dl != "" {
-		linodeBuiltin = false
+		linodeBuiltin = isCommandAvailable("docker-machine-driver-linode")
 	}
 	if err := addMachineDriver(Linodedriver, "https://github.com/linode/docker-machine-driver-linode/releases/download/v0.1.8/docker-machine-driver-linode_linux-amd64.zip", "/assets/rancher-ui-driver-linode/component.js", "b31b6a504c59ee758d2dda83029fe4a85b3f5601e22dfa58700a5e6c8f450dc7", []string{"api.linode.com"}, linodeBuiltin, linodeBuiltin, false, management); err != nil {
 		return err
@@ -120,13 +125,19 @@ func addMachineDrivers(management *config.ManagementContext) error {
 	if err := addMachineDriver(PacketDriver, "https://github.com/equinix/docker-machine-driver-metal/releases/download/v0.6.0/docker-machine-driver-metal_linux-amd64.zip", "https://rancher-drivers.equinixmetal.net/1.0.2/component.js", "fad5e551a35d2ef2db742b07ca6d61bb9c9b574d322d3000f0c557d5fb90a734", []string{"api.packet.net", "api.equinix.com", "rancher-drivers.equinixmetal.net"}, false, false, false, management); err != nil {
 		return err
 	}
-	if err := addMachineDriver(PhoenixNAPDriver, "https://github.com/phoenixnap/docker-machine-driver-pnap/releases/download/v0.1.0/docker-machine-driver-pnap_0.1.0_linux_amd64.zip", "", "5f25a7fbcaca0710b7290216464ca8433fa3d683b59d5e4e674bef2d0a3ff6c7", []string{"api.securedservers.com", "api.phoenixnap.com"}, false, false, false, management); err != nil {
+	if err := addMachineDriver(PhoenixNAPDriver, "https://github.com/phoenixnap/docker-machine-driver-pnap/releases/download/v0.4.0/docker-machine-driver-pnap_0.4.0_linux_amd64.zip", "", "0bc81bdc80ab258fa0db67918f3b04435ed2c81f84c942c9123a0729f884190b", []string{"api.securedservers.com", "api.phoenixnap.com"}, false, false, false, management); err != nil {
 		return err
 	}
 	if err := addMachineDriver(RackspaceDriver, "local://", "", "", nil, false, true, false, management); err != nil {
 		return err
 	}
 	if err := addMachineDriver(SoftLayerDriver, "local://", "", "", nil, false, true, false, management); err != nil {
+		return err
+	}
+	if err := addMachineDriver(NutanixDriver, "https://github.com/nutanix/docker-machine/releases/download/v3.1.0/docker-machine-driver-nutanix_v3.1.0_linux", "https://nutanix.github.io/rancher-ui-driver/v3.1.0/component.js", "e8f4f2e7ae7e927534884b5a3a45a38a5bd2c2872de1d65375f6e009bed75dba", []string{"nutanix.github.io"}, false, false, false, management); err != nil {
+		return err
+	}
+	if err := addMachineDriver(OutscaleDriver, "https://github.com/outscale-dev/docker-machine-driver-outscale/releases/download/v0.1.1/docker-machine-driver-outscale_0.1.1_linux_amd64.zip", "https://oos.eu-west-2.outscale.com/rancher-ui-driver-outscale/v0.1.1/component.js", "20422e37000286462c15d592bdb4ab3e2502970e11d7b963c0acf76858606531", []string{"oos.eu-west-2.outscale.com"}, false, false, false, management); err != nil {
 		return err
 	}
 	return addMachineDriver(Vmwaredriver, "local://", "", "", nil, true, true, false, management)
@@ -209,4 +220,8 @@ func addMachineDriver(name, url, uiURL, checksum string, whitelist []string, act
 	})
 
 	return err
+}
+
+func isCommandAvailable(name string) bool {
+	return exec.Command("command", "-v", name).Run() == nil
 }

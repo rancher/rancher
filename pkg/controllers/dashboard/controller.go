@@ -6,6 +6,7 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/dashboard/apiservice"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/clusterindex"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/clusterregistrationtoken"
+	"github.com/rancher/rancher/pkg/controllers/dashboard/cspadaptercharts"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/fleetcharts"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/helm"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/hostedcluster"
@@ -34,6 +35,10 @@ func Register(ctx context.Context, wrangler *wrangler.Context, embedded bool) er
 		wrangler.CRD.CustomResourceDefinition())
 	scaleavailable.Register(ctx, wrangler)
 	if err := systemcharts.Register(ctx, wrangler); err != nil {
+		return err
+	}
+
+	if err := cspadaptercharts.Register(ctx, wrangler); err != nil {
 		return err
 	}
 

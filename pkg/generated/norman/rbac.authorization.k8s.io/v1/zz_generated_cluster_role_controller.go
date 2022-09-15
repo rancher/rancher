@@ -42,7 +42,7 @@ func init() {
 	resource.Put(ClusterRoleGroupVersionResource)
 }
 
-// Deprecated use v1.ClusterRole instead
+// Deprecated: use v1.ClusterRole instead
 type ClusterRole = v1.ClusterRole
 
 func NewClusterRole(namespace, name string, obj v1.ClusterRole) *v1.ClusterRole {

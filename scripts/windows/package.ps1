@@ -33,9 +33,6 @@ $RELEASE_ID = $env:RELEASE_ID
 if (-not $RELEASE_ID) {
     $RELEASE_ID = $HOST_RELEASE_ID
 }
-if ($RELEASE_ID -eq "2009") {
-    $RELEASE_ID = "20H2"
-}
 
 $AGENT_IMAGE = ('{0}/rancher-agent:{1}-windows-{2}' -f $REPO, $TAG, $RELEASE_ID)
 

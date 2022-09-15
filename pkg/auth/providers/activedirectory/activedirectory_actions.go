@@ -74,9 +74,6 @@ func (p *adProvider) testAndApply(actionName string, action *types.Action, reque
 	if len(config.Servers) < 1 {
 		return httperror.NewAPIError(httperror.InvalidBodyContent, "must supply a server")
 	}
-	if len(config.Servers) > 1 {
-		return httperror.NewAPIError(httperror.InvalidBodyContent, "multiple servers not yet supported")
-	}
 
 	userPrincipal, groupPrincipals, err := p.loginUser(login, config, caPool, true)
 	if err != nil {

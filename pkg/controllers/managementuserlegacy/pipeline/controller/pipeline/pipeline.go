@@ -56,7 +56,11 @@ func (l *Lifecycle) Remove(obj *v3.Pipeline) (runtime.Object, error) {
 func (l *Lifecycle) sync(obj *v3.Pipeline) (*v3.Pipeline, error) {
 	if obj.Status.Token == "" {
 		//random token for webhook validation
-		obj.Status.Token = uuid.NewV4().String()
+		uuidv4, err := uuid.NewV4()
+		if err != nil {
+			return nil, err
+		}
+		obj.Status.Token = uuidv4.String()
 	}
 
 	sourceCodeCredentialID := obj.Spec.SourceCodeCredentialName

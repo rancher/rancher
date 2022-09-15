@@ -43,7 +43,7 @@ func init() {
 	resource.Put(PipelineGroupVersionResource)
 }
 
-// Deprecated use v3.Pipeline instead
+// Deprecated: use v3.Pipeline instead
 type Pipeline = v3.Pipeline
 
 func NewPipeline(namespace, name string, obj v3.Pipeline) *v3.Pipeline {

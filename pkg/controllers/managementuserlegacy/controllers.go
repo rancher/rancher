@@ -18,14 +18,14 @@ import (
 	"github.com/rancher/rancher/pkg/types/config"
 )
 
-func Register(ctx context.Context, cluster *config.UserContext, clusterRec *managementv3.Cluster, kubeConfigGetter common.KubeConfigGetter) error {
-	helm.Register(ctx, cluster, kubeConfigGetter)
+func Register(ctx context.Context, mgmt *config.ScaledContext, cluster *config.UserContext, clusterRec *managementv3.Cluster, kubeConfigGetter common.KubeConfigGetter) error {
+	helm.Register(ctx, mgmt, cluster, kubeConfigGetter)
 	logging.Register(ctx, cluster)
 	cis.Register(ctx, cluster)
 	pipeline.Register(ctx, cluster)
 	systemimage.Register(ctx, cluster)
 	approuter.Register(ctx, cluster)
-	alert.Register(ctx, cluster)
+	alert.Register(ctx, mgmt, cluster)
 	globaldns.Register(ctx, cluster)
 	monitoring.Register(ctx, cluster)
 	istio.Register(ctx, cluster)

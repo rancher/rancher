@@ -56,7 +56,8 @@ var (
 		Init(driverMetadataTypes).
 		Init(driverMetadataCisTypes).
 		Init(encryptionTypes).
-		Init(fleetTypes)
+		Init(fleetTypes).
+		Init(notificationTypes)
 
 	TokenSchemas = factory.Schemas(&Version).
 			Init(tokens)
@@ -526,6 +527,7 @@ func authnTypes(schemas *types.Schemas) *types.Schemas {
 				"testAndApply": {
 					Input: "azureADConfigApplyInput",
 				},
+				"upgrade": {},
 			}
 			schema.CollectionMethods = []string{}
 			schema.ResourceMethods = []string{http.MethodGet, http.MethodPut}
@@ -745,6 +747,7 @@ func globalTypes(schema *types.Schemas) *types.Schemas {
 func alertTypes(schema *types.Schemas) *types.Schemas {
 	return schema.
 		AddMapperForType(&Version, v3.Notifier{},
+			&m.Embed{Field: "status"},
 			m.DisplayName{}).
 		MustImport(&Version, v3.ClusterAlert{}).
 		MustImport(&Version, v3.ProjectAlert{}).
@@ -959,7 +962,10 @@ func clusterTemplateTypes(schemas *types.Schemas) *types.Schemas {
 		TypeName("clusterTemplate", v3.ClusterTemplate{}).
 		TypeName("clusterTemplateRevision", v3.ClusterTemplateRevision{}).
 		AddMapperForType(&Version, v3.ClusterTemplate{}, m.Drop{Field: "namespaceId"}, m.DisplayName{}).
-		AddMapperForType(&Version, v3.ClusterTemplateRevision{}, m.Drop{Field: "namespaceId"}, m.DisplayName{}).
+		AddMapperForType(&Version, v3.ClusterTemplateRevision{},
+			m.Drop{Field: "namespaceId"},
+			&m.Embed{Field: "status"},
+			m.DisplayName{}).
 		MustImport(&Version, v3.ClusterTemplateQuestionsOutput{}).
 		MustImport(&Version, v3.ClusterTemplate{}).
 		MustImportAndCustomize(&Version, v3.ClusterTemplateRevision{}, func(schema *types.Schema) {
@@ -990,4 +996,8 @@ func encryptionTypes(schemas *types.Schemas) *types.Schemas {
 		}{}).MustImport(&Version, apiserverconfig.KMSConfiguration{}, struct {
 		Timeout string
 	}{})
+}
+
+func notificationTypes(schemas *types.Schemas) *types.Schemas {
+	return schemas.MustImport(&Version, v3.RancherUserNotification{})
 }

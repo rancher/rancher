@@ -4,6 +4,8 @@ import (
 	"strings"
 	"testing"
 
+	v1 "k8s.io/api/core/v1"
+
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
 	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2"
@@ -106,8 +108,12 @@ func createTestPlanEntry(os string) *planEntry {
 					rke2.WorkerRoleLabel:       "true",
 				},
 			},
-			Spec:   capi.MachineSpec{},
-			Status: capi.MachineStatus{},
+			Spec: capi.MachineSpec{},
+			Status: capi.MachineStatus{
+				NodeInfo: &v1.NodeSystemInfo{
+					OperatingSystem: os,
+				},
+			},
 		},
 		Metadata: &plan.Metadata{
 			Labels: map[string]string{
@@ -120,6 +126,14 @@ func createTestPlanEntry(os string) *planEntry {
 	}
 }
 
+func createTestPlanEntryWithoutRoles(os string) *planEntry {
+	entry := createTestPlanEntry(os)
+	entry.Metadata.Labels = map[string]string{
+		rke2.CattleOSLabel: os,
+	}
+	return entry
+}
+
 func findEnv(s []string, v string) bool {
 	for _, item := range s {
 		if strings.Contains(item, v) {
@@ -127,4 +141,107 @@ func findEnv(s []string, v string) bool {
 		}
 	}
 	return false
+}
+
+func Test_IsWindows(t *testing.T) {
+	a := assert.New(t)
+	data := map[string]bool{
+		"windows": true,
+		"linux":   false,
+		"":        false,
+	}
+	for k, v := range data {
+		a.Equal(v, isWindows(&planEntry{
+			Metadata: &plan.Metadata{
+				Labels: map[string]string{
+					rke2.CattleOSLabel: k,
+				},
+			},
+		}))
+	}
+}
+
+func Test_notWindows(t *testing.T) {
+	type args struct {
+		entry    *planEntry
+		expected bool
+	}
+
+	tests := []struct {
+		name string
+		args args
+	}{
+		{
+			name: "Checking that linux isn't windows",
+			args: args{
+				entry:    createTestPlanEntry("linux"),
+				expected: true,
+			},
+		},
+		{
+			name: "Checking that windows is windows",
+			args: args{
+				entry:    createTestPlanEntry("windows"),
+				expected: false,
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// arrange
+			a := assert.New(t)
+
+			// act
+			result := notWindows(tt.args.entry)
+
+			// assert
+			a.Equal(result, tt.args.expected)
+		})
+	}
+}
+
+func Test_anyRoleWithoutWindows(t *testing.T) {
+	type args struct {
+		entry    *planEntry
+		expected bool
+	}
+
+	tests := []struct {
+		name string
+		args args
+	}{
+		{
+			name: "Should return linux node with roles",
+			args: args{
+				entry:    createTestPlanEntry("linux"),
+				expected: true,
+			},
+		},
+		{
+			name: "Shouldn't return windows node.",
+			args: args{
+				entry:    createTestPlanEntry("windows"),
+				expected: false,
+			},
+		},
+		{
+			name: "Shouldn't return node without any roles.",
+			args: args{
+				entry:    createTestPlanEntryWithoutRoles("linux"),
+				expected: false,
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// arrange
+			a := assert.New(t)
+
+			// act
+			result := anyRoleWithoutWindows(tt.args.entry)
+
+			// assert
+			a.Equal(result, tt.args.expected)
+		})
+	}
 }

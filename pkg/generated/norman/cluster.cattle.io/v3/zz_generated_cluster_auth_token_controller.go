@@ -43,7 +43,7 @@ func init() {
 	resource.Put(ClusterAuthTokenGroupVersionResource)
 }
 
-// Deprecated use v3.ClusterAuthToken instead
+// Deprecated: use v3.ClusterAuthToken instead
 type ClusterAuthToken = v3.ClusterAuthToken
 
 func NewClusterAuthToken(namespace, name string, obj v3.ClusterAuthToken) *v3.ClusterAuthToken {

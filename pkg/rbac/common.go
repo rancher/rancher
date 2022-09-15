@@ -7,6 +7,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/types"
+	mgmt "github.com/rancher/rancher/pkg/apis/management.cattle.io"
 	provv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	v32 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
@@ -120,7 +121,7 @@ func GrbCRBName(grb *v3.GlobalRoleBinding) string {
 func GetGRBSubject(grb *v3.GlobalRoleBinding) rbacv1.Subject {
 	kind := "User"
 	name := grb.UserName
-	if grb.ClusterName == "" && grb.GroupPrincipalName != "" {
+	if name == "" && grb.GroupPrincipalName != "" {
 		kind = "Group"
 		name = grb.GroupPrincipalName
 	}
@@ -264,4 +265,26 @@ func gatherRules(clusterRoles k8srbacv1.ClusterRoleCache, roleTemplates v32.Role
 
 func ProvisioningClusterAdminName(cluster *provv1.Cluster) string {
 	return name.SafeConcatName("crt", cluster.Name, "cluster-owner")
+}
+
+func RuleGivesResourceAccess(rule rbacv1.PolicyRule, resourceName string) bool {
+	if !isRuleInTargetAPIGroup(rule) {
+		// if we don't list the target api group, don't bother looking for the resources
+		return false
+	}
+	for _, resource := range rule.Resources {
+		if resource == resourceName || resource == "*" {
+			return true
+		}
+	}
+	return false
+}
+
+func isRuleInTargetAPIGroup(rule rbacv1.PolicyRule) bool {
+	for _, group := range rule.APIGroups {
+		if group == mgmt.GroupName || group == "*" {
+			return true
+		}
+	}
+	return false
 }

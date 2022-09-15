@@ -4,7 +4,10 @@ from pkg_resources import packaging
 from .common import *  # NOQA
 from .test_boto_create_eks import get_eks_kubeconfig
 from .test_import_k3s_cluster import create_multiple_control_cluster
-from .test_rke_cluster_provisioning import rke_config
+from .test_import_rke2_cluster import (
+    RANCHER_RKE2_VERSION, create_rke2_multiple_control_cluster
+)
+from .test_rke_cluster_provisioning import AZURE_CLIENT_ID, AZURE_CLIENT_SECRET, rke_config
 
 # RANCHER_HA_KUBECONFIG and RANCHER_HA_HOSTNAME are provided
 # when installing Rancher into a k3s setup
@@ -34,7 +37,6 @@ RANCHER_LOCAL_CLUSTER_TYPE = os.environ.get("RANCHER_LOCAL_CLUSTER_TYPE")
 RANCHER_ADD_CUSTOM_CLUSTER = os.environ.get("RANCHER_ADD_CUSTOM_CLUSTER",
                                             "True")
 KUBERNETES_VERSION = os.environ.get("RANCHER_LOCAL_KUBERNETES_VERSION","")
-RANCHER_K3S_VERSION = os.environ.get("RANCHER_K3S_VERSION", "")
 
 kubeconfig_path = DATA_SUBDIR + "/kube_config_cluster-ha-filled.yml"
 export_cmd = "export KUBECONFIG=" + kubeconfig_path
@@ -91,6 +93,13 @@ def test_install_rancher_ha(precheck_certificate_options):
                 create_multiple_control_cluster()
             cmd = "cp {0} {1}".format(k3s_kubeconfig_path, kubeconfig_path)
             run_command_with_stderr(cmd)
+        elif RANCHER_LOCAL_CLUSTER_TYPE == "RKE2":
+            print("RKE2 cluster is provisioning for the local cluster")
+            rke2_kubeconfig_path = \
+                create_rke2_multiple_control_cluster("rke2",
+                                                     RANCHER_RKE2_VERSION)
+            cmd = "cp {0} {1}".format(rke2_kubeconfig_path, kubeconfig_path)
+            run_command_with_stderr(cmd)
         elif RANCHER_LOCAL_CLUSTER_TYPE == "EKS":
             create_resources_eks()
             eks_kubeconfig_path = get_eks_kubeconfig(resource_prefix +
@@ -109,6 +118,13 @@ def test_install_rancher_ha(precheck_certificate_options):
                 "--set ingress."
                 "extraAnnotations.\"kubernetes\\.io/ingress\\.class\"=nginx"
             )
+        elif RANCHER_LOCAL_CLUSTER_TYPE == "GKE":
+            create_gke_cluster()
+            install_gke_ingress()
+            extra_settings.append(
+                "--set ingress."
+                "extraAnnotations.\"kubernetes\\.io/ingress\\.class\"=nginx"
+            )
     else:
         write_kubeconfig()
 
@@ -123,22 +139,21 @@ def test_install_rancher_ha(precheck_certificate_options):
         print("Error: {0}".format(e))
         assert False, "check the logs in console for details"
 
-    print_kubeconfig()
-    if RANCHER_HA_HARDENED:
+    print_kubeconfig(kubeconfig_path)
+    if RANCHER_HA_HARDENED and RANCHER_LOCAL_CLUSTER_TYPE == "RKE":
         prepare_hardened_cluster(profile, kubeconfig_path)
     if RANCHER_LOCAL_CLUSTER_TYPE == "RKE":
         check_rke_ingress_rollout()
+    elif RANCHER_LOCAL_CLUSTER_TYPE in ["K3S", "RKE2"]:
+        print("Skipping ingress rollout check for k3s and rke2 clusters")
+    else:
+        check_ingress_rollout()
     if cm_install:
         install_cert_manager()
     add_repo_create_namespace()
     # Here we use helm to install the Rancher chart
     install_rancher(extra_settings=extra_settings)
-    if RANCHER_LOCAL_CLUSTER_TYPE == "EKS":
-        # For EKS we need to wait for EKS to generate the nlb and then configure
-        # a Route53 record with the ingress address value
-        set_route53_with_eks_ingress()
-    if RANCHER_LOCAL_CLUSTER_TYPE == "AKS":
-        set_route53_with_aks_ingress()
+    set_route53_with_ingress()
     wait_for_status_code(url=RANCHER_SERVER_URL + "/v3", expected_code=401)
     auth_url = \
         RANCHER_SERVER_URL + "/v3-public/localproviders/local?action=login"
@@ -146,6 +161,8 @@ def test_install_rancher_ha(precheck_certificate_options):
     admin_client = set_url_and_password(RANCHER_SERVER_URL)
     cluster = get_cluster_by_name(admin_client, "local")
     validate_cluster_state(admin_client, cluster, False)
+    print("Local HA Rancher cluster created successfully! "
+          "Access the UI via:\n{}".format(RANCHER_SERVER_URL))
     if RANCHER_ADD_CUSTOM_CLUSTER.upper() == "TRUE":
         print("creating an custom cluster")
         create_custom_cluster(admin_client)
@@ -256,33 +273,53 @@ def install_eks_ingress():
                             DATA_SUBDIR + "/eks_nlb.yml")
 
 
-def set_route53_with_eks_ingress():
-    kubectl_ingress = "kubectl get ingress -n cattle-system -o " \
-                      "jsonpath=\"" \
-                      "{.items[0].status.loadBalancer.ingress[0].hostname}\""
-    ingress_address = run_command_with_stderr(export_cmd
-                                              + " && " +
-                                              kubectl_ingress).decode()
-    AmazonWebServices().upsert_route_53_record_cname(RANCHER_HA_HOSTNAME,
-                                                     ingress_address)
-    time.sleep(60)
+def set_route53_with_ingress():
+    ingress_address = None
+    if RANCHER_LOCAL_CLUSTER_TYPE == "EKS":
+        kubectl_ingress = "kubectl get ingress -n cattle-system -o " \
+                          "jsonpath=\"" \
+                          "{.items[0].status.loadBalancer.ingress[0].hostname}\""
+        time.sleep(10)
+        ingress_address = run_command_with_stderr(export_cmd
+                                                  + " && " +
+                                                  kubectl_ingress).decode()
+        AmazonWebServices().upsert_route_53_record_cname(RANCHER_HA_HOSTNAME,
+                                                         ingress_address)
 
+    elif RANCHER_LOCAL_CLUSTER_TYPE == "AKS":
+        kubectl_ingress = "kubectl get svc -n ingress-nginx " \
+                          "ingress-nginx-controller -o " \
+                          "jsonpath=\"" \
+                          "{.status.loadBalancer.ingress[0].ip}\""
+        time.sleep(10)
+        ingress_address = run_command_with_stderr(export_cmd
+                                                  + " && " +
+                                                  kubectl_ingress).decode()
 
-def set_route53_with_aks_ingress():
-    kubectl_ingress = "kubectl get svc -n ingress-nginx " \
-                      "ingress-nginx-controller -o " \
-                      "jsonpath=\"" \
-                      "{.status.loadBalancer.ingress[0].ip}\""
-    time.sleep(10)
-    ingress_address = run_command_with_stderr(export_cmd
-                                              + " && " +
-                                              kubectl_ingress).decode()
+        AmazonWebServices().upsert_route_53_record_cname(RANCHER_HA_HOSTNAME,
+                                                         ingress_address,
+                                                         record_type='A')
+    elif RANCHER_LOCAL_CLUSTER_TYPE == "GKE":
+        kubectl_ingress = "kubectl get svc -n ingress-nginx " \
+                          "ingress-nginx-controller -o " \
+                          "jsonpath=\"" \
+                          "{.status.loadBalancer.ingress[0].ip}\""
+        time.sleep(10)
+        ingress_address = run_command_with_stderr(export_cmd
+                                                  + " && " +
+                                                  kubectl_ingress).decode()
 
-    print("AKS INGRESS ADDRESS:")
+        AmazonWebServices().upsert_route_53_record_cname(RANCHER_HA_HOSTNAME,
+                                                         ingress_address,
+                                                         record_type='A')
+    elif RANCHER_LOCAL_CLUSTER_TYPE in ["RKE", "K3S", "RKE2"]:
+        return
+    else:
+        pytest.fail("Wrong RANCHER_LOCAL_CLUSTER_TYPE: {}"
+                    .format(RANCHER_LOCAL_CLUSTER_TYPE))
+
+    print("INGRESS ADDRESS:")
     print(ingress_address)
-    AmazonWebServices().upsert_route_53_record_cname(RANCHER_HA_HOSTNAME,
-                                                     ingress_address,
-                                                     record_type='A')
     time.sleep(60)
 
 
@@ -412,6 +449,18 @@ def create_rke_cluster(config_path):
     run_command_with_stderr(rke_cmd)
 
 
+def check_ingress_rollout():
+    run_command_with_stderr(
+        export_cmd + " && " +
+        "kubectl -n ingress-nginx rollout status deploy/ingress-nginx-controller")
+    run_command_with_stderr(
+        export_cmd + " && " +
+        "kubectl -n ingress-nginx wait --for=condition=complete job/ingress-nginx-admission-create")
+    run_command_with_stderr(
+        export_cmd + " && " +
+        "kubectl -n ingress-nginx wait --for=condition=complete job/ingress-nginx-admission-patch")
+
+
 def check_rke_ingress_rollout():
     rke_version = run_command_with_stderr('rke -v | cut -d " " -f 3')
     rke_version = ''.join(rke_version.decode('utf-8').split())
@@ -431,16 +480,6 @@ def check_rke_ingress_rollout():
             run_command_with_stderr(
                 export_cmd + " && " +
                 "kubectl -n ingress-nginx wait --for=condition=complete job/ingress-nginx-admission-patch")
-
-
-def print_kubeconfig():
-    kubeconfig_file = open(kubeconfig_path, "r")
-    kubeconfig_contents = kubeconfig_file.read()
-    kubeconfig_file.close()
-    kubeconfig_contents_encoded = base64.b64encode(
-        kubeconfig_contents.encode("utf-8")).decode("utf-8")
-    print("\n\n" + kubeconfig_contents + "\n\n")
-    print("\nBase64 encoded: \n\n" + kubeconfig_contents_encoded + "\n\n")
 
 
 def create_rke_cluster_config(aws_nodes):
@@ -464,7 +503,7 @@ def create_rke_cluster_config(aws_nodes):
 
     rkeconfig = rkeconfig.replace("$AWS_SSH_KEY_NAME", AWS_SSH_KEY_NAME)
     rkeconfig = rkeconfig.replace("$KUBERNETES_VERSION", KUBERNETES_VERSION)
-    
+
     if RANCHER_HA_HARDENED:
         rkeconfig_hardened = readDataFile(DATA_SUBDIR, "hardened-cluster.yml")
         rkeconfig += "\n"
@@ -483,15 +522,23 @@ def create_aks_cluster():
     tf_dir = DATA_SUBDIR + "/" + "terraform/aks"
     aks_k8_s_version = os.environ.get('RANCHER_AKS_K8S_VERSION', '')
     aks_location = os.environ.get('RANCHER_AKS_LOCATION', '')
-    client_id = os.environ.get('ARM_CLIENT_ID', '')
-    client_secret = os.environ.get('ARM_CLIENT_SECRET', '')
+    client_id = os.environ.get('AZURE_CLIENT_ID', '')
+    client_secret = os.environ.get('AZURE_CLIENT_SECRET', '')
 
     tf = Terraform(working_dir=tf_dir,
                    variables={'kubernetes_version': aks_k8_s_version,
                               'location': aks_location,
-                              'client_id': client_id,
-                              'client_secret': client_secret,
                               'cluster_name': resource_prefix})
+
+    tffile = tf_dir + "/aks.tf"
+
+    config = readDataFile(DATA_SUBDIR, tffile)
+    config = config.replace('id_placeholder', AZURE_CLIENT_ID)
+    config = config.replace('secret_placeholder', AZURE_CLIENT_SECRET)
+
+    f = open(tffile, "w")
+    f.write(config)
+    f.close()
 
     print("Creating cluster")
     tf.init()
@@ -504,9 +551,39 @@ def create_aks_cluster():
         kubefile.write(out_string)
 
 
+def create_gke_cluster():
+    tf_dir = DATA_SUBDIR + "/" + "terraform/gke"
+    credentials = os.environ.get('RANCHER_GKE_CREDENTIAL', '')
+    gke_k8_s_version = os.environ.get('RANCHER_GKE_K8S_VERSION', '')
+
+    tf = Terraform(working_dir=tf_dir,
+                   variables={'kubernetes_version': gke_k8_s_version,
+                              'credentials': credentials,
+                              'cluster_name': resource_prefix})
+
+    print("Creating cluster")
+    tf.init()
+    print(tf.plan(out="gks_plan_server.out"))
+    print("\n\n")
+    print(tf.apply("--auto-approve"))
+    print("\n\n")
+    out_string = tf.output("kube_config", full_value=True)
+    print("GKE KUBECONFIG")
+    print("\n\n")
+    print(out_string)
+    print("\n\n")
+    with open(kubeconfig_path, "w") as kubefile:
+        kubefile.write(out_string)
+
+
 def install_aks_ingress():
     run_command_with_stderr(export_cmd + " && kubectl apply -f " +
                             DATA_SUBDIR + "/aks_nlb.yml")
+
+
+def install_gke_ingress():
+    run_command_with_stderr(export_cmd + " && kubectl apply -f " +
+                            DATA_SUBDIR + "/gke_nlb.yml")
 
 
 @pytest.fixture(scope='module')

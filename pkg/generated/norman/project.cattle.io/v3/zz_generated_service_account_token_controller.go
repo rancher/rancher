@@ -43,7 +43,7 @@ func init() {
 	resource.Put(ServiceAccountTokenGroupVersionResource)
 }
 
-// Deprecated use v3.ServiceAccountToken instead
+// Deprecated: use v3.ServiceAccountToken instead
 type ServiceAccountToken = v3.ServiceAccountToken
 
 func NewServiceAccountToken(namespace, name string, obj v3.ServiceAccountToken) *v3.ServiceAccountToken {

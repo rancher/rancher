@@ -39,7 +39,6 @@ type ClusterStatus struct {
 	AgentDeployed      bool                                `json:"agentDeployed,omitempty"`
 	ObservedGeneration int64                               `json:"observedGeneration"`
 	Conditions         []genericcondition.GenericCondition `json:"conditions,omitempty"`
-	ETCDSnapshots      []rkev1.ETCDSnapshot                `json:"etcdSnapshots,omitempty"`
 }
 
 type ImportedConfig struct {

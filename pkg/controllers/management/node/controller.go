@@ -21,6 +21,7 @@ import (
 	"github.com/rancher/rancher/pkg/clustermanager"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/clusterregistrationtoken"
 	"github.com/rancher/rancher/pkg/controllers/management/drivers/nodedriver"
+	"github.com/rancher/rancher/pkg/controllers/management/secretmigrator"
 	"github.com/rancher/rancher/pkg/encryptedstore"
 	corev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
@@ -45,12 +46,10 @@ import (
 )
 
 const (
-	defaultEngineInstallURL            = "https://releases.rancher.com/install-docker/17.03.2.sh"
-	amazonec2                          = "amazonec2"
-	userNodeRemoveCleanupAnnotation    = "cleanup.cattle.io/user-node-remove"
-	userNodeRemoveCleanupAnnotationOld = "nodes.management.cattle.io/user-node-remove-cleanup"
-	userNodeRemoveFinalizerPrefix      = "clusterscoped.controller.cattle.io/user-node-remove_"
-	userNodeRemoveAnnotationPrefix     = "lifecycle.cattle.io/create.user-node-remove_"
+	defaultEngineInstallURL         = "https://releases.rancher.com/install-docker/17.03.2.sh"
+	amazonec2                       = "amazonec2"
+	userNodeRemoveCleanupAnnotation = "cleanup.cattle.io/user-node-remove"
+	userNodeRemoveFinalizerPrefix   = "clusterscoped.controller.cattle.io/user-node-remove_"
 )
 
 // SchemaToDriverFields maps Schema field => driver field
@@ -64,6 +63,7 @@ var SchemaToDriverFields = map[string]map[string]string{
 	"openstack":     {"cacert": "cacert", "privateKeyFile": "privateKeyFile", "userDataFile": "userDataFile"},
 	"otc":           {"privateKeyFile": "privateKeyFile"},
 	"packet":        {"userdata": "userdata"},
+	"pod":           {"userdata": "userdata"},
 	"vmwarevsphere": {"cloudConfig": "cloud-config"},
 	"google":        {"authEncodedJson": "authEncodedJson"},
 }
@@ -118,7 +118,7 @@ type Lifecycle struct {
 	devMode                   bool
 }
 
-func (m *Lifecycle) setupCustom(obj *v3.Node) {
+func (m *Lifecycle) setupCustom(obj *v32.Node) {
 	obj.Status.NodeConfig = &rketypes.RKEConfigNode{
 		NodeName:         obj.Namespace + ":" + obj.Name,
 		HostnameOverride: obj.Spec.RequestedHostname,
@@ -145,16 +145,16 @@ func (m *Lifecycle) setupCustom(obj *v3.Node) {
 	}
 }
 
-func isCustom(obj *v3.Node) bool {
+func isCustom(obj *v32.Node) bool {
 	return obj.Spec.CustomConfig != nil && obj.Spec.CustomConfig.Address != ""
 }
 
-func (m *Lifecycle) setWaiting(node *v3.Node) {
+func (m *Lifecycle) setWaiting(node *v32.Node) {
 	v32.NodeConditionRegistered.IsUnknown(node)
 	v32.NodeConditionRegistered.Message(node, "waiting to register with Kubernetes")
 }
 
-func (m *Lifecycle) Create(obj *v3.Node) (runtime.Object, error) {
+func (m *Lifecycle) Create(obj *v32.Node) (runtime.Object, error) {
 	if isCustom(obj) {
 		m.setupCustom(obj)
 		newObj, err := v32.NodeConditionInitialized.Once(obj, func() (runtime.Object, error) {
@@ -164,7 +164,7 @@ func (m *Lifecycle) Create(obj *v3.Node) (runtime.Object, error) {
 			m.setWaiting(obj)
 			return obj, nil
 		})
-		return newObj.(*v3.Node), err
+		return newObj.(*v32.Node), err
 	}
 
 	if obj.Spec.NodeTemplateName == "" {
@@ -172,7 +172,7 @@ func (m *Lifecycle) Create(obj *v3.Node) (runtime.Object, error) {
 	}
 
 	newObj, err := v32.NodeConditionInitialized.Once(obj, func() (runtime.Object, error) {
-		logrus.Debugf("Called v3.NodeConditionInitialized.Once for [%s] in namespace [%s]", obj.Name, obj.Namespace)
+		logrus.Debugf("Called v32.NodeConditionInitialized.Once for [%s] in namespace [%s]", obj.Name, obj.Namespace)
 		// Ensure jail is created first, else the function `NewNodeConfig` will create the full jail path (including parent jail directory) and CreateJail will remove the directory as it does not contain a done file
 		if !m.devMode {
 			err := jailer.CreateJail(obj.Namespace)
@@ -209,21 +209,21 @@ func (m *Lifecycle) Create(obj *v3.Node) (runtime.Object, error) {
 		return obj, nil
 	})
 
-	return newObj.(*v3.Node), err
+	return newObj.(*v32.Node), err
 }
 
-func (m *Lifecycle) getNodeTemplate(nodeTemplateName string) (*v3.NodeTemplate, error) {
+func (m *Lifecycle) getNodeTemplate(nodeTemplateName string) (*v32.NodeTemplate, error) {
 	ns, n := ref.Parse(nodeTemplateName)
 	logrus.Debugf("getNodeTemplate parsed [%s] to ns: [%s] and n: [%s]", nodeTemplateName, ns, n)
 	return m.nodeTemplateClient.GetNamespaced(ns, n, metav1.GetOptions{})
 }
 
-func (m *Lifecycle) getNodePool(nodePoolName string) (*v3.NodePool, error) {
+func (m *Lifecycle) getNodePool(nodePoolName string) (*v32.NodePool, error) {
 	ns, p := ref.Parse(nodePoolName)
 	return m.nodePoolLister.Get(ns, p)
 }
 
-func (m *Lifecycle) Remove(obj *v3.Node) (runtime.Object, error) {
+func (m *Lifecycle) Remove(obj *v32.Node) (runtime.Object, error) {
 	if obj.Status.NodeTemplateSpec == nil {
 		if err := m.cleanRKENode(obj); err != nil {
 			return obj, err
@@ -284,13 +284,13 @@ func (m *Lifecycle) Remove(obj *v3.Node) (runtime.Object, error) {
 	})
 
 	if err != nil {
-		return newObj.(*v3.Node), err
+		return newObj.(*v32.Node), err
 	}
 
-	return m.deleteV1Node(newObj.(*v3.Node))
+	return m.deleteV1Node(newObj.(*v32.Node))
 }
 
-func (m *Lifecycle) provision(driverConfig, nodeDir string, obj *v3.Node) (*v3.Node, error) {
+func (m *Lifecycle) provision(driverConfig, nodeDir string, obj *v32.Node) (*v32.Node, error) {
 	configRawMap := map[string]interface{}{}
 	if err := json.Unmarshal([]byte(driverConfig), &configRawMap); err != nil {
 		return obj, errors.Wrap(err, "failed to unmarshal node config")
@@ -402,7 +402,7 @@ func aliasToPath(driver string, config map[string]interface{}, ns string) error 
 	return nil
 }
 
-func (m *Lifecycle) deployAgent(nodeDir string, obj *v3.Node) error {
+func (m *Lifecycle) deployAgent(nodeDir string, obj *v32.Node) error {
 	token, err := m.systemAccountManager.GetOrCreateSystemClusterToken(obj.Namespace)
 	if err != nil {
 		return err
@@ -413,7 +413,13 @@ func (m *Lifecycle) deployAgent(nodeDir string, obj *v3.Node) error {
 		return err
 	}
 
-	err = m.authenticateRegistry(nodeDir, obj, cluster)
+	// make a deep copy of the cluster, so we are not modifying the original cluster object
+	clusterCopy := cluster.DeepCopy()
+	clusterCopy.Spec, err = secretmigrator.AssembleRKEConfigSpec(clusterCopy, clusterCopy.Spec, m.credLister)
+	if err != nil {
+		return err
+	}
+	err = m.authenticateRegistry(nodeDir, obj, clusterCopy)
 	if err != nil {
 		return err
 	}
@@ -438,7 +444,7 @@ func (m *Lifecycle) deployAgent(nodeDir string, obj *v3.Node) error {
 
 // authenticateRegistry authenticates the machine to a private registry if one is defined on the cluster
 // this enables the agent image to be pulled from the private registry
-func (m *Lifecycle) authenticateRegistry(nodeDir string, node *v3.Node, cluster *v3.Cluster) error {
+func (m *Lifecycle) authenticateRegistry(nodeDir string, node *v32.Node, cluster *v32.Cluster) error {
 	reg := util.GetPrivateRepo(cluster)
 	// if there is no private registry defined or there is a registry without credentials, return since auth is not needed
 	if reg == nil || reg.User == "" || reg.Password == "" {
@@ -464,7 +470,7 @@ func (m *Lifecycle) authenticateRegistry(nodeDir string, node *v3.Node, cluster 
 	return nil
 }
 
-func (m *Lifecycle) ready(obj *v3.Node) (*v3.Node, error) {
+func (m *Lifecycle) ready(obj *v32.Node) (*v32.Node, error) {
 	config, err := nodeconfig.NewNodeConfig(m.secretStore, obj)
 	if err != nil {
 		return obj, err
@@ -500,26 +506,26 @@ outer:
 		case err = <-done:
 			break outer
 		case <-time.After(5 * time.Second):
-			config.Save()
+			_ = config.Save()
 		}
 	}
 
 	newObj, saveError := v32.NodeConditionConfigSaved.Once(obj, func() (runtime.Object, error) {
 		return m.saveConfig(config, config.FullDir(), obj)
 	})
-	obj = newObj.(*v3.Node)
+	obj = newObj.(*v32.Node)
 	if err == nil {
 		return obj, saveError
 	}
 	return obj, err
 }
 
-func (m *Lifecycle) sync(key string, obj *v3.Node) (runtime.Object, error) {
-	if obj == nil || obj.DeletionTimestamp != nil {
+func (m *Lifecycle) sync(_ string, obj *v32.Node) (runtime.Object, error) {
+	if obj == nil {
 		return nil, nil
 	}
 
-	if cleanupAnnotation, ok := obj.Annotations[userNodeRemoveCleanupAnnotation]; !ok || cleanupAnnotation != "true" {
+	if obj.Annotations[userNodeRemoveCleanupAnnotation] != "true" {
 		// finalizer from user-node-remove has to be checked/cleaned
 		return m.userNodeRemoveCleanup(obj)
 	}
@@ -527,7 +533,7 @@ func (m *Lifecycle) sync(key string, obj *v3.Node) (runtime.Object, error) {
 	return obj, nil
 }
 
-func (m *Lifecycle) Updated(obj *v3.Node) (runtime.Object, error) {
+func (m *Lifecycle) Updated(obj *v32.Node) (runtime.Object, error) {
 	newObj, err := v32.NodeConditionProvisioned.Once(obj, func() (runtime.Object, error) {
 		if obj.Status.NodeTemplateSpec == nil {
 			m.setWaiting(obj)
@@ -548,10 +554,10 @@ func (m *Lifecycle) Updated(obj *v3.Node) (runtime.Object, error) {
 		}
 		return obj, err
 	})
-	return newObj.(*v3.Node), err
+	return newObj.(*v32.Node), err
 }
 
-func (m *Lifecycle) saveConfig(config *nodeconfig.NodeConfig, nodeDir string, obj *v3.Node) (*v3.Node, error) {
+func (m *Lifecycle) saveConfig(config *nodeconfig.NodeConfig, nodeDir string, obj *v32.Node) (*v32.Node, error) {
 	logrus.Infof("Generating and uploading node config %s", obj.Spec.RequestedHostname)
 	if err := config.Save(); err != nil {
 		return obj, err
@@ -562,7 +568,7 @@ func (m *Lifecycle) saveConfig(config *nodeconfig.NodeConfig, nodeDir string, ob
 		return obj, err
 	}
 
-	interalAddress, err := config.InternalIP()
+	internalAddress, err := config.InternalIP()
 	if err != nil {
 		return obj, err
 	}
@@ -582,7 +588,7 @@ func (m *Lifecycle) saveConfig(config *nodeconfig.NodeConfig, nodeDir string, ob
 		return obj, err
 	}
 
-	if err := config.Save(); err != nil {
+	if err = config.Save(); err != nil {
 		return obj, err
 	}
 
@@ -599,7 +605,7 @@ func (m *Lifecycle) saveConfig(config *nodeconfig.NodeConfig, nodeDir string, ob
 	obj.Status.NodeConfig = &rketypes.RKEConfigNode{
 		NodeName:         obj.Namespace + ":" + obj.Name,
 		Address:          ip,
-		InternalAddress:  interalAddress,
+		InternalAddress:  internalAddress,
 		User:             sshUser,
 		Role:             roles(obj),
 		HostnameOverride: obj.Spec.RequestedHostname,
@@ -621,7 +627,7 @@ func (m *Lifecycle) saveConfig(config *nodeconfig.NodeConfig, nodeDir string, ob
 	expectTaints := pool.Spec.NodeTaints
 
 	for key, ti := range templateSet {
-		// the expect taints are based on the node pool. so we don't need to set taints with same key and effect by template because
+		// the expected taints are based on the node pool. so we don't need to set taints with same key and effect by template because
 		// the taints from node pool should override the taints from template.
 		if _, ok := nodeSet[key]; !ok {
 			expectTaints = append(expectTaints, template.Spec.NodeTaints[ti])
@@ -632,7 +638,7 @@ func (m *Lifecycle) saveConfig(config *nodeconfig.NodeConfig, nodeDir string, ob
 	return obj, nil
 }
 
-func (m *Lifecycle) refreshNodeConfig(nc *nodeconfig.NodeConfig, obj *v3.Node) error {
+func (m *Lifecycle) refreshNodeConfig(nc *nodeconfig.NodeConfig, obj *v32.Node) error {
 	template, err := m.getNodeTemplate(obj.Spec.NodeTemplateName)
 	if err != nil {
 		return err
@@ -690,7 +696,7 @@ func (m *Lifecycle) refreshNodeConfig(nc *nodeconfig.NodeConfig, obj *v3.Node) e
 	return nil
 }
 
-func (m *Lifecycle) isNodeInAppliedSpec(node *v3.Node) (bool, error) {
+func (m *Lifecycle) isNodeInAppliedSpec(node *v32.Node) (bool, error) {
 	// worker/controlplane nodes can just be immediately deleted
 	if !node.Spec.Etcd {
 		return false, nil
@@ -725,7 +731,7 @@ func (m *Lifecycle) isNodeInAppliedSpec(node *v3.Node) (bool, error) {
 	return false, nil
 }
 
-func validateCustomHost(obj *v3.Node) error {
+func validateCustomHost(obj *v32.Node) error {
 	if obj.Spec.Imported {
 		return nil
 	}
@@ -750,7 +756,7 @@ func validateCustomHost(obj *v3.Node) error {
 	return nil
 }
 
-func roles(node *v3.Node) []string {
+func roles(node *v32.Node) []string {
 	var roles []string
 	if node.Spec.Etcd {
 		roles = append(roles, "etcd")
@@ -789,7 +795,7 @@ func (m *Lifecycle) setCredFields(data interface{}, fields map[string]v32.Field,
 	return nil
 }
 
-func (m *Lifecycle) updateRawConfigFromCredential(data map[string]interface{}, rawConfig interface{}, template *v3.NodeTemplate) error {
+func (m *Lifecycle) updateRawConfigFromCredential(data map[string]interface{}, rawConfig interface{}, template *v32.NodeTemplate) error {
 	credID := convert.ToString(values.GetValueN(data, "spec", "cloudCredentialName"))
 	if credID != "" {
 		existingSchema, err := m.schemaLister.Get("", template.Spec.Driver+"config")

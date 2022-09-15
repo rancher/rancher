@@ -40,6 +40,7 @@ type Manager struct {
 	bundledMode           bool
 	ConfigMap             corev1.ConfigMapInterface
 	ConfigMapLister       corev1.ConfigMapLister
+	SecretLister          corev1.SecretLister
 }
 
 type CatalogManager interface {
@@ -72,6 +73,7 @@ func New(management v3.Interface, project projectv3.Interface, core corev1.Inter
 		bundledMode:           bundledMode,
 		ConfigMap:             core.ConfigMaps(""),
 		ConfigMapLister:       core.ConfigMaps("").Controller().Lister(),
+		SecretLister:          core.Secrets("").Controller().Lister(),
 	}
 }
 

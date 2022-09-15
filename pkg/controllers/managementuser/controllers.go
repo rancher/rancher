@@ -26,7 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
-func Register(ctx context.Context, cluster *config.UserContext, clusterRec *managementv3.Cluster, kubeConfigGetter common.KubeConfigGetter) error {
+func Register(ctx context.Context, mgmt *config.ScaledContext, cluster *config.UserContext, clusterRec *managementv3.Cluster, kubeConfigGetter common.KubeConfigGetter) error {
 	rbac.Register(ctx, cluster)
 	healthsyncer.Register(ctx, cluster)
 	networkpolicy.Register(ctx, cluster)
@@ -38,9 +38,7 @@ func Register(ctx context.Context, cluster *config.UserContext, clusterRec *mana
 	windows.Register(ctx, clusterRec, cluster)
 	nsserviceaccount.Register(ctx, cluster)
 	if features.RKE2.Enabled() {
-		if err := snapshotbackpopulate.Register(ctx, cluster); err != nil {
-			return err
-		}
+		snapshotbackpopulate.Register(ctx, cluster)
 		pspdelete.Register(ctx, cluster)
 		machinerole.Register(ctx, cluster)
 	}
@@ -63,7 +61,7 @@ func Register(ctx context.Context, cluster *config.UserContext, clusterRec *mana
 	cluster.Core.Secrets("").Controller()
 	cluster.Core.ServiceAccounts("").Controller()
 
-	return managementuserlegacy.Register(ctx, cluster, clusterRec, kubeConfigGetter)
+	return managementuserlegacy.Register(ctx, mgmt, cluster, clusterRec, kubeConfigGetter)
 }
 
 func RegisterFollower(ctx context.Context, cluster *config.UserContext, kubeConfigGetter common.KubeConfigGetter, clusterManager healthsyncer.ClusterControllerLifecycle) error {

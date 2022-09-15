@@ -34,9 +34,9 @@ var (
 	}
 )
 
-func Register(ctx context.Context, cluster *config.UserContext) {
+func Register(ctx context.Context, mgmt *config.ScaledContext, cluster *config.UserContext) {
 	starter := cluster.DeferredStart(ctx, func(ctx context.Context) error {
-		registerDeferred(ctx, cluster)
+		registerDeferred(ctx, mgmt, cluster)
 		return nil
 	})
 
@@ -62,7 +62,7 @@ func AddStarter(ctx context.Context, cluster *config.UserContext, starter func()
 	})
 }
 
-func registerDeferred(ctx context.Context, cluster *config.UserContext) {
+func registerDeferred(ctx context.Context, mgmt *config.ScaledContext, cluster *config.UserContext) {
 	alertmanager := manager.NewAlertManager(cluster)
 
 	prometheusCRDManager := manager.NewPrometheusCRDManager(ctx, cluster)
@@ -82,7 +82,7 @@ func registerDeferred(ctx context.Context, cluster *config.UserContext) {
 	clusterAlertRules.AddClusterScopedHandler(ctx, "cluster-alert-rule-deployer", cluster.ClusterName, deploy.ClusterRuleSync)
 	projectAlertRules.AddClusterScopedHandler(ctx, "project-alert-rule-deployer", cluster.ClusterName, deploy.ProjectRuleSync)
 
-	configSyncer := configsyncer.NewConfigSyncer(ctx, cluster, alertmanager, prometheusCRDManager)
+	configSyncer := configsyncer.NewConfigSyncer(ctx, mgmt, cluster, alertmanager, prometheusCRDManager)
 	clusterAlertGroups.AddClusterScopedHandler(ctx, "cluster-alert-group-controller", cluster.ClusterName, configSyncer.ClusterGroupSync)
 	projectAlertGroups.AddClusterScopedHandler(ctx, "project-alert-group-controller", cluster.ClusterName, configSyncer.ProjectGroupSync)
 

@@ -11,7 +11,7 @@ type Client struct {
 	catalogClientV1.CatalogV1Interface
 }
 
-// NewForConfig creates a new CatalogV1Client for the given config. I
+// NewForConfig creates a new CatalogV1Client for the given config.
 func NewForConfig(c *rest.Config, ts *session.Session) (*Client, error) {
 	catalogClient, err := catalogClientV1.NewForConfig(c)
 	if err != nil {

@@ -12,6 +12,7 @@ const (
 	HarvesterMachingConfigConfigurationFileKey = "harvesterMachineConfig"
 )
 
+// HarvesterMachineConfig is configuration needed to create an rke-machine-config.cattle.io.harvesterconfig
 type HarvesterMachineConfig struct {
 	DiskSize    string `json:"diskSize" yaml:"diskSize"`
 	CPUCount    string `json:"cpuCount" yaml:"cpuCount"`

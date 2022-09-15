@@ -24,7 +24,7 @@ import (
 )
 
 func Register(ctx context.Context, scaledContext *config.ScaledContext, clusterManager *clustermanager.Manager, server *normanapi.Server) error {
-	if err := registerIndexers(ctx, scaledContext); err != nil {
+	if err := registerIndexers(scaledContext); err != nil {
 		return err
 	}
 
@@ -37,26 +37,26 @@ func Register(ctx context.Context, scaledContext *config.ScaledContext, clusterM
 	return nil
 }
 
-func registerIndexers(ctx context.Context, scaledContext *config.ScaledContext) error {
-	if err := clusterauthtoken.RegisterIndexers(ctx, scaledContext); err != nil {
+func registerIndexers(scaledContext *config.ScaledContext) error {
+	if err := clusterauthtoken.RegisterIndexers(scaledContext); err != nil {
 		return err
 	}
-	if err := rbac.RegisterIndexers(ctx, scaledContext); err != nil {
+	if err := rbac.RegisterIndexers(scaledContext); err != nil {
 		return err
 	}
-	if err := monitoring.RegisterIndexers(ctx, scaledContext); err != nil {
+	if err := monitoring.RegisterIndexers(scaledContext); err != nil {
 		return err
 	}
-	if err := auth.RegisterIndexers(ctx, scaledContext); err != nil {
+	if err := auth.RegisterIndexers(scaledContext); err != nil {
 		return err
 	}
-	if err := tokens.RegisterIndexer(ctx, scaledContext); err != nil {
+	if err := tokens.RegisterIndexer(scaledContext); err != nil {
 		return err
 	}
-	if err := podsecuritypolicy.RegisterIndexers(ctx, scaledContext); err != nil {
+	if err := podsecuritypolicy.RegisterIndexers(scaledContext); err != nil {
 		return err
 	}
-	if err := podsecuritypolicy2.RegisterIndexers(ctx, scaledContext); err != nil {
+	if err := podsecuritypolicy2.RegisterIndexers(scaledContext); err != nil {
 		return err
 	}
 	cluster.RegisterIndexers(scaledContext)

@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
+	"github.com/rancher/rancher/pkg/settings"
 	"github.com/sirupsen/logrus"
 )
 
@@ -38,6 +39,18 @@ func (d *DynamicDriver) Install() error {
 		return nil
 	}
 
+	if err := d.copyTo(d.binName()); err != nil {
+		return err
+	}
+
+	if os.Getenv("CATTLE_DEV_MODE") != "" {
+		return nil
+	}
+
+	return d.copyTo(fmt.Sprintf("%s/assets/%s", settings.UIPath.Get(), d.DriverName))
+}
+
+func (d *BaseDriver) copyTo(dest string) error {
 	binaryPath := d.binName()
 	tmpPath := binaryPath + "-tmp"
 	f, err := os.OpenFile(tmpPath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0755)
@@ -58,10 +71,11 @@ func (d *DynamicDriver) Install() error {
 		return errors.Wrapf(err, "Couldn't copy %v to %v", d.srcBinName(), tmpPath)
 	}
 
-	err = os.Rename(tmpPath, binaryPath)
+	err = os.Rename(tmpPath, dest)
 	if err != nil {
-		return errors.Wrapf(err, "Couldn't copy driver %v to %v", d.Name(), binaryPath)
+		return errors.Wrapf(err, "Couldn't copy driver %v to %v", d.Name(), dest)
 	}
+
 	return nil
 }
 
@@ -80,9 +94,13 @@ func (d *BaseDriver) Executable() error {
 	if err != nil {
 		return fmt.Errorf("Driver %s not found", binaryPath)
 	}
-	err = exec.Command(binaryPath).Start()
+	cmd := exec.Command(binaryPath)
+	err = cmd.Start()
 	if err != nil {
 		return errors.Wrapf(err, "Driver binary %s couldn't execute", binaryPath)
 	}
+
+	// We don't care about the exit code, just want to make sure we can execute the binary
+	_ = cmd.Wait()
 	return nil
 }

@@ -44,9 +44,9 @@ const (
 	defaultMaxRevisionCount   = 10
 )
 
-func Register(ctx context.Context, user *config.UserContext, kubeConfigGetter common.KubeConfigGetter) {
+func Register(ctx context.Context, mgmt *config.ScaledContext, user *config.UserContext, kubeConfigGetter common.KubeConfigGetter) {
 	starter := user.DeferredStart(ctx, func(ctx context.Context) error {
-		registerDeferred(ctx, user, kubeConfigGetter)
+		registerDeferred(ctx, mgmt, user, kubeConfigGetter)
 		return nil
 	})
 
@@ -56,7 +56,7 @@ func Register(ctx context.Context, user *config.UserContext, kubeConfigGetter co
 	})
 }
 
-func registerDeferred(ctx context.Context, user *config.UserContext, kubeConfigGetter common.KubeConfigGetter) {
+func registerDeferred(ctx context.Context, mgmt *config.ScaledContext, user *config.UserContext, kubeConfigGetter common.KubeConfigGetter) {
 	appClient := user.Management.Project.Apps("")
 	stackLifecycle := &Lifecycle{
 		KubeConfigGetter:      kubeConfigGetter,
@@ -77,6 +77,7 @@ func registerDeferred(ctx context.Context, user *config.UserContext, kubeConfigG
 		AppsLister:            user.Management.Project.Apps("").Controller().Lister(),
 		NsLister:              user.Core.Namespaces("").Controller().Lister(),
 		NsClient:              user.Core.Namespaces(""),
+		SecretLister:          mgmt.Core.Secrets("").Controller().Lister(),
 	}
 	appClient.AddClusterScopedLifecycle(ctx, "helm-controller", user.ClusterName, stackLifecycle)
 
@@ -103,6 +104,7 @@ type Lifecycle struct {
 	AppsLister            v3.AppLister
 	NsLister              corev1.NamespaceLister
 	NsClient              corev1.NamespaceInterface
+	SecretLister          corev1.SecretLister
 }
 
 func (l *Lifecycle) Create(obj *v3.App) (runtime.Object, error) {

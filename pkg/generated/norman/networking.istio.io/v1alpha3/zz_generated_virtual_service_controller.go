@@ -43,7 +43,7 @@ func init() {
 	resource.Put(VirtualServiceGroupVersionResource)
 }
 
-// Deprecated use v1alpha3.VirtualService instead
+// Deprecated: use v1alpha3.VirtualService instead
 type VirtualService = v1alpha3.VirtualService
 
 func NewVirtualService(namespace, name string, obj v1alpha3.VirtualService) *v1alpha3.VirtualService {

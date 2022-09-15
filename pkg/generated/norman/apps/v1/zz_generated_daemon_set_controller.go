@@ -43,7 +43,7 @@ func init() {
 	resource.Put(DaemonSetGroupVersionResource)
 }
 
-// Deprecated use v1.DaemonSet instead
+// Deprecated: use v1.DaemonSet instead
 type DaemonSet = v1.DaemonSet
 
 func NewDaemonSet(namespace, name string, obj v1.DaemonSet) *v1.DaemonSet {

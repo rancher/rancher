@@ -6,20 +6,21 @@ import (
 	"github.com/rancher/channelserver/pkg/model"
 	"github.com/rancher/norman/types/convert"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
-	"github.com/rancher/rancher/pkg/channelserver"
 	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2"
 )
 
 func filterConfigData(config map[string]interface{}, controlPlane *rkev1.RKEControlPlane, entry *planEntry) {
 	var (
 		isServer = isControlPlane(entry) || isEtcd(entry)
-		release  = channelserver.GetReleaseConfigByRuntimeAndVersion(context.TODO(),
-			rke2.GetRuntime(controlPlane.Spec.KubernetesVersion),
-			controlPlane.Spec.KubernetesVersion)
+		release  = rke2.GetKDMReleaseData(context.TODO(), controlPlane)
 	)
 
+	if release == nil {
+		return
+	}
+
 	for k, v := range config {
-		if newV, ok := filterField(isServer, k, v, release); ok {
+		if newV, ok := filterField(isServer, k, v, *release); ok {
 			config[k] = newV
 		} else {
 			delete(config, k)

@@ -73,7 +73,7 @@ func (h *handler) deployPlans(cluster *v3.Cluster, isK3s, isRke2 bool) error {
 			}
 			plan.Spec.NodeSelector.MatchExpressions = append(plan.Spec.NodeSelector.MatchExpressions, lsr)
 
-			_, err = planClient.Update(context.TODO(), &plan, metav1.UpdateOptions{})
+			_, err = planConfig.Plans(plan.Namespace).Update(context.TODO(), &plan, metav1.UpdateOptions{})
 			if err != nil {
 				return err
 			}

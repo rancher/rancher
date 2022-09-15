@@ -8,6 +8,7 @@ const (
 	ProbeType                               = "probe"
 	ProbeFieldCommand                       = "command"
 	ProbeFieldFailureThreshold              = "failureThreshold"
+	ProbeFieldGRPC                          = "grpc"
 	ProbeFieldHTTPHeaders                   = "httpHeaders"
 	ProbeFieldHost                          = "host"
 	ProbeFieldInitialDelaySeconds           = "initialDelaySeconds"
@@ -24,6 +25,7 @@ const (
 type Probe struct {
 	Command                       []string           `json:"command,omitempty" yaml:"command,omitempty"`
 	FailureThreshold              int64              `json:"failureThreshold,omitempty" yaml:"failureThreshold,omitempty"`
+	GRPC                          *GRPCAction        `json:"grpc,omitempty" yaml:"grpc,omitempty"`
 	HTTPHeaders                   []HTTPHeader       `json:"httpHeaders,omitempty" yaml:"httpHeaders,omitempty"`
 	Host                          string             `json:"host,omitempty" yaml:"host,omitempty"`
 	InitialDelaySeconds           int64              `json:"initialDelaySeconds,omitempty" yaml:"initialDelaySeconds,omitempty"`

@@ -43,7 +43,7 @@ func init() {
 	resource.Put(EndpointsGroupVersionResource)
 }
 
-// Deprecated use v1.Endpoints instead
+// Deprecated: use v1.Endpoints instead
 type Endpoints = v1.Endpoints
 
 func NewEndpoints(namespace, name string, obj v1.Endpoints) *v1.Endpoints {

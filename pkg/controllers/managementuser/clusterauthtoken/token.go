@@ -5,6 +5,8 @@ import (
 	"reflect"
 	"sort"
 
+	"github.com/rancher/rancher/pkg/controllers/managementuser/clusterauthtoken/common"
+	"github.com/rancher/rancher/pkg/features"
 	clusterv3 "github.com/rancher/rancher/pkg/generated/norman/cluster.cattle.io/v3"
 	managementv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -31,16 +33,28 @@ type tokenHandler struct {
 }
 
 func (h *tokenHandler) Create(token *managementv3.Token) (runtime.Object, error) {
-	// clusterAuthToken is no longer created here because it requires the rawValue of the
-	// original token and the token could be hashed. Now, clusterAuthToken is created in
-	// the API layer right after token creation.
-	if _, err := h.clusterAuthTokenLister.Get(h.namespace, token.Name); err != nil {
-		if !errors.IsNotFound(err) {
-			return h.Updated(token)
-		}
+	_, err := h.clusterAuthTokenLister.Get(h.namespace, token.Name)
+	if !errors.IsNotFound(err) {
+		return h.Updated(token)
+	} else if features.TokenHashing.Enabled() {
+		// clusterAuthToken is no longer created here because it requires the rawValue of the
+		// original token and the token could be hashed. Now, clusterAuthToken is created in
+		// the API layer right after token creation.
 		return token, fmt.Errorf("clusterAuthToken for token [%s] has not been created yet", token.Name)
 	}
-	return token, nil
+
+	err = h.updateClusterUserAttribute(token)
+	if err != nil {
+		return nil, err
+	}
+
+	clusterAuthToken, err := common.NewClusterAuthToken(token, token.Token)
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = h.clusterAuthToken.Create(clusterAuthToken)
+	return nil, err
 }
 
 func (h *tokenHandler) Updated(token *managementv3.Token) (runtime.Object, error) {

@@ -11,11 +11,11 @@ import (
 
 	"github.com/rancher/fleet/pkg/apis/fleet.cattle.io/v1alpha1"
 	rancherv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
-	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	fleetconst "github.com/rancher/rancher/pkg/fleet"
 	v3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	rocontrollers "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
 	namespaces "github.com/rancher/rancher/pkg/namespace"
+	"github.com/rancher/rancher/pkg/provisioningv2/image"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/systemtemplate"
 	"github.com/rancher/rancher/pkg/wrangler"
@@ -102,7 +102,7 @@ func (h *handler) OnChange(cluster *rancherv1.Cluster, status rancherv1.ClusterS
 		})
 	}
 
-	resources, err := ToResources(installer(cluster.Spec.AgentEnvVars, len(cluster.Spec.RKEConfig.MachineSelectorConfig) == 0, secretName, strconv.Itoa(int(cluster.Spec.RedeploySystemAgentGeneration))))
+	resources, err := ToResources(installer(cluster, secretName))
 	if err != nil {
 		return nil, status, err
 	}
@@ -136,22 +136,28 @@ func (h *handler) OnChange(cluster *rancherv1.Cluster, status rancherv1.ClusterS
 	return result, status, nil
 }
 
-func installer(envs []rkev1.EnvVar, allWorkers bool, secretName, generation string) []runtime.Object {
-	image := strings.SplitN(settings.SystemAgentUpgradeImage.Get(), ":", 2)
+func installer(cluster *rancherv1.Cluster, secretName string) []runtime.Object {
+	upgradeImage := strings.SplitN(settings.SystemAgentUpgradeImage.Get(), ":", 2)
 	version := "latest"
-	if len(image) == 2 {
-		version = image[1]
+	if len(upgradeImage) == 2 {
+		version = upgradeImage[1]
+	}
+
+	winsUpgradeImage := strings.SplitN(settings.WinsAgentUpgradeImage.Get(), ":", 2)
+	winsVersion := "latest"
+	if len(winsUpgradeImage) == 2 {
+		winsVersion = winsUpgradeImage[1]
 	}
 
 	var env []corev1.EnvVar
-	for _, e := range envs {
+	for _, e := range cluster.Spec.AgentEnvVars {
 		env = append(env, corev1.EnvVar{
 			Name:  e.Name,
 			Value: e.Value,
 		})
 	}
 
-	if allWorkers {
+	if len(cluster.Spec.RKEConfig.MachineSelectorConfig) == 0 {
 		env = append(env, corev1.EnvVar{
 			Name:  "CATTLE_ROLE_WORKER",
 			Value: "true",
@@ -167,7 +173,7 @@ func installer(envs []rkev1.EnvVar, allWorkers bool, secretName, generation stri
 			Name:      "system-agent-upgrader",
 			Namespace: namespaces.System,
 			Annotations: map[string]string{
-				"upgrade.cattle.io/digest": "spec.upgrade.envs",
+				"upgrade.cattle.io/digest": "spec.upgrade.envs,spec.upgrade.envFrom",
 			},
 		},
 		Spec: upgradev1.PlanSpec{
@@ -190,7 +196,52 @@ func installer(envs []rkev1.EnvVar, allWorkers bool, secretName, generation stri
 			},
 			ServiceAccountName: "system-agent-upgrader",
 			Upgrade: &upgradev1.ContainerSpec{
-				Image: settings.PrefixPrivateRegistry(image[0]),
+				Image: image.ResolveWithCluster(upgradeImage[0], cluster),
+				Env:   env,
+				EnvFrom: []corev1.EnvFromSource{{
+					SecretRef: &corev1.SecretEnvSource{
+						LocalObjectReference: corev1.LocalObjectReference{
+							Name: secretName,
+						},
+					},
+				}},
+			},
+		},
+	}
+
+	windowsPlan := &upgradev1.Plan{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Plan",
+			APIVersion: "upgrade.cattle.io/v1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "system-agent-upgrader-windows",
+			Namespace: namespaces.System,
+			Annotations: map[string]string{
+				"upgrade.cattle.io/digest": "spec.upgrade.envs,spec.upgrade.envFrom",
+			},
+		},
+		Spec: upgradev1.PlanSpec{
+			Concurrency: 10,
+			Version:     winsVersion,
+			Tolerations: []corev1.Toleration{{
+				Operator: corev1.TolerationOpExists,
+			},
+			},
+			NodeSelector: &metav1.LabelSelector{
+				MatchExpressions: []metav1.LabelSelectorRequirement{
+					{
+						Key:      corev1.LabelOSStable,
+						Operator: metav1.LabelSelectorOpIn,
+						Values: []string{
+							"windows",
+						},
+					},
+				},
+			},
+			ServiceAccountName: "system-agent-upgrader",
+			Upgrade: &upgradev1.ContainerSpec{
+				Image: image.ResolveWithCluster(winsUpgradeImage[0], cluster),
 				Env:   env,
 				EnvFrom: []corev1.EnvFromSource{{
 					SecretRef: &corev1.SecretEnvSource{
@@ -237,22 +288,27 @@ func installer(envs []rkev1.EnvVar, allWorkers bool, secretName, generation stri
 		},
 	}
 
-	if generation != "0" {
+	if cluster.Spec.RedeploySystemAgentGeneration != 0 {
 		plan.Spec.Secrets = append(plan.Spec.Secrets, upgradev1.SecretSpec{
 			Name: generationSecretName,
 		})
+
+		windowsPlan.Spec.Secrets = append(windowsPlan.Spec.Secrets, upgradev1.SecretSpec{
+			Name: generationSecretName,
+		})
+
 		objs = append(objs, &corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      generationSecretName,
 				Namespace: namespaces.System,
 			},
 			StringData: map[string]string{
-				"generation": generation,
+				"generation": strconv.Itoa(int(cluster.Spec.RedeploySystemAgentGeneration)),
 			},
 		})
 	}
 
-	return append([]runtime.Object{plan}, objs...)
+	return append([]runtime.Object{plan, windowsPlan}, objs...)
 }
 
 func ToResources(objs []runtime.Object) (result []v1alpha1.BundleResource, err error) {

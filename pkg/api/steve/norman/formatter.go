@@ -1,6 +1,7 @@
 package norman
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/rancher/apiserver/pkg/types"
@@ -82,7 +83,10 @@ type accessControlWrapper struct {
 
 func (a accessControlWrapper) CanDo(apiGroup, resource, verb string, apiContext *types2.APIContext, obj map[string]interface{}, schema *types2.Schema) error {
 	name, namespace := getNameAndNS(obj)
-	return a.ac.CanDo(a.apiRequest, resource, verb, namespace, name)
+	// The access control used by this function (schema based - provided by rancher/APIserver), expects the resource in
+	// the below format. We re-format it here since the original format does not match what is expected by the api server
+	formattedResource := fmt.Sprintf("%s/%s", apiGroup, resource)
+	return a.ac.CanDo(a.apiRequest, formattedResource, verb, namespace, name)
 }
 
 func getNameAndNS(obj map[string]interface{}) (string, string) {

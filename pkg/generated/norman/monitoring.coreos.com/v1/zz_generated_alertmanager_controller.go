@@ -43,7 +43,7 @@ func init() {
 	resource.Put(AlertmanagerGroupVersionResource)
 }
 
-// Deprecated use v1.Alertmanager instead
+// Deprecated: use v1.Alertmanager instead
 type Alertmanager = v1.Alertmanager
 
 func NewAlertmanager(namespace, name string, obj v1.Alertmanager) *v1.Alertmanager {

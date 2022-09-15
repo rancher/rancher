@@ -40,7 +40,7 @@ const (
 	TokenHashed            = "authn.management.cattle.io/token-hashed"
 	tokenKeyIndex          = "authn.management.cattle.io/token-key-index"
 	secretNameEnding       = "-secret"
-	secretNamespace        = "cattle-system"
+	SecretNamespace        = "cattle-system"
 	KubeconfigResponseType = "kubeconfig"
 )
 
@@ -48,7 +48,7 @@ var (
 	toDeleteCookies = []string{CookieName, CSRFCookie}
 )
 
-func RegisterIndexer(ctx context.Context, apiContext *config.ScaledContext) error {
+func RegisterIndexer(apiContext *config.ScaledContext) error {
 	informer := apiContext.Management.Users("").Controller().Informer()
 	return informer.AddIndexers(map[string]cache.IndexFunc{userPrincipalIndex: userPrincipalIndexer})
 }
@@ -100,7 +100,7 @@ func (m *Manager) createDerivedToken(jsonInput clientv3.Token, tokenAuthValue st
 		return v3.Token{}, "", 401, err
 	}
 
-	tokenTTL, err := ValidateMaxTTL(time.Duration(int64(jsonInput.TTLMillis)) * time.Millisecond)
+	tokenTTL, err := ClampToMaxTTL(time.Duration(int64(jsonInput.TTLMillis)) * time.Millisecond)
 	if err != nil {
 		return v3.Token{}, "", 500, fmt.Errorf("error validating max-ttl %v", err)
 	}
@@ -469,7 +469,7 @@ func (m *Manager) removeToken(request *types.APIContext) error {
 // CreateSecret saves the secret in k8s. Secret is saved under the userID-secret with
 // key being the provider and data being the providers secret
 func (m *Manager) CreateSecret(userID, provider, secret string) error {
-	_, err := m.secretLister.Get(secretNamespace, userID+secretNameEnding)
+	_, err := m.secretLister.Get(SecretNamespace, userID+secretNameEnding)
 	// An error either means it already exists or something bad happened
 	if err != nil {
 		if !apierrors.IsNotFound(err) {
@@ -484,7 +484,7 @@ func (m *Manager) CreateSecret(userID, provider, secret string) error {
 		}
 		s.ObjectMeta = metav1.ObjectMeta{
 			Name:      userID + secretNameEnding,
-			Namespace: secretNamespace,
+			Namespace: SecretNamespace,
 		}
 		_, err = m.secrets.Create(&s)
 		return err
@@ -495,7 +495,7 @@ func (m *Manager) CreateSecret(userID, provider, secret string) error {
 }
 
 func (m *Manager) GetSecret(userID string, provider string, fallbackTokens []*v3.Token) (string, error) {
-	cachedSecret, err := m.secretLister.Get(secretNamespace, userID+secretNameEnding)
+	cachedSecret, err := m.secretLister.Get(SecretNamespace, userID+secretNameEnding)
 	if err != nil && !apierrors.IsNotFound(err) {
 		return "", err
 	}
@@ -515,7 +515,7 @@ func (m *Manager) GetSecret(userID string, provider string, fallbackTokens []*v3
 }
 
 func (m *Manager) UpdateSecret(userID, provider, secret string) error {
-	cachedSecret, err := m.secretLister.Get(secretNamespace, userID+secretNameEnding)
+	cachedSecret, err := m.secretLister.Get(SecretNamespace, userID+secretNameEnding)
 	if err != nil {
 		return err
 	}
@@ -801,6 +801,7 @@ func (m *Manager) TokenStreamTransformer(
 	}), nil
 }
 
+// ParseTokenTTL parses an integer representing minutes as a string and returns its duration.
 func ParseTokenTTL(ttl string) (time.Duration, error) {
 	durString := fmt.Sprintf("%vm", ttl)
 	dur, err := time.ParseDuration(durString)
@@ -810,10 +811,11 @@ func ParseTokenTTL(ttl string) (time.Duration, error) {
 	return dur, nil
 }
 
-func ValidateMaxTTL(ttl time.Duration) (time.Duration, error) {
+// ClampToMaxTTL will return the duration of the provided TTL or the duration of settings.AuthTokenMaxTTLMinutes whichever is smaller.
+func ClampToMaxTTL(ttl time.Duration) (time.Duration, error) {
 	maxTTL, err := ParseTokenTTL(settings.AuthTokenMaxTTLMinutes.Get())
 	if err != nil {
-		return 0, fmt.Errorf("error getting auth-token-max-ttl %v", err)
+		return 0, fmt.Errorf("failed to parse setting '%s': %w", settings.AuthTokenMaxTTLMinutes.Name, err)
 	}
 	if maxTTL == 0 {
 		return ttl, nil
@@ -826,4 +828,19 @@ func ValidateMaxTTL(ttl time.Duration) (time.Duration, error) {
 		return ttl, nil
 	}
 	return maxTTL, nil
+}
+
+// GetKubeconfigDefaultTokenTTLInMilliSeconds will return the default TTL for kubeconfig tokens
+func GetKubeconfigDefaultTokenTTLInMilliSeconds() (*int64, error) {
+	defaultTokenTTL, err := ParseTokenTTL(settings.KubeconfigDefaultTokenTTLMinutes.Get())
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse setting '%s': %w", settings.KubeconfigDefaultTokenTTLMinutes.Name, err)
+	}
+
+	tokenTTL, err := ClampToMaxTTL(defaultTokenTTL)
+	if err != nil {
+		return nil, fmt.Errorf("failed to validate token ttl: %w", err)
+	}
+	ttlMilli := tokenTTL.Milliseconds()
+	return &ttlMilli, nil
 }

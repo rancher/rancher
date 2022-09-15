@@ -9,6 +9,7 @@ backup_info = {"backupname": None, "backup_id": None, "workload": None,
 
 rbac_roles = [CLUSTER_MEMBER, PROJECT_OWNER, PROJECT_MEMBER, PROJECT_READ_ONLY]
 
+
 def test_bkp_restore_local_create():
     validate_backup_create(namespace, backup_info)
 
@@ -46,10 +47,14 @@ def test_rbac_bkp_restore_create(role):
     user_token = rbac_get_user_token_by_role(role)
     user_client = get_client_for_token(user_token)
     user_cluster = user_client.list_cluster(name=CLUSTER_NAME).data[0]
-    with pytest.raises(ApiError) as e:
-        user_cluster.backupEtcd()
-    assert e.value.error.status == 403
-    assert e.value.error.code == 'PermissionDenied'
+    if not hasattr(user_cluster, 'backupEtcd'):
+        assert hasattr(user_cluster, 'backupEtcd') == False
+    else:
+        with pytest.raises(ApiError) as e:
+            user_cluster.backupEtcd()
+        assert e.value.error.status == 403
+        assert e.value.error.code == 'PermissionDenied'
+
 
 @if_test_rbac
 def test_rbac_bkp_restore_list_cluster_owner():
@@ -100,10 +105,13 @@ def test_rbac_bkp_restore_restore(role):
     user_token2 = rbac_get_user_token_by_role(role)
     user_client2 = get_client_for_token(user_token2)
     user_cluster2 = user_client2.list_cluster(name=CLUSTER_NAME).data[0]
-    with pytest.raises(ApiError) as e:
-        user_cluster2.restoreFromEtcdBackup(etcdBackupId=backup_id)
-    assert e.value.error.status == 403
-    assert e.value.error.code == 'PermissionDenied'
+    if not hasattr(user_cluster2, 'restoreFromEtcdBackup'):
+        assert hasattr(user_cluster2, 'restoreFromEtcdBackup') == False
+    else:
+        with pytest.raises(ApiError) as e:
+            user_cluster2.restoreFromEtcdBackup(etcdBackupId=backup_id)
+        assert e.value.error.status == 403
+        assert e.value.error.code == 'PermissionDenied'
 
 
 @if_test_rbac
@@ -143,10 +151,13 @@ def test_rbac_bkp_restore_delete(role):
 
     assert len(user_cluster2.etcdBackups(name=backupname)) == 0
     backup_to_delete = user_cluster.etcdBackups(name=backupname)['data'][0]
-    with pytest.raises(ApiError) as e:
-        user_client2.delete(backup_to_delete)
-    assert e.value.error.status == 403
-    assert e.value.error.code == 'Forbidden'
+    if not hasattr(user_cluster2, 'delete'):
+        assert hasattr(user_cluster2, 'delete') == False
+    else:
+        with pytest.raises(ApiError) as e:
+            user_client2.delete(backup_to_delete)
+        assert e.value.error.status == 403
+        assert e.value.error.code == 'Forbidden'
 
 
 @pytest.fixture(scope='module', autouse="True")

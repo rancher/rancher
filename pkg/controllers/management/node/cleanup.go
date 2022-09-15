@@ -2,27 +2,36 @@ package node
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
 
 	"github.com/rancher/rancher/pkg/agent/clean"
-	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	util "github.com/rancher/rancher/pkg/cluster"
 	"github.com/rancher/rancher/pkg/dialer"
-	v1 "github.com/rancher/rancher/pkg/generated/norman/batch/v1"
-	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/kubectl"
+	"github.com/rancher/rancher/pkg/namespace"
 	nodehelper "github.com/rancher/rancher/pkg/node"
 	"github.com/rancher/rancher/pkg/settings"
+	"github.com/rancher/rancher/pkg/systemtemplate"
 	"github.com/rancher/rancher/pkg/types/config"
 	rketypes "github.com/rancher/rke/types"
 	"github.com/sirupsen/logrus"
-	batchV1 "k8s.io/api/batch/v1"
-	coreV1 "k8s.io/api/core/v1"
+	batchv1 "k8s.io/api/batch/v1"
+	corev1 "k8s.io/api/core/v1"
 	kerror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+)
+
+const (
+	cleanupPodLabel                    = "rke.cattle.io/cleanup-node"
+	userNodeRemoveAnnotationPrefix     = "lifecycle.cattle.io/create.user-node-remove_"
+	userNodeRemoveCleanupAnnotationOld = "nodes.management.cattle.io/user-node-remove-cleanup"
 )
 
 func (m *Lifecycle) deleteV1Node(node *v3.Node) (runtime.Object, error) {
@@ -132,6 +141,10 @@ func (m *Lifecycle) drainNode(node *v3.Node) error {
 }
 
 func (m *Lifecycle) cleanRKENode(node *v3.Node) error {
+	if !features.RKE1CustomNodeCleanup.Enabled() {
+		return nil
+	}
+
 	cluster, err := m.clusterLister.Get("", node.Namespace)
 	if err != nil {
 		if kerror.IsNotFound(err) {
@@ -140,7 +153,7 @@ func (m *Lifecycle) cleanRKENode(node *v3.Node) error {
 		return err
 	}
 
-	if cluster.Status.Driver != v32.ClusterDriverRKE {
+	if cluster.Status.Driver != v3.ClusterDriverRKE {
 		return nil // not an rke node, bail out
 	}
 
@@ -153,15 +166,19 @@ func (m *Lifecycle) cleanRKENode(node *v3.Node) error {
 		return nil
 	}
 
-	job, err := m.createCleanupJob(userContext, node)
+	job, err := m.createCleanupJob(userContext, cluster, node)
 	if err != nil {
 		return err
 	}
 
-	return m.waitUntilJobCompletes(userContext, job)
+	if err = m.waitUntilJobCompletes(userContext, job); err != nil && !errors.Is(err, wait.ErrWaitTimeout) {
+		return err
+	}
+
+	return m.waitUntilJobDeletes(userContext, node.Name, job)
 }
 
-func (m *Lifecycle) waitUntilJobCompletes(userContext *config.UserContext, job *v1.Job) error {
+func (m *Lifecycle) waitForJobCondition(userContext *config.UserContext, job *batchv1.Job, condition func(*batchv1.Job, error) bool, logMessage string) error {
 	if job == nil {
 		return nil
 	}
@@ -172,9 +189,9 @@ func (m *Lifecycle) waitUntilJobCompletes(userContext *config.UserContext, job *
 		Steps:    10,
 	}
 
-	logrus.Infof("[node-cleanup] validating cleanup job %s finished, retrying up to 10 times", job.Name)
+	logrus.Infof("[node-cleanup] validating cleanup job %s %sd, retrying up to 10 times", job.Name, logMessage)
 	// purposefully ignoring error, if the drain fails this falls back to deleting the node as usual
-	if err := wait.ExponentialBackoff(backoff, func() (bool, error) {
+	return wait.ExponentialBackoff(backoff, func() (bool, error) {
 		ctx, cancel := context.WithTimeout(m.ctx, backoff.Duration)
 		defer cancel()
 
@@ -185,26 +202,49 @@ func (m *Lifecycle) waitUntilJobCompletes(userContext *config.UserContext, job *
 		}
 		if err != nil {
 			// kubectl failed continue on with delete any way
-			logrus.Errorf("[node-cleanup] failed to get job %s, retrying: %s", job.Name, err)
+			logrus.Errorf("[node-cleanup] failed to get job %s, retrying: %v", job.Name, err)
+		}
+
+		if !condition(j, err) {
+			logrus.Infof("[node-cleanup] waiting for %s job to %s", job.Name, logMessage)
 			return false, nil
 		}
 
-		if j.Status.Succeeded == 0 {
-			logrus.Infof("[node-cleanup] job %s still hasn't finished, backing off and retrying", job.Name)
-			return false, nil
-		}
-
-		logrus.Infof("[node-cleanup] job %s finished, continuing to delete v3 node", job.Name)
+		logrus.Infof("[node-cleanup] finished waiting for job %s to %s", job.Name, logMessage)
 		return true, nil
-	}); err != nil && err.Error() != "timed out waiting for the condition" {
-		return err
-	}
-
-	// remove the job to clean up
-	return userContext.K8sClient.BatchV1().Jobs(job.Namespace).Delete(m.ctx, job.Name, metav1.DeleteOptions{})
+	})
 }
 
-func (m *Lifecycle) createCleanupJob(userContext *config.UserContext, node *v3.Node) (*batchV1.Job, error) {
+func (m *Lifecycle) waitUntilJobCompletes(userContext *config.UserContext, job *batchv1.Job) error {
+	return m.waitForJobCondition(
+		userContext,
+		job,
+		func(j *batchv1.Job, err error) bool { return err == nil && j.Status.Succeeded > 0 },
+		"complete",
+	)
+}
+
+func (m *Lifecycle) waitUntilJobDeletes(userContext *config.UserContext, nodeName string, job *batchv1.Job) error {
+	return m.waitForJobCondition(userContext, job, func(j *batchv1.Job, err error) bool {
+		if err == nil {
+			if j.DeletionTimestamp.IsZero() {
+				err = userContext.BatchV1.Jobs(j.Namespace).Delete(j.Name, &metav1.DeleteOptions{PropagationPolicy: &[]metav1.DeletionPropagation{metav1.DeletePropagationForeground}[0]})
+			} else if pods, err := userContext.Core.Pods(j.Namespace).List(metav1.ListOptions{LabelSelector: fmt.Sprintf("%s=%s", cleanupPodLabel, nodeName)}); err != nil && !kerror.IsNotFound(err) {
+				logrus.Errorf("[node-cleanup] failed to list cleanup pods for node %s: %v", nodeName, err)
+				return false
+			} else if err == nil && len(pods.Items) > 0 {
+				if err = userContext.Core.Pods(j.Namespace).Delete(pods.Items[0].Name, &metav1.DeleteOptions{GracePeriodSeconds: &[]int64{0}[0]}); err != nil {
+					logrus.Errorf("[node-cleanup] failed to delete cleanup pod %s for node %s: %v", pods.Items[0].Name, nodeName, err)
+					return false
+				}
+			}
+		}
+		return kerror.IsNotFound(err)
+	},
+		"delete")
+}
+
+func (m *Lifecycle) createCleanupJob(userContext *config.UserContext, cluster *v3.Cluster, node *v3.Node) (*batchv1.Job, error) {
 	nodeLabel := "cattle.io/node"
 
 	// find if someone else already kicked this job off
@@ -214,17 +254,24 @@ func (m *Lifecycle) createCleanupJob(userContext *config.UserContext, node *v3.N
 	if err != nil && !kerror.IsNotFound(err) {
 		if strings.Contains(err.Error(), dialer.ErrAgentDisconnected.Error()) ||
 			strings.Contains(err.Error(), "connection refused") {
-			return nil, nil // can't connect, just continue on with the delete
+			return nil, nil // can't connect, just continue on with deleting v3 node
 		}
 		return nil, err
 	}
 
 	if len(existingJob.Items) != 0 {
-		logrus.Debugf("found existing jobs for node: %s", node.Name)
-		// found existing job by label selector so fake an already exists
-		return nil, &kerror.StatusError{
-			ErrStatus: metav1.Status{Reason: metav1.StatusReasonAlreadyExists},
+		if existingJob.Items[0].DeletionTimestamp.IsZero() {
+			// found an existing job that isn't deleting, so assuming another run of the controller is working on it.
+			// Return an "already exists" error.
+			return nil, &kerror.StatusError{
+				ErrStatus: metav1.Status{
+					Reason:  metav1.StatusReasonAlreadyExists,
+					Message: fmt.Sprintf("job already exists for %s/%s", node.Namespace, node.Name),
+				},
+			}
 		}
+
+		return nil, m.waitUntilJobDeletes(userContext, node.Name, &existingJob.Items[0])
 	}
 
 	meta := metav1.ObjectMeta{
@@ -236,59 +283,52 @@ func (m *Lifecycle) createCleanupJob(userContext *config.UserContext, node *v3.N
 		},
 	}
 
-	cluster, err := m.clusterLister.Get("", node.Namespace)
-	if err != nil {
-		if !kerror.IsNotFound(err) {
-			return nil, err
-		}
-	}
-
-	var tolerations []coreV1.Toleration
+	var tolerations []corev1.Toleration
 
 	for _, taint := range node.Spec.InternalNodeSpec.Taints {
-		tolerations = append(tolerations, coreV1.Toleration{
+		tolerations = append(tolerations, corev1.Toleration{
 			Effect:   taint.Effect,
 			Key:      taint.Key,
 			Operator: "Exists",
 		})
 	}
 
-	var mounts []coreV1.VolumeMount
-	var volumes []coreV1.Volume
+	var mounts []corev1.VolumeMount
+	var volumes []corev1.Volume
 
 	if os, ok := node.Status.NodeLabels["kubernetes.io/os"]; ok && os == "windows" {
-		t := coreV1.HostPathType("")
-		volumes = append(volumes, coreV1.Volume{
+		t := corev1.HostPathType("")
+		volumes = append(volumes, corev1.Volume{
 			Name: "docker",
-			VolumeSource: coreV1.VolumeSource{
-				HostPath: &coreV1.HostPathVolumeSource{
+			VolumeSource: corev1.VolumeSource{
+				HostPath: &corev1.HostPathVolumeSource{
 					Path: "\\\\.\\pipe\\docker_engine",
 					Type: &t,
 				},
 			},
 		})
-		mounts = append(mounts, coreV1.VolumeMount{
+		mounts = append(mounts, corev1.VolumeMount{
 			MountPath: "\\\\.\\pipe\\docker_engine",
 			Name:      "docker",
 		})
 	} else {
-		socket := coreV1.HostPathType("Socket")
-		volumes = append(volumes, coreV1.Volume{
+		socket := corev1.HostPathType("Socket")
+		volumes = append(volumes, corev1.Volume{
 			Name: "docker",
-			VolumeSource: coreV1.VolumeSource{
-				HostPath: &coreV1.HostPathVolumeSource{
+			VolumeSource: corev1.VolumeSource{
+				HostPath: &corev1.HostPathVolumeSource{
 					Path: "/var/run/docker.sock",
 					Type: &socket,
 				},
 			},
 		})
-		mounts = append(mounts, coreV1.VolumeMount{
+		mounts = append(mounts, corev1.VolumeMount{
 			MountPath: "/var/run/docker.sock",
 			Name:      "docker",
 		})
 	}
 
-	env := []coreV1.EnvVar{
+	env := []corev1.EnvVar{
 		{
 			Name:  "AGENT_IMAGE",
 			Value: settings.AgentImage.Get(),
@@ -297,38 +337,56 @@ func (m *Lifecycle) createCleanupJob(userContext *config.UserContext, node *v3.N
 
 	if cluster.Spec.RancherKubernetesEngineConfig != nil {
 		env = append(env,
-			coreV1.EnvVar{
+			corev1.EnvVar{
 				Name:  "PREFIX_PATH",
 				Value: cluster.Spec.RancherKubernetesEngineConfig.PrefixPath,
 			},
-			coreV1.EnvVar{
+			corev1.EnvVar{
 				Name:  "WINDOWS_PREFIX_PATH",
 				Value: cluster.Spec.RancherKubernetesEngineConfig.WindowsPrefixPath,
 			},
 		)
 	}
 
+	var imagePullSecrets []corev1.LocalObjectReference
+	if cluster.GetSecret("PrivateRegistrySecret") != "" {
+		privateRegistries, err := m.credLister.Get(namespace.GlobalNamespace, cluster.GetSecret("PrivateRegistrySecret"))
+		if err != nil {
+			return nil, err
+		} else if url, err := util.GeneratePrivateRegistryDockerConfig(util.GetPrivateRepo(cluster), privateRegistries); err != nil {
+			return nil, err
+		} else if url != "" {
+			imagePullSecrets = append(imagePullSecrets, corev1.LocalObjectReference{Name: "cattle-private-registry"})
+		}
+	}
+
 	fiveMin := int32(5 * 60)
-	job := batchV1.Job{
+	job := batchv1.Job{
 		ObjectMeta: meta,
-		Spec: batchV1.JobSpec{
+		Spec: batchv1.JobSpec{
 			TTLSecondsAfterFinished: &fiveMin,
-			Template: coreV1.PodTemplateSpec{
-				Spec: coreV1.PodSpec{
-					RestartPolicy: "Never",
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						cleanupPodLabel: node.Name,
+					},
+				},
+				Spec: corev1.PodSpec{
+					ImagePullSecrets: imagePullSecrets,
+					RestartPolicy:    "Never",
 					NodeSelector: map[string]string{
 						"kubernetes.io/hostname": node.Status.NodeName,
 					},
 					Tolerations: tolerations,
 					Volumes:     volumes,
-					Containers: []coreV1.Container{
+					Containers: []corev1.Container{
 						{
 							Name:            clean.NodeCleanupContainerName,
-							Image:           settings.AgentImage.Get(),
+							Image:           systemtemplate.GetDesiredAgentImage(cluster),
 							Args:            []string{"--", "agent", "clean", "job"},
 							Env:             env,
 							VolumeMounts:    mounts,
-							ImagePullPolicy: coreV1.PullIfNotPresent,
+							ImagePullPolicy: corev1.PullIfNotPresent,
 						},
 					},
 				},
@@ -339,31 +397,22 @@ func (m *Lifecycle) createCleanupJob(userContext *config.UserContext, node *v3.N
 	return userContext.K8sClient.BatchV1().Jobs("default").Create(context.TODO(), &job, metav1.CreateOptions{})
 }
 
-func createCleanupServiceAccount(userContext *config.UserContext) (*coreV1.ServiceAccount, error) {
-	meta := metav1.ObjectMeta{
-		GenerateName: "cattle-cleanup-node-",
-		Namespace:    "default",
-	}
-	serviceAccount := coreV1.ServiceAccount{
-		ObjectMeta: meta,
-	}
-	return userContext.K8sClient.CoreV1().ServiceAccounts("default").Create(context.TODO(), &serviceAccount, metav1.CreateOptions{})
-}
-
 func (m *Lifecycle) userNodeRemoveCleanup(obj *v3.Node) (runtime.Object, error) {
 	newObj := obj.DeepCopy()
 	newObj.SetFinalizers(removeFinalizerWithPrefix(newObj.GetFinalizers(), userNodeRemoveFinalizerPrefix))
 
-	annos := newObj.GetAnnotations()
-	if annos == nil {
-		annos = make(map[string]string)
-	} else {
-		annos = removeAnnotationWithPrefix(annos, userNodeRemoveAnnotationPrefix)
-		delete(annos, userNodeRemoveCleanupAnnotationOld)
-	}
+	if newObj.DeletionTimestamp == nil {
+		annos := newObj.GetAnnotations()
+		if annos == nil {
+			annos = make(map[string]string)
+		} else {
+			annos = removeAnnotationWithPrefix(annos, userNodeRemoveAnnotationPrefix)
+			delete(annos, userNodeRemoveCleanupAnnotationOld)
+		}
 
-	annos[userNodeRemoveCleanupAnnotation] = "true"
-	newObj.SetAnnotations(annos)
+		annos[userNodeRemoveCleanupAnnotation] = "true"
+		newObj.SetAnnotations(annos)
+	}
 	return m.nodeClient.Update(newObj)
 }
 
@@ -371,7 +420,7 @@ func removeFinalizerWithPrefix(finalizers []string, prefix string) []string {
 	var nf []string
 	for _, finalizer := range finalizers {
 		if strings.HasPrefix(finalizer, prefix) {
-			logrus.Debugf("a finalizer with prefix %s will be removed", prefix)
+			logrus.Debugf("finalizer with prefix [%s] will be removed", prefix)
 			continue
 		}
 		nf = append(nf, finalizer)
@@ -382,7 +431,7 @@ func removeFinalizerWithPrefix(finalizers []string, prefix string) []string {
 func removeAnnotationWithPrefix(annotations map[string]string, prefix string) map[string]string {
 	for k := range annotations {
 		if strings.HasPrefix(k, prefix) {
-			logrus.Debugf("annotation with prefix %s will be removed", prefix)
+			logrus.Debugf("annotation with prefix [%s] will be removed", prefix)
 			delete(annotations, k)
 		}
 	}

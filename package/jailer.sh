@@ -58,17 +58,13 @@ cp -r -l /opt/drivers/management-state/bin /opt/jail/$NAME/var/lib/rancher/manag
 cp -l /usr/bin/rancher-machine /opt/jail/$NAME/usr/bin
 
 # Hard link helm_2 into the jail
-if [[ -f /usr/bin/rancher-helm ]]; then
-  cp -l /usr/bin/rancher-helm /opt/jail/$NAME/usr/bin
-fi
+cp -l /usr/bin/rancher-helm /opt/jail/$NAME/usr/bin
 
 # Hard link helm_3 into the jail
 cp -l /usr/bin/helm_v3 /opt/jail/$NAME/usr/bin
 
 # Hard link tiller into the jail
-if [[ -f /usr/bin/rancher-tiler ]]; then
-  cp -l /usr/bin/rancher-tiller /opt/jail/$NAME/usr/bin
-fi
+cp -l /usr/bin/rancher-tiller /opt/jail/$NAME/usr/bin
 
 # Hard link kustomize into the jail
 cp -l /usr/bin/kustomize /opt/jail/$NAME/usr/bin
@@ -93,6 +89,9 @@ cp -l /bin/sh /opt/jail/$NAME/bin/
 
 # Hard link rm into the jail
 cp -l /bin/rm /opt/jail/$NAME/bin/
+
+# Hard link mkisofs into the jail
+cp -l /usr/bin/mkisofs /opt/jail/$NAME/usr/bin
 
 cd /dev
 # tar copy /dev excluding mqueue and shm

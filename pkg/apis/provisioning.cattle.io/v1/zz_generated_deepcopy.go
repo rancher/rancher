@@ -152,13 +152,6 @@ func (in *ClusterStatus) DeepCopyInto(out *ClusterStatus) {
 		*out = make([]genericcondition.GenericCondition, len(*in))
 		copy(*out, *in)
 	}
-	if in.ETCDSnapshots != nil {
-		in, out := &in.ETCDSnapshots, &out.ETCDSnapshots
-		*out = make([]rkecattleiov1.ETCDSnapshot, len(*in))
-		for i := range *in {
-			(*in)[i].DeepCopyInto(&(*out)[i])
-		}
-	}
 	return
 }
 
@@ -195,17 +188,22 @@ func (in *RKEConfig) DeepCopyInto(out *RKEConfig) {
 	if in.ETCDSnapshotCreate != nil {
 		in, out := &in.ETCDSnapshotCreate, &out.ETCDSnapshotCreate
 		*out = new(rkecattleiov1.ETCDSnapshotCreate)
-		(*in).DeepCopyInto(*out)
+		**out = **in
 	}
 	if in.ETCDSnapshotRestore != nil {
 		in, out := &in.ETCDSnapshotRestore, &out.ETCDSnapshotRestore
 		*out = new(rkecattleiov1.ETCDSnapshotRestore)
-		(*in).DeepCopyInto(*out)
+		**out = **in
 	}
 	if in.RotateCertificates != nil {
 		in, out := &in.RotateCertificates, &out.RotateCertificates
 		*out = new(rkecattleiov1.RotateCertificates)
 		(*in).DeepCopyInto(*out)
+	}
+	if in.RotateEncryptionKeys != nil {
+		in, out := &in.RotateEncryptionKeys, &out.RotateEncryptionKeys
+		*out = new(rkecattleiov1.RotateEncryptionKeys)
+		**out = **in
 	}
 	if in.MachinePools != nil {
 		in, out := &in.MachinePools, &out.MachinePools
@@ -236,6 +234,11 @@ func (in *RKEConfig) DeepCopy() *RKEConfig {
 func (in *RKEMachinePool) DeepCopyInto(out *RKEMachinePool) {
 	*out = *in
 	in.RKECommonNodeConfig.DeepCopyInto(&out.RKECommonNodeConfig)
+	if in.DrainBeforeDeleteTimeout != nil {
+		in, out := &in.DrainBeforeDeleteTimeout, &out.DrainBeforeDeleteTimeout
+		*out = new(metav1.Duration)
+		**out = **in
+	}
 	if in.NodeConfig != nil {
 		in, out := &in.NodeConfig, &out.NodeConfig
 		*out = new(corev1.ObjectReference)
@@ -277,7 +280,7 @@ func (in *RKEMachinePool) DeepCopyInto(out *RKEMachinePool) {
 	}
 	if in.MaxUnhealthy != nil {
 		in, out := &in.MaxUnhealthy, &out.MaxUnhealthy
-		*out = new(intstr.IntOrString)
+		*out = new(string)
 		**out = **in
 	}
 	if in.UnhealthyRange != nil {

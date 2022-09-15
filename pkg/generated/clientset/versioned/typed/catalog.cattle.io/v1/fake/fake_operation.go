@@ -117,7 +117,7 @@ func (c *FakeOperations) UpdateStatus(ctx context.Context, operation *catalogcat
 // Delete takes name of the operation and deletes it. Returns an error if one occurs.
 func (c *FakeOperations) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(operationsResource, c.ns, name), &catalogcattleiov1.Operation{})
+		Invokes(testing.NewDeleteActionWithOptions(operationsResource, c.ns, name, opts), &catalogcattleiov1.Operation{})
 
 	return err
 }

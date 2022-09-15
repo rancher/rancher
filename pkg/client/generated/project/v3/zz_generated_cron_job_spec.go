@@ -21,6 +21,7 @@ const (
 	CronJobSpecFieldHostname                      = "hostname"
 	CronJobSpecFieldImagePullSecrets              = "imagePullSecrets"
 	CronJobSpecFieldNodeID                        = "nodeId"
+	CronJobSpecFieldOS                            = "os"
 	CronJobSpecFieldObjectMeta                    = "metadata"
 	CronJobSpecFieldOverhead                      = "overhead"
 	CronJobSpecFieldPreemptionPolicy              = "preemptionPolicy"
@@ -39,6 +40,7 @@ const (
 	CronJobSpecFieldSysctls                       = "sysctls"
 	CronJobSpecFieldTTLSecondsAfterFinished       = "ttlSecondsAfterFinished"
 	CronJobSpecFieldTerminationGracePeriodSeconds = "terminationGracePeriodSeconds"
+	CronJobSpecFieldTimeZone                      = "timeZone"
 	CronJobSpecFieldTopologySpreadConstraints     = "topologySpreadConstraints"
 	CronJobSpecFieldUid                           = "uid"
 	CronJobSpecFieldVolumes                       = "volumes"
@@ -65,6 +67,7 @@ type CronJobSpec struct {
 	Hostname                      string                         `json:"hostname,omitempty" yaml:"hostname,omitempty"`
 	ImagePullSecrets              []LocalObjectReference         `json:"imagePullSecrets,omitempty" yaml:"imagePullSecrets,omitempty"`
 	NodeID                        string                         `json:"nodeId,omitempty" yaml:"nodeId,omitempty"`
+	OS                            *PodOS                         `json:"os,omitempty" yaml:"os,omitempty"`
 	ObjectMeta                    *ObjectMeta                    `json:"metadata,omitempty" yaml:"metadata,omitempty"`
 	Overhead                      map[string]string              `json:"overhead,omitempty" yaml:"overhead,omitempty"`
 	PreemptionPolicy              string                         `json:"preemptionPolicy,omitempty" yaml:"preemptionPolicy,omitempty"`
@@ -83,6 +86,7 @@ type CronJobSpec struct {
 	Sysctls                       []Sysctl                       `json:"sysctls,omitempty" yaml:"sysctls,omitempty"`
 	TTLSecondsAfterFinished       *int64                         `json:"ttlSecondsAfterFinished,omitempty" yaml:"ttlSecondsAfterFinished,omitempty"`
 	TerminationGracePeriodSeconds *int64                         `json:"terminationGracePeriodSeconds,omitempty" yaml:"terminationGracePeriodSeconds,omitempty"`
+	TimeZone                      string                         `json:"timeZone,omitempty" yaml:"timeZone,omitempty"`
 	TopologySpreadConstraints     []TopologySpreadConstraint     `json:"topologySpreadConstraints,omitempty" yaml:"topologySpreadConstraints,omitempty"`
 	Uid                           *int64                         `json:"uid,omitempty" yaml:"uid,omitempty"`
 	Volumes                       []Volume                       `json:"volumes,omitempty" yaml:"volumes,omitempty"`

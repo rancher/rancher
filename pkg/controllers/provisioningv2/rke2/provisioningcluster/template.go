@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
 	"strings"
 
 	"github.com/rancher/lasso/pkg/dynamic"
@@ -31,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 )
 
@@ -201,7 +203,11 @@ func toMachineTemplate(machinePoolName string, cluster *rancherv1.Cluster, machi
 			},
 		},
 	}
-	ustr.SetName(name.SafeConcatName(ustr.GetName(), createMachineTemplateHash(ustr.Object)))
+	mtHash := createMachineTemplateHash(ustr.Object)
+	ustr.SetName(name.SafeConcatName(ustr.GetName(), mtHash))
+	newLabels := ustr.GetLabels()
+	newLabels[rke2.MachineTemplateHashLabel] = mtHash
+	ustr.SetLabels(newLabels)
 	return ustr, nil
 }
 
@@ -239,6 +245,9 @@ func machineDeployments(cluster *rancherv1.Cluster, capiCluster *capi.Cluster, d
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: cluster.Namespace,
 				Name:      bootstrapName,
+				Labels: map[string]string{
+					rke2.ClusterNameLabel: cluster.Name,
+				},
 			},
 			Spec: rkev1.RKEBootstrapTemplateSpec{
 				ClusterName: cluster.Name,
@@ -271,12 +280,12 @@ func machineDeployments(cluster *rancherv1.Cluster, capiCluster *capi.Cluster, d
 		machinePoolNames[machinePool.Name] = true
 
 		var (
-			machinePoolName = name.SafeConcatName(cluster.Name, machinePool.Name)
-			infraRef        corev1.ObjectReference
+			machineDeploymentName = name.SafeConcatName(cluster.Name, machinePool.Name)
+			infraRef              corev1.ObjectReference
 		)
 
 		if machinePool.NodeConfig.APIVersion == "" || machinePool.NodeConfig.APIVersion == "rke-machine-config.cattle.io/v1" {
-			machineTemplate, err := toMachineTemplate(machinePoolName, cluster, machinePool, dynamic, dynamicSchema, secrets)
+			machineTemplate, err := toMachineTemplate(machineDeploymentName, cluster, machinePool, dynamic, dynamicSchema, secrets)
 			if err != nil {
 				return nil, err
 			}
@@ -292,6 +301,14 @@ func machineDeployments(cluster *rancherv1.Cluster, capiCluster *capi.Cluster, d
 			infraRef = *machinePool.NodeConfig
 		}
 
+		if machinePool.MachineOS == "" {
+			machinePool.MachineOS = rke2.DefaultMachineOS
+		}
+		if machinePool.MachineDeploymentLabels == nil {
+			machinePool.MachineDeploymentLabels = make(map[string]string)
+		}
+		machinePool.MachineDeploymentLabels[rke2.CattleOSLabel] = machinePool.MachineOS
+
 		machineDeploymentLabels := map[string]string{}
 		for k, v := range machinePool.Labels {
 			machineDeploymentLabels[k] = v
@@ -299,6 +316,7 @@ func machineDeployments(cluster *rancherv1.Cluster, capiCluster *capi.Cluster, d
 		for k, v := range machinePool.MachineDeploymentLabels {
 			machineDeploymentLabels[k] = v
 		}
+
 		machineSpecAnnotations := map[string]string{}
 		// Ignore drain if DrainBeforeDelete is unset or the pool is for etcd nodes
 		if !machinePool.DrainBeforeDelete || machinePool.EtcdRole {
@@ -308,7 +326,7 @@ func machineDeployments(cluster *rancherv1.Cluster, capiCluster *capi.Cluster, d
 		machineDeployment := &capi.MachineDeployment{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace:   cluster.Namespace,
-				Name:        machinePoolName,
+				Name:        machineDeploymentName,
 				Labels:      machineDeploymentLabels,
 				Annotations: machinePool.MachineDeploymentAnnotations,
 			},
@@ -327,7 +345,9 @@ func machineDeployments(cluster *rancherv1.Cluster, capiCluster *capi.Cluster, d
 					ObjectMeta: capi.ObjectMeta{
 						Labels: map[string]string{
 							capi.ClusterLabelName:           capiCluster.Name,
-							capi.MachineDeploymentLabelName: machinePoolName,
+							rke2.ClusterNameLabel:           capiCluster.Name,
+							capi.MachineDeploymentLabelName: machineDeploymentName,
+							rke2.RKEMachinePoolNameLabel:    machinePool.Name,
 						},
 						Annotations: machineSpecAnnotations,
 					},
@@ -342,6 +362,7 @@ func machineDeployments(cluster *rancherv1.Cluster, capiCluster *capi.Cluster, d
 							},
 						},
 						InfrastructureRef: infraRef,
+						NodeDrainTimeout:  machinePool.DrainBeforeDeleteTimeout,
 					},
 				},
 				Paused: machinePool.Paused,
@@ -365,6 +386,12 @@ func machineDeployments(cluster *rancherv1.Cluster, capiCluster *capi.Cluster, d
 			machineDeployment.Spec.Template.Labels[rke2.WorkerRoleLabel] = "true"
 		}
 
+		if len(machinePool.MachineOS) > 0 {
+			machineDeployment.Spec.Template.Labels[rke2.CattleOSLabel] = machinePool.MachineOS
+		} else {
+			machineDeployment.Spec.Template.Labels[rke2.CattleOSLabel] = rke2.DefaultMachineOS
+		}
+
 		if len(machinePool.Labels) > 0 {
 			for k, v := range machinePool.Labels {
 				machineDeployment.Spec.Template.Labels[k] = v
@@ -383,7 +410,7 @@ func machineDeployments(cluster *rancherv1.Cluster, capiCluster *capi.Cluster, d
 		result = append(result, machineDeployment)
 
 		// if a health check timeout was specified create health checks for this machine pool
-		if machinePool.UnhealthyNodeTimeout != nil {
+		if machinePool.UnhealthyNodeTimeout != nil && machinePool.UnhealthyNodeTimeout.Duration > 0 {
 			hc := deploymentHealthChecks(machineDeployment, machinePool)
 			result = append(result, hc)
 		}
@@ -394,6 +421,12 @@ func machineDeployments(cluster *rancherv1.Cluster, capiCluster *capi.Cluster, d
 
 // deploymentHealthChecks Health checks will mark a machine as failed if it has any of the conditions below for the duration of the given timeout. https://cluster-api.sigs.k8s.io/tasks/healthcheck.html#what-is-a-machinehealthcheck
 func deploymentHealthChecks(machineDeployment *capi.MachineDeployment, machinePool rancherv1.RKEMachinePool) *capi.MachineHealthCheck {
+	var maxUnhealthy *intstr.IntOrString
+	if machinePool.MaxUnhealthy != nil {
+		maxUnhealthy = new(intstr.IntOrString)
+		*maxUnhealthy = intstr.Parse(*machinePool.MaxUnhealthy)
+	}
+
 	return &capi.MachineHealthCheck{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      machineDeployment.Name,
@@ -418,7 +451,7 @@ func deploymentHealthChecks(machineDeployment *capi.MachineDeployment, machinePo
 					Timeout: *machinePool.UnhealthyNodeTimeout,
 				},
 			},
-			MaxUnhealthy:       machinePool.MaxUnhealthy,
+			MaxUnhealthy:       maxUnhealthy,
 			UnhealthyRange:     machinePool.UnhealthyRange,
 			NodeStartupTimeout: machinePool.NodeStartupTimeout,
 		},
@@ -443,8 +476,8 @@ func rkeCluster(cluster *rancherv1.Cluster) *rkev1.RKECluster {
 	}
 }
 
-// b64GZInterface is a function that will gzip then base64 encode the provided interface.
-func b64GZInterface(v interface{}) (string, error) {
+// compressInterface is a function that will marshal, gzip, then base64 encode the provided interface.
+func compressInterface(v interface{}) (string, error) {
 	var b64GZCluster string
 	marshalledCluster, err := json.Marshal(v)
 	if err != nil {
@@ -465,15 +498,55 @@ func b64GZInterface(v interface{}) (string, error) {
 	return b64GZCluster, nil
 }
 
+// decompressClusterSpec accepts an input string that is a base64/compressed cluster spec and will return a pointer to the cluster spec decompressed
+func decompressClusterSpec(inputb64 string) (*rancherv1.ClusterSpec, error) {
+	if inputb64 == "" {
+		return nil, fmt.Errorf("empty base64 input")
+	}
+
+	decodedGzip, err := base64.StdEncoding.DecodeString(inputb64)
+	if err != nil {
+		return nil, fmt.Errorf("error base64.DecodeString: %v", err)
+	}
+
+	buffer := bytes.NewBuffer(decodedGzip)
+
+	var gz io.Reader
+	gz, err = gzip.NewReader(buffer)
+	if err != nil {
+		return nil, err
+	}
+
+	csBytes, err := io.ReadAll(gz)
+	if err != nil {
+		return nil, err
+	}
+
+	c := rancherv1.ClusterSpec{}
+	err = json.Unmarshal(csBytes, &c)
+	if err != nil {
+		return nil, err
+	}
+
+	return &c, nil
+}
+
 // rkeControlPlane generates the rkecontrolplane object for a provided cluster object
 func rkeControlPlane(cluster *rancherv1.Cluster) (*rkev1.RKEControlPlane, error) {
 	// We need to base64/gzip encode the spec of our rancherv1.Cluster object so that we can reference it from the
 	// downstream cluster
-	b64GZCluster, err := b64GZInterface(cluster.Spec)
+	filteredClusterSpec := cluster.Spec.DeepCopy()
+	// set the corresponding specification for various operations to nil as these cause unnecessary reconciliation.
+	filteredClusterSpec.RKEConfig.ETCDSnapshotRestore = nil
+	filteredClusterSpec.RKEConfig.ETCDSnapshotCreate = nil
+	filteredClusterSpec.RKEConfig.RotateEncryptionKeys = nil
+	filteredClusterSpec.RKEConfig.RotateCertificates = nil
+	b64GZCluster, err := compressInterface(filteredClusterSpec)
 	if err != nil {
-		logrus.Errorf("cluster: %s/%s : error while gz/b64 encoding cluster specification: %v", cluster.Namespace, cluster.ClusterName, err)
+		logrus.Errorf("cluster: %s/%s : error while gz/b64 encoding cluster specification: %v", cluster.Namespace, cluster.Name, err)
 		return nil, err
 	}
+	rkeConfig := cluster.Spec.RKEConfig.DeepCopy()
 	return &rkev1.RKEControlPlane{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      cluster.Name,
@@ -486,11 +559,12 @@ func rkeControlPlane(cluster *rancherv1.Cluster) (*rkev1.RKEControlPlane, error)
 			},
 		},
 		Spec: rkev1.RKEControlPlaneSpec{
-			RKEClusterSpecCommon:     *cluster.Spec.RKEConfig.RKEClusterSpecCommon.DeepCopy(),
+			RKEClusterSpecCommon:     rkeConfig.RKEClusterSpecCommon,
 			LocalClusterAuthEndpoint: *cluster.Spec.LocalClusterAuthEndpoint.DeepCopy(),
-			ETCDSnapshotRestore:      cluster.Spec.RKEConfig.ETCDSnapshotRestore.DeepCopy(),
-			ETCDSnapshotCreate:       cluster.Spec.RKEConfig.ETCDSnapshotCreate.DeepCopy(),
-			RotateCertificates:       cluster.Spec.RKEConfig.RotateCertificates.DeepCopy(),
+			ETCDSnapshotRestore:      rkeConfig.ETCDSnapshotRestore,
+			ETCDSnapshotCreate:       rkeConfig.ETCDSnapshotCreate,
+			RotateCertificates:       rkeConfig.RotateCertificates,
+			RotateEncryptionKeys:     rkeConfig.RotateEncryptionKeys,
 			KubernetesVersion:        cluster.Spec.KubernetesVersion,
 			ManagementClusterName:    cluster.Status.ClusterName, // management cluster
 			AgentEnvVars:             cluster.Spec.AgentEnvVars,

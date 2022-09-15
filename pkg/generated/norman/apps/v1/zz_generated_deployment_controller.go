@@ -43,7 +43,7 @@ func init() {
 	resource.Put(DeploymentGroupVersionResource)
 }
 
-// Deprecated use v1.Deployment instead
+// Deprecated: use v1.Deployment instead
 type Deployment = v1.Deployment
 
 func NewDeployment(namespace, name string, obj v1.Deployment) *v1.Deployment {

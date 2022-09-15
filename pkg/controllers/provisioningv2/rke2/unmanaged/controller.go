@@ -22,7 +22,6 @@ import (
 	"github.com/rancher/wrangler/pkg/data"
 	corecontrollers "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/pkg/generic"
-	"github.com/rancher/wrangler/pkg/genericcondition"
 	"github.com/rancher/wrangler/pkg/kv"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
@@ -105,10 +104,10 @@ func (h *handler) onSecretChange(key string, secret *corev1.Secret) (*corev1.Sec
 	}
 
 	capiCluster, err := h.getCAPICluster(secret)
-	if apierror.IsNotFound(err) || capiCluster == nil {
-		return secret, nil
-	} else if err != nil {
+	if err != nil {
 		return secret, err
+	} else if capiCluster == nil {
+		return secret, nil
 	}
 
 	machineName, err := h.findMachine(capiCluster, secret.Name, data.String("id"))
@@ -150,6 +149,7 @@ func (h *handler) createMachineObjects(capiCluster *capi.Cluster, machineName st
 
 	if data.Bool("role-control-plane") {
 		labels[rke2.ControlPlaneRoleLabel] = "true"
+		labels[capi.MachineControlPlaneLabelName] = "true"
 	}
 	if data.Bool("role-etcd") {
 		labels[rke2.EtcdRoleLabel] = "true"
@@ -169,6 +169,7 @@ func (h *handler) createMachineObjects(capiCluster *capi.Cluster, machineName st
 
 	labels[rke2.MachineIDLabel] = data.String("id")
 	labels[rke2.ClusterNameLabel] = capiCluster.Name
+	labels[capi.ClusterLabelName] = capiCluster.Name
 
 	labelsMap := map[string]string{}
 	for _, str := range strings.Split(data.String("labels"), ",") {
@@ -211,20 +212,15 @@ func (h *handler) createMachineObjects(capiCluster *capi.Cluster, machineName st
 				Labels:      labels,
 				Annotations: annotations,
 			},
+			Spec: rkev1.RKEBootstrapSpec{
+				ClusterName: capiCluster.Name,
+			},
 		},
 		&rkev1.CustomMachine{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      machineName,
 				Namespace: capiCluster.Namespace,
 				Labels:    labels,
-			},
-			Status: rkev1.CustomMachineStatus{
-				Conditions: []genericcondition.GenericCondition{
-					{
-						Type:   "Ready",
-						Status: corev1.ConditionTrue,
-					},
-				},
 			},
 		},
 		&capi.Machine{
@@ -371,11 +367,20 @@ func (h *handler) onUnmanagedMachineOnRemove(key string, customMachine *rkev1.Cu
 	return customMachine, nil
 }
 
-func (h *handler) onUnmanagedMachineChange(key string, machine *rkev1.CustomMachine) (*rkev1.CustomMachine, error) {
-	if machine != nil && !machine.Status.Ready && machine.Spec.ProviderID != "" {
-		machine = machine.DeepCopy()
-		machine.Status.Ready = true
-		return h.unmanagedMachine.UpdateStatus(machine)
+func (h *handler) onUnmanagedMachineChange(_ string, machine *rkev1.CustomMachine) (*rkev1.CustomMachine, error) {
+	if machine != nil {
+		if !rke2.Ready.IsTrue(machine) {
+			// CustomMachines are provisioned already, so their Ready condition should be true.
+			machine = machine.DeepCopy()
+			rke2.Ready.SetStatus(machine, "True")
+			rke2.Ready.Message(machine, "")
+			return h.unmanagedMachine.UpdateStatus(machine)
+		}
+		if !machine.Status.Ready && machine.Spec.ProviderID != "" {
+			machine = machine.DeepCopy()
+			machine.Status.Ready = true
+			return h.unmanagedMachine.UpdateStatus(machine)
+		}
 	}
 	return machine, nil
 }

@@ -3,7 +3,6 @@ package clusterregistrationtoken
 import (
 	"fmt"
 	"net/url"
-	"strings"
 
 	"github.com/rancher/norman/types/convert"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
@@ -20,10 +19,10 @@ const (
 	commandFormat                        = "kubectl apply -f %s"
 	insecureCommandFormat                = "curl --insecure -sfL %s | kubectl apply -f -"
 	nodeCommandFormat                    = "sudo docker run -d --privileged --restart=unless-stopped --net=host -v /etc/kubernetes:/etc/kubernetes -v /var/run:/var/run %s %s --server %s --token %s%s"
-	rke2NodeCommandFormat                = "curl -fL %s | sudo %s sh -s - --server %s --label 'cattle.io/os=linux' --token %s%s"
-	rke2WindowsNodeCommandFormat         = `PowerShell curl.exe -fL %s -o install.ps1; Set-ExecutionPolicy Bypass -Scope Process -Force; ./install.ps1 -Server %s -Label 'cattle.io/os=windows' -Token %s -Worker%s`
-	rke2InsecureNodeCommandFormat        = "curl --insecure -fL %s | sudo %s sh -s - --server %s --label 'cattle.io/os=linux' --token %s%s"
-	rke2InsecureWindowsNodeCommandFormat = `PowerShell curl.exe --insecure -fL %s -o install.ps1; Set-ExecutionPolicy Bypass -Scope Process -Force; ./install.ps1 -Server %s -Label 'cattle.io/os=windows' -Token %s -Worker%s`
+	rke2NodeCommandFormat                = "%s curl -fL %s | sudo %s sh -s - --server %s --label 'cattle.io/os=linux' --token %s%s"
+	rke2WindowsNodeCommandFormat         = `%s curl.exe -fL %s -o install.ps1; Set-ExecutionPolicy Bypass -Scope Process -Force; ./install.ps1 -Server %s -Label 'cattle.io/os=windows' -Token %s -Worker%s`
+	rke2InsecureNodeCommandFormat        = "%s curl --insecure -fL %s | sudo %s sh -s - --server %s --label 'cattle.io/os=linux' --token %s%s"
+	rke2InsecureWindowsNodeCommandFormat = `%s curl.exe --insecure -fL %s -o install.ps1; Set-ExecutionPolicy Bypass -Scope Process -Force; ./install.ps1 -Server %s -Label 'cattle.io/os=windows' -Token %s -Worker%s`
 	loginCommandFormat                   = "echo \"%s\" | sudo docker login --username %s --password-stdin %s"
 	windowsNodeCommandFormat             = `PowerShell -NoLogo -NonInteractive -Command "& {docker run -v c:\:c:\host %s%s bootstrap --server %s --token %s%s%s | iex}"`
 )
@@ -81,21 +80,23 @@ func (h *handler) assignStatus(crt *v32.ClusterRegistrationToken) (v32.ClusterRe
 	if h.isRKE2(clusterID) {
 		// for linux
 		crtStatus.NodeCommand = fmt.Sprintf(rke2NodeCommandFormat,
+			AgentEnvVars(cluster, Linux),
 			rootURL+installer.SystemAgentInstallPath,
-			AgentEnvVars(cluster, false),
+			AgentEnvVars(cluster, Linux),
 			rootURL,
 			token,
 			ca)
 		crtStatus.InsecureNodeCommand = fmt.Sprintf(rke2InsecureNodeCommandFormat,
+			AgentEnvVars(cluster, Linux),
 			rootURL+installer.SystemAgentInstallPath,
-			AgentEnvVars(cluster, false),
+			AgentEnvVars(cluster, Linux),
 			rootURL,
 			token,
 			ca)
 	} else {
 		// for linux
 		crtStatus.NodeCommand = fmt.Sprintf(nodeCommandFormat,
-			AgentEnvVars(cluster, true),
+			AgentEnvVars(cluster, Docker),
 			agentImage,
 			rootURL,
 			token,
@@ -104,11 +105,13 @@ func (h *handler) assignStatus(crt *v32.ClusterRegistrationToken) (v32.ClusterRe
 	// for windows
 	if h.isRKE2(clusterID) {
 		crtStatus.WindowsNodeCommand = fmt.Sprintf(rke2WindowsNodeCommandFormat,
+			AgentEnvVars(cluster, PowerShell),
 			rootURL+installer.WindowsRke2InstallPath,
 			rootURL,
 			token,
 			caWindows)
 		crtStatus.InsecureWindowsNodeCommand = fmt.Sprintf(rke2InsecureWindowsNodeCommandFormat,
+			AgentEnvVars(cluster, PowerShell),
 			rootURL+installer.WindowsRke2InstallPath,
 			rootURL,
 			token,
@@ -149,22 +152,6 @@ func getWindowsPrefixPathArg(rkeConfig *rketypes.RancherKubernetesEngineConfig) 
 	return ""
 }
 
-func AgentEnvVars(cluster *v3.Cluster, docker bool) string {
-	var agentEnvVars []string
-	if cluster != nil {
-		for _, envVar := range cluster.Spec.AgentEnvVars {
-			if envVar.Value != "" {
-				if docker {
-					agentEnvVars = append(agentEnvVars, fmt.Sprintf("-e \"%s=%s\"", envVar.Name, envVar.Value))
-				} else {
-					agentEnvVars = append(agentEnvVars, fmt.Sprintf("%s=\"%s\"", envVar.Name, envVar.Value))
-				}
-			}
-		}
-	}
-	return strings.Join(agentEnvVars, " ")
-}
-
 func NodeCommand(token string, cluster *v3.Cluster) (string, error) {
 	ca := systemtemplate.CAChecksum()
 	if ca != "" {
@@ -176,7 +163,7 @@ func NodeCommand(token string, cluster *v3.Cluster) (string, error) {
 		return "", err
 	}
 	return fmt.Sprintf(nodeCommandFormat,
-		AgentEnvVars(cluster, true),
+		AgentEnvVars(cluster, Docker),
 		image.ResolveWithCluster(settings.AgentImage.Get(), cluster),
 		rootURL,
 		token,

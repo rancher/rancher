@@ -26,6 +26,7 @@ import (
 const (
 	UnknownFinder = iota
 	SoapFinder
+	SoapGetter
 	ContentLibraryManager
 	TagsManager
 	CustomFieldsFinder
@@ -42,6 +43,7 @@ var fieldNames = map[string]int{
 	"templates":           SoapFinder,
 	"clusters":            SoapFinder,
 	"resource-pools":      SoapFinder,
+	"guest-os":            SoapGetter,
 	"content-libraries":   ContentLibraryManager,
 	"library-templates":   ContentLibraryManager,
 	"tags":                TagsManager,
@@ -86,6 +88,7 @@ func (v *handler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 
 	var cc *v1.Secret
 	var errcode httperror.ErrorCode
+	var vmPath string
 
 	if id := req.FormValue("cloudCredentialId"); id != "" {
 		cc, errcode, err = v.getCloudCredential(id, req)
@@ -108,6 +111,14 @@ func (v *handler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 
 	var js []byte
 	switch fieldNames[fieldName] {
+	case SoapGetter:
+		var data []string
+		data, err = processSoapFinderGetters(req.Context(), vmPath, fieldName, cc, dc)
+		if err != nil {
+			invalidBody(res, req, err)
+			return
+		}
+		js, err = json.Marshal(map[string][]string{"data": data})
 	case SoapFinder:
 		var data []string
 		if data, err = processSoapFinder(req.Context(), fieldName, cc, dc); err != nil {

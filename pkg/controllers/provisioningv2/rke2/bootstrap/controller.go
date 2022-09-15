@@ -5,7 +5,6 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"errors"
-	"fmt"
 
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2"
@@ -13,6 +12,7 @@ import (
 	rkecontroller "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/provisioningv2/rke2/installer"
+	"github.com/rancher/rancher/pkg/serviceaccounttoken"
 	"github.com/rancher/rancher/pkg/tls"
 	"github.com/rancher/rancher/pkg/wrangler"
 	appcontrollers "github.com/rancher/wrangler/pkg/generated/controllers/apps/v1"
@@ -37,20 +37,24 @@ const (
 type handler struct {
 	serviceAccountCache corecontrollers.ServiceAccountCache
 	secretCache         corecontrollers.SecretCache
+	secretClient        corecontrollers.SecretClient
 	machineCache        capicontrollers.MachineCache
 	capiClusters        capicontrollers.ClusterCache
 	deploymentCache     appcontrollers.DeploymentCache
 	rkeControlPlanes    rkecontroller.RKEControlPlaneCache
+	rkeBootstrapClient  rkecontroller.RKEBootstrapClient
 }
 
 func Register(ctx context.Context, clients *wrangler.Context) {
 	h := &handler{
 		serviceAccountCache: clients.Core.ServiceAccount().Cache(),
 		secretCache:         clients.Core.Secret().Cache(),
+		secretClient:        clients.Core.Secret(),
 		machineCache:        clients.CAPI.Machine().Cache(),
 		capiClusters:        clients.CAPI.Cluster().Cache(),
 		deploymentCache:     clients.Apps.Deployment().Cache(),
 		rkeControlPlanes:    clients.RKE.RKEControlPlane().Cache(),
+		rkeBootstrapClient:  clients.RKE.RKEBootstrap(),
 	}
 	rkecontroller.RegisterRKEBootstrapGeneratingHandler(ctx,
 		clients.RKE.RKEBootstrap(),
@@ -90,7 +94,7 @@ func Register(ctx context.Context, clients *wrangler.Context) {
 	}, clients.RKE.RKEBootstrap(), clients.Core.ServiceAccount(), clients.CAPI.Machine())
 }
 
-func (h *handler) getBootstrapSecret(namespace, name string, envVars []corev1.EnvVar) (*corev1.Secret, error) {
+func (h *handler) getBootstrapSecret(namespace, name string, envVars []corev1.EnvVar, machine *capi.Machine) (*corev1.Secret, error) {
 	sa, err := h.serviceAccountCache.Get(namespace, name)
 	if apierror.IsNotFound(err) {
 		return nil, nil
@@ -100,37 +104,50 @@ func (h *handler) getBootstrapSecret(namespace, name string, envVars []corev1.En
 		return nil, err
 
 	}
-	for _, secretRef := range sa.Secrets {
-		secret, err := h.secretCache.Get(sa.Namespace, secretRef.Name)
-		if err != nil {
+	sName := serviceaccounttoken.ServiceAccountSecretName(sa)
+	secret, err := h.secretCache.Get(sa.Namespace, sName)
+	if err != nil {
+		if !apierror.IsNotFound(err) {
 			return nil, err
 		}
-
-		hash := sha256.Sum256(secret.Data["token"])
-
-		hasHostPort, err := h.rancherDeploymentHasHostPort()
+		sc := serviceaccounttoken.SecretTemplate(sa)
+		secret, err = h.secretClient.Create(sc)
 		if err != nil {
-			return nil, err
+			if !apierror.IsAlreadyExists(err) {
+				return nil, err
+			}
+			secret, err = h.secretClient.Get(sa.Namespace, sName, metav1.GetOptions{})
+			if err != nil {
+				return nil, err
+			}
 		}
+	}
+	hash := sha256.Sum256(secret.Data["token"])
 
-		data, err := installer.LinuxInstallScript(context.WithValue(context.Background(), tls.InternalAPI, hasHostPort), base64.URLEncoding.EncodeToString(hash[:]), envVars, "")
-		if err != nil {
-			return nil, err
-		}
-
-		return &corev1.Secret{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      name,
-				Namespace: namespace,
-			},
-			Data: map[string][]byte{
-				"value": data,
-			},
-			Type: "rke.cattle.io/bootstrap",
-		}, nil
+	hasHostPort, err := h.rancherDeploymentHasHostPort()
+	if err != nil {
+		return nil, err
 	}
 
-	return nil, nil
+	is := installer.LinuxInstallScript
+	if os := machine.GetLabels()[rke2.CattleOSLabel]; os == rke2.WindowsMachineOS {
+		is = installer.WindowsInstallScript
+	}
+	data, err := is(context.WithValue(context.Background(), tls.InternalAPI, hasHostPort), base64.URLEncoding.EncodeToString(hash[:]), envVars, "")
+	if err != nil {
+		return nil, err
+	}
+
+	return &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		},
+		Data: map[string][]byte{
+			"value": data,
+		},
+		Type: "rke.cattle.io/bootstrap",
+	}, nil
 }
 
 func (h *handler) assignPlanSecret(machine *capi.Machine, bootstrap *rkev1.RKEBootstrap) []runtime.Object {
@@ -248,7 +265,7 @@ func (h *handler) assignBootStrapSecret(machine *capi.Machine, bootstrap *rkev1.
 		},
 	}
 
-	bootstrapSecret, err := h.getBootstrapSecret(sa.Namespace, sa.Name, envVars)
+	bootstrapSecret, err := h.getBootstrapSecret(sa.Namespace, sa.Name, envVars, machine)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -260,6 +277,20 @@ func (h *handler) OnChange(bootstrap *rkev1.RKEBootstrap, status rkev1.RKEBootst
 	var (
 		result []runtime.Object
 	)
+
+	if bootstrap.Spec.ClusterName == "" {
+		// If the bootstrap spec cluster name is blank, we need to update the bootstrap spec to the correct value
+		// This is to handle old rkebootstrap objects for unmanaged clusters that did not have the spec properly set
+		if v, ok := bootstrap.Labels[capi.ClusterLabelName]; ok && v != "" {
+			bootstrap = bootstrap.DeepCopy()
+			bootstrap.Spec.ClusterName = v
+			var err error
+			bootstrap, err = h.rkeBootstrapClient.Update(bootstrap)
+			if err != nil {
+				return nil, bootstrap.Status, err
+			}
+		}
+	}
 
 	machine, err := rke2.GetMachineByOwner(h.machineCache, bootstrap)
 	if err != nil {
@@ -316,31 +347,10 @@ func getLabelsAndAnnotationsForPlanSecret(bootstrap *rkev1.RKEBootstrap, machine
 		labels[k] = v
 	}
 
-	annotations := make(map[string]string, len(bootstrap.Annotations)+1)
-	annotations[rke2.JoinURLAnnotation] = getMachineJoinURL(machine)
+	annotations := make(map[string]string, len(bootstrap.Annotations))
 	for k, v := range bootstrap.Annotations {
 		annotations[k] = v
 	}
 
 	return labels, annotations
-}
-
-func getMachineJoinURL(machine *capi.Machine) string {
-	if machine.Status.NodeInfo == nil {
-		return ""
-	}
-
-	address := ""
-	for _, machineAddress := range machine.Status.Addresses {
-		switch machineAddress.Type {
-		case capi.MachineInternalIP:
-			address = machineAddress.Address
-		case capi.MachineExternalIP:
-			if address == "" {
-				address = machineAddress.Address
-			}
-		}
-	}
-
-	return fmt.Sprintf("https://%s:%d", address, rke2.GetRuntimeSupervisorPort(machine.Status.NodeInfo.KubeletVersion))
 }

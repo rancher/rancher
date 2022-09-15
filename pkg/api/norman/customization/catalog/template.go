@@ -10,6 +10,7 @@ import (
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
+	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	helmlib "github.com/rancher/rancher/pkg/helm"
 	managementschema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
@@ -20,6 +21,7 @@ type TemplateWrapper struct {
 	ClusterCatalogLister         v3.ClusterCatalogLister
 	ProjectCatalogLister         v3.ProjectCatalogLister
 	CatalogTemplateVersionLister v3.CatalogTemplateVersionLister
+	SecretLister                 v1.SecretLister
 }
 
 func (t TemplateWrapper) TemplateFormatter(apiContext *types.APIContext, resource *types.RawResource) {
@@ -112,7 +114,7 @@ func (t TemplateWrapper) TemplateIconHandler(apiContext *types.APIContext, next 
 			return err
 		}
 
-		helm, err := helmlib.New(catalog)
+		helm, err := helmlib.New(catalog, t.SecretLister)
 		if err != nil {
 			return err
 		}

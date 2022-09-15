@@ -1,6 +1,7 @@
 package machineprovision
 
 import (
+	"sort"
 	"strconv"
 
 	name2 "github.com/rancher/wrangler/pkg/name"
@@ -17,8 +18,10 @@ const (
 	InfraMachineKind    = "rke.cattle.io/infra-machine-kind"
 	InfraMachineName    = "rke.cattle.io/infra-machine-name"
 	InfraJobRemove      = "rke.cattle.io/infra-remove"
+	CapiMachineName     = "rke.cattle.io/capi-machine-name"
 
 	pathToMachineFiles = "/path/to/machine/files"
+	sslCertDir         = "/etc/rancher/ssl"
 )
 
 var (
@@ -43,8 +46,8 @@ func objects(ready bool, args driverArgs) []runtime.Object {
 		return []runtime.Object{secret}
 	}
 
-	volumes := make([]corev1.Volume, 0, 2)
-	volumeMounts := make([]corev1.VolumeMount, 0, 2)
+	volumes := make([]corev1.Volume, 0)
+	volumeMounts := make([]corev1.VolumeMount, 0)
 	saName := GetJobName(args.MachineName)
 
 	if args.BootstrapRequired {
@@ -81,6 +84,12 @@ func objects(ready bool, args driverArgs) []runtime.Object {
 		for file := range args.FilesSecret.Data {
 			keysToPaths = append(keysToPaths, corev1.KeyToPath{Key: file, Path: file})
 		}
+
+		// Because of the way apply works, it must be ensured that the keysToPaths slice is always in the same order.
+		sort.Slice(keysToPaths, func(i, j int) bool {
+			return keysToPaths[i].Key < keysToPaths[j].Key
+		})
+
 		volumes = append(volumes, corev1.Volume{
 			Name: "machine-files",
 			VolumeSource: corev1.VolumeSource{
@@ -92,6 +101,32 @@ func objects(ready bool, args driverArgs) []runtime.Object {
 			},
 		})
 	}
+
+	if args.CertsSecret != nil {
+		volumes = append(volumes, corev1.Volume{
+			Name: "machine-certs",
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName:  args.CertsSecret.Name,
+					DefaultMode: &[]int32{0644}[0],
+				},
+			},
+		})
+		for key := range args.CertsSecret.Data {
+			// Setting one volume mount for each cert ensures that the directory remains writable in the container.
+			volumeMounts = append(volumeMounts, corev1.VolumeMount{
+				Name:      "machine-certs",
+				ReadOnly:  true,
+				MountPath: sslCertDir + "/" + key,
+				SubPath:   key,
+			})
+		}
+	}
+
+	// Because of the way apply works, it must be ensured that the volumeMounts always appear in the same order.
+	sort.Slice(volumeMounts, func(i, j int) bool {
+		return volumeMounts[i].MountPath < volumeMounts[j].MountPath
+	})
 
 	sa := &corev1.ServiceAccount{
 		ObjectMeta: metav1.ObjectMeta{
@@ -149,34 +184,30 @@ func objects(ready bool, args driverArgs) []runtime.Object {
 			Name:     "rke2-machine-provisioner",
 		},
 	}
+
+	labels := map[string]string{
+		InfraMachineGroup:   args.MachineGVK.Group,
+		InfraMachineVersion: args.MachineGVK.Version,
+		InfraMachineKind:    args.MachineGVK.Kind,
+		InfraMachineName:    args.MachineName,
+		InfraJobRemove:      strconv.FormatBool(!args.BootstrapRequired),
+		CapiMachineName:     args.CapiMachineName,
+	}
+
 	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      saName,
 			Namespace: args.MachineNamespace,
+			Labels:    labels,
 		},
 		Spec: batchv1.JobSpec{
 			BackoffLimit: &args.BackoffLimit,
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{
-						InfraMachineGroup:   args.MachineGVK.Group,
-						InfraMachineVersion: args.MachineGVK.Version,
-						InfraMachineKind:    args.MachineGVK.Kind,
-						InfraMachineName:    args.MachineName,
-						InfraJobRemove:      strconv.FormatBool(!args.BootstrapRequired),
-					},
+					Labels: labels,
 				},
 				Spec: corev1.PodSpec{
-					Volumes: append(volumes, corev1.Volume{
-						Name: "tls-ca-additional-volume",
-						VolumeSource: corev1.VolumeSource{
-							Secret: &corev1.SecretVolumeSource{
-								SecretName:  "tls-ca-additional",
-								DefaultMode: &[]int32{0444}[0],
-								Optional:    &[]bool{true}[0],
-							},
-						},
-					}),
+					Volumes:       volumes,
 					RestartPolicy: corev1.RestartPolicyNever,
 					Containers: []corev1.Container{
 						{
@@ -197,12 +228,7 @@ func objects(ready bool, args driverArgs) []runtime.Object {
 									},
 								},
 							},
-							VolumeMounts: append(volumeMounts, corev1.VolumeMount{
-								Name:      "tls-ca-additional-volume",
-								ReadOnly:  true,
-								MountPath: "/etc/ssl/certs/ca-additional.pem",
-								SubPath:   "ca-additional.pem",
-							}),
+							VolumeMounts: volumeMounts,
 						},
 					},
 					ServiceAccountName: saName,
@@ -218,6 +244,7 @@ func objects(ready bool, args driverArgs) []runtime.Object {
 		role,
 		rb,
 		args.FilesSecret,
+		args.CertsSecret,
 		rb2,
 		job,
 	}

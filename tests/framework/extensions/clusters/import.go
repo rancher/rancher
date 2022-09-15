@@ -2,9 +2,11 @@ package clusters
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/rancher/norman/types"
+	apisV1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	"github.com/rancher/rancher/tests/framework/clients/dynamic"
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
@@ -12,6 +14,7 @@ import (
 	"github.com/rancher/rancher/tests/framework/pkg/wait"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -44,7 +47,7 @@ users:
 `
 
 // ImportCluster creates a job using the given rest config that applies the import yaml from the given management cluster.
-func ImportCluster(client *rancher.Client, cluster *management.Cluster, rest *rest.Config) error {
+func ImportCluster(client *rancher.Client, cluster *apisV1.Cluster, rest *rest.Config) error {
 	// create a sub session to clean up after we apply the manifest
 	ts := client.Session.NewSession()
 	defer ts.Cleanup()
@@ -52,7 +55,7 @@ func ImportCluster(client *rancher.Client, cluster *management.Cluster, rest *re
 	var token management.ClusterRegistrationToken
 	err := kwait.Poll(500*time.Millisecond, 2*time.Minute, func() (done bool, err error) {
 		res, err := client.Management.ClusterRegistrationToken.List(&types.ListOpts{Filters: map[string]interface{}{
-			"clusterId": cluster.ID,
+			"clusterId": cluster.Status.ClusterName,
 		}})
 		if err != nil {
 			return false, err
@@ -101,7 +104,7 @@ func ImportCluster(client *rancher.Client, cluster *management.Cluster, rest *re
 			Name:     "cluster-admin",
 		},
 	}
-	_, err = downClient.Resource(rbacv1.SchemeGroupVersion.WithResource("clusterrolebindings")).Create(context.TODO(), ext_unstructured.MustToUnstructured(rb), metav1.CreateOptions{})
+	_, err = downClient.Resource(rbacv1.SchemeGroupVersion.WithResource("clusterrolebindings")).Namespace("").Create(context.TODO(), ext_unstructured.MustToUnstructured(rb), metav1.CreateOptions{})
 	if err != nil {
 		return err
 	}
@@ -136,8 +139,11 @@ func ImportCluster(client *rancher.Client, cluster *management.Cluster, rest *re
 					Containers: []corev1.Container{
 						{
 							Name:    "kubectl",
-							Image:   "rancher/shell:v0.1.10",
-							Command: []string{"kubectl", "apply", "--filename=" + token.ManifestURL},
+							Image:   "rancher/shell:v0.1.18",
+							Command: []string{"/bin/sh", "-c"},
+							Args: []string{
+								fmt.Sprintf("wget -qO- --tries=10 --no-check-certificate %s | kubectl apply -f - ;", token.ManifestURL),
+							},
 							SecurityContext: &corev1.SecurityContext{
 								RunAsUser:  &user,
 								RunAsGroup: &group,
@@ -174,7 +180,6 @@ func ImportCluster(client *rancher.Client, cluster *management.Cluster, rest *re
 	err = wait.WatchWait(jobWatch, func(event watch.Event) (bool, error) {
 		var wj batchv1.Job
 		_ = runtime.DefaultUnstructuredConverter.FromUnstructured(event.Object.(*unstructured.Unstructured).Object, &wj)
-
 		return wj.Status.Succeeded == 1, nil
 	})
 	if err != nil {

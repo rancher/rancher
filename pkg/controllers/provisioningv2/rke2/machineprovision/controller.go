@@ -17,7 +17,9 @@ import (
 	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta1"
 	mgmtcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	ranchercontrollers "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
+	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/provisioningv2/kubeconfig"
+	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/rancher/wrangler/pkg/apply"
 	"github.com/rancher/wrangler/pkg/condition"
@@ -27,6 +29,7 @@ import (
 	corecontrollers "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/pkg/generic"
 	"github.com/rancher/wrangler/pkg/genericcondition"
+	"github.com/rancher/wrangler/pkg/name"
 	"github.com/rancher/wrangler/pkg/summary"
 	"github.com/sirupsen/logrus"
 	batchv1 "k8s.io/api/batch/v1"
@@ -35,6 +38,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
@@ -46,8 +50,6 @@ const (
 	deleteJobConditionType = "DeleteJob"
 
 	forceRemoveMachineAnn = "provisioning.cattle.io/force-machine-remove"
-
-	drainingSucceededCondition = condition.Cond(capi.DrainingSucceededCondition)
 )
 
 type infraObject struct {
@@ -58,24 +60,25 @@ type infraObject struct {
 }
 
 func newInfraObject(obj runtime.Object) (*infraObject, error) {
-	objMeta, err := meta.Accessor(obj)
+	copiedObj := obj.DeepCopyObject()
+	objMeta, err := meta.Accessor(copiedObj)
 	if err != nil {
 		return nil, err
 	}
 
-	data, err := data.Convert(obj.DeepCopyObject())
+	data, err := data.Convert(copiedObj)
 	if err != nil {
 		return nil, err
 	}
 
-	typeMeta, err := meta.TypeAccessor(obj)
+	typeMeta, err := meta.TypeAccessor(copiedObj)
 	if err != nil {
 		return nil, err
 	}
 
 	return &infraObject{
 		data:     data,
-		obj:      obj,
+		obj:      copiedObj,
 		meta:     objMeta,
 		typeMeta: typeMeta,
 	}, nil
@@ -84,10 +87,12 @@ func newInfraObject(obj runtime.Object) (*infraObject, error) {
 type handler struct {
 	ctx                 context.Context
 	apply               apply.Apply
+	jobController       batchcontrollers.JobController
 	jobs                batchcontrollers.JobCache
 	pods                corecontrollers.PodCache
 	secrets             corecontrollers.SecretCache
 	machines            capicontrollers.MachineCache
+	machinesClient      capicontrollers.MachineClient
 	namespaces          corecontrollers.NamespaceCache
 	nodeDriverCache     mgmtcontrollers.NodeDriverCache
 	dynamic             *dynamic.Controller
@@ -104,9 +109,11 @@ func Register(ctx context.Context, clients *wrangler.Context) {
 			clients.RBAC.Role(),
 			clients.Batch.Job()),
 		pods:                clients.Core.Pod().Cache(),
+		jobController:       clients.Batch.Job(),
 		jobs:                clients.Batch.Job().Cache(),
 		secrets:             clients.Core.Secret().Cache(),
 		machines:            clients.CAPI.Machine().Cache(),
+		machinesClient:      clients.CAPI.Machine(),
 		nodeDriverCache:     clients.Mgmt.NodeDriver().Cache(),
 		namespaces:          clients.Core.Namespace().Cache(),
 		dynamic:             clients.Dynamic,
@@ -128,7 +135,7 @@ func validGVK(gvk schema.GroupVersionKind) bool {
 		gvk.Kind != "CustomMachine"
 }
 
-func (h *handler) OnJobChange(key string, job *batchv1.Job) (*batchv1.Job, error) {
+func (h *handler) OnJobChange(_ string, job *batchv1.Job) (*batchv1.Job, error) {
 	if job == nil {
 		return nil, nil
 	}
@@ -154,38 +161,33 @@ func (h *handler) OnJobChange(key string, job *batchv1.Job) (*batchv1.Job, error
 		return job, err
 	}
 
-	meta, err := meta.Accessor(infraMachine)
+	infraObj, err := newInfraObject(infraMachine)
 	if err != nil {
 		return nil, err
 	}
 
-	d, err := data.Convert(infraMachine)
-	if err != nil {
-		return job, err
-	}
-
-	newStatus, err := h.getMachineStatus(job, job.Spec.Template.Labels[InfraJobRemove] == "true")
+	newStatus, err := h.getMachineStatus(job)
 	if err != nil {
 		return job, err
 	}
 	newStatus.JobName = job.Name
 
-	if _, err := h.patchStatus(infraMachine, d, newStatus); err != nil {
+	if _, err := h.patchStatus(infraObj.obj, infraObj.data, newStatus); err != nil {
 		return job, err
 	}
 
 	// Re-evaluate the infra-machine after this
 	if err := h.dynamic.Enqueue(infraMachine.GetObjectKind().GroupVersionKind(),
-		meta.GetNamespace(), meta.GetName()); err != nil {
+		infraObj.meta.GetNamespace(), infraObj.meta.GetName()); err != nil {
 		return nil, err
 	}
 
 	return job, nil
 }
 
-func (h *handler) getMachineStatus(job *batchv1.Job, remove bool) (rkev1.RKEMachineStatus, error) {
+func (h *handler) getMachineStatus(job *batchv1.Job) (rkev1.RKEMachineStatus, error) {
 	condType := createJobConditionType
-	if remove {
+	if job.Spec.Template.Labels[InfraJobRemove] == "true" {
 		condType = deleteJobConditionType
 	}
 	if !job.Status.CompletionTime.IsZero() {
@@ -226,25 +228,20 @@ func (h *handler) getMachineStatus(job *batchv1.Job, remove bool) (rkev1.RKEMach
 		}
 
 		if lastPod != nil {
-			return getMachineStatusFromPod(lastPod, job.Spec.Template.Labels[InfraMachineKind], condType), nil
+			return getMachineStatusFromPod(lastPod, condType), nil
 		}
-	}
-
-	message := CreatingMachineMessage(job.Spec.Template.Labels[InfraMachineKind])
-	if condType != createJobConditionType {
-		message = DeletingMachineMessage(job.Spec.Template.Labels[InfraMachineKind])
 	}
 
 	return rkev1.RKEMachineStatus{Conditions: []genericcondition.GenericCondition{
 		{
 			Type:    "Ready",
 			Status:  corev1.ConditionFalse,
-			Message: message,
+			Message: ExecutingMachineMessage(job.Spec.Template.Labels, job.Namespace),
 		},
 	}}, nil
 }
 
-func getMachineStatusFromPod(pod *corev1.Pod, kind, condType string) rkev1.RKEMachineStatus {
+func getMachineStatusFromPod(pod *corev1.Pod, condType string) rkev1.RKEMachineStatus {
 	reason := string(capierrors.CreateMachineError)
 	if condType == deleteJobConditionType {
 		reason = string(capierrors.DeleteMachineError)
@@ -269,10 +266,7 @@ func getMachineStatusFromPod(pod *corev1.Pod, kind, condType string) rkev1.RKEMa
 	for _, containerStatus := range pod.Status.ContainerStatuses {
 		if containerStatus.State.Terminated != nil && containerStatus.State.Terminated.ExitCode != 0 {
 			failureMessage := strings.TrimSpace(containerStatus.State.Terminated.Message)
-			message := FailedMachineCreateMessage(kind, reason, failureMessage)
-			if condType != createJobConditionType {
-				message = FailedMachineDeleteMessage(kind, reason, failureMessage)
-			}
+			message := FailedMachineMessage(pod.Labels, pod.Namespace, reason, failureMessage)
 			return rkev1.RKEMachineStatus{
 				Conditions: []genericcondition.GenericCondition{
 					{
@@ -322,18 +316,30 @@ func (h *handler) OnRemove(key string, obj runtime.Object) (runtime.Object, erro
 	}
 
 	if !infraObj.data.Bool("status", "jobComplete") && infraObj.data.String("status", "failureReason") == "" {
+		job, err := h.getJobFromInfraMachine(infraObj)
+		if apierrors.IsNotFound(err) {
+			// If the job is not found, go ahead and proceed with machine deletion
+			return obj, h.apply.WithOwner(obj).ApplyObjects()
+		} else if err != nil {
+			return obj, err
+		}
+		logrus.Debugf("[MachineProvision] create job for %s not finished, job was found and the error was not nil and was not an isnotfound", key)
+		if job != nil {
+			// enqueue the job to force-reconcile the condition
+			h.jobController.Enqueue(job.Namespace, job.Name)
+			logrus.Tracef("[MachineProvision] create job object for %s was %+v", key, job)
+		}
 		return obj, fmt.Errorf("cannot delete machine %s because create job has not finished", infraObj.meta.GetName())
 	}
 
 	if cond := getCondition(infraObj.data, deleteJobConditionType); cond != nil {
-		job, err := h.jobs.Get(infraObj.meta.GetNamespace(), GetJobName(infraObj.meta.GetName()))
+		job, err := h.getJobFromInfraMachine(infraObj)
 		if apierrors.IsNotFound(err) {
 			// If the deletion job condition has been set on the infrastructure object and the deletion job has been removed,
 			// then we don't want to create another deletion job.
 			logrus.Infof("Machine %s %s has already been deleted", infraObj.obj.GetObjectKind().GroupVersionKind(), infraObj.meta.GetName())
-			return obj, nil
-		}
-		if err != nil {
+			return obj, h.apply.WithOwner(obj).ApplyObjects()
+		} else if err != nil {
 			return obj, err
 		}
 
@@ -360,7 +366,7 @@ func (h *handler) OnRemove(key string, obj runtime.Object) (runtime.Object, erro
 
 	if machine == nil || machine.Status.NodeRef == nil {
 		// Machine noderef is nil, we should just allow deletion.
-		logrus.Debugf("[MachineProvision] There was no associated K8s node with this etcd dynamicmachine %s. proceeding with deletion", key)
+		logrus.Debugf("[MachineProvision] There was no associated K8s node with this etcd dynamicmachine %s. Proceeding with deletion", key)
 		return h.doRemove(infraObj)
 	}
 
@@ -387,8 +393,7 @@ func (h *handler) OnRemove(key string, obj runtime.Object) (runtime.Object, erro
 		}
 	}
 
-	if _, nodeDrainExcluded := machine.Annotations[capi.ExcludeNodeDrainingAnnotation]; !removed ||
-		(!nodeDrainExcluded && !drainingSucceededCondition.IsTrue(machine) && drainingSucceededCondition.GetReason(machine) != capi.DrainingFailedReason) {
+	if !removed {
 		if err = h.dynamic.EnqueueAfter(obj.GetObjectKind().GroupVersionKind(), infraObj.meta.GetNamespace(), infraObj.meta.GetName(), 5*time.Second); err != nil {
 			return obj, err
 		}
@@ -444,12 +449,24 @@ func (h *handler) run(infraObj *infraObject, create bool) (runtime.Object, error
 			h.dynamic.EnqueueAfter(infraObj.obj.GetObjectKind().GroupVersionKind(), infraObj.meta.GetNamespace(), infraObj.meta.GetName(), 2*time.Second)
 	}
 
-	if err := h.apply.WithOwner(infraObj.obj).ApplyObjects(objects(args.String("providerID") != "" && create, dArgs)...); err != nil {
+	failedCreate := infraObj.data.String("status", "failureReason") == string(capierrors.CreateMachineError)
+
+	if err := h.apply.WithOwner(infraObj.obj).ApplyObjects(objects((args.String("providerID") != "" || failedCreate) && create, dArgs)...); err != nil {
 		return nil, err
 	}
 
 	if create {
-		return h.patchStatus(infraObj.obj, infraObj.data, dArgs.RKEMachineStatus)
+		infraObj.obj, err = h.patchStatus(infraObj.obj, infraObj.data, dArgs.RKEMachineStatus)
+		if err != nil {
+			return nil, err
+		}
+
+		if failedCreate {
+			logrus.Infof("[MachineProvision] Failed to create infrastructure %s/%s for machine %s, deleting and recreating...", infraObj.meta.GetNamespace(), infraObj.meta.GetName(), dArgs.CapiMachineName)
+			if err = h.machinesClient.Delete(infraObj.meta.GetNamespace(), dArgs.CapiMachineName, &metav1.DeleteOptions{}); err != nil {
+				return infraObj.obj, fmt.Errorf("failed to delete CAPI machine %s: %w", dArgs.CapiMachineName, err)
+			}
+		}
 	}
 
 	return infraObj.obj, nil
@@ -508,16 +525,35 @@ func (h *handler) patchStatus(obj runtime.Object, d data.Object, state rkev1.RKE
 	})
 }
 
+func (h *handler) getJobFromInfraMachine(infraObj *infraObject) (*batchv1.Job, error) {
+	gvk := infraObj.obj.GetObjectKind().GroupVersionKind()
+	jobs, err := h.jobs.List(infraObj.meta.GetNamespace(), labels.Set{
+		InfraMachineGroup:   gvk.Group,
+		InfraMachineVersion: gvk.Version,
+		InfraMachineKind:    gvk.Kind,
+		InfraMachineName:    infraObj.meta.GetName()}.AsSelector(),
+	)
+	if err != nil {
+		return nil, err
+	} else if len(jobs) == 0 {
+		// This is likely the name of the job, expect if the infra machine object has a very long name.
+		return nil, apierrors.NewNotFound(batchv1.Resource("jobs"), GetJobName(infraObj.meta.GetName()))
+	}
+
+	// There can be at most one job returned here because there can be at most one infra machine object with the given GVK and name.
+	return jobs[0], nil
+}
+
 func setCondition(dynamic *dynamic.Controller, obj runtime.Object, conditionType string, err error) (runtime.Object, error) {
+	if errors.Is(generic.ErrSkip, err) {
+		return obj, nil
+	}
+
 	var (
 		reason  = ""
 		status  = "True"
 		message = ""
 	)
-
-	if errors.Is(generic.ErrSkip, err) {
-		err = nil
-	}
 
 	if err != nil {
 		reason = "Error"
@@ -625,6 +661,40 @@ func constructFilesSecret(driver string, config map[string]interface{}) *corev1.
 	return nil
 }
 
+func (h *handler) constructCertsSecret(machineName, machineNamespace string) (*corev1.Secret, error) {
+	certSecretData := make(map[string][]byte)
+
+	cert := settings.CACerts.Get()
+	if cert != "" {
+		certSecretData["tls.crt"] = []byte(cert)
+	}
+
+	cert = settings.InternalCACerts.Get()
+	if cert != "" {
+		certSecretData["internal-tls.crt"] = []byte(cert)
+	}
+
+	if secret, err := h.secrets.Get(namespace.System, "tls-additional"); err == nil {
+		for key, val := range secret.Data {
+			certSecretData[key] = val
+		}
+	} else if !apierrors.IsNotFound(err) {
+		return nil, err
+	}
+
+	if len(certSecretData) > 0 {
+		return &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      name.SafeConcatName("machine", "certs", hashName(machineName)),
+				Namespace: machineNamespace,
+			},
+			Data: certSecretData,
+		}, nil
+	}
+
+	return nil, nil
+}
+
 func shouldCleanupObjects(job *batchv1.Job, d data.Object) bool {
 	if !job.Status.CompletionTime.IsZero() {
 		return true
@@ -644,18 +714,32 @@ func shouldCleanupObjects(job *batchv1.Job, d data.Object) bool {
 	return false
 }
 
-func FailedMachineDeleteMessage(kind, failureReason, failureMessage string) string {
-	return fmt.Sprintf("failed deleting server (%s) in infrastructure provider: %s: %s", kind, failureReason, failureMessage)
+func FailedMachineMessage(podLabels map[string]string, namespace, failureReason, failureMessage string) string {
+	verb := "creating"
+	if podLabels[InfraJobRemove] == "true" {
+		verb = "deleting"
+	}
+	return fmt.Sprintf("failed %s server [%s/%s] of kind (%s) for machine %s in infrastructure provider: %s: %s",
+		verb,
+		namespace,
+		podLabels[InfraMachineName],
+		podLabels[InfraMachineKind],
+		podLabels[CapiMachineName],
+		failureReason,
+		failureMessage,
+	)
 }
 
-func FailedMachineCreateMessage(kind, failureReason, failureMessage string) string {
-	return fmt.Sprintf("failed creating server (%s) in infrastructure provider: %s: %s", kind, failureReason, failureMessage)
-}
-
-func CreatingMachineMessage(kind string) string {
-	return fmt.Sprintf("creating server (%s) in infrastructure provider", kind)
-}
-
-func DeletingMachineMessage(kind string) string {
-	return fmt.Sprintf("deleting server (%s) in infrastructure provider", kind)
+func ExecutingMachineMessage(podLabels map[string]string, namespace string) string {
+	verb := "creating"
+	if podLabels[InfraJobRemove] == "true" {
+		verb = "deleting"
+	}
+	return fmt.Sprintf("%s server [%s/%s] of kind (%s) for machine %s in infrastructure provider",
+		verb,
+		namespace,
+		podLabels[InfraMachineName],
+		podLabels[InfraMachineKind],
+		podLabels[CapiMachineName],
+	)
 }

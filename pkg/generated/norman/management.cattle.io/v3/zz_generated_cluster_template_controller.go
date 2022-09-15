@@ -43,7 +43,7 @@ func init() {
 	resource.Put(ClusterTemplateGroupVersionResource)
 }
 
-// Deprecated use v3.ClusterTemplate instead
+// Deprecated: use v3.ClusterTemplate instead
 type ClusterTemplate = v3.ClusterTemplate
 
 func NewClusterTemplate(namespace, name string, obj v3.ClusterTemplate) *v3.ClusterTemplate {

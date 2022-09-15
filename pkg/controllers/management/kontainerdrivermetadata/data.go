@@ -1,6 +1,7 @@
 package kontainerdrivermetadata
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -13,6 +14,7 @@ import (
 	mVersion "github.com/mcuadros/go-version"
 	"github.com/rancher/norman/types/convert"
 	setting2 "github.com/rancher/rancher/pkg/api/norman/store/setting"
+	"github.com/rancher/rancher/pkg/channelserver"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/settings"
@@ -33,7 +35,6 @@ const (
 
 const (
 	APIVersion           = "management.cattle.io/v3"
-	RancherVersionDev    = "2.6.99"
 	DataJSONLocation     = "/var/lib/rancher-data/driver-metadata/data.json"
 	sendRKELabel         = "io.cattle.rke_store"
 	svcOptionLinuxKey    = "service-option-linux-key"
@@ -60,6 +61,8 @@ var rancherUpdateSettingMap = map[string]settings.Setting{
 	settings.UIKubernetesSupportedVersions.Name:     settings.UIKubernetesSupportedVersions,
 	settings.KubernetesVersionToSystemImages.Name:   settings.KubernetesVersionToSystemImages,
 	settings.KubernetesVersionToServiceOptions.Name: settings.KubernetesVersionToServiceOptions,
+	settings.Rke2DefaultVersion.Name:                settings.Rke2DefaultVersion,
+	settings.K3sDefaultVersion.Name:                 settings.K3sDefaultVersion,
 }
 
 func (md *MetadataController) loadDataFromLocal() (kdm.Data, error) {
@@ -131,7 +134,7 @@ func (md *MetadataController) saveSystemImages(K8sVersionRKESystemImages map[str
 	DefaultK8sVersions map[string]string) error {
 	maxVersionForMajorK8sVersion := map[string]string{}
 	deprecatedMap := map[string]bool{}
-	rancherVersion := GetRancherVersion()
+	rancherVersion := settings.GetRancherVersion()
 	var maxIgnore []string
 	for k8sVersion, systemImages := range K8sVersionRKESystemImages {
 		rancherVersionInfo, minorOk := K8sVersionInfo[k8sVersion]
@@ -683,6 +686,9 @@ func toUpdate(maxVersionForMajorK8sVersion map[string]string, deprecated map[str
 	uiSupported := fmt.Sprintf(">=%s.x <=%s.x", minVersion, maxVersion)
 	uiDefaultRange := fmt.Sprintf("<=%s.x", maxVersion)
 
+	rke2DefaultVersion := channelserver.GetDefaultByRuntimeAndServerVersion(context.TODO(), "rke2", rancherVersion)
+	k3sDefaultVersion := channelserver.GetDefaultByRuntimeAndServerVersion(context.TODO(), "k3s", rancherVersion)
+
 	return map[string]string{
 		settings.KubernetesVersionsCurrent.Name:         strings.Join(k8sVersionsCurrent, ","),
 		settings.KubernetesVersion.Name:                 defaultK8sVersion,
@@ -691,6 +697,8 @@ func toUpdate(maxVersionForMajorK8sVersion map[string]string, deprecated map[str
 		settings.UIKubernetesSupportedVersions.Name:     uiSupported,
 		settings.KubernetesVersionToSystemImages.Name:   k8sCurrRKEdata,
 		settings.KubernetesVersionToServiceOptions.Name: k8sSvcOptionData,
+		settings.Rke2DefaultVersion.Name:                rke2DefaultVersion,
+		settings.K3sDefaultVersion.Name:                 k3sDefaultVersion,
 	}, nil
 }
 

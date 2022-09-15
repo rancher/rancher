@@ -8,13 +8,16 @@ import (
 	"github.com/rancher/norman/types/convert"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	v1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
+	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2"
 	"github.com/rancher/rancher/pkg/features"
 	fleetconst "github.com/rancher/rancher/pkg/fleet"
 	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta1"
 	mgmtcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	rocontrollers "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
 	rkecontrollers "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
+	"github.com/rancher/rancher/pkg/provisioningv2/image"
 	"github.com/rancher/rancher/pkg/provisioningv2/kubeconfig"
+	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/rancher/wrangler/pkg/apply"
@@ -271,6 +274,8 @@ func (h *handler) createNewCluster(cluster *v1.Cluster, status v1.ClusterStatus,
 	spec.DefaultPodSecurityPolicyTemplateName = cluster.Spec.DefaultPodSecurityPolicyTemplateName
 	spec.DefaultClusterRoleForProjectMembers = cluster.Spec.DefaultClusterRoleForProjectMembers
 	spec.EnableNetworkPolicy = cluster.Spec.EnableNetworkPolicy
+	spec.DesiredAgentImage = image.ResolveWithCluster(settings.AgentImage.Get(), cluster)
+	spec.DesiredAuthImage = image.ResolveWithCluster(settings.AuthImage.Get(), cluster)
 
 	spec.AgentEnvVars = nil
 	for _, env := range cluster.Spec.AgentEnvVars {
@@ -335,9 +340,10 @@ func (h *handler) updateStatus(objs []runtime.Object, cluster *v1.Cluster, statu
 			ready = true
 		}
 		for _, messageCond := range existing.Status.Conditions {
-			if messageCond.Type == "Provisioned" && cluster.Spec.RKEConfig != nil {
+			if messageCond.Type == "Updated" || messageCond.Type == "Provisioned" || messageCond.Type == "Removed" {
 				continue
 			}
+
 			found := false
 			newCond := genericcondition.GenericCondition{
 				Type:               string(messageCond.Type),
@@ -358,6 +364,7 @@ func (h *handler) updateStatus(objs []runtime.Object, cluster *v1.Cluster, statu
 				status.Conditions = append(status.Conditions, newCond)
 			}
 		}
+		status.AgentDeployed = rke2.AgentDeployed.IsTrue(existing)
 	}
 
 	// Never set ready back to false because we will end up deleting the secret

@@ -7,6 +7,6 @@ const (
 )
 
 type Lifecycle struct {
-	PostStart *Handler `json:"postStart,omitempty" yaml:"postStart,omitempty"`
-	PreStop   *Handler `json:"preStop,omitempty" yaml:"preStop,omitempty"`
+	PostStart *LifecycleHandler `json:"postStart,omitempty" yaml:"postStart,omitempty"`
+	PreStop   *LifecycleHandler `json:"preStop,omitempty" yaml:"preStop,omitempty"`
 }

@@ -43,7 +43,7 @@ func init() {
 	resource.Put(ProjectMonitorGraphGroupVersionResource)
 }
 
-// Deprecated use v3.ProjectMonitorGraph instead
+// Deprecated: use v3.ProjectMonitorGraph instead
 type ProjectMonitorGraph = v3.ProjectMonitorGraph
 
 func NewProjectMonitorGraph(namespace, name string, obj v3.ProjectMonitorGraph) *v3.ProjectMonitorGraph {

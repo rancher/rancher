@@ -1,31 +1,29 @@
 package rancher
 
 import (
-	"bytes"
-
 	"github.com/mcuadros/go-version"
 	"github.com/rancher/norman/condition"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/tokens"
-	"github.com/rancher/rancher/pkg/controllers/provisioningv2/cluster"
 	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2"
 	"github.com/rancher/rancher/pkg/features"
-	fleetconst "github.com/rancher/rancher/pkg/fleet"
-	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta1"
 	v3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
-	provv1 "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
-	rkecontrollers "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
 	rancherversion "github.com/rancher/rancher/pkg/version"
 	"github.com/rancher/rancher/pkg/wrangler"
+	"github.com/rancher/wrangler/pkg/data"
+	"github.com/rancher/wrangler/pkg/data/convert"
 	controllerapiextv1 "github.com/rancher/wrangler/pkg/generated/controllers/apiextensions.k8s.io/v1"
 	controllerv1 "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
+	"github.com/rancher/wrangler/pkg/summary"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/mod/semver"
 	v1 "k8s.io/api/core/v1"
 	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	k8serror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/util/retry"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 )
@@ -39,8 +37,6 @@ const (
 	rancherVersionKey                         = "rancherVersion"
 	projectsCreatedKey                        = "projectsCreated"
 	namespacesAssignedKey                     = "namespacesAssigned"
-	caSecretName                              = "tls-ca-additional"
-	caSecretField                             = "ca-additional.pem"
 	capiMigratedKey                           = "capiMigrated"
 )
 
@@ -66,19 +62,12 @@ func runMigrations(wranglerContext *wrangler.Context) error {
 	}
 
 	if features.RKE2.Enabled() {
-		if err := migrateCAPIMachineLabelsAndAnnotationsToPlanSecret(
-			wranglerContext.Core.ConfigMap(),
-			wranglerContext.Core.Secret(),
-			wranglerContext.Mgmt.Cluster().Cache(),
-			wranglerContext.Provisioning.Cluster().Cache(),
-			wranglerContext.CAPI.Machine().Cache(),
-			wranglerContext.RKE.RKEBootstrap(),
-		); err != nil {
+		if err := migrateCAPIMachineLabelsAndAnnotationsToPlanSecret(wranglerContext); err != nil {
 			return err
 		}
 	}
 
-	return copyCAAdditionalSecret(wranglerContext.Core.Secret())
+	return nil
 }
 
 func getConfigMap(configMapController controllerv1.ConfigMapController, configMapName string) (*v1.ConfigMap, error) {
@@ -196,43 +185,6 @@ func forceSystemAndDefaultProjectCreation(configMapController controllerv1.Confi
 	return createOrUpdateConfigMap(configMapController, cm)
 }
 
-// copyCAAdditionalSecret will ensure that if a secret named tls-ca-additional exists in the cattle-system namespace
-// then this secret also exists in the fleet-default namespace. This is because the machine creation and deletion jobs
-// need to have access to this secret as well.
-func copyCAAdditionalSecret(secretClient controllerv1.SecretClient) error {
-	cattleSecret, err := secretClient.Get("cattle-system", caSecretName, metav1.GetOptions{})
-	if err != nil {
-		if k8serror.IsNotFound(err) {
-			return nil
-		}
-		return err
-	}
-
-	fleetSecret, err := secretClient.Get(fleetconst.ClustersDefaultNamespace, caSecretName, metav1.GetOptions{})
-	if err != nil {
-		if !k8serror.IsNotFound(err) {
-			return err
-		}
-		fleetSecret.Name = cattleSecret.Name
-		fleetSecret.Namespace = fleetconst.ClustersDefaultNamespace
-	} else if bytes.Equal(fleetSecret.Data[caSecretField], cattleSecret.Data[caSecretField]) {
-		// Both secrets contain the same data.
-		return nil
-	}
-
-	fleetSecret.Data = cattleSecret.Data
-
-	if err != nil {
-		// In this case, the fleetSecret doesn't exist yet.
-		_, err = secretClient.Create(fleetSecret)
-	} else {
-		_, err = secretClient.Update(fleetSecret)
-	}
-
-	return err
-
-}
-
 func forceSystemNamespaceAssignment(configMapController controllerv1.ConfigMapController, projectClient v3.ProjectClient) error {
 	cm, err := getConfigMap(configMapController, forceSystemNamespacesAssignment)
 	if err != nil || cm == nil {
@@ -321,9 +273,8 @@ func addWebhookConfigToCAPICRDs(crdClient controllerapiextv1.CustomResourceDefin
 	return nil
 }
 
-func migrateCAPIMachineLabelsAndAnnotationsToPlanSecret(configMapController controllerv1.ConfigMapController, secretsController controllerv1.SecretController, mgmtClusterCache v3.ClusterCache,
-	provClusterCache provv1.ClusterCache, capiMachineCache capicontrollers.MachineCache, bootstrapClient rkecontrollers.RKEBootstrapClient) error {
-	cm, err := getConfigMap(configMapController, migrateFromMachineToPlanSecret)
+func migrateCAPIMachineLabelsAndAnnotationsToPlanSecret(w *wrangler.Context) error {
+	cm, err := getConfigMap(w.Core.ConfigMap(), migrateFromMachineToPlanSecret)
 	if err != nil || cm == nil {
 		return err
 	}
@@ -332,15 +283,14 @@ func migrateCAPIMachineLabelsAndAnnotationsToPlanSecret(configMapController cont
 		return nil
 	}
 
-	mgmtClusters, err := mgmtClusterCache.List(labels.Everything())
+	mgmtClusters, err := w.Mgmt.Cluster().List(metav1.ListOptions{})
 	if err != nil {
 		return err
 	}
 
 	bootstrapLabelExcludes := map[string]struct{}{
-		rke2.InitNodeMachineIDLabel:     {},
-		rke2.InitNodeMachineIDDoneLabel: {},
-		rke2.InitNodeLabel:              {},
+		rke2.InitNodeMachineIDLabel: {},
+		rke2.InitNodeLabel:          {},
 	}
 
 	boostrapAnnotationExcludes := map[string]struct{}{
@@ -352,36 +302,43 @@ func migrateCAPIMachineLabelsAndAnnotationsToPlanSecret(configMapController cont
 		rke2.UnCordonAnnotation:  {},
 	}
 
-	for _, mgmtCluster := range mgmtClusters {
-		provClusters, err := provClusterCache.GetByIndex(cluster.ByCluster, mgmtCluster.Name)
-		if k8serror.IsNotFound(err) || len(provClusters) == 0 {
+	for _, mgmtCluster := range mgmtClusters.Items {
+		provClusters, err := w.Provisioning.Cluster().List(mgmtCluster.Spec.FleetWorkspaceName, metav1.ListOptions{})
+		if k8serror.IsNotFound(err) || len(provClusters.Items) == 0 {
 			continue
 		} else if err != nil {
 			return err
 		}
 
-		for _, provCluster := range provClusters {
-			machines, err := capiMachineCache.List(provCluster.Namespace, labels.Set{capi.ClusterLabelName: provCluster.Name}.AsSelector())
+		for _, provCluster := range provClusters.Items {
+			machines, err := w.CAPI.Machine().List(provCluster.Namespace, metav1.ListOptions{LabelSelector: labels.Set{capi.ClusterLabelName: provCluster.Name}.String()})
 			if err != nil {
 				return err
 			}
 
-			for _, machine := range machines {
+			otherMachines, err := w.CAPI.Machine().List(provCluster.Namespace, metav1.ListOptions{LabelSelector: labels.Set{rke2.ClusterNameLabel: provCluster.Name}.String()})
+			if err != nil {
+				return err
+			}
+
+			allMachines := append(machines.Items, otherMachines.Items...)
+
+			for _, machine := range allMachines {
 				if machine.Spec.Bootstrap.ConfigRef == nil || machine.Spec.Bootstrap.ConfigRef.APIVersion != rke2.RKEAPIVersion {
 					continue
 				}
 
-				planSecrets, err := secretsController.Cache().List(machine.Namespace, labels.Set{rke2.MachineNameLabel: machine.Name}.AsSelector())
+				planSecrets, err := w.Core.Secret().List(machine.Namespace, metav1.ListOptions{LabelSelector: labels.Set{rke2.MachineNameLabel: machine.Name}.String()})
 				if err != nil {
 					return err
 				}
-				if len(planSecrets) == 0 {
+				if len(planSecrets.Items) == 0 {
 					continue
 				}
 
-				for _, secret := range planSecrets {
+				for _, secret := range planSecrets.Items {
 					if err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
-						secret, err := secretsController.Get(secret.Namespace, secret.Name, metav1.GetOptions{})
+						secret, err := w.Core.Secret().Get(secret.Namespace, secret.Name, metav1.GetOptions{})
 						if err != nil {
 							return err
 						}
@@ -389,7 +346,7 @@ func migrateCAPIMachineLabelsAndAnnotationsToPlanSecret(configMapController cont
 						secret = secret.DeepCopy()
 						rke2.CopyMap(secret.Labels, machine.Labels)
 						rke2.CopyMap(secret.Annotations, machine.Annotations)
-						_, err = secretsController.Update(secret)
+						_, err = w.Core.Secret().Update(secret)
 						return err
 					}); err != nil {
 						return err
@@ -397,22 +354,101 @@ func migrateCAPIMachineLabelsAndAnnotationsToPlanSecret(configMapController cont
 				}
 
 				if err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
-					bootstrap, err := bootstrapClient.Get(machine.Spec.Bootstrap.ConfigRef.Namespace, machine.Spec.Bootstrap.ConfigRef.Name, metav1.GetOptions{})
+					bootstrap, err := w.RKE.RKEBootstrap().Get(machine.Spec.Bootstrap.ConfigRef.Namespace, machine.Spec.Bootstrap.ConfigRef.Name, metav1.GetOptions{})
 					if err != nil {
 						return err
 					}
 					bootstrap = bootstrap.DeepCopy()
 					rke2.CopyMapWithExcludes(bootstrap.Labels, machine.Labels, bootstrapLabelExcludes)
 					rke2.CopyMapWithExcludes(bootstrap.Annotations, machine.Annotations, boostrapAnnotationExcludes)
-					_, err = bootstrapClient.Update(bootstrap)
+					if bootstrap.Spec.ClusterName == "" {
+						// If the bootstrap spec cluster name is blank, we need to update the bootstrap spec to the correct value
+						// This is to handle old rkebootstrap objects for unmanaged clusters that did not have the spec properly set
+						if v, ok := bootstrap.Labels[capi.ClusterLabelName]; ok && v != "" {
+							bootstrap.Spec.ClusterName = v
+						}
+					}
+					_, err = w.RKE.RKEBootstrap().Update(bootstrap)
 					return err
 				}); err != nil {
 					return err
+				}
+
+				if machine.Spec.InfrastructureRef.APIVersion == rke2.RKEAPIVersion || machine.Spec.InfrastructureRef.APIVersion == rke2.RKEMachineAPIVersion {
+					gv, err := schema.ParseGroupVersion(machine.Spec.InfrastructureRef.APIVersion)
+					if err != nil {
+						// This error should not occur because RKEAPIVersion and RKEMachineAPIVersion are valid
+						continue
+					}
+
+					gvk := schema.GroupVersionKind{
+						Group:   gv.Group,
+						Version: gv.Version,
+						Kind:    machine.Spec.InfrastructureRef.Kind,
+					}
+					if err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+						infraMachine, err := w.Dynamic.Get(gvk, machine.Spec.InfrastructureRef.Namespace, machine.Spec.InfrastructureRef.Name)
+						if err != nil {
+							return err
+						}
+
+						d, err := data.Convert(infraMachine.DeepCopyObject())
+						if err != nil {
+							return err
+						}
+
+						if changed, err := insertOrUpdateCondition(d, summary.NewCondition("Ready", "True", "", "")); err != nil {
+							return err
+						} else if changed {
+							_, err = w.Dynamic.UpdateStatus(&unstructured.Unstructured{Object: d})
+							return err
+						}
+						return err
+					}); err != nil {
+						return err
+					}
 				}
 			}
 		}
 	}
 
 	cm.Data[capiMigratedKey] = "true"
-	return createOrUpdateConfigMap(configMapController, cm)
+	return createOrUpdateConfigMap(w.Core.ConfigMap(), cm)
+}
+
+func insertOrUpdateCondition(d data.Object, desiredCondition summary.Condition) (bool, error) {
+	for _, cond := range summary.GetUnstructuredConditions(d) {
+		if desiredCondition.Equals(cond) {
+			return false, nil
+		}
+	}
+
+	// The conditions must be converted to a map so that DeepCopyJSONValue will
+	// recognize it as a map instead of a data.Object.
+	newCond, err := convert.EncodeToMap(desiredCondition.Object)
+	if err != nil {
+		return false, err
+	}
+
+	dConditions := d.Slice("status", "conditions")
+	conditions := make([]interface{}, len(dConditions))
+	found := false
+	for i, cond := range dConditions {
+		if cond.String("type") == desiredCondition.Type() {
+			conditions[i] = newCond
+			found = true
+		} else {
+			conditions[i], err = convert.EncodeToMap(cond)
+			if err != nil {
+				return false, err
+			}
+		}
+	}
+
+	if !found {
+		conditions = append(conditions, newCond)
+	}
+	d.SetNested(conditions, "status", "conditions")
+
+	return true, nil
 }

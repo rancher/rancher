@@ -43,7 +43,7 @@ func init() {
 	resource.Put(NodePoolGroupVersionResource)
 }
 
-// Deprecated use v3.NodePool instead
+// Deprecated: use v3.NodePool instead
 type NodePool = v3.NodePool
 
 func NewNodePool(namespace, name string, obj v3.NodePool) *v3.NodePool {

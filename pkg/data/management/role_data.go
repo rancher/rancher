@@ -53,7 +53,8 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 		addRule().apiGroups("management.cattle.io").resources("cisconfigs").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("cisbenchmarkversions").verbs("get", "list", "watch").
 		addRule().apiGroups("rke-machine-config.cattle.io").resources("*").verbs("create").
-		addRule().apiGroups("catalog.cattle.io").resources("clusterrepos").verbs("get", "list", "watch")
+		addRule().apiGroups("catalog.cattle.io").resources("clusterrepos").verbs("get", "list", "watch").
+		addRule().apiGroups("rke.cattle.io").resources("etcdsnapshots").verbs("get", "list", "watch")
 
 	rb.addRole("Manage Node Drivers", "nodedrivers-manage").
 		addRule().apiGroups("management.cattle.io").resources("nodedrivers").verbs("*")
@@ -67,7 +68,7 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 		addRule().apiGroups("management.cattle.io").resources("users", "globalrolebindings").verbs("*").
 		addRule().apiGroups("management.cattle.io").resources("globalroles").verbs("get", "list", "watch")
 	rb.addRole("Manage Roles", "roles-manage").
-		addRule().apiGroups("management.cattle.io").resources("roletemplates").verbs("*")
+		addRule().apiGroups("management.cattle.io").resources("roletemplates").verbs("delete", "deletecollection", "get", "list", "patch", "create", "update", "watch")
 	rb.addRole("Manage Authentication", "authn-manage").
 		addRule().apiGroups("management.cattle.io").resources("authconfigs").verbs("get", "list", "watch", "update")
 	rb.addRole("Manage Settings", "settings-manage").
@@ -119,7 +120,8 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 		addRule().apiGroups("management.cattle.io").resources("settings").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("features").verbs("get", "list", "watch").
 		addRule().apiGroups("project.cattle.io").resources("sourcecodecredentials").verbs("*").
-		addRule().apiGroups("project.cattle.io").resources("sourcecoderepositories").verbs("*")
+		addRule().apiGroups("project.cattle.io").resources("sourcecoderepositories").verbs("*").
+		addRule().apiGroups("management.cattle.io").resources("rancherusernotifications").verbs("get", "list", "watch")
 
 	// TODO user should be dynamically authorized to only see herself
 	// TODO enable when groups are "in". they need to be self-service
@@ -142,6 +144,7 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 		addRule().apiGroups("*").resources("*").verbs("*").
 		addRule().apiGroups("management.cattle.io").resources("clusters").verbs("own").
 		addRule().apiGroups("provisioning.cattle.io").resources("clusters").verbs("*").
+		addRule().apiGroups("rke.cattle.io").resources("etcdsnapshots").verbs("get", "list", "watch").
 		addRule().apiGroups("cluster.x-k8s.io").resources("machines").verbs("*").
 		addRule().apiGroups("rke-machine-config.cattle.io").resources("*").verbs("*").
 		addRule().apiGroups("rke-machine.cattle.io").resources("*").verbs("*").
@@ -171,7 +174,8 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 		addRule().apiGroups("cluster.x-k8s.io").resources("machines").verbs("get", "watch").
 		addRule().apiGroups("cluster.x-k8s.io").resources("machinedeployments").verbs("get", "watch").
 		addRule().apiGroups("rke-machine-config.cattle.io").resources("*").verbs("get", "watch").
-		addRule().apiGroups("rke-machine.cattle.io").resources("*").verbs("get", "watch")
+		addRule().apiGroups("rke-machine.cattle.io").resources("*").verbs("get", "watch").
+		addRule().apiGroups("metrics.k8s.io").resources("nodemetrics", "nodes").verbs("get", "list", "watch")
 
 	rb.addRoleTemplate("Create Projects", "projects-create", "cluster", false, false, false).
 		addRule().apiGroups("management.cattle.io").resources("projects").verbs("create")
@@ -234,6 +238,7 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 	// Project roles
 	rb.addRoleTemplate("Project Owner", "project-owner", "project", false, false, false).
 		addRule().apiGroups("ui.cattle.io").resources("navlinks").verbs("get", "list", "watch").
+		addRule().apiGroups("").resources("nodes").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("projectroletemplatebindings").verbs("*").
 		addRule().apiGroups("project.cattle.io").resources("apps").verbs("*").
 		addRule().apiGroups("project.cattle.io").resources("apprevisions").verbs("*").
@@ -476,7 +481,8 @@ func addUserRules(role *roleBuilder) *roleBuilder {
 		addRule().apiGroups("project.cattle.io").resources("sourcecodecredentials").verbs("*").
 		addRule().apiGroups("project.cattle.io").resources("sourcecoderepositories").verbs("*").
 		addRule().apiGroups("provisioning.cattle.io").resources("clusters").verbs("create").
-		addRule().apiGroups("rke-machine-config.cattle.io").resources("*").verbs("create")
+		addRule().apiGroups("rke-machine-config.cattle.io").resources("*").verbs("create").
+		addRule().apiGroups("management.cattle.io").resources("rancherusernotifications").verbs("get", "list", "watch")
 
 	return role
 }

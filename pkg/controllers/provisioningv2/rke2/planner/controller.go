@@ -15,6 +15,7 @@ import (
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 )
 
 type handler struct {
@@ -37,28 +38,37 @@ func Register(ctx context.Context, clients *wrangler.Context, planner *planner.P
 					Name:      clusterName,
 				}}, nil
 			}
+		} else if machine, ok := obj.(*capi.Machine); ok {
+			clusterName := machine.Labels[capi.ClusterLabelName]
+			if clusterName != "" {
+				return []relatedresource.Key{{
+					Namespace: machine.Namespace,
+					Name:      clusterName,
+				}}, nil
+			}
 		}
 		return nil, nil
-	}, clients.RKE.RKEControlPlane(), clients.Core.Secret())
+	}, clients.RKE.RKEControlPlane(), clients.Core.Secret(), clients.CAPI.Machine())
 }
 
 func (h *handler) OnChange(cluster *rkev1.RKEControlPlane, status rkev1.RKEControlPlaneStatus) (rkev1.RKEControlPlaneStatus, error) {
+	logrus.Debugf("[planner] rkecluster %s/%s: handler OnChange called", cluster.Namespace, cluster.Name)
 	if !cluster.DeletionTimestamp.IsZero() {
 		return status, nil
 	}
 
 	status.ObservedGeneration = cluster.Generation
 
+	logrus.Debugf("[planner] rkecluster %s/%s: calling planner process", cluster.Namespace, cluster.Name)
 	err := h.planner.Process(cluster)
 	var errWaiting planner.ErrWaiting
 	if errors.As(err, &errWaiting) {
-		logrus.Infof("rkecluster %s/%s: %v", cluster.Namespace, cluster.Name, err)
+		logrus.Infof("[planner] rkecluster %s/%s: waiting: %v", cluster.Namespace, cluster.Name, err)
 		rke2.Ready.SetStatus(&status, "Unknown")
 		rke2.Ready.Message(&status, err.Error())
 		rke2.Ready.Reason(&status, "Waiting")
 		return status, nil
 	}
-
 	if !errors.Is(err, generic.ErrSkip) {
 		rke2.Ready.SetError(&status, "", err)
 		if err != nil {
@@ -66,10 +76,12 @@ func (h *handler) OnChange(cluster *rkev1.RKEControlPlane, status rkev1.RKEContr
 			// because we don't register this handler with an associated condition. This is pretty much a bug in the
 			// framework but it's too impactful to change right before 2.6.0 so we should consider changing this later.
 			// If you are reading this years later we'll just assume we decided not to change the framework.
-			logrus.Errorf("error in planner for '%s/%s': %v", cluster.Namespace, cluster.Name, err)
+			logrus.Errorf("[planner] rkecluster %s/%s: error encountered during plan processing was %v", cluster.Namespace, cluster.Name, err)
 			h.controlPlanes.EnqueueAfter(cluster.Namespace, cluster.Name, 5*time.Second)
 		}
+	} else {
+		logrus.Debugf("[planner] rkecluster %s/%s: objects changed, waiting for cache sync before finishing reconciliation", cluster.Namespace, cluster.Name)
 	}
-	logrus.Infof("rkecluster %s/%s: reconciliation complete", cluster.Namespace, cluster.Name)
+	logrus.Debugf("[planner] rkecluster %s/%s: reconciliation complete", cluster.Namespace, cluster.Name)
 	return status, nil
 }

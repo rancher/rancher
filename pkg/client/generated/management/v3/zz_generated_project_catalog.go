@@ -8,10 +8,12 @@ const (
 	ProjectCatalogType                      = "projectCatalog"
 	ProjectCatalogFieldAnnotations          = "annotations"
 	ProjectCatalogFieldBranch               = "branch"
+	ProjectCatalogFieldCatalogSecrets       = "catalogSecrets"
 	ProjectCatalogFieldCommit               = "commit"
 	ProjectCatalogFieldConditions           = "conditions"
 	ProjectCatalogFieldCreated              = "created"
 	ProjectCatalogFieldCreatorID            = "creatorId"
+	ProjectCatalogFieldCredentialSecret     = "credentialSecret"
 	ProjectCatalogFieldDescription          = "description"
 	ProjectCatalogFieldHelmVersion          = "helmVersion"
 	ProjectCatalogFieldKind                 = "kind"
@@ -35,10 +37,12 @@ type ProjectCatalog struct {
 	types.Resource
 	Annotations          map[string]string  `json:"annotations,omitempty" yaml:"annotations,omitempty"`
 	Branch               string             `json:"branch,omitempty" yaml:"branch,omitempty"`
+	CatalogSecrets       *CatalogSecrets    `json:"catalogSecrets,omitempty" yaml:"catalogSecrets,omitempty"`
 	Commit               string             `json:"commit,omitempty" yaml:"commit,omitempty"`
 	Conditions           []CatalogCondition `json:"conditions,omitempty" yaml:"conditions,omitempty"`
 	Created              string             `json:"created,omitempty" yaml:"created,omitempty"`
 	CreatorID            string             `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
+	CredentialSecret     string             `json:"credentialSecret,omitempty" yaml:"credentialSecret,omitempty"`
 	Description          string             `json:"description,omitempty" yaml:"description,omitempty"`
 	HelmVersion          string             `json:"helmVersion,omitempty" yaml:"helmVersion,omitempty"`
 	Kind                 string             `json:"kind,omitempty" yaml:"kind,omitempty"`

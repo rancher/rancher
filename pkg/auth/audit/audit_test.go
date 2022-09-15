@@ -1,21 +1,36 @@
 package audit
 
 import (
+	"bytes"
+	"compress/gzip"
+	"compress/zlib"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"net/http"
+	"os"
 	"reflect"
+	"regexp"
 	"strings"
 	"testing"
 
 	"github.com/rancher/rancher/pkg/data/management"
+	"github.com/stretchr/testify/suite"
 )
 
-func Test_concealSensitiveData(t *testing.T) {
+var errAny = errors.New("any error is allowed")
+
+type AuditTest struct {
+	suite.Suite
+}
+
+func TestAuditSuite(t *testing.T) {
+	suite.Run(t, new(AuditTest))
+}
+func (a *AuditTest) TestConcealSensitiveData() {
 	r, err := constructKeyConcealRegex()
-	if err != nil {
-		t.Fatalf("failed compiling sanitizing regex: %v", err)
-	}
-	a := auditLog{
+	a.Require().NoError(err, "failed compiling sanitizing regex")
+	logger := auditLog{
 		log:                nil,
 		writer:             nil,
 		reqBody:            nil,
@@ -126,20 +141,246 @@ func Test_concealSensitiveData(t *testing.T) {
 			want:  machineDataWant,
 		},
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+	for i := range tests {
+		test := tests[i]
+		a.Run(test.name, func() {
 			var want map[string]interface{}
-			if err := json.Unmarshal(tt.want, &want); err != nil {
-				t.Errorf("error unmarshaling: %v", err)
-			}
-			got := a.concealSensitiveData(tt.uri, tt.input)
+			err := json.Unmarshal(test.want, &want)
+			a.NoError(err, "failed to unmarshal")
+			got := logger.concealSensitiveData(test.uri, test.input)
 			var gotMap map[string]interface{}
-			if err := json.Unmarshal(got, &gotMap); err != nil {
-				t.Errorf("error unmarshaling: %v", err)
-			}
-			if !reflect.DeepEqual(want, gotMap) {
-				t.Errorf("concealSensitiveData() = %s, want %s", got, tt.want)
-			}
+			err = json.Unmarshal(got, &gotMap)
+			a.NoError(err, "failed to unmarshal")
+			a.Equal(want, gotMap, "concealSensitiveData() = %s, want %s", got, test.want)
 		})
 	}
+}
+func (a *AuditTest) TestCompression() {
+	// Create a temp log file
+	tmpFile, err := os.CreateTemp("", "audit-test")
+	a.Require().NoError(err, "Failed to create temp directory.")
+	// close the file so the logger can open it for writing
+	err = tmpFile.Close()
+	a.Require().NoError(err, "Failed to close temporary file after creation")
+
+	tmpPath := tmpFile.Name()
+	defer func() {
+		err = os.RemoveAll(tmpPath)
+		a.NoError(err, "Failed to clean up temp directory")
+	}()
+
+	writer := NewLogWriter(tmpPath, LevelRequestResponse, 30, 30, 100)
+	a.Require().NotNil(writer, "Failed to create auditWriter.")
+
+	sensitiveRegex, err := regexp.Compile(`[pP]assword|[tT]oken`)
+	a.Require().NoErrorf(err, "Failed to create valid regex: %v", err)
+
+	req, err := http.NewRequest(http.MethodGet, "/test", nil)
+	a.Require().NoErrorf(err, "Failed to create request: %v", err)
+
+	auditLog, err := newAuditLog(writer, req, sensitiveRegex)
+	a.Require().NoErrorf(err, "Failed to create AuditLog: %v", err)
+
+	const testString = "{\"test\":\"response\"}"
+	const testString2 = "{\"test\":\"request\"}"
+
+	tests := []struct {
+		name             string
+		respHeader       http.Header
+		respBody         []byte
+		reqBody          []byte
+		returnCode       int
+		expectedRespBody string
+		expectedReqBody  string
+		level            Level
+		Error            error
+	}{
+		{
+			name:       "invalid Encoding",
+			respHeader: http.Header{"Content-Type": []string{"application/json"}, "Content-Encoding": []string{"bzip2"}},
+			respBody:   []byte(testString),
+			Error:      ErrUnsupportedEncoding,
+			level:      LevelRequestResponse,
+		},
+		{
+			name:             "none encoding",
+			respHeader:       http.Header{"Content-Type": []string{"application/json"}, "Content-Encoding": []string{"none"}},
+			respBody:         []byte(testString),
+			reqBody:          []byte(testString2),
+			expectedRespBody: testString,
+			expectedReqBody:  testString2,
+			level:            LevelRequestResponse,
+		},
+		{
+			name:            "request only",
+			respHeader:      http.Header{"Content-Type": []string{"application/json"}, "Content-Encoding": []string{"none"}},
+			respBody:        []byte(testString),
+			reqBody:         []byte(testString2),
+			expectedReqBody: testString2,
+			level:           LevelRequest,
+		},
+		{
+			name:       "meta only",
+			respHeader: http.Header{"Content-Type": []string{"application/json"}, "Content-Encoding": []string{"none"}},
+			respBody:   []byte(testString),
+			reqBody:    []byte(testString2),
+			level:      LevelMetadata,
+		},
+		{
+			name:             "gzip encoding",
+			respHeader:       http.Header{"Content-Type": []string{"application/json"}, "Content-Encoding": []string{"gzip"}},
+			respBody:         a.gzip(testString),
+			expectedRespBody: testString,
+			level:            LevelRequestResponse,
+		},
+		{
+			name:             "deflate encoding",
+			respHeader:       http.Header{"Content-Type": []string{"application/json"}, "Content-Encoding": []string{"deflate"}},
+			respBody:         a.deflate(testString),
+			expectedRespBody: testString,
+			level:            LevelRequestResponse,
+		},
+		{
+			name:             "empty gzip response",
+			respHeader:       http.Header{"Content-Type": []string{"application/json"}, "Content-Encoding": []string{"gzip"}},
+			respBody:         a.gzip("{}"),
+			expectedRespBody: "{}",
+			level:            LevelRequestResponse,
+		},
+		{
+			name:             "empty deflate response",
+			respHeader:       http.Header{"Content-Type": []string{"application/json"}, "Content-Encoding": []string{"deflate"}},
+			respBody:         a.deflate("{}"),
+			expectedRespBody: "{}",
+			level:            LevelRequestResponse,
+		},
+
+		{
+			name:             "empty response",
+			respHeader:       http.Header{"Content-Type": []string{"application/json"}},
+			respBody:         []byte(""),
+			expectedRespBody: "",
+			level:            LevelRequestResponse,
+		},
+		{
+			name:       "invalid gzip response",
+			respHeader: http.Header{"Content-Type": []string{"application/json"}, "Content-Encoding": []string{"gzip"}},
+			respBody:   []byte(testString),
+			Error:      errAny,
+			level:      LevelRequestResponse,
+		},
+		{
+			name:       "invalid deflate response",
+			respHeader: http.Header{"Content-Type": []string{"application/json"}, "Content-Encoding": []string{"deflate"}},
+			respBody:   []byte(testString),
+			Error:      errAny,
+			level:      LevelRequestResponse,
+		},
+		{
+			name:       "invalid json gzip response",
+			respHeader: http.Header{"Content-Type": []string{"application/json"}, "Content-Encoding": []string{"gzip"}},
+			respBody:   a.gzip(""),
+			Error:      &json.SyntaxError{},
+			level:      LevelRequestResponse,
+		},
+		{
+			name:       "invalid json deflate response",
+			respHeader: http.Header{"Content-Type": []string{"application/json"}, "Content-Encoding": []string{"deflate"}},
+			respBody:   a.deflate("Bad Data[]}"),
+			Error:      &json.SyntaxError{},
+			level:      LevelRequestResponse,
+		},
+	}
+
+	for i := range tests {
+		test := tests[i]
+		a.Run(test.name, func() {
+			writer.Level = test.level
+			auditLog.reqBody = []byte(test.reqBody)
+			// write the test to the audit logger
+			err := auditLog.write(nil, req.Header, test.respHeader, test.returnCode, test.respBody)
+
+			// if we are expecting an error check the error is not nil and the correct type
+			if test.Error != nil {
+				if errors.Is(test.Error, errAny) {
+					a.Error(err, "Expected an Error")
+					return
+				}
+				a.Truef(errorIsType(err, test.Error), "Received error does not wrap an error of type '%T'", test.Error)
+				return
+			}
+			a.Require().NoErrorf(err, "Failed to write log: %v.", err)
+
+			// validate the json written to the file is as expected\
+
+			expectedData := a.addMeta(auditLog.log, test.respHeader, test.expectedReqBody, test.expectedRespBody)
+
+			a.JSONEqf(a.drain(tmpPath), expectedData, "Incorrect JSON stored.")
+		})
+	}
+
+}
+
+// addMeta adds expected log meta data to the expected log message.
+func (a *AuditTest) addMeta(log *log, respHeader http.Header, reqBody, respBody string) string {
+	data := map[string]interface{}{}
+	if reqBody != "" {
+		reqBodyData := map[string]interface{}{}
+		err := json.Unmarshal([]byte(reqBody), &reqBodyData)
+		a.NoErrorf(err, "Failed to unmarshal test body data: %v", err)
+		data["requestBody"] = reqBodyData
+	}
+	if respBody != "" {
+		respBodyData := map[string]interface{}{}
+		err := json.Unmarshal([]byte(respBody), &respBodyData)
+		a.NoErrorf(err, "Failed to unmarshal test body data: %v", err)
+		data["responseBody"] = respBodyData
+	}
+
+	data["method"] = log.Method
+	data["requestTimestamp"] = log.RequestTimestamp
+	data["auditID"] = log.AuditID
+	data["responseHeader"] = respHeader
+	data["responseTimestamp"] = log.ResponseTimestamp
+	retJSON, err := json.Marshal(data)
+	a.NoErrorf(err, "Failed to add json metadata for log message check: %v", err)
+	return string(retJSON)
+}
+
+// read a file's content then truncate
+func (a *AuditTest) drain(tmpFile string) string {
+	data, err := os.ReadFile(tmpFile)
+	a.NoErrorf(err, "Failed to read the temp file")
+	err = os.Truncate(tmpFile, 0)
+	a.NoError(err, "Failed to truncate temp file")
+	return string(data)
+}
+
+// gzip the given string
+func (a *AuditTest) gzip(input string) []byte {
+	var buf bytes.Buffer
+	w := gzip.NewWriter(&buf)
+	w.Write([]byte(input))
+	a.Require().NoError(w.Close())
+	return buf.Bytes()
+}
+
+// deflate the given string
+func (a *AuditTest) deflate(input string) []byte {
+	var buf bytes.Buffer
+	w := zlib.NewWriter(&buf)
+	w.Write([]byte(input))
+	a.Require().NoError(w.Close())
+	return buf.Bytes()
+}
+
+func errorIsType(err, target error) bool {
+	targetType := reflect.TypeOf(target)
+	for err != nil {
+		if reflect.TypeOf(err) == targetType {
+			return true
+		}
+		err = errors.Unwrap(err)
+	}
+	return false
 }

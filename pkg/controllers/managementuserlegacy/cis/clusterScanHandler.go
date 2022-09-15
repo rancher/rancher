@@ -104,10 +104,10 @@ func (csh *cisScanHandler) Create(cs *v3.ClusterScan) (runtime.Object, error) {
 	var err error
 	cluster, err := csh.clusterLister.Get("", cs.Spec.ClusterID)
 	if err != nil {
-		return cs, fmt.Errorf("cisScanHandler: Create: error listing cluster %v: %v", cs.ClusterName, err)
+		return cs, fmt.Errorf("cisScanHandler: Create: error listing cluster %v: %v", cs.Spec.ClusterID, err)
 	}
 	if !v32.ClusterConditionReady.IsTrue(cluster) {
-		return cs, fmt.Errorf("cisScanHandler: Create: cluster %v not ready", cs.ClusterName)
+		return cs, fmt.Errorf("cisScanHandler: Create: cluster %v not ready", cs.Spec.ClusterID)
 	}
 	if cluster.Spec.WindowsPreferedCluster {
 		v32.ClusterScanConditionFailed.True(cs)

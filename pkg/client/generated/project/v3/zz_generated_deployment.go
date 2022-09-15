@@ -31,6 +31,7 @@ const (
 	DeploymentFieldName                          = "name"
 	DeploymentFieldNamespaceId                   = "namespaceId"
 	DeploymentFieldNodeID                        = "nodeId"
+	DeploymentFieldOS                            = "os"
 	DeploymentFieldOverhead                      = "overhead"
 	DeploymentFieldOwnerReferences               = "ownerReferences"
 	DeploymentFieldPaused                        = "paused"
@@ -93,6 +94,7 @@ type Deployment struct {
 	Name                          string                         `json:"name,omitempty" yaml:"name,omitempty"`
 	NamespaceId                   string                         `json:"namespaceId,omitempty" yaml:"namespaceId,omitempty"`
 	NodeID                        string                         `json:"nodeId,omitempty" yaml:"nodeId,omitempty"`
+	OS                            *PodOS                         `json:"os,omitempty" yaml:"os,omitempty"`
 	Overhead                      map[string]string              `json:"overhead,omitempty" yaml:"overhead,omitempty"`
 	OwnerReferences               []OwnerReference               `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
 	Paused                        bool                           `json:"paused,omitempty" yaml:"paused,omitempty"`

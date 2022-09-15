@@ -30,6 +30,9 @@ var globalResourceRulesNeededInProjects = map[string]rbacv1.PolicyRule{
 	"navlinks": rbacv1.PolicyRule{
 		APIGroups: []string{"ui.cattle.io"},
 	},
+	"nodes": rbacv1.PolicyRule{
+		APIGroups: []string{""},
+	},
 	"persistentvolumes": rbacv1.PolicyRule{
 		APIGroups: []string{"", "core"},
 	},
@@ -98,7 +101,7 @@ func (p *prtbLifecycle) syncPRTB(binding *v3.ProjectRoleTemplateBinding) error {
 		return errors.Wrapf(err, "couldn't list namespaces with project ID %v", binding.ProjectName)
 	}
 	roles := map[string]*v3.RoleTemplate{}
-	if err := p.m.gatherRoles(rt, roles); err != nil {
+	if err := p.m.gatherRoles(rt, roles, 0); err != nil {
 		return err
 	}
 
@@ -116,8 +119,10 @@ func (p *prtbLifecycle) syncPRTB(binding *v3.ProjectRoleTemplateBinding) error {
 		}
 	}
 
-	if err := p.m.ensureServiceAccountImpersonator(binding.UserName, binding.GroupName); err != nil {
-		return errors.Wrapf(err, "couldn't ensure service account impersonator")
+	if binding.UserName != "" {
+		if err := p.m.ensureServiceAccountImpersonator(binding.UserName); err != nil {
+			return errors.Wrapf(err, "couldn't ensure service account impersonator")
+		}
 	}
 
 	return p.reconcileProjectAccessToGlobalResources(binding, roles)
@@ -447,15 +452,15 @@ func (p *prtbLifecycle) reconcilePRTBUserClusterLabels(binding *v3.ProjectRoleTe
 	}
 
 	retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		crtbToUpdate, updateErr := p.m.prtbs.GetNamespaced(binding.Namespace, binding.Name, metav1.GetOptions{})
+		prtbToUpdate, updateErr := p.m.prtbs.GetNamespaced(binding.Namespace, binding.Name, metav1.GetOptions{})
 		if updateErr != nil {
 			return updateErr
 		}
-		if crtbToUpdate.Labels == nil {
-			crtbToUpdate.Labels = make(map[string]string)
+		if prtbToUpdate.Labels == nil {
+			prtbToUpdate.Labels = make(map[string]string)
 		}
-		crtbToUpdate.Labels[rtbCrbRbLabelsUpdated] = "true"
-		_, err := p.m.prtbs.Update(crtbToUpdate)
+		prtbToUpdate.Labels[rtbCrbRbLabelsUpdated] = "true"
+		_, err := p.m.prtbs.Update(prtbToUpdate)
 		return err
 	})
 	return retryErr

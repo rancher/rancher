@@ -15,7 +15,7 @@ logging.getLogger('botocore').setLevel(logging.CRITICAL)
 AWS_REGION = os.environ.get("AWS_REGION", "us-east-2")
 AWS_REGION_AZ = os.environ.get("AWS_REGION_AZ", "us-east-2a")
 AWS_SECURITY_GROUP = os.environ.get("AWS_SECURITY_GROUPS",
-                                    'sg-0e753fd5550206e55')
+                                    'sg-04f28c5d02555da26')
 AWS_SUBNET = os.environ.get("AWS_SUBNET", "subnet-ee8cac86")
 AWS_HOSTED_ZONE_ID = os.environ.get("AWS_HOSTED_ZONE_ID", "")
 AWS_VPC_ID = os.environ.get("AWS_VPC_ID", "vpc-bfccf4d7")
@@ -32,6 +32,7 @@ AWS_AMI = os.environ.get("AWS_AMI", AWS_DEFAULT_AMI)
 AWS_USER = os.environ.get("AWS_USER", AWS_DEFAULT_USER)
 AWS_VOLUME_SIZE = os.environ.get("AWS_VOLUME_SIZE", "50")
 AWS_INSTANCE_TYPE = os.environ.get("AWS_INSTANCE_TYPE", 't3a.medium')
+AWS_BASTION_INSTANCE_TYPE = os.environ.get("AWS_INSTANCE_TYPE", 'c5.2xlarge')
 
 AWS_WINDOWS_VOLUME_SIZE = os.environ.get("AWS_WINDOWS_VOLUME_SIZE", "100")
 AWS_WINDOWS_INSTANCE_TYPE = 't3.xlarge'
@@ -98,9 +99,9 @@ class AmazonWebServices(CloudProviderBase):
         self.created_keys = []
 
     def create_node(self, node_name, ami=AWS_AMI, ssh_user=AWS_USER,
-                    key_name=None, wait_for_ready=True, public_ip=True):
+                    key_name=None, wait_for_ready=True, public_ip=True, for_bastion=False):
         volume_size = AWS_VOLUME_SIZE
-        instance_type = AWS_INSTANCE_TYPE
+        instance_type = AWS_BASTION_INSTANCE_TYPE if for_bastion else AWS_INSTANCE_TYPE
         if ssh_user == "Administrator":
             volume_size = AWS_WINDOWS_VOLUME_SIZE
             instance_type = AWS_WINDOWS_INSTANCE_TYPE
@@ -144,7 +145,12 @@ class AmazonWebServices(CloudProviderBase):
                 "Placement": {'AvailabilityZone': AWS_REGION_AZ},
                 "BlockDeviceMappings":
                     [{"DeviceName": "/dev/sda1",
-                      "Ebs": {"VolumeSize": int(volume_size)}
+                      "Ebs": {"DeleteOnTermination": True,
+                              "Iops": 6000 if for_bastion else 3000,
+                              "VolumeSize": int(volume_size),
+                              "VolumeType": 'gp3',
+                              "Throughput": 500 if for_bastion else 125
+                              }
                       }]
                 }
 

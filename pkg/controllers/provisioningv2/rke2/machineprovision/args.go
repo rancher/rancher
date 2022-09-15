@@ -1,14 +1,21 @@
 package machineprovision
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
+	"errors"
 	"fmt"
+	"io"
 	"os"
+	"path/filepath"
 	"regexp"
 	"sort"
 	"strings"
 
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
+	"github.com/rancher/rancher/pkg/controllers/management/drivers"
 	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	namespace2 "github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/wrangler/pkg/data"
@@ -42,12 +49,14 @@ type driverArgs struct {
 
 	DriverName          string
 	ImageName           string
+	CapiMachineName     string
 	MachineName         string
 	MachineNamespace    string
 	MachineGVK          schema.GroupVersionKind
 	ImagePullPolicy     corev1.PullPolicy
 	EnvSecret           *corev1.Secret
 	FilesSecret         *corev1.Secret
+	CertsSecret         *corev1.Secret
 	StateSecretName     string
 	BootstrapSecretName string
 	BootstrapRequired   bool
@@ -62,20 +71,27 @@ func (h *handler) getArgsEnvAndStatus(infraObj *infraObject, args map[string]int
 		filesSecret                          *corev1.Secret
 	)
 
+	if infraObj.data.String("spec", "providerID") != "" && !infraObj.data.Bool("status", "jobComplete") {
+		// If the providerID is set, but jobComplete is false, then we need to re-enqueue the job so the proper status is set from that handler.
+		job, err := h.getJobFromInfraMachine(infraObj)
+		if err != nil {
+			return driverArgs{}, err
+		}
+		h.jobController.Enqueue(infraObj.meta.GetNamespace(), job.Name)
+		return driverArgs{}, generic.ErrSkip
+	}
+
 	nd, err := h.nodeDriverCache.Get(driver)
 	if !create && apierror.IsNotFound(err) {
 		url = infraObj.data.String("status", "driverURL")
 		hash = infraObj.data.String("status", "driverHash")
 	} else if err != nil {
 		return driverArgs{}, err
-	} else {
-		url = nd.Spec.URL
-		hash = nd.Spec.Checksum
-	}
-
-	if strings.HasPrefix(url, "local://") {
-		url = ""
-		hash = ""
+	} else if !strings.HasPrefix(nd.Spec.URL, "local://") {
+		url, hash, err = getDriverDownloadURL(nd)
+		if err != nil {
+			return driverArgs{}, err
+		}
 	}
 
 	envSecret := &corev1.Secret{
@@ -89,8 +105,12 @@ func (h *handler) getArgsEnvAndStatus(infraObj *infraObject, args map[string]int
 			"NO_PROXY":    []byte(os.Getenv("NO_PROXY")),
 		},
 	}
+	machine, err := rke2.GetMachineByOwner(h.machines, infraObj.meta)
+	if err != nil && (create || !errors.Is(err, rke2.ErrNoMachineOwnerRef)) {
+		return driverArgs{}, err
+	}
 
-	bootstrapName, cloudCredentialSecretName, secrets, err := h.getSecretData(infraObj.meta, infraObj.data, create)
+	bootstrapName, cloudCredentialSecretName, secrets, err := h.getSecretData(machine, infraObj.data, create)
 	if err != nil {
 		return driverArgs{}, err
 	}
@@ -104,7 +124,6 @@ func (h *handler) getArgsEnvAndStatus(infraObj *infraObject, args map[string]int
 		k := strings.ToUpper(envName + "_" + regExHyphen.ReplaceAllString(k, "${1}_${2}"))
 		envSecret.Data[k] = []byte(v)
 	}
-
 	secretName := rke2.MachineStateSecretName(infraObj.meta.GetName())
 
 	cmd := []string{
@@ -132,12 +151,18 @@ func (h *handler) getArgsEnvAndStatus(infraObj *infraObject, args map[string]int
 		jobBackoffLimit = 3
 	}
 
+	certsSecret, err := h.constructCertsSecret(infraObj.meta.GetName(), infraObj.meta.GetNamespace())
+	if err != nil {
+		return driverArgs{}, err
+	}
+
 	// cloud-init will split the hostname on '.' and set the hostname to the first chunk. This causes an issue where all
 	// nodes in a machine pool may have the same node name in Kubernetes. Converting the '.' to '-' here prevents this.
 	cmd = append(cmd, strings.ReplaceAll(infraObj.meta.GetName(), ".", "-"))
 
 	return driverArgs{
 		DriverName:          driver,
+		CapiMachineName:     machine.Name,
 		MachineName:         infraObj.meta.GetName(),
 		MachineNamespace:    infraObj.meta.GetNamespace(),
 		MachineGVK:          infraObj.obj.GetObjectKind().GroupVersionKind(),
@@ -145,6 +170,7 @@ func (h *handler) getArgsEnvAndStatus(infraObj *infraObject, args map[string]int
 		ImagePullPolicy:     corev1.PullAlways,
 		EnvSecret:           envSecret,
 		FilesSecret:         filesSecret,
+		CertsSecret:         certsSecret,
 		StateSecretName:     secretName,
 		BootstrapSecretName: bootstrapName,
 		BootstrapRequired:   create,
@@ -180,26 +206,14 @@ func (h *handler) getBootstrapSecret(machine *capi.Machine) (string, error) {
 	return d.String("status", "dataSecretName"), nil
 }
 
-func (h *handler) getSecretData(meta metav1.Object, obj data.Object, create bool) (string, string, map[string]string, error) {
+func (h *handler) getSecretData(machine *capi.Machine, obj data.Object, create bool) (string, string, map[string]string, error) {
 	var (
-		err     error
-		machine *capi.Machine
-		result  = map[string]string{}
+		err    error
+		result = map[string]string{}
 	)
 
 	oldCredential := obj.String("status", "cloudCredentialSecretName")
 	cloudCredentialSecretName := obj.String("spec", "common", "cloudCredentialSecretName")
-
-	for _, ref := range meta.GetOwnerReferences() {
-		if ref.Kind != "Machine" {
-			continue
-		}
-
-		machine, err = h.machines.Get(meta.GetNamespace(), ref.Name)
-		if err != nil && !apierror.IsNotFound(err) {
-			return "", "", nil, err
-		}
-	}
 
 	if machine == nil && create {
 		return "", "", nil, generic.ErrSkip
@@ -209,8 +223,8 @@ func (h *handler) getSecretData(meta metav1.Object, obj data.Object, create bool
 		cloudCredentialSecretName = oldCredential
 	}
 
-	if cloudCredentialSecretName != "" {
-		secret, err := GetCloudCredentialSecret(h.secrets, meta.GetNamespace(), cloudCredentialSecretName)
+	if cloudCredentialSecretName != "" && machine != nil {
+		secret, err := GetCloudCredentialSecret(h.secrets, machine.GetNamespace(), cloudCredentialSecretName)
 		if err != nil {
 			return "", "", nil, err
 		}
@@ -284,4 +298,49 @@ func toArgs(driverName string, args map[string]interface{}, clusterID string) (c
 
 func getNodeDriverName(typeMeta meta.Type) string {
 	return strings.ToLower(strings.TrimSuffix(typeMeta.GetKind(), "Machine"))
+}
+
+// getDriverDownloadURL checks for a local version of the driver to download for air-gapped installs.
+// If no local version is found or CATTLE_DEV_MODE is set, then the URL from the node driver is returned.
+func getDriverDownloadURL(nd *v3.NodeDriver) (string, string, error) {
+	if os.Getenv("CATTLE_DEV_MODE") != "" {
+		return nd.Spec.URL, nd.Spec.Checksum, nil
+	}
+
+	driverName := nd.Name
+	if !strings.HasPrefix(driverName, drivers.DockerMachineDriverPrefix) {
+		driverName = drivers.DockerMachineDriverPrefix + driverName
+	}
+
+	path := filepath.Join(settings.UIPath.Get(), "assets", driverName)
+	if _, err := os.Stat(path); err != nil {
+		return nd.Spec.URL, nd.Spec.Checksum, nil
+	}
+
+	hash, err := hashFile(path)
+	if err != nil {
+		return "", "", err
+	}
+
+	return fmt.Sprintf("%s/assets/%s", settings.ServerURL.Get(), driverName), hash, nil
+}
+
+func hashName(name string) string {
+	b := sha256.Sum256([]byte(name))
+	return hex.EncodeToString(b[:16])
+}
+
+func hashFile(path string) (string, error) {
+	hasher := sha256.New()
+	f, err := os.Open(path)
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+
+	if _, err := io.Copy(hasher, f); err != nil {
+		return "", err
+	}
+
+	return hex.EncodeToString(hasher.Sum(nil)), nil
 }

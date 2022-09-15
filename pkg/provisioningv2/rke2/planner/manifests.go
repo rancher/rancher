@@ -38,7 +38,7 @@ func (p *Planner) getControlPlaneManifests(controlPlane *rkev1.RKEControlPlane, 
 	// if we have a nil snapshotMetadata object, it's probably because the annotation didn't exist on the controlplane object. this is not breaking though so don't block.
 	snapshotMetadata := getEtcdSnapshotExtraMetadata(controlPlane, rke2.GetRuntime(controlPlane.Spec.KubernetesVersion))
 	if snapshotMetadata == nil {
-		logrus.Errorf("Error while generating etcd snapshot extra metadata manifest for cluster %s: %v", controlPlane.ClusterName, err)
+		logrus.Errorf("Error while generating etcd snapshot extra metadata manifest for cluster %s", controlPlane.Spec.ClusterName)
 	} else {
 		result = append(result, *snapshotMetadata)
 	}
@@ -50,7 +50,7 @@ func (p *Planner) getControlPlaneManifests(controlPlane *rkev1.RKEControlPlane, 
 }
 
 // getEtcdSnapshotExtraMetadata returns a plan.File that contains the ConfigMap manifest of the cluster specification, if it exists.
-// Otherwise, it will return an empty plan.File and error.
+// Otherwise, it will return an empty plan.File and log an error.
 func getEtcdSnapshotExtraMetadata(controlPlane *rkev1.RKEControlPlane, runtime string) *plan.File {
 	if v, ok := controlPlane.Annotations[rke2.ClusterSpecAnnotation]; ok {
 		cm := fmt.Sprintf(EtcdSnapshotExtraMetadataConfigMapTemplate, runtime, metav1.NamespaceSystem, EtcdSnapshotConfigMapKey, v)
@@ -58,6 +58,7 @@ func getEtcdSnapshotExtraMetadata(controlPlane *rkev1.RKEControlPlane, runtime s
 			Content: base64.StdEncoding.EncodeToString([]byte(cm)),
 			Path:    fmt.Sprintf("/var/lib/rancher/%s/server/manifests/rancher/%s-etcd-snapshot-extra-metadata.yaml", runtime, runtime),
 			Dynamic: true,
+			Minor:   true,
 		}
 	}
 	logrus.Errorf("rkecluster %s/%s: unable to find cluster spec annotation for control plane", controlPlane.Spec.ClusterName, controlPlane.Namespace)
@@ -75,6 +76,7 @@ func (p *Planner) getClusterAgentManifestFile(controlPlane *rkev1.RKEControlPlan
 		Content: base64.StdEncoding.EncodeToString(data),
 		Path:    fmt.Sprintf("/var/lib/rancher/%s/server/manifests/rancher/cluster-agent.yaml", runtime),
 		Dynamic: true,
+		Minor:   true,
 	}, nil
 }
 

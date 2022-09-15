@@ -3,6 +3,7 @@ package v3
 import (
 	"github.com/rancher/lasso/pkg/client"
 	"github.com/rancher/lasso/pkg/controller"
+	"github.com/rancher/norman/generator"
 	"github.com/rancher/norman/objectclient"
 	"github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -75,6 +76,7 @@ type Interface interface {
 	CisConfigsGetter
 	CisBenchmarkVersionsGetter
 	FleetWorkspacesGetter
+	RancherUserNotificationsGetter
 }
 
 type Client struct {
@@ -87,7 +89,10 @@ func NewForConfig(cfg rest.Config) (Interface, error) {
 	if err := v3.AddToScheme(scheme); err != nil {
 		return nil, err
 	}
-	controllerFactory, err := controller.NewSharedControllerFactoryFromConfig(&cfg, scheme)
+	sharedOpts := &controller.SharedControllerFactoryOptions{
+		SyncOnlyChangedObjects: generator.SyncOnlyChangedObjects(),
+	}
+	controllerFactory, err := controller.NewSharedControllerFactoryFromConfigWithOptions(&cfg, scheme, sharedOpts)
 	if err != nil {
 		return nil, err
 	}
@@ -1005,6 +1010,20 @@ func (c *Client) FleetWorkspaces(namespace string) FleetWorkspaceInterface {
 	sharedClient := c.clientFactory.ForResourceKind(FleetWorkspaceGroupVersionResource, FleetWorkspaceGroupVersionKind.Kind, false)
 	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &FleetWorkspaceResource, FleetWorkspaceGroupVersionKind, fleetWorkspaceFactory{})
 	return &fleetWorkspaceClient{
+		ns:           namespace,
+		client:       c,
+		objectClient: objectClient,
+	}
+}
+
+type RancherUserNotificationsGetter interface {
+	RancherUserNotifications(namespace string) RancherUserNotificationInterface
+}
+
+func (c *Client) RancherUserNotifications(namespace string) RancherUserNotificationInterface {
+	sharedClient := c.clientFactory.ForResourceKind(RancherUserNotificationGroupVersionResource, RancherUserNotificationGroupVersionKind.Kind, false)
+	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &RancherUserNotificationResource, RancherUserNotificationGroupVersionKind, rancherUserNotificationFactory{})
+	return &rancherUserNotificationClient{
 		ns:           namespace,
 		client:       c,
 		objectClient: objectClient,

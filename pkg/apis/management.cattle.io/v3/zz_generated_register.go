@@ -92,6 +92,7 @@ var (
 	ProjectMonitorGraphResourceName                     = "projectmonitorgraphs"
 	ProjectNetworkPolicyResourceName                    = "projectnetworkpolicies"
 	ProjectRoleTemplateBindingResourceName              = "projectroletemplatebindings"
+	RancherUserNotificationResourceName                 = "rancherusernotifications"
 	RkeAddonResourceName                                = "rkeaddons"
 	RkeK8sServiceOptionResourceName                     = "rkek8sserviceoptions"
 	RkeK8sSystemImageResourceName                       = "rkek8ssystemimages"
@@ -256,6 +257,8 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&ProjectNetworkPolicyList{},
 		&ProjectRoleTemplateBinding{},
 		&ProjectRoleTemplateBindingList{},
+		&RancherUserNotification{},
+		&RancherUserNotificationList{},
 		&RkeAddon{},
 		&RkeAddonList{},
 		&RkeK8sServiceOption{},

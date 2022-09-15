@@ -15,6 +15,7 @@ variable "username" {}
 variable "password" {}
 variable "install_mode" {}
 variable "k3s_version" {}
+variable "k3s_channel" {}
 variable "no_of_server_nodes" {}
 variable "server_flags" {}
 variable "cluster_type" {}

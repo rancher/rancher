@@ -43,7 +43,7 @@ func init() {
 	resource.Put(ServiceMonitorGroupVersionResource)
 }
 
-// Deprecated use v1.ServiceMonitor instead
+// Deprecated: use v1.ServiceMonitor instead
 type ServiceMonitor = v1.ServiceMonitor
 
 func NewServiceMonitor(namespace, name string, obj v1.ServiceMonitor) *v1.ServiceMonitor {

@@ -158,7 +158,14 @@ func listKubernetesUpgradeVersions(ctx context.Context, clusterLister mgmtv3.Clu
 		return nil, http.StatusBadRequest, fmt.Errorf("invalid cluster id")
 	}
 
-	resp.CurrentVersion = *cluster.Spec.AKSConfig.KubernetesVersion
+	if cluster.Spec.AKSConfig.KubernetesVersion != nil {
+		resp.CurrentVersion = *cluster.Spec.AKSConfig.KubernetesVersion
+	} else {
+		if cluster.Status.AKSStatus.UpstreamSpec == nil || cluster.Status.AKSStatus.UpstreamSpec.KubernetesVersion == nil {
+			return nil, http.StatusBadRequest, fmt.Errorf("kubernetes version of the cluster cannot be determined")
+		}
+		resp.CurrentVersion = *cluster.Status.AKSStatus.UpstreamSpec.KubernetesVersion
+	}
 
 	// get the client for aks container service
 	clientContainer, err := NewContainerServiceClient(cap)

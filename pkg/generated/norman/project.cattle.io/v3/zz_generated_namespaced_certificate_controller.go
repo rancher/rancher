@@ -43,7 +43,7 @@ func init() {
 	resource.Put(NamespacedCertificateGroupVersionResource)
 }
 
-// Deprecated use v3.NamespacedCertificate instead
+// Deprecated: use v3.NamespacedCertificate instead
 type NamespacedCertificate = v3.NamespacedCertificate
 
 func NewNamespacedCertificate(namespace, name string, obj v3.NamespacedCertificate) *v3.NamespacedCertificate {
