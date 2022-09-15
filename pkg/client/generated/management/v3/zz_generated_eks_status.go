@@ -2,6 +2,7 @@ package client
 
 const (
 	EKSStatusType                               = "eksStatus"
+	EKSStatusFieldGeneratedNodeRole             = "generatedNodeRole"
 	EKSStatusFieldManagedLaunchTemplateID       = "managedLaunchTemplateID"
 	EKSStatusFieldManagedLaunchTemplateVersions = "managedLaunchTemplateVersions"
 	EKSStatusFieldPrivateRequiresTunnel         = "privateRequiresTunnel"
@@ -12,6 +13,7 @@ const (
 )
 
 type EKSStatus struct {
+	GeneratedNodeRole             string                `json:"generatedNodeRole,omitempty" yaml:"generatedNodeRole,omitempty"`
 	ManagedLaunchTemplateID       string                `json:"managedLaunchTemplateID,omitempty" yaml:"managedLaunchTemplateID,omitempty"`
 	ManagedLaunchTemplateVersions map[string]string     `json:"managedLaunchTemplateVersions,omitempty" yaml:"managedLaunchTemplateVersions,omitempty"`
 	PrivateRequiresTunnel         *bool                 `json:"privateRequiresTunnel,omitempty" yaml:"privateRequiresTunnel,omitempty"`
