@@ -123,6 +123,7 @@ func (l *Lifecycle) Create(obj *v3.App) (runtime.Object, error) {
 
 /*
 Updated depends on several conditions:
+
 	AppConditionMigrated: protects upgrade path for apps <2.1
 	AppConditionInstalled: flips status in UI and drives logic
 	AppConditionDeployed: flips status in UI

@@ -161,7 +161,7 @@ func (c Controller) getCertsFromUserCluster() (map[string]pki.CertificatePKI, er
 	return certs, nil
 }
 
-//deleteUnusedCerts removes unused certs and cleans up kubelet certs when GenerateServingCertificate is disabled
+// deleteUnusedCerts removes unused certs and cleans up kubelet certs when GenerateServingCertificate is disabled
 func deleteUnusedCerts(certsExpInfo map[string]v32.CertExpiration, rancherKubernetesEngineConfig *rketypes.RancherKubernetesEngineConfig) {
 	unusedCerts := make(map[string]bool)
 	for k := range certsExpInfo {

@@ -29,22 +29,22 @@ var _ v11.NodeLister = &NodeListerMock{}
 
 // NodeListerMock is a mock implementation of v11.NodeLister.
 //
-//     func TestSomethingThatUsesNodeLister(t *testing.T) {
+//	    func TestSomethingThatUsesNodeLister(t *testing.T) {
 //
-//         // make and configure a mocked v11.NodeLister
-//         mockedNodeLister := &NodeListerMock{
-//             GetFunc: func(namespace string, name string) (*v1.Node, error) {
-// 	               panic("mock out the Get method")
-//             },
-//             ListFunc: func(namespace string, selector labels.Selector) ([]*v1.Node, error) {
-// 	               panic("mock out the List method")
-//             },
-//         }
+//	        // make and configure a mocked v11.NodeLister
+//	        mockedNodeLister := &NodeListerMock{
+//	            GetFunc: func(namespace string, name string) (*v1.Node, error) {
+//		               panic("mock out the Get method")
+//	            },
+//	            ListFunc: func(namespace string, selector labels.Selector) ([]*v1.Node, error) {
+//		               panic("mock out the List method")
+//	            },
+//	        }
 //
-//         // use mockedNodeLister in code that requires v11.NodeLister
-//         // and then make assertions.
+//	        // use mockedNodeLister in code that requires v11.NodeLister
+//	        // and then make assertions.
 //
-//     }
+//	    }
 type NodeListerMock struct {
 	// GetFunc mocks the Get method.
 	GetFunc func(namespace string, name string) (*v1.Node, error)
@@ -91,7 +91,8 @@ func (mock *NodeListerMock) Get(namespace string, name string) (*v1.Node, error)
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//     len(mockedNodeLister.GetCalls())
+//
+//	len(mockedNodeLister.GetCalls())
 func (mock *NodeListerMock) GetCalls() []struct {
 	Namespace string
 	Name      string
@@ -126,7 +127,8 @@ func (mock *NodeListerMock) List(namespace string, selector labels.Selector) ([]
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//     len(mockedNodeLister.ListCalls())
+//
+//	len(mockedNodeLister.ListCalls())
 func (mock *NodeListerMock) ListCalls() []struct {
 	Namespace string
 	Selector  labels.Selector
@@ -159,43 +161,43 @@ var _ v11.NodeController = &NodeControllerMock{}
 
 // NodeControllerMock is a mock implementation of v11.NodeController.
 //
-//     func TestSomethingThatUsesNodeController(t *testing.T) {
+//	    func TestSomethingThatUsesNodeController(t *testing.T) {
 //
-//         // make and configure a mocked v11.NodeController
-//         mockedNodeController := &NodeControllerMock{
-//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v11.NodeHandlerFunc)  {
-// 	               panic("mock out the AddClusterScopedFeatureHandler method")
-//             },
-//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v11.NodeHandlerFunc)  {
-// 	               panic("mock out the AddClusterScopedHandler method")
-//             },
-//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v11.NodeHandlerFunc)  {
-// 	               panic("mock out the AddFeatureHandler method")
-//             },
-//             AddHandlerFunc: func(ctx context.Context, name string, handler v11.NodeHandlerFunc)  {
-// 	               panic("mock out the AddHandler method")
-//             },
-//             EnqueueFunc: func(namespace string, name string)  {
-// 	               panic("mock out the Enqueue method")
-//             },
-//             EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
-// 	               panic("mock out the EnqueueAfter method")
-//             },
-//             GenericFunc: func() controller.GenericController {
-// 	               panic("mock out the Generic method")
-//             },
-//             InformerFunc: func() cache.SharedIndexInformer {
-// 	               panic("mock out the Informer method")
-//             },
-//             ListerFunc: func() v11.NodeLister {
-// 	               panic("mock out the Lister method")
-//             },
-//         }
+//	        // make and configure a mocked v11.NodeController
+//	        mockedNodeController := &NodeControllerMock{
+//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v11.NodeHandlerFunc)  {
+//		               panic("mock out the AddClusterScopedFeatureHandler method")
+//	            },
+//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v11.NodeHandlerFunc)  {
+//		               panic("mock out the AddClusterScopedHandler method")
+//	            },
+//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v11.NodeHandlerFunc)  {
+//		               panic("mock out the AddFeatureHandler method")
+//	            },
+//	            AddHandlerFunc: func(ctx context.Context, name string, handler v11.NodeHandlerFunc)  {
+//		               panic("mock out the AddHandler method")
+//	            },
+//	            EnqueueFunc: func(namespace string, name string)  {
+//		               panic("mock out the Enqueue method")
+//	            },
+//	            EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
+//		               panic("mock out the EnqueueAfter method")
+//	            },
+//	            GenericFunc: func() controller.GenericController {
+//		               panic("mock out the Generic method")
+//	            },
+//	            InformerFunc: func() cache.SharedIndexInformer {
+//		               panic("mock out the Informer method")
+//	            },
+//	            ListerFunc: func() v11.NodeLister {
+//		               panic("mock out the Lister method")
+//	            },
+//	        }
 //
-//         // use mockedNodeController in code that requires v11.NodeController
-//         // and then make assertions.
+//	        // use mockedNodeController in code that requires v11.NodeController
+//	        // and then make assertions.
 //
-//     }
+//	    }
 type NodeControllerMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
 	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v11.NodeHandlerFunc)
@@ -324,7 +326,8 @@ func (mock *NodeControllerMock) AddClusterScopedFeatureHandler(ctx context.Conte
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//     len(mockedNodeController.AddClusterScopedFeatureHandlerCalls())
+//
+//	len(mockedNodeController.AddClusterScopedFeatureHandlerCalls())
 func (mock *NodeControllerMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -369,7 +372,8 @@ func (mock *NodeControllerMock) AddClusterScopedHandler(ctx context.Context, nam
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//     len(mockedNodeController.AddClusterScopedHandlerCalls())
+//
+//	len(mockedNodeController.AddClusterScopedHandlerCalls())
 func (mock *NodeControllerMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -412,7 +416,8 @@ func (mock *NodeControllerMock) AddFeatureHandler(ctx context.Context, enabled f
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//     len(mockedNodeController.AddFeatureHandlerCalls())
+//
+//	len(mockedNodeController.AddFeatureHandlerCalls())
 func (mock *NodeControllerMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
@@ -453,7 +458,8 @@ func (mock *NodeControllerMock) AddHandler(ctx context.Context, name string, han
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//     len(mockedNodeController.AddHandlerCalls())
+//
+//	len(mockedNodeController.AddHandlerCalls())
 func (mock *NodeControllerMock) AddHandlerCalls() []struct {
 	Ctx     context.Context
 	Name    string
@@ -490,7 +496,8 @@ func (mock *NodeControllerMock) Enqueue(namespace string, name string) {
 
 // EnqueueCalls gets all the calls that were made to Enqueue.
 // Check the length with:
-//     len(mockedNodeController.EnqueueCalls())
+//
+//	len(mockedNodeController.EnqueueCalls())
 func (mock *NodeControllerMock) EnqueueCalls() []struct {
 	Namespace string
 	Name      string
@@ -527,7 +534,8 @@ func (mock *NodeControllerMock) EnqueueAfter(namespace string, name string, afte
 
 // EnqueueAfterCalls gets all the calls that were made to EnqueueAfter.
 // Check the length with:
-//     len(mockedNodeController.EnqueueAfterCalls())
+//
+//	len(mockedNodeController.EnqueueAfterCalls())
 func (mock *NodeControllerMock) EnqueueAfterCalls() []struct {
 	Namespace string
 	Name      string
@@ -559,7 +567,8 @@ func (mock *NodeControllerMock) Generic() controller.GenericController {
 
 // GenericCalls gets all the calls that were made to Generic.
 // Check the length with:
-//     len(mockedNodeController.GenericCalls())
+//
+//	len(mockedNodeController.GenericCalls())
 func (mock *NodeControllerMock) GenericCalls() []struct {
 } {
 	var calls []struct {
@@ -585,7 +594,8 @@ func (mock *NodeControllerMock) Informer() cache.SharedIndexInformer {
 
 // InformerCalls gets all the calls that were made to Informer.
 // Check the length with:
-//     len(mockedNodeController.InformerCalls())
+//
+//	len(mockedNodeController.InformerCalls())
 func (mock *NodeControllerMock) InformerCalls() []struct {
 } {
 	var calls []struct {
@@ -611,7 +621,8 @@ func (mock *NodeControllerMock) Lister() v11.NodeLister {
 
 // ListerCalls gets all the calls that were made to Lister.
 // Check the length with:
-//     len(mockedNodeController.ListerCalls())
+//
+//	len(mockedNodeController.ListerCalls())
 func (mock *NodeControllerMock) ListerCalls() []struct {
 } {
 	var calls []struct {
@@ -651,76 +662,76 @@ var _ v11.NodeInterface = &NodeInterfaceMock{}
 
 // NodeInterfaceMock is a mock implementation of v11.NodeInterface.
 //
-//     func TestSomethingThatUsesNodeInterface(t *testing.T) {
+//	    func TestSomethingThatUsesNodeInterface(t *testing.T) {
 //
-//         // make and configure a mocked v11.NodeInterface
-//         mockedNodeInterface := &NodeInterfaceMock{
-//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v11.NodeHandlerFunc)  {
-// 	               panic("mock out the AddClusterScopedFeatureHandler method")
-//             },
-//             AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v11.NodeLifecycle)  {
-// 	               panic("mock out the AddClusterScopedFeatureLifecycle method")
-//             },
-//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v11.NodeHandlerFunc)  {
-// 	               panic("mock out the AddClusterScopedHandler method")
-//             },
-//             AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v11.NodeLifecycle)  {
-// 	               panic("mock out the AddClusterScopedLifecycle method")
-//             },
-//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v11.NodeHandlerFunc)  {
-// 	               panic("mock out the AddFeatureHandler method")
-//             },
-//             AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v11.NodeLifecycle)  {
-// 	               panic("mock out the AddFeatureLifecycle method")
-//             },
-//             AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v11.NodeHandlerFunc)  {
-// 	               panic("mock out the AddHandler method")
-//             },
-//             AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v11.NodeLifecycle)  {
-// 	               panic("mock out the AddLifecycle method")
-//             },
-//             ControllerFunc: func() v11.NodeController {
-// 	               panic("mock out the Controller method")
-//             },
-//             CreateFunc: func(in1 *v1.Node) (*v1.Node, error) {
-// 	               panic("mock out the Create method")
-//             },
-//             DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
-// 	               panic("mock out the Delete method")
-//             },
-//             DeleteCollectionFunc: func(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
-// 	               panic("mock out the DeleteCollection method")
-//             },
-//             DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
-// 	               panic("mock out the DeleteNamespaced method")
-//             },
-//             GetFunc: func(name string, opts metav1.GetOptions) (*v1.Node, error) {
-// 	               panic("mock out the Get method")
-//             },
-//             GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v1.Node, error) {
-// 	               panic("mock out the GetNamespaced method")
-//             },
-//             ListFunc: func(opts metav1.ListOptions) (*v1.NodeList, error) {
-// 	               panic("mock out the List method")
-//             },
-//             ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v1.NodeList, error) {
-// 	               panic("mock out the ListNamespaced method")
-//             },
-//             ObjectClientFunc: func() *objectclient.ObjectClient {
-// 	               panic("mock out the ObjectClient method")
-//             },
-//             UpdateFunc: func(in1 *v1.Node) (*v1.Node, error) {
-// 	               panic("mock out the Update method")
-//             },
-//             WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
-// 	               panic("mock out the Watch method")
-//             },
-//         }
+//	        // make and configure a mocked v11.NodeInterface
+//	        mockedNodeInterface := &NodeInterfaceMock{
+//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v11.NodeHandlerFunc)  {
+//		               panic("mock out the AddClusterScopedFeatureHandler method")
+//	            },
+//	            AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v11.NodeLifecycle)  {
+//		               panic("mock out the AddClusterScopedFeatureLifecycle method")
+//	            },
+//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v11.NodeHandlerFunc)  {
+//		               panic("mock out the AddClusterScopedHandler method")
+//	            },
+//	            AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v11.NodeLifecycle)  {
+//		               panic("mock out the AddClusterScopedLifecycle method")
+//	            },
+//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v11.NodeHandlerFunc)  {
+//		               panic("mock out the AddFeatureHandler method")
+//	            },
+//	            AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v11.NodeLifecycle)  {
+//		               panic("mock out the AddFeatureLifecycle method")
+//	            },
+//	            AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v11.NodeHandlerFunc)  {
+//		               panic("mock out the AddHandler method")
+//	            },
+//	            AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v11.NodeLifecycle)  {
+//		               panic("mock out the AddLifecycle method")
+//	            },
+//	            ControllerFunc: func() v11.NodeController {
+//		               panic("mock out the Controller method")
+//	            },
+//	            CreateFunc: func(in1 *v1.Node) (*v1.Node, error) {
+//		               panic("mock out the Create method")
+//	            },
+//	            DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
+//		               panic("mock out the Delete method")
+//	            },
+//	            DeleteCollectionFunc: func(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
+//		               panic("mock out the DeleteCollection method")
+//	            },
+//	            DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
+//		               panic("mock out the DeleteNamespaced method")
+//	            },
+//	            GetFunc: func(name string, opts metav1.GetOptions) (*v1.Node, error) {
+//		               panic("mock out the Get method")
+//	            },
+//	            GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v1.Node, error) {
+//		               panic("mock out the GetNamespaced method")
+//	            },
+//	            ListFunc: func(opts metav1.ListOptions) (*v1.NodeList, error) {
+//		               panic("mock out the List method")
+//	            },
+//	            ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v1.NodeList, error) {
+//		               panic("mock out the ListNamespaced method")
+//	            },
+//	            ObjectClientFunc: func() *objectclient.ObjectClient {
+//		               panic("mock out the ObjectClient method")
+//	            },
+//	            UpdateFunc: func(in1 *v1.Node) (*v1.Node, error) {
+//		               panic("mock out the Update method")
+//	            },
+//	            WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
+//		               panic("mock out the Watch method")
+//	            },
+//	        }
 //
-//         // use mockedNodeInterface in code that requires v11.NodeInterface
-//         // and then make assertions.
+//	        // use mockedNodeInterface in code that requires v11.NodeInterface
+//	        // and then make assertions.
 //
-//     }
+//	    }
 type NodeInterfaceMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
 	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v11.NodeHandlerFunc)
@@ -973,7 +984,8 @@ func (mock *NodeInterfaceMock) AddClusterScopedFeatureHandler(ctx context.Contex
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//     len(mockedNodeInterface.AddClusterScopedFeatureHandlerCalls())
+//
+//	len(mockedNodeInterface.AddClusterScopedFeatureHandlerCalls())
 func (mock *NodeInterfaceMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -1020,7 +1032,8 @@ func (mock *NodeInterfaceMock) AddClusterScopedFeatureLifecycle(ctx context.Cont
 
 // AddClusterScopedFeatureLifecycleCalls gets all the calls that were made to AddClusterScopedFeatureLifecycle.
 // Check the length with:
-//     len(mockedNodeInterface.AddClusterScopedFeatureLifecycleCalls())
+//
+//	len(mockedNodeInterface.AddClusterScopedFeatureLifecycleCalls())
 func (mock *NodeInterfaceMock) AddClusterScopedFeatureLifecycleCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -1065,7 +1078,8 @@ func (mock *NodeInterfaceMock) AddClusterScopedHandler(ctx context.Context, name
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//     len(mockedNodeInterface.AddClusterScopedHandlerCalls())
+//
+//	len(mockedNodeInterface.AddClusterScopedHandlerCalls())
 func (mock *NodeInterfaceMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -1108,7 +1122,8 @@ func (mock *NodeInterfaceMock) AddClusterScopedLifecycle(ctx context.Context, na
 
 // AddClusterScopedLifecycleCalls gets all the calls that were made to AddClusterScopedLifecycle.
 // Check the length with:
-//     len(mockedNodeInterface.AddClusterScopedLifecycleCalls())
+//
+//	len(mockedNodeInterface.AddClusterScopedLifecycleCalls())
 func (mock *NodeInterfaceMock) AddClusterScopedLifecycleCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -1151,7 +1166,8 @@ func (mock *NodeInterfaceMock) AddFeatureHandler(ctx context.Context, enabled fu
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//     len(mockedNodeInterface.AddFeatureHandlerCalls())
+//
+//	len(mockedNodeInterface.AddFeatureHandlerCalls())
 func (mock *NodeInterfaceMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
@@ -1194,7 +1210,8 @@ func (mock *NodeInterfaceMock) AddFeatureLifecycle(ctx context.Context, enabled 
 
 // AddFeatureLifecycleCalls gets all the calls that were made to AddFeatureLifecycle.
 // Check the length with:
-//     len(mockedNodeInterface.AddFeatureLifecycleCalls())
+//
+//	len(mockedNodeInterface.AddFeatureLifecycleCalls())
 func (mock *NodeInterfaceMock) AddFeatureLifecycleCalls() []struct {
 	Ctx       context.Context
 	Enabled   func() bool
@@ -1235,7 +1252,8 @@ func (mock *NodeInterfaceMock) AddHandler(ctx context.Context, name string, sync
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//     len(mockedNodeInterface.AddHandlerCalls())
+//
+//	len(mockedNodeInterface.AddHandlerCalls())
 func (mock *NodeInterfaceMock) AddHandlerCalls() []struct {
 	Ctx  context.Context
 	Name string
@@ -1274,7 +1292,8 @@ func (mock *NodeInterfaceMock) AddLifecycle(ctx context.Context, name string, li
 
 // AddLifecycleCalls gets all the calls that were made to AddLifecycle.
 // Check the length with:
-//     len(mockedNodeInterface.AddLifecycleCalls())
+//
+//	len(mockedNodeInterface.AddLifecycleCalls())
 func (mock *NodeInterfaceMock) AddLifecycleCalls() []struct {
 	Ctx       context.Context
 	Name      string
@@ -1306,7 +1325,8 @@ func (mock *NodeInterfaceMock) Controller() v11.NodeController {
 
 // ControllerCalls gets all the calls that were made to Controller.
 // Check the length with:
-//     len(mockedNodeInterface.ControllerCalls())
+//
+//	len(mockedNodeInterface.ControllerCalls())
 func (mock *NodeInterfaceMock) ControllerCalls() []struct {
 } {
 	var calls []struct {
@@ -1335,7 +1355,8 @@ func (mock *NodeInterfaceMock) Create(in1 *v1.Node) (*v1.Node, error) {
 
 // CreateCalls gets all the calls that were made to Create.
 // Check the length with:
-//     len(mockedNodeInterface.CreateCalls())
+//
+//	len(mockedNodeInterface.CreateCalls())
 func (mock *NodeInterfaceMock) CreateCalls() []struct {
 	In1 *v1.Node
 } {
@@ -1368,7 +1389,8 @@ func (mock *NodeInterfaceMock) Delete(name string, options *metav1.DeleteOptions
 
 // DeleteCalls gets all the calls that were made to Delete.
 // Check the length with:
-//     len(mockedNodeInterface.DeleteCalls())
+//
+//	len(mockedNodeInterface.DeleteCalls())
 func (mock *NodeInterfaceMock) DeleteCalls() []struct {
 	Name    string
 	Options *metav1.DeleteOptions
@@ -1403,7 +1425,8 @@ func (mock *NodeInterfaceMock) DeleteCollection(deleteOpts *metav1.DeleteOptions
 
 // DeleteCollectionCalls gets all the calls that were made to DeleteCollection.
 // Check the length with:
-//     len(mockedNodeInterface.DeleteCollectionCalls())
+//
+//	len(mockedNodeInterface.DeleteCollectionCalls())
 func (mock *NodeInterfaceMock) DeleteCollectionCalls() []struct {
 	DeleteOpts *metav1.DeleteOptions
 	ListOpts   metav1.ListOptions
@@ -1440,7 +1463,8 @@ func (mock *NodeInterfaceMock) DeleteNamespaced(namespace string, name string, o
 
 // DeleteNamespacedCalls gets all the calls that were made to DeleteNamespaced.
 // Check the length with:
-//     len(mockedNodeInterface.DeleteNamespacedCalls())
+//
+//	len(mockedNodeInterface.DeleteNamespacedCalls())
 func (mock *NodeInterfaceMock) DeleteNamespacedCalls() []struct {
 	Namespace string
 	Name      string
@@ -1477,7 +1501,8 @@ func (mock *NodeInterfaceMock) Get(name string, opts metav1.GetOptions) (*v1.Nod
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//     len(mockedNodeInterface.GetCalls())
+//
+//	len(mockedNodeInterface.GetCalls())
 func (mock *NodeInterfaceMock) GetCalls() []struct {
 	Name string
 	Opts metav1.GetOptions
@@ -1514,7 +1539,8 @@ func (mock *NodeInterfaceMock) GetNamespaced(namespace string, name string, opts
 
 // GetNamespacedCalls gets all the calls that were made to GetNamespaced.
 // Check the length with:
-//     len(mockedNodeInterface.GetNamespacedCalls())
+//
+//	len(mockedNodeInterface.GetNamespacedCalls())
 func (mock *NodeInterfaceMock) GetNamespacedCalls() []struct {
 	Namespace string
 	Name      string
@@ -1549,7 +1575,8 @@ func (mock *NodeInterfaceMock) List(opts metav1.ListOptions) (*v1.NodeList, erro
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//     len(mockedNodeInterface.ListCalls())
+//
+//	len(mockedNodeInterface.ListCalls())
 func (mock *NodeInterfaceMock) ListCalls() []struct {
 	Opts metav1.ListOptions
 } {
@@ -1582,7 +1609,8 @@ func (mock *NodeInterfaceMock) ListNamespaced(namespace string, opts metav1.List
 
 // ListNamespacedCalls gets all the calls that were made to ListNamespaced.
 // Check the length with:
-//     len(mockedNodeInterface.ListNamespacedCalls())
+//
+//	len(mockedNodeInterface.ListNamespacedCalls())
 func (mock *NodeInterfaceMock) ListNamespacedCalls() []struct {
 	Namespace string
 	Opts      metav1.ListOptions
@@ -1612,7 +1640,8 @@ func (mock *NodeInterfaceMock) ObjectClient() *objectclient.ObjectClient {
 
 // ObjectClientCalls gets all the calls that were made to ObjectClient.
 // Check the length with:
-//     len(mockedNodeInterface.ObjectClientCalls())
+//
+//	len(mockedNodeInterface.ObjectClientCalls())
 func (mock *NodeInterfaceMock) ObjectClientCalls() []struct {
 } {
 	var calls []struct {
@@ -1641,7 +1670,8 @@ func (mock *NodeInterfaceMock) Update(in1 *v1.Node) (*v1.Node, error) {
 
 // UpdateCalls gets all the calls that were made to Update.
 // Check the length with:
-//     len(mockedNodeInterface.UpdateCalls())
+//
+//	len(mockedNodeInterface.UpdateCalls())
 func (mock *NodeInterfaceMock) UpdateCalls() []struct {
 	In1 *v1.Node
 } {
@@ -1672,7 +1702,8 @@ func (mock *NodeInterfaceMock) Watch(opts metav1.ListOptions) (watch.Interface, 
 
 // WatchCalls gets all the calls that were made to Watch.
 // Check the length with:
-//     len(mockedNodeInterface.WatchCalls())
+//
+//	len(mockedNodeInterface.WatchCalls())
 func (mock *NodeInterfaceMock) WatchCalls() []struct {
 	Opts metav1.ListOptions
 } {
@@ -1695,19 +1726,19 @@ var _ v11.NodesGetter = &NodesGetterMock{}
 
 // NodesGetterMock is a mock implementation of v11.NodesGetter.
 //
-//     func TestSomethingThatUsesNodesGetter(t *testing.T) {
+//	    func TestSomethingThatUsesNodesGetter(t *testing.T) {
 //
-//         // make and configure a mocked v11.NodesGetter
-//         mockedNodesGetter := &NodesGetterMock{
-//             NodesFunc: func(namespace string) v11.NodeInterface {
-// 	               panic("mock out the Nodes method")
-//             },
-//         }
+//	        // make and configure a mocked v11.NodesGetter
+//	        mockedNodesGetter := &NodesGetterMock{
+//	            NodesFunc: func(namespace string) v11.NodeInterface {
+//		               panic("mock out the Nodes method")
+//	            },
+//	        }
 //
-//         // use mockedNodesGetter in code that requires v11.NodesGetter
-//         // and then make assertions.
+//	        // use mockedNodesGetter in code that requires v11.NodesGetter
+//	        // and then make assertions.
 //
-//     }
+//	    }
 type NodesGetterMock struct {
 	// NodesFunc mocks the Nodes method.
 	NodesFunc func(namespace string) v11.NodeInterface
@@ -1740,7 +1771,8 @@ func (mock *NodesGetterMock) Nodes(namespace string) v11.NodeInterface {
 
 // NodesCalls gets all the calls that were made to Nodes.
 // Check the length with:
-//     len(mockedNodesGetter.NodesCalls())
+//
+//	len(mockedNodesGetter.NodesCalls())
 func (mock *NodesGetterMock) NodesCalls() []struct {
 	Namespace string
 } {

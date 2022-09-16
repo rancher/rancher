@@ -105,7 +105,7 @@ func (s *yamlLinkHandler) LinkHandler(apiContext *types.APIContext, next types.R
 	return printer.PrintObj(result, apiContext.Response)
 }
 
-//getResourcePrefixMap converts resource path like `/api/v1/pods` to kind-prefix mappings
+// getResourcePrefixMap converts resource path like `/api/v1/pods` to kind-prefix mappings
 func getResourcePrefixMap(resources []string) map[string]string {
 	if len(resources) == 0 {
 		return resourcelink.ExportResourcePrefixMappings

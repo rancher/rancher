@@ -29,22 +29,22 @@ var _ v11.StorageClassLister = &StorageClassListerMock{}
 
 // StorageClassListerMock is a mock implementation of v11.StorageClassLister.
 //
-//     func TestSomethingThatUsesStorageClassLister(t *testing.T) {
+//	    func TestSomethingThatUsesStorageClassLister(t *testing.T) {
 //
-//         // make and configure a mocked v11.StorageClassLister
-//         mockedStorageClassLister := &StorageClassListerMock{
-//             GetFunc: func(namespace string, name string) (*v1.StorageClass, error) {
-// 	               panic("mock out the Get method")
-//             },
-//             ListFunc: func(namespace string, selector labels.Selector) ([]*v1.StorageClass, error) {
-// 	               panic("mock out the List method")
-//             },
-//         }
+//	        // make and configure a mocked v11.StorageClassLister
+//	        mockedStorageClassLister := &StorageClassListerMock{
+//	            GetFunc: func(namespace string, name string) (*v1.StorageClass, error) {
+//		               panic("mock out the Get method")
+//	            },
+//	            ListFunc: func(namespace string, selector labels.Selector) ([]*v1.StorageClass, error) {
+//		               panic("mock out the List method")
+//	            },
+//	        }
 //
-//         // use mockedStorageClassLister in code that requires v11.StorageClassLister
-//         // and then make assertions.
+//	        // use mockedStorageClassLister in code that requires v11.StorageClassLister
+//	        // and then make assertions.
 //
-//     }
+//	    }
 type StorageClassListerMock struct {
 	// GetFunc mocks the Get method.
 	GetFunc func(namespace string, name string) (*v1.StorageClass, error)
@@ -91,7 +91,8 @@ func (mock *StorageClassListerMock) Get(namespace string, name string) (*v1.Stor
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//     len(mockedStorageClassLister.GetCalls())
+//
+//	len(mockedStorageClassLister.GetCalls())
 func (mock *StorageClassListerMock) GetCalls() []struct {
 	Namespace string
 	Name      string
@@ -126,7 +127,8 @@ func (mock *StorageClassListerMock) List(namespace string, selector labels.Selec
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//     len(mockedStorageClassLister.ListCalls())
+//
+//	len(mockedStorageClassLister.ListCalls())
 func (mock *StorageClassListerMock) ListCalls() []struct {
 	Namespace string
 	Selector  labels.Selector
@@ -159,43 +161,43 @@ var _ v11.StorageClassController = &StorageClassControllerMock{}
 
 // StorageClassControllerMock is a mock implementation of v11.StorageClassController.
 //
-//     func TestSomethingThatUsesStorageClassController(t *testing.T) {
+//	    func TestSomethingThatUsesStorageClassController(t *testing.T) {
 //
-//         // make and configure a mocked v11.StorageClassController
-//         mockedStorageClassController := &StorageClassControllerMock{
-//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v11.StorageClassHandlerFunc)  {
-// 	               panic("mock out the AddClusterScopedFeatureHandler method")
-//             },
-//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v11.StorageClassHandlerFunc)  {
-// 	               panic("mock out the AddClusterScopedHandler method")
-//             },
-//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v11.StorageClassHandlerFunc)  {
-// 	               panic("mock out the AddFeatureHandler method")
-//             },
-//             AddHandlerFunc: func(ctx context.Context, name string, handler v11.StorageClassHandlerFunc)  {
-// 	               panic("mock out the AddHandler method")
-//             },
-//             EnqueueFunc: func(namespace string, name string)  {
-// 	               panic("mock out the Enqueue method")
-//             },
-//             EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
-// 	               panic("mock out the EnqueueAfter method")
-//             },
-//             GenericFunc: func() controller.GenericController {
-// 	               panic("mock out the Generic method")
-//             },
-//             InformerFunc: func() cache.SharedIndexInformer {
-// 	               panic("mock out the Informer method")
-//             },
-//             ListerFunc: func() v11.StorageClassLister {
-// 	               panic("mock out the Lister method")
-//             },
-//         }
+//	        // make and configure a mocked v11.StorageClassController
+//	        mockedStorageClassController := &StorageClassControllerMock{
+//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v11.StorageClassHandlerFunc)  {
+//		               panic("mock out the AddClusterScopedFeatureHandler method")
+//	            },
+//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v11.StorageClassHandlerFunc)  {
+//		               panic("mock out the AddClusterScopedHandler method")
+//	            },
+//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v11.StorageClassHandlerFunc)  {
+//		               panic("mock out the AddFeatureHandler method")
+//	            },
+//	            AddHandlerFunc: func(ctx context.Context, name string, handler v11.StorageClassHandlerFunc)  {
+//		               panic("mock out the AddHandler method")
+//	            },
+//	            EnqueueFunc: func(namespace string, name string)  {
+//		               panic("mock out the Enqueue method")
+//	            },
+//	            EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
+//		               panic("mock out the EnqueueAfter method")
+//	            },
+//	            GenericFunc: func() controller.GenericController {
+//		               panic("mock out the Generic method")
+//	            },
+//	            InformerFunc: func() cache.SharedIndexInformer {
+//		               panic("mock out the Informer method")
+//	            },
+//	            ListerFunc: func() v11.StorageClassLister {
+//		               panic("mock out the Lister method")
+//	            },
+//	        }
 //
-//         // use mockedStorageClassController in code that requires v11.StorageClassController
-//         // and then make assertions.
+//	        // use mockedStorageClassController in code that requires v11.StorageClassController
+//	        // and then make assertions.
 //
-//     }
+//	    }
 type StorageClassControllerMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
 	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v11.StorageClassHandlerFunc)
@@ -324,7 +326,8 @@ func (mock *StorageClassControllerMock) AddClusterScopedFeatureHandler(ctx conte
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//     len(mockedStorageClassController.AddClusterScopedFeatureHandlerCalls())
+//
+//	len(mockedStorageClassController.AddClusterScopedFeatureHandlerCalls())
 func (mock *StorageClassControllerMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -369,7 +372,8 @@ func (mock *StorageClassControllerMock) AddClusterScopedHandler(ctx context.Cont
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//     len(mockedStorageClassController.AddClusterScopedHandlerCalls())
+//
+//	len(mockedStorageClassController.AddClusterScopedHandlerCalls())
 func (mock *StorageClassControllerMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -412,7 +416,8 @@ func (mock *StorageClassControllerMock) AddFeatureHandler(ctx context.Context, e
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//     len(mockedStorageClassController.AddFeatureHandlerCalls())
+//
+//	len(mockedStorageClassController.AddFeatureHandlerCalls())
 func (mock *StorageClassControllerMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
@@ -453,7 +458,8 @@ func (mock *StorageClassControllerMock) AddHandler(ctx context.Context, name str
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//     len(mockedStorageClassController.AddHandlerCalls())
+//
+//	len(mockedStorageClassController.AddHandlerCalls())
 func (mock *StorageClassControllerMock) AddHandlerCalls() []struct {
 	Ctx     context.Context
 	Name    string
@@ -490,7 +496,8 @@ func (mock *StorageClassControllerMock) Enqueue(namespace string, name string) {
 
 // EnqueueCalls gets all the calls that were made to Enqueue.
 // Check the length with:
-//     len(mockedStorageClassController.EnqueueCalls())
+//
+//	len(mockedStorageClassController.EnqueueCalls())
 func (mock *StorageClassControllerMock) EnqueueCalls() []struct {
 	Namespace string
 	Name      string
@@ -527,7 +534,8 @@ func (mock *StorageClassControllerMock) EnqueueAfter(namespace string, name stri
 
 // EnqueueAfterCalls gets all the calls that were made to EnqueueAfter.
 // Check the length with:
-//     len(mockedStorageClassController.EnqueueAfterCalls())
+//
+//	len(mockedStorageClassController.EnqueueAfterCalls())
 func (mock *StorageClassControllerMock) EnqueueAfterCalls() []struct {
 	Namespace string
 	Name      string
@@ -559,7 +567,8 @@ func (mock *StorageClassControllerMock) Generic() controller.GenericController {
 
 // GenericCalls gets all the calls that were made to Generic.
 // Check the length with:
-//     len(mockedStorageClassController.GenericCalls())
+//
+//	len(mockedStorageClassController.GenericCalls())
 func (mock *StorageClassControllerMock) GenericCalls() []struct {
 } {
 	var calls []struct {
@@ -585,7 +594,8 @@ func (mock *StorageClassControllerMock) Informer() cache.SharedIndexInformer {
 
 // InformerCalls gets all the calls that were made to Informer.
 // Check the length with:
-//     len(mockedStorageClassController.InformerCalls())
+//
+//	len(mockedStorageClassController.InformerCalls())
 func (mock *StorageClassControllerMock) InformerCalls() []struct {
 } {
 	var calls []struct {
@@ -611,7 +621,8 @@ func (mock *StorageClassControllerMock) Lister() v11.StorageClassLister {
 
 // ListerCalls gets all the calls that were made to Lister.
 // Check the length with:
-//     len(mockedStorageClassController.ListerCalls())
+//
+//	len(mockedStorageClassController.ListerCalls())
 func (mock *StorageClassControllerMock) ListerCalls() []struct {
 } {
 	var calls []struct {
@@ -651,76 +662,76 @@ var _ v11.StorageClassInterface = &StorageClassInterfaceMock{}
 
 // StorageClassInterfaceMock is a mock implementation of v11.StorageClassInterface.
 //
-//     func TestSomethingThatUsesStorageClassInterface(t *testing.T) {
+//	    func TestSomethingThatUsesStorageClassInterface(t *testing.T) {
 //
-//         // make and configure a mocked v11.StorageClassInterface
-//         mockedStorageClassInterface := &StorageClassInterfaceMock{
-//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v11.StorageClassHandlerFunc)  {
-// 	               panic("mock out the AddClusterScopedFeatureHandler method")
-//             },
-//             AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v11.StorageClassLifecycle)  {
-// 	               panic("mock out the AddClusterScopedFeatureLifecycle method")
-//             },
-//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v11.StorageClassHandlerFunc)  {
-// 	               panic("mock out the AddClusterScopedHandler method")
-//             },
-//             AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v11.StorageClassLifecycle)  {
-// 	               panic("mock out the AddClusterScopedLifecycle method")
-//             },
-//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v11.StorageClassHandlerFunc)  {
-// 	               panic("mock out the AddFeatureHandler method")
-//             },
-//             AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v11.StorageClassLifecycle)  {
-// 	               panic("mock out the AddFeatureLifecycle method")
-//             },
-//             AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v11.StorageClassHandlerFunc)  {
-// 	               panic("mock out the AddHandler method")
-//             },
-//             AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v11.StorageClassLifecycle)  {
-// 	               panic("mock out the AddLifecycle method")
-//             },
-//             ControllerFunc: func() v11.StorageClassController {
-// 	               panic("mock out the Controller method")
-//             },
-//             CreateFunc: func(in1 *v1.StorageClass) (*v1.StorageClass, error) {
-// 	               panic("mock out the Create method")
-//             },
-//             DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
-// 	               panic("mock out the Delete method")
-//             },
-//             DeleteCollectionFunc: func(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
-// 	               panic("mock out the DeleteCollection method")
-//             },
-//             DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
-// 	               panic("mock out the DeleteNamespaced method")
-//             },
-//             GetFunc: func(name string, opts metav1.GetOptions) (*v1.StorageClass, error) {
-// 	               panic("mock out the Get method")
-//             },
-//             GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v1.StorageClass, error) {
-// 	               panic("mock out the GetNamespaced method")
-//             },
-//             ListFunc: func(opts metav1.ListOptions) (*v1.StorageClassList, error) {
-// 	               panic("mock out the List method")
-//             },
-//             ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v1.StorageClassList, error) {
-// 	               panic("mock out the ListNamespaced method")
-//             },
-//             ObjectClientFunc: func() *objectclient.ObjectClient {
-// 	               panic("mock out the ObjectClient method")
-//             },
-//             UpdateFunc: func(in1 *v1.StorageClass) (*v1.StorageClass, error) {
-// 	               panic("mock out the Update method")
-//             },
-//             WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
-// 	               panic("mock out the Watch method")
-//             },
-//         }
+//	        // make and configure a mocked v11.StorageClassInterface
+//	        mockedStorageClassInterface := &StorageClassInterfaceMock{
+//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v11.StorageClassHandlerFunc)  {
+//		               panic("mock out the AddClusterScopedFeatureHandler method")
+//	            },
+//	            AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v11.StorageClassLifecycle)  {
+//		               panic("mock out the AddClusterScopedFeatureLifecycle method")
+//	            },
+//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v11.StorageClassHandlerFunc)  {
+//		               panic("mock out the AddClusterScopedHandler method")
+//	            },
+//	            AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v11.StorageClassLifecycle)  {
+//		               panic("mock out the AddClusterScopedLifecycle method")
+//	            },
+//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v11.StorageClassHandlerFunc)  {
+//		               panic("mock out the AddFeatureHandler method")
+//	            },
+//	            AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v11.StorageClassLifecycle)  {
+//		               panic("mock out the AddFeatureLifecycle method")
+//	            },
+//	            AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v11.StorageClassHandlerFunc)  {
+//		               panic("mock out the AddHandler method")
+//	            },
+//	            AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v11.StorageClassLifecycle)  {
+//		               panic("mock out the AddLifecycle method")
+//	            },
+//	            ControllerFunc: func() v11.StorageClassController {
+//		               panic("mock out the Controller method")
+//	            },
+//	            CreateFunc: func(in1 *v1.StorageClass) (*v1.StorageClass, error) {
+//		               panic("mock out the Create method")
+//	            },
+//	            DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
+//		               panic("mock out the Delete method")
+//	            },
+//	            DeleteCollectionFunc: func(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
+//		               panic("mock out the DeleteCollection method")
+//	            },
+//	            DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
+//		               panic("mock out the DeleteNamespaced method")
+//	            },
+//	            GetFunc: func(name string, opts metav1.GetOptions) (*v1.StorageClass, error) {
+//		               panic("mock out the Get method")
+//	            },
+//	            GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v1.StorageClass, error) {
+//		               panic("mock out the GetNamespaced method")
+//	            },
+//	            ListFunc: func(opts metav1.ListOptions) (*v1.StorageClassList, error) {
+//		               panic("mock out the List method")
+//	            },
+//	            ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v1.StorageClassList, error) {
+//		               panic("mock out the ListNamespaced method")
+//	            },
+//	            ObjectClientFunc: func() *objectclient.ObjectClient {
+//		               panic("mock out the ObjectClient method")
+//	            },
+//	            UpdateFunc: func(in1 *v1.StorageClass) (*v1.StorageClass, error) {
+//		               panic("mock out the Update method")
+//	            },
+//	            WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
+//		               panic("mock out the Watch method")
+//	            },
+//	        }
 //
-//         // use mockedStorageClassInterface in code that requires v11.StorageClassInterface
-//         // and then make assertions.
+//	        // use mockedStorageClassInterface in code that requires v11.StorageClassInterface
+//	        // and then make assertions.
 //
-//     }
+//	    }
 type StorageClassInterfaceMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
 	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v11.StorageClassHandlerFunc)
@@ -973,7 +984,8 @@ func (mock *StorageClassInterfaceMock) AddClusterScopedFeatureHandler(ctx contex
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//     len(mockedStorageClassInterface.AddClusterScopedFeatureHandlerCalls())
+//
+//	len(mockedStorageClassInterface.AddClusterScopedFeatureHandlerCalls())
 func (mock *StorageClassInterfaceMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -1020,7 +1032,8 @@ func (mock *StorageClassInterfaceMock) AddClusterScopedFeatureLifecycle(ctx cont
 
 // AddClusterScopedFeatureLifecycleCalls gets all the calls that were made to AddClusterScopedFeatureLifecycle.
 // Check the length with:
-//     len(mockedStorageClassInterface.AddClusterScopedFeatureLifecycleCalls())
+//
+//	len(mockedStorageClassInterface.AddClusterScopedFeatureLifecycleCalls())
 func (mock *StorageClassInterfaceMock) AddClusterScopedFeatureLifecycleCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -1065,7 +1078,8 @@ func (mock *StorageClassInterfaceMock) AddClusterScopedHandler(ctx context.Conte
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//     len(mockedStorageClassInterface.AddClusterScopedHandlerCalls())
+//
+//	len(mockedStorageClassInterface.AddClusterScopedHandlerCalls())
 func (mock *StorageClassInterfaceMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -1108,7 +1122,8 @@ func (mock *StorageClassInterfaceMock) AddClusterScopedLifecycle(ctx context.Con
 
 // AddClusterScopedLifecycleCalls gets all the calls that were made to AddClusterScopedLifecycle.
 // Check the length with:
-//     len(mockedStorageClassInterface.AddClusterScopedLifecycleCalls())
+//
+//	len(mockedStorageClassInterface.AddClusterScopedLifecycleCalls())
 func (mock *StorageClassInterfaceMock) AddClusterScopedLifecycleCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -1151,7 +1166,8 @@ func (mock *StorageClassInterfaceMock) AddFeatureHandler(ctx context.Context, en
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//     len(mockedStorageClassInterface.AddFeatureHandlerCalls())
+//
+//	len(mockedStorageClassInterface.AddFeatureHandlerCalls())
 func (mock *StorageClassInterfaceMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
@@ -1194,7 +1210,8 @@ func (mock *StorageClassInterfaceMock) AddFeatureLifecycle(ctx context.Context, 
 
 // AddFeatureLifecycleCalls gets all the calls that were made to AddFeatureLifecycle.
 // Check the length with:
-//     len(mockedStorageClassInterface.AddFeatureLifecycleCalls())
+//
+//	len(mockedStorageClassInterface.AddFeatureLifecycleCalls())
 func (mock *StorageClassInterfaceMock) AddFeatureLifecycleCalls() []struct {
 	Ctx       context.Context
 	Enabled   func() bool
@@ -1235,7 +1252,8 @@ func (mock *StorageClassInterfaceMock) AddHandler(ctx context.Context, name stri
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//     len(mockedStorageClassInterface.AddHandlerCalls())
+//
+//	len(mockedStorageClassInterface.AddHandlerCalls())
 func (mock *StorageClassInterfaceMock) AddHandlerCalls() []struct {
 	Ctx  context.Context
 	Name string
@@ -1274,7 +1292,8 @@ func (mock *StorageClassInterfaceMock) AddLifecycle(ctx context.Context, name st
 
 // AddLifecycleCalls gets all the calls that were made to AddLifecycle.
 // Check the length with:
-//     len(mockedStorageClassInterface.AddLifecycleCalls())
+//
+//	len(mockedStorageClassInterface.AddLifecycleCalls())
 func (mock *StorageClassInterfaceMock) AddLifecycleCalls() []struct {
 	Ctx       context.Context
 	Name      string
@@ -1306,7 +1325,8 @@ func (mock *StorageClassInterfaceMock) Controller() v11.StorageClassController {
 
 // ControllerCalls gets all the calls that were made to Controller.
 // Check the length with:
-//     len(mockedStorageClassInterface.ControllerCalls())
+//
+//	len(mockedStorageClassInterface.ControllerCalls())
 func (mock *StorageClassInterfaceMock) ControllerCalls() []struct {
 } {
 	var calls []struct {
@@ -1335,7 +1355,8 @@ func (mock *StorageClassInterfaceMock) Create(in1 *v1.StorageClass) (*v1.Storage
 
 // CreateCalls gets all the calls that were made to Create.
 // Check the length with:
-//     len(mockedStorageClassInterface.CreateCalls())
+//
+//	len(mockedStorageClassInterface.CreateCalls())
 func (mock *StorageClassInterfaceMock) CreateCalls() []struct {
 	In1 *v1.StorageClass
 } {
@@ -1368,7 +1389,8 @@ func (mock *StorageClassInterfaceMock) Delete(name string, options *metav1.Delet
 
 // DeleteCalls gets all the calls that were made to Delete.
 // Check the length with:
-//     len(mockedStorageClassInterface.DeleteCalls())
+//
+//	len(mockedStorageClassInterface.DeleteCalls())
 func (mock *StorageClassInterfaceMock) DeleteCalls() []struct {
 	Name    string
 	Options *metav1.DeleteOptions
@@ -1403,7 +1425,8 @@ func (mock *StorageClassInterfaceMock) DeleteCollection(deleteOpts *metav1.Delet
 
 // DeleteCollectionCalls gets all the calls that were made to DeleteCollection.
 // Check the length with:
-//     len(mockedStorageClassInterface.DeleteCollectionCalls())
+//
+//	len(mockedStorageClassInterface.DeleteCollectionCalls())
 func (mock *StorageClassInterfaceMock) DeleteCollectionCalls() []struct {
 	DeleteOpts *metav1.DeleteOptions
 	ListOpts   metav1.ListOptions
@@ -1440,7 +1463,8 @@ func (mock *StorageClassInterfaceMock) DeleteNamespaced(namespace string, name s
 
 // DeleteNamespacedCalls gets all the calls that were made to DeleteNamespaced.
 // Check the length with:
-//     len(mockedStorageClassInterface.DeleteNamespacedCalls())
+//
+//	len(mockedStorageClassInterface.DeleteNamespacedCalls())
 func (mock *StorageClassInterfaceMock) DeleteNamespacedCalls() []struct {
 	Namespace string
 	Name      string
@@ -1477,7 +1501,8 @@ func (mock *StorageClassInterfaceMock) Get(name string, opts metav1.GetOptions) 
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//     len(mockedStorageClassInterface.GetCalls())
+//
+//	len(mockedStorageClassInterface.GetCalls())
 func (mock *StorageClassInterfaceMock) GetCalls() []struct {
 	Name string
 	Opts metav1.GetOptions
@@ -1514,7 +1539,8 @@ func (mock *StorageClassInterfaceMock) GetNamespaced(namespace string, name stri
 
 // GetNamespacedCalls gets all the calls that were made to GetNamespaced.
 // Check the length with:
-//     len(mockedStorageClassInterface.GetNamespacedCalls())
+//
+//	len(mockedStorageClassInterface.GetNamespacedCalls())
 func (mock *StorageClassInterfaceMock) GetNamespacedCalls() []struct {
 	Namespace string
 	Name      string
@@ -1549,7 +1575,8 @@ func (mock *StorageClassInterfaceMock) List(opts metav1.ListOptions) (*v1.Storag
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//     len(mockedStorageClassInterface.ListCalls())
+//
+//	len(mockedStorageClassInterface.ListCalls())
 func (mock *StorageClassInterfaceMock) ListCalls() []struct {
 	Opts metav1.ListOptions
 } {
@@ -1582,7 +1609,8 @@ func (mock *StorageClassInterfaceMock) ListNamespaced(namespace string, opts met
 
 // ListNamespacedCalls gets all the calls that were made to ListNamespaced.
 // Check the length with:
-//     len(mockedStorageClassInterface.ListNamespacedCalls())
+//
+//	len(mockedStorageClassInterface.ListNamespacedCalls())
 func (mock *StorageClassInterfaceMock) ListNamespacedCalls() []struct {
 	Namespace string
 	Opts      metav1.ListOptions
@@ -1612,7 +1640,8 @@ func (mock *StorageClassInterfaceMock) ObjectClient() *objectclient.ObjectClient
 
 // ObjectClientCalls gets all the calls that were made to ObjectClient.
 // Check the length with:
-//     len(mockedStorageClassInterface.ObjectClientCalls())
+//
+//	len(mockedStorageClassInterface.ObjectClientCalls())
 func (mock *StorageClassInterfaceMock) ObjectClientCalls() []struct {
 } {
 	var calls []struct {
@@ -1641,7 +1670,8 @@ func (mock *StorageClassInterfaceMock) Update(in1 *v1.StorageClass) (*v1.Storage
 
 // UpdateCalls gets all the calls that were made to Update.
 // Check the length with:
-//     len(mockedStorageClassInterface.UpdateCalls())
+//
+//	len(mockedStorageClassInterface.UpdateCalls())
 func (mock *StorageClassInterfaceMock) UpdateCalls() []struct {
 	In1 *v1.StorageClass
 } {
@@ -1672,7 +1702,8 @@ func (mock *StorageClassInterfaceMock) Watch(opts metav1.ListOptions) (watch.Int
 
 // WatchCalls gets all the calls that were made to Watch.
 // Check the length with:
-//     len(mockedStorageClassInterface.WatchCalls())
+//
+//	len(mockedStorageClassInterface.WatchCalls())
 func (mock *StorageClassInterfaceMock) WatchCalls() []struct {
 	Opts metav1.ListOptions
 } {
@@ -1695,19 +1726,19 @@ var _ v11.StorageClassesGetter = &StorageClassesGetterMock{}
 
 // StorageClassesGetterMock is a mock implementation of v11.StorageClassesGetter.
 //
-//     func TestSomethingThatUsesStorageClassesGetter(t *testing.T) {
+//	    func TestSomethingThatUsesStorageClassesGetter(t *testing.T) {
 //
-//         // make and configure a mocked v11.StorageClassesGetter
-//         mockedStorageClassesGetter := &StorageClassesGetterMock{
-//             StorageClassesFunc: func(namespace string) v11.StorageClassInterface {
-// 	               panic("mock out the StorageClasses method")
-//             },
-//         }
+//	        // make and configure a mocked v11.StorageClassesGetter
+//	        mockedStorageClassesGetter := &StorageClassesGetterMock{
+//	            StorageClassesFunc: func(namespace string) v11.StorageClassInterface {
+//		               panic("mock out the StorageClasses method")
+//	            },
+//	        }
 //
-//         // use mockedStorageClassesGetter in code that requires v11.StorageClassesGetter
-//         // and then make assertions.
+//	        // use mockedStorageClassesGetter in code that requires v11.StorageClassesGetter
+//	        // and then make assertions.
 //
-//     }
+//	    }
 type StorageClassesGetterMock struct {
 	// StorageClassesFunc mocks the StorageClasses method.
 	StorageClassesFunc func(namespace string) v11.StorageClassInterface
@@ -1740,7 +1771,8 @@ func (mock *StorageClassesGetterMock) StorageClasses(namespace string) v11.Stora
 
 // StorageClassesCalls gets all the calls that were made to StorageClasses.
 // Check the length with:
-//     len(mockedStorageClassesGetter.StorageClassesCalls())
+//
+//	len(mockedStorageClassesGetter.StorageClassesCalls())
 func (mock *StorageClassesGetterMock) StorageClassesCalls() []struct {
 	Namespace string
 } {

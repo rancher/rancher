@@ -29,22 +29,22 @@ var _ v31.AppRevisionLister = &AppRevisionListerMock{}
 
 // AppRevisionListerMock is a mock implementation of v31.AppRevisionLister.
 //
-//     func TestSomethingThatUsesAppRevisionLister(t *testing.T) {
+//	    func TestSomethingThatUsesAppRevisionLister(t *testing.T) {
 //
-//         // make and configure a mocked v31.AppRevisionLister
-//         mockedAppRevisionLister := &AppRevisionListerMock{
-//             GetFunc: func(namespace string, name string) (*v3.AppRevision, error) {
-// 	               panic("mock out the Get method")
-//             },
-//             ListFunc: func(namespace string, selector labels.Selector) ([]*v3.AppRevision, error) {
-// 	               panic("mock out the List method")
-//             },
-//         }
+//	        // make and configure a mocked v31.AppRevisionLister
+//	        mockedAppRevisionLister := &AppRevisionListerMock{
+//	            GetFunc: func(namespace string, name string) (*v3.AppRevision, error) {
+//		               panic("mock out the Get method")
+//	            },
+//	            ListFunc: func(namespace string, selector labels.Selector) ([]*v3.AppRevision, error) {
+//		               panic("mock out the List method")
+//	            },
+//	        }
 //
-//         // use mockedAppRevisionLister in code that requires v31.AppRevisionLister
-//         // and then make assertions.
+//	        // use mockedAppRevisionLister in code that requires v31.AppRevisionLister
+//	        // and then make assertions.
 //
-//     }
+//	    }
 type AppRevisionListerMock struct {
 	// GetFunc mocks the Get method.
 	GetFunc func(namespace string, name string) (*v3.AppRevision, error)
@@ -91,7 +91,8 @@ func (mock *AppRevisionListerMock) Get(namespace string, name string) (*v3.AppRe
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//     len(mockedAppRevisionLister.GetCalls())
+//
+//	len(mockedAppRevisionLister.GetCalls())
 func (mock *AppRevisionListerMock) GetCalls() []struct {
 	Namespace string
 	Name      string
@@ -126,7 +127,8 @@ func (mock *AppRevisionListerMock) List(namespace string, selector labels.Select
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//     len(mockedAppRevisionLister.ListCalls())
+//
+//	len(mockedAppRevisionLister.ListCalls())
 func (mock *AppRevisionListerMock) ListCalls() []struct {
 	Namespace string
 	Selector  labels.Selector
@@ -159,43 +161,43 @@ var _ v31.AppRevisionController = &AppRevisionControllerMock{}
 
 // AppRevisionControllerMock is a mock implementation of v31.AppRevisionController.
 //
-//     func TestSomethingThatUsesAppRevisionController(t *testing.T) {
+//	    func TestSomethingThatUsesAppRevisionController(t *testing.T) {
 //
-//         // make and configure a mocked v31.AppRevisionController
-//         mockedAppRevisionController := &AppRevisionControllerMock{
-//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v31.AppRevisionHandlerFunc)  {
-// 	               panic("mock out the AddClusterScopedFeatureHandler method")
-//             },
-//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v31.AppRevisionHandlerFunc)  {
-// 	               panic("mock out the AddClusterScopedHandler method")
-//             },
-//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.AppRevisionHandlerFunc)  {
-// 	               panic("mock out the AddFeatureHandler method")
-//             },
-//             AddHandlerFunc: func(ctx context.Context, name string, handler v31.AppRevisionHandlerFunc)  {
-// 	               panic("mock out the AddHandler method")
-//             },
-//             EnqueueFunc: func(namespace string, name string)  {
-// 	               panic("mock out the Enqueue method")
-//             },
-//             EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
-// 	               panic("mock out the EnqueueAfter method")
-//             },
-//             GenericFunc: func() controller.GenericController {
-// 	               panic("mock out the Generic method")
-//             },
-//             InformerFunc: func() cache.SharedIndexInformer {
-// 	               panic("mock out the Informer method")
-//             },
-//             ListerFunc: func() v31.AppRevisionLister {
-// 	               panic("mock out the Lister method")
-//             },
-//         }
+//	        // make and configure a mocked v31.AppRevisionController
+//	        mockedAppRevisionController := &AppRevisionControllerMock{
+//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v31.AppRevisionHandlerFunc)  {
+//		               panic("mock out the AddClusterScopedFeatureHandler method")
+//	            },
+//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v31.AppRevisionHandlerFunc)  {
+//		               panic("mock out the AddClusterScopedHandler method")
+//	            },
+//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.AppRevisionHandlerFunc)  {
+//		               panic("mock out the AddFeatureHandler method")
+//	            },
+//	            AddHandlerFunc: func(ctx context.Context, name string, handler v31.AppRevisionHandlerFunc)  {
+//		               panic("mock out the AddHandler method")
+//	            },
+//	            EnqueueFunc: func(namespace string, name string)  {
+//		               panic("mock out the Enqueue method")
+//	            },
+//	            EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
+//		               panic("mock out the EnqueueAfter method")
+//	            },
+//	            GenericFunc: func() controller.GenericController {
+//		               panic("mock out the Generic method")
+//	            },
+//	            InformerFunc: func() cache.SharedIndexInformer {
+//		               panic("mock out the Informer method")
+//	            },
+//	            ListerFunc: func() v31.AppRevisionLister {
+//		               panic("mock out the Lister method")
+//	            },
+//	        }
 //
-//         // use mockedAppRevisionController in code that requires v31.AppRevisionController
-//         // and then make assertions.
+//	        // use mockedAppRevisionController in code that requires v31.AppRevisionController
+//	        // and then make assertions.
 //
-//     }
+//	    }
 type AppRevisionControllerMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
 	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v31.AppRevisionHandlerFunc)
@@ -324,7 +326,8 @@ func (mock *AppRevisionControllerMock) AddClusterScopedFeatureHandler(ctx contex
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//     len(mockedAppRevisionController.AddClusterScopedFeatureHandlerCalls())
+//
+//	len(mockedAppRevisionController.AddClusterScopedFeatureHandlerCalls())
 func (mock *AppRevisionControllerMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -369,7 +372,8 @@ func (mock *AppRevisionControllerMock) AddClusterScopedHandler(ctx context.Conte
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//     len(mockedAppRevisionController.AddClusterScopedHandlerCalls())
+//
+//	len(mockedAppRevisionController.AddClusterScopedHandlerCalls())
 func (mock *AppRevisionControllerMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -412,7 +416,8 @@ func (mock *AppRevisionControllerMock) AddFeatureHandler(ctx context.Context, en
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//     len(mockedAppRevisionController.AddFeatureHandlerCalls())
+//
+//	len(mockedAppRevisionController.AddFeatureHandlerCalls())
 func (mock *AppRevisionControllerMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
@@ -453,7 +458,8 @@ func (mock *AppRevisionControllerMock) AddHandler(ctx context.Context, name stri
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//     len(mockedAppRevisionController.AddHandlerCalls())
+//
+//	len(mockedAppRevisionController.AddHandlerCalls())
 func (mock *AppRevisionControllerMock) AddHandlerCalls() []struct {
 	Ctx     context.Context
 	Name    string
@@ -490,7 +496,8 @@ func (mock *AppRevisionControllerMock) Enqueue(namespace string, name string) {
 
 // EnqueueCalls gets all the calls that were made to Enqueue.
 // Check the length with:
-//     len(mockedAppRevisionController.EnqueueCalls())
+//
+//	len(mockedAppRevisionController.EnqueueCalls())
 func (mock *AppRevisionControllerMock) EnqueueCalls() []struct {
 	Namespace string
 	Name      string
@@ -527,7 +534,8 @@ func (mock *AppRevisionControllerMock) EnqueueAfter(namespace string, name strin
 
 // EnqueueAfterCalls gets all the calls that were made to EnqueueAfter.
 // Check the length with:
-//     len(mockedAppRevisionController.EnqueueAfterCalls())
+//
+//	len(mockedAppRevisionController.EnqueueAfterCalls())
 func (mock *AppRevisionControllerMock) EnqueueAfterCalls() []struct {
 	Namespace string
 	Name      string
@@ -559,7 +567,8 @@ func (mock *AppRevisionControllerMock) Generic() controller.GenericController {
 
 // GenericCalls gets all the calls that were made to Generic.
 // Check the length with:
-//     len(mockedAppRevisionController.GenericCalls())
+//
+//	len(mockedAppRevisionController.GenericCalls())
 func (mock *AppRevisionControllerMock) GenericCalls() []struct {
 } {
 	var calls []struct {
@@ -585,7 +594,8 @@ func (mock *AppRevisionControllerMock) Informer() cache.SharedIndexInformer {
 
 // InformerCalls gets all the calls that were made to Informer.
 // Check the length with:
-//     len(mockedAppRevisionController.InformerCalls())
+//
+//	len(mockedAppRevisionController.InformerCalls())
 func (mock *AppRevisionControllerMock) InformerCalls() []struct {
 } {
 	var calls []struct {
@@ -611,7 +621,8 @@ func (mock *AppRevisionControllerMock) Lister() v31.AppRevisionLister {
 
 // ListerCalls gets all the calls that were made to Lister.
 // Check the length with:
-//     len(mockedAppRevisionController.ListerCalls())
+//
+//	len(mockedAppRevisionController.ListerCalls())
 func (mock *AppRevisionControllerMock) ListerCalls() []struct {
 } {
 	var calls []struct {
@@ -651,76 +662,76 @@ var _ v31.AppRevisionInterface = &AppRevisionInterfaceMock{}
 
 // AppRevisionInterfaceMock is a mock implementation of v31.AppRevisionInterface.
 //
-//     func TestSomethingThatUsesAppRevisionInterface(t *testing.T) {
+//	    func TestSomethingThatUsesAppRevisionInterface(t *testing.T) {
 //
-//         // make and configure a mocked v31.AppRevisionInterface
-//         mockedAppRevisionInterface := &AppRevisionInterfaceMock{
-//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v31.AppRevisionHandlerFunc)  {
-// 	               panic("mock out the AddClusterScopedFeatureHandler method")
-//             },
-//             AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v31.AppRevisionLifecycle)  {
-// 	               panic("mock out the AddClusterScopedFeatureLifecycle method")
-//             },
-//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v31.AppRevisionHandlerFunc)  {
-// 	               panic("mock out the AddClusterScopedHandler method")
-//             },
-//             AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v31.AppRevisionLifecycle)  {
-// 	               panic("mock out the AddClusterScopedLifecycle method")
-//             },
-//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.AppRevisionHandlerFunc)  {
-// 	               panic("mock out the AddFeatureHandler method")
-//             },
-//             AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v31.AppRevisionLifecycle)  {
-// 	               panic("mock out the AddFeatureLifecycle method")
-//             },
-//             AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v31.AppRevisionHandlerFunc)  {
-// 	               panic("mock out the AddHandler method")
-//             },
-//             AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v31.AppRevisionLifecycle)  {
-// 	               panic("mock out the AddLifecycle method")
-//             },
-//             ControllerFunc: func() v31.AppRevisionController {
-// 	               panic("mock out the Controller method")
-//             },
-//             CreateFunc: func(in1 *v3.AppRevision) (*v3.AppRevision, error) {
-// 	               panic("mock out the Create method")
-//             },
-//             DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
-// 	               panic("mock out the Delete method")
-//             },
-//             DeleteCollectionFunc: func(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
-// 	               panic("mock out the DeleteCollection method")
-//             },
-//             DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
-// 	               panic("mock out the DeleteNamespaced method")
-//             },
-//             GetFunc: func(name string, opts metav1.GetOptions) (*v3.AppRevision, error) {
-// 	               panic("mock out the Get method")
-//             },
-//             GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v3.AppRevision, error) {
-// 	               panic("mock out the GetNamespaced method")
-//             },
-//             ListFunc: func(opts metav1.ListOptions) (*v3.AppRevisionList, error) {
-// 	               panic("mock out the List method")
-//             },
-//             ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v3.AppRevisionList, error) {
-// 	               panic("mock out the ListNamespaced method")
-//             },
-//             ObjectClientFunc: func() *objectclient.ObjectClient {
-// 	               panic("mock out the ObjectClient method")
-//             },
-//             UpdateFunc: func(in1 *v3.AppRevision) (*v3.AppRevision, error) {
-// 	               panic("mock out the Update method")
-//             },
-//             WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
-// 	               panic("mock out the Watch method")
-//             },
-//         }
+//	        // make and configure a mocked v31.AppRevisionInterface
+//	        mockedAppRevisionInterface := &AppRevisionInterfaceMock{
+//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v31.AppRevisionHandlerFunc)  {
+//		               panic("mock out the AddClusterScopedFeatureHandler method")
+//	            },
+//	            AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v31.AppRevisionLifecycle)  {
+//		               panic("mock out the AddClusterScopedFeatureLifecycle method")
+//	            },
+//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v31.AppRevisionHandlerFunc)  {
+//		               panic("mock out the AddClusterScopedHandler method")
+//	            },
+//	            AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v31.AppRevisionLifecycle)  {
+//		               panic("mock out the AddClusterScopedLifecycle method")
+//	            },
+//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.AppRevisionHandlerFunc)  {
+//		               panic("mock out the AddFeatureHandler method")
+//	            },
+//	            AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v31.AppRevisionLifecycle)  {
+//		               panic("mock out the AddFeatureLifecycle method")
+//	            },
+//	            AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v31.AppRevisionHandlerFunc)  {
+//		               panic("mock out the AddHandler method")
+//	            },
+//	            AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v31.AppRevisionLifecycle)  {
+//		               panic("mock out the AddLifecycle method")
+//	            },
+//	            ControllerFunc: func() v31.AppRevisionController {
+//		               panic("mock out the Controller method")
+//	            },
+//	            CreateFunc: func(in1 *v3.AppRevision) (*v3.AppRevision, error) {
+//		               panic("mock out the Create method")
+//	            },
+//	            DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
+//		               panic("mock out the Delete method")
+//	            },
+//	            DeleteCollectionFunc: func(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
+//		               panic("mock out the DeleteCollection method")
+//	            },
+//	            DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
+//		               panic("mock out the DeleteNamespaced method")
+//	            },
+//	            GetFunc: func(name string, opts metav1.GetOptions) (*v3.AppRevision, error) {
+//		               panic("mock out the Get method")
+//	            },
+//	            GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v3.AppRevision, error) {
+//		               panic("mock out the GetNamespaced method")
+//	            },
+//	            ListFunc: func(opts metav1.ListOptions) (*v3.AppRevisionList, error) {
+//		               panic("mock out the List method")
+//	            },
+//	            ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v3.AppRevisionList, error) {
+//		               panic("mock out the ListNamespaced method")
+//	            },
+//	            ObjectClientFunc: func() *objectclient.ObjectClient {
+//		               panic("mock out the ObjectClient method")
+//	            },
+//	            UpdateFunc: func(in1 *v3.AppRevision) (*v3.AppRevision, error) {
+//		               panic("mock out the Update method")
+//	            },
+//	            WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
+//		               panic("mock out the Watch method")
+//	            },
+//	        }
 //
-//         // use mockedAppRevisionInterface in code that requires v31.AppRevisionInterface
-//         // and then make assertions.
+//	        // use mockedAppRevisionInterface in code that requires v31.AppRevisionInterface
+//	        // and then make assertions.
 //
-//     }
+//	    }
 type AppRevisionInterfaceMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
 	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v31.AppRevisionHandlerFunc)
@@ -973,7 +984,8 @@ func (mock *AppRevisionInterfaceMock) AddClusterScopedFeatureHandler(ctx context
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//     len(mockedAppRevisionInterface.AddClusterScopedFeatureHandlerCalls())
+//
+//	len(mockedAppRevisionInterface.AddClusterScopedFeatureHandlerCalls())
 func (mock *AppRevisionInterfaceMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -1020,7 +1032,8 @@ func (mock *AppRevisionInterfaceMock) AddClusterScopedFeatureLifecycle(ctx conte
 
 // AddClusterScopedFeatureLifecycleCalls gets all the calls that were made to AddClusterScopedFeatureLifecycle.
 // Check the length with:
-//     len(mockedAppRevisionInterface.AddClusterScopedFeatureLifecycleCalls())
+//
+//	len(mockedAppRevisionInterface.AddClusterScopedFeatureLifecycleCalls())
 func (mock *AppRevisionInterfaceMock) AddClusterScopedFeatureLifecycleCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -1065,7 +1078,8 @@ func (mock *AppRevisionInterfaceMock) AddClusterScopedHandler(ctx context.Contex
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//     len(mockedAppRevisionInterface.AddClusterScopedHandlerCalls())
+//
+//	len(mockedAppRevisionInterface.AddClusterScopedHandlerCalls())
 func (mock *AppRevisionInterfaceMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -1108,7 +1122,8 @@ func (mock *AppRevisionInterfaceMock) AddClusterScopedLifecycle(ctx context.Cont
 
 // AddClusterScopedLifecycleCalls gets all the calls that were made to AddClusterScopedLifecycle.
 // Check the length with:
-//     len(mockedAppRevisionInterface.AddClusterScopedLifecycleCalls())
+//
+//	len(mockedAppRevisionInterface.AddClusterScopedLifecycleCalls())
 func (mock *AppRevisionInterfaceMock) AddClusterScopedLifecycleCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -1151,7 +1166,8 @@ func (mock *AppRevisionInterfaceMock) AddFeatureHandler(ctx context.Context, ena
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//     len(mockedAppRevisionInterface.AddFeatureHandlerCalls())
+//
+//	len(mockedAppRevisionInterface.AddFeatureHandlerCalls())
 func (mock *AppRevisionInterfaceMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
@@ -1194,7 +1210,8 @@ func (mock *AppRevisionInterfaceMock) AddFeatureLifecycle(ctx context.Context, e
 
 // AddFeatureLifecycleCalls gets all the calls that were made to AddFeatureLifecycle.
 // Check the length with:
-//     len(mockedAppRevisionInterface.AddFeatureLifecycleCalls())
+//
+//	len(mockedAppRevisionInterface.AddFeatureLifecycleCalls())
 func (mock *AppRevisionInterfaceMock) AddFeatureLifecycleCalls() []struct {
 	Ctx       context.Context
 	Enabled   func() bool
@@ -1235,7 +1252,8 @@ func (mock *AppRevisionInterfaceMock) AddHandler(ctx context.Context, name strin
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//     len(mockedAppRevisionInterface.AddHandlerCalls())
+//
+//	len(mockedAppRevisionInterface.AddHandlerCalls())
 func (mock *AppRevisionInterfaceMock) AddHandlerCalls() []struct {
 	Ctx  context.Context
 	Name string
@@ -1274,7 +1292,8 @@ func (mock *AppRevisionInterfaceMock) AddLifecycle(ctx context.Context, name str
 
 // AddLifecycleCalls gets all the calls that were made to AddLifecycle.
 // Check the length with:
-//     len(mockedAppRevisionInterface.AddLifecycleCalls())
+//
+//	len(mockedAppRevisionInterface.AddLifecycleCalls())
 func (mock *AppRevisionInterfaceMock) AddLifecycleCalls() []struct {
 	Ctx       context.Context
 	Name      string
@@ -1306,7 +1325,8 @@ func (mock *AppRevisionInterfaceMock) Controller() v31.AppRevisionController {
 
 // ControllerCalls gets all the calls that were made to Controller.
 // Check the length with:
-//     len(mockedAppRevisionInterface.ControllerCalls())
+//
+//	len(mockedAppRevisionInterface.ControllerCalls())
 func (mock *AppRevisionInterfaceMock) ControllerCalls() []struct {
 } {
 	var calls []struct {
@@ -1335,7 +1355,8 @@ func (mock *AppRevisionInterfaceMock) Create(in1 *v3.AppRevision) (*v3.AppRevisi
 
 // CreateCalls gets all the calls that were made to Create.
 // Check the length with:
-//     len(mockedAppRevisionInterface.CreateCalls())
+//
+//	len(mockedAppRevisionInterface.CreateCalls())
 func (mock *AppRevisionInterfaceMock) CreateCalls() []struct {
 	In1 *v3.AppRevision
 } {
@@ -1368,7 +1389,8 @@ func (mock *AppRevisionInterfaceMock) Delete(name string, options *metav1.Delete
 
 // DeleteCalls gets all the calls that were made to Delete.
 // Check the length with:
-//     len(mockedAppRevisionInterface.DeleteCalls())
+//
+//	len(mockedAppRevisionInterface.DeleteCalls())
 func (mock *AppRevisionInterfaceMock) DeleteCalls() []struct {
 	Name    string
 	Options *metav1.DeleteOptions
@@ -1403,7 +1425,8 @@ func (mock *AppRevisionInterfaceMock) DeleteCollection(deleteOpts *metav1.Delete
 
 // DeleteCollectionCalls gets all the calls that were made to DeleteCollection.
 // Check the length with:
-//     len(mockedAppRevisionInterface.DeleteCollectionCalls())
+//
+//	len(mockedAppRevisionInterface.DeleteCollectionCalls())
 func (mock *AppRevisionInterfaceMock) DeleteCollectionCalls() []struct {
 	DeleteOpts *metav1.DeleteOptions
 	ListOpts   metav1.ListOptions
@@ -1440,7 +1463,8 @@ func (mock *AppRevisionInterfaceMock) DeleteNamespaced(namespace string, name st
 
 // DeleteNamespacedCalls gets all the calls that were made to DeleteNamespaced.
 // Check the length with:
-//     len(mockedAppRevisionInterface.DeleteNamespacedCalls())
+//
+//	len(mockedAppRevisionInterface.DeleteNamespacedCalls())
 func (mock *AppRevisionInterfaceMock) DeleteNamespacedCalls() []struct {
 	Namespace string
 	Name      string
@@ -1477,7 +1501,8 @@ func (mock *AppRevisionInterfaceMock) Get(name string, opts metav1.GetOptions) (
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//     len(mockedAppRevisionInterface.GetCalls())
+//
+//	len(mockedAppRevisionInterface.GetCalls())
 func (mock *AppRevisionInterfaceMock) GetCalls() []struct {
 	Name string
 	Opts metav1.GetOptions
@@ -1514,7 +1539,8 @@ func (mock *AppRevisionInterfaceMock) GetNamespaced(namespace string, name strin
 
 // GetNamespacedCalls gets all the calls that were made to GetNamespaced.
 // Check the length with:
-//     len(mockedAppRevisionInterface.GetNamespacedCalls())
+//
+//	len(mockedAppRevisionInterface.GetNamespacedCalls())
 func (mock *AppRevisionInterfaceMock) GetNamespacedCalls() []struct {
 	Namespace string
 	Name      string
@@ -1549,7 +1575,8 @@ func (mock *AppRevisionInterfaceMock) List(opts metav1.ListOptions) (*v3.AppRevi
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//     len(mockedAppRevisionInterface.ListCalls())
+//
+//	len(mockedAppRevisionInterface.ListCalls())
 func (mock *AppRevisionInterfaceMock) ListCalls() []struct {
 	Opts metav1.ListOptions
 } {
@@ -1582,7 +1609,8 @@ func (mock *AppRevisionInterfaceMock) ListNamespaced(namespace string, opts meta
 
 // ListNamespacedCalls gets all the calls that were made to ListNamespaced.
 // Check the length with:
-//     len(mockedAppRevisionInterface.ListNamespacedCalls())
+//
+//	len(mockedAppRevisionInterface.ListNamespacedCalls())
 func (mock *AppRevisionInterfaceMock) ListNamespacedCalls() []struct {
 	Namespace string
 	Opts      metav1.ListOptions
@@ -1612,7 +1640,8 @@ func (mock *AppRevisionInterfaceMock) ObjectClient() *objectclient.ObjectClient 
 
 // ObjectClientCalls gets all the calls that were made to ObjectClient.
 // Check the length with:
-//     len(mockedAppRevisionInterface.ObjectClientCalls())
+//
+//	len(mockedAppRevisionInterface.ObjectClientCalls())
 func (mock *AppRevisionInterfaceMock) ObjectClientCalls() []struct {
 } {
 	var calls []struct {
@@ -1641,7 +1670,8 @@ func (mock *AppRevisionInterfaceMock) Update(in1 *v3.AppRevision) (*v3.AppRevisi
 
 // UpdateCalls gets all the calls that were made to Update.
 // Check the length with:
-//     len(mockedAppRevisionInterface.UpdateCalls())
+//
+//	len(mockedAppRevisionInterface.UpdateCalls())
 func (mock *AppRevisionInterfaceMock) UpdateCalls() []struct {
 	In1 *v3.AppRevision
 } {
@@ -1672,7 +1702,8 @@ func (mock *AppRevisionInterfaceMock) Watch(opts metav1.ListOptions) (watch.Inte
 
 // WatchCalls gets all the calls that were made to Watch.
 // Check the length with:
-//     len(mockedAppRevisionInterface.WatchCalls())
+//
+//	len(mockedAppRevisionInterface.WatchCalls())
 func (mock *AppRevisionInterfaceMock) WatchCalls() []struct {
 	Opts metav1.ListOptions
 } {
@@ -1695,19 +1726,19 @@ var _ v31.AppRevisionsGetter = &AppRevisionsGetterMock{}
 
 // AppRevisionsGetterMock is a mock implementation of v31.AppRevisionsGetter.
 //
-//     func TestSomethingThatUsesAppRevisionsGetter(t *testing.T) {
+//	    func TestSomethingThatUsesAppRevisionsGetter(t *testing.T) {
 //
-//         // make and configure a mocked v31.AppRevisionsGetter
-//         mockedAppRevisionsGetter := &AppRevisionsGetterMock{
-//             AppRevisionsFunc: func(namespace string) v31.AppRevisionInterface {
-// 	               panic("mock out the AppRevisions method")
-//             },
-//         }
+//	        // make and configure a mocked v31.AppRevisionsGetter
+//	        mockedAppRevisionsGetter := &AppRevisionsGetterMock{
+//	            AppRevisionsFunc: func(namespace string) v31.AppRevisionInterface {
+//		               panic("mock out the AppRevisions method")
+//	            },
+//	        }
 //
-//         // use mockedAppRevisionsGetter in code that requires v31.AppRevisionsGetter
-//         // and then make assertions.
+//	        // use mockedAppRevisionsGetter in code that requires v31.AppRevisionsGetter
+//	        // and then make assertions.
 //
-//     }
+//	    }
 type AppRevisionsGetterMock struct {
 	// AppRevisionsFunc mocks the AppRevisions method.
 	AppRevisionsFunc func(namespace string) v31.AppRevisionInterface
@@ -1740,7 +1771,8 @@ func (mock *AppRevisionsGetterMock) AppRevisions(namespace string) v31.AppRevisi
 
 // AppRevisionsCalls gets all the calls that were made to AppRevisions.
 // Check the length with:
-//     len(mockedAppRevisionsGetter.AppRevisionsCalls())
+//
+//	len(mockedAppRevisionsGetter.AppRevisionsCalls())
 func (mock *AppRevisionsGetterMock) AppRevisionsCalls() []struct {
 	Namespace string
 } {
