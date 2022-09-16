@@ -229,3 +229,4 @@ VOLUME /var/lib/cni
 VOLUME /var/log
 
 ENTRYPOINT ["entrypoint.sh"]
+ENV ETCD_UNSUPPORTED_ARCH=arm64

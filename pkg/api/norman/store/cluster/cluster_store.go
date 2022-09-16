@@ -96,7 +96,7 @@ func (t *transformer) TransformerFunc(apiContext *types.APIContext, schema *type
 	return t.transposeGenericConfigToDynamicField(data)
 }
 
-//transposeGenericConfigToDynamicField converts a genericConfig to one usable by rancher and maps a kontainer id to a kontainer name
+// transposeGenericConfigToDynamicField converts a genericConfig to one usable by rancher and maps a kontainer id to a kontainer name
 func (t *transformer) transposeGenericConfigToDynamicField(data map[string]interface{}) (map[string]interface{}, error) {
 	if data["genericEngineConfig"] != nil {
 		drivers, err := t.KontainerDriverLister.List("", labels.Everything())

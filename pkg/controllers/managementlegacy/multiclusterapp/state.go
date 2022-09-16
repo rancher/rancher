@@ -22,7 +22,7 @@ const (
 	active     = "active"
 )
 
-//StartMCAppStateController gets all corresponding apps and update condition on multi cluster app sync
+// StartMCAppStateController gets all corresponding apps and update condition on multi cluster app sync
 func StartMCAppStateController(ctx context.Context, management *config.ManagementContext) {
 	mcApps := management.Management.MultiClusterApps("")
 	s := &MCAppStateController{

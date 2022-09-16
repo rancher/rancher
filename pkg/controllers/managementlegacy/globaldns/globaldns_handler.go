@@ -48,7 +48,7 @@ func newGlobalDNSController(ctx context.Context, mgmt *config.ManagementContext)
 	return n
 }
 
-//sync is called periodically and on real updates
+// sync is called periodically and on real updates
 func (n *GDController) sync(key string, obj *v3.GlobalDns) (runtime.Object, error) {
 	if obj == nil || obj.DeletionTimestamp != nil {
 		return nil, nil
