@@ -6,7 +6,7 @@ import (
 	"github.com/rancher/norman/types/values"
 )
 
-//NewWrapper returns a wrapper store which sets your object to transitioning state if your object has no conditions.
+// NewWrapper returns a wrapper store which sets your object to transitioning state if your object has no conditions.
 func NewWrapper(state, message string) func(types.Store) types.Store {
 	return func(store types.Store) types.Store {
 		return &transform.Store{
