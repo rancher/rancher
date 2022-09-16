@@ -61,7 +61,7 @@ func (c *Client) getCSRF() error {
 	return nil
 }
 
-//deleteBuild deletes the last build of a job
+// deleteBuild deletes the last build of a job
 func (c *Client) deleteBuild(jobname string, buildNumber int) error {
 	deleteBuildURI := fmt.Sprintf(DeleteBuildURI, jobname, buildNumber)
 	var targetURL *url.URL
