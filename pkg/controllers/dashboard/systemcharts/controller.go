@@ -2,55 +2,29 @@ package systemcharts
 
 import (
 	"context"
-	"sync"
 
 	catalog "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
-	"github.com/rancher/rancher/pkg/catalogv2/system"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/chart"
 	"github.com/rancher/rancher/pkg/features"
-	namespaces "github.com/rancher/rancher/pkg/namespace"
+	namespace "github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/wrangler"
 	corecontrollers "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/pkg/relatedresource"
+	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
-var (
-	toInstall = []chart.Definition{
-		{
-			ReleaseNamespace:  namespaces.System,
-			ChartName:         "rancher-webhook",
-			MinVersionSetting: settings.RancherWebhookMinVersion,
-			Values: func() map[string]interface{} {
-				return map[string]interface{}{
-					"capi": map[string]interface{}{
-						"enabled": features.EmbeddedClusterAPI.Enabled(),
-					},
-					"mcm": map[string]interface{}{
-						"enabled": features.MCM.Enabled(),
-					},
-				}
-			},
-			Enabled: func() bool {
-				return features.MCM.Enabled() || features.EmbeddedClusterAPI.Enabled()
-			},
-		},
-		{
-			ReleaseNamespace: "rancher-operator-system",
-			ChartName:        "rancher-operator",
-			Uninstall:        true,
-			RemoveNamespace:  true,
-		},
-	}
+const (
 	repoName = "rancher-charts"
 )
 
 func Register(ctx context.Context, wContext *wrangler.Context) error {
 	h := &handler{
-		manager:    wContext.SystemChartsManager,
-		namespaces: wContext.Core.Namespace(),
+		manager:      wContext.SystemChartsManager,
+		namespaces:   wContext.Core.Namespace(),
+		chartsConfig: chart.RancherConfigGetter{ConfigCache: wContext.Core.ConfigMap().Cache()},
 	}
 
 	wContext.Catalog.ClusterRepo().OnChange(ctx, "bootstrap-charts", h.onRepo)
@@ -63,9 +37,9 @@ func Register(ctx context.Context, wContext *wrangler.Context) error {
 }
 
 type handler struct {
-	manager    *system.Manager
-	namespaces corecontrollers.NamespaceController
-	once       sync.Once
+	manager      chart.Manager
+	namespaces   corecontrollers.NamespaceController
+	chartsConfig chart.RancherConfigGetter
 }
 
 func (h *handler) onRepo(key string, repo *catalog.ClusterRepo) (*catalog.ClusterRepo, error) {
@@ -78,7 +52,7 @@ func (h *handler) onRepo(key string, repo *catalog.ClusterRepo) (*catalog.Cluste
 			"systemDefaultRegistry": settings.SystemDefaultRegistry.Get(),
 		},
 	}
-	for _, chartDef := range toInstall {
+	for _, chartDef := range h.getChartsToInstall() {
 		if chartDef.Enabled != nil && !chartDef.Enabled() {
 			continue
 		}
@@ -109,4 +83,40 @@ func (h *handler) onRepo(key string, repo *catalog.ClusterRepo) (*catalog.Cluste
 	}
 
 	return repo, nil
+}
+
+func (h *handler) getChartsToInstall() []*chart.Definition {
+	return []*chart.Definition{
+		{
+			ReleaseNamespace:  namespace.System,
+			ChartName:         "rancher-webhook",
+			MinVersionSetting: settings.RancherWebhookMinVersion,
+			Values: func() map[string]interface{} {
+				values := map[string]interface{}{
+					"capi": map[string]interface{}{
+						"enabled": features.EmbeddedClusterAPI.Enabled(),
+					},
+					"mcm": map[string]interface{}{
+						"enabled": features.MCM.Enabled(),
+					},
+				}
+				// add priority class value.
+				if priorityClassName, err := h.chartsConfig.GetPriorityClassName(); err != nil {
+					logrus.Warnf("Failed to get rancher priorityClassName: %v", err)
+				} else {
+					values[chart.PriorityClassKey] = priorityClassName
+				}
+				return values
+			},
+			Enabled: func() bool {
+				return features.MCM.Enabled() || features.EmbeddedClusterAPI.Enabled()
+			},
+		},
+		{
+			ReleaseNamespace: "rancher-operator-system",
+			ChartName:        "rancher-operator",
+			Uninstall:        true,
+			RemoveNamespace:  true,
+		},
+	}
 }

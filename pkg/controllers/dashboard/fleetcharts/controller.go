@@ -6,13 +6,13 @@ import (
 	"sync"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	"github.com/rancher/rancher/pkg/catalogv2/system"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/chart"
 	"github.com/rancher/rancher/pkg/features"
 	fleetconst "github.com/rancher/rancher/pkg/fleet"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/rancher/wrangler/pkg/relatedresource"
+	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -33,7 +33,8 @@ var (
 
 func Register(ctx context.Context, wContext *wrangler.Context) error {
 	h := &handler{
-		manager: wContext.SystemChartsManager,
+		manager:      wContext.SystemChartsManager,
+		chartsConfig: chart.RancherConfigGetter{ConfigCache: wContext.Core.ConfigMap().Cache()},
 	}
 
 	wContext.Mgmt.Setting().OnChange(ctx, "fleet-install", h.onSetting)
@@ -51,7 +52,8 @@ func Register(ctx context.Context, wContext *wrangler.Context) error {
 
 type handler struct {
 	sync.Mutex
-	manager *system.Manager
+	manager      chart.Manager
+	chartsConfig chart.RancherConfigGetter
 }
 
 func (h *handler) onSetting(key string, setting *v3.Setting) (*v3.Setting, error) {
@@ -105,6 +107,14 @@ func (h *handler) onSetting(key string, setting *v3.Setting) (*v3.Setting, error
 	if envVal, ok := os.LookupEnv("NO_PROXY"); ok {
 		fleetChartValues["noProxy"] = envVal
 		gitjobChartValues["noProxy"] = envVal
+	}
+
+	// add priority class value
+	if priorityClassName, err := h.chartsConfig.GetPriorityClassName(); err != nil {
+		logrus.Warnf("Failed to get rancher priorityClassName: %v", err)
+	} else {
+		fleetChartValues[chart.PriorityClassKey] = priorityClassName
+		gitjobChartValues[chart.PriorityClassKey] = priorityClassName
 	}
 
 	if len(gitjobChartValues) > 0 {

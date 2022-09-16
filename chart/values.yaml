@@ -106,7 +106,7 @@ rancherImage: rancher/rancher
 replicas: 3
 
 # Set priorityClassName to avoid eviction
-priorityClassName: system-node-critical
+priorityClassName: rancher-critical
 
 # Set pod resource requests/limits for Rancher.
 resources: {}
