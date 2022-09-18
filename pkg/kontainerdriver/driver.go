@@ -5,8 +5,8 @@ import (
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 )
 
-func GetDriver(cluster *v3.Cluster, driverLister v3.KontainerDriverLister) (string, error) {
-	var driver *v3.KontainerDriver
+func GetDriver(cluster *apimgmtv3.Cluster, driverLister v3.KontainerDriverLister) (string, error) {
+	var driver *apimgmtv3.KontainerDriver
 	var err error
 
 	if cluster.Spec.GenericEngineConfig != nil {

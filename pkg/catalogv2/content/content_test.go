@@ -199,7 +199,7 @@ func TestFilterReleasesSemver(t *testing.T) {
 				},
 			}
 			contentManager := Manager{}
-			settings.ServerVersion.Set(tt.rancherVersion)
+			assert.NoError(t, settings.ServerVersion.Set(tt.rancherVersion))
 			contentManager.filterReleases(&filteredIndexFile, nil, false)
 			result := reflect.DeepEqual(indexFile, filteredIndexFile)
 			assert.Equal(t, tt.expectedPass, result)
@@ -336,7 +336,7 @@ func TestFilteringReleases(t *testing.T) {
 				},
 			}
 			contentManager := Manager{}
-			settings.ServerVersion.Set(tt.rancherVersion)
+			assert.NoError(t, settings.ServerVersion.Set(tt.rancherVersion))
 			kubeVersion, _ := semver.NewVersion(tt.kubernetesVersion)
 			contentManager.filterReleases(&filteredIndexFile, kubeVersion, tt.skipFiltering)
 			result := reflect.DeepEqual(indexFile, filteredIndexFile)
@@ -349,13 +349,13 @@ func TestFilteringReleases(t *testing.T) {
 }
 func TestFilteringReleaseKubeVersionAnnotation(t *testing.T) {
 	tests := []struct {
-		testName                    string
-		chartVersionAnnotation      string
-		rancherVersion              string
+		testName                   string
+		chartVersionAnnotation     string
+		rancherVersion             string
 		ChartKubeVersionAnnotation string
-		kubernetesVersion           string
-		skipFiltering               bool
-		expectedPass                bool
+		kubernetesVersion          string
+		skipFiltering              bool
+		expectedPass               bool
 	}{
 		{
 			"Index with chart that has no filters and skips filtering",
@@ -477,7 +477,7 @@ func TestFilteringReleaseKubeVersionAnnotation(t *testing.T) {
 								Version: "1.0.0",
 								Annotations: map[string]string{
 									"catalog.cattle.io/rancher-version": tt.chartVersionAnnotation,
-									"catalog.cattle.io/kube-version": tt.ChartKubeVersionAnnotation,
+									"catalog.cattle.io/kube-version":    tt.ChartKubeVersionAnnotation,
 								},
 							},
 							URLs:    nil,
@@ -497,7 +497,7 @@ func TestFilteringReleaseKubeVersionAnnotation(t *testing.T) {
 								Version: "1.0.0",
 								Annotations: map[string]string{
 									"catalog.cattle.io/rancher-version": tt.chartVersionAnnotation,
-									"catalog.cattle.io/kube-version": tt.ChartKubeVersionAnnotation,
+									"catalog.cattle.io/kube-version":    tt.ChartKubeVersionAnnotation,
 								},
 							},
 							URLs:    nil,
@@ -509,7 +509,7 @@ func TestFilteringReleaseKubeVersionAnnotation(t *testing.T) {
 				},
 			}
 			contentManager := Manager{}
-			settings.ServerVersion.Set(tt.rancherVersion)
+			assert.NoError(t, settings.ServerVersion.Set(tt.rancherVersion))
 			kubeVersion, _ := semver.NewVersion(tt.kubernetesVersion)
 			contentManager.filterReleases(&filteredIndexFile, kubeVersion, tt.skipFiltering)
 			result := reflect.DeepEqual(indexFile, filteredIndexFile)

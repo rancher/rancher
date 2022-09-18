@@ -429,7 +429,10 @@ func (d *Driver) RemoveLegacyServiceAccount(ctx context.Context, info *types.Clu
 }
 
 func (d *Driver) restore(info *types.ClusterInfo) (string, error) {
-	os.MkdirAll(rancherPath, 0700)
+	err := os.MkdirAll(rancherPath, 0700)
+	if err != nil {
+		logrus.Warnf("[restore] Unexpected error occurred when attempting to create directory (%s)", rancherPath)
+	}
 	dir, err := ioutil.TempDir(rancherPath, "rke-")
 	if err != nil {
 		return "", err
@@ -438,11 +441,17 @@ func (d *Driver) restore(info *types.ClusterInfo) (string, error) {
 	if info != nil {
 		state := info.Metadata["state"]
 		if state != "" {
-			ioutil.WriteFile(kubeConfig(dir), []byte(state), 0600)
+			err := ioutil.WriteFile(kubeConfig(dir), []byte(state), 0600)
+			if err != nil {
+				logrus.Warnf("[restore] Unexpected error occurred when attempting to write kubeConfig to (%s)", kubeConfig(dir))
+			}
 		}
 		fullState := info.Metadata["fullState"]
 		if fullState != "" {
-			ioutil.WriteFile(clusterState(dir), []byte(fullState), 0600)
+			err := ioutil.WriteFile(clusterState(dir), []byte(fullState), 0600)
+			if err != nil {
+				logrus.Warnf("[restore] Unexpected error occurred when attempting to write clusterState to (%s)", clusterState(dir))
+			}
 		}
 	}
 

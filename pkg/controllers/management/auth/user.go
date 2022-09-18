@@ -81,7 +81,7 @@ func newUserLifecycle(management *config.ManagementContext, clusterManager *clus
 }
 
 func grbByUserRefFunc(obj interface{}) ([]string, error) {
-	globalRoleBinding, ok := obj.(*v3.GlobalRoleBinding)
+	globalRoleBinding, ok := obj.(*v32.GlobalRoleBinding)
 	if !ok {
 		return []string{}, nil
 	}
@@ -90,7 +90,7 @@ func grbByUserRefFunc(obj interface{}) ([]string, error) {
 }
 
 func prtbByUserRefFunc(obj interface{}) ([]string, error) {
-	projectRoleBinding, ok := obj.(*v3.ProjectRoleTemplateBinding)
+	projectRoleBinding, ok := obj.(*v32.ProjectRoleTemplateBinding)
 	if !ok || projectRoleBinding.UserName == "" {
 		return []string{}, nil
 	}
@@ -99,7 +99,7 @@ func prtbByUserRefFunc(obj interface{}) ([]string, error) {
 }
 
 func crtbByUserRefFunc(obj interface{}) ([]string, error) {
-	clusterRoleBinding, ok := obj.(*v3.ClusterRoleTemplateBinding)
+	clusterRoleBinding, ok := obj.(*v32.ClusterRoleTemplateBinding)
 	if !ok || clusterRoleBinding.UserName == "" {
 		return []string{}, nil
 	}
@@ -108,7 +108,7 @@ func crtbByUserRefFunc(obj interface{}) ([]string, error) {
 }
 
 func tokenByUserRefFunc(obj interface{}) ([]string, error) {
-	token, ok := obj.(*v3.Token)
+	token, ok := obj.(*v32.Token)
 	if !ok {
 		return []string{}, nil
 	}
@@ -116,7 +116,7 @@ func tokenByUserRefFunc(obj interface{}) ([]string, error) {
 	return []string{token.UserID}, nil
 }
 
-func (l *userLifecycle) Create(user *v3.User) (runtime.Object, error) {
+func (l *userLifecycle) Create(user *v32.User) (runtime.Object, error) {
 	var match = false
 	for _, id := range user.PrincipalIDs {
 		if strings.HasPrefix(id, "local://") {
@@ -148,7 +148,7 @@ func (l *userLifecycle) Create(user *v3.User) (runtime.Object, error) {
 	return user, nil
 }
 
-func (l *userLifecycle) Updated(user *v3.User) (runtime.Object, error) {
+func (l *userLifecycle) Updated(user *v32.User) (runtime.Object, error) {
 	err := l.userManager.CreateNewUserClusterRoleBinding(user.Name, user.UID)
 	if err != nil {
 		return nil, err
@@ -156,7 +156,7 @@ func (l *userLifecycle) Updated(user *v3.User) (runtime.Object, error) {
 	return user, nil
 }
 
-func (l *userLifecycle) Remove(user *v3.User) (runtime.Object, error) {
+func (l *userLifecycle) Remove(user *v32.User) (runtime.Object, error) {
 	clusterRoles, err := l.getCRTBByUserName(user.Name)
 	if err != nil {
 		return nil, err
@@ -220,15 +220,15 @@ func (l *userLifecycle) Remove(user *v3.User) (runtime.Object, error) {
 	return user, nil
 }
 
-func (l *userLifecycle) getCRTBByUserName(username string) ([]*v3.ClusterRoleTemplateBinding, error) {
+func (l *userLifecycle) getCRTBByUserName(username string) ([]*v32.ClusterRoleTemplateBinding, error) {
 	obj, err := l.crtbIndexer.ByIndex(crtbByUserRefKey, username)
 	if err != nil {
 		return nil, fmt.Errorf("error getting cluster roles: %v", err)
 	}
 
-	var crtbs []*v3.ClusterRoleTemplateBinding
+	var crtbs []*v32.ClusterRoleTemplateBinding
 	for _, o := range obj {
-		crtb, ok := o.(*v3.ClusterRoleTemplateBinding)
+		crtb, ok := o.(*v32.ClusterRoleTemplateBinding)
 		if !ok {
 			return nil, fmt.Errorf("error converting obj to cluster role template binding: %v", o)
 		}
@@ -239,15 +239,15 @@ func (l *userLifecycle) getCRTBByUserName(username string) ([]*v3.ClusterRoleTem
 	return crtbs, nil
 }
 
-func (l *userLifecycle) getPRTBByUserName(username string) ([]*v3.ProjectRoleTemplateBinding, error) {
+func (l *userLifecycle) getPRTBByUserName(username string) ([]*v32.ProjectRoleTemplateBinding, error) {
 	objs, err := l.prtbIndexer.ByIndex(prtbByUserRefKey, username)
 	if err != nil {
 		return nil, fmt.Errorf("error getting indexed project roles: %v", err)
 	}
 
-	var prtbs []*v3.ProjectRoleTemplateBinding
+	var prtbs []*v32.ProjectRoleTemplateBinding
 	for _, obj := range objs {
-		prtb, ok := obj.(*v3.ProjectRoleTemplateBinding)
+		prtb, ok := obj.(*v32.ProjectRoleTemplateBinding)
 		if !ok {
 			return nil, fmt.Errorf("could not convert obj to v3.ProjectRoleTemplateBinding")
 		}
@@ -258,15 +258,15 @@ func (l *userLifecycle) getPRTBByUserName(username string) ([]*v3.ProjectRoleTem
 	return prtbs, nil
 }
 
-func (l *userLifecycle) getGRBByUserName(username string) ([]*v3.GlobalRoleBinding, error) {
+func (l *userLifecycle) getGRBByUserName(username string) ([]*v32.GlobalRoleBinding, error) {
 	objs, err := l.grbIndexer.ByIndex(grbByUserRefKey, username)
 	if err != nil {
 		return nil, fmt.Errorf("error getting indexed global roles: %v", err)
 	}
 
-	var grbs []*v3.GlobalRoleBinding
+	var grbs []*v32.GlobalRoleBinding
 	for _, obj := range objs {
-		grb, ok := obj.(*v3.GlobalRoleBinding)
+		grb, ok := obj.(*v32.GlobalRoleBinding)
 		if !ok {
 			return nil, fmt.Errorf("could not convert obj to v3.GlobalRoleBinding")
 		}
@@ -277,15 +277,15 @@ func (l *userLifecycle) getGRBByUserName(username string) ([]*v3.GlobalRoleBindi
 	return grbs, nil
 }
 
-func (l *userLifecycle) getTokensByUserName(username string) ([]*v3.Token, error) {
+func (l *userLifecycle) getTokensByUserName(username string) ([]*v32.Token, error) {
 	objs, err := l.tokenIndexer.ByIndex(tokenByUserRefKey, username)
 	if err != nil {
 		return nil, fmt.Errorf("error getting indexed tokens: %v", err)
 	}
 
-	var tokens []*v3.Token
+	var tokens []*v32.Token
 	for _, obj := range objs {
-		token, ok := obj.(*v3.Token)
+		token, ok := obj.(*v32.Token)
 		if !ok {
 			return nil, fmt.Errorf("could not convert to *v3.Token: %v", obj)
 		}
@@ -296,7 +296,7 @@ func (l *userLifecycle) getTokensByUserName(username string) ([]*v3.Token, error
 	return tokens, nil
 }
 
-func (l *userLifecycle) deleteAllCRTB(crtbs []*v3.ClusterRoleTemplateBinding) error {
+func (l *userLifecycle) deleteAllCRTB(crtbs []*v32.ClusterRoleTemplateBinding) error {
 	for _, crtb := range crtbs {
 		var err error
 		if crtb.Namespace == "" {
@@ -314,7 +314,7 @@ func (l *userLifecycle) deleteAllCRTB(crtbs []*v3.ClusterRoleTemplateBinding) er
 	return nil
 }
 
-func (l *userLifecycle) deleteAllPRTB(prtbs []*v3.ProjectRoleTemplateBinding) error {
+func (l *userLifecycle) deleteAllPRTB(prtbs []*v32.ProjectRoleTemplateBinding) error {
 	for _, prtb := range prtbs {
 		var err error
 		if prtb.Namespace == "" {
@@ -332,7 +332,7 @@ func (l *userLifecycle) deleteAllPRTB(prtbs []*v3.ProjectRoleTemplateBinding) er
 	return nil
 }
 
-func (l *userLifecycle) deleteAllGRB(grbs []*v3.GlobalRoleBinding) error {
+func (l *userLifecycle) deleteAllGRB(grbs []*v32.GlobalRoleBinding) error {
 	for _, grb := range grbs {
 		var err error
 		if grb.Namespace == "" {
@@ -351,12 +351,12 @@ func (l *userLifecycle) deleteAllGRB(grbs []*v3.GlobalRoleBinding) error {
 	return nil
 }
 
-func (l *userLifecycle) deleteClusterUserAttributes(username string, tokens []*v3.Token) error {
+func (l *userLifecycle) deleteClusterUserAttributes(username string, tokens []*v32.Token) error {
 	if len(tokens) == 0 {
 		return nil
 	}
 	// find the set of clusters associated with a list of tokens
-	set := make(map[string]*v3.Cluster)
+	set := make(map[string]*v32.Cluster)
 	for _, token := range tokens {
 		cluster, err := l.clusterLister.Get("", token.ClusterName)
 		if err != nil {
@@ -381,7 +381,7 @@ func (l *userLifecycle) deleteClusterUserAttributes(username string, tokens []*v
 	return nil
 }
 
-func (l *userLifecycle) deleteAllTokens(tokens []*v3.Token) error {
+func (l *userLifecycle) deleteAllTokens(tokens []*v32.Token) error {
 	for _, token := range tokens {
 		logrus.Infof("[%v] Deleting token %v for user %v", userController, token.Name, token.UserID)
 		err := l.tokens.DeleteNamespaced(token.Namespace, token.Name, &metav1.DeleteOptions{})
@@ -429,7 +429,7 @@ func (l *userLifecycle) deleteUserSecret(username string) error {
 	return l.secrets.DeleteNamespaced("cattle-system", username+"-secret", &metav1.DeleteOptions{})
 }
 
-func (l *userLifecycle) removeLegacyFinalizers(user *v3.User) (*v3.User, error) {
+func (l *userLifecycle) removeLegacyFinalizers(user *v32.User) (*v32.User, error) {
 	finalizers := user.GetFinalizers()
 	for i, finalizer := range finalizers {
 		if finalizer == "controller.cattle.io/cat-user-controller" {

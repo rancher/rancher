@@ -8,12 +8,9 @@ import (
 	"sync"
 	"time"
 
-	v33 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-
-	"k8s.io/apimachinery/pkg/runtime"
-
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/types"
+	v33 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/clustermanager"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/metrics"
@@ -22,6 +19,7 @@ import (
 	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 var (
@@ -84,7 +82,7 @@ type userControllersController struct {
 	start         time.Time
 }
 
-func (u *userControllersController) sync(key string, cluster *v3.Cluster) (runtime.Object, error) {
+func (u *userControllersController) sync(key string, cluster *v33.Cluster) (runtime.Object, error) {
 	if cluster != nil && cluster.DeletionTimestamp != nil {
 		err := u.cleanFinalizers(key, cluster)
 		if err != nil {
@@ -140,7 +138,7 @@ func (u *userControllersController) peersSync() error {
 	return types.NewErrors(errs...)
 }
 
-func (u *userControllersController) amOwner(peers tpeermanager.Peers, cluster *v3.Cluster) bool {
+func (u *userControllersController) amOwner(peers tpeermanager.Peers, cluster *v33.Cluster) bool {
 	if !u.clustered {
 		return true
 	}
@@ -160,7 +158,7 @@ func (u *userControllersController) amOwner(peers tpeermanager.Peers, cluster *v
 	return peers.IDs[scaled] == peers.SelfID
 }
 
-func (u *userControllersController) cleanFinalizers(key string, cluster *v3.Cluster) error {
+func (u *userControllersController) cleanFinalizers(key string, cluster *v33.Cluster) error {
 	c, err := u.clusters.Get(key, metav1.GetOptions{})
 	if err != nil {
 		return err

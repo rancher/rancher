@@ -8,9 +8,9 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/pkg/errors"
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	util "github.com/rancher/rancher/pkg/cluster"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
-	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/settings"
 	rketypes "github.com/rancher/rke/types"
 	img "github.com/rancher/rke/types/image"
@@ -42,7 +42,7 @@ func Resolve(image string) string {
 	return ResolveWithCluster(image, nil)
 }
 
-func ResolveWithCluster(image string, cluster *v3.Cluster) string {
+func ResolveWithCluster(image string, cluster *v32.Cluster) string {
 	reg := util.GetPrivateRepoURL(cluster)
 	if reg != "" && !strings.HasPrefix(image, reg) {
 		// Images from Dockerhub Library repo, we add rancher prefix when using private registry

@@ -6,7 +6,7 @@ import (
 	"github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
 	mgmt "github.com/rancher/rancher/pkg/apis/management.cattle.io"
-	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	v33 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	rbacv1 "github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1"
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/rbac"
@@ -41,7 +41,7 @@ type globalRoleLifecycle struct {
 	rClient  rbacv1.RoleInterface
 }
 
-func (gr *globalRoleLifecycle) Create(obj *v3.GlobalRole) (runtime.Object, error) {
+func (gr *globalRoleLifecycle) Create(obj *v33.GlobalRole) (runtime.Object, error) {
 	var returnError error
 	err := gr.reconcileGlobalRole(obj)
 	if err != nil {
@@ -54,7 +54,7 @@ func (gr *globalRoleLifecycle) Create(obj *v3.GlobalRole) (runtime.Object, error
 	return obj, returnError
 }
 
-func (gr *globalRoleLifecycle) Updated(obj *v3.GlobalRole) (runtime.Object, error) {
+func (gr *globalRoleLifecycle) Updated(obj *v33.GlobalRole) (runtime.Object, error) {
 	var returnError error
 	err := gr.reconcileGlobalRole(obj)
 	if err != nil {
@@ -67,12 +67,12 @@ func (gr *globalRoleLifecycle) Updated(obj *v3.GlobalRole) (runtime.Object, erro
 	return nil, returnError
 }
 
-func (gr *globalRoleLifecycle) Remove(obj *v3.GlobalRole) (runtime.Object, error) {
+func (gr *globalRoleLifecycle) Remove(obj *v33.GlobalRole) (runtime.Object, error) {
 	// Don't need to delete the created ClusterRole because owner reference will take care of that
 	return nil, nil
 }
 
-func (gr *globalRoleLifecycle) reconcileGlobalRole(globalRole *v3.GlobalRole) error {
+func (gr *globalRoleLifecycle) reconcileGlobalRole(globalRole *v33.GlobalRole) error {
 	crName := getCRName(globalRole)
 
 	clusterRole, _ := gr.crLister.Get("", crName)
@@ -114,7 +114,7 @@ func (gr *globalRoleLifecycle) reconcileGlobalRole(globalRole *v3.GlobalRole) er
 	return nil
 }
 
-func (gr *globalRoleLifecycle) reconcileCatalogRole(globalRole *v3.GlobalRole) error {
+func (gr *globalRoleLifecycle) reconcileCatalogRole(globalRole *v33.GlobalRole) error {
 	// rules which give template/template version access need to have a specific namespaced role created, since the
 	// backend resources that they grant access to are namespaced resources
 	var catalogRules []v1.PolicyRule
@@ -196,7 +196,7 @@ func (gr *globalRoleLifecycle) reconcileCatalogRole(globalRole *v3.GlobalRole) e
 	return nil
 }
 
-func getCRName(globalRole *v3.GlobalRole) string {
+func getCRName(globalRole *v33.GlobalRole) string {
 	if crName, ok := globalRole.Annotations[crNameAnnotation]; ok {
 		return crName
 	}

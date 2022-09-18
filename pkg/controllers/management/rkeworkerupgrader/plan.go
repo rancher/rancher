@@ -6,9 +6,9 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	kd "github.com/rancher/rancher/pkg/controllers/management/kontainerdrivermetadata"
 	"github.com/rancher/rancher/pkg/controllers/management/secretmigrator"
-	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/librke"
 	nodeserver "github.com/rancher/rancher/pkg/rkenodeconfigserver"
 	rkeservices "github.com/rancher/rke/services"
@@ -16,7 +16,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func (uh *upgradeHandler) nonWorkerPlan(node *v3.Node, cluster *v3.Cluster) (*rketypes.RKEConfigNodePlan, error) {
+func (uh *upgradeHandler) nonWorkerPlan(node *v32.Node, cluster *v32.Cluster) (*rketypes.RKEConfigNodePlan, error) {
 	appliedSpec := *cluster.Status.AppliedSpec.DeepCopy()
 	var err error
 	appliedSpec, err = secretmigrator.AssembleRKEConfigSpec(cluster, appliedSpec, uh.secretLister)
@@ -74,7 +74,7 @@ func (uh *upgradeHandler) nonWorkerPlan(node *v3.Node, cluster *v3.Cluster) (*rk
 	return nil, fmt.Errorf("failed to find plan for %s", hostAddress)
 }
 
-func (uh *upgradeHandler) workerPlan(node *v3.Node, cluster *v3.Cluster) (*rketypes.RKEConfigNodePlan, error) {
+func (uh *upgradeHandler) workerPlan(node *v32.Node, cluster *v32.Cluster) (*rketypes.RKEConfigNodePlan, error) {
 	infos, err := librke.GetDockerInfo(node)
 	if err != nil {
 		return nil, err

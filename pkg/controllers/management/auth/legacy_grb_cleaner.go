@@ -4,7 +4,7 @@ import (
 	"strings"
 
 	grbstore "github.com/rancher/rancher/pkg/api/norman/store/globalrolebindings"
-	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	v33 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"k8s.io/apimachinery/pkg/runtime"
 )
@@ -20,7 +20,7 @@ func newLegacyGRBCleaner(m *config.ManagementContext) *grbCleaner {
 }
 
 // sync cleans up all GRBs to drop cluster-scoped lifecycle handler finalizers
-func (p *grbCleaner) sync(key string, obj *v3.GlobalRoleBinding) (runtime.Object, error) {
+func (p *grbCleaner) sync(key string, obj *v33.GlobalRoleBinding) (runtime.Object, error) {
 	if key == "" || obj == nil {
 		return nil, nil
 	}

@@ -152,14 +152,14 @@ func IsNonWorker(roles []string) bool {
 	return false
 }
 
-func (n *RKENodeConfigServer) nonWorkerConfig(ctx context.Context, cluster *v3.Cluster, node *v3.Node) (*rkeworker.NodeConfig, error) {
+func (n *RKENodeConfigServer) nonWorkerConfig(ctx context.Context, cluster *v32.Cluster, node *v32.Node) (*rkeworker.NodeConfig, error) {
 	nodePlan := node.Status.NodePlan
 	nc := &rkeworker.NodeConfig{
 		ClusterName: cluster.Name,
 	}
 
 	if nodePlan == nil {
-		logrus.Tracef("cluster [%s]: node [%s] doesn't have node plan yet", cluster.Name, node.Name)
+		logrus.Tracef("[nonWorkerConfig] cluster [%s]: node [%s] doesn't have node plan yet", cluster.Name, node.Name)
 		nc.AgentCheckInterval = AgentCheckIntervalDuringCreate
 		return nc, nil
 	}
@@ -170,7 +170,7 @@ func (n *RKENodeConfigServer) nonWorkerConfig(ctx context.Context, cluster *v3.C
 	return nc, nil
 }
 
-func (n *RKENodeConfigServer) nodeConfig(ctx context.Context, cluster *v3.Cluster, node *v3.Node) (*rkeworker.NodeConfig, error) {
+func (n *RKENodeConfigServer) nodeConfig(ctx context.Context, cluster *v32.Cluster, node *v32.Node) (*rkeworker.NodeConfig, error) {
 	status := cluster.Status.AppliedSpec.DeepCopy()
 	rkeConfig := status.RancherKubernetesEngineConfig
 
@@ -182,7 +182,7 @@ func (n *RKENodeConfigServer) nodeConfig(ctx context.Context, cluster *v3.Cluste
 	}
 
 	if nodePlan == nil {
-		logrus.Tracef("cluster [%s]: node [%s] %s doesn't have node plan yet", cluster.Name, node.Name, hostAddress)
+		logrus.Tracef("[nodeConfig] cluster [%s]: node [%s] %s doesn't have node plan yet", cluster.Name, node.Name, hostAddress)
 		nc.AgentCheckInterval = AgentCheckIntervalDuringCreate
 		return nc, nil
 	}
@@ -205,15 +205,15 @@ func (n *RKENodeConfigServer) nodeConfig(ctx context.Context, cluster *v3.Cluste
 	}
 
 	if rkepki.IsKubeletGenerateServingCertificateEnabledinConfig(rkeConfig) {
-		logrus.Debugf("nodeConfig: VerifyKubeletCAEnabled is true, generating kubelet certificate for [%s]", hostAddress)
+		logrus.Debugf("[nodeConfig] nodeConfig: VerifyKubeletCAEnabled is true, generating kubelet certificate for [%s]", hostAddress)
 		err := rkepki.GenerateKubeletCertificate(ctx, bundle.Certs(), *rkeConfig, "", "", false)
 		if err != nil {
-			return nil, errors.Wrapf(err, "failed to generate kubelet certificate")
+			return nil, errors.Wrapf(err, "[nodeConfig] failed to generate kubelet certificate")
 		}
 	}
 	certString, err := bundle.SafeMarshal()
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to marshal certificates bundle")
+		return nil, errors.Wrapf(err, "[nodeConfig] failed to marshal certificates bundle")
 	}
 	nc.Certs = certString
 	np := nodePlan.Plan
@@ -226,15 +226,18 @@ func (n *RKENodeConfigServer) nodeConfig(ctx context.Context, cluster *v3.Cluste
 	if node.Status.AppliedNodeVersion != cluster.Status.NodeVersion {
 		if nodePlan.Version == cluster.Status.NodeVersion {
 			nc.NodeVersion = cluster.Status.NodeVersion
-			logrus.Infof("cluster [%s] worker-upgrade: sending node-version for node [%s] version %v", cluster.Name, node.Status.NodeName, nc.NodeVersion)
+			logrus.Infof("[nodeConfig] cluster [%s] worker-upgrade: sending node-version for node [%s] version %v", cluster.Name, node.Status.NodeName, nc.NodeVersion)
 		} else if v32.ClusterConditionUpgraded.IsUnknown(cluster) {
 			if nc.AgentCheckInterval != AgentCheckIntervalDuringUpgrade {
 				nodeCopy := node.DeepCopy()
 				nodeCopy.Status.NodePlan.AgentCheckInterval = AgentCheckIntervalDuringUpgrade
 
-				n.nodes.Update(nodeCopy)
+				_, err := n.nodes.Update(nodeCopy)
+				if err != nil {
+					logrus.Warnf("[nodeConfig] cluster [%s] worker-upgrade: unexpected error occurred while updating node (%s)", cluster.Name, nodeCopy.Name)
+				}
 
-				logrus.Infof("cluster [%s] worker-upgrade: updating [%s] with agent-interval [%v]", cluster.Name, node.Status.NodeName, AgentCheckIntervalDuringUpgrade)
+				logrus.Infof("[nodeConfig] cluster [%s] worker-upgrade: updating [%s] with agent-interval [%v]", cluster.Name, node.Status.NodeName, AgentCheckIntervalDuringUpgrade)
 				nc.AgentCheckInterval = AgentCheckIntervalDuringUpgrade
 			}
 		}
@@ -242,7 +245,7 @@ func (n *RKENodeConfigServer) nodeConfig(ctx context.Context, cluster *v3.Cluste
 	return nc, nil
 }
 
-func FilterHostForSpec(spec *rketypes.RancherKubernetesEngineConfig, n *v3.Node) {
+func FilterHostForSpec(spec *rketypes.RancherKubernetesEngineConfig, n *v32.Node) {
 	nodeList := make([]rketypes.RKEConfigNode, 0)
 	for _, node := range spec.Nodes {
 		if IsNonWorker(node.Role) || node.NodeName == n.Status.NodeConfig.NodeName {
@@ -253,7 +256,7 @@ func FilterHostForSpec(spec *rketypes.RancherKubernetesEngineConfig, n *v3.Node)
 }
 
 func AugmentProcesses(token string, processes map[string]rketypes.Process, worker bool, nodeName string,
-	cluster *v3.Cluster) (map[string]rketypes.Process, error) {
+	cluster *v32.Cluster) (map[string]rketypes.Process, error) {
 	var shared bool
 
 OuterLoop:
