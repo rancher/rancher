@@ -73,14 +73,30 @@ func (ap *azureProvider) testAndApply(actionName string, action *types.Action, r
 
 	azureADConfig := &azureADConfigApplyInput.Config
 
-	// This covers the case where users upgrade Rancher to v2.6.7+ without having used Azure AD as the auth provider.
-	// In 2.6.7+, whether Azure AD is later registered or not, Rancher on startup creates the annotation on the template auth config.
-	// But in the case where the auth config had been created on Rancher startup prior to v2.6.7, the annotation would be missing.
-	// This ensures the annotation is set on next auth provider setup attempt.
-	if azureADConfig.ObjectMeta.Annotations == nil {
-		azureADConfig.ObjectMeta.Annotations = make(map[string]string)
+	// Get the current config from the database and, if it is enabled and does not have the new auth flow annotation,
+	// do not set the annotation on the new config.
+	// This covers the case where admins had been using a deprecated Azure AD setup
+	// and must migrate to the new auth config setup after upgrading Rancher.
+	// But they may not want to migrate immediately, and could still want to reconfigure their existing, deprecated config by changing
+	// the Application Secret after rotating it, for example. This way, Rancher allows the old setup to be reconfigured.
+	currentConfig, err := ap.getAzureConfigK8s()
+	if err != nil {
+		logrus.Errorf("Failed to fetch Azure AD Config from Kubernetes: %v", err)
+		return httperror.NewAPIError(httperror.ServerError, "failed to fetch Azure AD Config from Kubernetes")
 	}
-	azureADConfig.ObjectMeta.Annotations[GraphEndpointMigratedAnnotation] = "true"
+
+	enabled := authProviderEnabled(currentConfig)
+	if !enabled || (enabled && configHasNewFlowAnnotation(currentConfig)) {
+		// This covers the case where admins upgrade Rancher to v2.6.7+ without having used Azure AD as the auth provider.
+		// In 2.6.7+, whether Azure AD is later registered or not, Rancher on startup creates the annotation on the template auth config.
+		// But in the case where the auth config had been created on Rancher startup prior to v2.6.7, the annotation would be missing.
+		// This ensures the annotation is set on initial attempt to set up Azure AD.
+		// This also covers the case where admins want to reconfigure a v2.6.7+ new auth flow setup with a new secret or app.
+		if azureADConfig.ObjectMeta.Annotations == nil {
+			azureADConfig.ObjectMeta.Annotations = make(map[string]string)
+		}
+		azureADConfig.ObjectMeta.Annotations[GraphEndpointMigratedAnnotation] = "true"
+	}
 
 	azureLogin := &v32.AzureADLogin{
 		Code: azureADConfigApplyInput.Code,

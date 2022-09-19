@@ -29,6 +29,7 @@ func TestConfigureTest(t *testing.T) {
 				"annotations": map[string]interface{}{
 					"auth.cattle.io/azuread-endpoint-migrated": "true",
 				},
+				"enabled":           false,
 				"endpoint":          "https://login.microsoftonline.com/",
 				"graphEndpoint":     "https://graph.microsoft.com",
 				"tokenEndpoint":     "https://login.microsoftonline.com/tenant123/oauth2/v2.0/token",
@@ -45,6 +46,7 @@ func TestConfigureTest(t *testing.T) {
 			authConfig: map[string]interface{}{
 				"accessMode":        "unrestricted",
 				"annotations":       map[string]interface{}{},
+				"enabled":           false,
 				"endpoint":          "https://login.microsoftonline.com/",
 				"graphEndpoint":     "https://graph.windows.net/",
 				"tokenEndpoint":     "https://login.microsoftonline.com/tenant123/oauth2/token",
