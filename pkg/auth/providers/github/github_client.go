@@ -21,7 +21,7 @@ const (
 	githubDefaultHostName = "https://github.com"
 )
 
-//GClient implements a httpclient for github
+// GClient implements a httpclient for github
 type GClient struct {
 	httpClient *http.Client
 }
@@ -257,7 +257,7 @@ func (g *GClient) getUserOrgByID(id string, githubAccessToken string, config *v3
 	return githubAcct, nil
 }
 
-//URLEncoded encodes the string
+// URLEncoded encodes the string
 func URLEncoded(str string) string {
 	u, err := url.Parse(str)
 	if err != nil {

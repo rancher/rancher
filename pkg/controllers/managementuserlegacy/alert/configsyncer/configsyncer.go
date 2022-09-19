@@ -117,8 +117,8 @@ func (d *ConfigSyncer) NotifierSync(key string, alert *v3.Notifier) (runtime.Obj
 	return nil, d.sync()
 }
 
-//sync: update the secret which store the configuration of alertmanager given the latest configured notifiers and alerts rules.
-//For each alert, it will generate a route and a receiver in the alertmanager's configuration file, for metric rules it will update operator crd also.
+// sync: update the secret which store the configuration of alertmanager given the latest configured notifiers and alerts rules.
+// For each alert, it will generate a route and a receiver in the alertmanager's configuration file, for metric rules it will update operator crd also.
 func (d *ConfigSyncer) sync() error {
 	project, err := project.GetSystemProject(d.clusterName, d.projectLister)
 	if err != nil {

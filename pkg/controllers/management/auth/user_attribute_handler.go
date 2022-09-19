@@ -22,7 +22,7 @@ func newUserAttributeController(mgmt *config.ManagementContext) *UserAttributeCo
 	return ua
 }
 
-//sync is called periodically and on real updates
+// sync is called periodically and on real updates
 func (ua *UserAttributeController) sync(key string, obj *v3.UserAttribute) (runtime.Object, error) {
 	if obj == nil || obj.DeletionTimestamp != nil {
 		return nil, nil

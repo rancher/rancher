@@ -61,7 +61,7 @@ func newGlobalDNSProviderCatalogLauncher(ctx context.Context, mgmt *config.Manag
 	return n
 }
 
-//sync is called periodically and on real updates
+// sync is called periodically and on real updates
 func (n *ProviderCatalogLauncher) sync(key string, obj *v3.GlobalDnsProvider) (runtime.Object, error) {
 	if obj == nil || obj.DeletionTimestamp != nil {
 		return nil, n.deleteExternalDNSApp(key)

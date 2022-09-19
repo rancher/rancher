@@ -158,16 +158,16 @@ func Test_manager_checkForGlobalResourceRules(t *testing.T) {
 			baseRule: rbacv1.PolicyRule{
 				ResourceNames: []string{"local"},
 			},
-			want:     map[string]bool{},
+			want: map[string]bool{},
 		},
 		{
 			name: "cluster_rule_roletemplate_resource_names_no_match",
 			role: &v3.RoleTemplate{
 				Rules: []v1.PolicyRule{
 					{
-						Verbs:     []string{"get"},
-						APIGroups: []string{"management.cattle.io"},
-						Resources: []string{"clusters"},
+						Verbs:         []string{"get"},
+						APIGroups:     []string{"management.cattle.io"},
+						Resources:     []string{"clusters"},
 						ResourceNames: []string{"local"},
 					},
 				},

@@ -29,22 +29,22 @@ var _ v31.PipelineSettingLister = &PipelineSettingListerMock{}
 
 // PipelineSettingListerMock is a mock implementation of v31.PipelineSettingLister.
 //
-//     func TestSomethingThatUsesPipelineSettingLister(t *testing.T) {
+//	    func TestSomethingThatUsesPipelineSettingLister(t *testing.T) {
 //
-//         // make and configure a mocked v31.PipelineSettingLister
-//         mockedPipelineSettingLister := &PipelineSettingListerMock{
-//             GetFunc: func(namespace string, name string) (*v3.PipelineSetting, error) {
-// 	               panic("mock out the Get method")
-//             },
-//             ListFunc: func(namespace string, selector labels.Selector) ([]*v3.PipelineSetting, error) {
-// 	               panic("mock out the List method")
-//             },
-//         }
+//	        // make and configure a mocked v31.PipelineSettingLister
+//	        mockedPipelineSettingLister := &PipelineSettingListerMock{
+//	            GetFunc: func(namespace string, name string) (*v3.PipelineSetting, error) {
+//		               panic("mock out the Get method")
+//	            },
+//	            ListFunc: func(namespace string, selector labels.Selector) ([]*v3.PipelineSetting, error) {
+//		               panic("mock out the List method")
+//	            },
+//	        }
 //
-//         // use mockedPipelineSettingLister in code that requires v31.PipelineSettingLister
-//         // and then make assertions.
+//	        // use mockedPipelineSettingLister in code that requires v31.PipelineSettingLister
+//	        // and then make assertions.
 //
-//     }
+//	    }
 type PipelineSettingListerMock struct {
 	// GetFunc mocks the Get method.
 	GetFunc func(namespace string, name string) (*v3.PipelineSetting, error)
@@ -91,7 +91,8 @@ func (mock *PipelineSettingListerMock) Get(namespace string, name string) (*v3.P
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//     len(mockedPipelineSettingLister.GetCalls())
+//
+//	len(mockedPipelineSettingLister.GetCalls())
 func (mock *PipelineSettingListerMock) GetCalls() []struct {
 	Namespace string
 	Name      string
@@ -126,7 +127,8 @@ func (mock *PipelineSettingListerMock) List(namespace string, selector labels.Se
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//     len(mockedPipelineSettingLister.ListCalls())
+//
+//	len(mockedPipelineSettingLister.ListCalls())
 func (mock *PipelineSettingListerMock) ListCalls() []struct {
 	Namespace string
 	Selector  labels.Selector
@@ -159,43 +161,43 @@ var _ v31.PipelineSettingController = &PipelineSettingControllerMock{}
 
 // PipelineSettingControllerMock is a mock implementation of v31.PipelineSettingController.
 //
-//     func TestSomethingThatUsesPipelineSettingController(t *testing.T) {
+//	    func TestSomethingThatUsesPipelineSettingController(t *testing.T) {
 //
-//         // make and configure a mocked v31.PipelineSettingController
-//         mockedPipelineSettingController := &PipelineSettingControllerMock{
-//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v31.PipelineSettingHandlerFunc)  {
-// 	               panic("mock out the AddClusterScopedFeatureHandler method")
-//             },
-//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v31.PipelineSettingHandlerFunc)  {
-// 	               panic("mock out the AddClusterScopedHandler method")
-//             },
-//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.PipelineSettingHandlerFunc)  {
-// 	               panic("mock out the AddFeatureHandler method")
-//             },
-//             AddHandlerFunc: func(ctx context.Context, name string, handler v31.PipelineSettingHandlerFunc)  {
-// 	               panic("mock out the AddHandler method")
-//             },
-//             EnqueueFunc: func(namespace string, name string)  {
-// 	               panic("mock out the Enqueue method")
-//             },
-//             EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
-// 	               panic("mock out the EnqueueAfter method")
-//             },
-//             GenericFunc: func() controller.GenericController {
-// 	               panic("mock out the Generic method")
-//             },
-//             InformerFunc: func() cache.SharedIndexInformer {
-// 	               panic("mock out the Informer method")
-//             },
-//             ListerFunc: func() v31.PipelineSettingLister {
-// 	               panic("mock out the Lister method")
-//             },
-//         }
+//	        // make and configure a mocked v31.PipelineSettingController
+//	        mockedPipelineSettingController := &PipelineSettingControllerMock{
+//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v31.PipelineSettingHandlerFunc)  {
+//		               panic("mock out the AddClusterScopedFeatureHandler method")
+//	            },
+//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v31.PipelineSettingHandlerFunc)  {
+//		               panic("mock out the AddClusterScopedHandler method")
+//	            },
+//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.PipelineSettingHandlerFunc)  {
+//		               panic("mock out the AddFeatureHandler method")
+//	            },
+//	            AddHandlerFunc: func(ctx context.Context, name string, handler v31.PipelineSettingHandlerFunc)  {
+//		               panic("mock out the AddHandler method")
+//	            },
+//	            EnqueueFunc: func(namespace string, name string)  {
+//		               panic("mock out the Enqueue method")
+//	            },
+//	            EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
+//		               panic("mock out the EnqueueAfter method")
+//	            },
+//	            GenericFunc: func() controller.GenericController {
+//		               panic("mock out the Generic method")
+//	            },
+//	            InformerFunc: func() cache.SharedIndexInformer {
+//		               panic("mock out the Informer method")
+//	            },
+//	            ListerFunc: func() v31.PipelineSettingLister {
+//		               panic("mock out the Lister method")
+//	            },
+//	        }
 //
-//         // use mockedPipelineSettingController in code that requires v31.PipelineSettingController
-//         // and then make assertions.
+//	        // use mockedPipelineSettingController in code that requires v31.PipelineSettingController
+//	        // and then make assertions.
 //
-//     }
+//	    }
 type PipelineSettingControllerMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
 	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v31.PipelineSettingHandlerFunc)
@@ -324,7 +326,8 @@ func (mock *PipelineSettingControllerMock) AddClusterScopedFeatureHandler(ctx co
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//     len(mockedPipelineSettingController.AddClusterScopedFeatureHandlerCalls())
+//
+//	len(mockedPipelineSettingController.AddClusterScopedFeatureHandlerCalls())
 func (mock *PipelineSettingControllerMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -369,7 +372,8 @@ func (mock *PipelineSettingControllerMock) AddClusterScopedHandler(ctx context.C
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//     len(mockedPipelineSettingController.AddClusterScopedHandlerCalls())
+//
+//	len(mockedPipelineSettingController.AddClusterScopedHandlerCalls())
 func (mock *PipelineSettingControllerMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -412,7 +416,8 @@ func (mock *PipelineSettingControllerMock) AddFeatureHandler(ctx context.Context
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//     len(mockedPipelineSettingController.AddFeatureHandlerCalls())
+//
+//	len(mockedPipelineSettingController.AddFeatureHandlerCalls())
 func (mock *PipelineSettingControllerMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
@@ -453,7 +458,8 @@ func (mock *PipelineSettingControllerMock) AddHandler(ctx context.Context, name 
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//     len(mockedPipelineSettingController.AddHandlerCalls())
+//
+//	len(mockedPipelineSettingController.AddHandlerCalls())
 func (mock *PipelineSettingControllerMock) AddHandlerCalls() []struct {
 	Ctx     context.Context
 	Name    string
@@ -490,7 +496,8 @@ func (mock *PipelineSettingControllerMock) Enqueue(namespace string, name string
 
 // EnqueueCalls gets all the calls that were made to Enqueue.
 // Check the length with:
-//     len(mockedPipelineSettingController.EnqueueCalls())
+//
+//	len(mockedPipelineSettingController.EnqueueCalls())
 func (mock *PipelineSettingControllerMock) EnqueueCalls() []struct {
 	Namespace string
 	Name      string
@@ -527,7 +534,8 @@ func (mock *PipelineSettingControllerMock) EnqueueAfter(namespace string, name s
 
 // EnqueueAfterCalls gets all the calls that were made to EnqueueAfter.
 // Check the length with:
-//     len(mockedPipelineSettingController.EnqueueAfterCalls())
+//
+//	len(mockedPipelineSettingController.EnqueueAfterCalls())
 func (mock *PipelineSettingControllerMock) EnqueueAfterCalls() []struct {
 	Namespace string
 	Name      string
@@ -559,7 +567,8 @@ func (mock *PipelineSettingControllerMock) Generic() controller.GenericControlle
 
 // GenericCalls gets all the calls that were made to Generic.
 // Check the length with:
-//     len(mockedPipelineSettingController.GenericCalls())
+//
+//	len(mockedPipelineSettingController.GenericCalls())
 func (mock *PipelineSettingControllerMock) GenericCalls() []struct {
 } {
 	var calls []struct {
@@ -585,7 +594,8 @@ func (mock *PipelineSettingControllerMock) Informer() cache.SharedIndexInformer 
 
 // InformerCalls gets all the calls that were made to Informer.
 // Check the length with:
-//     len(mockedPipelineSettingController.InformerCalls())
+//
+//	len(mockedPipelineSettingController.InformerCalls())
 func (mock *PipelineSettingControllerMock) InformerCalls() []struct {
 } {
 	var calls []struct {
@@ -611,7 +621,8 @@ func (mock *PipelineSettingControllerMock) Lister() v31.PipelineSettingLister {
 
 // ListerCalls gets all the calls that were made to Lister.
 // Check the length with:
-//     len(mockedPipelineSettingController.ListerCalls())
+//
+//	len(mockedPipelineSettingController.ListerCalls())
 func (mock *PipelineSettingControllerMock) ListerCalls() []struct {
 } {
 	var calls []struct {
@@ -651,76 +662,76 @@ var _ v31.PipelineSettingInterface = &PipelineSettingInterfaceMock{}
 
 // PipelineSettingInterfaceMock is a mock implementation of v31.PipelineSettingInterface.
 //
-//     func TestSomethingThatUsesPipelineSettingInterface(t *testing.T) {
+//	    func TestSomethingThatUsesPipelineSettingInterface(t *testing.T) {
 //
-//         // make and configure a mocked v31.PipelineSettingInterface
-//         mockedPipelineSettingInterface := &PipelineSettingInterfaceMock{
-//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v31.PipelineSettingHandlerFunc)  {
-// 	               panic("mock out the AddClusterScopedFeatureHandler method")
-//             },
-//             AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v31.PipelineSettingLifecycle)  {
-// 	               panic("mock out the AddClusterScopedFeatureLifecycle method")
-//             },
-//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v31.PipelineSettingHandlerFunc)  {
-// 	               panic("mock out the AddClusterScopedHandler method")
-//             },
-//             AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v31.PipelineSettingLifecycle)  {
-// 	               panic("mock out the AddClusterScopedLifecycle method")
-//             },
-//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.PipelineSettingHandlerFunc)  {
-// 	               panic("mock out the AddFeatureHandler method")
-//             },
-//             AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v31.PipelineSettingLifecycle)  {
-// 	               panic("mock out the AddFeatureLifecycle method")
-//             },
-//             AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v31.PipelineSettingHandlerFunc)  {
-// 	               panic("mock out the AddHandler method")
-//             },
-//             AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v31.PipelineSettingLifecycle)  {
-// 	               panic("mock out the AddLifecycle method")
-//             },
-//             ControllerFunc: func() v31.PipelineSettingController {
-// 	               panic("mock out the Controller method")
-//             },
-//             CreateFunc: func(in1 *v3.PipelineSetting) (*v3.PipelineSetting, error) {
-// 	               panic("mock out the Create method")
-//             },
-//             DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
-// 	               panic("mock out the Delete method")
-//             },
-//             DeleteCollectionFunc: func(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
-// 	               panic("mock out the DeleteCollection method")
-//             },
-//             DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
-// 	               panic("mock out the DeleteNamespaced method")
-//             },
-//             GetFunc: func(name string, opts metav1.GetOptions) (*v3.PipelineSetting, error) {
-// 	               panic("mock out the Get method")
-//             },
-//             GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v3.PipelineSetting, error) {
-// 	               panic("mock out the GetNamespaced method")
-//             },
-//             ListFunc: func(opts metav1.ListOptions) (*v3.PipelineSettingList, error) {
-// 	               panic("mock out the List method")
-//             },
-//             ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v3.PipelineSettingList, error) {
-// 	               panic("mock out the ListNamespaced method")
-//             },
-//             ObjectClientFunc: func() *objectclient.ObjectClient {
-// 	               panic("mock out the ObjectClient method")
-//             },
-//             UpdateFunc: func(in1 *v3.PipelineSetting) (*v3.PipelineSetting, error) {
-// 	               panic("mock out the Update method")
-//             },
-//             WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
-// 	               panic("mock out the Watch method")
-//             },
-//         }
+//	        // make and configure a mocked v31.PipelineSettingInterface
+//	        mockedPipelineSettingInterface := &PipelineSettingInterfaceMock{
+//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v31.PipelineSettingHandlerFunc)  {
+//		               panic("mock out the AddClusterScopedFeatureHandler method")
+//	            },
+//	            AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v31.PipelineSettingLifecycle)  {
+//		               panic("mock out the AddClusterScopedFeatureLifecycle method")
+//	            },
+//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v31.PipelineSettingHandlerFunc)  {
+//		               panic("mock out the AddClusterScopedHandler method")
+//	            },
+//	            AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v31.PipelineSettingLifecycle)  {
+//		               panic("mock out the AddClusterScopedLifecycle method")
+//	            },
+//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.PipelineSettingHandlerFunc)  {
+//		               panic("mock out the AddFeatureHandler method")
+//	            },
+//	            AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v31.PipelineSettingLifecycle)  {
+//		               panic("mock out the AddFeatureLifecycle method")
+//	            },
+//	            AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v31.PipelineSettingHandlerFunc)  {
+//		               panic("mock out the AddHandler method")
+//	            },
+//	            AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v31.PipelineSettingLifecycle)  {
+//		               panic("mock out the AddLifecycle method")
+//	            },
+//	            ControllerFunc: func() v31.PipelineSettingController {
+//		               panic("mock out the Controller method")
+//	            },
+//	            CreateFunc: func(in1 *v3.PipelineSetting) (*v3.PipelineSetting, error) {
+//		               panic("mock out the Create method")
+//	            },
+//	            DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
+//		               panic("mock out the Delete method")
+//	            },
+//	            DeleteCollectionFunc: func(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
+//		               panic("mock out the DeleteCollection method")
+//	            },
+//	            DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
+//		               panic("mock out the DeleteNamespaced method")
+//	            },
+//	            GetFunc: func(name string, opts metav1.GetOptions) (*v3.PipelineSetting, error) {
+//		               panic("mock out the Get method")
+//	            },
+//	            GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v3.PipelineSetting, error) {
+//		               panic("mock out the GetNamespaced method")
+//	            },
+//	            ListFunc: func(opts metav1.ListOptions) (*v3.PipelineSettingList, error) {
+//		               panic("mock out the List method")
+//	            },
+//	            ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v3.PipelineSettingList, error) {
+//		               panic("mock out the ListNamespaced method")
+//	            },
+//	            ObjectClientFunc: func() *objectclient.ObjectClient {
+//		               panic("mock out the ObjectClient method")
+//	            },
+//	            UpdateFunc: func(in1 *v3.PipelineSetting) (*v3.PipelineSetting, error) {
+//		               panic("mock out the Update method")
+//	            },
+//	            WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
+//		               panic("mock out the Watch method")
+//	            },
+//	        }
 //
-//         // use mockedPipelineSettingInterface in code that requires v31.PipelineSettingInterface
-//         // and then make assertions.
+//	        // use mockedPipelineSettingInterface in code that requires v31.PipelineSettingInterface
+//	        // and then make assertions.
 //
-//     }
+//	    }
 type PipelineSettingInterfaceMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
 	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v31.PipelineSettingHandlerFunc)
@@ -973,7 +984,8 @@ func (mock *PipelineSettingInterfaceMock) AddClusterScopedFeatureHandler(ctx con
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//     len(mockedPipelineSettingInterface.AddClusterScopedFeatureHandlerCalls())
+//
+//	len(mockedPipelineSettingInterface.AddClusterScopedFeatureHandlerCalls())
 func (mock *PipelineSettingInterfaceMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -1020,7 +1032,8 @@ func (mock *PipelineSettingInterfaceMock) AddClusterScopedFeatureLifecycle(ctx c
 
 // AddClusterScopedFeatureLifecycleCalls gets all the calls that were made to AddClusterScopedFeatureLifecycle.
 // Check the length with:
-//     len(mockedPipelineSettingInterface.AddClusterScopedFeatureLifecycleCalls())
+//
+//	len(mockedPipelineSettingInterface.AddClusterScopedFeatureLifecycleCalls())
 func (mock *PipelineSettingInterfaceMock) AddClusterScopedFeatureLifecycleCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -1065,7 +1078,8 @@ func (mock *PipelineSettingInterfaceMock) AddClusterScopedHandler(ctx context.Co
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//     len(mockedPipelineSettingInterface.AddClusterScopedHandlerCalls())
+//
+//	len(mockedPipelineSettingInterface.AddClusterScopedHandlerCalls())
 func (mock *PipelineSettingInterfaceMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -1108,7 +1122,8 @@ func (mock *PipelineSettingInterfaceMock) AddClusterScopedLifecycle(ctx context.
 
 // AddClusterScopedLifecycleCalls gets all the calls that were made to AddClusterScopedLifecycle.
 // Check the length with:
-//     len(mockedPipelineSettingInterface.AddClusterScopedLifecycleCalls())
+//
+//	len(mockedPipelineSettingInterface.AddClusterScopedLifecycleCalls())
 func (mock *PipelineSettingInterfaceMock) AddClusterScopedLifecycleCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -1151,7 +1166,8 @@ func (mock *PipelineSettingInterfaceMock) AddFeatureHandler(ctx context.Context,
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//     len(mockedPipelineSettingInterface.AddFeatureHandlerCalls())
+//
+//	len(mockedPipelineSettingInterface.AddFeatureHandlerCalls())
 func (mock *PipelineSettingInterfaceMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
@@ -1194,7 +1210,8 @@ func (mock *PipelineSettingInterfaceMock) AddFeatureLifecycle(ctx context.Contex
 
 // AddFeatureLifecycleCalls gets all the calls that were made to AddFeatureLifecycle.
 // Check the length with:
-//     len(mockedPipelineSettingInterface.AddFeatureLifecycleCalls())
+//
+//	len(mockedPipelineSettingInterface.AddFeatureLifecycleCalls())
 func (mock *PipelineSettingInterfaceMock) AddFeatureLifecycleCalls() []struct {
 	Ctx       context.Context
 	Enabled   func() bool
@@ -1235,7 +1252,8 @@ func (mock *PipelineSettingInterfaceMock) AddHandler(ctx context.Context, name s
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//     len(mockedPipelineSettingInterface.AddHandlerCalls())
+//
+//	len(mockedPipelineSettingInterface.AddHandlerCalls())
 func (mock *PipelineSettingInterfaceMock) AddHandlerCalls() []struct {
 	Ctx  context.Context
 	Name string
@@ -1274,7 +1292,8 @@ func (mock *PipelineSettingInterfaceMock) AddLifecycle(ctx context.Context, name
 
 // AddLifecycleCalls gets all the calls that were made to AddLifecycle.
 // Check the length with:
-//     len(mockedPipelineSettingInterface.AddLifecycleCalls())
+//
+//	len(mockedPipelineSettingInterface.AddLifecycleCalls())
 func (mock *PipelineSettingInterfaceMock) AddLifecycleCalls() []struct {
 	Ctx       context.Context
 	Name      string
@@ -1306,7 +1325,8 @@ func (mock *PipelineSettingInterfaceMock) Controller() v31.PipelineSettingContro
 
 // ControllerCalls gets all the calls that were made to Controller.
 // Check the length with:
-//     len(mockedPipelineSettingInterface.ControllerCalls())
+//
+//	len(mockedPipelineSettingInterface.ControllerCalls())
 func (mock *PipelineSettingInterfaceMock) ControllerCalls() []struct {
 } {
 	var calls []struct {
@@ -1335,7 +1355,8 @@ func (mock *PipelineSettingInterfaceMock) Create(in1 *v3.PipelineSetting) (*v3.P
 
 // CreateCalls gets all the calls that were made to Create.
 // Check the length with:
-//     len(mockedPipelineSettingInterface.CreateCalls())
+//
+//	len(mockedPipelineSettingInterface.CreateCalls())
 func (mock *PipelineSettingInterfaceMock) CreateCalls() []struct {
 	In1 *v3.PipelineSetting
 } {
@@ -1368,7 +1389,8 @@ func (mock *PipelineSettingInterfaceMock) Delete(name string, options *metav1.De
 
 // DeleteCalls gets all the calls that were made to Delete.
 // Check the length with:
-//     len(mockedPipelineSettingInterface.DeleteCalls())
+//
+//	len(mockedPipelineSettingInterface.DeleteCalls())
 func (mock *PipelineSettingInterfaceMock) DeleteCalls() []struct {
 	Name    string
 	Options *metav1.DeleteOptions
@@ -1403,7 +1425,8 @@ func (mock *PipelineSettingInterfaceMock) DeleteCollection(deleteOpts *metav1.De
 
 // DeleteCollectionCalls gets all the calls that were made to DeleteCollection.
 // Check the length with:
-//     len(mockedPipelineSettingInterface.DeleteCollectionCalls())
+//
+//	len(mockedPipelineSettingInterface.DeleteCollectionCalls())
 func (mock *PipelineSettingInterfaceMock) DeleteCollectionCalls() []struct {
 	DeleteOpts *metav1.DeleteOptions
 	ListOpts   metav1.ListOptions
@@ -1440,7 +1463,8 @@ func (mock *PipelineSettingInterfaceMock) DeleteNamespaced(namespace string, nam
 
 // DeleteNamespacedCalls gets all the calls that were made to DeleteNamespaced.
 // Check the length with:
-//     len(mockedPipelineSettingInterface.DeleteNamespacedCalls())
+//
+//	len(mockedPipelineSettingInterface.DeleteNamespacedCalls())
 func (mock *PipelineSettingInterfaceMock) DeleteNamespacedCalls() []struct {
 	Namespace string
 	Name      string
@@ -1477,7 +1501,8 @@ func (mock *PipelineSettingInterfaceMock) Get(name string, opts metav1.GetOption
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//     len(mockedPipelineSettingInterface.GetCalls())
+//
+//	len(mockedPipelineSettingInterface.GetCalls())
 func (mock *PipelineSettingInterfaceMock) GetCalls() []struct {
 	Name string
 	Opts metav1.GetOptions
@@ -1514,7 +1539,8 @@ func (mock *PipelineSettingInterfaceMock) GetNamespaced(namespace string, name s
 
 // GetNamespacedCalls gets all the calls that were made to GetNamespaced.
 // Check the length with:
-//     len(mockedPipelineSettingInterface.GetNamespacedCalls())
+//
+//	len(mockedPipelineSettingInterface.GetNamespacedCalls())
 func (mock *PipelineSettingInterfaceMock) GetNamespacedCalls() []struct {
 	Namespace string
 	Name      string
@@ -1549,7 +1575,8 @@ func (mock *PipelineSettingInterfaceMock) List(opts metav1.ListOptions) (*v3.Pip
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//     len(mockedPipelineSettingInterface.ListCalls())
+//
+//	len(mockedPipelineSettingInterface.ListCalls())
 func (mock *PipelineSettingInterfaceMock) ListCalls() []struct {
 	Opts metav1.ListOptions
 } {
@@ -1582,7 +1609,8 @@ func (mock *PipelineSettingInterfaceMock) ListNamespaced(namespace string, opts 
 
 // ListNamespacedCalls gets all the calls that were made to ListNamespaced.
 // Check the length with:
-//     len(mockedPipelineSettingInterface.ListNamespacedCalls())
+//
+//	len(mockedPipelineSettingInterface.ListNamespacedCalls())
 func (mock *PipelineSettingInterfaceMock) ListNamespacedCalls() []struct {
 	Namespace string
 	Opts      metav1.ListOptions
@@ -1612,7 +1640,8 @@ func (mock *PipelineSettingInterfaceMock) ObjectClient() *objectclient.ObjectCli
 
 // ObjectClientCalls gets all the calls that were made to ObjectClient.
 // Check the length with:
-//     len(mockedPipelineSettingInterface.ObjectClientCalls())
+//
+//	len(mockedPipelineSettingInterface.ObjectClientCalls())
 func (mock *PipelineSettingInterfaceMock) ObjectClientCalls() []struct {
 } {
 	var calls []struct {
@@ -1641,7 +1670,8 @@ func (mock *PipelineSettingInterfaceMock) Update(in1 *v3.PipelineSetting) (*v3.P
 
 // UpdateCalls gets all the calls that were made to Update.
 // Check the length with:
-//     len(mockedPipelineSettingInterface.UpdateCalls())
+//
+//	len(mockedPipelineSettingInterface.UpdateCalls())
 func (mock *PipelineSettingInterfaceMock) UpdateCalls() []struct {
 	In1 *v3.PipelineSetting
 } {
@@ -1672,7 +1702,8 @@ func (mock *PipelineSettingInterfaceMock) Watch(opts metav1.ListOptions) (watch.
 
 // WatchCalls gets all the calls that were made to Watch.
 // Check the length with:
-//     len(mockedPipelineSettingInterface.WatchCalls())
+//
+//	len(mockedPipelineSettingInterface.WatchCalls())
 func (mock *PipelineSettingInterfaceMock) WatchCalls() []struct {
 	Opts metav1.ListOptions
 } {
@@ -1695,19 +1726,19 @@ var _ v31.PipelineSettingsGetter = &PipelineSettingsGetterMock{}
 
 // PipelineSettingsGetterMock is a mock implementation of v31.PipelineSettingsGetter.
 //
-//     func TestSomethingThatUsesPipelineSettingsGetter(t *testing.T) {
+//	    func TestSomethingThatUsesPipelineSettingsGetter(t *testing.T) {
 //
-//         // make and configure a mocked v31.PipelineSettingsGetter
-//         mockedPipelineSettingsGetter := &PipelineSettingsGetterMock{
-//             PipelineSettingsFunc: func(namespace string) v31.PipelineSettingInterface {
-// 	               panic("mock out the PipelineSettings method")
-//             },
-//         }
+//	        // make and configure a mocked v31.PipelineSettingsGetter
+//	        mockedPipelineSettingsGetter := &PipelineSettingsGetterMock{
+//	            PipelineSettingsFunc: func(namespace string) v31.PipelineSettingInterface {
+//		               panic("mock out the PipelineSettings method")
+//	            },
+//	        }
 //
-//         // use mockedPipelineSettingsGetter in code that requires v31.PipelineSettingsGetter
-//         // and then make assertions.
+//	        // use mockedPipelineSettingsGetter in code that requires v31.PipelineSettingsGetter
+//	        // and then make assertions.
 //
-//     }
+//	    }
 type PipelineSettingsGetterMock struct {
 	// PipelineSettingsFunc mocks the PipelineSettings method.
 	PipelineSettingsFunc func(namespace string) v31.PipelineSettingInterface
@@ -1740,7 +1771,8 @@ func (mock *PipelineSettingsGetterMock) PipelineSettings(namespace string) v31.P
 
 // PipelineSettingsCalls gets all the calls that were made to PipelineSettings.
 // Check the length with:
-//     len(mockedPipelineSettingsGetter.PipelineSettingsCalls())
+//
+//	len(mockedPipelineSettingsGetter.PipelineSettingsCalls())
 func (mock *PipelineSettingsGetterMock) PipelineSettingsCalls() []struct {
 	Namespace string
 } {

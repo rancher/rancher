@@ -29,22 +29,22 @@ var _ v1beta11.IngressLister = &IngressListerMock{}
 
 // IngressListerMock is a mock implementation of v1beta11.IngressLister.
 //
-//     func TestSomethingThatUsesIngressLister(t *testing.T) {
+//	    func TestSomethingThatUsesIngressLister(t *testing.T) {
 //
-//         // make and configure a mocked v1beta11.IngressLister
-//         mockedIngressLister := &IngressListerMock{
-//             GetFunc: func(namespace string, name string) (*v1beta1.Ingress, error) {
-// 	               panic("mock out the Get method")
-//             },
-//             ListFunc: func(namespace string, selector labels.Selector) ([]*v1beta1.Ingress, error) {
-// 	               panic("mock out the List method")
-//             },
-//         }
+//	        // make and configure a mocked v1beta11.IngressLister
+//	        mockedIngressLister := &IngressListerMock{
+//	            GetFunc: func(namespace string, name string) (*v1beta1.Ingress, error) {
+//		               panic("mock out the Get method")
+//	            },
+//	            ListFunc: func(namespace string, selector labels.Selector) ([]*v1beta1.Ingress, error) {
+//		               panic("mock out the List method")
+//	            },
+//	        }
 //
-//         // use mockedIngressLister in code that requires v1beta11.IngressLister
-//         // and then make assertions.
+//	        // use mockedIngressLister in code that requires v1beta11.IngressLister
+//	        // and then make assertions.
 //
-//     }
+//	    }
 type IngressListerMock struct {
 	// GetFunc mocks the Get method.
 	GetFunc func(namespace string, name string) (*v1beta1.Ingress, error)
@@ -91,7 +91,8 @@ func (mock *IngressListerMock) Get(namespace string, name string) (*v1beta1.Ingr
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//     len(mockedIngressLister.GetCalls())
+//
+//	len(mockedIngressLister.GetCalls())
 func (mock *IngressListerMock) GetCalls() []struct {
 	Namespace string
 	Name      string
@@ -126,7 +127,8 @@ func (mock *IngressListerMock) List(namespace string, selector labels.Selector) 
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//     len(mockedIngressLister.ListCalls())
+//
+//	len(mockedIngressLister.ListCalls())
 func (mock *IngressListerMock) ListCalls() []struct {
 	Namespace string
 	Selector  labels.Selector
@@ -159,43 +161,43 @@ var _ v1beta11.IngressController = &IngressControllerMock{}
 
 // IngressControllerMock is a mock implementation of v1beta11.IngressController.
 //
-//     func TestSomethingThatUsesIngressController(t *testing.T) {
+//	    func TestSomethingThatUsesIngressController(t *testing.T) {
 //
-//         // make and configure a mocked v1beta11.IngressController
-//         mockedIngressController := &IngressControllerMock{
-//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v1beta11.IngressHandlerFunc)  {
-// 	               panic("mock out the AddClusterScopedFeatureHandler method")
-//             },
-//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v1beta11.IngressHandlerFunc)  {
-// 	               panic("mock out the AddClusterScopedHandler method")
-//             },
-//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v1beta11.IngressHandlerFunc)  {
-// 	               panic("mock out the AddFeatureHandler method")
-//             },
-//             AddHandlerFunc: func(ctx context.Context, name string, handler v1beta11.IngressHandlerFunc)  {
-// 	               panic("mock out the AddHandler method")
-//             },
-//             EnqueueFunc: func(namespace string, name string)  {
-// 	               panic("mock out the Enqueue method")
-//             },
-//             EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
-// 	               panic("mock out the EnqueueAfter method")
-//             },
-//             GenericFunc: func() controller.GenericController {
-// 	               panic("mock out the Generic method")
-//             },
-//             InformerFunc: func() cache.SharedIndexInformer {
-// 	               panic("mock out the Informer method")
-//             },
-//             ListerFunc: func() v1beta11.IngressLister {
-// 	               panic("mock out the Lister method")
-//             },
-//         }
+//	        // make and configure a mocked v1beta11.IngressController
+//	        mockedIngressController := &IngressControllerMock{
+//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v1beta11.IngressHandlerFunc)  {
+//		               panic("mock out the AddClusterScopedFeatureHandler method")
+//	            },
+//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v1beta11.IngressHandlerFunc)  {
+//		               panic("mock out the AddClusterScopedHandler method")
+//	            },
+//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v1beta11.IngressHandlerFunc)  {
+//		               panic("mock out the AddFeatureHandler method")
+//	            },
+//	            AddHandlerFunc: func(ctx context.Context, name string, handler v1beta11.IngressHandlerFunc)  {
+//		               panic("mock out the AddHandler method")
+//	            },
+//	            EnqueueFunc: func(namespace string, name string)  {
+//		               panic("mock out the Enqueue method")
+//	            },
+//	            EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
+//		               panic("mock out the EnqueueAfter method")
+//	            },
+//	            GenericFunc: func() controller.GenericController {
+//		               panic("mock out the Generic method")
+//	            },
+//	            InformerFunc: func() cache.SharedIndexInformer {
+//		               panic("mock out the Informer method")
+//	            },
+//	            ListerFunc: func() v1beta11.IngressLister {
+//		               panic("mock out the Lister method")
+//	            },
+//	        }
 //
-//         // use mockedIngressController in code that requires v1beta11.IngressController
-//         // and then make assertions.
+//	        // use mockedIngressController in code that requires v1beta11.IngressController
+//	        // and then make assertions.
 //
-//     }
+//	    }
 type IngressControllerMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
 	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v1beta11.IngressHandlerFunc)
@@ -324,7 +326,8 @@ func (mock *IngressControllerMock) AddClusterScopedFeatureHandler(ctx context.Co
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//     len(mockedIngressController.AddClusterScopedFeatureHandlerCalls())
+//
+//	len(mockedIngressController.AddClusterScopedFeatureHandlerCalls())
 func (mock *IngressControllerMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -369,7 +372,8 @@ func (mock *IngressControllerMock) AddClusterScopedHandler(ctx context.Context, 
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//     len(mockedIngressController.AddClusterScopedHandlerCalls())
+//
+//	len(mockedIngressController.AddClusterScopedHandlerCalls())
 func (mock *IngressControllerMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -412,7 +416,8 @@ func (mock *IngressControllerMock) AddFeatureHandler(ctx context.Context, enable
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//     len(mockedIngressController.AddFeatureHandlerCalls())
+//
+//	len(mockedIngressController.AddFeatureHandlerCalls())
 func (mock *IngressControllerMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
@@ -453,7 +458,8 @@ func (mock *IngressControllerMock) AddHandler(ctx context.Context, name string, 
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//     len(mockedIngressController.AddHandlerCalls())
+//
+//	len(mockedIngressController.AddHandlerCalls())
 func (mock *IngressControllerMock) AddHandlerCalls() []struct {
 	Ctx     context.Context
 	Name    string
@@ -490,7 +496,8 @@ func (mock *IngressControllerMock) Enqueue(namespace string, name string) {
 
 // EnqueueCalls gets all the calls that were made to Enqueue.
 // Check the length with:
-//     len(mockedIngressController.EnqueueCalls())
+//
+//	len(mockedIngressController.EnqueueCalls())
 func (mock *IngressControllerMock) EnqueueCalls() []struct {
 	Namespace string
 	Name      string
@@ -527,7 +534,8 @@ func (mock *IngressControllerMock) EnqueueAfter(namespace string, name string, a
 
 // EnqueueAfterCalls gets all the calls that were made to EnqueueAfter.
 // Check the length with:
-//     len(mockedIngressController.EnqueueAfterCalls())
+//
+//	len(mockedIngressController.EnqueueAfterCalls())
 func (mock *IngressControllerMock) EnqueueAfterCalls() []struct {
 	Namespace string
 	Name      string
@@ -559,7 +567,8 @@ func (mock *IngressControllerMock) Generic() controller.GenericController {
 
 // GenericCalls gets all the calls that were made to Generic.
 // Check the length with:
-//     len(mockedIngressController.GenericCalls())
+//
+//	len(mockedIngressController.GenericCalls())
 func (mock *IngressControllerMock) GenericCalls() []struct {
 } {
 	var calls []struct {
@@ -585,7 +594,8 @@ func (mock *IngressControllerMock) Informer() cache.SharedIndexInformer {
 
 // InformerCalls gets all the calls that were made to Informer.
 // Check the length with:
-//     len(mockedIngressController.InformerCalls())
+//
+//	len(mockedIngressController.InformerCalls())
 func (mock *IngressControllerMock) InformerCalls() []struct {
 } {
 	var calls []struct {
@@ -611,7 +621,8 @@ func (mock *IngressControllerMock) Lister() v1beta11.IngressLister {
 
 // ListerCalls gets all the calls that were made to Lister.
 // Check the length with:
-//     len(mockedIngressController.ListerCalls())
+//
+//	len(mockedIngressController.ListerCalls())
 func (mock *IngressControllerMock) ListerCalls() []struct {
 } {
 	var calls []struct {
@@ -651,76 +662,76 @@ var _ v1beta11.IngressInterface = &IngressInterfaceMock{}
 
 // IngressInterfaceMock is a mock implementation of v1beta11.IngressInterface.
 //
-//     func TestSomethingThatUsesIngressInterface(t *testing.T) {
+//	    func TestSomethingThatUsesIngressInterface(t *testing.T) {
 //
-//         // make and configure a mocked v1beta11.IngressInterface
-//         mockedIngressInterface := &IngressInterfaceMock{
-//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v1beta11.IngressHandlerFunc)  {
-// 	               panic("mock out the AddClusterScopedFeatureHandler method")
-//             },
-//             AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v1beta11.IngressLifecycle)  {
-// 	               panic("mock out the AddClusterScopedFeatureLifecycle method")
-//             },
-//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v1beta11.IngressHandlerFunc)  {
-// 	               panic("mock out the AddClusterScopedHandler method")
-//             },
-//             AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v1beta11.IngressLifecycle)  {
-// 	               panic("mock out the AddClusterScopedLifecycle method")
-//             },
-//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v1beta11.IngressHandlerFunc)  {
-// 	               panic("mock out the AddFeatureHandler method")
-//             },
-//             AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v1beta11.IngressLifecycle)  {
-// 	               panic("mock out the AddFeatureLifecycle method")
-//             },
-//             AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v1beta11.IngressHandlerFunc)  {
-// 	               panic("mock out the AddHandler method")
-//             },
-//             AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v1beta11.IngressLifecycle)  {
-// 	               panic("mock out the AddLifecycle method")
-//             },
-//             ControllerFunc: func() v1beta11.IngressController {
-// 	               panic("mock out the Controller method")
-//             },
-//             CreateFunc: func(in1 *v1beta1.Ingress) (*v1beta1.Ingress, error) {
-// 	               panic("mock out the Create method")
-//             },
-//             DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
-// 	               panic("mock out the Delete method")
-//             },
-//             DeleteCollectionFunc: func(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
-// 	               panic("mock out the DeleteCollection method")
-//             },
-//             DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
-// 	               panic("mock out the DeleteNamespaced method")
-//             },
-//             GetFunc: func(name string, opts metav1.GetOptions) (*v1beta1.Ingress, error) {
-// 	               panic("mock out the Get method")
-//             },
-//             GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v1beta1.Ingress, error) {
-// 	               panic("mock out the GetNamespaced method")
-//             },
-//             ListFunc: func(opts metav1.ListOptions) (*v1beta1.IngressList, error) {
-// 	               panic("mock out the List method")
-//             },
-//             ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v1beta1.IngressList, error) {
-// 	               panic("mock out the ListNamespaced method")
-//             },
-//             ObjectClientFunc: func() *objectclient.ObjectClient {
-// 	               panic("mock out the ObjectClient method")
-//             },
-//             UpdateFunc: func(in1 *v1beta1.Ingress) (*v1beta1.Ingress, error) {
-// 	               panic("mock out the Update method")
-//             },
-//             WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
-// 	               panic("mock out the Watch method")
-//             },
-//         }
+//	        // make and configure a mocked v1beta11.IngressInterface
+//	        mockedIngressInterface := &IngressInterfaceMock{
+//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v1beta11.IngressHandlerFunc)  {
+//		               panic("mock out the AddClusterScopedFeatureHandler method")
+//	            },
+//	            AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v1beta11.IngressLifecycle)  {
+//		               panic("mock out the AddClusterScopedFeatureLifecycle method")
+//	            },
+//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v1beta11.IngressHandlerFunc)  {
+//		               panic("mock out the AddClusterScopedHandler method")
+//	            },
+//	            AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v1beta11.IngressLifecycle)  {
+//		               panic("mock out the AddClusterScopedLifecycle method")
+//	            },
+//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v1beta11.IngressHandlerFunc)  {
+//		               panic("mock out the AddFeatureHandler method")
+//	            },
+//	            AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v1beta11.IngressLifecycle)  {
+//		               panic("mock out the AddFeatureLifecycle method")
+//	            },
+//	            AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v1beta11.IngressHandlerFunc)  {
+//		               panic("mock out the AddHandler method")
+//	            },
+//	            AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v1beta11.IngressLifecycle)  {
+//		               panic("mock out the AddLifecycle method")
+//	            },
+//	            ControllerFunc: func() v1beta11.IngressController {
+//		               panic("mock out the Controller method")
+//	            },
+//	            CreateFunc: func(in1 *v1beta1.Ingress) (*v1beta1.Ingress, error) {
+//		               panic("mock out the Create method")
+//	            },
+//	            DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
+//		               panic("mock out the Delete method")
+//	            },
+//	            DeleteCollectionFunc: func(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
+//		               panic("mock out the DeleteCollection method")
+//	            },
+//	            DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
+//		               panic("mock out the DeleteNamespaced method")
+//	            },
+//	            GetFunc: func(name string, opts metav1.GetOptions) (*v1beta1.Ingress, error) {
+//		               panic("mock out the Get method")
+//	            },
+//	            GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v1beta1.Ingress, error) {
+//		               panic("mock out the GetNamespaced method")
+//	            },
+//	            ListFunc: func(opts metav1.ListOptions) (*v1beta1.IngressList, error) {
+//		               panic("mock out the List method")
+//	            },
+//	            ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v1beta1.IngressList, error) {
+//		               panic("mock out the ListNamespaced method")
+//	            },
+//	            ObjectClientFunc: func() *objectclient.ObjectClient {
+//		               panic("mock out the ObjectClient method")
+//	            },
+//	            UpdateFunc: func(in1 *v1beta1.Ingress) (*v1beta1.Ingress, error) {
+//		               panic("mock out the Update method")
+//	            },
+//	            WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
+//		               panic("mock out the Watch method")
+//	            },
+//	        }
 //
-//         // use mockedIngressInterface in code that requires v1beta11.IngressInterface
-//         // and then make assertions.
+//	        // use mockedIngressInterface in code that requires v1beta11.IngressInterface
+//	        // and then make assertions.
 //
-//     }
+//	    }
 type IngressInterfaceMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
 	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v1beta11.IngressHandlerFunc)
@@ -973,7 +984,8 @@ func (mock *IngressInterfaceMock) AddClusterScopedFeatureHandler(ctx context.Con
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//     len(mockedIngressInterface.AddClusterScopedFeatureHandlerCalls())
+//
+//	len(mockedIngressInterface.AddClusterScopedFeatureHandlerCalls())
 func (mock *IngressInterfaceMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -1020,7 +1032,8 @@ func (mock *IngressInterfaceMock) AddClusterScopedFeatureLifecycle(ctx context.C
 
 // AddClusterScopedFeatureLifecycleCalls gets all the calls that were made to AddClusterScopedFeatureLifecycle.
 // Check the length with:
-//     len(mockedIngressInterface.AddClusterScopedFeatureLifecycleCalls())
+//
+//	len(mockedIngressInterface.AddClusterScopedFeatureLifecycleCalls())
 func (mock *IngressInterfaceMock) AddClusterScopedFeatureLifecycleCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -1065,7 +1078,8 @@ func (mock *IngressInterfaceMock) AddClusterScopedHandler(ctx context.Context, n
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//     len(mockedIngressInterface.AddClusterScopedHandlerCalls())
+//
+//	len(mockedIngressInterface.AddClusterScopedHandlerCalls())
 func (mock *IngressInterfaceMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -1108,7 +1122,8 @@ func (mock *IngressInterfaceMock) AddClusterScopedLifecycle(ctx context.Context,
 
 // AddClusterScopedLifecycleCalls gets all the calls that were made to AddClusterScopedLifecycle.
 // Check the length with:
-//     len(mockedIngressInterface.AddClusterScopedLifecycleCalls())
+//
+//	len(mockedIngressInterface.AddClusterScopedLifecycleCalls())
 func (mock *IngressInterfaceMock) AddClusterScopedLifecycleCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -1151,7 +1166,8 @@ func (mock *IngressInterfaceMock) AddFeatureHandler(ctx context.Context, enabled
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//     len(mockedIngressInterface.AddFeatureHandlerCalls())
+//
+//	len(mockedIngressInterface.AddFeatureHandlerCalls())
 func (mock *IngressInterfaceMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
@@ -1194,7 +1210,8 @@ func (mock *IngressInterfaceMock) AddFeatureLifecycle(ctx context.Context, enabl
 
 // AddFeatureLifecycleCalls gets all the calls that were made to AddFeatureLifecycle.
 // Check the length with:
-//     len(mockedIngressInterface.AddFeatureLifecycleCalls())
+//
+//	len(mockedIngressInterface.AddFeatureLifecycleCalls())
 func (mock *IngressInterfaceMock) AddFeatureLifecycleCalls() []struct {
 	Ctx       context.Context
 	Enabled   func() bool
@@ -1235,7 +1252,8 @@ func (mock *IngressInterfaceMock) AddHandler(ctx context.Context, name string, s
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//     len(mockedIngressInterface.AddHandlerCalls())
+//
+//	len(mockedIngressInterface.AddHandlerCalls())
 func (mock *IngressInterfaceMock) AddHandlerCalls() []struct {
 	Ctx  context.Context
 	Name string
@@ -1274,7 +1292,8 @@ func (mock *IngressInterfaceMock) AddLifecycle(ctx context.Context, name string,
 
 // AddLifecycleCalls gets all the calls that were made to AddLifecycle.
 // Check the length with:
-//     len(mockedIngressInterface.AddLifecycleCalls())
+//
+//	len(mockedIngressInterface.AddLifecycleCalls())
 func (mock *IngressInterfaceMock) AddLifecycleCalls() []struct {
 	Ctx       context.Context
 	Name      string
@@ -1306,7 +1325,8 @@ func (mock *IngressInterfaceMock) Controller() v1beta11.IngressController {
 
 // ControllerCalls gets all the calls that were made to Controller.
 // Check the length with:
-//     len(mockedIngressInterface.ControllerCalls())
+//
+//	len(mockedIngressInterface.ControllerCalls())
 func (mock *IngressInterfaceMock) ControllerCalls() []struct {
 } {
 	var calls []struct {
@@ -1335,7 +1355,8 @@ func (mock *IngressInterfaceMock) Create(in1 *v1beta1.Ingress) (*v1beta1.Ingress
 
 // CreateCalls gets all the calls that were made to Create.
 // Check the length with:
-//     len(mockedIngressInterface.CreateCalls())
+//
+//	len(mockedIngressInterface.CreateCalls())
 func (mock *IngressInterfaceMock) CreateCalls() []struct {
 	In1 *v1beta1.Ingress
 } {
@@ -1368,7 +1389,8 @@ func (mock *IngressInterfaceMock) Delete(name string, options *metav1.DeleteOpti
 
 // DeleteCalls gets all the calls that were made to Delete.
 // Check the length with:
-//     len(mockedIngressInterface.DeleteCalls())
+//
+//	len(mockedIngressInterface.DeleteCalls())
 func (mock *IngressInterfaceMock) DeleteCalls() []struct {
 	Name    string
 	Options *metav1.DeleteOptions
@@ -1403,7 +1425,8 @@ func (mock *IngressInterfaceMock) DeleteCollection(deleteOpts *metav1.DeleteOpti
 
 // DeleteCollectionCalls gets all the calls that were made to DeleteCollection.
 // Check the length with:
-//     len(mockedIngressInterface.DeleteCollectionCalls())
+//
+//	len(mockedIngressInterface.DeleteCollectionCalls())
 func (mock *IngressInterfaceMock) DeleteCollectionCalls() []struct {
 	DeleteOpts *metav1.DeleteOptions
 	ListOpts   metav1.ListOptions
@@ -1440,7 +1463,8 @@ func (mock *IngressInterfaceMock) DeleteNamespaced(namespace string, name string
 
 // DeleteNamespacedCalls gets all the calls that were made to DeleteNamespaced.
 // Check the length with:
-//     len(mockedIngressInterface.DeleteNamespacedCalls())
+//
+//	len(mockedIngressInterface.DeleteNamespacedCalls())
 func (mock *IngressInterfaceMock) DeleteNamespacedCalls() []struct {
 	Namespace string
 	Name      string
@@ -1477,7 +1501,8 @@ func (mock *IngressInterfaceMock) Get(name string, opts metav1.GetOptions) (*v1b
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//     len(mockedIngressInterface.GetCalls())
+//
+//	len(mockedIngressInterface.GetCalls())
 func (mock *IngressInterfaceMock) GetCalls() []struct {
 	Name string
 	Opts metav1.GetOptions
@@ -1514,7 +1539,8 @@ func (mock *IngressInterfaceMock) GetNamespaced(namespace string, name string, o
 
 // GetNamespacedCalls gets all the calls that were made to GetNamespaced.
 // Check the length with:
-//     len(mockedIngressInterface.GetNamespacedCalls())
+//
+//	len(mockedIngressInterface.GetNamespacedCalls())
 func (mock *IngressInterfaceMock) GetNamespacedCalls() []struct {
 	Namespace string
 	Name      string
@@ -1549,7 +1575,8 @@ func (mock *IngressInterfaceMock) List(opts metav1.ListOptions) (*v1beta1.Ingres
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//     len(mockedIngressInterface.ListCalls())
+//
+//	len(mockedIngressInterface.ListCalls())
 func (mock *IngressInterfaceMock) ListCalls() []struct {
 	Opts metav1.ListOptions
 } {
@@ -1582,7 +1609,8 @@ func (mock *IngressInterfaceMock) ListNamespaced(namespace string, opts metav1.L
 
 // ListNamespacedCalls gets all the calls that were made to ListNamespaced.
 // Check the length with:
-//     len(mockedIngressInterface.ListNamespacedCalls())
+//
+//	len(mockedIngressInterface.ListNamespacedCalls())
 func (mock *IngressInterfaceMock) ListNamespacedCalls() []struct {
 	Namespace string
 	Opts      metav1.ListOptions
@@ -1612,7 +1640,8 @@ func (mock *IngressInterfaceMock) ObjectClient() *objectclient.ObjectClient {
 
 // ObjectClientCalls gets all the calls that were made to ObjectClient.
 // Check the length with:
-//     len(mockedIngressInterface.ObjectClientCalls())
+//
+//	len(mockedIngressInterface.ObjectClientCalls())
 func (mock *IngressInterfaceMock) ObjectClientCalls() []struct {
 } {
 	var calls []struct {
@@ -1641,7 +1670,8 @@ func (mock *IngressInterfaceMock) Update(in1 *v1beta1.Ingress) (*v1beta1.Ingress
 
 // UpdateCalls gets all the calls that were made to Update.
 // Check the length with:
-//     len(mockedIngressInterface.UpdateCalls())
+//
+//	len(mockedIngressInterface.UpdateCalls())
 func (mock *IngressInterfaceMock) UpdateCalls() []struct {
 	In1 *v1beta1.Ingress
 } {
@@ -1672,7 +1702,8 @@ func (mock *IngressInterfaceMock) Watch(opts metav1.ListOptions) (watch.Interfac
 
 // WatchCalls gets all the calls that were made to Watch.
 // Check the length with:
-//     len(mockedIngressInterface.WatchCalls())
+//
+//	len(mockedIngressInterface.WatchCalls())
 func (mock *IngressInterfaceMock) WatchCalls() []struct {
 	Opts metav1.ListOptions
 } {
@@ -1695,19 +1726,19 @@ var _ v1beta11.IngressesGetter = &IngressesGetterMock{}
 
 // IngressesGetterMock is a mock implementation of v1beta11.IngressesGetter.
 //
-//     func TestSomethingThatUsesIngressesGetter(t *testing.T) {
+//	    func TestSomethingThatUsesIngressesGetter(t *testing.T) {
 //
-//         // make and configure a mocked v1beta11.IngressesGetter
-//         mockedIngressesGetter := &IngressesGetterMock{
-//             IngressesFunc: func(namespace string) v1beta11.IngressInterface {
-// 	               panic("mock out the Ingresses method")
-//             },
-//         }
+//	        // make and configure a mocked v1beta11.IngressesGetter
+//	        mockedIngressesGetter := &IngressesGetterMock{
+//	            IngressesFunc: func(namespace string) v1beta11.IngressInterface {
+//		               panic("mock out the Ingresses method")
+//	            },
+//	        }
 //
-//         // use mockedIngressesGetter in code that requires v1beta11.IngressesGetter
-//         // and then make assertions.
+//	        // use mockedIngressesGetter in code that requires v1beta11.IngressesGetter
+//	        // and then make assertions.
 //
-//     }
+//	    }
 type IngressesGetterMock struct {
 	// IngressesFunc mocks the Ingresses method.
 	IngressesFunc func(namespace string) v1beta11.IngressInterface
@@ -1740,7 +1771,8 @@ func (mock *IngressesGetterMock) Ingresses(namespace string) v1beta11.IngressInt
 
 // IngressesCalls gets all the calls that were made to Ingresses.
 // Check the length with:
-//     len(mockedIngressesGetter.IngressesCalls())
+//
+//	len(mockedIngressesGetter.IngressesCalls())
 func (mock *IngressesGetterMock) IngressesCalls() []struct {
 	Namespace string
 } {

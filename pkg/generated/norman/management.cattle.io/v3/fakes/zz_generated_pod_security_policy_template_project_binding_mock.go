@@ -29,22 +29,22 @@ var _ v31.PodSecurityPolicyTemplateProjectBindingLister = &PodSecurityPolicyTemp
 
 // PodSecurityPolicyTemplateProjectBindingListerMock is a mock implementation of v31.PodSecurityPolicyTemplateProjectBindingLister.
 //
-//     func TestSomethingThatUsesPodSecurityPolicyTemplateProjectBindingLister(t *testing.T) {
+//	    func TestSomethingThatUsesPodSecurityPolicyTemplateProjectBindingLister(t *testing.T) {
 //
-//         // make and configure a mocked v31.PodSecurityPolicyTemplateProjectBindingLister
-//         mockedPodSecurityPolicyTemplateProjectBindingLister := &PodSecurityPolicyTemplateProjectBindingListerMock{
-//             GetFunc: func(namespace string, name string) (*v3.PodSecurityPolicyTemplateProjectBinding, error) {
-// 	               panic("mock out the Get method")
-//             },
-//             ListFunc: func(namespace string, selector labels.Selector) ([]*v3.PodSecurityPolicyTemplateProjectBinding, error) {
-// 	               panic("mock out the List method")
-//             },
-//         }
+//	        // make and configure a mocked v31.PodSecurityPolicyTemplateProjectBindingLister
+//	        mockedPodSecurityPolicyTemplateProjectBindingLister := &PodSecurityPolicyTemplateProjectBindingListerMock{
+//	            GetFunc: func(namespace string, name string) (*v3.PodSecurityPolicyTemplateProjectBinding, error) {
+//		               panic("mock out the Get method")
+//	            },
+//	            ListFunc: func(namespace string, selector labels.Selector) ([]*v3.PodSecurityPolicyTemplateProjectBinding, error) {
+//		               panic("mock out the List method")
+//	            },
+//	        }
 //
-//         // use mockedPodSecurityPolicyTemplateProjectBindingLister in code that requires v31.PodSecurityPolicyTemplateProjectBindingLister
-//         // and then make assertions.
+//	        // use mockedPodSecurityPolicyTemplateProjectBindingLister in code that requires v31.PodSecurityPolicyTemplateProjectBindingLister
+//	        // and then make assertions.
 //
-//     }
+//	    }
 type PodSecurityPolicyTemplateProjectBindingListerMock struct {
 	// GetFunc mocks the Get method.
 	GetFunc func(namespace string, name string) (*v3.PodSecurityPolicyTemplateProjectBinding, error)
@@ -91,7 +91,8 @@ func (mock *PodSecurityPolicyTemplateProjectBindingListerMock) Get(namespace str
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//     len(mockedPodSecurityPolicyTemplateProjectBindingLister.GetCalls())
+//
+//	len(mockedPodSecurityPolicyTemplateProjectBindingLister.GetCalls())
 func (mock *PodSecurityPolicyTemplateProjectBindingListerMock) GetCalls() []struct {
 	Namespace string
 	Name      string
@@ -126,7 +127,8 @@ func (mock *PodSecurityPolicyTemplateProjectBindingListerMock) List(namespace st
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//     len(mockedPodSecurityPolicyTemplateProjectBindingLister.ListCalls())
+//
+//	len(mockedPodSecurityPolicyTemplateProjectBindingLister.ListCalls())
 func (mock *PodSecurityPolicyTemplateProjectBindingListerMock) ListCalls() []struct {
 	Namespace string
 	Selector  labels.Selector
@@ -159,43 +161,43 @@ var _ v31.PodSecurityPolicyTemplateProjectBindingController = &PodSecurityPolicy
 
 // PodSecurityPolicyTemplateProjectBindingControllerMock is a mock implementation of v31.PodSecurityPolicyTemplateProjectBindingController.
 //
-//     func TestSomethingThatUsesPodSecurityPolicyTemplateProjectBindingController(t *testing.T) {
+//	    func TestSomethingThatUsesPodSecurityPolicyTemplateProjectBindingController(t *testing.T) {
 //
-//         // make and configure a mocked v31.PodSecurityPolicyTemplateProjectBindingController
-//         mockedPodSecurityPolicyTemplateProjectBindingController := &PodSecurityPolicyTemplateProjectBindingControllerMock{
-//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v31.PodSecurityPolicyTemplateProjectBindingHandlerFunc)  {
-// 	               panic("mock out the AddClusterScopedFeatureHandler method")
-//             },
-//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v31.PodSecurityPolicyTemplateProjectBindingHandlerFunc)  {
-// 	               panic("mock out the AddClusterScopedHandler method")
-//             },
-//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.PodSecurityPolicyTemplateProjectBindingHandlerFunc)  {
-// 	               panic("mock out the AddFeatureHandler method")
-//             },
-//             AddHandlerFunc: func(ctx context.Context, name string, handler v31.PodSecurityPolicyTemplateProjectBindingHandlerFunc)  {
-// 	               panic("mock out the AddHandler method")
-//             },
-//             EnqueueFunc: func(namespace string, name string)  {
-// 	               panic("mock out the Enqueue method")
-//             },
-//             EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
-// 	               panic("mock out the EnqueueAfter method")
-//             },
-//             GenericFunc: func() controller.GenericController {
-// 	               panic("mock out the Generic method")
-//             },
-//             InformerFunc: func() cache.SharedIndexInformer {
-// 	               panic("mock out the Informer method")
-//             },
-//             ListerFunc: func() v31.PodSecurityPolicyTemplateProjectBindingLister {
-// 	               panic("mock out the Lister method")
-//             },
-//         }
+//	        // make and configure a mocked v31.PodSecurityPolicyTemplateProjectBindingController
+//	        mockedPodSecurityPolicyTemplateProjectBindingController := &PodSecurityPolicyTemplateProjectBindingControllerMock{
+//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v31.PodSecurityPolicyTemplateProjectBindingHandlerFunc)  {
+//		               panic("mock out the AddClusterScopedFeatureHandler method")
+//	            },
+//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v31.PodSecurityPolicyTemplateProjectBindingHandlerFunc)  {
+//		               panic("mock out the AddClusterScopedHandler method")
+//	            },
+//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.PodSecurityPolicyTemplateProjectBindingHandlerFunc)  {
+//		               panic("mock out the AddFeatureHandler method")
+//	            },
+//	            AddHandlerFunc: func(ctx context.Context, name string, handler v31.PodSecurityPolicyTemplateProjectBindingHandlerFunc)  {
+//		               panic("mock out the AddHandler method")
+//	            },
+//	            EnqueueFunc: func(namespace string, name string)  {
+//		               panic("mock out the Enqueue method")
+//	            },
+//	            EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
+//		               panic("mock out the EnqueueAfter method")
+//	            },
+//	            GenericFunc: func() controller.GenericController {
+//		               panic("mock out the Generic method")
+//	            },
+//	            InformerFunc: func() cache.SharedIndexInformer {
+//		               panic("mock out the Informer method")
+//	            },
+//	            ListerFunc: func() v31.PodSecurityPolicyTemplateProjectBindingLister {
+//		               panic("mock out the Lister method")
+//	            },
+//	        }
 //
-//         // use mockedPodSecurityPolicyTemplateProjectBindingController in code that requires v31.PodSecurityPolicyTemplateProjectBindingController
-//         // and then make assertions.
+//	        // use mockedPodSecurityPolicyTemplateProjectBindingController in code that requires v31.PodSecurityPolicyTemplateProjectBindingController
+//	        // and then make assertions.
 //
-//     }
+//	    }
 type PodSecurityPolicyTemplateProjectBindingControllerMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
 	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v31.PodSecurityPolicyTemplateProjectBindingHandlerFunc)
@@ -324,7 +326,8 @@ func (mock *PodSecurityPolicyTemplateProjectBindingControllerMock) AddClusterSco
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//     len(mockedPodSecurityPolicyTemplateProjectBindingController.AddClusterScopedFeatureHandlerCalls())
+//
+//	len(mockedPodSecurityPolicyTemplateProjectBindingController.AddClusterScopedFeatureHandlerCalls())
 func (mock *PodSecurityPolicyTemplateProjectBindingControllerMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -369,7 +372,8 @@ func (mock *PodSecurityPolicyTemplateProjectBindingControllerMock) AddClusterSco
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//     len(mockedPodSecurityPolicyTemplateProjectBindingController.AddClusterScopedHandlerCalls())
+//
+//	len(mockedPodSecurityPolicyTemplateProjectBindingController.AddClusterScopedHandlerCalls())
 func (mock *PodSecurityPolicyTemplateProjectBindingControllerMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -412,7 +416,8 @@ func (mock *PodSecurityPolicyTemplateProjectBindingControllerMock) AddFeatureHan
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//     len(mockedPodSecurityPolicyTemplateProjectBindingController.AddFeatureHandlerCalls())
+//
+//	len(mockedPodSecurityPolicyTemplateProjectBindingController.AddFeatureHandlerCalls())
 func (mock *PodSecurityPolicyTemplateProjectBindingControllerMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
@@ -453,7 +458,8 @@ func (mock *PodSecurityPolicyTemplateProjectBindingControllerMock) AddHandler(ct
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//     len(mockedPodSecurityPolicyTemplateProjectBindingController.AddHandlerCalls())
+//
+//	len(mockedPodSecurityPolicyTemplateProjectBindingController.AddHandlerCalls())
 func (mock *PodSecurityPolicyTemplateProjectBindingControllerMock) AddHandlerCalls() []struct {
 	Ctx     context.Context
 	Name    string
@@ -490,7 +496,8 @@ func (mock *PodSecurityPolicyTemplateProjectBindingControllerMock) Enqueue(names
 
 // EnqueueCalls gets all the calls that were made to Enqueue.
 // Check the length with:
-//     len(mockedPodSecurityPolicyTemplateProjectBindingController.EnqueueCalls())
+//
+//	len(mockedPodSecurityPolicyTemplateProjectBindingController.EnqueueCalls())
 func (mock *PodSecurityPolicyTemplateProjectBindingControllerMock) EnqueueCalls() []struct {
 	Namespace string
 	Name      string
@@ -527,7 +534,8 @@ func (mock *PodSecurityPolicyTemplateProjectBindingControllerMock) EnqueueAfter(
 
 // EnqueueAfterCalls gets all the calls that were made to EnqueueAfter.
 // Check the length with:
-//     len(mockedPodSecurityPolicyTemplateProjectBindingController.EnqueueAfterCalls())
+//
+//	len(mockedPodSecurityPolicyTemplateProjectBindingController.EnqueueAfterCalls())
 func (mock *PodSecurityPolicyTemplateProjectBindingControllerMock) EnqueueAfterCalls() []struct {
 	Namespace string
 	Name      string
@@ -559,7 +567,8 @@ func (mock *PodSecurityPolicyTemplateProjectBindingControllerMock) Generic() con
 
 // GenericCalls gets all the calls that were made to Generic.
 // Check the length with:
-//     len(mockedPodSecurityPolicyTemplateProjectBindingController.GenericCalls())
+//
+//	len(mockedPodSecurityPolicyTemplateProjectBindingController.GenericCalls())
 func (mock *PodSecurityPolicyTemplateProjectBindingControllerMock) GenericCalls() []struct {
 } {
 	var calls []struct {
@@ -585,7 +594,8 @@ func (mock *PodSecurityPolicyTemplateProjectBindingControllerMock) Informer() ca
 
 // InformerCalls gets all the calls that were made to Informer.
 // Check the length with:
-//     len(mockedPodSecurityPolicyTemplateProjectBindingController.InformerCalls())
+//
+//	len(mockedPodSecurityPolicyTemplateProjectBindingController.InformerCalls())
 func (mock *PodSecurityPolicyTemplateProjectBindingControllerMock) InformerCalls() []struct {
 } {
 	var calls []struct {
@@ -611,7 +621,8 @@ func (mock *PodSecurityPolicyTemplateProjectBindingControllerMock) Lister() v31.
 
 // ListerCalls gets all the calls that were made to Lister.
 // Check the length with:
-//     len(mockedPodSecurityPolicyTemplateProjectBindingController.ListerCalls())
+//
+//	len(mockedPodSecurityPolicyTemplateProjectBindingController.ListerCalls())
 func (mock *PodSecurityPolicyTemplateProjectBindingControllerMock) ListerCalls() []struct {
 } {
 	var calls []struct {
@@ -651,76 +662,76 @@ var _ v31.PodSecurityPolicyTemplateProjectBindingInterface = &PodSecurityPolicyT
 
 // PodSecurityPolicyTemplateProjectBindingInterfaceMock is a mock implementation of v31.PodSecurityPolicyTemplateProjectBindingInterface.
 //
-//     func TestSomethingThatUsesPodSecurityPolicyTemplateProjectBindingInterface(t *testing.T) {
+//	    func TestSomethingThatUsesPodSecurityPolicyTemplateProjectBindingInterface(t *testing.T) {
 //
-//         // make and configure a mocked v31.PodSecurityPolicyTemplateProjectBindingInterface
-//         mockedPodSecurityPolicyTemplateProjectBindingInterface := &PodSecurityPolicyTemplateProjectBindingInterfaceMock{
-//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v31.PodSecurityPolicyTemplateProjectBindingHandlerFunc)  {
-// 	               panic("mock out the AddClusterScopedFeatureHandler method")
-//             },
-//             AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v31.PodSecurityPolicyTemplateProjectBindingLifecycle)  {
-// 	               panic("mock out the AddClusterScopedFeatureLifecycle method")
-//             },
-//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v31.PodSecurityPolicyTemplateProjectBindingHandlerFunc)  {
-// 	               panic("mock out the AddClusterScopedHandler method")
-//             },
-//             AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v31.PodSecurityPolicyTemplateProjectBindingLifecycle)  {
-// 	               panic("mock out the AddClusterScopedLifecycle method")
-//             },
-//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.PodSecurityPolicyTemplateProjectBindingHandlerFunc)  {
-// 	               panic("mock out the AddFeatureHandler method")
-//             },
-//             AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v31.PodSecurityPolicyTemplateProjectBindingLifecycle)  {
-// 	               panic("mock out the AddFeatureLifecycle method")
-//             },
-//             AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v31.PodSecurityPolicyTemplateProjectBindingHandlerFunc)  {
-// 	               panic("mock out the AddHandler method")
-//             },
-//             AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v31.PodSecurityPolicyTemplateProjectBindingLifecycle)  {
-// 	               panic("mock out the AddLifecycle method")
-//             },
-//             ControllerFunc: func() v31.PodSecurityPolicyTemplateProjectBindingController {
-// 	               panic("mock out the Controller method")
-//             },
-//             CreateFunc: func(in1 *v3.PodSecurityPolicyTemplateProjectBinding) (*v3.PodSecurityPolicyTemplateProjectBinding, error) {
-// 	               panic("mock out the Create method")
-//             },
-//             DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
-// 	               panic("mock out the Delete method")
-//             },
-//             DeleteCollectionFunc: func(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
-// 	               panic("mock out the DeleteCollection method")
-//             },
-//             DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
-// 	               panic("mock out the DeleteNamespaced method")
-//             },
-//             GetFunc: func(name string, opts metav1.GetOptions) (*v3.PodSecurityPolicyTemplateProjectBinding, error) {
-// 	               panic("mock out the Get method")
-//             },
-//             GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v3.PodSecurityPolicyTemplateProjectBinding, error) {
-// 	               panic("mock out the GetNamespaced method")
-//             },
-//             ListFunc: func(opts metav1.ListOptions) (*v3.PodSecurityPolicyTemplateProjectBindingList, error) {
-// 	               panic("mock out the List method")
-//             },
-//             ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v3.PodSecurityPolicyTemplateProjectBindingList, error) {
-// 	               panic("mock out the ListNamespaced method")
-//             },
-//             ObjectClientFunc: func() *objectclient.ObjectClient {
-// 	               panic("mock out the ObjectClient method")
-//             },
-//             UpdateFunc: func(in1 *v3.PodSecurityPolicyTemplateProjectBinding) (*v3.PodSecurityPolicyTemplateProjectBinding, error) {
-// 	               panic("mock out the Update method")
-//             },
-//             WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
-// 	               panic("mock out the Watch method")
-//             },
-//         }
+//	        // make and configure a mocked v31.PodSecurityPolicyTemplateProjectBindingInterface
+//	        mockedPodSecurityPolicyTemplateProjectBindingInterface := &PodSecurityPolicyTemplateProjectBindingInterfaceMock{
+//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v31.PodSecurityPolicyTemplateProjectBindingHandlerFunc)  {
+//		               panic("mock out the AddClusterScopedFeatureHandler method")
+//	            },
+//	            AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v31.PodSecurityPolicyTemplateProjectBindingLifecycle)  {
+//		               panic("mock out the AddClusterScopedFeatureLifecycle method")
+//	            },
+//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v31.PodSecurityPolicyTemplateProjectBindingHandlerFunc)  {
+//		               panic("mock out the AddClusterScopedHandler method")
+//	            },
+//	            AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v31.PodSecurityPolicyTemplateProjectBindingLifecycle)  {
+//		               panic("mock out the AddClusterScopedLifecycle method")
+//	            },
+//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.PodSecurityPolicyTemplateProjectBindingHandlerFunc)  {
+//		               panic("mock out the AddFeatureHandler method")
+//	            },
+//	            AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v31.PodSecurityPolicyTemplateProjectBindingLifecycle)  {
+//		               panic("mock out the AddFeatureLifecycle method")
+//	            },
+//	            AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v31.PodSecurityPolicyTemplateProjectBindingHandlerFunc)  {
+//		               panic("mock out the AddHandler method")
+//	            },
+//	            AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v31.PodSecurityPolicyTemplateProjectBindingLifecycle)  {
+//		               panic("mock out the AddLifecycle method")
+//	            },
+//	            ControllerFunc: func() v31.PodSecurityPolicyTemplateProjectBindingController {
+//		               panic("mock out the Controller method")
+//	            },
+//	            CreateFunc: func(in1 *v3.PodSecurityPolicyTemplateProjectBinding) (*v3.PodSecurityPolicyTemplateProjectBinding, error) {
+//		               panic("mock out the Create method")
+//	            },
+//	            DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
+//		               panic("mock out the Delete method")
+//	            },
+//	            DeleteCollectionFunc: func(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
+//		               panic("mock out the DeleteCollection method")
+//	            },
+//	            DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
+//		               panic("mock out the DeleteNamespaced method")
+//	            },
+//	            GetFunc: func(name string, opts metav1.GetOptions) (*v3.PodSecurityPolicyTemplateProjectBinding, error) {
+//		               panic("mock out the Get method")
+//	            },
+//	            GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v3.PodSecurityPolicyTemplateProjectBinding, error) {
+//		               panic("mock out the GetNamespaced method")
+//	            },
+//	            ListFunc: func(opts metav1.ListOptions) (*v3.PodSecurityPolicyTemplateProjectBindingList, error) {
+//		               panic("mock out the List method")
+//	            },
+//	            ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v3.PodSecurityPolicyTemplateProjectBindingList, error) {
+//		               panic("mock out the ListNamespaced method")
+//	            },
+//	            ObjectClientFunc: func() *objectclient.ObjectClient {
+//		               panic("mock out the ObjectClient method")
+//	            },
+//	            UpdateFunc: func(in1 *v3.PodSecurityPolicyTemplateProjectBinding) (*v3.PodSecurityPolicyTemplateProjectBinding, error) {
+//		               panic("mock out the Update method")
+//	            },
+//	            WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
+//		               panic("mock out the Watch method")
+//	            },
+//	        }
 //
-//         // use mockedPodSecurityPolicyTemplateProjectBindingInterface in code that requires v31.PodSecurityPolicyTemplateProjectBindingInterface
-//         // and then make assertions.
+//	        // use mockedPodSecurityPolicyTemplateProjectBindingInterface in code that requires v31.PodSecurityPolicyTemplateProjectBindingInterface
+//	        // and then make assertions.
 //
-//     }
+//	    }
 type PodSecurityPolicyTemplateProjectBindingInterfaceMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
 	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v31.PodSecurityPolicyTemplateProjectBindingHandlerFunc)
@@ -973,7 +984,8 @@ func (mock *PodSecurityPolicyTemplateProjectBindingInterfaceMock) AddClusterScop
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//     len(mockedPodSecurityPolicyTemplateProjectBindingInterface.AddClusterScopedFeatureHandlerCalls())
+//
+//	len(mockedPodSecurityPolicyTemplateProjectBindingInterface.AddClusterScopedFeatureHandlerCalls())
 func (mock *PodSecurityPolicyTemplateProjectBindingInterfaceMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -1020,7 +1032,8 @@ func (mock *PodSecurityPolicyTemplateProjectBindingInterfaceMock) AddClusterScop
 
 // AddClusterScopedFeatureLifecycleCalls gets all the calls that were made to AddClusterScopedFeatureLifecycle.
 // Check the length with:
-//     len(mockedPodSecurityPolicyTemplateProjectBindingInterface.AddClusterScopedFeatureLifecycleCalls())
+//
+//	len(mockedPodSecurityPolicyTemplateProjectBindingInterface.AddClusterScopedFeatureLifecycleCalls())
 func (mock *PodSecurityPolicyTemplateProjectBindingInterfaceMock) AddClusterScopedFeatureLifecycleCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -1065,7 +1078,8 @@ func (mock *PodSecurityPolicyTemplateProjectBindingInterfaceMock) AddClusterScop
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//     len(mockedPodSecurityPolicyTemplateProjectBindingInterface.AddClusterScopedHandlerCalls())
+//
+//	len(mockedPodSecurityPolicyTemplateProjectBindingInterface.AddClusterScopedHandlerCalls())
 func (mock *PodSecurityPolicyTemplateProjectBindingInterfaceMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -1108,7 +1122,8 @@ func (mock *PodSecurityPolicyTemplateProjectBindingInterfaceMock) AddClusterScop
 
 // AddClusterScopedLifecycleCalls gets all the calls that were made to AddClusterScopedLifecycle.
 // Check the length with:
-//     len(mockedPodSecurityPolicyTemplateProjectBindingInterface.AddClusterScopedLifecycleCalls())
+//
+//	len(mockedPodSecurityPolicyTemplateProjectBindingInterface.AddClusterScopedLifecycleCalls())
 func (mock *PodSecurityPolicyTemplateProjectBindingInterfaceMock) AddClusterScopedLifecycleCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -1151,7 +1166,8 @@ func (mock *PodSecurityPolicyTemplateProjectBindingInterfaceMock) AddFeatureHand
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//     len(mockedPodSecurityPolicyTemplateProjectBindingInterface.AddFeatureHandlerCalls())
+//
+//	len(mockedPodSecurityPolicyTemplateProjectBindingInterface.AddFeatureHandlerCalls())
 func (mock *PodSecurityPolicyTemplateProjectBindingInterfaceMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
@@ -1194,7 +1210,8 @@ func (mock *PodSecurityPolicyTemplateProjectBindingInterfaceMock) AddFeatureLife
 
 // AddFeatureLifecycleCalls gets all the calls that were made to AddFeatureLifecycle.
 // Check the length with:
-//     len(mockedPodSecurityPolicyTemplateProjectBindingInterface.AddFeatureLifecycleCalls())
+//
+//	len(mockedPodSecurityPolicyTemplateProjectBindingInterface.AddFeatureLifecycleCalls())
 func (mock *PodSecurityPolicyTemplateProjectBindingInterfaceMock) AddFeatureLifecycleCalls() []struct {
 	Ctx       context.Context
 	Enabled   func() bool
@@ -1235,7 +1252,8 @@ func (mock *PodSecurityPolicyTemplateProjectBindingInterfaceMock) AddHandler(ctx
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//     len(mockedPodSecurityPolicyTemplateProjectBindingInterface.AddHandlerCalls())
+//
+//	len(mockedPodSecurityPolicyTemplateProjectBindingInterface.AddHandlerCalls())
 func (mock *PodSecurityPolicyTemplateProjectBindingInterfaceMock) AddHandlerCalls() []struct {
 	Ctx  context.Context
 	Name string
@@ -1274,7 +1292,8 @@ func (mock *PodSecurityPolicyTemplateProjectBindingInterfaceMock) AddLifecycle(c
 
 // AddLifecycleCalls gets all the calls that were made to AddLifecycle.
 // Check the length with:
-//     len(mockedPodSecurityPolicyTemplateProjectBindingInterface.AddLifecycleCalls())
+//
+//	len(mockedPodSecurityPolicyTemplateProjectBindingInterface.AddLifecycleCalls())
 func (mock *PodSecurityPolicyTemplateProjectBindingInterfaceMock) AddLifecycleCalls() []struct {
 	Ctx       context.Context
 	Name      string
@@ -1306,7 +1325,8 @@ func (mock *PodSecurityPolicyTemplateProjectBindingInterfaceMock) Controller() v
 
 // ControllerCalls gets all the calls that were made to Controller.
 // Check the length with:
-//     len(mockedPodSecurityPolicyTemplateProjectBindingInterface.ControllerCalls())
+//
+//	len(mockedPodSecurityPolicyTemplateProjectBindingInterface.ControllerCalls())
 func (mock *PodSecurityPolicyTemplateProjectBindingInterfaceMock) ControllerCalls() []struct {
 } {
 	var calls []struct {
@@ -1335,7 +1355,8 @@ func (mock *PodSecurityPolicyTemplateProjectBindingInterfaceMock) Create(in1 *v3
 
 // CreateCalls gets all the calls that were made to Create.
 // Check the length with:
-//     len(mockedPodSecurityPolicyTemplateProjectBindingInterface.CreateCalls())
+//
+//	len(mockedPodSecurityPolicyTemplateProjectBindingInterface.CreateCalls())
 func (mock *PodSecurityPolicyTemplateProjectBindingInterfaceMock) CreateCalls() []struct {
 	In1 *v3.PodSecurityPolicyTemplateProjectBinding
 } {
@@ -1368,7 +1389,8 @@ func (mock *PodSecurityPolicyTemplateProjectBindingInterfaceMock) Delete(name st
 
 // DeleteCalls gets all the calls that were made to Delete.
 // Check the length with:
-//     len(mockedPodSecurityPolicyTemplateProjectBindingInterface.DeleteCalls())
+//
+//	len(mockedPodSecurityPolicyTemplateProjectBindingInterface.DeleteCalls())
 func (mock *PodSecurityPolicyTemplateProjectBindingInterfaceMock) DeleteCalls() []struct {
 	Name    string
 	Options *metav1.DeleteOptions
@@ -1403,7 +1425,8 @@ func (mock *PodSecurityPolicyTemplateProjectBindingInterfaceMock) DeleteCollecti
 
 // DeleteCollectionCalls gets all the calls that were made to DeleteCollection.
 // Check the length with:
-//     len(mockedPodSecurityPolicyTemplateProjectBindingInterface.DeleteCollectionCalls())
+//
+//	len(mockedPodSecurityPolicyTemplateProjectBindingInterface.DeleteCollectionCalls())
 func (mock *PodSecurityPolicyTemplateProjectBindingInterfaceMock) DeleteCollectionCalls() []struct {
 	DeleteOpts *metav1.DeleteOptions
 	ListOpts   metav1.ListOptions
@@ -1440,7 +1463,8 @@ func (mock *PodSecurityPolicyTemplateProjectBindingInterfaceMock) DeleteNamespac
 
 // DeleteNamespacedCalls gets all the calls that were made to DeleteNamespaced.
 // Check the length with:
-//     len(mockedPodSecurityPolicyTemplateProjectBindingInterface.DeleteNamespacedCalls())
+//
+//	len(mockedPodSecurityPolicyTemplateProjectBindingInterface.DeleteNamespacedCalls())
 func (mock *PodSecurityPolicyTemplateProjectBindingInterfaceMock) DeleteNamespacedCalls() []struct {
 	Namespace string
 	Name      string
@@ -1477,7 +1501,8 @@ func (mock *PodSecurityPolicyTemplateProjectBindingInterfaceMock) Get(name strin
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//     len(mockedPodSecurityPolicyTemplateProjectBindingInterface.GetCalls())
+//
+//	len(mockedPodSecurityPolicyTemplateProjectBindingInterface.GetCalls())
 func (mock *PodSecurityPolicyTemplateProjectBindingInterfaceMock) GetCalls() []struct {
 	Name string
 	Opts metav1.GetOptions
@@ -1514,7 +1539,8 @@ func (mock *PodSecurityPolicyTemplateProjectBindingInterfaceMock) GetNamespaced(
 
 // GetNamespacedCalls gets all the calls that were made to GetNamespaced.
 // Check the length with:
-//     len(mockedPodSecurityPolicyTemplateProjectBindingInterface.GetNamespacedCalls())
+//
+//	len(mockedPodSecurityPolicyTemplateProjectBindingInterface.GetNamespacedCalls())
 func (mock *PodSecurityPolicyTemplateProjectBindingInterfaceMock) GetNamespacedCalls() []struct {
 	Namespace string
 	Name      string
@@ -1549,7 +1575,8 @@ func (mock *PodSecurityPolicyTemplateProjectBindingInterfaceMock) List(opts meta
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//     len(mockedPodSecurityPolicyTemplateProjectBindingInterface.ListCalls())
+//
+//	len(mockedPodSecurityPolicyTemplateProjectBindingInterface.ListCalls())
 func (mock *PodSecurityPolicyTemplateProjectBindingInterfaceMock) ListCalls() []struct {
 	Opts metav1.ListOptions
 } {
@@ -1582,7 +1609,8 @@ func (mock *PodSecurityPolicyTemplateProjectBindingInterfaceMock) ListNamespaced
 
 // ListNamespacedCalls gets all the calls that were made to ListNamespaced.
 // Check the length with:
-//     len(mockedPodSecurityPolicyTemplateProjectBindingInterface.ListNamespacedCalls())
+//
+//	len(mockedPodSecurityPolicyTemplateProjectBindingInterface.ListNamespacedCalls())
 func (mock *PodSecurityPolicyTemplateProjectBindingInterfaceMock) ListNamespacedCalls() []struct {
 	Namespace string
 	Opts      metav1.ListOptions
@@ -1612,7 +1640,8 @@ func (mock *PodSecurityPolicyTemplateProjectBindingInterfaceMock) ObjectClient()
 
 // ObjectClientCalls gets all the calls that were made to ObjectClient.
 // Check the length with:
-//     len(mockedPodSecurityPolicyTemplateProjectBindingInterface.ObjectClientCalls())
+//
+//	len(mockedPodSecurityPolicyTemplateProjectBindingInterface.ObjectClientCalls())
 func (mock *PodSecurityPolicyTemplateProjectBindingInterfaceMock) ObjectClientCalls() []struct {
 } {
 	var calls []struct {
@@ -1641,7 +1670,8 @@ func (mock *PodSecurityPolicyTemplateProjectBindingInterfaceMock) Update(in1 *v3
 
 // UpdateCalls gets all the calls that were made to Update.
 // Check the length with:
-//     len(mockedPodSecurityPolicyTemplateProjectBindingInterface.UpdateCalls())
+//
+//	len(mockedPodSecurityPolicyTemplateProjectBindingInterface.UpdateCalls())
 func (mock *PodSecurityPolicyTemplateProjectBindingInterfaceMock) UpdateCalls() []struct {
 	In1 *v3.PodSecurityPolicyTemplateProjectBinding
 } {
@@ -1672,7 +1702,8 @@ func (mock *PodSecurityPolicyTemplateProjectBindingInterfaceMock) Watch(opts met
 
 // WatchCalls gets all the calls that were made to Watch.
 // Check the length with:
-//     len(mockedPodSecurityPolicyTemplateProjectBindingInterface.WatchCalls())
+//
+//	len(mockedPodSecurityPolicyTemplateProjectBindingInterface.WatchCalls())
 func (mock *PodSecurityPolicyTemplateProjectBindingInterfaceMock) WatchCalls() []struct {
 	Opts metav1.ListOptions
 } {
@@ -1695,19 +1726,19 @@ var _ v31.PodSecurityPolicyTemplateProjectBindingsGetter = &PodSecurityPolicyTem
 
 // PodSecurityPolicyTemplateProjectBindingsGetterMock is a mock implementation of v31.PodSecurityPolicyTemplateProjectBindingsGetter.
 //
-//     func TestSomethingThatUsesPodSecurityPolicyTemplateProjectBindingsGetter(t *testing.T) {
+//	    func TestSomethingThatUsesPodSecurityPolicyTemplateProjectBindingsGetter(t *testing.T) {
 //
-//         // make and configure a mocked v31.PodSecurityPolicyTemplateProjectBindingsGetter
-//         mockedPodSecurityPolicyTemplateProjectBindingsGetter := &PodSecurityPolicyTemplateProjectBindingsGetterMock{
-//             PodSecurityPolicyTemplateProjectBindingsFunc: func(namespace string) v31.PodSecurityPolicyTemplateProjectBindingInterface {
-// 	               panic("mock out the PodSecurityPolicyTemplateProjectBindings method")
-//             },
-//         }
+//	        // make and configure a mocked v31.PodSecurityPolicyTemplateProjectBindingsGetter
+//	        mockedPodSecurityPolicyTemplateProjectBindingsGetter := &PodSecurityPolicyTemplateProjectBindingsGetterMock{
+//	            PodSecurityPolicyTemplateProjectBindingsFunc: func(namespace string) v31.PodSecurityPolicyTemplateProjectBindingInterface {
+//		               panic("mock out the PodSecurityPolicyTemplateProjectBindings method")
+//	            },
+//	        }
 //
-//         // use mockedPodSecurityPolicyTemplateProjectBindingsGetter in code that requires v31.PodSecurityPolicyTemplateProjectBindingsGetter
-//         // and then make assertions.
+//	        // use mockedPodSecurityPolicyTemplateProjectBindingsGetter in code that requires v31.PodSecurityPolicyTemplateProjectBindingsGetter
+//	        // and then make assertions.
 //
-//     }
+//	    }
 type PodSecurityPolicyTemplateProjectBindingsGetterMock struct {
 	// PodSecurityPolicyTemplateProjectBindingsFunc mocks the PodSecurityPolicyTemplateProjectBindings method.
 	PodSecurityPolicyTemplateProjectBindingsFunc func(namespace string) v31.PodSecurityPolicyTemplateProjectBindingInterface
@@ -1740,7 +1771,8 @@ func (mock *PodSecurityPolicyTemplateProjectBindingsGetterMock) PodSecurityPolic
 
 // PodSecurityPolicyTemplateProjectBindingsCalls gets all the calls that were made to PodSecurityPolicyTemplateProjectBindings.
 // Check the length with:
-//     len(mockedPodSecurityPolicyTemplateProjectBindingsGetter.PodSecurityPolicyTemplateProjectBindingsCalls())
+//
+//	len(mockedPodSecurityPolicyTemplateProjectBindingsGetter.PodSecurityPolicyTemplateProjectBindingsCalls())
 func (mock *PodSecurityPolicyTemplateProjectBindingsGetterMock) PodSecurityPolicyTemplateProjectBindingsCalls() []struct {
 	Namespace string
 } {

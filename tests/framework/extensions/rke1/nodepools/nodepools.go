@@ -16,20 +16,21 @@ type NodeRoles struct {
 
 // RKE1NodePoolSetup is a helper method that will loop and setup muliple node pools with the defined node roles from the `nodeRoles` parameter
 // `nodeRoles` would be in this format
-//   []map[string]bool{
-//   {
-// 	   ControlPlane: true,
-// 	   Etcd:         false,
-// 	   Worker:       false,
-//	   Quantity:     1,
-//   },
-//   {
-// 	   ControlPlane: false,
-// 	   Etcd:         true,
-// 	   Worker:       false,
-//	   Quantity:     1,
-//   },
-//  }
+//
+//	  []map[string]bool{
+//	  {
+//		   ControlPlane: true,
+//		   Etcd:         false,
+//		   Worker:       false,
+//		   Quantity:     1,
+//	  },
+//	  {
+//		   ControlPlane: false,
+//		   Etcd:         true,
+//		   Worker:       false,
+//		   Quantity:     1,
+//	  },
+//	 }
 func RKE1NodePoolSetup(client *rancher.Client, nodeRoles []NodeRoles, ClusterID, NodeTemplateID string) (*management.NodePool, error) {
 	nodePoolConfig := management.NodePool{
 		ClusterID:               ClusterID,
