@@ -29,22 +29,22 @@ var _ v11.PodLister = &PodListerMock{}
 
 // PodListerMock is a mock implementation of v11.PodLister.
 //
-//     func TestSomethingThatUsesPodLister(t *testing.T) {
+//	    func TestSomethingThatUsesPodLister(t *testing.T) {
 //
-//         // make and configure a mocked v11.PodLister
-//         mockedPodLister := &PodListerMock{
-//             GetFunc: func(namespace string, name string) (*v1.Pod, error) {
-// 	               panic("mock out the Get method")
-//             },
-//             ListFunc: func(namespace string, selector labels.Selector) ([]*v1.Pod, error) {
-// 	               panic("mock out the List method")
-//             },
-//         }
+//	        // make and configure a mocked v11.PodLister
+//	        mockedPodLister := &PodListerMock{
+//	            GetFunc: func(namespace string, name string) (*v1.Pod, error) {
+//		               panic("mock out the Get method")
+//	            },
+//	            ListFunc: func(namespace string, selector labels.Selector) ([]*v1.Pod, error) {
+//		               panic("mock out the List method")
+//	            },
+//	        }
 //
-//         // use mockedPodLister in code that requires v11.PodLister
-//         // and then make assertions.
+//	        // use mockedPodLister in code that requires v11.PodLister
+//	        // and then make assertions.
 //
-//     }
+//	    }
 type PodListerMock struct {
 	// GetFunc mocks the Get method.
 	GetFunc func(namespace string, name string) (*v1.Pod, error)
@@ -91,7 +91,8 @@ func (mock *PodListerMock) Get(namespace string, name string) (*v1.Pod, error) {
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//     len(mockedPodLister.GetCalls())
+//
+//	len(mockedPodLister.GetCalls())
 func (mock *PodListerMock) GetCalls() []struct {
 	Namespace string
 	Name      string
@@ -126,7 +127,8 @@ func (mock *PodListerMock) List(namespace string, selector labels.Selector) ([]*
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//     len(mockedPodLister.ListCalls())
+//
+//	len(mockedPodLister.ListCalls())
 func (mock *PodListerMock) ListCalls() []struct {
 	Namespace string
 	Selector  labels.Selector
@@ -159,43 +161,43 @@ var _ v11.PodController = &PodControllerMock{}
 
 // PodControllerMock is a mock implementation of v11.PodController.
 //
-//     func TestSomethingThatUsesPodController(t *testing.T) {
+//	    func TestSomethingThatUsesPodController(t *testing.T) {
 //
-//         // make and configure a mocked v11.PodController
-//         mockedPodController := &PodControllerMock{
-//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v11.PodHandlerFunc)  {
-// 	               panic("mock out the AddClusterScopedFeatureHandler method")
-//             },
-//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v11.PodHandlerFunc)  {
-// 	               panic("mock out the AddClusterScopedHandler method")
-//             },
-//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v11.PodHandlerFunc)  {
-// 	               panic("mock out the AddFeatureHandler method")
-//             },
-//             AddHandlerFunc: func(ctx context.Context, name string, handler v11.PodHandlerFunc)  {
-// 	               panic("mock out the AddHandler method")
-//             },
-//             EnqueueFunc: func(namespace string, name string)  {
-// 	               panic("mock out the Enqueue method")
-//             },
-//             EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
-// 	               panic("mock out the EnqueueAfter method")
-//             },
-//             GenericFunc: func() controller.GenericController {
-// 	               panic("mock out the Generic method")
-//             },
-//             InformerFunc: func() cache.SharedIndexInformer {
-// 	               panic("mock out the Informer method")
-//             },
-//             ListerFunc: func() v11.PodLister {
-// 	               panic("mock out the Lister method")
-//             },
-//         }
+//	        // make and configure a mocked v11.PodController
+//	        mockedPodController := &PodControllerMock{
+//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v11.PodHandlerFunc)  {
+//		               panic("mock out the AddClusterScopedFeatureHandler method")
+//	            },
+//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v11.PodHandlerFunc)  {
+//		               panic("mock out the AddClusterScopedHandler method")
+//	            },
+//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v11.PodHandlerFunc)  {
+//		               panic("mock out the AddFeatureHandler method")
+//	            },
+//	            AddHandlerFunc: func(ctx context.Context, name string, handler v11.PodHandlerFunc)  {
+//		               panic("mock out the AddHandler method")
+//	            },
+//	            EnqueueFunc: func(namespace string, name string)  {
+//		               panic("mock out the Enqueue method")
+//	            },
+//	            EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
+//		               panic("mock out the EnqueueAfter method")
+//	            },
+//	            GenericFunc: func() controller.GenericController {
+//		               panic("mock out the Generic method")
+//	            },
+//	            InformerFunc: func() cache.SharedIndexInformer {
+//		               panic("mock out the Informer method")
+//	            },
+//	            ListerFunc: func() v11.PodLister {
+//		               panic("mock out the Lister method")
+//	            },
+//	        }
 //
-//         // use mockedPodController in code that requires v11.PodController
-//         // and then make assertions.
+//	        // use mockedPodController in code that requires v11.PodController
+//	        // and then make assertions.
 //
-//     }
+//	    }
 type PodControllerMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
 	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v11.PodHandlerFunc)
@@ -324,7 +326,8 @@ func (mock *PodControllerMock) AddClusterScopedFeatureHandler(ctx context.Contex
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//     len(mockedPodController.AddClusterScopedFeatureHandlerCalls())
+//
+//	len(mockedPodController.AddClusterScopedFeatureHandlerCalls())
 func (mock *PodControllerMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -369,7 +372,8 @@ func (mock *PodControllerMock) AddClusterScopedHandler(ctx context.Context, name
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//     len(mockedPodController.AddClusterScopedHandlerCalls())
+//
+//	len(mockedPodController.AddClusterScopedHandlerCalls())
 func (mock *PodControllerMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -412,7 +416,8 @@ func (mock *PodControllerMock) AddFeatureHandler(ctx context.Context, enabled fu
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//     len(mockedPodController.AddFeatureHandlerCalls())
+//
+//	len(mockedPodController.AddFeatureHandlerCalls())
 func (mock *PodControllerMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
@@ -453,7 +458,8 @@ func (mock *PodControllerMock) AddHandler(ctx context.Context, name string, hand
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//     len(mockedPodController.AddHandlerCalls())
+//
+//	len(mockedPodController.AddHandlerCalls())
 func (mock *PodControllerMock) AddHandlerCalls() []struct {
 	Ctx     context.Context
 	Name    string
@@ -490,7 +496,8 @@ func (mock *PodControllerMock) Enqueue(namespace string, name string) {
 
 // EnqueueCalls gets all the calls that were made to Enqueue.
 // Check the length with:
-//     len(mockedPodController.EnqueueCalls())
+//
+//	len(mockedPodController.EnqueueCalls())
 func (mock *PodControllerMock) EnqueueCalls() []struct {
 	Namespace string
 	Name      string
@@ -527,7 +534,8 @@ func (mock *PodControllerMock) EnqueueAfter(namespace string, name string, after
 
 // EnqueueAfterCalls gets all the calls that were made to EnqueueAfter.
 // Check the length with:
-//     len(mockedPodController.EnqueueAfterCalls())
+//
+//	len(mockedPodController.EnqueueAfterCalls())
 func (mock *PodControllerMock) EnqueueAfterCalls() []struct {
 	Namespace string
 	Name      string
@@ -559,7 +567,8 @@ func (mock *PodControllerMock) Generic() controller.GenericController {
 
 // GenericCalls gets all the calls that were made to Generic.
 // Check the length with:
-//     len(mockedPodController.GenericCalls())
+//
+//	len(mockedPodController.GenericCalls())
 func (mock *PodControllerMock) GenericCalls() []struct {
 } {
 	var calls []struct {
@@ -585,7 +594,8 @@ func (mock *PodControllerMock) Informer() cache.SharedIndexInformer {
 
 // InformerCalls gets all the calls that were made to Informer.
 // Check the length with:
-//     len(mockedPodController.InformerCalls())
+//
+//	len(mockedPodController.InformerCalls())
 func (mock *PodControllerMock) InformerCalls() []struct {
 } {
 	var calls []struct {
@@ -611,7 +621,8 @@ func (mock *PodControllerMock) Lister() v11.PodLister {
 
 // ListerCalls gets all the calls that were made to Lister.
 // Check the length with:
-//     len(mockedPodController.ListerCalls())
+//
+//	len(mockedPodController.ListerCalls())
 func (mock *PodControllerMock) ListerCalls() []struct {
 } {
 	var calls []struct {
@@ -651,76 +662,76 @@ var _ v11.PodInterface = &PodInterfaceMock{}
 
 // PodInterfaceMock is a mock implementation of v11.PodInterface.
 //
-//     func TestSomethingThatUsesPodInterface(t *testing.T) {
+//	    func TestSomethingThatUsesPodInterface(t *testing.T) {
 //
-//         // make and configure a mocked v11.PodInterface
-//         mockedPodInterface := &PodInterfaceMock{
-//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v11.PodHandlerFunc)  {
-// 	               panic("mock out the AddClusterScopedFeatureHandler method")
-//             },
-//             AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v11.PodLifecycle)  {
-// 	               panic("mock out the AddClusterScopedFeatureLifecycle method")
-//             },
-//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v11.PodHandlerFunc)  {
-// 	               panic("mock out the AddClusterScopedHandler method")
-//             },
-//             AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v11.PodLifecycle)  {
-// 	               panic("mock out the AddClusterScopedLifecycle method")
-//             },
-//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v11.PodHandlerFunc)  {
-// 	               panic("mock out the AddFeatureHandler method")
-//             },
-//             AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v11.PodLifecycle)  {
-// 	               panic("mock out the AddFeatureLifecycle method")
-//             },
-//             AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v11.PodHandlerFunc)  {
-// 	               panic("mock out the AddHandler method")
-//             },
-//             AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v11.PodLifecycle)  {
-// 	               panic("mock out the AddLifecycle method")
-//             },
-//             ControllerFunc: func() v11.PodController {
-// 	               panic("mock out the Controller method")
-//             },
-//             CreateFunc: func(in1 *v1.Pod) (*v1.Pod, error) {
-// 	               panic("mock out the Create method")
-//             },
-//             DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
-// 	               panic("mock out the Delete method")
-//             },
-//             DeleteCollectionFunc: func(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
-// 	               panic("mock out the DeleteCollection method")
-//             },
-//             DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
-// 	               panic("mock out the DeleteNamespaced method")
-//             },
-//             GetFunc: func(name string, opts metav1.GetOptions) (*v1.Pod, error) {
-// 	               panic("mock out the Get method")
-//             },
-//             GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v1.Pod, error) {
-// 	               panic("mock out the GetNamespaced method")
-//             },
-//             ListFunc: func(opts metav1.ListOptions) (*v1.PodList, error) {
-// 	               panic("mock out the List method")
-//             },
-//             ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v1.PodList, error) {
-// 	               panic("mock out the ListNamespaced method")
-//             },
-//             ObjectClientFunc: func() *objectclient.ObjectClient {
-// 	               panic("mock out the ObjectClient method")
-//             },
-//             UpdateFunc: func(in1 *v1.Pod) (*v1.Pod, error) {
-// 	               panic("mock out the Update method")
-//             },
-//             WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
-// 	               panic("mock out the Watch method")
-//             },
-//         }
+//	        // make and configure a mocked v11.PodInterface
+//	        mockedPodInterface := &PodInterfaceMock{
+//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v11.PodHandlerFunc)  {
+//		               panic("mock out the AddClusterScopedFeatureHandler method")
+//	            },
+//	            AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v11.PodLifecycle)  {
+//		               panic("mock out the AddClusterScopedFeatureLifecycle method")
+//	            },
+//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v11.PodHandlerFunc)  {
+//		               panic("mock out the AddClusterScopedHandler method")
+//	            },
+//	            AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v11.PodLifecycle)  {
+//		               panic("mock out the AddClusterScopedLifecycle method")
+//	            },
+//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v11.PodHandlerFunc)  {
+//		               panic("mock out the AddFeatureHandler method")
+//	            },
+//	            AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v11.PodLifecycle)  {
+//		               panic("mock out the AddFeatureLifecycle method")
+//	            },
+//	            AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v11.PodHandlerFunc)  {
+//		               panic("mock out the AddHandler method")
+//	            },
+//	            AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v11.PodLifecycle)  {
+//		               panic("mock out the AddLifecycle method")
+//	            },
+//	            ControllerFunc: func() v11.PodController {
+//		               panic("mock out the Controller method")
+//	            },
+//	            CreateFunc: func(in1 *v1.Pod) (*v1.Pod, error) {
+//		               panic("mock out the Create method")
+//	            },
+//	            DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
+//		               panic("mock out the Delete method")
+//	            },
+//	            DeleteCollectionFunc: func(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
+//		               panic("mock out the DeleteCollection method")
+//	            },
+//	            DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
+//		               panic("mock out the DeleteNamespaced method")
+//	            },
+//	            GetFunc: func(name string, opts metav1.GetOptions) (*v1.Pod, error) {
+//		               panic("mock out the Get method")
+//	            },
+//	            GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v1.Pod, error) {
+//		               panic("mock out the GetNamespaced method")
+//	            },
+//	            ListFunc: func(opts metav1.ListOptions) (*v1.PodList, error) {
+//		               panic("mock out the List method")
+//	            },
+//	            ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v1.PodList, error) {
+//		               panic("mock out the ListNamespaced method")
+//	            },
+//	            ObjectClientFunc: func() *objectclient.ObjectClient {
+//		               panic("mock out the ObjectClient method")
+//	            },
+//	            UpdateFunc: func(in1 *v1.Pod) (*v1.Pod, error) {
+//		               panic("mock out the Update method")
+//	            },
+//	            WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
+//		               panic("mock out the Watch method")
+//	            },
+//	        }
 //
-//         // use mockedPodInterface in code that requires v11.PodInterface
-//         // and then make assertions.
+//	        // use mockedPodInterface in code that requires v11.PodInterface
+//	        // and then make assertions.
 //
-//     }
+//	    }
 type PodInterfaceMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
 	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v11.PodHandlerFunc)
@@ -973,7 +984,8 @@ func (mock *PodInterfaceMock) AddClusterScopedFeatureHandler(ctx context.Context
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//     len(mockedPodInterface.AddClusterScopedFeatureHandlerCalls())
+//
+//	len(mockedPodInterface.AddClusterScopedFeatureHandlerCalls())
 func (mock *PodInterfaceMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -1020,7 +1032,8 @@ func (mock *PodInterfaceMock) AddClusterScopedFeatureLifecycle(ctx context.Conte
 
 // AddClusterScopedFeatureLifecycleCalls gets all the calls that were made to AddClusterScopedFeatureLifecycle.
 // Check the length with:
-//     len(mockedPodInterface.AddClusterScopedFeatureLifecycleCalls())
+//
+//	len(mockedPodInterface.AddClusterScopedFeatureLifecycleCalls())
 func (mock *PodInterfaceMock) AddClusterScopedFeatureLifecycleCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -1065,7 +1078,8 @@ func (mock *PodInterfaceMock) AddClusterScopedHandler(ctx context.Context, name 
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//     len(mockedPodInterface.AddClusterScopedHandlerCalls())
+//
+//	len(mockedPodInterface.AddClusterScopedHandlerCalls())
 func (mock *PodInterfaceMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -1108,7 +1122,8 @@ func (mock *PodInterfaceMock) AddClusterScopedLifecycle(ctx context.Context, nam
 
 // AddClusterScopedLifecycleCalls gets all the calls that were made to AddClusterScopedLifecycle.
 // Check the length with:
-//     len(mockedPodInterface.AddClusterScopedLifecycleCalls())
+//
+//	len(mockedPodInterface.AddClusterScopedLifecycleCalls())
 func (mock *PodInterfaceMock) AddClusterScopedLifecycleCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -1151,7 +1166,8 @@ func (mock *PodInterfaceMock) AddFeatureHandler(ctx context.Context, enabled fun
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//     len(mockedPodInterface.AddFeatureHandlerCalls())
+//
+//	len(mockedPodInterface.AddFeatureHandlerCalls())
 func (mock *PodInterfaceMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
@@ -1194,7 +1210,8 @@ func (mock *PodInterfaceMock) AddFeatureLifecycle(ctx context.Context, enabled f
 
 // AddFeatureLifecycleCalls gets all the calls that were made to AddFeatureLifecycle.
 // Check the length with:
-//     len(mockedPodInterface.AddFeatureLifecycleCalls())
+//
+//	len(mockedPodInterface.AddFeatureLifecycleCalls())
 func (mock *PodInterfaceMock) AddFeatureLifecycleCalls() []struct {
 	Ctx       context.Context
 	Enabled   func() bool
@@ -1235,7 +1252,8 @@ func (mock *PodInterfaceMock) AddHandler(ctx context.Context, name string, syncM
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//     len(mockedPodInterface.AddHandlerCalls())
+//
+//	len(mockedPodInterface.AddHandlerCalls())
 func (mock *PodInterfaceMock) AddHandlerCalls() []struct {
 	Ctx  context.Context
 	Name string
@@ -1274,7 +1292,8 @@ func (mock *PodInterfaceMock) AddLifecycle(ctx context.Context, name string, lif
 
 // AddLifecycleCalls gets all the calls that were made to AddLifecycle.
 // Check the length with:
-//     len(mockedPodInterface.AddLifecycleCalls())
+//
+//	len(mockedPodInterface.AddLifecycleCalls())
 func (mock *PodInterfaceMock) AddLifecycleCalls() []struct {
 	Ctx       context.Context
 	Name      string
@@ -1306,7 +1325,8 @@ func (mock *PodInterfaceMock) Controller() v11.PodController {
 
 // ControllerCalls gets all the calls that were made to Controller.
 // Check the length with:
-//     len(mockedPodInterface.ControllerCalls())
+//
+//	len(mockedPodInterface.ControllerCalls())
 func (mock *PodInterfaceMock) ControllerCalls() []struct {
 } {
 	var calls []struct {
@@ -1335,7 +1355,8 @@ func (mock *PodInterfaceMock) Create(in1 *v1.Pod) (*v1.Pod, error) {
 
 // CreateCalls gets all the calls that were made to Create.
 // Check the length with:
-//     len(mockedPodInterface.CreateCalls())
+//
+//	len(mockedPodInterface.CreateCalls())
 func (mock *PodInterfaceMock) CreateCalls() []struct {
 	In1 *v1.Pod
 } {
@@ -1368,7 +1389,8 @@ func (mock *PodInterfaceMock) Delete(name string, options *metav1.DeleteOptions)
 
 // DeleteCalls gets all the calls that were made to Delete.
 // Check the length with:
-//     len(mockedPodInterface.DeleteCalls())
+//
+//	len(mockedPodInterface.DeleteCalls())
 func (mock *PodInterfaceMock) DeleteCalls() []struct {
 	Name    string
 	Options *metav1.DeleteOptions
@@ -1403,7 +1425,8 @@ func (mock *PodInterfaceMock) DeleteCollection(deleteOpts *metav1.DeleteOptions,
 
 // DeleteCollectionCalls gets all the calls that were made to DeleteCollection.
 // Check the length with:
-//     len(mockedPodInterface.DeleteCollectionCalls())
+//
+//	len(mockedPodInterface.DeleteCollectionCalls())
 func (mock *PodInterfaceMock) DeleteCollectionCalls() []struct {
 	DeleteOpts *metav1.DeleteOptions
 	ListOpts   metav1.ListOptions
@@ -1440,7 +1463,8 @@ func (mock *PodInterfaceMock) DeleteNamespaced(namespace string, name string, op
 
 // DeleteNamespacedCalls gets all the calls that were made to DeleteNamespaced.
 // Check the length with:
-//     len(mockedPodInterface.DeleteNamespacedCalls())
+//
+//	len(mockedPodInterface.DeleteNamespacedCalls())
 func (mock *PodInterfaceMock) DeleteNamespacedCalls() []struct {
 	Namespace string
 	Name      string
@@ -1477,7 +1501,8 @@ func (mock *PodInterfaceMock) Get(name string, opts metav1.GetOptions) (*v1.Pod,
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//     len(mockedPodInterface.GetCalls())
+//
+//	len(mockedPodInterface.GetCalls())
 func (mock *PodInterfaceMock) GetCalls() []struct {
 	Name string
 	Opts metav1.GetOptions
@@ -1514,7 +1539,8 @@ func (mock *PodInterfaceMock) GetNamespaced(namespace string, name string, opts 
 
 // GetNamespacedCalls gets all the calls that were made to GetNamespaced.
 // Check the length with:
-//     len(mockedPodInterface.GetNamespacedCalls())
+//
+//	len(mockedPodInterface.GetNamespacedCalls())
 func (mock *PodInterfaceMock) GetNamespacedCalls() []struct {
 	Namespace string
 	Name      string
@@ -1549,7 +1575,8 @@ func (mock *PodInterfaceMock) List(opts metav1.ListOptions) (*v1.PodList, error)
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//     len(mockedPodInterface.ListCalls())
+//
+//	len(mockedPodInterface.ListCalls())
 func (mock *PodInterfaceMock) ListCalls() []struct {
 	Opts metav1.ListOptions
 } {
@@ -1582,7 +1609,8 @@ func (mock *PodInterfaceMock) ListNamespaced(namespace string, opts metav1.ListO
 
 // ListNamespacedCalls gets all the calls that were made to ListNamespaced.
 // Check the length with:
-//     len(mockedPodInterface.ListNamespacedCalls())
+//
+//	len(mockedPodInterface.ListNamespacedCalls())
 func (mock *PodInterfaceMock) ListNamespacedCalls() []struct {
 	Namespace string
 	Opts      metav1.ListOptions
@@ -1612,7 +1640,8 @@ func (mock *PodInterfaceMock) ObjectClient() *objectclient.ObjectClient {
 
 // ObjectClientCalls gets all the calls that were made to ObjectClient.
 // Check the length with:
-//     len(mockedPodInterface.ObjectClientCalls())
+//
+//	len(mockedPodInterface.ObjectClientCalls())
 func (mock *PodInterfaceMock) ObjectClientCalls() []struct {
 } {
 	var calls []struct {
@@ -1641,7 +1670,8 @@ func (mock *PodInterfaceMock) Update(in1 *v1.Pod) (*v1.Pod, error) {
 
 // UpdateCalls gets all the calls that were made to Update.
 // Check the length with:
-//     len(mockedPodInterface.UpdateCalls())
+//
+//	len(mockedPodInterface.UpdateCalls())
 func (mock *PodInterfaceMock) UpdateCalls() []struct {
 	In1 *v1.Pod
 } {
@@ -1672,7 +1702,8 @@ func (mock *PodInterfaceMock) Watch(opts metav1.ListOptions) (watch.Interface, e
 
 // WatchCalls gets all the calls that were made to Watch.
 // Check the length with:
-//     len(mockedPodInterface.WatchCalls())
+//
+//	len(mockedPodInterface.WatchCalls())
 func (mock *PodInterfaceMock) WatchCalls() []struct {
 	Opts metav1.ListOptions
 } {
@@ -1695,19 +1726,19 @@ var _ v11.PodsGetter = &PodsGetterMock{}
 
 // PodsGetterMock is a mock implementation of v11.PodsGetter.
 //
-//     func TestSomethingThatUsesPodsGetter(t *testing.T) {
+//	    func TestSomethingThatUsesPodsGetter(t *testing.T) {
 //
-//         // make and configure a mocked v11.PodsGetter
-//         mockedPodsGetter := &PodsGetterMock{
-//             PodsFunc: func(namespace string) v11.PodInterface {
-// 	               panic("mock out the Pods method")
-//             },
-//         }
+//	        // make and configure a mocked v11.PodsGetter
+//	        mockedPodsGetter := &PodsGetterMock{
+//	            PodsFunc: func(namespace string) v11.PodInterface {
+//		               panic("mock out the Pods method")
+//	            },
+//	        }
 //
-//         // use mockedPodsGetter in code that requires v11.PodsGetter
-//         // and then make assertions.
+//	        // use mockedPodsGetter in code that requires v11.PodsGetter
+//	        // and then make assertions.
 //
-//     }
+//	    }
 type PodsGetterMock struct {
 	// PodsFunc mocks the Pods method.
 	PodsFunc func(namespace string) v11.PodInterface
@@ -1740,7 +1771,8 @@ func (mock *PodsGetterMock) Pods(namespace string) v11.PodInterface {
 
 // PodsCalls gets all the calls that were made to Pods.
 // Check the length with:
-//     len(mockedPodsGetter.PodsCalls())
+//
+//	len(mockedPodsGetter.PodsCalls())
 func (mock *PodsGetterMock) PodsCalls() []struct {
 	Namespace string
 } {

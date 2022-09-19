@@ -29,22 +29,22 @@ var _ v1alpha31.DestinationRuleLister = &DestinationRuleListerMock{}
 
 // DestinationRuleListerMock is a mock implementation of v1alpha31.DestinationRuleLister.
 //
-//     func TestSomethingThatUsesDestinationRuleLister(t *testing.T) {
+//	    func TestSomethingThatUsesDestinationRuleLister(t *testing.T) {
 //
-//         // make and configure a mocked v1alpha31.DestinationRuleLister
-//         mockedDestinationRuleLister := &DestinationRuleListerMock{
-//             GetFunc: func(namespace string, name string) (*v1alpha3.DestinationRule, error) {
-// 	               panic("mock out the Get method")
-//             },
-//             ListFunc: func(namespace string, selector labels.Selector) ([]*v1alpha3.DestinationRule, error) {
-// 	               panic("mock out the List method")
-//             },
-//         }
+//	        // make and configure a mocked v1alpha31.DestinationRuleLister
+//	        mockedDestinationRuleLister := &DestinationRuleListerMock{
+//	            GetFunc: func(namespace string, name string) (*v1alpha3.DestinationRule, error) {
+//		               panic("mock out the Get method")
+//	            },
+//	            ListFunc: func(namespace string, selector labels.Selector) ([]*v1alpha3.DestinationRule, error) {
+//		               panic("mock out the List method")
+//	            },
+//	        }
 //
-//         // use mockedDestinationRuleLister in code that requires v1alpha31.DestinationRuleLister
-//         // and then make assertions.
+//	        // use mockedDestinationRuleLister in code that requires v1alpha31.DestinationRuleLister
+//	        // and then make assertions.
 //
-//     }
+//	    }
 type DestinationRuleListerMock struct {
 	// GetFunc mocks the Get method.
 	GetFunc func(namespace string, name string) (*v1alpha3.DestinationRule, error)
@@ -91,7 +91,8 @@ func (mock *DestinationRuleListerMock) Get(namespace string, name string) (*v1al
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//     len(mockedDestinationRuleLister.GetCalls())
+//
+//	len(mockedDestinationRuleLister.GetCalls())
 func (mock *DestinationRuleListerMock) GetCalls() []struct {
 	Namespace string
 	Name      string
@@ -126,7 +127,8 @@ func (mock *DestinationRuleListerMock) List(namespace string, selector labels.Se
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//     len(mockedDestinationRuleLister.ListCalls())
+//
+//	len(mockedDestinationRuleLister.ListCalls())
 func (mock *DestinationRuleListerMock) ListCalls() []struct {
 	Namespace string
 	Selector  labels.Selector
@@ -159,43 +161,43 @@ var _ v1alpha31.DestinationRuleController = &DestinationRuleControllerMock{}
 
 // DestinationRuleControllerMock is a mock implementation of v1alpha31.DestinationRuleController.
 //
-//     func TestSomethingThatUsesDestinationRuleController(t *testing.T) {
+//	    func TestSomethingThatUsesDestinationRuleController(t *testing.T) {
 //
-//         // make and configure a mocked v1alpha31.DestinationRuleController
-//         mockedDestinationRuleController := &DestinationRuleControllerMock{
-//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v1alpha31.DestinationRuleHandlerFunc)  {
-// 	               panic("mock out the AddClusterScopedFeatureHandler method")
-//             },
-//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v1alpha31.DestinationRuleHandlerFunc)  {
-// 	               panic("mock out the AddClusterScopedHandler method")
-//             },
-//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v1alpha31.DestinationRuleHandlerFunc)  {
-// 	               panic("mock out the AddFeatureHandler method")
-//             },
-//             AddHandlerFunc: func(ctx context.Context, name string, handler v1alpha31.DestinationRuleHandlerFunc)  {
-// 	               panic("mock out the AddHandler method")
-//             },
-//             EnqueueFunc: func(namespace string, name string)  {
-// 	               panic("mock out the Enqueue method")
-//             },
-//             EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
-// 	               panic("mock out the EnqueueAfter method")
-//             },
-//             GenericFunc: func() controller.GenericController {
-// 	               panic("mock out the Generic method")
-//             },
-//             InformerFunc: func() cache.SharedIndexInformer {
-// 	               panic("mock out the Informer method")
-//             },
-//             ListerFunc: func() v1alpha31.DestinationRuleLister {
-// 	               panic("mock out the Lister method")
-//             },
-//         }
+//	        // make and configure a mocked v1alpha31.DestinationRuleController
+//	        mockedDestinationRuleController := &DestinationRuleControllerMock{
+//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v1alpha31.DestinationRuleHandlerFunc)  {
+//		               panic("mock out the AddClusterScopedFeatureHandler method")
+//	            },
+//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v1alpha31.DestinationRuleHandlerFunc)  {
+//		               panic("mock out the AddClusterScopedHandler method")
+//	            },
+//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v1alpha31.DestinationRuleHandlerFunc)  {
+//		               panic("mock out the AddFeatureHandler method")
+//	            },
+//	            AddHandlerFunc: func(ctx context.Context, name string, handler v1alpha31.DestinationRuleHandlerFunc)  {
+//		               panic("mock out the AddHandler method")
+//	            },
+//	            EnqueueFunc: func(namespace string, name string)  {
+//		               panic("mock out the Enqueue method")
+//	            },
+//	            EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
+//		               panic("mock out the EnqueueAfter method")
+//	            },
+//	            GenericFunc: func() controller.GenericController {
+//		               panic("mock out the Generic method")
+//	            },
+//	            InformerFunc: func() cache.SharedIndexInformer {
+//		               panic("mock out the Informer method")
+//	            },
+//	            ListerFunc: func() v1alpha31.DestinationRuleLister {
+//		               panic("mock out the Lister method")
+//	            },
+//	        }
 //
-//         // use mockedDestinationRuleController in code that requires v1alpha31.DestinationRuleController
-//         // and then make assertions.
+//	        // use mockedDestinationRuleController in code that requires v1alpha31.DestinationRuleController
+//	        // and then make assertions.
 //
-//     }
+//	    }
 type DestinationRuleControllerMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
 	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v1alpha31.DestinationRuleHandlerFunc)
@@ -324,7 +326,8 @@ func (mock *DestinationRuleControllerMock) AddClusterScopedFeatureHandler(ctx co
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//     len(mockedDestinationRuleController.AddClusterScopedFeatureHandlerCalls())
+//
+//	len(mockedDestinationRuleController.AddClusterScopedFeatureHandlerCalls())
 func (mock *DestinationRuleControllerMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -369,7 +372,8 @@ func (mock *DestinationRuleControllerMock) AddClusterScopedHandler(ctx context.C
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//     len(mockedDestinationRuleController.AddClusterScopedHandlerCalls())
+//
+//	len(mockedDestinationRuleController.AddClusterScopedHandlerCalls())
 func (mock *DestinationRuleControllerMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -412,7 +416,8 @@ func (mock *DestinationRuleControllerMock) AddFeatureHandler(ctx context.Context
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//     len(mockedDestinationRuleController.AddFeatureHandlerCalls())
+//
+//	len(mockedDestinationRuleController.AddFeatureHandlerCalls())
 func (mock *DestinationRuleControllerMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
@@ -453,7 +458,8 @@ func (mock *DestinationRuleControllerMock) AddHandler(ctx context.Context, name 
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//     len(mockedDestinationRuleController.AddHandlerCalls())
+//
+//	len(mockedDestinationRuleController.AddHandlerCalls())
 func (mock *DestinationRuleControllerMock) AddHandlerCalls() []struct {
 	Ctx     context.Context
 	Name    string
@@ -490,7 +496,8 @@ func (mock *DestinationRuleControllerMock) Enqueue(namespace string, name string
 
 // EnqueueCalls gets all the calls that were made to Enqueue.
 // Check the length with:
-//     len(mockedDestinationRuleController.EnqueueCalls())
+//
+//	len(mockedDestinationRuleController.EnqueueCalls())
 func (mock *DestinationRuleControllerMock) EnqueueCalls() []struct {
 	Namespace string
 	Name      string
@@ -527,7 +534,8 @@ func (mock *DestinationRuleControllerMock) EnqueueAfter(namespace string, name s
 
 // EnqueueAfterCalls gets all the calls that were made to EnqueueAfter.
 // Check the length with:
-//     len(mockedDestinationRuleController.EnqueueAfterCalls())
+//
+//	len(mockedDestinationRuleController.EnqueueAfterCalls())
 func (mock *DestinationRuleControllerMock) EnqueueAfterCalls() []struct {
 	Namespace string
 	Name      string
@@ -559,7 +567,8 @@ func (mock *DestinationRuleControllerMock) Generic() controller.GenericControlle
 
 // GenericCalls gets all the calls that were made to Generic.
 // Check the length with:
-//     len(mockedDestinationRuleController.GenericCalls())
+//
+//	len(mockedDestinationRuleController.GenericCalls())
 func (mock *DestinationRuleControllerMock) GenericCalls() []struct {
 } {
 	var calls []struct {
@@ -585,7 +594,8 @@ func (mock *DestinationRuleControllerMock) Informer() cache.SharedIndexInformer 
 
 // InformerCalls gets all the calls that were made to Informer.
 // Check the length with:
-//     len(mockedDestinationRuleController.InformerCalls())
+//
+//	len(mockedDestinationRuleController.InformerCalls())
 func (mock *DestinationRuleControllerMock) InformerCalls() []struct {
 } {
 	var calls []struct {
@@ -611,7 +621,8 @@ func (mock *DestinationRuleControllerMock) Lister() v1alpha31.DestinationRuleLis
 
 // ListerCalls gets all the calls that were made to Lister.
 // Check the length with:
-//     len(mockedDestinationRuleController.ListerCalls())
+//
+//	len(mockedDestinationRuleController.ListerCalls())
 func (mock *DestinationRuleControllerMock) ListerCalls() []struct {
 } {
 	var calls []struct {
@@ -651,76 +662,76 @@ var _ v1alpha31.DestinationRuleInterface = &DestinationRuleInterfaceMock{}
 
 // DestinationRuleInterfaceMock is a mock implementation of v1alpha31.DestinationRuleInterface.
 //
-//     func TestSomethingThatUsesDestinationRuleInterface(t *testing.T) {
+//	    func TestSomethingThatUsesDestinationRuleInterface(t *testing.T) {
 //
-//         // make and configure a mocked v1alpha31.DestinationRuleInterface
-//         mockedDestinationRuleInterface := &DestinationRuleInterfaceMock{
-//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v1alpha31.DestinationRuleHandlerFunc)  {
-// 	               panic("mock out the AddClusterScopedFeatureHandler method")
-//             },
-//             AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v1alpha31.DestinationRuleLifecycle)  {
-// 	               panic("mock out the AddClusterScopedFeatureLifecycle method")
-//             },
-//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v1alpha31.DestinationRuleHandlerFunc)  {
-// 	               panic("mock out the AddClusterScopedHandler method")
-//             },
-//             AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v1alpha31.DestinationRuleLifecycle)  {
-// 	               panic("mock out the AddClusterScopedLifecycle method")
-//             },
-//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v1alpha31.DestinationRuleHandlerFunc)  {
-// 	               panic("mock out the AddFeatureHandler method")
-//             },
-//             AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v1alpha31.DestinationRuleLifecycle)  {
-// 	               panic("mock out the AddFeatureLifecycle method")
-//             },
-//             AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v1alpha31.DestinationRuleHandlerFunc)  {
-// 	               panic("mock out the AddHandler method")
-//             },
-//             AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v1alpha31.DestinationRuleLifecycle)  {
-// 	               panic("mock out the AddLifecycle method")
-//             },
-//             ControllerFunc: func() v1alpha31.DestinationRuleController {
-// 	               panic("mock out the Controller method")
-//             },
-//             CreateFunc: func(in1 *v1alpha3.DestinationRule) (*v1alpha3.DestinationRule, error) {
-// 	               panic("mock out the Create method")
-//             },
-//             DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
-// 	               panic("mock out the Delete method")
-//             },
-//             DeleteCollectionFunc: func(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
-// 	               panic("mock out the DeleteCollection method")
-//             },
-//             DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
-// 	               panic("mock out the DeleteNamespaced method")
-//             },
-//             GetFunc: func(name string, opts metav1.GetOptions) (*v1alpha3.DestinationRule, error) {
-// 	               panic("mock out the Get method")
-//             },
-//             GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v1alpha3.DestinationRule, error) {
-// 	               panic("mock out the GetNamespaced method")
-//             },
-//             ListFunc: func(opts metav1.ListOptions) (*v1alpha3.DestinationRuleList, error) {
-// 	               panic("mock out the List method")
-//             },
-//             ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v1alpha3.DestinationRuleList, error) {
-// 	               panic("mock out the ListNamespaced method")
-//             },
-//             ObjectClientFunc: func() *objectclient.ObjectClient {
-// 	               panic("mock out the ObjectClient method")
-//             },
-//             UpdateFunc: func(in1 *v1alpha3.DestinationRule) (*v1alpha3.DestinationRule, error) {
-// 	               panic("mock out the Update method")
-//             },
-//             WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
-// 	               panic("mock out the Watch method")
-//             },
-//         }
+//	        // make and configure a mocked v1alpha31.DestinationRuleInterface
+//	        mockedDestinationRuleInterface := &DestinationRuleInterfaceMock{
+//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v1alpha31.DestinationRuleHandlerFunc)  {
+//		               panic("mock out the AddClusterScopedFeatureHandler method")
+//	            },
+//	            AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v1alpha31.DestinationRuleLifecycle)  {
+//		               panic("mock out the AddClusterScopedFeatureLifecycle method")
+//	            },
+//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v1alpha31.DestinationRuleHandlerFunc)  {
+//		               panic("mock out the AddClusterScopedHandler method")
+//	            },
+//	            AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v1alpha31.DestinationRuleLifecycle)  {
+//		               panic("mock out the AddClusterScopedLifecycle method")
+//	            },
+//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v1alpha31.DestinationRuleHandlerFunc)  {
+//		               panic("mock out the AddFeatureHandler method")
+//	            },
+//	            AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v1alpha31.DestinationRuleLifecycle)  {
+//		               panic("mock out the AddFeatureLifecycle method")
+//	            },
+//	            AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v1alpha31.DestinationRuleHandlerFunc)  {
+//		               panic("mock out the AddHandler method")
+//	            },
+//	            AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v1alpha31.DestinationRuleLifecycle)  {
+//		               panic("mock out the AddLifecycle method")
+//	            },
+//	            ControllerFunc: func() v1alpha31.DestinationRuleController {
+//		               panic("mock out the Controller method")
+//	            },
+//	            CreateFunc: func(in1 *v1alpha3.DestinationRule) (*v1alpha3.DestinationRule, error) {
+//		               panic("mock out the Create method")
+//	            },
+//	            DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
+//		               panic("mock out the Delete method")
+//	            },
+//	            DeleteCollectionFunc: func(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
+//		               panic("mock out the DeleteCollection method")
+//	            },
+//	            DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
+//		               panic("mock out the DeleteNamespaced method")
+//	            },
+//	            GetFunc: func(name string, opts metav1.GetOptions) (*v1alpha3.DestinationRule, error) {
+//		               panic("mock out the Get method")
+//	            },
+//	            GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v1alpha3.DestinationRule, error) {
+//		               panic("mock out the GetNamespaced method")
+//	            },
+//	            ListFunc: func(opts metav1.ListOptions) (*v1alpha3.DestinationRuleList, error) {
+//		               panic("mock out the List method")
+//	            },
+//	            ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v1alpha3.DestinationRuleList, error) {
+//		               panic("mock out the ListNamespaced method")
+//	            },
+//	            ObjectClientFunc: func() *objectclient.ObjectClient {
+//		               panic("mock out the ObjectClient method")
+//	            },
+//	            UpdateFunc: func(in1 *v1alpha3.DestinationRule) (*v1alpha3.DestinationRule, error) {
+//		               panic("mock out the Update method")
+//	            },
+//	            WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
+//		               panic("mock out the Watch method")
+//	            },
+//	        }
 //
-//         // use mockedDestinationRuleInterface in code that requires v1alpha31.DestinationRuleInterface
-//         // and then make assertions.
+//	        // use mockedDestinationRuleInterface in code that requires v1alpha31.DestinationRuleInterface
+//	        // and then make assertions.
 //
-//     }
+//	    }
 type DestinationRuleInterfaceMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
 	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v1alpha31.DestinationRuleHandlerFunc)
@@ -973,7 +984,8 @@ func (mock *DestinationRuleInterfaceMock) AddClusterScopedFeatureHandler(ctx con
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//     len(mockedDestinationRuleInterface.AddClusterScopedFeatureHandlerCalls())
+//
+//	len(mockedDestinationRuleInterface.AddClusterScopedFeatureHandlerCalls())
 func (mock *DestinationRuleInterfaceMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -1020,7 +1032,8 @@ func (mock *DestinationRuleInterfaceMock) AddClusterScopedFeatureLifecycle(ctx c
 
 // AddClusterScopedFeatureLifecycleCalls gets all the calls that were made to AddClusterScopedFeatureLifecycle.
 // Check the length with:
-//     len(mockedDestinationRuleInterface.AddClusterScopedFeatureLifecycleCalls())
+//
+//	len(mockedDestinationRuleInterface.AddClusterScopedFeatureLifecycleCalls())
 func (mock *DestinationRuleInterfaceMock) AddClusterScopedFeatureLifecycleCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -1065,7 +1078,8 @@ func (mock *DestinationRuleInterfaceMock) AddClusterScopedHandler(ctx context.Co
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//     len(mockedDestinationRuleInterface.AddClusterScopedHandlerCalls())
+//
+//	len(mockedDestinationRuleInterface.AddClusterScopedHandlerCalls())
 func (mock *DestinationRuleInterfaceMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -1108,7 +1122,8 @@ func (mock *DestinationRuleInterfaceMock) AddClusterScopedLifecycle(ctx context.
 
 // AddClusterScopedLifecycleCalls gets all the calls that were made to AddClusterScopedLifecycle.
 // Check the length with:
-//     len(mockedDestinationRuleInterface.AddClusterScopedLifecycleCalls())
+//
+//	len(mockedDestinationRuleInterface.AddClusterScopedLifecycleCalls())
 func (mock *DestinationRuleInterfaceMock) AddClusterScopedLifecycleCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -1151,7 +1166,8 @@ func (mock *DestinationRuleInterfaceMock) AddFeatureHandler(ctx context.Context,
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//     len(mockedDestinationRuleInterface.AddFeatureHandlerCalls())
+//
+//	len(mockedDestinationRuleInterface.AddFeatureHandlerCalls())
 func (mock *DestinationRuleInterfaceMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
@@ -1194,7 +1210,8 @@ func (mock *DestinationRuleInterfaceMock) AddFeatureLifecycle(ctx context.Contex
 
 // AddFeatureLifecycleCalls gets all the calls that were made to AddFeatureLifecycle.
 // Check the length with:
-//     len(mockedDestinationRuleInterface.AddFeatureLifecycleCalls())
+//
+//	len(mockedDestinationRuleInterface.AddFeatureLifecycleCalls())
 func (mock *DestinationRuleInterfaceMock) AddFeatureLifecycleCalls() []struct {
 	Ctx       context.Context
 	Enabled   func() bool
@@ -1235,7 +1252,8 @@ func (mock *DestinationRuleInterfaceMock) AddHandler(ctx context.Context, name s
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//     len(mockedDestinationRuleInterface.AddHandlerCalls())
+//
+//	len(mockedDestinationRuleInterface.AddHandlerCalls())
 func (mock *DestinationRuleInterfaceMock) AddHandlerCalls() []struct {
 	Ctx  context.Context
 	Name string
@@ -1274,7 +1292,8 @@ func (mock *DestinationRuleInterfaceMock) AddLifecycle(ctx context.Context, name
 
 // AddLifecycleCalls gets all the calls that were made to AddLifecycle.
 // Check the length with:
-//     len(mockedDestinationRuleInterface.AddLifecycleCalls())
+//
+//	len(mockedDestinationRuleInterface.AddLifecycleCalls())
 func (mock *DestinationRuleInterfaceMock) AddLifecycleCalls() []struct {
 	Ctx       context.Context
 	Name      string
@@ -1306,7 +1325,8 @@ func (mock *DestinationRuleInterfaceMock) Controller() v1alpha31.DestinationRule
 
 // ControllerCalls gets all the calls that were made to Controller.
 // Check the length with:
-//     len(mockedDestinationRuleInterface.ControllerCalls())
+//
+//	len(mockedDestinationRuleInterface.ControllerCalls())
 func (mock *DestinationRuleInterfaceMock) ControllerCalls() []struct {
 } {
 	var calls []struct {
@@ -1335,7 +1355,8 @@ func (mock *DestinationRuleInterfaceMock) Create(in1 *v1alpha3.DestinationRule) 
 
 // CreateCalls gets all the calls that were made to Create.
 // Check the length with:
-//     len(mockedDestinationRuleInterface.CreateCalls())
+//
+//	len(mockedDestinationRuleInterface.CreateCalls())
 func (mock *DestinationRuleInterfaceMock) CreateCalls() []struct {
 	In1 *v1alpha3.DestinationRule
 } {
@@ -1368,7 +1389,8 @@ func (mock *DestinationRuleInterfaceMock) Delete(name string, options *metav1.De
 
 // DeleteCalls gets all the calls that were made to Delete.
 // Check the length with:
-//     len(mockedDestinationRuleInterface.DeleteCalls())
+//
+//	len(mockedDestinationRuleInterface.DeleteCalls())
 func (mock *DestinationRuleInterfaceMock) DeleteCalls() []struct {
 	Name    string
 	Options *metav1.DeleteOptions
@@ -1403,7 +1425,8 @@ func (mock *DestinationRuleInterfaceMock) DeleteCollection(deleteOpts *metav1.De
 
 // DeleteCollectionCalls gets all the calls that were made to DeleteCollection.
 // Check the length with:
-//     len(mockedDestinationRuleInterface.DeleteCollectionCalls())
+//
+//	len(mockedDestinationRuleInterface.DeleteCollectionCalls())
 func (mock *DestinationRuleInterfaceMock) DeleteCollectionCalls() []struct {
 	DeleteOpts *metav1.DeleteOptions
 	ListOpts   metav1.ListOptions
@@ -1440,7 +1463,8 @@ func (mock *DestinationRuleInterfaceMock) DeleteNamespaced(namespace string, nam
 
 // DeleteNamespacedCalls gets all the calls that were made to DeleteNamespaced.
 // Check the length with:
-//     len(mockedDestinationRuleInterface.DeleteNamespacedCalls())
+//
+//	len(mockedDestinationRuleInterface.DeleteNamespacedCalls())
 func (mock *DestinationRuleInterfaceMock) DeleteNamespacedCalls() []struct {
 	Namespace string
 	Name      string
@@ -1477,7 +1501,8 @@ func (mock *DestinationRuleInterfaceMock) Get(name string, opts metav1.GetOption
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//     len(mockedDestinationRuleInterface.GetCalls())
+//
+//	len(mockedDestinationRuleInterface.GetCalls())
 func (mock *DestinationRuleInterfaceMock) GetCalls() []struct {
 	Name string
 	Opts metav1.GetOptions
@@ -1514,7 +1539,8 @@ func (mock *DestinationRuleInterfaceMock) GetNamespaced(namespace string, name s
 
 // GetNamespacedCalls gets all the calls that were made to GetNamespaced.
 // Check the length with:
-//     len(mockedDestinationRuleInterface.GetNamespacedCalls())
+//
+//	len(mockedDestinationRuleInterface.GetNamespacedCalls())
 func (mock *DestinationRuleInterfaceMock) GetNamespacedCalls() []struct {
 	Namespace string
 	Name      string
@@ -1549,7 +1575,8 @@ func (mock *DestinationRuleInterfaceMock) List(opts metav1.ListOptions) (*v1alph
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//     len(mockedDestinationRuleInterface.ListCalls())
+//
+//	len(mockedDestinationRuleInterface.ListCalls())
 func (mock *DestinationRuleInterfaceMock) ListCalls() []struct {
 	Opts metav1.ListOptions
 } {
@@ -1582,7 +1609,8 @@ func (mock *DestinationRuleInterfaceMock) ListNamespaced(namespace string, opts 
 
 // ListNamespacedCalls gets all the calls that were made to ListNamespaced.
 // Check the length with:
-//     len(mockedDestinationRuleInterface.ListNamespacedCalls())
+//
+//	len(mockedDestinationRuleInterface.ListNamespacedCalls())
 func (mock *DestinationRuleInterfaceMock) ListNamespacedCalls() []struct {
 	Namespace string
 	Opts      metav1.ListOptions
@@ -1612,7 +1640,8 @@ func (mock *DestinationRuleInterfaceMock) ObjectClient() *objectclient.ObjectCli
 
 // ObjectClientCalls gets all the calls that were made to ObjectClient.
 // Check the length with:
-//     len(mockedDestinationRuleInterface.ObjectClientCalls())
+//
+//	len(mockedDestinationRuleInterface.ObjectClientCalls())
 func (mock *DestinationRuleInterfaceMock) ObjectClientCalls() []struct {
 } {
 	var calls []struct {
@@ -1641,7 +1670,8 @@ func (mock *DestinationRuleInterfaceMock) Update(in1 *v1alpha3.DestinationRule) 
 
 // UpdateCalls gets all the calls that were made to Update.
 // Check the length with:
-//     len(mockedDestinationRuleInterface.UpdateCalls())
+//
+//	len(mockedDestinationRuleInterface.UpdateCalls())
 func (mock *DestinationRuleInterfaceMock) UpdateCalls() []struct {
 	In1 *v1alpha3.DestinationRule
 } {
@@ -1672,7 +1702,8 @@ func (mock *DestinationRuleInterfaceMock) Watch(opts metav1.ListOptions) (watch.
 
 // WatchCalls gets all the calls that were made to Watch.
 // Check the length with:
-//     len(mockedDestinationRuleInterface.WatchCalls())
+//
+//	len(mockedDestinationRuleInterface.WatchCalls())
 func (mock *DestinationRuleInterfaceMock) WatchCalls() []struct {
 	Opts metav1.ListOptions
 } {
@@ -1695,19 +1726,19 @@ var _ v1alpha31.DestinationRulesGetter = &DestinationRulesGetterMock{}
 
 // DestinationRulesGetterMock is a mock implementation of v1alpha31.DestinationRulesGetter.
 //
-//     func TestSomethingThatUsesDestinationRulesGetter(t *testing.T) {
+//	    func TestSomethingThatUsesDestinationRulesGetter(t *testing.T) {
 //
-//         // make and configure a mocked v1alpha31.DestinationRulesGetter
-//         mockedDestinationRulesGetter := &DestinationRulesGetterMock{
-//             DestinationRulesFunc: func(namespace string) v1alpha31.DestinationRuleInterface {
-// 	               panic("mock out the DestinationRules method")
-//             },
-//         }
+//	        // make and configure a mocked v1alpha31.DestinationRulesGetter
+//	        mockedDestinationRulesGetter := &DestinationRulesGetterMock{
+//	            DestinationRulesFunc: func(namespace string) v1alpha31.DestinationRuleInterface {
+//		               panic("mock out the DestinationRules method")
+//	            },
+//	        }
 //
-//         // use mockedDestinationRulesGetter in code that requires v1alpha31.DestinationRulesGetter
-//         // and then make assertions.
+//	        // use mockedDestinationRulesGetter in code that requires v1alpha31.DestinationRulesGetter
+//	        // and then make assertions.
 //
-//     }
+//	    }
 type DestinationRulesGetterMock struct {
 	// DestinationRulesFunc mocks the DestinationRules method.
 	DestinationRulesFunc func(namespace string) v1alpha31.DestinationRuleInterface
@@ -1740,7 +1771,8 @@ func (mock *DestinationRulesGetterMock) DestinationRules(namespace string) v1alp
 
 // DestinationRulesCalls gets all the calls that were made to DestinationRules.
 // Check the length with:
-//     len(mockedDestinationRulesGetter.DestinationRulesCalls())
+//
+//	len(mockedDestinationRulesGetter.DestinationRulesCalls())
 func (mock *DestinationRulesGetterMock) DestinationRulesCalls() []struct {
 	Namespace string
 } {

@@ -29,22 +29,22 @@ var _ v31.WorkloadLister = &WorkloadListerMock{}
 
 // WorkloadListerMock is a mock implementation of v31.WorkloadLister.
 //
-//     func TestSomethingThatUsesWorkloadLister(t *testing.T) {
+//	    func TestSomethingThatUsesWorkloadLister(t *testing.T) {
 //
-//         // make and configure a mocked v31.WorkloadLister
-//         mockedWorkloadLister := &WorkloadListerMock{
-//             GetFunc: func(namespace string, name string) (*v3.Workload, error) {
-// 	               panic("mock out the Get method")
-//             },
-//             ListFunc: func(namespace string, selector labels.Selector) ([]*v3.Workload, error) {
-// 	               panic("mock out the List method")
-//             },
-//         }
+//	        // make and configure a mocked v31.WorkloadLister
+//	        mockedWorkloadLister := &WorkloadListerMock{
+//	            GetFunc: func(namespace string, name string) (*v3.Workload, error) {
+//		               panic("mock out the Get method")
+//	            },
+//	            ListFunc: func(namespace string, selector labels.Selector) ([]*v3.Workload, error) {
+//		               panic("mock out the List method")
+//	            },
+//	        }
 //
-//         // use mockedWorkloadLister in code that requires v31.WorkloadLister
-//         // and then make assertions.
+//	        // use mockedWorkloadLister in code that requires v31.WorkloadLister
+//	        // and then make assertions.
 //
-//     }
+//	    }
 type WorkloadListerMock struct {
 	// GetFunc mocks the Get method.
 	GetFunc func(namespace string, name string) (*v3.Workload, error)
@@ -91,7 +91,8 @@ func (mock *WorkloadListerMock) Get(namespace string, name string) (*v3.Workload
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//     len(mockedWorkloadLister.GetCalls())
+//
+//	len(mockedWorkloadLister.GetCalls())
 func (mock *WorkloadListerMock) GetCalls() []struct {
 	Namespace string
 	Name      string
@@ -126,7 +127,8 @@ func (mock *WorkloadListerMock) List(namespace string, selector labels.Selector)
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//     len(mockedWorkloadLister.ListCalls())
+//
+//	len(mockedWorkloadLister.ListCalls())
 func (mock *WorkloadListerMock) ListCalls() []struct {
 	Namespace string
 	Selector  labels.Selector
@@ -159,43 +161,43 @@ var _ v31.WorkloadController = &WorkloadControllerMock{}
 
 // WorkloadControllerMock is a mock implementation of v31.WorkloadController.
 //
-//     func TestSomethingThatUsesWorkloadController(t *testing.T) {
+//	    func TestSomethingThatUsesWorkloadController(t *testing.T) {
 //
-//         // make and configure a mocked v31.WorkloadController
-//         mockedWorkloadController := &WorkloadControllerMock{
-//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v31.WorkloadHandlerFunc)  {
-// 	               panic("mock out the AddClusterScopedFeatureHandler method")
-//             },
-//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v31.WorkloadHandlerFunc)  {
-// 	               panic("mock out the AddClusterScopedHandler method")
-//             },
-//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.WorkloadHandlerFunc)  {
-// 	               panic("mock out the AddFeatureHandler method")
-//             },
-//             AddHandlerFunc: func(ctx context.Context, name string, handler v31.WorkloadHandlerFunc)  {
-// 	               panic("mock out the AddHandler method")
-//             },
-//             EnqueueFunc: func(namespace string, name string)  {
-// 	               panic("mock out the Enqueue method")
-//             },
-//             EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
-// 	               panic("mock out the EnqueueAfter method")
-//             },
-//             GenericFunc: func() controller.GenericController {
-// 	               panic("mock out the Generic method")
-//             },
-//             InformerFunc: func() cache.SharedIndexInformer {
-// 	               panic("mock out the Informer method")
-//             },
-//             ListerFunc: func() v31.WorkloadLister {
-// 	               panic("mock out the Lister method")
-//             },
-//         }
+//	        // make and configure a mocked v31.WorkloadController
+//	        mockedWorkloadController := &WorkloadControllerMock{
+//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v31.WorkloadHandlerFunc)  {
+//		               panic("mock out the AddClusterScopedFeatureHandler method")
+//	            },
+//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v31.WorkloadHandlerFunc)  {
+//		               panic("mock out the AddClusterScopedHandler method")
+//	            },
+//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.WorkloadHandlerFunc)  {
+//		               panic("mock out the AddFeatureHandler method")
+//	            },
+//	            AddHandlerFunc: func(ctx context.Context, name string, handler v31.WorkloadHandlerFunc)  {
+//		               panic("mock out the AddHandler method")
+//	            },
+//	            EnqueueFunc: func(namespace string, name string)  {
+//		               panic("mock out the Enqueue method")
+//	            },
+//	            EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
+//		               panic("mock out the EnqueueAfter method")
+//	            },
+//	            GenericFunc: func() controller.GenericController {
+//		               panic("mock out the Generic method")
+//	            },
+//	            InformerFunc: func() cache.SharedIndexInformer {
+//		               panic("mock out the Informer method")
+//	            },
+//	            ListerFunc: func() v31.WorkloadLister {
+//		               panic("mock out the Lister method")
+//	            },
+//	        }
 //
-//         // use mockedWorkloadController in code that requires v31.WorkloadController
-//         // and then make assertions.
+//	        // use mockedWorkloadController in code that requires v31.WorkloadController
+//	        // and then make assertions.
 //
-//     }
+//	    }
 type WorkloadControllerMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
 	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v31.WorkloadHandlerFunc)
@@ -324,7 +326,8 @@ func (mock *WorkloadControllerMock) AddClusterScopedFeatureHandler(ctx context.C
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//     len(mockedWorkloadController.AddClusterScopedFeatureHandlerCalls())
+//
+//	len(mockedWorkloadController.AddClusterScopedFeatureHandlerCalls())
 func (mock *WorkloadControllerMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -369,7 +372,8 @@ func (mock *WorkloadControllerMock) AddClusterScopedHandler(ctx context.Context,
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//     len(mockedWorkloadController.AddClusterScopedHandlerCalls())
+//
+//	len(mockedWorkloadController.AddClusterScopedHandlerCalls())
 func (mock *WorkloadControllerMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -412,7 +416,8 @@ func (mock *WorkloadControllerMock) AddFeatureHandler(ctx context.Context, enabl
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//     len(mockedWorkloadController.AddFeatureHandlerCalls())
+//
+//	len(mockedWorkloadController.AddFeatureHandlerCalls())
 func (mock *WorkloadControllerMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
@@ -453,7 +458,8 @@ func (mock *WorkloadControllerMock) AddHandler(ctx context.Context, name string,
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//     len(mockedWorkloadController.AddHandlerCalls())
+//
+//	len(mockedWorkloadController.AddHandlerCalls())
 func (mock *WorkloadControllerMock) AddHandlerCalls() []struct {
 	Ctx     context.Context
 	Name    string
@@ -490,7 +496,8 @@ func (mock *WorkloadControllerMock) Enqueue(namespace string, name string) {
 
 // EnqueueCalls gets all the calls that were made to Enqueue.
 // Check the length with:
-//     len(mockedWorkloadController.EnqueueCalls())
+//
+//	len(mockedWorkloadController.EnqueueCalls())
 func (mock *WorkloadControllerMock) EnqueueCalls() []struct {
 	Namespace string
 	Name      string
@@ -527,7 +534,8 @@ func (mock *WorkloadControllerMock) EnqueueAfter(namespace string, name string, 
 
 // EnqueueAfterCalls gets all the calls that were made to EnqueueAfter.
 // Check the length with:
-//     len(mockedWorkloadController.EnqueueAfterCalls())
+//
+//	len(mockedWorkloadController.EnqueueAfterCalls())
 func (mock *WorkloadControllerMock) EnqueueAfterCalls() []struct {
 	Namespace string
 	Name      string
@@ -559,7 +567,8 @@ func (mock *WorkloadControllerMock) Generic() controller.GenericController {
 
 // GenericCalls gets all the calls that were made to Generic.
 // Check the length with:
-//     len(mockedWorkloadController.GenericCalls())
+//
+//	len(mockedWorkloadController.GenericCalls())
 func (mock *WorkloadControllerMock) GenericCalls() []struct {
 } {
 	var calls []struct {
@@ -585,7 +594,8 @@ func (mock *WorkloadControllerMock) Informer() cache.SharedIndexInformer {
 
 // InformerCalls gets all the calls that were made to Informer.
 // Check the length with:
-//     len(mockedWorkloadController.InformerCalls())
+//
+//	len(mockedWorkloadController.InformerCalls())
 func (mock *WorkloadControllerMock) InformerCalls() []struct {
 } {
 	var calls []struct {
@@ -611,7 +621,8 @@ func (mock *WorkloadControllerMock) Lister() v31.WorkloadLister {
 
 // ListerCalls gets all the calls that were made to Lister.
 // Check the length with:
-//     len(mockedWorkloadController.ListerCalls())
+//
+//	len(mockedWorkloadController.ListerCalls())
 func (mock *WorkloadControllerMock) ListerCalls() []struct {
 } {
 	var calls []struct {
@@ -651,76 +662,76 @@ var _ v31.WorkloadInterface = &WorkloadInterfaceMock{}
 
 // WorkloadInterfaceMock is a mock implementation of v31.WorkloadInterface.
 //
-//     func TestSomethingThatUsesWorkloadInterface(t *testing.T) {
+//	    func TestSomethingThatUsesWorkloadInterface(t *testing.T) {
 //
-//         // make and configure a mocked v31.WorkloadInterface
-//         mockedWorkloadInterface := &WorkloadInterfaceMock{
-//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v31.WorkloadHandlerFunc)  {
-// 	               panic("mock out the AddClusterScopedFeatureHandler method")
-//             },
-//             AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v31.WorkloadLifecycle)  {
-// 	               panic("mock out the AddClusterScopedFeatureLifecycle method")
-//             },
-//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v31.WorkloadHandlerFunc)  {
-// 	               panic("mock out the AddClusterScopedHandler method")
-//             },
-//             AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v31.WorkloadLifecycle)  {
-// 	               panic("mock out the AddClusterScopedLifecycle method")
-//             },
-//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.WorkloadHandlerFunc)  {
-// 	               panic("mock out the AddFeatureHandler method")
-//             },
-//             AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v31.WorkloadLifecycle)  {
-// 	               panic("mock out the AddFeatureLifecycle method")
-//             },
-//             AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v31.WorkloadHandlerFunc)  {
-// 	               panic("mock out the AddHandler method")
-//             },
-//             AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v31.WorkloadLifecycle)  {
-// 	               panic("mock out the AddLifecycle method")
-//             },
-//             ControllerFunc: func() v31.WorkloadController {
-// 	               panic("mock out the Controller method")
-//             },
-//             CreateFunc: func(in1 *v3.Workload) (*v3.Workload, error) {
-// 	               panic("mock out the Create method")
-//             },
-//             DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
-// 	               panic("mock out the Delete method")
-//             },
-//             DeleteCollectionFunc: func(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
-// 	               panic("mock out the DeleteCollection method")
-//             },
-//             DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
-// 	               panic("mock out the DeleteNamespaced method")
-//             },
-//             GetFunc: func(name string, opts metav1.GetOptions) (*v3.Workload, error) {
-// 	               panic("mock out the Get method")
-//             },
-//             GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v3.Workload, error) {
-// 	               panic("mock out the GetNamespaced method")
-//             },
-//             ListFunc: func(opts metav1.ListOptions) (*v3.WorkloadList, error) {
-// 	               panic("mock out the List method")
-//             },
-//             ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v3.WorkloadList, error) {
-// 	               panic("mock out the ListNamespaced method")
-//             },
-//             ObjectClientFunc: func() *objectclient.ObjectClient {
-// 	               panic("mock out the ObjectClient method")
-//             },
-//             UpdateFunc: func(in1 *v3.Workload) (*v3.Workload, error) {
-// 	               panic("mock out the Update method")
-//             },
-//             WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
-// 	               panic("mock out the Watch method")
-//             },
-//         }
+//	        // make and configure a mocked v31.WorkloadInterface
+//	        mockedWorkloadInterface := &WorkloadInterfaceMock{
+//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v31.WorkloadHandlerFunc)  {
+//		               panic("mock out the AddClusterScopedFeatureHandler method")
+//	            },
+//	            AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v31.WorkloadLifecycle)  {
+//		               panic("mock out the AddClusterScopedFeatureLifecycle method")
+//	            },
+//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v31.WorkloadHandlerFunc)  {
+//		               panic("mock out the AddClusterScopedHandler method")
+//	            },
+//	            AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v31.WorkloadLifecycle)  {
+//		               panic("mock out the AddClusterScopedLifecycle method")
+//	            },
+//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.WorkloadHandlerFunc)  {
+//		               panic("mock out the AddFeatureHandler method")
+//	            },
+//	            AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v31.WorkloadLifecycle)  {
+//		               panic("mock out the AddFeatureLifecycle method")
+//	            },
+//	            AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v31.WorkloadHandlerFunc)  {
+//		               panic("mock out the AddHandler method")
+//	            },
+//	            AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v31.WorkloadLifecycle)  {
+//		               panic("mock out the AddLifecycle method")
+//	            },
+//	            ControllerFunc: func() v31.WorkloadController {
+//		               panic("mock out the Controller method")
+//	            },
+//	            CreateFunc: func(in1 *v3.Workload) (*v3.Workload, error) {
+//		               panic("mock out the Create method")
+//	            },
+//	            DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
+//		               panic("mock out the Delete method")
+//	            },
+//	            DeleteCollectionFunc: func(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
+//		               panic("mock out the DeleteCollection method")
+//	            },
+//	            DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
+//		               panic("mock out the DeleteNamespaced method")
+//	            },
+//	            GetFunc: func(name string, opts metav1.GetOptions) (*v3.Workload, error) {
+//		               panic("mock out the Get method")
+//	            },
+//	            GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v3.Workload, error) {
+//		               panic("mock out the GetNamespaced method")
+//	            },
+//	            ListFunc: func(opts metav1.ListOptions) (*v3.WorkloadList, error) {
+//		               panic("mock out the List method")
+//	            },
+//	            ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v3.WorkloadList, error) {
+//		               panic("mock out the ListNamespaced method")
+//	            },
+//	            ObjectClientFunc: func() *objectclient.ObjectClient {
+//		               panic("mock out the ObjectClient method")
+//	            },
+//	            UpdateFunc: func(in1 *v3.Workload) (*v3.Workload, error) {
+//		               panic("mock out the Update method")
+//	            },
+//	            WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
+//		               panic("mock out the Watch method")
+//	            },
+//	        }
 //
-//         // use mockedWorkloadInterface in code that requires v31.WorkloadInterface
-//         // and then make assertions.
+//	        // use mockedWorkloadInterface in code that requires v31.WorkloadInterface
+//	        // and then make assertions.
 //
-//     }
+//	    }
 type WorkloadInterfaceMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
 	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v31.WorkloadHandlerFunc)
@@ -973,7 +984,8 @@ func (mock *WorkloadInterfaceMock) AddClusterScopedFeatureHandler(ctx context.Co
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//     len(mockedWorkloadInterface.AddClusterScopedFeatureHandlerCalls())
+//
+//	len(mockedWorkloadInterface.AddClusterScopedFeatureHandlerCalls())
 func (mock *WorkloadInterfaceMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -1020,7 +1032,8 @@ func (mock *WorkloadInterfaceMock) AddClusterScopedFeatureLifecycle(ctx context.
 
 // AddClusterScopedFeatureLifecycleCalls gets all the calls that were made to AddClusterScopedFeatureLifecycle.
 // Check the length with:
-//     len(mockedWorkloadInterface.AddClusterScopedFeatureLifecycleCalls())
+//
+//	len(mockedWorkloadInterface.AddClusterScopedFeatureLifecycleCalls())
 func (mock *WorkloadInterfaceMock) AddClusterScopedFeatureLifecycleCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -1065,7 +1078,8 @@ func (mock *WorkloadInterfaceMock) AddClusterScopedHandler(ctx context.Context, 
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//     len(mockedWorkloadInterface.AddClusterScopedHandlerCalls())
+//
+//	len(mockedWorkloadInterface.AddClusterScopedHandlerCalls())
 func (mock *WorkloadInterfaceMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -1108,7 +1122,8 @@ func (mock *WorkloadInterfaceMock) AddClusterScopedLifecycle(ctx context.Context
 
 // AddClusterScopedLifecycleCalls gets all the calls that were made to AddClusterScopedLifecycle.
 // Check the length with:
-//     len(mockedWorkloadInterface.AddClusterScopedLifecycleCalls())
+//
+//	len(mockedWorkloadInterface.AddClusterScopedLifecycleCalls())
 func (mock *WorkloadInterfaceMock) AddClusterScopedLifecycleCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -1151,7 +1166,8 @@ func (mock *WorkloadInterfaceMock) AddFeatureHandler(ctx context.Context, enable
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//     len(mockedWorkloadInterface.AddFeatureHandlerCalls())
+//
+//	len(mockedWorkloadInterface.AddFeatureHandlerCalls())
 func (mock *WorkloadInterfaceMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
@@ -1194,7 +1210,8 @@ func (mock *WorkloadInterfaceMock) AddFeatureLifecycle(ctx context.Context, enab
 
 // AddFeatureLifecycleCalls gets all the calls that were made to AddFeatureLifecycle.
 // Check the length with:
-//     len(mockedWorkloadInterface.AddFeatureLifecycleCalls())
+//
+//	len(mockedWorkloadInterface.AddFeatureLifecycleCalls())
 func (mock *WorkloadInterfaceMock) AddFeatureLifecycleCalls() []struct {
 	Ctx       context.Context
 	Enabled   func() bool
@@ -1235,7 +1252,8 @@ func (mock *WorkloadInterfaceMock) AddHandler(ctx context.Context, name string, 
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//     len(mockedWorkloadInterface.AddHandlerCalls())
+//
+//	len(mockedWorkloadInterface.AddHandlerCalls())
 func (mock *WorkloadInterfaceMock) AddHandlerCalls() []struct {
 	Ctx  context.Context
 	Name string
@@ -1274,7 +1292,8 @@ func (mock *WorkloadInterfaceMock) AddLifecycle(ctx context.Context, name string
 
 // AddLifecycleCalls gets all the calls that were made to AddLifecycle.
 // Check the length with:
-//     len(mockedWorkloadInterface.AddLifecycleCalls())
+//
+//	len(mockedWorkloadInterface.AddLifecycleCalls())
 func (mock *WorkloadInterfaceMock) AddLifecycleCalls() []struct {
 	Ctx       context.Context
 	Name      string
@@ -1306,7 +1325,8 @@ func (mock *WorkloadInterfaceMock) Controller() v31.WorkloadController {
 
 // ControllerCalls gets all the calls that were made to Controller.
 // Check the length with:
-//     len(mockedWorkloadInterface.ControllerCalls())
+//
+//	len(mockedWorkloadInterface.ControllerCalls())
 func (mock *WorkloadInterfaceMock) ControllerCalls() []struct {
 } {
 	var calls []struct {
@@ -1335,7 +1355,8 @@ func (mock *WorkloadInterfaceMock) Create(in1 *v3.Workload) (*v3.Workload, error
 
 // CreateCalls gets all the calls that were made to Create.
 // Check the length with:
-//     len(mockedWorkloadInterface.CreateCalls())
+//
+//	len(mockedWorkloadInterface.CreateCalls())
 func (mock *WorkloadInterfaceMock) CreateCalls() []struct {
 	In1 *v3.Workload
 } {
@@ -1368,7 +1389,8 @@ func (mock *WorkloadInterfaceMock) Delete(name string, options *metav1.DeleteOpt
 
 // DeleteCalls gets all the calls that were made to Delete.
 // Check the length with:
-//     len(mockedWorkloadInterface.DeleteCalls())
+//
+//	len(mockedWorkloadInterface.DeleteCalls())
 func (mock *WorkloadInterfaceMock) DeleteCalls() []struct {
 	Name    string
 	Options *metav1.DeleteOptions
@@ -1403,7 +1425,8 @@ func (mock *WorkloadInterfaceMock) DeleteCollection(deleteOpts *metav1.DeleteOpt
 
 // DeleteCollectionCalls gets all the calls that were made to DeleteCollection.
 // Check the length with:
-//     len(mockedWorkloadInterface.DeleteCollectionCalls())
+//
+//	len(mockedWorkloadInterface.DeleteCollectionCalls())
 func (mock *WorkloadInterfaceMock) DeleteCollectionCalls() []struct {
 	DeleteOpts *metav1.DeleteOptions
 	ListOpts   metav1.ListOptions
@@ -1440,7 +1463,8 @@ func (mock *WorkloadInterfaceMock) DeleteNamespaced(namespace string, name strin
 
 // DeleteNamespacedCalls gets all the calls that were made to DeleteNamespaced.
 // Check the length with:
-//     len(mockedWorkloadInterface.DeleteNamespacedCalls())
+//
+//	len(mockedWorkloadInterface.DeleteNamespacedCalls())
 func (mock *WorkloadInterfaceMock) DeleteNamespacedCalls() []struct {
 	Namespace string
 	Name      string
@@ -1477,7 +1501,8 @@ func (mock *WorkloadInterfaceMock) Get(name string, opts metav1.GetOptions) (*v3
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//     len(mockedWorkloadInterface.GetCalls())
+//
+//	len(mockedWorkloadInterface.GetCalls())
 func (mock *WorkloadInterfaceMock) GetCalls() []struct {
 	Name string
 	Opts metav1.GetOptions
@@ -1514,7 +1539,8 @@ func (mock *WorkloadInterfaceMock) GetNamespaced(namespace string, name string, 
 
 // GetNamespacedCalls gets all the calls that were made to GetNamespaced.
 // Check the length with:
-//     len(mockedWorkloadInterface.GetNamespacedCalls())
+//
+//	len(mockedWorkloadInterface.GetNamespacedCalls())
 func (mock *WorkloadInterfaceMock) GetNamespacedCalls() []struct {
 	Namespace string
 	Name      string
@@ -1549,7 +1575,8 @@ func (mock *WorkloadInterfaceMock) List(opts metav1.ListOptions) (*v3.WorkloadLi
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//     len(mockedWorkloadInterface.ListCalls())
+//
+//	len(mockedWorkloadInterface.ListCalls())
 func (mock *WorkloadInterfaceMock) ListCalls() []struct {
 	Opts metav1.ListOptions
 } {
@@ -1582,7 +1609,8 @@ func (mock *WorkloadInterfaceMock) ListNamespaced(namespace string, opts metav1.
 
 // ListNamespacedCalls gets all the calls that were made to ListNamespaced.
 // Check the length with:
-//     len(mockedWorkloadInterface.ListNamespacedCalls())
+//
+//	len(mockedWorkloadInterface.ListNamespacedCalls())
 func (mock *WorkloadInterfaceMock) ListNamespacedCalls() []struct {
 	Namespace string
 	Opts      metav1.ListOptions
@@ -1612,7 +1640,8 @@ func (mock *WorkloadInterfaceMock) ObjectClient() *objectclient.ObjectClient {
 
 // ObjectClientCalls gets all the calls that were made to ObjectClient.
 // Check the length with:
-//     len(mockedWorkloadInterface.ObjectClientCalls())
+//
+//	len(mockedWorkloadInterface.ObjectClientCalls())
 func (mock *WorkloadInterfaceMock) ObjectClientCalls() []struct {
 } {
 	var calls []struct {
@@ -1641,7 +1670,8 @@ func (mock *WorkloadInterfaceMock) Update(in1 *v3.Workload) (*v3.Workload, error
 
 // UpdateCalls gets all the calls that were made to Update.
 // Check the length with:
-//     len(mockedWorkloadInterface.UpdateCalls())
+//
+//	len(mockedWorkloadInterface.UpdateCalls())
 func (mock *WorkloadInterfaceMock) UpdateCalls() []struct {
 	In1 *v3.Workload
 } {
@@ -1672,7 +1702,8 @@ func (mock *WorkloadInterfaceMock) Watch(opts metav1.ListOptions) (watch.Interfa
 
 // WatchCalls gets all the calls that were made to Watch.
 // Check the length with:
-//     len(mockedWorkloadInterface.WatchCalls())
+//
+//	len(mockedWorkloadInterface.WatchCalls())
 func (mock *WorkloadInterfaceMock) WatchCalls() []struct {
 	Opts metav1.ListOptions
 } {
@@ -1695,19 +1726,19 @@ var _ v31.WorkloadsGetter = &WorkloadsGetterMock{}
 
 // WorkloadsGetterMock is a mock implementation of v31.WorkloadsGetter.
 //
-//     func TestSomethingThatUsesWorkloadsGetter(t *testing.T) {
+//	    func TestSomethingThatUsesWorkloadsGetter(t *testing.T) {
 //
-//         // make and configure a mocked v31.WorkloadsGetter
-//         mockedWorkloadsGetter := &WorkloadsGetterMock{
-//             WorkloadsFunc: func(namespace string) v31.WorkloadInterface {
-// 	               panic("mock out the Workloads method")
-//             },
-//         }
+//	        // make and configure a mocked v31.WorkloadsGetter
+//	        mockedWorkloadsGetter := &WorkloadsGetterMock{
+//	            WorkloadsFunc: func(namespace string) v31.WorkloadInterface {
+//		               panic("mock out the Workloads method")
+//	            },
+//	        }
 //
-//         // use mockedWorkloadsGetter in code that requires v31.WorkloadsGetter
-//         // and then make assertions.
+//	        // use mockedWorkloadsGetter in code that requires v31.WorkloadsGetter
+//	        // and then make assertions.
 //
-//     }
+//	    }
 type WorkloadsGetterMock struct {
 	// WorkloadsFunc mocks the Workloads method.
 	WorkloadsFunc func(namespace string) v31.WorkloadInterface
@@ -1740,7 +1771,8 @@ func (mock *WorkloadsGetterMock) Workloads(namespace string) v31.WorkloadInterfa
 
 // WorkloadsCalls gets all the calls that were made to Workloads.
 // Check the length with:
-//     len(mockedWorkloadsGetter.WorkloadsCalls())
+//
+//	len(mockedWorkloadsGetter.WorkloadsCalls())
 func (mock *WorkloadsGetterMock) WorkloadsCalls() []struct {
 	Namespace string
 } {

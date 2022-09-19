@@ -29,22 +29,22 @@ var _ v31.RoleTemplateLister = &RoleTemplateListerMock{}
 
 // RoleTemplateListerMock is a mock implementation of v31.RoleTemplateLister.
 //
-//     func TestSomethingThatUsesRoleTemplateLister(t *testing.T) {
+//	    func TestSomethingThatUsesRoleTemplateLister(t *testing.T) {
 //
-//         // make and configure a mocked v31.RoleTemplateLister
-//         mockedRoleTemplateLister := &RoleTemplateListerMock{
-//             GetFunc: func(namespace string, name string) (*v3.RoleTemplate, error) {
-// 	               panic("mock out the Get method")
-//             },
-//             ListFunc: func(namespace string, selector labels.Selector) ([]*v3.RoleTemplate, error) {
-// 	               panic("mock out the List method")
-//             },
-//         }
+//	        // make and configure a mocked v31.RoleTemplateLister
+//	        mockedRoleTemplateLister := &RoleTemplateListerMock{
+//	            GetFunc: func(namespace string, name string) (*v3.RoleTemplate, error) {
+//		               panic("mock out the Get method")
+//	            },
+//	            ListFunc: func(namespace string, selector labels.Selector) ([]*v3.RoleTemplate, error) {
+//		               panic("mock out the List method")
+//	            },
+//	        }
 //
-//         // use mockedRoleTemplateLister in code that requires v31.RoleTemplateLister
-//         // and then make assertions.
+//	        // use mockedRoleTemplateLister in code that requires v31.RoleTemplateLister
+//	        // and then make assertions.
 //
-//     }
+//	    }
 type RoleTemplateListerMock struct {
 	// GetFunc mocks the Get method.
 	GetFunc func(namespace string, name string) (*v3.RoleTemplate, error)
@@ -91,7 +91,8 @@ func (mock *RoleTemplateListerMock) Get(namespace string, name string) (*v3.Role
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//     len(mockedRoleTemplateLister.GetCalls())
+//
+//	len(mockedRoleTemplateLister.GetCalls())
 func (mock *RoleTemplateListerMock) GetCalls() []struct {
 	Namespace string
 	Name      string
@@ -126,7 +127,8 @@ func (mock *RoleTemplateListerMock) List(namespace string, selector labels.Selec
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//     len(mockedRoleTemplateLister.ListCalls())
+//
+//	len(mockedRoleTemplateLister.ListCalls())
 func (mock *RoleTemplateListerMock) ListCalls() []struct {
 	Namespace string
 	Selector  labels.Selector
@@ -159,43 +161,43 @@ var _ v31.RoleTemplateController = &RoleTemplateControllerMock{}
 
 // RoleTemplateControllerMock is a mock implementation of v31.RoleTemplateController.
 //
-//     func TestSomethingThatUsesRoleTemplateController(t *testing.T) {
+//	    func TestSomethingThatUsesRoleTemplateController(t *testing.T) {
 //
-//         // make and configure a mocked v31.RoleTemplateController
-//         mockedRoleTemplateController := &RoleTemplateControllerMock{
-//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v31.RoleTemplateHandlerFunc)  {
-// 	               panic("mock out the AddClusterScopedFeatureHandler method")
-//             },
-//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v31.RoleTemplateHandlerFunc)  {
-// 	               panic("mock out the AddClusterScopedHandler method")
-//             },
-//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.RoleTemplateHandlerFunc)  {
-// 	               panic("mock out the AddFeatureHandler method")
-//             },
-//             AddHandlerFunc: func(ctx context.Context, name string, handler v31.RoleTemplateHandlerFunc)  {
-// 	               panic("mock out the AddHandler method")
-//             },
-//             EnqueueFunc: func(namespace string, name string)  {
-// 	               panic("mock out the Enqueue method")
-//             },
-//             EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
-// 	               panic("mock out the EnqueueAfter method")
-//             },
-//             GenericFunc: func() controller.GenericController {
-// 	               panic("mock out the Generic method")
-//             },
-//             InformerFunc: func() cache.SharedIndexInformer {
-// 	               panic("mock out the Informer method")
-//             },
-//             ListerFunc: func() v31.RoleTemplateLister {
-// 	               panic("mock out the Lister method")
-//             },
-//         }
+//	        // make and configure a mocked v31.RoleTemplateController
+//	        mockedRoleTemplateController := &RoleTemplateControllerMock{
+//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v31.RoleTemplateHandlerFunc)  {
+//		               panic("mock out the AddClusterScopedFeatureHandler method")
+//	            },
+//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v31.RoleTemplateHandlerFunc)  {
+//		               panic("mock out the AddClusterScopedHandler method")
+//	            },
+//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.RoleTemplateHandlerFunc)  {
+//		               panic("mock out the AddFeatureHandler method")
+//	            },
+//	            AddHandlerFunc: func(ctx context.Context, name string, handler v31.RoleTemplateHandlerFunc)  {
+//		               panic("mock out the AddHandler method")
+//	            },
+//	            EnqueueFunc: func(namespace string, name string)  {
+//		               panic("mock out the Enqueue method")
+//	            },
+//	            EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
+//		               panic("mock out the EnqueueAfter method")
+//	            },
+//	            GenericFunc: func() controller.GenericController {
+//		               panic("mock out the Generic method")
+//	            },
+//	            InformerFunc: func() cache.SharedIndexInformer {
+//		               panic("mock out the Informer method")
+//	            },
+//	            ListerFunc: func() v31.RoleTemplateLister {
+//		               panic("mock out the Lister method")
+//	            },
+//	        }
 //
-//         // use mockedRoleTemplateController in code that requires v31.RoleTemplateController
-//         // and then make assertions.
+//	        // use mockedRoleTemplateController in code that requires v31.RoleTemplateController
+//	        // and then make assertions.
 //
-//     }
+//	    }
 type RoleTemplateControllerMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
 	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v31.RoleTemplateHandlerFunc)
@@ -324,7 +326,8 @@ func (mock *RoleTemplateControllerMock) AddClusterScopedFeatureHandler(ctx conte
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//     len(mockedRoleTemplateController.AddClusterScopedFeatureHandlerCalls())
+//
+//	len(mockedRoleTemplateController.AddClusterScopedFeatureHandlerCalls())
 func (mock *RoleTemplateControllerMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -369,7 +372,8 @@ func (mock *RoleTemplateControllerMock) AddClusterScopedHandler(ctx context.Cont
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//     len(mockedRoleTemplateController.AddClusterScopedHandlerCalls())
+//
+//	len(mockedRoleTemplateController.AddClusterScopedHandlerCalls())
 func (mock *RoleTemplateControllerMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -412,7 +416,8 @@ func (mock *RoleTemplateControllerMock) AddFeatureHandler(ctx context.Context, e
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//     len(mockedRoleTemplateController.AddFeatureHandlerCalls())
+//
+//	len(mockedRoleTemplateController.AddFeatureHandlerCalls())
 func (mock *RoleTemplateControllerMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
@@ -453,7 +458,8 @@ func (mock *RoleTemplateControllerMock) AddHandler(ctx context.Context, name str
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//     len(mockedRoleTemplateController.AddHandlerCalls())
+//
+//	len(mockedRoleTemplateController.AddHandlerCalls())
 func (mock *RoleTemplateControllerMock) AddHandlerCalls() []struct {
 	Ctx     context.Context
 	Name    string
@@ -490,7 +496,8 @@ func (mock *RoleTemplateControllerMock) Enqueue(namespace string, name string) {
 
 // EnqueueCalls gets all the calls that were made to Enqueue.
 // Check the length with:
-//     len(mockedRoleTemplateController.EnqueueCalls())
+//
+//	len(mockedRoleTemplateController.EnqueueCalls())
 func (mock *RoleTemplateControllerMock) EnqueueCalls() []struct {
 	Namespace string
 	Name      string
@@ -527,7 +534,8 @@ func (mock *RoleTemplateControllerMock) EnqueueAfter(namespace string, name stri
 
 // EnqueueAfterCalls gets all the calls that were made to EnqueueAfter.
 // Check the length with:
-//     len(mockedRoleTemplateController.EnqueueAfterCalls())
+//
+//	len(mockedRoleTemplateController.EnqueueAfterCalls())
 func (mock *RoleTemplateControllerMock) EnqueueAfterCalls() []struct {
 	Namespace string
 	Name      string
@@ -559,7 +567,8 @@ func (mock *RoleTemplateControllerMock) Generic() controller.GenericController {
 
 // GenericCalls gets all the calls that were made to Generic.
 // Check the length with:
-//     len(mockedRoleTemplateController.GenericCalls())
+//
+//	len(mockedRoleTemplateController.GenericCalls())
 func (mock *RoleTemplateControllerMock) GenericCalls() []struct {
 } {
 	var calls []struct {
@@ -585,7 +594,8 @@ func (mock *RoleTemplateControllerMock) Informer() cache.SharedIndexInformer {
 
 // InformerCalls gets all the calls that were made to Informer.
 // Check the length with:
-//     len(mockedRoleTemplateController.InformerCalls())
+//
+//	len(mockedRoleTemplateController.InformerCalls())
 func (mock *RoleTemplateControllerMock) InformerCalls() []struct {
 } {
 	var calls []struct {
@@ -611,7 +621,8 @@ func (mock *RoleTemplateControllerMock) Lister() v31.RoleTemplateLister {
 
 // ListerCalls gets all the calls that were made to Lister.
 // Check the length with:
-//     len(mockedRoleTemplateController.ListerCalls())
+//
+//	len(mockedRoleTemplateController.ListerCalls())
 func (mock *RoleTemplateControllerMock) ListerCalls() []struct {
 } {
 	var calls []struct {
@@ -651,76 +662,76 @@ var _ v31.RoleTemplateInterface = &RoleTemplateInterfaceMock{}
 
 // RoleTemplateInterfaceMock is a mock implementation of v31.RoleTemplateInterface.
 //
-//     func TestSomethingThatUsesRoleTemplateInterface(t *testing.T) {
+//	    func TestSomethingThatUsesRoleTemplateInterface(t *testing.T) {
 //
-//         // make and configure a mocked v31.RoleTemplateInterface
-//         mockedRoleTemplateInterface := &RoleTemplateInterfaceMock{
-//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v31.RoleTemplateHandlerFunc)  {
-// 	               panic("mock out the AddClusterScopedFeatureHandler method")
-//             },
-//             AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v31.RoleTemplateLifecycle)  {
-// 	               panic("mock out the AddClusterScopedFeatureLifecycle method")
-//             },
-//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v31.RoleTemplateHandlerFunc)  {
-// 	               panic("mock out the AddClusterScopedHandler method")
-//             },
-//             AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v31.RoleTemplateLifecycle)  {
-// 	               panic("mock out the AddClusterScopedLifecycle method")
-//             },
-//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.RoleTemplateHandlerFunc)  {
-// 	               panic("mock out the AddFeatureHandler method")
-//             },
-//             AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v31.RoleTemplateLifecycle)  {
-// 	               panic("mock out the AddFeatureLifecycle method")
-//             },
-//             AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v31.RoleTemplateHandlerFunc)  {
-// 	               panic("mock out the AddHandler method")
-//             },
-//             AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v31.RoleTemplateLifecycle)  {
-// 	               panic("mock out the AddLifecycle method")
-//             },
-//             ControllerFunc: func() v31.RoleTemplateController {
-// 	               panic("mock out the Controller method")
-//             },
-//             CreateFunc: func(in1 *v3.RoleTemplate) (*v3.RoleTemplate, error) {
-// 	               panic("mock out the Create method")
-//             },
-//             DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
-// 	               panic("mock out the Delete method")
-//             },
-//             DeleteCollectionFunc: func(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
-// 	               panic("mock out the DeleteCollection method")
-//             },
-//             DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
-// 	               panic("mock out the DeleteNamespaced method")
-//             },
-//             GetFunc: func(name string, opts metav1.GetOptions) (*v3.RoleTemplate, error) {
-// 	               panic("mock out the Get method")
-//             },
-//             GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v3.RoleTemplate, error) {
-// 	               panic("mock out the GetNamespaced method")
-//             },
-//             ListFunc: func(opts metav1.ListOptions) (*v3.RoleTemplateList, error) {
-// 	               panic("mock out the List method")
-//             },
-//             ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v3.RoleTemplateList, error) {
-// 	               panic("mock out the ListNamespaced method")
-//             },
-//             ObjectClientFunc: func() *objectclient.ObjectClient {
-// 	               panic("mock out the ObjectClient method")
-//             },
-//             UpdateFunc: func(in1 *v3.RoleTemplate) (*v3.RoleTemplate, error) {
-// 	               panic("mock out the Update method")
-//             },
-//             WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
-// 	               panic("mock out the Watch method")
-//             },
-//         }
+//	        // make and configure a mocked v31.RoleTemplateInterface
+//	        mockedRoleTemplateInterface := &RoleTemplateInterfaceMock{
+//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v31.RoleTemplateHandlerFunc)  {
+//		               panic("mock out the AddClusterScopedFeatureHandler method")
+//	            },
+//	            AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v31.RoleTemplateLifecycle)  {
+//		               panic("mock out the AddClusterScopedFeatureLifecycle method")
+//	            },
+//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v31.RoleTemplateHandlerFunc)  {
+//		               panic("mock out the AddClusterScopedHandler method")
+//	            },
+//	            AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v31.RoleTemplateLifecycle)  {
+//		               panic("mock out the AddClusterScopedLifecycle method")
+//	            },
+//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.RoleTemplateHandlerFunc)  {
+//		               panic("mock out the AddFeatureHandler method")
+//	            },
+//	            AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v31.RoleTemplateLifecycle)  {
+//		               panic("mock out the AddFeatureLifecycle method")
+//	            },
+//	            AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v31.RoleTemplateHandlerFunc)  {
+//		               panic("mock out the AddHandler method")
+//	            },
+//	            AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v31.RoleTemplateLifecycle)  {
+//		               panic("mock out the AddLifecycle method")
+//	            },
+//	            ControllerFunc: func() v31.RoleTemplateController {
+//		               panic("mock out the Controller method")
+//	            },
+//	            CreateFunc: func(in1 *v3.RoleTemplate) (*v3.RoleTemplate, error) {
+//		               panic("mock out the Create method")
+//	            },
+//	            DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
+//		               panic("mock out the Delete method")
+//	            },
+//	            DeleteCollectionFunc: func(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
+//		               panic("mock out the DeleteCollection method")
+//	            },
+//	            DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
+//		               panic("mock out the DeleteNamespaced method")
+//	            },
+//	            GetFunc: func(name string, opts metav1.GetOptions) (*v3.RoleTemplate, error) {
+//		               panic("mock out the Get method")
+//	            },
+//	            GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v3.RoleTemplate, error) {
+//		               panic("mock out the GetNamespaced method")
+//	            },
+//	            ListFunc: func(opts metav1.ListOptions) (*v3.RoleTemplateList, error) {
+//		               panic("mock out the List method")
+//	            },
+//	            ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v3.RoleTemplateList, error) {
+//		               panic("mock out the ListNamespaced method")
+//	            },
+//	            ObjectClientFunc: func() *objectclient.ObjectClient {
+//		               panic("mock out the ObjectClient method")
+//	            },
+//	            UpdateFunc: func(in1 *v3.RoleTemplate) (*v3.RoleTemplate, error) {
+//		               panic("mock out the Update method")
+//	            },
+//	            WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
+//		               panic("mock out the Watch method")
+//	            },
+//	        }
 //
-//         // use mockedRoleTemplateInterface in code that requires v31.RoleTemplateInterface
-//         // and then make assertions.
+//	        // use mockedRoleTemplateInterface in code that requires v31.RoleTemplateInterface
+//	        // and then make assertions.
 //
-//     }
+//	    }
 type RoleTemplateInterfaceMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
 	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v31.RoleTemplateHandlerFunc)
@@ -973,7 +984,8 @@ func (mock *RoleTemplateInterfaceMock) AddClusterScopedFeatureHandler(ctx contex
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//     len(mockedRoleTemplateInterface.AddClusterScopedFeatureHandlerCalls())
+//
+//	len(mockedRoleTemplateInterface.AddClusterScopedFeatureHandlerCalls())
 func (mock *RoleTemplateInterfaceMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -1020,7 +1032,8 @@ func (mock *RoleTemplateInterfaceMock) AddClusterScopedFeatureLifecycle(ctx cont
 
 // AddClusterScopedFeatureLifecycleCalls gets all the calls that were made to AddClusterScopedFeatureLifecycle.
 // Check the length with:
-//     len(mockedRoleTemplateInterface.AddClusterScopedFeatureLifecycleCalls())
+//
+//	len(mockedRoleTemplateInterface.AddClusterScopedFeatureLifecycleCalls())
 func (mock *RoleTemplateInterfaceMock) AddClusterScopedFeatureLifecycleCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -1065,7 +1078,8 @@ func (mock *RoleTemplateInterfaceMock) AddClusterScopedHandler(ctx context.Conte
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//     len(mockedRoleTemplateInterface.AddClusterScopedHandlerCalls())
+//
+//	len(mockedRoleTemplateInterface.AddClusterScopedHandlerCalls())
 func (mock *RoleTemplateInterfaceMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -1108,7 +1122,8 @@ func (mock *RoleTemplateInterfaceMock) AddClusterScopedLifecycle(ctx context.Con
 
 // AddClusterScopedLifecycleCalls gets all the calls that were made to AddClusterScopedLifecycle.
 // Check the length with:
-//     len(mockedRoleTemplateInterface.AddClusterScopedLifecycleCalls())
+//
+//	len(mockedRoleTemplateInterface.AddClusterScopedLifecycleCalls())
 func (mock *RoleTemplateInterfaceMock) AddClusterScopedLifecycleCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -1151,7 +1166,8 @@ func (mock *RoleTemplateInterfaceMock) AddFeatureHandler(ctx context.Context, en
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//     len(mockedRoleTemplateInterface.AddFeatureHandlerCalls())
+//
+//	len(mockedRoleTemplateInterface.AddFeatureHandlerCalls())
 func (mock *RoleTemplateInterfaceMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
@@ -1194,7 +1210,8 @@ func (mock *RoleTemplateInterfaceMock) AddFeatureLifecycle(ctx context.Context, 
 
 // AddFeatureLifecycleCalls gets all the calls that were made to AddFeatureLifecycle.
 // Check the length with:
-//     len(mockedRoleTemplateInterface.AddFeatureLifecycleCalls())
+//
+//	len(mockedRoleTemplateInterface.AddFeatureLifecycleCalls())
 func (mock *RoleTemplateInterfaceMock) AddFeatureLifecycleCalls() []struct {
 	Ctx       context.Context
 	Enabled   func() bool
@@ -1235,7 +1252,8 @@ func (mock *RoleTemplateInterfaceMock) AddHandler(ctx context.Context, name stri
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//     len(mockedRoleTemplateInterface.AddHandlerCalls())
+//
+//	len(mockedRoleTemplateInterface.AddHandlerCalls())
 func (mock *RoleTemplateInterfaceMock) AddHandlerCalls() []struct {
 	Ctx  context.Context
 	Name string
@@ -1274,7 +1292,8 @@ func (mock *RoleTemplateInterfaceMock) AddLifecycle(ctx context.Context, name st
 
 // AddLifecycleCalls gets all the calls that were made to AddLifecycle.
 // Check the length with:
-//     len(mockedRoleTemplateInterface.AddLifecycleCalls())
+//
+//	len(mockedRoleTemplateInterface.AddLifecycleCalls())
 func (mock *RoleTemplateInterfaceMock) AddLifecycleCalls() []struct {
 	Ctx       context.Context
 	Name      string
@@ -1306,7 +1325,8 @@ func (mock *RoleTemplateInterfaceMock) Controller() v31.RoleTemplateController {
 
 // ControllerCalls gets all the calls that were made to Controller.
 // Check the length with:
-//     len(mockedRoleTemplateInterface.ControllerCalls())
+//
+//	len(mockedRoleTemplateInterface.ControllerCalls())
 func (mock *RoleTemplateInterfaceMock) ControllerCalls() []struct {
 } {
 	var calls []struct {
@@ -1335,7 +1355,8 @@ func (mock *RoleTemplateInterfaceMock) Create(in1 *v3.RoleTemplate) (*v3.RoleTem
 
 // CreateCalls gets all the calls that were made to Create.
 // Check the length with:
-//     len(mockedRoleTemplateInterface.CreateCalls())
+//
+//	len(mockedRoleTemplateInterface.CreateCalls())
 func (mock *RoleTemplateInterfaceMock) CreateCalls() []struct {
 	In1 *v3.RoleTemplate
 } {
@@ -1368,7 +1389,8 @@ func (mock *RoleTemplateInterfaceMock) Delete(name string, options *metav1.Delet
 
 // DeleteCalls gets all the calls that were made to Delete.
 // Check the length with:
-//     len(mockedRoleTemplateInterface.DeleteCalls())
+//
+//	len(mockedRoleTemplateInterface.DeleteCalls())
 func (mock *RoleTemplateInterfaceMock) DeleteCalls() []struct {
 	Name    string
 	Options *metav1.DeleteOptions
@@ -1403,7 +1425,8 @@ func (mock *RoleTemplateInterfaceMock) DeleteCollection(deleteOpts *metav1.Delet
 
 // DeleteCollectionCalls gets all the calls that were made to DeleteCollection.
 // Check the length with:
-//     len(mockedRoleTemplateInterface.DeleteCollectionCalls())
+//
+//	len(mockedRoleTemplateInterface.DeleteCollectionCalls())
 func (mock *RoleTemplateInterfaceMock) DeleteCollectionCalls() []struct {
 	DeleteOpts *metav1.DeleteOptions
 	ListOpts   metav1.ListOptions
@@ -1440,7 +1463,8 @@ func (mock *RoleTemplateInterfaceMock) DeleteNamespaced(namespace string, name s
 
 // DeleteNamespacedCalls gets all the calls that were made to DeleteNamespaced.
 // Check the length with:
-//     len(mockedRoleTemplateInterface.DeleteNamespacedCalls())
+//
+//	len(mockedRoleTemplateInterface.DeleteNamespacedCalls())
 func (mock *RoleTemplateInterfaceMock) DeleteNamespacedCalls() []struct {
 	Namespace string
 	Name      string
@@ -1477,7 +1501,8 @@ func (mock *RoleTemplateInterfaceMock) Get(name string, opts metav1.GetOptions) 
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//     len(mockedRoleTemplateInterface.GetCalls())
+//
+//	len(mockedRoleTemplateInterface.GetCalls())
 func (mock *RoleTemplateInterfaceMock) GetCalls() []struct {
 	Name string
 	Opts metav1.GetOptions
@@ -1514,7 +1539,8 @@ func (mock *RoleTemplateInterfaceMock) GetNamespaced(namespace string, name stri
 
 // GetNamespacedCalls gets all the calls that were made to GetNamespaced.
 // Check the length with:
-//     len(mockedRoleTemplateInterface.GetNamespacedCalls())
+//
+//	len(mockedRoleTemplateInterface.GetNamespacedCalls())
 func (mock *RoleTemplateInterfaceMock) GetNamespacedCalls() []struct {
 	Namespace string
 	Name      string
@@ -1549,7 +1575,8 @@ func (mock *RoleTemplateInterfaceMock) List(opts metav1.ListOptions) (*v3.RoleTe
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//     len(mockedRoleTemplateInterface.ListCalls())
+//
+//	len(mockedRoleTemplateInterface.ListCalls())
 func (mock *RoleTemplateInterfaceMock) ListCalls() []struct {
 	Opts metav1.ListOptions
 } {
@@ -1582,7 +1609,8 @@ func (mock *RoleTemplateInterfaceMock) ListNamespaced(namespace string, opts met
 
 // ListNamespacedCalls gets all the calls that were made to ListNamespaced.
 // Check the length with:
-//     len(mockedRoleTemplateInterface.ListNamespacedCalls())
+//
+//	len(mockedRoleTemplateInterface.ListNamespacedCalls())
 func (mock *RoleTemplateInterfaceMock) ListNamespacedCalls() []struct {
 	Namespace string
 	Opts      metav1.ListOptions
@@ -1612,7 +1640,8 @@ func (mock *RoleTemplateInterfaceMock) ObjectClient() *objectclient.ObjectClient
 
 // ObjectClientCalls gets all the calls that were made to ObjectClient.
 // Check the length with:
-//     len(mockedRoleTemplateInterface.ObjectClientCalls())
+//
+//	len(mockedRoleTemplateInterface.ObjectClientCalls())
 func (mock *RoleTemplateInterfaceMock) ObjectClientCalls() []struct {
 } {
 	var calls []struct {
@@ -1641,7 +1670,8 @@ func (mock *RoleTemplateInterfaceMock) Update(in1 *v3.RoleTemplate) (*v3.RoleTem
 
 // UpdateCalls gets all the calls that were made to Update.
 // Check the length with:
-//     len(mockedRoleTemplateInterface.UpdateCalls())
+//
+//	len(mockedRoleTemplateInterface.UpdateCalls())
 func (mock *RoleTemplateInterfaceMock) UpdateCalls() []struct {
 	In1 *v3.RoleTemplate
 } {
@@ -1672,7 +1702,8 @@ func (mock *RoleTemplateInterfaceMock) Watch(opts metav1.ListOptions) (watch.Int
 
 // WatchCalls gets all the calls that were made to Watch.
 // Check the length with:
-//     len(mockedRoleTemplateInterface.WatchCalls())
+//
+//	len(mockedRoleTemplateInterface.WatchCalls())
 func (mock *RoleTemplateInterfaceMock) WatchCalls() []struct {
 	Opts metav1.ListOptions
 } {
@@ -1695,19 +1726,19 @@ var _ v31.RoleTemplatesGetter = &RoleTemplatesGetterMock{}
 
 // RoleTemplatesGetterMock is a mock implementation of v31.RoleTemplatesGetter.
 //
-//     func TestSomethingThatUsesRoleTemplatesGetter(t *testing.T) {
+//	    func TestSomethingThatUsesRoleTemplatesGetter(t *testing.T) {
 //
-//         // make and configure a mocked v31.RoleTemplatesGetter
-//         mockedRoleTemplatesGetter := &RoleTemplatesGetterMock{
-//             RoleTemplatesFunc: func(namespace string) v31.RoleTemplateInterface {
-// 	               panic("mock out the RoleTemplates method")
-//             },
-//         }
+//	        // make and configure a mocked v31.RoleTemplatesGetter
+//	        mockedRoleTemplatesGetter := &RoleTemplatesGetterMock{
+//	            RoleTemplatesFunc: func(namespace string) v31.RoleTemplateInterface {
+//		               panic("mock out the RoleTemplates method")
+//	            },
+//	        }
 //
-//         // use mockedRoleTemplatesGetter in code that requires v31.RoleTemplatesGetter
-//         // and then make assertions.
+//	        // use mockedRoleTemplatesGetter in code that requires v31.RoleTemplatesGetter
+//	        // and then make assertions.
 //
-//     }
+//	    }
 type RoleTemplatesGetterMock struct {
 	// RoleTemplatesFunc mocks the RoleTemplates method.
 	RoleTemplatesFunc func(namespace string) v31.RoleTemplateInterface
@@ -1740,7 +1771,8 @@ func (mock *RoleTemplatesGetterMock) RoleTemplates(namespace string) v31.RoleTem
 
 // RoleTemplatesCalls gets all the calls that were made to RoleTemplates.
 // Check the length with:
-//     len(mockedRoleTemplatesGetter.RoleTemplatesCalls())
+//
+//	len(mockedRoleTemplatesGetter.RoleTemplatesCalls())
 func (mock *RoleTemplatesGetterMock) RoleTemplatesCalls() []struct {
 	Namespace string
 } {

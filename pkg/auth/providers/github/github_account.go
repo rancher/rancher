@@ -8,7 +8,7 @@ type searchResult struct {
 	Items []Account `json:"items"`
 }
 
-//Account defines properties an account on github has
+// Account defines properties an account on github has
 type Account struct {
 	ID        int    `json:"id,omitempty"`
 	Login     string `json:"login,omitempty"`
@@ -18,7 +18,7 @@ type Account struct {
 	Type      string `json:"type,omitempty"`
 }
 
-//Team defines properties a team on github has
+// Team defines properties a team on github has
 type Team struct {
 	ID           int                    `json:"id,omitempty"`
 	Organization map[string]interface{} `json:"organization,omitempty"`

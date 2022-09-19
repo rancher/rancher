@@ -210,10 +210,10 @@ func getKey(key string) string {
 	return base64.URLEncoding.EncodeToString([]byte(key))
 }
 
-//Related issue: #12619
-//In Rancher API schema, Capabilities is defined as enum type and `ALL` is one of the options, which means Rancher API only accepts `ALL`.
-//However, Kubernetes accepts both `all` and `ALL`` for capabilities, if user uses kubectl and use `all`` in the yaml, edit will fail in Rancher UI.
-//Thus we should convert `all`` to `ALL` so that UI always get `ALL`.
+// Related issue: #12619
+// In Rancher API schema, Capabilities is defined as enum type and `ALL` is one of the options, which means Rancher API only accepts `ALL`.
+// However, Kubernetes accepts both `all` and `ALL“ for capabilities, if user uses kubectl and use `all“ in the yaml, edit will fail in Rancher UI.
+// Thus we should convert `all“ to `ALL` so that UI always get `ALL`.
 func capabilitiesToUpperCase(data map[string]interface{}) map[string]interface{} {
 	containers := convert.ToMapSlice(data["containers"])
 	elements := []string{"capDrop", "capAdd"}

@@ -29,22 +29,22 @@ var _ v31.NamespacedDockerCredentialLister = &NamespacedDockerCredentialListerMo
 
 // NamespacedDockerCredentialListerMock is a mock implementation of v31.NamespacedDockerCredentialLister.
 //
-//     func TestSomethingThatUsesNamespacedDockerCredentialLister(t *testing.T) {
+//	    func TestSomethingThatUsesNamespacedDockerCredentialLister(t *testing.T) {
 //
-//         // make and configure a mocked v31.NamespacedDockerCredentialLister
-//         mockedNamespacedDockerCredentialLister := &NamespacedDockerCredentialListerMock{
-//             GetFunc: func(namespace string, name string) (*v3.NamespacedDockerCredential, error) {
-// 	               panic("mock out the Get method")
-//             },
-//             ListFunc: func(namespace string, selector labels.Selector) ([]*v3.NamespacedDockerCredential, error) {
-// 	               panic("mock out the List method")
-//             },
-//         }
+//	        // make and configure a mocked v31.NamespacedDockerCredentialLister
+//	        mockedNamespacedDockerCredentialLister := &NamespacedDockerCredentialListerMock{
+//	            GetFunc: func(namespace string, name string) (*v3.NamespacedDockerCredential, error) {
+//		               panic("mock out the Get method")
+//	            },
+//	            ListFunc: func(namespace string, selector labels.Selector) ([]*v3.NamespacedDockerCredential, error) {
+//		               panic("mock out the List method")
+//	            },
+//	        }
 //
-//         // use mockedNamespacedDockerCredentialLister in code that requires v31.NamespacedDockerCredentialLister
-//         // and then make assertions.
+//	        // use mockedNamespacedDockerCredentialLister in code that requires v31.NamespacedDockerCredentialLister
+//	        // and then make assertions.
 //
-//     }
+//	    }
 type NamespacedDockerCredentialListerMock struct {
 	// GetFunc mocks the Get method.
 	GetFunc func(namespace string, name string) (*v3.NamespacedDockerCredential, error)
@@ -91,7 +91,8 @@ func (mock *NamespacedDockerCredentialListerMock) Get(namespace string, name str
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//     len(mockedNamespacedDockerCredentialLister.GetCalls())
+//
+//	len(mockedNamespacedDockerCredentialLister.GetCalls())
 func (mock *NamespacedDockerCredentialListerMock) GetCalls() []struct {
 	Namespace string
 	Name      string
@@ -126,7 +127,8 @@ func (mock *NamespacedDockerCredentialListerMock) List(namespace string, selecto
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//     len(mockedNamespacedDockerCredentialLister.ListCalls())
+//
+//	len(mockedNamespacedDockerCredentialLister.ListCalls())
 func (mock *NamespacedDockerCredentialListerMock) ListCalls() []struct {
 	Namespace string
 	Selector  labels.Selector
@@ -159,43 +161,43 @@ var _ v31.NamespacedDockerCredentialController = &NamespacedDockerCredentialCont
 
 // NamespacedDockerCredentialControllerMock is a mock implementation of v31.NamespacedDockerCredentialController.
 //
-//     func TestSomethingThatUsesNamespacedDockerCredentialController(t *testing.T) {
+//	    func TestSomethingThatUsesNamespacedDockerCredentialController(t *testing.T) {
 //
-//         // make and configure a mocked v31.NamespacedDockerCredentialController
-//         mockedNamespacedDockerCredentialController := &NamespacedDockerCredentialControllerMock{
-//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v31.NamespacedDockerCredentialHandlerFunc)  {
-// 	               panic("mock out the AddClusterScopedFeatureHandler method")
-//             },
-//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v31.NamespacedDockerCredentialHandlerFunc)  {
-// 	               panic("mock out the AddClusterScopedHandler method")
-//             },
-//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.NamespacedDockerCredentialHandlerFunc)  {
-// 	               panic("mock out the AddFeatureHandler method")
-//             },
-//             AddHandlerFunc: func(ctx context.Context, name string, handler v31.NamespacedDockerCredentialHandlerFunc)  {
-// 	               panic("mock out the AddHandler method")
-//             },
-//             EnqueueFunc: func(namespace string, name string)  {
-// 	               panic("mock out the Enqueue method")
-//             },
-//             EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
-// 	               panic("mock out the EnqueueAfter method")
-//             },
-//             GenericFunc: func() controller.GenericController {
-// 	               panic("mock out the Generic method")
-//             },
-//             InformerFunc: func() cache.SharedIndexInformer {
-// 	               panic("mock out the Informer method")
-//             },
-//             ListerFunc: func() v31.NamespacedDockerCredentialLister {
-// 	               panic("mock out the Lister method")
-//             },
-//         }
+//	        // make and configure a mocked v31.NamespacedDockerCredentialController
+//	        mockedNamespacedDockerCredentialController := &NamespacedDockerCredentialControllerMock{
+//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v31.NamespacedDockerCredentialHandlerFunc)  {
+//		               panic("mock out the AddClusterScopedFeatureHandler method")
+//	            },
+//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v31.NamespacedDockerCredentialHandlerFunc)  {
+//		               panic("mock out the AddClusterScopedHandler method")
+//	            },
+//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.NamespacedDockerCredentialHandlerFunc)  {
+//		               panic("mock out the AddFeatureHandler method")
+//	            },
+//	            AddHandlerFunc: func(ctx context.Context, name string, handler v31.NamespacedDockerCredentialHandlerFunc)  {
+//		               panic("mock out the AddHandler method")
+//	            },
+//	            EnqueueFunc: func(namespace string, name string)  {
+//		               panic("mock out the Enqueue method")
+//	            },
+//	            EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
+//		               panic("mock out the EnqueueAfter method")
+//	            },
+//	            GenericFunc: func() controller.GenericController {
+//		               panic("mock out the Generic method")
+//	            },
+//	            InformerFunc: func() cache.SharedIndexInformer {
+//		               panic("mock out the Informer method")
+//	            },
+//	            ListerFunc: func() v31.NamespacedDockerCredentialLister {
+//		               panic("mock out the Lister method")
+//	            },
+//	        }
 //
-//         // use mockedNamespacedDockerCredentialController in code that requires v31.NamespacedDockerCredentialController
-//         // and then make assertions.
+//	        // use mockedNamespacedDockerCredentialController in code that requires v31.NamespacedDockerCredentialController
+//	        // and then make assertions.
 //
-//     }
+//	    }
 type NamespacedDockerCredentialControllerMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
 	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v31.NamespacedDockerCredentialHandlerFunc)
@@ -324,7 +326,8 @@ func (mock *NamespacedDockerCredentialControllerMock) AddClusterScopedFeatureHan
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//     len(mockedNamespacedDockerCredentialController.AddClusterScopedFeatureHandlerCalls())
+//
+//	len(mockedNamespacedDockerCredentialController.AddClusterScopedFeatureHandlerCalls())
 func (mock *NamespacedDockerCredentialControllerMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -369,7 +372,8 @@ func (mock *NamespacedDockerCredentialControllerMock) AddClusterScopedHandler(ct
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//     len(mockedNamespacedDockerCredentialController.AddClusterScopedHandlerCalls())
+//
+//	len(mockedNamespacedDockerCredentialController.AddClusterScopedHandlerCalls())
 func (mock *NamespacedDockerCredentialControllerMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -412,7 +416,8 @@ func (mock *NamespacedDockerCredentialControllerMock) AddFeatureHandler(ctx cont
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//     len(mockedNamespacedDockerCredentialController.AddFeatureHandlerCalls())
+//
+//	len(mockedNamespacedDockerCredentialController.AddFeatureHandlerCalls())
 func (mock *NamespacedDockerCredentialControllerMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
@@ -453,7 +458,8 @@ func (mock *NamespacedDockerCredentialControllerMock) AddHandler(ctx context.Con
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//     len(mockedNamespacedDockerCredentialController.AddHandlerCalls())
+//
+//	len(mockedNamespacedDockerCredentialController.AddHandlerCalls())
 func (mock *NamespacedDockerCredentialControllerMock) AddHandlerCalls() []struct {
 	Ctx     context.Context
 	Name    string
@@ -490,7 +496,8 @@ func (mock *NamespacedDockerCredentialControllerMock) Enqueue(namespace string, 
 
 // EnqueueCalls gets all the calls that were made to Enqueue.
 // Check the length with:
-//     len(mockedNamespacedDockerCredentialController.EnqueueCalls())
+//
+//	len(mockedNamespacedDockerCredentialController.EnqueueCalls())
 func (mock *NamespacedDockerCredentialControllerMock) EnqueueCalls() []struct {
 	Namespace string
 	Name      string
@@ -527,7 +534,8 @@ func (mock *NamespacedDockerCredentialControllerMock) EnqueueAfter(namespace str
 
 // EnqueueAfterCalls gets all the calls that were made to EnqueueAfter.
 // Check the length with:
-//     len(mockedNamespacedDockerCredentialController.EnqueueAfterCalls())
+//
+//	len(mockedNamespacedDockerCredentialController.EnqueueAfterCalls())
 func (mock *NamespacedDockerCredentialControllerMock) EnqueueAfterCalls() []struct {
 	Namespace string
 	Name      string
@@ -559,7 +567,8 @@ func (mock *NamespacedDockerCredentialControllerMock) Generic() controller.Gener
 
 // GenericCalls gets all the calls that were made to Generic.
 // Check the length with:
-//     len(mockedNamespacedDockerCredentialController.GenericCalls())
+//
+//	len(mockedNamespacedDockerCredentialController.GenericCalls())
 func (mock *NamespacedDockerCredentialControllerMock) GenericCalls() []struct {
 } {
 	var calls []struct {
@@ -585,7 +594,8 @@ func (mock *NamespacedDockerCredentialControllerMock) Informer() cache.SharedInd
 
 // InformerCalls gets all the calls that were made to Informer.
 // Check the length with:
-//     len(mockedNamespacedDockerCredentialController.InformerCalls())
+//
+//	len(mockedNamespacedDockerCredentialController.InformerCalls())
 func (mock *NamespacedDockerCredentialControllerMock) InformerCalls() []struct {
 } {
 	var calls []struct {
@@ -611,7 +621,8 @@ func (mock *NamespacedDockerCredentialControllerMock) Lister() v31.NamespacedDoc
 
 // ListerCalls gets all the calls that were made to Lister.
 // Check the length with:
-//     len(mockedNamespacedDockerCredentialController.ListerCalls())
+//
+//	len(mockedNamespacedDockerCredentialController.ListerCalls())
 func (mock *NamespacedDockerCredentialControllerMock) ListerCalls() []struct {
 } {
 	var calls []struct {
@@ -651,76 +662,76 @@ var _ v31.NamespacedDockerCredentialInterface = &NamespacedDockerCredentialInter
 
 // NamespacedDockerCredentialInterfaceMock is a mock implementation of v31.NamespacedDockerCredentialInterface.
 //
-//     func TestSomethingThatUsesNamespacedDockerCredentialInterface(t *testing.T) {
+//	    func TestSomethingThatUsesNamespacedDockerCredentialInterface(t *testing.T) {
 //
-//         // make and configure a mocked v31.NamespacedDockerCredentialInterface
-//         mockedNamespacedDockerCredentialInterface := &NamespacedDockerCredentialInterfaceMock{
-//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v31.NamespacedDockerCredentialHandlerFunc)  {
-// 	               panic("mock out the AddClusterScopedFeatureHandler method")
-//             },
-//             AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v31.NamespacedDockerCredentialLifecycle)  {
-// 	               panic("mock out the AddClusterScopedFeatureLifecycle method")
-//             },
-//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v31.NamespacedDockerCredentialHandlerFunc)  {
-// 	               panic("mock out the AddClusterScopedHandler method")
-//             },
-//             AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v31.NamespacedDockerCredentialLifecycle)  {
-// 	               panic("mock out the AddClusterScopedLifecycle method")
-//             },
-//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.NamespacedDockerCredentialHandlerFunc)  {
-// 	               panic("mock out the AddFeatureHandler method")
-//             },
-//             AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v31.NamespacedDockerCredentialLifecycle)  {
-// 	               panic("mock out the AddFeatureLifecycle method")
-//             },
-//             AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v31.NamespacedDockerCredentialHandlerFunc)  {
-// 	               panic("mock out the AddHandler method")
-//             },
-//             AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v31.NamespacedDockerCredentialLifecycle)  {
-// 	               panic("mock out the AddLifecycle method")
-//             },
-//             ControllerFunc: func() v31.NamespacedDockerCredentialController {
-// 	               panic("mock out the Controller method")
-//             },
-//             CreateFunc: func(in1 *v3.NamespacedDockerCredential) (*v3.NamespacedDockerCredential, error) {
-// 	               panic("mock out the Create method")
-//             },
-//             DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
-// 	               panic("mock out the Delete method")
-//             },
-//             DeleteCollectionFunc: func(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
-// 	               panic("mock out the DeleteCollection method")
-//             },
-//             DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
-// 	               panic("mock out the DeleteNamespaced method")
-//             },
-//             GetFunc: func(name string, opts metav1.GetOptions) (*v3.NamespacedDockerCredential, error) {
-// 	               panic("mock out the Get method")
-//             },
-//             GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v3.NamespacedDockerCredential, error) {
-// 	               panic("mock out the GetNamespaced method")
-//             },
-//             ListFunc: func(opts metav1.ListOptions) (*v3.NamespacedDockerCredentialList, error) {
-// 	               panic("mock out the List method")
-//             },
-//             ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v3.NamespacedDockerCredentialList, error) {
-// 	               panic("mock out the ListNamespaced method")
-//             },
-//             ObjectClientFunc: func() *objectclient.ObjectClient {
-// 	               panic("mock out the ObjectClient method")
-//             },
-//             UpdateFunc: func(in1 *v3.NamespacedDockerCredential) (*v3.NamespacedDockerCredential, error) {
-// 	               panic("mock out the Update method")
-//             },
-//             WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
-// 	               panic("mock out the Watch method")
-//             },
-//         }
+//	        // make and configure a mocked v31.NamespacedDockerCredentialInterface
+//	        mockedNamespacedDockerCredentialInterface := &NamespacedDockerCredentialInterfaceMock{
+//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v31.NamespacedDockerCredentialHandlerFunc)  {
+//		               panic("mock out the AddClusterScopedFeatureHandler method")
+//	            },
+//	            AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v31.NamespacedDockerCredentialLifecycle)  {
+//		               panic("mock out the AddClusterScopedFeatureLifecycle method")
+//	            },
+//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v31.NamespacedDockerCredentialHandlerFunc)  {
+//		               panic("mock out the AddClusterScopedHandler method")
+//	            },
+//	            AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v31.NamespacedDockerCredentialLifecycle)  {
+//		               panic("mock out the AddClusterScopedLifecycle method")
+//	            },
+//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.NamespacedDockerCredentialHandlerFunc)  {
+//		               panic("mock out the AddFeatureHandler method")
+//	            },
+//	            AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v31.NamespacedDockerCredentialLifecycle)  {
+//		               panic("mock out the AddFeatureLifecycle method")
+//	            },
+//	            AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v31.NamespacedDockerCredentialHandlerFunc)  {
+//		               panic("mock out the AddHandler method")
+//	            },
+//	            AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v31.NamespacedDockerCredentialLifecycle)  {
+//		               panic("mock out the AddLifecycle method")
+//	            },
+//	            ControllerFunc: func() v31.NamespacedDockerCredentialController {
+//		               panic("mock out the Controller method")
+//	            },
+//	            CreateFunc: func(in1 *v3.NamespacedDockerCredential) (*v3.NamespacedDockerCredential, error) {
+//		               panic("mock out the Create method")
+//	            },
+//	            DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
+//		               panic("mock out the Delete method")
+//	            },
+//	            DeleteCollectionFunc: func(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
+//		               panic("mock out the DeleteCollection method")
+//	            },
+//	            DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
+//		               panic("mock out the DeleteNamespaced method")
+//	            },
+//	            GetFunc: func(name string, opts metav1.GetOptions) (*v3.NamespacedDockerCredential, error) {
+//		               panic("mock out the Get method")
+//	            },
+//	            GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v3.NamespacedDockerCredential, error) {
+//		               panic("mock out the GetNamespaced method")
+//	            },
+//	            ListFunc: func(opts metav1.ListOptions) (*v3.NamespacedDockerCredentialList, error) {
+//		               panic("mock out the List method")
+//	            },
+//	            ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v3.NamespacedDockerCredentialList, error) {
+//		               panic("mock out the ListNamespaced method")
+//	            },
+//	            ObjectClientFunc: func() *objectclient.ObjectClient {
+//		               panic("mock out the ObjectClient method")
+//	            },
+//	            UpdateFunc: func(in1 *v3.NamespacedDockerCredential) (*v3.NamespacedDockerCredential, error) {
+//		               panic("mock out the Update method")
+//	            },
+//	            WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
+//		               panic("mock out the Watch method")
+//	            },
+//	        }
 //
-//         // use mockedNamespacedDockerCredentialInterface in code that requires v31.NamespacedDockerCredentialInterface
-//         // and then make assertions.
+//	        // use mockedNamespacedDockerCredentialInterface in code that requires v31.NamespacedDockerCredentialInterface
+//	        // and then make assertions.
 //
-//     }
+//	    }
 type NamespacedDockerCredentialInterfaceMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
 	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v31.NamespacedDockerCredentialHandlerFunc)
@@ -973,7 +984,8 @@ func (mock *NamespacedDockerCredentialInterfaceMock) AddClusterScopedFeatureHand
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//     len(mockedNamespacedDockerCredentialInterface.AddClusterScopedFeatureHandlerCalls())
+//
+//	len(mockedNamespacedDockerCredentialInterface.AddClusterScopedFeatureHandlerCalls())
 func (mock *NamespacedDockerCredentialInterfaceMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -1020,7 +1032,8 @@ func (mock *NamespacedDockerCredentialInterfaceMock) AddClusterScopedFeatureLife
 
 // AddClusterScopedFeatureLifecycleCalls gets all the calls that were made to AddClusterScopedFeatureLifecycle.
 // Check the length with:
-//     len(mockedNamespacedDockerCredentialInterface.AddClusterScopedFeatureLifecycleCalls())
+//
+//	len(mockedNamespacedDockerCredentialInterface.AddClusterScopedFeatureLifecycleCalls())
 func (mock *NamespacedDockerCredentialInterfaceMock) AddClusterScopedFeatureLifecycleCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -1065,7 +1078,8 @@ func (mock *NamespacedDockerCredentialInterfaceMock) AddClusterScopedHandler(ctx
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//     len(mockedNamespacedDockerCredentialInterface.AddClusterScopedHandlerCalls())
+//
+//	len(mockedNamespacedDockerCredentialInterface.AddClusterScopedHandlerCalls())
 func (mock *NamespacedDockerCredentialInterfaceMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -1108,7 +1122,8 @@ func (mock *NamespacedDockerCredentialInterfaceMock) AddClusterScopedLifecycle(c
 
 // AddClusterScopedLifecycleCalls gets all the calls that were made to AddClusterScopedLifecycle.
 // Check the length with:
-//     len(mockedNamespacedDockerCredentialInterface.AddClusterScopedLifecycleCalls())
+//
+//	len(mockedNamespacedDockerCredentialInterface.AddClusterScopedLifecycleCalls())
 func (mock *NamespacedDockerCredentialInterfaceMock) AddClusterScopedLifecycleCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -1151,7 +1166,8 @@ func (mock *NamespacedDockerCredentialInterfaceMock) AddFeatureHandler(ctx conte
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//     len(mockedNamespacedDockerCredentialInterface.AddFeatureHandlerCalls())
+//
+//	len(mockedNamespacedDockerCredentialInterface.AddFeatureHandlerCalls())
 func (mock *NamespacedDockerCredentialInterfaceMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
@@ -1194,7 +1210,8 @@ func (mock *NamespacedDockerCredentialInterfaceMock) AddFeatureLifecycle(ctx con
 
 // AddFeatureLifecycleCalls gets all the calls that were made to AddFeatureLifecycle.
 // Check the length with:
-//     len(mockedNamespacedDockerCredentialInterface.AddFeatureLifecycleCalls())
+//
+//	len(mockedNamespacedDockerCredentialInterface.AddFeatureLifecycleCalls())
 func (mock *NamespacedDockerCredentialInterfaceMock) AddFeatureLifecycleCalls() []struct {
 	Ctx       context.Context
 	Enabled   func() bool
@@ -1235,7 +1252,8 @@ func (mock *NamespacedDockerCredentialInterfaceMock) AddHandler(ctx context.Cont
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//     len(mockedNamespacedDockerCredentialInterface.AddHandlerCalls())
+//
+//	len(mockedNamespacedDockerCredentialInterface.AddHandlerCalls())
 func (mock *NamespacedDockerCredentialInterfaceMock) AddHandlerCalls() []struct {
 	Ctx  context.Context
 	Name string
@@ -1274,7 +1292,8 @@ func (mock *NamespacedDockerCredentialInterfaceMock) AddLifecycle(ctx context.Co
 
 // AddLifecycleCalls gets all the calls that were made to AddLifecycle.
 // Check the length with:
-//     len(mockedNamespacedDockerCredentialInterface.AddLifecycleCalls())
+//
+//	len(mockedNamespacedDockerCredentialInterface.AddLifecycleCalls())
 func (mock *NamespacedDockerCredentialInterfaceMock) AddLifecycleCalls() []struct {
 	Ctx       context.Context
 	Name      string
@@ -1306,7 +1325,8 @@ func (mock *NamespacedDockerCredentialInterfaceMock) Controller() v31.Namespaced
 
 // ControllerCalls gets all the calls that were made to Controller.
 // Check the length with:
-//     len(mockedNamespacedDockerCredentialInterface.ControllerCalls())
+//
+//	len(mockedNamespacedDockerCredentialInterface.ControllerCalls())
 func (mock *NamespacedDockerCredentialInterfaceMock) ControllerCalls() []struct {
 } {
 	var calls []struct {
@@ -1335,7 +1355,8 @@ func (mock *NamespacedDockerCredentialInterfaceMock) Create(in1 *v3.NamespacedDo
 
 // CreateCalls gets all the calls that were made to Create.
 // Check the length with:
-//     len(mockedNamespacedDockerCredentialInterface.CreateCalls())
+//
+//	len(mockedNamespacedDockerCredentialInterface.CreateCalls())
 func (mock *NamespacedDockerCredentialInterfaceMock) CreateCalls() []struct {
 	In1 *v3.NamespacedDockerCredential
 } {
@@ -1368,7 +1389,8 @@ func (mock *NamespacedDockerCredentialInterfaceMock) Delete(name string, options
 
 // DeleteCalls gets all the calls that were made to Delete.
 // Check the length with:
-//     len(mockedNamespacedDockerCredentialInterface.DeleteCalls())
+//
+//	len(mockedNamespacedDockerCredentialInterface.DeleteCalls())
 func (mock *NamespacedDockerCredentialInterfaceMock) DeleteCalls() []struct {
 	Name    string
 	Options *metav1.DeleteOptions
@@ -1403,7 +1425,8 @@ func (mock *NamespacedDockerCredentialInterfaceMock) DeleteCollection(deleteOpts
 
 // DeleteCollectionCalls gets all the calls that were made to DeleteCollection.
 // Check the length with:
-//     len(mockedNamespacedDockerCredentialInterface.DeleteCollectionCalls())
+//
+//	len(mockedNamespacedDockerCredentialInterface.DeleteCollectionCalls())
 func (mock *NamespacedDockerCredentialInterfaceMock) DeleteCollectionCalls() []struct {
 	DeleteOpts *metav1.DeleteOptions
 	ListOpts   metav1.ListOptions
@@ -1440,7 +1463,8 @@ func (mock *NamespacedDockerCredentialInterfaceMock) DeleteNamespaced(namespace 
 
 // DeleteNamespacedCalls gets all the calls that were made to DeleteNamespaced.
 // Check the length with:
-//     len(mockedNamespacedDockerCredentialInterface.DeleteNamespacedCalls())
+//
+//	len(mockedNamespacedDockerCredentialInterface.DeleteNamespacedCalls())
 func (mock *NamespacedDockerCredentialInterfaceMock) DeleteNamespacedCalls() []struct {
 	Namespace string
 	Name      string
@@ -1477,7 +1501,8 @@ func (mock *NamespacedDockerCredentialInterfaceMock) Get(name string, opts metav
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//     len(mockedNamespacedDockerCredentialInterface.GetCalls())
+//
+//	len(mockedNamespacedDockerCredentialInterface.GetCalls())
 func (mock *NamespacedDockerCredentialInterfaceMock) GetCalls() []struct {
 	Name string
 	Opts metav1.GetOptions
@@ -1514,7 +1539,8 @@ func (mock *NamespacedDockerCredentialInterfaceMock) GetNamespaced(namespace str
 
 // GetNamespacedCalls gets all the calls that were made to GetNamespaced.
 // Check the length with:
-//     len(mockedNamespacedDockerCredentialInterface.GetNamespacedCalls())
+//
+//	len(mockedNamespacedDockerCredentialInterface.GetNamespacedCalls())
 func (mock *NamespacedDockerCredentialInterfaceMock) GetNamespacedCalls() []struct {
 	Namespace string
 	Name      string
@@ -1549,7 +1575,8 @@ func (mock *NamespacedDockerCredentialInterfaceMock) List(opts metav1.ListOption
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//     len(mockedNamespacedDockerCredentialInterface.ListCalls())
+//
+//	len(mockedNamespacedDockerCredentialInterface.ListCalls())
 func (mock *NamespacedDockerCredentialInterfaceMock) ListCalls() []struct {
 	Opts metav1.ListOptions
 } {
@@ -1582,7 +1609,8 @@ func (mock *NamespacedDockerCredentialInterfaceMock) ListNamespaced(namespace st
 
 // ListNamespacedCalls gets all the calls that were made to ListNamespaced.
 // Check the length with:
-//     len(mockedNamespacedDockerCredentialInterface.ListNamespacedCalls())
+//
+//	len(mockedNamespacedDockerCredentialInterface.ListNamespacedCalls())
 func (mock *NamespacedDockerCredentialInterfaceMock) ListNamespacedCalls() []struct {
 	Namespace string
 	Opts      metav1.ListOptions
@@ -1612,7 +1640,8 @@ func (mock *NamespacedDockerCredentialInterfaceMock) ObjectClient() *objectclien
 
 // ObjectClientCalls gets all the calls that were made to ObjectClient.
 // Check the length with:
-//     len(mockedNamespacedDockerCredentialInterface.ObjectClientCalls())
+//
+//	len(mockedNamespacedDockerCredentialInterface.ObjectClientCalls())
 func (mock *NamespacedDockerCredentialInterfaceMock) ObjectClientCalls() []struct {
 } {
 	var calls []struct {
@@ -1641,7 +1670,8 @@ func (mock *NamespacedDockerCredentialInterfaceMock) Update(in1 *v3.NamespacedDo
 
 // UpdateCalls gets all the calls that were made to Update.
 // Check the length with:
-//     len(mockedNamespacedDockerCredentialInterface.UpdateCalls())
+//
+//	len(mockedNamespacedDockerCredentialInterface.UpdateCalls())
 func (mock *NamespacedDockerCredentialInterfaceMock) UpdateCalls() []struct {
 	In1 *v3.NamespacedDockerCredential
 } {
@@ -1672,7 +1702,8 @@ func (mock *NamespacedDockerCredentialInterfaceMock) Watch(opts metav1.ListOptio
 
 // WatchCalls gets all the calls that were made to Watch.
 // Check the length with:
-//     len(mockedNamespacedDockerCredentialInterface.WatchCalls())
+//
+//	len(mockedNamespacedDockerCredentialInterface.WatchCalls())
 func (mock *NamespacedDockerCredentialInterfaceMock) WatchCalls() []struct {
 	Opts metav1.ListOptions
 } {
@@ -1695,19 +1726,19 @@ var _ v31.NamespacedDockerCredentialsGetter = &NamespacedDockerCredentialsGetter
 
 // NamespacedDockerCredentialsGetterMock is a mock implementation of v31.NamespacedDockerCredentialsGetter.
 //
-//     func TestSomethingThatUsesNamespacedDockerCredentialsGetter(t *testing.T) {
+//	    func TestSomethingThatUsesNamespacedDockerCredentialsGetter(t *testing.T) {
 //
-//         // make and configure a mocked v31.NamespacedDockerCredentialsGetter
-//         mockedNamespacedDockerCredentialsGetter := &NamespacedDockerCredentialsGetterMock{
-//             NamespacedDockerCredentialsFunc: func(namespace string) v31.NamespacedDockerCredentialInterface {
-// 	               panic("mock out the NamespacedDockerCredentials method")
-//             },
-//         }
+//	        // make and configure a mocked v31.NamespacedDockerCredentialsGetter
+//	        mockedNamespacedDockerCredentialsGetter := &NamespacedDockerCredentialsGetterMock{
+//	            NamespacedDockerCredentialsFunc: func(namespace string) v31.NamespacedDockerCredentialInterface {
+//		               panic("mock out the NamespacedDockerCredentials method")
+//	            },
+//	        }
 //
-//         // use mockedNamespacedDockerCredentialsGetter in code that requires v31.NamespacedDockerCredentialsGetter
-//         // and then make assertions.
+//	        // use mockedNamespacedDockerCredentialsGetter in code that requires v31.NamespacedDockerCredentialsGetter
+//	        // and then make assertions.
 //
-//     }
+//	    }
 type NamespacedDockerCredentialsGetterMock struct {
 	// NamespacedDockerCredentialsFunc mocks the NamespacedDockerCredentials method.
 	NamespacedDockerCredentialsFunc func(namespace string) v31.NamespacedDockerCredentialInterface
@@ -1740,7 +1771,8 @@ func (mock *NamespacedDockerCredentialsGetterMock) NamespacedDockerCredentials(n
 
 // NamespacedDockerCredentialsCalls gets all the calls that were made to NamespacedDockerCredentials.
 // Check the length with:
-//     len(mockedNamespacedDockerCredentialsGetter.NamespacedDockerCredentialsCalls())
+//
+//	len(mockedNamespacedDockerCredentialsGetter.NamespacedDockerCredentialsCalls())
 func (mock *NamespacedDockerCredentialsGetterMock) NamespacedDockerCredentialsCalls() []struct {
 	Namespace string
 } {

@@ -10,7 +10,7 @@ var (
 	RequestKey = struct{}{}
 )
 
-//ReturnHTTPError handles sending out Error response
+// ReturnHTTPError handles sending out Error response
 // TODO Use the Norman API error framework instead
 func ReturnHTTPError(w http.ResponseWriter, r *http.Request, httpStatus int, errorMessage string) {
 	w.Header().Set("Content-Type", "application/json")
@@ -53,7 +53,7 @@ func GetHost(req *http.Request) string {
 	return host
 }
 
-//AuthError structure contains the error resource definition
+// AuthError structure contains the error resource definition
 type AuthError struct {
 	Type    string `json:"type"`
 	Status  string `json:"status"`

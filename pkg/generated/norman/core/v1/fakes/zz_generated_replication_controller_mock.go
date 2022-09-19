@@ -29,22 +29,22 @@ var _ v11.ReplicationControllerLister = &ReplicationControllerListerMock{}
 
 // ReplicationControllerListerMock is a mock implementation of v11.ReplicationControllerLister.
 //
-//     func TestSomethingThatUsesReplicationControllerLister(t *testing.T) {
+//	    func TestSomethingThatUsesReplicationControllerLister(t *testing.T) {
 //
-//         // make and configure a mocked v11.ReplicationControllerLister
-//         mockedReplicationControllerLister := &ReplicationControllerListerMock{
-//             GetFunc: func(namespace string, name string) (*v1.ReplicationController, error) {
-// 	               panic("mock out the Get method")
-//             },
-//             ListFunc: func(namespace string, selector labels.Selector) ([]*v1.ReplicationController, error) {
-// 	               panic("mock out the List method")
-//             },
-//         }
+//	        // make and configure a mocked v11.ReplicationControllerLister
+//	        mockedReplicationControllerLister := &ReplicationControllerListerMock{
+//	            GetFunc: func(namespace string, name string) (*v1.ReplicationController, error) {
+//		               panic("mock out the Get method")
+//	            },
+//	            ListFunc: func(namespace string, selector labels.Selector) ([]*v1.ReplicationController, error) {
+//		               panic("mock out the List method")
+//	            },
+//	        }
 //
-//         // use mockedReplicationControllerLister in code that requires v11.ReplicationControllerLister
-//         // and then make assertions.
+//	        // use mockedReplicationControllerLister in code that requires v11.ReplicationControllerLister
+//	        // and then make assertions.
 //
-//     }
+//	    }
 type ReplicationControllerListerMock struct {
 	// GetFunc mocks the Get method.
 	GetFunc func(namespace string, name string) (*v1.ReplicationController, error)
@@ -91,7 +91,8 @@ func (mock *ReplicationControllerListerMock) Get(namespace string, name string) 
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//     len(mockedReplicationControllerLister.GetCalls())
+//
+//	len(mockedReplicationControllerLister.GetCalls())
 func (mock *ReplicationControllerListerMock) GetCalls() []struct {
 	Namespace string
 	Name      string
@@ -126,7 +127,8 @@ func (mock *ReplicationControllerListerMock) List(namespace string, selector lab
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//     len(mockedReplicationControllerLister.ListCalls())
+//
+//	len(mockedReplicationControllerLister.ListCalls())
 func (mock *ReplicationControllerListerMock) ListCalls() []struct {
 	Namespace string
 	Selector  labels.Selector
@@ -159,43 +161,43 @@ var _ v11.ReplicationControllerController = &ReplicationControllerControllerMock
 
 // ReplicationControllerControllerMock is a mock implementation of v11.ReplicationControllerController.
 //
-//     func TestSomethingThatUsesReplicationControllerController(t *testing.T) {
+//	    func TestSomethingThatUsesReplicationControllerController(t *testing.T) {
 //
-//         // make and configure a mocked v11.ReplicationControllerController
-//         mockedReplicationControllerController := &ReplicationControllerControllerMock{
-//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v11.ReplicationControllerHandlerFunc)  {
-// 	               panic("mock out the AddClusterScopedFeatureHandler method")
-//             },
-//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v11.ReplicationControllerHandlerFunc)  {
-// 	               panic("mock out the AddClusterScopedHandler method")
-//             },
-//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v11.ReplicationControllerHandlerFunc)  {
-// 	               panic("mock out the AddFeatureHandler method")
-//             },
-//             AddHandlerFunc: func(ctx context.Context, name string, handler v11.ReplicationControllerHandlerFunc)  {
-// 	               panic("mock out the AddHandler method")
-//             },
-//             EnqueueFunc: func(namespace string, name string)  {
-// 	               panic("mock out the Enqueue method")
-//             },
-//             EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
-// 	               panic("mock out the EnqueueAfter method")
-//             },
-//             GenericFunc: func() controller.GenericController {
-// 	               panic("mock out the Generic method")
-//             },
-//             InformerFunc: func() cache.SharedIndexInformer {
-// 	               panic("mock out the Informer method")
-//             },
-//             ListerFunc: func() v11.ReplicationControllerLister {
-// 	               panic("mock out the Lister method")
-//             },
-//         }
+//	        // make and configure a mocked v11.ReplicationControllerController
+//	        mockedReplicationControllerController := &ReplicationControllerControllerMock{
+//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v11.ReplicationControllerHandlerFunc)  {
+//		               panic("mock out the AddClusterScopedFeatureHandler method")
+//	            },
+//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v11.ReplicationControllerHandlerFunc)  {
+//		               panic("mock out the AddClusterScopedHandler method")
+//	            },
+//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v11.ReplicationControllerHandlerFunc)  {
+//		               panic("mock out the AddFeatureHandler method")
+//	            },
+//	            AddHandlerFunc: func(ctx context.Context, name string, handler v11.ReplicationControllerHandlerFunc)  {
+//		               panic("mock out the AddHandler method")
+//	            },
+//	            EnqueueFunc: func(namespace string, name string)  {
+//		               panic("mock out the Enqueue method")
+//	            },
+//	            EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
+//		               panic("mock out the EnqueueAfter method")
+//	            },
+//	            GenericFunc: func() controller.GenericController {
+//		               panic("mock out the Generic method")
+//	            },
+//	            InformerFunc: func() cache.SharedIndexInformer {
+//		               panic("mock out the Informer method")
+//	            },
+//	            ListerFunc: func() v11.ReplicationControllerLister {
+//		               panic("mock out the Lister method")
+//	            },
+//	        }
 //
-//         // use mockedReplicationControllerController in code that requires v11.ReplicationControllerController
-//         // and then make assertions.
+//	        // use mockedReplicationControllerController in code that requires v11.ReplicationControllerController
+//	        // and then make assertions.
 //
-//     }
+//	    }
 type ReplicationControllerControllerMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
 	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v11.ReplicationControllerHandlerFunc)
@@ -324,7 +326,8 @@ func (mock *ReplicationControllerControllerMock) AddClusterScopedFeatureHandler(
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//     len(mockedReplicationControllerController.AddClusterScopedFeatureHandlerCalls())
+//
+//	len(mockedReplicationControllerController.AddClusterScopedFeatureHandlerCalls())
 func (mock *ReplicationControllerControllerMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -369,7 +372,8 @@ func (mock *ReplicationControllerControllerMock) AddClusterScopedHandler(ctx con
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//     len(mockedReplicationControllerController.AddClusterScopedHandlerCalls())
+//
+//	len(mockedReplicationControllerController.AddClusterScopedHandlerCalls())
 func (mock *ReplicationControllerControllerMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -412,7 +416,8 @@ func (mock *ReplicationControllerControllerMock) AddFeatureHandler(ctx context.C
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//     len(mockedReplicationControllerController.AddFeatureHandlerCalls())
+//
+//	len(mockedReplicationControllerController.AddFeatureHandlerCalls())
 func (mock *ReplicationControllerControllerMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
@@ -453,7 +458,8 @@ func (mock *ReplicationControllerControllerMock) AddHandler(ctx context.Context,
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//     len(mockedReplicationControllerController.AddHandlerCalls())
+//
+//	len(mockedReplicationControllerController.AddHandlerCalls())
 func (mock *ReplicationControllerControllerMock) AddHandlerCalls() []struct {
 	Ctx     context.Context
 	Name    string
@@ -490,7 +496,8 @@ func (mock *ReplicationControllerControllerMock) Enqueue(namespace string, name 
 
 // EnqueueCalls gets all the calls that were made to Enqueue.
 // Check the length with:
-//     len(mockedReplicationControllerController.EnqueueCalls())
+//
+//	len(mockedReplicationControllerController.EnqueueCalls())
 func (mock *ReplicationControllerControllerMock) EnqueueCalls() []struct {
 	Namespace string
 	Name      string
@@ -527,7 +534,8 @@ func (mock *ReplicationControllerControllerMock) EnqueueAfter(namespace string, 
 
 // EnqueueAfterCalls gets all the calls that were made to EnqueueAfter.
 // Check the length with:
-//     len(mockedReplicationControllerController.EnqueueAfterCalls())
+//
+//	len(mockedReplicationControllerController.EnqueueAfterCalls())
 func (mock *ReplicationControllerControllerMock) EnqueueAfterCalls() []struct {
 	Namespace string
 	Name      string
@@ -559,7 +567,8 @@ func (mock *ReplicationControllerControllerMock) Generic() controller.GenericCon
 
 // GenericCalls gets all the calls that were made to Generic.
 // Check the length with:
-//     len(mockedReplicationControllerController.GenericCalls())
+//
+//	len(mockedReplicationControllerController.GenericCalls())
 func (mock *ReplicationControllerControllerMock) GenericCalls() []struct {
 } {
 	var calls []struct {
@@ -585,7 +594,8 @@ func (mock *ReplicationControllerControllerMock) Informer() cache.SharedIndexInf
 
 // InformerCalls gets all the calls that were made to Informer.
 // Check the length with:
-//     len(mockedReplicationControllerController.InformerCalls())
+//
+//	len(mockedReplicationControllerController.InformerCalls())
 func (mock *ReplicationControllerControllerMock) InformerCalls() []struct {
 } {
 	var calls []struct {
@@ -611,7 +621,8 @@ func (mock *ReplicationControllerControllerMock) Lister() v11.ReplicationControl
 
 // ListerCalls gets all the calls that were made to Lister.
 // Check the length with:
-//     len(mockedReplicationControllerController.ListerCalls())
+//
+//	len(mockedReplicationControllerController.ListerCalls())
 func (mock *ReplicationControllerControllerMock) ListerCalls() []struct {
 } {
 	var calls []struct {
@@ -651,76 +662,76 @@ var _ v11.ReplicationControllerInterface = &ReplicationControllerInterfaceMock{}
 
 // ReplicationControllerInterfaceMock is a mock implementation of v11.ReplicationControllerInterface.
 //
-//     func TestSomethingThatUsesReplicationControllerInterface(t *testing.T) {
+//	    func TestSomethingThatUsesReplicationControllerInterface(t *testing.T) {
 //
-//         // make and configure a mocked v11.ReplicationControllerInterface
-//         mockedReplicationControllerInterface := &ReplicationControllerInterfaceMock{
-//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v11.ReplicationControllerHandlerFunc)  {
-// 	               panic("mock out the AddClusterScopedFeatureHandler method")
-//             },
-//             AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v11.ReplicationControllerLifecycle)  {
-// 	               panic("mock out the AddClusterScopedFeatureLifecycle method")
-//             },
-//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v11.ReplicationControllerHandlerFunc)  {
-// 	               panic("mock out the AddClusterScopedHandler method")
-//             },
-//             AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v11.ReplicationControllerLifecycle)  {
-// 	               panic("mock out the AddClusterScopedLifecycle method")
-//             },
-//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v11.ReplicationControllerHandlerFunc)  {
-// 	               panic("mock out the AddFeatureHandler method")
-//             },
-//             AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v11.ReplicationControllerLifecycle)  {
-// 	               panic("mock out the AddFeatureLifecycle method")
-//             },
-//             AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v11.ReplicationControllerHandlerFunc)  {
-// 	               panic("mock out the AddHandler method")
-//             },
-//             AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v11.ReplicationControllerLifecycle)  {
-// 	               panic("mock out the AddLifecycle method")
-//             },
-//             ControllerFunc: func() v11.ReplicationControllerController {
-// 	               panic("mock out the Controller method")
-//             },
-//             CreateFunc: func(in1 *v1.ReplicationController) (*v1.ReplicationController, error) {
-// 	               panic("mock out the Create method")
-//             },
-//             DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
-// 	               panic("mock out the Delete method")
-//             },
-//             DeleteCollectionFunc: func(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
-// 	               panic("mock out the DeleteCollection method")
-//             },
-//             DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
-// 	               panic("mock out the DeleteNamespaced method")
-//             },
-//             GetFunc: func(name string, opts metav1.GetOptions) (*v1.ReplicationController, error) {
-// 	               panic("mock out the Get method")
-//             },
-//             GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v1.ReplicationController, error) {
-// 	               panic("mock out the GetNamespaced method")
-//             },
-//             ListFunc: func(opts metav1.ListOptions) (*v1.ReplicationControllerList, error) {
-// 	               panic("mock out the List method")
-//             },
-//             ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v1.ReplicationControllerList, error) {
-// 	               panic("mock out the ListNamespaced method")
-//             },
-//             ObjectClientFunc: func() *objectclient.ObjectClient {
-// 	               panic("mock out the ObjectClient method")
-//             },
-//             UpdateFunc: func(in1 *v1.ReplicationController) (*v1.ReplicationController, error) {
-// 	               panic("mock out the Update method")
-//             },
-//             WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
-// 	               panic("mock out the Watch method")
-//             },
-//         }
+//	        // make and configure a mocked v11.ReplicationControllerInterface
+//	        mockedReplicationControllerInterface := &ReplicationControllerInterfaceMock{
+//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v11.ReplicationControllerHandlerFunc)  {
+//		               panic("mock out the AddClusterScopedFeatureHandler method")
+//	            },
+//	            AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v11.ReplicationControllerLifecycle)  {
+//		               panic("mock out the AddClusterScopedFeatureLifecycle method")
+//	            },
+//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v11.ReplicationControllerHandlerFunc)  {
+//		               panic("mock out the AddClusterScopedHandler method")
+//	            },
+//	            AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v11.ReplicationControllerLifecycle)  {
+//		               panic("mock out the AddClusterScopedLifecycle method")
+//	            },
+//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v11.ReplicationControllerHandlerFunc)  {
+//		               panic("mock out the AddFeatureHandler method")
+//	            },
+//	            AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v11.ReplicationControllerLifecycle)  {
+//		               panic("mock out the AddFeatureLifecycle method")
+//	            },
+//	            AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v11.ReplicationControllerHandlerFunc)  {
+//		               panic("mock out the AddHandler method")
+//	            },
+//	            AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v11.ReplicationControllerLifecycle)  {
+//		               panic("mock out the AddLifecycle method")
+//	            },
+//	            ControllerFunc: func() v11.ReplicationControllerController {
+//		               panic("mock out the Controller method")
+//	            },
+//	            CreateFunc: func(in1 *v1.ReplicationController) (*v1.ReplicationController, error) {
+//		               panic("mock out the Create method")
+//	            },
+//	            DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
+//		               panic("mock out the Delete method")
+//	            },
+//	            DeleteCollectionFunc: func(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
+//		               panic("mock out the DeleteCollection method")
+//	            },
+//	            DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
+//		               panic("mock out the DeleteNamespaced method")
+//	            },
+//	            GetFunc: func(name string, opts metav1.GetOptions) (*v1.ReplicationController, error) {
+//		               panic("mock out the Get method")
+//	            },
+//	            GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v1.ReplicationController, error) {
+//		               panic("mock out the GetNamespaced method")
+//	            },
+//	            ListFunc: func(opts metav1.ListOptions) (*v1.ReplicationControllerList, error) {
+//		               panic("mock out the List method")
+//	            },
+//	            ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v1.ReplicationControllerList, error) {
+//		               panic("mock out the ListNamespaced method")
+//	            },
+//	            ObjectClientFunc: func() *objectclient.ObjectClient {
+//		               panic("mock out the ObjectClient method")
+//	            },
+//	            UpdateFunc: func(in1 *v1.ReplicationController) (*v1.ReplicationController, error) {
+//		               panic("mock out the Update method")
+//	            },
+//	            WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
+//		               panic("mock out the Watch method")
+//	            },
+//	        }
 //
-//         // use mockedReplicationControllerInterface in code that requires v11.ReplicationControllerInterface
-//         // and then make assertions.
+//	        // use mockedReplicationControllerInterface in code that requires v11.ReplicationControllerInterface
+//	        // and then make assertions.
 //
-//     }
+//	    }
 type ReplicationControllerInterfaceMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
 	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v11.ReplicationControllerHandlerFunc)
@@ -973,7 +984,8 @@ func (mock *ReplicationControllerInterfaceMock) AddClusterScopedFeatureHandler(c
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//     len(mockedReplicationControllerInterface.AddClusterScopedFeatureHandlerCalls())
+//
+//	len(mockedReplicationControllerInterface.AddClusterScopedFeatureHandlerCalls())
 func (mock *ReplicationControllerInterfaceMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -1020,7 +1032,8 @@ func (mock *ReplicationControllerInterfaceMock) AddClusterScopedFeatureLifecycle
 
 // AddClusterScopedFeatureLifecycleCalls gets all the calls that were made to AddClusterScopedFeatureLifecycle.
 // Check the length with:
-//     len(mockedReplicationControllerInterface.AddClusterScopedFeatureLifecycleCalls())
+//
+//	len(mockedReplicationControllerInterface.AddClusterScopedFeatureLifecycleCalls())
 func (mock *ReplicationControllerInterfaceMock) AddClusterScopedFeatureLifecycleCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -1065,7 +1078,8 @@ func (mock *ReplicationControllerInterfaceMock) AddClusterScopedHandler(ctx cont
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//     len(mockedReplicationControllerInterface.AddClusterScopedHandlerCalls())
+//
+//	len(mockedReplicationControllerInterface.AddClusterScopedHandlerCalls())
 func (mock *ReplicationControllerInterfaceMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -1108,7 +1122,8 @@ func (mock *ReplicationControllerInterfaceMock) AddClusterScopedLifecycle(ctx co
 
 // AddClusterScopedLifecycleCalls gets all the calls that were made to AddClusterScopedLifecycle.
 // Check the length with:
-//     len(mockedReplicationControllerInterface.AddClusterScopedLifecycleCalls())
+//
+//	len(mockedReplicationControllerInterface.AddClusterScopedLifecycleCalls())
 func (mock *ReplicationControllerInterfaceMock) AddClusterScopedLifecycleCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -1151,7 +1166,8 @@ func (mock *ReplicationControllerInterfaceMock) AddFeatureHandler(ctx context.Co
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//     len(mockedReplicationControllerInterface.AddFeatureHandlerCalls())
+//
+//	len(mockedReplicationControllerInterface.AddFeatureHandlerCalls())
 func (mock *ReplicationControllerInterfaceMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
@@ -1194,7 +1210,8 @@ func (mock *ReplicationControllerInterfaceMock) AddFeatureLifecycle(ctx context.
 
 // AddFeatureLifecycleCalls gets all the calls that were made to AddFeatureLifecycle.
 // Check the length with:
-//     len(mockedReplicationControllerInterface.AddFeatureLifecycleCalls())
+//
+//	len(mockedReplicationControllerInterface.AddFeatureLifecycleCalls())
 func (mock *ReplicationControllerInterfaceMock) AddFeatureLifecycleCalls() []struct {
 	Ctx       context.Context
 	Enabled   func() bool
@@ -1235,7 +1252,8 @@ func (mock *ReplicationControllerInterfaceMock) AddHandler(ctx context.Context, 
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//     len(mockedReplicationControllerInterface.AddHandlerCalls())
+//
+//	len(mockedReplicationControllerInterface.AddHandlerCalls())
 func (mock *ReplicationControllerInterfaceMock) AddHandlerCalls() []struct {
 	Ctx  context.Context
 	Name string
@@ -1274,7 +1292,8 @@ func (mock *ReplicationControllerInterfaceMock) AddLifecycle(ctx context.Context
 
 // AddLifecycleCalls gets all the calls that were made to AddLifecycle.
 // Check the length with:
-//     len(mockedReplicationControllerInterface.AddLifecycleCalls())
+//
+//	len(mockedReplicationControllerInterface.AddLifecycleCalls())
 func (mock *ReplicationControllerInterfaceMock) AddLifecycleCalls() []struct {
 	Ctx       context.Context
 	Name      string
@@ -1306,7 +1325,8 @@ func (mock *ReplicationControllerInterfaceMock) Controller() v11.ReplicationCont
 
 // ControllerCalls gets all the calls that were made to Controller.
 // Check the length with:
-//     len(mockedReplicationControllerInterface.ControllerCalls())
+//
+//	len(mockedReplicationControllerInterface.ControllerCalls())
 func (mock *ReplicationControllerInterfaceMock) ControllerCalls() []struct {
 } {
 	var calls []struct {
@@ -1335,7 +1355,8 @@ func (mock *ReplicationControllerInterfaceMock) Create(in1 *v1.ReplicationContro
 
 // CreateCalls gets all the calls that were made to Create.
 // Check the length with:
-//     len(mockedReplicationControllerInterface.CreateCalls())
+//
+//	len(mockedReplicationControllerInterface.CreateCalls())
 func (mock *ReplicationControllerInterfaceMock) CreateCalls() []struct {
 	In1 *v1.ReplicationController
 } {
@@ -1368,7 +1389,8 @@ func (mock *ReplicationControllerInterfaceMock) Delete(name string, options *met
 
 // DeleteCalls gets all the calls that were made to Delete.
 // Check the length with:
-//     len(mockedReplicationControllerInterface.DeleteCalls())
+//
+//	len(mockedReplicationControllerInterface.DeleteCalls())
 func (mock *ReplicationControllerInterfaceMock) DeleteCalls() []struct {
 	Name    string
 	Options *metav1.DeleteOptions
@@ -1403,7 +1425,8 @@ func (mock *ReplicationControllerInterfaceMock) DeleteCollection(deleteOpts *met
 
 // DeleteCollectionCalls gets all the calls that were made to DeleteCollection.
 // Check the length with:
-//     len(mockedReplicationControllerInterface.DeleteCollectionCalls())
+//
+//	len(mockedReplicationControllerInterface.DeleteCollectionCalls())
 func (mock *ReplicationControllerInterfaceMock) DeleteCollectionCalls() []struct {
 	DeleteOpts *metav1.DeleteOptions
 	ListOpts   metav1.ListOptions
@@ -1440,7 +1463,8 @@ func (mock *ReplicationControllerInterfaceMock) DeleteNamespaced(namespace strin
 
 // DeleteNamespacedCalls gets all the calls that were made to DeleteNamespaced.
 // Check the length with:
-//     len(mockedReplicationControllerInterface.DeleteNamespacedCalls())
+//
+//	len(mockedReplicationControllerInterface.DeleteNamespacedCalls())
 func (mock *ReplicationControllerInterfaceMock) DeleteNamespacedCalls() []struct {
 	Namespace string
 	Name      string
@@ -1477,7 +1501,8 @@ func (mock *ReplicationControllerInterfaceMock) Get(name string, opts metav1.Get
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//     len(mockedReplicationControllerInterface.GetCalls())
+//
+//	len(mockedReplicationControllerInterface.GetCalls())
 func (mock *ReplicationControllerInterfaceMock) GetCalls() []struct {
 	Name string
 	Opts metav1.GetOptions
@@ -1514,7 +1539,8 @@ func (mock *ReplicationControllerInterfaceMock) GetNamespaced(namespace string, 
 
 // GetNamespacedCalls gets all the calls that were made to GetNamespaced.
 // Check the length with:
-//     len(mockedReplicationControllerInterface.GetNamespacedCalls())
+//
+//	len(mockedReplicationControllerInterface.GetNamespacedCalls())
 func (mock *ReplicationControllerInterfaceMock) GetNamespacedCalls() []struct {
 	Namespace string
 	Name      string
@@ -1549,7 +1575,8 @@ func (mock *ReplicationControllerInterfaceMock) List(opts metav1.ListOptions) (*
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//     len(mockedReplicationControllerInterface.ListCalls())
+//
+//	len(mockedReplicationControllerInterface.ListCalls())
 func (mock *ReplicationControllerInterfaceMock) ListCalls() []struct {
 	Opts metav1.ListOptions
 } {
@@ -1582,7 +1609,8 @@ func (mock *ReplicationControllerInterfaceMock) ListNamespaced(namespace string,
 
 // ListNamespacedCalls gets all the calls that were made to ListNamespaced.
 // Check the length with:
-//     len(mockedReplicationControllerInterface.ListNamespacedCalls())
+//
+//	len(mockedReplicationControllerInterface.ListNamespacedCalls())
 func (mock *ReplicationControllerInterfaceMock) ListNamespacedCalls() []struct {
 	Namespace string
 	Opts      metav1.ListOptions
@@ -1612,7 +1640,8 @@ func (mock *ReplicationControllerInterfaceMock) ObjectClient() *objectclient.Obj
 
 // ObjectClientCalls gets all the calls that were made to ObjectClient.
 // Check the length with:
-//     len(mockedReplicationControllerInterface.ObjectClientCalls())
+//
+//	len(mockedReplicationControllerInterface.ObjectClientCalls())
 func (mock *ReplicationControllerInterfaceMock) ObjectClientCalls() []struct {
 } {
 	var calls []struct {
@@ -1641,7 +1670,8 @@ func (mock *ReplicationControllerInterfaceMock) Update(in1 *v1.ReplicationContro
 
 // UpdateCalls gets all the calls that were made to Update.
 // Check the length with:
-//     len(mockedReplicationControllerInterface.UpdateCalls())
+//
+//	len(mockedReplicationControllerInterface.UpdateCalls())
 func (mock *ReplicationControllerInterfaceMock) UpdateCalls() []struct {
 	In1 *v1.ReplicationController
 } {
@@ -1672,7 +1702,8 @@ func (mock *ReplicationControllerInterfaceMock) Watch(opts metav1.ListOptions) (
 
 // WatchCalls gets all the calls that were made to Watch.
 // Check the length with:
-//     len(mockedReplicationControllerInterface.WatchCalls())
+//
+//	len(mockedReplicationControllerInterface.WatchCalls())
 func (mock *ReplicationControllerInterfaceMock) WatchCalls() []struct {
 	Opts metav1.ListOptions
 } {
@@ -1695,19 +1726,19 @@ var _ v11.ReplicationControllersGetter = &ReplicationControllersGetterMock{}
 
 // ReplicationControllersGetterMock is a mock implementation of v11.ReplicationControllersGetter.
 //
-//     func TestSomethingThatUsesReplicationControllersGetter(t *testing.T) {
+//	    func TestSomethingThatUsesReplicationControllersGetter(t *testing.T) {
 //
-//         // make and configure a mocked v11.ReplicationControllersGetter
-//         mockedReplicationControllersGetter := &ReplicationControllersGetterMock{
-//             ReplicationControllersFunc: func(namespace string) v11.ReplicationControllerInterface {
-// 	               panic("mock out the ReplicationControllers method")
-//             },
-//         }
+//	        // make and configure a mocked v11.ReplicationControllersGetter
+//	        mockedReplicationControllersGetter := &ReplicationControllersGetterMock{
+//	            ReplicationControllersFunc: func(namespace string) v11.ReplicationControllerInterface {
+//		               panic("mock out the ReplicationControllers method")
+//	            },
+//	        }
 //
-//         // use mockedReplicationControllersGetter in code that requires v11.ReplicationControllersGetter
-//         // and then make assertions.
+//	        // use mockedReplicationControllersGetter in code that requires v11.ReplicationControllersGetter
+//	        // and then make assertions.
 //
-//     }
+//	    }
 type ReplicationControllersGetterMock struct {
 	// ReplicationControllersFunc mocks the ReplicationControllers method.
 	ReplicationControllersFunc func(namespace string) v11.ReplicationControllerInterface
@@ -1740,7 +1771,8 @@ func (mock *ReplicationControllersGetterMock) ReplicationControllers(namespace s
 
 // ReplicationControllersCalls gets all the calls that were made to ReplicationControllers.
 // Check the length with:
-//     len(mockedReplicationControllersGetter.ReplicationControllersCalls())
+//
+//	len(mockedReplicationControllersGetter.ReplicationControllersCalls())
 func (mock *ReplicationControllersGetterMock) ReplicationControllersCalls() []struct {
 	Namespace string
 } {

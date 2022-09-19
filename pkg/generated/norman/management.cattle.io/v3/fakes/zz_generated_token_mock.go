@@ -29,22 +29,22 @@ var _ v31.TokenLister = &TokenListerMock{}
 
 // TokenListerMock is a mock implementation of v31.TokenLister.
 //
-//     func TestSomethingThatUsesTokenLister(t *testing.T) {
+//	    func TestSomethingThatUsesTokenLister(t *testing.T) {
 //
-//         // make and configure a mocked v31.TokenLister
-//         mockedTokenLister := &TokenListerMock{
-//             GetFunc: func(namespace string, name string) (*v3.Token, error) {
-// 	               panic("mock out the Get method")
-//             },
-//             ListFunc: func(namespace string, selector labels.Selector) ([]*v3.Token, error) {
-// 	               panic("mock out the List method")
-//             },
-//         }
+//	        // make and configure a mocked v31.TokenLister
+//	        mockedTokenLister := &TokenListerMock{
+//	            GetFunc: func(namespace string, name string) (*v3.Token, error) {
+//		               panic("mock out the Get method")
+//	            },
+//	            ListFunc: func(namespace string, selector labels.Selector) ([]*v3.Token, error) {
+//		               panic("mock out the List method")
+//	            },
+//	        }
 //
-//         // use mockedTokenLister in code that requires v31.TokenLister
-//         // and then make assertions.
+//	        // use mockedTokenLister in code that requires v31.TokenLister
+//	        // and then make assertions.
 //
-//     }
+//	    }
 type TokenListerMock struct {
 	// GetFunc mocks the Get method.
 	GetFunc func(namespace string, name string) (*v3.Token, error)
@@ -91,7 +91,8 @@ func (mock *TokenListerMock) Get(namespace string, name string) (*v3.Token, erro
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//     len(mockedTokenLister.GetCalls())
+//
+//	len(mockedTokenLister.GetCalls())
 func (mock *TokenListerMock) GetCalls() []struct {
 	Namespace string
 	Name      string
@@ -126,7 +127,8 @@ func (mock *TokenListerMock) List(namespace string, selector labels.Selector) ([
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//     len(mockedTokenLister.ListCalls())
+//
+//	len(mockedTokenLister.ListCalls())
 func (mock *TokenListerMock) ListCalls() []struct {
 	Namespace string
 	Selector  labels.Selector
@@ -159,43 +161,43 @@ var _ v31.TokenController = &TokenControllerMock{}
 
 // TokenControllerMock is a mock implementation of v31.TokenController.
 //
-//     func TestSomethingThatUsesTokenController(t *testing.T) {
+//	    func TestSomethingThatUsesTokenController(t *testing.T) {
 //
-//         // make and configure a mocked v31.TokenController
-//         mockedTokenController := &TokenControllerMock{
-//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v31.TokenHandlerFunc)  {
-// 	               panic("mock out the AddClusterScopedFeatureHandler method")
-//             },
-//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v31.TokenHandlerFunc)  {
-// 	               panic("mock out the AddClusterScopedHandler method")
-//             },
-//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.TokenHandlerFunc)  {
-// 	               panic("mock out the AddFeatureHandler method")
-//             },
-//             AddHandlerFunc: func(ctx context.Context, name string, handler v31.TokenHandlerFunc)  {
-// 	               panic("mock out the AddHandler method")
-//             },
-//             EnqueueFunc: func(namespace string, name string)  {
-// 	               panic("mock out the Enqueue method")
-//             },
-//             EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
-// 	               panic("mock out the EnqueueAfter method")
-//             },
-//             GenericFunc: func() controller.GenericController {
-// 	               panic("mock out the Generic method")
-//             },
-//             InformerFunc: func() cache.SharedIndexInformer {
-// 	               panic("mock out the Informer method")
-//             },
-//             ListerFunc: func() v31.TokenLister {
-// 	               panic("mock out the Lister method")
-//             },
-//         }
+//	        // make and configure a mocked v31.TokenController
+//	        mockedTokenController := &TokenControllerMock{
+//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v31.TokenHandlerFunc)  {
+//		               panic("mock out the AddClusterScopedFeatureHandler method")
+//	            },
+//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v31.TokenHandlerFunc)  {
+//		               panic("mock out the AddClusterScopedHandler method")
+//	            },
+//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.TokenHandlerFunc)  {
+//		               panic("mock out the AddFeatureHandler method")
+//	            },
+//	            AddHandlerFunc: func(ctx context.Context, name string, handler v31.TokenHandlerFunc)  {
+//		               panic("mock out the AddHandler method")
+//	            },
+//	            EnqueueFunc: func(namespace string, name string)  {
+//		               panic("mock out the Enqueue method")
+//	            },
+//	            EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
+//		               panic("mock out the EnqueueAfter method")
+//	            },
+//	            GenericFunc: func() controller.GenericController {
+//		               panic("mock out the Generic method")
+//	            },
+//	            InformerFunc: func() cache.SharedIndexInformer {
+//		               panic("mock out the Informer method")
+//	            },
+//	            ListerFunc: func() v31.TokenLister {
+//		               panic("mock out the Lister method")
+//	            },
+//	        }
 //
-//         // use mockedTokenController in code that requires v31.TokenController
-//         // and then make assertions.
+//	        // use mockedTokenController in code that requires v31.TokenController
+//	        // and then make assertions.
 //
-//     }
+//	    }
 type TokenControllerMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
 	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v31.TokenHandlerFunc)
@@ -324,7 +326,8 @@ func (mock *TokenControllerMock) AddClusterScopedFeatureHandler(ctx context.Cont
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//     len(mockedTokenController.AddClusterScopedFeatureHandlerCalls())
+//
+//	len(mockedTokenController.AddClusterScopedFeatureHandlerCalls())
 func (mock *TokenControllerMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -369,7 +372,8 @@ func (mock *TokenControllerMock) AddClusterScopedHandler(ctx context.Context, na
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//     len(mockedTokenController.AddClusterScopedHandlerCalls())
+//
+//	len(mockedTokenController.AddClusterScopedHandlerCalls())
 func (mock *TokenControllerMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -412,7 +416,8 @@ func (mock *TokenControllerMock) AddFeatureHandler(ctx context.Context, enabled 
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//     len(mockedTokenController.AddFeatureHandlerCalls())
+//
+//	len(mockedTokenController.AddFeatureHandlerCalls())
 func (mock *TokenControllerMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
@@ -453,7 +458,8 @@ func (mock *TokenControllerMock) AddHandler(ctx context.Context, name string, ha
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//     len(mockedTokenController.AddHandlerCalls())
+//
+//	len(mockedTokenController.AddHandlerCalls())
 func (mock *TokenControllerMock) AddHandlerCalls() []struct {
 	Ctx     context.Context
 	Name    string
@@ -490,7 +496,8 @@ func (mock *TokenControllerMock) Enqueue(namespace string, name string) {
 
 // EnqueueCalls gets all the calls that were made to Enqueue.
 // Check the length with:
-//     len(mockedTokenController.EnqueueCalls())
+//
+//	len(mockedTokenController.EnqueueCalls())
 func (mock *TokenControllerMock) EnqueueCalls() []struct {
 	Namespace string
 	Name      string
@@ -527,7 +534,8 @@ func (mock *TokenControllerMock) EnqueueAfter(namespace string, name string, aft
 
 // EnqueueAfterCalls gets all the calls that were made to EnqueueAfter.
 // Check the length with:
-//     len(mockedTokenController.EnqueueAfterCalls())
+//
+//	len(mockedTokenController.EnqueueAfterCalls())
 func (mock *TokenControllerMock) EnqueueAfterCalls() []struct {
 	Namespace string
 	Name      string
@@ -559,7 +567,8 @@ func (mock *TokenControllerMock) Generic() controller.GenericController {
 
 // GenericCalls gets all the calls that were made to Generic.
 // Check the length with:
-//     len(mockedTokenController.GenericCalls())
+//
+//	len(mockedTokenController.GenericCalls())
 func (mock *TokenControllerMock) GenericCalls() []struct {
 } {
 	var calls []struct {
@@ -585,7 +594,8 @@ func (mock *TokenControllerMock) Informer() cache.SharedIndexInformer {
 
 // InformerCalls gets all the calls that were made to Informer.
 // Check the length with:
-//     len(mockedTokenController.InformerCalls())
+//
+//	len(mockedTokenController.InformerCalls())
 func (mock *TokenControllerMock) InformerCalls() []struct {
 } {
 	var calls []struct {
@@ -611,7 +621,8 @@ func (mock *TokenControllerMock) Lister() v31.TokenLister {
 
 // ListerCalls gets all the calls that were made to Lister.
 // Check the length with:
-//     len(mockedTokenController.ListerCalls())
+//
+//	len(mockedTokenController.ListerCalls())
 func (mock *TokenControllerMock) ListerCalls() []struct {
 } {
 	var calls []struct {
@@ -651,76 +662,76 @@ var _ v31.TokenInterface = &TokenInterfaceMock{}
 
 // TokenInterfaceMock is a mock implementation of v31.TokenInterface.
 //
-//     func TestSomethingThatUsesTokenInterface(t *testing.T) {
+//	    func TestSomethingThatUsesTokenInterface(t *testing.T) {
 //
-//         // make and configure a mocked v31.TokenInterface
-//         mockedTokenInterface := &TokenInterfaceMock{
-//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v31.TokenHandlerFunc)  {
-// 	               panic("mock out the AddClusterScopedFeatureHandler method")
-//             },
-//             AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v31.TokenLifecycle)  {
-// 	               panic("mock out the AddClusterScopedFeatureLifecycle method")
-//             },
-//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v31.TokenHandlerFunc)  {
-// 	               panic("mock out the AddClusterScopedHandler method")
-//             },
-//             AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v31.TokenLifecycle)  {
-// 	               panic("mock out the AddClusterScopedLifecycle method")
-//             },
-//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.TokenHandlerFunc)  {
-// 	               panic("mock out the AddFeatureHandler method")
-//             },
-//             AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v31.TokenLifecycle)  {
-// 	               panic("mock out the AddFeatureLifecycle method")
-//             },
-//             AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v31.TokenHandlerFunc)  {
-// 	               panic("mock out the AddHandler method")
-//             },
-//             AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v31.TokenLifecycle)  {
-// 	               panic("mock out the AddLifecycle method")
-//             },
-//             ControllerFunc: func() v31.TokenController {
-// 	               panic("mock out the Controller method")
-//             },
-//             CreateFunc: func(in1 *v3.Token) (*v3.Token, error) {
-// 	               panic("mock out the Create method")
-//             },
-//             DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
-// 	               panic("mock out the Delete method")
-//             },
-//             DeleteCollectionFunc: func(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
-// 	               panic("mock out the DeleteCollection method")
-//             },
-//             DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
-// 	               panic("mock out the DeleteNamespaced method")
-//             },
-//             GetFunc: func(name string, opts metav1.GetOptions) (*v3.Token, error) {
-// 	               panic("mock out the Get method")
-//             },
-//             GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v3.Token, error) {
-// 	               panic("mock out the GetNamespaced method")
-//             },
-//             ListFunc: func(opts metav1.ListOptions) (*v3.TokenList, error) {
-// 	               panic("mock out the List method")
-//             },
-//             ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v3.TokenList, error) {
-// 	               panic("mock out the ListNamespaced method")
-//             },
-//             ObjectClientFunc: func() *objectclient.ObjectClient {
-// 	               panic("mock out the ObjectClient method")
-//             },
-//             UpdateFunc: func(in1 *v3.Token) (*v3.Token, error) {
-// 	               panic("mock out the Update method")
-//             },
-//             WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
-// 	               panic("mock out the Watch method")
-//             },
-//         }
+//	        // make and configure a mocked v31.TokenInterface
+//	        mockedTokenInterface := &TokenInterfaceMock{
+//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v31.TokenHandlerFunc)  {
+//		               panic("mock out the AddClusterScopedFeatureHandler method")
+//	            },
+//	            AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v31.TokenLifecycle)  {
+//		               panic("mock out the AddClusterScopedFeatureLifecycle method")
+//	            },
+//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v31.TokenHandlerFunc)  {
+//		               panic("mock out the AddClusterScopedHandler method")
+//	            },
+//	            AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v31.TokenLifecycle)  {
+//		               panic("mock out the AddClusterScopedLifecycle method")
+//	            },
+//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.TokenHandlerFunc)  {
+//		               panic("mock out the AddFeatureHandler method")
+//	            },
+//	            AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v31.TokenLifecycle)  {
+//		               panic("mock out the AddFeatureLifecycle method")
+//	            },
+//	            AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v31.TokenHandlerFunc)  {
+//		               panic("mock out the AddHandler method")
+//	            },
+//	            AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v31.TokenLifecycle)  {
+//		               panic("mock out the AddLifecycle method")
+//	            },
+//	            ControllerFunc: func() v31.TokenController {
+//		               panic("mock out the Controller method")
+//	            },
+//	            CreateFunc: func(in1 *v3.Token) (*v3.Token, error) {
+//		               panic("mock out the Create method")
+//	            },
+//	            DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
+//		               panic("mock out the Delete method")
+//	            },
+//	            DeleteCollectionFunc: func(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
+//		               panic("mock out the DeleteCollection method")
+//	            },
+//	            DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
+//		               panic("mock out the DeleteNamespaced method")
+//	            },
+//	            GetFunc: func(name string, opts metav1.GetOptions) (*v3.Token, error) {
+//		               panic("mock out the Get method")
+//	            },
+//	            GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v3.Token, error) {
+//		               panic("mock out the GetNamespaced method")
+//	            },
+//	            ListFunc: func(opts metav1.ListOptions) (*v3.TokenList, error) {
+//		               panic("mock out the List method")
+//	            },
+//	            ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v3.TokenList, error) {
+//		               panic("mock out the ListNamespaced method")
+//	            },
+//	            ObjectClientFunc: func() *objectclient.ObjectClient {
+//		               panic("mock out the ObjectClient method")
+//	            },
+//	            UpdateFunc: func(in1 *v3.Token) (*v3.Token, error) {
+//		               panic("mock out the Update method")
+//	            },
+//	            WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
+//		               panic("mock out the Watch method")
+//	            },
+//	        }
 //
-//         // use mockedTokenInterface in code that requires v31.TokenInterface
-//         // and then make assertions.
+//	        // use mockedTokenInterface in code that requires v31.TokenInterface
+//	        // and then make assertions.
 //
-//     }
+//	    }
 type TokenInterfaceMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
 	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v31.TokenHandlerFunc)
@@ -973,7 +984,8 @@ func (mock *TokenInterfaceMock) AddClusterScopedFeatureHandler(ctx context.Conte
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//     len(mockedTokenInterface.AddClusterScopedFeatureHandlerCalls())
+//
+//	len(mockedTokenInterface.AddClusterScopedFeatureHandlerCalls())
 func (mock *TokenInterfaceMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -1020,7 +1032,8 @@ func (mock *TokenInterfaceMock) AddClusterScopedFeatureLifecycle(ctx context.Con
 
 // AddClusterScopedFeatureLifecycleCalls gets all the calls that were made to AddClusterScopedFeatureLifecycle.
 // Check the length with:
-//     len(mockedTokenInterface.AddClusterScopedFeatureLifecycleCalls())
+//
+//	len(mockedTokenInterface.AddClusterScopedFeatureLifecycleCalls())
 func (mock *TokenInterfaceMock) AddClusterScopedFeatureLifecycleCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -1065,7 +1078,8 @@ func (mock *TokenInterfaceMock) AddClusterScopedHandler(ctx context.Context, nam
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//     len(mockedTokenInterface.AddClusterScopedHandlerCalls())
+//
+//	len(mockedTokenInterface.AddClusterScopedHandlerCalls())
 func (mock *TokenInterfaceMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -1108,7 +1122,8 @@ func (mock *TokenInterfaceMock) AddClusterScopedLifecycle(ctx context.Context, n
 
 // AddClusterScopedLifecycleCalls gets all the calls that were made to AddClusterScopedLifecycle.
 // Check the length with:
-//     len(mockedTokenInterface.AddClusterScopedLifecycleCalls())
+//
+//	len(mockedTokenInterface.AddClusterScopedLifecycleCalls())
 func (mock *TokenInterfaceMock) AddClusterScopedLifecycleCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -1151,7 +1166,8 @@ func (mock *TokenInterfaceMock) AddFeatureHandler(ctx context.Context, enabled f
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//     len(mockedTokenInterface.AddFeatureHandlerCalls())
+//
+//	len(mockedTokenInterface.AddFeatureHandlerCalls())
 func (mock *TokenInterfaceMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
@@ -1194,7 +1210,8 @@ func (mock *TokenInterfaceMock) AddFeatureLifecycle(ctx context.Context, enabled
 
 // AddFeatureLifecycleCalls gets all the calls that were made to AddFeatureLifecycle.
 // Check the length with:
-//     len(mockedTokenInterface.AddFeatureLifecycleCalls())
+//
+//	len(mockedTokenInterface.AddFeatureLifecycleCalls())
 func (mock *TokenInterfaceMock) AddFeatureLifecycleCalls() []struct {
 	Ctx       context.Context
 	Enabled   func() bool
@@ -1235,7 +1252,8 @@ func (mock *TokenInterfaceMock) AddHandler(ctx context.Context, name string, syn
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//     len(mockedTokenInterface.AddHandlerCalls())
+//
+//	len(mockedTokenInterface.AddHandlerCalls())
 func (mock *TokenInterfaceMock) AddHandlerCalls() []struct {
 	Ctx  context.Context
 	Name string
@@ -1274,7 +1292,8 @@ func (mock *TokenInterfaceMock) AddLifecycle(ctx context.Context, name string, l
 
 // AddLifecycleCalls gets all the calls that were made to AddLifecycle.
 // Check the length with:
-//     len(mockedTokenInterface.AddLifecycleCalls())
+//
+//	len(mockedTokenInterface.AddLifecycleCalls())
 func (mock *TokenInterfaceMock) AddLifecycleCalls() []struct {
 	Ctx       context.Context
 	Name      string
@@ -1306,7 +1325,8 @@ func (mock *TokenInterfaceMock) Controller() v31.TokenController {
 
 // ControllerCalls gets all the calls that were made to Controller.
 // Check the length with:
-//     len(mockedTokenInterface.ControllerCalls())
+//
+//	len(mockedTokenInterface.ControllerCalls())
 func (mock *TokenInterfaceMock) ControllerCalls() []struct {
 } {
 	var calls []struct {
@@ -1335,7 +1355,8 @@ func (mock *TokenInterfaceMock) Create(in1 *v3.Token) (*v3.Token, error) {
 
 // CreateCalls gets all the calls that were made to Create.
 // Check the length with:
-//     len(mockedTokenInterface.CreateCalls())
+//
+//	len(mockedTokenInterface.CreateCalls())
 func (mock *TokenInterfaceMock) CreateCalls() []struct {
 	In1 *v3.Token
 } {
@@ -1368,7 +1389,8 @@ func (mock *TokenInterfaceMock) Delete(name string, options *metav1.DeleteOption
 
 // DeleteCalls gets all the calls that were made to Delete.
 // Check the length with:
-//     len(mockedTokenInterface.DeleteCalls())
+//
+//	len(mockedTokenInterface.DeleteCalls())
 func (mock *TokenInterfaceMock) DeleteCalls() []struct {
 	Name    string
 	Options *metav1.DeleteOptions
@@ -1403,7 +1425,8 @@ func (mock *TokenInterfaceMock) DeleteCollection(deleteOpts *metav1.DeleteOption
 
 // DeleteCollectionCalls gets all the calls that were made to DeleteCollection.
 // Check the length with:
-//     len(mockedTokenInterface.DeleteCollectionCalls())
+//
+//	len(mockedTokenInterface.DeleteCollectionCalls())
 func (mock *TokenInterfaceMock) DeleteCollectionCalls() []struct {
 	DeleteOpts *metav1.DeleteOptions
 	ListOpts   metav1.ListOptions
@@ -1440,7 +1463,8 @@ func (mock *TokenInterfaceMock) DeleteNamespaced(namespace string, name string, 
 
 // DeleteNamespacedCalls gets all the calls that were made to DeleteNamespaced.
 // Check the length with:
-//     len(mockedTokenInterface.DeleteNamespacedCalls())
+//
+//	len(mockedTokenInterface.DeleteNamespacedCalls())
 func (mock *TokenInterfaceMock) DeleteNamespacedCalls() []struct {
 	Namespace string
 	Name      string
@@ -1477,7 +1501,8 @@ func (mock *TokenInterfaceMock) Get(name string, opts metav1.GetOptions) (*v3.To
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//     len(mockedTokenInterface.GetCalls())
+//
+//	len(mockedTokenInterface.GetCalls())
 func (mock *TokenInterfaceMock) GetCalls() []struct {
 	Name string
 	Opts metav1.GetOptions
@@ -1514,7 +1539,8 @@ func (mock *TokenInterfaceMock) GetNamespaced(namespace string, name string, opt
 
 // GetNamespacedCalls gets all the calls that were made to GetNamespaced.
 // Check the length with:
-//     len(mockedTokenInterface.GetNamespacedCalls())
+//
+//	len(mockedTokenInterface.GetNamespacedCalls())
 func (mock *TokenInterfaceMock) GetNamespacedCalls() []struct {
 	Namespace string
 	Name      string
@@ -1549,7 +1575,8 @@ func (mock *TokenInterfaceMock) List(opts metav1.ListOptions) (*v3.TokenList, er
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//     len(mockedTokenInterface.ListCalls())
+//
+//	len(mockedTokenInterface.ListCalls())
 func (mock *TokenInterfaceMock) ListCalls() []struct {
 	Opts metav1.ListOptions
 } {
@@ -1582,7 +1609,8 @@ func (mock *TokenInterfaceMock) ListNamespaced(namespace string, opts metav1.Lis
 
 // ListNamespacedCalls gets all the calls that were made to ListNamespaced.
 // Check the length with:
-//     len(mockedTokenInterface.ListNamespacedCalls())
+//
+//	len(mockedTokenInterface.ListNamespacedCalls())
 func (mock *TokenInterfaceMock) ListNamespacedCalls() []struct {
 	Namespace string
 	Opts      metav1.ListOptions
@@ -1612,7 +1640,8 @@ func (mock *TokenInterfaceMock) ObjectClient() *objectclient.ObjectClient {
 
 // ObjectClientCalls gets all the calls that were made to ObjectClient.
 // Check the length with:
-//     len(mockedTokenInterface.ObjectClientCalls())
+//
+//	len(mockedTokenInterface.ObjectClientCalls())
 func (mock *TokenInterfaceMock) ObjectClientCalls() []struct {
 } {
 	var calls []struct {
@@ -1641,7 +1670,8 @@ func (mock *TokenInterfaceMock) Update(in1 *v3.Token) (*v3.Token, error) {
 
 // UpdateCalls gets all the calls that were made to Update.
 // Check the length with:
-//     len(mockedTokenInterface.UpdateCalls())
+//
+//	len(mockedTokenInterface.UpdateCalls())
 func (mock *TokenInterfaceMock) UpdateCalls() []struct {
 	In1 *v3.Token
 } {
@@ -1672,7 +1702,8 @@ func (mock *TokenInterfaceMock) Watch(opts metav1.ListOptions) (watch.Interface,
 
 // WatchCalls gets all the calls that were made to Watch.
 // Check the length with:
-//     len(mockedTokenInterface.WatchCalls())
+//
+//	len(mockedTokenInterface.WatchCalls())
 func (mock *TokenInterfaceMock) WatchCalls() []struct {
 	Opts metav1.ListOptions
 } {
@@ -1695,19 +1726,19 @@ var _ v31.TokensGetter = &TokensGetterMock{}
 
 // TokensGetterMock is a mock implementation of v31.TokensGetter.
 //
-//     func TestSomethingThatUsesTokensGetter(t *testing.T) {
+//	    func TestSomethingThatUsesTokensGetter(t *testing.T) {
 //
-//         // make and configure a mocked v31.TokensGetter
-//         mockedTokensGetter := &TokensGetterMock{
-//             TokensFunc: func(namespace string) v31.TokenInterface {
-// 	               panic("mock out the Tokens method")
-//             },
-//         }
+//	        // make and configure a mocked v31.TokensGetter
+//	        mockedTokensGetter := &TokensGetterMock{
+//	            TokensFunc: func(namespace string) v31.TokenInterface {
+//		               panic("mock out the Tokens method")
+//	            },
+//	        }
 //
-//         // use mockedTokensGetter in code that requires v31.TokensGetter
-//         // and then make assertions.
+//	        // use mockedTokensGetter in code that requires v31.TokensGetter
+//	        // and then make assertions.
 //
-//     }
+//	    }
 type TokensGetterMock struct {
 	// TokensFunc mocks the Tokens method.
 	TokensFunc func(namespace string) v31.TokenInterface
@@ -1740,7 +1771,8 @@ func (mock *TokensGetterMock) Tokens(namespace string) v31.TokenInterface {
 
 // TokensCalls gets all the calls that were made to Tokens.
 // Check the length with:
-//     len(mockedTokensGetter.TokensCalls())
+//
+//	len(mockedTokensGetter.TokensCalls())
 func (mock *TokensGetterMock) TokensCalls() []struct {
 	Namespace string
 } {

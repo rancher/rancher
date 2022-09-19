@@ -23,7 +23,7 @@ func newAuthSettingController(mgmt *config.ManagementContext) *SettingController
 	return n
 }
 
-//sync is called periodically and on real updates
+// sync is called periodically and on real updates
 func (n *SettingController) sync(key string, obj *v3.Setting) (runtime.Object, error) {
 	if obj == nil || obj.DeletionTimestamp != nil {
 		return nil, nil

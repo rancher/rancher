@@ -32,10 +32,10 @@ func RegisterIndexers(scaledContext *config.ScaledContext) error {
 }
 
 // RegisterServiceAccount ensures that:
-// 	1. Each namespace has a pod security policy assigned to a role if:
-//		a. its project has a PSPT assigned to it
-//		OR
-//		b. its cluster has a default PSPT assigned to it
+//  1. Each namespace has a pod security policy assigned to a role if:
+//     a. its project has a PSPT assigned to it
+//     OR
+//     b. its cluster has a default PSPT assigned to it
 //  2. PSPs are bound to their associated service accounts via a cluster role binding
 func RegisterServiceAccount(ctx context.Context, context *config.UserContext) {
 	logrus.Infof("registering podsecuritypolicy serviceaccount handler for cluster %v", context.ClusterName)

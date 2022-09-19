@@ -235,9 +235,9 @@ func (nt *nodeTemplateController) createGlobalNodeTemplateClone(legacyName, clon
 }
 
 /*
-	legacy vmwarevsphere nodetemplates were free form text fields
-	and this is an attempt to normalize the data to a valid vsphere path
-	e.g. "My Network" becomes "/DC_NAME/networks/My Network"
+legacy vmwarevsphere nodetemplates were free form text fields
+and this is an attempt to normalize the data to a valid vsphere path
+e.g. "My Network" becomes "/DC_NAME/networks/My Network"
 */
 func vsphereLegacyNormalizer(nt *unstructured.Unstructured) {
 	spec, ok := nt.Object["spec"].(map[string]interface{})

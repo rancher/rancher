@@ -1,6 +1,6 @@
 module github.com/rancher/rancher
 
-go 1.17
+go 1.19
 
 replace (
 	github.com/docker/distribution => github.com/docker/distribution v2.7.1+incompatible // oras dep requires a replace is set

@@ -29,22 +29,22 @@ var _ v1alpha31.VirtualServiceLister = &VirtualServiceListerMock{}
 
 // VirtualServiceListerMock is a mock implementation of v1alpha31.VirtualServiceLister.
 //
-//     func TestSomethingThatUsesVirtualServiceLister(t *testing.T) {
+//	    func TestSomethingThatUsesVirtualServiceLister(t *testing.T) {
 //
-//         // make and configure a mocked v1alpha31.VirtualServiceLister
-//         mockedVirtualServiceLister := &VirtualServiceListerMock{
-//             GetFunc: func(namespace string, name string) (*v1alpha3.VirtualService, error) {
-// 	               panic("mock out the Get method")
-//             },
-//             ListFunc: func(namespace string, selector labels.Selector) ([]*v1alpha3.VirtualService, error) {
-// 	               panic("mock out the List method")
-//             },
-//         }
+//	        // make and configure a mocked v1alpha31.VirtualServiceLister
+//	        mockedVirtualServiceLister := &VirtualServiceListerMock{
+//	            GetFunc: func(namespace string, name string) (*v1alpha3.VirtualService, error) {
+//		               panic("mock out the Get method")
+//	            },
+//	            ListFunc: func(namespace string, selector labels.Selector) ([]*v1alpha3.VirtualService, error) {
+//		               panic("mock out the List method")
+//	            },
+//	        }
 //
-//         // use mockedVirtualServiceLister in code that requires v1alpha31.VirtualServiceLister
-//         // and then make assertions.
+//	        // use mockedVirtualServiceLister in code that requires v1alpha31.VirtualServiceLister
+//	        // and then make assertions.
 //
-//     }
+//	    }
 type VirtualServiceListerMock struct {
 	// GetFunc mocks the Get method.
 	GetFunc func(namespace string, name string) (*v1alpha3.VirtualService, error)
@@ -91,7 +91,8 @@ func (mock *VirtualServiceListerMock) Get(namespace string, name string) (*v1alp
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//     len(mockedVirtualServiceLister.GetCalls())
+//
+//	len(mockedVirtualServiceLister.GetCalls())
 func (mock *VirtualServiceListerMock) GetCalls() []struct {
 	Namespace string
 	Name      string
@@ -126,7 +127,8 @@ func (mock *VirtualServiceListerMock) List(namespace string, selector labels.Sel
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//     len(mockedVirtualServiceLister.ListCalls())
+//
+//	len(mockedVirtualServiceLister.ListCalls())
 func (mock *VirtualServiceListerMock) ListCalls() []struct {
 	Namespace string
 	Selector  labels.Selector
@@ -159,43 +161,43 @@ var _ v1alpha31.VirtualServiceController = &VirtualServiceControllerMock{}
 
 // VirtualServiceControllerMock is a mock implementation of v1alpha31.VirtualServiceController.
 //
-//     func TestSomethingThatUsesVirtualServiceController(t *testing.T) {
+//	    func TestSomethingThatUsesVirtualServiceController(t *testing.T) {
 //
-//         // make and configure a mocked v1alpha31.VirtualServiceController
-//         mockedVirtualServiceController := &VirtualServiceControllerMock{
-//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v1alpha31.VirtualServiceHandlerFunc)  {
-// 	               panic("mock out the AddClusterScopedFeatureHandler method")
-//             },
-//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v1alpha31.VirtualServiceHandlerFunc)  {
-// 	               panic("mock out the AddClusterScopedHandler method")
-//             },
-//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v1alpha31.VirtualServiceHandlerFunc)  {
-// 	               panic("mock out the AddFeatureHandler method")
-//             },
-//             AddHandlerFunc: func(ctx context.Context, name string, handler v1alpha31.VirtualServiceHandlerFunc)  {
-// 	               panic("mock out the AddHandler method")
-//             },
-//             EnqueueFunc: func(namespace string, name string)  {
-// 	               panic("mock out the Enqueue method")
-//             },
-//             EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
-// 	               panic("mock out the EnqueueAfter method")
-//             },
-//             GenericFunc: func() controller.GenericController {
-// 	               panic("mock out the Generic method")
-//             },
-//             InformerFunc: func() cache.SharedIndexInformer {
-// 	               panic("mock out the Informer method")
-//             },
-//             ListerFunc: func() v1alpha31.VirtualServiceLister {
-// 	               panic("mock out the Lister method")
-//             },
-//         }
+//	        // make and configure a mocked v1alpha31.VirtualServiceController
+//	        mockedVirtualServiceController := &VirtualServiceControllerMock{
+//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v1alpha31.VirtualServiceHandlerFunc)  {
+//		               panic("mock out the AddClusterScopedFeatureHandler method")
+//	            },
+//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v1alpha31.VirtualServiceHandlerFunc)  {
+//		               panic("mock out the AddClusterScopedHandler method")
+//	            },
+//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v1alpha31.VirtualServiceHandlerFunc)  {
+//		               panic("mock out the AddFeatureHandler method")
+//	            },
+//	            AddHandlerFunc: func(ctx context.Context, name string, handler v1alpha31.VirtualServiceHandlerFunc)  {
+//		               panic("mock out the AddHandler method")
+//	            },
+//	            EnqueueFunc: func(namespace string, name string)  {
+//		               panic("mock out the Enqueue method")
+//	            },
+//	            EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
+//		               panic("mock out the EnqueueAfter method")
+//	            },
+//	            GenericFunc: func() controller.GenericController {
+//		               panic("mock out the Generic method")
+//	            },
+//	            InformerFunc: func() cache.SharedIndexInformer {
+//		               panic("mock out the Informer method")
+//	            },
+//	            ListerFunc: func() v1alpha31.VirtualServiceLister {
+//		               panic("mock out the Lister method")
+//	            },
+//	        }
 //
-//         // use mockedVirtualServiceController in code that requires v1alpha31.VirtualServiceController
-//         // and then make assertions.
+//	        // use mockedVirtualServiceController in code that requires v1alpha31.VirtualServiceController
+//	        // and then make assertions.
 //
-//     }
+//	    }
 type VirtualServiceControllerMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
 	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v1alpha31.VirtualServiceHandlerFunc)
@@ -324,7 +326,8 @@ func (mock *VirtualServiceControllerMock) AddClusterScopedFeatureHandler(ctx con
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//     len(mockedVirtualServiceController.AddClusterScopedFeatureHandlerCalls())
+//
+//	len(mockedVirtualServiceController.AddClusterScopedFeatureHandlerCalls())
 func (mock *VirtualServiceControllerMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -369,7 +372,8 @@ func (mock *VirtualServiceControllerMock) AddClusterScopedHandler(ctx context.Co
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//     len(mockedVirtualServiceController.AddClusterScopedHandlerCalls())
+//
+//	len(mockedVirtualServiceController.AddClusterScopedHandlerCalls())
 func (mock *VirtualServiceControllerMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -412,7 +416,8 @@ func (mock *VirtualServiceControllerMock) AddFeatureHandler(ctx context.Context,
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//     len(mockedVirtualServiceController.AddFeatureHandlerCalls())
+//
+//	len(mockedVirtualServiceController.AddFeatureHandlerCalls())
 func (mock *VirtualServiceControllerMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
@@ -453,7 +458,8 @@ func (mock *VirtualServiceControllerMock) AddHandler(ctx context.Context, name s
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//     len(mockedVirtualServiceController.AddHandlerCalls())
+//
+//	len(mockedVirtualServiceController.AddHandlerCalls())
 func (mock *VirtualServiceControllerMock) AddHandlerCalls() []struct {
 	Ctx     context.Context
 	Name    string
@@ -490,7 +496,8 @@ func (mock *VirtualServiceControllerMock) Enqueue(namespace string, name string)
 
 // EnqueueCalls gets all the calls that were made to Enqueue.
 // Check the length with:
-//     len(mockedVirtualServiceController.EnqueueCalls())
+//
+//	len(mockedVirtualServiceController.EnqueueCalls())
 func (mock *VirtualServiceControllerMock) EnqueueCalls() []struct {
 	Namespace string
 	Name      string
@@ -527,7 +534,8 @@ func (mock *VirtualServiceControllerMock) EnqueueAfter(namespace string, name st
 
 // EnqueueAfterCalls gets all the calls that were made to EnqueueAfter.
 // Check the length with:
-//     len(mockedVirtualServiceController.EnqueueAfterCalls())
+//
+//	len(mockedVirtualServiceController.EnqueueAfterCalls())
 func (mock *VirtualServiceControllerMock) EnqueueAfterCalls() []struct {
 	Namespace string
 	Name      string
@@ -559,7 +567,8 @@ func (mock *VirtualServiceControllerMock) Generic() controller.GenericController
 
 // GenericCalls gets all the calls that were made to Generic.
 // Check the length with:
-//     len(mockedVirtualServiceController.GenericCalls())
+//
+//	len(mockedVirtualServiceController.GenericCalls())
 func (mock *VirtualServiceControllerMock) GenericCalls() []struct {
 } {
 	var calls []struct {
@@ -585,7 +594,8 @@ func (mock *VirtualServiceControllerMock) Informer() cache.SharedIndexInformer {
 
 // InformerCalls gets all the calls that were made to Informer.
 // Check the length with:
-//     len(mockedVirtualServiceController.InformerCalls())
+//
+//	len(mockedVirtualServiceController.InformerCalls())
 func (mock *VirtualServiceControllerMock) InformerCalls() []struct {
 } {
 	var calls []struct {
@@ -611,7 +621,8 @@ func (mock *VirtualServiceControllerMock) Lister() v1alpha31.VirtualServiceListe
 
 // ListerCalls gets all the calls that were made to Lister.
 // Check the length with:
-//     len(mockedVirtualServiceController.ListerCalls())
+//
+//	len(mockedVirtualServiceController.ListerCalls())
 func (mock *VirtualServiceControllerMock) ListerCalls() []struct {
 } {
 	var calls []struct {
@@ -651,76 +662,76 @@ var _ v1alpha31.VirtualServiceInterface = &VirtualServiceInterfaceMock{}
 
 // VirtualServiceInterfaceMock is a mock implementation of v1alpha31.VirtualServiceInterface.
 //
-//     func TestSomethingThatUsesVirtualServiceInterface(t *testing.T) {
+//	    func TestSomethingThatUsesVirtualServiceInterface(t *testing.T) {
 //
-//         // make and configure a mocked v1alpha31.VirtualServiceInterface
-//         mockedVirtualServiceInterface := &VirtualServiceInterfaceMock{
-//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v1alpha31.VirtualServiceHandlerFunc)  {
-// 	               panic("mock out the AddClusterScopedFeatureHandler method")
-//             },
-//             AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v1alpha31.VirtualServiceLifecycle)  {
-// 	               panic("mock out the AddClusterScopedFeatureLifecycle method")
-//             },
-//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v1alpha31.VirtualServiceHandlerFunc)  {
-// 	               panic("mock out the AddClusterScopedHandler method")
-//             },
-//             AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v1alpha31.VirtualServiceLifecycle)  {
-// 	               panic("mock out the AddClusterScopedLifecycle method")
-//             },
-//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v1alpha31.VirtualServiceHandlerFunc)  {
-// 	               panic("mock out the AddFeatureHandler method")
-//             },
-//             AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v1alpha31.VirtualServiceLifecycle)  {
-// 	               panic("mock out the AddFeatureLifecycle method")
-//             },
-//             AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v1alpha31.VirtualServiceHandlerFunc)  {
-// 	               panic("mock out the AddHandler method")
-//             },
-//             AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v1alpha31.VirtualServiceLifecycle)  {
-// 	               panic("mock out the AddLifecycle method")
-//             },
-//             ControllerFunc: func() v1alpha31.VirtualServiceController {
-// 	               panic("mock out the Controller method")
-//             },
-//             CreateFunc: func(in1 *v1alpha3.VirtualService) (*v1alpha3.VirtualService, error) {
-// 	               panic("mock out the Create method")
-//             },
-//             DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
-// 	               panic("mock out the Delete method")
-//             },
-//             DeleteCollectionFunc: func(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
-// 	               panic("mock out the DeleteCollection method")
-//             },
-//             DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
-// 	               panic("mock out the DeleteNamespaced method")
-//             },
-//             GetFunc: func(name string, opts metav1.GetOptions) (*v1alpha3.VirtualService, error) {
-// 	               panic("mock out the Get method")
-//             },
-//             GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v1alpha3.VirtualService, error) {
-// 	               panic("mock out the GetNamespaced method")
-//             },
-//             ListFunc: func(opts metav1.ListOptions) (*v1alpha3.VirtualServiceList, error) {
-// 	               panic("mock out the List method")
-//             },
-//             ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v1alpha3.VirtualServiceList, error) {
-// 	               panic("mock out the ListNamespaced method")
-//             },
-//             ObjectClientFunc: func() *objectclient.ObjectClient {
-// 	               panic("mock out the ObjectClient method")
-//             },
-//             UpdateFunc: func(in1 *v1alpha3.VirtualService) (*v1alpha3.VirtualService, error) {
-// 	               panic("mock out the Update method")
-//             },
-//             WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
-// 	               panic("mock out the Watch method")
-//             },
-//         }
+//	        // make and configure a mocked v1alpha31.VirtualServiceInterface
+//	        mockedVirtualServiceInterface := &VirtualServiceInterfaceMock{
+//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v1alpha31.VirtualServiceHandlerFunc)  {
+//		               panic("mock out the AddClusterScopedFeatureHandler method")
+//	            },
+//	            AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v1alpha31.VirtualServiceLifecycle)  {
+//		               panic("mock out the AddClusterScopedFeatureLifecycle method")
+//	            },
+//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v1alpha31.VirtualServiceHandlerFunc)  {
+//		               panic("mock out the AddClusterScopedHandler method")
+//	            },
+//	            AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v1alpha31.VirtualServiceLifecycle)  {
+//		               panic("mock out the AddClusterScopedLifecycle method")
+//	            },
+//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v1alpha31.VirtualServiceHandlerFunc)  {
+//		               panic("mock out the AddFeatureHandler method")
+//	            },
+//	            AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v1alpha31.VirtualServiceLifecycle)  {
+//		               panic("mock out the AddFeatureLifecycle method")
+//	            },
+//	            AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v1alpha31.VirtualServiceHandlerFunc)  {
+//		               panic("mock out the AddHandler method")
+//	            },
+//	            AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v1alpha31.VirtualServiceLifecycle)  {
+//		               panic("mock out the AddLifecycle method")
+//	            },
+//	            ControllerFunc: func() v1alpha31.VirtualServiceController {
+//		               panic("mock out the Controller method")
+//	            },
+//	            CreateFunc: func(in1 *v1alpha3.VirtualService) (*v1alpha3.VirtualService, error) {
+//		               panic("mock out the Create method")
+//	            },
+//	            DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
+//		               panic("mock out the Delete method")
+//	            },
+//	            DeleteCollectionFunc: func(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
+//		               panic("mock out the DeleteCollection method")
+//	            },
+//	            DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
+//		               panic("mock out the DeleteNamespaced method")
+//	            },
+//	            GetFunc: func(name string, opts metav1.GetOptions) (*v1alpha3.VirtualService, error) {
+//		               panic("mock out the Get method")
+//	            },
+//	            GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v1alpha3.VirtualService, error) {
+//		               panic("mock out the GetNamespaced method")
+//	            },
+//	            ListFunc: func(opts metav1.ListOptions) (*v1alpha3.VirtualServiceList, error) {
+//		               panic("mock out the List method")
+//	            },
+//	            ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v1alpha3.VirtualServiceList, error) {
+//		               panic("mock out the ListNamespaced method")
+//	            },
+//	            ObjectClientFunc: func() *objectclient.ObjectClient {
+//		               panic("mock out the ObjectClient method")
+//	            },
+//	            UpdateFunc: func(in1 *v1alpha3.VirtualService) (*v1alpha3.VirtualService, error) {
+//		               panic("mock out the Update method")
+//	            },
+//	            WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
+//		               panic("mock out the Watch method")
+//	            },
+//	        }
 //
-//         // use mockedVirtualServiceInterface in code that requires v1alpha31.VirtualServiceInterface
-//         // and then make assertions.
+//	        // use mockedVirtualServiceInterface in code that requires v1alpha31.VirtualServiceInterface
+//	        // and then make assertions.
 //
-//     }
+//	    }
 type VirtualServiceInterfaceMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
 	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v1alpha31.VirtualServiceHandlerFunc)
@@ -973,7 +984,8 @@ func (mock *VirtualServiceInterfaceMock) AddClusterScopedFeatureHandler(ctx cont
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//     len(mockedVirtualServiceInterface.AddClusterScopedFeatureHandlerCalls())
+//
+//	len(mockedVirtualServiceInterface.AddClusterScopedFeatureHandlerCalls())
 func (mock *VirtualServiceInterfaceMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -1020,7 +1032,8 @@ func (mock *VirtualServiceInterfaceMock) AddClusterScopedFeatureLifecycle(ctx co
 
 // AddClusterScopedFeatureLifecycleCalls gets all the calls that were made to AddClusterScopedFeatureLifecycle.
 // Check the length with:
-//     len(mockedVirtualServiceInterface.AddClusterScopedFeatureLifecycleCalls())
+//
+//	len(mockedVirtualServiceInterface.AddClusterScopedFeatureLifecycleCalls())
 func (mock *VirtualServiceInterfaceMock) AddClusterScopedFeatureLifecycleCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -1065,7 +1078,8 @@ func (mock *VirtualServiceInterfaceMock) AddClusterScopedHandler(ctx context.Con
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//     len(mockedVirtualServiceInterface.AddClusterScopedHandlerCalls())
+//
+//	len(mockedVirtualServiceInterface.AddClusterScopedHandlerCalls())
 func (mock *VirtualServiceInterfaceMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -1108,7 +1122,8 @@ func (mock *VirtualServiceInterfaceMock) AddClusterScopedLifecycle(ctx context.C
 
 // AddClusterScopedLifecycleCalls gets all the calls that were made to AddClusterScopedLifecycle.
 // Check the length with:
-//     len(mockedVirtualServiceInterface.AddClusterScopedLifecycleCalls())
+//
+//	len(mockedVirtualServiceInterface.AddClusterScopedLifecycleCalls())
 func (mock *VirtualServiceInterfaceMock) AddClusterScopedLifecycleCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -1151,7 +1166,8 @@ func (mock *VirtualServiceInterfaceMock) AddFeatureHandler(ctx context.Context, 
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//     len(mockedVirtualServiceInterface.AddFeatureHandlerCalls())
+//
+//	len(mockedVirtualServiceInterface.AddFeatureHandlerCalls())
 func (mock *VirtualServiceInterfaceMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
@@ -1194,7 +1210,8 @@ func (mock *VirtualServiceInterfaceMock) AddFeatureLifecycle(ctx context.Context
 
 // AddFeatureLifecycleCalls gets all the calls that were made to AddFeatureLifecycle.
 // Check the length with:
-//     len(mockedVirtualServiceInterface.AddFeatureLifecycleCalls())
+//
+//	len(mockedVirtualServiceInterface.AddFeatureLifecycleCalls())
 func (mock *VirtualServiceInterfaceMock) AddFeatureLifecycleCalls() []struct {
 	Ctx       context.Context
 	Enabled   func() bool
@@ -1235,7 +1252,8 @@ func (mock *VirtualServiceInterfaceMock) AddHandler(ctx context.Context, name st
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//     len(mockedVirtualServiceInterface.AddHandlerCalls())
+//
+//	len(mockedVirtualServiceInterface.AddHandlerCalls())
 func (mock *VirtualServiceInterfaceMock) AddHandlerCalls() []struct {
 	Ctx  context.Context
 	Name string
@@ -1274,7 +1292,8 @@ func (mock *VirtualServiceInterfaceMock) AddLifecycle(ctx context.Context, name 
 
 // AddLifecycleCalls gets all the calls that were made to AddLifecycle.
 // Check the length with:
-//     len(mockedVirtualServiceInterface.AddLifecycleCalls())
+//
+//	len(mockedVirtualServiceInterface.AddLifecycleCalls())
 func (mock *VirtualServiceInterfaceMock) AddLifecycleCalls() []struct {
 	Ctx       context.Context
 	Name      string
@@ -1306,7 +1325,8 @@ func (mock *VirtualServiceInterfaceMock) Controller() v1alpha31.VirtualServiceCo
 
 // ControllerCalls gets all the calls that were made to Controller.
 // Check the length with:
-//     len(mockedVirtualServiceInterface.ControllerCalls())
+//
+//	len(mockedVirtualServiceInterface.ControllerCalls())
 func (mock *VirtualServiceInterfaceMock) ControllerCalls() []struct {
 } {
 	var calls []struct {
@@ -1335,7 +1355,8 @@ func (mock *VirtualServiceInterfaceMock) Create(in1 *v1alpha3.VirtualService) (*
 
 // CreateCalls gets all the calls that were made to Create.
 // Check the length with:
-//     len(mockedVirtualServiceInterface.CreateCalls())
+//
+//	len(mockedVirtualServiceInterface.CreateCalls())
 func (mock *VirtualServiceInterfaceMock) CreateCalls() []struct {
 	In1 *v1alpha3.VirtualService
 } {
@@ -1368,7 +1389,8 @@ func (mock *VirtualServiceInterfaceMock) Delete(name string, options *metav1.Del
 
 // DeleteCalls gets all the calls that were made to Delete.
 // Check the length with:
-//     len(mockedVirtualServiceInterface.DeleteCalls())
+//
+//	len(mockedVirtualServiceInterface.DeleteCalls())
 func (mock *VirtualServiceInterfaceMock) DeleteCalls() []struct {
 	Name    string
 	Options *metav1.DeleteOptions
@@ -1403,7 +1425,8 @@ func (mock *VirtualServiceInterfaceMock) DeleteCollection(deleteOpts *metav1.Del
 
 // DeleteCollectionCalls gets all the calls that were made to DeleteCollection.
 // Check the length with:
-//     len(mockedVirtualServiceInterface.DeleteCollectionCalls())
+//
+//	len(mockedVirtualServiceInterface.DeleteCollectionCalls())
 func (mock *VirtualServiceInterfaceMock) DeleteCollectionCalls() []struct {
 	DeleteOpts *metav1.DeleteOptions
 	ListOpts   metav1.ListOptions
@@ -1440,7 +1463,8 @@ func (mock *VirtualServiceInterfaceMock) DeleteNamespaced(namespace string, name
 
 // DeleteNamespacedCalls gets all the calls that were made to DeleteNamespaced.
 // Check the length with:
-//     len(mockedVirtualServiceInterface.DeleteNamespacedCalls())
+//
+//	len(mockedVirtualServiceInterface.DeleteNamespacedCalls())
 func (mock *VirtualServiceInterfaceMock) DeleteNamespacedCalls() []struct {
 	Namespace string
 	Name      string
@@ -1477,7 +1501,8 @@ func (mock *VirtualServiceInterfaceMock) Get(name string, opts metav1.GetOptions
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//     len(mockedVirtualServiceInterface.GetCalls())
+//
+//	len(mockedVirtualServiceInterface.GetCalls())
 func (mock *VirtualServiceInterfaceMock) GetCalls() []struct {
 	Name string
 	Opts metav1.GetOptions
@@ -1514,7 +1539,8 @@ func (mock *VirtualServiceInterfaceMock) GetNamespaced(namespace string, name st
 
 // GetNamespacedCalls gets all the calls that were made to GetNamespaced.
 // Check the length with:
-//     len(mockedVirtualServiceInterface.GetNamespacedCalls())
+//
+//	len(mockedVirtualServiceInterface.GetNamespacedCalls())
 func (mock *VirtualServiceInterfaceMock) GetNamespacedCalls() []struct {
 	Namespace string
 	Name      string
@@ -1549,7 +1575,8 @@ func (mock *VirtualServiceInterfaceMock) List(opts metav1.ListOptions) (*v1alpha
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//     len(mockedVirtualServiceInterface.ListCalls())
+//
+//	len(mockedVirtualServiceInterface.ListCalls())
 func (mock *VirtualServiceInterfaceMock) ListCalls() []struct {
 	Opts metav1.ListOptions
 } {
@@ -1582,7 +1609,8 @@ func (mock *VirtualServiceInterfaceMock) ListNamespaced(namespace string, opts m
 
 // ListNamespacedCalls gets all the calls that were made to ListNamespaced.
 // Check the length with:
-//     len(mockedVirtualServiceInterface.ListNamespacedCalls())
+//
+//	len(mockedVirtualServiceInterface.ListNamespacedCalls())
 func (mock *VirtualServiceInterfaceMock) ListNamespacedCalls() []struct {
 	Namespace string
 	Opts      metav1.ListOptions
@@ -1612,7 +1640,8 @@ func (mock *VirtualServiceInterfaceMock) ObjectClient() *objectclient.ObjectClie
 
 // ObjectClientCalls gets all the calls that were made to ObjectClient.
 // Check the length with:
-//     len(mockedVirtualServiceInterface.ObjectClientCalls())
+//
+//	len(mockedVirtualServiceInterface.ObjectClientCalls())
 func (mock *VirtualServiceInterfaceMock) ObjectClientCalls() []struct {
 } {
 	var calls []struct {
@@ -1641,7 +1670,8 @@ func (mock *VirtualServiceInterfaceMock) Update(in1 *v1alpha3.VirtualService) (*
 
 // UpdateCalls gets all the calls that were made to Update.
 // Check the length with:
-//     len(mockedVirtualServiceInterface.UpdateCalls())
+//
+//	len(mockedVirtualServiceInterface.UpdateCalls())
 func (mock *VirtualServiceInterfaceMock) UpdateCalls() []struct {
 	In1 *v1alpha3.VirtualService
 } {
@@ -1672,7 +1702,8 @@ func (mock *VirtualServiceInterfaceMock) Watch(opts metav1.ListOptions) (watch.I
 
 // WatchCalls gets all the calls that were made to Watch.
 // Check the length with:
-//     len(mockedVirtualServiceInterface.WatchCalls())
+//
+//	len(mockedVirtualServiceInterface.WatchCalls())
 func (mock *VirtualServiceInterfaceMock) WatchCalls() []struct {
 	Opts metav1.ListOptions
 } {
@@ -1695,19 +1726,19 @@ var _ v1alpha31.VirtualServicesGetter = &VirtualServicesGetterMock{}
 
 // VirtualServicesGetterMock is a mock implementation of v1alpha31.VirtualServicesGetter.
 //
-//     func TestSomethingThatUsesVirtualServicesGetter(t *testing.T) {
+//	    func TestSomethingThatUsesVirtualServicesGetter(t *testing.T) {
 //
-//         // make and configure a mocked v1alpha31.VirtualServicesGetter
-//         mockedVirtualServicesGetter := &VirtualServicesGetterMock{
-//             VirtualServicesFunc: func(namespace string) v1alpha31.VirtualServiceInterface {
-// 	               panic("mock out the VirtualServices method")
-//             },
-//         }
+//	        // make and configure a mocked v1alpha31.VirtualServicesGetter
+//	        mockedVirtualServicesGetter := &VirtualServicesGetterMock{
+//	            VirtualServicesFunc: func(namespace string) v1alpha31.VirtualServiceInterface {
+//		               panic("mock out the VirtualServices method")
+//	            },
+//	        }
 //
-//         // use mockedVirtualServicesGetter in code that requires v1alpha31.VirtualServicesGetter
-//         // and then make assertions.
+//	        // use mockedVirtualServicesGetter in code that requires v1alpha31.VirtualServicesGetter
+//	        // and then make assertions.
 //
-//     }
+//	    }
 type VirtualServicesGetterMock struct {
 	// VirtualServicesFunc mocks the VirtualServices method.
 	VirtualServicesFunc func(namespace string) v1alpha31.VirtualServiceInterface
@@ -1740,7 +1771,8 @@ func (mock *VirtualServicesGetterMock) VirtualServices(namespace string) v1alpha
 
 // VirtualServicesCalls gets all the calls that were made to VirtualServices.
 // Check the length with:
-//     len(mockedVirtualServicesGetter.VirtualServicesCalls())
+//
+//	len(mockedVirtualServicesGetter.VirtualServicesCalls())
 func (mock *VirtualServicesGetterMock) VirtualServicesCalls() []struct {
 	Namespace string
 } {
