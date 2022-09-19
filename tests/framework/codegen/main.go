@@ -7,9 +7,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	managementSchema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
 	"github.com/rancher/rancher/tests/framework/codegen/generator"
 	clusterMachineSchema "github.com/rancher/rancher/tests/framework/pkg/schemas/cluster.x-k8s.io.machines/v1beta1"
+	managementSchema "github.com/rancher/rancher/tests/framework/pkg/schemas/management.cattle.io/v3"
 	provisioningSchema "github.com/rancher/rancher/tests/framework/pkg/schemas/provisioning.cattle.io/v1"
 )
 
