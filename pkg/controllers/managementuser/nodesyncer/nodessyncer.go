@@ -410,7 +410,7 @@ func (m *nodesSyncer) reconcileAll() error {
 		if err != nil {
 			return err
 		}
-		if node == nil {
+		if node == nil || machine.DeletionTimestamp != nil {
 			logrus.Debugf("Failed to get node for machine [%s], preparing to delete", machine.Name)
 			toDelete[machine.Name] = machine
 			continue
