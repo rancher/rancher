@@ -7,6 +7,7 @@ import (
 	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2"
+	"k8s.io/client-go/rest"
 )
 
 const (
@@ -179,6 +180,7 @@ func Test_generateAndSetServiceAccount(t *testing.T) {
 	if err != nil {
 		t.Errorf("error getting mock v3 cluster: %s", err)
 	}
+	mockOperatorController.Mock.On("getRestConfig", mockCluster).Return(&rest.Config{}, nil)
 
 	cluster, err := mockOperatorController.generateAndSetServiceAccount(&mockCluster)
 
@@ -267,6 +269,7 @@ func Test_generateSATokenWithPublicAPI(t *testing.T) {
 	if err != nil {
 		t.Errorf("error getting mock v3 cluster: %s", err)
 	}
+	mockOperatorController.Mock.On("getRestConfig", mockCluster).Return(&rest.Config{}, nil)
 	input := mockCluster.DeepCopy()
 	isPrivate := true
 	input.Status.AKSStatus.UpstreamSpec.PrivateCluster = &isPrivate
