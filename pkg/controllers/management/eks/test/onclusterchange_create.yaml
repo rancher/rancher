@@ -1,0 +1,63 @@
+apiVersion: management.cattle.io/v3
+kind: Cluster
+spec:
+  agentImageOverride: ""
+  answers: {}
+  clusterSecrets: {}
+  description: ""
+  desiredAgentImage: ""
+  desiredAuthImage: ""
+  displayName: eks-test
+  dockerRootDir: /var/lib/docker
+  eksConfig:
+    amazonCredentialSecret: cattle-global-data:cc-kxfmx
+    displayName: eks-test
+    imported: false
+    kmsKey: ""
+    kubernetesVersion: "1.22"
+    loggingTypes: []
+    nodeGroups:
+    - desiredSize: 2
+      diskSize: 20
+      ec2SshKey: ""
+      gpu: false
+      imageId: ""
+      instanceType: t3.medium
+      labels: {}
+      launchTemplate: null
+      maxSize: 2
+      minSize: 2
+      nodegroupName: nodegroup
+      requestSpotInstances: false
+      resourceTags: {}
+      spotInstanceTypes: []
+      subnets: []
+      tags: {}
+      userData: ""
+      version: "1.22"
+    privateAccess: false
+    publicAccess: true
+    publicAccessSources: []
+    region: us-east-2
+    secretsEncryption: false
+    securityGroups: []
+    serviceRole: ""
+    subnets: []
+    tags: {}
+  enableClusterAlerting: false
+  enableClusterMonitoring: false
+  enableNetworkPolicy: false
+  fleetWorkspaceName: fleet-default
+  internal: false
+  localClusterAuthEndpoint:
+    enabled: false
+  windowsPreferedCluster: false
+status:
+  conditions:
+  - lastUpdateTime: "2022-08-15T17:55:31-04:00"
+    status: Unknown
+    type: Provisioned
+  driver: EKS
+  eksStatus:
+    upstreamSpec:
+      testField: "upstream spec is already set"

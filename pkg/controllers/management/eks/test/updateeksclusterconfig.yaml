@@ -1,0 +1,272 @@
+apiVersion: management.cattle.io/v3
+kind: Cluster
+spec:
+  agentImageOverride: ""
+  answers: {}
+  clusterSecrets: {}
+  description: ""
+  desiredAgentImage: ""
+  desiredAuthImage: ""
+  displayName: ekscc-test
+  dockerRootDir: /var/lib/docker
+  eksConfig:
+    amazonCredentialSecret: cattle-global-data:cc-kxfmx
+    displayName: ekscc-test
+    imported: false
+    kmsKey: ""
+    kubernetesVersion: "1.22"
+    loggingTypes: []
+    nodeGroups:
+    - desiredSize: 2
+      diskSize: 20
+      ec2SshKey: ""
+      gpu: false
+      imageId: ""
+      instanceType: t3.medium
+      labels: {}
+      launchTemplate: null
+      maxSize: 2
+      minSize: 2
+      nodegroupName: nodegroup
+      requestSpotInstances: false
+      resourceTags: {}
+      spotInstanceTypes: []
+      subnets:
+      - subnet-01
+      - subnet-02
+      - subnet-03
+      tags:
+        TESTKEY: TESTVALUE
+      userData: ""
+      version: "1.22"
+    privateAccess: false
+    publicAccess: true
+    publicAccessSources:
+    - 0.0.0.0/0
+    region: us-east-2
+    secretsEncryption: false
+    securityGroups: []
+    serviceRole: ""
+    subnets: []
+    tags: {}
+  enableClusterAlerting: false
+  enableClusterMonitoring: false
+  enableNetworkPolicy: false
+  fleetWorkspaceName: fleet-default
+  internal: false
+  localClusterAuthEndpoint:
+    enabled: false
+  windowsPreferedCluster: false
+status:
+  agentFeatures:
+    embedded-cluster-api: false
+    fleet: false
+    monitoringv1: false
+    multi-cluster-management: false
+    multi-cluster-management-agent: true
+    provisioningv2: false
+    rke2: false
+  agentImage: rancher/rancher-agent:v2.6-head
+  allocatable:
+    cpu: 3860m
+    memory: 6824936Ki
+    pods: "34"
+  apiEndpoint: https://apiendpoint.us-east-2.eks.amazonaws.com
+  appliedAgentEnvVars:
+  - name: CATTLE_SERVER_VERSION
+    value: dev
+  - name: CATTLE_INSTALL_UUID
+    value: 3573e14c-efce-425e-ae8a-7ddc80578c5e
+  - name: CATTLE_INGRESS_IP_DOMAIN
+    value: sslip.io
+  appliedEnableNetworkPolicy: false
+  appliedPodSecurityPolicyTemplateId: ""
+  appliedSpec:
+    agentImageOverride: ""
+    answers: {}
+    clusterSecrets: {}
+    description: ""
+    desiredAgentImage: ""
+    desiredAuthImage: ""
+    displayName: ""
+    eksConfig:
+      amazonCredentialSecret: cattle-global-data:cc-kxfmx
+      displayName: ekscc-test
+      imported: false
+      kmsKey: ""
+      kubernetesVersion: "1.22"
+      loggingTypes: []
+      nodeGroups:
+      - desiredSize: 2
+        diskSize: 20
+        ec2SshKey: null
+        gpu: false
+        imageId: null
+        instanceType: t3.medium
+        labels: {}
+        launchTemplate: null
+        maxSize: 2
+        minSize: 2
+        nodegroupName: nodegroup
+        requestSpotInstances: false
+        resourceTags: {}
+        spotInstanceTypes: null
+        subnets:
+        - subnet-01
+        - subnet-02
+        - subnet-03
+        tags: {}
+        userData: null
+        version: "1.22"
+      privateAccess: false
+      publicAccess: true
+      publicAccessSources:
+      - 0.0.0.0/0
+      region: us-east-2
+      secretsEncryption: false
+      securityGroups: []
+      serviceRole: ""
+      subnets: []
+      tags: {}
+    enableClusterAlerting: false
+    enableClusterMonitoring: false
+    enableNetworkPolicy: null
+    internal: false
+    localClusterAuthEndpoint:
+      enabled: false
+    windowsPreferedCluster: false
+  authImage: ""
+  caCert: testcacertvalue12345678910
+  capabilities:
+    loadBalancerCapabilities: {}
+  capacity:
+    cpu: "4"
+    memory: 7934952Ki
+    pods: "34"
+  conditions:
+  - status: "True"
+    type: Pending
+  - lastUpdateTime: "2022-08-17T18:55:19-04:00"
+    status: "True"
+    type: Provisioned
+  - lastUpdateTime: "2022-08-17T18:58:36-04:00"
+    status: "True"
+    type: Waiting
+  - lastUpdateTime: "2022-08-17T18:43:43-04:00"
+    status: "True"
+    type: BackingNamespaceCreated
+  - lastUpdateTime: "2022-08-17T18:43:44-04:00"
+    status: "True"
+    type: DefaultProjectCreated
+  - lastUpdateTime: "2022-08-17T18:43:44-04:00"
+    status: "True"
+    type: SystemProjectCreated
+  - lastUpdateTime: "2022-08-17T18:43:44-04:00"
+    status: "True"
+    type: InitialRolesPopulated
+  - lastUpdateTime: "2022-08-17T18:43:46-04:00"
+    status: "True"
+    type: CreatorMadeOwner
+  - lastUpdateTime: "2022-08-17T22:58:31Z"
+    status: "True"
+    type: Connected
+  - lastUpdateTime: "2022-08-17T18:43:47-04:00"
+    status: "True"
+    type: NoDiskPressure
+  - lastUpdateTime: "2022-08-17T18:43:47-04:00"
+    status: "True"
+    type: NoMemoryPressure
+  - lastUpdateTime: "2022-08-17T18:43:47-04:00"
+    status: "True"
+    type: SecretsMigrated
+  - lastUpdateTime: "2022-08-17T18:43:47-04:00"
+    status: "True"
+    type: ServiceAccountSecretsMigrated
+  - lastUpdateTime: "2022-08-17T18:57:47-04:00"
+    status: "True"
+    type: Updated
+  - lastUpdateTime: "2022-08-17T18:58:36-04:00"
+    status: "True"
+    type: Ready
+  - lastUpdateTime: "2022-08-17T18:57:52-04:00"
+    status: "True"
+    type: GlobalAdminsSynced
+  - lastUpdateTime: "2022-08-17T18:58:01-04:00"
+    status: "True"
+    type: SystemAccountCreated
+  - lastUpdateTime: "2022-08-17T18:58:03-04:00"
+    status: "True"
+    type: AgentDeployed
+  driver: EKS
+  eksStatus:
+    managedLaunchTemplateID: lt-id
+    managedLaunchTemplateVersions:
+      nodegroup: "2"
+    privateRequiresTunnel: null
+    securityGroups: null
+    subnets:
+    - subnet-01
+    - subnet-02
+    - subnet-03
+    upstreamSpec:
+      amazonCredentialSecret: cattle-global-data:cc-kxfmx
+      displayName: ekscc-test
+      imported: false
+      kmsKey: ""
+      kubernetesVersion: "1.22"
+      loggingTypes: []
+      nodeGroups:
+      - desiredSize: 2
+        diskSize: 20
+        ec2SshKey: null
+        gpu: false
+        imageId: null
+        instanceType: t3.medium
+        labels: {}
+        launchTemplate: null
+        maxSize: 2
+        minSize: 2
+        nodegroupName: nodegroup
+        requestSpotInstances: false
+        resourceTags: {}
+        spotInstanceTypes: null
+        subnets:
+        - subnet-01
+        - subnet-02
+        - subnet-03
+        tags: {}
+        userData: null
+        version: "1.22"
+      privateAccess: false
+      publicAccess: true
+      publicAccessSources:
+      - 0.0.0.0/0
+      region: us-east-2
+      secretsEncryption: false
+      securityGroups: []
+      serviceRole: ""
+      subnets: []
+      tags: {}
+    virtualNetwork: vpc-network
+  limits:
+    cpu: "0"
+    memory: 340Mi
+    pods: "0"
+  linuxWorkerCount: 2
+  nodeCount: 2
+  provider: eks
+  requested:
+    cpu: 450m
+    memory: 140Mi
+    pods: "9"
+  serviceAccountTokenSecret: cluster-serviceaccounttoken-secret
+  version:
+    buildDate: "2022-07-06T18:06:23Z"
+    compiler: gc
+    gitCommit: b9628d6d3867ffd84c704af0befd31c7451cdc37
+    gitTreeState: clean
+    gitVersion: v1.22.11-eks-18ef993
+    goVersion: go1.16.15
+    major: "1"
+    minor: 22+
+    platform: linux/amd64
