@@ -1,0 +1,52 @@
+{
+  "apiVersion": "aks.cattle.io/v1",
+  "kind": "AKSClusterConfig",
+  "spec": {
+    "authBaseUrl": null,
+    "authorizedIpRanges": null,
+    "azureCredentialSecret": "cattle-global-data:cc-26b5h",
+    "baseUrl": null,
+    "clusterName": "aks-test",
+    "dnsPrefix": "aks-dns-prefix",
+    "dnsServiceIp": null,
+    "dockerBridgeCidr": null,
+    "httpApplicationRouting": null,
+    "imported": false,
+    "kubernetesVersion": "1.23.8",
+    "linuxAdminUsername": "azureuser",
+    "loadBalancerSku": "Standard",
+    "logAnalyticsWorkspaceGroup": null,
+    "logAnalyticsWorkspaceName": null,
+    "monitoring": null,
+    "networkPlugin": "kubenet",
+    "networkPolicy": null,
+    "nodePools": [
+      {
+        "availabilityZones": [
+          "1",
+          "2",
+          "3"
+        ],
+        "count": 1,
+        "enableAutoScaling": false,
+        "maxPods": 110,
+        "mode": "System",
+        "name": "agentpool",
+        "orchestratorVersion": "1.23.8",
+        "osDiskSizeGB": 128,
+        "osDiskType": "Managed",
+        "osType": "Linux",
+        "vmSize": "Standard_DS2_v2"
+      }
+    ],
+    "podCidr": null,
+    "privateCluster": false,
+    "resourceGroup": "aks-resource-group",
+    "resourceLocation": "eastus",
+    "serviceCidr": null,
+    "subnet": null,
+    "tags": {},
+    "virtualNetwork": null,
+    "virtualNetworkResourceGroup": null
+  }
+}

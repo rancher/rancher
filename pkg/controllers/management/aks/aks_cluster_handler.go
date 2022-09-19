@@ -95,6 +95,7 @@ func (e *aksOperatorController) onClusterChange(_ string, cluster *apimgmtv3.Clu
 
 	// get aks Cluster Config, if it does not exist, create it
 	aksClusterConfigDynamic, err := e.DynamicClient.Namespace(namespace.GlobalNamespace).Get(context.TODO(), cluster.Name, v1.GetOptions{})
+
 	if err != nil {
 		if !errors.IsNotFound(err) {
 			return cluster, err
@@ -324,7 +325,7 @@ func (e *aksOperatorController) updateAKSClusterConfig(cluster *apimgmtv3.Cluste
 func (e *aksOperatorController) generateAndSetServiceAccount(cluster *apimgmtv3.Cluster) (*apimgmtv3.Cluster, error) {
 	restConfig, err := e.getRestConfig(cluster)
 	if err != nil {
-		return cluster, fmt.Errorf("error getting service account token: %v", err)
+		return cluster, fmt.Errorf("error getting kube config: %v", err)
 	}
 
 	clusterDialer, err := e.ClientDialer.ClusterDialer(cluster.Name)
@@ -335,7 +336,7 @@ func (e *aksOperatorController) generateAndSetServiceAccount(cluster *apimgmtv3.
 	restConfig.Dial = clusterDialer
 	saToken, err := clusteroperator.GenerateSAToken(restConfig)
 	if err != nil {
-		return cluster, fmt.Errorf("error getting service account token: %v", err)
+		return cluster, fmt.Errorf("error generating service account token: %v", err)
 	}
 
 	cluster = cluster.DeepCopy()

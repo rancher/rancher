@@ -1,0 +1,85 @@
+apiVersion: management.cattle.io/v3
+kind: Cluster
+spec:
+  agentImageOverride: ""
+  answers: {}
+  clusterSecrets: {}
+  description: ""
+  desiredAgentImage: ""
+  desiredAuthImage: ""
+  displayName: eks-test
+  dockerRootDir: /var/lib/docker
+  eksConfig:
+    amazonCredentialSecret: cattle-global-data:cc-kxfmx
+    displayName: eks-test
+    imported: false
+    kmsKey: ""
+    kubernetesVersion: "1.22"
+    loggingTypes: []
+    nodeGroups:
+    - desiredSize: 2
+      diskSize: 20
+      ec2SshKey: ""
+      gpu: false
+      imageId: ""
+      instanceType: t3.medium
+      labels: {}
+      launchTemplate: null
+      maxSize: 2
+      minSize: 2
+      nodegroupName: nodegroup
+      requestSpotInstances: false
+      resourceTags: {}
+      spotInstanceTypes: []
+      subnets:
+      - subnet-01
+      - subnet-02
+      - subnet-03
+      tags: {}
+      userData: ""
+      version: "1.22"
+    - desiredSize: 2
+      diskSize: 20
+      ec2SshKey: ""
+      gpu: false
+      imageId: ""
+      instanceType: t3.medium
+      labels: {}
+      launchTemplate: null
+      maxSize: 2
+      minSize: 2
+      nodegroupName: nodegroup2
+      requestSpotInstances: false
+      resourceTags: {}
+      spotInstanceTypes: []
+      subnets: []
+      tags: {}
+      userData: ""
+      version: "1.22"
+    privateAccess: false
+    publicAccess: true
+    publicAccessSources:
+    - 0.0.0.0/0
+    region: us-east-2
+    secretsEncryption: false
+    securityGroups: []
+    serviceRole: ""
+    subnets: []
+    tags: {}
+  enableClusterAlerting: false
+  enableClusterMonitoring: false
+  enableNetworkPolicy: false
+  fleetWorkspaceName: fleet-default
+  internal: false
+  localClusterAuthEndpoint:
+    enabled: false
+  windowsPreferedCluster: false
+status:
+  conditions:
+  - lastUpdateTime: "2022-08-15T18:08:55-04:00"
+    status: "True"
+    type: Provisioned
+  - lastUpdateTime: "2022-08-16T11:32:29-04:00"
+    status: Unknown
+    type: Updated
+  driver: EKS
