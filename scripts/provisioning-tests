@@ -111,7 +111,7 @@ done
 
 echo Running provisioning-tests
 export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
-go test -v -timeout 60m ./tests/integration/pkg/tests/... || {
+go test -v -parallel 1 -failfast -timeout 60m ./tests/integration/pkg/tests/... || {
     echo -e "-----RANCHER-LOG-DUMP-START-----"
     cat /tmp/rancher.log | gzip | base64 -w 0
     echo -e "\n-----RANCHER-LOG-DUMP-END-----"
