@@ -2,9 +2,9 @@ package serviceaccounttoken
 
 import (
 	"context"
-	"fmt"
 	"time"
 
+	"github.com/rancher/wrangler/pkg/name"
 	"github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
 	apierror "k8s.io/apimachinery/pkg/api/errors"
@@ -75,5 +75,5 @@ func SecretTemplate(sa *v1.ServiceAccount) *v1.Secret {
 
 // ServiceAccountSecretName returns the secret name for the given Service Account.
 func ServiceAccountSecretName(sa *v1.ServiceAccount) string {
-	return fmt.Sprintf("%s-token", sa.Name)
+	return name.SafeConcatName(sa.Name, "token")
 }
