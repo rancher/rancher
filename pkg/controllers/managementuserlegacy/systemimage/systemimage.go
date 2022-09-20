@@ -8,7 +8,6 @@ import (
 	cutils "github.com/rancher/rancher/pkg/catalog/utils"
 	alerting "github.com/rancher/rancher/pkg/controllers/managementuserlegacy/alert/deployer"
 	logging "github.com/rancher/rancher/pkg/controllers/managementuserlegacy/logging/deployer"
-	pipeline "github.com/rancher/rancher/pkg/controllers/managementuserlegacy/pipeline/upgrade"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/project"
 	"k8s.io/apimachinery/pkg/labels"
@@ -118,6 +117,5 @@ func getSystemService() map[string]SystemService {
 	return map[string]SystemService{
 		alerting.ServiceName: alerting.NewService(),
 		logging.ServiceName:  logging.NewService(),
-		pipeline.ServiceName: pipeline.NewService(),
 	}
 }

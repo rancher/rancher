@@ -12,14 +12,9 @@ import (
 	"github.com/rancher/norman/types/convert"
 	v1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 
-	"github.com/mitchellh/mapstructure"
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	apiprjv3 "github.com/rancher/rancher/pkg/apis/project.cattle.io/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
-	pv3 "github.com/rancher/rancher/pkg/generated/norman/project.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/namespace"
-	"github.com/rancher/rancher/pkg/pipeline/remote/model"
-	pipelineutils "github.com/rancher/rancher/pkg/pipeline/utils"
 	rketypes "github.com/rancher/rke/types"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
@@ -66,18 +61,6 @@ func (h *handler) sync(_ string, cluster *v3.Cluster) (runtime.Object, error) {
 	}
 
 	return h.migrateServiceAccountSecrets(cluster)
-}
-
-func (h *handler) getUnstructuredPipelineConfig(namespace, pType string) (map[string]interface{}, error) {
-	obj, err := h.sourceCodeProviderConfigs.ObjectClient().UnstructuredClient().GetNamespaced(namespace, pType, metav1.GetOptions{})
-	if err != nil {
-		return nil, err
-	}
-	u, ok := obj.(runtime.Unstructured)
-	if !ok {
-		return nil, fmt.Errorf("could not get github source code provider")
-	}
-	return u.UnstructuredContent(), nil
 }
 
 // CreateOrUpdatePrivateRegistrySecret accepts an optional secret name and a RancherKubernetesEngineConfig object and creates a dockerconfigjson Secret
@@ -951,183 +934,6 @@ func (h *handler) migrateClusterSecrets(cluster *v3.Cluster) (*v3.Cluster, error
 			}
 		}
 
-		// sourcecodeproviderconfigs
-		for _, p := range projects {
-			m, err := h.getUnstructuredPipelineConfig(p.Name, model.GithubType)
-			if err != nil && !apierrors.IsNotFound(err) {
-				logrus.Errorf("[secretmigrator] failed to migrate secrets for %s pipeline config in cluster %s, will retry: %v", model.GithubType, clusterCopy.Name, err)
-				return cluster, err
-			}
-			if !apierrors.IsNotFound(err) {
-				if credentialSecret, ok := m["credentialSecret"]; ok && credentialSecret != nil {
-					continue
-				}
-				logrus.Tracef("[secretmigrator] migrating secrets for %s pipeline config in cluster %s", model.GithubType, clusterCopy.Name)
-				github := &apiprjv3.GithubPipelineConfig{}
-				if err = mapstructure.Decode(m, github); err != nil {
-					logrus.Errorf("[secretmigrator] failed to migrate secrets for %s pipeline config in cluster %s, will retry: %v", model.GithubType, clusterCopy.Name, err)
-					return cluster, err
-				}
-				secret, err := h.migrator.CreateOrUpdateSourceCodeProviderConfigSecret("", github.ClientSecret, clusterCopy, model.GithubType)
-				if err != nil {
-					logrus.Errorf("[secretmigrator] failed to migrate secrets for %s pipeline config in cluster %s, will retry: %v", model.GithubType, clusterCopy.Name, err)
-					return cluster, err
-				}
-				if secret != nil {
-					logrus.Tracef("[secretmigrator] secret found for %s pipeline config in cluster %s", model.GithubType, clusterCopy.Name)
-					github.CredentialSecret = secret.Name
-					github.ClientSecret = ""
-					github.ObjectMeta, github.APIVersion, github.Kind, err = setSourceCodeProviderConfigMetadata(m)
-					if err != nil {
-						logrus.Errorf("[secretmigrator] failed to migrate secrets for %s pipeline config in cluster %s, will retry: %v", model.GithubType, clusterCopy.Name, err)
-						deleteErr := h.migrator.secrets.DeleteNamespaced(SecretNamespace, secret.Name, &metav1.DeleteOptions{})
-						if deleteErr != nil {
-							logrus.Errorf("[secretmigrator] encountered error while handling migration error: %v", deleteErr)
-						}
-						return cluster, err
-					}
-					if _, err = h.sourceCodeProviderConfigs.ObjectClient().Update(github.Name, github); err != nil {
-						logrus.Errorf("[secretmigrator] failed to migrate secrets for %s pipeline config in cluster %s, will retry: %v", model.GithubType, clusterCopy.Name, err)
-						deleteErr := h.migrator.secrets.DeleteNamespaced(SecretNamespace, secret.Name, &metav1.DeleteOptions{})
-						if deleteErr != nil {
-							logrus.Errorf("[secretmigrator] encountered error while handling migration error: %v", deleteErr)
-						}
-						return cluster, err
-					}
-				}
-			}
-			m, err = h.getUnstructuredPipelineConfig(p.Name, model.GitlabType)
-			if err != nil && !apierrors.IsNotFound(err) {
-				logrus.Errorf("[secretmigrator] failed to migrate secrets for %s pipeline config in cluster %s, will retry: %v", model.GitlabType, clusterCopy.Name, err)
-				return cluster, err
-			}
-			if !apierrors.IsNotFound(err) {
-				if credentialSecret, ok := m["credentialSecret"]; ok && credentialSecret != nil {
-					continue
-				}
-				logrus.Tracef("[secretmigrator] migrating secrets for %s pipeline config in cluster %s", model.GitlabType, clusterCopy.Name)
-				gitlab := &apiprjv3.GitlabPipelineConfig{}
-				if err = mapstructure.Decode(m, gitlab); err != nil {
-					logrus.Errorf("[secretmigrator] failed to migrate secrets for %s pipeline config in cluster %s, will retry: %v", model.GitlabType, clusterCopy.Name, err)
-					return cluster, err
-				}
-				secret, err := h.migrator.CreateOrUpdateSourceCodeProviderConfigSecret("", gitlab.ClientSecret, clusterCopy, model.GitlabType)
-				if err != nil {
-					logrus.Errorf("[secretmigrator] failed to migrate secrets for %s pipeline config in cluster %s, will retry: %v", model.GitlabType, clusterCopy.Name, err)
-					return cluster, err
-				}
-				if secret != nil {
-					logrus.Tracef("[secretmigrator] secret found for %s pipeline config in cluster %s", model.GitlabType, clusterCopy.Name)
-					gitlab.CredentialSecret = secret.Name
-					gitlab.ClientSecret = ""
-					gitlab.ObjectMeta, gitlab.APIVersion, gitlab.Kind, err = setSourceCodeProviderConfigMetadata(m)
-					if err != nil {
-						logrus.Errorf("[secretmigrator] failed to migrate secrets for %s pipeline config in cluster %s, will retry: %v", model.GitlabType, clusterCopy.Name, err)
-						deleteErr := h.migrator.secrets.DeleteNamespaced(SecretNamespace, secret.Name, &metav1.DeleteOptions{})
-						if deleteErr != nil {
-							logrus.Errorf("[secretmigrator] encountered error while handling migration error: %v", deleteErr)
-						}
-						return cluster, err
-					}
-					if _, err = h.sourceCodeProviderConfigs.ObjectClient().Update(gitlab.Name, gitlab); err != nil {
-						logrus.Errorf("[secretmigrator] failed to migrate secrets for %s pipeline config in cluster %s, will retry: %v", model.GitlabType, clusterCopy.Name, err)
-						deleteErr := h.migrator.secrets.DeleteNamespaced(SecretNamespace, secret.Name, &metav1.DeleteOptions{})
-						if deleteErr != nil {
-							logrus.Errorf("[secretmigrator] encountered error while handling migration error: %v", deleteErr)
-						}
-						return cluster, err
-					}
-				}
-			}
-			m, err = h.getUnstructuredPipelineConfig(p.Name, model.BitbucketCloudType)
-			if err != nil && !apierrors.IsNotFound(err) {
-				logrus.Errorf("[secretmigrator] failed to migrate secrets for %s pipeline config in cluster %s, will retry: %v", model.BitbucketCloudType, clusterCopy.Name, err)
-				return cluster, err
-			}
-			if !apierrors.IsNotFound(err) {
-				if credentialSecret, ok := m["credentialSecret"]; ok && credentialSecret != nil {
-					continue
-				}
-				logrus.Tracef("[secretmigrator] migrating secrets for %s pipeline config in cluster %s", model.BitbucketCloudType, clusterCopy.Name)
-				bbcloud := &apiprjv3.BitbucketCloudPipelineConfig{}
-				if err = mapstructure.Decode(m, bbcloud); err != nil {
-					logrus.Errorf("[secretmigrator] failed to migrate secrets for %s pipeline config in cluster %s, will retry: %v", model.BitbucketCloudType, clusterCopy.Name, err)
-					return cluster, err
-				}
-				secret, err := h.migrator.CreateOrUpdateSourceCodeProviderConfigSecret("", bbcloud.ClientSecret, clusterCopy, model.BitbucketCloudType)
-				if err != nil {
-					logrus.Errorf("[secretmigrator] failed to migrate secrets for %s pipeline config in cluster %s, will retry: %v", model.BitbucketCloudType, clusterCopy.Name, err)
-					return cluster, err
-				}
-				if secret != nil {
-					logrus.Tracef("[secretmigrator] secret found for %s pipeline config in cluster %s", model.BitbucketCloudType, clusterCopy.Name)
-					bbcloud.CredentialSecret = secret.Name
-					bbcloud.ClientSecret = ""
-					bbcloud.ObjectMeta, bbcloud.APIVersion, bbcloud.Kind, err = setSourceCodeProviderConfigMetadata(m)
-					if err != nil {
-						logrus.Errorf("[secretmigrator] failed to migrate secrets for %s pipeline config in cluster %s, will retry: %v", model.BitbucketCloudType, clusterCopy.Name, err)
-						deleteErr := h.migrator.secrets.DeleteNamespaced(SecretNamespace, secret.Name, &metav1.DeleteOptions{})
-						if deleteErr != nil {
-							logrus.Errorf("[secretmigrator] encountered error while handling migration error: %v", deleteErr)
-						}
-						return cluster, err
-					}
-					if _, err = h.sourceCodeProviderConfigs.ObjectClient().Update(bbcloud.Name, bbcloud); err != nil {
-						logrus.Errorf("[secretmigrator] failed to migrate secrets for %s pipeline config in cluster %s, will retry: %v", model.BitbucketCloudType, clusterCopy.Name, err)
-						deleteErr := h.migrator.secrets.DeleteNamespaced(SecretNamespace, secret.Name, &metav1.DeleteOptions{})
-						if deleteErr != nil {
-							logrus.Errorf("[secretmigrator] encountered error while handling migration error: %v", deleteErr)
-						}
-						return cluster, err
-					}
-				}
-			}
-			m, err = h.getUnstructuredPipelineConfig(p.Name, model.BitbucketServerType)
-			if err != nil && !apierrors.IsNotFound(err) {
-				logrus.Errorf("[secretmigrator] failed to migrate secrets for %s pipeline config in cluster %s, will retry: %v", model.BitbucketServerType, clusterCopy.Name, err)
-				return cluster, err
-			}
-			if !apierrors.IsNotFound(err) {
-				if credentialSecret, ok := m["credentialSecret"]; ok && credentialSecret != nil {
-					continue
-				}
-				logrus.Tracef("[secretmigrator] migrating secrets for %s pipeline config in cluster %s", model.BitbucketServerType, clusterCopy.Name)
-				bbserver := &apiprjv3.BitbucketServerPipelineConfig{}
-				if err = mapstructure.Decode(m, bbserver); err != nil {
-					logrus.Errorf("[secretmigrator] failed to migrate secrets for %s pipeline config in cluster %s, will retry: %v", model.BitbucketServerType, clusterCopy.Name, err)
-					return cluster, err
-				}
-				secret, err := h.migrator.CreateOrUpdateSourceCodeProviderConfigSecret("", bbserver.PrivateKey, clusterCopy, model.BitbucketServerType)
-				if err != nil {
-					logrus.Errorf("[secretmigrator] failed to migrate secrets for %s pipeline config in cluster %s, will retry: %v", model.BitbucketServerType, clusterCopy.Name, err)
-					return cluster, err
-				}
-				if secret != nil {
-					logrus.Tracef("[secretmigrator] secret found for %s pipeline config in cluster %s", model.BitbucketServerType, clusterCopy.Name)
-					bbserver.CredentialSecret = secret.Name
-					bbserver.PrivateKey = ""
-					bbserver.ObjectMeta, bbserver.APIVersion, bbserver.Kind, err = setSourceCodeProviderConfigMetadata(m)
-					if err != nil {
-						logrus.Errorf("[secretmigrator] failed to migrate secrets for %s pipeline config in cluster %s, will retry: %v", model.BitbucketServerType, clusterCopy.Name, err)
-						deleteErr := h.migrator.secrets.DeleteNamespaced(SecretNamespace, secret.Name, &metav1.DeleteOptions{})
-						if deleteErr != nil {
-							logrus.Errorf("[secretmigrator] encountered error while handling migration error: %v", deleteErr)
-						}
-						return cluster, err
-					}
-					_, err = h.sourceCodeProviderConfigs.ObjectClient().Update(bbserver.Name, bbserver)
-					if err != nil {
-						logrus.Errorf("[secretmigrator] failed to migrate secrets for %s pipeline config in cluster %s, will retry: %v", model.BitbucketServerType, clusterCopy.Name, err)
-						deleteErr := h.migrator.secrets.DeleteNamespaced(SecretNamespace, secret.Name, &metav1.DeleteOptions{})
-						if deleteErr != nil {
-							logrus.Errorf("[secretmigrator] encountered error while handling migration error: %v", deleteErr)
-						}
-						return cluster, err
-					}
-				}
-			}
-		}
-
 		logrus.Tracef("[secretmigrator] setting cluster condition [%s] and updating cluster [%s]", apimgmtv3.ClusterConditionSecretsMigrated, clusterCopy.Name)
 		apimgmtv3.ClusterConditionSecretsMigrated.True(clusterCopy)
 		clusterCopy, err = h.clusters.Update(clusterCopy)
@@ -1195,15 +1001,4 @@ func (h *handler) migrateServiceAccountSecrets(cluster *v3.Cluster) (*v3.Cluster
 	}
 	cluster = clusterCopy.DeepCopy()
 	return cluster, doErr
-}
-
-func setSourceCodeProviderConfigMetadata(m map[string]interface{}) (metav1.ObjectMeta, string, string, error) {
-	objectMeta, err := pipelineutils.ObjectMetaFromUnstructureContent(m)
-	if err != nil {
-		return metav1.ObjectMeta{}, "", "", err
-	}
-	if objectMeta == nil {
-		return metav1.ObjectMeta{}, "", "", fmt.Errorf("could not get ObjectMeta from sourcecodeproviderconfig")
-	}
-	return *objectMeta, "project.cattle.io/v3", pv3.SourceCodeProviderConfigGroupVersionKind.Kind, nil
 }

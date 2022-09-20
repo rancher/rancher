@@ -35,13 +35,6 @@ type Client struct {
 	Workload                      WorkloadOperations
 	App                           AppOperations
 	AppRevision                   AppRevisionOperations
-	SourceCodeProvider            SourceCodeProviderOperations
-	SourceCodeProviderConfig      SourceCodeProviderConfigOperations
-	SourceCodeCredential          SourceCodeCredentialOperations
-	Pipeline                      PipelineOperations
-	PipelineExecution             PipelineExecutionOperations
-	PipelineSetting               PipelineSettingOperations
-	SourceCodeRepository          SourceCodeRepositoryOperations
 	Prometheus                    PrometheusOperations
 	ServiceMonitor                ServiceMonitorOperations
 	PrometheusRule                PrometheusRuleOperations
@@ -90,13 +83,6 @@ func NewClient(opts *clientbase.ClientOpts) (*Client, error) {
 	client.Workload = newWorkloadClient(client)
 	client.App = newAppClient(client)
 	client.AppRevision = newAppRevisionClient(client)
-	client.SourceCodeProvider = newSourceCodeProviderClient(client)
-	client.SourceCodeProviderConfig = newSourceCodeProviderConfigClient(client)
-	client.SourceCodeCredential = newSourceCodeCredentialClient(client)
-	client.Pipeline = newPipelineClient(client)
-	client.PipelineExecution = newPipelineExecutionClient(client)
-	client.PipelineSetting = newPipelineSettingClient(client)
-	client.SourceCodeRepository = newSourceCodeRepositoryClient(client)
 	client.Prometheus = newPrometheusClient(client)
 	client.ServiceMonitor = newServiceMonitorClient(client)
 	client.PrometheusRule = newPrometheusRuleClient(client)

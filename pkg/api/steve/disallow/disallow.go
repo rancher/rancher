@@ -18,9 +18,6 @@ var (
 		"settings": true,
 	}
 	disallowGet = map[string]bool{
-		"pipelines":                 true,
-		"pipelineexecutions":        true,
-		"pipelinesettings":          true,
 		"preferences":               true,
 		"sourcecodecredentials":     true,
 		"sourcecodeproviderconfigs": true,

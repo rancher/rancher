@@ -159,22 +159,6 @@ func (s *Manager) GetProjectSystemUser(projectName string) (*v3.User, error) {
 	return s.userManager.EnsureUser(fmt.Sprintf("system://%s", projectName), ProjectSystemAccountPrefix+projectName)
 }
 
-func (s *Manager) GetProjectPipelineSystemToken(projectName string) (*v3.Token, error) {
-	return s.tokenLister.Get("", projectName+"-pipeline")
-}
-
-// CreateProjectPipelineSystemToken will create a new pipeline token for the given project
-// if one does not exist. If a token already exists, it's value will be overwritten with a
-// new token.
-func (s *Manager) CreateProjectPipelineSystemToken(projectName string) (string, error) {
-	user, err := s.GetProjectSystemUser(projectName)
-	if err != nil {
-		return "", err
-	}
-	var ttl int64
-	return s.systemTokens.EnsureSystemToken(projectName+"-pipeline", "Pipeline token for project "+projectName, "pipeline", user.Name, &ttl, false)
-}
-
 func (s *Manager) CreateProjectHelmSystemToken(projectName string) (string, error) {
 	user, err := s.GetProjectSystemUser(projectName)
 	if err != nil {

@@ -3,7 +3,6 @@ package image
 import (
 	"testing"
 
-	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	rketypes "github.com/rancher/rke/types"
 	assertlib "github.com/stretchr/testify/assert"
 )
@@ -22,13 +21,11 @@ func TestFetchImagesFromSystem(t *testing.T) {
 			WindowsPodInfraContainer: "rancher/kubelet-pause:v0.1.4",
 		},
 	}
-	toolsSystemImages := v32.ToolsSystemImages
 	bothImages := []string{
 		linuxRKESystemImages[k8sVersion].NginxProxy,
 	}
 	linuxImagesOnly := []string{
 		linuxRKESystemImages[k8sVersion].CoreDNS,
-		toolsSystemImages.PipelineSystemImages.Jenkins, // from tools
 	}
 	windowsImagesOnly := []string{
 		windowsRKESystemImages[k8sVersion].WindowsPodInfraContainer,
