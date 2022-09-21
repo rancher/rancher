@@ -8,7 +8,6 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/managementuserlegacy/approuter"
 	"github.com/rancher/rancher/pkg/controllers/managementuserlegacy/globaldns"
 	"github.com/rancher/rancher/pkg/controllers/managementuserlegacy/helm"
-	"github.com/rancher/rancher/pkg/controllers/managementuserlegacy/istio"
 	"github.com/rancher/rancher/pkg/controllers/managementuserlegacy/logging"
 	"github.com/rancher/rancher/pkg/controllers/managementuserlegacy/monitoring"
 	"github.com/rancher/rancher/pkg/controllers/managementuserlegacy/systemimage"
@@ -24,7 +23,6 @@ func Register(ctx context.Context, mgmt *config.ScaledContext, cluster *config.U
 	alert.Register(ctx, mgmt, cluster)
 	globaldns.Register(ctx, cluster)
 	monitoring.Register(ctx, cluster)
-	istio.Register(ctx, cluster)
 
 	// register controller for API
 	cluster.APIAggregation.APIServices("").Controller()
