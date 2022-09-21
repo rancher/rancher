@@ -151,7 +151,7 @@ var (
 
 	// Deprecated in favour of UICustomLinks = NewSetting("ui-custom-links", {})
 	UICommunityLinks = NewSetting("ui-community-links", "true")
-	
+
 	// Key(display text), value(url) for user customisable links to display in homepage and support pages.
 	UICustomLinks = NewSetting("ui-custom-links", "{}")
 
