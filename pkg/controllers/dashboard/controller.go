@@ -14,6 +14,7 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/dashboard/mcmagent"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/scaleavailable"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/systemcharts"
+	"github.com/rancher/rancher/pkg/controllers/management/clusterconnected"
 	"github.com/rancher/rancher/pkg/controllers/provisioningv2"
 	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/wrangler"
@@ -41,6 +42,8 @@ func Register(ctx context.Context, wrangler *wrangler.Context, embedded bool) er
 	if err := cspadaptercharts.Register(ctx, wrangler); err != nil {
 		return err
 	}
+
+	clusterconnected.Register(ctx, wrangler)
 
 	if features.MCM.Enabled() {
 		hostedcluster.Register(ctx, wrangler)
