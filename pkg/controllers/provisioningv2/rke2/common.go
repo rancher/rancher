@@ -80,8 +80,6 @@ const (
 	Waiting             = condition.Cond("Waiting")
 	Pending             = condition.Cond("Pending")
 	Removed             = condition.Cond("Removed")
-	AgentDeployed       = condition.Cond("AgentDeployed")
-	AgentConnected      = condition.Cond("Connected")
 	PlanApplied         = condition.Cond("PlanApplied")
 	InfrastructureReady = condition.Cond(capi.InfrastructureReadyCondition)
 
