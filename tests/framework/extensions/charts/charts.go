@@ -19,6 +19,13 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 )
 
+const (
+	// defaultRegistrySettingID is a private constant string that contains the ID of system default registry setting.
+	defaultRegistrySettingID = "system-default-registry"
+	// serverURLSettingID is a private constant string that contains the ID of server URL setting.
+	serverURLSettingID = "server-url"
+)
+
 // InstallOptions is a struct of the required options to install a chart.
 type InstallOptions struct {
 	Version     string
@@ -31,9 +38,10 @@ type InstallOptions struct {
 // It is used to avoid passing the same options to different functions while using the chart helpers.
 type payloadOpts struct {
 	InstallOptions
-	Name      string
-	Host      string
-	Namespace string
+	Name            string
+	Namespace       string
+	Host            string
+	DefaultRegistry string
 }
 
 // RancherIstioOpts is a struct of the required options to install Rancher Istio with desired chart values.
