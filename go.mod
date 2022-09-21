@@ -69,7 +69,7 @@ require (
 	github.com/coreos/go-semver v0.3.0
 	github.com/creasty/defaults v1.5.2
 	github.com/crewjam/saml v0.4.5
-	github.com/davecgh/go-spew v1.1.1
+	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/docker/distribution v2.8.1+incompatible
 	github.com/docker/docker v20.10.14+incompatible
 	github.com/docker/go-connections v0.4.0

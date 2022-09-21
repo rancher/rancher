@@ -99,6 +99,53 @@ def test_default_pod_sec(admin_mc, list_remove_resource):
     wait_for_cluster_to_be_deleted(client, cluster.id)
 
 
+def test_cron_schedule(admin_mc, list_remove_resource):
+    cluster_template = create_cluster_template(admin_mc, [], admin_mc)
+    remove_list = [cluster_template]
+    list_remove_resource(remove_list)
+
+    tId = cluster_template.id
+    client = admin_mc.client
+    cconfig = {
+        "dockerRootDir": "/var/lib/docker",
+        "enableClusterAlerting": "false",
+        "enableClusterMonitoring": "false",
+        "enableNetworkPolicy": "false",
+        "labels": {},
+        "clusterTemplateRevisionId": "cattle-global-data:ctr-xxxxx",
+        "name": "testclusterfromtemplate",
+        "rancherKubernetesEngineConfig": {},
+        "scheduledClusterScan": {
+            "enabled": "true",
+            "scanConfig": {
+                "cisScanConfig": {
+                    "failuresOnly": "false",
+                    "overrideBenchmarkVersion": "rke-cis-1.4",
+                    "profile": "permissive",
+                    "skip": "null"
+                }
+            },
+            "scheduleConfig": {
+                "cronSchedule": ""
+            }
+        },
+        "type": "cluster"
+    }
+    rev = client.create_cluster_template_revision(name=random_str(),
+                                                  clusterConfig=cconfig,
+                                                  clusterTemplateId=tId,
+                                                  enabled="true")
+
+    time.sleep(2)
+    cluster = wait_for_cluster_create(client, name=random_str(),
+                                      clusterTemplateRevisionId=rev.id)
+    remove_list.insert(0, cluster)
+    assert cluster.conditions[0].type == 'Pending'
+    assert cluster.conditions[0].status == 'True'
+    client.delete(cluster)
+    wait_for_cluster_to_be_deleted(client, cluster.id)
+
+
 def test_check_default_revision(admin_mc, remove_resource):
     cluster_template = create_cluster_template(admin_mc,
                                                [], admin_mc)

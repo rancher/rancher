@@ -83,21 +83,6 @@ func (f *Formatter) Formatter(request *types.APIContext, resource *types.RawReso
 			}
 		}
 
-		isActiveCluster := false
-		if resource.Values["state"] == "active" {
-			isActiveCluster = true
-		}
-		isWindowsCluster := false
-		if resource.Values["windowsPreferedCluster"] == true {
-			isWindowsCluster = true
-		}
-		if isActiveCluster && !isWindowsCluster {
-			canUpdateCluster := canUpdateCluster(request)
-			logrus.Debugf("isActiveCluster: %v isWindowsCluster: %v user: %v, canUpdateCluster: %v", isActiveCluster, isWindowsCluster, request.Request.Header.Get("Impersonate-User"), canUpdateCluster)
-			if canUpdateCluster {
-				resource.AddAction(request, v32.ClusterActionRunSecurityScan)
-			}
-		}
 	}
 
 	if convert.ToBool(resource.Values["enableClusterMonitoring"]) {

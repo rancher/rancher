@@ -284,11 +284,6 @@ func Clusters(ctx context.Context, schemas *types.Schemas, managementContext *co
 	handler.CisBenchmarkVersionClient = managementContext.Management.CisBenchmarkVersions("")
 	handler.CisBenchmarkVersionLister = managementContext.Management.CisBenchmarkVersions("").Controller().Lister()
 
-	clusterValidator.CisConfigClient = managementContext.Management.CisConfigs(namespace.GlobalNamespace)
-	clusterValidator.CisConfigLister = managementContext.Management.CisConfigs(namespace.GlobalNamespace).Controller().Lister()
-	clusterValidator.CisBenchmarkVersionClient = managementContext.Management.CisBenchmarkVersions(namespace.GlobalNamespace)
-	clusterValidator.CisBenchmarkVersionLister = managementContext.Management.CisBenchmarkVersions(namespace.GlobalNamespace).Controller().Lister()
-
 	schema.ActionHandler = handler.ClusterActionHandler
 	schema.Validator = clusterValidator.Validator
 }

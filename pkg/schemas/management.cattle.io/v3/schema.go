@@ -305,9 +305,6 @@ func clusterTypes(schemas *types.Schemas) *types.Schemas {
 			schema.ResourceActions[v3.ClusterActionRotateEncryptionKey] = types.Action{
 				Output: "rotateEncryptionKeyOutput",
 			}
-			schema.ResourceActions[v3.ClusterActionRunSecurityScan] = types.Action{
-				Input: "cisScanConfig",
-			}
 			schema.ResourceActions[v3.ClusterActionSaveAsTemplate] = types.Action{
 				Input:  "saveAsTemplateInput",
 				Output: "saveAsTemplateOutput",
