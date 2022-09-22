@@ -3,9 +3,7 @@ package util
 import (
 	"context"
 	"fmt"
-	"time"
 
-	errs "github.com/pkg/errors"
 	"github.com/rancher/rancher/pkg/serviceaccounttoken"
 	v3 "github.com/rancher/rke/types"
 	"gopkg.in/yaml.v2"
@@ -94,23 +92,14 @@ func GenerateServiceAccountToken(clientset kubernetes.Interface) (string, error)
 		return "", fmt.Errorf("error creating role bindings: %v", err)
 	}
 
-	start := time.Millisecond * 250
-	for i := 0; i < 5; i++ {
-		time.Sleep(start)
-		if serviceAccount, err = clientset.CoreV1().ServiceAccounts(cattleNamespace).Get(context.TODO(), serviceAccount.Name, metav1.GetOptions{}); err != nil {
-			return "", fmt.Errorf("error getting service account: %v", err)
-		}
-		secret, err := serviceaccounttoken.CreateSecretForServiceAccount(context.TODO(), clientset, serviceAccount)
-		if err != nil {
-			return "", fmt.Errorf("error creating secret for service account: %v", err)
-		}
-		if token, ok := secret.Data["token"]; ok {
-			return string(token), nil
-		}
-		start = start * 2
+	if serviceAccount, err = clientset.CoreV1().ServiceAccounts(cattleNamespace).Get(context.Background(), serviceAccount.Name, metav1.GetOptions{}); err != nil {
+		return "", fmt.Errorf("error getting service account: %w", err)
 	}
-
-	return "", errs.New("failed to fetch serviceAccountToken")
+	secret, err := serviceaccounttoken.EnsureSecretForServiceAccount(context.Background(), nil, clientset, serviceAccount)
+	if err != nil {
+		return "", fmt.Errorf("error ensuring secret for service account: %w", err)
+	}
+	return string(secret.Data["token"]), nil
 }
 
 func DeleteLegacyServiceAccountAndRoleBinding(clientset kubernetes.Interface) error {

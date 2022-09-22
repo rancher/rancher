@@ -28,6 +28,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
@@ -55,6 +56,7 @@ type RKE2ConfigServer struct {
 	machines                 capicontrollers.MachineClient
 	bootstrapCache           rkecontroller.RKEBootstrapCache
 	provisioningClusterCache provisioningcontrollers.ClusterCache
+	k8s                      kubernetes.Interface
 }
 
 func New(clients *wrangler.Context) *RKE2ConfigServer {
@@ -82,6 +84,7 @@ func New(clients *wrangler.Context) *RKE2ConfigServer {
 		machines:                 clients.CAPI.Machine(),
 		bootstrapCache:           clients.RKE.RKEBootstrap().Cache(),
 		provisioningClusterCache: clients.Provisioning.Cluster().Cache(),
+		k8s:                      clients.K8s,
 	}
 }
 
@@ -340,7 +343,7 @@ func (r *RKE2ConfigServer) findSA(req *http.Request) (string, *corev1.Secret, er
 		if planSecret == "" {
 			continue
 		}
-		tokenSecret, _, err := rke2.GetPlanServiceAccountTokenSecret(r.secrets, planSA)
+		tokenSecret, _, err := rke2.GetPlanServiceAccountTokenSecret(r.secrets, r.k8s, planSA)
 		if err != nil {
 			logrus.Errorf("[rke2configserver] error encountered when searching for token secret for planSA %s/%s: %v", planSA.Namespace, planSA.Name, err)
 			continue
@@ -389,7 +392,7 @@ func (r *RKE2ConfigServer) findSA(req *http.Request) (string, *corev1.Secret, er
 			if planSecret == "" {
 				continue
 			}
-			tokenSecret, watchable, err := rke2.GetPlanServiceAccountTokenSecret(r.secrets, planSA)
+			tokenSecret, watchable, err := rke2.GetPlanServiceAccountTokenSecret(r.secrets, r.k8s, planSA)
 			if err != nil || tokenSecret == nil {
 				logrus.Debugf("[rke2configserver] %s/%s token secret for planSecret %s was nil or error received", machineNamespace, machineName, planSecret)
 				if err != nil {
@@ -425,10 +428,6 @@ func (r *RKE2ConfigServer) findSA(req *http.Request) (string, *corev1.Secret, er
 	}()
 	for event := range respSecret.ResultChan() {
 		if secret, ok := event.Object.(*corev1.Secret); ok {
-			if !rke2.PlanServiceAccountTokenReady(planSA, secret) {
-				logrus.Debugf("[rke2configserver] %s/%s planSA %s/%s service account token %s/%s was not ready yet", machineNamespace, machineName, planSA.Namespace, planSA.Name, secret.Namespace, secret.Name)
-				continue
-			}
 			logrus.Infof("[rke2configserver] %s/%s machineID: %s delivering planSecret %s with token secret %s/%s to system-agent from secret watch", machineNamespace, machineName, machineID, planSecret, secret.Namespace, secret.Name)
 			return planSecret, secret, nil
 		}

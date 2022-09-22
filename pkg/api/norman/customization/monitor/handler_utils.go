@@ -187,9 +187,9 @@ func getAuthToken(userContext *config.UserContext, appName, namespace string) (s
 		return "", fmt.Errorf("get service account %s:%s for monitor failed, %v", namespace, appName, err)
 	}
 
-	secret, err := serviceaccounttoken.CreateSecretForServiceAccount(context.TODO(), userContext.K8sClient, sa)
+	secret, err := serviceaccounttoken.EnsureSecretForServiceAccount(context.Background(), nil, userContext.K8sClient, sa)
 	if err != nil {
-		return "", fmt.Errorf("get secret from service account %s:%s for monitor failed: %v", namespace, appName, err)
+		return "", fmt.Errorf("ensure secret from service account %s:%s for monitor failed: %w", namespace, appName, err)
 	}
 
 	return string(secret.Data[v1.ServiceAccountTokenKey]), nil
