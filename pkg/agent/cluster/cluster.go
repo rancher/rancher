@@ -74,9 +74,9 @@ func getTokenFromAPI() ([]byte, []byte, error) {
 		}
 		return secret.Data[coreV1.ServiceAccountRootCAKey], secret.Data[coreV1.ServiceAccountTokenKey], nil
 	}
-	secret, err := serviceaccounttoken.CreateSecretForServiceAccount(context.Background(), k8s, sa)
+	secret, err := serviceaccounttoken.EnsureSecretForServiceAccount(context.Background(), nil, k8s, sa)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to create secret for service account %s/%s: %w", namespace.System, "cattle", err)
+		return nil, nil, fmt.Errorf("failed to ensure secret for service account %s/%s: %w", namespace.System, "cattle", err)
 	}
 	return []byte(cm.Data["ca.crt"]), []byte(secret.Data[coreV1.ServiceAccountTokenKey]), nil
 }
