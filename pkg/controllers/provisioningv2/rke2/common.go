@@ -23,11 +23,11 @@ import (
 	"github.com/rancher/wrangler/pkg/generic"
 	"github.com/rancher/wrangler/pkg/name"
 	corev1 "k8s.io/api/core/v1"
-	apierror "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/kubernetes"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 	capierrors "sigs.k8s.io/cluster-api/errors"
 )
@@ -236,50 +236,15 @@ func GetPlanSecretName(planSA *corev1.ServiceAccount) (string, error) {
 
 // GetPlanServiceAccountTokenSecret retrieves the secret that corresponds to the plan service account that is passed in. It will create a secret if one does not
 // already exist for the plan service account.
-func GetPlanServiceAccountTokenSecret(secretClient corecontrollers.SecretController, planSA *corev1.ServiceAccount) (*corev1.Secret, bool, error) {
+func GetPlanServiceAccountTokenSecret(secretClient corecontrollers.SecretController, k8s kubernetes.Interface, planSA *corev1.ServiceAccount) (*corev1.Secret, bool, error) {
 	if planSA == nil {
 		return nil, false, fmt.Errorf("planSA was nil")
 	}
-	sName := serviceaccounttoken.ServiceAccountSecretName(planSA)
-	secret, err := secretClient.Cache().Get(planSA.Namespace, sName)
+	secret, err := serviceaccounttoken.EnsureSecretForServiceAccount(context.Background(), secretClient.Cache().Get, k8s, planSA)
 	if err != nil {
-		if !apierror.IsNotFound(err) {
-			return nil, false, err
-		}
-		sc := serviceaccounttoken.SecretTemplate(planSA)
-		secret, err = secretClient.Create(sc)
-		if err != nil {
-			if !apierror.IsAlreadyExists(err) {
-				return nil, false, err
-			}
-			secret, err = secretClient.Cache().Get(planSA.Namespace, sName)
-			if err != nil {
-				return nil, false, err
-			}
-		}
-	}
-	// wait for token to be populated
-	if !PlanServiceAccountTokenReady(planSA, secret) {
-		return secret, true, fmt.Errorf("planSA %s/%s token secret %s/%s was not ready for consumption yet", planSA.Namespace, planSA.Name, secret.Namespace, secret.Name)
+		return nil, false, fmt.Errorf("error ensuring secret for service account [%s:%s]: %w", planSA.Namespace, planSA.Name, err)
 	}
 	return secret, true, nil
-}
-
-func PlanServiceAccountTokenReady(planSA *corev1.ServiceAccount, tokenSecret *corev1.Secret) bool {
-	if planSA == nil || tokenSecret == nil {
-		return false
-	}
-	if tokenSecret.Name != serviceaccounttoken.ServiceAccountSecretName(planSA) {
-		return false
-	}
-	if v, ok := tokenSecret.Data[corev1.ServiceAccountTokenKey]; ok {
-		if len(v) == 0 {
-			return false
-		}
-	} else {
-		return false
-	}
-	return true
 }
 
 func PlanSecretFromBootstrapName(bootstrapName string) string {
