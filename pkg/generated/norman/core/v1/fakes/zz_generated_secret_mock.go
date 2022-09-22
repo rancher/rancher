@@ -29,22 +29,22 @@ var _ v11.SecretLister = &SecretListerMock{}
 
 // SecretListerMock is a mock implementation of v11.SecretLister.
 //
-//     func TestSomethingThatUsesSecretLister(t *testing.T) {
+//	    func TestSomethingThatUsesSecretLister(t *testing.T) {
 //
-//         // make and configure a mocked v11.SecretLister
-//         mockedSecretLister := &SecretListerMock{
-//             GetFunc: func(namespace string, name string) (*v1.Secret, error) {
-// 	               panic("mock out the Get method")
-//             },
-//             ListFunc: func(namespace string, selector labels.Selector) ([]*v1.Secret, error) {
-// 	               panic("mock out the List method")
-//             },
-//         }
+//	        // make and configure a mocked v11.SecretLister
+//	        mockedSecretLister := &SecretListerMock{
+//	            GetFunc: func(namespace string, name string) (*v1.Secret, error) {
+//		               panic("mock out the Get method")
+//	            },
+//	            ListFunc: func(namespace string, selector labels.Selector) ([]*v1.Secret, error) {
+//		               panic("mock out the List method")
+//	            },
+//	        }
 //
-//         // use mockedSecretLister in code that requires v11.SecretLister
-//         // and then make assertions.
+//	        // use mockedSecretLister in code that requires v11.SecretLister
+//	        // and then make assertions.
 //
-//     }
+//	    }
 type SecretListerMock struct {
 	// GetFunc mocks the Get method.
 	GetFunc func(namespace string, name string) (*v1.Secret, error)
@@ -91,7 +91,8 @@ func (mock *SecretListerMock) Get(namespace string, name string) (*v1.Secret, er
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//     len(mockedSecretLister.GetCalls())
+//
+//	len(mockedSecretLister.GetCalls())
 func (mock *SecretListerMock) GetCalls() []struct {
 	Namespace string
 	Name      string
@@ -126,7 +127,8 @@ func (mock *SecretListerMock) List(namespace string, selector labels.Selector) (
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//     len(mockedSecretLister.ListCalls())
+//
+//	len(mockedSecretLister.ListCalls())
 func (mock *SecretListerMock) ListCalls() []struct {
 	Namespace string
 	Selector  labels.Selector
@@ -159,43 +161,43 @@ var _ v11.SecretController = &SecretControllerMock{}
 
 // SecretControllerMock is a mock implementation of v11.SecretController.
 //
-//     func TestSomethingThatUsesSecretController(t *testing.T) {
+//	    func TestSomethingThatUsesSecretController(t *testing.T) {
 //
-//         // make and configure a mocked v11.SecretController
-//         mockedSecretController := &SecretControllerMock{
-//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v11.SecretHandlerFunc)  {
-// 	               panic("mock out the AddClusterScopedFeatureHandler method")
-//             },
-//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v11.SecretHandlerFunc)  {
-// 	               panic("mock out the AddClusterScopedHandler method")
-//             },
-//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v11.SecretHandlerFunc)  {
-// 	               panic("mock out the AddFeatureHandler method")
-//             },
-//             AddHandlerFunc: func(ctx context.Context, name string, handler v11.SecretHandlerFunc)  {
-// 	               panic("mock out the AddHandler method")
-//             },
-//             EnqueueFunc: func(namespace string, name string)  {
-// 	               panic("mock out the Enqueue method")
-//             },
-//             EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
-// 	               panic("mock out the EnqueueAfter method")
-//             },
-//             GenericFunc: func() controller.GenericController {
-// 	               panic("mock out the Generic method")
-//             },
-//             InformerFunc: func() cache.SharedIndexInformer {
-// 	               panic("mock out the Informer method")
-//             },
-//             ListerFunc: func() v11.SecretLister {
-// 	               panic("mock out the Lister method")
-//             },
-//         }
+//	        // make and configure a mocked v11.SecretController
+//	        mockedSecretController := &SecretControllerMock{
+//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v11.SecretHandlerFunc)  {
+//		               panic("mock out the AddClusterScopedFeatureHandler method")
+//	            },
+//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v11.SecretHandlerFunc)  {
+//		               panic("mock out the AddClusterScopedHandler method")
+//	            },
+//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v11.SecretHandlerFunc)  {
+//		               panic("mock out the AddFeatureHandler method")
+//	            },
+//	            AddHandlerFunc: func(ctx context.Context, name string, handler v11.SecretHandlerFunc)  {
+//		               panic("mock out the AddHandler method")
+//	            },
+//	            EnqueueFunc: func(namespace string, name string)  {
+//		               panic("mock out the Enqueue method")
+//	            },
+//	            EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
+//		               panic("mock out the EnqueueAfter method")
+//	            },
+//	            GenericFunc: func() controller.GenericController {
+//		               panic("mock out the Generic method")
+//	            },
+//	            InformerFunc: func() cache.SharedIndexInformer {
+//		               panic("mock out the Informer method")
+//	            },
+//	            ListerFunc: func() v11.SecretLister {
+//		               panic("mock out the Lister method")
+//	            },
+//	        }
 //
-//         // use mockedSecretController in code that requires v11.SecretController
-//         // and then make assertions.
+//	        // use mockedSecretController in code that requires v11.SecretController
+//	        // and then make assertions.
 //
-//     }
+//	    }
 type SecretControllerMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
 	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v11.SecretHandlerFunc)
@@ -324,7 +326,8 @@ func (mock *SecretControllerMock) AddClusterScopedFeatureHandler(ctx context.Con
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//     len(mockedSecretController.AddClusterScopedFeatureHandlerCalls())
+//
+//	len(mockedSecretController.AddClusterScopedFeatureHandlerCalls())
 func (mock *SecretControllerMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -369,7 +372,8 @@ func (mock *SecretControllerMock) AddClusterScopedHandler(ctx context.Context, n
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//     len(mockedSecretController.AddClusterScopedHandlerCalls())
+//
+//	len(mockedSecretController.AddClusterScopedHandlerCalls())
 func (mock *SecretControllerMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -412,7 +416,8 @@ func (mock *SecretControllerMock) AddFeatureHandler(ctx context.Context, enabled
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//     len(mockedSecretController.AddFeatureHandlerCalls())
+//
+//	len(mockedSecretController.AddFeatureHandlerCalls())
 func (mock *SecretControllerMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
@@ -453,7 +458,8 @@ func (mock *SecretControllerMock) AddHandler(ctx context.Context, name string, h
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//     len(mockedSecretController.AddHandlerCalls())
+//
+//	len(mockedSecretController.AddHandlerCalls())
 func (mock *SecretControllerMock) AddHandlerCalls() []struct {
 	Ctx     context.Context
 	Name    string
@@ -490,7 +496,8 @@ func (mock *SecretControllerMock) Enqueue(namespace string, name string) {
 
 // EnqueueCalls gets all the calls that were made to Enqueue.
 // Check the length with:
-//     len(mockedSecretController.EnqueueCalls())
+//
+//	len(mockedSecretController.EnqueueCalls())
 func (mock *SecretControllerMock) EnqueueCalls() []struct {
 	Namespace string
 	Name      string
@@ -527,7 +534,8 @@ func (mock *SecretControllerMock) EnqueueAfter(namespace string, name string, af
 
 // EnqueueAfterCalls gets all the calls that were made to EnqueueAfter.
 // Check the length with:
-//     len(mockedSecretController.EnqueueAfterCalls())
+//
+//	len(mockedSecretController.EnqueueAfterCalls())
 func (mock *SecretControllerMock) EnqueueAfterCalls() []struct {
 	Namespace string
 	Name      string
@@ -559,7 +567,8 @@ func (mock *SecretControllerMock) Generic() controller.GenericController {
 
 // GenericCalls gets all the calls that were made to Generic.
 // Check the length with:
-//     len(mockedSecretController.GenericCalls())
+//
+//	len(mockedSecretController.GenericCalls())
 func (mock *SecretControllerMock) GenericCalls() []struct {
 } {
 	var calls []struct {
@@ -585,7 +594,8 @@ func (mock *SecretControllerMock) Informer() cache.SharedIndexInformer {
 
 // InformerCalls gets all the calls that were made to Informer.
 // Check the length with:
-//     len(mockedSecretController.InformerCalls())
+//
+//	len(mockedSecretController.InformerCalls())
 func (mock *SecretControllerMock) InformerCalls() []struct {
 } {
 	var calls []struct {
@@ -611,7 +621,8 @@ func (mock *SecretControllerMock) Lister() v11.SecretLister {
 
 // ListerCalls gets all the calls that were made to Lister.
 // Check the length with:
-//     len(mockedSecretController.ListerCalls())
+//
+//	len(mockedSecretController.ListerCalls())
 func (mock *SecretControllerMock) ListerCalls() []struct {
 } {
 	var calls []struct {
@@ -651,76 +662,76 @@ var _ v11.SecretInterface = &SecretInterfaceMock{}
 
 // SecretInterfaceMock is a mock implementation of v11.SecretInterface.
 //
-//     func TestSomethingThatUsesSecretInterface(t *testing.T) {
+//	    func TestSomethingThatUsesSecretInterface(t *testing.T) {
 //
-//         // make and configure a mocked v11.SecretInterface
-//         mockedSecretInterface := &SecretInterfaceMock{
-//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v11.SecretHandlerFunc)  {
-// 	               panic("mock out the AddClusterScopedFeatureHandler method")
-//             },
-//             AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v11.SecretLifecycle)  {
-// 	               panic("mock out the AddClusterScopedFeatureLifecycle method")
-//             },
-//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v11.SecretHandlerFunc)  {
-// 	               panic("mock out the AddClusterScopedHandler method")
-//             },
-//             AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v11.SecretLifecycle)  {
-// 	               panic("mock out the AddClusterScopedLifecycle method")
-//             },
-//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v11.SecretHandlerFunc)  {
-// 	               panic("mock out the AddFeatureHandler method")
-//             },
-//             AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v11.SecretLifecycle)  {
-// 	               panic("mock out the AddFeatureLifecycle method")
-//             },
-//             AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v11.SecretHandlerFunc)  {
-// 	               panic("mock out the AddHandler method")
-//             },
-//             AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v11.SecretLifecycle)  {
-// 	               panic("mock out the AddLifecycle method")
-//             },
-//             ControllerFunc: func() v11.SecretController {
-// 	               panic("mock out the Controller method")
-//             },
-//             CreateFunc: func(in1 *v1.Secret) (*v1.Secret, error) {
-// 	               panic("mock out the Create method")
-//             },
-//             DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
-// 	               panic("mock out the Delete method")
-//             },
-//             DeleteCollectionFunc: func(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
-// 	               panic("mock out the DeleteCollection method")
-//             },
-//             DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
-// 	               panic("mock out the DeleteNamespaced method")
-//             },
-//             GetFunc: func(name string, opts metav1.GetOptions) (*v1.Secret, error) {
-// 	               panic("mock out the Get method")
-//             },
-//             GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v1.Secret, error) {
-// 	               panic("mock out the GetNamespaced method")
-//             },
-//             ListFunc: func(opts metav1.ListOptions) (*v1.SecretList, error) {
-// 	               panic("mock out the List method")
-//             },
-//             ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v1.SecretList, error) {
-// 	               panic("mock out the ListNamespaced method")
-//             },
-//             ObjectClientFunc: func() *objectclient.ObjectClient {
-// 	               panic("mock out the ObjectClient method")
-//             },
-//             UpdateFunc: func(in1 *v1.Secret) (*v1.Secret, error) {
-// 	               panic("mock out the Update method")
-//             },
-//             WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
-// 	               panic("mock out the Watch method")
-//             },
-//         }
+//	        // make and configure a mocked v11.SecretInterface
+//	        mockedSecretInterface := &SecretInterfaceMock{
+//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v11.SecretHandlerFunc)  {
+//		               panic("mock out the AddClusterScopedFeatureHandler method")
+//	            },
+//	            AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v11.SecretLifecycle)  {
+//		               panic("mock out the AddClusterScopedFeatureLifecycle method")
+//	            },
+//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v11.SecretHandlerFunc)  {
+//		               panic("mock out the AddClusterScopedHandler method")
+//	            },
+//	            AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v11.SecretLifecycle)  {
+//		               panic("mock out the AddClusterScopedLifecycle method")
+//	            },
+//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v11.SecretHandlerFunc)  {
+//		               panic("mock out the AddFeatureHandler method")
+//	            },
+//	            AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v11.SecretLifecycle)  {
+//		               panic("mock out the AddFeatureLifecycle method")
+//	            },
+//	            AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v11.SecretHandlerFunc)  {
+//		               panic("mock out the AddHandler method")
+//	            },
+//	            AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v11.SecretLifecycle)  {
+//		               panic("mock out the AddLifecycle method")
+//	            },
+//	            ControllerFunc: func() v11.SecretController {
+//		               panic("mock out the Controller method")
+//	            },
+//	            CreateFunc: func(in1 *v1.Secret) (*v1.Secret, error) {
+//		               panic("mock out the Create method")
+//	            },
+//	            DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
+//		               panic("mock out the Delete method")
+//	            },
+//	            DeleteCollectionFunc: func(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
+//		               panic("mock out the DeleteCollection method")
+//	            },
+//	            DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
+//		               panic("mock out the DeleteNamespaced method")
+//	            },
+//	            GetFunc: func(name string, opts metav1.GetOptions) (*v1.Secret, error) {
+//		               panic("mock out the Get method")
+//	            },
+//	            GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v1.Secret, error) {
+//		               panic("mock out the GetNamespaced method")
+//	            },
+//	            ListFunc: func(opts metav1.ListOptions) (*v1.SecretList, error) {
+//		               panic("mock out the List method")
+//	            },
+//	            ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v1.SecretList, error) {
+//		               panic("mock out the ListNamespaced method")
+//	            },
+//	            ObjectClientFunc: func() *objectclient.ObjectClient {
+//		               panic("mock out the ObjectClient method")
+//	            },
+//	            UpdateFunc: func(in1 *v1.Secret) (*v1.Secret, error) {
+//		               panic("mock out the Update method")
+//	            },
+//	            WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
+//		               panic("mock out the Watch method")
+//	            },
+//	        }
 //
-//         // use mockedSecretInterface in code that requires v11.SecretInterface
-//         // and then make assertions.
+//	        // use mockedSecretInterface in code that requires v11.SecretInterface
+//	        // and then make assertions.
 //
-//     }
+//	    }
 type SecretInterfaceMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
 	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v11.SecretHandlerFunc)
@@ -973,7 +984,8 @@ func (mock *SecretInterfaceMock) AddClusterScopedFeatureHandler(ctx context.Cont
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//     len(mockedSecretInterface.AddClusterScopedFeatureHandlerCalls())
+//
+//	len(mockedSecretInterface.AddClusterScopedFeatureHandlerCalls())
 func (mock *SecretInterfaceMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -1020,7 +1032,8 @@ func (mock *SecretInterfaceMock) AddClusterScopedFeatureLifecycle(ctx context.Co
 
 // AddClusterScopedFeatureLifecycleCalls gets all the calls that were made to AddClusterScopedFeatureLifecycle.
 // Check the length with:
-//     len(mockedSecretInterface.AddClusterScopedFeatureLifecycleCalls())
+//
+//	len(mockedSecretInterface.AddClusterScopedFeatureLifecycleCalls())
 func (mock *SecretInterfaceMock) AddClusterScopedFeatureLifecycleCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -1065,7 +1078,8 @@ func (mock *SecretInterfaceMock) AddClusterScopedHandler(ctx context.Context, na
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//     len(mockedSecretInterface.AddClusterScopedHandlerCalls())
+//
+//	len(mockedSecretInterface.AddClusterScopedHandlerCalls())
 func (mock *SecretInterfaceMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -1108,7 +1122,8 @@ func (mock *SecretInterfaceMock) AddClusterScopedLifecycle(ctx context.Context, 
 
 // AddClusterScopedLifecycleCalls gets all the calls that were made to AddClusterScopedLifecycle.
 // Check the length with:
-//     len(mockedSecretInterface.AddClusterScopedLifecycleCalls())
+//
+//	len(mockedSecretInterface.AddClusterScopedLifecycleCalls())
 func (mock *SecretInterfaceMock) AddClusterScopedLifecycleCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -1151,7 +1166,8 @@ func (mock *SecretInterfaceMock) AddFeatureHandler(ctx context.Context, enabled 
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//     len(mockedSecretInterface.AddFeatureHandlerCalls())
+//
+//	len(mockedSecretInterface.AddFeatureHandlerCalls())
 func (mock *SecretInterfaceMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
@@ -1194,7 +1210,8 @@ func (mock *SecretInterfaceMock) AddFeatureLifecycle(ctx context.Context, enable
 
 // AddFeatureLifecycleCalls gets all the calls that were made to AddFeatureLifecycle.
 // Check the length with:
-//     len(mockedSecretInterface.AddFeatureLifecycleCalls())
+//
+//	len(mockedSecretInterface.AddFeatureLifecycleCalls())
 func (mock *SecretInterfaceMock) AddFeatureLifecycleCalls() []struct {
 	Ctx       context.Context
 	Enabled   func() bool
@@ -1235,7 +1252,8 @@ func (mock *SecretInterfaceMock) AddHandler(ctx context.Context, name string, sy
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//     len(mockedSecretInterface.AddHandlerCalls())
+//
+//	len(mockedSecretInterface.AddHandlerCalls())
 func (mock *SecretInterfaceMock) AddHandlerCalls() []struct {
 	Ctx  context.Context
 	Name string
@@ -1274,7 +1292,8 @@ func (mock *SecretInterfaceMock) AddLifecycle(ctx context.Context, name string, 
 
 // AddLifecycleCalls gets all the calls that were made to AddLifecycle.
 // Check the length with:
-//     len(mockedSecretInterface.AddLifecycleCalls())
+//
+//	len(mockedSecretInterface.AddLifecycleCalls())
 func (mock *SecretInterfaceMock) AddLifecycleCalls() []struct {
 	Ctx       context.Context
 	Name      string
@@ -1306,7 +1325,8 @@ func (mock *SecretInterfaceMock) Controller() v11.SecretController {
 
 // ControllerCalls gets all the calls that were made to Controller.
 // Check the length with:
-//     len(mockedSecretInterface.ControllerCalls())
+//
+//	len(mockedSecretInterface.ControllerCalls())
 func (mock *SecretInterfaceMock) ControllerCalls() []struct {
 } {
 	var calls []struct {
@@ -1335,7 +1355,8 @@ func (mock *SecretInterfaceMock) Create(in1 *v1.Secret) (*v1.Secret, error) {
 
 // CreateCalls gets all the calls that were made to Create.
 // Check the length with:
-//     len(mockedSecretInterface.CreateCalls())
+//
+//	len(mockedSecretInterface.CreateCalls())
 func (mock *SecretInterfaceMock) CreateCalls() []struct {
 	In1 *v1.Secret
 } {
@@ -1368,7 +1389,8 @@ func (mock *SecretInterfaceMock) Delete(name string, options *metav1.DeleteOptio
 
 // DeleteCalls gets all the calls that were made to Delete.
 // Check the length with:
-//     len(mockedSecretInterface.DeleteCalls())
+//
+//	len(mockedSecretInterface.DeleteCalls())
 func (mock *SecretInterfaceMock) DeleteCalls() []struct {
 	Name    string
 	Options *metav1.DeleteOptions
@@ -1403,7 +1425,8 @@ func (mock *SecretInterfaceMock) DeleteCollection(deleteOpts *metav1.DeleteOptio
 
 // DeleteCollectionCalls gets all the calls that were made to DeleteCollection.
 // Check the length with:
-//     len(mockedSecretInterface.DeleteCollectionCalls())
+//
+//	len(mockedSecretInterface.DeleteCollectionCalls())
 func (mock *SecretInterfaceMock) DeleteCollectionCalls() []struct {
 	DeleteOpts *metav1.DeleteOptions
 	ListOpts   metav1.ListOptions
@@ -1440,7 +1463,8 @@ func (mock *SecretInterfaceMock) DeleteNamespaced(namespace string, name string,
 
 // DeleteNamespacedCalls gets all the calls that were made to DeleteNamespaced.
 // Check the length with:
-//     len(mockedSecretInterface.DeleteNamespacedCalls())
+//
+//	len(mockedSecretInterface.DeleteNamespacedCalls())
 func (mock *SecretInterfaceMock) DeleteNamespacedCalls() []struct {
 	Namespace string
 	Name      string
@@ -1477,7 +1501,8 @@ func (mock *SecretInterfaceMock) Get(name string, opts metav1.GetOptions) (*v1.S
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//     len(mockedSecretInterface.GetCalls())
+//
+//	len(mockedSecretInterface.GetCalls())
 func (mock *SecretInterfaceMock) GetCalls() []struct {
 	Name string
 	Opts metav1.GetOptions
@@ -1514,7 +1539,8 @@ func (mock *SecretInterfaceMock) GetNamespaced(namespace string, name string, op
 
 // GetNamespacedCalls gets all the calls that were made to GetNamespaced.
 // Check the length with:
-//     len(mockedSecretInterface.GetNamespacedCalls())
+//
+//	len(mockedSecretInterface.GetNamespacedCalls())
 func (mock *SecretInterfaceMock) GetNamespacedCalls() []struct {
 	Namespace string
 	Name      string
@@ -1549,7 +1575,8 @@ func (mock *SecretInterfaceMock) List(opts metav1.ListOptions) (*v1.SecretList, 
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//     len(mockedSecretInterface.ListCalls())
+//
+//	len(mockedSecretInterface.ListCalls())
 func (mock *SecretInterfaceMock) ListCalls() []struct {
 	Opts metav1.ListOptions
 } {
@@ -1582,7 +1609,8 @@ func (mock *SecretInterfaceMock) ListNamespaced(namespace string, opts metav1.Li
 
 // ListNamespacedCalls gets all the calls that were made to ListNamespaced.
 // Check the length with:
-//     len(mockedSecretInterface.ListNamespacedCalls())
+//
+//	len(mockedSecretInterface.ListNamespacedCalls())
 func (mock *SecretInterfaceMock) ListNamespacedCalls() []struct {
 	Namespace string
 	Opts      metav1.ListOptions
@@ -1612,7 +1640,8 @@ func (mock *SecretInterfaceMock) ObjectClient() *objectclient.ObjectClient {
 
 // ObjectClientCalls gets all the calls that were made to ObjectClient.
 // Check the length with:
-//     len(mockedSecretInterface.ObjectClientCalls())
+//
+//	len(mockedSecretInterface.ObjectClientCalls())
 func (mock *SecretInterfaceMock) ObjectClientCalls() []struct {
 } {
 	var calls []struct {
@@ -1641,7 +1670,8 @@ func (mock *SecretInterfaceMock) Update(in1 *v1.Secret) (*v1.Secret, error) {
 
 // UpdateCalls gets all the calls that were made to Update.
 // Check the length with:
-//     len(mockedSecretInterface.UpdateCalls())
+//
+//	len(mockedSecretInterface.UpdateCalls())
 func (mock *SecretInterfaceMock) UpdateCalls() []struct {
 	In1 *v1.Secret
 } {
@@ -1672,7 +1702,8 @@ func (mock *SecretInterfaceMock) Watch(opts metav1.ListOptions) (watch.Interface
 
 // WatchCalls gets all the calls that were made to Watch.
 // Check the length with:
-//     len(mockedSecretInterface.WatchCalls())
+//
+//	len(mockedSecretInterface.WatchCalls())
 func (mock *SecretInterfaceMock) WatchCalls() []struct {
 	Opts metav1.ListOptions
 } {
@@ -1695,19 +1726,19 @@ var _ v11.SecretsGetter = &SecretsGetterMock{}
 
 // SecretsGetterMock is a mock implementation of v11.SecretsGetter.
 //
-//     func TestSomethingThatUsesSecretsGetter(t *testing.T) {
+//	    func TestSomethingThatUsesSecretsGetter(t *testing.T) {
 //
-//         // make and configure a mocked v11.SecretsGetter
-//         mockedSecretsGetter := &SecretsGetterMock{
-//             SecretsFunc: func(namespace string) v11.SecretInterface {
-// 	               panic("mock out the Secrets method")
-//             },
-//         }
+//	        // make and configure a mocked v11.SecretsGetter
+//	        mockedSecretsGetter := &SecretsGetterMock{
+//	            SecretsFunc: func(namespace string) v11.SecretInterface {
+//		               panic("mock out the Secrets method")
+//	            },
+//	        }
 //
-//         // use mockedSecretsGetter in code that requires v11.SecretsGetter
-//         // and then make assertions.
+//	        // use mockedSecretsGetter in code that requires v11.SecretsGetter
+//	        // and then make assertions.
 //
-//     }
+//	    }
 type SecretsGetterMock struct {
 	// SecretsFunc mocks the Secrets method.
 	SecretsFunc func(namespace string) v11.SecretInterface
@@ -1740,7 +1771,8 @@ func (mock *SecretsGetterMock) Secrets(namespace string) v11.SecretInterface {
 
 // SecretsCalls gets all the calls that were made to Secrets.
 // Check the length with:
-//     len(mockedSecretsGetter.SecretsCalls())
+//
+//	len(mockedSecretsGetter.SecretsCalls())
 func (mock *SecretsGetterMock) SecretsCalls() []struct {
 	Namespace string
 } {

@@ -30,7 +30,7 @@ func newProviderSecretSyncer(ctx context.Context, mgmt *config.ManagementContext
 	return n
 }
 
-//sync is called periodically and on real updates
+// sync is called periodically and on real updates
 func (n *ProviderSecretSyncer) sync(key string, obj *corev1.Secret) (runtime.Object, error) {
 	if obj == nil || obj.DeletionTimestamp != nil {
 		return nil, nil

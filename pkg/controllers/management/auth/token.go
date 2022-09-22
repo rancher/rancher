@@ -23,7 +23,7 @@ func newTokenController(mgmt *config.ManagementContext) *TokenController {
 	return n
 }
 
-//sync is called periodically and on real updates
+// sync is called periodically and on real updates
 func (n *TokenController) sync(key string, obj *v3.Token) (runtime.Object, error) {
 	if obj == nil {
 		return nil, nil

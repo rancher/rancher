@@ -131,7 +131,7 @@ func GetTaintsFromStrings(sources []string) []v1.Taint {
 	return rtn
 }
 
-//MergeTaints will override t1 taint by t2 with same key and effect
+// MergeTaints will override t1 taint by t2 with same key and effect
 func MergeTaints(t1 []v1.Taint, t2 []v1.Taint) []v1.Taint {
 	set1 := GetKeyEffectTaintSet(t1)
 	set2 := GetKeyEffectTaintSet(t2)

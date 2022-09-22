@@ -29,22 +29,22 @@ var _ v31.DynamicSchemaLister = &DynamicSchemaListerMock{}
 
 // DynamicSchemaListerMock is a mock implementation of v31.DynamicSchemaLister.
 //
-//     func TestSomethingThatUsesDynamicSchemaLister(t *testing.T) {
+//	    func TestSomethingThatUsesDynamicSchemaLister(t *testing.T) {
 //
-//         // make and configure a mocked v31.DynamicSchemaLister
-//         mockedDynamicSchemaLister := &DynamicSchemaListerMock{
-//             GetFunc: func(namespace string, name string) (*v3.DynamicSchema, error) {
-// 	               panic("mock out the Get method")
-//             },
-//             ListFunc: func(namespace string, selector labels.Selector) ([]*v3.DynamicSchema, error) {
-// 	               panic("mock out the List method")
-//             },
-//         }
+//	        // make and configure a mocked v31.DynamicSchemaLister
+//	        mockedDynamicSchemaLister := &DynamicSchemaListerMock{
+//	            GetFunc: func(namespace string, name string) (*v3.DynamicSchema, error) {
+//		               panic("mock out the Get method")
+//	            },
+//	            ListFunc: func(namespace string, selector labels.Selector) ([]*v3.DynamicSchema, error) {
+//		               panic("mock out the List method")
+//	            },
+//	        }
 //
-//         // use mockedDynamicSchemaLister in code that requires v31.DynamicSchemaLister
-//         // and then make assertions.
+//	        // use mockedDynamicSchemaLister in code that requires v31.DynamicSchemaLister
+//	        // and then make assertions.
 //
-//     }
+//	    }
 type DynamicSchemaListerMock struct {
 	// GetFunc mocks the Get method.
 	GetFunc func(namespace string, name string) (*v3.DynamicSchema, error)
@@ -91,7 +91,8 @@ func (mock *DynamicSchemaListerMock) Get(namespace string, name string) (*v3.Dyn
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//     len(mockedDynamicSchemaLister.GetCalls())
+//
+//	len(mockedDynamicSchemaLister.GetCalls())
 func (mock *DynamicSchemaListerMock) GetCalls() []struct {
 	Namespace string
 	Name      string
@@ -126,7 +127,8 @@ func (mock *DynamicSchemaListerMock) List(namespace string, selector labels.Sele
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//     len(mockedDynamicSchemaLister.ListCalls())
+//
+//	len(mockedDynamicSchemaLister.ListCalls())
 func (mock *DynamicSchemaListerMock) ListCalls() []struct {
 	Namespace string
 	Selector  labels.Selector
@@ -159,43 +161,43 @@ var _ v31.DynamicSchemaController = &DynamicSchemaControllerMock{}
 
 // DynamicSchemaControllerMock is a mock implementation of v31.DynamicSchemaController.
 //
-//     func TestSomethingThatUsesDynamicSchemaController(t *testing.T) {
+//	    func TestSomethingThatUsesDynamicSchemaController(t *testing.T) {
 //
-//         // make and configure a mocked v31.DynamicSchemaController
-//         mockedDynamicSchemaController := &DynamicSchemaControllerMock{
-//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v31.DynamicSchemaHandlerFunc)  {
-// 	               panic("mock out the AddClusterScopedFeatureHandler method")
-//             },
-//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v31.DynamicSchemaHandlerFunc)  {
-// 	               panic("mock out the AddClusterScopedHandler method")
-//             },
-//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.DynamicSchemaHandlerFunc)  {
-// 	               panic("mock out the AddFeatureHandler method")
-//             },
-//             AddHandlerFunc: func(ctx context.Context, name string, handler v31.DynamicSchemaHandlerFunc)  {
-// 	               panic("mock out the AddHandler method")
-//             },
-//             EnqueueFunc: func(namespace string, name string)  {
-// 	               panic("mock out the Enqueue method")
-//             },
-//             EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
-// 	               panic("mock out the EnqueueAfter method")
-//             },
-//             GenericFunc: func() controller.GenericController {
-// 	               panic("mock out the Generic method")
-//             },
-//             InformerFunc: func() cache.SharedIndexInformer {
-// 	               panic("mock out the Informer method")
-//             },
-//             ListerFunc: func() v31.DynamicSchemaLister {
-// 	               panic("mock out the Lister method")
-//             },
-//         }
+//	        // make and configure a mocked v31.DynamicSchemaController
+//	        mockedDynamicSchemaController := &DynamicSchemaControllerMock{
+//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v31.DynamicSchemaHandlerFunc)  {
+//		               panic("mock out the AddClusterScopedFeatureHandler method")
+//	            },
+//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v31.DynamicSchemaHandlerFunc)  {
+//		               panic("mock out the AddClusterScopedHandler method")
+//	            },
+//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.DynamicSchemaHandlerFunc)  {
+//		               panic("mock out the AddFeatureHandler method")
+//	            },
+//	            AddHandlerFunc: func(ctx context.Context, name string, handler v31.DynamicSchemaHandlerFunc)  {
+//		               panic("mock out the AddHandler method")
+//	            },
+//	            EnqueueFunc: func(namespace string, name string)  {
+//		               panic("mock out the Enqueue method")
+//	            },
+//	            EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
+//		               panic("mock out the EnqueueAfter method")
+//	            },
+//	            GenericFunc: func() controller.GenericController {
+//		               panic("mock out the Generic method")
+//	            },
+//	            InformerFunc: func() cache.SharedIndexInformer {
+//		               panic("mock out the Informer method")
+//	            },
+//	            ListerFunc: func() v31.DynamicSchemaLister {
+//		               panic("mock out the Lister method")
+//	            },
+//	        }
 //
-//         // use mockedDynamicSchemaController in code that requires v31.DynamicSchemaController
-//         // and then make assertions.
+//	        // use mockedDynamicSchemaController in code that requires v31.DynamicSchemaController
+//	        // and then make assertions.
 //
-//     }
+//	    }
 type DynamicSchemaControllerMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
 	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v31.DynamicSchemaHandlerFunc)
@@ -324,7 +326,8 @@ func (mock *DynamicSchemaControllerMock) AddClusterScopedFeatureHandler(ctx cont
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//     len(mockedDynamicSchemaController.AddClusterScopedFeatureHandlerCalls())
+//
+//	len(mockedDynamicSchemaController.AddClusterScopedFeatureHandlerCalls())
 func (mock *DynamicSchemaControllerMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -369,7 +372,8 @@ func (mock *DynamicSchemaControllerMock) AddClusterScopedHandler(ctx context.Con
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//     len(mockedDynamicSchemaController.AddClusterScopedHandlerCalls())
+//
+//	len(mockedDynamicSchemaController.AddClusterScopedHandlerCalls())
 func (mock *DynamicSchemaControllerMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -412,7 +416,8 @@ func (mock *DynamicSchemaControllerMock) AddFeatureHandler(ctx context.Context, 
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//     len(mockedDynamicSchemaController.AddFeatureHandlerCalls())
+//
+//	len(mockedDynamicSchemaController.AddFeatureHandlerCalls())
 func (mock *DynamicSchemaControllerMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
@@ -453,7 +458,8 @@ func (mock *DynamicSchemaControllerMock) AddHandler(ctx context.Context, name st
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//     len(mockedDynamicSchemaController.AddHandlerCalls())
+//
+//	len(mockedDynamicSchemaController.AddHandlerCalls())
 func (mock *DynamicSchemaControllerMock) AddHandlerCalls() []struct {
 	Ctx     context.Context
 	Name    string
@@ -490,7 +496,8 @@ func (mock *DynamicSchemaControllerMock) Enqueue(namespace string, name string) 
 
 // EnqueueCalls gets all the calls that were made to Enqueue.
 // Check the length with:
-//     len(mockedDynamicSchemaController.EnqueueCalls())
+//
+//	len(mockedDynamicSchemaController.EnqueueCalls())
 func (mock *DynamicSchemaControllerMock) EnqueueCalls() []struct {
 	Namespace string
 	Name      string
@@ -527,7 +534,8 @@ func (mock *DynamicSchemaControllerMock) EnqueueAfter(namespace string, name str
 
 // EnqueueAfterCalls gets all the calls that were made to EnqueueAfter.
 // Check the length with:
-//     len(mockedDynamicSchemaController.EnqueueAfterCalls())
+//
+//	len(mockedDynamicSchemaController.EnqueueAfterCalls())
 func (mock *DynamicSchemaControllerMock) EnqueueAfterCalls() []struct {
 	Namespace string
 	Name      string
@@ -559,7 +567,8 @@ func (mock *DynamicSchemaControllerMock) Generic() controller.GenericController 
 
 // GenericCalls gets all the calls that were made to Generic.
 // Check the length with:
-//     len(mockedDynamicSchemaController.GenericCalls())
+//
+//	len(mockedDynamicSchemaController.GenericCalls())
 func (mock *DynamicSchemaControllerMock) GenericCalls() []struct {
 } {
 	var calls []struct {
@@ -585,7 +594,8 @@ func (mock *DynamicSchemaControllerMock) Informer() cache.SharedIndexInformer {
 
 // InformerCalls gets all the calls that were made to Informer.
 // Check the length with:
-//     len(mockedDynamicSchemaController.InformerCalls())
+//
+//	len(mockedDynamicSchemaController.InformerCalls())
 func (mock *DynamicSchemaControllerMock) InformerCalls() []struct {
 } {
 	var calls []struct {
@@ -611,7 +621,8 @@ func (mock *DynamicSchemaControllerMock) Lister() v31.DynamicSchemaLister {
 
 // ListerCalls gets all the calls that were made to Lister.
 // Check the length with:
-//     len(mockedDynamicSchemaController.ListerCalls())
+//
+//	len(mockedDynamicSchemaController.ListerCalls())
 func (mock *DynamicSchemaControllerMock) ListerCalls() []struct {
 } {
 	var calls []struct {
@@ -651,76 +662,76 @@ var _ v31.DynamicSchemaInterface = &DynamicSchemaInterfaceMock{}
 
 // DynamicSchemaInterfaceMock is a mock implementation of v31.DynamicSchemaInterface.
 //
-//     func TestSomethingThatUsesDynamicSchemaInterface(t *testing.T) {
+//	    func TestSomethingThatUsesDynamicSchemaInterface(t *testing.T) {
 //
-//         // make and configure a mocked v31.DynamicSchemaInterface
-//         mockedDynamicSchemaInterface := &DynamicSchemaInterfaceMock{
-//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v31.DynamicSchemaHandlerFunc)  {
-// 	               panic("mock out the AddClusterScopedFeatureHandler method")
-//             },
-//             AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v31.DynamicSchemaLifecycle)  {
-// 	               panic("mock out the AddClusterScopedFeatureLifecycle method")
-//             },
-//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v31.DynamicSchemaHandlerFunc)  {
-// 	               panic("mock out the AddClusterScopedHandler method")
-//             },
-//             AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v31.DynamicSchemaLifecycle)  {
-// 	               panic("mock out the AddClusterScopedLifecycle method")
-//             },
-//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.DynamicSchemaHandlerFunc)  {
-// 	               panic("mock out the AddFeatureHandler method")
-//             },
-//             AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v31.DynamicSchemaLifecycle)  {
-// 	               panic("mock out the AddFeatureLifecycle method")
-//             },
-//             AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v31.DynamicSchemaHandlerFunc)  {
-// 	               panic("mock out the AddHandler method")
-//             },
-//             AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v31.DynamicSchemaLifecycle)  {
-// 	               panic("mock out the AddLifecycle method")
-//             },
-//             ControllerFunc: func() v31.DynamicSchemaController {
-// 	               panic("mock out the Controller method")
-//             },
-//             CreateFunc: func(in1 *v3.DynamicSchema) (*v3.DynamicSchema, error) {
-// 	               panic("mock out the Create method")
-//             },
-//             DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
-// 	               panic("mock out the Delete method")
-//             },
-//             DeleteCollectionFunc: func(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
-// 	               panic("mock out the DeleteCollection method")
-//             },
-//             DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
-// 	               panic("mock out the DeleteNamespaced method")
-//             },
-//             GetFunc: func(name string, opts metav1.GetOptions) (*v3.DynamicSchema, error) {
-// 	               panic("mock out the Get method")
-//             },
-//             GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v3.DynamicSchema, error) {
-// 	               panic("mock out the GetNamespaced method")
-//             },
-//             ListFunc: func(opts metav1.ListOptions) (*v3.DynamicSchemaList, error) {
-// 	               panic("mock out the List method")
-//             },
-//             ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v3.DynamicSchemaList, error) {
-// 	               panic("mock out the ListNamespaced method")
-//             },
-//             ObjectClientFunc: func() *objectclient.ObjectClient {
-// 	               panic("mock out the ObjectClient method")
-//             },
-//             UpdateFunc: func(in1 *v3.DynamicSchema) (*v3.DynamicSchema, error) {
-// 	               panic("mock out the Update method")
-//             },
-//             WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
-// 	               panic("mock out the Watch method")
-//             },
-//         }
+//	        // make and configure a mocked v31.DynamicSchemaInterface
+//	        mockedDynamicSchemaInterface := &DynamicSchemaInterfaceMock{
+//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v31.DynamicSchemaHandlerFunc)  {
+//		               panic("mock out the AddClusterScopedFeatureHandler method")
+//	            },
+//	            AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v31.DynamicSchemaLifecycle)  {
+//		               panic("mock out the AddClusterScopedFeatureLifecycle method")
+//	            },
+//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v31.DynamicSchemaHandlerFunc)  {
+//		               panic("mock out the AddClusterScopedHandler method")
+//	            },
+//	            AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v31.DynamicSchemaLifecycle)  {
+//		               panic("mock out the AddClusterScopedLifecycle method")
+//	            },
+//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.DynamicSchemaHandlerFunc)  {
+//		               panic("mock out the AddFeatureHandler method")
+//	            },
+//	            AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v31.DynamicSchemaLifecycle)  {
+//		               panic("mock out the AddFeatureLifecycle method")
+//	            },
+//	            AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v31.DynamicSchemaHandlerFunc)  {
+//		               panic("mock out the AddHandler method")
+//	            },
+//	            AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v31.DynamicSchemaLifecycle)  {
+//		               panic("mock out the AddLifecycle method")
+//	            },
+//	            ControllerFunc: func() v31.DynamicSchemaController {
+//		               panic("mock out the Controller method")
+//	            },
+//	            CreateFunc: func(in1 *v3.DynamicSchema) (*v3.DynamicSchema, error) {
+//		               panic("mock out the Create method")
+//	            },
+//	            DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
+//		               panic("mock out the Delete method")
+//	            },
+//	            DeleteCollectionFunc: func(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
+//		               panic("mock out the DeleteCollection method")
+//	            },
+//	            DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
+//		               panic("mock out the DeleteNamespaced method")
+//	            },
+//	            GetFunc: func(name string, opts metav1.GetOptions) (*v3.DynamicSchema, error) {
+//		               panic("mock out the Get method")
+//	            },
+//	            GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v3.DynamicSchema, error) {
+//		               panic("mock out the GetNamespaced method")
+//	            },
+//	            ListFunc: func(opts metav1.ListOptions) (*v3.DynamicSchemaList, error) {
+//		               panic("mock out the List method")
+//	            },
+//	            ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v3.DynamicSchemaList, error) {
+//		               panic("mock out the ListNamespaced method")
+//	            },
+//	            ObjectClientFunc: func() *objectclient.ObjectClient {
+//		               panic("mock out the ObjectClient method")
+//	            },
+//	            UpdateFunc: func(in1 *v3.DynamicSchema) (*v3.DynamicSchema, error) {
+//		               panic("mock out the Update method")
+//	            },
+//	            WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
+//		               panic("mock out the Watch method")
+//	            },
+//	        }
 //
-//         // use mockedDynamicSchemaInterface in code that requires v31.DynamicSchemaInterface
-//         // and then make assertions.
+//	        // use mockedDynamicSchemaInterface in code that requires v31.DynamicSchemaInterface
+//	        // and then make assertions.
 //
-//     }
+//	    }
 type DynamicSchemaInterfaceMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
 	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v31.DynamicSchemaHandlerFunc)
@@ -973,7 +984,8 @@ func (mock *DynamicSchemaInterfaceMock) AddClusterScopedFeatureHandler(ctx conte
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//     len(mockedDynamicSchemaInterface.AddClusterScopedFeatureHandlerCalls())
+//
+//	len(mockedDynamicSchemaInterface.AddClusterScopedFeatureHandlerCalls())
 func (mock *DynamicSchemaInterfaceMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -1020,7 +1032,8 @@ func (mock *DynamicSchemaInterfaceMock) AddClusterScopedFeatureLifecycle(ctx con
 
 // AddClusterScopedFeatureLifecycleCalls gets all the calls that were made to AddClusterScopedFeatureLifecycle.
 // Check the length with:
-//     len(mockedDynamicSchemaInterface.AddClusterScopedFeatureLifecycleCalls())
+//
+//	len(mockedDynamicSchemaInterface.AddClusterScopedFeatureLifecycleCalls())
 func (mock *DynamicSchemaInterfaceMock) AddClusterScopedFeatureLifecycleCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -1065,7 +1078,8 @@ func (mock *DynamicSchemaInterfaceMock) AddClusterScopedHandler(ctx context.Cont
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//     len(mockedDynamicSchemaInterface.AddClusterScopedHandlerCalls())
+//
+//	len(mockedDynamicSchemaInterface.AddClusterScopedHandlerCalls())
 func (mock *DynamicSchemaInterfaceMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -1108,7 +1122,8 @@ func (mock *DynamicSchemaInterfaceMock) AddClusterScopedLifecycle(ctx context.Co
 
 // AddClusterScopedLifecycleCalls gets all the calls that were made to AddClusterScopedLifecycle.
 // Check the length with:
-//     len(mockedDynamicSchemaInterface.AddClusterScopedLifecycleCalls())
+//
+//	len(mockedDynamicSchemaInterface.AddClusterScopedLifecycleCalls())
 func (mock *DynamicSchemaInterfaceMock) AddClusterScopedLifecycleCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -1151,7 +1166,8 @@ func (mock *DynamicSchemaInterfaceMock) AddFeatureHandler(ctx context.Context, e
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//     len(mockedDynamicSchemaInterface.AddFeatureHandlerCalls())
+//
+//	len(mockedDynamicSchemaInterface.AddFeatureHandlerCalls())
 func (mock *DynamicSchemaInterfaceMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
@@ -1194,7 +1210,8 @@ func (mock *DynamicSchemaInterfaceMock) AddFeatureLifecycle(ctx context.Context,
 
 // AddFeatureLifecycleCalls gets all the calls that were made to AddFeatureLifecycle.
 // Check the length with:
-//     len(mockedDynamicSchemaInterface.AddFeatureLifecycleCalls())
+//
+//	len(mockedDynamicSchemaInterface.AddFeatureLifecycleCalls())
 func (mock *DynamicSchemaInterfaceMock) AddFeatureLifecycleCalls() []struct {
 	Ctx       context.Context
 	Enabled   func() bool
@@ -1235,7 +1252,8 @@ func (mock *DynamicSchemaInterfaceMock) AddHandler(ctx context.Context, name str
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//     len(mockedDynamicSchemaInterface.AddHandlerCalls())
+//
+//	len(mockedDynamicSchemaInterface.AddHandlerCalls())
 func (mock *DynamicSchemaInterfaceMock) AddHandlerCalls() []struct {
 	Ctx  context.Context
 	Name string
@@ -1274,7 +1292,8 @@ func (mock *DynamicSchemaInterfaceMock) AddLifecycle(ctx context.Context, name s
 
 // AddLifecycleCalls gets all the calls that were made to AddLifecycle.
 // Check the length with:
-//     len(mockedDynamicSchemaInterface.AddLifecycleCalls())
+//
+//	len(mockedDynamicSchemaInterface.AddLifecycleCalls())
 func (mock *DynamicSchemaInterfaceMock) AddLifecycleCalls() []struct {
 	Ctx       context.Context
 	Name      string
@@ -1306,7 +1325,8 @@ func (mock *DynamicSchemaInterfaceMock) Controller() v31.DynamicSchemaController
 
 // ControllerCalls gets all the calls that were made to Controller.
 // Check the length with:
-//     len(mockedDynamicSchemaInterface.ControllerCalls())
+//
+//	len(mockedDynamicSchemaInterface.ControllerCalls())
 func (mock *DynamicSchemaInterfaceMock) ControllerCalls() []struct {
 } {
 	var calls []struct {
@@ -1335,7 +1355,8 @@ func (mock *DynamicSchemaInterfaceMock) Create(in1 *v3.DynamicSchema) (*v3.Dynam
 
 // CreateCalls gets all the calls that were made to Create.
 // Check the length with:
-//     len(mockedDynamicSchemaInterface.CreateCalls())
+//
+//	len(mockedDynamicSchemaInterface.CreateCalls())
 func (mock *DynamicSchemaInterfaceMock) CreateCalls() []struct {
 	In1 *v3.DynamicSchema
 } {
@@ -1368,7 +1389,8 @@ func (mock *DynamicSchemaInterfaceMock) Delete(name string, options *metav1.Dele
 
 // DeleteCalls gets all the calls that were made to Delete.
 // Check the length with:
-//     len(mockedDynamicSchemaInterface.DeleteCalls())
+//
+//	len(mockedDynamicSchemaInterface.DeleteCalls())
 func (mock *DynamicSchemaInterfaceMock) DeleteCalls() []struct {
 	Name    string
 	Options *metav1.DeleteOptions
@@ -1403,7 +1425,8 @@ func (mock *DynamicSchemaInterfaceMock) DeleteCollection(deleteOpts *metav1.Dele
 
 // DeleteCollectionCalls gets all the calls that were made to DeleteCollection.
 // Check the length with:
-//     len(mockedDynamicSchemaInterface.DeleteCollectionCalls())
+//
+//	len(mockedDynamicSchemaInterface.DeleteCollectionCalls())
 func (mock *DynamicSchemaInterfaceMock) DeleteCollectionCalls() []struct {
 	DeleteOpts *metav1.DeleteOptions
 	ListOpts   metav1.ListOptions
@@ -1440,7 +1463,8 @@ func (mock *DynamicSchemaInterfaceMock) DeleteNamespaced(namespace string, name 
 
 // DeleteNamespacedCalls gets all the calls that were made to DeleteNamespaced.
 // Check the length with:
-//     len(mockedDynamicSchemaInterface.DeleteNamespacedCalls())
+//
+//	len(mockedDynamicSchemaInterface.DeleteNamespacedCalls())
 func (mock *DynamicSchemaInterfaceMock) DeleteNamespacedCalls() []struct {
 	Namespace string
 	Name      string
@@ -1477,7 +1501,8 @@ func (mock *DynamicSchemaInterfaceMock) Get(name string, opts metav1.GetOptions)
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//     len(mockedDynamicSchemaInterface.GetCalls())
+//
+//	len(mockedDynamicSchemaInterface.GetCalls())
 func (mock *DynamicSchemaInterfaceMock) GetCalls() []struct {
 	Name string
 	Opts metav1.GetOptions
@@ -1514,7 +1539,8 @@ func (mock *DynamicSchemaInterfaceMock) GetNamespaced(namespace string, name str
 
 // GetNamespacedCalls gets all the calls that were made to GetNamespaced.
 // Check the length with:
-//     len(mockedDynamicSchemaInterface.GetNamespacedCalls())
+//
+//	len(mockedDynamicSchemaInterface.GetNamespacedCalls())
 func (mock *DynamicSchemaInterfaceMock) GetNamespacedCalls() []struct {
 	Namespace string
 	Name      string
@@ -1549,7 +1575,8 @@ func (mock *DynamicSchemaInterfaceMock) List(opts metav1.ListOptions) (*v3.Dynam
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//     len(mockedDynamicSchemaInterface.ListCalls())
+//
+//	len(mockedDynamicSchemaInterface.ListCalls())
 func (mock *DynamicSchemaInterfaceMock) ListCalls() []struct {
 	Opts metav1.ListOptions
 } {
@@ -1582,7 +1609,8 @@ func (mock *DynamicSchemaInterfaceMock) ListNamespaced(namespace string, opts me
 
 // ListNamespacedCalls gets all the calls that were made to ListNamespaced.
 // Check the length with:
-//     len(mockedDynamicSchemaInterface.ListNamespacedCalls())
+//
+//	len(mockedDynamicSchemaInterface.ListNamespacedCalls())
 func (mock *DynamicSchemaInterfaceMock) ListNamespacedCalls() []struct {
 	Namespace string
 	Opts      metav1.ListOptions
@@ -1612,7 +1640,8 @@ func (mock *DynamicSchemaInterfaceMock) ObjectClient() *objectclient.ObjectClien
 
 // ObjectClientCalls gets all the calls that were made to ObjectClient.
 // Check the length with:
-//     len(mockedDynamicSchemaInterface.ObjectClientCalls())
+//
+//	len(mockedDynamicSchemaInterface.ObjectClientCalls())
 func (mock *DynamicSchemaInterfaceMock) ObjectClientCalls() []struct {
 } {
 	var calls []struct {
@@ -1641,7 +1670,8 @@ func (mock *DynamicSchemaInterfaceMock) Update(in1 *v3.DynamicSchema) (*v3.Dynam
 
 // UpdateCalls gets all the calls that were made to Update.
 // Check the length with:
-//     len(mockedDynamicSchemaInterface.UpdateCalls())
+//
+//	len(mockedDynamicSchemaInterface.UpdateCalls())
 func (mock *DynamicSchemaInterfaceMock) UpdateCalls() []struct {
 	In1 *v3.DynamicSchema
 } {
@@ -1672,7 +1702,8 @@ func (mock *DynamicSchemaInterfaceMock) Watch(opts metav1.ListOptions) (watch.In
 
 // WatchCalls gets all the calls that were made to Watch.
 // Check the length with:
-//     len(mockedDynamicSchemaInterface.WatchCalls())
+//
+//	len(mockedDynamicSchemaInterface.WatchCalls())
 func (mock *DynamicSchemaInterfaceMock) WatchCalls() []struct {
 	Opts metav1.ListOptions
 } {
@@ -1695,19 +1726,19 @@ var _ v31.DynamicSchemasGetter = &DynamicSchemasGetterMock{}
 
 // DynamicSchemasGetterMock is a mock implementation of v31.DynamicSchemasGetter.
 //
-//     func TestSomethingThatUsesDynamicSchemasGetter(t *testing.T) {
+//	    func TestSomethingThatUsesDynamicSchemasGetter(t *testing.T) {
 //
-//         // make and configure a mocked v31.DynamicSchemasGetter
-//         mockedDynamicSchemasGetter := &DynamicSchemasGetterMock{
-//             DynamicSchemasFunc: func(namespace string) v31.DynamicSchemaInterface {
-// 	               panic("mock out the DynamicSchemas method")
-//             },
-//         }
+//	        // make and configure a mocked v31.DynamicSchemasGetter
+//	        mockedDynamicSchemasGetter := &DynamicSchemasGetterMock{
+//	            DynamicSchemasFunc: func(namespace string) v31.DynamicSchemaInterface {
+//		               panic("mock out the DynamicSchemas method")
+//	            },
+//	        }
 //
-//         // use mockedDynamicSchemasGetter in code that requires v31.DynamicSchemasGetter
-//         // and then make assertions.
+//	        // use mockedDynamicSchemasGetter in code that requires v31.DynamicSchemasGetter
+//	        // and then make assertions.
 //
-//     }
+//	    }
 type DynamicSchemasGetterMock struct {
 	// DynamicSchemasFunc mocks the DynamicSchemas method.
 	DynamicSchemasFunc func(namespace string) v31.DynamicSchemaInterface
@@ -1740,7 +1771,8 @@ func (mock *DynamicSchemasGetterMock) DynamicSchemas(namespace string) v31.Dynam
 
 // DynamicSchemasCalls gets all the calls that were made to DynamicSchemas.
 // Check the length with:
-//     len(mockedDynamicSchemasGetter.DynamicSchemasCalls())
+//
+//	len(mockedDynamicSchemasGetter.DynamicSchemasCalls())
 func (mock *DynamicSchemasGetterMock) DynamicSchemasCalls() []struct {
 	Namespace string
 } {

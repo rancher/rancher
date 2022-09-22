@@ -17,7 +17,7 @@ const (
 	LoggingNamespace = "cattle-logging"
 )
 
-//daemonset, pod, container name
+// daemonset, pod, container name
 const (
 	FluentdName                = "fluentd"
 	FluentdHelperName          = "fluentd-helper"
@@ -26,7 +26,7 @@ const (
 	FluentdTesterContainerName = "dry-run"
 )
 
-//config
+// config
 const (
 	LoggingSecretName             = "fluentd"
 	LoggingSSLSecretName          = "fluentd-ssl"
@@ -34,7 +34,7 @@ const (
 	LoggingSecretProjectConfigKey = "project.conf"
 )
 
-//target
+// target
 const (
 	Elasticsearch   = "elasticsearch"
 	Splunk          = "splunk"
@@ -48,7 +48,7 @@ const (
 	GoogleKubernetesEngine = "googleKubernetesEngine"
 )
 
-//ssl
+// ssl
 const (
 	DefaultCertDir = "/fluentd/etc/config/ssl"
 	CaFileName     = "ca.pem"

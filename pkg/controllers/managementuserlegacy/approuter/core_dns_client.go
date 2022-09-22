@@ -277,7 +277,7 @@ func (c *Client) setSecret(resp *model.Response) error {
 	return nil
 }
 
-//getSecret return token and fqdn
+// getSecret return token and fqdn
 func (c *Client) getSecret() (string, string, error) {
 	sec, err := c.managementSecretLister.Get(c.clusterName, secretKey)
 	if err != nil {
@@ -296,7 +296,7 @@ func NewClient(secrets v1.SecretInterface, secretLister v1.SecretLister, cluster
 	}
 }
 
-//buildUrl return request url
+// buildUrl return request url
 func buildURL(base, fqdn, path string) (url string) {
 	return fmt.Sprintf("%s/domain%s%s", base, fqdn, path)
 }
