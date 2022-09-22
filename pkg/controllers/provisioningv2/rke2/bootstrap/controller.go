@@ -25,6 +25,7 @@ import (
 	apierror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/kubernetes"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 )
 
@@ -41,6 +42,7 @@ type handler struct {
 	deploymentCache     appcontrollers.DeploymentCache
 	rkeControlPlanes    rkecontroller.RKEControlPlaneCache
 	rkeBootstrapClient  rkecontroller.RKEBootstrapClient
+	k8s                 kubernetes.Interface
 }
 
 func Register(ctx context.Context, clients *wrangler.Context) {
@@ -53,6 +55,7 @@ func Register(ctx context.Context, clients *wrangler.Context) {
 		deploymentCache:     clients.Apps.Deployment().Cache(),
 		rkeControlPlanes:    clients.RKE.RKEControlPlane().Cache(),
 		rkeBootstrapClient:  clients.RKE.RKEBootstrap(),
+		k8s:                 clients.K8s,
 	}
 	rkecontroller.RegisterRKEBootstrapGeneratingHandler(ctx,
 		clients.RKE.RKEBootstrap(),
@@ -102,23 +105,9 @@ func (h *handler) getBootstrapSecret(namespace, name string, envVars []corev1.En
 		return nil, err
 
 	}
-	sName := serviceaccounttoken.ServiceAccountSecretName(sa)
-	secret, err := h.secretCache.Get(sa.Namespace, sName)
+	secret, err := serviceaccounttoken.EnsureSecretForServiceAccount(context.Background(), h.secretCache.Get, h.k8s, sa)
 	if err != nil {
-		if !apierror.IsNotFound(err) {
-			return nil, err
-		}
-		sc := serviceaccounttoken.SecretTemplate(sa)
-		secret, err = h.secretClient.Create(sc)
-		if err != nil {
-			if !apierror.IsAlreadyExists(err) {
-				return nil, err
-			}
-			secret, err = h.secretClient.Get(sa.Namespace, sName, metav1.GetOptions{})
-			if err != nil {
-				return nil, err
-			}
-		}
+		return nil, err
 	}
 	hash := sha256.Sum256(secret.Data["token"])
 
