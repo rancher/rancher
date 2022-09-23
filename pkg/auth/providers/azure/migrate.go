@@ -9,22 +9,17 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// migrateToMicrosoftGraph performs the migration of the registered Azure AD auth provider
+// migrateToMicrosoftGraph performs a migration of the registered Azure AD auth provider
 // from the deprecated Azure AD Graph API to the Microsoft Graph API.
-// It modifies the existing auth config value in the database, so that it has up-to-date endpoints to the new API.
+// It modifies the existing auth config in the database, so that it has up-to-date endpoints to the new API.
 // Most importantly, it sets the annotation that specifies that the auth config has been migrated to use the new auth flow.
+// The method receives the current AuthConfig from the database, then updates it in-memory to use the new endpoints.
 
-// It also verifies that admins have properly configured an existing app registration's permissions
-// in the Azure portal before they update their Azure AD auth config to use the new authentication flow.
-// The method receives the current AuthConfig from the database, then updates it in-memory to use the new endpoints,
-// and creates a new test Azure client, thereby getting an access token to the Graph API.
-// Then it parses the JWT and inspects the permissions contained within. If the admins had not set those as per docs,
-// then Rancher won't find the permissions in the test token and will return an error.
-
+// It also creates a new test Azure client to catch any errors before committing the migration.
 // If validation and applying work, then migrateToMicrosoftGraph deletes all secrets with access tokens to the
 // deprecated Azure AD Graph API.
 func (ap *azureProvider) migrateToMicrosoftGraph() error {
-	cfg, err := ap.updateConfigAndValidatePermissions()
+	cfg, err := ap.updateConfigAndTest()
 	if err != nil {
 		return err
 	}
@@ -36,7 +31,7 @@ func (ap *azureProvider) migrateToMicrosoftGraph() error {
 	return nil
 }
 
-func (ap *azureProvider) updateConfigAndValidatePermissions() (*v32.AzureADConfig, error) {
+func (ap *azureProvider) updateConfigAndTest() (*v32.AzureADConfig, error) {
 	cfg, err := ap.getAzureConfigK8s()
 	if err != nil {
 		return nil, err
@@ -47,7 +42,7 @@ func (ap *azureProvider) updateConfigAndValidatePermissions() (*v32.AzureADConfi
 
 	updateAzureADEndpoints(cfg)
 
-	// Try to get a new client, which will fetch a new access token and validate its permissions.
+	// Try to get a new client, which will fetch a new access token and catch any errors.
 	_, err = clients.NewMSGraphClient(cfg, ap.secrets)
 	if err != nil {
 		return nil, err
