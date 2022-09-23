@@ -853,7 +853,7 @@ func PruneEmpty(config map[string]interface{}) {
 }
 
 // getTaints returns a slice of taints for the machine in question
-func getTaints(entry *planEntry, runtime string) (result []corev1.Taint, _ error) {
+func getTaints(entry *planEntry) (result []corev1.Taint, _ error) {
 	data := entry.Metadata.Annotations[rke2.TaintsAnnotation]
 	if data != "" {
 		if err := json.Unmarshal([]byte(data), &result); err != nil {
@@ -861,15 +861,14 @@ func getTaints(entry *planEntry, runtime string) (result []corev1.Taint, _ error
 		}
 	}
 
-	if runtime == rke2.RuntimeRKE2 {
-		if isEtcd(entry) && !isWorker(entry) {
+	if !isWorker(entry) {
+		if isEtcd(entry) {
 			result = append(result, corev1.Taint{
 				Key:    "node-role.kubernetes.io/etcd",
 				Effect: corev1.TaintEffectNoExecute,
 			})
 		}
-
-		if isControlPlane(entry) && !isWorker(entry) {
+		if isControlPlane(entry) {
 			result = append(result, corev1.Taint{
 				Key:    "node-role.kubernetes.io/control-plane",
 				Effect: corev1.TaintEffectNoSchedule,
