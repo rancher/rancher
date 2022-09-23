@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/hashicorp/go-multierror"
 	lru "github.com/hashicorp/golang-lru"
 	"github.com/mitchellh/mapstructure"
 	"github.com/pkg/errors"
@@ -488,4 +489,32 @@ func (ap *azureProvider) GetUserExtraAttributes(userPrincipal v3.Principal) map[
 		extras[common.UserAttributeUserName] = []string{userPrincipal.LoginName}
 	}
 	return extras
+}
+
+// IsDisabledProvider checks if the Azure AD auth provider is currently disabled in Rancher.
+func (ap *azureProvider) IsDisabledProvider() (bool, error) {
+	azureConfig, err := ap.getAzureConfigK8s()
+	if err != nil {
+		return false, err
+	}
+	return !azureConfig.Enabled, nil
+}
+
+// CleanupResources deletes resources associated with the Azure AD auth provider.
+func (ap *azureProvider) CleanupResources(config *v3.AuthConfig) error {
+	if config == nil {
+		return fmt.Errorf("cannot delete Azure AD auth provider resources if its config is nil")
+	}
+	var result error
+	err := ap.secrets.DeleteNamespaced(common.SecretsNamespace, clients.AccessTokenSecretName, &metav1.DeleteOptions{})
+	if err != nil && !apierrors.IsNotFound(err) {
+		result = multierror.Append(err, result)
+	}
+
+	secretName := fmt.Sprintf("%s-%s", config.Type, client.AzureADConfigFieldApplicationSecret)
+	err = ap.secrets.DeleteNamespaced(common.SecretsNamespace, secretName, &metav1.DeleteOptions{})
+	if err != nil && !apierrors.IsNotFound(err) {
+		result = multierror.Append(err, result)
+	}
+	return result
 }

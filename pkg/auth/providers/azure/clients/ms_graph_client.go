@@ -22,6 +22,9 @@ import (
 )
 
 const (
+	// AccessTokenSecretName is the name of the secret that contains an access token for the Microsoft Graph API.
+	AccessTokenSecretName = "azuread-access-token"
+
 	providerLogPrefix = "AZUREAD_PROVIDER"
 	cacheLogPrefix    = "AZUREAD_PROVIDER_CACHE"
 )
@@ -232,36 +235,33 @@ type AccessTokenCache struct {
 	Secrets corev1.SecretInterface
 }
 
-// Replace fetches the access token from a secret in a database into the cache.
+// Replace fetches the access token from a secret in Kubernetes.
 func (c AccessTokenCache) Replace(cache cache.Unmarshaler, key string) {
-	secret, err := common.ReadFromSecret(c.Secrets, common.SecretsNamespace+":azuread-access-token", "access-token")
+	secretName := fmt.Sprintf("%s:%s", common.SecretsNamespace, AccessTokenSecretName)
+	secret, err := common.ReadFromSecret(c.Secrets, secretName, "access-token")
 	if err != nil {
-		logrus.Errorf("[%s] failed to read the access token from the database: %v", cacheLogPrefix, err)
+		logrus.Errorf("[%s] failed to read the access token from Kubernetes: %v", cacheLogPrefix, err)
 		return
 	}
 
 	err = cache.Unmarshal([]byte(secret))
 	if err != nil {
-		logrus.Errorf("[%s] failed to put the access token secret into the cache: %v", cacheLogPrefix, err)
+		logrus.Errorf("[%s] failed to unmarshal the access token: %v", cacheLogPrefix, err)
 	}
 }
 
-// Export persists the access token to a secret in the database.
+// Export persists the access token to a secret in Kubernetes.
 func (c AccessTokenCache) Export(cache cache.Marshaler, key string) {
 	marshalled, err := cache.Marshal()
 	if err != nil {
-		logrus.Errorf("[%s] failed to marshal the access token before saving to the database: %v", cacheLogPrefix, err)
+		logrus.Errorf("[%s] failed to marshal the access token before saving in Kubernetes: %v", cacheLogPrefix, err)
 		return
 	}
 
 	err = common.CreateOrUpdateSecrets(c.Secrets, string(marshalled), "access-token", "azuread")
 	if err != nil {
-		logrus.Errorf("[%s] failed to save the access token in the database: %v", cacheLogPrefix, err)
+		logrus.Errorf("[%s] failed to save the access token in Kubernetes: %v", cacheLogPrefix, err)
 	}
-}
-
-func (c AccessTokenCache) Clear() error {
-	return c.Secrets.DeleteNamespaced(common.SecretsNamespace, "azuread-access-token", &metav1.DeleteOptions{})
 }
 
 // NewMSGraphClient returns a client of the Microsoft Graph API. It attempts to get an access token to the API.

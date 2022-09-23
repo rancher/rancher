@@ -239,3 +239,17 @@ func (p *adProvider) GetUserExtraAttributes(userPrincipal v3.Principal) map[stri
 	}
 	return extras
 }
+
+// IsDisabledProvider checks if the Azure Active Directory provider is currently disabled in Rancher.
+func (p *adProvider) IsDisabledProvider() (bool, error) {
+	adConfig, _, err := p.getActiveDirectoryConfig()
+	if err != nil {
+		return false, err
+	}
+	return !adConfig.Enabled, nil
+}
+
+// CleanupResources deletes resources associated with the Azure Active Directory auth provider.
+func (p *adProvider) CleanupResources(*v3.AuthConfig) error {
+	return nil
+}

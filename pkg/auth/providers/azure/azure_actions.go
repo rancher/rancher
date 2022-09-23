@@ -62,6 +62,17 @@ func (ap *azureProvider) ConfigureTest(actionName string, action *types.Action, 
 }
 
 func (ap *azureProvider) testAndApply(actionName string, action *types.Action, request *types.APIContext) error {
+	var err error
+	// On any error, delete the cached secret containing the access token to the Microsoft Graph, in case it had been
+	// cached without having sufficient API permissions. Rancher has no precise control over when this secret is cached.
+	defer func() {
+		if err != nil {
+			if err = ap.secrets.DeleteNamespaced(common.SecretsNamespace, clients.AccessTokenSecretName, &metav1.DeleteOptions{}); err != nil {
+				logrus.Errorf("Failed to delete the Azure AD access token secret from Kubernetes")
+			}
+		}
+	}()
+
 	azureADConfigApplyInput := &v32.AzureADConfigApplyInput{}
 	if err := json.NewDecoder(request.Request.Body).Decode(azureADConfigApplyInput); err != nil {
 		return httperror.NewAPIError(httperror.InvalidBodyContent,
