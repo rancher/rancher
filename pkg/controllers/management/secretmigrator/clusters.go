@@ -935,7 +935,6 @@ func (h *handler) migrateClusterSecrets(cluster *v3.Cluster) (*v3.Cluster, error
 		}
 
 		logrus.Tracef("[secretmigrator] setting cluster condition [%s] and updating cluster [%s]", apimgmtv3.ClusterConditionSecretsMigrated, clusterCopy.Name)
-		apimgmtv3.ClusterConditionSecretsMigrated.True(clusterCopy)
 		clusterCopy, err = h.clusters.Update(clusterCopy)
 		if err != nil {
 			return cluster, err
@@ -983,7 +982,6 @@ func (h *handler) migrateServiceAccountSecrets(cluster *v3.Cluster) (*v3.Cluster
 			}
 		}
 		logrus.Tracef("[secretmigrator] setting cluster condition [%s] and updating cluster [%s]", apimgmtv3.ClusterConditionServiceAccountSecretsMigrated, clusterCopy.Name)
-		apimgmtv3.ClusterConditionServiceAccountSecretsMigrated.True(clusterCopy)
 		var err error
 		clusterCopy, err = h.clusters.Update(clusterCopy)
 		if err != nil {
