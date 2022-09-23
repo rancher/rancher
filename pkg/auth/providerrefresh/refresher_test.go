@@ -360,6 +360,14 @@ func (p *mockLocalProvider) GetUserExtraAttributes(userPrincipal v3.Principal) m
 	}
 }
 
+func (p *mockLocalProvider) IsDisabledProvider() (bool, error) {
+	return false, nil
+}
+
+func (p *mockLocalProvider) CleanupResources(*v3.AuthConfig) error {
+	return nil
+}
+
 type mockShibbolethProvider struct{}
 
 func (p *mockShibbolethProvider) GetName() string {
@@ -399,4 +407,12 @@ func (p *mockShibbolethProvider) GetUserExtraAttributes(userPrincipal v3.Princip
 		common.UserAttributePrincipalID: []string{userPrincipal.ExtraInfo[common.UserAttributePrincipalID]},
 		common.UserAttributeUserName:    []string{userPrincipal.ExtraInfo[common.UserAttributeUserName]},
 	}
+}
+
+func (p *mockShibbolethProvider) IsDisabledProvider() (bool, error) {
+	return false, nil
+}
+
+func (p *mockShibbolethProvider) CleanupResources(*v3.AuthConfig) error {
+	return nil
 }
