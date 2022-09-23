@@ -511,7 +511,7 @@ func (ap *azureProvider) CleanupResources(config *v3.AuthConfig) error {
 		result = multierror.Append(err, result)
 	}
 
-	secretName := fmt.Sprintf("%s-%s", config.Type, client.AzureADConfigFieldApplicationSecret)
+	secretName := fmt.Sprintf("%s-%s", strings.ToLower(config.Type), strings.ToLower(client.AzureADConfigFieldApplicationSecret))
 	err = ap.secrets.DeleteNamespaced(common.SecretsNamespace, secretName, &metav1.DeleteOptions{})
 	if err != nil && !apierrors.IsNotFound(err) {
 		result = multierror.Append(err, result)

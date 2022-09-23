@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/AzureAD/microsoft-authentication-library-for-go/apps/cache"
@@ -117,10 +116,6 @@ func (c azureMSGraphClient) LoginUser(config *v32.AzureADConfig, credential *v32
 	}
 	logrus.Debugf("[%s] Completed token swap with AzureAD", providerLogPrefix)
 
-	if err := EnsureMSGraphTokenHasPermissions(c.AccessToken()); err != nil {
-		return v3.Principal{}, nil, "", err
-	}
-
 	logrus.Debugf("[%s] Started getting user info from AzureAD", providerLogPrefix)
 	userPrincipal, err := c.GetUser(oid)
 	if err != nil {
@@ -142,38 +137,6 @@ func (c azureMSGraphClient) LoginUser(config *v32.AzureADConfig, credential *v32
 	// Return an empty string for the provider token, so that it does not get saved in a secret later, like users'
 	// access tokens are stored in secrets in the old Azure AD Graph flow.
 	return userPrincipal, groupPrincipals, "", nil
-}
-
-// EnsureMSGraphTokenHasPermissions checks that a token received from Azure AD has the permissions Rancher requires
-// for working with the Microsoft Graph API.
-func EnsureMSGraphTokenHasPermissions(token string) error {
-	msGraphRequiredPermissions := []string{
-		"Group.Read.All",
-		"User.Read.All",
-	}
-	errMSGraphMissingPermissions := fmt.Errorf("missing required Application type permissions from Microsoft Graph: need %s",
-		strings.Join(msGraphRequiredPermissions, ", "))
-
-	field, err := ExtractFieldFromJWT(token, "roles")
-	if err != nil {
-		return fmt.Errorf("failed to parse the 'roles' field in JWT - either the token is malformed or lacks permissions")
-	}
-	roles, ok := field.([]interface{})
-	if !ok {
-		return errMSGraphMissingPermissions
-	}
-	permissionSet := make(map[string]struct{})
-	for _, r := range roles {
-		if name, ok := r.(string); ok {
-			permissionSet[name] = struct{}{}
-		}
-	}
-	for _, p := range msGraphRequiredPermissions {
-		if _, ok := permissionSet[p]; !ok {
-			return errMSGraphMissingPermissions
-		}
-	}
-	return nil
 }
 
 type customAuthResult struct {
@@ -292,14 +255,6 @@ func NewMSGraphClient(config *v32.AzureADConfig, secrets corev1.SecretInterface)
 		if err != nil {
 			return nil, err
 		}
-	}
-
-	if err = EnsureMSGraphTokenHasPermissions(ar.AccessToken); err != nil {
-		if deletionErr := tokenCache.Clear(); deletionErr != nil {
-			logrus.Errorf("[%s] failed to delete the cached secret with an invalid Azure AD access token: %v",
-				providerLogPrefix, deletionErr)
-		}
-		return nil, err
 	}
 
 	authResult := getCustomAuthResult(&ar)
