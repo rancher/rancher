@@ -140,13 +140,10 @@ func (r *RKE1NodeDriverProvisioningTestSuite) ProvisioningRKE1Cluster(provider P
 					clusterResp, err := clusters.CreateRKE1Cluster(testSessionClient, cluster)
 					require.NoError(r.T(), err)
 
-					client, err = client.ReLogin()
-					require.NoError(r.T(), err)
-
 					nodeTemplateResp, err := provider.NodeTemplateFunc(client)
 					require.NoError(r.T(), err)
 
-					nodePool, err := nodepools.RKE1NodePoolSetup(testSessionClient, tt.nodeRoles, clusterResp.ID, nodeTemplateResp.ID)
+					nodePool, err := nodepools.NodePoolSetup(testSessionClient, tt.nodeRoles, clusterResp.ID, nodeTemplateResp.ID)
 					require.NoError(r.T(), err)
 
 					nodePoolName := nodePool.Name
@@ -168,6 +165,9 @@ func (r *RKE1NodeDriverProvisioningTestSuite) ProvisioningRKE1Cluster(provider P
 					clusterToken, err := clusters.CheckServiceAccountTokenSecret(client, clusterName)
 					require.NoError(r.T(), err)
 					assert.NotEmpty(r.T(), clusterToken)
+
+					err = nodepools.ScaleWorkerNodePool(testSessionClient, tt.nodeRoles, clusterResp.ID, nodeTemplateResp.ID)
+					require.NoError(r.T(), err)
 				})
 			}
 		}
@@ -210,13 +210,10 @@ func (r *RKE1NodeDriverProvisioningTestSuite) ProvisioningRKE1ClusterDynamicInpu
 					clusterResp, err := clusters.CreateRKE1Cluster(testSessionClient, cluster)
 					require.NoError(r.T(), err)
 
-					client, err = client.ReLogin()
-					require.NoError(r.T(), err)
-
 					nodeTemplateResp, err := provider.NodeTemplateFunc(client)
 					require.NoError(r.T(), err)
 
-					nodePool, err := nodepools.RKE1NodePoolSetup(testSessionClient, nodesAndRoles, clusterResp.ID, nodeTemplateResp.ID)
+					nodePool, err := nodepools.NodePoolSetup(testSessionClient, nodesAndRoles, clusterResp.ID, nodeTemplateResp.ID)
 					require.NoError(r.T(), err)
 
 					nodePoolName := nodePool.Name
@@ -238,6 +235,9 @@ func (r *RKE1NodeDriverProvisioningTestSuite) ProvisioningRKE1ClusterDynamicInpu
 					clusterToken, err := clusters.CheckServiceAccountTokenSecret(client, clusterName)
 					require.NoError(r.T(), err)
 					assert.NotEmpty(r.T(), clusterToken)
+
+					err = nodepools.ScaleWorkerNodePool(testSessionClient, nodesAndRoles, clusterResp.ID, nodeTemplateResp.ID)
+					require.NoError(r.T(), err)
 				})
 			}
 		}
