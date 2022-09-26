@@ -29,10 +29,7 @@ func authProviderEnabled(config *v32.AzureADConfig) bool {
 }
 
 func isConfigDeprecated(cfg *v32.AzureADConfig) bool {
-	if !cfg.Enabled {
-		return false
-	}
-	return !configHasNewFlowAnnotation(cfg)
+	return authProviderEnabled(cfg) && !configHasNewFlowAnnotation(cfg)
 }
 
 func configHasNewFlowAnnotation(cfg *v32.AzureADConfig) bool {
