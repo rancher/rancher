@@ -109,6 +109,12 @@ replicas: 3
 # Set priorityClassName to avoid eviction
 priorityClassName: rancher-critical
 
+# Define node affinities
+nodeAffinity: {}
+
+# Define tolerations
+tolerations: []
+
 # Set pod resource requests/limits for Rancher.
 resources: {}
 

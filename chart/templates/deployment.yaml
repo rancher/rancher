@@ -60,9 +60,18 @@ spec:
               topologyKey: {{ .Values.topologyKey | default "kubernetes.io/hostname" }}
 {{- end }}
         nodeAffinity:
+{{- if or .Values.nodeAffinity }}
+{{ toYaml .Values.nodeAffinity | indent 10}}
+{{- else }}
           requiredDuringSchedulingIgnoredDuringExecution:
             nodeSelectorTerms: {{ include "linux-node-selector-terms" . | nindent 14 }}
+{{- end }}
+{{- if .Values.tolerations }}
+      tolerations:
+{{ toYaml .Values.tolerations | indent 8}}
+{{- else }}
       tolerations: {{ include "linux-node-tolerations" . | nindent 8 }}
+{{- end }}
       containers:
       - image: {{ .Values.rancherImage }}:{{ default .Chart.AppVersion .Values.rancherImageTag }}
         imagePullPolicy: {{ default "IfNotPresent" .Values.rancherImagePullPolicy }}
