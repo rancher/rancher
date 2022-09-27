@@ -133,6 +133,7 @@ func NewRKE1ClusterConfig(clusterName, cni, kubernetesVersion string, client *ra
 				MTU:     0,
 				Options: map[string]string{},
 			},
+			Version: kubernetesVersion,
 		},
 	}
 
@@ -202,6 +203,11 @@ func CreateRKE1Cluster(client *rancher.Client, rke1Cluster *management.Cluster) 
 	}
 
 	cluster, err := client.Management.Cluster.Create(rke1Cluster)
+	if err != nil {
+		return nil, err
+	}
+
+	client, err = client.ReLogin()
 	if err != nil {
 		return nil, err
 	}
