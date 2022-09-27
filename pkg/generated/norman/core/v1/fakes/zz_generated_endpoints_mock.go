@@ -29,22 +29,22 @@ var _ v11.EndpointsLister = &EndpointsListerMock{}
 
 // EndpointsListerMock is a mock implementation of v11.EndpointsLister.
 //
-//	    func TestSomethingThatUsesEndpointsLister(t *testing.T) {
+//     func TestSomethingThatUsesEndpointsLister(t *testing.T) {
 //
-//	        // make and configure a mocked v11.EndpointsLister
-//	        mockedEndpointsLister := &EndpointsListerMock{
-//	            GetFunc: func(namespace string, name string) (*v1.Endpoints, error) {
-//		               panic("mock out the Get method")
-//	            },
-//	            ListFunc: func(namespace string, selector labels.Selector) ([]*v1.Endpoints, error) {
-//		               panic("mock out the List method")
-//	            },
-//	        }
+//         // make and configure a mocked v11.EndpointsLister
+//         mockedEndpointsLister := &EndpointsListerMock{
+//             GetFunc: func(namespace string, name string) (*v1.Endpoints, error) {
+// 	               panic("mock out the Get method")
+//             },
+//             ListFunc: func(namespace string, selector labels.Selector) ([]*v1.Endpoints, error) {
+// 	               panic("mock out the List method")
+//             },
+//         }
 //
-//	        // use mockedEndpointsLister in code that requires v11.EndpointsLister
-//	        // and then make assertions.
+//         // use mockedEndpointsLister in code that requires v11.EndpointsLister
+//         // and then make assertions.
 //
-//	    }
+//     }
 type EndpointsListerMock struct {
 	// GetFunc mocks the Get method.
 	GetFunc func(namespace string, name string) (*v1.Endpoints, error)
@@ -91,8 +91,7 @@ func (mock *EndpointsListerMock) Get(namespace string, name string) (*v1.Endpoin
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//
-//	len(mockedEndpointsLister.GetCalls())
+//     len(mockedEndpointsLister.GetCalls())
 func (mock *EndpointsListerMock) GetCalls() []struct {
 	Namespace string
 	Name      string
@@ -127,8 +126,7 @@ func (mock *EndpointsListerMock) List(namespace string, selector labels.Selector
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//
-//	len(mockedEndpointsLister.ListCalls())
+//     len(mockedEndpointsLister.ListCalls())
 func (mock *EndpointsListerMock) ListCalls() []struct {
 	Namespace string
 	Selector  labels.Selector
@@ -161,43 +159,43 @@ var _ v11.EndpointsController = &EndpointsControllerMock{}
 
 // EndpointsControllerMock is a mock implementation of v11.EndpointsController.
 //
-//	    func TestSomethingThatUsesEndpointsController(t *testing.T) {
+//     func TestSomethingThatUsesEndpointsController(t *testing.T) {
 //
-//	        // make and configure a mocked v11.EndpointsController
-//	        mockedEndpointsController := &EndpointsControllerMock{
-//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v11.EndpointsHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedFeatureHandler method")
-//	            },
-//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v11.EndpointsHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedHandler method")
-//	            },
-//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v11.EndpointsHandlerFunc)  {
-//		               panic("mock out the AddFeatureHandler method")
-//	            },
-//	            AddHandlerFunc: func(ctx context.Context, name string, handler v11.EndpointsHandlerFunc)  {
-//		               panic("mock out the AddHandler method")
-//	            },
-//	            EnqueueFunc: func(namespace string, name string)  {
-//		               panic("mock out the Enqueue method")
-//	            },
-//	            EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
-//		               panic("mock out the EnqueueAfter method")
-//	            },
-//	            GenericFunc: func() controller.GenericController {
-//		               panic("mock out the Generic method")
-//	            },
-//	            InformerFunc: func() cache.SharedIndexInformer {
-//		               panic("mock out the Informer method")
-//	            },
-//	            ListerFunc: func() v11.EndpointsLister {
-//		               panic("mock out the Lister method")
-//	            },
-//	        }
+//         // make and configure a mocked v11.EndpointsController
+//         mockedEndpointsController := &EndpointsControllerMock{
+//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v11.EndpointsHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedFeatureHandler method")
+//             },
+//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v11.EndpointsHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedHandler method")
+//             },
+//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v11.EndpointsHandlerFunc)  {
+// 	               panic("mock out the AddFeatureHandler method")
+//             },
+//             AddHandlerFunc: func(ctx context.Context, name string, handler v11.EndpointsHandlerFunc)  {
+// 	               panic("mock out the AddHandler method")
+//             },
+//             EnqueueFunc: func(namespace string, name string)  {
+// 	               panic("mock out the Enqueue method")
+//             },
+//             EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
+// 	               panic("mock out the EnqueueAfter method")
+//             },
+//             GenericFunc: func() controller.GenericController {
+// 	               panic("mock out the Generic method")
+//             },
+//             InformerFunc: func() cache.SharedIndexInformer {
+// 	               panic("mock out the Informer method")
+//             },
+//             ListerFunc: func() v11.EndpointsLister {
+// 	               panic("mock out the Lister method")
+//             },
+//         }
 //
-//	        // use mockedEndpointsController in code that requires v11.EndpointsController
-//	        // and then make assertions.
+//         // use mockedEndpointsController in code that requires v11.EndpointsController
+//         // and then make assertions.
 //
-//	    }
+//     }
 type EndpointsControllerMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
 	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v11.EndpointsHandlerFunc)
@@ -326,8 +324,7 @@ func (mock *EndpointsControllerMock) AddClusterScopedFeatureHandler(ctx context.
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//
-//	len(mockedEndpointsController.AddClusterScopedFeatureHandlerCalls())
+//     len(mockedEndpointsController.AddClusterScopedFeatureHandlerCalls())
 func (mock *EndpointsControllerMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -372,8 +369,7 @@ func (mock *EndpointsControllerMock) AddClusterScopedHandler(ctx context.Context
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//
-//	len(mockedEndpointsController.AddClusterScopedHandlerCalls())
+//     len(mockedEndpointsController.AddClusterScopedHandlerCalls())
 func (mock *EndpointsControllerMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -416,8 +412,7 @@ func (mock *EndpointsControllerMock) AddFeatureHandler(ctx context.Context, enab
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//
-//	len(mockedEndpointsController.AddFeatureHandlerCalls())
+//     len(mockedEndpointsController.AddFeatureHandlerCalls())
 func (mock *EndpointsControllerMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
@@ -458,8 +453,7 @@ func (mock *EndpointsControllerMock) AddHandler(ctx context.Context, name string
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//
-//	len(mockedEndpointsController.AddHandlerCalls())
+//     len(mockedEndpointsController.AddHandlerCalls())
 func (mock *EndpointsControllerMock) AddHandlerCalls() []struct {
 	Ctx     context.Context
 	Name    string
@@ -496,8 +490,7 @@ func (mock *EndpointsControllerMock) Enqueue(namespace string, name string) {
 
 // EnqueueCalls gets all the calls that were made to Enqueue.
 // Check the length with:
-//
-//	len(mockedEndpointsController.EnqueueCalls())
+//     len(mockedEndpointsController.EnqueueCalls())
 func (mock *EndpointsControllerMock) EnqueueCalls() []struct {
 	Namespace string
 	Name      string
@@ -534,8 +527,7 @@ func (mock *EndpointsControllerMock) EnqueueAfter(namespace string, name string,
 
 // EnqueueAfterCalls gets all the calls that were made to EnqueueAfter.
 // Check the length with:
-//
-//	len(mockedEndpointsController.EnqueueAfterCalls())
+//     len(mockedEndpointsController.EnqueueAfterCalls())
 func (mock *EndpointsControllerMock) EnqueueAfterCalls() []struct {
 	Namespace string
 	Name      string
@@ -567,8 +559,7 @@ func (mock *EndpointsControllerMock) Generic() controller.GenericController {
 
 // GenericCalls gets all the calls that were made to Generic.
 // Check the length with:
-//
-//	len(mockedEndpointsController.GenericCalls())
+//     len(mockedEndpointsController.GenericCalls())
 func (mock *EndpointsControllerMock) GenericCalls() []struct {
 } {
 	var calls []struct {
@@ -594,8 +585,7 @@ func (mock *EndpointsControllerMock) Informer() cache.SharedIndexInformer {
 
 // InformerCalls gets all the calls that were made to Informer.
 // Check the length with:
-//
-//	len(mockedEndpointsController.InformerCalls())
+//     len(mockedEndpointsController.InformerCalls())
 func (mock *EndpointsControllerMock) InformerCalls() []struct {
 } {
 	var calls []struct {
@@ -621,8 +611,7 @@ func (mock *EndpointsControllerMock) Lister() v11.EndpointsLister {
 
 // ListerCalls gets all the calls that were made to Lister.
 // Check the length with:
-//
-//	len(mockedEndpointsController.ListerCalls())
+//     len(mockedEndpointsController.ListerCalls())
 func (mock *EndpointsControllerMock) ListerCalls() []struct {
 } {
 	var calls []struct {
@@ -662,76 +651,76 @@ var _ v11.EndpointsInterface = &EndpointsInterfaceMock{}
 
 // EndpointsInterfaceMock is a mock implementation of v11.EndpointsInterface.
 //
-//	    func TestSomethingThatUsesEndpointsInterface(t *testing.T) {
+//     func TestSomethingThatUsesEndpointsInterface(t *testing.T) {
 //
-//	        // make and configure a mocked v11.EndpointsInterface
-//	        mockedEndpointsInterface := &EndpointsInterfaceMock{
-//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v11.EndpointsHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedFeatureHandler method")
-//	            },
-//	            AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v11.EndpointsLifecycle)  {
-//		               panic("mock out the AddClusterScopedFeatureLifecycle method")
-//	            },
-//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v11.EndpointsHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedHandler method")
-//	            },
-//	            AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v11.EndpointsLifecycle)  {
-//		               panic("mock out the AddClusterScopedLifecycle method")
-//	            },
-//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v11.EndpointsHandlerFunc)  {
-//		               panic("mock out the AddFeatureHandler method")
-//	            },
-//	            AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v11.EndpointsLifecycle)  {
-//		               panic("mock out the AddFeatureLifecycle method")
-//	            },
-//	            AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v11.EndpointsHandlerFunc)  {
-//		               panic("mock out the AddHandler method")
-//	            },
-//	            AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v11.EndpointsLifecycle)  {
-//		               panic("mock out the AddLifecycle method")
-//	            },
-//	            ControllerFunc: func() v11.EndpointsController {
-//		               panic("mock out the Controller method")
-//	            },
-//	            CreateFunc: func(in1 *v1.Endpoints) (*v1.Endpoints, error) {
-//		               panic("mock out the Create method")
-//	            },
-//	            DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
-//		               panic("mock out the Delete method")
-//	            },
-//	            DeleteCollectionFunc: func(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
-//		               panic("mock out the DeleteCollection method")
-//	            },
-//	            DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
-//		               panic("mock out the DeleteNamespaced method")
-//	            },
-//	            GetFunc: func(name string, opts metav1.GetOptions) (*v1.Endpoints, error) {
-//		               panic("mock out the Get method")
-//	            },
-//	            GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v1.Endpoints, error) {
-//		               panic("mock out the GetNamespaced method")
-//	            },
-//	            ListFunc: func(opts metav1.ListOptions) (*v1.EndpointsList, error) {
-//		               panic("mock out the List method")
-//	            },
-//	            ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v1.EndpointsList, error) {
-//		               panic("mock out the ListNamespaced method")
-//	            },
-//	            ObjectClientFunc: func() *objectclient.ObjectClient {
-//		               panic("mock out the ObjectClient method")
-//	            },
-//	            UpdateFunc: func(in1 *v1.Endpoints) (*v1.Endpoints, error) {
-//		               panic("mock out the Update method")
-//	            },
-//	            WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
-//		               panic("mock out the Watch method")
-//	            },
-//	        }
+//         // make and configure a mocked v11.EndpointsInterface
+//         mockedEndpointsInterface := &EndpointsInterfaceMock{
+//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v11.EndpointsHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedFeatureHandler method")
+//             },
+//             AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v11.EndpointsLifecycle)  {
+// 	               panic("mock out the AddClusterScopedFeatureLifecycle method")
+//             },
+//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v11.EndpointsHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedHandler method")
+//             },
+//             AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v11.EndpointsLifecycle)  {
+// 	               panic("mock out the AddClusterScopedLifecycle method")
+//             },
+//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v11.EndpointsHandlerFunc)  {
+// 	               panic("mock out the AddFeatureHandler method")
+//             },
+//             AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v11.EndpointsLifecycle)  {
+// 	               panic("mock out the AddFeatureLifecycle method")
+//             },
+//             AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v11.EndpointsHandlerFunc)  {
+// 	               panic("mock out the AddHandler method")
+//             },
+//             AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v11.EndpointsLifecycle)  {
+// 	               panic("mock out the AddLifecycle method")
+//             },
+//             ControllerFunc: func() v11.EndpointsController {
+// 	               panic("mock out the Controller method")
+//             },
+//             CreateFunc: func(in1 *v1.Endpoints) (*v1.Endpoints, error) {
+// 	               panic("mock out the Create method")
+//             },
+//             DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
+// 	               panic("mock out the Delete method")
+//             },
+//             DeleteCollectionFunc: func(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
+// 	               panic("mock out the DeleteCollection method")
+//             },
+//             DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
+// 	               panic("mock out the DeleteNamespaced method")
+//             },
+//             GetFunc: func(name string, opts metav1.GetOptions) (*v1.Endpoints, error) {
+// 	               panic("mock out the Get method")
+//             },
+//             GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v1.Endpoints, error) {
+// 	               panic("mock out the GetNamespaced method")
+//             },
+//             ListFunc: func(opts metav1.ListOptions) (*v1.EndpointsList, error) {
+// 	               panic("mock out the List method")
+//             },
+//             ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v1.EndpointsList, error) {
+// 	               panic("mock out the ListNamespaced method")
+//             },
+//             ObjectClientFunc: func() *objectclient.ObjectClient {
+// 	               panic("mock out the ObjectClient method")
+//             },
+//             UpdateFunc: func(in1 *v1.Endpoints) (*v1.Endpoints, error) {
+// 	               panic("mock out the Update method")
+//             },
+//             WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
+// 	               panic("mock out the Watch method")
+//             },
+//         }
 //
-//	        // use mockedEndpointsInterface in code that requires v11.EndpointsInterface
-//	        // and then make assertions.
+//         // use mockedEndpointsInterface in code that requires v11.EndpointsInterface
+//         // and then make assertions.
 //
-//	    }
+//     }
 type EndpointsInterfaceMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
 	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v11.EndpointsHandlerFunc)
@@ -984,8 +973,7 @@ func (mock *EndpointsInterfaceMock) AddClusterScopedFeatureHandler(ctx context.C
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//
-//	len(mockedEndpointsInterface.AddClusterScopedFeatureHandlerCalls())
+//     len(mockedEndpointsInterface.AddClusterScopedFeatureHandlerCalls())
 func (mock *EndpointsInterfaceMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -1032,8 +1020,7 @@ func (mock *EndpointsInterfaceMock) AddClusterScopedFeatureLifecycle(ctx context
 
 // AddClusterScopedFeatureLifecycleCalls gets all the calls that were made to AddClusterScopedFeatureLifecycle.
 // Check the length with:
-//
-//	len(mockedEndpointsInterface.AddClusterScopedFeatureLifecycleCalls())
+//     len(mockedEndpointsInterface.AddClusterScopedFeatureLifecycleCalls())
 func (mock *EndpointsInterfaceMock) AddClusterScopedFeatureLifecycleCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -1078,8 +1065,7 @@ func (mock *EndpointsInterfaceMock) AddClusterScopedHandler(ctx context.Context,
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//
-//	len(mockedEndpointsInterface.AddClusterScopedHandlerCalls())
+//     len(mockedEndpointsInterface.AddClusterScopedHandlerCalls())
 func (mock *EndpointsInterfaceMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -1122,8 +1108,7 @@ func (mock *EndpointsInterfaceMock) AddClusterScopedLifecycle(ctx context.Contex
 
 // AddClusterScopedLifecycleCalls gets all the calls that were made to AddClusterScopedLifecycle.
 // Check the length with:
-//
-//	len(mockedEndpointsInterface.AddClusterScopedLifecycleCalls())
+//     len(mockedEndpointsInterface.AddClusterScopedLifecycleCalls())
 func (mock *EndpointsInterfaceMock) AddClusterScopedLifecycleCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -1166,8 +1151,7 @@ func (mock *EndpointsInterfaceMock) AddFeatureHandler(ctx context.Context, enabl
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//
-//	len(mockedEndpointsInterface.AddFeatureHandlerCalls())
+//     len(mockedEndpointsInterface.AddFeatureHandlerCalls())
 func (mock *EndpointsInterfaceMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
@@ -1210,8 +1194,7 @@ func (mock *EndpointsInterfaceMock) AddFeatureLifecycle(ctx context.Context, ena
 
 // AddFeatureLifecycleCalls gets all the calls that were made to AddFeatureLifecycle.
 // Check the length with:
-//
-//	len(mockedEndpointsInterface.AddFeatureLifecycleCalls())
+//     len(mockedEndpointsInterface.AddFeatureLifecycleCalls())
 func (mock *EndpointsInterfaceMock) AddFeatureLifecycleCalls() []struct {
 	Ctx       context.Context
 	Enabled   func() bool
@@ -1252,8 +1235,7 @@ func (mock *EndpointsInterfaceMock) AddHandler(ctx context.Context, name string,
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//
-//	len(mockedEndpointsInterface.AddHandlerCalls())
+//     len(mockedEndpointsInterface.AddHandlerCalls())
 func (mock *EndpointsInterfaceMock) AddHandlerCalls() []struct {
 	Ctx  context.Context
 	Name string
@@ -1292,8 +1274,7 @@ func (mock *EndpointsInterfaceMock) AddLifecycle(ctx context.Context, name strin
 
 // AddLifecycleCalls gets all the calls that were made to AddLifecycle.
 // Check the length with:
-//
-//	len(mockedEndpointsInterface.AddLifecycleCalls())
+//     len(mockedEndpointsInterface.AddLifecycleCalls())
 func (mock *EndpointsInterfaceMock) AddLifecycleCalls() []struct {
 	Ctx       context.Context
 	Name      string
@@ -1325,8 +1306,7 @@ func (mock *EndpointsInterfaceMock) Controller() v11.EndpointsController {
 
 // ControllerCalls gets all the calls that were made to Controller.
 // Check the length with:
-//
-//	len(mockedEndpointsInterface.ControllerCalls())
+//     len(mockedEndpointsInterface.ControllerCalls())
 func (mock *EndpointsInterfaceMock) ControllerCalls() []struct {
 } {
 	var calls []struct {
@@ -1355,8 +1335,7 @@ func (mock *EndpointsInterfaceMock) Create(in1 *v1.Endpoints) (*v1.Endpoints, er
 
 // CreateCalls gets all the calls that were made to Create.
 // Check the length with:
-//
-//	len(mockedEndpointsInterface.CreateCalls())
+//     len(mockedEndpointsInterface.CreateCalls())
 func (mock *EndpointsInterfaceMock) CreateCalls() []struct {
 	In1 *v1.Endpoints
 } {
@@ -1389,8 +1368,7 @@ func (mock *EndpointsInterfaceMock) Delete(name string, options *metav1.DeleteOp
 
 // DeleteCalls gets all the calls that were made to Delete.
 // Check the length with:
-//
-//	len(mockedEndpointsInterface.DeleteCalls())
+//     len(mockedEndpointsInterface.DeleteCalls())
 func (mock *EndpointsInterfaceMock) DeleteCalls() []struct {
 	Name    string
 	Options *metav1.DeleteOptions
@@ -1425,8 +1403,7 @@ func (mock *EndpointsInterfaceMock) DeleteCollection(deleteOpts *metav1.DeleteOp
 
 // DeleteCollectionCalls gets all the calls that were made to DeleteCollection.
 // Check the length with:
-//
-//	len(mockedEndpointsInterface.DeleteCollectionCalls())
+//     len(mockedEndpointsInterface.DeleteCollectionCalls())
 func (mock *EndpointsInterfaceMock) DeleteCollectionCalls() []struct {
 	DeleteOpts *metav1.DeleteOptions
 	ListOpts   metav1.ListOptions
@@ -1463,8 +1440,7 @@ func (mock *EndpointsInterfaceMock) DeleteNamespaced(namespace string, name stri
 
 // DeleteNamespacedCalls gets all the calls that were made to DeleteNamespaced.
 // Check the length with:
-//
-//	len(mockedEndpointsInterface.DeleteNamespacedCalls())
+//     len(mockedEndpointsInterface.DeleteNamespacedCalls())
 func (mock *EndpointsInterfaceMock) DeleteNamespacedCalls() []struct {
 	Namespace string
 	Name      string
@@ -1501,8 +1477,7 @@ func (mock *EndpointsInterfaceMock) Get(name string, opts metav1.GetOptions) (*v
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//
-//	len(mockedEndpointsInterface.GetCalls())
+//     len(mockedEndpointsInterface.GetCalls())
 func (mock *EndpointsInterfaceMock) GetCalls() []struct {
 	Name string
 	Opts metav1.GetOptions
@@ -1539,8 +1514,7 @@ func (mock *EndpointsInterfaceMock) GetNamespaced(namespace string, name string,
 
 // GetNamespacedCalls gets all the calls that were made to GetNamespaced.
 // Check the length with:
-//
-//	len(mockedEndpointsInterface.GetNamespacedCalls())
+//     len(mockedEndpointsInterface.GetNamespacedCalls())
 func (mock *EndpointsInterfaceMock) GetNamespacedCalls() []struct {
 	Namespace string
 	Name      string
@@ -1575,8 +1549,7 @@ func (mock *EndpointsInterfaceMock) List(opts metav1.ListOptions) (*v1.Endpoints
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//
-//	len(mockedEndpointsInterface.ListCalls())
+//     len(mockedEndpointsInterface.ListCalls())
 func (mock *EndpointsInterfaceMock) ListCalls() []struct {
 	Opts metav1.ListOptions
 } {
@@ -1609,8 +1582,7 @@ func (mock *EndpointsInterfaceMock) ListNamespaced(namespace string, opts metav1
 
 // ListNamespacedCalls gets all the calls that were made to ListNamespaced.
 // Check the length with:
-//
-//	len(mockedEndpointsInterface.ListNamespacedCalls())
+//     len(mockedEndpointsInterface.ListNamespacedCalls())
 func (mock *EndpointsInterfaceMock) ListNamespacedCalls() []struct {
 	Namespace string
 	Opts      metav1.ListOptions
@@ -1640,8 +1612,7 @@ func (mock *EndpointsInterfaceMock) ObjectClient() *objectclient.ObjectClient {
 
 // ObjectClientCalls gets all the calls that were made to ObjectClient.
 // Check the length with:
-//
-//	len(mockedEndpointsInterface.ObjectClientCalls())
+//     len(mockedEndpointsInterface.ObjectClientCalls())
 func (mock *EndpointsInterfaceMock) ObjectClientCalls() []struct {
 } {
 	var calls []struct {
@@ -1670,8 +1641,7 @@ func (mock *EndpointsInterfaceMock) Update(in1 *v1.Endpoints) (*v1.Endpoints, er
 
 // UpdateCalls gets all the calls that were made to Update.
 // Check the length with:
-//
-//	len(mockedEndpointsInterface.UpdateCalls())
+//     len(mockedEndpointsInterface.UpdateCalls())
 func (mock *EndpointsInterfaceMock) UpdateCalls() []struct {
 	In1 *v1.Endpoints
 } {
@@ -1702,8 +1672,7 @@ func (mock *EndpointsInterfaceMock) Watch(opts metav1.ListOptions) (watch.Interf
 
 // WatchCalls gets all the calls that were made to Watch.
 // Check the length with:
-//
-//	len(mockedEndpointsInterface.WatchCalls())
+//     len(mockedEndpointsInterface.WatchCalls())
 func (mock *EndpointsInterfaceMock) WatchCalls() []struct {
 	Opts metav1.ListOptions
 } {
@@ -1726,19 +1695,19 @@ var _ v11.EndpointsGetter = &EndpointsGetterMock{}
 
 // EndpointsGetterMock is a mock implementation of v11.EndpointsGetter.
 //
-//	    func TestSomethingThatUsesEndpointsGetter(t *testing.T) {
+//     func TestSomethingThatUsesEndpointsGetter(t *testing.T) {
 //
-//	        // make and configure a mocked v11.EndpointsGetter
-//	        mockedEndpointsGetter := &EndpointsGetterMock{
-//	            EndpointsFunc: func(namespace string) v11.EndpointsInterface {
-//		               panic("mock out the Endpoints method")
-//	            },
-//	        }
+//         // make and configure a mocked v11.EndpointsGetter
+//         mockedEndpointsGetter := &EndpointsGetterMock{
+//             EndpointsFunc: func(namespace string) v11.EndpointsInterface {
+// 	               panic("mock out the Endpoints method")
+//             },
+//         }
 //
-//	        // use mockedEndpointsGetter in code that requires v11.EndpointsGetter
-//	        // and then make assertions.
+//         // use mockedEndpointsGetter in code that requires v11.EndpointsGetter
+//         // and then make assertions.
 //
-//	    }
+//     }
 type EndpointsGetterMock struct {
 	// EndpointsFunc mocks the Endpoints method.
 	EndpointsFunc func(namespace string) v11.EndpointsInterface
@@ -1771,8 +1740,7 @@ func (mock *EndpointsGetterMock) Endpoints(namespace string) v11.EndpointsInterf
 
 // EndpointsCalls gets all the calls that were made to Endpoints.
 // Check the length with:
-//
-//	len(mockedEndpointsGetter.EndpointsCalls())
+//     len(mockedEndpointsGetter.EndpointsCalls())
 func (mock *EndpointsGetterMock) EndpointsCalls() []struct {
 	Namespace string
 } {

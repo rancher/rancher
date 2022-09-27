@@ -29,22 +29,22 @@ var _ v11.PrometheusLister = &PrometheusListerMock{}
 
 // PrometheusListerMock is a mock implementation of v11.PrometheusLister.
 //
-//	    func TestSomethingThatUsesPrometheusLister(t *testing.T) {
+//     func TestSomethingThatUsesPrometheusLister(t *testing.T) {
 //
-//	        // make and configure a mocked v11.PrometheusLister
-//	        mockedPrometheusLister := &PrometheusListerMock{
-//	            GetFunc: func(namespace string, name string) (*v1.Prometheus, error) {
-//		               panic("mock out the Get method")
-//	            },
-//	            ListFunc: func(namespace string, selector labels.Selector) ([]*v1.Prometheus, error) {
-//		               panic("mock out the List method")
-//	            },
-//	        }
+//         // make and configure a mocked v11.PrometheusLister
+//         mockedPrometheusLister := &PrometheusListerMock{
+//             GetFunc: func(namespace string, name string) (*v1.Prometheus, error) {
+// 	               panic("mock out the Get method")
+//             },
+//             ListFunc: func(namespace string, selector labels.Selector) ([]*v1.Prometheus, error) {
+// 	               panic("mock out the List method")
+//             },
+//         }
 //
-//	        // use mockedPrometheusLister in code that requires v11.PrometheusLister
-//	        // and then make assertions.
+//         // use mockedPrometheusLister in code that requires v11.PrometheusLister
+//         // and then make assertions.
 //
-//	    }
+//     }
 type PrometheusListerMock struct {
 	// GetFunc mocks the Get method.
 	GetFunc func(namespace string, name string) (*v1.Prometheus, error)
@@ -91,8 +91,7 @@ func (mock *PrometheusListerMock) Get(namespace string, name string) (*v1.Promet
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//
-//	len(mockedPrometheusLister.GetCalls())
+//     len(mockedPrometheusLister.GetCalls())
 func (mock *PrometheusListerMock) GetCalls() []struct {
 	Namespace string
 	Name      string
@@ -127,8 +126,7 @@ func (mock *PrometheusListerMock) List(namespace string, selector labels.Selecto
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//
-//	len(mockedPrometheusLister.ListCalls())
+//     len(mockedPrometheusLister.ListCalls())
 func (mock *PrometheusListerMock) ListCalls() []struct {
 	Namespace string
 	Selector  labels.Selector
@@ -161,43 +159,43 @@ var _ v11.PrometheusController = &PrometheusControllerMock{}
 
 // PrometheusControllerMock is a mock implementation of v11.PrometheusController.
 //
-//	    func TestSomethingThatUsesPrometheusController(t *testing.T) {
+//     func TestSomethingThatUsesPrometheusController(t *testing.T) {
 //
-//	        // make and configure a mocked v11.PrometheusController
-//	        mockedPrometheusController := &PrometheusControllerMock{
-//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v11.PrometheusHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedFeatureHandler method")
-//	            },
-//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v11.PrometheusHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedHandler method")
-//	            },
-//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v11.PrometheusHandlerFunc)  {
-//		               panic("mock out the AddFeatureHandler method")
-//	            },
-//	            AddHandlerFunc: func(ctx context.Context, name string, handler v11.PrometheusHandlerFunc)  {
-//		               panic("mock out the AddHandler method")
-//	            },
-//	            EnqueueFunc: func(namespace string, name string)  {
-//		               panic("mock out the Enqueue method")
-//	            },
-//	            EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
-//		               panic("mock out the EnqueueAfter method")
-//	            },
-//	            GenericFunc: func() controller.GenericController {
-//		               panic("mock out the Generic method")
-//	            },
-//	            InformerFunc: func() cache.SharedIndexInformer {
-//		               panic("mock out the Informer method")
-//	            },
-//	            ListerFunc: func() v11.PrometheusLister {
-//		               panic("mock out the Lister method")
-//	            },
-//	        }
+//         // make and configure a mocked v11.PrometheusController
+//         mockedPrometheusController := &PrometheusControllerMock{
+//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v11.PrometheusHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedFeatureHandler method")
+//             },
+//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v11.PrometheusHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedHandler method")
+//             },
+//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v11.PrometheusHandlerFunc)  {
+// 	               panic("mock out the AddFeatureHandler method")
+//             },
+//             AddHandlerFunc: func(ctx context.Context, name string, handler v11.PrometheusHandlerFunc)  {
+// 	               panic("mock out the AddHandler method")
+//             },
+//             EnqueueFunc: func(namespace string, name string)  {
+// 	               panic("mock out the Enqueue method")
+//             },
+//             EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
+// 	               panic("mock out the EnqueueAfter method")
+//             },
+//             GenericFunc: func() controller.GenericController {
+// 	               panic("mock out the Generic method")
+//             },
+//             InformerFunc: func() cache.SharedIndexInformer {
+// 	               panic("mock out the Informer method")
+//             },
+//             ListerFunc: func() v11.PrometheusLister {
+// 	               panic("mock out the Lister method")
+//             },
+//         }
 //
-//	        // use mockedPrometheusController in code that requires v11.PrometheusController
-//	        // and then make assertions.
+//         // use mockedPrometheusController in code that requires v11.PrometheusController
+//         // and then make assertions.
 //
-//	    }
+//     }
 type PrometheusControllerMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
 	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v11.PrometheusHandlerFunc)
@@ -326,8 +324,7 @@ func (mock *PrometheusControllerMock) AddClusterScopedFeatureHandler(ctx context
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//
-//	len(mockedPrometheusController.AddClusterScopedFeatureHandlerCalls())
+//     len(mockedPrometheusController.AddClusterScopedFeatureHandlerCalls())
 func (mock *PrometheusControllerMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -372,8 +369,7 @@ func (mock *PrometheusControllerMock) AddClusterScopedHandler(ctx context.Contex
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//
-//	len(mockedPrometheusController.AddClusterScopedHandlerCalls())
+//     len(mockedPrometheusController.AddClusterScopedHandlerCalls())
 func (mock *PrometheusControllerMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -416,8 +412,7 @@ func (mock *PrometheusControllerMock) AddFeatureHandler(ctx context.Context, ena
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//
-//	len(mockedPrometheusController.AddFeatureHandlerCalls())
+//     len(mockedPrometheusController.AddFeatureHandlerCalls())
 func (mock *PrometheusControllerMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
@@ -458,8 +453,7 @@ func (mock *PrometheusControllerMock) AddHandler(ctx context.Context, name strin
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//
-//	len(mockedPrometheusController.AddHandlerCalls())
+//     len(mockedPrometheusController.AddHandlerCalls())
 func (mock *PrometheusControllerMock) AddHandlerCalls() []struct {
 	Ctx     context.Context
 	Name    string
@@ -496,8 +490,7 @@ func (mock *PrometheusControllerMock) Enqueue(namespace string, name string) {
 
 // EnqueueCalls gets all the calls that were made to Enqueue.
 // Check the length with:
-//
-//	len(mockedPrometheusController.EnqueueCalls())
+//     len(mockedPrometheusController.EnqueueCalls())
 func (mock *PrometheusControllerMock) EnqueueCalls() []struct {
 	Namespace string
 	Name      string
@@ -534,8 +527,7 @@ func (mock *PrometheusControllerMock) EnqueueAfter(namespace string, name string
 
 // EnqueueAfterCalls gets all the calls that were made to EnqueueAfter.
 // Check the length with:
-//
-//	len(mockedPrometheusController.EnqueueAfterCalls())
+//     len(mockedPrometheusController.EnqueueAfterCalls())
 func (mock *PrometheusControllerMock) EnqueueAfterCalls() []struct {
 	Namespace string
 	Name      string
@@ -567,8 +559,7 @@ func (mock *PrometheusControllerMock) Generic() controller.GenericController {
 
 // GenericCalls gets all the calls that were made to Generic.
 // Check the length with:
-//
-//	len(mockedPrometheusController.GenericCalls())
+//     len(mockedPrometheusController.GenericCalls())
 func (mock *PrometheusControllerMock) GenericCalls() []struct {
 } {
 	var calls []struct {
@@ -594,8 +585,7 @@ func (mock *PrometheusControllerMock) Informer() cache.SharedIndexInformer {
 
 // InformerCalls gets all the calls that were made to Informer.
 // Check the length with:
-//
-//	len(mockedPrometheusController.InformerCalls())
+//     len(mockedPrometheusController.InformerCalls())
 func (mock *PrometheusControllerMock) InformerCalls() []struct {
 } {
 	var calls []struct {
@@ -621,8 +611,7 @@ func (mock *PrometheusControllerMock) Lister() v11.PrometheusLister {
 
 // ListerCalls gets all the calls that were made to Lister.
 // Check the length with:
-//
-//	len(mockedPrometheusController.ListerCalls())
+//     len(mockedPrometheusController.ListerCalls())
 func (mock *PrometheusControllerMock) ListerCalls() []struct {
 } {
 	var calls []struct {
@@ -662,76 +651,76 @@ var _ v11.PrometheusInterface = &PrometheusInterfaceMock{}
 
 // PrometheusInterfaceMock is a mock implementation of v11.PrometheusInterface.
 //
-//	    func TestSomethingThatUsesPrometheusInterface(t *testing.T) {
+//     func TestSomethingThatUsesPrometheusInterface(t *testing.T) {
 //
-//	        // make and configure a mocked v11.PrometheusInterface
-//	        mockedPrometheusInterface := &PrometheusInterfaceMock{
-//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v11.PrometheusHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedFeatureHandler method")
-//	            },
-//	            AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v11.PrometheusLifecycle)  {
-//		               panic("mock out the AddClusterScopedFeatureLifecycle method")
-//	            },
-//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v11.PrometheusHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedHandler method")
-//	            },
-//	            AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v11.PrometheusLifecycle)  {
-//		               panic("mock out the AddClusterScopedLifecycle method")
-//	            },
-//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v11.PrometheusHandlerFunc)  {
-//		               panic("mock out the AddFeatureHandler method")
-//	            },
-//	            AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v11.PrometheusLifecycle)  {
-//		               panic("mock out the AddFeatureLifecycle method")
-//	            },
-//	            AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v11.PrometheusHandlerFunc)  {
-//		               panic("mock out the AddHandler method")
-//	            },
-//	            AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v11.PrometheusLifecycle)  {
-//		               panic("mock out the AddLifecycle method")
-//	            },
-//	            ControllerFunc: func() v11.PrometheusController {
-//		               panic("mock out the Controller method")
-//	            },
-//	            CreateFunc: func(in1 *v1.Prometheus) (*v1.Prometheus, error) {
-//		               panic("mock out the Create method")
-//	            },
-//	            DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
-//		               panic("mock out the Delete method")
-//	            },
-//	            DeleteCollectionFunc: func(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
-//		               panic("mock out the DeleteCollection method")
-//	            },
-//	            DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
-//		               panic("mock out the DeleteNamespaced method")
-//	            },
-//	            GetFunc: func(name string, opts metav1.GetOptions) (*v1.Prometheus, error) {
-//		               panic("mock out the Get method")
-//	            },
-//	            GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v1.Prometheus, error) {
-//		               panic("mock out the GetNamespaced method")
-//	            },
-//	            ListFunc: func(opts metav1.ListOptions) (*v1.PrometheusList, error) {
-//		               panic("mock out the List method")
-//	            },
-//	            ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v1.PrometheusList, error) {
-//		               panic("mock out the ListNamespaced method")
-//	            },
-//	            ObjectClientFunc: func() *objectclient.ObjectClient {
-//		               panic("mock out the ObjectClient method")
-//	            },
-//	            UpdateFunc: func(in1 *v1.Prometheus) (*v1.Prometheus, error) {
-//		               panic("mock out the Update method")
-//	            },
-//	            WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
-//		               panic("mock out the Watch method")
-//	            },
-//	        }
+//         // make and configure a mocked v11.PrometheusInterface
+//         mockedPrometheusInterface := &PrometheusInterfaceMock{
+//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v11.PrometheusHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedFeatureHandler method")
+//             },
+//             AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v11.PrometheusLifecycle)  {
+// 	               panic("mock out the AddClusterScopedFeatureLifecycle method")
+//             },
+//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v11.PrometheusHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedHandler method")
+//             },
+//             AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v11.PrometheusLifecycle)  {
+// 	               panic("mock out the AddClusterScopedLifecycle method")
+//             },
+//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v11.PrometheusHandlerFunc)  {
+// 	               panic("mock out the AddFeatureHandler method")
+//             },
+//             AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v11.PrometheusLifecycle)  {
+// 	               panic("mock out the AddFeatureLifecycle method")
+//             },
+//             AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v11.PrometheusHandlerFunc)  {
+// 	               panic("mock out the AddHandler method")
+//             },
+//             AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v11.PrometheusLifecycle)  {
+// 	               panic("mock out the AddLifecycle method")
+//             },
+//             ControllerFunc: func() v11.PrometheusController {
+// 	               panic("mock out the Controller method")
+//             },
+//             CreateFunc: func(in1 *v1.Prometheus) (*v1.Prometheus, error) {
+// 	               panic("mock out the Create method")
+//             },
+//             DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
+// 	               panic("mock out the Delete method")
+//             },
+//             DeleteCollectionFunc: func(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
+// 	               panic("mock out the DeleteCollection method")
+//             },
+//             DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
+// 	               panic("mock out the DeleteNamespaced method")
+//             },
+//             GetFunc: func(name string, opts metav1.GetOptions) (*v1.Prometheus, error) {
+// 	               panic("mock out the Get method")
+//             },
+//             GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v1.Prometheus, error) {
+// 	               panic("mock out the GetNamespaced method")
+//             },
+//             ListFunc: func(opts metav1.ListOptions) (*v1.PrometheusList, error) {
+// 	               panic("mock out the List method")
+//             },
+//             ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v1.PrometheusList, error) {
+// 	               panic("mock out the ListNamespaced method")
+//             },
+//             ObjectClientFunc: func() *objectclient.ObjectClient {
+// 	               panic("mock out the ObjectClient method")
+//             },
+//             UpdateFunc: func(in1 *v1.Prometheus) (*v1.Prometheus, error) {
+// 	               panic("mock out the Update method")
+//             },
+//             WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
+// 	               panic("mock out the Watch method")
+//             },
+//         }
 //
-//	        // use mockedPrometheusInterface in code that requires v11.PrometheusInterface
-//	        // and then make assertions.
+//         // use mockedPrometheusInterface in code that requires v11.PrometheusInterface
+//         // and then make assertions.
 //
-//	    }
+//     }
 type PrometheusInterfaceMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
 	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v11.PrometheusHandlerFunc)
@@ -984,8 +973,7 @@ func (mock *PrometheusInterfaceMock) AddClusterScopedFeatureHandler(ctx context.
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//
-//	len(mockedPrometheusInterface.AddClusterScopedFeatureHandlerCalls())
+//     len(mockedPrometheusInterface.AddClusterScopedFeatureHandlerCalls())
 func (mock *PrometheusInterfaceMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -1032,8 +1020,7 @@ func (mock *PrometheusInterfaceMock) AddClusterScopedFeatureLifecycle(ctx contex
 
 // AddClusterScopedFeatureLifecycleCalls gets all the calls that were made to AddClusterScopedFeatureLifecycle.
 // Check the length with:
-//
-//	len(mockedPrometheusInterface.AddClusterScopedFeatureLifecycleCalls())
+//     len(mockedPrometheusInterface.AddClusterScopedFeatureLifecycleCalls())
 func (mock *PrometheusInterfaceMock) AddClusterScopedFeatureLifecycleCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -1078,8 +1065,7 @@ func (mock *PrometheusInterfaceMock) AddClusterScopedHandler(ctx context.Context
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//
-//	len(mockedPrometheusInterface.AddClusterScopedHandlerCalls())
+//     len(mockedPrometheusInterface.AddClusterScopedHandlerCalls())
 func (mock *PrometheusInterfaceMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -1122,8 +1108,7 @@ func (mock *PrometheusInterfaceMock) AddClusterScopedLifecycle(ctx context.Conte
 
 // AddClusterScopedLifecycleCalls gets all the calls that were made to AddClusterScopedLifecycle.
 // Check the length with:
-//
-//	len(mockedPrometheusInterface.AddClusterScopedLifecycleCalls())
+//     len(mockedPrometheusInterface.AddClusterScopedLifecycleCalls())
 func (mock *PrometheusInterfaceMock) AddClusterScopedLifecycleCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -1166,8 +1151,7 @@ func (mock *PrometheusInterfaceMock) AddFeatureHandler(ctx context.Context, enab
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//
-//	len(mockedPrometheusInterface.AddFeatureHandlerCalls())
+//     len(mockedPrometheusInterface.AddFeatureHandlerCalls())
 func (mock *PrometheusInterfaceMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
@@ -1210,8 +1194,7 @@ func (mock *PrometheusInterfaceMock) AddFeatureLifecycle(ctx context.Context, en
 
 // AddFeatureLifecycleCalls gets all the calls that were made to AddFeatureLifecycle.
 // Check the length with:
-//
-//	len(mockedPrometheusInterface.AddFeatureLifecycleCalls())
+//     len(mockedPrometheusInterface.AddFeatureLifecycleCalls())
 func (mock *PrometheusInterfaceMock) AddFeatureLifecycleCalls() []struct {
 	Ctx       context.Context
 	Enabled   func() bool
@@ -1252,8 +1235,7 @@ func (mock *PrometheusInterfaceMock) AddHandler(ctx context.Context, name string
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//
-//	len(mockedPrometheusInterface.AddHandlerCalls())
+//     len(mockedPrometheusInterface.AddHandlerCalls())
 func (mock *PrometheusInterfaceMock) AddHandlerCalls() []struct {
 	Ctx  context.Context
 	Name string
@@ -1292,8 +1274,7 @@ func (mock *PrometheusInterfaceMock) AddLifecycle(ctx context.Context, name stri
 
 // AddLifecycleCalls gets all the calls that were made to AddLifecycle.
 // Check the length with:
-//
-//	len(mockedPrometheusInterface.AddLifecycleCalls())
+//     len(mockedPrometheusInterface.AddLifecycleCalls())
 func (mock *PrometheusInterfaceMock) AddLifecycleCalls() []struct {
 	Ctx       context.Context
 	Name      string
@@ -1325,8 +1306,7 @@ func (mock *PrometheusInterfaceMock) Controller() v11.PrometheusController {
 
 // ControllerCalls gets all the calls that were made to Controller.
 // Check the length with:
-//
-//	len(mockedPrometheusInterface.ControllerCalls())
+//     len(mockedPrometheusInterface.ControllerCalls())
 func (mock *PrometheusInterfaceMock) ControllerCalls() []struct {
 } {
 	var calls []struct {
@@ -1355,8 +1335,7 @@ func (mock *PrometheusInterfaceMock) Create(in1 *v1.Prometheus) (*v1.Prometheus,
 
 // CreateCalls gets all the calls that were made to Create.
 // Check the length with:
-//
-//	len(mockedPrometheusInterface.CreateCalls())
+//     len(mockedPrometheusInterface.CreateCalls())
 func (mock *PrometheusInterfaceMock) CreateCalls() []struct {
 	In1 *v1.Prometheus
 } {
@@ -1389,8 +1368,7 @@ func (mock *PrometheusInterfaceMock) Delete(name string, options *metav1.DeleteO
 
 // DeleteCalls gets all the calls that were made to Delete.
 // Check the length with:
-//
-//	len(mockedPrometheusInterface.DeleteCalls())
+//     len(mockedPrometheusInterface.DeleteCalls())
 func (mock *PrometheusInterfaceMock) DeleteCalls() []struct {
 	Name    string
 	Options *metav1.DeleteOptions
@@ -1425,8 +1403,7 @@ func (mock *PrometheusInterfaceMock) DeleteCollection(deleteOpts *metav1.DeleteO
 
 // DeleteCollectionCalls gets all the calls that were made to DeleteCollection.
 // Check the length with:
-//
-//	len(mockedPrometheusInterface.DeleteCollectionCalls())
+//     len(mockedPrometheusInterface.DeleteCollectionCalls())
 func (mock *PrometheusInterfaceMock) DeleteCollectionCalls() []struct {
 	DeleteOpts *metav1.DeleteOptions
 	ListOpts   metav1.ListOptions
@@ -1463,8 +1440,7 @@ func (mock *PrometheusInterfaceMock) DeleteNamespaced(namespace string, name str
 
 // DeleteNamespacedCalls gets all the calls that were made to DeleteNamespaced.
 // Check the length with:
-//
-//	len(mockedPrometheusInterface.DeleteNamespacedCalls())
+//     len(mockedPrometheusInterface.DeleteNamespacedCalls())
 func (mock *PrometheusInterfaceMock) DeleteNamespacedCalls() []struct {
 	Namespace string
 	Name      string
@@ -1501,8 +1477,7 @@ func (mock *PrometheusInterfaceMock) Get(name string, opts metav1.GetOptions) (*
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//
-//	len(mockedPrometheusInterface.GetCalls())
+//     len(mockedPrometheusInterface.GetCalls())
 func (mock *PrometheusInterfaceMock) GetCalls() []struct {
 	Name string
 	Opts metav1.GetOptions
@@ -1539,8 +1514,7 @@ func (mock *PrometheusInterfaceMock) GetNamespaced(namespace string, name string
 
 // GetNamespacedCalls gets all the calls that were made to GetNamespaced.
 // Check the length with:
-//
-//	len(mockedPrometheusInterface.GetNamespacedCalls())
+//     len(mockedPrometheusInterface.GetNamespacedCalls())
 func (mock *PrometheusInterfaceMock) GetNamespacedCalls() []struct {
 	Namespace string
 	Name      string
@@ -1575,8 +1549,7 @@ func (mock *PrometheusInterfaceMock) List(opts metav1.ListOptions) (*v1.Promethe
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//
-//	len(mockedPrometheusInterface.ListCalls())
+//     len(mockedPrometheusInterface.ListCalls())
 func (mock *PrometheusInterfaceMock) ListCalls() []struct {
 	Opts metav1.ListOptions
 } {
@@ -1609,8 +1582,7 @@ func (mock *PrometheusInterfaceMock) ListNamespaced(namespace string, opts metav
 
 // ListNamespacedCalls gets all the calls that were made to ListNamespaced.
 // Check the length with:
-//
-//	len(mockedPrometheusInterface.ListNamespacedCalls())
+//     len(mockedPrometheusInterface.ListNamespacedCalls())
 func (mock *PrometheusInterfaceMock) ListNamespacedCalls() []struct {
 	Namespace string
 	Opts      metav1.ListOptions
@@ -1640,8 +1612,7 @@ func (mock *PrometheusInterfaceMock) ObjectClient() *objectclient.ObjectClient {
 
 // ObjectClientCalls gets all the calls that were made to ObjectClient.
 // Check the length with:
-//
-//	len(mockedPrometheusInterface.ObjectClientCalls())
+//     len(mockedPrometheusInterface.ObjectClientCalls())
 func (mock *PrometheusInterfaceMock) ObjectClientCalls() []struct {
 } {
 	var calls []struct {
@@ -1670,8 +1641,7 @@ func (mock *PrometheusInterfaceMock) Update(in1 *v1.Prometheus) (*v1.Prometheus,
 
 // UpdateCalls gets all the calls that were made to Update.
 // Check the length with:
-//
-//	len(mockedPrometheusInterface.UpdateCalls())
+//     len(mockedPrometheusInterface.UpdateCalls())
 func (mock *PrometheusInterfaceMock) UpdateCalls() []struct {
 	In1 *v1.Prometheus
 } {
@@ -1702,8 +1672,7 @@ func (mock *PrometheusInterfaceMock) Watch(opts metav1.ListOptions) (watch.Inter
 
 // WatchCalls gets all the calls that were made to Watch.
 // Check the length with:
-//
-//	len(mockedPrometheusInterface.WatchCalls())
+//     len(mockedPrometheusInterface.WatchCalls())
 func (mock *PrometheusInterfaceMock) WatchCalls() []struct {
 	Opts metav1.ListOptions
 } {
@@ -1726,19 +1695,19 @@ var _ v11.PrometheusesGetter = &PrometheusesGetterMock{}
 
 // PrometheusesGetterMock is a mock implementation of v11.PrometheusesGetter.
 //
-//	    func TestSomethingThatUsesPrometheusesGetter(t *testing.T) {
+//     func TestSomethingThatUsesPrometheusesGetter(t *testing.T) {
 //
-//	        // make and configure a mocked v11.PrometheusesGetter
-//	        mockedPrometheusesGetter := &PrometheusesGetterMock{
-//	            PrometheusesFunc: func(namespace string) v11.PrometheusInterface {
-//		               panic("mock out the Prometheuses method")
-//	            },
-//	        }
+//         // make and configure a mocked v11.PrometheusesGetter
+//         mockedPrometheusesGetter := &PrometheusesGetterMock{
+//             PrometheusesFunc: func(namespace string) v11.PrometheusInterface {
+// 	               panic("mock out the Prometheuses method")
+//             },
+//         }
 //
-//	        // use mockedPrometheusesGetter in code that requires v11.PrometheusesGetter
-//	        // and then make assertions.
+//         // use mockedPrometheusesGetter in code that requires v11.PrometheusesGetter
+//         // and then make assertions.
 //
-//	    }
+//     }
 type PrometheusesGetterMock struct {
 	// PrometheusesFunc mocks the Prometheuses method.
 	PrometheusesFunc func(namespace string) v11.PrometheusInterface
@@ -1771,8 +1740,7 @@ func (mock *PrometheusesGetterMock) Prometheuses(namespace string) v11.Prometheu
 
 // PrometheusesCalls gets all the calls that were made to Prometheuses.
 // Check the length with:
-//
-//	len(mockedPrometheusesGetter.PrometheusesCalls())
+//     len(mockedPrometheusesGetter.PrometheusesCalls())
 func (mock *PrometheusesGetterMock) PrometheusesCalls() []struct {
 	Namespace string
 } {

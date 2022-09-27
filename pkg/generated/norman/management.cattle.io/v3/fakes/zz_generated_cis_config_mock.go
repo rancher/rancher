@@ -29,22 +29,22 @@ var _ v31.CisConfigLister = &CisConfigListerMock{}
 
 // CisConfigListerMock is a mock implementation of v31.CisConfigLister.
 //
-//	    func TestSomethingThatUsesCisConfigLister(t *testing.T) {
+//     func TestSomethingThatUsesCisConfigLister(t *testing.T) {
 //
-//	        // make and configure a mocked v31.CisConfigLister
-//	        mockedCisConfigLister := &CisConfigListerMock{
-//	            GetFunc: func(namespace string, name string) (*v3.CisConfig, error) {
-//		               panic("mock out the Get method")
-//	            },
-//	            ListFunc: func(namespace string, selector labels.Selector) ([]*v3.CisConfig, error) {
-//		               panic("mock out the List method")
-//	            },
-//	        }
+//         // make and configure a mocked v31.CisConfigLister
+//         mockedCisConfigLister := &CisConfigListerMock{
+//             GetFunc: func(namespace string, name string) (*v3.CisConfig, error) {
+// 	               panic("mock out the Get method")
+//             },
+//             ListFunc: func(namespace string, selector labels.Selector) ([]*v3.CisConfig, error) {
+// 	               panic("mock out the List method")
+//             },
+//         }
 //
-//	        // use mockedCisConfigLister in code that requires v31.CisConfigLister
-//	        // and then make assertions.
+//         // use mockedCisConfigLister in code that requires v31.CisConfigLister
+//         // and then make assertions.
 //
-//	    }
+//     }
 type CisConfigListerMock struct {
 	// GetFunc mocks the Get method.
 	GetFunc func(namespace string, name string) (*v3.CisConfig, error)
@@ -91,8 +91,7 @@ func (mock *CisConfigListerMock) Get(namespace string, name string) (*v3.CisConf
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//
-//	len(mockedCisConfigLister.GetCalls())
+//     len(mockedCisConfigLister.GetCalls())
 func (mock *CisConfigListerMock) GetCalls() []struct {
 	Namespace string
 	Name      string
@@ -127,8 +126,7 @@ func (mock *CisConfigListerMock) List(namespace string, selector labels.Selector
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//
-//	len(mockedCisConfigLister.ListCalls())
+//     len(mockedCisConfigLister.ListCalls())
 func (mock *CisConfigListerMock) ListCalls() []struct {
 	Namespace string
 	Selector  labels.Selector
@@ -161,43 +159,43 @@ var _ v31.CisConfigController = &CisConfigControllerMock{}
 
 // CisConfigControllerMock is a mock implementation of v31.CisConfigController.
 //
-//	    func TestSomethingThatUsesCisConfigController(t *testing.T) {
+//     func TestSomethingThatUsesCisConfigController(t *testing.T) {
 //
-//	        // make and configure a mocked v31.CisConfigController
-//	        mockedCisConfigController := &CisConfigControllerMock{
-//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v31.CisConfigHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedFeatureHandler method")
-//	            },
-//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v31.CisConfigHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedHandler method")
-//	            },
-//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.CisConfigHandlerFunc)  {
-//		               panic("mock out the AddFeatureHandler method")
-//	            },
-//	            AddHandlerFunc: func(ctx context.Context, name string, handler v31.CisConfigHandlerFunc)  {
-//		               panic("mock out the AddHandler method")
-//	            },
-//	            EnqueueFunc: func(namespace string, name string)  {
-//		               panic("mock out the Enqueue method")
-//	            },
-//	            EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
-//		               panic("mock out the EnqueueAfter method")
-//	            },
-//	            GenericFunc: func() controller.GenericController {
-//		               panic("mock out the Generic method")
-//	            },
-//	            InformerFunc: func() cache.SharedIndexInformer {
-//		               panic("mock out the Informer method")
-//	            },
-//	            ListerFunc: func() v31.CisConfigLister {
-//		               panic("mock out the Lister method")
-//	            },
-//	        }
+//         // make and configure a mocked v31.CisConfigController
+//         mockedCisConfigController := &CisConfigControllerMock{
+//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v31.CisConfigHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedFeatureHandler method")
+//             },
+//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v31.CisConfigHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedHandler method")
+//             },
+//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.CisConfigHandlerFunc)  {
+// 	               panic("mock out the AddFeatureHandler method")
+//             },
+//             AddHandlerFunc: func(ctx context.Context, name string, handler v31.CisConfigHandlerFunc)  {
+// 	               panic("mock out the AddHandler method")
+//             },
+//             EnqueueFunc: func(namespace string, name string)  {
+// 	               panic("mock out the Enqueue method")
+//             },
+//             EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
+// 	               panic("mock out the EnqueueAfter method")
+//             },
+//             GenericFunc: func() controller.GenericController {
+// 	               panic("mock out the Generic method")
+//             },
+//             InformerFunc: func() cache.SharedIndexInformer {
+// 	               panic("mock out the Informer method")
+//             },
+//             ListerFunc: func() v31.CisConfigLister {
+// 	               panic("mock out the Lister method")
+//             },
+//         }
 //
-//	        // use mockedCisConfigController in code that requires v31.CisConfigController
-//	        // and then make assertions.
+//         // use mockedCisConfigController in code that requires v31.CisConfigController
+//         // and then make assertions.
 //
-//	    }
+//     }
 type CisConfigControllerMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
 	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v31.CisConfigHandlerFunc)
@@ -326,8 +324,7 @@ func (mock *CisConfigControllerMock) AddClusterScopedFeatureHandler(ctx context.
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//
-//	len(mockedCisConfigController.AddClusterScopedFeatureHandlerCalls())
+//     len(mockedCisConfigController.AddClusterScopedFeatureHandlerCalls())
 func (mock *CisConfigControllerMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -372,8 +369,7 @@ func (mock *CisConfigControllerMock) AddClusterScopedHandler(ctx context.Context
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//
-//	len(mockedCisConfigController.AddClusterScopedHandlerCalls())
+//     len(mockedCisConfigController.AddClusterScopedHandlerCalls())
 func (mock *CisConfigControllerMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -416,8 +412,7 @@ func (mock *CisConfigControllerMock) AddFeatureHandler(ctx context.Context, enab
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//
-//	len(mockedCisConfigController.AddFeatureHandlerCalls())
+//     len(mockedCisConfigController.AddFeatureHandlerCalls())
 func (mock *CisConfigControllerMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
@@ -458,8 +453,7 @@ func (mock *CisConfigControllerMock) AddHandler(ctx context.Context, name string
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//
-//	len(mockedCisConfigController.AddHandlerCalls())
+//     len(mockedCisConfigController.AddHandlerCalls())
 func (mock *CisConfigControllerMock) AddHandlerCalls() []struct {
 	Ctx     context.Context
 	Name    string
@@ -496,8 +490,7 @@ func (mock *CisConfigControllerMock) Enqueue(namespace string, name string) {
 
 // EnqueueCalls gets all the calls that were made to Enqueue.
 // Check the length with:
-//
-//	len(mockedCisConfigController.EnqueueCalls())
+//     len(mockedCisConfigController.EnqueueCalls())
 func (mock *CisConfigControllerMock) EnqueueCalls() []struct {
 	Namespace string
 	Name      string
@@ -534,8 +527,7 @@ func (mock *CisConfigControllerMock) EnqueueAfter(namespace string, name string,
 
 // EnqueueAfterCalls gets all the calls that were made to EnqueueAfter.
 // Check the length with:
-//
-//	len(mockedCisConfigController.EnqueueAfterCalls())
+//     len(mockedCisConfigController.EnqueueAfterCalls())
 func (mock *CisConfigControllerMock) EnqueueAfterCalls() []struct {
 	Namespace string
 	Name      string
@@ -567,8 +559,7 @@ func (mock *CisConfigControllerMock) Generic() controller.GenericController {
 
 // GenericCalls gets all the calls that were made to Generic.
 // Check the length with:
-//
-//	len(mockedCisConfigController.GenericCalls())
+//     len(mockedCisConfigController.GenericCalls())
 func (mock *CisConfigControllerMock) GenericCalls() []struct {
 } {
 	var calls []struct {
@@ -594,8 +585,7 @@ func (mock *CisConfigControllerMock) Informer() cache.SharedIndexInformer {
 
 // InformerCalls gets all the calls that were made to Informer.
 // Check the length with:
-//
-//	len(mockedCisConfigController.InformerCalls())
+//     len(mockedCisConfigController.InformerCalls())
 func (mock *CisConfigControllerMock) InformerCalls() []struct {
 } {
 	var calls []struct {
@@ -621,8 +611,7 @@ func (mock *CisConfigControllerMock) Lister() v31.CisConfigLister {
 
 // ListerCalls gets all the calls that were made to Lister.
 // Check the length with:
-//
-//	len(mockedCisConfigController.ListerCalls())
+//     len(mockedCisConfigController.ListerCalls())
 func (mock *CisConfigControllerMock) ListerCalls() []struct {
 } {
 	var calls []struct {
@@ -662,76 +651,76 @@ var _ v31.CisConfigInterface = &CisConfigInterfaceMock{}
 
 // CisConfigInterfaceMock is a mock implementation of v31.CisConfigInterface.
 //
-//	    func TestSomethingThatUsesCisConfigInterface(t *testing.T) {
+//     func TestSomethingThatUsesCisConfigInterface(t *testing.T) {
 //
-//	        // make and configure a mocked v31.CisConfigInterface
-//	        mockedCisConfigInterface := &CisConfigInterfaceMock{
-//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v31.CisConfigHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedFeatureHandler method")
-//	            },
-//	            AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v31.CisConfigLifecycle)  {
-//		               panic("mock out the AddClusterScopedFeatureLifecycle method")
-//	            },
-//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v31.CisConfigHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedHandler method")
-//	            },
-//	            AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v31.CisConfigLifecycle)  {
-//		               panic("mock out the AddClusterScopedLifecycle method")
-//	            },
-//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.CisConfigHandlerFunc)  {
-//		               panic("mock out the AddFeatureHandler method")
-//	            },
-//	            AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v31.CisConfigLifecycle)  {
-//		               panic("mock out the AddFeatureLifecycle method")
-//	            },
-//	            AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v31.CisConfigHandlerFunc)  {
-//		               panic("mock out the AddHandler method")
-//	            },
-//	            AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v31.CisConfigLifecycle)  {
-//		               panic("mock out the AddLifecycle method")
-//	            },
-//	            ControllerFunc: func() v31.CisConfigController {
-//		               panic("mock out the Controller method")
-//	            },
-//	            CreateFunc: func(in1 *v3.CisConfig) (*v3.CisConfig, error) {
-//		               panic("mock out the Create method")
-//	            },
-//	            DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
-//		               panic("mock out the Delete method")
-//	            },
-//	            DeleteCollectionFunc: func(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
-//		               panic("mock out the DeleteCollection method")
-//	            },
-//	            DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
-//		               panic("mock out the DeleteNamespaced method")
-//	            },
-//	            GetFunc: func(name string, opts metav1.GetOptions) (*v3.CisConfig, error) {
-//		               panic("mock out the Get method")
-//	            },
-//	            GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v3.CisConfig, error) {
-//		               panic("mock out the GetNamespaced method")
-//	            },
-//	            ListFunc: func(opts metav1.ListOptions) (*v3.CisConfigList, error) {
-//		               panic("mock out the List method")
-//	            },
-//	            ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v3.CisConfigList, error) {
-//		               panic("mock out the ListNamespaced method")
-//	            },
-//	            ObjectClientFunc: func() *objectclient.ObjectClient {
-//		               panic("mock out the ObjectClient method")
-//	            },
-//	            UpdateFunc: func(in1 *v3.CisConfig) (*v3.CisConfig, error) {
-//		               panic("mock out the Update method")
-//	            },
-//	            WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
-//		               panic("mock out the Watch method")
-//	            },
-//	        }
+//         // make and configure a mocked v31.CisConfigInterface
+//         mockedCisConfigInterface := &CisConfigInterfaceMock{
+//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v31.CisConfigHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedFeatureHandler method")
+//             },
+//             AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v31.CisConfigLifecycle)  {
+// 	               panic("mock out the AddClusterScopedFeatureLifecycle method")
+//             },
+//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v31.CisConfigHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedHandler method")
+//             },
+//             AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v31.CisConfigLifecycle)  {
+// 	               panic("mock out the AddClusterScopedLifecycle method")
+//             },
+//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.CisConfigHandlerFunc)  {
+// 	               panic("mock out the AddFeatureHandler method")
+//             },
+//             AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v31.CisConfigLifecycle)  {
+// 	               panic("mock out the AddFeatureLifecycle method")
+//             },
+//             AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v31.CisConfigHandlerFunc)  {
+// 	               panic("mock out the AddHandler method")
+//             },
+//             AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v31.CisConfigLifecycle)  {
+// 	               panic("mock out the AddLifecycle method")
+//             },
+//             ControllerFunc: func() v31.CisConfigController {
+// 	               panic("mock out the Controller method")
+//             },
+//             CreateFunc: func(in1 *v3.CisConfig) (*v3.CisConfig, error) {
+// 	               panic("mock out the Create method")
+//             },
+//             DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
+// 	               panic("mock out the Delete method")
+//             },
+//             DeleteCollectionFunc: func(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
+// 	               panic("mock out the DeleteCollection method")
+//             },
+//             DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
+// 	               panic("mock out the DeleteNamespaced method")
+//             },
+//             GetFunc: func(name string, opts metav1.GetOptions) (*v3.CisConfig, error) {
+// 	               panic("mock out the Get method")
+//             },
+//             GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v3.CisConfig, error) {
+// 	               panic("mock out the GetNamespaced method")
+//             },
+//             ListFunc: func(opts metav1.ListOptions) (*v3.CisConfigList, error) {
+// 	               panic("mock out the List method")
+//             },
+//             ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v3.CisConfigList, error) {
+// 	               panic("mock out the ListNamespaced method")
+//             },
+//             ObjectClientFunc: func() *objectclient.ObjectClient {
+// 	               panic("mock out the ObjectClient method")
+//             },
+//             UpdateFunc: func(in1 *v3.CisConfig) (*v3.CisConfig, error) {
+// 	               panic("mock out the Update method")
+//             },
+//             WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
+// 	               panic("mock out the Watch method")
+//             },
+//         }
 //
-//	        // use mockedCisConfigInterface in code that requires v31.CisConfigInterface
-//	        // and then make assertions.
+//         // use mockedCisConfigInterface in code that requires v31.CisConfigInterface
+//         // and then make assertions.
 //
-//	    }
+//     }
 type CisConfigInterfaceMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
 	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v31.CisConfigHandlerFunc)
@@ -984,8 +973,7 @@ func (mock *CisConfigInterfaceMock) AddClusterScopedFeatureHandler(ctx context.C
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//
-//	len(mockedCisConfigInterface.AddClusterScopedFeatureHandlerCalls())
+//     len(mockedCisConfigInterface.AddClusterScopedFeatureHandlerCalls())
 func (mock *CisConfigInterfaceMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -1032,8 +1020,7 @@ func (mock *CisConfigInterfaceMock) AddClusterScopedFeatureLifecycle(ctx context
 
 // AddClusterScopedFeatureLifecycleCalls gets all the calls that were made to AddClusterScopedFeatureLifecycle.
 // Check the length with:
-//
-//	len(mockedCisConfigInterface.AddClusterScopedFeatureLifecycleCalls())
+//     len(mockedCisConfigInterface.AddClusterScopedFeatureLifecycleCalls())
 func (mock *CisConfigInterfaceMock) AddClusterScopedFeatureLifecycleCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -1078,8 +1065,7 @@ func (mock *CisConfigInterfaceMock) AddClusterScopedHandler(ctx context.Context,
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//
-//	len(mockedCisConfigInterface.AddClusterScopedHandlerCalls())
+//     len(mockedCisConfigInterface.AddClusterScopedHandlerCalls())
 func (mock *CisConfigInterfaceMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -1122,8 +1108,7 @@ func (mock *CisConfigInterfaceMock) AddClusterScopedLifecycle(ctx context.Contex
 
 // AddClusterScopedLifecycleCalls gets all the calls that were made to AddClusterScopedLifecycle.
 // Check the length with:
-//
-//	len(mockedCisConfigInterface.AddClusterScopedLifecycleCalls())
+//     len(mockedCisConfigInterface.AddClusterScopedLifecycleCalls())
 func (mock *CisConfigInterfaceMock) AddClusterScopedLifecycleCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -1166,8 +1151,7 @@ func (mock *CisConfigInterfaceMock) AddFeatureHandler(ctx context.Context, enabl
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//
-//	len(mockedCisConfigInterface.AddFeatureHandlerCalls())
+//     len(mockedCisConfigInterface.AddFeatureHandlerCalls())
 func (mock *CisConfigInterfaceMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
@@ -1210,8 +1194,7 @@ func (mock *CisConfigInterfaceMock) AddFeatureLifecycle(ctx context.Context, ena
 
 // AddFeatureLifecycleCalls gets all the calls that were made to AddFeatureLifecycle.
 // Check the length with:
-//
-//	len(mockedCisConfigInterface.AddFeatureLifecycleCalls())
+//     len(mockedCisConfigInterface.AddFeatureLifecycleCalls())
 func (mock *CisConfigInterfaceMock) AddFeatureLifecycleCalls() []struct {
 	Ctx       context.Context
 	Enabled   func() bool
@@ -1252,8 +1235,7 @@ func (mock *CisConfigInterfaceMock) AddHandler(ctx context.Context, name string,
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//
-//	len(mockedCisConfigInterface.AddHandlerCalls())
+//     len(mockedCisConfigInterface.AddHandlerCalls())
 func (mock *CisConfigInterfaceMock) AddHandlerCalls() []struct {
 	Ctx  context.Context
 	Name string
@@ -1292,8 +1274,7 @@ func (mock *CisConfigInterfaceMock) AddLifecycle(ctx context.Context, name strin
 
 // AddLifecycleCalls gets all the calls that were made to AddLifecycle.
 // Check the length with:
-//
-//	len(mockedCisConfigInterface.AddLifecycleCalls())
+//     len(mockedCisConfigInterface.AddLifecycleCalls())
 func (mock *CisConfigInterfaceMock) AddLifecycleCalls() []struct {
 	Ctx       context.Context
 	Name      string
@@ -1325,8 +1306,7 @@ func (mock *CisConfigInterfaceMock) Controller() v31.CisConfigController {
 
 // ControllerCalls gets all the calls that were made to Controller.
 // Check the length with:
-//
-//	len(mockedCisConfigInterface.ControllerCalls())
+//     len(mockedCisConfigInterface.ControllerCalls())
 func (mock *CisConfigInterfaceMock) ControllerCalls() []struct {
 } {
 	var calls []struct {
@@ -1355,8 +1335,7 @@ func (mock *CisConfigInterfaceMock) Create(in1 *v3.CisConfig) (*v3.CisConfig, er
 
 // CreateCalls gets all the calls that were made to Create.
 // Check the length with:
-//
-//	len(mockedCisConfigInterface.CreateCalls())
+//     len(mockedCisConfigInterface.CreateCalls())
 func (mock *CisConfigInterfaceMock) CreateCalls() []struct {
 	In1 *v3.CisConfig
 } {
@@ -1389,8 +1368,7 @@ func (mock *CisConfigInterfaceMock) Delete(name string, options *metav1.DeleteOp
 
 // DeleteCalls gets all the calls that were made to Delete.
 // Check the length with:
-//
-//	len(mockedCisConfigInterface.DeleteCalls())
+//     len(mockedCisConfigInterface.DeleteCalls())
 func (mock *CisConfigInterfaceMock) DeleteCalls() []struct {
 	Name    string
 	Options *metav1.DeleteOptions
@@ -1425,8 +1403,7 @@ func (mock *CisConfigInterfaceMock) DeleteCollection(deleteOpts *metav1.DeleteOp
 
 // DeleteCollectionCalls gets all the calls that were made to DeleteCollection.
 // Check the length with:
-//
-//	len(mockedCisConfigInterface.DeleteCollectionCalls())
+//     len(mockedCisConfigInterface.DeleteCollectionCalls())
 func (mock *CisConfigInterfaceMock) DeleteCollectionCalls() []struct {
 	DeleteOpts *metav1.DeleteOptions
 	ListOpts   metav1.ListOptions
@@ -1463,8 +1440,7 @@ func (mock *CisConfigInterfaceMock) DeleteNamespaced(namespace string, name stri
 
 // DeleteNamespacedCalls gets all the calls that were made to DeleteNamespaced.
 // Check the length with:
-//
-//	len(mockedCisConfigInterface.DeleteNamespacedCalls())
+//     len(mockedCisConfigInterface.DeleteNamespacedCalls())
 func (mock *CisConfigInterfaceMock) DeleteNamespacedCalls() []struct {
 	Namespace string
 	Name      string
@@ -1501,8 +1477,7 @@ func (mock *CisConfigInterfaceMock) Get(name string, opts metav1.GetOptions) (*v
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//
-//	len(mockedCisConfigInterface.GetCalls())
+//     len(mockedCisConfigInterface.GetCalls())
 func (mock *CisConfigInterfaceMock) GetCalls() []struct {
 	Name string
 	Opts metav1.GetOptions
@@ -1539,8 +1514,7 @@ func (mock *CisConfigInterfaceMock) GetNamespaced(namespace string, name string,
 
 // GetNamespacedCalls gets all the calls that were made to GetNamespaced.
 // Check the length with:
-//
-//	len(mockedCisConfigInterface.GetNamespacedCalls())
+//     len(mockedCisConfigInterface.GetNamespacedCalls())
 func (mock *CisConfigInterfaceMock) GetNamespacedCalls() []struct {
 	Namespace string
 	Name      string
@@ -1575,8 +1549,7 @@ func (mock *CisConfigInterfaceMock) List(opts metav1.ListOptions) (*v3.CisConfig
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//
-//	len(mockedCisConfigInterface.ListCalls())
+//     len(mockedCisConfigInterface.ListCalls())
 func (mock *CisConfigInterfaceMock) ListCalls() []struct {
 	Opts metav1.ListOptions
 } {
@@ -1609,8 +1582,7 @@ func (mock *CisConfigInterfaceMock) ListNamespaced(namespace string, opts metav1
 
 // ListNamespacedCalls gets all the calls that were made to ListNamespaced.
 // Check the length with:
-//
-//	len(mockedCisConfigInterface.ListNamespacedCalls())
+//     len(mockedCisConfigInterface.ListNamespacedCalls())
 func (mock *CisConfigInterfaceMock) ListNamespacedCalls() []struct {
 	Namespace string
 	Opts      metav1.ListOptions
@@ -1640,8 +1612,7 @@ func (mock *CisConfigInterfaceMock) ObjectClient() *objectclient.ObjectClient {
 
 // ObjectClientCalls gets all the calls that were made to ObjectClient.
 // Check the length with:
-//
-//	len(mockedCisConfigInterface.ObjectClientCalls())
+//     len(mockedCisConfigInterface.ObjectClientCalls())
 func (mock *CisConfigInterfaceMock) ObjectClientCalls() []struct {
 } {
 	var calls []struct {
@@ -1670,8 +1641,7 @@ func (mock *CisConfigInterfaceMock) Update(in1 *v3.CisConfig) (*v3.CisConfig, er
 
 // UpdateCalls gets all the calls that were made to Update.
 // Check the length with:
-//
-//	len(mockedCisConfigInterface.UpdateCalls())
+//     len(mockedCisConfigInterface.UpdateCalls())
 func (mock *CisConfigInterfaceMock) UpdateCalls() []struct {
 	In1 *v3.CisConfig
 } {
@@ -1702,8 +1672,7 @@ func (mock *CisConfigInterfaceMock) Watch(opts metav1.ListOptions) (watch.Interf
 
 // WatchCalls gets all the calls that were made to Watch.
 // Check the length with:
-//
-//	len(mockedCisConfigInterface.WatchCalls())
+//     len(mockedCisConfigInterface.WatchCalls())
 func (mock *CisConfigInterfaceMock) WatchCalls() []struct {
 	Opts metav1.ListOptions
 } {
@@ -1726,19 +1695,19 @@ var _ v31.CisConfigsGetter = &CisConfigsGetterMock{}
 
 // CisConfigsGetterMock is a mock implementation of v31.CisConfigsGetter.
 //
-//	    func TestSomethingThatUsesCisConfigsGetter(t *testing.T) {
+//     func TestSomethingThatUsesCisConfigsGetter(t *testing.T) {
 //
-//	        // make and configure a mocked v31.CisConfigsGetter
-//	        mockedCisConfigsGetter := &CisConfigsGetterMock{
-//	            CisConfigsFunc: func(namespace string) v31.CisConfigInterface {
-//		               panic("mock out the CisConfigs method")
-//	            },
-//	        }
+//         // make and configure a mocked v31.CisConfigsGetter
+//         mockedCisConfigsGetter := &CisConfigsGetterMock{
+//             CisConfigsFunc: func(namespace string) v31.CisConfigInterface {
+// 	               panic("mock out the CisConfigs method")
+//             },
+//         }
 //
-//	        // use mockedCisConfigsGetter in code that requires v31.CisConfigsGetter
-//	        // and then make assertions.
+//         // use mockedCisConfigsGetter in code that requires v31.CisConfigsGetter
+//         // and then make assertions.
 //
-//	    }
+//     }
 type CisConfigsGetterMock struct {
 	// CisConfigsFunc mocks the CisConfigs method.
 	CisConfigsFunc func(namespace string) v31.CisConfigInterface
@@ -1771,8 +1740,7 @@ func (mock *CisConfigsGetterMock) CisConfigs(namespace string) v31.CisConfigInte
 
 // CisConfigsCalls gets all the calls that were made to CisConfigs.
 // Check the length with:
-//
-//	len(mockedCisConfigsGetter.CisConfigsCalls())
+//     len(mockedCisConfigsGetter.CisConfigsCalls())
 func (mock *CisConfigsGetterMock) CisConfigsCalls() []struct {
 	Namespace string
 } {

@@ -29,22 +29,22 @@ var _ v11.EventLister = &EventListerMock{}
 
 // EventListerMock is a mock implementation of v11.EventLister.
 //
-//	    func TestSomethingThatUsesEventLister(t *testing.T) {
+//     func TestSomethingThatUsesEventLister(t *testing.T) {
 //
-//	        // make and configure a mocked v11.EventLister
-//	        mockedEventLister := &EventListerMock{
-//	            GetFunc: func(namespace string, name string) (*v1.Event, error) {
-//		               panic("mock out the Get method")
-//	            },
-//	            ListFunc: func(namespace string, selector labels.Selector) ([]*v1.Event, error) {
-//		               panic("mock out the List method")
-//	            },
-//	        }
+//         // make and configure a mocked v11.EventLister
+//         mockedEventLister := &EventListerMock{
+//             GetFunc: func(namespace string, name string) (*v1.Event, error) {
+// 	               panic("mock out the Get method")
+//             },
+//             ListFunc: func(namespace string, selector labels.Selector) ([]*v1.Event, error) {
+// 	               panic("mock out the List method")
+//             },
+//         }
 //
-//	        // use mockedEventLister in code that requires v11.EventLister
-//	        // and then make assertions.
+//         // use mockedEventLister in code that requires v11.EventLister
+//         // and then make assertions.
 //
-//	    }
+//     }
 type EventListerMock struct {
 	// GetFunc mocks the Get method.
 	GetFunc func(namespace string, name string) (*v1.Event, error)
@@ -91,8 +91,7 @@ func (mock *EventListerMock) Get(namespace string, name string) (*v1.Event, erro
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//
-//	len(mockedEventLister.GetCalls())
+//     len(mockedEventLister.GetCalls())
 func (mock *EventListerMock) GetCalls() []struct {
 	Namespace string
 	Name      string
@@ -127,8 +126,7 @@ func (mock *EventListerMock) List(namespace string, selector labels.Selector) ([
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//
-//	len(mockedEventLister.ListCalls())
+//     len(mockedEventLister.ListCalls())
 func (mock *EventListerMock) ListCalls() []struct {
 	Namespace string
 	Selector  labels.Selector
@@ -161,43 +159,43 @@ var _ v11.EventController = &EventControllerMock{}
 
 // EventControllerMock is a mock implementation of v11.EventController.
 //
-//	    func TestSomethingThatUsesEventController(t *testing.T) {
+//     func TestSomethingThatUsesEventController(t *testing.T) {
 //
-//	        // make and configure a mocked v11.EventController
-//	        mockedEventController := &EventControllerMock{
-//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v11.EventHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedFeatureHandler method")
-//	            },
-//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v11.EventHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedHandler method")
-//	            },
-//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v11.EventHandlerFunc)  {
-//		               panic("mock out the AddFeatureHandler method")
-//	            },
-//	            AddHandlerFunc: func(ctx context.Context, name string, handler v11.EventHandlerFunc)  {
-//		               panic("mock out the AddHandler method")
-//	            },
-//	            EnqueueFunc: func(namespace string, name string)  {
-//		               panic("mock out the Enqueue method")
-//	            },
-//	            EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
-//		               panic("mock out the EnqueueAfter method")
-//	            },
-//	            GenericFunc: func() controller.GenericController {
-//		               panic("mock out the Generic method")
-//	            },
-//	            InformerFunc: func() cache.SharedIndexInformer {
-//		               panic("mock out the Informer method")
-//	            },
-//	            ListerFunc: func() v11.EventLister {
-//		               panic("mock out the Lister method")
-//	            },
-//	        }
+//         // make and configure a mocked v11.EventController
+//         mockedEventController := &EventControllerMock{
+//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v11.EventHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedFeatureHandler method")
+//             },
+//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v11.EventHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedHandler method")
+//             },
+//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v11.EventHandlerFunc)  {
+// 	               panic("mock out the AddFeatureHandler method")
+//             },
+//             AddHandlerFunc: func(ctx context.Context, name string, handler v11.EventHandlerFunc)  {
+// 	               panic("mock out the AddHandler method")
+//             },
+//             EnqueueFunc: func(namespace string, name string)  {
+// 	               panic("mock out the Enqueue method")
+//             },
+//             EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
+// 	               panic("mock out the EnqueueAfter method")
+//             },
+//             GenericFunc: func() controller.GenericController {
+// 	               panic("mock out the Generic method")
+//             },
+//             InformerFunc: func() cache.SharedIndexInformer {
+// 	               panic("mock out the Informer method")
+//             },
+//             ListerFunc: func() v11.EventLister {
+// 	               panic("mock out the Lister method")
+//             },
+//         }
 //
-//	        // use mockedEventController in code that requires v11.EventController
-//	        // and then make assertions.
+//         // use mockedEventController in code that requires v11.EventController
+//         // and then make assertions.
 //
-//	    }
+//     }
 type EventControllerMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
 	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v11.EventHandlerFunc)
@@ -326,8 +324,7 @@ func (mock *EventControllerMock) AddClusterScopedFeatureHandler(ctx context.Cont
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//
-//	len(mockedEventController.AddClusterScopedFeatureHandlerCalls())
+//     len(mockedEventController.AddClusterScopedFeatureHandlerCalls())
 func (mock *EventControllerMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -372,8 +369,7 @@ func (mock *EventControllerMock) AddClusterScopedHandler(ctx context.Context, na
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//
-//	len(mockedEventController.AddClusterScopedHandlerCalls())
+//     len(mockedEventController.AddClusterScopedHandlerCalls())
 func (mock *EventControllerMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -416,8 +412,7 @@ func (mock *EventControllerMock) AddFeatureHandler(ctx context.Context, enabled 
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//
-//	len(mockedEventController.AddFeatureHandlerCalls())
+//     len(mockedEventController.AddFeatureHandlerCalls())
 func (mock *EventControllerMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
@@ -458,8 +453,7 @@ func (mock *EventControllerMock) AddHandler(ctx context.Context, name string, ha
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//
-//	len(mockedEventController.AddHandlerCalls())
+//     len(mockedEventController.AddHandlerCalls())
 func (mock *EventControllerMock) AddHandlerCalls() []struct {
 	Ctx     context.Context
 	Name    string
@@ -496,8 +490,7 @@ func (mock *EventControllerMock) Enqueue(namespace string, name string) {
 
 // EnqueueCalls gets all the calls that were made to Enqueue.
 // Check the length with:
-//
-//	len(mockedEventController.EnqueueCalls())
+//     len(mockedEventController.EnqueueCalls())
 func (mock *EventControllerMock) EnqueueCalls() []struct {
 	Namespace string
 	Name      string
@@ -534,8 +527,7 @@ func (mock *EventControllerMock) EnqueueAfter(namespace string, name string, aft
 
 // EnqueueAfterCalls gets all the calls that were made to EnqueueAfter.
 // Check the length with:
-//
-//	len(mockedEventController.EnqueueAfterCalls())
+//     len(mockedEventController.EnqueueAfterCalls())
 func (mock *EventControllerMock) EnqueueAfterCalls() []struct {
 	Namespace string
 	Name      string
@@ -567,8 +559,7 @@ func (mock *EventControllerMock) Generic() controller.GenericController {
 
 // GenericCalls gets all the calls that were made to Generic.
 // Check the length with:
-//
-//	len(mockedEventController.GenericCalls())
+//     len(mockedEventController.GenericCalls())
 func (mock *EventControllerMock) GenericCalls() []struct {
 } {
 	var calls []struct {
@@ -594,8 +585,7 @@ func (mock *EventControllerMock) Informer() cache.SharedIndexInformer {
 
 // InformerCalls gets all the calls that were made to Informer.
 // Check the length with:
-//
-//	len(mockedEventController.InformerCalls())
+//     len(mockedEventController.InformerCalls())
 func (mock *EventControllerMock) InformerCalls() []struct {
 } {
 	var calls []struct {
@@ -621,8 +611,7 @@ func (mock *EventControllerMock) Lister() v11.EventLister {
 
 // ListerCalls gets all the calls that were made to Lister.
 // Check the length with:
-//
-//	len(mockedEventController.ListerCalls())
+//     len(mockedEventController.ListerCalls())
 func (mock *EventControllerMock) ListerCalls() []struct {
 } {
 	var calls []struct {
@@ -662,76 +651,76 @@ var _ v11.EventInterface = &EventInterfaceMock{}
 
 // EventInterfaceMock is a mock implementation of v11.EventInterface.
 //
-//	    func TestSomethingThatUsesEventInterface(t *testing.T) {
+//     func TestSomethingThatUsesEventInterface(t *testing.T) {
 //
-//	        // make and configure a mocked v11.EventInterface
-//	        mockedEventInterface := &EventInterfaceMock{
-//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v11.EventHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedFeatureHandler method")
-//	            },
-//	            AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v11.EventLifecycle)  {
-//		               panic("mock out the AddClusterScopedFeatureLifecycle method")
-//	            },
-//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v11.EventHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedHandler method")
-//	            },
-//	            AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v11.EventLifecycle)  {
-//		               panic("mock out the AddClusterScopedLifecycle method")
-//	            },
-//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v11.EventHandlerFunc)  {
-//		               panic("mock out the AddFeatureHandler method")
-//	            },
-//	            AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v11.EventLifecycle)  {
-//		               panic("mock out the AddFeatureLifecycle method")
-//	            },
-//	            AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v11.EventHandlerFunc)  {
-//		               panic("mock out the AddHandler method")
-//	            },
-//	            AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v11.EventLifecycle)  {
-//		               panic("mock out the AddLifecycle method")
-//	            },
-//	            ControllerFunc: func() v11.EventController {
-//		               panic("mock out the Controller method")
-//	            },
-//	            CreateFunc: func(in1 *v1.Event) (*v1.Event, error) {
-//		               panic("mock out the Create method")
-//	            },
-//	            DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
-//		               panic("mock out the Delete method")
-//	            },
-//	            DeleteCollectionFunc: func(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
-//		               panic("mock out the DeleteCollection method")
-//	            },
-//	            DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
-//		               panic("mock out the DeleteNamespaced method")
-//	            },
-//	            GetFunc: func(name string, opts metav1.GetOptions) (*v1.Event, error) {
-//		               panic("mock out the Get method")
-//	            },
-//	            GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v1.Event, error) {
-//		               panic("mock out the GetNamespaced method")
-//	            },
-//	            ListFunc: func(opts metav1.ListOptions) (*v1.EventList, error) {
-//		               panic("mock out the List method")
-//	            },
-//	            ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v1.EventList, error) {
-//		               panic("mock out the ListNamespaced method")
-//	            },
-//	            ObjectClientFunc: func() *objectclient.ObjectClient {
-//		               panic("mock out the ObjectClient method")
-//	            },
-//	            UpdateFunc: func(in1 *v1.Event) (*v1.Event, error) {
-//		               panic("mock out the Update method")
-//	            },
-//	            WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
-//		               panic("mock out the Watch method")
-//	            },
-//	        }
+//         // make and configure a mocked v11.EventInterface
+//         mockedEventInterface := &EventInterfaceMock{
+//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v11.EventHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedFeatureHandler method")
+//             },
+//             AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v11.EventLifecycle)  {
+// 	               panic("mock out the AddClusterScopedFeatureLifecycle method")
+//             },
+//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v11.EventHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedHandler method")
+//             },
+//             AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v11.EventLifecycle)  {
+// 	               panic("mock out the AddClusterScopedLifecycle method")
+//             },
+//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v11.EventHandlerFunc)  {
+// 	               panic("mock out the AddFeatureHandler method")
+//             },
+//             AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v11.EventLifecycle)  {
+// 	               panic("mock out the AddFeatureLifecycle method")
+//             },
+//             AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v11.EventHandlerFunc)  {
+// 	               panic("mock out the AddHandler method")
+//             },
+//             AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v11.EventLifecycle)  {
+// 	               panic("mock out the AddLifecycle method")
+//             },
+//             ControllerFunc: func() v11.EventController {
+// 	               panic("mock out the Controller method")
+//             },
+//             CreateFunc: func(in1 *v1.Event) (*v1.Event, error) {
+// 	               panic("mock out the Create method")
+//             },
+//             DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
+// 	               panic("mock out the Delete method")
+//             },
+//             DeleteCollectionFunc: func(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
+// 	               panic("mock out the DeleteCollection method")
+//             },
+//             DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
+// 	               panic("mock out the DeleteNamespaced method")
+//             },
+//             GetFunc: func(name string, opts metav1.GetOptions) (*v1.Event, error) {
+// 	               panic("mock out the Get method")
+//             },
+//             GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v1.Event, error) {
+// 	               panic("mock out the GetNamespaced method")
+//             },
+//             ListFunc: func(opts metav1.ListOptions) (*v1.EventList, error) {
+// 	               panic("mock out the List method")
+//             },
+//             ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v1.EventList, error) {
+// 	               panic("mock out the ListNamespaced method")
+//             },
+//             ObjectClientFunc: func() *objectclient.ObjectClient {
+// 	               panic("mock out the ObjectClient method")
+//             },
+//             UpdateFunc: func(in1 *v1.Event) (*v1.Event, error) {
+// 	               panic("mock out the Update method")
+//             },
+//             WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
+// 	               panic("mock out the Watch method")
+//             },
+//         }
 //
-//	        // use mockedEventInterface in code that requires v11.EventInterface
-//	        // and then make assertions.
+//         // use mockedEventInterface in code that requires v11.EventInterface
+//         // and then make assertions.
 //
-//	    }
+//     }
 type EventInterfaceMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
 	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v11.EventHandlerFunc)
@@ -984,8 +973,7 @@ func (mock *EventInterfaceMock) AddClusterScopedFeatureHandler(ctx context.Conte
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//
-//	len(mockedEventInterface.AddClusterScopedFeatureHandlerCalls())
+//     len(mockedEventInterface.AddClusterScopedFeatureHandlerCalls())
 func (mock *EventInterfaceMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -1032,8 +1020,7 @@ func (mock *EventInterfaceMock) AddClusterScopedFeatureLifecycle(ctx context.Con
 
 // AddClusterScopedFeatureLifecycleCalls gets all the calls that were made to AddClusterScopedFeatureLifecycle.
 // Check the length with:
-//
-//	len(mockedEventInterface.AddClusterScopedFeatureLifecycleCalls())
+//     len(mockedEventInterface.AddClusterScopedFeatureLifecycleCalls())
 func (mock *EventInterfaceMock) AddClusterScopedFeatureLifecycleCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -1078,8 +1065,7 @@ func (mock *EventInterfaceMock) AddClusterScopedHandler(ctx context.Context, nam
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//
-//	len(mockedEventInterface.AddClusterScopedHandlerCalls())
+//     len(mockedEventInterface.AddClusterScopedHandlerCalls())
 func (mock *EventInterfaceMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -1122,8 +1108,7 @@ func (mock *EventInterfaceMock) AddClusterScopedLifecycle(ctx context.Context, n
 
 // AddClusterScopedLifecycleCalls gets all the calls that were made to AddClusterScopedLifecycle.
 // Check the length with:
-//
-//	len(mockedEventInterface.AddClusterScopedLifecycleCalls())
+//     len(mockedEventInterface.AddClusterScopedLifecycleCalls())
 func (mock *EventInterfaceMock) AddClusterScopedLifecycleCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -1166,8 +1151,7 @@ func (mock *EventInterfaceMock) AddFeatureHandler(ctx context.Context, enabled f
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//
-//	len(mockedEventInterface.AddFeatureHandlerCalls())
+//     len(mockedEventInterface.AddFeatureHandlerCalls())
 func (mock *EventInterfaceMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
@@ -1210,8 +1194,7 @@ func (mock *EventInterfaceMock) AddFeatureLifecycle(ctx context.Context, enabled
 
 // AddFeatureLifecycleCalls gets all the calls that were made to AddFeatureLifecycle.
 // Check the length with:
-//
-//	len(mockedEventInterface.AddFeatureLifecycleCalls())
+//     len(mockedEventInterface.AddFeatureLifecycleCalls())
 func (mock *EventInterfaceMock) AddFeatureLifecycleCalls() []struct {
 	Ctx       context.Context
 	Enabled   func() bool
@@ -1252,8 +1235,7 @@ func (mock *EventInterfaceMock) AddHandler(ctx context.Context, name string, syn
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//
-//	len(mockedEventInterface.AddHandlerCalls())
+//     len(mockedEventInterface.AddHandlerCalls())
 func (mock *EventInterfaceMock) AddHandlerCalls() []struct {
 	Ctx  context.Context
 	Name string
@@ -1292,8 +1274,7 @@ func (mock *EventInterfaceMock) AddLifecycle(ctx context.Context, name string, l
 
 // AddLifecycleCalls gets all the calls that were made to AddLifecycle.
 // Check the length with:
-//
-//	len(mockedEventInterface.AddLifecycleCalls())
+//     len(mockedEventInterface.AddLifecycleCalls())
 func (mock *EventInterfaceMock) AddLifecycleCalls() []struct {
 	Ctx       context.Context
 	Name      string
@@ -1325,8 +1306,7 @@ func (mock *EventInterfaceMock) Controller() v11.EventController {
 
 // ControllerCalls gets all the calls that were made to Controller.
 // Check the length with:
-//
-//	len(mockedEventInterface.ControllerCalls())
+//     len(mockedEventInterface.ControllerCalls())
 func (mock *EventInterfaceMock) ControllerCalls() []struct {
 } {
 	var calls []struct {
@@ -1355,8 +1335,7 @@ func (mock *EventInterfaceMock) Create(in1 *v1.Event) (*v1.Event, error) {
 
 // CreateCalls gets all the calls that were made to Create.
 // Check the length with:
-//
-//	len(mockedEventInterface.CreateCalls())
+//     len(mockedEventInterface.CreateCalls())
 func (mock *EventInterfaceMock) CreateCalls() []struct {
 	In1 *v1.Event
 } {
@@ -1389,8 +1368,7 @@ func (mock *EventInterfaceMock) Delete(name string, options *metav1.DeleteOption
 
 // DeleteCalls gets all the calls that were made to Delete.
 // Check the length with:
-//
-//	len(mockedEventInterface.DeleteCalls())
+//     len(mockedEventInterface.DeleteCalls())
 func (mock *EventInterfaceMock) DeleteCalls() []struct {
 	Name    string
 	Options *metav1.DeleteOptions
@@ -1425,8 +1403,7 @@ func (mock *EventInterfaceMock) DeleteCollection(deleteOpts *metav1.DeleteOption
 
 // DeleteCollectionCalls gets all the calls that were made to DeleteCollection.
 // Check the length with:
-//
-//	len(mockedEventInterface.DeleteCollectionCalls())
+//     len(mockedEventInterface.DeleteCollectionCalls())
 func (mock *EventInterfaceMock) DeleteCollectionCalls() []struct {
 	DeleteOpts *metav1.DeleteOptions
 	ListOpts   metav1.ListOptions
@@ -1463,8 +1440,7 @@ func (mock *EventInterfaceMock) DeleteNamespaced(namespace string, name string, 
 
 // DeleteNamespacedCalls gets all the calls that were made to DeleteNamespaced.
 // Check the length with:
-//
-//	len(mockedEventInterface.DeleteNamespacedCalls())
+//     len(mockedEventInterface.DeleteNamespacedCalls())
 func (mock *EventInterfaceMock) DeleteNamespacedCalls() []struct {
 	Namespace string
 	Name      string
@@ -1501,8 +1477,7 @@ func (mock *EventInterfaceMock) Get(name string, opts metav1.GetOptions) (*v1.Ev
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//
-//	len(mockedEventInterface.GetCalls())
+//     len(mockedEventInterface.GetCalls())
 func (mock *EventInterfaceMock) GetCalls() []struct {
 	Name string
 	Opts metav1.GetOptions
@@ -1539,8 +1514,7 @@ func (mock *EventInterfaceMock) GetNamespaced(namespace string, name string, opt
 
 // GetNamespacedCalls gets all the calls that were made to GetNamespaced.
 // Check the length with:
-//
-//	len(mockedEventInterface.GetNamespacedCalls())
+//     len(mockedEventInterface.GetNamespacedCalls())
 func (mock *EventInterfaceMock) GetNamespacedCalls() []struct {
 	Namespace string
 	Name      string
@@ -1575,8 +1549,7 @@ func (mock *EventInterfaceMock) List(opts metav1.ListOptions) (*v1.EventList, er
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//
-//	len(mockedEventInterface.ListCalls())
+//     len(mockedEventInterface.ListCalls())
 func (mock *EventInterfaceMock) ListCalls() []struct {
 	Opts metav1.ListOptions
 } {
@@ -1609,8 +1582,7 @@ func (mock *EventInterfaceMock) ListNamespaced(namespace string, opts metav1.Lis
 
 // ListNamespacedCalls gets all the calls that were made to ListNamespaced.
 // Check the length with:
-//
-//	len(mockedEventInterface.ListNamespacedCalls())
+//     len(mockedEventInterface.ListNamespacedCalls())
 func (mock *EventInterfaceMock) ListNamespacedCalls() []struct {
 	Namespace string
 	Opts      metav1.ListOptions
@@ -1640,8 +1612,7 @@ func (mock *EventInterfaceMock) ObjectClient() *objectclient.ObjectClient {
 
 // ObjectClientCalls gets all the calls that were made to ObjectClient.
 // Check the length with:
-//
-//	len(mockedEventInterface.ObjectClientCalls())
+//     len(mockedEventInterface.ObjectClientCalls())
 func (mock *EventInterfaceMock) ObjectClientCalls() []struct {
 } {
 	var calls []struct {
@@ -1670,8 +1641,7 @@ func (mock *EventInterfaceMock) Update(in1 *v1.Event) (*v1.Event, error) {
 
 // UpdateCalls gets all the calls that were made to Update.
 // Check the length with:
-//
-//	len(mockedEventInterface.UpdateCalls())
+//     len(mockedEventInterface.UpdateCalls())
 func (mock *EventInterfaceMock) UpdateCalls() []struct {
 	In1 *v1.Event
 } {
@@ -1702,8 +1672,7 @@ func (mock *EventInterfaceMock) Watch(opts metav1.ListOptions) (watch.Interface,
 
 // WatchCalls gets all the calls that were made to Watch.
 // Check the length with:
-//
-//	len(mockedEventInterface.WatchCalls())
+//     len(mockedEventInterface.WatchCalls())
 func (mock *EventInterfaceMock) WatchCalls() []struct {
 	Opts metav1.ListOptions
 } {
@@ -1726,19 +1695,19 @@ var _ v11.EventsGetter = &EventsGetterMock{}
 
 // EventsGetterMock is a mock implementation of v11.EventsGetter.
 //
-//	    func TestSomethingThatUsesEventsGetter(t *testing.T) {
+//     func TestSomethingThatUsesEventsGetter(t *testing.T) {
 //
-//	        // make and configure a mocked v11.EventsGetter
-//	        mockedEventsGetter := &EventsGetterMock{
-//	            EventsFunc: func(namespace string) v11.EventInterface {
-//		               panic("mock out the Events method")
-//	            },
-//	        }
+//         // make and configure a mocked v11.EventsGetter
+//         mockedEventsGetter := &EventsGetterMock{
+//             EventsFunc: func(namespace string) v11.EventInterface {
+// 	               panic("mock out the Events method")
+//             },
+//         }
 //
-//	        // use mockedEventsGetter in code that requires v11.EventsGetter
-//	        // and then make assertions.
+//         // use mockedEventsGetter in code that requires v11.EventsGetter
+//         // and then make assertions.
 //
-//	    }
+//     }
 type EventsGetterMock struct {
 	// EventsFunc mocks the Events method.
 	EventsFunc func(namespace string) v11.EventInterface
@@ -1771,8 +1740,7 @@ func (mock *EventsGetterMock) Events(namespace string) v11.EventInterface {
 
 // EventsCalls gets all the calls that were made to Events.
 // Check the length with:
-//
-//	len(mockedEventsGetter.EventsCalls())
+//     len(mockedEventsGetter.EventsCalls())
 func (mock *EventsGetterMock) EventsCalls() []struct {
 	Namespace string
 } {

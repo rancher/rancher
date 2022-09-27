@@ -29,22 +29,22 @@ var _ v31.ProjectMonitorGraphLister = &ProjectMonitorGraphListerMock{}
 
 // ProjectMonitorGraphListerMock is a mock implementation of v31.ProjectMonitorGraphLister.
 //
-//	    func TestSomethingThatUsesProjectMonitorGraphLister(t *testing.T) {
+//     func TestSomethingThatUsesProjectMonitorGraphLister(t *testing.T) {
 //
-//	        // make and configure a mocked v31.ProjectMonitorGraphLister
-//	        mockedProjectMonitorGraphLister := &ProjectMonitorGraphListerMock{
-//	            GetFunc: func(namespace string, name string) (*v3.ProjectMonitorGraph, error) {
-//		               panic("mock out the Get method")
-//	            },
-//	            ListFunc: func(namespace string, selector labels.Selector) ([]*v3.ProjectMonitorGraph, error) {
-//		               panic("mock out the List method")
-//	            },
-//	        }
+//         // make and configure a mocked v31.ProjectMonitorGraphLister
+//         mockedProjectMonitorGraphLister := &ProjectMonitorGraphListerMock{
+//             GetFunc: func(namespace string, name string) (*v3.ProjectMonitorGraph, error) {
+// 	               panic("mock out the Get method")
+//             },
+//             ListFunc: func(namespace string, selector labels.Selector) ([]*v3.ProjectMonitorGraph, error) {
+// 	               panic("mock out the List method")
+//             },
+//         }
 //
-//	        // use mockedProjectMonitorGraphLister in code that requires v31.ProjectMonitorGraphLister
-//	        // and then make assertions.
+//         // use mockedProjectMonitorGraphLister in code that requires v31.ProjectMonitorGraphLister
+//         // and then make assertions.
 //
-//	    }
+//     }
 type ProjectMonitorGraphListerMock struct {
 	// GetFunc mocks the Get method.
 	GetFunc func(namespace string, name string) (*v3.ProjectMonitorGraph, error)
@@ -91,8 +91,7 @@ func (mock *ProjectMonitorGraphListerMock) Get(namespace string, name string) (*
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//
-//	len(mockedProjectMonitorGraphLister.GetCalls())
+//     len(mockedProjectMonitorGraphLister.GetCalls())
 func (mock *ProjectMonitorGraphListerMock) GetCalls() []struct {
 	Namespace string
 	Name      string
@@ -127,8 +126,7 @@ func (mock *ProjectMonitorGraphListerMock) List(namespace string, selector label
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//
-//	len(mockedProjectMonitorGraphLister.ListCalls())
+//     len(mockedProjectMonitorGraphLister.ListCalls())
 func (mock *ProjectMonitorGraphListerMock) ListCalls() []struct {
 	Namespace string
 	Selector  labels.Selector
@@ -161,43 +159,43 @@ var _ v31.ProjectMonitorGraphController = &ProjectMonitorGraphControllerMock{}
 
 // ProjectMonitorGraphControllerMock is a mock implementation of v31.ProjectMonitorGraphController.
 //
-//	    func TestSomethingThatUsesProjectMonitorGraphController(t *testing.T) {
+//     func TestSomethingThatUsesProjectMonitorGraphController(t *testing.T) {
 //
-//	        // make and configure a mocked v31.ProjectMonitorGraphController
-//	        mockedProjectMonitorGraphController := &ProjectMonitorGraphControllerMock{
-//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v31.ProjectMonitorGraphHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedFeatureHandler method")
-//	            },
-//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v31.ProjectMonitorGraphHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedHandler method")
-//	            },
-//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.ProjectMonitorGraphHandlerFunc)  {
-//		               panic("mock out the AddFeatureHandler method")
-//	            },
-//	            AddHandlerFunc: func(ctx context.Context, name string, handler v31.ProjectMonitorGraphHandlerFunc)  {
-//		               panic("mock out the AddHandler method")
-//	            },
-//	            EnqueueFunc: func(namespace string, name string)  {
-//		               panic("mock out the Enqueue method")
-//	            },
-//	            EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
-//		               panic("mock out the EnqueueAfter method")
-//	            },
-//	            GenericFunc: func() controller.GenericController {
-//		               panic("mock out the Generic method")
-//	            },
-//	            InformerFunc: func() cache.SharedIndexInformer {
-//		               panic("mock out the Informer method")
-//	            },
-//	            ListerFunc: func() v31.ProjectMonitorGraphLister {
-//		               panic("mock out the Lister method")
-//	            },
-//	        }
+//         // make and configure a mocked v31.ProjectMonitorGraphController
+//         mockedProjectMonitorGraphController := &ProjectMonitorGraphControllerMock{
+//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v31.ProjectMonitorGraphHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedFeatureHandler method")
+//             },
+//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v31.ProjectMonitorGraphHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedHandler method")
+//             },
+//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.ProjectMonitorGraphHandlerFunc)  {
+// 	               panic("mock out the AddFeatureHandler method")
+//             },
+//             AddHandlerFunc: func(ctx context.Context, name string, handler v31.ProjectMonitorGraphHandlerFunc)  {
+// 	               panic("mock out the AddHandler method")
+//             },
+//             EnqueueFunc: func(namespace string, name string)  {
+// 	               panic("mock out the Enqueue method")
+//             },
+//             EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
+// 	               panic("mock out the EnqueueAfter method")
+//             },
+//             GenericFunc: func() controller.GenericController {
+// 	               panic("mock out the Generic method")
+//             },
+//             InformerFunc: func() cache.SharedIndexInformer {
+// 	               panic("mock out the Informer method")
+//             },
+//             ListerFunc: func() v31.ProjectMonitorGraphLister {
+// 	               panic("mock out the Lister method")
+//             },
+//         }
 //
-//	        // use mockedProjectMonitorGraphController in code that requires v31.ProjectMonitorGraphController
-//	        // and then make assertions.
+//         // use mockedProjectMonitorGraphController in code that requires v31.ProjectMonitorGraphController
+//         // and then make assertions.
 //
-//	    }
+//     }
 type ProjectMonitorGraphControllerMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
 	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v31.ProjectMonitorGraphHandlerFunc)
@@ -326,8 +324,7 @@ func (mock *ProjectMonitorGraphControllerMock) AddClusterScopedFeatureHandler(ct
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//
-//	len(mockedProjectMonitorGraphController.AddClusterScopedFeatureHandlerCalls())
+//     len(mockedProjectMonitorGraphController.AddClusterScopedFeatureHandlerCalls())
 func (mock *ProjectMonitorGraphControllerMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -372,8 +369,7 @@ func (mock *ProjectMonitorGraphControllerMock) AddClusterScopedHandler(ctx conte
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//
-//	len(mockedProjectMonitorGraphController.AddClusterScopedHandlerCalls())
+//     len(mockedProjectMonitorGraphController.AddClusterScopedHandlerCalls())
 func (mock *ProjectMonitorGraphControllerMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -416,8 +412,7 @@ func (mock *ProjectMonitorGraphControllerMock) AddFeatureHandler(ctx context.Con
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//
-//	len(mockedProjectMonitorGraphController.AddFeatureHandlerCalls())
+//     len(mockedProjectMonitorGraphController.AddFeatureHandlerCalls())
 func (mock *ProjectMonitorGraphControllerMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
@@ -458,8 +453,7 @@ func (mock *ProjectMonitorGraphControllerMock) AddHandler(ctx context.Context, n
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//
-//	len(mockedProjectMonitorGraphController.AddHandlerCalls())
+//     len(mockedProjectMonitorGraphController.AddHandlerCalls())
 func (mock *ProjectMonitorGraphControllerMock) AddHandlerCalls() []struct {
 	Ctx     context.Context
 	Name    string
@@ -496,8 +490,7 @@ func (mock *ProjectMonitorGraphControllerMock) Enqueue(namespace string, name st
 
 // EnqueueCalls gets all the calls that were made to Enqueue.
 // Check the length with:
-//
-//	len(mockedProjectMonitorGraphController.EnqueueCalls())
+//     len(mockedProjectMonitorGraphController.EnqueueCalls())
 func (mock *ProjectMonitorGraphControllerMock) EnqueueCalls() []struct {
 	Namespace string
 	Name      string
@@ -534,8 +527,7 @@ func (mock *ProjectMonitorGraphControllerMock) EnqueueAfter(namespace string, na
 
 // EnqueueAfterCalls gets all the calls that were made to EnqueueAfter.
 // Check the length with:
-//
-//	len(mockedProjectMonitorGraphController.EnqueueAfterCalls())
+//     len(mockedProjectMonitorGraphController.EnqueueAfterCalls())
 func (mock *ProjectMonitorGraphControllerMock) EnqueueAfterCalls() []struct {
 	Namespace string
 	Name      string
@@ -567,8 +559,7 @@ func (mock *ProjectMonitorGraphControllerMock) Generic() controller.GenericContr
 
 // GenericCalls gets all the calls that were made to Generic.
 // Check the length with:
-//
-//	len(mockedProjectMonitorGraphController.GenericCalls())
+//     len(mockedProjectMonitorGraphController.GenericCalls())
 func (mock *ProjectMonitorGraphControllerMock) GenericCalls() []struct {
 } {
 	var calls []struct {
@@ -594,8 +585,7 @@ func (mock *ProjectMonitorGraphControllerMock) Informer() cache.SharedIndexInfor
 
 // InformerCalls gets all the calls that were made to Informer.
 // Check the length with:
-//
-//	len(mockedProjectMonitorGraphController.InformerCalls())
+//     len(mockedProjectMonitorGraphController.InformerCalls())
 func (mock *ProjectMonitorGraphControllerMock) InformerCalls() []struct {
 } {
 	var calls []struct {
@@ -621,8 +611,7 @@ func (mock *ProjectMonitorGraphControllerMock) Lister() v31.ProjectMonitorGraphL
 
 // ListerCalls gets all the calls that were made to Lister.
 // Check the length with:
-//
-//	len(mockedProjectMonitorGraphController.ListerCalls())
+//     len(mockedProjectMonitorGraphController.ListerCalls())
 func (mock *ProjectMonitorGraphControllerMock) ListerCalls() []struct {
 } {
 	var calls []struct {
@@ -662,76 +651,76 @@ var _ v31.ProjectMonitorGraphInterface = &ProjectMonitorGraphInterfaceMock{}
 
 // ProjectMonitorGraphInterfaceMock is a mock implementation of v31.ProjectMonitorGraphInterface.
 //
-//	    func TestSomethingThatUsesProjectMonitorGraphInterface(t *testing.T) {
+//     func TestSomethingThatUsesProjectMonitorGraphInterface(t *testing.T) {
 //
-//	        // make and configure a mocked v31.ProjectMonitorGraphInterface
-//	        mockedProjectMonitorGraphInterface := &ProjectMonitorGraphInterfaceMock{
-//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v31.ProjectMonitorGraphHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedFeatureHandler method")
-//	            },
-//	            AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v31.ProjectMonitorGraphLifecycle)  {
-//		               panic("mock out the AddClusterScopedFeatureLifecycle method")
-//	            },
-//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v31.ProjectMonitorGraphHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedHandler method")
-//	            },
-//	            AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v31.ProjectMonitorGraphLifecycle)  {
-//		               panic("mock out the AddClusterScopedLifecycle method")
-//	            },
-//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.ProjectMonitorGraphHandlerFunc)  {
-//		               panic("mock out the AddFeatureHandler method")
-//	            },
-//	            AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v31.ProjectMonitorGraphLifecycle)  {
-//		               panic("mock out the AddFeatureLifecycle method")
-//	            },
-//	            AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v31.ProjectMonitorGraphHandlerFunc)  {
-//		               panic("mock out the AddHandler method")
-//	            },
-//	            AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v31.ProjectMonitorGraphLifecycle)  {
-//		               panic("mock out the AddLifecycle method")
-//	            },
-//	            ControllerFunc: func() v31.ProjectMonitorGraphController {
-//		               panic("mock out the Controller method")
-//	            },
-//	            CreateFunc: func(in1 *v3.ProjectMonitorGraph) (*v3.ProjectMonitorGraph, error) {
-//		               panic("mock out the Create method")
-//	            },
-//	            DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
-//		               panic("mock out the Delete method")
-//	            },
-//	            DeleteCollectionFunc: func(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
-//		               panic("mock out the DeleteCollection method")
-//	            },
-//	            DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
-//		               panic("mock out the DeleteNamespaced method")
-//	            },
-//	            GetFunc: func(name string, opts metav1.GetOptions) (*v3.ProjectMonitorGraph, error) {
-//		               panic("mock out the Get method")
-//	            },
-//	            GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v3.ProjectMonitorGraph, error) {
-//		               panic("mock out the GetNamespaced method")
-//	            },
-//	            ListFunc: func(opts metav1.ListOptions) (*v3.ProjectMonitorGraphList, error) {
-//		               panic("mock out the List method")
-//	            },
-//	            ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v3.ProjectMonitorGraphList, error) {
-//		               panic("mock out the ListNamespaced method")
-//	            },
-//	            ObjectClientFunc: func() *objectclient.ObjectClient {
-//		               panic("mock out the ObjectClient method")
-//	            },
-//	            UpdateFunc: func(in1 *v3.ProjectMonitorGraph) (*v3.ProjectMonitorGraph, error) {
-//		               panic("mock out the Update method")
-//	            },
-//	            WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
-//		               panic("mock out the Watch method")
-//	            },
-//	        }
+//         // make and configure a mocked v31.ProjectMonitorGraphInterface
+//         mockedProjectMonitorGraphInterface := &ProjectMonitorGraphInterfaceMock{
+//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v31.ProjectMonitorGraphHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedFeatureHandler method")
+//             },
+//             AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v31.ProjectMonitorGraphLifecycle)  {
+// 	               panic("mock out the AddClusterScopedFeatureLifecycle method")
+//             },
+//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v31.ProjectMonitorGraphHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedHandler method")
+//             },
+//             AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v31.ProjectMonitorGraphLifecycle)  {
+// 	               panic("mock out the AddClusterScopedLifecycle method")
+//             },
+//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.ProjectMonitorGraphHandlerFunc)  {
+// 	               panic("mock out the AddFeatureHandler method")
+//             },
+//             AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v31.ProjectMonitorGraphLifecycle)  {
+// 	               panic("mock out the AddFeatureLifecycle method")
+//             },
+//             AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v31.ProjectMonitorGraphHandlerFunc)  {
+// 	               panic("mock out the AddHandler method")
+//             },
+//             AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v31.ProjectMonitorGraphLifecycle)  {
+// 	               panic("mock out the AddLifecycle method")
+//             },
+//             ControllerFunc: func() v31.ProjectMonitorGraphController {
+// 	               panic("mock out the Controller method")
+//             },
+//             CreateFunc: func(in1 *v3.ProjectMonitorGraph) (*v3.ProjectMonitorGraph, error) {
+// 	               panic("mock out the Create method")
+//             },
+//             DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
+// 	               panic("mock out the Delete method")
+//             },
+//             DeleteCollectionFunc: func(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
+// 	               panic("mock out the DeleteCollection method")
+//             },
+//             DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
+// 	               panic("mock out the DeleteNamespaced method")
+//             },
+//             GetFunc: func(name string, opts metav1.GetOptions) (*v3.ProjectMonitorGraph, error) {
+// 	               panic("mock out the Get method")
+//             },
+//             GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v3.ProjectMonitorGraph, error) {
+// 	               panic("mock out the GetNamespaced method")
+//             },
+//             ListFunc: func(opts metav1.ListOptions) (*v3.ProjectMonitorGraphList, error) {
+// 	               panic("mock out the List method")
+//             },
+//             ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v3.ProjectMonitorGraphList, error) {
+// 	               panic("mock out the ListNamespaced method")
+//             },
+//             ObjectClientFunc: func() *objectclient.ObjectClient {
+// 	               panic("mock out the ObjectClient method")
+//             },
+//             UpdateFunc: func(in1 *v3.ProjectMonitorGraph) (*v3.ProjectMonitorGraph, error) {
+// 	               panic("mock out the Update method")
+//             },
+//             WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
+// 	               panic("mock out the Watch method")
+//             },
+//         }
 //
-//	        // use mockedProjectMonitorGraphInterface in code that requires v31.ProjectMonitorGraphInterface
-//	        // and then make assertions.
+//         // use mockedProjectMonitorGraphInterface in code that requires v31.ProjectMonitorGraphInterface
+//         // and then make assertions.
 //
-//	    }
+//     }
 type ProjectMonitorGraphInterfaceMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
 	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v31.ProjectMonitorGraphHandlerFunc)
@@ -984,8 +973,7 @@ func (mock *ProjectMonitorGraphInterfaceMock) AddClusterScopedFeatureHandler(ctx
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//
-//	len(mockedProjectMonitorGraphInterface.AddClusterScopedFeatureHandlerCalls())
+//     len(mockedProjectMonitorGraphInterface.AddClusterScopedFeatureHandlerCalls())
 func (mock *ProjectMonitorGraphInterfaceMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -1032,8 +1020,7 @@ func (mock *ProjectMonitorGraphInterfaceMock) AddClusterScopedFeatureLifecycle(c
 
 // AddClusterScopedFeatureLifecycleCalls gets all the calls that were made to AddClusterScopedFeatureLifecycle.
 // Check the length with:
-//
-//	len(mockedProjectMonitorGraphInterface.AddClusterScopedFeatureLifecycleCalls())
+//     len(mockedProjectMonitorGraphInterface.AddClusterScopedFeatureLifecycleCalls())
 func (mock *ProjectMonitorGraphInterfaceMock) AddClusterScopedFeatureLifecycleCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -1078,8 +1065,7 @@ func (mock *ProjectMonitorGraphInterfaceMock) AddClusterScopedHandler(ctx contex
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//
-//	len(mockedProjectMonitorGraphInterface.AddClusterScopedHandlerCalls())
+//     len(mockedProjectMonitorGraphInterface.AddClusterScopedHandlerCalls())
 func (mock *ProjectMonitorGraphInterfaceMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -1122,8 +1108,7 @@ func (mock *ProjectMonitorGraphInterfaceMock) AddClusterScopedLifecycle(ctx cont
 
 // AddClusterScopedLifecycleCalls gets all the calls that were made to AddClusterScopedLifecycle.
 // Check the length with:
-//
-//	len(mockedProjectMonitorGraphInterface.AddClusterScopedLifecycleCalls())
+//     len(mockedProjectMonitorGraphInterface.AddClusterScopedLifecycleCalls())
 func (mock *ProjectMonitorGraphInterfaceMock) AddClusterScopedLifecycleCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -1166,8 +1151,7 @@ func (mock *ProjectMonitorGraphInterfaceMock) AddFeatureHandler(ctx context.Cont
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//
-//	len(mockedProjectMonitorGraphInterface.AddFeatureHandlerCalls())
+//     len(mockedProjectMonitorGraphInterface.AddFeatureHandlerCalls())
 func (mock *ProjectMonitorGraphInterfaceMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
@@ -1210,8 +1194,7 @@ func (mock *ProjectMonitorGraphInterfaceMock) AddFeatureLifecycle(ctx context.Co
 
 // AddFeatureLifecycleCalls gets all the calls that were made to AddFeatureLifecycle.
 // Check the length with:
-//
-//	len(mockedProjectMonitorGraphInterface.AddFeatureLifecycleCalls())
+//     len(mockedProjectMonitorGraphInterface.AddFeatureLifecycleCalls())
 func (mock *ProjectMonitorGraphInterfaceMock) AddFeatureLifecycleCalls() []struct {
 	Ctx       context.Context
 	Enabled   func() bool
@@ -1252,8 +1235,7 @@ func (mock *ProjectMonitorGraphInterfaceMock) AddHandler(ctx context.Context, na
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//
-//	len(mockedProjectMonitorGraphInterface.AddHandlerCalls())
+//     len(mockedProjectMonitorGraphInterface.AddHandlerCalls())
 func (mock *ProjectMonitorGraphInterfaceMock) AddHandlerCalls() []struct {
 	Ctx  context.Context
 	Name string
@@ -1292,8 +1274,7 @@ func (mock *ProjectMonitorGraphInterfaceMock) AddLifecycle(ctx context.Context, 
 
 // AddLifecycleCalls gets all the calls that were made to AddLifecycle.
 // Check the length with:
-//
-//	len(mockedProjectMonitorGraphInterface.AddLifecycleCalls())
+//     len(mockedProjectMonitorGraphInterface.AddLifecycleCalls())
 func (mock *ProjectMonitorGraphInterfaceMock) AddLifecycleCalls() []struct {
 	Ctx       context.Context
 	Name      string
@@ -1325,8 +1306,7 @@ func (mock *ProjectMonitorGraphInterfaceMock) Controller() v31.ProjectMonitorGra
 
 // ControllerCalls gets all the calls that were made to Controller.
 // Check the length with:
-//
-//	len(mockedProjectMonitorGraphInterface.ControllerCalls())
+//     len(mockedProjectMonitorGraphInterface.ControllerCalls())
 func (mock *ProjectMonitorGraphInterfaceMock) ControllerCalls() []struct {
 } {
 	var calls []struct {
@@ -1355,8 +1335,7 @@ func (mock *ProjectMonitorGraphInterfaceMock) Create(in1 *v3.ProjectMonitorGraph
 
 // CreateCalls gets all the calls that were made to Create.
 // Check the length with:
-//
-//	len(mockedProjectMonitorGraphInterface.CreateCalls())
+//     len(mockedProjectMonitorGraphInterface.CreateCalls())
 func (mock *ProjectMonitorGraphInterfaceMock) CreateCalls() []struct {
 	In1 *v3.ProjectMonitorGraph
 } {
@@ -1389,8 +1368,7 @@ func (mock *ProjectMonitorGraphInterfaceMock) Delete(name string, options *metav
 
 // DeleteCalls gets all the calls that were made to Delete.
 // Check the length with:
-//
-//	len(mockedProjectMonitorGraphInterface.DeleteCalls())
+//     len(mockedProjectMonitorGraphInterface.DeleteCalls())
 func (mock *ProjectMonitorGraphInterfaceMock) DeleteCalls() []struct {
 	Name    string
 	Options *metav1.DeleteOptions
@@ -1425,8 +1403,7 @@ func (mock *ProjectMonitorGraphInterfaceMock) DeleteCollection(deleteOpts *metav
 
 // DeleteCollectionCalls gets all the calls that were made to DeleteCollection.
 // Check the length with:
-//
-//	len(mockedProjectMonitorGraphInterface.DeleteCollectionCalls())
+//     len(mockedProjectMonitorGraphInterface.DeleteCollectionCalls())
 func (mock *ProjectMonitorGraphInterfaceMock) DeleteCollectionCalls() []struct {
 	DeleteOpts *metav1.DeleteOptions
 	ListOpts   metav1.ListOptions
@@ -1463,8 +1440,7 @@ func (mock *ProjectMonitorGraphInterfaceMock) DeleteNamespaced(namespace string,
 
 // DeleteNamespacedCalls gets all the calls that were made to DeleteNamespaced.
 // Check the length with:
-//
-//	len(mockedProjectMonitorGraphInterface.DeleteNamespacedCalls())
+//     len(mockedProjectMonitorGraphInterface.DeleteNamespacedCalls())
 func (mock *ProjectMonitorGraphInterfaceMock) DeleteNamespacedCalls() []struct {
 	Namespace string
 	Name      string
@@ -1501,8 +1477,7 @@ func (mock *ProjectMonitorGraphInterfaceMock) Get(name string, opts metav1.GetOp
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//
-//	len(mockedProjectMonitorGraphInterface.GetCalls())
+//     len(mockedProjectMonitorGraphInterface.GetCalls())
 func (mock *ProjectMonitorGraphInterfaceMock) GetCalls() []struct {
 	Name string
 	Opts metav1.GetOptions
@@ -1539,8 +1514,7 @@ func (mock *ProjectMonitorGraphInterfaceMock) GetNamespaced(namespace string, na
 
 // GetNamespacedCalls gets all the calls that were made to GetNamespaced.
 // Check the length with:
-//
-//	len(mockedProjectMonitorGraphInterface.GetNamespacedCalls())
+//     len(mockedProjectMonitorGraphInterface.GetNamespacedCalls())
 func (mock *ProjectMonitorGraphInterfaceMock) GetNamespacedCalls() []struct {
 	Namespace string
 	Name      string
@@ -1575,8 +1549,7 @@ func (mock *ProjectMonitorGraphInterfaceMock) List(opts metav1.ListOptions) (*v3
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//
-//	len(mockedProjectMonitorGraphInterface.ListCalls())
+//     len(mockedProjectMonitorGraphInterface.ListCalls())
 func (mock *ProjectMonitorGraphInterfaceMock) ListCalls() []struct {
 	Opts metav1.ListOptions
 } {
@@ -1609,8 +1582,7 @@ func (mock *ProjectMonitorGraphInterfaceMock) ListNamespaced(namespace string, o
 
 // ListNamespacedCalls gets all the calls that were made to ListNamespaced.
 // Check the length with:
-//
-//	len(mockedProjectMonitorGraphInterface.ListNamespacedCalls())
+//     len(mockedProjectMonitorGraphInterface.ListNamespacedCalls())
 func (mock *ProjectMonitorGraphInterfaceMock) ListNamespacedCalls() []struct {
 	Namespace string
 	Opts      metav1.ListOptions
@@ -1640,8 +1612,7 @@ func (mock *ProjectMonitorGraphInterfaceMock) ObjectClient() *objectclient.Objec
 
 // ObjectClientCalls gets all the calls that were made to ObjectClient.
 // Check the length with:
-//
-//	len(mockedProjectMonitorGraphInterface.ObjectClientCalls())
+//     len(mockedProjectMonitorGraphInterface.ObjectClientCalls())
 func (mock *ProjectMonitorGraphInterfaceMock) ObjectClientCalls() []struct {
 } {
 	var calls []struct {
@@ -1670,8 +1641,7 @@ func (mock *ProjectMonitorGraphInterfaceMock) Update(in1 *v3.ProjectMonitorGraph
 
 // UpdateCalls gets all the calls that were made to Update.
 // Check the length with:
-//
-//	len(mockedProjectMonitorGraphInterface.UpdateCalls())
+//     len(mockedProjectMonitorGraphInterface.UpdateCalls())
 func (mock *ProjectMonitorGraphInterfaceMock) UpdateCalls() []struct {
 	In1 *v3.ProjectMonitorGraph
 } {
@@ -1702,8 +1672,7 @@ func (mock *ProjectMonitorGraphInterfaceMock) Watch(opts metav1.ListOptions) (wa
 
 // WatchCalls gets all the calls that were made to Watch.
 // Check the length with:
-//
-//	len(mockedProjectMonitorGraphInterface.WatchCalls())
+//     len(mockedProjectMonitorGraphInterface.WatchCalls())
 func (mock *ProjectMonitorGraphInterfaceMock) WatchCalls() []struct {
 	Opts metav1.ListOptions
 } {
@@ -1726,19 +1695,19 @@ var _ v31.ProjectMonitorGraphsGetter = &ProjectMonitorGraphsGetterMock{}
 
 // ProjectMonitorGraphsGetterMock is a mock implementation of v31.ProjectMonitorGraphsGetter.
 //
-//	    func TestSomethingThatUsesProjectMonitorGraphsGetter(t *testing.T) {
+//     func TestSomethingThatUsesProjectMonitorGraphsGetter(t *testing.T) {
 //
-//	        // make and configure a mocked v31.ProjectMonitorGraphsGetter
-//	        mockedProjectMonitorGraphsGetter := &ProjectMonitorGraphsGetterMock{
-//	            ProjectMonitorGraphsFunc: func(namespace string) v31.ProjectMonitorGraphInterface {
-//		               panic("mock out the ProjectMonitorGraphs method")
-//	            },
-//	        }
+//         // make and configure a mocked v31.ProjectMonitorGraphsGetter
+//         mockedProjectMonitorGraphsGetter := &ProjectMonitorGraphsGetterMock{
+//             ProjectMonitorGraphsFunc: func(namespace string) v31.ProjectMonitorGraphInterface {
+// 	               panic("mock out the ProjectMonitorGraphs method")
+//             },
+//         }
 //
-//	        // use mockedProjectMonitorGraphsGetter in code that requires v31.ProjectMonitorGraphsGetter
-//	        // and then make assertions.
+//         // use mockedProjectMonitorGraphsGetter in code that requires v31.ProjectMonitorGraphsGetter
+//         // and then make assertions.
 //
-//	    }
+//     }
 type ProjectMonitorGraphsGetterMock struct {
 	// ProjectMonitorGraphsFunc mocks the ProjectMonitorGraphs method.
 	ProjectMonitorGraphsFunc func(namespace string) v31.ProjectMonitorGraphInterface
@@ -1771,8 +1740,7 @@ func (mock *ProjectMonitorGraphsGetterMock) ProjectMonitorGraphs(namespace strin
 
 // ProjectMonitorGraphsCalls gets all the calls that were made to ProjectMonitorGraphs.
 // Check the length with:
-//
-//	len(mockedProjectMonitorGraphsGetter.ProjectMonitorGraphsCalls())
+//     len(mockedProjectMonitorGraphsGetter.ProjectMonitorGraphsCalls())
 func (mock *ProjectMonitorGraphsGetterMock) ProjectMonitorGraphsCalls() []struct {
 	Namespace string
 } {

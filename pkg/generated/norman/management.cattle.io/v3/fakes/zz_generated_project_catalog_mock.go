@@ -29,22 +29,22 @@ var _ v31.ProjectCatalogLister = &ProjectCatalogListerMock{}
 
 // ProjectCatalogListerMock is a mock implementation of v31.ProjectCatalogLister.
 //
-//	    func TestSomethingThatUsesProjectCatalogLister(t *testing.T) {
+//     func TestSomethingThatUsesProjectCatalogLister(t *testing.T) {
 //
-//	        // make and configure a mocked v31.ProjectCatalogLister
-//	        mockedProjectCatalogLister := &ProjectCatalogListerMock{
-//	            GetFunc: func(namespace string, name string) (*v3.ProjectCatalog, error) {
-//		               panic("mock out the Get method")
-//	            },
-//	            ListFunc: func(namespace string, selector labels.Selector) ([]*v3.ProjectCatalog, error) {
-//		               panic("mock out the List method")
-//	            },
-//	        }
+//         // make and configure a mocked v31.ProjectCatalogLister
+//         mockedProjectCatalogLister := &ProjectCatalogListerMock{
+//             GetFunc: func(namespace string, name string) (*v3.ProjectCatalog, error) {
+// 	               panic("mock out the Get method")
+//             },
+//             ListFunc: func(namespace string, selector labels.Selector) ([]*v3.ProjectCatalog, error) {
+// 	               panic("mock out the List method")
+//             },
+//         }
 //
-//	        // use mockedProjectCatalogLister in code that requires v31.ProjectCatalogLister
-//	        // and then make assertions.
+//         // use mockedProjectCatalogLister in code that requires v31.ProjectCatalogLister
+//         // and then make assertions.
 //
-//	    }
+//     }
 type ProjectCatalogListerMock struct {
 	// GetFunc mocks the Get method.
 	GetFunc func(namespace string, name string) (*v3.ProjectCatalog, error)
@@ -91,8 +91,7 @@ func (mock *ProjectCatalogListerMock) Get(namespace string, name string) (*v3.Pr
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//
-//	len(mockedProjectCatalogLister.GetCalls())
+//     len(mockedProjectCatalogLister.GetCalls())
 func (mock *ProjectCatalogListerMock) GetCalls() []struct {
 	Namespace string
 	Name      string
@@ -127,8 +126,7 @@ func (mock *ProjectCatalogListerMock) List(namespace string, selector labels.Sel
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//
-//	len(mockedProjectCatalogLister.ListCalls())
+//     len(mockedProjectCatalogLister.ListCalls())
 func (mock *ProjectCatalogListerMock) ListCalls() []struct {
 	Namespace string
 	Selector  labels.Selector
@@ -161,43 +159,43 @@ var _ v31.ProjectCatalogController = &ProjectCatalogControllerMock{}
 
 // ProjectCatalogControllerMock is a mock implementation of v31.ProjectCatalogController.
 //
-//	    func TestSomethingThatUsesProjectCatalogController(t *testing.T) {
+//     func TestSomethingThatUsesProjectCatalogController(t *testing.T) {
 //
-//	        // make and configure a mocked v31.ProjectCatalogController
-//	        mockedProjectCatalogController := &ProjectCatalogControllerMock{
-//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v31.ProjectCatalogHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedFeatureHandler method")
-//	            },
-//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v31.ProjectCatalogHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedHandler method")
-//	            },
-//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.ProjectCatalogHandlerFunc)  {
-//		               panic("mock out the AddFeatureHandler method")
-//	            },
-//	            AddHandlerFunc: func(ctx context.Context, name string, handler v31.ProjectCatalogHandlerFunc)  {
-//		               panic("mock out the AddHandler method")
-//	            },
-//	            EnqueueFunc: func(namespace string, name string)  {
-//		               panic("mock out the Enqueue method")
-//	            },
-//	            EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
-//		               panic("mock out the EnqueueAfter method")
-//	            },
-//	            GenericFunc: func() controller.GenericController {
-//		               panic("mock out the Generic method")
-//	            },
-//	            InformerFunc: func() cache.SharedIndexInformer {
-//		               panic("mock out the Informer method")
-//	            },
-//	            ListerFunc: func() v31.ProjectCatalogLister {
-//		               panic("mock out the Lister method")
-//	            },
-//	        }
+//         // make and configure a mocked v31.ProjectCatalogController
+//         mockedProjectCatalogController := &ProjectCatalogControllerMock{
+//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v31.ProjectCatalogHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedFeatureHandler method")
+//             },
+//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v31.ProjectCatalogHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedHandler method")
+//             },
+//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.ProjectCatalogHandlerFunc)  {
+// 	               panic("mock out the AddFeatureHandler method")
+//             },
+//             AddHandlerFunc: func(ctx context.Context, name string, handler v31.ProjectCatalogHandlerFunc)  {
+// 	               panic("mock out the AddHandler method")
+//             },
+//             EnqueueFunc: func(namespace string, name string)  {
+// 	               panic("mock out the Enqueue method")
+//             },
+//             EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
+// 	               panic("mock out the EnqueueAfter method")
+//             },
+//             GenericFunc: func() controller.GenericController {
+// 	               panic("mock out the Generic method")
+//             },
+//             InformerFunc: func() cache.SharedIndexInformer {
+// 	               panic("mock out the Informer method")
+//             },
+//             ListerFunc: func() v31.ProjectCatalogLister {
+// 	               panic("mock out the Lister method")
+//             },
+//         }
 //
-//	        // use mockedProjectCatalogController in code that requires v31.ProjectCatalogController
-//	        // and then make assertions.
+//         // use mockedProjectCatalogController in code that requires v31.ProjectCatalogController
+//         // and then make assertions.
 //
-//	    }
+//     }
 type ProjectCatalogControllerMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
 	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v31.ProjectCatalogHandlerFunc)
@@ -326,8 +324,7 @@ func (mock *ProjectCatalogControllerMock) AddClusterScopedFeatureHandler(ctx con
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//
-//	len(mockedProjectCatalogController.AddClusterScopedFeatureHandlerCalls())
+//     len(mockedProjectCatalogController.AddClusterScopedFeatureHandlerCalls())
 func (mock *ProjectCatalogControllerMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -372,8 +369,7 @@ func (mock *ProjectCatalogControllerMock) AddClusterScopedHandler(ctx context.Co
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//
-//	len(mockedProjectCatalogController.AddClusterScopedHandlerCalls())
+//     len(mockedProjectCatalogController.AddClusterScopedHandlerCalls())
 func (mock *ProjectCatalogControllerMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -416,8 +412,7 @@ func (mock *ProjectCatalogControllerMock) AddFeatureHandler(ctx context.Context,
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//
-//	len(mockedProjectCatalogController.AddFeatureHandlerCalls())
+//     len(mockedProjectCatalogController.AddFeatureHandlerCalls())
 func (mock *ProjectCatalogControllerMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
@@ -458,8 +453,7 @@ func (mock *ProjectCatalogControllerMock) AddHandler(ctx context.Context, name s
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//
-//	len(mockedProjectCatalogController.AddHandlerCalls())
+//     len(mockedProjectCatalogController.AddHandlerCalls())
 func (mock *ProjectCatalogControllerMock) AddHandlerCalls() []struct {
 	Ctx     context.Context
 	Name    string
@@ -496,8 +490,7 @@ func (mock *ProjectCatalogControllerMock) Enqueue(namespace string, name string)
 
 // EnqueueCalls gets all the calls that were made to Enqueue.
 // Check the length with:
-//
-//	len(mockedProjectCatalogController.EnqueueCalls())
+//     len(mockedProjectCatalogController.EnqueueCalls())
 func (mock *ProjectCatalogControllerMock) EnqueueCalls() []struct {
 	Namespace string
 	Name      string
@@ -534,8 +527,7 @@ func (mock *ProjectCatalogControllerMock) EnqueueAfter(namespace string, name st
 
 // EnqueueAfterCalls gets all the calls that were made to EnqueueAfter.
 // Check the length with:
-//
-//	len(mockedProjectCatalogController.EnqueueAfterCalls())
+//     len(mockedProjectCatalogController.EnqueueAfterCalls())
 func (mock *ProjectCatalogControllerMock) EnqueueAfterCalls() []struct {
 	Namespace string
 	Name      string
@@ -567,8 +559,7 @@ func (mock *ProjectCatalogControllerMock) Generic() controller.GenericController
 
 // GenericCalls gets all the calls that were made to Generic.
 // Check the length with:
-//
-//	len(mockedProjectCatalogController.GenericCalls())
+//     len(mockedProjectCatalogController.GenericCalls())
 func (mock *ProjectCatalogControllerMock) GenericCalls() []struct {
 } {
 	var calls []struct {
@@ -594,8 +585,7 @@ func (mock *ProjectCatalogControllerMock) Informer() cache.SharedIndexInformer {
 
 // InformerCalls gets all the calls that were made to Informer.
 // Check the length with:
-//
-//	len(mockedProjectCatalogController.InformerCalls())
+//     len(mockedProjectCatalogController.InformerCalls())
 func (mock *ProjectCatalogControllerMock) InformerCalls() []struct {
 } {
 	var calls []struct {
@@ -621,8 +611,7 @@ func (mock *ProjectCatalogControllerMock) Lister() v31.ProjectCatalogLister {
 
 // ListerCalls gets all the calls that were made to Lister.
 // Check the length with:
-//
-//	len(mockedProjectCatalogController.ListerCalls())
+//     len(mockedProjectCatalogController.ListerCalls())
 func (mock *ProjectCatalogControllerMock) ListerCalls() []struct {
 } {
 	var calls []struct {
@@ -662,76 +651,76 @@ var _ v31.ProjectCatalogInterface = &ProjectCatalogInterfaceMock{}
 
 // ProjectCatalogInterfaceMock is a mock implementation of v31.ProjectCatalogInterface.
 //
-//	    func TestSomethingThatUsesProjectCatalogInterface(t *testing.T) {
+//     func TestSomethingThatUsesProjectCatalogInterface(t *testing.T) {
 //
-//	        // make and configure a mocked v31.ProjectCatalogInterface
-//	        mockedProjectCatalogInterface := &ProjectCatalogInterfaceMock{
-//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v31.ProjectCatalogHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedFeatureHandler method")
-//	            },
-//	            AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v31.ProjectCatalogLifecycle)  {
-//		               panic("mock out the AddClusterScopedFeatureLifecycle method")
-//	            },
-//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v31.ProjectCatalogHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedHandler method")
-//	            },
-//	            AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v31.ProjectCatalogLifecycle)  {
-//		               panic("mock out the AddClusterScopedLifecycle method")
-//	            },
-//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.ProjectCatalogHandlerFunc)  {
-//		               panic("mock out the AddFeatureHandler method")
-//	            },
-//	            AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v31.ProjectCatalogLifecycle)  {
-//		               panic("mock out the AddFeatureLifecycle method")
-//	            },
-//	            AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v31.ProjectCatalogHandlerFunc)  {
-//		               panic("mock out the AddHandler method")
-//	            },
-//	            AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v31.ProjectCatalogLifecycle)  {
-//		               panic("mock out the AddLifecycle method")
-//	            },
-//	            ControllerFunc: func() v31.ProjectCatalogController {
-//		               panic("mock out the Controller method")
-//	            },
-//	            CreateFunc: func(in1 *v3.ProjectCatalog) (*v3.ProjectCatalog, error) {
-//		               panic("mock out the Create method")
-//	            },
-//	            DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
-//		               panic("mock out the Delete method")
-//	            },
-//	            DeleteCollectionFunc: func(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
-//		               panic("mock out the DeleteCollection method")
-//	            },
-//	            DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
-//		               panic("mock out the DeleteNamespaced method")
-//	            },
-//	            GetFunc: func(name string, opts metav1.GetOptions) (*v3.ProjectCatalog, error) {
-//		               panic("mock out the Get method")
-//	            },
-//	            GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v3.ProjectCatalog, error) {
-//		               panic("mock out the GetNamespaced method")
-//	            },
-//	            ListFunc: func(opts metav1.ListOptions) (*v3.ProjectCatalogList, error) {
-//		               panic("mock out the List method")
-//	            },
-//	            ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v3.ProjectCatalogList, error) {
-//		               panic("mock out the ListNamespaced method")
-//	            },
-//	            ObjectClientFunc: func() *objectclient.ObjectClient {
-//		               panic("mock out the ObjectClient method")
-//	            },
-//	            UpdateFunc: func(in1 *v3.ProjectCatalog) (*v3.ProjectCatalog, error) {
-//		               panic("mock out the Update method")
-//	            },
-//	            WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
-//		               panic("mock out the Watch method")
-//	            },
-//	        }
+//         // make and configure a mocked v31.ProjectCatalogInterface
+//         mockedProjectCatalogInterface := &ProjectCatalogInterfaceMock{
+//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v31.ProjectCatalogHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedFeatureHandler method")
+//             },
+//             AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v31.ProjectCatalogLifecycle)  {
+// 	               panic("mock out the AddClusterScopedFeatureLifecycle method")
+//             },
+//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v31.ProjectCatalogHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedHandler method")
+//             },
+//             AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v31.ProjectCatalogLifecycle)  {
+// 	               panic("mock out the AddClusterScopedLifecycle method")
+//             },
+//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.ProjectCatalogHandlerFunc)  {
+// 	               panic("mock out the AddFeatureHandler method")
+//             },
+//             AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v31.ProjectCatalogLifecycle)  {
+// 	               panic("mock out the AddFeatureLifecycle method")
+//             },
+//             AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v31.ProjectCatalogHandlerFunc)  {
+// 	               panic("mock out the AddHandler method")
+//             },
+//             AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v31.ProjectCatalogLifecycle)  {
+// 	               panic("mock out the AddLifecycle method")
+//             },
+//             ControllerFunc: func() v31.ProjectCatalogController {
+// 	               panic("mock out the Controller method")
+//             },
+//             CreateFunc: func(in1 *v3.ProjectCatalog) (*v3.ProjectCatalog, error) {
+// 	               panic("mock out the Create method")
+//             },
+//             DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
+// 	               panic("mock out the Delete method")
+//             },
+//             DeleteCollectionFunc: func(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
+// 	               panic("mock out the DeleteCollection method")
+//             },
+//             DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
+// 	               panic("mock out the DeleteNamespaced method")
+//             },
+//             GetFunc: func(name string, opts metav1.GetOptions) (*v3.ProjectCatalog, error) {
+// 	               panic("mock out the Get method")
+//             },
+//             GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v3.ProjectCatalog, error) {
+// 	               panic("mock out the GetNamespaced method")
+//             },
+//             ListFunc: func(opts metav1.ListOptions) (*v3.ProjectCatalogList, error) {
+// 	               panic("mock out the List method")
+//             },
+//             ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v3.ProjectCatalogList, error) {
+// 	               panic("mock out the ListNamespaced method")
+//             },
+//             ObjectClientFunc: func() *objectclient.ObjectClient {
+// 	               panic("mock out the ObjectClient method")
+//             },
+//             UpdateFunc: func(in1 *v3.ProjectCatalog) (*v3.ProjectCatalog, error) {
+// 	               panic("mock out the Update method")
+//             },
+//             WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
+// 	               panic("mock out the Watch method")
+//             },
+//         }
 //
-//	        // use mockedProjectCatalogInterface in code that requires v31.ProjectCatalogInterface
-//	        // and then make assertions.
+//         // use mockedProjectCatalogInterface in code that requires v31.ProjectCatalogInterface
+//         // and then make assertions.
 //
-//	    }
+//     }
 type ProjectCatalogInterfaceMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
 	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v31.ProjectCatalogHandlerFunc)
@@ -984,8 +973,7 @@ func (mock *ProjectCatalogInterfaceMock) AddClusterScopedFeatureHandler(ctx cont
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//
-//	len(mockedProjectCatalogInterface.AddClusterScopedFeatureHandlerCalls())
+//     len(mockedProjectCatalogInterface.AddClusterScopedFeatureHandlerCalls())
 func (mock *ProjectCatalogInterfaceMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -1032,8 +1020,7 @@ func (mock *ProjectCatalogInterfaceMock) AddClusterScopedFeatureLifecycle(ctx co
 
 // AddClusterScopedFeatureLifecycleCalls gets all the calls that were made to AddClusterScopedFeatureLifecycle.
 // Check the length with:
-//
-//	len(mockedProjectCatalogInterface.AddClusterScopedFeatureLifecycleCalls())
+//     len(mockedProjectCatalogInterface.AddClusterScopedFeatureLifecycleCalls())
 func (mock *ProjectCatalogInterfaceMock) AddClusterScopedFeatureLifecycleCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -1078,8 +1065,7 @@ func (mock *ProjectCatalogInterfaceMock) AddClusterScopedHandler(ctx context.Con
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//
-//	len(mockedProjectCatalogInterface.AddClusterScopedHandlerCalls())
+//     len(mockedProjectCatalogInterface.AddClusterScopedHandlerCalls())
 func (mock *ProjectCatalogInterfaceMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -1122,8 +1108,7 @@ func (mock *ProjectCatalogInterfaceMock) AddClusterScopedLifecycle(ctx context.C
 
 // AddClusterScopedLifecycleCalls gets all the calls that were made to AddClusterScopedLifecycle.
 // Check the length with:
-//
-//	len(mockedProjectCatalogInterface.AddClusterScopedLifecycleCalls())
+//     len(mockedProjectCatalogInterface.AddClusterScopedLifecycleCalls())
 func (mock *ProjectCatalogInterfaceMock) AddClusterScopedLifecycleCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -1166,8 +1151,7 @@ func (mock *ProjectCatalogInterfaceMock) AddFeatureHandler(ctx context.Context, 
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//
-//	len(mockedProjectCatalogInterface.AddFeatureHandlerCalls())
+//     len(mockedProjectCatalogInterface.AddFeatureHandlerCalls())
 func (mock *ProjectCatalogInterfaceMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
@@ -1210,8 +1194,7 @@ func (mock *ProjectCatalogInterfaceMock) AddFeatureLifecycle(ctx context.Context
 
 // AddFeatureLifecycleCalls gets all the calls that were made to AddFeatureLifecycle.
 // Check the length with:
-//
-//	len(mockedProjectCatalogInterface.AddFeatureLifecycleCalls())
+//     len(mockedProjectCatalogInterface.AddFeatureLifecycleCalls())
 func (mock *ProjectCatalogInterfaceMock) AddFeatureLifecycleCalls() []struct {
 	Ctx       context.Context
 	Enabled   func() bool
@@ -1252,8 +1235,7 @@ func (mock *ProjectCatalogInterfaceMock) AddHandler(ctx context.Context, name st
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//
-//	len(mockedProjectCatalogInterface.AddHandlerCalls())
+//     len(mockedProjectCatalogInterface.AddHandlerCalls())
 func (mock *ProjectCatalogInterfaceMock) AddHandlerCalls() []struct {
 	Ctx  context.Context
 	Name string
@@ -1292,8 +1274,7 @@ func (mock *ProjectCatalogInterfaceMock) AddLifecycle(ctx context.Context, name 
 
 // AddLifecycleCalls gets all the calls that were made to AddLifecycle.
 // Check the length with:
-//
-//	len(mockedProjectCatalogInterface.AddLifecycleCalls())
+//     len(mockedProjectCatalogInterface.AddLifecycleCalls())
 func (mock *ProjectCatalogInterfaceMock) AddLifecycleCalls() []struct {
 	Ctx       context.Context
 	Name      string
@@ -1325,8 +1306,7 @@ func (mock *ProjectCatalogInterfaceMock) Controller() v31.ProjectCatalogControll
 
 // ControllerCalls gets all the calls that were made to Controller.
 // Check the length with:
-//
-//	len(mockedProjectCatalogInterface.ControllerCalls())
+//     len(mockedProjectCatalogInterface.ControllerCalls())
 func (mock *ProjectCatalogInterfaceMock) ControllerCalls() []struct {
 } {
 	var calls []struct {
@@ -1355,8 +1335,7 @@ func (mock *ProjectCatalogInterfaceMock) Create(in1 *v3.ProjectCatalog) (*v3.Pro
 
 // CreateCalls gets all the calls that were made to Create.
 // Check the length with:
-//
-//	len(mockedProjectCatalogInterface.CreateCalls())
+//     len(mockedProjectCatalogInterface.CreateCalls())
 func (mock *ProjectCatalogInterfaceMock) CreateCalls() []struct {
 	In1 *v3.ProjectCatalog
 } {
@@ -1389,8 +1368,7 @@ func (mock *ProjectCatalogInterfaceMock) Delete(name string, options *metav1.Del
 
 // DeleteCalls gets all the calls that were made to Delete.
 // Check the length with:
-//
-//	len(mockedProjectCatalogInterface.DeleteCalls())
+//     len(mockedProjectCatalogInterface.DeleteCalls())
 func (mock *ProjectCatalogInterfaceMock) DeleteCalls() []struct {
 	Name    string
 	Options *metav1.DeleteOptions
@@ -1425,8 +1403,7 @@ func (mock *ProjectCatalogInterfaceMock) DeleteCollection(deleteOpts *metav1.Del
 
 // DeleteCollectionCalls gets all the calls that were made to DeleteCollection.
 // Check the length with:
-//
-//	len(mockedProjectCatalogInterface.DeleteCollectionCalls())
+//     len(mockedProjectCatalogInterface.DeleteCollectionCalls())
 func (mock *ProjectCatalogInterfaceMock) DeleteCollectionCalls() []struct {
 	DeleteOpts *metav1.DeleteOptions
 	ListOpts   metav1.ListOptions
@@ -1463,8 +1440,7 @@ func (mock *ProjectCatalogInterfaceMock) DeleteNamespaced(namespace string, name
 
 // DeleteNamespacedCalls gets all the calls that were made to DeleteNamespaced.
 // Check the length with:
-//
-//	len(mockedProjectCatalogInterface.DeleteNamespacedCalls())
+//     len(mockedProjectCatalogInterface.DeleteNamespacedCalls())
 func (mock *ProjectCatalogInterfaceMock) DeleteNamespacedCalls() []struct {
 	Namespace string
 	Name      string
@@ -1501,8 +1477,7 @@ func (mock *ProjectCatalogInterfaceMock) Get(name string, opts metav1.GetOptions
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//
-//	len(mockedProjectCatalogInterface.GetCalls())
+//     len(mockedProjectCatalogInterface.GetCalls())
 func (mock *ProjectCatalogInterfaceMock) GetCalls() []struct {
 	Name string
 	Opts metav1.GetOptions
@@ -1539,8 +1514,7 @@ func (mock *ProjectCatalogInterfaceMock) GetNamespaced(namespace string, name st
 
 // GetNamespacedCalls gets all the calls that were made to GetNamespaced.
 // Check the length with:
-//
-//	len(mockedProjectCatalogInterface.GetNamespacedCalls())
+//     len(mockedProjectCatalogInterface.GetNamespacedCalls())
 func (mock *ProjectCatalogInterfaceMock) GetNamespacedCalls() []struct {
 	Namespace string
 	Name      string
@@ -1575,8 +1549,7 @@ func (mock *ProjectCatalogInterfaceMock) List(opts metav1.ListOptions) (*v3.Proj
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//
-//	len(mockedProjectCatalogInterface.ListCalls())
+//     len(mockedProjectCatalogInterface.ListCalls())
 func (mock *ProjectCatalogInterfaceMock) ListCalls() []struct {
 	Opts metav1.ListOptions
 } {
@@ -1609,8 +1582,7 @@ func (mock *ProjectCatalogInterfaceMock) ListNamespaced(namespace string, opts m
 
 // ListNamespacedCalls gets all the calls that were made to ListNamespaced.
 // Check the length with:
-//
-//	len(mockedProjectCatalogInterface.ListNamespacedCalls())
+//     len(mockedProjectCatalogInterface.ListNamespacedCalls())
 func (mock *ProjectCatalogInterfaceMock) ListNamespacedCalls() []struct {
 	Namespace string
 	Opts      metav1.ListOptions
@@ -1640,8 +1612,7 @@ func (mock *ProjectCatalogInterfaceMock) ObjectClient() *objectclient.ObjectClie
 
 // ObjectClientCalls gets all the calls that were made to ObjectClient.
 // Check the length with:
-//
-//	len(mockedProjectCatalogInterface.ObjectClientCalls())
+//     len(mockedProjectCatalogInterface.ObjectClientCalls())
 func (mock *ProjectCatalogInterfaceMock) ObjectClientCalls() []struct {
 } {
 	var calls []struct {
@@ -1670,8 +1641,7 @@ func (mock *ProjectCatalogInterfaceMock) Update(in1 *v3.ProjectCatalog) (*v3.Pro
 
 // UpdateCalls gets all the calls that were made to Update.
 // Check the length with:
-//
-//	len(mockedProjectCatalogInterface.UpdateCalls())
+//     len(mockedProjectCatalogInterface.UpdateCalls())
 func (mock *ProjectCatalogInterfaceMock) UpdateCalls() []struct {
 	In1 *v3.ProjectCatalog
 } {
@@ -1702,8 +1672,7 @@ func (mock *ProjectCatalogInterfaceMock) Watch(opts metav1.ListOptions) (watch.I
 
 // WatchCalls gets all the calls that were made to Watch.
 // Check the length with:
-//
-//	len(mockedProjectCatalogInterface.WatchCalls())
+//     len(mockedProjectCatalogInterface.WatchCalls())
 func (mock *ProjectCatalogInterfaceMock) WatchCalls() []struct {
 	Opts metav1.ListOptions
 } {
@@ -1726,19 +1695,19 @@ var _ v31.ProjectCatalogsGetter = &ProjectCatalogsGetterMock{}
 
 // ProjectCatalogsGetterMock is a mock implementation of v31.ProjectCatalogsGetter.
 //
-//	    func TestSomethingThatUsesProjectCatalogsGetter(t *testing.T) {
+//     func TestSomethingThatUsesProjectCatalogsGetter(t *testing.T) {
 //
-//	        // make and configure a mocked v31.ProjectCatalogsGetter
-//	        mockedProjectCatalogsGetter := &ProjectCatalogsGetterMock{
-//	            ProjectCatalogsFunc: func(namespace string) v31.ProjectCatalogInterface {
-//		               panic("mock out the ProjectCatalogs method")
-//	            },
-//	        }
+//         // make and configure a mocked v31.ProjectCatalogsGetter
+//         mockedProjectCatalogsGetter := &ProjectCatalogsGetterMock{
+//             ProjectCatalogsFunc: func(namespace string) v31.ProjectCatalogInterface {
+// 	               panic("mock out the ProjectCatalogs method")
+//             },
+//         }
 //
-//	        // use mockedProjectCatalogsGetter in code that requires v31.ProjectCatalogsGetter
-//	        // and then make assertions.
+//         // use mockedProjectCatalogsGetter in code that requires v31.ProjectCatalogsGetter
+//         // and then make assertions.
 //
-//	    }
+//     }
 type ProjectCatalogsGetterMock struct {
 	// ProjectCatalogsFunc mocks the ProjectCatalogs method.
 	ProjectCatalogsFunc func(namespace string) v31.ProjectCatalogInterface
@@ -1771,8 +1740,7 @@ func (mock *ProjectCatalogsGetterMock) ProjectCatalogs(namespace string) v31.Pro
 
 // ProjectCatalogsCalls gets all the calls that were made to ProjectCatalogs.
 // Check the length with:
-//
-//	len(mockedProjectCatalogsGetter.ProjectCatalogsCalls())
+//     len(mockedProjectCatalogsGetter.ProjectCatalogsCalls())
 func (mock *ProjectCatalogsGetterMock) ProjectCatalogsCalls() []struct {
 	Namespace string
 } {

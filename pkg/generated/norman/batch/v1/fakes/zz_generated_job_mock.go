@@ -29,22 +29,22 @@ var _ v11.JobLister = &JobListerMock{}
 
 // JobListerMock is a mock implementation of v11.JobLister.
 //
-//	    func TestSomethingThatUsesJobLister(t *testing.T) {
+//     func TestSomethingThatUsesJobLister(t *testing.T) {
 //
-//	        // make and configure a mocked v11.JobLister
-//	        mockedJobLister := &JobListerMock{
-//	            GetFunc: func(namespace string, name string) (*v1.Job, error) {
-//		               panic("mock out the Get method")
-//	            },
-//	            ListFunc: func(namespace string, selector labels.Selector) ([]*v1.Job, error) {
-//		               panic("mock out the List method")
-//	            },
-//	        }
+//         // make and configure a mocked v11.JobLister
+//         mockedJobLister := &JobListerMock{
+//             GetFunc: func(namespace string, name string) (*v1.Job, error) {
+// 	               panic("mock out the Get method")
+//             },
+//             ListFunc: func(namespace string, selector labels.Selector) ([]*v1.Job, error) {
+// 	               panic("mock out the List method")
+//             },
+//         }
 //
-//	        // use mockedJobLister in code that requires v11.JobLister
-//	        // and then make assertions.
+//         // use mockedJobLister in code that requires v11.JobLister
+//         // and then make assertions.
 //
-//	    }
+//     }
 type JobListerMock struct {
 	// GetFunc mocks the Get method.
 	GetFunc func(namespace string, name string) (*v1.Job, error)
@@ -91,8 +91,7 @@ func (mock *JobListerMock) Get(namespace string, name string) (*v1.Job, error) {
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//
-//	len(mockedJobLister.GetCalls())
+//     len(mockedJobLister.GetCalls())
 func (mock *JobListerMock) GetCalls() []struct {
 	Namespace string
 	Name      string
@@ -127,8 +126,7 @@ func (mock *JobListerMock) List(namespace string, selector labels.Selector) ([]*
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//
-//	len(mockedJobLister.ListCalls())
+//     len(mockedJobLister.ListCalls())
 func (mock *JobListerMock) ListCalls() []struct {
 	Namespace string
 	Selector  labels.Selector
@@ -161,43 +159,43 @@ var _ v11.JobController = &JobControllerMock{}
 
 // JobControllerMock is a mock implementation of v11.JobController.
 //
-//	    func TestSomethingThatUsesJobController(t *testing.T) {
+//     func TestSomethingThatUsesJobController(t *testing.T) {
 //
-//	        // make and configure a mocked v11.JobController
-//	        mockedJobController := &JobControllerMock{
-//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v11.JobHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedFeatureHandler method")
-//	            },
-//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v11.JobHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedHandler method")
-//	            },
-//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v11.JobHandlerFunc)  {
-//		               panic("mock out the AddFeatureHandler method")
-//	            },
-//	            AddHandlerFunc: func(ctx context.Context, name string, handler v11.JobHandlerFunc)  {
-//		               panic("mock out the AddHandler method")
-//	            },
-//	            EnqueueFunc: func(namespace string, name string)  {
-//		               panic("mock out the Enqueue method")
-//	            },
-//	            EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
-//		               panic("mock out the EnqueueAfter method")
-//	            },
-//	            GenericFunc: func() controller.GenericController {
-//		               panic("mock out the Generic method")
-//	            },
-//	            InformerFunc: func() cache.SharedIndexInformer {
-//		               panic("mock out the Informer method")
-//	            },
-//	            ListerFunc: func() v11.JobLister {
-//		               panic("mock out the Lister method")
-//	            },
-//	        }
+//         // make and configure a mocked v11.JobController
+//         mockedJobController := &JobControllerMock{
+//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v11.JobHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedFeatureHandler method")
+//             },
+//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v11.JobHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedHandler method")
+//             },
+//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v11.JobHandlerFunc)  {
+// 	               panic("mock out the AddFeatureHandler method")
+//             },
+//             AddHandlerFunc: func(ctx context.Context, name string, handler v11.JobHandlerFunc)  {
+// 	               panic("mock out the AddHandler method")
+//             },
+//             EnqueueFunc: func(namespace string, name string)  {
+// 	               panic("mock out the Enqueue method")
+//             },
+//             EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
+// 	               panic("mock out the EnqueueAfter method")
+//             },
+//             GenericFunc: func() controller.GenericController {
+// 	               panic("mock out the Generic method")
+//             },
+//             InformerFunc: func() cache.SharedIndexInformer {
+// 	               panic("mock out the Informer method")
+//             },
+//             ListerFunc: func() v11.JobLister {
+// 	               panic("mock out the Lister method")
+//             },
+//         }
 //
-//	        // use mockedJobController in code that requires v11.JobController
-//	        // and then make assertions.
+//         // use mockedJobController in code that requires v11.JobController
+//         // and then make assertions.
 //
-//	    }
+//     }
 type JobControllerMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
 	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v11.JobHandlerFunc)
@@ -326,8 +324,7 @@ func (mock *JobControllerMock) AddClusterScopedFeatureHandler(ctx context.Contex
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//
-//	len(mockedJobController.AddClusterScopedFeatureHandlerCalls())
+//     len(mockedJobController.AddClusterScopedFeatureHandlerCalls())
 func (mock *JobControllerMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -372,8 +369,7 @@ func (mock *JobControllerMock) AddClusterScopedHandler(ctx context.Context, name
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//
-//	len(mockedJobController.AddClusterScopedHandlerCalls())
+//     len(mockedJobController.AddClusterScopedHandlerCalls())
 func (mock *JobControllerMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -416,8 +412,7 @@ func (mock *JobControllerMock) AddFeatureHandler(ctx context.Context, enabled fu
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//
-//	len(mockedJobController.AddFeatureHandlerCalls())
+//     len(mockedJobController.AddFeatureHandlerCalls())
 func (mock *JobControllerMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
@@ -458,8 +453,7 @@ func (mock *JobControllerMock) AddHandler(ctx context.Context, name string, hand
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//
-//	len(mockedJobController.AddHandlerCalls())
+//     len(mockedJobController.AddHandlerCalls())
 func (mock *JobControllerMock) AddHandlerCalls() []struct {
 	Ctx     context.Context
 	Name    string
@@ -496,8 +490,7 @@ func (mock *JobControllerMock) Enqueue(namespace string, name string) {
 
 // EnqueueCalls gets all the calls that were made to Enqueue.
 // Check the length with:
-//
-//	len(mockedJobController.EnqueueCalls())
+//     len(mockedJobController.EnqueueCalls())
 func (mock *JobControllerMock) EnqueueCalls() []struct {
 	Namespace string
 	Name      string
@@ -534,8 +527,7 @@ func (mock *JobControllerMock) EnqueueAfter(namespace string, name string, after
 
 // EnqueueAfterCalls gets all the calls that were made to EnqueueAfter.
 // Check the length with:
-//
-//	len(mockedJobController.EnqueueAfterCalls())
+//     len(mockedJobController.EnqueueAfterCalls())
 func (mock *JobControllerMock) EnqueueAfterCalls() []struct {
 	Namespace string
 	Name      string
@@ -567,8 +559,7 @@ func (mock *JobControllerMock) Generic() controller.GenericController {
 
 // GenericCalls gets all the calls that were made to Generic.
 // Check the length with:
-//
-//	len(mockedJobController.GenericCalls())
+//     len(mockedJobController.GenericCalls())
 func (mock *JobControllerMock) GenericCalls() []struct {
 } {
 	var calls []struct {
@@ -594,8 +585,7 @@ func (mock *JobControllerMock) Informer() cache.SharedIndexInformer {
 
 // InformerCalls gets all the calls that were made to Informer.
 // Check the length with:
-//
-//	len(mockedJobController.InformerCalls())
+//     len(mockedJobController.InformerCalls())
 func (mock *JobControllerMock) InformerCalls() []struct {
 } {
 	var calls []struct {
@@ -621,8 +611,7 @@ func (mock *JobControllerMock) Lister() v11.JobLister {
 
 // ListerCalls gets all the calls that were made to Lister.
 // Check the length with:
-//
-//	len(mockedJobController.ListerCalls())
+//     len(mockedJobController.ListerCalls())
 func (mock *JobControllerMock) ListerCalls() []struct {
 } {
 	var calls []struct {
@@ -662,76 +651,76 @@ var _ v11.JobInterface = &JobInterfaceMock{}
 
 // JobInterfaceMock is a mock implementation of v11.JobInterface.
 //
-//	    func TestSomethingThatUsesJobInterface(t *testing.T) {
+//     func TestSomethingThatUsesJobInterface(t *testing.T) {
 //
-//	        // make and configure a mocked v11.JobInterface
-//	        mockedJobInterface := &JobInterfaceMock{
-//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v11.JobHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedFeatureHandler method")
-//	            },
-//	            AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v11.JobLifecycle)  {
-//		               panic("mock out the AddClusterScopedFeatureLifecycle method")
-//	            },
-//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v11.JobHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedHandler method")
-//	            },
-//	            AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v11.JobLifecycle)  {
-//		               panic("mock out the AddClusterScopedLifecycle method")
-//	            },
-//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v11.JobHandlerFunc)  {
-//		               panic("mock out the AddFeatureHandler method")
-//	            },
-//	            AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v11.JobLifecycle)  {
-//		               panic("mock out the AddFeatureLifecycle method")
-//	            },
-//	            AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v11.JobHandlerFunc)  {
-//		               panic("mock out the AddHandler method")
-//	            },
-//	            AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v11.JobLifecycle)  {
-//		               panic("mock out the AddLifecycle method")
-//	            },
-//	            ControllerFunc: func() v11.JobController {
-//		               panic("mock out the Controller method")
-//	            },
-//	            CreateFunc: func(in1 *v1.Job) (*v1.Job, error) {
-//		               panic("mock out the Create method")
-//	            },
-//	            DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
-//		               panic("mock out the Delete method")
-//	            },
-//	            DeleteCollectionFunc: func(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
-//		               panic("mock out the DeleteCollection method")
-//	            },
-//	            DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
-//		               panic("mock out the DeleteNamespaced method")
-//	            },
-//	            GetFunc: func(name string, opts metav1.GetOptions) (*v1.Job, error) {
-//		               panic("mock out the Get method")
-//	            },
-//	            GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v1.Job, error) {
-//		               panic("mock out the GetNamespaced method")
-//	            },
-//	            ListFunc: func(opts metav1.ListOptions) (*v1.JobList, error) {
-//		               panic("mock out the List method")
-//	            },
-//	            ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v1.JobList, error) {
-//		               panic("mock out the ListNamespaced method")
-//	            },
-//	            ObjectClientFunc: func() *objectclient.ObjectClient {
-//		               panic("mock out the ObjectClient method")
-//	            },
-//	            UpdateFunc: func(in1 *v1.Job) (*v1.Job, error) {
-//		               panic("mock out the Update method")
-//	            },
-//	            WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
-//		               panic("mock out the Watch method")
-//	            },
-//	        }
+//         // make and configure a mocked v11.JobInterface
+//         mockedJobInterface := &JobInterfaceMock{
+//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v11.JobHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedFeatureHandler method")
+//             },
+//             AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v11.JobLifecycle)  {
+// 	               panic("mock out the AddClusterScopedFeatureLifecycle method")
+//             },
+//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v11.JobHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedHandler method")
+//             },
+//             AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v11.JobLifecycle)  {
+// 	               panic("mock out the AddClusterScopedLifecycle method")
+//             },
+//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v11.JobHandlerFunc)  {
+// 	               panic("mock out the AddFeatureHandler method")
+//             },
+//             AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v11.JobLifecycle)  {
+// 	               panic("mock out the AddFeatureLifecycle method")
+//             },
+//             AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v11.JobHandlerFunc)  {
+// 	               panic("mock out the AddHandler method")
+//             },
+//             AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v11.JobLifecycle)  {
+// 	               panic("mock out the AddLifecycle method")
+//             },
+//             ControllerFunc: func() v11.JobController {
+// 	               panic("mock out the Controller method")
+//             },
+//             CreateFunc: func(in1 *v1.Job) (*v1.Job, error) {
+// 	               panic("mock out the Create method")
+//             },
+//             DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
+// 	               panic("mock out the Delete method")
+//             },
+//             DeleteCollectionFunc: func(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
+// 	               panic("mock out the DeleteCollection method")
+//             },
+//             DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
+// 	               panic("mock out the DeleteNamespaced method")
+//             },
+//             GetFunc: func(name string, opts metav1.GetOptions) (*v1.Job, error) {
+// 	               panic("mock out the Get method")
+//             },
+//             GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v1.Job, error) {
+// 	               panic("mock out the GetNamespaced method")
+//             },
+//             ListFunc: func(opts metav1.ListOptions) (*v1.JobList, error) {
+// 	               panic("mock out the List method")
+//             },
+//             ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v1.JobList, error) {
+// 	               panic("mock out the ListNamespaced method")
+//             },
+//             ObjectClientFunc: func() *objectclient.ObjectClient {
+// 	               panic("mock out the ObjectClient method")
+//             },
+//             UpdateFunc: func(in1 *v1.Job) (*v1.Job, error) {
+// 	               panic("mock out the Update method")
+//             },
+//             WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
+// 	               panic("mock out the Watch method")
+//             },
+//         }
 //
-//	        // use mockedJobInterface in code that requires v11.JobInterface
-//	        // and then make assertions.
+//         // use mockedJobInterface in code that requires v11.JobInterface
+//         // and then make assertions.
 //
-//	    }
+//     }
 type JobInterfaceMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
 	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v11.JobHandlerFunc)
@@ -984,8 +973,7 @@ func (mock *JobInterfaceMock) AddClusterScopedFeatureHandler(ctx context.Context
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//
-//	len(mockedJobInterface.AddClusterScopedFeatureHandlerCalls())
+//     len(mockedJobInterface.AddClusterScopedFeatureHandlerCalls())
 func (mock *JobInterfaceMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -1032,8 +1020,7 @@ func (mock *JobInterfaceMock) AddClusterScopedFeatureLifecycle(ctx context.Conte
 
 // AddClusterScopedFeatureLifecycleCalls gets all the calls that were made to AddClusterScopedFeatureLifecycle.
 // Check the length with:
-//
-//	len(mockedJobInterface.AddClusterScopedFeatureLifecycleCalls())
+//     len(mockedJobInterface.AddClusterScopedFeatureLifecycleCalls())
 func (mock *JobInterfaceMock) AddClusterScopedFeatureLifecycleCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -1078,8 +1065,7 @@ func (mock *JobInterfaceMock) AddClusterScopedHandler(ctx context.Context, name 
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//
-//	len(mockedJobInterface.AddClusterScopedHandlerCalls())
+//     len(mockedJobInterface.AddClusterScopedHandlerCalls())
 func (mock *JobInterfaceMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -1122,8 +1108,7 @@ func (mock *JobInterfaceMock) AddClusterScopedLifecycle(ctx context.Context, nam
 
 // AddClusterScopedLifecycleCalls gets all the calls that were made to AddClusterScopedLifecycle.
 // Check the length with:
-//
-//	len(mockedJobInterface.AddClusterScopedLifecycleCalls())
+//     len(mockedJobInterface.AddClusterScopedLifecycleCalls())
 func (mock *JobInterfaceMock) AddClusterScopedLifecycleCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -1166,8 +1151,7 @@ func (mock *JobInterfaceMock) AddFeatureHandler(ctx context.Context, enabled fun
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//
-//	len(mockedJobInterface.AddFeatureHandlerCalls())
+//     len(mockedJobInterface.AddFeatureHandlerCalls())
 func (mock *JobInterfaceMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
@@ -1210,8 +1194,7 @@ func (mock *JobInterfaceMock) AddFeatureLifecycle(ctx context.Context, enabled f
 
 // AddFeatureLifecycleCalls gets all the calls that were made to AddFeatureLifecycle.
 // Check the length with:
-//
-//	len(mockedJobInterface.AddFeatureLifecycleCalls())
+//     len(mockedJobInterface.AddFeatureLifecycleCalls())
 func (mock *JobInterfaceMock) AddFeatureLifecycleCalls() []struct {
 	Ctx       context.Context
 	Enabled   func() bool
@@ -1252,8 +1235,7 @@ func (mock *JobInterfaceMock) AddHandler(ctx context.Context, name string, syncM
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//
-//	len(mockedJobInterface.AddHandlerCalls())
+//     len(mockedJobInterface.AddHandlerCalls())
 func (mock *JobInterfaceMock) AddHandlerCalls() []struct {
 	Ctx  context.Context
 	Name string
@@ -1292,8 +1274,7 @@ func (mock *JobInterfaceMock) AddLifecycle(ctx context.Context, name string, lif
 
 // AddLifecycleCalls gets all the calls that were made to AddLifecycle.
 // Check the length with:
-//
-//	len(mockedJobInterface.AddLifecycleCalls())
+//     len(mockedJobInterface.AddLifecycleCalls())
 func (mock *JobInterfaceMock) AddLifecycleCalls() []struct {
 	Ctx       context.Context
 	Name      string
@@ -1325,8 +1306,7 @@ func (mock *JobInterfaceMock) Controller() v11.JobController {
 
 // ControllerCalls gets all the calls that were made to Controller.
 // Check the length with:
-//
-//	len(mockedJobInterface.ControllerCalls())
+//     len(mockedJobInterface.ControllerCalls())
 func (mock *JobInterfaceMock) ControllerCalls() []struct {
 } {
 	var calls []struct {
@@ -1355,8 +1335,7 @@ func (mock *JobInterfaceMock) Create(in1 *v1.Job) (*v1.Job, error) {
 
 // CreateCalls gets all the calls that were made to Create.
 // Check the length with:
-//
-//	len(mockedJobInterface.CreateCalls())
+//     len(mockedJobInterface.CreateCalls())
 func (mock *JobInterfaceMock) CreateCalls() []struct {
 	In1 *v1.Job
 } {
@@ -1389,8 +1368,7 @@ func (mock *JobInterfaceMock) Delete(name string, options *metav1.DeleteOptions)
 
 // DeleteCalls gets all the calls that were made to Delete.
 // Check the length with:
-//
-//	len(mockedJobInterface.DeleteCalls())
+//     len(mockedJobInterface.DeleteCalls())
 func (mock *JobInterfaceMock) DeleteCalls() []struct {
 	Name    string
 	Options *metav1.DeleteOptions
@@ -1425,8 +1403,7 @@ func (mock *JobInterfaceMock) DeleteCollection(deleteOpts *metav1.DeleteOptions,
 
 // DeleteCollectionCalls gets all the calls that were made to DeleteCollection.
 // Check the length with:
-//
-//	len(mockedJobInterface.DeleteCollectionCalls())
+//     len(mockedJobInterface.DeleteCollectionCalls())
 func (mock *JobInterfaceMock) DeleteCollectionCalls() []struct {
 	DeleteOpts *metav1.DeleteOptions
 	ListOpts   metav1.ListOptions
@@ -1463,8 +1440,7 @@ func (mock *JobInterfaceMock) DeleteNamespaced(namespace string, name string, op
 
 // DeleteNamespacedCalls gets all the calls that were made to DeleteNamespaced.
 // Check the length with:
-//
-//	len(mockedJobInterface.DeleteNamespacedCalls())
+//     len(mockedJobInterface.DeleteNamespacedCalls())
 func (mock *JobInterfaceMock) DeleteNamespacedCalls() []struct {
 	Namespace string
 	Name      string
@@ -1501,8 +1477,7 @@ func (mock *JobInterfaceMock) Get(name string, opts metav1.GetOptions) (*v1.Job,
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//
-//	len(mockedJobInterface.GetCalls())
+//     len(mockedJobInterface.GetCalls())
 func (mock *JobInterfaceMock) GetCalls() []struct {
 	Name string
 	Opts metav1.GetOptions
@@ -1539,8 +1514,7 @@ func (mock *JobInterfaceMock) GetNamespaced(namespace string, name string, opts 
 
 // GetNamespacedCalls gets all the calls that were made to GetNamespaced.
 // Check the length with:
-//
-//	len(mockedJobInterface.GetNamespacedCalls())
+//     len(mockedJobInterface.GetNamespacedCalls())
 func (mock *JobInterfaceMock) GetNamespacedCalls() []struct {
 	Namespace string
 	Name      string
@@ -1575,8 +1549,7 @@ func (mock *JobInterfaceMock) List(opts metav1.ListOptions) (*v1.JobList, error)
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//
-//	len(mockedJobInterface.ListCalls())
+//     len(mockedJobInterface.ListCalls())
 func (mock *JobInterfaceMock) ListCalls() []struct {
 	Opts metav1.ListOptions
 } {
@@ -1609,8 +1582,7 @@ func (mock *JobInterfaceMock) ListNamespaced(namespace string, opts metav1.ListO
 
 // ListNamespacedCalls gets all the calls that were made to ListNamespaced.
 // Check the length with:
-//
-//	len(mockedJobInterface.ListNamespacedCalls())
+//     len(mockedJobInterface.ListNamespacedCalls())
 func (mock *JobInterfaceMock) ListNamespacedCalls() []struct {
 	Namespace string
 	Opts      metav1.ListOptions
@@ -1640,8 +1612,7 @@ func (mock *JobInterfaceMock) ObjectClient() *objectclient.ObjectClient {
 
 // ObjectClientCalls gets all the calls that were made to ObjectClient.
 // Check the length with:
-//
-//	len(mockedJobInterface.ObjectClientCalls())
+//     len(mockedJobInterface.ObjectClientCalls())
 func (mock *JobInterfaceMock) ObjectClientCalls() []struct {
 } {
 	var calls []struct {
@@ -1670,8 +1641,7 @@ func (mock *JobInterfaceMock) Update(in1 *v1.Job) (*v1.Job, error) {
 
 // UpdateCalls gets all the calls that were made to Update.
 // Check the length with:
-//
-//	len(mockedJobInterface.UpdateCalls())
+//     len(mockedJobInterface.UpdateCalls())
 func (mock *JobInterfaceMock) UpdateCalls() []struct {
 	In1 *v1.Job
 } {
@@ -1702,8 +1672,7 @@ func (mock *JobInterfaceMock) Watch(opts metav1.ListOptions) (watch.Interface, e
 
 // WatchCalls gets all the calls that were made to Watch.
 // Check the length with:
-//
-//	len(mockedJobInterface.WatchCalls())
+//     len(mockedJobInterface.WatchCalls())
 func (mock *JobInterfaceMock) WatchCalls() []struct {
 	Opts metav1.ListOptions
 } {
@@ -1726,19 +1695,19 @@ var _ v11.JobsGetter = &JobsGetterMock{}
 
 // JobsGetterMock is a mock implementation of v11.JobsGetter.
 //
-//	    func TestSomethingThatUsesJobsGetter(t *testing.T) {
+//     func TestSomethingThatUsesJobsGetter(t *testing.T) {
 //
-//	        // make and configure a mocked v11.JobsGetter
-//	        mockedJobsGetter := &JobsGetterMock{
-//	            JobsFunc: func(namespace string) v11.JobInterface {
-//		               panic("mock out the Jobs method")
-//	            },
-//	        }
+//         // make and configure a mocked v11.JobsGetter
+//         mockedJobsGetter := &JobsGetterMock{
+//             JobsFunc: func(namespace string) v11.JobInterface {
+// 	               panic("mock out the Jobs method")
+//             },
+//         }
 //
-//	        // use mockedJobsGetter in code that requires v11.JobsGetter
-//	        // and then make assertions.
+//         // use mockedJobsGetter in code that requires v11.JobsGetter
+//         // and then make assertions.
 //
-//	    }
+//     }
 type JobsGetterMock struct {
 	// JobsFunc mocks the Jobs method.
 	JobsFunc func(namespace string) v11.JobInterface
@@ -1771,8 +1740,7 @@ func (mock *JobsGetterMock) Jobs(namespace string) v11.JobInterface {
 
 // JobsCalls gets all the calls that were made to Jobs.
 // Check the length with:
-//
-//	len(mockedJobsGetter.JobsCalls())
+//     len(mockedJobsGetter.JobsCalls())
 func (mock *JobsGetterMock) JobsCalls() []struct {
 	Namespace string
 } {

@@ -29,22 +29,22 @@ var _ v11.NetworkPolicyLister = &NetworkPolicyListerMock{}
 
 // NetworkPolicyListerMock is a mock implementation of v11.NetworkPolicyLister.
 //
-//	    func TestSomethingThatUsesNetworkPolicyLister(t *testing.T) {
+//     func TestSomethingThatUsesNetworkPolicyLister(t *testing.T) {
 //
-//	        // make and configure a mocked v11.NetworkPolicyLister
-//	        mockedNetworkPolicyLister := &NetworkPolicyListerMock{
-//	            GetFunc: func(namespace string, name string) (*v1.NetworkPolicy, error) {
-//		               panic("mock out the Get method")
-//	            },
-//	            ListFunc: func(namespace string, selector labels.Selector) ([]*v1.NetworkPolicy, error) {
-//		               panic("mock out the List method")
-//	            },
-//	        }
+//         // make and configure a mocked v11.NetworkPolicyLister
+//         mockedNetworkPolicyLister := &NetworkPolicyListerMock{
+//             GetFunc: func(namespace string, name string) (*v1.NetworkPolicy, error) {
+// 	               panic("mock out the Get method")
+//             },
+//             ListFunc: func(namespace string, selector labels.Selector) ([]*v1.NetworkPolicy, error) {
+// 	               panic("mock out the List method")
+//             },
+//         }
 //
-//	        // use mockedNetworkPolicyLister in code that requires v11.NetworkPolicyLister
-//	        // and then make assertions.
+//         // use mockedNetworkPolicyLister in code that requires v11.NetworkPolicyLister
+//         // and then make assertions.
 //
-//	    }
+//     }
 type NetworkPolicyListerMock struct {
 	// GetFunc mocks the Get method.
 	GetFunc func(namespace string, name string) (*v1.NetworkPolicy, error)
@@ -91,8 +91,7 @@ func (mock *NetworkPolicyListerMock) Get(namespace string, name string) (*v1.Net
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//
-//	len(mockedNetworkPolicyLister.GetCalls())
+//     len(mockedNetworkPolicyLister.GetCalls())
 func (mock *NetworkPolicyListerMock) GetCalls() []struct {
 	Namespace string
 	Name      string
@@ -127,8 +126,7 @@ func (mock *NetworkPolicyListerMock) List(namespace string, selector labels.Sele
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//
-//	len(mockedNetworkPolicyLister.ListCalls())
+//     len(mockedNetworkPolicyLister.ListCalls())
 func (mock *NetworkPolicyListerMock) ListCalls() []struct {
 	Namespace string
 	Selector  labels.Selector
@@ -161,43 +159,43 @@ var _ v11.NetworkPolicyController = &NetworkPolicyControllerMock{}
 
 // NetworkPolicyControllerMock is a mock implementation of v11.NetworkPolicyController.
 //
-//	    func TestSomethingThatUsesNetworkPolicyController(t *testing.T) {
+//     func TestSomethingThatUsesNetworkPolicyController(t *testing.T) {
 //
-//	        // make and configure a mocked v11.NetworkPolicyController
-//	        mockedNetworkPolicyController := &NetworkPolicyControllerMock{
-//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v11.NetworkPolicyHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedFeatureHandler method")
-//	            },
-//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v11.NetworkPolicyHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedHandler method")
-//	            },
-//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v11.NetworkPolicyHandlerFunc)  {
-//		               panic("mock out the AddFeatureHandler method")
-//	            },
-//	            AddHandlerFunc: func(ctx context.Context, name string, handler v11.NetworkPolicyHandlerFunc)  {
-//		               panic("mock out the AddHandler method")
-//	            },
-//	            EnqueueFunc: func(namespace string, name string)  {
-//		               panic("mock out the Enqueue method")
-//	            },
-//	            EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
-//		               panic("mock out the EnqueueAfter method")
-//	            },
-//	            GenericFunc: func() controller.GenericController {
-//		               panic("mock out the Generic method")
-//	            },
-//	            InformerFunc: func() cache.SharedIndexInformer {
-//		               panic("mock out the Informer method")
-//	            },
-//	            ListerFunc: func() v11.NetworkPolicyLister {
-//		               panic("mock out the Lister method")
-//	            },
-//	        }
+//         // make and configure a mocked v11.NetworkPolicyController
+//         mockedNetworkPolicyController := &NetworkPolicyControllerMock{
+//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v11.NetworkPolicyHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedFeatureHandler method")
+//             },
+//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v11.NetworkPolicyHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedHandler method")
+//             },
+//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v11.NetworkPolicyHandlerFunc)  {
+// 	               panic("mock out the AddFeatureHandler method")
+//             },
+//             AddHandlerFunc: func(ctx context.Context, name string, handler v11.NetworkPolicyHandlerFunc)  {
+// 	               panic("mock out the AddHandler method")
+//             },
+//             EnqueueFunc: func(namespace string, name string)  {
+// 	               panic("mock out the Enqueue method")
+//             },
+//             EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
+// 	               panic("mock out the EnqueueAfter method")
+//             },
+//             GenericFunc: func() controller.GenericController {
+// 	               panic("mock out the Generic method")
+//             },
+//             InformerFunc: func() cache.SharedIndexInformer {
+// 	               panic("mock out the Informer method")
+//             },
+//             ListerFunc: func() v11.NetworkPolicyLister {
+// 	               panic("mock out the Lister method")
+//             },
+//         }
 //
-//	        // use mockedNetworkPolicyController in code that requires v11.NetworkPolicyController
-//	        // and then make assertions.
+//         // use mockedNetworkPolicyController in code that requires v11.NetworkPolicyController
+//         // and then make assertions.
 //
-//	    }
+//     }
 type NetworkPolicyControllerMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
 	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v11.NetworkPolicyHandlerFunc)
@@ -326,8 +324,7 @@ func (mock *NetworkPolicyControllerMock) AddClusterScopedFeatureHandler(ctx cont
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//
-//	len(mockedNetworkPolicyController.AddClusterScopedFeatureHandlerCalls())
+//     len(mockedNetworkPolicyController.AddClusterScopedFeatureHandlerCalls())
 func (mock *NetworkPolicyControllerMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -372,8 +369,7 @@ func (mock *NetworkPolicyControllerMock) AddClusterScopedHandler(ctx context.Con
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//
-//	len(mockedNetworkPolicyController.AddClusterScopedHandlerCalls())
+//     len(mockedNetworkPolicyController.AddClusterScopedHandlerCalls())
 func (mock *NetworkPolicyControllerMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -416,8 +412,7 @@ func (mock *NetworkPolicyControllerMock) AddFeatureHandler(ctx context.Context, 
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//
-//	len(mockedNetworkPolicyController.AddFeatureHandlerCalls())
+//     len(mockedNetworkPolicyController.AddFeatureHandlerCalls())
 func (mock *NetworkPolicyControllerMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
@@ -458,8 +453,7 @@ func (mock *NetworkPolicyControllerMock) AddHandler(ctx context.Context, name st
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//
-//	len(mockedNetworkPolicyController.AddHandlerCalls())
+//     len(mockedNetworkPolicyController.AddHandlerCalls())
 func (mock *NetworkPolicyControllerMock) AddHandlerCalls() []struct {
 	Ctx     context.Context
 	Name    string
@@ -496,8 +490,7 @@ func (mock *NetworkPolicyControllerMock) Enqueue(namespace string, name string) 
 
 // EnqueueCalls gets all the calls that were made to Enqueue.
 // Check the length with:
-//
-//	len(mockedNetworkPolicyController.EnqueueCalls())
+//     len(mockedNetworkPolicyController.EnqueueCalls())
 func (mock *NetworkPolicyControllerMock) EnqueueCalls() []struct {
 	Namespace string
 	Name      string
@@ -534,8 +527,7 @@ func (mock *NetworkPolicyControllerMock) EnqueueAfter(namespace string, name str
 
 // EnqueueAfterCalls gets all the calls that were made to EnqueueAfter.
 // Check the length with:
-//
-//	len(mockedNetworkPolicyController.EnqueueAfterCalls())
+//     len(mockedNetworkPolicyController.EnqueueAfterCalls())
 func (mock *NetworkPolicyControllerMock) EnqueueAfterCalls() []struct {
 	Namespace string
 	Name      string
@@ -567,8 +559,7 @@ func (mock *NetworkPolicyControllerMock) Generic() controller.GenericController 
 
 // GenericCalls gets all the calls that were made to Generic.
 // Check the length with:
-//
-//	len(mockedNetworkPolicyController.GenericCalls())
+//     len(mockedNetworkPolicyController.GenericCalls())
 func (mock *NetworkPolicyControllerMock) GenericCalls() []struct {
 } {
 	var calls []struct {
@@ -594,8 +585,7 @@ func (mock *NetworkPolicyControllerMock) Informer() cache.SharedIndexInformer {
 
 // InformerCalls gets all the calls that were made to Informer.
 // Check the length with:
-//
-//	len(mockedNetworkPolicyController.InformerCalls())
+//     len(mockedNetworkPolicyController.InformerCalls())
 func (mock *NetworkPolicyControllerMock) InformerCalls() []struct {
 } {
 	var calls []struct {
@@ -621,8 +611,7 @@ func (mock *NetworkPolicyControllerMock) Lister() v11.NetworkPolicyLister {
 
 // ListerCalls gets all the calls that were made to Lister.
 // Check the length with:
-//
-//	len(mockedNetworkPolicyController.ListerCalls())
+//     len(mockedNetworkPolicyController.ListerCalls())
 func (mock *NetworkPolicyControllerMock) ListerCalls() []struct {
 } {
 	var calls []struct {
@@ -662,76 +651,76 @@ var _ v11.NetworkPolicyInterface = &NetworkPolicyInterfaceMock{}
 
 // NetworkPolicyInterfaceMock is a mock implementation of v11.NetworkPolicyInterface.
 //
-//	    func TestSomethingThatUsesNetworkPolicyInterface(t *testing.T) {
+//     func TestSomethingThatUsesNetworkPolicyInterface(t *testing.T) {
 //
-//	        // make and configure a mocked v11.NetworkPolicyInterface
-//	        mockedNetworkPolicyInterface := &NetworkPolicyInterfaceMock{
-//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v11.NetworkPolicyHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedFeatureHandler method")
-//	            },
-//	            AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v11.NetworkPolicyLifecycle)  {
-//		               panic("mock out the AddClusterScopedFeatureLifecycle method")
-//	            },
-//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v11.NetworkPolicyHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedHandler method")
-//	            },
-//	            AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v11.NetworkPolicyLifecycle)  {
-//		               panic("mock out the AddClusterScopedLifecycle method")
-//	            },
-//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v11.NetworkPolicyHandlerFunc)  {
-//		               panic("mock out the AddFeatureHandler method")
-//	            },
-//	            AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v11.NetworkPolicyLifecycle)  {
-//		               panic("mock out the AddFeatureLifecycle method")
-//	            },
-//	            AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v11.NetworkPolicyHandlerFunc)  {
-//		               panic("mock out the AddHandler method")
-//	            },
-//	            AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v11.NetworkPolicyLifecycle)  {
-//		               panic("mock out the AddLifecycle method")
-//	            },
-//	            ControllerFunc: func() v11.NetworkPolicyController {
-//		               panic("mock out the Controller method")
-//	            },
-//	            CreateFunc: func(in1 *v1.NetworkPolicy) (*v1.NetworkPolicy, error) {
-//		               panic("mock out the Create method")
-//	            },
-//	            DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
-//		               panic("mock out the Delete method")
-//	            },
-//	            DeleteCollectionFunc: func(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
-//		               panic("mock out the DeleteCollection method")
-//	            },
-//	            DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
-//		               panic("mock out the DeleteNamespaced method")
-//	            },
-//	            GetFunc: func(name string, opts metav1.GetOptions) (*v1.NetworkPolicy, error) {
-//		               panic("mock out the Get method")
-//	            },
-//	            GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v1.NetworkPolicy, error) {
-//		               panic("mock out the GetNamespaced method")
-//	            },
-//	            ListFunc: func(opts metav1.ListOptions) (*v1.NetworkPolicyList, error) {
-//		               panic("mock out the List method")
-//	            },
-//	            ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v1.NetworkPolicyList, error) {
-//		               panic("mock out the ListNamespaced method")
-//	            },
-//	            ObjectClientFunc: func() *objectclient.ObjectClient {
-//		               panic("mock out the ObjectClient method")
-//	            },
-//	            UpdateFunc: func(in1 *v1.NetworkPolicy) (*v1.NetworkPolicy, error) {
-//		               panic("mock out the Update method")
-//	            },
-//	            WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
-//		               panic("mock out the Watch method")
-//	            },
-//	        }
+//         // make and configure a mocked v11.NetworkPolicyInterface
+//         mockedNetworkPolicyInterface := &NetworkPolicyInterfaceMock{
+//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v11.NetworkPolicyHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedFeatureHandler method")
+//             },
+//             AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v11.NetworkPolicyLifecycle)  {
+// 	               panic("mock out the AddClusterScopedFeatureLifecycle method")
+//             },
+//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v11.NetworkPolicyHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedHandler method")
+//             },
+//             AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v11.NetworkPolicyLifecycle)  {
+// 	               panic("mock out the AddClusterScopedLifecycle method")
+//             },
+//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v11.NetworkPolicyHandlerFunc)  {
+// 	               panic("mock out the AddFeatureHandler method")
+//             },
+//             AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v11.NetworkPolicyLifecycle)  {
+// 	               panic("mock out the AddFeatureLifecycle method")
+//             },
+//             AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v11.NetworkPolicyHandlerFunc)  {
+// 	               panic("mock out the AddHandler method")
+//             },
+//             AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v11.NetworkPolicyLifecycle)  {
+// 	               panic("mock out the AddLifecycle method")
+//             },
+//             ControllerFunc: func() v11.NetworkPolicyController {
+// 	               panic("mock out the Controller method")
+//             },
+//             CreateFunc: func(in1 *v1.NetworkPolicy) (*v1.NetworkPolicy, error) {
+// 	               panic("mock out the Create method")
+//             },
+//             DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
+// 	               panic("mock out the Delete method")
+//             },
+//             DeleteCollectionFunc: func(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
+// 	               panic("mock out the DeleteCollection method")
+//             },
+//             DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
+// 	               panic("mock out the DeleteNamespaced method")
+//             },
+//             GetFunc: func(name string, opts metav1.GetOptions) (*v1.NetworkPolicy, error) {
+// 	               panic("mock out the Get method")
+//             },
+//             GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v1.NetworkPolicy, error) {
+// 	               panic("mock out the GetNamespaced method")
+//             },
+//             ListFunc: func(opts metav1.ListOptions) (*v1.NetworkPolicyList, error) {
+// 	               panic("mock out the List method")
+//             },
+//             ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v1.NetworkPolicyList, error) {
+// 	               panic("mock out the ListNamespaced method")
+//             },
+//             ObjectClientFunc: func() *objectclient.ObjectClient {
+// 	               panic("mock out the ObjectClient method")
+//             },
+//             UpdateFunc: func(in1 *v1.NetworkPolicy) (*v1.NetworkPolicy, error) {
+// 	               panic("mock out the Update method")
+//             },
+//             WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
+// 	               panic("mock out the Watch method")
+//             },
+//         }
 //
-//	        // use mockedNetworkPolicyInterface in code that requires v11.NetworkPolicyInterface
-//	        // and then make assertions.
+//         // use mockedNetworkPolicyInterface in code that requires v11.NetworkPolicyInterface
+//         // and then make assertions.
 //
-//	    }
+//     }
 type NetworkPolicyInterfaceMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
 	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v11.NetworkPolicyHandlerFunc)
@@ -984,8 +973,7 @@ func (mock *NetworkPolicyInterfaceMock) AddClusterScopedFeatureHandler(ctx conte
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//
-//	len(mockedNetworkPolicyInterface.AddClusterScopedFeatureHandlerCalls())
+//     len(mockedNetworkPolicyInterface.AddClusterScopedFeatureHandlerCalls())
 func (mock *NetworkPolicyInterfaceMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -1032,8 +1020,7 @@ func (mock *NetworkPolicyInterfaceMock) AddClusterScopedFeatureLifecycle(ctx con
 
 // AddClusterScopedFeatureLifecycleCalls gets all the calls that were made to AddClusterScopedFeatureLifecycle.
 // Check the length with:
-//
-//	len(mockedNetworkPolicyInterface.AddClusterScopedFeatureLifecycleCalls())
+//     len(mockedNetworkPolicyInterface.AddClusterScopedFeatureLifecycleCalls())
 func (mock *NetworkPolicyInterfaceMock) AddClusterScopedFeatureLifecycleCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -1078,8 +1065,7 @@ func (mock *NetworkPolicyInterfaceMock) AddClusterScopedHandler(ctx context.Cont
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//
-//	len(mockedNetworkPolicyInterface.AddClusterScopedHandlerCalls())
+//     len(mockedNetworkPolicyInterface.AddClusterScopedHandlerCalls())
 func (mock *NetworkPolicyInterfaceMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -1122,8 +1108,7 @@ func (mock *NetworkPolicyInterfaceMock) AddClusterScopedLifecycle(ctx context.Co
 
 // AddClusterScopedLifecycleCalls gets all the calls that were made to AddClusterScopedLifecycle.
 // Check the length with:
-//
-//	len(mockedNetworkPolicyInterface.AddClusterScopedLifecycleCalls())
+//     len(mockedNetworkPolicyInterface.AddClusterScopedLifecycleCalls())
 func (mock *NetworkPolicyInterfaceMock) AddClusterScopedLifecycleCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -1166,8 +1151,7 @@ func (mock *NetworkPolicyInterfaceMock) AddFeatureHandler(ctx context.Context, e
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//
-//	len(mockedNetworkPolicyInterface.AddFeatureHandlerCalls())
+//     len(mockedNetworkPolicyInterface.AddFeatureHandlerCalls())
 func (mock *NetworkPolicyInterfaceMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
@@ -1210,8 +1194,7 @@ func (mock *NetworkPolicyInterfaceMock) AddFeatureLifecycle(ctx context.Context,
 
 // AddFeatureLifecycleCalls gets all the calls that were made to AddFeatureLifecycle.
 // Check the length with:
-//
-//	len(mockedNetworkPolicyInterface.AddFeatureLifecycleCalls())
+//     len(mockedNetworkPolicyInterface.AddFeatureLifecycleCalls())
 func (mock *NetworkPolicyInterfaceMock) AddFeatureLifecycleCalls() []struct {
 	Ctx       context.Context
 	Enabled   func() bool
@@ -1252,8 +1235,7 @@ func (mock *NetworkPolicyInterfaceMock) AddHandler(ctx context.Context, name str
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//
-//	len(mockedNetworkPolicyInterface.AddHandlerCalls())
+//     len(mockedNetworkPolicyInterface.AddHandlerCalls())
 func (mock *NetworkPolicyInterfaceMock) AddHandlerCalls() []struct {
 	Ctx  context.Context
 	Name string
@@ -1292,8 +1274,7 @@ func (mock *NetworkPolicyInterfaceMock) AddLifecycle(ctx context.Context, name s
 
 // AddLifecycleCalls gets all the calls that were made to AddLifecycle.
 // Check the length with:
-//
-//	len(mockedNetworkPolicyInterface.AddLifecycleCalls())
+//     len(mockedNetworkPolicyInterface.AddLifecycleCalls())
 func (mock *NetworkPolicyInterfaceMock) AddLifecycleCalls() []struct {
 	Ctx       context.Context
 	Name      string
@@ -1325,8 +1306,7 @@ func (mock *NetworkPolicyInterfaceMock) Controller() v11.NetworkPolicyController
 
 // ControllerCalls gets all the calls that were made to Controller.
 // Check the length with:
-//
-//	len(mockedNetworkPolicyInterface.ControllerCalls())
+//     len(mockedNetworkPolicyInterface.ControllerCalls())
 func (mock *NetworkPolicyInterfaceMock) ControllerCalls() []struct {
 } {
 	var calls []struct {
@@ -1355,8 +1335,7 @@ func (mock *NetworkPolicyInterfaceMock) Create(in1 *v1.NetworkPolicy) (*v1.Netwo
 
 // CreateCalls gets all the calls that were made to Create.
 // Check the length with:
-//
-//	len(mockedNetworkPolicyInterface.CreateCalls())
+//     len(mockedNetworkPolicyInterface.CreateCalls())
 func (mock *NetworkPolicyInterfaceMock) CreateCalls() []struct {
 	In1 *v1.NetworkPolicy
 } {
@@ -1389,8 +1368,7 @@ func (mock *NetworkPolicyInterfaceMock) Delete(name string, options *metav1.Dele
 
 // DeleteCalls gets all the calls that were made to Delete.
 // Check the length with:
-//
-//	len(mockedNetworkPolicyInterface.DeleteCalls())
+//     len(mockedNetworkPolicyInterface.DeleteCalls())
 func (mock *NetworkPolicyInterfaceMock) DeleteCalls() []struct {
 	Name    string
 	Options *metav1.DeleteOptions
@@ -1425,8 +1403,7 @@ func (mock *NetworkPolicyInterfaceMock) DeleteCollection(deleteOpts *metav1.Dele
 
 // DeleteCollectionCalls gets all the calls that were made to DeleteCollection.
 // Check the length with:
-//
-//	len(mockedNetworkPolicyInterface.DeleteCollectionCalls())
+//     len(mockedNetworkPolicyInterface.DeleteCollectionCalls())
 func (mock *NetworkPolicyInterfaceMock) DeleteCollectionCalls() []struct {
 	DeleteOpts *metav1.DeleteOptions
 	ListOpts   metav1.ListOptions
@@ -1463,8 +1440,7 @@ func (mock *NetworkPolicyInterfaceMock) DeleteNamespaced(namespace string, name 
 
 // DeleteNamespacedCalls gets all the calls that were made to DeleteNamespaced.
 // Check the length with:
-//
-//	len(mockedNetworkPolicyInterface.DeleteNamespacedCalls())
+//     len(mockedNetworkPolicyInterface.DeleteNamespacedCalls())
 func (mock *NetworkPolicyInterfaceMock) DeleteNamespacedCalls() []struct {
 	Namespace string
 	Name      string
@@ -1501,8 +1477,7 @@ func (mock *NetworkPolicyInterfaceMock) Get(name string, opts metav1.GetOptions)
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//
-//	len(mockedNetworkPolicyInterface.GetCalls())
+//     len(mockedNetworkPolicyInterface.GetCalls())
 func (mock *NetworkPolicyInterfaceMock) GetCalls() []struct {
 	Name string
 	Opts metav1.GetOptions
@@ -1539,8 +1514,7 @@ func (mock *NetworkPolicyInterfaceMock) GetNamespaced(namespace string, name str
 
 // GetNamespacedCalls gets all the calls that were made to GetNamespaced.
 // Check the length with:
-//
-//	len(mockedNetworkPolicyInterface.GetNamespacedCalls())
+//     len(mockedNetworkPolicyInterface.GetNamespacedCalls())
 func (mock *NetworkPolicyInterfaceMock) GetNamespacedCalls() []struct {
 	Namespace string
 	Name      string
@@ -1575,8 +1549,7 @@ func (mock *NetworkPolicyInterfaceMock) List(opts metav1.ListOptions) (*v1.Netwo
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//
-//	len(mockedNetworkPolicyInterface.ListCalls())
+//     len(mockedNetworkPolicyInterface.ListCalls())
 func (mock *NetworkPolicyInterfaceMock) ListCalls() []struct {
 	Opts metav1.ListOptions
 } {
@@ -1609,8 +1582,7 @@ func (mock *NetworkPolicyInterfaceMock) ListNamespaced(namespace string, opts me
 
 // ListNamespacedCalls gets all the calls that were made to ListNamespaced.
 // Check the length with:
-//
-//	len(mockedNetworkPolicyInterface.ListNamespacedCalls())
+//     len(mockedNetworkPolicyInterface.ListNamespacedCalls())
 func (mock *NetworkPolicyInterfaceMock) ListNamespacedCalls() []struct {
 	Namespace string
 	Opts      metav1.ListOptions
@@ -1640,8 +1612,7 @@ func (mock *NetworkPolicyInterfaceMock) ObjectClient() *objectclient.ObjectClien
 
 // ObjectClientCalls gets all the calls that were made to ObjectClient.
 // Check the length with:
-//
-//	len(mockedNetworkPolicyInterface.ObjectClientCalls())
+//     len(mockedNetworkPolicyInterface.ObjectClientCalls())
 func (mock *NetworkPolicyInterfaceMock) ObjectClientCalls() []struct {
 } {
 	var calls []struct {
@@ -1670,8 +1641,7 @@ func (mock *NetworkPolicyInterfaceMock) Update(in1 *v1.NetworkPolicy) (*v1.Netwo
 
 // UpdateCalls gets all the calls that were made to Update.
 // Check the length with:
-//
-//	len(mockedNetworkPolicyInterface.UpdateCalls())
+//     len(mockedNetworkPolicyInterface.UpdateCalls())
 func (mock *NetworkPolicyInterfaceMock) UpdateCalls() []struct {
 	In1 *v1.NetworkPolicy
 } {
@@ -1702,8 +1672,7 @@ func (mock *NetworkPolicyInterfaceMock) Watch(opts metav1.ListOptions) (watch.In
 
 // WatchCalls gets all the calls that were made to Watch.
 // Check the length with:
-//
-//	len(mockedNetworkPolicyInterface.WatchCalls())
+//     len(mockedNetworkPolicyInterface.WatchCalls())
 func (mock *NetworkPolicyInterfaceMock) WatchCalls() []struct {
 	Opts metav1.ListOptions
 } {
@@ -1726,19 +1695,19 @@ var _ v11.NetworkPoliciesGetter = &NetworkPoliciesGetterMock{}
 
 // NetworkPoliciesGetterMock is a mock implementation of v11.NetworkPoliciesGetter.
 //
-//	    func TestSomethingThatUsesNetworkPoliciesGetter(t *testing.T) {
+//     func TestSomethingThatUsesNetworkPoliciesGetter(t *testing.T) {
 //
-//	        // make and configure a mocked v11.NetworkPoliciesGetter
-//	        mockedNetworkPoliciesGetter := &NetworkPoliciesGetterMock{
-//	            NetworkPoliciesFunc: func(namespace string) v11.NetworkPolicyInterface {
-//		               panic("mock out the NetworkPolicies method")
-//	            },
-//	        }
+//         // make and configure a mocked v11.NetworkPoliciesGetter
+//         mockedNetworkPoliciesGetter := &NetworkPoliciesGetterMock{
+//             NetworkPoliciesFunc: func(namespace string) v11.NetworkPolicyInterface {
+// 	               panic("mock out the NetworkPolicies method")
+//             },
+//         }
 //
-//	        // use mockedNetworkPoliciesGetter in code that requires v11.NetworkPoliciesGetter
-//	        // and then make assertions.
+//         // use mockedNetworkPoliciesGetter in code that requires v11.NetworkPoliciesGetter
+//         // and then make assertions.
 //
-//	    }
+//     }
 type NetworkPoliciesGetterMock struct {
 	// NetworkPoliciesFunc mocks the NetworkPolicies method.
 	NetworkPoliciesFunc func(namespace string) v11.NetworkPolicyInterface
@@ -1771,8 +1740,7 @@ func (mock *NetworkPoliciesGetterMock) NetworkPolicies(namespace string) v11.Net
 
 // NetworkPoliciesCalls gets all the calls that were made to NetworkPolicies.
 // Check the length with:
-//
-//	len(mockedNetworkPoliciesGetter.NetworkPoliciesCalls())
+//     len(mockedNetworkPoliciesGetter.NetworkPoliciesCalls())
 func (mock *NetworkPoliciesGetterMock) NetworkPoliciesCalls() []struct {
 	Namespace string
 } {

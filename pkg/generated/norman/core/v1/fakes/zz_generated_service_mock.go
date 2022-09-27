@@ -29,22 +29,22 @@ var _ v11.ServiceLister = &ServiceListerMock{}
 
 // ServiceListerMock is a mock implementation of v11.ServiceLister.
 //
-//	    func TestSomethingThatUsesServiceLister(t *testing.T) {
+//     func TestSomethingThatUsesServiceLister(t *testing.T) {
 //
-//	        // make and configure a mocked v11.ServiceLister
-//	        mockedServiceLister := &ServiceListerMock{
-//	            GetFunc: func(namespace string, name string) (*v1.Service, error) {
-//		               panic("mock out the Get method")
-//	            },
-//	            ListFunc: func(namespace string, selector labels.Selector) ([]*v1.Service, error) {
-//		               panic("mock out the List method")
-//	            },
-//	        }
+//         // make and configure a mocked v11.ServiceLister
+//         mockedServiceLister := &ServiceListerMock{
+//             GetFunc: func(namespace string, name string) (*v1.Service, error) {
+// 	               panic("mock out the Get method")
+//             },
+//             ListFunc: func(namespace string, selector labels.Selector) ([]*v1.Service, error) {
+// 	               panic("mock out the List method")
+//             },
+//         }
 //
-//	        // use mockedServiceLister in code that requires v11.ServiceLister
-//	        // and then make assertions.
+//         // use mockedServiceLister in code that requires v11.ServiceLister
+//         // and then make assertions.
 //
-//	    }
+//     }
 type ServiceListerMock struct {
 	// GetFunc mocks the Get method.
 	GetFunc func(namespace string, name string) (*v1.Service, error)
@@ -91,8 +91,7 @@ func (mock *ServiceListerMock) Get(namespace string, name string) (*v1.Service, 
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//
-//	len(mockedServiceLister.GetCalls())
+//     len(mockedServiceLister.GetCalls())
 func (mock *ServiceListerMock) GetCalls() []struct {
 	Namespace string
 	Name      string
@@ -127,8 +126,7 @@ func (mock *ServiceListerMock) List(namespace string, selector labels.Selector) 
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//
-//	len(mockedServiceLister.ListCalls())
+//     len(mockedServiceLister.ListCalls())
 func (mock *ServiceListerMock) ListCalls() []struct {
 	Namespace string
 	Selector  labels.Selector
@@ -161,43 +159,43 @@ var _ v11.ServiceController = &ServiceControllerMock{}
 
 // ServiceControllerMock is a mock implementation of v11.ServiceController.
 //
-//	    func TestSomethingThatUsesServiceController(t *testing.T) {
+//     func TestSomethingThatUsesServiceController(t *testing.T) {
 //
-//	        // make and configure a mocked v11.ServiceController
-//	        mockedServiceController := &ServiceControllerMock{
-//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v11.ServiceHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedFeatureHandler method")
-//	            },
-//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v11.ServiceHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedHandler method")
-//	            },
-//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v11.ServiceHandlerFunc)  {
-//		               panic("mock out the AddFeatureHandler method")
-//	            },
-//	            AddHandlerFunc: func(ctx context.Context, name string, handler v11.ServiceHandlerFunc)  {
-//		               panic("mock out the AddHandler method")
-//	            },
-//	            EnqueueFunc: func(namespace string, name string)  {
-//		               panic("mock out the Enqueue method")
-//	            },
-//	            EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
-//		               panic("mock out the EnqueueAfter method")
-//	            },
-//	            GenericFunc: func() controller.GenericController {
-//		               panic("mock out the Generic method")
-//	            },
-//	            InformerFunc: func() cache.SharedIndexInformer {
-//		               panic("mock out the Informer method")
-//	            },
-//	            ListerFunc: func() v11.ServiceLister {
-//		               panic("mock out the Lister method")
-//	            },
-//	        }
+//         // make and configure a mocked v11.ServiceController
+//         mockedServiceController := &ServiceControllerMock{
+//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v11.ServiceHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedFeatureHandler method")
+//             },
+//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v11.ServiceHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedHandler method")
+//             },
+//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v11.ServiceHandlerFunc)  {
+// 	               panic("mock out the AddFeatureHandler method")
+//             },
+//             AddHandlerFunc: func(ctx context.Context, name string, handler v11.ServiceHandlerFunc)  {
+// 	               panic("mock out the AddHandler method")
+//             },
+//             EnqueueFunc: func(namespace string, name string)  {
+// 	               panic("mock out the Enqueue method")
+//             },
+//             EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
+// 	               panic("mock out the EnqueueAfter method")
+//             },
+//             GenericFunc: func() controller.GenericController {
+// 	               panic("mock out the Generic method")
+//             },
+//             InformerFunc: func() cache.SharedIndexInformer {
+// 	               panic("mock out the Informer method")
+//             },
+//             ListerFunc: func() v11.ServiceLister {
+// 	               panic("mock out the Lister method")
+//             },
+//         }
 //
-//	        // use mockedServiceController in code that requires v11.ServiceController
-//	        // and then make assertions.
+//         // use mockedServiceController in code that requires v11.ServiceController
+//         // and then make assertions.
 //
-//	    }
+//     }
 type ServiceControllerMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
 	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v11.ServiceHandlerFunc)
@@ -326,8 +324,7 @@ func (mock *ServiceControllerMock) AddClusterScopedFeatureHandler(ctx context.Co
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//
-//	len(mockedServiceController.AddClusterScopedFeatureHandlerCalls())
+//     len(mockedServiceController.AddClusterScopedFeatureHandlerCalls())
 func (mock *ServiceControllerMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -372,8 +369,7 @@ func (mock *ServiceControllerMock) AddClusterScopedHandler(ctx context.Context, 
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//
-//	len(mockedServiceController.AddClusterScopedHandlerCalls())
+//     len(mockedServiceController.AddClusterScopedHandlerCalls())
 func (mock *ServiceControllerMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -416,8 +412,7 @@ func (mock *ServiceControllerMock) AddFeatureHandler(ctx context.Context, enable
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//
-//	len(mockedServiceController.AddFeatureHandlerCalls())
+//     len(mockedServiceController.AddFeatureHandlerCalls())
 func (mock *ServiceControllerMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
@@ -458,8 +453,7 @@ func (mock *ServiceControllerMock) AddHandler(ctx context.Context, name string, 
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//
-//	len(mockedServiceController.AddHandlerCalls())
+//     len(mockedServiceController.AddHandlerCalls())
 func (mock *ServiceControllerMock) AddHandlerCalls() []struct {
 	Ctx     context.Context
 	Name    string
@@ -496,8 +490,7 @@ func (mock *ServiceControllerMock) Enqueue(namespace string, name string) {
 
 // EnqueueCalls gets all the calls that were made to Enqueue.
 // Check the length with:
-//
-//	len(mockedServiceController.EnqueueCalls())
+//     len(mockedServiceController.EnqueueCalls())
 func (mock *ServiceControllerMock) EnqueueCalls() []struct {
 	Namespace string
 	Name      string
@@ -534,8 +527,7 @@ func (mock *ServiceControllerMock) EnqueueAfter(namespace string, name string, a
 
 // EnqueueAfterCalls gets all the calls that were made to EnqueueAfter.
 // Check the length with:
-//
-//	len(mockedServiceController.EnqueueAfterCalls())
+//     len(mockedServiceController.EnqueueAfterCalls())
 func (mock *ServiceControllerMock) EnqueueAfterCalls() []struct {
 	Namespace string
 	Name      string
@@ -567,8 +559,7 @@ func (mock *ServiceControllerMock) Generic() controller.GenericController {
 
 // GenericCalls gets all the calls that were made to Generic.
 // Check the length with:
-//
-//	len(mockedServiceController.GenericCalls())
+//     len(mockedServiceController.GenericCalls())
 func (mock *ServiceControllerMock) GenericCalls() []struct {
 } {
 	var calls []struct {
@@ -594,8 +585,7 @@ func (mock *ServiceControllerMock) Informer() cache.SharedIndexInformer {
 
 // InformerCalls gets all the calls that were made to Informer.
 // Check the length with:
-//
-//	len(mockedServiceController.InformerCalls())
+//     len(mockedServiceController.InformerCalls())
 func (mock *ServiceControllerMock) InformerCalls() []struct {
 } {
 	var calls []struct {
@@ -621,8 +611,7 @@ func (mock *ServiceControllerMock) Lister() v11.ServiceLister {
 
 // ListerCalls gets all the calls that were made to Lister.
 // Check the length with:
-//
-//	len(mockedServiceController.ListerCalls())
+//     len(mockedServiceController.ListerCalls())
 func (mock *ServiceControllerMock) ListerCalls() []struct {
 } {
 	var calls []struct {
@@ -662,76 +651,76 @@ var _ v11.ServiceInterface = &ServiceInterfaceMock{}
 
 // ServiceInterfaceMock is a mock implementation of v11.ServiceInterface.
 //
-//	    func TestSomethingThatUsesServiceInterface(t *testing.T) {
+//     func TestSomethingThatUsesServiceInterface(t *testing.T) {
 //
-//	        // make and configure a mocked v11.ServiceInterface
-//	        mockedServiceInterface := &ServiceInterfaceMock{
-//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v11.ServiceHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedFeatureHandler method")
-//	            },
-//	            AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v11.ServiceLifecycle)  {
-//		               panic("mock out the AddClusterScopedFeatureLifecycle method")
-//	            },
-//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v11.ServiceHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedHandler method")
-//	            },
-//	            AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v11.ServiceLifecycle)  {
-//		               panic("mock out the AddClusterScopedLifecycle method")
-//	            },
-//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v11.ServiceHandlerFunc)  {
-//		               panic("mock out the AddFeatureHandler method")
-//	            },
-//	            AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v11.ServiceLifecycle)  {
-//		               panic("mock out the AddFeatureLifecycle method")
-//	            },
-//	            AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v11.ServiceHandlerFunc)  {
-//		               panic("mock out the AddHandler method")
-//	            },
-//	            AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v11.ServiceLifecycle)  {
-//		               panic("mock out the AddLifecycle method")
-//	            },
-//	            ControllerFunc: func() v11.ServiceController {
-//		               panic("mock out the Controller method")
-//	            },
-//	            CreateFunc: func(in1 *v1.Service) (*v1.Service, error) {
-//		               panic("mock out the Create method")
-//	            },
-//	            DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
-//		               panic("mock out the Delete method")
-//	            },
-//	            DeleteCollectionFunc: func(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
-//		               panic("mock out the DeleteCollection method")
-//	            },
-//	            DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
-//		               panic("mock out the DeleteNamespaced method")
-//	            },
-//	            GetFunc: func(name string, opts metav1.GetOptions) (*v1.Service, error) {
-//		               panic("mock out the Get method")
-//	            },
-//	            GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v1.Service, error) {
-//		               panic("mock out the GetNamespaced method")
-//	            },
-//	            ListFunc: func(opts metav1.ListOptions) (*v1.ServiceList, error) {
-//		               panic("mock out the List method")
-//	            },
-//	            ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v1.ServiceList, error) {
-//		               panic("mock out the ListNamespaced method")
-//	            },
-//	            ObjectClientFunc: func() *objectclient.ObjectClient {
-//		               panic("mock out the ObjectClient method")
-//	            },
-//	            UpdateFunc: func(in1 *v1.Service) (*v1.Service, error) {
-//		               panic("mock out the Update method")
-//	            },
-//	            WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
-//		               panic("mock out the Watch method")
-//	            },
-//	        }
+//         // make and configure a mocked v11.ServiceInterface
+//         mockedServiceInterface := &ServiceInterfaceMock{
+//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v11.ServiceHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedFeatureHandler method")
+//             },
+//             AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v11.ServiceLifecycle)  {
+// 	               panic("mock out the AddClusterScopedFeatureLifecycle method")
+//             },
+//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v11.ServiceHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedHandler method")
+//             },
+//             AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v11.ServiceLifecycle)  {
+// 	               panic("mock out the AddClusterScopedLifecycle method")
+//             },
+//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v11.ServiceHandlerFunc)  {
+// 	               panic("mock out the AddFeatureHandler method")
+//             },
+//             AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v11.ServiceLifecycle)  {
+// 	               panic("mock out the AddFeatureLifecycle method")
+//             },
+//             AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v11.ServiceHandlerFunc)  {
+// 	               panic("mock out the AddHandler method")
+//             },
+//             AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v11.ServiceLifecycle)  {
+// 	               panic("mock out the AddLifecycle method")
+//             },
+//             ControllerFunc: func() v11.ServiceController {
+// 	               panic("mock out the Controller method")
+//             },
+//             CreateFunc: func(in1 *v1.Service) (*v1.Service, error) {
+// 	               panic("mock out the Create method")
+//             },
+//             DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
+// 	               panic("mock out the Delete method")
+//             },
+//             DeleteCollectionFunc: func(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
+// 	               panic("mock out the DeleteCollection method")
+//             },
+//             DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
+// 	               panic("mock out the DeleteNamespaced method")
+//             },
+//             GetFunc: func(name string, opts metav1.GetOptions) (*v1.Service, error) {
+// 	               panic("mock out the Get method")
+//             },
+//             GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v1.Service, error) {
+// 	               panic("mock out the GetNamespaced method")
+//             },
+//             ListFunc: func(opts metav1.ListOptions) (*v1.ServiceList, error) {
+// 	               panic("mock out the List method")
+//             },
+//             ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v1.ServiceList, error) {
+// 	               panic("mock out the ListNamespaced method")
+//             },
+//             ObjectClientFunc: func() *objectclient.ObjectClient {
+// 	               panic("mock out the ObjectClient method")
+//             },
+//             UpdateFunc: func(in1 *v1.Service) (*v1.Service, error) {
+// 	               panic("mock out the Update method")
+//             },
+//             WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
+// 	               panic("mock out the Watch method")
+//             },
+//         }
 //
-//	        // use mockedServiceInterface in code that requires v11.ServiceInterface
-//	        // and then make assertions.
+//         // use mockedServiceInterface in code that requires v11.ServiceInterface
+//         // and then make assertions.
 //
-//	    }
+//     }
 type ServiceInterfaceMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
 	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v11.ServiceHandlerFunc)
@@ -984,8 +973,7 @@ func (mock *ServiceInterfaceMock) AddClusterScopedFeatureHandler(ctx context.Con
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//
-//	len(mockedServiceInterface.AddClusterScopedFeatureHandlerCalls())
+//     len(mockedServiceInterface.AddClusterScopedFeatureHandlerCalls())
 func (mock *ServiceInterfaceMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -1032,8 +1020,7 @@ func (mock *ServiceInterfaceMock) AddClusterScopedFeatureLifecycle(ctx context.C
 
 // AddClusterScopedFeatureLifecycleCalls gets all the calls that were made to AddClusterScopedFeatureLifecycle.
 // Check the length with:
-//
-//	len(mockedServiceInterface.AddClusterScopedFeatureLifecycleCalls())
+//     len(mockedServiceInterface.AddClusterScopedFeatureLifecycleCalls())
 func (mock *ServiceInterfaceMock) AddClusterScopedFeatureLifecycleCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -1078,8 +1065,7 @@ func (mock *ServiceInterfaceMock) AddClusterScopedHandler(ctx context.Context, n
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//
-//	len(mockedServiceInterface.AddClusterScopedHandlerCalls())
+//     len(mockedServiceInterface.AddClusterScopedHandlerCalls())
 func (mock *ServiceInterfaceMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -1122,8 +1108,7 @@ func (mock *ServiceInterfaceMock) AddClusterScopedLifecycle(ctx context.Context,
 
 // AddClusterScopedLifecycleCalls gets all the calls that were made to AddClusterScopedLifecycle.
 // Check the length with:
-//
-//	len(mockedServiceInterface.AddClusterScopedLifecycleCalls())
+//     len(mockedServiceInterface.AddClusterScopedLifecycleCalls())
 func (mock *ServiceInterfaceMock) AddClusterScopedLifecycleCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -1166,8 +1151,7 @@ func (mock *ServiceInterfaceMock) AddFeatureHandler(ctx context.Context, enabled
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//
-//	len(mockedServiceInterface.AddFeatureHandlerCalls())
+//     len(mockedServiceInterface.AddFeatureHandlerCalls())
 func (mock *ServiceInterfaceMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
@@ -1210,8 +1194,7 @@ func (mock *ServiceInterfaceMock) AddFeatureLifecycle(ctx context.Context, enabl
 
 // AddFeatureLifecycleCalls gets all the calls that were made to AddFeatureLifecycle.
 // Check the length with:
-//
-//	len(mockedServiceInterface.AddFeatureLifecycleCalls())
+//     len(mockedServiceInterface.AddFeatureLifecycleCalls())
 func (mock *ServiceInterfaceMock) AddFeatureLifecycleCalls() []struct {
 	Ctx       context.Context
 	Enabled   func() bool
@@ -1252,8 +1235,7 @@ func (mock *ServiceInterfaceMock) AddHandler(ctx context.Context, name string, s
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//
-//	len(mockedServiceInterface.AddHandlerCalls())
+//     len(mockedServiceInterface.AddHandlerCalls())
 func (mock *ServiceInterfaceMock) AddHandlerCalls() []struct {
 	Ctx  context.Context
 	Name string
@@ -1292,8 +1274,7 @@ func (mock *ServiceInterfaceMock) AddLifecycle(ctx context.Context, name string,
 
 // AddLifecycleCalls gets all the calls that were made to AddLifecycle.
 // Check the length with:
-//
-//	len(mockedServiceInterface.AddLifecycleCalls())
+//     len(mockedServiceInterface.AddLifecycleCalls())
 func (mock *ServiceInterfaceMock) AddLifecycleCalls() []struct {
 	Ctx       context.Context
 	Name      string
@@ -1325,8 +1306,7 @@ func (mock *ServiceInterfaceMock) Controller() v11.ServiceController {
 
 // ControllerCalls gets all the calls that were made to Controller.
 // Check the length with:
-//
-//	len(mockedServiceInterface.ControllerCalls())
+//     len(mockedServiceInterface.ControllerCalls())
 func (mock *ServiceInterfaceMock) ControllerCalls() []struct {
 } {
 	var calls []struct {
@@ -1355,8 +1335,7 @@ func (mock *ServiceInterfaceMock) Create(in1 *v1.Service) (*v1.Service, error) {
 
 // CreateCalls gets all the calls that were made to Create.
 // Check the length with:
-//
-//	len(mockedServiceInterface.CreateCalls())
+//     len(mockedServiceInterface.CreateCalls())
 func (mock *ServiceInterfaceMock) CreateCalls() []struct {
 	In1 *v1.Service
 } {
@@ -1389,8 +1368,7 @@ func (mock *ServiceInterfaceMock) Delete(name string, options *metav1.DeleteOpti
 
 // DeleteCalls gets all the calls that were made to Delete.
 // Check the length with:
-//
-//	len(mockedServiceInterface.DeleteCalls())
+//     len(mockedServiceInterface.DeleteCalls())
 func (mock *ServiceInterfaceMock) DeleteCalls() []struct {
 	Name    string
 	Options *metav1.DeleteOptions
@@ -1425,8 +1403,7 @@ func (mock *ServiceInterfaceMock) DeleteCollection(deleteOpts *metav1.DeleteOpti
 
 // DeleteCollectionCalls gets all the calls that were made to DeleteCollection.
 // Check the length with:
-//
-//	len(mockedServiceInterface.DeleteCollectionCalls())
+//     len(mockedServiceInterface.DeleteCollectionCalls())
 func (mock *ServiceInterfaceMock) DeleteCollectionCalls() []struct {
 	DeleteOpts *metav1.DeleteOptions
 	ListOpts   metav1.ListOptions
@@ -1463,8 +1440,7 @@ func (mock *ServiceInterfaceMock) DeleteNamespaced(namespace string, name string
 
 // DeleteNamespacedCalls gets all the calls that were made to DeleteNamespaced.
 // Check the length with:
-//
-//	len(mockedServiceInterface.DeleteNamespacedCalls())
+//     len(mockedServiceInterface.DeleteNamespacedCalls())
 func (mock *ServiceInterfaceMock) DeleteNamespacedCalls() []struct {
 	Namespace string
 	Name      string
@@ -1501,8 +1477,7 @@ func (mock *ServiceInterfaceMock) Get(name string, opts metav1.GetOptions) (*v1.
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//
-//	len(mockedServiceInterface.GetCalls())
+//     len(mockedServiceInterface.GetCalls())
 func (mock *ServiceInterfaceMock) GetCalls() []struct {
 	Name string
 	Opts metav1.GetOptions
@@ -1539,8 +1514,7 @@ func (mock *ServiceInterfaceMock) GetNamespaced(namespace string, name string, o
 
 // GetNamespacedCalls gets all the calls that were made to GetNamespaced.
 // Check the length with:
-//
-//	len(mockedServiceInterface.GetNamespacedCalls())
+//     len(mockedServiceInterface.GetNamespacedCalls())
 func (mock *ServiceInterfaceMock) GetNamespacedCalls() []struct {
 	Namespace string
 	Name      string
@@ -1575,8 +1549,7 @@ func (mock *ServiceInterfaceMock) List(opts metav1.ListOptions) (*v1.ServiceList
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//
-//	len(mockedServiceInterface.ListCalls())
+//     len(mockedServiceInterface.ListCalls())
 func (mock *ServiceInterfaceMock) ListCalls() []struct {
 	Opts metav1.ListOptions
 } {
@@ -1609,8 +1582,7 @@ func (mock *ServiceInterfaceMock) ListNamespaced(namespace string, opts metav1.L
 
 // ListNamespacedCalls gets all the calls that were made to ListNamespaced.
 // Check the length with:
-//
-//	len(mockedServiceInterface.ListNamespacedCalls())
+//     len(mockedServiceInterface.ListNamespacedCalls())
 func (mock *ServiceInterfaceMock) ListNamespacedCalls() []struct {
 	Namespace string
 	Opts      metav1.ListOptions
@@ -1640,8 +1612,7 @@ func (mock *ServiceInterfaceMock) ObjectClient() *objectclient.ObjectClient {
 
 // ObjectClientCalls gets all the calls that were made to ObjectClient.
 // Check the length with:
-//
-//	len(mockedServiceInterface.ObjectClientCalls())
+//     len(mockedServiceInterface.ObjectClientCalls())
 func (mock *ServiceInterfaceMock) ObjectClientCalls() []struct {
 } {
 	var calls []struct {
@@ -1670,8 +1641,7 @@ func (mock *ServiceInterfaceMock) Update(in1 *v1.Service) (*v1.Service, error) {
 
 // UpdateCalls gets all the calls that were made to Update.
 // Check the length with:
-//
-//	len(mockedServiceInterface.UpdateCalls())
+//     len(mockedServiceInterface.UpdateCalls())
 func (mock *ServiceInterfaceMock) UpdateCalls() []struct {
 	In1 *v1.Service
 } {
@@ -1702,8 +1672,7 @@ func (mock *ServiceInterfaceMock) Watch(opts metav1.ListOptions) (watch.Interfac
 
 // WatchCalls gets all the calls that were made to Watch.
 // Check the length with:
-//
-//	len(mockedServiceInterface.WatchCalls())
+//     len(mockedServiceInterface.WatchCalls())
 func (mock *ServiceInterfaceMock) WatchCalls() []struct {
 	Opts metav1.ListOptions
 } {
@@ -1726,19 +1695,19 @@ var _ v11.ServicesGetter = &ServicesGetterMock{}
 
 // ServicesGetterMock is a mock implementation of v11.ServicesGetter.
 //
-//	    func TestSomethingThatUsesServicesGetter(t *testing.T) {
+//     func TestSomethingThatUsesServicesGetter(t *testing.T) {
 //
-//	        // make and configure a mocked v11.ServicesGetter
-//	        mockedServicesGetter := &ServicesGetterMock{
-//	            ServicesFunc: func(namespace string) v11.ServiceInterface {
-//		               panic("mock out the Services method")
-//	            },
-//	        }
+//         // make and configure a mocked v11.ServicesGetter
+//         mockedServicesGetter := &ServicesGetterMock{
+//             ServicesFunc: func(namespace string) v11.ServiceInterface {
+// 	               panic("mock out the Services method")
+//             },
+//         }
 //
-//	        // use mockedServicesGetter in code that requires v11.ServicesGetter
-//	        // and then make assertions.
+//         // use mockedServicesGetter in code that requires v11.ServicesGetter
+//         // and then make assertions.
 //
-//	    }
+//     }
 type ServicesGetterMock struct {
 	// ServicesFunc mocks the Services method.
 	ServicesFunc func(namespace string) v11.ServiceInterface
@@ -1771,8 +1740,7 @@ func (mock *ServicesGetterMock) Services(namespace string) v11.ServiceInterface 
 
 // ServicesCalls gets all the calls that were made to Services.
 // Check the length with:
-//
-//	len(mockedServicesGetter.ServicesCalls())
+//     len(mockedServicesGetter.ServicesCalls())
 func (mock *ServicesGetterMock) ServicesCalls() []struct {
 	Namespace string
 } {

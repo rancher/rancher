@@ -29,22 +29,22 @@ var _ v11.APIServiceLister = &APIServiceListerMock{}
 
 // APIServiceListerMock is a mock implementation of v11.APIServiceLister.
 //
-//	    func TestSomethingThatUsesAPIServiceLister(t *testing.T) {
+//     func TestSomethingThatUsesAPIServiceLister(t *testing.T) {
 //
-//	        // make and configure a mocked v11.APIServiceLister
-//	        mockedAPIServiceLister := &APIServiceListerMock{
-//	            GetFunc: func(namespace string, name string) (*v1.APIService, error) {
-//		               panic("mock out the Get method")
-//	            },
-//	            ListFunc: func(namespace string, selector labels.Selector) ([]*v1.APIService, error) {
-//		               panic("mock out the List method")
-//	            },
-//	        }
+//         // make and configure a mocked v11.APIServiceLister
+//         mockedAPIServiceLister := &APIServiceListerMock{
+//             GetFunc: func(namespace string, name string) (*v1.APIService, error) {
+// 	               panic("mock out the Get method")
+//             },
+//             ListFunc: func(namespace string, selector labels.Selector) ([]*v1.APIService, error) {
+// 	               panic("mock out the List method")
+//             },
+//         }
 //
-//	        // use mockedAPIServiceLister in code that requires v11.APIServiceLister
-//	        // and then make assertions.
+//         // use mockedAPIServiceLister in code that requires v11.APIServiceLister
+//         // and then make assertions.
 //
-//	    }
+//     }
 type APIServiceListerMock struct {
 	// GetFunc mocks the Get method.
 	GetFunc func(namespace string, name string) (*v1.APIService, error)
@@ -91,8 +91,7 @@ func (mock *APIServiceListerMock) Get(namespace string, name string) (*v1.APISer
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//
-//	len(mockedAPIServiceLister.GetCalls())
+//     len(mockedAPIServiceLister.GetCalls())
 func (mock *APIServiceListerMock) GetCalls() []struct {
 	Namespace string
 	Name      string
@@ -127,8 +126,7 @@ func (mock *APIServiceListerMock) List(namespace string, selector labels.Selecto
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//
-//	len(mockedAPIServiceLister.ListCalls())
+//     len(mockedAPIServiceLister.ListCalls())
 func (mock *APIServiceListerMock) ListCalls() []struct {
 	Namespace string
 	Selector  labels.Selector
@@ -161,43 +159,43 @@ var _ v11.APIServiceController = &APIServiceControllerMock{}
 
 // APIServiceControllerMock is a mock implementation of v11.APIServiceController.
 //
-//	    func TestSomethingThatUsesAPIServiceController(t *testing.T) {
+//     func TestSomethingThatUsesAPIServiceController(t *testing.T) {
 //
-//	        // make and configure a mocked v11.APIServiceController
-//	        mockedAPIServiceController := &APIServiceControllerMock{
-//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v11.APIServiceHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedFeatureHandler method")
-//	            },
-//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v11.APIServiceHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedHandler method")
-//	            },
-//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v11.APIServiceHandlerFunc)  {
-//		               panic("mock out the AddFeatureHandler method")
-//	            },
-//	            AddHandlerFunc: func(ctx context.Context, name string, handler v11.APIServiceHandlerFunc)  {
-//		               panic("mock out the AddHandler method")
-//	            },
-//	            EnqueueFunc: func(namespace string, name string)  {
-//		               panic("mock out the Enqueue method")
-//	            },
-//	            EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
-//		               panic("mock out the EnqueueAfter method")
-//	            },
-//	            GenericFunc: func() controller.GenericController {
-//		               panic("mock out the Generic method")
-//	            },
-//	            InformerFunc: func() cache.SharedIndexInformer {
-//		               panic("mock out the Informer method")
-//	            },
-//	            ListerFunc: func() v11.APIServiceLister {
-//		               panic("mock out the Lister method")
-//	            },
-//	        }
+//         // make and configure a mocked v11.APIServiceController
+//         mockedAPIServiceController := &APIServiceControllerMock{
+//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v11.APIServiceHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedFeatureHandler method")
+//             },
+//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v11.APIServiceHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedHandler method")
+//             },
+//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v11.APIServiceHandlerFunc)  {
+// 	               panic("mock out the AddFeatureHandler method")
+//             },
+//             AddHandlerFunc: func(ctx context.Context, name string, handler v11.APIServiceHandlerFunc)  {
+// 	               panic("mock out the AddHandler method")
+//             },
+//             EnqueueFunc: func(namespace string, name string)  {
+// 	               panic("mock out the Enqueue method")
+//             },
+//             EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
+// 	               panic("mock out the EnqueueAfter method")
+//             },
+//             GenericFunc: func() controller.GenericController {
+// 	               panic("mock out the Generic method")
+//             },
+//             InformerFunc: func() cache.SharedIndexInformer {
+// 	               panic("mock out the Informer method")
+//             },
+//             ListerFunc: func() v11.APIServiceLister {
+// 	               panic("mock out the Lister method")
+//             },
+//         }
 //
-//	        // use mockedAPIServiceController in code that requires v11.APIServiceController
-//	        // and then make assertions.
+//         // use mockedAPIServiceController in code that requires v11.APIServiceController
+//         // and then make assertions.
 //
-//	    }
+//     }
 type APIServiceControllerMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
 	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v11.APIServiceHandlerFunc)
@@ -326,8 +324,7 @@ func (mock *APIServiceControllerMock) AddClusterScopedFeatureHandler(ctx context
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//
-//	len(mockedAPIServiceController.AddClusterScopedFeatureHandlerCalls())
+//     len(mockedAPIServiceController.AddClusterScopedFeatureHandlerCalls())
 func (mock *APIServiceControllerMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -372,8 +369,7 @@ func (mock *APIServiceControllerMock) AddClusterScopedHandler(ctx context.Contex
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//
-//	len(mockedAPIServiceController.AddClusterScopedHandlerCalls())
+//     len(mockedAPIServiceController.AddClusterScopedHandlerCalls())
 func (mock *APIServiceControllerMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -416,8 +412,7 @@ func (mock *APIServiceControllerMock) AddFeatureHandler(ctx context.Context, ena
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//
-//	len(mockedAPIServiceController.AddFeatureHandlerCalls())
+//     len(mockedAPIServiceController.AddFeatureHandlerCalls())
 func (mock *APIServiceControllerMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
@@ -458,8 +453,7 @@ func (mock *APIServiceControllerMock) AddHandler(ctx context.Context, name strin
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//
-//	len(mockedAPIServiceController.AddHandlerCalls())
+//     len(mockedAPIServiceController.AddHandlerCalls())
 func (mock *APIServiceControllerMock) AddHandlerCalls() []struct {
 	Ctx     context.Context
 	Name    string
@@ -496,8 +490,7 @@ func (mock *APIServiceControllerMock) Enqueue(namespace string, name string) {
 
 // EnqueueCalls gets all the calls that were made to Enqueue.
 // Check the length with:
-//
-//	len(mockedAPIServiceController.EnqueueCalls())
+//     len(mockedAPIServiceController.EnqueueCalls())
 func (mock *APIServiceControllerMock) EnqueueCalls() []struct {
 	Namespace string
 	Name      string
@@ -534,8 +527,7 @@ func (mock *APIServiceControllerMock) EnqueueAfter(namespace string, name string
 
 // EnqueueAfterCalls gets all the calls that were made to EnqueueAfter.
 // Check the length with:
-//
-//	len(mockedAPIServiceController.EnqueueAfterCalls())
+//     len(mockedAPIServiceController.EnqueueAfterCalls())
 func (mock *APIServiceControllerMock) EnqueueAfterCalls() []struct {
 	Namespace string
 	Name      string
@@ -567,8 +559,7 @@ func (mock *APIServiceControllerMock) Generic() controller.GenericController {
 
 // GenericCalls gets all the calls that were made to Generic.
 // Check the length with:
-//
-//	len(mockedAPIServiceController.GenericCalls())
+//     len(mockedAPIServiceController.GenericCalls())
 func (mock *APIServiceControllerMock) GenericCalls() []struct {
 } {
 	var calls []struct {
@@ -594,8 +585,7 @@ func (mock *APIServiceControllerMock) Informer() cache.SharedIndexInformer {
 
 // InformerCalls gets all the calls that were made to Informer.
 // Check the length with:
-//
-//	len(mockedAPIServiceController.InformerCalls())
+//     len(mockedAPIServiceController.InformerCalls())
 func (mock *APIServiceControllerMock) InformerCalls() []struct {
 } {
 	var calls []struct {
@@ -621,8 +611,7 @@ func (mock *APIServiceControllerMock) Lister() v11.APIServiceLister {
 
 // ListerCalls gets all the calls that were made to Lister.
 // Check the length with:
-//
-//	len(mockedAPIServiceController.ListerCalls())
+//     len(mockedAPIServiceController.ListerCalls())
 func (mock *APIServiceControllerMock) ListerCalls() []struct {
 } {
 	var calls []struct {
@@ -662,76 +651,76 @@ var _ v11.APIServiceInterface = &APIServiceInterfaceMock{}
 
 // APIServiceInterfaceMock is a mock implementation of v11.APIServiceInterface.
 //
-//	    func TestSomethingThatUsesAPIServiceInterface(t *testing.T) {
+//     func TestSomethingThatUsesAPIServiceInterface(t *testing.T) {
 //
-//	        // make and configure a mocked v11.APIServiceInterface
-//	        mockedAPIServiceInterface := &APIServiceInterfaceMock{
-//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v11.APIServiceHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedFeatureHandler method")
-//	            },
-//	            AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v11.APIServiceLifecycle)  {
-//		               panic("mock out the AddClusterScopedFeatureLifecycle method")
-//	            },
-//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v11.APIServiceHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedHandler method")
-//	            },
-//	            AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v11.APIServiceLifecycle)  {
-//		               panic("mock out the AddClusterScopedLifecycle method")
-//	            },
-//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v11.APIServiceHandlerFunc)  {
-//		               panic("mock out the AddFeatureHandler method")
-//	            },
-//	            AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v11.APIServiceLifecycle)  {
-//		               panic("mock out the AddFeatureLifecycle method")
-//	            },
-//	            AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v11.APIServiceHandlerFunc)  {
-//		               panic("mock out the AddHandler method")
-//	            },
-//	            AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v11.APIServiceLifecycle)  {
-//		               panic("mock out the AddLifecycle method")
-//	            },
-//	            ControllerFunc: func() v11.APIServiceController {
-//		               panic("mock out the Controller method")
-//	            },
-//	            CreateFunc: func(in1 *v1.APIService) (*v1.APIService, error) {
-//		               panic("mock out the Create method")
-//	            },
-//	            DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
-//		               panic("mock out the Delete method")
-//	            },
-//	            DeleteCollectionFunc: func(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
-//		               panic("mock out the DeleteCollection method")
-//	            },
-//	            DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
-//		               panic("mock out the DeleteNamespaced method")
-//	            },
-//	            GetFunc: func(name string, opts metav1.GetOptions) (*v1.APIService, error) {
-//		               panic("mock out the Get method")
-//	            },
-//	            GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v1.APIService, error) {
-//		               panic("mock out the GetNamespaced method")
-//	            },
-//	            ListFunc: func(opts metav1.ListOptions) (*v1.APIServiceList, error) {
-//		               panic("mock out the List method")
-//	            },
-//	            ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v1.APIServiceList, error) {
-//		               panic("mock out the ListNamespaced method")
-//	            },
-//	            ObjectClientFunc: func() *objectclient.ObjectClient {
-//		               panic("mock out the ObjectClient method")
-//	            },
-//	            UpdateFunc: func(in1 *v1.APIService) (*v1.APIService, error) {
-//		               panic("mock out the Update method")
-//	            },
-//	            WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
-//		               panic("mock out the Watch method")
-//	            },
-//	        }
+//         // make and configure a mocked v11.APIServiceInterface
+//         mockedAPIServiceInterface := &APIServiceInterfaceMock{
+//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v11.APIServiceHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedFeatureHandler method")
+//             },
+//             AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v11.APIServiceLifecycle)  {
+// 	               panic("mock out the AddClusterScopedFeatureLifecycle method")
+//             },
+//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v11.APIServiceHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedHandler method")
+//             },
+//             AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v11.APIServiceLifecycle)  {
+// 	               panic("mock out the AddClusterScopedLifecycle method")
+//             },
+//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v11.APIServiceHandlerFunc)  {
+// 	               panic("mock out the AddFeatureHandler method")
+//             },
+//             AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v11.APIServiceLifecycle)  {
+// 	               panic("mock out the AddFeatureLifecycle method")
+//             },
+//             AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v11.APIServiceHandlerFunc)  {
+// 	               panic("mock out the AddHandler method")
+//             },
+//             AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v11.APIServiceLifecycle)  {
+// 	               panic("mock out the AddLifecycle method")
+//             },
+//             ControllerFunc: func() v11.APIServiceController {
+// 	               panic("mock out the Controller method")
+//             },
+//             CreateFunc: func(in1 *v1.APIService) (*v1.APIService, error) {
+// 	               panic("mock out the Create method")
+//             },
+//             DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
+// 	               panic("mock out the Delete method")
+//             },
+//             DeleteCollectionFunc: func(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
+// 	               panic("mock out the DeleteCollection method")
+//             },
+//             DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
+// 	               panic("mock out the DeleteNamespaced method")
+//             },
+//             GetFunc: func(name string, opts metav1.GetOptions) (*v1.APIService, error) {
+// 	               panic("mock out the Get method")
+//             },
+//             GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v1.APIService, error) {
+// 	               panic("mock out the GetNamespaced method")
+//             },
+//             ListFunc: func(opts metav1.ListOptions) (*v1.APIServiceList, error) {
+// 	               panic("mock out the List method")
+//             },
+//             ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v1.APIServiceList, error) {
+// 	               panic("mock out the ListNamespaced method")
+//             },
+//             ObjectClientFunc: func() *objectclient.ObjectClient {
+// 	               panic("mock out the ObjectClient method")
+//             },
+//             UpdateFunc: func(in1 *v1.APIService) (*v1.APIService, error) {
+// 	               panic("mock out the Update method")
+//             },
+//             WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
+// 	               panic("mock out the Watch method")
+//             },
+//         }
 //
-//	        // use mockedAPIServiceInterface in code that requires v11.APIServiceInterface
-//	        // and then make assertions.
+//         // use mockedAPIServiceInterface in code that requires v11.APIServiceInterface
+//         // and then make assertions.
 //
-//	    }
+//     }
 type APIServiceInterfaceMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
 	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v11.APIServiceHandlerFunc)
@@ -984,8 +973,7 @@ func (mock *APIServiceInterfaceMock) AddClusterScopedFeatureHandler(ctx context.
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//
-//	len(mockedAPIServiceInterface.AddClusterScopedFeatureHandlerCalls())
+//     len(mockedAPIServiceInterface.AddClusterScopedFeatureHandlerCalls())
 func (mock *APIServiceInterfaceMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -1032,8 +1020,7 @@ func (mock *APIServiceInterfaceMock) AddClusterScopedFeatureLifecycle(ctx contex
 
 // AddClusterScopedFeatureLifecycleCalls gets all the calls that were made to AddClusterScopedFeatureLifecycle.
 // Check the length with:
-//
-//	len(mockedAPIServiceInterface.AddClusterScopedFeatureLifecycleCalls())
+//     len(mockedAPIServiceInterface.AddClusterScopedFeatureLifecycleCalls())
 func (mock *APIServiceInterfaceMock) AddClusterScopedFeatureLifecycleCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -1078,8 +1065,7 @@ func (mock *APIServiceInterfaceMock) AddClusterScopedHandler(ctx context.Context
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//
-//	len(mockedAPIServiceInterface.AddClusterScopedHandlerCalls())
+//     len(mockedAPIServiceInterface.AddClusterScopedHandlerCalls())
 func (mock *APIServiceInterfaceMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -1122,8 +1108,7 @@ func (mock *APIServiceInterfaceMock) AddClusterScopedLifecycle(ctx context.Conte
 
 // AddClusterScopedLifecycleCalls gets all the calls that were made to AddClusterScopedLifecycle.
 // Check the length with:
-//
-//	len(mockedAPIServiceInterface.AddClusterScopedLifecycleCalls())
+//     len(mockedAPIServiceInterface.AddClusterScopedLifecycleCalls())
 func (mock *APIServiceInterfaceMock) AddClusterScopedLifecycleCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -1166,8 +1151,7 @@ func (mock *APIServiceInterfaceMock) AddFeatureHandler(ctx context.Context, enab
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//
-//	len(mockedAPIServiceInterface.AddFeatureHandlerCalls())
+//     len(mockedAPIServiceInterface.AddFeatureHandlerCalls())
 func (mock *APIServiceInterfaceMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
@@ -1210,8 +1194,7 @@ func (mock *APIServiceInterfaceMock) AddFeatureLifecycle(ctx context.Context, en
 
 // AddFeatureLifecycleCalls gets all the calls that were made to AddFeatureLifecycle.
 // Check the length with:
-//
-//	len(mockedAPIServiceInterface.AddFeatureLifecycleCalls())
+//     len(mockedAPIServiceInterface.AddFeatureLifecycleCalls())
 func (mock *APIServiceInterfaceMock) AddFeatureLifecycleCalls() []struct {
 	Ctx       context.Context
 	Enabled   func() bool
@@ -1252,8 +1235,7 @@ func (mock *APIServiceInterfaceMock) AddHandler(ctx context.Context, name string
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//
-//	len(mockedAPIServiceInterface.AddHandlerCalls())
+//     len(mockedAPIServiceInterface.AddHandlerCalls())
 func (mock *APIServiceInterfaceMock) AddHandlerCalls() []struct {
 	Ctx  context.Context
 	Name string
@@ -1292,8 +1274,7 @@ func (mock *APIServiceInterfaceMock) AddLifecycle(ctx context.Context, name stri
 
 // AddLifecycleCalls gets all the calls that were made to AddLifecycle.
 // Check the length with:
-//
-//	len(mockedAPIServiceInterface.AddLifecycleCalls())
+//     len(mockedAPIServiceInterface.AddLifecycleCalls())
 func (mock *APIServiceInterfaceMock) AddLifecycleCalls() []struct {
 	Ctx       context.Context
 	Name      string
@@ -1325,8 +1306,7 @@ func (mock *APIServiceInterfaceMock) Controller() v11.APIServiceController {
 
 // ControllerCalls gets all the calls that were made to Controller.
 // Check the length with:
-//
-//	len(mockedAPIServiceInterface.ControllerCalls())
+//     len(mockedAPIServiceInterface.ControllerCalls())
 func (mock *APIServiceInterfaceMock) ControllerCalls() []struct {
 } {
 	var calls []struct {
@@ -1355,8 +1335,7 @@ func (mock *APIServiceInterfaceMock) Create(in1 *v1.APIService) (*v1.APIService,
 
 // CreateCalls gets all the calls that were made to Create.
 // Check the length with:
-//
-//	len(mockedAPIServiceInterface.CreateCalls())
+//     len(mockedAPIServiceInterface.CreateCalls())
 func (mock *APIServiceInterfaceMock) CreateCalls() []struct {
 	In1 *v1.APIService
 } {
@@ -1389,8 +1368,7 @@ func (mock *APIServiceInterfaceMock) Delete(name string, options *metav1.DeleteO
 
 // DeleteCalls gets all the calls that were made to Delete.
 // Check the length with:
-//
-//	len(mockedAPIServiceInterface.DeleteCalls())
+//     len(mockedAPIServiceInterface.DeleteCalls())
 func (mock *APIServiceInterfaceMock) DeleteCalls() []struct {
 	Name    string
 	Options *metav1.DeleteOptions
@@ -1425,8 +1403,7 @@ func (mock *APIServiceInterfaceMock) DeleteCollection(deleteOpts *metav1.DeleteO
 
 // DeleteCollectionCalls gets all the calls that were made to DeleteCollection.
 // Check the length with:
-//
-//	len(mockedAPIServiceInterface.DeleteCollectionCalls())
+//     len(mockedAPIServiceInterface.DeleteCollectionCalls())
 func (mock *APIServiceInterfaceMock) DeleteCollectionCalls() []struct {
 	DeleteOpts *metav1.DeleteOptions
 	ListOpts   metav1.ListOptions
@@ -1463,8 +1440,7 @@ func (mock *APIServiceInterfaceMock) DeleteNamespaced(namespace string, name str
 
 // DeleteNamespacedCalls gets all the calls that were made to DeleteNamespaced.
 // Check the length with:
-//
-//	len(mockedAPIServiceInterface.DeleteNamespacedCalls())
+//     len(mockedAPIServiceInterface.DeleteNamespacedCalls())
 func (mock *APIServiceInterfaceMock) DeleteNamespacedCalls() []struct {
 	Namespace string
 	Name      string
@@ -1501,8 +1477,7 @@ func (mock *APIServiceInterfaceMock) Get(name string, opts metav1.GetOptions) (*
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//
-//	len(mockedAPIServiceInterface.GetCalls())
+//     len(mockedAPIServiceInterface.GetCalls())
 func (mock *APIServiceInterfaceMock) GetCalls() []struct {
 	Name string
 	Opts metav1.GetOptions
@@ -1539,8 +1514,7 @@ func (mock *APIServiceInterfaceMock) GetNamespaced(namespace string, name string
 
 // GetNamespacedCalls gets all the calls that were made to GetNamespaced.
 // Check the length with:
-//
-//	len(mockedAPIServiceInterface.GetNamespacedCalls())
+//     len(mockedAPIServiceInterface.GetNamespacedCalls())
 func (mock *APIServiceInterfaceMock) GetNamespacedCalls() []struct {
 	Namespace string
 	Name      string
@@ -1575,8 +1549,7 @@ func (mock *APIServiceInterfaceMock) List(opts metav1.ListOptions) (*v1.APIServi
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//
-//	len(mockedAPIServiceInterface.ListCalls())
+//     len(mockedAPIServiceInterface.ListCalls())
 func (mock *APIServiceInterfaceMock) ListCalls() []struct {
 	Opts metav1.ListOptions
 } {
@@ -1609,8 +1582,7 @@ func (mock *APIServiceInterfaceMock) ListNamespaced(namespace string, opts metav
 
 // ListNamespacedCalls gets all the calls that were made to ListNamespaced.
 // Check the length with:
-//
-//	len(mockedAPIServiceInterface.ListNamespacedCalls())
+//     len(mockedAPIServiceInterface.ListNamespacedCalls())
 func (mock *APIServiceInterfaceMock) ListNamespacedCalls() []struct {
 	Namespace string
 	Opts      metav1.ListOptions
@@ -1640,8 +1612,7 @@ func (mock *APIServiceInterfaceMock) ObjectClient() *objectclient.ObjectClient {
 
 // ObjectClientCalls gets all the calls that were made to ObjectClient.
 // Check the length with:
-//
-//	len(mockedAPIServiceInterface.ObjectClientCalls())
+//     len(mockedAPIServiceInterface.ObjectClientCalls())
 func (mock *APIServiceInterfaceMock) ObjectClientCalls() []struct {
 } {
 	var calls []struct {
@@ -1670,8 +1641,7 @@ func (mock *APIServiceInterfaceMock) Update(in1 *v1.APIService) (*v1.APIService,
 
 // UpdateCalls gets all the calls that were made to Update.
 // Check the length with:
-//
-//	len(mockedAPIServiceInterface.UpdateCalls())
+//     len(mockedAPIServiceInterface.UpdateCalls())
 func (mock *APIServiceInterfaceMock) UpdateCalls() []struct {
 	In1 *v1.APIService
 } {
@@ -1702,8 +1672,7 @@ func (mock *APIServiceInterfaceMock) Watch(opts metav1.ListOptions) (watch.Inter
 
 // WatchCalls gets all the calls that were made to Watch.
 // Check the length with:
-//
-//	len(mockedAPIServiceInterface.WatchCalls())
+//     len(mockedAPIServiceInterface.WatchCalls())
 func (mock *APIServiceInterfaceMock) WatchCalls() []struct {
 	Opts metav1.ListOptions
 } {
@@ -1726,19 +1695,19 @@ var _ v11.APIServicesGetter = &APIServicesGetterMock{}
 
 // APIServicesGetterMock is a mock implementation of v11.APIServicesGetter.
 //
-//	    func TestSomethingThatUsesAPIServicesGetter(t *testing.T) {
+//     func TestSomethingThatUsesAPIServicesGetter(t *testing.T) {
 //
-//	        // make and configure a mocked v11.APIServicesGetter
-//	        mockedAPIServicesGetter := &APIServicesGetterMock{
-//	            APIServicesFunc: func(namespace string) v11.APIServiceInterface {
-//		               panic("mock out the APIServices method")
-//	            },
-//	        }
+//         // make and configure a mocked v11.APIServicesGetter
+//         mockedAPIServicesGetter := &APIServicesGetterMock{
+//             APIServicesFunc: func(namespace string) v11.APIServiceInterface {
+// 	               panic("mock out the APIServices method")
+//             },
+//         }
 //
-//	        // use mockedAPIServicesGetter in code that requires v11.APIServicesGetter
-//	        // and then make assertions.
+//         // use mockedAPIServicesGetter in code that requires v11.APIServicesGetter
+//         // and then make assertions.
 //
-//	    }
+//     }
 type APIServicesGetterMock struct {
 	// APIServicesFunc mocks the APIServices method.
 	APIServicesFunc func(namespace string) v11.APIServiceInterface
@@ -1771,8 +1740,7 @@ func (mock *APIServicesGetterMock) APIServices(namespace string) v11.APIServiceI
 
 // APIServicesCalls gets all the calls that were made to APIServices.
 // Check the length with:
-//
-//	len(mockedAPIServicesGetter.APIServicesCalls())
+//     len(mockedAPIServicesGetter.APIServicesCalls())
 func (mock *APIServicesGetterMock) APIServicesCalls() []struct {
 	Namespace string
 } {
