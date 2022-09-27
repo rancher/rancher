@@ -118,7 +118,7 @@ func (s *userStore) Create(apiContext *types.APIContext, schema *types.Schema, d
 		return nil, errors.New("invalid password")
 	}
 
-	if err := validatePassword(username, password, settings.PasswordMinLength.GetInt()); err != nil {
+	if err := validatePassword(username, "", password, settings.PasswordMinLength.GetInt()); err != nil {
 		return nil, httperror.NewAPIError(httperror.InvalidBodyContent, err.Error())
 	}
 
