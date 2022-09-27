@@ -108,8 +108,26 @@ replicas: 3
 # Set priorityClassName to avoid eviction
 priorityClassName: system-node-critical
 
+# Allow to set nodeAffinity
+#
+# nodeAffinity:
+#   requiredDuringSchedulingIgnoredDuringExecution:
+#     nodeSelectorTerms:
+#     - matchExpressions:
+#       - key: node-role.kubernetes.io/master
+#         operator: Exists
+nodeAffinity: {}
+
 # Set pod resource requests/limits for Rancher.
 resources: {}
+
+# allow to se tolerations
+#
+# tolerations:
+# - key: node-role.kubernetes.io/master
+#   operator: Exists
+#   effect: NoSchedule
+tolerations: []
 
 #
 # tls
