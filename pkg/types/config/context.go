@@ -24,7 +24,6 @@ import (
 	extv1beta1 "github.com/rancher/rancher/pkg/generated/norman/extensions/v1beta1"
 	managementv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	monitoringv1 "github.com/rancher/rancher/pkg/generated/norman/monitoring.coreos.com/v1"
-	istiov1alpha3 "github.com/rancher/rancher/pkg/generated/norman/networking.istio.io/v1alpha3"
 	knetworkingv1 "github.com/rancher/rancher/pkg/generated/norman/networking.k8s.io/v1"
 	policyv1beta1 "github.com/rancher/rancher/pkg/generated/norman/policy/v1beta1"
 	projectv3 "github.com/rancher/rancher/pkg/generated/norman/project.cattle.io/v3"
@@ -233,7 +232,6 @@ type UserContext struct {
 	Networking     knetworkingv1.Interface
 	Monitoring     monitoringv1.Interface
 	Cluster        clusterv3.Interface
-	Istio          istiov1alpha3.Interface
 	Storage        storagev1.Interface
 	Policy         policyv1beta1.Interface
 
@@ -307,7 +305,6 @@ func (w *UserContext) UserOnlyContext() *UserOnlyContext {
 		BatchV1Beta1: w.BatchV1Beta1,
 		Monitoring:   w.Monitoring,
 		Cluster:      w.Cluster,
-		Istio:        w.Istio,
 		Storage:      w.Storage,
 		Policy:       w.Policy,
 	}
@@ -333,7 +330,6 @@ type UserOnlyContext struct {
 	Networking      knetworkingv1.Interface
 	Monitoring      monitoringv1.Interface
 	Cluster         clusterv3.Interface
-	Istio           istiov1alpha3.Interface
 	Storage         storagev1.Interface
 	Policy          policyv1beta1.Interface
 }
@@ -510,11 +506,6 @@ func NewUserContext(scaledContext *ScaledContext, config rest.Config, clusterNam
 		return nil, err
 	}
 
-	context.Istio, err = istiov1alpha3.NewFromControllerFactory(controllerFactory)
-	if err != nil {
-		return nil, err
-	}
-
 	context.APIAggregation, err = apiregistrationv1.NewFromControllerFactory(controllerFactory)
 	if err != nil {
 		return nil, err
@@ -632,11 +623,6 @@ func NewUserOnlyContext(config *wrangler.Context) (*UserOnlyContext, error) {
 	}
 
 	context.Cluster, err = clusterv3.NewFromControllerFactory(context.ControllerFactory)
-	if err != nil {
-		return nil, err
-	}
-
-	context.Istio, err = istiov1alpha3.NewFromControllerFactory(context.ControllerFactory)
 	if err != nil {
 		return nil, err
 	}

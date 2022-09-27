@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"sync"
 
-	istiov1alpha3api "github.com/knative/pkg/apis/istio/v1alpha3"
 	prommonitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	fleetv1alpha1api "github.com/rancher/fleet/pkg/apis/fleet.cattle.io/v1alpha1"
 	"github.com/rancher/lasso/pkg/controller"
@@ -84,7 +83,6 @@ var (
 		apiextensionsv1.AddToScheme,
 		apiregistrationv12.AddToScheme,
 		prommonitoringv1.AddToScheme,
-		istiov1alpha3api.AddToScheme,
 		catalogv1.AddToScheme,
 	}
 	AddToScheme = localSchemeBuilder.AddToScheme
