@@ -394,7 +394,7 @@ func (m *nodesSyncer) reconcileAll() error {
 		return err
 	}
 
-	nodeMap := make(map[string]*corev1.Node)
+	nodeMap := make(map[string]*corev1.Node, len(nodes))
 	for _, node := range nodes {
 		nodeMap[node.Name] = node
 	}

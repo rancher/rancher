@@ -397,7 +397,7 @@ func (m *Lifecycle) createCleanupJob(userContext *config.UserContext, cluster *v
 	return userContext.K8sClient.BatchV1().Jobs("default").Create(context.TODO(), &job, metav1.CreateOptions{})
 }
 
-func (m *Lifecycle) userNodeRemoveCleanup(obj *v3.Node) (runtime.Object, error) {
+func (m *Lifecycle) userNodeRemoveCleanup(obj *v3.Node) (*v3.Node, error) {
 	newObj := obj.DeepCopy()
 	newObj.SetFinalizers(removeFinalizerWithPrefix(newObj.GetFinalizers(), userNodeRemoveFinalizerPrefix))
 
