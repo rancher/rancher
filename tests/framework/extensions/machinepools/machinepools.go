@@ -2,7 +2,9 @@ package machinepools
 
 import (
 	"context"
+	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	provisioning "github.com/rancher/rancher/tests/framework/clients/rancher/generated/provisioning/v1"
@@ -52,7 +54,25 @@ type NodeRoles struct {
 	Quantity     int64 `json:"quantity" yaml:"quantity"`
 }
 
-// RKEMachinePoolSetup is a helper method that will loop and setup muliple node pools with the defined node roles from the `nodeRoles` parameter
+func (n NodeRoles) String() string {
+	result := make([]string, 0, 3)
+	if n.Quantity < 1 {
+		return ""
+	}
+	if n.ControlPlane {
+		result = append(result, "controlplane")
+	}
+	if n.Etcd {
+		result = append(result, "etcd")
+	}
+	if n.Worker {
+		result = append(result, "worker")
+	}
+
+	return fmt.Sprintf("%d %s", n.Quantity, strings.Join(result, "+"))
+}
+
+// RKEMachinePoolSetup is a helper method that will loop and setup multiple node pools with the defined node roles from the `nodeRoles` parameter
 // `machineConfig` is the *unstructured.Unstructured created by CreateMachineConfig
 // `nodeRoles` would be in this format
 //   []NodeRoles{
