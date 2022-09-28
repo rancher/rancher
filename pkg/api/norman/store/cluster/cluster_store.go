@@ -452,7 +452,7 @@ func transposeNameFields(data map[string]interface{}, clusterConfigSchema *types
 }
 
 func loadDataFromTemplate(clusterTemplateRevision *v3.ClusterTemplateRevision, clusterTemplate *v3.ClusterTemplate, data map[string]interface{}, clusterConfigSchema *types.Schema, existingCluster map[string]interface{}, secretLister v1.SecretLister) (map[string]interface{}, error) {
-	clusterConfig := *clusterTemplateRevision.Spec.ClusterConfig.DeepCopy()
+	clusterConfig := *clusterTemplateRevision.Spec.ClusterConfig
 	clusterConfigSpec, err := secretmigrator.AssembleRKEConfigTemplateSpec(clusterTemplateRevision, v32.ClusterSpec{ClusterSpecBase: clusterConfig}, secretLister)
 	if err != nil {
 		return nil, err

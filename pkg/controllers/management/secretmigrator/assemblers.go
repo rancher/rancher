@@ -26,7 +26,6 @@ func AssemblePrivateRegistryCredential(secretRef, objType, objName string, spec 
 			logrus.Warnf("[secretmigrator] secrets for %s %s are not finished migrating", objType, objName)
 		}
 		return spec, nil
-
 	}
 	registrySecret, err := secretLister.Get(SecretNamespace, secretRef)
 	if err != nil {
@@ -37,13 +36,14 @@ func AssemblePrivateRegistryCredential(secretRef, objType, objName string, spec 
 	if err != nil {
 		return spec, err
 	}
-	for i, privateRegistry := range spec.RancherKubernetesEngineConfig.PrivateRegistries {
+	specCopy := spec.DeepCopy()
+	for i, privateRegistry := range specCopy.RancherKubernetesEngineConfig.PrivateRegistries {
 		if reg, ok := dockerCfg.Auths[privateRegistry.URL]; ok {
-			spec.RancherKubernetesEngineConfig.PrivateRegistries[i].User = reg.Username
-			spec.RancherKubernetesEngineConfig.PrivateRegistries[i].Password = reg.Password
+			specCopy.RancherKubernetesEngineConfig.PrivateRegistries[i].User = reg.Username
+			specCopy.RancherKubernetesEngineConfig.PrivateRegistries[i].Password = reg.Password
 		}
 	}
-	return spec, nil
+	return *specCopy, nil
 }
 
 // AssembleS3Credential looks up the S3 backup config Secret and inserts the keys into the S3BackupConfig on the Cluster spec.
@@ -62,8 +62,9 @@ func AssembleS3Credential(secretRef, objType, objName string, spec apimgmtv3.Clu
 	if err != nil {
 		return spec, err
 	}
-	spec.RancherKubernetesEngineConfig.Services.Etcd.BackupConfig.S3BackupConfig.SecretKey = string(s3Cred.Data[SecretKey])
-	return spec, nil
+	specCopy := spec.DeepCopy()
+	specCopy.RancherKubernetesEngineConfig.Services.Etcd.BackupConfig.S3BackupConfig.SecretKey = string(s3Cred.Data[SecretKey])
+	return *specCopy, nil
 }
 
 // AssembleWeaveCredential looks up the weave Secret and inserts the keys into the network provider config on the Cluster spec.
@@ -77,14 +78,14 @@ func AssembleWeaveCredential(secretRef, objType, objName string, spec apimgmtv3.
 			logrus.Warnf("[secretmigrator] secrets for %s %s are not finished migrating", objType, objName)
 		}
 		return spec, nil
-
 	}
 	weaveSecret, err := secretLister.Get(SecretNamespace, secretRef)
 	if err != nil {
 		return spec, err
 	}
-	spec.RancherKubernetesEngineConfig.Network.WeaveNetworkProvider.Password = string(weaveSecret.Data[SecretKey])
-	return spec, nil
+	specCopy := spec.DeepCopy()
+	specCopy.RancherKubernetesEngineConfig.Network.WeaveNetworkProvider.Password = string(weaveSecret.Data[SecretKey])
+	return *specCopy, nil
 }
 
 // AssembleVsphereGlobalCredential looks up the vsphere global Secret and inserts the keys into the cloud provider config on the Cluster spec.
@@ -98,14 +99,14 @@ func AssembleVsphereGlobalCredential(secretRef, objType, objName string, spec ap
 			logrus.Warnf("[secretmigrator] secrets for %s %s are not finished migrating", objType, objName)
 		}
 		return spec, nil
-
 	}
 	vsphereSecret, err := secretLister.Get(SecretNamespace, secretRef)
 	if err != nil {
 		return spec, err
 	}
-	spec.RancherKubernetesEngineConfig.CloudProvider.VsphereCloudProvider.Global.Password = string(vsphereSecret.Data[SecretKey])
-	return spec, nil
+	specCopy := spec.DeepCopy()
+	specCopy.RancherKubernetesEngineConfig.CloudProvider.VsphereCloudProvider.Global.Password = string(vsphereSecret.Data[SecretKey])
+	return *specCopy, nil
 }
 
 // AssembleVsphereVirtualCenterCredential looks up the vsphere virtualcenter Secret and inserts the keys into the cloud provider config on the Cluster spec.
@@ -128,12 +129,13 @@ func AssembleVsphereVirtualCenterCredential(secretRef, objType, objName string, 
 	if err != nil {
 		return spec, err
 	}
+	specCopy := spec.DeepCopy()
 	for k, v := range vcenterSecret.Data {
-		vCenter := spec.RancherKubernetesEngineConfig.CloudProvider.VsphereCloudProvider.VirtualCenter[k]
+		vCenter := specCopy.RancherKubernetesEngineConfig.CloudProvider.VsphereCloudProvider.VirtualCenter[k]
 		vCenter.Password = string(v)
-		spec.RancherKubernetesEngineConfig.CloudProvider.VsphereCloudProvider.VirtualCenter[k] = vCenter
+		specCopy.RancherKubernetesEngineConfig.CloudProvider.VsphereCloudProvider.VirtualCenter[k] = vCenter
 	}
-	return spec, nil
+	return *specCopy, nil
 }
 
 // AssembleOpenStackCredential looks up the OpenStack Secret and inserts the keys into the cloud provider config on the Cluster spec.
@@ -153,8 +155,9 @@ func AssembleOpenStackCredential(secretRef, objType, objName string, spec apimgm
 	if err != nil {
 		return spec, err
 	}
-	spec.RancherKubernetesEngineConfig.CloudProvider.OpenstackCloudProvider.Global.Password = string(openStackSecret.Data[SecretKey])
-	return spec, nil
+	specCopy := spec.DeepCopy()
+	specCopy.RancherKubernetesEngineConfig.CloudProvider.OpenstackCloudProvider.Global.Password = string(openStackSecret.Data[SecretKey])
+	return *specCopy, nil
 }
 
 // AssembleAADClientSecretCredential looks up the AAD client secret Secret and inserts the keys into the cloud provider config on the Cluster spec.
@@ -174,8 +177,9 @@ func AssembleAADClientSecretCredential(secretRef, objType, objName string, spec 
 	if err != nil {
 		return spec, err
 	}
-	spec.RancherKubernetesEngineConfig.CloudProvider.AzureCloudProvider.AADClientSecret = string(aadClientSecret.Data[SecretKey])
-	return spec, nil
+	specCopy := spec.DeepCopy()
+	specCopy.RancherKubernetesEngineConfig.CloudProvider.AzureCloudProvider.AADClientSecret = string(aadClientSecret.Data[SecretKey])
+	return *specCopy, nil
 }
 
 // AssembleAADCertCredential looks up the AAD client cert password Secret and inserts the keys into the cloud provider config on the Cluster spec.
@@ -195,8 +199,9 @@ func AssembleAADCertCredential(secretRef, objType, objName string, spec apimgmtv
 	if err != nil {
 		return spec, err
 	}
-	spec.RancherKubernetesEngineConfig.CloudProvider.AzureCloudProvider.AADClientCertPassword = string(aadCertSecret.Data[SecretKey])
-	return spec, nil
+	specCopy := spec.DeepCopy()
+	specCopy.RancherKubernetesEngineConfig.CloudProvider.AzureCloudProvider.AADClientCertPassword = string(aadCertSecret.Data[SecretKey])
+	return *specCopy, nil
 }
 
 // AssembleACIAPICUserKeyCredential looks up the aci apic user key Secret and inserts the keys into the AciNetworkProvider on the Cluster spec.
@@ -216,8 +221,9 @@ func AssembleACIAPICUserKeyCredential(secretRef, objType, objName string, spec a
 	if err != nil {
 		return spec, err
 	}
-	spec.RancherKubernetesEngineConfig.Network.AciNetworkProvider.ApicUserKey = string(aciUserKeySecret.Data[SecretKey])
-	return spec, nil
+	specCopy := spec.DeepCopy()
+	specCopy.RancherKubernetesEngineConfig.Network.AciNetworkProvider.ApicUserKey = string(aciUserKeySecret.Data[SecretKey])
+	return *specCopy, nil
 }
 
 // AssembleACITokenCredential looks up the aci token Secret and inserts the keys into the AciNetworkProvider on the Cluster spec.
@@ -237,8 +243,9 @@ func AssembleACITokenCredential(secretRef, objType, objName string, spec apimgmt
 	if err != nil {
 		return spec, err
 	}
-	spec.RancherKubernetesEngineConfig.Network.AciNetworkProvider.Token = string(aciTokenSecret.Data[SecretKey])
-	return spec, nil
+	specCopy := spec.DeepCopy()
+	specCopy.RancherKubernetesEngineConfig.Network.AciNetworkProvider.Token = string(aciTokenSecret.Data[SecretKey])
+	return *specCopy, nil
 }
 
 // AssembleACIKafkaClientKeyCredential looks up the aci kafka client key Secret and inserts the keys into the AciNetworkProvider on the Cluster spec.
@@ -258,8 +265,9 @@ func AssembleACIKafkaClientKeyCredential(secretRef, objType, objName string, spe
 	if err != nil {
 		return spec, err
 	}
-	spec.RancherKubernetesEngineConfig.Network.AciNetworkProvider.KafkaClientKey = string(aciKafkaClientKeySecret.Data[SecretKey])
-	return spec, nil
+	specCopy := spec.DeepCopy()
+	specCopy.RancherKubernetesEngineConfig.Network.AciNetworkProvider.KafkaClientKey = string(aciKafkaClientKeySecret.Data[SecretKey])
+	return *specCopy, nil
 }
 
 // AssembleRKEConfigSpec is a wrapper assembler for assembling configs on Clusters.
