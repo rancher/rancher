@@ -371,8 +371,7 @@ func (c *Controller) etcdSave(b *v3.EtcdBackup) (*v3.EtcdBackup, error) {
 			return b, err
 		}
 		cluster.Spec.RancherKubernetesEngineConfig.Services.Etcd.BackupConfig = b.Spec.BackupConfig.DeepCopy()
-		spec := *cluster.Spec.DeepCopy()
-		spec, err = secretmigrator.AssembleS3Credential(cluster.GetSecret("S3CredentialSecret"), secretmigrator.ClusterType, cluster.Name, spec, c.secretLister)
+		spec, err := secretmigrator.AssembleS3Credential(cluster.GetSecret("S3CredentialSecret"), secretmigrator.ClusterType, cluster.Name, cluster.Spec, c.secretLister)
 		if err != nil {
 			return b, err
 		}
@@ -403,8 +402,7 @@ func (c *Controller) etcdRemoveSnapshotWithBackoff(b *v3.EtcdBackup) error {
 		return err
 	}
 	cluster.Spec.RancherKubernetesEngineConfig.Services.Etcd.BackupConfig = b.Spec.BackupConfig.DeepCopy()
-	spec := *cluster.Spec.DeepCopy()
-	spec, err = secretmigrator.AssembleS3Credential(cluster.GetSecret("S3CredentialSecret"), secretmigrator.ClusterType, cluster.Name, spec, c.secretLister)
+	spec, err := secretmigrator.AssembleS3Credential(cluster.GetSecret("S3CredentialSecret"), secretmigrator.ClusterType, cluster.Name, cluster.Spec, c.secretLister)
 	if err != nil {
 		return err
 	}
