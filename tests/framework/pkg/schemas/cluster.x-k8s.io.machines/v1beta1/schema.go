@@ -2,8 +2,7 @@ package schema
 
 import (
 	"github.com/rancher/norman/types"
-	provisioningSchema "github.com/rancher/rancher/tests/framework/pkg/schemas/provisioning.cattle.io/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	m "github.com/rancher/norman/types/mapper"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 )
 
@@ -19,8 +18,9 @@ var (
 )
 
 func clusterMachineTypes(schemas *types.Schemas) *types.Schemas {
-	return schemas.
-		MustImportAndCustomize(&Version, metav1.Duration{}, func(schema *types.Schema) {}, provisioningSchema.Duration{}).
+	return schemas.AddMapperForType(&Version, capi.MachineSpec{},
+		&m.ChangeType{Field: "nodeDeletionTimeout", Type: "string"},
+		&m.ChangeType{Field: "nodeDrainTimeout", Type: "string"}).
 		MustImportAndCustomize(&Version, capi.Machine{}, func(schema *types.Schema) {
 			schema.ID = "cluster.x-k8s.io.machine"
 		})
