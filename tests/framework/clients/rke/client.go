@@ -30,7 +30,7 @@ func NewForConfig(c *rest.Config, ts *session.Session) (*Client, error) {
 	return &Client{rkeClient, ts}, nil
 }
 
-// RKEControlPlanes takes a namespace a returns an RKEControlPlane object that is used for the CRUD of a pkg/apis/rke.cattle.io/v1 RKEControlPlane
+// RKEControlPlanes takes a namespace and returns an RKEControlPlane object that is used for the CRUD of a pkg/apis/rke.cattle.io/v1 RKEControlPlane
 func (p *Client) RKEControlPlanes(namespace string) *RKEControlPlane {
 	return &RKEControlPlane{p.RkeV1Interface.RKEControlPlanes(namespace), p.ts}
 }

@@ -94,10 +94,6 @@ func (r *V2ProvCertRotationTestSuite) testCertRotation(provider Provider, kubeVe
 
 			// rotate certs
 			require.NoError(r.T(), r.rotateCerts(clusterName, 1))
-			// verify certs rotated
-
-			// wait until cluster Updated == True
-
 			// rotate certs again
 			require.NoError(r.T(), r.rotateCerts(clusterName, 2))
 		})
