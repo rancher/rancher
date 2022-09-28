@@ -335,8 +335,7 @@ func (m *nodesSyncer) getNodePlan(node *apimgmtv3.Node) (rketypes.RKEConfigNodeP
 		return rketypes.RKEConfigNodePlan{}, err
 	}
 
-	appliedSpec := *cluster.Status.AppliedSpec.DeepCopy()
-	appliedSpec, err = secretmigrator.AssembleRKEConfigSpec(cluster, appliedSpec, m.secretLister)
+	appliedSpec, err := secretmigrator.AssembleRKEConfigSpec(cluster, cluster.Status.AppliedSpec, m.secretLister)
 	if err != nil {
 		return rketypes.RKEConfigNodePlan{}, err
 	}
