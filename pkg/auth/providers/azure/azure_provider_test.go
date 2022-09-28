@@ -12,6 +12,7 @@ import (
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	managementschema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
 	"github.com/stretchr/testify/assert"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // TestConfigureTest inspects the Redirect URL during Azure AD setup.
@@ -29,6 +30,7 @@ func TestConfigureTest(t *testing.T) {
 				"annotations": map[string]interface{}{
 					"auth.cattle.io/azuread-endpoint-migrated": "true",
 				},
+				"enabled":           false,
 				"endpoint":          "https://login.microsoftonline.com/",
 				"graphEndpoint":     "https://graph.microsoft.com",
 				"tokenEndpoint":     "https://login.microsoftonline.com/tenant123/oauth2/v2.0/token",
@@ -45,6 +47,7 @@ func TestConfigureTest(t *testing.T) {
 			authConfig: map[string]interface{}{
 				"accessMode":        "unrestricted",
 				"annotations":       map[string]interface{}{},
+				"enabled":           false,
 				"endpoint":          "https://login.microsoftonline.com/",
 				"graphEndpoint":     "https://graph.windows.net/",
 				"tokenEndpoint":     "https://login.microsoftonline.com/tenant123/oauth2/token",
@@ -222,6 +225,88 @@ func TestTransformToAuthProvider(t *testing.T) {
 			url, ok := authProvider["redirectUrl"].(string)
 			assert.True(t, ok)
 			assert.Equal(t, test.expectedRedirectUrl, url)
+		})
+	}
+}
+
+func TestMigrateNewFlowAnnotation(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name               string
+		current            *v3.AzureADConfig
+		proposed           *v3.AzureADConfig
+		annotationExpected bool
+	}{
+		{
+			name: "new setup on Rancher v2.6.7+ after an upgrade from previous version",
+			current: &v3.AzureADConfig{
+				AuthConfig: v3.AuthConfig{
+					Enabled: false,
+				},
+				GraphEndpoint: "https://graph.microsoft.com",
+			},
+			proposed:           &v3.AzureADConfig{},
+			annotationExpected: true,
+		},
+		{
+			name: "new setup on Rancher v2.6.7+",
+			current: &v3.AzureADConfig{
+				AuthConfig: v3.AuthConfig{
+					Enabled: false,
+					ObjectMeta: metav1.ObjectMeta{
+						Annotations: map[string]string{
+							GraphEndpointMigratedAnnotation: "true",
+						},
+					},
+				},
+				GraphEndpoint: "https://graph.microsoft.com",
+			},
+			proposed:           &v3.AzureADConfig{},
+			annotationExpected: true,
+		},
+		{
+			name: "reconfigure existing deprecated setup",
+			current: &v3.AzureADConfig{
+				AuthConfig: v3.AuthConfig{
+					Enabled: true,
+				},
+				GraphEndpoint: "https://graph.windows.net/",
+			},
+			proposed:           &v3.AzureADConfig{},
+			annotationExpected: false,
+		},
+		{
+			name: "reconfigure existing new setup",
+			current: &v3.AzureADConfig{
+				AuthConfig: v3.AuthConfig{
+					Enabled: true,
+					ObjectMeta: metav1.ObjectMeta{
+						Annotations: map[string]string{
+							GraphEndpointMigratedAnnotation: "true",
+						},
+					},
+				},
+				GraphEndpoint: "https://graph.microsoft.com",
+			},
+			proposed:           &v3.AzureADConfig{},
+			annotationExpected: true,
+		},
+	}
+
+	for i := range tests {
+		test := tests[i]
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			migrateNewFlowAnnotation(test.current, test.proposed)
+			_, hasAnnotation := test.proposed.Annotations[GraphEndpointMigratedAnnotation]
+			if test.annotationExpected && !hasAnnotation {
+				assert.Fail(t, "expected annotation on the processed config, but did not find one")
+			}
+			if !test.annotationExpected && hasAnnotation {
+				assert.Fail(t, "did not expect the annotation on the processed config, but found one")
+			}
 		})
 	}
 }
