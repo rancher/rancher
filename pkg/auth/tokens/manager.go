@@ -668,12 +668,13 @@ func (m *Manager) NewLoginToken(userID string, userPrincipal v3.Principal, group
 	}
 
 	token := &v3.Token{
-		UserPrincipal: userPrincipal,
-		IsDerived:     false,
-		TTLMillis:     ttl,
-		UserID:        userID,
-		AuthProvider:  provider,
-		Description:   description,
+		UserPrincipal:   userPrincipal,
+		GroupPrincipals: groupPrincipals,
+		IsDerived:       false,
+		TTLMillis:       ttl,
+		UserID:          userID,
+		AuthProvider:    provider,
+		Description:     description,
 		ObjectMeta: metav1.ObjectMeta{
 			Labels: map[string]string{
 				TokenKindLabel: "session",
