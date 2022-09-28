@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/rancher/rancher/pkg/agent/clean"
-	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	util "github.com/rancher/rancher/pkg/cluster"
 	"github.com/rancher/rancher/pkg/dialer"
 	"github.com/rancher/rancher/pkg/features"
@@ -28,13 +28,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 )
 
-const (
-	cleanupPodLabel                    = "rke.cattle.io/cleanup-node"
-	userNodeRemoveAnnotationPrefix     = "lifecycle.cattle.io/create.user-node-remove_"
-	userNodeRemoveCleanupAnnotationOld = "nodes.management.cattle.io/user-node-remove-cleanup"
-)
+const cleanupPodLabel = "rke.cattle.io/cleanup-node"
 
-func (m *Lifecycle) deleteV1Node(node *v3.Node) (runtime.Object, error) {
+func (m *Lifecycle) deleteV1Node(node *v32.Node) (runtime.Object, error) {
 	logrus.Debugf("Deleting v1.node for [%v] node", node.Status.NodeName)
 	if nodehelper.IgnoreNode(node.Status.NodeName, node.Status.NodeLabels) {
 		logrus.Debugf("Skipping v1.node removal for [%v] node", node.Status.NodeName)
@@ -75,7 +71,7 @@ func (m *Lifecycle) deleteV1Node(node *v3.Node) (runtime.Object, error) {
 	return node, nil
 }
 
-func (m *Lifecycle) drainNode(node *v3.Node) error {
+func (m *Lifecycle) drainNode(node *v32.Node) error {
 	nodeCopy := node.DeepCopy() // copy for cache protection as we do no updating but need things set for the drain
 	cluster, err := m.clusterLister.Get("", nodeCopy.Namespace)
 	if err != nil {
@@ -140,7 +136,7 @@ func (m *Lifecycle) drainNode(node *v3.Node) error {
 	})
 }
 
-func (m *Lifecycle) cleanRKENode(node *v3.Node) error {
+func (m *Lifecycle) cleanRKENode(node *v32.Node) error {
 	if !features.RKE1CustomNodeCleanup.Enabled() {
 		return nil
 	}
@@ -153,7 +149,7 @@ func (m *Lifecycle) cleanRKENode(node *v3.Node) error {
 		return err
 	}
 
-	if cluster.Status.Driver != v3.ClusterDriverRKE {
+	if cluster.Status.Driver != v32.ClusterDriverRKE {
 		return nil // not an rke node, bail out
 	}
 
@@ -244,7 +240,7 @@ func (m *Lifecycle) waitUntilJobDeletes(userContext *config.UserContext, nodeNam
 		"delete")
 }
 
-func (m *Lifecycle) createCleanupJob(userContext *config.UserContext, cluster *v3.Cluster, node *v3.Node) (*batchv1.Job, error) {
+func (m *Lifecycle) createCleanupJob(userContext *config.UserContext, cluster *v32.Cluster, node *v32.Node) (*batchv1.Job, error) {
 	nodeLabel := "cattle.io/node"
 
 	// find if someone else already kicked this job off
@@ -397,30 +393,11 @@ func (m *Lifecycle) createCleanupJob(userContext *config.UserContext, cluster *v
 	return userContext.K8sClient.BatchV1().Jobs("default").Create(context.TODO(), &job, metav1.CreateOptions{})
 }
 
-func (m *Lifecycle) userNodeRemoveCleanup(obj *v3.Node) (runtime.Object, error) {
-	newObj := obj.DeepCopy()
-	newObj.SetFinalizers(removeFinalizerWithPrefix(newObj.GetFinalizers(), userNodeRemoveFinalizerPrefix))
-
-	if newObj.DeletionTimestamp == nil {
-		annos := newObj.GetAnnotations()
-		if annos == nil {
-			annos = make(map[string]string)
-		} else {
-			annos = removeAnnotationWithPrefix(annos, userNodeRemoveAnnotationPrefix)
-			delete(annos, userNodeRemoveCleanupAnnotationOld)
-		}
-
-		annos[userNodeRemoveCleanupAnnotation] = "true"
-		newObj.SetAnnotations(annos)
-	}
-	return m.nodeClient.Update(newObj)
-}
-
 func removeFinalizerWithPrefix(finalizers []string, prefix string) []string {
 	var nf []string
 	for _, finalizer := range finalizers {
 		if strings.HasPrefix(finalizer, prefix) {
-			logrus.Debugf("finalizer with prefix [%s] will be removed", prefix)
+			logrus.Debugf("a finalizer with prefix %s will be removed", prefix)
 			continue
 		}
 		nf = append(nf, finalizer)
@@ -431,7 +408,7 @@ func removeFinalizerWithPrefix(finalizers []string, prefix string) []string {
 func removeAnnotationWithPrefix(annotations map[string]string, prefix string) map[string]string {
 	for k := range annotations {
 		if strings.HasPrefix(k, prefix) {
-			logrus.Debugf("annotation with prefix [%s] will be removed", prefix)
+			logrus.Debugf("annotation with prefix %s will be removed", prefix)
 			delete(annotations, k)
 		}
 	}

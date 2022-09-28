@@ -10,7 +10,7 @@ import (
 
 	"github.com/pkg/errors"
 	cond "github.com/rancher/norman/condition"
-	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	kd "github.com/rancher/rancher/pkg/controllers/management/kontainerdrivermetadata"
 	"github.com/rancher/rancher/pkg/controllers/management/secretmigrator"
 	"github.com/rancher/rancher/pkg/controllers/managementagent/podresources"
@@ -34,7 +34,10 @@ import (
 const (
 	AllNodeKey     = "_machine_all_"
 	annotationName = "management.cattle.io/nodesyncer"
+	apiUpdate      = "management.cattle.io/apiUpdate"
 )
+
+var apiUpdateMap = map[string]string{apiUpdate: "true"}
 
 type nodeSyncer struct {
 	machines         v3.NodeInterface
@@ -127,7 +130,7 @@ func (n *nodeSyncer) sync(key string, node *corev1.Node) (runtime.Object, error)
 	return nil, nil
 }
 
-func (n *nodeSyncer) needUpdate(_ string, node *corev1.Node) (bool, error) {
+func (n *nodeSyncer) needUpdate(key string, node *corev1.Node) (bool, error) {
 	if node == nil || node.DeletionTimestamp != nil {
 		return true, nil
 	}
@@ -161,17 +164,17 @@ func (n *nodeSyncer) needUpdate(_ string, node *corev1.Node) (bool, error) {
 	return true, nil
 }
 
-func (m *nodesSyncer) sync(key string, _ *apimgmtv3.Node) (runtime.Object, error) {
+func (m *nodesSyncer) sync(key string, machine *v3.Node) (runtime.Object, error) {
 	if key == fmt.Sprintf("%s/%s", m.clusterNamespace, AllNodeKey) {
 		return nil, m.reconcileAll()
 	}
 	return nil, nil
 }
 
-func (m *nodesSyncer) updateNodeAndNode(node *corev1.Node, obj *apimgmtv3.Node) (*corev1.Node, *apimgmtv3.Node, error) {
+func (m *nodesSyncer) updateNodeAndNode(node *corev1.Node, obj *v3.Node) (*corev1.Node, *v3.Node, error) {
 	node, err := m.nodeClient.Update(node)
 	if err != nil {
-		// Return apimgmtv3.Node is nil because it hasn't been persisted and therefor out of sync with cache
+		// Return v3.Node is nil because it hasn't been persisted and therefor out of sync with cache
 		// so we don't want to return it from the handler
 		return node, nil, err
 	}
@@ -185,7 +188,7 @@ func (m *nodesSyncer) updateNodeAndNode(node *corev1.Node, obj *apimgmtv3.Node) 
 	return node, obj, nil
 }
 
-func (m *nodesSyncer) updateLabels(node *corev1.Node, obj *apimgmtv3.Node, nodePlan rketypes.RKEConfigNodePlan) (*corev1.Node, *apimgmtv3.Node, error) {
+func (m *nodesSyncer) updateLabels(node *corev1.Node, obj *v3.Node, nodePlan rketypes.RKEConfigNodePlan) (*corev1.Node, *v3.Node, error) {
 	finalMap, changed := computeDelta(node.Labels, nodePlan.Labels, obj.Spec.MetadataUpdate.Labels, onlyKubeLabels)
 	if !changed {
 		return node, obj, nil
@@ -201,13 +204,13 @@ func (m *nodesSyncer) updateLabels(node *corev1.Node, obj *apimgmtv3.Node, nodeP
 
 	node.Labels = finalMap
 
-	obj.Spec.MetadataUpdate.Labels = apimgmtv3.MapDelta{}
+	obj.Spec.MetadataUpdate.Labels = v32.MapDelta{}
 
 	return m.updateNodeAndNode(node, obj)
 }
 
 // For any key that already exist in the plan, we should update or delete. For others, do not touch the plan.
-func computePlanDelta(planValues map[string]string, delta apimgmtv3.MapDelta) (map[string]string, bool) {
+func computePlanDelta(planValues map[string]string, delta v32.MapDelta) (map[string]string, bool) {
 	update := false
 	for k, v := range delta.Add {
 		if planValues[k] != "" {
@@ -226,7 +229,7 @@ func computePlanDelta(planValues map[string]string, delta apimgmtv3.MapDelta) (m
 
 }
 
-func (m *nodesSyncer) updateAnnotations(node *corev1.Node, obj *apimgmtv3.Node, nodePlan rketypes.RKEConfigNodePlan) (*corev1.Node, *apimgmtv3.Node, error) {
+func (m *nodesSyncer) updateAnnotations(node *corev1.Node, obj *v3.Node, nodePlan rketypes.RKEConfigNodePlan) (*corev1.Node, *v3.Node, error) {
 	finalMap, changed := computeDelta(node.Annotations, nodePlan.Annotations, obj.Spec.MetadataUpdate.Annotations, allowAllPolicy)
 	if !changed {
 		return node, obj, nil
@@ -234,12 +237,12 @@ func (m *nodesSyncer) updateAnnotations(node *corev1.Node, obj *apimgmtv3.Node, 
 
 	node, obj = node.DeepCopy(), obj.DeepCopy()
 	node.Annotations = finalMap
-	obj.Spec.MetadataUpdate.Annotations = apimgmtv3.MapDelta{}
+	obj.Spec.MetadataUpdate.Annotations = v32.MapDelta{}
 
 	return m.updateNodeAndNode(node, obj)
 }
 
-func (m *nodesSyncer) syncLabels(_ string, obj *apimgmtv3.Node) (runtime.Object, error) {
+func (m *nodesSyncer) syncLabels(key string, obj *v3.Node) (runtime.Object, error) {
 	if obj == nil {
 		return nil, nil
 	}
@@ -273,7 +276,7 @@ func allowAllPolicy(_ string) bool {
 
 // computeDelta will return the final updated map to apply and a boolean indicating whether there are changes to be applied.
 // If the boolean is false, the caller need not take any action as the data is already in sync.
-func computeDelta(currentState map[string]string, planValues map[string]string, delta apimgmtv3.MapDelta, canChangeValue canChangeValuePolicy) (map[string]string, bool) {
+func computeDelta(currentState map[string]string, planValues map[string]string, delta v32.MapDelta, canChangeValue canChangeValuePolicy) (map[string]string, bool) {
 	result := map[string]string{}
 	changed := false
 
@@ -308,13 +311,13 @@ func computeDelta(currentState map[string]string, planValues map[string]string, 
 	return result, changed
 }
 
-func (m *nodesSyncer) getNodePlan(node *apimgmtv3.Node) (rketypes.RKEConfigNodePlan, error) {
+func (m *nodesSyncer) getNodePlan(node *v3.Node) (rketypes.RKEConfigNodePlan, error) {
 	cluster, err := m.clusterLister.Get("", node.Namespace)
 	if err != nil {
 		return rketypes.RKEConfigNodePlan{}, err
 	}
 
-	if cluster.Status.Driver != apimgmtv3.ClusterDriverRKE || cluster.Status.AppliedSpec.RancherKubernetesEngineConfig == nil {
+	if cluster.Status.Driver != v32.ClusterDriverRKE || cluster.Status.AppliedSpec.RancherKubernetesEngineConfig == nil {
 		return rketypes.RKEConfigNodePlan{}, nil
 	}
 
@@ -403,8 +406,8 @@ func (m *nodesSyncer) reconcileAll() error {
 	if err != nil {
 		return err
 	}
-	machineMap := make(map[string]*apimgmtv3.Node)
-	toDelete := make(map[string]*apimgmtv3.Node)
+	machineMap := make(map[string]*v3.Node)
+	toDelete := make(map[string]*v3.Node)
 	for _, machine := range machines {
 		node, err := nodehelper.GetNodeForMachine(machine, m.nodeLister)
 		if err != nil {
@@ -445,17 +448,14 @@ func (m *nodesSyncer) reconcileAll() error {
 	return nil
 }
 
-func (m *nodesSyncer) reconcileNodeForNode(machine *apimgmtv3.Node, node *corev1.Node, nodeCache *NodeCache) error {
+func (m *nodesSyncer) reconcileNodeForNode(machine *v3.Node, node *corev1.Node, nodeCache *NodeCache) error {
 	if machine == nil {
 		return m.createNode(node, nodeCache)
 	}
 	return m.updateNode(machine, node)
 }
 
-func (m *nodesSyncer) removeNode(machine *apimgmtv3.Node) error {
-	if machine.DeletionTimestamp != nil {
-		return nil
-	}
+func (m *nodesSyncer) removeNode(machine *v3.Node) error {
 	if machine.Annotations == nil {
 		return nil
 	}
@@ -472,7 +472,7 @@ func (m *nodesSyncer) removeNode(machine *apimgmtv3.Node) error {
 	return nil
 }
 
-func (m *nodesSyncer) updateNode(existing *apimgmtv3.Node, node *corev1.Node) error {
+func (m *nodesSyncer) updateNode(existing *v3.Node, node *corev1.Node) error {
 	toUpdate, err := m.convertNodeToMachine(node, existing)
 	if err != nil {
 		return err
@@ -493,7 +493,7 @@ func (m *nodesSyncer) updateNode(existing *apimgmtv3.Node, node *corev1.Node) er
 func (m *nodesSyncer) createNode(node *corev1.Node, nodeCache *NodeCache) error {
 	// respect user defined name or label
 	if nodehelper.IgnoreNode(node.Name, node.Labels) {
-		logrus.Debugf("Skipping apimgmtv3.Node creation for [%v] node", node.Name)
+		logrus.Debugf("Skipping v3.node creation for [%v] node", node.Name)
 		return nil
 	}
 
@@ -523,18 +523,18 @@ func (m *nodesSyncer) createNode(node *corev1.Node, nodeCache *NodeCache) error 
 	return nil
 }
 
-func (m *nodesSyncer) getMachineForNodeFromCache(node *corev1.Node) (*apimgmtv3.Node, error) {
+func (m *nodesSyncer) getMachineForNodeFromCache(node *corev1.Node) (*v3.Node, error) {
 	return nodehelper.GetMachineForNode(node, m.clusterNamespace, m.machineLister)
 }
 
 type NodeCache struct {
-	all    []*apimgmtv3.Node
-	byName map[string][]*apimgmtv3.Node
+	all    []*v3.Node
+	byName map[string][]*v3.Node
 }
 
-func (n *NodeCache) Add(machine *apimgmtv3.Node) {
+func (n *NodeCache) Add(machine *v3.Node) {
 	if n.byName == nil {
-		n.byName = map[string][]*apimgmtv3.Node{}
+		n.byName = map[string][]*v3.Node{}
 	}
 	if name, ok := machine.Labels[nodehelper.LabelNodeName]; ok {
 		n.byName[name] = append(n.byName[name], machine)
@@ -542,7 +542,7 @@ func (n *NodeCache) Add(machine *apimgmtv3.Node) {
 	n.all = append(n.all, machine)
 }
 
-func (m *nodesSyncer) getMachineForNode(node *corev1.Node, nodeCache *NodeCache) (*apimgmtv3.Node, error) {
+func (m *nodesSyncer) getMachineForNode(node *corev1.Node, nodeCache *NodeCache) (*v3.Node, error) {
 	if len(nodeCache.all) == 0 {
 		machines, err := m.machines.List(metav1.ListOptions{})
 		if err != nil {
@@ -569,7 +569,7 @@ func (m *nodesSyncer) getMachineForNode(node *corev1.Node, nodeCache *NodeCache)
 	return nil, nil
 }
 
-func resetConditions(machine *apimgmtv3.Node) *apimgmtv3.Node {
+func resetConditions(machine *v3.Node) *v3.Node {
 	if machine.Status.InternalNodeStatus.Conditions == nil {
 		return machine
 	}
@@ -588,7 +588,7 @@ func resetConditions(machine *apimgmtv3.Node) *apimgmtv3.Node {
 	return updated
 }
 
-func objectsAreEqual(existing *apimgmtv3.Node, toUpdate *apimgmtv3.Node) bool {
+func objectsAreEqual(existing *v3.Node, toUpdate *v3.Node) bool {
 	// we are updating spec and status only, so compare them
 	toUpdateToCompare := resetConditions(toUpdate)
 	existingToCompare := resetConditions(existing)
@@ -681,12 +681,12 @@ func statusEqualTest(proposed, existing corev1.NodeStatus) bool {
 	return true
 }
 
-func cleanStatus(machine *apimgmtv3.Node) {
+func cleanStatus(machine *v3.Node) {
 	var conditions []corev1.NodeCondition
 	for _, condition := range machine.Status.InternalNodeStatus.Conditions {
 		if condition.Type == "Ready" {
 			conditions = append(conditions, condition)
-			readyCondition := apimgmtv3.NodeCondition{
+			readyCondition := v32.NodeCondition{
 				Type:               cond.Cond(condition.Type),
 				Status:             condition.Status,
 				LastTransitionTime: condition.LastTransitionTime.String(),
@@ -737,12 +737,12 @@ func getResourceList(annotation string, node *corev1.Node) corev1.ResourceList {
 	return result
 }
 
-func (m *nodesSyncer) convertNodeToMachine(node *corev1.Node, existing *apimgmtv3.Node) (*apimgmtv3.Node, error) {
-	var machine *apimgmtv3.Node
+func (m *nodesSyncer) convertNodeToMachine(node *corev1.Node, existing *v3.Node) (*v3.Node, error) {
+	var machine *v3.Node
 	if existing == nil {
-		machine = &apimgmtv3.Node{
-			Spec:   apimgmtv3.NodeSpec{},
-			Status: apimgmtv3.NodeStatus{},
+		machine = &v3.Node{
+			Spec:   v32.NodeSpec{},
+			Status: v32.NodeStatus{},
 			ObjectMeta: metav1.ObjectMeta{
 				GenerateName: "machine-"},
 		}
@@ -790,8 +790,8 @@ func (m *nodesSyncer) convertNodeToMachine(node *corev1.Node, existing *apimgmtv
 	}
 	machine.Labels[nodehelper.LabelNodeName] = node.Name
 	cleanStatus(machine)
-	apimgmtv3.NodeConditionRegistered.True(machine)
-	apimgmtv3.NodeConditionRegistered.Message(machine, "registered with kubernetes")
+	v32.NodeConditionRegistered.True(machine)
+	v32.NodeConditionRegistered.Message(machine, "registered with kubernetes")
 	return machine, nil
 }
 
@@ -826,7 +826,7 @@ func (m *nodesSyncer) isClusterRestoring() (bool, error) {
 	return false, nil
 }
 
-func determineNodeRoles(machine *apimgmtv3.Node) {
+func determineNodeRoles(machine *v3.Node) {
 	if machine.Status.NodeLabels != nil {
 		_, etcd := machine.Status.NodeLabels["node-role.kubernetes.io/etcd"]
 		_, control := machine.Status.NodeLabels["node-role.kubernetes.io/controlplane"]
