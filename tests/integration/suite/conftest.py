@@ -41,10 +41,13 @@ def get_ip():
 IP = get_ip()
 SERVER_URL = 'https://' + IP + ':8443'
 BASE_URL = SERVER_URL + '/v3'
-AUTH_URL = BASE_URL + '-public/localproviders/local?action=login'
+AUTH_URL = BASE_URL + '-public/localProviders/local?action=login'
 DEFAULT_TIMEOUT = 120
 DEFAULT_CATALOG = "https://github.com/rancher/integration-test-charts"
 WAIT_HTTP_ERROR_CODES = [404, 405]
+
+TEST_USERNAME = 'admin'
+TEST_PASSWORD = 'admin'
 
 
 class ManagementContext:
@@ -100,10 +103,11 @@ class DINDContext:
 def admin_mc():
     """Returns a ManagementContext for the default global admin user."""
     r = requests.post(AUTH_URL, json={
-        'username': 'admin',
-        'password': 'admin',
+        'username': TEST_USERNAME,
+        'password': TEST_PASSWORD,
         'responseType': 'json',
     }, verify=False)
+    # breakpoint()
     protect_response(r)
     client = rancher.Client(url=BASE_URL, token=r.json()['token'],
                             verify=False)
