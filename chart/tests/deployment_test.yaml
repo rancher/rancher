@@ -294,3 +294,21 @@ tests:
   asserts:
   - isNull:
       path: spec.template.spec.containers[0].volumeMounts
+- it: should set priorityClassName=system-node-critical
+  set:
+    priorityClassName: "system-node-critical"
+  asserts:
+    - equal:
+        path: spec.template.spec.priorityClassName
+        value: "system-node-critical"
+- it: should not set priorityClassName=system-node-critical
+  set:
+    priorityClassName: ""
+  asserts:
+    - isNull:
+        path: spec.template.spec.priorityClassName
+- it: should default priorityClassName="rancher-critical"
+  asserts:
+    - equal:
+        path: spec.template.spec.priorityClassName
+        value: "rancher-critical"
