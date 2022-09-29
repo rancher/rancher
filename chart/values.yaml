@@ -19,18 +19,17 @@ auditLog:
   maxBackup: 1
   maxSize: 100
 
+  # Image for collecting rancher audit logs.
+  # Important: update pkg/image/export/resolve.go when this default image is changed, so that it's reflected accordingly in rancher-images.txt generated for air-gapped setups.
+  image:
+    repository: "registry.suse.com/bci/bci-micro"
+    tag: 15.4.14.3
+    # Override imagePullPolicy image
+    # options: Always, Never, IfNotPresent
+    pullPolicy: "IfNotPresent"
+
 # As of Rancher v2.5.0 this flag is deprecated and must be set to 'true' in order for Rancher to start
 addLocal: "true"
-
-# Image for collecting rancher audit logs.
-# Important: update pkg/image/export/main.go when this default image is changed, so that it's reflected accordingly in rancher-images.txt generated for air-gapped setups.
-busyboxImage: rancher/mirrored-library-busybox
-busyboxImageTag: 1.34.1
-
-# Override imagePullPolicy for busybox images
-# options: Always, Never, IfNotPresent
-# Defaults to IfNotPresent
-# busyboxImagePullPolicy: <pullPolicy>
 
 # Add debug flag to Rancher server
 debug: false
