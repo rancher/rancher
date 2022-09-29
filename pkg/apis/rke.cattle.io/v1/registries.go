@@ -6,12 +6,12 @@ type Mirror struct {
 	// one by one until a working one is found. The endpoint must be a valid url
 	// with host specified.
 	// The scheme, host and path from the endpoint URL will be used.
-	Endpoints []string `json:"endpoint,omitempty"`
+	Endpoints []string `json:"endpoint,omitempty" yaml:"endpoint,omitempty"`
 
 	// Rewrites are repository rewrite rules for a namespace. When fetching image resources
 	// from an endpoint and a key matches the repository via regular expression matching
 	// it will be replaced with the corresponding value from the map in the resource request.
-	Rewrites map[string]string `json:"rewrite,omitempty"`
+	Rewrites map[string]string `json:"rewrite,omitempty" yaml:"rewrite,omitempty"`
 }
 
 const (
@@ -26,34 +26,34 @@ const (
 // AuthConfig contains the config related to authentication to a specific registry
 type AuthConfig struct {
 	// Username is the username to login the registry.
-	Username string `json:"username,omitempty"`
+	Username string `json:"username,omitempty" yaml:"username,omitempty"`
 	// Password is the password to login the registry.
-	Password string `json:"password,omitempty"`
+	Password string `json:"password,omitempty" yaml:"password,omitempty"`
 	// Auth is a base64 encoded string from the concatenation of the username,
 	// a colon, and the password.
-	Auth string `json:"auth,omitempty"`
+	Auth string `json:"auth,omitempty" yaml:"auth,omitempty"`
 	// IdentityToken is used to authenticate the user and get
 	// an access token for the registry.
-	IdentityToken string `json:"identityToken,omitempty"`
+	IdentityToken string `json:"identityToken,omitempty" yaml:"identityToken,omitempty"`
 }
 
 // Registry is registry settings configured
 type Registry struct {
 	// Mirrors are namespace to mirror mapping for all namespaces.
-	Mirrors map[string]Mirror `json:"mirrors,omitempty"`
+	Mirrors map[string]Mirror `json:"mirrors,omitempty" yaml:"mirrors,omitempty"`
 	// Configs are configs for each registry.
 	// The key is the FDQN or IP of the registry.
-	Configs map[string]RegistryConfig `json:"configs,omitempty"`
+	Configs map[string]RegistryConfig `json:"configs,omitempty" yaml:"configs,omitempty"`
 }
 
 // RegistryConfig contains configuration used to communicate with the registry.
 type RegistryConfig struct {
 	// Auth contains information to authenticate to the registry.
-	AuthConfigSecretName string `json:"authConfigSecretName,omitempty"`
+	AuthConfigSecretName string `json:"authConfigSecretName,omitempty" yaml:"authConfigSecretName,omitempty"`
 	// TLS is a pair of Cert/Key which then are used when creating the transport
 	// that communicates with the registry.
-	TLSSecretName string `json:"tlsSecretName,omitempty"`
-	CABundle      []byte `json:"caBundle,omitempty"`
+	TLSSecretName string `json:"tlsSecretName,omitempty" yaml:"tlsSecretName,omitempty"`
+	CABundle      []byte `json:"caBundle,omitempty" yaml:"caBundle,omitempty"`
 
-	InsecureSkipVerify bool `json:"insecureSkipVerify,omitempty"`
+	InsecureSkipVerify bool `json:"insecureSkipVerify,omitempty" yaml:"insecureSkipVerify,omitempty"`
 }
