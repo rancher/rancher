@@ -11,10 +11,12 @@ import (
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/auth/providers/azure/clients"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	managementschema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func (ap *azureProvider) formatter(apiContext *types.APIContext, resource *types.RawResource) {
@@ -62,6 +64,17 @@ func (ap *azureProvider) ConfigureTest(actionName string, action *types.Action, 
 }
 
 func (ap *azureProvider) testAndApply(actionName string, action *types.Action, request *types.APIContext) error {
+	var err error
+	// On any error, delete the cached secret containing the access token to the Microsoft Graph, in case it had been
+	// cached without having sufficient API permissions. Rancher has no precise control over when this secret is cached.
+	defer func() {
+		if err != nil {
+			if err = ap.secrets.DeleteNamespaced(common.SecretsNamespace, clients.AccessTokenSecretName, &metav1.DeleteOptions{}); err != nil {
+				logrus.Errorf("Failed to delete the Azure AD access token secret from Kubernetes")
+			}
+		}
+	}()
+
 	azureADConfigApplyInput := &v32.AzureADConfigApplyInput{}
 	if err := json.NewDecoder(request.Request.Body).Decode(azureADConfigApplyInput); err != nil {
 		return httperror.NewAPIError(httperror.InvalidBodyContent,

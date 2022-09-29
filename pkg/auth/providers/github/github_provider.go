@@ -419,3 +419,17 @@ func (g *ghProvider) GetUserExtraAttributes(userPrincipal v3.Principal) map[stri
 	}
 	return extras
 }
+
+// IsDisabledProvider checks if the GitHub auth provider is currently disabled in Rancher.
+func (g *ghProvider) IsDisabledProvider() (bool, error) {
+	ghConfig, err := g.getGithubConfigCR()
+	if err != nil {
+		return false, err
+	}
+	return !ghConfig.Enabled, nil
+}
+
+// CleanupResources deletes resources associated with the GitHub auth provider.
+func (g *ghProvider) CleanupResources(*v3.AuthConfig) error {
+	return nil
+}
