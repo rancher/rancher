@@ -140,8 +140,8 @@ func NewRKE1ClusterConfig(clusterName, cni, kubernetesVersion string, client *ra
 	return clusterConfig
 }
 
-// NewRKE2ClusterConfig is a constructor for a apisV1.Cluster object, to be used by the rancher.Client.Provisioning client.
-func NewRKE2ClusterConfig(clusterName, namespace, cni, cloudCredentialSecretName, kubernetesVersion string, machinePools []provisioning.RKEMachinePool) *provisioning.Cluster {
+// NewK3SRKE2ClusterConfig is a constructor for a apisV1.Cluster object, to be used by the rancher.Client.Provisioning client.
+func NewK3SRKE2ClusterConfig(clusterName, namespace, cni, cloudCredentialSecretName, kubernetesVersion string, machinePools []provisioning.RKEMachinePool) *provisioning.Cluster {
 	//metav1.ObjectMeta
 	objectMeta := &provisioning.ObjectMeta{
 		Name:      clusterName,
@@ -241,9 +241,9 @@ func CreateRKE1Cluster(client *rancher.Client, rke1Cluster *management.Cluster) 
 	return cluster, nil
 }
 
-// CreateRKE2Cluster is a "helper" functions that takes a rancher client, and the rke2 cluster config as parameters. This function
+// CreateK3SRKE2Cluster is a "helper" functions that takes a rancher client, and the rke2 cluster config as parameters. This function
 // registers a delete cluster fuction with a wait.WatchWait to ensure the cluster is removed cleanly.
-func CreateRKE2Cluster(client *rancher.Client, rke2Cluster *provisioning.Cluster) (*provisioning.Cluster, error) {
+func CreateK3SRKE2Cluster(client *rancher.Client, rke2Cluster *provisioning.Cluster) (*provisioning.Cluster, error) {
 	cluster, err := client.Provisioning.Cluster.Create(rke2Cluster)
 	if err != nil {
 		return nil, err
