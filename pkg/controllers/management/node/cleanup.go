@@ -398,11 +398,11 @@ func (m *Lifecycle) createCleanupJob(userContext *config.UserContext, cluster *v
 }
 
 func (m *Lifecycle) userNodeRemoveCleanup(obj *v3.Node) *v3.Node {
-	newObj := obj.DeepCopy()
-	newObj.SetFinalizers(removeFinalizerWithPrefix(newObj.GetFinalizers(), userNodeRemoveFinalizerPrefix))
+	obj = obj.DeepCopy()
+	obj.SetFinalizers(removeFinalizerWithPrefix(obj.GetFinalizers(), userNodeRemoveFinalizerPrefix))
 
-	if newObj.DeletionTimestamp == nil {
-		annos := newObj.GetAnnotations()
+	if obj.DeletionTimestamp == nil {
+		annos := obj.GetAnnotations()
 		if annos == nil {
 			annos = make(map[string]string)
 		} else {
@@ -411,8 +411,9 @@ func (m *Lifecycle) userNodeRemoveCleanup(obj *v3.Node) *v3.Node {
 		}
 
 		annos[userNodeRemoveCleanupAnnotation] = "true"
+		obj.SetAnnotations(annos)
 	}
-	return newObj
+	return obj
 }
 
 func removeFinalizerWithPrefix(finalizers []string, prefix string) []string {
