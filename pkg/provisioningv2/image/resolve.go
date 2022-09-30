@@ -16,7 +16,6 @@ func ResolveWithControlPlane(image string, cp *rkev1.RKEControlPlane) string {
 
 func ResolveWithCluster(image string, cluster *v1.Cluster) string {
 	return resolve(GetPrivateRepoURLFromCluster(cluster), image)
-
 }
 
 func resolve(reg, image string) string {
@@ -31,6 +30,17 @@ func resolve(reg, image string) string {
 	return image
 }
 
+// GetPrivateRepoSecretFromCluster returns the name of the secret containing the credentials for the cluster level system-default-registry.
+func GetPrivateRepoSecretFromCluster(cluster *v1.Cluster) string {
+	if cluster != nil && cluster.Spec.RKEConfig != nil && cluster.Spec.RKEConfig.Registries != nil {
+		return cluster.Spec.RKEConfig.Registries.Configs[GetPrivateRepoURLFromCluster(cluster)].AuthConfigSecretName
+	}
+	return "" // don't return settings.SystemDefaultRegistry.Get() as the global system-default-registry requires no auth
+}
+
+// GetPrivateRepoURLFromCluster returns the system-default-registry URL from either the clusters
+// machineGlobalConfig, or one of its machineSelectorConfig's which has no label selectors.
+// If no cluster level system-default-registry is configured, it will return the global system-default-registry.
 func GetPrivateRepoURLFromCluster(cluster *v1.Cluster) string {
 	if cluster != nil && cluster.Spec.RKEConfig != nil {
 		return getPrivateRepoURL(cluster.Spec.RKEConfig.MachineGlobalConfig, cluster.Spec.RKEConfig.MachineSelectorConfig)
@@ -39,6 +49,9 @@ func GetPrivateRepoURLFromCluster(cluster *v1.Cluster) string {
 	return settings.SystemDefaultRegistry.Get()
 }
 
+// GetPrivateRepoURLFromControlPlane returns the system-default-registry URL from either the control planes
+// machineGlobalConfig, or one of its machineSelectorConfig's which has no label selectors.
+// If no cluster level system-default-registry is configured, it will return the global system-default-registry.
 func GetPrivateRepoURLFromControlPlane(cp *rkev1.RKEControlPlane) string {
 	if cp != nil {
 		return getPrivateRepoURL(cp.Spec.MachineGlobalConfig, cp.Spec.MachineSelectorConfig)
