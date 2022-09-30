@@ -133,6 +133,7 @@ func NewRKE1ClusterConfig(clusterName, cni, kubernetesVersion string, client *ra
 				MTU:     0,
 				Options: map[string]string{},
 			},
+			Version: kubernetesVersion,
 		},
 	}
 
@@ -206,6 +207,11 @@ func CreateRKE1Cluster(client *rancher.Client, rke1Cluster *management.Cluster) 
 		return nil, err
 	}
 
+	client, err = client.ReLogin()
+	if err != nil {
+		return nil, err
+	}
+
 	client.Session.RegisterCleanupFunc(func() error {
 		err := client.Management.Cluster.Delete(rke1Cluster)
 		if err != nil {
@@ -218,7 +224,6 @@ func CreateRKE1Cluster(client *rancher.Client, rke1Cluster *management.Cluster) 
 		}
 
 		watchInterface, err := adminClient.GetManagementWatchInterface(management.ClusterType, opts)
-
 		if err != nil {
 			return err
 		}
