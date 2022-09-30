@@ -8,7 +8,6 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/managementuserlegacy/approuter"
 	"github.com/rancher/rancher/pkg/controllers/managementuserlegacy/globaldns"
 	"github.com/rancher/rancher/pkg/controllers/managementuserlegacy/helm"
-	"github.com/rancher/rancher/pkg/controllers/managementuserlegacy/logging"
 	"github.com/rancher/rancher/pkg/controllers/managementuserlegacy/monitoring"
 	"github.com/rancher/rancher/pkg/controllers/managementuserlegacy/systemimage"
 	managementv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
@@ -17,7 +16,6 @@ import (
 
 func Register(ctx context.Context, mgmt *config.ScaledContext, cluster *config.UserContext, clusterRec *managementv3.Cluster, kubeConfigGetter common.KubeConfigGetter) error {
 	helm.Register(ctx, mgmt, cluster, kubeConfigGetter)
-	logging.Register(ctx, cluster)
 	systemimage.Register(ctx, cluster)
 	approuter.Register(ctx, cluster)
 	alert.Register(ctx, mgmt, cluster)

@@ -37,7 +37,6 @@ var (
 		Init(schemaTypes).
 		Init(userTypes).
 		Init(projectNetworkPolicyTypes).
-		Init(logTypes).
 		Init(globalTypes).
 		Init(rkeTypes).
 		Init(alertTypes).
@@ -691,37 +690,6 @@ func projectNetworkPolicyTypes(schema *types.Schemas) *types.Schemas {
 		MustImportAndCustomize(&Version, v3.ProjectNetworkPolicy{}, func(schema *types.Schema) {
 			schema.CollectionMethods = []string{http.MethodGet}
 			schema.ResourceMethods = []string{http.MethodGet}
-		})
-}
-
-func logTypes(schema *types.Schemas) *types.Schemas {
-	return schema.
-		AddMapperForType(&Version, v3.ClusterLogging{},
-			&m.Embed{Field: "status"},
-			m.DisplayName{}).
-		AddMapperForType(&Version, v3.ProjectLogging{},
-			m.DisplayName{}).
-		MustImport(&Version, v3.ClusterTestInput{}).
-		MustImport(&Version, v3.ProjectTestInput{}).
-		MustImportAndCustomize(&Version, v3.ClusterLogging{}, func(schema *types.Schema) {
-			schema.CollectionActions = map[string]types.Action{
-				"test": {
-					Input: "clusterTestInput",
-				},
-				"dryRun": {
-					Input: "clusterTestInput",
-				},
-			}
-		}).
-		MustImportAndCustomize(&Version, v3.ProjectLogging{}, func(schema *types.Schema) {
-			schema.CollectionActions = map[string]types.Action{
-				"test": {
-					Input: "projectTestInput",
-				},
-				"dryRun": {
-					Input: "projectTestInput",
-				},
-			}
 		})
 }
 

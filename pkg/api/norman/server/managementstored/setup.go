@@ -23,7 +23,6 @@ import (
 	"github.com/rancher/rancher/pkg/api/norman/customization/globalrole"
 	"github.com/rancher/rancher/pkg/api/norman/customization/globalrolebinding"
 	"github.com/rancher/rancher/pkg/api/norman/customization/kontainerdriver"
-	"github.com/rancher/rancher/pkg/api/norman/customization/logging"
 	"github.com/rancher/rancher/pkg/api/norman/customization/monitor"
 	"github.com/rancher/rancher/pkg/api/norman/customization/multiclusterapp"
 	"github.com/rancher/rancher/pkg/api/norman/customization/namespacedresource"
@@ -123,7 +122,6 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 		client.ClusterAlertType,
 		client.ClusterAlertGroupType,
 		client.ClusterCatalogType,
-		client.ClusterLoggingType,
 		client.ClusterAlertRuleType,
 		client.ClusterMonitorGraphType,
 		client.ClusterScanType,
@@ -135,7 +133,6 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 		client.ProjectAlertType,
 		client.ProjectAlertGroupType,
 		client.ProjectCatalogType,
-		client.ProjectLoggingType,
 		client.ProjectAlertRuleType,
 		client.ProjectMonitorGraphType,
 		client.CisConfigType,
@@ -186,7 +183,6 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 	ProjectCatalog(schemas, apiContext)
 	ClusterCatalog(schemas, apiContext)
 	App(schemas, apiContext, clusterManager)
-	LoggingTypes(schemas, apiContext, clusterManager, k8sProxy)
 	Alert(schemas, apiContext)
 	TemplateContent(schemas)
 	Monitor(schemas, apiContext, clusterManager)
@@ -559,20 +555,6 @@ func Feature(schemas *types.Schemas, management *config.ScaledContext) {
 	schema.Validator = validator.Validator
 	schema.Formatter = feature.Formatter
 	schema.Store = featStore.New(schema.Store)
-}
-
-func LoggingTypes(schemas *types.Schemas, management *config.ScaledContext, clusterManager *clustermanager.Manager, k8sProxy http.Handler) {
-	handler := logging.NewHandler(management, clusterManager)
-
-	schema := schemas.Schema(&managementschema.Version, client.ClusterLoggingType)
-	schema.CollectionFormatter = logging.CollectionFormatter
-	schema.ActionHandler = handler.ActionHandler
-	schema.Validator = logging.ClusterLoggingValidator
-
-	schema = schemas.Schema(&managementschema.Version, client.ProjectLoggingType)
-	schema.CollectionFormatter = logging.CollectionFormatter
-	schema.ActionHandler = handler.ActionHandler
-	schema.Validator = logging.ProjectLoggingValidator
 }
 
 func Alert(schemas *types.Schemas, management *config.ScaledContext) {
