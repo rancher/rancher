@@ -351,11 +351,11 @@ func (m *Lifecycle) createCleanupJob(userContext *config.UserContext, cluster *v
 	}
 
 	var imagePullSecrets []corev1.LocalObjectReference
-	if cluster.GetSecret("PrivateRegistrySecret") != "" {
-		privateRegistries, err := m.credLister.Get(namespace.GlobalNamespace, cluster.GetSecret("PrivateRegistrySecret"))
+	if registrySecret := cluster.GetSecret(v3.ClusterPrivateRegistrySecret); registrySecret != "" {
+		privateRegistries, err := m.credLister.Get(namespace.GlobalNamespace, registrySecret)
 		if err != nil {
 			return nil, err
-		} else if url, err := util.GeneratePrivateRegistryDockerConfig(util.GetPrivateRepo(cluster), privateRegistries); err != nil {
+		} else if url, err := util.GeneratePrivateRegistryDockerConfig(util.GetPrivateRepo(cluster), privateRegistries.Data[".dockerconfigjson"]); err != nil {
 			return nil, err
 		} else if url != "" {
 			imagePullSecrets = append(imagePullSecrets, corev1.LocalObjectReference{Name: "cattle-private-registry"})
