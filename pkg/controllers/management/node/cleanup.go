@@ -397,7 +397,7 @@ func (m *Lifecycle) createCleanupJob(userContext *config.UserContext, cluster *v
 	return userContext.K8sClient.BatchV1().Jobs("default").Create(context.TODO(), &job, metav1.CreateOptions{})
 }
 
-func (m *Lifecycle) userNodeRemoveCleanup(obj *v3.Node) (*v3.Node, error) {
+func (m *Lifecycle) userNodeRemoveCleanup(obj *v3.Node) *v3.Node {
 	newObj := obj.DeepCopy()
 	newObj.SetFinalizers(removeFinalizerWithPrefix(newObj.GetFinalizers(), userNodeRemoveFinalizerPrefix))
 
@@ -411,9 +411,8 @@ func (m *Lifecycle) userNodeRemoveCleanup(obj *v3.Node) (*v3.Node, error) {
 		}
 
 		annos[userNodeRemoveCleanupAnnotation] = "true"
-		newObj.SetAnnotations(annos)
 	}
-	return m.nodeClient.Update(newObj)
+	return newObj
 }
 
 func removeFinalizerWithPrefix(finalizers []string, prefix string) []string {

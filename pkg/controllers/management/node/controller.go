@@ -223,13 +223,7 @@ func (m *Lifecycle) getNodePool(nodePoolName string) (*apimgmtv3.NodePool, error
 }
 
 func (m *Lifecycle) Remove(machine *apimgmtv3.Node) (obj runtime.Object, err error) {
-	if machine.Annotations[userNodeRemoveCleanupAnnotation] != "true" {
-		// if a node is provisioned on <v2.5.1, rancher is stopped, and the node is deleted; the user-node-remove finalizer
-		// should just be removed here.
-		if machine, err = m.userNodeRemoveCleanup(machine); err != nil {
-			return machine, err
-		}
-	}
+	machine = m.userNodeRemoveCleanup(machine)
 
 	if machine.Status.NodeTemplateSpec == nil {
 		if err = m.cleanRKENode(machine); err != nil {
@@ -534,10 +528,10 @@ func (m *Lifecycle) sync(_ string, machine *apimgmtv3.Node) (runtime.Object, err
 	}
 
 	if machine.Annotations[userNodeRemoveCleanupAnnotation] != "true" {
-		return m.userNodeRemoveCleanup(machine)
+		machine = m.userNodeRemoveCleanup(machine)
 	}
 
-	return machine, nil
+	return m.nodeClient.Update(machine)
 }
 
 func (m *Lifecycle) Updated(obj *apimgmtv3.Node) (runtime.Object, error) {
