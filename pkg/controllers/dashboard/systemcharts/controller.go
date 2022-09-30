@@ -13,6 +13,7 @@ import (
 	"github.com/rancher/wrangler/pkg/relatedresource"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/errors"
+	apierror "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -102,7 +103,9 @@ func (h *handler) getChartsToInstall() []*chart.Definition {
 				}
 				// add priority class value.
 				if priorityClassName, err := h.chartsConfig.GetPriorityClassName(); err != nil {
-					logrus.Warnf("Failed to get rancher priorityClassName: %v", err)
+					if !apierror.IsNotFound(err) {
+						logrus.Warnf("Failed to get rancher priorityClassName for 'rancher-webhook': %v", err)
+					}
 				} else {
 					values[chart.PriorityClassKey] = priorityClassName
 				}

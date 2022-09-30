@@ -13,6 +13,7 @@ import (
 	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/rancher/wrangler/pkg/relatedresource"
 	"github.com/sirupsen/logrus"
+	apierror "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -111,7 +112,9 @@ func (h *handler) onSetting(key string, setting *v3.Setting) (*v3.Setting, error
 
 	// add priority class value
 	if priorityClassName, err := h.chartsConfig.GetPriorityClassName(); err != nil {
-		logrus.Warnf("Failed to get rancher priorityClassName: %v", err)
+		if !apierror.IsNotFound(err) {
+			logrus.Warnf("Failed to get rancher priorityClassName for '%s': %v", fleetChart.ChartName, err)
+		}
 	} else {
 		fleetChartValues[chart.PriorityClassKey] = priorityClassName
 		gitjobChartValues[chart.PriorityClassKey] = priorityClassName
