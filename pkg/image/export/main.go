@@ -227,10 +227,9 @@ func saveImagesAndSources(imagesAndSources []string) []string {
 
 func checkImage(image string) error {
 	// ignore non prefixed images, also in types (image/mirror.go)
-	if strings.HasPrefix(image, "weaveworks") || strings.HasPrefix(image, "noiro") {
+	if strings.HasPrefix(image, "weaveworks") || strings.HasPrefix(image, "noiro") || strings.HasPrefix(image, "registry.suse.com") {
 		return nil
 	}
-
 	imageNameTag := strings.Split(image, ":")
 	if len(imageNameTag) != 2 {
 		return fmt.Errorf("Can't extract tag from image [%s]", image)
