@@ -68,10 +68,10 @@ func (r *V2ProvCertRotationTestSuite) testCertRotation(provider Provider, kubeVe
 			machineConfigResp, err := machinepools.CreateMachineConfig(provider.MachineConfig, machinePoolConfig, testSessionClient)
 			require.NoError(r.T(), err)
 
-			machinePools := machinepools.RKEMachinePoolSetup(nodesAndRoles, machineConfigResp)
+			machinePools := machinepools.MachinePoolSetup(nodesAndRoles, machineConfigResp)
 
-			cluster := clusters.NewRKE2ClusterConfig(clusterName, namespace, "calico", credential.ID, kubeVersion, machinePools)
-			clusterResp, err := clusters.CreateRKE2Cluster(testSessionClient, cluster)
+			cluster := clusters.NewK3SRKE2ClusterConfig(clusterName, namespace, "calico", credential.ID, kubeVersion, machinePools)
+			clusterResp, err := clusters.CreateK3SRKE2Cluster(testSessionClient, cluster)
 			require.NoError(r.T(), err)
 
 			kubeProvisioningClient, err := r.client.GetKubeAPIProvisioningClient()
@@ -92,9 +92,7 @@ func (r *V2ProvCertRotationTestSuite) testCertRotation(provider Provider, kubeVe
 			require.NoError(r.T(), err)
 			require.NotNil(r.T(), cluster.Status)
 
-			// rotate certs
 			require.NoError(r.T(), r.rotateCerts(clusterName, 1))
-			// rotate certs again
 			require.NoError(r.T(), r.rotateCerts(clusterName, 2))
 		})
 	})

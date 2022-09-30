@@ -149,11 +149,11 @@ func (r *RKE2NodeDriverProvisioningTestSuite) ProvisioningRKE2Cluster(provider P
 					machineConfigResp, err := machinepools.CreateMachineConfig(provider.MachineConfig, machinePoolConfig, testSessionClient)
 					require.NoError(r.T(), err)
 
-					machinePools := machinepools.RKEMachinePoolSetup(tt.nodeRoles, machineConfigResp)
+					machinePools := machinepools.MachinePoolSetup(tt.nodeRoles, machineConfigResp)
 
-					cluster := clusters.NewRKE2ClusterConfig(clusterName, namespace, cni, cloudCredential.ID, kubeVersion, machinePools)
+					cluster := clusters.NewK3SRKE2ClusterConfig(clusterName, namespace, cni, cloudCredential.ID, kubeVersion, machinePools)
 
-					clusterResp, err := clusters.CreateRKE2Cluster(testSessionClient, cluster)
+					clusterResp, err := clusters.CreateK3SRKE2Cluster(testSessionClient, cluster)
 					require.NoError(r.T(), err)
 
 					kubeProvisioningClient, err := r.client.GetKubeAPIProvisioningClient()
@@ -219,11 +219,11 @@ func (r *RKE2NodeDriverProvisioningTestSuite) ProvisioningRKE2ClusterDynamicInpu
 					machineConfigResp, err := machinepools.CreateMachineConfig(provider.MachineConfig, machinePoolConfig, testSessionClient)
 					require.NoError(r.T(), err)
 
-					machinePools := machinepools.RKEMachinePoolSetup(nodesAndRoles, machineConfigResp)
+					machinePools := machinepools.MachinePoolSetup(nodesAndRoles, machineConfigResp)
 
-					cluster := clusters.NewRKE2ClusterConfig(clusterName, namespace, cni, cloudCredential.ID, kubeVersion, machinePools)
+					cluster := clusters.NewK3SRKE2ClusterConfig(clusterName, namespace, cni, cloudCredential.ID, kubeVersion, machinePools)
 
-					clusterResp, err := clusters.CreateRKE2Cluster(testSessionClient, cluster)
+					clusterResp, err := clusters.CreateK3SRKE2Cluster(testSessionClient, cluster)
 					require.NoError(r.T(), err)
 
 					kubeProvisioningClient, err := r.client.GetKubeAPIProvisioningClient()
@@ -309,11 +309,11 @@ func (r *RKE2NodeDriverProvisioningTestSuite) ProvisioningRKE2CNICluster(provide
 					machineConfigResp, err := machinepools.CreateMachineConfig(provider.MachineConfig, machinePoolConfig, testSessionClient)
 					require.NoError(r.T(), err)
 
-					machinePools := machinepools.RKEMachinePoolSetup(tt.nodeRoles, machineConfigResp)
+					machinePools := machinepools.MachinePoolSetup(tt.nodeRoles, machineConfigResp)
 
-					cluster := clusters.NewRKE2ClusterConfig(clusterName, namespace, cni, cloudCredential.ID, kubeVersion, machinePools)
+					cluster := clusters.NewK3SRKE2ClusterConfig(clusterName, namespace, cni, cloudCredential.ID, kubeVersion, machinePools)
 
-					clusterResp, err := clusters.CreateRKE2Cluster(testSessionClient, cluster)
+					clusterResp, err := clusters.CreateK3SRKE2Cluster(testSessionClient, cluster)
 					require.NoError(r.T(), err)
 
 					kubeProvisioningClient, err := r.client.GetKubeAPIProvisioningClient()
