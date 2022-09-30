@@ -160,7 +160,7 @@ var (
 	UICommunityLinks = NewSetting("ui-community-links", "true")
 
 	// UICustomLinks Key(display text), value(url) for user customisable links to display in homepage and support pages.
-	UICustomLinks = NewSetting("ui-custom-links", "{}")
+	UICustomLinks = NewSetting("ui-custom-links", "[]")
 
 	// UIDashboardPath path within Rancher Manager where the dashboard files are found.
 	UIDashboardPath = NewSetting("ui-dashboard-path", "/usr/share/rancher/ui-dashboard")
