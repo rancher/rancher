@@ -29,22 +29,22 @@ var _ v31.NotifierLister = &NotifierListerMock{}
 
 // NotifierListerMock is a mock implementation of v31.NotifierLister.
 //
-//	    func TestSomethingThatUsesNotifierLister(t *testing.T) {
+//     func TestSomethingThatUsesNotifierLister(t *testing.T) {
 //
-//	        // make and configure a mocked v31.NotifierLister
-//	        mockedNotifierLister := &NotifierListerMock{
-//	            GetFunc: func(namespace string, name string) (*v3.Notifier, error) {
-//		               panic("mock out the Get method")
-//	            },
-//	            ListFunc: func(namespace string, selector labels.Selector) ([]*v3.Notifier, error) {
-//		               panic("mock out the List method")
-//	            },
-//	        }
+//         // make and configure a mocked v31.NotifierLister
+//         mockedNotifierLister := &NotifierListerMock{
+//             GetFunc: func(namespace string, name string) (*v3.Notifier, error) {
+// 	               panic("mock out the Get method")
+//             },
+//             ListFunc: func(namespace string, selector labels.Selector) ([]*v3.Notifier, error) {
+// 	               panic("mock out the List method")
+//             },
+//         }
 //
-//	        // use mockedNotifierLister in code that requires v31.NotifierLister
-//	        // and then make assertions.
+//         // use mockedNotifierLister in code that requires v31.NotifierLister
+//         // and then make assertions.
 //
-//	    }
+//     }
 type NotifierListerMock struct {
 	// GetFunc mocks the Get method.
 	GetFunc func(namespace string, name string) (*v3.Notifier, error)
@@ -91,8 +91,7 @@ func (mock *NotifierListerMock) Get(namespace string, name string) (*v3.Notifier
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//
-//	len(mockedNotifierLister.GetCalls())
+//     len(mockedNotifierLister.GetCalls())
 func (mock *NotifierListerMock) GetCalls() []struct {
 	Namespace string
 	Name      string
@@ -127,8 +126,7 @@ func (mock *NotifierListerMock) List(namespace string, selector labels.Selector)
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//
-//	len(mockedNotifierLister.ListCalls())
+//     len(mockedNotifierLister.ListCalls())
 func (mock *NotifierListerMock) ListCalls() []struct {
 	Namespace string
 	Selector  labels.Selector
@@ -161,43 +159,43 @@ var _ v31.NotifierController = &NotifierControllerMock{}
 
 // NotifierControllerMock is a mock implementation of v31.NotifierController.
 //
-//	    func TestSomethingThatUsesNotifierController(t *testing.T) {
+//     func TestSomethingThatUsesNotifierController(t *testing.T) {
 //
-//	        // make and configure a mocked v31.NotifierController
-//	        mockedNotifierController := &NotifierControllerMock{
-//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v31.NotifierHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedFeatureHandler method")
-//	            },
-//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v31.NotifierHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedHandler method")
-//	            },
-//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.NotifierHandlerFunc)  {
-//		               panic("mock out the AddFeatureHandler method")
-//	            },
-//	            AddHandlerFunc: func(ctx context.Context, name string, handler v31.NotifierHandlerFunc)  {
-//		               panic("mock out the AddHandler method")
-//	            },
-//	            EnqueueFunc: func(namespace string, name string)  {
-//		               panic("mock out the Enqueue method")
-//	            },
-//	            EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
-//		               panic("mock out the EnqueueAfter method")
-//	            },
-//	            GenericFunc: func() controller.GenericController {
-//		               panic("mock out the Generic method")
-//	            },
-//	            InformerFunc: func() cache.SharedIndexInformer {
-//		               panic("mock out the Informer method")
-//	            },
-//	            ListerFunc: func() v31.NotifierLister {
-//		               panic("mock out the Lister method")
-//	            },
-//	        }
+//         // make and configure a mocked v31.NotifierController
+//         mockedNotifierController := &NotifierControllerMock{
+//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v31.NotifierHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedFeatureHandler method")
+//             },
+//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v31.NotifierHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedHandler method")
+//             },
+//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.NotifierHandlerFunc)  {
+// 	               panic("mock out the AddFeatureHandler method")
+//             },
+//             AddHandlerFunc: func(ctx context.Context, name string, handler v31.NotifierHandlerFunc)  {
+// 	               panic("mock out the AddHandler method")
+//             },
+//             EnqueueFunc: func(namespace string, name string)  {
+// 	               panic("mock out the Enqueue method")
+//             },
+//             EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
+// 	               panic("mock out the EnqueueAfter method")
+//             },
+//             GenericFunc: func() controller.GenericController {
+// 	               panic("mock out the Generic method")
+//             },
+//             InformerFunc: func() cache.SharedIndexInformer {
+// 	               panic("mock out the Informer method")
+//             },
+//             ListerFunc: func() v31.NotifierLister {
+// 	               panic("mock out the Lister method")
+//             },
+//         }
 //
-//	        // use mockedNotifierController in code that requires v31.NotifierController
-//	        // and then make assertions.
+//         // use mockedNotifierController in code that requires v31.NotifierController
+//         // and then make assertions.
 //
-//	    }
+//     }
 type NotifierControllerMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
 	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v31.NotifierHandlerFunc)
@@ -326,8 +324,7 @@ func (mock *NotifierControllerMock) AddClusterScopedFeatureHandler(ctx context.C
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//
-//	len(mockedNotifierController.AddClusterScopedFeatureHandlerCalls())
+//     len(mockedNotifierController.AddClusterScopedFeatureHandlerCalls())
 func (mock *NotifierControllerMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -372,8 +369,7 @@ func (mock *NotifierControllerMock) AddClusterScopedHandler(ctx context.Context,
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//
-//	len(mockedNotifierController.AddClusterScopedHandlerCalls())
+//     len(mockedNotifierController.AddClusterScopedHandlerCalls())
 func (mock *NotifierControllerMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -416,8 +412,7 @@ func (mock *NotifierControllerMock) AddFeatureHandler(ctx context.Context, enabl
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//
-//	len(mockedNotifierController.AddFeatureHandlerCalls())
+//     len(mockedNotifierController.AddFeatureHandlerCalls())
 func (mock *NotifierControllerMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
@@ -458,8 +453,7 @@ func (mock *NotifierControllerMock) AddHandler(ctx context.Context, name string,
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//
-//	len(mockedNotifierController.AddHandlerCalls())
+//     len(mockedNotifierController.AddHandlerCalls())
 func (mock *NotifierControllerMock) AddHandlerCalls() []struct {
 	Ctx     context.Context
 	Name    string
@@ -496,8 +490,7 @@ func (mock *NotifierControllerMock) Enqueue(namespace string, name string) {
 
 // EnqueueCalls gets all the calls that were made to Enqueue.
 // Check the length with:
-//
-//	len(mockedNotifierController.EnqueueCalls())
+//     len(mockedNotifierController.EnqueueCalls())
 func (mock *NotifierControllerMock) EnqueueCalls() []struct {
 	Namespace string
 	Name      string
@@ -534,8 +527,7 @@ func (mock *NotifierControllerMock) EnqueueAfter(namespace string, name string, 
 
 // EnqueueAfterCalls gets all the calls that were made to EnqueueAfter.
 // Check the length with:
-//
-//	len(mockedNotifierController.EnqueueAfterCalls())
+//     len(mockedNotifierController.EnqueueAfterCalls())
 func (mock *NotifierControllerMock) EnqueueAfterCalls() []struct {
 	Namespace string
 	Name      string
@@ -567,8 +559,7 @@ func (mock *NotifierControllerMock) Generic() controller.GenericController {
 
 // GenericCalls gets all the calls that were made to Generic.
 // Check the length with:
-//
-//	len(mockedNotifierController.GenericCalls())
+//     len(mockedNotifierController.GenericCalls())
 func (mock *NotifierControllerMock) GenericCalls() []struct {
 } {
 	var calls []struct {
@@ -594,8 +585,7 @@ func (mock *NotifierControllerMock) Informer() cache.SharedIndexInformer {
 
 // InformerCalls gets all the calls that were made to Informer.
 // Check the length with:
-//
-//	len(mockedNotifierController.InformerCalls())
+//     len(mockedNotifierController.InformerCalls())
 func (mock *NotifierControllerMock) InformerCalls() []struct {
 } {
 	var calls []struct {
@@ -621,8 +611,7 @@ func (mock *NotifierControllerMock) Lister() v31.NotifierLister {
 
 // ListerCalls gets all the calls that were made to Lister.
 // Check the length with:
-//
-//	len(mockedNotifierController.ListerCalls())
+//     len(mockedNotifierController.ListerCalls())
 func (mock *NotifierControllerMock) ListerCalls() []struct {
 } {
 	var calls []struct {
@@ -662,76 +651,76 @@ var _ v31.NotifierInterface = &NotifierInterfaceMock{}
 
 // NotifierInterfaceMock is a mock implementation of v31.NotifierInterface.
 //
-//	    func TestSomethingThatUsesNotifierInterface(t *testing.T) {
+//     func TestSomethingThatUsesNotifierInterface(t *testing.T) {
 //
-//	        // make and configure a mocked v31.NotifierInterface
-//	        mockedNotifierInterface := &NotifierInterfaceMock{
-//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v31.NotifierHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedFeatureHandler method")
-//	            },
-//	            AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v31.NotifierLifecycle)  {
-//		               panic("mock out the AddClusterScopedFeatureLifecycle method")
-//	            },
-//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v31.NotifierHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedHandler method")
-//	            },
-//	            AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v31.NotifierLifecycle)  {
-//		               panic("mock out the AddClusterScopedLifecycle method")
-//	            },
-//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.NotifierHandlerFunc)  {
-//		               panic("mock out the AddFeatureHandler method")
-//	            },
-//	            AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v31.NotifierLifecycle)  {
-//		               panic("mock out the AddFeatureLifecycle method")
-//	            },
-//	            AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v31.NotifierHandlerFunc)  {
-//		               panic("mock out the AddHandler method")
-//	            },
-//	            AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v31.NotifierLifecycle)  {
-//		               panic("mock out the AddLifecycle method")
-//	            },
-//	            ControllerFunc: func() v31.NotifierController {
-//		               panic("mock out the Controller method")
-//	            },
-//	            CreateFunc: func(in1 *v3.Notifier) (*v3.Notifier, error) {
-//		               panic("mock out the Create method")
-//	            },
-//	            DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
-//		               panic("mock out the Delete method")
-//	            },
-//	            DeleteCollectionFunc: func(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
-//		               panic("mock out the DeleteCollection method")
-//	            },
-//	            DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
-//		               panic("mock out the DeleteNamespaced method")
-//	            },
-//	            GetFunc: func(name string, opts metav1.GetOptions) (*v3.Notifier, error) {
-//		               panic("mock out the Get method")
-//	            },
-//	            GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v3.Notifier, error) {
-//		               panic("mock out the GetNamespaced method")
-//	            },
-//	            ListFunc: func(opts metav1.ListOptions) (*v3.NotifierList, error) {
-//		               panic("mock out the List method")
-//	            },
-//	            ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v3.NotifierList, error) {
-//		               panic("mock out the ListNamespaced method")
-//	            },
-//	            ObjectClientFunc: func() *objectclient.ObjectClient {
-//		               panic("mock out the ObjectClient method")
-//	            },
-//	            UpdateFunc: func(in1 *v3.Notifier) (*v3.Notifier, error) {
-//		               panic("mock out the Update method")
-//	            },
-//	            WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
-//		               panic("mock out the Watch method")
-//	            },
-//	        }
+//         // make and configure a mocked v31.NotifierInterface
+//         mockedNotifierInterface := &NotifierInterfaceMock{
+//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v31.NotifierHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedFeatureHandler method")
+//             },
+//             AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v31.NotifierLifecycle)  {
+// 	               panic("mock out the AddClusterScopedFeatureLifecycle method")
+//             },
+//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v31.NotifierHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedHandler method")
+//             },
+//             AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v31.NotifierLifecycle)  {
+// 	               panic("mock out the AddClusterScopedLifecycle method")
+//             },
+//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.NotifierHandlerFunc)  {
+// 	               panic("mock out the AddFeatureHandler method")
+//             },
+//             AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v31.NotifierLifecycle)  {
+// 	               panic("mock out the AddFeatureLifecycle method")
+//             },
+//             AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v31.NotifierHandlerFunc)  {
+// 	               panic("mock out the AddHandler method")
+//             },
+//             AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v31.NotifierLifecycle)  {
+// 	               panic("mock out the AddLifecycle method")
+//             },
+//             ControllerFunc: func() v31.NotifierController {
+// 	               panic("mock out the Controller method")
+//             },
+//             CreateFunc: func(in1 *v3.Notifier) (*v3.Notifier, error) {
+// 	               panic("mock out the Create method")
+//             },
+//             DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
+// 	               panic("mock out the Delete method")
+//             },
+//             DeleteCollectionFunc: func(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
+// 	               panic("mock out the DeleteCollection method")
+//             },
+//             DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
+// 	               panic("mock out the DeleteNamespaced method")
+//             },
+//             GetFunc: func(name string, opts metav1.GetOptions) (*v3.Notifier, error) {
+// 	               panic("mock out the Get method")
+//             },
+//             GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v3.Notifier, error) {
+// 	               panic("mock out the GetNamespaced method")
+//             },
+//             ListFunc: func(opts metav1.ListOptions) (*v3.NotifierList, error) {
+// 	               panic("mock out the List method")
+//             },
+//             ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v3.NotifierList, error) {
+// 	               panic("mock out the ListNamespaced method")
+//             },
+//             ObjectClientFunc: func() *objectclient.ObjectClient {
+// 	               panic("mock out the ObjectClient method")
+//             },
+//             UpdateFunc: func(in1 *v3.Notifier) (*v3.Notifier, error) {
+// 	               panic("mock out the Update method")
+//             },
+//             WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
+// 	               panic("mock out the Watch method")
+//             },
+//         }
 //
-//	        // use mockedNotifierInterface in code that requires v31.NotifierInterface
-//	        // and then make assertions.
+//         // use mockedNotifierInterface in code that requires v31.NotifierInterface
+//         // and then make assertions.
 //
-//	    }
+//     }
 type NotifierInterfaceMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
 	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v31.NotifierHandlerFunc)
@@ -984,8 +973,7 @@ func (mock *NotifierInterfaceMock) AddClusterScopedFeatureHandler(ctx context.Co
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//
-//	len(mockedNotifierInterface.AddClusterScopedFeatureHandlerCalls())
+//     len(mockedNotifierInterface.AddClusterScopedFeatureHandlerCalls())
 func (mock *NotifierInterfaceMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -1032,8 +1020,7 @@ func (mock *NotifierInterfaceMock) AddClusterScopedFeatureLifecycle(ctx context.
 
 // AddClusterScopedFeatureLifecycleCalls gets all the calls that were made to AddClusterScopedFeatureLifecycle.
 // Check the length with:
-//
-//	len(mockedNotifierInterface.AddClusterScopedFeatureLifecycleCalls())
+//     len(mockedNotifierInterface.AddClusterScopedFeatureLifecycleCalls())
 func (mock *NotifierInterfaceMock) AddClusterScopedFeatureLifecycleCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -1078,8 +1065,7 @@ func (mock *NotifierInterfaceMock) AddClusterScopedHandler(ctx context.Context, 
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//
-//	len(mockedNotifierInterface.AddClusterScopedHandlerCalls())
+//     len(mockedNotifierInterface.AddClusterScopedHandlerCalls())
 func (mock *NotifierInterfaceMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -1122,8 +1108,7 @@ func (mock *NotifierInterfaceMock) AddClusterScopedLifecycle(ctx context.Context
 
 // AddClusterScopedLifecycleCalls gets all the calls that were made to AddClusterScopedLifecycle.
 // Check the length with:
-//
-//	len(mockedNotifierInterface.AddClusterScopedLifecycleCalls())
+//     len(mockedNotifierInterface.AddClusterScopedLifecycleCalls())
 func (mock *NotifierInterfaceMock) AddClusterScopedLifecycleCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -1166,8 +1151,7 @@ func (mock *NotifierInterfaceMock) AddFeatureHandler(ctx context.Context, enable
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//
-//	len(mockedNotifierInterface.AddFeatureHandlerCalls())
+//     len(mockedNotifierInterface.AddFeatureHandlerCalls())
 func (mock *NotifierInterfaceMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
@@ -1210,8 +1194,7 @@ func (mock *NotifierInterfaceMock) AddFeatureLifecycle(ctx context.Context, enab
 
 // AddFeatureLifecycleCalls gets all the calls that were made to AddFeatureLifecycle.
 // Check the length with:
-//
-//	len(mockedNotifierInterface.AddFeatureLifecycleCalls())
+//     len(mockedNotifierInterface.AddFeatureLifecycleCalls())
 func (mock *NotifierInterfaceMock) AddFeatureLifecycleCalls() []struct {
 	Ctx       context.Context
 	Enabled   func() bool
@@ -1252,8 +1235,7 @@ func (mock *NotifierInterfaceMock) AddHandler(ctx context.Context, name string, 
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//
-//	len(mockedNotifierInterface.AddHandlerCalls())
+//     len(mockedNotifierInterface.AddHandlerCalls())
 func (mock *NotifierInterfaceMock) AddHandlerCalls() []struct {
 	Ctx  context.Context
 	Name string
@@ -1292,8 +1274,7 @@ func (mock *NotifierInterfaceMock) AddLifecycle(ctx context.Context, name string
 
 // AddLifecycleCalls gets all the calls that were made to AddLifecycle.
 // Check the length with:
-//
-//	len(mockedNotifierInterface.AddLifecycleCalls())
+//     len(mockedNotifierInterface.AddLifecycleCalls())
 func (mock *NotifierInterfaceMock) AddLifecycleCalls() []struct {
 	Ctx       context.Context
 	Name      string
@@ -1325,8 +1306,7 @@ func (mock *NotifierInterfaceMock) Controller() v31.NotifierController {
 
 // ControllerCalls gets all the calls that were made to Controller.
 // Check the length with:
-//
-//	len(mockedNotifierInterface.ControllerCalls())
+//     len(mockedNotifierInterface.ControllerCalls())
 func (mock *NotifierInterfaceMock) ControllerCalls() []struct {
 } {
 	var calls []struct {
@@ -1355,8 +1335,7 @@ func (mock *NotifierInterfaceMock) Create(in1 *v3.Notifier) (*v3.Notifier, error
 
 // CreateCalls gets all the calls that were made to Create.
 // Check the length with:
-//
-//	len(mockedNotifierInterface.CreateCalls())
+//     len(mockedNotifierInterface.CreateCalls())
 func (mock *NotifierInterfaceMock) CreateCalls() []struct {
 	In1 *v3.Notifier
 } {
@@ -1389,8 +1368,7 @@ func (mock *NotifierInterfaceMock) Delete(name string, options *metav1.DeleteOpt
 
 // DeleteCalls gets all the calls that were made to Delete.
 // Check the length with:
-//
-//	len(mockedNotifierInterface.DeleteCalls())
+//     len(mockedNotifierInterface.DeleteCalls())
 func (mock *NotifierInterfaceMock) DeleteCalls() []struct {
 	Name    string
 	Options *metav1.DeleteOptions
@@ -1425,8 +1403,7 @@ func (mock *NotifierInterfaceMock) DeleteCollection(deleteOpts *metav1.DeleteOpt
 
 // DeleteCollectionCalls gets all the calls that were made to DeleteCollection.
 // Check the length with:
-//
-//	len(mockedNotifierInterface.DeleteCollectionCalls())
+//     len(mockedNotifierInterface.DeleteCollectionCalls())
 func (mock *NotifierInterfaceMock) DeleteCollectionCalls() []struct {
 	DeleteOpts *metav1.DeleteOptions
 	ListOpts   metav1.ListOptions
@@ -1463,8 +1440,7 @@ func (mock *NotifierInterfaceMock) DeleteNamespaced(namespace string, name strin
 
 // DeleteNamespacedCalls gets all the calls that were made to DeleteNamespaced.
 // Check the length with:
-//
-//	len(mockedNotifierInterface.DeleteNamespacedCalls())
+//     len(mockedNotifierInterface.DeleteNamespacedCalls())
 func (mock *NotifierInterfaceMock) DeleteNamespacedCalls() []struct {
 	Namespace string
 	Name      string
@@ -1501,8 +1477,7 @@ func (mock *NotifierInterfaceMock) Get(name string, opts metav1.GetOptions) (*v3
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//
-//	len(mockedNotifierInterface.GetCalls())
+//     len(mockedNotifierInterface.GetCalls())
 func (mock *NotifierInterfaceMock) GetCalls() []struct {
 	Name string
 	Opts metav1.GetOptions
@@ -1539,8 +1514,7 @@ func (mock *NotifierInterfaceMock) GetNamespaced(namespace string, name string, 
 
 // GetNamespacedCalls gets all the calls that were made to GetNamespaced.
 // Check the length with:
-//
-//	len(mockedNotifierInterface.GetNamespacedCalls())
+//     len(mockedNotifierInterface.GetNamespacedCalls())
 func (mock *NotifierInterfaceMock) GetNamespacedCalls() []struct {
 	Namespace string
 	Name      string
@@ -1575,8 +1549,7 @@ func (mock *NotifierInterfaceMock) List(opts metav1.ListOptions) (*v3.NotifierLi
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//
-//	len(mockedNotifierInterface.ListCalls())
+//     len(mockedNotifierInterface.ListCalls())
 func (mock *NotifierInterfaceMock) ListCalls() []struct {
 	Opts metav1.ListOptions
 } {
@@ -1609,8 +1582,7 @@ func (mock *NotifierInterfaceMock) ListNamespaced(namespace string, opts metav1.
 
 // ListNamespacedCalls gets all the calls that were made to ListNamespaced.
 // Check the length with:
-//
-//	len(mockedNotifierInterface.ListNamespacedCalls())
+//     len(mockedNotifierInterface.ListNamespacedCalls())
 func (mock *NotifierInterfaceMock) ListNamespacedCalls() []struct {
 	Namespace string
 	Opts      metav1.ListOptions
@@ -1640,8 +1612,7 @@ func (mock *NotifierInterfaceMock) ObjectClient() *objectclient.ObjectClient {
 
 // ObjectClientCalls gets all the calls that were made to ObjectClient.
 // Check the length with:
-//
-//	len(mockedNotifierInterface.ObjectClientCalls())
+//     len(mockedNotifierInterface.ObjectClientCalls())
 func (mock *NotifierInterfaceMock) ObjectClientCalls() []struct {
 } {
 	var calls []struct {
@@ -1670,8 +1641,7 @@ func (mock *NotifierInterfaceMock) Update(in1 *v3.Notifier) (*v3.Notifier, error
 
 // UpdateCalls gets all the calls that were made to Update.
 // Check the length with:
-//
-//	len(mockedNotifierInterface.UpdateCalls())
+//     len(mockedNotifierInterface.UpdateCalls())
 func (mock *NotifierInterfaceMock) UpdateCalls() []struct {
 	In1 *v3.Notifier
 } {
@@ -1702,8 +1672,7 @@ func (mock *NotifierInterfaceMock) Watch(opts metav1.ListOptions) (watch.Interfa
 
 // WatchCalls gets all the calls that were made to Watch.
 // Check the length with:
-//
-//	len(mockedNotifierInterface.WatchCalls())
+//     len(mockedNotifierInterface.WatchCalls())
 func (mock *NotifierInterfaceMock) WatchCalls() []struct {
 	Opts metav1.ListOptions
 } {
@@ -1726,19 +1695,19 @@ var _ v31.NotifiersGetter = &NotifiersGetterMock{}
 
 // NotifiersGetterMock is a mock implementation of v31.NotifiersGetter.
 //
-//	    func TestSomethingThatUsesNotifiersGetter(t *testing.T) {
+//     func TestSomethingThatUsesNotifiersGetter(t *testing.T) {
 //
-//	        // make and configure a mocked v31.NotifiersGetter
-//	        mockedNotifiersGetter := &NotifiersGetterMock{
-//	            NotifiersFunc: func(namespace string) v31.NotifierInterface {
-//		               panic("mock out the Notifiers method")
-//	            },
-//	        }
+//         // make and configure a mocked v31.NotifiersGetter
+//         mockedNotifiersGetter := &NotifiersGetterMock{
+//             NotifiersFunc: func(namespace string) v31.NotifierInterface {
+// 	               panic("mock out the Notifiers method")
+//             },
+//         }
 //
-//	        // use mockedNotifiersGetter in code that requires v31.NotifiersGetter
-//	        // and then make assertions.
+//         // use mockedNotifiersGetter in code that requires v31.NotifiersGetter
+//         // and then make assertions.
 //
-//	    }
+//     }
 type NotifiersGetterMock struct {
 	// NotifiersFunc mocks the Notifiers method.
 	NotifiersFunc func(namespace string) v31.NotifierInterface
@@ -1771,8 +1740,7 @@ func (mock *NotifiersGetterMock) Notifiers(namespace string) v31.NotifierInterfa
 
 // NotifiersCalls gets all the calls that were made to Notifiers.
 // Check the length with:
-//
-//	len(mockedNotifiersGetter.NotifiersCalls())
+//     len(mockedNotifiersGetter.NotifiersCalls())
 func (mock *NotifiersGetterMock) NotifiersCalls() []struct {
 	Namespace string
 } {

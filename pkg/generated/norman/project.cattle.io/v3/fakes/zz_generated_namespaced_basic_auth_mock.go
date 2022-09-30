@@ -29,22 +29,22 @@ var _ v31.NamespacedBasicAuthLister = &NamespacedBasicAuthListerMock{}
 
 // NamespacedBasicAuthListerMock is a mock implementation of v31.NamespacedBasicAuthLister.
 //
-//	    func TestSomethingThatUsesNamespacedBasicAuthLister(t *testing.T) {
+//     func TestSomethingThatUsesNamespacedBasicAuthLister(t *testing.T) {
 //
-//	        // make and configure a mocked v31.NamespacedBasicAuthLister
-//	        mockedNamespacedBasicAuthLister := &NamespacedBasicAuthListerMock{
-//	            GetFunc: func(namespace string, name string) (*v3.NamespacedBasicAuth, error) {
-//		               panic("mock out the Get method")
-//	            },
-//	            ListFunc: func(namespace string, selector labels.Selector) ([]*v3.NamespacedBasicAuth, error) {
-//		               panic("mock out the List method")
-//	            },
-//	        }
+//         // make and configure a mocked v31.NamespacedBasicAuthLister
+//         mockedNamespacedBasicAuthLister := &NamespacedBasicAuthListerMock{
+//             GetFunc: func(namespace string, name string) (*v3.NamespacedBasicAuth, error) {
+// 	               panic("mock out the Get method")
+//             },
+//             ListFunc: func(namespace string, selector labels.Selector) ([]*v3.NamespacedBasicAuth, error) {
+// 	               panic("mock out the List method")
+//             },
+//         }
 //
-//	        // use mockedNamespacedBasicAuthLister in code that requires v31.NamespacedBasicAuthLister
-//	        // and then make assertions.
+//         // use mockedNamespacedBasicAuthLister in code that requires v31.NamespacedBasicAuthLister
+//         // and then make assertions.
 //
-//	    }
+//     }
 type NamespacedBasicAuthListerMock struct {
 	// GetFunc mocks the Get method.
 	GetFunc func(namespace string, name string) (*v3.NamespacedBasicAuth, error)
@@ -91,8 +91,7 @@ func (mock *NamespacedBasicAuthListerMock) Get(namespace string, name string) (*
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//
-//	len(mockedNamespacedBasicAuthLister.GetCalls())
+//     len(mockedNamespacedBasicAuthLister.GetCalls())
 func (mock *NamespacedBasicAuthListerMock) GetCalls() []struct {
 	Namespace string
 	Name      string
@@ -127,8 +126,7 @@ func (mock *NamespacedBasicAuthListerMock) List(namespace string, selector label
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//
-//	len(mockedNamespacedBasicAuthLister.ListCalls())
+//     len(mockedNamespacedBasicAuthLister.ListCalls())
 func (mock *NamespacedBasicAuthListerMock) ListCalls() []struct {
 	Namespace string
 	Selector  labels.Selector
@@ -161,43 +159,43 @@ var _ v31.NamespacedBasicAuthController = &NamespacedBasicAuthControllerMock{}
 
 // NamespacedBasicAuthControllerMock is a mock implementation of v31.NamespacedBasicAuthController.
 //
-//	    func TestSomethingThatUsesNamespacedBasicAuthController(t *testing.T) {
+//     func TestSomethingThatUsesNamespacedBasicAuthController(t *testing.T) {
 //
-//	        // make and configure a mocked v31.NamespacedBasicAuthController
-//	        mockedNamespacedBasicAuthController := &NamespacedBasicAuthControllerMock{
-//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v31.NamespacedBasicAuthHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedFeatureHandler method")
-//	            },
-//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v31.NamespacedBasicAuthHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedHandler method")
-//	            },
-//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.NamespacedBasicAuthHandlerFunc)  {
-//		               panic("mock out the AddFeatureHandler method")
-//	            },
-//	            AddHandlerFunc: func(ctx context.Context, name string, handler v31.NamespacedBasicAuthHandlerFunc)  {
-//		               panic("mock out the AddHandler method")
-//	            },
-//	            EnqueueFunc: func(namespace string, name string)  {
-//		               panic("mock out the Enqueue method")
-//	            },
-//	            EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
-//		               panic("mock out the EnqueueAfter method")
-//	            },
-//	            GenericFunc: func() controller.GenericController {
-//		               panic("mock out the Generic method")
-//	            },
-//	            InformerFunc: func() cache.SharedIndexInformer {
-//		               panic("mock out the Informer method")
-//	            },
-//	            ListerFunc: func() v31.NamespacedBasicAuthLister {
-//		               panic("mock out the Lister method")
-//	            },
-//	        }
+//         // make and configure a mocked v31.NamespacedBasicAuthController
+//         mockedNamespacedBasicAuthController := &NamespacedBasicAuthControllerMock{
+//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v31.NamespacedBasicAuthHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedFeatureHandler method")
+//             },
+//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v31.NamespacedBasicAuthHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedHandler method")
+//             },
+//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.NamespacedBasicAuthHandlerFunc)  {
+// 	               panic("mock out the AddFeatureHandler method")
+//             },
+//             AddHandlerFunc: func(ctx context.Context, name string, handler v31.NamespacedBasicAuthHandlerFunc)  {
+// 	               panic("mock out the AddHandler method")
+//             },
+//             EnqueueFunc: func(namespace string, name string)  {
+// 	               panic("mock out the Enqueue method")
+//             },
+//             EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
+// 	               panic("mock out the EnqueueAfter method")
+//             },
+//             GenericFunc: func() controller.GenericController {
+// 	               panic("mock out the Generic method")
+//             },
+//             InformerFunc: func() cache.SharedIndexInformer {
+// 	               panic("mock out the Informer method")
+//             },
+//             ListerFunc: func() v31.NamespacedBasicAuthLister {
+// 	               panic("mock out the Lister method")
+//             },
+//         }
 //
-//	        // use mockedNamespacedBasicAuthController in code that requires v31.NamespacedBasicAuthController
-//	        // and then make assertions.
+//         // use mockedNamespacedBasicAuthController in code that requires v31.NamespacedBasicAuthController
+//         // and then make assertions.
 //
-//	    }
+//     }
 type NamespacedBasicAuthControllerMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
 	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v31.NamespacedBasicAuthHandlerFunc)
@@ -326,8 +324,7 @@ func (mock *NamespacedBasicAuthControllerMock) AddClusterScopedFeatureHandler(ct
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//
-//	len(mockedNamespacedBasicAuthController.AddClusterScopedFeatureHandlerCalls())
+//     len(mockedNamespacedBasicAuthController.AddClusterScopedFeatureHandlerCalls())
 func (mock *NamespacedBasicAuthControllerMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -372,8 +369,7 @@ func (mock *NamespacedBasicAuthControllerMock) AddClusterScopedHandler(ctx conte
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//
-//	len(mockedNamespacedBasicAuthController.AddClusterScopedHandlerCalls())
+//     len(mockedNamespacedBasicAuthController.AddClusterScopedHandlerCalls())
 func (mock *NamespacedBasicAuthControllerMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -416,8 +412,7 @@ func (mock *NamespacedBasicAuthControllerMock) AddFeatureHandler(ctx context.Con
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//
-//	len(mockedNamespacedBasicAuthController.AddFeatureHandlerCalls())
+//     len(mockedNamespacedBasicAuthController.AddFeatureHandlerCalls())
 func (mock *NamespacedBasicAuthControllerMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
@@ -458,8 +453,7 @@ func (mock *NamespacedBasicAuthControllerMock) AddHandler(ctx context.Context, n
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//
-//	len(mockedNamespacedBasicAuthController.AddHandlerCalls())
+//     len(mockedNamespacedBasicAuthController.AddHandlerCalls())
 func (mock *NamespacedBasicAuthControllerMock) AddHandlerCalls() []struct {
 	Ctx     context.Context
 	Name    string
@@ -496,8 +490,7 @@ func (mock *NamespacedBasicAuthControllerMock) Enqueue(namespace string, name st
 
 // EnqueueCalls gets all the calls that were made to Enqueue.
 // Check the length with:
-//
-//	len(mockedNamespacedBasicAuthController.EnqueueCalls())
+//     len(mockedNamespacedBasicAuthController.EnqueueCalls())
 func (mock *NamespacedBasicAuthControllerMock) EnqueueCalls() []struct {
 	Namespace string
 	Name      string
@@ -534,8 +527,7 @@ func (mock *NamespacedBasicAuthControllerMock) EnqueueAfter(namespace string, na
 
 // EnqueueAfterCalls gets all the calls that were made to EnqueueAfter.
 // Check the length with:
-//
-//	len(mockedNamespacedBasicAuthController.EnqueueAfterCalls())
+//     len(mockedNamespacedBasicAuthController.EnqueueAfterCalls())
 func (mock *NamespacedBasicAuthControllerMock) EnqueueAfterCalls() []struct {
 	Namespace string
 	Name      string
@@ -567,8 +559,7 @@ func (mock *NamespacedBasicAuthControllerMock) Generic() controller.GenericContr
 
 // GenericCalls gets all the calls that were made to Generic.
 // Check the length with:
-//
-//	len(mockedNamespacedBasicAuthController.GenericCalls())
+//     len(mockedNamespacedBasicAuthController.GenericCalls())
 func (mock *NamespacedBasicAuthControllerMock) GenericCalls() []struct {
 } {
 	var calls []struct {
@@ -594,8 +585,7 @@ func (mock *NamespacedBasicAuthControllerMock) Informer() cache.SharedIndexInfor
 
 // InformerCalls gets all the calls that were made to Informer.
 // Check the length with:
-//
-//	len(mockedNamespacedBasicAuthController.InformerCalls())
+//     len(mockedNamespacedBasicAuthController.InformerCalls())
 func (mock *NamespacedBasicAuthControllerMock) InformerCalls() []struct {
 } {
 	var calls []struct {
@@ -621,8 +611,7 @@ func (mock *NamespacedBasicAuthControllerMock) Lister() v31.NamespacedBasicAuthL
 
 // ListerCalls gets all the calls that were made to Lister.
 // Check the length with:
-//
-//	len(mockedNamespacedBasicAuthController.ListerCalls())
+//     len(mockedNamespacedBasicAuthController.ListerCalls())
 func (mock *NamespacedBasicAuthControllerMock) ListerCalls() []struct {
 } {
 	var calls []struct {
@@ -662,76 +651,76 @@ var _ v31.NamespacedBasicAuthInterface = &NamespacedBasicAuthInterfaceMock{}
 
 // NamespacedBasicAuthInterfaceMock is a mock implementation of v31.NamespacedBasicAuthInterface.
 //
-//	    func TestSomethingThatUsesNamespacedBasicAuthInterface(t *testing.T) {
+//     func TestSomethingThatUsesNamespacedBasicAuthInterface(t *testing.T) {
 //
-//	        // make and configure a mocked v31.NamespacedBasicAuthInterface
-//	        mockedNamespacedBasicAuthInterface := &NamespacedBasicAuthInterfaceMock{
-//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v31.NamespacedBasicAuthHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedFeatureHandler method")
-//	            },
-//	            AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v31.NamespacedBasicAuthLifecycle)  {
-//		               panic("mock out the AddClusterScopedFeatureLifecycle method")
-//	            },
-//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v31.NamespacedBasicAuthHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedHandler method")
-//	            },
-//	            AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v31.NamespacedBasicAuthLifecycle)  {
-//		               panic("mock out the AddClusterScopedLifecycle method")
-//	            },
-//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.NamespacedBasicAuthHandlerFunc)  {
-//		               panic("mock out the AddFeatureHandler method")
-//	            },
-//	            AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v31.NamespacedBasicAuthLifecycle)  {
-//		               panic("mock out the AddFeatureLifecycle method")
-//	            },
-//	            AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v31.NamespacedBasicAuthHandlerFunc)  {
-//		               panic("mock out the AddHandler method")
-//	            },
-//	            AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v31.NamespacedBasicAuthLifecycle)  {
-//		               panic("mock out the AddLifecycle method")
-//	            },
-//	            ControllerFunc: func() v31.NamespacedBasicAuthController {
-//		               panic("mock out the Controller method")
-//	            },
-//	            CreateFunc: func(in1 *v3.NamespacedBasicAuth) (*v3.NamespacedBasicAuth, error) {
-//		               panic("mock out the Create method")
-//	            },
-//	            DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
-//		               panic("mock out the Delete method")
-//	            },
-//	            DeleteCollectionFunc: func(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
-//		               panic("mock out the DeleteCollection method")
-//	            },
-//	            DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
-//		               panic("mock out the DeleteNamespaced method")
-//	            },
-//	            GetFunc: func(name string, opts metav1.GetOptions) (*v3.NamespacedBasicAuth, error) {
-//		               panic("mock out the Get method")
-//	            },
-//	            GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v3.NamespacedBasicAuth, error) {
-//		               panic("mock out the GetNamespaced method")
-//	            },
-//	            ListFunc: func(opts metav1.ListOptions) (*v3.NamespacedBasicAuthList, error) {
-//		               panic("mock out the List method")
-//	            },
-//	            ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v3.NamespacedBasicAuthList, error) {
-//		               panic("mock out the ListNamespaced method")
-//	            },
-//	            ObjectClientFunc: func() *objectclient.ObjectClient {
-//		               panic("mock out the ObjectClient method")
-//	            },
-//	            UpdateFunc: func(in1 *v3.NamespacedBasicAuth) (*v3.NamespacedBasicAuth, error) {
-//		               panic("mock out the Update method")
-//	            },
-//	            WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
-//		               panic("mock out the Watch method")
-//	            },
-//	        }
+//         // make and configure a mocked v31.NamespacedBasicAuthInterface
+//         mockedNamespacedBasicAuthInterface := &NamespacedBasicAuthInterfaceMock{
+//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v31.NamespacedBasicAuthHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedFeatureHandler method")
+//             },
+//             AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v31.NamespacedBasicAuthLifecycle)  {
+// 	               panic("mock out the AddClusterScopedFeatureLifecycle method")
+//             },
+//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v31.NamespacedBasicAuthHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedHandler method")
+//             },
+//             AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v31.NamespacedBasicAuthLifecycle)  {
+// 	               panic("mock out the AddClusterScopedLifecycle method")
+//             },
+//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.NamespacedBasicAuthHandlerFunc)  {
+// 	               panic("mock out the AddFeatureHandler method")
+//             },
+//             AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v31.NamespacedBasicAuthLifecycle)  {
+// 	               panic("mock out the AddFeatureLifecycle method")
+//             },
+//             AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v31.NamespacedBasicAuthHandlerFunc)  {
+// 	               panic("mock out the AddHandler method")
+//             },
+//             AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v31.NamespacedBasicAuthLifecycle)  {
+// 	               panic("mock out the AddLifecycle method")
+//             },
+//             ControllerFunc: func() v31.NamespacedBasicAuthController {
+// 	               panic("mock out the Controller method")
+//             },
+//             CreateFunc: func(in1 *v3.NamespacedBasicAuth) (*v3.NamespacedBasicAuth, error) {
+// 	               panic("mock out the Create method")
+//             },
+//             DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
+// 	               panic("mock out the Delete method")
+//             },
+//             DeleteCollectionFunc: func(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
+// 	               panic("mock out the DeleteCollection method")
+//             },
+//             DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
+// 	               panic("mock out the DeleteNamespaced method")
+//             },
+//             GetFunc: func(name string, opts metav1.GetOptions) (*v3.NamespacedBasicAuth, error) {
+// 	               panic("mock out the Get method")
+//             },
+//             GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v3.NamespacedBasicAuth, error) {
+// 	               panic("mock out the GetNamespaced method")
+//             },
+//             ListFunc: func(opts metav1.ListOptions) (*v3.NamespacedBasicAuthList, error) {
+// 	               panic("mock out the List method")
+//             },
+//             ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v3.NamespacedBasicAuthList, error) {
+// 	               panic("mock out the ListNamespaced method")
+//             },
+//             ObjectClientFunc: func() *objectclient.ObjectClient {
+// 	               panic("mock out the ObjectClient method")
+//             },
+//             UpdateFunc: func(in1 *v3.NamespacedBasicAuth) (*v3.NamespacedBasicAuth, error) {
+// 	               panic("mock out the Update method")
+//             },
+//             WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
+// 	               panic("mock out the Watch method")
+//             },
+//         }
 //
-//	        // use mockedNamespacedBasicAuthInterface in code that requires v31.NamespacedBasicAuthInterface
-//	        // and then make assertions.
+//         // use mockedNamespacedBasicAuthInterface in code that requires v31.NamespacedBasicAuthInterface
+//         // and then make assertions.
 //
-//	    }
+//     }
 type NamespacedBasicAuthInterfaceMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
 	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v31.NamespacedBasicAuthHandlerFunc)
@@ -984,8 +973,7 @@ func (mock *NamespacedBasicAuthInterfaceMock) AddClusterScopedFeatureHandler(ctx
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//
-//	len(mockedNamespacedBasicAuthInterface.AddClusterScopedFeatureHandlerCalls())
+//     len(mockedNamespacedBasicAuthInterface.AddClusterScopedFeatureHandlerCalls())
 func (mock *NamespacedBasicAuthInterfaceMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -1032,8 +1020,7 @@ func (mock *NamespacedBasicAuthInterfaceMock) AddClusterScopedFeatureLifecycle(c
 
 // AddClusterScopedFeatureLifecycleCalls gets all the calls that were made to AddClusterScopedFeatureLifecycle.
 // Check the length with:
-//
-//	len(mockedNamespacedBasicAuthInterface.AddClusterScopedFeatureLifecycleCalls())
+//     len(mockedNamespacedBasicAuthInterface.AddClusterScopedFeatureLifecycleCalls())
 func (mock *NamespacedBasicAuthInterfaceMock) AddClusterScopedFeatureLifecycleCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -1078,8 +1065,7 @@ func (mock *NamespacedBasicAuthInterfaceMock) AddClusterScopedHandler(ctx contex
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//
-//	len(mockedNamespacedBasicAuthInterface.AddClusterScopedHandlerCalls())
+//     len(mockedNamespacedBasicAuthInterface.AddClusterScopedHandlerCalls())
 func (mock *NamespacedBasicAuthInterfaceMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -1122,8 +1108,7 @@ func (mock *NamespacedBasicAuthInterfaceMock) AddClusterScopedLifecycle(ctx cont
 
 // AddClusterScopedLifecycleCalls gets all the calls that were made to AddClusterScopedLifecycle.
 // Check the length with:
-//
-//	len(mockedNamespacedBasicAuthInterface.AddClusterScopedLifecycleCalls())
+//     len(mockedNamespacedBasicAuthInterface.AddClusterScopedLifecycleCalls())
 func (mock *NamespacedBasicAuthInterfaceMock) AddClusterScopedLifecycleCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -1166,8 +1151,7 @@ func (mock *NamespacedBasicAuthInterfaceMock) AddFeatureHandler(ctx context.Cont
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//
-//	len(mockedNamespacedBasicAuthInterface.AddFeatureHandlerCalls())
+//     len(mockedNamespacedBasicAuthInterface.AddFeatureHandlerCalls())
 func (mock *NamespacedBasicAuthInterfaceMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
@@ -1210,8 +1194,7 @@ func (mock *NamespacedBasicAuthInterfaceMock) AddFeatureLifecycle(ctx context.Co
 
 // AddFeatureLifecycleCalls gets all the calls that were made to AddFeatureLifecycle.
 // Check the length with:
-//
-//	len(mockedNamespacedBasicAuthInterface.AddFeatureLifecycleCalls())
+//     len(mockedNamespacedBasicAuthInterface.AddFeatureLifecycleCalls())
 func (mock *NamespacedBasicAuthInterfaceMock) AddFeatureLifecycleCalls() []struct {
 	Ctx       context.Context
 	Enabled   func() bool
@@ -1252,8 +1235,7 @@ func (mock *NamespacedBasicAuthInterfaceMock) AddHandler(ctx context.Context, na
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//
-//	len(mockedNamespacedBasicAuthInterface.AddHandlerCalls())
+//     len(mockedNamespacedBasicAuthInterface.AddHandlerCalls())
 func (mock *NamespacedBasicAuthInterfaceMock) AddHandlerCalls() []struct {
 	Ctx  context.Context
 	Name string
@@ -1292,8 +1274,7 @@ func (mock *NamespacedBasicAuthInterfaceMock) AddLifecycle(ctx context.Context, 
 
 // AddLifecycleCalls gets all the calls that were made to AddLifecycle.
 // Check the length with:
-//
-//	len(mockedNamespacedBasicAuthInterface.AddLifecycleCalls())
+//     len(mockedNamespacedBasicAuthInterface.AddLifecycleCalls())
 func (mock *NamespacedBasicAuthInterfaceMock) AddLifecycleCalls() []struct {
 	Ctx       context.Context
 	Name      string
@@ -1325,8 +1306,7 @@ func (mock *NamespacedBasicAuthInterfaceMock) Controller() v31.NamespacedBasicAu
 
 // ControllerCalls gets all the calls that were made to Controller.
 // Check the length with:
-//
-//	len(mockedNamespacedBasicAuthInterface.ControllerCalls())
+//     len(mockedNamespacedBasicAuthInterface.ControllerCalls())
 func (mock *NamespacedBasicAuthInterfaceMock) ControllerCalls() []struct {
 } {
 	var calls []struct {
@@ -1355,8 +1335,7 @@ func (mock *NamespacedBasicAuthInterfaceMock) Create(in1 *v3.NamespacedBasicAuth
 
 // CreateCalls gets all the calls that were made to Create.
 // Check the length with:
-//
-//	len(mockedNamespacedBasicAuthInterface.CreateCalls())
+//     len(mockedNamespacedBasicAuthInterface.CreateCalls())
 func (mock *NamespacedBasicAuthInterfaceMock) CreateCalls() []struct {
 	In1 *v3.NamespacedBasicAuth
 } {
@@ -1389,8 +1368,7 @@ func (mock *NamespacedBasicAuthInterfaceMock) Delete(name string, options *metav
 
 // DeleteCalls gets all the calls that were made to Delete.
 // Check the length with:
-//
-//	len(mockedNamespacedBasicAuthInterface.DeleteCalls())
+//     len(mockedNamespacedBasicAuthInterface.DeleteCalls())
 func (mock *NamespacedBasicAuthInterfaceMock) DeleteCalls() []struct {
 	Name    string
 	Options *metav1.DeleteOptions
@@ -1425,8 +1403,7 @@ func (mock *NamespacedBasicAuthInterfaceMock) DeleteCollection(deleteOpts *metav
 
 // DeleteCollectionCalls gets all the calls that were made to DeleteCollection.
 // Check the length with:
-//
-//	len(mockedNamespacedBasicAuthInterface.DeleteCollectionCalls())
+//     len(mockedNamespacedBasicAuthInterface.DeleteCollectionCalls())
 func (mock *NamespacedBasicAuthInterfaceMock) DeleteCollectionCalls() []struct {
 	DeleteOpts *metav1.DeleteOptions
 	ListOpts   metav1.ListOptions
@@ -1463,8 +1440,7 @@ func (mock *NamespacedBasicAuthInterfaceMock) DeleteNamespaced(namespace string,
 
 // DeleteNamespacedCalls gets all the calls that were made to DeleteNamespaced.
 // Check the length with:
-//
-//	len(mockedNamespacedBasicAuthInterface.DeleteNamespacedCalls())
+//     len(mockedNamespacedBasicAuthInterface.DeleteNamespacedCalls())
 func (mock *NamespacedBasicAuthInterfaceMock) DeleteNamespacedCalls() []struct {
 	Namespace string
 	Name      string
@@ -1501,8 +1477,7 @@ func (mock *NamespacedBasicAuthInterfaceMock) Get(name string, opts metav1.GetOp
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//
-//	len(mockedNamespacedBasicAuthInterface.GetCalls())
+//     len(mockedNamespacedBasicAuthInterface.GetCalls())
 func (mock *NamespacedBasicAuthInterfaceMock) GetCalls() []struct {
 	Name string
 	Opts metav1.GetOptions
@@ -1539,8 +1514,7 @@ func (mock *NamespacedBasicAuthInterfaceMock) GetNamespaced(namespace string, na
 
 // GetNamespacedCalls gets all the calls that were made to GetNamespaced.
 // Check the length with:
-//
-//	len(mockedNamespacedBasicAuthInterface.GetNamespacedCalls())
+//     len(mockedNamespacedBasicAuthInterface.GetNamespacedCalls())
 func (mock *NamespacedBasicAuthInterfaceMock) GetNamespacedCalls() []struct {
 	Namespace string
 	Name      string
@@ -1575,8 +1549,7 @@ func (mock *NamespacedBasicAuthInterfaceMock) List(opts metav1.ListOptions) (*v3
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//
-//	len(mockedNamespacedBasicAuthInterface.ListCalls())
+//     len(mockedNamespacedBasicAuthInterface.ListCalls())
 func (mock *NamespacedBasicAuthInterfaceMock) ListCalls() []struct {
 	Opts metav1.ListOptions
 } {
@@ -1609,8 +1582,7 @@ func (mock *NamespacedBasicAuthInterfaceMock) ListNamespaced(namespace string, o
 
 // ListNamespacedCalls gets all the calls that were made to ListNamespaced.
 // Check the length with:
-//
-//	len(mockedNamespacedBasicAuthInterface.ListNamespacedCalls())
+//     len(mockedNamespacedBasicAuthInterface.ListNamespacedCalls())
 func (mock *NamespacedBasicAuthInterfaceMock) ListNamespacedCalls() []struct {
 	Namespace string
 	Opts      metav1.ListOptions
@@ -1640,8 +1612,7 @@ func (mock *NamespacedBasicAuthInterfaceMock) ObjectClient() *objectclient.Objec
 
 // ObjectClientCalls gets all the calls that were made to ObjectClient.
 // Check the length with:
-//
-//	len(mockedNamespacedBasicAuthInterface.ObjectClientCalls())
+//     len(mockedNamespacedBasicAuthInterface.ObjectClientCalls())
 func (mock *NamespacedBasicAuthInterfaceMock) ObjectClientCalls() []struct {
 } {
 	var calls []struct {
@@ -1670,8 +1641,7 @@ func (mock *NamespacedBasicAuthInterfaceMock) Update(in1 *v3.NamespacedBasicAuth
 
 // UpdateCalls gets all the calls that were made to Update.
 // Check the length with:
-//
-//	len(mockedNamespacedBasicAuthInterface.UpdateCalls())
+//     len(mockedNamespacedBasicAuthInterface.UpdateCalls())
 func (mock *NamespacedBasicAuthInterfaceMock) UpdateCalls() []struct {
 	In1 *v3.NamespacedBasicAuth
 } {
@@ -1702,8 +1672,7 @@ func (mock *NamespacedBasicAuthInterfaceMock) Watch(opts metav1.ListOptions) (wa
 
 // WatchCalls gets all the calls that were made to Watch.
 // Check the length with:
-//
-//	len(mockedNamespacedBasicAuthInterface.WatchCalls())
+//     len(mockedNamespacedBasicAuthInterface.WatchCalls())
 func (mock *NamespacedBasicAuthInterfaceMock) WatchCalls() []struct {
 	Opts metav1.ListOptions
 } {
@@ -1726,19 +1695,19 @@ var _ v31.NamespacedBasicAuthsGetter = &NamespacedBasicAuthsGetterMock{}
 
 // NamespacedBasicAuthsGetterMock is a mock implementation of v31.NamespacedBasicAuthsGetter.
 //
-//	    func TestSomethingThatUsesNamespacedBasicAuthsGetter(t *testing.T) {
+//     func TestSomethingThatUsesNamespacedBasicAuthsGetter(t *testing.T) {
 //
-//	        // make and configure a mocked v31.NamespacedBasicAuthsGetter
-//	        mockedNamespacedBasicAuthsGetter := &NamespacedBasicAuthsGetterMock{
-//	            NamespacedBasicAuthsFunc: func(namespace string) v31.NamespacedBasicAuthInterface {
-//		               panic("mock out the NamespacedBasicAuths method")
-//	            },
-//	        }
+//         // make and configure a mocked v31.NamespacedBasicAuthsGetter
+//         mockedNamespacedBasicAuthsGetter := &NamespacedBasicAuthsGetterMock{
+//             NamespacedBasicAuthsFunc: func(namespace string) v31.NamespacedBasicAuthInterface {
+// 	               panic("mock out the NamespacedBasicAuths method")
+//             },
+//         }
 //
-//	        // use mockedNamespacedBasicAuthsGetter in code that requires v31.NamespacedBasicAuthsGetter
-//	        // and then make assertions.
+//         // use mockedNamespacedBasicAuthsGetter in code that requires v31.NamespacedBasicAuthsGetter
+//         // and then make assertions.
 //
-//	    }
+//     }
 type NamespacedBasicAuthsGetterMock struct {
 	// NamespacedBasicAuthsFunc mocks the NamespacedBasicAuths method.
 	NamespacedBasicAuthsFunc func(namespace string) v31.NamespacedBasicAuthInterface
@@ -1771,8 +1740,7 @@ func (mock *NamespacedBasicAuthsGetterMock) NamespacedBasicAuths(namespace strin
 
 // NamespacedBasicAuthsCalls gets all the calls that were made to NamespacedBasicAuths.
 // Check the length with:
-//
-//	len(mockedNamespacedBasicAuthsGetter.NamespacedBasicAuthsCalls())
+//     len(mockedNamespacedBasicAuthsGetter.NamespacedBasicAuthsCalls())
 func (mock *NamespacedBasicAuthsGetterMock) NamespacedBasicAuthsCalls() []struct {
 	Namespace string
 } {

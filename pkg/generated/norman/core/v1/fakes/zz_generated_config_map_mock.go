@@ -29,22 +29,22 @@ var _ v11.ConfigMapLister = &ConfigMapListerMock{}
 
 // ConfigMapListerMock is a mock implementation of v11.ConfigMapLister.
 //
-//	    func TestSomethingThatUsesConfigMapLister(t *testing.T) {
+//     func TestSomethingThatUsesConfigMapLister(t *testing.T) {
 //
-//	        // make and configure a mocked v11.ConfigMapLister
-//	        mockedConfigMapLister := &ConfigMapListerMock{
-//	            GetFunc: func(namespace string, name string) (*v1.ConfigMap, error) {
-//		               panic("mock out the Get method")
-//	            },
-//	            ListFunc: func(namespace string, selector labels.Selector) ([]*v1.ConfigMap, error) {
-//		               panic("mock out the List method")
-//	            },
-//	        }
+//         // make and configure a mocked v11.ConfigMapLister
+//         mockedConfigMapLister := &ConfigMapListerMock{
+//             GetFunc: func(namespace string, name string) (*v1.ConfigMap, error) {
+// 	               panic("mock out the Get method")
+//             },
+//             ListFunc: func(namespace string, selector labels.Selector) ([]*v1.ConfigMap, error) {
+// 	               panic("mock out the List method")
+//             },
+//         }
 //
-//	        // use mockedConfigMapLister in code that requires v11.ConfigMapLister
-//	        // and then make assertions.
+//         // use mockedConfigMapLister in code that requires v11.ConfigMapLister
+//         // and then make assertions.
 //
-//	    }
+//     }
 type ConfigMapListerMock struct {
 	// GetFunc mocks the Get method.
 	GetFunc func(namespace string, name string) (*v1.ConfigMap, error)
@@ -91,8 +91,7 @@ func (mock *ConfigMapListerMock) Get(namespace string, name string) (*v1.ConfigM
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//
-//	len(mockedConfigMapLister.GetCalls())
+//     len(mockedConfigMapLister.GetCalls())
 func (mock *ConfigMapListerMock) GetCalls() []struct {
 	Namespace string
 	Name      string
@@ -127,8 +126,7 @@ func (mock *ConfigMapListerMock) List(namespace string, selector labels.Selector
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//
-//	len(mockedConfigMapLister.ListCalls())
+//     len(mockedConfigMapLister.ListCalls())
 func (mock *ConfigMapListerMock) ListCalls() []struct {
 	Namespace string
 	Selector  labels.Selector
@@ -161,43 +159,43 @@ var _ v11.ConfigMapController = &ConfigMapControllerMock{}
 
 // ConfigMapControllerMock is a mock implementation of v11.ConfigMapController.
 //
-//	    func TestSomethingThatUsesConfigMapController(t *testing.T) {
+//     func TestSomethingThatUsesConfigMapController(t *testing.T) {
 //
-//	        // make and configure a mocked v11.ConfigMapController
-//	        mockedConfigMapController := &ConfigMapControllerMock{
-//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v11.ConfigMapHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedFeatureHandler method")
-//	            },
-//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v11.ConfigMapHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedHandler method")
-//	            },
-//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v11.ConfigMapHandlerFunc)  {
-//		               panic("mock out the AddFeatureHandler method")
-//	            },
-//	            AddHandlerFunc: func(ctx context.Context, name string, handler v11.ConfigMapHandlerFunc)  {
-//		               panic("mock out the AddHandler method")
-//	            },
-//	            EnqueueFunc: func(namespace string, name string)  {
-//		               panic("mock out the Enqueue method")
-//	            },
-//	            EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
-//		               panic("mock out the EnqueueAfter method")
-//	            },
-//	            GenericFunc: func() controller.GenericController {
-//		               panic("mock out the Generic method")
-//	            },
-//	            InformerFunc: func() cache.SharedIndexInformer {
-//		               panic("mock out the Informer method")
-//	            },
-//	            ListerFunc: func() v11.ConfigMapLister {
-//		               panic("mock out the Lister method")
-//	            },
-//	        }
+//         // make and configure a mocked v11.ConfigMapController
+//         mockedConfigMapController := &ConfigMapControllerMock{
+//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v11.ConfigMapHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedFeatureHandler method")
+//             },
+//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v11.ConfigMapHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedHandler method")
+//             },
+//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v11.ConfigMapHandlerFunc)  {
+// 	               panic("mock out the AddFeatureHandler method")
+//             },
+//             AddHandlerFunc: func(ctx context.Context, name string, handler v11.ConfigMapHandlerFunc)  {
+// 	               panic("mock out the AddHandler method")
+//             },
+//             EnqueueFunc: func(namespace string, name string)  {
+// 	               panic("mock out the Enqueue method")
+//             },
+//             EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
+// 	               panic("mock out the EnqueueAfter method")
+//             },
+//             GenericFunc: func() controller.GenericController {
+// 	               panic("mock out the Generic method")
+//             },
+//             InformerFunc: func() cache.SharedIndexInformer {
+// 	               panic("mock out the Informer method")
+//             },
+//             ListerFunc: func() v11.ConfigMapLister {
+// 	               panic("mock out the Lister method")
+//             },
+//         }
 //
-//	        // use mockedConfigMapController in code that requires v11.ConfigMapController
-//	        // and then make assertions.
+//         // use mockedConfigMapController in code that requires v11.ConfigMapController
+//         // and then make assertions.
 //
-//	    }
+//     }
 type ConfigMapControllerMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
 	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v11.ConfigMapHandlerFunc)
@@ -326,8 +324,7 @@ func (mock *ConfigMapControllerMock) AddClusterScopedFeatureHandler(ctx context.
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//
-//	len(mockedConfigMapController.AddClusterScopedFeatureHandlerCalls())
+//     len(mockedConfigMapController.AddClusterScopedFeatureHandlerCalls())
 func (mock *ConfigMapControllerMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -372,8 +369,7 @@ func (mock *ConfigMapControllerMock) AddClusterScopedHandler(ctx context.Context
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//
-//	len(mockedConfigMapController.AddClusterScopedHandlerCalls())
+//     len(mockedConfigMapController.AddClusterScopedHandlerCalls())
 func (mock *ConfigMapControllerMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -416,8 +412,7 @@ func (mock *ConfigMapControllerMock) AddFeatureHandler(ctx context.Context, enab
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//
-//	len(mockedConfigMapController.AddFeatureHandlerCalls())
+//     len(mockedConfigMapController.AddFeatureHandlerCalls())
 func (mock *ConfigMapControllerMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
@@ -458,8 +453,7 @@ func (mock *ConfigMapControllerMock) AddHandler(ctx context.Context, name string
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//
-//	len(mockedConfigMapController.AddHandlerCalls())
+//     len(mockedConfigMapController.AddHandlerCalls())
 func (mock *ConfigMapControllerMock) AddHandlerCalls() []struct {
 	Ctx     context.Context
 	Name    string
@@ -496,8 +490,7 @@ func (mock *ConfigMapControllerMock) Enqueue(namespace string, name string) {
 
 // EnqueueCalls gets all the calls that were made to Enqueue.
 // Check the length with:
-//
-//	len(mockedConfigMapController.EnqueueCalls())
+//     len(mockedConfigMapController.EnqueueCalls())
 func (mock *ConfigMapControllerMock) EnqueueCalls() []struct {
 	Namespace string
 	Name      string
@@ -534,8 +527,7 @@ func (mock *ConfigMapControllerMock) EnqueueAfter(namespace string, name string,
 
 // EnqueueAfterCalls gets all the calls that were made to EnqueueAfter.
 // Check the length with:
-//
-//	len(mockedConfigMapController.EnqueueAfterCalls())
+//     len(mockedConfigMapController.EnqueueAfterCalls())
 func (mock *ConfigMapControllerMock) EnqueueAfterCalls() []struct {
 	Namespace string
 	Name      string
@@ -567,8 +559,7 @@ func (mock *ConfigMapControllerMock) Generic() controller.GenericController {
 
 // GenericCalls gets all the calls that were made to Generic.
 // Check the length with:
-//
-//	len(mockedConfigMapController.GenericCalls())
+//     len(mockedConfigMapController.GenericCalls())
 func (mock *ConfigMapControllerMock) GenericCalls() []struct {
 } {
 	var calls []struct {
@@ -594,8 +585,7 @@ func (mock *ConfigMapControllerMock) Informer() cache.SharedIndexInformer {
 
 // InformerCalls gets all the calls that were made to Informer.
 // Check the length with:
-//
-//	len(mockedConfigMapController.InformerCalls())
+//     len(mockedConfigMapController.InformerCalls())
 func (mock *ConfigMapControllerMock) InformerCalls() []struct {
 } {
 	var calls []struct {
@@ -621,8 +611,7 @@ func (mock *ConfigMapControllerMock) Lister() v11.ConfigMapLister {
 
 // ListerCalls gets all the calls that were made to Lister.
 // Check the length with:
-//
-//	len(mockedConfigMapController.ListerCalls())
+//     len(mockedConfigMapController.ListerCalls())
 func (mock *ConfigMapControllerMock) ListerCalls() []struct {
 } {
 	var calls []struct {
@@ -662,76 +651,76 @@ var _ v11.ConfigMapInterface = &ConfigMapInterfaceMock{}
 
 // ConfigMapInterfaceMock is a mock implementation of v11.ConfigMapInterface.
 //
-//	    func TestSomethingThatUsesConfigMapInterface(t *testing.T) {
+//     func TestSomethingThatUsesConfigMapInterface(t *testing.T) {
 //
-//	        // make and configure a mocked v11.ConfigMapInterface
-//	        mockedConfigMapInterface := &ConfigMapInterfaceMock{
-//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v11.ConfigMapHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedFeatureHandler method")
-//	            },
-//	            AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v11.ConfigMapLifecycle)  {
-//		               panic("mock out the AddClusterScopedFeatureLifecycle method")
-//	            },
-//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v11.ConfigMapHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedHandler method")
-//	            },
-//	            AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v11.ConfigMapLifecycle)  {
-//		               panic("mock out the AddClusterScopedLifecycle method")
-//	            },
-//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v11.ConfigMapHandlerFunc)  {
-//		               panic("mock out the AddFeatureHandler method")
-//	            },
-//	            AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v11.ConfigMapLifecycle)  {
-//		               panic("mock out the AddFeatureLifecycle method")
-//	            },
-//	            AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v11.ConfigMapHandlerFunc)  {
-//		               panic("mock out the AddHandler method")
-//	            },
-//	            AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v11.ConfigMapLifecycle)  {
-//		               panic("mock out the AddLifecycle method")
-//	            },
-//	            ControllerFunc: func() v11.ConfigMapController {
-//		               panic("mock out the Controller method")
-//	            },
-//	            CreateFunc: func(in1 *v1.ConfigMap) (*v1.ConfigMap, error) {
-//		               panic("mock out the Create method")
-//	            },
-//	            DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
-//		               panic("mock out the Delete method")
-//	            },
-//	            DeleteCollectionFunc: func(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
-//		               panic("mock out the DeleteCollection method")
-//	            },
-//	            DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
-//		               panic("mock out the DeleteNamespaced method")
-//	            },
-//	            GetFunc: func(name string, opts metav1.GetOptions) (*v1.ConfigMap, error) {
-//		               panic("mock out the Get method")
-//	            },
-//	            GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v1.ConfigMap, error) {
-//		               panic("mock out the GetNamespaced method")
-//	            },
-//	            ListFunc: func(opts metav1.ListOptions) (*v1.ConfigMapList, error) {
-//		               panic("mock out the List method")
-//	            },
-//	            ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v1.ConfigMapList, error) {
-//		               panic("mock out the ListNamespaced method")
-//	            },
-//	            ObjectClientFunc: func() *objectclient.ObjectClient {
-//		               panic("mock out the ObjectClient method")
-//	            },
-//	            UpdateFunc: func(in1 *v1.ConfigMap) (*v1.ConfigMap, error) {
-//		               panic("mock out the Update method")
-//	            },
-//	            WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
-//		               panic("mock out the Watch method")
-//	            },
-//	        }
+//         // make and configure a mocked v11.ConfigMapInterface
+//         mockedConfigMapInterface := &ConfigMapInterfaceMock{
+//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v11.ConfigMapHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedFeatureHandler method")
+//             },
+//             AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v11.ConfigMapLifecycle)  {
+// 	               panic("mock out the AddClusterScopedFeatureLifecycle method")
+//             },
+//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v11.ConfigMapHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedHandler method")
+//             },
+//             AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v11.ConfigMapLifecycle)  {
+// 	               panic("mock out the AddClusterScopedLifecycle method")
+//             },
+//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v11.ConfigMapHandlerFunc)  {
+// 	               panic("mock out the AddFeatureHandler method")
+//             },
+//             AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v11.ConfigMapLifecycle)  {
+// 	               panic("mock out the AddFeatureLifecycle method")
+//             },
+//             AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v11.ConfigMapHandlerFunc)  {
+// 	               panic("mock out the AddHandler method")
+//             },
+//             AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v11.ConfigMapLifecycle)  {
+// 	               panic("mock out the AddLifecycle method")
+//             },
+//             ControllerFunc: func() v11.ConfigMapController {
+// 	               panic("mock out the Controller method")
+//             },
+//             CreateFunc: func(in1 *v1.ConfigMap) (*v1.ConfigMap, error) {
+// 	               panic("mock out the Create method")
+//             },
+//             DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
+// 	               panic("mock out the Delete method")
+//             },
+//             DeleteCollectionFunc: func(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
+// 	               panic("mock out the DeleteCollection method")
+//             },
+//             DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
+// 	               panic("mock out the DeleteNamespaced method")
+//             },
+//             GetFunc: func(name string, opts metav1.GetOptions) (*v1.ConfigMap, error) {
+// 	               panic("mock out the Get method")
+//             },
+//             GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v1.ConfigMap, error) {
+// 	               panic("mock out the GetNamespaced method")
+//             },
+//             ListFunc: func(opts metav1.ListOptions) (*v1.ConfigMapList, error) {
+// 	               panic("mock out the List method")
+//             },
+//             ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v1.ConfigMapList, error) {
+// 	               panic("mock out the ListNamespaced method")
+//             },
+//             ObjectClientFunc: func() *objectclient.ObjectClient {
+// 	               panic("mock out the ObjectClient method")
+//             },
+//             UpdateFunc: func(in1 *v1.ConfigMap) (*v1.ConfigMap, error) {
+// 	               panic("mock out the Update method")
+//             },
+//             WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
+// 	               panic("mock out the Watch method")
+//             },
+//         }
 //
-//	        // use mockedConfigMapInterface in code that requires v11.ConfigMapInterface
-//	        // and then make assertions.
+//         // use mockedConfigMapInterface in code that requires v11.ConfigMapInterface
+//         // and then make assertions.
 //
-//	    }
+//     }
 type ConfigMapInterfaceMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
 	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v11.ConfigMapHandlerFunc)
@@ -984,8 +973,7 @@ func (mock *ConfigMapInterfaceMock) AddClusterScopedFeatureHandler(ctx context.C
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//
-//	len(mockedConfigMapInterface.AddClusterScopedFeatureHandlerCalls())
+//     len(mockedConfigMapInterface.AddClusterScopedFeatureHandlerCalls())
 func (mock *ConfigMapInterfaceMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -1032,8 +1020,7 @@ func (mock *ConfigMapInterfaceMock) AddClusterScopedFeatureLifecycle(ctx context
 
 // AddClusterScopedFeatureLifecycleCalls gets all the calls that were made to AddClusterScopedFeatureLifecycle.
 // Check the length with:
-//
-//	len(mockedConfigMapInterface.AddClusterScopedFeatureLifecycleCalls())
+//     len(mockedConfigMapInterface.AddClusterScopedFeatureLifecycleCalls())
 func (mock *ConfigMapInterfaceMock) AddClusterScopedFeatureLifecycleCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -1078,8 +1065,7 @@ func (mock *ConfigMapInterfaceMock) AddClusterScopedHandler(ctx context.Context,
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//
-//	len(mockedConfigMapInterface.AddClusterScopedHandlerCalls())
+//     len(mockedConfigMapInterface.AddClusterScopedHandlerCalls())
 func (mock *ConfigMapInterfaceMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -1122,8 +1108,7 @@ func (mock *ConfigMapInterfaceMock) AddClusterScopedLifecycle(ctx context.Contex
 
 // AddClusterScopedLifecycleCalls gets all the calls that were made to AddClusterScopedLifecycle.
 // Check the length with:
-//
-//	len(mockedConfigMapInterface.AddClusterScopedLifecycleCalls())
+//     len(mockedConfigMapInterface.AddClusterScopedLifecycleCalls())
 func (mock *ConfigMapInterfaceMock) AddClusterScopedLifecycleCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -1166,8 +1151,7 @@ func (mock *ConfigMapInterfaceMock) AddFeatureHandler(ctx context.Context, enabl
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//
-//	len(mockedConfigMapInterface.AddFeatureHandlerCalls())
+//     len(mockedConfigMapInterface.AddFeatureHandlerCalls())
 func (mock *ConfigMapInterfaceMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
@@ -1210,8 +1194,7 @@ func (mock *ConfigMapInterfaceMock) AddFeatureLifecycle(ctx context.Context, ena
 
 // AddFeatureLifecycleCalls gets all the calls that were made to AddFeatureLifecycle.
 // Check the length with:
-//
-//	len(mockedConfigMapInterface.AddFeatureLifecycleCalls())
+//     len(mockedConfigMapInterface.AddFeatureLifecycleCalls())
 func (mock *ConfigMapInterfaceMock) AddFeatureLifecycleCalls() []struct {
 	Ctx       context.Context
 	Enabled   func() bool
@@ -1252,8 +1235,7 @@ func (mock *ConfigMapInterfaceMock) AddHandler(ctx context.Context, name string,
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//
-//	len(mockedConfigMapInterface.AddHandlerCalls())
+//     len(mockedConfigMapInterface.AddHandlerCalls())
 func (mock *ConfigMapInterfaceMock) AddHandlerCalls() []struct {
 	Ctx  context.Context
 	Name string
@@ -1292,8 +1274,7 @@ func (mock *ConfigMapInterfaceMock) AddLifecycle(ctx context.Context, name strin
 
 // AddLifecycleCalls gets all the calls that were made to AddLifecycle.
 // Check the length with:
-//
-//	len(mockedConfigMapInterface.AddLifecycleCalls())
+//     len(mockedConfigMapInterface.AddLifecycleCalls())
 func (mock *ConfigMapInterfaceMock) AddLifecycleCalls() []struct {
 	Ctx       context.Context
 	Name      string
@@ -1325,8 +1306,7 @@ func (mock *ConfigMapInterfaceMock) Controller() v11.ConfigMapController {
 
 // ControllerCalls gets all the calls that were made to Controller.
 // Check the length with:
-//
-//	len(mockedConfigMapInterface.ControllerCalls())
+//     len(mockedConfigMapInterface.ControllerCalls())
 func (mock *ConfigMapInterfaceMock) ControllerCalls() []struct {
 } {
 	var calls []struct {
@@ -1355,8 +1335,7 @@ func (mock *ConfigMapInterfaceMock) Create(in1 *v1.ConfigMap) (*v1.ConfigMap, er
 
 // CreateCalls gets all the calls that were made to Create.
 // Check the length with:
-//
-//	len(mockedConfigMapInterface.CreateCalls())
+//     len(mockedConfigMapInterface.CreateCalls())
 func (mock *ConfigMapInterfaceMock) CreateCalls() []struct {
 	In1 *v1.ConfigMap
 } {
@@ -1389,8 +1368,7 @@ func (mock *ConfigMapInterfaceMock) Delete(name string, options *metav1.DeleteOp
 
 // DeleteCalls gets all the calls that were made to Delete.
 // Check the length with:
-//
-//	len(mockedConfigMapInterface.DeleteCalls())
+//     len(mockedConfigMapInterface.DeleteCalls())
 func (mock *ConfigMapInterfaceMock) DeleteCalls() []struct {
 	Name    string
 	Options *metav1.DeleteOptions
@@ -1425,8 +1403,7 @@ func (mock *ConfigMapInterfaceMock) DeleteCollection(deleteOpts *metav1.DeleteOp
 
 // DeleteCollectionCalls gets all the calls that were made to DeleteCollection.
 // Check the length with:
-//
-//	len(mockedConfigMapInterface.DeleteCollectionCalls())
+//     len(mockedConfigMapInterface.DeleteCollectionCalls())
 func (mock *ConfigMapInterfaceMock) DeleteCollectionCalls() []struct {
 	DeleteOpts *metav1.DeleteOptions
 	ListOpts   metav1.ListOptions
@@ -1463,8 +1440,7 @@ func (mock *ConfigMapInterfaceMock) DeleteNamespaced(namespace string, name stri
 
 // DeleteNamespacedCalls gets all the calls that were made to DeleteNamespaced.
 // Check the length with:
-//
-//	len(mockedConfigMapInterface.DeleteNamespacedCalls())
+//     len(mockedConfigMapInterface.DeleteNamespacedCalls())
 func (mock *ConfigMapInterfaceMock) DeleteNamespacedCalls() []struct {
 	Namespace string
 	Name      string
@@ -1501,8 +1477,7 @@ func (mock *ConfigMapInterfaceMock) Get(name string, opts metav1.GetOptions) (*v
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//
-//	len(mockedConfigMapInterface.GetCalls())
+//     len(mockedConfigMapInterface.GetCalls())
 func (mock *ConfigMapInterfaceMock) GetCalls() []struct {
 	Name string
 	Opts metav1.GetOptions
@@ -1539,8 +1514,7 @@ func (mock *ConfigMapInterfaceMock) GetNamespaced(namespace string, name string,
 
 // GetNamespacedCalls gets all the calls that were made to GetNamespaced.
 // Check the length with:
-//
-//	len(mockedConfigMapInterface.GetNamespacedCalls())
+//     len(mockedConfigMapInterface.GetNamespacedCalls())
 func (mock *ConfigMapInterfaceMock) GetNamespacedCalls() []struct {
 	Namespace string
 	Name      string
@@ -1575,8 +1549,7 @@ func (mock *ConfigMapInterfaceMock) List(opts metav1.ListOptions) (*v1.ConfigMap
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//
-//	len(mockedConfigMapInterface.ListCalls())
+//     len(mockedConfigMapInterface.ListCalls())
 func (mock *ConfigMapInterfaceMock) ListCalls() []struct {
 	Opts metav1.ListOptions
 } {
@@ -1609,8 +1582,7 @@ func (mock *ConfigMapInterfaceMock) ListNamespaced(namespace string, opts metav1
 
 // ListNamespacedCalls gets all the calls that were made to ListNamespaced.
 // Check the length with:
-//
-//	len(mockedConfigMapInterface.ListNamespacedCalls())
+//     len(mockedConfigMapInterface.ListNamespacedCalls())
 func (mock *ConfigMapInterfaceMock) ListNamespacedCalls() []struct {
 	Namespace string
 	Opts      metav1.ListOptions
@@ -1640,8 +1612,7 @@ func (mock *ConfigMapInterfaceMock) ObjectClient() *objectclient.ObjectClient {
 
 // ObjectClientCalls gets all the calls that were made to ObjectClient.
 // Check the length with:
-//
-//	len(mockedConfigMapInterface.ObjectClientCalls())
+//     len(mockedConfigMapInterface.ObjectClientCalls())
 func (mock *ConfigMapInterfaceMock) ObjectClientCalls() []struct {
 } {
 	var calls []struct {
@@ -1670,8 +1641,7 @@ func (mock *ConfigMapInterfaceMock) Update(in1 *v1.ConfigMap) (*v1.ConfigMap, er
 
 // UpdateCalls gets all the calls that were made to Update.
 // Check the length with:
-//
-//	len(mockedConfigMapInterface.UpdateCalls())
+//     len(mockedConfigMapInterface.UpdateCalls())
 func (mock *ConfigMapInterfaceMock) UpdateCalls() []struct {
 	In1 *v1.ConfigMap
 } {
@@ -1702,8 +1672,7 @@ func (mock *ConfigMapInterfaceMock) Watch(opts metav1.ListOptions) (watch.Interf
 
 // WatchCalls gets all the calls that were made to Watch.
 // Check the length with:
-//
-//	len(mockedConfigMapInterface.WatchCalls())
+//     len(mockedConfigMapInterface.WatchCalls())
 func (mock *ConfigMapInterfaceMock) WatchCalls() []struct {
 	Opts metav1.ListOptions
 } {
@@ -1726,19 +1695,19 @@ var _ v11.ConfigMapsGetter = &ConfigMapsGetterMock{}
 
 // ConfigMapsGetterMock is a mock implementation of v11.ConfigMapsGetter.
 //
-//	    func TestSomethingThatUsesConfigMapsGetter(t *testing.T) {
+//     func TestSomethingThatUsesConfigMapsGetter(t *testing.T) {
 //
-//	        // make and configure a mocked v11.ConfigMapsGetter
-//	        mockedConfigMapsGetter := &ConfigMapsGetterMock{
-//	            ConfigMapsFunc: func(namespace string) v11.ConfigMapInterface {
-//		               panic("mock out the ConfigMaps method")
-//	            },
-//	        }
+//         // make and configure a mocked v11.ConfigMapsGetter
+//         mockedConfigMapsGetter := &ConfigMapsGetterMock{
+//             ConfigMapsFunc: func(namespace string) v11.ConfigMapInterface {
+// 	               panic("mock out the ConfigMaps method")
+//             },
+//         }
 //
-//	        // use mockedConfigMapsGetter in code that requires v11.ConfigMapsGetter
-//	        // and then make assertions.
+//         // use mockedConfigMapsGetter in code that requires v11.ConfigMapsGetter
+//         // and then make assertions.
 //
-//	    }
+//     }
 type ConfigMapsGetterMock struct {
 	// ConfigMapsFunc mocks the ConfigMaps method.
 	ConfigMapsFunc func(namespace string) v11.ConfigMapInterface
@@ -1771,8 +1740,7 @@ func (mock *ConfigMapsGetterMock) ConfigMaps(namespace string) v11.ConfigMapInte
 
 // ConfigMapsCalls gets all the calls that were made to ConfigMaps.
 // Check the length with:
-//
-//	len(mockedConfigMapsGetter.ConfigMapsCalls())
+//     len(mockedConfigMapsGetter.ConfigMapsCalls())
 func (mock *ConfigMapsGetterMock) ConfigMapsCalls() []struct {
 	Namespace string
 } {

@@ -29,22 +29,22 @@ var _ v31.LdapConfigLister = &LdapConfigListerMock{}
 
 // LdapConfigListerMock is a mock implementation of v31.LdapConfigLister.
 //
-//	    func TestSomethingThatUsesLdapConfigLister(t *testing.T) {
+//     func TestSomethingThatUsesLdapConfigLister(t *testing.T) {
 //
-//	        // make and configure a mocked v31.LdapConfigLister
-//	        mockedLdapConfigLister := &LdapConfigListerMock{
-//	            GetFunc: func(namespace string, name string) (*v3.LdapConfig, error) {
-//		               panic("mock out the Get method")
-//	            },
-//	            ListFunc: func(namespace string, selector labels.Selector) ([]*v3.LdapConfig, error) {
-//		               panic("mock out the List method")
-//	            },
-//	        }
+//         // make and configure a mocked v31.LdapConfigLister
+//         mockedLdapConfigLister := &LdapConfigListerMock{
+//             GetFunc: func(namespace string, name string) (*v3.LdapConfig, error) {
+// 	               panic("mock out the Get method")
+//             },
+//             ListFunc: func(namespace string, selector labels.Selector) ([]*v3.LdapConfig, error) {
+// 	               panic("mock out the List method")
+//             },
+//         }
 //
-//	        // use mockedLdapConfigLister in code that requires v31.LdapConfigLister
-//	        // and then make assertions.
+//         // use mockedLdapConfigLister in code that requires v31.LdapConfigLister
+//         // and then make assertions.
 //
-//	    }
+//     }
 type LdapConfigListerMock struct {
 	// GetFunc mocks the Get method.
 	GetFunc func(namespace string, name string) (*v3.LdapConfig, error)
@@ -91,8 +91,7 @@ func (mock *LdapConfigListerMock) Get(namespace string, name string) (*v3.LdapCo
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//
-//	len(mockedLdapConfigLister.GetCalls())
+//     len(mockedLdapConfigLister.GetCalls())
 func (mock *LdapConfigListerMock) GetCalls() []struct {
 	Namespace string
 	Name      string
@@ -127,8 +126,7 @@ func (mock *LdapConfigListerMock) List(namespace string, selector labels.Selecto
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//
-//	len(mockedLdapConfigLister.ListCalls())
+//     len(mockedLdapConfigLister.ListCalls())
 func (mock *LdapConfigListerMock) ListCalls() []struct {
 	Namespace string
 	Selector  labels.Selector
@@ -161,43 +159,43 @@ var _ v31.LdapConfigController = &LdapConfigControllerMock{}
 
 // LdapConfigControllerMock is a mock implementation of v31.LdapConfigController.
 //
-//	    func TestSomethingThatUsesLdapConfigController(t *testing.T) {
+//     func TestSomethingThatUsesLdapConfigController(t *testing.T) {
 //
-//	        // make and configure a mocked v31.LdapConfigController
-//	        mockedLdapConfigController := &LdapConfigControllerMock{
-//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v31.LdapConfigHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedFeatureHandler method")
-//	            },
-//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v31.LdapConfigHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedHandler method")
-//	            },
-//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.LdapConfigHandlerFunc)  {
-//		               panic("mock out the AddFeatureHandler method")
-//	            },
-//	            AddHandlerFunc: func(ctx context.Context, name string, handler v31.LdapConfigHandlerFunc)  {
-//		               panic("mock out the AddHandler method")
-//	            },
-//	            EnqueueFunc: func(namespace string, name string)  {
-//		               panic("mock out the Enqueue method")
-//	            },
-//	            EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
-//		               panic("mock out the EnqueueAfter method")
-//	            },
-//	            GenericFunc: func() controller.GenericController {
-//		               panic("mock out the Generic method")
-//	            },
-//	            InformerFunc: func() cache.SharedIndexInformer {
-//		               panic("mock out the Informer method")
-//	            },
-//	            ListerFunc: func() v31.LdapConfigLister {
-//		               panic("mock out the Lister method")
-//	            },
-//	        }
+//         // make and configure a mocked v31.LdapConfigController
+//         mockedLdapConfigController := &LdapConfigControllerMock{
+//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v31.LdapConfigHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedFeatureHandler method")
+//             },
+//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v31.LdapConfigHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedHandler method")
+//             },
+//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.LdapConfigHandlerFunc)  {
+// 	               panic("mock out the AddFeatureHandler method")
+//             },
+//             AddHandlerFunc: func(ctx context.Context, name string, handler v31.LdapConfigHandlerFunc)  {
+// 	               panic("mock out the AddHandler method")
+//             },
+//             EnqueueFunc: func(namespace string, name string)  {
+// 	               panic("mock out the Enqueue method")
+//             },
+//             EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
+// 	               panic("mock out the EnqueueAfter method")
+//             },
+//             GenericFunc: func() controller.GenericController {
+// 	               panic("mock out the Generic method")
+//             },
+//             InformerFunc: func() cache.SharedIndexInformer {
+// 	               panic("mock out the Informer method")
+//             },
+//             ListerFunc: func() v31.LdapConfigLister {
+// 	               panic("mock out the Lister method")
+//             },
+//         }
 //
-//	        // use mockedLdapConfigController in code that requires v31.LdapConfigController
-//	        // and then make assertions.
+//         // use mockedLdapConfigController in code that requires v31.LdapConfigController
+//         // and then make assertions.
 //
-//	    }
+//     }
 type LdapConfigControllerMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
 	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v31.LdapConfigHandlerFunc)
@@ -326,8 +324,7 @@ func (mock *LdapConfigControllerMock) AddClusterScopedFeatureHandler(ctx context
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//
-//	len(mockedLdapConfigController.AddClusterScopedFeatureHandlerCalls())
+//     len(mockedLdapConfigController.AddClusterScopedFeatureHandlerCalls())
 func (mock *LdapConfigControllerMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -372,8 +369,7 @@ func (mock *LdapConfigControllerMock) AddClusterScopedHandler(ctx context.Contex
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//
-//	len(mockedLdapConfigController.AddClusterScopedHandlerCalls())
+//     len(mockedLdapConfigController.AddClusterScopedHandlerCalls())
 func (mock *LdapConfigControllerMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -416,8 +412,7 @@ func (mock *LdapConfigControllerMock) AddFeatureHandler(ctx context.Context, ena
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//
-//	len(mockedLdapConfigController.AddFeatureHandlerCalls())
+//     len(mockedLdapConfigController.AddFeatureHandlerCalls())
 func (mock *LdapConfigControllerMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
@@ -458,8 +453,7 @@ func (mock *LdapConfigControllerMock) AddHandler(ctx context.Context, name strin
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//
-//	len(mockedLdapConfigController.AddHandlerCalls())
+//     len(mockedLdapConfigController.AddHandlerCalls())
 func (mock *LdapConfigControllerMock) AddHandlerCalls() []struct {
 	Ctx     context.Context
 	Name    string
@@ -496,8 +490,7 @@ func (mock *LdapConfigControllerMock) Enqueue(namespace string, name string) {
 
 // EnqueueCalls gets all the calls that were made to Enqueue.
 // Check the length with:
-//
-//	len(mockedLdapConfigController.EnqueueCalls())
+//     len(mockedLdapConfigController.EnqueueCalls())
 func (mock *LdapConfigControllerMock) EnqueueCalls() []struct {
 	Namespace string
 	Name      string
@@ -534,8 +527,7 @@ func (mock *LdapConfigControllerMock) EnqueueAfter(namespace string, name string
 
 // EnqueueAfterCalls gets all the calls that were made to EnqueueAfter.
 // Check the length with:
-//
-//	len(mockedLdapConfigController.EnqueueAfterCalls())
+//     len(mockedLdapConfigController.EnqueueAfterCalls())
 func (mock *LdapConfigControllerMock) EnqueueAfterCalls() []struct {
 	Namespace string
 	Name      string
@@ -567,8 +559,7 @@ func (mock *LdapConfigControllerMock) Generic() controller.GenericController {
 
 // GenericCalls gets all the calls that were made to Generic.
 // Check the length with:
-//
-//	len(mockedLdapConfigController.GenericCalls())
+//     len(mockedLdapConfigController.GenericCalls())
 func (mock *LdapConfigControllerMock) GenericCalls() []struct {
 } {
 	var calls []struct {
@@ -594,8 +585,7 @@ func (mock *LdapConfigControllerMock) Informer() cache.SharedIndexInformer {
 
 // InformerCalls gets all the calls that were made to Informer.
 // Check the length with:
-//
-//	len(mockedLdapConfigController.InformerCalls())
+//     len(mockedLdapConfigController.InformerCalls())
 func (mock *LdapConfigControllerMock) InformerCalls() []struct {
 } {
 	var calls []struct {
@@ -621,8 +611,7 @@ func (mock *LdapConfigControllerMock) Lister() v31.LdapConfigLister {
 
 // ListerCalls gets all the calls that were made to Lister.
 // Check the length with:
-//
-//	len(mockedLdapConfigController.ListerCalls())
+//     len(mockedLdapConfigController.ListerCalls())
 func (mock *LdapConfigControllerMock) ListerCalls() []struct {
 } {
 	var calls []struct {
@@ -662,76 +651,76 @@ var _ v31.LdapConfigInterface = &LdapConfigInterfaceMock{}
 
 // LdapConfigInterfaceMock is a mock implementation of v31.LdapConfigInterface.
 //
-//	    func TestSomethingThatUsesLdapConfigInterface(t *testing.T) {
+//     func TestSomethingThatUsesLdapConfigInterface(t *testing.T) {
 //
-//	        // make and configure a mocked v31.LdapConfigInterface
-//	        mockedLdapConfigInterface := &LdapConfigInterfaceMock{
-//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v31.LdapConfigHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedFeatureHandler method")
-//	            },
-//	            AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v31.LdapConfigLifecycle)  {
-//		               panic("mock out the AddClusterScopedFeatureLifecycle method")
-//	            },
-//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v31.LdapConfigHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedHandler method")
-//	            },
-//	            AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v31.LdapConfigLifecycle)  {
-//		               panic("mock out the AddClusterScopedLifecycle method")
-//	            },
-//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.LdapConfigHandlerFunc)  {
-//		               panic("mock out the AddFeatureHandler method")
-//	            },
-//	            AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v31.LdapConfigLifecycle)  {
-//		               panic("mock out the AddFeatureLifecycle method")
-//	            },
-//	            AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v31.LdapConfigHandlerFunc)  {
-//		               panic("mock out the AddHandler method")
-//	            },
-//	            AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v31.LdapConfigLifecycle)  {
-//		               panic("mock out the AddLifecycle method")
-//	            },
-//	            ControllerFunc: func() v31.LdapConfigController {
-//		               panic("mock out the Controller method")
-//	            },
-//	            CreateFunc: func(in1 *v3.LdapConfig) (*v3.LdapConfig, error) {
-//		               panic("mock out the Create method")
-//	            },
-//	            DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
-//		               panic("mock out the Delete method")
-//	            },
-//	            DeleteCollectionFunc: func(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
-//		               panic("mock out the DeleteCollection method")
-//	            },
-//	            DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
-//		               panic("mock out the DeleteNamespaced method")
-//	            },
-//	            GetFunc: func(name string, opts metav1.GetOptions) (*v3.LdapConfig, error) {
-//		               panic("mock out the Get method")
-//	            },
-//	            GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v3.LdapConfig, error) {
-//		               panic("mock out the GetNamespaced method")
-//	            },
-//	            ListFunc: func(opts metav1.ListOptions) (*v3.LdapConfigList, error) {
-//		               panic("mock out the List method")
-//	            },
-//	            ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v3.LdapConfigList, error) {
-//		               panic("mock out the ListNamespaced method")
-//	            },
-//	            ObjectClientFunc: func() *objectclient.ObjectClient {
-//		               panic("mock out the ObjectClient method")
-//	            },
-//	            UpdateFunc: func(in1 *v3.LdapConfig) (*v3.LdapConfig, error) {
-//		               panic("mock out the Update method")
-//	            },
-//	            WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
-//		               panic("mock out the Watch method")
-//	            },
-//	        }
+//         // make and configure a mocked v31.LdapConfigInterface
+//         mockedLdapConfigInterface := &LdapConfigInterfaceMock{
+//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v31.LdapConfigHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedFeatureHandler method")
+//             },
+//             AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v31.LdapConfigLifecycle)  {
+// 	               panic("mock out the AddClusterScopedFeatureLifecycle method")
+//             },
+//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v31.LdapConfigHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedHandler method")
+//             },
+//             AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v31.LdapConfigLifecycle)  {
+// 	               panic("mock out the AddClusterScopedLifecycle method")
+//             },
+//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.LdapConfigHandlerFunc)  {
+// 	               panic("mock out the AddFeatureHandler method")
+//             },
+//             AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v31.LdapConfigLifecycle)  {
+// 	               panic("mock out the AddFeatureLifecycle method")
+//             },
+//             AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v31.LdapConfigHandlerFunc)  {
+// 	               panic("mock out the AddHandler method")
+//             },
+//             AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v31.LdapConfigLifecycle)  {
+// 	               panic("mock out the AddLifecycle method")
+//             },
+//             ControllerFunc: func() v31.LdapConfigController {
+// 	               panic("mock out the Controller method")
+//             },
+//             CreateFunc: func(in1 *v3.LdapConfig) (*v3.LdapConfig, error) {
+// 	               panic("mock out the Create method")
+//             },
+//             DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
+// 	               panic("mock out the Delete method")
+//             },
+//             DeleteCollectionFunc: func(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
+// 	               panic("mock out the DeleteCollection method")
+//             },
+//             DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
+// 	               panic("mock out the DeleteNamespaced method")
+//             },
+//             GetFunc: func(name string, opts metav1.GetOptions) (*v3.LdapConfig, error) {
+// 	               panic("mock out the Get method")
+//             },
+//             GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v3.LdapConfig, error) {
+// 	               panic("mock out the GetNamespaced method")
+//             },
+//             ListFunc: func(opts metav1.ListOptions) (*v3.LdapConfigList, error) {
+// 	               panic("mock out the List method")
+//             },
+//             ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v3.LdapConfigList, error) {
+// 	               panic("mock out the ListNamespaced method")
+//             },
+//             ObjectClientFunc: func() *objectclient.ObjectClient {
+// 	               panic("mock out the ObjectClient method")
+//             },
+//             UpdateFunc: func(in1 *v3.LdapConfig) (*v3.LdapConfig, error) {
+// 	               panic("mock out the Update method")
+//             },
+//             WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
+// 	               panic("mock out the Watch method")
+//             },
+//         }
 //
-//	        // use mockedLdapConfigInterface in code that requires v31.LdapConfigInterface
-//	        // and then make assertions.
+//         // use mockedLdapConfigInterface in code that requires v31.LdapConfigInterface
+//         // and then make assertions.
 //
-//	    }
+//     }
 type LdapConfigInterfaceMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
 	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v31.LdapConfigHandlerFunc)
@@ -984,8 +973,7 @@ func (mock *LdapConfigInterfaceMock) AddClusterScopedFeatureHandler(ctx context.
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//
-//	len(mockedLdapConfigInterface.AddClusterScopedFeatureHandlerCalls())
+//     len(mockedLdapConfigInterface.AddClusterScopedFeatureHandlerCalls())
 func (mock *LdapConfigInterfaceMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -1032,8 +1020,7 @@ func (mock *LdapConfigInterfaceMock) AddClusterScopedFeatureLifecycle(ctx contex
 
 // AddClusterScopedFeatureLifecycleCalls gets all the calls that were made to AddClusterScopedFeatureLifecycle.
 // Check the length with:
-//
-//	len(mockedLdapConfigInterface.AddClusterScopedFeatureLifecycleCalls())
+//     len(mockedLdapConfigInterface.AddClusterScopedFeatureLifecycleCalls())
 func (mock *LdapConfigInterfaceMock) AddClusterScopedFeatureLifecycleCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -1078,8 +1065,7 @@ func (mock *LdapConfigInterfaceMock) AddClusterScopedHandler(ctx context.Context
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//
-//	len(mockedLdapConfigInterface.AddClusterScopedHandlerCalls())
+//     len(mockedLdapConfigInterface.AddClusterScopedHandlerCalls())
 func (mock *LdapConfigInterfaceMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -1122,8 +1108,7 @@ func (mock *LdapConfigInterfaceMock) AddClusterScopedLifecycle(ctx context.Conte
 
 // AddClusterScopedLifecycleCalls gets all the calls that were made to AddClusterScopedLifecycle.
 // Check the length with:
-//
-//	len(mockedLdapConfigInterface.AddClusterScopedLifecycleCalls())
+//     len(mockedLdapConfigInterface.AddClusterScopedLifecycleCalls())
 func (mock *LdapConfigInterfaceMock) AddClusterScopedLifecycleCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -1166,8 +1151,7 @@ func (mock *LdapConfigInterfaceMock) AddFeatureHandler(ctx context.Context, enab
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//
-//	len(mockedLdapConfigInterface.AddFeatureHandlerCalls())
+//     len(mockedLdapConfigInterface.AddFeatureHandlerCalls())
 func (mock *LdapConfigInterfaceMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
@@ -1210,8 +1194,7 @@ func (mock *LdapConfigInterfaceMock) AddFeatureLifecycle(ctx context.Context, en
 
 // AddFeatureLifecycleCalls gets all the calls that were made to AddFeatureLifecycle.
 // Check the length with:
-//
-//	len(mockedLdapConfigInterface.AddFeatureLifecycleCalls())
+//     len(mockedLdapConfigInterface.AddFeatureLifecycleCalls())
 func (mock *LdapConfigInterfaceMock) AddFeatureLifecycleCalls() []struct {
 	Ctx       context.Context
 	Enabled   func() bool
@@ -1252,8 +1235,7 @@ func (mock *LdapConfigInterfaceMock) AddHandler(ctx context.Context, name string
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//
-//	len(mockedLdapConfigInterface.AddHandlerCalls())
+//     len(mockedLdapConfigInterface.AddHandlerCalls())
 func (mock *LdapConfigInterfaceMock) AddHandlerCalls() []struct {
 	Ctx  context.Context
 	Name string
@@ -1292,8 +1274,7 @@ func (mock *LdapConfigInterfaceMock) AddLifecycle(ctx context.Context, name stri
 
 // AddLifecycleCalls gets all the calls that were made to AddLifecycle.
 // Check the length with:
-//
-//	len(mockedLdapConfigInterface.AddLifecycleCalls())
+//     len(mockedLdapConfigInterface.AddLifecycleCalls())
 func (mock *LdapConfigInterfaceMock) AddLifecycleCalls() []struct {
 	Ctx       context.Context
 	Name      string
@@ -1325,8 +1306,7 @@ func (mock *LdapConfigInterfaceMock) Controller() v31.LdapConfigController {
 
 // ControllerCalls gets all the calls that were made to Controller.
 // Check the length with:
-//
-//	len(mockedLdapConfigInterface.ControllerCalls())
+//     len(mockedLdapConfigInterface.ControllerCalls())
 func (mock *LdapConfigInterfaceMock) ControllerCalls() []struct {
 } {
 	var calls []struct {
@@ -1355,8 +1335,7 @@ func (mock *LdapConfigInterfaceMock) Create(in1 *v3.LdapConfig) (*v3.LdapConfig,
 
 // CreateCalls gets all the calls that were made to Create.
 // Check the length with:
-//
-//	len(mockedLdapConfigInterface.CreateCalls())
+//     len(mockedLdapConfigInterface.CreateCalls())
 func (mock *LdapConfigInterfaceMock) CreateCalls() []struct {
 	In1 *v3.LdapConfig
 } {
@@ -1389,8 +1368,7 @@ func (mock *LdapConfigInterfaceMock) Delete(name string, options *metav1.DeleteO
 
 // DeleteCalls gets all the calls that were made to Delete.
 // Check the length with:
-//
-//	len(mockedLdapConfigInterface.DeleteCalls())
+//     len(mockedLdapConfigInterface.DeleteCalls())
 func (mock *LdapConfigInterfaceMock) DeleteCalls() []struct {
 	Name    string
 	Options *metav1.DeleteOptions
@@ -1425,8 +1403,7 @@ func (mock *LdapConfigInterfaceMock) DeleteCollection(deleteOpts *metav1.DeleteO
 
 // DeleteCollectionCalls gets all the calls that were made to DeleteCollection.
 // Check the length with:
-//
-//	len(mockedLdapConfigInterface.DeleteCollectionCalls())
+//     len(mockedLdapConfigInterface.DeleteCollectionCalls())
 func (mock *LdapConfigInterfaceMock) DeleteCollectionCalls() []struct {
 	DeleteOpts *metav1.DeleteOptions
 	ListOpts   metav1.ListOptions
@@ -1463,8 +1440,7 @@ func (mock *LdapConfigInterfaceMock) DeleteNamespaced(namespace string, name str
 
 // DeleteNamespacedCalls gets all the calls that were made to DeleteNamespaced.
 // Check the length with:
-//
-//	len(mockedLdapConfigInterface.DeleteNamespacedCalls())
+//     len(mockedLdapConfigInterface.DeleteNamespacedCalls())
 func (mock *LdapConfigInterfaceMock) DeleteNamespacedCalls() []struct {
 	Namespace string
 	Name      string
@@ -1501,8 +1477,7 @@ func (mock *LdapConfigInterfaceMock) Get(name string, opts metav1.GetOptions) (*
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//
-//	len(mockedLdapConfigInterface.GetCalls())
+//     len(mockedLdapConfigInterface.GetCalls())
 func (mock *LdapConfigInterfaceMock) GetCalls() []struct {
 	Name string
 	Opts metav1.GetOptions
@@ -1539,8 +1514,7 @@ func (mock *LdapConfigInterfaceMock) GetNamespaced(namespace string, name string
 
 // GetNamespacedCalls gets all the calls that were made to GetNamespaced.
 // Check the length with:
-//
-//	len(mockedLdapConfigInterface.GetNamespacedCalls())
+//     len(mockedLdapConfigInterface.GetNamespacedCalls())
 func (mock *LdapConfigInterfaceMock) GetNamespacedCalls() []struct {
 	Namespace string
 	Name      string
@@ -1575,8 +1549,7 @@ func (mock *LdapConfigInterfaceMock) List(opts metav1.ListOptions) (*v3.LdapConf
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//
-//	len(mockedLdapConfigInterface.ListCalls())
+//     len(mockedLdapConfigInterface.ListCalls())
 func (mock *LdapConfigInterfaceMock) ListCalls() []struct {
 	Opts metav1.ListOptions
 } {
@@ -1609,8 +1582,7 @@ func (mock *LdapConfigInterfaceMock) ListNamespaced(namespace string, opts metav
 
 // ListNamespacedCalls gets all the calls that were made to ListNamespaced.
 // Check the length with:
-//
-//	len(mockedLdapConfigInterface.ListNamespacedCalls())
+//     len(mockedLdapConfigInterface.ListNamespacedCalls())
 func (mock *LdapConfigInterfaceMock) ListNamespacedCalls() []struct {
 	Namespace string
 	Opts      metav1.ListOptions
@@ -1640,8 +1612,7 @@ func (mock *LdapConfigInterfaceMock) ObjectClient() *objectclient.ObjectClient {
 
 // ObjectClientCalls gets all the calls that were made to ObjectClient.
 // Check the length with:
-//
-//	len(mockedLdapConfigInterface.ObjectClientCalls())
+//     len(mockedLdapConfigInterface.ObjectClientCalls())
 func (mock *LdapConfigInterfaceMock) ObjectClientCalls() []struct {
 } {
 	var calls []struct {
@@ -1670,8 +1641,7 @@ func (mock *LdapConfigInterfaceMock) Update(in1 *v3.LdapConfig) (*v3.LdapConfig,
 
 // UpdateCalls gets all the calls that were made to Update.
 // Check the length with:
-//
-//	len(mockedLdapConfigInterface.UpdateCalls())
+//     len(mockedLdapConfigInterface.UpdateCalls())
 func (mock *LdapConfigInterfaceMock) UpdateCalls() []struct {
 	In1 *v3.LdapConfig
 } {
@@ -1702,8 +1672,7 @@ func (mock *LdapConfigInterfaceMock) Watch(opts metav1.ListOptions) (watch.Inter
 
 // WatchCalls gets all the calls that were made to Watch.
 // Check the length with:
-//
-//	len(mockedLdapConfigInterface.WatchCalls())
+//     len(mockedLdapConfigInterface.WatchCalls())
 func (mock *LdapConfigInterfaceMock) WatchCalls() []struct {
 	Opts metav1.ListOptions
 } {
@@ -1726,19 +1695,19 @@ var _ v31.LdapConfigsGetter = &LdapConfigsGetterMock{}
 
 // LdapConfigsGetterMock is a mock implementation of v31.LdapConfigsGetter.
 //
-//	    func TestSomethingThatUsesLdapConfigsGetter(t *testing.T) {
+//     func TestSomethingThatUsesLdapConfigsGetter(t *testing.T) {
 //
-//	        // make and configure a mocked v31.LdapConfigsGetter
-//	        mockedLdapConfigsGetter := &LdapConfigsGetterMock{
-//	            LdapConfigsFunc: func(namespace string) v31.LdapConfigInterface {
-//		               panic("mock out the LdapConfigs method")
-//	            },
-//	        }
+//         // make and configure a mocked v31.LdapConfigsGetter
+//         mockedLdapConfigsGetter := &LdapConfigsGetterMock{
+//             LdapConfigsFunc: func(namespace string) v31.LdapConfigInterface {
+// 	               panic("mock out the LdapConfigs method")
+//             },
+//         }
 //
-//	        // use mockedLdapConfigsGetter in code that requires v31.LdapConfigsGetter
-//	        // and then make assertions.
+//         // use mockedLdapConfigsGetter in code that requires v31.LdapConfigsGetter
+//         // and then make assertions.
 //
-//	    }
+//     }
 type LdapConfigsGetterMock struct {
 	// LdapConfigsFunc mocks the LdapConfigs method.
 	LdapConfigsFunc func(namespace string) v31.LdapConfigInterface
@@ -1771,8 +1740,7 @@ func (mock *LdapConfigsGetterMock) LdapConfigs(namespace string) v31.LdapConfigI
 
 // LdapConfigsCalls gets all the calls that were made to LdapConfigs.
 // Check the length with:
-//
-//	len(mockedLdapConfigsGetter.LdapConfigsCalls())
+//     len(mockedLdapConfigsGetter.LdapConfigsCalls())
 func (mock *LdapConfigsGetterMock) LdapConfigsCalls() []struct {
 	Namespace string
 } {

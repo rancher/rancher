@@ -29,22 +29,22 @@ var _ v31.CertificateLister = &CertificateListerMock{}
 
 // CertificateListerMock is a mock implementation of v31.CertificateLister.
 //
-//	    func TestSomethingThatUsesCertificateLister(t *testing.T) {
+//     func TestSomethingThatUsesCertificateLister(t *testing.T) {
 //
-//	        // make and configure a mocked v31.CertificateLister
-//	        mockedCertificateLister := &CertificateListerMock{
-//	            GetFunc: func(namespace string, name string) (*v3.Certificate, error) {
-//		               panic("mock out the Get method")
-//	            },
-//	            ListFunc: func(namespace string, selector labels.Selector) ([]*v3.Certificate, error) {
-//		               panic("mock out the List method")
-//	            },
-//	        }
+//         // make and configure a mocked v31.CertificateLister
+//         mockedCertificateLister := &CertificateListerMock{
+//             GetFunc: func(namespace string, name string) (*v3.Certificate, error) {
+// 	               panic("mock out the Get method")
+//             },
+//             ListFunc: func(namespace string, selector labels.Selector) ([]*v3.Certificate, error) {
+// 	               panic("mock out the List method")
+//             },
+//         }
 //
-//	        // use mockedCertificateLister in code that requires v31.CertificateLister
-//	        // and then make assertions.
+//         // use mockedCertificateLister in code that requires v31.CertificateLister
+//         // and then make assertions.
 //
-//	    }
+//     }
 type CertificateListerMock struct {
 	// GetFunc mocks the Get method.
 	GetFunc func(namespace string, name string) (*v3.Certificate, error)
@@ -91,8 +91,7 @@ func (mock *CertificateListerMock) Get(namespace string, name string) (*v3.Certi
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//
-//	len(mockedCertificateLister.GetCalls())
+//     len(mockedCertificateLister.GetCalls())
 func (mock *CertificateListerMock) GetCalls() []struct {
 	Namespace string
 	Name      string
@@ -127,8 +126,7 @@ func (mock *CertificateListerMock) List(namespace string, selector labels.Select
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//
-//	len(mockedCertificateLister.ListCalls())
+//     len(mockedCertificateLister.ListCalls())
 func (mock *CertificateListerMock) ListCalls() []struct {
 	Namespace string
 	Selector  labels.Selector
@@ -161,43 +159,43 @@ var _ v31.CertificateController = &CertificateControllerMock{}
 
 // CertificateControllerMock is a mock implementation of v31.CertificateController.
 //
-//	    func TestSomethingThatUsesCertificateController(t *testing.T) {
+//     func TestSomethingThatUsesCertificateController(t *testing.T) {
 //
-//	        // make and configure a mocked v31.CertificateController
-//	        mockedCertificateController := &CertificateControllerMock{
-//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v31.CertificateHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedFeatureHandler method")
-//	            },
-//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v31.CertificateHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedHandler method")
-//	            },
-//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.CertificateHandlerFunc)  {
-//		               panic("mock out the AddFeatureHandler method")
-//	            },
-//	            AddHandlerFunc: func(ctx context.Context, name string, handler v31.CertificateHandlerFunc)  {
-//		               panic("mock out the AddHandler method")
-//	            },
-//	            EnqueueFunc: func(namespace string, name string)  {
-//		               panic("mock out the Enqueue method")
-//	            },
-//	            EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
-//		               panic("mock out the EnqueueAfter method")
-//	            },
-//	            GenericFunc: func() controller.GenericController {
-//		               panic("mock out the Generic method")
-//	            },
-//	            InformerFunc: func() cache.SharedIndexInformer {
-//		               panic("mock out the Informer method")
-//	            },
-//	            ListerFunc: func() v31.CertificateLister {
-//		               panic("mock out the Lister method")
-//	            },
-//	        }
+//         // make and configure a mocked v31.CertificateController
+//         mockedCertificateController := &CertificateControllerMock{
+//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v31.CertificateHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedFeatureHandler method")
+//             },
+//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v31.CertificateHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedHandler method")
+//             },
+//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.CertificateHandlerFunc)  {
+// 	               panic("mock out the AddFeatureHandler method")
+//             },
+//             AddHandlerFunc: func(ctx context.Context, name string, handler v31.CertificateHandlerFunc)  {
+// 	               panic("mock out the AddHandler method")
+//             },
+//             EnqueueFunc: func(namespace string, name string)  {
+// 	               panic("mock out the Enqueue method")
+//             },
+//             EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
+// 	               panic("mock out the EnqueueAfter method")
+//             },
+//             GenericFunc: func() controller.GenericController {
+// 	               panic("mock out the Generic method")
+//             },
+//             InformerFunc: func() cache.SharedIndexInformer {
+// 	               panic("mock out the Informer method")
+//             },
+//             ListerFunc: func() v31.CertificateLister {
+// 	               panic("mock out the Lister method")
+//             },
+//         }
 //
-//	        // use mockedCertificateController in code that requires v31.CertificateController
-//	        // and then make assertions.
+//         // use mockedCertificateController in code that requires v31.CertificateController
+//         // and then make assertions.
 //
-//	    }
+//     }
 type CertificateControllerMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
 	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v31.CertificateHandlerFunc)
@@ -326,8 +324,7 @@ func (mock *CertificateControllerMock) AddClusterScopedFeatureHandler(ctx contex
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//
-//	len(mockedCertificateController.AddClusterScopedFeatureHandlerCalls())
+//     len(mockedCertificateController.AddClusterScopedFeatureHandlerCalls())
 func (mock *CertificateControllerMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -372,8 +369,7 @@ func (mock *CertificateControllerMock) AddClusterScopedHandler(ctx context.Conte
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//
-//	len(mockedCertificateController.AddClusterScopedHandlerCalls())
+//     len(mockedCertificateController.AddClusterScopedHandlerCalls())
 func (mock *CertificateControllerMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -416,8 +412,7 @@ func (mock *CertificateControllerMock) AddFeatureHandler(ctx context.Context, en
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//
-//	len(mockedCertificateController.AddFeatureHandlerCalls())
+//     len(mockedCertificateController.AddFeatureHandlerCalls())
 func (mock *CertificateControllerMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
@@ -458,8 +453,7 @@ func (mock *CertificateControllerMock) AddHandler(ctx context.Context, name stri
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//
-//	len(mockedCertificateController.AddHandlerCalls())
+//     len(mockedCertificateController.AddHandlerCalls())
 func (mock *CertificateControllerMock) AddHandlerCalls() []struct {
 	Ctx     context.Context
 	Name    string
@@ -496,8 +490,7 @@ func (mock *CertificateControllerMock) Enqueue(namespace string, name string) {
 
 // EnqueueCalls gets all the calls that were made to Enqueue.
 // Check the length with:
-//
-//	len(mockedCertificateController.EnqueueCalls())
+//     len(mockedCertificateController.EnqueueCalls())
 func (mock *CertificateControllerMock) EnqueueCalls() []struct {
 	Namespace string
 	Name      string
@@ -534,8 +527,7 @@ func (mock *CertificateControllerMock) EnqueueAfter(namespace string, name strin
 
 // EnqueueAfterCalls gets all the calls that were made to EnqueueAfter.
 // Check the length with:
-//
-//	len(mockedCertificateController.EnqueueAfterCalls())
+//     len(mockedCertificateController.EnqueueAfterCalls())
 func (mock *CertificateControllerMock) EnqueueAfterCalls() []struct {
 	Namespace string
 	Name      string
@@ -567,8 +559,7 @@ func (mock *CertificateControllerMock) Generic() controller.GenericController {
 
 // GenericCalls gets all the calls that were made to Generic.
 // Check the length with:
-//
-//	len(mockedCertificateController.GenericCalls())
+//     len(mockedCertificateController.GenericCalls())
 func (mock *CertificateControllerMock) GenericCalls() []struct {
 } {
 	var calls []struct {
@@ -594,8 +585,7 @@ func (mock *CertificateControllerMock) Informer() cache.SharedIndexInformer {
 
 // InformerCalls gets all the calls that were made to Informer.
 // Check the length with:
-//
-//	len(mockedCertificateController.InformerCalls())
+//     len(mockedCertificateController.InformerCalls())
 func (mock *CertificateControllerMock) InformerCalls() []struct {
 } {
 	var calls []struct {
@@ -621,8 +611,7 @@ func (mock *CertificateControllerMock) Lister() v31.CertificateLister {
 
 // ListerCalls gets all the calls that were made to Lister.
 // Check the length with:
-//
-//	len(mockedCertificateController.ListerCalls())
+//     len(mockedCertificateController.ListerCalls())
 func (mock *CertificateControllerMock) ListerCalls() []struct {
 } {
 	var calls []struct {
@@ -662,76 +651,76 @@ var _ v31.CertificateInterface = &CertificateInterfaceMock{}
 
 // CertificateInterfaceMock is a mock implementation of v31.CertificateInterface.
 //
-//	    func TestSomethingThatUsesCertificateInterface(t *testing.T) {
+//     func TestSomethingThatUsesCertificateInterface(t *testing.T) {
 //
-//	        // make and configure a mocked v31.CertificateInterface
-//	        mockedCertificateInterface := &CertificateInterfaceMock{
-//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v31.CertificateHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedFeatureHandler method")
-//	            },
-//	            AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v31.CertificateLifecycle)  {
-//		               panic("mock out the AddClusterScopedFeatureLifecycle method")
-//	            },
-//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v31.CertificateHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedHandler method")
-//	            },
-//	            AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v31.CertificateLifecycle)  {
-//		               panic("mock out the AddClusterScopedLifecycle method")
-//	            },
-//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.CertificateHandlerFunc)  {
-//		               panic("mock out the AddFeatureHandler method")
-//	            },
-//	            AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v31.CertificateLifecycle)  {
-//		               panic("mock out the AddFeatureLifecycle method")
-//	            },
-//	            AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v31.CertificateHandlerFunc)  {
-//		               panic("mock out the AddHandler method")
-//	            },
-//	            AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v31.CertificateLifecycle)  {
-//		               panic("mock out the AddLifecycle method")
-//	            },
-//	            ControllerFunc: func() v31.CertificateController {
-//		               panic("mock out the Controller method")
-//	            },
-//	            CreateFunc: func(in1 *v3.Certificate) (*v3.Certificate, error) {
-//		               panic("mock out the Create method")
-//	            },
-//	            DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
-//		               panic("mock out the Delete method")
-//	            },
-//	            DeleteCollectionFunc: func(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
-//		               panic("mock out the DeleteCollection method")
-//	            },
-//	            DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
-//		               panic("mock out the DeleteNamespaced method")
-//	            },
-//	            GetFunc: func(name string, opts metav1.GetOptions) (*v3.Certificate, error) {
-//		               panic("mock out the Get method")
-//	            },
-//	            GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v3.Certificate, error) {
-//		               panic("mock out the GetNamespaced method")
-//	            },
-//	            ListFunc: func(opts metav1.ListOptions) (*v3.CertificateList, error) {
-//		               panic("mock out the List method")
-//	            },
-//	            ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v3.CertificateList, error) {
-//		               panic("mock out the ListNamespaced method")
-//	            },
-//	            ObjectClientFunc: func() *objectclient.ObjectClient {
-//		               panic("mock out the ObjectClient method")
-//	            },
-//	            UpdateFunc: func(in1 *v3.Certificate) (*v3.Certificate, error) {
-//		               panic("mock out the Update method")
-//	            },
-//	            WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
-//		               panic("mock out the Watch method")
-//	            },
-//	        }
+//         // make and configure a mocked v31.CertificateInterface
+//         mockedCertificateInterface := &CertificateInterfaceMock{
+//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v31.CertificateHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedFeatureHandler method")
+//             },
+//             AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v31.CertificateLifecycle)  {
+// 	               panic("mock out the AddClusterScopedFeatureLifecycle method")
+//             },
+//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v31.CertificateHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedHandler method")
+//             },
+//             AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v31.CertificateLifecycle)  {
+// 	               panic("mock out the AddClusterScopedLifecycle method")
+//             },
+//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.CertificateHandlerFunc)  {
+// 	               panic("mock out the AddFeatureHandler method")
+//             },
+//             AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v31.CertificateLifecycle)  {
+// 	               panic("mock out the AddFeatureLifecycle method")
+//             },
+//             AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v31.CertificateHandlerFunc)  {
+// 	               panic("mock out the AddHandler method")
+//             },
+//             AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v31.CertificateLifecycle)  {
+// 	               panic("mock out the AddLifecycle method")
+//             },
+//             ControllerFunc: func() v31.CertificateController {
+// 	               panic("mock out the Controller method")
+//             },
+//             CreateFunc: func(in1 *v3.Certificate) (*v3.Certificate, error) {
+// 	               panic("mock out the Create method")
+//             },
+//             DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
+// 	               panic("mock out the Delete method")
+//             },
+//             DeleteCollectionFunc: func(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
+// 	               panic("mock out the DeleteCollection method")
+//             },
+//             DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
+// 	               panic("mock out the DeleteNamespaced method")
+//             },
+//             GetFunc: func(name string, opts metav1.GetOptions) (*v3.Certificate, error) {
+// 	               panic("mock out the Get method")
+//             },
+//             GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v3.Certificate, error) {
+// 	               panic("mock out the GetNamespaced method")
+//             },
+//             ListFunc: func(opts metav1.ListOptions) (*v3.CertificateList, error) {
+// 	               panic("mock out the List method")
+//             },
+//             ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v3.CertificateList, error) {
+// 	               panic("mock out the ListNamespaced method")
+//             },
+//             ObjectClientFunc: func() *objectclient.ObjectClient {
+// 	               panic("mock out the ObjectClient method")
+//             },
+//             UpdateFunc: func(in1 *v3.Certificate) (*v3.Certificate, error) {
+// 	               panic("mock out the Update method")
+//             },
+//             WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
+// 	               panic("mock out the Watch method")
+//             },
+//         }
 //
-//	        // use mockedCertificateInterface in code that requires v31.CertificateInterface
-//	        // and then make assertions.
+//         // use mockedCertificateInterface in code that requires v31.CertificateInterface
+//         // and then make assertions.
 //
-//	    }
+//     }
 type CertificateInterfaceMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
 	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v31.CertificateHandlerFunc)
@@ -984,8 +973,7 @@ func (mock *CertificateInterfaceMock) AddClusterScopedFeatureHandler(ctx context
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//
-//	len(mockedCertificateInterface.AddClusterScopedFeatureHandlerCalls())
+//     len(mockedCertificateInterface.AddClusterScopedFeatureHandlerCalls())
 func (mock *CertificateInterfaceMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -1032,8 +1020,7 @@ func (mock *CertificateInterfaceMock) AddClusterScopedFeatureLifecycle(ctx conte
 
 // AddClusterScopedFeatureLifecycleCalls gets all the calls that were made to AddClusterScopedFeatureLifecycle.
 // Check the length with:
-//
-//	len(mockedCertificateInterface.AddClusterScopedFeatureLifecycleCalls())
+//     len(mockedCertificateInterface.AddClusterScopedFeatureLifecycleCalls())
 func (mock *CertificateInterfaceMock) AddClusterScopedFeatureLifecycleCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -1078,8 +1065,7 @@ func (mock *CertificateInterfaceMock) AddClusterScopedHandler(ctx context.Contex
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//
-//	len(mockedCertificateInterface.AddClusterScopedHandlerCalls())
+//     len(mockedCertificateInterface.AddClusterScopedHandlerCalls())
 func (mock *CertificateInterfaceMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -1122,8 +1108,7 @@ func (mock *CertificateInterfaceMock) AddClusterScopedLifecycle(ctx context.Cont
 
 // AddClusterScopedLifecycleCalls gets all the calls that were made to AddClusterScopedLifecycle.
 // Check the length with:
-//
-//	len(mockedCertificateInterface.AddClusterScopedLifecycleCalls())
+//     len(mockedCertificateInterface.AddClusterScopedLifecycleCalls())
 func (mock *CertificateInterfaceMock) AddClusterScopedLifecycleCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -1166,8 +1151,7 @@ func (mock *CertificateInterfaceMock) AddFeatureHandler(ctx context.Context, ena
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//
-//	len(mockedCertificateInterface.AddFeatureHandlerCalls())
+//     len(mockedCertificateInterface.AddFeatureHandlerCalls())
 func (mock *CertificateInterfaceMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
@@ -1210,8 +1194,7 @@ func (mock *CertificateInterfaceMock) AddFeatureLifecycle(ctx context.Context, e
 
 // AddFeatureLifecycleCalls gets all the calls that were made to AddFeatureLifecycle.
 // Check the length with:
-//
-//	len(mockedCertificateInterface.AddFeatureLifecycleCalls())
+//     len(mockedCertificateInterface.AddFeatureLifecycleCalls())
 func (mock *CertificateInterfaceMock) AddFeatureLifecycleCalls() []struct {
 	Ctx       context.Context
 	Enabled   func() bool
@@ -1252,8 +1235,7 @@ func (mock *CertificateInterfaceMock) AddHandler(ctx context.Context, name strin
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//
-//	len(mockedCertificateInterface.AddHandlerCalls())
+//     len(mockedCertificateInterface.AddHandlerCalls())
 func (mock *CertificateInterfaceMock) AddHandlerCalls() []struct {
 	Ctx  context.Context
 	Name string
@@ -1292,8 +1274,7 @@ func (mock *CertificateInterfaceMock) AddLifecycle(ctx context.Context, name str
 
 // AddLifecycleCalls gets all the calls that were made to AddLifecycle.
 // Check the length with:
-//
-//	len(mockedCertificateInterface.AddLifecycleCalls())
+//     len(mockedCertificateInterface.AddLifecycleCalls())
 func (mock *CertificateInterfaceMock) AddLifecycleCalls() []struct {
 	Ctx       context.Context
 	Name      string
@@ -1325,8 +1306,7 @@ func (mock *CertificateInterfaceMock) Controller() v31.CertificateController {
 
 // ControllerCalls gets all the calls that were made to Controller.
 // Check the length with:
-//
-//	len(mockedCertificateInterface.ControllerCalls())
+//     len(mockedCertificateInterface.ControllerCalls())
 func (mock *CertificateInterfaceMock) ControllerCalls() []struct {
 } {
 	var calls []struct {
@@ -1355,8 +1335,7 @@ func (mock *CertificateInterfaceMock) Create(in1 *v3.Certificate) (*v3.Certifica
 
 // CreateCalls gets all the calls that were made to Create.
 // Check the length with:
-//
-//	len(mockedCertificateInterface.CreateCalls())
+//     len(mockedCertificateInterface.CreateCalls())
 func (mock *CertificateInterfaceMock) CreateCalls() []struct {
 	In1 *v3.Certificate
 } {
@@ -1389,8 +1368,7 @@ func (mock *CertificateInterfaceMock) Delete(name string, options *metav1.Delete
 
 // DeleteCalls gets all the calls that were made to Delete.
 // Check the length with:
-//
-//	len(mockedCertificateInterface.DeleteCalls())
+//     len(mockedCertificateInterface.DeleteCalls())
 func (mock *CertificateInterfaceMock) DeleteCalls() []struct {
 	Name    string
 	Options *metav1.DeleteOptions
@@ -1425,8 +1403,7 @@ func (mock *CertificateInterfaceMock) DeleteCollection(deleteOpts *metav1.Delete
 
 // DeleteCollectionCalls gets all the calls that were made to DeleteCollection.
 // Check the length with:
-//
-//	len(mockedCertificateInterface.DeleteCollectionCalls())
+//     len(mockedCertificateInterface.DeleteCollectionCalls())
 func (mock *CertificateInterfaceMock) DeleteCollectionCalls() []struct {
 	DeleteOpts *metav1.DeleteOptions
 	ListOpts   metav1.ListOptions
@@ -1463,8 +1440,7 @@ func (mock *CertificateInterfaceMock) DeleteNamespaced(namespace string, name st
 
 // DeleteNamespacedCalls gets all the calls that were made to DeleteNamespaced.
 // Check the length with:
-//
-//	len(mockedCertificateInterface.DeleteNamespacedCalls())
+//     len(mockedCertificateInterface.DeleteNamespacedCalls())
 func (mock *CertificateInterfaceMock) DeleteNamespacedCalls() []struct {
 	Namespace string
 	Name      string
@@ -1501,8 +1477,7 @@ func (mock *CertificateInterfaceMock) Get(name string, opts metav1.GetOptions) (
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//
-//	len(mockedCertificateInterface.GetCalls())
+//     len(mockedCertificateInterface.GetCalls())
 func (mock *CertificateInterfaceMock) GetCalls() []struct {
 	Name string
 	Opts metav1.GetOptions
@@ -1539,8 +1514,7 @@ func (mock *CertificateInterfaceMock) GetNamespaced(namespace string, name strin
 
 // GetNamespacedCalls gets all the calls that were made to GetNamespaced.
 // Check the length with:
-//
-//	len(mockedCertificateInterface.GetNamespacedCalls())
+//     len(mockedCertificateInterface.GetNamespacedCalls())
 func (mock *CertificateInterfaceMock) GetNamespacedCalls() []struct {
 	Namespace string
 	Name      string
@@ -1575,8 +1549,7 @@ func (mock *CertificateInterfaceMock) List(opts metav1.ListOptions) (*v3.Certifi
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//
-//	len(mockedCertificateInterface.ListCalls())
+//     len(mockedCertificateInterface.ListCalls())
 func (mock *CertificateInterfaceMock) ListCalls() []struct {
 	Opts metav1.ListOptions
 } {
@@ -1609,8 +1582,7 @@ func (mock *CertificateInterfaceMock) ListNamespaced(namespace string, opts meta
 
 // ListNamespacedCalls gets all the calls that were made to ListNamespaced.
 // Check the length with:
-//
-//	len(mockedCertificateInterface.ListNamespacedCalls())
+//     len(mockedCertificateInterface.ListNamespacedCalls())
 func (mock *CertificateInterfaceMock) ListNamespacedCalls() []struct {
 	Namespace string
 	Opts      metav1.ListOptions
@@ -1640,8 +1612,7 @@ func (mock *CertificateInterfaceMock) ObjectClient() *objectclient.ObjectClient 
 
 // ObjectClientCalls gets all the calls that were made to ObjectClient.
 // Check the length with:
-//
-//	len(mockedCertificateInterface.ObjectClientCalls())
+//     len(mockedCertificateInterface.ObjectClientCalls())
 func (mock *CertificateInterfaceMock) ObjectClientCalls() []struct {
 } {
 	var calls []struct {
@@ -1670,8 +1641,7 @@ func (mock *CertificateInterfaceMock) Update(in1 *v3.Certificate) (*v3.Certifica
 
 // UpdateCalls gets all the calls that were made to Update.
 // Check the length with:
-//
-//	len(mockedCertificateInterface.UpdateCalls())
+//     len(mockedCertificateInterface.UpdateCalls())
 func (mock *CertificateInterfaceMock) UpdateCalls() []struct {
 	In1 *v3.Certificate
 } {
@@ -1702,8 +1672,7 @@ func (mock *CertificateInterfaceMock) Watch(opts metav1.ListOptions) (watch.Inte
 
 // WatchCalls gets all the calls that were made to Watch.
 // Check the length with:
-//
-//	len(mockedCertificateInterface.WatchCalls())
+//     len(mockedCertificateInterface.WatchCalls())
 func (mock *CertificateInterfaceMock) WatchCalls() []struct {
 	Opts metav1.ListOptions
 } {
@@ -1726,19 +1695,19 @@ var _ v31.CertificatesGetter = &CertificatesGetterMock{}
 
 // CertificatesGetterMock is a mock implementation of v31.CertificatesGetter.
 //
-//	    func TestSomethingThatUsesCertificatesGetter(t *testing.T) {
+//     func TestSomethingThatUsesCertificatesGetter(t *testing.T) {
 //
-//	        // make and configure a mocked v31.CertificatesGetter
-//	        mockedCertificatesGetter := &CertificatesGetterMock{
-//	            CertificatesFunc: func(namespace string) v31.CertificateInterface {
-//		               panic("mock out the Certificates method")
-//	            },
-//	        }
+//         // make and configure a mocked v31.CertificatesGetter
+//         mockedCertificatesGetter := &CertificatesGetterMock{
+//             CertificatesFunc: func(namespace string) v31.CertificateInterface {
+// 	               panic("mock out the Certificates method")
+//             },
+//         }
 //
-//	        // use mockedCertificatesGetter in code that requires v31.CertificatesGetter
-//	        // and then make assertions.
+//         // use mockedCertificatesGetter in code that requires v31.CertificatesGetter
+//         // and then make assertions.
 //
-//	    }
+//     }
 type CertificatesGetterMock struct {
 	// CertificatesFunc mocks the Certificates method.
 	CertificatesFunc func(namespace string) v31.CertificateInterface
@@ -1771,8 +1740,7 @@ func (mock *CertificatesGetterMock) Certificates(namespace string) v31.Certifica
 
 // CertificatesCalls gets all the calls that were made to Certificates.
 // Check the length with:
-//
-//	len(mockedCertificatesGetter.CertificatesCalls())
+//     len(mockedCertificatesGetter.CertificatesCalls())
 func (mock *CertificatesGetterMock) CertificatesCalls() []struct {
 	Namespace string
 } {

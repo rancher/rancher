@@ -29,22 +29,22 @@ var _ v31.MultiClusterAppRevisionLister = &MultiClusterAppRevisionListerMock{}
 
 // MultiClusterAppRevisionListerMock is a mock implementation of v31.MultiClusterAppRevisionLister.
 //
-//	    func TestSomethingThatUsesMultiClusterAppRevisionLister(t *testing.T) {
+//     func TestSomethingThatUsesMultiClusterAppRevisionLister(t *testing.T) {
 //
-//	        // make and configure a mocked v31.MultiClusterAppRevisionLister
-//	        mockedMultiClusterAppRevisionLister := &MultiClusterAppRevisionListerMock{
-//	            GetFunc: func(namespace string, name string) (*v3.MultiClusterAppRevision, error) {
-//		               panic("mock out the Get method")
-//	            },
-//	            ListFunc: func(namespace string, selector labels.Selector) ([]*v3.MultiClusterAppRevision, error) {
-//		               panic("mock out the List method")
-//	            },
-//	        }
+//         // make and configure a mocked v31.MultiClusterAppRevisionLister
+//         mockedMultiClusterAppRevisionLister := &MultiClusterAppRevisionListerMock{
+//             GetFunc: func(namespace string, name string) (*v3.MultiClusterAppRevision, error) {
+// 	               panic("mock out the Get method")
+//             },
+//             ListFunc: func(namespace string, selector labels.Selector) ([]*v3.MultiClusterAppRevision, error) {
+// 	               panic("mock out the List method")
+//             },
+//         }
 //
-//	        // use mockedMultiClusterAppRevisionLister in code that requires v31.MultiClusterAppRevisionLister
-//	        // and then make assertions.
+//         // use mockedMultiClusterAppRevisionLister in code that requires v31.MultiClusterAppRevisionLister
+//         // and then make assertions.
 //
-//	    }
+//     }
 type MultiClusterAppRevisionListerMock struct {
 	// GetFunc mocks the Get method.
 	GetFunc func(namespace string, name string) (*v3.MultiClusterAppRevision, error)
@@ -91,8 +91,7 @@ func (mock *MultiClusterAppRevisionListerMock) Get(namespace string, name string
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//
-//	len(mockedMultiClusterAppRevisionLister.GetCalls())
+//     len(mockedMultiClusterAppRevisionLister.GetCalls())
 func (mock *MultiClusterAppRevisionListerMock) GetCalls() []struct {
 	Namespace string
 	Name      string
@@ -127,8 +126,7 @@ func (mock *MultiClusterAppRevisionListerMock) List(namespace string, selector l
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//
-//	len(mockedMultiClusterAppRevisionLister.ListCalls())
+//     len(mockedMultiClusterAppRevisionLister.ListCalls())
 func (mock *MultiClusterAppRevisionListerMock) ListCalls() []struct {
 	Namespace string
 	Selector  labels.Selector
@@ -161,43 +159,43 @@ var _ v31.MultiClusterAppRevisionController = &MultiClusterAppRevisionController
 
 // MultiClusterAppRevisionControllerMock is a mock implementation of v31.MultiClusterAppRevisionController.
 //
-//	    func TestSomethingThatUsesMultiClusterAppRevisionController(t *testing.T) {
+//     func TestSomethingThatUsesMultiClusterAppRevisionController(t *testing.T) {
 //
-//	        // make and configure a mocked v31.MultiClusterAppRevisionController
-//	        mockedMultiClusterAppRevisionController := &MultiClusterAppRevisionControllerMock{
-//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v31.MultiClusterAppRevisionHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedFeatureHandler method")
-//	            },
-//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v31.MultiClusterAppRevisionHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedHandler method")
-//	            },
-//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.MultiClusterAppRevisionHandlerFunc)  {
-//		               panic("mock out the AddFeatureHandler method")
-//	            },
-//	            AddHandlerFunc: func(ctx context.Context, name string, handler v31.MultiClusterAppRevisionHandlerFunc)  {
-//		               panic("mock out the AddHandler method")
-//	            },
-//	            EnqueueFunc: func(namespace string, name string)  {
-//		               panic("mock out the Enqueue method")
-//	            },
-//	            EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
-//		               panic("mock out the EnqueueAfter method")
-//	            },
-//	            GenericFunc: func() controller.GenericController {
-//		               panic("mock out the Generic method")
-//	            },
-//	            InformerFunc: func() cache.SharedIndexInformer {
-//		               panic("mock out the Informer method")
-//	            },
-//	            ListerFunc: func() v31.MultiClusterAppRevisionLister {
-//		               panic("mock out the Lister method")
-//	            },
-//	        }
+//         // make and configure a mocked v31.MultiClusterAppRevisionController
+//         mockedMultiClusterAppRevisionController := &MultiClusterAppRevisionControllerMock{
+//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v31.MultiClusterAppRevisionHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedFeatureHandler method")
+//             },
+//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v31.MultiClusterAppRevisionHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedHandler method")
+//             },
+//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.MultiClusterAppRevisionHandlerFunc)  {
+// 	               panic("mock out the AddFeatureHandler method")
+//             },
+//             AddHandlerFunc: func(ctx context.Context, name string, handler v31.MultiClusterAppRevisionHandlerFunc)  {
+// 	               panic("mock out the AddHandler method")
+//             },
+//             EnqueueFunc: func(namespace string, name string)  {
+// 	               panic("mock out the Enqueue method")
+//             },
+//             EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
+// 	               panic("mock out the EnqueueAfter method")
+//             },
+//             GenericFunc: func() controller.GenericController {
+// 	               panic("mock out the Generic method")
+//             },
+//             InformerFunc: func() cache.SharedIndexInformer {
+// 	               panic("mock out the Informer method")
+//             },
+//             ListerFunc: func() v31.MultiClusterAppRevisionLister {
+// 	               panic("mock out the Lister method")
+//             },
+//         }
 //
-//	        // use mockedMultiClusterAppRevisionController in code that requires v31.MultiClusterAppRevisionController
-//	        // and then make assertions.
+//         // use mockedMultiClusterAppRevisionController in code that requires v31.MultiClusterAppRevisionController
+//         // and then make assertions.
 //
-//	    }
+//     }
 type MultiClusterAppRevisionControllerMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
 	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v31.MultiClusterAppRevisionHandlerFunc)
@@ -326,8 +324,7 @@ func (mock *MultiClusterAppRevisionControllerMock) AddClusterScopedFeatureHandle
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//
-//	len(mockedMultiClusterAppRevisionController.AddClusterScopedFeatureHandlerCalls())
+//     len(mockedMultiClusterAppRevisionController.AddClusterScopedFeatureHandlerCalls())
 func (mock *MultiClusterAppRevisionControllerMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -372,8 +369,7 @@ func (mock *MultiClusterAppRevisionControllerMock) AddClusterScopedHandler(ctx c
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//
-//	len(mockedMultiClusterAppRevisionController.AddClusterScopedHandlerCalls())
+//     len(mockedMultiClusterAppRevisionController.AddClusterScopedHandlerCalls())
 func (mock *MultiClusterAppRevisionControllerMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -416,8 +412,7 @@ func (mock *MultiClusterAppRevisionControllerMock) AddFeatureHandler(ctx context
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//
-//	len(mockedMultiClusterAppRevisionController.AddFeatureHandlerCalls())
+//     len(mockedMultiClusterAppRevisionController.AddFeatureHandlerCalls())
 func (mock *MultiClusterAppRevisionControllerMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
@@ -458,8 +453,7 @@ func (mock *MultiClusterAppRevisionControllerMock) AddHandler(ctx context.Contex
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//
-//	len(mockedMultiClusterAppRevisionController.AddHandlerCalls())
+//     len(mockedMultiClusterAppRevisionController.AddHandlerCalls())
 func (mock *MultiClusterAppRevisionControllerMock) AddHandlerCalls() []struct {
 	Ctx     context.Context
 	Name    string
@@ -496,8 +490,7 @@ func (mock *MultiClusterAppRevisionControllerMock) Enqueue(namespace string, nam
 
 // EnqueueCalls gets all the calls that were made to Enqueue.
 // Check the length with:
-//
-//	len(mockedMultiClusterAppRevisionController.EnqueueCalls())
+//     len(mockedMultiClusterAppRevisionController.EnqueueCalls())
 func (mock *MultiClusterAppRevisionControllerMock) EnqueueCalls() []struct {
 	Namespace string
 	Name      string
@@ -534,8 +527,7 @@ func (mock *MultiClusterAppRevisionControllerMock) EnqueueAfter(namespace string
 
 // EnqueueAfterCalls gets all the calls that were made to EnqueueAfter.
 // Check the length with:
-//
-//	len(mockedMultiClusterAppRevisionController.EnqueueAfterCalls())
+//     len(mockedMultiClusterAppRevisionController.EnqueueAfterCalls())
 func (mock *MultiClusterAppRevisionControllerMock) EnqueueAfterCalls() []struct {
 	Namespace string
 	Name      string
@@ -567,8 +559,7 @@ func (mock *MultiClusterAppRevisionControllerMock) Generic() controller.GenericC
 
 // GenericCalls gets all the calls that were made to Generic.
 // Check the length with:
-//
-//	len(mockedMultiClusterAppRevisionController.GenericCalls())
+//     len(mockedMultiClusterAppRevisionController.GenericCalls())
 func (mock *MultiClusterAppRevisionControllerMock) GenericCalls() []struct {
 } {
 	var calls []struct {
@@ -594,8 +585,7 @@ func (mock *MultiClusterAppRevisionControllerMock) Informer() cache.SharedIndexI
 
 // InformerCalls gets all the calls that were made to Informer.
 // Check the length with:
-//
-//	len(mockedMultiClusterAppRevisionController.InformerCalls())
+//     len(mockedMultiClusterAppRevisionController.InformerCalls())
 func (mock *MultiClusterAppRevisionControllerMock) InformerCalls() []struct {
 } {
 	var calls []struct {
@@ -621,8 +611,7 @@ func (mock *MultiClusterAppRevisionControllerMock) Lister() v31.MultiClusterAppR
 
 // ListerCalls gets all the calls that were made to Lister.
 // Check the length with:
-//
-//	len(mockedMultiClusterAppRevisionController.ListerCalls())
+//     len(mockedMultiClusterAppRevisionController.ListerCalls())
 func (mock *MultiClusterAppRevisionControllerMock) ListerCalls() []struct {
 } {
 	var calls []struct {
@@ -662,76 +651,76 @@ var _ v31.MultiClusterAppRevisionInterface = &MultiClusterAppRevisionInterfaceMo
 
 // MultiClusterAppRevisionInterfaceMock is a mock implementation of v31.MultiClusterAppRevisionInterface.
 //
-//	    func TestSomethingThatUsesMultiClusterAppRevisionInterface(t *testing.T) {
+//     func TestSomethingThatUsesMultiClusterAppRevisionInterface(t *testing.T) {
 //
-//	        // make and configure a mocked v31.MultiClusterAppRevisionInterface
-//	        mockedMultiClusterAppRevisionInterface := &MultiClusterAppRevisionInterfaceMock{
-//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v31.MultiClusterAppRevisionHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedFeatureHandler method")
-//	            },
-//	            AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v31.MultiClusterAppRevisionLifecycle)  {
-//		               panic("mock out the AddClusterScopedFeatureLifecycle method")
-//	            },
-//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v31.MultiClusterAppRevisionHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedHandler method")
-//	            },
-//	            AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v31.MultiClusterAppRevisionLifecycle)  {
-//		               panic("mock out the AddClusterScopedLifecycle method")
-//	            },
-//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.MultiClusterAppRevisionHandlerFunc)  {
-//		               panic("mock out the AddFeatureHandler method")
-//	            },
-//	            AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v31.MultiClusterAppRevisionLifecycle)  {
-//		               panic("mock out the AddFeatureLifecycle method")
-//	            },
-//	            AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v31.MultiClusterAppRevisionHandlerFunc)  {
-//		               panic("mock out the AddHandler method")
-//	            },
-//	            AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v31.MultiClusterAppRevisionLifecycle)  {
-//		               panic("mock out the AddLifecycle method")
-//	            },
-//	            ControllerFunc: func() v31.MultiClusterAppRevisionController {
-//		               panic("mock out the Controller method")
-//	            },
-//	            CreateFunc: func(in1 *v3.MultiClusterAppRevision) (*v3.MultiClusterAppRevision, error) {
-//		               panic("mock out the Create method")
-//	            },
-//	            DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
-//		               panic("mock out the Delete method")
-//	            },
-//	            DeleteCollectionFunc: func(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
-//		               panic("mock out the DeleteCollection method")
-//	            },
-//	            DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
-//		               panic("mock out the DeleteNamespaced method")
-//	            },
-//	            GetFunc: func(name string, opts metav1.GetOptions) (*v3.MultiClusterAppRevision, error) {
-//		               panic("mock out the Get method")
-//	            },
-//	            GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v3.MultiClusterAppRevision, error) {
-//		               panic("mock out the GetNamespaced method")
-//	            },
-//	            ListFunc: func(opts metav1.ListOptions) (*v3.MultiClusterAppRevisionList, error) {
-//		               panic("mock out the List method")
-//	            },
-//	            ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v3.MultiClusterAppRevisionList, error) {
-//		               panic("mock out the ListNamespaced method")
-//	            },
-//	            ObjectClientFunc: func() *objectclient.ObjectClient {
-//		               panic("mock out the ObjectClient method")
-//	            },
-//	            UpdateFunc: func(in1 *v3.MultiClusterAppRevision) (*v3.MultiClusterAppRevision, error) {
-//		               panic("mock out the Update method")
-//	            },
-//	            WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
-//		               panic("mock out the Watch method")
-//	            },
-//	        }
+//         // make and configure a mocked v31.MultiClusterAppRevisionInterface
+//         mockedMultiClusterAppRevisionInterface := &MultiClusterAppRevisionInterfaceMock{
+//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v31.MultiClusterAppRevisionHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedFeatureHandler method")
+//             },
+//             AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v31.MultiClusterAppRevisionLifecycle)  {
+// 	               panic("mock out the AddClusterScopedFeatureLifecycle method")
+//             },
+//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v31.MultiClusterAppRevisionHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedHandler method")
+//             },
+//             AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v31.MultiClusterAppRevisionLifecycle)  {
+// 	               panic("mock out the AddClusterScopedLifecycle method")
+//             },
+//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.MultiClusterAppRevisionHandlerFunc)  {
+// 	               panic("mock out the AddFeatureHandler method")
+//             },
+//             AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v31.MultiClusterAppRevisionLifecycle)  {
+// 	               panic("mock out the AddFeatureLifecycle method")
+//             },
+//             AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v31.MultiClusterAppRevisionHandlerFunc)  {
+// 	               panic("mock out the AddHandler method")
+//             },
+//             AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v31.MultiClusterAppRevisionLifecycle)  {
+// 	               panic("mock out the AddLifecycle method")
+//             },
+//             ControllerFunc: func() v31.MultiClusterAppRevisionController {
+// 	               panic("mock out the Controller method")
+//             },
+//             CreateFunc: func(in1 *v3.MultiClusterAppRevision) (*v3.MultiClusterAppRevision, error) {
+// 	               panic("mock out the Create method")
+//             },
+//             DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
+// 	               panic("mock out the Delete method")
+//             },
+//             DeleteCollectionFunc: func(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
+// 	               panic("mock out the DeleteCollection method")
+//             },
+//             DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
+// 	               panic("mock out the DeleteNamespaced method")
+//             },
+//             GetFunc: func(name string, opts metav1.GetOptions) (*v3.MultiClusterAppRevision, error) {
+// 	               panic("mock out the Get method")
+//             },
+//             GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v3.MultiClusterAppRevision, error) {
+// 	               panic("mock out the GetNamespaced method")
+//             },
+//             ListFunc: func(opts metav1.ListOptions) (*v3.MultiClusterAppRevisionList, error) {
+// 	               panic("mock out the List method")
+//             },
+//             ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v3.MultiClusterAppRevisionList, error) {
+// 	               panic("mock out the ListNamespaced method")
+//             },
+//             ObjectClientFunc: func() *objectclient.ObjectClient {
+// 	               panic("mock out the ObjectClient method")
+//             },
+//             UpdateFunc: func(in1 *v3.MultiClusterAppRevision) (*v3.MultiClusterAppRevision, error) {
+// 	               panic("mock out the Update method")
+//             },
+//             WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
+// 	               panic("mock out the Watch method")
+//             },
+//         }
 //
-//	        // use mockedMultiClusterAppRevisionInterface in code that requires v31.MultiClusterAppRevisionInterface
-//	        // and then make assertions.
+//         // use mockedMultiClusterAppRevisionInterface in code that requires v31.MultiClusterAppRevisionInterface
+//         // and then make assertions.
 //
-//	    }
+//     }
 type MultiClusterAppRevisionInterfaceMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
 	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v31.MultiClusterAppRevisionHandlerFunc)
@@ -984,8 +973,7 @@ func (mock *MultiClusterAppRevisionInterfaceMock) AddClusterScopedFeatureHandler
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//
-//	len(mockedMultiClusterAppRevisionInterface.AddClusterScopedFeatureHandlerCalls())
+//     len(mockedMultiClusterAppRevisionInterface.AddClusterScopedFeatureHandlerCalls())
 func (mock *MultiClusterAppRevisionInterfaceMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -1032,8 +1020,7 @@ func (mock *MultiClusterAppRevisionInterfaceMock) AddClusterScopedFeatureLifecyc
 
 // AddClusterScopedFeatureLifecycleCalls gets all the calls that were made to AddClusterScopedFeatureLifecycle.
 // Check the length with:
-//
-//	len(mockedMultiClusterAppRevisionInterface.AddClusterScopedFeatureLifecycleCalls())
+//     len(mockedMultiClusterAppRevisionInterface.AddClusterScopedFeatureLifecycleCalls())
 func (mock *MultiClusterAppRevisionInterfaceMock) AddClusterScopedFeatureLifecycleCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -1078,8 +1065,7 @@ func (mock *MultiClusterAppRevisionInterfaceMock) AddClusterScopedHandler(ctx co
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//
-//	len(mockedMultiClusterAppRevisionInterface.AddClusterScopedHandlerCalls())
+//     len(mockedMultiClusterAppRevisionInterface.AddClusterScopedHandlerCalls())
 func (mock *MultiClusterAppRevisionInterfaceMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -1122,8 +1108,7 @@ func (mock *MultiClusterAppRevisionInterfaceMock) AddClusterScopedLifecycle(ctx 
 
 // AddClusterScopedLifecycleCalls gets all the calls that were made to AddClusterScopedLifecycle.
 // Check the length with:
-//
-//	len(mockedMultiClusterAppRevisionInterface.AddClusterScopedLifecycleCalls())
+//     len(mockedMultiClusterAppRevisionInterface.AddClusterScopedLifecycleCalls())
 func (mock *MultiClusterAppRevisionInterfaceMock) AddClusterScopedLifecycleCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -1166,8 +1151,7 @@ func (mock *MultiClusterAppRevisionInterfaceMock) AddFeatureHandler(ctx context.
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//
-//	len(mockedMultiClusterAppRevisionInterface.AddFeatureHandlerCalls())
+//     len(mockedMultiClusterAppRevisionInterface.AddFeatureHandlerCalls())
 func (mock *MultiClusterAppRevisionInterfaceMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
@@ -1210,8 +1194,7 @@ func (mock *MultiClusterAppRevisionInterfaceMock) AddFeatureLifecycle(ctx contex
 
 // AddFeatureLifecycleCalls gets all the calls that were made to AddFeatureLifecycle.
 // Check the length with:
-//
-//	len(mockedMultiClusterAppRevisionInterface.AddFeatureLifecycleCalls())
+//     len(mockedMultiClusterAppRevisionInterface.AddFeatureLifecycleCalls())
 func (mock *MultiClusterAppRevisionInterfaceMock) AddFeatureLifecycleCalls() []struct {
 	Ctx       context.Context
 	Enabled   func() bool
@@ -1252,8 +1235,7 @@ func (mock *MultiClusterAppRevisionInterfaceMock) AddHandler(ctx context.Context
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//
-//	len(mockedMultiClusterAppRevisionInterface.AddHandlerCalls())
+//     len(mockedMultiClusterAppRevisionInterface.AddHandlerCalls())
 func (mock *MultiClusterAppRevisionInterfaceMock) AddHandlerCalls() []struct {
 	Ctx  context.Context
 	Name string
@@ -1292,8 +1274,7 @@ func (mock *MultiClusterAppRevisionInterfaceMock) AddLifecycle(ctx context.Conte
 
 // AddLifecycleCalls gets all the calls that were made to AddLifecycle.
 // Check the length with:
-//
-//	len(mockedMultiClusterAppRevisionInterface.AddLifecycleCalls())
+//     len(mockedMultiClusterAppRevisionInterface.AddLifecycleCalls())
 func (mock *MultiClusterAppRevisionInterfaceMock) AddLifecycleCalls() []struct {
 	Ctx       context.Context
 	Name      string
@@ -1325,8 +1306,7 @@ func (mock *MultiClusterAppRevisionInterfaceMock) Controller() v31.MultiClusterA
 
 // ControllerCalls gets all the calls that were made to Controller.
 // Check the length with:
-//
-//	len(mockedMultiClusterAppRevisionInterface.ControllerCalls())
+//     len(mockedMultiClusterAppRevisionInterface.ControllerCalls())
 func (mock *MultiClusterAppRevisionInterfaceMock) ControllerCalls() []struct {
 } {
 	var calls []struct {
@@ -1355,8 +1335,7 @@ func (mock *MultiClusterAppRevisionInterfaceMock) Create(in1 *v3.MultiClusterApp
 
 // CreateCalls gets all the calls that were made to Create.
 // Check the length with:
-//
-//	len(mockedMultiClusterAppRevisionInterface.CreateCalls())
+//     len(mockedMultiClusterAppRevisionInterface.CreateCalls())
 func (mock *MultiClusterAppRevisionInterfaceMock) CreateCalls() []struct {
 	In1 *v3.MultiClusterAppRevision
 } {
@@ -1389,8 +1368,7 @@ func (mock *MultiClusterAppRevisionInterfaceMock) Delete(name string, options *m
 
 // DeleteCalls gets all the calls that were made to Delete.
 // Check the length with:
-//
-//	len(mockedMultiClusterAppRevisionInterface.DeleteCalls())
+//     len(mockedMultiClusterAppRevisionInterface.DeleteCalls())
 func (mock *MultiClusterAppRevisionInterfaceMock) DeleteCalls() []struct {
 	Name    string
 	Options *metav1.DeleteOptions
@@ -1425,8 +1403,7 @@ func (mock *MultiClusterAppRevisionInterfaceMock) DeleteCollection(deleteOpts *m
 
 // DeleteCollectionCalls gets all the calls that were made to DeleteCollection.
 // Check the length with:
-//
-//	len(mockedMultiClusterAppRevisionInterface.DeleteCollectionCalls())
+//     len(mockedMultiClusterAppRevisionInterface.DeleteCollectionCalls())
 func (mock *MultiClusterAppRevisionInterfaceMock) DeleteCollectionCalls() []struct {
 	DeleteOpts *metav1.DeleteOptions
 	ListOpts   metav1.ListOptions
@@ -1463,8 +1440,7 @@ func (mock *MultiClusterAppRevisionInterfaceMock) DeleteNamespaced(namespace str
 
 // DeleteNamespacedCalls gets all the calls that were made to DeleteNamespaced.
 // Check the length with:
-//
-//	len(mockedMultiClusterAppRevisionInterface.DeleteNamespacedCalls())
+//     len(mockedMultiClusterAppRevisionInterface.DeleteNamespacedCalls())
 func (mock *MultiClusterAppRevisionInterfaceMock) DeleteNamespacedCalls() []struct {
 	Namespace string
 	Name      string
@@ -1501,8 +1477,7 @@ func (mock *MultiClusterAppRevisionInterfaceMock) Get(name string, opts metav1.G
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//
-//	len(mockedMultiClusterAppRevisionInterface.GetCalls())
+//     len(mockedMultiClusterAppRevisionInterface.GetCalls())
 func (mock *MultiClusterAppRevisionInterfaceMock) GetCalls() []struct {
 	Name string
 	Opts metav1.GetOptions
@@ -1539,8 +1514,7 @@ func (mock *MultiClusterAppRevisionInterfaceMock) GetNamespaced(namespace string
 
 // GetNamespacedCalls gets all the calls that were made to GetNamespaced.
 // Check the length with:
-//
-//	len(mockedMultiClusterAppRevisionInterface.GetNamespacedCalls())
+//     len(mockedMultiClusterAppRevisionInterface.GetNamespacedCalls())
 func (mock *MultiClusterAppRevisionInterfaceMock) GetNamespacedCalls() []struct {
 	Namespace string
 	Name      string
@@ -1575,8 +1549,7 @@ func (mock *MultiClusterAppRevisionInterfaceMock) List(opts metav1.ListOptions) 
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//
-//	len(mockedMultiClusterAppRevisionInterface.ListCalls())
+//     len(mockedMultiClusterAppRevisionInterface.ListCalls())
 func (mock *MultiClusterAppRevisionInterfaceMock) ListCalls() []struct {
 	Opts metav1.ListOptions
 } {
@@ -1609,8 +1582,7 @@ func (mock *MultiClusterAppRevisionInterfaceMock) ListNamespaced(namespace strin
 
 // ListNamespacedCalls gets all the calls that were made to ListNamespaced.
 // Check the length with:
-//
-//	len(mockedMultiClusterAppRevisionInterface.ListNamespacedCalls())
+//     len(mockedMultiClusterAppRevisionInterface.ListNamespacedCalls())
 func (mock *MultiClusterAppRevisionInterfaceMock) ListNamespacedCalls() []struct {
 	Namespace string
 	Opts      metav1.ListOptions
@@ -1640,8 +1612,7 @@ func (mock *MultiClusterAppRevisionInterfaceMock) ObjectClient() *objectclient.O
 
 // ObjectClientCalls gets all the calls that were made to ObjectClient.
 // Check the length with:
-//
-//	len(mockedMultiClusterAppRevisionInterface.ObjectClientCalls())
+//     len(mockedMultiClusterAppRevisionInterface.ObjectClientCalls())
 func (mock *MultiClusterAppRevisionInterfaceMock) ObjectClientCalls() []struct {
 } {
 	var calls []struct {
@@ -1670,8 +1641,7 @@ func (mock *MultiClusterAppRevisionInterfaceMock) Update(in1 *v3.MultiClusterApp
 
 // UpdateCalls gets all the calls that were made to Update.
 // Check the length with:
-//
-//	len(mockedMultiClusterAppRevisionInterface.UpdateCalls())
+//     len(mockedMultiClusterAppRevisionInterface.UpdateCalls())
 func (mock *MultiClusterAppRevisionInterfaceMock) UpdateCalls() []struct {
 	In1 *v3.MultiClusterAppRevision
 } {
@@ -1702,8 +1672,7 @@ func (mock *MultiClusterAppRevisionInterfaceMock) Watch(opts metav1.ListOptions)
 
 // WatchCalls gets all the calls that were made to Watch.
 // Check the length with:
-//
-//	len(mockedMultiClusterAppRevisionInterface.WatchCalls())
+//     len(mockedMultiClusterAppRevisionInterface.WatchCalls())
 func (mock *MultiClusterAppRevisionInterfaceMock) WatchCalls() []struct {
 	Opts metav1.ListOptions
 } {
@@ -1726,19 +1695,19 @@ var _ v31.MultiClusterAppRevisionsGetter = &MultiClusterAppRevisionsGetterMock{}
 
 // MultiClusterAppRevisionsGetterMock is a mock implementation of v31.MultiClusterAppRevisionsGetter.
 //
-//	    func TestSomethingThatUsesMultiClusterAppRevisionsGetter(t *testing.T) {
+//     func TestSomethingThatUsesMultiClusterAppRevisionsGetter(t *testing.T) {
 //
-//	        // make and configure a mocked v31.MultiClusterAppRevisionsGetter
-//	        mockedMultiClusterAppRevisionsGetter := &MultiClusterAppRevisionsGetterMock{
-//	            MultiClusterAppRevisionsFunc: func(namespace string) v31.MultiClusterAppRevisionInterface {
-//		               panic("mock out the MultiClusterAppRevisions method")
-//	            },
-//	        }
+//         // make and configure a mocked v31.MultiClusterAppRevisionsGetter
+//         mockedMultiClusterAppRevisionsGetter := &MultiClusterAppRevisionsGetterMock{
+//             MultiClusterAppRevisionsFunc: func(namespace string) v31.MultiClusterAppRevisionInterface {
+// 	               panic("mock out the MultiClusterAppRevisions method")
+//             },
+//         }
 //
-//	        // use mockedMultiClusterAppRevisionsGetter in code that requires v31.MultiClusterAppRevisionsGetter
-//	        // and then make assertions.
+//         // use mockedMultiClusterAppRevisionsGetter in code that requires v31.MultiClusterAppRevisionsGetter
+//         // and then make assertions.
 //
-//	    }
+//     }
 type MultiClusterAppRevisionsGetterMock struct {
 	// MultiClusterAppRevisionsFunc mocks the MultiClusterAppRevisions method.
 	MultiClusterAppRevisionsFunc func(namespace string) v31.MultiClusterAppRevisionInterface
@@ -1771,8 +1740,7 @@ func (mock *MultiClusterAppRevisionsGetterMock) MultiClusterAppRevisions(namespa
 
 // MultiClusterAppRevisionsCalls gets all the calls that were made to MultiClusterAppRevisions.
 // Check the length with:
-//
-//	len(mockedMultiClusterAppRevisionsGetter.MultiClusterAppRevisionsCalls())
+//     len(mockedMultiClusterAppRevisionsGetter.MultiClusterAppRevisionsCalls())
 func (mock *MultiClusterAppRevisionsGetterMock) MultiClusterAppRevisionsCalls() []struct {
 	Namespace string
 } {

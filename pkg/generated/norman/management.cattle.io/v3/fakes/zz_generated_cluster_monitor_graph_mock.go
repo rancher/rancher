@@ -29,22 +29,22 @@ var _ v31.ClusterMonitorGraphLister = &ClusterMonitorGraphListerMock{}
 
 // ClusterMonitorGraphListerMock is a mock implementation of v31.ClusterMonitorGraphLister.
 //
-//	    func TestSomethingThatUsesClusterMonitorGraphLister(t *testing.T) {
+//     func TestSomethingThatUsesClusterMonitorGraphLister(t *testing.T) {
 //
-//	        // make and configure a mocked v31.ClusterMonitorGraphLister
-//	        mockedClusterMonitorGraphLister := &ClusterMonitorGraphListerMock{
-//	            GetFunc: func(namespace string, name string) (*v3.ClusterMonitorGraph, error) {
-//		               panic("mock out the Get method")
-//	            },
-//	            ListFunc: func(namespace string, selector labels.Selector) ([]*v3.ClusterMonitorGraph, error) {
-//		               panic("mock out the List method")
-//	            },
-//	        }
+//         // make and configure a mocked v31.ClusterMonitorGraphLister
+//         mockedClusterMonitorGraphLister := &ClusterMonitorGraphListerMock{
+//             GetFunc: func(namespace string, name string) (*v3.ClusterMonitorGraph, error) {
+// 	               panic("mock out the Get method")
+//             },
+//             ListFunc: func(namespace string, selector labels.Selector) ([]*v3.ClusterMonitorGraph, error) {
+// 	               panic("mock out the List method")
+//             },
+//         }
 //
-//	        // use mockedClusterMonitorGraphLister in code that requires v31.ClusterMonitorGraphLister
-//	        // and then make assertions.
+//         // use mockedClusterMonitorGraphLister in code that requires v31.ClusterMonitorGraphLister
+//         // and then make assertions.
 //
-//	    }
+//     }
 type ClusterMonitorGraphListerMock struct {
 	// GetFunc mocks the Get method.
 	GetFunc func(namespace string, name string) (*v3.ClusterMonitorGraph, error)
@@ -91,8 +91,7 @@ func (mock *ClusterMonitorGraphListerMock) Get(namespace string, name string) (*
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//
-//	len(mockedClusterMonitorGraphLister.GetCalls())
+//     len(mockedClusterMonitorGraphLister.GetCalls())
 func (mock *ClusterMonitorGraphListerMock) GetCalls() []struct {
 	Namespace string
 	Name      string
@@ -127,8 +126,7 @@ func (mock *ClusterMonitorGraphListerMock) List(namespace string, selector label
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//
-//	len(mockedClusterMonitorGraphLister.ListCalls())
+//     len(mockedClusterMonitorGraphLister.ListCalls())
 func (mock *ClusterMonitorGraphListerMock) ListCalls() []struct {
 	Namespace string
 	Selector  labels.Selector
@@ -161,43 +159,43 @@ var _ v31.ClusterMonitorGraphController = &ClusterMonitorGraphControllerMock{}
 
 // ClusterMonitorGraphControllerMock is a mock implementation of v31.ClusterMonitorGraphController.
 //
-//	    func TestSomethingThatUsesClusterMonitorGraphController(t *testing.T) {
+//     func TestSomethingThatUsesClusterMonitorGraphController(t *testing.T) {
 //
-//	        // make and configure a mocked v31.ClusterMonitorGraphController
-//	        mockedClusterMonitorGraphController := &ClusterMonitorGraphControllerMock{
-//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v31.ClusterMonitorGraphHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedFeatureHandler method")
-//	            },
-//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v31.ClusterMonitorGraphHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedHandler method")
-//	            },
-//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.ClusterMonitorGraphHandlerFunc)  {
-//		               panic("mock out the AddFeatureHandler method")
-//	            },
-//	            AddHandlerFunc: func(ctx context.Context, name string, handler v31.ClusterMonitorGraphHandlerFunc)  {
-//		               panic("mock out the AddHandler method")
-//	            },
-//	            EnqueueFunc: func(namespace string, name string)  {
-//		               panic("mock out the Enqueue method")
-//	            },
-//	            EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
-//		               panic("mock out the EnqueueAfter method")
-//	            },
-//	            GenericFunc: func() controller.GenericController {
-//		               panic("mock out the Generic method")
-//	            },
-//	            InformerFunc: func() cache.SharedIndexInformer {
-//		               panic("mock out the Informer method")
-//	            },
-//	            ListerFunc: func() v31.ClusterMonitorGraphLister {
-//		               panic("mock out the Lister method")
-//	            },
-//	        }
+//         // make and configure a mocked v31.ClusterMonitorGraphController
+//         mockedClusterMonitorGraphController := &ClusterMonitorGraphControllerMock{
+//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v31.ClusterMonitorGraphHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedFeatureHandler method")
+//             },
+//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v31.ClusterMonitorGraphHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedHandler method")
+//             },
+//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.ClusterMonitorGraphHandlerFunc)  {
+// 	               panic("mock out the AddFeatureHandler method")
+//             },
+//             AddHandlerFunc: func(ctx context.Context, name string, handler v31.ClusterMonitorGraphHandlerFunc)  {
+// 	               panic("mock out the AddHandler method")
+//             },
+//             EnqueueFunc: func(namespace string, name string)  {
+// 	               panic("mock out the Enqueue method")
+//             },
+//             EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
+// 	               panic("mock out the EnqueueAfter method")
+//             },
+//             GenericFunc: func() controller.GenericController {
+// 	               panic("mock out the Generic method")
+//             },
+//             InformerFunc: func() cache.SharedIndexInformer {
+// 	               panic("mock out the Informer method")
+//             },
+//             ListerFunc: func() v31.ClusterMonitorGraphLister {
+// 	               panic("mock out the Lister method")
+//             },
+//         }
 //
-//	        // use mockedClusterMonitorGraphController in code that requires v31.ClusterMonitorGraphController
-//	        // and then make assertions.
+//         // use mockedClusterMonitorGraphController in code that requires v31.ClusterMonitorGraphController
+//         // and then make assertions.
 //
-//	    }
+//     }
 type ClusterMonitorGraphControllerMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
 	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v31.ClusterMonitorGraphHandlerFunc)
@@ -326,8 +324,7 @@ func (mock *ClusterMonitorGraphControllerMock) AddClusterScopedFeatureHandler(ct
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//
-//	len(mockedClusterMonitorGraphController.AddClusterScopedFeatureHandlerCalls())
+//     len(mockedClusterMonitorGraphController.AddClusterScopedFeatureHandlerCalls())
 func (mock *ClusterMonitorGraphControllerMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -372,8 +369,7 @@ func (mock *ClusterMonitorGraphControllerMock) AddClusterScopedHandler(ctx conte
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//
-//	len(mockedClusterMonitorGraphController.AddClusterScopedHandlerCalls())
+//     len(mockedClusterMonitorGraphController.AddClusterScopedHandlerCalls())
 func (mock *ClusterMonitorGraphControllerMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -416,8 +412,7 @@ func (mock *ClusterMonitorGraphControllerMock) AddFeatureHandler(ctx context.Con
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//
-//	len(mockedClusterMonitorGraphController.AddFeatureHandlerCalls())
+//     len(mockedClusterMonitorGraphController.AddFeatureHandlerCalls())
 func (mock *ClusterMonitorGraphControllerMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
@@ -458,8 +453,7 @@ func (mock *ClusterMonitorGraphControllerMock) AddHandler(ctx context.Context, n
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//
-//	len(mockedClusterMonitorGraphController.AddHandlerCalls())
+//     len(mockedClusterMonitorGraphController.AddHandlerCalls())
 func (mock *ClusterMonitorGraphControllerMock) AddHandlerCalls() []struct {
 	Ctx     context.Context
 	Name    string
@@ -496,8 +490,7 @@ func (mock *ClusterMonitorGraphControllerMock) Enqueue(namespace string, name st
 
 // EnqueueCalls gets all the calls that were made to Enqueue.
 // Check the length with:
-//
-//	len(mockedClusterMonitorGraphController.EnqueueCalls())
+//     len(mockedClusterMonitorGraphController.EnqueueCalls())
 func (mock *ClusterMonitorGraphControllerMock) EnqueueCalls() []struct {
 	Namespace string
 	Name      string
@@ -534,8 +527,7 @@ func (mock *ClusterMonitorGraphControllerMock) EnqueueAfter(namespace string, na
 
 // EnqueueAfterCalls gets all the calls that were made to EnqueueAfter.
 // Check the length with:
-//
-//	len(mockedClusterMonitorGraphController.EnqueueAfterCalls())
+//     len(mockedClusterMonitorGraphController.EnqueueAfterCalls())
 func (mock *ClusterMonitorGraphControllerMock) EnqueueAfterCalls() []struct {
 	Namespace string
 	Name      string
@@ -567,8 +559,7 @@ func (mock *ClusterMonitorGraphControllerMock) Generic() controller.GenericContr
 
 // GenericCalls gets all the calls that were made to Generic.
 // Check the length with:
-//
-//	len(mockedClusterMonitorGraphController.GenericCalls())
+//     len(mockedClusterMonitorGraphController.GenericCalls())
 func (mock *ClusterMonitorGraphControllerMock) GenericCalls() []struct {
 } {
 	var calls []struct {
@@ -594,8 +585,7 @@ func (mock *ClusterMonitorGraphControllerMock) Informer() cache.SharedIndexInfor
 
 // InformerCalls gets all the calls that were made to Informer.
 // Check the length with:
-//
-//	len(mockedClusterMonitorGraphController.InformerCalls())
+//     len(mockedClusterMonitorGraphController.InformerCalls())
 func (mock *ClusterMonitorGraphControllerMock) InformerCalls() []struct {
 } {
 	var calls []struct {
@@ -621,8 +611,7 @@ func (mock *ClusterMonitorGraphControllerMock) Lister() v31.ClusterMonitorGraphL
 
 // ListerCalls gets all the calls that were made to Lister.
 // Check the length with:
-//
-//	len(mockedClusterMonitorGraphController.ListerCalls())
+//     len(mockedClusterMonitorGraphController.ListerCalls())
 func (mock *ClusterMonitorGraphControllerMock) ListerCalls() []struct {
 } {
 	var calls []struct {
@@ -662,76 +651,76 @@ var _ v31.ClusterMonitorGraphInterface = &ClusterMonitorGraphInterfaceMock{}
 
 // ClusterMonitorGraphInterfaceMock is a mock implementation of v31.ClusterMonitorGraphInterface.
 //
-//	    func TestSomethingThatUsesClusterMonitorGraphInterface(t *testing.T) {
+//     func TestSomethingThatUsesClusterMonitorGraphInterface(t *testing.T) {
 //
-//	        // make and configure a mocked v31.ClusterMonitorGraphInterface
-//	        mockedClusterMonitorGraphInterface := &ClusterMonitorGraphInterfaceMock{
-//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v31.ClusterMonitorGraphHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedFeatureHandler method")
-//	            },
-//	            AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v31.ClusterMonitorGraphLifecycle)  {
-//		               panic("mock out the AddClusterScopedFeatureLifecycle method")
-//	            },
-//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v31.ClusterMonitorGraphHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedHandler method")
-//	            },
-//	            AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v31.ClusterMonitorGraphLifecycle)  {
-//		               panic("mock out the AddClusterScopedLifecycle method")
-//	            },
-//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.ClusterMonitorGraphHandlerFunc)  {
-//		               panic("mock out the AddFeatureHandler method")
-//	            },
-//	            AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v31.ClusterMonitorGraphLifecycle)  {
-//		               panic("mock out the AddFeatureLifecycle method")
-//	            },
-//	            AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v31.ClusterMonitorGraphHandlerFunc)  {
-//		               panic("mock out the AddHandler method")
-//	            },
-//	            AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v31.ClusterMonitorGraphLifecycle)  {
-//		               panic("mock out the AddLifecycle method")
-//	            },
-//	            ControllerFunc: func() v31.ClusterMonitorGraphController {
-//		               panic("mock out the Controller method")
-//	            },
-//	            CreateFunc: func(in1 *v3.ClusterMonitorGraph) (*v3.ClusterMonitorGraph, error) {
-//		               panic("mock out the Create method")
-//	            },
-//	            DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
-//		               panic("mock out the Delete method")
-//	            },
-//	            DeleteCollectionFunc: func(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
-//		               panic("mock out the DeleteCollection method")
-//	            },
-//	            DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
-//		               panic("mock out the DeleteNamespaced method")
-//	            },
-//	            GetFunc: func(name string, opts metav1.GetOptions) (*v3.ClusterMonitorGraph, error) {
-//		               panic("mock out the Get method")
-//	            },
-//	            GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v3.ClusterMonitorGraph, error) {
-//		               panic("mock out the GetNamespaced method")
-//	            },
-//	            ListFunc: func(opts metav1.ListOptions) (*v3.ClusterMonitorGraphList, error) {
-//		               panic("mock out the List method")
-//	            },
-//	            ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v3.ClusterMonitorGraphList, error) {
-//		               panic("mock out the ListNamespaced method")
-//	            },
-//	            ObjectClientFunc: func() *objectclient.ObjectClient {
-//		               panic("mock out the ObjectClient method")
-//	            },
-//	            UpdateFunc: func(in1 *v3.ClusterMonitorGraph) (*v3.ClusterMonitorGraph, error) {
-//		               panic("mock out the Update method")
-//	            },
-//	            WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
-//		               panic("mock out the Watch method")
-//	            },
-//	        }
+//         // make and configure a mocked v31.ClusterMonitorGraphInterface
+//         mockedClusterMonitorGraphInterface := &ClusterMonitorGraphInterfaceMock{
+//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v31.ClusterMonitorGraphHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedFeatureHandler method")
+//             },
+//             AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v31.ClusterMonitorGraphLifecycle)  {
+// 	               panic("mock out the AddClusterScopedFeatureLifecycle method")
+//             },
+//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v31.ClusterMonitorGraphHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedHandler method")
+//             },
+//             AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v31.ClusterMonitorGraphLifecycle)  {
+// 	               panic("mock out the AddClusterScopedLifecycle method")
+//             },
+//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.ClusterMonitorGraphHandlerFunc)  {
+// 	               panic("mock out the AddFeatureHandler method")
+//             },
+//             AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v31.ClusterMonitorGraphLifecycle)  {
+// 	               panic("mock out the AddFeatureLifecycle method")
+//             },
+//             AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v31.ClusterMonitorGraphHandlerFunc)  {
+// 	               panic("mock out the AddHandler method")
+//             },
+//             AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v31.ClusterMonitorGraphLifecycle)  {
+// 	               panic("mock out the AddLifecycle method")
+//             },
+//             ControllerFunc: func() v31.ClusterMonitorGraphController {
+// 	               panic("mock out the Controller method")
+//             },
+//             CreateFunc: func(in1 *v3.ClusterMonitorGraph) (*v3.ClusterMonitorGraph, error) {
+// 	               panic("mock out the Create method")
+//             },
+//             DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
+// 	               panic("mock out the Delete method")
+//             },
+//             DeleteCollectionFunc: func(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
+// 	               panic("mock out the DeleteCollection method")
+//             },
+//             DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
+// 	               panic("mock out the DeleteNamespaced method")
+//             },
+//             GetFunc: func(name string, opts metav1.GetOptions) (*v3.ClusterMonitorGraph, error) {
+// 	               panic("mock out the Get method")
+//             },
+//             GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v3.ClusterMonitorGraph, error) {
+// 	               panic("mock out the GetNamespaced method")
+//             },
+//             ListFunc: func(opts metav1.ListOptions) (*v3.ClusterMonitorGraphList, error) {
+// 	               panic("mock out the List method")
+//             },
+//             ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v3.ClusterMonitorGraphList, error) {
+// 	               panic("mock out the ListNamespaced method")
+//             },
+//             ObjectClientFunc: func() *objectclient.ObjectClient {
+// 	               panic("mock out the ObjectClient method")
+//             },
+//             UpdateFunc: func(in1 *v3.ClusterMonitorGraph) (*v3.ClusterMonitorGraph, error) {
+// 	               panic("mock out the Update method")
+//             },
+//             WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
+// 	               panic("mock out the Watch method")
+//             },
+//         }
 //
-//	        // use mockedClusterMonitorGraphInterface in code that requires v31.ClusterMonitorGraphInterface
-//	        // and then make assertions.
+//         // use mockedClusterMonitorGraphInterface in code that requires v31.ClusterMonitorGraphInterface
+//         // and then make assertions.
 //
-//	    }
+//     }
 type ClusterMonitorGraphInterfaceMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
 	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v31.ClusterMonitorGraphHandlerFunc)
@@ -984,8 +973,7 @@ func (mock *ClusterMonitorGraphInterfaceMock) AddClusterScopedFeatureHandler(ctx
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//
-//	len(mockedClusterMonitorGraphInterface.AddClusterScopedFeatureHandlerCalls())
+//     len(mockedClusterMonitorGraphInterface.AddClusterScopedFeatureHandlerCalls())
 func (mock *ClusterMonitorGraphInterfaceMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -1032,8 +1020,7 @@ func (mock *ClusterMonitorGraphInterfaceMock) AddClusterScopedFeatureLifecycle(c
 
 // AddClusterScopedFeatureLifecycleCalls gets all the calls that were made to AddClusterScopedFeatureLifecycle.
 // Check the length with:
-//
-//	len(mockedClusterMonitorGraphInterface.AddClusterScopedFeatureLifecycleCalls())
+//     len(mockedClusterMonitorGraphInterface.AddClusterScopedFeatureLifecycleCalls())
 func (mock *ClusterMonitorGraphInterfaceMock) AddClusterScopedFeatureLifecycleCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -1078,8 +1065,7 @@ func (mock *ClusterMonitorGraphInterfaceMock) AddClusterScopedHandler(ctx contex
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//
-//	len(mockedClusterMonitorGraphInterface.AddClusterScopedHandlerCalls())
+//     len(mockedClusterMonitorGraphInterface.AddClusterScopedHandlerCalls())
 func (mock *ClusterMonitorGraphInterfaceMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -1122,8 +1108,7 @@ func (mock *ClusterMonitorGraphInterfaceMock) AddClusterScopedLifecycle(ctx cont
 
 // AddClusterScopedLifecycleCalls gets all the calls that were made to AddClusterScopedLifecycle.
 // Check the length with:
-//
-//	len(mockedClusterMonitorGraphInterface.AddClusterScopedLifecycleCalls())
+//     len(mockedClusterMonitorGraphInterface.AddClusterScopedLifecycleCalls())
 func (mock *ClusterMonitorGraphInterfaceMock) AddClusterScopedLifecycleCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -1166,8 +1151,7 @@ func (mock *ClusterMonitorGraphInterfaceMock) AddFeatureHandler(ctx context.Cont
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//
-//	len(mockedClusterMonitorGraphInterface.AddFeatureHandlerCalls())
+//     len(mockedClusterMonitorGraphInterface.AddFeatureHandlerCalls())
 func (mock *ClusterMonitorGraphInterfaceMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
@@ -1210,8 +1194,7 @@ func (mock *ClusterMonitorGraphInterfaceMock) AddFeatureLifecycle(ctx context.Co
 
 // AddFeatureLifecycleCalls gets all the calls that were made to AddFeatureLifecycle.
 // Check the length with:
-//
-//	len(mockedClusterMonitorGraphInterface.AddFeatureLifecycleCalls())
+//     len(mockedClusterMonitorGraphInterface.AddFeatureLifecycleCalls())
 func (mock *ClusterMonitorGraphInterfaceMock) AddFeatureLifecycleCalls() []struct {
 	Ctx       context.Context
 	Enabled   func() bool
@@ -1252,8 +1235,7 @@ func (mock *ClusterMonitorGraphInterfaceMock) AddHandler(ctx context.Context, na
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//
-//	len(mockedClusterMonitorGraphInterface.AddHandlerCalls())
+//     len(mockedClusterMonitorGraphInterface.AddHandlerCalls())
 func (mock *ClusterMonitorGraphInterfaceMock) AddHandlerCalls() []struct {
 	Ctx  context.Context
 	Name string
@@ -1292,8 +1274,7 @@ func (mock *ClusterMonitorGraphInterfaceMock) AddLifecycle(ctx context.Context, 
 
 // AddLifecycleCalls gets all the calls that were made to AddLifecycle.
 // Check the length with:
-//
-//	len(mockedClusterMonitorGraphInterface.AddLifecycleCalls())
+//     len(mockedClusterMonitorGraphInterface.AddLifecycleCalls())
 func (mock *ClusterMonitorGraphInterfaceMock) AddLifecycleCalls() []struct {
 	Ctx       context.Context
 	Name      string
@@ -1325,8 +1306,7 @@ func (mock *ClusterMonitorGraphInterfaceMock) Controller() v31.ClusterMonitorGra
 
 // ControllerCalls gets all the calls that were made to Controller.
 // Check the length with:
-//
-//	len(mockedClusterMonitorGraphInterface.ControllerCalls())
+//     len(mockedClusterMonitorGraphInterface.ControllerCalls())
 func (mock *ClusterMonitorGraphInterfaceMock) ControllerCalls() []struct {
 } {
 	var calls []struct {
@@ -1355,8 +1335,7 @@ func (mock *ClusterMonitorGraphInterfaceMock) Create(in1 *v3.ClusterMonitorGraph
 
 // CreateCalls gets all the calls that were made to Create.
 // Check the length with:
-//
-//	len(mockedClusterMonitorGraphInterface.CreateCalls())
+//     len(mockedClusterMonitorGraphInterface.CreateCalls())
 func (mock *ClusterMonitorGraphInterfaceMock) CreateCalls() []struct {
 	In1 *v3.ClusterMonitorGraph
 } {
@@ -1389,8 +1368,7 @@ func (mock *ClusterMonitorGraphInterfaceMock) Delete(name string, options *metav
 
 // DeleteCalls gets all the calls that were made to Delete.
 // Check the length with:
-//
-//	len(mockedClusterMonitorGraphInterface.DeleteCalls())
+//     len(mockedClusterMonitorGraphInterface.DeleteCalls())
 func (mock *ClusterMonitorGraphInterfaceMock) DeleteCalls() []struct {
 	Name    string
 	Options *metav1.DeleteOptions
@@ -1425,8 +1403,7 @@ func (mock *ClusterMonitorGraphInterfaceMock) DeleteCollection(deleteOpts *metav
 
 // DeleteCollectionCalls gets all the calls that were made to DeleteCollection.
 // Check the length with:
-//
-//	len(mockedClusterMonitorGraphInterface.DeleteCollectionCalls())
+//     len(mockedClusterMonitorGraphInterface.DeleteCollectionCalls())
 func (mock *ClusterMonitorGraphInterfaceMock) DeleteCollectionCalls() []struct {
 	DeleteOpts *metav1.DeleteOptions
 	ListOpts   metav1.ListOptions
@@ -1463,8 +1440,7 @@ func (mock *ClusterMonitorGraphInterfaceMock) DeleteNamespaced(namespace string,
 
 // DeleteNamespacedCalls gets all the calls that were made to DeleteNamespaced.
 // Check the length with:
-//
-//	len(mockedClusterMonitorGraphInterface.DeleteNamespacedCalls())
+//     len(mockedClusterMonitorGraphInterface.DeleteNamespacedCalls())
 func (mock *ClusterMonitorGraphInterfaceMock) DeleteNamespacedCalls() []struct {
 	Namespace string
 	Name      string
@@ -1501,8 +1477,7 @@ func (mock *ClusterMonitorGraphInterfaceMock) Get(name string, opts metav1.GetOp
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//
-//	len(mockedClusterMonitorGraphInterface.GetCalls())
+//     len(mockedClusterMonitorGraphInterface.GetCalls())
 func (mock *ClusterMonitorGraphInterfaceMock) GetCalls() []struct {
 	Name string
 	Opts metav1.GetOptions
@@ -1539,8 +1514,7 @@ func (mock *ClusterMonitorGraphInterfaceMock) GetNamespaced(namespace string, na
 
 // GetNamespacedCalls gets all the calls that were made to GetNamespaced.
 // Check the length with:
-//
-//	len(mockedClusterMonitorGraphInterface.GetNamespacedCalls())
+//     len(mockedClusterMonitorGraphInterface.GetNamespacedCalls())
 func (mock *ClusterMonitorGraphInterfaceMock) GetNamespacedCalls() []struct {
 	Namespace string
 	Name      string
@@ -1575,8 +1549,7 @@ func (mock *ClusterMonitorGraphInterfaceMock) List(opts metav1.ListOptions) (*v3
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//
-//	len(mockedClusterMonitorGraphInterface.ListCalls())
+//     len(mockedClusterMonitorGraphInterface.ListCalls())
 func (mock *ClusterMonitorGraphInterfaceMock) ListCalls() []struct {
 	Opts metav1.ListOptions
 } {
@@ -1609,8 +1582,7 @@ func (mock *ClusterMonitorGraphInterfaceMock) ListNamespaced(namespace string, o
 
 // ListNamespacedCalls gets all the calls that were made to ListNamespaced.
 // Check the length with:
-//
-//	len(mockedClusterMonitorGraphInterface.ListNamespacedCalls())
+//     len(mockedClusterMonitorGraphInterface.ListNamespacedCalls())
 func (mock *ClusterMonitorGraphInterfaceMock) ListNamespacedCalls() []struct {
 	Namespace string
 	Opts      metav1.ListOptions
@@ -1640,8 +1612,7 @@ func (mock *ClusterMonitorGraphInterfaceMock) ObjectClient() *objectclient.Objec
 
 // ObjectClientCalls gets all the calls that were made to ObjectClient.
 // Check the length with:
-//
-//	len(mockedClusterMonitorGraphInterface.ObjectClientCalls())
+//     len(mockedClusterMonitorGraphInterface.ObjectClientCalls())
 func (mock *ClusterMonitorGraphInterfaceMock) ObjectClientCalls() []struct {
 } {
 	var calls []struct {
@@ -1670,8 +1641,7 @@ func (mock *ClusterMonitorGraphInterfaceMock) Update(in1 *v3.ClusterMonitorGraph
 
 // UpdateCalls gets all the calls that were made to Update.
 // Check the length with:
-//
-//	len(mockedClusterMonitorGraphInterface.UpdateCalls())
+//     len(mockedClusterMonitorGraphInterface.UpdateCalls())
 func (mock *ClusterMonitorGraphInterfaceMock) UpdateCalls() []struct {
 	In1 *v3.ClusterMonitorGraph
 } {
@@ -1702,8 +1672,7 @@ func (mock *ClusterMonitorGraphInterfaceMock) Watch(opts metav1.ListOptions) (wa
 
 // WatchCalls gets all the calls that were made to Watch.
 // Check the length with:
-//
-//	len(mockedClusterMonitorGraphInterface.WatchCalls())
+//     len(mockedClusterMonitorGraphInterface.WatchCalls())
 func (mock *ClusterMonitorGraphInterfaceMock) WatchCalls() []struct {
 	Opts metav1.ListOptions
 } {
@@ -1726,19 +1695,19 @@ var _ v31.ClusterMonitorGraphsGetter = &ClusterMonitorGraphsGetterMock{}
 
 // ClusterMonitorGraphsGetterMock is a mock implementation of v31.ClusterMonitorGraphsGetter.
 //
-//	    func TestSomethingThatUsesClusterMonitorGraphsGetter(t *testing.T) {
+//     func TestSomethingThatUsesClusterMonitorGraphsGetter(t *testing.T) {
 //
-//	        // make and configure a mocked v31.ClusterMonitorGraphsGetter
-//	        mockedClusterMonitorGraphsGetter := &ClusterMonitorGraphsGetterMock{
-//	            ClusterMonitorGraphsFunc: func(namespace string) v31.ClusterMonitorGraphInterface {
-//		               panic("mock out the ClusterMonitorGraphs method")
-//	            },
-//	        }
+//         // make and configure a mocked v31.ClusterMonitorGraphsGetter
+//         mockedClusterMonitorGraphsGetter := &ClusterMonitorGraphsGetterMock{
+//             ClusterMonitorGraphsFunc: func(namespace string) v31.ClusterMonitorGraphInterface {
+// 	               panic("mock out the ClusterMonitorGraphs method")
+//             },
+//         }
 //
-//	        // use mockedClusterMonitorGraphsGetter in code that requires v31.ClusterMonitorGraphsGetter
-//	        // and then make assertions.
+//         // use mockedClusterMonitorGraphsGetter in code that requires v31.ClusterMonitorGraphsGetter
+//         // and then make assertions.
 //
-//	    }
+//     }
 type ClusterMonitorGraphsGetterMock struct {
 	// ClusterMonitorGraphsFunc mocks the ClusterMonitorGraphs method.
 	ClusterMonitorGraphsFunc func(namespace string) v31.ClusterMonitorGraphInterface
@@ -1771,8 +1740,7 @@ func (mock *ClusterMonitorGraphsGetterMock) ClusterMonitorGraphs(namespace strin
 
 // ClusterMonitorGraphsCalls gets all the calls that were made to ClusterMonitorGraphs.
 // Check the length with:
-//
-//	len(mockedClusterMonitorGraphsGetter.ClusterMonitorGraphsCalls())
+//     len(mockedClusterMonitorGraphsGetter.ClusterMonitorGraphsCalls())
 func (mock *ClusterMonitorGraphsGetterMock) ClusterMonitorGraphsCalls() []struct {
 	Namespace string
 } {

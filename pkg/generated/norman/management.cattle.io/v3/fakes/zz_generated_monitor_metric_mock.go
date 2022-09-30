@@ -29,22 +29,22 @@ var _ v31.MonitorMetricLister = &MonitorMetricListerMock{}
 
 // MonitorMetricListerMock is a mock implementation of v31.MonitorMetricLister.
 //
-//	    func TestSomethingThatUsesMonitorMetricLister(t *testing.T) {
+//     func TestSomethingThatUsesMonitorMetricLister(t *testing.T) {
 //
-//	        // make and configure a mocked v31.MonitorMetricLister
-//	        mockedMonitorMetricLister := &MonitorMetricListerMock{
-//	            GetFunc: func(namespace string, name string) (*v3.MonitorMetric, error) {
-//		               panic("mock out the Get method")
-//	            },
-//	            ListFunc: func(namespace string, selector labels.Selector) ([]*v3.MonitorMetric, error) {
-//		               panic("mock out the List method")
-//	            },
-//	        }
+//         // make and configure a mocked v31.MonitorMetricLister
+//         mockedMonitorMetricLister := &MonitorMetricListerMock{
+//             GetFunc: func(namespace string, name string) (*v3.MonitorMetric, error) {
+// 	               panic("mock out the Get method")
+//             },
+//             ListFunc: func(namespace string, selector labels.Selector) ([]*v3.MonitorMetric, error) {
+// 	               panic("mock out the List method")
+//             },
+//         }
 //
-//	        // use mockedMonitorMetricLister in code that requires v31.MonitorMetricLister
-//	        // and then make assertions.
+//         // use mockedMonitorMetricLister in code that requires v31.MonitorMetricLister
+//         // and then make assertions.
 //
-//	    }
+//     }
 type MonitorMetricListerMock struct {
 	// GetFunc mocks the Get method.
 	GetFunc func(namespace string, name string) (*v3.MonitorMetric, error)
@@ -91,8 +91,7 @@ func (mock *MonitorMetricListerMock) Get(namespace string, name string) (*v3.Mon
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//
-//	len(mockedMonitorMetricLister.GetCalls())
+//     len(mockedMonitorMetricLister.GetCalls())
 func (mock *MonitorMetricListerMock) GetCalls() []struct {
 	Namespace string
 	Name      string
@@ -127,8 +126,7 @@ func (mock *MonitorMetricListerMock) List(namespace string, selector labels.Sele
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//
-//	len(mockedMonitorMetricLister.ListCalls())
+//     len(mockedMonitorMetricLister.ListCalls())
 func (mock *MonitorMetricListerMock) ListCalls() []struct {
 	Namespace string
 	Selector  labels.Selector
@@ -161,43 +159,43 @@ var _ v31.MonitorMetricController = &MonitorMetricControllerMock{}
 
 // MonitorMetricControllerMock is a mock implementation of v31.MonitorMetricController.
 //
-//	    func TestSomethingThatUsesMonitorMetricController(t *testing.T) {
+//     func TestSomethingThatUsesMonitorMetricController(t *testing.T) {
 //
-//	        // make and configure a mocked v31.MonitorMetricController
-//	        mockedMonitorMetricController := &MonitorMetricControllerMock{
-//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v31.MonitorMetricHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedFeatureHandler method")
-//	            },
-//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v31.MonitorMetricHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedHandler method")
-//	            },
-//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.MonitorMetricHandlerFunc)  {
-//		               panic("mock out the AddFeatureHandler method")
-//	            },
-//	            AddHandlerFunc: func(ctx context.Context, name string, handler v31.MonitorMetricHandlerFunc)  {
-//		               panic("mock out the AddHandler method")
-//	            },
-//	            EnqueueFunc: func(namespace string, name string)  {
-//		               panic("mock out the Enqueue method")
-//	            },
-//	            EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
-//		               panic("mock out the EnqueueAfter method")
-//	            },
-//	            GenericFunc: func() controller.GenericController {
-//		               panic("mock out the Generic method")
-//	            },
-//	            InformerFunc: func() cache.SharedIndexInformer {
-//		               panic("mock out the Informer method")
-//	            },
-//	            ListerFunc: func() v31.MonitorMetricLister {
-//		               panic("mock out the Lister method")
-//	            },
-//	        }
+//         // make and configure a mocked v31.MonitorMetricController
+//         mockedMonitorMetricController := &MonitorMetricControllerMock{
+//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v31.MonitorMetricHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedFeatureHandler method")
+//             },
+//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v31.MonitorMetricHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedHandler method")
+//             },
+//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.MonitorMetricHandlerFunc)  {
+// 	               panic("mock out the AddFeatureHandler method")
+//             },
+//             AddHandlerFunc: func(ctx context.Context, name string, handler v31.MonitorMetricHandlerFunc)  {
+// 	               panic("mock out the AddHandler method")
+//             },
+//             EnqueueFunc: func(namespace string, name string)  {
+// 	               panic("mock out the Enqueue method")
+//             },
+//             EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
+// 	               panic("mock out the EnqueueAfter method")
+//             },
+//             GenericFunc: func() controller.GenericController {
+// 	               panic("mock out the Generic method")
+//             },
+//             InformerFunc: func() cache.SharedIndexInformer {
+// 	               panic("mock out the Informer method")
+//             },
+//             ListerFunc: func() v31.MonitorMetricLister {
+// 	               panic("mock out the Lister method")
+//             },
+//         }
 //
-//	        // use mockedMonitorMetricController in code that requires v31.MonitorMetricController
-//	        // and then make assertions.
+//         // use mockedMonitorMetricController in code that requires v31.MonitorMetricController
+//         // and then make assertions.
 //
-//	    }
+//     }
 type MonitorMetricControllerMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
 	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v31.MonitorMetricHandlerFunc)
@@ -326,8 +324,7 @@ func (mock *MonitorMetricControllerMock) AddClusterScopedFeatureHandler(ctx cont
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//
-//	len(mockedMonitorMetricController.AddClusterScopedFeatureHandlerCalls())
+//     len(mockedMonitorMetricController.AddClusterScopedFeatureHandlerCalls())
 func (mock *MonitorMetricControllerMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -372,8 +369,7 @@ func (mock *MonitorMetricControllerMock) AddClusterScopedHandler(ctx context.Con
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//
-//	len(mockedMonitorMetricController.AddClusterScopedHandlerCalls())
+//     len(mockedMonitorMetricController.AddClusterScopedHandlerCalls())
 func (mock *MonitorMetricControllerMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -416,8 +412,7 @@ func (mock *MonitorMetricControllerMock) AddFeatureHandler(ctx context.Context, 
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//
-//	len(mockedMonitorMetricController.AddFeatureHandlerCalls())
+//     len(mockedMonitorMetricController.AddFeatureHandlerCalls())
 func (mock *MonitorMetricControllerMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
@@ -458,8 +453,7 @@ func (mock *MonitorMetricControllerMock) AddHandler(ctx context.Context, name st
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//
-//	len(mockedMonitorMetricController.AddHandlerCalls())
+//     len(mockedMonitorMetricController.AddHandlerCalls())
 func (mock *MonitorMetricControllerMock) AddHandlerCalls() []struct {
 	Ctx     context.Context
 	Name    string
@@ -496,8 +490,7 @@ func (mock *MonitorMetricControllerMock) Enqueue(namespace string, name string) 
 
 // EnqueueCalls gets all the calls that were made to Enqueue.
 // Check the length with:
-//
-//	len(mockedMonitorMetricController.EnqueueCalls())
+//     len(mockedMonitorMetricController.EnqueueCalls())
 func (mock *MonitorMetricControllerMock) EnqueueCalls() []struct {
 	Namespace string
 	Name      string
@@ -534,8 +527,7 @@ func (mock *MonitorMetricControllerMock) EnqueueAfter(namespace string, name str
 
 // EnqueueAfterCalls gets all the calls that were made to EnqueueAfter.
 // Check the length with:
-//
-//	len(mockedMonitorMetricController.EnqueueAfterCalls())
+//     len(mockedMonitorMetricController.EnqueueAfterCalls())
 func (mock *MonitorMetricControllerMock) EnqueueAfterCalls() []struct {
 	Namespace string
 	Name      string
@@ -567,8 +559,7 @@ func (mock *MonitorMetricControllerMock) Generic() controller.GenericController 
 
 // GenericCalls gets all the calls that were made to Generic.
 // Check the length with:
-//
-//	len(mockedMonitorMetricController.GenericCalls())
+//     len(mockedMonitorMetricController.GenericCalls())
 func (mock *MonitorMetricControllerMock) GenericCalls() []struct {
 } {
 	var calls []struct {
@@ -594,8 +585,7 @@ func (mock *MonitorMetricControllerMock) Informer() cache.SharedIndexInformer {
 
 // InformerCalls gets all the calls that were made to Informer.
 // Check the length with:
-//
-//	len(mockedMonitorMetricController.InformerCalls())
+//     len(mockedMonitorMetricController.InformerCalls())
 func (mock *MonitorMetricControllerMock) InformerCalls() []struct {
 } {
 	var calls []struct {
@@ -621,8 +611,7 @@ func (mock *MonitorMetricControllerMock) Lister() v31.MonitorMetricLister {
 
 // ListerCalls gets all the calls that were made to Lister.
 // Check the length with:
-//
-//	len(mockedMonitorMetricController.ListerCalls())
+//     len(mockedMonitorMetricController.ListerCalls())
 func (mock *MonitorMetricControllerMock) ListerCalls() []struct {
 } {
 	var calls []struct {
@@ -662,76 +651,76 @@ var _ v31.MonitorMetricInterface = &MonitorMetricInterfaceMock{}
 
 // MonitorMetricInterfaceMock is a mock implementation of v31.MonitorMetricInterface.
 //
-//	    func TestSomethingThatUsesMonitorMetricInterface(t *testing.T) {
+//     func TestSomethingThatUsesMonitorMetricInterface(t *testing.T) {
 //
-//	        // make and configure a mocked v31.MonitorMetricInterface
-//	        mockedMonitorMetricInterface := &MonitorMetricInterfaceMock{
-//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v31.MonitorMetricHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedFeatureHandler method")
-//	            },
-//	            AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v31.MonitorMetricLifecycle)  {
-//		               panic("mock out the AddClusterScopedFeatureLifecycle method")
-//	            },
-//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v31.MonitorMetricHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedHandler method")
-//	            },
-//	            AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v31.MonitorMetricLifecycle)  {
-//		               panic("mock out the AddClusterScopedLifecycle method")
-//	            },
-//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.MonitorMetricHandlerFunc)  {
-//		               panic("mock out the AddFeatureHandler method")
-//	            },
-//	            AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v31.MonitorMetricLifecycle)  {
-//		               panic("mock out the AddFeatureLifecycle method")
-//	            },
-//	            AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v31.MonitorMetricHandlerFunc)  {
-//		               panic("mock out the AddHandler method")
-//	            },
-//	            AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v31.MonitorMetricLifecycle)  {
-//		               panic("mock out the AddLifecycle method")
-//	            },
-//	            ControllerFunc: func() v31.MonitorMetricController {
-//		               panic("mock out the Controller method")
-//	            },
-//	            CreateFunc: func(in1 *v3.MonitorMetric) (*v3.MonitorMetric, error) {
-//		               panic("mock out the Create method")
-//	            },
-//	            DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
-//		               panic("mock out the Delete method")
-//	            },
-//	            DeleteCollectionFunc: func(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
-//		               panic("mock out the DeleteCollection method")
-//	            },
-//	            DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
-//		               panic("mock out the DeleteNamespaced method")
-//	            },
-//	            GetFunc: func(name string, opts metav1.GetOptions) (*v3.MonitorMetric, error) {
-//		               panic("mock out the Get method")
-//	            },
-//	            GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v3.MonitorMetric, error) {
-//		               panic("mock out the GetNamespaced method")
-//	            },
-//	            ListFunc: func(opts metav1.ListOptions) (*v3.MonitorMetricList, error) {
-//		               panic("mock out the List method")
-//	            },
-//	            ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v3.MonitorMetricList, error) {
-//		               panic("mock out the ListNamespaced method")
-//	            },
-//	            ObjectClientFunc: func() *objectclient.ObjectClient {
-//		               panic("mock out the ObjectClient method")
-//	            },
-//	            UpdateFunc: func(in1 *v3.MonitorMetric) (*v3.MonitorMetric, error) {
-//		               panic("mock out the Update method")
-//	            },
-//	            WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
-//		               panic("mock out the Watch method")
-//	            },
-//	        }
+//         // make and configure a mocked v31.MonitorMetricInterface
+//         mockedMonitorMetricInterface := &MonitorMetricInterfaceMock{
+//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v31.MonitorMetricHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedFeatureHandler method")
+//             },
+//             AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v31.MonitorMetricLifecycle)  {
+// 	               panic("mock out the AddClusterScopedFeatureLifecycle method")
+//             },
+//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v31.MonitorMetricHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedHandler method")
+//             },
+//             AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v31.MonitorMetricLifecycle)  {
+// 	               panic("mock out the AddClusterScopedLifecycle method")
+//             },
+//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.MonitorMetricHandlerFunc)  {
+// 	               panic("mock out the AddFeatureHandler method")
+//             },
+//             AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v31.MonitorMetricLifecycle)  {
+// 	               panic("mock out the AddFeatureLifecycle method")
+//             },
+//             AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v31.MonitorMetricHandlerFunc)  {
+// 	               panic("mock out the AddHandler method")
+//             },
+//             AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v31.MonitorMetricLifecycle)  {
+// 	               panic("mock out the AddLifecycle method")
+//             },
+//             ControllerFunc: func() v31.MonitorMetricController {
+// 	               panic("mock out the Controller method")
+//             },
+//             CreateFunc: func(in1 *v3.MonitorMetric) (*v3.MonitorMetric, error) {
+// 	               panic("mock out the Create method")
+//             },
+//             DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
+// 	               panic("mock out the Delete method")
+//             },
+//             DeleteCollectionFunc: func(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
+// 	               panic("mock out the DeleteCollection method")
+//             },
+//             DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
+// 	               panic("mock out the DeleteNamespaced method")
+//             },
+//             GetFunc: func(name string, opts metav1.GetOptions) (*v3.MonitorMetric, error) {
+// 	               panic("mock out the Get method")
+//             },
+//             GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v3.MonitorMetric, error) {
+// 	               panic("mock out the GetNamespaced method")
+//             },
+//             ListFunc: func(opts metav1.ListOptions) (*v3.MonitorMetricList, error) {
+// 	               panic("mock out the List method")
+//             },
+//             ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v3.MonitorMetricList, error) {
+// 	               panic("mock out the ListNamespaced method")
+//             },
+//             ObjectClientFunc: func() *objectclient.ObjectClient {
+// 	               panic("mock out the ObjectClient method")
+//             },
+//             UpdateFunc: func(in1 *v3.MonitorMetric) (*v3.MonitorMetric, error) {
+// 	               panic("mock out the Update method")
+//             },
+//             WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
+// 	               panic("mock out the Watch method")
+//             },
+//         }
 //
-//	        // use mockedMonitorMetricInterface in code that requires v31.MonitorMetricInterface
-//	        // and then make assertions.
+//         // use mockedMonitorMetricInterface in code that requires v31.MonitorMetricInterface
+//         // and then make assertions.
 //
-//	    }
+//     }
 type MonitorMetricInterfaceMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
 	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v31.MonitorMetricHandlerFunc)
@@ -984,8 +973,7 @@ func (mock *MonitorMetricInterfaceMock) AddClusterScopedFeatureHandler(ctx conte
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//
-//	len(mockedMonitorMetricInterface.AddClusterScopedFeatureHandlerCalls())
+//     len(mockedMonitorMetricInterface.AddClusterScopedFeatureHandlerCalls())
 func (mock *MonitorMetricInterfaceMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -1032,8 +1020,7 @@ func (mock *MonitorMetricInterfaceMock) AddClusterScopedFeatureLifecycle(ctx con
 
 // AddClusterScopedFeatureLifecycleCalls gets all the calls that were made to AddClusterScopedFeatureLifecycle.
 // Check the length with:
-//
-//	len(mockedMonitorMetricInterface.AddClusterScopedFeatureLifecycleCalls())
+//     len(mockedMonitorMetricInterface.AddClusterScopedFeatureLifecycleCalls())
 func (mock *MonitorMetricInterfaceMock) AddClusterScopedFeatureLifecycleCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -1078,8 +1065,7 @@ func (mock *MonitorMetricInterfaceMock) AddClusterScopedHandler(ctx context.Cont
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//
-//	len(mockedMonitorMetricInterface.AddClusterScopedHandlerCalls())
+//     len(mockedMonitorMetricInterface.AddClusterScopedHandlerCalls())
 func (mock *MonitorMetricInterfaceMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -1122,8 +1108,7 @@ func (mock *MonitorMetricInterfaceMock) AddClusterScopedLifecycle(ctx context.Co
 
 // AddClusterScopedLifecycleCalls gets all the calls that were made to AddClusterScopedLifecycle.
 // Check the length with:
-//
-//	len(mockedMonitorMetricInterface.AddClusterScopedLifecycleCalls())
+//     len(mockedMonitorMetricInterface.AddClusterScopedLifecycleCalls())
 func (mock *MonitorMetricInterfaceMock) AddClusterScopedLifecycleCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -1166,8 +1151,7 @@ func (mock *MonitorMetricInterfaceMock) AddFeatureHandler(ctx context.Context, e
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//
-//	len(mockedMonitorMetricInterface.AddFeatureHandlerCalls())
+//     len(mockedMonitorMetricInterface.AddFeatureHandlerCalls())
 func (mock *MonitorMetricInterfaceMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
@@ -1210,8 +1194,7 @@ func (mock *MonitorMetricInterfaceMock) AddFeatureLifecycle(ctx context.Context,
 
 // AddFeatureLifecycleCalls gets all the calls that were made to AddFeatureLifecycle.
 // Check the length with:
-//
-//	len(mockedMonitorMetricInterface.AddFeatureLifecycleCalls())
+//     len(mockedMonitorMetricInterface.AddFeatureLifecycleCalls())
 func (mock *MonitorMetricInterfaceMock) AddFeatureLifecycleCalls() []struct {
 	Ctx       context.Context
 	Enabled   func() bool
@@ -1252,8 +1235,7 @@ func (mock *MonitorMetricInterfaceMock) AddHandler(ctx context.Context, name str
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//
-//	len(mockedMonitorMetricInterface.AddHandlerCalls())
+//     len(mockedMonitorMetricInterface.AddHandlerCalls())
 func (mock *MonitorMetricInterfaceMock) AddHandlerCalls() []struct {
 	Ctx  context.Context
 	Name string
@@ -1292,8 +1274,7 @@ func (mock *MonitorMetricInterfaceMock) AddLifecycle(ctx context.Context, name s
 
 // AddLifecycleCalls gets all the calls that were made to AddLifecycle.
 // Check the length with:
-//
-//	len(mockedMonitorMetricInterface.AddLifecycleCalls())
+//     len(mockedMonitorMetricInterface.AddLifecycleCalls())
 func (mock *MonitorMetricInterfaceMock) AddLifecycleCalls() []struct {
 	Ctx       context.Context
 	Name      string
@@ -1325,8 +1306,7 @@ func (mock *MonitorMetricInterfaceMock) Controller() v31.MonitorMetricController
 
 // ControllerCalls gets all the calls that were made to Controller.
 // Check the length with:
-//
-//	len(mockedMonitorMetricInterface.ControllerCalls())
+//     len(mockedMonitorMetricInterface.ControllerCalls())
 func (mock *MonitorMetricInterfaceMock) ControllerCalls() []struct {
 } {
 	var calls []struct {
@@ -1355,8 +1335,7 @@ func (mock *MonitorMetricInterfaceMock) Create(in1 *v3.MonitorMetric) (*v3.Monit
 
 // CreateCalls gets all the calls that were made to Create.
 // Check the length with:
-//
-//	len(mockedMonitorMetricInterface.CreateCalls())
+//     len(mockedMonitorMetricInterface.CreateCalls())
 func (mock *MonitorMetricInterfaceMock) CreateCalls() []struct {
 	In1 *v3.MonitorMetric
 } {
@@ -1389,8 +1368,7 @@ func (mock *MonitorMetricInterfaceMock) Delete(name string, options *metav1.Dele
 
 // DeleteCalls gets all the calls that were made to Delete.
 // Check the length with:
-//
-//	len(mockedMonitorMetricInterface.DeleteCalls())
+//     len(mockedMonitorMetricInterface.DeleteCalls())
 func (mock *MonitorMetricInterfaceMock) DeleteCalls() []struct {
 	Name    string
 	Options *metav1.DeleteOptions
@@ -1425,8 +1403,7 @@ func (mock *MonitorMetricInterfaceMock) DeleteCollection(deleteOpts *metav1.Dele
 
 // DeleteCollectionCalls gets all the calls that were made to DeleteCollection.
 // Check the length with:
-//
-//	len(mockedMonitorMetricInterface.DeleteCollectionCalls())
+//     len(mockedMonitorMetricInterface.DeleteCollectionCalls())
 func (mock *MonitorMetricInterfaceMock) DeleteCollectionCalls() []struct {
 	DeleteOpts *metav1.DeleteOptions
 	ListOpts   metav1.ListOptions
@@ -1463,8 +1440,7 @@ func (mock *MonitorMetricInterfaceMock) DeleteNamespaced(namespace string, name 
 
 // DeleteNamespacedCalls gets all the calls that were made to DeleteNamespaced.
 // Check the length with:
-//
-//	len(mockedMonitorMetricInterface.DeleteNamespacedCalls())
+//     len(mockedMonitorMetricInterface.DeleteNamespacedCalls())
 func (mock *MonitorMetricInterfaceMock) DeleteNamespacedCalls() []struct {
 	Namespace string
 	Name      string
@@ -1501,8 +1477,7 @@ func (mock *MonitorMetricInterfaceMock) Get(name string, opts metav1.GetOptions)
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//
-//	len(mockedMonitorMetricInterface.GetCalls())
+//     len(mockedMonitorMetricInterface.GetCalls())
 func (mock *MonitorMetricInterfaceMock) GetCalls() []struct {
 	Name string
 	Opts metav1.GetOptions
@@ -1539,8 +1514,7 @@ func (mock *MonitorMetricInterfaceMock) GetNamespaced(namespace string, name str
 
 // GetNamespacedCalls gets all the calls that were made to GetNamespaced.
 // Check the length with:
-//
-//	len(mockedMonitorMetricInterface.GetNamespacedCalls())
+//     len(mockedMonitorMetricInterface.GetNamespacedCalls())
 func (mock *MonitorMetricInterfaceMock) GetNamespacedCalls() []struct {
 	Namespace string
 	Name      string
@@ -1575,8 +1549,7 @@ func (mock *MonitorMetricInterfaceMock) List(opts metav1.ListOptions) (*v3.Monit
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//
-//	len(mockedMonitorMetricInterface.ListCalls())
+//     len(mockedMonitorMetricInterface.ListCalls())
 func (mock *MonitorMetricInterfaceMock) ListCalls() []struct {
 	Opts metav1.ListOptions
 } {
@@ -1609,8 +1582,7 @@ func (mock *MonitorMetricInterfaceMock) ListNamespaced(namespace string, opts me
 
 // ListNamespacedCalls gets all the calls that were made to ListNamespaced.
 // Check the length with:
-//
-//	len(mockedMonitorMetricInterface.ListNamespacedCalls())
+//     len(mockedMonitorMetricInterface.ListNamespacedCalls())
 func (mock *MonitorMetricInterfaceMock) ListNamespacedCalls() []struct {
 	Namespace string
 	Opts      metav1.ListOptions
@@ -1640,8 +1612,7 @@ func (mock *MonitorMetricInterfaceMock) ObjectClient() *objectclient.ObjectClien
 
 // ObjectClientCalls gets all the calls that were made to ObjectClient.
 // Check the length with:
-//
-//	len(mockedMonitorMetricInterface.ObjectClientCalls())
+//     len(mockedMonitorMetricInterface.ObjectClientCalls())
 func (mock *MonitorMetricInterfaceMock) ObjectClientCalls() []struct {
 } {
 	var calls []struct {
@@ -1670,8 +1641,7 @@ func (mock *MonitorMetricInterfaceMock) Update(in1 *v3.MonitorMetric) (*v3.Monit
 
 // UpdateCalls gets all the calls that were made to Update.
 // Check the length with:
-//
-//	len(mockedMonitorMetricInterface.UpdateCalls())
+//     len(mockedMonitorMetricInterface.UpdateCalls())
 func (mock *MonitorMetricInterfaceMock) UpdateCalls() []struct {
 	In1 *v3.MonitorMetric
 } {
@@ -1702,8 +1672,7 @@ func (mock *MonitorMetricInterfaceMock) Watch(opts metav1.ListOptions) (watch.In
 
 // WatchCalls gets all the calls that were made to Watch.
 // Check the length with:
-//
-//	len(mockedMonitorMetricInterface.WatchCalls())
+//     len(mockedMonitorMetricInterface.WatchCalls())
 func (mock *MonitorMetricInterfaceMock) WatchCalls() []struct {
 	Opts metav1.ListOptions
 } {
@@ -1726,19 +1695,19 @@ var _ v31.MonitorMetricsGetter = &MonitorMetricsGetterMock{}
 
 // MonitorMetricsGetterMock is a mock implementation of v31.MonitorMetricsGetter.
 //
-//	    func TestSomethingThatUsesMonitorMetricsGetter(t *testing.T) {
+//     func TestSomethingThatUsesMonitorMetricsGetter(t *testing.T) {
 //
-//	        // make and configure a mocked v31.MonitorMetricsGetter
-//	        mockedMonitorMetricsGetter := &MonitorMetricsGetterMock{
-//	            MonitorMetricsFunc: func(namespace string) v31.MonitorMetricInterface {
-//		               panic("mock out the MonitorMetrics method")
-//	            },
-//	        }
+//         // make and configure a mocked v31.MonitorMetricsGetter
+//         mockedMonitorMetricsGetter := &MonitorMetricsGetterMock{
+//             MonitorMetricsFunc: func(namespace string) v31.MonitorMetricInterface {
+// 	               panic("mock out the MonitorMetrics method")
+//             },
+//         }
 //
-//	        // use mockedMonitorMetricsGetter in code that requires v31.MonitorMetricsGetter
-//	        // and then make assertions.
+//         // use mockedMonitorMetricsGetter in code that requires v31.MonitorMetricsGetter
+//         // and then make assertions.
 //
-//	    }
+//     }
 type MonitorMetricsGetterMock struct {
 	// MonitorMetricsFunc mocks the MonitorMetrics method.
 	MonitorMetricsFunc func(namespace string) v31.MonitorMetricInterface
@@ -1771,8 +1740,7 @@ func (mock *MonitorMetricsGetterMock) MonitorMetrics(namespace string) v31.Monit
 
 // MonitorMetricsCalls gets all the calls that were made to MonitorMetrics.
 // Check the length with:
-//
-//	len(mockedMonitorMetricsGetter.MonitorMetricsCalls())
+//     len(mockedMonitorMetricsGetter.MonitorMetricsCalls())
 func (mock *MonitorMetricsGetterMock) MonitorMetricsCalls() []struct {
 	Namespace string
 } {

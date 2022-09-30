@@ -29,22 +29,22 @@ var _ v31.RkeAddonLister = &RkeAddonListerMock{}
 
 // RkeAddonListerMock is a mock implementation of v31.RkeAddonLister.
 //
-//	    func TestSomethingThatUsesRkeAddonLister(t *testing.T) {
+//     func TestSomethingThatUsesRkeAddonLister(t *testing.T) {
 //
-//	        // make and configure a mocked v31.RkeAddonLister
-//	        mockedRkeAddonLister := &RkeAddonListerMock{
-//	            GetFunc: func(namespace string, name string) (*v3.RkeAddon, error) {
-//		               panic("mock out the Get method")
-//	            },
-//	            ListFunc: func(namespace string, selector labels.Selector) ([]*v3.RkeAddon, error) {
-//		               panic("mock out the List method")
-//	            },
-//	        }
+//         // make and configure a mocked v31.RkeAddonLister
+//         mockedRkeAddonLister := &RkeAddonListerMock{
+//             GetFunc: func(namespace string, name string) (*v3.RkeAddon, error) {
+// 	               panic("mock out the Get method")
+//             },
+//             ListFunc: func(namespace string, selector labels.Selector) ([]*v3.RkeAddon, error) {
+// 	               panic("mock out the List method")
+//             },
+//         }
 //
-//	        // use mockedRkeAddonLister in code that requires v31.RkeAddonLister
-//	        // and then make assertions.
+//         // use mockedRkeAddonLister in code that requires v31.RkeAddonLister
+//         // and then make assertions.
 //
-//	    }
+//     }
 type RkeAddonListerMock struct {
 	// GetFunc mocks the Get method.
 	GetFunc func(namespace string, name string) (*v3.RkeAddon, error)
@@ -91,8 +91,7 @@ func (mock *RkeAddonListerMock) Get(namespace string, name string) (*v3.RkeAddon
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//
-//	len(mockedRkeAddonLister.GetCalls())
+//     len(mockedRkeAddonLister.GetCalls())
 func (mock *RkeAddonListerMock) GetCalls() []struct {
 	Namespace string
 	Name      string
@@ -127,8 +126,7 @@ func (mock *RkeAddonListerMock) List(namespace string, selector labels.Selector)
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//
-//	len(mockedRkeAddonLister.ListCalls())
+//     len(mockedRkeAddonLister.ListCalls())
 func (mock *RkeAddonListerMock) ListCalls() []struct {
 	Namespace string
 	Selector  labels.Selector
@@ -161,43 +159,43 @@ var _ v31.RkeAddonController = &RkeAddonControllerMock{}
 
 // RkeAddonControllerMock is a mock implementation of v31.RkeAddonController.
 //
-//	    func TestSomethingThatUsesRkeAddonController(t *testing.T) {
+//     func TestSomethingThatUsesRkeAddonController(t *testing.T) {
 //
-//	        // make and configure a mocked v31.RkeAddonController
-//	        mockedRkeAddonController := &RkeAddonControllerMock{
-//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v31.RkeAddonHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedFeatureHandler method")
-//	            },
-//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v31.RkeAddonHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedHandler method")
-//	            },
-//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.RkeAddonHandlerFunc)  {
-//		               panic("mock out the AddFeatureHandler method")
-//	            },
-//	            AddHandlerFunc: func(ctx context.Context, name string, handler v31.RkeAddonHandlerFunc)  {
-//		               panic("mock out the AddHandler method")
-//	            },
-//	            EnqueueFunc: func(namespace string, name string)  {
-//		               panic("mock out the Enqueue method")
-//	            },
-//	            EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
-//		               panic("mock out the EnqueueAfter method")
-//	            },
-//	            GenericFunc: func() controller.GenericController {
-//		               panic("mock out the Generic method")
-//	            },
-//	            InformerFunc: func() cache.SharedIndexInformer {
-//		               panic("mock out the Informer method")
-//	            },
-//	            ListerFunc: func() v31.RkeAddonLister {
-//		               panic("mock out the Lister method")
-//	            },
-//	        }
+//         // make and configure a mocked v31.RkeAddonController
+//         mockedRkeAddonController := &RkeAddonControllerMock{
+//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v31.RkeAddonHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedFeatureHandler method")
+//             },
+//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v31.RkeAddonHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedHandler method")
+//             },
+//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.RkeAddonHandlerFunc)  {
+// 	               panic("mock out the AddFeatureHandler method")
+//             },
+//             AddHandlerFunc: func(ctx context.Context, name string, handler v31.RkeAddonHandlerFunc)  {
+// 	               panic("mock out the AddHandler method")
+//             },
+//             EnqueueFunc: func(namespace string, name string)  {
+// 	               panic("mock out the Enqueue method")
+//             },
+//             EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
+// 	               panic("mock out the EnqueueAfter method")
+//             },
+//             GenericFunc: func() controller.GenericController {
+// 	               panic("mock out the Generic method")
+//             },
+//             InformerFunc: func() cache.SharedIndexInformer {
+// 	               panic("mock out the Informer method")
+//             },
+//             ListerFunc: func() v31.RkeAddonLister {
+// 	               panic("mock out the Lister method")
+//             },
+//         }
 //
-//	        // use mockedRkeAddonController in code that requires v31.RkeAddonController
-//	        // and then make assertions.
+//         // use mockedRkeAddonController in code that requires v31.RkeAddonController
+//         // and then make assertions.
 //
-//	    }
+//     }
 type RkeAddonControllerMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
 	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v31.RkeAddonHandlerFunc)
@@ -326,8 +324,7 @@ func (mock *RkeAddonControllerMock) AddClusterScopedFeatureHandler(ctx context.C
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//
-//	len(mockedRkeAddonController.AddClusterScopedFeatureHandlerCalls())
+//     len(mockedRkeAddonController.AddClusterScopedFeatureHandlerCalls())
 func (mock *RkeAddonControllerMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -372,8 +369,7 @@ func (mock *RkeAddonControllerMock) AddClusterScopedHandler(ctx context.Context,
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//
-//	len(mockedRkeAddonController.AddClusterScopedHandlerCalls())
+//     len(mockedRkeAddonController.AddClusterScopedHandlerCalls())
 func (mock *RkeAddonControllerMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -416,8 +412,7 @@ func (mock *RkeAddonControllerMock) AddFeatureHandler(ctx context.Context, enabl
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//
-//	len(mockedRkeAddonController.AddFeatureHandlerCalls())
+//     len(mockedRkeAddonController.AddFeatureHandlerCalls())
 func (mock *RkeAddonControllerMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
@@ -458,8 +453,7 @@ func (mock *RkeAddonControllerMock) AddHandler(ctx context.Context, name string,
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//
-//	len(mockedRkeAddonController.AddHandlerCalls())
+//     len(mockedRkeAddonController.AddHandlerCalls())
 func (mock *RkeAddonControllerMock) AddHandlerCalls() []struct {
 	Ctx     context.Context
 	Name    string
@@ -496,8 +490,7 @@ func (mock *RkeAddonControllerMock) Enqueue(namespace string, name string) {
 
 // EnqueueCalls gets all the calls that were made to Enqueue.
 // Check the length with:
-//
-//	len(mockedRkeAddonController.EnqueueCalls())
+//     len(mockedRkeAddonController.EnqueueCalls())
 func (mock *RkeAddonControllerMock) EnqueueCalls() []struct {
 	Namespace string
 	Name      string
@@ -534,8 +527,7 @@ func (mock *RkeAddonControllerMock) EnqueueAfter(namespace string, name string, 
 
 // EnqueueAfterCalls gets all the calls that were made to EnqueueAfter.
 // Check the length with:
-//
-//	len(mockedRkeAddonController.EnqueueAfterCalls())
+//     len(mockedRkeAddonController.EnqueueAfterCalls())
 func (mock *RkeAddonControllerMock) EnqueueAfterCalls() []struct {
 	Namespace string
 	Name      string
@@ -567,8 +559,7 @@ func (mock *RkeAddonControllerMock) Generic() controller.GenericController {
 
 // GenericCalls gets all the calls that were made to Generic.
 // Check the length with:
-//
-//	len(mockedRkeAddonController.GenericCalls())
+//     len(mockedRkeAddonController.GenericCalls())
 func (mock *RkeAddonControllerMock) GenericCalls() []struct {
 } {
 	var calls []struct {
@@ -594,8 +585,7 @@ func (mock *RkeAddonControllerMock) Informer() cache.SharedIndexInformer {
 
 // InformerCalls gets all the calls that were made to Informer.
 // Check the length with:
-//
-//	len(mockedRkeAddonController.InformerCalls())
+//     len(mockedRkeAddonController.InformerCalls())
 func (mock *RkeAddonControllerMock) InformerCalls() []struct {
 } {
 	var calls []struct {
@@ -621,8 +611,7 @@ func (mock *RkeAddonControllerMock) Lister() v31.RkeAddonLister {
 
 // ListerCalls gets all the calls that were made to Lister.
 // Check the length with:
-//
-//	len(mockedRkeAddonController.ListerCalls())
+//     len(mockedRkeAddonController.ListerCalls())
 func (mock *RkeAddonControllerMock) ListerCalls() []struct {
 } {
 	var calls []struct {
@@ -662,76 +651,76 @@ var _ v31.RkeAddonInterface = &RkeAddonInterfaceMock{}
 
 // RkeAddonInterfaceMock is a mock implementation of v31.RkeAddonInterface.
 //
-//	    func TestSomethingThatUsesRkeAddonInterface(t *testing.T) {
+//     func TestSomethingThatUsesRkeAddonInterface(t *testing.T) {
 //
-//	        // make and configure a mocked v31.RkeAddonInterface
-//	        mockedRkeAddonInterface := &RkeAddonInterfaceMock{
-//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v31.RkeAddonHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedFeatureHandler method")
-//	            },
-//	            AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v31.RkeAddonLifecycle)  {
-//		               panic("mock out the AddClusterScopedFeatureLifecycle method")
-//	            },
-//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v31.RkeAddonHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedHandler method")
-//	            },
-//	            AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v31.RkeAddonLifecycle)  {
-//		               panic("mock out the AddClusterScopedLifecycle method")
-//	            },
-//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.RkeAddonHandlerFunc)  {
-//		               panic("mock out the AddFeatureHandler method")
-//	            },
-//	            AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v31.RkeAddonLifecycle)  {
-//		               panic("mock out the AddFeatureLifecycle method")
-//	            },
-//	            AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v31.RkeAddonHandlerFunc)  {
-//		               panic("mock out the AddHandler method")
-//	            },
-//	            AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v31.RkeAddonLifecycle)  {
-//		               panic("mock out the AddLifecycle method")
-//	            },
-//	            ControllerFunc: func() v31.RkeAddonController {
-//		               panic("mock out the Controller method")
-//	            },
-//	            CreateFunc: func(in1 *v3.RkeAddon) (*v3.RkeAddon, error) {
-//		               panic("mock out the Create method")
-//	            },
-//	            DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
-//		               panic("mock out the Delete method")
-//	            },
-//	            DeleteCollectionFunc: func(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
-//		               panic("mock out the DeleteCollection method")
-//	            },
-//	            DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
-//		               panic("mock out the DeleteNamespaced method")
-//	            },
-//	            GetFunc: func(name string, opts metav1.GetOptions) (*v3.RkeAddon, error) {
-//		               panic("mock out the Get method")
-//	            },
-//	            GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v3.RkeAddon, error) {
-//		               panic("mock out the GetNamespaced method")
-//	            },
-//	            ListFunc: func(opts metav1.ListOptions) (*v3.RkeAddonList, error) {
-//		               panic("mock out the List method")
-//	            },
-//	            ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v3.RkeAddonList, error) {
-//		               panic("mock out the ListNamespaced method")
-//	            },
-//	            ObjectClientFunc: func() *objectclient.ObjectClient {
-//		               panic("mock out the ObjectClient method")
-//	            },
-//	            UpdateFunc: func(in1 *v3.RkeAddon) (*v3.RkeAddon, error) {
-//		               panic("mock out the Update method")
-//	            },
-//	            WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
-//		               panic("mock out the Watch method")
-//	            },
-//	        }
+//         // make and configure a mocked v31.RkeAddonInterface
+//         mockedRkeAddonInterface := &RkeAddonInterfaceMock{
+//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v31.RkeAddonHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedFeatureHandler method")
+//             },
+//             AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v31.RkeAddonLifecycle)  {
+// 	               panic("mock out the AddClusterScopedFeatureLifecycle method")
+//             },
+//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v31.RkeAddonHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedHandler method")
+//             },
+//             AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v31.RkeAddonLifecycle)  {
+// 	               panic("mock out the AddClusterScopedLifecycle method")
+//             },
+//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.RkeAddonHandlerFunc)  {
+// 	               panic("mock out the AddFeatureHandler method")
+//             },
+//             AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v31.RkeAddonLifecycle)  {
+// 	               panic("mock out the AddFeatureLifecycle method")
+//             },
+//             AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v31.RkeAddonHandlerFunc)  {
+// 	               panic("mock out the AddHandler method")
+//             },
+//             AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v31.RkeAddonLifecycle)  {
+// 	               panic("mock out the AddLifecycle method")
+//             },
+//             ControllerFunc: func() v31.RkeAddonController {
+// 	               panic("mock out the Controller method")
+//             },
+//             CreateFunc: func(in1 *v3.RkeAddon) (*v3.RkeAddon, error) {
+// 	               panic("mock out the Create method")
+//             },
+//             DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
+// 	               panic("mock out the Delete method")
+//             },
+//             DeleteCollectionFunc: func(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
+// 	               panic("mock out the DeleteCollection method")
+//             },
+//             DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
+// 	               panic("mock out the DeleteNamespaced method")
+//             },
+//             GetFunc: func(name string, opts metav1.GetOptions) (*v3.RkeAddon, error) {
+// 	               panic("mock out the Get method")
+//             },
+//             GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v3.RkeAddon, error) {
+// 	               panic("mock out the GetNamespaced method")
+//             },
+//             ListFunc: func(opts metav1.ListOptions) (*v3.RkeAddonList, error) {
+// 	               panic("mock out the List method")
+//             },
+//             ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v3.RkeAddonList, error) {
+// 	               panic("mock out the ListNamespaced method")
+//             },
+//             ObjectClientFunc: func() *objectclient.ObjectClient {
+// 	               panic("mock out the ObjectClient method")
+//             },
+//             UpdateFunc: func(in1 *v3.RkeAddon) (*v3.RkeAddon, error) {
+// 	               panic("mock out the Update method")
+//             },
+//             WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
+// 	               panic("mock out the Watch method")
+//             },
+//         }
 //
-//	        // use mockedRkeAddonInterface in code that requires v31.RkeAddonInterface
-//	        // and then make assertions.
+//         // use mockedRkeAddonInterface in code that requires v31.RkeAddonInterface
+//         // and then make assertions.
 //
-//	    }
+//     }
 type RkeAddonInterfaceMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
 	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v31.RkeAddonHandlerFunc)
@@ -984,8 +973,7 @@ func (mock *RkeAddonInterfaceMock) AddClusterScopedFeatureHandler(ctx context.Co
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//
-//	len(mockedRkeAddonInterface.AddClusterScopedFeatureHandlerCalls())
+//     len(mockedRkeAddonInterface.AddClusterScopedFeatureHandlerCalls())
 func (mock *RkeAddonInterfaceMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -1032,8 +1020,7 @@ func (mock *RkeAddonInterfaceMock) AddClusterScopedFeatureLifecycle(ctx context.
 
 // AddClusterScopedFeatureLifecycleCalls gets all the calls that were made to AddClusterScopedFeatureLifecycle.
 // Check the length with:
-//
-//	len(mockedRkeAddonInterface.AddClusterScopedFeatureLifecycleCalls())
+//     len(mockedRkeAddonInterface.AddClusterScopedFeatureLifecycleCalls())
 func (mock *RkeAddonInterfaceMock) AddClusterScopedFeatureLifecycleCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -1078,8 +1065,7 @@ func (mock *RkeAddonInterfaceMock) AddClusterScopedHandler(ctx context.Context, 
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//
-//	len(mockedRkeAddonInterface.AddClusterScopedHandlerCalls())
+//     len(mockedRkeAddonInterface.AddClusterScopedHandlerCalls())
 func (mock *RkeAddonInterfaceMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -1122,8 +1108,7 @@ func (mock *RkeAddonInterfaceMock) AddClusterScopedLifecycle(ctx context.Context
 
 // AddClusterScopedLifecycleCalls gets all the calls that were made to AddClusterScopedLifecycle.
 // Check the length with:
-//
-//	len(mockedRkeAddonInterface.AddClusterScopedLifecycleCalls())
+//     len(mockedRkeAddonInterface.AddClusterScopedLifecycleCalls())
 func (mock *RkeAddonInterfaceMock) AddClusterScopedLifecycleCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -1166,8 +1151,7 @@ func (mock *RkeAddonInterfaceMock) AddFeatureHandler(ctx context.Context, enable
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//
-//	len(mockedRkeAddonInterface.AddFeatureHandlerCalls())
+//     len(mockedRkeAddonInterface.AddFeatureHandlerCalls())
 func (mock *RkeAddonInterfaceMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
@@ -1210,8 +1194,7 @@ func (mock *RkeAddonInterfaceMock) AddFeatureLifecycle(ctx context.Context, enab
 
 // AddFeatureLifecycleCalls gets all the calls that were made to AddFeatureLifecycle.
 // Check the length with:
-//
-//	len(mockedRkeAddonInterface.AddFeatureLifecycleCalls())
+//     len(mockedRkeAddonInterface.AddFeatureLifecycleCalls())
 func (mock *RkeAddonInterfaceMock) AddFeatureLifecycleCalls() []struct {
 	Ctx       context.Context
 	Enabled   func() bool
@@ -1252,8 +1235,7 @@ func (mock *RkeAddonInterfaceMock) AddHandler(ctx context.Context, name string, 
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//
-//	len(mockedRkeAddonInterface.AddHandlerCalls())
+//     len(mockedRkeAddonInterface.AddHandlerCalls())
 func (mock *RkeAddonInterfaceMock) AddHandlerCalls() []struct {
 	Ctx  context.Context
 	Name string
@@ -1292,8 +1274,7 @@ func (mock *RkeAddonInterfaceMock) AddLifecycle(ctx context.Context, name string
 
 // AddLifecycleCalls gets all the calls that were made to AddLifecycle.
 // Check the length with:
-//
-//	len(mockedRkeAddonInterface.AddLifecycleCalls())
+//     len(mockedRkeAddonInterface.AddLifecycleCalls())
 func (mock *RkeAddonInterfaceMock) AddLifecycleCalls() []struct {
 	Ctx       context.Context
 	Name      string
@@ -1325,8 +1306,7 @@ func (mock *RkeAddonInterfaceMock) Controller() v31.RkeAddonController {
 
 // ControllerCalls gets all the calls that were made to Controller.
 // Check the length with:
-//
-//	len(mockedRkeAddonInterface.ControllerCalls())
+//     len(mockedRkeAddonInterface.ControllerCalls())
 func (mock *RkeAddonInterfaceMock) ControllerCalls() []struct {
 } {
 	var calls []struct {
@@ -1355,8 +1335,7 @@ func (mock *RkeAddonInterfaceMock) Create(in1 *v3.RkeAddon) (*v3.RkeAddon, error
 
 // CreateCalls gets all the calls that were made to Create.
 // Check the length with:
-//
-//	len(mockedRkeAddonInterface.CreateCalls())
+//     len(mockedRkeAddonInterface.CreateCalls())
 func (mock *RkeAddonInterfaceMock) CreateCalls() []struct {
 	In1 *v3.RkeAddon
 } {
@@ -1389,8 +1368,7 @@ func (mock *RkeAddonInterfaceMock) Delete(name string, options *metav1.DeleteOpt
 
 // DeleteCalls gets all the calls that were made to Delete.
 // Check the length with:
-//
-//	len(mockedRkeAddonInterface.DeleteCalls())
+//     len(mockedRkeAddonInterface.DeleteCalls())
 func (mock *RkeAddonInterfaceMock) DeleteCalls() []struct {
 	Name    string
 	Options *metav1.DeleteOptions
@@ -1425,8 +1403,7 @@ func (mock *RkeAddonInterfaceMock) DeleteCollection(deleteOpts *metav1.DeleteOpt
 
 // DeleteCollectionCalls gets all the calls that were made to DeleteCollection.
 // Check the length with:
-//
-//	len(mockedRkeAddonInterface.DeleteCollectionCalls())
+//     len(mockedRkeAddonInterface.DeleteCollectionCalls())
 func (mock *RkeAddonInterfaceMock) DeleteCollectionCalls() []struct {
 	DeleteOpts *metav1.DeleteOptions
 	ListOpts   metav1.ListOptions
@@ -1463,8 +1440,7 @@ func (mock *RkeAddonInterfaceMock) DeleteNamespaced(namespace string, name strin
 
 // DeleteNamespacedCalls gets all the calls that were made to DeleteNamespaced.
 // Check the length with:
-//
-//	len(mockedRkeAddonInterface.DeleteNamespacedCalls())
+//     len(mockedRkeAddonInterface.DeleteNamespacedCalls())
 func (mock *RkeAddonInterfaceMock) DeleteNamespacedCalls() []struct {
 	Namespace string
 	Name      string
@@ -1501,8 +1477,7 @@ func (mock *RkeAddonInterfaceMock) Get(name string, opts metav1.GetOptions) (*v3
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//
-//	len(mockedRkeAddonInterface.GetCalls())
+//     len(mockedRkeAddonInterface.GetCalls())
 func (mock *RkeAddonInterfaceMock) GetCalls() []struct {
 	Name string
 	Opts metav1.GetOptions
@@ -1539,8 +1514,7 @@ func (mock *RkeAddonInterfaceMock) GetNamespaced(namespace string, name string, 
 
 // GetNamespacedCalls gets all the calls that were made to GetNamespaced.
 // Check the length with:
-//
-//	len(mockedRkeAddonInterface.GetNamespacedCalls())
+//     len(mockedRkeAddonInterface.GetNamespacedCalls())
 func (mock *RkeAddonInterfaceMock) GetNamespacedCalls() []struct {
 	Namespace string
 	Name      string
@@ -1575,8 +1549,7 @@ func (mock *RkeAddonInterfaceMock) List(opts metav1.ListOptions) (*v3.RkeAddonLi
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//
-//	len(mockedRkeAddonInterface.ListCalls())
+//     len(mockedRkeAddonInterface.ListCalls())
 func (mock *RkeAddonInterfaceMock) ListCalls() []struct {
 	Opts metav1.ListOptions
 } {
@@ -1609,8 +1582,7 @@ func (mock *RkeAddonInterfaceMock) ListNamespaced(namespace string, opts metav1.
 
 // ListNamespacedCalls gets all the calls that were made to ListNamespaced.
 // Check the length with:
-//
-//	len(mockedRkeAddonInterface.ListNamespacedCalls())
+//     len(mockedRkeAddonInterface.ListNamespacedCalls())
 func (mock *RkeAddonInterfaceMock) ListNamespacedCalls() []struct {
 	Namespace string
 	Opts      metav1.ListOptions
@@ -1640,8 +1612,7 @@ func (mock *RkeAddonInterfaceMock) ObjectClient() *objectclient.ObjectClient {
 
 // ObjectClientCalls gets all the calls that were made to ObjectClient.
 // Check the length with:
-//
-//	len(mockedRkeAddonInterface.ObjectClientCalls())
+//     len(mockedRkeAddonInterface.ObjectClientCalls())
 func (mock *RkeAddonInterfaceMock) ObjectClientCalls() []struct {
 } {
 	var calls []struct {
@@ -1670,8 +1641,7 @@ func (mock *RkeAddonInterfaceMock) Update(in1 *v3.RkeAddon) (*v3.RkeAddon, error
 
 // UpdateCalls gets all the calls that were made to Update.
 // Check the length with:
-//
-//	len(mockedRkeAddonInterface.UpdateCalls())
+//     len(mockedRkeAddonInterface.UpdateCalls())
 func (mock *RkeAddonInterfaceMock) UpdateCalls() []struct {
 	In1 *v3.RkeAddon
 } {
@@ -1702,8 +1672,7 @@ func (mock *RkeAddonInterfaceMock) Watch(opts metav1.ListOptions) (watch.Interfa
 
 // WatchCalls gets all the calls that were made to Watch.
 // Check the length with:
-//
-//	len(mockedRkeAddonInterface.WatchCalls())
+//     len(mockedRkeAddonInterface.WatchCalls())
 func (mock *RkeAddonInterfaceMock) WatchCalls() []struct {
 	Opts metav1.ListOptions
 } {
@@ -1726,19 +1695,19 @@ var _ v31.RkeAddonsGetter = &RkeAddonsGetterMock{}
 
 // RkeAddonsGetterMock is a mock implementation of v31.RkeAddonsGetter.
 //
-//	    func TestSomethingThatUsesRkeAddonsGetter(t *testing.T) {
+//     func TestSomethingThatUsesRkeAddonsGetter(t *testing.T) {
 //
-//	        // make and configure a mocked v31.RkeAddonsGetter
-//	        mockedRkeAddonsGetter := &RkeAddonsGetterMock{
-//	            RkeAddonsFunc: func(namespace string) v31.RkeAddonInterface {
-//		               panic("mock out the RkeAddons method")
-//	            },
-//	        }
+//         // make and configure a mocked v31.RkeAddonsGetter
+//         mockedRkeAddonsGetter := &RkeAddonsGetterMock{
+//             RkeAddonsFunc: func(namespace string) v31.RkeAddonInterface {
+// 	               panic("mock out the RkeAddons method")
+//             },
+//         }
 //
-//	        // use mockedRkeAddonsGetter in code that requires v31.RkeAddonsGetter
-//	        // and then make assertions.
+//         // use mockedRkeAddonsGetter in code that requires v31.RkeAddonsGetter
+//         // and then make assertions.
 //
-//	    }
+//     }
 type RkeAddonsGetterMock struct {
 	// RkeAddonsFunc mocks the RkeAddons method.
 	RkeAddonsFunc func(namespace string) v31.RkeAddonInterface
@@ -1771,8 +1740,7 @@ func (mock *RkeAddonsGetterMock) RkeAddons(namespace string) v31.RkeAddonInterfa
 
 // RkeAddonsCalls gets all the calls that were made to RkeAddons.
 // Check the length with:
-//
-//	len(mockedRkeAddonsGetter.RkeAddonsCalls())
+//     len(mockedRkeAddonsGetter.RkeAddonsCalls())
 func (mock *RkeAddonsGetterMock) RkeAddonsCalls() []struct {
 	Namespace string
 } {

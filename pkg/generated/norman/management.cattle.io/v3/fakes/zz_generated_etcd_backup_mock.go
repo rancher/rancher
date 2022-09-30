@@ -29,22 +29,22 @@ var _ v31.EtcdBackupLister = &EtcdBackupListerMock{}
 
 // EtcdBackupListerMock is a mock implementation of v31.EtcdBackupLister.
 //
-//	    func TestSomethingThatUsesEtcdBackupLister(t *testing.T) {
+//     func TestSomethingThatUsesEtcdBackupLister(t *testing.T) {
 //
-//	        // make and configure a mocked v31.EtcdBackupLister
-//	        mockedEtcdBackupLister := &EtcdBackupListerMock{
-//	            GetFunc: func(namespace string, name string) (*v3.EtcdBackup, error) {
-//		               panic("mock out the Get method")
-//	            },
-//	            ListFunc: func(namespace string, selector labels.Selector) ([]*v3.EtcdBackup, error) {
-//		               panic("mock out the List method")
-//	            },
-//	        }
+//         // make and configure a mocked v31.EtcdBackupLister
+//         mockedEtcdBackupLister := &EtcdBackupListerMock{
+//             GetFunc: func(namespace string, name string) (*v3.EtcdBackup, error) {
+// 	               panic("mock out the Get method")
+//             },
+//             ListFunc: func(namespace string, selector labels.Selector) ([]*v3.EtcdBackup, error) {
+// 	               panic("mock out the List method")
+//             },
+//         }
 //
-//	        // use mockedEtcdBackupLister in code that requires v31.EtcdBackupLister
-//	        // and then make assertions.
+//         // use mockedEtcdBackupLister in code that requires v31.EtcdBackupLister
+//         // and then make assertions.
 //
-//	    }
+//     }
 type EtcdBackupListerMock struct {
 	// GetFunc mocks the Get method.
 	GetFunc func(namespace string, name string) (*v3.EtcdBackup, error)
@@ -91,8 +91,7 @@ func (mock *EtcdBackupListerMock) Get(namespace string, name string) (*v3.EtcdBa
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//
-//	len(mockedEtcdBackupLister.GetCalls())
+//     len(mockedEtcdBackupLister.GetCalls())
 func (mock *EtcdBackupListerMock) GetCalls() []struct {
 	Namespace string
 	Name      string
@@ -127,8 +126,7 @@ func (mock *EtcdBackupListerMock) List(namespace string, selector labels.Selecto
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//
-//	len(mockedEtcdBackupLister.ListCalls())
+//     len(mockedEtcdBackupLister.ListCalls())
 func (mock *EtcdBackupListerMock) ListCalls() []struct {
 	Namespace string
 	Selector  labels.Selector
@@ -161,43 +159,43 @@ var _ v31.EtcdBackupController = &EtcdBackupControllerMock{}
 
 // EtcdBackupControllerMock is a mock implementation of v31.EtcdBackupController.
 //
-//	    func TestSomethingThatUsesEtcdBackupController(t *testing.T) {
+//     func TestSomethingThatUsesEtcdBackupController(t *testing.T) {
 //
-//	        // make and configure a mocked v31.EtcdBackupController
-//	        mockedEtcdBackupController := &EtcdBackupControllerMock{
-//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v31.EtcdBackupHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedFeatureHandler method")
-//	            },
-//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v31.EtcdBackupHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedHandler method")
-//	            },
-//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.EtcdBackupHandlerFunc)  {
-//		               panic("mock out the AddFeatureHandler method")
-//	            },
-//	            AddHandlerFunc: func(ctx context.Context, name string, handler v31.EtcdBackupHandlerFunc)  {
-//		               panic("mock out the AddHandler method")
-//	            },
-//	            EnqueueFunc: func(namespace string, name string)  {
-//		               panic("mock out the Enqueue method")
-//	            },
-//	            EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
-//		               panic("mock out the EnqueueAfter method")
-//	            },
-//	            GenericFunc: func() controller.GenericController {
-//		               panic("mock out the Generic method")
-//	            },
-//	            InformerFunc: func() cache.SharedIndexInformer {
-//		               panic("mock out the Informer method")
-//	            },
-//	            ListerFunc: func() v31.EtcdBackupLister {
-//		               panic("mock out the Lister method")
-//	            },
-//	        }
+//         // make and configure a mocked v31.EtcdBackupController
+//         mockedEtcdBackupController := &EtcdBackupControllerMock{
+//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v31.EtcdBackupHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedFeatureHandler method")
+//             },
+//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v31.EtcdBackupHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedHandler method")
+//             },
+//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.EtcdBackupHandlerFunc)  {
+// 	               panic("mock out the AddFeatureHandler method")
+//             },
+//             AddHandlerFunc: func(ctx context.Context, name string, handler v31.EtcdBackupHandlerFunc)  {
+// 	               panic("mock out the AddHandler method")
+//             },
+//             EnqueueFunc: func(namespace string, name string)  {
+// 	               panic("mock out the Enqueue method")
+//             },
+//             EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
+// 	               panic("mock out the EnqueueAfter method")
+//             },
+//             GenericFunc: func() controller.GenericController {
+// 	               panic("mock out the Generic method")
+//             },
+//             InformerFunc: func() cache.SharedIndexInformer {
+// 	               panic("mock out the Informer method")
+//             },
+//             ListerFunc: func() v31.EtcdBackupLister {
+// 	               panic("mock out the Lister method")
+//             },
+//         }
 //
-//	        // use mockedEtcdBackupController in code that requires v31.EtcdBackupController
-//	        // and then make assertions.
+//         // use mockedEtcdBackupController in code that requires v31.EtcdBackupController
+//         // and then make assertions.
 //
-//	    }
+//     }
 type EtcdBackupControllerMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
 	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v31.EtcdBackupHandlerFunc)
@@ -326,8 +324,7 @@ func (mock *EtcdBackupControllerMock) AddClusterScopedFeatureHandler(ctx context
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//
-//	len(mockedEtcdBackupController.AddClusterScopedFeatureHandlerCalls())
+//     len(mockedEtcdBackupController.AddClusterScopedFeatureHandlerCalls())
 func (mock *EtcdBackupControllerMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -372,8 +369,7 @@ func (mock *EtcdBackupControllerMock) AddClusterScopedHandler(ctx context.Contex
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//
-//	len(mockedEtcdBackupController.AddClusterScopedHandlerCalls())
+//     len(mockedEtcdBackupController.AddClusterScopedHandlerCalls())
 func (mock *EtcdBackupControllerMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -416,8 +412,7 @@ func (mock *EtcdBackupControllerMock) AddFeatureHandler(ctx context.Context, ena
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//
-//	len(mockedEtcdBackupController.AddFeatureHandlerCalls())
+//     len(mockedEtcdBackupController.AddFeatureHandlerCalls())
 func (mock *EtcdBackupControllerMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
@@ -458,8 +453,7 @@ func (mock *EtcdBackupControllerMock) AddHandler(ctx context.Context, name strin
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//
-//	len(mockedEtcdBackupController.AddHandlerCalls())
+//     len(mockedEtcdBackupController.AddHandlerCalls())
 func (mock *EtcdBackupControllerMock) AddHandlerCalls() []struct {
 	Ctx     context.Context
 	Name    string
@@ -496,8 +490,7 @@ func (mock *EtcdBackupControllerMock) Enqueue(namespace string, name string) {
 
 // EnqueueCalls gets all the calls that were made to Enqueue.
 // Check the length with:
-//
-//	len(mockedEtcdBackupController.EnqueueCalls())
+//     len(mockedEtcdBackupController.EnqueueCalls())
 func (mock *EtcdBackupControllerMock) EnqueueCalls() []struct {
 	Namespace string
 	Name      string
@@ -534,8 +527,7 @@ func (mock *EtcdBackupControllerMock) EnqueueAfter(namespace string, name string
 
 // EnqueueAfterCalls gets all the calls that were made to EnqueueAfter.
 // Check the length with:
-//
-//	len(mockedEtcdBackupController.EnqueueAfterCalls())
+//     len(mockedEtcdBackupController.EnqueueAfterCalls())
 func (mock *EtcdBackupControllerMock) EnqueueAfterCalls() []struct {
 	Namespace string
 	Name      string
@@ -567,8 +559,7 @@ func (mock *EtcdBackupControllerMock) Generic() controller.GenericController {
 
 // GenericCalls gets all the calls that were made to Generic.
 // Check the length with:
-//
-//	len(mockedEtcdBackupController.GenericCalls())
+//     len(mockedEtcdBackupController.GenericCalls())
 func (mock *EtcdBackupControllerMock) GenericCalls() []struct {
 } {
 	var calls []struct {
@@ -594,8 +585,7 @@ func (mock *EtcdBackupControllerMock) Informer() cache.SharedIndexInformer {
 
 // InformerCalls gets all the calls that were made to Informer.
 // Check the length with:
-//
-//	len(mockedEtcdBackupController.InformerCalls())
+//     len(mockedEtcdBackupController.InformerCalls())
 func (mock *EtcdBackupControllerMock) InformerCalls() []struct {
 } {
 	var calls []struct {
@@ -621,8 +611,7 @@ func (mock *EtcdBackupControllerMock) Lister() v31.EtcdBackupLister {
 
 // ListerCalls gets all the calls that were made to Lister.
 // Check the length with:
-//
-//	len(mockedEtcdBackupController.ListerCalls())
+//     len(mockedEtcdBackupController.ListerCalls())
 func (mock *EtcdBackupControllerMock) ListerCalls() []struct {
 } {
 	var calls []struct {
@@ -662,76 +651,76 @@ var _ v31.EtcdBackupInterface = &EtcdBackupInterfaceMock{}
 
 // EtcdBackupInterfaceMock is a mock implementation of v31.EtcdBackupInterface.
 //
-//	    func TestSomethingThatUsesEtcdBackupInterface(t *testing.T) {
+//     func TestSomethingThatUsesEtcdBackupInterface(t *testing.T) {
 //
-//	        // make and configure a mocked v31.EtcdBackupInterface
-//	        mockedEtcdBackupInterface := &EtcdBackupInterfaceMock{
-//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v31.EtcdBackupHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedFeatureHandler method")
-//	            },
-//	            AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v31.EtcdBackupLifecycle)  {
-//		               panic("mock out the AddClusterScopedFeatureLifecycle method")
-//	            },
-//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v31.EtcdBackupHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedHandler method")
-//	            },
-//	            AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v31.EtcdBackupLifecycle)  {
-//		               panic("mock out the AddClusterScopedLifecycle method")
-//	            },
-//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.EtcdBackupHandlerFunc)  {
-//		               panic("mock out the AddFeatureHandler method")
-//	            },
-//	            AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v31.EtcdBackupLifecycle)  {
-//		               panic("mock out the AddFeatureLifecycle method")
-//	            },
-//	            AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v31.EtcdBackupHandlerFunc)  {
-//		               panic("mock out the AddHandler method")
-//	            },
-//	            AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v31.EtcdBackupLifecycle)  {
-//		               panic("mock out the AddLifecycle method")
-//	            },
-//	            ControllerFunc: func() v31.EtcdBackupController {
-//		               panic("mock out the Controller method")
-//	            },
-//	            CreateFunc: func(in1 *v3.EtcdBackup) (*v3.EtcdBackup, error) {
-//		               panic("mock out the Create method")
-//	            },
-//	            DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
-//		               panic("mock out the Delete method")
-//	            },
-//	            DeleteCollectionFunc: func(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
-//		               panic("mock out the DeleteCollection method")
-//	            },
-//	            DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
-//		               panic("mock out the DeleteNamespaced method")
-//	            },
-//	            GetFunc: func(name string, opts metav1.GetOptions) (*v3.EtcdBackup, error) {
-//		               panic("mock out the Get method")
-//	            },
-//	            GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v3.EtcdBackup, error) {
-//		               panic("mock out the GetNamespaced method")
-//	            },
-//	            ListFunc: func(opts metav1.ListOptions) (*v3.EtcdBackupList, error) {
-//		               panic("mock out the List method")
-//	            },
-//	            ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v3.EtcdBackupList, error) {
-//		               panic("mock out the ListNamespaced method")
-//	            },
-//	            ObjectClientFunc: func() *objectclient.ObjectClient {
-//		               panic("mock out the ObjectClient method")
-//	            },
-//	            UpdateFunc: func(in1 *v3.EtcdBackup) (*v3.EtcdBackup, error) {
-//		               panic("mock out the Update method")
-//	            },
-//	            WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
-//		               panic("mock out the Watch method")
-//	            },
-//	        }
+//         // make and configure a mocked v31.EtcdBackupInterface
+//         mockedEtcdBackupInterface := &EtcdBackupInterfaceMock{
+//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v31.EtcdBackupHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedFeatureHandler method")
+//             },
+//             AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v31.EtcdBackupLifecycle)  {
+// 	               panic("mock out the AddClusterScopedFeatureLifecycle method")
+//             },
+//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v31.EtcdBackupHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedHandler method")
+//             },
+//             AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v31.EtcdBackupLifecycle)  {
+// 	               panic("mock out the AddClusterScopedLifecycle method")
+//             },
+//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.EtcdBackupHandlerFunc)  {
+// 	               panic("mock out the AddFeatureHandler method")
+//             },
+//             AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v31.EtcdBackupLifecycle)  {
+// 	               panic("mock out the AddFeatureLifecycle method")
+//             },
+//             AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v31.EtcdBackupHandlerFunc)  {
+// 	               panic("mock out the AddHandler method")
+//             },
+//             AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v31.EtcdBackupLifecycle)  {
+// 	               panic("mock out the AddLifecycle method")
+//             },
+//             ControllerFunc: func() v31.EtcdBackupController {
+// 	               panic("mock out the Controller method")
+//             },
+//             CreateFunc: func(in1 *v3.EtcdBackup) (*v3.EtcdBackup, error) {
+// 	               panic("mock out the Create method")
+//             },
+//             DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
+// 	               panic("mock out the Delete method")
+//             },
+//             DeleteCollectionFunc: func(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
+// 	               panic("mock out the DeleteCollection method")
+//             },
+//             DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
+// 	               panic("mock out the DeleteNamespaced method")
+//             },
+//             GetFunc: func(name string, opts metav1.GetOptions) (*v3.EtcdBackup, error) {
+// 	               panic("mock out the Get method")
+//             },
+//             GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v3.EtcdBackup, error) {
+// 	               panic("mock out the GetNamespaced method")
+//             },
+//             ListFunc: func(opts metav1.ListOptions) (*v3.EtcdBackupList, error) {
+// 	               panic("mock out the List method")
+//             },
+//             ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v3.EtcdBackupList, error) {
+// 	               panic("mock out the ListNamespaced method")
+//             },
+//             ObjectClientFunc: func() *objectclient.ObjectClient {
+// 	               panic("mock out the ObjectClient method")
+//             },
+//             UpdateFunc: func(in1 *v3.EtcdBackup) (*v3.EtcdBackup, error) {
+// 	               panic("mock out the Update method")
+//             },
+//             WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
+// 	               panic("mock out the Watch method")
+//             },
+//         }
 //
-//	        // use mockedEtcdBackupInterface in code that requires v31.EtcdBackupInterface
-//	        // and then make assertions.
+//         // use mockedEtcdBackupInterface in code that requires v31.EtcdBackupInterface
+//         // and then make assertions.
 //
-//	    }
+//     }
 type EtcdBackupInterfaceMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
 	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v31.EtcdBackupHandlerFunc)
@@ -984,8 +973,7 @@ func (mock *EtcdBackupInterfaceMock) AddClusterScopedFeatureHandler(ctx context.
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//
-//	len(mockedEtcdBackupInterface.AddClusterScopedFeatureHandlerCalls())
+//     len(mockedEtcdBackupInterface.AddClusterScopedFeatureHandlerCalls())
 func (mock *EtcdBackupInterfaceMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -1032,8 +1020,7 @@ func (mock *EtcdBackupInterfaceMock) AddClusterScopedFeatureLifecycle(ctx contex
 
 // AddClusterScopedFeatureLifecycleCalls gets all the calls that were made to AddClusterScopedFeatureLifecycle.
 // Check the length with:
-//
-//	len(mockedEtcdBackupInterface.AddClusterScopedFeatureLifecycleCalls())
+//     len(mockedEtcdBackupInterface.AddClusterScopedFeatureLifecycleCalls())
 func (mock *EtcdBackupInterfaceMock) AddClusterScopedFeatureLifecycleCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -1078,8 +1065,7 @@ func (mock *EtcdBackupInterfaceMock) AddClusterScopedHandler(ctx context.Context
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//
-//	len(mockedEtcdBackupInterface.AddClusterScopedHandlerCalls())
+//     len(mockedEtcdBackupInterface.AddClusterScopedHandlerCalls())
 func (mock *EtcdBackupInterfaceMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -1122,8 +1108,7 @@ func (mock *EtcdBackupInterfaceMock) AddClusterScopedLifecycle(ctx context.Conte
 
 // AddClusterScopedLifecycleCalls gets all the calls that were made to AddClusterScopedLifecycle.
 // Check the length with:
-//
-//	len(mockedEtcdBackupInterface.AddClusterScopedLifecycleCalls())
+//     len(mockedEtcdBackupInterface.AddClusterScopedLifecycleCalls())
 func (mock *EtcdBackupInterfaceMock) AddClusterScopedLifecycleCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -1166,8 +1151,7 @@ func (mock *EtcdBackupInterfaceMock) AddFeatureHandler(ctx context.Context, enab
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//
-//	len(mockedEtcdBackupInterface.AddFeatureHandlerCalls())
+//     len(mockedEtcdBackupInterface.AddFeatureHandlerCalls())
 func (mock *EtcdBackupInterfaceMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
@@ -1210,8 +1194,7 @@ func (mock *EtcdBackupInterfaceMock) AddFeatureLifecycle(ctx context.Context, en
 
 // AddFeatureLifecycleCalls gets all the calls that were made to AddFeatureLifecycle.
 // Check the length with:
-//
-//	len(mockedEtcdBackupInterface.AddFeatureLifecycleCalls())
+//     len(mockedEtcdBackupInterface.AddFeatureLifecycleCalls())
 func (mock *EtcdBackupInterfaceMock) AddFeatureLifecycleCalls() []struct {
 	Ctx       context.Context
 	Enabled   func() bool
@@ -1252,8 +1235,7 @@ func (mock *EtcdBackupInterfaceMock) AddHandler(ctx context.Context, name string
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//
-//	len(mockedEtcdBackupInterface.AddHandlerCalls())
+//     len(mockedEtcdBackupInterface.AddHandlerCalls())
 func (mock *EtcdBackupInterfaceMock) AddHandlerCalls() []struct {
 	Ctx  context.Context
 	Name string
@@ -1292,8 +1274,7 @@ func (mock *EtcdBackupInterfaceMock) AddLifecycle(ctx context.Context, name stri
 
 // AddLifecycleCalls gets all the calls that were made to AddLifecycle.
 // Check the length with:
-//
-//	len(mockedEtcdBackupInterface.AddLifecycleCalls())
+//     len(mockedEtcdBackupInterface.AddLifecycleCalls())
 func (mock *EtcdBackupInterfaceMock) AddLifecycleCalls() []struct {
 	Ctx       context.Context
 	Name      string
@@ -1325,8 +1306,7 @@ func (mock *EtcdBackupInterfaceMock) Controller() v31.EtcdBackupController {
 
 // ControllerCalls gets all the calls that were made to Controller.
 // Check the length with:
-//
-//	len(mockedEtcdBackupInterface.ControllerCalls())
+//     len(mockedEtcdBackupInterface.ControllerCalls())
 func (mock *EtcdBackupInterfaceMock) ControllerCalls() []struct {
 } {
 	var calls []struct {
@@ -1355,8 +1335,7 @@ func (mock *EtcdBackupInterfaceMock) Create(in1 *v3.EtcdBackup) (*v3.EtcdBackup,
 
 // CreateCalls gets all the calls that were made to Create.
 // Check the length with:
-//
-//	len(mockedEtcdBackupInterface.CreateCalls())
+//     len(mockedEtcdBackupInterface.CreateCalls())
 func (mock *EtcdBackupInterfaceMock) CreateCalls() []struct {
 	In1 *v3.EtcdBackup
 } {
@@ -1389,8 +1368,7 @@ func (mock *EtcdBackupInterfaceMock) Delete(name string, options *metav1.DeleteO
 
 // DeleteCalls gets all the calls that were made to Delete.
 // Check the length with:
-//
-//	len(mockedEtcdBackupInterface.DeleteCalls())
+//     len(mockedEtcdBackupInterface.DeleteCalls())
 func (mock *EtcdBackupInterfaceMock) DeleteCalls() []struct {
 	Name    string
 	Options *metav1.DeleteOptions
@@ -1425,8 +1403,7 @@ func (mock *EtcdBackupInterfaceMock) DeleteCollection(deleteOpts *metav1.DeleteO
 
 // DeleteCollectionCalls gets all the calls that were made to DeleteCollection.
 // Check the length with:
-//
-//	len(mockedEtcdBackupInterface.DeleteCollectionCalls())
+//     len(mockedEtcdBackupInterface.DeleteCollectionCalls())
 func (mock *EtcdBackupInterfaceMock) DeleteCollectionCalls() []struct {
 	DeleteOpts *metav1.DeleteOptions
 	ListOpts   metav1.ListOptions
@@ -1463,8 +1440,7 @@ func (mock *EtcdBackupInterfaceMock) DeleteNamespaced(namespace string, name str
 
 // DeleteNamespacedCalls gets all the calls that were made to DeleteNamespaced.
 // Check the length with:
-//
-//	len(mockedEtcdBackupInterface.DeleteNamespacedCalls())
+//     len(mockedEtcdBackupInterface.DeleteNamespacedCalls())
 func (mock *EtcdBackupInterfaceMock) DeleteNamespacedCalls() []struct {
 	Namespace string
 	Name      string
@@ -1501,8 +1477,7 @@ func (mock *EtcdBackupInterfaceMock) Get(name string, opts metav1.GetOptions) (*
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//
-//	len(mockedEtcdBackupInterface.GetCalls())
+//     len(mockedEtcdBackupInterface.GetCalls())
 func (mock *EtcdBackupInterfaceMock) GetCalls() []struct {
 	Name string
 	Opts metav1.GetOptions
@@ -1539,8 +1514,7 @@ func (mock *EtcdBackupInterfaceMock) GetNamespaced(namespace string, name string
 
 // GetNamespacedCalls gets all the calls that were made to GetNamespaced.
 // Check the length with:
-//
-//	len(mockedEtcdBackupInterface.GetNamespacedCalls())
+//     len(mockedEtcdBackupInterface.GetNamespacedCalls())
 func (mock *EtcdBackupInterfaceMock) GetNamespacedCalls() []struct {
 	Namespace string
 	Name      string
@@ -1575,8 +1549,7 @@ func (mock *EtcdBackupInterfaceMock) List(opts metav1.ListOptions) (*v3.EtcdBack
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//
-//	len(mockedEtcdBackupInterface.ListCalls())
+//     len(mockedEtcdBackupInterface.ListCalls())
 func (mock *EtcdBackupInterfaceMock) ListCalls() []struct {
 	Opts metav1.ListOptions
 } {
@@ -1609,8 +1582,7 @@ func (mock *EtcdBackupInterfaceMock) ListNamespaced(namespace string, opts metav
 
 // ListNamespacedCalls gets all the calls that were made to ListNamespaced.
 // Check the length with:
-//
-//	len(mockedEtcdBackupInterface.ListNamespacedCalls())
+//     len(mockedEtcdBackupInterface.ListNamespacedCalls())
 func (mock *EtcdBackupInterfaceMock) ListNamespacedCalls() []struct {
 	Namespace string
 	Opts      metav1.ListOptions
@@ -1640,8 +1612,7 @@ func (mock *EtcdBackupInterfaceMock) ObjectClient() *objectclient.ObjectClient {
 
 // ObjectClientCalls gets all the calls that were made to ObjectClient.
 // Check the length with:
-//
-//	len(mockedEtcdBackupInterface.ObjectClientCalls())
+//     len(mockedEtcdBackupInterface.ObjectClientCalls())
 func (mock *EtcdBackupInterfaceMock) ObjectClientCalls() []struct {
 } {
 	var calls []struct {
@@ -1670,8 +1641,7 @@ func (mock *EtcdBackupInterfaceMock) Update(in1 *v3.EtcdBackup) (*v3.EtcdBackup,
 
 // UpdateCalls gets all the calls that were made to Update.
 // Check the length with:
-//
-//	len(mockedEtcdBackupInterface.UpdateCalls())
+//     len(mockedEtcdBackupInterface.UpdateCalls())
 func (mock *EtcdBackupInterfaceMock) UpdateCalls() []struct {
 	In1 *v3.EtcdBackup
 } {
@@ -1702,8 +1672,7 @@ func (mock *EtcdBackupInterfaceMock) Watch(opts metav1.ListOptions) (watch.Inter
 
 // WatchCalls gets all the calls that were made to Watch.
 // Check the length with:
-//
-//	len(mockedEtcdBackupInterface.WatchCalls())
+//     len(mockedEtcdBackupInterface.WatchCalls())
 func (mock *EtcdBackupInterfaceMock) WatchCalls() []struct {
 	Opts metav1.ListOptions
 } {
@@ -1726,19 +1695,19 @@ var _ v31.EtcdBackupsGetter = &EtcdBackupsGetterMock{}
 
 // EtcdBackupsGetterMock is a mock implementation of v31.EtcdBackupsGetter.
 //
-//	    func TestSomethingThatUsesEtcdBackupsGetter(t *testing.T) {
+//     func TestSomethingThatUsesEtcdBackupsGetter(t *testing.T) {
 //
-//	        // make and configure a mocked v31.EtcdBackupsGetter
-//	        mockedEtcdBackupsGetter := &EtcdBackupsGetterMock{
-//	            EtcdBackupsFunc: func(namespace string) v31.EtcdBackupInterface {
-//		               panic("mock out the EtcdBackups method")
-//	            },
-//	        }
+//         // make and configure a mocked v31.EtcdBackupsGetter
+//         mockedEtcdBackupsGetter := &EtcdBackupsGetterMock{
+//             EtcdBackupsFunc: func(namespace string) v31.EtcdBackupInterface {
+// 	               panic("mock out the EtcdBackups method")
+//             },
+//         }
 //
-//	        // use mockedEtcdBackupsGetter in code that requires v31.EtcdBackupsGetter
-//	        // and then make assertions.
+//         // use mockedEtcdBackupsGetter in code that requires v31.EtcdBackupsGetter
+//         // and then make assertions.
 //
-//	    }
+//     }
 type EtcdBackupsGetterMock struct {
 	// EtcdBackupsFunc mocks the EtcdBackups method.
 	EtcdBackupsFunc func(namespace string) v31.EtcdBackupInterface
@@ -1771,8 +1740,7 @@ func (mock *EtcdBackupsGetterMock) EtcdBackups(namespace string) v31.EtcdBackupI
 
 // EtcdBackupsCalls gets all the calls that were made to EtcdBackups.
 // Check the length with:
-//
-//	len(mockedEtcdBackupsGetter.EtcdBackupsCalls())
+//     len(mockedEtcdBackupsGetter.EtcdBackupsCalls())
 func (mock *EtcdBackupsGetterMock) EtcdBackupsCalls() []struct {
 	Namespace string
 } {

@@ -29,22 +29,22 @@ var _ v2beta21.HorizontalPodAutoscalerLister = &HorizontalPodAutoscalerListerMoc
 
 // HorizontalPodAutoscalerListerMock is a mock implementation of v2beta21.HorizontalPodAutoscalerLister.
 //
-//	    func TestSomethingThatUsesHorizontalPodAutoscalerLister(t *testing.T) {
+//     func TestSomethingThatUsesHorizontalPodAutoscalerLister(t *testing.T) {
 //
-//	        // make and configure a mocked v2beta21.HorizontalPodAutoscalerLister
-//	        mockedHorizontalPodAutoscalerLister := &HorizontalPodAutoscalerListerMock{
-//	            GetFunc: func(namespace string, name string) (*v2beta2.HorizontalPodAutoscaler, error) {
-//		               panic("mock out the Get method")
-//	            },
-//	            ListFunc: func(namespace string, selector labels.Selector) ([]*v2beta2.HorizontalPodAutoscaler, error) {
-//		               panic("mock out the List method")
-//	            },
-//	        }
+//         // make and configure a mocked v2beta21.HorizontalPodAutoscalerLister
+//         mockedHorizontalPodAutoscalerLister := &HorizontalPodAutoscalerListerMock{
+//             GetFunc: func(namespace string, name string) (*v2beta2.HorizontalPodAutoscaler, error) {
+// 	               panic("mock out the Get method")
+//             },
+//             ListFunc: func(namespace string, selector labels.Selector) ([]*v2beta2.HorizontalPodAutoscaler, error) {
+// 	               panic("mock out the List method")
+//             },
+//         }
 //
-//	        // use mockedHorizontalPodAutoscalerLister in code that requires v2beta21.HorizontalPodAutoscalerLister
-//	        // and then make assertions.
+//         // use mockedHorizontalPodAutoscalerLister in code that requires v2beta21.HorizontalPodAutoscalerLister
+//         // and then make assertions.
 //
-//	    }
+//     }
 type HorizontalPodAutoscalerListerMock struct {
 	// GetFunc mocks the Get method.
 	GetFunc func(namespace string, name string) (*v2beta2.HorizontalPodAutoscaler, error)
@@ -91,8 +91,7 @@ func (mock *HorizontalPodAutoscalerListerMock) Get(namespace string, name string
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//
-//	len(mockedHorizontalPodAutoscalerLister.GetCalls())
+//     len(mockedHorizontalPodAutoscalerLister.GetCalls())
 func (mock *HorizontalPodAutoscalerListerMock) GetCalls() []struct {
 	Namespace string
 	Name      string
@@ -127,8 +126,7 @@ func (mock *HorizontalPodAutoscalerListerMock) List(namespace string, selector l
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//
-//	len(mockedHorizontalPodAutoscalerLister.ListCalls())
+//     len(mockedHorizontalPodAutoscalerLister.ListCalls())
 func (mock *HorizontalPodAutoscalerListerMock) ListCalls() []struct {
 	Namespace string
 	Selector  labels.Selector
@@ -161,43 +159,43 @@ var _ v2beta21.HorizontalPodAutoscalerController = &HorizontalPodAutoscalerContr
 
 // HorizontalPodAutoscalerControllerMock is a mock implementation of v2beta21.HorizontalPodAutoscalerController.
 //
-//	    func TestSomethingThatUsesHorizontalPodAutoscalerController(t *testing.T) {
+//     func TestSomethingThatUsesHorizontalPodAutoscalerController(t *testing.T) {
 //
-//	        // make and configure a mocked v2beta21.HorizontalPodAutoscalerController
-//	        mockedHorizontalPodAutoscalerController := &HorizontalPodAutoscalerControllerMock{
-//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v2beta21.HorizontalPodAutoscalerHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedFeatureHandler method")
-//	            },
-//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v2beta21.HorizontalPodAutoscalerHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedHandler method")
-//	            },
-//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v2beta21.HorizontalPodAutoscalerHandlerFunc)  {
-//		               panic("mock out the AddFeatureHandler method")
-//	            },
-//	            AddHandlerFunc: func(ctx context.Context, name string, handler v2beta21.HorizontalPodAutoscalerHandlerFunc)  {
-//		               panic("mock out the AddHandler method")
-//	            },
-//	            EnqueueFunc: func(namespace string, name string)  {
-//		               panic("mock out the Enqueue method")
-//	            },
-//	            EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
-//		               panic("mock out the EnqueueAfter method")
-//	            },
-//	            GenericFunc: func() controller.GenericController {
-//		               panic("mock out the Generic method")
-//	            },
-//	            InformerFunc: func() cache.SharedIndexInformer {
-//		               panic("mock out the Informer method")
-//	            },
-//	            ListerFunc: func() v2beta21.HorizontalPodAutoscalerLister {
-//		               panic("mock out the Lister method")
-//	            },
-//	        }
+//         // make and configure a mocked v2beta21.HorizontalPodAutoscalerController
+//         mockedHorizontalPodAutoscalerController := &HorizontalPodAutoscalerControllerMock{
+//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v2beta21.HorizontalPodAutoscalerHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedFeatureHandler method")
+//             },
+//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v2beta21.HorizontalPodAutoscalerHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedHandler method")
+//             },
+//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v2beta21.HorizontalPodAutoscalerHandlerFunc)  {
+// 	               panic("mock out the AddFeatureHandler method")
+//             },
+//             AddHandlerFunc: func(ctx context.Context, name string, handler v2beta21.HorizontalPodAutoscalerHandlerFunc)  {
+// 	               panic("mock out the AddHandler method")
+//             },
+//             EnqueueFunc: func(namespace string, name string)  {
+// 	               panic("mock out the Enqueue method")
+//             },
+//             EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
+// 	               panic("mock out the EnqueueAfter method")
+//             },
+//             GenericFunc: func() controller.GenericController {
+// 	               panic("mock out the Generic method")
+//             },
+//             InformerFunc: func() cache.SharedIndexInformer {
+// 	               panic("mock out the Informer method")
+//             },
+//             ListerFunc: func() v2beta21.HorizontalPodAutoscalerLister {
+// 	               panic("mock out the Lister method")
+//             },
+//         }
 //
-//	        // use mockedHorizontalPodAutoscalerController in code that requires v2beta21.HorizontalPodAutoscalerController
-//	        // and then make assertions.
+//         // use mockedHorizontalPodAutoscalerController in code that requires v2beta21.HorizontalPodAutoscalerController
+//         // and then make assertions.
 //
-//	    }
+//     }
 type HorizontalPodAutoscalerControllerMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
 	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v2beta21.HorizontalPodAutoscalerHandlerFunc)
@@ -326,8 +324,7 @@ func (mock *HorizontalPodAutoscalerControllerMock) AddClusterScopedFeatureHandle
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//
-//	len(mockedHorizontalPodAutoscalerController.AddClusterScopedFeatureHandlerCalls())
+//     len(mockedHorizontalPodAutoscalerController.AddClusterScopedFeatureHandlerCalls())
 func (mock *HorizontalPodAutoscalerControllerMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -372,8 +369,7 @@ func (mock *HorizontalPodAutoscalerControllerMock) AddClusterScopedHandler(ctx c
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//
-//	len(mockedHorizontalPodAutoscalerController.AddClusterScopedHandlerCalls())
+//     len(mockedHorizontalPodAutoscalerController.AddClusterScopedHandlerCalls())
 func (mock *HorizontalPodAutoscalerControllerMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -416,8 +412,7 @@ func (mock *HorizontalPodAutoscalerControllerMock) AddFeatureHandler(ctx context
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//
-//	len(mockedHorizontalPodAutoscalerController.AddFeatureHandlerCalls())
+//     len(mockedHorizontalPodAutoscalerController.AddFeatureHandlerCalls())
 func (mock *HorizontalPodAutoscalerControllerMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
@@ -458,8 +453,7 @@ func (mock *HorizontalPodAutoscalerControllerMock) AddHandler(ctx context.Contex
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//
-//	len(mockedHorizontalPodAutoscalerController.AddHandlerCalls())
+//     len(mockedHorizontalPodAutoscalerController.AddHandlerCalls())
 func (mock *HorizontalPodAutoscalerControllerMock) AddHandlerCalls() []struct {
 	Ctx     context.Context
 	Name    string
@@ -496,8 +490,7 @@ func (mock *HorizontalPodAutoscalerControllerMock) Enqueue(namespace string, nam
 
 // EnqueueCalls gets all the calls that were made to Enqueue.
 // Check the length with:
-//
-//	len(mockedHorizontalPodAutoscalerController.EnqueueCalls())
+//     len(mockedHorizontalPodAutoscalerController.EnqueueCalls())
 func (mock *HorizontalPodAutoscalerControllerMock) EnqueueCalls() []struct {
 	Namespace string
 	Name      string
@@ -534,8 +527,7 @@ func (mock *HorizontalPodAutoscalerControllerMock) EnqueueAfter(namespace string
 
 // EnqueueAfterCalls gets all the calls that were made to EnqueueAfter.
 // Check the length with:
-//
-//	len(mockedHorizontalPodAutoscalerController.EnqueueAfterCalls())
+//     len(mockedHorizontalPodAutoscalerController.EnqueueAfterCalls())
 func (mock *HorizontalPodAutoscalerControllerMock) EnqueueAfterCalls() []struct {
 	Namespace string
 	Name      string
@@ -567,8 +559,7 @@ func (mock *HorizontalPodAutoscalerControllerMock) Generic() controller.GenericC
 
 // GenericCalls gets all the calls that were made to Generic.
 // Check the length with:
-//
-//	len(mockedHorizontalPodAutoscalerController.GenericCalls())
+//     len(mockedHorizontalPodAutoscalerController.GenericCalls())
 func (mock *HorizontalPodAutoscalerControllerMock) GenericCalls() []struct {
 } {
 	var calls []struct {
@@ -594,8 +585,7 @@ func (mock *HorizontalPodAutoscalerControllerMock) Informer() cache.SharedIndexI
 
 // InformerCalls gets all the calls that were made to Informer.
 // Check the length with:
-//
-//	len(mockedHorizontalPodAutoscalerController.InformerCalls())
+//     len(mockedHorizontalPodAutoscalerController.InformerCalls())
 func (mock *HorizontalPodAutoscalerControllerMock) InformerCalls() []struct {
 } {
 	var calls []struct {
@@ -621,8 +611,7 @@ func (mock *HorizontalPodAutoscalerControllerMock) Lister() v2beta21.HorizontalP
 
 // ListerCalls gets all the calls that were made to Lister.
 // Check the length with:
-//
-//	len(mockedHorizontalPodAutoscalerController.ListerCalls())
+//     len(mockedHorizontalPodAutoscalerController.ListerCalls())
 func (mock *HorizontalPodAutoscalerControllerMock) ListerCalls() []struct {
 } {
 	var calls []struct {
@@ -662,76 +651,76 @@ var _ v2beta21.HorizontalPodAutoscalerInterface = &HorizontalPodAutoscalerInterf
 
 // HorizontalPodAutoscalerInterfaceMock is a mock implementation of v2beta21.HorizontalPodAutoscalerInterface.
 //
-//	    func TestSomethingThatUsesHorizontalPodAutoscalerInterface(t *testing.T) {
+//     func TestSomethingThatUsesHorizontalPodAutoscalerInterface(t *testing.T) {
 //
-//	        // make and configure a mocked v2beta21.HorizontalPodAutoscalerInterface
-//	        mockedHorizontalPodAutoscalerInterface := &HorizontalPodAutoscalerInterfaceMock{
-//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v2beta21.HorizontalPodAutoscalerHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedFeatureHandler method")
-//	            },
-//	            AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v2beta21.HorizontalPodAutoscalerLifecycle)  {
-//		               panic("mock out the AddClusterScopedFeatureLifecycle method")
-//	            },
-//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v2beta21.HorizontalPodAutoscalerHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedHandler method")
-//	            },
-//	            AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v2beta21.HorizontalPodAutoscalerLifecycle)  {
-//		               panic("mock out the AddClusterScopedLifecycle method")
-//	            },
-//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v2beta21.HorizontalPodAutoscalerHandlerFunc)  {
-//		               panic("mock out the AddFeatureHandler method")
-//	            },
-//	            AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v2beta21.HorizontalPodAutoscalerLifecycle)  {
-//		               panic("mock out the AddFeatureLifecycle method")
-//	            },
-//	            AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v2beta21.HorizontalPodAutoscalerHandlerFunc)  {
-//		               panic("mock out the AddHandler method")
-//	            },
-//	            AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v2beta21.HorizontalPodAutoscalerLifecycle)  {
-//		               panic("mock out the AddLifecycle method")
-//	            },
-//	            ControllerFunc: func() v2beta21.HorizontalPodAutoscalerController {
-//		               panic("mock out the Controller method")
-//	            },
-//	            CreateFunc: func(in1 *v2beta2.HorizontalPodAutoscaler) (*v2beta2.HorizontalPodAutoscaler, error) {
-//		               panic("mock out the Create method")
-//	            },
-//	            DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
-//		               panic("mock out the Delete method")
-//	            },
-//	            DeleteCollectionFunc: func(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
-//		               panic("mock out the DeleteCollection method")
-//	            },
-//	            DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
-//		               panic("mock out the DeleteNamespaced method")
-//	            },
-//	            GetFunc: func(name string, opts metav1.GetOptions) (*v2beta2.HorizontalPodAutoscaler, error) {
-//		               panic("mock out the Get method")
-//	            },
-//	            GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v2beta2.HorizontalPodAutoscaler, error) {
-//		               panic("mock out the GetNamespaced method")
-//	            },
-//	            ListFunc: func(opts metav1.ListOptions) (*v2beta2.HorizontalPodAutoscalerList, error) {
-//		               panic("mock out the List method")
-//	            },
-//	            ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v2beta2.HorizontalPodAutoscalerList, error) {
-//		               panic("mock out the ListNamespaced method")
-//	            },
-//	            ObjectClientFunc: func() *objectclient.ObjectClient {
-//		               panic("mock out the ObjectClient method")
-//	            },
-//	            UpdateFunc: func(in1 *v2beta2.HorizontalPodAutoscaler) (*v2beta2.HorizontalPodAutoscaler, error) {
-//		               panic("mock out the Update method")
-//	            },
-//	            WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
-//		               panic("mock out the Watch method")
-//	            },
-//	        }
+//         // make and configure a mocked v2beta21.HorizontalPodAutoscalerInterface
+//         mockedHorizontalPodAutoscalerInterface := &HorizontalPodAutoscalerInterfaceMock{
+//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v2beta21.HorizontalPodAutoscalerHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedFeatureHandler method")
+//             },
+//             AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v2beta21.HorizontalPodAutoscalerLifecycle)  {
+// 	               panic("mock out the AddClusterScopedFeatureLifecycle method")
+//             },
+//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v2beta21.HorizontalPodAutoscalerHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedHandler method")
+//             },
+//             AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v2beta21.HorizontalPodAutoscalerLifecycle)  {
+// 	               panic("mock out the AddClusterScopedLifecycle method")
+//             },
+//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v2beta21.HorizontalPodAutoscalerHandlerFunc)  {
+// 	               panic("mock out the AddFeatureHandler method")
+//             },
+//             AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v2beta21.HorizontalPodAutoscalerLifecycle)  {
+// 	               panic("mock out the AddFeatureLifecycle method")
+//             },
+//             AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v2beta21.HorizontalPodAutoscalerHandlerFunc)  {
+// 	               panic("mock out the AddHandler method")
+//             },
+//             AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v2beta21.HorizontalPodAutoscalerLifecycle)  {
+// 	               panic("mock out the AddLifecycle method")
+//             },
+//             ControllerFunc: func() v2beta21.HorizontalPodAutoscalerController {
+// 	               panic("mock out the Controller method")
+//             },
+//             CreateFunc: func(in1 *v2beta2.HorizontalPodAutoscaler) (*v2beta2.HorizontalPodAutoscaler, error) {
+// 	               panic("mock out the Create method")
+//             },
+//             DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
+// 	               panic("mock out the Delete method")
+//             },
+//             DeleteCollectionFunc: func(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
+// 	               panic("mock out the DeleteCollection method")
+//             },
+//             DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
+// 	               panic("mock out the DeleteNamespaced method")
+//             },
+//             GetFunc: func(name string, opts metav1.GetOptions) (*v2beta2.HorizontalPodAutoscaler, error) {
+// 	               panic("mock out the Get method")
+//             },
+//             GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v2beta2.HorizontalPodAutoscaler, error) {
+// 	               panic("mock out the GetNamespaced method")
+//             },
+//             ListFunc: func(opts metav1.ListOptions) (*v2beta2.HorizontalPodAutoscalerList, error) {
+// 	               panic("mock out the List method")
+//             },
+//             ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v2beta2.HorizontalPodAutoscalerList, error) {
+// 	               panic("mock out the ListNamespaced method")
+//             },
+//             ObjectClientFunc: func() *objectclient.ObjectClient {
+// 	               panic("mock out the ObjectClient method")
+//             },
+//             UpdateFunc: func(in1 *v2beta2.HorizontalPodAutoscaler) (*v2beta2.HorizontalPodAutoscaler, error) {
+// 	               panic("mock out the Update method")
+//             },
+//             WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
+// 	               panic("mock out the Watch method")
+//             },
+//         }
 //
-//	        // use mockedHorizontalPodAutoscalerInterface in code that requires v2beta21.HorizontalPodAutoscalerInterface
-//	        // and then make assertions.
+//         // use mockedHorizontalPodAutoscalerInterface in code that requires v2beta21.HorizontalPodAutoscalerInterface
+//         // and then make assertions.
 //
-//	    }
+//     }
 type HorizontalPodAutoscalerInterfaceMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
 	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v2beta21.HorizontalPodAutoscalerHandlerFunc)
@@ -984,8 +973,7 @@ func (mock *HorizontalPodAutoscalerInterfaceMock) AddClusterScopedFeatureHandler
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//
-//	len(mockedHorizontalPodAutoscalerInterface.AddClusterScopedFeatureHandlerCalls())
+//     len(mockedHorizontalPodAutoscalerInterface.AddClusterScopedFeatureHandlerCalls())
 func (mock *HorizontalPodAutoscalerInterfaceMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -1032,8 +1020,7 @@ func (mock *HorizontalPodAutoscalerInterfaceMock) AddClusterScopedFeatureLifecyc
 
 // AddClusterScopedFeatureLifecycleCalls gets all the calls that were made to AddClusterScopedFeatureLifecycle.
 // Check the length with:
-//
-//	len(mockedHorizontalPodAutoscalerInterface.AddClusterScopedFeatureLifecycleCalls())
+//     len(mockedHorizontalPodAutoscalerInterface.AddClusterScopedFeatureLifecycleCalls())
 func (mock *HorizontalPodAutoscalerInterfaceMock) AddClusterScopedFeatureLifecycleCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -1078,8 +1065,7 @@ func (mock *HorizontalPodAutoscalerInterfaceMock) AddClusterScopedHandler(ctx co
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//
-//	len(mockedHorizontalPodAutoscalerInterface.AddClusterScopedHandlerCalls())
+//     len(mockedHorizontalPodAutoscalerInterface.AddClusterScopedHandlerCalls())
 func (mock *HorizontalPodAutoscalerInterfaceMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -1122,8 +1108,7 @@ func (mock *HorizontalPodAutoscalerInterfaceMock) AddClusterScopedLifecycle(ctx 
 
 // AddClusterScopedLifecycleCalls gets all the calls that were made to AddClusterScopedLifecycle.
 // Check the length with:
-//
-//	len(mockedHorizontalPodAutoscalerInterface.AddClusterScopedLifecycleCalls())
+//     len(mockedHorizontalPodAutoscalerInterface.AddClusterScopedLifecycleCalls())
 func (mock *HorizontalPodAutoscalerInterfaceMock) AddClusterScopedLifecycleCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -1166,8 +1151,7 @@ func (mock *HorizontalPodAutoscalerInterfaceMock) AddFeatureHandler(ctx context.
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//
-//	len(mockedHorizontalPodAutoscalerInterface.AddFeatureHandlerCalls())
+//     len(mockedHorizontalPodAutoscalerInterface.AddFeatureHandlerCalls())
 func (mock *HorizontalPodAutoscalerInterfaceMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
@@ -1210,8 +1194,7 @@ func (mock *HorizontalPodAutoscalerInterfaceMock) AddFeatureLifecycle(ctx contex
 
 // AddFeatureLifecycleCalls gets all the calls that were made to AddFeatureLifecycle.
 // Check the length with:
-//
-//	len(mockedHorizontalPodAutoscalerInterface.AddFeatureLifecycleCalls())
+//     len(mockedHorizontalPodAutoscalerInterface.AddFeatureLifecycleCalls())
 func (mock *HorizontalPodAutoscalerInterfaceMock) AddFeatureLifecycleCalls() []struct {
 	Ctx       context.Context
 	Enabled   func() bool
@@ -1252,8 +1235,7 @@ func (mock *HorizontalPodAutoscalerInterfaceMock) AddHandler(ctx context.Context
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//
-//	len(mockedHorizontalPodAutoscalerInterface.AddHandlerCalls())
+//     len(mockedHorizontalPodAutoscalerInterface.AddHandlerCalls())
 func (mock *HorizontalPodAutoscalerInterfaceMock) AddHandlerCalls() []struct {
 	Ctx  context.Context
 	Name string
@@ -1292,8 +1274,7 @@ func (mock *HorizontalPodAutoscalerInterfaceMock) AddLifecycle(ctx context.Conte
 
 // AddLifecycleCalls gets all the calls that were made to AddLifecycle.
 // Check the length with:
-//
-//	len(mockedHorizontalPodAutoscalerInterface.AddLifecycleCalls())
+//     len(mockedHorizontalPodAutoscalerInterface.AddLifecycleCalls())
 func (mock *HorizontalPodAutoscalerInterfaceMock) AddLifecycleCalls() []struct {
 	Ctx       context.Context
 	Name      string
@@ -1325,8 +1306,7 @@ func (mock *HorizontalPodAutoscalerInterfaceMock) Controller() v2beta21.Horizont
 
 // ControllerCalls gets all the calls that were made to Controller.
 // Check the length with:
-//
-//	len(mockedHorizontalPodAutoscalerInterface.ControllerCalls())
+//     len(mockedHorizontalPodAutoscalerInterface.ControllerCalls())
 func (mock *HorizontalPodAutoscalerInterfaceMock) ControllerCalls() []struct {
 } {
 	var calls []struct {
@@ -1355,8 +1335,7 @@ func (mock *HorizontalPodAutoscalerInterfaceMock) Create(in1 *v2beta2.Horizontal
 
 // CreateCalls gets all the calls that were made to Create.
 // Check the length with:
-//
-//	len(mockedHorizontalPodAutoscalerInterface.CreateCalls())
+//     len(mockedHorizontalPodAutoscalerInterface.CreateCalls())
 func (mock *HorizontalPodAutoscalerInterfaceMock) CreateCalls() []struct {
 	In1 *v2beta2.HorizontalPodAutoscaler
 } {
@@ -1389,8 +1368,7 @@ func (mock *HorizontalPodAutoscalerInterfaceMock) Delete(name string, options *m
 
 // DeleteCalls gets all the calls that were made to Delete.
 // Check the length with:
-//
-//	len(mockedHorizontalPodAutoscalerInterface.DeleteCalls())
+//     len(mockedHorizontalPodAutoscalerInterface.DeleteCalls())
 func (mock *HorizontalPodAutoscalerInterfaceMock) DeleteCalls() []struct {
 	Name    string
 	Options *metav1.DeleteOptions
@@ -1425,8 +1403,7 @@ func (mock *HorizontalPodAutoscalerInterfaceMock) DeleteCollection(deleteOpts *m
 
 // DeleteCollectionCalls gets all the calls that were made to DeleteCollection.
 // Check the length with:
-//
-//	len(mockedHorizontalPodAutoscalerInterface.DeleteCollectionCalls())
+//     len(mockedHorizontalPodAutoscalerInterface.DeleteCollectionCalls())
 func (mock *HorizontalPodAutoscalerInterfaceMock) DeleteCollectionCalls() []struct {
 	DeleteOpts *metav1.DeleteOptions
 	ListOpts   metav1.ListOptions
@@ -1463,8 +1440,7 @@ func (mock *HorizontalPodAutoscalerInterfaceMock) DeleteNamespaced(namespace str
 
 // DeleteNamespacedCalls gets all the calls that were made to DeleteNamespaced.
 // Check the length with:
-//
-//	len(mockedHorizontalPodAutoscalerInterface.DeleteNamespacedCalls())
+//     len(mockedHorizontalPodAutoscalerInterface.DeleteNamespacedCalls())
 func (mock *HorizontalPodAutoscalerInterfaceMock) DeleteNamespacedCalls() []struct {
 	Namespace string
 	Name      string
@@ -1501,8 +1477,7 @@ func (mock *HorizontalPodAutoscalerInterfaceMock) Get(name string, opts metav1.G
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//
-//	len(mockedHorizontalPodAutoscalerInterface.GetCalls())
+//     len(mockedHorizontalPodAutoscalerInterface.GetCalls())
 func (mock *HorizontalPodAutoscalerInterfaceMock) GetCalls() []struct {
 	Name string
 	Opts metav1.GetOptions
@@ -1539,8 +1514,7 @@ func (mock *HorizontalPodAutoscalerInterfaceMock) GetNamespaced(namespace string
 
 // GetNamespacedCalls gets all the calls that were made to GetNamespaced.
 // Check the length with:
-//
-//	len(mockedHorizontalPodAutoscalerInterface.GetNamespacedCalls())
+//     len(mockedHorizontalPodAutoscalerInterface.GetNamespacedCalls())
 func (mock *HorizontalPodAutoscalerInterfaceMock) GetNamespacedCalls() []struct {
 	Namespace string
 	Name      string
@@ -1575,8 +1549,7 @@ func (mock *HorizontalPodAutoscalerInterfaceMock) List(opts metav1.ListOptions) 
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//
-//	len(mockedHorizontalPodAutoscalerInterface.ListCalls())
+//     len(mockedHorizontalPodAutoscalerInterface.ListCalls())
 func (mock *HorizontalPodAutoscalerInterfaceMock) ListCalls() []struct {
 	Opts metav1.ListOptions
 } {
@@ -1609,8 +1582,7 @@ func (mock *HorizontalPodAutoscalerInterfaceMock) ListNamespaced(namespace strin
 
 // ListNamespacedCalls gets all the calls that were made to ListNamespaced.
 // Check the length with:
-//
-//	len(mockedHorizontalPodAutoscalerInterface.ListNamespacedCalls())
+//     len(mockedHorizontalPodAutoscalerInterface.ListNamespacedCalls())
 func (mock *HorizontalPodAutoscalerInterfaceMock) ListNamespacedCalls() []struct {
 	Namespace string
 	Opts      metav1.ListOptions
@@ -1640,8 +1612,7 @@ func (mock *HorizontalPodAutoscalerInterfaceMock) ObjectClient() *objectclient.O
 
 // ObjectClientCalls gets all the calls that were made to ObjectClient.
 // Check the length with:
-//
-//	len(mockedHorizontalPodAutoscalerInterface.ObjectClientCalls())
+//     len(mockedHorizontalPodAutoscalerInterface.ObjectClientCalls())
 func (mock *HorizontalPodAutoscalerInterfaceMock) ObjectClientCalls() []struct {
 } {
 	var calls []struct {
@@ -1670,8 +1641,7 @@ func (mock *HorizontalPodAutoscalerInterfaceMock) Update(in1 *v2beta2.Horizontal
 
 // UpdateCalls gets all the calls that were made to Update.
 // Check the length with:
-//
-//	len(mockedHorizontalPodAutoscalerInterface.UpdateCalls())
+//     len(mockedHorizontalPodAutoscalerInterface.UpdateCalls())
 func (mock *HorizontalPodAutoscalerInterfaceMock) UpdateCalls() []struct {
 	In1 *v2beta2.HorizontalPodAutoscaler
 } {
@@ -1702,8 +1672,7 @@ func (mock *HorizontalPodAutoscalerInterfaceMock) Watch(opts metav1.ListOptions)
 
 // WatchCalls gets all the calls that were made to Watch.
 // Check the length with:
-//
-//	len(mockedHorizontalPodAutoscalerInterface.WatchCalls())
+//     len(mockedHorizontalPodAutoscalerInterface.WatchCalls())
 func (mock *HorizontalPodAutoscalerInterfaceMock) WatchCalls() []struct {
 	Opts metav1.ListOptions
 } {
@@ -1726,19 +1695,19 @@ var _ v2beta21.HorizontalPodAutoscalersGetter = &HorizontalPodAutoscalersGetterM
 
 // HorizontalPodAutoscalersGetterMock is a mock implementation of v2beta21.HorizontalPodAutoscalersGetter.
 //
-//	    func TestSomethingThatUsesHorizontalPodAutoscalersGetter(t *testing.T) {
+//     func TestSomethingThatUsesHorizontalPodAutoscalersGetter(t *testing.T) {
 //
-//	        // make and configure a mocked v2beta21.HorizontalPodAutoscalersGetter
-//	        mockedHorizontalPodAutoscalersGetter := &HorizontalPodAutoscalersGetterMock{
-//	            HorizontalPodAutoscalersFunc: func(namespace string) v2beta21.HorizontalPodAutoscalerInterface {
-//		               panic("mock out the HorizontalPodAutoscalers method")
-//	            },
-//	        }
+//         // make and configure a mocked v2beta21.HorizontalPodAutoscalersGetter
+//         mockedHorizontalPodAutoscalersGetter := &HorizontalPodAutoscalersGetterMock{
+//             HorizontalPodAutoscalersFunc: func(namespace string) v2beta21.HorizontalPodAutoscalerInterface {
+// 	               panic("mock out the HorizontalPodAutoscalers method")
+//             },
+//         }
 //
-//	        // use mockedHorizontalPodAutoscalersGetter in code that requires v2beta21.HorizontalPodAutoscalersGetter
-//	        // and then make assertions.
+//         // use mockedHorizontalPodAutoscalersGetter in code that requires v2beta21.HorizontalPodAutoscalersGetter
+//         // and then make assertions.
 //
-//	    }
+//     }
 type HorizontalPodAutoscalersGetterMock struct {
 	// HorizontalPodAutoscalersFunc mocks the HorizontalPodAutoscalers method.
 	HorizontalPodAutoscalersFunc func(namespace string) v2beta21.HorizontalPodAutoscalerInterface
@@ -1771,8 +1740,7 @@ func (mock *HorizontalPodAutoscalersGetterMock) HorizontalPodAutoscalers(namespa
 
 // HorizontalPodAutoscalersCalls gets all the calls that were made to HorizontalPodAutoscalers.
 // Check the length with:
-//
-//	len(mockedHorizontalPodAutoscalersGetter.HorizontalPodAutoscalersCalls())
+//     len(mockedHorizontalPodAutoscalersGetter.HorizontalPodAutoscalersCalls())
 func (mock *HorizontalPodAutoscalersGetterMock) HorizontalPodAutoscalersCalls() []struct {
 	Namespace string
 } {

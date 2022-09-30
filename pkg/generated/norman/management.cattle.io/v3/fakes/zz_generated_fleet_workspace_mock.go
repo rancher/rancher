@@ -29,22 +29,22 @@ var _ v31.FleetWorkspaceLister = &FleetWorkspaceListerMock{}
 
 // FleetWorkspaceListerMock is a mock implementation of v31.FleetWorkspaceLister.
 //
-//	    func TestSomethingThatUsesFleetWorkspaceLister(t *testing.T) {
+//     func TestSomethingThatUsesFleetWorkspaceLister(t *testing.T) {
 //
-//	        // make and configure a mocked v31.FleetWorkspaceLister
-//	        mockedFleetWorkspaceLister := &FleetWorkspaceListerMock{
-//	            GetFunc: func(namespace string, name string) (*v3.FleetWorkspace, error) {
-//		               panic("mock out the Get method")
-//	            },
-//	            ListFunc: func(namespace string, selector labels.Selector) ([]*v3.FleetWorkspace, error) {
-//		               panic("mock out the List method")
-//	            },
-//	        }
+//         // make and configure a mocked v31.FleetWorkspaceLister
+//         mockedFleetWorkspaceLister := &FleetWorkspaceListerMock{
+//             GetFunc: func(namespace string, name string) (*v3.FleetWorkspace, error) {
+// 	               panic("mock out the Get method")
+//             },
+//             ListFunc: func(namespace string, selector labels.Selector) ([]*v3.FleetWorkspace, error) {
+// 	               panic("mock out the List method")
+//             },
+//         }
 //
-//	        // use mockedFleetWorkspaceLister in code that requires v31.FleetWorkspaceLister
-//	        // and then make assertions.
+//         // use mockedFleetWorkspaceLister in code that requires v31.FleetWorkspaceLister
+//         // and then make assertions.
 //
-//	    }
+//     }
 type FleetWorkspaceListerMock struct {
 	// GetFunc mocks the Get method.
 	GetFunc func(namespace string, name string) (*v3.FleetWorkspace, error)
@@ -91,8 +91,7 @@ func (mock *FleetWorkspaceListerMock) Get(namespace string, name string) (*v3.Fl
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//
-//	len(mockedFleetWorkspaceLister.GetCalls())
+//     len(mockedFleetWorkspaceLister.GetCalls())
 func (mock *FleetWorkspaceListerMock) GetCalls() []struct {
 	Namespace string
 	Name      string
@@ -127,8 +126,7 @@ func (mock *FleetWorkspaceListerMock) List(namespace string, selector labels.Sel
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//
-//	len(mockedFleetWorkspaceLister.ListCalls())
+//     len(mockedFleetWorkspaceLister.ListCalls())
 func (mock *FleetWorkspaceListerMock) ListCalls() []struct {
 	Namespace string
 	Selector  labels.Selector
@@ -161,43 +159,43 @@ var _ v31.FleetWorkspaceController = &FleetWorkspaceControllerMock{}
 
 // FleetWorkspaceControllerMock is a mock implementation of v31.FleetWorkspaceController.
 //
-//	    func TestSomethingThatUsesFleetWorkspaceController(t *testing.T) {
+//     func TestSomethingThatUsesFleetWorkspaceController(t *testing.T) {
 //
-//	        // make and configure a mocked v31.FleetWorkspaceController
-//	        mockedFleetWorkspaceController := &FleetWorkspaceControllerMock{
-//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v31.FleetWorkspaceHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedFeatureHandler method")
-//	            },
-//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v31.FleetWorkspaceHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedHandler method")
-//	            },
-//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.FleetWorkspaceHandlerFunc)  {
-//		               panic("mock out the AddFeatureHandler method")
-//	            },
-//	            AddHandlerFunc: func(ctx context.Context, name string, handler v31.FleetWorkspaceHandlerFunc)  {
-//		               panic("mock out the AddHandler method")
-//	            },
-//	            EnqueueFunc: func(namespace string, name string)  {
-//		               panic("mock out the Enqueue method")
-//	            },
-//	            EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
-//		               panic("mock out the EnqueueAfter method")
-//	            },
-//	            GenericFunc: func() controller.GenericController {
-//		               panic("mock out the Generic method")
-//	            },
-//	            InformerFunc: func() cache.SharedIndexInformer {
-//		               panic("mock out the Informer method")
-//	            },
-//	            ListerFunc: func() v31.FleetWorkspaceLister {
-//		               panic("mock out the Lister method")
-//	            },
-//	        }
+//         // make and configure a mocked v31.FleetWorkspaceController
+//         mockedFleetWorkspaceController := &FleetWorkspaceControllerMock{
+//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v31.FleetWorkspaceHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedFeatureHandler method")
+//             },
+//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v31.FleetWorkspaceHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedHandler method")
+//             },
+//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.FleetWorkspaceHandlerFunc)  {
+// 	               panic("mock out the AddFeatureHandler method")
+//             },
+//             AddHandlerFunc: func(ctx context.Context, name string, handler v31.FleetWorkspaceHandlerFunc)  {
+// 	               panic("mock out the AddHandler method")
+//             },
+//             EnqueueFunc: func(namespace string, name string)  {
+// 	               panic("mock out the Enqueue method")
+//             },
+//             EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
+// 	               panic("mock out the EnqueueAfter method")
+//             },
+//             GenericFunc: func() controller.GenericController {
+// 	               panic("mock out the Generic method")
+//             },
+//             InformerFunc: func() cache.SharedIndexInformer {
+// 	               panic("mock out the Informer method")
+//             },
+//             ListerFunc: func() v31.FleetWorkspaceLister {
+// 	               panic("mock out the Lister method")
+//             },
+//         }
 //
-//	        // use mockedFleetWorkspaceController in code that requires v31.FleetWorkspaceController
-//	        // and then make assertions.
+//         // use mockedFleetWorkspaceController in code that requires v31.FleetWorkspaceController
+//         // and then make assertions.
 //
-//	    }
+//     }
 type FleetWorkspaceControllerMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
 	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v31.FleetWorkspaceHandlerFunc)
@@ -326,8 +324,7 @@ func (mock *FleetWorkspaceControllerMock) AddClusterScopedFeatureHandler(ctx con
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//
-//	len(mockedFleetWorkspaceController.AddClusterScopedFeatureHandlerCalls())
+//     len(mockedFleetWorkspaceController.AddClusterScopedFeatureHandlerCalls())
 func (mock *FleetWorkspaceControllerMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -372,8 +369,7 @@ func (mock *FleetWorkspaceControllerMock) AddClusterScopedHandler(ctx context.Co
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//
-//	len(mockedFleetWorkspaceController.AddClusterScopedHandlerCalls())
+//     len(mockedFleetWorkspaceController.AddClusterScopedHandlerCalls())
 func (mock *FleetWorkspaceControllerMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -416,8 +412,7 @@ func (mock *FleetWorkspaceControllerMock) AddFeatureHandler(ctx context.Context,
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//
-//	len(mockedFleetWorkspaceController.AddFeatureHandlerCalls())
+//     len(mockedFleetWorkspaceController.AddFeatureHandlerCalls())
 func (mock *FleetWorkspaceControllerMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
@@ -458,8 +453,7 @@ func (mock *FleetWorkspaceControllerMock) AddHandler(ctx context.Context, name s
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//
-//	len(mockedFleetWorkspaceController.AddHandlerCalls())
+//     len(mockedFleetWorkspaceController.AddHandlerCalls())
 func (mock *FleetWorkspaceControllerMock) AddHandlerCalls() []struct {
 	Ctx     context.Context
 	Name    string
@@ -496,8 +490,7 @@ func (mock *FleetWorkspaceControllerMock) Enqueue(namespace string, name string)
 
 // EnqueueCalls gets all the calls that were made to Enqueue.
 // Check the length with:
-//
-//	len(mockedFleetWorkspaceController.EnqueueCalls())
+//     len(mockedFleetWorkspaceController.EnqueueCalls())
 func (mock *FleetWorkspaceControllerMock) EnqueueCalls() []struct {
 	Namespace string
 	Name      string
@@ -534,8 +527,7 @@ func (mock *FleetWorkspaceControllerMock) EnqueueAfter(namespace string, name st
 
 // EnqueueAfterCalls gets all the calls that were made to EnqueueAfter.
 // Check the length with:
-//
-//	len(mockedFleetWorkspaceController.EnqueueAfterCalls())
+//     len(mockedFleetWorkspaceController.EnqueueAfterCalls())
 func (mock *FleetWorkspaceControllerMock) EnqueueAfterCalls() []struct {
 	Namespace string
 	Name      string
@@ -567,8 +559,7 @@ func (mock *FleetWorkspaceControllerMock) Generic() controller.GenericController
 
 // GenericCalls gets all the calls that were made to Generic.
 // Check the length with:
-//
-//	len(mockedFleetWorkspaceController.GenericCalls())
+//     len(mockedFleetWorkspaceController.GenericCalls())
 func (mock *FleetWorkspaceControllerMock) GenericCalls() []struct {
 } {
 	var calls []struct {
@@ -594,8 +585,7 @@ func (mock *FleetWorkspaceControllerMock) Informer() cache.SharedIndexInformer {
 
 // InformerCalls gets all the calls that were made to Informer.
 // Check the length with:
-//
-//	len(mockedFleetWorkspaceController.InformerCalls())
+//     len(mockedFleetWorkspaceController.InformerCalls())
 func (mock *FleetWorkspaceControllerMock) InformerCalls() []struct {
 } {
 	var calls []struct {
@@ -621,8 +611,7 @@ func (mock *FleetWorkspaceControllerMock) Lister() v31.FleetWorkspaceLister {
 
 // ListerCalls gets all the calls that were made to Lister.
 // Check the length with:
-//
-//	len(mockedFleetWorkspaceController.ListerCalls())
+//     len(mockedFleetWorkspaceController.ListerCalls())
 func (mock *FleetWorkspaceControllerMock) ListerCalls() []struct {
 } {
 	var calls []struct {
@@ -662,76 +651,76 @@ var _ v31.FleetWorkspaceInterface = &FleetWorkspaceInterfaceMock{}
 
 // FleetWorkspaceInterfaceMock is a mock implementation of v31.FleetWorkspaceInterface.
 //
-//	    func TestSomethingThatUsesFleetWorkspaceInterface(t *testing.T) {
+//     func TestSomethingThatUsesFleetWorkspaceInterface(t *testing.T) {
 //
-//	        // make and configure a mocked v31.FleetWorkspaceInterface
-//	        mockedFleetWorkspaceInterface := &FleetWorkspaceInterfaceMock{
-//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v31.FleetWorkspaceHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedFeatureHandler method")
-//	            },
-//	            AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v31.FleetWorkspaceLifecycle)  {
-//		               panic("mock out the AddClusterScopedFeatureLifecycle method")
-//	            },
-//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v31.FleetWorkspaceHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedHandler method")
-//	            },
-//	            AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v31.FleetWorkspaceLifecycle)  {
-//		               panic("mock out the AddClusterScopedLifecycle method")
-//	            },
-//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.FleetWorkspaceHandlerFunc)  {
-//		               panic("mock out the AddFeatureHandler method")
-//	            },
-//	            AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v31.FleetWorkspaceLifecycle)  {
-//		               panic("mock out the AddFeatureLifecycle method")
-//	            },
-//	            AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v31.FleetWorkspaceHandlerFunc)  {
-//		               panic("mock out the AddHandler method")
-//	            },
-//	            AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v31.FleetWorkspaceLifecycle)  {
-//		               panic("mock out the AddLifecycle method")
-//	            },
-//	            ControllerFunc: func() v31.FleetWorkspaceController {
-//		               panic("mock out the Controller method")
-//	            },
-//	            CreateFunc: func(in1 *v3.FleetWorkspace) (*v3.FleetWorkspace, error) {
-//		               panic("mock out the Create method")
-//	            },
-//	            DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
-//		               panic("mock out the Delete method")
-//	            },
-//	            DeleteCollectionFunc: func(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
-//		               panic("mock out the DeleteCollection method")
-//	            },
-//	            DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
-//		               panic("mock out the DeleteNamespaced method")
-//	            },
-//	            GetFunc: func(name string, opts metav1.GetOptions) (*v3.FleetWorkspace, error) {
-//		               panic("mock out the Get method")
-//	            },
-//	            GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v3.FleetWorkspace, error) {
-//		               panic("mock out the GetNamespaced method")
-//	            },
-//	            ListFunc: func(opts metav1.ListOptions) (*v3.FleetWorkspaceList, error) {
-//		               panic("mock out the List method")
-//	            },
-//	            ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v3.FleetWorkspaceList, error) {
-//		               panic("mock out the ListNamespaced method")
-//	            },
-//	            ObjectClientFunc: func() *objectclient.ObjectClient {
-//		               panic("mock out the ObjectClient method")
-//	            },
-//	            UpdateFunc: func(in1 *v3.FleetWorkspace) (*v3.FleetWorkspace, error) {
-//		               panic("mock out the Update method")
-//	            },
-//	            WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
-//		               panic("mock out the Watch method")
-//	            },
-//	        }
+//         // make and configure a mocked v31.FleetWorkspaceInterface
+//         mockedFleetWorkspaceInterface := &FleetWorkspaceInterfaceMock{
+//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v31.FleetWorkspaceHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedFeatureHandler method")
+//             },
+//             AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v31.FleetWorkspaceLifecycle)  {
+// 	               panic("mock out the AddClusterScopedFeatureLifecycle method")
+//             },
+//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v31.FleetWorkspaceHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedHandler method")
+//             },
+//             AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v31.FleetWorkspaceLifecycle)  {
+// 	               panic("mock out the AddClusterScopedLifecycle method")
+//             },
+//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.FleetWorkspaceHandlerFunc)  {
+// 	               panic("mock out the AddFeatureHandler method")
+//             },
+//             AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v31.FleetWorkspaceLifecycle)  {
+// 	               panic("mock out the AddFeatureLifecycle method")
+//             },
+//             AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v31.FleetWorkspaceHandlerFunc)  {
+// 	               panic("mock out the AddHandler method")
+//             },
+//             AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v31.FleetWorkspaceLifecycle)  {
+// 	               panic("mock out the AddLifecycle method")
+//             },
+//             ControllerFunc: func() v31.FleetWorkspaceController {
+// 	               panic("mock out the Controller method")
+//             },
+//             CreateFunc: func(in1 *v3.FleetWorkspace) (*v3.FleetWorkspace, error) {
+// 	               panic("mock out the Create method")
+//             },
+//             DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
+// 	               panic("mock out the Delete method")
+//             },
+//             DeleteCollectionFunc: func(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
+// 	               panic("mock out the DeleteCollection method")
+//             },
+//             DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
+// 	               panic("mock out the DeleteNamespaced method")
+//             },
+//             GetFunc: func(name string, opts metav1.GetOptions) (*v3.FleetWorkspace, error) {
+// 	               panic("mock out the Get method")
+//             },
+//             GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v3.FleetWorkspace, error) {
+// 	               panic("mock out the GetNamespaced method")
+//             },
+//             ListFunc: func(opts metav1.ListOptions) (*v3.FleetWorkspaceList, error) {
+// 	               panic("mock out the List method")
+//             },
+//             ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v3.FleetWorkspaceList, error) {
+// 	               panic("mock out the ListNamespaced method")
+//             },
+//             ObjectClientFunc: func() *objectclient.ObjectClient {
+// 	               panic("mock out the ObjectClient method")
+//             },
+//             UpdateFunc: func(in1 *v3.FleetWorkspace) (*v3.FleetWorkspace, error) {
+// 	               panic("mock out the Update method")
+//             },
+//             WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
+// 	               panic("mock out the Watch method")
+//             },
+//         }
 //
-//	        // use mockedFleetWorkspaceInterface in code that requires v31.FleetWorkspaceInterface
-//	        // and then make assertions.
+//         // use mockedFleetWorkspaceInterface in code that requires v31.FleetWorkspaceInterface
+//         // and then make assertions.
 //
-//	    }
+//     }
 type FleetWorkspaceInterfaceMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
 	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v31.FleetWorkspaceHandlerFunc)
@@ -984,8 +973,7 @@ func (mock *FleetWorkspaceInterfaceMock) AddClusterScopedFeatureHandler(ctx cont
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//
-//	len(mockedFleetWorkspaceInterface.AddClusterScopedFeatureHandlerCalls())
+//     len(mockedFleetWorkspaceInterface.AddClusterScopedFeatureHandlerCalls())
 func (mock *FleetWorkspaceInterfaceMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -1032,8 +1020,7 @@ func (mock *FleetWorkspaceInterfaceMock) AddClusterScopedFeatureLifecycle(ctx co
 
 // AddClusterScopedFeatureLifecycleCalls gets all the calls that were made to AddClusterScopedFeatureLifecycle.
 // Check the length with:
-//
-//	len(mockedFleetWorkspaceInterface.AddClusterScopedFeatureLifecycleCalls())
+//     len(mockedFleetWorkspaceInterface.AddClusterScopedFeatureLifecycleCalls())
 func (mock *FleetWorkspaceInterfaceMock) AddClusterScopedFeatureLifecycleCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -1078,8 +1065,7 @@ func (mock *FleetWorkspaceInterfaceMock) AddClusterScopedHandler(ctx context.Con
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//
-//	len(mockedFleetWorkspaceInterface.AddClusterScopedHandlerCalls())
+//     len(mockedFleetWorkspaceInterface.AddClusterScopedHandlerCalls())
 func (mock *FleetWorkspaceInterfaceMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -1122,8 +1108,7 @@ func (mock *FleetWorkspaceInterfaceMock) AddClusterScopedLifecycle(ctx context.C
 
 // AddClusterScopedLifecycleCalls gets all the calls that were made to AddClusterScopedLifecycle.
 // Check the length with:
-//
-//	len(mockedFleetWorkspaceInterface.AddClusterScopedLifecycleCalls())
+//     len(mockedFleetWorkspaceInterface.AddClusterScopedLifecycleCalls())
 func (mock *FleetWorkspaceInterfaceMock) AddClusterScopedLifecycleCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -1166,8 +1151,7 @@ func (mock *FleetWorkspaceInterfaceMock) AddFeatureHandler(ctx context.Context, 
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//
-//	len(mockedFleetWorkspaceInterface.AddFeatureHandlerCalls())
+//     len(mockedFleetWorkspaceInterface.AddFeatureHandlerCalls())
 func (mock *FleetWorkspaceInterfaceMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
@@ -1210,8 +1194,7 @@ func (mock *FleetWorkspaceInterfaceMock) AddFeatureLifecycle(ctx context.Context
 
 // AddFeatureLifecycleCalls gets all the calls that were made to AddFeatureLifecycle.
 // Check the length with:
-//
-//	len(mockedFleetWorkspaceInterface.AddFeatureLifecycleCalls())
+//     len(mockedFleetWorkspaceInterface.AddFeatureLifecycleCalls())
 func (mock *FleetWorkspaceInterfaceMock) AddFeatureLifecycleCalls() []struct {
 	Ctx       context.Context
 	Enabled   func() bool
@@ -1252,8 +1235,7 @@ func (mock *FleetWorkspaceInterfaceMock) AddHandler(ctx context.Context, name st
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//
-//	len(mockedFleetWorkspaceInterface.AddHandlerCalls())
+//     len(mockedFleetWorkspaceInterface.AddHandlerCalls())
 func (mock *FleetWorkspaceInterfaceMock) AddHandlerCalls() []struct {
 	Ctx  context.Context
 	Name string
@@ -1292,8 +1274,7 @@ func (mock *FleetWorkspaceInterfaceMock) AddLifecycle(ctx context.Context, name 
 
 // AddLifecycleCalls gets all the calls that were made to AddLifecycle.
 // Check the length with:
-//
-//	len(mockedFleetWorkspaceInterface.AddLifecycleCalls())
+//     len(mockedFleetWorkspaceInterface.AddLifecycleCalls())
 func (mock *FleetWorkspaceInterfaceMock) AddLifecycleCalls() []struct {
 	Ctx       context.Context
 	Name      string
@@ -1325,8 +1306,7 @@ func (mock *FleetWorkspaceInterfaceMock) Controller() v31.FleetWorkspaceControll
 
 // ControllerCalls gets all the calls that were made to Controller.
 // Check the length with:
-//
-//	len(mockedFleetWorkspaceInterface.ControllerCalls())
+//     len(mockedFleetWorkspaceInterface.ControllerCalls())
 func (mock *FleetWorkspaceInterfaceMock) ControllerCalls() []struct {
 } {
 	var calls []struct {
@@ -1355,8 +1335,7 @@ func (mock *FleetWorkspaceInterfaceMock) Create(in1 *v3.FleetWorkspace) (*v3.Fle
 
 // CreateCalls gets all the calls that were made to Create.
 // Check the length with:
-//
-//	len(mockedFleetWorkspaceInterface.CreateCalls())
+//     len(mockedFleetWorkspaceInterface.CreateCalls())
 func (mock *FleetWorkspaceInterfaceMock) CreateCalls() []struct {
 	In1 *v3.FleetWorkspace
 } {
@@ -1389,8 +1368,7 @@ func (mock *FleetWorkspaceInterfaceMock) Delete(name string, options *metav1.Del
 
 // DeleteCalls gets all the calls that were made to Delete.
 // Check the length with:
-//
-//	len(mockedFleetWorkspaceInterface.DeleteCalls())
+//     len(mockedFleetWorkspaceInterface.DeleteCalls())
 func (mock *FleetWorkspaceInterfaceMock) DeleteCalls() []struct {
 	Name    string
 	Options *metav1.DeleteOptions
@@ -1425,8 +1403,7 @@ func (mock *FleetWorkspaceInterfaceMock) DeleteCollection(deleteOpts *metav1.Del
 
 // DeleteCollectionCalls gets all the calls that were made to DeleteCollection.
 // Check the length with:
-//
-//	len(mockedFleetWorkspaceInterface.DeleteCollectionCalls())
+//     len(mockedFleetWorkspaceInterface.DeleteCollectionCalls())
 func (mock *FleetWorkspaceInterfaceMock) DeleteCollectionCalls() []struct {
 	DeleteOpts *metav1.DeleteOptions
 	ListOpts   metav1.ListOptions
@@ -1463,8 +1440,7 @@ func (mock *FleetWorkspaceInterfaceMock) DeleteNamespaced(namespace string, name
 
 // DeleteNamespacedCalls gets all the calls that were made to DeleteNamespaced.
 // Check the length with:
-//
-//	len(mockedFleetWorkspaceInterface.DeleteNamespacedCalls())
+//     len(mockedFleetWorkspaceInterface.DeleteNamespacedCalls())
 func (mock *FleetWorkspaceInterfaceMock) DeleteNamespacedCalls() []struct {
 	Namespace string
 	Name      string
@@ -1501,8 +1477,7 @@ func (mock *FleetWorkspaceInterfaceMock) Get(name string, opts metav1.GetOptions
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//
-//	len(mockedFleetWorkspaceInterface.GetCalls())
+//     len(mockedFleetWorkspaceInterface.GetCalls())
 func (mock *FleetWorkspaceInterfaceMock) GetCalls() []struct {
 	Name string
 	Opts metav1.GetOptions
@@ -1539,8 +1514,7 @@ func (mock *FleetWorkspaceInterfaceMock) GetNamespaced(namespace string, name st
 
 // GetNamespacedCalls gets all the calls that were made to GetNamespaced.
 // Check the length with:
-//
-//	len(mockedFleetWorkspaceInterface.GetNamespacedCalls())
+//     len(mockedFleetWorkspaceInterface.GetNamespacedCalls())
 func (mock *FleetWorkspaceInterfaceMock) GetNamespacedCalls() []struct {
 	Namespace string
 	Name      string
@@ -1575,8 +1549,7 @@ func (mock *FleetWorkspaceInterfaceMock) List(opts metav1.ListOptions) (*v3.Flee
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//
-//	len(mockedFleetWorkspaceInterface.ListCalls())
+//     len(mockedFleetWorkspaceInterface.ListCalls())
 func (mock *FleetWorkspaceInterfaceMock) ListCalls() []struct {
 	Opts metav1.ListOptions
 } {
@@ -1609,8 +1582,7 @@ func (mock *FleetWorkspaceInterfaceMock) ListNamespaced(namespace string, opts m
 
 // ListNamespacedCalls gets all the calls that were made to ListNamespaced.
 // Check the length with:
-//
-//	len(mockedFleetWorkspaceInterface.ListNamespacedCalls())
+//     len(mockedFleetWorkspaceInterface.ListNamespacedCalls())
 func (mock *FleetWorkspaceInterfaceMock) ListNamespacedCalls() []struct {
 	Namespace string
 	Opts      metav1.ListOptions
@@ -1640,8 +1612,7 @@ func (mock *FleetWorkspaceInterfaceMock) ObjectClient() *objectclient.ObjectClie
 
 // ObjectClientCalls gets all the calls that were made to ObjectClient.
 // Check the length with:
-//
-//	len(mockedFleetWorkspaceInterface.ObjectClientCalls())
+//     len(mockedFleetWorkspaceInterface.ObjectClientCalls())
 func (mock *FleetWorkspaceInterfaceMock) ObjectClientCalls() []struct {
 } {
 	var calls []struct {
@@ -1670,8 +1641,7 @@ func (mock *FleetWorkspaceInterfaceMock) Update(in1 *v3.FleetWorkspace) (*v3.Fle
 
 // UpdateCalls gets all the calls that were made to Update.
 // Check the length with:
-//
-//	len(mockedFleetWorkspaceInterface.UpdateCalls())
+//     len(mockedFleetWorkspaceInterface.UpdateCalls())
 func (mock *FleetWorkspaceInterfaceMock) UpdateCalls() []struct {
 	In1 *v3.FleetWorkspace
 } {
@@ -1702,8 +1672,7 @@ func (mock *FleetWorkspaceInterfaceMock) Watch(opts metav1.ListOptions) (watch.I
 
 // WatchCalls gets all the calls that were made to Watch.
 // Check the length with:
-//
-//	len(mockedFleetWorkspaceInterface.WatchCalls())
+//     len(mockedFleetWorkspaceInterface.WatchCalls())
 func (mock *FleetWorkspaceInterfaceMock) WatchCalls() []struct {
 	Opts metav1.ListOptions
 } {
@@ -1726,19 +1695,19 @@ var _ v31.FleetWorkspacesGetter = &FleetWorkspacesGetterMock{}
 
 // FleetWorkspacesGetterMock is a mock implementation of v31.FleetWorkspacesGetter.
 //
-//	    func TestSomethingThatUsesFleetWorkspacesGetter(t *testing.T) {
+//     func TestSomethingThatUsesFleetWorkspacesGetter(t *testing.T) {
 //
-//	        // make and configure a mocked v31.FleetWorkspacesGetter
-//	        mockedFleetWorkspacesGetter := &FleetWorkspacesGetterMock{
-//	            FleetWorkspacesFunc: func(namespace string) v31.FleetWorkspaceInterface {
-//		               panic("mock out the FleetWorkspaces method")
-//	            },
-//	        }
+//         // make and configure a mocked v31.FleetWorkspacesGetter
+//         mockedFleetWorkspacesGetter := &FleetWorkspacesGetterMock{
+//             FleetWorkspacesFunc: func(namespace string) v31.FleetWorkspaceInterface {
+// 	               panic("mock out the FleetWorkspaces method")
+//             },
+//         }
 //
-//	        // use mockedFleetWorkspacesGetter in code that requires v31.FleetWorkspacesGetter
-//	        // and then make assertions.
+//         // use mockedFleetWorkspacesGetter in code that requires v31.FleetWorkspacesGetter
+//         // and then make assertions.
 //
-//	    }
+//     }
 type FleetWorkspacesGetterMock struct {
 	// FleetWorkspacesFunc mocks the FleetWorkspaces method.
 	FleetWorkspacesFunc func(namespace string) v31.FleetWorkspaceInterface
@@ -1771,8 +1740,7 @@ func (mock *FleetWorkspacesGetterMock) FleetWorkspaces(namespace string) v31.Fle
 
 // FleetWorkspacesCalls gets all the calls that were made to FleetWorkspaces.
 // Check the length with:
-//
-//	len(mockedFleetWorkspacesGetter.FleetWorkspacesCalls())
+//     len(mockedFleetWorkspacesGetter.FleetWorkspacesCalls())
 func (mock *FleetWorkspacesGetterMock) FleetWorkspacesCalls() []struct {
 	Namespace string
 } {

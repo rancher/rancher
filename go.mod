@@ -87,7 +87,6 @@ require (
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/hashicorp/golang-lru v0.5.4
 	github.com/heptio/authenticator v0.0.0-20180409043135-d282f87a1972
-	github.com/knative/pkg v0.0.0-20190817231834-12ee58e32cc8
 	github.com/manicminer/hamilton v0.46.0
 	github.com/mattn/go-colorable v0.1.12
 	github.com/mcuadros/go-version v0.0.0-20180611085657-6d5863ca60fa
