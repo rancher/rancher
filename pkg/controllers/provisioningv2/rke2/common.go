@@ -80,8 +80,6 @@ const (
 	Waiting             = condition.Cond("Waiting")
 	Pending             = condition.Cond("Pending")
 	Removed             = condition.Cond("Removed")
-	AgentDeployed       = condition.Cond("AgentDeployed")
-	AgentConnected      = condition.Cond("Connected")
 	PlanApplied         = condition.Cond("PlanApplied")
 	InfrastructureReady = condition.Cond(capi.InfrastructureReadyCondition)
 
@@ -198,43 +196,85 @@ func IsOwnedByMachine(bootstrapCache rkecontroller.RKEBootstrapCache, machineNam
 	return false, nil
 }
 
-// GetServiceAccountSecretNames will return the plan secret name and service account token names
-func GetServiceAccountSecretNames(bootstrapCache rkecontroller.RKEBootstrapCache, secretClient corecontrollers.SecretController, machineName string, planSA *corev1.ServiceAccount) (string, string, error) {
+// PlanSACheck checks the given plan service account to ensure that it matches the machine that is passed,
+// and makes sure that the plan service account is owned by the machine in question.
+func PlanSACheck(bootstrapCache rkecontroller.RKEBootstrapCache, machineName string, planSA *corev1.ServiceAccount) error {
+	if planSA == nil {
+		return fmt.Errorf("planSA was nil during planSA check for machineName %s", machineName)
+	}
+	if machineName == "" {
+		return fmt.Errorf("planSA %s/%s compared machine name was blank", planSA.Namespace, planSA.Name)
+	}
 	if planSA.Labels[MachineNameLabel] != machineName ||
 		planSA.Labels[RoleLabel] != RolePlan ||
 		planSA.Labels[PlanSecret] == "" {
-		return "", "", nil
+		return fmt.Errorf("planSA %s/%s does not have correct labels", planSA.Namespace, planSA.Name)
 	}
+	if foundParent, err := IsOwnedByMachine(bootstrapCache, machineName, planSA); err != nil {
+		return err
+	} else if !foundParent {
+		return fmt.Errorf("planSA %s/%s no parent found for planSA, was not owned by machine %s", planSA.Namespace, planSA.Name, machineName)
+	}
+	return nil
+}
 
+// GetPlanSecretName will return the plan secret name that is assigned to the plan service account
+func GetPlanSecretName(planSA *corev1.ServiceAccount) (string, error) {
+	if planSA == nil {
+		return "", fmt.Errorf("planSA was nil")
+	}
+	if planSA.Labels[PlanSecret] == "" {
+		return "", fmt.Errorf("planSA %s/%s plan secret label was not set", planSA.Namespace, planSA.Name)
+	}
+	return planSA.Labels[PlanSecret], nil
+}
+
+// GetPlanServiceAccountTokenSecret retrieves the secret that corresponds to the plan service account that is passed in. It will create a secret if one does not
+// already exist for the plan service account.
+func GetPlanServiceAccountTokenSecret(secretClient corecontrollers.SecretController, planSA *corev1.ServiceAccount) (*corev1.Secret, bool, error) {
+	if planSA == nil {
+		return nil, false, fmt.Errorf("planSA was nil")
+	}
 	sName := serviceaccounttoken.ServiceAccountSecretName(planSA)
 	secret, err := secretClient.Cache().Get(planSA.Namespace, sName)
 	if err != nil {
 		if !apierror.IsNotFound(err) {
-			return "", "", err
+			return nil, false, err
 		}
 		sc := serviceaccounttoken.SecretTemplate(planSA)
 		secret, err = secretClient.Create(sc)
 		if err != nil {
 			if !apierror.IsAlreadyExists(err) {
-				return "", "", err
+				return nil, false, err
 			}
 			secret, err = secretClient.Cache().Get(planSA.Namespace, sName)
 			if err != nil {
-				return "", "", err
+				return nil, false, err
 			}
 		}
 	}
-
-	if foundParent, err := IsOwnedByMachine(bootstrapCache, machineName, planSA); err != nil || !foundParent {
-		return "", "", err
-	}
-
 	// wait for token to be populated
-	if secret.Data[corev1.ServiceAccountTokenKey] == nil {
-		return "", "", nil
+	if !PlanServiceAccountTokenReady(planSA, secret) {
+		return secret, true, fmt.Errorf("planSA %s/%s token secret %s/%s was not ready for consumption yet", planSA.Namespace, planSA.Name, secret.Namespace, secret.Name)
 	}
+	return secret, true, nil
+}
 
-	return planSA.Labels[PlanSecret], secret.Name, nil
+func PlanServiceAccountTokenReady(planSA *corev1.ServiceAccount, tokenSecret *corev1.Secret) bool {
+	if planSA == nil || tokenSecret == nil {
+		return false
+	}
+	if tokenSecret.Name != serviceaccounttoken.ServiceAccountSecretName(planSA) {
+		return false
+	}
+	if v, ok := tokenSecret.Data[corev1.ServiceAccountTokenKey]; ok {
+		if len(v) == 0 {
+			return false
+		}
+	} else {
+		return false
+	}
+	return true
 }
 
 func PlanSecretFromBootstrapName(bootstrapName string) string {

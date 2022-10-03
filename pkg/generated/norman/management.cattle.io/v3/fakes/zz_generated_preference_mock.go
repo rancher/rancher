@@ -29,22 +29,22 @@ var _ v31.PreferenceLister = &PreferenceListerMock{}
 
 // PreferenceListerMock is a mock implementation of v31.PreferenceLister.
 //
-//	    func TestSomethingThatUsesPreferenceLister(t *testing.T) {
+//     func TestSomethingThatUsesPreferenceLister(t *testing.T) {
 //
-//	        // make and configure a mocked v31.PreferenceLister
-//	        mockedPreferenceLister := &PreferenceListerMock{
-//	            GetFunc: func(namespace string, name string) (*v3.Preference, error) {
-//		               panic("mock out the Get method")
-//	            },
-//	            ListFunc: func(namespace string, selector labels.Selector) ([]*v3.Preference, error) {
-//		               panic("mock out the List method")
-//	            },
-//	        }
+//         // make and configure a mocked v31.PreferenceLister
+//         mockedPreferenceLister := &PreferenceListerMock{
+//             GetFunc: func(namespace string, name string) (*v3.Preference, error) {
+// 	               panic("mock out the Get method")
+//             },
+//             ListFunc: func(namespace string, selector labels.Selector) ([]*v3.Preference, error) {
+// 	               panic("mock out the List method")
+//             },
+//         }
 //
-//	        // use mockedPreferenceLister in code that requires v31.PreferenceLister
-//	        // and then make assertions.
+//         // use mockedPreferenceLister in code that requires v31.PreferenceLister
+//         // and then make assertions.
 //
-//	    }
+//     }
 type PreferenceListerMock struct {
 	// GetFunc mocks the Get method.
 	GetFunc func(namespace string, name string) (*v3.Preference, error)
@@ -91,8 +91,7 @@ func (mock *PreferenceListerMock) Get(namespace string, name string) (*v3.Prefer
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//
-//	len(mockedPreferenceLister.GetCalls())
+//     len(mockedPreferenceLister.GetCalls())
 func (mock *PreferenceListerMock) GetCalls() []struct {
 	Namespace string
 	Name      string
@@ -127,8 +126,7 @@ func (mock *PreferenceListerMock) List(namespace string, selector labels.Selecto
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//
-//	len(mockedPreferenceLister.ListCalls())
+//     len(mockedPreferenceLister.ListCalls())
 func (mock *PreferenceListerMock) ListCalls() []struct {
 	Namespace string
 	Selector  labels.Selector
@@ -161,43 +159,43 @@ var _ v31.PreferenceController = &PreferenceControllerMock{}
 
 // PreferenceControllerMock is a mock implementation of v31.PreferenceController.
 //
-//	    func TestSomethingThatUsesPreferenceController(t *testing.T) {
+//     func TestSomethingThatUsesPreferenceController(t *testing.T) {
 //
-//	        // make and configure a mocked v31.PreferenceController
-//	        mockedPreferenceController := &PreferenceControllerMock{
-//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v31.PreferenceHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedFeatureHandler method")
-//	            },
-//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v31.PreferenceHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedHandler method")
-//	            },
-//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.PreferenceHandlerFunc)  {
-//		               panic("mock out the AddFeatureHandler method")
-//	            },
-//	            AddHandlerFunc: func(ctx context.Context, name string, handler v31.PreferenceHandlerFunc)  {
-//		               panic("mock out the AddHandler method")
-//	            },
-//	            EnqueueFunc: func(namespace string, name string)  {
-//		               panic("mock out the Enqueue method")
-//	            },
-//	            EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
-//		               panic("mock out the EnqueueAfter method")
-//	            },
-//	            GenericFunc: func() controller.GenericController {
-//		               panic("mock out the Generic method")
-//	            },
-//	            InformerFunc: func() cache.SharedIndexInformer {
-//		               panic("mock out the Informer method")
-//	            },
-//	            ListerFunc: func() v31.PreferenceLister {
-//		               panic("mock out the Lister method")
-//	            },
-//	        }
+//         // make and configure a mocked v31.PreferenceController
+//         mockedPreferenceController := &PreferenceControllerMock{
+//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v31.PreferenceHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedFeatureHandler method")
+//             },
+//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v31.PreferenceHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedHandler method")
+//             },
+//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.PreferenceHandlerFunc)  {
+// 	               panic("mock out the AddFeatureHandler method")
+//             },
+//             AddHandlerFunc: func(ctx context.Context, name string, handler v31.PreferenceHandlerFunc)  {
+// 	               panic("mock out the AddHandler method")
+//             },
+//             EnqueueFunc: func(namespace string, name string)  {
+// 	               panic("mock out the Enqueue method")
+//             },
+//             EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
+// 	               panic("mock out the EnqueueAfter method")
+//             },
+//             GenericFunc: func() controller.GenericController {
+// 	               panic("mock out the Generic method")
+//             },
+//             InformerFunc: func() cache.SharedIndexInformer {
+// 	               panic("mock out the Informer method")
+//             },
+//             ListerFunc: func() v31.PreferenceLister {
+// 	               panic("mock out the Lister method")
+//             },
+//         }
 //
-//	        // use mockedPreferenceController in code that requires v31.PreferenceController
-//	        // and then make assertions.
+//         // use mockedPreferenceController in code that requires v31.PreferenceController
+//         // and then make assertions.
 //
-//	    }
+//     }
 type PreferenceControllerMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
 	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v31.PreferenceHandlerFunc)
@@ -326,8 +324,7 @@ func (mock *PreferenceControllerMock) AddClusterScopedFeatureHandler(ctx context
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//
-//	len(mockedPreferenceController.AddClusterScopedFeatureHandlerCalls())
+//     len(mockedPreferenceController.AddClusterScopedFeatureHandlerCalls())
 func (mock *PreferenceControllerMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -372,8 +369,7 @@ func (mock *PreferenceControllerMock) AddClusterScopedHandler(ctx context.Contex
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//
-//	len(mockedPreferenceController.AddClusterScopedHandlerCalls())
+//     len(mockedPreferenceController.AddClusterScopedHandlerCalls())
 func (mock *PreferenceControllerMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -416,8 +412,7 @@ func (mock *PreferenceControllerMock) AddFeatureHandler(ctx context.Context, ena
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//
-//	len(mockedPreferenceController.AddFeatureHandlerCalls())
+//     len(mockedPreferenceController.AddFeatureHandlerCalls())
 func (mock *PreferenceControllerMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
@@ -458,8 +453,7 @@ func (mock *PreferenceControllerMock) AddHandler(ctx context.Context, name strin
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//
-//	len(mockedPreferenceController.AddHandlerCalls())
+//     len(mockedPreferenceController.AddHandlerCalls())
 func (mock *PreferenceControllerMock) AddHandlerCalls() []struct {
 	Ctx     context.Context
 	Name    string
@@ -496,8 +490,7 @@ func (mock *PreferenceControllerMock) Enqueue(namespace string, name string) {
 
 // EnqueueCalls gets all the calls that were made to Enqueue.
 // Check the length with:
-//
-//	len(mockedPreferenceController.EnqueueCalls())
+//     len(mockedPreferenceController.EnqueueCalls())
 func (mock *PreferenceControllerMock) EnqueueCalls() []struct {
 	Namespace string
 	Name      string
@@ -534,8 +527,7 @@ func (mock *PreferenceControllerMock) EnqueueAfter(namespace string, name string
 
 // EnqueueAfterCalls gets all the calls that were made to EnqueueAfter.
 // Check the length with:
-//
-//	len(mockedPreferenceController.EnqueueAfterCalls())
+//     len(mockedPreferenceController.EnqueueAfterCalls())
 func (mock *PreferenceControllerMock) EnqueueAfterCalls() []struct {
 	Namespace string
 	Name      string
@@ -567,8 +559,7 @@ func (mock *PreferenceControllerMock) Generic() controller.GenericController {
 
 // GenericCalls gets all the calls that were made to Generic.
 // Check the length with:
-//
-//	len(mockedPreferenceController.GenericCalls())
+//     len(mockedPreferenceController.GenericCalls())
 func (mock *PreferenceControllerMock) GenericCalls() []struct {
 } {
 	var calls []struct {
@@ -594,8 +585,7 @@ func (mock *PreferenceControllerMock) Informer() cache.SharedIndexInformer {
 
 // InformerCalls gets all the calls that were made to Informer.
 // Check the length with:
-//
-//	len(mockedPreferenceController.InformerCalls())
+//     len(mockedPreferenceController.InformerCalls())
 func (mock *PreferenceControllerMock) InformerCalls() []struct {
 } {
 	var calls []struct {
@@ -621,8 +611,7 @@ func (mock *PreferenceControllerMock) Lister() v31.PreferenceLister {
 
 // ListerCalls gets all the calls that were made to Lister.
 // Check the length with:
-//
-//	len(mockedPreferenceController.ListerCalls())
+//     len(mockedPreferenceController.ListerCalls())
 func (mock *PreferenceControllerMock) ListerCalls() []struct {
 } {
 	var calls []struct {
@@ -662,76 +651,76 @@ var _ v31.PreferenceInterface = &PreferenceInterfaceMock{}
 
 // PreferenceInterfaceMock is a mock implementation of v31.PreferenceInterface.
 //
-//	    func TestSomethingThatUsesPreferenceInterface(t *testing.T) {
+//     func TestSomethingThatUsesPreferenceInterface(t *testing.T) {
 //
-//	        // make and configure a mocked v31.PreferenceInterface
-//	        mockedPreferenceInterface := &PreferenceInterfaceMock{
-//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v31.PreferenceHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedFeatureHandler method")
-//	            },
-//	            AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v31.PreferenceLifecycle)  {
-//		               panic("mock out the AddClusterScopedFeatureLifecycle method")
-//	            },
-//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v31.PreferenceHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedHandler method")
-//	            },
-//	            AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v31.PreferenceLifecycle)  {
-//		               panic("mock out the AddClusterScopedLifecycle method")
-//	            },
-//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.PreferenceHandlerFunc)  {
-//		               panic("mock out the AddFeatureHandler method")
-//	            },
-//	            AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v31.PreferenceLifecycle)  {
-//		               panic("mock out the AddFeatureLifecycle method")
-//	            },
-//	            AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v31.PreferenceHandlerFunc)  {
-//		               panic("mock out the AddHandler method")
-//	            },
-//	            AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v31.PreferenceLifecycle)  {
-//		               panic("mock out the AddLifecycle method")
-//	            },
-//	            ControllerFunc: func() v31.PreferenceController {
-//		               panic("mock out the Controller method")
-//	            },
-//	            CreateFunc: func(in1 *v3.Preference) (*v3.Preference, error) {
-//		               panic("mock out the Create method")
-//	            },
-//	            DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
-//		               panic("mock out the Delete method")
-//	            },
-//	            DeleteCollectionFunc: func(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
-//		               panic("mock out the DeleteCollection method")
-//	            },
-//	            DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
-//		               panic("mock out the DeleteNamespaced method")
-//	            },
-//	            GetFunc: func(name string, opts metav1.GetOptions) (*v3.Preference, error) {
-//		               panic("mock out the Get method")
-//	            },
-//	            GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v3.Preference, error) {
-//		               panic("mock out the GetNamespaced method")
-//	            },
-//	            ListFunc: func(opts metav1.ListOptions) (*v3.PreferenceList, error) {
-//		               panic("mock out the List method")
-//	            },
-//	            ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v3.PreferenceList, error) {
-//		               panic("mock out the ListNamespaced method")
-//	            },
-//	            ObjectClientFunc: func() *objectclient.ObjectClient {
-//		               panic("mock out the ObjectClient method")
-//	            },
-//	            UpdateFunc: func(in1 *v3.Preference) (*v3.Preference, error) {
-//		               panic("mock out the Update method")
-//	            },
-//	            WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
-//		               panic("mock out the Watch method")
-//	            },
-//	        }
+//         // make and configure a mocked v31.PreferenceInterface
+//         mockedPreferenceInterface := &PreferenceInterfaceMock{
+//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v31.PreferenceHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedFeatureHandler method")
+//             },
+//             AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v31.PreferenceLifecycle)  {
+// 	               panic("mock out the AddClusterScopedFeatureLifecycle method")
+//             },
+//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v31.PreferenceHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedHandler method")
+//             },
+//             AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v31.PreferenceLifecycle)  {
+// 	               panic("mock out the AddClusterScopedLifecycle method")
+//             },
+//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.PreferenceHandlerFunc)  {
+// 	               panic("mock out the AddFeatureHandler method")
+//             },
+//             AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v31.PreferenceLifecycle)  {
+// 	               panic("mock out the AddFeatureLifecycle method")
+//             },
+//             AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v31.PreferenceHandlerFunc)  {
+// 	               panic("mock out the AddHandler method")
+//             },
+//             AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v31.PreferenceLifecycle)  {
+// 	               panic("mock out the AddLifecycle method")
+//             },
+//             ControllerFunc: func() v31.PreferenceController {
+// 	               panic("mock out the Controller method")
+//             },
+//             CreateFunc: func(in1 *v3.Preference) (*v3.Preference, error) {
+// 	               panic("mock out the Create method")
+//             },
+//             DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
+// 	               panic("mock out the Delete method")
+//             },
+//             DeleteCollectionFunc: func(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
+// 	               panic("mock out the DeleteCollection method")
+//             },
+//             DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
+// 	               panic("mock out the DeleteNamespaced method")
+//             },
+//             GetFunc: func(name string, opts metav1.GetOptions) (*v3.Preference, error) {
+// 	               panic("mock out the Get method")
+//             },
+//             GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v3.Preference, error) {
+// 	               panic("mock out the GetNamespaced method")
+//             },
+//             ListFunc: func(opts metav1.ListOptions) (*v3.PreferenceList, error) {
+// 	               panic("mock out the List method")
+//             },
+//             ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v3.PreferenceList, error) {
+// 	               panic("mock out the ListNamespaced method")
+//             },
+//             ObjectClientFunc: func() *objectclient.ObjectClient {
+// 	               panic("mock out the ObjectClient method")
+//             },
+//             UpdateFunc: func(in1 *v3.Preference) (*v3.Preference, error) {
+// 	               panic("mock out the Update method")
+//             },
+//             WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
+// 	               panic("mock out the Watch method")
+//             },
+//         }
 //
-//	        // use mockedPreferenceInterface in code that requires v31.PreferenceInterface
-//	        // and then make assertions.
+//         // use mockedPreferenceInterface in code that requires v31.PreferenceInterface
+//         // and then make assertions.
 //
-//	    }
+//     }
 type PreferenceInterfaceMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
 	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v31.PreferenceHandlerFunc)
@@ -984,8 +973,7 @@ func (mock *PreferenceInterfaceMock) AddClusterScopedFeatureHandler(ctx context.
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//
-//	len(mockedPreferenceInterface.AddClusterScopedFeatureHandlerCalls())
+//     len(mockedPreferenceInterface.AddClusterScopedFeatureHandlerCalls())
 func (mock *PreferenceInterfaceMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -1032,8 +1020,7 @@ func (mock *PreferenceInterfaceMock) AddClusterScopedFeatureLifecycle(ctx contex
 
 // AddClusterScopedFeatureLifecycleCalls gets all the calls that were made to AddClusterScopedFeatureLifecycle.
 // Check the length with:
-//
-//	len(mockedPreferenceInterface.AddClusterScopedFeatureLifecycleCalls())
+//     len(mockedPreferenceInterface.AddClusterScopedFeatureLifecycleCalls())
 func (mock *PreferenceInterfaceMock) AddClusterScopedFeatureLifecycleCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -1078,8 +1065,7 @@ func (mock *PreferenceInterfaceMock) AddClusterScopedHandler(ctx context.Context
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//
-//	len(mockedPreferenceInterface.AddClusterScopedHandlerCalls())
+//     len(mockedPreferenceInterface.AddClusterScopedHandlerCalls())
 func (mock *PreferenceInterfaceMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -1122,8 +1108,7 @@ func (mock *PreferenceInterfaceMock) AddClusterScopedLifecycle(ctx context.Conte
 
 // AddClusterScopedLifecycleCalls gets all the calls that were made to AddClusterScopedLifecycle.
 // Check the length with:
-//
-//	len(mockedPreferenceInterface.AddClusterScopedLifecycleCalls())
+//     len(mockedPreferenceInterface.AddClusterScopedLifecycleCalls())
 func (mock *PreferenceInterfaceMock) AddClusterScopedLifecycleCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -1166,8 +1151,7 @@ func (mock *PreferenceInterfaceMock) AddFeatureHandler(ctx context.Context, enab
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//
-//	len(mockedPreferenceInterface.AddFeatureHandlerCalls())
+//     len(mockedPreferenceInterface.AddFeatureHandlerCalls())
 func (mock *PreferenceInterfaceMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
@@ -1210,8 +1194,7 @@ func (mock *PreferenceInterfaceMock) AddFeatureLifecycle(ctx context.Context, en
 
 // AddFeatureLifecycleCalls gets all the calls that were made to AddFeatureLifecycle.
 // Check the length with:
-//
-//	len(mockedPreferenceInterface.AddFeatureLifecycleCalls())
+//     len(mockedPreferenceInterface.AddFeatureLifecycleCalls())
 func (mock *PreferenceInterfaceMock) AddFeatureLifecycleCalls() []struct {
 	Ctx       context.Context
 	Enabled   func() bool
@@ -1252,8 +1235,7 @@ func (mock *PreferenceInterfaceMock) AddHandler(ctx context.Context, name string
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//
-//	len(mockedPreferenceInterface.AddHandlerCalls())
+//     len(mockedPreferenceInterface.AddHandlerCalls())
 func (mock *PreferenceInterfaceMock) AddHandlerCalls() []struct {
 	Ctx  context.Context
 	Name string
@@ -1292,8 +1274,7 @@ func (mock *PreferenceInterfaceMock) AddLifecycle(ctx context.Context, name stri
 
 // AddLifecycleCalls gets all the calls that were made to AddLifecycle.
 // Check the length with:
-//
-//	len(mockedPreferenceInterface.AddLifecycleCalls())
+//     len(mockedPreferenceInterface.AddLifecycleCalls())
 func (mock *PreferenceInterfaceMock) AddLifecycleCalls() []struct {
 	Ctx       context.Context
 	Name      string
@@ -1325,8 +1306,7 @@ func (mock *PreferenceInterfaceMock) Controller() v31.PreferenceController {
 
 // ControllerCalls gets all the calls that were made to Controller.
 // Check the length with:
-//
-//	len(mockedPreferenceInterface.ControllerCalls())
+//     len(mockedPreferenceInterface.ControllerCalls())
 func (mock *PreferenceInterfaceMock) ControllerCalls() []struct {
 } {
 	var calls []struct {
@@ -1355,8 +1335,7 @@ func (mock *PreferenceInterfaceMock) Create(in1 *v3.Preference) (*v3.Preference,
 
 // CreateCalls gets all the calls that were made to Create.
 // Check the length with:
-//
-//	len(mockedPreferenceInterface.CreateCalls())
+//     len(mockedPreferenceInterface.CreateCalls())
 func (mock *PreferenceInterfaceMock) CreateCalls() []struct {
 	In1 *v3.Preference
 } {
@@ -1389,8 +1368,7 @@ func (mock *PreferenceInterfaceMock) Delete(name string, options *metav1.DeleteO
 
 // DeleteCalls gets all the calls that were made to Delete.
 // Check the length with:
-//
-//	len(mockedPreferenceInterface.DeleteCalls())
+//     len(mockedPreferenceInterface.DeleteCalls())
 func (mock *PreferenceInterfaceMock) DeleteCalls() []struct {
 	Name    string
 	Options *metav1.DeleteOptions
@@ -1425,8 +1403,7 @@ func (mock *PreferenceInterfaceMock) DeleteCollection(deleteOpts *metav1.DeleteO
 
 // DeleteCollectionCalls gets all the calls that were made to DeleteCollection.
 // Check the length with:
-//
-//	len(mockedPreferenceInterface.DeleteCollectionCalls())
+//     len(mockedPreferenceInterface.DeleteCollectionCalls())
 func (mock *PreferenceInterfaceMock) DeleteCollectionCalls() []struct {
 	DeleteOpts *metav1.DeleteOptions
 	ListOpts   metav1.ListOptions
@@ -1463,8 +1440,7 @@ func (mock *PreferenceInterfaceMock) DeleteNamespaced(namespace string, name str
 
 // DeleteNamespacedCalls gets all the calls that were made to DeleteNamespaced.
 // Check the length with:
-//
-//	len(mockedPreferenceInterface.DeleteNamespacedCalls())
+//     len(mockedPreferenceInterface.DeleteNamespacedCalls())
 func (mock *PreferenceInterfaceMock) DeleteNamespacedCalls() []struct {
 	Namespace string
 	Name      string
@@ -1501,8 +1477,7 @@ func (mock *PreferenceInterfaceMock) Get(name string, opts metav1.GetOptions) (*
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//
-//	len(mockedPreferenceInterface.GetCalls())
+//     len(mockedPreferenceInterface.GetCalls())
 func (mock *PreferenceInterfaceMock) GetCalls() []struct {
 	Name string
 	Opts metav1.GetOptions
@@ -1539,8 +1514,7 @@ func (mock *PreferenceInterfaceMock) GetNamespaced(namespace string, name string
 
 // GetNamespacedCalls gets all the calls that were made to GetNamespaced.
 // Check the length with:
-//
-//	len(mockedPreferenceInterface.GetNamespacedCalls())
+//     len(mockedPreferenceInterface.GetNamespacedCalls())
 func (mock *PreferenceInterfaceMock) GetNamespacedCalls() []struct {
 	Namespace string
 	Name      string
@@ -1575,8 +1549,7 @@ func (mock *PreferenceInterfaceMock) List(opts metav1.ListOptions) (*v3.Preferen
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//
-//	len(mockedPreferenceInterface.ListCalls())
+//     len(mockedPreferenceInterface.ListCalls())
 func (mock *PreferenceInterfaceMock) ListCalls() []struct {
 	Opts metav1.ListOptions
 } {
@@ -1609,8 +1582,7 @@ func (mock *PreferenceInterfaceMock) ListNamespaced(namespace string, opts metav
 
 // ListNamespacedCalls gets all the calls that were made to ListNamespaced.
 // Check the length with:
-//
-//	len(mockedPreferenceInterface.ListNamespacedCalls())
+//     len(mockedPreferenceInterface.ListNamespacedCalls())
 func (mock *PreferenceInterfaceMock) ListNamespacedCalls() []struct {
 	Namespace string
 	Opts      metav1.ListOptions
@@ -1640,8 +1612,7 @@ func (mock *PreferenceInterfaceMock) ObjectClient() *objectclient.ObjectClient {
 
 // ObjectClientCalls gets all the calls that were made to ObjectClient.
 // Check the length with:
-//
-//	len(mockedPreferenceInterface.ObjectClientCalls())
+//     len(mockedPreferenceInterface.ObjectClientCalls())
 func (mock *PreferenceInterfaceMock) ObjectClientCalls() []struct {
 } {
 	var calls []struct {
@@ -1670,8 +1641,7 @@ func (mock *PreferenceInterfaceMock) Update(in1 *v3.Preference) (*v3.Preference,
 
 // UpdateCalls gets all the calls that were made to Update.
 // Check the length with:
-//
-//	len(mockedPreferenceInterface.UpdateCalls())
+//     len(mockedPreferenceInterface.UpdateCalls())
 func (mock *PreferenceInterfaceMock) UpdateCalls() []struct {
 	In1 *v3.Preference
 } {
@@ -1702,8 +1672,7 @@ func (mock *PreferenceInterfaceMock) Watch(opts metav1.ListOptions) (watch.Inter
 
 // WatchCalls gets all the calls that were made to Watch.
 // Check the length with:
-//
-//	len(mockedPreferenceInterface.WatchCalls())
+//     len(mockedPreferenceInterface.WatchCalls())
 func (mock *PreferenceInterfaceMock) WatchCalls() []struct {
 	Opts metav1.ListOptions
 } {
@@ -1726,19 +1695,19 @@ var _ v31.PreferencesGetter = &PreferencesGetterMock{}
 
 // PreferencesGetterMock is a mock implementation of v31.PreferencesGetter.
 //
-//	    func TestSomethingThatUsesPreferencesGetter(t *testing.T) {
+//     func TestSomethingThatUsesPreferencesGetter(t *testing.T) {
 //
-//	        // make and configure a mocked v31.PreferencesGetter
-//	        mockedPreferencesGetter := &PreferencesGetterMock{
-//	            PreferencesFunc: func(namespace string) v31.PreferenceInterface {
-//		               panic("mock out the Preferences method")
-//	            },
-//	        }
+//         // make and configure a mocked v31.PreferencesGetter
+//         mockedPreferencesGetter := &PreferencesGetterMock{
+//             PreferencesFunc: func(namespace string) v31.PreferenceInterface {
+// 	               panic("mock out the Preferences method")
+//             },
+//         }
 //
-//	        // use mockedPreferencesGetter in code that requires v31.PreferencesGetter
-//	        // and then make assertions.
+//         // use mockedPreferencesGetter in code that requires v31.PreferencesGetter
+//         // and then make assertions.
 //
-//	    }
+//     }
 type PreferencesGetterMock struct {
 	// PreferencesFunc mocks the Preferences method.
 	PreferencesFunc func(namespace string) v31.PreferenceInterface
@@ -1771,8 +1740,7 @@ func (mock *PreferencesGetterMock) Preferences(namespace string) v31.PreferenceI
 
 // PreferencesCalls gets all the calls that were made to Preferences.
 // Check the length with:
-//
-//	len(mockedPreferencesGetter.PreferencesCalls())
+//     len(mockedPreferencesGetter.PreferencesCalls())
 func (mock *PreferencesGetterMock) PreferencesCalls() []struct {
 	Namespace string
 } {

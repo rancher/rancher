@@ -29,22 +29,22 @@ var _ v11.ComponentStatusLister = &ComponentStatusListerMock{}
 
 // ComponentStatusListerMock is a mock implementation of v11.ComponentStatusLister.
 //
-//	    func TestSomethingThatUsesComponentStatusLister(t *testing.T) {
+//     func TestSomethingThatUsesComponentStatusLister(t *testing.T) {
 //
-//	        // make and configure a mocked v11.ComponentStatusLister
-//	        mockedComponentStatusLister := &ComponentStatusListerMock{
-//	            GetFunc: func(namespace string, name string) (*v1.ComponentStatus, error) {
-//		               panic("mock out the Get method")
-//	            },
-//	            ListFunc: func(namespace string, selector labels.Selector) ([]*v1.ComponentStatus, error) {
-//		               panic("mock out the List method")
-//	            },
-//	        }
+//         // make and configure a mocked v11.ComponentStatusLister
+//         mockedComponentStatusLister := &ComponentStatusListerMock{
+//             GetFunc: func(namespace string, name string) (*v1.ComponentStatus, error) {
+// 	               panic("mock out the Get method")
+//             },
+//             ListFunc: func(namespace string, selector labels.Selector) ([]*v1.ComponentStatus, error) {
+// 	               panic("mock out the List method")
+//             },
+//         }
 //
-//	        // use mockedComponentStatusLister in code that requires v11.ComponentStatusLister
-//	        // and then make assertions.
+//         // use mockedComponentStatusLister in code that requires v11.ComponentStatusLister
+//         // and then make assertions.
 //
-//	    }
+//     }
 type ComponentStatusListerMock struct {
 	// GetFunc mocks the Get method.
 	GetFunc func(namespace string, name string) (*v1.ComponentStatus, error)
@@ -91,8 +91,7 @@ func (mock *ComponentStatusListerMock) Get(namespace string, name string) (*v1.C
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//
-//	len(mockedComponentStatusLister.GetCalls())
+//     len(mockedComponentStatusLister.GetCalls())
 func (mock *ComponentStatusListerMock) GetCalls() []struct {
 	Namespace string
 	Name      string
@@ -127,8 +126,7 @@ func (mock *ComponentStatusListerMock) List(namespace string, selector labels.Se
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//
-//	len(mockedComponentStatusLister.ListCalls())
+//     len(mockedComponentStatusLister.ListCalls())
 func (mock *ComponentStatusListerMock) ListCalls() []struct {
 	Namespace string
 	Selector  labels.Selector
@@ -161,43 +159,43 @@ var _ v11.ComponentStatusController = &ComponentStatusControllerMock{}
 
 // ComponentStatusControllerMock is a mock implementation of v11.ComponentStatusController.
 //
-//	    func TestSomethingThatUsesComponentStatusController(t *testing.T) {
+//     func TestSomethingThatUsesComponentStatusController(t *testing.T) {
 //
-//	        // make and configure a mocked v11.ComponentStatusController
-//	        mockedComponentStatusController := &ComponentStatusControllerMock{
-//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v11.ComponentStatusHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedFeatureHandler method")
-//	            },
-//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v11.ComponentStatusHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedHandler method")
-//	            },
-//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v11.ComponentStatusHandlerFunc)  {
-//		               panic("mock out the AddFeatureHandler method")
-//	            },
-//	            AddHandlerFunc: func(ctx context.Context, name string, handler v11.ComponentStatusHandlerFunc)  {
-//		               panic("mock out the AddHandler method")
-//	            },
-//	            EnqueueFunc: func(namespace string, name string)  {
-//		               panic("mock out the Enqueue method")
-//	            },
-//	            EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
-//		               panic("mock out the EnqueueAfter method")
-//	            },
-//	            GenericFunc: func() controller.GenericController {
-//		               panic("mock out the Generic method")
-//	            },
-//	            InformerFunc: func() cache.SharedIndexInformer {
-//		               panic("mock out the Informer method")
-//	            },
-//	            ListerFunc: func() v11.ComponentStatusLister {
-//		               panic("mock out the Lister method")
-//	            },
-//	        }
+//         // make and configure a mocked v11.ComponentStatusController
+//         mockedComponentStatusController := &ComponentStatusControllerMock{
+//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v11.ComponentStatusHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedFeatureHandler method")
+//             },
+//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v11.ComponentStatusHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedHandler method")
+//             },
+//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v11.ComponentStatusHandlerFunc)  {
+// 	               panic("mock out the AddFeatureHandler method")
+//             },
+//             AddHandlerFunc: func(ctx context.Context, name string, handler v11.ComponentStatusHandlerFunc)  {
+// 	               panic("mock out the AddHandler method")
+//             },
+//             EnqueueFunc: func(namespace string, name string)  {
+// 	               panic("mock out the Enqueue method")
+//             },
+//             EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
+// 	               panic("mock out the EnqueueAfter method")
+//             },
+//             GenericFunc: func() controller.GenericController {
+// 	               panic("mock out the Generic method")
+//             },
+//             InformerFunc: func() cache.SharedIndexInformer {
+// 	               panic("mock out the Informer method")
+//             },
+//             ListerFunc: func() v11.ComponentStatusLister {
+// 	               panic("mock out the Lister method")
+//             },
+//         }
 //
-//	        // use mockedComponentStatusController in code that requires v11.ComponentStatusController
-//	        // and then make assertions.
+//         // use mockedComponentStatusController in code that requires v11.ComponentStatusController
+//         // and then make assertions.
 //
-//	    }
+//     }
 type ComponentStatusControllerMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
 	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v11.ComponentStatusHandlerFunc)
@@ -326,8 +324,7 @@ func (mock *ComponentStatusControllerMock) AddClusterScopedFeatureHandler(ctx co
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//
-//	len(mockedComponentStatusController.AddClusterScopedFeatureHandlerCalls())
+//     len(mockedComponentStatusController.AddClusterScopedFeatureHandlerCalls())
 func (mock *ComponentStatusControllerMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -372,8 +369,7 @@ func (mock *ComponentStatusControllerMock) AddClusterScopedHandler(ctx context.C
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//
-//	len(mockedComponentStatusController.AddClusterScopedHandlerCalls())
+//     len(mockedComponentStatusController.AddClusterScopedHandlerCalls())
 func (mock *ComponentStatusControllerMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -416,8 +412,7 @@ func (mock *ComponentStatusControllerMock) AddFeatureHandler(ctx context.Context
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//
-//	len(mockedComponentStatusController.AddFeatureHandlerCalls())
+//     len(mockedComponentStatusController.AddFeatureHandlerCalls())
 func (mock *ComponentStatusControllerMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
@@ -458,8 +453,7 @@ func (mock *ComponentStatusControllerMock) AddHandler(ctx context.Context, name 
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//
-//	len(mockedComponentStatusController.AddHandlerCalls())
+//     len(mockedComponentStatusController.AddHandlerCalls())
 func (mock *ComponentStatusControllerMock) AddHandlerCalls() []struct {
 	Ctx     context.Context
 	Name    string
@@ -496,8 +490,7 @@ func (mock *ComponentStatusControllerMock) Enqueue(namespace string, name string
 
 // EnqueueCalls gets all the calls that were made to Enqueue.
 // Check the length with:
-//
-//	len(mockedComponentStatusController.EnqueueCalls())
+//     len(mockedComponentStatusController.EnqueueCalls())
 func (mock *ComponentStatusControllerMock) EnqueueCalls() []struct {
 	Namespace string
 	Name      string
@@ -534,8 +527,7 @@ func (mock *ComponentStatusControllerMock) EnqueueAfter(namespace string, name s
 
 // EnqueueAfterCalls gets all the calls that were made to EnqueueAfter.
 // Check the length with:
-//
-//	len(mockedComponentStatusController.EnqueueAfterCalls())
+//     len(mockedComponentStatusController.EnqueueAfterCalls())
 func (mock *ComponentStatusControllerMock) EnqueueAfterCalls() []struct {
 	Namespace string
 	Name      string
@@ -567,8 +559,7 @@ func (mock *ComponentStatusControllerMock) Generic() controller.GenericControlle
 
 // GenericCalls gets all the calls that were made to Generic.
 // Check the length with:
-//
-//	len(mockedComponentStatusController.GenericCalls())
+//     len(mockedComponentStatusController.GenericCalls())
 func (mock *ComponentStatusControllerMock) GenericCalls() []struct {
 } {
 	var calls []struct {
@@ -594,8 +585,7 @@ func (mock *ComponentStatusControllerMock) Informer() cache.SharedIndexInformer 
 
 // InformerCalls gets all the calls that were made to Informer.
 // Check the length with:
-//
-//	len(mockedComponentStatusController.InformerCalls())
+//     len(mockedComponentStatusController.InformerCalls())
 func (mock *ComponentStatusControllerMock) InformerCalls() []struct {
 } {
 	var calls []struct {
@@ -621,8 +611,7 @@ func (mock *ComponentStatusControllerMock) Lister() v11.ComponentStatusLister {
 
 // ListerCalls gets all the calls that were made to Lister.
 // Check the length with:
-//
-//	len(mockedComponentStatusController.ListerCalls())
+//     len(mockedComponentStatusController.ListerCalls())
 func (mock *ComponentStatusControllerMock) ListerCalls() []struct {
 } {
 	var calls []struct {
@@ -662,76 +651,76 @@ var _ v11.ComponentStatusInterface = &ComponentStatusInterfaceMock{}
 
 // ComponentStatusInterfaceMock is a mock implementation of v11.ComponentStatusInterface.
 //
-//	    func TestSomethingThatUsesComponentStatusInterface(t *testing.T) {
+//     func TestSomethingThatUsesComponentStatusInterface(t *testing.T) {
 //
-//	        // make and configure a mocked v11.ComponentStatusInterface
-//	        mockedComponentStatusInterface := &ComponentStatusInterfaceMock{
-//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v11.ComponentStatusHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedFeatureHandler method")
-//	            },
-//	            AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v11.ComponentStatusLifecycle)  {
-//		               panic("mock out the AddClusterScopedFeatureLifecycle method")
-//	            },
-//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v11.ComponentStatusHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedHandler method")
-//	            },
-//	            AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v11.ComponentStatusLifecycle)  {
-//		               panic("mock out the AddClusterScopedLifecycle method")
-//	            },
-//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v11.ComponentStatusHandlerFunc)  {
-//		               panic("mock out the AddFeatureHandler method")
-//	            },
-//	            AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v11.ComponentStatusLifecycle)  {
-//		               panic("mock out the AddFeatureLifecycle method")
-//	            },
-//	            AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v11.ComponentStatusHandlerFunc)  {
-//		               panic("mock out the AddHandler method")
-//	            },
-//	            AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v11.ComponentStatusLifecycle)  {
-//		               panic("mock out the AddLifecycle method")
-//	            },
-//	            ControllerFunc: func() v11.ComponentStatusController {
-//		               panic("mock out the Controller method")
-//	            },
-//	            CreateFunc: func(in1 *v1.ComponentStatus) (*v1.ComponentStatus, error) {
-//		               panic("mock out the Create method")
-//	            },
-//	            DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
-//		               panic("mock out the Delete method")
-//	            },
-//	            DeleteCollectionFunc: func(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
-//		               panic("mock out the DeleteCollection method")
-//	            },
-//	            DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
-//		               panic("mock out the DeleteNamespaced method")
-//	            },
-//	            GetFunc: func(name string, opts metav1.GetOptions) (*v1.ComponentStatus, error) {
-//		               panic("mock out the Get method")
-//	            },
-//	            GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v1.ComponentStatus, error) {
-//		               panic("mock out the GetNamespaced method")
-//	            },
-//	            ListFunc: func(opts metav1.ListOptions) (*v1.ComponentStatusList, error) {
-//		               panic("mock out the List method")
-//	            },
-//	            ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v1.ComponentStatusList, error) {
-//		               panic("mock out the ListNamespaced method")
-//	            },
-//	            ObjectClientFunc: func() *objectclient.ObjectClient {
-//		               panic("mock out the ObjectClient method")
-//	            },
-//	            UpdateFunc: func(in1 *v1.ComponentStatus) (*v1.ComponentStatus, error) {
-//		               panic("mock out the Update method")
-//	            },
-//	            WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
-//		               panic("mock out the Watch method")
-//	            },
-//	        }
+//         // make and configure a mocked v11.ComponentStatusInterface
+//         mockedComponentStatusInterface := &ComponentStatusInterfaceMock{
+//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v11.ComponentStatusHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedFeatureHandler method")
+//             },
+//             AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v11.ComponentStatusLifecycle)  {
+// 	               panic("mock out the AddClusterScopedFeatureLifecycle method")
+//             },
+//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v11.ComponentStatusHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedHandler method")
+//             },
+//             AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v11.ComponentStatusLifecycle)  {
+// 	               panic("mock out the AddClusterScopedLifecycle method")
+//             },
+//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v11.ComponentStatusHandlerFunc)  {
+// 	               panic("mock out the AddFeatureHandler method")
+//             },
+//             AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v11.ComponentStatusLifecycle)  {
+// 	               panic("mock out the AddFeatureLifecycle method")
+//             },
+//             AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v11.ComponentStatusHandlerFunc)  {
+// 	               panic("mock out the AddHandler method")
+//             },
+//             AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v11.ComponentStatusLifecycle)  {
+// 	               panic("mock out the AddLifecycle method")
+//             },
+//             ControllerFunc: func() v11.ComponentStatusController {
+// 	               panic("mock out the Controller method")
+//             },
+//             CreateFunc: func(in1 *v1.ComponentStatus) (*v1.ComponentStatus, error) {
+// 	               panic("mock out the Create method")
+//             },
+//             DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
+// 	               panic("mock out the Delete method")
+//             },
+//             DeleteCollectionFunc: func(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
+// 	               panic("mock out the DeleteCollection method")
+//             },
+//             DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
+// 	               panic("mock out the DeleteNamespaced method")
+//             },
+//             GetFunc: func(name string, opts metav1.GetOptions) (*v1.ComponentStatus, error) {
+// 	               panic("mock out the Get method")
+//             },
+//             GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v1.ComponentStatus, error) {
+// 	               panic("mock out the GetNamespaced method")
+//             },
+//             ListFunc: func(opts metav1.ListOptions) (*v1.ComponentStatusList, error) {
+// 	               panic("mock out the List method")
+//             },
+//             ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v1.ComponentStatusList, error) {
+// 	               panic("mock out the ListNamespaced method")
+//             },
+//             ObjectClientFunc: func() *objectclient.ObjectClient {
+// 	               panic("mock out the ObjectClient method")
+//             },
+//             UpdateFunc: func(in1 *v1.ComponentStatus) (*v1.ComponentStatus, error) {
+// 	               panic("mock out the Update method")
+//             },
+//             WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
+// 	               panic("mock out the Watch method")
+//             },
+//         }
 //
-//	        // use mockedComponentStatusInterface in code that requires v11.ComponentStatusInterface
-//	        // and then make assertions.
+//         // use mockedComponentStatusInterface in code that requires v11.ComponentStatusInterface
+//         // and then make assertions.
 //
-//	    }
+//     }
 type ComponentStatusInterfaceMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
 	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v11.ComponentStatusHandlerFunc)
@@ -984,8 +973,7 @@ func (mock *ComponentStatusInterfaceMock) AddClusterScopedFeatureHandler(ctx con
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//
-//	len(mockedComponentStatusInterface.AddClusterScopedFeatureHandlerCalls())
+//     len(mockedComponentStatusInterface.AddClusterScopedFeatureHandlerCalls())
 func (mock *ComponentStatusInterfaceMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -1032,8 +1020,7 @@ func (mock *ComponentStatusInterfaceMock) AddClusterScopedFeatureLifecycle(ctx c
 
 // AddClusterScopedFeatureLifecycleCalls gets all the calls that were made to AddClusterScopedFeatureLifecycle.
 // Check the length with:
-//
-//	len(mockedComponentStatusInterface.AddClusterScopedFeatureLifecycleCalls())
+//     len(mockedComponentStatusInterface.AddClusterScopedFeatureLifecycleCalls())
 func (mock *ComponentStatusInterfaceMock) AddClusterScopedFeatureLifecycleCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -1078,8 +1065,7 @@ func (mock *ComponentStatusInterfaceMock) AddClusterScopedHandler(ctx context.Co
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//
-//	len(mockedComponentStatusInterface.AddClusterScopedHandlerCalls())
+//     len(mockedComponentStatusInterface.AddClusterScopedHandlerCalls())
 func (mock *ComponentStatusInterfaceMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -1122,8 +1108,7 @@ func (mock *ComponentStatusInterfaceMock) AddClusterScopedLifecycle(ctx context.
 
 // AddClusterScopedLifecycleCalls gets all the calls that were made to AddClusterScopedLifecycle.
 // Check the length with:
-//
-//	len(mockedComponentStatusInterface.AddClusterScopedLifecycleCalls())
+//     len(mockedComponentStatusInterface.AddClusterScopedLifecycleCalls())
 func (mock *ComponentStatusInterfaceMock) AddClusterScopedLifecycleCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -1166,8 +1151,7 @@ func (mock *ComponentStatusInterfaceMock) AddFeatureHandler(ctx context.Context,
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//
-//	len(mockedComponentStatusInterface.AddFeatureHandlerCalls())
+//     len(mockedComponentStatusInterface.AddFeatureHandlerCalls())
 func (mock *ComponentStatusInterfaceMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
@@ -1210,8 +1194,7 @@ func (mock *ComponentStatusInterfaceMock) AddFeatureLifecycle(ctx context.Contex
 
 // AddFeatureLifecycleCalls gets all the calls that were made to AddFeatureLifecycle.
 // Check the length with:
-//
-//	len(mockedComponentStatusInterface.AddFeatureLifecycleCalls())
+//     len(mockedComponentStatusInterface.AddFeatureLifecycleCalls())
 func (mock *ComponentStatusInterfaceMock) AddFeatureLifecycleCalls() []struct {
 	Ctx       context.Context
 	Enabled   func() bool
@@ -1252,8 +1235,7 @@ func (mock *ComponentStatusInterfaceMock) AddHandler(ctx context.Context, name s
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//
-//	len(mockedComponentStatusInterface.AddHandlerCalls())
+//     len(mockedComponentStatusInterface.AddHandlerCalls())
 func (mock *ComponentStatusInterfaceMock) AddHandlerCalls() []struct {
 	Ctx  context.Context
 	Name string
@@ -1292,8 +1274,7 @@ func (mock *ComponentStatusInterfaceMock) AddLifecycle(ctx context.Context, name
 
 // AddLifecycleCalls gets all the calls that were made to AddLifecycle.
 // Check the length with:
-//
-//	len(mockedComponentStatusInterface.AddLifecycleCalls())
+//     len(mockedComponentStatusInterface.AddLifecycleCalls())
 func (mock *ComponentStatusInterfaceMock) AddLifecycleCalls() []struct {
 	Ctx       context.Context
 	Name      string
@@ -1325,8 +1306,7 @@ func (mock *ComponentStatusInterfaceMock) Controller() v11.ComponentStatusContro
 
 // ControllerCalls gets all the calls that were made to Controller.
 // Check the length with:
-//
-//	len(mockedComponentStatusInterface.ControllerCalls())
+//     len(mockedComponentStatusInterface.ControllerCalls())
 func (mock *ComponentStatusInterfaceMock) ControllerCalls() []struct {
 } {
 	var calls []struct {
@@ -1355,8 +1335,7 @@ func (mock *ComponentStatusInterfaceMock) Create(in1 *v1.ComponentStatus) (*v1.C
 
 // CreateCalls gets all the calls that were made to Create.
 // Check the length with:
-//
-//	len(mockedComponentStatusInterface.CreateCalls())
+//     len(mockedComponentStatusInterface.CreateCalls())
 func (mock *ComponentStatusInterfaceMock) CreateCalls() []struct {
 	In1 *v1.ComponentStatus
 } {
@@ -1389,8 +1368,7 @@ func (mock *ComponentStatusInterfaceMock) Delete(name string, options *metav1.De
 
 // DeleteCalls gets all the calls that were made to Delete.
 // Check the length with:
-//
-//	len(mockedComponentStatusInterface.DeleteCalls())
+//     len(mockedComponentStatusInterface.DeleteCalls())
 func (mock *ComponentStatusInterfaceMock) DeleteCalls() []struct {
 	Name    string
 	Options *metav1.DeleteOptions
@@ -1425,8 +1403,7 @@ func (mock *ComponentStatusInterfaceMock) DeleteCollection(deleteOpts *metav1.De
 
 // DeleteCollectionCalls gets all the calls that were made to DeleteCollection.
 // Check the length with:
-//
-//	len(mockedComponentStatusInterface.DeleteCollectionCalls())
+//     len(mockedComponentStatusInterface.DeleteCollectionCalls())
 func (mock *ComponentStatusInterfaceMock) DeleteCollectionCalls() []struct {
 	DeleteOpts *metav1.DeleteOptions
 	ListOpts   metav1.ListOptions
@@ -1463,8 +1440,7 @@ func (mock *ComponentStatusInterfaceMock) DeleteNamespaced(namespace string, nam
 
 // DeleteNamespacedCalls gets all the calls that were made to DeleteNamespaced.
 // Check the length with:
-//
-//	len(mockedComponentStatusInterface.DeleteNamespacedCalls())
+//     len(mockedComponentStatusInterface.DeleteNamespacedCalls())
 func (mock *ComponentStatusInterfaceMock) DeleteNamespacedCalls() []struct {
 	Namespace string
 	Name      string
@@ -1501,8 +1477,7 @@ func (mock *ComponentStatusInterfaceMock) Get(name string, opts metav1.GetOption
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//
-//	len(mockedComponentStatusInterface.GetCalls())
+//     len(mockedComponentStatusInterface.GetCalls())
 func (mock *ComponentStatusInterfaceMock) GetCalls() []struct {
 	Name string
 	Opts metav1.GetOptions
@@ -1539,8 +1514,7 @@ func (mock *ComponentStatusInterfaceMock) GetNamespaced(namespace string, name s
 
 // GetNamespacedCalls gets all the calls that were made to GetNamespaced.
 // Check the length with:
-//
-//	len(mockedComponentStatusInterface.GetNamespacedCalls())
+//     len(mockedComponentStatusInterface.GetNamespacedCalls())
 func (mock *ComponentStatusInterfaceMock) GetNamespacedCalls() []struct {
 	Namespace string
 	Name      string
@@ -1575,8 +1549,7 @@ func (mock *ComponentStatusInterfaceMock) List(opts metav1.ListOptions) (*v1.Com
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//
-//	len(mockedComponentStatusInterface.ListCalls())
+//     len(mockedComponentStatusInterface.ListCalls())
 func (mock *ComponentStatusInterfaceMock) ListCalls() []struct {
 	Opts metav1.ListOptions
 } {
@@ -1609,8 +1582,7 @@ func (mock *ComponentStatusInterfaceMock) ListNamespaced(namespace string, opts 
 
 // ListNamespacedCalls gets all the calls that were made to ListNamespaced.
 // Check the length with:
-//
-//	len(mockedComponentStatusInterface.ListNamespacedCalls())
+//     len(mockedComponentStatusInterface.ListNamespacedCalls())
 func (mock *ComponentStatusInterfaceMock) ListNamespacedCalls() []struct {
 	Namespace string
 	Opts      metav1.ListOptions
@@ -1640,8 +1612,7 @@ func (mock *ComponentStatusInterfaceMock) ObjectClient() *objectclient.ObjectCli
 
 // ObjectClientCalls gets all the calls that were made to ObjectClient.
 // Check the length with:
-//
-//	len(mockedComponentStatusInterface.ObjectClientCalls())
+//     len(mockedComponentStatusInterface.ObjectClientCalls())
 func (mock *ComponentStatusInterfaceMock) ObjectClientCalls() []struct {
 } {
 	var calls []struct {
@@ -1670,8 +1641,7 @@ func (mock *ComponentStatusInterfaceMock) Update(in1 *v1.ComponentStatus) (*v1.C
 
 // UpdateCalls gets all the calls that were made to Update.
 // Check the length with:
-//
-//	len(mockedComponentStatusInterface.UpdateCalls())
+//     len(mockedComponentStatusInterface.UpdateCalls())
 func (mock *ComponentStatusInterfaceMock) UpdateCalls() []struct {
 	In1 *v1.ComponentStatus
 } {
@@ -1702,8 +1672,7 @@ func (mock *ComponentStatusInterfaceMock) Watch(opts metav1.ListOptions) (watch.
 
 // WatchCalls gets all the calls that were made to Watch.
 // Check the length with:
-//
-//	len(mockedComponentStatusInterface.WatchCalls())
+//     len(mockedComponentStatusInterface.WatchCalls())
 func (mock *ComponentStatusInterfaceMock) WatchCalls() []struct {
 	Opts metav1.ListOptions
 } {
@@ -1726,19 +1695,19 @@ var _ v11.ComponentStatusesGetter = &ComponentStatusesGetterMock{}
 
 // ComponentStatusesGetterMock is a mock implementation of v11.ComponentStatusesGetter.
 //
-//	    func TestSomethingThatUsesComponentStatusesGetter(t *testing.T) {
+//     func TestSomethingThatUsesComponentStatusesGetter(t *testing.T) {
 //
-//	        // make and configure a mocked v11.ComponentStatusesGetter
-//	        mockedComponentStatusesGetter := &ComponentStatusesGetterMock{
-//	            ComponentStatusesFunc: func(namespace string) v11.ComponentStatusInterface {
-//		               panic("mock out the ComponentStatuses method")
-//	            },
-//	        }
+//         // make and configure a mocked v11.ComponentStatusesGetter
+//         mockedComponentStatusesGetter := &ComponentStatusesGetterMock{
+//             ComponentStatusesFunc: func(namespace string) v11.ComponentStatusInterface {
+// 	               panic("mock out the ComponentStatuses method")
+//             },
+//         }
 //
-//	        // use mockedComponentStatusesGetter in code that requires v11.ComponentStatusesGetter
-//	        // and then make assertions.
+//         // use mockedComponentStatusesGetter in code that requires v11.ComponentStatusesGetter
+//         // and then make assertions.
 //
-//	    }
+//     }
 type ComponentStatusesGetterMock struct {
 	// ComponentStatusesFunc mocks the ComponentStatuses method.
 	ComponentStatusesFunc func(namespace string) v11.ComponentStatusInterface
@@ -1771,8 +1740,7 @@ func (mock *ComponentStatusesGetterMock) ComponentStatuses(namespace string) v11
 
 // ComponentStatusesCalls gets all the calls that were made to ComponentStatuses.
 // Check the length with:
-//
-//	len(mockedComponentStatusesGetter.ComponentStatusesCalls())
+//     len(mockedComponentStatusesGetter.ComponentStatusesCalls())
 func (mock *ComponentStatusesGetterMock) ComponentStatusesCalls() []struct {
 	Namespace string
 } {

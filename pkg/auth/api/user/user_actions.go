@@ -95,7 +95,7 @@ func (h *Handler) changePassword(actionName string, action *types.Action, reques
 		return err
 	}
 
-	if err := validatePassword(user.Username, newPass, settings.PasswordMinLength.GetInt()); err != nil {
+	if err := validatePassword(user.Username, currentPass, newPass, settings.PasswordMinLength.GetInt()); err != nil {
 		return httperror.NewAPIError(httperror.InvalidBodyContent, err.Error())
 	}
 
@@ -141,7 +141,8 @@ func (h *Handler) setPassword(actionName string, action *types.Action, request *
 
 	username := userData[client.UserFieldUsername].(string)
 
-	if err := validatePassword(username, newPass, settings.PasswordMinLength.GetInt()); err != nil {
+	// passing empty currentPass to validator since, this api call doesn't assume an existing password
+	if err := validatePassword(username, "", newPass, settings.PasswordMinLength.GetInt()); err != nil {
 		return httperror.NewAPIError(httperror.InvalidBodyContent, err.Error())
 	}
 
@@ -182,14 +183,18 @@ func (h *Handler) userCanRefresh(request *types.APIContext) bool {
 	return request.AccessControl.CanDo(v3.UserGroupVersionKind.Group, v3.UserResource.Name, "create", request, nil, request.Schema) == nil
 }
 
-// validatePassword will ensure a password is at least the minimum required length in runes, and that the username and password do not match.
-func validatePassword(user string, pass string, minPassLen int) error {
+// validatePassword will ensure a password is at least the minimum required length in runes,
+// that the username and password do not match, and that the new password is not the same as the current password.
+func validatePassword(user string, currentPass string, pass string, minPassLen int) error {
 	if utf8.RuneCountInString(pass) < minPassLen {
 		return errors.Errorf("Password must be at least %v characters", minPassLen)
 	}
 
 	if user == pass {
 		return errors.New("Password cannot be the same as username")
+	}
+	if pass == currentPass {
+		return errors.New("The new password must not be the same as the current password")
 	}
 
 	return nil

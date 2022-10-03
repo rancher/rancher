@@ -3,7 +3,6 @@ package schema
 import (
 	"net/http"
 
-	istiov1alpha3 "github.com/knative/pkg/apis/istio/v1alpha3"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	"github.com/rancher/norman/types"
 	m "github.com/rancher/norman/types/mapper"
@@ -49,8 +48,7 @@ var (
 		Init(workloadTypes).
 		Init(appTypes).
 		Init(monitoringTypes).
-		Init(autoscalingTypes).
-		Init(istioTypes)
+		Init(autoscalingTypes)
 )
 
 func configMapTypes(schemas *types.Schemas) *types.Schemas {
@@ -987,27 +985,5 @@ func autoscalingTypes(schemas *types.Schemas) *types.Schemas {
 		MustImport(&Version, autoscaling.HorizontalPodAutoscaler{}, projectOverride{}, struct {
 			DisplayName string `json:"displayName,omitempty"`
 			Description string `json:"description,omitempty"`
-		}{})
-}
-
-func istioTypes(schemas *types.Schemas) *types.Schemas {
-	return schemas.
-		MustImport(&Version, istiov1alpha3.HTTPMatchRequest{}, struct {
-			Port *uint32 `json:"port,omitempty"`
-		}{}).
-		MustImport(&Version, istiov1alpha3.HTTPRoute{}, struct {
-			WebsocketUpgrade *bool `json:"websocketUpgrade,omitempty"`
-		}{}).
-		MustImport(&Version, istiov1alpha3.VirtualService{}, projectOverride{}, struct {
-			Status interface{}
-		}{}).
-		MustImport(&Version, istiov1alpha3.ConsistentHashLB{}, struct {
-			UseSourceIP *bool `json:"useSourceIp,omitempty"`
-		}{}).
-		MustImport(&Version, istiov1alpha3.DestinationRule{}, projectOverride{}, struct {
-			Status interface{}
-		}{}).
-		MustImport(&Version, istiov1alpha3.Gateway{}, projectOverride{}, struct {
-			Status interface{}
 		}{})
 }

@@ -34,6 +34,22 @@ func GetPrivateRepo(cluster *v3.Cluster) *rketypes.PrivateRegistry {
 	return nil
 }
 
+// TransformProvV2RegistryCredentialsToDockerConfigJSON transforms a ProvV2 registry secret into a credentialprovider.DockerConfigJSON secret
+func TransformProvV2RegistryCredentialsToDockerConfigJSON(url string, registryCredentials *corev1.Secret) (map[string][]byte, error) {
+	username := string(registryCredentials.Data["username"])
+	password := string(registryCredentials.Data["password"])
+	authConfig := credentialprovider.DockerConfigJSON{
+		Auths: credentialprovider.DockerConfig{
+			url: credentialprovider.DockerConfigEntry{
+				Username: username,
+				Password: password,
+			},
+		},
+	}
+	j, err := json.Marshal(authConfig)
+	return map[string][]byte{".dockerconfigjson": j}, err
+}
+
 func GenerateClusterPrivateRegistryDockerConfig(cluster *v3.Cluster) (string, error) {
 	if cluster == nil {
 		return "", nil
@@ -41,8 +57,8 @@ func GenerateClusterPrivateRegistryDockerConfig(cluster *v3.Cluster) (string, er
 	return GeneratePrivateRegistryDockerConfig(GetPrivateRepo(cluster), nil)
 }
 
-// This method generates base64 encoded credentials for the registry
-func GeneratePrivateRegistryDockerConfig(privateRegistry *rketypes.PrivateRegistry, registrySecret *corev1.Secret) (string, error) {
+// GeneratePrivateRegistryDockerConfig generates base64 encoded credentials for the provided registry
+func GeneratePrivateRegistryDockerConfig(privateRegistry *rketypes.PrivateRegistry, registrySecret []byte) (string, error) {
 	if privateRegistry == nil {
 		return "", nil
 	}
@@ -62,17 +78,15 @@ func GeneratePrivateRegistryDockerConfig(privateRegistry *rketypes.PrivateRegist
 	if registrySecret != nil {
 		privateRegistry = privateRegistry.DeepCopy()
 		dockerCfg := credentialprovider.DockerConfigJSON{}
-		if dockerConfigJSON := registrySecret.Data[".dockerconfigjson"]; len(dockerConfigJSON) > 0 {
-			err := json.Unmarshal(dockerConfigJSON, &dockerCfg)
+		if len(registrySecret) > 0 {
+			err := json.Unmarshal(registrySecret, &dockerCfg) // check to see if registrySecret is in the correct format
 			if err != nil {
 				logrus.Debug("Failed to parse dockerconfig for registry secret: " + err.Error())
 				return "", err
 			}
-		}
-
-		if reg, ok := dockerCfg.Auths[privateRegistry.URL]; ok {
-			privateRegistry.User = reg.Username
-			privateRegistry.Password = reg.Password
+			if _, ok := dockerCfg.Auths[privateRegistry.URL]; ok {
+				return base64.URLEncoding.EncodeToString(registrySecret), nil
+			}
 		}
 	}
 	if privateRegistry.User == "" || privateRegistry.Password == "" {

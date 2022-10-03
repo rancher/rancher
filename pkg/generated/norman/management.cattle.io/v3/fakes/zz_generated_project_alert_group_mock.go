@@ -29,22 +29,22 @@ var _ v31.ProjectAlertGroupLister = &ProjectAlertGroupListerMock{}
 
 // ProjectAlertGroupListerMock is a mock implementation of v31.ProjectAlertGroupLister.
 //
-//	    func TestSomethingThatUsesProjectAlertGroupLister(t *testing.T) {
+//     func TestSomethingThatUsesProjectAlertGroupLister(t *testing.T) {
 //
-//	        // make and configure a mocked v31.ProjectAlertGroupLister
-//	        mockedProjectAlertGroupLister := &ProjectAlertGroupListerMock{
-//	            GetFunc: func(namespace string, name string) (*v3.ProjectAlertGroup, error) {
-//		               panic("mock out the Get method")
-//	            },
-//	            ListFunc: func(namespace string, selector labels.Selector) ([]*v3.ProjectAlertGroup, error) {
-//		               panic("mock out the List method")
-//	            },
-//	        }
+//         // make and configure a mocked v31.ProjectAlertGroupLister
+//         mockedProjectAlertGroupLister := &ProjectAlertGroupListerMock{
+//             GetFunc: func(namespace string, name string) (*v3.ProjectAlertGroup, error) {
+// 	               panic("mock out the Get method")
+//             },
+//             ListFunc: func(namespace string, selector labels.Selector) ([]*v3.ProjectAlertGroup, error) {
+// 	               panic("mock out the List method")
+//             },
+//         }
 //
-//	        // use mockedProjectAlertGroupLister in code that requires v31.ProjectAlertGroupLister
-//	        // and then make assertions.
+//         // use mockedProjectAlertGroupLister in code that requires v31.ProjectAlertGroupLister
+//         // and then make assertions.
 //
-//	    }
+//     }
 type ProjectAlertGroupListerMock struct {
 	// GetFunc mocks the Get method.
 	GetFunc func(namespace string, name string) (*v3.ProjectAlertGroup, error)
@@ -91,8 +91,7 @@ func (mock *ProjectAlertGroupListerMock) Get(namespace string, name string) (*v3
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//
-//	len(mockedProjectAlertGroupLister.GetCalls())
+//     len(mockedProjectAlertGroupLister.GetCalls())
 func (mock *ProjectAlertGroupListerMock) GetCalls() []struct {
 	Namespace string
 	Name      string
@@ -127,8 +126,7 @@ func (mock *ProjectAlertGroupListerMock) List(namespace string, selector labels.
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//
-//	len(mockedProjectAlertGroupLister.ListCalls())
+//     len(mockedProjectAlertGroupLister.ListCalls())
 func (mock *ProjectAlertGroupListerMock) ListCalls() []struct {
 	Namespace string
 	Selector  labels.Selector
@@ -161,43 +159,43 @@ var _ v31.ProjectAlertGroupController = &ProjectAlertGroupControllerMock{}
 
 // ProjectAlertGroupControllerMock is a mock implementation of v31.ProjectAlertGroupController.
 //
-//	    func TestSomethingThatUsesProjectAlertGroupController(t *testing.T) {
+//     func TestSomethingThatUsesProjectAlertGroupController(t *testing.T) {
 //
-//	        // make and configure a mocked v31.ProjectAlertGroupController
-//	        mockedProjectAlertGroupController := &ProjectAlertGroupControllerMock{
-//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v31.ProjectAlertGroupHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedFeatureHandler method")
-//	            },
-//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v31.ProjectAlertGroupHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedHandler method")
-//	            },
-//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.ProjectAlertGroupHandlerFunc)  {
-//		               panic("mock out the AddFeatureHandler method")
-//	            },
-//	            AddHandlerFunc: func(ctx context.Context, name string, handler v31.ProjectAlertGroupHandlerFunc)  {
-//		               panic("mock out the AddHandler method")
-//	            },
-//	            EnqueueFunc: func(namespace string, name string)  {
-//		               panic("mock out the Enqueue method")
-//	            },
-//	            EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
-//		               panic("mock out the EnqueueAfter method")
-//	            },
-//	            GenericFunc: func() controller.GenericController {
-//		               panic("mock out the Generic method")
-//	            },
-//	            InformerFunc: func() cache.SharedIndexInformer {
-//		               panic("mock out the Informer method")
-//	            },
-//	            ListerFunc: func() v31.ProjectAlertGroupLister {
-//		               panic("mock out the Lister method")
-//	            },
-//	        }
+//         // make and configure a mocked v31.ProjectAlertGroupController
+//         mockedProjectAlertGroupController := &ProjectAlertGroupControllerMock{
+//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v31.ProjectAlertGroupHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedFeatureHandler method")
+//             },
+//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v31.ProjectAlertGroupHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedHandler method")
+//             },
+//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.ProjectAlertGroupHandlerFunc)  {
+// 	               panic("mock out the AddFeatureHandler method")
+//             },
+//             AddHandlerFunc: func(ctx context.Context, name string, handler v31.ProjectAlertGroupHandlerFunc)  {
+// 	               panic("mock out the AddHandler method")
+//             },
+//             EnqueueFunc: func(namespace string, name string)  {
+// 	               panic("mock out the Enqueue method")
+//             },
+//             EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
+// 	               panic("mock out the EnqueueAfter method")
+//             },
+//             GenericFunc: func() controller.GenericController {
+// 	               panic("mock out the Generic method")
+//             },
+//             InformerFunc: func() cache.SharedIndexInformer {
+// 	               panic("mock out the Informer method")
+//             },
+//             ListerFunc: func() v31.ProjectAlertGroupLister {
+// 	               panic("mock out the Lister method")
+//             },
+//         }
 //
-//	        // use mockedProjectAlertGroupController in code that requires v31.ProjectAlertGroupController
-//	        // and then make assertions.
+//         // use mockedProjectAlertGroupController in code that requires v31.ProjectAlertGroupController
+//         // and then make assertions.
 //
-//	    }
+//     }
 type ProjectAlertGroupControllerMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
 	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v31.ProjectAlertGroupHandlerFunc)
@@ -326,8 +324,7 @@ func (mock *ProjectAlertGroupControllerMock) AddClusterScopedFeatureHandler(ctx 
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//
-//	len(mockedProjectAlertGroupController.AddClusterScopedFeatureHandlerCalls())
+//     len(mockedProjectAlertGroupController.AddClusterScopedFeatureHandlerCalls())
 func (mock *ProjectAlertGroupControllerMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -372,8 +369,7 @@ func (mock *ProjectAlertGroupControllerMock) AddClusterScopedHandler(ctx context
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//
-//	len(mockedProjectAlertGroupController.AddClusterScopedHandlerCalls())
+//     len(mockedProjectAlertGroupController.AddClusterScopedHandlerCalls())
 func (mock *ProjectAlertGroupControllerMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -416,8 +412,7 @@ func (mock *ProjectAlertGroupControllerMock) AddFeatureHandler(ctx context.Conte
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//
-//	len(mockedProjectAlertGroupController.AddFeatureHandlerCalls())
+//     len(mockedProjectAlertGroupController.AddFeatureHandlerCalls())
 func (mock *ProjectAlertGroupControllerMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
@@ -458,8 +453,7 @@ func (mock *ProjectAlertGroupControllerMock) AddHandler(ctx context.Context, nam
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//
-//	len(mockedProjectAlertGroupController.AddHandlerCalls())
+//     len(mockedProjectAlertGroupController.AddHandlerCalls())
 func (mock *ProjectAlertGroupControllerMock) AddHandlerCalls() []struct {
 	Ctx     context.Context
 	Name    string
@@ -496,8 +490,7 @@ func (mock *ProjectAlertGroupControllerMock) Enqueue(namespace string, name stri
 
 // EnqueueCalls gets all the calls that were made to Enqueue.
 // Check the length with:
-//
-//	len(mockedProjectAlertGroupController.EnqueueCalls())
+//     len(mockedProjectAlertGroupController.EnqueueCalls())
 func (mock *ProjectAlertGroupControllerMock) EnqueueCalls() []struct {
 	Namespace string
 	Name      string
@@ -534,8 +527,7 @@ func (mock *ProjectAlertGroupControllerMock) EnqueueAfter(namespace string, name
 
 // EnqueueAfterCalls gets all the calls that were made to EnqueueAfter.
 // Check the length with:
-//
-//	len(mockedProjectAlertGroupController.EnqueueAfterCalls())
+//     len(mockedProjectAlertGroupController.EnqueueAfterCalls())
 func (mock *ProjectAlertGroupControllerMock) EnqueueAfterCalls() []struct {
 	Namespace string
 	Name      string
@@ -567,8 +559,7 @@ func (mock *ProjectAlertGroupControllerMock) Generic() controller.GenericControl
 
 // GenericCalls gets all the calls that were made to Generic.
 // Check the length with:
-//
-//	len(mockedProjectAlertGroupController.GenericCalls())
+//     len(mockedProjectAlertGroupController.GenericCalls())
 func (mock *ProjectAlertGroupControllerMock) GenericCalls() []struct {
 } {
 	var calls []struct {
@@ -594,8 +585,7 @@ func (mock *ProjectAlertGroupControllerMock) Informer() cache.SharedIndexInforme
 
 // InformerCalls gets all the calls that were made to Informer.
 // Check the length with:
-//
-//	len(mockedProjectAlertGroupController.InformerCalls())
+//     len(mockedProjectAlertGroupController.InformerCalls())
 func (mock *ProjectAlertGroupControllerMock) InformerCalls() []struct {
 } {
 	var calls []struct {
@@ -621,8 +611,7 @@ func (mock *ProjectAlertGroupControllerMock) Lister() v31.ProjectAlertGroupListe
 
 // ListerCalls gets all the calls that were made to Lister.
 // Check the length with:
-//
-//	len(mockedProjectAlertGroupController.ListerCalls())
+//     len(mockedProjectAlertGroupController.ListerCalls())
 func (mock *ProjectAlertGroupControllerMock) ListerCalls() []struct {
 } {
 	var calls []struct {
@@ -662,76 +651,76 @@ var _ v31.ProjectAlertGroupInterface = &ProjectAlertGroupInterfaceMock{}
 
 // ProjectAlertGroupInterfaceMock is a mock implementation of v31.ProjectAlertGroupInterface.
 //
-//	    func TestSomethingThatUsesProjectAlertGroupInterface(t *testing.T) {
+//     func TestSomethingThatUsesProjectAlertGroupInterface(t *testing.T) {
 //
-//	        // make and configure a mocked v31.ProjectAlertGroupInterface
-//	        mockedProjectAlertGroupInterface := &ProjectAlertGroupInterfaceMock{
-//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v31.ProjectAlertGroupHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedFeatureHandler method")
-//	            },
-//	            AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v31.ProjectAlertGroupLifecycle)  {
-//		               panic("mock out the AddClusterScopedFeatureLifecycle method")
-//	            },
-//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v31.ProjectAlertGroupHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedHandler method")
-//	            },
-//	            AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v31.ProjectAlertGroupLifecycle)  {
-//		               panic("mock out the AddClusterScopedLifecycle method")
-//	            },
-//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.ProjectAlertGroupHandlerFunc)  {
-//		               panic("mock out the AddFeatureHandler method")
-//	            },
-//	            AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v31.ProjectAlertGroupLifecycle)  {
-//		               panic("mock out the AddFeatureLifecycle method")
-//	            },
-//	            AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v31.ProjectAlertGroupHandlerFunc)  {
-//		               panic("mock out the AddHandler method")
-//	            },
-//	            AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v31.ProjectAlertGroupLifecycle)  {
-//		               panic("mock out the AddLifecycle method")
-//	            },
-//	            ControllerFunc: func() v31.ProjectAlertGroupController {
-//		               panic("mock out the Controller method")
-//	            },
-//	            CreateFunc: func(in1 *v3.ProjectAlertGroup) (*v3.ProjectAlertGroup, error) {
-//		               panic("mock out the Create method")
-//	            },
-//	            DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
-//		               panic("mock out the Delete method")
-//	            },
-//	            DeleteCollectionFunc: func(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
-//		               panic("mock out the DeleteCollection method")
-//	            },
-//	            DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
-//		               panic("mock out the DeleteNamespaced method")
-//	            },
-//	            GetFunc: func(name string, opts metav1.GetOptions) (*v3.ProjectAlertGroup, error) {
-//		               panic("mock out the Get method")
-//	            },
-//	            GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v3.ProjectAlertGroup, error) {
-//		               panic("mock out the GetNamespaced method")
-//	            },
-//	            ListFunc: func(opts metav1.ListOptions) (*v3.ProjectAlertGroupList, error) {
-//		               panic("mock out the List method")
-//	            },
-//	            ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v3.ProjectAlertGroupList, error) {
-//		               panic("mock out the ListNamespaced method")
-//	            },
-//	            ObjectClientFunc: func() *objectclient.ObjectClient {
-//		               panic("mock out the ObjectClient method")
-//	            },
-//	            UpdateFunc: func(in1 *v3.ProjectAlertGroup) (*v3.ProjectAlertGroup, error) {
-//		               panic("mock out the Update method")
-//	            },
-//	            WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
-//		               panic("mock out the Watch method")
-//	            },
-//	        }
+//         // make and configure a mocked v31.ProjectAlertGroupInterface
+//         mockedProjectAlertGroupInterface := &ProjectAlertGroupInterfaceMock{
+//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v31.ProjectAlertGroupHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedFeatureHandler method")
+//             },
+//             AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v31.ProjectAlertGroupLifecycle)  {
+// 	               panic("mock out the AddClusterScopedFeatureLifecycle method")
+//             },
+//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v31.ProjectAlertGroupHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedHandler method")
+//             },
+//             AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v31.ProjectAlertGroupLifecycle)  {
+// 	               panic("mock out the AddClusterScopedLifecycle method")
+//             },
+//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.ProjectAlertGroupHandlerFunc)  {
+// 	               panic("mock out the AddFeatureHandler method")
+//             },
+//             AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v31.ProjectAlertGroupLifecycle)  {
+// 	               panic("mock out the AddFeatureLifecycle method")
+//             },
+//             AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v31.ProjectAlertGroupHandlerFunc)  {
+// 	               panic("mock out the AddHandler method")
+//             },
+//             AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v31.ProjectAlertGroupLifecycle)  {
+// 	               panic("mock out the AddLifecycle method")
+//             },
+//             ControllerFunc: func() v31.ProjectAlertGroupController {
+// 	               panic("mock out the Controller method")
+//             },
+//             CreateFunc: func(in1 *v3.ProjectAlertGroup) (*v3.ProjectAlertGroup, error) {
+// 	               panic("mock out the Create method")
+//             },
+//             DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
+// 	               panic("mock out the Delete method")
+//             },
+//             DeleteCollectionFunc: func(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
+// 	               panic("mock out the DeleteCollection method")
+//             },
+//             DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
+// 	               panic("mock out the DeleteNamespaced method")
+//             },
+//             GetFunc: func(name string, opts metav1.GetOptions) (*v3.ProjectAlertGroup, error) {
+// 	               panic("mock out the Get method")
+//             },
+//             GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v3.ProjectAlertGroup, error) {
+// 	               panic("mock out the GetNamespaced method")
+//             },
+//             ListFunc: func(opts metav1.ListOptions) (*v3.ProjectAlertGroupList, error) {
+// 	               panic("mock out the List method")
+//             },
+//             ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v3.ProjectAlertGroupList, error) {
+// 	               panic("mock out the ListNamespaced method")
+//             },
+//             ObjectClientFunc: func() *objectclient.ObjectClient {
+// 	               panic("mock out the ObjectClient method")
+//             },
+//             UpdateFunc: func(in1 *v3.ProjectAlertGroup) (*v3.ProjectAlertGroup, error) {
+// 	               panic("mock out the Update method")
+//             },
+//             WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
+// 	               panic("mock out the Watch method")
+//             },
+//         }
 //
-//	        // use mockedProjectAlertGroupInterface in code that requires v31.ProjectAlertGroupInterface
-//	        // and then make assertions.
+//         // use mockedProjectAlertGroupInterface in code that requires v31.ProjectAlertGroupInterface
+//         // and then make assertions.
 //
-//	    }
+//     }
 type ProjectAlertGroupInterfaceMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
 	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v31.ProjectAlertGroupHandlerFunc)
@@ -984,8 +973,7 @@ func (mock *ProjectAlertGroupInterfaceMock) AddClusterScopedFeatureHandler(ctx c
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//
-//	len(mockedProjectAlertGroupInterface.AddClusterScopedFeatureHandlerCalls())
+//     len(mockedProjectAlertGroupInterface.AddClusterScopedFeatureHandlerCalls())
 func (mock *ProjectAlertGroupInterfaceMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -1032,8 +1020,7 @@ func (mock *ProjectAlertGroupInterfaceMock) AddClusterScopedFeatureLifecycle(ctx
 
 // AddClusterScopedFeatureLifecycleCalls gets all the calls that were made to AddClusterScopedFeatureLifecycle.
 // Check the length with:
-//
-//	len(mockedProjectAlertGroupInterface.AddClusterScopedFeatureLifecycleCalls())
+//     len(mockedProjectAlertGroupInterface.AddClusterScopedFeatureLifecycleCalls())
 func (mock *ProjectAlertGroupInterfaceMock) AddClusterScopedFeatureLifecycleCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -1078,8 +1065,7 @@ func (mock *ProjectAlertGroupInterfaceMock) AddClusterScopedHandler(ctx context.
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//
-//	len(mockedProjectAlertGroupInterface.AddClusterScopedHandlerCalls())
+//     len(mockedProjectAlertGroupInterface.AddClusterScopedHandlerCalls())
 func (mock *ProjectAlertGroupInterfaceMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -1122,8 +1108,7 @@ func (mock *ProjectAlertGroupInterfaceMock) AddClusterScopedLifecycle(ctx contex
 
 // AddClusterScopedLifecycleCalls gets all the calls that were made to AddClusterScopedLifecycle.
 // Check the length with:
-//
-//	len(mockedProjectAlertGroupInterface.AddClusterScopedLifecycleCalls())
+//     len(mockedProjectAlertGroupInterface.AddClusterScopedLifecycleCalls())
 func (mock *ProjectAlertGroupInterfaceMock) AddClusterScopedLifecycleCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -1166,8 +1151,7 @@ func (mock *ProjectAlertGroupInterfaceMock) AddFeatureHandler(ctx context.Contex
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//
-//	len(mockedProjectAlertGroupInterface.AddFeatureHandlerCalls())
+//     len(mockedProjectAlertGroupInterface.AddFeatureHandlerCalls())
 func (mock *ProjectAlertGroupInterfaceMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
@@ -1210,8 +1194,7 @@ func (mock *ProjectAlertGroupInterfaceMock) AddFeatureLifecycle(ctx context.Cont
 
 // AddFeatureLifecycleCalls gets all the calls that were made to AddFeatureLifecycle.
 // Check the length with:
-//
-//	len(mockedProjectAlertGroupInterface.AddFeatureLifecycleCalls())
+//     len(mockedProjectAlertGroupInterface.AddFeatureLifecycleCalls())
 func (mock *ProjectAlertGroupInterfaceMock) AddFeatureLifecycleCalls() []struct {
 	Ctx       context.Context
 	Enabled   func() bool
@@ -1252,8 +1235,7 @@ func (mock *ProjectAlertGroupInterfaceMock) AddHandler(ctx context.Context, name
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//
-//	len(mockedProjectAlertGroupInterface.AddHandlerCalls())
+//     len(mockedProjectAlertGroupInterface.AddHandlerCalls())
 func (mock *ProjectAlertGroupInterfaceMock) AddHandlerCalls() []struct {
 	Ctx  context.Context
 	Name string
@@ -1292,8 +1274,7 @@ func (mock *ProjectAlertGroupInterfaceMock) AddLifecycle(ctx context.Context, na
 
 // AddLifecycleCalls gets all the calls that were made to AddLifecycle.
 // Check the length with:
-//
-//	len(mockedProjectAlertGroupInterface.AddLifecycleCalls())
+//     len(mockedProjectAlertGroupInterface.AddLifecycleCalls())
 func (mock *ProjectAlertGroupInterfaceMock) AddLifecycleCalls() []struct {
 	Ctx       context.Context
 	Name      string
@@ -1325,8 +1306,7 @@ func (mock *ProjectAlertGroupInterfaceMock) Controller() v31.ProjectAlertGroupCo
 
 // ControllerCalls gets all the calls that were made to Controller.
 // Check the length with:
-//
-//	len(mockedProjectAlertGroupInterface.ControllerCalls())
+//     len(mockedProjectAlertGroupInterface.ControllerCalls())
 func (mock *ProjectAlertGroupInterfaceMock) ControllerCalls() []struct {
 } {
 	var calls []struct {
@@ -1355,8 +1335,7 @@ func (mock *ProjectAlertGroupInterfaceMock) Create(in1 *v3.ProjectAlertGroup) (*
 
 // CreateCalls gets all the calls that were made to Create.
 // Check the length with:
-//
-//	len(mockedProjectAlertGroupInterface.CreateCalls())
+//     len(mockedProjectAlertGroupInterface.CreateCalls())
 func (mock *ProjectAlertGroupInterfaceMock) CreateCalls() []struct {
 	In1 *v3.ProjectAlertGroup
 } {
@@ -1389,8 +1368,7 @@ func (mock *ProjectAlertGroupInterfaceMock) Delete(name string, options *metav1.
 
 // DeleteCalls gets all the calls that were made to Delete.
 // Check the length with:
-//
-//	len(mockedProjectAlertGroupInterface.DeleteCalls())
+//     len(mockedProjectAlertGroupInterface.DeleteCalls())
 func (mock *ProjectAlertGroupInterfaceMock) DeleteCalls() []struct {
 	Name    string
 	Options *metav1.DeleteOptions
@@ -1425,8 +1403,7 @@ func (mock *ProjectAlertGroupInterfaceMock) DeleteCollection(deleteOpts *metav1.
 
 // DeleteCollectionCalls gets all the calls that were made to DeleteCollection.
 // Check the length with:
-//
-//	len(mockedProjectAlertGroupInterface.DeleteCollectionCalls())
+//     len(mockedProjectAlertGroupInterface.DeleteCollectionCalls())
 func (mock *ProjectAlertGroupInterfaceMock) DeleteCollectionCalls() []struct {
 	DeleteOpts *metav1.DeleteOptions
 	ListOpts   metav1.ListOptions
@@ -1463,8 +1440,7 @@ func (mock *ProjectAlertGroupInterfaceMock) DeleteNamespaced(namespace string, n
 
 // DeleteNamespacedCalls gets all the calls that were made to DeleteNamespaced.
 // Check the length with:
-//
-//	len(mockedProjectAlertGroupInterface.DeleteNamespacedCalls())
+//     len(mockedProjectAlertGroupInterface.DeleteNamespacedCalls())
 func (mock *ProjectAlertGroupInterfaceMock) DeleteNamespacedCalls() []struct {
 	Namespace string
 	Name      string
@@ -1501,8 +1477,7 @@ func (mock *ProjectAlertGroupInterfaceMock) Get(name string, opts metav1.GetOpti
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//
-//	len(mockedProjectAlertGroupInterface.GetCalls())
+//     len(mockedProjectAlertGroupInterface.GetCalls())
 func (mock *ProjectAlertGroupInterfaceMock) GetCalls() []struct {
 	Name string
 	Opts metav1.GetOptions
@@ -1539,8 +1514,7 @@ func (mock *ProjectAlertGroupInterfaceMock) GetNamespaced(namespace string, name
 
 // GetNamespacedCalls gets all the calls that were made to GetNamespaced.
 // Check the length with:
-//
-//	len(mockedProjectAlertGroupInterface.GetNamespacedCalls())
+//     len(mockedProjectAlertGroupInterface.GetNamespacedCalls())
 func (mock *ProjectAlertGroupInterfaceMock) GetNamespacedCalls() []struct {
 	Namespace string
 	Name      string
@@ -1575,8 +1549,7 @@ func (mock *ProjectAlertGroupInterfaceMock) List(opts metav1.ListOptions) (*v3.P
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//
-//	len(mockedProjectAlertGroupInterface.ListCalls())
+//     len(mockedProjectAlertGroupInterface.ListCalls())
 func (mock *ProjectAlertGroupInterfaceMock) ListCalls() []struct {
 	Opts metav1.ListOptions
 } {
@@ -1609,8 +1582,7 @@ func (mock *ProjectAlertGroupInterfaceMock) ListNamespaced(namespace string, opt
 
 // ListNamespacedCalls gets all the calls that were made to ListNamespaced.
 // Check the length with:
-//
-//	len(mockedProjectAlertGroupInterface.ListNamespacedCalls())
+//     len(mockedProjectAlertGroupInterface.ListNamespacedCalls())
 func (mock *ProjectAlertGroupInterfaceMock) ListNamespacedCalls() []struct {
 	Namespace string
 	Opts      metav1.ListOptions
@@ -1640,8 +1612,7 @@ func (mock *ProjectAlertGroupInterfaceMock) ObjectClient() *objectclient.ObjectC
 
 // ObjectClientCalls gets all the calls that were made to ObjectClient.
 // Check the length with:
-//
-//	len(mockedProjectAlertGroupInterface.ObjectClientCalls())
+//     len(mockedProjectAlertGroupInterface.ObjectClientCalls())
 func (mock *ProjectAlertGroupInterfaceMock) ObjectClientCalls() []struct {
 } {
 	var calls []struct {
@@ -1670,8 +1641,7 @@ func (mock *ProjectAlertGroupInterfaceMock) Update(in1 *v3.ProjectAlertGroup) (*
 
 // UpdateCalls gets all the calls that were made to Update.
 // Check the length with:
-//
-//	len(mockedProjectAlertGroupInterface.UpdateCalls())
+//     len(mockedProjectAlertGroupInterface.UpdateCalls())
 func (mock *ProjectAlertGroupInterfaceMock) UpdateCalls() []struct {
 	In1 *v3.ProjectAlertGroup
 } {
@@ -1702,8 +1672,7 @@ func (mock *ProjectAlertGroupInterfaceMock) Watch(opts metav1.ListOptions) (watc
 
 // WatchCalls gets all the calls that were made to Watch.
 // Check the length with:
-//
-//	len(mockedProjectAlertGroupInterface.WatchCalls())
+//     len(mockedProjectAlertGroupInterface.WatchCalls())
 func (mock *ProjectAlertGroupInterfaceMock) WatchCalls() []struct {
 	Opts metav1.ListOptions
 } {
@@ -1726,19 +1695,19 @@ var _ v31.ProjectAlertGroupsGetter = &ProjectAlertGroupsGetterMock{}
 
 // ProjectAlertGroupsGetterMock is a mock implementation of v31.ProjectAlertGroupsGetter.
 //
-//	    func TestSomethingThatUsesProjectAlertGroupsGetter(t *testing.T) {
+//     func TestSomethingThatUsesProjectAlertGroupsGetter(t *testing.T) {
 //
-//	        // make and configure a mocked v31.ProjectAlertGroupsGetter
-//	        mockedProjectAlertGroupsGetter := &ProjectAlertGroupsGetterMock{
-//	            ProjectAlertGroupsFunc: func(namespace string) v31.ProjectAlertGroupInterface {
-//		               panic("mock out the ProjectAlertGroups method")
-//	            },
-//	        }
+//         // make and configure a mocked v31.ProjectAlertGroupsGetter
+//         mockedProjectAlertGroupsGetter := &ProjectAlertGroupsGetterMock{
+//             ProjectAlertGroupsFunc: func(namespace string) v31.ProjectAlertGroupInterface {
+// 	               panic("mock out the ProjectAlertGroups method")
+//             },
+//         }
 //
-//	        // use mockedProjectAlertGroupsGetter in code that requires v31.ProjectAlertGroupsGetter
-//	        // and then make assertions.
+//         // use mockedProjectAlertGroupsGetter in code that requires v31.ProjectAlertGroupsGetter
+//         // and then make assertions.
 //
-//	    }
+//     }
 type ProjectAlertGroupsGetterMock struct {
 	// ProjectAlertGroupsFunc mocks the ProjectAlertGroups method.
 	ProjectAlertGroupsFunc func(namespace string) v31.ProjectAlertGroupInterface
@@ -1771,8 +1740,7 @@ func (mock *ProjectAlertGroupsGetterMock) ProjectAlertGroups(namespace string) v
 
 // ProjectAlertGroupsCalls gets all the calls that were made to ProjectAlertGroups.
 // Check the length with:
-//
-//	len(mockedProjectAlertGroupsGetter.ProjectAlertGroupsCalls())
+//     len(mockedProjectAlertGroupsGetter.ProjectAlertGroupsCalls())
 func (mock *ProjectAlertGroupsGetterMock) ProjectAlertGroupsCalls() []struct {
 	Namespace string
 } {

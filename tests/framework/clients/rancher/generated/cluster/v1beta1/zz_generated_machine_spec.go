@@ -17,8 +17,8 @@ type MachineSpec struct {
 	ClusterName         string           `json:"clusterName,omitempty" yaml:"clusterName,omitempty"`
 	FailureDomain       string           `json:"failureDomain,omitempty" yaml:"failureDomain,omitempty"`
 	InfrastructureRef   *ObjectReference `json:"infrastructureRef,omitempty" yaml:"infrastructureRef,omitempty"`
-	NodeDeletionTimeout *Duration        `json:"nodeDeletionTimeout,omitempty" yaml:"nodeDeletionTimeout,omitempty"`
-	NodeDrainTimeout    *Duration        `json:"nodeDrainTimeout,omitempty" yaml:"nodeDrainTimeout,omitempty"`
+	NodeDeletionTimeout string           `json:"nodeDeletionTimeout,omitempty" yaml:"nodeDeletionTimeout,omitempty"`
+	NodeDrainTimeout    string           `json:"nodeDrainTimeout,omitempty" yaml:"nodeDrainTimeout,omitempty"`
 	ProviderID          string           `json:"providerID,omitempty" yaml:"providerID,omitempty"`
 	Version             string           `json:"version,omitempty" yaml:"version,omitempty"`
 }

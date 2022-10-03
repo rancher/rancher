@@ -29,22 +29,22 @@ var _ v31.TemplateContentLister = &TemplateContentListerMock{}
 
 // TemplateContentListerMock is a mock implementation of v31.TemplateContentLister.
 //
-//	    func TestSomethingThatUsesTemplateContentLister(t *testing.T) {
+//     func TestSomethingThatUsesTemplateContentLister(t *testing.T) {
 //
-//	        // make and configure a mocked v31.TemplateContentLister
-//	        mockedTemplateContentLister := &TemplateContentListerMock{
-//	            GetFunc: func(namespace string, name string) (*v3.TemplateContent, error) {
-//		               panic("mock out the Get method")
-//	            },
-//	            ListFunc: func(namespace string, selector labels.Selector) ([]*v3.TemplateContent, error) {
-//		               panic("mock out the List method")
-//	            },
-//	        }
+//         // make and configure a mocked v31.TemplateContentLister
+//         mockedTemplateContentLister := &TemplateContentListerMock{
+//             GetFunc: func(namespace string, name string) (*v3.TemplateContent, error) {
+// 	               panic("mock out the Get method")
+//             },
+//             ListFunc: func(namespace string, selector labels.Selector) ([]*v3.TemplateContent, error) {
+// 	               panic("mock out the List method")
+//             },
+//         }
 //
-//	        // use mockedTemplateContentLister in code that requires v31.TemplateContentLister
-//	        // and then make assertions.
+//         // use mockedTemplateContentLister in code that requires v31.TemplateContentLister
+//         // and then make assertions.
 //
-//	    }
+//     }
 type TemplateContentListerMock struct {
 	// GetFunc mocks the Get method.
 	GetFunc func(namespace string, name string) (*v3.TemplateContent, error)
@@ -91,8 +91,7 @@ func (mock *TemplateContentListerMock) Get(namespace string, name string) (*v3.T
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//
-//	len(mockedTemplateContentLister.GetCalls())
+//     len(mockedTemplateContentLister.GetCalls())
 func (mock *TemplateContentListerMock) GetCalls() []struct {
 	Namespace string
 	Name      string
@@ -127,8 +126,7 @@ func (mock *TemplateContentListerMock) List(namespace string, selector labels.Se
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//
-//	len(mockedTemplateContentLister.ListCalls())
+//     len(mockedTemplateContentLister.ListCalls())
 func (mock *TemplateContentListerMock) ListCalls() []struct {
 	Namespace string
 	Selector  labels.Selector
@@ -161,43 +159,43 @@ var _ v31.TemplateContentController = &TemplateContentControllerMock{}
 
 // TemplateContentControllerMock is a mock implementation of v31.TemplateContentController.
 //
-//	    func TestSomethingThatUsesTemplateContentController(t *testing.T) {
+//     func TestSomethingThatUsesTemplateContentController(t *testing.T) {
 //
-//	        // make and configure a mocked v31.TemplateContentController
-//	        mockedTemplateContentController := &TemplateContentControllerMock{
-//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v31.TemplateContentHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedFeatureHandler method")
-//	            },
-//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v31.TemplateContentHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedHandler method")
-//	            },
-//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.TemplateContentHandlerFunc)  {
-//		               panic("mock out the AddFeatureHandler method")
-//	            },
-//	            AddHandlerFunc: func(ctx context.Context, name string, handler v31.TemplateContentHandlerFunc)  {
-//		               panic("mock out the AddHandler method")
-//	            },
-//	            EnqueueFunc: func(namespace string, name string)  {
-//		               panic("mock out the Enqueue method")
-//	            },
-//	            EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
-//		               panic("mock out the EnqueueAfter method")
-//	            },
-//	            GenericFunc: func() controller.GenericController {
-//		               panic("mock out the Generic method")
-//	            },
-//	            InformerFunc: func() cache.SharedIndexInformer {
-//		               panic("mock out the Informer method")
-//	            },
-//	            ListerFunc: func() v31.TemplateContentLister {
-//		               panic("mock out the Lister method")
-//	            },
-//	        }
+//         // make and configure a mocked v31.TemplateContentController
+//         mockedTemplateContentController := &TemplateContentControllerMock{
+//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v31.TemplateContentHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedFeatureHandler method")
+//             },
+//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v31.TemplateContentHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedHandler method")
+//             },
+//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.TemplateContentHandlerFunc)  {
+// 	               panic("mock out the AddFeatureHandler method")
+//             },
+//             AddHandlerFunc: func(ctx context.Context, name string, handler v31.TemplateContentHandlerFunc)  {
+// 	               panic("mock out the AddHandler method")
+//             },
+//             EnqueueFunc: func(namespace string, name string)  {
+// 	               panic("mock out the Enqueue method")
+//             },
+//             EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
+// 	               panic("mock out the EnqueueAfter method")
+//             },
+//             GenericFunc: func() controller.GenericController {
+// 	               panic("mock out the Generic method")
+//             },
+//             InformerFunc: func() cache.SharedIndexInformer {
+// 	               panic("mock out the Informer method")
+//             },
+//             ListerFunc: func() v31.TemplateContentLister {
+// 	               panic("mock out the Lister method")
+//             },
+//         }
 //
-//	        // use mockedTemplateContentController in code that requires v31.TemplateContentController
-//	        // and then make assertions.
+//         // use mockedTemplateContentController in code that requires v31.TemplateContentController
+//         // and then make assertions.
 //
-//	    }
+//     }
 type TemplateContentControllerMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
 	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v31.TemplateContentHandlerFunc)
@@ -326,8 +324,7 @@ func (mock *TemplateContentControllerMock) AddClusterScopedFeatureHandler(ctx co
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//
-//	len(mockedTemplateContentController.AddClusterScopedFeatureHandlerCalls())
+//     len(mockedTemplateContentController.AddClusterScopedFeatureHandlerCalls())
 func (mock *TemplateContentControllerMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -372,8 +369,7 @@ func (mock *TemplateContentControllerMock) AddClusterScopedHandler(ctx context.C
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//
-//	len(mockedTemplateContentController.AddClusterScopedHandlerCalls())
+//     len(mockedTemplateContentController.AddClusterScopedHandlerCalls())
 func (mock *TemplateContentControllerMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -416,8 +412,7 @@ func (mock *TemplateContentControllerMock) AddFeatureHandler(ctx context.Context
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//
-//	len(mockedTemplateContentController.AddFeatureHandlerCalls())
+//     len(mockedTemplateContentController.AddFeatureHandlerCalls())
 func (mock *TemplateContentControllerMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
@@ -458,8 +453,7 @@ func (mock *TemplateContentControllerMock) AddHandler(ctx context.Context, name 
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//
-//	len(mockedTemplateContentController.AddHandlerCalls())
+//     len(mockedTemplateContentController.AddHandlerCalls())
 func (mock *TemplateContentControllerMock) AddHandlerCalls() []struct {
 	Ctx     context.Context
 	Name    string
@@ -496,8 +490,7 @@ func (mock *TemplateContentControllerMock) Enqueue(namespace string, name string
 
 // EnqueueCalls gets all the calls that were made to Enqueue.
 // Check the length with:
-//
-//	len(mockedTemplateContentController.EnqueueCalls())
+//     len(mockedTemplateContentController.EnqueueCalls())
 func (mock *TemplateContentControllerMock) EnqueueCalls() []struct {
 	Namespace string
 	Name      string
@@ -534,8 +527,7 @@ func (mock *TemplateContentControllerMock) EnqueueAfter(namespace string, name s
 
 // EnqueueAfterCalls gets all the calls that were made to EnqueueAfter.
 // Check the length with:
-//
-//	len(mockedTemplateContentController.EnqueueAfterCalls())
+//     len(mockedTemplateContentController.EnqueueAfterCalls())
 func (mock *TemplateContentControllerMock) EnqueueAfterCalls() []struct {
 	Namespace string
 	Name      string
@@ -567,8 +559,7 @@ func (mock *TemplateContentControllerMock) Generic() controller.GenericControlle
 
 // GenericCalls gets all the calls that were made to Generic.
 // Check the length with:
-//
-//	len(mockedTemplateContentController.GenericCalls())
+//     len(mockedTemplateContentController.GenericCalls())
 func (mock *TemplateContentControllerMock) GenericCalls() []struct {
 } {
 	var calls []struct {
@@ -594,8 +585,7 @@ func (mock *TemplateContentControllerMock) Informer() cache.SharedIndexInformer 
 
 // InformerCalls gets all the calls that were made to Informer.
 // Check the length with:
-//
-//	len(mockedTemplateContentController.InformerCalls())
+//     len(mockedTemplateContentController.InformerCalls())
 func (mock *TemplateContentControllerMock) InformerCalls() []struct {
 } {
 	var calls []struct {
@@ -621,8 +611,7 @@ func (mock *TemplateContentControllerMock) Lister() v31.TemplateContentLister {
 
 // ListerCalls gets all the calls that were made to Lister.
 // Check the length with:
-//
-//	len(mockedTemplateContentController.ListerCalls())
+//     len(mockedTemplateContentController.ListerCalls())
 func (mock *TemplateContentControllerMock) ListerCalls() []struct {
 } {
 	var calls []struct {
@@ -662,76 +651,76 @@ var _ v31.TemplateContentInterface = &TemplateContentInterfaceMock{}
 
 // TemplateContentInterfaceMock is a mock implementation of v31.TemplateContentInterface.
 //
-//	    func TestSomethingThatUsesTemplateContentInterface(t *testing.T) {
+//     func TestSomethingThatUsesTemplateContentInterface(t *testing.T) {
 //
-//	        // make and configure a mocked v31.TemplateContentInterface
-//	        mockedTemplateContentInterface := &TemplateContentInterfaceMock{
-//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v31.TemplateContentHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedFeatureHandler method")
-//	            },
-//	            AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v31.TemplateContentLifecycle)  {
-//		               panic("mock out the AddClusterScopedFeatureLifecycle method")
-//	            },
-//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v31.TemplateContentHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedHandler method")
-//	            },
-//	            AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v31.TemplateContentLifecycle)  {
-//		               panic("mock out the AddClusterScopedLifecycle method")
-//	            },
-//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.TemplateContentHandlerFunc)  {
-//		               panic("mock out the AddFeatureHandler method")
-//	            },
-//	            AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v31.TemplateContentLifecycle)  {
-//		               panic("mock out the AddFeatureLifecycle method")
-//	            },
-//	            AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v31.TemplateContentHandlerFunc)  {
-//		               panic("mock out the AddHandler method")
-//	            },
-//	            AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v31.TemplateContentLifecycle)  {
-//		               panic("mock out the AddLifecycle method")
-//	            },
-//	            ControllerFunc: func() v31.TemplateContentController {
-//		               panic("mock out the Controller method")
-//	            },
-//	            CreateFunc: func(in1 *v3.TemplateContent) (*v3.TemplateContent, error) {
-//		               panic("mock out the Create method")
-//	            },
-//	            DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
-//		               panic("mock out the Delete method")
-//	            },
-//	            DeleteCollectionFunc: func(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
-//		               panic("mock out the DeleteCollection method")
-//	            },
-//	            DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
-//		               panic("mock out the DeleteNamespaced method")
-//	            },
-//	            GetFunc: func(name string, opts metav1.GetOptions) (*v3.TemplateContent, error) {
-//		               panic("mock out the Get method")
-//	            },
-//	            GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v3.TemplateContent, error) {
-//		               panic("mock out the GetNamespaced method")
-//	            },
-//	            ListFunc: func(opts metav1.ListOptions) (*v3.TemplateContentList, error) {
-//		               panic("mock out the List method")
-//	            },
-//	            ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v3.TemplateContentList, error) {
-//		               panic("mock out the ListNamespaced method")
-//	            },
-//	            ObjectClientFunc: func() *objectclient.ObjectClient {
-//		               panic("mock out the ObjectClient method")
-//	            },
-//	            UpdateFunc: func(in1 *v3.TemplateContent) (*v3.TemplateContent, error) {
-//		               panic("mock out the Update method")
-//	            },
-//	            WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
-//		               panic("mock out the Watch method")
-//	            },
-//	        }
+//         // make and configure a mocked v31.TemplateContentInterface
+//         mockedTemplateContentInterface := &TemplateContentInterfaceMock{
+//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v31.TemplateContentHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedFeatureHandler method")
+//             },
+//             AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v31.TemplateContentLifecycle)  {
+// 	               panic("mock out the AddClusterScopedFeatureLifecycle method")
+//             },
+//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v31.TemplateContentHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedHandler method")
+//             },
+//             AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v31.TemplateContentLifecycle)  {
+// 	               panic("mock out the AddClusterScopedLifecycle method")
+//             },
+//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.TemplateContentHandlerFunc)  {
+// 	               panic("mock out the AddFeatureHandler method")
+//             },
+//             AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v31.TemplateContentLifecycle)  {
+// 	               panic("mock out the AddFeatureLifecycle method")
+//             },
+//             AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v31.TemplateContentHandlerFunc)  {
+// 	               panic("mock out the AddHandler method")
+//             },
+//             AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v31.TemplateContentLifecycle)  {
+// 	               panic("mock out the AddLifecycle method")
+//             },
+//             ControllerFunc: func() v31.TemplateContentController {
+// 	               panic("mock out the Controller method")
+//             },
+//             CreateFunc: func(in1 *v3.TemplateContent) (*v3.TemplateContent, error) {
+// 	               panic("mock out the Create method")
+//             },
+//             DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
+// 	               panic("mock out the Delete method")
+//             },
+//             DeleteCollectionFunc: func(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
+// 	               panic("mock out the DeleteCollection method")
+//             },
+//             DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
+// 	               panic("mock out the DeleteNamespaced method")
+//             },
+//             GetFunc: func(name string, opts metav1.GetOptions) (*v3.TemplateContent, error) {
+// 	               panic("mock out the Get method")
+//             },
+//             GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v3.TemplateContent, error) {
+// 	               panic("mock out the GetNamespaced method")
+//             },
+//             ListFunc: func(opts metav1.ListOptions) (*v3.TemplateContentList, error) {
+// 	               panic("mock out the List method")
+//             },
+//             ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v3.TemplateContentList, error) {
+// 	               panic("mock out the ListNamespaced method")
+//             },
+//             ObjectClientFunc: func() *objectclient.ObjectClient {
+// 	               panic("mock out the ObjectClient method")
+//             },
+//             UpdateFunc: func(in1 *v3.TemplateContent) (*v3.TemplateContent, error) {
+// 	               panic("mock out the Update method")
+//             },
+//             WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
+// 	               panic("mock out the Watch method")
+//             },
+//         }
 //
-//	        // use mockedTemplateContentInterface in code that requires v31.TemplateContentInterface
-//	        // and then make assertions.
+//         // use mockedTemplateContentInterface in code that requires v31.TemplateContentInterface
+//         // and then make assertions.
 //
-//	    }
+//     }
 type TemplateContentInterfaceMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
 	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v31.TemplateContentHandlerFunc)
@@ -984,8 +973,7 @@ func (mock *TemplateContentInterfaceMock) AddClusterScopedFeatureHandler(ctx con
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//
-//	len(mockedTemplateContentInterface.AddClusterScopedFeatureHandlerCalls())
+//     len(mockedTemplateContentInterface.AddClusterScopedFeatureHandlerCalls())
 func (mock *TemplateContentInterfaceMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -1032,8 +1020,7 @@ func (mock *TemplateContentInterfaceMock) AddClusterScopedFeatureLifecycle(ctx c
 
 // AddClusterScopedFeatureLifecycleCalls gets all the calls that were made to AddClusterScopedFeatureLifecycle.
 // Check the length with:
-//
-//	len(mockedTemplateContentInterface.AddClusterScopedFeatureLifecycleCalls())
+//     len(mockedTemplateContentInterface.AddClusterScopedFeatureLifecycleCalls())
 func (mock *TemplateContentInterfaceMock) AddClusterScopedFeatureLifecycleCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -1078,8 +1065,7 @@ func (mock *TemplateContentInterfaceMock) AddClusterScopedHandler(ctx context.Co
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//
-//	len(mockedTemplateContentInterface.AddClusterScopedHandlerCalls())
+//     len(mockedTemplateContentInterface.AddClusterScopedHandlerCalls())
 func (mock *TemplateContentInterfaceMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -1122,8 +1108,7 @@ func (mock *TemplateContentInterfaceMock) AddClusterScopedLifecycle(ctx context.
 
 // AddClusterScopedLifecycleCalls gets all the calls that were made to AddClusterScopedLifecycle.
 // Check the length with:
-//
-//	len(mockedTemplateContentInterface.AddClusterScopedLifecycleCalls())
+//     len(mockedTemplateContentInterface.AddClusterScopedLifecycleCalls())
 func (mock *TemplateContentInterfaceMock) AddClusterScopedLifecycleCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -1166,8 +1151,7 @@ func (mock *TemplateContentInterfaceMock) AddFeatureHandler(ctx context.Context,
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//
-//	len(mockedTemplateContentInterface.AddFeatureHandlerCalls())
+//     len(mockedTemplateContentInterface.AddFeatureHandlerCalls())
 func (mock *TemplateContentInterfaceMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
@@ -1210,8 +1194,7 @@ func (mock *TemplateContentInterfaceMock) AddFeatureLifecycle(ctx context.Contex
 
 // AddFeatureLifecycleCalls gets all the calls that were made to AddFeatureLifecycle.
 // Check the length with:
-//
-//	len(mockedTemplateContentInterface.AddFeatureLifecycleCalls())
+//     len(mockedTemplateContentInterface.AddFeatureLifecycleCalls())
 func (mock *TemplateContentInterfaceMock) AddFeatureLifecycleCalls() []struct {
 	Ctx       context.Context
 	Enabled   func() bool
@@ -1252,8 +1235,7 @@ func (mock *TemplateContentInterfaceMock) AddHandler(ctx context.Context, name s
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//
-//	len(mockedTemplateContentInterface.AddHandlerCalls())
+//     len(mockedTemplateContentInterface.AddHandlerCalls())
 func (mock *TemplateContentInterfaceMock) AddHandlerCalls() []struct {
 	Ctx  context.Context
 	Name string
@@ -1292,8 +1274,7 @@ func (mock *TemplateContentInterfaceMock) AddLifecycle(ctx context.Context, name
 
 // AddLifecycleCalls gets all the calls that were made to AddLifecycle.
 // Check the length with:
-//
-//	len(mockedTemplateContentInterface.AddLifecycleCalls())
+//     len(mockedTemplateContentInterface.AddLifecycleCalls())
 func (mock *TemplateContentInterfaceMock) AddLifecycleCalls() []struct {
 	Ctx       context.Context
 	Name      string
@@ -1325,8 +1306,7 @@ func (mock *TemplateContentInterfaceMock) Controller() v31.TemplateContentContro
 
 // ControllerCalls gets all the calls that were made to Controller.
 // Check the length with:
-//
-//	len(mockedTemplateContentInterface.ControllerCalls())
+//     len(mockedTemplateContentInterface.ControllerCalls())
 func (mock *TemplateContentInterfaceMock) ControllerCalls() []struct {
 } {
 	var calls []struct {
@@ -1355,8 +1335,7 @@ func (mock *TemplateContentInterfaceMock) Create(in1 *v3.TemplateContent) (*v3.T
 
 // CreateCalls gets all the calls that were made to Create.
 // Check the length with:
-//
-//	len(mockedTemplateContentInterface.CreateCalls())
+//     len(mockedTemplateContentInterface.CreateCalls())
 func (mock *TemplateContentInterfaceMock) CreateCalls() []struct {
 	In1 *v3.TemplateContent
 } {
@@ -1389,8 +1368,7 @@ func (mock *TemplateContentInterfaceMock) Delete(name string, options *metav1.De
 
 // DeleteCalls gets all the calls that were made to Delete.
 // Check the length with:
-//
-//	len(mockedTemplateContentInterface.DeleteCalls())
+//     len(mockedTemplateContentInterface.DeleteCalls())
 func (mock *TemplateContentInterfaceMock) DeleteCalls() []struct {
 	Name    string
 	Options *metav1.DeleteOptions
@@ -1425,8 +1403,7 @@ func (mock *TemplateContentInterfaceMock) DeleteCollection(deleteOpts *metav1.De
 
 // DeleteCollectionCalls gets all the calls that were made to DeleteCollection.
 // Check the length with:
-//
-//	len(mockedTemplateContentInterface.DeleteCollectionCalls())
+//     len(mockedTemplateContentInterface.DeleteCollectionCalls())
 func (mock *TemplateContentInterfaceMock) DeleteCollectionCalls() []struct {
 	DeleteOpts *metav1.DeleteOptions
 	ListOpts   metav1.ListOptions
@@ -1463,8 +1440,7 @@ func (mock *TemplateContentInterfaceMock) DeleteNamespaced(namespace string, nam
 
 // DeleteNamespacedCalls gets all the calls that were made to DeleteNamespaced.
 // Check the length with:
-//
-//	len(mockedTemplateContentInterface.DeleteNamespacedCalls())
+//     len(mockedTemplateContentInterface.DeleteNamespacedCalls())
 func (mock *TemplateContentInterfaceMock) DeleteNamespacedCalls() []struct {
 	Namespace string
 	Name      string
@@ -1501,8 +1477,7 @@ func (mock *TemplateContentInterfaceMock) Get(name string, opts metav1.GetOption
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//
-//	len(mockedTemplateContentInterface.GetCalls())
+//     len(mockedTemplateContentInterface.GetCalls())
 func (mock *TemplateContentInterfaceMock) GetCalls() []struct {
 	Name string
 	Opts metav1.GetOptions
@@ -1539,8 +1514,7 @@ func (mock *TemplateContentInterfaceMock) GetNamespaced(namespace string, name s
 
 // GetNamespacedCalls gets all the calls that were made to GetNamespaced.
 // Check the length with:
-//
-//	len(mockedTemplateContentInterface.GetNamespacedCalls())
+//     len(mockedTemplateContentInterface.GetNamespacedCalls())
 func (mock *TemplateContentInterfaceMock) GetNamespacedCalls() []struct {
 	Namespace string
 	Name      string
@@ -1575,8 +1549,7 @@ func (mock *TemplateContentInterfaceMock) List(opts metav1.ListOptions) (*v3.Tem
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//
-//	len(mockedTemplateContentInterface.ListCalls())
+//     len(mockedTemplateContentInterface.ListCalls())
 func (mock *TemplateContentInterfaceMock) ListCalls() []struct {
 	Opts metav1.ListOptions
 } {
@@ -1609,8 +1582,7 @@ func (mock *TemplateContentInterfaceMock) ListNamespaced(namespace string, opts 
 
 // ListNamespacedCalls gets all the calls that were made to ListNamespaced.
 // Check the length with:
-//
-//	len(mockedTemplateContentInterface.ListNamespacedCalls())
+//     len(mockedTemplateContentInterface.ListNamespacedCalls())
 func (mock *TemplateContentInterfaceMock) ListNamespacedCalls() []struct {
 	Namespace string
 	Opts      metav1.ListOptions
@@ -1640,8 +1612,7 @@ func (mock *TemplateContentInterfaceMock) ObjectClient() *objectclient.ObjectCli
 
 // ObjectClientCalls gets all the calls that were made to ObjectClient.
 // Check the length with:
-//
-//	len(mockedTemplateContentInterface.ObjectClientCalls())
+//     len(mockedTemplateContentInterface.ObjectClientCalls())
 func (mock *TemplateContentInterfaceMock) ObjectClientCalls() []struct {
 } {
 	var calls []struct {
@@ -1670,8 +1641,7 @@ func (mock *TemplateContentInterfaceMock) Update(in1 *v3.TemplateContent) (*v3.T
 
 // UpdateCalls gets all the calls that were made to Update.
 // Check the length with:
-//
-//	len(mockedTemplateContentInterface.UpdateCalls())
+//     len(mockedTemplateContentInterface.UpdateCalls())
 func (mock *TemplateContentInterfaceMock) UpdateCalls() []struct {
 	In1 *v3.TemplateContent
 } {
@@ -1702,8 +1672,7 @@ func (mock *TemplateContentInterfaceMock) Watch(opts metav1.ListOptions) (watch.
 
 // WatchCalls gets all the calls that were made to Watch.
 // Check the length with:
-//
-//	len(mockedTemplateContentInterface.WatchCalls())
+//     len(mockedTemplateContentInterface.WatchCalls())
 func (mock *TemplateContentInterfaceMock) WatchCalls() []struct {
 	Opts metav1.ListOptions
 } {
@@ -1726,19 +1695,19 @@ var _ v31.TemplateContentsGetter = &TemplateContentsGetterMock{}
 
 // TemplateContentsGetterMock is a mock implementation of v31.TemplateContentsGetter.
 //
-//	    func TestSomethingThatUsesTemplateContentsGetter(t *testing.T) {
+//     func TestSomethingThatUsesTemplateContentsGetter(t *testing.T) {
 //
-//	        // make and configure a mocked v31.TemplateContentsGetter
-//	        mockedTemplateContentsGetter := &TemplateContentsGetterMock{
-//	            TemplateContentsFunc: func(namespace string) v31.TemplateContentInterface {
-//		               panic("mock out the TemplateContents method")
-//	            },
-//	        }
+//         // make and configure a mocked v31.TemplateContentsGetter
+//         mockedTemplateContentsGetter := &TemplateContentsGetterMock{
+//             TemplateContentsFunc: func(namespace string) v31.TemplateContentInterface {
+// 	               panic("mock out the TemplateContents method")
+//             },
+//         }
 //
-//	        // use mockedTemplateContentsGetter in code that requires v31.TemplateContentsGetter
-//	        // and then make assertions.
+//         // use mockedTemplateContentsGetter in code that requires v31.TemplateContentsGetter
+//         // and then make assertions.
 //
-//	    }
+//     }
 type TemplateContentsGetterMock struct {
 	// TemplateContentsFunc mocks the TemplateContents method.
 	TemplateContentsFunc func(namespace string) v31.TemplateContentInterface
@@ -1771,8 +1740,7 @@ func (mock *TemplateContentsGetterMock) TemplateContents(namespace string) v31.T
 
 // TemplateContentsCalls gets all the calls that were made to TemplateContents.
 // Check the length with:
-//
-//	len(mockedTemplateContentsGetter.TemplateContentsCalls())
+//     len(mockedTemplateContentsGetter.TemplateContentsCalls())
 func (mock *TemplateContentsGetterMock) TemplateContentsCalls() []struct {
 	Namespace string
 } {

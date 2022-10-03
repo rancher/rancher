@@ -29,22 +29,22 @@ var _ v11.LimitRangeLister = &LimitRangeListerMock{}
 
 // LimitRangeListerMock is a mock implementation of v11.LimitRangeLister.
 //
-//	    func TestSomethingThatUsesLimitRangeLister(t *testing.T) {
+//     func TestSomethingThatUsesLimitRangeLister(t *testing.T) {
 //
-//	        // make and configure a mocked v11.LimitRangeLister
-//	        mockedLimitRangeLister := &LimitRangeListerMock{
-//	            GetFunc: func(namespace string, name string) (*v1.LimitRange, error) {
-//		               panic("mock out the Get method")
-//	            },
-//	            ListFunc: func(namespace string, selector labels.Selector) ([]*v1.LimitRange, error) {
-//		               panic("mock out the List method")
-//	            },
-//	        }
+//         // make and configure a mocked v11.LimitRangeLister
+//         mockedLimitRangeLister := &LimitRangeListerMock{
+//             GetFunc: func(namespace string, name string) (*v1.LimitRange, error) {
+// 	               panic("mock out the Get method")
+//             },
+//             ListFunc: func(namespace string, selector labels.Selector) ([]*v1.LimitRange, error) {
+// 	               panic("mock out the List method")
+//             },
+//         }
 //
-//	        // use mockedLimitRangeLister in code that requires v11.LimitRangeLister
-//	        // and then make assertions.
+//         // use mockedLimitRangeLister in code that requires v11.LimitRangeLister
+//         // and then make assertions.
 //
-//	    }
+//     }
 type LimitRangeListerMock struct {
 	// GetFunc mocks the Get method.
 	GetFunc func(namespace string, name string) (*v1.LimitRange, error)
@@ -91,8 +91,7 @@ func (mock *LimitRangeListerMock) Get(namespace string, name string) (*v1.LimitR
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//
-//	len(mockedLimitRangeLister.GetCalls())
+//     len(mockedLimitRangeLister.GetCalls())
 func (mock *LimitRangeListerMock) GetCalls() []struct {
 	Namespace string
 	Name      string
@@ -127,8 +126,7 @@ func (mock *LimitRangeListerMock) List(namespace string, selector labels.Selecto
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//
-//	len(mockedLimitRangeLister.ListCalls())
+//     len(mockedLimitRangeLister.ListCalls())
 func (mock *LimitRangeListerMock) ListCalls() []struct {
 	Namespace string
 	Selector  labels.Selector
@@ -161,43 +159,43 @@ var _ v11.LimitRangeController = &LimitRangeControllerMock{}
 
 // LimitRangeControllerMock is a mock implementation of v11.LimitRangeController.
 //
-//	    func TestSomethingThatUsesLimitRangeController(t *testing.T) {
+//     func TestSomethingThatUsesLimitRangeController(t *testing.T) {
 //
-//	        // make and configure a mocked v11.LimitRangeController
-//	        mockedLimitRangeController := &LimitRangeControllerMock{
-//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v11.LimitRangeHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedFeatureHandler method")
-//	            },
-//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v11.LimitRangeHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedHandler method")
-//	            },
-//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v11.LimitRangeHandlerFunc)  {
-//		               panic("mock out the AddFeatureHandler method")
-//	            },
-//	            AddHandlerFunc: func(ctx context.Context, name string, handler v11.LimitRangeHandlerFunc)  {
-//		               panic("mock out the AddHandler method")
-//	            },
-//	            EnqueueFunc: func(namespace string, name string)  {
-//		               panic("mock out the Enqueue method")
-//	            },
-//	            EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
-//		               panic("mock out the EnqueueAfter method")
-//	            },
-//	            GenericFunc: func() controller.GenericController {
-//		               panic("mock out the Generic method")
-//	            },
-//	            InformerFunc: func() cache.SharedIndexInformer {
-//		               panic("mock out the Informer method")
-//	            },
-//	            ListerFunc: func() v11.LimitRangeLister {
-//		               panic("mock out the Lister method")
-//	            },
-//	        }
+//         // make and configure a mocked v11.LimitRangeController
+//         mockedLimitRangeController := &LimitRangeControllerMock{
+//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v11.LimitRangeHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedFeatureHandler method")
+//             },
+//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v11.LimitRangeHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedHandler method")
+//             },
+//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v11.LimitRangeHandlerFunc)  {
+// 	               panic("mock out the AddFeatureHandler method")
+//             },
+//             AddHandlerFunc: func(ctx context.Context, name string, handler v11.LimitRangeHandlerFunc)  {
+// 	               panic("mock out the AddHandler method")
+//             },
+//             EnqueueFunc: func(namespace string, name string)  {
+// 	               panic("mock out the Enqueue method")
+//             },
+//             EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
+// 	               panic("mock out the EnqueueAfter method")
+//             },
+//             GenericFunc: func() controller.GenericController {
+// 	               panic("mock out the Generic method")
+//             },
+//             InformerFunc: func() cache.SharedIndexInformer {
+// 	               panic("mock out the Informer method")
+//             },
+//             ListerFunc: func() v11.LimitRangeLister {
+// 	               panic("mock out the Lister method")
+//             },
+//         }
 //
-//	        // use mockedLimitRangeController in code that requires v11.LimitRangeController
-//	        // and then make assertions.
+//         // use mockedLimitRangeController in code that requires v11.LimitRangeController
+//         // and then make assertions.
 //
-//	    }
+//     }
 type LimitRangeControllerMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
 	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v11.LimitRangeHandlerFunc)
@@ -326,8 +324,7 @@ func (mock *LimitRangeControllerMock) AddClusterScopedFeatureHandler(ctx context
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//
-//	len(mockedLimitRangeController.AddClusterScopedFeatureHandlerCalls())
+//     len(mockedLimitRangeController.AddClusterScopedFeatureHandlerCalls())
 func (mock *LimitRangeControllerMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -372,8 +369,7 @@ func (mock *LimitRangeControllerMock) AddClusterScopedHandler(ctx context.Contex
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//
-//	len(mockedLimitRangeController.AddClusterScopedHandlerCalls())
+//     len(mockedLimitRangeController.AddClusterScopedHandlerCalls())
 func (mock *LimitRangeControllerMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -416,8 +412,7 @@ func (mock *LimitRangeControllerMock) AddFeatureHandler(ctx context.Context, ena
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//
-//	len(mockedLimitRangeController.AddFeatureHandlerCalls())
+//     len(mockedLimitRangeController.AddFeatureHandlerCalls())
 func (mock *LimitRangeControllerMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
@@ -458,8 +453,7 @@ func (mock *LimitRangeControllerMock) AddHandler(ctx context.Context, name strin
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//
-//	len(mockedLimitRangeController.AddHandlerCalls())
+//     len(mockedLimitRangeController.AddHandlerCalls())
 func (mock *LimitRangeControllerMock) AddHandlerCalls() []struct {
 	Ctx     context.Context
 	Name    string
@@ -496,8 +490,7 @@ func (mock *LimitRangeControllerMock) Enqueue(namespace string, name string) {
 
 // EnqueueCalls gets all the calls that were made to Enqueue.
 // Check the length with:
-//
-//	len(mockedLimitRangeController.EnqueueCalls())
+//     len(mockedLimitRangeController.EnqueueCalls())
 func (mock *LimitRangeControllerMock) EnqueueCalls() []struct {
 	Namespace string
 	Name      string
@@ -534,8 +527,7 @@ func (mock *LimitRangeControllerMock) EnqueueAfter(namespace string, name string
 
 // EnqueueAfterCalls gets all the calls that were made to EnqueueAfter.
 // Check the length with:
-//
-//	len(mockedLimitRangeController.EnqueueAfterCalls())
+//     len(mockedLimitRangeController.EnqueueAfterCalls())
 func (mock *LimitRangeControllerMock) EnqueueAfterCalls() []struct {
 	Namespace string
 	Name      string
@@ -567,8 +559,7 @@ func (mock *LimitRangeControllerMock) Generic() controller.GenericController {
 
 // GenericCalls gets all the calls that were made to Generic.
 // Check the length with:
-//
-//	len(mockedLimitRangeController.GenericCalls())
+//     len(mockedLimitRangeController.GenericCalls())
 func (mock *LimitRangeControllerMock) GenericCalls() []struct {
 } {
 	var calls []struct {
@@ -594,8 +585,7 @@ func (mock *LimitRangeControllerMock) Informer() cache.SharedIndexInformer {
 
 // InformerCalls gets all the calls that were made to Informer.
 // Check the length with:
-//
-//	len(mockedLimitRangeController.InformerCalls())
+//     len(mockedLimitRangeController.InformerCalls())
 func (mock *LimitRangeControllerMock) InformerCalls() []struct {
 } {
 	var calls []struct {
@@ -621,8 +611,7 @@ func (mock *LimitRangeControllerMock) Lister() v11.LimitRangeLister {
 
 // ListerCalls gets all the calls that were made to Lister.
 // Check the length with:
-//
-//	len(mockedLimitRangeController.ListerCalls())
+//     len(mockedLimitRangeController.ListerCalls())
 func (mock *LimitRangeControllerMock) ListerCalls() []struct {
 } {
 	var calls []struct {
@@ -662,76 +651,76 @@ var _ v11.LimitRangeInterface = &LimitRangeInterfaceMock{}
 
 // LimitRangeInterfaceMock is a mock implementation of v11.LimitRangeInterface.
 //
-//	    func TestSomethingThatUsesLimitRangeInterface(t *testing.T) {
+//     func TestSomethingThatUsesLimitRangeInterface(t *testing.T) {
 //
-//	        // make and configure a mocked v11.LimitRangeInterface
-//	        mockedLimitRangeInterface := &LimitRangeInterfaceMock{
-//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v11.LimitRangeHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedFeatureHandler method")
-//	            },
-//	            AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v11.LimitRangeLifecycle)  {
-//		               panic("mock out the AddClusterScopedFeatureLifecycle method")
-//	            },
-//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v11.LimitRangeHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedHandler method")
-//	            },
-//	            AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v11.LimitRangeLifecycle)  {
-//		               panic("mock out the AddClusterScopedLifecycle method")
-//	            },
-//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v11.LimitRangeHandlerFunc)  {
-//		               panic("mock out the AddFeatureHandler method")
-//	            },
-//	            AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v11.LimitRangeLifecycle)  {
-//		               panic("mock out the AddFeatureLifecycle method")
-//	            },
-//	            AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v11.LimitRangeHandlerFunc)  {
-//		               panic("mock out the AddHandler method")
-//	            },
-//	            AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v11.LimitRangeLifecycle)  {
-//		               panic("mock out the AddLifecycle method")
-//	            },
-//	            ControllerFunc: func() v11.LimitRangeController {
-//		               panic("mock out the Controller method")
-//	            },
-//	            CreateFunc: func(in1 *v1.LimitRange) (*v1.LimitRange, error) {
-//		               panic("mock out the Create method")
-//	            },
-//	            DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
-//		               panic("mock out the Delete method")
-//	            },
-//	            DeleteCollectionFunc: func(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
-//		               panic("mock out the DeleteCollection method")
-//	            },
-//	            DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
-//		               panic("mock out the DeleteNamespaced method")
-//	            },
-//	            GetFunc: func(name string, opts metav1.GetOptions) (*v1.LimitRange, error) {
-//		               panic("mock out the Get method")
-//	            },
-//	            GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v1.LimitRange, error) {
-//		               panic("mock out the GetNamespaced method")
-//	            },
-//	            ListFunc: func(opts metav1.ListOptions) (*v1.LimitRangeList, error) {
-//		               panic("mock out the List method")
-//	            },
-//	            ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v1.LimitRangeList, error) {
-//		               panic("mock out the ListNamespaced method")
-//	            },
-//	            ObjectClientFunc: func() *objectclient.ObjectClient {
-//		               panic("mock out the ObjectClient method")
-//	            },
-//	            UpdateFunc: func(in1 *v1.LimitRange) (*v1.LimitRange, error) {
-//		               panic("mock out the Update method")
-//	            },
-//	            WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
-//		               panic("mock out the Watch method")
-//	            },
-//	        }
+//         // make and configure a mocked v11.LimitRangeInterface
+//         mockedLimitRangeInterface := &LimitRangeInterfaceMock{
+//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v11.LimitRangeHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedFeatureHandler method")
+//             },
+//             AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v11.LimitRangeLifecycle)  {
+// 	               panic("mock out the AddClusterScopedFeatureLifecycle method")
+//             },
+//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v11.LimitRangeHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedHandler method")
+//             },
+//             AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v11.LimitRangeLifecycle)  {
+// 	               panic("mock out the AddClusterScopedLifecycle method")
+//             },
+//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v11.LimitRangeHandlerFunc)  {
+// 	               panic("mock out the AddFeatureHandler method")
+//             },
+//             AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v11.LimitRangeLifecycle)  {
+// 	               panic("mock out the AddFeatureLifecycle method")
+//             },
+//             AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v11.LimitRangeHandlerFunc)  {
+// 	               panic("mock out the AddHandler method")
+//             },
+//             AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v11.LimitRangeLifecycle)  {
+// 	               panic("mock out the AddLifecycle method")
+//             },
+//             ControllerFunc: func() v11.LimitRangeController {
+// 	               panic("mock out the Controller method")
+//             },
+//             CreateFunc: func(in1 *v1.LimitRange) (*v1.LimitRange, error) {
+// 	               panic("mock out the Create method")
+//             },
+//             DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
+// 	               panic("mock out the Delete method")
+//             },
+//             DeleteCollectionFunc: func(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
+// 	               panic("mock out the DeleteCollection method")
+//             },
+//             DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
+// 	               panic("mock out the DeleteNamespaced method")
+//             },
+//             GetFunc: func(name string, opts metav1.GetOptions) (*v1.LimitRange, error) {
+// 	               panic("mock out the Get method")
+//             },
+//             GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v1.LimitRange, error) {
+// 	               panic("mock out the GetNamespaced method")
+//             },
+//             ListFunc: func(opts metav1.ListOptions) (*v1.LimitRangeList, error) {
+// 	               panic("mock out the List method")
+//             },
+//             ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v1.LimitRangeList, error) {
+// 	               panic("mock out the ListNamespaced method")
+//             },
+//             ObjectClientFunc: func() *objectclient.ObjectClient {
+// 	               panic("mock out the ObjectClient method")
+//             },
+//             UpdateFunc: func(in1 *v1.LimitRange) (*v1.LimitRange, error) {
+// 	               panic("mock out the Update method")
+//             },
+//             WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
+// 	               panic("mock out the Watch method")
+//             },
+//         }
 //
-//	        // use mockedLimitRangeInterface in code that requires v11.LimitRangeInterface
-//	        // and then make assertions.
+//         // use mockedLimitRangeInterface in code that requires v11.LimitRangeInterface
+//         // and then make assertions.
 //
-//	    }
+//     }
 type LimitRangeInterfaceMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
 	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v11.LimitRangeHandlerFunc)
@@ -984,8 +973,7 @@ func (mock *LimitRangeInterfaceMock) AddClusterScopedFeatureHandler(ctx context.
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//
-//	len(mockedLimitRangeInterface.AddClusterScopedFeatureHandlerCalls())
+//     len(mockedLimitRangeInterface.AddClusterScopedFeatureHandlerCalls())
 func (mock *LimitRangeInterfaceMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -1032,8 +1020,7 @@ func (mock *LimitRangeInterfaceMock) AddClusterScopedFeatureLifecycle(ctx contex
 
 // AddClusterScopedFeatureLifecycleCalls gets all the calls that were made to AddClusterScopedFeatureLifecycle.
 // Check the length with:
-//
-//	len(mockedLimitRangeInterface.AddClusterScopedFeatureLifecycleCalls())
+//     len(mockedLimitRangeInterface.AddClusterScopedFeatureLifecycleCalls())
 func (mock *LimitRangeInterfaceMock) AddClusterScopedFeatureLifecycleCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -1078,8 +1065,7 @@ func (mock *LimitRangeInterfaceMock) AddClusterScopedHandler(ctx context.Context
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//
-//	len(mockedLimitRangeInterface.AddClusterScopedHandlerCalls())
+//     len(mockedLimitRangeInterface.AddClusterScopedHandlerCalls())
 func (mock *LimitRangeInterfaceMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -1122,8 +1108,7 @@ func (mock *LimitRangeInterfaceMock) AddClusterScopedLifecycle(ctx context.Conte
 
 // AddClusterScopedLifecycleCalls gets all the calls that were made to AddClusterScopedLifecycle.
 // Check the length with:
-//
-//	len(mockedLimitRangeInterface.AddClusterScopedLifecycleCalls())
+//     len(mockedLimitRangeInterface.AddClusterScopedLifecycleCalls())
 func (mock *LimitRangeInterfaceMock) AddClusterScopedLifecycleCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -1166,8 +1151,7 @@ func (mock *LimitRangeInterfaceMock) AddFeatureHandler(ctx context.Context, enab
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//
-//	len(mockedLimitRangeInterface.AddFeatureHandlerCalls())
+//     len(mockedLimitRangeInterface.AddFeatureHandlerCalls())
 func (mock *LimitRangeInterfaceMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
@@ -1210,8 +1194,7 @@ func (mock *LimitRangeInterfaceMock) AddFeatureLifecycle(ctx context.Context, en
 
 // AddFeatureLifecycleCalls gets all the calls that were made to AddFeatureLifecycle.
 // Check the length with:
-//
-//	len(mockedLimitRangeInterface.AddFeatureLifecycleCalls())
+//     len(mockedLimitRangeInterface.AddFeatureLifecycleCalls())
 func (mock *LimitRangeInterfaceMock) AddFeatureLifecycleCalls() []struct {
 	Ctx       context.Context
 	Enabled   func() bool
@@ -1252,8 +1235,7 @@ func (mock *LimitRangeInterfaceMock) AddHandler(ctx context.Context, name string
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//
-//	len(mockedLimitRangeInterface.AddHandlerCalls())
+//     len(mockedLimitRangeInterface.AddHandlerCalls())
 func (mock *LimitRangeInterfaceMock) AddHandlerCalls() []struct {
 	Ctx  context.Context
 	Name string
@@ -1292,8 +1274,7 @@ func (mock *LimitRangeInterfaceMock) AddLifecycle(ctx context.Context, name stri
 
 // AddLifecycleCalls gets all the calls that were made to AddLifecycle.
 // Check the length with:
-//
-//	len(mockedLimitRangeInterface.AddLifecycleCalls())
+//     len(mockedLimitRangeInterface.AddLifecycleCalls())
 func (mock *LimitRangeInterfaceMock) AddLifecycleCalls() []struct {
 	Ctx       context.Context
 	Name      string
@@ -1325,8 +1306,7 @@ func (mock *LimitRangeInterfaceMock) Controller() v11.LimitRangeController {
 
 // ControllerCalls gets all the calls that were made to Controller.
 // Check the length with:
-//
-//	len(mockedLimitRangeInterface.ControllerCalls())
+//     len(mockedLimitRangeInterface.ControllerCalls())
 func (mock *LimitRangeInterfaceMock) ControllerCalls() []struct {
 } {
 	var calls []struct {
@@ -1355,8 +1335,7 @@ func (mock *LimitRangeInterfaceMock) Create(in1 *v1.LimitRange) (*v1.LimitRange,
 
 // CreateCalls gets all the calls that were made to Create.
 // Check the length with:
-//
-//	len(mockedLimitRangeInterface.CreateCalls())
+//     len(mockedLimitRangeInterface.CreateCalls())
 func (mock *LimitRangeInterfaceMock) CreateCalls() []struct {
 	In1 *v1.LimitRange
 } {
@@ -1389,8 +1368,7 @@ func (mock *LimitRangeInterfaceMock) Delete(name string, options *metav1.DeleteO
 
 // DeleteCalls gets all the calls that were made to Delete.
 // Check the length with:
-//
-//	len(mockedLimitRangeInterface.DeleteCalls())
+//     len(mockedLimitRangeInterface.DeleteCalls())
 func (mock *LimitRangeInterfaceMock) DeleteCalls() []struct {
 	Name    string
 	Options *metav1.DeleteOptions
@@ -1425,8 +1403,7 @@ func (mock *LimitRangeInterfaceMock) DeleteCollection(deleteOpts *metav1.DeleteO
 
 // DeleteCollectionCalls gets all the calls that were made to DeleteCollection.
 // Check the length with:
-//
-//	len(mockedLimitRangeInterface.DeleteCollectionCalls())
+//     len(mockedLimitRangeInterface.DeleteCollectionCalls())
 func (mock *LimitRangeInterfaceMock) DeleteCollectionCalls() []struct {
 	DeleteOpts *metav1.DeleteOptions
 	ListOpts   metav1.ListOptions
@@ -1463,8 +1440,7 @@ func (mock *LimitRangeInterfaceMock) DeleteNamespaced(namespace string, name str
 
 // DeleteNamespacedCalls gets all the calls that were made to DeleteNamespaced.
 // Check the length with:
-//
-//	len(mockedLimitRangeInterface.DeleteNamespacedCalls())
+//     len(mockedLimitRangeInterface.DeleteNamespacedCalls())
 func (mock *LimitRangeInterfaceMock) DeleteNamespacedCalls() []struct {
 	Namespace string
 	Name      string
@@ -1501,8 +1477,7 @@ func (mock *LimitRangeInterfaceMock) Get(name string, opts metav1.GetOptions) (*
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//
-//	len(mockedLimitRangeInterface.GetCalls())
+//     len(mockedLimitRangeInterface.GetCalls())
 func (mock *LimitRangeInterfaceMock) GetCalls() []struct {
 	Name string
 	Opts metav1.GetOptions
@@ -1539,8 +1514,7 @@ func (mock *LimitRangeInterfaceMock) GetNamespaced(namespace string, name string
 
 // GetNamespacedCalls gets all the calls that were made to GetNamespaced.
 // Check the length with:
-//
-//	len(mockedLimitRangeInterface.GetNamespacedCalls())
+//     len(mockedLimitRangeInterface.GetNamespacedCalls())
 func (mock *LimitRangeInterfaceMock) GetNamespacedCalls() []struct {
 	Namespace string
 	Name      string
@@ -1575,8 +1549,7 @@ func (mock *LimitRangeInterfaceMock) List(opts metav1.ListOptions) (*v1.LimitRan
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//
-//	len(mockedLimitRangeInterface.ListCalls())
+//     len(mockedLimitRangeInterface.ListCalls())
 func (mock *LimitRangeInterfaceMock) ListCalls() []struct {
 	Opts metav1.ListOptions
 } {
@@ -1609,8 +1582,7 @@ func (mock *LimitRangeInterfaceMock) ListNamespaced(namespace string, opts metav
 
 // ListNamespacedCalls gets all the calls that were made to ListNamespaced.
 // Check the length with:
-//
-//	len(mockedLimitRangeInterface.ListNamespacedCalls())
+//     len(mockedLimitRangeInterface.ListNamespacedCalls())
 func (mock *LimitRangeInterfaceMock) ListNamespacedCalls() []struct {
 	Namespace string
 	Opts      metav1.ListOptions
@@ -1640,8 +1612,7 @@ func (mock *LimitRangeInterfaceMock) ObjectClient() *objectclient.ObjectClient {
 
 // ObjectClientCalls gets all the calls that were made to ObjectClient.
 // Check the length with:
-//
-//	len(mockedLimitRangeInterface.ObjectClientCalls())
+//     len(mockedLimitRangeInterface.ObjectClientCalls())
 func (mock *LimitRangeInterfaceMock) ObjectClientCalls() []struct {
 } {
 	var calls []struct {
@@ -1670,8 +1641,7 @@ func (mock *LimitRangeInterfaceMock) Update(in1 *v1.LimitRange) (*v1.LimitRange,
 
 // UpdateCalls gets all the calls that were made to Update.
 // Check the length with:
-//
-//	len(mockedLimitRangeInterface.UpdateCalls())
+//     len(mockedLimitRangeInterface.UpdateCalls())
 func (mock *LimitRangeInterfaceMock) UpdateCalls() []struct {
 	In1 *v1.LimitRange
 } {
@@ -1702,8 +1672,7 @@ func (mock *LimitRangeInterfaceMock) Watch(opts metav1.ListOptions) (watch.Inter
 
 // WatchCalls gets all the calls that were made to Watch.
 // Check the length with:
-//
-//	len(mockedLimitRangeInterface.WatchCalls())
+//     len(mockedLimitRangeInterface.WatchCalls())
 func (mock *LimitRangeInterfaceMock) WatchCalls() []struct {
 	Opts metav1.ListOptions
 } {
@@ -1726,19 +1695,19 @@ var _ v11.LimitRangesGetter = &LimitRangesGetterMock{}
 
 // LimitRangesGetterMock is a mock implementation of v11.LimitRangesGetter.
 //
-//	    func TestSomethingThatUsesLimitRangesGetter(t *testing.T) {
+//     func TestSomethingThatUsesLimitRangesGetter(t *testing.T) {
 //
-//	        // make and configure a mocked v11.LimitRangesGetter
-//	        mockedLimitRangesGetter := &LimitRangesGetterMock{
-//	            LimitRangesFunc: func(namespace string) v11.LimitRangeInterface {
-//		               panic("mock out the LimitRanges method")
-//	            },
-//	        }
+//         // make and configure a mocked v11.LimitRangesGetter
+//         mockedLimitRangesGetter := &LimitRangesGetterMock{
+//             LimitRangesFunc: func(namespace string) v11.LimitRangeInterface {
+// 	               panic("mock out the LimitRanges method")
+//             },
+//         }
 //
-//	        // use mockedLimitRangesGetter in code that requires v11.LimitRangesGetter
-//	        // and then make assertions.
+//         // use mockedLimitRangesGetter in code that requires v11.LimitRangesGetter
+//         // and then make assertions.
 //
-//	    }
+//     }
 type LimitRangesGetterMock struct {
 	// LimitRangesFunc mocks the LimitRanges method.
 	LimitRangesFunc func(namespace string) v11.LimitRangeInterface
@@ -1771,8 +1740,7 @@ func (mock *LimitRangesGetterMock) LimitRanges(namespace string) v11.LimitRangeI
 
 // LimitRangesCalls gets all the calls that were made to LimitRanges.
 // Check the length with:
-//
-//	len(mockedLimitRangesGetter.LimitRangesCalls())
+//     len(mockedLimitRangesGetter.LimitRangesCalls())
 func (mock *LimitRangesGetterMock) LimitRangesCalls() []struct {
 	Namespace string
 } {

@@ -29,22 +29,22 @@ var _ v31.SettingLister = &SettingListerMock{}
 
 // SettingListerMock is a mock implementation of v31.SettingLister.
 //
-//	    func TestSomethingThatUsesSettingLister(t *testing.T) {
+//     func TestSomethingThatUsesSettingLister(t *testing.T) {
 //
-//	        // make and configure a mocked v31.SettingLister
-//	        mockedSettingLister := &SettingListerMock{
-//	            GetFunc: func(namespace string, name string) (*v3.Setting, error) {
-//		               panic("mock out the Get method")
-//	            },
-//	            ListFunc: func(namespace string, selector labels.Selector) ([]*v3.Setting, error) {
-//		               panic("mock out the List method")
-//	            },
-//	        }
+//         // make and configure a mocked v31.SettingLister
+//         mockedSettingLister := &SettingListerMock{
+//             GetFunc: func(namespace string, name string) (*v3.Setting, error) {
+// 	               panic("mock out the Get method")
+//             },
+//             ListFunc: func(namespace string, selector labels.Selector) ([]*v3.Setting, error) {
+// 	               panic("mock out the List method")
+//             },
+//         }
 //
-//	        // use mockedSettingLister in code that requires v31.SettingLister
-//	        // and then make assertions.
+//         // use mockedSettingLister in code that requires v31.SettingLister
+//         // and then make assertions.
 //
-//	    }
+//     }
 type SettingListerMock struct {
 	// GetFunc mocks the Get method.
 	GetFunc func(namespace string, name string) (*v3.Setting, error)
@@ -91,8 +91,7 @@ func (mock *SettingListerMock) Get(namespace string, name string) (*v3.Setting, 
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//
-//	len(mockedSettingLister.GetCalls())
+//     len(mockedSettingLister.GetCalls())
 func (mock *SettingListerMock) GetCalls() []struct {
 	Namespace string
 	Name      string
@@ -127,8 +126,7 @@ func (mock *SettingListerMock) List(namespace string, selector labels.Selector) 
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//
-//	len(mockedSettingLister.ListCalls())
+//     len(mockedSettingLister.ListCalls())
 func (mock *SettingListerMock) ListCalls() []struct {
 	Namespace string
 	Selector  labels.Selector
@@ -161,43 +159,43 @@ var _ v31.SettingController = &SettingControllerMock{}
 
 // SettingControllerMock is a mock implementation of v31.SettingController.
 //
-//	    func TestSomethingThatUsesSettingController(t *testing.T) {
+//     func TestSomethingThatUsesSettingController(t *testing.T) {
 //
-//	        // make and configure a mocked v31.SettingController
-//	        mockedSettingController := &SettingControllerMock{
-//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v31.SettingHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedFeatureHandler method")
-//	            },
-//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v31.SettingHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedHandler method")
-//	            },
-//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.SettingHandlerFunc)  {
-//		               panic("mock out the AddFeatureHandler method")
-//	            },
-//	            AddHandlerFunc: func(ctx context.Context, name string, handler v31.SettingHandlerFunc)  {
-//		               panic("mock out the AddHandler method")
-//	            },
-//	            EnqueueFunc: func(namespace string, name string)  {
-//		               panic("mock out the Enqueue method")
-//	            },
-//	            EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
-//		               panic("mock out the EnqueueAfter method")
-//	            },
-//	            GenericFunc: func() controller.GenericController {
-//		               panic("mock out the Generic method")
-//	            },
-//	            InformerFunc: func() cache.SharedIndexInformer {
-//		               panic("mock out the Informer method")
-//	            },
-//	            ListerFunc: func() v31.SettingLister {
-//		               panic("mock out the Lister method")
-//	            },
-//	        }
+//         // make and configure a mocked v31.SettingController
+//         mockedSettingController := &SettingControllerMock{
+//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v31.SettingHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedFeatureHandler method")
+//             },
+//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v31.SettingHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedHandler method")
+//             },
+//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.SettingHandlerFunc)  {
+// 	               panic("mock out the AddFeatureHandler method")
+//             },
+//             AddHandlerFunc: func(ctx context.Context, name string, handler v31.SettingHandlerFunc)  {
+// 	               panic("mock out the AddHandler method")
+//             },
+//             EnqueueFunc: func(namespace string, name string)  {
+// 	               panic("mock out the Enqueue method")
+//             },
+//             EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
+// 	               panic("mock out the EnqueueAfter method")
+//             },
+//             GenericFunc: func() controller.GenericController {
+// 	               panic("mock out the Generic method")
+//             },
+//             InformerFunc: func() cache.SharedIndexInformer {
+// 	               panic("mock out the Informer method")
+//             },
+//             ListerFunc: func() v31.SettingLister {
+// 	               panic("mock out the Lister method")
+//             },
+//         }
 //
-//	        // use mockedSettingController in code that requires v31.SettingController
-//	        // and then make assertions.
+//         // use mockedSettingController in code that requires v31.SettingController
+//         // and then make assertions.
 //
-//	    }
+//     }
 type SettingControllerMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
 	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v31.SettingHandlerFunc)
@@ -326,8 +324,7 @@ func (mock *SettingControllerMock) AddClusterScopedFeatureHandler(ctx context.Co
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//
-//	len(mockedSettingController.AddClusterScopedFeatureHandlerCalls())
+//     len(mockedSettingController.AddClusterScopedFeatureHandlerCalls())
 func (mock *SettingControllerMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -372,8 +369,7 @@ func (mock *SettingControllerMock) AddClusterScopedHandler(ctx context.Context, 
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//
-//	len(mockedSettingController.AddClusterScopedHandlerCalls())
+//     len(mockedSettingController.AddClusterScopedHandlerCalls())
 func (mock *SettingControllerMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -416,8 +412,7 @@ func (mock *SettingControllerMock) AddFeatureHandler(ctx context.Context, enable
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//
-//	len(mockedSettingController.AddFeatureHandlerCalls())
+//     len(mockedSettingController.AddFeatureHandlerCalls())
 func (mock *SettingControllerMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
@@ -458,8 +453,7 @@ func (mock *SettingControllerMock) AddHandler(ctx context.Context, name string, 
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//
-//	len(mockedSettingController.AddHandlerCalls())
+//     len(mockedSettingController.AddHandlerCalls())
 func (mock *SettingControllerMock) AddHandlerCalls() []struct {
 	Ctx     context.Context
 	Name    string
@@ -496,8 +490,7 @@ func (mock *SettingControllerMock) Enqueue(namespace string, name string) {
 
 // EnqueueCalls gets all the calls that were made to Enqueue.
 // Check the length with:
-//
-//	len(mockedSettingController.EnqueueCalls())
+//     len(mockedSettingController.EnqueueCalls())
 func (mock *SettingControllerMock) EnqueueCalls() []struct {
 	Namespace string
 	Name      string
@@ -534,8 +527,7 @@ func (mock *SettingControllerMock) EnqueueAfter(namespace string, name string, a
 
 // EnqueueAfterCalls gets all the calls that were made to EnqueueAfter.
 // Check the length with:
-//
-//	len(mockedSettingController.EnqueueAfterCalls())
+//     len(mockedSettingController.EnqueueAfterCalls())
 func (mock *SettingControllerMock) EnqueueAfterCalls() []struct {
 	Namespace string
 	Name      string
@@ -567,8 +559,7 @@ func (mock *SettingControllerMock) Generic() controller.GenericController {
 
 // GenericCalls gets all the calls that were made to Generic.
 // Check the length with:
-//
-//	len(mockedSettingController.GenericCalls())
+//     len(mockedSettingController.GenericCalls())
 func (mock *SettingControllerMock) GenericCalls() []struct {
 } {
 	var calls []struct {
@@ -594,8 +585,7 @@ func (mock *SettingControllerMock) Informer() cache.SharedIndexInformer {
 
 // InformerCalls gets all the calls that were made to Informer.
 // Check the length with:
-//
-//	len(mockedSettingController.InformerCalls())
+//     len(mockedSettingController.InformerCalls())
 func (mock *SettingControllerMock) InformerCalls() []struct {
 } {
 	var calls []struct {
@@ -621,8 +611,7 @@ func (mock *SettingControllerMock) Lister() v31.SettingLister {
 
 // ListerCalls gets all the calls that were made to Lister.
 // Check the length with:
-//
-//	len(mockedSettingController.ListerCalls())
+//     len(mockedSettingController.ListerCalls())
 func (mock *SettingControllerMock) ListerCalls() []struct {
 } {
 	var calls []struct {
@@ -662,76 +651,76 @@ var _ v31.SettingInterface = &SettingInterfaceMock{}
 
 // SettingInterfaceMock is a mock implementation of v31.SettingInterface.
 //
-//	    func TestSomethingThatUsesSettingInterface(t *testing.T) {
+//     func TestSomethingThatUsesSettingInterface(t *testing.T) {
 //
-//	        // make and configure a mocked v31.SettingInterface
-//	        mockedSettingInterface := &SettingInterfaceMock{
-//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v31.SettingHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedFeatureHandler method")
-//	            },
-//	            AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v31.SettingLifecycle)  {
-//		               panic("mock out the AddClusterScopedFeatureLifecycle method")
-//	            },
-//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v31.SettingHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedHandler method")
-//	            },
-//	            AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v31.SettingLifecycle)  {
-//		               panic("mock out the AddClusterScopedLifecycle method")
-//	            },
-//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.SettingHandlerFunc)  {
-//		               panic("mock out the AddFeatureHandler method")
-//	            },
-//	            AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v31.SettingLifecycle)  {
-//		               panic("mock out the AddFeatureLifecycle method")
-//	            },
-//	            AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v31.SettingHandlerFunc)  {
-//		               panic("mock out the AddHandler method")
-//	            },
-//	            AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v31.SettingLifecycle)  {
-//		               panic("mock out the AddLifecycle method")
-//	            },
-//	            ControllerFunc: func() v31.SettingController {
-//		               panic("mock out the Controller method")
-//	            },
-//	            CreateFunc: func(in1 *v3.Setting) (*v3.Setting, error) {
-//		               panic("mock out the Create method")
-//	            },
-//	            DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
-//		               panic("mock out the Delete method")
-//	            },
-//	            DeleteCollectionFunc: func(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
-//		               panic("mock out the DeleteCollection method")
-//	            },
-//	            DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
-//		               panic("mock out the DeleteNamespaced method")
-//	            },
-//	            GetFunc: func(name string, opts metav1.GetOptions) (*v3.Setting, error) {
-//		               panic("mock out the Get method")
-//	            },
-//	            GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v3.Setting, error) {
-//		               panic("mock out the GetNamespaced method")
-//	            },
-//	            ListFunc: func(opts metav1.ListOptions) (*v3.SettingList, error) {
-//		               panic("mock out the List method")
-//	            },
-//	            ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v3.SettingList, error) {
-//		               panic("mock out the ListNamespaced method")
-//	            },
-//	            ObjectClientFunc: func() *objectclient.ObjectClient {
-//		               panic("mock out the ObjectClient method")
-//	            },
-//	            UpdateFunc: func(in1 *v3.Setting) (*v3.Setting, error) {
-//		               panic("mock out the Update method")
-//	            },
-//	            WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
-//		               panic("mock out the Watch method")
-//	            },
-//	        }
+//         // make and configure a mocked v31.SettingInterface
+//         mockedSettingInterface := &SettingInterfaceMock{
+//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v31.SettingHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedFeatureHandler method")
+//             },
+//             AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v31.SettingLifecycle)  {
+// 	               panic("mock out the AddClusterScopedFeatureLifecycle method")
+//             },
+//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v31.SettingHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedHandler method")
+//             },
+//             AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v31.SettingLifecycle)  {
+// 	               panic("mock out the AddClusterScopedLifecycle method")
+//             },
+//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.SettingHandlerFunc)  {
+// 	               panic("mock out the AddFeatureHandler method")
+//             },
+//             AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v31.SettingLifecycle)  {
+// 	               panic("mock out the AddFeatureLifecycle method")
+//             },
+//             AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v31.SettingHandlerFunc)  {
+// 	               panic("mock out the AddHandler method")
+//             },
+//             AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v31.SettingLifecycle)  {
+// 	               panic("mock out the AddLifecycle method")
+//             },
+//             ControllerFunc: func() v31.SettingController {
+// 	               panic("mock out the Controller method")
+//             },
+//             CreateFunc: func(in1 *v3.Setting) (*v3.Setting, error) {
+// 	               panic("mock out the Create method")
+//             },
+//             DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
+// 	               panic("mock out the Delete method")
+//             },
+//             DeleteCollectionFunc: func(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
+// 	               panic("mock out the DeleteCollection method")
+//             },
+//             DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
+// 	               panic("mock out the DeleteNamespaced method")
+//             },
+//             GetFunc: func(name string, opts metav1.GetOptions) (*v3.Setting, error) {
+// 	               panic("mock out the Get method")
+//             },
+//             GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v3.Setting, error) {
+// 	               panic("mock out the GetNamespaced method")
+//             },
+//             ListFunc: func(opts metav1.ListOptions) (*v3.SettingList, error) {
+// 	               panic("mock out the List method")
+//             },
+//             ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v3.SettingList, error) {
+// 	               panic("mock out the ListNamespaced method")
+//             },
+//             ObjectClientFunc: func() *objectclient.ObjectClient {
+// 	               panic("mock out the ObjectClient method")
+//             },
+//             UpdateFunc: func(in1 *v3.Setting) (*v3.Setting, error) {
+// 	               panic("mock out the Update method")
+//             },
+//             WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
+// 	               panic("mock out the Watch method")
+//             },
+//         }
 //
-//	        // use mockedSettingInterface in code that requires v31.SettingInterface
-//	        // and then make assertions.
+//         // use mockedSettingInterface in code that requires v31.SettingInterface
+//         // and then make assertions.
 //
-//	    }
+//     }
 type SettingInterfaceMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
 	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v31.SettingHandlerFunc)
@@ -984,8 +973,7 @@ func (mock *SettingInterfaceMock) AddClusterScopedFeatureHandler(ctx context.Con
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//
-//	len(mockedSettingInterface.AddClusterScopedFeatureHandlerCalls())
+//     len(mockedSettingInterface.AddClusterScopedFeatureHandlerCalls())
 func (mock *SettingInterfaceMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -1032,8 +1020,7 @@ func (mock *SettingInterfaceMock) AddClusterScopedFeatureLifecycle(ctx context.C
 
 // AddClusterScopedFeatureLifecycleCalls gets all the calls that were made to AddClusterScopedFeatureLifecycle.
 // Check the length with:
-//
-//	len(mockedSettingInterface.AddClusterScopedFeatureLifecycleCalls())
+//     len(mockedSettingInterface.AddClusterScopedFeatureLifecycleCalls())
 func (mock *SettingInterfaceMock) AddClusterScopedFeatureLifecycleCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -1078,8 +1065,7 @@ func (mock *SettingInterfaceMock) AddClusterScopedHandler(ctx context.Context, n
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//
-//	len(mockedSettingInterface.AddClusterScopedHandlerCalls())
+//     len(mockedSettingInterface.AddClusterScopedHandlerCalls())
 func (mock *SettingInterfaceMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -1122,8 +1108,7 @@ func (mock *SettingInterfaceMock) AddClusterScopedLifecycle(ctx context.Context,
 
 // AddClusterScopedLifecycleCalls gets all the calls that were made to AddClusterScopedLifecycle.
 // Check the length with:
-//
-//	len(mockedSettingInterface.AddClusterScopedLifecycleCalls())
+//     len(mockedSettingInterface.AddClusterScopedLifecycleCalls())
 func (mock *SettingInterfaceMock) AddClusterScopedLifecycleCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -1166,8 +1151,7 @@ func (mock *SettingInterfaceMock) AddFeatureHandler(ctx context.Context, enabled
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//
-//	len(mockedSettingInterface.AddFeatureHandlerCalls())
+//     len(mockedSettingInterface.AddFeatureHandlerCalls())
 func (mock *SettingInterfaceMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
@@ -1210,8 +1194,7 @@ func (mock *SettingInterfaceMock) AddFeatureLifecycle(ctx context.Context, enabl
 
 // AddFeatureLifecycleCalls gets all the calls that were made to AddFeatureLifecycle.
 // Check the length with:
-//
-//	len(mockedSettingInterface.AddFeatureLifecycleCalls())
+//     len(mockedSettingInterface.AddFeatureLifecycleCalls())
 func (mock *SettingInterfaceMock) AddFeatureLifecycleCalls() []struct {
 	Ctx       context.Context
 	Enabled   func() bool
@@ -1252,8 +1235,7 @@ func (mock *SettingInterfaceMock) AddHandler(ctx context.Context, name string, s
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//
-//	len(mockedSettingInterface.AddHandlerCalls())
+//     len(mockedSettingInterface.AddHandlerCalls())
 func (mock *SettingInterfaceMock) AddHandlerCalls() []struct {
 	Ctx  context.Context
 	Name string
@@ -1292,8 +1274,7 @@ func (mock *SettingInterfaceMock) AddLifecycle(ctx context.Context, name string,
 
 // AddLifecycleCalls gets all the calls that were made to AddLifecycle.
 // Check the length with:
-//
-//	len(mockedSettingInterface.AddLifecycleCalls())
+//     len(mockedSettingInterface.AddLifecycleCalls())
 func (mock *SettingInterfaceMock) AddLifecycleCalls() []struct {
 	Ctx       context.Context
 	Name      string
@@ -1325,8 +1306,7 @@ func (mock *SettingInterfaceMock) Controller() v31.SettingController {
 
 // ControllerCalls gets all the calls that were made to Controller.
 // Check the length with:
-//
-//	len(mockedSettingInterface.ControllerCalls())
+//     len(mockedSettingInterface.ControllerCalls())
 func (mock *SettingInterfaceMock) ControllerCalls() []struct {
 } {
 	var calls []struct {
@@ -1355,8 +1335,7 @@ func (mock *SettingInterfaceMock) Create(in1 *v3.Setting) (*v3.Setting, error) {
 
 // CreateCalls gets all the calls that were made to Create.
 // Check the length with:
-//
-//	len(mockedSettingInterface.CreateCalls())
+//     len(mockedSettingInterface.CreateCalls())
 func (mock *SettingInterfaceMock) CreateCalls() []struct {
 	In1 *v3.Setting
 } {
@@ -1389,8 +1368,7 @@ func (mock *SettingInterfaceMock) Delete(name string, options *metav1.DeleteOpti
 
 // DeleteCalls gets all the calls that were made to Delete.
 // Check the length with:
-//
-//	len(mockedSettingInterface.DeleteCalls())
+//     len(mockedSettingInterface.DeleteCalls())
 func (mock *SettingInterfaceMock) DeleteCalls() []struct {
 	Name    string
 	Options *metav1.DeleteOptions
@@ -1425,8 +1403,7 @@ func (mock *SettingInterfaceMock) DeleteCollection(deleteOpts *metav1.DeleteOpti
 
 // DeleteCollectionCalls gets all the calls that were made to DeleteCollection.
 // Check the length with:
-//
-//	len(mockedSettingInterface.DeleteCollectionCalls())
+//     len(mockedSettingInterface.DeleteCollectionCalls())
 func (mock *SettingInterfaceMock) DeleteCollectionCalls() []struct {
 	DeleteOpts *metav1.DeleteOptions
 	ListOpts   metav1.ListOptions
@@ -1463,8 +1440,7 @@ func (mock *SettingInterfaceMock) DeleteNamespaced(namespace string, name string
 
 // DeleteNamespacedCalls gets all the calls that were made to DeleteNamespaced.
 // Check the length with:
-//
-//	len(mockedSettingInterface.DeleteNamespacedCalls())
+//     len(mockedSettingInterface.DeleteNamespacedCalls())
 func (mock *SettingInterfaceMock) DeleteNamespacedCalls() []struct {
 	Namespace string
 	Name      string
@@ -1501,8 +1477,7 @@ func (mock *SettingInterfaceMock) Get(name string, opts metav1.GetOptions) (*v3.
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//
-//	len(mockedSettingInterface.GetCalls())
+//     len(mockedSettingInterface.GetCalls())
 func (mock *SettingInterfaceMock) GetCalls() []struct {
 	Name string
 	Opts metav1.GetOptions
@@ -1539,8 +1514,7 @@ func (mock *SettingInterfaceMock) GetNamespaced(namespace string, name string, o
 
 // GetNamespacedCalls gets all the calls that were made to GetNamespaced.
 // Check the length with:
-//
-//	len(mockedSettingInterface.GetNamespacedCalls())
+//     len(mockedSettingInterface.GetNamespacedCalls())
 func (mock *SettingInterfaceMock) GetNamespacedCalls() []struct {
 	Namespace string
 	Name      string
@@ -1575,8 +1549,7 @@ func (mock *SettingInterfaceMock) List(opts metav1.ListOptions) (*v3.SettingList
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//
-//	len(mockedSettingInterface.ListCalls())
+//     len(mockedSettingInterface.ListCalls())
 func (mock *SettingInterfaceMock) ListCalls() []struct {
 	Opts metav1.ListOptions
 } {
@@ -1609,8 +1582,7 @@ func (mock *SettingInterfaceMock) ListNamespaced(namespace string, opts metav1.L
 
 // ListNamespacedCalls gets all the calls that were made to ListNamespaced.
 // Check the length with:
-//
-//	len(mockedSettingInterface.ListNamespacedCalls())
+//     len(mockedSettingInterface.ListNamespacedCalls())
 func (mock *SettingInterfaceMock) ListNamespacedCalls() []struct {
 	Namespace string
 	Opts      metav1.ListOptions
@@ -1640,8 +1612,7 @@ func (mock *SettingInterfaceMock) ObjectClient() *objectclient.ObjectClient {
 
 // ObjectClientCalls gets all the calls that were made to ObjectClient.
 // Check the length with:
-//
-//	len(mockedSettingInterface.ObjectClientCalls())
+//     len(mockedSettingInterface.ObjectClientCalls())
 func (mock *SettingInterfaceMock) ObjectClientCalls() []struct {
 } {
 	var calls []struct {
@@ -1670,8 +1641,7 @@ func (mock *SettingInterfaceMock) Update(in1 *v3.Setting) (*v3.Setting, error) {
 
 // UpdateCalls gets all the calls that were made to Update.
 // Check the length with:
-//
-//	len(mockedSettingInterface.UpdateCalls())
+//     len(mockedSettingInterface.UpdateCalls())
 func (mock *SettingInterfaceMock) UpdateCalls() []struct {
 	In1 *v3.Setting
 } {
@@ -1702,8 +1672,7 @@ func (mock *SettingInterfaceMock) Watch(opts metav1.ListOptions) (watch.Interfac
 
 // WatchCalls gets all the calls that were made to Watch.
 // Check the length with:
-//
-//	len(mockedSettingInterface.WatchCalls())
+//     len(mockedSettingInterface.WatchCalls())
 func (mock *SettingInterfaceMock) WatchCalls() []struct {
 	Opts metav1.ListOptions
 } {
@@ -1726,19 +1695,19 @@ var _ v31.SettingsGetter = &SettingsGetterMock{}
 
 // SettingsGetterMock is a mock implementation of v31.SettingsGetter.
 //
-//	    func TestSomethingThatUsesSettingsGetter(t *testing.T) {
+//     func TestSomethingThatUsesSettingsGetter(t *testing.T) {
 //
-//	        // make and configure a mocked v31.SettingsGetter
-//	        mockedSettingsGetter := &SettingsGetterMock{
-//	            SettingsFunc: func(namespace string) v31.SettingInterface {
-//		               panic("mock out the Settings method")
-//	            },
-//	        }
+//         // make and configure a mocked v31.SettingsGetter
+//         mockedSettingsGetter := &SettingsGetterMock{
+//             SettingsFunc: func(namespace string) v31.SettingInterface {
+// 	               panic("mock out the Settings method")
+//             },
+//         }
 //
-//	        // use mockedSettingsGetter in code that requires v31.SettingsGetter
-//	        // and then make assertions.
+//         // use mockedSettingsGetter in code that requires v31.SettingsGetter
+//         // and then make assertions.
 //
-//	    }
+//     }
 type SettingsGetterMock struct {
 	// SettingsFunc mocks the Settings method.
 	SettingsFunc func(namespace string) v31.SettingInterface
@@ -1771,8 +1740,7 @@ func (mock *SettingsGetterMock) Settings(namespace string) v31.SettingInterface 
 
 // SettingsCalls gets all the calls that were made to Settings.
 // Check the length with:
-//
-//	len(mockedSettingsGetter.SettingsCalls())
+//     len(mockedSettingsGetter.SettingsCalls())
 func (mock *SettingsGetterMock) SettingsCalls() []struct {
 	Namespace string
 } {

@@ -13,7 +13,6 @@ import (
 	"github.com/rancher/rancher/pkg/api/norman/customization/yaml"
 	"github.com/rancher/rancher/pkg/api/norman/store/apiservice"
 	"github.com/rancher/rancher/pkg/api/norman/store/cert"
-	"github.com/rancher/rancher/pkg/api/norman/store/crd"
 	"github.com/rancher/rancher/pkg/api/norman/store/hpa"
 	"github.com/rancher/rancher/pkg/api/norman/store/ingress"
 	"github.com/rancher/rancher/pkg/api/norman/store/namespace"
@@ -60,16 +59,12 @@ func Setup(ctx context.Context, mgmt *config.ScaledContext, clusterManager *clus
 	addProxyStore(ctx, schemas, mgmt, client.PrometheusRuleType, "monitoring.coreos.com/v1", nil)
 	addProxyStore(ctx, schemas, mgmt, client.AlertmanagerType, "monitoring.coreos.com/v1", nil)
 	addProxyStore(ctx, schemas, mgmt, client.ServiceMonitorType, "monitoring.coreos.com/v1", nil)
-	addProxyStore(ctx, schemas, mgmt, client.VirtualServiceType, "networking.istio.io/v1alpha3", nil)
-	addProxyStore(ctx, schemas, mgmt, client.DestinationRuleType, "networking.istio.io/v1alpha3", nil)
-	addProxyStore(ctx, schemas, mgmt, client.GatewayType, "networking.istio.io/v1alpha3", nil)
 
 	Secret(ctx, mgmt, schemas)
 	Service(ctx, schemas, mgmt)
 	Workload(schemas, clusterManager)
 	Namespace(schemas, clusterManager)
 	HPA(schemas, clusterManager)
-	Istio(schemas)
 
 	SetProjectID(schemas, clusterManager, k8sProxy)
 	StorageClass(schemas)
@@ -153,18 +148,6 @@ func Secret(ctx context.Context, management *config.ScaledContext, schemas *type
 
 	schema = schemas.Schema(&schema.Version, "namespacedCertificate")
 	schema.Store = cert.Wrap(schema.Store)
-}
-
-func Istio(schemas *types.Schemas) {
-	istioTypes := []string{client.VirtualServiceType, client.DestinationRuleType, client.GatewayType}
-	for _, t := range istioTypes {
-		schema := schemas.Schema(&schema.Version, t)
-		store := &crd.ForgetCRDNotFoundStore{
-			Store: schema.Store,
-		}
-		schema.Store = store
-	}
-
 }
 
 func HPA(schemas *types.Schemas, manager *clustermanager.Manager) {

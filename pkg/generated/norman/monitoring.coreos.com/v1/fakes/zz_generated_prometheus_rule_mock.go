@@ -29,22 +29,22 @@ var _ v11.PrometheusRuleLister = &PrometheusRuleListerMock{}
 
 // PrometheusRuleListerMock is a mock implementation of v11.PrometheusRuleLister.
 //
-//	    func TestSomethingThatUsesPrometheusRuleLister(t *testing.T) {
+//     func TestSomethingThatUsesPrometheusRuleLister(t *testing.T) {
 //
-//	        // make and configure a mocked v11.PrometheusRuleLister
-//	        mockedPrometheusRuleLister := &PrometheusRuleListerMock{
-//	            GetFunc: func(namespace string, name string) (*v1.PrometheusRule, error) {
-//		               panic("mock out the Get method")
-//	            },
-//	            ListFunc: func(namespace string, selector labels.Selector) ([]*v1.PrometheusRule, error) {
-//		               panic("mock out the List method")
-//	            },
-//	        }
+//         // make and configure a mocked v11.PrometheusRuleLister
+//         mockedPrometheusRuleLister := &PrometheusRuleListerMock{
+//             GetFunc: func(namespace string, name string) (*v1.PrometheusRule, error) {
+// 	               panic("mock out the Get method")
+//             },
+//             ListFunc: func(namespace string, selector labels.Selector) ([]*v1.PrometheusRule, error) {
+// 	               panic("mock out the List method")
+//             },
+//         }
 //
-//	        // use mockedPrometheusRuleLister in code that requires v11.PrometheusRuleLister
-//	        // and then make assertions.
+//         // use mockedPrometheusRuleLister in code that requires v11.PrometheusRuleLister
+//         // and then make assertions.
 //
-//	    }
+//     }
 type PrometheusRuleListerMock struct {
 	// GetFunc mocks the Get method.
 	GetFunc func(namespace string, name string) (*v1.PrometheusRule, error)
@@ -91,8 +91,7 @@ func (mock *PrometheusRuleListerMock) Get(namespace string, name string) (*v1.Pr
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//
-//	len(mockedPrometheusRuleLister.GetCalls())
+//     len(mockedPrometheusRuleLister.GetCalls())
 func (mock *PrometheusRuleListerMock) GetCalls() []struct {
 	Namespace string
 	Name      string
@@ -127,8 +126,7 @@ func (mock *PrometheusRuleListerMock) List(namespace string, selector labels.Sel
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//
-//	len(mockedPrometheusRuleLister.ListCalls())
+//     len(mockedPrometheusRuleLister.ListCalls())
 func (mock *PrometheusRuleListerMock) ListCalls() []struct {
 	Namespace string
 	Selector  labels.Selector
@@ -161,43 +159,43 @@ var _ v11.PrometheusRuleController = &PrometheusRuleControllerMock{}
 
 // PrometheusRuleControllerMock is a mock implementation of v11.PrometheusRuleController.
 //
-//	    func TestSomethingThatUsesPrometheusRuleController(t *testing.T) {
+//     func TestSomethingThatUsesPrometheusRuleController(t *testing.T) {
 //
-//	        // make and configure a mocked v11.PrometheusRuleController
-//	        mockedPrometheusRuleController := &PrometheusRuleControllerMock{
-//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v11.PrometheusRuleHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedFeatureHandler method")
-//	            },
-//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v11.PrometheusRuleHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedHandler method")
-//	            },
-//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v11.PrometheusRuleHandlerFunc)  {
-//		               panic("mock out the AddFeatureHandler method")
-//	            },
-//	            AddHandlerFunc: func(ctx context.Context, name string, handler v11.PrometheusRuleHandlerFunc)  {
-//		               panic("mock out the AddHandler method")
-//	            },
-//	            EnqueueFunc: func(namespace string, name string)  {
-//		               panic("mock out the Enqueue method")
-//	            },
-//	            EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
-//		               panic("mock out the EnqueueAfter method")
-//	            },
-//	            GenericFunc: func() controller.GenericController {
-//		               panic("mock out the Generic method")
-//	            },
-//	            InformerFunc: func() cache.SharedIndexInformer {
-//		               panic("mock out the Informer method")
-//	            },
-//	            ListerFunc: func() v11.PrometheusRuleLister {
-//		               panic("mock out the Lister method")
-//	            },
-//	        }
+//         // make and configure a mocked v11.PrometheusRuleController
+//         mockedPrometheusRuleController := &PrometheusRuleControllerMock{
+//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v11.PrometheusRuleHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedFeatureHandler method")
+//             },
+//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v11.PrometheusRuleHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedHandler method")
+//             },
+//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v11.PrometheusRuleHandlerFunc)  {
+// 	               panic("mock out the AddFeatureHandler method")
+//             },
+//             AddHandlerFunc: func(ctx context.Context, name string, handler v11.PrometheusRuleHandlerFunc)  {
+// 	               panic("mock out the AddHandler method")
+//             },
+//             EnqueueFunc: func(namespace string, name string)  {
+// 	               panic("mock out the Enqueue method")
+//             },
+//             EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
+// 	               panic("mock out the EnqueueAfter method")
+//             },
+//             GenericFunc: func() controller.GenericController {
+// 	               panic("mock out the Generic method")
+//             },
+//             InformerFunc: func() cache.SharedIndexInformer {
+// 	               panic("mock out the Informer method")
+//             },
+//             ListerFunc: func() v11.PrometheusRuleLister {
+// 	               panic("mock out the Lister method")
+//             },
+//         }
 //
-//	        // use mockedPrometheusRuleController in code that requires v11.PrometheusRuleController
-//	        // and then make assertions.
+//         // use mockedPrometheusRuleController in code that requires v11.PrometheusRuleController
+//         // and then make assertions.
 //
-//	    }
+//     }
 type PrometheusRuleControllerMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
 	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v11.PrometheusRuleHandlerFunc)
@@ -326,8 +324,7 @@ func (mock *PrometheusRuleControllerMock) AddClusterScopedFeatureHandler(ctx con
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//
-//	len(mockedPrometheusRuleController.AddClusterScopedFeatureHandlerCalls())
+//     len(mockedPrometheusRuleController.AddClusterScopedFeatureHandlerCalls())
 func (mock *PrometheusRuleControllerMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -372,8 +369,7 @@ func (mock *PrometheusRuleControllerMock) AddClusterScopedHandler(ctx context.Co
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//
-//	len(mockedPrometheusRuleController.AddClusterScopedHandlerCalls())
+//     len(mockedPrometheusRuleController.AddClusterScopedHandlerCalls())
 func (mock *PrometheusRuleControllerMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -416,8 +412,7 @@ func (mock *PrometheusRuleControllerMock) AddFeatureHandler(ctx context.Context,
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//
-//	len(mockedPrometheusRuleController.AddFeatureHandlerCalls())
+//     len(mockedPrometheusRuleController.AddFeatureHandlerCalls())
 func (mock *PrometheusRuleControllerMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
@@ -458,8 +453,7 @@ func (mock *PrometheusRuleControllerMock) AddHandler(ctx context.Context, name s
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//
-//	len(mockedPrometheusRuleController.AddHandlerCalls())
+//     len(mockedPrometheusRuleController.AddHandlerCalls())
 func (mock *PrometheusRuleControllerMock) AddHandlerCalls() []struct {
 	Ctx     context.Context
 	Name    string
@@ -496,8 +490,7 @@ func (mock *PrometheusRuleControllerMock) Enqueue(namespace string, name string)
 
 // EnqueueCalls gets all the calls that were made to Enqueue.
 // Check the length with:
-//
-//	len(mockedPrometheusRuleController.EnqueueCalls())
+//     len(mockedPrometheusRuleController.EnqueueCalls())
 func (mock *PrometheusRuleControllerMock) EnqueueCalls() []struct {
 	Namespace string
 	Name      string
@@ -534,8 +527,7 @@ func (mock *PrometheusRuleControllerMock) EnqueueAfter(namespace string, name st
 
 // EnqueueAfterCalls gets all the calls that were made to EnqueueAfter.
 // Check the length with:
-//
-//	len(mockedPrometheusRuleController.EnqueueAfterCalls())
+//     len(mockedPrometheusRuleController.EnqueueAfterCalls())
 func (mock *PrometheusRuleControllerMock) EnqueueAfterCalls() []struct {
 	Namespace string
 	Name      string
@@ -567,8 +559,7 @@ func (mock *PrometheusRuleControllerMock) Generic() controller.GenericController
 
 // GenericCalls gets all the calls that were made to Generic.
 // Check the length with:
-//
-//	len(mockedPrometheusRuleController.GenericCalls())
+//     len(mockedPrometheusRuleController.GenericCalls())
 func (mock *PrometheusRuleControllerMock) GenericCalls() []struct {
 } {
 	var calls []struct {
@@ -594,8 +585,7 @@ func (mock *PrometheusRuleControllerMock) Informer() cache.SharedIndexInformer {
 
 // InformerCalls gets all the calls that were made to Informer.
 // Check the length with:
-//
-//	len(mockedPrometheusRuleController.InformerCalls())
+//     len(mockedPrometheusRuleController.InformerCalls())
 func (mock *PrometheusRuleControllerMock) InformerCalls() []struct {
 } {
 	var calls []struct {
@@ -621,8 +611,7 @@ func (mock *PrometheusRuleControllerMock) Lister() v11.PrometheusRuleLister {
 
 // ListerCalls gets all the calls that were made to Lister.
 // Check the length with:
-//
-//	len(mockedPrometheusRuleController.ListerCalls())
+//     len(mockedPrometheusRuleController.ListerCalls())
 func (mock *PrometheusRuleControllerMock) ListerCalls() []struct {
 } {
 	var calls []struct {
@@ -662,76 +651,76 @@ var _ v11.PrometheusRuleInterface = &PrometheusRuleInterfaceMock{}
 
 // PrometheusRuleInterfaceMock is a mock implementation of v11.PrometheusRuleInterface.
 //
-//	    func TestSomethingThatUsesPrometheusRuleInterface(t *testing.T) {
+//     func TestSomethingThatUsesPrometheusRuleInterface(t *testing.T) {
 //
-//	        // make and configure a mocked v11.PrometheusRuleInterface
-//	        mockedPrometheusRuleInterface := &PrometheusRuleInterfaceMock{
-//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v11.PrometheusRuleHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedFeatureHandler method")
-//	            },
-//	            AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v11.PrometheusRuleLifecycle)  {
-//		               panic("mock out the AddClusterScopedFeatureLifecycle method")
-//	            },
-//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v11.PrometheusRuleHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedHandler method")
-//	            },
-//	            AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v11.PrometheusRuleLifecycle)  {
-//		               panic("mock out the AddClusterScopedLifecycle method")
-//	            },
-//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v11.PrometheusRuleHandlerFunc)  {
-//		               panic("mock out the AddFeatureHandler method")
-//	            },
-//	            AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v11.PrometheusRuleLifecycle)  {
-//		               panic("mock out the AddFeatureLifecycle method")
-//	            },
-//	            AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v11.PrometheusRuleHandlerFunc)  {
-//		               panic("mock out the AddHandler method")
-//	            },
-//	            AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v11.PrometheusRuleLifecycle)  {
-//		               panic("mock out the AddLifecycle method")
-//	            },
-//	            ControllerFunc: func() v11.PrometheusRuleController {
-//		               panic("mock out the Controller method")
-//	            },
-//	            CreateFunc: func(in1 *v1.PrometheusRule) (*v1.PrometheusRule, error) {
-//		               panic("mock out the Create method")
-//	            },
-//	            DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
-//		               panic("mock out the Delete method")
-//	            },
-//	            DeleteCollectionFunc: func(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
-//		               panic("mock out the DeleteCollection method")
-//	            },
-//	            DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
-//		               panic("mock out the DeleteNamespaced method")
-//	            },
-//	            GetFunc: func(name string, opts metav1.GetOptions) (*v1.PrometheusRule, error) {
-//		               panic("mock out the Get method")
-//	            },
-//	            GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v1.PrometheusRule, error) {
-//		               panic("mock out the GetNamespaced method")
-//	            },
-//	            ListFunc: func(opts metav1.ListOptions) (*v1.PrometheusRuleList, error) {
-//		               panic("mock out the List method")
-//	            },
-//	            ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v1.PrometheusRuleList, error) {
-//		               panic("mock out the ListNamespaced method")
-//	            },
-//	            ObjectClientFunc: func() *objectclient.ObjectClient {
-//		               panic("mock out the ObjectClient method")
-//	            },
-//	            UpdateFunc: func(in1 *v1.PrometheusRule) (*v1.PrometheusRule, error) {
-//		               panic("mock out the Update method")
-//	            },
-//	            WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
-//		               panic("mock out the Watch method")
-//	            },
-//	        }
+//         // make and configure a mocked v11.PrometheusRuleInterface
+//         mockedPrometheusRuleInterface := &PrometheusRuleInterfaceMock{
+//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v11.PrometheusRuleHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedFeatureHandler method")
+//             },
+//             AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v11.PrometheusRuleLifecycle)  {
+// 	               panic("mock out the AddClusterScopedFeatureLifecycle method")
+//             },
+//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v11.PrometheusRuleHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedHandler method")
+//             },
+//             AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v11.PrometheusRuleLifecycle)  {
+// 	               panic("mock out the AddClusterScopedLifecycle method")
+//             },
+//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v11.PrometheusRuleHandlerFunc)  {
+// 	               panic("mock out the AddFeatureHandler method")
+//             },
+//             AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v11.PrometheusRuleLifecycle)  {
+// 	               panic("mock out the AddFeatureLifecycle method")
+//             },
+//             AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v11.PrometheusRuleHandlerFunc)  {
+// 	               panic("mock out the AddHandler method")
+//             },
+//             AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v11.PrometheusRuleLifecycle)  {
+// 	               panic("mock out the AddLifecycle method")
+//             },
+//             ControllerFunc: func() v11.PrometheusRuleController {
+// 	               panic("mock out the Controller method")
+//             },
+//             CreateFunc: func(in1 *v1.PrometheusRule) (*v1.PrometheusRule, error) {
+// 	               panic("mock out the Create method")
+//             },
+//             DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
+// 	               panic("mock out the Delete method")
+//             },
+//             DeleteCollectionFunc: func(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
+// 	               panic("mock out the DeleteCollection method")
+//             },
+//             DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
+// 	               panic("mock out the DeleteNamespaced method")
+//             },
+//             GetFunc: func(name string, opts metav1.GetOptions) (*v1.PrometheusRule, error) {
+// 	               panic("mock out the Get method")
+//             },
+//             GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v1.PrometheusRule, error) {
+// 	               panic("mock out the GetNamespaced method")
+//             },
+//             ListFunc: func(opts metav1.ListOptions) (*v1.PrometheusRuleList, error) {
+// 	               panic("mock out the List method")
+//             },
+//             ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v1.PrometheusRuleList, error) {
+// 	               panic("mock out the ListNamespaced method")
+//             },
+//             ObjectClientFunc: func() *objectclient.ObjectClient {
+// 	               panic("mock out the ObjectClient method")
+//             },
+//             UpdateFunc: func(in1 *v1.PrometheusRule) (*v1.PrometheusRule, error) {
+// 	               panic("mock out the Update method")
+//             },
+//             WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
+// 	               panic("mock out the Watch method")
+//             },
+//         }
 //
-//	        // use mockedPrometheusRuleInterface in code that requires v11.PrometheusRuleInterface
-//	        // and then make assertions.
+//         // use mockedPrometheusRuleInterface in code that requires v11.PrometheusRuleInterface
+//         // and then make assertions.
 //
-//	    }
+//     }
 type PrometheusRuleInterfaceMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
 	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v11.PrometheusRuleHandlerFunc)
@@ -984,8 +973,7 @@ func (mock *PrometheusRuleInterfaceMock) AddClusterScopedFeatureHandler(ctx cont
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//
-//	len(mockedPrometheusRuleInterface.AddClusterScopedFeatureHandlerCalls())
+//     len(mockedPrometheusRuleInterface.AddClusterScopedFeatureHandlerCalls())
 func (mock *PrometheusRuleInterfaceMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -1032,8 +1020,7 @@ func (mock *PrometheusRuleInterfaceMock) AddClusterScopedFeatureLifecycle(ctx co
 
 // AddClusterScopedFeatureLifecycleCalls gets all the calls that were made to AddClusterScopedFeatureLifecycle.
 // Check the length with:
-//
-//	len(mockedPrometheusRuleInterface.AddClusterScopedFeatureLifecycleCalls())
+//     len(mockedPrometheusRuleInterface.AddClusterScopedFeatureLifecycleCalls())
 func (mock *PrometheusRuleInterfaceMock) AddClusterScopedFeatureLifecycleCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -1078,8 +1065,7 @@ func (mock *PrometheusRuleInterfaceMock) AddClusterScopedHandler(ctx context.Con
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//
-//	len(mockedPrometheusRuleInterface.AddClusterScopedHandlerCalls())
+//     len(mockedPrometheusRuleInterface.AddClusterScopedHandlerCalls())
 func (mock *PrometheusRuleInterfaceMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -1122,8 +1108,7 @@ func (mock *PrometheusRuleInterfaceMock) AddClusterScopedLifecycle(ctx context.C
 
 // AddClusterScopedLifecycleCalls gets all the calls that were made to AddClusterScopedLifecycle.
 // Check the length with:
-//
-//	len(mockedPrometheusRuleInterface.AddClusterScopedLifecycleCalls())
+//     len(mockedPrometheusRuleInterface.AddClusterScopedLifecycleCalls())
 func (mock *PrometheusRuleInterfaceMock) AddClusterScopedLifecycleCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -1166,8 +1151,7 @@ func (mock *PrometheusRuleInterfaceMock) AddFeatureHandler(ctx context.Context, 
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//
-//	len(mockedPrometheusRuleInterface.AddFeatureHandlerCalls())
+//     len(mockedPrometheusRuleInterface.AddFeatureHandlerCalls())
 func (mock *PrometheusRuleInterfaceMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
@@ -1210,8 +1194,7 @@ func (mock *PrometheusRuleInterfaceMock) AddFeatureLifecycle(ctx context.Context
 
 // AddFeatureLifecycleCalls gets all the calls that were made to AddFeatureLifecycle.
 // Check the length with:
-//
-//	len(mockedPrometheusRuleInterface.AddFeatureLifecycleCalls())
+//     len(mockedPrometheusRuleInterface.AddFeatureLifecycleCalls())
 func (mock *PrometheusRuleInterfaceMock) AddFeatureLifecycleCalls() []struct {
 	Ctx       context.Context
 	Enabled   func() bool
@@ -1252,8 +1235,7 @@ func (mock *PrometheusRuleInterfaceMock) AddHandler(ctx context.Context, name st
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//
-//	len(mockedPrometheusRuleInterface.AddHandlerCalls())
+//     len(mockedPrometheusRuleInterface.AddHandlerCalls())
 func (mock *PrometheusRuleInterfaceMock) AddHandlerCalls() []struct {
 	Ctx  context.Context
 	Name string
@@ -1292,8 +1274,7 @@ func (mock *PrometheusRuleInterfaceMock) AddLifecycle(ctx context.Context, name 
 
 // AddLifecycleCalls gets all the calls that were made to AddLifecycle.
 // Check the length with:
-//
-//	len(mockedPrometheusRuleInterface.AddLifecycleCalls())
+//     len(mockedPrometheusRuleInterface.AddLifecycleCalls())
 func (mock *PrometheusRuleInterfaceMock) AddLifecycleCalls() []struct {
 	Ctx       context.Context
 	Name      string
@@ -1325,8 +1306,7 @@ func (mock *PrometheusRuleInterfaceMock) Controller() v11.PrometheusRuleControll
 
 // ControllerCalls gets all the calls that were made to Controller.
 // Check the length with:
-//
-//	len(mockedPrometheusRuleInterface.ControllerCalls())
+//     len(mockedPrometheusRuleInterface.ControllerCalls())
 func (mock *PrometheusRuleInterfaceMock) ControllerCalls() []struct {
 } {
 	var calls []struct {
@@ -1355,8 +1335,7 @@ func (mock *PrometheusRuleInterfaceMock) Create(in1 *v1.PrometheusRule) (*v1.Pro
 
 // CreateCalls gets all the calls that were made to Create.
 // Check the length with:
-//
-//	len(mockedPrometheusRuleInterface.CreateCalls())
+//     len(mockedPrometheusRuleInterface.CreateCalls())
 func (mock *PrometheusRuleInterfaceMock) CreateCalls() []struct {
 	In1 *v1.PrometheusRule
 } {
@@ -1389,8 +1368,7 @@ func (mock *PrometheusRuleInterfaceMock) Delete(name string, options *metav1.Del
 
 // DeleteCalls gets all the calls that were made to Delete.
 // Check the length with:
-//
-//	len(mockedPrometheusRuleInterface.DeleteCalls())
+//     len(mockedPrometheusRuleInterface.DeleteCalls())
 func (mock *PrometheusRuleInterfaceMock) DeleteCalls() []struct {
 	Name    string
 	Options *metav1.DeleteOptions
@@ -1425,8 +1403,7 @@ func (mock *PrometheusRuleInterfaceMock) DeleteCollection(deleteOpts *metav1.Del
 
 // DeleteCollectionCalls gets all the calls that were made to DeleteCollection.
 // Check the length with:
-//
-//	len(mockedPrometheusRuleInterface.DeleteCollectionCalls())
+//     len(mockedPrometheusRuleInterface.DeleteCollectionCalls())
 func (mock *PrometheusRuleInterfaceMock) DeleteCollectionCalls() []struct {
 	DeleteOpts *metav1.DeleteOptions
 	ListOpts   metav1.ListOptions
@@ -1463,8 +1440,7 @@ func (mock *PrometheusRuleInterfaceMock) DeleteNamespaced(namespace string, name
 
 // DeleteNamespacedCalls gets all the calls that were made to DeleteNamespaced.
 // Check the length with:
-//
-//	len(mockedPrometheusRuleInterface.DeleteNamespacedCalls())
+//     len(mockedPrometheusRuleInterface.DeleteNamespacedCalls())
 func (mock *PrometheusRuleInterfaceMock) DeleteNamespacedCalls() []struct {
 	Namespace string
 	Name      string
@@ -1501,8 +1477,7 @@ func (mock *PrometheusRuleInterfaceMock) Get(name string, opts metav1.GetOptions
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//
-//	len(mockedPrometheusRuleInterface.GetCalls())
+//     len(mockedPrometheusRuleInterface.GetCalls())
 func (mock *PrometheusRuleInterfaceMock) GetCalls() []struct {
 	Name string
 	Opts metav1.GetOptions
@@ -1539,8 +1514,7 @@ func (mock *PrometheusRuleInterfaceMock) GetNamespaced(namespace string, name st
 
 // GetNamespacedCalls gets all the calls that were made to GetNamespaced.
 // Check the length with:
-//
-//	len(mockedPrometheusRuleInterface.GetNamespacedCalls())
+//     len(mockedPrometheusRuleInterface.GetNamespacedCalls())
 func (mock *PrometheusRuleInterfaceMock) GetNamespacedCalls() []struct {
 	Namespace string
 	Name      string
@@ -1575,8 +1549,7 @@ func (mock *PrometheusRuleInterfaceMock) List(opts metav1.ListOptions) (*v1.Prom
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//
-//	len(mockedPrometheusRuleInterface.ListCalls())
+//     len(mockedPrometheusRuleInterface.ListCalls())
 func (mock *PrometheusRuleInterfaceMock) ListCalls() []struct {
 	Opts metav1.ListOptions
 } {
@@ -1609,8 +1582,7 @@ func (mock *PrometheusRuleInterfaceMock) ListNamespaced(namespace string, opts m
 
 // ListNamespacedCalls gets all the calls that were made to ListNamespaced.
 // Check the length with:
-//
-//	len(mockedPrometheusRuleInterface.ListNamespacedCalls())
+//     len(mockedPrometheusRuleInterface.ListNamespacedCalls())
 func (mock *PrometheusRuleInterfaceMock) ListNamespacedCalls() []struct {
 	Namespace string
 	Opts      metav1.ListOptions
@@ -1640,8 +1612,7 @@ func (mock *PrometheusRuleInterfaceMock) ObjectClient() *objectclient.ObjectClie
 
 // ObjectClientCalls gets all the calls that were made to ObjectClient.
 // Check the length with:
-//
-//	len(mockedPrometheusRuleInterface.ObjectClientCalls())
+//     len(mockedPrometheusRuleInterface.ObjectClientCalls())
 func (mock *PrometheusRuleInterfaceMock) ObjectClientCalls() []struct {
 } {
 	var calls []struct {
@@ -1670,8 +1641,7 @@ func (mock *PrometheusRuleInterfaceMock) Update(in1 *v1.PrometheusRule) (*v1.Pro
 
 // UpdateCalls gets all the calls that were made to Update.
 // Check the length with:
-//
-//	len(mockedPrometheusRuleInterface.UpdateCalls())
+//     len(mockedPrometheusRuleInterface.UpdateCalls())
 func (mock *PrometheusRuleInterfaceMock) UpdateCalls() []struct {
 	In1 *v1.PrometheusRule
 } {
@@ -1702,8 +1672,7 @@ func (mock *PrometheusRuleInterfaceMock) Watch(opts metav1.ListOptions) (watch.I
 
 // WatchCalls gets all the calls that were made to Watch.
 // Check the length with:
-//
-//	len(mockedPrometheusRuleInterface.WatchCalls())
+//     len(mockedPrometheusRuleInterface.WatchCalls())
 func (mock *PrometheusRuleInterfaceMock) WatchCalls() []struct {
 	Opts metav1.ListOptions
 } {
@@ -1726,19 +1695,19 @@ var _ v11.PrometheusRulesGetter = &PrometheusRulesGetterMock{}
 
 // PrometheusRulesGetterMock is a mock implementation of v11.PrometheusRulesGetter.
 //
-//	    func TestSomethingThatUsesPrometheusRulesGetter(t *testing.T) {
+//     func TestSomethingThatUsesPrometheusRulesGetter(t *testing.T) {
 //
-//	        // make and configure a mocked v11.PrometheusRulesGetter
-//	        mockedPrometheusRulesGetter := &PrometheusRulesGetterMock{
-//	            PrometheusRulesFunc: func(namespace string) v11.PrometheusRuleInterface {
-//		               panic("mock out the PrometheusRules method")
-//	            },
-//	        }
+//         // make and configure a mocked v11.PrometheusRulesGetter
+//         mockedPrometheusRulesGetter := &PrometheusRulesGetterMock{
+//             PrometheusRulesFunc: func(namespace string) v11.PrometheusRuleInterface {
+// 	               panic("mock out the PrometheusRules method")
+//             },
+//         }
 //
-//	        // use mockedPrometheusRulesGetter in code that requires v11.PrometheusRulesGetter
-//	        // and then make assertions.
+//         // use mockedPrometheusRulesGetter in code that requires v11.PrometheusRulesGetter
+//         // and then make assertions.
 //
-//	    }
+//     }
 type PrometheusRulesGetterMock struct {
 	// PrometheusRulesFunc mocks the PrometheusRules method.
 	PrometheusRulesFunc func(namespace string) v11.PrometheusRuleInterface
@@ -1771,8 +1740,7 @@ func (mock *PrometheusRulesGetterMock) PrometheusRules(namespace string) v11.Pro
 
 // PrometheusRulesCalls gets all the calls that were made to PrometheusRules.
 // Check the length with:
-//
-//	len(mockedPrometheusRulesGetter.PrometheusRulesCalls())
+//     len(mockedPrometheusRulesGetter.PrometheusRulesCalls())
 func (mock *PrometheusRulesGetterMock) PrometheusRulesCalls() []struct {
 	Namespace string
 } {

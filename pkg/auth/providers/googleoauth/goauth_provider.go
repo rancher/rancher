@@ -438,3 +438,17 @@ func (g *googleOauthProvider) GetUserExtraAttributes(userPrincipal v3.Principal)
 	}
 	return extras
 }
+
+// IsDisabledProvider checks if the Google auth provider is currently disabled in Rancher.
+func (g *googleOauthProvider) IsDisabledProvider() (bool, error) {
+	googleOauthConfig, err := g.getGoogleOAuthConfigCR()
+	if err != nil {
+		return false, err
+	}
+	return !googleOauthConfig.Enabled, nil
+}
+
+// CleanupResources deletes resources associated with the Google auth provider.
+func (g *googleOauthProvider) CleanupResources(*v3.AuthConfig) error {
+	return nil
+}

@@ -1,3 +1,6 @@
+/*
+Package config contains functions for creating management, scaled, and user contexts that user norman controllers.
+*/
 package config
 
 import (
@@ -13,6 +16,7 @@ import (
 	"github.com/rancher/norman/store/proxy"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/pkg/catalog/manager"
+	"github.com/rancher/rancher/pkg/controllers"
 	"github.com/rancher/rancher/pkg/generated/controllers/catalog.cattle.io"
 	apiregistrationv1 "github.com/rancher/rancher/pkg/generated/norman/apiregistration.k8s.io/v1"
 	appsv1 "github.com/rancher/rancher/pkg/generated/norman/apps/v1"
@@ -24,7 +28,6 @@ import (
 	extv1beta1 "github.com/rancher/rancher/pkg/generated/norman/extensions/v1beta1"
 	managementv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	monitoringv1 "github.com/rancher/rancher/pkg/generated/norman/monitoring.coreos.com/v1"
-	istiov1alpha3 "github.com/rancher/rancher/pkg/generated/norman/networking.istio.io/v1alpha3"
 	knetworkingv1 "github.com/rancher/rancher/pkg/generated/norman/networking.k8s.io/v1"
 	policyv1beta1 "github.com/rancher/rancher/pkg/generated/norman/policy/v1beta1"
 	projectv3 "github.com/rancher/rancher/pkg/generated/norman/project.cattle.io/v3"
@@ -122,7 +125,8 @@ func NewScaledContext(config rest.Config, opts *ScaleContextOptions) (*ScaledCon
 	}
 
 	if opts.ControllerFactory == nil {
-		controllerFactory, err := controller.NewSharedControllerFactoryFromConfig(enableProtobuf(&context.RESTConfig), wrangler.Scheme)
+		controllerFactoryOpts := controllers.GetOptsFromEnv(controllers.Scaled)
+		controllerFactory, err := controller.NewSharedControllerFactoryFromConfigWithOptions(enableProtobuf(&context.RESTConfig), wrangler.Scheme, controllerFactoryOpts)
 		if err != nil {
 			return nil, err
 		}
@@ -233,7 +237,6 @@ type UserContext struct {
 	Networking     knetworkingv1.Interface
 	Monitoring     monitoringv1.Interface
 	Cluster        clusterv3.Interface
-	Istio          istiov1alpha3.Interface
 	Storage        storagev1.Interface
 	Policy         policyv1beta1.Interface
 
@@ -307,7 +310,6 @@ func (w *UserContext) UserOnlyContext() *UserOnlyContext {
 		BatchV1Beta1: w.BatchV1Beta1,
 		Monitoring:   w.Monitoring,
 		Cluster:      w.Cluster,
-		Istio:        w.Istio,
 		Storage:      w.Storage,
 		Policy:       w.Policy,
 	}
@@ -333,7 +335,6 @@ type UserOnlyContext struct {
 	Networking      knetworkingv1.Interface
 	Monitoring      monitoringv1.Interface
 	Cluster         clusterv3.Interface
-	Istio           istiov1alpha3.Interface
 	Storage         storagev1.Interface
 	Policy          policyv1beta1.Interface
 }
@@ -437,7 +438,7 @@ func NewUserContext(scaledContext *ScaledContext, config rest.Config, clusterNam
 		KindNamespace: context.KindNamespaces,
 	})
 
-	controllerFactory := controller.NewSharedControllerFactory(cacheFactory, nil)
+	controllerFactory := controller.NewSharedControllerFactory(cacheFactory, controllers.GetOptsFromEnv(controllers.User))
 	context.ControllerFactory = controllerFactory
 
 	context.K8sClient, err = kubernetes.NewForConfig(&config)
@@ -506,11 +507,6 @@ func NewUserContext(scaledContext *ScaledContext, config rest.Config, clusterNam
 	}
 
 	context.Cluster, err = clusterv3.NewFromControllerFactory(controllerFactory)
-	if err != nil {
-		return nil, err
-	}
-
-	context.Istio, err = istiov1alpha3.NewFromControllerFactory(controllerFactory)
 	if err != nil {
 		return nil, err
 	}
@@ -632,11 +628,6 @@ func NewUserOnlyContext(config *wrangler.Context) (*UserOnlyContext, error) {
 	}
 
 	context.Cluster, err = clusterv3.NewFromControllerFactory(context.ControllerFactory)
-	if err != nil {
-		return nil, err
-	}
-
-	context.Istio, err = istiov1alpha3.NewFromControllerFactory(context.ControllerFactory)
 	if err != nil {
 		return nil, err
 	}

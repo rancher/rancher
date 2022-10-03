@@ -406,3 +406,17 @@ func (s *Provider) GetUserExtraAttributes(userPrincipal v3.Principal) map[string
 	}
 	return extras
 }
+
+// IsDisabledProvider checks if the SAML auth provider is currently disabled in Rancher.
+func (s *Provider) IsDisabledProvider() (bool, error) {
+	samlConfig, err := s.getSamlConfig()
+	if err != nil {
+		return false, err
+	}
+	return !samlConfig.Enabled, nil
+}
+
+// CleanupResources deletes resources associated with the SAML auth provider.
+func (s *Provider) CleanupResources(*v3.AuthConfig) error {
+	return nil
+}

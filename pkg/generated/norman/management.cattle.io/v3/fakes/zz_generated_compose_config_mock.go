@@ -29,22 +29,22 @@ var _ v31.ComposeConfigLister = &ComposeConfigListerMock{}
 
 // ComposeConfigListerMock is a mock implementation of v31.ComposeConfigLister.
 //
-//	    func TestSomethingThatUsesComposeConfigLister(t *testing.T) {
+//     func TestSomethingThatUsesComposeConfigLister(t *testing.T) {
 //
-//	        // make and configure a mocked v31.ComposeConfigLister
-//	        mockedComposeConfigLister := &ComposeConfigListerMock{
-//	            GetFunc: func(namespace string, name string) (*v3.ComposeConfig, error) {
-//		               panic("mock out the Get method")
-//	            },
-//	            ListFunc: func(namespace string, selector labels.Selector) ([]*v3.ComposeConfig, error) {
-//		               panic("mock out the List method")
-//	            },
-//	        }
+//         // make and configure a mocked v31.ComposeConfigLister
+//         mockedComposeConfigLister := &ComposeConfigListerMock{
+//             GetFunc: func(namespace string, name string) (*v3.ComposeConfig, error) {
+// 	               panic("mock out the Get method")
+//             },
+//             ListFunc: func(namespace string, selector labels.Selector) ([]*v3.ComposeConfig, error) {
+// 	               panic("mock out the List method")
+//             },
+//         }
 //
-//	        // use mockedComposeConfigLister in code that requires v31.ComposeConfigLister
-//	        // and then make assertions.
+//         // use mockedComposeConfigLister in code that requires v31.ComposeConfigLister
+//         // and then make assertions.
 //
-//	    }
+//     }
 type ComposeConfigListerMock struct {
 	// GetFunc mocks the Get method.
 	GetFunc func(namespace string, name string) (*v3.ComposeConfig, error)
@@ -91,8 +91,7 @@ func (mock *ComposeConfigListerMock) Get(namespace string, name string) (*v3.Com
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//
-//	len(mockedComposeConfigLister.GetCalls())
+//     len(mockedComposeConfigLister.GetCalls())
 func (mock *ComposeConfigListerMock) GetCalls() []struct {
 	Namespace string
 	Name      string
@@ -127,8 +126,7 @@ func (mock *ComposeConfigListerMock) List(namespace string, selector labels.Sele
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//
-//	len(mockedComposeConfigLister.ListCalls())
+//     len(mockedComposeConfigLister.ListCalls())
 func (mock *ComposeConfigListerMock) ListCalls() []struct {
 	Namespace string
 	Selector  labels.Selector
@@ -161,43 +159,43 @@ var _ v31.ComposeConfigController = &ComposeConfigControllerMock{}
 
 // ComposeConfigControllerMock is a mock implementation of v31.ComposeConfigController.
 //
-//	    func TestSomethingThatUsesComposeConfigController(t *testing.T) {
+//     func TestSomethingThatUsesComposeConfigController(t *testing.T) {
 //
-//	        // make and configure a mocked v31.ComposeConfigController
-//	        mockedComposeConfigController := &ComposeConfigControllerMock{
-//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v31.ComposeConfigHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedFeatureHandler method")
-//	            },
-//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v31.ComposeConfigHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedHandler method")
-//	            },
-//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.ComposeConfigHandlerFunc)  {
-//		               panic("mock out the AddFeatureHandler method")
-//	            },
-//	            AddHandlerFunc: func(ctx context.Context, name string, handler v31.ComposeConfigHandlerFunc)  {
-//		               panic("mock out the AddHandler method")
-//	            },
-//	            EnqueueFunc: func(namespace string, name string)  {
-//		               panic("mock out the Enqueue method")
-//	            },
-//	            EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
-//		               panic("mock out the EnqueueAfter method")
-//	            },
-//	            GenericFunc: func() controller.GenericController {
-//		               panic("mock out the Generic method")
-//	            },
-//	            InformerFunc: func() cache.SharedIndexInformer {
-//		               panic("mock out the Informer method")
-//	            },
-//	            ListerFunc: func() v31.ComposeConfigLister {
-//		               panic("mock out the Lister method")
-//	            },
-//	        }
+//         // make and configure a mocked v31.ComposeConfigController
+//         mockedComposeConfigController := &ComposeConfigControllerMock{
+//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v31.ComposeConfigHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedFeatureHandler method")
+//             },
+//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v31.ComposeConfigHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedHandler method")
+//             },
+//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.ComposeConfigHandlerFunc)  {
+// 	               panic("mock out the AddFeatureHandler method")
+//             },
+//             AddHandlerFunc: func(ctx context.Context, name string, handler v31.ComposeConfigHandlerFunc)  {
+// 	               panic("mock out the AddHandler method")
+//             },
+//             EnqueueFunc: func(namespace string, name string)  {
+// 	               panic("mock out the Enqueue method")
+//             },
+//             EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
+// 	               panic("mock out the EnqueueAfter method")
+//             },
+//             GenericFunc: func() controller.GenericController {
+// 	               panic("mock out the Generic method")
+//             },
+//             InformerFunc: func() cache.SharedIndexInformer {
+// 	               panic("mock out the Informer method")
+//             },
+//             ListerFunc: func() v31.ComposeConfigLister {
+// 	               panic("mock out the Lister method")
+//             },
+//         }
 //
-//	        // use mockedComposeConfigController in code that requires v31.ComposeConfigController
-//	        // and then make assertions.
+//         // use mockedComposeConfigController in code that requires v31.ComposeConfigController
+//         // and then make assertions.
 //
-//	    }
+//     }
 type ComposeConfigControllerMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
 	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v31.ComposeConfigHandlerFunc)
@@ -326,8 +324,7 @@ func (mock *ComposeConfigControllerMock) AddClusterScopedFeatureHandler(ctx cont
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//
-//	len(mockedComposeConfigController.AddClusterScopedFeatureHandlerCalls())
+//     len(mockedComposeConfigController.AddClusterScopedFeatureHandlerCalls())
 func (mock *ComposeConfigControllerMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -372,8 +369,7 @@ func (mock *ComposeConfigControllerMock) AddClusterScopedHandler(ctx context.Con
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//
-//	len(mockedComposeConfigController.AddClusterScopedHandlerCalls())
+//     len(mockedComposeConfigController.AddClusterScopedHandlerCalls())
 func (mock *ComposeConfigControllerMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -416,8 +412,7 @@ func (mock *ComposeConfigControllerMock) AddFeatureHandler(ctx context.Context, 
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//
-//	len(mockedComposeConfigController.AddFeatureHandlerCalls())
+//     len(mockedComposeConfigController.AddFeatureHandlerCalls())
 func (mock *ComposeConfigControllerMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
@@ -458,8 +453,7 @@ func (mock *ComposeConfigControllerMock) AddHandler(ctx context.Context, name st
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//
-//	len(mockedComposeConfigController.AddHandlerCalls())
+//     len(mockedComposeConfigController.AddHandlerCalls())
 func (mock *ComposeConfigControllerMock) AddHandlerCalls() []struct {
 	Ctx     context.Context
 	Name    string
@@ -496,8 +490,7 @@ func (mock *ComposeConfigControllerMock) Enqueue(namespace string, name string) 
 
 // EnqueueCalls gets all the calls that were made to Enqueue.
 // Check the length with:
-//
-//	len(mockedComposeConfigController.EnqueueCalls())
+//     len(mockedComposeConfigController.EnqueueCalls())
 func (mock *ComposeConfigControllerMock) EnqueueCalls() []struct {
 	Namespace string
 	Name      string
@@ -534,8 +527,7 @@ func (mock *ComposeConfigControllerMock) EnqueueAfter(namespace string, name str
 
 // EnqueueAfterCalls gets all the calls that were made to EnqueueAfter.
 // Check the length with:
-//
-//	len(mockedComposeConfigController.EnqueueAfterCalls())
+//     len(mockedComposeConfigController.EnqueueAfterCalls())
 func (mock *ComposeConfigControllerMock) EnqueueAfterCalls() []struct {
 	Namespace string
 	Name      string
@@ -567,8 +559,7 @@ func (mock *ComposeConfigControllerMock) Generic() controller.GenericController 
 
 // GenericCalls gets all the calls that were made to Generic.
 // Check the length with:
-//
-//	len(mockedComposeConfigController.GenericCalls())
+//     len(mockedComposeConfigController.GenericCalls())
 func (mock *ComposeConfigControllerMock) GenericCalls() []struct {
 } {
 	var calls []struct {
@@ -594,8 +585,7 @@ func (mock *ComposeConfigControllerMock) Informer() cache.SharedIndexInformer {
 
 // InformerCalls gets all the calls that were made to Informer.
 // Check the length with:
-//
-//	len(mockedComposeConfigController.InformerCalls())
+//     len(mockedComposeConfigController.InformerCalls())
 func (mock *ComposeConfigControllerMock) InformerCalls() []struct {
 } {
 	var calls []struct {
@@ -621,8 +611,7 @@ func (mock *ComposeConfigControllerMock) Lister() v31.ComposeConfigLister {
 
 // ListerCalls gets all the calls that were made to Lister.
 // Check the length with:
-//
-//	len(mockedComposeConfigController.ListerCalls())
+//     len(mockedComposeConfigController.ListerCalls())
 func (mock *ComposeConfigControllerMock) ListerCalls() []struct {
 } {
 	var calls []struct {
@@ -662,76 +651,76 @@ var _ v31.ComposeConfigInterface = &ComposeConfigInterfaceMock{}
 
 // ComposeConfigInterfaceMock is a mock implementation of v31.ComposeConfigInterface.
 //
-//	    func TestSomethingThatUsesComposeConfigInterface(t *testing.T) {
+//     func TestSomethingThatUsesComposeConfigInterface(t *testing.T) {
 //
-//	        // make and configure a mocked v31.ComposeConfigInterface
-//	        mockedComposeConfigInterface := &ComposeConfigInterfaceMock{
-//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v31.ComposeConfigHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedFeatureHandler method")
-//	            },
-//	            AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v31.ComposeConfigLifecycle)  {
-//		               panic("mock out the AddClusterScopedFeatureLifecycle method")
-//	            },
-//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v31.ComposeConfigHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedHandler method")
-//	            },
-//	            AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v31.ComposeConfigLifecycle)  {
-//		               panic("mock out the AddClusterScopedLifecycle method")
-//	            },
-//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.ComposeConfigHandlerFunc)  {
-//		               panic("mock out the AddFeatureHandler method")
-//	            },
-//	            AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v31.ComposeConfigLifecycle)  {
-//		               panic("mock out the AddFeatureLifecycle method")
-//	            },
-//	            AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v31.ComposeConfigHandlerFunc)  {
-//		               panic("mock out the AddHandler method")
-//	            },
-//	            AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v31.ComposeConfigLifecycle)  {
-//		               panic("mock out the AddLifecycle method")
-//	            },
-//	            ControllerFunc: func() v31.ComposeConfigController {
-//		               panic("mock out the Controller method")
-//	            },
-//	            CreateFunc: func(in1 *v3.ComposeConfig) (*v3.ComposeConfig, error) {
-//		               panic("mock out the Create method")
-//	            },
-//	            DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
-//		               panic("mock out the Delete method")
-//	            },
-//	            DeleteCollectionFunc: func(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
-//		               panic("mock out the DeleteCollection method")
-//	            },
-//	            DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
-//		               panic("mock out the DeleteNamespaced method")
-//	            },
-//	            GetFunc: func(name string, opts metav1.GetOptions) (*v3.ComposeConfig, error) {
-//		               panic("mock out the Get method")
-//	            },
-//	            GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v3.ComposeConfig, error) {
-//		               panic("mock out the GetNamespaced method")
-//	            },
-//	            ListFunc: func(opts metav1.ListOptions) (*v3.ComposeConfigList, error) {
-//		               panic("mock out the List method")
-//	            },
-//	            ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v3.ComposeConfigList, error) {
-//		               panic("mock out the ListNamespaced method")
-//	            },
-//	            ObjectClientFunc: func() *objectclient.ObjectClient {
-//		               panic("mock out the ObjectClient method")
-//	            },
-//	            UpdateFunc: func(in1 *v3.ComposeConfig) (*v3.ComposeConfig, error) {
-//		               panic("mock out the Update method")
-//	            },
-//	            WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
-//		               panic("mock out the Watch method")
-//	            },
-//	        }
+//         // make and configure a mocked v31.ComposeConfigInterface
+//         mockedComposeConfigInterface := &ComposeConfigInterfaceMock{
+//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v31.ComposeConfigHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedFeatureHandler method")
+//             },
+//             AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v31.ComposeConfigLifecycle)  {
+// 	               panic("mock out the AddClusterScopedFeatureLifecycle method")
+//             },
+//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v31.ComposeConfigHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedHandler method")
+//             },
+//             AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v31.ComposeConfigLifecycle)  {
+// 	               panic("mock out the AddClusterScopedLifecycle method")
+//             },
+//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.ComposeConfigHandlerFunc)  {
+// 	               panic("mock out the AddFeatureHandler method")
+//             },
+//             AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v31.ComposeConfigLifecycle)  {
+// 	               panic("mock out the AddFeatureLifecycle method")
+//             },
+//             AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v31.ComposeConfigHandlerFunc)  {
+// 	               panic("mock out the AddHandler method")
+//             },
+//             AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v31.ComposeConfigLifecycle)  {
+// 	               panic("mock out the AddLifecycle method")
+//             },
+//             ControllerFunc: func() v31.ComposeConfigController {
+// 	               panic("mock out the Controller method")
+//             },
+//             CreateFunc: func(in1 *v3.ComposeConfig) (*v3.ComposeConfig, error) {
+// 	               panic("mock out the Create method")
+//             },
+//             DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
+// 	               panic("mock out the Delete method")
+//             },
+//             DeleteCollectionFunc: func(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
+// 	               panic("mock out the DeleteCollection method")
+//             },
+//             DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
+// 	               panic("mock out the DeleteNamespaced method")
+//             },
+//             GetFunc: func(name string, opts metav1.GetOptions) (*v3.ComposeConfig, error) {
+// 	               panic("mock out the Get method")
+//             },
+//             GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v3.ComposeConfig, error) {
+// 	               panic("mock out the GetNamespaced method")
+//             },
+//             ListFunc: func(opts metav1.ListOptions) (*v3.ComposeConfigList, error) {
+// 	               panic("mock out the List method")
+//             },
+//             ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v3.ComposeConfigList, error) {
+// 	               panic("mock out the ListNamespaced method")
+//             },
+//             ObjectClientFunc: func() *objectclient.ObjectClient {
+// 	               panic("mock out the ObjectClient method")
+//             },
+//             UpdateFunc: func(in1 *v3.ComposeConfig) (*v3.ComposeConfig, error) {
+// 	               panic("mock out the Update method")
+//             },
+//             WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
+// 	               panic("mock out the Watch method")
+//             },
+//         }
 //
-//	        // use mockedComposeConfigInterface in code that requires v31.ComposeConfigInterface
-//	        // and then make assertions.
+//         // use mockedComposeConfigInterface in code that requires v31.ComposeConfigInterface
+//         // and then make assertions.
 //
-//	    }
+//     }
 type ComposeConfigInterfaceMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
 	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v31.ComposeConfigHandlerFunc)
@@ -984,8 +973,7 @@ func (mock *ComposeConfigInterfaceMock) AddClusterScopedFeatureHandler(ctx conte
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//
-//	len(mockedComposeConfigInterface.AddClusterScopedFeatureHandlerCalls())
+//     len(mockedComposeConfigInterface.AddClusterScopedFeatureHandlerCalls())
 func (mock *ComposeConfigInterfaceMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -1032,8 +1020,7 @@ func (mock *ComposeConfigInterfaceMock) AddClusterScopedFeatureLifecycle(ctx con
 
 // AddClusterScopedFeatureLifecycleCalls gets all the calls that were made to AddClusterScopedFeatureLifecycle.
 // Check the length with:
-//
-//	len(mockedComposeConfigInterface.AddClusterScopedFeatureLifecycleCalls())
+//     len(mockedComposeConfigInterface.AddClusterScopedFeatureLifecycleCalls())
 func (mock *ComposeConfigInterfaceMock) AddClusterScopedFeatureLifecycleCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -1078,8 +1065,7 @@ func (mock *ComposeConfigInterfaceMock) AddClusterScopedHandler(ctx context.Cont
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//
-//	len(mockedComposeConfigInterface.AddClusterScopedHandlerCalls())
+//     len(mockedComposeConfigInterface.AddClusterScopedHandlerCalls())
 func (mock *ComposeConfigInterfaceMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -1122,8 +1108,7 @@ func (mock *ComposeConfigInterfaceMock) AddClusterScopedLifecycle(ctx context.Co
 
 // AddClusterScopedLifecycleCalls gets all the calls that were made to AddClusterScopedLifecycle.
 // Check the length with:
-//
-//	len(mockedComposeConfigInterface.AddClusterScopedLifecycleCalls())
+//     len(mockedComposeConfigInterface.AddClusterScopedLifecycleCalls())
 func (mock *ComposeConfigInterfaceMock) AddClusterScopedLifecycleCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -1166,8 +1151,7 @@ func (mock *ComposeConfigInterfaceMock) AddFeatureHandler(ctx context.Context, e
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//
-//	len(mockedComposeConfigInterface.AddFeatureHandlerCalls())
+//     len(mockedComposeConfigInterface.AddFeatureHandlerCalls())
 func (mock *ComposeConfigInterfaceMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
@@ -1210,8 +1194,7 @@ func (mock *ComposeConfigInterfaceMock) AddFeatureLifecycle(ctx context.Context,
 
 // AddFeatureLifecycleCalls gets all the calls that were made to AddFeatureLifecycle.
 // Check the length with:
-//
-//	len(mockedComposeConfigInterface.AddFeatureLifecycleCalls())
+//     len(mockedComposeConfigInterface.AddFeatureLifecycleCalls())
 func (mock *ComposeConfigInterfaceMock) AddFeatureLifecycleCalls() []struct {
 	Ctx       context.Context
 	Enabled   func() bool
@@ -1252,8 +1235,7 @@ func (mock *ComposeConfigInterfaceMock) AddHandler(ctx context.Context, name str
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//
-//	len(mockedComposeConfigInterface.AddHandlerCalls())
+//     len(mockedComposeConfigInterface.AddHandlerCalls())
 func (mock *ComposeConfigInterfaceMock) AddHandlerCalls() []struct {
 	Ctx  context.Context
 	Name string
@@ -1292,8 +1274,7 @@ func (mock *ComposeConfigInterfaceMock) AddLifecycle(ctx context.Context, name s
 
 // AddLifecycleCalls gets all the calls that were made to AddLifecycle.
 // Check the length with:
-//
-//	len(mockedComposeConfigInterface.AddLifecycleCalls())
+//     len(mockedComposeConfigInterface.AddLifecycleCalls())
 func (mock *ComposeConfigInterfaceMock) AddLifecycleCalls() []struct {
 	Ctx       context.Context
 	Name      string
@@ -1325,8 +1306,7 @@ func (mock *ComposeConfigInterfaceMock) Controller() v31.ComposeConfigController
 
 // ControllerCalls gets all the calls that were made to Controller.
 // Check the length with:
-//
-//	len(mockedComposeConfigInterface.ControllerCalls())
+//     len(mockedComposeConfigInterface.ControllerCalls())
 func (mock *ComposeConfigInterfaceMock) ControllerCalls() []struct {
 } {
 	var calls []struct {
@@ -1355,8 +1335,7 @@ func (mock *ComposeConfigInterfaceMock) Create(in1 *v3.ComposeConfig) (*v3.Compo
 
 // CreateCalls gets all the calls that were made to Create.
 // Check the length with:
-//
-//	len(mockedComposeConfigInterface.CreateCalls())
+//     len(mockedComposeConfigInterface.CreateCalls())
 func (mock *ComposeConfigInterfaceMock) CreateCalls() []struct {
 	In1 *v3.ComposeConfig
 } {
@@ -1389,8 +1368,7 @@ func (mock *ComposeConfigInterfaceMock) Delete(name string, options *metav1.Dele
 
 // DeleteCalls gets all the calls that were made to Delete.
 // Check the length with:
-//
-//	len(mockedComposeConfigInterface.DeleteCalls())
+//     len(mockedComposeConfigInterface.DeleteCalls())
 func (mock *ComposeConfigInterfaceMock) DeleteCalls() []struct {
 	Name    string
 	Options *metav1.DeleteOptions
@@ -1425,8 +1403,7 @@ func (mock *ComposeConfigInterfaceMock) DeleteCollection(deleteOpts *metav1.Dele
 
 // DeleteCollectionCalls gets all the calls that were made to DeleteCollection.
 // Check the length with:
-//
-//	len(mockedComposeConfigInterface.DeleteCollectionCalls())
+//     len(mockedComposeConfigInterface.DeleteCollectionCalls())
 func (mock *ComposeConfigInterfaceMock) DeleteCollectionCalls() []struct {
 	DeleteOpts *metav1.DeleteOptions
 	ListOpts   metav1.ListOptions
@@ -1463,8 +1440,7 @@ func (mock *ComposeConfigInterfaceMock) DeleteNamespaced(namespace string, name 
 
 // DeleteNamespacedCalls gets all the calls that were made to DeleteNamespaced.
 // Check the length with:
-//
-//	len(mockedComposeConfigInterface.DeleteNamespacedCalls())
+//     len(mockedComposeConfigInterface.DeleteNamespacedCalls())
 func (mock *ComposeConfigInterfaceMock) DeleteNamespacedCalls() []struct {
 	Namespace string
 	Name      string
@@ -1501,8 +1477,7 @@ func (mock *ComposeConfigInterfaceMock) Get(name string, opts metav1.GetOptions)
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//
-//	len(mockedComposeConfigInterface.GetCalls())
+//     len(mockedComposeConfigInterface.GetCalls())
 func (mock *ComposeConfigInterfaceMock) GetCalls() []struct {
 	Name string
 	Opts metav1.GetOptions
@@ -1539,8 +1514,7 @@ func (mock *ComposeConfigInterfaceMock) GetNamespaced(namespace string, name str
 
 // GetNamespacedCalls gets all the calls that were made to GetNamespaced.
 // Check the length with:
-//
-//	len(mockedComposeConfigInterface.GetNamespacedCalls())
+//     len(mockedComposeConfigInterface.GetNamespacedCalls())
 func (mock *ComposeConfigInterfaceMock) GetNamespacedCalls() []struct {
 	Namespace string
 	Name      string
@@ -1575,8 +1549,7 @@ func (mock *ComposeConfigInterfaceMock) List(opts metav1.ListOptions) (*v3.Compo
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//
-//	len(mockedComposeConfigInterface.ListCalls())
+//     len(mockedComposeConfigInterface.ListCalls())
 func (mock *ComposeConfigInterfaceMock) ListCalls() []struct {
 	Opts metav1.ListOptions
 } {
@@ -1609,8 +1582,7 @@ func (mock *ComposeConfigInterfaceMock) ListNamespaced(namespace string, opts me
 
 // ListNamespacedCalls gets all the calls that were made to ListNamespaced.
 // Check the length with:
-//
-//	len(mockedComposeConfigInterface.ListNamespacedCalls())
+//     len(mockedComposeConfigInterface.ListNamespacedCalls())
 func (mock *ComposeConfigInterfaceMock) ListNamespacedCalls() []struct {
 	Namespace string
 	Opts      metav1.ListOptions
@@ -1640,8 +1612,7 @@ func (mock *ComposeConfigInterfaceMock) ObjectClient() *objectclient.ObjectClien
 
 // ObjectClientCalls gets all the calls that were made to ObjectClient.
 // Check the length with:
-//
-//	len(mockedComposeConfigInterface.ObjectClientCalls())
+//     len(mockedComposeConfigInterface.ObjectClientCalls())
 func (mock *ComposeConfigInterfaceMock) ObjectClientCalls() []struct {
 } {
 	var calls []struct {
@@ -1670,8 +1641,7 @@ func (mock *ComposeConfigInterfaceMock) Update(in1 *v3.ComposeConfig) (*v3.Compo
 
 // UpdateCalls gets all the calls that were made to Update.
 // Check the length with:
-//
-//	len(mockedComposeConfigInterface.UpdateCalls())
+//     len(mockedComposeConfigInterface.UpdateCalls())
 func (mock *ComposeConfigInterfaceMock) UpdateCalls() []struct {
 	In1 *v3.ComposeConfig
 } {
@@ -1702,8 +1672,7 @@ func (mock *ComposeConfigInterfaceMock) Watch(opts metav1.ListOptions) (watch.In
 
 // WatchCalls gets all the calls that were made to Watch.
 // Check the length with:
-//
-//	len(mockedComposeConfigInterface.WatchCalls())
+//     len(mockedComposeConfigInterface.WatchCalls())
 func (mock *ComposeConfigInterfaceMock) WatchCalls() []struct {
 	Opts metav1.ListOptions
 } {
@@ -1726,19 +1695,19 @@ var _ v31.ComposeConfigsGetter = &ComposeConfigsGetterMock{}
 
 // ComposeConfigsGetterMock is a mock implementation of v31.ComposeConfigsGetter.
 //
-//	    func TestSomethingThatUsesComposeConfigsGetter(t *testing.T) {
+//     func TestSomethingThatUsesComposeConfigsGetter(t *testing.T) {
 //
-//	        // make and configure a mocked v31.ComposeConfigsGetter
-//	        mockedComposeConfigsGetter := &ComposeConfigsGetterMock{
-//	            ComposeConfigsFunc: func(namespace string) v31.ComposeConfigInterface {
-//		               panic("mock out the ComposeConfigs method")
-//	            },
-//	        }
+//         // make and configure a mocked v31.ComposeConfigsGetter
+//         mockedComposeConfigsGetter := &ComposeConfigsGetterMock{
+//             ComposeConfigsFunc: func(namespace string) v31.ComposeConfigInterface {
+// 	               panic("mock out the ComposeConfigs method")
+//             },
+//         }
 //
-//	        // use mockedComposeConfigsGetter in code that requires v31.ComposeConfigsGetter
-//	        // and then make assertions.
+//         // use mockedComposeConfigsGetter in code that requires v31.ComposeConfigsGetter
+//         // and then make assertions.
 //
-//	    }
+//     }
 type ComposeConfigsGetterMock struct {
 	// ComposeConfigsFunc mocks the ComposeConfigs method.
 	ComposeConfigsFunc func(namespace string) v31.ComposeConfigInterface
@@ -1771,8 +1740,7 @@ func (mock *ComposeConfigsGetterMock) ComposeConfigs(namespace string) v31.Compo
 
 // ComposeConfigsCalls gets all the calls that were made to ComposeConfigs.
 // Check the length with:
-//
-//	len(mockedComposeConfigsGetter.ComposeConfigsCalls())
+//     len(mockedComposeConfigsGetter.ComposeConfigsCalls())
 func (mock *ComposeConfigsGetterMock) ComposeConfigsCalls() []struct {
 	Namespace string
 } {

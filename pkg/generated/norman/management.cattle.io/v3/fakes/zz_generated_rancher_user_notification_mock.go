@@ -29,22 +29,22 @@ var _ v31.RancherUserNotificationLister = &RancherUserNotificationListerMock{}
 
 // RancherUserNotificationListerMock is a mock implementation of v31.RancherUserNotificationLister.
 //
-//	    func TestSomethingThatUsesRancherUserNotificationLister(t *testing.T) {
+//     func TestSomethingThatUsesRancherUserNotificationLister(t *testing.T) {
 //
-//	        // make and configure a mocked v31.RancherUserNotificationLister
-//	        mockedRancherUserNotificationLister := &RancherUserNotificationListerMock{
-//	            GetFunc: func(namespace string, name string) (*v3.RancherUserNotification, error) {
-//		               panic("mock out the Get method")
-//	            },
-//	            ListFunc: func(namespace string, selector labels.Selector) ([]*v3.RancherUserNotification, error) {
-//		               panic("mock out the List method")
-//	            },
-//	        }
+//         // make and configure a mocked v31.RancherUserNotificationLister
+//         mockedRancherUserNotificationLister := &RancherUserNotificationListerMock{
+//             GetFunc: func(namespace string, name string) (*v3.RancherUserNotification, error) {
+// 	               panic("mock out the Get method")
+//             },
+//             ListFunc: func(namespace string, selector labels.Selector) ([]*v3.RancherUserNotification, error) {
+// 	               panic("mock out the List method")
+//             },
+//         }
 //
-//	        // use mockedRancherUserNotificationLister in code that requires v31.RancherUserNotificationLister
-//	        // and then make assertions.
+//         // use mockedRancherUserNotificationLister in code that requires v31.RancherUserNotificationLister
+//         // and then make assertions.
 //
-//	    }
+//     }
 type RancherUserNotificationListerMock struct {
 	// GetFunc mocks the Get method.
 	GetFunc func(namespace string, name string) (*v3.RancherUserNotification, error)
@@ -91,8 +91,7 @@ func (mock *RancherUserNotificationListerMock) Get(namespace string, name string
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//
-//	len(mockedRancherUserNotificationLister.GetCalls())
+//     len(mockedRancherUserNotificationLister.GetCalls())
 func (mock *RancherUserNotificationListerMock) GetCalls() []struct {
 	Namespace string
 	Name      string
@@ -127,8 +126,7 @@ func (mock *RancherUserNotificationListerMock) List(namespace string, selector l
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//
-//	len(mockedRancherUserNotificationLister.ListCalls())
+//     len(mockedRancherUserNotificationLister.ListCalls())
 func (mock *RancherUserNotificationListerMock) ListCalls() []struct {
 	Namespace string
 	Selector  labels.Selector
@@ -161,43 +159,43 @@ var _ v31.RancherUserNotificationController = &RancherUserNotificationController
 
 // RancherUserNotificationControllerMock is a mock implementation of v31.RancherUserNotificationController.
 //
-//	    func TestSomethingThatUsesRancherUserNotificationController(t *testing.T) {
+//     func TestSomethingThatUsesRancherUserNotificationController(t *testing.T) {
 //
-//	        // make and configure a mocked v31.RancherUserNotificationController
-//	        mockedRancherUserNotificationController := &RancherUserNotificationControllerMock{
-//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v31.RancherUserNotificationHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedFeatureHandler method")
-//	            },
-//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v31.RancherUserNotificationHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedHandler method")
-//	            },
-//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.RancherUserNotificationHandlerFunc)  {
-//		               panic("mock out the AddFeatureHandler method")
-//	            },
-//	            AddHandlerFunc: func(ctx context.Context, name string, handler v31.RancherUserNotificationHandlerFunc)  {
-//		               panic("mock out the AddHandler method")
-//	            },
-//	            EnqueueFunc: func(namespace string, name string)  {
-//		               panic("mock out the Enqueue method")
-//	            },
-//	            EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
-//		               panic("mock out the EnqueueAfter method")
-//	            },
-//	            GenericFunc: func() controller.GenericController {
-//		               panic("mock out the Generic method")
-//	            },
-//	            InformerFunc: func() cache.SharedIndexInformer {
-//		               panic("mock out the Informer method")
-//	            },
-//	            ListerFunc: func() v31.RancherUserNotificationLister {
-//		               panic("mock out the Lister method")
-//	            },
-//	        }
+//         // make and configure a mocked v31.RancherUserNotificationController
+//         mockedRancherUserNotificationController := &RancherUserNotificationControllerMock{
+//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v31.RancherUserNotificationHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedFeatureHandler method")
+//             },
+//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v31.RancherUserNotificationHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedHandler method")
+//             },
+//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.RancherUserNotificationHandlerFunc)  {
+// 	               panic("mock out the AddFeatureHandler method")
+//             },
+//             AddHandlerFunc: func(ctx context.Context, name string, handler v31.RancherUserNotificationHandlerFunc)  {
+// 	               panic("mock out the AddHandler method")
+//             },
+//             EnqueueFunc: func(namespace string, name string)  {
+// 	               panic("mock out the Enqueue method")
+//             },
+//             EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
+// 	               panic("mock out the EnqueueAfter method")
+//             },
+//             GenericFunc: func() controller.GenericController {
+// 	               panic("mock out the Generic method")
+//             },
+//             InformerFunc: func() cache.SharedIndexInformer {
+// 	               panic("mock out the Informer method")
+//             },
+//             ListerFunc: func() v31.RancherUserNotificationLister {
+// 	               panic("mock out the Lister method")
+//             },
+//         }
 //
-//	        // use mockedRancherUserNotificationController in code that requires v31.RancherUserNotificationController
-//	        // and then make assertions.
+//         // use mockedRancherUserNotificationController in code that requires v31.RancherUserNotificationController
+//         // and then make assertions.
 //
-//	    }
+//     }
 type RancherUserNotificationControllerMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
 	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v31.RancherUserNotificationHandlerFunc)
@@ -326,8 +324,7 @@ func (mock *RancherUserNotificationControllerMock) AddClusterScopedFeatureHandle
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//
-//	len(mockedRancherUserNotificationController.AddClusterScopedFeatureHandlerCalls())
+//     len(mockedRancherUserNotificationController.AddClusterScopedFeatureHandlerCalls())
 func (mock *RancherUserNotificationControllerMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -372,8 +369,7 @@ func (mock *RancherUserNotificationControllerMock) AddClusterScopedHandler(ctx c
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//
-//	len(mockedRancherUserNotificationController.AddClusterScopedHandlerCalls())
+//     len(mockedRancherUserNotificationController.AddClusterScopedHandlerCalls())
 func (mock *RancherUserNotificationControllerMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -416,8 +412,7 @@ func (mock *RancherUserNotificationControllerMock) AddFeatureHandler(ctx context
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//
-//	len(mockedRancherUserNotificationController.AddFeatureHandlerCalls())
+//     len(mockedRancherUserNotificationController.AddFeatureHandlerCalls())
 func (mock *RancherUserNotificationControllerMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
@@ -458,8 +453,7 @@ func (mock *RancherUserNotificationControllerMock) AddHandler(ctx context.Contex
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//
-//	len(mockedRancherUserNotificationController.AddHandlerCalls())
+//     len(mockedRancherUserNotificationController.AddHandlerCalls())
 func (mock *RancherUserNotificationControllerMock) AddHandlerCalls() []struct {
 	Ctx     context.Context
 	Name    string
@@ -496,8 +490,7 @@ func (mock *RancherUserNotificationControllerMock) Enqueue(namespace string, nam
 
 // EnqueueCalls gets all the calls that were made to Enqueue.
 // Check the length with:
-//
-//	len(mockedRancherUserNotificationController.EnqueueCalls())
+//     len(mockedRancherUserNotificationController.EnqueueCalls())
 func (mock *RancherUserNotificationControllerMock) EnqueueCalls() []struct {
 	Namespace string
 	Name      string
@@ -534,8 +527,7 @@ func (mock *RancherUserNotificationControllerMock) EnqueueAfter(namespace string
 
 // EnqueueAfterCalls gets all the calls that were made to EnqueueAfter.
 // Check the length with:
-//
-//	len(mockedRancherUserNotificationController.EnqueueAfterCalls())
+//     len(mockedRancherUserNotificationController.EnqueueAfterCalls())
 func (mock *RancherUserNotificationControllerMock) EnqueueAfterCalls() []struct {
 	Namespace string
 	Name      string
@@ -567,8 +559,7 @@ func (mock *RancherUserNotificationControllerMock) Generic() controller.GenericC
 
 // GenericCalls gets all the calls that were made to Generic.
 // Check the length with:
-//
-//	len(mockedRancherUserNotificationController.GenericCalls())
+//     len(mockedRancherUserNotificationController.GenericCalls())
 func (mock *RancherUserNotificationControllerMock) GenericCalls() []struct {
 } {
 	var calls []struct {
@@ -594,8 +585,7 @@ func (mock *RancherUserNotificationControllerMock) Informer() cache.SharedIndexI
 
 // InformerCalls gets all the calls that were made to Informer.
 // Check the length with:
-//
-//	len(mockedRancherUserNotificationController.InformerCalls())
+//     len(mockedRancherUserNotificationController.InformerCalls())
 func (mock *RancherUserNotificationControllerMock) InformerCalls() []struct {
 } {
 	var calls []struct {
@@ -621,8 +611,7 @@ func (mock *RancherUserNotificationControllerMock) Lister() v31.RancherUserNotif
 
 // ListerCalls gets all the calls that were made to Lister.
 // Check the length with:
-//
-//	len(mockedRancherUserNotificationController.ListerCalls())
+//     len(mockedRancherUserNotificationController.ListerCalls())
 func (mock *RancherUserNotificationControllerMock) ListerCalls() []struct {
 } {
 	var calls []struct {
@@ -662,76 +651,76 @@ var _ v31.RancherUserNotificationInterface = &RancherUserNotificationInterfaceMo
 
 // RancherUserNotificationInterfaceMock is a mock implementation of v31.RancherUserNotificationInterface.
 //
-//	    func TestSomethingThatUsesRancherUserNotificationInterface(t *testing.T) {
+//     func TestSomethingThatUsesRancherUserNotificationInterface(t *testing.T) {
 //
-//	        // make and configure a mocked v31.RancherUserNotificationInterface
-//	        mockedRancherUserNotificationInterface := &RancherUserNotificationInterfaceMock{
-//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v31.RancherUserNotificationHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedFeatureHandler method")
-//	            },
-//	            AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v31.RancherUserNotificationLifecycle)  {
-//		               panic("mock out the AddClusterScopedFeatureLifecycle method")
-//	            },
-//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v31.RancherUserNotificationHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedHandler method")
-//	            },
-//	            AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v31.RancherUserNotificationLifecycle)  {
-//		               panic("mock out the AddClusterScopedLifecycle method")
-//	            },
-//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.RancherUserNotificationHandlerFunc)  {
-//		               panic("mock out the AddFeatureHandler method")
-//	            },
-//	            AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v31.RancherUserNotificationLifecycle)  {
-//		               panic("mock out the AddFeatureLifecycle method")
-//	            },
-//	            AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v31.RancherUserNotificationHandlerFunc)  {
-//		               panic("mock out the AddHandler method")
-//	            },
-//	            AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v31.RancherUserNotificationLifecycle)  {
-//		               panic("mock out the AddLifecycle method")
-//	            },
-//	            ControllerFunc: func() v31.RancherUserNotificationController {
-//		               panic("mock out the Controller method")
-//	            },
-//	            CreateFunc: func(in1 *v3.RancherUserNotification) (*v3.RancherUserNotification, error) {
-//		               panic("mock out the Create method")
-//	            },
-//	            DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
-//		               panic("mock out the Delete method")
-//	            },
-//	            DeleteCollectionFunc: func(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
-//		               panic("mock out the DeleteCollection method")
-//	            },
-//	            DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
-//		               panic("mock out the DeleteNamespaced method")
-//	            },
-//	            GetFunc: func(name string, opts metav1.GetOptions) (*v3.RancherUserNotification, error) {
-//		               panic("mock out the Get method")
-//	            },
-//	            GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v3.RancherUserNotification, error) {
-//		               panic("mock out the GetNamespaced method")
-//	            },
-//	            ListFunc: func(opts metav1.ListOptions) (*v3.RancherUserNotificationList, error) {
-//		               panic("mock out the List method")
-//	            },
-//	            ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v3.RancherUserNotificationList, error) {
-//		               panic("mock out the ListNamespaced method")
-//	            },
-//	            ObjectClientFunc: func() *objectclient.ObjectClient {
-//		               panic("mock out the ObjectClient method")
-//	            },
-//	            UpdateFunc: func(in1 *v3.RancherUserNotification) (*v3.RancherUserNotification, error) {
-//		               panic("mock out the Update method")
-//	            },
-//	            WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
-//		               panic("mock out the Watch method")
-//	            },
-//	        }
+//         // make and configure a mocked v31.RancherUserNotificationInterface
+//         mockedRancherUserNotificationInterface := &RancherUserNotificationInterfaceMock{
+//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v31.RancherUserNotificationHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedFeatureHandler method")
+//             },
+//             AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v31.RancherUserNotificationLifecycle)  {
+// 	               panic("mock out the AddClusterScopedFeatureLifecycle method")
+//             },
+//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v31.RancherUserNotificationHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedHandler method")
+//             },
+//             AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v31.RancherUserNotificationLifecycle)  {
+// 	               panic("mock out the AddClusterScopedLifecycle method")
+//             },
+//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.RancherUserNotificationHandlerFunc)  {
+// 	               panic("mock out the AddFeatureHandler method")
+//             },
+//             AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v31.RancherUserNotificationLifecycle)  {
+// 	               panic("mock out the AddFeatureLifecycle method")
+//             },
+//             AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v31.RancherUserNotificationHandlerFunc)  {
+// 	               panic("mock out the AddHandler method")
+//             },
+//             AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v31.RancherUserNotificationLifecycle)  {
+// 	               panic("mock out the AddLifecycle method")
+//             },
+//             ControllerFunc: func() v31.RancherUserNotificationController {
+// 	               panic("mock out the Controller method")
+//             },
+//             CreateFunc: func(in1 *v3.RancherUserNotification) (*v3.RancherUserNotification, error) {
+// 	               panic("mock out the Create method")
+//             },
+//             DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
+// 	               panic("mock out the Delete method")
+//             },
+//             DeleteCollectionFunc: func(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
+// 	               panic("mock out the DeleteCollection method")
+//             },
+//             DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
+// 	               panic("mock out the DeleteNamespaced method")
+//             },
+//             GetFunc: func(name string, opts metav1.GetOptions) (*v3.RancherUserNotification, error) {
+// 	               panic("mock out the Get method")
+//             },
+//             GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v3.RancherUserNotification, error) {
+// 	               panic("mock out the GetNamespaced method")
+//             },
+//             ListFunc: func(opts metav1.ListOptions) (*v3.RancherUserNotificationList, error) {
+// 	               panic("mock out the List method")
+//             },
+//             ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v3.RancherUserNotificationList, error) {
+// 	               panic("mock out the ListNamespaced method")
+//             },
+//             ObjectClientFunc: func() *objectclient.ObjectClient {
+// 	               panic("mock out the ObjectClient method")
+//             },
+//             UpdateFunc: func(in1 *v3.RancherUserNotification) (*v3.RancherUserNotification, error) {
+// 	               panic("mock out the Update method")
+//             },
+//             WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
+// 	               panic("mock out the Watch method")
+//             },
+//         }
 //
-//	        // use mockedRancherUserNotificationInterface in code that requires v31.RancherUserNotificationInterface
-//	        // and then make assertions.
+//         // use mockedRancherUserNotificationInterface in code that requires v31.RancherUserNotificationInterface
+//         // and then make assertions.
 //
-//	    }
+//     }
 type RancherUserNotificationInterfaceMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
 	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v31.RancherUserNotificationHandlerFunc)
@@ -984,8 +973,7 @@ func (mock *RancherUserNotificationInterfaceMock) AddClusterScopedFeatureHandler
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//
-//	len(mockedRancherUserNotificationInterface.AddClusterScopedFeatureHandlerCalls())
+//     len(mockedRancherUserNotificationInterface.AddClusterScopedFeatureHandlerCalls())
 func (mock *RancherUserNotificationInterfaceMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -1032,8 +1020,7 @@ func (mock *RancherUserNotificationInterfaceMock) AddClusterScopedFeatureLifecyc
 
 // AddClusterScopedFeatureLifecycleCalls gets all the calls that were made to AddClusterScopedFeatureLifecycle.
 // Check the length with:
-//
-//	len(mockedRancherUserNotificationInterface.AddClusterScopedFeatureLifecycleCalls())
+//     len(mockedRancherUserNotificationInterface.AddClusterScopedFeatureLifecycleCalls())
 func (mock *RancherUserNotificationInterfaceMock) AddClusterScopedFeatureLifecycleCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -1078,8 +1065,7 @@ func (mock *RancherUserNotificationInterfaceMock) AddClusterScopedHandler(ctx co
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//
-//	len(mockedRancherUserNotificationInterface.AddClusterScopedHandlerCalls())
+//     len(mockedRancherUserNotificationInterface.AddClusterScopedHandlerCalls())
 func (mock *RancherUserNotificationInterfaceMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -1122,8 +1108,7 @@ func (mock *RancherUserNotificationInterfaceMock) AddClusterScopedLifecycle(ctx 
 
 // AddClusterScopedLifecycleCalls gets all the calls that were made to AddClusterScopedLifecycle.
 // Check the length with:
-//
-//	len(mockedRancherUserNotificationInterface.AddClusterScopedLifecycleCalls())
+//     len(mockedRancherUserNotificationInterface.AddClusterScopedLifecycleCalls())
 func (mock *RancherUserNotificationInterfaceMock) AddClusterScopedLifecycleCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -1166,8 +1151,7 @@ func (mock *RancherUserNotificationInterfaceMock) AddFeatureHandler(ctx context.
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//
-//	len(mockedRancherUserNotificationInterface.AddFeatureHandlerCalls())
+//     len(mockedRancherUserNotificationInterface.AddFeatureHandlerCalls())
 func (mock *RancherUserNotificationInterfaceMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
@@ -1210,8 +1194,7 @@ func (mock *RancherUserNotificationInterfaceMock) AddFeatureLifecycle(ctx contex
 
 // AddFeatureLifecycleCalls gets all the calls that were made to AddFeatureLifecycle.
 // Check the length with:
-//
-//	len(mockedRancherUserNotificationInterface.AddFeatureLifecycleCalls())
+//     len(mockedRancherUserNotificationInterface.AddFeatureLifecycleCalls())
 func (mock *RancherUserNotificationInterfaceMock) AddFeatureLifecycleCalls() []struct {
 	Ctx       context.Context
 	Enabled   func() bool
@@ -1252,8 +1235,7 @@ func (mock *RancherUserNotificationInterfaceMock) AddHandler(ctx context.Context
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//
-//	len(mockedRancherUserNotificationInterface.AddHandlerCalls())
+//     len(mockedRancherUserNotificationInterface.AddHandlerCalls())
 func (mock *RancherUserNotificationInterfaceMock) AddHandlerCalls() []struct {
 	Ctx  context.Context
 	Name string
@@ -1292,8 +1274,7 @@ func (mock *RancherUserNotificationInterfaceMock) AddLifecycle(ctx context.Conte
 
 // AddLifecycleCalls gets all the calls that were made to AddLifecycle.
 // Check the length with:
-//
-//	len(mockedRancherUserNotificationInterface.AddLifecycleCalls())
+//     len(mockedRancherUserNotificationInterface.AddLifecycleCalls())
 func (mock *RancherUserNotificationInterfaceMock) AddLifecycleCalls() []struct {
 	Ctx       context.Context
 	Name      string
@@ -1325,8 +1306,7 @@ func (mock *RancherUserNotificationInterfaceMock) Controller() v31.RancherUserNo
 
 // ControllerCalls gets all the calls that were made to Controller.
 // Check the length with:
-//
-//	len(mockedRancherUserNotificationInterface.ControllerCalls())
+//     len(mockedRancherUserNotificationInterface.ControllerCalls())
 func (mock *RancherUserNotificationInterfaceMock) ControllerCalls() []struct {
 } {
 	var calls []struct {
@@ -1355,8 +1335,7 @@ func (mock *RancherUserNotificationInterfaceMock) Create(in1 *v3.RancherUserNoti
 
 // CreateCalls gets all the calls that were made to Create.
 // Check the length with:
-//
-//	len(mockedRancherUserNotificationInterface.CreateCalls())
+//     len(mockedRancherUserNotificationInterface.CreateCalls())
 func (mock *RancherUserNotificationInterfaceMock) CreateCalls() []struct {
 	In1 *v3.RancherUserNotification
 } {
@@ -1389,8 +1368,7 @@ func (mock *RancherUserNotificationInterfaceMock) Delete(name string, options *m
 
 // DeleteCalls gets all the calls that were made to Delete.
 // Check the length with:
-//
-//	len(mockedRancherUserNotificationInterface.DeleteCalls())
+//     len(mockedRancherUserNotificationInterface.DeleteCalls())
 func (mock *RancherUserNotificationInterfaceMock) DeleteCalls() []struct {
 	Name    string
 	Options *metav1.DeleteOptions
@@ -1425,8 +1403,7 @@ func (mock *RancherUserNotificationInterfaceMock) DeleteCollection(deleteOpts *m
 
 // DeleteCollectionCalls gets all the calls that were made to DeleteCollection.
 // Check the length with:
-//
-//	len(mockedRancherUserNotificationInterface.DeleteCollectionCalls())
+//     len(mockedRancherUserNotificationInterface.DeleteCollectionCalls())
 func (mock *RancherUserNotificationInterfaceMock) DeleteCollectionCalls() []struct {
 	DeleteOpts *metav1.DeleteOptions
 	ListOpts   metav1.ListOptions
@@ -1463,8 +1440,7 @@ func (mock *RancherUserNotificationInterfaceMock) DeleteNamespaced(namespace str
 
 // DeleteNamespacedCalls gets all the calls that were made to DeleteNamespaced.
 // Check the length with:
-//
-//	len(mockedRancherUserNotificationInterface.DeleteNamespacedCalls())
+//     len(mockedRancherUserNotificationInterface.DeleteNamespacedCalls())
 func (mock *RancherUserNotificationInterfaceMock) DeleteNamespacedCalls() []struct {
 	Namespace string
 	Name      string
@@ -1501,8 +1477,7 @@ func (mock *RancherUserNotificationInterfaceMock) Get(name string, opts metav1.G
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//
-//	len(mockedRancherUserNotificationInterface.GetCalls())
+//     len(mockedRancherUserNotificationInterface.GetCalls())
 func (mock *RancherUserNotificationInterfaceMock) GetCalls() []struct {
 	Name string
 	Opts metav1.GetOptions
@@ -1539,8 +1514,7 @@ func (mock *RancherUserNotificationInterfaceMock) GetNamespaced(namespace string
 
 // GetNamespacedCalls gets all the calls that were made to GetNamespaced.
 // Check the length with:
-//
-//	len(mockedRancherUserNotificationInterface.GetNamespacedCalls())
+//     len(mockedRancherUserNotificationInterface.GetNamespacedCalls())
 func (mock *RancherUserNotificationInterfaceMock) GetNamespacedCalls() []struct {
 	Namespace string
 	Name      string
@@ -1575,8 +1549,7 @@ func (mock *RancherUserNotificationInterfaceMock) List(opts metav1.ListOptions) 
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//
-//	len(mockedRancherUserNotificationInterface.ListCalls())
+//     len(mockedRancherUserNotificationInterface.ListCalls())
 func (mock *RancherUserNotificationInterfaceMock) ListCalls() []struct {
 	Opts metav1.ListOptions
 } {
@@ -1609,8 +1582,7 @@ func (mock *RancherUserNotificationInterfaceMock) ListNamespaced(namespace strin
 
 // ListNamespacedCalls gets all the calls that were made to ListNamespaced.
 // Check the length with:
-//
-//	len(mockedRancherUserNotificationInterface.ListNamespacedCalls())
+//     len(mockedRancherUserNotificationInterface.ListNamespacedCalls())
 func (mock *RancherUserNotificationInterfaceMock) ListNamespacedCalls() []struct {
 	Namespace string
 	Opts      metav1.ListOptions
@@ -1640,8 +1612,7 @@ func (mock *RancherUserNotificationInterfaceMock) ObjectClient() *objectclient.O
 
 // ObjectClientCalls gets all the calls that were made to ObjectClient.
 // Check the length with:
-//
-//	len(mockedRancherUserNotificationInterface.ObjectClientCalls())
+//     len(mockedRancherUserNotificationInterface.ObjectClientCalls())
 func (mock *RancherUserNotificationInterfaceMock) ObjectClientCalls() []struct {
 } {
 	var calls []struct {
@@ -1670,8 +1641,7 @@ func (mock *RancherUserNotificationInterfaceMock) Update(in1 *v3.RancherUserNoti
 
 // UpdateCalls gets all the calls that were made to Update.
 // Check the length with:
-//
-//	len(mockedRancherUserNotificationInterface.UpdateCalls())
+//     len(mockedRancherUserNotificationInterface.UpdateCalls())
 func (mock *RancherUserNotificationInterfaceMock) UpdateCalls() []struct {
 	In1 *v3.RancherUserNotification
 } {
@@ -1702,8 +1672,7 @@ func (mock *RancherUserNotificationInterfaceMock) Watch(opts metav1.ListOptions)
 
 // WatchCalls gets all the calls that were made to Watch.
 // Check the length with:
-//
-//	len(mockedRancherUserNotificationInterface.WatchCalls())
+//     len(mockedRancherUserNotificationInterface.WatchCalls())
 func (mock *RancherUserNotificationInterfaceMock) WatchCalls() []struct {
 	Opts metav1.ListOptions
 } {
@@ -1726,19 +1695,19 @@ var _ v31.RancherUserNotificationsGetter = &RancherUserNotificationsGetterMock{}
 
 // RancherUserNotificationsGetterMock is a mock implementation of v31.RancherUserNotificationsGetter.
 //
-//	    func TestSomethingThatUsesRancherUserNotificationsGetter(t *testing.T) {
+//     func TestSomethingThatUsesRancherUserNotificationsGetter(t *testing.T) {
 //
-//	        // make and configure a mocked v31.RancherUserNotificationsGetter
-//	        mockedRancherUserNotificationsGetter := &RancherUserNotificationsGetterMock{
-//	            RancherUserNotificationsFunc: func(namespace string) v31.RancherUserNotificationInterface {
-//		               panic("mock out the RancherUserNotifications method")
-//	            },
-//	        }
+//         // make and configure a mocked v31.RancherUserNotificationsGetter
+//         mockedRancherUserNotificationsGetter := &RancherUserNotificationsGetterMock{
+//             RancherUserNotificationsFunc: func(namespace string) v31.RancherUserNotificationInterface {
+// 	               panic("mock out the RancherUserNotifications method")
+//             },
+//         }
 //
-//	        // use mockedRancherUserNotificationsGetter in code that requires v31.RancherUserNotificationsGetter
-//	        // and then make assertions.
+//         // use mockedRancherUserNotificationsGetter in code that requires v31.RancherUserNotificationsGetter
+//         // and then make assertions.
 //
-//	    }
+//     }
 type RancherUserNotificationsGetterMock struct {
 	// RancherUserNotificationsFunc mocks the RancherUserNotifications method.
 	RancherUserNotificationsFunc func(namespace string) v31.RancherUserNotificationInterface
@@ -1771,8 +1740,7 @@ func (mock *RancherUserNotificationsGetterMock) RancherUserNotifications(namespa
 
 // RancherUserNotificationsCalls gets all the calls that were made to RancherUserNotifications.
 // Check the length with:
-//
-//	len(mockedRancherUserNotificationsGetter.RancherUserNotificationsCalls())
+//     len(mockedRancherUserNotificationsGetter.RancherUserNotificationsCalls())
 func (mock *RancherUserNotificationsGetterMock) RancherUserNotificationsCalls() []struct {
 	Namespace string
 } {

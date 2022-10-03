@@ -29,22 +29,22 @@ var _ v31.ClusterRegistrationTokenLister = &ClusterRegistrationTokenListerMock{}
 
 // ClusterRegistrationTokenListerMock is a mock implementation of v31.ClusterRegistrationTokenLister.
 //
-//	    func TestSomethingThatUsesClusterRegistrationTokenLister(t *testing.T) {
+//     func TestSomethingThatUsesClusterRegistrationTokenLister(t *testing.T) {
 //
-//	        // make and configure a mocked v31.ClusterRegistrationTokenLister
-//	        mockedClusterRegistrationTokenLister := &ClusterRegistrationTokenListerMock{
-//	            GetFunc: func(namespace string, name string) (*v3.ClusterRegistrationToken, error) {
-//		               panic("mock out the Get method")
-//	            },
-//	            ListFunc: func(namespace string, selector labels.Selector) ([]*v3.ClusterRegistrationToken, error) {
-//		               panic("mock out the List method")
-//	            },
-//	        }
+//         // make and configure a mocked v31.ClusterRegistrationTokenLister
+//         mockedClusterRegistrationTokenLister := &ClusterRegistrationTokenListerMock{
+//             GetFunc: func(namespace string, name string) (*v3.ClusterRegistrationToken, error) {
+// 	               panic("mock out the Get method")
+//             },
+//             ListFunc: func(namespace string, selector labels.Selector) ([]*v3.ClusterRegistrationToken, error) {
+// 	               panic("mock out the List method")
+//             },
+//         }
 //
-//	        // use mockedClusterRegistrationTokenLister in code that requires v31.ClusterRegistrationTokenLister
-//	        // and then make assertions.
+//         // use mockedClusterRegistrationTokenLister in code that requires v31.ClusterRegistrationTokenLister
+//         // and then make assertions.
 //
-//	    }
+//     }
 type ClusterRegistrationTokenListerMock struct {
 	// GetFunc mocks the Get method.
 	GetFunc func(namespace string, name string) (*v3.ClusterRegistrationToken, error)
@@ -91,8 +91,7 @@ func (mock *ClusterRegistrationTokenListerMock) Get(namespace string, name strin
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//
-//	len(mockedClusterRegistrationTokenLister.GetCalls())
+//     len(mockedClusterRegistrationTokenLister.GetCalls())
 func (mock *ClusterRegistrationTokenListerMock) GetCalls() []struct {
 	Namespace string
 	Name      string
@@ -127,8 +126,7 @@ func (mock *ClusterRegistrationTokenListerMock) List(namespace string, selector 
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//
-//	len(mockedClusterRegistrationTokenLister.ListCalls())
+//     len(mockedClusterRegistrationTokenLister.ListCalls())
 func (mock *ClusterRegistrationTokenListerMock) ListCalls() []struct {
 	Namespace string
 	Selector  labels.Selector
@@ -161,43 +159,43 @@ var _ v31.ClusterRegistrationTokenController = &ClusterRegistrationTokenControll
 
 // ClusterRegistrationTokenControllerMock is a mock implementation of v31.ClusterRegistrationTokenController.
 //
-//	    func TestSomethingThatUsesClusterRegistrationTokenController(t *testing.T) {
+//     func TestSomethingThatUsesClusterRegistrationTokenController(t *testing.T) {
 //
-//	        // make and configure a mocked v31.ClusterRegistrationTokenController
-//	        mockedClusterRegistrationTokenController := &ClusterRegistrationTokenControllerMock{
-//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v31.ClusterRegistrationTokenHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedFeatureHandler method")
-//	            },
-//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v31.ClusterRegistrationTokenHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedHandler method")
-//	            },
-//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.ClusterRegistrationTokenHandlerFunc)  {
-//		               panic("mock out the AddFeatureHandler method")
-//	            },
-//	            AddHandlerFunc: func(ctx context.Context, name string, handler v31.ClusterRegistrationTokenHandlerFunc)  {
-//		               panic("mock out the AddHandler method")
-//	            },
-//	            EnqueueFunc: func(namespace string, name string)  {
-//		               panic("mock out the Enqueue method")
-//	            },
-//	            EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
-//		               panic("mock out the EnqueueAfter method")
-//	            },
-//	            GenericFunc: func() controller.GenericController {
-//		               panic("mock out the Generic method")
-//	            },
-//	            InformerFunc: func() cache.SharedIndexInformer {
-//		               panic("mock out the Informer method")
-//	            },
-//	            ListerFunc: func() v31.ClusterRegistrationTokenLister {
-//		               panic("mock out the Lister method")
-//	            },
-//	        }
+//         // make and configure a mocked v31.ClusterRegistrationTokenController
+//         mockedClusterRegistrationTokenController := &ClusterRegistrationTokenControllerMock{
+//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v31.ClusterRegistrationTokenHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedFeatureHandler method")
+//             },
+//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v31.ClusterRegistrationTokenHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedHandler method")
+//             },
+//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.ClusterRegistrationTokenHandlerFunc)  {
+// 	               panic("mock out the AddFeatureHandler method")
+//             },
+//             AddHandlerFunc: func(ctx context.Context, name string, handler v31.ClusterRegistrationTokenHandlerFunc)  {
+// 	               panic("mock out the AddHandler method")
+//             },
+//             EnqueueFunc: func(namespace string, name string)  {
+// 	               panic("mock out the Enqueue method")
+//             },
+//             EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
+// 	               panic("mock out the EnqueueAfter method")
+//             },
+//             GenericFunc: func() controller.GenericController {
+// 	               panic("mock out the Generic method")
+//             },
+//             InformerFunc: func() cache.SharedIndexInformer {
+// 	               panic("mock out the Informer method")
+//             },
+//             ListerFunc: func() v31.ClusterRegistrationTokenLister {
+// 	               panic("mock out the Lister method")
+//             },
+//         }
 //
-//	        // use mockedClusterRegistrationTokenController in code that requires v31.ClusterRegistrationTokenController
-//	        // and then make assertions.
+//         // use mockedClusterRegistrationTokenController in code that requires v31.ClusterRegistrationTokenController
+//         // and then make assertions.
 //
-//	    }
+//     }
 type ClusterRegistrationTokenControllerMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
 	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v31.ClusterRegistrationTokenHandlerFunc)
@@ -326,8 +324,7 @@ func (mock *ClusterRegistrationTokenControllerMock) AddClusterScopedFeatureHandl
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//
-//	len(mockedClusterRegistrationTokenController.AddClusterScopedFeatureHandlerCalls())
+//     len(mockedClusterRegistrationTokenController.AddClusterScopedFeatureHandlerCalls())
 func (mock *ClusterRegistrationTokenControllerMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -372,8 +369,7 @@ func (mock *ClusterRegistrationTokenControllerMock) AddClusterScopedHandler(ctx 
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//
-//	len(mockedClusterRegistrationTokenController.AddClusterScopedHandlerCalls())
+//     len(mockedClusterRegistrationTokenController.AddClusterScopedHandlerCalls())
 func (mock *ClusterRegistrationTokenControllerMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -416,8 +412,7 @@ func (mock *ClusterRegistrationTokenControllerMock) AddFeatureHandler(ctx contex
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//
-//	len(mockedClusterRegistrationTokenController.AddFeatureHandlerCalls())
+//     len(mockedClusterRegistrationTokenController.AddFeatureHandlerCalls())
 func (mock *ClusterRegistrationTokenControllerMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
@@ -458,8 +453,7 @@ func (mock *ClusterRegistrationTokenControllerMock) AddHandler(ctx context.Conte
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//
-//	len(mockedClusterRegistrationTokenController.AddHandlerCalls())
+//     len(mockedClusterRegistrationTokenController.AddHandlerCalls())
 func (mock *ClusterRegistrationTokenControllerMock) AddHandlerCalls() []struct {
 	Ctx     context.Context
 	Name    string
@@ -496,8 +490,7 @@ func (mock *ClusterRegistrationTokenControllerMock) Enqueue(namespace string, na
 
 // EnqueueCalls gets all the calls that were made to Enqueue.
 // Check the length with:
-//
-//	len(mockedClusterRegistrationTokenController.EnqueueCalls())
+//     len(mockedClusterRegistrationTokenController.EnqueueCalls())
 func (mock *ClusterRegistrationTokenControllerMock) EnqueueCalls() []struct {
 	Namespace string
 	Name      string
@@ -534,8 +527,7 @@ func (mock *ClusterRegistrationTokenControllerMock) EnqueueAfter(namespace strin
 
 // EnqueueAfterCalls gets all the calls that were made to EnqueueAfter.
 // Check the length with:
-//
-//	len(mockedClusterRegistrationTokenController.EnqueueAfterCalls())
+//     len(mockedClusterRegistrationTokenController.EnqueueAfterCalls())
 func (mock *ClusterRegistrationTokenControllerMock) EnqueueAfterCalls() []struct {
 	Namespace string
 	Name      string
@@ -567,8 +559,7 @@ func (mock *ClusterRegistrationTokenControllerMock) Generic() controller.Generic
 
 // GenericCalls gets all the calls that were made to Generic.
 // Check the length with:
-//
-//	len(mockedClusterRegistrationTokenController.GenericCalls())
+//     len(mockedClusterRegistrationTokenController.GenericCalls())
 func (mock *ClusterRegistrationTokenControllerMock) GenericCalls() []struct {
 } {
 	var calls []struct {
@@ -594,8 +585,7 @@ func (mock *ClusterRegistrationTokenControllerMock) Informer() cache.SharedIndex
 
 // InformerCalls gets all the calls that were made to Informer.
 // Check the length with:
-//
-//	len(mockedClusterRegistrationTokenController.InformerCalls())
+//     len(mockedClusterRegistrationTokenController.InformerCalls())
 func (mock *ClusterRegistrationTokenControllerMock) InformerCalls() []struct {
 } {
 	var calls []struct {
@@ -621,8 +611,7 @@ func (mock *ClusterRegistrationTokenControllerMock) Lister() v31.ClusterRegistra
 
 // ListerCalls gets all the calls that were made to Lister.
 // Check the length with:
-//
-//	len(mockedClusterRegistrationTokenController.ListerCalls())
+//     len(mockedClusterRegistrationTokenController.ListerCalls())
 func (mock *ClusterRegistrationTokenControllerMock) ListerCalls() []struct {
 } {
 	var calls []struct {
@@ -662,76 +651,76 @@ var _ v31.ClusterRegistrationTokenInterface = &ClusterRegistrationTokenInterface
 
 // ClusterRegistrationTokenInterfaceMock is a mock implementation of v31.ClusterRegistrationTokenInterface.
 //
-//	    func TestSomethingThatUsesClusterRegistrationTokenInterface(t *testing.T) {
+//     func TestSomethingThatUsesClusterRegistrationTokenInterface(t *testing.T) {
 //
-//	        // make and configure a mocked v31.ClusterRegistrationTokenInterface
-//	        mockedClusterRegistrationTokenInterface := &ClusterRegistrationTokenInterfaceMock{
-//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v31.ClusterRegistrationTokenHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedFeatureHandler method")
-//	            },
-//	            AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v31.ClusterRegistrationTokenLifecycle)  {
-//		               panic("mock out the AddClusterScopedFeatureLifecycle method")
-//	            },
-//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v31.ClusterRegistrationTokenHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedHandler method")
-//	            },
-//	            AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v31.ClusterRegistrationTokenLifecycle)  {
-//		               panic("mock out the AddClusterScopedLifecycle method")
-//	            },
-//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.ClusterRegistrationTokenHandlerFunc)  {
-//		               panic("mock out the AddFeatureHandler method")
-//	            },
-//	            AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v31.ClusterRegistrationTokenLifecycle)  {
-//		               panic("mock out the AddFeatureLifecycle method")
-//	            },
-//	            AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v31.ClusterRegistrationTokenHandlerFunc)  {
-//		               panic("mock out the AddHandler method")
-//	            },
-//	            AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v31.ClusterRegistrationTokenLifecycle)  {
-//		               panic("mock out the AddLifecycle method")
-//	            },
-//	            ControllerFunc: func() v31.ClusterRegistrationTokenController {
-//		               panic("mock out the Controller method")
-//	            },
-//	            CreateFunc: func(in1 *v3.ClusterRegistrationToken) (*v3.ClusterRegistrationToken, error) {
-//		               panic("mock out the Create method")
-//	            },
-//	            DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
-//		               panic("mock out the Delete method")
-//	            },
-//	            DeleteCollectionFunc: func(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
-//		               panic("mock out the DeleteCollection method")
-//	            },
-//	            DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
-//		               panic("mock out the DeleteNamespaced method")
-//	            },
-//	            GetFunc: func(name string, opts metav1.GetOptions) (*v3.ClusterRegistrationToken, error) {
-//		               panic("mock out the Get method")
-//	            },
-//	            GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v3.ClusterRegistrationToken, error) {
-//		               panic("mock out the GetNamespaced method")
-//	            },
-//	            ListFunc: func(opts metav1.ListOptions) (*v3.ClusterRegistrationTokenList, error) {
-//		               panic("mock out the List method")
-//	            },
-//	            ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v3.ClusterRegistrationTokenList, error) {
-//		               panic("mock out the ListNamespaced method")
-//	            },
-//	            ObjectClientFunc: func() *objectclient.ObjectClient {
-//		               panic("mock out the ObjectClient method")
-//	            },
-//	            UpdateFunc: func(in1 *v3.ClusterRegistrationToken) (*v3.ClusterRegistrationToken, error) {
-//		               panic("mock out the Update method")
-//	            },
-//	            WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
-//		               panic("mock out the Watch method")
-//	            },
-//	        }
+//         // make and configure a mocked v31.ClusterRegistrationTokenInterface
+//         mockedClusterRegistrationTokenInterface := &ClusterRegistrationTokenInterfaceMock{
+//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v31.ClusterRegistrationTokenHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedFeatureHandler method")
+//             },
+//             AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v31.ClusterRegistrationTokenLifecycle)  {
+// 	               panic("mock out the AddClusterScopedFeatureLifecycle method")
+//             },
+//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v31.ClusterRegistrationTokenHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedHandler method")
+//             },
+//             AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v31.ClusterRegistrationTokenLifecycle)  {
+// 	               panic("mock out the AddClusterScopedLifecycle method")
+//             },
+//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.ClusterRegistrationTokenHandlerFunc)  {
+// 	               panic("mock out the AddFeatureHandler method")
+//             },
+//             AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v31.ClusterRegistrationTokenLifecycle)  {
+// 	               panic("mock out the AddFeatureLifecycle method")
+//             },
+//             AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v31.ClusterRegistrationTokenHandlerFunc)  {
+// 	               panic("mock out the AddHandler method")
+//             },
+//             AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v31.ClusterRegistrationTokenLifecycle)  {
+// 	               panic("mock out the AddLifecycle method")
+//             },
+//             ControllerFunc: func() v31.ClusterRegistrationTokenController {
+// 	               panic("mock out the Controller method")
+//             },
+//             CreateFunc: func(in1 *v3.ClusterRegistrationToken) (*v3.ClusterRegistrationToken, error) {
+// 	               panic("mock out the Create method")
+//             },
+//             DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
+// 	               panic("mock out the Delete method")
+//             },
+//             DeleteCollectionFunc: func(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
+// 	               panic("mock out the DeleteCollection method")
+//             },
+//             DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
+// 	               panic("mock out the DeleteNamespaced method")
+//             },
+//             GetFunc: func(name string, opts metav1.GetOptions) (*v3.ClusterRegistrationToken, error) {
+// 	               panic("mock out the Get method")
+//             },
+//             GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v3.ClusterRegistrationToken, error) {
+// 	               panic("mock out the GetNamespaced method")
+//             },
+//             ListFunc: func(opts metav1.ListOptions) (*v3.ClusterRegistrationTokenList, error) {
+// 	               panic("mock out the List method")
+//             },
+//             ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v3.ClusterRegistrationTokenList, error) {
+// 	               panic("mock out the ListNamespaced method")
+//             },
+//             ObjectClientFunc: func() *objectclient.ObjectClient {
+// 	               panic("mock out the ObjectClient method")
+//             },
+//             UpdateFunc: func(in1 *v3.ClusterRegistrationToken) (*v3.ClusterRegistrationToken, error) {
+// 	               panic("mock out the Update method")
+//             },
+//             WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
+// 	               panic("mock out the Watch method")
+//             },
+//         }
 //
-//	        // use mockedClusterRegistrationTokenInterface in code that requires v31.ClusterRegistrationTokenInterface
-//	        // and then make assertions.
+//         // use mockedClusterRegistrationTokenInterface in code that requires v31.ClusterRegistrationTokenInterface
+//         // and then make assertions.
 //
-//	    }
+//     }
 type ClusterRegistrationTokenInterfaceMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
 	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v31.ClusterRegistrationTokenHandlerFunc)
@@ -984,8 +973,7 @@ func (mock *ClusterRegistrationTokenInterfaceMock) AddClusterScopedFeatureHandle
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//
-//	len(mockedClusterRegistrationTokenInterface.AddClusterScopedFeatureHandlerCalls())
+//     len(mockedClusterRegistrationTokenInterface.AddClusterScopedFeatureHandlerCalls())
 func (mock *ClusterRegistrationTokenInterfaceMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -1032,8 +1020,7 @@ func (mock *ClusterRegistrationTokenInterfaceMock) AddClusterScopedFeatureLifecy
 
 // AddClusterScopedFeatureLifecycleCalls gets all the calls that were made to AddClusterScopedFeatureLifecycle.
 // Check the length with:
-//
-//	len(mockedClusterRegistrationTokenInterface.AddClusterScopedFeatureLifecycleCalls())
+//     len(mockedClusterRegistrationTokenInterface.AddClusterScopedFeatureLifecycleCalls())
 func (mock *ClusterRegistrationTokenInterfaceMock) AddClusterScopedFeatureLifecycleCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -1078,8 +1065,7 @@ func (mock *ClusterRegistrationTokenInterfaceMock) AddClusterScopedHandler(ctx c
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//
-//	len(mockedClusterRegistrationTokenInterface.AddClusterScopedHandlerCalls())
+//     len(mockedClusterRegistrationTokenInterface.AddClusterScopedHandlerCalls())
 func (mock *ClusterRegistrationTokenInterfaceMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -1122,8 +1108,7 @@ func (mock *ClusterRegistrationTokenInterfaceMock) AddClusterScopedLifecycle(ctx
 
 // AddClusterScopedLifecycleCalls gets all the calls that were made to AddClusterScopedLifecycle.
 // Check the length with:
-//
-//	len(mockedClusterRegistrationTokenInterface.AddClusterScopedLifecycleCalls())
+//     len(mockedClusterRegistrationTokenInterface.AddClusterScopedLifecycleCalls())
 func (mock *ClusterRegistrationTokenInterfaceMock) AddClusterScopedLifecycleCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -1166,8 +1151,7 @@ func (mock *ClusterRegistrationTokenInterfaceMock) AddFeatureHandler(ctx context
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//
-//	len(mockedClusterRegistrationTokenInterface.AddFeatureHandlerCalls())
+//     len(mockedClusterRegistrationTokenInterface.AddFeatureHandlerCalls())
 func (mock *ClusterRegistrationTokenInterfaceMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
@@ -1210,8 +1194,7 @@ func (mock *ClusterRegistrationTokenInterfaceMock) AddFeatureLifecycle(ctx conte
 
 // AddFeatureLifecycleCalls gets all the calls that were made to AddFeatureLifecycle.
 // Check the length with:
-//
-//	len(mockedClusterRegistrationTokenInterface.AddFeatureLifecycleCalls())
+//     len(mockedClusterRegistrationTokenInterface.AddFeatureLifecycleCalls())
 func (mock *ClusterRegistrationTokenInterfaceMock) AddFeatureLifecycleCalls() []struct {
 	Ctx       context.Context
 	Enabled   func() bool
@@ -1252,8 +1235,7 @@ func (mock *ClusterRegistrationTokenInterfaceMock) AddHandler(ctx context.Contex
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//
-//	len(mockedClusterRegistrationTokenInterface.AddHandlerCalls())
+//     len(mockedClusterRegistrationTokenInterface.AddHandlerCalls())
 func (mock *ClusterRegistrationTokenInterfaceMock) AddHandlerCalls() []struct {
 	Ctx  context.Context
 	Name string
@@ -1292,8 +1274,7 @@ func (mock *ClusterRegistrationTokenInterfaceMock) AddLifecycle(ctx context.Cont
 
 // AddLifecycleCalls gets all the calls that were made to AddLifecycle.
 // Check the length with:
-//
-//	len(mockedClusterRegistrationTokenInterface.AddLifecycleCalls())
+//     len(mockedClusterRegistrationTokenInterface.AddLifecycleCalls())
 func (mock *ClusterRegistrationTokenInterfaceMock) AddLifecycleCalls() []struct {
 	Ctx       context.Context
 	Name      string
@@ -1325,8 +1306,7 @@ func (mock *ClusterRegistrationTokenInterfaceMock) Controller() v31.ClusterRegis
 
 // ControllerCalls gets all the calls that were made to Controller.
 // Check the length with:
-//
-//	len(mockedClusterRegistrationTokenInterface.ControllerCalls())
+//     len(mockedClusterRegistrationTokenInterface.ControllerCalls())
 func (mock *ClusterRegistrationTokenInterfaceMock) ControllerCalls() []struct {
 } {
 	var calls []struct {
@@ -1355,8 +1335,7 @@ func (mock *ClusterRegistrationTokenInterfaceMock) Create(in1 *v3.ClusterRegistr
 
 // CreateCalls gets all the calls that were made to Create.
 // Check the length with:
-//
-//	len(mockedClusterRegistrationTokenInterface.CreateCalls())
+//     len(mockedClusterRegistrationTokenInterface.CreateCalls())
 func (mock *ClusterRegistrationTokenInterfaceMock) CreateCalls() []struct {
 	In1 *v3.ClusterRegistrationToken
 } {
@@ -1389,8 +1368,7 @@ func (mock *ClusterRegistrationTokenInterfaceMock) Delete(name string, options *
 
 // DeleteCalls gets all the calls that were made to Delete.
 // Check the length with:
-//
-//	len(mockedClusterRegistrationTokenInterface.DeleteCalls())
+//     len(mockedClusterRegistrationTokenInterface.DeleteCalls())
 func (mock *ClusterRegistrationTokenInterfaceMock) DeleteCalls() []struct {
 	Name    string
 	Options *metav1.DeleteOptions
@@ -1425,8 +1403,7 @@ func (mock *ClusterRegistrationTokenInterfaceMock) DeleteCollection(deleteOpts *
 
 // DeleteCollectionCalls gets all the calls that were made to DeleteCollection.
 // Check the length with:
-//
-//	len(mockedClusterRegistrationTokenInterface.DeleteCollectionCalls())
+//     len(mockedClusterRegistrationTokenInterface.DeleteCollectionCalls())
 func (mock *ClusterRegistrationTokenInterfaceMock) DeleteCollectionCalls() []struct {
 	DeleteOpts *metav1.DeleteOptions
 	ListOpts   metav1.ListOptions
@@ -1463,8 +1440,7 @@ func (mock *ClusterRegistrationTokenInterfaceMock) DeleteNamespaced(namespace st
 
 // DeleteNamespacedCalls gets all the calls that were made to DeleteNamespaced.
 // Check the length with:
-//
-//	len(mockedClusterRegistrationTokenInterface.DeleteNamespacedCalls())
+//     len(mockedClusterRegistrationTokenInterface.DeleteNamespacedCalls())
 func (mock *ClusterRegistrationTokenInterfaceMock) DeleteNamespacedCalls() []struct {
 	Namespace string
 	Name      string
@@ -1501,8 +1477,7 @@ func (mock *ClusterRegistrationTokenInterfaceMock) Get(name string, opts metav1.
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//
-//	len(mockedClusterRegistrationTokenInterface.GetCalls())
+//     len(mockedClusterRegistrationTokenInterface.GetCalls())
 func (mock *ClusterRegistrationTokenInterfaceMock) GetCalls() []struct {
 	Name string
 	Opts metav1.GetOptions
@@ -1539,8 +1514,7 @@ func (mock *ClusterRegistrationTokenInterfaceMock) GetNamespaced(namespace strin
 
 // GetNamespacedCalls gets all the calls that were made to GetNamespaced.
 // Check the length with:
-//
-//	len(mockedClusterRegistrationTokenInterface.GetNamespacedCalls())
+//     len(mockedClusterRegistrationTokenInterface.GetNamespacedCalls())
 func (mock *ClusterRegistrationTokenInterfaceMock) GetNamespacedCalls() []struct {
 	Namespace string
 	Name      string
@@ -1575,8 +1549,7 @@ func (mock *ClusterRegistrationTokenInterfaceMock) List(opts metav1.ListOptions)
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//
-//	len(mockedClusterRegistrationTokenInterface.ListCalls())
+//     len(mockedClusterRegistrationTokenInterface.ListCalls())
 func (mock *ClusterRegistrationTokenInterfaceMock) ListCalls() []struct {
 	Opts metav1.ListOptions
 } {
@@ -1609,8 +1582,7 @@ func (mock *ClusterRegistrationTokenInterfaceMock) ListNamespaced(namespace stri
 
 // ListNamespacedCalls gets all the calls that were made to ListNamespaced.
 // Check the length with:
-//
-//	len(mockedClusterRegistrationTokenInterface.ListNamespacedCalls())
+//     len(mockedClusterRegistrationTokenInterface.ListNamespacedCalls())
 func (mock *ClusterRegistrationTokenInterfaceMock) ListNamespacedCalls() []struct {
 	Namespace string
 	Opts      metav1.ListOptions
@@ -1640,8 +1612,7 @@ func (mock *ClusterRegistrationTokenInterfaceMock) ObjectClient() *objectclient.
 
 // ObjectClientCalls gets all the calls that were made to ObjectClient.
 // Check the length with:
-//
-//	len(mockedClusterRegistrationTokenInterface.ObjectClientCalls())
+//     len(mockedClusterRegistrationTokenInterface.ObjectClientCalls())
 func (mock *ClusterRegistrationTokenInterfaceMock) ObjectClientCalls() []struct {
 } {
 	var calls []struct {
@@ -1670,8 +1641,7 @@ func (mock *ClusterRegistrationTokenInterfaceMock) Update(in1 *v3.ClusterRegistr
 
 // UpdateCalls gets all the calls that were made to Update.
 // Check the length with:
-//
-//	len(mockedClusterRegistrationTokenInterface.UpdateCalls())
+//     len(mockedClusterRegistrationTokenInterface.UpdateCalls())
 func (mock *ClusterRegistrationTokenInterfaceMock) UpdateCalls() []struct {
 	In1 *v3.ClusterRegistrationToken
 } {
@@ -1702,8 +1672,7 @@ func (mock *ClusterRegistrationTokenInterfaceMock) Watch(opts metav1.ListOptions
 
 // WatchCalls gets all the calls that were made to Watch.
 // Check the length with:
-//
-//	len(mockedClusterRegistrationTokenInterface.WatchCalls())
+//     len(mockedClusterRegistrationTokenInterface.WatchCalls())
 func (mock *ClusterRegistrationTokenInterfaceMock) WatchCalls() []struct {
 	Opts metav1.ListOptions
 } {
@@ -1726,19 +1695,19 @@ var _ v31.ClusterRegistrationTokensGetter = &ClusterRegistrationTokensGetterMock
 
 // ClusterRegistrationTokensGetterMock is a mock implementation of v31.ClusterRegistrationTokensGetter.
 //
-//	    func TestSomethingThatUsesClusterRegistrationTokensGetter(t *testing.T) {
+//     func TestSomethingThatUsesClusterRegistrationTokensGetter(t *testing.T) {
 //
-//	        // make and configure a mocked v31.ClusterRegistrationTokensGetter
-//	        mockedClusterRegistrationTokensGetter := &ClusterRegistrationTokensGetterMock{
-//	            ClusterRegistrationTokensFunc: func(namespace string) v31.ClusterRegistrationTokenInterface {
-//		               panic("mock out the ClusterRegistrationTokens method")
-//	            },
-//	        }
+//         // make and configure a mocked v31.ClusterRegistrationTokensGetter
+//         mockedClusterRegistrationTokensGetter := &ClusterRegistrationTokensGetterMock{
+//             ClusterRegistrationTokensFunc: func(namespace string) v31.ClusterRegistrationTokenInterface {
+// 	               panic("mock out the ClusterRegistrationTokens method")
+//             },
+//         }
 //
-//	        // use mockedClusterRegistrationTokensGetter in code that requires v31.ClusterRegistrationTokensGetter
-//	        // and then make assertions.
+//         // use mockedClusterRegistrationTokensGetter in code that requires v31.ClusterRegistrationTokensGetter
+//         // and then make assertions.
 //
-//	    }
+//     }
 type ClusterRegistrationTokensGetterMock struct {
 	// ClusterRegistrationTokensFunc mocks the ClusterRegistrationTokens method.
 	ClusterRegistrationTokensFunc func(namespace string) v31.ClusterRegistrationTokenInterface
@@ -1771,8 +1740,7 @@ func (mock *ClusterRegistrationTokensGetterMock) ClusterRegistrationTokens(names
 
 // ClusterRegistrationTokensCalls gets all the calls that were made to ClusterRegistrationTokens.
 // Check the length with:
-//
-//	len(mockedClusterRegistrationTokensGetter.ClusterRegistrationTokensCalls())
+//     len(mockedClusterRegistrationTokensGetter.ClusterRegistrationTokensCalls())
 func (mock *ClusterRegistrationTokensGetterMock) ClusterRegistrationTokensCalls() []struct {
 	Namespace string
 } {

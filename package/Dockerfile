@@ -41,12 +41,12 @@ ENV DOCKER_MACHINE_HARVESTER_VERSION v0.5.0
 ENV CATTLE_KDM_BRANCH ${CATTLE_KDM_BRANCH}
 ENV HELM_VERSION v3.9.0
 ENV KUSTOMIZE_VERSION v4.5.5
-ENV CATTLE_WINS_AGENT_VERSION v0.4.9
+ENV CATTLE_WINS_AGENT_VERSION v0.4.10
 ENV CATTLE_WINS_AGENT_INSTALL_SCRIPT https://raw.githubusercontent.com/rancher/wins/${CATTLE_WINS_AGENT_VERSION}/install.ps1
 ENV CATTLE_WINS_AGENT_UNINSTALL_SCRIPT https://raw.githubusercontent.com/rancher/wins/${CATTLE_WINS_AGENT_VERSION}/uninstall.ps1
 ENV CATTLE_WINS_AGENT_UPGRADE_IMAGE rancher/wins:${CATTLE_WINS_AGENT_VERSION}
 ENV CATTLE_CSI_PROXY_AGENT_VERSION v1.1.1
-ENV CATTLE_SYSTEM_AGENT_VERSION v0.2.10
+ENV CATTLE_SYSTEM_AGENT_VERSION v0.2.11
 ENV CATTLE_SYSTEM_AGENT_INSTALL_SCRIPT https://raw.githubusercontent.com/rancher/system-agent/${CATTLE_SYSTEM_AGENT_VERSION}/install.sh
 ENV CATTLE_SYSTEM_AGENT_UNINSTALL_SCRIPT https://raw.githubusercontent.com/rancher/system-agent/${CATTLE_SYSTEM_AGENT_VERSION}/system-agent-uninstall.sh
 ENV CATTLE_SYSTEM_AGENT_UPGRADE_IMAGE rancher/system-agent:${CATTLE_SYSTEM_AGENT_VERSION}-suc
@@ -54,8 +54,8 @@ ENV CATTLE_SYSTEM_UPGRADE_CONTROLLER_CHART_VERSION 100.0.3+up0.3.3
 
 # System charts minimal version
 ENV CATTLE_FLEET_MIN_VERSION=101.0.0+up0.5.0-rc2
-ENV CATTLE_RANCHER_WEBHOOK_MIN_VERSION=2.0.0+up0.3.0-rc2
-ENV CATTLE_CSP_ADAPTER_MIN_VERSION=1.0.1
+ENV CATTLE_RANCHER_WEBHOOK_MIN_VERSION=2.0.0+up0.3.0-rc3
+ENV CATTLE_CSP_ADAPTER_MIN_VERSION=2.0.0+up2.0.0-rc1
 
 RUN mkdir -p /var/lib/rancher-data/local-catalogs/system-library && \
     mkdir -p /var/lib/rancher-data/local-catalogs/library && \
@@ -162,8 +162,8 @@ RUN curl -sLf ${!TINI_URL} > /usr/bin/tini && \
     mkdir -p /var/lib/rancher-data/driver-metadata
 
 # Versions for UI, DASHBOARD and CLI will be the same as 2.6 until new releases are made to these
-ENV CATTLE_UI_VERSION 2.6.9-rc1
-ENV CATTLE_DASHBOARD_UI_VERSION v2.7.0-rc1
+ENV CATTLE_UI_VERSION 2.7.0-rc3
+ENV CATTLE_DASHBOARD_UI_VERSION v2.7.0-rc3
 ENV CATTLE_CLI_VERSION v2.7.0-rc1
 
 # Please update the api-ui-version in pkg/settings/settings.go when updating the version here.

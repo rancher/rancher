@@ -79,6 +79,7 @@ require (
 	github.com/go-ldap/ldap/v3 v3.4.1
 	github.com/go-logr/logr v1.2.3
 	github.com/golang-jwt/jwt v3.2.1+incompatible
+	github.com/golang/mock v1.6.0
 	github.com/golang/protobuf v1.5.2
 	github.com/google/go-querystring v1.1.0 // indirect
 	github.com/gorilla/mux v1.8.0
@@ -86,7 +87,6 @@ require (
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/hashicorp/golang-lru v0.5.4
 	github.com/heptio/authenticator v0.0.0-20180409043135-d282f87a1972
-	github.com/knative/pkg v0.0.0-20190817231834-12ee58e32cc8
 	github.com/manicminer/hamilton v0.46.0
 	github.com/mattn/go-colorable v0.1.12
 	github.com/mcuadros/go-version v0.0.0-20180611085657-6d5863ca60fa
@@ -118,7 +118,7 @@ require (
 	github.com/rancher/remotedialer v0.2.6-0.20220624190122-ea57207bf2b8
 	github.com/rancher/rke v1.4.0-rc1
 	github.com/rancher/security-scan v0.1.7-0.20200222041501-f7377f127168
-	github.com/rancher/steve v0.0.0-20220805200026-647cba2be744
+	github.com/rancher/steve v0.0.0-20220928204312-06584d207dac
 	github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20210727200656-10b094e30007
 	github.com/rancher/wrangler v1.0.1-0.20220520195731-8eeded9bae2a
 	github.com/robfig/cron v1.1.0

@@ -29,22 +29,22 @@ var _ v31.SSHAuthLister = &SSHAuthListerMock{}
 
 // SSHAuthListerMock is a mock implementation of v31.SSHAuthLister.
 //
-//	    func TestSomethingThatUsesSSHAuthLister(t *testing.T) {
+//     func TestSomethingThatUsesSSHAuthLister(t *testing.T) {
 //
-//	        // make and configure a mocked v31.SSHAuthLister
-//	        mockedSSHAuthLister := &SSHAuthListerMock{
-//	            GetFunc: func(namespace string, name string) (*v3.SSHAuth, error) {
-//		               panic("mock out the Get method")
-//	            },
-//	            ListFunc: func(namespace string, selector labels.Selector) ([]*v3.SSHAuth, error) {
-//		               panic("mock out the List method")
-//	            },
-//	        }
+//         // make and configure a mocked v31.SSHAuthLister
+//         mockedSSHAuthLister := &SSHAuthListerMock{
+//             GetFunc: func(namespace string, name string) (*v3.SSHAuth, error) {
+// 	               panic("mock out the Get method")
+//             },
+//             ListFunc: func(namespace string, selector labels.Selector) ([]*v3.SSHAuth, error) {
+// 	               panic("mock out the List method")
+//             },
+//         }
 //
-//	        // use mockedSSHAuthLister in code that requires v31.SSHAuthLister
-//	        // and then make assertions.
+//         // use mockedSSHAuthLister in code that requires v31.SSHAuthLister
+//         // and then make assertions.
 //
-//	    }
+//     }
 type SSHAuthListerMock struct {
 	// GetFunc mocks the Get method.
 	GetFunc func(namespace string, name string) (*v3.SSHAuth, error)
@@ -91,8 +91,7 @@ func (mock *SSHAuthListerMock) Get(namespace string, name string) (*v3.SSHAuth, 
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//
-//	len(mockedSSHAuthLister.GetCalls())
+//     len(mockedSSHAuthLister.GetCalls())
 func (mock *SSHAuthListerMock) GetCalls() []struct {
 	Namespace string
 	Name      string
@@ -127,8 +126,7 @@ func (mock *SSHAuthListerMock) List(namespace string, selector labels.Selector) 
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//
-//	len(mockedSSHAuthLister.ListCalls())
+//     len(mockedSSHAuthLister.ListCalls())
 func (mock *SSHAuthListerMock) ListCalls() []struct {
 	Namespace string
 	Selector  labels.Selector
@@ -161,43 +159,43 @@ var _ v31.SSHAuthController = &SSHAuthControllerMock{}
 
 // SSHAuthControllerMock is a mock implementation of v31.SSHAuthController.
 //
-//	    func TestSomethingThatUsesSSHAuthController(t *testing.T) {
+//     func TestSomethingThatUsesSSHAuthController(t *testing.T) {
 //
-//	        // make and configure a mocked v31.SSHAuthController
-//	        mockedSSHAuthController := &SSHAuthControllerMock{
-//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v31.SSHAuthHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedFeatureHandler method")
-//	            },
-//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v31.SSHAuthHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedHandler method")
-//	            },
-//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.SSHAuthHandlerFunc)  {
-//		               panic("mock out the AddFeatureHandler method")
-//	            },
-//	            AddHandlerFunc: func(ctx context.Context, name string, handler v31.SSHAuthHandlerFunc)  {
-//		               panic("mock out the AddHandler method")
-//	            },
-//	            EnqueueFunc: func(namespace string, name string)  {
-//		               panic("mock out the Enqueue method")
-//	            },
-//	            EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
-//		               panic("mock out the EnqueueAfter method")
-//	            },
-//	            GenericFunc: func() controller.GenericController {
-//		               panic("mock out the Generic method")
-//	            },
-//	            InformerFunc: func() cache.SharedIndexInformer {
-//		               panic("mock out the Informer method")
-//	            },
-//	            ListerFunc: func() v31.SSHAuthLister {
-//		               panic("mock out the Lister method")
-//	            },
-//	        }
+//         // make and configure a mocked v31.SSHAuthController
+//         mockedSSHAuthController := &SSHAuthControllerMock{
+//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v31.SSHAuthHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedFeatureHandler method")
+//             },
+//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v31.SSHAuthHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedHandler method")
+//             },
+//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.SSHAuthHandlerFunc)  {
+// 	               panic("mock out the AddFeatureHandler method")
+//             },
+//             AddHandlerFunc: func(ctx context.Context, name string, handler v31.SSHAuthHandlerFunc)  {
+// 	               panic("mock out the AddHandler method")
+//             },
+//             EnqueueFunc: func(namespace string, name string)  {
+// 	               panic("mock out the Enqueue method")
+//             },
+//             EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
+// 	               panic("mock out the EnqueueAfter method")
+//             },
+//             GenericFunc: func() controller.GenericController {
+// 	               panic("mock out the Generic method")
+//             },
+//             InformerFunc: func() cache.SharedIndexInformer {
+// 	               panic("mock out the Informer method")
+//             },
+//             ListerFunc: func() v31.SSHAuthLister {
+// 	               panic("mock out the Lister method")
+//             },
+//         }
 //
-//	        // use mockedSSHAuthController in code that requires v31.SSHAuthController
-//	        // and then make assertions.
+//         // use mockedSSHAuthController in code that requires v31.SSHAuthController
+//         // and then make assertions.
 //
-//	    }
+//     }
 type SSHAuthControllerMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
 	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v31.SSHAuthHandlerFunc)
@@ -326,8 +324,7 @@ func (mock *SSHAuthControllerMock) AddClusterScopedFeatureHandler(ctx context.Co
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//
-//	len(mockedSSHAuthController.AddClusterScopedFeatureHandlerCalls())
+//     len(mockedSSHAuthController.AddClusterScopedFeatureHandlerCalls())
 func (mock *SSHAuthControllerMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -372,8 +369,7 @@ func (mock *SSHAuthControllerMock) AddClusterScopedHandler(ctx context.Context, 
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//
-//	len(mockedSSHAuthController.AddClusterScopedHandlerCalls())
+//     len(mockedSSHAuthController.AddClusterScopedHandlerCalls())
 func (mock *SSHAuthControllerMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -416,8 +412,7 @@ func (mock *SSHAuthControllerMock) AddFeatureHandler(ctx context.Context, enable
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//
-//	len(mockedSSHAuthController.AddFeatureHandlerCalls())
+//     len(mockedSSHAuthController.AddFeatureHandlerCalls())
 func (mock *SSHAuthControllerMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
@@ -458,8 +453,7 @@ func (mock *SSHAuthControllerMock) AddHandler(ctx context.Context, name string, 
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//
-//	len(mockedSSHAuthController.AddHandlerCalls())
+//     len(mockedSSHAuthController.AddHandlerCalls())
 func (mock *SSHAuthControllerMock) AddHandlerCalls() []struct {
 	Ctx     context.Context
 	Name    string
@@ -496,8 +490,7 @@ func (mock *SSHAuthControllerMock) Enqueue(namespace string, name string) {
 
 // EnqueueCalls gets all the calls that were made to Enqueue.
 // Check the length with:
-//
-//	len(mockedSSHAuthController.EnqueueCalls())
+//     len(mockedSSHAuthController.EnqueueCalls())
 func (mock *SSHAuthControllerMock) EnqueueCalls() []struct {
 	Namespace string
 	Name      string
@@ -534,8 +527,7 @@ func (mock *SSHAuthControllerMock) EnqueueAfter(namespace string, name string, a
 
 // EnqueueAfterCalls gets all the calls that were made to EnqueueAfter.
 // Check the length with:
-//
-//	len(mockedSSHAuthController.EnqueueAfterCalls())
+//     len(mockedSSHAuthController.EnqueueAfterCalls())
 func (mock *SSHAuthControllerMock) EnqueueAfterCalls() []struct {
 	Namespace string
 	Name      string
@@ -567,8 +559,7 @@ func (mock *SSHAuthControllerMock) Generic() controller.GenericController {
 
 // GenericCalls gets all the calls that were made to Generic.
 // Check the length with:
-//
-//	len(mockedSSHAuthController.GenericCalls())
+//     len(mockedSSHAuthController.GenericCalls())
 func (mock *SSHAuthControllerMock) GenericCalls() []struct {
 } {
 	var calls []struct {
@@ -594,8 +585,7 @@ func (mock *SSHAuthControllerMock) Informer() cache.SharedIndexInformer {
 
 // InformerCalls gets all the calls that were made to Informer.
 // Check the length with:
-//
-//	len(mockedSSHAuthController.InformerCalls())
+//     len(mockedSSHAuthController.InformerCalls())
 func (mock *SSHAuthControllerMock) InformerCalls() []struct {
 } {
 	var calls []struct {
@@ -621,8 +611,7 @@ func (mock *SSHAuthControllerMock) Lister() v31.SSHAuthLister {
 
 // ListerCalls gets all the calls that were made to Lister.
 // Check the length with:
-//
-//	len(mockedSSHAuthController.ListerCalls())
+//     len(mockedSSHAuthController.ListerCalls())
 func (mock *SSHAuthControllerMock) ListerCalls() []struct {
 } {
 	var calls []struct {
@@ -662,76 +651,76 @@ var _ v31.SSHAuthInterface = &SSHAuthInterfaceMock{}
 
 // SSHAuthInterfaceMock is a mock implementation of v31.SSHAuthInterface.
 //
-//	    func TestSomethingThatUsesSSHAuthInterface(t *testing.T) {
+//     func TestSomethingThatUsesSSHAuthInterface(t *testing.T) {
 //
-//	        // make and configure a mocked v31.SSHAuthInterface
-//	        mockedSSHAuthInterface := &SSHAuthInterfaceMock{
-//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v31.SSHAuthHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedFeatureHandler method")
-//	            },
-//	            AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v31.SSHAuthLifecycle)  {
-//		               panic("mock out the AddClusterScopedFeatureLifecycle method")
-//	            },
-//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v31.SSHAuthHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedHandler method")
-//	            },
-//	            AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v31.SSHAuthLifecycle)  {
-//		               panic("mock out the AddClusterScopedLifecycle method")
-//	            },
-//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.SSHAuthHandlerFunc)  {
-//		               panic("mock out the AddFeatureHandler method")
-//	            },
-//	            AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v31.SSHAuthLifecycle)  {
-//		               panic("mock out the AddFeatureLifecycle method")
-//	            },
-//	            AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v31.SSHAuthHandlerFunc)  {
-//		               panic("mock out the AddHandler method")
-//	            },
-//	            AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v31.SSHAuthLifecycle)  {
-//		               panic("mock out the AddLifecycle method")
-//	            },
-//	            ControllerFunc: func() v31.SSHAuthController {
-//		               panic("mock out the Controller method")
-//	            },
-//	            CreateFunc: func(in1 *v3.SSHAuth) (*v3.SSHAuth, error) {
-//		               panic("mock out the Create method")
-//	            },
-//	            DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
-//		               panic("mock out the Delete method")
-//	            },
-//	            DeleteCollectionFunc: func(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
-//		               panic("mock out the DeleteCollection method")
-//	            },
-//	            DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
-//		               panic("mock out the DeleteNamespaced method")
-//	            },
-//	            GetFunc: func(name string, opts metav1.GetOptions) (*v3.SSHAuth, error) {
-//		               panic("mock out the Get method")
-//	            },
-//	            GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v3.SSHAuth, error) {
-//		               panic("mock out the GetNamespaced method")
-//	            },
-//	            ListFunc: func(opts metav1.ListOptions) (*v3.SSHAuthList, error) {
-//		               panic("mock out the List method")
-//	            },
-//	            ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v3.SSHAuthList, error) {
-//		               panic("mock out the ListNamespaced method")
-//	            },
-//	            ObjectClientFunc: func() *objectclient.ObjectClient {
-//		               panic("mock out the ObjectClient method")
-//	            },
-//	            UpdateFunc: func(in1 *v3.SSHAuth) (*v3.SSHAuth, error) {
-//		               panic("mock out the Update method")
-//	            },
-//	            WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
-//		               panic("mock out the Watch method")
-//	            },
-//	        }
+//         // make and configure a mocked v31.SSHAuthInterface
+//         mockedSSHAuthInterface := &SSHAuthInterfaceMock{
+//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v31.SSHAuthHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedFeatureHandler method")
+//             },
+//             AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v31.SSHAuthLifecycle)  {
+// 	               panic("mock out the AddClusterScopedFeatureLifecycle method")
+//             },
+//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v31.SSHAuthHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedHandler method")
+//             },
+//             AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v31.SSHAuthLifecycle)  {
+// 	               panic("mock out the AddClusterScopedLifecycle method")
+//             },
+//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.SSHAuthHandlerFunc)  {
+// 	               panic("mock out the AddFeatureHandler method")
+//             },
+//             AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v31.SSHAuthLifecycle)  {
+// 	               panic("mock out the AddFeatureLifecycle method")
+//             },
+//             AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v31.SSHAuthHandlerFunc)  {
+// 	               panic("mock out the AddHandler method")
+//             },
+//             AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v31.SSHAuthLifecycle)  {
+// 	               panic("mock out the AddLifecycle method")
+//             },
+//             ControllerFunc: func() v31.SSHAuthController {
+// 	               panic("mock out the Controller method")
+//             },
+//             CreateFunc: func(in1 *v3.SSHAuth) (*v3.SSHAuth, error) {
+// 	               panic("mock out the Create method")
+//             },
+//             DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
+// 	               panic("mock out the Delete method")
+//             },
+//             DeleteCollectionFunc: func(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
+// 	               panic("mock out the DeleteCollection method")
+//             },
+//             DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
+// 	               panic("mock out the DeleteNamespaced method")
+//             },
+//             GetFunc: func(name string, opts metav1.GetOptions) (*v3.SSHAuth, error) {
+// 	               panic("mock out the Get method")
+//             },
+//             GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v3.SSHAuth, error) {
+// 	               panic("mock out the GetNamespaced method")
+//             },
+//             ListFunc: func(opts metav1.ListOptions) (*v3.SSHAuthList, error) {
+// 	               panic("mock out the List method")
+//             },
+//             ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v3.SSHAuthList, error) {
+// 	               panic("mock out the ListNamespaced method")
+//             },
+//             ObjectClientFunc: func() *objectclient.ObjectClient {
+// 	               panic("mock out the ObjectClient method")
+//             },
+//             UpdateFunc: func(in1 *v3.SSHAuth) (*v3.SSHAuth, error) {
+// 	               panic("mock out the Update method")
+//             },
+//             WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
+// 	               panic("mock out the Watch method")
+//             },
+//         }
 //
-//	        // use mockedSSHAuthInterface in code that requires v31.SSHAuthInterface
-//	        // and then make assertions.
+//         // use mockedSSHAuthInterface in code that requires v31.SSHAuthInterface
+//         // and then make assertions.
 //
-//	    }
+//     }
 type SSHAuthInterfaceMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
 	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v31.SSHAuthHandlerFunc)
@@ -984,8 +973,7 @@ func (mock *SSHAuthInterfaceMock) AddClusterScopedFeatureHandler(ctx context.Con
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//
-//	len(mockedSSHAuthInterface.AddClusterScopedFeatureHandlerCalls())
+//     len(mockedSSHAuthInterface.AddClusterScopedFeatureHandlerCalls())
 func (mock *SSHAuthInterfaceMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -1032,8 +1020,7 @@ func (mock *SSHAuthInterfaceMock) AddClusterScopedFeatureLifecycle(ctx context.C
 
 // AddClusterScopedFeatureLifecycleCalls gets all the calls that were made to AddClusterScopedFeatureLifecycle.
 // Check the length with:
-//
-//	len(mockedSSHAuthInterface.AddClusterScopedFeatureLifecycleCalls())
+//     len(mockedSSHAuthInterface.AddClusterScopedFeatureLifecycleCalls())
 func (mock *SSHAuthInterfaceMock) AddClusterScopedFeatureLifecycleCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -1078,8 +1065,7 @@ func (mock *SSHAuthInterfaceMock) AddClusterScopedHandler(ctx context.Context, n
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//
-//	len(mockedSSHAuthInterface.AddClusterScopedHandlerCalls())
+//     len(mockedSSHAuthInterface.AddClusterScopedHandlerCalls())
 func (mock *SSHAuthInterfaceMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -1122,8 +1108,7 @@ func (mock *SSHAuthInterfaceMock) AddClusterScopedLifecycle(ctx context.Context,
 
 // AddClusterScopedLifecycleCalls gets all the calls that were made to AddClusterScopedLifecycle.
 // Check the length with:
-//
-//	len(mockedSSHAuthInterface.AddClusterScopedLifecycleCalls())
+//     len(mockedSSHAuthInterface.AddClusterScopedLifecycleCalls())
 func (mock *SSHAuthInterfaceMock) AddClusterScopedLifecycleCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -1166,8 +1151,7 @@ func (mock *SSHAuthInterfaceMock) AddFeatureHandler(ctx context.Context, enabled
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//
-//	len(mockedSSHAuthInterface.AddFeatureHandlerCalls())
+//     len(mockedSSHAuthInterface.AddFeatureHandlerCalls())
 func (mock *SSHAuthInterfaceMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
@@ -1210,8 +1194,7 @@ func (mock *SSHAuthInterfaceMock) AddFeatureLifecycle(ctx context.Context, enabl
 
 // AddFeatureLifecycleCalls gets all the calls that were made to AddFeatureLifecycle.
 // Check the length with:
-//
-//	len(mockedSSHAuthInterface.AddFeatureLifecycleCalls())
+//     len(mockedSSHAuthInterface.AddFeatureLifecycleCalls())
 func (mock *SSHAuthInterfaceMock) AddFeatureLifecycleCalls() []struct {
 	Ctx       context.Context
 	Enabled   func() bool
@@ -1252,8 +1235,7 @@ func (mock *SSHAuthInterfaceMock) AddHandler(ctx context.Context, name string, s
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//
-//	len(mockedSSHAuthInterface.AddHandlerCalls())
+//     len(mockedSSHAuthInterface.AddHandlerCalls())
 func (mock *SSHAuthInterfaceMock) AddHandlerCalls() []struct {
 	Ctx  context.Context
 	Name string
@@ -1292,8 +1274,7 @@ func (mock *SSHAuthInterfaceMock) AddLifecycle(ctx context.Context, name string,
 
 // AddLifecycleCalls gets all the calls that were made to AddLifecycle.
 // Check the length with:
-//
-//	len(mockedSSHAuthInterface.AddLifecycleCalls())
+//     len(mockedSSHAuthInterface.AddLifecycleCalls())
 func (mock *SSHAuthInterfaceMock) AddLifecycleCalls() []struct {
 	Ctx       context.Context
 	Name      string
@@ -1325,8 +1306,7 @@ func (mock *SSHAuthInterfaceMock) Controller() v31.SSHAuthController {
 
 // ControllerCalls gets all the calls that were made to Controller.
 // Check the length with:
-//
-//	len(mockedSSHAuthInterface.ControllerCalls())
+//     len(mockedSSHAuthInterface.ControllerCalls())
 func (mock *SSHAuthInterfaceMock) ControllerCalls() []struct {
 } {
 	var calls []struct {
@@ -1355,8 +1335,7 @@ func (mock *SSHAuthInterfaceMock) Create(in1 *v3.SSHAuth) (*v3.SSHAuth, error) {
 
 // CreateCalls gets all the calls that were made to Create.
 // Check the length with:
-//
-//	len(mockedSSHAuthInterface.CreateCalls())
+//     len(mockedSSHAuthInterface.CreateCalls())
 func (mock *SSHAuthInterfaceMock) CreateCalls() []struct {
 	In1 *v3.SSHAuth
 } {
@@ -1389,8 +1368,7 @@ func (mock *SSHAuthInterfaceMock) Delete(name string, options *metav1.DeleteOpti
 
 // DeleteCalls gets all the calls that were made to Delete.
 // Check the length with:
-//
-//	len(mockedSSHAuthInterface.DeleteCalls())
+//     len(mockedSSHAuthInterface.DeleteCalls())
 func (mock *SSHAuthInterfaceMock) DeleteCalls() []struct {
 	Name    string
 	Options *metav1.DeleteOptions
@@ -1425,8 +1403,7 @@ func (mock *SSHAuthInterfaceMock) DeleteCollection(deleteOpts *metav1.DeleteOpti
 
 // DeleteCollectionCalls gets all the calls that were made to DeleteCollection.
 // Check the length with:
-//
-//	len(mockedSSHAuthInterface.DeleteCollectionCalls())
+//     len(mockedSSHAuthInterface.DeleteCollectionCalls())
 func (mock *SSHAuthInterfaceMock) DeleteCollectionCalls() []struct {
 	DeleteOpts *metav1.DeleteOptions
 	ListOpts   metav1.ListOptions
@@ -1463,8 +1440,7 @@ func (mock *SSHAuthInterfaceMock) DeleteNamespaced(namespace string, name string
 
 // DeleteNamespacedCalls gets all the calls that were made to DeleteNamespaced.
 // Check the length with:
-//
-//	len(mockedSSHAuthInterface.DeleteNamespacedCalls())
+//     len(mockedSSHAuthInterface.DeleteNamespacedCalls())
 func (mock *SSHAuthInterfaceMock) DeleteNamespacedCalls() []struct {
 	Namespace string
 	Name      string
@@ -1501,8 +1477,7 @@ func (mock *SSHAuthInterfaceMock) Get(name string, opts metav1.GetOptions) (*v3.
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//
-//	len(mockedSSHAuthInterface.GetCalls())
+//     len(mockedSSHAuthInterface.GetCalls())
 func (mock *SSHAuthInterfaceMock) GetCalls() []struct {
 	Name string
 	Opts metav1.GetOptions
@@ -1539,8 +1514,7 @@ func (mock *SSHAuthInterfaceMock) GetNamespaced(namespace string, name string, o
 
 // GetNamespacedCalls gets all the calls that were made to GetNamespaced.
 // Check the length with:
-//
-//	len(mockedSSHAuthInterface.GetNamespacedCalls())
+//     len(mockedSSHAuthInterface.GetNamespacedCalls())
 func (mock *SSHAuthInterfaceMock) GetNamespacedCalls() []struct {
 	Namespace string
 	Name      string
@@ -1575,8 +1549,7 @@ func (mock *SSHAuthInterfaceMock) List(opts metav1.ListOptions) (*v3.SSHAuthList
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//
-//	len(mockedSSHAuthInterface.ListCalls())
+//     len(mockedSSHAuthInterface.ListCalls())
 func (mock *SSHAuthInterfaceMock) ListCalls() []struct {
 	Opts metav1.ListOptions
 } {
@@ -1609,8 +1582,7 @@ func (mock *SSHAuthInterfaceMock) ListNamespaced(namespace string, opts metav1.L
 
 // ListNamespacedCalls gets all the calls that were made to ListNamespaced.
 // Check the length with:
-//
-//	len(mockedSSHAuthInterface.ListNamespacedCalls())
+//     len(mockedSSHAuthInterface.ListNamespacedCalls())
 func (mock *SSHAuthInterfaceMock) ListNamespacedCalls() []struct {
 	Namespace string
 	Opts      metav1.ListOptions
@@ -1640,8 +1612,7 @@ func (mock *SSHAuthInterfaceMock) ObjectClient() *objectclient.ObjectClient {
 
 // ObjectClientCalls gets all the calls that were made to ObjectClient.
 // Check the length with:
-//
-//	len(mockedSSHAuthInterface.ObjectClientCalls())
+//     len(mockedSSHAuthInterface.ObjectClientCalls())
 func (mock *SSHAuthInterfaceMock) ObjectClientCalls() []struct {
 } {
 	var calls []struct {
@@ -1670,8 +1641,7 @@ func (mock *SSHAuthInterfaceMock) Update(in1 *v3.SSHAuth) (*v3.SSHAuth, error) {
 
 // UpdateCalls gets all the calls that were made to Update.
 // Check the length with:
-//
-//	len(mockedSSHAuthInterface.UpdateCalls())
+//     len(mockedSSHAuthInterface.UpdateCalls())
 func (mock *SSHAuthInterfaceMock) UpdateCalls() []struct {
 	In1 *v3.SSHAuth
 } {
@@ -1702,8 +1672,7 @@ func (mock *SSHAuthInterfaceMock) Watch(opts metav1.ListOptions) (watch.Interfac
 
 // WatchCalls gets all the calls that were made to Watch.
 // Check the length with:
-//
-//	len(mockedSSHAuthInterface.WatchCalls())
+//     len(mockedSSHAuthInterface.WatchCalls())
 func (mock *SSHAuthInterfaceMock) WatchCalls() []struct {
 	Opts metav1.ListOptions
 } {
@@ -1726,19 +1695,19 @@ var _ v31.SSHAuthsGetter = &SSHAuthsGetterMock{}
 
 // SSHAuthsGetterMock is a mock implementation of v31.SSHAuthsGetter.
 //
-//	    func TestSomethingThatUsesSSHAuthsGetter(t *testing.T) {
+//     func TestSomethingThatUsesSSHAuthsGetter(t *testing.T) {
 //
-//	        // make and configure a mocked v31.SSHAuthsGetter
-//	        mockedSSHAuthsGetter := &SSHAuthsGetterMock{
-//	            SSHAuthsFunc: func(namespace string) v31.SSHAuthInterface {
-//		               panic("mock out the SSHAuths method")
-//	            },
-//	        }
+//         // make and configure a mocked v31.SSHAuthsGetter
+//         mockedSSHAuthsGetter := &SSHAuthsGetterMock{
+//             SSHAuthsFunc: func(namespace string) v31.SSHAuthInterface {
+// 	               panic("mock out the SSHAuths method")
+//             },
+//         }
 //
-//	        // use mockedSSHAuthsGetter in code that requires v31.SSHAuthsGetter
-//	        // and then make assertions.
+//         // use mockedSSHAuthsGetter in code that requires v31.SSHAuthsGetter
+//         // and then make assertions.
 //
-//	    }
+//     }
 type SSHAuthsGetterMock struct {
 	// SSHAuthsFunc mocks the SSHAuths method.
 	SSHAuthsFunc func(namespace string) v31.SSHAuthInterface
@@ -1771,8 +1740,7 @@ func (mock *SSHAuthsGetterMock) SSHAuths(namespace string) v31.SSHAuthInterface 
 
 // SSHAuthsCalls gets all the calls that were made to SSHAuths.
 // Check the length with:
-//
-//	len(mockedSSHAuthsGetter.SSHAuthsCalls())
+//     len(mockedSSHAuthsGetter.SSHAuthsCalls())
 func (mock *SSHAuthsGetterMock) SSHAuthsCalls() []struct {
 	Namespace string
 } {

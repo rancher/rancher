@@ -29,22 +29,22 @@ var _ v31.NodePoolLister = &NodePoolListerMock{}
 
 // NodePoolListerMock is a mock implementation of v31.NodePoolLister.
 //
-//	    func TestSomethingThatUsesNodePoolLister(t *testing.T) {
+//     func TestSomethingThatUsesNodePoolLister(t *testing.T) {
 //
-//	        // make and configure a mocked v31.NodePoolLister
-//	        mockedNodePoolLister := &NodePoolListerMock{
-//	            GetFunc: func(namespace string, name string) (*v3.NodePool, error) {
-//		               panic("mock out the Get method")
-//	            },
-//	            ListFunc: func(namespace string, selector labels.Selector) ([]*v3.NodePool, error) {
-//		               panic("mock out the List method")
-//	            },
-//	        }
+//         // make and configure a mocked v31.NodePoolLister
+//         mockedNodePoolLister := &NodePoolListerMock{
+//             GetFunc: func(namespace string, name string) (*v3.NodePool, error) {
+// 	               panic("mock out the Get method")
+//             },
+//             ListFunc: func(namespace string, selector labels.Selector) ([]*v3.NodePool, error) {
+// 	               panic("mock out the List method")
+//             },
+//         }
 //
-//	        // use mockedNodePoolLister in code that requires v31.NodePoolLister
-//	        // and then make assertions.
+//         // use mockedNodePoolLister in code that requires v31.NodePoolLister
+//         // and then make assertions.
 //
-//	    }
+//     }
 type NodePoolListerMock struct {
 	// GetFunc mocks the Get method.
 	GetFunc func(namespace string, name string) (*v3.NodePool, error)
@@ -91,8 +91,7 @@ func (mock *NodePoolListerMock) Get(namespace string, name string) (*v3.NodePool
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//
-//	len(mockedNodePoolLister.GetCalls())
+//     len(mockedNodePoolLister.GetCalls())
 func (mock *NodePoolListerMock) GetCalls() []struct {
 	Namespace string
 	Name      string
@@ -127,8 +126,7 @@ func (mock *NodePoolListerMock) List(namespace string, selector labels.Selector)
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//
-//	len(mockedNodePoolLister.ListCalls())
+//     len(mockedNodePoolLister.ListCalls())
 func (mock *NodePoolListerMock) ListCalls() []struct {
 	Namespace string
 	Selector  labels.Selector
@@ -161,43 +159,43 @@ var _ v31.NodePoolController = &NodePoolControllerMock{}
 
 // NodePoolControllerMock is a mock implementation of v31.NodePoolController.
 //
-//	    func TestSomethingThatUsesNodePoolController(t *testing.T) {
+//     func TestSomethingThatUsesNodePoolController(t *testing.T) {
 //
-//	        // make and configure a mocked v31.NodePoolController
-//	        mockedNodePoolController := &NodePoolControllerMock{
-//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v31.NodePoolHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedFeatureHandler method")
-//	            },
-//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v31.NodePoolHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedHandler method")
-//	            },
-//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.NodePoolHandlerFunc)  {
-//		               panic("mock out the AddFeatureHandler method")
-//	            },
-//	            AddHandlerFunc: func(ctx context.Context, name string, handler v31.NodePoolHandlerFunc)  {
-//		               panic("mock out the AddHandler method")
-//	            },
-//	            EnqueueFunc: func(namespace string, name string)  {
-//		               panic("mock out the Enqueue method")
-//	            },
-//	            EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
-//		               panic("mock out the EnqueueAfter method")
-//	            },
-//	            GenericFunc: func() controller.GenericController {
-//		               panic("mock out the Generic method")
-//	            },
-//	            InformerFunc: func() cache.SharedIndexInformer {
-//		               panic("mock out the Informer method")
-//	            },
-//	            ListerFunc: func() v31.NodePoolLister {
-//		               panic("mock out the Lister method")
-//	            },
-//	        }
+//         // make and configure a mocked v31.NodePoolController
+//         mockedNodePoolController := &NodePoolControllerMock{
+//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v31.NodePoolHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedFeatureHandler method")
+//             },
+//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v31.NodePoolHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedHandler method")
+//             },
+//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.NodePoolHandlerFunc)  {
+// 	               panic("mock out the AddFeatureHandler method")
+//             },
+//             AddHandlerFunc: func(ctx context.Context, name string, handler v31.NodePoolHandlerFunc)  {
+// 	               panic("mock out the AddHandler method")
+//             },
+//             EnqueueFunc: func(namespace string, name string)  {
+// 	               panic("mock out the Enqueue method")
+//             },
+//             EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
+// 	               panic("mock out the EnqueueAfter method")
+//             },
+//             GenericFunc: func() controller.GenericController {
+// 	               panic("mock out the Generic method")
+//             },
+//             InformerFunc: func() cache.SharedIndexInformer {
+// 	               panic("mock out the Informer method")
+//             },
+//             ListerFunc: func() v31.NodePoolLister {
+// 	               panic("mock out the Lister method")
+//             },
+//         }
 //
-//	        // use mockedNodePoolController in code that requires v31.NodePoolController
-//	        // and then make assertions.
+//         // use mockedNodePoolController in code that requires v31.NodePoolController
+//         // and then make assertions.
 //
-//	    }
+//     }
 type NodePoolControllerMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
 	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v31.NodePoolHandlerFunc)
@@ -326,8 +324,7 @@ func (mock *NodePoolControllerMock) AddClusterScopedFeatureHandler(ctx context.C
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//
-//	len(mockedNodePoolController.AddClusterScopedFeatureHandlerCalls())
+//     len(mockedNodePoolController.AddClusterScopedFeatureHandlerCalls())
 func (mock *NodePoolControllerMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -372,8 +369,7 @@ func (mock *NodePoolControllerMock) AddClusterScopedHandler(ctx context.Context,
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//
-//	len(mockedNodePoolController.AddClusterScopedHandlerCalls())
+//     len(mockedNodePoolController.AddClusterScopedHandlerCalls())
 func (mock *NodePoolControllerMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -416,8 +412,7 @@ func (mock *NodePoolControllerMock) AddFeatureHandler(ctx context.Context, enabl
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//
-//	len(mockedNodePoolController.AddFeatureHandlerCalls())
+//     len(mockedNodePoolController.AddFeatureHandlerCalls())
 func (mock *NodePoolControllerMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
@@ -458,8 +453,7 @@ func (mock *NodePoolControllerMock) AddHandler(ctx context.Context, name string,
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//
-//	len(mockedNodePoolController.AddHandlerCalls())
+//     len(mockedNodePoolController.AddHandlerCalls())
 func (mock *NodePoolControllerMock) AddHandlerCalls() []struct {
 	Ctx     context.Context
 	Name    string
@@ -496,8 +490,7 @@ func (mock *NodePoolControllerMock) Enqueue(namespace string, name string) {
 
 // EnqueueCalls gets all the calls that were made to Enqueue.
 // Check the length with:
-//
-//	len(mockedNodePoolController.EnqueueCalls())
+//     len(mockedNodePoolController.EnqueueCalls())
 func (mock *NodePoolControllerMock) EnqueueCalls() []struct {
 	Namespace string
 	Name      string
@@ -534,8 +527,7 @@ func (mock *NodePoolControllerMock) EnqueueAfter(namespace string, name string, 
 
 // EnqueueAfterCalls gets all the calls that were made to EnqueueAfter.
 // Check the length with:
-//
-//	len(mockedNodePoolController.EnqueueAfterCalls())
+//     len(mockedNodePoolController.EnqueueAfterCalls())
 func (mock *NodePoolControllerMock) EnqueueAfterCalls() []struct {
 	Namespace string
 	Name      string
@@ -567,8 +559,7 @@ func (mock *NodePoolControllerMock) Generic() controller.GenericController {
 
 // GenericCalls gets all the calls that were made to Generic.
 // Check the length with:
-//
-//	len(mockedNodePoolController.GenericCalls())
+//     len(mockedNodePoolController.GenericCalls())
 func (mock *NodePoolControllerMock) GenericCalls() []struct {
 } {
 	var calls []struct {
@@ -594,8 +585,7 @@ func (mock *NodePoolControllerMock) Informer() cache.SharedIndexInformer {
 
 // InformerCalls gets all the calls that were made to Informer.
 // Check the length with:
-//
-//	len(mockedNodePoolController.InformerCalls())
+//     len(mockedNodePoolController.InformerCalls())
 func (mock *NodePoolControllerMock) InformerCalls() []struct {
 } {
 	var calls []struct {
@@ -621,8 +611,7 @@ func (mock *NodePoolControllerMock) Lister() v31.NodePoolLister {
 
 // ListerCalls gets all the calls that were made to Lister.
 // Check the length with:
-//
-//	len(mockedNodePoolController.ListerCalls())
+//     len(mockedNodePoolController.ListerCalls())
 func (mock *NodePoolControllerMock) ListerCalls() []struct {
 } {
 	var calls []struct {
@@ -662,76 +651,76 @@ var _ v31.NodePoolInterface = &NodePoolInterfaceMock{}
 
 // NodePoolInterfaceMock is a mock implementation of v31.NodePoolInterface.
 //
-//	    func TestSomethingThatUsesNodePoolInterface(t *testing.T) {
+//     func TestSomethingThatUsesNodePoolInterface(t *testing.T) {
 //
-//	        // make and configure a mocked v31.NodePoolInterface
-//	        mockedNodePoolInterface := &NodePoolInterfaceMock{
-//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v31.NodePoolHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedFeatureHandler method")
-//	            },
-//	            AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v31.NodePoolLifecycle)  {
-//		               panic("mock out the AddClusterScopedFeatureLifecycle method")
-//	            },
-//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v31.NodePoolHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedHandler method")
-//	            },
-//	            AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v31.NodePoolLifecycle)  {
-//		               panic("mock out the AddClusterScopedLifecycle method")
-//	            },
-//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.NodePoolHandlerFunc)  {
-//		               panic("mock out the AddFeatureHandler method")
-//	            },
-//	            AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v31.NodePoolLifecycle)  {
-//		               panic("mock out the AddFeatureLifecycle method")
-//	            },
-//	            AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v31.NodePoolHandlerFunc)  {
-//		               panic("mock out the AddHandler method")
-//	            },
-//	            AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v31.NodePoolLifecycle)  {
-//		               panic("mock out the AddLifecycle method")
-//	            },
-//	            ControllerFunc: func() v31.NodePoolController {
-//		               panic("mock out the Controller method")
-//	            },
-//	            CreateFunc: func(in1 *v3.NodePool) (*v3.NodePool, error) {
-//		               panic("mock out the Create method")
-//	            },
-//	            DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
-//		               panic("mock out the Delete method")
-//	            },
-//	            DeleteCollectionFunc: func(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
-//		               panic("mock out the DeleteCollection method")
-//	            },
-//	            DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
-//		               panic("mock out the DeleteNamespaced method")
-//	            },
-//	            GetFunc: func(name string, opts metav1.GetOptions) (*v3.NodePool, error) {
-//		               panic("mock out the Get method")
-//	            },
-//	            GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v3.NodePool, error) {
-//		               panic("mock out the GetNamespaced method")
-//	            },
-//	            ListFunc: func(opts metav1.ListOptions) (*v3.NodePoolList, error) {
-//		               panic("mock out the List method")
-//	            },
-//	            ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v3.NodePoolList, error) {
-//		               panic("mock out the ListNamespaced method")
-//	            },
-//	            ObjectClientFunc: func() *objectclient.ObjectClient {
-//		               panic("mock out the ObjectClient method")
-//	            },
-//	            UpdateFunc: func(in1 *v3.NodePool) (*v3.NodePool, error) {
-//		               panic("mock out the Update method")
-//	            },
-//	            WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
-//		               panic("mock out the Watch method")
-//	            },
-//	        }
+//         // make and configure a mocked v31.NodePoolInterface
+//         mockedNodePoolInterface := &NodePoolInterfaceMock{
+//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v31.NodePoolHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedFeatureHandler method")
+//             },
+//             AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v31.NodePoolLifecycle)  {
+// 	               panic("mock out the AddClusterScopedFeatureLifecycle method")
+//             },
+//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v31.NodePoolHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedHandler method")
+//             },
+//             AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v31.NodePoolLifecycle)  {
+// 	               panic("mock out the AddClusterScopedLifecycle method")
+//             },
+//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.NodePoolHandlerFunc)  {
+// 	               panic("mock out the AddFeatureHandler method")
+//             },
+//             AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v31.NodePoolLifecycle)  {
+// 	               panic("mock out the AddFeatureLifecycle method")
+//             },
+//             AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v31.NodePoolHandlerFunc)  {
+// 	               panic("mock out the AddHandler method")
+//             },
+//             AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v31.NodePoolLifecycle)  {
+// 	               panic("mock out the AddLifecycle method")
+//             },
+//             ControllerFunc: func() v31.NodePoolController {
+// 	               panic("mock out the Controller method")
+//             },
+//             CreateFunc: func(in1 *v3.NodePool) (*v3.NodePool, error) {
+// 	               panic("mock out the Create method")
+//             },
+//             DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
+// 	               panic("mock out the Delete method")
+//             },
+//             DeleteCollectionFunc: func(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
+// 	               panic("mock out the DeleteCollection method")
+//             },
+//             DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
+// 	               panic("mock out the DeleteNamespaced method")
+//             },
+//             GetFunc: func(name string, opts metav1.GetOptions) (*v3.NodePool, error) {
+// 	               panic("mock out the Get method")
+//             },
+//             GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v3.NodePool, error) {
+// 	               panic("mock out the GetNamespaced method")
+//             },
+//             ListFunc: func(opts metav1.ListOptions) (*v3.NodePoolList, error) {
+// 	               panic("mock out the List method")
+//             },
+//             ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v3.NodePoolList, error) {
+// 	               panic("mock out the ListNamespaced method")
+//             },
+//             ObjectClientFunc: func() *objectclient.ObjectClient {
+// 	               panic("mock out the ObjectClient method")
+//             },
+//             UpdateFunc: func(in1 *v3.NodePool) (*v3.NodePool, error) {
+// 	               panic("mock out the Update method")
+//             },
+//             WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
+// 	               panic("mock out the Watch method")
+//             },
+//         }
 //
-//	        // use mockedNodePoolInterface in code that requires v31.NodePoolInterface
-//	        // and then make assertions.
+//         // use mockedNodePoolInterface in code that requires v31.NodePoolInterface
+//         // and then make assertions.
 //
-//	    }
+//     }
 type NodePoolInterfaceMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
 	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v31.NodePoolHandlerFunc)
@@ -984,8 +973,7 @@ func (mock *NodePoolInterfaceMock) AddClusterScopedFeatureHandler(ctx context.Co
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//
-//	len(mockedNodePoolInterface.AddClusterScopedFeatureHandlerCalls())
+//     len(mockedNodePoolInterface.AddClusterScopedFeatureHandlerCalls())
 func (mock *NodePoolInterfaceMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -1032,8 +1020,7 @@ func (mock *NodePoolInterfaceMock) AddClusterScopedFeatureLifecycle(ctx context.
 
 // AddClusterScopedFeatureLifecycleCalls gets all the calls that were made to AddClusterScopedFeatureLifecycle.
 // Check the length with:
-//
-//	len(mockedNodePoolInterface.AddClusterScopedFeatureLifecycleCalls())
+//     len(mockedNodePoolInterface.AddClusterScopedFeatureLifecycleCalls())
 func (mock *NodePoolInterfaceMock) AddClusterScopedFeatureLifecycleCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -1078,8 +1065,7 @@ func (mock *NodePoolInterfaceMock) AddClusterScopedHandler(ctx context.Context, 
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//
-//	len(mockedNodePoolInterface.AddClusterScopedHandlerCalls())
+//     len(mockedNodePoolInterface.AddClusterScopedHandlerCalls())
 func (mock *NodePoolInterfaceMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -1122,8 +1108,7 @@ func (mock *NodePoolInterfaceMock) AddClusterScopedLifecycle(ctx context.Context
 
 // AddClusterScopedLifecycleCalls gets all the calls that were made to AddClusterScopedLifecycle.
 // Check the length with:
-//
-//	len(mockedNodePoolInterface.AddClusterScopedLifecycleCalls())
+//     len(mockedNodePoolInterface.AddClusterScopedLifecycleCalls())
 func (mock *NodePoolInterfaceMock) AddClusterScopedLifecycleCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -1166,8 +1151,7 @@ func (mock *NodePoolInterfaceMock) AddFeatureHandler(ctx context.Context, enable
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//
-//	len(mockedNodePoolInterface.AddFeatureHandlerCalls())
+//     len(mockedNodePoolInterface.AddFeatureHandlerCalls())
 func (mock *NodePoolInterfaceMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
@@ -1210,8 +1194,7 @@ func (mock *NodePoolInterfaceMock) AddFeatureLifecycle(ctx context.Context, enab
 
 // AddFeatureLifecycleCalls gets all the calls that were made to AddFeatureLifecycle.
 // Check the length with:
-//
-//	len(mockedNodePoolInterface.AddFeatureLifecycleCalls())
+//     len(mockedNodePoolInterface.AddFeatureLifecycleCalls())
 func (mock *NodePoolInterfaceMock) AddFeatureLifecycleCalls() []struct {
 	Ctx       context.Context
 	Enabled   func() bool
@@ -1252,8 +1235,7 @@ func (mock *NodePoolInterfaceMock) AddHandler(ctx context.Context, name string, 
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//
-//	len(mockedNodePoolInterface.AddHandlerCalls())
+//     len(mockedNodePoolInterface.AddHandlerCalls())
 func (mock *NodePoolInterfaceMock) AddHandlerCalls() []struct {
 	Ctx  context.Context
 	Name string
@@ -1292,8 +1274,7 @@ func (mock *NodePoolInterfaceMock) AddLifecycle(ctx context.Context, name string
 
 // AddLifecycleCalls gets all the calls that were made to AddLifecycle.
 // Check the length with:
-//
-//	len(mockedNodePoolInterface.AddLifecycleCalls())
+//     len(mockedNodePoolInterface.AddLifecycleCalls())
 func (mock *NodePoolInterfaceMock) AddLifecycleCalls() []struct {
 	Ctx       context.Context
 	Name      string
@@ -1325,8 +1306,7 @@ func (mock *NodePoolInterfaceMock) Controller() v31.NodePoolController {
 
 // ControllerCalls gets all the calls that were made to Controller.
 // Check the length with:
-//
-//	len(mockedNodePoolInterface.ControllerCalls())
+//     len(mockedNodePoolInterface.ControllerCalls())
 func (mock *NodePoolInterfaceMock) ControllerCalls() []struct {
 } {
 	var calls []struct {
@@ -1355,8 +1335,7 @@ func (mock *NodePoolInterfaceMock) Create(in1 *v3.NodePool) (*v3.NodePool, error
 
 // CreateCalls gets all the calls that were made to Create.
 // Check the length with:
-//
-//	len(mockedNodePoolInterface.CreateCalls())
+//     len(mockedNodePoolInterface.CreateCalls())
 func (mock *NodePoolInterfaceMock) CreateCalls() []struct {
 	In1 *v3.NodePool
 } {
@@ -1389,8 +1368,7 @@ func (mock *NodePoolInterfaceMock) Delete(name string, options *metav1.DeleteOpt
 
 // DeleteCalls gets all the calls that were made to Delete.
 // Check the length with:
-//
-//	len(mockedNodePoolInterface.DeleteCalls())
+//     len(mockedNodePoolInterface.DeleteCalls())
 func (mock *NodePoolInterfaceMock) DeleteCalls() []struct {
 	Name    string
 	Options *metav1.DeleteOptions
@@ -1425,8 +1403,7 @@ func (mock *NodePoolInterfaceMock) DeleteCollection(deleteOpts *metav1.DeleteOpt
 
 // DeleteCollectionCalls gets all the calls that were made to DeleteCollection.
 // Check the length with:
-//
-//	len(mockedNodePoolInterface.DeleteCollectionCalls())
+//     len(mockedNodePoolInterface.DeleteCollectionCalls())
 func (mock *NodePoolInterfaceMock) DeleteCollectionCalls() []struct {
 	DeleteOpts *metav1.DeleteOptions
 	ListOpts   metav1.ListOptions
@@ -1463,8 +1440,7 @@ func (mock *NodePoolInterfaceMock) DeleteNamespaced(namespace string, name strin
 
 // DeleteNamespacedCalls gets all the calls that were made to DeleteNamespaced.
 // Check the length with:
-//
-//	len(mockedNodePoolInterface.DeleteNamespacedCalls())
+//     len(mockedNodePoolInterface.DeleteNamespacedCalls())
 func (mock *NodePoolInterfaceMock) DeleteNamespacedCalls() []struct {
 	Namespace string
 	Name      string
@@ -1501,8 +1477,7 @@ func (mock *NodePoolInterfaceMock) Get(name string, opts metav1.GetOptions) (*v3
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//
-//	len(mockedNodePoolInterface.GetCalls())
+//     len(mockedNodePoolInterface.GetCalls())
 func (mock *NodePoolInterfaceMock) GetCalls() []struct {
 	Name string
 	Opts metav1.GetOptions
@@ -1539,8 +1514,7 @@ func (mock *NodePoolInterfaceMock) GetNamespaced(namespace string, name string, 
 
 // GetNamespacedCalls gets all the calls that were made to GetNamespaced.
 // Check the length with:
-//
-//	len(mockedNodePoolInterface.GetNamespacedCalls())
+//     len(mockedNodePoolInterface.GetNamespacedCalls())
 func (mock *NodePoolInterfaceMock) GetNamespacedCalls() []struct {
 	Namespace string
 	Name      string
@@ -1575,8 +1549,7 @@ func (mock *NodePoolInterfaceMock) List(opts metav1.ListOptions) (*v3.NodePoolLi
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//
-//	len(mockedNodePoolInterface.ListCalls())
+//     len(mockedNodePoolInterface.ListCalls())
 func (mock *NodePoolInterfaceMock) ListCalls() []struct {
 	Opts metav1.ListOptions
 } {
@@ -1609,8 +1582,7 @@ func (mock *NodePoolInterfaceMock) ListNamespaced(namespace string, opts metav1.
 
 // ListNamespacedCalls gets all the calls that were made to ListNamespaced.
 // Check the length with:
-//
-//	len(mockedNodePoolInterface.ListNamespacedCalls())
+//     len(mockedNodePoolInterface.ListNamespacedCalls())
 func (mock *NodePoolInterfaceMock) ListNamespacedCalls() []struct {
 	Namespace string
 	Opts      metav1.ListOptions
@@ -1640,8 +1612,7 @@ func (mock *NodePoolInterfaceMock) ObjectClient() *objectclient.ObjectClient {
 
 // ObjectClientCalls gets all the calls that were made to ObjectClient.
 // Check the length with:
-//
-//	len(mockedNodePoolInterface.ObjectClientCalls())
+//     len(mockedNodePoolInterface.ObjectClientCalls())
 func (mock *NodePoolInterfaceMock) ObjectClientCalls() []struct {
 } {
 	var calls []struct {
@@ -1670,8 +1641,7 @@ func (mock *NodePoolInterfaceMock) Update(in1 *v3.NodePool) (*v3.NodePool, error
 
 // UpdateCalls gets all the calls that were made to Update.
 // Check the length with:
-//
-//	len(mockedNodePoolInterface.UpdateCalls())
+//     len(mockedNodePoolInterface.UpdateCalls())
 func (mock *NodePoolInterfaceMock) UpdateCalls() []struct {
 	In1 *v3.NodePool
 } {
@@ -1702,8 +1672,7 @@ func (mock *NodePoolInterfaceMock) Watch(opts metav1.ListOptions) (watch.Interfa
 
 // WatchCalls gets all the calls that were made to Watch.
 // Check the length with:
-//
-//	len(mockedNodePoolInterface.WatchCalls())
+//     len(mockedNodePoolInterface.WatchCalls())
 func (mock *NodePoolInterfaceMock) WatchCalls() []struct {
 	Opts metav1.ListOptions
 } {
@@ -1726,19 +1695,19 @@ var _ v31.NodePoolsGetter = &NodePoolsGetterMock{}
 
 // NodePoolsGetterMock is a mock implementation of v31.NodePoolsGetter.
 //
-//	    func TestSomethingThatUsesNodePoolsGetter(t *testing.T) {
+//     func TestSomethingThatUsesNodePoolsGetter(t *testing.T) {
 //
-//	        // make and configure a mocked v31.NodePoolsGetter
-//	        mockedNodePoolsGetter := &NodePoolsGetterMock{
-//	            NodePoolsFunc: func(namespace string) v31.NodePoolInterface {
-//		               panic("mock out the NodePools method")
-//	            },
-//	        }
+//         // make and configure a mocked v31.NodePoolsGetter
+//         mockedNodePoolsGetter := &NodePoolsGetterMock{
+//             NodePoolsFunc: func(namespace string) v31.NodePoolInterface {
+// 	               panic("mock out the NodePools method")
+//             },
+//         }
 //
-//	        // use mockedNodePoolsGetter in code that requires v31.NodePoolsGetter
-//	        // and then make assertions.
+//         // use mockedNodePoolsGetter in code that requires v31.NodePoolsGetter
+//         // and then make assertions.
 //
-//	    }
+//     }
 type NodePoolsGetterMock struct {
 	// NodePoolsFunc mocks the NodePools method.
 	NodePoolsFunc func(namespace string) v31.NodePoolInterface
@@ -1771,8 +1740,7 @@ func (mock *NodePoolsGetterMock) NodePools(namespace string) v31.NodePoolInterfa
 
 // NodePoolsCalls gets all the calls that were made to NodePools.
 // Check the length with:
-//
-//	len(mockedNodePoolsGetter.NodePoolsCalls())
+//     len(mockedNodePoolsGetter.NodePoolsCalls())
 func (mock *NodePoolsGetterMock) NodePoolsCalls() []struct {
 	Namespace string
 } {

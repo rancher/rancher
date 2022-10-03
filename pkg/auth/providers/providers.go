@@ -208,3 +208,22 @@ func RefetchGroupPrincipals(principalID string, providerName string, secret stri
 func GetUserExtraAttributes(providerName string, userPrincipal v3.Principal) map[string][]string {
 	return Providers[providerName].GetUserExtraAttributes(userPrincipal)
 }
+
+func IsDisabledProvider(providerName string) (bool, error) {
+	provider, err := GetProvider(providerName)
+	if err != nil {
+		return false, err
+	}
+	return provider.IsDisabledProvider()
+}
+
+func CleanupOnDisable(config *v3.AuthConfig) error {
+	if config == nil {
+		return fmt.Errorf("cannot get auth provider if its config is nil")
+	}
+	provider, err := GetProvider(config.Name)
+	if err != nil {
+		return err
+	}
+	return provider.CleanupResources(config)
+}

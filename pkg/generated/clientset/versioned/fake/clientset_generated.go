@@ -24,6 +24,8 @@ import (
 	fakecatalogv1 "github.com/rancher/rancher/pkg/generated/clientset/versioned/typed/catalog.cattle.io/v1/fake"
 	provisioningv1 "github.com/rancher/rancher/pkg/generated/clientset/versioned/typed/provisioning.cattle.io/v1"
 	fakeprovisioningv1 "github.com/rancher/rancher/pkg/generated/clientset/versioned/typed/provisioning.cattle.io/v1/fake"
+	rkev1 "github.com/rancher/rancher/pkg/generated/clientset/versioned/typed/rke.cattle.io/v1"
+	fakerkev1 "github.com/rancher/rancher/pkg/generated/clientset/versioned/typed/rke.cattle.io/v1/fake"
 	upgradev1 "github.com/rancher/rancher/pkg/generated/clientset/versioned/typed/upgrade.cattle.io/v1"
 	fakeupgradev1 "github.com/rancher/rancher/pkg/generated/clientset/versioned/typed/upgrade.cattle.io/v1/fake"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -91,6 +93,11 @@ func (c *Clientset) CatalogV1() catalogv1.CatalogV1Interface {
 // ProvisioningV1 retrieves the ProvisioningV1Client
 func (c *Clientset) ProvisioningV1() provisioningv1.ProvisioningV1Interface {
 	return &fakeprovisioningv1.FakeProvisioningV1{Fake: &c.Fake}
+}
+
+// RkeV1 retrieves the RkeV1Client
+func (c *Clientset) RkeV1() rkev1.RkeV1Interface {
+	return &fakerkev1.FakeRkeV1{Fake: &c.Fake}
 }
 
 // UpgradeV1 retrieves the UpgradeV1Client

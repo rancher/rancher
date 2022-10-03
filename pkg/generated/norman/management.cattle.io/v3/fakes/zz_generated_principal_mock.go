@@ -29,22 +29,22 @@ var _ v31.PrincipalLister = &PrincipalListerMock{}
 
 // PrincipalListerMock is a mock implementation of v31.PrincipalLister.
 //
-//	    func TestSomethingThatUsesPrincipalLister(t *testing.T) {
+//     func TestSomethingThatUsesPrincipalLister(t *testing.T) {
 //
-//	        // make and configure a mocked v31.PrincipalLister
-//	        mockedPrincipalLister := &PrincipalListerMock{
-//	            GetFunc: func(namespace string, name string) (*v3.Principal, error) {
-//		               panic("mock out the Get method")
-//	            },
-//	            ListFunc: func(namespace string, selector labels.Selector) ([]*v3.Principal, error) {
-//		               panic("mock out the List method")
-//	            },
-//	        }
+//         // make and configure a mocked v31.PrincipalLister
+//         mockedPrincipalLister := &PrincipalListerMock{
+//             GetFunc: func(namespace string, name string) (*v3.Principal, error) {
+// 	               panic("mock out the Get method")
+//             },
+//             ListFunc: func(namespace string, selector labels.Selector) ([]*v3.Principal, error) {
+// 	               panic("mock out the List method")
+//             },
+//         }
 //
-//	        // use mockedPrincipalLister in code that requires v31.PrincipalLister
-//	        // and then make assertions.
+//         // use mockedPrincipalLister in code that requires v31.PrincipalLister
+//         // and then make assertions.
 //
-//	    }
+//     }
 type PrincipalListerMock struct {
 	// GetFunc mocks the Get method.
 	GetFunc func(namespace string, name string) (*v3.Principal, error)
@@ -91,8 +91,7 @@ func (mock *PrincipalListerMock) Get(namespace string, name string) (*v3.Princip
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//
-//	len(mockedPrincipalLister.GetCalls())
+//     len(mockedPrincipalLister.GetCalls())
 func (mock *PrincipalListerMock) GetCalls() []struct {
 	Namespace string
 	Name      string
@@ -127,8 +126,7 @@ func (mock *PrincipalListerMock) List(namespace string, selector labels.Selector
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//
-//	len(mockedPrincipalLister.ListCalls())
+//     len(mockedPrincipalLister.ListCalls())
 func (mock *PrincipalListerMock) ListCalls() []struct {
 	Namespace string
 	Selector  labels.Selector
@@ -161,43 +159,43 @@ var _ v31.PrincipalController = &PrincipalControllerMock{}
 
 // PrincipalControllerMock is a mock implementation of v31.PrincipalController.
 //
-//	    func TestSomethingThatUsesPrincipalController(t *testing.T) {
+//     func TestSomethingThatUsesPrincipalController(t *testing.T) {
 //
-//	        // make and configure a mocked v31.PrincipalController
-//	        mockedPrincipalController := &PrincipalControllerMock{
-//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v31.PrincipalHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedFeatureHandler method")
-//	            },
-//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v31.PrincipalHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedHandler method")
-//	            },
-//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.PrincipalHandlerFunc)  {
-//		               panic("mock out the AddFeatureHandler method")
-//	            },
-//	            AddHandlerFunc: func(ctx context.Context, name string, handler v31.PrincipalHandlerFunc)  {
-//		               panic("mock out the AddHandler method")
-//	            },
-//	            EnqueueFunc: func(namespace string, name string)  {
-//		               panic("mock out the Enqueue method")
-//	            },
-//	            EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
-//		               panic("mock out the EnqueueAfter method")
-//	            },
-//	            GenericFunc: func() controller.GenericController {
-//		               panic("mock out the Generic method")
-//	            },
-//	            InformerFunc: func() cache.SharedIndexInformer {
-//		               panic("mock out the Informer method")
-//	            },
-//	            ListerFunc: func() v31.PrincipalLister {
-//		               panic("mock out the Lister method")
-//	            },
-//	        }
+//         // make and configure a mocked v31.PrincipalController
+//         mockedPrincipalController := &PrincipalControllerMock{
+//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v31.PrincipalHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedFeatureHandler method")
+//             },
+//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v31.PrincipalHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedHandler method")
+//             },
+//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.PrincipalHandlerFunc)  {
+// 	               panic("mock out the AddFeatureHandler method")
+//             },
+//             AddHandlerFunc: func(ctx context.Context, name string, handler v31.PrincipalHandlerFunc)  {
+// 	               panic("mock out the AddHandler method")
+//             },
+//             EnqueueFunc: func(namespace string, name string)  {
+// 	               panic("mock out the Enqueue method")
+//             },
+//             EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
+// 	               panic("mock out the EnqueueAfter method")
+//             },
+//             GenericFunc: func() controller.GenericController {
+// 	               panic("mock out the Generic method")
+//             },
+//             InformerFunc: func() cache.SharedIndexInformer {
+// 	               panic("mock out the Informer method")
+//             },
+//             ListerFunc: func() v31.PrincipalLister {
+// 	               panic("mock out the Lister method")
+//             },
+//         }
 //
-//	        // use mockedPrincipalController in code that requires v31.PrincipalController
-//	        // and then make assertions.
+//         // use mockedPrincipalController in code that requires v31.PrincipalController
+//         // and then make assertions.
 //
-//	    }
+//     }
 type PrincipalControllerMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
 	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v31.PrincipalHandlerFunc)
@@ -326,8 +324,7 @@ func (mock *PrincipalControllerMock) AddClusterScopedFeatureHandler(ctx context.
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//
-//	len(mockedPrincipalController.AddClusterScopedFeatureHandlerCalls())
+//     len(mockedPrincipalController.AddClusterScopedFeatureHandlerCalls())
 func (mock *PrincipalControllerMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -372,8 +369,7 @@ func (mock *PrincipalControllerMock) AddClusterScopedHandler(ctx context.Context
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//
-//	len(mockedPrincipalController.AddClusterScopedHandlerCalls())
+//     len(mockedPrincipalController.AddClusterScopedHandlerCalls())
 func (mock *PrincipalControllerMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -416,8 +412,7 @@ func (mock *PrincipalControllerMock) AddFeatureHandler(ctx context.Context, enab
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//
-//	len(mockedPrincipalController.AddFeatureHandlerCalls())
+//     len(mockedPrincipalController.AddFeatureHandlerCalls())
 func (mock *PrincipalControllerMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
@@ -458,8 +453,7 @@ func (mock *PrincipalControllerMock) AddHandler(ctx context.Context, name string
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//
-//	len(mockedPrincipalController.AddHandlerCalls())
+//     len(mockedPrincipalController.AddHandlerCalls())
 func (mock *PrincipalControllerMock) AddHandlerCalls() []struct {
 	Ctx     context.Context
 	Name    string
@@ -496,8 +490,7 @@ func (mock *PrincipalControllerMock) Enqueue(namespace string, name string) {
 
 // EnqueueCalls gets all the calls that were made to Enqueue.
 // Check the length with:
-//
-//	len(mockedPrincipalController.EnqueueCalls())
+//     len(mockedPrincipalController.EnqueueCalls())
 func (mock *PrincipalControllerMock) EnqueueCalls() []struct {
 	Namespace string
 	Name      string
@@ -534,8 +527,7 @@ func (mock *PrincipalControllerMock) EnqueueAfter(namespace string, name string,
 
 // EnqueueAfterCalls gets all the calls that were made to EnqueueAfter.
 // Check the length with:
-//
-//	len(mockedPrincipalController.EnqueueAfterCalls())
+//     len(mockedPrincipalController.EnqueueAfterCalls())
 func (mock *PrincipalControllerMock) EnqueueAfterCalls() []struct {
 	Namespace string
 	Name      string
@@ -567,8 +559,7 @@ func (mock *PrincipalControllerMock) Generic() controller.GenericController {
 
 // GenericCalls gets all the calls that were made to Generic.
 // Check the length with:
-//
-//	len(mockedPrincipalController.GenericCalls())
+//     len(mockedPrincipalController.GenericCalls())
 func (mock *PrincipalControllerMock) GenericCalls() []struct {
 } {
 	var calls []struct {
@@ -594,8 +585,7 @@ func (mock *PrincipalControllerMock) Informer() cache.SharedIndexInformer {
 
 // InformerCalls gets all the calls that were made to Informer.
 // Check the length with:
-//
-//	len(mockedPrincipalController.InformerCalls())
+//     len(mockedPrincipalController.InformerCalls())
 func (mock *PrincipalControllerMock) InformerCalls() []struct {
 } {
 	var calls []struct {
@@ -621,8 +611,7 @@ func (mock *PrincipalControllerMock) Lister() v31.PrincipalLister {
 
 // ListerCalls gets all the calls that were made to Lister.
 // Check the length with:
-//
-//	len(mockedPrincipalController.ListerCalls())
+//     len(mockedPrincipalController.ListerCalls())
 func (mock *PrincipalControllerMock) ListerCalls() []struct {
 } {
 	var calls []struct {
@@ -662,76 +651,76 @@ var _ v31.PrincipalInterface = &PrincipalInterfaceMock{}
 
 // PrincipalInterfaceMock is a mock implementation of v31.PrincipalInterface.
 //
-//	    func TestSomethingThatUsesPrincipalInterface(t *testing.T) {
+//     func TestSomethingThatUsesPrincipalInterface(t *testing.T) {
 //
-//	        // make and configure a mocked v31.PrincipalInterface
-//	        mockedPrincipalInterface := &PrincipalInterfaceMock{
-//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v31.PrincipalHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedFeatureHandler method")
-//	            },
-//	            AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v31.PrincipalLifecycle)  {
-//		               panic("mock out the AddClusterScopedFeatureLifecycle method")
-//	            },
-//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v31.PrincipalHandlerFunc)  {
-//		               panic("mock out the AddClusterScopedHandler method")
-//	            },
-//	            AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v31.PrincipalLifecycle)  {
-//		               panic("mock out the AddClusterScopedLifecycle method")
-//	            },
-//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.PrincipalHandlerFunc)  {
-//		               panic("mock out the AddFeatureHandler method")
-//	            },
-//	            AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v31.PrincipalLifecycle)  {
-//		               panic("mock out the AddFeatureLifecycle method")
-//	            },
-//	            AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v31.PrincipalHandlerFunc)  {
-//		               panic("mock out the AddHandler method")
-//	            },
-//	            AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v31.PrincipalLifecycle)  {
-//		               panic("mock out the AddLifecycle method")
-//	            },
-//	            ControllerFunc: func() v31.PrincipalController {
-//		               panic("mock out the Controller method")
-//	            },
-//	            CreateFunc: func(in1 *v3.Principal) (*v3.Principal, error) {
-//		               panic("mock out the Create method")
-//	            },
-//	            DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
-//		               panic("mock out the Delete method")
-//	            },
-//	            DeleteCollectionFunc: func(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
-//		               panic("mock out the DeleteCollection method")
-//	            },
-//	            DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
-//		               panic("mock out the DeleteNamespaced method")
-//	            },
-//	            GetFunc: func(name string, opts metav1.GetOptions) (*v3.Principal, error) {
-//		               panic("mock out the Get method")
-//	            },
-//	            GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v3.Principal, error) {
-//		               panic("mock out the GetNamespaced method")
-//	            },
-//	            ListFunc: func(opts metav1.ListOptions) (*v3.PrincipalList, error) {
-//		               panic("mock out the List method")
-//	            },
-//	            ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v3.PrincipalList, error) {
-//		               panic("mock out the ListNamespaced method")
-//	            },
-//	            ObjectClientFunc: func() *objectclient.ObjectClient {
-//		               panic("mock out the ObjectClient method")
-//	            },
-//	            UpdateFunc: func(in1 *v3.Principal) (*v3.Principal, error) {
-//		               panic("mock out the Update method")
-//	            },
-//	            WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
-//		               panic("mock out the Watch method")
-//	            },
-//	        }
+//         // make and configure a mocked v31.PrincipalInterface
+//         mockedPrincipalInterface := &PrincipalInterfaceMock{
+//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v31.PrincipalHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedFeatureHandler method")
+//             },
+//             AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v31.PrincipalLifecycle)  {
+// 	               panic("mock out the AddClusterScopedFeatureLifecycle method")
+//             },
+//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v31.PrincipalHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedHandler method")
+//             },
+//             AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v31.PrincipalLifecycle)  {
+// 	               panic("mock out the AddClusterScopedLifecycle method")
+//             },
+//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.PrincipalHandlerFunc)  {
+// 	               panic("mock out the AddFeatureHandler method")
+//             },
+//             AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v31.PrincipalLifecycle)  {
+// 	               panic("mock out the AddFeatureLifecycle method")
+//             },
+//             AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v31.PrincipalHandlerFunc)  {
+// 	               panic("mock out the AddHandler method")
+//             },
+//             AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v31.PrincipalLifecycle)  {
+// 	               panic("mock out the AddLifecycle method")
+//             },
+//             ControllerFunc: func() v31.PrincipalController {
+// 	               panic("mock out the Controller method")
+//             },
+//             CreateFunc: func(in1 *v3.Principal) (*v3.Principal, error) {
+// 	               panic("mock out the Create method")
+//             },
+//             DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
+// 	               panic("mock out the Delete method")
+//             },
+//             DeleteCollectionFunc: func(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
+// 	               panic("mock out the DeleteCollection method")
+//             },
+//             DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
+// 	               panic("mock out the DeleteNamespaced method")
+//             },
+//             GetFunc: func(name string, opts metav1.GetOptions) (*v3.Principal, error) {
+// 	               panic("mock out the Get method")
+//             },
+//             GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v3.Principal, error) {
+// 	               panic("mock out the GetNamespaced method")
+//             },
+//             ListFunc: func(opts metav1.ListOptions) (*v3.PrincipalList, error) {
+// 	               panic("mock out the List method")
+//             },
+//             ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v3.PrincipalList, error) {
+// 	               panic("mock out the ListNamespaced method")
+//             },
+//             ObjectClientFunc: func() *objectclient.ObjectClient {
+// 	               panic("mock out the ObjectClient method")
+//             },
+//             UpdateFunc: func(in1 *v3.Principal) (*v3.Principal, error) {
+// 	               panic("mock out the Update method")
+//             },
+//             WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
+// 	               panic("mock out the Watch method")
+//             },
+//         }
 //
-//	        // use mockedPrincipalInterface in code that requires v31.PrincipalInterface
-//	        // and then make assertions.
+//         // use mockedPrincipalInterface in code that requires v31.PrincipalInterface
+//         // and then make assertions.
 //
-//	    }
+//     }
 type PrincipalInterfaceMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
 	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v31.PrincipalHandlerFunc)
@@ -984,8 +973,7 @@ func (mock *PrincipalInterfaceMock) AddClusterScopedFeatureHandler(ctx context.C
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//
-//	len(mockedPrincipalInterface.AddClusterScopedFeatureHandlerCalls())
+//     len(mockedPrincipalInterface.AddClusterScopedFeatureHandlerCalls())
 func (mock *PrincipalInterfaceMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -1032,8 +1020,7 @@ func (mock *PrincipalInterfaceMock) AddClusterScopedFeatureLifecycle(ctx context
 
 // AddClusterScopedFeatureLifecycleCalls gets all the calls that were made to AddClusterScopedFeatureLifecycle.
 // Check the length with:
-//
-//	len(mockedPrincipalInterface.AddClusterScopedFeatureLifecycleCalls())
+//     len(mockedPrincipalInterface.AddClusterScopedFeatureLifecycleCalls())
 func (mock *PrincipalInterfaceMock) AddClusterScopedFeatureLifecycleCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -1078,8 +1065,7 @@ func (mock *PrincipalInterfaceMock) AddClusterScopedHandler(ctx context.Context,
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//
-//	len(mockedPrincipalInterface.AddClusterScopedHandlerCalls())
+//     len(mockedPrincipalInterface.AddClusterScopedHandlerCalls())
 func (mock *PrincipalInterfaceMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -1122,8 +1108,7 @@ func (mock *PrincipalInterfaceMock) AddClusterScopedLifecycle(ctx context.Contex
 
 // AddClusterScopedLifecycleCalls gets all the calls that were made to AddClusterScopedLifecycle.
 // Check the length with:
-//
-//	len(mockedPrincipalInterface.AddClusterScopedLifecycleCalls())
+//     len(mockedPrincipalInterface.AddClusterScopedLifecycleCalls())
 func (mock *PrincipalInterfaceMock) AddClusterScopedLifecycleCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -1166,8 +1151,7 @@ func (mock *PrincipalInterfaceMock) AddFeatureHandler(ctx context.Context, enabl
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//
-//	len(mockedPrincipalInterface.AddFeatureHandlerCalls())
+//     len(mockedPrincipalInterface.AddFeatureHandlerCalls())
 func (mock *PrincipalInterfaceMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
@@ -1210,8 +1194,7 @@ func (mock *PrincipalInterfaceMock) AddFeatureLifecycle(ctx context.Context, ena
 
 // AddFeatureLifecycleCalls gets all the calls that were made to AddFeatureLifecycle.
 // Check the length with:
-//
-//	len(mockedPrincipalInterface.AddFeatureLifecycleCalls())
+//     len(mockedPrincipalInterface.AddFeatureLifecycleCalls())
 func (mock *PrincipalInterfaceMock) AddFeatureLifecycleCalls() []struct {
 	Ctx       context.Context
 	Enabled   func() bool
@@ -1252,8 +1235,7 @@ func (mock *PrincipalInterfaceMock) AddHandler(ctx context.Context, name string,
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//
-//	len(mockedPrincipalInterface.AddHandlerCalls())
+//     len(mockedPrincipalInterface.AddHandlerCalls())
 func (mock *PrincipalInterfaceMock) AddHandlerCalls() []struct {
 	Ctx  context.Context
 	Name string
@@ -1292,8 +1274,7 @@ func (mock *PrincipalInterfaceMock) AddLifecycle(ctx context.Context, name strin
 
 // AddLifecycleCalls gets all the calls that were made to AddLifecycle.
 // Check the length with:
-//
-//	len(mockedPrincipalInterface.AddLifecycleCalls())
+//     len(mockedPrincipalInterface.AddLifecycleCalls())
 func (mock *PrincipalInterfaceMock) AddLifecycleCalls() []struct {
 	Ctx       context.Context
 	Name      string
@@ -1325,8 +1306,7 @@ func (mock *PrincipalInterfaceMock) Controller() v31.PrincipalController {
 
 // ControllerCalls gets all the calls that were made to Controller.
 // Check the length with:
-//
-//	len(mockedPrincipalInterface.ControllerCalls())
+//     len(mockedPrincipalInterface.ControllerCalls())
 func (mock *PrincipalInterfaceMock) ControllerCalls() []struct {
 } {
 	var calls []struct {
@@ -1355,8 +1335,7 @@ func (mock *PrincipalInterfaceMock) Create(in1 *v3.Principal) (*v3.Principal, er
 
 // CreateCalls gets all the calls that were made to Create.
 // Check the length with:
-//
-//	len(mockedPrincipalInterface.CreateCalls())
+//     len(mockedPrincipalInterface.CreateCalls())
 func (mock *PrincipalInterfaceMock) CreateCalls() []struct {
 	In1 *v3.Principal
 } {
@@ -1389,8 +1368,7 @@ func (mock *PrincipalInterfaceMock) Delete(name string, options *metav1.DeleteOp
 
 // DeleteCalls gets all the calls that were made to Delete.
 // Check the length with:
-//
-//	len(mockedPrincipalInterface.DeleteCalls())
+//     len(mockedPrincipalInterface.DeleteCalls())
 func (mock *PrincipalInterfaceMock) DeleteCalls() []struct {
 	Name    string
 	Options *metav1.DeleteOptions
@@ -1425,8 +1403,7 @@ func (mock *PrincipalInterfaceMock) DeleteCollection(deleteOpts *metav1.DeleteOp
 
 // DeleteCollectionCalls gets all the calls that were made to DeleteCollection.
 // Check the length with:
-//
-//	len(mockedPrincipalInterface.DeleteCollectionCalls())
+//     len(mockedPrincipalInterface.DeleteCollectionCalls())
 func (mock *PrincipalInterfaceMock) DeleteCollectionCalls() []struct {
 	DeleteOpts *metav1.DeleteOptions
 	ListOpts   metav1.ListOptions
@@ -1463,8 +1440,7 @@ func (mock *PrincipalInterfaceMock) DeleteNamespaced(namespace string, name stri
 
 // DeleteNamespacedCalls gets all the calls that were made to DeleteNamespaced.
 // Check the length with:
-//
-//	len(mockedPrincipalInterface.DeleteNamespacedCalls())
+//     len(mockedPrincipalInterface.DeleteNamespacedCalls())
 func (mock *PrincipalInterfaceMock) DeleteNamespacedCalls() []struct {
 	Namespace string
 	Name      string
@@ -1501,8 +1477,7 @@ func (mock *PrincipalInterfaceMock) Get(name string, opts metav1.GetOptions) (*v
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//
-//	len(mockedPrincipalInterface.GetCalls())
+//     len(mockedPrincipalInterface.GetCalls())
 func (mock *PrincipalInterfaceMock) GetCalls() []struct {
 	Name string
 	Opts metav1.GetOptions
@@ -1539,8 +1514,7 @@ func (mock *PrincipalInterfaceMock) GetNamespaced(namespace string, name string,
 
 // GetNamespacedCalls gets all the calls that were made to GetNamespaced.
 // Check the length with:
-//
-//	len(mockedPrincipalInterface.GetNamespacedCalls())
+//     len(mockedPrincipalInterface.GetNamespacedCalls())
 func (mock *PrincipalInterfaceMock) GetNamespacedCalls() []struct {
 	Namespace string
 	Name      string
@@ -1575,8 +1549,7 @@ func (mock *PrincipalInterfaceMock) List(opts metav1.ListOptions) (*v3.Principal
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//
-//	len(mockedPrincipalInterface.ListCalls())
+//     len(mockedPrincipalInterface.ListCalls())
 func (mock *PrincipalInterfaceMock) ListCalls() []struct {
 	Opts metav1.ListOptions
 } {
@@ -1609,8 +1582,7 @@ func (mock *PrincipalInterfaceMock) ListNamespaced(namespace string, opts metav1
 
 // ListNamespacedCalls gets all the calls that were made to ListNamespaced.
 // Check the length with:
-//
-//	len(mockedPrincipalInterface.ListNamespacedCalls())
+//     len(mockedPrincipalInterface.ListNamespacedCalls())
 func (mock *PrincipalInterfaceMock) ListNamespacedCalls() []struct {
 	Namespace string
 	Opts      metav1.ListOptions
@@ -1640,8 +1612,7 @@ func (mock *PrincipalInterfaceMock) ObjectClient() *objectclient.ObjectClient {
 
 // ObjectClientCalls gets all the calls that were made to ObjectClient.
 // Check the length with:
-//
-//	len(mockedPrincipalInterface.ObjectClientCalls())
+//     len(mockedPrincipalInterface.ObjectClientCalls())
 func (mock *PrincipalInterfaceMock) ObjectClientCalls() []struct {
 } {
 	var calls []struct {
@@ -1670,8 +1641,7 @@ func (mock *PrincipalInterfaceMock) Update(in1 *v3.Principal) (*v3.Principal, er
 
 // UpdateCalls gets all the calls that were made to Update.
 // Check the length with:
-//
-//	len(mockedPrincipalInterface.UpdateCalls())
+//     len(mockedPrincipalInterface.UpdateCalls())
 func (mock *PrincipalInterfaceMock) UpdateCalls() []struct {
 	In1 *v3.Principal
 } {
@@ -1702,8 +1672,7 @@ func (mock *PrincipalInterfaceMock) Watch(opts metav1.ListOptions) (watch.Interf
 
 // WatchCalls gets all the calls that were made to Watch.
 // Check the length with:
-//
-//	len(mockedPrincipalInterface.WatchCalls())
+//     len(mockedPrincipalInterface.WatchCalls())
 func (mock *PrincipalInterfaceMock) WatchCalls() []struct {
 	Opts metav1.ListOptions
 } {
@@ -1726,19 +1695,19 @@ var _ v31.PrincipalsGetter = &PrincipalsGetterMock{}
 
 // PrincipalsGetterMock is a mock implementation of v31.PrincipalsGetter.
 //
-//	    func TestSomethingThatUsesPrincipalsGetter(t *testing.T) {
+//     func TestSomethingThatUsesPrincipalsGetter(t *testing.T) {
 //
-//	        // make and configure a mocked v31.PrincipalsGetter
-//	        mockedPrincipalsGetter := &PrincipalsGetterMock{
-//	            PrincipalsFunc: func(namespace string) v31.PrincipalInterface {
-//		               panic("mock out the Principals method")
-//	            },
-//	        }
+//         // make and configure a mocked v31.PrincipalsGetter
+//         mockedPrincipalsGetter := &PrincipalsGetterMock{
+//             PrincipalsFunc: func(namespace string) v31.PrincipalInterface {
+// 	               panic("mock out the Principals method")
+//             },
+//         }
 //
-//	        // use mockedPrincipalsGetter in code that requires v31.PrincipalsGetter
-//	        // and then make assertions.
+//         // use mockedPrincipalsGetter in code that requires v31.PrincipalsGetter
+//         // and then make assertions.
 //
-//	    }
+//     }
 type PrincipalsGetterMock struct {
 	// PrincipalsFunc mocks the Principals method.
 	PrincipalsFunc func(namespace string) v31.PrincipalInterface
@@ -1771,8 +1740,7 @@ func (mock *PrincipalsGetterMock) Principals(namespace string) v31.PrincipalInte
 
 // PrincipalsCalls gets all the calls that were made to Principals.
 // Check the length with:
-//
-//	len(mockedPrincipalsGetter.PrincipalsCalls())
+//     len(mockedPrincipalsGetter.PrincipalsCalls())
 func (mock *PrincipalsGetterMock) PrincipalsCalls() []struct {
 	Namespace string
 } {

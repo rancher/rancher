@@ -1,10 +1,8 @@
 package client
 
 const (
-	DurationType          = "duration"
-	DurationFieldDuration = "duration"
+	DurationType = "duration"
 )
 
 type Duration struct {
-	Duration string `json:"duration,omitempty" yaml:"duration,omitempty"`
 }
