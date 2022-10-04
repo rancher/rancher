@@ -16,7 +16,7 @@ import (
 	"github.com/rancher/lasso/pkg/controller"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
-	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/clusterrouter"
 	"github.com/rancher/rancher/pkg/controllers/management/secretmigrator"
 	clusterController "github.com/rancher/rancher/pkg/controllers/managementuser"
@@ -56,7 +56,7 @@ type Manager struct {
 
 type record struct {
 	sync.Mutex
-	clusterRec    *v3.Cluster
+	clusterRec    *apimgmtv3.Cluster
 	cluster       *config.UserContext
 	accessControl types.AccessControl
 	started       bool
@@ -77,7 +77,7 @@ func NewManager(httpsPort int, context *config.ScaledContext, asl accesscontrol.
 	}
 }
 
-func (m *Manager) Stop(cluster *v3.Cluster) {
+func (m *Manager) Stop(cluster *apimgmtv3.Cluster) {
 	obj, ok := m.controllers.Load(cluster.UID)
 	if !ok {
 		return
@@ -87,7 +87,7 @@ func (m *Manager) Stop(cluster *v3.Cluster) {
 	m.controllers.Delete(cluster.UID)
 }
 
-func (m *Manager) Start(ctx context.Context, cluster *v3.Cluster, clusterOwner bool) error {
+func (m *Manager) Start(ctx context.Context, cluster *apimgmtv3.Cluster, clusterOwner bool) error {
 	if cluster.DeletionTimestamp != nil {
 		return nil
 	}
@@ -100,7 +100,7 @@ func (m *Manager) Start(ctx context.Context, cluster *v3.Cluster, clusterOwner b
 	return err
 }
 
-func (m *Manager) RESTConfig(cluster *v3.Cluster) (rest.Config, error) {
+func (m *Manager) RESTConfig(cluster *apimgmtv3.Cluster) (rest.Config, error) {
 	obj, ok := m.controllers.Load(cluster.UID)
 	if !ok {
 		return rest.Config{}, fmt.Errorf("cluster record not found %s %s", cluster.Name, cluster.UID)
@@ -112,15 +112,15 @@ func (m *Manager) RESTConfig(cluster *v3.Cluster) (rest.Config, error) {
 
 func (m *Manager) markUnavailable(clusterName string) {
 	if cluster, err := m.clusters.Get(clusterName, metav1.GetOptions{}); err == nil {
-		if !v32.ClusterConditionReady.IsFalse(cluster) {
-			v32.ClusterConditionReady.False(cluster)
+		if !apimgmtv3.ClusterConditionReady.IsFalse(cluster) {
+			apimgmtv3.ClusterConditionReady.False(cluster)
 			m.clusters.Update(cluster)
 		}
 		m.Stop(cluster)
 	}
 }
 
-func (m *Manager) start(ctx context.Context, cluster *v3.Cluster, controllers, clusterOwner bool) (*record, error) {
+func (m *Manager) start(ctx context.Context, cluster *apimgmtv3.Cluster, controllers, clusterOwner bool) (*record, error) {
 	if cluster.DeletionTimestamp != nil {
 		return nil, nil
 	}
@@ -171,7 +171,7 @@ func (m *Manager) startController(r *record, controllers, clusterOwner bool) err
 	return nil
 }
 
-func (m *Manager) changed(r *record, cluster *v3.Cluster, controllers, clusterOwner bool) bool {
+func (m *Manager) changed(r *record, cluster *apimgmtv3.Cluster, controllers, clusterOwner bool) bool {
 	existing := r.clusterRec
 	if existing.Status.APIEndpoint != cluster.Status.APIEndpoint ||
 		existing.Status.ServiceAccountTokenSecret != cluster.Status.ServiceAccountTokenSecret ||
@@ -256,7 +256,7 @@ func (m *Manager) doStart(rec *record, clusterOwner bool) (exit error) {
 	}
 }
 
-func ToRESTConfig(cluster *v3.Cluster, context *config.ScaledContext, secretLister v1.SecretLister) (*rest.Config, error) {
+func ToRESTConfig(cluster *apimgmtv3.Cluster, context *config.ScaledContext, secretLister v1.SecretLister) (*rest.Config, error) {
 	if cluster == nil {
 		return nil, nil
 	}
@@ -265,12 +265,17 @@ func ToRESTConfig(cluster *v3.Cluster, context *config.ScaledContext, secretList
 		return &context.RESTConfig, nil
 	}
 
-	if cluster.Status.APIEndpoint == "" || cluster.Status.CACert == "" || cluster.Status.ServiceAccountTokenSecret == "" {
+	if cluster.Status.APIEndpoint == "" || cluster.Status.CACert == "" {
 		return nil, nil
 	}
 
-	if !v32.ClusterConditionProvisioned.IsTrue(cluster) {
+	if !apimgmtv3.ClusterConditionProvisioned.IsTrue(cluster) {
 		return nil, nil
+	}
+
+	// clusters that don't have a service account token secret can't interact with downstream yet
+	if !apimgmtv3.ClusterConditionServiceAccountSecretsMigrated.IsTrue(cluster) {
+		return nil, fmt.Errorf("waiting for service account token secret to be populated for cluster [%s]", cluster.Name)
 	}
 
 	u, err := url.Parse(cluster.Status.APIEndpoint)
@@ -289,7 +294,7 @@ func ToRESTConfig(cluster *v3.Cluster, context *config.ScaledContext, secretList
 	}
 
 	var tlsDialer func(string, string) (net.Conn, error)
-	if cluster.Status.Driver == v32.ClusterDriverRKE {
+	if cluster.Status.Driver == apimgmtv3.ClusterDriverRKE {
 		tlsDialer, err = nameIgnoringTLSDialer(clusterDialer, caBytes)
 		if err != nil {
 			return nil, err
@@ -300,6 +305,7 @@ func ToRESTConfig(cluster *v3.Cluster, context *config.ScaledContext, secretList
 	if err != nil {
 		return nil, err
 	}
+
 	// adding suffix to make tlsConfig hashkey unique
 	suffix := []byte("\n" + cluster.Name)
 	rc := &rest.Config{
@@ -404,7 +410,7 @@ func VerifyIgnoreDNSName(caCertsPEM []byte) (func(rawCerts [][]byte, verifiedCha
 	}, nil
 }
 
-func (m *Manager) toRecord(ctx context.Context, cluster *v3.Cluster) (*record, error) {
+func (m *Manager) toRecord(ctx context.Context, cluster *apimgmtv3.Cluster) (*record, error) {
 	kubeConfig, err := ToRESTConfig(cluster, m.ScaledContext, m.secretLister)
 	if kubeConfig == nil || err != nil {
 		return nil, err
@@ -451,7 +457,7 @@ func (m *Manager) UnversionedClient(apiContext *types.APIContext, storageContext
 	return record.cluster.UnversionedClient, nil
 }
 
-func (m *Manager) APIExtClient(apiContext *types.APIContext, storageContext types.StorageContext) (clientset.Interface, error) {
+func (m *Manager) APIExtClient(_ *types.APIContext, _ types.StorageContext) (clientset.Interface, error) {
 	return m.ScaledContext.APIExtClient, nil
 }
 
@@ -464,7 +470,7 @@ func (m *Manager) UserContextNoControllers(clusterName string) (*config.UserCont
 	}
 	ctx, err := m.UserContextFromCluster(cluster)
 	if ctx == nil && err == nil {
-		return nil, fmt.Errorf("cluster context %s is unavaiblable", clusterName)
+		return nil, fmt.Errorf("cluster context %s is unavailable", clusterName)
 	}
 	return ctx, err
 }
@@ -491,7 +497,7 @@ func (m *Manager) UserContext(clusterName string) (*config.UserContext, error) {
 
 // UserContextFromCluster accepts a pointer to a Cluster and returns a client
 // for that cluster. It does not start any controllers.
-func (m *Manager) UserContextFromCluster(cluster *v3.Cluster) (*config.UserContext, error) {
+func (m *Manager) UserContextFromCluster(cluster *apimgmtv3.Cluster) (*config.UserContext, error) {
 	kubeConfig, err := ToRESTConfig(cluster, m.ScaledContext, m.secretLister)
 	if err != nil {
 		return nil, err
@@ -536,7 +542,7 @@ func (m *Manager) ClusterName(apiContext *types.APIContext) string {
 	return clusterID
 }
 
-func (m *Manager) cluster(apiContext *types.APIContext, context types.StorageContext) (*v3.Cluster, error) {
+func (m *Manager) cluster(apiContext *types.APIContext, context types.StorageContext) (*apimgmtv3.Cluster, error) {
 	switch context {
 	case types.DefaultStorageContext:
 		return nil, nil
