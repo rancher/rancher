@@ -225,9 +225,9 @@ func (m *Lifecycle) reportStatus(stdoutReader io.Reader, stderrReader io.Reader,
 		if strings.HasPrefix(msg, debugPrefix) {
 			// calls in machine with log.Debug are all prefixed and spammy so only log
 			// under trace and don't add to the v3.NodeConditionProvisioned.Message
-			logrus.Tracef("[node-controller-rancher-machine] %v", msg)
+			logrus.Tracef("[node-controller] %v", msg)
 		} else {
-			logrus.Infof("[node-controller-rancher-machine] %v", msg)
+			logrus.Infof("[node-controller] %v", msg)
 			v32.NodeConditionProvisioned.Message(node, msg)
 		}
 
@@ -304,12 +304,12 @@ func deleteNode(nodeDir string, node *v3.Node) error {
 	scanner := bufio.NewScanner(stdoutReader)
 	for scanner.Scan() {
 		msg := scanner.Text()
-		logrus.Infof("[node-controller-rancher-machine] %v", msg)
+		logrus.Infof("[node-controller] %v", msg)
 	}
 	scanner = bufio.NewScanner(stderrReader)
 	for scanner.Scan() {
 		msg := scanner.Text()
-		logrus.Warnf("[node-controller-rancher-machine] %v", msg)
+		logrus.Warnf("[node-controller] %v", msg)
 	}
 
 	return command.Wait()
