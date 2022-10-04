@@ -29,22 +29,22 @@ var _ v11.AlertmanagerLister = &AlertmanagerListerMock{}
 
 // AlertmanagerListerMock is a mock implementation of v11.AlertmanagerLister.
 //
-//     func TestSomethingThatUsesAlertmanagerLister(t *testing.T) {
+//	    func TestSomethingThatUsesAlertmanagerLister(t *testing.T) {
 //
-//         // make and configure a mocked v11.AlertmanagerLister
-//         mockedAlertmanagerLister := &AlertmanagerListerMock{
-//             GetFunc: func(namespace string, name string) (*v1.Alertmanager, error) {
-// 	               panic("mock out the Get method")
-//             },
-//             ListFunc: func(namespace string, selector labels.Selector) ([]*v1.Alertmanager, error) {
-// 	               panic("mock out the List method")
-//             },
-//         }
+//	        // make and configure a mocked v11.AlertmanagerLister
+//	        mockedAlertmanagerLister := &AlertmanagerListerMock{
+//	            GetFunc: func(namespace string, name string) (*v1.Alertmanager, error) {
+//		               panic("mock out the Get method")
+//	            },
+//	            ListFunc: func(namespace string, selector labels.Selector) ([]*v1.Alertmanager, error) {
+//		               panic("mock out the List method")
+//	            },
+//	        }
 //
-//         // use mockedAlertmanagerLister in code that requires v11.AlertmanagerLister
-//         // and then make assertions.
+//	        // use mockedAlertmanagerLister in code that requires v11.AlertmanagerLister
+//	        // and then make assertions.
 //
-//     }
+//	    }
 type AlertmanagerListerMock struct {
 	// GetFunc mocks the Get method.
 	GetFunc func(namespace string, name string) (*v1.Alertmanager, error)
@@ -91,7 +91,8 @@ func (mock *AlertmanagerListerMock) Get(namespace string, name string) (*v1.Aler
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//     len(mockedAlertmanagerLister.GetCalls())
+//
+//	len(mockedAlertmanagerLister.GetCalls())
 func (mock *AlertmanagerListerMock) GetCalls() []struct {
 	Namespace string
 	Name      string
@@ -126,7 +127,8 @@ func (mock *AlertmanagerListerMock) List(namespace string, selector labels.Selec
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//     len(mockedAlertmanagerLister.ListCalls())
+//
+//	len(mockedAlertmanagerLister.ListCalls())
 func (mock *AlertmanagerListerMock) ListCalls() []struct {
 	Namespace string
 	Selector  labels.Selector
@@ -159,43 +161,43 @@ var _ v11.AlertmanagerController = &AlertmanagerControllerMock{}
 
 // AlertmanagerControllerMock is a mock implementation of v11.AlertmanagerController.
 //
-//     func TestSomethingThatUsesAlertmanagerController(t *testing.T) {
+//	    func TestSomethingThatUsesAlertmanagerController(t *testing.T) {
 //
-//         // make and configure a mocked v11.AlertmanagerController
-//         mockedAlertmanagerController := &AlertmanagerControllerMock{
-//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v11.AlertmanagerHandlerFunc)  {
-// 	               panic("mock out the AddClusterScopedFeatureHandler method")
-//             },
-//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v11.AlertmanagerHandlerFunc)  {
-// 	               panic("mock out the AddClusterScopedHandler method")
-//             },
-//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v11.AlertmanagerHandlerFunc)  {
-// 	               panic("mock out the AddFeatureHandler method")
-//             },
-//             AddHandlerFunc: func(ctx context.Context, name string, handler v11.AlertmanagerHandlerFunc)  {
-// 	               panic("mock out the AddHandler method")
-//             },
-//             EnqueueFunc: func(namespace string, name string)  {
-// 	               panic("mock out the Enqueue method")
-//             },
-//             EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
-// 	               panic("mock out the EnqueueAfter method")
-//             },
-//             GenericFunc: func() controller.GenericController {
-// 	               panic("mock out the Generic method")
-//             },
-//             InformerFunc: func() cache.SharedIndexInformer {
-// 	               panic("mock out the Informer method")
-//             },
-//             ListerFunc: func() v11.AlertmanagerLister {
-// 	               panic("mock out the Lister method")
-//             },
-//         }
+//	        // make and configure a mocked v11.AlertmanagerController
+//	        mockedAlertmanagerController := &AlertmanagerControllerMock{
+//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v11.AlertmanagerHandlerFunc)  {
+//		               panic("mock out the AddClusterScopedFeatureHandler method")
+//	            },
+//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v11.AlertmanagerHandlerFunc)  {
+//		               panic("mock out the AddClusterScopedHandler method")
+//	            },
+//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v11.AlertmanagerHandlerFunc)  {
+//		               panic("mock out the AddFeatureHandler method")
+//	            },
+//	            AddHandlerFunc: func(ctx context.Context, name string, handler v11.AlertmanagerHandlerFunc)  {
+//		               panic("mock out the AddHandler method")
+//	            },
+//	            EnqueueFunc: func(namespace string, name string)  {
+//		               panic("mock out the Enqueue method")
+//	            },
+//	            EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
+//		               panic("mock out the EnqueueAfter method")
+//	            },
+//	            GenericFunc: func() controller.GenericController {
+//		               panic("mock out the Generic method")
+//	            },
+//	            InformerFunc: func() cache.SharedIndexInformer {
+//		               panic("mock out the Informer method")
+//	            },
+//	            ListerFunc: func() v11.AlertmanagerLister {
+//		               panic("mock out the Lister method")
+//	            },
+//	        }
 //
-//         // use mockedAlertmanagerController in code that requires v11.AlertmanagerController
-//         // and then make assertions.
+//	        // use mockedAlertmanagerController in code that requires v11.AlertmanagerController
+//	        // and then make assertions.
 //
-//     }
+//	    }
 type AlertmanagerControllerMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
 	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v11.AlertmanagerHandlerFunc)
@@ -324,7 +326,8 @@ func (mock *AlertmanagerControllerMock) AddClusterScopedFeatureHandler(ctx conte
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//     len(mockedAlertmanagerController.AddClusterScopedFeatureHandlerCalls())
+//
+//	len(mockedAlertmanagerController.AddClusterScopedFeatureHandlerCalls())
 func (mock *AlertmanagerControllerMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -369,7 +372,8 @@ func (mock *AlertmanagerControllerMock) AddClusterScopedHandler(ctx context.Cont
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//     len(mockedAlertmanagerController.AddClusterScopedHandlerCalls())
+//
+//	len(mockedAlertmanagerController.AddClusterScopedHandlerCalls())
 func (mock *AlertmanagerControllerMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -412,7 +416,8 @@ func (mock *AlertmanagerControllerMock) AddFeatureHandler(ctx context.Context, e
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//     len(mockedAlertmanagerController.AddFeatureHandlerCalls())
+//
+//	len(mockedAlertmanagerController.AddFeatureHandlerCalls())
 func (mock *AlertmanagerControllerMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
@@ -453,7 +458,8 @@ func (mock *AlertmanagerControllerMock) AddHandler(ctx context.Context, name str
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//     len(mockedAlertmanagerController.AddHandlerCalls())
+//
+//	len(mockedAlertmanagerController.AddHandlerCalls())
 func (mock *AlertmanagerControllerMock) AddHandlerCalls() []struct {
 	Ctx     context.Context
 	Name    string
@@ -490,7 +496,8 @@ func (mock *AlertmanagerControllerMock) Enqueue(namespace string, name string) {
 
 // EnqueueCalls gets all the calls that were made to Enqueue.
 // Check the length with:
-//     len(mockedAlertmanagerController.EnqueueCalls())
+//
+//	len(mockedAlertmanagerController.EnqueueCalls())
 func (mock *AlertmanagerControllerMock) EnqueueCalls() []struct {
 	Namespace string
 	Name      string
@@ -527,7 +534,8 @@ func (mock *AlertmanagerControllerMock) EnqueueAfter(namespace string, name stri
 
 // EnqueueAfterCalls gets all the calls that were made to EnqueueAfter.
 // Check the length with:
-//     len(mockedAlertmanagerController.EnqueueAfterCalls())
+//
+//	len(mockedAlertmanagerController.EnqueueAfterCalls())
 func (mock *AlertmanagerControllerMock) EnqueueAfterCalls() []struct {
 	Namespace string
 	Name      string
@@ -559,7 +567,8 @@ func (mock *AlertmanagerControllerMock) Generic() controller.GenericController {
 
 // GenericCalls gets all the calls that were made to Generic.
 // Check the length with:
-//     len(mockedAlertmanagerController.GenericCalls())
+//
+//	len(mockedAlertmanagerController.GenericCalls())
 func (mock *AlertmanagerControllerMock) GenericCalls() []struct {
 } {
 	var calls []struct {
@@ -585,7 +594,8 @@ func (mock *AlertmanagerControllerMock) Informer() cache.SharedIndexInformer {
 
 // InformerCalls gets all the calls that were made to Informer.
 // Check the length with:
-//     len(mockedAlertmanagerController.InformerCalls())
+//
+//	len(mockedAlertmanagerController.InformerCalls())
 func (mock *AlertmanagerControllerMock) InformerCalls() []struct {
 } {
 	var calls []struct {
@@ -611,7 +621,8 @@ func (mock *AlertmanagerControllerMock) Lister() v11.AlertmanagerLister {
 
 // ListerCalls gets all the calls that were made to Lister.
 // Check the length with:
-//     len(mockedAlertmanagerController.ListerCalls())
+//
+//	len(mockedAlertmanagerController.ListerCalls())
 func (mock *AlertmanagerControllerMock) ListerCalls() []struct {
 } {
 	var calls []struct {
@@ -651,76 +662,76 @@ var _ v11.AlertmanagerInterface = &AlertmanagerInterfaceMock{}
 
 // AlertmanagerInterfaceMock is a mock implementation of v11.AlertmanagerInterface.
 //
-//     func TestSomethingThatUsesAlertmanagerInterface(t *testing.T) {
+//	    func TestSomethingThatUsesAlertmanagerInterface(t *testing.T) {
 //
-//         // make and configure a mocked v11.AlertmanagerInterface
-//         mockedAlertmanagerInterface := &AlertmanagerInterfaceMock{
-//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v11.AlertmanagerHandlerFunc)  {
-// 	               panic("mock out the AddClusterScopedFeatureHandler method")
-//             },
-//             AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v11.AlertmanagerLifecycle)  {
-// 	               panic("mock out the AddClusterScopedFeatureLifecycle method")
-//             },
-//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v11.AlertmanagerHandlerFunc)  {
-// 	               panic("mock out the AddClusterScopedHandler method")
-//             },
-//             AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v11.AlertmanagerLifecycle)  {
-// 	               panic("mock out the AddClusterScopedLifecycle method")
-//             },
-//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v11.AlertmanagerHandlerFunc)  {
-// 	               panic("mock out the AddFeatureHandler method")
-//             },
-//             AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v11.AlertmanagerLifecycle)  {
-// 	               panic("mock out the AddFeatureLifecycle method")
-//             },
-//             AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v11.AlertmanagerHandlerFunc)  {
-// 	               panic("mock out the AddHandler method")
-//             },
-//             AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v11.AlertmanagerLifecycle)  {
-// 	               panic("mock out the AddLifecycle method")
-//             },
-//             ControllerFunc: func() v11.AlertmanagerController {
-// 	               panic("mock out the Controller method")
-//             },
-//             CreateFunc: func(in1 *v1.Alertmanager) (*v1.Alertmanager, error) {
-// 	               panic("mock out the Create method")
-//             },
-//             DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
-// 	               panic("mock out the Delete method")
-//             },
-//             DeleteCollectionFunc: func(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
-// 	               panic("mock out the DeleteCollection method")
-//             },
-//             DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
-// 	               panic("mock out the DeleteNamespaced method")
-//             },
-//             GetFunc: func(name string, opts metav1.GetOptions) (*v1.Alertmanager, error) {
-// 	               panic("mock out the Get method")
-//             },
-//             GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v1.Alertmanager, error) {
-// 	               panic("mock out the GetNamespaced method")
-//             },
-//             ListFunc: func(opts metav1.ListOptions) (*v1.AlertmanagerList, error) {
-// 	               panic("mock out the List method")
-//             },
-//             ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v1.AlertmanagerList, error) {
-// 	               panic("mock out the ListNamespaced method")
-//             },
-//             ObjectClientFunc: func() *objectclient.ObjectClient {
-// 	               panic("mock out the ObjectClient method")
-//             },
-//             UpdateFunc: func(in1 *v1.Alertmanager) (*v1.Alertmanager, error) {
-// 	               panic("mock out the Update method")
-//             },
-//             WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
-// 	               panic("mock out the Watch method")
-//             },
-//         }
+//	        // make and configure a mocked v11.AlertmanagerInterface
+//	        mockedAlertmanagerInterface := &AlertmanagerInterfaceMock{
+//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v11.AlertmanagerHandlerFunc)  {
+//		               panic("mock out the AddClusterScopedFeatureHandler method")
+//	            },
+//	            AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v11.AlertmanagerLifecycle)  {
+//		               panic("mock out the AddClusterScopedFeatureLifecycle method")
+//	            },
+//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v11.AlertmanagerHandlerFunc)  {
+//		               panic("mock out the AddClusterScopedHandler method")
+//	            },
+//	            AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v11.AlertmanagerLifecycle)  {
+//		               panic("mock out the AddClusterScopedLifecycle method")
+//	            },
+//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v11.AlertmanagerHandlerFunc)  {
+//		               panic("mock out the AddFeatureHandler method")
+//	            },
+//	            AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v11.AlertmanagerLifecycle)  {
+//		               panic("mock out the AddFeatureLifecycle method")
+//	            },
+//	            AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v11.AlertmanagerHandlerFunc)  {
+//		               panic("mock out the AddHandler method")
+//	            },
+//	            AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v11.AlertmanagerLifecycle)  {
+//		               panic("mock out the AddLifecycle method")
+//	            },
+//	            ControllerFunc: func() v11.AlertmanagerController {
+//		               panic("mock out the Controller method")
+//	            },
+//	            CreateFunc: func(in1 *v1.Alertmanager) (*v1.Alertmanager, error) {
+//		               panic("mock out the Create method")
+//	            },
+//	            DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
+//		               panic("mock out the Delete method")
+//	            },
+//	            DeleteCollectionFunc: func(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
+//		               panic("mock out the DeleteCollection method")
+//	            },
+//	            DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
+//		               panic("mock out the DeleteNamespaced method")
+//	            },
+//	            GetFunc: func(name string, opts metav1.GetOptions) (*v1.Alertmanager, error) {
+//		               panic("mock out the Get method")
+//	            },
+//	            GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v1.Alertmanager, error) {
+//		               panic("mock out the GetNamespaced method")
+//	            },
+//	            ListFunc: func(opts metav1.ListOptions) (*v1.AlertmanagerList, error) {
+//		               panic("mock out the List method")
+//	            },
+//	            ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v1.AlertmanagerList, error) {
+//		               panic("mock out the ListNamespaced method")
+//	            },
+//	            ObjectClientFunc: func() *objectclient.ObjectClient {
+//		               panic("mock out the ObjectClient method")
+//	            },
+//	            UpdateFunc: func(in1 *v1.Alertmanager) (*v1.Alertmanager, error) {
+//		               panic("mock out the Update method")
+//	            },
+//	            WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
+//		               panic("mock out the Watch method")
+//	            },
+//	        }
 //
-//         // use mockedAlertmanagerInterface in code that requires v11.AlertmanagerInterface
-//         // and then make assertions.
+//	        // use mockedAlertmanagerInterface in code that requires v11.AlertmanagerInterface
+//	        // and then make assertions.
 //
-//     }
+//	    }
 type AlertmanagerInterfaceMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
 	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v11.AlertmanagerHandlerFunc)
@@ -973,7 +984,8 @@ func (mock *AlertmanagerInterfaceMock) AddClusterScopedFeatureHandler(ctx contex
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//     len(mockedAlertmanagerInterface.AddClusterScopedFeatureHandlerCalls())
+//
+//	len(mockedAlertmanagerInterface.AddClusterScopedFeatureHandlerCalls())
 func (mock *AlertmanagerInterfaceMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -1020,7 +1032,8 @@ func (mock *AlertmanagerInterfaceMock) AddClusterScopedFeatureLifecycle(ctx cont
 
 // AddClusterScopedFeatureLifecycleCalls gets all the calls that were made to AddClusterScopedFeatureLifecycle.
 // Check the length with:
-//     len(mockedAlertmanagerInterface.AddClusterScopedFeatureLifecycleCalls())
+//
+//	len(mockedAlertmanagerInterface.AddClusterScopedFeatureLifecycleCalls())
 func (mock *AlertmanagerInterfaceMock) AddClusterScopedFeatureLifecycleCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -1065,7 +1078,8 @@ func (mock *AlertmanagerInterfaceMock) AddClusterScopedHandler(ctx context.Conte
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//     len(mockedAlertmanagerInterface.AddClusterScopedHandlerCalls())
+//
+//	len(mockedAlertmanagerInterface.AddClusterScopedHandlerCalls())
 func (mock *AlertmanagerInterfaceMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -1108,7 +1122,8 @@ func (mock *AlertmanagerInterfaceMock) AddClusterScopedLifecycle(ctx context.Con
 
 // AddClusterScopedLifecycleCalls gets all the calls that were made to AddClusterScopedLifecycle.
 // Check the length with:
-//     len(mockedAlertmanagerInterface.AddClusterScopedLifecycleCalls())
+//
+//	len(mockedAlertmanagerInterface.AddClusterScopedLifecycleCalls())
 func (mock *AlertmanagerInterfaceMock) AddClusterScopedLifecycleCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -1151,7 +1166,8 @@ func (mock *AlertmanagerInterfaceMock) AddFeatureHandler(ctx context.Context, en
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//     len(mockedAlertmanagerInterface.AddFeatureHandlerCalls())
+//
+//	len(mockedAlertmanagerInterface.AddFeatureHandlerCalls())
 func (mock *AlertmanagerInterfaceMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
@@ -1194,7 +1210,8 @@ func (mock *AlertmanagerInterfaceMock) AddFeatureLifecycle(ctx context.Context, 
 
 // AddFeatureLifecycleCalls gets all the calls that were made to AddFeatureLifecycle.
 // Check the length with:
-//     len(mockedAlertmanagerInterface.AddFeatureLifecycleCalls())
+//
+//	len(mockedAlertmanagerInterface.AddFeatureLifecycleCalls())
 func (mock *AlertmanagerInterfaceMock) AddFeatureLifecycleCalls() []struct {
 	Ctx       context.Context
 	Enabled   func() bool
@@ -1235,7 +1252,8 @@ func (mock *AlertmanagerInterfaceMock) AddHandler(ctx context.Context, name stri
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//     len(mockedAlertmanagerInterface.AddHandlerCalls())
+//
+//	len(mockedAlertmanagerInterface.AddHandlerCalls())
 func (mock *AlertmanagerInterfaceMock) AddHandlerCalls() []struct {
 	Ctx  context.Context
 	Name string
@@ -1274,7 +1292,8 @@ func (mock *AlertmanagerInterfaceMock) AddLifecycle(ctx context.Context, name st
 
 // AddLifecycleCalls gets all the calls that were made to AddLifecycle.
 // Check the length with:
-//     len(mockedAlertmanagerInterface.AddLifecycleCalls())
+//
+//	len(mockedAlertmanagerInterface.AddLifecycleCalls())
 func (mock *AlertmanagerInterfaceMock) AddLifecycleCalls() []struct {
 	Ctx       context.Context
 	Name      string
@@ -1306,7 +1325,8 @@ func (mock *AlertmanagerInterfaceMock) Controller() v11.AlertmanagerController {
 
 // ControllerCalls gets all the calls that were made to Controller.
 // Check the length with:
-//     len(mockedAlertmanagerInterface.ControllerCalls())
+//
+//	len(mockedAlertmanagerInterface.ControllerCalls())
 func (mock *AlertmanagerInterfaceMock) ControllerCalls() []struct {
 } {
 	var calls []struct {
@@ -1335,7 +1355,8 @@ func (mock *AlertmanagerInterfaceMock) Create(in1 *v1.Alertmanager) (*v1.Alertma
 
 // CreateCalls gets all the calls that were made to Create.
 // Check the length with:
-//     len(mockedAlertmanagerInterface.CreateCalls())
+//
+//	len(mockedAlertmanagerInterface.CreateCalls())
 func (mock *AlertmanagerInterfaceMock) CreateCalls() []struct {
 	In1 *v1.Alertmanager
 } {
@@ -1368,7 +1389,8 @@ func (mock *AlertmanagerInterfaceMock) Delete(name string, options *metav1.Delet
 
 // DeleteCalls gets all the calls that were made to Delete.
 // Check the length with:
-//     len(mockedAlertmanagerInterface.DeleteCalls())
+//
+//	len(mockedAlertmanagerInterface.DeleteCalls())
 func (mock *AlertmanagerInterfaceMock) DeleteCalls() []struct {
 	Name    string
 	Options *metav1.DeleteOptions
@@ -1403,7 +1425,8 @@ func (mock *AlertmanagerInterfaceMock) DeleteCollection(deleteOpts *metav1.Delet
 
 // DeleteCollectionCalls gets all the calls that were made to DeleteCollection.
 // Check the length with:
-//     len(mockedAlertmanagerInterface.DeleteCollectionCalls())
+//
+//	len(mockedAlertmanagerInterface.DeleteCollectionCalls())
 func (mock *AlertmanagerInterfaceMock) DeleteCollectionCalls() []struct {
 	DeleteOpts *metav1.DeleteOptions
 	ListOpts   metav1.ListOptions
@@ -1440,7 +1463,8 @@ func (mock *AlertmanagerInterfaceMock) DeleteNamespaced(namespace string, name s
 
 // DeleteNamespacedCalls gets all the calls that were made to DeleteNamespaced.
 // Check the length with:
-//     len(mockedAlertmanagerInterface.DeleteNamespacedCalls())
+//
+//	len(mockedAlertmanagerInterface.DeleteNamespacedCalls())
 func (mock *AlertmanagerInterfaceMock) DeleteNamespacedCalls() []struct {
 	Namespace string
 	Name      string
@@ -1477,7 +1501,8 @@ func (mock *AlertmanagerInterfaceMock) Get(name string, opts metav1.GetOptions) 
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//     len(mockedAlertmanagerInterface.GetCalls())
+//
+//	len(mockedAlertmanagerInterface.GetCalls())
 func (mock *AlertmanagerInterfaceMock) GetCalls() []struct {
 	Name string
 	Opts metav1.GetOptions
@@ -1514,7 +1539,8 @@ func (mock *AlertmanagerInterfaceMock) GetNamespaced(namespace string, name stri
 
 // GetNamespacedCalls gets all the calls that were made to GetNamespaced.
 // Check the length with:
-//     len(mockedAlertmanagerInterface.GetNamespacedCalls())
+//
+//	len(mockedAlertmanagerInterface.GetNamespacedCalls())
 func (mock *AlertmanagerInterfaceMock) GetNamespacedCalls() []struct {
 	Namespace string
 	Name      string
@@ -1549,7 +1575,8 @@ func (mock *AlertmanagerInterfaceMock) List(opts metav1.ListOptions) (*v1.Alertm
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//     len(mockedAlertmanagerInterface.ListCalls())
+//
+//	len(mockedAlertmanagerInterface.ListCalls())
 func (mock *AlertmanagerInterfaceMock) ListCalls() []struct {
 	Opts metav1.ListOptions
 } {
@@ -1582,7 +1609,8 @@ func (mock *AlertmanagerInterfaceMock) ListNamespaced(namespace string, opts met
 
 // ListNamespacedCalls gets all the calls that were made to ListNamespaced.
 // Check the length with:
-//     len(mockedAlertmanagerInterface.ListNamespacedCalls())
+//
+//	len(mockedAlertmanagerInterface.ListNamespacedCalls())
 func (mock *AlertmanagerInterfaceMock) ListNamespacedCalls() []struct {
 	Namespace string
 	Opts      metav1.ListOptions
@@ -1612,7 +1640,8 @@ func (mock *AlertmanagerInterfaceMock) ObjectClient() *objectclient.ObjectClient
 
 // ObjectClientCalls gets all the calls that were made to ObjectClient.
 // Check the length with:
-//     len(mockedAlertmanagerInterface.ObjectClientCalls())
+//
+//	len(mockedAlertmanagerInterface.ObjectClientCalls())
 func (mock *AlertmanagerInterfaceMock) ObjectClientCalls() []struct {
 } {
 	var calls []struct {
@@ -1641,7 +1670,8 @@ func (mock *AlertmanagerInterfaceMock) Update(in1 *v1.Alertmanager) (*v1.Alertma
 
 // UpdateCalls gets all the calls that were made to Update.
 // Check the length with:
-//     len(mockedAlertmanagerInterface.UpdateCalls())
+//
+//	len(mockedAlertmanagerInterface.UpdateCalls())
 func (mock *AlertmanagerInterfaceMock) UpdateCalls() []struct {
 	In1 *v1.Alertmanager
 } {
@@ -1672,7 +1702,8 @@ func (mock *AlertmanagerInterfaceMock) Watch(opts metav1.ListOptions) (watch.Int
 
 // WatchCalls gets all the calls that were made to Watch.
 // Check the length with:
-//     len(mockedAlertmanagerInterface.WatchCalls())
+//
+//	len(mockedAlertmanagerInterface.WatchCalls())
 func (mock *AlertmanagerInterfaceMock) WatchCalls() []struct {
 	Opts metav1.ListOptions
 } {
@@ -1695,19 +1726,19 @@ var _ v11.AlertmanagersGetter = &AlertmanagersGetterMock{}
 
 // AlertmanagersGetterMock is a mock implementation of v11.AlertmanagersGetter.
 //
-//     func TestSomethingThatUsesAlertmanagersGetter(t *testing.T) {
+//	    func TestSomethingThatUsesAlertmanagersGetter(t *testing.T) {
 //
-//         // make and configure a mocked v11.AlertmanagersGetter
-//         mockedAlertmanagersGetter := &AlertmanagersGetterMock{
-//             AlertmanagersFunc: func(namespace string) v11.AlertmanagerInterface {
-// 	               panic("mock out the Alertmanagers method")
-//             },
-//         }
+//	        // make and configure a mocked v11.AlertmanagersGetter
+//	        mockedAlertmanagersGetter := &AlertmanagersGetterMock{
+//	            AlertmanagersFunc: func(namespace string) v11.AlertmanagerInterface {
+//		               panic("mock out the Alertmanagers method")
+//	            },
+//	        }
 //
-//         // use mockedAlertmanagersGetter in code that requires v11.AlertmanagersGetter
-//         // and then make assertions.
+//	        // use mockedAlertmanagersGetter in code that requires v11.AlertmanagersGetter
+//	        // and then make assertions.
 //
-//     }
+//	    }
 type AlertmanagersGetterMock struct {
 	// AlertmanagersFunc mocks the Alertmanagers method.
 	AlertmanagersFunc func(namespace string) v11.AlertmanagerInterface
@@ -1740,7 +1771,8 @@ func (mock *AlertmanagersGetterMock) Alertmanagers(namespace string) v11.Alertma
 
 // AlertmanagersCalls gets all the calls that were made to Alertmanagers.
 // Check the length with:
-//     len(mockedAlertmanagersGetter.AlertmanagersCalls())
+//
+//	len(mockedAlertmanagersGetter.AlertmanagersCalls())
 func (mock *AlertmanagersGetterMock) AlertmanagersCalls() []struct {
 	Namespace string
 } {

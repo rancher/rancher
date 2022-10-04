@@ -29,22 +29,22 @@ var _ v31.CloudCredentialLister = &CloudCredentialListerMock{}
 
 // CloudCredentialListerMock is a mock implementation of v31.CloudCredentialLister.
 //
-//     func TestSomethingThatUsesCloudCredentialLister(t *testing.T) {
+//	    func TestSomethingThatUsesCloudCredentialLister(t *testing.T) {
 //
-//         // make and configure a mocked v31.CloudCredentialLister
-//         mockedCloudCredentialLister := &CloudCredentialListerMock{
-//             GetFunc: func(namespace string, name string) (*v3.CloudCredential, error) {
-// 	               panic("mock out the Get method")
-//             },
-//             ListFunc: func(namespace string, selector labels.Selector) ([]*v3.CloudCredential, error) {
-// 	               panic("mock out the List method")
-//             },
-//         }
+//	        // make and configure a mocked v31.CloudCredentialLister
+//	        mockedCloudCredentialLister := &CloudCredentialListerMock{
+//	            GetFunc: func(namespace string, name string) (*v3.CloudCredential, error) {
+//		               panic("mock out the Get method")
+//	            },
+//	            ListFunc: func(namespace string, selector labels.Selector) ([]*v3.CloudCredential, error) {
+//		               panic("mock out the List method")
+//	            },
+//	        }
 //
-//         // use mockedCloudCredentialLister in code that requires v31.CloudCredentialLister
-//         // and then make assertions.
+//	        // use mockedCloudCredentialLister in code that requires v31.CloudCredentialLister
+//	        // and then make assertions.
 //
-//     }
+//	    }
 type CloudCredentialListerMock struct {
 	// GetFunc mocks the Get method.
 	GetFunc func(namespace string, name string) (*v3.CloudCredential, error)
@@ -91,7 +91,8 @@ func (mock *CloudCredentialListerMock) Get(namespace string, name string) (*v3.C
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//     len(mockedCloudCredentialLister.GetCalls())
+//
+//	len(mockedCloudCredentialLister.GetCalls())
 func (mock *CloudCredentialListerMock) GetCalls() []struct {
 	Namespace string
 	Name      string
@@ -126,7 +127,8 @@ func (mock *CloudCredentialListerMock) List(namespace string, selector labels.Se
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//     len(mockedCloudCredentialLister.ListCalls())
+//
+//	len(mockedCloudCredentialLister.ListCalls())
 func (mock *CloudCredentialListerMock) ListCalls() []struct {
 	Namespace string
 	Selector  labels.Selector
@@ -159,43 +161,43 @@ var _ v31.CloudCredentialController = &CloudCredentialControllerMock{}
 
 // CloudCredentialControllerMock is a mock implementation of v31.CloudCredentialController.
 //
-//     func TestSomethingThatUsesCloudCredentialController(t *testing.T) {
+//	    func TestSomethingThatUsesCloudCredentialController(t *testing.T) {
 //
-//         // make and configure a mocked v31.CloudCredentialController
-//         mockedCloudCredentialController := &CloudCredentialControllerMock{
-//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v31.CloudCredentialHandlerFunc)  {
-// 	               panic("mock out the AddClusterScopedFeatureHandler method")
-//             },
-//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v31.CloudCredentialHandlerFunc)  {
-// 	               panic("mock out the AddClusterScopedHandler method")
-//             },
-//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.CloudCredentialHandlerFunc)  {
-// 	               panic("mock out the AddFeatureHandler method")
-//             },
-//             AddHandlerFunc: func(ctx context.Context, name string, handler v31.CloudCredentialHandlerFunc)  {
-// 	               panic("mock out the AddHandler method")
-//             },
-//             EnqueueFunc: func(namespace string, name string)  {
-// 	               panic("mock out the Enqueue method")
-//             },
-//             EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
-// 	               panic("mock out the EnqueueAfter method")
-//             },
-//             GenericFunc: func() controller.GenericController {
-// 	               panic("mock out the Generic method")
-//             },
-//             InformerFunc: func() cache.SharedIndexInformer {
-// 	               panic("mock out the Informer method")
-//             },
-//             ListerFunc: func() v31.CloudCredentialLister {
-// 	               panic("mock out the Lister method")
-//             },
-//         }
+//	        // make and configure a mocked v31.CloudCredentialController
+//	        mockedCloudCredentialController := &CloudCredentialControllerMock{
+//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v31.CloudCredentialHandlerFunc)  {
+//		               panic("mock out the AddClusterScopedFeatureHandler method")
+//	            },
+//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v31.CloudCredentialHandlerFunc)  {
+//		               panic("mock out the AddClusterScopedHandler method")
+//	            },
+//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.CloudCredentialHandlerFunc)  {
+//		               panic("mock out the AddFeatureHandler method")
+//	            },
+//	            AddHandlerFunc: func(ctx context.Context, name string, handler v31.CloudCredentialHandlerFunc)  {
+//		               panic("mock out the AddHandler method")
+//	            },
+//	            EnqueueFunc: func(namespace string, name string)  {
+//		               panic("mock out the Enqueue method")
+//	            },
+//	            EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
+//		               panic("mock out the EnqueueAfter method")
+//	            },
+//	            GenericFunc: func() controller.GenericController {
+//		               panic("mock out the Generic method")
+//	            },
+//	            InformerFunc: func() cache.SharedIndexInformer {
+//		               panic("mock out the Informer method")
+//	            },
+//	            ListerFunc: func() v31.CloudCredentialLister {
+//		               panic("mock out the Lister method")
+//	            },
+//	        }
 //
-//         // use mockedCloudCredentialController in code that requires v31.CloudCredentialController
-//         // and then make assertions.
+//	        // use mockedCloudCredentialController in code that requires v31.CloudCredentialController
+//	        // and then make assertions.
 //
-//     }
+//	    }
 type CloudCredentialControllerMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
 	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v31.CloudCredentialHandlerFunc)
@@ -324,7 +326,8 @@ func (mock *CloudCredentialControllerMock) AddClusterScopedFeatureHandler(ctx co
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//     len(mockedCloudCredentialController.AddClusterScopedFeatureHandlerCalls())
+//
+//	len(mockedCloudCredentialController.AddClusterScopedFeatureHandlerCalls())
 func (mock *CloudCredentialControllerMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -369,7 +372,8 @@ func (mock *CloudCredentialControllerMock) AddClusterScopedHandler(ctx context.C
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//     len(mockedCloudCredentialController.AddClusterScopedHandlerCalls())
+//
+//	len(mockedCloudCredentialController.AddClusterScopedHandlerCalls())
 func (mock *CloudCredentialControllerMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -412,7 +416,8 @@ func (mock *CloudCredentialControllerMock) AddFeatureHandler(ctx context.Context
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//     len(mockedCloudCredentialController.AddFeatureHandlerCalls())
+//
+//	len(mockedCloudCredentialController.AddFeatureHandlerCalls())
 func (mock *CloudCredentialControllerMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
@@ -453,7 +458,8 @@ func (mock *CloudCredentialControllerMock) AddHandler(ctx context.Context, name 
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//     len(mockedCloudCredentialController.AddHandlerCalls())
+//
+//	len(mockedCloudCredentialController.AddHandlerCalls())
 func (mock *CloudCredentialControllerMock) AddHandlerCalls() []struct {
 	Ctx     context.Context
 	Name    string
@@ -490,7 +496,8 @@ func (mock *CloudCredentialControllerMock) Enqueue(namespace string, name string
 
 // EnqueueCalls gets all the calls that were made to Enqueue.
 // Check the length with:
-//     len(mockedCloudCredentialController.EnqueueCalls())
+//
+//	len(mockedCloudCredentialController.EnqueueCalls())
 func (mock *CloudCredentialControllerMock) EnqueueCalls() []struct {
 	Namespace string
 	Name      string
@@ -527,7 +534,8 @@ func (mock *CloudCredentialControllerMock) EnqueueAfter(namespace string, name s
 
 // EnqueueAfterCalls gets all the calls that were made to EnqueueAfter.
 // Check the length with:
-//     len(mockedCloudCredentialController.EnqueueAfterCalls())
+//
+//	len(mockedCloudCredentialController.EnqueueAfterCalls())
 func (mock *CloudCredentialControllerMock) EnqueueAfterCalls() []struct {
 	Namespace string
 	Name      string
@@ -559,7 +567,8 @@ func (mock *CloudCredentialControllerMock) Generic() controller.GenericControlle
 
 // GenericCalls gets all the calls that were made to Generic.
 // Check the length with:
-//     len(mockedCloudCredentialController.GenericCalls())
+//
+//	len(mockedCloudCredentialController.GenericCalls())
 func (mock *CloudCredentialControllerMock) GenericCalls() []struct {
 } {
 	var calls []struct {
@@ -585,7 +594,8 @@ func (mock *CloudCredentialControllerMock) Informer() cache.SharedIndexInformer 
 
 // InformerCalls gets all the calls that were made to Informer.
 // Check the length with:
-//     len(mockedCloudCredentialController.InformerCalls())
+//
+//	len(mockedCloudCredentialController.InformerCalls())
 func (mock *CloudCredentialControllerMock) InformerCalls() []struct {
 } {
 	var calls []struct {
@@ -611,7 +621,8 @@ func (mock *CloudCredentialControllerMock) Lister() v31.CloudCredentialLister {
 
 // ListerCalls gets all the calls that were made to Lister.
 // Check the length with:
-//     len(mockedCloudCredentialController.ListerCalls())
+//
+//	len(mockedCloudCredentialController.ListerCalls())
 func (mock *CloudCredentialControllerMock) ListerCalls() []struct {
 } {
 	var calls []struct {
@@ -651,76 +662,76 @@ var _ v31.CloudCredentialInterface = &CloudCredentialInterfaceMock{}
 
 // CloudCredentialInterfaceMock is a mock implementation of v31.CloudCredentialInterface.
 //
-//     func TestSomethingThatUsesCloudCredentialInterface(t *testing.T) {
+//	    func TestSomethingThatUsesCloudCredentialInterface(t *testing.T) {
 //
-//         // make and configure a mocked v31.CloudCredentialInterface
-//         mockedCloudCredentialInterface := &CloudCredentialInterfaceMock{
-//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v31.CloudCredentialHandlerFunc)  {
-// 	               panic("mock out the AddClusterScopedFeatureHandler method")
-//             },
-//             AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v31.CloudCredentialLifecycle)  {
-// 	               panic("mock out the AddClusterScopedFeatureLifecycle method")
-//             },
-//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v31.CloudCredentialHandlerFunc)  {
-// 	               panic("mock out the AddClusterScopedHandler method")
-//             },
-//             AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v31.CloudCredentialLifecycle)  {
-// 	               panic("mock out the AddClusterScopedLifecycle method")
-//             },
-//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.CloudCredentialHandlerFunc)  {
-// 	               panic("mock out the AddFeatureHandler method")
-//             },
-//             AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v31.CloudCredentialLifecycle)  {
-// 	               panic("mock out the AddFeatureLifecycle method")
-//             },
-//             AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v31.CloudCredentialHandlerFunc)  {
-// 	               panic("mock out the AddHandler method")
-//             },
-//             AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v31.CloudCredentialLifecycle)  {
-// 	               panic("mock out the AddLifecycle method")
-//             },
-//             ControllerFunc: func() v31.CloudCredentialController {
-// 	               panic("mock out the Controller method")
-//             },
-//             CreateFunc: func(in1 *v3.CloudCredential) (*v3.CloudCredential, error) {
-// 	               panic("mock out the Create method")
-//             },
-//             DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
-// 	               panic("mock out the Delete method")
-//             },
-//             DeleteCollectionFunc: func(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
-// 	               panic("mock out the DeleteCollection method")
-//             },
-//             DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
-// 	               panic("mock out the DeleteNamespaced method")
-//             },
-//             GetFunc: func(name string, opts metav1.GetOptions) (*v3.CloudCredential, error) {
-// 	               panic("mock out the Get method")
-//             },
-//             GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v3.CloudCredential, error) {
-// 	               panic("mock out the GetNamespaced method")
-//             },
-//             ListFunc: func(opts metav1.ListOptions) (*v3.CloudCredentialList, error) {
-// 	               panic("mock out the List method")
-//             },
-//             ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v3.CloudCredentialList, error) {
-// 	               panic("mock out the ListNamespaced method")
-//             },
-//             ObjectClientFunc: func() *objectclient.ObjectClient {
-// 	               panic("mock out the ObjectClient method")
-//             },
-//             UpdateFunc: func(in1 *v3.CloudCredential) (*v3.CloudCredential, error) {
-// 	               panic("mock out the Update method")
-//             },
-//             WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
-// 	               panic("mock out the Watch method")
-//             },
-//         }
+//	        // make and configure a mocked v31.CloudCredentialInterface
+//	        mockedCloudCredentialInterface := &CloudCredentialInterfaceMock{
+//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v31.CloudCredentialHandlerFunc)  {
+//		               panic("mock out the AddClusterScopedFeatureHandler method")
+//	            },
+//	            AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v31.CloudCredentialLifecycle)  {
+//		               panic("mock out the AddClusterScopedFeatureLifecycle method")
+//	            },
+//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v31.CloudCredentialHandlerFunc)  {
+//		               panic("mock out the AddClusterScopedHandler method")
+//	            },
+//	            AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v31.CloudCredentialLifecycle)  {
+//		               panic("mock out the AddClusterScopedLifecycle method")
+//	            },
+//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.CloudCredentialHandlerFunc)  {
+//		               panic("mock out the AddFeatureHandler method")
+//	            },
+//	            AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v31.CloudCredentialLifecycle)  {
+//		               panic("mock out the AddFeatureLifecycle method")
+//	            },
+//	            AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v31.CloudCredentialHandlerFunc)  {
+//		               panic("mock out the AddHandler method")
+//	            },
+//	            AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v31.CloudCredentialLifecycle)  {
+//		               panic("mock out the AddLifecycle method")
+//	            },
+//	            ControllerFunc: func() v31.CloudCredentialController {
+//		               panic("mock out the Controller method")
+//	            },
+//	            CreateFunc: func(in1 *v3.CloudCredential) (*v3.CloudCredential, error) {
+//		               panic("mock out the Create method")
+//	            },
+//	            DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
+//		               panic("mock out the Delete method")
+//	            },
+//	            DeleteCollectionFunc: func(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
+//		               panic("mock out the DeleteCollection method")
+//	            },
+//	            DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
+//		               panic("mock out the DeleteNamespaced method")
+//	            },
+//	            GetFunc: func(name string, opts metav1.GetOptions) (*v3.CloudCredential, error) {
+//		               panic("mock out the Get method")
+//	            },
+//	            GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v3.CloudCredential, error) {
+//		               panic("mock out the GetNamespaced method")
+//	            },
+//	            ListFunc: func(opts metav1.ListOptions) (*v3.CloudCredentialList, error) {
+//		               panic("mock out the List method")
+//	            },
+//	            ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v3.CloudCredentialList, error) {
+//		               panic("mock out the ListNamespaced method")
+//	            },
+//	            ObjectClientFunc: func() *objectclient.ObjectClient {
+//		               panic("mock out the ObjectClient method")
+//	            },
+//	            UpdateFunc: func(in1 *v3.CloudCredential) (*v3.CloudCredential, error) {
+//		               panic("mock out the Update method")
+//	            },
+//	            WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
+//		               panic("mock out the Watch method")
+//	            },
+//	        }
 //
-//         // use mockedCloudCredentialInterface in code that requires v31.CloudCredentialInterface
-//         // and then make assertions.
+//	        // use mockedCloudCredentialInterface in code that requires v31.CloudCredentialInterface
+//	        // and then make assertions.
 //
-//     }
+//	    }
 type CloudCredentialInterfaceMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
 	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v31.CloudCredentialHandlerFunc)
@@ -973,7 +984,8 @@ func (mock *CloudCredentialInterfaceMock) AddClusterScopedFeatureHandler(ctx con
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//     len(mockedCloudCredentialInterface.AddClusterScopedFeatureHandlerCalls())
+//
+//	len(mockedCloudCredentialInterface.AddClusterScopedFeatureHandlerCalls())
 func (mock *CloudCredentialInterfaceMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -1020,7 +1032,8 @@ func (mock *CloudCredentialInterfaceMock) AddClusterScopedFeatureLifecycle(ctx c
 
 // AddClusterScopedFeatureLifecycleCalls gets all the calls that were made to AddClusterScopedFeatureLifecycle.
 // Check the length with:
-//     len(mockedCloudCredentialInterface.AddClusterScopedFeatureLifecycleCalls())
+//
+//	len(mockedCloudCredentialInterface.AddClusterScopedFeatureLifecycleCalls())
 func (mock *CloudCredentialInterfaceMock) AddClusterScopedFeatureLifecycleCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -1065,7 +1078,8 @@ func (mock *CloudCredentialInterfaceMock) AddClusterScopedHandler(ctx context.Co
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//     len(mockedCloudCredentialInterface.AddClusterScopedHandlerCalls())
+//
+//	len(mockedCloudCredentialInterface.AddClusterScopedHandlerCalls())
 func (mock *CloudCredentialInterfaceMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -1108,7 +1122,8 @@ func (mock *CloudCredentialInterfaceMock) AddClusterScopedLifecycle(ctx context.
 
 // AddClusterScopedLifecycleCalls gets all the calls that were made to AddClusterScopedLifecycle.
 // Check the length with:
-//     len(mockedCloudCredentialInterface.AddClusterScopedLifecycleCalls())
+//
+//	len(mockedCloudCredentialInterface.AddClusterScopedLifecycleCalls())
 func (mock *CloudCredentialInterfaceMock) AddClusterScopedLifecycleCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -1151,7 +1166,8 @@ func (mock *CloudCredentialInterfaceMock) AddFeatureHandler(ctx context.Context,
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//     len(mockedCloudCredentialInterface.AddFeatureHandlerCalls())
+//
+//	len(mockedCloudCredentialInterface.AddFeatureHandlerCalls())
 func (mock *CloudCredentialInterfaceMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
@@ -1194,7 +1210,8 @@ func (mock *CloudCredentialInterfaceMock) AddFeatureLifecycle(ctx context.Contex
 
 // AddFeatureLifecycleCalls gets all the calls that were made to AddFeatureLifecycle.
 // Check the length with:
-//     len(mockedCloudCredentialInterface.AddFeatureLifecycleCalls())
+//
+//	len(mockedCloudCredentialInterface.AddFeatureLifecycleCalls())
 func (mock *CloudCredentialInterfaceMock) AddFeatureLifecycleCalls() []struct {
 	Ctx       context.Context
 	Enabled   func() bool
@@ -1235,7 +1252,8 @@ func (mock *CloudCredentialInterfaceMock) AddHandler(ctx context.Context, name s
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//     len(mockedCloudCredentialInterface.AddHandlerCalls())
+//
+//	len(mockedCloudCredentialInterface.AddHandlerCalls())
 func (mock *CloudCredentialInterfaceMock) AddHandlerCalls() []struct {
 	Ctx  context.Context
 	Name string
@@ -1274,7 +1292,8 @@ func (mock *CloudCredentialInterfaceMock) AddLifecycle(ctx context.Context, name
 
 // AddLifecycleCalls gets all the calls that were made to AddLifecycle.
 // Check the length with:
-//     len(mockedCloudCredentialInterface.AddLifecycleCalls())
+//
+//	len(mockedCloudCredentialInterface.AddLifecycleCalls())
 func (mock *CloudCredentialInterfaceMock) AddLifecycleCalls() []struct {
 	Ctx       context.Context
 	Name      string
@@ -1306,7 +1325,8 @@ func (mock *CloudCredentialInterfaceMock) Controller() v31.CloudCredentialContro
 
 // ControllerCalls gets all the calls that were made to Controller.
 // Check the length with:
-//     len(mockedCloudCredentialInterface.ControllerCalls())
+//
+//	len(mockedCloudCredentialInterface.ControllerCalls())
 func (mock *CloudCredentialInterfaceMock) ControllerCalls() []struct {
 } {
 	var calls []struct {
@@ -1335,7 +1355,8 @@ func (mock *CloudCredentialInterfaceMock) Create(in1 *v3.CloudCredential) (*v3.C
 
 // CreateCalls gets all the calls that were made to Create.
 // Check the length with:
-//     len(mockedCloudCredentialInterface.CreateCalls())
+//
+//	len(mockedCloudCredentialInterface.CreateCalls())
 func (mock *CloudCredentialInterfaceMock) CreateCalls() []struct {
 	In1 *v3.CloudCredential
 } {
@@ -1368,7 +1389,8 @@ func (mock *CloudCredentialInterfaceMock) Delete(name string, options *metav1.De
 
 // DeleteCalls gets all the calls that were made to Delete.
 // Check the length with:
-//     len(mockedCloudCredentialInterface.DeleteCalls())
+//
+//	len(mockedCloudCredentialInterface.DeleteCalls())
 func (mock *CloudCredentialInterfaceMock) DeleteCalls() []struct {
 	Name    string
 	Options *metav1.DeleteOptions
@@ -1403,7 +1425,8 @@ func (mock *CloudCredentialInterfaceMock) DeleteCollection(deleteOpts *metav1.De
 
 // DeleteCollectionCalls gets all the calls that were made to DeleteCollection.
 // Check the length with:
-//     len(mockedCloudCredentialInterface.DeleteCollectionCalls())
+//
+//	len(mockedCloudCredentialInterface.DeleteCollectionCalls())
 func (mock *CloudCredentialInterfaceMock) DeleteCollectionCalls() []struct {
 	DeleteOpts *metav1.DeleteOptions
 	ListOpts   metav1.ListOptions
@@ -1440,7 +1463,8 @@ func (mock *CloudCredentialInterfaceMock) DeleteNamespaced(namespace string, nam
 
 // DeleteNamespacedCalls gets all the calls that were made to DeleteNamespaced.
 // Check the length with:
-//     len(mockedCloudCredentialInterface.DeleteNamespacedCalls())
+//
+//	len(mockedCloudCredentialInterface.DeleteNamespacedCalls())
 func (mock *CloudCredentialInterfaceMock) DeleteNamespacedCalls() []struct {
 	Namespace string
 	Name      string
@@ -1477,7 +1501,8 @@ func (mock *CloudCredentialInterfaceMock) Get(name string, opts metav1.GetOption
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//     len(mockedCloudCredentialInterface.GetCalls())
+//
+//	len(mockedCloudCredentialInterface.GetCalls())
 func (mock *CloudCredentialInterfaceMock) GetCalls() []struct {
 	Name string
 	Opts metav1.GetOptions
@@ -1514,7 +1539,8 @@ func (mock *CloudCredentialInterfaceMock) GetNamespaced(namespace string, name s
 
 // GetNamespacedCalls gets all the calls that were made to GetNamespaced.
 // Check the length with:
-//     len(mockedCloudCredentialInterface.GetNamespacedCalls())
+//
+//	len(mockedCloudCredentialInterface.GetNamespacedCalls())
 func (mock *CloudCredentialInterfaceMock) GetNamespacedCalls() []struct {
 	Namespace string
 	Name      string
@@ -1549,7 +1575,8 @@ func (mock *CloudCredentialInterfaceMock) List(opts metav1.ListOptions) (*v3.Clo
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//     len(mockedCloudCredentialInterface.ListCalls())
+//
+//	len(mockedCloudCredentialInterface.ListCalls())
 func (mock *CloudCredentialInterfaceMock) ListCalls() []struct {
 	Opts metav1.ListOptions
 } {
@@ -1582,7 +1609,8 @@ func (mock *CloudCredentialInterfaceMock) ListNamespaced(namespace string, opts 
 
 // ListNamespacedCalls gets all the calls that were made to ListNamespaced.
 // Check the length with:
-//     len(mockedCloudCredentialInterface.ListNamespacedCalls())
+//
+//	len(mockedCloudCredentialInterface.ListNamespacedCalls())
 func (mock *CloudCredentialInterfaceMock) ListNamespacedCalls() []struct {
 	Namespace string
 	Opts      metav1.ListOptions
@@ -1612,7 +1640,8 @@ func (mock *CloudCredentialInterfaceMock) ObjectClient() *objectclient.ObjectCli
 
 // ObjectClientCalls gets all the calls that were made to ObjectClient.
 // Check the length with:
-//     len(mockedCloudCredentialInterface.ObjectClientCalls())
+//
+//	len(mockedCloudCredentialInterface.ObjectClientCalls())
 func (mock *CloudCredentialInterfaceMock) ObjectClientCalls() []struct {
 } {
 	var calls []struct {
@@ -1641,7 +1670,8 @@ func (mock *CloudCredentialInterfaceMock) Update(in1 *v3.CloudCredential) (*v3.C
 
 // UpdateCalls gets all the calls that were made to Update.
 // Check the length with:
-//     len(mockedCloudCredentialInterface.UpdateCalls())
+//
+//	len(mockedCloudCredentialInterface.UpdateCalls())
 func (mock *CloudCredentialInterfaceMock) UpdateCalls() []struct {
 	In1 *v3.CloudCredential
 } {
@@ -1672,7 +1702,8 @@ func (mock *CloudCredentialInterfaceMock) Watch(opts metav1.ListOptions) (watch.
 
 // WatchCalls gets all the calls that were made to Watch.
 // Check the length with:
-//     len(mockedCloudCredentialInterface.WatchCalls())
+//
+//	len(mockedCloudCredentialInterface.WatchCalls())
 func (mock *CloudCredentialInterfaceMock) WatchCalls() []struct {
 	Opts metav1.ListOptions
 } {
@@ -1695,19 +1726,19 @@ var _ v31.CloudCredentialsGetter = &CloudCredentialsGetterMock{}
 
 // CloudCredentialsGetterMock is a mock implementation of v31.CloudCredentialsGetter.
 //
-//     func TestSomethingThatUsesCloudCredentialsGetter(t *testing.T) {
+//	    func TestSomethingThatUsesCloudCredentialsGetter(t *testing.T) {
 //
-//         // make and configure a mocked v31.CloudCredentialsGetter
-//         mockedCloudCredentialsGetter := &CloudCredentialsGetterMock{
-//             CloudCredentialsFunc: func(namespace string) v31.CloudCredentialInterface {
-// 	               panic("mock out the CloudCredentials method")
-//             },
-//         }
+//	        // make and configure a mocked v31.CloudCredentialsGetter
+//	        mockedCloudCredentialsGetter := &CloudCredentialsGetterMock{
+//	            CloudCredentialsFunc: func(namespace string) v31.CloudCredentialInterface {
+//		               panic("mock out the CloudCredentials method")
+//	            },
+//	        }
 //
-//         // use mockedCloudCredentialsGetter in code that requires v31.CloudCredentialsGetter
-//         // and then make assertions.
+//	        // use mockedCloudCredentialsGetter in code that requires v31.CloudCredentialsGetter
+//	        // and then make assertions.
 //
-//     }
+//	    }
 type CloudCredentialsGetterMock struct {
 	// CloudCredentialsFunc mocks the CloudCredentials method.
 	CloudCredentialsFunc func(namespace string) v31.CloudCredentialInterface
@@ -1740,7 +1771,8 @@ func (mock *CloudCredentialsGetterMock) CloudCredentials(namespace string) v31.C
 
 // CloudCredentialsCalls gets all the calls that were made to CloudCredentials.
 // Check the length with:
-//     len(mockedCloudCredentialsGetter.CloudCredentialsCalls())
+//
+//	len(mockedCloudCredentialsGetter.CloudCredentialsCalls())
 func (mock *CloudCredentialsGetterMock) CloudCredentialsCalls() []struct {
 	Namespace string
 } {
