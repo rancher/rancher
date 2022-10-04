@@ -171,7 +171,7 @@ func (m *Lifecycle) Create(obj *apimgmtv3.Node) (runtime.Object, error) {
 	}
 
 	newObj, err := apimgmtv3.NodeConditionInitialized.Once(obj, func() (runtime.Object, error) {
-		logrus.Debugf("Called apimgmtv3.NodeConditionInitialized.Once for [%s] in namespace [%s]", obj.Name, obj.Namespace)
+		logrus.Debugf("[node-controller] Called apimgmtv3.NodeConditionInitialized.Once for [%s] in namespace [%s]", obj.Name, obj.Namespace)
 		// Ensure jail is created first, else the function `NewNodeConfig` will create the full jail path (including parent jail directory) and CreateJail will remove the directory as it does not contain a done file
 		if !m.devMode {
 			err := jailer.CreateJail(obj.Namespace)
@@ -213,7 +213,7 @@ func (m *Lifecycle) Create(obj *apimgmtv3.Node) (runtime.Object, error) {
 
 func (m *Lifecycle) getNodeTemplate(nodeTemplateName string) (*apimgmtv3.NodeTemplate, error) {
 	ns, n := ref.Parse(nodeTemplateName)
-	logrus.Debugf("getNodeTemplate parsed [%s] to ns: [%s] and n: [%s]", nodeTemplateName, ns, n)
+	logrus.Debugf("[node-controller] getNodeTemplate parsed [%s] to ns: [%s] and n: [%s]", nodeTemplateName, ns, n)
 	return m.nodeTemplateClient.GetNamespaced(ns, n, metav1.GetOptions{})
 }
 
@@ -271,14 +271,14 @@ func (m *Lifecycle) Remove(machine *apimgmtv3.Node) (obj runtime.Object, err err
 		}
 
 		if exists {
-			logrus.Infof("Removing node %s", machine.Spec.RequestedHostname)
+			logrus.Infof("[node-controller] Removing node %s", machine.Spec.RequestedHostname)
 			if err = m.drainNode(machine); err != nil {
 				return machine, err
 			}
 			if err = deleteNode(config.Dir(), machine); err != nil {
 				return machine, err
 			}
-			logrus.Infof("Removing node %s done", machine.Spec.RequestedHostname)
+			logrus.Infof("[node-controller] Removing node %s done", machine.Spec.RequestedHostname)
 		}
 
 		return machine, nil
@@ -315,7 +315,7 @@ func (m *Lifecycle) provision(driverConfig, nodeDir string, obj *apimgmtv3.Node)
 		return obj, err
 	}
 
-	logrus.Infof("Provisioning node %s", obj.Spec.RequestedHostname)
+	logrus.Infof("[node-controller] Provisioning node %s", obj.Spec.RequestedHostname)
 
 	stdoutReader, stderrReader, err := startReturnOutput(cmd)
 	if err != nil {
@@ -338,7 +338,7 @@ func (m *Lifecycle) provision(driverConfig, nodeDir string, obj *apimgmtv3.Node)
 		return obj, err
 	}
 
-	logrus.Infof("Provisioning node %s done", obj.Spec.RequestedHostname)
+	logrus.Infof("[node-controller] Provisioning node %s done", obj.Spec.RequestedHostname)
 	return obj, nil
 }
 
@@ -453,7 +453,7 @@ func (m *Lifecycle) authenticateRegistry(nodeDir string, node *apimgmtv3.Node, c
 		return nil
 	}
 
-	logrus.Infof("[node-controller-rancher-machine] private registry detected, authenticating %s to %s", node.Spec.RequestedHostname, reg.URL)
+	logrus.Infof("[node-controller] private registry detected, authenticating %s to %s", node.Spec.RequestedHostname, reg.URL)
 
 	login := clusterregistrationtoken.LoginCommand(*reg)
 	args := buildLoginCommand(node, login)
@@ -462,7 +462,7 @@ func (m *Lifecycle) authenticateRegistry(nodeDir string, node *apimgmtv3.Node, c
 		return err
 	}
 
-	logrus.Tracef("[node-controller-rancher-machine] login command: %s", cmd.String())
+	logrus.Tracef("[node-controller] login command: %s", cmd.String())
 
 	output, err := cmd.CombinedOutput()
 	if err != nil {
@@ -559,7 +559,7 @@ func (m *Lifecycle) Updated(obj *apimgmtv3.Node) (runtime.Object, error) {
 }
 
 func (m *Lifecycle) saveConfig(config *nodeconfig.NodeConfig, nodeDir string, obj *apimgmtv3.Node) (*apimgmtv3.Node, error) {
-	logrus.Infof("Generating and uploading node config %s", obj.Spec.RequestedHostname)
+	logrus.Infof("[node-controller] Generating and uploading node config %s", obj.Spec.RequestedHostname)
 	if err := config.Save(); err != nil {
 		return obj, err
 	}
@@ -657,7 +657,7 @@ func (m *Lifecycle) refreshNodeConfig(nc *nodeconfig.NodeConfig, obj *apimgmtv3.
 	}
 
 	if err := m.updateRawConfigFromCredential(data, rawConfig, template); err != nil {
-		logrus.Debugf("refreshNodeConfig: error calling updateRawConfigFromCredential for [%v]: %v", obj.Name, err)
+		logrus.Debugf("[node-controller] refreshNodeConfig: error calling updateRawConfigFromCredential for [%v]: %v", obj.Name, err)
 		return err
 	}
 
@@ -665,7 +665,7 @@ func (m *Lifecycle) refreshNodeConfig(nc *nodeconfig.NodeConfig, obj *apimgmtv3.
 
 	if template.Spec.Driver == amazonec2 {
 		setEc2ClusterIDTag(rawConfig, obj.Namespace)
-		logrus.Debug("refreshNodeConfig: Updating amazonec2 machine config")
+		logrus.Debug("[node-controller] refreshNodeConfig: Updating amazonec2 machine config")
 		//TODO: Update to not be amazon specific, this needs to be moved to the driver
 		update, err = nc.UpdateAmazonAuth(rawConfig)
 		if err != nil {
@@ -803,7 +803,7 @@ func (m *Lifecycle) updateRawConfigFromCredential(data map[string]interface{}, r
 		if err != nil {
 			return err
 		}
-		logrus.Debugf("setCredFields for credentialName %s", credID)
+		logrus.Debugf("[node-controller] setCredFields for credentialName %s", credID)
 		err = m.setCredFields(rawConfig, existingSchema.Spec.ResourceFields, credID)
 		if err != nil {
 			return errors.Wrap(err, "failed to set credential fields")

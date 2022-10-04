@@ -35,19 +35,21 @@ const (
 )
 
 func (m *Lifecycle) deleteV1Node(node *v3.Node) (runtime.Object, error) {
-	logrus.Debugf("Deleting v1.node for [%v] node", node.Status.NodeName)
+	logrus.Debugf("[node-cleanup] Deleting v1.node for [%v] node", node.Status.NodeName)
 	if nodehelper.IgnoreNode(node.Status.NodeName, node.Status.NodeLabels) {
-		logrus.Debugf("Skipping v1.node removal for [%v] node", node.Status.NodeName)
+		logrus.Debugf("[node-cleanup] Skipping v1.node removal for [%v] node", node.Status.NodeName)
 		return node, nil
 	}
 
 	if node.Status.NodeName == "" {
+		logrus.Debugf("[node-cleanup] Skipping v1.node removal for machine [%v] without node name", node.Name)
 		return node, nil
 	}
 
 	cluster, err := m.clusterLister.Get("", node.Namespace)
 	if err != nil {
 		if kerror.IsNotFound(err) {
+			logrus.Debugf("[node-cleanup] Skipping v1.node removal for machine [%v] without cluster [%v]", node.Name, node.Namespace)
 			return node, nil
 		}
 		return node, err
@@ -57,7 +59,7 @@ func (m *Lifecycle) deleteV1Node(node *v3.Node) (runtime.Object, error) {
 		return node, err
 	}
 	if userClient == nil {
-		logrus.Debugf("cluster is already deleted, cannot delete RKE node")
+		logrus.Debugf("[node-cleanup] cluster is already deleted, cannot delete RKE node")
 		return node, nil
 	}
 
@@ -94,14 +96,14 @@ func (m *Lifecycle) drainNode(node *v3.Node) error {
 		return nil
 	}
 
-	logrus.Infof("node [%s] requires draining before delete", nodeCopy.Spec.RequestedHostname)
+	logrus.Infof("[node-cleanup] node [%s] requires draining before delete", nodeCopy.Spec.RequestedHostname)
 	kubeConfig, _, err := m.getKubeConfig(cluster)
 	if err != nil {
 		return fmt.Errorf("node [%s] error getting kubeConfig", nodeCopy.Spec.RequestedHostname)
 	}
 
 	if nodeCopy.Spec.NodeDrainInput == nil {
-		logrus.Debugf("node [%s] has no NodeDrainInput, creating one with 60s timeout",
+		logrus.Debugf("[node-cleanup] node [%s] has no NodeDrainInput, creating one with 60s timeout",
 			nodeCopy.Spec.RequestedHostname)
 		nodeCopy.Spec.NodeDrainInput = &rketypes.NodeDrainInput{
 			Force:           true,
@@ -118,7 +120,7 @@ func (m *Lifecycle) drainNode(node *v3.Node) error {
 		Steps:    3,
 	}
 
-	logrus.Infof("node [%s] attempting to drain, retrying up to 3 times", nodeCopy.Spec.RequestedHostname)
+	logrus.Infof("[node-cleanup] node [%s] attempting to drain, retrying up to 3 times", nodeCopy.Spec.RequestedHostname)
 	// purposefully ignoring error, if the drain fails this falls back to deleting the node as usual
 	return wait.ExponentialBackoff(backoff, func() (bool, error) {
 		ctx, cancel := context.WithTimeout(m.ctx, time.Duration(nodeCopy.Spec.NodeDrainInput.Timeout)*time.Second)
@@ -126,16 +128,16 @@ func (m *Lifecycle) drainNode(node *v3.Node) error {
 
 		_, msg, err := kubectl.Drain(ctx, kubeConfig, nodeCopy.Status.NodeName, nodehelper.GetDrainFlags(nodeCopy))
 		if ctx.Err() != nil {
-			logrus.Errorf("node [%s] kubectl drain failed, retrying: %s", nodeCopy.Spec.RequestedHostname, ctx.Err())
+			logrus.Errorf("[node-cleanup] node [%s] kubectl drain failed, retrying: %s", nodeCopy.Spec.RequestedHostname, ctx.Err())
 			return false, nil
 		}
 		if err != nil {
 			// kubectl failed continue on with delete any way
-			logrus.Errorf("node [%s] kubectl drain error, retrying: %s", nodeCopy.Spec.RequestedHostname, err)
+			logrus.Errorf("[node-cleanup] node [%s] kubectl drain error, retrying: %s", nodeCopy.Spec.RequestedHostname, err)
 			return false, nil
 		}
 
-		logrus.Infof("node [%s] kubectl drain response: %s", nodeCopy.Spec.RequestedHostname, msg)
+		logrus.Infof("[node-cleanup] node [%s] kubectl drain response: %s", nodeCopy.Spec.RequestedHostname, msg)
 		return true, nil
 	})
 }
@@ -162,7 +164,7 @@ func (m *Lifecycle) cleanRKENode(node *v3.Node) error {
 		return err
 	}
 	if userContext == nil {
-		logrus.Debugf("cluster is already deleted, cannot clean RKE node")
+		logrus.Debugf("[node-cleanup] cluster is already deleted, cannot clean RKE node")
 		return nil
 	}
 
@@ -420,7 +422,7 @@ func removeFinalizerWithPrefix(finalizers []string, prefix string) []string {
 	var nf []string
 	for _, finalizer := range finalizers {
 		if strings.HasPrefix(finalizer, prefix) {
-			logrus.Debugf("finalizer with prefix [%s] will be removed", prefix)
+			logrus.Debugf("[node-cleanup] finalizer with prefix [%s] will be removed", prefix)
 			continue
 		}
 		nf = append(nf, finalizer)
@@ -431,7 +433,7 @@ func removeFinalizerWithPrefix(finalizers []string, prefix string) []string {
 func removeAnnotationWithPrefix(annotations map[string]string, prefix string) map[string]string {
 	for k := range annotations {
 		if strings.HasPrefix(k, prefix) {
-			logrus.Debugf("annotation with prefix [%s] will be removed", prefix)
+			logrus.Debugf("[node-cleanup] annotation with prefix [%s] will be removed", prefix)
 			delete(annotations, k)
 		}
 	}
