@@ -239,3 +239,11 @@ func (p *adProvider) GetUserExtraAttributes(userPrincipal v3.Principal) map[stri
 	}
 	return extras
 }
+
+func (p *adProvider) IsDisabledProvider() (bool, error) {
+	adConfig, _, err := p.getActiveDirectoryConfig()
+	if err != nil {
+		return false, err
+	}
+	return !adConfig.Enabled, nil
+}

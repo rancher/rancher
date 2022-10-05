@@ -208,3 +208,7 @@ func RefetchGroupPrincipals(principalID string, providerName string, secret stri
 func GetUserExtraAttributes(providerName string, userPrincipal v3.Principal) map[string][]string {
 	return Providers[providerName].GetUserExtraAttributes(userPrincipal)
 }
+
+func IsDisabledProvider(providerName string) (bool, error) {
+	return Providers[providerName].IsDisabledProvider()
+}

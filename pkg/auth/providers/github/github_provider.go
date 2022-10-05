@@ -419,3 +419,11 @@ func (g *ghProvider) GetUserExtraAttributes(userPrincipal v3.Principal) map[stri
 	}
 	return extras
 }
+
+func (g *ghProvider) IsDisabledProvider() (bool, error) {
+	ghConfig, err := g.getGithubConfigCR()
+	if err != nil {
+		return false, err
+	}
+	return !ghConfig.Enabled, nil
+}

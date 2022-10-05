@@ -458,3 +458,8 @@ func (l *Provider) GetUserExtraAttributes(userPrincipal v3.Principal) map[string
 	}
 	return extras
 }
+
+func (l *Provider) IsDisabledProvider() (bool, error) {
+	// as of now, local provider can't be disabled, so this always returns false
+	return false, nil
+}
