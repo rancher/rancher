@@ -474,3 +474,11 @@ func (o *OpenIDCProvider) UpdateToken(refreshedToken *oauth2.Token, userID strin
 	o.TokenMGR.UpdateSecret(userID, o.Name, string(marshalledToken))
 	return err
 }
+
+func (o *OpenIDCProvider) IsDisabledProvider() (bool, error) {
+	oidcConfig, err := o.GetOIDCConfig()
+	if err != nil {
+		return false, err
+	}
+	return !oidcConfig.Enabled, nil
+}

@@ -438,3 +438,11 @@ func (g *googleOauthProvider) GetUserExtraAttributes(userPrincipal v3.Principal)
 	}
 	return extras
 }
+
+func (g *googleOauthProvider) IsDisabledProvider() (bool, error) {
+	googleOauthConfig, err := g.getGoogleOAuthConfigCR()
+	if err != nil {
+		return false, err
+	}
+	return !googleOauthConfig.Enabled, nil
+}

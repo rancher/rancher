@@ -380,3 +380,11 @@ func (p *ldapProvider) GetUserExtraAttributes(userPrincipal v3.Principal) map[st
 	}
 	return extras
 }
+
+func (p *ldapProvider) IsDisabledProvider() (bool, error) {
+	ldapConfig, _, err := p.getLDAPConfig()
+	if err != nil {
+		return false, err
+	}
+	return !ldapConfig.Enabled, nil
+}
