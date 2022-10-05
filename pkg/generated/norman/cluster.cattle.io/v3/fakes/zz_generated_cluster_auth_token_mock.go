@@ -29,22 +29,22 @@ var _ v31.ClusterAuthTokenLister = &ClusterAuthTokenListerMock{}
 
 // ClusterAuthTokenListerMock is a mock implementation of v31.ClusterAuthTokenLister.
 //
-//     func TestSomethingThatUsesClusterAuthTokenLister(t *testing.T) {
+//	    func TestSomethingThatUsesClusterAuthTokenLister(t *testing.T) {
 //
-//         // make and configure a mocked v31.ClusterAuthTokenLister
-//         mockedClusterAuthTokenLister := &ClusterAuthTokenListerMock{
-//             GetFunc: func(namespace string, name string) (*v3.ClusterAuthToken, error) {
-// 	               panic("mock out the Get method")
-//             },
-//             ListFunc: func(namespace string, selector labels.Selector) ([]*v3.ClusterAuthToken, error) {
-// 	               panic("mock out the List method")
-//             },
-//         }
+//	        // make and configure a mocked v31.ClusterAuthTokenLister
+//	        mockedClusterAuthTokenLister := &ClusterAuthTokenListerMock{
+//	            GetFunc: func(namespace string, name string) (*v3.ClusterAuthToken, error) {
+//		               panic("mock out the Get method")
+//	            },
+//	            ListFunc: func(namespace string, selector labels.Selector) ([]*v3.ClusterAuthToken, error) {
+//		               panic("mock out the List method")
+//	            },
+//	        }
 //
-//         // use mockedClusterAuthTokenLister in code that requires v31.ClusterAuthTokenLister
-//         // and then make assertions.
+//	        // use mockedClusterAuthTokenLister in code that requires v31.ClusterAuthTokenLister
+//	        // and then make assertions.
 //
-//     }
+//	    }
 type ClusterAuthTokenListerMock struct {
 	// GetFunc mocks the Get method.
 	GetFunc func(namespace string, name string) (*v3.ClusterAuthToken, error)
@@ -91,7 +91,8 @@ func (mock *ClusterAuthTokenListerMock) Get(namespace string, name string) (*v3.
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//     len(mockedClusterAuthTokenLister.GetCalls())
+//
+//	len(mockedClusterAuthTokenLister.GetCalls())
 func (mock *ClusterAuthTokenListerMock) GetCalls() []struct {
 	Namespace string
 	Name      string
@@ -126,7 +127,8 @@ func (mock *ClusterAuthTokenListerMock) List(namespace string, selector labels.S
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//     len(mockedClusterAuthTokenLister.ListCalls())
+//
+//	len(mockedClusterAuthTokenLister.ListCalls())
 func (mock *ClusterAuthTokenListerMock) ListCalls() []struct {
 	Namespace string
 	Selector  labels.Selector
@@ -159,43 +161,43 @@ var _ v31.ClusterAuthTokenController = &ClusterAuthTokenControllerMock{}
 
 // ClusterAuthTokenControllerMock is a mock implementation of v31.ClusterAuthTokenController.
 //
-//     func TestSomethingThatUsesClusterAuthTokenController(t *testing.T) {
+//	    func TestSomethingThatUsesClusterAuthTokenController(t *testing.T) {
 //
-//         // make and configure a mocked v31.ClusterAuthTokenController
-//         mockedClusterAuthTokenController := &ClusterAuthTokenControllerMock{
-//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v31.ClusterAuthTokenHandlerFunc)  {
-// 	               panic("mock out the AddClusterScopedFeatureHandler method")
-//             },
-//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v31.ClusterAuthTokenHandlerFunc)  {
-// 	               panic("mock out the AddClusterScopedHandler method")
-//             },
-//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.ClusterAuthTokenHandlerFunc)  {
-// 	               panic("mock out the AddFeatureHandler method")
-//             },
-//             AddHandlerFunc: func(ctx context.Context, name string, handler v31.ClusterAuthTokenHandlerFunc)  {
-// 	               panic("mock out the AddHandler method")
-//             },
-//             EnqueueFunc: func(namespace string, name string)  {
-// 	               panic("mock out the Enqueue method")
-//             },
-//             EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
-// 	               panic("mock out the EnqueueAfter method")
-//             },
-//             GenericFunc: func() controller.GenericController {
-// 	               panic("mock out the Generic method")
-//             },
-//             InformerFunc: func() cache.SharedIndexInformer {
-// 	               panic("mock out the Informer method")
-//             },
-//             ListerFunc: func() v31.ClusterAuthTokenLister {
-// 	               panic("mock out the Lister method")
-//             },
-//         }
+//	        // make and configure a mocked v31.ClusterAuthTokenController
+//	        mockedClusterAuthTokenController := &ClusterAuthTokenControllerMock{
+//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v31.ClusterAuthTokenHandlerFunc)  {
+//		               panic("mock out the AddClusterScopedFeatureHandler method")
+//	            },
+//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v31.ClusterAuthTokenHandlerFunc)  {
+//		               panic("mock out the AddClusterScopedHandler method")
+//	            },
+//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.ClusterAuthTokenHandlerFunc)  {
+//		               panic("mock out the AddFeatureHandler method")
+//	            },
+//	            AddHandlerFunc: func(ctx context.Context, name string, handler v31.ClusterAuthTokenHandlerFunc)  {
+//		               panic("mock out the AddHandler method")
+//	            },
+//	            EnqueueFunc: func(namespace string, name string)  {
+//		               panic("mock out the Enqueue method")
+//	            },
+//	            EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
+//		               panic("mock out the EnqueueAfter method")
+//	            },
+//	            GenericFunc: func() controller.GenericController {
+//		               panic("mock out the Generic method")
+//	            },
+//	            InformerFunc: func() cache.SharedIndexInformer {
+//		               panic("mock out the Informer method")
+//	            },
+//	            ListerFunc: func() v31.ClusterAuthTokenLister {
+//		               panic("mock out the Lister method")
+//	            },
+//	        }
 //
-//         // use mockedClusterAuthTokenController in code that requires v31.ClusterAuthTokenController
-//         // and then make assertions.
+//	        // use mockedClusterAuthTokenController in code that requires v31.ClusterAuthTokenController
+//	        // and then make assertions.
 //
-//     }
+//	    }
 type ClusterAuthTokenControllerMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
 	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v31.ClusterAuthTokenHandlerFunc)
@@ -324,7 +326,8 @@ func (mock *ClusterAuthTokenControllerMock) AddClusterScopedFeatureHandler(ctx c
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//     len(mockedClusterAuthTokenController.AddClusterScopedFeatureHandlerCalls())
+//
+//	len(mockedClusterAuthTokenController.AddClusterScopedFeatureHandlerCalls())
 func (mock *ClusterAuthTokenControllerMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -369,7 +372,8 @@ func (mock *ClusterAuthTokenControllerMock) AddClusterScopedHandler(ctx context.
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//     len(mockedClusterAuthTokenController.AddClusterScopedHandlerCalls())
+//
+//	len(mockedClusterAuthTokenController.AddClusterScopedHandlerCalls())
 func (mock *ClusterAuthTokenControllerMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -412,7 +416,8 @@ func (mock *ClusterAuthTokenControllerMock) AddFeatureHandler(ctx context.Contex
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//     len(mockedClusterAuthTokenController.AddFeatureHandlerCalls())
+//
+//	len(mockedClusterAuthTokenController.AddFeatureHandlerCalls())
 func (mock *ClusterAuthTokenControllerMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
@@ -453,7 +458,8 @@ func (mock *ClusterAuthTokenControllerMock) AddHandler(ctx context.Context, name
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//     len(mockedClusterAuthTokenController.AddHandlerCalls())
+//
+//	len(mockedClusterAuthTokenController.AddHandlerCalls())
 func (mock *ClusterAuthTokenControllerMock) AddHandlerCalls() []struct {
 	Ctx     context.Context
 	Name    string
@@ -490,7 +496,8 @@ func (mock *ClusterAuthTokenControllerMock) Enqueue(namespace string, name strin
 
 // EnqueueCalls gets all the calls that were made to Enqueue.
 // Check the length with:
-//     len(mockedClusterAuthTokenController.EnqueueCalls())
+//
+//	len(mockedClusterAuthTokenController.EnqueueCalls())
 func (mock *ClusterAuthTokenControllerMock) EnqueueCalls() []struct {
 	Namespace string
 	Name      string
@@ -527,7 +534,8 @@ func (mock *ClusterAuthTokenControllerMock) EnqueueAfter(namespace string, name 
 
 // EnqueueAfterCalls gets all the calls that were made to EnqueueAfter.
 // Check the length with:
-//     len(mockedClusterAuthTokenController.EnqueueAfterCalls())
+//
+//	len(mockedClusterAuthTokenController.EnqueueAfterCalls())
 func (mock *ClusterAuthTokenControllerMock) EnqueueAfterCalls() []struct {
 	Namespace string
 	Name      string
@@ -559,7 +567,8 @@ func (mock *ClusterAuthTokenControllerMock) Generic() controller.GenericControll
 
 // GenericCalls gets all the calls that were made to Generic.
 // Check the length with:
-//     len(mockedClusterAuthTokenController.GenericCalls())
+//
+//	len(mockedClusterAuthTokenController.GenericCalls())
 func (mock *ClusterAuthTokenControllerMock) GenericCalls() []struct {
 } {
 	var calls []struct {
@@ -585,7 +594,8 @@ func (mock *ClusterAuthTokenControllerMock) Informer() cache.SharedIndexInformer
 
 // InformerCalls gets all the calls that were made to Informer.
 // Check the length with:
-//     len(mockedClusterAuthTokenController.InformerCalls())
+//
+//	len(mockedClusterAuthTokenController.InformerCalls())
 func (mock *ClusterAuthTokenControllerMock) InformerCalls() []struct {
 } {
 	var calls []struct {
@@ -611,7 +621,8 @@ func (mock *ClusterAuthTokenControllerMock) Lister() v31.ClusterAuthTokenLister 
 
 // ListerCalls gets all the calls that were made to Lister.
 // Check the length with:
-//     len(mockedClusterAuthTokenController.ListerCalls())
+//
+//	len(mockedClusterAuthTokenController.ListerCalls())
 func (mock *ClusterAuthTokenControllerMock) ListerCalls() []struct {
 } {
 	var calls []struct {
@@ -651,76 +662,76 @@ var _ v31.ClusterAuthTokenInterface = &ClusterAuthTokenInterfaceMock{}
 
 // ClusterAuthTokenInterfaceMock is a mock implementation of v31.ClusterAuthTokenInterface.
 //
-//     func TestSomethingThatUsesClusterAuthTokenInterface(t *testing.T) {
+//	    func TestSomethingThatUsesClusterAuthTokenInterface(t *testing.T) {
 //
-//         // make and configure a mocked v31.ClusterAuthTokenInterface
-//         mockedClusterAuthTokenInterface := &ClusterAuthTokenInterfaceMock{
-//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v31.ClusterAuthTokenHandlerFunc)  {
-// 	               panic("mock out the AddClusterScopedFeatureHandler method")
-//             },
-//             AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v31.ClusterAuthTokenLifecycle)  {
-// 	               panic("mock out the AddClusterScopedFeatureLifecycle method")
-//             },
-//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v31.ClusterAuthTokenHandlerFunc)  {
-// 	               panic("mock out the AddClusterScopedHandler method")
-//             },
-//             AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v31.ClusterAuthTokenLifecycle)  {
-// 	               panic("mock out the AddClusterScopedLifecycle method")
-//             },
-//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.ClusterAuthTokenHandlerFunc)  {
-// 	               panic("mock out the AddFeatureHandler method")
-//             },
-//             AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v31.ClusterAuthTokenLifecycle)  {
-// 	               panic("mock out the AddFeatureLifecycle method")
-//             },
-//             AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v31.ClusterAuthTokenHandlerFunc)  {
-// 	               panic("mock out the AddHandler method")
-//             },
-//             AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v31.ClusterAuthTokenLifecycle)  {
-// 	               panic("mock out the AddLifecycle method")
-//             },
-//             ControllerFunc: func() v31.ClusterAuthTokenController {
-// 	               panic("mock out the Controller method")
-//             },
-//             CreateFunc: func(in1 *v3.ClusterAuthToken) (*v3.ClusterAuthToken, error) {
-// 	               panic("mock out the Create method")
-//             },
-//             DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
-// 	               panic("mock out the Delete method")
-//             },
-//             DeleteCollectionFunc: func(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
-// 	               panic("mock out the DeleteCollection method")
-//             },
-//             DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
-// 	               panic("mock out the DeleteNamespaced method")
-//             },
-//             GetFunc: func(name string, opts metav1.GetOptions) (*v3.ClusterAuthToken, error) {
-// 	               panic("mock out the Get method")
-//             },
-//             GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v3.ClusterAuthToken, error) {
-// 	               panic("mock out the GetNamespaced method")
-//             },
-//             ListFunc: func(opts metav1.ListOptions) (*v3.ClusterAuthTokenList, error) {
-// 	               panic("mock out the List method")
-//             },
-//             ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v3.ClusterAuthTokenList, error) {
-// 	               panic("mock out the ListNamespaced method")
-//             },
-//             ObjectClientFunc: func() *objectclient.ObjectClient {
-// 	               panic("mock out the ObjectClient method")
-//             },
-//             UpdateFunc: func(in1 *v3.ClusterAuthToken) (*v3.ClusterAuthToken, error) {
-// 	               panic("mock out the Update method")
-//             },
-//             WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
-// 	               panic("mock out the Watch method")
-//             },
-//         }
+//	        // make and configure a mocked v31.ClusterAuthTokenInterface
+//	        mockedClusterAuthTokenInterface := &ClusterAuthTokenInterfaceMock{
+//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v31.ClusterAuthTokenHandlerFunc)  {
+//		               panic("mock out the AddClusterScopedFeatureHandler method")
+//	            },
+//	            AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v31.ClusterAuthTokenLifecycle)  {
+//		               panic("mock out the AddClusterScopedFeatureLifecycle method")
+//	            },
+//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v31.ClusterAuthTokenHandlerFunc)  {
+//		               panic("mock out the AddClusterScopedHandler method")
+//	            },
+//	            AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v31.ClusterAuthTokenLifecycle)  {
+//		               panic("mock out the AddClusterScopedLifecycle method")
+//	            },
+//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.ClusterAuthTokenHandlerFunc)  {
+//		               panic("mock out the AddFeatureHandler method")
+//	            },
+//	            AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v31.ClusterAuthTokenLifecycle)  {
+//		               panic("mock out the AddFeatureLifecycle method")
+//	            },
+//	            AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v31.ClusterAuthTokenHandlerFunc)  {
+//		               panic("mock out the AddHandler method")
+//	            },
+//	            AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v31.ClusterAuthTokenLifecycle)  {
+//		               panic("mock out the AddLifecycle method")
+//	            },
+//	            ControllerFunc: func() v31.ClusterAuthTokenController {
+//		               panic("mock out the Controller method")
+//	            },
+//	            CreateFunc: func(in1 *v3.ClusterAuthToken) (*v3.ClusterAuthToken, error) {
+//		               panic("mock out the Create method")
+//	            },
+//	            DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
+//		               panic("mock out the Delete method")
+//	            },
+//	            DeleteCollectionFunc: func(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
+//		               panic("mock out the DeleteCollection method")
+//	            },
+//	            DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
+//		               panic("mock out the DeleteNamespaced method")
+//	            },
+//	            GetFunc: func(name string, opts metav1.GetOptions) (*v3.ClusterAuthToken, error) {
+//		               panic("mock out the Get method")
+//	            },
+//	            GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v3.ClusterAuthToken, error) {
+//		               panic("mock out the GetNamespaced method")
+//	            },
+//	            ListFunc: func(opts metav1.ListOptions) (*v3.ClusterAuthTokenList, error) {
+//		               panic("mock out the List method")
+//	            },
+//	            ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v3.ClusterAuthTokenList, error) {
+//		               panic("mock out the ListNamespaced method")
+//	            },
+//	            ObjectClientFunc: func() *objectclient.ObjectClient {
+//		               panic("mock out the ObjectClient method")
+//	            },
+//	            UpdateFunc: func(in1 *v3.ClusterAuthToken) (*v3.ClusterAuthToken, error) {
+//		               panic("mock out the Update method")
+//	            },
+//	            WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
+//		               panic("mock out the Watch method")
+//	            },
+//	        }
 //
-//         // use mockedClusterAuthTokenInterface in code that requires v31.ClusterAuthTokenInterface
-//         // and then make assertions.
+//	        // use mockedClusterAuthTokenInterface in code that requires v31.ClusterAuthTokenInterface
+//	        // and then make assertions.
 //
-//     }
+//	    }
 type ClusterAuthTokenInterfaceMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
 	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v31.ClusterAuthTokenHandlerFunc)
@@ -973,7 +984,8 @@ func (mock *ClusterAuthTokenInterfaceMock) AddClusterScopedFeatureHandler(ctx co
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//     len(mockedClusterAuthTokenInterface.AddClusterScopedFeatureHandlerCalls())
+//
+//	len(mockedClusterAuthTokenInterface.AddClusterScopedFeatureHandlerCalls())
 func (mock *ClusterAuthTokenInterfaceMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -1020,7 +1032,8 @@ func (mock *ClusterAuthTokenInterfaceMock) AddClusterScopedFeatureLifecycle(ctx 
 
 // AddClusterScopedFeatureLifecycleCalls gets all the calls that were made to AddClusterScopedFeatureLifecycle.
 // Check the length with:
-//     len(mockedClusterAuthTokenInterface.AddClusterScopedFeatureLifecycleCalls())
+//
+//	len(mockedClusterAuthTokenInterface.AddClusterScopedFeatureLifecycleCalls())
 func (mock *ClusterAuthTokenInterfaceMock) AddClusterScopedFeatureLifecycleCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -1065,7 +1078,8 @@ func (mock *ClusterAuthTokenInterfaceMock) AddClusterScopedHandler(ctx context.C
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//     len(mockedClusterAuthTokenInterface.AddClusterScopedHandlerCalls())
+//
+//	len(mockedClusterAuthTokenInterface.AddClusterScopedHandlerCalls())
 func (mock *ClusterAuthTokenInterfaceMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -1108,7 +1122,8 @@ func (mock *ClusterAuthTokenInterfaceMock) AddClusterScopedLifecycle(ctx context
 
 // AddClusterScopedLifecycleCalls gets all the calls that were made to AddClusterScopedLifecycle.
 // Check the length with:
-//     len(mockedClusterAuthTokenInterface.AddClusterScopedLifecycleCalls())
+//
+//	len(mockedClusterAuthTokenInterface.AddClusterScopedLifecycleCalls())
 func (mock *ClusterAuthTokenInterfaceMock) AddClusterScopedLifecycleCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -1151,7 +1166,8 @@ func (mock *ClusterAuthTokenInterfaceMock) AddFeatureHandler(ctx context.Context
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//     len(mockedClusterAuthTokenInterface.AddFeatureHandlerCalls())
+//
+//	len(mockedClusterAuthTokenInterface.AddFeatureHandlerCalls())
 func (mock *ClusterAuthTokenInterfaceMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
@@ -1194,7 +1210,8 @@ func (mock *ClusterAuthTokenInterfaceMock) AddFeatureLifecycle(ctx context.Conte
 
 // AddFeatureLifecycleCalls gets all the calls that were made to AddFeatureLifecycle.
 // Check the length with:
-//     len(mockedClusterAuthTokenInterface.AddFeatureLifecycleCalls())
+//
+//	len(mockedClusterAuthTokenInterface.AddFeatureLifecycleCalls())
 func (mock *ClusterAuthTokenInterfaceMock) AddFeatureLifecycleCalls() []struct {
 	Ctx       context.Context
 	Enabled   func() bool
@@ -1235,7 +1252,8 @@ func (mock *ClusterAuthTokenInterfaceMock) AddHandler(ctx context.Context, name 
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//     len(mockedClusterAuthTokenInterface.AddHandlerCalls())
+//
+//	len(mockedClusterAuthTokenInterface.AddHandlerCalls())
 func (mock *ClusterAuthTokenInterfaceMock) AddHandlerCalls() []struct {
 	Ctx  context.Context
 	Name string
@@ -1274,7 +1292,8 @@ func (mock *ClusterAuthTokenInterfaceMock) AddLifecycle(ctx context.Context, nam
 
 // AddLifecycleCalls gets all the calls that were made to AddLifecycle.
 // Check the length with:
-//     len(mockedClusterAuthTokenInterface.AddLifecycleCalls())
+//
+//	len(mockedClusterAuthTokenInterface.AddLifecycleCalls())
 func (mock *ClusterAuthTokenInterfaceMock) AddLifecycleCalls() []struct {
 	Ctx       context.Context
 	Name      string
@@ -1306,7 +1325,8 @@ func (mock *ClusterAuthTokenInterfaceMock) Controller() v31.ClusterAuthTokenCont
 
 // ControllerCalls gets all the calls that were made to Controller.
 // Check the length with:
-//     len(mockedClusterAuthTokenInterface.ControllerCalls())
+//
+//	len(mockedClusterAuthTokenInterface.ControllerCalls())
 func (mock *ClusterAuthTokenInterfaceMock) ControllerCalls() []struct {
 } {
 	var calls []struct {
@@ -1335,7 +1355,8 @@ func (mock *ClusterAuthTokenInterfaceMock) Create(in1 *v3.ClusterAuthToken) (*v3
 
 // CreateCalls gets all the calls that were made to Create.
 // Check the length with:
-//     len(mockedClusterAuthTokenInterface.CreateCalls())
+//
+//	len(mockedClusterAuthTokenInterface.CreateCalls())
 func (mock *ClusterAuthTokenInterfaceMock) CreateCalls() []struct {
 	In1 *v3.ClusterAuthToken
 } {
@@ -1368,7 +1389,8 @@ func (mock *ClusterAuthTokenInterfaceMock) Delete(name string, options *metav1.D
 
 // DeleteCalls gets all the calls that were made to Delete.
 // Check the length with:
-//     len(mockedClusterAuthTokenInterface.DeleteCalls())
+//
+//	len(mockedClusterAuthTokenInterface.DeleteCalls())
 func (mock *ClusterAuthTokenInterfaceMock) DeleteCalls() []struct {
 	Name    string
 	Options *metav1.DeleteOptions
@@ -1403,7 +1425,8 @@ func (mock *ClusterAuthTokenInterfaceMock) DeleteCollection(deleteOpts *metav1.D
 
 // DeleteCollectionCalls gets all the calls that were made to DeleteCollection.
 // Check the length with:
-//     len(mockedClusterAuthTokenInterface.DeleteCollectionCalls())
+//
+//	len(mockedClusterAuthTokenInterface.DeleteCollectionCalls())
 func (mock *ClusterAuthTokenInterfaceMock) DeleteCollectionCalls() []struct {
 	DeleteOpts *metav1.DeleteOptions
 	ListOpts   metav1.ListOptions
@@ -1440,7 +1463,8 @@ func (mock *ClusterAuthTokenInterfaceMock) DeleteNamespaced(namespace string, na
 
 // DeleteNamespacedCalls gets all the calls that were made to DeleteNamespaced.
 // Check the length with:
-//     len(mockedClusterAuthTokenInterface.DeleteNamespacedCalls())
+//
+//	len(mockedClusterAuthTokenInterface.DeleteNamespacedCalls())
 func (mock *ClusterAuthTokenInterfaceMock) DeleteNamespacedCalls() []struct {
 	Namespace string
 	Name      string
@@ -1477,7 +1501,8 @@ func (mock *ClusterAuthTokenInterfaceMock) Get(name string, opts metav1.GetOptio
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//     len(mockedClusterAuthTokenInterface.GetCalls())
+//
+//	len(mockedClusterAuthTokenInterface.GetCalls())
 func (mock *ClusterAuthTokenInterfaceMock) GetCalls() []struct {
 	Name string
 	Opts metav1.GetOptions
@@ -1514,7 +1539,8 @@ func (mock *ClusterAuthTokenInterfaceMock) GetNamespaced(namespace string, name 
 
 // GetNamespacedCalls gets all the calls that were made to GetNamespaced.
 // Check the length with:
-//     len(mockedClusterAuthTokenInterface.GetNamespacedCalls())
+//
+//	len(mockedClusterAuthTokenInterface.GetNamespacedCalls())
 func (mock *ClusterAuthTokenInterfaceMock) GetNamespacedCalls() []struct {
 	Namespace string
 	Name      string
@@ -1549,7 +1575,8 @@ func (mock *ClusterAuthTokenInterfaceMock) List(opts metav1.ListOptions) (*v3.Cl
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//     len(mockedClusterAuthTokenInterface.ListCalls())
+//
+//	len(mockedClusterAuthTokenInterface.ListCalls())
 func (mock *ClusterAuthTokenInterfaceMock) ListCalls() []struct {
 	Opts metav1.ListOptions
 } {
@@ -1582,7 +1609,8 @@ func (mock *ClusterAuthTokenInterfaceMock) ListNamespaced(namespace string, opts
 
 // ListNamespacedCalls gets all the calls that were made to ListNamespaced.
 // Check the length with:
-//     len(mockedClusterAuthTokenInterface.ListNamespacedCalls())
+//
+//	len(mockedClusterAuthTokenInterface.ListNamespacedCalls())
 func (mock *ClusterAuthTokenInterfaceMock) ListNamespacedCalls() []struct {
 	Namespace string
 	Opts      metav1.ListOptions
@@ -1612,7 +1640,8 @@ func (mock *ClusterAuthTokenInterfaceMock) ObjectClient() *objectclient.ObjectCl
 
 // ObjectClientCalls gets all the calls that were made to ObjectClient.
 // Check the length with:
-//     len(mockedClusterAuthTokenInterface.ObjectClientCalls())
+//
+//	len(mockedClusterAuthTokenInterface.ObjectClientCalls())
 func (mock *ClusterAuthTokenInterfaceMock) ObjectClientCalls() []struct {
 } {
 	var calls []struct {
@@ -1641,7 +1670,8 @@ func (mock *ClusterAuthTokenInterfaceMock) Update(in1 *v3.ClusterAuthToken) (*v3
 
 // UpdateCalls gets all the calls that were made to Update.
 // Check the length with:
-//     len(mockedClusterAuthTokenInterface.UpdateCalls())
+//
+//	len(mockedClusterAuthTokenInterface.UpdateCalls())
 func (mock *ClusterAuthTokenInterfaceMock) UpdateCalls() []struct {
 	In1 *v3.ClusterAuthToken
 } {
@@ -1672,7 +1702,8 @@ func (mock *ClusterAuthTokenInterfaceMock) Watch(opts metav1.ListOptions) (watch
 
 // WatchCalls gets all the calls that were made to Watch.
 // Check the length with:
-//     len(mockedClusterAuthTokenInterface.WatchCalls())
+//
+//	len(mockedClusterAuthTokenInterface.WatchCalls())
 func (mock *ClusterAuthTokenInterfaceMock) WatchCalls() []struct {
 	Opts metav1.ListOptions
 } {
@@ -1695,19 +1726,19 @@ var _ v31.ClusterAuthTokensGetter = &ClusterAuthTokensGetterMock{}
 
 // ClusterAuthTokensGetterMock is a mock implementation of v31.ClusterAuthTokensGetter.
 //
-//     func TestSomethingThatUsesClusterAuthTokensGetter(t *testing.T) {
+//	    func TestSomethingThatUsesClusterAuthTokensGetter(t *testing.T) {
 //
-//         // make and configure a mocked v31.ClusterAuthTokensGetter
-//         mockedClusterAuthTokensGetter := &ClusterAuthTokensGetterMock{
-//             ClusterAuthTokensFunc: func(namespace string) v31.ClusterAuthTokenInterface {
-// 	               panic("mock out the ClusterAuthTokens method")
-//             },
-//         }
+//	        // make and configure a mocked v31.ClusterAuthTokensGetter
+//	        mockedClusterAuthTokensGetter := &ClusterAuthTokensGetterMock{
+//	            ClusterAuthTokensFunc: func(namespace string) v31.ClusterAuthTokenInterface {
+//		               panic("mock out the ClusterAuthTokens method")
+//	            },
+//	        }
 //
-//         // use mockedClusterAuthTokensGetter in code that requires v31.ClusterAuthTokensGetter
-//         // and then make assertions.
+//	        // use mockedClusterAuthTokensGetter in code that requires v31.ClusterAuthTokensGetter
+//	        // and then make assertions.
 //
-//     }
+//	    }
 type ClusterAuthTokensGetterMock struct {
 	// ClusterAuthTokensFunc mocks the ClusterAuthTokens method.
 	ClusterAuthTokensFunc func(namespace string) v31.ClusterAuthTokenInterface
@@ -1740,7 +1771,8 @@ func (mock *ClusterAuthTokensGetterMock) ClusterAuthTokens(namespace string) v31
 
 // ClusterAuthTokensCalls gets all the calls that were made to ClusterAuthTokens.
 // Check the length with:
-//     len(mockedClusterAuthTokensGetter.ClusterAuthTokensCalls())
+//
+//	len(mockedClusterAuthTokensGetter.ClusterAuthTokensCalls())
 func (mock *ClusterAuthTokensGetterMock) ClusterAuthTokensCalls() []struct {
 	Namespace string
 } {
