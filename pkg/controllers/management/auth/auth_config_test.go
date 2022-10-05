@@ -25,85 +25,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
-type mockAzureProvider struct {
-	secrets v1.SecretInterface
-}
-
-func (p *mockAzureProvider) GetName() string {
-	return "mockAzureAD"
-}
-
-func (p *mockAzureProvider) AuthenticateUser(ctx context.Context, input interface{}) (v3.Principal, []v3.Principal, string, error) {
-	panic("not implemented")
-}
-
-func (p *mockAzureProvider) SearchPrincipals(name, principalType string, myToken v3.Token) ([]v3.Principal, error) {
-	panic("not implemented")
-}
-
-func (p *mockAzureProvider) GetPrincipal(principalID string, token v3.Token) (v3.Principal, error) {
-	return token.UserPrincipal, nil
-}
-
-func (p *mockAzureProvider) CustomizeSchema(schema *types.Schema) {
-	panic("not implemented")
-}
-
-func (p *mockAzureProvider) TransformToAuthProvider(authConfig map[string]interface{}) (map[string]interface{}, error) {
-	panic("not implemented")
-}
-
-func (p *mockAzureProvider) RefetchGroupPrincipals(principalID string, secret string) ([]v3.Principal, error) {
-	return []v3.Principal{}, nil
-}
-
-func (p *mockAzureProvider) CanAccessWithGroupProviders(userPrincipalID string, groups []v3.Principal) (bool, error) {
-	return true, nil
-}
-
-func (p *mockAzureProvider) GetUserExtraAttributes(userPrincipal v3.Principal) map[string][]string {
-	return map[string][]string{
-		common.UserAttributePrincipalID: {userPrincipal.ExtraInfo[common.UserAttributePrincipalID]},
-		common.UserAttributeUserName:    {userPrincipal.ExtraInfo[common.UserAttributeUserName]},
-	}
-}
-
-func (p *mockAzureProvider) IsDisabledProvider() (bool, error) {
-	return true, nil
-}
-
-func (p *mockAzureProvider) CleanupResources(*v3.AuthConfig) error {
-	return p.secrets.DeleteNamespaced(common.SecretsNamespace, clients.AccessTokenSecretName, &metav1.DeleteOptions{})
-}
-
-func getSecretInterfaceMock(store map[string]*corev1.Secret) v1.SecretInterface {
-	secretInterfaceMock := &fakes.SecretInterfaceMock{}
-
-	secretInterfaceMock.CreateFunc = func(secret *corev1.Secret) (*corev1.Secret, error) {
-		if secret.Name == "" {
-			uniqueIdentifier := md5.Sum([]byte(time.Now().String()))
-			secret.Name = hex.EncodeToString(uniqueIdentifier[:])
-		}
-		store[fmt.Sprintf("%s:%s", secret.Namespace, secret.Name)] = secret
-		return secret, nil
-	}
-
-	secretInterfaceMock.GetNamespacedFunc = func(namespace string, name string, opts metav1.GetOptions) (*corev1.Secret, error) {
-		secret, ok := store[fmt.Sprintf("%s:%s", namespace, name)]
-		if ok {
-			return secret, nil
-		}
-		return nil, errors.New("secret not found")
-	}
-
-	secretInterfaceMock.DeleteNamespacedFunc = func(namespace string, name string, options *metav1.DeleteOptions) error {
-		delete(store, fmt.Sprintf("%s:%s", namespace, name))
-		return nil
-	}
-
-	return secretInterfaceMock
-}
-
 func TestSyncTriggersCleanupOnDisable(t *testing.T) {
 	mockSecrets := make(map[string]*corev1.Secret)
 	provider := &mockAzureProvider{
@@ -187,6 +108,163 @@ func TestSyncDoesNotTriggerCleanup(t *testing.T) {
 	assert.NotNil(t, s, "expected the secret to not be nil")
 }
 
+func TestSync(t *testing.T) {
+	tests := []struct {
+		name                    string
+		usernamesForTestConfig  []string
+		usernamesForOtherConfig []string
+		listUsersErr            error
+		errExpected             bool
+	}{
+		{
+			name:                    "basic test case - refresh single user",
+			usernamesForTestConfig:  []string{"tUser"},
+			usernamesForOtherConfig: []string{},
+			listUsersErr:            nil,
+			errExpected:             false,
+		},
+		{
+			name:                    "refresh user belonging to one auth provider but not another",
+			usernamesForTestConfig:  []string{"tUser"},
+			usernamesForOtherConfig: []string{"oUser"},
+			listUsersErr:            nil,
+			errExpected:             false,
+		},
+		{
+			name:                    "refresh multiple users, some in the auth config, others not",
+			usernamesForTestConfig:  []string{"tUser", "sUser", "newUser"},
+			usernamesForOtherConfig: []string{"oUser", "configUser", "otherConfigUser"},
+			listUsersErr:            nil,
+			errExpected:             false,
+		},
+		{
+			name:                    "error when listing users - expect an error",
+			usernamesForTestConfig:  []string{"tUser", "sUser", "newUser"},
+			usernamesForOtherConfig: []string{"oUser", "configUser", "otherConfigUser"},
+			listUsersErr:            fmt.Errorf("error when listing users"),
+			errExpected:             true,
+		},
+	}
+	for _, test := range tests {
+		test := test
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			const testConfigName = "testConfig"
+			const otherConfigName = "otherConfig"
+
+			mockUsers := newMockUserLister()
+			for _, username := range test.usernamesForTestConfig {
+				mockUsers.AddUser(username, testConfigName)
+			}
+
+			for _, username := range test.usernamesForOtherConfig {
+				mockUsers.AddUser(username, otherConfigName)
+			}
+
+			if test.listUsersErr != nil {
+				mockUsers.AddListUserError(test.listUsersErr)
+			}
+
+			mockRefresher := newMockAuthProvider()
+			controller := authConfigController{users: &mockUsers, authRefresher: &mockRefresher, cleanup: &fakeCleanupService{}}
+			config := v3.AuthConfig{
+				ObjectMeta: metav1.ObjectMeta{Name: testConfigName},
+			}
+			_, err := controller.sync("test", &config)
+			if test.errExpected {
+				assert.Error(t, err, "Expected error but none was provided")
+			} else {
+				assert.NoError(t, err, "Expected no error")
+				for _, username := range test.usernamesForTestConfig {
+					assert.Contains(t, mockRefresher.refreshedUsers, username, "Expected user to be refreshed")
+				}
+				for _, username := range test.usernamesForOtherConfig {
+					assert.NotContains(t, mockRefresher.refreshedUsers, username, "Did not expect user to be refreshed")
+				}
+			}
+		})
+	}
+}
+
+type mockAzureProvider struct {
+	secrets v1.SecretInterface
+}
+
+func (p *mockAzureProvider) GetName() string {
+	return "mockAzureAD"
+}
+
+func (p *mockAzureProvider) AuthenticateUser(ctx context.Context, input interface{}) (v3.Principal, []v3.Principal, string, error) {
+	panic("not implemented")
+}
+
+func (p *mockAzureProvider) SearchPrincipals(name, principalType string, myToken v3.Token) ([]v3.Principal, error) {
+	panic("not implemented")
+}
+
+func (p *mockAzureProvider) GetPrincipal(principalID string, token v3.Token) (v3.Principal, error) {
+	return token.UserPrincipal, nil
+}
+
+func (p *mockAzureProvider) CustomizeSchema(schema *types.Schema) {
+	panic("not implemented")
+}
+
+func (p *mockAzureProvider) TransformToAuthProvider(authConfig map[string]interface{}) (map[string]interface{}, error) {
+	panic("not implemented")
+}
+
+func (p *mockAzureProvider) RefetchGroupPrincipals(principalID string, secret string) ([]v3.Principal, error) {
+	return []v3.Principal{}, nil
+}
+
+func (p *mockAzureProvider) CanAccessWithGroupProviders(userPrincipalID string, groups []v3.Principal) (bool, error) {
+	return true, nil
+}
+
+func (p *mockAzureProvider) GetUserExtraAttributes(userPrincipal v3.Principal) map[string][]string {
+	return map[string][]string{
+		common.UserAttributePrincipalID: {userPrincipal.ExtraInfo[common.UserAttributePrincipalID]},
+		common.UserAttributeUserName:    {userPrincipal.ExtraInfo[common.UserAttributeUserName]},
+	}
+}
+
+func (p *mockAzureProvider) IsDisabledProvider() (bool, error) {
+	return true, nil
+}
+
+func (p *mockAzureProvider) CleanupResources(*v3.AuthConfig) error {
+	return p.secrets.DeleteNamespaced(common.SecretsNamespace, clients.AccessTokenSecretName, &metav1.DeleteOptions{})
+}
+
+func getSecretInterfaceMock(store map[string]*corev1.Secret) v1.SecretInterface {
+	secretInterfaceMock := &fakes.SecretInterfaceMock{}
+
+	secretInterfaceMock.CreateFunc = func(secret *corev1.Secret) (*corev1.Secret, error) {
+		if secret.Name == "" {
+			uniqueIdentifier := md5.Sum([]byte(time.Now().String()))
+			secret.Name = hex.EncodeToString(uniqueIdentifier[:])
+		}
+		store[fmt.Sprintf("%s:%s", secret.Namespace, secret.Name)] = secret
+		return secret, nil
+	}
+
+	secretInterfaceMock.GetNamespacedFunc = func(namespace string, name string, opts metav1.GetOptions) (*corev1.Secret, error) {
+		secret, ok := store[fmt.Sprintf("%s:%s", namespace, name)]
+		if ok {
+			return secret, nil
+		}
+		return nil, errors.New("secret not found")
+	}
+
+	secretInterfaceMock.DeleteNamespacedFunc = func(namespace string, name string, options *metav1.DeleteOptions) error {
+		delete(store, fmt.Sprintf("%s:%s", namespace, name))
+		return nil
+	}
+
+	return secretInterfaceMock
+}
+
 type mockUserLister struct {
 	users        []*v3.User
 	listUsersErr error
@@ -256,4 +334,10 @@ func (m *mockAuthProvider) TriggerAllUserRefresh() {
 
 func (m *mockAuthProvider) TriggerUserRefresh(username string, force bool) {
 	m.refreshedUsers[username] = force
+}
+
+type fakeCleanupService struct{}
+
+func (f *fakeCleanupService) TriggerCleanup(config *v3.AuthConfig) error {
+	return nil
 }
