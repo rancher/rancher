@@ -17,11 +17,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-)
-
-var (
-	specialFalse = false
-	falsePointer = &specialFalse
+	"k8s.io/utils/pointer"
 )
 
 type UserAuthRefresher interface {
@@ -192,18 +188,19 @@ func (r *refresher) refreshAttributes(attribs *v3.UserAttribute) (*v3.UserAttrib
 
 	for providerName := range providers.ProviderNames {
 		// We have to find out if the user has a userprincipal for the provider.
-		prefix := providerName + "_user://"
-		if providerName == "local" {
-			prefix = "local://"
-		}
-		principalID := ""
-		for _, id := range user.PrincipalIDs {
-			if strings.HasPrefix(id, prefix) {
-				principalID = id
-				break
-			}
-		}
+		principalID := GetPrincipalIDForProvider(providerName, user)
 		var newGroupPrincipals []v3.Principal
+
+		providerDisabled, err := providers.IsDisabledProvider(providerName)
+		if err != nil {
+			logrus.Warnf("Unable to determine if provider %s was disabled, will assume that it isn't with error: %v", providerName, err)
+			// this is set as false by the return, but it's re-set here to be explicit/safe about the behavior
+			providerDisabled = false
+		}
+		if providerDisabled {
+			// if this auth provider has been disabled, act as though the user lost access to this provider
+			principalID = ""
+		}
 
 		// If there is no principalID for the provider, there is no reason to go through the refetch process
 		if principalID != "" {
@@ -312,12 +309,27 @@ func (r *refresher) refreshAttributes(attribs *v3.UserAttribute) (*v3.UserAttrib
 
 	// user has been deactivated, disable their tokens
 	for _, token := range derivedTokenList {
-		token.Enabled = falsePointer
+		token = token.DeepCopy()
+		token.Enabled = pointer.Bool(false)
 		_, err := r.tokenMGR.UpdateToken(token)
 		if err != nil {
 			return nil, err
 		}
 	}
+	return attribs, err
+}
 
-	return attribs, nil
+func GetPrincipalIDForProvider(providerName string, user *v3.User) string {
+	prefix := providerName + "_user://"
+	if providerName == "local" {
+		prefix = "local://"
+	}
+	principalID := ""
+	for _, id := range user.PrincipalIDs {
+		if strings.HasPrefix(id, prefix) {
+			principalID = id
+			break
+		}
+	}
+	return principalID
 }

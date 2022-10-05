@@ -464,8 +464,3 @@ func (l *Provider) GetUserExtraAttributes(userPrincipal v3.Principal) map[string
 func (l *Provider) IsDisabledProvider() (bool, error) {
 	return false, nil
 }
-
-// CleanupResources deletes resources associated with the local auth provider.
-func (l *Provider) CleanupResources(*v3.AuthConfig) error {
-	return nil
-}
