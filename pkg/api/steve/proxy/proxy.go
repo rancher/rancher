@@ -65,6 +65,7 @@ func NewProxyMiddleware(sar v1.AuthorizationV1Interface,
 
 	mux := gmux.NewRouter()
 	mux.UseEncodedPath()
+	mux.PathPrefix("/api").HandlerFunc(proxyHandler.authLocalCluster(mux))
 	mux.Path("/v1/management.cattle.io.clusters/{clusterID}").Queries("link", "shell").HandlerFunc(routeToShellProxy("link", "shell", localSupport, localCluster, mux, proxyHandler))
 	mux.Path("/v1/management.cattle.io.clusters/{clusterID}").Queries("action", "apply").HandlerFunc(routeToShellProxy("action", "apply", localSupport, localCluster, mux, proxyHandler))
 	mux.Path("/v3/clusters/{clusterID}").Queries("shell", "true").HandlerFunc(routeToShellProxy("link", "shell", localSupport, localCluster, mux, proxyHandler))
@@ -128,6 +129,19 @@ func (h *Handler) MatchNonLegacy(prefix string) gmux.MatcherFunc {
 		match.Vars["clusterID"] = clusterID
 
 		return true
+	}
+}
+
+func (h *Handler) authLocalCluster(router *gmux.Router) func(rw http.ResponseWriter, r *http.Request) {
+	return func(rw http.ResponseWriter, req *http.Request) {
+		authed := h.userCanAccessCluster(req, "local")
+		if !authed {
+			if req.Context().Value(auth.CattleAuthFailed) != "true" {
+				rw.WriteHeader(http.StatusUnauthorized)
+				return
+			}
+		}
+		router.NotFoundHandler.ServeHTTP(rw, req)
 	}
 }
 
