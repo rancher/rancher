@@ -19,7 +19,7 @@ type Token struct {
 
 	Token           string            `json:"token" norman:"writeOnly,noupdate"`
 	UserPrincipal   Principal         `json:"userPrincipal" norman:"type=reference[principal]"`
-	GroupPrincipals []Principal       `json:"groupPrincipals" norman:"type=array[reference[principal]]"`
+	GroupPrincipals []Principal       `json:"groupPrincipals,omitempty" norman:"type=array[reference[principal]]"`
 	ProviderInfo    map[string]string `json:"providerInfo,omitempty"`
 	UserID          string            `json:"userId" norman:"type=reference[user]"`
 	AuthProvider    string            `json:"authProvider"`
