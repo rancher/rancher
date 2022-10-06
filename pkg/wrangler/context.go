@@ -122,8 +122,8 @@ type Context struct {
 	PeerManager         peermanager.PeerManager
 	Provisioning        provisioningv1.Interface
 
-	MGMTWithAgent   func(string) managementv3.Interface
-	BatchWithAgent  func(string) batchv1.Interface
+	MGMTWithAgent    func(string) managementv3.Interface
+	BatchWithAgent   func(string) batchv1.Interface
 	ProjectWithAgent func(string) projectv3.Interface
 	CatalogWithAgent func(string) catalogcontrollers.Interface
 
@@ -331,7 +331,6 @@ func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restCo
 	})
 
 	return &Context{
-<<<<<<< HEAD
 		Controllers:             steveControllers,
 		Apply:                   apply,
 		SharedControllerFactory: controllerFactory,
@@ -346,29 +345,29 @@ func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restCo
 		Provisioning:            provisioning.Provisioning().V1(),
 		Catalog:                 helm.Catalog().V1(),
 		Batch:                   batch.Batch().V1(),
-		MGMTWithAgent:         func(userAgent string) managementv3.Interface {
+		MGMTWithAgent: func(userAgent string) managementv3.Interface {
 			return mgmt.WithAgent(userAgent).Management().V3()
 		},
-		BatchWithAgent:        func(userAgent string) batchv1.Interface {
-			return batch.WithAgent(userAgent)
+		BatchWithAgent: func(userAgent string) batchv1.Interface {
+			return batch.WithAgent(userAgent).Batch().V1()
 		},
-		ProjectWithAgent:      func(userAgent string) projectv3.Interface{
+		ProjectWithAgent: func(userAgent string) projectv3.Interface {
 			return project.WithAgent(userAgent).Project().V3()
 		},
-		ControllerFactory:       controllerFactory,
-		ASL:                     asl,
-		ClientConfig:            clientConfig,
-		MultiClusterManager:     noopMCM{},
-		CachedDiscovery:         cache,
-		RESTMapper:              restMapper,
-		leadership:              leadership,
-		PeerManager:             peerManager,
-		RESTClientGetter:        restClientGetter,
-		CatalogContentManager:   content,
-		HelmOperations:          helmop,
-		SystemChartsManager:     systemCharts,
-		TunnelAuthorizer:        tunnelAuth,
-		TunnelServer:            tunnelServer,
+		ControllerFactory:     controllerFactory,
+		ASL:                   asl,
+		ClientConfig:          clientConfig,
+		MultiClusterManager:   noopMCM{},
+		CachedDiscovery:       cache,
+		RESTMapper:            restMapper,
+		leadership:            leadership,
+		PeerManager:           peerManager,
+		RESTClientGetter:      restClientGetter,
+		CatalogContentManager: content,
+		HelmOperations:        helmop,
+		SystemChartsManager:   systemCharts,
+		TunnelAuthorizer:      tunnelAuth,
+		TunnelServer:          tunnelServer,
 	}, nil
 }
 

@@ -59,12 +59,13 @@ var (
 )
 
 func Register(ctx context.Context, management *config.ManagementContext, clusterManager *clustermanager.Manager) {
+	testAgent := management.ManagementWithAgent("testagent123")
 	c := &clusterDeploy{
 		mgmt:                 management,
 		systemAccountManager: systemaccount.NewManager(management),
 		userManager:          management.UserManager,
-		clusters:             management.Management.Clusters(""),
-		nodeLister:           management.Management.Nodes("").Controller().Lister(),
+		clusters:             testAgent.Clusters(""),
+		nodeLister:           testAgent.Nodes("").Controller().Lister(),
 		clusterManager:       clusterManager,
 		secretLister:         management.Core.Secrets("").Controller().Lister(),
 	}

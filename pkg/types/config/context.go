@@ -497,25 +497,21 @@ func NewUserOnlyContext(config *wrangler.Context) (*UserOnlyContext, error) {
 		K8sClient:         config.K8s,
 	}
 
-	context.Apps, err = appsv1.NewFromControllerFactory(context.ControllerFactory)
-	if err != nil {
-		return nil, err
-	}
-
-	context.Apps = appsv1.NewFromControllerFactory(controllerFactory)
-	context.Core = corev1.NewFromControllerFactory(controllerFactory)
-	context.Project = projectv3.NewFromControllerFactory(controllerFactory)
-	context.Storage = storagev1.NewFromControllerFactory(controllerFactory)
-	context.RBAC = rbacv1.NewFromControllerFactory(controllerFactory)
-	context.Extensions = extv1beta1.NewFromControllerFactory(controllerFactory)
-	context.Policy = policyv1beta1.NewFromControllerFactory(controllerFactory)
-	context.BatchV1 = batchv1.NewFromControllerFactory(controllerFactory)
-	context.BatchV1Beta1 = batchv1beta1.NewFromControllerFactory(controllerFactory)
-	context.Autoscaling = autoscaling.NewFromControllerFactory(controllerFactory)
-	context.Monitoring = monitoringv1.NewFromControllerFactory(controllerFactory)
-	context.Cluster = clusterv3.NewFromControllerFactory(controllerFactory)
-	context.Istio = istiov1alpha3.NewFromControllerFactory(controllerFactory)
-	context.APIRegistration = apiregistrationv1.NewFromControllerFactory(controllerFactory)
+	context.Apps = appsv1.NewFromControllerFactory(context.ControllerFactory)
+	context.Core = corev1.NewFromControllerFactory(context.ControllerFactory)
+	context.Project = projectv3.NewFromControllerFactory(context.ControllerFactory)
+	context.Storage = storagev1.NewFromControllerFactory(context.ControllerFactory)
+	context.RBAC = rbacv1.NewFromControllerFactory(context.ControllerFactory)
+	context.Extensions = extv1beta1.NewFromControllerFactory(context.ControllerFactory)
+	context.Policy = policyv1beta1.NewFromControllerFactory(context.ControllerFactory)
+	context.BatchV1 = batchv1.NewFromControllerFactory(context.ControllerFactory)
+	context.BatchV1Beta1 = batchv1beta1.NewFromControllerFactory(context.ControllerFactory)
+	context.Autoscaling = autoscaling.NewFromControllerFactory(context.ControllerFactory)
+	context.Monitoring = monitoringv1.NewFromControllerFactory(context.ControllerFactory)
+	context.Cluster = clusterv3.NewFromControllerFactory(context.ControllerFactory)
+	context.Istio = istiov1alpha3.NewFromControllerFactory(context.ControllerFactory)
+	context.APIRegistration = apiregistrationv1.NewFromControllerFactory(context.ControllerFactory)
+	context.Networking = knetworkingv1.NewFromControllerFactory(context.ControllerFactory)
 
 	dynamicConfig := context.RESTConfig
 	if dynamicConfig.NegotiatedSerializer == nil {
