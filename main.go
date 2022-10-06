@@ -23,7 +23,7 @@ import (
 
 var (
 	profileAddress = "localhost:6060"
-	kubeConfig     string
+	kubeConfig string
 )
 
 func main() {
