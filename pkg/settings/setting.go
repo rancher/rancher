@@ -50,7 +50,7 @@ var (
 	InternalServerURL                   = NewSetting("internal-server-url", "")
 	InternalCACerts                     = NewSetting("internal-cacerts", "")
 	IsRKE                               = NewSetting("is-rke", "")
-	JailerTimeout                       = NewSetting("jailer-timeout", "60")
+	JailerTimeout                       = NewSetting("jailer-timeout", "63")
 	KubernetesVersion                   = NewSetting("k8s-version", "")
 	KubernetesVersionToServiceOptions   = NewSetting("k8s-version-to-service-options", "")
 	KubernetesVersionToSystemImages     = NewSetting("k8s-version-to-images", "")
