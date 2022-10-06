@@ -1357,7 +1357,12 @@ type RancherUserNotificationsGetter interface {
 
 func (c *Client) RancherUserNotifications(namespace string) RancherUserNotificationInterface {
 	sharedClient := c.clientFactory.ForResourceKind(RancherUserNotificationGroupVersionResource, RancherUserNotificationGroupVersionKind.Kind, false)
-	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &RancherUserNotificationResource, RancherUserNotificationGroupVersionKind, rancherUserNotificationFactory{})
+	client, err := sharedClient.WithAgent(c.userAgent)
+	if err != nil {
+		logrus.Errorf("Failed to add user agent to [RancherUserNotifications] client: %v", err)
+		client = sharedClient
+	}
+	objectClient := objectclient.NewObjectClient(namespace, client, &RancherUserNotificationResource, RancherUserNotificationGroupVersionKind, rancherUserNotificationFactory{})
 	return &rancherUserNotificationClient{
 		ns:           namespace,
 		client:       c,

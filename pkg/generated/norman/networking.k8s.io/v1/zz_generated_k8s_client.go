@@ -77,7 +77,12 @@ type IngressesGetter interface {
 
 func (c *Client) Ingresses(namespace string) IngressInterface {
 	sharedClient := c.clientFactory.ForResourceKind(IngressGroupVersionResource, IngressGroupVersionKind.Kind, true)
-	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &IngressResource, IngressGroupVersionKind, ingressFactory{})
+	client, err := sharedClient.WithAgent(c.userAgent)
+	if err != nil {
+		logrus.Errorf("Failed to add user agent to [Ingresses] client: %v", err)
+		client = sharedClient
+	}
+	objectClient := objectclient.NewObjectClient(namespace, client, &IngressResource, IngressGroupVersionKind, ingressFactory{})
 	return &ingressClient{
 		ns:           namespace,
 		client:       c,

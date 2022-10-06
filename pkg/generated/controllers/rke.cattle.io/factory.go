@@ -27,6 +27,14 @@ type Factory struct {
 	*generic.Factory
 }
 
+func (f *Factory) WithAgent(userAgent string) *Factory {
+	factory := *f
+	config := f.Config
+	config.UserAgent = userAgent
+	factory.Config = config
+	return &factory
+}
+
 func NewFactoryFromConfigOrDie(config *rest.Config) *Factory {
 	f, err := NewFactoryFromConfig(config)
 	if err != nil {

@@ -29,9 +29,9 @@ type Factory struct {
 
 func (f *Factory) WithAgent(userAgent string) *Factory {
 	factory := *f
-	config := *f.config
+	config := f.Config
 	config.UserAgent = userAgent
-	factory.config = &config
+	factory.Config = config
 	return &factory
 }
 
