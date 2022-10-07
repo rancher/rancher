@@ -38,8 +38,6 @@ type Config struct {
 	Tokens                                   map[string]managementClient.Token                                   `json:"tokens,omitempty" yaml:"tokens,omitempty"`
 	DynamicSchemas                           map[string]managementClient.DynamicSchema                           `json:"dynamicSchemas,omitempty" yaml:"dynamicSchemas,omitempty"`
 	Preferences                              map[string]managementClient.Preference                              `json:"preferences,omitempty" yaml:"preferences,omitempty"`
-	ClusterLoggings                          map[string]managementClient.ClusterLogging                          `json:"clusterLoggings,omitempty" yaml:"clusterLoggings,omitempty"`
-	ProjectLoggings                          map[string]managementClient.ProjectLogging                          `json:"projectLoggings,omitempty" yaml:"projectLoggings,omitempty"`
 	Settings                                 map[string]managementClient.Setting                                 `json:"settings,omitempty" yaml:"settings,omitempty"`
 	Features                                 map[string]managementClient.Feature                                 `json:"features,omitempty" yaml:"features,omitempty"`
 	ClusterAlerts                            map[string]managementClient.ClusterAlert                            `json:"clusterAlerts,omitempty" yaml:"clusterAlerts,omitempty"`
