@@ -113,7 +113,7 @@ func addMachineDrivers(management *config.ManagementContext) error {
 	if err := addMachineDriver(Linodedriver, "https://github.com/linode/docker-machine-driver-linode/releases/download/v0.1.8/docker-machine-driver-linode_linux-amd64.zip", "/assets/rancher-ui-driver-linode/component.js", "b31b6a504c59ee758d2dda83029fe4a85b3f5601e22dfa58700a5e6c8f450dc7", []string{"api.linode.com"}, linodeBuiltin, linodeBuiltin, false, management); err != nil {
 		return err
 	}
-	if err := addMachineDriver(OCIDriver, "https://github.com/rancher-plugins/rancher-machine-driver-oci/releases/download/v1.1.0/docker-machine-driver-oci-linux", "", "c19b109050e56a451f93c3390cc9d015da985a19d21bd0def858430be3324fd2", []string{"*.oraclecloud.com"}, false, false, false, management); err != nil {
+	if err := addMachineDriver(OCIDriver, "https://github.com/rancher-plugins/rancher-machine-driver-oci/releases/download/v1.3.0/docker-machine-driver-oci-linux", "", "0a1afa6a0af85ecf3d77cc554960e36e1be5fd12b22b0155717b9289669e4021", []string{"*.oraclecloud.com"}, false, false, false, management); err != nil {
 		return err
 	}
 	if err := addMachineDriver(OpenstackDriver, "local://", "", "", nil, false, true, false, management); err != nil {
