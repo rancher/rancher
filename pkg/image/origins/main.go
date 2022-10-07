@@ -7,6 +7,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/pkg/errors"
 	"github.com/rancher/rancher/pkg/image/utilities"
 
 	img "github.com/rancher/rancher/pkg/image"
@@ -14,7 +15,7 @@ import (
 
 // This file attempts to create an updated mapping of images used in rancher and their source code origin.
 // It does so on a best-effort basis and prints the resulting map to the terminal. Rancher images which share a name
-// with its base repository (such as gke-operator, which comes from github.com/rancher/gke-operator) will be
+// with their base repository (such as gke-operator, which comes from github.com/rancher/gke-operator) will be
 // automatically resolved. In the case where images are detected but cannot be automatically resolved, a warning
 // will be printed to the console indicating such images, and the value of the image in the map will be 'unknown'.
 //
@@ -29,33 +30,33 @@ func main() {
 const imageNotFound = "image not found"
 
 func inner(systemChartsPath, chartsPath string, imagesFromArgs []string) error {
-	linuxImagesFromArgs, targetImages, _, targetWindowsImages, _, err := utilities.GatherTargetImagesAndSources(systemChartsPath, chartsPath, imagesFromArgs)
+	targetsAndSources, err := utilities.GatherTargetImagesAndSources(systemChartsPath, chartsPath, imagesFromArgs)
 	if err != nil {
 		return err
 	}
 
-	unusedImages := CheckForImagesNoLongerBeingUsed(linuxImagesFromArgs, targetImages, targetWindowsImages)
+	unusedImages := CheckForImagesNoLongerBeingUsed(targetsAndSources)
 	if len(unusedImages) > 0 {
 		fmt.Println("Some images are no longer used by Rancher, please remove the following images from pkg/image/origin.go: ", unusedImages)
 	}
 
-	return PrintUpdatedImageOrigins(linuxImagesFromArgs, targetImages, targetWindowsImages)
+	return PrintUpdatedImageOrigins(targetsAndSources)
 }
 
 // CheckForImagesNoLongerBeingUsed determines if /pkg/img/origins.go has keys within the map which
 // are no longer relevant. If so, they should be removed from /pkg/img/origins.go so that rancher-origins.txt
 // is up-to-date for the current version of Rancher.
-func CheckForImagesNoLongerBeingUsed(linuxImagesFromArgs, targetImages, targetWindowsImages []string) []string {
+func CheckForImagesNoLongerBeingUsed(targetsAndSources utilities.ImageTargetsAndSources) []string {
 	currentImages := make(map[string]interface{})
-	for _, e := range img.UniqueTargetImages(linuxImagesFromArgs) {
+	for _, e := range img.UniqueTargetImages(targetsAndSources.LinuxImagesFromArgs) {
 		currentImages[e] = true
 	}
 
-	for _, e := range img.UniqueTargetImages(targetImages) {
+	for _, e := range img.UniqueTargetImages(targetsAndSources.TargetLinuxImages) {
 		currentImages[e] = true
 	}
 
-	for _, e := range img.UniqueTargetImages(targetWindowsImages) {
+	for _, e := range img.UniqueTargetImages(targetsAndSources.TargetWindowsImages) {
 		currentImages[e] = true
 	}
 
@@ -70,7 +71,7 @@ func CheckForImagesNoLongerBeingUsed(linuxImagesFromArgs, targetImages, targetWi
 	return unusedImages
 }
 
-func PrintUpdatedImageOrigins(linuxImagesFromArgs, targetImages, targetWindowsImages []string) error {
+func PrintUpdatedImageOrigins(targetsAndSources utilities.ImageTargetsAndSources) error {
 	fmt.Println("Generating updated rancher-image-origins map")
 
 	// use the existing map so that we don't
@@ -78,17 +79,17 @@ func PrintUpdatedImageOrigins(linuxImagesFromArgs, targetImages, targetWindowsIm
 	imgToURL := img.OriginMap
 
 	// look through any images passed as arguments
-	err := convertImagesToRepoUrls(linuxImagesFromArgs, imgToURL)
+	err := convertImagesToRepoUrls(targetsAndSources.LinuxImagesFromArgs, imgToURL)
 	if err != nil {
 		return err
 	}
 	// look through the linux target images
-	err = convertImagesToRepoUrls(targetImages, imgToURL)
+	err = convertImagesToRepoUrls(targetsAndSources.TargetLinuxImages, imgToURL)
 	if err != nil {
 		return err
 	}
 	// look through the windows target images
-	err = convertImagesToRepoUrls(targetWindowsImages, imgToURL)
+	err = convertImagesToRepoUrls(targetsAndSources.TargetWindowsImages, imgToURL)
 	if err != nil {
 		return err
 	}
@@ -144,15 +145,27 @@ func convertImagesToRepoUrls(images []string, imgToURL map[string]string) error 
 		}
 		switch {
 		case strings.Contains(repo, "mirrored"):
-			// no way to automatically determine origin.
-			// needs manual resolution, see origins.go.
-			imgToURL[repo] = "unknown"
+			// mirrored images, assumes everything after 'mirrored-'
+			// can be directly converted into a github repository.
+			ownerAndRepository := strings.Split(strings.ReplaceAll(repo, "mirrored-", ""), "-")
+			if len(ownerAndRepository) <= 1 {
+				imgToURL[repo] = "unknown"
+				continue
+			}
+			url, err := checkURL(fmt.Sprintf("https://www.github.com/%s/%s", ownerAndRepository[0], strings.Join(ownerAndRepository[1:], "")))
+			if err != nil && err.Error() != imageNotFound {
+				return errors.Wrap(err, fmt.Sprintf("encountered HTTP error while resolving repository: %s", repo))
+			}
+			if err != nil {
+				url = "unknown"
+			}
+			imgToURL[repo] = url
 		case strings.Contains(repo, "hardened"):
 			// hardened images conversion, best effort
 			cleanRepo := strings.ReplaceAll(repo, "hardened-", "image-build-")
 			url, err := checkURL("https://www.github.com/rancher/" + cleanRepo)
 			if err != nil && err.Error() != imageNotFound {
-				return err
+				return errors.Wrap(err, fmt.Sprintf("encountered HTTP error while resolving repository: %s", repo))
 			}
 			if err != nil {
 				url = "unknown"
@@ -163,7 +176,7 @@ func convertImagesToRepoUrls(images []string, imgToURL map[string]string) error 
 			// a name with their base repository
 			url, err := checkURL("https://www.github.com/rancher/" + repo)
 			if err != nil && err.Error() != imageNotFound {
-				return err
+				return errors.Wrap(err, fmt.Sprintf("encountered HTTP error while resolving repository: %s", repo))
 			}
 			if err != nil {
 				url = "unknown"

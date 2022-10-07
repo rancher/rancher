@@ -1,7 +1,6 @@
 package utilities
 
 import (
-	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -10,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/coreos/go-semver/semver"
+	"github.com/pkg/errors"
 	kd "github.com/rancher/rancher/pkg/controllers/management/kontainerdrivermetadata"
 	img "github.com/rancher/rancher/pkg/image"
 	ext "github.com/rancher/rancher/pkg/image/external"
@@ -45,10 +45,24 @@ var (
 	}
 )
 
-func GatherTargetImagesAndSources(systemChartsPath, chartsPath string, imagesFromArgs []string) ([]string, []string, []string, []string, []string, error) {
+// ImageTargetsAndSources is an aggregate type containing
+// the list of images used by Rancher for Linux and Windows,
+// as well as the source of these images.
+type ImageTargetsAndSources struct {
+	LinuxImagesFromArgs           []string
+	TargetLinuxImages             []string
+	TargetLinuxImagesAndSources   []string
+	TargetWindowsImages           []string
+	TargetWindowsImagesAndSources []string
+}
+
+// GatherTargetImagesAndSources queries KDM and charts/system-charts to gather all the images used by Rancher and their source.
+// it an aggregate type, ImageTargetsAndSources, which contains the images required to run Rancher on Linux and Windows, as well
+// as the source of each image.
+func GatherTargetImagesAndSources(systemChartsPath, chartsPath string, imagesFromArgs []string) (ImageTargetsAndSources, error) {
 	rancherVersion, ok := os.LookupEnv("TAG")
 	if !ok {
-		return nil, nil, nil, nil, nil, fmt.Errorf("no tag %s", rancherVersion)
+		return ImageTargetsAndSources{}, fmt.Errorf("no tag defining current Rancher version, cannot gather target images and sources")
 	}
 
 	if !img.IsValidSemver(rancherVersion) || strings.HasPrefix(rancherVersion, "dev") || strings.HasPrefix(rancherVersion, "master") || strings.HasSuffix(rancherVersion, "-head") {
@@ -62,11 +76,11 @@ func GatherTargetImagesAndSources(systemChartsPath, chartsPath string, imagesFro
 		b, err = os.ReadFile(filepath.Join(os.Getenv("HOME"), "bin", "data.json"))
 	}
 	if err != nil {
-		return nil, nil, nil, nil, nil, err
+		return ImageTargetsAndSources{}, errors.Wrap(err, "could not read data.json")
 	}
 	data, err := kdm.FromData(b)
 	if err != nil {
-		return nil, nil, nil, nil, nil, err
+		return ImageTargetsAndSources{}, errors.Wrap(err, "could not load KDM data")
 	}
 
 	linuxInfo, windowsInfo := kd.GetK8sVersionInfo(
@@ -83,7 +97,7 @@ func GatherTargetImagesAndSources(systemChartsPath, chartsPath string, imagesFro
 	}
 	sort.Strings(k8sVersions)
 	if err := writeSliceToFile(filepath.Join(os.Getenv("HOME"), "bin", "rancher-rke-k8s-versions.txt"), k8sVersions); err != nil {
-		return nil, nil, nil, nil, nil, err
+		return ImageTargetsAndSources{}, errors.Wrap(err, "could not write rancher-rke-k8s-versions.txt file")
 	}
 
 	externalImages := make(map[string][]string)
@@ -93,7 +107,7 @@ func GatherTargetImagesAndSources(systemChartsPath, chartsPath string, imagesFro
 		Patch: 0,
 	})
 	if err != nil {
-		return nil, nil, nil, nil, nil, err
+		return ImageTargetsAndSources{}, errors.Wrap(err, "could not get external images for K3s")
 	}
 	if k3sUpgradeImages != nil {
 		externalImages["k3sUpgrade"] = k3sUpgradeImages
@@ -107,7 +121,7 @@ func GatherTargetImagesAndSources(systemChartsPath, chartsPath string, imagesFro
 		Patch: 0,
 	})
 	if err != nil {
-		return nil, nil, nil, nil, nil, err
+		return ImageTargetsAndSources{}, errors.Wrap(err, "could not get external images for RKE2")
 
 	}
 	if rke2AllImages != nil {
@@ -117,7 +131,7 @@ func GatherTargetImagesAndSources(systemChartsPath, chartsPath string, imagesFro
 	sort.Strings(imagesFromArgs)
 	winsIndex := sort.SearchStrings(imagesFromArgs, "rancher/wins")
 	if winsIndex > len(imagesFromArgs)-1 {
-		return nil, nil, nil, nil, nil, errors.New("rancher/wins upgrade image not found")
+		return ImageTargetsAndSources{}, errors.New("rancher/wins upgrade image not found")
 	}
 
 	winsAgentUpdateImage := imagesFromArgs[winsIndex]
@@ -131,18 +145,26 @@ func GatherTargetImagesAndSources(systemChartsPath, chartsPath string, imagesFro
 	}
 	targetImages, targetImagesAndSources, err := img.GetImages(exportConfig, externalImages, linuxImagesFromArgs, linuxInfo.RKESystemImages)
 	if err != nil {
-		return nil, nil, nil, nil, nil, err
+		return ImageTargetsAndSources{}, err
 	}
 
 	exportConfig.OsType = img.Windows
 	targetWindowsImages, targetWindowsImagesAndSources, err := img.GetImages(exportConfig, nil, []string{getWindowsAgentImage(), winsAgentUpdateImage}, windowsInfo.RKESystemImages)
 	if err != nil {
-		return nil, nil, nil, nil, nil, err
+		return ImageTargetsAndSources{}, err
 	}
 
-	return linuxImagesFromArgs, targetImages, targetImagesAndSources, targetWindowsImages, targetWindowsImagesAndSources, nil
+	return ImageTargetsAndSources{
+		LinuxImagesFromArgs:           linuxImagesFromArgs,
+		TargetLinuxImages:             targetImages,
+		TargetLinuxImagesAndSources:   targetImagesAndSources,
+		TargetWindowsImages:           targetWindowsImages,
+		TargetWindowsImagesAndSources: targetWindowsImagesAndSources,
+	}, nil
 }
 
+// LoadScript produces executable files for Linux and Windows
+// which will load all images used by Rancher into a given image repository.
 func LoadScript(arch string, targetImages []string) error {
 	loadScriptName := getScriptFilename(arch, "load")
 	log.Printf("Creating %s\n", loadScriptName)
@@ -157,6 +179,9 @@ func LoadScript(arch string, targetImages []string) error {
 	return nil
 }
 
+// SaveScript produces executable files for Linux and Windows
+// which will save all the images used by Rancher using the command
+// `docker save`
 func SaveScript(arch string, targetImages []string) error {
 	filename := getScriptFilename(arch, "save")
 	log.Printf("Creating %s\n", filename)
@@ -172,6 +197,8 @@ func SaveScript(arch string, targetImages []string) error {
 	return nil
 }
 
+// ImagesText will produce a file containing all the images
+// used by Rancher for a particular arch.
 func ImagesText(arch string, targetImages []string) error {
 	filename := filenameMap[arch]
 	log.Printf("Creating %s\n", filename)
@@ -193,7 +220,7 @@ func ImagesText(arch string, targetImages []string) error {
 	return nil
 }
 
-// imagesAndSourcesText writes data of the format "image source1,..." to the filename
+// ImagesAndSourcesText writes data of the format "image source1,..." to the filename
 // designated for the given arch
 func ImagesAndSourcesText(arch string, targetImagesAndSources []string) error {
 	filename := sourcesFilenameMap[arch]
@@ -215,6 +242,8 @@ func ImagesAndSourcesText(arch string, targetImagesAndSources []string) error {
 	return nil
 }
 
+// MirrorScript creates executable files for Linux and Windows
+// which will perform `docker pull`'s for each image used by Rancher
 func MirrorScript(arch string, targetImages []string) error {
 	filename := getScriptFilename(arch, "mirror")
 	log.Printf("Creating %s\n", filename)

@@ -19,14 +19,14 @@ func main() {
 }
 
 func run(systemChartsPath, chartsPath string, imagesFromArgs []string) error {
-	linuxImagesFromArgs, targetImages, targetImagesAndSources, targetWindowsImages, targetWindowsImagesAndSources, err := utilities.GatherTargetImagesAndSources(systemChartsPath, chartsPath, imagesFromArgs)
+	targetsAndSources, err := utilities.GatherTargetImagesAndSources(systemChartsPath, chartsPath, imagesFromArgs)
 	if err != nil {
 		return err
 	}
 
 	// create rancher-image-origins.txt. Will fail if /pkg/image/origins.go
 	// does not provide a mapping for each image.
-	err = img.GenerateImageOrigins(linuxImagesFromArgs, targetImages, targetWindowsImages)
+	err = img.GenerateImageOrigins(targetsAndSources.LinuxImagesFromArgs, targetsAndSources.TargetLinuxImages, targetsAndSources.TargetWindowsImages)
 	if err != nil {
 		return err
 	}
@@ -36,8 +36,8 @@ func run(systemChartsPath, chartsPath string, imagesFromArgs []string) error {
 		imagesAndSources []string
 	}
 	for arch, imageLists := range map[string]imageTextLists{
-		"linux":   {images: targetImages, imagesAndSources: targetImagesAndSources},
-		"windows": {images: targetWindowsImages, imagesAndSources: targetWindowsImagesAndSources},
+		"linux":   {images: targetsAndSources.TargetLinuxImages, imagesAndSources: targetsAndSources.TargetLinuxImagesAndSources},
+		"windows": {images: targetsAndSources.TargetWindowsImages, imagesAndSources: targetsAndSources.TargetWindowsImagesAndSources},
 	} {
 		err = utilities.ImagesText(arch, imageLists.images)
 		if err != nil {
