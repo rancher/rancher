@@ -28,8 +28,8 @@ func CreateMachineConfig(resource string, machinePoolConfig *unstructured.Unstru
 	return dynamic.Resource(groupVersionResource).Namespace(machinePoolConfig.GetNamespace()).Create(context.TODO(), machinePoolConfig, metav1.CreateOptions{})
 }
 
-// NewRKEMachinePool is a constructor that sets up a apisV1.RKEMachinePool object to be used to provision a cluster.
-func NewRKEMachinePool(controlPlaneRole, etcdRole, workerRole bool, poolName string, quantity int64, machineConfig *unstructured.Unstructured) provisioning.RKEMachinePool {
+// NewMachinePool is a constructor that sets up a apisV1.RKEMachinePool object to be used to provision a cluster.
+func NewMachinePool(controlPlaneRole, etcdRole, workerRole bool, poolName string, quantity int64, machineConfig *unstructured.Unstructured) provisioning.RKEMachinePool {
 	machineConfigRef := &provisioning.ObjectReference{
 		Kind: machineConfig.GetKind(),
 		Name: machineConfig.GetName(),
@@ -52,7 +52,7 @@ type NodeRoles struct {
 	Quantity     int64 `json:"quantity" yaml:"quantity"`
 }
 
-// RKEMachinePoolSetup is a helper method that will loop and setup muliple node pools with the defined node roles from the `nodeRoles` parameter
+// MachinePoolSetup is a helper method that will loop and setup muliple node pools with the defined node roles from the `nodeRoles` parameter
 // `machineConfig` is the *unstructured.Unstructured created by CreateMachineConfig
 // `nodeRoles` would be in this format
 //   []NodeRoles{
@@ -70,10 +70,10 @@ type NodeRoles struct {
 //   },
 //  }
 
-func RKEMachinePoolSetup(nodeRoles []NodeRoles, machineConfig *unstructured.Unstructured) []provisioning.RKEMachinePool {
+func MachinePoolSetup(nodeRoles []NodeRoles, machineConfig *unstructured.Unstructured) []provisioning.RKEMachinePool {
 	machinePools := []provisioning.RKEMachinePool{}
 	for index, roles := range nodeRoles {
-		machinePool := NewRKEMachinePool(roles.ControlPlane, roles.Etcd, roles.Worker, "pool"+strconv.Itoa(index), roles.Quantity, machineConfig)
+		machinePool := NewMachinePool(roles.ControlPlane, roles.Etcd, roles.Worker, "pool"+strconv.Itoa(index), roles.Quantity, machineConfig)
 		machinePools = append(machinePools, machinePool)
 	}
 
