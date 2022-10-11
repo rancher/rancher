@@ -6,7 +6,6 @@ package wrangler
 import (
 	"context"
 	"fmt"
-	cache2 "github.com/rancher/lasso/pkg/cache"
 	"net"
 	"net/http"
 	"sync"
@@ -347,27 +346,32 @@ func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restCo
 		Catalog:                 helm.Catalog().V1(),
 		Batch:                   batch.Batch().V1(),
 		MGMTWithAgent: func(userAgent string) managementv3.Interface {
-			agentOpts := &generic.FactoryOptions{}
-			if opts != nil {
-				agentOpts.Namespace = opts.Namespace
-				agentOpts.Resync = opts.Resync
-				agentOpts.HealthCallback = opts.HealthCallback
-			}
-			agentOpts.SharedCacheFactory, _ = cache2.NewSharedCachedFactoryWithAgent(userAgent, agentOpts.SharedCacheFactory)
-			factory, err := generic.ControllerFactoryWithAgent(userAgent, mgmt.Factory)
-			if err != nil {
+			mgmtWithAgent := mgmt.WithAgent(userAgent).V3()
+			return mgmtWithAgent
+			/*
+				agentOpts := &generic.FactoryOptions{}
+				if opts != nil {
+					agentOpts.Namespace = opts.Namespace
+					agentOpts.Resync = opts.Resync
+					agentOpts.HealthCallback = opts.HealthCallback
+				}
+				agentOpts.SharedCacheFactory, _ = cache2.NewSharedCachedFactoryWithAgent(userAgent, agentOpts.SharedCacheFactory)
+				factory, err := generic.ControllerFactoryWithAgent(userAgent, mgmt.Factory)
+				if err != nil {
 
-			}
-			mgmt.WithAgent()
-			agentOpts.SharedControllerFactory = factory.ControllerFactory()
-			mgmt, err := management.NewFactoryFromConfigWithOptions(restConfig, opts)
-			if err != nil {
-				return nil, err
-			}
-			return &f
+				}
+
+				agentOpts.SharedControllerFactory = factory.ControllerFactory()
+				mgmt, err := management.NewFactoryFromConfigWithOptions(restConfig, agentOpts)
+				if err != nil {
+					return nil, err
+				}
+				mgmt.WithAgent().V3()
+				return mgmt.Management().V3()*/
 		},
 		BatchWithAgent: func(userAgent string) batchv1.Interface {
-			return batch.WithAgent(userAgent).Batch().V1()
+			mgmtWithAgent := batch.WithAgent(userAgent).V1()
+			return mgmtWithAgent
 		},
 		ProjectWithAgent: func(userAgent string) projectv3.Interface {
 			return project.WithAgent(userAgent).Project().V3()
