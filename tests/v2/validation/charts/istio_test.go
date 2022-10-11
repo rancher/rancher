@@ -7,18 +7,17 @@ import (
 	"strings"
 	"testing"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
 	"github.com/rancher/rancher/tests/framework/extensions/charts"
 	"github.com/rancher/rancher/tests/framework/extensions/clusters"
 	"github.com/rancher/rancher/tests/framework/extensions/namespaces"
-	"github.com/rancher/rancher/tests/framework/extensions/workloads/deployments"
 	"github.com/rancher/rancher/tests/framework/pkg/session"
-	"github.com/rancher/rancher/tests/integration/pkg/defaults"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 type IstioTestSuite struct {
@@ -207,6 +206,9 @@ func (i *IstioTestSuite) TestUpgradeIstioChart() {
 	client, err := i.client.WithSession(subSession)
 	require.NoError(i.T(), err)
 
+	steveclient, err := client.Steve.ProxyDownstream(i.project.ClusterID)
+	require.NoError(i.T(), err)
+
 	i.T().Log("Checking if the monitoring chart is installed")
 	monitoringChart, err := charts.GetChartStatus(client, i.project.ClusterID, charts.RancherMonitoringNamespace, charts.RancherMonitoringName)
 	require.NoError(i.T(), err)
@@ -228,7 +230,7 @@ func (i *IstioTestSuite) TestUpgradeIstioChart() {
 	// Change istio install option version to previous version of the latest version
 	versionsList, err := client.Catalog.GetListChartVersions(charts.RancherIstioName)
 	require.NoError(i.T(), err)
-	require.Greaterf(i.T(), len(versionsList), 2, "There should be at least 2 versions of the istio chart")
+	require.Greaterf(i.T(), len(versionsList), 1, "There should be at least 2 versions of the istio chart")
 	versionLatest := versionsList[0]
 	versionBeforeLatest := versionsList[1]
 	i.chartInstallOptions.istio.Version = versionBeforeLatest
@@ -264,17 +266,14 @@ func (i *IstioTestSuite) TestUpgradeIstioChart() {
 
 	// List deployments that have the istio app version as label
 	istioVersionPreUpgrade := istioChartPreUpgrade.ChartDetails.Spec.Chart.Metadata.AppVersion
-	deploymentListPreUpgrade, err := deployments.ListDeployments(client, i.project.ClusterID, charts.RancherIstioNamespace, metav1.ListOptions{
-		LabelSelector:  "operator.istio.io/version=" + istioVersionPreUpgrade,
-		TimeoutSeconds: &defaults.WatchTimeoutSeconds,
-	})
+	deploymentListPreUpgrade, err := listIstioDeployments(steveclient)
 	require.NoError(i.T(), err)
-	require.Equalf(i.T(), 2, len(deploymentListPreUpgrade.Items), "Pilot & Ingressgateways deployments don't have the correct istio version labels")
+	require.Equalf(i.T(), 2, len(deploymentListPreUpgrade), "Pilot & Ingressgateways deployments don't have the correct istio version labels")
 
-	for _, deployment := range deploymentListPreUpgrade.Items {
-		imageVersion := strings.Split(deployment.Spec.Template.Spec.Containers[0].Image, ":")[1]
-		i.T().Logf("Comparing image and app versions: \n container image version: %v \n istio version: %v and actual: %v\n", deployment.Spec.Template.Spec.Containers[0].Image, istioVersionPreUpgrade, imageVersion)
-		require.Equalf(i.T(), istioVersionPreUpgrade, imageVersion, "Pilot & Ingressgateways images don't use the correct istio image version")
+	for _, deploymentSpec := range deploymentListPreUpgrade {
+		imageVersion := strings.Split(deploymentSpec.Template.Spec.Containers[0].Image, ":")[1]
+		i.T().Logf("Comparing image and app versions: \n container image version: %v \n istio version: %v and actual: %v\n", deploymentSpec.Template.Spec.Containers[0].Image, istioVersionPreUpgrade, imageVersion)
+		require.Containsf(i.T(), imageVersion, istioVersionPreUpgrade, "Pilot & Ingressgateways images don't use the correct istio image version")
 	}
 
 	i.chartInstallOptions.istio.Version, err = client.Catalog.GetLatestChartVersion(charts.RancherIstioName)
@@ -301,17 +300,14 @@ func (i *IstioTestSuite) TestUpgradeIstioChart() {
 
 	// List deployments that have the istio app version as label
 	istioVersionPostUpgrade := istioChartPostUpgrade.ChartDetails.Spec.Chart.Metadata.AppVersion
-	deploymentListPostUpgrade, err := deployments.ListDeployments(client, i.project.ClusterID, charts.RancherIstioNamespace, metav1.ListOptions{
-		LabelSelector:  "operator.istio.io/version=" + istioVersionPostUpgrade,
-		TimeoutSeconds: &defaults.WatchTimeoutSeconds,
-	})
+	deploymentListPostUpgrade, err := listIstioDeployments(steveclient)
 	require.NoError(i.T(), err)
-	require.Equalf(i.T(), 2, len(deploymentListPostUpgrade.Items), "Pilot & Ingressgateways deployments don't have the correct istio version labels")
+	require.Equalf(i.T(), 2, len(deploymentListPostUpgrade), "Pilot & Ingressgateways deployments don't have the correct istio version labels")
 
-	for _, deployment := range deploymentListPostUpgrade.Items {
-		imageVersion := strings.Split(deployment.Spec.Template.Spec.Containers[0].Image, ":")[1]
-		i.T().Logf("Comparing image and app versions: \n container image: %v \n istio version: %v and actual: %v\n", deployment.Spec.Template.Spec.Containers[0].Image, istioVersionPostUpgrade, imageVersion)
-		require.Equalf(i.T(), istioVersionPostUpgrade, imageVersion, "Pilot & Ingressgateways images don't use the correct istio image version")
+	for _, deploymentSpec := range deploymentListPostUpgrade {
+		imageVersion := strings.Split(deploymentSpec.Template.Spec.Containers[0].Image, ":")[1]
+		i.T().Logf("Comparing image and app versions: \n container image: %v \n istio version: %v and actual: %v\n", deploymentSpec.Template.Spec.Containers[0].Image, istioVersionPostUpgrade, imageVersion)
+		require.Containsf(i.T(), imageVersion, istioVersionPostUpgrade, "Pilot & Ingressgateways images don't use the correct istio image version")
 	}
 }
 

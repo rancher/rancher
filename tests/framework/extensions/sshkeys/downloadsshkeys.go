@@ -10,14 +10,15 @@ import (
 )
 
 const (
-	privateKeySSHKeyRegExPattern = `----BEGIN RSA PRIVATE KEY-{3,}\n([\s\S]*?)\n-{3,}END RSA PRIVATE KEY-----`
+	privateKeySSHKeyRegExPattern              = `----BEGIN RSA PRIVATE KEY-{3,}\n([\s\S]*?)\n-{3,}END RSA PRIVATE KEY-----`
+	ClusterMachineConstraintResourceSteveType = "cluster.x-k8s.io.machine"
 )
 
 // DownloadSSHKeys is a helper function that takes a client, the machinePoolNodeName to download
 // the ssh key for a particular node.
 func DownloadSSHKeys(client *rancher.Client, machinePoolNodeName string) (string, error) {
 	machinePoolNodeNameName := fmt.Sprintf("fleet-default/%s", machinePoolNodeName)
-	machine, err := client.Cluster.Machine.ByID(machinePoolNodeNameName)
+	machine, err := client.Steve.SteveType(ClusterMachineConstraintResourceSteveType).ByID(machinePoolNodeNameName)
 	if err != nil {
 		return "", err
 	}
