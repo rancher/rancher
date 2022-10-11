@@ -370,11 +370,10 @@ func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restCo
 				return mgmt.Management().V3()*/
 		},
 		BatchWithAgent: func(userAgent string) batchv1.Interface {
-			mgmtWithAgent := batch.WithAgent(userAgent).V1()
-			return mgmtWithAgent
+			return batch.WithAgent(userAgent).V1()
 		},
 		ProjectWithAgent: func(userAgent string) projectv3.Interface {
-			return project.WithAgent(userAgent).Project().V3()
+			return project.WithAgent(userAgent).V3()
 		},
 		ControllerFactory:     controllerFactory,
 		ASL:                   asl,
