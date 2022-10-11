@@ -41,7 +41,7 @@ func (k *K3SNodeDriverProvisioningTestSuite) TearDownSuite() {
 }
 
 func (k *K3SNodeDriverProvisioningTestSuite) SetupSuite() {
-	testSession := session.NewSession(k.T())
+	testSession := session.NewSession()
 	k.session = testSession
 
 	clustersConfig := new(provisioning.Config)
@@ -132,7 +132,7 @@ func (k *K3SNodeDriverProvisioningTestSuite) ProvisioningK3SCluster(provider Pro
 		for _, kubeVersion := range k.kubernetesVersions {
 			name = tt.name + providerName + " Kubernetes version: " + kubeVersion
 			k.Run(name, func() {
-				testSession := session.NewSession(k.T())
+				testSession := session.NewSession()
 				defer testSession.Cleanup()
 
 				testSessionClient, err := tt.client.WithSession(testSession)
@@ -199,7 +199,7 @@ func (k *K3SNodeDriverProvisioningTestSuite) ProvisioningK3SClusterDynamicInput(
 		for _, kubeVersion := range k.kubernetesVersions {
 			name = tt.name + providerName + " Kubernetes version: " + kubeVersion
 			k.Run(name, func() {
-				testSession := session.NewSession(k.T())
+				testSession := session.NewSession()
 				defer testSession.Cleanup()
 
 				testSessionClient, err := tt.client.WithSession(testSession)

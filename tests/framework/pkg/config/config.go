@@ -1,7 +1,6 @@
 package config
 
 import (
-	"io/ioutil"
 	"os"
 
 	"github.com/creasty/defaults"
@@ -18,7 +17,7 @@ func LoadConfig(key string, config interface{}) {
 		return
 	}
 
-	allString, err := ioutil.ReadFile(configPath)
+	allString, err := os.ReadFile(configPath)
 	if err != nil {
 		panic(err)
 	}
@@ -44,4 +43,41 @@ func LoadConfig(key string, config interface{}) {
 		panic(err)
 	}
 
+}
+
+// UpdateConfig is function that updates the CATTLE_TEST_CONFIG yaml/json that the framework uses.
+func UpdateConfig(key string, config interface{}) {
+	configPath := os.Getenv("CATTLE_TEST_CONFIG")
+
+	if configPath == "" {
+		yaml.Unmarshal([]byte("{}"), config)
+		return
+	}
+
+	// Read json buffer from jsonFile
+	byteValue, err := os.ReadFile(configPath)
+	if err != nil {
+		panic(err)
+	}
+
+	// We have known the outer json object is a map, so we define result as map.
+	// otherwise, result could be defined as slice if outer is an array
+	var result map[string]interface{}
+	err = yaml.Unmarshal(byteValue, &result)
+	if err != nil {
+		panic(err)
+	}
+
+	result[key] = config
+
+	yamlConfig, err := yaml.Marshal(result)
+
+	if err != nil {
+		panic(err)
+	}
+
+	err = os.WriteFile(configPath, yamlConfig, 0644)
+	if err != nil {
+		panic(err)
+	}
 }

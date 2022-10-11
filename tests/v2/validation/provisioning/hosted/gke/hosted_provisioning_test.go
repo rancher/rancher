@@ -33,7 +33,7 @@ func (h *HostedGKEClusterProvisioningTestSuite) TearDownSuite() {
 }
 
 func (h *HostedGKEClusterProvisioningTestSuite) SetupSuite() {
-	testSession := session.NewSession(h.T())
+	testSession := session.NewSession()
 	h.session = testSession
 
 	client, err := rancher.NewClient("", testSession)

@@ -37,7 +37,7 @@ func (c *CustomClusterProvisioningTestSuite) TearDownSuite() {
 }
 
 func (c *CustomClusterProvisioningTestSuite) SetupSuite() {
-	testSession := session.NewSession(c.T())
+	testSession := session.NewSession()
 	c.session = testSession
 
 	clustersConfig := new(provisioning.Config)
@@ -96,7 +96,7 @@ func (c *CustomClusterProvisioningTestSuite) TestProvisioningRKE1CustomCluster()
 	}
 	var name string
 	for _, tt := range tests {
-		testSession := session.NewSession(c.T())
+		testSession := session.NewSession()
 		defer testSession.Cleanup()
 
 		client, err := tt.client.WithSession(testSession)
@@ -152,7 +152,7 @@ func (c *CustomClusterProvisioningTestSuite) TestProvisioningRKE1CustomClusterDy
 
 	var name string
 	for _, tt := range tests {
-		testSession := session.NewSession(c.T())
+		testSession := session.NewSession()
 		defer testSession.Cleanup()
 
 		client, err := tt.client.WithSession(testSession)
