@@ -43,7 +43,7 @@ func (r *RKE2NodeDriverProvisioningTestSuite) TearDownSuite() {
 }
 
 func (r *RKE2NodeDriverProvisioningTestSuite) SetupSuite() {
-	testSession := session.NewSession(r.T())
+	testSession := session.NewSession()
 	r.session = testSession
 
 	clustersConfig := new(provisioning.Config)
@@ -137,7 +137,7 @@ func (r *RKE2NodeDriverProvisioningTestSuite) ProvisioningRKE2Cluster(provider P
 			for _, cni := range r.cnis {
 				name += " cni: " + cni
 				r.Run(name, func() {
-					testSession := session.NewSession(r.T())
+					testSession := session.NewSession()
 					defer testSession.Cleanup()
 
 					testSessionClient, err := tt.client.WithSession(testSession)
@@ -207,7 +207,7 @@ func (r *RKE2NodeDriverProvisioningTestSuite) ProvisioningRKE2ClusterDynamicInpu
 			for _, cni := range r.cnis {
 				name += " cni: " + cni
 				r.Run(name, func() {
-					testSession := session.NewSession(r.T())
+					testSession := session.NewSession()
 					defer testSession.Cleanup()
 
 					testSessionClient, err := tt.client.WithSession(testSession)
@@ -298,7 +298,7 @@ func (r *RKE2NodeDriverProvisioningTestSuite) ProvisioningRKE2CNICluster(provide
 			for _, cni := range r.cnis {
 				name += " cni: " + cni
 				r.Run(name, func() {
-					testSession := session.NewSession(r.T())
+					testSession := session.NewSession()
 					defer testSession.Cleanup()
 
 					testSessionClient, err := tt.client.WithSession(testSession)

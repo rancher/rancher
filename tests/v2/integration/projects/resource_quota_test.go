@@ -37,7 +37,7 @@ func (s *ResourceQuotaSuite) TearDownSuite() {
 }
 
 func (s *ResourceQuotaSuite) SetupSuite() {
-	testSession := session.NewSession(s.T())
+	testSession := session.NewSession()
 	s.session = testSession
 
 	client, err := rancher.NewClient("", testSession)

@@ -163,7 +163,7 @@ func (s *SteveAPITestSuite) TearDownSuite() {
 }
 
 func (s *SteveAPITestSuite) SetupSuite() {
-	testSession := session.NewSession(s.T())
+	testSession := session.NewSession()
 	s.session = testSession
 
 	client, err := rancher.NewClient("", testSession)
@@ -183,9 +183,10 @@ func (s *SteveAPITestSuite) SetupSuite() {
 		ClusterID: clusterID,
 		Name:      projectName,
 	})
+	require.NoError(s.T(), err)
 
 	// create project namespaces
-	for k, _ := range namespaceMap {
+	for k := range namespaceMap {
 		name := namegenerator.AppendRandomString(k)
 		_, err := namespaces.CreateNamespace(client, name, "", nil, nil, s.project)
 		require.NoError(s.T(), err)
@@ -251,6 +252,7 @@ func (s *SteveAPITestSuite) SetupSuite() {
 					Name: userObj.ID,
 				}
 				_, err = rbac.CreateRoleBinding(s.client, s.project.ClusterID, namegenerator.AppendRandomString(rb.Name), namespaceMap[rb.Namespace], rb.RoleRef.Name, subject)
+				require.NoError(s.T(), err)
 			}
 		}
 		s.userClients[user], err = s.client.AsUser(userObj)

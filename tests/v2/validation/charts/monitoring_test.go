@@ -40,7 +40,7 @@ func (m *MonitoringTestSuite) TearDownSuite() {
 }
 
 func (m *MonitoringTestSuite) SetupSuite() {
-	testSession := session.NewSession(m.T())
+	testSession := session.NewSession()
 	m.session = testSession
 
 	client, err := rancher.NewClient("", testSession)

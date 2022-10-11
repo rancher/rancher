@@ -42,7 +42,7 @@ func (c *ClusterRepoTestSuite) TearDownSuite() {
 }
 
 func (c *ClusterRepoTestSuite) SetupSuite() {
-	testSession := session.NewSession(c.T())
+	testSession := session.NewSession()
 	c.session = testSession
 
 	client, err := rancher.NewClient("", testSession)
@@ -134,6 +134,9 @@ func (c *ClusterRepoTestSuite) pollUntilDownloaded(ClusterRepoName string, prevD
 	var clusterRepo *stevev1.SteveAPIObject
 	err := wait.Poll(PollInterval, PollTimeout, func() (done bool, err error) {
 		clusterRepo, err = c.client.Steve.SteveType(catalog.ClusterRepoSteveResourceType).ByID(ClusterRepoName)
+		if err != nil {
+			return false, err
+		}
 		status := c.getStatusFromClusterRepo(clusterRepo)
 		if clusterRepo.Name != ClusterRepoName {
 			return false, nil

@@ -36,7 +36,7 @@ func (r *RKE1NodeDriverProvisioningTestSuite) TearDownSuite() {
 }
 
 func (r *RKE1NodeDriverProvisioningTestSuite) SetupSuite() {
-	testSession := session.NewSession(r.T())
+	testSession := session.NewSession()
 	r.session = testSession
 
 	clustersConfig := new(provisioning.Config)
