@@ -54,10 +54,10 @@ const (
 	ClusterConditionNoDiskPressure condition.Cond = "NoDiskPressure"
 	// ClusterConditionNoMemoryPressure true when all cluster nodes have sufficient memory
 	ClusterConditionNoMemoryPressure condition.Cond = "NoMemoryPressure"
-	// ClusterConditionconditionDefaultProjectCreated true when default project has been created
-	ClusterConditionconditionDefaultProjectCreated condition.Cond = "DefaultProjectCreated"
-	// ClusterConditionconditionSystemProjectCreated true when system project has been created
-	ClusterConditionconditionSystemProjectCreated condition.Cond = "SystemProjectCreated"
+	// ClusterConditionDefaultProjectCreated true when default project has been created
+	ClusterConditionDefaultProjectCreated condition.Cond = "DefaultProjectCreated"
+	// ClusterConditionSystemProjectCreated true when system project has been created
+	ClusterConditionSystemProjectCreated condition.Cond = "SystemProjectCreated"
 	// Deprecated: ClusterConditionDefaultNamespaceAssigned true when cluster's default namespace has been initially assigned
 	ClusterConditionDefaultNamespaceAssigned condition.Cond = "DefaultNamespaceAssigned"
 	// Deprecated: ClusterConditionSystemNamespacesAssigned true when cluster's system namespaces has been initially assigned to
@@ -75,6 +75,7 @@ const (
 	ClusterConditionSecretsMigrated                      condition.Cond = "SecretsMigrated"
 	ClusterConditionServiceAccountSecretsMigrated        condition.Cond = "ServiceAccountSecretsMigrated"
 	ClusterConditionHarvesterCloudProviderConfigMigrated condition.Cond = "HarvesterCloudProviderConfigMigrated"
+	ClusterConditionRKESecretsMigrated                   condition.Cond = "RKESecretsMigrated"
 
 	ClusterDriverImported = "imported"
 	ClusterDriverLocal    = "local"
@@ -400,14 +401,18 @@ type GKEStatus struct {
 }
 
 type ClusterSecrets struct {
-	PrivateRegistrySecret string `json:"privateRegistrySecret,omitempty" norman:"nocreate,noupdate"`
-	S3CredentialSecret    string `json:"s3CredentialSecret,omitempty" norman:"nocreate,noupdate"`
-	WeavePasswordSecret   string `json:"weavePasswordSecret,omitempty" norman:"nocreate,noupdate"`
-	VsphereSecret         string `json:"vsphereSecret,omitempty" norman:"nocreate,noupdate"`
-	VirtualCenterSecret   string `json:"virtualCenterSecret,omitempty" norman:"nocreate,noupdate"`
-	OpenStackSecret       string `json:"openStackSecret,omitempty" norman:"nocreate,noupdate"`
-	AADClientSecret       string `json:"aadClientSecret,omitempty" norman:"nocreate,noupdate"`
-	AADClientCertSecret   string `json:"aadClientCertSecret,omitempty" norman:"nocreate,noupdate"`
+	PrivateRegistrySecret               string `json:"privateRegistrySecret,omitempty" norman:"nocreate,noupdate"`
+	S3CredentialSecret                  string `json:"s3CredentialSecret,omitempty" norman:"nocreate,noupdate"`
+	WeavePasswordSecret                 string `json:"weavePasswordSecret,omitempty" norman:"nocreate,noupdate"`
+	VsphereSecret                       string `json:"vsphereSecret,omitempty" norman:"nocreate,noupdate"`
+	VirtualCenterSecret                 string `json:"virtualCenterSecret,omitempty" norman:"nocreate,noupdate"`
+	OpenStackSecret                     string `json:"openStackSecret,omitempty" norman:"nocreate,noupdate"`
+	AADClientSecret                     string `json:"aadClientSecret,omitempty" norman:"nocreate,noupdate"`
+	AADClientCertSecret                 string `json:"aadClientCertSecret,omitempty" norman:"nocreate,noupdate"`
+	RKESecretsEncryptionProvidersSecret string `json:"rkeSecretsEncryptionProvidersSecret,omitempty" norman:"nocreate,noupdate"`
+	RKEBastionHostSSHKeySecret          string `json:"rkeBastionHostSSHKeySecret,omitempty" norman:"nocreate,noupdate"`
+	RKEKubeletExtraEnvSecret            string `json:"rkeKubeletExtraEnvSecret,omitempty" norman:"nocreate,noupdate"`
+	RKEPrivateRegistryECRSecret         string `json:"rkePrivateRegistryECRSecret,omitempty" norman:"nocreate,noupdate"`
 }
 
 // GetSecret gets a reference to a secret by its field name, either from the ClusterSecrets field or the Status field.
