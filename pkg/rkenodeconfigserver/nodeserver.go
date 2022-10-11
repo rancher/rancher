@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"strings"
 
-	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/clusterregistrationtoken"
 	"github.com/rancher/rancher/pkg/tunnelserver/mcmauthorizer"
 
@@ -86,7 +86,7 @@ func (n *RKENodeConfigServer) ServeHTTP(rw http.ResponseWriter, req *http.Reques
 		return
 	}
 
-	if client.Cluster.Status.Driver != v32.ClusterDriverRKE {
+	if client.Cluster.Status.Driver != apimgmtv3.ClusterDriverRKE {
 		rw.WriteHeader(http.StatusNotFound)
 		return
 	}
@@ -152,7 +152,7 @@ func IsNonWorker(roles []string) bool {
 	return false
 }
 
-func (n *RKENodeConfigServer) nonWorkerConfig(ctx context.Context, cluster *v3.Cluster, node *v3.Node) (*rkeworker.NodeConfig, error) {
+func (n *RKENodeConfigServer) nonWorkerConfig(_ context.Context, cluster *apimgmtv3.Cluster, node *apimgmtv3.Node) (*rkeworker.NodeConfig, error) {
 	nodePlan := node.Status.NodePlan
 	nc := &rkeworker.NodeConfig{
 		ClusterName: cluster.Name,
@@ -170,7 +170,7 @@ func (n *RKENodeConfigServer) nonWorkerConfig(ctx context.Context, cluster *v3.C
 	return nc, nil
 }
 
-func (n *RKENodeConfigServer) nodeConfig(ctx context.Context, cluster *v3.Cluster, node *v3.Node) (*rkeworker.NodeConfig, error) {
+func (n *RKENodeConfigServer) nodeConfig(ctx context.Context, cluster *apimgmtv3.Cluster, node *apimgmtv3.Node) (*rkeworker.NodeConfig, error) {
 	status := cluster.Status.AppliedSpec.DeepCopy()
 	rkeConfig := status.RancherKubernetesEngineConfig
 
@@ -227,7 +227,7 @@ func (n *RKENodeConfigServer) nodeConfig(ctx context.Context, cluster *v3.Cluste
 		if nodePlan.Version == cluster.Status.NodeVersion {
 			nc.NodeVersion = cluster.Status.NodeVersion
 			logrus.Infof("cluster [%s] worker-upgrade: sending node-version for node [%s] version %v", cluster.Name, node.Status.NodeName, nc.NodeVersion)
-		} else if v32.ClusterConditionUpgraded.IsUnknown(cluster) {
+		} else if apimgmtv3.ClusterConditionUpgraded.IsUnknown(cluster) {
 			if nc.AgentCheckInterval != AgentCheckIntervalDuringUpgrade {
 				nodeCopy := node.DeepCopy()
 				nodeCopy.Status.NodePlan.AgentCheckInterval = AgentCheckIntervalDuringUpgrade
@@ -253,7 +253,7 @@ func FilterHostForSpec(spec *rketypes.RancherKubernetesEngineConfig, n *v3.Node)
 }
 
 func AugmentProcesses(token string, processes map[string]rketypes.Process, worker bool, nodeName string,
-	cluster *v3.Cluster) (map[string]rketypes.Process, error) {
+	cluster *apimgmtv3.Cluster) (map[string]rketypes.Process, error) {
 	var shared bool
 
 OuterLoop:
