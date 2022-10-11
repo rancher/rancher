@@ -11,7 +11,7 @@ import (
 	"github.com/rancher/rancher/tests/framework/extensions/machinepools"
 	"github.com/rancher/rancher/tests/framework/extensions/users"
 	password "github.com/rancher/rancher/tests/framework/extensions/users/passwordgenerator"
-	"github.com/rancher/rancher/tests/framework/extensions/workloads"
+	pods "github.com/rancher/rancher/tests/framework/extensions/workloads/pods"
 	"github.com/rancher/rancher/tests/framework/pkg/config"
 	"github.com/rancher/rancher/tests/framework/pkg/session"
 	"github.com/rancher/rancher/tests/framework/pkg/wait"
@@ -146,10 +146,10 @@ func (r *RKE2NodeDriverProvisioningTestSuite) ProvisioningRKE2Cluster(provider P
 					generatedPoolName := fmt.Sprintf("nc-%s-pool1-", clusterName)
 					machinePoolConfig := provider.MachinePoolFunc(generatedPoolName, namespace)
 
-					machineConfigResp, err := machinepools.CreateMachineConfig(provider.MachineConfig, machinePoolConfig, testSessionClient)
+					machineConfigResp, err := testSessionClient.Steve.SteveType(provider.MachineConfigPoolResourceSteveType).Create(machinePoolConfig)
 					require.NoError(r.T(), err)
 
-					machinePools := machinepools.MachinePoolSetup(tt.nodeRoles, machineConfigResp)
+					machinePools := machinepools.RKEMachinePoolSetup(tt.nodeRoles, machineConfigResp)
 
 					cluster := clusters.NewK3SRKE2ClusterConfig(clusterName, namespace, cni, cloudCredential.ID, kubeVersion, machinePools)
 
@@ -216,10 +216,10 @@ func (r *RKE2NodeDriverProvisioningTestSuite) ProvisioningRKE2ClusterDynamicInpu
 					generatedPoolName := fmt.Sprintf("nc-%s-pool1-", clusterName)
 					machinePoolConfig := provider.MachinePoolFunc(generatedPoolName, namespace)
 
-					machineConfigResp, err := machinepools.CreateMachineConfig(provider.MachineConfig, machinePoolConfig, testSessionClient)
+					machineConfigResp, err := testSessionClient.Steve.SteveType(provider.MachineConfigPoolResourceSteveType).Create(machinePoolConfig)
 					require.NoError(r.T(), err)
 
-					machinePools := machinepools.MachinePoolSetup(nodesAndRoles, machineConfigResp)
+					machinePools := machinepools.RKEMachinePoolSetup(nodesAndRoles, machineConfigResp)
 
 					cluster := clusters.NewK3SRKE2ClusterConfig(clusterName, namespace, cni, cloudCredential.ID, kubeVersion, machinePools)
 
@@ -298,6 +298,7 @@ func (r *RKE2NodeDriverProvisioningTestSuite) ProvisioningRKE2CNICluster(provide
 				name += " cni: " + cni
 				r.Run(name, func() {
 					testSession := session.NewSession(r.T())
+					defer testSession.Cleanup()
 
 					testSessionClient, err := tt.client.WithSession(testSession)
 					require.NoError(r.T(), err)
@@ -306,10 +307,10 @@ func (r *RKE2NodeDriverProvisioningTestSuite) ProvisioningRKE2CNICluster(provide
 					generatedPoolName := fmt.Sprintf("nc-%s-pool1-", clusterName)
 					machinePoolConfig := provider.MachinePoolFunc(generatedPoolName, namespace)
 
-					machineConfigResp, err := machinepools.CreateMachineConfig(provider.MachineConfig, machinePoolConfig, testSessionClient)
+					machineConfigResp, err := testSessionClient.Steve.SteveType(provider.MachineConfigPoolResourceSteveType).Create(machinePoolConfig)
 					require.NoError(r.T(), err)
 
-					machinePools := machinepools.MachinePoolSetup(tt.nodeRoles, machineConfigResp)
+					machinePools := machinepools.RKEMachinePoolSetup(tt.nodeRoles, machineConfigResp)
 
 					cluster := clusters.NewK3SRKE2ClusterConfig(clusterName, namespace, cni, cloudCredential.ID, kubeVersion, machinePools)
 
@@ -337,8 +338,9 @@ func (r *RKE2NodeDriverProvisioningTestSuite) ProvisioningRKE2CNICluster(provide
 
 					clusterID, err := clusters.GetClusterIDByName(r.client, clusterName)
 					assert.NoError(r.T(), err)
-					podResults, podErrors := workloads.StatusPods(client, clusterID, metav1.ListOptions{})
-					fmt.Print(podResults, podErrors)
+					podResults, podErrors := pods.StatusPods(client, clusterID)
+					assert.NotEmpty(r.T(), podResults)
+					assert.Empty(r.T(), podErrors)
 				})
 			}
 		}

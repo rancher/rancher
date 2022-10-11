@@ -7,10 +7,10 @@ import (
 	"github.com/rancher/rancher/pkg/api/steve/catalog/types"
 	catalogv1 "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
+	kubenamespaces "github.com/rancher/rancher/tests/framework/extensions/kubeapi/namespaces"
 	"github.com/rancher/rancher/tests/framework/extensions/namespaces"
 	"github.com/rancher/rancher/tests/framework/pkg/wait"
 	"github.com/rancher/rancher/tests/integration/pkg/defaults"
-	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/watch"
 )
@@ -68,16 +68,19 @@ func InstallRancherIstioChart(client *rancher.Client, installOptions *InstallOpt
 			return err
 		}
 
-		dynamicClient, err := client.GetDownStreamClusterClient(installOptions.ClusterID)
+		steveclient, err := client.Steve.ProxyDownstream(installOptions.ClusterID)
 		if err != nil {
 			return err
 		}
-		namespaceResource := dynamicClient.Resource(namespaces.NamespaceGroupVersionResource).Namespace("")
 
-		err = namespaceResource.Delete(context.TODO(), RancherIstioNamespace, metav1.DeleteOptions{})
-		if errors.IsNotFound(err) {
-			return nil
+		namespaceClient := steveclient.SteveType(namespaces.NamespaceSteveType)
+
+		namespace, err := namespaceClient.ByID(RancherIstioNamespace)
+		if err != nil {
+			return err
 		}
+
+		err = namespaceClient.Delete(namespace)
 		if err != nil {
 			return err
 		}
@@ -90,7 +93,7 @@ func InstallRancherIstioChart(client *rancher.Client, installOptions *InstallOpt
 		if err != nil {
 			return err
 		}
-		adminNamespaceResource := adminDynamicClient.Resource(namespaces.NamespaceGroupVersionResource).Namespace("")
+		adminNamespaceResource := adminDynamicClient.Resource(kubenamespaces.NamespaceGroupVersionResource).Namespace("")
 
 		watchNamespaceInterface, err := adminNamespaceResource.Watch(context.TODO(), metav1.ListOptions{
 			FieldSelector:  "metadata.name=" + RancherIstioNamespace,

@@ -8,10 +8,7 @@ import (
 	"strings"
 
 	"github.com/rancher/rancher/tests/framework/codegen/generator"
-	clusterMachineSchema "github.com/rancher/rancher/tests/framework/pkg/schemas/cluster.x-k8s.io.machines/v1beta1"
 	managementSchema "github.com/rancher/rancher/tests/framework/pkg/schemas/management.cattle.io/v3"
-	provisioningSchema "github.com/rancher/rancher/tests/framework/pkg/schemas/provisioning.cattle.io/v1"
-	rkeSchema "github.com/rancher/rancher/tests/framework/pkg/schemas/rke.cattle.io/v1"
 )
 
 func main() {
@@ -19,11 +16,6 @@ func main() {
 	generator.GenerateClient(managementSchema.Schemas, map[string]bool{
 		"userAttribute": true,
 	})
-
-	generator.GenerateClient(clusterMachineSchema.Schemas, map[string]bool{})
-
-	generator.GenerateClient(provisioningSchema.Schemas, map[string]bool{})
-	generator.GenerateClient(rkeSchema.Schemas, map[string]bool{})
 
 	if err := replaceClientBasePackages(); err != nil {
 		panic(err)
