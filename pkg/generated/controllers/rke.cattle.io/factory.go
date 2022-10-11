@@ -20,19 +20,12 @@ package rke
 
 import (
 	"github.com/rancher/wrangler/pkg/generic"
+	"github.com/sirupsen/logrus"
 	"k8s.io/client-go/rest"
 )
 
 type Factory struct {
 	*generic.Factory
-}
-
-func (f *Factory) WithAgent(userAgent string) *Factory {
-	factory := *f
-	config := f.Config
-	config.UserAgent = userAgent
-	factory.Config = config
-	return &factory
 }
 
 func NewFactoryFromConfigOrDie(config *rest.Config) *Factory {
@@ -72,4 +65,13 @@ func NewFactoryFromConfigWithOptionsOrDie(config *rest.Config, opts *FactoryOpti
 
 func (c *Factory) Rke() Interface {
 	return New(c.ControllerFactory())
+}
+
+func (c *Factory) WithAgent(userAgent string) Interface {
+	factory, err := generic.ControllerFactoryWithAgent(userAgent, c.Factory)
+	if err != nil {
+		logrus.Debugf("failed to create Rke Factory with agent [%s]: %v", userAgent, err)
+		return c.Rke()
+	}
+	return New(factory.ControllerFactory())
 }
