@@ -4,8 +4,10 @@ import (
 	"os"
 	"testing"
 
+	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
+	v1 "github.com/rancher/rancher/tests/framework/clients/rancher/v1"
 	"github.com/rancher/rancher/tests/framework/extensions/charts"
 	"github.com/rancher/rancher/tests/framework/extensions/clusters"
 	"github.com/rancher/rancher/tests/framework/extensions/namespaces"
@@ -105,27 +107,32 @@ func (g *GateKeeperTestSuite) TestGatekeeperChart() {
 
 	g.T().Log("Create a namespace that doesn't have the proper label and assert that creation fails with the expected error")
 	_, err = namespaces.CreateNamespace(client, RancherDisallowedNamespace, "{}", map[string]string{}, map[string]string{}, g.project)
-	assert.EqualError(g.T(), err, "admission webhook \"validation.gatekeeper.sh\" denied the request: [all-must-have-owner] All namespaces must have an `owner` label that points to your company username")
-
+	assert.ErrorContains(g.T(), err, "Bad response statusCode [403]. Status [403 Forbidden].")
 	g.T().Log("Waiting for gatekeeper audit to finish")
-	getAuditTimestamp(client, g.project)
+	err = getAuditTimestamp(client, g.project)
+	require.NoError(g.T(), err)
+
+	steveClient, err := client.Steve.ProxyDownstream(g.project.ClusterID)
+	require.NoError(g.T(), err)
 
 	// now that audit has run, get the list of constraints again
-	constraintList, err := getUnstructuredList(client, g.project, Constraint)
+	constraintList, err := steveClient.SteveType(ConstraintResourceSteveType).List(&types.ListOpts{})
 	require.NoError(g.T(), err)
 
 	// parse list of constraints
-	violations, err := parseConstraintList(constraintList)
+	constraintsStatusType := &ConstraintStatus{}
+	constraintStatus := constraintList.Data[0].Status
+	err = v1.ConvertToK8sType(constraintStatus, constraintsStatusType)
 	require.NoError(g.T(), err)
 
 	g.T().Log("getting list of all namespaces")
-	namespacesList, err := getUnstructuredList(client, g.project, Namespaces)
+	namespacesList, err := steveClient.SteveType(namespaces.NamespaceSteveType).List(&types.ListOpts{})
 	require.NoError(g.T(), err)
 
 	g.T().Log("getting list of namespaces with violations...")
-	totalViolations := violations.Items[0].Status.TotalViolations
+	totalViolations := constraintsStatusType.TotalViolations
 	// get the number of namespaces
-	totalNamespaces := len(namespacesList.Items)
+	totalNamespaces := len(namespacesList.Data)
 
 	g.T().Log("Asserting that all namespaces violate the constraint")
 	assert.EqualValues(g.T(), totalNamespaces, totalViolations)

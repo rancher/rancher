@@ -5,8 +5,10 @@ import (
 	"fmt"
 	"testing"
 
+	apiv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
+	v1 "github.com/rancher/rancher/tests/framework/clients/rancher/v1"
 	"github.com/rancher/rancher/tests/framework/extensions/cloudcredentials"
 	"github.com/rancher/rancher/tests/framework/extensions/clusters"
 	"github.com/rancher/rancher/tests/framework/extensions/machinepools"
@@ -65,10 +67,10 @@ func (r *V2ProvCertRotationTestSuite) testCertRotation(provider Provider, kubeVe
 			generatedPoolName := fmt.Sprintf("nc-%s-pool1-", clusterName)
 			machinePoolConfig := provider.MachinePoolFunc(generatedPoolName, namespace)
 
-			machineConfigResp, err := machinepools.CreateMachineConfig(provider.MachineConfig, machinePoolConfig, testSessionClient)
+			machineConfigResp, err := testSessionClient.Steve.SteveType(provider.MachineConfigPoolResourceSteveType).Create(machinePoolConfig)
 			require.NoError(r.T(), err)
 
-			machinePools := machinepools.MachinePoolSetup(nodesAndRoles, machineConfigResp)
+			machinePools := machinepools.RKEMachinePoolSetup(nodesAndRoles, machineConfigResp)
 
 			cluster := clusters.NewK3SRKE2ClusterConfig(clusterName, namespace, "calico", credential.ID, kubeVersion, machinePools)
 			clusterResp, err := clusters.CreateK3SRKE2Cluster(testSessionClient, cluster)
@@ -88,12 +90,14 @@ func (r *V2ProvCertRotationTestSuite) testCertRotation(provider Provider, kubeVe
 			require.NoError(r.T(), err)
 			assert.Equal(r.T(), clusterName, clusterResp.ObjectMeta.Name)
 
-			cluster, err = r.client.Provisioning.Cluster.ByID(clusterResp.ID)
+			steveCluster, err := r.client.Steve.SteveType(clusters.ProvisioningSteveResouceType).ByID(clusterResp.ID)
 			require.NoError(r.T(), err)
-			require.NotNil(r.T(), cluster.Status)
+			require.NotNil(r.T(), steveCluster.Status)
 
-			require.NoError(r.T(), r.rotateCerts(clusterName, 1))
-			require.NoError(r.T(), r.rotateCerts(clusterName, 2))
+			// rotate certs
+			require.NoError(r.T(), r.rotateCerts(clusterResp.ID, 1))
+			// rotate certs again
+			require.NoError(r.T(), r.rotateCerts(clusterResp.ID, 2))
 		})
 	})
 }
@@ -122,16 +126,24 @@ func (r *V2ProvCertRotationTestSuite) rotateCerts(id string, generation int64) e
 	kubeProvisioningClient, err := r.client.GetKubeAPIProvisioningClient()
 	require.NoError(r.T(), err)
 
-	cluster, err := kubeProvisioningClient.Clusters(namespace).Get(context.TODO(), id, metav1.GetOptions{})
+	cluster, err := r.client.Steve.SteveType(clusters.ProvisioningSteveResouceType).ByID(id)
 	if err != nil {
 		return err
 	}
 
-	cluster.Spec.RKEConfig.RotateCertificates = &rkev1.RotateCertificates{
+	clusterSpec := &apiv1.ClusterSpec{}
+	err = v1.ConvertToK8sType(cluster.Spec, clusterSpec)
+	require.NoError(r.T(), err)
+
+	updatedCluster := *cluster
+
+	clusterSpec.RKEConfig.RotateCertificates = &rkev1.RotateCertificates{
 		Generation: generation,
 	}
 
-	cluster, err = kubeProvisioningClient.Clusters(namespace).Update(context.TODO(), cluster, metav1.UpdateOptions{})
+	updatedCluster.Spec = *clusterSpec
+
+	cluster, err = r.client.Steve.SteveType(clusters.ProvisioningSteveResouceType).Update(cluster, updatedCluster)
 	if err != nil {
 		return err
 	}
@@ -148,6 +160,21 @@ func (r *V2ProvCertRotationTestSuite) rotateCerts(id string, generation int64) e
 	checkFunc := CertRotationComplete(generation)
 
 	err = wait.WatchWait(result, checkFunc)
+	if err != nil {
+		return err
+	}
+
+	clusterWait, err := kubeProvisioningClient.Clusters("fleet-default").Watch(context.TODO(), metav1.ListOptions{
+		FieldSelector:  "metadata.name=" + cluster.ObjectMeta.Name,
+		TimeoutSeconds: &defaults.WatchTimeoutSeconds,
+	})
+	if err != nil {
+		return err
+	}
+
+	clusterCheckFunc := clusters.IsProvisioningClusterReady
+
+	err = wait.WatchWait(clusterWait, clusterCheckFunc)
 	if err != nil {
 		return err
 	}

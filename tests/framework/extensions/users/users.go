@@ -2,6 +2,7 @@ package users
 
 import (
 	"strings"
+	"time"
 
 	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/pkg/api/scheme"
@@ -12,6 +13,7 @@ import (
 	"github.com/rancher/rancher/tests/integration/pkg/defaults"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	kwait "k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 )
 
@@ -75,7 +77,19 @@ func AddProjectMember(rancherClient *rancher.Client, project *management.Project
 		return err
 	}
 
-	_, err = rancherClient.Management.ProjectRoleTemplateBinding.Create(role)
+	roleTemplateResp, err := rancherClient.Management.ProjectRoleTemplateBinding.Create(role)
+
+	err = kwait.Poll(500*time.Millisecond, 2*time.Minute, func() (done bool, err error) {
+		projectRoleTemplate, err := rancherClient.Management.ProjectRoleTemplateBinding.ByID(roleTemplateResp.ID)
+		if err != nil {
+			return false, err
+		}
+		if projectRoleTemplate != nil {
+			return true, nil
+		}
+
+		return false, nil
+	})
 	return err
 }
 

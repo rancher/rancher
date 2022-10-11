@@ -13,10 +13,8 @@ import (
 	frameworkDynamic "github.com/rancher/rancher/tests/framework/clients/dynamic"
 	"github.com/rancher/rancher/tests/framework/clients/ec2"
 	"github.com/rancher/rancher/tests/framework/clients/rancher/catalog"
-	cluster "github.com/rancher/rancher/tests/framework/clients/rancher/generated/cluster/v1beta1"
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
-	provisioning "github.com/rancher/rancher/tests/framework/clients/rancher/generated/provisioning/v1"
-	rke "github.com/rancher/rancher/tests/framework/clients/rancher/generated/rke/v1"
+	v1 "github.com/rancher/rancher/tests/framework/clients/rancher/v1"
 
 	kubeProvisioning "github.com/rancher/rancher/tests/framework/clients/provisioning"
 	kubeRKE "github.com/rancher/rancher/tests/framework/clients/rke"
@@ -37,14 +35,10 @@ import (
 type Client struct {
 	// Client used to access management.cattle.io v3 API resources
 	Management *management.Client
-	// Client used to access provisioning.cattle.io v1 API resources (clusters)
-	Provisioning *provisioning.Client
-	// Client used to access rke.cattle.io v1 API resources (clusters)
-	RKE *rke.Client
+	// Client used to access Steve v1 API resources
+	Steve *v1.Client
 	// Client used to access catalog.cattle.io v1 API resources (apps, charts, etc.)
 	Catalog *catalog.Client
-	// Client used to access cluster.x-k8s.io.machine v1 API
-	Cluster *cluster.Client
 	// Config used to test against a rancher instance
 	RancherConfig *Config
 	// Session is the session object used by the client to track all the resources being created by the client.
@@ -85,24 +79,12 @@ func NewClient(bearerToken string, session *session.Session) (*Client, error) {
 
 	c.Management.Ops.Session = session
 
-	c.Provisioning, err = provisioning.NewClient(clientOptsV1(restConfig, c.RancherConfig))
+	c.Steve, err = v1.NewClient(clientOptsV1(restConfig, c.RancherConfig))
 	if err != nil {
 		return nil, err
 	}
 
-	c.Provisioning.Ops.Session = session
-
-	c.Cluster, err = cluster.NewClient(clientOptsV1(restConfig, c.RancherConfig))
-	if err != nil {
-		return nil, err
-	}
-	c.Cluster.Ops.Session = session
-
-	c.RKE, err = rke.NewClient(clientOptsV1(restConfig, c.RancherConfig))
-	if err != nil {
-		return nil, err
-	}
-	c.RKE.Ops.Session = session
+	c.Steve.Ops.Session = session
 
 	catalogClient, err := catalog.NewForConfig(restConfig, session)
 	if err != nil {
