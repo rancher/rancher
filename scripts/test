@@ -82,6 +82,15 @@ done
 #kill $TPID
 
 echo Running tests
+
+echo Running: build-token-generator
+./tests/v2/integration/scripts/build-integration-setup
+
+path=$(pwd)
+./tests/v2/integration/bin/integrationsetup
+export CATTLE_TEST_CONFIG=${path}/config.yaml
+go test -v ./tests/v2/integration/...
+
 INT_TESTS_STARTED=true
 cd ./tests/integration
 tox -e rancher -- -m "not nonparallel" -n $(nproc)
