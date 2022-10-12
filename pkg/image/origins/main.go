@@ -7,7 +7,6 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/pkg/errors"
 	"github.com/rancher/rancher/pkg/image/utilities"
 
 	img "github.com/rancher/rancher/pkg/image"
@@ -152,9 +151,9 @@ func convertImagesToRepoUrls(images []string, imgToURL map[string]string) error 
 				imgToURL[repo] = "unknown"
 				continue
 			}
-			url, err := checkURL(fmt.Sprintf("https://www.github.com/%s/%s", ownerAndRepository[0], strings.Join(ownerAndRepository[1:], "")))
+			url, err := checkURL(fmt.Sprintf("https://github.com/%s/%s", ownerAndRepository[0], strings.Join(ownerAndRepository[1:], "")))
 			if err != nil && err.Error() != imageNotFound {
-				return errors.Wrap(err, fmt.Sprintf("encountered HTTP error while resolving repository: %s", repo))
+				return fmt.Errorf("encountered HTTP error while resolving repository %s: %w", repo, err)
 			}
 			if err != nil {
 				url = "unknown"
@@ -163,9 +162,9 @@ func convertImagesToRepoUrls(images []string, imgToURL map[string]string) error 
 		case strings.Contains(repo, "hardened"):
 			// hardened images conversion, best effort
 			cleanRepo := strings.ReplaceAll(repo, "hardened-", "image-build-")
-			url, err := checkURL("https://www.github.com/rancher/" + cleanRepo)
+			url, err := checkURL("https://github.com/rancher/" + cleanRepo)
 			if err != nil && err.Error() != imageNotFound {
-				return errors.Wrap(err, fmt.Sprintf("encountered HTTP error while resolving repository: %s", repo))
+				return fmt.Errorf("encountered HTTP error while resolving repository %s: %w", repo, err)
 			}
 			if err != nil {
 				url = "unknown"
@@ -174,9 +173,9 @@ func convertImagesToRepoUrls(images []string, imgToURL map[string]string) error 
 		default:
 			// handle Rancher images which share
 			// a name with their base repository
-			url, err := checkURL("https://www.github.com/rancher/" + repo)
+			url, err := checkURL("https://github.com/rancher/" + repo)
 			if err != nil && err.Error() != imageNotFound {
-				return errors.Wrap(err, fmt.Sprintf("encountered HTTP error while resolving repository: %s", repo))
+				return fmt.Errorf("encountered HTTP error while resolving repository %s: %w", repo, err)
 			}
 			if err != nil {
 				url = "unknown"

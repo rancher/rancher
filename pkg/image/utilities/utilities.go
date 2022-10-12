@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	"github.com/coreos/go-semver/semver"
-	"github.com/pkg/errors"
 	kd "github.com/rancher/rancher/pkg/controllers/management/kontainerdrivermetadata"
 	img "github.com/rancher/rancher/pkg/image"
 	ext "github.com/rancher/rancher/pkg/image/external"
@@ -76,11 +75,11 @@ func GatherTargetImagesAndSources(systemChartsPath, chartsPath string, imagesFro
 		b, err = os.ReadFile(filepath.Join(os.Getenv("HOME"), "bin", "data.json"))
 	}
 	if err != nil {
-		return ImageTargetsAndSources{}, errors.Wrap(err, "could not read data.json")
+		return ImageTargetsAndSources{}, fmt.Errorf("could not read data.json: %w", err)
 	}
 	data, err := kdm.FromData(b)
 	if err != nil {
-		return ImageTargetsAndSources{}, errors.Wrap(err, "could not load KDM data")
+		return ImageTargetsAndSources{}, fmt.Errorf("could not load KDM data: %w", err)
 	}
 
 	linuxInfo, windowsInfo := kd.GetK8sVersionInfo(
@@ -97,7 +96,7 @@ func GatherTargetImagesAndSources(systemChartsPath, chartsPath string, imagesFro
 	}
 	sort.Strings(k8sVersions)
 	if err := writeSliceToFile(filepath.Join(os.Getenv("HOME"), "bin", "rancher-rke-k8s-versions.txt"), k8sVersions); err != nil {
-		return ImageTargetsAndSources{}, errors.Wrap(err, "could not write rancher-rke-k8s-versions.txt file")
+		return ImageTargetsAndSources{}, fmt.Errorf("%s: %w", "could not write rancher-rke-k8s-versions.txt file", err)
 	}
 
 	externalImages := make(map[string][]string)
@@ -107,7 +106,7 @@ func GatherTargetImagesAndSources(systemChartsPath, chartsPath string, imagesFro
 		Patch: 0,
 	})
 	if err != nil {
-		return ImageTargetsAndSources{}, errors.Wrap(err, "could not get external images for K3s")
+		return ImageTargetsAndSources{}, fmt.Errorf("%s: %w", "could not get external images for K3s", err)
 	}
 	if k3sUpgradeImages != nil {
 		externalImages["k3sUpgrade"] = k3sUpgradeImages
@@ -121,7 +120,7 @@ func GatherTargetImagesAndSources(systemChartsPath, chartsPath string, imagesFro
 		Patch: 0,
 	})
 	if err != nil {
-		return ImageTargetsAndSources{}, errors.Wrap(err, "could not get external images for RKE2")
+		return ImageTargetsAndSources{}, fmt.Errorf("%s: %w", "could not get external images for RKE2", err)
 
 	}
 	if rke2AllImages != nil {
@@ -131,7 +130,7 @@ func GatherTargetImagesAndSources(systemChartsPath, chartsPath string, imagesFro
 	sort.Strings(imagesFromArgs)
 	winsIndex := sort.SearchStrings(imagesFromArgs, "rancher/wins")
 	if winsIndex > len(imagesFromArgs)-1 {
-		return ImageTargetsAndSources{}, errors.New("rancher/wins upgrade image not found")
+		return ImageTargetsAndSources{}, fmt.Errorf("rancher/wins upgrade image not found")
 	}
 
 	winsAgentUpdateImage := imagesFromArgs[winsIndex]

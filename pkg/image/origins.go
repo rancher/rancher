@@ -2,12 +2,9 @@ package image
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"strings"
-
-	"github.com/pkg/errors"
-
-	"github.com/sirupsen/logrus"
 )
 
 // OriginMap is a mapping between images used by Rancher
@@ -201,8 +198,8 @@ var OriginMap = map[string]string{
 	"prom-prometheus":                                         "https://github.com/prometheus/prometheus",
 	"prometheus-auth":                                         "https://github.com/rancher/prometheus-auth",
 	"prometheus-federator":                                    "https://github.com/rancher/prometheus-federator",
-	"pushprox-client":                                         "https://github.com/prometheus-community/PushProx/tree/master/cmd/client",
-	"pushprox-proxy":                                          "https://github.com/prometheus-community/PushProx/tree/master/cmd/proxy",
+	"pushprox-client":                                         "https://github.com/rancher/PushProx",
+	"pushprox-proxy":                                          "https://github.com/rancher/PushProx",
 	"rancher":                                                 "https://github.com/rancher/rancher",
 	"rancher-agent":                                           "https://github.com/rancher/rancher-agent",
 	"rancher-csp-adapter":                                     "https://github.com/rancher/csp-adapter",
@@ -233,7 +230,7 @@ var OriginMap = map[string]string{
 // ensures that they are covered by the OriginMap. If so, a file titled `rancher-image-origins.txt` will be written,
 // containing a space delimited list of un-versioned  images and their source code repository.
 func GenerateImageOrigins(linuxImagesFromArgs, targetImages, targetWindowsImages []string) error {
-	logrus.Infof("building rancher-image-origins.txt")
+	log.Printf("building rancher-image-origins.txt")
 
 	allImages := GetAllUniqueImages(linuxImagesFromArgs, targetImages, targetWindowsImages)
 
@@ -255,7 +252,7 @@ func GenerateImageOrigins(linuxImagesFromArgs, targetImages, targetWindowsImages
 
 	originsFile, err := os.Create("rancher-image-origins.txt")
 	if err != nil {
-		return errors.Wrap(err, "could not create rancher-image-origin.txt file")
+		return fmt.Errorf("could not create rancher-image-origin.txt file: %w", err)
 	}
 
 	originsFile.Chmod(0755)
