@@ -6,7 +6,6 @@ import (
 	"github.com/rancher/norman/generator"
 	"github.com/rancher/norman/objectclient"
 	"github.com/rancher/rancher/pkg/apis/cluster.cattle.io/v3"
-	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/rest"
 )
@@ -17,7 +16,6 @@ type Interface interface {
 }
 
 type Client struct {
-	userAgent         string
 	controllerFactory controller.SharedControllerFactory
 	clientFactory     client.SharedClientFactory
 }
@@ -46,9 +44,8 @@ func NewFromControllerFactory(factory controller.SharedControllerFactory) Interf
 
 func NewFromControllerFactoryWithAgent(userAgent string, factory controller.SharedControllerFactory) Interface {
 	return &Client{
-		userAgent:         userAgent,
 		controllerFactory: factory,
-		clientFactory:     factory.SharedCacheFactory().SharedClientFactory(),
+		clientFactory:     client.NewSharedClientFactoryWithAgent(userAgent, factory.SharedCacheFactory().SharedClientFactory()),
 	}
 }
 
@@ -58,12 +55,7 @@ type ClusterAuthTokensGetter interface {
 
 func (c *Client) ClusterAuthTokens(namespace string) ClusterAuthTokenInterface {
 	sharedClient := c.clientFactory.ForResourceKind(ClusterAuthTokenGroupVersionResource, ClusterAuthTokenGroupVersionKind.Kind, true)
-	client, err := sharedClient.WithAgent(c.userAgent)
-	if err != nil {
-		logrus.Errorf("Failed to add user agent to [ClusterAuthTokens] client: %v", err)
-		client = sharedClient
-	}
-	objectClient := objectclient.NewObjectClient(namespace, client, &ClusterAuthTokenResource, ClusterAuthTokenGroupVersionKind, clusterAuthTokenFactory{})
+	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &ClusterAuthTokenResource, ClusterAuthTokenGroupVersionKind, clusterAuthTokenFactory{})
 	return &clusterAuthTokenClient{
 		ns:           namespace,
 		client:       c,
@@ -77,12 +69,7 @@ type ClusterUserAttributesGetter interface {
 
 func (c *Client) ClusterUserAttributes(namespace string) ClusterUserAttributeInterface {
 	sharedClient := c.clientFactory.ForResourceKind(ClusterUserAttributeGroupVersionResource, ClusterUserAttributeGroupVersionKind.Kind, true)
-	client, err := sharedClient.WithAgent(c.userAgent)
-	if err != nil {
-		logrus.Errorf("Failed to add user agent to [ClusterUserAttributes] client: %v", err)
-		client = sharedClient
-	}
-	objectClient := objectclient.NewObjectClient(namespace, client, &ClusterUserAttributeResource, ClusterUserAttributeGroupVersionKind, clusterUserAttributeFactory{})
+	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &ClusterUserAttributeResource, ClusterUserAttributeGroupVersionKind, clusterUserAttributeFactory{})
 	return &clusterUserAttributeClient{
 		ns:           namespace,
 		client:       c,

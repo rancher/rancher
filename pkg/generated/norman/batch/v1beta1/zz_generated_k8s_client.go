@@ -5,7 +5,6 @@ import (
 	"github.com/rancher/lasso/pkg/controller"
 	"github.com/rancher/norman/generator"
 	"github.com/rancher/norman/objectclient"
-	"github.com/sirupsen/logrus"
 	"k8s.io/api/batch/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/rest"
@@ -16,7 +15,6 @@ type Interface interface {
 }
 
 type Client struct {
-	userAgent         string
 	controllerFactory controller.SharedControllerFactory
 	clientFactory     client.SharedClientFactory
 }
@@ -45,9 +43,8 @@ func NewFromControllerFactory(factory controller.SharedControllerFactory) Interf
 
 func NewFromControllerFactoryWithAgent(userAgent string, factory controller.SharedControllerFactory) Interface {
 	return &Client{
-		userAgent:         userAgent,
 		controllerFactory: factory,
-		clientFactory:     factory.SharedCacheFactory().SharedClientFactory(),
+		clientFactory:     client.NewSharedClientFactoryWithAgent(userAgent, factory.SharedCacheFactory().SharedClientFactory()),
 	}
 }
 
@@ -57,12 +54,7 @@ type CronJobsGetter interface {
 
 func (c *Client) CronJobs(namespace string) CronJobInterface {
 	sharedClient := c.clientFactory.ForResourceKind(CronJobGroupVersionResource, CronJobGroupVersionKind.Kind, true)
-	client, err := sharedClient.WithAgent(c.userAgent)
-	if err != nil {
-		logrus.Errorf("Failed to add user agent to [CronJobs] client: %v", err)
-		client = sharedClient
-	}
-	objectClient := objectclient.NewObjectClient(namespace, client, &CronJobResource, CronJobGroupVersionKind, cronJobFactory{})
+	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &CronJobResource, CronJobGroupVersionKind, cronJobFactory{})
 	return &cronJobClient{
 		ns:           namespace,
 		client:       c,

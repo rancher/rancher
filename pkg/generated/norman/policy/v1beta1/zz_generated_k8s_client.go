@@ -5,7 +5,6 @@ import (
 	"github.com/rancher/lasso/pkg/controller"
 	"github.com/rancher/norman/generator"
 	"github.com/rancher/norman/objectclient"
-	"github.com/sirupsen/logrus"
 	"k8s.io/api/policy/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/rest"
@@ -16,7 +15,6 @@ type Interface interface {
 }
 
 type Client struct {
-	userAgent         string
 	controllerFactory controller.SharedControllerFactory
 	clientFactory     client.SharedClientFactory
 }
@@ -45,9 +43,8 @@ func NewFromControllerFactory(factory controller.SharedControllerFactory) Interf
 
 func NewFromControllerFactoryWithAgent(userAgent string, factory controller.SharedControllerFactory) Interface {
 	return &Client{
-		userAgent:         userAgent,
 		controllerFactory: factory,
-		clientFactory:     factory.SharedCacheFactory().SharedClientFactory(),
+		clientFactory:     client.NewSharedClientFactoryWithAgent(userAgent, factory.SharedCacheFactory().SharedClientFactory()),
 	}
 }
 
@@ -57,12 +54,7 @@ type PodSecurityPoliciesGetter interface {
 
 func (c *Client) PodSecurityPolicies(namespace string) PodSecurityPolicyInterface {
 	sharedClient := c.clientFactory.ForResourceKind(PodSecurityPolicyGroupVersionResource, PodSecurityPolicyGroupVersionKind.Kind, false)
-	client, err := sharedClient.WithAgent(c.userAgent)
-	if err != nil {
-		logrus.Errorf("Failed to add user agent to [PodSecurityPolicies] client: %v", err)
-		client = sharedClient
-	}
-	objectClient := objectclient.NewObjectClient(namespace, client, &PodSecurityPolicyResource, PodSecurityPolicyGroupVersionKind, podSecurityPolicyFactory{})
+	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &PodSecurityPolicyResource, PodSecurityPolicyGroupVersionKind, podSecurityPolicyFactory{})
 	return &podSecurityPolicyClient{
 		ns:           namespace,
 		client:       c,
