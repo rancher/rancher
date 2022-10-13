@@ -19,8 +19,8 @@ limitations under the License.
 package cluster
 
 import (
+	"github.com/rancher/lasso/pkg/controller"
 	"github.com/rancher/wrangler/pkg/generic"
-	"github.com/sirupsen/logrus"
 	"k8s.io/client-go/rest"
 )
 
@@ -68,10 +68,5 @@ func (c *Factory) Cluster() Interface {
 }
 
 func (c *Factory) WithAgent(userAgent string) Interface {
-	factory, err := generic.ControllerFactoryWithAgent(userAgent, c.Factory)
-	if err != nil {
-		logrus.Debugf("failed to create Cluster Factory with agent [%s]: %v", userAgent, err)
-		return c.Cluster()
-	}
-	return New(factory.ControllerFactory())
+	return New(controller.NewSharedControllerFactoryWithAgent(userAgent, c.ControllerFactory()))
 }
