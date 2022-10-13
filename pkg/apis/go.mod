@@ -6,12 +6,12 @@ replace k8s.io/client-go => k8s.io/client-go v0.24.2
 
 require (
 	github.com/pkg/errors v0.9.1
-	github.com/rancher/aks-operator v1.0.7-rc1
-	github.com/rancher/eks-operator v1.1.5-rc1
+	github.com/rancher/aks-operator v1.0.7
+	github.com/rancher/eks-operator v1.1.5
 	github.com/rancher/fleet/pkg/apis v0.0.0-20220916041858-eae202f68985
 	github.com/rancher/gke-operator v1.1.4
 	github.com/rancher/norman v0.0.0-20220627222520-b74009fac3ff
-	github.com/rancher/rke v1.3.15-rc2
+	github.com/rancher/rke v1.3.15
 	github.com/rancher/wrangler v1.0.1-0.20220520195731-8eeded9bae2a
 	github.com/sirupsen/logrus v1.8.1
 	k8s.io/api v0.24.5
