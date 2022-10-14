@@ -10,6 +10,7 @@ variable "vpc_id" {}
 variable "sg_id" {}
 variable "subnets" {}
 variable "access_key" {}
+variable "access_key_name" {}
 variable "ec2_instance_class" {}
 variable "availability_zone" {}
 variable "resource_name" {}

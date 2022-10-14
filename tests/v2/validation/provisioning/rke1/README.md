@@ -54,7 +54,7 @@ RKE1 specifically needs a node template config to run properly. These are the in
     "iamInstanceProfile": "EngineeringUsersUS",
     "insecureTransport": false,
     "instanceType": "t2.2xlarge",
-    "keypairName": "jenkins-rke-validation",
+    "keypairName": "your-key-name",
     "kmsKey": "",
     "monitoring": false,
     "privateAddressOnly": false,
