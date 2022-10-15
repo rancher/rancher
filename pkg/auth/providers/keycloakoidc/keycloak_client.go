@@ -165,12 +165,15 @@ func (k *KeyCloakClient) getFromKeyCloakByID(principalID, principalType string, 
 }
 
 func getSearchURL(issuer string) (string, error) {
-	splitIssuer := strings.SplitAfter(issuer, "/auth/")
-	return fmt.Sprintf(
-		"%sadmin/%s",
-		splitIssuer[0],
-		splitIssuer[1],
-	), nil
+	iss := strings.SplitAfter(issuer, "/auth/") // keycloak < 19 has auth prefix
+	if len(iss) == 2 {
+		return fmt.Sprintf("%sadmin/%s", iss[0], iss[1]), nil
+	}
+	iss = strings.SplitN(issuer, "/realms/", 2) // keycloak >= 19 doesn't have auth prefix
+	if len(iss) == 2 {
+		return fmt.Sprintf("%s/admin/realms/%s", iss[0], strings.Join(iss[1:], "")), nil
+	}
+	return "", fmt.Errorf("can't parse issuer url")
 }
 
 // URLEncoded encodes the string
