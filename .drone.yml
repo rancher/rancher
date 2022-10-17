@@ -31,7 +31,7 @@ trigger:
     - promote
 ---
 kind: pipeline
-name: provisioning-tests-rke
+name: provisioning-tests-rke2
 
 platform:
   os: linux
@@ -41,7 +41,7 @@ steps:
 - name: provisioning-tests
   image: rancher/dapper:v0.5.8
   commands:
-  - dapper provisioning-tests-rke
+  - dapper provisioning-tests-rke2
   privileged: true
   volumes:
   - name: docker
