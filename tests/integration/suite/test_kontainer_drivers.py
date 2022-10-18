@@ -289,7 +289,7 @@ def test_kontainer_driver_links(admin_mc):
     images = get_images(url, token)
     assert "hyperkube" in images
     assert "rke-tools" in images
-    assert "kubelet-pause" in images
+    assert "mirrored-pause" in images
 
 
 def get_images(url, token):
@@ -308,6 +308,8 @@ def get_images(url, token):
             test["rke-tools"] = True
         elif "rancher/kubelet-pause" in str(line):
             test["kubelet-pause"] = True
+        elif "rancher/mirrored-pause" in str(line):
+            test["mirrored-pause"] = True
     return test
 
 
