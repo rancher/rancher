@@ -8,7 +8,6 @@ import (
 	"github.com/rancher/norman/types/convert"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	v1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
-	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2"
 	"github.com/rancher/rancher/pkg/features"
 	fleetconst "github.com/rancher/rancher/pkg/fleet"
 	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta1"
@@ -18,7 +17,6 @@ import (
 	"github.com/rancher/rancher/pkg/provisioningv2/image"
 	"github.com/rancher/rancher/pkg/provisioningv2/kubeconfig"
 	"github.com/rancher/rancher/pkg/settings"
-	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/rancher/wrangler/pkg/apply"
 	"github.com/rancher/wrangler/pkg/condition"
@@ -94,6 +92,9 @@ func Register(
 			clients.Mgmt.Cluster()),
 	}
 
+	clients.Provisioning.Cluster().Cache().AddIndexer(ByCluster, byClusterIndex)
+	clients.Provisioning.Cluster().Cache().AddIndexer(ByCloudCred, byCloudCredentialIndex)
+
 	mgmtcontrollers.RegisterClusterGeneratingHandler(ctx,
 		clients.Mgmt.Cluster(),
 		clients.Apply.WithCacheTypes(clients.Provisioning.Cluster()),
@@ -129,13 +130,6 @@ func Register(
 
 	clients.Mgmt.Cluster().OnRemove(ctx, "mgmt-cluster-remove", h.OnMgmtClusterRemove)
 	clients.Provisioning.Cluster().OnRemove(ctx, "provisioning-cluster-remove", h.OnClusterRemove)
-}
-
-func RegisterIndexers(context *config.ScaledContext) {
-	if features.ProvisioningV2.Enabled() {
-		context.Wrangler.Provisioning.Cluster().Cache().AddIndexer(ByCluster, byClusterIndex)
-		context.Wrangler.Provisioning.Cluster().Cache().AddIndexer(ByCloudCred, byCloudCredentialIndex)
-	}
 }
 
 func byClusterIndex(obj *v1.Cluster) ([]string, error) {
@@ -364,7 +358,7 @@ func (h *handler) updateStatus(objs []runtime.Object, cluster *v1.Cluster, statu
 				status.Conditions = append(status.Conditions, newCond)
 			}
 		}
-		status.AgentDeployed = rke2.AgentDeployed.IsTrue(existing)
+		status.AgentDeployed = v3.ClusterConditionAgentDeployed.IsTrue(existing)
 	}
 
 	// Never set ready back to false because we will end up deleting the secret

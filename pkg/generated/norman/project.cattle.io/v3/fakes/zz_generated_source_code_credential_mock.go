@@ -29,22 +29,22 @@ var _ v31.SourceCodeCredentialLister = &SourceCodeCredentialListerMock{}
 
 // SourceCodeCredentialListerMock is a mock implementation of v31.SourceCodeCredentialLister.
 //
-//     func TestSomethingThatUsesSourceCodeCredentialLister(t *testing.T) {
+//	    func TestSomethingThatUsesSourceCodeCredentialLister(t *testing.T) {
 //
-//         // make and configure a mocked v31.SourceCodeCredentialLister
-//         mockedSourceCodeCredentialLister := &SourceCodeCredentialListerMock{
-//             GetFunc: func(namespace string, name string) (*v3.SourceCodeCredential, error) {
-// 	               panic("mock out the Get method")
-//             },
-//             ListFunc: func(namespace string, selector labels.Selector) ([]*v3.SourceCodeCredential, error) {
-// 	               panic("mock out the List method")
-//             },
-//         }
+//	        // make and configure a mocked v31.SourceCodeCredentialLister
+//	        mockedSourceCodeCredentialLister := &SourceCodeCredentialListerMock{
+//	            GetFunc: func(namespace string, name string) (*v3.SourceCodeCredential, error) {
+//		               panic("mock out the Get method")
+//	            },
+//	            ListFunc: func(namespace string, selector labels.Selector) ([]*v3.SourceCodeCredential, error) {
+//		               panic("mock out the List method")
+//	            },
+//	        }
 //
-//         // use mockedSourceCodeCredentialLister in code that requires v31.SourceCodeCredentialLister
-//         // and then make assertions.
+//	        // use mockedSourceCodeCredentialLister in code that requires v31.SourceCodeCredentialLister
+//	        // and then make assertions.
 //
-//     }
+//	    }
 type SourceCodeCredentialListerMock struct {
 	// GetFunc mocks the Get method.
 	GetFunc func(namespace string, name string) (*v3.SourceCodeCredential, error)
@@ -91,7 +91,8 @@ func (mock *SourceCodeCredentialListerMock) Get(namespace string, name string) (
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//     len(mockedSourceCodeCredentialLister.GetCalls())
+//
+//	len(mockedSourceCodeCredentialLister.GetCalls())
 func (mock *SourceCodeCredentialListerMock) GetCalls() []struct {
 	Namespace string
 	Name      string
@@ -126,7 +127,8 @@ func (mock *SourceCodeCredentialListerMock) List(namespace string, selector labe
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//     len(mockedSourceCodeCredentialLister.ListCalls())
+//
+//	len(mockedSourceCodeCredentialLister.ListCalls())
 func (mock *SourceCodeCredentialListerMock) ListCalls() []struct {
 	Namespace string
 	Selector  labels.Selector
@@ -159,43 +161,43 @@ var _ v31.SourceCodeCredentialController = &SourceCodeCredentialControllerMock{}
 
 // SourceCodeCredentialControllerMock is a mock implementation of v31.SourceCodeCredentialController.
 //
-//     func TestSomethingThatUsesSourceCodeCredentialController(t *testing.T) {
+//	    func TestSomethingThatUsesSourceCodeCredentialController(t *testing.T) {
 //
-//         // make and configure a mocked v31.SourceCodeCredentialController
-//         mockedSourceCodeCredentialController := &SourceCodeCredentialControllerMock{
-//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v31.SourceCodeCredentialHandlerFunc)  {
-// 	               panic("mock out the AddClusterScopedFeatureHandler method")
-//             },
-//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v31.SourceCodeCredentialHandlerFunc)  {
-// 	               panic("mock out the AddClusterScopedHandler method")
-//             },
-//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.SourceCodeCredentialHandlerFunc)  {
-// 	               panic("mock out the AddFeatureHandler method")
-//             },
-//             AddHandlerFunc: func(ctx context.Context, name string, handler v31.SourceCodeCredentialHandlerFunc)  {
-// 	               panic("mock out the AddHandler method")
-//             },
-//             EnqueueFunc: func(namespace string, name string)  {
-// 	               panic("mock out the Enqueue method")
-//             },
-//             EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
-// 	               panic("mock out the EnqueueAfter method")
-//             },
-//             GenericFunc: func() controller.GenericController {
-// 	               panic("mock out the Generic method")
-//             },
-//             InformerFunc: func() cache.SharedIndexInformer {
-// 	               panic("mock out the Informer method")
-//             },
-//             ListerFunc: func() v31.SourceCodeCredentialLister {
-// 	               panic("mock out the Lister method")
-//             },
-//         }
+//	        // make and configure a mocked v31.SourceCodeCredentialController
+//	        mockedSourceCodeCredentialController := &SourceCodeCredentialControllerMock{
+//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v31.SourceCodeCredentialHandlerFunc)  {
+//		               panic("mock out the AddClusterScopedFeatureHandler method")
+//	            },
+//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v31.SourceCodeCredentialHandlerFunc)  {
+//		               panic("mock out the AddClusterScopedHandler method")
+//	            },
+//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.SourceCodeCredentialHandlerFunc)  {
+//		               panic("mock out the AddFeatureHandler method")
+//	            },
+//	            AddHandlerFunc: func(ctx context.Context, name string, handler v31.SourceCodeCredentialHandlerFunc)  {
+//		               panic("mock out the AddHandler method")
+//	            },
+//	            EnqueueFunc: func(namespace string, name string)  {
+//		               panic("mock out the Enqueue method")
+//	            },
+//	            EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
+//		               panic("mock out the EnqueueAfter method")
+//	            },
+//	            GenericFunc: func() controller.GenericController {
+//		               panic("mock out the Generic method")
+//	            },
+//	            InformerFunc: func() cache.SharedIndexInformer {
+//		               panic("mock out the Informer method")
+//	            },
+//	            ListerFunc: func() v31.SourceCodeCredentialLister {
+//		               panic("mock out the Lister method")
+//	            },
+//	        }
 //
-//         // use mockedSourceCodeCredentialController in code that requires v31.SourceCodeCredentialController
-//         // and then make assertions.
+//	        // use mockedSourceCodeCredentialController in code that requires v31.SourceCodeCredentialController
+//	        // and then make assertions.
 //
-//     }
+//	    }
 type SourceCodeCredentialControllerMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
 	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v31.SourceCodeCredentialHandlerFunc)
@@ -324,7 +326,8 @@ func (mock *SourceCodeCredentialControllerMock) AddClusterScopedFeatureHandler(c
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//     len(mockedSourceCodeCredentialController.AddClusterScopedFeatureHandlerCalls())
+//
+//	len(mockedSourceCodeCredentialController.AddClusterScopedFeatureHandlerCalls())
 func (mock *SourceCodeCredentialControllerMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -369,7 +372,8 @@ func (mock *SourceCodeCredentialControllerMock) AddClusterScopedHandler(ctx cont
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//     len(mockedSourceCodeCredentialController.AddClusterScopedHandlerCalls())
+//
+//	len(mockedSourceCodeCredentialController.AddClusterScopedHandlerCalls())
 func (mock *SourceCodeCredentialControllerMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -412,7 +416,8 @@ func (mock *SourceCodeCredentialControllerMock) AddFeatureHandler(ctx context.Co
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//     len(mockedSourceCodeCredentialController.AddFeatureHandlerCalls())
+//
+//	len(mockedSourceCodeCredentialController.AddFeatureHandlerCalls())
 func (mock *SourceCodeCredentialControllerMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
@@ -453,7 +458,8 @@ func (mock *SourceCodeCredentialControllerMock) AddHandler(ctx context.Context, 
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//     len(mockedSourceCodeCredentialController.AddHandlerCalls())
+//
+//	len(mockedSourceCodeCredentialController.AddHandlerCalls())
 func (mock *SourceCodeCredentialControllerMock) AddHandlerCalls() []struct {
 	Ctx     context.Context
 	Name    string
@@ -490,7 +496,8 @@ func (mock *SourceCodeCredentialControllerMock) Enqueue(namespace string, name s
 
 // EnqueueCalls gets all the calls that were made to Enqueue.
 // Check the length with:
-//     len(mockedSourceCodeCredentialController.EnqueueCalls())
+//
+//	len(mockedSourceCodeCredentialController.EnqueueCalls())
 func (mock *SourceCodeCredentialControllerMock) EnqueueCalls() []struct {
 	Namespace string
 	Name      string
@@ -527,7 +534,8 @@ func (mock *SourceCodeCredentialControllerMock) EnqueueAfter(namespace string, n
 
 // EnqueueAfterCalls gets all the calls that were made to EnqueueAfter.
 // Check the length with:
-//     len(mockedSourceCodeCredentialController.EnqueueAfterCalls())
+//
+//	len(mockedSourceCodeCredentialController.EnqueueAfterCalls())
 func (mock *SourceCodeCredentialControllerMock) EnqueueAfterCalls() []struct {
 	Namespace string
 	Name      string
@@ -559,7 +567,8 @@ func (mock *SourceCodeCredentialControllerMock) Generic() controller.GenericCont
 
 // GenericCalls gets all the calls that were made to Generic.
 // Check the length with:
-//     len(mockedSourceCodeCredentialController.GenericCalls())
+//
+//	len(mockedSourceCodeCredentialController.GenericCalls())
 func (mock *SourceCodeCredentialControllerMock) GenericCalls() []struct {
 } {
 	var calls []struct {
@@ -585,7 +594,8 @@ func (mock *SourceCodeCredentialControllerMock) Informer() cache.SharedIndexInfo
 
 // InformerCalls gets all the calls that were made to Informer.
 // Check the length with:
-//     len(mockedSourceCodeCredentialController.InformerCalls())
+//
+//	len(mockedSourceCodeCredentialController.InformerCalls())
 func (mock *SourceCodeCredentialControllerMock) InformerCalls() []struct {
 } {
 	var calls []struct {
@@ -611,7 +621,8 @@ func (mock *SourceCodeCredentialControllerMock) Lister() v31.SourceCodeCredentia
 
 // ListerCalls gets all the calls that were made to Lister.
 // Check the length with:
-//     len(mockedSourceCodeCredentialController.ListerCalls())
+//
+//	len(mockedSourceCodeCredentialController.ListerCalls())
 func (mock *SourceCodeCredentialControllerMock) ListerCalls() []struct {
 } {
 	var calls []struct {
@@ -651,76 +662,76 @@ var _ v31.SourceCodeCredentialInterface = &SourceCodeCredentialInterfaceMock{}
 
 // SourceCodeCredentialInterfaceMock is a mock implementation of v31.SourceCodeCredentialInterface.
 //
-//     func TestSomethingThatUsesSourceCodeCredentialInterface(t *testing.T) {
+//	    func TestSomethingThatUsesSourceCodeCredentialInterface(t *testing.T) {
 //
-//         // make and configure a mocked v31.SourceCodeCredentialInterface
-//         mockedSourceCodeCredentialInterface := &SourceCodeCredentialInterfaceMock{
-//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v31.SourceCodeCredentialHandlerFunc)  {
-// 	               panic("mock out the AddClusterScopedFeatureHandler method")
-//             },
-//             AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v31.SourceCodeCredentialLifecycle)  {
-// 	               panic("mock out the AddClusterScopedFeatureLifecycle method")
-//             },
-//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v31.SourceCodeCredentialHandlerFunc)  {
-// 	               panic("mock out the AddClusterScopedHandler method")
-//             },
-//             AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v31.SourceCodeCredentialLifecycle)  {
-// 	               panic("mock out the AddClusterScopedLifecycle method")
-//             },
-//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.SourceCodeCredentialHandlerFunc)  {
-// 	               panic("mock out the AddFeatureHandler method")
-//             },
-//             AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v31.SourceCodeCredentialLifecycle)  {
-// 	               panic("mock out the AddFeatureLifecycle method")
-//             },
-//             AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v31.SourceCodeCredentialHandlerFunc)  {
-// 	               panic("mock out the AddHandler method")
-//             },
-//             AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v31.SourceCodeCredentialLifecycle)  {
-// 	               panic("mock out the AddLifecycle method")
-//             },
-//             ControllerFunc: func() v31.SourceCodeCredentialController {
-// 	               panic("mock out the Controller method")
-//             },
-//             CreateFunc: func(in1 *v3.SourceCodeCredential) (*v3.SourceCodeCredential, error) {
-// 	               panic("mock out the Create method")
-//             },
-//             DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
-// 	               panic("mock out the Delete method")
-//             },
-//             DeleteCollectionFunc: func(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
-// 	               panic("mock out the DeleteCollection method")
-//             },
-//             DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
-// 	               panic("mock out the DeleteNamespaced method")
-//             },
-//             GetFunc: func(name string, opts metav1.GetOptions) (*v3.SourceCodeCredential, error) {
-// 	               panic("mock out the Get method")
-//             },
-//             GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v3.SourceCodeCredential, error) {
-// 	               panic("mock out the GetNamespaced method")
-//             },
-//             ListFunc: func(opts metav1.ListOptions) (*v3.SourceCodeCredentialList, error) {
-// 	               panic("mock out the List method")
-//             },
-//             ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v3.SourceCodeCredentialList, error) {
-// 	               panic("mock out the ListNamespaced method")
-//             },
-//             ObjectClientFunc: func() *objectclient.ObjectClient {
-// 	               panic("mock out the ObjectClient method")
-//             },
-//             UpdateFunc: func(in1 *v3.SourceCodeCredential) (*v3.SourceCodeCredential, error) {
-// 	               panic("mock out the Update method")
-//             },
-//             WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
-// 	               panic("mock out the Watch method")
-//             },
-//         }
+//	        // make and configure a mocked v31.SourceCodeCredentialInterface
+//	        mockedSourceCodeCredentialInterface := &SourceCodeCredentialInterfaceMock{
+//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v31.SourceCodeCredentialHandlerFunc)  {
+//		               panic("mock out the AddClusterScopedFeatureHandler method")
+//	            },
+//	            AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v31.SourceCodeCredentialLifecycle)  {
+//		               panic("mock out the AddClusterScopedFeatureLifecycle method")
+//	            },
+//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v31.SourceCodeCredentialHandlerFunc)  {
+//		               panic("mock out the AddClusterScopedHandler method")
+//	            },
+//	            AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v31.SourceCodeCredentialLifecycle)  {
+//		               panic("mock out the AddClusterScopedLifecycle method")
+//	            },
+//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.SourceCodeCredentialHandlerFunc)  {
+//		               panic("mock out the AddFeatureHandler method")
+//	            },
+//	            AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v31.SourceCodeCredentialLifecycle)  {
+//		               panic("mock out the AddFeatureLifecycle method")
+//	            },
+//	            AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v31.SourceCodeCredentialHandlerFunc)  {
+//		               panic("mock out the AddHandler method")
+//	            },
+//	            AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v31.SourceCodeCredentialLifecycle)  {
+//		               panic("mock out the AddLifecycle method")
+//	            },
+//	            ControllerFunc: func() v31.SourceCodeCredentialController {
+//		               panic("mock out the Controller method")
+//	            },
+//	            CreateFunc: func(in1 *v3.SourceCodeCredential) (*v3.SourceCodeCredential, error) {
+//		               panic("mock out the Create method")
+//	            },
+//	            DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
+//		               panic("mock out the Delete method")
+//	            },
+//	            DeleteCollectionFunc: func(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
+//		               panic("mock out the DeleteCollection method")
+//	            },
+//	            DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
+//		               panic("mock out the DeleteNamespaced method")
+//	            },
+//	            GetFunc: func(name string, opts metav1.GetOptions) (*v3.SourceCodeCredential, error) {
+//		               panic("mock out the Get method")
+//	            },
+//	            GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v3.SourceCodeCredential, error) {
+//		               panic("mock out the GetNamespaced method")
+//	            },
+//	            ListFunc: func(opts metav1.ListOptions) (*v3.SourceCodeCredentialList, error) {
+//		               panic("mock out the List method")
+//	            },
+//	            ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v3.SourceCodeCredentialList, error) {
+//		               panic("mock out the ListNamespaced method")
+//	            },
+//	            ObjectClientFunc: func() *objectclient.ObjectClient {
+//		               panic("mock out the ObjectClient method")
+//	            },
+//	            UpdateFunc: func(in1 *v3.SourceCodeCredential) (*v3.SourceCodeCredential, error) {
+//		               panic("mock out the Update method")
+//	            },
+//	            WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
+//		               panic("mock out the Watch method")
+//	            },
+//	        }
 //
-//         // use mockedSourceCodeCredentialInterface in code that requires v31.SourceCodeCredentialInterface
-//         // and then make assertions.
+//	        // use mockedSourceCodeCredentialInterface in code that requires v31.SourceCodeCredentialInterface
+//	        // and then make assertions.
 //
-//     }
+//	    }
 type SourceCodeCredentialInterfaceMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
 	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v31.SourceCodeCredentialHandlerFunc)
@@ -973,7 +984,8 @@ func (mock *SourceCodeCredentialInterfaceMock) AddClusterScopedFeatureHandler(ct
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//     len(mockedSourceCodeCredentialInterface.AddClusterScopedFeatureHandlerCalls())
+//
+//	len(mockedSourceCodeCredentialInterface.AddClusterScopedFeatureHandlerCalls())
 func (mock *SourceCodeCredentialInterfaceMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -1020,7 +1032,8 @@ func (mock *SourceCodeCredentialInterfaceMock) AddClusterScopedFeatureLifecycle(
 
 // AddClusterScopedFeatureLifecycleCalls gets all the calls that were made to AddClusterScopedFeatureLifecycle.
 // Check the length with:
-//     len(mockedSourceCodeCredentialInterface.AddClusterScopedFeatureLifecycleCalls())
+//
+//	len(mockedSourceCodeCredentialInterface.AddClusterScopedFeatureLifecycleCalls())
 func (mock *SourceCodeCredentialInterfaceMock) AddClusterScopedFeatureLifecycleCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -1065,7 +1078,8 @@ func (mock *SourceCodeCredentialInterfaceMock) AddClusterScopedHandler(ctx conte
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//     len(mockedSourceCodeCredentialInterface.AddClusterScopedHandlerCalls())
+//
+//	len(mockedSourceCodeCredentialInterface.AddClusterScopedHandlerCalls())
 func (mock *SourceCodeCredentialInterfaceMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -1108,7 +1122,8 @@ func (mock *SourceCodeCredentialInterfaceMock) AddClusterScopedLifecycle(ctx con
 
 // AddClusterScopedLifecycleCalls gets all the calls that were made to AddClusterScopedLifecycle.
 // Check the length with:
-//     len(mockedSourceCodeCredentialInterface.AddClusterScopedLifecycleCalls())
+//
+//	len(mockedSourceCodeCredentialInterface.AddClusterScopedLifecycleCalls())
 func (mock *SourceCodeCredentialInterfaceMock) AddClusterScopedLifecycleCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -1151,7 +1166,8 @@ func (mock *SourceCodeCredentialInterfaceMock) AddFeatureHandler(ctx context.Con
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//     len(mockedSourceCodeCredentialInterface.AddFeatureHandlerCalls())
+//
+//	len(mockedSourceCodeCredentialInterface.AddFeatureHandlerCalls())
 func (mock *SourceCodeCredentialInterfaceMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
@@ -1194,7 +1210,8 @@ func (mock *SourceCodeCredentialInterfaceMock) AddFeatureLifecycle(ctx context.C
 
 // AddFeatureLifecycleCalls gets all the calls that were made to AddFeatureLifecycle.
 // Check the length with:
-//     len(mockedSourceCodeCredentialInterface.AddFeatureLifecycleCalls())
+//
+//	len(mockedSourceCodeCredentialInterface.AddFeatureLifecycleCalls())
 func (mock *SourceCodeCredentialInterfaceMock) AddFeatureLifecycleCalls() []struct {
 	Ctx       context.Context
 	Enabled   func() bool
@@ -1235,7 +1252,8 @@ func (mock *SourceCodeCredentialInterfaceMock) AddHandler(ctx context.Context, n
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//     len(mockedSourceCodeCredentialInterface.AddHandlerCalls())
+//
+//	len(mockedSourceCodeCredentialInterface.AddHandlerCalls())
 func (mock *SourceCodeCredentialInterfaceMock) AddHandlerCalls() []struct {
 	Ctx  context.Context
 	Name string
@@ -1274,7 +1292,8 @@ func (mock *SourceCodeCredentialInterfaceMock) AddLifecycle(ctx context.Context,
 
 // AddLifecycleCalls gets all the calls that were made to AddLifecycle.
 // Check the length with:
-//     len(mockedSourceCodeCredentialInterface.AddLifecycleCalls())
+//
+//	len(mockedSourceCodeCredentialInterface.AddLifecycleCalls())
 func (mock *SourceCodeCredentialInterfaceMock) AddLifecycleCalls() []struct {
 	Ctx       context.Context
 	Name      string
@@ -1306,7 +1325,8 @@ func (mock *SourceCodeCredentialInterfaceMock) Controller() v31.SourceCodeCreden
 
 // ControllerCalls gets all the calls that were made to Controller.
 // Check the length with:
-//     len(mockedSourceCodeCredentialInterface.ControllerCalls())
+//
+//	len(mockedSourceCodeCredentialInterface.ControllerCalls())
 func (mock *SourceCodeCredentialInterfaceMock) ControllerCalls() []struct {
 } {
 	var calls []struct {
@@ -1335,7 +1355,8 @@ func (mock *SourceCodeCredentialInterfaceMock) Create(in1 *v3.SourceCodeCredenti
 
 // CreateCalls gets all the calls that were made to Create.
 // Check the length with:
-//     len(mockedSourceCodeCredentialInterface.CreateCalls())
+//
+//	len(mockedSourceCodeCredentialInterface.CreateCalls())
 func (mock *SourceCodeCredentialInterfaceMock) CreateCalls() []struct {
 	In1 *v3.SourceCodeCredential
 } {
@@ -1368,7 +1389,8 @@ func (mock *SourceCodeCredentialInterfaceMock) Delete(name string, options *meta
 
 // DeleteCalls gets all the calls that were made to Delete.
 // Check the length with:
-//     len(mockedSourceCodeCredentialInterface.DeleteCalls())
+//
+//	len(mockedSourceCodeCredentialInterface.DeleteCalls())
 func (mock *SourceCodeCredentialInterfaceMock) DeleteCalls() []struct {
 	Name    string
 	Options *metav1.DeleteOptions
@@ -1403,7 +1425,8 @@ func (mock *SourceCodeCredentialInterfaceMock) DeleteCollection(deleteOpts *meta
 
 // DeleteCollectionCalls gets all the calls that were made to DeleteCollection.
 // Check the length with:
-//     len(mockedSourceCodeCredentialInterface.DeleteCollectionCalls())
+//
+//	len(mockedSourceCodeCredentialInterface.DeleteCollectionCalls())
 func (mock *SourceCodeCredentialInterfaceMock) DeleteCollectionCalls() []struct {
 	DeleteOpts *metav1.DeleteOptions
 	ListOpts   metav1.ListOptions
@@ -1440,7 +1463,8 @@ func (mock *SourceCodeCredentialInterfaceMock) DeleteNamespaced(namespace string
 
 // DeleteNamespacedCalls gets all the calls that were made to DeleteNamespaced.
 // Check the length with:
-//     len(mockedSourceCodeCredentialInterface.DeleteNamespacedCalls())
+//
+//	len(mockedSourceCodeCredentialInterface.DeleteNamespacedCalls())
 func (mock *SourceCodeCredentialInterfaceMock) DeleteNamespacedCalls() []struct {
 	Namespace string
 	Name      string
@@ -1477,7 +1501,8 @@ func (mock *SourceCodeCredentialInterfaceMock) Get(name string, opts metav1.GetO
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//     len(mockedSourceCodeCredentialInterface.GetCalls())
+//
+//	len(mockedSourceCodeCredentialInterface.GetCalls())
 func (mock *SourceCodeCredentialInterfaceMock) GetCalls() []struct {
 	Name string
 	Opts metav1.GetOptions
@@ -1514,7 +1539,8 @@ func (mock *SourceCodeCredentialInterfaceMock) GetNamespaced(namespace string, n
 
 // GetNamespacedCalls gets all the calls that were made to GetNamespaced.
 // Check the length with:
-//     len(mockedSourceCodeCredentialInterface.GetNamespacedCalls())
+//
+//	len(mockedSourceCodeCredentialInterface.GetNamespacedCalls())
 func (mock *SourceCodeCredentialInterfaceMock) GetNamespacedCalls() []struct {
 	Namespace string
 	Name      string
@@ -1549,7 +1575,8 @@ func (mock *SourceCodeCredentialInterfaceMock) List(opts metav1.ListOptions) (*v
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//     len(mockedSourceCodeCredentialInterface.ListCalls())
+//
+//	len(mockedSourceCodeCredentialInterface.ListCalls())
 func (mock *SourceCodeCredentialInterfaceMock) ListCalls() []struct {
 	Opts metav1.ListOptions
 } {
@@ -1582,7 +1609,8 @@ func (mock *SourceCodeCredentialInterfaceMock) ListNamespaced(namespace string, 
 
 // ListNamespacedCalls gets all the calls that were made to ListNamespaced.
 // Check the length with:
-//     len(mockedSourceCodeCredentialInterface.ListNamespacedCalls())
+//
+//	len(mockedSourceCodeCredentialInterface.ListNamespacedCalls())
 func (mock *SourceCodeCredentialInterfaceMock) ListNamespacedCalls() []struct {
 	Namespace string
 	Opts      metav1.ListOptions
@@ -1612,7 +1640,8 @@ func (mock *SourceCodeCredentialInterfaceMock) ObjectClient() *objectclient.Obje
 
 // ObjectClientCalls gets all the calls that were made to ObjectClient.
 // Check the length with:
-//     len(mockedSourceCodeCredentialInterface.ObjectClientCalls())
+//
+//	len(mockedSourceCodeCredentialInterface.ObjectClientCalls())
 func (mock *SourceCodeCredentialInterfaceMock) ObjectClientCalls() []struct {
 } {
 	var calls []struct {
@@ -1641,7 +1670,8 @@ func (mock *SourceCodeCredentialInterfaceMock) Update(in1 *v3.SourceCodeCredenti
 
 // UpdateCalls gets all the calls that were made to Update.
 // Check the length with:
-//     len(mockedSourceCodeCredentialInterface.UpdateCalls())
+//
+//	len(mockedSourceCodeCredentialInterface.UpdateCalls())
 func (mock *SourceCodeCredentialInterfaceMock) UpdateCalls() []struct {
 	In1 *v3.SourceCodeCredential
 } {
@@ -1672,7 +1702,8 @@ func (mock *SourceCodeCredentialInterfaceMock) Watch(opts metav1.ListOptions) (w
 
 // WatchCalls gets all the calls that were made to Watch.
 // Check the length with:
-//     len(mockedSourceCodeCredentialInterface.WatchCalls())
+//
+//	len(mockedSourceCodeCredentialInterface.WatchCalls())
 func (mock *SourceCodeCredentialInterfaceMock) WatchCalls() []struct {
 	Opts metav1.ListOptions
 } {
@@ -1695,19 +1726,19 @@ var _ v31.SourceCodeCredentialsGetter = &SourceCodeCredentialsGetterMock{}
 
 // SourceCodeCredentialsGetterMock is a mock implementation of v31.SourceCodeCredentialsGetter.
 //
-//     func TestSomethingThatUsesSourceCodeCredentialsGetter(t *testing.T) {
+//	    func TestSomethingThatUsesSourceCodeCredentialsGetter(t *testing.T) {
 //
-//         // make and configure a mocked v31.SourceCodeCredentialsGetter
-//         mockedSourceCodeCredentialsGetter := &SourceCodeCredentialsGetterMock{
-//             SourceCodeCredentialsFunc: func(namespace string) v31.SourceCodeCredentialInterface {
-// 	               panic("mock out the SourceCodeCredentials method")
-//             },
-//         }
+//	        // make and configure a mocked v31.SourceCodeCredentialsGetter
+//	        mockedSourceCodeCredentialsGetter := &SourceCodeCredentialsGetterMock{
+//	            SourceCodeCredentialsFunc: func(namespace string) v31.SourceCodeCredentialInterface {
+//		               panic("mock out the SourceCodeCredentials method")
+//	            },
+//	        }
 //
-//         // use mockedSourceCodeCredentialsGetter in code that requires v31.SourceCodeCredentialsGetter
-//         // and then make assertions.
+//	        // use mockedSourceCodeCredentialsGetter in code that requires v31.SourceCodeCredentialsGetter
+//	        // and then make assertions.
 //
-//     }
+//	    }
 type SourceCodeCredentialsGetterMock struct {
 	// SourceCodeCredentialsFunc mocks the SourceCodeCredentials method.
 	SourceCodeCredentialsFunc func(namespace string) v31.SourceCodeCredentialInterface
@@ -1740,7 +1771,8 @@ func (mock *SourceCodeCredentialsGetterMock) SourceCodeCredentials(namespace str
 
 // SourceCodeCredentialsCalls gets all the calls that were made to SourceCodeCredentials.
 // Check the length with:
-//     len(mockedSourceCodeCredentialsGetter.SourceCodeCredentialsCalls())
+//
+//	len(mockedSourceCodeCredentialsGetter.SourceCodeCredentialsCalls())
 func (mock *SourceCodeCredentialsGetterMock) SourceCodeCredentialsCalls() []struct {
 	Namespace string
 } {

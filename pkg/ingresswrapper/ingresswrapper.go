@@ -241,7 +241,7 @@ func (i *CompatInterface) Update(ingress Ingress) (runtime.Object, error) {
 	return i.ingressLegacyInterface.Update(toUpdate)
 }
 
-//CompatLister is a wrapper for the norman listers for
+// CompatLister is a wrapper for the norman listers for
 // networking.k8s.io/v1/Ingress and extensions/v1beta1/Ingress.
 type CompatLister struct {
 	ingressLister           rnetworkingv1.IngressLister

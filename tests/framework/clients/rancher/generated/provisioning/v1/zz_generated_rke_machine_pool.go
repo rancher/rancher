@@ -30,7 +30,7 @@ type RKEMachinePool struct {
 	ControlPlaneRole             bool                         `json:"controlPlaneRole,omitempty" yaml:"controlPlaneRole,omitempty"`
 	DisplayName                  string                       `json:"displayName,omitempty" yaml:"displayName,omitempty"`
 	DrainBeforeDelete            bool                         `json:"drainBeforeDelete,omitempty" yaml:"drainBeforeDelete,omitempty"`
-	DrainBeforeDeleteTimeout     *Duration                    `json:"drainBeforeDeleteTimeout,omitempty" yaml:"drainBeforeDeleteTimeout,omitempty"`
+	DrainBeforeDeleteTimeout     string                       `json:"drainBeforeDeleteTimeout,omitempty" yaml:"drainBeforeDeleteTimeout,omitempty"`
 	EtcdRole                     bool                         `json:"etcdRole,omitempty" yaml:"etcdRole,omitempty"`
 	Labels                       map[string]string            `json:"labels,omitempty" yaml:"labels,omitempty"`
 	MachineDeploymentAnnotations map[string]string            `json:"machineDeploymentAnnotations,omitempty" yaml:"machineDeploymentAnnotations,omitempty"`
@@ -39,12 +39,12 @@ type RKEMachinePool struct {
 	MaxUnhealthy                 string                       `json:"maxUnhealthy,omitempty" yaml:"maxUnhealthy,omitempty"`
 	Name                         string                       `json:"name,omitempty" yaml:"name,omitempty"`
 	NodeConfig                   *ObjectReference             `json:"machineConfigRef,omitempty" yaml:"machineConfigRef,omitempty"`
-	NodeStartupTimeout           *Duration                    `json:"nodeStartupTimeout,omitempty" yaml:"nodeStartupTimeout,omitempty"`
+	NodeStartupTimeout           string                       `json:"nodeStartupTimeout,omitempty" yaml:"nodeStartupTimeout,omitempty"`
 	Paused                       bool                         `json:"paused,omitempty" yaml:"paused,omitempty"`
 	Quantity                     *int64                       `json:"quantity,omitempty" yaml:"quantity,omitempty"`
 	RollingUpdate                *RKEMachinePoolRollingUpdate `json:"rollingUpdate,omitempty" yaml:"rollingUpdate,omitempty"`
 	Taints                       []Taint                      `json:"taints,omitempty" yaml:"taints,omitempty"`
-	UnhealthyNodeTimeout         *Duration                    `json:"unhealthyNodeTimeout,omitempty" yaml:"unhealthyNodeTimeout,omitempty"`
+	UnhealthyNodeTimeout         string                       `json:"unhealthyNodeTimeout,omitempty" yaml:"unhealthyNodeTimeout,omitempty"`
 	UnhealthyRange               string                       `json:"unhealthyRange,omitempty" yaml:"unhealthyRange,omitempty"`
 	WorkerRole                   bool                         `json:"workerRole,omitempty" yaml:"workerRole,omitempty"`
 }

@@ -26,6 +26,7 @@ resource "azurerm_kubernetes_cluster" "default" {
   dns_prefix          = "taaks${random_string.random.result}"
   kubernetes_version  = var.kubernetes_version
   sku_tier            = "Paid"
+  role_based_access_control_enabled = true
 
   default_node_pool {
     name            = "taaks${random_string.random.result}"

@@ -116,9 +116,9 @@ func (c *CustomClusterProvisioningTestSuite) ProvisioningRKE2CustomCluster(exter
 
 					clusterName := provisioning.AppendRandomString(externalNodeProvider.Name)
 
-					cluster := clusters.NewRKE2ClusterConfig(clusterName, namespace, cni, "", kubeVersion, nil)
+					cluster := clusters.NewK3SRKE2ClusterConfig(clusterName, namespace, cni, "", kubeVersion, nil)
 
-					clusterResp, err := clusters.CreateRKE2Cluster(client, cluster)
+					clusterResp, err := clusters.CreateK3SRKE2Cluster(client, cluster)
 					require.NoError(c.T(), err)
 
 					client, err = client.ReLogin()
@@ -210,9 +210,9 @@ func (c *CustomClusterProvisioningTestSuite) ProvisioningRKE2CustomClusterDynami
 
 					clusterName := provisioning.AppendRandomString(externalNodeProvider.Name)
 
-					cluster := clusters.NewRKE2ClusterConfig(clusterName, namespace, cni, "", kubeVersion, nil)
+					cluster := clusters.NewK3SRKE2ClusterConfig(clusterName, namespace, cni, "", kubeVersion, nil)
 
-					clusterResp, err := clusters.CreateRKE2Cluster(client, cluster)
+					clusterResp, err := clusters.CreateK3SRKE2Cluster(client, cluster)
 					require.NoError(c.T(), err)
 
 					client, err = client.ReLogin()

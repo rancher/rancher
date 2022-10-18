@@ -13,7 +13,7 @@ var (
 	baseCattle = "./clients/rancher/generated"
 )
 
-// GenerateClient is used to generate clients using `schema` an object of type ]Schemas from the norman/types package
+// GenerateClient is used to generate clients using `schema` an object of type Schemas from the norman/types package
 // defined by specific api e.g. management.cattle.io
 func GenerateClient(schemas *types.Schemas, backendTypes map[string]bool) {
 	version := getVersion(schemas)

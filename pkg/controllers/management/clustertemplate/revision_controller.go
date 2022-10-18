@@ -44,7 +44,7 @@ func Register(ctx context.Context, management *config.ManagementContext) {
 	registerRbacControllers(ctx, management)
 }
 
-//sync is called periodically and on real updates
+// sync is called periodically and on real updates
 func (n *RevController) sync(key string, obj *v3.ClusterTemplateRevision) (runtime.Object, error) {
 	if obj == nil || obj.DeletionTimestamp != nil {
 		return nil, nil

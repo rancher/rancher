@@ -27,7 +27,7 @@ var (
 	ProviderNames          = make(map[string]bool)
 	ProvidersWithSecrets   = make(map[string]bool)
 	UnrefreshableProviders = make(map[string]bool)
-	providers              = make(map[string]common.AuthProvider)
+	Providers              = make(map[string]common.AuthProvider)
 	LocalProvider          = "local"
 	providersByType        = make(map[string]common.AuthProvider)
 	confMu                 sync.Mutex
@@ -35,7 +35,7 @@ var (
 )
 
 func GetProvider(providerName string) (common.AuthProvider, error) {
-	if provider, ok := providers[providerName]; ok {
+	if provider, ok := Providers[providerName]; ok {
 		if provider != nil {
 			return provider, nil
 		}
@@ -56,95 +56,95 @@ func Configure(ctx context.Context, mgmt *config.ScaledContext) {
 
 	p = local.Configure(ctx, mgmt, tokenMGR)
 	ProviderNames[local.Name] = true
-	providers[local.Name] = p
+	Providers[local.Name] = p
 	providersByType[client.LocalConfigType] = p
 	providersByType[publicclient.LocalProviderType] = p
 
 	p = github.Configure(ctx, mgmt, userMGR, tokenMGR)
 	ProviderNames[github.Name] = true
 	ProvidersWithSecrets[github.Name] = true
-	providers[github.Name] = p
+	Providers[github.Name] = p
 	providersByType[client.GithubConfigType] = p
 	providersByType[publicclient.GithubProviderType] = p
 
 	p = azure.Configure(ctx, mgmt, userMGR, tokenMGR)
 	ProviderNames[azure.Name] = true
 	ProvidersWithSecrets[azure.Name] = true
-	providers[azure.Name] = p
+	Providers[azure.Name] = p
 	providersByType[client.AzureADConfigType] = p
 	providersByType[publicclient.AzureADProviderType] = p
 
 	p = activedirectory.Configure(ctx, mgmt, userMGR, tokenMGR)
 	ProviderNames[activedirectory.Name] = true
-	providers[activedirectory.Name] = p
+	Providers[activedirectory.Name] = p
 	providersByType[client.ActiveDirectoryConfigType] = p
 	providersByType[publicclient.ActiveDirectoryProviderType] = p
 
 	p = ldap.Configure(ctx, mgmt, userMGR, tokenMGR, ldap.OpenLdapName)
 	ProviderNames[ldap.OpenLdapName] = true
-	providers[ldap.OpenLdapName] = p
+	Providers[ldap.OpenLdapName] = p
 	providersByType[client.OpenLdapConfigType] = p
 	providersByType[publicclient.OpenLdapProviderType] = p
 
 	p = ldap.Configure(ctx, mgmt, userMGR, tokenMGR, ldap.FreeIpaName)
 	ProviderNames[ldap.FreeIpaName] = true
-	providers[ldap.FreeIpaName] = p
+	Providers[ldap.FreeIpaName] = p
 	providersByType[client.FreeIpaConfigType] = p
 	providersByType[publicclient.FreeIpaProviderType] = p
 
 	p = saml.Configure(ctx, mgmt, userMGR, tokenMGR, saml.PingName)
 	ProviderNames[saml.PingName] = true
 	UnrefreshableProviders[saml.PingName] = true
-	providers[saml.PingName] = p
+	Providers[saml.PingName] = p
 	providersByType[client.PingConfigType] = p
 	providersByType[publicclient.PingProviderType] = p
 
 	p = saml.Configure(ctx, mgmt, userMGR, tokenMGR, saml.ADFSName)
 	ProviderNames[saml.ADFSName] = true
 	UnrefreshableProviders[saml.ADFSName] = true
-	providers[saml.ADFSName] = p
+	Providers[saml.ADFSName] = p
 	providersByType[client.ADFSConfigType] = p
 	providersByType[publicclient.ADFSProviderType] = p
 
 	p = saml.Configure(ctx, mgmt, userMGR, tokenMGR, saml.KeyCloakName)
 	ProviderNames[saml.KeyCloakName] = true
 	UnrefreshableProviders[saml.KeyCloakName] = true
-	providers[saml.KeyCloakName] = p
+	Providers[saml.KeyCloakName] = p
 	providersByType[client.KeyCloakConfigType] = p
 	providersByType[publicclient.KeyCloakProviderType] = p
 
 	p = saml.Configure(ctx, mgmt, userMGR, tokenMGR, saml.OKTAName)
 	ProviderNames[saml.OKTAName] = true
 	UnrefreshableProviders[saml.OKTAName] = true
-	providers[saml.OKTAName] = p
+	Providers[saml.OKTAName] = p
 	providersByType[client.OKTAConfigType] = p
 	providersByType[publicclient.OKTAProviderType] = p
 
 	p = saml.Configure(ctx, mgmt, userMGR, tokenMGR, saml.ShibbolethName)
 	ProviderNames[saml.ShibbolethName] = true
 	UnrefreshableProviders[saml.ShibbolethName] = false
-	providers[saml.ShibbolethName] = p
+	Providers[saml.ShibbolethName] = p
 	providersByType[client.ShibbolethConfigType] = p
 	providersByType[publicclient.ShibbolethProviderType] = p
 
 	p = googleoauth.Configure(ctx, mgmt, userMGR, tokenMGR)
 	ProviderNames[googleoauth.Name] = true
 	ProvidersWithSecrets[googleoauth.Name] = true
-	providers[googleoauth.Name] = p
+	Providers[googleoauth.Name] = p
 	providersByType[client.GoogleOauthConfigType] = p
 	providersByType[publicclient.GoogleOAuthProviderType] = p
 
 	p = oidc.Configure(ctx, mgmt, userMGR, tokenMGR)
 	ProviderNames[oidc.Name] = true
 	ProvidersWithSecrets[oidc.Name] = true
-	providers[oidc.Name] = p
+	Providers[oidc.Name] = p
 	providersByType[client.OIDCConfigType] = p
 	providersByType[publicclient.OIDCProviderType] = p
 
 	p = keycloakoidc.Configure(ctx, mgmt, userMGR, tokenMGR)
 	ProviderNames[keycloakoidc.Name] = true
 	ProvidersWithSecrets[keycloakoidc.Name] = true
-	providers[keycloakoidc.Name] = p
+	Providers[keycloakoidc.Name] = p
 	providersByType[client.KeyCloakOIDCConfigType] = p
 	providersByType[publicclient.KeyCloakOIDCProviderType] = p
 }
@@ -157,14 +157,14 @@ func IsValidUserExtraAttribute(key string) bool {
 }
 
 func AuthenticateUser(ctx context.Context, input interface{}, providerName string) (v3.Principal, []v3.Principal, string, error) {
-	return providers[providerName].AuthenticateUser(ctx, input)
+	return Providers[providerName].AuthenticateUser(ctx, input)
 }
 
 func GetPrincipal(principalID string, myToken v3.Token) (v3.Principal, error) {
-	principal, err := providers[myToken.AuthProvider].GetPrincipal(principalID, myToken)
+	principal, err := Providers[myToken.AuthProvider].GetPrincipal(principalID, myToken)
 
 	if err != nil && myToken.AuthProvider != LocalProvider {
-		p2, e2 := providers[LocalProvider].GetPrincipal(principalID, myToken)
+		p2, e2 := Providers[LocalProvider].GetPrincipal(principalID, myToken)
 		if e2 == nil {
 			return p2, nil
 		}
@@ -177,15 +177,15 @@ func SearchPrincipals(name, principalType string, myToken v3.Token) ([]v3.Princi
 	if myToken.AuthProvider == "" {
 		return []v3.Principal{}, fmt.Errorf("[SearchPrincipals] no authProvider specified in token")
 	}
-	if providers[myToken.AuthProvider] == nil {
+	if Providers[myToken.AuthProvider] == nil {
 		return []v3.Principal{}, fmt.Errorf("[SearchPrincipals] authProvider %v not initialized", myToken.AuthProvider)
 	}
-	principals, err := providers[myToken.AuthProvider].SearchPrincipals(name, principalType, myToken)
+	principals, err := Providers[myToken.AuthProvider].SearchPrincipals(name, principalType, myToken)
 	if err != nil {
 		return principals, err
 	}
 	if myToken.AuthProvider != LocalProvider {
-		lp := providers[LocalProvider]
+		lp := Providers[LocalProvider]
 		if lpDedupe, _ := lp.(*local.Provider); lpDedupe != nil {
 			localPrincipals, err := lpDedupe.SearchPrincipalsDedupe(name, principalType, myToken, principals)
 			if err != nil {
@@ -198,13 +198,13 @@ func SearchPrincipals(name, principalType string, myToken v3.Token) ([]v3.Princi
 }
 
 func CanAccessWithGroupProviders(providerName string, userPrincipalID string, groups []v3.Principal) (bool, error) {
-	return providers[providerName].CanAccessWithGroupProviders(userPrincipalID, groups)
+	return Providers[providerName].CanAccessWithGroupProviders(userPrincipalID, groups)
 }
 
 func RefetchGroupPrincipals(principalID string, providerName string, secret string) ([]v3.Principal, error) {
-	return providers[providerName].RefetchGroupPrincipals(principalID, secret)
+	return Providers[providerName].RefetchGroupPrincipals(principalID, secret)
 }
 
 func GetUserExtraAttributes(providerName string, userPrincipal v3.Principal) map[string][]string {
-	return providers[providerName].GetUserExtraAttributes(userPrincipal)
+	return Providers[providerName].GetUserExtraAttributes(userPrincipal)
 }

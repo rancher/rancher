@@ -29,22 +29,22 @@ var _ v31.GlobalDnsLister = &GlobalDnsListerMock{}
 
 // GlobalDnsListerMock is a mock implementation of v31.GlobalDnsLister.
 //
-//     func TestSomethingThatUsesGlobalDnsLister(t *testing.T) {
+//	    func TestSomethingThatUsesGlobalDnsLister(t *testing.T) {
 //
-//         // make and configure a mocked v31.GlobalDnsLister
-//         mockedGlobalDnsLister := &GlobalDnsListerMock{
-//             GetFunc: func(namespace string, name string) (*v3.GlobalDns, error) {
-// 	               panic("mock out the Get method")
-//             },
-//             ListFunc: func(namespace string, selector labels.Selector) ([]*v3.GlobalDns, error) {
-// 	               panic("mock out the List method")
-//             },
-//         }
+//	        // make and configure a mocked v31.GlobalDnsLister
+//	        mockedGlobalDnsLister := &GlobalDnsListerMock{
+//	            GetFunc: func(namespace string, name string) (*v3.GlobalDns, error) {
+//		               panic("mock out the Get method")
+//	            },
+//	            ListFunc: func(namespace string, selector labels.Selector) ([]*v3.GlobalDns, error) {
+//		               panic("mock out the List method")
+//	            },
+//	        }
 //
-//         // use mockedGlobalDnsLister in code that requires v31.GlobalDnsLister
-//         // and then make assertions.
+//	        // use mockedGlobalDnsLister in code that requires v31.GlobalDnsLister
+//	        // and then make assertions.
 //
-//     }
+//	    }
 type GlobalDnsListerMock struct {
 	// GetFunc mocks the Get method.
 	GetFunc func(namespace string, name string) (*v3.GlobalDns, error)
@@ -91,7 +91,8 @@ func (mock *GlobalDnsListerMock) Get(namespace string, name string) (*v3.GlobalD
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//     len(mockedGlobalDnsLister.GetCalls())
+//
+//	len(mockedGlobalDnsLister.GetCalls())
 func (mock *GlobalDnsListerMock) GetCalls() []struct {
 	Namespace string
 	Name      string
@@ -126,7 +127,8 @@ func (mock *GlobalDnsListerMock) List(namespace string, selector labels.Selector
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//     len(mockedGlobalDnsLister.ListCalls())
+//
+//	len(mockedGlobalDnsLister.ListCalls())
 func (mock *GlobalDnsListerMock) ListCalls() []struct {
 	Namespace string
 	Selector  labels.Selector
@@ -159,43 +161,43 @@ var _ v31.GlobalDnsController = &GlobalDnsControllerMock{}
 
 // GlobalDnsControllerMock is a mock implementation of v31.GlobalDnsController.
 //
-//     func TestSomethingThatUsesGlobalDnsController(t *testing.T) {
+//	    func TestSomethingThatUsesGlobalDnsController(t *testing.T) {
 //
-//         // make and configure a mocked v31.GlobalDnsController
-//         mockedGlobalDnsController := &GlobalDnsControllerMock{
-//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v31.GlobalDnsHandlerFunc)  {
-// 	               panic("mock out the AddClusterScopedFeatureHandler method")
-//             },
-//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v31.GlobalDnsHandlerFunc)  {
-// 	               panic("mock out the AddClusterScopedHandler method")
-//             },
-//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.GlobalDnsHandlerFunc)  {
-// 	               panic("mock out the AddFeatureHandler method")
-//             },
-//             AddHandlerFunc: func(ctx context.Context, name string, handler v31.GlobalDnsHandlerFunc)  {
-// 	               panic("mock out the AddHandler method")
-//             },
-//             EnqueueFunc: func(namespace string, name string)  {
-// 	               panic("mock out the Enqueue method")
-//             },
-//             EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
-// 	               panic("mock out the EnqueueAfter method")
-//             },
-//             GenericFunc: func() controller.GenericController {
-// 	               panic("mock out the Generic method")
-//             },
-//             InformerFunc: func() cache.SharedIndexInformer {
-// 	               panic("mock out the Informer method")
-//             },
-//             ListerFunc: func() v31.GlobalDnsLister {
-// 	               panic("mock out the Lister method")
-//             },
-//         }
+//	        // make and configure a mocked v31.GlobalDnsController
+//	        mockedGlobalDnsController := &GlobalDnsControllerMock{
+//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v31.GlobalDnsHandlerFunc)  {
+//		               panic("mock out the AddClusterScopedFeatureHandler method")
+//	            },
+//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v31.GlobalDnsHandlerFunc)  {
+//		               panic("mock out the AddClusterScopedHandler method")
+//	            },
+//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.GlobalDnsHandlerFunc)  {
+//		               panic("mock out the AddFeatureHandler method")
+//	            },
+//	            AddHandlerFunc: func(ctx context.Context, name string, handler v31.GlobalDnsHandlerFunc)  {
+//		               panic("mock out the AddHandler method")
+//	            },
+//	            EnqueueFunc: func(namespace string, name string)  {
+//		               panic("mock out the Enqueue method")
+//	            },
+//	            EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
+//		               panic("mock out the EnqueueAfter method")
+//	            },
+//	            GenericFunc: func() controller.GenericController {
+//		               panic("mock out the Generic method")
+//	            },
+//	            InformerFunc: func() cache.SharedIndexInformer {
+//		               panic("mock out the Informer method")
+//	            },
+//	            ListerFunc: func() v31.GlobalDnsLister {
+//		               panic("mock out the Lister method")
+//	            },
+//	        }
 //
-//         // use mockedGlobalDnsController in code that requires v31.GlobalDnsController
-//         // and then make assertions.
+//	        // use mockedGlobalDnsController in code that requires v31.GlobalDnsController
+//	        // and then make assertions.
 //
-//     }
+//	    }
 type GlobalDnsControllerMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
 	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v31.GlobalDnsHandlerFunc)
@@ -324,7 +326,8 @@ func (mock *GlobalDnsControllerMock) AddClusterScopedFeatureHandler(ctx context.
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//     len(mockedGlobalDnsController.AddClusterScopedFeatureHandlerCalls())
+//
+//	len(mockedGlobalDnsController.AddClusterScopedFeatureHandlerCalls())
 func (mock *GlobalDnsControllerMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -369,7 +372,8 @@ func (mock *GlobalDnsControllerMock) AddClusterScopedHandler(ctx context.Context
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//     len(mockedGlobalDnsController.AddClusterScopedHandlerCalls())
+//
+//	len(mockedGlobalDnsController.AddClusterScopedHandlerCalls())
 func (mock *GlobalDnsControllerMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -412,7 +416,8 @@ func (mock *GlobalDnsControllerMock) AddFeatureHandler(ctx context.Context, enab
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//     len(mockedGlobalDnsController.AddFeatureHandlerCalls())
+//
+//	len(mockedGlobalDnsController.AddFeatureHandlerCalls())
 func (mock *GlobalDnsControllerMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
@@ -453,7 +458,8 @@ func (mock *GlobalDnsControllerMock) AddHandler(ctx context.Context, name string
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//     len(mockedGlobalDnsController.AddHandlerCalls())
+//
+//	len(mockedGlobalDnsController.AddHandlerCalls())
 func (mock *GlobalDnsControllerMock) AddHandlerCalls() []struct {
 	Ctx     context.Context
 	Name    string
@@ -490,7 +496,8 @@ func (mock *GlobalDnsControllerMock) Enqueue(namespace string, name string) {
 
 // EnqueueCalls gets all the calls that were made to Enqueue.
 // Check the length with:
-//     len(mockedGlobalDnsController.EnqueueCalls())
+//
+//	len(mockedGlobalDnsController.EnqueueCalls())
 func (mock *GlobalDnsControllerMock) EnqueueCalls() []struct {
 	Namespace string
 	Name      string
@@ -527,7 +534,8 @@ func (mock *GlobalDnsControllerMock) EnqueueAfter(namespace string, name string,
 
 // EnqueueAfterCalls gets all the calls that were made to EnqueueAfter.
 // Check the length with:
-//     len(mockedGlobalDnsController.EnqueueAfterCalls())
+//
+//	len(mockedGlobalDnsController.EnqueueAfterCalls())
 func (mock *GlobalDnsControllerMock) EnqueueAfterCalls() []struct {
 	Namespace string
 	Name      string
@@ -559,7 +567,8 @@ func (mock *GlobalDnsControllerMock) Generic() controller.GenericController {
 
 // GenericCalls gets all the calls that were made to Generic.
 // Check the length with:
-//     len(mockedGlobalDnsController.GenericCalls())
+//
+//	len(mockedGlobalDnsController.GenericCalls())
 func (mock *GlobalDnsControllerMock) GenericCalls() []struct {
 } {
 	var calls []struct {
@@ -585,7 +594,8 @@ func (mock *GlobalDnsControllerMock) Informer() cache.SharedIndexInformer {
 
 // InformerCalls gets all the calls that were made to Informer.
 // Check the length with:
-//     len(mockedGlobalDnsController.InformerCalls())
+//
+//	len(mockedGlobalDnsController.InformerCalls())
 func (mock *GlobalDnsControllerMock) InformerCalls() []struct {
 } {
 	var calls []struct {
@@ -611,7 +621,8 @@ func (mock *GlobalDnsControllerMock) Lister() v31.GlobalDnsLister {
 
 // ListerCalls gets all the calls that were made to Lister.
 // Check the length with:
-//     len(mockedGlobalDnsController.ListerCalls())
+//
+//	len(mockedGlobalDnsController.ListerCalls())
 func (mock *GlobalDnsControllerMock) ListerCalls() []struct {
 } {
 	var calls []struct {
@@ -651,76 +662,76 @@ var _ v31.GlobalDnsInterface = &GlobalDnsInterfaceMock{}
 
 // GlobalDnsInterfaceMock is a mock implementation of v31.GlobalDnsInterface.
 //
-//     func TestSomethingThatUsesGlobalDnsInterface(t *testing.T) {
+//	    func TestSomethingThatUsesGlobalDnsInterface(t *testing.T) {
 //
-//         // make and configure a mocked v31.GlobalDnsInterface
-//         mockedGlobalDnsInterface := &GlobalDnsInterfaceMock{
-//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v31.GlobalDnsHandlerFunc)  {
-// 	               panic("mock out the AddClusterScopedFeatureHandler method")
-//             },
-//             AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v31.GlobalDnsLifecycle)  {
-// 	               panic("mock out the AddClusterScopedFeatureLifecycle method")
-//             },
-//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v31.GlobalDnsHandlerFunc)  {
-// 	               panic("mock out the AddClusterScopedHandler method")
-//             },
-//             AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v31.GlobalDnsLifecycle)  {
-// 	               panic("mock out the AddClusterScopedLifecycle method")
-//             },
-//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.GlobalDnsHandlerFunc)  {
-// 	               panic("mock out the AddFeatureHandler method")
-//             },
-//             AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v31.GlobalDnsLifecycle)  {
-// 	               panic("mock out the AddFeatureLifecycle method")
-//             },
-//             AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v31.GlobalDnsHandlerFunc)  {
-// 	               panic("mock out the AddHandler method")
-//             },
-//             AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v31.GlobalDnsLifecycle)  {
-// 	               panic("mock out the AddLifecycle method")
-//             },
-//             ControllerFunc: func() v31.GlobalDnsController {
-// 	               panic("mock out the Controller method")
-//             },
-//             CreateFunc: func(in1 *v3.GlobalDns) (*v3.GlobalDns, error) {
-// 	               panic("mock out the Create method")
-//             },
-//             DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
-// 	               panic("mock out the Delete method")
-//             },
-//             DeleteCollectionFunc: func(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
-// 	               panic("mock out the DeleteCollection method")
-//             },
-//             DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
-// 	               panic("mock out the DeleteNamespaced method")
-//             },
-//             GetFunc: func(name string, opts metav1.GetOptions) (*v3.GlobalDns, error) {
-// 	               panic("mock out the Get method")
-//             },
-//             GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v3.GlobalDns, error) {
-// 	               panic("mock out the GetNamespaced method")
-//             },
-//             ListFunc: func(opts metav1.ListOptions) (*v3.GlobalDnsList, error) {
-// 	               panic("mock out the List method")
-//             },
-//             ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v3.GlobalDnsList, error) {
-// 	               panic("mock out the ListNamespaced method")
-//             },
-//             ObjectClientFunc: func() *objectclient.ObjectClient {
-// 	               panic("mock out the ObjectClient method")
-//             },
-//             UpdateFunc: func(in1 *v3.GlobalDns) (*v3.GlobalDns, error) {
-// 	               panic("mock out the Update method")
-//             },
-//             WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
-// 	               panic("mock out the Watch method")
-//             },
-//         }
+//	        // make and configure a mocked v31.GlobalDnsInterface
+//	        mockedGlobalDnsInterface := &GlobalDnsInterfaceMock{
+//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v31.GlobalDnsHandlerFunc)  {
+//		               panic("mock out the AddClusterScopedFeatureHandler method")
+//	            },
+//	            AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v31.GlobalDnsLifecycle)  {
+//		               panic("mock out the AddClusterScopedFeatureLifecycle method")
+//	            },
+//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v31.GlobalDnsHandlerFunc)  {
+//		               panic("mock out the AddClusterScopedHandler method")
+//	            },
+//	            AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v31.GlobalDnsLifecycle)  {
+//		               panic("mock out the AddClusterScopedLifecycle method")
+//	            },
+//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.GlobalDnsHandlerFunc)  {
+//		               panic("mock out the AddFeatureHandler method")
+//	            },
+//	            AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v31.GlobalDnsLifecycle)  {
+//		               panic("mock out the AddFeatureLifecycle method")
+//	            },
+//	            AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v31.GlobalDnsHandlerFunc)  {
+//		               panic("mock out the AddHandler method")
+//	            },
+//	            AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v31.GlobalDnsLifecycle)  {
+//		               panic("mock out the AddLifecycle method")
+//	            },
+//	            ControllerFunc: func() v31.GlobalDnsController {
+//		               panic("mock out the Controller method")
+//	            },
+//	            CreateFunc: func(in1 *v3.GlobalDns) (*v3.GlobalDns, error) {
+//		               panic("mock out the Create method")
+//	            },
+//	            DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
+//		               panic("mock out the Delete method")
+//	            },
+//	            DeleteCollectionFunc: func(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
+//		               panic("mock out the DeleteCollection method")
+//	            },
+//	            DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
+//		               panic("mock out the DeleteNamespaced method")
+//	            },
+//	            GetFunc: func(name string, opts metav1.GetOptions) (*v3.GlobalDns, error) {
+//		               panic("mock out the Get method")
+//	            },
+//	            GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v3.GlobalDns, error) {
+//		               panic("mock out the GetNamespaced method")
+//	            },
+//	            ListFunc: func(opts metav1.ListOptions) (*v3.GlobalDnsList, error) {
+//		               panic("mock out the List method")
+//	            },
+//	            ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v3.GlobalDnsList, error) {
+//		               panic("mock out the ListNamespaced method")
+//	            },
+//	            ObjectClientFunc: func() *objectclient.ObjectClient {
+//		               panic("mock out the ObjectClient method")
+//	            },
+//	            UpdateFunc: func(in1 *v3.GlobalDns) (*v3.GlobalDns, error) {
+//		               panic("mock out the Update method")
+//	            },
+//	            WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
+//		               panic("mock out the Watch method")
+//	            },
+//	        }
 //
-//         // use mockedGlobalDnsInterface in code that requires v31.GlobalDnsInterface
-//         // and then make assertions.
+//	        // use mockedGlobalDnsInterface in code that requires v31.GlobalDnsInterface
+//	        // and then make assertions.
 //
-//     }
+//	    }
 type GlobalDnsInterfaceMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
 	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v31.GlobalDnsHandlerFunc)
@@ -973,7 +984,8 @@ func (mock *GlobalDnsInterfaceMock) AddClusterScopedFeatureHandler(ctx context.C
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//     len(mockedGlobalDnsInterface.AddClusterScopedFeatureHandlerCalls())
+//
+//	len(mockedGlobalDnsInterface.AddClusterScopedFeatureHandlerCalls())
 func (mock *GlobalDnsInterfaceMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -1020,7 +1032,8 @@ func (mock *GlobalDnsInterfaceMock) AddClusterScopedFeatureLifecycle(ctx context
 
 // AddClusterScopedFeatureLifecycleCalls gets all the calls that were made to AddClusterScopedFeatureLifecycle.
 // Check the length with:
-//     len(mockedGlobalDnsInterface.AddClusterScopedFeatureLifecycleCalls())
+//
+//	len(mockedGlobalDnsInterface.AddClusterScopedFeatureLifecycleCalls())
 func (mock *GlobalDnsInterfaceMock) AddClusterScopedFeatureLifecycleCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -1065,7 +1078,8 @@ func (mock *GlobalDnsInterfaceMock) AddClusterScopedHandler(ctx context.Context,
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//     len(mockedGlobalDnsInterface.AddClusterScopedHandlerCalls())
+//
+//	len(mockedGlobalDnsInterface.AddClusterScopedHandlerCalls())
 func (mock *GlobalDnsInterfaceMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -1108,7 +1122,8 @@ func (mock *GlobalDnsInterfaceMock) AddClusterScopedLifecycle(ctx context.Contex
 
 // AddClusterScopedLifecycleCalls gets all the calls that were made to AddClusterScopedLifecycle.
 // Check the length with:
-//     len(mockedGlobalDnsInterface.AddClusterScopedLifecycleCalls())
+//
+//	len(mockedGlobalDnsInterface.AddClusterScopedLifecycleCalls())
 func (mock *GlobalDnsInterfaceMock) AddClusterScopedLifecycleCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -1151,7 +1166,8 @@ func (mock *GlobalDnsInterfaceMock) AddFeatureHandler(ctx context.Context, enabl
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//     len(mockedGlobalDnsInterface.AddFeatureHandlerCalls())
+//
+//	len(mockedGlobalDnsInterface.AddFeatureHandlerCalls())
 func (mock *GlobalDnsInterfaceMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
@@ -1194,7 +1210,8 @@ func (mock *GlobalDnsInterfaceMock) AddFeatureLifecycle(ctx context.Context, ena
 
 // AddFeatureLifecycleCalls gets all the calls that were made to AddFeatureLifecycle.
 // Check the length with:
-//     len(mockedGlobalDnsInterface.AddFeatureLifecycleCalls())
+//
+//	len(mockedGlobalDnsInterface.AddFeatureLifecycleCalls())
 func (mock *GlobalDnsInterfaceMock) AddFeatureLifecycleCalls() []struct {
 	Ctx       context.Context
 	Enabled   func() bool
@@ -1235,7 +1252,8 @@ func (mock *GlobalDnsInterfaceMock) AddHandler(ctx context.Context, name string,
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//     len(mockedGlobalDnsInterface.AddHandlerCalls())
+//
+//	len(mockedGlobalDnsInterface.AddHandlerCalls())
 func (mock *GlobalDnsInterfaceMock) AddHandlerCalls() []struct {
 	Ctx  context.Context
 	Name string
@@ -1274,7 +1292,8 @@ func (mock *GlobalDnsInterfaceMock) AddLifecycle(ctx context.Context, name strin
 
 // AddLifecycleCalls gets all the calls that were made to AddLifecycle.
 // Check the length with:
-//     len(mockedGlobalDnsInterface.AddLifecycleCalls())
+//
+//	len(mockedGlobalDnsInterface.AddLifecycleCalls())
 func (mock *GlobalDnsInterfaceMock) AddLifecycleCalls() []struct {
 	Ctx       context.Context
 	Name      string
@@ -1306,7 +1325,8 @@ func (mock *GlobalDnsInterfaceMock) Controller() v31.GlobalDnsController {
 
 // ControllerCalls gets all the calls that were made to Controller.
 // Check the length with:
-//     len(mockedGlobalDnsInterface.ControllerCalls())
+//
+//	len(mockedGlobalDnsInterface.ControllerCalls())
 func (mock *GlobalDnsInterfaceMock) ControllerCalls() []struct {
 } {
 	var calls []struct {
@@ -1335,7 +1355,8 @@ func (mock *GlobalDnsInterfaceMock) Create(in1 *v3.GlobalDns) (*v3.GlobalDns, er
 
 // CreateCalls gets all the calls that were made to Create.
 // Check the length with:
-//     len(mockedGlobalDnsInterface.CreateCalls())
+//
+//	len(mockedGlobalDnsInterface.CreateCalls())
 func (mock *GlobalDnsInterfaceMock) CreateCalls() []struct {
 	In1 *v3.GlobalDns
 } {
@@ -1368,7 +1389,8 @@ func (mock *GlobalDnsInterfaceMock) Delete(name string, options *metav1.DeleteOp
 
 // DeleteCalls gets all the calls that were made to Delete.
 // Check the length with:
-//     len(mockedGlobalDnsInterface.DeleteCalls())
+//
+//	len(mockedGlobalDnsInterface.DeleteCalls())
 func (mock *GlobalDnsInterfaceMock) DeleteCalls() []struct {
 	Name    string
 	Options *metav1.DeleteOptions
@@ -1403,7 +1425,8 @@ func (mock *GlobalDnsInterfaceMock) DeleteCollection(deleteOpts *metav1.DeleteOp
 
 // DeleteCollectionCalls gets all the calls that were made to DeleteCollection.
 // Check the length with:
-//     len(mockedGlobalDnsInterface.DeleteCollectionCalls())
+//
+//	len(mockedGlobalDnsInterface.DeleteCollectionCalls())
 func (mock *GlobalDnsInterfaceMock) DeleteCollectionCalls() []struct {
 	DeleteOpts *metav1.DeleteOptions
 	ListOpts   metav1.ListOptions
@@ -1440,7 +1463,8 @@ func (mock *GlobalDnsInterfaceMock) DeleteNamespaced(namespace string, name stri
 
 // DeleteNamespacedCalls gets all the calls that were made to DeleteNamespaced.
 // Check the length with:
-//     len(mockedGlobalDnsInterface.DeleteNamespacedCalls())
+//
+//	len(mockedGlobalDnsInterface.DeleteNamespacedCalls())
 func (mock *GlobalDnsInterfaceMock) DeleteNamespacedCalls() []struct {
 	Namespace string
 	Name      string
@@ -1477,7 +1501,8 @@ func (mock *GlobalDnsInterfaceMock) Get(name string, opts metav1.GetOptions) (*v
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//     len(mockedGlobalDnsInterface.GetCalls())
+//
+//	len(mockedGlobalDnsInterface.GetCalls())
 func (mock *GlobalDnsInterfaceMock) GetCalls() []struct {
 	Name string
 	Opts metav1.GetOptions
@@ -1514,7 +1539,8 @@ func (mock *GlobalDnsInterfaceMock) GetNamespaced(namespace string, name string,
 
 // GetNamespacedCalls gets all the calls that were made to GetNamespaced.
 // Check the length with:
-//     len(mockedGlobalDnsInterface.GetNamespacedCalls())
+//
+//	len(mockedGlobalDnsInterface.GetNamespacedCalls())
 func (mock *GlobalDnsInterfaceMock) GetNamespacedCalls() []struct {
 	Namespace string
 	Name      string
@@ -1549,7 +1575,8 @@ func (mock *GlobalDnsInterfaceMock) List(opts metav1.ListOptions) (*v3.GlobalDns
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//     len(mockedGlobalDnsInterface.ListCalls())
+//
+//	len(mockedGlobalDnsInterface.ListCalls())
 func (mock *GlobalDnsInterfaceMock) ListCalls() []struct {
 	Opts metav1.ListOptions
 } {
@@ -1582,7 +1609,8 @@ func (mock *GlobalDnsInterfaceMock) ListNamespaced(namespace string, opts metav1
 
 // ListNamespacedCalls gets all the calls that were made to ListNamespaced.
 // Check the length with:
-//     len(mockedGlobalDnsInterface.ListNamespacedCalls())
+//
+//	len(mockedGlobalDnsInterface.ListNamespacedCalls())
 func (mock *GlobalDnsInterfaceMock) ListNamespacedCalls() []struct {
 	Namespace string
 	Opts      metav1.ListOptions
@@ -1612,7 +1640,8 @@ func (mock *GlobalDnsInterfaceMock) ObjectClient() *objectclient.ObjectClient {
 
 // ObjectClientCalls gets all the calls that were made to ObjectClient.
 // Check the length with:
-//     len(mockedGlobalDnsInterface.ObjectClientCalls())
+//
+//	len(mockedGlobalDnsInterface.ObjectClientCalls())
 func (mock *GlobalDnsInterfaceMock) ObjectClientCalls() []struct {
 } {
 	var calls []struct {
@@ -1641,7 +1670,8 @@ func (mock *GlobalDnsInterfaceMock) Update(in1 *v3.GlobalDns) (*v3.GlobalDns, er
 
 // UpdateCalls gets all the calls that were made to Update.
 // Check the length with:
-//     len(mockedGlobalDnsInterface.UpdateCalls())
+//
+//	len(mockedGlobalDnsInterface.UpdateCalls())
 func (mock *GlobalDnsInterfaceMock) UpdateCalls() []struct {
 	In1 *v3.GlobalDns
 } {
@@ -1672,7 +1702,8 @@ func (mock *GlobalDnsInterfaceMock) Watch(opts metav1.ListOptions) (watch.Interf
 
 // WatchCalls gets all the calls that were made to Watch.
 // Check the length with:
-//     len(mockedGlobalDnsInterface.WatchCalls())
+//
+//	len(mockedGlobalDnsInterface.WatchCalls())
 func (mock *GlobalDnsInterfaceMock) WatchCalls() []struct {
 	Opts metav1.ListOptions
 } {
@@ -1695,19 +1726,19 @@ var _ v31.GlobalDnsesGetter = &GlobalDnsesGetterMock{}
 
 // GlobalDnsesGetterMock is a mock implementation of v31.GlobalDnsesGetter.
 //
-//     func TestSomethingThatUsesGlobalDnsesGetter(t *testing.T) {
+//	    func TestSomethingThatUsesGlobalDnsesGetter(t *testing.T) {
 //
-//         // make and configure a mocked v31.GlobalDnsesGetter
-//         mockedGlobalDnsesGetter := &GlobalDnsesGetterMock{
-//             GlobalDnsesFunc: func(namespace string) v31.GlobalDnsInterface {
-// 	               panic("mock out the GlobalDnses method")
-//             },
-//         }
+//	        // make and configure a mocked v31.GlobalDnsesGetter
+//	        mockedGlobalDnsesGetter := &GlobalDnsesGetterMock{
+//	            GlobalDnsesFunc: func(namespace string) v31.GlobalDnsInterface {
+//		               panic("mock out the GlobalDnses method")
+//	            },
+//	        }
 //
-//         // use mockedGlobalDnsesGetter in code that requires v31.GlobalDnsesGetter
-//         // and then make assertions.
+//	        // use mockedGlobalDnsesGetter in code that requires v31.GlobalDnsesGetter
+//	        // and then make assertions.
 //
-//     }
+//	    }
 type GlobalDnsesGetterMock struct {
 	// GlobalDnsesFunc mocks the GlobalDnses method.
 	GlobalDnsesFunc func(namespace string) v31.GlobalDnsInterface
@@ -1740,7 +1771,8 @@ func (mock *GlobalDnsesGetterMock) GlobalDnses(namespace string) v31.GlobalDnsIn
 
 // GlobalDnsesCalls gets all the calls that were made to GlobalDnses.
 // Check the length with:
-//     len(mockedGlobalDnsesGetter.GlobalDnsesCalls())
+//
+//	len(mockedGlobalDnsesGetter.GlobalDnsesCalls())
 func (mock *GlobalDnsesGetterMock) GlobalDnsesCalls() []struct {
 	Namespace string
 } {

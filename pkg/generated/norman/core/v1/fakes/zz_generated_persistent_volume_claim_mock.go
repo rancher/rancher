@@ -29,22 +29,22 @@ var _ v11.PersistentVolumeClaimLister = &PersistentVolumeClaimListerMock{}
 
 // PersistentVolumeClaimListerMock is a mock implementation of v11.PersistentVolumeClaimLister.
 //
-//     func TestSomethingThatUsesPersistentVolumeClaimLister(t *testing.T) {
+//	    func TestSomethingThatUsesPersistentVolumeClaimLister(t *testing.T) {
 //
-//         // make and configure a mocked v11.PersistentVolumeClaimLister
-//         mockedPersistentVolumeClaimLister := &PersistentVolumeClaimListerMock{
-//             GetFunc: func(namespace string, name string) (*v1.PersistentVolumeClaim, error) {
-// 	               panic("mock out the Get method")
-//             },
-//             ListFunc: func(namespace string, selector labels.Selector) ([]*v1.PersistentVolumeClaim, error) {
-// 	               panic("mock out the List method")
-//             },
-//         }
+//	        // make and configure a mocked v11.PersistentVolumeClaimLister
+//	        mockedPersistentVolumeClaimLister := &PersistentVolumeClaimListerMock{
+//	            GetFunc: func(namespace string, name string) (*v1.PersistentVolumeClaim, error) {
+//		               panic("mock out the Get method")
+//	            },
+//	            ListFunc: func(namespace string, selector labels.Selector) ([]*v1.PersistentVolumeClaim, error) {
+//		               panic("mock out the List method")
+//	            },
+//	        }
 //
-//         // use mockedPersistentVolumeClaimLister in code that requires v11.PersistentVolumeClaimLister
-//         // and then make assertions.
+//	        // use mockedPersistentVolumeClaimLister in code that requires v11.PersistentVolumeClaimLister
+//	        // and then make assertions.
 //
-//     }
+//	    }
 type PersistentVolumeClaimListerMock struct {
 	// GetFunc mocks the Get method.
 	GetFunc func(namespace string, name string) (*v1.PersistentVolumeClaim, error)
@@ -91,7 +91,8 @@ func (mock *PersistentVolumeClaimListerMock) Get(namespace string, name string) 
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//     len(mockedPersistentVolumeClaimLister.GetCalls())
+//
+//	len(mockedPersistentVolumeClaimLister.GetCalls())
 func (mock *PersistentVolumeClaimListerMock) GetCalls() []struct {
 	Namespace string
 	Name      string
@@ -126,7 +127,8 @@ func (mock *PersistentVolumeClaimListerMock) List(namespace string, selector lab
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//     len(mockedPersistentVolumeClaimLister.ListCalls())
+//
+//	len(mockedPersistentVolumeClaimLister.ListCalls())
 func (mock *PersistentVolumeClaimListerMock) ListCalls() []struct {
 	Namespace string
 	Selector  labels.Selector
@@ -159,43 +161,43 @@ var _ v11.PersistentVolumeClaimController = &PersistentVolumeClaimControllerMock
 
 // PersistentVolumeClaimControllerMock is a mock implementation of v11.PersistentVolumeClaimController.
 //
-//     func TestSomethingThatUsesPersistentVolumeClaimController(t *testing.T) {
+//	    func TestSomethingThatUsesPersistentVolumeClaimController(t *testing.T) {
 //
-//         // make and configure a mocked v11.PersistentVolumeClaimController
-//         mockedPersistentVolumeClaimController := &PersistentVolumeClaimControllerMock{
-//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v11.PersistentVolumeClaimHandlerFunc)  {
-// 	               panic("mock out the AddClusterScopedFeatureHandler method")
-//             },
-//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v11.PersistentVolumeClaimHandlerFunc)  {
-// 	               panic("mock out the AddClusterScopedHandler method")
-//             },
-//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v11.PersistentVolumeClaimHandlerFunc)  {
-// 	               panic("mock out the AddFeatureHandler method")
-//             },
-//             AddHandlerFunc: func(ctx context.Context, name string, handler v11.PersistentVolumeClaimHandlerFunc)  {
-// 	               panic("mock out the AddHandler method")
-//             },
-//             EnqueueFunc: func(namespace string, name string)  {
-// 	               panic("mock out the Enqueue method")
-//             },
-//             EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
-// 	               panic("mock out the EnqueueAfter method")
-//             },
-//             GenericFunc: func() controller.GenericController {
-// 	               panic("mock out the Generic method")
-//             },
-//             InformerFunc: func() cache.SharedIndexInformer {
-// 	               panic("mock out the Informer method")
-//             },
-//             ListerFunc: func() v11.PersistentVolumeClaimLister {
-// 	               panic("mock out the Lister method")
-//             },
-//         }
+//	        // make and configure a mocked v11.PersistentVolumeClaimController
+//	        mockedPersistentVolumeClaimController := &PersistentVolumeClaimControllerMock{
+//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v11.PersistentVolumeClaimHandlerFunc)  {
+//		               panic("mock out the AddClusterScopedFeatureHandler method")
+//	            },
+//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v11.PersistentVolumeClaimHandlerFunc)  {
+//		               panic("mock out the AddClusterScopedHandler method")
+//	            },
+//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v11.PersistentVolumeClaimHandlerFunc)  {
+//		               panic("mock out the AddFeatureHandler method")
+//	            },
+//	            AddHandlerFunc: func(ctx context.Context, name string, handler v11.PersistentVolumeClaimHandlerFunc)  {
+//		               panic("mock out the AddHandler method")
+//	            },
+//	            EnqueueFunc: func(namespace string, name string)  {
+//		               panic("mock out the Enqueue method")
+//	            },
+//	            EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
+//		               panic("mock out the EnqueueAfter method")
+//	            },
+//	            GenericFunc: func() controller.GenericController {
+//		               panic("mock out the Generic method")
+//	            },
+//	            InformerFunc: func() cache.SharedIndexInformer {
+//		               panic("mock out the Informer method")
+//	            },
+//	            ListerFunc: func() v11.PersistentVolumeClaimLister {
+//		               panic("mock out the Lister method")
+//	            },
+//	        }
 //
-//         // use mockedPersistentVolumeClaimController in code that requires v11.PersistentVolumeClaimController
-//         // and then make assertions.
+//	        // use mockedPersistentVolumeClaimController in code that requires v11.PersistentVolumeClaimController
+//	        // and then make assertions.
 //
-//     }
+//	    }
 type PersistentVolumeClaimControllerMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
 	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v11.PersistentVolumeClaimHandlerFunc)
@@ -324,7 +326,8 @@ func (mock *PersistentVolumeClaimControllerMock) AddClusterScopedFeatureHandler(
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//     len(mockedPersistentVolumeClaimController.AddClusterScopedFeatureHandlerCalls())
+//
+//	len(mockedPersistentVolumeClaimController.AddClusterScopedFeatureHandlerCalls())
 func (mock *PersistentVolumeClaimControllerMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -369,7 +372,8 @@ func (mock *PersistentVolumeClaimControllerMock) AddClusterScopedHandler(ctx con
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//     len(mockedPersistentVolumeClaimController.AddClusterScopedHandlerCalls())
+//
+//	len(mockedPersistentVolumeClaimController.AddClusterScopedHandlerCalls())
 func (mock *PersistentVolumeClaimControllerMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -412,7 +416,8 @@ func (mock *PersistentVolumeClaimControllerMock) AddFeatureHandler(ctx context.C
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//     len(mockedPersistentVolumeClaimController.AddFeatureHandlerCalls())
+//
+//	len(mockedPersistentVolumeClaimController.AddFeatureHandlerCalls())
 func (mock *PersistentVolumeClaimControllerMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
@@ -453,7 +458,8 @@ func (mock *PersistentVolumeClaimControllerMock) AddHandler(ctx context.Context,
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//     len(mockedPersistentVolumeClaimController.AddHandlerCalls())
+//
+//	len(mockedPersistentVolumeClaimController.AddHandlerCalls())
 func (mock *PersistentVolumeClaimControllerMock) AddHandlerCalls() []struct {
 	Ctx     context.Context
 	Name    string
@@ -490,7 +496,8 @@ func (mock *PersistentVolumeClaimControllerMock) Enqueue(namespace string, name 
 
 // EnqueueCalls gets all the calls that were made to Enqueue.
 // Check the length with:
-//     len(mockedPersistentVolumeClaimController.EnqueueCalls())
+//
+//	len(mockedPersistentVolumeClaimController.EnqueueCalls())
 func (mock *PersistentVolumeClaimControllerMock) EnqueueCalls() []struct {
 	Namespace string
 	Name      string
@@ -527,7 +534,8 @@ func (mock *PersistentVolumeClaimControllerMock) EnqueueAfter(namespace string, 
 
 // EnqueueAfterCalls gets all the calls that were made to EnqueueAfter.
 // Check the length with:
-//     len(mockedPersistentVolumeClaimController.EnqueueAfterCalls())
+//
+//	len(mockedPersistentVolumeClaimController.EnqueueAfterCalls())
 func (mock *PersistentVolumeClaimControllerMock) EnqueueAfterCalls() []struct {
 	Namespace string
 	Name      string
@@ -559,7 +567,8 @@ func (mock *PersistentVolumeClaimControllerMock) Generic() controller.GenericCon
 
 // GenericCalls gets all the calls that were made to Generic.
 // Check the length with:
-//     len(mockedPersistentVolumeClaimController.GenericCalls())
+//
+//	len(mockedPersistentVolumeClaimController.GenericCalls())
 func (mock *PersistentVolumeClaimControllerMock) GenericCalls() []struct {
 } {
 	var calls []struct {
@@ -585,7 +594,8 @@ func (mock *PersistentVolumeClaimControllerMock) Informer() cache.SharedIndexInf
 
 // InformerCalls gets all the calls that were made to Informer.
 // Check the length with:
-//     len(mockedPersistentVolumeClaimController.InformerCalls())
+//
+//	len(mockedPersistentVolumeClaimController.InformerCalls())
 func (mock *PersistentVolumeClaimControllerMock) InformerCalls() []struct {
 } {
 	var calls []struct {
@@ -611,7 +621,8 @@ func (mock *PersistentVolumeClaimControllerMock) Lister() v11.PersistentVolumeCl
 
 // ListerCalls gets all the calls that were made to Lister.
 // Check the length with:
-//     len(mockedPersistentVolumeClaimController.ListerCalls())
+//
+//	len(mockedPersistentVolumeClaimController.ListerCalls())
 func (mock *PersistentVolumeClaimControllerMock) ListerCalls() []struct {
 } {
 	var calls []struct {
@@ -651,76 +662,76 @@ var _ v11.PersistentVolumeClaimInterface = &PersistentVolumeClaimInterfaceMock{}
 
 // PersistentVolumeClaimInterfaceMock is a mock implementation of v11.PersistentVolumeClaimInterface.
 //
-//     func TestSomethingThatUsesPersistentVolumeClaimInterface(t *testing.T) {
+//	    func TestSomethingThatUsesPersistentVolumeClaimInterface(t *testing.T) {
 //
-//         // make and configure a mocked v11.PersistentVolumeClaimInterface
-//         mockedPersistentVolumeClaimInterface := &PersistentVolumeClaimInterfaceMock{
-//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v11.PersistentVolumeClaimHandlerFunc)  {
-// 	               panic("mock out the AddClusterScopedFeatureHandler method")
-//             },
-//             AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v11.PersistentVolumeClaimLifecycle)  {
-// 	               panic("mock out the AddClusterScopedFeatureLifecycle method")
-//             },
-//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v11.PersistentVolumeClaimHandlerFunc)  {
-// 	               panic("mock out the AddClusterScopedHandler method")
-//             },
-//             AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v11.PersistentVolumeClaimLifecycle)  {
-// 	               panic("mock out the AddClusterScopedLifecycle method")
-//             },
-//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v11.PersistentVolumeClaimHandlerFunc)  {
-// 	               panic("mock out the AddFeatureHandler method")
-//             },
-//             AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v11.PersistentVolumeClaimLifecycle)  {
-// 	               panic("mock out the AddFeatureLifecycle method")
-//             },
-//             AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v11.PersistentVolumeClaimHandlerFunc)  {
-// 	               panic("mock out the AddHandler method")
-//             },
-//             AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v11.PersistentVolumeClaimLifecycle)  {
-// 	               panic("mock out the AddLifecycle method")
-//             },
-//             ControllerFunc: func() v11.PersistentVolumeClaimController {
-// 	               panic("mock out the Controller method")
-//             },
-//             CreateFunc: func(in1 *v1.PersistentVolumeClaim) (*v1.PersistentVolumeClaim, error) {
-// 	               panic("mock out the Create method")
-//             },
-//             DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
-// 	               panic("mock out the Delete method")
-//             },
-//             DeleteCollectionFunc: func(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
-// 	               panic("mock out the DeleteCollection method")
-//             },
-//             DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
-// 	               panic("mock out the DeleteNamespaced method")
-//             },
-//             GetFunc: func(name string, opts metav1.GetOptions) (*v1.PersistentVolumeClaim, error) {
-// 	               panic("mock out the Get method")
-//             },
-//             GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v1.PersistentVolumeClaim, error) {
-// 	               panic("mock out the GetNamespaced method")
-//             },
-//             ListFunc: func(opts metav1.ListOptions) (*v1.PersistentVolumeClaimList, error) {
-// 	               panic("mock out the List method")
-//             },
-//             ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v1.PersistentVolumeClaimList, error) {
-// 	               panic("mock out the ListNamespaced method")
-//             },
-//             ObjectClientFunc: func() *objectclient.ObjectClient {
-// 	               panic("mock out the ObjectClient method")
-//             },
-//             UpdateFunc: func(in1 *v1.PersistentVolumeClaim) (*v1.PersistentVolumeClaim, error) {
-// 	               panic("mock out the Update method")
-//             },
-//             WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
-// 	               panic("mock out the Watch method")
-//             },
-//         }
+//	        // make and configure a mocked v11.PersistentVolumeClaimInterface
+//	        mockedPersistentVolumeClaimInterface := &PersistentVolumeClaimInterfaceMock{
+//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v11.PersistentVolumeClaimHandlerFunc)  {
+//		               panic("mock out the AddClusterScopedFeatureHandler method")
+//	            },
+//	            AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v11.PersistentVolumeClaimLifecycle)  {
+//		               panic("mock out the AddClusterScopedFeatureLifecycle method")
+//	            },
+//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v11.PersistentVolumeClaimHandlerFunc)  {
+//		               panic("mock out the AddClusterScopedHandler method")
+//	            },
+//	            AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v11.PersistentVolumeClaimLifecycle)  {
+//		               panic("mock out the AddClusterScopedLifecycle method")
+//	            },
+//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v11.PersistentVolumeClaimHandlerFunc)  {
+//		               panic("mock out the AddFeatureHandler method")
+//	            },
+//	            AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v11.PersistentVolumeClaimLifecycle)  {
+//		               panic("mock out the AddFeatureLifecycle method")
+//	            },
+//	            AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v11.PersistentVolumeClaimHandlerFunc)  {
+//		               panic("mock out the AddHandler method")
+//	            },
+//	            AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v11.PersistentVolumeClaimLifecycle)  {
+//		               panic("mock out the AddLifecycle method")
+//	            },
+//	            ControllerFunc: func() v11.PersistentVolumeClaimController {
+//		               panic("mock out the Controller method")
+//	            },
+//	            CreateFunc: func(in1 *v1.PersistentVolumeClaim) (*v1.PersistentVolumeClaim, error) {
+//		               panic("mock out the Create method")
+//	            },
+//	            DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
+//		               panic("mock out the Delete method")
+//	            },
+//	            DeleteCollectionFunc: func(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
+//		               panic("mock out the DeleteCollection method")
+//	            },
+//	            DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
+//		               panic("mock out the DeleteNamespaced method")
+//	            },
+//	            GetFunc: func(name string, opts metav1.GetOptions) (*v1.PersistentVolumeClaim, error) {
+//		               panic("mock out the Get method")
+//	            },
+//	            GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v1.PersistentVolumeClaim, error) {
+//		               panic("mock out the GetNamespaced method")
+//	            },
+//	            ListFunc: func(opts metav1.ListOptions) (*v1.PersistentVolumeClaimList, error) {
+//		               panic("mock out the List method")
+//	            },
+//	            ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v1.PersistentVolumeClaimList, error) {
+//		               panic("mock out the ListNamespaced method")
+//	            },
+//	            ObjectClientFunc: func() *objectclient.ObjectClient {
+//		               panic("mock out the ObjectClient method")
+//	            },
+//	            UpdateFunc: func(in1 *v1.PersistentVolumeClaim) (*v1.PersistentVolumeClaim, error) {
+//		               panic("mock out the Update method")
+//	            },
+//	            WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
+//		               panic("mock out the Watch method")
+//	            },
+//	        }
 //
-//         // use mockedPersistentVolumeClaimInterface in code that requires v11.PersistentVolumeClaimInterface
-//         // and then make assertions.
+//	        // use mockedPersistentVolumeClaimInterface in code that requires v11.PersistentVolumeClaimInterface
+//	        // and then make assertions.
 //
-//     }
+//	    }
 type PersistentVolumeClaimInterfaceMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
 	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v11.PersistentVolumeClaimHandlerFunc)
@@ -973,7 +984,8 @@ func (mock *PersistentVolumeClaimInterfaceMock) AddClusterScopedFeatureHandler(c
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//     len(mockedPersistentVolumeClaimInterface.AddClusterScopedFeatureHandlerCalls())
+//
+//	len(mockedPersistentVolumeClaimInterface.AddClusterScopedFeatureHandlerCalls())
 func (mock *PersistentVolumeClaimInterfaceMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -1020,7 +1032,8 @@ func (mock *PersistentVolumeClaimInterfaceMock) AddClusterScopedFeatureLifecycle
 
 // AddClusterScopedFeatureLifecycleCalls gets all the calls that were made to AddClusterScopedFeatureLifecycle.
 // Check the length with:
-//     len(mockedPersistentVolumeClaimInterface.AddClusterScopedFeatureLifecycleCalls())
+//
+//	len(mockedPersistentVolumeClaimInterface.AddClusterScopedFeatureLifecycleCalls())
 func (mock *PersistentVolumeClaimInterfaceMock) AddClusterScopedFeatureLifecycleCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -1065,7 +1078,8 @@ func (mock *PersistentVolumeClaimInterfaceMock) AddClusterScopedHandler(ctx cont
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//     len(mockedPersistentVolumeClaimInterface.AddClusterScopedHandlerCalls())
+//
+//	len(mockedPersistentVolumeClaimInterface.AddClusterScopedHandlerCalls())
 func (mock *PersistentVolumeClaimInterfaceMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -1108,7 +1122,8 @@ func (mock *PersistentVolumeClaimInterfaceMock) AddClusterScopedLifecycle(ctx co
 
 // AddClusterScopedLifecycleCalls gets all the calls that were made to AddClusterScopedLifecycle.
 // Check the length with:
-//     len(mockedPersistentVolumeClaimInterface.AddClusterScopedLifecycleCalls())
+//
+//	len(mockedPersistentVolumeClaimInterface.AddClusterScopedLifecycleCalls())
 func (mock *PersistentVolumeClaimInterfaceMock) AddClusterScopedLifecycleCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -1151,7 +1166,8 @@ func (mock *PersistentVolumeClaimInterfaceMock) AddFeatureHandler(ctx context.Co
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//     len(mockedPersistentVolumeClaimInterface.AddFeatureHandlerCalls())
+//
+//	len(mockedPersistentVolumeClaimInterface.AddFeatureHandlerCalls())
 func (mock *PersistentVolumeClaimInterfaceMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
@@ -1194,7 +1210,8 @@ func (mock *PersistentVolumeClaimInterfaceMock) AddFeatureLifecycle(ctx context.
 
 // AddFeatureLifecycleCalls gets all the calls that were made to AddFeatureLifecycle.
 // Check the length with:
-//     len(mockedPersistentVolumeClaimInterface.AddFeatureLifecycleCalls())
+//
+//	len(mockedPersistentVolumeClaimInterface.AddFeatureLifecycleCalls())
 func (mock *PersistentVolumeClaimInterfaceMock) AddFeatureLifecycleCalls() []struct {
 	Ctx       context.Context
 	Enabled   func() bool
@@ -1235,7 +1252,8 @@ func (mock *PersistentVolumeClaimInterfaceMock) AddHandler(ctx context.Context, 
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//     len(mockedPersistentVolumeClaimInterface.AddHandlerCalls())
+//
+//	len(mockedPersistentVolumeClaimInterface.AddHandlerCalls())
 func (mock *PersistentVolumeClaimInterfaceMock) AddHandlerCalls() []struct {
 	Ctx  context.Context
 	Name string
@@ -1274,7 +1292,8 @@ func (mock *PersistentVolumeClaimInterfaceMock) AddLifecycle(ctx context.Context
 
 // AddLifecycleCalls gets all the calls that were made to AddLifecycle.
 // Check the length with:
-//     len(mockedPersistentVolumeClaimInterface.AddLifecycleCalls())
+//
+//	len(mockedPersistentVolumeClaimInterface.AddLifecycleCalls())
 func (mock *PersistentVolumeClaimInterfaceMock) AddLifecycleCalls() []struct {
 	Ctx       context.Context
 	Name      string
@@ -1306,7 +1325,8 @@ func (mock *PersistentVolumeClaimInterfaceMock) Controller() v11.PersistentVolum
 
 // ControllerCalls gets all the calls that were made to Controller.
 // Check the length with:
-//     len(mockedPersistentVolumeClaimInterface.ControllerCalls())
+//
+//	len(mockedPersistentVolumeClaimInterface.ControllerCalls())
 func (mock *PersistentVolumeClaimInterfaceMock) ControllerCalls() []struct {
 } {
 	var calls []struct {
@@ -1335,7 +1355,8 @@ func (mock *PersistentVolumeClaimInterfaceMock) Create(in1 *v1.PersistentVolumeC
 
 // CreateCalls gets all the calls that were made to Create.
 // Check the length with:
-//     len(mockedPersistentVolumeClaimInterface.CreateCalls())
+//
+//	len(mockedPersistentVolumeClaimInterface.CreateCalls())
 func (mock *PersistentVolumeClaimInterfaceMock) CreateCalls() []struct {
 	In1 *v1.PersistentVolumeClaim
 } {
@@ -1368,7 +1389,8 @@ func (mock *PersistentVolumeClaimInterfaceMock) Delete(name string, options *met
 
 // DeleteCalls gets all the calls that were made to Delete.
 // Check the length with:
-//     len(mockedPersistentVolumeClaimInterface.DeleteCalls())
+//
+//	len(mockedPersistentVolumeClaimInterface.DeleteCalls())
 func (mock *PersistentVolumeClaimInterfaceMock) DeleteCalls() []struct {
 	Name    string
 	Options *metav1.DeleteOptions
@@ -1403,7 +1425,8 @@ func (mock *PersistentVolumeClaimInterfaceMock) DeleteCollection(deleteOpts *met
 
 // DeleteCollectionCalls gets all the calls that were made to DeleteCollection.
 // Check the length with:
-//     len(mockedPersistentVolumeClaimInterface.DeleteCollectionCalls())
+//
+//	len(mockedPersistentVolumeClaimInterface.DeleteCollectionCalls())
 func (mock *PersistentVolumeClaimInterfaceMock) DeleteCollectionCalls() []struct {
 	DeleteOpts *metav1.DeleteOptions
 	ListOpts   metav1.ListOptions
@@ -1440,7 +1463,8 @@ func (mock *PersistentVolumeClaimInterfaceMock) DeleteNamespaced(namespace strin
 
 // DeleteNamespacedCalls gets all the calls that were made to DeleteNamespaced.
 // Check the length with:
-//     len(mockedPersistentVolumeClaimInterface.DeleteNamespacedCalls())
+//
+//	len(mockedPersistentVolumeClaimInterface.DeleteNamespacedCalls())
 func (mock *PersistentVolumeClaimInterfaceMock) DeleteNamespacedCalls() []struct {
 	Namespace string
 	Name      string
@@ -1477,7 +1501,8 @@ func (mock *PersistentVolumeClaimInterfaceMock) Get(name string, opts metav1.Get
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//     len(mockedPersistentVolumeClaimInterface.GetCalls())
+//
+//	len(mockedPersistentVolumeClaimInterface.GetCalls())
 func (mock *PersistentVolumeClaimInterfaceMock) GetCalls() []struct {
 	Name string
 	Opts metav1.GetOptions
@@ -1514,7 +1539,8 @@ func (mock *PersistentVolumeClaimInterfaceMock) GetNamespaced(namespace string, 
 
 // GetNamespacedCalls gets all the calls that were made to GetNamespaced.
 // Check the length with:
-//     len(mockedPersistentVolumeClaimInterface.GetNamespacedCalls())
+//
+//	len(mockedPersistentVolumeClaimInterface.GetNamespacedCalls())
 func (mock *PersistentVolumeClaimInterfaceMock) GetNamespacedCalls() []struct {
 	Namespace string
 	Name      string
@@ -1549,7 +1575,8 @@ func (mock *PersistentVolumeClaimInterfaceMock) List(opts metav1.ListOptions) (*
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//     len(mockedPersistentVolumeClaimInterface.ListCalls())
+//
+//	len(mockedPersistentVolumeClaimInterface.ListCalls())
 func (mock *PersistentVolumeClaimInterfaceMock) ListCalls() []struct {
 	Opts metav1.ListOptions
 } {
@@ -1582,7 +1609,8 @@ func (mock *PersistentVolumeClaimInterfaceMock) ListNamespaced(namespace string,
 
 // ListNamespacedCalls gets all the calls that were made to ListNamespaced.
 // Check the length with:
-//     len(mockedPersistentVolumeClaimInterface.ListNamespacedCalls())
+//
+//	len(mockedPersistentVolumeClaimInterface.ListNamespacedCalls())
 func (mock *PersistentVolumeClaimInterfaceMock) ListNamespacedCalls() []struct {
 	Namespace string
 	Opts      metav1.ListOptions
@@ -1612,7 +1640,8 @@ func (mock *PersistentVolumeClaimInterfaceMock) ObjectClient() *objectclient.Obj
 
 // ObjectClientCalls gets all the calls that were made to ObjectClient.
 // Check the length with:
-//     len(mockedPersistentVolumeClaimInterface.ObjectClientCalls())
+//
+//	len(mockedPersistentVolumeClaimInterface.ObjectClientCalls())
 func (mock *PersistentVolumeClaimInterfaceMock) ObjectClientCalls() []struct {
 } {
 	var calls []struct {
@@ -1641,7 +1670,8 @@ func (mock *PersistentVolumeClaimInterfaceMock) Update(in1 *v1.PersistentVolumeC
 
 // UpdateCalls gets all the calls that were made to Update.
 // Check the length with:
-//     len(mockedPersistentVolumeClaimInterface.UpdateCalls())
+//
+//	len(mockedPersistentVolumeClaimInterface.UpdateCalls())
 func (mock *PersistentVolumeClaimInterfaceMock) UpdateCalls() []struct {
 	In1 *v1.PersistentVolumeClaim
 } {
@@ -1672,7 +1702,8 @@ func (mock *PersistentVolumeClaimInterfaceMock) Watch(opts metav1.ListOptions) (
 
 // WatchCalls gets all the calls that were made to Watch.
 // Check the length with:
-//     len(mockedPersistentVolumeClaimInterface.WatchCalls())
+//
+//	len(mockedPersistentVolumeClaimInterface.WatchCalls())
 func (mock *PersistentVolumeClaimInterfaceMock) WatchCalls() []struct {
 	Opts metav1.ListOptions
 } {
@@ -1695,19 +1726,19 @@ var _ v11.PersistentVolumeClaimsGetter = &PersistentVolumeClaimsGetterMock{}
 
 // PersistentVolumeClaimsGetterMock is a mock implementation of v11.PersistentVolumeClaimsGetter.
 //
-//     func TestSomethingThatUsesPersistentVolumeClaimsGetter(t *testing.T) {
+//	    func TestSomethingThatUsesPersistentVolumeClaimsGetter(t *testing.T) {
 //
-//         // make and configure a mocked v11.PersistentVolumeClaimsGetter
-//         mockedPersistentVolumeClaimsGetter := &PersistentVolumeClaimsGetterMock{
-//             PersistentVolumeClaimsFunc: func(namespace string) v11.PersistentVolumeClaimInterface {
-// 	               panic("mock out the PersistentVolumeClaims method")
-//             },
-//         }
+//	        // make and configure a mocked v11.PersistentVolumeClaimsGetter
+//	        mockedPersistentVolumeClaimsGetter := &PersistentVolumeClaimsGetterMock{
+//	            PersistentVolumeClaimsFunc: func(namespace string) v11.PersistentVolumeClaimInterface {
+//		               panic("mock out the PersistentVolumeClaims method")
+//	            },
+//	        }
 //
-//         // use mockedPersistentVolumeClaimsGetter in code that requires v11.PersistentVolumeClaimsGetter
-//         // and then make assertions.
+//	        // use mockedPersistentVolumeClaimsGetter in code that requires v11.PersistentVolumeClaimsGetter
+//	        // and then make assertions.
 //
-//     }
+//	    }
 type PersistentVolumeClaimsGetterMock struct {
 	// PersistentVolumeClaimsFunc mocks the PersistentVolumeClaims method.
 	PersistentVolumeClaimsFunc func(namespace string) v11.PersistentVolumeClaimInterface
@@ -1740,7 +1771,8 @@ func (mock *PersistentVolumeClaimsGetterMock) PersistentVolumeClaims(namespace s
 
 // PersistentVolumeClaimsCalls gets all the calls that were made to PersistentVolumeClaims.
 // Check the length with:
-//     len(mockedPersistentVolumeClaimsGetter.PersistentVolumeClaimsCalls())
+//
+//	len(mockedPersistentVolumeClaimsGetter.PersistentVolumeClaimsCalls())
 func (mock *PersistentVolumeClaimsGetterMock) PersistentVolumeClaimsCalls() []struct {
 	Namespace string
 } {

@@ -475,7 +475,7 @@ type ProjectLifecycle struct {
 	clusterName        string
 }
 
-//Create built-in project alerts
+// Create built-in project alerts
 func (l *ProjectLifecycle) Create(obj *v3.Project) (runtime.Object, error) {
 	name := "projectalert-workload-alert"
 	projectName := obj.Name

@@ -2,6 +2,7 @@ package clusterconnected
 
 import (
 	"context"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"time"
@@ -53,7 +54,7 @@ func (c *checker) check() error {
 
 	for _, cluster := range clusters {
 		if err := c.checkCluster(cluster); err != nil {
-			logrus.Errorf("failed to check connectivity of cluster [%s]", cluster.Name)
+			logrus.Errorf("failed to check connectivity of cluster [%s]: %v", cluster.Name, err)
 		}
 	}
 	return nil
@@ -87,6 +88,9 @@ func (c *checker) hasSession(cluster *v3.Cluster) bool {
 
 func (c *checker) checkCluster(cluster *v3.Cluster) error {
 	if cluster.Spec.Internal {
+		if !Connected.IsTrue(cluster) {
+			return c.updateClusterConnectedCondition(cluster, true)
+		}
 		return nil
 	}
 
@@ -99,30 +103,30 @@ func (c *checker) checkCluster(cluster *v3.Cluster) error {
 		return nil
 	}
 
-	var (
-		err error
-	)
+	return c.updateClusterConnectedCondition(cluster, hasSession)
+}
 
+func (c *checker) updateClusterConnectedCondition(cluster *v3.Cluster, connected bool) error {
+	if cluster == nil {
+		return fmt.Errorf("cluster cannot be nil")
+	}
 	for i := 0; i < 3; i++ {
 		cluster = cluster.DeepCopy()
-		Connected.SetStatusBool(cluster, hasSession)
-		if !hasSession && v3.ClusterConditionProvisioned.IsTrue(cluster) {
+		Connected.SetStatusBool(cluster, connected)
+		if !connected && v3.ClusterConditionProvisioned.IsTrue(cluster) {
 			v3.ClusterConditionReady.False(cluster)
 			v3.ClusterConditionReady.Reason(cluster, "Disconnected")
 			v3.ClusterConditionReady.Message(cluster, "Cluster agent is not connected")
 		}
-		_, err = c.clusters.Update(cluster)
+		_, err := c.clusters.Update(cluster)
 		if apierror.IsConflict(err) {
 			cluster, err = c.clusters.Get(cluster.Name, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
 			continue
-		} else if err != nil {
-			return err
 		}
-		return nil
+		return err
 	}
-
-	return err
+	return fmt.Errorf("unable to update cluster connected condition")
 }

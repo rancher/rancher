@@ -444,6 +444,8 @@ func (m *Lifecycle) createOrUpdateNodeForEmbeddedTypeWithParents(embeddedType, f
 		return nil
 	}
 
+	nodeSchema = nodeSchema.DeepCopy()
+
 	shouldUpdate := false
 	if embedded {
 		if nodeSchema.Spec.ResourceFields == nil {

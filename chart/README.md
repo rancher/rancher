@@ -1,3 +1,5 @@
+By installing this application, you accept the [End User License Agreement & Terms & Conditions](https://www.suse.com/licensing/eula/).
+
 # Rancher
 
 ***Rancher*** is open source software that combines everything an organization needs to adopt and run containers in production. Built on Kubernetes, Rancher makes it easy for DevOps teams to test, deploy and manage their applications.
