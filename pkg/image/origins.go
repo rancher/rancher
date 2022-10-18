@@ -224,6 +224,7 @@ var OriginMap = map[string]string{
 	"windows_exporter-package":                                "https://github.com/rancher/windows_exporter-package",
 	"wins":                                                    "https://github.com/rancher/wins",
 	"wmi_exporter-package":                                    "https://github.com/rancher/wmi_exporter-package",
+	"hardened-node-feature-discovery":                         "https://github.com/rancher/image-build-node-feature-discovery",
 }
 
 // GenerateImageOrigins looks through all target images gathered from KDM/Charts and
