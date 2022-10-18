@@ -5,25 +5,29 @@ import (
 	"reflect"
 
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-
-	rketypes "github.com/rancher/rke/types"
-
 	"github.com/rancher/rancher/pkg/clusterprovisioninglogger"
+	"github.com/rancher/rancher/pkg/controllers/management/secretmigrator"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/kontainer-engine/service"
 	"github.com/rancher/rke/services"
+	rketypes "github.com/rancher/rke/types"
 	"github.com/sirupsen/logrus"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
 const DriverNameField = "driverName"
 
 func (p *Provisioner) driverCreate(cluster *v3.Cluster, spec v32.ClusterSpec) (api string, token string, cert string, err error) {
-	ctx, logger := clusterprovisioninglogger.NewLogger(p.Clusters, cluster, v32.ClusterConditionProvisioned)
+	ctx, logger := clusterprovisioninglogger.NewLogger(p.Clusters, p.ConfigMaps, cluster, v32.ClusterConditionProvisioned)
 	defer logger.Close()
 
 	spec = cleanRKE(spec)
+	spec, err = secretmigrator.AssembleRKEConfigSpec(cluster, spec, p.SecretLister)
+	if err != nil {
+		return "", "", "", err
+	}
 
 	if newCluster, err := p.Clusters.Update(cluster); err == nil {
 		cluster = newCluster
@@ -54,21 +58,31 @@ func (p *Provisioner) getKontainerDriver(spec v32.ClusterSpec) (*v3.KontainerDri
 }
 
 func (p *Provisioner) driverUpdate(cluster *v3.Cluster, spec v32.ClusterSpec) (api string, token string, cert string, updateTriggered bool, err error) {
-	ctx, logger := clusterprovisioninglogger.NewLogger(p.Clusters, cluster, v32.ClusterConditionUpdated)
+	ctx, logger := clusterprovisioninglogger.NewLogger(p.Clusters, p.ConfigMaps, cluster, v32.ClusterConditionUpdated)
 	defer logger.Close()
 
 	spec = cleanRKE(spec)
 	applied := cleanRKE(cluster.Status.AppliedSpec)
 
-	if spec.RancherKubernetesEngineConfig != nil && cluster.Status.APIEndpoint != "" && cluster.Status.ServiceAccountToken != "" &&
+	if spec.RancherKubernetesEngineConfig != nil && cluster.Status.APIEndpoint != "" && cluster.Status.ServiceAccountTokenSecret != "" &&
 		reflect.DeepEqual(applied.RancherKubernetesEngineConfig, spec.RancherKubernetesEngineConfig) {
-		return cluster.Status.APIEndpoint, cluster.Status.ServiceAccountToken, cluster.Status.CACert, false, nil
+		secret, err := p.Secrets.GetNamespaced("cattle-global-data", cluster.Status.ServiceAccountTokenSecret, v1.GetOptions{})
+		if err != nil {
+			logrus.Errorf("Could not find service account token secret %s for cluster %s: [%v]", cluster.Status.ServiceAccountTokenSecret, cluster.Name, err)
+			return cluster.Status.APIEndpoint, "", cluster.Status.CACert, false, err
+		}
+		return cluster.Status.APIEndpoint, string(secret.Data["credential"]), cluster.Status.CACert, false, nil
 	}
 
 	if spec.RancherKubernetesEngineConfig != nil && spec.RancherKubernetesEngineConfig.Services.Etcd.Snapshot == nil &&
 		applied.RancherKubernetesEngineConfig != nil && applied.RancherKubernetesEngineConfig.Services.Etcd.Snapshot == nil {
 		_false := false
 		cluster.Spec.RancherKubernetesEngineConfig.Services.Etcd.Snapshot = &_false
+	}
+
+	spec, err = secretmigrator.AssembleRKEConfigSpec(cluster, spec, p.SecretLister)
+	if err != nil {
+		return "", "", "", false, err
 	}
 
 	if newCluster, err := p.Clusters.Update(cluster); err == nil {
@@ -85,7 +99,7 @@ func (p *Provisioner) driverUpdate(cluster *v3.Cluster, spec v32.ClusterSpec) (a
 }
 
 func (p *Provisioner) driverRemove(cluster *v3.Cluster, forceRemove bool) error {
-	ctx, logger := clusterprovisioninglogger.NewLogger(p.Clusters, cluster, v32.ClusterConditionProvisioned)
+	ctx, logger := clusterprovisioninglogger.NewLogger(p.Clusters, p.ConfigMaps, cluster, v32.ClusterConditionProvisioned)
 	defer logger.Close()
 
 	spec := cleanRKE(cluster.Spec)
@@ -111,10 +125,14 @@ func (p *Provisioner) driverRemove(cluster *v3.Cluster, forceRemove bool) error 
 }
 
 func (p *Provisioner) driverRestore(cluster *v3.Cluster, spec v32.ClusterSpec, snapshot string) (string, string, string, error) {
-	ctx, logger := clusterprovisioninglogger.NewLogger(p.Clusters, cluster, v32.ClusterConditionUpdated)
+	ctx, logger := clusterprovisioninglogger.NewLogger(p.Clusters, p.ConfigMaps, cluster, v32.ClusterConditionUpdated)
 	defer logger.Close()
 
 	spec = cleanRKE(spec)
+	spec, err := secretmigrator.AssembleRKEConfigSpec(cluster, spec, p.SecretLister)
+	if err != nil {
+		return "", "", "", err
+	}
 
 	newCluster, err := p.Clusters.Update(cluster)
 	if err != nil {
@@ -131,7 +149,7 @@ func (p *Provisioner) driverRestore(cluster *v3.Cluster, spec v32.ClusterSpec, s
 }
 
 func (p *Provisioner) generateServiceAccount(cluster *v3.Cluster, spec v32.ClusterSpec) (string, error) {
-	ctx, logger := clusterprovisioninglogger.NewLogger(p.Clusters, cluster, v32.ClusterConditionUpdated)
+	ctx, logger := clusterprovisioninglogger.NewLogger(p.Clusters, p.ConfigMaps, cluster, v32.ClusterConditionUpdated)
 	defer logger.Close()
 
 	spec = cleanRKE(spec)
@@ -145,7 +163,7 @@ func (p *Provisioner) generateServiceAccount(cluster *v3.Cluster, spec v32.Clust
 }
 
 func (p *Provisioner) removeLegacyServiceAccount(cluster *v3.Cluster, spec v32.ClusterSpec) error {
-	ctx, logger := clusterprovisioninglogger.NewLogger(p.Clusters, cluster, v32.ClusterConditionUpdated)
+	ctx, logger := clusterprovisioninglogger.NewLogger(p.Clusters, p.ConfigMaps, cluster, v32.ClusterConditionUpdated)
 	defer logger.Close()
 
 	spec = cleanRKE(spec)

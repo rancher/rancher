@@ -23,7 +23,7 @@ const psptpbByTargetProjectNameAnnotationIndex = "podsecuritypolicy.rbac.user.ca
 const roleBindingByServiceAccountIndex = "podsecuritypolicy.rbac.user.cattle.io/role-binding-by-service-account"
 const psptpbRoleBindingAnnotation = "podsecuritypolicy.rbac.user.cattle.io/psptpb-role-binding"
 
-func RegisterIndexers(ctx context.Context, scaledContext *config.ScaledContext) error {
+func RegisterIndexers(scaledContext *config.ScaledContext) error {
 	psptpbInformer := scaledContext.Management.PodSecurityPolicyTemplateProjectBindings("").Controller().Informer()
 	psptpbIndexers := map[string]cache.IndexFunc{
 		psptpbByTargetProjectNameAnnotationIndex: psptpbByTargetProjectName,

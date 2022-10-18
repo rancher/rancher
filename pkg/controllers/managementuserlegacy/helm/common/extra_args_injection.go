@@ -35,7 +35,7 @@ func injectDefaultRegistry(obj *v3.App) map[string]string {
 		return nil
 	}
 
-	return map[string]string{"systemDefaultRegistry": reg}
+	return map[string]string{"systemDefaultRegistry": reg, "cattle.systemDefaultRegistry": reg}
 }
 
 func injectClusterInfo(obj *v3.App) map[string]string {

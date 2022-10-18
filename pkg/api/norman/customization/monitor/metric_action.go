@@ -82,7 +82,7 @@ func (h *MetricHandler) Action(actionName string, action *types.Action, apiConte
 			return err
 		}
 
-		userContext, err := h.clustermanager.UserContext(clusterName)
+		userContext, err := h.clustermanager.UserContextNoControllers(clusterName)
 		if err != nil {
 			return fmt.Errorf("get usercontext failed, %v", err)
 		}
@@ -137,7 +137,7 @@ func (h *MetricHandler) Action(actionName string, action *types.Action, apiConte
 			return fmt.Errorf("clusterName is empty")
 		}
 
-		userContext, err := h.clustermanager.UserContext(clusterName)
+		userContext, err := h.clustermanager.UserContextNoControllers(clusterName)
 		if err != nil {
 			return fmt.Errorf("get usercontext failed, %v", err)
 		}
@@ -185,7 +185,7 @@ func (h *MetricHandler) Action(actionName string, action *types.Action, apiConte
 			return fmt.Errorf("clusterName is empty")
 		}
 
-		userContext, err := h.clustermanager.UserContext(clusterName)
+		userContext, err := h.clustermanager.UserContextNoControllers(clusterName)
 		if err != nil {
 			return fmt.Errorf("get usercontext failed, %v", err)
 		}

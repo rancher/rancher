@@ -95,7 +95,7 @@ func (h *handler) onClusterChange(key string, cluster *v3.Cluster) (*v3.Cluster,
 // deployK3sBaseUpgradeController creates a rancher k3s/rke2 upgrader controller if one does not exist.
 // Updates k3s upgrader controller if one exists and is not the newest available version.
 func (h *handler) deployK3sBasedUpgradeController(clusterName string, isK3s, isRke2 bool) error {
-	userCtx, err := h.manager.UserContext(clusterName)
+	userCtx, err := h.manager.UserContextNoControllers(clusterName)
 	if err != nil {
 		return err
 	}

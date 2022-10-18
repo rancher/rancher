@@ -43,7 +43,7 @@ func init() {
 	resource.Put(IngressGroupVersionResource)
 }
 
-// Deprecated use v1beta1.Ingress instead
+// Deprecated: use v1beta1.Ingress instead
 type Ingress = v1beta1.Ingress
 
 func NewIngress(namespace, name string, obj v1beta1.Ingress) *v1beta1.Ingress {

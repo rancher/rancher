@@ -2,11 +2,11 @@ package secret
 
 import (
 	"context"
+	"fmt"
+	"reflect"
 	"strings"
 
 	"k8s.io/apimachinery/pkg/runtime"
-
-	"fmt"
 
 	"github.com/rancher/norman/controller"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
@@ -36,6 +36,7 @@ const (
 
 type Controller struct {
 	secrets                   v1.SecretInterface
+	secretLister              v1.SecretLister
 	clusterNamespaceLister    v1.NamespaceLister
 	managementNamespaceLister v1.NamespaceLister
 	projectLister             v3.ProjectLister
@@ -43,9 +44,38 @@ type Controller struct {
 }
 
 func Register(ctx context.Context, cluster *config.UserContext) {
+	starter := cluster.DeferredStart(ctx, func(ctx context.Context) error {
+		registerDeferred(ctx, cluster)
+		return nil
+	})
+
+	projectLister := cluster.Management.Management.Projects("").Controller().Lister()
+	secrets := cluster.Management.Core.Secrets("")
+	secrets.AddHandler(ctx, "secret-deferred", func(key string, obj *corev1.Secret) (runtime.Object, error) {
+		if obj == nil {
+			return nil, nil
+		}
+
+		_, err := projectLister.Get(cluster.ClusterName, obj.Namespace)
+		if errors.IsNotFound(err) {
+			return obj, nil
+		} else if err != nil {
+			return obj, err
+		}
+
+		if !strings.HasPrefix(obj.Name, "default-token-") {
+			return obj, starter()
+		}
+
+		return obj, nil
+	})
+}
+
+func registerDeferred(ctx context.Context, cluster *config.UserContext) {
 	clusterSecretsClient := cluster.Core.Secrets("")
 	s := &Controller{
 		secrets:                   clusterSecretsClient,
+		secretLister:              clusterSecretsClient.Controller().Lister(),
 		clusterNamespaceLister:    cluster.Core.Namespaces("").Controller().Lister(),
 		managementNamespaceLister: cluster.Management.Core.Namespaces("").Controller().Lister(),
 		projectLister:             cluster.Management.Management.Projects(cluster.ClusterName).Controller().Lister(),
@@ -54,6 +84,7 @@ func Register(ctx context.Context, cluster *config.UserContext) {
 
 	n := &NamespaceController{
 		clusterSecretsClient: clusterSecretsClient,
+		clusterSecretsLister: clusterSecretsClient.Controller().Lister(),
 		managementSecrets:    cluster.Management.Core.Secrets("").Controller().Lister(),
 	}
 	cluster.Core.Namespaces("").AddHandler(ctx, "secretsController", n.sync)
@@ -89,6 +120,7 @@ func Register(ctx context.Context, cluster *config.UserContext) {
 
 type NamespaceController struct {
 	clusterSecretsClient v1.SecretInterface
+	clusterSecretsLister v1.SecretLister
 	managementSecrets    v1.SecretLister
 }
 
@@ -119,6 +151,9 @@ func (n *NamespaceController) sync(key string, obj *corev1.Namespace) (runtime.O
 					continue
 				}
 				namespacedSecret := getNamespacedSecret(secret, obj.Name)
+				if _, err := n.clusterSecretsLister.Get(namespacedSecret.Namespace, namespacedSecret.Name); err == nil {
+					continue
+				}
 				logrus.Infof("Creating secret [%s] into namespace [%s]", namespacedSecret.Name, obj.Name)
 				_, err := n.clusterSecretsClient.Create(namespacedSecret)
 				if err != nil && !errors.IsAlreadyExists(err) {
@@ -214,16 +249,26 @@ func (s *Controller) createOrUpdate(obj *corev1.Secret, action string) error {
 		return err
 	}
 	for _, namespace := range clusterNamespaces {
+		if !namespace.DeletionTimestamp.IsZero() {
+			continue
+		}
 		// copy the secret into namespace
 		namespacedSecret := getNamespacedSecret(obj, namespace.Name)
 		switch action {
 		case create:
+			if _, err := s.secretLister.Get(namespacedSecret.Namespace, namespacedSecret.Name); err == nil {
+				continue
+			}
 			logrus.Infof("Copying secret [%s] into namespace [%s]", namespacedSecret.Name, namespace.Name)
 			_, err := s.secrets.Create(namespacedSecret)
 			if err != nil && !errors.IsAlreadyExists(err) {
 				return err
 			}
 		case update:
+			if existing, err := s.secretLister.Get(namespacedSecret.Namespace, namespacedSecret.Name); err == nil &&
+				reflect.DeepEqual(existing.Data, namespacedSecret.Data) {
+				continue
+			}
 			logrus.Infof("Updating secret [%s] into namespace [%s]", namespacedSecret.Name, namespace.Name)
 			_, err := s.secrets.Update(namespacedSecret)
 			if err != nil && !errors.IsNotFound(err) {
@@ -250,12 +295,14 @@ func getNamespacedSecret(obj *corev1.Secret, namespace string) *corev1.Secret {
 	namespacedSecret.Namespace = namespace
 	namespacedSecret.Type = obj.Type
 	namespacedSecret.Annotations = make(map[string]string)
-	copyMap(obj.Annotations, namespacedSecret.Annotations)
+	namespacedSecret.Labels = make(map[string]string)
+	copyMap(namespacedSecret.Annotations, obj.Annotations)
+	copyMap(namespacedSecret.Labels, obj.Labels)
 	namespacedSecret.Annotations[userSecretAnnotation] = "true"
 	return namespacedSecret
 }
 
-func copyMap(src map[string]string, dst map[string]string) {
+func copyMap(dst map[string]string, src map[string]string) {
 	for k, v := range src {
 		dst[k] = v
 	}

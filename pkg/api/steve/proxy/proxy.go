@@ -2,6 +2,7 @@ package proxy
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"net/http"
 	"strings"
@@ -14,6 +15,7 @@ import (
 	"github.com/rancher/remotedialer"
 	"github.com/rancher/steve/pkg/auth"
 	"github.com/rancher/steve/pkg/proxy"
+	"github.com/sirupsen/logrus"
 	authzv1 "k8s.io/api/authorization/v1"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
@@ -42,7 +44,7 @@ func RewriteLocalCluster(next http.Handler) http.Handler {
 	})
 }
 
-func NewProxyMiddleware(sar v1.SubjectAccessReviewInterface,
+func NewProxyMiddleware(sar v1.AuthorizationV1Interface,
 	dialerFactory ClusterDialerFactory,
 	clusters v3.ClusterCache,
 	localSupport bool,
@@ -82,6 +84,11 @@ func routeToShellProxy(key, value string, localSupport bool, localCluster http.H
 		cluster := vars["clusterID"]
 		if cluster == "local" {
 			if localSupport {
+				authed := proxyHandler.userCanAccessCluster(r, cluster)
+				if !authed {
+					rw.WriteHeader(http.StatusUnauthorized)
+					return
+				}
 				q := r.URL.Query()
 				q.Set(key, value)
 				r.URL.RawQuery = q.Encode()
@@ -125,20 +132,13 @@ func (h *Handler) MatchNonLegacy(prefix string) gmux.MatcherFunc {
 }
 
 func (h *Handler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
-	user, ok := request.UserFrom(req.Context())
-	if !ok {
-		rw.WriteHeader(http.StatusUnauthorized)
-		return
-	}
-
-	prefix := "/" + gmux.Vars(req)["prefix"]
 	clusterID := gmux.Vars(req)["clusterID"]
-
-	if !h.canAccess(req.Context(), user, clusterID) {
+	authed := h.userCanAccessCluster(req, clusterID)
+	if !authed {
 		rw.WriteHeader(http.StatusUnauthorized)
 		return
 	}
-
+	prefix := "/" + gmux.Vars(req)["prefix"]
 	handler, err := h.next(clusterID, prefix)
 	if err != nil {
 		rw.WriteHeader(http.StatusInternalServerError)
@@ -149,13 +149,38 @@ func (h *Handler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	handler.ServeHTTP(rw, req)
 }
 
+func (h *Handler) userCanAccessCluster(req *http.Request, clusterID string) bool {
+	requestUser, ok := request.UserFrom(req.Context())
+	if ok {
+		return h.canAccess(req.Context(), requestUser, clusterID)
+	}
+	return false
+}
+
 func (h *Handler) dialer(ctx context.Context, network, address string) (net.Conn, error) {
 	host, _, err := net.SplitHostPort(address)
 	if err != nil {
 		return nil, err
 	}
 	dialer := h.dialerFactory("stv-cluster-" + host)
-	return dialer(ctx, network, "127.0.0.1:6080")
+	var conn net.Conn
+	for i := 0; i < 15; i++ {
+		conn, err = dialer(ctx, network, "127.0.0.1:6080")
+		if err != nil && strings.Contains(err.Error(), "failed to find Session for client") {
+			if i < 14 {
+				logrus.Tracef("steve.proxy.dialer: lost connection, retrying")
+				time.Sleep(time.Second)
+			} else {
+				logrus.Tracef("steve.proxy.dialer: lost connection, failed to reconnect after 15 attempts")
+			}
+		} else {
+			break
+		}
+	}
+	if err != nil {
+		return conn, fmt.Errorf("lost connection to cluster: %w", err)
+	}
+	return conn, nil
 }
 
 func (h *Handler) next(clusterID, prefix string) (http.Handler, error) {

@@ -11,6 +11,8 @@ import (
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
+	"github.com/rancher/rancher/pkg/controllers/management/cluster"
+	mgmtv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/namespace"
@@ -33,7 +35,7 @@ type handler struct {
 	Action        string
 	schemas       *types.Schemas
 	secretsLister v1.SecretLister
-	clusterLister v3.ClusterLister
+	clusterCache  mgmtv3.ClusterCache
 	ac            types.AccessControl
 }
 
@@ -41,7 +43,7 @@ func NewGKEHandler(scaledContext *config.ScaledContext) http.Handler {
 	return &handler{
 		schemas:       scaledContext.Schemas,
 		secretsLister: scaledContext.Core.Secrets(namespace.GlobalNamespace).Controller().Lister(),
-		clusterLister: scaledContext.Management.Clusters("").Controller().Lister(),
+		clusterCache:  scaledContext.Wrangler.Mgmt.Cluster().Cache(),
 		ac:            scaledContext.AccessControl,
 	}
 }
@@ -143,7 +145,7 @@ func (h *handler) getCloudCredential(req *http.Request, cap *Capabilities, credI
 		return http.StatusBadRequest, fmt.Errorf("invalid cloud credential ID %s", credID)
 	}
 
-	var accessCred client.CloudCredential //var to check access
+	var accessCred client.CloudCredential // var to check access
 	if err := access.ByID(h.generateAPIContext(req), &schema.Version, client.CloudCredentialType, credID, &accessCred); err != nil {
 		apiError, ok := err.(*httperror.APIError)
 		if !ok {
@@ -155,11 +157,7 @@ func (h *handler) getCloudCredential(req *http.Request, cap *Capabilities, credI
 		if apiError.Code.Status != httperror.PermissionDenied.Status {
 			return httperror.InvalidBodyContent.Status, err
 		}
-		var clusterID string
-		if clusterID = req.URL.Query().Get("clusterID"); clusterID == "" {
-			return httperror.InvalidBodyContent.Status, fmt.Errorf("cloud credential not found")
-		}
-		if errCode, err := h.clusterCheck(h.generateAPIContext(req), clusterID, credID); err != nil {
+		if errCode, err := h.clusterCheck(h.generateAPIContext(req), req.URL.Query().Get("clusterID"), credID); err != nil {
 			return errCode, err
 		}
 	}
@@ -190,28 +188,40 @@ func (h *handler) getCloudCredential(req *http.Request, cap *Capabilities, credI
 }
 
 func (h *handler) clusterCheck(apiContext *types.APIContext, clusterID, cloudCredentialID string) (int, error) {
-	clusterInfo := map[string]interface{}{
-		"id": clusterID,
-	}
-
-	clusterSchema := h.schemas.Schema(&mgmtSchema.Version, client.ClusterType)
-	if err := h.ac.CanDo(v3.ClusterGroupVersionKind.Group, v3.ClusterResource.Name, "update", apiContext, clusterInfo, clusterSchema); err != nil {
-		return httperror.InvalidBodyContent.Status, fmt.Errorf("cluster not found")
-	}
-
-	cluster, err := h.clusterLister.Get("", clusterID)
-	if err != nil {
-		if httperror.IsNotFound(err) {
-			return httperror.InvalidBodyContent.Status, fmt.Errorf("cluster not found")
+	var (
+		clusters []*v3.Cluster
+		err      error
+	)
+	if clusterID == "" {
+		// If no clusterID is passed, then we check all clusters that the user has access to and are associated to the cloud credential.
+		clusters, err = h.clusterCache.GetByIndex(cluster.ByCloudCredential, cloudCredentialID)
+		if err != nil {
+			return httperror.InvalidBodyContent.Status, err
 		}
-		return httperror.ServerError.Status, err
+		if len(clusters) == 0 {
+			return httperror.InvalidBodyContent.Status, fmt.Errorf("cloud credential not found")
+		}
+	} else {
+		c, err := h.clusterCache.Get(clusterID)
+		if err != nil {
+			return httperror.ServerError.Status, err
+		}
+		clusters = []*v3.Cluster{c}
 	}
 
-	if cluster.Spec.GKEConfig.GoogleCredentialSecret != cloudCredentialID {
-		return httperror.InvalidBodyContent.Status, fmt.Errorf("cloud credential not found")
+	for _, c := range clusters {
+		if c.Spec.GKEConfig == nil || c.Spec.GKEConfig.GoogleCredentialSecret != cloudCredentialID {
+			continue
+		}
+
+		clusterSchema := h.schemas.Schema(&mgmtSchema.Version, client.ClusterType)
+		if err := h.ac.CanDo(v3.ClusterGroupVersionKind.Group, v3.ClusterResource.Name, "update", apiContext, map[string]interface{}{"id": c.Name}, clusterSchema); err == nil {
+			return http.StatusOK, nil
+		}
+
 	}
 
-	return http.StatusOK, nil
+	return httperror.InvalidBodyContent.Status, fmt.Errorf("cloud credential not found")
 }
 
 func (h *handler) getCredentialsFromBody(writer http.ResponseWriter, req *http.Request, cap *Capabilities) (int, error) {

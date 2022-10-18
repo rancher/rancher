@@ -19,7 +19,7 @@ spec:
 apiVersion: policy/v1beta1
 kind: PodSecurityPolicy
 metadata:
-  name: cis1.5-compliant-psp
+  name: restricted-psp
 spec:
   privileged: false
   allowPrivilegeEscalation: false
@@ -31,7 +31,9 @@ spec:
     - 'projected'
     - 'secret'
     - 'downwardAPI'
+    - 'csi'
     - 'persistentVolumeClaim'
+    - 'ephemeral'
   hostNetwork: false
   hostIPC: false
   hostPID: false
@@ -54,7 +56,7 @@ spec:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: psp:restricted
+  name: psp:restricted-psp
   labels:
     addonmanager.kubernetes.io/mode: EnsureExists
 rules:
@@ -62,18 +64,18 @@ rules:
   resources: ['podsecuritypolicies']
   verbs:     ['use']
   resourceNames:
-  - cis1.5-compliant-psp
+  - restricted-psp
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: default:restricted
+  name: default:restricted-psp
   labels:
     addonmanager.kubernetes.io/mode: EnsureExists
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: psp:restricted
+  name: psp:restricted-psp
 subjects:
 - kind: Group
   name: system:authenticated
@@ -184,3 +186,34 @@ subjects:
 - apiGroup: rbac.authorization.k8s.io
   kind: Group
   name: system:serviceaccounts
+---
+# Reference https://rancher.com/docs/k3s/latest/en/security/hardening_guide/#networkpolicies
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-all-svclbtraefik-ingress
+  namespace: kube-system
+spec:
+  podSelector:
+    matchLabels:
+      svccontroller.k3s.cattle.io/svcname: traefik
+  ingress:
+  - {}
+  policyTypes:
+  - Ingress
+---
+# Reference https://rancher.com/docs/k3s/latest/en/security/hardening_guide/#networkpolicies
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-all-metrics-server
+  namespace: kube-system
+spec:
+  podSelector:
+    matchLabels:
+      k8s-app: metrics-server
+  ingress:
+  - {}
+  policyTypes:
+  - Ingress
+---

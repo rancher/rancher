@@ -7,6 +7,7 @@ import (
 
 	"github.com/rancher/rancher/tests/integration/pkg/defaults"
 	"github.com/sirupsen/logrus"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -45,13 +46,13 @@ func doWatch(ctx context.Context, watchFunc watchFunc, cb func(obj runtime.Objec
 				return false, nil
 			}
 			switch event.Type {
-			case watch.Added:
-				fallthrough
-			case watch.Modified:
-				fallthrough
-			case watch.Deleted:
+			case watch.Added, watch.Modified, watch.Deleted:
 				done, err := cb(event.Object)
 				if err != nil || done {
+					if apierrors.IsConflict(err) {
+						// if we got a conflict, return a false (not done) and nil for error
+						return false, nil
+					}
 					return true, err
 				}
 			}
@@ -69,7 +70,7 @@ func retryWatch(ctx context.Context, watchFunc watchFunc, cb func(obj runtime.Ob
 	}
 }
 
-func Object(ctx context.Context, watchFunc WatchFunc, obj runtime.Object, cb func(obj runtime.Object) (bool, error)) (err error) {
+func Object(ctx context.Context, watchFunc WatchFunc, obj runtime.Object, cb func(obj runtime.Object) (bool, error)) error {
 	if done, err := cb(obj); err != nil || done {
 		return err
 	}
@@ -85,4 +86,24 @@ func Object(ctx context.Context, watchFunc WatchFunc, obj runtime.Object, cb fun
 			TimeoutSeconds: &defaults.WatchTimeoutSeconds,
 		})
 	}, cb)
+}
+
+func EnsureDoesNotExist(ctx context.Context, getter func() (runtime.Object, error)) error {
+	ticker := time.NewTicker(5 * time.Second)
+	defer ticker.Stop()
+	ctx, cancel := context.WithTimeout(ctx, time.Duration(defaults.WatchTimeoutSeconds)*time.Second)
+	defer cancel()
+	for {
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("timeout waiting for deletion: %w", ctx.Err())
+		case <-ticker.C:
+			_, err := getter()
+			if apierrors.IsNotFound(err) {
+				return nil
+			} else if err != nil {
+				return err
+			}
+		}
+	}
 }

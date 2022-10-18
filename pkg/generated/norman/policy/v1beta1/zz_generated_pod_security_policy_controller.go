@@ -42,7 +42,7 @@ func init() {
 	resource.Put(PodSecurityPolicyGroupVersionResource)
 }
 
-// Deprecated use v1beta1.PodSecurityPolicy instead
+// Deprecated: use v1beta1.PodSecurityPolicy instead
 type PodSecurityPolicy = v1beta1.PodSecurityPolicy
 
 func NewPodSecurityPolicy(namespace, name string, obj v1beta1.PodSecurityPolicy) *v1beta1.PodSecurityPolicy {

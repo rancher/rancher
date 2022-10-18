@@ -1,11 +1,11 @@
 variable "kubernetes_version" {
   description = "Azure Kubernetes Cluster K8s version"
-  default = "1.19.6"
+  default = "1.23.5"
 }
 
 variable "location" {
   description = "Azure Kubernetes location (US Central, US East, etc)"
-  default = "Central US"
+  default = "East US 2"
 }
 
 variable "node_count" {
@@ -21,12 +21,6 @@ variable "vm_size" {
 variable "disk_capacity" {
   description = "VM System Volume size"
   default = 30
-}
-variable "client_id" {
-  default = ""
-}
-variable "client_secret" {
-  default = ""
 }
 
 variable "cluster_name" {

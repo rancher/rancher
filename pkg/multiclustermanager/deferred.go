@@ -133,7 +133,7 @@ func (s *DeferredServer) K8sClient(clusterName string) (kubernetes.Interface, er
 	if mcm == nil {
 		return nil, nil
 	}
-	clusterContext, err := mcm.clusterManager.UserContext(clusterName)
+	clusterContext, err := mcm.clusterManager.UserContextNoControllers(clusterName)
 	if err != nil {
 		return nil, err
 	}

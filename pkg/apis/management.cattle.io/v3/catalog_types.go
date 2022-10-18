@@ -25,13 +25,14 @@ type Catalog struct {
 }
 
 type CatalogSpec struct {
-	Description string `json:"description"`
-	URL         string `json:"url,omitempty" norman:"required"`
-	Branch      string `json:"branch,omitempty"`
-	CatalogKind string `json:"catalogKind,omitempty"`
-	Username    string `json:"username,omitempty"`
-	Password    string `json:"password,omitempty" norman:"type=password"`
-	HelmVersion string `json:"helmVersion,omitempty" norman:"noupdate"`
+	Description    string         `json:"description"`
+	URL            string         `json:"url,omitempty" norman:"required"`
+	Branch         string         `json:"branch,omitempty"`
+	CatalogKind    string         `json:"catalogKind,omitempty"`
+	Username       string         `json:"username,omitempty"`
+	Password       string         `json:"password,omitempty" norman:"type=password"`
+	HelmVersion    string         `json:"helmVersion,omitempty" norman:"noupdate"`
+	CatalogSecrets CatalogSecrets `json:"catalogSecrets" norman:"nocreate,noupdate"`
 }
 
 type CatalogStatus struct {
@@ -42,13 +43,15 @@ type CatalogStatus struct {
 	// Deprecated: should no longer be in use. If a Catalog CR is encountered with this field
 	// populated, it will be set to nil.
 	HelmVersionCommits map[string]VersionCommits `json:"helmVersionCommits,omitempty"`
+	CredentialSecret   string                    `json:"credentialSecret,omitempty" norman:"nocreate,noupdate"` // Deprecated: use CatalogSpec.CatalogSecrets.CredentialSecret instead
 }
 
 var (
-	CatalogConditionRefreshed  condition.Cond = "Refreshed"
-	CatalogConditionUpgraded   condition.Cond = "Upgraded"
-	CatalogConditionDiskCached condition.Cond = "DiskCached"
-	CatalogConditionProcessed  condition.Cond = "Processed"
+	CatalogConditionRefreshed       condition.Cond = "Refreshed"
+	CatalogConditionUpgraded        condition.Cond = "Upgraded"
+	CatalogConditionDiskCached      condition.Cond = "DiskCached"
+	CatalogConditionProcessed       condition.Cond = "Processed"
+	CatalogConditionSecretsMigrated condition.Cond = "SecretsMigrated"
 )
 
 type CatalogCondition struct {
@@ -98,7 +101,8 @@ type CatalogTemplate struct {
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 	// Specification of the desired behavior of the the cluster. More info:
 	// https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#spec-and-status
-	Template
+	Spec   TemplateSpec   `json:"spec"`
+	Status TemplateStatus `json:"status"`
 }
 
 type TemplateSpec struct {
@@ -159,7 +163,8 @@ type CatalogTemplateVersion struct {
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 	// Specification of the desired behavior of the the cluster. More info:
 	// https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#spec-and-status
-	TemplateVersion
+	Spec   TemplateVersionSpec   `json:"spec"`
+	Status TemplateVersionStatus `json:"status"`
 }
 
 type TemplateVersionSpec struct {
@@ -283,4 +288,17 @@ type ClusterCatalog struct {
 
 type CatalogRefresh struct {
 	Catalogs []string `json:"catalogs"`
+}
+
+type CatalogSecrets struct {
+	CredentialSecret string `json:"credentialSecret,omitempty" norman:"nocreate,noupdate"`
+}
+
+// GetSecret gets a reference to the private catalog secret, either from the CatalogSecrets field or the Status field.
+// Spec.CatalogSecrets.CredentialSecret is preferred because Status.CredentialSecret is deprecated.
+func (c *Catalog) GetSecret() string {
+	if c.Spec.CatalogSecrets.CredentialSecret != "" {
+		return c.Spec.CatalogSecrets.CredentialSecret
+	}
+	return c.Status.CredentialSecret
 }

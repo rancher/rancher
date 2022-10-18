@@ -20,6 +20,7 @@ const (
 	AppFieldHelmVersion          = "helmVersion"
 	AppFieldLabels               = "labels"
 	AppFieldLastAppliedTemplates = "lastAppliedTemplate"
+	AppFieldMaxRevisionCount     = "maxRevisionCount"
 	AppFieldMultiClusterAppID    = "multiClusterAppId"
 	AppFieldName                 = "name"
 	AppFieldNamespaceId          = "namespaceId"
@@ -54,6 +55,7 @@ type App struct {
 	HelmVersion          string            `json:"helmVersion,omitempty" yaml:"helmVersion,omitempty"`
 	Labels               map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
 	LastAppliedTemplates string            `json:"lastAppliedTemplate,omitempty" yaml:"lastAppliedTemplate,omitempty"`
+	MaxRevisionCount     int64             `json:"maxRevisionCount,omitempty" yaml:"maxRevisionCount,omitempty"`
 	MultiClusterAppID    string            `json:"multiClusterAppId,omitempty" yaml:"multiClusterAppId,omitempty"`
 	Name                 string            `json:"name,omitempty" yaml:"name,omitempty"`
 	NamespaceId          string            `json:"namespaceId,omitempty" yaml:"namespaceId,omitempty"`

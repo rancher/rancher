@@ -12,7 +12,7 @@ spec:
   chart: ingress-nginx
   repo: https://kubernetes.github.io/ingress-nginx
   targetNamespace: ingress-nginx
-  version: v3.15.2
+  version: v4.0.19
   set:
   valuesContent: |-
     fullnameOverride: ingress-nginx
@@ -20,6 +20,9 @@ spec:
       kind: DaemonSet
       admissionWebhooks:
         failurePolicy: Ignore
+      dnsPolicy: ClusterFirstWithHostNet
+      watchIngressWithoutClass: true
+      allowSnippetAnnotations: false
       hostNetwork: true
       hostPort:
         enabled: true
@@ -29,8 +32,6 @@ spec:
         enabled: false
       metrics:
         enabled: true
-        serviceMonitor:
-          enabled: true
       config:
         use-forwarded-headers: "true"
         server-tokens: "false"

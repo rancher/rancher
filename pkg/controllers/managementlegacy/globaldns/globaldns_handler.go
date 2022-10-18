@@ -13,14 +13,15 @@ import (
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/sirupsen/logrus"
 
+	"github.com/rancher/rancher/pkg/ingresswrapper"
 	apiv1 "k8s.io/api/core/v1"
-	"k8s.io/api/extensions/v1beta1"
+	kextv1beta1 "k8s.io/api/extensions/v1beta1"
+	knetworkingv1 "k8s.io/api/networking/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	clientv1beta1 "k8s.io/client-go/kubernetes/typed/extensions/v1beta1"
 )
 
 const (
@@ -32,14 +33,15 @@ const (
 )
 
 type GDController struct {
-	ingresses               clientv1beta1.IngressInterface //need to use client-go IngressInterface to update Ingress.Status field
+	ingresses               ingresswrapper.CompatClient
 	managementContext       *config.ManagementContext
 	globalDNSProviderLister v3.GlobalDnsProviderLister
 }
 
 func newGlobalDNSController(ctx context.Context, mgmt *config.ManagementContext) *GDController {
+
 	n := &GDController{
-		ingresses:               mgmt.K8sClient.ExtensionsV1beta1().Ingresses(namespace.GlobalNamespace),
+		ingresses:               ingresswrapper.NewCompatClient(mgmt.K8sClient, namespace.GlobalNamespace),
 		managementContext:       mgmt,
 		globalDNSProviderLister: mgmt.Management.GlobalDnsProviders(namespace.GlobalNamespace).Controller().Lister(),
 	}
@@ -101,8 +103,8 @@ func (n *GDController) sync(key string, obj *v3.GlobalDns) (runtime.Object, erro
 	return nil, nil
 }
 
-func (n *GDController) getIngressForGlobalDNS(globaldns *v3.GlobalDns) (*v1beta1.Ingress, error) {
-	ingress, err := n.ingresses.Get(context.TODO(), strings.Join([]string{"globaldns-ingress", globaldns.Name}, "-"), metav1.GetOptions{}) //n.Get("", strings.Join([]string{"globaldns-ingress", globaldns.Name}, "-"))
+func (n *GDController) getIngressForGlobalDNS(globaldns *v3.GlobalDns) (ingresswrapper.Ingress, error) {
+	ingress, err := n.ingresses.Get(context.TODO(), strings.Join([]string{"globaldns-ingress", globaldns.Name}, "-"), metav1.GetOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -113,8 +115,8 @@ func (n *GDController) getIngressForGlobalDNS(globaldns *v3.GlobalDns) (*v1beta1
 	return nil, nil
 }
 
-func (n *GDController) isIngressOwnedByGlobalDNS(ingress *v1beta1.Ingress, globaldns *v3.GlobalDns) bool {
-	for i, owners := 0, ingress.GetOwnerReferences(); owners != nil && i < len(owners); i++ {
+func (n *GDController) isIngressOwnedByGlobalDNS(obj ingresswrapper.Ingress, globaldns *v3.GlobalDns) bool {
+	for i, owners := 0, obj.GetOwnerReferences(); owners != nil && i < len(owners); i++ {
 		if owners[i].UID == globaldns.UID && owners[i].Kind == globaldns.Kind {
 			return true
 		}
@@ -122,10 +124,16 @@ func (n *GDController) isIngressOwnedByGlobalDNS(ingress *v1beta1.Ingress, globa
 	return false
 }
 
-func (n *GDController) createIngressForGlobalDNS(globaldns *v3.GlobalDns) (*v1beta1.Ingress, error) {
-	ingressSpec := n.generateNewIngressSpec(globaldns)
+func (n *GDController) createIngressForGlobalDNS(globaldns *v3.GlobalDns) (ingresswrapper.Ingress, error) {
+	var ingressSpec ingresswrapper.Ingress
+	if n.ingresses.ServerSupportsIngressV1 {
+		ingressSpec = n.generateNewIngressV1Spec(globaldns)
+	} else {
+		ingressSpec = n.generateNewIngressV1Beta1Spec(globaldns)
+	}
+	annotations := ingressSpec.GetAnnotations()
 	if globaldns.Spec.TTL != 0 {
-		ingressSpec.ObjectMeta.Annotations[annotationDNSTTL] = strconv.FormatInt(globaldns.Spec.TTL, 10)
+		annotations[annotationDNSTTL] = strconv.FormatInt(globaldns.Spec.TTL, 10)
 	}
 	if globaldns.Spec.ProviderName != "" {
 		ingressClass, err := n.getIngressClass(globaldns.Spec.ProviderName)
@@ -133,20 +141,22 @@ func (n *GDController) createIngressForGlobalDNS(globaldns *v3.GlobalDns) (*v1be
 			return nil, err
 		}
 		if ingressClass != "" {
-			ingressSpec.ObjectMeta.Annotations[annotationIngressClass] = ingressClass
+			annotations[annotationIngressClass] = ingressClass
 		}
 	}
+	ingressSpec.SetAnnotations(annotations)
 	ingressObj, err := n.ingresses.Create(context.TODO(), ingressSpec, metav1.CreateOptions{})
 	if err != nil {
 		return nil, err
 	}
-	logrus.Infof("Created ingress %v for globalDNS %s", ingressObj.Name, globaldns.Name)
+	logrus.Infof("Created ingress %v for globalDNS %s", ingressObj.GetName(), globaldns.Name)
 	return ingressObj, nil
 }
 
-func (n *GDController) generateNewIngressSpec(globaldns *v3.GlobalDns) *v1beta1.Ingress {
+func (n *GDController) generateNewIngressV1Spec(globaldns *v3.GlobalDns) *knetworkingv1.Ingress {
 	controller := true
-	return &v1beta1.Ingress{
+	pathType := knetworkingv1.PathTypeImplementationSpecific
+	return &knetworkingv1.Ingress{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: strings.Join([]string{"globaldns-ingress", globaldns.Name}, "-"),
 			OwnerReferences: []metav1.OwnerReference{
@@ -163,15 +173,61 @@ func (n *GDController) generateNewIngressSpec(globaldns *v3.GlobalDns) *v1beta1.
 			},
 			Namespace: globaldns.Namespace,
 		},
-		Spec: v1beta1.IngressSpec{
-			Rules: []v1beta1.IngressRule{
+		Spec: knetworkingv1.IngressSpec{
+			Rules: []knetworkingv1.IngressRule{
 				{
 					Host: globaldns.Spec.FQDN,
-					IngressRuleValue: v1beta1.IngressRuleValue{
-						HTTP: &v1beta1.HTTPIngressRuleValue{
-							Paths: []v1beta1.HTTPIngressPath{
+					IngressRuleValue: knetworkingv1.IngressRuleValue{
+						HTTP: &knetworkingv1.HTTPIngressRuleValue{
+							Paths: []knetworkingv1.HTTPIngressPath{
 								{
-									Backend: v1beta1.IngressBackend{
+									Backend: knetworkingv1.IngressBackend{
+										Service: &knetworkingv1.IngressServiceBackend{
+											Name: "http-svc-dummy",
+											Port: knetworkingv1.ServiceBackendPort{
+												Number: 42,
+											},
+										},
+									},
+									PathType: &pathType,
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+func (n *GDController) generateNewIngressV1Beta1Spec(globaldns *v3.GlobalDns) *kextv1beta1.Ingress {
+	controller := true
+	return &kextv1beta1.Ingress{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: strings.Join([]string{"globaldns-ingress", globaldns.Name}, "-"),
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					Name:       globaldns.Name,
+					APIVersion: globaldns.APIVersion,
+					UID:        globaldns.UID,
+					Kind:       globaldns.Kind,
+					Controller: &controller,
+				},
+			},
+			Annotations: map[string]string{
+				annotationIngressClass: "rancher-external-dns",
+			},
+			Namespace: globaldns.Namespace,
+		},
+		Spec: kextv1beta1.IngressSpec{
+			Rules: []kextv1beta1.IngressRule{
+				{
+					Host: globaldns.Spec.FQDN,
+					IngressRuleValue: kextv1beta1.IngressRuleValue{
+						HTTP: &kextv1beta1.HTTPIngressRuleValue{
+							Paths: []kextv1beta1.HTTPIngressPath{
+								{
+									Backend: kextv1beta1.IngressBackend{
 										ServiceName: "http-svc-dummy",
 										ServicePort: intstr.IntOrString{
 											Type:   intstr.Int,
@@ -233,29 +289,32 @@ func (n *GDController) getGlobalDNSProviderName(globalDNSProviderName string) (s
 	return provider, nil
 }
 
-func (n *GDController) updateIngressForDNS(ingress *v1beta1.Ingress, obj *v3.GlobalDns) error {
+func (n *GDController) updateIngressForDNS(ingress ingresswrapper.Ingress, obj *v3.GlobalDns) error {
 	var err error
 
-	if n.ifEndpointsDiffer(ingress.Status.LoadBalancer.Ingress, obj.Status.Endpoints) {
-		ingress.Status.LoadBalancer.Ingress = n.sliceToStatus(obj.Status.Endpoints)
-		ingress, err = n.ingresses.UpdateStatus(context.TODO(), ingress, metav1.UpdateOptions{})
-
+	ingressObj, err := ingresswrapper.ToCompatIngress(ingress)
+	if err != nil {
+		return err
+	}
+	if n.ifEndpointsDiffer(ingressObj.Status.LoadBalancer.Ingress, obj.Status.Endpoints) {
+		ingressObj.Status.LoadBalancer.Ingress = n.sliceToStatus(obj.Status.Endpoints)
+		ingressObj, err = n.ingresses.UpdateStatus(context.TODO(), ingress, metav1.UpdateOptions{})
 		if err != nil {
 			return fmt.Errorf("GlobalDNSController: Error updating Ingress %v", err)
 		}
 	}
 
 	var updateIngress bool
-	if len(ingress.Spec.Rules) > 0 {
-		if !strings.EqualFold(ingress.Spec.Rules[0].Host, obj.Spec.FQDN) {
-			ingress.Spec.Rules[0].Host = obj.Spec.FQDN
+	if len(ingressObj.Spec.Rules) > 0 {
+		if !strings.EqualFold(ingressObj.Spec.Rules[0].Host, obj.Spec.FQDN) {
+			ingressObj.Spec.Rules[0].Host = obj.Spec.FQDN
 			updateIngress = true
 		}
 	}
 
 	ttlvalue := strconv.FormatInt(obj.Spec.TTL, 10)
-	if !strings.EqualFold(ingress.ObjectMeta.Annotations[annotationDNSTTL], ttlvalue) {
-		ingress.ObjectMeta.Annotations[annotationDNSTTL] = ttlvalue
+	if !strings.EqualFold(ingressObj.Annotations[annotationDNSTTL], ttlvalue) {
+		ingressObj.Annotations[annotationDNSTTL] = ttlvalue
 		updateIngress = true
 	}
 
@@ -264,14 +323,14 @@ func (n *GDController) updateIngressForDNS(ingress *v1beta1.Ingress, obj *v3.Glo
 		if err != nil {
 			return err
 		}
-		if !strings.EqualFold(ingress.ObjectMeta.Annotations[annotationIngressClass], ingressClass) {
-			ingress.ObjectMeta.Annotations[annotationIngressClass] = ingressClass
+		if !strings.EqualFold(ingressObj.Annotations[annotationIngressClass], ingressClass) {
+			ingressObj.Annotations[annotationIngressClass] = ingressClass
 			updateIngress = true
 		}
 	}
 
 	if updateIngress {
-		_, err = n.ingresses.Update(context.TODO(), ingress, metav1.UpdateOptions{})
+		_, err := n.ingresses.Update(context.TODO(), ingressObj, metav1.UpdateOptions{})
 		if err != nil {
 			return fmt.Errorf("GlobalDNSController: Error updating Ingress %v", err)
 		}
@@ -279,7 +338,6 @@ func (n *GDController) updateIngressForDNS(ingress *v1beta1.Ingress, obj *v3.Glo
 
 	return nil
 }
-
 func (n *GDController) ifEndpointsDiffer(ingressEps []apiv1.LoadBalancerIngress, endpoints []string) bool {
 	if len(ingressEps) != len(endpoints) {
 		return true

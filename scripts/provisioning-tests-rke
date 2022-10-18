@@ -1,6 +1,9 @@
 #!/bin/bash
 set -e
+if ./scripts/only-ui-bumps.sh; then
+    exit 0
+fi
 
 cd $(dirname $0)/..
 
-TEST_RKE=true ./scripts/provisioning-tests
+# DIST=rke2 ./scripts/provisioning-tests

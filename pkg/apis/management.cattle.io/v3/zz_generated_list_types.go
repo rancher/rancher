@@ -1,5 +1,5 @@
 /*
-Copyright 2021 Rancher Labs, Inc.
+Copyright 2022 Rancher Labs, Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -1073,6 +1073,23 @@ type ProjectRoleTemplateBindingList struct {
 
 func NewProjectRoleTemplateBinding(namespace, name string, obj ProjectRoleTemplateBinding) *ProjectRoleTemplateBinding {
 	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("ProjectRoleTemplateBinding").ToAPIVersionAndKind()
+	obj.Name = name
+	obj.Namespace = namespace
+	return &obj
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// RancherUserNotificationList is a list of RancherUserNotification resources
+type RancherUserNotificationList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata"`
+
+	Items []RancherUserNotification `json:"items"`
+}
+
+func NewRancherUserNotification(namespace, name string, obj RancherUserNotification) *RancherUserNotification {
+	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("RancherUserNotification").ToAPIVersionAndKind()
 	obj.Name = name
 	obj.Namespace = namespace
 	return &obj

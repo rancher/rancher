@@ -43,7 +43,7 @@ func init() {
 	resource.Put(PrometheusGroupVersionResource)
 }
 
-// Deprecated use v1.Prometheus instead
+// Deprecated: use v1.Prometheus instead
 type Prometheus = v1.Prometheus
 
 func NewPrometheus(namespace, name string, obj v1.Prometheus) *v1.Prometheus {

@@ -34,6 +34,7 @@ type AppDeployer struct {
 	AppsLister projectv3.AppLister
 	Namespaces v1.NamespaceInterface
 	PodLister  v1.PodLister
+	Pods       v1.PodInterface
 }
 
 func (d *AppDeployer) initNamespace(name string) error {
@@ -123,17 +124,33 @@ func (d *AppDeployer) isDeploySuccess(targetNamespace string, selector map[strin
 	for {
 		select {
 		case <-ticker.C:
-			pods, err := d.PodLister.List(targetNamespace, labels.Set(selector).AsSelector())
-			if err != nil {
-				return errors.Wrap(err, "list pods failed in check app deploy")
-			}
-
-			for _, pod := range pods {
-				switch pod.Status.Phase {
-				case k8scorev1.PodFailed:
-					return errors.New("get failed status from pod, please the check logs for " + pod.Namespace + ":" + pod.Name)
-				case k8scorev1.PodRunning, k8scorev1.PodSucceeded:
-					return nil
+			if d.PodLister == nil {
+				pods, err := d.Pods.ListNamespaced(targetNamespace, metav1.ListOptions{
+					LabelSelector: labels.Set(selector).AsSelector().String(),
+				})
+				if err != nil {
+					return errors.Wrap(err, "list pods failed in check app deploy")
+				}
+				for _, pod := range pods.Items {
+					switch pod.Status.Phase {
+					case k8scorev1.PodFailed:
+						return errors.New("get failed status from pod, please the check logs for " + pod.Namespace + ":" + pod.Name)
+					case k8scorev1.PodRunning, k8scorev1.PodSucceeded:
+						return nil
+					}
+				}
+			} else {
+				pods, err := d.PodLister.List(targetNamespace, labels.Set(selector).AsSelector())
+				if err != nil {
+					return errors.Wrap(err, "list pods failed in check app deploy")
+				}
+				for _, pod := range pods {
+					switch pod.Status.Phase {
+					case k8scorev1.PodFailed:
+						return errors.New("get failed status from pod, please the check logs for " + pod.Namespace + ":" + pod.Name)
+					case k8scorev1.PodRunning, k8scorev1.PodSucceeded:
+						return nil
+					}
 				}
 			}
 

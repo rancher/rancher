@@ -42,7 +42,7 @@ func init() {
 	resource.Put(FleetWorkspaceGroupVersionResource)
 }
 
-// Deprecated use v3.FleetWorkspace instead
+// Deprecated: use v3.FleetWorkspace instead
 type FleetWorkspace = v3.FleetWorkspace
 
 func NewFleetWorkspace(namespace, name string, obj v3.FleetWorkspace) *v3.FleetWorkspace {

@@ -18,7 +18,9 @@ import (
 	"github.com/rancher/norman/types"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/clusterrouter"
+	"github.com/rancher/rancher/pkg/controllers/management/secretmigrator"
 	clusterController "github.com/rancher/rancher/pkg/controllers/managementuser"
+	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/kontainer-engine/drivers/gke"
 	"github.com/rancher/rancher/pkg/rbac"
@@ -33,7 +35,7 @@ import (
 	"golang.org/x/sync/semaphore"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	authv1 "k8s.io/client-go/kubernetes/typed/authorization/v1"
 	"k8s.io/client-go/rest"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
@@ -44,6 +46,7 @@ type Manager struct {
 	ScaledContext *config.ScaledContext
 	clusterLister v3.ClusterLister
 	clusters      v3.ClusterInterface
+	secretLister  v1.SecretLister
 	controllers   sync.Map
 	accessControl types.AccessControl
 	rbac          rbacv1.Interface
@@ -62,13 +65,14 @@ type record struct {
 	cancel        context.CancelFunc
 }
 
-func NewManager(httpsPort int, context *config.ScaledContext, rbacControllers rbacv1.Interface, asl accesscontrol.AccessSetLookup) *Manager {
+func NewManager(httpsPort int, context *config.ScaledContext, asl accesscontrol.AccessSetLookup) *Manager {
 	return &Manager{
 		httpsPort:     httpsPort,
 		ScaledContext: context,
-		accessControl: rbac.NewAccessControlWithASL("", rbacControllers, asl),
+		accessControl: rbac.NewAccessControlWithASL("", asl),
 		clusterLister: context.Management.Clusters("").Controller().Lister(),
 		clusters:      context.Management.Clusters(""),
+		secretLister:  context.Core.Secrets("").Controller().Lister(),
 		startSem:      semaphore.NewWeighted(int64(settings.ClusterControllerStartCount.GetInt())),
 	}
 }
@@ -107,7 +111,7 @@ func (m *Manager) RESTConfig(cluster *v3.Cluster) (rest.Config, error) {
 }
 
 func (m *Manager) markUnavailable(clusterName string) {
-	if cluster, err := m.clusters.Get(clusterName, v1.GetOptions{}); err == nil {
+	if cluster, err := m.clusters.Get(clusterName, metav1.GetOptions{}); err == nil {
 		if !v32.ClusterConditionReady.IsFalse(cluster) {
 			v32.ClusterConditionReady.False(cluster)
 			m.clusters.Update(cluster)
@@ -170,7 +174,7 @@ func (m *Manager) startController(r *record, controllers, clusterOwner bool) err
 func (m *Manager) changed(r *record, cluster *v3.Cluster, controllers, clusterOwner bool) bool {
 	existing := r.clusterRec
 	if existing.Status.APIEndpoint != cluster.Status.APIEndpoint ||
-		existing.Status.ServiceAccountToken != cluster.Status.ServiceAccountToken ||
+		existing.Status.ServiceAccountTokenSecret != cluster.Status.ServiceAccountTokenSecret ||
 		existing.Status.CACert != cluster.Status.CACert ||
 		existing.Status.AppliedSpec.LocalClusterAuthEndpoint.Enabled != cluster.Status.AppliedSpec.LocalClusterAuthEndpoint.Enabled {
 		return true
@@ -194,7 +198,7 @@ func (m *Manager) doStart(rec *record, clusterOwner bool) (exit error) {
 		// Prior to k8s v1.14, we simply did a DiscoveryClient.Version() check to see if the user cluster is alive
 		// As of k8s v1.14, kubeapi returns a successful version response even if etcd is not available.
 		// To work around this, now we try to get a namespace from the API, even if not found, it means the API is up.
-		if _, err := rec.cluster.K8sClient.CoreV1().Namespaces().Get(rec.ctx, "kube-system", v1.GetOptions{}); err != nil && !apierrors.IsNotFound(err) {
+		if _, err := rec.cluster.K8sClient.CoreV1().Namespaces().Get(rec.ctx, "kube-system", metav1.GetOptions{}); err != nil && !apierrors.IsNotFound(err) {
 			if i == 2 {
 				m.markUnavailable(rec.cluster.ClusterName)
 			}
@@ -216,7 +220,7 @@ func (m *Manager) doStart(rec *record, clusterOwner bool) (exit error) {
 
 	transaction := controller.NewHandlerTransaction(rec.ctx)
 	if clusterOwner {
-		if err := clusterController.Register(transaction, rec.cluster, rec.clusterRec, m); err != nil {
+		if err := clusterController.Register(transaction, m.ScaledContext, rec.cluster, rec.clusterRec, m); err != nil {
 			transaction.Rollback()
 			return err
 		}
@@ -232,7 +236,7 @@ func (m *Manager) doStart(rec *record, clusterOwner bool) (exit error) {
 		defer close(done)
 
 		logrus.Debugf("[clustermanager] creating AccessControl for cluster %v", rec.cluster.ClusterName)
-		rec.accessControl = rbac.NewAccessControl(rec.ctx, rec.cluster.ClusterName, rec.cluster.RBACw)
+		rec.accessControl = rbac.NewAccessControl(transaction, rec.cluster.ClusterName, rec.cluster.RBACw)
 
 		err := rec.cluster.Start(rec.ctx)
 		if err == nil {
@@ -252,7 +256,7 @@ func (m *Manager) doStart(rec *record, clusterOwner bool) (exit error) {
 	}
 }
 
-func ToRESTConfig(cluster *v3.Cluster, context *config.ScaledContext) (*rest.Config, error) {
+func ToRESTConfig(cluster *v3.Cluster, context *config.ScaledContext, secretLister v1.SecretLister) (*rest.Config, error) {
 	if cluster == nil {
 		return nil, nil
 	}
@@ -261,7 +265,7 @@ func ToRESTConfig(cluster *v3.Cluster, context *config.ScaledContext) (*rest.Con
 		return &context.RESTConfig, nil
 	}
 
-	if cluster.Status.APIEndpoint == "" || cluster.Status.CACert == "" || cluster.Status.ServiceAccountToken == "" {
+	if cluster.Status.APIEndpoint == "" || cluster.Status.CACert == "" || cluster.Status.ServiceAccountTokenSecret == "" {
 		return nil, nil
 	}
 
@@ -292,11 +296,15 @@ func ToRESTConfig(cluster *v3.Cluster, context *config.ScaledContext) (*rest.Con
 		}
 	}
 
+	secret, err := secretLister.Get(secretmigrator.SecretNamespace, cluster.Status.ServiceAccountTokenSecret)
+	if err != nil {
+		return nil, err
+	}
 	// adding suffix to make tlsConfig hashkey unique
 	suffix := []byte("\n" + cluster.Name)
 	rc := &rest.Config{
 		Host:        u.String(),
-		BearerToken: cluster.Status.ServiceAccountToken,
+		BearerToken: string(secret.Data[secretmigrator.SecretKey]),
 		TLSClientConfig: rest.TLSClientConfig{
 			CAData:     append(caBytes, suffix...),
 			NextProtos: []string{"http/1.1"},
@@ -397,7 +405,7 @@ func VerifyIgnoreDNSName(caCertsPEM []byte) (func(rawCerts [][]byte, verifiedCha
 }
 
 func (m *Manager) toRecord(ctx context.Context, cluster *v3.Cluster) (*record, error) {
-	kubeConfig, err := ToRESTConfig(cluster, m.ScaledContext)
+	kubeConfig, err := ToRESTConfig(cluster, m.ScaledContext, m.secretLister)
 	if kubeConfig == nil || err != nil {
 		return nil, err
 	}
@@ -447,6 +455,20 @@ func (m *Manager) APIExtClient(apiContext *types.APIContext, storageContext type
 	return m.ScaledContext.APIExtClient, nil
 }
 
+// UserContextNoControllers accepts a cluster name and returns a client for that cluster,
+// no controllers are started for that cluster in the process.
+func (m *Manager) UserContextNoControllers(clusterName string) (*config.UserContext, error) {
+	cluster, err := m.clusterLister.Get("", clusterName)
+	if err != nil {
+		return nil, err
+	}
+	ctx, err := m.UserContextFromCluster(cluster)
+	if ctx == nil && err == nil {
+		return nil, fmt.Errorf("cluster context %s is unavaiblable", clusterName)
+	}
+	return ctx, err
+}
+
 // UserContext accepts a cluster name and returns a client for that cluster,
 // starting all controllers for that cluster in the process.
 func (m *Manager) UserContext(clusterName string) (*config.UserContext, error) {
@@ -470,7 +492,7 @@ func (m *Manager) UserContext(clusterName string) (*config.UserContext, error) {
 // UserContextFromCluster accepts a pointer to a Cluster and returns a client
 // for that cluster. It does not start any controllers.
 func (m *Manager) UserContextFromCluster(cluster *v3.Cluster) (*config.UserContext, error) {
-	kubeConfig, err := ToRESTConfig(cluster, m.ScaledContext)
+	kubeConfig, err := ToRESTConfig(cluster, m.ScaledContext, m.secretLister)
 	if err != nil {
 		return nil, err
 	}
@@ -565,7 +587,7 @@ func (m *Manager) GetHTTPSPort() int {
 
 func (m *Manager) SubjectAccessReviewForCluster(req *http.Request) (authv1.SubjectAccessReviewInterface, error) {
 	clusterID := clusterrouter.GetClusterID(req)
-	userContext, err := m.UserContext(clusterID)
+	userContext, err := m.UserContextNoControllers(clusterID)
 	if err != nil {
 		return nil, err
 	}

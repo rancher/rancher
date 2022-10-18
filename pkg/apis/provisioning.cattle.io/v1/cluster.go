@@ -20,8 +20,9 @@ type ClusterSpec struct {
 	CloudCredentialSecretName string `json:"cloudCredentialSecretName,omitempty"`
 	KubernetesVersion         string `json:"kubernetesVersion,omitempty"`
 
-	ClusterAPIConfig *ClusterAPIConfig `json:"clusterAPIConfig,omitempty"`
-	RKEConfig        *RKEConfig        `json:"rkeConfig,omitempty"`
+	ClusterAPIConfig         *ClusterAPIConfig              `json:"clusterAPIConfig,omitempty"`
+	RKEConfig                *RKEConfig                     `json:"rkeConfig,omitempty"`
+	LocalClusterAuthEndpoint rkev1.LocalClusterAuthEndpoint `json:"localClusterAuthEndpoint,omitempty"`
 
 	AgentEnvVars                         []rkev1.EnvVar `json:"agentEnvVars,omitempty"`
 	DefaultPodSecurityPolicyTemplateName string         `json:"defaultPodSecurityPolicyTemplateName,omitempty" norman:"type=reference[podSecurityPolicyTemplate]"`
@@ -38,7 +39,6 @@ type ClusterStatus struct {
 	AgentDeployed      bool                                `json:"agentDeployed,omitempty"`
 	ObservedGeneration int64                               `json:"observedGeneration"`
 	Conditions         []genericcondition.GenericCondition `json:"conditions,omitempty"`
-	ETCDSnapshots      []rkev1.ETCDSnapshot                `json:"etcdSnapshots,omitempty"`
 }
 
 type ImportedConfig struct {

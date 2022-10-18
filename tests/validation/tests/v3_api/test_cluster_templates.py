@@ -16,8 +16,6 @@ from .test_rbac import create_user
 from .test_rke_cluster_provisioning import engine_install_url
 
 
-
-DO_ACCESSKEY = os.environ.get('DO_ACCESSKEY', "None")
 RANCHER_S3_BUCKETNAME = os.environ.get('RANCHER_S3_BUCKETNAME', "None")
 RANCHER_S3_ENDPOINT = os.environ.get('RANCHER_S3_ENDPOINT', "None")
 AWS_ACCESS_KEY_ID = os.environ.get('AWS_ACCESS_KEY_ID', "None")
@@ -690,7 +688,7 @@ def test_cluster_template_create_with_monitoring():
     cluster_name = random_test_name("test-auto")
     # Create a cluster using the cluster template revision
     cluster = create_node_cluster(
-        standard_user_client, name=cluster_name, nodecount=3, nodesize="8gb",
+        standard_user_client, name=cluster_name, nodecount=3, nodesize="s-4vcpu-8gb",
         clusterTemplateRevisionId=cluster_template_revision.id,
         userToken=userToken)
     check_cluster_version(cluster, k8sversionlist[0])
@@ -760,7 +758,7 @@ def test_cluster_template_create_update_with_monitoring():
 
     # Create a cluster using the cluster template revision created
     cluster = create_node_cluster(
-        standard_user_client, name=cluster_name, nodecount=3, nodesize="8gb",
+        standard_user_client, name=cluster_name, nodecount=3, nodesize="s-4vcpu-8gb",
         clusterTemplateRevisionId=cluster_template_revision1.id,
         userToken=userToken)
     check_cluster_version(cluster, k8sversionlist[0])
@@ -988,27 +986,38 @@ def cluster_template_create_edit(userToken):
     cluster_cleanup(client, cluster)
 
 
-def node_template_digocean(userclient, nodesize):
+def node_template_linode(userclient, nodesize):
     client = userclient
-    do_cloud_credential_config = {"accessToken": DO_ACCESSKEY}
-    do_cloud_credential = client.create_cloud_credential(
-        digitaloceancredentialConfig=do_cloud_credential_config)
+    linode_cloud_credential_config = {"token": LINODE_ACCESSKEY}
+    linode_cloud_credential = client.create_cloud_credential(
+        linodecredentialConfig=linode_cloud_credential_config)
     time.sleep(3)
     node_template = client.create_node_template(
-        digitaloceanConfig={"region": "nyc3",
-                            "size": nodesize,
-                            "image": "ubuntu-18-04-x64"},
+        linodeConfig={"authorizedUsers": "",
+                      "createPrivateIp": False,
+                      "dockerPort": "2376",
+                      "image": "linode/ubuntu18.04",
+                      "instanceType": "g6-standard-2",
+                      "label": "",
+                      "region": "us-west",
+                      "sshPort": "22",
+                      "sshUser": "",
+                      "stackscript": "",
+                      "stackscriptData": "",
+                      "swapSize": "512",
+                      "tags": "",
+                      "uaPrefix": "Rancher"},
         name=random_name(),
-        driver="digitalocean",
-        namespaceId="dig",
-        cloudCredentialId=do_cloud_credential.id,
+        driver="linode",
+        namespaceId="lin",
+        cloudCredentialId=linode_cloud_credential.id,
         engineInstallURL=engine_install_url,
         useInternalIpAddress=True)
     node_template = client.wait_success(node_template)
     return node_template
 
 
-def create_node_cluster(userclient, name, nodecount=1, nodesize="4gb",
+def create_node_cluster(userclient, name, nodecount=1, nodesize="s-2vcpu-4gb",
                         clusterTemplateRevisionId=None,
                         rancherKubernetesEngineConfig=None, answers=None,
                         userToken=None):
@@ -1023,7 +1032,7 @@ def create_node_cluster(userclient, name, nodecount=1, nodesize="4gb",
                 name=name,
                 clusterTemplateRevisionId=clusterTemplateRevisionId,
                 answers=answers)
-    nodetemplate = node_template_digocean(client, nodesize)
+    nodetemplate = node_template_linode(client, nodesize)
     nodes = []
     node = {"hostnamePrefix": random_test_name("test-auto"),
             "nodeTemplateId": nodetemplate.id,
@@ -1113,7 +1122,7 @@ def getRKEConfig(k8sversion):
                         "accessKey": AWS_ACCESS_KEY_ID,
                         "secretKey": AWS_SECRET_ACCESS_KEY,
                         "bucketName": "test-auto-s3",
-                        "endpoint": "s3.amazonaws.com"
+                        "endpoint": "s3.us-east-2.amazonaws.com"
                     }
                 }
             }

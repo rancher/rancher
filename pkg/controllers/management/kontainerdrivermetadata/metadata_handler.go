@@ -10,6 +10,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/types/convert"
+	"github.com/rancher/rancher/pkg/channelserver"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/namespace"
@@ -120,6 +121,8 @@ func (m *MetadataController) sync(key string, setting *v3.Setting) (runtime.Obje
 		m.Settings.Controller().EnqueueAfter(setting.Namespace, setting.Name, time.Minute*time.Duration(interval))
 	}
 
+	// refresh to sync k3s/rke2 releases
+	channelserver.Refresh()
 	return setting, m.refresh()
 }
 

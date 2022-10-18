@@ -10,8 +10,10 @@ import (
 	"github.com/rancher/norman/condition"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
+	localprovider "github.com/rancher/rancher/pkg/auth/providers/local"
 	"github.com/rancher/rancher/pkg/clustermanager"
 	"github.com/rancher/rancher/pkg/settings"
+	"github.com/rancher/rancher/pkg/user"
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/transport"
@@ -23,7 +25,7 @@ type ShellLinkHandler struct {
 }
 
 func (s *ShellLinkHandler) LinkHandler(apiContext *types.APIContext, next types.RequestHandler) error {
-	context, err := s.ClusterManager.UserContext(apiContext.ID)
+	context, err := s.ClusterManager.UserContextNoControllers(apiContext.ID)
 	if err != nil {
 		return err
 	}
@@ -35,8 +37,16 @@ func (s *ShellLinkHandler) LinkHandler(apiContext *types.APIContext, next types.
 	if minutes, err := strconv.ParseInt(settings.AuthUserSessionTTLMinutes.Get(), 10, 64); err == nil {
 		shellTTL = minutes * 60 * 1000 // convert minutes to milliseconds
 	}
-
-	token, err := userManager.EnsureToken("kubectl-shell-"+userID, "Access to kubectl shell in the browser", "kubectl-shell", userID, &shellTTL, true)
+	input := user.TokenInput{
+		TokenName:    "kubectl-shell-" + userID,
+		Description:  "Access to kubectl shell in the browser",
+		Kind:         "kubectl-shell",
+		UserName:     userID,
+		AuthProvider: localprovider.Name,
+		TTL:          &shellTTL,
+		Randomize:    true,
+	}
+	token, err := userManager.EnsureToken(input)
 	if err != nil {
 		return err
 	}

@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2"
 	api "k8s.io/api/core/v1"
 )
 
@@ -19,13 +20,13 @@ func (r *RKE2ConfigServer) findMachineByProvisioningSA(req *http.Request) (strin
 		return "", "", err
 	}
 
-	if sa.Labels[roleLabel] != roleBootstrap || string(sa.UID) != secrets[0].Annotations[api.ServiceAccountUIDKey] {
+	if sa.Labels[rke2.RoleLabel] != rke2.RoleBootstrap || string(sa.UID) != secrets[0].Annotations[api.ServiceAccountUIDKey] {
 		return "", "", err
 	}
 
-	if foundParent, err := r.isOwnedByMachine(sa.Labels[machineNameLabel], sa); err != nil || !foundParent {
+	if foundParent, err := rke2.IsOwnedByMachine(r.bootstrapCache, sa.Labels[rke2.MachineNameLabel], sa); err != nil || !foundParent {
 		return "", "", err
 	}
 
-	return sa.Namespace, sa.Labels[machineNameLabel], nil
+	return sa.Namespace, sa.Labels[rke2.MachineNameLabel], nil
 }

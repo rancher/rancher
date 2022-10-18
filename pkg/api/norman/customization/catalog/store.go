@@ -8,6 +8,7 @@ import (
 	"github.com/rancher/norman/store/proxy"
 	"github.com/rancher/norman/store/transform"
 	"github.com/rancher/norman/types"
+	"github.com/rancher/rancher/pkg/api/scheme"
 	"github.com/rancher/rancher/pkg/catalog/manager"
 	catUtil "github.com/rancher/rancher/pkg/catalog/utils"
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
@@ -34,6 +35,7 @@ func GetTemplateStore(ctx context.Context, managementContext *config.ScaledConte
 	s := &transform.Store{
 		Store: proxy.NewProxyStore(ctx, managementContext.ClientGetter,
 			config.ManagementStorageContext,
+			scheme.Scheme,
 			[]string{"apis"},
 			"management.cattle.io",
 			"v3",
@@ -55,12 +57,12 @@ func (t *templateStore) extractVersionLinks(apiContext *types.APIContext, resour
 	r := map[string]interface{}{}
 	versionMaps, ok := resource[client.CatalogTemplateFieldVersions].([]interface{})
 	if ok {
-		for _, version := range versionMaps {
+		for _, versionData := range versionMaps {
 			revision := ""
-			if v, ok := version.(map[string]interface{})["revision"].(int64); ok {
+			if v, ok := versionData.(map[string]interface{})["revision"].(int64); ok {
 				revision = strconv.FormatInt(v, 10)
 			}
-			versionString, ok := version.(map[string]interface{})["version"].(string)
+			versionString, ok := versionData.(map[string]interface{})["version"].(string)
 			if !ok {
 				logrus.Trace("[templateStore] failed type assertion for field \"version\" for CatalogTemplateFieldVersion")
 				continue
@@ -69,8 +71,14 @@ func (t *templateStore) extractVersionLinks(apiContext *types.APIContext, resour
 			if revision != "" {
 				versionID = fmt.Sprintf("%v-%v", resource["id"], revision)
 			}
-			if t.isTemplateVersionCompatible(apiContext.Query.Get("clusterName"), version.(map[string]interface{})["externalId"].(string)) {
-				r[versionString] = apiContext.URLBuilder.ResourceLinkByID(schema, versionID)
+			versionLink := apiContext.URLBuilder.ResourceLinkByID(schema, versionID)
+			currentVersion := apiContext.Query.Get("currentVersion")
+			if currentVersion != "" && currentVersion == versionString {
+				r[versionString] = versionLink
+				continue
+			}
+			if t.isTemplateVersionCompatible(apiContext.Query.Get("clusterName"), versionData.(map[string]interface{})["externalId"].(string)) {
+				r[versionString] = versionLink
 			}
 		}
 	}
@@ -97,7 +105,7 @@ func (t *templateStore) isTemplateVersionCompatible(clusterName, externalID stri
 		return true
 	}
 
-	err = t.CatalogManager.ValidateRancherVersion(template)
+	err = t.CatalogManager.ValidateRancherVersion(template, "")
 	if err != nil {
 		return false
 	}

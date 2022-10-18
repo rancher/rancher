@@ -1,5 +1,5 @@
 #!/bin/bash
-# This script will create a txt file which will be used to print components versions on tag
+# This script will create a txt file with -rc images/components which will be used as (pre) release description by Drone
 set -e -x
 
 echo "Creating ./bin/rancher-components.txt"
@@ -10,15 +10,29 @@ mkdir -p bin
 
 COMPONENTSFILE=./bin/rancher-components.txt
 
-echo "# Components" > $COMPONENTSFILE
+echo "# Images with -rc" > $COMPONENTSFILE
 
-printf '%s\n' "$(grep "_VERSION" ./package/Dockerfile | grep ENV | egrep -v "http|\\$" | grep CATTLE |sed 's/CATTLE_//g' | sed 's/=/ /g' | grep UI | awk '{ print $2,$3 }')" >> $COMPONENTSFILE
+printf '%s\n' "$(grep -h "\-rc" ./bin/rancher-images.txt ./bin/rancher-windows-images.txt | awk -F: '{ print $1,$2 }')" | sort -u >> $COMPONENTSFILE
 
-printf '%s\n' "$(grep "rancher/" ./go.mod | egrep -v "\./"  | egrep "rke|machine" | sort -r |  awk -F'/' '{ print $NF }' | awk '$1 = toupper($1)')" >> $COMPONENTSFILE
+echo "# Components with -rc" >> $COMPONENTSFILE
 
-printf '%s\n' "$(grep "_VERSION" ./package/Dockerfile | grep ENV | egrep -v "http|\\$" | grep CATTLE |sed 's/CATTLE_//g' | sed 's/=/ /g' | grep -v UI | awk '{ print $2,$3 }' | sort)" >> $COMPONENTSFILE
+printf '%s\n' "$(grep "_VERSION" ./package/Dockerfile | grep ENV | egrep -v "http|\\$|MIN_VERSION" | grep CATTLE |sed 's/CATTLE_//g' | sed 's/=/ /g' |  awk '{ print $2,$3 }' | sort | grep "\-rc")" >> $COMPONENTSFILE
 
-printf '%s\n' "$(grep "rancher/" ./go.mod | egrep -v "\./"  | egrep -v "rke|machine|\/pkg\/apis|\/pkg\/client|^module" | grep -v "=>" | awk -F'/' '{ print $NF }' | awk '$1 = toupper($1)' | sort)" >> $COMPONENTSFILE
+printf '%s\n' "$(grep "rancher/" ./go.mod | egrep -v "\./"  | egrep -v "\/pkg\/apis|\/pkg\/client|^module" | grep -v "=>" | awk -F'/' '{ print $NF }' | awk '$1 = toupper($1)' | sort | grep "\-rc")" >> $COMPONENTSFILE
 
+echo "# Min version components with -rc" >> $COMPONENTSFILE
+
+printf '%s\n' "$(grep "_MIN_VERSION" ./package/Dockerfile | grep ENV | grep CATTLE |sed 's/CATTLE_//g' | sed 's/=/ /g' |  awk '{ print $2,$3 }' | sort | grep "\-rc")" >> $COMPONENTSFILE
+
+K8SVERSIONSFILE=./bin/rancher-rke-k8s-versions.txt
+
+if [[ -f "$K8SVERSIONSFILE" ]]; then
+    echo "# RKE Kubernetes versions" >> $COMPONENTSFILE
+    cat $K8SVERSIONSFILE >> $COMPONENTSFILE
+fi
+
+echo "# Chart/KDM sources" >> $COMPONENTSFILE
+
+bash ./scripts/check-chart-kdm-source-values >> $COMPONENTSFILE
 
 echo "Done creating ./bin/rancher-components.txt"

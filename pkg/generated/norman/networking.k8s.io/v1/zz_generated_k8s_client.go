@@ -3,6 +3,7 @@ package v1
 import (
 	"github.com/rancher/lasso/pkg/client"
 	"github.com/rancher/lasso/pkg/controller"
+	"github.com/rancher/norman/generator"
 	"github.com/rancher/norman/objectclient"
 	"k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -11,6 +12,7 @@ import (
 
 type Interface interface {
 	NetworkPoliciesGetter
+	IngressesGetter
 }
 
 type Client struct {
@@ -23,7 +25,10 @@ func NewForConfig(cfg rest.Config) (Interface, error) {
 	if err := v1.AddToScheme(scheme); err != nil {
 		return nil, err
 	}
-	controllerFactory, err := controller.NewSharedControllerFactoryFromConfig(&cfg, scheme)
+	sharedOpts := &controller.SharedControllerFactoryOptions{
+		SyncOnlyChangedObjects: generator.SyncOnlyChangedObjects(),
+	}
+	controllerFactory, err := controller.NewSharedControllerFactoryFromConfigWithOptions(&cfg, scheme, sharedOpts)
 	if err != nil {
 		return nil, err
 	}
@@ -45,6 +50,20 @@ func (c *Client) NetworkPolicies(namespace string) NetworkPolicyInterface {
 	sharedClient := c.clientFactory.ForResourceKind(NetworkPolicyGroupVersionResource, NetworkPolicyGroupVersionKind.Kind, true)
 	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &NetworkPolicyResource, NetworkPolicyGroupVersionKind, networkPolicyFactory{})
 	return &networkPolicyClient{
+		ns:           namespace,
+		client:       c,
+		objectClient: objectClient,
+	}
+}
+
+type IngressesGetter interface {
+	Ingresses(namespace string) IngressInterface
+}
+
+func (c *Client) Ingresses(namespace string) IngressInterface {
+	sharedClient := c.clientFactory.ForResourceKind(IngressGroupVersionResource, IngressGroupVersionKind.Kind, true)
+	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &IngressResource, IngressGroupVersionKind, ingressFactory{})
+	return &ingressClient{
 		ns:           namespace,
 		client:       c,
 		objectClient: objectClient,

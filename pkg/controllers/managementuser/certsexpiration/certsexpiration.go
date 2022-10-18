@@ -35,6 +35,24 @@ type Controller struct {
 }
 
 func Register(ctx context.Context, userContext *config.UserContext) {
+	starter := userContext.DeferredStart(ctx, func(ctx context.Context) error {
+		registerDeferred(ctx, userContext)
+		return nil
+	})
+
+	clusters := userContext.Management.Management.Clusters("")
+	clusters.AddHandler(ctx, "certs-expiration-deferred", func(key string, obj *v32.Cluster) (runtime.Object, error) {
+		if obj != nil &&
+			obj.Name == userContext.ClusterName &&
+			obj.Spec.RancherKubernetesEngineConfig != nil &&
+			obj.Status.AppliedSpec.RancherKubernetesEngineConfig != nil {
+			return obj, starter()
+		}
+		return obj, nil
+	})
+}
+
+func registerDeferred(ctx context.Context, userContext *config.UserContext) {
 	c := &Controller{
 		ClusterName:   userContext.ClusterName,
 		ClusterLister: userContext.Management.Management.Clusters("").Controller().Lister(),

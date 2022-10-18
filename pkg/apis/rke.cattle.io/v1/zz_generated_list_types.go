@@ -1,5 +1,5 @@
 /*
-Copyright 2021 Rancher Labs, Inc.
+Copyright 2022 Rancher Labs, Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -36,6 +36,23 @@ type CustomMachineList struct {
 
 func NewCustomMachine(namespace, name string, obj CustomMachine) *CustomMachine {
 	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("CustomMachine").ToAPIVersionAndKind()
+	obj.Name = name
+	obj.Namespace = namespace
+	return &obj
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// ETCDSnapshotList is a list of ETCDSnapshot resources
+type ETCDSnapshotList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata"`
+
+	Items []ETCDSnapshot `json:"items"`
+}
+
+func NewETCDSnapshot(namespace, name string, obj ETCDSnapshot) *ETCDSnapshot {
+	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("ETCDSnapshot").ToAPIVersionAndKind()
 	obj.Name = name
 	obj.Namespace = namespace
 	return &obj

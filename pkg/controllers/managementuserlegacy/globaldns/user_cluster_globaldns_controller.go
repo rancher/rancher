@@ -5,19 +5,18 @@ import (
 	"strings"
 
 	v1coreRancher "github.com/rancher/rancher/pkg/generated/norman/core/v1"
-	v1beta1Rancher "github.com/rancher/rancher/pkg/generated/norman/extensions/v1beta1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/ingresswrapper"
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/sirupsen/logrus"
-	"k8s.io/api/extensions/v1beta1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
 type UserGlobalDNSController struct {
-	ingressLister         v1beta1Rancher.IngressLister
+	ingressLister         ingresswrapper.CompatLister
 	globalDNSs            v3.GlobalDnsInterface
 	multiclusterappLister v3.MultiClusterAppLister
 	namespaceLister       v1coreRancher.NamespaceLister
@@ -26,7 +25,7 @@ type UserGlobalDNSController struct {
 
 func newUserGlobalDNSController(clusterContext *config.UserContext) *UserGlobalDNSController {
 	g := UserGlobalDNSController{
-		ingressLister:         clusterContext.Extensions.Ingresses("").Controller().Lister(),
+		ingressLister:         ingresswrapper.NewCompatLister(clusterContext.Networking, clusterContext.Extensions, clusterContext.K8sClient),
 		globalDNSs:            clusterContext.Management.Management.GlobalDnses(""),
 		multiclusterappLister: clusterContext.Management.Management.MultiClusterApps("").Controller().Lister(),
 		namespaceLister:       clusterContext.Core.Namespaces("").Controller().Lister(),
@@ -76,7 +75,7 @@ func (g *UserGlobalDNSController) reconcileMultiClusterApp(obj *v3.GlobalDns) ([
 	}
 
 	// go through target projects which are part of the current cluster and find all ingresses
-	var allIngresses []*v1beta1.Ingress
+	var allIngresses []*ingresswrapper.CompatIngress
 
 	for _, t := range mcapp.Spec.Targets {
 		split := strings.SplitN(t.ProjectName, ":", 2)
@@ -89,11 +88,11 @@ func (g *UserGlobalDNSController) reconcileMultiClusterApp(obj *v3.GlobalDns) ([
 		}
 
 		// each target will have appName, this appName is also the namespace in which all workloads for this app are created
-		ingresses, err := g.ingressLister.List(t.AppName, labels.NewSelector())
+		var err error
+		allIngresses, err = g.ingressLister.List(t.AppName, labels.NewSelector())
 		if err != nil {
 			return nil, err
 		}
-		allIngresses = append(allIngresses, ingresses...)
 	}
 
 	//gather endpoints
@@ -102,7 +101,7 @@ func (g *UserGlobalDNSController) reconcileMultiClusterApp(obj *v3.GlobalDns) ([
 
 func (g *UserGlobalDNSController) reconcileProjects(obj *v3.GlobalDns) ([]string, error) {
 	// go through target projects which are part of the current cluster and find all ingresses
-	var allIngresses []*v1beta1.Ingress
+	var allIngresses []*ingresswrapper.CompatIngress
 
 	allNamespaces, err := g.namespaceLister.List("", labels.NewSelector())
 	if err != nil {
@@ -128,18 +127,18 @@ func (g *UserGlobalDNSController) reconcileProjects(obj *v3.GlobalDns) ([]string
 			}
 		}
 		for _, namespace := range namespacesInProject {
-			ingresses, err := g.ingressLister.List(namespace, labels.NewSelector())
+			var err error
+			allIngresses, err = g.ingressLister.List(namespace, labels.NewSelector())
 			if err != nil {
 				return nil, err
 			}
-			allIngresses = append(allIngresses, ingresses...)
 		}
 	}
 	//gather endpoints
 	return g.fetchGlobalDNSEndpointsForIngresses(allIngresses, obj)
 }
 
-func (g *UserGlobalDNSController) fetchGlobalDNSEndpointsForIngresses(ingresses []*v1beta1.Ingress, obj *v3.GlobalDns) ([]string, error) {
+func (g *UserGlobalDNSController) fetchGlobalDNSEndpointsForIngresses(ingresses []*ingresswrapper.CompatIngress, obj *v3.GlobalDns) ([]string, error) {
 	if len(ingresses) == 0 {
 		return nil, nil
 	}
@@ -147,7 +146,7 @@ func (g *UserGlobalDNSController) fetchGlobalDNSEndpointsForIngresses(ingresses 
 	var allEndpoints []string
 	//gather endpoints from all ingresses
 	for _, ing := range ingresses {
-		if gdns, ok := ing.Annotations[annotationGlobalDNS]; ok {
+		if gdns, ok := ing.GetAnnotations()[annotationGlobalDNS]; ok {
 			// check if the globalDNS in annotation is same as the FQDN set on the GlobalDNS
 			if gdns != obj.Spec.FQDN {
 				continue

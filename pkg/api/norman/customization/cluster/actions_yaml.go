@@ -178,7 +178,7 @@ func (a ActionHandler) processYAML(apiContext *types.APIContext, clusterName, pr
 }
 
 func (a ActionHandler) findOrCreateProjectNamespaces(apiContext *types.APIContext, namespaces []string, clusterName, projectName string) (corev1.NamespaceInterface, error) {
-	userCtx, err := a.ClusterManager.UserContext(clusterName)
+	userCtx, err := a.ClusterManager.UserContextNoControllers(clusterName)
 	if err != nil {
 		return nil, err
 	}

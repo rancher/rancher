@@ -83,6 +83,29 @@ func GetNodeInternalAddress(node *corev1.Node) string {
 	return ""
 }
 
+func GetEndpointV1NodeIP(node *v1.Node) string {
+	externalIP := ""
+	internalIP := ""
+	for _, ip := range node.Status.Addresses {
+		if ip.Type == "ExternalIP" && ip.Address != "" {
+			externalIP = ip.Address
+			break
+		} else if ip.Type == "InternalIP" && ip.Address != "" {
+			internalIP = ip.Address
+		}
+	}
+	if externalIP != "" {
+		return externalIP
+	}
+	if node.Annotations != nil {
+		externalIP = node.Annotations[externalAddressAnnotation]
+		if externalIP != "" {
+			return externalIP
+		}
+	}
+	return internalIP
+}
+
 func GetEndpointNodeIP(node *v3.Node) string {
 	externalIP := ""
 	internalIP := ""
@@ -168,6 +191,15 @@ func GetMachineForNode(node *corev1.Node, clusterNamespace string, machineLister
 		}
 	}
 	return nil, nil
+}
+
+func IsNodeReady(node *v1.Node) bool {
+	for _, cond := range node.Status.Conditions {
+		if cond.Type == corev1.NodeReady {
+			return cond.Status == corev1.ConditionTrue
+		}
+	}
+	return false
 }
 
 func IsMachineReady(machine *v3.Node) bool {

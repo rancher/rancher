@@ -1,5 +1,5 @@
 /*
-Copyright 2021 Rancher Labs, Inc.
+Copyright 2022 Rancher Labs, Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -29,6 +29,7 @@ import (
 
 var (
 	CustomMachineResourceName        = "custommachines"
+	ETCDSnapshotResourceName         = "etcdsnapshots"
 	RKEBootstrapResourceName         = "rkebootstraps"
 	RKEBootstrapTemplateResourceName = "rkebootstraptemplates"
 	RKEClusterResourceName           = "rkeclusters"
@@ -58,6 +59,8 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 	scheme.AddKnownTypes(SchemeGroupVersion,
 		&CustomMachine{},
 		&CustomMachineList{},
+		&ETCDSnapshot{},
+		&ETCDSnapshotList{},
 		&RKEBootstrap{},
 		&RKEBootstrapList{},
 		&RKEBootstrapTemplate{},

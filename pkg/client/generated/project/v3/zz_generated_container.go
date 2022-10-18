@@ -62,8 +62,8 @@ type Container struct {
 	LivenessProbe            *Probe                         `json:"livenessProbe,omitempty" yaml:"livenessProbe,omitempty"`
 	Name                     string                         `json:"name,omitempty" yaml:"name,omitempty"`
 	Ports                    []ContainerPort                `json:"ports,omitempty" yaml:"ports,omitempty"`
-	PostStart                *Handler                       `json:"postStart,omitempty" yaml:"postStart,omitempty"`
-	PreStop                  *Handler                       `json:"preStop,omitempty" yaml:"preStop,omitempty"`
+	PostStart                *LifecycleHandler              `json:"postStart,omitempty" yaml:"postStart,omitempty"`
+	PreStop                  *LifecycleHandler              `json:"preStop,omitempty" yaml:"preStop,omitempty"`
 	Privileged               *bool                          `json:"privileged,omitempty" yaml:"privileged,omitempty"`
 	ProcMount                string                         `json:"procMount,omitempty" yaml:"procMount,omitempty"`
 	ReadOnly                 *bool                          `json:"readOnly,omitempty" yaml:"readOnly,omitempty"`

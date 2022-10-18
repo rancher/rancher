@@ -3,6 +3,8 @@ package clusterstats
 import (
 	"context"
 	"reflect"
+	"regexp"
+	"strconv"
 	"time"
 
 	"github.com/pkg/errors"
@@ -10,8 +12,11 @@ import (
 	"github.com/rancher/rancher/pkg/clustermanager"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
+	"github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 )
@@ -21,7 +26,10 @@ const (
 	nodeRoleControlPlaneHyphen = "node-role.kubernetes.io/control-plane"
 	nodeRoleETCD               = "node-role.kubernetes.io/etcd"
 	nodeRoleMaster             = "node-role.kubernetes.io/master"
+	agentVersionUpgraded       = "agent.cluster.cattle.io/upgraded-v1.22"
 )
+
+var numericReg = regexp.MustCompile("[^0-9]")
 
 type StatsAggregator struct {
 	NodesLister    v3.NodeLister
@@ -72,7 +80,7 @@ func (s *StatsAggregator) aggregate(cluster *v3.Cluster, clusterName string) err
 	for _, m := range allMachines {
 		// if none are set, then nodes syncer has not completed
 		if !m.Spec.Worker && !m.Spec.ControlPlane && !m.Spec.Etcd {
-			return errors.Errorf("node role cannot be determined because node %s has not finished syncing. retrying...", m.Status.NodeName)
+			return errors.Errorf("node role cannot be determined because node %s has not finished syncing. retrying", m.Status.NodeName)
 		}
 		if isTaintedNoExecuteNoSchedule(m) && !m.Spec.Worker {
 			continue
@@ -160,6 +168,13 @@ func (s *StatsAggregator) aggregate(cluster *v3.Cluster, clusterName string) err
 		v32.ClusterConditionNoMemoryPressure.False(cluster)
 	}
 
+	var oldVersion int
+	if cluster.Status.Version != nil {
+		oldVersion, err = minorVersion(cluster)
+		if err != nil {
+			return err
+		}
+	}
 	versionChanged := s.updateVersion(cluster)
 
 	if statusChanged(origStatus, &cluster.Status) || versionChanged {
@@ -167,12 +182,33 @@ func (s *StatsAggregator) aggregate(cluster *v3.Cluster, clusterName string) err
 		return err
 	}
 
+	// If the cluster went through an upgrade from <=1.21 to >=1.22, restart
+	// the cluster agent in order to restart controllers that will no longer work
+	// with the new API.
+	if versionChanged && !cluster.Spec.Internal {
+		newVersion, err := minorVersion(cluster)
+		if err != nil {
+			return err
+		}
+		if newVersion >= 22 && oldVersion <= 21 {
+			err := s.restartAgentDeployment(cluster)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
 	return nil
+}
+
+func minorVersion(cluster *v3.Cluster) (int, error) {
+	minorVersion := numericReg.ReplaceAllString(cluster.Status.Version.Minor, "")
+	return strconv.Atoi(minorVersion)
 }
 
 func (s *StatsAggregator) updateVersion(cluster *v3.Cluster) bool {
 	updated := false
-	userContext, err := s.ClusterManager.UserContext(cluster.Name)
+	userContext, err := s.ClusterManager.UserContextNoControllers(cluster.Name)
 	if err == nil {
 		callWithTimeout(func() {
 			// This has the tendency to timeout
@@ -189,6 +225,38 @@ func (s *StatsAggregator) updateVersion(cluster *v3.Cluster) bool {
 		})
 	}
 	return updated
+}
+
+// restartAgentDeployment sets an annotation on the cluster agent deployment template
+// which will force a restart of the deployment. This is used when the cluster is
+// upgraded to >=1.22 to ensure that controllers that are not compatible with v1.22 APIs
+// are stopped, and controllers that are only compatible with v1.22 are started.
+func (s *StatsAggregator) restartAgentDeployment(cluster *v3.Cluster) error {
+	userContext, err := s.ClusterManager.UserContextNoControllers(cluster.Name)
+	if err != nil {
+		return err
+	}
+	deployment, err := userContext.Apps.Deployments("cattle-system").Get("cattle-cluster-agent", metav1.GetOptions{})
+	if err != nil && !apierrors.IsNotFound(err) {
+		return err
+	}
+	if apierrors.IsNotFound(err) {
+		return nil
+	}
+	// Add annotation to the agent deployment template in order to force a restart
+	if deployment.Spec.Template.Annotations == nil {
+		deployment.Spec.Template.Annotations = make(map[string]string)
+	}
+	if deployment.Spec.Template.Annotations[agentVersionUpgraded] != "true" {
+		logrus.Tracef("statsAggregator: updated cluster %s to v1.22, annotating agent deployment", cluster.Name)
+		toUpdate := deployment.DeepCopy()
+		toUpdate.Spec.Template.Annotations[agentVersionUpgraded] = "true"
+		_, err = userContext.Apps.Deployments("cattle-system").Update(toUpdate)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func statusChanged(existingCluster, newCluster *v32.ClusterStatus) bool {

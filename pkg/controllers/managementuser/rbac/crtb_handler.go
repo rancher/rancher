@@ -68,8 +68,10 @@ func (c *crtbLifecycle) syncCRTB(binding *v3.ClusterRoleTemplateBinding) error {
 		return errors.Wrapf(err, "couldn't ensure cluster bindings %v", binding)
 	}
 
-	if err := c.m.ensureServiceAccountImpersonator(binding.UserName, binding.GroupName); err != nil {
-		return errors.Wrapf(err, "couldn't ensure service account impersonator")
+	if binding.UserName != "" {
+		if err := c.m.ensureServiceAccountImpersonator(binding.UserName); err != nil {
+			return errors.Wrapf(err, "couldn't ensure service account impersonator")
+		}
 	}
 
 	return nil

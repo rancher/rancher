@@ -2,7 +2,6 @@ package management
 
 import (
 	"context"
-	"os"
 	"reflect"
 	"sort"
 	"sync"
@@ -15,7 +14,6 @@ import (
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/wrangler"
-	"github.com/rancher/wrangler/pkg/randomtoken"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/bcrypt"
 	corev1 "k8s.io/api/core/v1"
@@ -28,12 +26,11 @@ import (
 )
 
 const (
-	bootstrappedRole            = "authz.management.cattle.io/bootstrapped-role"
-	bootstrapAdminConfig        = "admincreated"
-	cattleNamespace             = "cattle-system"
-	defaultAdminLabelKey        = "authz.management.cattle.io/bootstrapping"
-	defaultAdminLabelValue      = "admin-user"
-	bootstrapPasswordSecretName = "bootstrap-secret"
+	bootstrappedRole       = "authz.management.cattle.io/bootstrapped-role"
+	bootstrapAdminConfig   = "admincreated"
+	cattleNamespace        = "cattle-system"
+	defaultAdminLabelKey   = "authz.management.cattle.io/bootstrapping"
+	defaultAdminLabelValue = "admin-user"
 )
 
 var (
@@ -55,7 +52,9 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 		addRule().apiGroups("").resources("secrets").verbs("create").
 		addRule().apiGroups("management.cattle.io").resources("cisconfigs").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("cisbenchmarkversions").verbs("get", "list", "watch").
-		addRule().apiGroups("rke-machine-config.cattle.io").resources("*").verbs("create")
+		addRule().apiGroups("rke-machine-config.cattle.io").resources("*").verbs("create").
+		addRule().apiGroups("catalog.cattle.io").resources("clusterrepos").verbs("get", "list", "watch").
+		addRule().apiGroups("rke.cattle.io").resources("etcdsnapshots").verbs("get", "list", "watch")
 
 	rb.addRole("Manage Node Drivers", "nodedrivers-manage").
 		addRule().apiGroups("management.cattle.io").resources("nodedrivers").verbs("*")
@@ -69,7 +68,7 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 		addRule().apiGroups("management.cattle.io").resources("users", "globalrolebindings").verbs("*").
 		addRule().apiGroups("management.cattle.io").resources("globalroles").verbs("get", "list", "watch")
 	rb.addRole("Manage Roles", "roles-manage").
-		addRule().apiGroups("management.cattle.io").resources("roletemplates").verbs("*")
+		addRule().apiGroups("management.cattle.io").resources("roletemplates").verbs("delete", "deletecollection", "get", "list", "patch", "create", "update", "watch")
 	rb.addRole("Manage Authentication", "authn-manage").
 		addRule().apiGroups("management.cattle.io").resources("authconfigs").verbs("get", "list", "watch", "update")
 	rb.addRole("Manage Settings", "settings-manage").
@@ -121,7 +120,8 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 		addRule().apiGroups("management.cattle.io").resources("settings").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("features").verbs("get", "list", "watch").
 		addRule().apiGroups("project.cattle.io").resources("sourcecodecredentials").verbs("*").
-		addRule().apiGroups("project.cattle.io").resources("sourcecoderepositories").verbs("*")
+		addRule().apiGroups("project.cattle.io").resources("sourcecoderepositories").verbs("*").
+		addRule().apiGroups("management.cattle.io").resources("rancherusernotifications").verbs("get", "list", "watch")
 
 	// TODO user should be dynamically authorized to only see herself
 	// TODO enable when groups are "in". they need to be self-service
@@ -144,6 +144,7 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 		addRule().apiGroups("*").resources("*").verbs("*").
 		addRule().apiGroups("management.cattle.io").resources("clusters").verbs("own").
 		addRule().apiGroups("provisioning.cattle.io").resources("clusters").verbs("*").
+		addRule().apiGroups("rke.cattle.io").resources("etcdsnapshots").verbs("get", "list", "watch").
 		addRule().apiGroups("cluster.x-k8s.io").resources("machines").verbs("*").
 		addRule().apiGroups("rke-machine-config.cattle.io").resources("*").verbs("*").
 		addRule().apiGroups("rke-machine.cattle.io").resources("*").verbs("*").
@@ -173,7 +174,8 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 		addRule().apiGroups("cluster.x-k8s.io").resources("machines").verbs("get", "watch").
 		addRule().apiGroups("cluster.x-k8s.io").resources("machinedeployments").verbs("get", "watch").
 		addRule().apiGroups("rke-machine-config.cattle.io").resources("*").verbs("get", "watch").
-		addRule().apiGroups("rke-machine.cattle.io").resources("*").verbs("get", "watch")
+		addRule().apiGroups("rke-machine.cattle.io").resources("*").verbs("get", "watch").
+		addRule().apiGroups("metrics.k8s.io").resources("nodemetrics", "nodes").verbs("get", "list", "watch")
 
 	rb.addRoleTemplate("Create Projects", "projects-create", "cluster", false, false, false).
 		addRule().apiGroups("management.cattle.io").resources("projects").verbs("create")
@@ -220,10 +222,12 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 		addRule().apiGroups("management.cattle.io").resources("clusterroletemplatebindings").verbs("get", "list", "watch")
 
 	rb.addRoleTemplate("Manage Cluster Catalogs", "clustercatalogs-manage", "cluster", false, false, true).
-		addRule().apiGroups("management.cattle.io").resources("clustercatalogs").verbs("*")
+		addRule().apiGroups("management.cattle.io").resources("clustercatalogs").verbs("*").
+		addRule().apiGroups("catalog.cattle.io").resources("clusterrepos").verbs("*")
 
 	rb.addRoleTemplate("View Cluster Catalogs", "clustercatalogs-view", "cluster", false, false, false).
-		addRule().apiGroups("management.cattle.io").resources("clustercatalogs").verbs("get", "list", "watch")
+		addRule().apiGroups("management.cattle.io").resources("clustercatalogs").verbs("get", "list", "watch").
+		addRule().apiGroups("catalog.cattle.io").resources("clusterrepos").verbs("get", "list", "watch")
 
 	rb.addRoleTemplate("Manage Cluster Backups", "backups-manage", "cluster", false, false, false).
 		addRule().apiGroups("management.cattle.io").resources("etcdbackups").verbs("*")
@@ -234,6 +238,7 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 	// Project roles
 	rb.addRoleTemplate("Project Owner", "project-owner", "project", false, false, false).
 		addRule().apiGroups("ui.cattle.io").resources("navlinks").verbs("get", "list", "watch").
+		addRule().apiGroups("").resources("nodes").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("projectroletemplatebindings").verbs("*").
 		addRule().apiGroups("project.cattle.io").resources("apps").verbs("*").
 		addRule().apiGroups("project.cattle.io").resources("apprevisions").verbs("*").
@@ -269,7 +274,7 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 		addRule().apiGroups("catalog.cattle.io").resources("operations").verbs("get", "list", "watch").
 		addRule().apiGroups("catalog.cattle.io").resources("releases").verbs("get", "list", "watch").
 		addRule().apiGroups("catalog.cattle.io").resources("apps").verbs("get", "list", "watch").
-		addRule().apiGroups("management.cattle.io").resources("clusters").verbs("get").
+		addRule().apiGroups("management.cattle.io").resources("clusters").verbs("get").resourceNames("local").
 		setRoleTemplateNames("admin")
 
 	rb.addRoleTemplate("Project Member", "project-member", "project", false, false, false).
@@ -306,7 +311,7 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 		addRule().apiGroups("catalog.cattle.io").resources("operations").verbs("get", "list", "watch").
 		addRule().apiGroups("catalog.cattle.io").resources("releases").verbs("get", "list", "watch").
 		addRule().apiGroups("catalog.cattle.io").resources("apps").verbs("get", "list", "watch").
-		addRule().apiGroups("management.cattle.io").resources("clusters").verbs("get").
+		addRule().apiGroups("management.cattle.io").resources("clusters").verbs("get").resourceNames("local").
 		setRoleTemplateNames("edit")
 
 	rb.addRoleTemplate("Read-only", "read-only", "project", false, false, false).
@@ -339,7 +344,7 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 		addRule().apiGroups("catalog.cattle.io").resources("operations").verbs("get", "list", "watch").
 		addRule().apiGroups("catalog.cattle.io").resources("releases").verbs("get", "list", "watch").
 		addRule().apiGroups("catalog.cattle.io").resources("apps").verbs("get", "list", "watch").
-		addRule().apiGroups("management.cattle.io").resources("clusters").verbs("get").
+		addRule().apiGroups("management.cattle.io").resources("clusters").verbs("get").resourceNames("local").
 		setRoleTemplateNames("view")
 
 	rb.addRoleTemplate("Create Namespaces", "create-ns", "project", false, false, false).
@@ -476,7 +481,8 @@ func addUserRules(role *roleBuilder) *roleBuilder {
 		addRule().apiGroups("project.cattle.io").resources("sourcecodecredentials").verbs("*").
 		addRule().apiGroups("project.cattle.io").resources("sourcecoderepositories").verbs("*").
 		addRule().apiGroups("provisioning.cattle.io").resources("clusters").verbs("create").
-		addRule().apiGroups("rke-machine-config.cattle.io").resources("*").verbs("create")
+		addRule().apiGroups("rke-machine-config.cattle.io").resources("*").verbs("create").
+		addRule().apiGroups("management.cattle.io").resources("rancherusernotifications").verbs("get", "list", "watch")
 
 	return role
 }
@@ -519,43 +525,13 @@ func BootstrapAdmin(management *wrangler.Context) (string, error) {
 
 	if len(users.Items) == 0 {
 		// Config map does not exist and no users, attempt to create the default admin user
-		var showPassword, mustChangePassword bool
-
-		bootstrapPassword := os.Getenv("CATTLE_BOOTSTRAP_PASSWORD")
-		if bootstrapPassword == "" {
-			// Default: Generate a password and show it
-			showPassword = true
-			mustChangePassword = true
-			bootstrapPassword, err = randomtoken.Generate()
-			if err != nil {
-				return "", err
-			}
-		} else if bootstrapPassword == "admin" {
-			// Legacy: User has explicitly set the bootstrap password back to admin
-			showPassword = false
-			mustChangePassword = true
-		} else {
-			// User provided bootstrap password
-			showPassword = false
-			mustChangePassword = false
+		bootstrapPassword, bootstrapPasswordIsGenerated, err := GetBootstrapPassword(context.TODO(), management.K8s.CoreV1().Secrets(cattleNamespace))
+		if err != nil {
+			return "", errors.Wrap(err, "failed to retrieve bootstrap password")
 		}
 
-		// get the existing secret, ignore if not found
-		var bootstrapPasswordSecret *corev1.Secret
-		bootstrapPasswordSecret, err = management.K8s.CoreV1().Secrets(cattleNamespace).Get(context.TODO(), bootstrapPasswordSecretName, v1.GetOptions{})
-		if err != nil && !apierrors.IsNotFound(err) {
-			return "", err
-		}
+		bootstrapPasswordHash, _ := bcrypt.GenerateFromPassword([]byte(bootstrapPassword), bcrypt.DefaultCost)
 
-		// persist the secret
-		if bootstrapPasswordSecret.ObjectMeta.GetResourceVersion() != "" {
-			bootstrapPasswordSecret.StringData = map[string]string{"bootstrapPassword": bootstrapPassword}
-			if _, err := management.K8s.CoreV1().Secrets(cattleNamespace).Update(context.TODO(), bootstrapPasswordSecret, v1.UpdateOptions{}); err != nil {
-				return "", err
-			}
-		}
-
-		hash, _ := bcrypt.GenerateFromPassword([]byte(bootstrapPassword), bcrypt.DefaultCost)
 		admin, err := management.Mgmt.User().Create(&v3.User{
 			ObjectMeta: v1.ObjectMeta{
 				GenerateName: "user-",
@@ -563,8 +539,8 @@ func BootstrapAdmin(management *wrangler.Context) (string, error) {
 			},
 			DisplayName:        "Default Admin",
 			Username:           "admin",
-			Password:           string(hash),
-			MustChangePassword: mustChangePassword,
+			Password:           string(bootstrapPasswordHash),
+			MustChangePassword: bootstrapPasswordIsGenerated || bootstrapPassword == "admin",
 		})
 		if err != nil && !apierrors.IsAlreadyExists(err) {
 			return "", errors.Wrap(err, "can not ensure admin user exists")
@@ -587,7 +563,7 @@ func BootstrapAdmin(management *wrangler.Context) (string, error) {
 			logrus.Infof("")
 			logrus.Infof("-----------------------------------------")
 			logrus.Infof("Welcome to Rancher")
-			if showPassword {
+			if bootstrapPasswordIsGenerated {
 				logrus.Infof("A bootstrap password has been generated for your admin user.")
 				logrus.Infof("")
 				logrus.Infof("Bootstrap Password: %s", bootstrapPassword)

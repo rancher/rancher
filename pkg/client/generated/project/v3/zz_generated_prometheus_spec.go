@@ -15,6 +15,10 @@ const (
 	PrometheusSpecFieldDisableCompaction                  = "disableCompaction"
 	PrometheusSpecFieldEnableAdminAPI                     = "enableAdminAPI"
 	PrometheusSpecFieldEnableFeatures                     = "enableFeatures"
+	PrometheusSpecFieldEnforcedBodySizeLimit              = "enforcedBodySizeLimit"
+	PrometheusSpecFieldEnforcedLabelLimit                 = "enforcedLabelLimit"
+	PrometheusSpecFieldEnforcedLabelNameLengthLimit       = "enforcedLabelNameLengthLimit"
+	PrometheusSpecFieldEnforcedLabelValueLengthLimit      = "enforcedLabelValueLengthLimit"
 	PrometheusSpecFieldEnforcedNamespaceLabel             = "enforcedNamespaceLabel"
 	PrometheusSpecFieldEnforcedSampleLimit                = "enforcedSampleLimit"
 	PrometheusSpecFieldEnforcedTargetLimit                = "enforcedTargetLimit"
@@ -28,6 +32,7 @@ const (
 	PrometheusSpecFieldListenLocal                        = "listenLocal"
 	PrometheusSpecFieldLogFormat                          = "logFormat"
 	PrometheusSpecFieldLogLevel                           = "logLevel"
+	PrometheusSpecFieldMinReadySeconds                    = "minReadySeconds"
 	PrometheusSpecFieldNodeSelector                       = "nodeSelector"
 	PrometheusSpecFieldOverrideHonorLabels                = "overrideHonorLabels"
 	PrometheusSpecFieldOverrideHonorTimestamps            = "overrideHonorTimestamps"
@@ -85,6 +90,10 @@ type PrometheusSpec struct {
 	DisableCompaction                  bool                               `json:"disableCompaction,omitempty" yaml:"disableCompaction,omitempty"`
 	EnableAdminAPI                     bool                               `json:"enableAdminAPI,omitempty" yaml:"enableAdminAPI,omitempty"`
 	EnableFeatures                     []string                           `json:"enableFeatures,omitempty" yaml:"enableFeatures,omitempty"`
+	EnforcedBodySizeLimit              string                             `json:"enforcedBodySizeLimit,omitempty" yaml:"enforcedBodySizeLimit,omitempty"`
+	EnforcedLabelLimit                 *int64                             `json:"enforcedLabelLimit,omitempty" yaml:"enforcedLabelLimit,omitempty"`
+	EnforcedLabelNameLengthLimit       *int64                             `json:"enforcedLabelNameLengthLimit,omitempty" yaml:"enforcedLabelNameLengthLimit,omitempty"`
+	EnforcedLabelValueLengthLimit      *int64                             `json:"enforcedLabelValueLengthLimit,omitempty" yaml:"enforcedLabelValueLengthLimit,omitempty"`
 	EnforcedNamespaceLabel             string                             `json:"enforcedNamespaceLabel,omitempty" yaml:"enforcedNamespaceLabel,omitempty"`
 	EnforcedSampleLimit                *int64                             `json:"enforcedSampleLimit,omitempty" yaml:"enforcedSampleLimit,omitempty"`
 	EnforcedTargetLimit                *int64                             `json:"enforcedTargetLimit,omitempty" yaml:"enforcedTargetLimit,omitempty"`
@@ -98,6 +107,7 @@ type PrometheusSpec struct {
 	ListenLocal                        bool                               `json:"listenLocal,omitempty" yaml:"listenLocal,omitempty"`
 	LogFormat                          string                             `json:"logFormat,omitempty" yaml:"logFormat,omitempty"`
 	LogLevel                           string                             `json:"logLevel,omitempty" yaml:"logLevel,omitempty"`
+	MinReadySeconds                    *int64                             `json:"minReadySeconds,omitempty" yaml:"minReadySeconds,omitempty"`
 	NodeSelector                       map[string]string                  `json:"nodeSelector,omitempty" yaml:"nodeSelector,omitempty"`
 	OverrideHonorLabels                bool                               `json:"overrideHonorLabels,omitempty" yaml:"overrideHonorLabels,omitempty"`
 	OverrideHonorTimestamps            bool                               `json:"overrideHonorTimestamps,omitempty" yaml:"overrideHonorTimestamps,omitempty"`

@@ -154,10 +154,6 @@ func (c *Cluster) GenerateServiceAccount(ctx context.Context) error {
 		return err
 	}
 
-	if err := c.PersistStore.PersistStatus(*c, Updating); err != nil {
-		return err
-	}
-
 	// receive cluster info back
 	info, err := c.Driver.PostCheck(ctx, toInfo(c))
 	if err != nil {
@@ -335,10 +331,6 @@ func (c *Cluster) GetDriverCreateOptions(ctx context.Context) (*types.DriverFlag
 
 func (c *Cluster) GetDriverUpdateOptions(ctx context.Context) (*types.DriverFlags, error) {
 	return c.Driver.GetDriverUpdateOptions(ctx)
-}
-
-func (c *Cluster) getState() (string, error) {
-	return c.PersistStore.GetStatus(c.Name)
 }
 
 // Store persists cluster information

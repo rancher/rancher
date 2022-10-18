@@ -43,7 +43,7 @@ func init() {
 	resource.Put(WorkloadGroupVersionResource)
 }
 
-// Deprecated use v3.Workload instead
+// Deprecated: use v3.Workload instead
 type Workload = v3.Workload
 
 func NewWorkload(namespace, name string, obj v3.Workload) *v3.Workload {

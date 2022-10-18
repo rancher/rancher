@@ -1,7 +1,6 @@
 package rbac
 
 import (
-	"context"
 	"time"
 
 	"github.com/rancher/norman/types/slice"
@@ -25,7 +24,7 @@ const (
 	grbByUserAndRoleIndex = "authz.cluster.cattle.io/grb-by-user-and-role"
 )
 
-func RegisterIndexers(ctx context.Context, scaledContext *config.ScaledContext) error {
+func RegisterIndexers(scaledContext *config.ScaledContext) error {
 	informer := scaledContext.Management.GlobalRoleBindings("").Controller().Informer()
 	indexers := map[string]cache.IndexFunc{
 		grbByUserAndRoleIndex: grbByUserAndRole,
@@ -181,11 +180,8 @@ func (c *grbHandler) ensureProvisioningClusterAdminBinding(obj *v3.GlobalRoleBin
 
 	provCluster := pClusters[0]
 
-	subject := k8srbac.Subject{
-		Kind: "User",
-		Name: obj.UserName,
-	}
-	rbName := name.SafeConcatName(rbac.ProvisioningClusterAdminName(provCluster), subject.Name)
+	subject := rbac.GetGRBSubject(obj)
+	rbName := name.SafeConcatName(rbac.ProvisioningClusterAdminName(provCluster), rbac.GetGRBTargetKey(obj))
 
 	existingRb, err := c.rbLister.Get(provCluster.Namespace, rbName)
 	if err != nil && !apierrors.IsNotFound(err) {

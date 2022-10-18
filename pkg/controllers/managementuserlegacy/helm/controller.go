@@ -41,9 +41,22 @@ const (
 	creatorIDAnn              = "field.cattle.io/creatorId"
 	MultiClusterAppIDSelector = "mcapp"
 	projectIDFieldLabel       = "field.cattle.io/projectId"
+	defaultMaxRevisionCount   = 10
 )
 
-func Register(ctx context.Context, user *config.UserContext, kubeConfigGetter common.KubeConfigGetter) {
+func Register(ctx context.Context, mgmt *config.ScaledContext, user *config.UserContext, kubeConfigGetter common.KubeConfigGetter) {
+	starter := user.DeferredStart(ctx, func(ctx context.Context) error {
+		registerDeferred(ctx, mgmt, user, kubeConfigGetter)
+		return nil
+	})
+
+	apps := user.Management.Project.Apps("")
+	apps.AddClusterScopedHandler(ctx, "helm-deferred", user.ClusterName, func(key string, obj *v32.App) (runtime.Object, error) {
+		return obj, starter()
+	})
+}
+
+func registerDeferred(ctx context.Context, mgmt *config.ScaledContext, user *config.UserContext, kubeConfigGetter common.KubeConfigGetter) {
 	appClient := user.Management.Project.Apps("")
 	stackLifecycle := &Lifecycle{
 		KubeConfigGetter:      kubeConfigGetter,
@@ -64,6 +77,7 @@ func Register(ctx context.Context, user *config.UserContext, kubeConfigGetter co
 		AppsLister:            user.Management.Project.Apps("").Controller().Lister(),
 		NsLister:              user.Core.Namespaces("").Controller().Lister(),
 		NsClient:              user.Core.Namespaces(""),
+		SecretLister:          mgmt.Core.Secrets("").Controller().Lister(),
 	}
 	appClient.AddClusterScopedLifecycle(ctx, "helm-controller", user.ClusterName, stackLifecycle)
 
@@ -90,6 +104,7 @@ type Lifecycle struct {
 	AppsLister            v3.AppLister
 	NsLister              corev1.NamespaceLister
 	NsClient              corev1.NamespaceInterface
+	SecretLister          corev1.SecretLister
 }
 
 func (l *Lifecycle) Create(obj *v3.App) (runtime.Object, error) {
@@ -269,29 +284,31 @@ func (l *Lifecycle) Remove(obj *v3.App) (runtime.Object, error) {
 			return obj, err
 		}
 	}
-	tempDirs, err := createTempDir(obj)
-	if err != nil {
-		return obj, err
-	}
-	defer os.RemoveAll(tempDirs.FullPath)
-	tokenName, err := l.writeKubeConfig(obj, tempDirs.KubeConfigFull, true)
-	if err != nil {
-		return obj, err
-	}
-	defer func() {
-		if err := l.systemTokens.DeleteToken(tokenName); err != nil {
-			logrus.Errorf("cleanup for helm token [%s] failed, will not retry: %v", tokenName, err)
+	if !(obj.Annotations["cattle.io/skipUninstall"] == "true") {
+		tempDirs, err := createTempDir(obj)
+		if err != nil {
+			return obj, err
 		}
-	}()
-	// try three times and succeed
-	start := time.Second * 1
-	for i := 0; i < 3; i++ {
-		if err = helmDelete(tempDirs, obj); err == nil {
-			break
+		defer os.RemoveAll(tempDirs.FullPath)
+		tokenName, err := l.writeKubeConfig(obj, tempDirs.KubeConfigFull, true)
+		if err != nil {
+			return obj, err
 		}
-		logrus.Warn(err)
-		time.Sleep(start)
-		start *= 2
+		defer func() {
+			if err := l.systemTokens.DeleteToken(tokenName); err != nil {
+				logrus.Errorf("cleanup for helm token [%s] failed, will not retry: %v", tokenName, err)
+			}
+		}()
+		// try three times and succeed
+		start := time.Second * 1
+		for i := 0; i < 3; i++ {
+			if err = helmDelete(tempDirs, obj); err == nil {
+				break
+			}
+			logrus.Warn(err)
+			time.Sleep(start)
+			start *= 2
+		}
 	}
 	ns, err := l.NsClient.Get(obj.Spec.TargetNamespace, metav1.GetOptions{})
 	if err != nil && !errors.IsNotFound(err) {
@@ -327,6 +344,7 @@ func (l *Lifecycle) Remove(obj *v3.App) (runtime.Object, error) {
 }
 
 func (l *Lifecycle) Run(obj *v3.App, template string, tempDirs *hCommon.HelmPath) error {
+	defer l.pruneOldRevisions(obj)
 	tokenName, err := l.writeKubeConfig(obj, tempDirs.KubeConfigFull, false)
 	if err != nil {
 		return err
@@ -347,6 +365,36 @@ func (l *Lifecycle) Run(obj *v3.App, template string, tempDirs *hCommon.HelmPath
 		return err
 	}
 	return l.createAppRevision(obj, template, notes, false)
+}
+
+// pruneOldRevisions checks if the total number of app revisions does not exceed the set maximum.
+// If it does, the method deletes the oldest revision(s) to maintain the maximum number of revisions and no more.
+func (l *Lifecycle) pruneOldRevisions(obj *v3.App) {
+	if obj.Spec.MaxRevisionCount < 1 {
+		obj.Spec.MaxRevisionCount = defaultMaxRevisionCount
+	}
+	_, projectName := ref.Parse(obj.Spec.ProjectName)
+	appRevisionClient := l.AppRevisionGetter.AppRevisions(projectName)
+	revisions, err := appRevisionClient.List(metav1.ListOptions{
+		LabelSelector: fmt.Sprintf("%s=%s", appLabel, obj.Name),
+	})
+	if err != nil {
+		logrus.Warnf("[helm-controller] Failed to list revisions for app %s: %v", projectName, err)
+		return
+	}
+	// Sort revisions by creation timestamp, starting with the oldest.
+	sort.Slice(revisions.Items, func(i, j int) bool {
+		return revisions.Items[i].CreationTimestamp.Before(&revisions.Items[j].CreationTimestamp)
+	})
+	if len(revisions.Items) > obj.Spec.MaxRevisionCount {
+		logrus.Tracef("[helm-controller] App %s is exceeding the maximum (%d) number of stored revisions", obj.Name, obj.Spec.MaxRevisionCount)
+		deleteCount := len(revisions.Items) - obj.Spec.MaxRevisionCount
+		for _, revision := range revisions.Items[:deleteCount] {
+			if err := appRevisionClient.Delete(revision.Name, &metav1.DeleteOptions{}); err != nil && !errors.IsNotFound(err) {
+				logrus.Warnf("[helm-controller] Failed to delete app revision %s: %v", revision.Name, err)
+			}
+		}
+	}
 }
 
 func (l *Lifecycle) createAppRevision(obj *v3.App, template, notes string, failed bool) error {
@@ -445,5 +493,5 @@ func (l *Lifecycle) getHelmVersion(obj *v3.App) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return templateVersion.TemplateVersion.Status.HelmVersion, nil
+	return templateVersion.Status.HelmVersion, nil
 }

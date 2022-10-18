@@ -318,7 +318,7 @@ func (s *Provider) HandleSamlAssertion(w http.ResponseWriter, r *http.Request, a
 		return
 	}
 	if !allowed {
-		log.Errorf("SAML: User does not have access %v", err)
+		log.Errorf("SAML: User [%s] is not an authorized user or is not a member of an authorized group", userPrincipal.Name)
 		http.Redirect(w, r, redirectURL+"errorCode=403", http.StatusFound)
 		return
 	}
@@ -326,9 +326,12 @@ func (s *Provider) HandleSamlAssertion(w http.ResponseWriter, r *http.Request, a
 	userID := s.clientState.GetState(r, "Rancher_UserID")
 	if userID != "" && rancherAction == testAndEnableAction {
 		user, err := s.userMGR.SetPrincipalOnCurrentUserByUserID(userID, userPrincipal)
-		if err != nil {
+		if err != nil && user == nil {
 			log.Errorf("SAML: Error setting principal on current user %v", err)
 			http.Redirect(w, r, redirectURL+"errorCode=500", http.StatusFound)
+			return
+		} else if err != nil && user != nil {
+			http.Redirect(w, r, redirectURL+"errorCode=422&errorMsg="+err.Error(), http.StatusFound)
 			return
 		}
 
@@ -344,7 +347,7 @@ func (s *Provider) HandleSamlAssertion(w http.ResponseWriter, r *http.Request, a
 		if r.URL.Scheme == "https" {
 			isSecure = true
 		}
-		err = setRancherToken(w, r, s.tokenMGR, user.Name, userPrincipal, groupPrincipals, isSecure)
+		err = s.setRancherToken(w, r, s.tokenMGR, user.Name, userPrincipal, groupPrincipals, isSecure)
 		if err != nil {
 			log.Errorf("SAML: Failed creating token with error: %v", err)
 			http.Redirect(w, r, redirectURL+"errorCode=500", http.StatusFound)
@@ -379,7 +382,7 @@ func (s *Provider) HandleSamlAssertion(w http.ResponseWriter, r *http.Request, a
 		return
 	}
 
-	err = setRancherToken(w, r, s.tokenMGR, user.Name, userPrincipal, groupPrincipals, true)
+	err = s.setRancherToken(w, r, s.tokenMGR, user.Name, userPrincipal, groupPrincipals, true)
 	if err != nil {
 		log.Errorf("SAML: Failed creating token with error: %v", err)
 		http.Redirect(w, r, redirectURL+"errorCode=500", http.StatusFound)
@@ -397,7 +400,7 @@ func (s *Provider) HandleSamlAssertion(w http.ResponseWriter, r *http.Request, a
 			responseType := s.clientState.GetState(r, "Rancher_ResponseType")
 			publicKey := s.clientState.GetState(r, "Rancher_PublicKey")
 
-			token, tokenValue, err := tokens.GetKubeConfigToken(user.Name, responseType, s.userMGR)
+			token, tokenValue, err := tokens.GetKubeConfigToken(user.Name, responseType, s.userMGR, userPrincipal)
 			if err != nil {
 				log.Errorf("SAML: getToken error %v", err)
 				http.Redirect(w, r, redirectURL+"errorCode=500", http.StatusFound)
@@ -457,14 +460,15 @@ func (s *Provider) HandleSamlAssertion(w http.ResponseWriter, r *http.Request, a
 	}
 }
 
-func setRancherToken(w http.ResponseWriter, r *http.Request, tokenMGR *tokens.Manager, userID string, userPrincipal v3.Principal,
+func (s *Provider) setRancherToken(w http.ResponseWriter, r *http.Request, tokenMGR *tokens.Manager, userID string, userPrincipal v3.Principal,
 	groupPrincipals []v3.Principal, isSecure bool) error {
 	authTimeout := settings.AuthUserSessionTTLMinutes.Get()
 	var ttl int64
 	if minutes, err := strconv.ParseInt(authTimeout, 10, 64); err == nil {
 		ttl = minutes * 60 * 1000
 	}
-	rToken, unhashedTokenKey, err := tokenMGR.NewLoginToken(userID, userPrincipal, groupPrincipals, "", ttl, "")
+	userExtraInfo := s.GetUserExtraAttributes(userPrincipal)
+	rToken, unhashedTokenKey, err := tokenMGR.NewLoginToken(userID, userPrincipal, groupPrincipals, "", ttl, "", userExtraInfo)
 	if err != nil {
 		return err
 	}

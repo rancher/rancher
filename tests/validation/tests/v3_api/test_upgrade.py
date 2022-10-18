@@ -1,5 +1,6 @@
 import base64
 import pytest
+from .test_ingress import get_ingress_ip_domain
 
 
 from .common import *  # NOQA
@@ -135,7 +136,7 @@ def test_validate_existing_catalog_app():
 @if_validate_ingress
 @pytest.mark.run(order=2)
 def test_validate_existing_ingress_daemon():
-    validate_ingress_xip_io(ingress_name1_validate,
+    validate_ingress_io(ingress_name1_validate,
                             ingress_wlname1_validate)
 
 
@@ -143,7 +144,7 @@ def test_validate_existing_ingress_daemon():
 @if_validate_ingress
 @pytest.mark.run(order=2)
 def test_validate_existing_ingress_wl():
-    validate_ingress_xip_io(ingress_name2_validate,
+    validate_ingress_io(ingress_name2_validate,
                             ingress_wlname2_validate)
 
 
@@ -204,14 +205,14 @@ def test_create_validate_wokloads_with_secret():
 
 @if_validate_ingress
 @pytest.mark.run(order=5)
-def test_create_and_validate_ingress_xip_io_daemon():
-    create_and_validate_ingress_xip_io_daemon()
+def test_create_and_validate_ingress_io_daemon():
+    create_and_validate_ingress_io_daemon()
 
 
 @if_validate_ingress
 @pytest.mark.run(order=5)
-def test_create_and_validate_ingress_xip_io_wl():
-    create_and_validate_ingress_xip_io_wl()
+def test_create_and_validate_ingress_io_wl():
+    create_and_validate_ingress_io_wl()
 
 
 # It's hard to find an App to support Windows case for now.
@@ -269,7 +270,7 @@ def validate_wl(workload_name, pod_count=2):
     validate_service_discovery_upgrade(workload_name, [workload_name])
 
 
-def create_and_validate_ingress_xip_io_daemon():
+def create_and_validate_ingress_io_daemon():
     p_client = namespace["p_client"]
     ns = namespace["ns"]
     cluster = namespace["cluster"]
@@ -284,17 +285,17 @@ def create_and_validate_ingress_xip_io_daemon():
     validate_workload(p_client, workload, "daemonSet", ns.name,
                       len(get_schedulable_nodes(cluster)))
     path = "/name.html"
-    rule = {"host": "xip.io",
+    rule = {"host": get_ingress_ip_domain(),
             "paths":
                 [{"workloadIds": [workload.id], "targetPort": TEST_IMAGE_PORT,
                   "path": path}]}
     p_client.create_ingress(name=ingress_name1_create,
                             namespaceId=ns.id,
                             rules=[rule])
-    validate_ingress_xip_io(ingress_name1_create, ingress_wlname1_create)
+    validate_ingress_io(ingress_name1_create, ingress_wlname1_create)
 
 
-def create_and_validate_ingress_xip_io_wl():
+def create_and_validate_ingress_io_wl():
     p_client = namespace["p_client"]
     ns = namespace["ns"]
     con = [{"name": "test1",
@@ -306,14 +307,14 @@ def create_and_validate_ingress_xip_io_wl():
                                         namespaceId=ns.id, scale=2)
     validate_wl(ingress_wlname2_create, 2)
     path = "/name.html"
-    rule = {"host": "xip.io",
+    rule = {"host": get_ingress_ip_domain(),
             "paths":
                 [{"workloadIds": [workload.id], "targetPort": TEST_IMAGE_PORT,
                   "path": path}]}
     p_client.create_ingress(name=ingress_name2_create,
                             namespaceId=ns.id,
                             rules=[rule])
-    validate_ingress_xip_io(ingress_name2_create, ingress_wlname2_create)
+    validate_ingress_io(ingress_name2_create, ingress_wlname2_create)
 
 
 def modify_workload_validate_deployment():
@@ -346,7 +347,7 @@ def modify_workload_validate_ingress():
     validate_wl(ing_workload.name, 4)
 
     # Validate ingress after workload scale up
-    validate_ingress_xip_io(ingress_name2_validate, ingress_wlname2_validate)
+    validate_ingress_io(ingress_name2_validate, ingress_wlname2_validate)
 
 
 def modify_workload_validate_sd():
@@ -394,7 +395,7 @@ def modify_workload_validate_secret():
         keyvaluepair, workloadwithsecretasenvvar=True, podcount=3)
 
 
-def validate_ingress_xip_io(ing_name, workload_name):
+def validate_ingress_io(ing_name, workload_name):
     p_client = namespace["p_client"]
     ns = namespace["ns"]
     workloads = p_client.list_workload(name=workload_name,

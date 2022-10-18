@@ -20,6 +20,7 @@ const (
 	DeploymentSpecFieldHostname                      = "hostname"
 	DeploymentSpecFieldImagePullSecrets              = "imagePullSecrets"
 	DeploymentSpecFieldNodeID                        = "nodeId"
+	DeploymentSpecFieldOS                            = "os"
 	DeploymentSpecFieldObjectMeta                    = "metadata"
 	DeploymentSpecFieldOverhead                      = "overhead"
 	DeploymentSpecFieldPaused                        = "paused"
@@ -64,6 +65,7 @@ type DeploymentSpec struct {
 	Hostname                      string                         `json:"hostname,omitempty" yaml:"hostname,omitempty"`
 	ImagePullSecrets              []LocalObjectReference         `json:"imagePullSecrets,omitempty" yaml:"imagePullSecrets,omitempty"`
 	NodeID                        string                         `json:"nodeId,omitempty" yaml:"nodeId,omitempty"`
+	OS                            *PodOS                         `json:"os,omitempty" yaml:"os,omitempty"`
 	ObjectMeta                    *ObjectMeta                    `json:"metadata,omitempty" yaml:"metadata,omitempty"`
 	Overhead                      map[string]string              `json:"overhead,omitempty" yaml:"overhead,omitempty"`
 	Paused                        bool                           `json:"paused,omitempty" yaml:"paused,omitempty"`

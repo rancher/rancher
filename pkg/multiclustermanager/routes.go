@@ -14,6 +14,7 @@ import (
 	"github.com/rancher/rancher/pkg/api/norman/customization/oci"
 	"github.com/rancher/rancher/pkg/api/norman/customization/vsphere"
 	managementapi "github.com/rancher/rancher/pkg/api/norman/server"
+	"github.com/rancher/rancher/pkg/api/steve/supportconfigs"
 	"github.com/rancher/rancher/pkg/auth/providers/publicapi"
 	"github.com/rancher/rancher/pkg/auth/providers/saml"
 	"github.com/rancher/rancher/pkg/auth/requests"
@@ -66,6 +67,9 @@ func router(ctx context.Context, localClusterEnabled bool, tunnelAuthorizer *mcm
 
 	metricsHandler := metrics.NewMetricsHandler(scaledContext, clusterManager, promhttp.Handler())
 
+	channelserver := channelserver.NewHandler(ctx)
+
+	supportConfigGenerator := supportconfigs.NewHandler(scaledContext)
 	// Unauthenticated routes
 	unauthed := mux.NewRouter()
 	unauthed.UseEncodedPath()
@@ -80,17 +84,22 @@ func router(ctx context.Context, localClusterEnabled bool, tunnelAuthorizer *mcm
 	unauthed.Handle("/v3/settings/ui-banners", managementAPI).MatcherFunc(onlyGet)
 	unauthed.Handle("/v3/settings/ui-issues", managementAPI).MatcherFunc(onlyGet)
 	unauthed.Handle("/v3/settings/ui-pl", managementAPI).MatcherFunc(onlyGet)
+	unauthed.Handle("/v3/settings/ui-brand", managementAPI).MatcherFunc(onlyGet)
 	unauthed.Handle("/v3/settings/ui-default-landing", managementAPI).MatcherFunc(onlyGet)
 	unauthed.PathPrefix("/hooks").Handler(hooks.New(scaledContext))
-	unauthed.PathPrefix("/v1-{prefix}-release/release").Handler(channelserver.NewHandler(ctx))
+	unauthed.PathPrefix("/v1-{prefix}-release/channel").Handler(channelserver)
+	unauthed.PathPrefix("/v1-{prefix}-release/release").Handler(channelserver)
 	unauthed.PathPrefix("/v1-saml").Handler(saml.AuthHandler())
 	unauthed.PathPrefix("/v3-public").Handler(publicAPI)
 
 	// Authenticated routes
 	authed := mux.NewRouter()
 	authed.UseEncodedPath()
-	authed.Use(mux.MiddlewareFunc(auth.ToMiddleware(requests.NewImpersonatingAuth(sar.NewSubjectAccessReview(clusterManager)))))
-	authed.Use(mux.MiddlewareFunc(rbac.NewAccessControlHandler()))
+	impersonatingAuth := auth.ToMiddleware(requests.NewImpersonatingAuth(sar.NewSubjectAccessReview(clusterManager)))
+	accessControlHandler := rbac.NewAccessControlHandler()
+
+	authed.Use(mux.MiddlewareFunc(impersonatingAuth))
+	authed.Use(mux.MiddlewareFunc(accessControlHandler))
 	authed.Use(requests.NewAuthenticatedFilter)
 
 	authed.Path("/meta/{resource:aks.+}").Handler(aks.NewAKSHandler(scaledContext))
@@ -98,8 +107,8 @@ func router(ctx context.Context, localClusterEnabled bool, tunnelAuthorizer *mcm
 	authed.Path("/meta/oci/{resource}").Handler(oci.NewOCIHandler(scaledContext))
 	authed.Path("/meta/vsphere/{field}").Handler(vsphere.NewVsphereHandler(scaledContext))
 	authed.Path("/v3/tokenreview").Methods(http.MethodPost).Handler(&webhook.TokenReviewer{})
-	authed.Path("/metrics").Handler(metricsHandler)
 	authed.Path("/metrics/{clusterID}").Handler(metricsHandler)
+	authed.Path(supportconfigs.Endpoint).Handler(&supportConfigGenerator)
 	authed.PathPrefix("/k8s/clusters/").Handler(k8sProxy)
 	authed.PathPrefix("/meta/proxy").Handler(metaProxy)
 	authed.PathPrefix("/v1-telemetry").Handler(telemetry.NewProxy())
@@ -107,9 +116,20 @@ func router(ctx context.Context, localClusterEnabled bool, tunnelAuthorizer *mcm
 	authed.PathPrefix("/v3/token").Handler(tokenAPI)
 	authed.PathPrefix("/v3").Handler(managementAPI)
 
+	// Metrics authenticated route
+	metricsAuthed := mux.NewRouter()
+	metricsAuthed.UseEncodedPath()
+	tokenReviewAuth := auth.ToMiddleware(requests.NewTokenReviewAuth(scaledContext.K8sClient.AuthenticationV1()))
+	metricsAuthed.Use(mux.MiddlewareFunc(tokenReviewAuth.Chain(impersonatingAuth)))
+	metricsAuthed.Use(mux.MiddlewareFunc(accessControlHandler))
+	metricsAuthed.Use(requests.NewAuthenticatedFilter)
+
+	metricsAuthed.Path("/metrics").Handler(metricsHandler)
+
 	unauthed.NotFoundHandler = authed
+	authed.NotFoundHandler = metricsAuthed
 	return func(next http.Handler) http.Handler {
-		authed.NotFoundHandler = next
+		metricsAuthed.NotFoundHandler = next
 		return unauthed
 	}, nil
 }

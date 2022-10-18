@@ -165,5 +165,5 @@ func (a ActionHandler) validateChartCompatibility(version, clusterName string) e
 	if err != nil {
 		return err
 	}
-	return a.CatalogManager.ValidateChartCompatibility(templateVersion, clusterName)
+	return a.CatalogManager.ValidateChartCompatibility(templateVersion, clusterName, "")
 }

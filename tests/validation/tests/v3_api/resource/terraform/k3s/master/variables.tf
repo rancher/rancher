@@ -15,10 +15,16 @@ variable "username" {}
 variable "password" {}
 variable "install_mode" {}
 variable "k3s_version" {}
+variable "k3s_channel" {}
 variable "no_of_server_nodes" {}
 variable "server_flags" {}
 variable "cluster_type" {}
 variable "node_os" {}
+
+variable "create_lb" {
+  description = "Create Network Load Balancer if set to true"
+  type = bool
+}
 
 variable "external_db" {}
 variable "external_db_version" {}

@@ -9,6 +9,11 @@ import (
 	"strings"
 	"time"
 
+	prov "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
+	"github.com/rancher/rancher/pkg/controllers/management/cluster"
+	provcluster "github.com/rancher/rancher/pkg/controllers/provisioningv2/cluster"
+	mgmtv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
+	provv1 "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/settings"
@@ -57,7 +62,8 @@ type proxy struct {
 	prefix             string
 	validHostsSupplier Supplier
 	credentials        v1.SecretInterface
-	clusters           v3.ClusterInterface
+	mgmtClustersCache  mgmtv3.ClusterCache
+	provClustersCache  provv1.ClusterCache
 	authorizer         authorizer.Authorizer
 }
 
@@ -84,7 +90,7 @@ func (p *proxy) isAllowed(host string) bool {
 
 func NewProxy(prefix string, validHosts Supplier, scaledContext *config.ScaledContext) (http.Handler, error) {
 	cfg := authorizerfactory.DelegatingAuthorizerConfig{
-		SubjectAccessReviewClient: scaledContext.K8sClient.AuthorizationV1().SubjectAccessReviews(),
+		SubjectAccessReviewClient: scaledContext.K8sClient.AuthorizationV1(),
 		AllowCacheTTL:             time.Second * time.Duration(settings.AuthorizationCacheTTLSeconds.GetInt()),
 		DenyCacheTTL:              time.Second * time.Duration(settings.AuthorizationDenyCacheTTLSeconds.GetInt()),
 		WebhookRetryBackoff:       &auth.WebhookBackoff,
@@ -100,7 +106,8 @@ func NewProxy(prefix string, validHosts Supplier, scaledContext *config.ScaledCo
 		prefix:             prefix,
 		validHostsSupplier: validHosts,
 		credentials:        scaledContext.Core.Secrets(""),
-		clusters:           scaledContext.Management.Clusters(""),
+		mgmtClustersCache:  scaledContext.Wrangler.Mgmt.Cluster().Cache(),
+		provClustersCache:  scaledContext.Wrangler.Provisioning.Cluster().Cache(),
 	}
 
 	return &httputil.ReverseProxy{
@@ -214,10 +221,7 @@ func (p *proxy) secretGetter(req *http.Request, cAuth string) SecretGetter {
 		}
 		unauthorizedErr := fmt.Errorf("unauthorized %s to %s/%s: %s", user.GetName(), namespace, name, reason)
 		if decision != authorizer.DecisionAllow {
-			if clusterID == "" {
-				return nil, unauthorizedErr
-			}
-			decision, err = p.checkCluster(req, user, clusterID, fmt.Sprintf("%s:%s", namespace, name))
+			decision, err = p.checkIndirectAccessViaCluster(req, user, clusterID, fmt.Sprintf("%s:%s", namespace, name))
 			if err != nil {
 				return nil, err
 			}
@@ -229,17 +233,69 @@ func (p *proxy) secretGetter(req *http.Request, cAuth string) SecretGetter {
 	}
 }
 
-func (p *proxy) checkCluster(req *http.Request, user user.Info, clusterID, credID string) (authorizer.Decision, error) {
-	cluster, err := p.clusters.Controller().Lister().Get("", clusterID)
-	if err != nil {
+// checkIndirectAccessViaCluster checks if the user has access to the cloud credential via being owner of a cluster associated to the cloud credential.
+// Currently, only EKS and provisioningv2 clusters are supported because those clusters have a cloud credential associated to them.
+// GKE and AKS clusters also have cloud credential associated to them, but those are checked via specific proxies (not the meta proxy).
+func (p *proxy) checkIndirectAccessViaCluster(req *http.Request, user user.Info, clusterID, credID string) (authorizer.Decision, error) {
+	var (
+		mgmtClusters []*v3.Cluster
+		provClusters []*prov.Cluster
+		err          error
+	)
+	if clusterID == "" {
+		// If no clusterID is passed, then we check all clusters that the user has access to and are associated to the cloud credential.
+		// Both management and provisioning clusters should be checked.
+		mgmtClusters, err = p.mgmtClustersCache.GetByIndex(cluster.ByCloudCredential, credID)
+		if err != nil {
+			return authorizer.DecisionDeny, err
+		}
+
+		provClusters, err = p.provClustersCache.GetByIndex(provcluster.ByCloudCred, credID)
+		if err != nil {
+			return authorizer.DecisionDeny, err
+		}
+	} else {
+		if c, err := p.mgmtClustersCache.Get(clusterID); err == nil {
+			mgmtClusters = []*v3.Cluster{c}
+		} else {
+			return authorizer.DecisionDeny, err
+		}
+		provClusters, err = p.provClustersCache.GetByIndex(provcluster.ByCluster, clusterID)
+		if err != nil {
+			return authorizer.DecisionDeny, err
+		}
+	}
+	if len(mgmtClusters)+len(provClusters) == 0 {
 		return authorizer.DecisionDeny, err
 	}
-	if cluster.Spec.EKSConfig == nil {
-		return authorizer.DecisionDeny, nil
+
+	for _, c := range mgmtClusters {
+		if c.Spec.EKSConfig == nil || c.Spec.EKSConfig.AmazonCredentialSecret != credID {
+			continue
+		}
+
+		decision, err := p.checkAccessToV3ClusterWithID(req, user, c.Name)
+		if err == nil && decision == authorizer.DecisionAllow {
+			return decision, nil
+		}
 	}
-	if cluster.Spec.EKSConfig.AmazonCredentialSecret != credID {
-		return authorizer.DecisionDeny, nil
+
+	for _, c := range provClusters {
+		if c.Spec.CloudCredentialSecretName != credID {
+			continue
+		}
+
+		// Check that the user has access to the management cluster associated to the provisioning cluster.
+		// If a user has access to the management cluster, then the user has access to the provisioning cluster.
+		decision, err := p.checkAccessToV3ClusterWithID(req, user, c.Status.ClusterName)
+		if err == nil && decision == authorizer.DecisionAllow {
+			return decision, nil
+		}
 	}
+	return authorizer.DecisionDeny, nil
+}
+
+func (p *proxy) checkAccessToV3ClusterWithID(req *http.Request, user user.Info, clusterID string) (authorizer.Decision, error) {
 	decision, _, err := p.authorizer.Authorize(req.Context(), authorizer.AttributesRecord{
 		User:            user,
 		Verb:            "update",
@@ -249,6 +305,7 @@ func (p *proxy) checkCluster(req *http.Request, user user.Info, clusterID, credI
 		Name:            clusterID,
 		ResourceRequest: true,
 	})
+
 	return decision, err
 }
 

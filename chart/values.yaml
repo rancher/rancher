@@ -72,6 +72,7 @@ ingress:
   enabled: true
   includeDefaultExtraAnnotations: true
   extraAnnotations: {}
+  ingressClassName: ""
 
   # configurationSnippet - Add additional Nginx configuration. This example statically sets a header on the ingress.
   # configurationSnippet: |

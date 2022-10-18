@@ -3,15 +3,16 @@ package user
 import (
 	"net/http"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/parse"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/pkg/auth/providerrefresh"
-	"github.com/rancher/rancher/pkg/auth/settings"
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/settings"
 	"golang.org/x/crypto/bcrypt"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -94,6 +95,10 @@ func (h *Handler) changePassword(actionName string, action *types.Action, reques
 		return err
 	}
 
+	if err := validatePassword(user.Username, newPass, settings.PasswordMinLength.GetInt()); err != nil {
+		return httperror.NewAPIError(httperror.InvalidBodyContent, err.Error())
+	}
+
 	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(currentPass)); err != nil {
 		return httperror.NewAPIError(httperror.InvalidBodyContent, "invalid current password")
 	}
@@ -134,6 +139,12 @@ func (h *Handler) setPassword(actionName string, action *types.Action, request *
 		return errors.New("Invalid password")
 	}
 
+	username := userData[client.UserFieldUsername].(string)
+
+	if err := validatePassword(username, newPass, settings.PasswordMinLength.GetInt()); err != nil {
+		return httperror.NewAPIError(httperror.InvalidBodyContent, err.Error())
+	}
+
 	userData[client.UserFieldPassword] = newPass
 	if err := hashPassword(userData); err != nil {
 		return err
@@ -169,4 +180,17 @@ func (h *Handler) refreshAttributes(actionName string, action *types.Action, req
 
 func (h *Handler) userCanRefresh(request *types.APIContext) bool {
 	return request.AccessControl.CanDo(v3.UserGroupVersionKind.Group, v3.UserResource.Name, "create", request, nil, request.Schema) == nil
+}
+
+// validatePassword will ensure a password is at least the minimum required length in runes, and that the username and password do not match.
+func validatePassword(user string, pass string, minPassLen int) error {
+	if utf8.RuneCountInString(pass) < minPassLen {
+		return errors.Errorf("Password must be at least %v characters", minPassLen)
+	}
+
+	if user == pass {
+		return errors.New("Password cannot be the same as username")
+	}
+
+	return nil
 }

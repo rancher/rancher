@@ -23,25 +23,35 @@ import (
 
 const owner = "owner-user"
 
-var globalResourcesNeededInProjects = map[string][]string{
-	"navlinks": {
-		"ui.cattle.io",
+// globalResourceRulesNeededInProjects is the set of PolicyRules that need to be present on *-promoted ClusterRoles
+// Binding a user to a *-promoted ClusterRole with these PolicyRules results in that user being granted access to these "global" resources.
+// The PolicyRule for each resource is the base policy rule, verbs are added dynamically and the key is used for the Resources value of each rule
+var globalResourceRulesNeededInProjects = map[string]rbacv1.PolicyRule{
+	"navlinks": rbacv1.PolicyRule{
+		APIGroups: []string{"ui.cattle.io"},
 	},
-	"persistentvolumes": {
-		"",
-		"core",
+	"nodes": rbacv1.PolicyRule{
+		APIGroups: []string{""},
 	},
-	"storageclasses": {
-		"storage.k8s.io",
+	"persistentvolumes": rbacv1.PolicyRule{
+		APIGroups: []string{"", "core"},
 	},
-	"apiservices": {
-		"apiregistration.k8s.io",
+	"storageclasses": rbacv1.PolicyRule{
+		APIGroups: []string{"storage.k8s.io"},
 	},
-	"clusterrepos": {
-		"catalog.cattle.io",
+	"apiservices": rbacv1.PolicyRule{
+		APIGroups: []string{"apiregistration.k8s.io"},
 	},
-	"clusters": {
-		"management.cattle.io",
+	"clusterrepos": rbacv1.PolicyRule{
+		APIGroups: []string{"catalog.cattle.io"},
+	},
+	"clusters": rbacv1.PolicyRule{
+		APIGroups: []string{"management.cattle.io"},
+		// since *-promoted roles may be applied in all clusters, the resource name needs to be "local"
+		// performing 'kubectl get clusters.management.cattle.io local' needs to work for the user within the context of the cluster they are promoted in,
+		// otherwise certain functionality that relies on this global permission will not work correctly, e.g. kubectl shell
+		// this will not grant the user permissions on the management cluster unless they are added as a project member/owner/read-only within that cluster
+		ResourceNames: []string{"local"},
 	},
 }
 
@@ -101,13 +111,18 @@ func (p *prtbLifecycle) syncPRTB(binding *v3.ProjectRoleTemplateBinding) error {
 
 	for _, n := range namespaces {
 		ns := n.(*v1.Namespace)
+		if !ns.DeletionTimestamp.IsZero() {
+			continue
+		}
 		if err := p.m.ensureProjectRoleBindings(ns.Name, roles, binding); err != nil {
 			return errors.Wrapf(err, "couldn't ensure binding %v in %v", binding.Name, ns.Name)
 		}
 	}
 
-	if err := p.m.ensureServiceAccountImpersonator(binding.UserName, binding.GroupName); err != nil {
-		return errors.Wrapf(err, "couldn't ensure service account impersonator")
+	if binding.UserName != "" {
+		if err := p.m.ensureServiceAccountImpersonator(binding.UserName); err != nil {
+			return errors.Wrapf(err, "couldn't ensure service account impersonator")
+		}
 	}
 
 	return p.reconcileProjectAccessToGlobalResources(binding, roles)
@@ -229,7 +244,7 @@ func (m *manager) ownerExistsByNsName(nsAndName interface{}) (bool, error) {
 }
 
 // If the roleTemplate has rules granting access to non-namespaced (global) resource, return the verbs for those rules
-func (m *manager) checkForGlobalResourceRules(role *v3.RoleTemplate, resource string) (map[string]bool, error) {
+func (m *manager) checkForGlobalResourceRules(role *v3.RoleTemplate, resource string, baseRule rbacv1.PolicyRule) (map[string]bool, error) {
 	var rules []rbacv1.PolicyRule
 	if role.External {
 		externalRole, err := m.crLister.Get("", role.Name)
@@ -246,7 +261,9 @@ func (m *manager) checkForGlobalResourceRules(role *v3.RoleTemplate, resource st
 
 	verbs := map[string]bool{}
 	for _, rule := range rules {
-		if (slice.ContainsString(rule.Resources, resource) || slice.ContainsString(rule.Resources, "*")) && len(rule.ResourceNames) == 0 {
+		// given the global resource, we check if the passed in RoleTemplate has a corresponding rule, if it does, we add the verbs specified in the rule to the map of verbs that is returned
+		// NOTE: ResourceNames are checked since some global resources are scoped to specific resources, e.g. management.cattle.io/v3.Clusters are scoped to just the "local" cluster resource
+		if (slice.ContainsString(rule.Resources, resource) || slice.ContainsString(rule.Resources, "*")) && reflect.DeepEqual(rule.ResourceNames, baseRule.ResourceNames) {
 			if checkGroup(resource, rule) {
 				for _, v := range rule.Verbs {
 					verbs[v] = true
@@ -259,20 +276,31 @@ func (m *manager) checkForGlobalResourceRules(role *v3.RoleTemplate, resource st
 }
 
 // Ensure the clusterRole used to grant access of global resources to users/groups in projects has appropriate rules for the given resource and verbs
-func (m *manager) reconcileRoleForProjectAccessToGlobalResource(resource string, rt *v3.RoleTemplate, newVerbs map[string]bool) (string, error) {
+func (m *manager) reconcileRoleForProjectAccessToGlobalResource(resource string, rt *v3.RoleTemplate, newVerbs map[string]bool, baseRule rbacv1.PolicyRule) (string, error) {
 	clusterRoles := m.workload.RBAC.ClusterRoles("")
 	roleName := rt.Name + "-promoted"
 	if role, err := m.crLister.Get("", roleName); err == nil && role != nil {
 		currentVerbs := map[string]bool{}
+		currentResourceNames := map[string]struct{}{}
 		for _, rule := range role.Rules {
 			if slice.ContainsString(rule.Resources, resource) {
 				for _, v := range rule.Verbs {
 					currentVerbs[v] = true
 				}
+				for _, v := range rule.ResourceNames {
+					currentResourceNames[v] = struct{}{}
+				}
 			}
 		}
 
-		if !reflect.DeepEqual(currentVerbs, newVerbs) {
+		desiredResourceNames := map[string]struct{}{}
+		for _, resourceName := range baseRule.ResourceNames {
+			desiredResourceNames[resourceName] = struct{}{}
+		}
+
+		// if the verbs or the resourceNames in the promoted clusterrole don't match what's desired then the role requires updating
+		// desired verbs are passed in and the desired resourceNames come from the resource's base rule
+		if !reflect.DeepEqual(currentVerbs, newVerbs) || !reflect.DeepEqual(currentResourceNames, desiredResourceNames) {
 			role = role.DeepCopy()
 			added := false
 			for i, rule := range role.Rules {
@@ -288,6 +316,7 @@ func (m *manager) reconcileRoleForProjectAccessToGlobalResource(resource string,
 			_, err := clusterRoles.Update(role)
 			return roleName, err
 		}
+
 		return roleName, nil
 	}
 
@@ -306,21 +335,23 @@ func (m *manager) reconcileRoleForProjectAccessToGlobalResource(resource string,
 	return roleName, nil
 }
 
+// checkGroup returns true if the passed in PolicyRule has a group that matches the corresponding baseRule for the passed in global resource
 func checkGroup(resource string, rule rbacv1.PolicyRule) bool {
 	if slice.ContainsString(rule.APIGroups, "*") {
 		return true
 	}
 
-	groups, ok := globalResourcesNeededInProjects[resource]
+	baseRule, ok := globalResourceRulesNeededInProjects[resource]
 	if !ok {
 		return false
 	}
 
 	for _, rg := range rule.APIGroups {
-		if slice.ContainsString(groups, rg) {
+		if slice.ContainsString(baseRule.APIGroups, rg) {
 			return true
 		}
 	}
+
 	return false
 }
 
@@ -333,12 +364,13 @@ func buildRule(resource string, verbs map[string]bool) rbacv1.PolicyRule {
 	// Sort the verbs, a map does not guarantee order
 	sort.Strings(vs)
 
-	groups := globalResourcesNeededInProjects[resource]
+	baseRule := globalResourceRulesNeededInProjects[resource]
 
 	return rbacv1.PolicyRule{
-		Resources: []string{resource},
-		Verbs:     vs,
-		APIGroups: groups,
+		Resources:     []string{resource},
+		Verbs:         vs,
+		APIGroups:     baseRule.APIGroups,
+		ResourceNames: baseRule.ResourceNames,
 	}
 }
 
@@ -420,15 +452,15 @@ func (p *prtbLifecycle) reconcilePRTBUserClusterLabels(binding *v3.ProjectRoleTe
 	}
 
 	retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		crtbToUpdate, updateErr := p.m.prtbs.GetNamespaced(binding.Namespace, binding.Name, metav1.GetOptions{})
+		prtbToUpdate, updateErr := p.m.prtbs.GetNamespaced(binding.Namespace, binding.Name, metav1.GetOptions{})
 		if updateErr != nil {
 			return updateErr
 		}
-		if crtbToUpdate.Labels == nil {
-			crtbToUpdate.Labels = make(map[string]string)
+		if prtbToUpdate.Labels == nil {
+			prtbToUpdate.Labels = make(map[string]string)
 		}
-		crtbToUpdate.Labels[rtbCrbRbLabelsUpdated] = "true"
-		_, err := p.m.prtbs.Update(crtbToUpdate)
+		prtbToUpdate.Labels[rtbCrbRbLabelsUpdated] = "true"
+		_, err := p.m.prtbs.Update(prtbToUpdate)
 		return err
 	})
 	return retryErr

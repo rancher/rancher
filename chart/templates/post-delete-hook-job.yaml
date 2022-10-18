@@ -32,6 +32,8 @@ spec:
           env:
             - name: NAMESPACES
               value: {{ .Values.postDelete.namespaceList | join " " | quote }}
+            - name: RANCHER_NAMESPACE
+              value: {{ .Release.Namespace }}
             - name: TIMEOUT
               value: {{ .Values.postDelete.timeout | quote }}
             - name: IGNORETIMEOUTERROR

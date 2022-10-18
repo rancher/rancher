@@ -313,12 +313,7 @@ func (m *manager) compareAndUpdateNamespacedRole(role *rbacv1.Role, rt *v3.RoleT
 	return err
 }
 
-func (m *manager) gatherRoles(rt *v3.RoleTemplate, roleTemplates map[string]*v3.RoleTemplate) error {
-	err := m.gatherRolesRecurse(rt, roleTemplates)
-	if err != nil {
-		return err
-	}
-
+func ToLowerRoleTemplates(roleTemplates map[string]*v3.RoleTemplate) {
 	// clean the roles for kubeneretes: lowercase resources and verbs
 	for key, rt := range roleTemplates {
 		if rt.External {
@@ -346,7 +341,14 @@ func (m *manager) gatherRoles(rt *v3.RoleTemplate, roleTemplates map[string]*v3.
 		rt.Rules = toLowerRules
 		roleTemplates[key] = rt
 	}
+}
 
+func (m *manager) gatherRoles(rt *v3.RoleTemplate, roleTemplates map[string]*v3.RoleTemplate) error {
+	err := m.gatherRolesRecurse(rt, roleTemplates)
+	if err != nil {
+		return err
+	}
+	ToLowerRoleTemplates(roleTemplates)
 	return nil
 }
 
@@ -428,7 +430,7 @@ type createFn func(objectMeta metav1.ObjectMeta, subjects []rbacv1.Subject, role
 type listFn func(ns string, selector labels.Selector) ([]interface{}, error)
 type convertFn func(i interface{}) (string, string, []rbacv1.Subject)
 
-func (m *manager) ensureBindings(ns string, roles map[string]*v3.RoleTemplate, binding interface{}, client *objectclient.ObjectClient,
+func (m *manager) ensureBindings(ns string, roles map[string]*v3.RoleTemplate, binding metav1.Object, client *objectclient.ObjectClient,
 	create createFn, list listFn, convert convertFn) error {
 	meta, err := meta.Accessor(binding)
 	if err != nil {
@@ -476,9 +478,14 @@ func (m *manager) ensureBindings(ns string, roles map[string]*v3.RoleTemplate, b
 	for key, rb := range desiredRBs {
 		switch roleBinding := rb.(type) {
 		case *rbacv1.RoleBinding:
-			logrus.Infof("Creating roleBinding %v", key)
-			_, err := m.workload.RBAC.RoleBindings(ns).Create(roleBinding)
-			if err != nil && !apierrors.IsAlreadyExists(err) {
+			_, err := m.workload.RBAC.RoleBindings("").Controller().Lister().Get(ns, roleBinding.Name)
+			if apierrors.IsNotFound(err) {
+				logrus.Infof("Creating roleBinding %v in %s", key, ns)
+				_, err := m.workload.RBAC.RoleBindings(ns).Create(roleBinding)
+				if err != nil && !apierrors.IsAlreadyExists(err) {
+					return err
+				}
+			} else if err != nil {
 				return err
 			}
 		case *rbacv1.ClusterRoleBinding:

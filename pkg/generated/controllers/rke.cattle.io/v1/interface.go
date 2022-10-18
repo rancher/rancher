@@ -1,5 +1,5 @@
 /*
-Copyright 2021 Rancher Labs, Inc.
+Copyright 2022 Rancher Labs, Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -31,6 +31,7 @@ func init() {
 
 type Interface interface {
 	CustomMachine() CustomMachineController
+	ETCDSnapshot() ETCDSnapshotController
 	RKEBootstrap() RKEBootstrapController
 	RKEBootstrapTemplate() RKEBootstrapTemplateController
 	RKECluster() RKEClusterController
@@ -49,6 +50,9 @@ type version struct {
 
 func (c *version) CustomMachine() CustomMachineController {
 	return NewCustomMachineController(schema.GroupVersionKind{Group: "rke.cattle.io", Version: "v1", Kind: "CustomMachine"}, "custommachines", true, c.controllerFactory)
+}
+func (c *version) ETCDSnapshot() ETCDSnapshotController {
+	return NewETCDSnapshotController(schema.GroupVersionKind{Group: "rke.cattle.io", Version: "v1", Kind: "ETCDSnapshot"}, "etcdsnapshots", true, c.controllerFactory)
 }
 func (c *version) RKEBootstrap() RKEBootstrapController {
 	return NewRKEBootstrapController(schema.GroupVersionKind{Group: "rke.cattle.io", Version: "v1", Kind: "RKEBootstrap"}, "rkebootstraps", true, c.controllerFactory)

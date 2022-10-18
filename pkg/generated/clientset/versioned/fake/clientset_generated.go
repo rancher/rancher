@@ -1,5 +1,5 @@
 /*
-Copyright 2021 Rancher Labs, Inc.
+Copyright 2022 Rancher Labs, Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,6 +20,8 @@ package fake
 
 import (
 	clientset "github.com/rancher/rancher/pkg/generated/clientset/versioned"
+	catalogv1 "github.com/rancher/rancher/pkg/generated/clientset/versioned/typed/catalog.cattle.io/v1"
+	fakecatalogv1 "github.com/rancher/rancher/pkg/generated/clientset/versioned/typed/catalog.cattle.io/v1/fake"
 	provisioningv1 "github.com/rancher/rancher/pkg/generated/clientset/versioned/typed/provisioning.cattle.io/v1"
 	fakeprovisioningv1 "github.com/rancher/rancher/pkg/generated/clientset/versioned/typed/provisioning.cattle.io/v1/fake"
 	upgradev1 "github.com/rancher/rancher/pkg/generated/clientset/versioned/typed/upgrade.cattle.io/v1"
@@ -76,7 +78,15 @@ func (c *Clientset) Tracker() testing.ObjectTracker {
 	return c.tracker
 }
 
-var _ clientset.Interface = &Clientset{}
+var (
+	_ clientset.Interface = &Clientset{}
+	_ testing.FakeClient  = &Clientset{}
+)
+
+// CatalogV1 retrieves the CatalogV1Client
+func (c *Clientset) CatalogV1() catalogv1.CatalogV1Interface {
+	return &fakecatalogv1.FakeCatalogV1{Fake: &c.Fake}
+}
 
 // ProvisioningV1 retrieves the ProvisioningV1Client
 func (c *Clientset) ProvisioningV1() provisioningv1.ProvisioningV1Interface {

@@ -1,5 +1,5 @@
 /*
-Copyright 2021 Rancher Labs, Inc.
+Copyright 2022 Rancher Labs, Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -117,7 +117,7 @@ func (c *FakeClusters) UpdateStatus(ctx context.Context, cluster *provisioningca
 // Delete takes name of the cluster and deletes it. Returns an error if one occurs.
 func (c *FakeClusters) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(clustersResource, c.ns, name), &provisioningcattleiov1.Cluster{})
+		Invokes(testing.NewDeleteActionWithOptions(clustersResource, c.ns, name, opts), &provisioningcattleiov1.Cluster{})
 
 	return err
 }

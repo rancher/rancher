@@ -9,6 +9,7 @@ import (
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/rancher/pkg/auth/providerrefresh"
 	"github.com/rancher/rancher/pkg/auth/providers"
+	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
@@ -147,9 +148,7 @@ func (a *tokenAuthenticator) Authenticate(req *http.Request) (*AuthenticatorResp
 			groups = append(groups, name)
 		}
 	}
-
 	groups = append(groups, user.AllAuthenticated, "system:cattle:authenticated")
-
 	if !strings.HasPrefix(token.UserID, "system:") {
 		go a.userAuthRefresher.TriggerUserRefresh(token.UserID, false)
 	}
@@ -158,13 +157,43 @@ func (a *tokenAuthenticator) Authenticate(req *http.Request) (*AuthenticatorResp
 	authResp.User = token.UserID
 	authResp.UserPrincipal = token.UserPrincipal.Name
 	authResp.Groups = groups
-	logrus.Debugf("Auth filter calling provider to get extra info %v", token.AuthProvider)
+	authResp.Extras = getUserExtraInfo(token, u, attribs)
+	logrus.Debugf("Extras returned %v", authResp.Extras)
 
-	extraFromProvider := providers.GetUserExtraAttributes(token.AuthProvider, token)
-	if extraFromProvider != nil {
-		authResp.Extras = extraFromProvider
-	}
 	return authResp, nil
+}
+
+func getUserExtraInfo(token *v3.Token, u *v3.User, attribs *v3.UserAttribute) map[string][]string {
+	extraInfo := make(map[string][]string)
+
+	if attribs != nil && attribs.ExtraByProvider != nil && len(attribs.ExtraByProvider) != 0 {
+		if token.AuthProvider == "local" || token.AuthProvider == "" {
+			//gather all extraInfo for all external auth providers present in the userAttributes
+			for _, extra := range attribs.ExtraByProvider {
+				for key, value := range extra {
+					extraInfo[key] = append(extraInfo[key], value...)
+				}
+			}
+			return extraInfo
+		}
+		//authProvider is set in token
+		if extraInfo, ok := attribs.ExtraByProvider[token.AuthProvider]; ok {
+			return extraInfo
+		}
+	}
+
+	extraInfo = providers.GetUserExtraAttributes(token.AuthProvider, token.UserPrincipal)
+	//if principalid is not set in extra, read from user
+	if extraInfo != nil {
+		if len(extraInfo[common.UserAttributePrincipalID]) == 0 {
+			extraInfo[common.UserAttributePrincipalID] = u.PrincipalIDs
+		}
+		if len(extraInfo[common.UserAttributeUserName]) == 0 {
+			extraInfo[common.UserAttributeUserName] = []string{u.DisplayName}
+		}
+	}
+
+	return extraInfo
 }
 
 func (a *tokenAuthenticator) TokenFromRequest(req *http.Request) (*v3.Token, error) {

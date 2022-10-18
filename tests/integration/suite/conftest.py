@@ -11,7 +11,7 @@ import rancher
 from sys import platform
 from .common import random_str, wait_for_template_to_be_created
 from kubernetes.client import ApiClient, Configuration, CustomObjectsApi, \
-    ApiextensionsV1beta1Api
+    ApiextensionsV1Api
 from kubernetes.client.rest import ApiException
 from kubernetes.config.kube_config import KubeConfigLoader
 from rancher import ApiError
@@ -198,8 +198,11 @@ def user_factory(admin_mc, remove_resource):
     """
     def _create_user(globalRoleId='user'):
         admin = admin_mc.client
-        username = random_str()
-        password = random_str()
+        # User creation will fail if password < minimum (default: 12) or
+        # username == password. Since random_str concatenates a random number
+        # plus seconds since epoch, this ensures no collisions
+        username = random_str() + "username"
+        password = random_str() + "password"
         user = admin.create_user(username=username, password=password)
         remove_resource(user)
         grb = admin.create_global_role_binding(
@@ -407,7 +410,7 @@ def raw_remove_custom_resource(admin_mc, request):
     even if the test fails. This should only be used if remove_resource, which
     exclusively uses the rancher api, cannot be used"""
     def _cleanup(resource):
-        k8s_v1beta1_client = ApiextensionsV1beta1Api(admin_mc.k8s_client)
+        k8s_v1_client = ApiextensionsV1Api(admin_mc.k8s_client)
         k8s_client = CustomObjectsApi(admin_mc.k8s_client)
 
         def clean():
@@ -423,11 +426,12 @@ def raw_remove_custom_resource(admin_mc, request):
             group = api_version_parts[0]
             version = api_version_parts[1]
 
-            crd_list = k8s_v1beta1_client.\
+            crd_list = k8s_v1_client.\
                 list_custom_resource_definition().items
+
             crd = list(filter(lambda x: x.spec.names.kind == kind and
                               x.spec.group == group and
-                              x.spec.version == version,
+                              x.spec.versions[0].name == version,
                               crd_list))[0]
             try:
                 k8s_client.delete_namespaced_custom_object(

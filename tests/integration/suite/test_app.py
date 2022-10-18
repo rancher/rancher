@@ -40,56 +40,6 @@ def test_app_mysql(admin_pc, admin_mc):
     wait_for_workload(client, ns.name, count=1)
 
 
-def test_app_wordpress(admin_pc, admin_mc):
-    client = admin_pc.client
-    name = random_str()
-
-    ns = admin_pc.cluster.client.create_namespace(name=random_str(),
-                                                  projectId=admin_pc.
-                                                  project.id)
-    wait_for_template_to_be_created(admin_mc.client, "library")
-    answers = {
-        "defaultImage": "true",
-        "externalDatabase.database": "",
-        "externalDatabase.host": "",
-        "externalDatabase.password": "",
-        "externalDatabase.port": "3306",
-        "externalDatabase.user": "",
-        "image.repository": "bitnami/wordpress",
-        "image.tag": "5.2.3",
-        "ingress.enabled": "true",
-        "ingress.hosts[0].name": "xip.io",
-        "mariadb.enabled": "true",
-        "mariadb.image.repository": "bitnami/mariadb",
-        "mariadb.image.tag": "10.1.32",
-        "mariadb.mariadbDatabase": "wordpress",
-        "mariadb.mariadbPassword": "",
-        "mariadb.mariadbUser": "wordpress",
-        "mariadb.persistence.enabled": "false",
-        "mariadb.persistence.size": "8Gi",
-        "mariadb.persistence.storageClass": "",
-        "nodePorts.http": "",
-        "nodePorts.https": "",
-        "persistence.enabled": "false",
-        "persistence.size": "10Gi",
-        "persistence.storageClass": "",
-        "serviceType": "NodePort",
-        "wordpressEmail": "user@example.com",
-        "wordpressPassword": "",
-        "wordpressUsername": "user"
-    }
-    external_id = "catalog://?catalog=library&template=wordpress" \
-                  "&version=7.3.8&namespace=cattle-global-data"
-    client.create_app(
-        name=name,
-        externalId=external_id,
-        targetNamespace=ns.name,
-        projectId=admin_pc.project.id,
-        answers=answers
-    )
-    wait_for_workload(client, ns.name, count=2)
-
-
 @pytest.mark.skip(reason="istio disabled")
 def test_app_istio(admin_cc, admin_pc, admin_mc):
     client = admin_pc.client
@@ -361,23 +311,27 @@ def test_app_create_validation(admin_mc, admin_pc, custom_catalog,
         }]
     }
 
-    set_server_version(client, "2.4.2-beta2")
+    server_version = "2.4.2-beta2"
+    set_server_version(client, server_version)
 
     # First try requires a min of 2.5.0 so an error should be returned
     with pytest.raises(ApiError) as e:
         app1 = admin_pc.client.create_app(app_data)
         remove_resource(app1)
     assert e.value.error.status == 422
-    assert e.value.error.message == 'rancher min version not met'
+    assert 'incompatible rancher version [%s] for template' % server_version \
+        in e.value.error.message
 
-    set_server_version(client, "2.7.1")
+    server_version = "2.7.1"
+    set_server_version(client, server_version)
 
     # Second try requires a max of 2.7.0 so an error should be returned
     with pytest.raises(ApiError) as e:
         app1 = admin_pc.client.create_app(app_data)
         remove_resource(app1)
     assert e.value.error.status == 422
-    assert e.value.error.message == 'rancher max version exceeded'
+    assert 'incompatible rancher version [%s] for template' % server_version \
+        in e.value.error.message
 
     set_server_version(client, "2.5.1-rc4")
 
@@ -437,7 +391,8 @@ def test_app_update_validation(admin_mc, admin_pc, custom_catalog,
         }]
     }
 
-    set_server_version(client, "2.4.2-rc3")
+    server_version = "2.4.2-rc3"
+    set_server_version(client, server_version)
 
     # Launch the app version 2.3.1 with rancher 2.4.2-rc3
     app1 = admin_pc.client.create_app(app_data)
@@ -457,15 +412,18 @@ def test_app_update_validation(admin_mc, admin_pc, custom_catalog,
     with pytest.raises(ApiError) as e:
         app1 = client.action(**upgrade_dict)
     assert e.value.error.status == 422
-    assert e.value.error.message == 'rancher min version not met'
+    assert 'incompatible rancher version [%s] for template' % server_version \
+        in e.value.error.message
 
-    set_server_version(client, "2.7.1")
+    server_version = "2.7.1"
+    set_server_version(client, server_version)
 
     # # Second try requires a max of 2.7.0 so an error should be returned
     with pytest.raises(ApiError) as e:
         app1 = client.action(**upgrade_dict)
     assert e.value.error.status == 422
-    assert e.value.error.message == 'rancher max version exceeded'
+    assert 'incompatible rancher version [%s] for template' % server_version \
+        in e.value.error.message
 
 
 @pytest.mark.nonparallel
@@ -573,23 +531,25 @@ def test_app_rollback_validation(admin_mc, admin_pc, custom_catalog,
         'forceUpgrade': False,
     }
 
-    set_server_version(client, "2.6.1")
+    server_version = "2.6.1"
+    set_server_version(client, server_version)
 
     # Rollback requires a max of 2.6.0 so an error should be returned
     with pytest.raises(ApiError) as e:
         client.action(**rollback_dict)
     assert e.value.error.status == 422
-    assert e.value.error.message == 'rancher max version exceeded'
+    assert 'incompatible rancher version [%s] for template' % server_version \
+        in e.value.error.message
 
-    set_server_version(client, "2.0.0-rc3")
+    server_version = "2.0.0-rc3"
+    set_server_version(client, server_version)
 
     # Second try requires a min of 2.4.1 so an error should be returned
     with pytest.raises(ApiError) as e:
         client.action(**rollback_dict)
-
-    msg = e.value.error
-    assert e.value.error.message == 'rancher min version not met', msg
     assert e.value.error.status == 422
+    assert 'incompatible rancher version [%s] for template' % server_version \
+        in e.value.error.message
 
 
 def test_app_has_helmversion(admin_pc, admin_mc, remove_resource):

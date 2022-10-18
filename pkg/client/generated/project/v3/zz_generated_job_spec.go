@@ -21,6 +21,7 @@ const (
 	JobSpecFieldImagePullSecrets              = "imagePullSecrets"
 	JobSpecFieldJobConfig                     = "jobConfig"
 	JobSpecFieldNodeID                        = "nodeId"
+	JobSpecFieldOS                            = "os"
 	JobSpecFieldObjectMeta                    = "metadata"
 	JobSpecFieldOverhead                      = "overhead"
 	JobSpecFieldPreemptionPolicy              = "preemptionPolicy"
@@ -66,6 +67,7 @@ type JobSpec struct {
 	ImagePullSecrets              []LocalObjectReference         `json:"imagePullSecrets,omitempty" yaml:"imagePullSecrets,omitempty"`
 	JobConfig                     *JobConfig                     `json:"jobConfig,omitempty" yaml:"jobConfig,omitempty"`
 	NodeID                        string                         `json:"nodeId,omitempty" yaml:"nodeId,omitempty"`
+	OS                            *PodOS                         `json:"os,omitempty" yaml:"os,omitempty"`
 	ObjectMeta                    *ObjectMeta                    `json:"metadata,omitempty" yaml:"metadata,omitempty"`
 	Overhead                      map[string]string              `json:"overhead,omitempty" yaml:"overhead,omitempty"`
 	PreemptionPolicy              string                         `json:"preemptionPolicy,omitempty" yaml:"preemptionPolicy,omitempty"`

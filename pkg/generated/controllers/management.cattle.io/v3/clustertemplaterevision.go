@@ -1,5 +1,5 @@
 /*
-Copyright 2021 Rancher Labs, Inc.
+Copyright 2022 Rancher Labs, Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -25,7 +25,10 @@ import (
 	"github.com/rancher/lasso/pkg/client"
 	"github.com/rancher/lasso/pkg/controller"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/wrangler/pkg/apply"
+	"github.com/rancher/wrangler/pkg/condition"
 	"github.com/rancher/wrangler/pkg/generic"
+	"github.com/rancher/wrangler/pkg/kv"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -55,7 +58,7 @@ type ClusterTemplateRevisionController interface {
 type ClusterTemplateRevisionClient interface {
 	Create(*v3.ClusterTemplateRevision) (*v3.ClusterTemplateRevision, error)
 	Update(*v3.ClusterTemplateRevision) (*v3.ClusterTemplateRevision, error)
-
+	UpdateStatus(*v3.ClusterTemplateRevision) (*v3.ClusterTemplateRevision, error)
 	Delete(namespace, name string, options *metav1.DeleteOptions) error
 	Get(namespace, name string, options metav1.GetOptions) (*v3.ClusterTemplateRevision, error)
 	List(namespace string, opts metav1.ListOptions) (*v3.ClusterTemplateRevisionList, error)
@@ -184,6 +187,11 @@ func (c *clusterTemplateRevisionController) Update(obj *v3.ClusterTemplateRevisi
 	return result, c.client.Update(context.TODO(), obj.Namespace, obj, result, metav1.UpdateOptions{})
 }
 
+func (c *clusterTemplateRevisionController) UpdateStatus(obj *v3.ClusterTemplateRevision) (*v3.ClusterTemplateRevision, error) {
+	result := &v3.ClusterTemplateRevision{}
+	return result, c.client.UpdateStatus(context.TODO(), obj.Namespace, obj, result, metav1.UpdateOptions{})
+}
+
 func (c *clusterTemplateRevisionController) Delete(namespace, name string, options *metav1.DeleteOptions) error {
 	if options == nil {
 		options = &metav1.DeleteOptions{}
@@ -253,4 +261,116 @@ func (c *clusterTemplateRevisionCache) GetByIndex(indexName, key string) (result
 		result = append(result, obj.(*v3.ClusterTemplateRevision))
 	}
 	return result, nil
+}
+
+type ClusterTemplateRevisionStatusHandler func(obj *v3.ClusterTemplateRevision, status v3.ClusterTemplateRevisionStatus) (v3.ClusterTemplateRevisionStatus, error)
+
+type ClusterTemplateRevisionGeneratingHandler func(obj *v3.ClusterTemplateRevision, status v3.ClusterTemplateRevisionStatus) ([]runtime.Object, v3.ClusterTemplateRevisionStatus, error)
+
+func RegisterClusterTemplateRevisionStatusHandler(ctx context.Context, controller ClusterTemplateRevisionController, condition condition.Cond, name string, handler ClusterTemplateRevisionStatusHandler) {
+	statusHandler := &clusterTemplateRevisionStatusHandler{
+		client:    controller,
+		condition: condition,
+		handler:   handler,
+	}
+	controller.AddGenericHandler(ctx, name, FromClusterTemplateRevisionHandlerToHandler(statusHandler.sync))
+}
+
+func RegisterClusterTemplateRevisionGeneratingHandler(ctx context.Context, controller ClusterTemplateRevisionController, apply apply.Apply,
+	condition condition.Cond, name string, handler ClusterTemplateRevisionGeneratingHandler, opts *generic.GeneratingHandlerOptions) {
+	statusHandler := &clusterTemplateRevisionGeneratingHandler{
+		ClusterTemplateRevisionGeneratingHandler: handler,
+		apply:                                    apply,
+		name:                                     name,
+		gvk:                                      controller.GroupVersionKind(),
+	}
+	if opts != nil {
+		statusHandler.opts = *opts
+	}
+	controller.OnChange(ctx, name, statusHandler.Remove)
+	RegisterClusterTemplateRevisionStatusHandler(ctx, controller, condition, name, statusHandler.Handle)
+}
+
+type clusterTemplateRevisionStatusHandler struct {
+	client    ClusterTemplateRevisionClient
+	condition condition.Cond
+	handler   ClusterTemplateRevisionStatusHandler
+}
+
+func (a *clusterTemplateRevisionStatusHandler) sync(key string, obj *v3.ClusterTemplateRevision) (*v3.ClusterTemplateRevision, error) {
+	if obj == nil {
+		return obj, nil
+	}
+
+	origStatus := obj.Status.DeepCopy()
+	obj = obj.DeepCopy()
+	newStatus, err := a.handler(obj, obj.Status)
+	if err != nil {
+		// Revert to old status on error
+		newStatus = *origStatus.DeepCopy()
+	}
+
+	if a.condition != "" {
+		if errors.IsConflict(err) {
+			a.condition.SetError(&newStatus, "", nil)
+		} else {
+			a.condition.SetError(&newStatus, "", err)
+		}
+	}
+	if !equality.Semantic.DeepEqual(origStatus, &newStatus) {
+		if a.condition != "" {
+			// Since status has changed, update the lastUpdatedTime
+			a.condition.LastUpdated(&newStatus, time.Now().UTC().Format(time.RFC3339))
+		}
+
+		var newErr error
+		obj.Status = newStatus
+		newObj, newErr := a.client.UpdateStatus(obj)
+		if err == nil {
+			err = newErr
+		}
+		if newErr == nil {
+			obj = newObj
+		}
+	}
+	return obj, err
+}
+
+type clusterTemplateRevisionGeneratingHandler struct {
+	ClusterTemplateRevisionGeneratingHandler
+	apply apply.Apply
+	opts  generic.GeneratingHandlerOptions
+	gvk   schema.GroupVersionKind
+	name  string
+}
+
+func (a *clusterTemplateRevisionGeneratingHandler) Remove(key string, obj *v3.ClusterTemplateRevision) (*v3.ClusterTemplateRevision, error) {
+	if obj != nil {
+		return obj, nil
+	}
+
+	obj = &v3.ClusterTemplateRevision{}
+	obj.Namespace, obj.Name = kv.RSplit(key, "/")
+	obj.SetGroupVersionKind(a.gvk)
+
+	return nil, generic.ConfigureApplyForObject(a.apply, obj, &a.opts).
+		WithOwner(obj).
+		WithSetID(a.name).
+		ApplyObjects()
+}
+
+func (a *clusterTemplateRevisionGeneratingHandler) Handle(obj *v3.ClusterTemplateRevision, status v3.ClusterTemplateRevisionStatus) (v3.ClusterTemplateRevisionStatus, error) {
+	if !obj.DeletionTimestamp.IsZero() {
+		return status, nil
+	}
+
+	objs, newStatus, err := a.ClusterTemplateRevisionGeneratingHandler(obj, status)
+	if err != nil {
+		return newStatus, err
+	}
+
+	return newStatus, generic.ConfigureApplyForObject(a.apply, obj, &a.opts).
+		WithOwner(obj).
+		WithSetID(a.name).
+		ApplyObjects(objs...)
 }

@@ -71,6 +71,7 @@ type Config struct {
 	CisConfigs                               map[string]managementClient.CisConfig                               `json:"cisConfigs,omitempty" yaml:"cisConfigs,omitempty"`
 	CisBenchmarkVersions                     map[string]managementClient.CisBenchmarkVersion                     `json:"cisBenchmarkVersions,omitempty" yaml:"cisBenchmarkVersions,omitempty"`
 	FleetWorkspaces                          map[string]managementClient.FleetWorkspace                          `json:"fleetWorkspaces,omitempty" yaml:"fleetWorkspaces,omitempty"`
+	RancherUserNotifications                 map[string]managementClient.RancherUserNotification                 `json:"rancherUserNotifications,omitempty" yaml:"rancherUserNotifications,omitempty"`
 
 	// Cluster Client
 	Namespaces        map[string]clusterClient.Namespace        `json:"namespaces,omitempty" yaml:"namespaces,omitempty"`

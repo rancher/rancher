@@ -139,7 +139,7 @@ In a web browser, go to the DNS name that forwards traffic to your load balancer
 
 Doesn’t work? Take a look at the [Troubleshooting Page](https://rancher.com/docs/rancher/v2.x/en/installation/options/troubleshooting/)
 
-***All of these intructions are defined in detailed in the [Rancher Documentation](https://rancher.com/docs/rancher/v2.x/en/installation/k8s-install/helm-rancher/).***
+***All of these instructions are defined in detailed in the [Rancher Documentation](https://rancher.com/docs/rancher/v2.x/en/installation/k8s-install/helm-rancher/).***
 
 ### Helm Chart Options for Kubernetes Installations
 
@@ -178,6 +178,7 @@ Specify each parameter using the `--set key=value[,key=value]` argument to `helm
 | `extraEnv`                     | []                                                    | ***list*** - set additional environment variables for Rancher Note: *Available as of v2.2.0*                                                                                                                 |
 | `imagePullSecrets`             | []                                                    | ***list*** - list of names of Secret resource containing private registry credentials                                                                                                                        |
 | `ingress.enabled`              | true                                                  | ***bool*** - install ingress resource
+| `ingress.ingressClassName`     | " "                                                   | ***string*** - class name of ingress if not set manually or by the ingress controller's defaults
 | `ingress.includeDefaultExtraAnnotations` | true                                        | ***bool*** - Add default nginx annotations
 | `ingress.extraAnnotations`     | {}                                                    | ***map*** - additional annotations to customize the ingress                                                                                                                                                  |
 | `ingress.configurationSnippet` | " "                                                   | ***string*** - Add additional Nginx configuration. Can be used for proxy configuration. Note: *Available as of v2.0.15, v2.1.10 and v2.2.4*                                                                  |

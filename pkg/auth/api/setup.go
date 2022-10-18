@@ -8,6 +8,7 @@ import (
 	"github.com/rancher/norman/pkg/subscribe"
 	"github.com/rancher/norman/store/crd"
 	"github.com/rancher/norman/types"
+	"github.com/rancher/rancher/pkg/api/scheme"
 	"github.com/rancher/rancher/pkg/auth/api/user"
 	"github.com/rancher/rancher/pkg/auth/principals"
 	"github.com/rancher/rancher/pkg/auth/providerrefresh"
@@ -59,7 +60,7 @@ func newSchemas(ctx context.Context, apiContext *config.ScaledContext) (*types.S
 	subscribe.Register(&managementschema.Version, schemas)
 
 	factory := &crd.Factory{ClientGetter: apiContext.ClientGetter}
-	factory.BatchCreateCRDs(ctx, config.ManagementStorageContext, schemas, &managementschema.Version,
+	factory.BatchCreateCRDs(ctx, config.ManagementStorageContext, scheme.Scheme, schemas, &managementschema.Version,
 		client.AuthConfigType,
 		client.GroupMemberType,
 		client.GroupType,

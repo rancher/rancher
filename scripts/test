@@ -4,54 +4,85 @@ set -e
 cleanup()
 {
     EXIT=$?
-    set +e
+    set +ex
     echo Stopping rancher server
-    kill $PID
-    wait $PID
+    kill $RANCHER_RUN_PID
+    wait $RANCHER_RUN_PID
+    if [ $PID != -1 ]; then
+      kill $PID
+      wait $PID
+    fi
     return $EXIT
 }
+
+# skipping tests for s390x since k3s doesn't support s390x yet
+if [ ${ARCH} == s390x ]; then
+    exit 0
+fi
 
 cd $(dirname $0)/..
 
 #[ "${ARCH}" == "amd64" ] && RACE=-race
 go test -cover -tags=test ./pkg/...
 
-if [ ${ARCH} == arm64 ]; then
-    export ETCD_UNSUPPORTED_ARCH=arm64
+if [ ${ARCH} == arm64 ] || [ ${ARCH} == s390x ]; then
+    export ETCD_UNSUPPORTED_ARCH=${ARCH}
 fi
 
-echo Starting rancher server
+echo Starting rancher server for test
 touch /tmp/rancher.log
-./scripts/run >/tmp/rancher.log 2>&1 &
-PID=$!
-trap cleanup exit
+
+run_rancher()
+{
+    while sleep 2; do
+        if [ "$PID" != "-1" ] && [ ! -e /proc/$PID ]; then
+            echo Rancher died
+            echo Rancher logs were
+            tail -n 25 /tmp/rancher.log
+            echo K3s logs were:
+            tail -n 25 build/testdata/k3s.log
+            if [ "$INT_TESTS_STARTED" = "true" ]; then
+              echo Rancher died after tests started, aborting
+              exit 1
+            fi
+            set +e
+            echo Attempting to kill K3s
+            pkill -e k3s
+            set -e
+            PID=-1
+            sleep 5
+        fi
+        if [ "$PID" = "-1" ]; then
+          echo Starting rancher server using run
+          ./scripts/run >/tmp/rancher.log 2>&1 &
+          PID=$!
+        fi
+        sleep 2
+    done
+}
 
 # uncomment to get startup logs. Don't leave them on because it slows drone down too
 # much
 #tail -F /tmp/rancher.log &
 #TPID=$!
+PID=-1
+run_rancher &
+RANCHER_RUN_PID=$!
+trap cleanup exit
+
+echo Sleeping for 5 seconds before checking Rancher health
+sleep 5
+
 while ! curl -sf http://localhost:8080/ping; do
-    if [ ! -e /proc/$PID ]; then
-        echo Rancher died
-        cat /tmp/rancher.log
-        ./scripts/run >/tmp/rancher.log 2>&1 &
-        PID=$!
-    fi
     sleep 2
 done
 while ! kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml rollout status -w -n cattle-system deploy/rancher-webhook; do
-    if [ ! -e /proc/$PID ]; then
-        echo Rancher died
-        cat /tmp/rancher.log
-        ./scripts/run >/tmp/rancher.log 2>&1 &
-        PID=$!
-    fi
     sleep 2
 done
 #kill $TPID
 
 echo Running tests
-
+INT_TESTS_STARTED=true
 cd ./tests/integration
 tox -e rancher -- -m "not nonparallel" -n $(nproc)
 tox -e rancher -- -m nonparallel

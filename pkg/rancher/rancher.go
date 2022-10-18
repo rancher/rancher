@@ -5,7 +5,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
+	"strings"
 
+	"github.com/Masterminds/semver/v3"
 	"github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
 	responsewriter "github.com/rancher/apiserver/pkg/middleware"
@@ -122,6 +125,9 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 		if err := setupRancherService(ctx, restConfig, opts.HTTPSListenPort); err != nil {
 			return nil, err
 		}
+		if err := bumpRancherWebhookIfNecessary(ctx, restConfig); err != nil {
+			return nil, err
+		}
 	}
 
 	wranglerContext.MultiClusterManager = newMCM(wranglerContext, opts)
@@ -131,7 +137,7 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 		return nil, err
 	}
 
-	if err := features.MigrateFeatures(wranglerContext.Mgmt.Feature(), wranglerContext.CRD.CustomResourceDefinition()); err != nil {
+	if err := features.MigrateFeatures(wranglerContext.Mgmt.Feature(), wranglerContext.CRD.CustomResourceDefinition(), wranglerContext.Mgmt.Cluster()); err != nil {
 		return nil, fmt.Errorf("migrating features: %w", err)
 	}
 	features.InitializeFeatures(wranglerContext.Mgmt.Feature(), opts.Features)
@@ -175,7 +181,7 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 		return nil, err
 	}
 
-	clusterProxy, err := proxy.NewProxyMiddleware(wranglerContext.K8s.AuthorizationV1().SubjectAccessReviews(),
+	clusterProxy, err := proxy.NewProxyMiddleware(wranglerContext.K8s.AuthorizationV1(),
 		wranglerContext.TunnelServer.Dialer,
 		wranglerContext.Mgmt.Cluster().Cache(),
 		localClusterEnabled(opts),
@@ -204,6 +210,7 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 		Handler: responsewriter.Chain{
 			auth.SetXAPICattleAuthHeader,
 			responsewriter.ContentTypeOptions,
+			responsewriter.NoCache,
 			websocket.NewWebsocketHandler,
 			proxy.RewriteLocalCluster,
 			clusterProxy,
@@ -246,11 +253,7 @@ func (r *Rancher) Start(ctx context.Context) error {
 			return err
 		}
 
-		if err := forceUpgradeLogout(r.Wrangler.Core.ConfigMap(), r.Wrangler.Mgmt.Token(), "v2.6.0"); err != nil {
-			return err
-		}
-
-		return forceSystemAndDefaultProjectCreation(r.Wrangler.Core.ConfigMap(), r.Wrangler.Mgmt.Cluster())
+		return runMigrations(r.Wrangler)
 	})
 
 	if err := r.authServer.Start(ctx, false); err != nil {
@@ -438,6 +441,54 @@ func setupRancherService(ctx context.Context, restConfig *rest.Config, httpsList
 			return fmt.Errorf("setupRancherService error refreshing endpoint: %w", err)
 		}
 	}
+	return nil
+}
+
+// bumpRancherServiceVersion bumps the version of rancher-webhook if it is detected that the version is less than
+// v0.2.2-alpha1. This is because the version of rancher-webhook less than v0.2.2-alpha1 does not support Kubernetes v1.22+
+// This should only be called when Rancher is run in a Docker container because the Kubernetes version and Rancher version
+// are bumped at the same time. In a Kubernetes cluster, usually the Rancher version is bumped when the cluster is upgraded.
+func bumpRancherWebhookIfNecessary(ctx context.Context, restConfig *rest.Config) error {
+	webhookVersionParts := strings.Split(os.Getenv("CATTLE_RANCHER_WEBHOOK_MIN_VERSION"), "+up")
+	if len(webhookVersionParts) != 2 {
+		return nil
+	} else if !strings.HasPrefix(webhookVersionParts[1], "v") {
+		webhookVersionParts[1] = "v" + webhookVersionParts[1]
+	}
+
+	clientset, err := kubernetes.NewForConfig(restConfig)
+	if err != nil {
+		return fmt.Errorf("error setting up kubernetes clientset: %w", err)
+	}
+
+	rancherWebhookDeployment, err := clientset.AppsV1().Deployments(namespace.System).Get(ctx, "rancher-webhook", metav1.GetOptions{})
+	if err != nil {
+		if k8serror.IsNotFound(err) {
+			return nil
+		}
+		return err
+	}
+
+	for i, c := range rancherWebhookDeployment.Spec.Template.Spec.Containers {
+		imageVersionParts := strings.Split(c.Image, ":")
+		if c.Name != "rancher-webhook" || len(imageVersionParts) != 2 {
+			continue
+		}
+
+		semVer, err := semver.NewVersion(strings.TrimPrefix(imageVersionParts[1], "v"))
+		if err != nil {
+			continue
+		}
+		if semVer.LessThan(semver.MustParse("0.2.2-alpha1")) {
+			rancherWebhookDeployment = rancherWebhookDeployment.DeepCopy()
+			c.Image = fmt.Sprintf("%s:%s", imageVersionParts[0], webhookVersionParts[1])
+			rancherWebhookDeployment.Spec.Template.Spec.Containers[i] = c
+
+			_, err = clientset.AppsV1().Deployments(namespace.System).Update(ctx, rancherWebhookDeployment, metav1.UpdateOptions{})
+			return err
+		}
+	}
+
 	return nil
 }
 

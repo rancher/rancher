@@ -42,7 +42,7 @@ func init() {
 	resource.Put(NamespaceGroupVersionResource)
 }
 
-// Deprecated use v1.Namespace instead
+// Deprecated: use v1.Namespace instead
 type Namespace = v1.Namespace
 
 func NewNamespace(namespace, name string, obj v1.Namespace) *v1.Namespace {

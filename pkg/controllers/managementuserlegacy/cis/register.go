@@ -11,10 +11,22 @@ import (
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 // Register initializes the controllers and registers
 func Register(ctx context.Context, userContext *config.UserContext) {
+	starter := userContext.DeferredStart(ctx, func(ctx context.Context) error {
+		registerDeferred(ctx, userContext)
+		return nil
+	})
+
+	clusterScans := userContext.Management.Management.ClusterScans("")
+	clusterScans.AddClusterScopedHandler(ctx, "cis-deferred", userContext.ClusterName, func(key string, obj *v32.ClusterScan) (runtime.Object, error) {
+		return obj, starter()
+	})
+}
+func registerDeferred(ctx context.Context, userContext *config.UserContext) {
 	clusterName := userContext.ClusterName
 	clusterClient := userContext.Management.Management.Clusters(metav1.NamespaceAll)
 	var cluster *v3.Cluster

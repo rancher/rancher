@@ -1,5 +1,5 @@
 /*
-Copyright 2021 Rancher Labs, Inc.
+Copyright 2022 Rancher Labs, Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,11 +20,11 @@ package cluster
 
 import (
 	"github.com/rancher/lasso/pkg/controller"
-	v1alpha4 "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1alpha4"
+	v1beta1 "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta1"
 )
 
 type Interface interface {
-	V1alpha4() v1alpha4.Interface
+	V1beta1() v1beta1.Interface
 }
 
 type group struct {
@@ -38,6 +38,6 @@ func New(controllerFactory controller.SharedControllerFactory) Interface {
 	}
 }
 
-func (g *group) V1alpha4() v1alpha4.Interface {
-	return v1alpha4.New(g.controllerFactory)
+func (g *group) V1beta1() v1beta1.Interface {
+	return v1beta1.New(g.controllerFactory)
 }

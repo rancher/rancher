@@ -8,6 +8,7 @@ import (
 	"io"
 	"io/ioutil"
 	"net/url"
+	"strings"
 	"sync"
 
 	"github.com/Masterminds/semver/v3"
@@ -205,20 +206,46 @@ func (c *Manager) filterReleases(index *repo.IndexFile, k8sVersion *semver.Versi
 		logrus.Errorf("failed to parse server version %s: %v", settings.ServerVersion.Get(), err)
 		return index
 	}
+	rancherVersionWithoutPrerelease, err := rancherVersion.SetPrerelease("")
+	if err != nil {
+		logrus.Errorf("failed to remove prerelease from %s: %v", settings.ServerVersion.Get(), err)
+		return index
+	}
 
 	for rel, versions := range index.Entries {
 		newVersions := make([]*repo.ChartVersion, 0, len(versions))
 		for _, version := range versions {
 			if constraintStr, ok := version.Annotations["catalog.cattle.io/rancher-version"]; ok {
 				if constraint, err := semver.NewConstraint(constraintStr); err == nil {
-					if !constraint.Check(rancherVersion) {
+					satisfiesConstraint, errs := constraint.Validate(rancherVersion)
+					// Check if the reason for failure is because it is ignroing prereleases
+					constraintDoesNotMatchPrereleases := false
+					for _, err := range errs {
+						// Comes from error in https://github.com/Masterminds/semver/blob/60c7ae8a99210a90a9457d5de5f6dcbc4dab8e64/constraints.go#L93
+						if strings.Contains(err.Error(), "the constraint is only looking for release versions") {
+							constraintDoesNotMatchPrereleases = true
+							break
+						}
+					}
+					if constraintDoesNotMatchPrereleases {
+						satisfiesConstraint = constraint.Check(&rancherVersionWithoutPrerelease)
+					}
+					if !satisfiesConstraint {
 						continue
 					}
 				} else {
 					logrus.Errorf("failed to parse constraint version %s: %v", constraintStr, err)
 				}
 			}
-
+			if constraintStr, ok := version.Annotations["catalog.cattle.io/kube-version"]; ok {
+				if constraint, err := semver.NewConstraint(constraintStr); err == nil {
+					if !constraint.Check(k8sVersion) {
+						continue
+					}
+				} else {
+					logrus.Errorf("failed to parse constraint kube-version %s from annotation: %v", constraintStr, err)
+				}
+			}
 			if version.KubeVersion != "" {
 				if constraint, err := semver.NewConstraint(version.KubeVersion); err == nil {
 					if !constraint.Check(k8sVersion) {
@@ -267,7 +294,7 @@ func (c *Manager) Icon(namespace, name, chartName, version string) (io.ReadClose
 		return nil, "", err
 	}
 
-	return helmhttp.Icon(secret, repo.status.URL, repo.spec.CABundle, repo.spec.InsecureSkipTLSverify, chart)
+	return helmhttp.Icon(secret, repo.status.URL, repo.spec.CABundle, repo.spec.InsecureSkipTLSverify, repo.spec.DisableSameOriginCheck, chart)
 }
 
 func isHTTP(iconURL string) bool {
@@ -300,7 +327,7 @@ func (c *Manager) Chart(namespace, name, chartName, version string, skipFilter b
 		return nil, err
 	}
 
-	return helmhttp.Chart(secret, repo.status.URL, repo.spec.CABundle, repo.spec.InsecureSkipTLSverify, chart)
+	return helmhttp.Chart(secret, repo.status.URL, repo.spec.CABundle, repo.spec.InsecureSkipTLSverify, repo.spec.DisableSameOriginCheck, chart)
 }
 
 func (c *Manager) Info(namespace, name, chartName, version string) (*types.ChartInfo, error) {

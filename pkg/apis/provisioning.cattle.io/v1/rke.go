@@ -3,6 +3,7 @@ package v1
 import (
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
@@ -13,6 +14,8 @@ type RKEMachinePool struct {
 	EtcdRole                     bool                         `json:"etcdRole,omitempty"`
 	ControlPlaneRole             bool                         `json:"controlPlaneRole,omitempty"`
 	WorkerRole                   bool                         `json:"workerRole,omitempty"`
+	DrainBeforeDelete            bool                         `json:"drainBeforeDelete,omitempty"`
+	DrainBeforeDeleteTimeout     *metav1.Duration             `json:"drainBeforeDeleteTimeout,omitempty"`
 	NodeConfig                   *corev1.ObjectReference      `json:"machineConfigRef,omitempty" wrangler:"required"`
 	Name                         string                       `json:"name,omitempty" wrangler:"required"`
 	DisplayName                  string                       `json:"displayName,omitempty"`
@@ -20,6 +23,11 @@ type RKEMachinePool struct {
 	RollingUpdate                *RKEMachinePoolRollingUpdate `json:"rollingUpdate,omitempty"`
 	MachineDeploymentLabels      map[string]string            `json:"machineDeploymentLabels,omitempty"`
 	MachineDeploymentAnnotations map[string]string            `json:"machineDeploymentAnnotations,omitempty"`
+	NodeStartupTimeout           *metav1.Duration             `json:"nodeStartupTimeout,omitempty"`
+	UnhealthyNodeTimeout         *metav1.Duration             `json:"unhealthyNodeTimeout,omitempty"`
+	MaxUnhealthy                 *string                      `json:"maxUnhealthy,omitempty"`
+	UnhealthyRange               *string                      `json:"unhealthyRange,omitempty"`
+	MachineOS                    string                       `json:"machineOS,omitempty"`
 }
 
 type RKEMachinePoolRollingUpdate struct {
@@ -55,11 +63,19 @@ type RKEMachinePoolRollingUpdate struct {
 	MaxSurge *intstr.IntOrString `json:"maxSurge,omitempty"`
 }
 
+// Note: if you add new fields to the RKEConfig, please ensure that you check
+// `pkg/controllers/provisioningv2/rke2/provisioningcluster/template.go` file and
+// drop the fields when saving a copy of the cluster spec on etcd snapshots, otherwise,
+// operations using the new fields will cause unnecessary plan thrashing.
+
 type RKEConfig struct {
 	rkev1.RKEClusterSpecCommon
 
-	ETCDSnapshotCreate  *rkev1.ETCDSnapshotCreate  `json:"etcdSnapshotCreate,omitempty"`
-	ETCDSnapshotRestore *rkev1.ETCDSnapshotRestore `json:"etcdSnapshotRestore,omitempty"`
-	MachinePools        []RKEMachinePool           `json:"machinePools,omitempty"`
-	InfrastructureRef   *corev1.ObjectReference    `json:"infrastructureRef,omitempty"`
+	ETCDSnapshotCreate   *rkev1.ETCDSnapshotCreate   `json:"etcdSnapshotCreate,omitempty"`
+	ETCDSnapshotRestore  *rkev1.ETCDSnapshotRestore  `json:"etcdSnapshotRestore,omitempty"`
+	RotateCertificates   *rkev1.RotateCertificates   `json:"rotateCertificates,omitempty"`
+	RotateEncryptionKeys *rkev1.RotateEncryptionKeys `json:"rotateEncryptionKeys,omitempty"`
+
+	MachinePools      []RKEMachinePool        `json:"machinePools,omitempty"`
+	InfrastructureRef *corev1.ObjectReference `json:"infrastructureRef,omitempty"`
 }

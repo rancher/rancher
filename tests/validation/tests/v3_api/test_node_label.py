@@ -13,6 +13,7 @@ from .common import get_user_client
 from .common import get_user_client_and_cluster
 from .common import execute_kubectl_cmd
 from .common import if_test_rbac
+from .common import LINODE_ACCESSKEY
 from .common import random_name
 from .common import random_test_name
 from .common import rbac_get_user_token_by_role
@@ -20,7 +21,6 @@ from .common import validate_cluster_state
 from .common import wait_for_condition
 from .conftest import wait_for_cluster_delete
 from rancher import ApiError
-from .test_rke_cluster_provisioning import DO_ACCESSKEY
 from .test_rke_cluster_provisioning import evaluate_clustername
 from .test_rke_cluster_provisioning import get_custom_host_registration_cmd
 from .test_rke_cluster_provisioning import HOST_NAME
@@ -31,7 +31,7 @@ from lib.aws import AmazonWebServices
 
 cluster_detail = {"cluster": None, "client": None}
 cluster_node_template = {"cluster": None, "node_pools": None,
-                         "node_template": None, "do_cloud_credential": None,
+                         "node_template": None, "linode_cloud_credential": None,
                          "label_value": None, "test_label": None}
 cluster_custom = {"cluster": None, "test_label": None,
                   "label_value": None, "aws_node": None}
@@ -488,7 +488,7 @@ def test_node_label_node_template_add():
     test_label = random_name()
     label_value = random_name()
     # create a node template with a label
-    node_template_new, do_cloud_credential = \
+    node_template_new, linode_cloud_credential = \
         create_node_template_label(client, test_label, label_value)
     # Add a node in cluster
     cluster, node_pools = add_node_cluster(node_template_new, cluster)
@@ -517,7 +517,7 @@ def test_node_label_node_template_edit():
     client = cluster_detail["client"]
     cluster = cluster_node_template["cluster"]
     node_template = cluster_node_template["node_template"]
-    do_cloud_credential = cluster_node_template["do_cloud_credential"]
+    linode_cloud_credential = cluster_node_template["linode_cloud_credential"]
     test_label = cluster_node_template["test_label"]
     create_kubeconfig(cluster)
     nodes = client.list_node(clusterId=cluster.id).data
@@ -534,11 +534,21 @@ def test_node_label_node_template_edit():
     new_value = random_name()
     template_label[test_label] = new_value
     node_template_new = client.update(node_template, labels=template_label,
-                                      cloudCredentialId=do_cloud_credential.id,
-                                      digitaloceanConfig=
-                                      {"region": "nyc3",
-                                       "size": "2gb",
-                                       "image": "ubuntu-16-04-x64"})
+                                      cloudCredentialId=linode_cloud_credential.id,
+                                      linodeConfig={"authorizedUsers": "",
+                                                    "createPrivateIp": False,
+                                                    "dockerPort": "2376",
+                                                    "image": "linode/ubuntu18.04",
+                                                    "instanceType": "g6-standard-2",
+                                                    "label": "",
+                                                    "region": "us-east",
+                                                    "sshPort": "22",
+                                                    "sshUser": "",
+                                                    "stackscript": "",
+                                                    "stackscriptData": "",
+                                                    "swapSize": "512",
+                                                    "tags": "",
+                                                    "uaPrefix": "Rancher"})
     node_template_new = client.wait_success(node_template_new)
     assert test_label in node_template_new["labels"], \
         "Label is not set on node template"
@@ -573,7 +583,7 @@ def test_node_label_node_template_delete():
     client = cluster_detail["client"]
     cluster = cluster_node_template["cluster"]
     node_template = cluster_node_template["node_template"]
-    do_cloud_credential = cluster_node_template["do_cloud_credential"]
+    linode_cloud_credential = cluster_node_template["linode_cloud_credential"]
     test_label = cluster_node_template["test_label"]
     create_kubeconfig(cluster_node_template["cluster"])
 
@@ -590,11 +600,21 @@ def test_node_label_node_template_delete():
 
     # update node template
     node_template_new = client.update(node_template, labels=template_label,
-                                      cloudCredentialId=do_cloud_credential.id,
-                                      digitaloceanConfig=
-                                      {"region": "nyc3",
-                                       "size": "2gb",
-                                       "image": "ubuntu-16-04-x64"})
+                                      cloudCredentialId=linode_cloud_credential.id,
+                                      linodeConfig={"authorizedUsers": "",
+                                                    "createPrivateIp": False,
+                                                    "dockerPort": "2376",
+                                                    "image": "linode/ubuntu18.04",
+                                                    "instanceType": "g6-standard-2",
+                                                    "label": "",
+                                                    "region": "us-east",
+                                                    "sshPort": "22",
+                                                    "sshUser": "",
+                                                    "stackscript": "",
+                                                    "stackscriptData": "",
+                                                    "swapSize": "512",
+                                                    "tags": "",
+                                                    "uaPrefix": "Rancher"})
     node_template_new = client.wait_success(node_template_new)
     assert test_label not in node_template_new["labels"], \
         "Label is available on the node template"
@@ -624,7 +644,7 @@ def test_node_label_node_template_edit_api():
     """
     test_label = random_name()
     label_value = random_name()
-    cluster, node_pools, node_template, do_cloud_credential = \
+    cluster, node_pools, node_template, linode_cloud_credential = \
         create_cluster_node_template_label(test_label, label_value)
     client = get_user_client()
     cluster_node_template_2["cluster"].append(cluster)
@@ -660,7 +680,7 @@ def test_node_label_node_template_delete_api():
     """
     test_label = random_name()
     label_value = random_name()
-    cluster, node_pools, node_template, do_cloud_credential = \
+    cluster, node_pools, node_template, linode_cloud_credential = \
         create_cluster_node_template_label(test_label, label_value)
     client = get_user_client()
     cluster_node_template_2["cluster"].append(cluster)
@@ -898,7 +918,7 @@ def create_project_client(request):
     cluster_node_template["cluster"], \
     node_pools, \
     cluster_node_template["node_template"], \
-    cluster_node_template["do_cloud_credential"] = \
+    cluster_node_template["linode_cloud_credential"] = \
         create_cluster_node_template_label(test_label, label_value)
     cluster_node_template["node_pools"] = node_pools[0]
     cluster_node_template["test_label"] = test_label
@@ -1072,10 +1092,10 @@ def create_cluster_node_template_label(test_label, label_value):
     Cluster spec: 1 node all roles
     :param test_label: label to add in the node template
     :param label_value: label value
-    :return: cluster, node_pools, node_template, do_cloud_credential
+    :return: cluster, node_pools, node_template, linode_cloud_credential
     """
     client = get_user_client()
-    node_template, do_cloud_credential = \
+    node_template, linode_cloud_credential = \
         create_node_template_label(client, test_label, label_value)
     assert test_label in node_template["labels"], \
         "Label is not set on node template"
@@ -1113,7 +1133,7 @@ def create_cluster_node_template_label(test_label, label_value):
         node_pools.append(node_pool)
     cluster = validate_cluster_state(client, cluster)
 
-    return cluster, node_pools, node_template, do_cloud_credential
+    return cluster, node_pools, node_template, linode_cloud_credential
 
 
 def create_custom_node_label(node_roles, test_label,
@@ -1162,19 +1182,30 @@ def create_node_template_label(client, test_label, label_value):
     :param label_value: value of the label to add in the node template
     :return: node template and do cloud credential value
     """
-    do_cloud_credential_config = {"accessToken": DO_ACCESSKEY}
-    do_cloud_credential = client.create_cloud_credential(
-        digitaloceancredentialConfig=do_cloud_credential_config
+    linode_cloud_credential_config = {"token": LINODE_ACCESSKEY}
+    linode_cloud_credential = client.create_cloud_credential(
+        linodecredentialConfig=linode_cloud_credential_config
     )
     node_template = client.create_node_template(
-        digitaloceanConfig={"region": "nyc3",
-                            "size": "s-2vcpu-2gb-intel",
-                            "image": "ubuntu-18-04-x64"},
+        linodeConfig={"authorizedUsers": "",
+                      "createPrivateIp": False,
+                      "dockerPort": "2376",
+                      "image": "linode/ubuntu18.04",
+                      "instanceType": "g6-standard-2",
+                      "label": "",
+                      "region": "us-east",
+                      "sshPort": "22",
+                      "sshUser": "",
+                      "stackscript": "",
+                      "stackscriptData": "",
+                      "swapSize": "512",
+                      "tags": "",
+                      "uaPrefix": "Rancher"},
         name=random_name(),
-        driver="digitalocean",
-        cloudCredentialId=do_cloud_credential.id,
+        driver="linode",
+        cloudCredentialId=linode_cloud_credential.id,
         engineInstallURL=engine_install_url,
         useInternalIpAddress=True,
         labels={"cattle.io/creator": "norman", test_label: label_value})
     node_template = client.wait_success(node_template)
-    return node_template, do_cloud_credential
+    return node_template, linode_cloud_credential

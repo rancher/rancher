@@ -22,10 +22,21 @@ type minioClient struct {
 }
 
 func (j *Engine) getMinioURL(ns string) (string, error) {
-	MinioName := utils.MinioName
-	svc, err := j.ServiceLister.Get(ns, MinioName)
-	if err != nil {
-		return "", err
+	var (
+		MinioName = utils.MinioName
+		svc       *corev1.Service
+		err       error
+	)
+	if j.UseCache {
+		svc, err = j.ServiceLister.Get(ns, MinioName)
+		if err != nil {
+			return "", err
+		}
+	} else {
+		svc, err = j.Services.GetNamespaced(ns, MinioName, metav1.GetOptions{})
+		if err != nil {
+			return "", err
+		}
 	}
 
 	ip := svc.Spec.ClusterIP

@@ -26,6 +26,8 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/management/rbac"
 	"github.com/rancher/rancher/pkg/controllers/management/restrictedadminrbac"
 	"github.com/rancher/rancher/pkg/controllers/management/rkeworkerupgrader"
+	"github.com/rancher/rancher/pkg/controllers/management/secretmigrator"
+	"github.com/rancher/rancher/pkg/controllers/management/settings"
 	"github.com/rancher/rancher/pkg/controllers/management/usercontrollers"
 	"github.com/rancher/rancher/pkg/controllers/managementlegacy"
 	"github.com/rancher/rancher/pkg/types/config"
@@ -60,6 +62,8 @@ func Register(ctx context.Context, management *config.ManagementContext, manager
 	rkeworkerupgrader.Register(ctx, management, manager.ScaledContext)
 	rbac.Register(ctx, management)
 	restrictedadminrbac.Register(ctx, management, wrangler)
+	secretmigrator.Register(ctx, management)
+	settings.Register(ctx, management)
 	managementlegacy.Register(ctx, management, manager)
 
 	// Ensure caches are available for user controllers, these are used as part of

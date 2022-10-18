@@ -74,7 +74,7 @@ func (a *Config) ActionHandler(actionName string, action *types.Action, apiConte
 		if clusterName == "" {
 			return httperror.NewAPIError(httperror.ServerError, fmt.Sprintf("Cluster name empty %s", deployment.ID))
 		}
-		clusterContext, err := a.ClusterManager.UserContext(clusterName)
+		clusterContext, err := a.ClusterManager.UserContextNoControllers(clusterName)
 		if err != nil {
 			return httperror.NewAPIError(httperror.ServerError, fmt.Sprintf("Error getting cluster context %s", deployment.ID))
 		}
@@ -190,13 +190,9 @@ func (a *Config) rollbackDeployment(apiContext *types.APIContext, clusterContext
 			return httperror.NewAPIError(httperror.ServerError, fmt.Sprintf("Invalid ReplicaSet %s", rollbackInput.ReplicaSetID))
 		}
 		replicaNamespace, replicaName := split[1], split[2]
-		rs, err := clusterContext.Apps.ReplicaSets("").Controller().Lister().Get(replicaNamespace, replicaName)
+		rs, err := clusterContext.Apps.ReplicaSets("").GetNamespaced(replicaNamespace, replicaName, v1.GetOptions{})
 		if err != nil {
-			logrus.Debugf("ReplicaSet not found in cache, fetching from etcd")
-			rs, err = clusterContext.Apps.ReplicaSets("").GetNamespaced(replicaNamespace, replicaName, v1.GetOptions{})
-			if err != nil {
-				return httperror.NewAPIError(httperror.ServerError, fmt.Sprintf("ReplicaSet %s not found for deployment %s", rollbackInput.ReplicaSetID, deployment.ID))
-			}
+			return httperror.NewAPIError(httperror.ServerError, fmt.Sprintf("ReplicaSet %s not found for deployment %s", rollbackInput.ReplicaSetID, deployment.ID))
 		}
 		toUpdateDepl := depl.DeepCopy()
 		toUpdateDepl.Spec.Template.Spec = rs.Spec.Template.Spec

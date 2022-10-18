@@ -41,8 +41,7 @@ func Setup(ctx context.Context, mgmt *config.ScaledContext, clusterManager *clus
 	addProxyStore(ctx, schemas, mgmt, client.CronJobType, "batch/v1beta1", workload.NewCustomizeStore)
 	addProxyStore(ctx, schemas, mgmt, client.DaemonSetType, "apps/v1", workload.NewCustomizeStore)
 	addProxyStore(ctx, schemas, mgmt, client.DeploymentType, "apps/v1", workload.NewCustomizeStore)
-	//TODO: Update to use networking.k8s.io/v1beta1 when k8s 1.3 is no longer supported
-	addProxyStore(ctx, schemas, mgmt, client.IngressType, "extensions/v1beta1", ingress.Wrap)
+	addProxyStore(ctx, schemas, mgmt, client.IngressType, "networking.k8s.io/v1", ingress.Wrap(clusterManager, mgmt))
 	addProxyStore(ctx, schemas, mgmt, client.JobType, "batch/v1", workload.NewCustomizeStore)
 	addProxyStore(ctx, schemas, mgmt, client.PersistentVolumeClaimType, "v1", nil)
 	addProxyStore(ctx, schemas, mgmt, client.PodType, "v1", func(store types.Store) types.Store {

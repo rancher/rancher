@@ -9,6 +9,8 @@ import (
 	"github.com/rancher/apiserver/pkg/types"
 	"github.com/rancher/rancher/pkg/api/steve/norman"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
+	"github.com/rancher/rancher/pkg/auth/requests"
+	"github.com/rancher/rancher/pkg/clusterrouter"
 	normanv3 "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/types/config"
@@ -23,6 +25,9 @@ import (
 )
 
 func Register(ctx context.Context, server *steve.Server, wrangler *wrangler.Context) error {
+	log := &log{
+		cg: server.ClientFactory,
+	}
 	shell := &shell{
 		cg:              server.ClientFactory,
 		namespace:       "cattle-system",
@@ -40,6 +45,7 @@ func Register(ctx context.Context, server *steve.Server, wrangler *wrangler.Cont
 	}
 	kubeconfig := kubeconfigDownload{
 		userMgr: userManager,
+		auth:    requests.NewAuthenticator(ctx, clusterrouter.GetClusterID, sc),
 	}
 
 	server.ClusterCache.OnAdd(ctx, shell.impersonator.PurgeOldRoles)
@@ -57,6 +63,7 @@ func Register(ctx context.Context, server *steve.Server, wrangler *wrangler.Cont
 				schema.LinkHandlers = map[string]http.Handler{}
 			}
 			schema.LinkHandlers["shell"] = shell
+			schema.LinkHandlers["log"] = log
 			if schema.ActionHandlers == nil {
 				schema.ActionHandlers = map[string]http.Handler{}
 			}

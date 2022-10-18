@@ -3,8 +3,10 @@ package resourcequota
 import (
 	"context"
 
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -13,6 +15,25 @@ const (
 )
 
 func Register(ctx context.Context, cluster *config.UserContext) {
+	starter := cluster.DeferredStart(ctx, func(ctx context.Context) error {
+		registerDeferred(ctx, cluster)
+		return nil
+	})
+
+	projects := cluster.Management.Management.Projects(cluster.ClusterName)
+	projects.AddHandler(ctx, "resourcequota-deferred", func(key string, obj *v3.Project) (runtime.Object, error) {
+		if obj != nil &&
+			(obj.Spec.ResourceQuota != nil ||
+				obj.Spec.ContainerDefaultResourceLimit != nil ||
+				obj.Spec.NamespaceDefaultResourceQuota != nil) {
+			return obj, starter()
+		}
+		return obj, nil
+	})
+
+}
+
+func registerDeferred(ctx context.Context, cluster *config.UserContext) {
 	// Index for looking up Namespaces by projectID annotation
 	nsInformer := cluster.Core.Namespaces("").Controller().Informer()
 	nsIndexers := map[string]cache.IndexFunc{

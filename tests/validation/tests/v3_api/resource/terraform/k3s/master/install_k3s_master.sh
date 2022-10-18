@@ -2,10 +2,13 @@
 echo "$@"
 
 mkdir -p /etc/rancher/k3s
+mkdir -p /var/lib/rancher/k3s/server/logs
+token=$(openssl rand -base64 21)
 cat << EOF >/etc/rancher/k3s/config.yaml
 write-kubeconfig-mode: "0644"
 tls-san:
   - ${2}
+token: ${token}
 EOF
 
 if [[ -n "${8}" ]] && [[ "${8}" == *":"* ]]
@@ -22,10 +25,19 @@ then
   echo -e "vm.overcommit_memory=1" >>/etc/sysctl.d/90-kubelet.conf
   echo -e "kernel.panic=10" >>/etc/sysctl.d/90-kubelet.conf
   echo -e "kernel.panic_on_oops=1" >>/etc/sysctl.d/90-kubelet.conf
+  echo -e "kernel.keys.root_maxbytes=25000000" >>/etc/sysctl.d/90-kubelet.conf
   sysctl -p /etc/sysctl.d/90-kubelet.conf
   systemctl restart systemd-sysctl
   mkdir -p /var/lib/rancher/k3s/server/manifests
   cat /tmp/policy.yaml > /var/lib/rancher/k3s/server/manifests/policy.yaml
+  cat /tmp/audit.yaml > /var/lib/rancher/k3s/server/audit.yaml
+
+  if [[ "${4}" == *"v1.18"* ]] || [[ "${4}" == *"v1.19"* ]] || [[ "${4}" == *"v1.20"* ]]
+  then
+    cat /tmp/v120ingresspolicy.yaml > /var/lib/rancher/k3s/server/manifests/v120ingresspolicy.yaml
+  else
+    cat /tmp/v121ingresspolicy.yaml > /var/lib/rancher/k3s/server/manifests/v121ingresspolicy.yaml
+  fi
 fi
 
 
@@ -50,7 +62,12 @@ then
    then
        curl -sfL https://get.k3s.io | INSTALL_K3S_TYPE='server' sh -s - server --cluster-init --node-external-ip="${6}" ${8} --tls-san "${2}" --write-kubeconfig-mode "0644"
    else
-       curl -sfL https://get.k3s.io | INSTALL_K3S_TYPE='server' sh -s - server --cluster-init --node-external-ip="${6}"
+       if [ ${11} != "null" ]
+       then
+           curl -sfL https://get.k3s.io | INSTALL_K3S_CHANNEL=${11} INSTALL_K3S_TYPE='server' sh -s - server --cluster-init --node-external-ip="${6}"
+       else
+           curl -sfL https://get.k3s.io | INSTALL_K3S_TYPE='server' sh -s - server --cluster-init --node-external-ip="${6}"
+       fi
    fi
 else
   echo "CLUSTER TYPE is external db"
@@ -58,7 +75,12 @@ else
   then
       curl -sfL https://get.k3s.io | sh -s - server --node-external-ip="${6}" --datastore-endpoint="${7}" ${8} --tls-san "${2}" --write-kubeconfig-mode "0644"
   else
-      curl -sfL https://get.k3s.io | sh -s - server --node-external-ip="${6}" --datastore-endpoint="${7}"
+      if [ ${11} != "null" ]
+      then
+          curl -sfL https://get.k3s.io | INSTALL_K3S_CHANNEL=${11} sh -s - server --node-external-ip="${6}" --datastore-endpoint="${7}"
+      else
+          curl -sfL https://get.k3s.io | sh -s - server --node-external-ip="${6}" --datastore-endpoint="${7}"
+      fi
   fi
 fi
 

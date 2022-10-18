@@ -1,0 +1,20 @@
+#!/bin/bash
+set -e
+MODULE=$GOGET_MODULE
+VERSION=$GOGET_VERSION
+
+SUBDIRS="pkg/apis pkg/client"
+
+for SUBDIR in $SUBDIRS; do
+    if grep -q $MODULE "${SUBDIR}/go.mod"; then
+        cd $SUBDIR
+        go get -d "${MODULE}@${VERSION}"
+        go mod tidy
+        go mod verify
+        cd -
+    fi
+done
+
+go get -d "${MODULE}@${VERSION}"
+go mod tidy
+go mod verify

@@ -6,13 +6,15 @@ import (
 	"testing"
 
 	"github.com/rancher/norman/types"
+	mgmt "github.com/rancher/rancher/pkg/apis/management.cattle.io"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	rbacv1 "k8s.io/api/rbac/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func Test_BuildSubjectFromRTB(t *testing.T) {
 	type testCase struct {
-		from  interface{}
+		from  metav1.Object
 		to    rbacv1.Subject
 		iserr bool
 	}
@@ -119,6 +121,71 @@ func Test_TypeFromContext(t *testing.T) {
 		outputType := TypeFromContext(tcase.apiContext, tcase.resource)
 		if tcase.expectedType != outputType {
 			t.Errorf("resource type %s is mismatched, expect %s", outputType, tcase.expectedType)
+		}
+	}
+}
+
+func Test_RuleGivesResourceAccess(t *testing.T) {
+	type testCase struct {
+		rule         rbacv1.PolicyRule
+		resourceName string
+		expected     bool
+	}
+	createTestCase := func(apiGroup string, ruleResource string, requestResource string, outcome bool) testCase {
+		return testCase{
+			rule: rbacv1.PolicyRule{
+				APIGroups: []string{
+					apiGroup,
+				},
+				Verbs: []string{
+					"*",
+				},
+				Resources: []string{
+					ruleResource,
+				},
+			},
+			resourceName: requestResource,
+			expected:     outcome,
+		}
+	}
+
+	createMultiGroupResourceTestCase := func(apiGroups []string, resources []string, requestResource string, outcome bool) testCase {
+		return testCase{
+			rule: rbacv1.PolicyRule{
+				APIGroups: apiGroups,
+				Verbs: []string{
+					"*",
+				},
+				Resources: resources,
+			},
+			resourceName: requestResource,
+			expected:     outcome,
+		}
+	}
+
+	testCases := []testCase{
+		createTestCase("*", "test", "test", true),
+		createTestCase("*", "test", "nottest", false),
+		createTestCase("*", "*", "test", true),
+		createTestCase(mgmt.GroupName, "test", "test", true),
+		createTestCase(mgmt.GroupName, "test", "nottest", false),
+		createTestCase(mgmt.GroupName, "*", "test", true),
+		createTestCase("fake.company.io", "test", "test", false),
+		createTestCase("fake.company.io", "test", "nottest", false),
+		createTestCase("fake.company.io", "*", "nottest", false),
+		createMultiGroupResourceTestCase([]string{"fake.company.io", mgmt.GroupName}, []string{"test"}, "test", true),
+		createMultiGroupResourceTestCase([]string{"fake.company.io", mgmt.GroupName}, []string{"test"}, "nottest", false),
+		createMultiGroupResourceTestCase([]string{"fake.company.io", mgmt.GroupName}, []string{"*"}, "test", true),
+		createMultiGroupResourceTestCase([]string{"fake.company.io", mgmt.GroupName}, []string{"nottest", "test"}, "test", true),
+		createMultiGroupResourceTestCase([]string{"fake.company.io", "*"}, []string{"nottest", "test"}, "test", true),
+		createMultiGroupResourceTestCase([]string{"fake.company.io", "*"}, []string{"nottest", "test"}, "supertest", false),
+		createMultiGroupResourceTestCase([]string{"fake.company.io", "faker.company.io"}, []string{"nottest", "test"}, "test", false),
+	}
+
+	for _, tcase := range testCases {
+		givesAccess := RuleGivesResourceAccess(tcase.rule, tcase.resourceName)
+		if tcase.expected != givesAccess {
+			t.Errorf("got %t, expected %t, for rule %v resource %v", givesAccess, tcase.expected, tcase.rule, tcase.resourceName)
 		}
 	}
 }

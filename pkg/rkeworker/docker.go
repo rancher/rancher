@@ -27,6 +27,7 @@ const (
 	RKEContainerNameLabel  = "io.rancher.rke.container.name"
 	CattleProcessNameLabel = "io.cattle.process.name"
 	ShareMntContainerName  = "share-mnt"
+	DummyK8sVersion        = "v1.22.0-rancher1"
 )
 
 type NodeConfig struct {
@@ -125,7 +126,9 @@ func runProcess(ctx context.Context, name string, p rketypes.Process, start, for
 
 	// Host is used to determine if selinux is enabled in the Docker daemon, but this is not needed for workers as the components sharing files in service-sidekick all run as privileged
 	emptyHost := hosts.Host{}
-	config, hostConfig, _ := services.GetProcessConfig(p, &emptyHost)
+	// We pass a dummy k8s version as the function requires it since introducing not rewriting SELinux labels on binds starting with k8s v1.22
+	// But as the binds are already properly prepared, this has no other meaning than making sure the function can be used with required parameters
+	config, hostConfig, _ := services.GetProcessConfig(p, &emptyHost, DummyK8sVersion)
 	if config.Labels == nil {
 		config.Labels = map[string]string{}
 	}

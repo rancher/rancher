@@ -3,6 +3,7 @@ package pspdelete
 import (
 	"context"
 
+	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/controllers/provisioningv2/cluster"
 	provisioningcontrollers "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
 	v1beta12 "github.com/rancher/rancher/pkg/generated/norman/policy/v1beta1"
@@ -22,7 +23,37 @@ type handler struct {
 	podSecurityPolicies v1beta12.PodSecurityPolicyInterface
 }
 
-func Register(ctx context.Context, context *config.UserContext) {
+func Register(ctx context.Context, userContext *config.UserContext) {
+	starter := userContext.DeferredStart(ctx, func(ctx context.Context) error {
+		registerDeferred(ctx, userContext)
+		return nil
+	})
+
+	clusters := userContext.Management.Management.Clusters("")
+	clusterCache := userContext.Management.Wrangler.Provisioning.Cluster().Cache()
+	clusters.AddHandler(ctx, "pspdelete-deferred", func(key string, obj *v3.Cluster) (runtime.Object, error) {
+		if obj == nil ||
+			obj.Name != userContext.ClusterName ||
+			obj.Spec.DefaultPodSecurityPolicyTemplateName == "" {
+			return obj, nil
+		}
+
+		clusters, err := clusterCache.GetByIndex(cluster.ByCluster, obj.Name)
+		if err != nil || len(clusters) != 1 {
+			return obj, err
+		}
+
+		clusterSpec := clusters[0].Spec
+		if clusterSpec.DefaultPodSecurityPolicyTemplateName != "" && clusterSpec.RKEConfig != nil {
+			return obj, starter()
+		}
+
+		return obj, nil
+	})
+
+}
+
+func registerDeferred(ctx context.Context, context *config.UserContext) {
 	h := handler{
 		clusterName:         context.ClusterName,
 		clusterCache:        context.Management.Wrangler.Provisioning.Cluster().Cache(),

@@ -43,7 +43,7 @@ func init() {
 	resource.Put(NodeTemplateGroupVersionResource)
 }
 
-// Deprecated use v3.NodeTemplate instead
+// Deprecated: use v3.NodeTemplate instead
 type NodeTemplate = v3.NodeTemplate
 
 func NewNodeTemplate(namespace, name string, obj v3.NodeTemplate) *v3.NodeTemplate {

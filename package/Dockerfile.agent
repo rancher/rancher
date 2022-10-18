@@ -2,17 +2,17 @@ ARG RANCHER_TAG=dev
 ARG RANCHER_REPO=rancher
 FROM ${RANCHER_REPO}/rancher:${RANCHER_TAG} as rancher
 
-FROM registry.suse.com/suse/sle15:15.3
+FROM registry.suse.com/bci/bci-base:15.3
 ARG ARCH=amd64
 
-ENV KUBECTL_VERSION v1.21.3
+ENV KUBECTL_VERSION v1.23.6
 RUN zypper -n install --no-recommends curl ca-certificates jq git-core hostname iproute2 vim-small less \
 	bash-completion acl openssh-clients tar gzip xz gawk sysstat && \
     zypper -n clean -a && rm -rf /tmp/* /var/tmp/* /usr/share/doc/packages/* && \
     curl -sLf https://storage.googleapis.com/kubernetes-release/release/${KUBECTL_VERSION}/bin/linux/${ARCH}/kubectl > /usr/bin/kubectl && \
     chmod +x /usr/bin/kubectl
 
-ENV LOGLEVEL_VERSION v0.1.3
+ENV LOGLEVEL_VERSION v0.1.5
 
 RUN curl -sLf https://github.com/rancher/loglevel/releases/download/${LOGLEVEL_VERSION}/loglevel-${ARCH}-${LOGLEVEL_VERSION}.tar.gz | tar xvzf - -C /usr/bin
 

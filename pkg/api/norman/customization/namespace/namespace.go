@@ -74,7 +74,7 @@ func (w ActionWrapper) ActionHandler(actionName string, action *types.Action, ap
 	case "move":
 		clusterID := w.ClusterManager.ClusterName(apiContext)
 		_, projectID := ref.Parse(convert.ToString(actionInput["projectId"]))
-		userContext, err := w.ClusterManager.UserContext(clusterID)
+		userContext, err := w.ClusterManager.UserContextNoControllers(clusterID)
 		if err != nil {
 			if !kerrors.IsNotFound(err) {
 				return err

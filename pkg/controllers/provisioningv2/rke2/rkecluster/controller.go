@@ -4,16 +4,12 @@ import (
 	"context"
 
 	v1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
+	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2"
 	rkecontroller "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/wrangler"
-	"github.com/rancher/wrangler/pkg/condition"
 	"github.com/rancher/wrangler/pkg/relatedresource"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
-)
-
-var (
-	Provisioned condition.Cond = "Provisioned"
 )
 
 type handler struct {
@@ -27,7 +23,7 @@ func Register(ctx context.Context, clients *wrangler.Context) {
 		rkeControlPlanes: clients.RKE.RKEControlPlane().Cache(),
 	}
 
-	clients.RKE.RKECluster().OnChange(ctx, "rke", h.UpdateSpec)
+	clients.RKE.RKECluster().OnChange(ctx, "rke-cluster", h.UpdateSpec)
 	rkecontroller.RegisterRKEClusterStatusHandler(ctx,
 		clients.RKE.RKECluster(),
 		"Defined",
@@ -41,7 +37,7 @@ func Register(ctx context.Context, clients *wrangler.Context) {
 	}, clients.RKE.RKECluster(), clients.RKE.RKEControlPlane())
 }
 
-func (h *handler) UpdateSpec(key string, cluster *v1.RKECluster) (*v1.RKECluster, error) {
+func (h *handler) UpdateSpec(_ string, cluster *v1.RKECluster) (*v1.RKECluster, error) {
 	if cluster == nil {
 		return nil, nil
 	}
@@ -58,17 +54,21 @@ func (h *handler) UpdateSpec(key string, cluster *v1.RKECluster) (*v1.RKECluster
 	return cluster, nil
 }
 
-func (h *handler) OnChange(obj *v1.RKECluster, status v1.RKEClusterStatus) (v1.RKEClusterStatus, error) {
-	cp, err := h.rkeControlPlanes.Get(obj.Namespace, obj.Name)
+func (h *handler) OnChange(rkeCluster *v1.RKECluster, status v1.RKEClusterStatus) (v1.RKEClusterStatus, error) {
+	conditionToUpdate := rke2.Ready
+	if !rkeCluster.DeletionTimestamp.IsZero() {
+		conditionToUpdate = rke2.Removed
+	}
+	cp, err := h.rkeControlPlanes.Get(rkeCluster.Namespace, rkeCluster.Name)
 	if err == nil {
-		Provisioned.SetStatus(&status, Provisioned.GetStatus(cp))
-		Provisioned.Reason(&status, Provisioned.GetReason(cp))
-		Provisioned.Message(&status, Provisioned.GetMessage(cp))
+		conditionToUpdate.SetStatus(&status, conditionToUpdate.GetStatus(cp))
+		conditionToUpdate.Reason(&status, conditionToUpdate.GetReason(cp))
+		conditionToUpdate.Message(&status, conditionToUpdate.GetMessage(cp))
 	} else if !apierrors.IsNotFound(err) {
 		return status, err
 	}
 
-	status.Ready = condition.Cond("Provisioned").IsTrue(&status)
-	status.ObservedGeneration = obj.Generation
+	status.Ready = rke2.Ready.IsTrue(&status)
+	status.ObservedGeneration = rkeCluster.Generation
 	return status, nil
 }

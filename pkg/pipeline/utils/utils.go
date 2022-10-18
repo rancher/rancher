@@ -3,10 +3,12 @@ package utils
 import (
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/mitchellh/mapstructure"
 	"github.com/pkg/errors"
 	v32 "github.com/rancher/rancher/pkg/apis/project.cattle.io/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/project.cattle.io/v3"
@@ -297,4 +299,31 @@ func EnsureAccessToken(credentialInterface v3.SourceCodeCredentialInterface, rem
 		return torefresh.Spec.AccessToken, nil
 	}
 	return credential.Spec.AccessToken, nil
+}
+
+func ObjectMetaFromUnstructureContent(unstructuredContent map[string]interface{}) (*metav1.ObjectMeta, error) {
+	metadataMap, ok := unstructuredContent["metadata"].(map[string]interface{})
+	if !ok {
+		return nil, fmt.Errorf("failed to retrieve metadata, cannot read k8s unstructured data")
+	}
+
+	objectMeta := &metav1.ObjectMeta{}
+	stringToTimeHook := func(f reflect.Type, t reflect.Type, data interface{}) (interface{}, error) {
+		if f.Kind() == reflect.String && t == reflect.TypeOf(metav1.Time{}) {
+			time, err := time.Parse(time.RFC3339, data.(string))
+			return metav1.Time{Time: time}, err
+		}
+		return data, nil
+	}
+	decoder, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
+		DecodeHook: stringToTimeHook,
+		Result:     objectMeta,
+	})
+	if err != nil {
+		return nil, err
+	}
+	if err := decoder.Decode(metadataMap); err != nil {
+		return nil, fmt.Errorf("failed to decode metadata, error: %v", err)
+	}
+	return objectMeta, nil
 }

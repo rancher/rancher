@@ -3,3 +3,4 @@
 # modern version of git and editors capable of LF line endings.
 
 *.go -text diff=golang
+* text eol=lf

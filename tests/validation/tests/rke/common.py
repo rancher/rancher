@@ -1,9 +1,14 @@
 import time
 import os
 import json
+from packaging import version
 
 k8s_resource_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)),
                                "resources/k8s_ymls/")
+k8s_rancher_version = str(os.environ.get("RANCHER_K8S_VERSION").split("-")[0][1:])
+k8s_rancher_version = version.parse(k8s_rancher_version)
+k8s_rancher_version = version.parse(f"{str(k8s_rancher_version.major)}.{str(k8s_rancher_version.minor)}")
+k8s_fixed_version = version.parse("1.21")
 
 # Global expectedimagesdict declared to store the images for a specific
 # k8s Version
@@ -133,11 +138,17 @@ def wait_for_etcd_cluster_health(node, etcd_private_ip=False):
     endpoints = "127.0.0.1"
     if etcd_private_ip:
         endpoints = node.private_ip_address
-    etcd_tls_cmd = (
-        'ETCDCTL_API=2 etcdctl --endpoints "https://'+endpoints+':2379" '
-        ' --ca-file /etc/kubernetes/ssl/kube-ca.pem --cert-file '
-        ' $ETCDCTL_CERT --key-file '
-        ' $ETCDCTL_KEY cluster-health')
+    if k8s_rancher_version <= k8s_fixed_version:
+        etcd_tls_cmd = (
+                'ETCDCTL_API=2 etcdctl --endpoints "https://' + endpoints + ':2379" '
+                 ' --ca-file /etc/kubernetes/ssl/kube-ca.pem --cert-file '
+                 ' $ETCDCTL_CERT --key-file '
+                 ' $ETCDCTL_KEY cluster-health'
+        )
+    else:
+        etcd_tls_cmd = (
+            'ETCDCTL_API=3 etcdctl endpoint health --cluster'
+        )
 
     print(etcd_tls_cmd)
     start_time = time.time()
@@ -145,8 +156,12 @@ def wait_for_etcd_cluster_health(node, etcd_private_ip=False):
         result = node.docker_exec('etcd', "sh -c '" + etcd_tls_cmd + "'")
         print("**RESULT**")
         print(result)
-        if 'cluster is healthy' in result:
-            break
+        if k8s_rancher_version <= k8s_fixed_version:
+            if 'cluster is healthy' in result:
+                break
+        else:
+            if 'is healthy' in result:
+                break
         time.sleep(5)
     return result
 
@@ -356,11 +371,16 @@ def validation_node_roles(nodes, k8s_nodes, etcd_private_ip=False):
                             "Expected to find taint for etcd-only node"
                 # check etcd membership and cluster health
                 result = wait_for_etcd_cluster_health(node, etcd_private_ip)
-                for member in etcd_members:
-                    expect = "got healthy result from https://{}".format(
-                        member)
-                    assert expect in result, result
-                assert 'cluster is healthy' in result, result
+                if k8s_rancher_version <= k8s_fixed_version:
+                    for member in etcd_members:
+                        expect = "got healthy result from https://{}".format(member)
+                        assert expect in result, result
+                    assert 'cluster is healthy' in result, result
+                else:
+                    for member in etcd_members:
+                        expect = "https://{}:2379 is healthy: successfully committed proposal".format(member)
+                        assert expect in result, result
+                    assert 'is healthy' in result, result
 
 
 class PodIntercommunicationValidation(object):

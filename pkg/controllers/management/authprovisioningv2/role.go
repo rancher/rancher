@@ -38,7 +38,7 @@ func (h *handler) initializeCRDs(crdClient apiextcontrollers.CustomResourceDefin
 		if match == nil {
 			continue
 		}
-		h.addResources(*match)
+		h.modifyResources(*match, true)
 	}
 
 	return nil
@@ -68,10 +68,17 @@ func (h *handler) gvkMatcher(gvk schema.GroupVersionKind) bool {
 	return ok
 }
 
-func (h *handler) addResources(resource resourceMatch) {
+func (h *handler) modifyResources(resource resourceMatch, addResource bool) {
 	h.resourcesLock.Lock()
 	defer h.resourcesLock.Unlock()
-	h.resources[resource.GVK] = resource
+	_, resourceExists := h.resources[resource.GVK]
+	if addResource && !resourceExists {
+		h.resources[resource.GVK] = resource
+	} else if !addResource && resourceExists {
+		delete(h.resources, resource.GVK)
+	} else {
+		return
+	}
 
 	resources := make([]resourceMatch, 0, len(h.resources))
 	for _, v := range h.resources {
@@ -88,9 +95,8 @@ func (h *handler) OnCRD(key string, crd *apiextv1.CustomResourceDefinition) (*ap
 		return crd, nil
 	}
 
-	resourceMatch := crdToResourceMatch(crd)
-	if resourceMatch != nil {
-		h.addResources(*resourceMatch)
+	if resourceMatch := crdToResourceMatch(crd); resourceMatch != nil {
+		h.modifyResources(*resourceMatch, crd.DeletionTimestamp.IsZero())
 	}
 
 	return crd, nil

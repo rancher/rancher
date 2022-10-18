@@ -3,11 +3,14 @@ package channelserver
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
+	"sort"
 	"strconv"
 	"sync"
 	"time"
 
+	"github.com/blang/semver"
 	"github.com/rancher/channelserver/pkg/config"
 	"github.com/rancher/channelserver/pkg/model"
 	"github.com/rancher/channelserver/pkg/server"
@@ -17,8 +20,6 @@ import (
 	"github.com/rancher/wrangler/pkg/schemas"
 	"github.com/sirupsen/logrus"
 )
-
-const refreshAction = "refresh"
 
 var (
 	configs     map[string]*config.Config
@@ -52,7 +53,9 @@ func getChannelServerArg() string {
 	return serverVersion
 }
 
-type DynamicInterval struct{}
+type DynamicInterval struct {
+	subKey string
+}
 
 func (d *DynamicInterval) Wait(ctx context.Context) bool {
 	start := time.Now()
@@ -65,10 +68,11 @@ func (d *DynamicInterval) Wait(ctx context.Context) bool {
 			}
 			continue
 		case msg := <-action:
-			if msg == refreshAction {
-				logrus.Infof("getReleaseConfig: reloading config for k3s/rke2")
+			if msg == d.subKey {
+				logrus.Infof("getReleaseConfig: reloading config for %s", d.subKey)
 				return true
 			}
+			action <- msg
 		case <-ctx.Done():
 			return false
 		}
@@ -76,7 +80,8 @@ func (d *DynamicInterval) Wait(ctx context.Context) bool {
 }
 
 func Refresh() {
-	action <- refreshAction
+	action <- "k3s"
+	action <- "rke2"
 }
 
 type DynamicSource struct{}
@@ -107,23 +112,89 @@ func GetReleaseConfigByRuntimeAndVersion(ctx context.Context, runtime, kubernete
 
 func GetReleaseConfigByRuntime(ctx context.Context, runtime string) *config.Config {
 	configsInit.Do(func() {
-		interval := &DynamicInterval{}
 		urls := []config.Source{
 			&DynamicSource{},
 			config.StringSource("/var/lib/rancher-data/driver-metadata/data.json"),
 		}
 		configs = map[string]*config.Config{
-			"k3s":  config.NewConfig(ctx, "k3s", interval, getChannelServerArg(), urls),
-			"rke2": config.NewConfig(ctx, "rke2", interval, getChannelServerArg(), urls),
+			"k3s":  config.NewConfig(ctx, "k3s", &DynamicInterval{"k3s"}, getChannelServerArg(), "rancher", urls),
+			"rke2": config.NewConfig(ctx, "rke2", &DynamicInterval{"rke2"}, getChannelServerArg(), "rancher", urls),
 		}
 	})
 	return configs[runtime]
 }
 
 func NewHandler(ctx context.Context) http.Handler {
-	action = make(chan string)
+	action = make(chan string, 2)
 	return server.NewHandler(map[string]*config.Config{
 		"v1-k3s-release":  GetReleaseConfigByRuntime(ctx, "k3s"),
 		"v1-rke2-release": GetReleaseConfigByRuntime(ctx, "rke2"),
 	})
+}
+
+func GetDefaultByRuntimeAndServerVersion(ctx context.Context, runtime, serverVersion string) string {
+	version, err := getDefaultFromAppDefaultsByRuntimeAndServerVersion(ctx, runtime, serverVersion)
+	if err != nil {
+		logrus.Debugf("[channelserver] fallback to use the default channel due to: %v", err)
+		version = getDefaultFromChannel(ctx, runtime, "default")
+	}
+	return version
+}
+
+func getDefaultFromAppDefaultsByRuntimeAndServerVersion(ctx context.Context, runtime, serverVersion string) (string, error) {
+	var defaultVersionRange string
+	serverVersionParsed, err := semver.ParseTolerant(serverVersion)
+	if err != nil {
+		return "", fmt.Errorf("fails to parse the server version: %v", err)
+	}
+	config := GetReleaseConfigByRuntime(ctx, runtime)
+	appDefaults := config.AppDefaultsConfig().AppDefaults
+	if len(appDefaults) == 0 {
+		return "", fmt.Errorf("no %s appDefaults is found for %s", runtime, serverVersion)
+	}
+	// We use the first entry from the list. We do not expect the list contains more than one entry.
+	for _, appDefault := range appDefaults[0].Defaults {
+		avrParsed, err := semver.ParseRange(appDefault.AppVersion)
+		if err != nil {
+			return "", fmt.Errorf("faild to parse %s appVersionRange for %s: %v", runtime, serverVersion, err)
+		}
+		if avrParsed(serverVersionParsed) {
+			defaultVersionRange = appDefault.DefaultVersion
+			continue
+		}
+	}
+	if defaultVersionRange == "" {
+		return "", fmt.Errorf("no matching %s defaultVersionRange is found for %s", runtime, serverVersion)
+	}
+	dvrParsed, err := semver.ParseRange(defaultVersionRange)
+	if err != nil {
+		return "", fmt.Errorf("faild to parse %s defaultVersionRange for %s: %v", runtime, serverVersion, err)
+	}
+
+	var candidate []string
+	for _, release := range config.ReleasesConfig().Releases {
+		version, err := semver.ParseTolerant(release.Version)
+		if err != nil {
+			logrus.Debugf("fails to parse the release version %s: %v", release.Version, err)
+			continue
+		}
+		if dvrParsed(version) {
+			candidate = append(candidate, release.Version)
+		}
+	}
+	if len(candidate) == 0 {
+		return "", fmt.Errorf("no %s version is found for %s", runtime, serverVersion)
+	}
+	sort.Strings(candidate)
+	return candidate[len(candidate)-1], nil
+}
+
+func getDefaultFromChannel(ctx context.Context, runtime, channelName string) string {
+	config := GetReleaseConfigByRuntime(ctx, runtime)
+	for _, c := range config.ChannelsConfig().Channels {
+		if c.Name == channelName {
+			return c.Latest
+		}
+	}
+	return ""
 }

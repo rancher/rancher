@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"log"
 	"net/http"
@@ -203,26 +202,14 @@ func initLogs(c *cli.Context, cfg rancher.Options) {
 	logserver.StartServerWithDefaults()
 }
 
-func migrateETCDlocal() {
-	if _, err := os.Stat("etcd"); err != nil {
-		return
-	}
-
-	// Purposely ignoring errors
-	_ = os.Mkdir("management-state", 0700)
-	_ = os.Symlink("../etcd", "management-state/etcd")
-}
-
 func run(cli *cli.Context, cfg rancher.Options) error {
 	logrus.Infof("Rancher version %s is starting", version.FriendlyVersion())
 	logrus.Infof("Rancher arguments %+v", cfg)
-	ctx := signals.SetupSignalHandler(context.Background())
+	ctx := signals.SetupSignalContext()
 
 	if cfg.AddLocal != "true" && cfg.AddLocal != "auto" {
 		logrus.Fatal("add-local flag must be set to 'true', see Rancher 2.5.0 release notes for more information")
 	}
-
-	migrateETCDlocal()
 
 	embedded, clientConfig, err := k8s.GetConfig(ctx, cfg.K8sMode, kubeConfig)
 	if err != nil {

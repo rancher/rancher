@@ -32,6 +32,7 @@ const (
 	CronJobFieldName                          = "name"
 	CronJobFieldNamespaceId                   = "namespaceId"
 	CronJobFieldNodeID                        = "nodeId"
+	CronJobFieldOS                            = "os"
 	CronJobFieldOverhead                      = "overhead"
 	CronJobFieldOwnerReferences               = "ownerReferences"
 	CronJobFieldPreemptionPolicy              = "preemptionPolicy"
@@ -54,6 +55,7 @@ const (
 	CronJobFieldSysctls                       = "sysctls"
 	CronJobFieldTTLSecondsAfterFinished       = "ttlSecondsAfterFinished"
 	CronJobFieldTerminationGracePeriodSeconds = "terminationGracePeriodSeconds"
+	CronJobFieldTimeZone                      = "timeZone"
 	CronJobFieldTopologySpreadConstraints     = "topologySpreadConstraints"
 	CronJobFieldTransitioning                 = "transitioning"
 	CronJobFieldTransitioningMessage          = "transitioningMessage"
@@ -94,6 +96,7 @@ type CronJob struct {
 	Name                          string                         `json:"name,omitempty" yaml:"name,omitempty"`
 	NamespaceId                   string                         `json:"namespaceId,omitempty" yaml:"namespaceId,omitempty"`
 	NodeID                        string                         `json:"nodeId,omitempty" yaml:"nodeId,omitempty"`
+	OS                            *PodOS                         `json:"os,omitempty" yaml:"os,omitempty"`
 	Overhead                      map[string]string              `json:"overhead,omitempty" yaml:"overhead,omitempty"`
 	OwnerReferences               []OwnerReference               `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
 	PreemptionPolicy              string                         `json:"preemptionPolicy,omitempty" yaml:"preemptionPolicy,omitempty"`
@@ -116,6 +119,7 @@ type CronJob struct {
 	Sysctls                       []Sysctl                       `json:"sysctls,omitempty" yaml:"sysctls,omitempty"`
 	TTLSecondsAfterFinished       *int64                         `json:"ttlSecondsAfterFinished,omitempty" yaml:"ttlSecondsAfterFinished,omitempty"`
 	TerminationGracePeriodSeconds *int64                         `json:"terminationGracePeriodSeconds,omitempty" yaml:"terminationGracePeriodSeconds,omitempty"`
+	TimeZone                      string                         `json:"timeZone,omitempty" yaml:"timeZone,omitempty"`
 	TopologySpreadConstraints     []TopologySpreadConstraint     `json:"topologySpreadConstraints,omitempty" yaml:"topologySpreadConstraints,omitempty"`
 	Transitioning                 string                         `json:"transitioning,omitempty" yaml:"transitioning,omitempty"`
 	TransitioningMessage          string                         `json:"transitioningMessage,omitempty" yaml:"transitioningMessage,omitempty"`

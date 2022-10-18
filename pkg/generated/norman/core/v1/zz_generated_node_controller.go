@@ -42,7 +42,7 @@ func init() {
 	resource.Put(NodeGroupVersionResource)
 }
 
-// Deprecated use v1.Node instead
+// Deprecated: use v1.Node instead
 type Node = v1.Node
 
 func NewNode(namespace, name string, obj v1.Node) *v1.Node {

@@ -368,7 +368,7 @@ func createKustomizeFiles(tempDirs *HelmPath, labelValue string) error {
 	// the file to the "injail" location
 	if os.Getenv("CATTLE_DEV_MODE") != "" {
 		kpath = filepath.Join(tempDirs.InJailPath, "/kustomize.sh")
-		err = os.Link("./package/kustomize.sh", kpath)
+		err = os.Link("./kustomize.sh", kpath)
 		if err != nil {
 			err = os.Link(filepath.Join(os.Getenv("DAPPER_SOURCE"), "package/kustomize.sh"), kpath)
 			if err != nil {

@@ -46,7 +46,7 @@ func (ch *ClusterImport) ClusterImportHandler(resp http.ResponseWriter, req *htt
 	}
 
 	if err := systemtemplate.SystemTemplate(resp, image.Resolve(settings.AgentImage.Get()), authImage, "", token, url,
-		false, cluster, nil, nil); err != nil {
+		false, cluster, nil, nil, nil); err != nil {
 		resp.WriteHeader(500)
 		resp.Write([]byte(err.Error()))
 	}

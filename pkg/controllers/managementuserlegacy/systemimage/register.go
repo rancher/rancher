@@ -3,10 +3,24 @@ package systemimage
 import (
 	"context"
 
+	"github.com/rancher/rancher/pkg/controllers/managementuserlegacy/alert"
+	"github.com/rancher/rancher/pkg/controllers/managementuserlegacy/logging"
+	"github.com/rancher/rancher/pkg/controllers/managementuserlegacy/pipeline"
 	"github.com/rancher/rancher/pkg/types/config"
 )
 
 func Register(ctx context.Context, cluster *config.UserContext) {
+	starter := cluster.DeferredStart(ctx, func(ctx context.Context) error {
+		registerDeferred(ctx, cluster)
+		return nil
+	})
+
+	alert.AddStarter(ctx, cluster, starter)
+	logging.AddStarter(ctx, cluster, starter)
+	pipeline.AddStarter(ctx, cluster, starter)
+}
+
+func registerDeferred(ctx context.Context, cluster *config.UserContext) {
 	projClient := cluster.Management.Management.Projects(cluster.ClusterName)
 	catalogClient := cluster.Management.Management.Catalogs("")
 	systemServices := getSystemService()

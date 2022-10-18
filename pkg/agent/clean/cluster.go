@@ -1,3 +1,4 @@
+//go:build !windows
 // +build !windows
 
 /*
@@ -63,6 +64,8 @@ var (
 		"cattle-prometheus",
 		"cattle-logging",
 		"cattle-pipeline",
+		"cattle-fleet-system",
+		"cattle-impersonation-system",
 	}
 
 	getNSFuncs = []getNSFunc{

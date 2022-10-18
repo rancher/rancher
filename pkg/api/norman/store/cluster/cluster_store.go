@@ -6,11 +6,13 @@ import (
 	"fmt"
 	"net/http"
 	"reflect"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
 
 	"github.com/blang/semver"
+	mVersion "github.com/mcuadros/go-version"
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/api/access"
 	"github.com/rancher/norman/httperror"
@@ -30,7 +32,9 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/management/clusterstatus"
 	"github.com/rancher/rancher/pkg/controllers/management/etcdbackup"
 	"github.com/rancher/rancher/pkg/controllers/management/rkeworkerupgrader"
+	"github.com/rancher/rancher/pkg/controllers/management/secretmigrator"
 	"github.com/rancher/rancher/pkg/controllers/managementlegacy/cis"
+	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/namespace"
 	nodehelper "github.com/rancher/rancher/pkg/node"
@@ -43,8 +47,10 @@ import (
 	rkeservices "github.com/rancher/rke/services"
 	rketypes "github.com/rancher/rke/types"
 	"github.com/sirupsen/logrus"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	k8sTypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/dynamic"
 )
@@ -53,6 +59,16 @@ const (
 	DefaultBackupIntervalHours = 12
 	DefaultBackupRetention     = 6
 	s3TransportTimeout         = 10
+	clusterSecrets             = "clusterSecrets"
+	registrySecretKey          = "privateRegistrySecret"
+	s3SecretKey                = "s3CredentialSecret"
+	weaveSecretKey             = "weavePasswordSecret"
+	vsphereSecretKey           = "vsphereSecret"
+	virtualCenterSecretKey     = "virtualCenterSecret"
+	openStackSecretKey         = "openStackSecret"
+	aadClientSecretKey         = "aadClientSecret"
+	aadClientCertSecretKey     = "aadClientCertSecret"
+	clusterCRIDockerdAnn       = "io.cattle.cluster.cridockerd.enable"
 )
 
 type Store struct {
@@ -66,6 +82,9 @@ type Store struct {
 	ClusterLister                 v3.ClusterLister
 	DialerFactory                 dialer.Factory
 	ClusterClient                 dynamic.ResourceInterface
+	SecretClient                  v1.SecretInterface
+	SecretLister                  v1.SecretLister
+	secretMigrator                *secretmigrator.Migrator
 }
 
 type transformer struct {
@@ -138,6 +157,11 @@ func GetClusterStore(schema *types.Schema, mgmt *config.ScaledContext, clusterMa
 		ClusterLister:                 mgmt.Management.Clusters("").Controller().Lister(),
 		NodeLister:                    mgmt.Management.Nodes("").Controller().Lister(),
 		DialerFactory:                 mgmt.Dialer,
+		SecretLister:                  mgmt.Core.Secrets("").Controller().Lister(),
+		secretMigrator: secretmigrator.NewMigrator(
+			mgmt.Core.Secrets("").Controller().Lister(),
+			mgmt.Core.Secrets(""),
+		),
 	}
 
 	dynamicClient, err := dynamic.NewForConfig(&mgmt.RESTConfig)
@@ -188,6 +212,17 @@ func (r *Store) ByID(apiContext *types.APIContext, schema *types.Schema, id stri
 	return r.Store.ByID(apiContext, schema, id)
 }
 
+type secrets struct {
+	regSecret       *corev1.Secret
+	s3Secret        *corev1.Secret
+	weaveSecret     *corev1.Secret
+	vsphereSecret   *corev1.Secret
+	vcenterSecret   *corev1.Secret
+	openStackSecret *corev1.Secret
+	aadClientSecret *corev1.Secret
+	aadCertSecret   *corev1.Secret
+}
+
 func (r *Store) Create(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}) (map[string]interface{}, error) {
 	name := convert.ToString(data["name"])
 	if name == "" {
@@ -208,16 +243,18 @@ func (r *Store) Create(apiContext *types.APIContext, schema *types.Schema, data 
 			return nil, err
 		}
 		clusterConfigSchema := apiContext.Schemas.Schema(&managementschema.Version, managementv3.ClusterSpecBaseType)
-		data, err = loadDataFromTemplate(clusterTemplateRevision, clusterTemplate, data, clusterConfigSchema, nil)
+		data, err = loadDataFromTemplate(clusterTemplateRevision, clusterTemplate, data, clusterConfigSchema, nil, r.SecretLister)
 		if err != nil {
 			return nil, err
 		}
+		data = cleanQuestions(data)
 	}
 
 	err := setKubernetesVersion(data, true)
 	if err != nil {
 		return nil, err
 	}
+	enableCRIDockerd(data)
 	// enable local backups for rke clusters by default
 	enableLocalBackup(data)
 	if err := setNodeUpgradeStrategy(data, nil); err != nil {
@@ -250,8 +287,115 @@ func (r *Store) Create(apiContext *types.APIContext, schema *types.Schema, data 
 	if err := validateS3Credentials(data, nil); err != nil {
 		return nil, err
 	}
+	if err := validateKeyRotation(data); err != nil {
+		return nil, err
+	}
+	cleanPrivateRegistry(data)
 
-	return r.Store.Create(apiContext, schema, data)
+	allSecrets, err := r.migrateSecrets(apiContext.Request.Context(), data, nil, "", "", "", "", "", "", "", "")
+	if err != nil {
+		return nil, err
+	}
+
+	data, err = r.Store.Create(apiContext, schema, data)
+	if err != nil {
+		if allSecrets.regSecret != nil {
+			if cleanupErr := r.secretMigrator.Cleanup(allSecrets.regSecret.Name); cleanupErr != nil {
+				logrus.Errorf("cluster store: encountered error while handling migration error: %v, original error: %v", cleanupErr, err)
+			}
+		}
+		if allSecrets.s3Secret != nil {
+			if cleanupErr := r.secretMigrator.Cleanup(allSecrets.s3Secret.Name); cleanupErr != nil {
+				logrus.Errorf("cluster store: encountered error while handling migration error: %v, original error: %v", cleanupErr, err)
+			}
+		}
+		if allSecrets.weaveSecret != nil {
+			if cleanupErr := r.secretMigrator.Cleanup(allSecrets.weaveSecret.Name); cleanupErr != nil {
+				logrus.Errorf("cluster store: encountered error while handling migration error: %v, original error: %v", cleanupErr, err)
+			}
+		}
+		if allSecrets.vsphereSecret != nil {
+			if cleanupErr := r.secretMigrator.Cleanup(allSecrets.vsphereSecret.Name); cleanupErr != nil {
+				logrus.Errorf("cluster store: encountered error while handling migration error: %v, original error: %v", cleanupErr, err)
+			}
+		}
+		if allSecrets.vcenterSecret != nil {
+			if cleanupErr := r.secretMigrator.Cleanup(allSecrets.vcenterSecret.Name); cleanupErr != nil {
+				logrus.Errorf("cluster store: encountered error while handling migration error: %v, original error: %v", cleanupErr, err)
+			}
+		}
+		if allSecrets.openStackSecret != nil {
+			if cleanupErr := r.secretMigrator.Cleanup(allSecrets.openStackSecret.Name); cleanupErr != nil {
+				logrus.Errorf("cluster store: encountered error while handling migration error: %v, original error: %v", cleanupErr, err)
+			}
+		}
+		if allSecrets.aadClientSecret != nil {
+			if cleanupErr := r.secretMigrator.Cleanup(allSecrets.aadClientSecret.Name); cleanupErr != nil {
+				logrus.Errorf("cluster store: encountered error while handling migration error: %v, original error: %v", cleanupErr, err)
+			}
+		}
+		if allSecrets.aadCertSecret != nil {
+			if cleanupErr := r.secretMigrator.Cleanup(allSecrets.aadCertSecret.Name); cleanupErr != nil {
+				logrus.Errorf("cluster store: encountered error while handling migration error: %v, original error: %v", cleanupErr, err)
+			}
+		}
+		return nil, err
+	}
+	owner := metav1.OwnerReference{
+		APIVersion: "management.cattle.io/v3",
+		Kind:       "Cluster",
+		Name:       data["id"].(string),
+		UID:        k8sTypes.UID(data["uuid"].(string)),
+	}
+	if allSecrets.regSecret != nil {
+		err = r.secretMigrator.UpdateSecretOwnerReference(allSecrets.regSecret, owner)
+		if err != nil {
+			logrus.Errorf("cluster store: failed to set %s %s as secret owner", owner.Kind, owner.Name)
+		}
+	}
+	if allSecrets.s3Secret != nil {
+		err = r.secretMigrator.UpdateSecretOwnerReference(allSecrets.s3Secret, owner)
+		if err != nil {
+			logrus.Errorf("cluster store: failed to set %s %s as secret owner", owner.Kind, owner.Name)
+		}
+	}
+	if allSecrets.weaveSecret != nil {
+		err = r.secretMigrator.UpdateSecretOwnerReference(allSecrets.weaveSecret, owner)
+		if err != nil {
+			logrus.Errorf("cluster store: failed to set %s %s as secret owner", owner.Kind, owner.Name)
+		}
+	}
+	if allSecrets.vsphereSecret != nil {
+		err = r.secretMigrator.UpdateSecretOwnerReference(allSecrets.vsphereSecret, owner)
+		if err != nil {
+			logrus.Errorf("cluster store: failed to set %s %s as secret owner", owner.Kind, owner.Name)
+		}
+	}
+	if allSecrets.vcenterSecret != nil {
+		err = r.secretMigrator.UpdateSecretOwnerReference(allSecrets.vcenterSecret, owner)
+		if err != nil {
+			logrus.Errorf("cluster store: failed to set %s %s as secret owner", owner.Kind, owner.Name)
+		}
+	}
+	if allSecrets.openStackSecret != nil {
+		err = r.secretMigrator.UpdateSecretOwnerReference(allSecrets.openStackSecret, owner)
+		if err != nil {
+			logrus.Errorf("cluster store: failed to set %s %s as secret owner", owner.Kind, owner.Name)
+		}
+	}
+	if allSecrets.aadClientSecret != nil {
+		err = r.secretMigrator.UpdateSecretOwnerReference(allSecrets.aadClientSecret, owner)
+		if err != nil {
+			logrus.Errorf("cluster store: failed to set %s %s as secret owner", owner.Kind, owner.Name)
+		}
+	}
+	if allSecrets.aadCertSecret != nil {
+		err = r.secretMigrator.UpdateSecretOwnerReference(allSecrets.aadCertSecret, owner)
+		if err != nil {
+			logrus.Errorf("cluster store: failed to set %s %s as secret owner", owner.Kind, owner.Name)
+		}
+	}
+	return data, nil
 }
 
 func transposeNameFields(data map[string]interface{}, clusterConfigSchema *types.Schema) map[string]interface{} {
@@ -269,8 +413,13 @@ func transposeNameFields(data map[string]interface{}, clusterConfigSchema *types
 	return data
 }
 
-func loadDataFromTemplate(clusterTemplateRevision *v3.ClusterTemplateRevision, clusterTemplate *v3.ClusterTemplate, data map[string]interface{}, clusterConfigSchema *types.Schema, existingCluster map[string]interface{}) (map[string]interface{}, error) {
-	dataFromTemplate, err := convert.EncodeToMap(clusterTemplateRevision.Spec.ClusterConfig)
+func loadDataFromTemplate(clusterTemplateRevision *v3.ClusterTemplateRevision, clusterTemplate *v3.ClusterTemplate, data map[string]interface{}, clusterConfigSchema *types.Schema, existingCluster map[string]interface{}, secretLister v1.SecretLister) (map[string]interface{}, error) {
+	clusterConfig := *clusterTemplateRevision.Spec.ClusterConfig.DeepCopy()
+	clusterConfigSpec, err := secretmigrator.AssembleRKEConfigTemplateSpec(clusterTemplateRevision, v32.ClusterSpec{ClusterSpecBase: clusterConfig}, secretLister)
+	if err != nil {
+		return nil, err
+	}
+	dataFromTemplate, err := convert.EncodeToMap(clusterConfigSpec)
 	if err != nil {
 		return nil, err
 	}
@@ -287,7 +436,48 @@ func loadDataFromTemplate(clusterTemplateRevision *v3.ClusterTemplateRevision, c
 
 	defaultedAnswers := make(map[string]string)
 
+	// The key in the map is used to preserve the order of registries
+	registryMap := make(map[int]map[string]interface{})
+	existingRegistries := convert.ToMapSlice(convert.ToMapInterface(existingCluster[managementv3.ClusterSpecFieldRancherKubernetesEngineConfig])[managementv3.RancherKubernetesEngineConfigFieldPrivateRegistries])
+	privateRegistryOverride := false
+	for i, registry := range existingRegistries {
+		registryMap[i] = registry
+	}
+	processingError := "Error processing clusterTemplate answers"
 	for _, question := range clusterTemplateRevision.Spec.Questions {
+		if question.Default == "" {
+			if secretmigrator.MatchesQuestionPath(question.Variable) {
+				if strings.HasPrefix(question.Variable, "rancherKubernetesEngineConfig.privateRegistries") {
+
+					registries, ok := values.GetSlice(dataFromTemplate, "rancherKubernetesEngineConfig", "privateRegistries")
+					if !ok {
+						return nil, httperror.WrapAPIError(err, httperror.ServerError, processingError)
+					}
+					index, err := getIndexFromQuestion(question.Variable)
+					if err != nil {
+						return nil, httperror.WrapAPIError(err, httperror.ServerError, processingError)
+					}
+					question.Default = registries[index]["password"].(string)
+				} else if strings.HasPrefix(question.Variable, "rancherKubernetesEngineConfig.cloudProvider.vsphereCloudProvider.virtualCenter") {
+					vcenters, ok := values.GetValue(dataFromTemplate, "rancherKubernetesEngineConfig", "cloudProvider", "vsphereCloudProvider", "virtualCenter")
+					if !ok {
+						return nil, httperror.WrapAPIError(err, httperror.ServerError, processingError)
+					}
+					key, err := getKeyFromQuestion(question.Variable)
+					if err != nil {
+						return nil, httperror.WrapAPIError(err, httperror.ServerError, processingError)
+					}
+					question.Default = vcenters.(map[string]interface{})[key].(map[string]interface{})["password"].(string)
+
+				} else {
+					keyParts := strings.Split(question.Variable, ".")
+					qDefault, ok := values.GetValue(dataFromTemplate, keyParts...)
+					if ok {
+						question.Default = qDefault.(string)
+					}
+				}
+			}
+		}
 		answer, ok := allAnswers[question.Variable]
 		if !ok {
 			if question.Required && question.Default == "" {
@@ -303,16 +493,41 @@ func loadDataFromTemplate(clusterTemplateRevision *v3.ClusterTemplateRevision, c
 		}
 		val, err := builder.ConvertSimple(question.Type, answer, builder.Create)
 		if err != nil {
-			return nil, httperror.WrapAPIError(err, httperror.ServerError, "Error processing clusterTemplate answers")
+			return nil, httperror.WrapAPIError(err, httperror.ServerError, processingError)
 		}
 		keyParts := strings.Split(question.Variable, ".")
-		values.PutValue(dataFromTemplate, val, keyParts...)
+		if strings.HasPrefix(question.Variable, "rancherKubernetesEngineConfig.privateRegistries") {
+			privateRegistryOverride = true
+			// for example: question.Variable = rancherKubernetesEngineConfig.privateRegistries[0].url
+			index, err := getIndexFromQuestion(question.Variable)
+			if err != nil {
+				return nil, httperror.WrapAPIError(err, httperror.ServerError, "Error processing clusterTemplate answers to private registry")
+			}
+			key := keyParts[len(keyParts)-1]
+			if _, ok := registryMap[index]; ok {
+				registryMap[index][key] = val
+			} else {
+				registryMap[index] = map[string]interface{}{
+					key: val,
+				}
+			}
+		} else {
+			values.PutValue(dataFromTemplate, val, keyParts...)
+		}
 
 		questionMap, err := convert.EncodeToMap(question)
 		if err != nil {
 			return nil, httperror.WrapAPIError(err, httperror.ServerError, "Error reading clusterTemplate questions")
 		}
 		revisionQuestions = append(revisionQuestions, questionMap)
+	}
+	if len(registryMap) > 0 && privateRegistryOverride {
+		registries, err := convertRegistryMapToSliceInOrder(registryMap)
+		if err != nil {
+			return nil, httperror.WrapAPIError(err, httperror.ServerError, "Error processing clusterTemplate answers to private registry")
+		}
+		// save privateRegistries back to rancherKubernetesEngineConfig
+		values.PutValue(dataFromTemplate, registries, managementv3.ClusterSpecFieldRancherKubernetesEngineConfig, managementv3.RancherKubernetesEngineConfigFieldPrivateRegistries)
 	}
 	//save defaultAnswers to answer
 	if allAnswers == nil {
@@ -352,6 +567,47 @@ func loadDataFromTemplate(clusterTemplateRevision *v3.ClusterTemplateRevision, c
 	}
 
 	return dataFromTemplate, nil
+}
+
+func convertRegistryMapToSliceInOrder(registryMap map[int]map[string]interface{}) ([]map[string]interface{}, error) {
+	size := len(registryMap)
+	registries := make([]map[string]interface{}, size)
+	for k, v := range registryMap {
+		if k >= size {
+			return nil, fmt.Errorf("the index %d is out of the bound of the registry list (size of %d)", k, size)
+		}
+		registries[k] = v
+		registries[k][managementv3.PrivateRegistryFieldIsDefault] = false
+	}
+	// set the first registry in the list as the default registry if it exists
+	if len(registries) > 0 {
+		registries[0][managementv3.PrivateRegistryFieldIsDefault] = true
+	}
+	return registries, nil
+}
+
+func getIndexFromQuestion(question string) (int, error) {
+	re, err := regexp.Compile(`\[\d+\]`)
+	if err != nil {
+		return 0, err
+	}
+	target := re.FindString(question)
+	if target == "" {
+		return 0, fmt.Errorf("cannot get index from the question: %s", question)
+	}
+	return strconv.Atoi(target[1 : len(target)-1])
+}
+
+func getKeyFromQuestion(question string) (string, error) {
+	re, err := regexp.Compile(`\[.+\]`)
+	if err != nil {
+		return "", err
+	}
+	target := re.FindString(question)
+	if target == "" {
+		return "", fmt.Errorf("cannot get key from the question: %s", question)
+	}
+	return target[1 : len(target)-1], nil
 }
 
 func hasTemplate(data map[string]interface{}) bool {
@@ -504,10 +760,11 @@ func (r *Store) Update(apiContext *types.APIContext, schema *types.Schema, data 
 		}
 
 		clusterConfigSchema := apiContext.Schemas.Schema(&managementschema.Version, managementv3.ClusterSpecBaseType)
-		clusterUpdate, err := loadDataFromTemplate(clusterTemplateRevision, clusterTemplate, data, clusterConfigSchema, existingCluster)
+		clusterUpdate, err := loadDataFromTemplate(clusterTemplateRevision, clusterTemplate, data, clusterConfigSchema, existingCluster, r.SecretLister)
 		if err != nil {
 			return nil, err
 		}
+		clusterUpdate = cleanQuestions(clusterUpdate)
 
 		data = clusterUpdate
 
@@ -527,6 +784,7 @@ func (r *Store) Update(apiContext *types.APIContext, schema *types.Schema, data 
 	if err != nil {
 		return nil, err
 	}
+	enableCRIDockerd(data)
 	if err := setNodeUpgradeStrategy(data, existingCluster); err != nil {
 		return nil, err
 	}
@@ -539,15 +797,15 @@ func (r *Store) Update(apiContext *types.APIContext, schema *types.Schema, data 
 		return nil, httperror.NewFieldAPIError(httperror.InvalidOption, "enableNetworkPolicy", err.Error())
 	}
 
-	setBackupConfigSecretKeyIfNotExists(existingCluster, data)
-	setPrivateRegistryPasswordIfNotExists(existingCluster, data)
-	setCloudProviderPasswordFieldsIfNotExists(existingCluster, data)
-	setWeavePasswordFieldsIfNotExists(existingCluster, data)
+	cleanPrivateRegistry(data)
 	dialer, err := r.DialerFactory.ClusterDialer(id)
 	if err != nil {
 		return nil, errors.Wrap(err, "error getting dialer")
 	}
 	if err := validateUpdatedS3Credentials(existingCluster, data, dialer); err != nil {
+		return nil, err
+	}
+	if err := validateKeyRotation(data); err != nil {
 		return nil, err
 	}
 	handleScheduledScan(data)
@@ -571,7 +829,179 @@ func (r *Store) Update(apiContext *types.APIContext, schema *types.Schema, data 
 		}
 	}
 
-	return r.Store.Update(apiContext, schema, data, id)
+	getSecretByKey := func(key string) string {
+		if v, ok := values.GetValue(existingCluster, clusterSecrets, key); ok && v.(string) != "" {
+			return v.(string)
+		}
+		if v, ok := values.GetValue(existingCluster, key); ok {
+			return v.(string)
+		}
+		return ""
+	}
+	currentRegSecret := getSecretByKey(registrySecretKey)
+	currentS3Secret := getSecretByKey(s3SecretKey)
+	currentWeaveSecret := getSecretByKey(weaveSecretKey)
+	currentVsphereSecret := getSecretByKey(vsphereSecretKey)
+	currentVcenterSecret := getSecretByKey(virtualCenterSecretKey)
+	currentOpenStackSecret := getSecretByKey(openStackSecretKey)
+	currentAADClientSecret := getSecretByKey(aadClientSecretKey)
+	currentAADCertSecret := getSecretByKey(aadClientCertSecretKey)
+	allSecrets, err := r.migrateSecrets(apiContext.Request.Context(), data, existingCluster, currentRegSecret, currentS3Secret, currentWeaveSecret, currentVsphereSecret, currentVcenterSecret, currentOpenStackSecret, currentAADClientSecret, currentAADCertSecret)
+	if err != nil {
+		return nil, err
+	}
+	data, err = r.Store.Update(apiContext, schema, data, id)
+	if err != nil {
+		if allSecrets.regSecret != nil && currentRegSecret == "" {
+			if cleanupErr := r.secretMigrator.Cleanup(allSecrets.regSecret.Name); cleanupErr != nil {
+				logrus.Errorf("cluster store: encountered error while handling migration error: %v, original error: %v", cleanupErr, err)
+			}
+		}
+		if allSecrets.s3Secret != nil && currentS3Secret == "" {
+			if cleanupErr := r.secretMigrator.Cleanup(allSecrets.s3Secret.Name); cleanupErr != nil {
+				logrus.Errorf("cluster store: encountered error while handling migration error: %v, original error: %v", cleanupErr, err)
+			}
+		}
+		if allSecrets.weaveSecret != nil && currentWeaveSecret == "" {
+			if cleanupErr := r.secretMigrator.Cleanup(allSecrets.weaveSecret.Name); cleanupErr != nil {
+				logrus.Errorf("cluster store: encountered error while handling migration error: %v, original error: %v", cleanupErr, err)
+			}
+		}
+		if allSecrets.vsphereSecret != nil && currentVsphereSecret == "" {
+			if cleanupErr := r.secretMigrator.Cleanup(allSecrets.vsphereSecret.Name); cleanupErr != nil {
+				logrus.Errorf("cluster store: encountered error while handling migration error: %v, original error: %v", cleanupErr, err)
+			}
+		}
+		if allSecrets.vcenterSecret != nil && currentVcenterSecret == "" {
+			if cleanupErr := r.secretMigrator.Cleanup(allSecrets.vcenterSecret.Name); cleanupErr != nil {
+				logrus.Errorf("cluster store: encountered error while handling migration error: %v, original error: %v", cleanupErr, err)
+			}
+		}
+		if allSecrets.openStackSecret != nil && currentOpenStackSecret == "" {
+			if cleanupErr := r.secretMigrator.Cleanup(allSecrets.openStackSecret.Name); cleanupErr != nil {
+				logrus.Errorf("cluster store: encountered error while handling migration error: %v, original error: %v", cleanupErr, err)
+			}
+		}
+		if allSecrets.aadClientSecret != nil && currentAADClientSecret == "" {
+			if cleanupErr := r.secretMigrator.Cleanup(allSecrets.aadClientSecret.Name); cleanupErr != nil {
+				logrus.Errorf("cluster store: encountered error while handling migration error: %v, original error: %v", cleanupErr, err)
+			}
+		}
+		if allSecrets.aadCertSecret != nil && currentAADCertSecret == "" {
+			if cleanupErr := r.secretMigrator.Cleanup(allSecrets.aadCertSecret.Name); cleanupErr != nil {
+				logrus.Errorf("cluster store: encountered error while handling migration error: %v, original error: %v", cleanupErr, err)
+			}
+		}
+	}
+	if allSecrets.regSecret != nil || allSecrets.s3Secret != nil || allSecrets.weaveSecret != nil || allSecrets.vsphereSecret != nil || allSecrets.vcenterSecret != nil || allSecrets.openStackSecret != nil || allSecrets.aadClientSecret != nil || allSecrets.aadCertSecret != nil {
+		if r.ClusterClient == nil {
+			return nil, fmt.Errorf("Error updating the cluster: k8s client is nil")
+		}
+		cluster, err := r.ClusterClient.Get(apiContext.Request.Context(), existingCluster["id"].(string), metav1.GetOptions{})
+		if err != nil {
+			return nil, err
+		}
+		if allSecrets.regSecret != nil {
+			if _, ok := existingCluster[registrySecretKey]; ok {
+				values.RemoveValue(cluster.Object, "status", registrySecretKey)
+			}
+		}
+		if allSecrets.s3Secret != nil {
+			if _, ok := existingCluster[s3SecretKey]; ok {
+				values.RemoveValue(cluster.Object, "status", s3SecretKey)
+			}
+		}
+		if allSecrets.weaveSecret != nil {
+			if _, ok := existingCluster[weaveSecretKey]; ok {
+				values.RemoveValue(cluster.Object, "status", weaveSecretKey)
+			}
+		}
+		if allSecrets.vsphereSecret != nil {
+			if _, ok := existingCluster[vsphereSecretKey]; ok {
+				values.RemoveValue(cluster.Object, "status", vsphereSecretKey)
+			}
+		}
+		if allSecrets.vcenterSecret != nil {
+			if _, ok := existingCluster[virtualCenterSecretKey]; ok {
+				values.RemoveValue(cluster.Object, "status", virtualCenterSecretKey)
+			}
+		}
+		if allSecrets.openStackSecret != nil {
+			if _, ok := existingCluster[openStackSecretKey]; ok {
+				values.RemoveValue(cluster.Object, "status", openStackSecretKey)
+			}
+		}
+		if allSecrets.aadClientSecret != nil {
+			if _, ok := existingCluster[aadClientSecretKey]; ok {
+				values.RemoveValue(cluster.Object, "status", aadClientSecretKey)
+			}
+		}
+		if allSecrets.aadCertSecret != nil {
+			if _, ok := existingCluster[aadClientCertSecretKey]; ok {
+				values.RemoveValue(cluster.Object, "status", aadClientCertSecretKey)
+			}
+		}
+		_, err = r.ClusterClient.Update(apiContext.Request.Context(), cluster, metav1.UpdateOptions{})
+		if err != nil {
+			return nil, err
+		}
+	}
+	owner := metav1.OwnerReference{
+		APIVersion: "management.cattle.io/v3",
+		Kind:       "Cluster",
+		Name:       data["id"].(string),
+		UID:        k8sTypes.UID(data["uuid"].(string)),
+	}
+	errMsg := fmt.Sprintf("cluster store: failed to set %s %s as secret owner", owner.Kind, owner.Name)
+	if allSecrets.regSecret != nil {
+		err = r.secretMigrator.UpdateSecretOwnerReference(allSecrets.regSecret, owner)
+		if err != nil {
+			logrus.Errorf(errMsg)
+		}
+	}
+	if allSecrets.s3Secret != nil {
+		err = r.secretMigrator.UpdateSecretOwnerReference(allSecrets.s3Secret, owner)
+		if err != nil {
+			logrus.Errorf(errMsg)
+		}
+	}
+	if allSecrets.weaveSecret != nil {
+		err = r.secretMigrator.UpdateSecretOwnerReference(allSecrets.weaveSecret, owner)
+		if err != nil {
+			logrus.Errorf(errMsg)
+		}
+	}
+	if allSecrets.vsphereSecret != nil {
+		err = r.secretMigrator.UpdateSecretOwnerReference(allSecrets.vsphereSecret, owner)
+		if err != nil {
+			logrus.Errorf(errMsg)
+		}
+	}
+	if allSecrets.vcenterSecret != nil {
+		err = r.secretMigrator.UpdateSecretOwnerReference(allSecrets.vcenterSecret, owner)
+		if err != nil {
+			logrus.Errorf(errMsg)
+		}
+	}
+	if allSecrets.openStackSecret != nil {
+		err = r.secretMigrator.UpdateSecretOwnerReference(allSecrets.openStackSecret, owner)
+		if err != nil {
+			logrus.Errorf(errMsg)
+		}
+	}
+	if allSecrets.aadClientSecret != nil {
+		err = r.secretMigrator.UpdateSecretOwnerReference(allSecrets.aadClientSecret, owner)
+		if err != nil {
+			logrus.Errorf(errMsg)
+		}
+	}
+	if allSecrets.aadCertSecret != nil {
+		err = r.secretMigrator.UpdateSecretOwnerReference(allSecrets.aadCertSecret, owner)
+		if err != nil {
+			logrus.Errorf(errMsg)
+		}
+	}
+	return data, err
 }
 
 // this method moves the cluster config to and from the genericEngineConfig field so that
@@ -645,6 +1075,87 @@ func (r *Store) updateClusterByK8sclient(ctx context.Context, id, name string, d
 	values.RemoveValue(object.Object, "spec", "displayName")
 
 	return object.Object["spec"].(map[string]interface{}), nil
+}
+
+func (r *Store) migrateSecrets(ctx context.Context, data, existingCluster map[string]interface{}, currentReg, currentS3, currentWeave, currentVsphere, currentVCenter, currentOpenStack, currentAADClientSecret, currentAADCert string) (secrets, error) {
+	rkeConfig, err := getRkeConfig(data)
+	if err != nil || rkeConfig == nil {
+		return secrets{}, err
+	}
+	var s secrets
+	s.regSecret, err = r.secretMigrator.CreateOrUpdatePrivateRegistrySecret(currentReg, rkeConfig, nil)
+	if err != nil {
+		return secrets{}, err
+	}
+	if s.regSecret != nil {
+		values.PutValue(data, s.regSecret.Name, clusterSecrets, registrySecretKey)
+		rkeConfig.PrivateRegistries = secretmigrator.CleanRegistries(rkeConfig.PrivateRegistries)
+	}
+	s.s3Secret, err = r.secretMigrator.CreateOrUpdateS3Secret(currentS3, rkeConfig, nil)
+	if err != nil {
+		return secrets{}, err
+	}
+	if s.s3Secret != nil {
+		values.PutValue(data, s.s3Secret.Name, clusterSecrets, s3SecretKey)
+		rkeConfig.Services.Etcd.BackupConfig.S3BackupConfig.SecretKey = ""
+	}
+	s.weaveSecret, err = r.secretMigrator.CreateOrUpdateWeaveSecret(currentWeave, rkeConfig, nil)
+	if err != nil {
+		return secrets{}, err
+	}
+	if s.weaveSecret != nil {
+		values.PutValue(data, s.weaveSecret.Name, clusterSecrets, weaveSecretKey)
+		rkeConfig.Network.WeaveNetworkProvider.Password = ""
+	}
+	s.vsphereSecret, err = r.secretMigrator.CreateOrUpdateVsphereGlobalSecret(currentVsphere, rkeConfig, nil)
+	if err != nil {
+		return secrets{}, err
+	}
+	if s.vsphereSecret != nil {
+		values.PutValue(data, s.vsphereSecret.Name, clusterSecrets, vsphereSecretKey)
+		rkeConfig.CloudProvider.VsphereCloudProvider.Global.Password = ""
+	}
+	s.vcenterSecret, err = r.secretMigrator.CreateOrUpdateVsphereVirtualCenterSecret(currentVCenter, rkeConfig, nil)
+	if err != nil {
+		return secrets{}, err
+	}
+	if s.vcenterSecret != nil {
+		values.PutValue(data, s.vcenterSecret.Name, clusterSecrets, virtualCenterSecretKey)
+		for k, v := range rkeConfig.CloudProvider.VsphereCloudProvider.VirtualCenter {
+			v.Password = ""
+			rkeConfig.CloudProvider.VsphereCloudProvider.VirtualCenter[k] = v
+		}
+	}
+	s.openStackSecret, err = r.secretMigrator.CreateOrUpdateOpenStackSecret(currentOpenStack, rkeConfig, nil)
+	if err != nil {
+		return secrets{}, err
+	}
+	if s.openStackSecret != nil {
+		values.PutValue(data, s.openStackSecret.Name, clusterSecrets, openStackSecretKey)
+		rkeConfig.CloudProvider.OpenstackCloudProvider.Global.Password = ""
+	}
+	s.aadClientSecret, err = r.secretMigrator.CreateOrUpdateAADClientSecret(currentAADClientSecret, rkeConfig, nil)
+	if err != nil {
+		return secrets{}, err
+	}
+	if s.aadClientSecret != nil {
+		values.PutValue(data, s.aadClientSecret.Name, clusterSecrets, aadClientSecretKey)
+		rkeConfig.CloudProvider.AzureCloudProvider.AADClientSecret = ""
+	}
+	s.aadCertSecret, err = r.secretMigrator.CreateOrUpdateAADCertSecret(currentAADCert, rkeConfig, nil)
+	if err != nil {
+		return secrets{}, err
+	}
+	if s.aadCertSecret != nil {
+		values.PutValue(data, s.aadCertSecret.Name, clusterSecrets, aadClientCertSecretKey)
+		rkeConfig.CloudProvider.AzureCloudProvider.AADClientCertPassword = ""
+	}
+
+	data["rancherKubernetesEngineConfig"], err = convert.EncodeToMap(rkeConfig)
+	if err != nil {
+		return secrets{}, err
+	}
+	return s, nil
 }
 
 func canUseClusterName(apiContext *types.APIContext, requestedName string) error {
@@ -850,6 +1361,24 @@ func enableLocalBackup(data map[string]interface{}) {
 	}
 }
 
+func enableCRIDockerd(data map[string]interface{}) {
+	rkeConfig, ok := values.GetValue(data, "rancherKubernetesEngineConfig")
+	if ok && rkeConfig != nil {
+		k8sVersion := convert.ToString(values.GetValueN(data, "rancherKubernetesEngineConfig", "kubernetesVersion"))
+		if mVersion.Compare(k8sVersion, "v1.24.0-rancher1-1", ">=") {
+			annotation, _ := values.GetValue(data, managementv3.ClusterFieldAnnotations)
+			m := toMap(annotation)
+			var enableCRIDockerd124 bool
+			if enable, ok := m[clusterCRIDockerdAnn]; ok && convert.ToString(enable) == "false" {
+				values.PutValue(data, enableCRIDockerd124, "rancherKubernetesEngineConfig", "enableCriDockerd")
+				return
+			}
+			enableCRIDockerd124 = true
+			values.PutValue(data, enableCRIDockerd124, "rancherKubernetesEngineConfig", "enableCriDockerd")
+		}
+	}
+}
+
 func handleScheduleScanScheduleConfig(data map[string]interface{}) {
 	scheduleConfigData, ok := values.GetValue(data, "scheduledClusterScan", "scheduleConfig")
 	if !ok || (ok && scheduleConfigData == nil) {
@@ -885,36 +1414,6 @@ func handleScheduledScan(data map[string]interface{}) {
 		}
 		handleScheduleScanScheduleConfig(data)
 		handleScheduleScanScanConfig(data)
-	}
-}
-
-func setBackupConfigSecretKeyIfNotExists(oldData, newData map[string]interface{}) {
-	s3BackupConfig := values.GetValueN(newData, "rancherKubernetesEngineConfig", "services", "etcd", "backupConfig", "s3BackupConfig")
-	if s3BackupConfig == nil {
-		return
-	}
-	val := convert.ToMapInterface(s3BackupConfig)
-	if val["secretKey"] != nil {
-		return
-	}
-	oldSecretKey := convert.ToString(values.GetValueN(oldData, "rancherKubernetesEngineConfig", "services", "etcd", "backupConfig", "s3BackupConfig", "secretKey"))
-	if oldSecretKey != "" {
-		values.PutValue(newData, oldSecretKey, "rancherKubernetesEngineConfig", "services", "etcd", "backupConfig", "s3BackupConfig", "secretKey")
-	}
-}
-
-func setWeavePasswordFieldsIfNotExists(oldData, newData map[string]interface{}) {
-	weaveConfig := values.GetValueN(newData, "rancherKubernetesEngineConfig", "network", "weaveNetworkProvider")
-	if weaveConfig == nil {
-		return
-	}
-	val := convert.ToMapInterface(weaveConfig)
-	if val["password"] != nil {
-		return
-	}
-	oldWeavePassword := convert.ToString(values.GetValueN(oldData, "rancherKubernetesEngineConfig", "network", "weaveNetworkProvider", "password"))
-	if oldWeavePassword != "" {
-		values.PutValue(newData, oldWeavePassword, "rancherKubernetesEngineConfig", "network", "weaveNetworkProvider", "password")
 	}
 }
 
@@ -971,81 +1470,24 @@ func validateS3Credentials(data map[string]interface{}, dialer dialer.Dialer) er
 	return nil
 }
 
-func setPrivateRegistryPasswordIfNotExists(oldData, newData map[string]interface{}) {
-	newSlice, ok := values.GetSlice(newData, "rancherKubernetesEngineConfig", "privateRegistries")
-	if !ok || newSlice == nil {
+func cleanPrivateRegistry(data map[string]interface{}) {
+	registries, ok := values.GetSlice(data, "rancherKubernetesEngineConfig", "privateRegistries")
+	if !ok || registries == nil {
 		return
 	}
-	oldSlice, ok := values.GetSlice(oldData, "rancherKubernetesEngineConfig", "privateRegistries")
-	if !ok || oldSlice == nil {
-		return
-	}
-
-	var updatedConfig []map[string]interface{}
-	for _, newConfig := range newSlice {
-		if newConfig["password"] != nil {
-			updatedConfig = append(updatedConfig, newConfig)
-			continue
-		}
-		for _, oldConfig := range oldSlice {
-			if newConfig["url"] == oldConfig["url"] && newConfig["user"] == oldConfig["user"] &&
-				oldConfig["password"] != nil {
-				newConfig["password"] = oldConfig["password"]
-				break
+	var updatedRegistries []map[string]interface{}
+	for _, registry := range registries {
+		if registry["ecrCredentialPlugin"] != nil {
+			awsAccessKeyID, _ := values.GetValue(registry, "ecrCredentialPlugin", "awsAccessKeyId")
+			awsSecretAccessKey, _ := values.GetValue(registry, "ecrCredentialPlugin", "awsSecretAccessKey")
+			awsAccessToken, _ := values.GetValue(registry, "ecrCredentialPlugin", "awsAccessToken")
+			if awsAccessKeyID == nil && awsSecretAccessKey == nil && awsAccessToken == nil {
+				delete(registry, "ecrCredentialPlugin")
 			}
 		}
-		updatedConfig = append(updatedConfig, newConfig)
+		updatedRegistries = append(updatedRegistries, registry)
 	}
-	values.PutValue(newData, updatedConfig, "rancherKubernetesEngineConfig", "privateRegistries")
-}
-
-func setCloudProviderPasswordFieldsIfNotExists(oldData, newData map[string]interface{}) {
-	replaceWithOldSecretIfNotExists(oldData, newData, "openstackCloudProvider", "rancherKubernetesEngineConfig", "cloudProvider", "openstackCloudProvider", "global", "password")
-	replaceWithOldSecretIfNotExists(oldData, newData, "vsphereCloudProvider", "rancherKubernetesEngineConfig", "cloudProvider", "vsphereCloudProvider", "global", "password")
-	azureCloudProviderPasswordFields := []string{"aadClientSecret", "aadClientCertPassword"}
-	for _, secretField := range azureCloudProviderPasswordFields {
-		replaceWithOldSecretIfNotExists(oldData, newData, "azureCloudProvider", "rancherKubernetesEngineConfig", "cloudProvider", "azureCloudProvider", secretField)
-	}
-	vSphereCloudProviderConfig := values.GetValueN(newData, "rancherKubernetesEngineConfig", "cloudProvider", "vsphereCloudProvider")
-	if vSphereCloudProviderConfig == nil {
-		return
-	}
-	newVCenter := values.GetValueN(newData, "rancherKubernetesEngineConfig", "cloudProvider", "vsphereCloudProvider", "virtualCenter")
-	if newVCenter != nil {
-		oldVCenter := values.GetValueN(oldData, "rancherKubernetesEngineConfig", "cloudProvider", "vsphereCloudProvider", "virtualCenter")
-		newVCenterMap := convert.ToMapInterface(newVCenter)
-		oldVCenterMap := convert.ToMapInterface(oldVCenter)
-		for vCenterName, vCenterConfigInterface := range newVCenterMap {
-			vCenterConfig := convert.ToMapInterface(vCenterConfigInterface)
-			if vCenterConfig["password"] != nil {
-				continue
-			}
-			// new vcenter has no password provided
-			// see if this vcenter exists in oldData
-			if oldVCenterConfigInterface, ok := oldVCenterMap[vCenterName]; ok {
-				oldVCenterConfig := convert.ToMapInterface(oldVCenterConfigInterface)
-				if oldVCenterConfig["password"] != nil {
-					vCenterConfig["password"] = oldVCenterConfig["password"]
-					newVCenterMap[vCenterName] = vCenterConfig
-				}
-			}
-		}
-	}
-}
-
-func replaceWithOldSecretIfNotExists(oldData, newData map[string]interface{}, cloudProviderName string, keys ...string) {
-	cloudProviderConfig := values.GetValueN(newData, "rancherKubernetesEngineConfig", "cloudProvider", cloudProviderName)
-	if cloudProviderConfig == nil {
-		return
-	}
-	newSecret := convert.ToString(values.GetValueN(newData, keys...))
-	if newSecret != "" {
-		return
-	}
-	oldSecret := convert.ToString(values.GetValueN(oldData, keys...))
-	if oldSecret != "" {
-		values.PutValue(newData, oldSecret, keys...)
-	}
+	values.PutValue(data, updatedRegistries, "rancherKubernetesEngineConfig", "privateRegistries")
 }
 
 func (r *Store) validateUnavailableNodes(data, existingData map[string]interface{}, id string) error {
@@ -1136,4 +1578,51 @@ func canUpgrade(nodes []*v3.Node, upgradeStrategy *rketypes.NodeUpgradeStrategy)
 			maxUnavailableWorker, workerOnlyNotReady, workerOnlyReady)
 	}
 	return nil
+}
+
+func validateKeyRotation(data map[string]interface{}) error {
+	secretsEncryptionEnabled, _ := values.GetValue(data, "rancherKubernetesEngineConfig", "services", "kubeApi", "secretsEncryptionConfig", "enabled")
+	rotateEncryptionKeyEnabled, _ := values.GetValue(data, "rancherKubernetesEngineConfig", "rotateEncryptionKey")
+	if rotateEncryptionKeyEnabled != nil && rotateEncryptionKeyEnabled == true {
+		if secretsEncryptionEnabled != nil && secretsEncryptionEnabled == false {
+			return fmt.Errorf("unable to rotate encryption key when encryption configuration is disabled")
+		}
+	}
+	return nil
+}
+
+func cleanQuestions(data map[string]interface{}) map[string]interface{} {
+	if _, ok := data["questions"]; ok {
+		questions := data["questions"].([]map[string]interface{})
+		for i, q := range questions {
+			if secretmigrator.MatchesQuestionPath(q["variable"].(string)) {
+				delete(q, "default")
+			}
+			questions[i] = q
+		}
+		values.PutValue(data, questions, "questions")
+	}
+	if _, ok := values.GetValue(data, "answers", "values"); ok {
+		values.RemoveValue(data, "answers", "values", secretmigrator.S3BackupAnswersPath)
+		values.RemoveValue(data, "answers", "values", secretmigrator.WeavePasswordAnswersPath)
+		values.RemoveValue(data, "answers", "values", secretmigrator.VsphereGlobalAnswersPath)
+		values.RemoveValue(data, "answers", "values", secretmigrator.OpenStackAnswersPath)
+		values.RemoveValue(data, "answers", "values", secretmigrator.AADClientAnswersPath)
+		values.RemoveValue(data, "answers", "values", secretmigrator.AADCertAnswersPath)
+		for i := 0; ; i++ {
+			key := fmt.Sprintf(secretmigrator.RegistryPasswordAnswersPath, i)
+			if _, ok := values.GetValue(data, "answers", "values", key); !ok {
+				break
+			}
+			values.RemoveValue(data, "answers", "values", key)
+		}
+		vcenters, ok := values.GetValue(data, "rancherKubernetesEngineConfig", "cloudProvider", "vsphereCloudProvider", "virtualCenter")
+		if ok {
+			for k := range vcenters.(map[string]interface{}) {
+				key := fmt.Sprintf(secretmigrator.VcenterAnswersPath, k)
+				values.RemoveValue(data, "answers", "values", key)
+			}
+		}
+	}
+	return data
 }

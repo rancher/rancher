@@ -5,6 +5,7 @@ import (
 
 	"github.com/hashicorp/go-multierror"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	fleetconst "github.com/rancher/rancher/pkg/fleet"
 	"github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/wrangler/pkg/relatedresource"
 	k8srbac "k8s.io/api/rbac/v1"
@@ -15,7 +16,7 @@ import (
 )
 
 func (r *rbaccontroller) enqueueGrb(namespace, _ string, obj runtime.Object) ([]relatedresource.Key, error) {
-	if fw, ok := obj.(*v3.FleetWorkspace); !ok || fw.Name == "fleet-local" {
+	if fw, ok := obj.(*v3.FleetWorkspace); !ok || fw.Name == fleetconst.ClustersLocalNamespace {
 		return nil, nil
 	}
 
@@ -51,17 +52,17 @@ func (r *rbaccontroller) ensureRestricedAdminForFleet(key string, obj *v3.Global
 
 	var finalError error
 	for _, fw := range fleetworkspaces {
-		if fw.Name == "fleet-local" {
+		if fw.Name == fleetconst.ClustersLocalNamespace {
 			continue
 		}
-		if err := r.ensureRolebinding(fw.Name, obj.UserName, obj); err != nil {
+		if err := r.ensureRolebinding(fw.Name, rbac.GetGRBSubject(obj), obj); err != nil {
 			finalError = multierror.Append(finalError, err)
 		}
 	}
 	return obj, finalError
 }
 
-func (r *rbaccontroller) ensureRolebinding(namespace, userName string, grb *v3.GlobalRoleBinding) error {
+func (r *rbaccontroller) ensureRolebinding(namespace string, subject k8srbac.Subject, grb *v3.GlobalRoleBinding) error {
 	rbName := fmt.Sprintf("%s-fleetworkspace-%s", grb.Name, rbac.RestrictedAdminClusterRoleBinding)
 	rb := &k8srbac.RoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
@@ -82,10 +83,7 @@ func (r *rbaccontroller) ensureRolebinding(namespace, userName string, grb *v3.G
 			Kind: "ClusterRole",
 		},
 		Subjects: []k8srbac.Subject{
-			{
-				Kind: "User",
-				Name: userName,
-			},
+			subject,
 		},
 	}
 	_, err := r.rbLister.Get(namespace, rbName)

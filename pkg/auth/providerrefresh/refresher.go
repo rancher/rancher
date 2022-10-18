@@ -206,6 +206,10 @@ func (r *refresher) refreshAttributes(attribs *v3.UserAttribute) (*v3.UserAttrib
 			secret := ""
 			if providers.ProvidersWithSecrets[providerName] {
 				secret, err = r.tokenMGR.GetSecret(user.Name, providerName, loginTokens[providerName])
+				if apierrors.IsNotFound(err) {
+					// There is no secret so we can't refresh, just continue to the next attribute
+					return attribs, nil
+				}
 				if err != nil {
 					return nil, err
 				}
@@ -246,6 +250,21 @@ func (r *refresher) refreshAttributes(attribs *v3.UserAttribute) (*v3.UserAttrib
 		}
 
 		attribs.GroupPrincipals[providerName] = v32.Principals{Items: newGroupPrincipals}
+
+		if principalID != "" && len(loginTokens[providerName]) > 0 {
+			// A user is 1:1 with its principal for a given provider, no need to get principals from tokens beyond the first one
+			userPrincipal, err := providers.GetPrincipal(principalID, *loginTokens[providerName][0])
+			if err != nil {
+				return nil, err
+			}
+			userExtraInfo := providers.GetUserExtraAttributes(providerName, userPrincipal)
+			if userExtraInfo != nil {
+				if attribs.ExtraByProvider == nil {
+					attribs.ExtraByProvider = make(map[string]map[string][]string)
+				}
+				attribs.ExtraByProvider[providerName] = userExtraInfo
+			}
+		}
 
 		canAccessProvider := false
 

@@ -40,13 +40,13 @@ func (m *manager) reconcileProjectAccessToGlobalResources(binding *v3.ProjectRol
 		roles = append(roles, role)
 
 		for _, rt := range rts {
-			for resource := range globalResourcesNeededInProjects {
-				verbs, err := m.checkForGlobalResourceRules(rt, resource)
+			for resource, baseRule := range globalResourceRulesNeededInProjects {
+				verbs, err := m.checkForGlobalResourceRules(rt, resource, baseRule)
 				if err != nil {
 					return nil, err
 				}
 				if len(verbs) > 0 {
-					roleName, err := m.reconcileRoleForProjectAccessToGlobalResource(resource, rt, verbs)
+					roleName, err := m.reconcileRoleForProjectAccessToGlobalResource(resource, rt, verbs, baseRule)
 					if err != nil {
 						return nil, err
 					}

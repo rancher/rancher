@@ -7,13 +7,11 @@ import (
 	"time"
 
 	"github.com/blang/semver"
-	mVersion "github.com/mcuadros/go-version"
 	"github.com/pkg/errors"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/catalog/utils"
 	"github.com/rancher/rancher/pkg/controllers/managementuserlegacy/helm/common"
 	corev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
-	managementv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	projectv3 "github.com/rancher/rancher/pkg/generated/norman/project.cattle.io/v3"
 	helmlib "github.com/rancher/rancher/pkg/helm"
@@ -42,17 +40,18 @@ type Manager struct {
 	bundledMode           bool
 	ConfigMap             corev1.ConfigMapInterface
 	ConfigMapLister       corev1.ConfigMapLister
+	SecretLister          corev1.SecretLister
 }
 
 type CatalogManager interface {
-	ValidateChartCompatibility(template *v3.CatalogTemplateVersion, clusterName string) error
+	ValidateChartCompatibility(template *v3.CatalogTemplateVersion, clusterName, currentAppVersion string) error
 	ValidateKubeVersion(template *v3.CatalogTemplateVersion, clusterName string) error
-	ValidateRancherVersion(template *v3.CatalogTemplateVersion) error
+	ValidateRancherVersion(template *v3.CatalogTemplateVersion, currentAppVersion string) error
 	LatestAvailableTemplateVersion(template *v3.CatalogTemplate, clusterName string) (*v32.TemplateVersionSpec, error)
 	GetSystemAppCatalogID(templateVersionID, clusterName string) (string, error)
 }
 
-func New(management managementv3.Interface, project projectv3.Interface, core corev1.Interface) *Manager {
+func New(management v3.Interface, project projectv3.Interface, core corev1.Interface) *Manager {
 	var bundledMode bool
 	if strings.ToLower(settings.SystemCatalog.Get()) == "bundled" {
 		bundledMode = true
@@ -74,6 +73,7 @@ func New(management managementv3.Interface, project projectv3.Interface, core co
 		bundledMode:           bundledMode,
 		ConfigMap:             core.ConfigMaps(""),
 		ConfigMapLister:       core.ConfigMaps("").Controller().Lister(),
+		SecretLister:          core.Secrets("").Controller().Lister(),
 	}
 }
 
@@ -107,7 +107,7 @@ func (m *Manager) DeleteOldTemplateContent() bool {
 }
 
 func (m *Manager) DeleteBadCatalogTemplates() bool {
-	// Orphaned catalog templates and template versions may exist, remove any where the catalog does not exist
+	// Orphaned catalog templates and template versions may exist, remove anywhere the catalog does not exist
 	errs := m.deleteBadCatalogTemplates()
 	if len(errs) == 0 {
 		return true
@@ -206,8 +206,8 @@ func (m *Manager) deleteBadCatalogTemplates() []error {
 	return errs
 }
 
-func (m *Manager) ValidateChartCompatibility(template *v3.CatalogTemplateVersion, clusterName string) error {
-	if err := m.ValidateRancherVersion(template); err != nil {
+func (m *Manager) ValidateChartCompatibility(template *v3.CatalogTemplateVersion, clusterName, currentAppVersion string) error {
+	if err := m.ValidateRancherVersion(template, currentAppVersion); err != nil {
 		return err
 	}
 	return m.ValidateKubeVersion(template, clusterName)
@@ -242,9 +242,13 @@ func (m *Manager) ValidateKubeVersion(template *v3.CatalogTemplateVersion, clust
 	return nil
 }
 
-func (m *Manager) ValidateRancherVersion(template *v3.CatalogTemplateVersion) error {
-	rancherMin := template.Spec.RancherMinVersion
-	rancherMax := template.Spec.RancherMaxVersion
+func (m *Manager) ValidateRancherVersion(template *v3.CatalogTemplateVersion, currentAppVersion string) error {
+	if currentAppVersion != "" && currentAppVersion == template.Spec.Version {
+		// if current app version is provided and the version in the update is equal to it then the
+		// version is deemed okay as it is already installed. This ensures the app can continue to
+		// be edited as long as it is not being upgraded/rollbacked to another incompatible version.
+		return nil
+	}
 
 	serverVersion := settings.ServerVersion.Get()
 
@@ -253,14 +257,31 @@ func (m *Manager) ValidateRancherVersion(template *v3.CatalogTemplateVersion) er
 		return nil
 	}
 
-	if rancherMin != "" && !mVersion.Compare(serverVersion, rancherMin, ">=") {
-		return fmt.Errorf("rancher min version not met")
+	serverVersion = strings.TrimPrefix(serverVersion, "v")
+
+	versionRange := ""
+	if template.Spec.RancherMinVersion != "" {
+		versionRange += " >=" + strings.TrimPrefix(template.Spec.RancherMinVersion, "v")
+	}
+	if template.Spec.RancherMaxVersion != "" {
+		versionRange += " <=" + strings.TrimPrefix(template.Spec.RancherMaxVersion, "v")
+	}
+	if versionRange == "" {
+		return nil
+	}
+	constraint, err := semver.ParseRange(versionRange)
+	if err != nil {
+		logrus.Errorf("failed to parse constraint for rancher version %s: %v", versionRange, err)
+		return nil
 	}
 
-	if rancherMax != "" && !mVersion.Compare(serverVersion, rancherMax, "<=") {
-		return fmt.Errorf("rancher max version exceeded")
+	rancherVersion, err := semver.Parse(serverVersion)
+	if err != nil {
+		return err
 	}
-
+	if !constraint(rancherVersion) {
+		return fmt.Errorf("incompatible rancher version [%s] for template [%s]", serverVersion, template.Name)
+	}
 	return nil
 }
 
@@ -286,12 +307,10 @@ func (m *Manager) LatestAvailableTemplateVersion(template *v3.CatalogTemplate, c
 
 	for _, templateVersion := range versions {
 		catalogTemplateVersion := &v3.CatalogTemplateVersion{
-			TemplateVersion: v3.TemplateVersion{
-				Spec: templateVersion,
-			},
+			Spec: templateVersion,
 		}
 
-		if err := m.ValidateChartCompatibility(catalogTemplateVersion, clusterName); err == nil {
+		if err := m.ValidateChartCompatibility(catalogTemplateVersion, clusterName, ""); err == nil {
 			return &templateVersion, nil
 		}
 	}

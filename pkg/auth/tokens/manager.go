@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"reflect"
 	"sort"
 	"time"
 
@@ -39,7 +40,7 @@ const (
 	TokenHashed            = "authn.management.cattle.io/token-hashed"
 	tokenKeyIndex          = "authn.management.cattle.io/token-key-index"
 	secretNameEnding       = "-secret"
-	secretNamespace        = "cattle-system"
+	SecretNamespace        = "cattle-system"
 	KubeconfigResponseType = "kubeconfig"
 )
 
@@ -47,7 +48,7 @@ var (
 	toDeleteCookies = []string{CookieName, CSRFCookie}
 )
 
-func RegisterIndexer(ctx context.Context, apiContext *config.ScaledContext) error {
+func RegisterIndexer(apiContext *config.ScaledContext) error {
 	informer := apiContext.Management.Users("").Controller().Informer()
 	return informer.AddIndexers(map[string]cache.IndexFunc{userPrincipalIndex: userPrincipalIndexer})
 }
@@ -99,7 +100,7 @@ func (m *Manager) createDerivedToken(jsonInput clientv3.Token, tokenAuthValue st
 		return v3.Token{}, "", 401, err
 	}
 
-	tokenTTL, err := ValidateMaxTTL(time.Duration(int64(jsonInput.TTLMillis)) * time.Millisecond)
+	tokenTTL, err := ClampToMaxTTL(time.Duration(int64(jsonInput.TTLMillis)) * time.Millisecond)
 	if err != nil {
 		return v3.Token{}, "", 500, fmt.Errorf("error validating max-ttl %v", err)
 	}
@@ -468,7 +469,7 @@ func (m *Manager) removeToken(request *types.APIContext) error {
 // CreateSecret saves the secret in k8s. Secret is saved under the userID-secret with
 // key being the provider and data being the providers secret
 func (m *Manager) CreateSecret(userID, provider, secret string) error {
-	_, err := m.secretLister.Get(secretNamespace, userID+secretNameEnding)
+	_, err := m.secretLister.Get(SecretNamespace, userID+secretNameEnding)
 	// An error either means it already exists or something bad happened
 	if err != nil {
 		if !apierrors.IsNotFound(err) {
@@ -483,7 +484,7 @@ func (m *Manager) CreateSecret(userID, provider, secret string) error {
 		}
 		s.ObjectMeta = metav1.ObjectMeta{
 			Name:      userID + secretNameEnding,
-			Namespace: secretNamespace,
+			Namespace: SecretNamespace,
 		}
 		_, err = m.secrets.Create(&s)
 		return err
@@ -494,7 +495,7 @@ func (m *Manager) CreateSecret(userID, provider, secret string) error {
 }
 
 func (m *Manager) GetSecret(userID string, provider string, fallbackTokens []*v3.Token) (string, error) {
-	cachedSecret, err := m.secretLister.Get(secretNamespace, userID+secretNameEnding)
+	cachedSecret, err := m.secretLister.Get(SecretNamespace, userID+secretNameEnding)
 	if err != nil && !apierrors.IsNotFound(err) {
 		return "", err
 	}
@@ -514,7 +515,7 @@ func (m *Manager) GetSecret(userID string, provider string, fallbackTokens []*v3
 }
 
 func (m *Manager) UpdateSecret(userID, provider, secret string) error {
-	cachedSecret, err := m.secretLister.Get(secretNamespace, userID+secretNameEnding)
+	cachedSecret, err := m.secretLister.Get(SecretNamespace, userID+secretNameEnding)
 	if err != nil {
 		return err
 	}
@@ -562,6 +563,7 @@ func (m *Manager) EnsureAndGetUserAttribute(userID string) (*v3.UserAttribute, b
 			},
 		},
 		GroupPrincipals: map[string]v32.Principals{},
+		ExtraByProvider: map[string]map[string][]string{},
 		LastRefresh:     "",
 		NeedsRefresh:    false,
 	}
@@ -569,14 +571,18 @@ func (m *Manager) EnsureAndGetUserAttribute(userID string) (*v3.UserAttribute, b
 	return attribs, true, nil
 }
 
-func (m *Manager) UserAttributeCreateOrUpdate(userID, provider string, groupPrincipals []v3.Principal) error {
+func (m *Manager) UserAttributeCreateOrUpdate(userID, provider string, groupPrincipals []v3.Principal, userExtraInfo map[string][]string) error {
 	attribs, needCreate, err := m.EnsureAndGetUserAttribute(userID)
 	if err != nil {
 		return err
 	}
 
+	if userExtraInfo == nil {
+		userExtraInfo = make(map[string][]string)
+	}
 	if needCreate {
 		attribs.GroupPrincipals[provider] = v32.Principals{Items: groupPrincipals}
+		attribs.ExtraByProvider[provider] = userExtraInfo
 		_, err := m.userAttributes.Create(attribs)
 		if err != nil {
 			return err
@@ -585,8 +591,12 @@ func (m *Manager) UserAttributeCreateOrUpdate(userID, provider string, groupPrin
 	}
 
 	// Exists, just update if necessary
-	if m.UserAttributeChanged(attribs, provider, groupPrincipals) {
+	if m.UserAttributeChanged(attribs, provider, userExtraInfo, groupPrincipals) {
+		if attribs.ExtraByProvider == nil {
+			attribs.ExtraByProvider = make(map[string]map[string][]string)
+		}
 		attribs.GroupPrincipals[provider] = v32.Principals{Items: groupPrincipals}
+		attribs.ExtraByProvider[provider] = userExtraInfo
 		_, err := m.userAttributes.Update(attribs)
 		if err != nil {
 			return err
@@ -596,7 +606,7 @@ func (m *Manager) UserAttributeCreateOrUpdate(userID, provider string, groupPrin
 	return nil
 }
 
-func (m *Manager) UserAttributeChanged(attribs *v32.UserAttribute, provider string, groupPrincipals []v32.Principal) bool {
+func (m *Manager) UserAttributeChanged(attribs *v32.UserAttribute, provider string, extraInfo map[string][]string, groupPrincipals []v32.Principal) bool {
 	oldSet := []string{}
 	newSet := []string{}
 	for _, principal := range attribs.GroupPrincipals[provider].Items {
@@ -618,6 +628,13 @@ func (m *Manager) UserAttributeChanged(attribs *v32.UserAttribute, provider stri
 		}
 	}
 
+	if attribs.ExtraByProvider == nil && extraInfo != nil {
+		return true
+	}
+	if !reflect.DeepEqual(attribs.ExtraByProvider[provider], extraInfo) {
+		return true
+	}
+
 	return false
 }
 
@@ -628,7 +645,7 @@ var uaBackoff = wait.Backoff{
 	Steps:    5,
 }
 
-func (m *Manager) NewLoginToken(userID string, userPrincipal v3.Principal, groupPrincipals []v3.Principal, providerToken string, ttl int64, description string) (v3.Token, string, error) {
+func (m *Manager) NewLoginToken(userID string, userPrincipal v3.Principal, groupPrincipals []v3.Principal, providerToken string, ttl int64, description string, userExtraInfo map[string][]string) (v3.Token, string, error) {
 	provider := userPrincipal.Provider
 	// Providers that use oauth need to create a secret for storing the access token.
 	if (provider == "github" || provider == "azuread" || provider == "googleoauth" || provider == "oidc" || provider == "keycloakoidc") && providerToken != "" {
@@ -639,7 +656,7 @@ func (m *Manager) NewLoginToken(userID string, userPrincipal v3.Principal, group
 	}
 
 	err := wait.ExponentialBackoff(uaBackoff, func() (bool, error) {
-		err := m.UserAttributeCreateOrUpdate(userID, provider, groupPrincipals)
+		err := m.UserAttributeCreateOrUpdate(userID, provider, groupPrincipals, userExtraInfo)
 		if err != nil {
 			logrus.Warnf("Problem creating or updating userAttribute for %v: %v", userID, err)
 		}
@@ -730,8 +747,8 @@ func (m *Manager) IsMemberOf(token v3.Token, group v3.Principal) bool {
 	return groups[group.Name]
 }
 
-func (m *Manager) CreateTokenAndSetCookie(userID string, userPrincipal v3.Principal, groupPrincipals []v3.Principal, providerToken string, ttl int, description string, request *types.APIContext) error {
-	token, unhashedTokenKey, err := m.NewLoginToken(userID, userPrincipal, groupPrincipals, providerToken, 0, description)
+func (m *Manager) CreateTokenAndSetCookie(userID string, userPrincipal v3.Principal, groupPrincipals []v3.Principal, providerToken string, ttl int, description string, request *types.APIContext, userExtraInfo map[string][]string) error {
+	token, unhashedTokenKey, err := m.NewLoginToken(userID, userPrincipal, groupPrincipals, providerToken, 0, description, userExtraInfo)
 	if err != nil {
 		logrus.Errorf("Failed creating token with error: %v", err)
 		return httperror.NewAPIErrorLong(500, "", fmt.Sprintf("Failed creating token with error: %v", err))
@@ -784,6 +801,7 @@ func (m *Manager) TokenStreamTransformer(
 	}), nil
 }
 
+// ParseTokenTTL parses an integer representing minutes as a string and returns its duration.
 func ParseTokenTTL(ttl string) (time.Duration, error) {
 	durString := fmt.Sprintf("%vm", ttl)
 	dur, err := time.ParseDuration(durString)
@@ -793,10 +811,11 @@ func ParseTokenTTL(ttl string) (time.Duration, error) {
 	return dur, nil
 }
 
-func ValidateMaxTTL(ttl time.Duration) (time.Duration, error) {
+// ClampToMaxTTL will return the duration of the provided TTL or the duration of settings.AuthTokenMaxTTLMinutes whichever is smaller.
+func ClampToMaxTTL(ttl time.Duration) (time.Duration, error) {
 	maxTTL, err := ParseTokenTTL(settings.AuthTokenMaxTTLMinutes.Get())
 	if err != nil {
-		return 0, fmt.Errorf("error getting auth-token-max-ttl %v", err)
+		return 0, fmt.Errorf("failed to parse setting '%s': %w", settings.AuthTokenMaxTTLMinutes.Name, err)
 	}
 	if maxTTL == 0 {
 		return ttl, nil
@@ -809,4 +828,19 @@ func ValidateMaxTTL(ttl time.Duration) (time.Duration, error) {
 		return ttl, nil
 	}
 	return maxTTL, nil
+}
+
+// GetKubeconfigDefaultTokenTTLInMilliSeconds will return the default TTL for kubeconfig tokens
+func GetKubeconfigDefaultTokenTTLInMilliSeconds() (*int64, error) {
+	defaultTokenTTL, err := ParseTokenTTL(settings.KubeconfigDefaultTokenTTLMinutes.Get())
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse setting '%s': %w", settings.KubeconfigDefaultTokenTTLMinutes.Name, err)
+	}
+
+	tokenTTL, err := ClampToMaxTTL(defaultTokenTTL)
+	if err != nil {
+		return nil, fmt.Errorf("failed to validate token ttl: %w", err)
+	}
+	ttlMilli := tokenTTL.Milliseconds()
+	return &ttlMilli, nil
 }

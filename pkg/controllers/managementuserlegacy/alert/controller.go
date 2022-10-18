@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/ref"
 
 	"github.com/rancher/norman/controller"
@@ -33,7 +34,35 @@ var (
 	}
 )
 
-func Register(ctx context.Context, cluster *config.UserContext) {
+func Register(ctx context.Context, mgmt *config.ScaledContext, cluster *config.UserContext) {
+	starter := cluster.DeferredStart(ctx, func(ctx context.Context) error {
+		registerDeferred(ctx, mgmt, cluster)
+		return nil
+	})
+
+	AddStarter(ctx, cluster, starter)
+}
+
+func AddStarter(ctx context.Context, cluster *config.UserContext, starter func() error) {
+	cluster.Management.Management.Features("").AddHandler(ctx, "alerts-deferred", func(key string, obj *v32.Feature) (runtime.Object, error) {
+		if features.Legacy.Enabled() {
+			return obj, starter()
+		}
+		return obj, nil
+	})
+
+	alerts := cluster.Management.Management.ClusterAlerts("")
+	alerts.AddClusterScopedHandler(ctx, "alerts-deferred", cluster.ClusterName, func(key string, obj *v32.ClusterAlert) (runtime.Object, error) {
+		return obj, starter()
+	})
+
+	notifiers := cluster.Management.Management.Notifiers("")
+	notifiers.AddClusterScopedHandler(ctx, "alerts-deferred", cluster.ClusterName, func(key string, obj *v32.Notifier) (runtime.Object, error) {
+		return obj, starter()
+	})
+}
+
+func registerDeferred(ctx context.Context, mgmt *config.ScaledContext, cluster *config.UserContext) {
 	alertmanager := manager.NewAlertManager(cluster)
 
 	prometheusCRDManager := manager.NewPrometheusCRDManager(ctx, cluster)
@@ -53,7 +82,7 @@ func Register(ctx context.Context, cluster *config.UserContext) {
 	clusterAlertRules.AddClusterScopedHandler(ctx, "cluster-alert-rule-deployer", cluster.ClusterName, deploy.ClusterRuleSync)
 	projectAlertRules.AddClusterScopedHandler(ctx, "project-alert-rule-deployer", cluster.ClusterName, deploy.ProjectRuleSync)
 
-	configSyncer := configsyncer.NewConfigSyncer(ctx, cluster, alertmanager, prometheusCRDManager)
+	configSyncer := configsyncer.NewConfigSyncer(ctx, mgmt, cluster, alertmanager, prometheusCRDManager)
 	clusterAlertGroups.AddClusterScopedHandler(ctx, "cluster-alert-group-controller", cluster.ClusterName, configSyncer.ClusterGroupSync)
 	projectAlertGroups.AddClusterScopedHandler(ctx, "project-alert-group-controller", cluster.ClusterName, configSyncer.ProjectGroupSync)
 

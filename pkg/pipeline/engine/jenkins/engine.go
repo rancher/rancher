@@ -41,6 +41,7 @@ type Engine struct {
 	JenkinsClient    *Client
 	HTTPClient       *http.Client
 	ServiceLister    v1.ServiceLister
+	Services         v1.ServiceInterface
 	PodLister        v1.PodLister
 	DeploymentLister appsv1.DeploymentLister
 
@@ -57,10 +58,21 @@ type Engine struct {
 }
 
 func (j *Engine) getJenkinsURL(execution *v3.PipelineExecution) (string, error) {
-	ns := utils.GetPipelineCommonName(execution.Spec.ProjectName)
-	service, err := j.ServiceLister.Get(ns, utils.JenkinsName)
-	if err != nil {
-		return "", err
+	var (
+		ns      = utils.GetPipelineCommonName(execution.Spec.ProjectName)
+		err     error
+		service *corev1.Service
+	)
+	if j.UseCache {
+		service, err = j.ServiceLister.Get(ns, utils.JenkinsName)
+		if err != nil {
+			return "", err
+		}
+	} else {
+		service, err = j.Services.GetNamespaced(ns, utils.JenkinsName, metav1.GetOptions{})
+		if err != nil {
+			return "", err
+		}
 	}
 	ip := service.Spec.ClusterIP
 	return fmt.Sprintf("http://%s:%d", ip, utils.JenkinsPort), nil

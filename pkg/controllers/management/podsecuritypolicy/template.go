@@ -14,7 +14,7 @@ import (
 
 const psptpbByPSPTNameIndex = "something.something.psptpb/pspt-name"
 
-func RegisterIndexers(ctx context.Context, scaledContext *config.ScaledContext) error {
+func RegisterIndexers(scaledContext *config.ScaledContext) error {
 	psptpbInformer := scaledContext.Management.PodSecurityPolicyTemplateProjectBindings("").Controller().Informer()
 	psptpbIndexers := map[string]cache.IndexFunc{
 		psptpbByPSPTNameIndex: PSPTPBByPSPTName,

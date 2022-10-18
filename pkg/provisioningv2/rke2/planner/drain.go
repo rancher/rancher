@@ -1,71 +1,112 @@
 package planner
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
+	"fmt"
+	"strings"
 
 	"github.com/rancher/norman/types/convert"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
-	capi "sigs.k8s.io/cluster-api/api/v1alpha4"
+	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2"
+	"github.com/rancher/wrangler/pkg/kv"
 )
 
-const (
-	DrainAnnotation     = "rke.cattle.io/drain-options"
-	UnCordonAnnotation  = "rke.cattle.io/uncordon"
-	DrainDoneAnnotation = "rke.cattle.io/drain-done"
-)
-
-func DrainHash(data []byte) string {
-	digest := sha256.Sum256(data)
-	return hex.EncodeToString(digest[:])[:12]
+func getRestartStamp(plan *plan.NodePlan) string {
+	for _, instr := range plan.Instructions {
+		for _, env := range instr.Env {
+			k, v := kv.Split(env, "=")
+			if k == "RESTART_STAMP" ||
+				k == "$env:RESTART_STAMP" {
+				return v
+			}
+		}
+	}
+	return ""
 }
 
-func (p *Planner) drain(machine *capi.Machine, clusterPlan *plan.Plan, options rkev1.DrainOptions) (bool, error) {
-	// We never drain a single node cluster
-	if !options.Enabled || len(clusterPlan.Machines) == 1 {
-		return true, nil
+func shouldDrain(oldPlan *plan.NodePlan, newPlan plan.NodePlan) bool {
+	if oldPlan == nil {
+		return false
 	}
+	return getRestartStamp(oldPlan) != getRestartStamp(&newPlan)
+}
 
+func optionsToString(options rkev1.DrainOptions, disable bool) (string, error) {
+	if disable {
+		options.Enabled = false
+	}
 	// convert to map first for consistent ordering before creating the json string
 	opts, err := convert.EncodeToMap(options)
 	if err != nil {
-		return false, err
+		return "", err
 	}
 
 	data, err := json.Marshal(opts)
 	if err != nil {
-		return false, err
+		return "", err
 	}
 
-	hash := DrainHash(data)
-	if machine.Annotations[DrainDoneAnnotation] == hash {
+	return string(data), nil
+}
+
+func (p *Planner) drain(oldPlan *plan.NodePlan, newPlan plan.NodePlan, entry *planEntry, clusterPlan *plan.Plan, options rkev1.DrainOptions) (bool, error) {
+	if entry == nil || entry.Metadata == nil || entry.Metadata.Annotations == nil || entry.Machine == nil || entry.Machine.Status.NodeRef == nil {
 		return true, nil
 	}
 
-	if machine.Annotations[DrainAnnotation] != string(data) {
-		machine = machine.DeepCopy()
-		if machine.Annotations == nil {
-			machine.Annotations = map[string]string{}
-		}
-		machine.Annotations[DrainAnnotation] = string(data)
-		_, err := p.machines.Update(machine)
+	// Short circuit if there is nothing to do, don't set annotations and move on
+	if (!options.Enabled || len(clusterPlan.Machines) == 1) &&
+		len(options.PreDrainHooks) == 0 &&
+		len(options.PostDrainHooks) == 0 {
+		return true, nil
+	}
+
+	if !shouldDrain(oldPlan, newPlan) {
+		return true, nil
+	}
+
+	// Don't drain a single node cluster, but still run the hooks
+	optionString, err := optionsToString(options, len(clusterPlan.Machines) == 1)
+	if err != nil {
 		return false, err
 	}
 
-	return false, nil
+	if entry.Metadata.Annotations[rke2.DrainAnnotation] != optionString {
+		entry.Metadata.Annotations[rke2.DrainAnnotation] = optionString
+		return false, p.store.updatePlanSecretLabelsAndAnnotations(entry)
+	}
+
+	if err := checkForDrainError(entry, "draining"); err != nil {
+		// This is the only place true and an error is returned to indicate that draining is ongoing, but there is an error.
+		return true, err
+	}
+
+	return entry.Metadata.Annotations[rke2.DrainDoneAnnotation] == optionString, nil
 }
 
-func (p *Planner) undrain(machine *capi.Machine) (bool, error) {
-	if machine.Annotations[DrainAnnotation] != "" {
-		machine = machine.DeepCopy()
-		delete(machine.Annotations, DrainAnnotation)
-		delete(machine.Annotations, DrainDoneAnnotation)
-		machine.Annotations[UnCordonAnnotation] = "true"
-		_, err := p.machines.Update(machine)
-		return false, err
+func (p *Planner) undrain(entry *planEntry) (bool, error) {
+	if entry.Metadata.Annotations[rke2.DrainAnnotation] != "" &&
+		entry.Metadata.Annotations[rke2.DrainAnnotation] != entry.Metadata.Annotations[rke2.UnCordonAnnotation] {
+		entry.Metadata.Annotations[rke2.UnCordonAnnotation] = entry.Metadata.Annotations[rke2.DrainAnnotation]
+		return false, p.store.updatePlanSecretLabelsAndAnnotations(entry)
 	}
 
-	return machine.Annotations[UnCordonAnnotation] == "", nil
+	if err := checkForDrainError(entry, "undraining"); err != nil {
+		// This is the only place true and an error is returned to indicate that undraining is ongoing, but there is an error.
+		return true, err
+	}
+
+	// The annotations will be removed when undrain is done
+	return entry.Metadata.Annotations[rke2.UnCordonAnnotation] == "", nil
+}
+
+// checkForDrainError checks if there is an error in the drain annotations. It ignores errors that contain "error trying to reach service"
+// because these indicate that the cluster is not reachable because the node is restarting or the cattle-cluster-agent is getting rescheduled.
+// These errors are expected during draining and it is not necessary to alert the user about them.
+func checkForDrainError(entry *planEntry, drainStep string) error {
+	if errStr := entry.Metadata.Annotations[rke2.DrainErrorAnnotation]; errStr != "" && !strings.Contains(errStr, "error trying to reach service") {
+		return fmt.Errorf("error %s machine %s: %s", drainStep, entry.Machine.Name, errStr)
+	}
+	return nil
 }

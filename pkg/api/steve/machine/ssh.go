@@ -16,8 +16,8 @@ import (
 
 	"github.com/gorilla/websocket"
 	"github.com/rancher/apiserver/pkg/types"
-	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2/machineprovision"
-	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1alpha4"
+	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2"
+	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta1"
 	corecontrollers "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
 	"golang.org/x/crypto/ssh"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -182,7 +182,7 @@ func (s *sshClient) getSSHKey(machineNamespace, machineName string) (*machineInf
 		return nil, err
 	}
 
-	secretName := machineprovision.MachineStateSecretName(machine.Spec.InfrastructureRef.Name)
+	secretName := rke2.MachineStateSecretName(machine.Spec.InfrastructureRef.Name)
 	secret, err := s.secrets.Get(machineNamespace, secretName, metav1.GetOptions{})
 	if err != nil {
 		return nil, err

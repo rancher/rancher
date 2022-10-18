@@ -11,6 +11,7 @@ const (
 	PersistentVolumeClaimFieldCreated              = "created"
 	PersistentVolumeClaimFieldCreatorID            = "creatorId"
 	PersistentVolumeClaimFieldDataSource           = "dataSource"
+	PersistentVolumeClaimFieldDataSourceRef        = "dataSourceRef"
 	PersistentVolumeClaimFieldLabels               = "labels"
 	PersistentVolumeClaimFieldName                 = "name"
 	PersistentVolumeClaimFieldNamespaceId          = "namespaceId"
@@ -36,6 +37,7 @@ type PersistentVolumeClaim struct {
 	Created              string                       `json:"created,omitempty" yaml:"created,omitempty"`
 	CreatorID            string                       `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
 	DataSource           *TypedLocalObjectReference   `json:"dataSource,omitempty" yaml:"dataSource,omitempty"`
+	DataSourceRef        *TypedLocalObjectReference   `json:"dataSourceRef,omitempty" yaml:"dataSourceRef,omitempty"`
 	Labels               map[string]string            `json:"labels,omitempty" yaml:"labels,omitempty"`
 	Name                 string                       `json:"name,omitempty" yaml:"name,omitempty"`
 	NamespaceId          string                       `json:"namespaceId,omitempty" yaml:"namespaceId,omitempty"`

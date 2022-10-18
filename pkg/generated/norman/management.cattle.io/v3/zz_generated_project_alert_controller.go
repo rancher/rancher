@@ -43,7 +43,7 @@ func init() {
 	resource.Put(ProjectAlertGroupVersionResource)
 }
 
-// Deprecated use v3.ProjectAlert instead
+// Deprecated: use v3.ProjectAlert instead
 type ProjectAlert = v3.ProjectAlert
 
 func NewProjectAlert(namespace, name string, obj v3.ProjectAlert) *v3.ProjectAlert {

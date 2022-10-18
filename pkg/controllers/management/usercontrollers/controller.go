@@ -5,9 +5,8 @@ import (
 	"time"
 
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-
-	"github.com/rancher/norman/httperror"
 	"github.com/rancher/rancher/pkg/clustermanager"
+	"github.com/rancher/rancher/pkg/controllers/management/imported"
 	"github.com/rancher/rancher/pkg/controllers/managementagent/nslabels"
 	"github.com/rancher/rancher/pkg/controllers/managementuserlegacy/helm"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
@@ -17,10 +16,10 @@ import (
 	batchV1 "k8s.io/api/batch/v1"
 	coreV1 "k8s.io/api/core/v1"
 	rbacV1 "k8s.io/api/rbac/v1"
-	apierror "k8s.io/apimachinery/pkg/api/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 )
 
@@ -68,29 +67,37 @@ func (c *ClusterLifecycleCleanup) Create(obj *v3.Cluster) (runtime.Object, error
 }
 
 func (c *ClusterLifecycleCleanup) Remove(obj *v3.Cluster) (runtime.Object, error) {
-	var err error
-	if obj.Name == "local" && obj.Spec.Internal {
-		err = c.cleanupLocalCluster(obj)
-	} else if obj.Status.Driver == v32.ClusterDriverImported ||
-		obj.Status.Driver == v32.ClusterDriverK3s ||
-		obj.Status.Driver == v32.ClusterDriverK3os ||
-		obj.Status.Driver == v32.ClusterDriverRke2 ||
-		obj.Status.Driver == v32.ClusterDriverRancherD ||
-		(obj.Status.AKSStatus.UpstreamSpec != nil && obj.Status.AKSStatus.UpstreamSpec.Imported) ||
-		(obj.Status.EKSStatus.UpstreamSpec != nil && obj.Status.EKSStatus.UpstreamSpec.Imported) ||
-		(obj.Status.GKEStatus.UpstreamSpec != nil && obj.Status.GKEStatus.UpstreamSpec.Imported) {
-		err = c.cleanupImportedCluster(obj)
+	if obj == nil {
+		return obj, nil
 	}
-	if err != nil {
-		apiError, ok := err.(*httperror.APIError)
-		// If it's not an API error give it back
-		if !ok {
-			return nil, err
+
+	// Try to clean up an imported cluster 3 times, then move on.
+	backoff := wait.Backoff{
+		Duration: 3 * time.Second,
+		Factor:   1,
+		Steps:    3,
+	}
+
+	if err := wait.ExponentialBackoff(backoff, func() (bool, error) {
+		var err error
+		if obj.Name == "local" && obj.Spec.Internal {
+			err = c.cleanupLocalCluster(obj)
+		} else if obj.Status.Driver == v32.ClusterDriverK3s ||
+			obj.Status.Driver == v32.ClusterDriverK3os ||
+			obj.Status.Driver == v32.ClusterDriverRke2 ||
+			obj.Status.Driver == v32.ClusterDriverRancherD ||
+			(obj.Status.Driver == v32.ClusterDriverImported && !imported.IsAdministratedByProvisioningCluster(obj)) ||
+			(obj.Status.AKSStatus.UpstreamSpec != nil && obj.Status.AKSStatus.UpstreamSpec.Imported) ||
+			(obj.Status.EKSStatus.UpstreamSpec != nil && obj.Status.EKSStatus.UpstreamSpec.Imported) ||
+			(obj.Status.GKEStatus.UpstreamSpec != nil && obj.Status.GKEStatus.UpstreamSpec.Imported) {
+			err = c.cleanupImportedCluster(obj)
 		}
-		// If it's anything but clusterUnavailable give it back
-		if apiError.Code != httperror.ClusterUnavailable {
-			return nil, err
+		if err != nil {
+			logrus.Infof("[cluster-cleanup] error cleaning up cluster [%s]: %v", obj.Name, err)
 		}
+		return err == nil, nil
+	}); err != nil {
+		logrus.Warnf("[cluster-cleanup] could not clean imported cluster [%s], moving on with removing cluster: %v", obj.Name, err)
 	}
 
 	c.Manager.Stop(obj)
@@ -377,7 +384,7 @@ func cleanupNamespaces(client kubernetes.Interface) error {
 		err = tryUpdate(func() error {
 			nameSpace, err := client.CoreV1().Namespaces().Get(context.TODO(), ns.Name, metav1.GetOptions{})
 			if err != nil {
-				if apierror.IsNotFound(err) {
+				if apierrors.IsNotFound(err) {
 					return nil
 				}
 				return err

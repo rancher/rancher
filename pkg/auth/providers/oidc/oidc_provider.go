@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"strings"
 
 	"github.com/coreos/go-oidc/v3/oidc"
@@ -97,7 +98,7 @@ func (o *OpenIDCProvider) LoginUser(ctx context.Context, oauthLoginInfo *v32.OID
 			return userPrincipal, nil, "", userClaimInfo, err
 		}
 	}
-	userInfo, oauth2Token, err := o.getUserInfo(&ctx, config, oauthLoginInfo.Code, &userClaimInfo)
+	userInfo, oauth2Token, err := o.getUserInfo(&ctx, config, oauthLoginInfo.Code, &userClaimInfo, "")
 	if err != nil {
 		return userPrincipal, groupPrincipals, "", userClaimInfo, err
 	}
@@ -202,8 +203,14 @@ func (o *OpenIDCProvider) RefetchGroupPrincipals(principalID string, secret stri
 		logrus.Errorf("[generic oidc] refetchGroupPrincipals: error fetching OIDCConfig: %v", err)
 		return groupPrincipals, err
 	}
+	// need to get the user information so that the refreshed token can be saved using the username / userID
+	user, err := o.UserMGR.GetUserByPrincipalID(principalID)
+	if err != nil {
+		logrus.Errorf("[generic oidc] refetchGroupPrincipals: error getting user by principalID: %v", err)
+		return groupPrincipals, err
+	}
 	//do not need userInfo or oauth2Token since we are only processing groups
-	_, _, err = o.getUserInfo(&o.CTX, config, secret, &claimInfo)
+	_, _, err = o.getUserInfo(&o.CTX, config, secret, &claimInfo, user.Name)
 	if err != nil {
 		return groupPrincipals, err
 	}
@@ -348,14 +355,18 @@ func (o *OpenIDCProvider) IsThisUserMe(me v3.Principal, other v3.Principal) bool
 	return false
 }
 
-func (o *OpenIDCProvider) GetUserExtraAttributes(token *v3.Token) map[string][]string {
+func (o *OpenIDCProvider) GetUserExtraAttributes(userPrincipal v3.Principal) map[string][]string {
 	extras := make(map[string][]string)
-	extras["principalid"] = []string{token.UserPrincipal.Name}
-	extras["username"] = []string{token.UserPrincipal.LoginName}
+	if userPrincipal.Name != "" {
+		extras[common.UserAttributePrincipalID] = []string{userPrincipal.Name}
+	}
+	if userPrincipal.LoginName != "" {
+		extras[common.UserAttributeUserName] = []string{userPrincipal.LoginName}
+	}
 	return extras
 }
 
-func (o *OpenIDCProvider) getUserInfo(ctx *context.Context, config *v32.OIDCConfig, authCode string, claimInfo *ClaimInfo) (*oidc.UserInfo, *oauth2.Token, error) {
+func (o *OpenIDCProvider) getUserInfo(ctx *context.Context, config *v32.OIDCConfig, authCode string, claimInfo *ClaimInfo, userName string) (*oidc.UserInfo, *oauth2.Token, error) {
 	var userInfo *oidc.UserInfo
 	var oauth2Token *oauth2.Token
 	var err error
@@ -385,16 +396,24 @@ func (o *OpenIDCProvider) getUserInfo(ctx *context.Context, config *v32.OIDCConf
 	if !oauth2Token.Valid() {
 		// since token is not valid, the TokenSource func will attempt to refresh the access token
 		// if the refresh token has not expired
-		logrus.Debugf("[generic oidc] saveOIDCConfig: attempting to refresh access token")
+		logrus.Debugf("[generic oidc] getUserInfo: attempting to refresh access token")
 	}
-	logrus.Debugf("[generic oidc] saveOIDCConfig: getting user info")
-	userInfo, err = provider.UserInfo(updatedContext, oauthConfig.TokenSource(updatedContext, oauth2Token))
+	reusedToken, err := oauth2.ReuseTokenSource(oauth2Token, oauthConfig.TokenSource(updatedContext, oauth2Token)).Token()
+	if err != nil {
+		return userInfo, oauth2Token, err
+	}
+	if !reflect.DeepEqual(oauth2Token, reusedToken) {
+		o.UpdateToken(reusedToken, userName)
+	}
+	logrus.Debugf("[generic oidc] getUserInfo: getting user info")
+	userInfo, err = provider.UserInfo(updatedContext, oauthConfig.TokenSource(updatedContext, reusedToken))
 	if err != nil {
 		return userInfo, oauth2Token, err
 	}
 	if err := userInfo.Claims(&claimInfo); err != nil {
 		return userInfo, oauth2Token, err
 	}
+
 	return userInfo, oauth2Token, nil
 }
 
@@ -442,4 +461,16 @@ func (o *OpenIDCProvider) getGroupsFromClaimInfo(claimInfo ClaimInfo) []v3.Princ
 		}
 	}
 	return groupPrincipals
+}
+
+func (o *OpenIDCProvider) UpdateToken(refreshedToken *oauth2.Token, userID string) error {
+	var err error
+	logrus.Debugf("[generic oidc] UpdateToken: access token has been refreshed")
+	marshalledToken, err := json.Marshal(refreshedToken)
+	if err != nil {
+		return err
+	}
+	logrus.Debugf("[generic oidc] UpdateToken: saving refreshed access token")
+	o.TokenMGR.UpdateSecret(userID, o.Name, string(marshalledToken))
+	return err
 }

@@ -43,7 +43,7 @@ func init() {
 	resource.Put(ReplicationControllerGroupVersionResource)
 }
 
-// Deprecated use v1.ReplicationController instead
+// Deprecated: use v1.ReplicationController instead
 type ReplicationController = v1.ReplicationController
 
 func NewReplicationController(namespace, name string, obj v1.ReplicationController) *v1.ReplicationController {

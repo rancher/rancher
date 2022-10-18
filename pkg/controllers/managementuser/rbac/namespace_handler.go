@@ -9,6 +9,7 @@ import (
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/slice"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/resourcequota"
+	fleetconst "github.com/rancher/rancher/pkg/fleet"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	namespaceutil "github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/project"
@@ -177,7 +178,7 @@ func (n *nsLifecycle) GetSystemProjectName() (string, error) {
 }
 
 func IsFleetNamespace(ns *v1.Namespace) bool {
-	return ns.Name == "fleet-local" || ns.Name == "fleet-default" || ns.Name == "cattle-fleet-clusters-system" || ns.Labels["fleet.cattle.io/managed"] == "true"
+	return ns.Name == fleetconst.ClustersLocalNamespace || ns.Name == fleetconst.ClustersDefaultNamespace || ns.Name == fleetconst.ReleaseClustersNamespace || ns.Labels["fleet.cattle.io/managed"] == "true"
 }
 
 func (n *nsLifecycle) ensurePRTBAddToNamespace(ns *v1.Namespace) (bool, error) {

@@ -42,7 +42,7 @@ func init() {
 	resource.Put(RoleTemplateGroupVersionResource)
 }
 
-// Deprecated use v3.RoleTemplate instead
+// Deprecated: use v3.RoleTemplate instead
 type RoleTemplate = v3.RoleTemplate
 
 func NewRoleTemplate(namespace, name string, obj v3.RoleTemplate) *v3.RoleTemplate {

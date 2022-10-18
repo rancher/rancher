@@ -132,11 +132,13 @@ spec:
         - name: CATTLE_RESTRICTED_DEFAULT_ADMIN
           value: "true"
 {{- end}}
+{{- if .Values.bootstrapPassword }}
         - name: CATTLE_BOOTSTRAP_PASSWORD
           valueFrom:
             secretKeyRef:
               name: "bootstrap-secret"
               key: "bootstrapPassword"
+{{- end }}
 {{- if .Values.extraEnv }}
 {{ toYaml .Values.extraEnv | indent 8}}
 {{- end }}
@@ -188,7 +190,8 @@ spec:
         - mountPath: /var/log/auditlog
           name: audit-log
 {{- end }}
-{{- if gt (int .Values.auditLog.level) 0 }}
+{{- if eq .Values.auditLog.destination "sidecar" }}
+  {{- if gt (int .Values.auditLog.level) 0 }}
       # Make audit logs available for Rancher log collector tools.
       - image: {{ .Values.busyboxImage }}
         imagePullPolicy: {{ default "IfNotPresent" .Values.busyboxImagePullPolicy }}
@@ -198,6 +201,7 @@ spec:
         volumeMounts:
         - mountPath: /var/log/auditlog
           name: audit-log
+  {{- end }}
 {{- end }}
       volumes:
 {{- if .Values.extraVolumes }}

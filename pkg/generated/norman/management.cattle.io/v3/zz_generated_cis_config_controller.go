@@ -43,7 +43,7 @@ func init() {
 	resource.Put(CisConfigGroupVersionResource)
 }
 
-// Deprecated use v3.CisConfig instead
+// Deprecated: use v3.CisConfig instead
 type CisConfig = v3.CisConfig
 
 func NewCisConfig(namespace, name string, obj v3.CisConfig) *v3.CisConfig {

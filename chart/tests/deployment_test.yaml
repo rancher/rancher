@@ -50,11 +50,6 @@ tests:
         value: NAMESPACE
       - name: CATTLE_PEER_SERVICE
         value: RELEASE-NAME-rancher
-      - name: CATTLE_BOOTSTRAP_PASSWORD
-        valueFrom:
-          secretKeyRef:
-            name: "bootstrap-secret"
-            key: "bootstrapPassword"
 - it: should default imagePullPolicy to IfNotPresent
   asserts:
   - equal:
@@ -67,17 +62,19 @@ tests:
   - equal:
       path: spec.template.spec.containers[0].imagePullPolicy
       value: Always
-- it: should set busybox image as busybox
+- it: should set sidecar image as busybox when auditLog.destination is sidecar and auditLog.level > 0
   set:
     auditLog:
+      destination: sidecar
       level: 1
   asserts:
   - equal:
       path: spec.template.spec.containers[1].image
       value: busybox
-- it: should override busybox image
+- it: should override busybox image when auditLog.destination is sidecar and auditLog.level > 0 and busyboxImage is set
   set:
     auditLog:
+      destination: sidecar
       level: 1
     busyboxImage: my.private.repo:5000/rancher/busybox:1.0.1
   asserts:

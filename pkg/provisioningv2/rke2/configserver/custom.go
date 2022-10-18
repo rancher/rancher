@@ -8,17 +8,17 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2"
 	corev1 "k8s.io/api/core/v1"
 	apierror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"sigs.k8s.io/cluster-api/api/v1alpha4"
+	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 )
 
 const (
-	machineRequestType = "rke.cattle.io/machine-request"
-	machineIDHeader    = "X-Cattle-Id"
-	headerPrefix       = "X-Cattle-"
+	machineIDHeader = "X-Cattle-Id"
+	headerPrefix    = "X-Cattle-"
 )
 
 func (r *RKE2ConfigServer) findMachineByClusterToken(req *http.Request) (string, string, error) {
@@ -57,14 +57,14 @@ func (r *RKE2ConfigServer) findMachineByClusterToken(req *http.Request) (string,
 		return "", "", err
 	}
 
-	machineNamespace, machineName := secret.Labels[machineNamespaceLabel], secret.Labels[machineNameLabel]
+	machineNamespace, machineName := secret.Labels[rke2.MachineNamespaceLabel], secret.Labels[rke2.MachineNameLabel]
 	_ = r.secrets.Delete(secret.Namespace, secret.Name, nil)
 	return machineNamespace, machineName, nil
 }
 
-func (r *RKE2ConfigServer) findMachineByID(machineID, ns string) (*v1alpha4.Machine, error) {
+func (r *RKE2ConfigServer) findMachineByID(machineID, ns string) (*capi.Machine, error) {
 	machines, err := r.machineCache.List(ns, labels.SelectorFromSet(map[string]string{
-		machineIDLabel: machineID,
+		rke2.MachineIDLabel: machineID,
 	}))
 	if err != nil {
 		return nil, err
@@ -92,12 +92,12 @@ func (r *RKE2ConfigServer) createSecret(namespace, name string, data map[string]
 		Data: map[string][]byte{
 			"data": dataBytes,
 		},
-		Type: machineRequestType,
+		Type: rke2.MachineRequestType,
 	})
 }
 
 func (r *RKE2ConfigServer) waitReady(secret *corev1.Secret) (*corev1.Secret, error) {
-	if secret.Labels[machineNameLabel] != "" {
+	if secret.Labels[rke2.MachineNameLabel] != "" {
 		return secret, nil
 	}
 
@@ -116,7 +116,7 @@ func (r *RKE2ConfigServer) waitReady(secret *corev1.Secret) (*corev1.Secret, err
 
 	for obj := range resp.ResultChan() {
 		secret, ok := obj.Object.(*corev1.Secret)
-		if ok && secret.Labels[machineNameLabel] != "" {
+		if ok && secret.Labels[rke2.MachineNameLabel] != "" {
 			return secret, nil
 		}
 	}

@@ -9,6 +9,7 @@ import (
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/rancher/pkg/api/norman/store/cert"
+	"github.com/rancher/rancher/pkg/api/scheme"
 	client "github.com/rancher/rancher/pkg/client/generated/project/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/sirupsen/logrus"
@@ -29,6 +30,7 @@ func (s *Store) Create(apiContext *types.APIContext, schema *types.Schema, data 
 func NewNamespacedSecretStore(ctx context.Context, clientGetter proxy.ClientGetter) *Store {
 	secretsStore := proxy.NewProxyStore(ctx, clientGetter,
 		config.UserStorageContext,
+		scheme.Scheme,
 		[]string{"api"},
 		"",
 		"v1",

@@ -2,38 +2,36 @@ package image
 
 import (
 	"fmt"
-	"io/ioutil"
-	"os"
 	"path"
-	"path/filepath"
 	"sort"
 	"strings"
 
+	"github.com/Masterminds/semver/v3"
 	"github.com/pkg/errors"
-	"github.com/rancher/norman/types/convert"
-	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	util "github.com/rancher/rancher/pkg/cluster"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
-	libhelm "github.com/rancher/rancher/pkg/helm"
 	"github.com/rancher/rancher/pkg/settings"
 	rketypes "github.com/rancher/rke/types"
 	img "github.com/rancher/rke/types/image"
-	"gopkg.in/yaml.v2"
 )
+
+// ExportConfig provides parameters you can define to configure image exporting for Rancher components
+type ExportConfig struct {
+	RancherVersion   string
+	OsType           OSType
+	ChartsPath       string
+	SystemChartsPath string
+}
 
 type OSType int
 
-type chart struct {
-	dir     string
-	version string
-}
-
-const imageListDelimiter = "\n"
 const (
 	Linux OSType = iota
 	Windows
 )
+
+const imageListDelimiter = "\n"
 
 var osTypeImageListName = map[OSType]string{
 	Windows: "windows-rancher-images",
@@ -57,156 +55,28 @@ func ResolveWithCluster(image string, cluster *v3.Cluster) string {
 	return image
 }
 
-func getChartAndVersion(path string) (map[string]chart, error) {
-	rtn := map[string]chart{}
-	helm := libhelm.Helm{
-		LocalPath: path,
-		IconPath:  path,
-		Hash:      "",
-	}
-	index, err := helm.LoadIndex()
-	if err != nil {
-		return nil, err
-	}
-	for k, versions := range index.IndexFile.Entries {
-		// because versions is sorted in reverse order, the first one will be the latest version
-		if len(versions) > 0 {
-			newestVersionedChart := versions[0]
-			rtn[k] = chart{
-				dir:     newestVersionedChart.Dir,
-				version: newestVersionedChart.Version}
-		}
-	}
-
-	return rtn, nil
-}
-
-func pickImagesFromValuesYAML(imagesSet map[string]map[string]bool, charts map[string]chart, basePath, path string, info os.FileInfo, osType OSType) error {
-	if info.Name() != "values.yaml" {
-		return nil
-	}
-	relPath, err := filepath.Rel(basePath, path)
-	if err != nil {
-		return err
-	}
-	var chartNameAndVersion string
-	for name, chart := range charts {
-		if strings.HasPrefix(relPath, chart.dir) {
-			chartNameAndVersion = fmt.Sprintf("%s:%s", name, chart.version)
-			break
-		}
-	}
-	if chartNameAndVersion == "" {
-		// path does not belong to a given chart
-		return nil
-	}
-	data, err := ioutil.ReadFile(path)
-	if err != nil {
-		return err
-	}
-	dataInterface := map[interface{}]interface{}{}
-	if err := yaml.Unmarshal(data, &dataInterface); err != nil {
-		return err
-	}
-
-	walkthroughMap(dataInterface, func(inputMap map[interface{}]interface{}) {
-		generateImages(chartNameAndVersion, inputMap, imagesSet, osType)
-	})
-	return nil
-}
-
-func generateImages(chartNameAndVersion string, inputMap map[interface{}]interface{}, output map[string]map[string]bool, osType OSType) {
-	r, repoOk := inputMap["repository"]
-	t, tagOk := inputMap["tag"]
-	if !repoOk || !tagOk {
-		return
-	}
-	repo, repoOk := r.(string)
-	if !repoOk {
-		return
-	}
-
-	imageName := fmt.Sprintf("%s:%v", repo, t)
-
-	// By default, images are added to the generic images list ("linux"). For Windows and multi-OS
-	// images to be considered, they must use a comma-delineated list (e.g. "os: windows",
-	// "os: windows,linux", and "os: linux,windows").
-	if osList, ok := inputMap["os"].(string); ok {
-		for _, os := range strings.Split(osList, ",") {
-			switch strings.TrimSpace(strings.ToLower(os)) {
-			case "windows":
-				if osType == Windows {
-					addSourceToImage(output, imageName, chartNameAndVersion)
-					return
-				}
-			case "linux":
-				if osType == Linux {
-					addSourceToImage(output, imageName, chartNameAndVersion)
-					return
-				}
-			}
-		}
-	} else {
-		if inputMap["os"] != nil {
-			panic(fmt.Sprintf("Field 'os:' for image %s contains neither a string nor nil", imageName))
-		}
-		if osType == Linux {
-			addSourceToImage(output, imageName, chartNameAndVersion)
-		}
-	}
-}
-
-func addSourceToImage(imagesSet map[string]map[string]bool, image string, sources ...string) {
-	if image == "" {
-		return
-	}
-	if imagesSet[image] == nil {
-		imagesSet[image] = make(map[string]bool)
-	}
-	for _, source := range sources {
-		imagesSet[image][source] = true
-	}
-}
-
-func walkthroughMap(data interface{}, walkFunc func(map[interface{}]interface{})) {
-	if inputMap, isMap := data.(map[interface{}]interface{}); isMap {
-		// Run the walkFunc on the root node and each child node
-		walkFunc(inputMap)
-		for _, value := range inputMap {
-			walkthroughMap(value, walkFunc)
-		}
-	} else if inputList, isList := data.([]interface{}); isList {
-		// Run the walkFunc on each element in the root node, ignoring the root itself
-		for _, elem := range inputList {
-			walkthroughMap(elem, walkFunc)
-		}
-	}
-}
-
-func GetImages(systemChartPath, chartPath string, externalImages map[string][]string, imagesFromArgs []string, rkeSystemImages map[string]rketypes.RKESystemImages, osType OSType) ([]string, []string, error) {
-	// fetch images from system charts
-	imagesSet := make(map[string]map[string]bool)
-	if systemChartPath != "" {
-		if err := fetchImagesFromCharts(systemChartPath, osType, imagesSet); err != nil {
-			return nil, nil, errors.Wrap(err, "failed to fetch images from system charts")
-		}
-	}
+func GetImages(exportConfig ExportConfig, externalImages map[string][]string, imagesFromArgs []string, rkeSystemImages map[string]rketypes.RKESystemImages) ([]string, []string, error) {
+	imagesSet := make(map[string]map[string]struct{})
 
 	// fetch images from charts
-	if chartPath != "" {
-		if err := fetchImagesFromCharts(chartPath, osType, imagesSet); err != nil {
-			return nil, nil, errors.Wrap(err, "failed to fetch images from charts")
-		}
+	charts := Charts{exportConfig}
+	if err := charts.FetchImages(imagesSet); err != nil {
+		return nil, nil, errors.Wrap(err, "failed to fetch images from charts")
+	}
+
+	// fetch images from system charts
+	systemCharts := SystemCharts{exportConfig}
+	if err := systemCharts.FetchImages(imagesSet); err != nil {
+		return nil, nil, errors.Wrap(err, "failed to fetch images from system charts")
 	}
 
 	// fetch images from system images
-	if len(rkeSystemImages) > 0 {
-		if err := fetchImagesFromSystem(rkeSystemImages, osType, imagesSet); err != nil {
-			return nil, nil, errors.Wrap(err, "failed to fetch images from system images")
-		}
+	system := System{exportConfig}
+	if err := system.FetchImages(rkeSystemImages, imagesSet); err != nil {
+		return nil, nil, errors.Wrap(err, "failed to fetch images from system")
 	}
 
-	setRequirementImages(osType, imagesSet)
+	setRequirementImages(exportConfig.OsType, imagesSet)
 
 	// set rancher images from args
 	setImages("rancher", imagesFromArgs, imagesSet)
@@ -222,93 +92,39 @@ func GetImages(systemChartPath, chartPath string, externalImages map[string][]st
 	return imagesList, imagesAndSourcesList, nil
 }
 
-func setImages(source string, imagesFromArgs []string, imagesSet map[string]map[string]bool) {
-	for _, image := range imagesFromArgs {
-		addSourceToImage(imagesSet, image, source)
+func AddImagesToImageListConfigMap(cm *v1.ConfigMap, rancherVersion, systemChartsPath string) error {
+	exportConfig := ExportConfig{
+		SystemChartsPath: systemChartsPath,
+		OsType:           Windows,
+		RancherVersion:   rancherVersion,
 	}
-}
-
-func convertMirroredImages(imagesSet map[string]map[string]bool) {
-	for image := range imagesSet {
-		convertedImage := img.Mirror(image)
-		if image == convertedImage {
-			continue
-		}
-		for source, val := range imagesSet[image] {
-			if !val {
-				continue
-			}
-			addSourceToImage(imagesSet, convertedImage, source)
-		}
-		delete(imagesSet, image)
-	}
-}
-
-func fetchImagesFromCharts(path string, osType OSType, imagesSet map[string]map[string]bool) error {
-	chartVersion, err := getChartAndVersion(path)
-	if err != nil {
-		return errors.Wrapf(err, "failed to get chart and version from %q", path)
-	}
-
-	err = filepath.Walk(path, func(p string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-		return pickImagesFromValuesYAML(imagesSet, chartVersion, path, p, info, osType)
-	})
-	if err != nil {
-		return errors.Wrap(err, "failed to pick images from values.yaml")
-	}
-
-	return nil
-}
-
-func fetchImagesFromSystem(rkeSystemImages map[string]rketypes.RKESystemImages, osType OSType, imagesSet map[string]map[string]bool) error {
-	collectionImagesList := []interface{}{
-		rkeSystemImages,
-	}
-	switch osType {
-	case Linux:
-		collectionImagesList = append(collectionImagesList, v32.ToolsSystemImages)
-	}
-
-	images, err := flatImagesFromCollections(collectionImagesList...)
+	windowsImages, _, err := GetImages(exportConfig, nil, []string{}, nil)
 	if err != nil {
 		return err
 	}
-
-	for _, image := range images {
-		addSourceToImage(imagesSet, image, "system")
-
+	exportConfig.OsType = Linux
+	linuxImages, _, err := GetImages(exportConfig, nil, []string{}, nil)
+	if err != nil {
+		return err
 	}
+	cm.Data = make(map[string]string, 2)
+	cm.Data[osTypeImageListName[Windows]] = strings.Join(windowsImages, imageListDelimiter)
+	cm.Data[osTypeImageListName[Linux]] = strings.Join(linuxImages, imageListDelimiter)
 	return nil
 }
 
-func flatImagesFromCollections(cols ...interface{}) (images []string, err error) {
-	for _, col := range cols {
-		colObj := map[string]interface{}{}
-		if err := convert.ToObj(col, &colObj); err != nil {
-			return []string{}, err
-		}
-
-		images = append(images, fetchImagesFromCollection(colObj)...)
-	}
-	return images, nil
+func ParseCatalogImageListConfigMap(cm *v1.ConfigMap) ([]string, []string) {
+	windowsImages := strings.Split(cm.Data[osTypeImageListName[Windows]], imageListDelimiter)
+	linuxImages := strings.Split(cm.Data[osTypeImageListName[Linux]], imageListDelimiter)
+	return windowsImages, linuxImages
 }
 
-func fetchImagesFromCollection(obj map[string]interface{}) (images []string) {
-	for _, v := range obj {
-		switch t := v.(type) {
-		case string:
-			images = append(images, t)
-		case map[string]interface{}:
-			images = append(images, fetchImagesFromCollection(t)...)
-		}
-	}
-	return images
+func IsValidSemver(version string) bool {
+	_, err := semver.NewVersion(version)
+	return err == nil
 }
 
-func setRequirementImages(osType OSType, imagesSet map[string]map[string]bool) {
+func setRequirementImages(osType OSType, imagesSet map[string]map[string]struct{}) {
 	coreLabel := "core"
 	switch osType {
 	case Linux:
@@ -318,7 +134,38 @@ func setRequirementImages(osType OSType, imagesSet map[string]map[string]bool) {
 	}
 }
 
-func generateImageAndSourceLists(imagesSet map[string]map[string]bool) ([]string, []string) {
+func setImages(source string, imagesFromArgs []string, imagesSet map[string]map[string]struct{}) {
+	for _, image := range imagesFromArgs {
+		addSourceToImage(imagesSet, image, source)
+	}
+}
+
+func addSourceToImage(imagesSet map[string]map[string]struct{}, image string, sources ...string) {
+	if image == "" {
+		return
+	}
+	if imagesSet[image] == nil {
+		imagesSet[image] = make(map[string]struct{})
+	}
+	for _, source := range sources {
+		imagesSet[image][source] = struct{}{}
+	}
+}
+
+func convertMirroredImages(imagesSet map[string]map[string]struct{}) {
+	for image := range imagesSet {
+		convertedImage := img.Mirror(image)
+		if image == convertedImage {
+			continue
+		}
+		for source := range imagesSet[image] {
+			addSourceToImage(imagesSet, convertedImage, source)
+		}
+		delete(imagesSet, image)
+	}
+}
+
+func generateImageAndSourceLists(imagesSet map[string]map[string]struct{}) ([]string, []string) {
 	var images, imagesAndSources []string
 	// unique
 	for image := range imagesSet {
@@ -337,43 +184,12 @@ func generateImageAndSourceLists(imagesSet map[string]map[string]bool) ([]string
 	return images, imagesAndSources
 }
 
-func getSourcesList(imageSources map[string]bool) string {
+func getSourcesList(imageSources map[string]struct{}) string {
 	var sources []string
 
-	for source, val := range imageSources {
-		if !val {
-			continue
-		}
+	for source := range imageSources {
 		sources = append(sources, source)
 	}
 	sort.Strings(sources)
 	return strings.Join(sources, ",")
-}
-
-func AddImagesToImageListConfigMap(cm *v1.ConfigMap, chartPath string) (err error) {
-	var windowsImages []string
-	var linuxImages []string
-
-	windowsImages, _, err = GetImages(chartPath, "", nil, []string{}, nil, Windows)
-	if err != nil {
-		return
-	}
-
-	linuxImages, _, err = GetImages(chartPath, "", nil, []string{}, nil, Linux)
-	if err != nil {
-		return
-	}
-
-	cm.Data = make(map[string]string, 2)
-	cm.Data[osTypeImageListName[Windows]] = strings.Join(windowsImages, imageListDelimiter)
-	cm.Data[osTypeImageListName[Linux]] = strings.Join(linuxImages, imageListDelimiter)
-
-	return
-}
-
-func ParseCatalogImageListConfigMap(cm *v1.ConfigMap) (windowsImageList, linuxImageList []string) {
-	windowsImageList = strings.Split(cm.Data[osTypeImageListName[Windows]], imageListDelimiter)
-	linuxImageList = strings.Split(cm.Data[osTypeImageListName[Linux]], imageListDelimiter)
-
-	return
 }

@@ -14,12 +14,14 @@ import (
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	mgmtclient "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	"github.com/rancher/rancher/pkg/clustermanager"
+	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/resourcequota"
 	mgmtschema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/kubernetes/pkg/kubelet/util/format"
 )
 
 const roleTemplatesRequired = "authz.management.cattle.io/creator-role-bindings"
@@ -32,6 +34,7 @@ type projectStore struct {
 	roleTemplateLister v3.RoleTemplateLister
 	scaledContext      *config.ScaledContext
 	clusterLister      v3.ClusterLister
+	secretLister       v1.SecretLister
 }
 
 func SetProjectStore(schema *types.Schema, mgmt *config.ScaledContext) {
@@ -41,6 +44,7 @@ func SetProjectStore(schema *types.Schema, mgmt *config.ScaledContext) {
 		roleTemplateLister: mgmt.Management.RoleTemplates("").Controller().Lister(),
 		scaledContext:      mgmt,
 		clusterLister:      mgmt.Management.Clusters("").Controller().Lister(),
+		secretLister:       mgmt.Core.Secrets("").Controller().Lister(),
 	}
 	schema.Store = store
 }
@@ -164,13 +168,13 @@ func (s *projectStore) validateResourceQuota(apiContext *types.APIContext, data 
 func (s *projectStore) isQuotaFit(apiContext *types.APIContext, nsQuotaLimit *v32.ResourceQuotaLimit,
 	projectQuotaLimit *v32.ResourceQuotaLimit, id string) error {
 	// check that namespace default quota is within project quota
-	isFit, msg, err := resourcequota.IsQuotaFit(nsQuotaLimit, []*v32.ResourceQuotaLimit{}, projectQuotaLimit)
+	isFit, exceeded, err := resourcequota.IsQuotaFit(nsQuotaLimit, []*v32.ResourceQuotaLimit{}, projectQuotaLimit)
 	if err != nil {
 		return err
 	}
 	if !isFit {
 		return httperror.NewFieldAPIError(httperror.MaxLimitExceeded, namespaceQuotaField, fmt.Sprintf("exceeds %s on fields: %s",
-			quotaField, msg))
+			quotaField, format.ResourceList(exceeded)))
 	}
 
 	if id == "" {
@@ -226,13 +230,13 @@ func (s *projectStore) isQuotaFit(apiContext *types.APIContext, nsQuotaLimit *v3
 	if err != nil {
 		return err
 	}
-	isFit, msg, err = resourcequota.IsQuotaFit(usedQuotaLimit, []*v32.ResourceQuotaLimit{}, projectQuotaLimit)
+	isFit, exceeded, err = resourcequota.IsQuotaFit(usedQuotaLimit, []*v32.ResourceQuotaLimit{}, projectQuotaLimit)
 	if err != nil {
 		return err
 	}
 	if !isFit {
 		return httperror.NewFieldAPIError(httperror.MaxLimitExceeded, quotaField, fmt.Sprintf("is below the used limit on fields: %s",
-			msg))
+			format.ResourceList(exceeded)))
 	}
 
 	if len(limitToAdd) == 0 && len(limitToRemove) == 0 {
@@ -261,14 +265,14 @@ func (s *projectStore) isQuotaFit(apiContext *types.APIContext, nsQuotaLimit *v3
 		nsLimits = append(nsLimits, converted)
 	}
 
-	isFit, msg, err = resourcequota.IsQuotaFit(&v32.ResourceQuotaLimit{}, nsLimits, projectQuotaLimit)
+	isFit, exceeded, err = resourcequota.IsQuotaFit(&v32.ResourceQuotaLimit{}, nsLimits, projectQuotaLimit)
 	if err != nil {
 		return err
 	}
 	if !isFit {
 		return httperror.NewFieldAPIError(httperror.MaxLimitExceeded, namespaceQuotaField,
 			fmt.Sprintf("exceeds project limit on fields %s when applied to all namespaces in a project",
-				msg))
+				format.ResourceList(exceeded)))
 	}
 
 	return nil
@@ -280,7 +284,7 @@ func (s *projectStore) getNamespacesCount(apiContext *types.APIContext, project 
 		return 0, err
 	}
 
-	kubeConfig, err := clustermanager.ToRESTConfig(cluster, s.scaledContext)
+	kubeConfig, err := clustermanager.ToRESTConfig(cluster, s.scaledContext, s.secretLister)
 	if kubeConfig == nil || err != nil {
 		return 0, err
 	}

@@ -39,7 +39,7 @@ func (s *Store) Create(apiContext *types.APIContext, schema *types.Schema, data 
 	projectID, _ := data["projectId"].(string)
 	clusterName, _ := ref.Parse(projectID)
 
-	if err := s.validateChartCompatibility(clusterName, data); err != nil {
+	if err := s.validateChartCompatibility(clusterName, "", data); err != nil {
 		return nil, httperror.NewAPIError(httperror.InvalidBodyContent, err.Error())
 	}
 
@@ -69,7 +69,22 @@ func (s *Store) Update(apiContext *types.APIContext, schema *types.Schema, data 
 	projectID, _ := data["projectId"].(string)
 	clusterName, _ := ref.Parse(projectID)
 
-	if err := s.validateChartCompatibility(clusterName, data); err != nil {
+	ns, name := ref.Parse(id)
+	if ns == "" || name == "" {
+		return nil, httperror.NewAPIError(httperror.InvalidBodyContent, fmt.Sprintf("invalid app id %s", id))
+	}
+
+	app, err := s.Apps.Get(ns, name)
+	if err != nil {
+		return nil, httperror.NewAPIError(httperror.ServerError, fmt.Sprintf("could not retrieve app [%s]: %v", id, err))
+	}
+	_, _, _, _, currentAppVersion, err := hcommon.SplitExternalID(app.Spec.ExternalID)
+	if err != nil {
+		httperror.NewAPIError(httperror.InvalidBodyContent, fmt.Sprintf("could not parse current externalID [%s]: %s",
+			app.Spec.ExternalID, err.Error()))
+	}
+
+	if err := s.validateChartCompatibility(clusterName, currentAppVersion, data); err != nil {
 		return nil, httperror.NewAPIError(httperror.InvalidBodyContent, err.Error())
 	}
 
@@ -94,23 +109,23 @@ func (s *Store) validateForMultiClusterApp(id string, msg string) error {
 	return nil
 }
 
-func (s *Store) validateChartCompatibility(clusterName string, data map[string]interface{}) error {
+func (s *Store) validateChartCompatibility(clusterName, currentAppVersion string, data map[string]interface{}) error {
 	externalID := convert.ToString(data["externalId"])
 	if externalID == "" {
 		return nil
 	}
 
-	templateVersionID, namespace, err := hcommon.ParseExternalID(externalID)
+	templateVersionID, templateNamespace, err := hcommon.ParseExternalID(externalID)
 	if err != nil {
 		return err
 	}
 
-	template, err := s.TemplateVersionLister.Get(namespace, templateVersionID)
+	template, err := s.TemplateVersionLister.Get(templateNamespace, templateVersionID)
 	if err != nil {
 		return err
 	}
 
-	return s.CatalogManager.ValidateChartCompatibility(template, clusterName)
+	return s.CatalogManager.ValidateChartCompatibility(template, clusterName, currentAppVersion)
 }
 
 func (s *Store) checkAccessToTemplateVersion(apiContext *types.APIContext, data map[string]interface{}) error {

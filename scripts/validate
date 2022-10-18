@@ -34,7 +34,7 @@ fi
 badmodule="false"
 while read -r module tag; do
   # Get tag from module in ./go.mod
-  roottag=$(cat go.mod | sed '1,/require/d' | grep "${module} " | awk '{ print $2 }')
+  roottag=$(cat go.mod | sed '1,/^require/d' | grep "${module} " | awk '{ print $2 }')
   echo "${module}:"
   echo "${tag} (./pkg/apis/go.mod)"
   echo "${roottag} (./go.mod)"

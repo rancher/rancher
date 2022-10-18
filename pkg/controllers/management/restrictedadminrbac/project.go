@@ -29,7 +29,6 @@ func (r *rbaccontroller) projectRBACSync(key string, project *apimgmtv3.Project)
 	}
 	for _, x := range grbs {
 		grb, _ := x.(*v3.GlobalRoleBinding)
-		restrictedAdminUserName := grb.UserName
 		rbName := fmt.Sprintf("%s-%s", grb.Name, rbac.RestrictedAdminProjectRoleBinding)
 		rb, err := r.rbLister.Get(project.Name, rbName)
 		if err != nil && !k8serrors.IsNotFound(err) {
@@ -58,10 +57,7 @@ func (r *rbaccontroller) projectRBACSync(key string, project *apimgmtv3.Project)
 				Kind: "ClusterRole",
 			},
 			Subjects: []k8srbac.Subject{
-				{
-					Kind: "User",
-					Name: restrictedAdminUserName,
-				},
+				rbac.GetGRBSubject(grb),
 			},
 		})
 		if err != nil && !k8serrors.IsAlreadyExists(err) {

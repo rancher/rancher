@@ -43,7 +43,8 @@ MACHINE_TIMEOUT = float(os.environ.get('RANCHER_MACHINE_TIMEOUT', "1200"))
 HARDENED_CLUSTER = ast.literal_eval(
     os.environ.get('RANCHER_HARDENED_CLUSTER', "False"))
 TEST_OS = os.environ.get('RANCHER_TEST_OS', "linux")
-TEST_IMAGE = os.environ.get('RANCHER_TEST_IMAGE', "ranchertest/mytestcontainer")
+TEST_IMAGE = os.environ.get(
+    'RANCHER_TEST_IMAGE', "ranchertest/mytestcontainer")
 TEST_IMAGE_PORT = os.environ.get('RANCHER_TEST_IMAGE_PORT', "80")
 TEST_IMAGE_NGINX = os.environ.get('RANCHER_TEST_IMAGE_NGINX', "nginx")
 TEST_IMAGE_OS_BASE = os.environ.get('RANCHER_TEST_IMAGE_OS_BASE', "ubuntu")
@@ -357,18 +358,24 @@ def assign_members_to_project(client, user, project, role_template_id):
 
 
 def change_member_role_in_cluster(client, user, crtb, role_template_id):
-    crtb = client.update(
-        crtb,
+    client.delete(crtb)
+    crtb = client.create_cluster_role_template_binding(
+        clusterId=crtb.clusterId,
         roleTemplateId=role_template_id,
-        userId=user.id)
+        subjectKind="User",
+        userId=user.id
+    )
     return crtb
 
 
 def change_member_role_in_project(client, user, prtb, role_template_id):
-    prtb = client.update(
-        prtb,
+    client.delete(prtb)
+    prtb = client.create_project_role_template_binding(
+        projectId=prtb.projectId,
         roleTemplateId=role_template_id,
-        userId=user.id)
+        subjectKind="User",
+        userId=user.id
+    )
     return prtb
 
 
@@ -403,7 +410,8 @@ def validate_all_workload_image_from_rancher(project_client, ns, pod_count=1,
         job_list = []
     workload_list = deployment_list + daemonset_list + cronjob_list + job_list
 
-    wls = [dep.name for dep in project_client.list_workload(namespaceId=ns.id).data]
+    wls = [dep.name for dep in project_client.list_workload(
+        namespaceId=ns.id).data]
     assert len(workload_list) == len(wls), \
         "Expected {} workload(s) to be present in {} namespace " \
         "but there were {}".format(len(workload_list), ns.name, len(wls))
@@ -466,7 +474,6 @@ def validate_workload(p_client, workload, type, ns_name, pod_count=1,
             expected_status = "Running"
         p = wait_for_pod_to_running(p_client, pod, job_type=job_type)
         assert p["status"]["phase"] == expected_status
-
 
     wl_result = execute_kubectl_cmd(
         "get " + type + " " + workload.name + " -n " + ns_name)
@@ -590,6 +597,7 @@ def run_command_with_stderr(command, log_out=True):
 
 def wait_for_wl_to_active(client, workload, timeout=DEFAULT_TIMEOUT):
     start = time.time()
+    timeout = start + timeout
     workloads = client.list_workload(uuid=workload.uuid).data
     assert len(workloads) == 1
     wl = workloads[0]
@@ -646,7 +654,7 @@ def wait_for_pod_to_running(client, pod, timeout=DEFAULT_TIMEOUT, job_type=False
         expected_state = "succeeded"
     else:
         expected_state = "running"
-    while p.state != expected_state :
+    while p.state != expected_state:
         if time.time() - start > timeout:
             raise AssertionError(
                 "Timed out waiting for state to get to active")
@@ -663,16 +671,25 @@ def get_schedulable_nodes(cluster, client=None, os_type=TEST_OS):
     nodes = client.list_node(clusterId=cluster.id).data
     schedulable_nodes = []
     for node in nodes:
-        if node.worker and (not node.unschedulable):
+        if not node.unschedulable:
+            shouldSchedule = True
+            # node.taints doesn't exist if the node has no taints.
+            try:
+                for tval in node.taints:
+                    if str(tval).find("PreferNoSchedule") == -1:
+                        if str(tval).find("NoExecute") > -1 or str(tval).find("NoSchedule") > -1:
+                            shouldSchedule = False
+                            break
+            except AttributeError:
+                pass
+            if not shouldSchedule:
+                continue
             for key, val in node.labels.items():
                 # Either one of the labels should be present on the node
                 if key == 'kubernetes.io/os' or key == 'beta.kubernetes.io/os':
                     if val == os_type:
                         schedulable_nodes.append(node)
                         break
-        # Including master in list of nodes as master is also schedulable
-        if ('k3s' in cluster.version["gitVersion"] or 'rke2' in cluster.version["gitVersion"]) and node.controlPlane:
-            schedulable_nodes.append(node)
     return schedulable_nodes
 
 
@@ -867,8 +884,7 @@ def validate_http_response(cmd, target_name_list, client_pod=None,
     if client_pod is None and cmd.startswith("http://"):
         wait_until_active(cmd, 60)
     target_hit_list = target_name_list[:]
-    count = 5 * len(target_name_list)
-    for i in range(1, count):
+    while len(target_hit_list) != 0:
         if len(target_hit_list) == 0:
             break
         if client_pod is None:
@@ -883,6 +899,7 @@ def validate_http_response(cmd, target_name_list, client_pod=None,
                            '{0}).Content }}"'.format(cmd)
             else:
                 wget_cmd = "wget -qO- " + cmd
+            time.sleep(6)
             result = kubectl_pod_exec(client_pod, wget_cmd)
             result = result.decode()
         if result is not None:
@@ -991,8 +1008,21 @@ def validate_dns_record(pod, record, expected, port=TEST_IMAGE_PORT):
         record["name"], record["namespaceId"])
     validate_dns_entry(pod, host, expected, port=port)
 
+def retry_dig(host, pod, expected, retry_count=3):
+    for i in range(0, retry_count):
+        dig_cmd = 'dig {0} +short'.format(host)
+        dig_output = kubectl_pod_exec(pod, dig_cmd)
+        decode_dig = dig_output.decode('utf-8')
+        split_dig = decode_dig.splitlines()
+        dig_length = len(split_dig)
+        expected_length = len(expected)
+        if dig_length >= expected_length:
+            return dig_output
+        elif dig_length < expected_length:
+            time.sleep(3)
+    pytest.fail(f"failed to get the expected number of dns hosts from dig")
 
-def validate_dns_entry(pod, host, expected, port=TEST_IMAGE_PORT):
+def validate_dns_entry(pod, host, expected, port=TEST_IMAGE_PORT, retry_count=3):
     if is_windows():
         validate_dns_entry_windows(pod, host, expected)
         return
@@ -1003,6 +1033,14 @@ def validate_dns_entry(pod, host, expected, port=TEST_IMAGE_PORT):
     else:
         cmd = 'ping -c 1 -W 1 {0}'.format(host)
     cmd_output = kubectl_pod_exec(pod, cmd)
+
+    if str(pod.name) not in str(cmd_output):
+        for i in range(0, retry_count):
+            cmd_output = kubectl_pod_exec(pod, cmd)
+            if str(pod.name) in str(cmd_output):
+                break
+            else:
+                time.sleep(5)
 
     connectivity_validation_pass = False
     for expected_value in expected:
@@ -1016,11 +1054,11 @@ def validate_dns_entry(pod, host, expected, port=TEST_IMAGE_PORT):
     else:
         assert " 0% packet loss" in str(cmd_output)
 
-    dig_cmd = 'dig {0} +short'.format(host)
-    dig_output = kubectl_pod_exec(pod, dig_cmd)
+    dig_output = retry_dig(host, pod, expected)
 
     for expected_value in expected:
-        assert expected_value in str(dig_output)
+        assert expected_value in str(dig_output), \
+            "Error the dig command returned: {0}".format(dig_output)
 
 
 def validate_dns_entry_windows(pod, host, expected):
@@ -1640,6 +1678,7 @@ def wait_for_app_to_active(client, app_id,
     @return: app object
     """
     start = time.time()
+    timeout = start + timeout
     app_data = client.list_app(id=app_id).data
     while len(app_data) == 0:
         if time.time() - start > timeout / 10:
@@ -2094,12 +2133,12 @@ def set_url_password_token(rancher_url, server_url=None, version=""):
         rpassword = ADMIN_PASSWORD
         print("on 2.6 or later")
     retries = 5
-    for attempt in range(1,retries):
+    for attempt in range(1, retries):
         try:
             r = requests.post(auth_url, json={
-            'username': 'admin',
-            'password': rpassword,
-            'responseType': 'json',
+                'username': 'admin',
+                'password': rpassword,
+                'responseType': 'json',
             }, verify=False)
         except requests.exceptions.RequestException:
             print("password request failed. Retry attempt: ",
@@ -2180,6 +2219,7 @@ def generate_template_global_role(name, new_user_default=False, template=None):
 def wait_for_backup_to_active(cluster, backupname,
                               timeout=DEFAULT_TIMEOUT):
     start = time.time()
+    timeout = start + timeout
     etcdbackups = cluster.etcdBackups(name=backupname)
     assert len(etcdbackups) == 1
     etcdbackupdata = etcdbackups['data']
@@ -2239,6 +2279,8 @@ def validate_backup_create(namespace, backup_info, backup_mode=None):
     validate_ingress(p_client, cluster, [backup_info["workload"]], host, path)
 
     # Perform Backup
+    user_client = get_user_client()
+    cluster = user_client.reload(cluster)
     backup = cluster.backupEtcd()
     backup_info["backupname"] = backup['metadata']['name']
     wait_for_backup_to_active(cluster, backup_info["backupname"])
@@ -2523,9 +2565,11 @@ class WebsocketLogParse:
     the class is used for receiving and parsing the message
     received from the websocket
     """
+
     def __init__(self):
         self.lock = Lock()
         self._last_message = ''
+
     def receiver(self, socket, skip, b64=True):
         """
         run a thread to receive and save the message from the web socket
@@ -2709,58 +2753,14 @@ def delete_resource_in_AWS_by_prefix(resource_prefix):
 
 def configure_cis_requirements(aws_nodes, profile, node_roles, client,
                                cluster):
-    i = 0
-    if profile == 'rke-cis-1.4':
-        for aws_node in aws_nodes:
-            aws_node.execute_command("sudo sysctl -w vm.overcommit_memory=1")
-            aws_node.execute_command("sudo sysctl -w kernel.panic=10")
-            aws_node.execute_command("sudo sysctl -w kernel.panic_on_oops=1")
-            if node_roles[i] == ["etcd"]:
-                aws_node.execute_command("sudo useradd etcd")
-            docker_run_cmd = \
-                get_custom_host_registration_cmd(client,
-                                                 cluster,
-                                                 node_roles[i],
-                                                 aws_node)
-            aws_node.execute_command(docker_run_cmd)
-            i += 1
-    elif profile == 'rke-cis-1.5':
-        for aws_node in aws_nodes:
-            aws_node.execute_command("sudo sysctl -w vm.overcommit_memory=1")
-            aws_node.execute_command("sudo sysctl -w kernel.panic=10")
-            aws_node.execute_command("sudo sysctl -w vm.panic_on_oom=0")
-            aws_node.execute_command("sudo sysctl -w kernel.panic_on_oops=1")
-            aws_node.execute_command("sudo sysctl -w "
-                                     "kernel.keys.root_maxbytes=25000000")
-            if node_roles[i] == ["etcd"]:
-                aws_node.execute_command("sudo groupadd -g 52034 etcd")
-                aws_node.execute_command("sudo useradd -u 52034 -g 52034 etcd")
-            docker_run_cmd = \
-                get_custom_host_registration_cmd(client,
-                                                 cluster,
-                                                 node_roles[i],
-                                                 aws_node)
-            aws_node.execute_command(docker_run_cmd)
-            i += 1
-    time.sleep(5)
+    prepare_hardened_nodes(
+        aws_nodes, profile, node_roles, client, cluster, True)
     cluster = validate_cluster_state(client, cluster)
 
     # the workloads under System project to get active
     time.sleep(20)
-    if profile == 'rke-cis-1.5':
-        create_kubeconfig(cluster)
-        network_policy_file = DATA_SUBDIR + "/default-allow-all.yaml"
-        account_update_file = DATA_SUBDIR + "/account_update.yaml"
-        items = execute_kubectl_cmd("get namespaces -A")["items"]
-        all_ns = [item["metadata"]["name"] for item in items]
-        for ns in all_ns:
-            execute_kubectl_cmd("apply -f {0} -n {1}".
-                                format(network_policy_file, ns))
-        namespace = ["default", "kube-system"]
-        for ns in namespace:
-            execute_kubectl_cmd('patch serviceaccount default'
-                                ' -n {0} -p "$(cat {1})"'.
-                                format(ns, account_update_file))
+    create_kubeconfig(cluster)
+    prepare_hardened_cluster('rke-cis-1.5', kube_fname)
     return cluster
 
 
@@ -2978,3 +2978,76 @@ def update_and_validate_kdm(kdm_url, admin_token=ADMIN_TOKEN,
     kdm_refresh_url = rancher_api_url + "/kontainerdrivers?action=refresh"
     response = requests.post(kdm_refresh_url, verify=False, headers=header)
     assert response.ok
+
+
+def prepare_hardened_nodes(aws_nodes, profile, node_roles,
+                           client=None, cluster=None, custom_cluster=False):
+    i = 0
+    conf_file = DATA_SUBDIR + "/sysctl-config"
+    if profile == 'rke-cis-1.4':
+        for aws_node in aws_nodes:
+            file1 = open(conf_file, 'r')
+            while True:
+                line = file1.readline()
+                if not line:
+                    break
+                aws_node.execute_command(line.strip())
+            if "etcd" in node_roles[i]:
+                aws_node.execute_command("sudo useradd etcd")
+            if custom_cluster:
+                docker_run_cmd = \
+                    get_custom_host_registration_cmd(client,
+                                                     cluster,
+                                                     node_roles[i],
+                                                     aws_node)
+                aws_node.execute_command(docker_run_cmd)
+            i += 1
+    elif profile == 'rke-cis-1.5':
+        for aws_node in aws_nodes:
+            file1 = open(conf_file, 'r')
+            while True:
+                line = file1.readline()
+                if not line:
+                    break
+                aws_node.execute_command(line.strip())
+            if "etcd" in node_roles[i]:
+                aws_node.execute_command("sudo groupadd -g 52034 etcd")
+                aws_node.execute_command("sudo useradd -u 52034 -g 52034 etcd")
+            if custom_cluster:
+                docker_run_cmd = \
+                    get_custom_host_registration_cmd(client,
+                                                     cluster,
+                                                     node_roles[i],
+                                                     aws_node)
+                aws_node.execute_command(docker_run_cmd)
+            i += 1
+    time.sleep(5)
+    file1.close()
+    return aws_nodes
+
+
+def prepare_hardened_cluster(profile, kubeconfig_path):
+    if profile == 'rke-cis-1.5':
+        network_policy_file = DATA_SUBDIR + "/default-allow-all.yaml"
+        account_update_file = DATA_SUBDIR + "/account_update.yaml"
+        items = execute_kubectl_cmd("get namespaces -A",
+                                    kubeconfig=kubeconfig_path)["items"]
+        all_ns = [item["metadata"]["name"] for item in items]
+        for ns in all_ns:
+            execute_kubectl_cmd("apply -f {0} -n {1}".
+                                format(network_policy_file, ns),
+                                kubeconfig=kubeconfig_path)
+            execute_kubectl_cmd('patch serviceaccount default'
+                                ' -n {0} -p "$(cat {1})"'.
+                                format(ns, account_update_file),
+                                kubeconfig=kubeconfig_path)
+
+
+def print_kubeconfig(kpath):
+    kubeconfig_file = open(kpath, "r")
+    kubeconfig_contents = kubeconfig_file.read()
+    kubeconfig_file.close()
+    kubeconfig_contents_encoded = base64.b64encode(
+        kubeconfig_contents.encode("utf-8")).decode("utf-8")
+    print("\n\n" + kubeconfig_contents + "\n\n")
+    print("\nBase64 encoded: \n\n" + kubeconfig_contents_encoded + "\n\n")

@@ -13,10 +13,10 @@ def needs_cluster(py_options, upgrade_check, create_resource_prefix) {
           string(name: 'CATTLE_TEST_URL', value: "${CATTLE_TEST_URL}"),
           string(name: 'ADMIN_TOKEN', value: "${ADMIN_TOKEN}"),
           string(name: 'USER_TOKEN', value: "${USER_TOKEN}"),
-          string(name: 'RANCHER_CLUSTER_NAME', value: "${cluster_arr[i]}"),
+          string(name: 'RANCHER_CLUSTER_NAME', value: "${cluster_arr[i]}", trim: true),
           string(name: 'PYTEST_OPTIONS', value: "-k ${py_options}"),
           string(name: 'RANCHER_UPGRADE_CHECK', value: "${upgrade_check}"),
-          string(name: 'RANCHER_CLUSTER_UPGRADE_VERSION', value: "${version_arr[i]}"),
+          string(name: 'RANCHER_CLUSTER_UPGRADE_VERSION', value: "${version_arr[i]}", trim: true),
           string(name: 'RANCHER_VALIDATE_RESOURCES_PREFIX', value: "${RANCHER_VALIDATE_RESOURCES_PREFIX}"),
           string(name: 'RANCHER_CREATE_RESOURCES_PREFIX', value: "${create_resource_prefix}"),
         ]
@@ -122,14 +122,14 @@ node {
                   cluster_count = cluster_arr.size()
                   for (int i = 0; i < cluster_count; i++) {
                     def params = [
-                      string(name: 'RANCHER_HOSTNAME_PREFIX', value: "${cluster_arr[i]}"),
-                      string(name: 'RANCHER_CLUSTER_NAME', value: "${cluster_arr[i]}"),
+                      string(name: 'RANCHER_HOSTNAME_PREFIX', value: "${cluster_arr[i]}", trim: true),
+                      string(name: 'RANCHER_CLUSTER_NAME', value: "${cluster_arr[i]}", trim: true),
                       string(name: 'CATTLE_TEST_URL', value: "${CATTLE_TEST_URL}"),
                       string(name: 'ADMIN_TOKEN', value: "${ADMIN_TOKEN}"),
                       string(name: 'USER_TOKEN', value: "${USER_TOKEN}"),
                       string(name: 'RANCHER_K3S_NO_OF_SERVER_NODES', value: "${RANCHER_K3S_NO_OF_SERVER_NODES}"),
                       string(name: 'RANCHER_K3S_NO_OF_WORKER_NODES', value: "${RANCHER_K3S_NO_OF_WORKER_NODES}"),
-                      string(name: 'RANCHER_K3S_VERSION', value: "${k3s_versions[i]}"),
+                      string(name: 'RANCHER_K3S_VERSION', value: "${k3s_versions[i]}", trim: true),
                       string(name: 'RANCHER_NODE_OS', value: "${RANCHER_NODE_OS}"),
                       string(name: 'AWS_AMI', value: "${K3S_AWS_AMI}"),
                       string(name: 'RANCHER_K3S_SERVER_FLAGS', value: "${RANCHER_K3S_SERVER_FLAGS}"),
@@ -143,7 +143,7 @@ node {
                       string(name: 'AWS_VOLUME_SIZE', value: "${AWS_VOLUME_SIZE}"),
                     ]
                     echo "Params are: ${params}"
-                    jobs["test-${i}"] = { build job: 'rancher_v3_import_k3s_ha_cluster', parameters: params }
+                    jobs["test-${i}"] = { build job: 'import_k3s_ha_cluster', parameters: params }
                   }
                   parallel jobs
                   CLUSTERS_CREATED = true

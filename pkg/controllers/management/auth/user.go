@@ -369,7 +369,7 @@ func (l *userLifecycle) deleteClusterUserAttributes(username string, tokens []*v
 	}
 
 	for _, cluster := range set {
-		userCtx, err := l.clusterManager.UserContext(cluster.Name)
+		userCtx, err := l.clusterManager.UserContextNoControllers(cluster.Name)
 		if err != nil {
 			return err
 		}

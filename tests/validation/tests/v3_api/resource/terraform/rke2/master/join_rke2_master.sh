@@ -22,11 +22,13 @@ then
      echo -e "node-external-ip: ${6}" >> /etc/rancher/rke2/config.yaml
    fi
    cat /etc/rancher/rke2/config.yaml
+else
+  echo -e "node-external-ip: ${6}" >> /etc/rancher/rke2/config.yaml
 fi
 
-if [[ ${1} == *"rhel"* ]]
+if [[ ${1} = "rhel" ]]
 then
-   subscription-manager register --auto-attach --username=${10} --password=${11}
+   subscription-manager register --auto-attach --username=${11} --password=${12}
    subscription-manager repos --enable=rhel-7-server-extras-rpms
 fi
 
@@ -43,13 +45,19 @@ then
   sudo systemctl reload NetworkManager
 fi
 
+export "${10}"="${5}"
+if [ ! -z "${13}" ]
+then
+  export INSTALL_RKE2_METHOD="${13}"
+fi
+
 if [ ${8} = "rke2" ]
 then
    if [ ${7} != "null" ]
    then
-       curl -sfL https://get.rke2.io | INSTALL_RKE2_VERSION=${5}  INSTALL_RKE2_CHANNEL=${7} sh -
+       curl -sfL https://get.rke2.io | INSTALL_RKE2_CHANNEL=${7} sh -
    else
-       curl -sfL https://get.rke2.io | INSTALL_RKE2_VERSION=${5} sh -
+       curl -sfL https://get.rke2.io | sh -
    fi
    sleep 10
    if [ ! -z "${9}" ] && [[ "${9}" == *"cis"* ]]
@@ -61,7 +69,7 @@ then
            cp -f /usr/local/share/rke2/rke2-cis-sysctl.conf /etc/sysctl.d/60-rke2-cis.conf
        fi
        systemctl restart systemd-sysctl
-       useradd -r -c "etcd user" -s /sbin/nologin -M etcd
+       useradd -r -c "etcd user" -s /sbin/nologin -M etcd -U
    fi
    sudo systemctl enable rke2-server
    sudo systemctl start rke2-server

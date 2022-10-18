@@ -43,7 +43,7 @@ func init() {
 	resource.Put(CisBenchmarkVersionGroupVersionResource)
 }
 
-// Deprecated use v3.CisBenchmarkVersion instead
+// Deprecated: use v3.CisBenchmarkVersion instead
 type CisBenchmarkVersion = v3.CisBenchmarkVersion
 
 func NewCisBenchmarkVersion(namespace, name string, obj v3.CisBenchmarkVersion) *v3.CisBenchmarkVersion {

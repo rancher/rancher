@@ -37,11 +37,8 @@ func (r *rbaccontroller) clusterRBACSync(key string, cluster *v3.Cluster) (runti
 	for _, x := range grbs {
 		grb, _ := x.(*v3.GlobalRoleBinding)
 		grbList = append(grbList, grb)
-		restrictedAdminUserName := grb.UserName
-		subjects = append(subjects, k8srbac.Subject{
-			Kind: "User",
-			Name: restrictedAdminUserName,
-		})
+		subject := rbac.GetGRBSubject(grb)
+		subjects = append(subjects, subject)
 		rbName := fmt.Sprintf("%s-%s", grb.Name, rbac.RestrictedAdminClusterRoleBinding)
 		rb, err := r.rbLister.Get(cluster.Name, rbName)
 		if err != nil && !k8serrors.IsNotFound(err) {
@@ -69,12 +66,7 @@ func (r *rbaccontroller) clusterRBACSync(key string, cluster *v3.Cluster) (runti
 				Name: rbac.ClusterCRDsClusterRole,
 				Kind: "ClusterRole",
 			},
-			Subjects: []k8srbac.Subject{
-				{
-					Kind: "User",
-					Name: restrictedAdminUserName,
-				},
-			},
+			Subjects: []k8srbac.Subject{subject},
 		})
 		if err != nil && !k8serrors.IsAlreadyExists(err) {
 			returnErr = multierror.Append(returnErr, err)
@@ -196,11 +188,8 @@ func (r *rbaccontroller) createRBForRestrictedAdminProvisioningClusterAccess(clu
 	for _, grb := range grbList {
 		// The roleBinding name format: r-cluster-<cluster name>-admin-<subject name>
 		// Example: r-cluster-cluster1-admin-u-xyz
-		subject := k8srbac.Subject{
-			Kind: "User",
-			Name: grb.UserName,
-		}
-		rbName := name.SafeConcatName(rbac.ProvisioningClusterAdminName(provCluster), grb.UserName)
+		subject := rbac.GetGRBSubject(grb)
+		rbName := name.SafeConcatName(rbac.ProvisioningClusterAdminName(provCluster), rbac.GetGRBTargetKey(grb))
 		existingRb, err := r.rbLister.Get(provCluster.Namespace, rbName)
 		if err != nil && !k8serrors.IsNotFound(err) {
 			returnErr = multierror.Append(returnErr, err)

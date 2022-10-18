@@ -5,51 +5,57 @@ import (
 )
 
 const (
-	ServiceMonitorType                   = "serviceMonitor"
-	ServiceMonitorFieldAnnotations       = "annotations"
-	ServiceMonitorFieldCreated           = "created"
-	ServiceMonitorFieldCreatorID         = "creatorId"
-	ServiceMonitorFieldEndpoints         = "endpoints"
-	ServiceMonitorFieldJobLabel          = "jobLabel"
-	ServiceMonitorFieldLabels            = "labels"
-	ServiceMonitorFieldName              = "name"
-	ServiceMonitorFieldNamespaceId       = "namespaceId"
-	ServiceMonitorFieldNamespaceSelector = "namespaceSelector"
-	ServiceMonitorFieldOwnerReferences   = "ownerReferences"
-	ServiceMonitorFieldPodTargetLabels   = "podTargetLabels"
-	ServiceMonitorFieldProjectID         = "projectId"
-	ServiceMonitorFieldRemoved           = "removed"
-	ServiceMonitorFieldSampleLimit       = "sampleLimit"
-	ServiceMonitorFieldSelector          = "selector"
-	ServiceMonitorFieldTargetLabels      = "targetLabels"
-	ServiceMonitorFieldTargetLimit       = "targetLimit"
-	ServiceMonitorFieldTargetService     = "targetService"
-	ServiceMonitorFieldTargetWorkload    = "targetWorkload"
-	ServiceMonitorFieldUUID              = "uuid"
+	ServiceMonitorType                       = "serviceMonitor"
+	ServiceMonitorFieldAnnotations           = "annotations"
+	ServiceMonitorFieldCreated               = "created"
+	ServiceMonitorFieldCreatorID             = "creatorId"
+	ServiceMonitorFieldEndpoints             = "endpoints"
+	ServiceMonitorFieldJobLabel              = "jobLabel"
+	ServiceMonitorFieldLabelLimit            = "labelLimit"
+	ServiceMonitorFieldLabelNameLengthLimit  = "labelNameLengthLimit"
+	ServiceMonitorFieldLabelValueLengthLimit = "labelValueLengthLimit"
+	ServiceMonitorFieldLabels                = "labels"
+	ServiceMonitorFieldName                  = "name"
+	ServiceMonitorFieldNamespaceId           = "namespaceId"
+	ServiceMonitorFieldNamespaceSelector     = "namespaceSelector"
+	ServiceMonitorFieldOwnerReferences       = "ownerReferences"
+	ServiceMonitorFieldPodTargetLabels       = "podTargetLabels"
+	ServiceMonitorFieldProjectID             = "projectId"
+	ServiceMonitorFieldRemoved               = "removed"
+	ServiceMonitorFieldSampleLimit           = "sampleLimit"
+	ServiceMonitorFieldSelector              = "selector"
+	ServiceMonitorFieldTargetLabels          = "targetLabels"
+	ServiceMonitorFieldTargetLimit           = "targetLimit"
+	ServiceMonitorFieldTargetService         = "targetService"
+	ServiceMonitorFieldTargetWorkload        = "targetWorkload"
+	ServiceMonitorFieldUUID                  = "uuid"
 )
 
 type ServiceMonitor struct {
 	types.Resource
-	Annotations       map[string]string `json:"annotations,omitempty" yaml:"annotations,omitempty"`
-	Created           string            `json:"created,omitempty" yaml:"created,omitempty"`
-	CreatorID         string            `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
-	Endpoints         []Endpoint        `json:"endpoints,omitempty" yaml:"endpoints,omitempty"`
-	JobLabel          string            `json:"jobLabel,omitempty" yaml:"jobLabel,omitempty"`
-	Labels            map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
-	Name              string            `json:"name,omitempty" yaml:"name,omitempty"`
-	NamespaceId       string            `json:"namespaceId,omitempty" yaml:"namespaceId,omitempty"`
-	NamespaceSelector []string          `json:"namespaceSelector,omitempty" yaml:"namespaceSelector,omitempty"`
-	OwnerReferences   []OwnerReference  `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
-	PodTargetLabels   []string          `json:"podTargetLabels,omitempty" yaml:"podTargetLabels,omitempty"`
-	ProjectID         string            `json:"projectId,omitempty" yaml:"projectId,omitempty"`
-	Removed           string            `json:"removed,omitempty" yaml:"removed,omitempty"`
-	SampleLimit       int64             `json:"sampleLimit,omitempty" yaml:"sampleLimit,omitempty"`
-	Selector          *LabelSelector    `json:"selector,omitempty" yaml:"selector,omitempty"`
-	TargetLabels      []string          `json:"targetLabels,omitempty" yaml:"targetLabels,omitempty"`
-	TargetLimit       int64             `json:"targetLimit,omitempty" yaml:"targetLimit,omitempty"`
-	TargetService     string            `json:"targetService,omitempty" yaml:"targetService,omitempty"`
-	TargetWorkload    string            `json:"targetWorkload,omitempty" yaml:"targetWorkload,omitempty"`
-	UUID              string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
+	Annotations           map[string]string `json:"annotations,omitempty" yaml:"annotations,omitempty"`
+	Created               string            `json:"created,omitempty" yaml:"created,omitempty"`
+	CreatorID             string            `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
+	Endpoints             []Endpoint        `json:"endpoints,omitempty" yaml:"endpoints,omitempty"`
+	JobLabel              string            `json:"jobLabel,omitempty" yaml:"jobLabel,omitempty"`
+	LabelLimit            int64             `json:"labelLimit,omitempty" yaml:"labelLimit,omitempty"`
+	LabelNameLengthLimit  int64             `json:"labelNameLengthLimit,omitempty" yaml:"labelNameLengthLimit,omitempty"`
+	LabelValueLengthLimit int64             `json:"labelValueLengthLimit,omitempty" yaml:"labelValueLengthLimit,omitempty"`
+	Labels                map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
+	Name                  string            `json:"name,omitempty" yaml:"name,omitempty"`
+	NamespaceId           string            `json:"namespaceId,omitempty" yaml:"namespaceId,omitempty"`
+	NamespaceSelector     []string          `json:"namespaceSelector,omitempty" yaml:"namespaceSelector,omitempty"`
+	OwnerReferences       []OwnerReference  `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
+	PodTargetLabels       []string          `json:"podTargetLabels,omitempty" yaml:"podTargetLabels,omitempty"`
+	ProjectID             string            `json:"projectId,omitempty" yaml:"projectId,omitempty"`
+	Removed               string            `json:"removed,omitempty" yaml:"removed,omitempty"`
+	SampleLimit           int64             `json:"sampleLimit,omitempty" yaml:"sampleLimit,omitempty"`
+	Selector              *LabelSelector    `json:"selector,omitempty" yaml:"selector,omitempty"`
+	TargetLabels          []string          `json:"targetLabels,omitempty" yaml:"targetLabels,omitempty"`
+	TargetLimit           int64             `json:"targetLimit,omitempty" yaml:"targetLimit,omitempty"`
+	TargetService         string            `json:"targetService,omitempty" yaml:"targetService,omitempty"`
+	TargetWorkload        string            `json:"targetWorkload,omitempty" yaml:"targetWorkload,omitempty"`
+	UUID                  string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 }
 
 type ServiceMonitorCollection struct {

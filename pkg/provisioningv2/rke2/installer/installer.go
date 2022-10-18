@@ -1,6 +1,7 @@
 package installer
 
 import (
+	"context"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -9,23 +10,24 @@ import (
 
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/systemtemplate"
+	"github.com/rancher/rancher/pkg/tls"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 )
 
 const (
 	SystemAgentInstallPath = "/system-agent-install.sh" // corresponding curl -o in package/Dockerfile
-	WindowsRke2InstallPath = "/rke2-agent-install.ps1"  // corresponding curl -o in package/Dockerfile
+	WindowsRke2InstallPath = "/wins-agent-install.ps1"  // corresponding curl -o in package/Dockerfile
 )
 
 var (
 	localAgentInstallScripts = []string{
-		"/usr/share/rancher/ui/assets" + SystemAgentInstallPath,
+		settings.UIPath.Get() + "/assets" + SystemAgentInstallPath,
 		"." + SystemAgentInstallPath,
 	}
 	localWindowsRke2InstallScripts = []string{
-		"./rke2-install.ps1",
-	}
+		settings.UIPath.Get() + "/assets" + WindowsRke2InstallPath,
+		"." + WindowsRke2InstallPath}
 )
 
 func installScript(setting settings.Setting, files []string) ([]byte, error) {
@@ -53,7 +55,7 @@ func installScript(setting settings.Setting, files []string) ([]byte, error) {
 	return ioutil.ReadAll(resp.Body)
 }
 
-func LinuxInstallScript(token string, envVars []corev1.EnvVar, defaultHost string) ([]byte, error) {
+func LinuxInstallScript(ctx context.Context, token string, envVars []corev1.EnvVar, defaultHost string) ([]byte, error) {
 	data, err := installScript(
 		settings.SystemAgentInstallScript,
 		localAgentInstallScripts)
@@ -69,6 +71,9 @@ func LinuxInstallScript(token string, envVars []corev1.EnvVar, defaultHost strin
 		}
 	}
 	ca := systemtemplate.CAChecksum()
+	if v, ok := ctx.Value(tls.InternalAPI).(bool); ok && v {
+		ca = systemtemplate.InternalCAChecksum()
+	}
 	if ca != "" {
 		ca = "CATTLE_CA_CHECKSUM=\"" + ca + "\""
 	}
@@ -97,20 +102,43 @@ func LinuxInstallScript(token string, envVars []corev1.EnvVar, defaultHost strin
 `, envVarBuf.String(), binaryURL, server, ca, token, data)), nil
 }
 
-func WindowsInstallScript(token string, envVars []corev1.EnvVar, defaultHost string) ([]byte, error) {
+func WindowsInstallScript(ctx context.Context, token string, envVars []corev1.EnvVar, defaultHost string) ([]byte, error) {
 	data, err := installScript(
-		settings.WindowsRke2InstallScript,
+		settings.WinsAgentInstallScript,
 		localWindowsRke2InstallScripts)
 	if err != nil {
 		return nil, err
 	}
 
+	binaryURL := ""
+	if settings.WinsAgentVersion.Get() != "" {
+		if settings.ServerURL.Get() != "" {
+			binaryURL = fmt.Sprintf("$env:CATTLE_AGENT_BINARY_BASE_URL=\"%s/assets\"", settings.ServerURL.Get())
+		} else if defaultHost != "" {
+			binaryURL = fmt.Sprintf("$env:CATTLE_AGENT_BINARY_BASE_URL=\"https://%s/assets\"", defaultHost)
+		}
+	}
+
+	csiProxyURL := settings.CSIProxyAgentURL.Get()
+	csiProxyVersion := "v1.0.0"
+	if settings.CSIProxyAgentVersion.Get() != "" {
+		csiProxyVersion = settings.CSIProxyAgentVersion.Get()
+		if settings.ServerURL.Get() != "" {
+			csiProxyURL = fmt.Sprintf("%s/assets/csi-proxy-%%[1]s.tar.gz", settings.ServerURL.Get())
+		} else if defaultHost != "" {
+			csiProxyURL = fmt.Sprintf("https://%s/assets/csi-proxy-%%[1]s.tar.gz", defaultHost)
+		}
+	}
+
 	ca := systemtemplate.CAChecksum()
+	if v, ok := ctx.Value(tls.InternalAPI).(bool); ok && v {
+		ca = systemtemplate.InternalCAChecksum()
+	}
 	if ca != "" {
 		ca = "$env:CATTLE_CA_CHECKSUM=\"" + ca + "\""
 	}
 	if token != "" {
-		token = "$env:CATTLE_ROLE_NONE=true\n$env:CATTLE_TOKEN=\"" + token + "\""
+		token = "$env:CATTLE_ROLE_NONE=\"true\"\n$env:CATTLE_TOKEN=\"" + token + "\""
 	}
 	envVarBuf := &strings.Builder{}
 	for _, envVar := range envVars {
@@ -130,8 +158,14 @@ func WindowsInstallScript(token string, envVars []corev1.EnvVar, defaultHost str
 %s
 %s
 %s
+%s
 
-Rke2-Installer @PSBoundParameters
+# Enables CSI Proxy
+$env:CSI_PROXY_URL = "%s"
+$env:CSI_PROXY_VERSION = "%s"
+$env:CSI_PROXY_KUBELET_PATH = "C:/var/lib/rancher/rke2/bin/kubelet.exe"
+
+Invoke-WinsInstaller @PSBoundParameters
 exit 0
-`, data, envVarBuf.String(), server, ca, token)), nil
+`, data, envVarBuf.String(), binaryURL, server, ca, token, csiProxyURL, csiProxyVersion)), nil
 }

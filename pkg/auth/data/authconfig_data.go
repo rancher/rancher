@@ -74,9 +74,15 @@ func AuthConfigs(management *config.ManagementContext) error {
 }
 
 func addAuthConfig(name, aType string, enabled bool, management *config.ManagementContext) error {
+	annotations := make(map[string]string)
+	if name == azure.Name {
+		annotations[azure.GraphEndpointMigratedAnnotation] = "true"
+	}
+
 	_, err := management.Management.AuthConfigs("").ObjectClient().Create(&v3.AuthConfig{
 		ObjectMeta: v1.ObjectMeta{
-			Name: name,
+			Name:        name,
+			Annotations: annotations,
 		},
 		Type:    aType,
 		Enabled: enabled,

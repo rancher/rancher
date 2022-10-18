@@ -26,12 +26,13 @@ AWS_CICD_INSTANCE_TAG = os.environ.get("AWS_CICD_INSTANCE_TAG",
                                        'rancher-validation')
 AWS_IAM_PROFILE = os.environ.get("AWS_IAM_PROFILE", "")
 # by default the public Ubuntu 18.04 AMI is used
-AWS_DEFAULT_AMI = "ami-0d5d9d301c853a04a"
+AWS_DEFAULT_AMI = "ami-0c3357e45c1a0eebe"
 AWS_DEFAULT_USER = "ubuntu"
 AWS_AMI = os.environ.get("AWS_AMI", AWS_DEFAULT_AMI)
 AWS_USER = os.environ.get("AWS_USER", AWS_DEFAULT_USER)
 AWS_VOLUME_SIZE = os.environ.get("AWS_VOLUME_SIZE", "50")
 AWS_INSTANCE_TYPE = os.environ.get("AWS_INSTANCE_TYPE", 't3a.medium')
+AWS_BASTION_INSTANCE_TYPE = os.environ.get("AWS_INSTANCE_TYPE", 'c5.2xlarge')
 
 AWS_WINDOWS_VOLUME_SIZE = os.environ.get("AWS_WINDOWS_VOLUME_SIZE", "100")
 AWS_WINDOWS_INSTANCE_TYPE = 't3.xlarge'
@@ -98,9 +99,9 @@ class AmazonWebServices(CloudProviderBase):
         self.created_keys = []
 
     def create_node(self, node_name, ami=AWS_AMI, ssh_user=AWS_USER,
-                    key_name=None, wait_for_ready=True, public_ip=True):
+                    key_name=None, wait_for_ready=True, public_ip=True, for_bastion=False):
         volume_size = AWS_VOLUME_SIZE
-        instance_type = AWS_INSTANCE_TYPE
+        instance_type = AWS_BASTION_INSTANCE_TYPE if for_bastion else AWS_INSTANCE_TYPE
         if ssh_user == "Administrator":
             volume_size = AWS_WINDOWS_VOLUME_SIZE
             instance_type = AWS_WINDOWS_INSTANCE_TYPE
@@ -144,7 +145,12 @@ class AmazonWebServices(CloudProviderBase):
                 "Placement": {'AvailabilityZone': AWS_REGION_AZ},
                 "BlockDeviceMappings":
                     [{"DeviceName": "/dev/sda1",
-                      "Ebs": {"VolumeSize": int(volume_size)}
+                      "Ebs": {"DeleteOnTermination": True,
+                              "Iops": 6000 if for_bastion else 3000,
+                              "VolumeSize": int(volume_size),
+                              "VolumeType": 'gp3',
+                              "Throughput": 500 if for_bastion else 125
+                              }
                       }]
                 }
 
@@ -474,6 +480,27 @@ class AmazonWebServices(CloudProviderBase):
     def upsert_route_53_record_cname(
             self, record_name, record_value, action='UPSERT',
             record_type='CNAME', record_ttl=300):
+        return self._route53_client.change_resource_record_sets(
+            HostedZoneId=AWS_HOSTED_ZONE_ID,
+            ChangeBatch={
+                'Comment': 'Record created or updated for automation',
+                'Changes': [{
+                    'Action': action,
+                    'ResourceRecordSet': {
+                        'Name': record_name,
+                        'Type': record_type,
+                        'TTL': record_ttl,
+                        'ResourceRecords': [{
+                            'Value': record_value
+                        }]
+                    }
+                }]
+            }
+        )
+    
+    def upsert_route_53_record_a(
+            self, record_name, record_value, action='UPSERT',
+            record_type='A', record_ttl=300):
         return self._route53_client.change_resource_record_sets(
             HostedZoneId=AWS_HOSTED_ZONE_ID,
             ChangeBatch={

@@ -3,29 +3,31 @@ package machinerole
 import (
 	"context"
 
-	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1alpha4"
+	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	"github.com/rancher/rancher/pkg/types/config"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 )
 
 type handler struct {
-	clusterName string
-	nodes       v1.NodeInterface
-	machines    capicontrollers.MachineCache
+	clusterName   string
+	nodes         v1.NodeInterface
+	secretsLister v1.SecretLister
 }
 
 func Register(ctx context.Context, context *config.UserContext) {
 	h := handler{
-		clusterName: context.ClusterName,
-		nodes:       context.Core.Nodes(""),
-		machines:    context.Management.Wrangler.CAPI.Machine().Cache(),
+		clusterName:   context.ClusterName,
+		nodes:         context.Core.Nodes(""),
+		secretsLister: context.Management.Core.Secrets("").Controller().Lister(),
 	}
 	context.Core.Nodes("").Controller().AddHandler(ctx, "machine-worker-label", h.WorkerLabelSync)
 }
 
-func (h *handler) WorkerLabelSync(key string, node *corev1.Node) (runtime.Object, error) {
+func (h *handler) WorkerLabelSync(_ string, node *corev1.Node) (runtime.Object, error) {
 	if node == nil || node.DeletionTimestamp != nil || node.Labels == nil || node.Annotations == nil {
 		return node, nil
 	}
@@ -33,25 +35,22 @@ func (h *handler) WorkerLabelSync(key string, node *corev1.Node) (runtime.Object
 	if _, ok := node.Labels["node-role.kubernetes.io/worker"]; ok {
 		return node, nil
 	}
-	machineName := node.Annotations["cluster.x-k8s.io/machine"]
+	machineName := node.Annotations[capi.MachineAnnotation]
 	if machineName == "" {
 		return node, nil
 	}
-	machineNS := node.Annotations["cluster.x-k8s.io/cluster-namespace"]
+	machineNS := node.Annotations[capi.ClusterNamespaceAnnotation]
 	if machineNS == "" {
 		return node, nil
 	}
-	machine, err := h.machines.Get(machineNS, machineName)
-	if err != nil {
-		return nil, err
+
+	secrets, err := h.secretsLister.List(machineNS, labels.SelectorFromSet(labels.Set{rke2.MachineNameLabel: machineName, rke2.WorkerRoleLabel: "true"}))
+	if err != nil || len(secrets) == 0 {
+		return node, err
 	}
-	var nodeCopy *corev1.Node
-	if val, exists := machine.Labels["rke.cattle.io/worker-role"]; exists && val == "true" {
-		nodeCopy = node.DeepCopy()
-		nodeCopy.Labels["node-role.kubernetes.io/worker"] = "true"
-	}
-	if nodeCopy == nil {
-		return node, nil
-	}
-	return h.nodes.Update(nodeCopy)
+
+	node = node.DeepCopy()
+	node.Labels["node-role.kubernetes.io/worker"] = "true"
+
+	return h.nodes.Update(node)
 }
