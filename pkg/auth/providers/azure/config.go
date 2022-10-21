@@ -29,14 +29,12 @@ func authProviderEnabled(config *v32.AzureADConfig) bool {
 }
 
 func isConfigDeprecated(cfg *v32.AzureADConfig) bool {
-	if !cfg.Enabled {
-		return false
-	}
-	v, ok := cfg.ObjectMeta.Annotations[GraphEndpointMigratedAnnotation]
-	if !ok || v != "true" {
-		logrus.Tracef("Could not find the %s annotation that specifies whether the Graph Endpoint has been migrated, or its value is not \"true\" - Rancher will use the old endpoint.",
-			GraphEndpointMigratedAnnotation)
-		return true
+	return authProviderEnabled(cfg) && !configHasNewFlowAnnotation(cfg)
+}
+
+func configHasNewFlowAnnotation(cfg *v32.AzureADConfig) bool {
+	if cfg.ObjectMeta.Annotations != nil {
+		return cfg.ObjectMeta.Annotations[GraphEndpointMigratedAnnotation] == "true"
 	}
 	return false
 }
