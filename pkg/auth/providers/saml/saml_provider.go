@@ -406,3 +406,11 @@ func (s *Provider) GetUserExtraAttributes(userPrincipal v3.Principal) map[string
 	}
 	return extras
 }
+
+func (s *Provider) IsDisabledProvider() (bool, error) {
+	samlConfig, err := s.getSamlConfig()
+	if err != nil {
+		return false, err
+	}
+	return !samlConfig.Enabled, nil
+}
