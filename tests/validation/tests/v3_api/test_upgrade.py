@@ -614,7 +614,7 @@ def validate_worklaods_with_secret(workload_name1, workload_name2):
 
 
 def upgrade_rancher_server(serverIp,
-                           sshKeyPath=".ssh/jenkins-rke-validation.pem",
+                           sshKeyPath=".ssh/jenkins-elliptic-validation.pem",
                            containerName="rancher-server"):
     if serverIp.startswith('https://'):
         serverIp = serverIp[8:]
