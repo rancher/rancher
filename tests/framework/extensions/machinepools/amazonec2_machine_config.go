@@ -9,7 +9,7 @@ const (
 	AWSKind                              = "Amazonec2Config"
 	AWSPoolType                          = "rke-machine-config.cattle.io.amazonec2config"
 	AWSResourceConfig                    = "amazonec2configs"
-	AWSMachingConfigConfigurationFileKey = "awsMachineConfig"
+	AWSMachineConfigConfigurationFileKey = "awsMachineConfig"
 )
 
 // AWSMachineConfig is configuration needed to create an rke-machine-config.cattle.io.amazonec2config
@@ -30,7 +30,7 @@ type AWSMachineConfig struct {
 // that CreateMachineConfig uses to created the rke-machine-config
 func NewAWSMachineConfig(generatedPoolName, namespace string) *unstructured.Unstructured {
 	var awsMachineConfig AWSMachineConfig
-	config.LoadConfig(AWSMachingConfigConfigurationFileKey, &awsMachineConfig)
+	config.LoadConfig(AWSMachineConfigConfigurationFileKey, &awsMachineConfig)
 
 	machineConfig := &unstructured.Unstructured{}
 	machineConfig.SetAPIVersion("rke-machine-config.cattle.io/v1")

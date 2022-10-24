@@ -27,6 +27,8 @@ const (
 	wloadServiceName             = "wload-service"
 	wloadAfterBackup             = "wload-after-backup"
 	ProvisioningSteveResouceType = "provisioning.cattle.io.cluster"
+	isCattleLabeled              = true
+	etcdnodeCount                = 3
 )
 
 func createSnapshot(client *rancher.Client, clustername string, generation int, namespace string) error {

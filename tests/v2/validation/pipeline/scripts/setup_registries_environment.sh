@@ -3,12 +3,12 @@ set -ex
 cd $(dirname $0)/../../../../
 
 echo "build corral packages"
-sh tests/v2/validation/scripts/build_corral_packages.sh
+sh tests/v2/validation/pipeline/scripts/build_corral_packages.sh
 
 echo | corral config
 
 echo "build registries images"
-sh tests/v2/validation/scripts/build_registries_images.sh
+sh tests/v2/validation/pipeline/scripts/build_registries_images.sh
 
 corral list
 

@@ -8,8 +8,10 @@ import (
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
 	"github.com/rancher/rancher/tests/framework/extensions/clusters"
 	nodestat "github.com/rancher/rancher/tests/framework/extensions/nodes"
+	"github.com/rancher/rancher/tests/framework/extensions/pipeline"
 	"github.com/rancher/rancher/tests/framework/extensions/tokenregistration"
 	"github.com/rancher/rancher/tests/framework/extensions/workloads/pods"
+	"github.com/rancher/rancher/tests/framework/pkg/environmentflag"
 	namegen "github.com/rancher/rancher/tests/framework/pkg/namegenerator"
 	"github.com/rancher/rancher/tests/framework/pkg/wait"
 	"github.com/rancher/rancher/tests/integration/pkg/defaults"
@@ -28,6 +30,10 @@ func TestProvisioningRKE1CustomCluster(t *testing.T, client *rancher.Client, ext
 	cluster := clusters.NewRKE1ClusterConfig(clusterName, cni, kubeVersion, client)
 	clusterResp, err := clusters.CreateRKE1Cluster(client, cluster)
 	require.NoError(t, err)
+
+	if client.Flags.GetValue(environmentflag.UpdateClusterName) {
+		pipeline.UpdateConfigClusterName(clusterName)
+	}
 
 	client, err = client.ReLogin()
 	require.NoError(t, err)

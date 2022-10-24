@@ -10,9 +10,12 @@ import (
 	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/pkg/api/scheme"
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
+	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
 	v1 "github.com/rancher/rancher/tests/framework/clients/rancher/v1"
+	"github.com/rancher/rancher/tests/framework/extensions/clusters"
 	"github.com/rancher/rancher/tests/framework/extensions/ingresses"
 	kubeingress "github.com/rancher/rancher/tests/framework/extensions/kubeapi/ingresses"
+	"github.com/rancher/rancher/tests/framework/extensions/projects"
 	"github.com/rancher/rancher/tests/framework/extensions/services"
 	"github.com/rancher/rancher/tests/framework/extensions/workloads"
 	"github.com/rancher/rancher/tests/framework/pkg/namegenerator"
@@ -51,6 +54,32 @@ const (
 
 func getSteveID(namespaceName, resourceName string) string {
 	return fmt.Sprintf(namespaceName + "/" + resourceName)
+}
+
+func getProject(client *rancher.Client, clusterName, projectName string) (project *management.Project, err error) {
+	clusterID, err := clusters.GetClusterIDByName(client, clusterName)
+	if err != nil {
+		return
+	}
+
+	project, err = projects.GetProjectByName(client, clusterID, projectName)
+	if err != nil {
+		return
+	}
+
+	if project == nil {
+		projectConfig := &management.Project{
+			ClusterID: clusterID,
+			Name:      projectName,
+		}
+
+		project, err = client.Management.Project.Create(projectConfig)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return
 }
 
 // newIngressTemplate is a private constructor that returns ingress spec for specific services

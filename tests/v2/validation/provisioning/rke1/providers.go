@@ -9,19 +9,13 @@ import (
 	azure "github.com/rancher/rancher/tests/framework/extensions/rke1/nodetemplates/azure"
 	harvester "github.com/rancher/rancher/tests/framework/extensions/rke1/nodetemplates/harvester"
 	linode "github.com/rancher/rancher/tests/framework/extensions/rke1/nodetemplates/linode"
-)
-
-const (
-	awsProviderName       = "aws"
-	azureProviderName     = "azure"
-	harvesterProviderName = "harvester"
-	linodeProviderName    = "linode"
+	"github.com/rancher/rancher/tests/v2/validation/provisioning"
 )
 
 type NodeTemplateFunc func(rancherClient *rancher.Client) (*nodetemplates.NodeTemplate, error)
 
 type Provider struct {
-	Name             string
+	Name             provisioning.ProviderName
 	NodeTemplateFunc NodeTemplateFunc
 }
 
@@ -30,27 +24,27 @@ type Provider struct {
 // string of the name of the provider.
 func CreateProvider(name string) Provider {
 	switch {
-	case name == awsProviderName:
+	case name == provisioning.AWSProviderName.String():
 		provider := Provider{
-			Name:             name,
+			Name:             provisioning.AWSProviderName,
 			NodeTemplateFunc: aws.CreateAWSNodeTemplate,
 		}
 		return provider
-	case name == azureProviderName:
+	case name == provisioning.AzureProviderName.String():
 		provider := Provider{
-			Name:             name,
+			Name:             provisioning.AzureProviderName,
 			NodeTemplateFunc: azure.CreateAzureNodeTemplate,
 		}
 		return provider
-	case name == harvesterProviderName:
+	case name == provisioning.HarvesterProviderName.String():
 		provider := Provider{
-			Name:             name,
+			Name:             provisioning.HarvesterProviderName,
 			NodeTemplateFunc: harvester.CreateHarvesterNodeTemplate,
 		}
 		return provider
-	case name == linodeProviderName:
+	case name == provisioning.LinodeProviderName.String():
 		provider := Provider{
-			Name:             name,
+			Name:             provisioning.LinodeProviderName,
 			NodeTemplateFunc: linode.CreateLinodeNodeTemplate,
 		}
 		return provider

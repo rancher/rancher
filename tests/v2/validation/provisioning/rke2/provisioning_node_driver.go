@@ -9,7 +9,9 @@ import (
 	"github.com/rancher/rancher/tests/framework/extensions/clusters"
 	"github.com/rancher/rancher/tests/framework/extensions/machinepools"
 	nodestat "github.com/rancher/rancher/tests/framework/extensions/nodes"
+	"github.com/rancher/rancher/tests/framework/extensions/pipeline"
 	"github.com/rancher/rancher/tests/framework/extensions/workloads/pods"
+	"github.com/rancher/rancher/tests/framework/pkg/environmentflag"
 	namegen "github.com/rancher/rancher/tests/framework/pkg/namegenerator"
 	"github.com/rancher/rancher/tests/framework/pkg/wait"
 	"github.com/rancher/rancher/tests/integration/pkg/defaults"
@@ -22,7 +24,7 @@ func TestProvisioningRKE2Cluster(t *testing.T, client *rancher.Client, provider 
 	cloudCredential, err := provider.CloudCredFunc(client)
 	require.NoError(t, err)
 
-	clusterName := namegen.AppendRandomString(provider.Name)
+	clusterName := namegen.AppendRandomString(provider.Name.String())
 	generatedPoolName := fmt.Sprintf("nc-%s-pool1-", clusterName)
 	machinePoolConfig := provider.MachinePoolFunc(generatedPoolName, namespace)
 
@@ -34,6 +36,10 @@ func TestProvisioningRKE2Cluster(t *testing.T, client *rancher.Client, provider 
 	cluster := clusters.NewK3SRKE2ClusterConfig(clusterName, namespace, cni, cloudCredential.ID, kubeVersion, machinePools)
 	clusterResp, err := clusters.CreateK3SRKE2Cluster(client, cluster)
 	require.NoError(t, err)
+
+	if client.Flags.GetValue(environmentflag.UpdateClusterName) {
+		pipeline.UpdateConfigClusterName(clusterName)
+	}
 
 	adminClient, err := rancher.NewClient(client.RancherConfig.AdminToken, client.Session)
 	require.NoError(t, err)
