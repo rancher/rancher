@@ -87,12 +87,12 @@ func (c *CustomClusterProvisioningTestSuite) TestProvisioningK3SCustomCluster() 
 		nodeRoles []string
 		client    *rancher.Client
 	}{
-		{"1 Node all roles Admin User", nodeRoles0, c.client},
-		{"1 Node all roles Standard User", nodeRoles0, c.standardUserClient},
-		{"2 nodes - etcd/cp roles per 1 node Admin User", nodeRoles1, c.client},
-		{"2 nodes - etcd/cp roles per 1 node Standard User", nodeRoles1, c.standardUserClient},
-		{"3 nodes - 1 role per node Admin User", nodeRoles2, c.client},
-		{"3 nodes - 1 role per node Standard User", nodeRoles2, c.standardUserClient},
+		{"1 Node all roles " + provisioning.AdminClientName.String(), nodeRoles0, c.client},
+		{"1 Node all roles " + provisioning.StandardClientName.String(), nodeRoles0, c.standardUserClient},
+		{"2 nodes - etcd/cp roles per 1 node " + provisioning.AdminClientName.String(), nodeRoles1, c.client},
+		{"2 nodes - etcd/cp roles per 1 node " + provisioning.StandardClientName.String(), nodeRoles1, c.standardUserClient},
+		{"3 nodes - 1 role per node " + provisioning.AdminClientName.String(), nodeRoles2, c.client},
+		{"3 nodes - 1 role per node " + provisioning.StandardClientName.String(), nodeRoles2, c.standardUserClient},
 	}
 	var name string
 	for _, tt := range tests {
@@ -104,8 +104,9 @@ func (c *CustomClusterProvisioningTestSuite) TestProvisioningK3SCustomCluster() 
 
 		for _, nodeProviderName := range c.nodeProviders {
 			externalNodeProvider := provisioning.ExternalNodeProviderSetup(nodeProviderName)
+			providerName := " Node Provider: " + nodeProviderName
 			for _, kubeVersion := range c.kubernetesVersions {
-				name = tt.name + " Kubernetes version: " + kubeVersion
+				name = tt.name + providerName + " Kubernetes version: " + kubeVersion
 				c.Run(name, func() {
 					TestProvisioningK3SCustomCluster(c.T(), client, externalNodeProvider, tt.nodeRoles, kubeVersion, c.hardened)
 				})
@@ -143,8 +144,8 @@ func (c *CustomClusterProvisioningTestSuite) TestProvisioningK3SCustomClusterDyn
 		name   string
 		client *rancher.Client
 	}{
-		{"Admin User", c.client},
-		{"Standard User", c.standardUserClient},
+		{provisioning.AdminClientName.String(), c.client},
+		{provisioning.StandardClientName.String(), c.standardUserClient},
 	}
 	var name string
 	for _, tt := range tests {
@@ -156,8 +157,9 @@ func (c *CustomClusterProvisioningTestSuite) TestProvisioningK3SCustomClusterDyn
 
 		for _, nodeProviderName := range c.nodeProviders {
 			externalNodeProvider := provisioning.ExternalNodeProviderSetup(nodeProviderName)
+			providerName := " Node Provider: " + nodeProviderName
 			for _, kubeVersion := range c.kubernetesVersions {
-				name = tt.name + " Kubernetes version: " + kubeVersion
+				name = tt.name + providerName + " Kubernetes version: " + kubeVersion
 				c.Run(name, func() {
 					TestProvisioningK3SCustomCluster(c.T(), client, externalNodeProvider, rolesPerNode, kubeVersion, c.hardened)
 				})

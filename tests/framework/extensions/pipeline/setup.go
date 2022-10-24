@@ -1,7 +1,8 @@
-package pipelineutils
+package pipeline
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/rancher/norman/types"
@@ -9,8 +10,8 @@ import (
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
 	v1 "github.com/rancher/rancher/tests/framework/clients/rancher/v1"
-	"github.com/rancher/rancher/tests/framework/extensions/token"
 	"github.com/rancher/rancher/tests/framework/extensions/clusters"
+	"github.com/rancher/rancher/tests/framework/extensions/token"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kwait "k8s.io/apimachinery/pkg/util/wait"
 )
@@ -19,6 +20,7 @@ const (
 	clusterName = "local"
 )
 
+// CreateAdminToken is a function that creates a new admin token
 func CreateAdminToken(password string, rancherConfig *rancher.Config) (string, error) {
 	adminUser := &management.User{
 		Username: "admin",
@@ -42,49 +44,15 @@ func CreateAdminToken(password string, rancherConfig *rancher.Config) (string, e
 	return userToken.Token, nil
 }
 
+// PostRancherInstall is a function that updates EULA after the rancher installation
+// and sets new admin password to the admin user
 func PostRancherInstall(adminClient *rancher.Client, adminPassword string) error {
 	clusterID, err := clusters.GetClusterIDByName(adminClient, clusterName)
 	if err != nil {
 		return err
 	}
 
-	steveClient, err := adminClient.Steve.ProxyDownstream(clusterID)
-	if err != nil {
-		return err
-	}
-
-	timeStamp := time.Now().Format(time.RFC3339)
-	settingEULA := v3.Setting{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "eula-agreed",
-		},
-		Default: timeStamp,
-		Value:   timeStamp,
-	}
-
-	urlSetting := &v3.Setting{}
-
-	_, err = steveClient.SteveType("management.cattle.io.setting").Create(settingEULA)
-	if err != nil {
-		return err
-	}
-
-	urlSettingResp, err := steveClient.SteveType("management.cattle.io.setting").ByID("server-url")
-	if err != nil {
-		return err
-	}
-
-	err = v1.ConvertToK8sType(urlSettingResp.JSONResp, urlSetting)
-	if err != nil {
-		return err
-	}
-
-	urlSetting.Value = fmt.Sprintf("https://%s", adminClient.RancherConfig.Host)
-
-	_, err = steveClient.SteveType("management.cattle.io.setting").Update(urlSettingResp, urlSetting)
-	if err != nil {
-		return err
-	}
+	UpdateEULA(adminClient, clusterID)
 
 	userList, err := adminClient.Management.User.List(&types.ListOpts{
 		Filters: map[string]interface{}{
@@ -102,6 +70,53 @@ func PostRancherInstall(adminClient *rancher.Client, adminPassword string) error
 		NewPassword: adminPassword,
 	}
 	_, err = adminClient.Management.User.ActionSetpassword(adminUser, &setPasswordInput)
+
+	return err
+}
+
+// UpdateEULA is a function that updates EULA after the rancher installation
+func UpdateEULA(adminClient *rancher.Client, clusterID string) error {
+	clusterID, err := clusters.GetClusterIDByName(adminClient, clusterID)
+	if err != nil {
+		return err
+	}
+
+	steveClient, err := adminClient.Steve.ProxyDownstream(clusterID)
+	if err != nil {
+		return err
+	}
+
+	urlSetting := &v3.Setting{}
+	urlSettingResp, err := steveClient.SteveType("management.cattle.io.setting").ByID("server-url")
+	if err != nil {
+		return err
+	}
+
+	err = v1.ConvertToK8sType(urlSettingResp.JSONResp, urlSetting)
+	if err != nil {
+		return err
+	}
+
+	urlSetting.Value = fmt.Sprintf("https://%s", adminClient.RancherConfig.Host)
+
+	_, err = steveClient.SteveType("management.cattle.io.setting").Update(urlSettingResp, urlSetting)
+	if err != nil {
+		return err
+	}
+
+	timeStamp := time.Now().Format(time.RFC3339)
+	settingEULA := v3.Setting{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "eula-agreed",
+		},
+		Default: timeStamp,
+		Value:   timeStamp,
+	}
+
+	_, err = steveClient.SteveType("management.cattle.io.setting").Create(settingEULA)
+	if err != nil && strings.Contains(err.Error(), "409 Conflict") {
+		return nil
+	}
 
 	return err
 }

@@ -115,7 +115,7 @@ func (k *KdmChecksTestSuite) TestProvisioningSingleNodeRKE1Clusters() {
 }
 
 func (k *KdmChecksTestSuite) provisionRKE1Cluster(client *rancher.Client, provider Provider, nodesAndRoles []nodepools.NodeRoles, k8sVersion, cni string, nodeTemplate *nodetemplates.NodeTemplate) (*management.Cluster, *management.NodePool, string, string, error) {
-	clusterName := namegen.AppendRandomString(provider.Name)
+	clusterName := namegen.AppendRandomString(provider.Name.String())
 
 	cluster := clusters.NewRKE1ClusterConfig(clusterName, cni, k8sVersion, client)
 	clusterResp, err := clusters.CreateRKE1Cluster(client, cluster)

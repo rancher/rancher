@@ -9,13 +9,16 @@ import (
 	"github.com/rancher/rancher/tests/framework/extensions/clusters"
 	"github.com/rancher/rancher/tests/framework/extensions/clusters/eks"
 	nodestat "github.com/rancher/rancher/tests/framework/extensions/nodes"
+	"github.com/rancher/rancher/tests/framework/extensions/pipeline"
 	"github.com/rancher/rancher/tests/framework/extensions/users"
 	password "github.com/rancher/rancher/tests/framework/extensions/users/passwordgenerator"
 	"github.com/rancher/rancher/tests/framework/extensions/workloads/pods"
+	"github.com/rancher/rancher/tests/framework/pkg/environmentflag"
 	namegen "github.com/rancher/rancher/tests/framework/pkg/namegenerator"
 	"github.com/rancher/rancher/tests/framework/pkg/session"
 	"github.com/rancher/rancher/tests/framework/pkg/wait"
 	"github.com/rancher/rancher/tests/integration/pkg/defaults"
+	"github.com/rancher/rancher/tests/v2/validation/provisioning"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -69,8 +72,8 @@ func (h *HostedEKSClusterProvisioningTestSuite) TestProvisioningHostedEKS() {
 		client      *rancher.Client
 		clusterName string
 	}{
-		{"Admin User", h.client, ""},
-		{"Standard User", h.standardUserClient, ""},
+		{provisioning.AdminClientName.String(), h.client, ""},
+		{provisioning.StandardClientName.String(), h.standardUserClient, ""},
 	}
 
 	for _, tt := range tests {
@@ -93,6 +96,10 @@ func (h *HostedEKSClusterProvisioningTestSuite) testProvisioningHostedEKSCluster
 	clusterName = namegen.AppendRandomString("ekshostcluster")
 	clusterResp, err := eks.CreateEKSHostedCluster(rancherClient, clusterName, cloudCredential.ID, false, false, false, false, map[string]string{})
 	require.NoError(h.T(), err)
+
+	if h.client.Flags.GetValue(environmentflag.UpdateClusterName) {
+		pipeline.UpdateConfigClusterName(clusterName)
+	}
 
 	opts := metav1.ListOptions{
 		FieldSelector:  "metadata.name=" + clusterResp.ID,

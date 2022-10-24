@@ -9,7 +9,7 @@ const (
 	HarvesterKind                              = "HarvesterConfig"
 	HarvesterPoolType                          = "rke-machine-config.cattle.io.harvesterconfig"
 	HarvesterResourceConfig                    = "harvesterconfigs"
-	HarvesterMachingConfigConfigurationFileKey = "harvesterMachineConfig"
+	HarvesterMachineConfigConfigurationFileKey = "harvesterMachineConfig"
 )
 
 // HarvesterMachineConfig is configuration needed to create an rke-machine-config.cattle.io.harvesterconfig
@@ -28,7 +28,7 @@ type HarvesterMachineConfig struct {
 // It returns an *unstructured.Unstructured that CreateMachineConfig uses to created the rke-machine-config
 func NewHarvesterMachineConfig(generatedPoolName, namespace string) *unstructured.Unstructured {
 	var harvesterMachineConfig HarvesterMachineConfig
-	config.LoadConfig(HarvesterMachingConfigConfigurationFileKey, &harvesterMachineConfig)
+	config.LoadConfig(HarvesterMachineConfigConfigurationFileKey, &harvesterMachineConfig)
 	machineConfig := &unstructured.Unstructured{}
 
 	machineConfig.SetAPIVersion("rke-machine-config.cattle.io/v1")
