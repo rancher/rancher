@@ -1,4 +1,5 @@
 variable "access_key" {}
+variable "access_key_name" {}
 variable "availability_zone" {}
 variable "aws_ami" {}
 variable "aws_user" {}
