@@ -130,8 +130,8 @@ func setRequirementImages(osType OSType, imagesSet map[string]map[string]struct{
 	case Linux:
 		addSourceToImage(imagesSet, settings.ShellImage.Get(), coreLabel)
 		addSourceToImage(imagesSet, settings.MachineProvisionImage.Get(), coreLabel)
-		addSourceToImage(imagesSet, "registry.suse.com/bci/bci-busybox:15.4.11.2", coreLabel)
-		addSourceToImage(imagesSet, "registry.suse.com/bci/bci-micro:15.4.14.3", coreLabel)
+		addSourceToImage(imagesSet, "rancher/mirrored-bci-busybox:15.4.11.2", coreLabel)
+		addSourceToImage(imagesSet, "rancher/mirrored-bci-micro:15.4.14.3", coreLabel)
 	}
 }
 

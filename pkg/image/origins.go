@@ -82,6 +82,8 @@ var OriginMap = map[string]string{
 	"mirrored-appscode-kubed":                   "https://github.com/kubeops/config-syncer",
 	"mirrored-banzaicloud-fluentd":              "https://github.com/fluent/fluentd",
 	"mirrored-banzaicloud-logging-operator":     "https://github.com/banzaicloud/logging-operator",
+	"mirrored-bci-busybox":                      "https://build.opensuse.org/package/show/devel:BCI:SLE-15-SP4/busybox-image",
+	"mirrored-bci-micro":                        "https://build.opensuse.org/package/show/devel:BCI:SLE-15-SP4/micro-image",
 	"mirrored-calico-apiserver":                 "https://github.com/projectcalico/calico/tree/master/apiserver",
 	"mirrored-calico-cni":                       "https://github.com/projectcalico/calico",
 	"mirrored-calico-ctl":                       "https://github.com/projectcalico/calico/tree/master/calicoctl",
