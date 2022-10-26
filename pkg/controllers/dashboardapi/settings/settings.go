@@ -1,3 +1,6 @@
+// Package settings registers the settings provider which acts as a client for setting and provides functions for
+// maintaining settings in k8s on startup. This maintenance includes configuring setting to match any corresponding
+// env variables that are set or updating their default values.
 package settings
 
 import (
@@ -75,6 +78,10 @@ func (s *settingsProvider) SetIfUnset(name, value string) error {
 	return err
 }
 
+// SetAll iterates through a map of settings.Setting and updates corresponding settings in k8s
+// to match any values set for them via their respective CATTLE_<setting-name> env var, their
+// source to "env" if configured by an env var, and their default to match the setting in the
+// map.
 func (s *settingsProvider) SetAll(settingsMap map[string]settings.Setting) error {
 	fallback := map[string]string{}
 
@@ -115,6 +122,10 @@ func (s *settingsProvider) SetAll(settingsMap map[string]settings.Setting) error
 			}
 			if envValue != "" && obj.Source != "env" {
 				obj.Source = "env"
+				update = true
+			}
+			if envValue == "" && obj.Source == "env" {
+				obj.Source = ""
 				update = true
 			}
 			if envValue != "" && obj.Value != envValue {
