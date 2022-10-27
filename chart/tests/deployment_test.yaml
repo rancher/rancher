@@ -70,7 +70,7 @@ tests:
   asserts:
   - equal:
       path: spec.template.spec.containers[1].image
-      value: registry.suse.com/bci/bci-micro:15.4.14.3
+      value: rancher/mirrored-bci-micro:15.4.14.3
 - it: should override auditLog.image.repository value when auditLog.destination is sidecar and auditLog.level > 0 and both auditLog.image.repository and auditLog.image.tag are set
   set:
     auditLog:
