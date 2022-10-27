@@ -7,7 +7,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/hashicorp/go-multierror"
 	lru "github.com/hashicorp/golang-lru"
 	"github.com/mitchellh/mapstructure"
 	"github.com/pkg/errors"
@@ -301,7 +300,7 @@ func (ap *azureProvider) saveAzureConfigK8s(config *v32.AzureADConfig) error {
 		return err
 	}
 
-	config.ApplicationSecret = common.GetName(config.Type, field)
+	config.ApplicationSecret = common.GetFullSecretName(config.Type, field)
 
 	logrus.Debugf("updating AzureADConfig")
 	_, err = ap.authConfigs.ObjectClient().Update(config.ObjectMeta.Name, config)
@@ -498,23 +497,4 @@ func (ap *azureProvider) IsDisabledProvider() (bool, error) {
 		return false, err
 	}
 	return !azureConfig.Enabled, nil
-}
-
-// CleanupResources deletes resources associated with the Azure AD auth provider.
-func (ap *azureProvider) CleanupResources(config *v3.AuthConfig) error {
-	if config == nil {
-		return fmt.Errorf("cannot delete Azure AD auth provider resources if its config is nil")
-	}
-	var result error
-	err := ap.secrets.DeleteNamespaced(common.SecretsNamespace, clients.AccessTokenSecretName, &metav1.DeleteOptions{})
-	if err != nil && !apierrors.IsNotFound(err) {
-		result = multierror.Append(err, result)
-	}
-
-	secretName := fmt.Sprintf("%s-%s", strings.ToLower(config.Type), strings.ToLower(client.AzureADConfigFieldApplicationSecret))
-	err = ap.secrets.DeleteNamespaced(common.SecretsNamespace, secretName, &metav1.DeleteOptions{})
-	if err != nil && !apierrors.IsNotFound(err) {
-		result = multierror.Append(err, result)
-	}
-	return result
 }

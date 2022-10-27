@@ -6,12 +6,11 @@ import (
 	"net/http"
 	"strings"
 
-	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-
 	"github.com/crewjam/saml"
 	"github.com/mitchellh/mapstructure"
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/types"
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/api/secrets"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/providers/ldap"
@@ -212,13 +211,18 @@ func (s *Provider) saveSamlConfig(config *v32.SamlConfig) error {
 	storedSamlConfig.Annotations = config.Annotations
 	config.ObjectMeta = storedSamlConfig.ObjectMeta
 
-	field := strings.ToLower(secrets.TypeToFields[configType][0])
+	var field string
+	// This assumes the provider needs to create only one secret. If there are new entries
+	// in the secret collection, this code that creates the actual secrets would need to be updated.
+	if fields, ok := secrets.TypeToFields[configType]; ok && len(fields) > 0 {
+		field = strings.ToLower(fields[0])
+	}
 	if err := common.CreateOrUpdateSecrets(s.secrets, config.SpKey,
 		field, strings.ToLower(config.Type)); err != nil {
 		return err
 	}
 
-	config.SpKey = common.GetName(config.Type, field)
+	config.SpKey = common.GetFullSecretName(config.Type, field)
 	if s.hasLdapGroupSearch() {
 		_, err = s.authConfigs.ObjectClient().Update(config.ObjectMeta.Name, s.combineSamlAndLdapConfig(config))
 		return err
@@ -414,9 +418,4 @@ func (s *Provider) IsDisabledProvider() (bool, error) {
 		return false, err
 	}
 	return !samlConfig.Enabled, nil
-}
-
-// CleanupResources deletes resources associated with the SAML auth provider.
-func (s *Provider) CleanupResources(*v3.AuthConfig) error {
-	return nil
 }

@@ -107,7 +107,10 @@ def test_auth_config_secrets(admin_mc):
         "spKey": "-----BEGIN PRIVATE KEY-----",
     }
     ping_config = client.by_id_auth_config("ping")
-    client.update(ping_config, key_data)
+    # Ensure the config is enabled, else Rancher will think the auth provider
+    # has been disabled and needs to perform cleanup,
+    # which will delete the secret.
+    client.update(ping_config, key_data, enabled=True)
     k8sclient = CoreV1Api(admin_mc.k8s_client)
     # wait for ping secret to get created
     wait_for(lambda: key_secret_creation(k8sclient), timeout=60,

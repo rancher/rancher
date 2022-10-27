@@ -6,11 +6,10 @@ import (
 	"fmt"
 	"strings"
 
-	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-
 	"github.com/mitchellh/mapstructure"
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/types"
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	v3client "github.com/rancher/rancher/pkg/client/generated/management/v3"
@@ -247,9 +246,4 @@ func (p *adProvider) IsDisabledProvider() (bool, error) {
 		return false, err
 	}
 	return !adConfig.Enabled, nil
-}
-
-// CleanupResources deletes resources associated with the Azure Active Directory auth provider.
-func (p *adProvider) CleanupResources(*v3.AuthConfig) error {
-	return nil
 }

@@ -16,6 +16,7 @@ import (
 	"github.com/rancher/norman/types/convert"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/util"
+	"github.com/rancher/rancher/pkg/catalog/utils"
 	clientv3 "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
@@ -645,10 +646,13 @@ var uaBackoff = wait.Backoff{
 	Steps:    5,
 }
 
+// PerUserCacheProviders is a set of provider names for which the token manager creates a per-user login token.
+var PerUserCacheProviders = []string{"github", "azuread", "googleoauth", "oidc", "keycloakoidc"}
+
 func (m *Manager) NewLoginToken(userID string, userPrincipal v3.Principal, groupPrincipals []v3.Principal, providerToken string, ttl int64, description string, userExtraInfo map[string][]string) (v3.Token, string, error) {
 	provider := userPrincipal.Provider
 	// Providers that use oauth need to create a secret for storing the access token.
-	if (provider == "github" || provider == "azuread" || provider == "googleoauth" || provider == "oidc" || provider == "keycloakoidc") && providerToken != "" {
+	if utils.Contains(PerUserCacheProviders, provider) && providerToken != "" {
 		err := m.CreateSecret(userID, provider, providerToken)
 		if err != nil {
 			return v3.Token{}, "", fmt.Errorf("unable to create secret: %s", err)

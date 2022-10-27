@@ -6,12 +6,11 @@ import (
 	"fmt"
 	"strings"
 
-	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-
 	ldapv3 "github.com/go-ldap/ldap/v3"
 	"github.com/mitchellh/mapstructure"
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/types"
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/providers/common/ldap"
 	"github.com/rancher/rancher/pkg/auth/tokens"
@@ -388,9 +387,4 @@ func (p *ldapProvider) IsDisabledProvider() (bool, error) {
 		return false, err
 	}
 	return !ldapConfig.Enabled, nil
-}
-
-// CleanupResources deletes resources associated with the LDAP auth provider.
-func (p *ldapProvider) CleanupResources(*v3.AuthConfig) error {
-	return nil
 }
