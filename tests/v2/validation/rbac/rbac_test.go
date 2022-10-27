@@ -10,6 +10,7 @@ import (
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
 	"github.com/rancher/rancher/tests/framework/extensions/clusters"
 	"github.com/rancher/rancher/tests/framework/extensions/namespaces"
+	"github.com/rancher/rancher/tests/framework/extensions/projects"
 	"github.com/rancher/rancher/tests/framework/extensions/users"
 	"github.com/rancher/rancher/tests/framework/pkg/session"
 	provisioning "github.com/rancher/rancher/tests/v2/validation/provisioning"
@@ -21,12 +22,15 @@ import (
 
 type RBTestSuite struct {
 	suite.Suite
-	client             *rancher.Client
-	standardUser       *management.User
-	standardUserClient *rancher.Client
-	session            *session.Session
-	cluster            *management.Cluster
-	adminProject       *management.Project
+	client                *rancher.Client
+	standardUser          *management.User
+	standardUserClient    *rancher.Client
+	session               *session.Session
+	cluster               *management.Cluster
+	adminProject          *management.Project
+	standardUserCOProject *management.Project
+	additionalUser        *management.User
+	additionalUserClient  *rancher.Client
 }
 
 func (rb *RBTestSuite) TearDownSuite() {
@@ -177,8 +181,8 @@ func (rb *RBTestSuite) TestRBAC() {
 		name        string
 		clusterRole string
 	}{
-		{"Cluster Owner", "cluster-owner"},
-		{"Cluster Member", "cluster-member"},
+		{"Cluster Owner", roleOwner},
+		{"Cluster Member", roleMember},
 	}
 	for _, tt := range tests {
 		rb.Run("Set up User with Cluster Role "+tt.name, func() {
@@ -227,7 +231,7 @@ func (rb *RBTestSuite) TestRBAC() {
 
 		})
 
-		rb.Run("Test ase 4 through 6 - Validate namespaces checks for members with role "+tt.name, func() {
+		rb.Run("Testcase 4 through 6 - Validate namespaces checks for members with role "+tt.name, func() {
 			rb.ValidateNS(tt.clusterRole)
 
 		})
@@ -240,6 +244,109 @@ func (rb *RBTestSuite) TestRBAC() {
 		})
 
 	}
+}
+
+func (rb *RBTestSuite) ValidateAddCMAsProjectOwner(role string) {
+
+	//Additional test1 Add members
+
+	errUserRole := users.AddClusterRoleToUser(rb.standardUserClient, rb.cluster, rb.additionalUser, roleMember)
+	require.NoError(rb.T(), errUserRole)
+	additionalUserClient, err := rb.additionalUserClient.ReLogin()
+	require.NoError(rb.T(), err)
+	rb.additionalUserClient = additionalUserClient
+
+	clusterList, err := listClusters(rb.additionalUserClient)
+	require.NoError(rb.T(), err)
+	assert.Equal(rb.T(), 1, len(clusterList.Data))
+
+	//Add the cluster member to the project created as by the cluster Owner
+	err = users.AddProjectMember(rb.standardUserClient, rb.standardUserCOProject, rb.additionalUser, "project-owner")
+	require.NoError(rb.T(), err)
+	userGetProject, err := projects.GetProjectList(rb.additionalUserClient, rb.cluster.ID)
+	assert.Equal(rb.T(), rb.standardUserCOProject.Name, userGetProject.Data[0].Name)
+
+}
+
+func (rb *RBTestSuite) ValidateAddStdUserAsProjectOwner(role string) {
+
+	//Create project as a cluster Owner
+	createProjectAsCO, err := createProject(rb.client, rb.cluster.ID)
+	require.NoError(rb.T(), err)
+	rb.standardUserCOProject = createProjectAsCO
+
+	//Additional test2 Validate if cluster members can create a project in the downstream cluster
+	err = users.AddProjectMember(rb.standardUserClient, rb.standardUserCOProject, rb.additionalUser, "project-owner")
+	require.NoError(rb.T(), err)
+	userGetProject, err := projects.GetProjectList(rb.additionalUserClient, rb.cluster.ID)
+	assert.Equal(rb.T(), rb.standardUserCOProject.Name, userGetProject.Data[0].Name)
+
+	err = users.RemoveProjectMember(rb.standardUserClient, rb.additionalUser)
+	require.NoError(rb.T(), err)
+
+}
+
+func (rb *RBTestSuite) ValidateAddMemberAsClusterRoles(role string) {
+
+	//Additional test3 Add members
+
+	errUserRole := users.AddClusterRoleToUser(rb.standardUserClient, rb.cluster, rb.additionalUser, roleOwner)
+	require.NoError(rb.T(), errUserRole)
+	additionalUserClient, err := rb.additionalUserClient.ReLogin()
+	require.NoError(rb.T(), err)
+	rb.additionalUserClient = additionalUserClient
+
+	clusterList, err := listClusters(rb.additionalUserClient)
+	require.NoError(rb.T(), err)
+	assert.Equal(rb.T(), 1, len(clusterList.Data))
+
+	err = users.RemoveClusterRoleFromUser(rb.standardUserClient, rb.additionalUser)
+	require.NoError(rb.T(), err)
+
+}
+
+func (rb *RBTestSuite) TestRBACAdditional() {
+	rb.Run("Set up User with Cluster Role "+roleOwner, func() {
+		newUser, err := createUser(rb.client)
+		require.NoError(rb.T(), err)
+		rb.standardUser = newUser
+		rb.T().Logf("Created user: %v", rb.standardUser.Username)
+		rb.standardUserClient, err = rb.client.AsUser(newUser)
+		require.NoError(rb.T(), err)
+
+		subSession := rb.session.NewSession()
+		defer subSession.Cleanup()
+
+		rb.T().Logf("Adding user as " + roleOwner + " to the downstream cluster.")
+		//Adding created user to the downstream clusters with the role cluster Owner.
+		err = users.AddClusterRoleToUser(rb.client, rb.cluster, rb.standardUser, roleOwner)
+		require.NoError(rb.T(), err)
+		rb.standardUserClient, err = rb.standardUserClient.ReLogin()
+		require.NoError(rb.T(), err)
+
+		//Setting up an additional user for the additional rbac cases
+		additionalUser, err := createUser(rb.client)
+		require.NoError(rb.T(), err)
+		rb.additionalUser = additionalUser
+		rb.additionalUserClient, err = rb.client.AsUser(rb.additionalUser)
+		require.NoError(rb.T(), err)
+	})
+
+	rb.Run("Additional test1 - Validating if member with role "+roleOwner+" can add another standard user as a project owner", func() {
+		rb.ValidateAddStdUserAsProjectOwner(roleOwner)
+
+	})
+
+	rb.Run("Additional test2 - Validating if member with role "+roleOwner+" can add another standard user as a cluster owner", func() {
+		rb.ValidateAddMemberAsClusterRoles(roleOwner)
+
+	})
+
+	rb.Run("Additional test3 - Validating if member with role "+roleOwner+" can add a cluster member as a project owner", func() {
+		rb.ValidateAddCMAsProjectOwner(roleOwner)
+
+	})
+
 }
 
 func TestRBACTestSuite(t *testing.T) {

@@ -1,6 +1,7 @@
 package users
 
 import (
+	"fmt"
 	"strings"
 	"time"
 
@@ -49,11 +50,17 @@ func AddProjectMember(rancherClient *rancher.Client, project *management.Project
 
 	name := strings.Split(project.ID, ":")[1]
 
+	adminClient, err := rancher.NewClient(rancherClient.RancherConfig.AdminToken, rancherClient.Session)
+	if err != nil {
+		return err
+	}
+
 	opts := metav1.ListOptions{
 		FieldSelector:  "metadata.name=" + name,
 		TimeoutSeconds: &defaults.WatchTimeoutSeconds,
 	}
-	watchInterface, err := rancherClient.GetManagementWatchInterface(management.ProjectType, opts)
+	fmt.Println()
+	watchInterface, err := adminClient.GetManagementWatchInterface(management.ProjectType, opts)
 	if err != nil {
 		return err
 	}
