@@ -216,14 +216,3 @@ func IsDisabledProvider(providerName string) (bool, error) {
 	}
 	return provider.IsDisabledProvider()
 }
-
-func CleanupOnDisable(config *v3.AuthConfig) error {
-	if config == nil {
-		return fmt.Errorf("cannot get auth provider if its config is nil")
-	}
-	provider, err := GetProvider(config.Name)
-	if err != nil {
-		return err
-	}
-	return provider.CleanupResources(config)
-}

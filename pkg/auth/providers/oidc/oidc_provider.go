@@ -291,14 +291,14 @@ func (o *OpenIDCProvider) saveOIDCConfig(config *v32.OIDCConfig) error {
 		if err = common.CreateOrUpdateSecrets(o.Secrets, config.PrivateKey, privateKeyField, strings.ToLower(config.Type)); err != nil {
 			return err
 		}
-		config.PrivateKey = common.GetName(config.Type, privateKeyField)
+		config.PrivateKey = common.GetFullSecretName(config.Type, privateKeyField)
 	}
 
 	secretField := strings.ToLower(client.OIDCConfigFieldClientSecret)
 	if err := common.CreateOrUpdateSecrets(o.Secrets, convert.ToString(config.ClientSecret), secretField, strings.ToLower(config.Type)); err != nil {
 		return err
 	}
-	config.ClientSecret = common.GetName(config.Type, secretField)
+	config.ClientSecret = common.GetFullSecretName(config.Type, secretField)
 
 	logrus.Debugf("[generic oidc] saveOIDCConfig: updating config")
 	_, err = o.AuthConfigs.ObjectClient().Update(config.ObjectMeta.Name, config)
@@ -482,9 +482,4 @@ func (o *OpenIDCProvider) IsDisabledProvider() (bool, error) {
 		return false, err
 	}
 	return !oidcConfig.Enabled, nil
-}
-
-// CleanupResources deletes resources associated with the OIDC auth provider.
-func (o *OpenIDCProvider) CleanupResources(*v3.AuthConfig) error {
-	return nil
 }
