@@ -4,10 +4,10 @@
 
 case $RELEASE_TYPE in
   rc)
-    REQUIRED_VALUE="dev-v2.6"
+    REQUIRED_VALUE="dev-v2.7"
     ;;
   final-rc)
-    REQUIRED_VALUE="release-v2.6"
+    REQUIRED_VALUE="release-v2.7"
     ;;
 esac
 
@@ -16,18 +16,18 @@ if [ -n "${RELEASE_TYPE}" ]; then
    echo "Going to check for ${REQUIRED_VALUE}"
 fi
 
-# scripts/package
+# scripts/package-env
 for PKGENV in SYSTEM_CHART_DEFAULT_BRANCH CHART_DEFAULT_BRANCH; do
-   FOUND_VALUE=$(grep ^${PKGENV} scripts/package | awk -F':-' '{ print $2 }' | sed 's/.$//' | sed 's/"//g')
+   FOUND_VALUE=$(grep ^${PKGENV} scripts/package-env | awk -F':-' '{ print $2 }' | sed 's/.$//' | sed 's/"//g')
    if [ -n "${RELEASE_TYPE}" ]; then
-      echo -n "${PKGENV}: ${FOUND_VALUE} in scripts/package: "
+      echo -n "${PKGENV}: ${FOUND_VALUE} in scripts/package-env: "
       if [ "${FOUND_VALUE}" != "${REQUIRED_VALUE}" ]; then
         echo "INCORRECT (should be ${REQUIRED_VALUE})"
       else
         echo "CORRECT"
       fi
    else
-      echo "* ${PKGENV}: ${FOUND_VALUE} (\`scripts/package\`)"
+      echo "* ${PKGENV}: ${FOUND_VALUE} (\`scripts/package-env\`)"
    fi
 done
 
