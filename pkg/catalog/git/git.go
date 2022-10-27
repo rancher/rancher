@@ -15,7 +15,7 @@ func Clone(path, url, branch string) error {
 	if err := catUtil.ValidateURL(url); err != nil {
 		return err
 	}
-	return runcmd("git", "clone", "-b", branch, "--single-branch", url, path)
+	return runcmd("git", "clone", "-b", branch, "--single-branch", "--", url, path)
 }
 
 func Update(path, commit string) error {
@@ -35,7 +35,7 @@ func RemoteBranchHeadCommit(url, branch string) (string, error) {
 	if err := catUtil.ValidateURL(url); err != nil {
 		return "", err
 	}
-	cmd := exec.Command("git", "ls-remote", url, branch)
+	cmd := exec.Command("git", "ls-remote", "--", url, branch)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return "", errors.Wrap(err, string(output))
@@ -51,7 +51,7 @@ func IsValid(url string) bool {
 	if err := catUtil.ValidateURL(url); err != nil {
 		return false
 	}
-	err := runcmd("git", "ls-remote", url)
+	err := runcmd("git", "ls-remote", "--", url)
 	return err == nil
 }
 
@@ -80,5 +80,5 @@ func CloneWithDepth(path, url, branch string, depth int) error {
 	if err := catUtil.ValidateURL(url); err != nil {
 		return err
 	}
-	return runcmd("git", "clone", "-b", branch, "--single-branch", fmt.Sprintf("--depth=%v", depth), url, path)
+	return runcmd("git", "clone", "-b", branch, "--single-branch", fmt.Sprintf("--depth=%v", depth), "--", url, path)
 }
