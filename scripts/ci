@@ -3,11 +3,17 @@ set -e
 
 cd $(dirname $0)
 
-if ./only-ui-bumps.sh; then
-    ./build
-    ./package
-    ./chart/ci
-    exit 0
+if ./skip-ci.sh; then
+    # We need to build because we publish -head artifacts on merge (push)
+    if [ "${DRONE_BUILD_EVENT}" = "push" ]; then
+        ./build
+        ./package
+        ./chart/ci
+        exit 0
+    # Do not need to build on PR if we can skip
+    elif [ "${DRONE_BUILD_EVENT}" = "pull_request" ]; then
+        exit 0
+    fi
 fi
 
 ./validate

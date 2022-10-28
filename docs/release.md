@@ -2,6 +2,10 @@
 
 This page should include everything needed to create a release candidate or release.
 
+## Prerequisites
+
+Make sure that the GitHub teams [rancher-release-captains](https://github.com/orgs/rancher/teams/rancher-release-captains) and [rancher-releases-mates](https://github.com/orgs/rancher/teams/rancher-releases-mates) are up-to-date so they can be used to request reviewers. This needs to be done at the beginning of a new release cycle and can be requested by creating an issue with the EIO team.
+
 ## Check chart and KDM sources
 
 Run `make check-chart-kdm-source-values` with the environment variable `RELEASE_TYPE` set to the type of release you are trying to create.

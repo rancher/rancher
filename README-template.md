@@ -1,6 +1,6 @@
 # Rancher
 
-*This file is auto-generated from README-template.md, please make any changes there.*
+*This file is auto-generated from `README-template.md` using [Update README workflow](https://github.com/rancher/rancher/actions/workflows/update-readme.yml), please make any changes in `README-template.md` and generate a new `README.md` using the workflow. See [Workflows README](.github/workflows#update-readme-update-readme.yml) for more information.*
 
 [![Build Status](https://drone-publish.rancher.io/api/badges/rancher/rancher/status.svg?branch=release/v2.6)](https://drone-publish.rancher.io/rancher/rancher)
 [![Docker Pulls](https://img.shields.io/docker/pulls/rancher/rancher.svg)](https://store.docker.com/community/images/rancher/rancher)
