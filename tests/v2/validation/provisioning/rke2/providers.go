@@ -26,10 +26,10 @@ type CloudCredFunc func(rancherClient *rancher.Client) (*cloudcredentials.CloudC
 type MachinePoolFunc func(generatedPoolName, namespace string) *unstructured.Unstructured
 
 type Provider struct {
-	Name            string
-	MachineConfig   string
-	MachinePoolFunc MachinePoolFunc
-	CloudCredFunc   CloudCredFunc
+	Name                               string
+	MachineConfigPoolResourceSteveType string
+	MachinePoolFunc                    MachinePoolFunc
+	CloudCredFunc                      CloudCredFunc
 }
 
 // CreateProvider returns all machine and cloud credential
@@ -39,42 +39,42 @@ func CreateProvider(name string) Provider {
 	switch {
 	case name == awsProviderName:
 		provider := Provider{
-			Name:            name,
-			MachineConfig:   machinepools.AWSResourceConfig,
-			MachinePoolFunc: machinepools.NewAWSMachineConfig,
-			CloudCredFunc:   aws.CreateAWSCloudCredentials,
+			Name:                               name,
+			MachineConfigPoolResourceSteveType: machinepools.AWSPoolType,
+			MachinePoolFunc:                    machinepools.NewAWSMachineConfig,
+			CloudCredFunc:                      aws.CreateAWSCloudCredentials,
 		}
 		return provider
 	case name == azureProviderName:
 		provider := Provider{
-			Name:            name,
-			MachineConfig:   machinepools.AzureResourceConfig,
-			MachinePoolFunc: machinepools.NewAzureMachineConfig,
-			CloudCredFunc:   azure.CreateAzureCloudCredentials,
+			Name:                               name,
+			MachineConfigPoolResourceSteveType: machinepools.AzurePoolType,
+			MachinePoolFunc:                    machinepools.NewAzureMachineConfig,
+			CloudCredFunc:                      azure.CreateAzureCloudCredentials,
 		}
 		return provider
 	case name == doProviderName:
 		provider := Provider{
-			Name:            name,
-			MachineConfig:   machinepools.DOResourceConfig,
-			MachinePoolFunc: machinepools.NewDigitalOceanMachineConfig,
-			CloudCredFunc:   digitalocean.CreateDigitalOceanCloudCredentials,
+			Name:                               name,
+			MachineConfigPoolResourceSteveType: machinepools.DOPoolType,
+			MachinePoolFunc:                    machinepools.NewDigitalOceanMachineConfig,
+			CloudCredFunc:                      digitalocean.CreateDigitalOceanCloudCredentials,
 		}
 		return provider
 	case name == linodeProviderName:
 		provider := Provider{
-			Name:            name,
-			MachineConfig:   machinepools.LinodeResourceConfig,
-			MachinePoolFunc: machinepools.NewLinodeMachineConfig,
-			CloudCredFunc:   linode.CreateLinodeCloudCredentials,
+			Name:                               name,
+			MachineConfigPoolResourceSteveType: machinepools.LinodePoolType,
+			MachinePoolFunc:                    machinepools.NewLinodeMachineConfig,
+			CloudCredFunc:                      linode.CreateLinodeCloudCredentials,
 		}
 		return provider
 	case name == harvesterProviderName:
 		provider := Provider{
-			Name:            name,
-			MachineConfig:   machinepools.HarvesterResourceConfig,
-			MachinePoolFunc: machinepools.NewHarvesterMachineConfig,
-			CloudCredFunc:   harvester.CreateHarvesterCloudCredentials,
+			Name:                               name,
+			MachineConfigPoolResourceSteveType: machinepools.HarvesterPoolType,
+			MachinePoolFunc:                    machinepools.NewHarvesterMachineConfig,
+			CloudCredFunc:                      harvester.CreateHarvesterCloudCredentials,
 		}
 		return provider
 	default:

@@ -5,8 +5,10 @@ import (
 	"fmt"
 	"testing"
 
+	apiv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
+	v1 "github.com/rancher/rancher/tests/framework/clients/rancher/v1"
 	"github.com/rancher/rancher/tests/framework/extensions/clusters"
 	"github.com/rancher/rancher/tests/framework/extensions/machinepools"
 	"github.com/rancher/rancher/tests/framework/extensions/tokenregistration"
@@ -120,10 +122,14 @@ func (c *CustomClusterProvisioningTestSuite) ProvisioningK3SCustomCluster(extern
 				client, err = client.ReLogin()
 				require.NoError(c.T(), err)
 
-				customCluster, err := client.Provisioning.Cluster.ByID(clusterResp.ID)
+				customCluster, err := client.Steve.SteveType(clusters.ProvisioningSteveResouceType).ByID(clusterResp.ID)
 				require.NoError(c.T(), err)
 
-				token, err := tokenregistration.GetRegistrationToken(client, customCluster.Status.ClusterName)
+				clusterStatus := &apiv1.ClusterStatus{}
+				err = v1.ConvertToK8sType(customCluster.Status, clusterStatus)
+				require.NoError(c.T(), err)
+
+				token, err := tokenregistration.GetRegistrationToken(client, clusterStatus.ClusterName)
 				require.NoError(c.T(), err)
 
 				for key, node := range nodes {
@@ -211,10 +217,14 @@ func (c *CustomClusterProvisioningTestSuite) ProvisioningK3SCustomClusterDynamic
 				client, err = client.ReLogin()
 				require.NoError(c.T(), err)
 
-				customCluster, err := client.Provisioning.Cluster.ByID(clusterResp.ID)
+				customCluster, err := client.Steve.SteveType(clusters.ProvisioningSteveResouceType).ByID(clusterResp.ID)
 				require.NoError(c.T(), err)
 
-				token, err := tokenregistration.GetRegistrationToken(client, customCluster.Status.ClusterName)
+				clusterStatus := &apiv1.ClusterStatus{}
+				err = v1.ConvertToK8sType(customCluster.Status, clusterStatus)
+				require.NoError(c.T(), err)
+
+				token, err := tokenregistration.GetRegistrationToken(client, clusterStatus.ClusterName)
 				require.NoError(c.T(), err)
 
 				for key, node := range nodes {
@@ -273,6 +283,6 @@ func (c *CustomClusterProvisioningTestSuite) TestProvisioningCustomClusterDynami
 
 // In order for 'go test' to run this suite, we need to create
 // a normal test function and pass our suite to suite.Run
-func TestCustomClusterProvisioningTestSuite(t *testing.T) {
+func TestCustomClusterK3SProvisioningTestSuite(t *testing.T) {
 	suite.Run(t, new(CustomClusterProvisioningTestSuite))
 }
