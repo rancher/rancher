@@ -67,6 +67,9 @@ const (
 	openStackSecretKey         = "openStackSecret"
 	aadClientSecretKey         = "aadClientSecret"
 	aadClientCertSecretKey     = "aadClientCertSecret"
+	aciAPICUserKeySecretKey    = "aciAPICUserKeySecret"
+	aciTokenSecretKey          = "aciTokenSecret"
+	aciKafkaClientKeySecretKey = "aciKafkaClientKeySecret"
 )
 
 type Store struct {
@@ -94,7 +97,7 @@ func (t *transformer) TransformerFunc(apiContext *types.APIContext, schema *type
 	return t.transposeGenericConfigToDynamicField(data)
 }
 
-//transposeGenericConfigToDynamicField converts a genericConfig to one usable by rancher and maps a kontainer id to a kontainer name
+// transposeGenericConfigToDynamicField converts a genericConfig to one usable by rancher and maps a kontainer id to a kontainer name
 func (t *transformer) transposeGenericConfigToDynamicField(data map[string]interface{}) (map[string]interface{}, error) {
 	if data["genericEngineConfig"] != nil {
 		drivers, err := t.KontainerDriverLister.List("", labels.Everything())
@@ -211,14 +214,17 @@ func (r *Store) ByID(apiContext *types.APIContext, schema *types.Schema, id stri
 }
 
 type secrets struct {
-	regSecret       *corev1.Secret
-	s3Secret        *corev1.Secret
-	weaveSecret     *corev1.Secret
-	vsphereSecret   *corev1.Secret
-	vcenterSecret   *corev1.Secret
-	openStackSecret *corev1.Secret
-	aadClientSecret *corev1.Secret
-	aadCertSecret   *corev1.Secret
+	regSecret               *corev1.Secret
+	s3Secret                *corev1.Secret
+	weaveSecret             *corev1.Secret
+	vsphereSecret           *corev1.Secret
+	vcenterSecret           *corev1.Secret
+	openStackSecret         *corev1.Secret
+	aadClientSecret         *corev1.Secret
+	aadCertSecret           *corev1.Secret
+	aciAPICUserKeySecret    *corev1.Secret
+	aciTokenSecret          *corev1.Secret
+	aciKafkaClientKeySecret *corev1.Secret
 }
 
 func (r *Store) Create(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}) (map[string]interface{}, error) {
@@ -285,7 +291,7 @@ func (r *Store) Create(apiContext *types.APIContext, schema *types.Schema, data 
 		return nil, err
 	}
 
-	allSecrets, err := r.migrateSecrets(apiContext.Request.Context(), data, nil, "", "", "", "", "", "", "", "")
+	allSecrets, err := r.migrateSecrets(apiContext.Request.Context(), data, nil, "", "", "", "", "", "", "", "", "", "", "")
 	if err != nil {
 		return nil, err
 	}
@@ -329,6 +335,21 @@ func (r *Store) Create(apiContext *types.APIContext, schema *types.Schema, data 
 		}
 		if allSecrets.aadCertSecret != nil {
 			if cleanupErr := r.secretMigrator.Cleanup(allSecrets.aadCertSecret.Name); cleanupErr != nil {
+				logrus.Errorf("cluster store: encountered error while handling migration error: %v, original error: %v", cleanupErr, err)
+			}
+		}
+		if allSecrets.aciAPICUserKeySecret != nil {
+			if cleanupErr := r.secretMigrator.Cleanup(allSecrets.aciAPICUserKeySecret.Name); cleanupErr != nil {
+				logrus.Errorf("cluster store: encountered error while handling migration error: %v, original error: %v", cleanupErr, err)
+			}
+		}
+		if allSecrets.aciTokenSecret != nil {
+			if cleanupErr := r.secretMigrator.Cleanup(allSecrets.aciTokenSecret.Name); cleanupErr != nil {
+				logrus.Errorf("cluster store: encountered error while handling migration error: %v, original error: %v", cleanupErr, err)
+			}
+		}
+		if allSecrets.aciKafkaClientKeySecret != nil {
+			if cleanupErr := r.secretMigrator.Cleanup(allSecrets.aciKafkaClientKeySecret.Name); cleanupErr != nil {
 				logrus.Errorf("cluster store: encountered error while handling migration error: %v, original error: %v", cleanupErr, err)
 			}
 		}
@@ -388,6 +409,24 @@ func (r *Store) Create(apiContext *types.APIContext, schema *types.Schema, data 
 			logrus.Errorf("cluster store: failed to set %s %s as secret owner", owner.Kind, owner.Name)
 		}
 	}
+	if allSecrets.aciAPICUserKeySecret != nil {
+		err = r.secretMigrator.UpdateSecretOwnerReference(allSecrets.aciAPICUserKeySecret, owner)
+		if err != nil {
+			logrus.Errorf("cluster store: failed to set %s %s as secret owner", owner.Kind, owner.Name)
+		}
+	}
+	if allSecrets.aciTokenSecret != nil {
+		err = r.secretMigrator.UpdateSecretOwnerReference(allSecrets.aciTokenSecret, owner)
+		if err != nil {
+			logrus.Errorf("cluster store: failed to set %s %s as secret owner", owner.Kind, owner.Name)
+		}
+	}
+	if allSecrets.aciKafkaClientKeySecret != nil {
+		err = r.secretMigrator.UpdateSecretOwnerReference(allSecrets.aciKafkaClientKeySecret, owner)
+		if err != nil {
+			logrus.Errorf("cluster store: failed to set %s %s as secret owner", owner.Kind, owner.Name)
+		}
+	}
 	return data, nil
 }
 
@@ -407,7 +446,7 @@ func transposeNameFields(data map[string]interface{}, clusterConfigSchema *types
 }
 
 func loadDataFromTemplate(clusterTemplateRevision *v3.ClusterTemplateRevision, clusterTemplate *v3.ClusterTemplate, data map[string]interface{}, clusterConfigSchema *types.Schema, existingCluster map[string]interface{}, secretLister v1.SecretLister) (map[string]interface{}, error) {
-	clusterConfig := *clusterTemplateRevision.Spec.ClusterConfig.DeepCopy()
+	clusterConfig := *clusterTemplateRevision.Spec.ClusterConfig
 	clusterConfigSpec, err := secretmigrator.AssembleRKEConfigTemplateSpec(clusterTemplateRevision, v32.ClusterSpec{ClusterSpecBase: clusterConfig}, secretLister)
 	if err != nil {
 		return nil, err
@@ -785,7 +824,21 @@ func (r *Store) Update(apiContext *types.APIContext, schema *types.Schema, data 
 	currentOpenStackSecret := getSecretByKey(openStackSecretKey)
 	currentAADClientSecret := getSecretByKey(aadClientSecretKey)
 	currentAADCertSecret := getSecretByKey(aadClientCertSecretKey)
-	allSecrets, err := r.migrateSecrets(apiContext.Request.Context(), data, existingCluster, currentRegSecret, currentS3Secret, currentWeaveSecret, currentVsphereSecret, currentVcenterSecret, currentOpenStackSecret, currentAADClientSecret, currentAADCertSecret)
+	currentACIAPICUserKeySecret := getSecretByKey(aciAPICUserKeySecretKey)
+	currentACITokenSecret := getSecretByKey(aciTokenSecretKey)
+	currentACIKafkaClientKeySecret := getSecretByKey(aciKafkaClientKeySecretKey)
+	allSecrets, err := r.migrateSecrets(apiContext.Request.Context(), data, existingCluster,
+		currentRegSecret,
+		currentS3Secret,
+		currentWeaveSecret,
+		currentVsphereSecret,
+		currentVcenterSecret,
+		currentOpenStackSecret,
+		currentAADClientSecret,
+		currentAADCertSecret,
+		currentACIAPICUserKeySecret,
+		currentACITokenSecret,
+		currentACIKafkaClientKeySecret)
 	if err != nil {
 		return nil, err
 	}
@@ -828,6 +881,21 @@ func (r *Store) Update(apiContext *types.APIContext, schema *types.Schema, data 
 		}
 		if allSecrets.aadCertSecret != nil && currentAADCertSecret == "" {
 			if cleanupErr := r.secretMigrator.Cleanup(allSecrets.aadCertSecret.Name); cleanupErr != nil {
+				logrus.Errorf("cluster store: encountered error while handling migration error: %v, original error: %v", cleanupErr, err)
+			}
+		}
+		if allSecrets.aciAPICUserKeySecret != nil && currentACIAPICUserKeySecret == "" {
+			if cleanupErr := r.secretMigrator.Cleanup(allSecrets.aciAPICUserKeySecret.Name); cleanupErr != nil {
+				logrus.Errorf("cluster store: encountered error while handling migration error: %v, original error: %v", cleanupErr, err)
+			}
+		}
+		if allSecrets.aciTokenSecret != nil && currentACITokenSecret == "" {
+			if cleanupErr := r.secretMigrator.Cleanup(allSecrets.aciTokenSecret.Name); cleanupErr != nil {
+				logrus.Errorf("cluster store: encountered error while handling migration error: %v, original error: %v", cleanupErr, err)
+			}
+		}
+		if allSecrets.aciKafkaClientKeySecret != nil && currentACIKafkaClientKeySecret == "" {
+			if cleanupErr := r.secretMigrator.Cleanup(allSecrets.aciKafkaClientKeySecret.Name); cleanupErr != nil {
 				logrus.Errorf("cluster store: encountered error while handling migration error: %v, original error: %v", cleanupErr, err)
 			}
 		}
@@ -940,6 +1008,24 @@ func (r *Store) Update(apiContext *types.APIContext, schema *types.Schema, data 
 			logrus.Errorf(errMsg)
 		}
 	}
+	if allSecrets.aciAPICUserKeySecret != nil {
+		err = r.secretMigrator.UpdateSecretOwnerReference(allSecrets.aciAPICUserKeySecret, owner)
+		if err != nil {
+			logrus.Errorf(errMsg)
+		}
+	}
+	if allSecrets.aciTokenSecret != nil {
+		err = r.secretMigrator.UpdateSecretOwnerReference(allSecrets.aciTokenSecret, owner)
+		if err != nil {
+			logrus.Errorf(errMsg)
+		}
+	}
+	if allSecrets.aciKafkaClientKeySecret != nil {
+		err = r.secretMigrator.UpdateSecretOwnerReference(allSecrets.aciKafkaClientKeySecret, owner)
+		if err != nil {
+			logrus.Errorf(errMsg)
+		}
+	}
 	return data, err
 }
 
@@ -1016,7 +1102,7 @@ func (r *Store) updateClusterByK8sclient(ctx context.Context, id, name string, d
 	return object.Object["spec"].(map[string]interface{}), nil
 }
 
-func (r *Store) migrateSecrets(ctx context.Context, data, existingCluster map[string]interface{}, currentReg, currentS3, currentWeave, currentVsphere, currentVCenter, currentOpenStack, currentAADClientSecret, currentAADCert string) (secrets, error) {
+func (r *Store) migrateSecrets(ctx context.Context, data, existingCluster map[string]interface{}, currentReg, currentS3, currentWeave, currentVsphere, currentVCenter, currentOpenStack, currentAADClientSecret, currentAADCert, currentACIAPICUserKey, currentACIToken, currentACIKafkaClientKey string) (secrets, error) {
 	rkeConfig, err := getRkeConfig(data)
 	if err != nil || rkeConfig == nil {
 		return secrets{}, err
@@ -1088,6 +1174,30 @@ func (r *Store) migrateSecrets(ctx context.Context, data, existingCluster map[st
 	if s.aadCertSecret != nil {
 		values.PutValue(data, s.aadCertSecret.Name, clusterSecrets, aadClientCertSecretKey)
 		rkeConfig.CloudProvider.AzureCloudProvider.AADClientCertPassword = ""
+	}
+	s.aciAPICUserKeySecret, err = r.secretMigrator.CreateOrUpdateACIAPICUserKeySecret(currentACIAPICUserKey, rkeConfig, nil)
+	if err != nil {
+		return secrets{}, err
+	}
+	if s.aciAPICUserKeySecret != nil {
+		values.PutValue(data, s.aciAPICUserKeySecret.Name, clusterSecrets, aciAPICUserKeySecretKey)
+		rkeConfig.Network.AciNetworkProvider.ApicUserKey = ""
+	}
+	s.aciTokenSecret, err = r.secretMigrator.CreateOrUpdateACITokenSecret(currentACIToken, rkeConfig, nil)
+	if err != nil {
+		return secrets{}, err
+	}
+	if s.aciTokenSecret != nil {
+		values.PutValue(data, s.aciTokenSecret.Name, clusterSecrets, aciTokenSecretKey)
+		rkeConfig.Network.AciNetworkProvider.Token = ""
+	}
+	s.aciKafkaClientKeySecret, err = r.secretMigrator.CreateOrUpdateACIKafkaClientKeySecret(currentACIKafkaClientKey, rkeConfig, nil)
+	if err != nil {
+		return secrets{}, err
+	}
+	if s.aciKafkaClientKeySecret != nil {
+		values.PutValue(data, s.aciKafkaClientKeySecret.Name, clusterSecrets, aciKafkaClientKeySecretKey)
+		rkeConfig.Network.AciNetworkProvider.KafkaClientKey = ""
 	}
 
 	data["rancherKubernetesEngineConfig"], err = convert.EncodeToMap(rkeConfig)
