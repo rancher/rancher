@@ -1,0 +1,16 @@
+## Rancher Docker-compose file
+## Create the folders for the docker-compose file
+## mkdir -p rancher/conf
+
+version: '3'
+services:
+  app:
+    image: 'rancher/rancher:latest'
+    container_name: rancher
+    restart: unless-stopped
+    ports:
+      - '80:80'
+      - '443:443'
+    privileged: true
+    volumes:
+      - ./conf:/var/lib/rancher
