@@ -18,6 +18,7 @@ auditLog:
   maxAge: 1
   maxBackup: 1
   maxSize: 100
+  resources: {}
 
 # As of Rancher v2.5.0 this flag is deprecated and must be set to 'true' in order for Rancher to start
 addLocal: "true"

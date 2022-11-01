@@ -195,6 +195,8 @@ spec:
         name: {{ template "rancher.name" . }}-audit-log
         command: ["tail"]
         args: ["-F", "/var/log/auditlog/rancher-api-audit.log"]
+        resources:
+{{ toYaml .Values.auditLog.resources | indent 10 }}
         volumeMounts:
         - mountPath: /var/log/auditlog
           name: audit-log
