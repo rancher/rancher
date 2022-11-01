@@ -13,6 +13,9 @@ import (
 	"k8s.io/kubernetes/pkg/credentialprovider"
 )
 
+// GetPrivateRepoURL returns the URL of the private repo specified. It will return the cluster level repo if one is
+// found, or the system default registry if no cluster level registry is found. If either is not found, it will return
+// an empty string.
 func GetPrivateRepoURL(cluster *v3.Cluster) string {
 	registry := GetPrivateRepo(cluster)
 	if registry == nil {
@@ -21,15 +24,27 @@ func GetPrivateRepoURL(cluster *v3.Cluster) string {
 	return registry.URL
 }
 
+// GetPrivateRepo returns a PrivateRegistry entry (or nil if one is not found) for the given
+// clusters.management.cattle.io/v3 object. If a cluster-level registry is not defined, it will return the system
+// default registry if one exists.
 func GetPrivateRepo(cluster *v3.Cluster) *rketypes.PrivateRegistry {
-	if cluster != nil && cluster.Spec.RancherKubernetesEngineConfig != nil && len(cluster.Spec.RancherKubernetesEngineConfig.PrivateRegistries) > 0 {
-		config := cluster.Spec.RancherKubernetesEngineConfig
-		return &config.PrivateRegistries[0]
+	privateClusterLevelRepo := GetPrivateClusterLevelRepo(cluster)
+	if privateClusterLevelRepo != nil {
+		return privateClusterLevelRepo
 	}
 	if settings.SystemDefaultRegistry.Get() != "" {
 		return &rketypes.PrivateRegistry{
 			URL: settings.SystemDefaultRegistry.Get(),
 		}
+	}
+	return nil
+}
+
+// GetPrivateClusterLevelRepo returns the cluster-level repo for the given clusters.management.cattle.io/v3 object (or nil if one is not found).
+func GetPrivateClusterLevelRepo(cluster *v3.Cluster) *rketypes.PrivateRegistry {
+	if cluster != nil && cluster.Spec.RancherKubernetesEngineConfig != nil && len(cluster.Spec.RancherKubernetesEngineConfig.PrivateRegistries) > 0 {
+		config := cluster.Spec.RancherKubernetesEngineConfig
+		return &config.PrivateRegistries[0]
 	}
 	return nil
 }
