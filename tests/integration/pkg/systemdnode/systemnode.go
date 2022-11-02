@@ -109,6 +109,11 @@ INVOCATION_ID=
 					},
 					{
 						Name:      "systemd",
+						MountPath: "/usr/local/lib/systemd/system/k3s-agent.service.d/10-delegate.conf",
+						SubPath:   "dropin",
+					},
+					{
+						Name:      "systemd",
 						MountPath: "/etc/default/rke2-server",
 						SubPath:   "disable",
 					},
@@ -120,6 +125,11 @@ INVOCATION_ID=
 					{
 						Name:      "systemd",
 						MountPath: "/etc/default/k3s",
+						SubPath:   "disable",
+					},
+					{
+						Name:      "systemd",
+						MountPath: "/etc/default/k3s-agent",
 						SubPath:   "disable",
 					},
 				},
