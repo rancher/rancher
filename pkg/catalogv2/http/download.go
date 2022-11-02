@@ -76,12 +76,12 @@ func Chart(secret *corev1.Secret, repoURL string, caBundle []byte, insecureSkipT
 	}
 	defer client.CloseIdleConnections()
 
-	u, err := url.Parse(chart.URLs[0])
+	u, err := url.Parse(getEncodedSpaceAndPlusURL(chart.URLs[0]))
 	if err != nil {
 		return nil, err
 	}
 	if !u.IsAbs() {
-		base, err := url.Parse(repoURL)
+		base, err := url.Parse(getEncodedSpaceAndPlusURL(repoURL))
 		if err != nil {
 			return nil, err
 		}
@@ -152,4 +152,13 @@ func DownloadIndex(secret *corev1.Secret, repoURL string, caBundle []byte, insec
 	}
 
 	return index, nil
+}
+
+// getEncodedSpaceAndPlusURL replaces the ' ' (space) and '+' character in URL to %20 and %2B
+// to avoid the '+' is treated as encoded space when using the functions in net/url package.
+func getEncodedSpaceAndPlusURL(u string) string {
+	u = strings.Trim(u, " ")
+	u = strings.ReplaceAll(u, "+", "%2B")
+	u = strings.ReplaceAll(u, " ", "%20")
+	return u
 }
