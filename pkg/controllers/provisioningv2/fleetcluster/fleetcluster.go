@@ -7,6 +7,7 @@ import (
 	fleet "github.com/rancher/fleet/pkg/apis/fleet.cattle.io/v1alpha1"
 	mgmt "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	v1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
+	mgmtcluster "github.com/rancher/rancher/pkg/cluster"
 	fleetconst "github.com/rancher/rancher/pkg/fleet"
 	fleetcontrollers "github.com/rancher/rancher/pkg/generated/controllers/fleet.cattle.io/v1alpha1"
 	mgmtcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
@@ -29,6 +30,11 @@ type handler struct {
 	apply         apply.Apply
 }
 
+// Register registers the fleetcluster controller, which is responsible for creating fleet cluster objects.
+// When fleet cluster objects are created, Fleet uses the object to deploy the fleet-agent into the cluster. Notably,
+// the fleetcluster operates on both provisioning and management clusters in Rancher, by way of transformation logic
+// in the provisioningcluster rke2 controller (a clusters.provisioning.cattle.io/v1 object is generated for every
+// corresponding clusters.management.cattle.io/v3 object, if one does not already exist, and vice-versa)
 func Register(ctx context.Context, clients *wrangler.Context) {
 	h := &handler{
 		clusters:      clients.Mgmt.Cluster(),
@@ -116,6 +122,15 @@ func (h *handler) createCluster(cluster *v1.Cluster, status v1.ClusterStatus) ([
 		clientSecret = "local-cluster"
 	}
 
+	var privateRepoURL string
+	if cluster.Spec.RKEConfig == nil {
+		// If the RKEConfig is nil, we are likely dealing with a legacy (v3/mgmt) cluster, and need to check the v3
+		// cluster for the cluster level registry.
+		privateRepoURL = mgmtcluster.GetPrivateRepoURL(mgmtCluster)
+	} else {
+		privateRepoURL = image.GetPrivateRepoURLFromCluster(cluster)
+	}
+
 	return []runtime.Object{&fleet.Cluster{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      cluster.Name,
@@ -126,7 +141,7 @@ func (h *handler) createCluster(cluster *v1.Cluster, status v1.ClusterStatus) ([
 			KubeConfigSecret: clientSecret,
 			AgentEnvVars:     mgmtCluster.Spec.AgentEnvVars,
 			AgentNamespace:   agentNamespace,
-			PrivateRepoURL:   image.GetPrivateRepoURLFromCluster(cluster),
+			PrivateRepoURL:   privateRepoURL,
 		},
 	}}, status, nil
 }
