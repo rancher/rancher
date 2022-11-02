@@ -99,6 +99,10 @@ write_files:
     Type=exec
   path: /etc/systemd/system/k3s.service.d/10-delegate.conf
 - content: |
+    [Service]
+    Type=exec
+  path: /etc/systemd/system/k3s-agent.service.d/10-delegate.conf
+- content: |
     NOTIFY_SOCKET=
     INVOCATION_ID=
   path: /etc/default/rke2-server
@@ -109,7 +113,12 @@ write_files:
 - content: |
     NOTIFY_SOCKET=
     INVOCATION_ID=
-  path: /etc/default/k3s`
+  path: /etc/default/k3s
+- content: |
+    NOTIFY_SOCKET=
+    INVOCATION_ID=
+  path: /etc/default/k3s-agent`
+
 	podConfigClient := clients.Dynamic.Resource(schema.GroupVersionResource{
 		Group:    "rke-machine-config.cattle.io",
 		Version:  "v1",
