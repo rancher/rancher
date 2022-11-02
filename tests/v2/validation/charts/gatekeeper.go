@@ -1,15 +1,12 @@
 package charts
 
 import (
-	"context"
-	"encoding/json"
 	"time"
 
+	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime/schema"
+	v1 "github.com/rancher/rancher/tests/framework/clients/rancher/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 )
 
@@ -17,98 +14,41 @@ const (
 	// Project that charts are installed in
 	gatekeeperProjectName = "gatekeeper-project"
 	// namespace that is created without a label
-	RancherDisallowedNamespace = "no-label"
+	RancherDisallowedNamespace  = "no-label"
+	ConstraintResourceSteveType = "constraints.gatekeeper.sh.k8srequiredlabels"
 )
 
-var Constraint = schema.GroupVersionResource{
-	Group:    "constraints.gatekeeper.sh",
-	Version:  "v1beta1",
-	Resource: "k8srequiredlabels",
-}
-
-var Namespaces = schema.GroupVersionResource{
-	Group:    "",
-	Version:  "v1",
-	Resource: "namespaces",
-}
-
-type Status struct {
+type ConstraintStatus struct {
 	AuditTimestamp  string
 	ByPod           interface{}
 	TotalViolations int64
 	Violations      []interface{}
 }
-type Items struct {
-	ApiVersion string
-	Kind       string
-	Metadata   interface{}
-	Spec       interface{}
-	Status     Status
-}
 
-// ConstraintResponse is the data structure that is used to extract data about the gatekeeper constraint created in the test
-// It contains the Items and Status structs, which are used for the same purpose
-// anything that isn't being used in the test is declared as a string or an interface
-type ConstraintResponse struct {
-	ApiVersion string
-	Items      []Items
-	Kind       string
-	Metadata   interface{}
-}
-
-// GetUnstructuredList helper function that returns an unstructured list of data from a cluster resource
-func getUnstructuredList(client *rancher.Client, project *management.Project, schema schema.GroupVersionResource) (*unstructured.UnstructuredList, error) {
-	dynamicClient, err := client.GetDownStreamClusterClient(project.ClusterID)
-	if err != nil {
-		return nil, err
-	}
-
-	unstructured := dynamicClient.Resource(schema).Namespace("")
-
-	unstructuredList, err := unstructured.List(context.TODO(), metav1.ListOptions{})
-	if err != nil {
-		return nil, err
-	}
-
-	return unstructuredList, nil
-}
-
-// parseConstraintList converts an Unstructed List into a Constraint response by marshaling it into json, then unmarshaling the json into the Constraint respionse struct, allowing access to deeply nested fields
-func parseConstraintList(list *unstructured.UnstructuredList) (*ConstraintResponse, error) {
-	jsonConstraint, err := list.MarshalJSON()
-	if err != nil {
-		return nil, err
-	}
-
-	var parsedConstraint ConstraintResponse
-	err = json.Unmarshal([]byte(jsonConstraint), &parsedConstraint)
-	if err != nil {
-		return nil, err
-	}
-
-	return &parsedConstraint, nil
-
-}
-
-func getAuditTimestamp(client *rancher.Client, project *management.Project) {
+func getAuditTimestamp(client *rancher.Client, project *management.Project) error {
 	// wait until the first audit finishes running.
 	// AuditTimestamp will be empty string until first audit finishes
-	wait.Poll(1*time.Second, 5*time.Minute, func() (done bool, err error) {
+	steveClient, err := client.Steve.ProxyDownstream(project.ClusterID)
+	if err != nil {
+		return err
+	}
+	return wait.Poll(1*time.Second, 5*time.Minute, func() (done bool, err error) {
 
 		// get list of constraints
-		auditList, err := getUnstructuredList(client, project, Constraint)
+		auditList, err := steveClient.SteveType(ConstraintResourceSteveType).List(&types.ListOpts{})
 		if err != nil {
 			return false, nil
 		}
 
-		// parse it so that we can extract individual values
-		parsedAuditList, err := parseConstraintList(auditList)
+		constraintsStatusType := &ConstraintStatus{}
+		constraintStatus := auditList.Data[0].Status
+		err = v1.ConvertToK8sType(constraintStatus, constraintsStatusType)
 		if err != nil {
 			return false, nil
 		}
 
 		// extract the timestamp of the last constraint audit
-		auditTime := parsedAuditList.Items[0].Status.AuditTimestamp
+		auditTime := constraintsStatusType.AuditTimestamp
 		if auditTime == "" {
 			return false, nil
 		}

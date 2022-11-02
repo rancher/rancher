@@ -10,6 +10,7 @@ import (
 	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
+	v1 "github.com/rancher/rancher/tests/framework/clients/rancher/v1"
 	"github.com/rancher/rancher/tests/framework/extensions/charts"
 	"github.com/rancher/rancher/tests/framework/extensions/clusters"
 	"github.com/rancher/rancher/tests/framework/extensions/namespaces"
@@ -20,9 +21,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
+	appv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	apimachinerytypes "k8s.io/apimachinery/pkg/types"
 )
 
 type MonitoringTestSuite struct {
@@ -100,6 +101,9 @@ func (m *MonitoringTestSuite) TestMonitoringChart() {
 	client, err := m.client.WithSession(subSession)
 	require.NoError(m.T(), err)
 
+	steveclient, err := client.Steve.ProxyDownstream(m.project.ClusterID)
+	require.NoError(m.T(), err)
+
 	m.T().Log("Checking if the monitoring chart is already installed")
 	initialMonitoringChart, err := charts.GetChartStatus(client, m.project.ClusterID, charts.RancherMonitoringNamespace, charts.RancherMonitoringName)
 	require.NoError(m.T(), err)
@@ -140,26 +144,40 @@ func (m *MonitoringTestSuite) TestMonitoringChart() {
 	require.NoError(m.T(), err)
 
 	m.T().Log("Creating alert webhook receiver deployment and its resources")
-	alertWebhookReceiverDeployment, err := createAlertWebhookReceiverDeployment(client, m.project.ClusterID, webhookReceiverNamespace.Name, webhookReceiverDeploymentName)
+	alertWebhookReceiverDeploymentResp, err := createAlertWebhookReceiverDeployment(client, m.project.ClusterID, webhookReceiverNamespace.Name, webhookReceiverDeploymentName)
 	require.NoError(m.T(), err)
-	assert.Equal(m.T(), alertWebhookReceiverDeployment.Name, webhookReceiverDeploymentName)
+	assert.Equal(m.T(), alertWebhookReceiverDeploymentResp.Name, webhookReceiverDeploymentName)
 
 	m.T().Log("Waiting webhook receiver deployment to have expected number of available replicas")
 	err = charts.WatchAndWaitDeployments(client, m.project.ClusterID, webhookReceiverNamespace.Name, metav1.ListOptions{})
 	require.NoError(m.T(), err)
 
+	alertWebhookReceiverDeploymentSpec := &appv1.DeploymentSpec{}
+	err = v1.ConvertToK8sType(alertWebhookReceiverDeploymentResp.Spec, alertWebhookReceiverDeploymentSpec)
+	require.NoError(m.T(), err)
+
 	m.T().Log("Creating node port service for webhook receiver deployment")
-	serviceSpec := corev1.ServiceSpec{
-		Type: corev1.ServiceTypeNodePort,
-		Ports: []corev1.ServicePort{
-			{
-				Name: "port",
-				Port: 8080,
-			},
+	webhookServiceTemplate := corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      webhookReceiverServiceName,
+			Namespace: webhookReceiverNamespace.Name,
 		},
-		Selector: alertWebhookReceiverDeployment.Spec.Template.Labels,
+		Spec: corev1.ServiceSpec{
+			Type: corev1.ServiceTypeNodePort,
+			Ports: []corev1.ServicePort{
+				{
+					Name: "port",
+					Port: 8080,
+				},
+			},
+			Selector: alertWebhookReceiverDeploymentSpec.Template.Labels,
+		},
 	}
-	webhookReceiverService, err := services.CreateService(client, m.project.ClusterID, webhookReceiverServiceName, webhookReceiverNamespace.Name, serviceSpec)
+	webhookReceiverServiceResp, err := steveclient.SteveType(services.ServiceSteveType).Create(webhookServiceTemplate)
+	require.NoError(m.T(), err)
+
+	webhookReceiverServiceSpec := &corev1.ServiceSpec{}
+	err = v1.ConvertToK8sType(webhookReceiverServiceResp.Spec, webhookReceiverServiceSpec)
 	require.NoError(m.T(), err)
 
 	// Get a random worker node' public external IP of a specific cluster
@@ -174,46 +192,57 @@ func (m *MonitoringTestSuite) TestMonitoringChart() {
 	randWorkerNodePublicIP := workerNodePublicIPs[rand.Intn(len(workerNodePublicIPs))]
 
 	// Get URL and string versions of origin with random node' public IP
-	hostWithProtocol := fmt.Sprintf("http://%v:%v", randWorkerNodePublicIP, webhookReceiverService.Spec.Ports[0].NodePort)
+	hostWithProtocol := fmt.Sprintf("http://%v:%v", randWorkerNodePublicIP, webhookReceiverServiceSpec.Ports[0].NodePort)
 	urlOfHost, err := url.Parse(hostWithProtocol)
 	require.NoError(m.T(), err)
 
-	m.T().Logf("Getting alert manager secret")
-	alertManagerSecret, err := secrets.GetSecretByName(client, m.project.ClusterID, charts.RancherMonitoringNamespace, charts.RancherMonitoringAlertSecret, metav1.GetOptions{})
+	m.T().Logf("Getting alert manager secret to edit receiver")
+	alertManagerSecretResp, err := steveclient.SteveType(secrets.SecretSteveType).ByID(alertManagerSecretId)
+	require.NoError(m.T(), err)
+
+	alertManagerSecret := &corev1.Secret{}
+	err = v1.ConvertToK8sType(alertManagerSecretResp.JSONResp, alertManagerSecret)
 	require.NoError(m.T(), err)
 
 	m.T().Logf("Editing alert manager secret receivers")
 	encodedAlertConfigWithReceiver, err := editAlertReceiver(alertManagerSecret.Data[secretPath], hostWithProtocol, urlOfHost)
 	require.NoError(m.T(), err)
 
-	patchedSecret, err := secrets.PatchSecret(client, m.project.ClusterID, charts.RancherMonitoringAlertSecret, charts.RancherMonitoringNamespace, apimachinerytypes.JSONPatchType, secrets.AddPatchOP, secretPathForPatch, encodedAlertConfigWithReceiver, metav1.PatchOptions{})
+	alertManagerSecret.Data[secretPath] = encodedAlertConfigWithReceiver
+
+	editedReceiverSecretResp, err := steveclient.SteveType(secrets.SecretSteveType).Update(alertManagerSecretResp, alertManagerSecret)
 	require.NoError(m.T(), err)
-	assert.Equal(m.T(), patchedSecret.Name, charts.RancherMonitoringAlertSecret)
+	assert.Equal(m.T(), editedReceiverSecretResp.Name, charts.RancherMonitoringAlertSecret)
 
 	m.T().Logf("Creating prometheus rule")
 	err = createPrometheusRule(client, m.project.ClusterID)
 	require.NoError(m.T(), err)
 
-	m.T().Logf("Getting alert manager secret")
-	alertManagerSecret, err = secrets.GetSecretByName(client, m.project.ClusterID, charts.RancherMonitoringNamespace, charts.RancherMonitoringAlertSecret, metav1.GetOptions{})
+	m.T().Logf("Getting alert manager secret to edit routes")
+	alertManagerSecretResp, err = steveclient.SteveType(secrets.SecretSteveType).ByID(alertManagerSecretId)
+	require.NoError(m.T(), err)
+
+	err = v1.ConvertToK8sType(alertManagerSecretResp.JSONResp, alertManagerSecret)
 	require.NoError(m.T(), err)
 
 	m.T().Logf("Editing alert manager secret routes")
 	encodedAlertConfigWithRoute, err := editAlertRoute(alertManagerSecret.Data[secretPath], hostWithProtocol, urlOfHost)
 	require.NoError(m.T(), err)
 
-	patchedSecret, err = secrets.PatchSecret(client, m.project.ClusterID, charts.RancherMonitoringAlertSecret, charts.RancherMonitoringNamespace, apimachinerytypes.JSONPatchType, secrets.AddPatchOP, secretPathForPatch, encodedAlertConfigWithRoute, metav1.PatchOptions{})
+	alertManagerSecret.Data[secretPath] = encodedAlertConfigWithRoute
+
+	editedRouteSecretResp, err := steveclient.SteveType(secrets.SecretSteveType).Update(alertManagerSecretResp, alertManagerSecret)
 	require.NoError(m.T(), err)
-	assert.Equal(m.T(), patchedSecret.Name, charts.RancherMonitoringAlertSecret)
+	assert.Equal(m.T(), editedRouteSecretResp.Name, charts.RancherMonitoringAlertSecret)
 
 	m.T().Logf("Validating traefik is accessible externally")
-	host := fmt.Sprintf("%v:%v", randWorkerNodePublicIP, webhookReceiverService.Spec.Ports[0].NodePort)
+	host := fmt.Sprintf("%v:%v", randWorkerNodePublicIP, webhookReceiverServiceSpec.Ports[0].NodePort)
 	result, err := charts.GetChartCaseEndpoint(client, host, "dashboard", false)
 	assert.NoError(m.T(), err)
 	assert.True(m.T(), result.Ok)
 
 	m.T().Logf("Validating alertmanager sent alert to webhook receiver")
-	err = charts.WatchAndWaitDeploymentForAnnotation(client, m.project.ClusterID, webhookReceiverNamespace.Name, alertWebhookReceiverDeployment.Name, webhookReceiverAnnotationKey, webhookReceiverAnnotationValue)
+	err = charts.WatchAndWaitDeploymentForAnnotation(client, m.project.ClusterID, webhookReceiverNamespace.Name, alertWebhookReceiverDeploymentResp.Name, webhookReceiverAnnotationKey, webhookReceiverAnnotationValue)
 	require.NoError(m.T(), err)
 }
 
@@ -231,7 +260,7 @@ func (m *MonitoringTestSuite) TestUpgradeMonitoringChart() {
 	// Change monitoring install option version to previous version of the latest version
 	versionsList, err := client.Catalog.GetListChartVersions(charts.RancherMonitoringName)
 	require.NoError(m.T(), err)
-	require.Greaterf(m.T(), len(versionsList), 2, "There should be at least 2 versions of the monitoring chart")
+	require.Greaterf(m.T(), len(versionsList), 1, "There should be at least 2 versions of the monitoring chart")
 	versionLatest := versionsList[0]
 	versionBeforeLatest := versionsList[1]
 	m.chartInstallOptions.Version = versionBeforeLatest
