@@ -2133,7 +2133,9 @@ def set_url_password_token(rancher_url, server_url=None, version=""):
         rancher_url + "/v3-public/localproviders/local?action=login"
     rpassword = 'admin'
     print(auth_url)
-    if version.find("master") > -1 or version.find("2.6") > -1:
+    if "master" in version or \
+            "2.6" in version or \
+            "2.7" in version:
         rpassword = ADMIN_PASSWORD
         print("on 2.6 or later")
     retries = 5
