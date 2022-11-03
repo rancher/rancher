@@ -113,11 +113,15 @@ func (s *settingsProvider) SetAll(settingsMap map[string]settings.Setting) error
 				obj.Default = setting.Default
 				update = true
 			}
-			if envValue != "" && obj.Source != "env" {
+			if envValue != "" && obj.Source != "env" && envValue != obj.Default {
 				obj.Source = "env"
 				update = true
 			}
-			if envValue != "" && obj.Value != envValue {
+			if envValue == obj.Default {
+				obj.Source = ""
+				update = true
+			}
+			if obj.Value != envValue {
 				obj.Value = envValue
 				update = true
 			}

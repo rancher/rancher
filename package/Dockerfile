@@ -169,6 +169,9 @@ ENV CATTLE_CLI_VERSION v2.7.0-rc1
 # Please update the api-ui-version in pkg/settings/settings.go when updating the version here.
 ENV CATTLE_API_UI_VERSION 1.1.9
 
+# Explicitly set the branding to an empty string for non-suse branded installs
+ENV CATTLE_UI_BRAND=
+
 RUN mkdir -p /var/log/auditlog
 ENV AUDIT_LOG_PATH /var/log/auditlog/rancher-api-audit.log
 ENV AUDIT_LOG_MAXAGE 10
