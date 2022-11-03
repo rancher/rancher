@@ -79,7 +79,7 @@ def test_install_rancher_ha(precheck_certificate_options):
         if RANCHER_LOCAL_CLUSTER_TYPE == "RKE":
             print("RKE cluster is provisioning for the local cluster")
             nodes = create_resources()
-            if RANCHER_HA_HARDENED:
+            if RANCHER_HA_HARDENED.upper() == "TRUE":
                 node_role = [["worker", "controlplane", "etcd"]]
                 node_roles =[]
                 for role in node_role:
@@ -504,7 +504,7 @@ def create_rke_cluster_config(aws_nodes):
     rkeconfig = rkeconfig.replace("$AWS_SSH_KEY_NAME", AWS_SSH_KEY_NAME)
     rkeconfig = rkeconfig.replace("$KUBERNETES_VERSION", KUBERNETES_VERSION)
 
-    if RANCHER_HA_HARDENED:
+    if RANCHER_HA_HARDENED.upper() == "TRUE":
         rkeconfig_hardened = readDataFile(DATA_SUBDIR, "hardened-cluster.yml")
         rkeconfig += "\n"
         rkeconfig += rkeconfig_hardened
