@@ -216,6 +216,7 @@ func (a *APIOperations) DoCreate(schemaType string, createObj interface{}, respO
 			if jsonResp["actions"] != nil {
 				resourcePointer.Actions = convertMap(jsonResp["actions"].(map[string]any))
 			}
+			resource = *resourcePointer
 		}
 
 	} else {
