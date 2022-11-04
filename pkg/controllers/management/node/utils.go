@@ -225,9 +225,9 @@ func (m *Lifecycle) reportStatus(stdoutReader io.Reader, stderrReader io.Reader,
 		if strings.HasPrefix(msg, debugPrefix) {
 			// calls in machine with log.Debug are all prefixed and spammy so only log
 			// under trace and don't add to the v3.NodeConditionProvisioned.Message
-			logrus.Tracef("[node-controller] %v", msg)
+			logrus.Tracef("[node-controller] [cluster-id: %s] %v", node.ObjClusterName(), msg)
 		} else {
-			logrus.Infof("[node-controller] %v", msg)
+			logrus.Infof("[node-controller] [cluster-id: %s] %v", node.ObjClusterName(), msg)
 			v32.NodeConditionProvisioned.Message(node, msg)
 		}
 
