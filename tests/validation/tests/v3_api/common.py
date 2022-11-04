@@ -2644,7 +2644,7 @@ def create_connection(url, subprotocols):
         url=url,
         sslopt={"cert_reqs": ssl.CERT_NONE},
         subprotocols=subprotocols,
-        timeout=10,
+        timeout=20,
         cookie="R_SESS=" + USER_TOKEN
     )
     assert ws.connected, "failed to build the websocket"
