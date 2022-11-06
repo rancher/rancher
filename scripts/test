@@ -89,11 +89,29 @@ echo Running: build-token-generator
 path=$(pwd)
 ./tests/v2/integration/bin/integrationsetup
 export CATTLE_TEST_CONFIG=${path}/config.yaml
-go test -v ./tests/v2/integration/...
+go test -v ./tests/v2/integration/... || {
+    echo Rancher logs were
+    tail -n 25 /tmp/rancher.log
+    echo K3s logs were:
+    tail -n 25 $HOME/build/testdata/k3s.log
+    exit 1
+}
 
 INT_TESTS_STARTED=true
 cd ./tests/integration
-tox -e rancher -- -m "not nonparallel" -n $(nproc)
-tox -e rancher -- -m nonparallel
+tox -e rancher -- -m "not nonparallel" -n $(nproc) || {
+    echo Rancher logs were
+    tail -n 25 /tmp/rancher.log
+    echo K3s logs were:
+    tail -n 25 $HOME/build/testdata/k3s.log
+    exit 1
+}
+tox -e rancher -- -m nonparallel || {
+    echo Rancher logs were
+    tail -n 25 /tmp/rancher.log
+    echo K3s logs were:
+    tail -n 25 $HOME/build/testdata/k3s.log
+    exit 1
+}
 
 #tail -f /tmp/rancher-test.log &

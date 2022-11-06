@@ -113,8 +113,15 @@ done
 echo Running provisioning-tests
 export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
 go test -v -failfast -timeout 60m ./tests/integration/pkg/tests/... || {
+    set +e
+    crictl --runtime-endpoint=unix:///run/k3s/containerd/containerd.sock ps -q --name="container|machine"
+    for container in $(crictl --runtime-endpoint=unix:///run/k3s/containerd/containerd.sock ps -q --name="container|machine"); do for service in $DIST $DIST-server $DIST-agent rancher-system-agent; do crictl --runtime-endpoint=unix:///run/k3s/containerd/containerd.sock exec -ti $container sh -c 'if systemctl cat '"$service"'.service >/dev/null 2>&1;then echo "-----$(echo '"$container"' | tr [:lower:] [:upper:])-$(echo '"$service"' | tr [:lower:] [:upper:])LOG-DUMP-START-----"; journalctl --no-pager -n 100 -xeu '"$service"'.service; echo "-----$(echo '"$container"' | tr [:lower:] [:upper:])-$(echo '"$service"' | tr [:lower:] [:upper:])LOG-DUMP-END-----"; fi'; done; done
     echo -e "-----RANCHER-LOG-DUMP-START-----"
     cat /tmp/rancher.log | gzip | base64 -w 0
     echo -e "\n-----RANCHER-LOG-DUMP-END-----"
+    echo -e "-----K3S-LOG-DUMP-START-----"
+    cat build/testdata/k3s.log | gzip | base64 -w 0
+    echo -e "\n-----K3S-LOG-DUMP-END-----"
+
     exit 1
 }
