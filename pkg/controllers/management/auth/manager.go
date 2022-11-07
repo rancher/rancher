@@ -361,7 +361,7 @@ func (m *manager) reconcileClusterMembershipBindingForDelete(roleToKeep, rtbNsAn
 		return rb.RoleRef.Name
 	}
 
-	return m.reconcileMembershipBindingForDelete("", roleToKeep, rtbNsAndName, m.crbIndexer, convert, m.mgmt.RBAC.ClusterRoleBindings("").ObjectClient())
+	return m.reconcileMembershipBindingForDelete("", roleToKeep, rtbNsAndName, convert, true)
 }
 
 // The PRTB has been deleted, either delete or update the project membership binding so that the subject
@@ -372,12 +372,21 @@ func (m *manager) reconcileProjectMembershipBindingForDelete(namespace, roleToKe
 		return rb.RoleRef.Name
 	}
 
-	return m.reconcileMembershipBindingForDelete(namespace, roleToKeep, rtbNsAndName, m.rbIndexer, convert, m.mgmt.RBAC.RoleBindings(namespace).ObjectClient())
+	return m.reconcileMembershipBindingForDelete(namespace, roleToKeep, rtbNsAndName, convert, false)
 }
 
 type convertFn func(i interface{}) string
 
-func (m *manager) reconcileMembershipBindingForDelete(namespace, roleToKeep, rtbNsAndName string, index cache.Indexer, convert convertFn, client *objectclient.ObjectClient) error {
+// The isForCRB parameter signals to us which Indexer/Client we need to use inside the function
+func (m *manager) reconcileMembershipBindingForDelete(namespace, roleToKeep, rtbNsAndName string, convert convertFn, isForCRB bool) error {
+	// We key on isForCRB to determine which indexer to use
+	var index cache.Indexer
+	if isForCRB {
+		index = m.crbIndexer
+	} else {
+		index = m.rbIndexer
+	}
+
 	roleBindings, err := index.ByIndex(membershipBindingOwnerIndex, namespace+"/"+rtbNsAndName)
 	if err != nil {
 		return err
@@ -411,17 +420,31 @@ func (m *manager) reconcileMembershipBindingForDelete(namespace, roleToKeep, rtb
 			}
 		}
 
+		// Here again we key on isForCRB to determine which client to use
 		if !otherOwners {
-			logrus.Infof("[%v] Deleting roleBinding %v", m.controller, objMeta.GetName())
-			if err := client.Delete(objMeta.GetName(), &metav1.DeleteOptions{}); err != nil {
+			var err error
+			if isForCRB {
+				logrus.Infof("[%v] Deleting clusterRoleBinding %v", m.controller, objMeta.GetName())
+				err = m.crbClient.Delete(objMeta.GetName(), &metav1.DeleteOptions{})
+			} else {
+				logrus.Infof("[%v] Deleting roleBinding %v", m.controller, objMeta.GetName())
+				err = m.rbClient.DeleteNamespaced(namespace, objMeta.GetName(), &metav1.DeleteOptions{})
+			}
+			if err != nil {
 				if apierrors.IsNotFound(err) {
 					continue
 				}
 				return err
 			}
 		} else {
-			logrus.Infof("[%v] Updating owner label for roleBinding %v", m.controller, objMeta.GetName())
-			if _, err := client.Update(objMeta.GetName(), objCopy); err != nil {
+			if isForCRB {
+				logrus.Infof("[%v] Updating owner label for clusterRoleBinding %v", m.controller, objMeta.GetName())
+				m.crbClient.Update(obj.(*v1.ClusterRoleBinding))
+			} else {
+				logrus.Infof("[%v] Updating owner label for roleBinding %v", m.controller, objMeta.GetName())
+				m.rbClient.Update(obj.(*v1.RoleBinding))
+			}
+			if err != nil {
 				return err
 			}
 		}

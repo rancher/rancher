@@ -259,6 +259,7 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 		addRule().apiGroups("management.cattle.io").resources("projectmonitorgraphs").verbs("*").
 		addRule().apiGroups("management.cattle.io").resources("catalogtemplates").verbs("*").
 		addRule().apiGroups("management.cattle.io").resources("catalogtemplateversions").verbs("*").
+		addRule().apiGroups("management.cattle.io").resources("podsecuritypolicytemplateprojectbindings").verbs("*").
 		addRule().apiGroups("monitoring.cattle.io").resources("prometheus").verbs("view").
 		addRule().apiGroups("monitoring.coreos.com").resources("prometheuses", "prometheusrules", "servicemonitors").verbs("*").
 		addRule().apiGroups("networking.istio.io").resources("destinationrules", "envoyfilters", "gateways", "serviceentries", "sidecars", "virtualservices").verbs("*").
