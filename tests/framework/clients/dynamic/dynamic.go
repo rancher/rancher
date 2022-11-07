@@ -36,11 +36,12 @@ func NewForConfig(ts *session.Session, inConfig *rest.Config) (dynamic.Interface
 }
 
 // Resource takes a schema.GroupVersionResource parameter to set the appropriate resource interface e.g.
-//  schema.GroupVersionResource {
-// 	  Group:    "management.cattle.io",
-// 	  Version:  "v3",
-// 	  Resource: "users",
-//  }
+//
+//	 schema.GroupVersionResource {
+//		  Group:    "management.cattle.io",
+//		  Version:  "v3",
+//		  Resource: "users",
+//	 }
 func (d *Client) Resource(resource schema.GroupVersionResource) dynamic.NamespaceableResourceInterface {
 	return &NamespaceableResourceClient{
 		NamespaceableResourceInterface: d.Interface.Resource(resource),

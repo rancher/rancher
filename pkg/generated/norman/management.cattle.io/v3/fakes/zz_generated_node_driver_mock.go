@@ -29,22 +29,22 @@ var _ v31.NodeDriverLister = &NodeDriverListerMock{}
 
 // NodeDriverListerMock is a mock implementation of v31.NodeDriverLister.
 //
-//     func TestSomethingThatUsesNodeDriverLister(t *testing.T) {
+//	    func TestSomethingThatUsesNodeDriverLister(t *testing.T) {
 //
-//         // make and configure a mocked v31.NodeDriverLister
-//         mockedNodeDriverLister := &NodeDriverListerMock{
-//             GetFunc: func(namespace string, name string) (*v3.NodeDriver, error) {
-// 	               panic("mock out the Get method")
-//             },
-//             ListFunc: func(namespace string, selector labels.Selector) ([]*v3.NodeDriver, error) {
-// 	               panic("mock out the List method")
-//             },
-//         }
+//	        // make and configure a mocked v31.NodeDriverLister
+//	        mockedNodeDriverLister := &NodeDriverListerMock{
+//	            GetFunc: func(namespace string, name string) (*v3.NodeDriver, error) {
+//		               panic("mock out the Get method")
+//	            },
+//	            ListFunc: func(namespace string, selector labels.Selector) ([]*v3.NodeDriver, error) {
+//		               panic("mock out the List method")
+//	            },
+//	        }
 //
-//         // use mockedNodeDriverLister in code that requires v31.NodeDriverLister
-//         // and then make assertions.
+//	        // use mockedNodeDriverLister in code that requires v31.NodeDriverLister
+//	        // and then make assertions.
 //
-//     }
+//	    }
 type NodeDriverListerMock struct {
 	// GetFunc mocks the Get method.
 	GetFunc func(namespace string, name string) (*v3.NodeDriver, error)
@@ -91,7 +91,8 @@ func (mock *NodeDriverListerMock) Get(namespace string, name string) (*v3.NodeDr
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//     len(mockedNodeDriverLister.GetCalls())
+//
+//	len(mockedNodeDriverLister.GetCalls())
 func (mock *NodeDriverListerMock) GetCalls() []struct {
 	Namespace string
 	Name      string
@@ -126,7 +127,8 @@ func (mock *NodeDriverListerMock) List(namespace string, selector labels.Selecto
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//     len(mockedNodeDriverLister.ListCalls())
+//
+//	len(mockedNodeDriverLister.ListCalls())
 func (mock *NodeDriverListerMock) ListCalls() []struct {
 	Namespace string
 	Selector  labels.Selector
@@ -159,43 +161,43 @@ var _ v31.NodeDriverController = &NodeDriverControllerMock{}
 
 // NodeDriverControllerMock is a mock implementation of v31.NodeDriverController.
 //
-//     func TestSomethingThatUsesNodeDriverController(t *testing.T) {
+//	    func TestSomethingThatUsesNodeDriverController(t *testing.T) {
 //
-//         // make and configure a mocked v31.NodeDriverController
-//         mockedNodeDriverController := &NodeDriverControllerMock{
-//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v31.NodeDriverHandlerFunc)  {
-// 	               panic("mock out the AddClusterScopedFeatureHandler method")
-//             },
-//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v31.NodeDriverHandlerFunc)  {
-// 	               panic("mock out the AddClusterScopedHandler method")
-//             },
-//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.NodeDriverHandlerFunc)  {
-// 	               panic("mock out the AddFeatureHandler method")
-//             },
-//             AddHandlerFunc: func(ctx context.Context, name string, handler v31.NodeDriverHandlerFunc)  {
-// 	               panic("mock out the AddHandler method")
-//             },
-//             EnqueueFunc: func(namespace string, name string)  {
-// 	               panic("mock out the Enqueue method")
-//             },
-//             EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
-// 	               panic("mock out the EnqueueAfter method")
-//             },
-//             GenericFunc: func() controller.GenericController {
-// 	               panic("mock out the Generic method")
-//             },
-//             InformerFunc: func() cache.SharedIndexInformer {
-// 	               panic("mock out the Informer method")
-//             },
-//             ListerFunc: func() v31.NodeDriverLister {
-// 	               panic("mock out the Lister method")
-//             },
-//         }
+//	        // make and configure a mocked v31.NodeDriverController
+//	        mockedNodeDriverController := &NodeDriverControllerMock{
+//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v31.NodeDriverHandlerFunc)  {
+//		               panic("mock out the AddClusterScopedFeatureHandler method")
+//	            },
+//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v31.NodeDriverHandlerFunc)  {
+//		               panic("mock out the AddClusterScopedHandler method")
+//	            },
+//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.NodeDriverHandlerFunc)  {
+//		               panic("mock out the AddFeatureHandler method")
+//	            },
+//	            AddHandlerFunc: func(ctx context.Context, name string, handler v31.NodeDriverHandlerFunc)  {
+//		               panic("mock out the AddHandler method")
+//	            },
+//	            EnqueueFunc: func(namespace string, name string)  {
+//		               panic("mock out the Enqueue method")
+//	            },
+//	            EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
+//		               panic("mock out the EnqueueAfter method")
+//	            },
+//	            GenericFunc: func() controller.GenericController {
+//		               panic("mock out the Generic method")
+//	            },
+//	            InformerFunc: func() cache.SharedIndexInformer {
+//		               panic("mock out the Informer method")
+//	            },
+//	            ListerFunc: func() v31.NodeDriverLister {
+//		               panic("mock out the Lister method")
+//	            },
+//	        }
 //
-//         // use mockedNodeDriverController in code that requires v31.NodeDriverController
-//         // and then make assertions.
+//	        // use mockedNodeDriverController in code that requires v31.NodeDriverController
+//	        // and then make assertions.
 //
-//     }
+//	    }
 type NodeDriverControllerMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
 	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v31.NodeDriverHandlerFunc)
@@ -324,7 +326,8 @@ func (mock *NodeDriverControllerMock) AddClusterScopedFeatureHandler(ctx context
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//     len(mockedNodeDriverController.AddClusterScopedFeatureHandlerCalls())
+//
+//	len(mockedNodeDriverController.AddClusterScopedFeatureHandlerCalls())
 func (mock *NodeDriverControllerMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -369,7 +372,8 @@ func (mock *NodeDriverControllerMock) AddClusterScopedHandler(ctx context.Contex
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//     len(mockedNodeDriverController.AddClusterScopedHandlerCalls())
+//
+//	len(mockedNodeDriverController.AddClusterScopedHandlerCalls())
 func (mock *NodeDriverControllerMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -412,7 +416,8 @@ func (mock *NodeDriverControllerMock) AddFeatureHandler(ctx context.Context, ena
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//     len(mockedNodeDriverController.AddFeatureHandlerCalls())
+//
+//	len(mockedNodeDriverController.AddFeatureHandlerCalls())
 func (mock *NodeDriverControllerMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
@@ -453,7 +458,8 @@ func (mock *NodeDriverControllerMock) AddHandler(ctx context.Context, name strin
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//     len(mockedNodeDriverController.AddHandlerCalls())
+//
+//	len(mockedNodeDriverController.AddHandlerCalls())
 func (mock *NodeDriverControllerMock) AddHandlerCalls() []struct {
 	Ctx     context.Context
 	Name    string
@@ -490,7 +496,8 @@ func (mock *NodeDriverControllerMock) Enqueue(namespace string, name string) {
 
 // EnqueueCalls gets all the calls that were made to Enqueue.
 // Check the length with:
-//     len(mockedNodeDriverController.EnqueueCalls())
+//
+//	len(mockedNodeDriverController.EnqueueCalls())
 func (mock *NodeDriverControllerMock) EnqueueCalls() []struct {
 	Namespace string
 	Name      string
@@ -527,7 +534,8 @@ func (mock *NodeDriverControllerMock) EnqueueAfter(namespace string, name string
 
 // EnqueueAfterCalls gets all the calls that were made to EnqueueAfter.
 // Check the length with:
-//     len(mockedNodeDriverController.EnqueueAfterCalls())
+//
+//	len(mockedNodeDriverController.EnqueueAfterCalls())
 func (mock *NodeDriverControllerMock) EnqueueAfterCalls() []struct {
 	Namespace string
 	Name      string
@@ -559,7 +567,8 @@ func (mock *NodeDriverControllerMock) Generic() controller.GenericController {
 
 // GenericCalls gets all the calls that were made to Generic.
 // Check the length with:
-//     len(mockedNodeDriverController.GenericCalls())
+//
+//	len(mockedNodeDriverController.GenericCalls())
 func (mock *NodeDriverControllerMock) GenericCalls() []struct {
 } {
 	var calls []struct {
@@ -585,7 +594,8 @@ func (mock *NodeDriverControllerMock) Informer() cache.SharedIndexInformer {
 
 // InformerCalls gets all the calls that were made to Informer.
 // Check the length with:
-//     len(mockedNodeDriverController.InformerCalls())
+//
+//	len(mockedNodeDriverController.InformerCalls())
 func (mock *NodeDriverControllerMock) InformerCalls() []struct {
 } {
 	var calls []struct {
@@ -611,7 +621,8 @@ func (mock *NodeDriverControllerMock) Lister() v31.NodeDriverLister {
 
 // ListerCalls gets all the calls that were made to Lister.
 // Check the length with:
-//     len(mockedNodeDriverController.ListerCalls())
+//
+//	len(mockedNodeDriverController.ListerCalls())
 func (mock *NodeDriverControllerMock) ListerCalls() []struct {
 } {
 	var calls []struct {
@@ -651,76 +662,76 @@ var _ v31.NodeDriverInterface = &NodeDriverInterfaceMock{}
 
 // NodeDriverInterfaceMock is a mock implementation of v31.NodeDriverInterface.
 //
-//     func TestSomethingThatUsesNodeDriverInterface(t *testing.T) {
+//	    func TestSomethingThatUsesNodeDriverInterface(t *testing.T) {
 //
-//         // make and configure a mocked v31.NodeDriverInterface
-//         mockedNodeDriverInterface := &NodeDriverInterfaceMock{
-//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v31.NodeDriverHandlerFunc)  {
-// 	               panic("mock out the AddClusterScopedFeatureHandler method")
-//             },
-//             AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v31.NodeDriverLifecycle)  {
-// 	               panic("mock out the AddClusterScopedFeatureLifecycle method")
-//             },
-//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v31.NodeDriverHandlerFunc)  {
-// 	               panic("mock out the AddClusterScopedHandler method")
-//             },
-//             AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v31.NodeDriverLifecycle)  {
-// 	               panic("mock out the AddClusterScopedLifecycle method")
-//             },
-//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.NodeDriverHandlerFunc)  {
-// 	               panic("mock out the AddFeatureHandler method")
-//             },
-//             AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v31.NodeDriverLifecycle)  {
-// 	               panic("mock out the AddFeatureLifecycle method")
-//             },
-//             AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v31.NodeDriverHandlerFunc)  {
-// 	               panic("mock out the AddHandler method")
-//             },
-//             AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v31.NodeDriverLifecycle)  {
-// 	               panic("mock out the AddLifecycle method")
-//             },
-//             ControllerFunc: func() v31.NodeDriverController {
-// 	               panic("mock out the Controller method")
-//             },
-//             CreateFunc: func(in1 *v3.NodeDriver) (*v3.NodeDriver, error) {
-// 	               panic("mock out the Create method")
-//             },
-//             DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
-// 	               panic("mock out the Delete method")
-//             },
-//             DeleteCollectionFunc: func(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
-// 	               panic("mock out the DeleteCollection method")
-//             },
-//             DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
-// 	               panic("mock out the DeleteNamespaced method")
-//             },
-//             GetFunc: func(name string, opts metav1.GetOptions) (*v3.NodeDriver, error) {
-// 	               panic("mock out the Get method")
-//             },
-//             GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v3.NodeDriver, error) {
-// 	               panic("mock out the GetNamespaced method")
-//             },
-//             ListFunc: func(opts metav1.ListOptions) (*v3.NodeDriverList, error) {
-// 	               panic("mock out the List method")
-//             },
-//             ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v3.NodeDriverList, error) {
-// 	               panic("mock out the ListNamespaced method")
-//             },
-//             ObjectClientFunc: func() *objectclient.ObjectClient {
-// 	               panic("mock out the ObjectClient method")
-//             },
-//             UpdateFunc: func(in1 *v3.NodeDriver) (*v3.NodeDriver, error) {
-// 	               panic("mock out the Update method")
-//             },
-//             WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
-// 	               panic("mock out the Watch method")
-//             },
-//         }
+//	        // make and configure a mocked v31.NodeDriverInterface
+//	        mockedNodeDriverInterface := &NodeDriverInterfaceMock{
+//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v31.NodeDriverHandlerFunc)  {
+//		               panic("mock out the AddClusterScopedFeatureHandler method")
+//	            },
+//	            AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v31.NodeDriverLifecycle)  {
+//		               panic("mock out the AddClusterScopedFeatureLifecycle method")
+//	            },
+//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v31.NodeDriverHandlerFunc)  {
+//		               panic("mock out the AddClusterScopedHandler method")
+//	            },
+//	            AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v31.NodeDriverLifecycle)  {
+//		               panic("mock out the AddClusterScopedLifecycle method")
+//	            },
+//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.NodeDriverHandlerFunc)  {
+//		               panic("mock out the AddFeatureHandler method")
+//	            },
+//	            AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v31.NodeDriverLifecycle)  {
+//		               panic("mock out the AddFeatureLifecycle method")
+//	            },
+//	            AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v31.NodeDriverHandlerFunc)  {
+//		               panic("mock out the AddHandler method")
+//	            },
+//	            AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v31.NodeDriverLifecycle)  {
+//		               panic("mock out the AddLifecycle method")
+//	            },
+//	            ControllerFunc: func() v31.NodeDriverController {
+//		               panic("mock out the Controller method")
+//	            },
+//	            CreateFunc: func(in1 *v3.NodeDriver) (*v3.NodeDriver, error) {
+//		               panic("mock out the Create method")
+//	            },
+//	            DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
+//		               panic("mock out the Delete method")
+//	            },
+//	            DeleteCollectionFunc: func(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
+//		               panic("mock out the DeleteCollection method")
+//	            },
+//	            DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
+//		               panic("mock out the DeleteNamespaced method")
+//	            },
+//	            GetFunc: func(name string, opts metav1.GetOptions) (*v3.NodeDriver, error) {
+//		               panic("mock out the Get method")
+//	            },
+//	            GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v3.NodeDriver, error) {
+//		               panic("mock out the GetNamespaced method")
+//	            },
+//	            ListFunc: func(opts metav1.ListOptions) (*v3.NodeDriverList, error) {
+//		               panic("mock out the List method")
+//	            },
+//	            ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v3.NodeDriverList, error) {
+//		               panic("mock out the ListNamespaced method")
+//	            },
+//	            ObjectClientFunc: func() *objectclient.ObjectClient {
+//		               panic("mock out the ObjectClient method")
+//	            },
+//	            UpdateFunc: func(in1 *v3.NodeDriver) (*v3.NodeDriver, error) {
+//		               panic("mock out the Update method")
+//	            },
+//	            WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
+//		               panic("mock out the Watch method")
+//	            },
+//	        }
 //
-//         // use mockedNodeDriverInterface in code that requires v31.NodeDriverInterface
-//         // and then make assertions.
+//	        // use mockedNodeDriverInterface in code that requires v31.NodeDriverInterface
+//	        // and then make assertions.
 //
-//     }
+//	    }
 type NodeDriverInterfaceMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
 	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v31.NodeDriverHandlerFunc)
@@ -973,7 +984,8 @@ func (mock *NodeDriverInterfaceMock) AddClusterScopedFeatureHandler(ctx context.
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//     len(mockedNodeDriverInterface.AddClusterScopedFeatureHandlerCalls())
+//
+//	len(mockedNodeDriverInterface.AddClusterScopedFeatureHandlerCalls())
 func (mock *NodeDriverInterfaceMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -1020,7 +1032,8 @@ func (mock *NodeDriverInterfaceMock) AddClusterScopedFeatureLifecycle(ctx contex
 
 // AddClusterScopedFeatureLifecycleCalls gets all the calls that were made to AddClusterScopedFeatureLifecycle.
 // Check the length with:
-//     len(mockedNodeDriverInterface.AddClusterScopedFeatureLifecycleCalls())
+//
+//	len(mockedNodeDriverInterface.AddClusterScopedFeatureLifecycleCalls())
 func (mock *NodeDriverInterfaceMock) AddClusterScopedFeatureLifecycleCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -1065,7 +1078,8 @@ func (mock *NodeDriverInterfaceMock) AddClusterScopedHandler(ctx context.Context
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//     len(mockedNodeDriverInterface.AddClusterScopedHandlerCalls())
+//
+//	len(mockedNodeDriverInterface.AddClusterScopedHandlerCalls())
 func (mock *NodeDriverInterfaceMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -1108,7 +1122,8 @@ func (mock *NodeDriverInterfaceMock) AddClusterScopedLifecycle(ctx context.Conte
 
 // AddClusterScopedLifecycleCalls gets all the calls that were made to AddClusterScopedLifecycle.
 // Check the length with:
-//     len(mockedNodeDriverInterface.AddClusterScopedLifecycleCalls())
+//
+//	len(mockedNodeDriverInterface.AddClusterScopedLifecycleCalls())
 func (mock *NodeDriverInterfaceMock) AddClusterScopedLifecycleCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -1151,7 +1166,8 @@ func (mock *NodeDriverInterfaceMock) AddFeatureHandler(ctx context.Context, enab
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//     len(mockedNodeDriverInterface.AddFeatureHandlerCalls())
+//
+//	len(mockedNodeDriverInterface.AddFeatureHandlerCalls())
 func (mock *NodeDriverInterfaceMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
@@ -1194,7 +1210,8 @@ func (mock *NodeDriverInterfaceMock) AddFeatureLifecycle(ctx context.Context, en
 
 // AddFeatureLifecycleCalls gets all the calls that were made to AddFeatureLifecycle.
 // Check the length with:
-//     len(mockedNodeDriverInterface.AddFeatureLifecycleCalls())
+//
+//	len(mockedNodeDriverInterface.AddFeatureLifecycleCalls())
 func (mock *NodeDriverInterfaceMock) AddFeatureLifecycleCalls() []struct {
 	Ctx       context.Context
 	Enabled   func() bool
@@ -1235,7 +1252,8 @@ func (mock *NodeDriverInterfaceMock) AddHandler(ctx context.Context, name string
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//     len(mockedNodeDriverInterface.AddHandlerCalls())
+//
+//	len(mockedNodeDriverInterface.AddHandlerCalls())
 func (mock *NodeDriverInterfaceMock) AddHandlerCalls() []struct {
 	Ctx  context.Context
 	Name string
@@ -1274,7 +1292,8 @@ func (mock *NodeDriverInterfaceMock) AddLifecycle(ctx context.Context, name stri
 
 // AddLifecycleCalls gets all the calls that were made to AddLifecycle.
 // Check the length with:
-//     len(mockedNodeDriverInterface.AddLifecycleCalls())
+//
+//	len(mockedNodeDriverInterface.AddLifecycleCalls())
 func (mock *NodeDriverInterfaceMock) AddLifecycleCalls() []struct {
 	Ctx       context.Context
 	Name      string
@@ -1306,7 +1325,8 @@ func (mock *NodeDriverInterfaceMock) Controller() v31.NodeDriverController {
 
 // ControllerCalls gets all the calls that were made to Controller.
 // Check the length with:
-//     len(mockedNodeDriverInterface.ControllerCalls())
+//
+//	len(mockedNodeDriverInterface.ControllerCalls())
 func (mock *NodeDriverInterfaceMock) ControllerCalls() []struct {
 } {
 	var calls []struct {
@@ -1335,7 +1355,8 @@ func (mock *NodeDriverInterfaceMock) Create(in1 *v3.NodeDriver) (*v3.NodeDriver,
 
 // CreateCalls gets all the calls that were made to Create.
 // Check the length with:
-//     len(mockedNodeDriverInterface.CreateCalls())
+//
+//	len(mockedNodeDriverInterface.CreateCalls())
 func (mock *NodeDriverInterfaceMock) CreateCalls() []struct {
 	In1 *v3.NodeDriver
 } {
@@ -1368,7 +1389,8 @@ func (mock *NodeDriverInterfaceMock) Delete(name string, options *metav1.DeleteO
 
 // DeleteCalls gets all the calls that were made to Delete.
 // Check the length with:
-//     len(mockedNodeDriverInterface.DeleteCalls())
+//
+//	len(mockedNodeDriverInterface.DeleteCalls())
 func (mock *NodeDriverInterfaceMock) DeleteCalls() []struct {
 	Name    string
 	Options *metav1.DeleteOptions
@@ -1403,7 +1425,8 @@ func (mock *NodeDriverInterfaceMock) DeleteCollection(deleteOpts *metav1.DeleteO
 
 // DeleteCollectionCalls gets all the calls that were made to DeleteCollection.
 // Check the length with:
-//     len(mockedNodeDriverInterface.DeleteCollectionCalls())
+//
+//	len(mockedNodeDriverInterface.DeleteCollectionCalls())
 func (mock *NodeDriverInterfaceMock) DeleteCollectionCalls() []struct {
 	DeleteOpts *metav1.DeleteOptions
 	ListOpts   metav1.ListOptions
@@ -1440,7 +1463,8 @@ func (mock *NodeDriverInterfaceMock) DeleteNamespaced(namespace string, name str
 
 // DeleteNamespacedCalls gets all the calls that were made to DeleteNamespaced.
 // Check the length with:
-//     len(mockedNodeDriverInterface.DeleteNamespacedCalls())
+//
+//	len(mockedNodeDriverInterface.DeleteNamespacedCalls())
 func (mock *NodeDriverInterfaceMock) DeleteNamespacedCalls() []struct {
 	Namespace string
 	Name      string
@@ -1477,7 +1501,8 @@ func (mock *NodeDriverInterfaceMock) Get(name string, opts metav1.GetOptions) (*
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//     len(mockedNodeDriverInterface.GetCalls())
+//
+//	len(mockedNodeDriverInterface.GetCalls())
 func (mock *NodeDriverInterfaceMock) GetCalls() []struct {
 	Name string
 	Opts metav1.GetOptions
@@ -1514,7 +1539,8 @@ func (mock *NodeDriverInterfaceMock) GetNamespaced(namespace string, name string
 
 // GetNamespacedCalls gets all the calls that were made to GetNamespaced.
 // Check the length with:
-//     len(mockedNodeDriverInterface.GetNamespacedCalls())
+//
+//	len(mockedNodeDriverInterface.GetNamespacedCalls())
 func (mock *NodeDriverInterfaceMock) GetNamespacedCalls() []struct {
 	Namespace string
 	Name      string
@@ -1549,7 +1575,8 @@ func (mock *NodeDriverInterfaceMock) List(opts metav1.ListOptions) (*v3.NodeDriv
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//     len(mockedNodeDriverInterface.ListCalls())
+//
+//	len(mockedNodeDriverInterface.ListCalls())
 func (mock *NodeDriverInterfaceMock) ListCalls() []struct {
 	Opts metav1.ListOptions
 } {
@@ -1582,7 +1609,8 @@ func (mock *NodeDriverInterfaceMock) ListNamespaced(namespace string, opts metav
 
 // ListNamespacedCalls gets all the calls that were made to ListNamespaced.
 // Check the length with:
-//     len(mockedNodeDriverInterface.ListNamespacedCalls())
+//
+//	len(mockedNodeDriverInterface.ListNamespacedCalls())
 func (mock *NodeDriverInterfaceMock) ListNamespacedCalls() []struct {
 	Namespace string
 	Opts      metav1.ListOptions
@@ -1612,7 +1640,8 @@ func (mock *NodeDriverInterfaceMock) ObjectClient() *objectclient.ObjectClient {
 
 // ObjectClientCalls gets all the calls that were made to ObjectClient.
 // Check the length with:
-//     len(mockedNodeDriverInterface.ObjectClientCalls())
+//
+//	len(mockedNodeDriverInterface.ObjectClientCalls())
 func (mock *NodeDriverInterfaceMock) ObjectClientCalls() []struct {
 } {
 	var calls []struct {
@@ -1641,7 +1670,8 @@ func (mock *NodeDriverInterfaceMock) Update(in1 *v3.NodeDriver) (*v3.NodeDriver,
 
 // UpdateCalls gets all the calls that were made to Update.
 // Check the length with:
-//     len(mockedNodeDriverInterface.UpdateCalls())
+//
+//	len(mockedNodeDriverInterface.UpdateCalls())
 func (mock *NodeDriverInterfaceMock) UpdateCalls() []struct {
 	In1 *v3.NodeDriver
 } {
@@ -1672,7 +1702,8 @@ func (mock *NodeDriverInterfaceMock) Watch(opts metav1.ListOptions) (watch.Inter
 
 // WatchCalls gets all the calls that were made to Watch.
 // Check the length with:
-//     len(mockedNodeDriverInterface.WatchCalls())
+//
+//	len(mockedNodeDriverInterface.WatchCalls())
 func (mock *NodeDriverInterfaceMock) WatchCalls() []struct {
 	Opts metav1.ListOptions
 } {
@@ -1695,19 +1726,19 @@ var _ v31.NodeDriversGetter = &NodeDriversGetterMock{}
 
 // NodeDriversGetterMock is a mock implementation of v31.NodeDriversGetter.
 //
-//     func TestSomethingThatUsesNodeDriversGetter(t *testing.T) {
+//	    func TestSomethingThatUsesNodeDriversGetter(t *testing.T) {
 //
-//         // make and configure a mocked v31.NodeDriversGetter
-//         mockedNodeDriversGetter := &NodeDriversGetterMock{
-//             NodeDriversFunc: func(namespace string) v31.NodeDriverInterface {
-// 	               panic("mock out the NodeDrivers method")
-//             },
-//         }
+//	        // make and configure a mocked v31.NodeDriversGetter
+//	        mockedNodeDriversGetter := &NodeDriversGetterMock{
+//	            NodeDriversFunc: func(namespace string) v31.NodeDriverInterface {
+//		               panic("mock out the NodeDrivers method")
+//	            },
+//	        }
 //
-//         // use mockedNodeDriversGetter in code that requires v31.NodeDriversGetter
-//         // and then make assertions.
+//	        // use mockedNodeDriversGetter in code that requires v31.NodeDriversGetter
+//	        // and then make assertions.
 //
-//     }
+//	    }
 type NodeDriversGetterMock struct {
 	// NodeDriversFunc mocks the NodeDrivers method.
 	NodeDriversFunc func(namespace string) v31.NodeDriverInterface
@@ -1740,7 +1771,8 @@ func (mock *NodeDriversGetterMock) NodeDrivers(namespace string) v31.NodeDriverI
 
 // NodeDriversCalls gets all the calls that were made to NodeDrivers.
 // Check the length with:
-//     len(mockedNodeDriversGetter.NodeDriversCalls())
+//
+//	len(mockedNodeDriversGetter.NodeDriversCalls())
 func (mock *NodeDriversGetterMock) NodeDriversCalls() []struct {
 	Namespace string
 } {

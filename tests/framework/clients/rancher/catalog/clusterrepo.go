@@ -15,7 +15,7 @@ const (
 	rancherAppsURL   = "v1/catalog.cattle.io.apps/"
 )
 
-//GetListChartVersions is used to get the list of versions of `chartName`
+// GetListChartVersions is used to get the list of versions of `chartName`
 func (c *Client) GetListChartVersions(chartName string) ([]string, error) {
 	result, err := c.RESTClient().Get().
 		AbsPath(rancherChartsURL).Param("link", "index").

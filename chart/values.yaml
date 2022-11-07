@@ -19,17 +19,17 @@ auditLog:
   maxBackup: 1
   maxSize: 100
 
+  # Image for collecting rancher audit logs.
+  # Important: update pkg/image/export/resolve.go when this default image is changed, so that it's reflected accordingly in rancher-images.txt generated for air-gapped setups.
+  image:
+    repository: "rancher/mirrored-bci-micro"
+    tag: 15.4.14.3
+    # Override imagePullPolicy image
+    # options: Always, Never, IfNotPresent
+    pullPolicy: "IfNotPresent"
+
 # As of Rancher v2.5.0 this flag is deprecated and must be set to 'true' in order for Rancher to start
 addLocal: "true"
-
-# Image for collecting rancher audit logs.
-# Important: update pkg/image/export/main.go when this default image is changed, so that it's reflected accordingly in rancher-images.txt generated for air-gapped setups.
-busyboxImage: busybox
-
-# Override imagePullPolicy for busybox images
-# options: Always, Never, IfNotPresent
-# Defaults to IfNotPresent
-# busyboxImagePullPolicy: <pullPolicy>
 
 # Add debug flag to Rancher server
 debug: false
@@ -60,6 +60,8 @@ ingress:
   includeDefaultExtraAnnotations: true
   extraAnnotations: {}
   ingressClassName: ""
+  # backend port number
+  servicePort: 80
 
   # configurationSnippet - Add additional Nginx configuration. This example statically sets a header on the ingress.
   # configurationSnippet: |
@@ -104,6 +106,9 @@ rancherImage: rancher/rancher
 # of available nodes in the cluster
 replicas: 3
 
+# Set priorityClassName to avoid eviction
+priorityClassName: rancher-critical
+
 # Set pod resource requests/limits for Rancher.
 resources: {}
 
@@ -120,7 +125,7 @@ systemDefaultRegistry: ""
 useBundledSystemChart: false
 
 # Certmanager version compatibility
-certmanager: 
+certmanager:
   version: ""
 
 # Rancher custom logos persistence
@@ -133,7 +138,7 @@ customLogos:
   volumeKind: persistentVolumeClaim
   ## Use an existing volume. Custom logos should be copied to the volume by the user
   # volumeName: custom-logos
-  ## Just for volumeKind: persistentVolumeClaim 
+  ## Just for volumeKind: persistentVolumeClaim
   ## To disables dynamic provisioning, set storageClass: "" or storageClass: "-"
   # storageClass: "-"
   accessMode: ReadWriteOnce

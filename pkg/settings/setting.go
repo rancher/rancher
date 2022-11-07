@@ -16,7 +16,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 )
 
-const RancherVersionDev = "2.6.99"
+const RancherVersionDev = "2.7.99"
 
 var (
 	releasePattern = regexp.MustCompile("^v[0-9]")
@@ -56,7 +56,7 @@ var (
 	KubernetesVersionToSystemImages     = NewSetting("k8s-version-to-images", "")
 	KubernetesVersionsCurrent           = NewSetting("k8s-versions-current", "")
 	KubernetesVersionsDeprecated        = NewSetting("k8s-versions-deprecated", "")
-	KDMBranch                           = NewSetting("kdm-branch", "release-v2.6")
+	KDMBranch                           = NewSetting("kdm-branch", "dev-v2.7")
 	MachineVersion                      = NewSetting("machine-version", "dev")
 	Namespace                           = NewSetting("namespace", os.Getenv("CATTLE_NAMESPACE"))
 	PasswordMinLength                   = NewSetting("password-min-length", "12")
@@ -71,34 +71,16 @@ var (
 	WinsAgentVersion                    = NewSetting("wins-agent-version", "")
 	CSIProxyAgentVersion                = NewSetting("csi-proxy-agent-version", "")
 	CSIProxyAgentURL                    = NewSetting("csi-proxy-agent-url", "https://acs-mirror.azureedge.net/csi-proxy/%[1]s/binaries/csi-proxy-%[1]s.tar.gz")
-	SystemAgentInstallScript            = NewSetting("system-agent-install-script", "https://raw.githubusercontent.com/rancher/system-agent/v0.2.10/install.sh")
-	WinsAgentInstallScript              = NewSetting("wins-agent-install-script", "https://raw.githubusercontent.com/rancher/wins/v0.4.7/install.ps1")
+	SystemAgentInstallScript            = NewSetting("system-agent-install-script", "https://raw.githubusercontent.com/rancher/system-agent/v0.2.13/install.sh")
+	WinsAgentInstallScript              = NewSetting("wins-agent-install-script", "https://raw.githubusercontent.com/rancher/wins/v0.4.11/install.ps1")
 	SystemAgentInstallerImage           = NewSetting("system-agent-installer-image", "rancher/system-agent-installer-")
 	SystemAgentUpgradeImage             = NewSetting("system-agent-upgrade-image", "")
 	WinsAgentUpgradeImage               = NewSetting("wins-agent-upgrade-image", "")
-	SystemDefaultRegistry               = NewSetting("system-default-registry", "")
-	SystemNamespaces                    = NewSetting("system-namespaces", "kube-system,kube-public,cattle-system,cattle-alerting,cattle-logging,cattle-pipeline,cattle-prometheus,ingress-nginx,cattle-global-data,cattle-istio,kube-node-lease,cert-manager,cattle-global-nt,security-scan,cattle-fleet-system,cattle-fleet-local-system,calico-system,tigera-operator,cattle-impersonation-system,rancher-operator-system,cattle-csp-adapter-system,calico-apiserver")
+	SystemNamespaces                    = NewSetting("system-namespaces", "kube-system,kube-public,cattle-system,cattle-alerting,cattle-logging,cattle-prometheus,ingress-nginx,cattle-global-data,cattle-istio,kube-node-lease,cert-manager,cattle-global-nt,security-scan,cattle-fleet-system,cattle-fleet-local-system,calico-system,tigera-operator,cattle-impersonation-system,rancher-operator-system,cattle-csp-adapter-system,calico-apiserver")
 	SystemUpgradeControllerChartVersion = NewSetting("system-upgrade-controller-chart-version", "")
 	TelemetryOpt                        = NewSetting("telemetry-opt", "")
 	TLSMinVersion                       = NewSetting("tls-min-version", "1.2")
 	TLSCiphers                          = NewSetting("tls-ciphers", "TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305")
-	UIBanners                           = NewSetting("ui-banners", "{}")
-	UIBrand                             = NewSetting("ui-brand", "")
-	UIDefaultLanding                    = NewSetting("ui-default-landing", "vue")
-	UIFeedBackForm                      = NewSetting("ui-feedback-form", "")
-	UIIndex                             = NewSetting("ui-index", "https://releases.rancher.com/ui/latest2/index.html")
-	UIPath                              = NewSetting("ui-path", "/usr/share/rancher/ui")
-	UIDashboardIndex                    = NewSetting("ui-dashboard-index", "https://releases.rancher.com/dashboard/latest/index.html")
-	UIDashboardPath                     = NewSetting("ui-dashboard-path", "/usr/share/rancher/ui-dashboard")
-	UIFavicon                           = NewSetting("ui-favicon", "")
-	UIPerformance                       = NewSetting("ui-performance", "") // Experimental settings for UI functionality to improve the UX with large nunbers of resources
-	UIPreferred                         = NewSetting("ui-preferred", "vue")
-	UIOfflinePreferred                  = NewSetting("ui-offline-preferred", "dynamic")
-	UIIssues                            = NewSetting("ui-issues", "")
-	UIPL                                = NewSetting("ui-pl", "rancher")
-	UICommunityLinks                    = NewSetting("ui-community-links", "true")
-	UIKubernetesSupportedVersions       = NewSetting("ui-k8s-supported-versions-range", ">= 1.11.0 <=1.14.x")
-	UIKubernetesDefaultVersion          = NewSetting("ui-k8s-default-version-range", "<=1.14.x")
 	WhitelistDomain                     = NewSetting("whitelist-domain", "forums.rancher.com")
 	WhitelistEnvironmentVars            = NewSetting("whitelist-envvars", "HTTP_PROXY,HTTPS_PROXY,NO_PROXY")
 	AuthUserInfoResyncCron              = NewSetting("auth-user-info-resync-cron", "0 0 * * *")
@@ -107,7 +89,7 @@ var (
 	ClusterTemplateEnforcement          = NewSetting("cluster-template-enforcement", "false")
 	InitialDockerRootDir                = NewSetting("initial-docker-root-dir", "/var/lib/docker")
 	SystemCatalog                       = NewSetting("system-catalog", "external") // Options are 'external' or 'bundled'
-	ChartDefaultBranch                  = NewSetting("chart-default-branch", "release-v2.6")
+	ChartDefaultBranch                  = NewSetting("chart-default-branch", "dev-v2.7")
 	PartnerChartDefaultBranch           = NewSetting("partner-chart-default-branch", "main")
 	RKE2ChartDefaultBranch              = NewSetting("rke2-chart-default-branch", "main")
 	FleetDefaultWorkspaceName           = NewSetting("fleet-default-workspace-name", fleetconst.ClustersDefaultNamespace) // fleetWorkspaceName to assign to clusters with none
@@ -135,11 +117,14 @@ var (
 	// AuthUserSessionTTLMinutes represents the time to live for tokens used for login sessions in minutes.
 	AuthUserSessionTTLMinutes = NewSetting("auth-user-session-ttl-minutes", "960") // 16 hours
 
+	// ConfigMapName name of the configmap that stores rancher configuration information.
+	ConfigMapName = NewSetting("config-map-name", "rancher-config")
+
 	// CSPAdapterMinVersion is used to determine if an existing installation of the CSP adapter should be upgraded to a new version
-	// has no effect if the csp adapter is not installed
+	// has no effect if the csp adapter is not installed.
 	CSPAdapterMinVersion = NewSetting("csp-adapter-min-version", "")
 
-	// FleetMinVersion is the minimum version of the fleet chart that rancher will install
+	// FleetMinVersion is the minimum version of the fleet chart that rancher will install.
 	FleetMinVersion = NewSetting("fleet-min-version", "")
 
 	// KubeconfigDefaultTokenTTLMinutes is the default time to live applied to kubeconfigs created for users.
@@ -157,8 +142,72 @@ var (
 	// Deprecated: On removal use kubeconfig-default-ttl-minutes for all kubeconfigs.
 	KubeconfigTokenTTLMinutes = NewSetting("kubeconfig-token-ttl-minutes", "960") // 16 hours
 
-	// RancherWebhookMinVersion is the minimum version of the webhook that rancher will install
+	// RancherWebhookMinVersion is the minimum version of the webhook that rancher will install.
 	RancherWebhookMinVersion = NewSetting("rancher-webhook-min-version", "")
+
+	// SystemDefaultRegistry is the default contrainer registry used for images.
+	// The environmental variable "CATTLE_BASE_REGISTRY" controls the default value of this setting.
+	SystemDefaultRegistry = NewSetting("system-default-registry", os.Getenv("CATTLE_BASE_REGISTRY"))
+
+	// UIBanners holds configuration to display a custom fixed banner in the header, footer, or both
+	UIBanners = NewSetting("ui-banners", "{}")
+
+	// UIBrand High level 'brand' value, for example `suse`.
+	UIBrand = NewSetting("ui-brand", "")
+
+	// UICommunityLinks displays community links in the UI.
+	// Deprecated in favour of UICustomLinks = NewSetting("ui-custom-links", "").
+	UICommunityLinks = NewSetting("ui-community-links", "true")
+
+	// UICustomLinks Key(display text), value(url) for user customisable links to display in homepage and support pages.
+	UICustomLinks = NewSetting("ui-custom-links", "")
+
+	// UIDashboardPath path within Rancher Manager where the dashboard files are found.
+	UIDashboardPath = NewSetting("ui-dashboard-path", "/usr/share/rancher/ui-dashboard")
+
+	// UIDashboardIndex depends on ui-offline-preferred, use this version of the dashboard instead of the one contained in Rancher Manager.
+	UIDashboardIndex = NewSetting("ui-dashboard-index", "https://releases.rancher.com/dashboard/latest/index.html")
+
+	// UIDashboardHarvesterLegacyPlugin depending on ui-offline-preferred and if a Harvester Cluster does not contain it's own Harvester plugin, use this version of the plugin instead.
+	UIDashboardHarvesterLegacyPlugin = NewSetting("ui-dashboard-harvester-legacy-plugin", "https://releases.rancher.com/harvester-ui/plugin/harvester-1.0.3-head/harvester-1.0.3-head.umd.min.js")
+
+	// UIDefaultLanding the default page users land on after login.
+	UIDefaultLanding = NewSetting("ui-default-landing", "vue")
+
+	// UIFavicon custom favicon.
+	UIFavicon = NewSetting("ui-favicon", "")
+
+	// UIFeedBackForm Ember UI specific.
+	UIFeedBackForm = NewSetting("ui-feedback-form", "")
+
+	// UIIndex depends on ui-offline-preferred, use this version of the old ember UI instead of the one contained in Rancher Manager.
+	UIIndex = NewSetting("ui-index", "https://releases.rancher.com/ui/latest2/index.html")
+
+	// UIIssues use a url address to send new 'File an Issue' reports instead of sending users to the Github issues page.
+	// Deprecated in favour of UICustomLinks = NewSetting("ui-custom-links", {}).
+	UIIssues = NewSetting("ui-issues", "")
+
+	// UIKubernetesDefaultVersion Ember UI specific.
+	UIKubernetesDefaultVersion = NewSetting("ui-k8s-default-version-range", "<=1.14.x")
+
+	// UIKubernetesSupportedVersions Ember UI specific.
+	UIKubernetesSupportedVersions = NewSetting("ui-k8s-supported-versions-range", ">= 1.11.0 <=1.14.x")
+
+	// UIOfflinePreferred controls whether UI assets are served locally by the server container ('true') or from the remote URL defined in the ui-index and ui-dashboard-index settings ('false).
+	// The `dynamic` option will use remote assets for `-head` builds, otherwise the local assets for production builds.
+	UIOfflinePreferred = NewSetting("ui-offline-preferred", "dynamic")
+
+	// UIPath path within Rancher Manager where the old ember UI files are found.
+	UIPath = NewSetting("ui-path", "/usr/share/rancher/ui")
+
+	// UIPerformance experimental settings for UI functionality to improve the UX with large numbers of resources.
+	UIPerformance = NewSetting("ui-performance", "")
+
+	// UIPL the vendor/company name.
+	UIPL = NewSetting("ui-pl", "rancher")
+
+	// UIPreferred Ensure that the new Dashboard is the default UI.
+	UIPreferred = NewSetting("ui-preferred", "vue")
 )
 
 // FullShellImage returns the full private registry name of the rancher shell image.
@@ -267,7 +316,7 @@ func (s Setting) GetInt() int {
 	return i
 }
 
-// SetProvider will set the given provider as the global provider for all settings
+// SetProvider will set the given provider as the global provider for all settings.
 func SetProvider(p Provider) error {
 	if err := p.SetAll(settings); err != nil {
 		return err
@@ -286,7 +335,7 @@ func NewSetting(name, def string) Setting {
 	return s
 }
 
-// GetEnvKey will return the given string formatted as a rancher environmental variable
+// GetEnvKey will return the given string formatted as a rancher environmental variable.
 func GetEnvKey(key string) string {
 	return "CATTLE_" + strings.ToUpper(strings.Replace(key, "-", "_", -1))
 }
@@ -323,7 +372,7 @@ func DefaultAgentSettings() []Setting {
 	}
 }
 
-// DefaultAgentSettings will return a list of default agent settings as environmental variables
+// DefaultAgentSettingsAsEnvVars will return a list of default agent settings as environmental variables.
 func DefaultAgentSettingsAsEnvVars() []v1.EnvVar {
 	defaultAgentSettings := DefaultAgentSettings()
 	envVars := make([]v1.EnvVar, 0, len(defaultAgentSettings))

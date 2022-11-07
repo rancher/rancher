@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"math"
 	"path/filepath"
+	"reflect"
 	"sort"
 	"strconv"
 	"strings"
@@ -421,6 +422,13 @@ func isInDrain(entry *planEntry) bool {
 		entry.Metadata.Annotations[rke2.UnCordonAnnotation] != ""
 }
 
+// planAppliedButWaitingForProbes returns a boolean indicating whether a plan was successfully able to be applied, but
+// the probes have not been successful. This indicates that while the overall plan hasn't completed yet, it's
+// instructions have and can now be overridden if necessary without causing thrashing.
+func planAppliedButWaitingForProbes(entry *planEntry) bool {
+	return entry.Plan.AppliedPlan != nil && reflect.DeepEqual(entry.Plan.Plan, *entry.Plan.AppliedPlan) && !entry.Plan.Healthy
+}
+
 func calculateConcurrency(maxUnavailable string, entries []*planEntry, exclude roleFilter) (int, int, error) {
 	var (
 		count, unavailable int
@@ -565,8 +573,9 @@ func (p *Planner) reconcile(controlPlane *rkev1.RKEControlPlane, tokensSecret pl
 			// 2. If the plan has failed to apply. Note that the `Failed` will only be `true` if the max failure count has passed, or (if max-failures is not set) the plan has failed to apply at least once.
 			// 3. concurrency == 0 which means infinite concurrency.
 			// 4. unavailable < concurrency meaning we have capacity to make something unavailable
+			// 5. If the plans are in sync, but we are still waiting for probes, it is safe to apply new instructions
 			logrus.Debugf("[planner] rkecluster %s/%s reconcile tier %s - concurrency: %d, unavailable: %d", controlPlane.Namespace, controlPlane.Name, tierName, concurrency, unavailable)
-			if isInDrain(entry) || entry.Plan.Failed || concurrency == 0 || unavailable < concurrency {
+			if isInDrain(entry) || entry.Plan.Failed || concurrency == 0 || unavailable < concurrency || planAppliedButWaitingForProbes(entry) {
 				reconciling = append(reconciling, entry.Machine.Name)
 				if !isUnavailable(entry) {
 					unavailable++
@@ -844,7 +853,7 @@ func PruneEmpty(config map[string]interface{}) {
 }
 
 // getTaints returns a slice of taints for the machine in question
-func getTaints(entry *planEntry, runtime string) (result []corev1.Taint, _ error) {
+func getTaints(entry *planEntry) (result []corev1.Taint, _ error) {
 	data := entry.Metadata.Annotations[rke2.TaintsAnnotation]
 	if data != "" {
 		if err := json.Unmarshal([]byte(data), &result); err != nil {
@@ -852,15 +861,14 @@ func getTaints(entry *planEntry, runtime string) (result []corev1.Taint, _ error
 		}
 	}
 
-	if runtime == rke2.RuntimeRKE2 {
-		if isEtcd(entry) && !isWorker(entry) {
+	if !isWorker(entry) {
+		if isEtcd(entry) {
 			result = append(result, corev1.Taint{
 				Key:    "node-role.kubernetes.io/etcd",
 				Effect: corev1.TaintEffectNoExecute,
 			})
 		}
-
-		if isControlPlane(entry) && !isWorker(entry) {
+		if isControlPlane(entry) {
 			result = append(result, corev1.Taint{
 				Key:    "node-role.kubernetes.io/control-plane",
 				Effect: corev1.TaintEffectNoSchedule,

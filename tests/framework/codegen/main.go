@@ -7,9 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	managementSchema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
 	"github.com/rancher/rancher/tests/framework/codegen/generator"
-	provisioningSchema "github.com/rancher/rancher/tests/framework/pkg/schemas/provisioning.cattle.io/v1"
+	managementSchema "github.com/rancher/rancher/tests/framework/pkg/schemas/management.cattle.io/v3"
 )
 
 func main() {
@@ -17,8 +16,6 @@ func main() {
 	generator.GenerateClient(managementSchema.Schemas, map[string]bool{
 		"userAttribute": true,
 	})
-
-	generator.GenerateClient(provisioningSchema.Schemas, map[string]bool{})
 
 	if err := replaceClientBasePackages(); err != nil {
 		panic(err)

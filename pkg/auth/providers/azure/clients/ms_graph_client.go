@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/AzureAD/microsoft-authentication-library-for-go/apps/cache"
@@ -21,8 +20,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-var errMSGraphNoPermissions = fmt.Errorf("missing required permissions from Microsoft Graph: need %s",
-	strings.Join(msGraphRequiredPermissions, ", "))
+const (
+	// AccessTokenSecretName is the name of the secret that contains an access token for the Microsoft Graph API.
+	AccessTokenSecretName = "azuread-access-token"
+
+	providerLogPrefix = "AZUREAD_PROVIDER"
+	cacheLogPrefix    = "AZUREAD_PROVIDER_CACHE"
+)
 
 type azureMSGraphClient struct {
 	authResult  *customAuthResult
@@ -103,26 +107,22 @@ func (c azureMSGraphClient) ListGroupMemberships(id string) ([]string, error) {
 // LoginUser verifies the user and fetches the user principal, user's group principals. It deliberately does not return
 // the provider access token because the client itself handles its caching and does not need to return it.
 func (c azureMSGraphClient) LoginUser(config *v32.AzureADConfig, credential *v32.AzureADLogin) (v3.Principal, []v3.Principal, string, error) {
-	logrus.Debug("[AZURE_PROVIDER] Started token swap with AzureAD")
+	logrus.Debugf("[%s] Started token swap with AzureAD", providerLogPrefix)
 
 	// Acquire the OID just to verify the user.
 	oid, err := oidFromAuthCode(credential.Code, config)
 	if err != nil {
 		return v3.Principal{}, nil, "", err
 	}
-	logrus.Debug("[AZURE_PROVIDER] Completed token swap with AzureAD")
+	logrus.Debugf("[%s] Completed token swap with AzureAD", providerLogPrefix)
 
-	if !msGraphTokenHasPermissions(c.AccessToken()) {
-		return v3.Principal{}, nil, "", errMSGraphNoPermissions
-	}
-
-	logrus.Debug("[AZURE_PROVIDER] Started getting user info from AzureAD")
+	logrus.Debugf("[%s] Started getting user info from AzureAD", providerLogPrefix)
 	userPrincipal, err := c.GetUser(oid)
 	if err != nil {
 		return v3.Principal{}, nil, "", err
 	}
 	userPrincipal.Me = true
-	logrus.Debug("[AZURE_PROVIDER] Completed getting user info from AzureAD")
+	logrus.Debugf("[%s] Completed getting user info from AzureAD", providerLogPrefix)
 
 	userGroups, err := c.ListGroupMemberships(GetPrincipalID(userPrincipal))
 	if err != nil {
@@ -137,36 +137,6 @@ func (c azureMSGraphClient) LoginUser(config *v32.AzureADConfig, credential *v32
 	// Return an empty string for the provider token, so that it does not get saved in a secret later, like users'
 	// access tokens are stored in secrets in the old Azure AD Graph flow.
 	return userPrincipal, groupPrincipals, "", nil
-}
-
-var msGraphRequiredPermissions = []string{
-	"Group.Read.All",
-	"User.Read.All",
-}
-
-// msGraphTokenHasPermissions checks that a token received from Azure AD has the permissions Rancher requires
-// for working with the Microsoft Graph API.
-func msGraphTokenHasPermissions(token string) bool {
-	field, err := ExtractFieldFromJWT(token, "roles")
-	if err != nil {
-		return false
-	}
-	roles, ok := field.([]interface{})
-	if !ok {
-		return false
-	}
-	permissionSet := make(map[string]struct{})
-	for _, r := range roles {
-		if name, ok := r.(string); ok {
-			permissionSet[name] = struct{}{}
-		}
-	}
-	for _, p := range msGraphRequiredPermissions {
-		if _, ok := permissionSet[p]; !ok {
-			return false
-		}
-	}
-	return true
 }
 
 type customAuthResult struct {
@@ -228,44 +198,48 @@ type AccessTokenCache struct {
 	Secrets corev1.SecretInterface
 }
 
-// Replace fetches the access token from a secret in a database into the cache.
+// Replace fetches the access token from a secret in Kubernetes.
 func (c AccessTokenCache) Replace(cache cache.Unmarshaler, key string) {
-	secret, err := common.ReadFromSecret(c.Secrets, common.SecretsNamespace+":azuread-access-token", "access-token")
+	secretName := fmt.Sprintf("%s:%s", common.SecretsNamespace, AccessTokenSecretName)
+	secret, err := common.ReadFromSecret(c.Secrets, secretName, "access-token")
 	if err != nil {
-		logrus.Errorf("failed to read the access token from the database: %v", err)
+		logrus.Errorf("[%s] failed to read the access token from Kubernetes: %v", cacheLogPrefix, err)
 		return
 	}
 
 	err = cache.Unmarshal([]byte(secret))
 	if err != nil {
-		logrus.Errorf("failed to put the access token secret into the cache: %v", err)
+		logrus.Errorf("[%s] failed to unmarshal the access token: %v", cacheLogPrefix, err)
 	}
 }
 
-// Export persists the access token to the secret in the database.
+// Export persists the access token to a secret in Kubernetes.
 func (c AccessTokenCache) Export(cache cache.Marshaler, key string) {
 	marshalled, err := cache.Marshal()
 	if err != nil {
-		logrus.Errorf("failed to marshal the access token before saving to the database: %v", err)
+		logrus.Errorf("[%s] failed to marshal the access token before saving in Kubernetes: %v", cacheLogPrefix, err)
 		return
 	}
+
 	err = common.CreateOrUpdateSecrets(c.Secrets, string(marshalled), "access-token", "azuread")
 	if err != nil {
-		logrus.Errorf("failed to save the access token in the database: %v", err)
+		logrus.Errorf("[%s] failed to save the access token in Kubernetes: %v", cacheLogPrefix, err)
 	}
 }
 
 // NewMSGraphClient returns a client of the Microsoft Graph API. It attempts to get an access token to the API.
 // It first tries to fetch the token from the refresh token, if the access token is found in the database.
 // If that fails, it tries to acquire it directly from the auth provider with the credential (application secret in Azure).
+// It also checks that the access token has the necessary permissions.
 func NewMSGraphClient(config *v32.AzureADConfig, secrets corev1.SecretInterface) (AzureClient, error) {
 	c := &azureMSGraphClient{}
 	cred, err := confidential.NewCredFromSecret(config.ApplicationSecret)
 	if err != nil {
 		return nil, fmt.Errorf("could not create a cred from a secret: %w", err)
 	}
+	tokenCache := AccessTokenCache{Secrets: secrets}
 	confidentialClientApp, err := confidential.New(config.ApplicationID, cred,
-		confidential.WithAccessor(AccessTokenCache{Secrets: secrets}),
+		confidential.WithAccessor(tokenCache),
 		confidential.WithAuthority(fmt.Sprintf("%s%s", config.Endpoint, config.TenantID)))
 	if err != nil {
 		return nil, err
@@ -282,6 +256,7 @@ func NewMSGraphClient(config *v32.AzureADConfig, secrets corev1.SecretInterface)
 			return nil, err
 		}
 	}
+
 	authResult := getCustomAuthResult(&ar)
 	authorizer := authorizer{authResult: authResult}
 

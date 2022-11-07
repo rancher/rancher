@@ -29,22 +29,22 @@ var _ v11.ResourceQuotaLister = &ResourceQuotaListerMock{}
 
 // ResourceQuotaListerMock is a mock implementation of v11.ResourceQuotaLister.
 //
-//     func TestSomethingThatUsesResourceQuotaLister(t *testing.T) {
+//	    func TestSomethingThatUsesResourceQuotaLister(t *testing.T) {
 //
-//         // make and configure a mocked v11.ResourceQuotaLister
-//         mockedResourceQuotaLister := &ResourceQuotaListerMock{
-//             GetFunc: func(namespace string, name string) (*v1.ResourceQuota, error) {
-// 	               panic("mock out the Get method")
-//             },
-//             ListFunc: func(namespace string, selector labels.Selector) ([]*v1.ResourceQuota, error) {
-// 	               panic("mock out the List method")
-//             },
-//         }
+//	        // make and configure a mocked v11.ResourceQuotaLister
+//	        mockedResourceQuotaLister := &ResourceQuotaListerMock{
+//	            GetFunc: func(namespace string, name string) (*v1.ResourceQuota, error) {
+//		               panic("mock out the Get method")
+//	            },
+//	            ListFunc: func(namespace string, selector labels.Selector) ([]*v1.ResourceQuota, error) {
+//		               panic("mock out the List method")
+//	            },
+//	        }
 //
-//         // use mockedResourceQuotaLister in code that requires v11.ResourceQuotaLister
-//         // and then make assertions.
+//	        // use mockedResourceQuotaLister in code that requires v11.ResourceQuotaLister
+//	        // and then make assertions.
 //
-//     }
+//	    }
 type ResourceQuotaListerMock struct {
 	// GetFunc mocks the Get method.
 	GetFunc func(namespace string, name string) (*v1.ResourceQuota, error)
@@ -91,7 +91,8 @@ func (mock *ResourceQuotaListerMock) Get(namespace string, name string) (*v1.Res
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//     len(mockedResourceQuotaLister.GetCalls())
+//
+//	len(mockedResourceQuotaLister.GetCalls())
 func (mock *ResourceQuotaListerMock) GetCalls() []struct {
 	Namespace string
 	Name      string
@@ -126,7 +127,8 @@ func (mock *ResourceQuotaListerMock) List(namespace string, selector labels.Sele
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//     len(mockedResourceQuotaLister.ListCalls())
+//
+//	len(mockedResourceQuotaLister.ListCalls())
 func (mock *ResourceQuotaListerMock) ListCalls() []struct {
 	Namespace string
 	Selector  labels.Selector
@@ -159,43 +161,43 @@ var _ v11.ResourceQuotaController = &ResourceQuotaControllerMock{}
 
 // ResourceQuotaControllerMock is a mock implementation of v11.ResourceQuotaController.
 //
-//     func TestSomethingThatUsesResourceQuotaController(t *testing.T) {
+//	    func TestSomethingThatUsesResourceQuotaController(t *testing.T) {
 //
-//         // make and configure a mocked v11.ResourceQuotaController
-//         mockedResourceQuotaController := &ResourceQuotaControllerMock{
-//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v11.ResourceQuotaHandlerFunc)  {
-// 	               panic("mock out the AddClusterScopedFeatureHandler method")
-//             },
-//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v11.ResourceQuotaHandlerFunc)  {
-// 	               panic("mock out the AddClusterScopedHandler method")
-//             },
-//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v11.ResourceQuotaHandlerFunc)  {
-// 	               panic("mock out the AddFeatureHandler method")
-//             },
-//             AddHandlerFunc: func(ctx context.Context, name string, handler v11.ResourceQuotaHandlerFunc)  {
-// 	               panic("mock out the AddHandler method")
-//             },
-//             EnqueueFunc: func(namespace string, name string)  {
-// 	               panic("mock out the Enqueue method")
-//             },
-//             EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
-// 	               panic("mock out the EnqueueAfter method")
-//             },
-//             GenericFunc: func() controller.GenericController {
-// 	               panic("mock out the Generic method")
-//             },
-//             InformerFunc: func() cache.SharedIndexInformer {
-// 	               panic("mock out the Informer method")
-//             },
-//             ListerFunc: func() v11.ResourceQuotaLister {
-// 	               panic("mock out the Lister method")
-//             },
-//         }
+//	        // make and configure a mocked v11.ResourceQuotaController
+//	        mockedResourceQuotaController := &ResourceQuotaControllerMock{
+//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v11.ResourceQuotaHandlerFunc)  {
+//		               panic("mock out the AddClusterScopedFeatureHandler method")
+//	            },
+//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v11.ResourceQuotaHandlerFunc)  {
+//		               panic("mock out the AddClusterScopedHandler method")
+//	            },
+//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v11.ResourceQuotaHandlerFunc)  {
+//		               panic("mock out the AddFeatureHandler method")
+//	            },
+//	            AddHandlerFunc: func(ctx context.Context, name string, handler v11.ResourceQuotaHandlerFunc)  {
+//		               panic("mock out the AddHandler method")
+//	            },
+//	            EnqueueFunc: func(namespace string, name string)  {
+//		               panic("mock out the Enqueue method")
+//	            },
+//	            EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
+//		               panic("mock out the EnqueueAfter method")
+//	            },
+//	            GenericFunc: func() controller.GenericController {
+//		               panic("mock out the Generic method")
+//	            },
+//	            InformerFunc: func() cache.SharedIndexInformer {
+//		               panic("mock out the Informer method")
+//	            },
+//	            ListerFunc: func() v11.ResourceQuotaLister {
+//		               panic("mock out the Lister method")
+//	            },
+//	        }
 //
-//         // use mockedResourceQuotaController in code that requires v11.ResourceQuotaController
-//         // and then make assertions.
+//	        // use mockedResourceQuotaController in code that requires v11.ResourceQuotaController
+//	        // and then make assertions.
 //
-//     }
+//	    }
 type ResourceQuotaControllerMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
 	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v11.ResourceQuotaHandlerFunc)
@@ -324,7 +326,8 @@ func (mock *ResourceQuotaControllerMock) AddClusterScopedFeatureHandler(ctx cont
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//     len(mockedResourceQuotaController.AddClusterScopedFeatureHandlerCalls())
+//
+//	len(mockedResourceQuotaController.AddClusterScopedFeatureHandlerCalls())
 func (mock *ResourceQuotaControllerMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -369,7 +372,8 @@ func (mock *ResourceQuotaControllerMock) AddClusterScopedHandler(ctx context.Con
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//     len(mockedResourceQuotaController.AddClusterScopedHandlerCalls())
+//
+//	len(mockedResourceQuotaController.AddClusterScopedHandlerCalls())
 func (mock *ResourceQuotaControllerMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -412,7 +416,8 @@ func (mock *ResourceQuotaControllerMock) AddFeatureHandler(ctx context.Context, 
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//     len(mockedResourceQuotaController.AddFeatureHandlerCalls())
+//
+//	len(mockedResourceQuotaController.AddFeatureHandlerCalls())
 func (mock *ResourceQuotaControllerMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
@@ -453,7 +458,8 @@ func (mock *ResourceQuotaControllerMock) AddHandler(ctx context.Context, name st
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//     len(mockedResourceQuotaController.AddHandlerCalls())
+//
+//	len(mockedResourceQuotaController.AddHandlerCalls())
 func (mock *ResourceQuotaControllerMock) AddHandlerCalls() []struct {
 	Ctx     context.Context
 	Name    string
@@ -490,7 +496,8 @@ func (mock *ResourceQuotaControllerMock) Enqueue(namespace string, name string) 
 
 // EnqueueCalls gets all the calls that were made to Enqueue.
 // Check the length with:
-//     len(mockedResourceQuotaController.EnqueueCalls())
+//
+//	len(mockedResourceQuotaController.EnqueueCalls())
 func (mock *ResourceQuotaControllerMock) EnqueueCalls() []struct {
 	Namespace string
 	Name      string
@@ -527,7 +534,8 @@ func (mock *ResourceQuotaControllerMock) EnqueueAfter(namespace string, name str
 
 // EnqueueAfterCalls gets all the calls that were made to EnqueueAfter.
 // Check the length with:
-//     len(mockedResourceQuotaController.EnqueueAfterCalls())
+//
+//	len(mockedResourceQuotaController.EnqueueAfterCalls())
 func (mock *ResourceQuotaControllerMock) EnqueueAfterCalls() []struct {
 	Namespace string
 	Name      string
@@ -559,7 +567,8 @@ func (mock *ResourceQuotaControllerMock) Generic() controller.GenericController 
 
 // GenericCalls gets all the calls that were made to Generic.
 // Check the length with:
-//     len(mockedResourceQuotaController.GenericCalls())
+//
+//	len(mockedResourceQuotaController.GenericCalls())
 func (mock *ResourceQuotaControllerMock) GenericCalls() []struct {
 } {
 	var calls []struct {
@@ -585,7 +594,8 @@ func (mock *ResourceQuotaControllerMock) Informer() cache.SharedIndexInformer {
 
 // InformerCalls gets all the calls that were made to Informer.
 // Check the length with:
-//     len(mockedResourceQuotaController.InformerCalls())
+//
+//	len(mockedResourceQuotaController.InformerCalls())
 func (mock *ResourceQuotaControllerMock) InformerCalls() []struct {
 } {
 	var calls []struct {
@@ -611,7 +621,8 @@ func (mock *ResourceQuotaControllerMock) Lister() v11.ResourceQuotaLister {
 
 // ListerCalls gets all the calls that were made to Lister.
 // Check the length with:
-//     len(mockedResourceQuotaController.ListerCalls())
+//
+//	len(mockedResourceQuotaController.ListerCalls())
 func (mock *ResourceQuotaControllerMock) ListerCalls() []struct {
 } {
 	var calls []struct {
@@ -651,76 +662,76 @@ var _ v11.ResourceQuotaInterface = &ResourceQuotaInterfaceMock{}
 
 // ResourceQuotaInterfaceMock is a mock implementation of v11.ResourceQuotaInterface.
 //
-//     func TestSomethingThatUsesResourceQuotaInterface(t *testing.T) {
+//	    func TestSomethingThatUsesResourceQuotaInterface(t *testing.T) {
 //
-//         // make and configure a mocked v11.ResourceQuotaInterface
-//         mockedResourceQuotaInterface := &ResourceQuotaInterfaceMock{
-//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v11.ResourceQuotaHandlerFunc)  {
-// 	               panic("mock out the AddClusterScopedFeatureHandler method")
-//             },
-//             AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v11.ResourceQuotaLifecycle)  {
-// 	               panic("mock out the AddClusterScopedFeatureLifecycle method")
-//             },
-//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v11.ResourceQuotaHandlerFunc)  {
-// 	               panic("mock out the AddClusterScopedHandler method")
-//             },
-//             AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v11.ResourceQuotaLifecycle)  {
-// 	               panic("mock out the AddClusterScopedLifecycle method")
-//             },
-//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v11.ResourceQuotaHandlerFunc)  {
-// 	               panic("mock out the AddFeatureHandler method")
-//             },
-//             AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v11.ResourceQuotaLifecycle)  {
-// 	               panic("mock out the AddFeatureLifecycle method")
-//             },
-//             AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v11.ResourceQuotaHandlerFunc)  {
-// 	               panic("mock out the AddHandler method")
-//             },
-//             AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v11.ResourceQuotaLifecycle)  {
-// 	               panic("mock out the AddLifecycle method")
-//             },
-//             ControllerFunc: func() v11.ResourceQuotaController {
-// 	               panic("mock out the Controller method")
-//             },
-//             CreateFunc: func(in1 *v1.ResourceQuota) (*v1.ResourceQuota, error) {
-// 	               panic("mock out the Create method")
-//             },
-//             DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
-// 	               panic("mock out the Delete method")
-//             },
-//             DeleteCollectionFunc: func(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
-// 	               panic("mock out the DeleteCollection method")
-//             },
-//             DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
-// 	               panic("mock out the DeleteNamespaced method")
-//             },
-//             GetFunc: func(name string, opts metav1.GetOptions) (*v1.ResourceQuota, error) {
-// 	               panic("mock out the Get method")
-//             },
-//             GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v1.ResourceQuota, error) {
-// 	               panic("mock out the GetNamespaced method")
-//             },
-//             ListFunc: func(opts metav1.ListOptions) (*v1.ResourceQuotaList, error) {
-// 	               panic("mock out the List method")
-//             },
-//             ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v1.ResourceQuotaList, error) {
-// 	               panic("mock out the ListNamespaced method")
-//             },
-//             ObjectClientFunc: func() *objectclient.ObjectClient {
-// 	               panic("mock out the ObjectClient method")
-//             },
-//             UpdateFunc: func(in1 *v1.ResourceQuota) (*v1.ResourceQuota, error) {
-// 	               panic("mock out the Update method")
-//             },
-//             WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
-// 	               panic("mock out the Watch method")
-//             },
-//         }
+//	        // make and configure a mocked v11.ResourceQuotaInterface
+//	        mockedResourceQuotaInterface := &ResourceQuotaInterfaceMock{
+//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v11.ResourceQuotaHandlerFunc)  {
+//		               panic("mock out the AddClusterScopedFeatureHandler method")
+//	            },
+//	            AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v11.ResourceQuotaLifecycle)  {
+//		               panic("mock out the AddClusterScopedFeatureLifecycle method")
+//	            },
+//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v11.ResourceQuotaHandlerFunc)  {
+//		               panic("mock out the AddClusterScopedHandler method")
+//	            },
+//	            AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v11.ResourceQuotaLifecycle)  {
+//		               panic("mock out the AddClusterScopedLifecycle method")
+//	            },
+//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v11.ResourceQuotaHandlerFunc)  {
+//		               panic("mock out the AddFeatureHandler method")
+//	            },
+//	            AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v11.ResourceQuotaLifecycle)  {
+//		               panic("mock out the AddFeatureLifecycle method")
+//	            },
+//	            AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v11.ResourceQuotaHandlerFunc)  {
+//		               panic("mock out the AddHandler method")
+//	            },
+//	            AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v11.ResourceQuotaLifecycle)  {
+//		               panic("mock out the AddLifecycle method")
+//	            },
+//	            ControllerFunc: func() v11.ResourceQuotaController {
+//		               panic("mock out the Controller method")
+//	            },
+//	            CreateFunc: func(in1 *v1.ResourceQuota) (*v1.ResourceQuota, error) {
+//		               panic("mock out the Create method")
+//	            },
+//	            DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
+//		               panic("mock out the Delete method")
+//	            },
+//	            DeleteCollectionFunc: func(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
+//		               panic("mock out the DeleteCollection method")
+//	            },
+//	            DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
+//		               panic("mock out the DeleteNamespaced method")
+//	            },
+//	            GetFunc: func(name string, opts metav1.GetOptions) (*v1.ResourceQuota, error) {
+//		               panic("mock out the Get method")
+//	            },
+//	            GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v1.ResourceQuota, error) {
+//		               panic("mock out the GetNamespaced method")
+//	            },
+//	            ListFunc: func(opts metav1.ListOptions) (*v1.ResourceQuotaList, error) {
+//		               panic("mock out the List method")
+//	            },
+//	            ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v1.ResourceQuotaList, error) {
+//		               panic("mock out the ListNamespaced method")
+//	            },
+//	            ObjectClientFunc: func() *objectclient.ObjectClient {
+//		               panic("mock out the ObjectClient method")
+//	            },
+//	            UpdateFunc: func(in1 *v1.ResourceQuota) (*v1.ResourceQuota, error) {
+//		               panic("mock out the Update method")
+//	            },
+//	            WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
+//		               panic("mock out the Watch method")
+//	            },
+//	        }
 //
-//         // use mockedResourceQuotaInterface in code that requires v11.ResourceQuotaInterface
-//         // and then make assertions.
+//	        // use mockedResourceQuotaInterface in code that requires v11.ResourceQuotaInterface
+//	        // and then make assertions.
 //
-//     }
+//	    }
 type ResourceQuotaInterfaceMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
 	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v11.ResourceQuotaHandlerFunc)
@@ -973,7 +984,8 @@ func (mock *ResourceQuotaInterfaceMock) AddClusterScopedFeatureHandler(ctx conte
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//     len(mockedResourceQuotaInterface.AddClusterScopedFeatureHandlerCalls())
+//
+//	len(mockedResourceQuotaInterface.AddClusterScopedFeatureHandlerCalls())
 func (mock *ResourceQuotaInterfaceMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -1020,7 +1032,8 @@ func (mock *ResourceQuotaInterfaceMock) AddClusterScopedFeatureLifecycle(ctx con
 
 // AddClusterScopedFeatureLifecycleCalls gets all the calls that were made to AddClusterScopedFeatureLifecycle.
 // Check the length with:
-//     len(mockedResourceQuotaInterface.AddClusterScopedFeatureLifecycleCalls())
+//
+//	len(mockedResourceQuotaInterface.AddClusterScopedFeatureLifecycleCalls())
 func (mock *ResourceQuotaInterfaceMock) AddClusterScopedFeatureLifecycleCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -1065,7 +1078,8 @@ func (mock *ResourceQuotaInterfaceMock) AddClusterScopedHandler(ctx context.Cont
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//     len(mockedResourceQuotaInterface.AddClusterScopedHandlerCalls())
+//
+//	len(mockedResourceQuotaInterface.AddClusterScopedHandlerCalls())
 func (mock *ResourceQuotaInterfaceMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -1108,7 +1122,8 @@ func (mock *ResourceQuotaInterfaceMock) AddClusterScopedLifecycle(ctx context.Co
 
 // AddClusterScopedLifecycleCalls gets all the calls that were made to AddClusterScopedLifecycle.
 // Check the length with:
-//     len(mockedResourceQuotaInterface.AddClusterScopedLifecycleCalls())
+//
+//	len(mockedResourceQuotaInterface.AddClusterScopedLifecycleCalls())
 func (mock *ResourceQuotaInterfaceMock) AddClusterScopedLifecycleCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -1151,7 +1166,8 @@ func (mock *ResourceQuotaInterfaceMock) AddFeatureHandler(ctx context.Context, e
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//     len(mockedResourceQuotaInterface.AddFeatureHandlerCalls())
+//
+//	len(mockedResourceQuotaInterface.AddFeatureHandlerCalls())
 func (mock *ResourceQuotaInterfaceMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
@@ -1194,7 +1210,8 @@ func (mock *ResourceQuotaInterfaceMock) AddFeatureLifecycle(ctx context.Context,
 
 // AddFeatureLifecycleCalls gets all the calls that were made to AddFeatureLifecycle.
 // Check the length with:
-//     len(mockedResourceQuotaInterface.AddFeatureLifecycleCalls())
+//
+//	len(mockedResourceQuotaInterface.AddFeatureLifecycleCalls())
 func (mock *ResourceQuotaInterfaceMock) AddFeatureLifecycleCalls() []struct {
 	Ctx       context.Context
 	Enabled   func() bool
@@ -1235,7 +1252,8 @@ func (mock *ResourceQuotaInterfaceMock) AddHandler(ctx context.Context, name str
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//     len(mockedResourceQuotaInterface.AddHandlerCalls())
+//
+//	len(mockedResourceQuotaInterface.AddHandlerCalls())
 func (mock *ResourceQuotaInterfaceMock) AddHandlerCalls() []struct {
 	Ctx  context.Context
 	Name string
@@ -1274,7 +1292,8 @@ func (mock *ResourceQuotaInterfaceMock) AddLifecycle(ctx context.Context, name s
 
 // AddLifecycleCalls gets all the calls that were made to AddLifecycle.
 // Check the length with:
-//     len(mockedResourceQuotaInterface.AddLifecycleCalls())
+//
+//	len(mockedResourceQuotaInterface.AddLifecycleCalls())
 func (mock *ResourceQuotaInterfaceMock) AddLifecycleCalls() []struct {
 	Ctx       context.Context
 	Name      string
@@ -1306,7 +1325,8 @@ func (mock *ResourceQuotaInterfaceMock) Controller() v11.ResourceQuotaController
 
 // ControllerCalls gets all the calls that were made to Controller.
 // Check the length with:
-//     len(mockedResourceQuotaInterface.ControllerCalls())
+//
+//	len(mockedResourceQuotaInterface.ControllerCalls())
 func (mock *ResourceQuotaInterfaceMock) ControllerCalls() []struct {
 } {
 	var calls []struct {
@@ -1335,7 +1355,8 @@ func (mock *ResourceQuotaInterfaceMock) Create(in1 *v1.ResourceQuota) (*v1.Resou
 
 // CreateCalls gets all the calls that were made to Create.
 // Check the length with:
-//     len(mockedResourceQuotaInterface.CreateCalls())
+//
+//	len(mockedResourceQuotaInterface.CreateCalls())
 func (mock *ResourceQuotaInterfaceMock) CreateCalls() []struct {
 	In1 *v1.ResourceQuota
 } {
@@ -1368,7 +1389,8 @@ func (mock *ResourceQuotaInterfaceMock) Delete(name string, options *metav1.Dele
 
 // DeleteCalls gets all the calls that were made to Delete.
 // Check the length with:
-//     len(mockedResourceQuotaInterface.DeleteCalls())
+//
+//	len(mockedResourceQuotaInterface.DeleteCalls())
 func (mock *ResourceQuotaInterfaceMock) DeleteCalls() []struct {
 	Name    string
 	Options *metav1.DeleteOptions
@@ -1403,7 +1425,8 @@ func (mock *ResourceQuotaInterfaceMock) DeleteCollection(deleteOpts *metav1.Dele
 
 // DeleteCollectionCalls gets all the calls that were made to DeleteCollection.
 // Check the length with:
-//     len(mockedResourceQuotaInterface.DeleteCollectionCalls())
+//
+//	len(mockedResourceQuotaInterface.DeleteCollectionCalls())
 func (mock *ResourceQuotaInterfaceMock) DeleteCollectionCalls() []struct {
 	DeleteOpts *metav1.DeleteOptions
 	ListOpts   metav1.ListOptions
@@ -1440,7 +1463,8 @@ func (mock *ResourceQuotaInterfaceMock) DeleteNamespaced(namespace string, name 
 
 // DeleteNamespacedCalls gets all the calls that were made to DeleteNamespaced.
 // Check the length with:
-//     len(mockedResourceQuotaInterface.DeleteNamespacedCalls())
+//
+//	len(mockedResourceQuotaInterface.DeleteNamespacedCalls())
 func (mock *ResourceQuotaInterfaceMock) DeleteNamespacedCalls() []struct {
 	Namespace string
 	Name      string
@@ -1477,7 +1501,8 @@ func (mock *ResourceQuotaInterfaceMock) Get(name string, opts metav1.GetOptions)
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//     len(mockedResourceQuotaInterface.GetCalls())
+//
+//	len(mockedResourceQuotaInterface.GetCalls())
 func (mock *ResourceQuotaInterfaceMock) GetCalls() []struct {
 	Name string
 	Opts metav1.GetOptions
@@ -1514,7 +1539,8 @@ func (mock *ResourceQuotaInterfaceMock) GetNamespaced(namespace string, name str
 
 // GetNamespacedCalls gets all the calls that were made to GetNamespaced.
 // Check the length with:
-//     len(mockedResourceQuotaInterface.GetNamespacedCalls())
+//
+//	len(mockedResourceQuotaInterface.GetNamespacedCalls())
 func (mock *ResourceQuotaInterfaceMock) GetNamespacedCalls() []struct {
 	Namespace string
 	Name      string
@@ -1549,7 +1575,8 @@ func (mock *ResourceQuotaInterfaceMock) List(opts metav1.ListOptions) (*v1.Resou
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//     len(mockedResourceQuotaInterface.ListCalls())
+//
+//	len(mockedResourceQuotaInterface.ListCalls())
 func (mock *ResourceQuotaInterfaceMock) ListCalls() []struct {
 	Opts metav1.ListOptions
 } {
@@ -1582,7 +1609,8 @@ func (mock *ResourceQuotaInterfaceMock) ListNamespaced(namespace string, opts me
 
 // ListNamespacedCalls gets all the calls that were made to ListNamespaced.
 // Check the length with:
-//     len(mockedResourceQuotaInterface.ListNamespacedCalls())
+//
+//	len(mockedResourceQuotaInterface.ListNamespacedCalls())
 func (mock *ResourceQuotaInterfaceMock) ListNamespacedCalls() []struct {
 	Namespace string
 	Opts      metav1.ListOptions
@@ -1612,7 +1640,8 @@ func (mock *ResourceQuotaInterfaceMock) ObjectClient() *objectclient.ObjectClien
 
 // ObjectClientCalls gets all the calls that were made to ObjectClient.
 // Check the length with:
-//     len(mockedResourceQuotaInterface.ObjectClientCalls())
+//
+//	len(mockedResourceQuotaInterface.ObjectClientCalls())
 func (mock *ResourceQuotaInterfaceMock) ObjectClientCalls() []struct {
 } {
 	var calls []struct {
@@ -1641,7 +1670,8 @@ func (mock *ResourceQuotaInterfaceMock) Update(in1 *v1.ResourceQuota) (*v1.Resou
 
 // UpdateCalls gets all the calls that were made to Update.
 // Check the length with:
-//     len(mockedResourceQuotaInterface.UpdateCalls())
+//
+//	len(mockedResourceQuotaInterface.UpdateCalls())
 func (mock *ResourceQuotaInterfaceMock) UpdateCalls() []struct {
 	In1 *v1.ResourceQuota
 } {
@@ -1672,7 +1702,8 @@ func (mock *ResourceQuotaInterfaceMock) Watch(opts metav1.ListOptions) (watch.In
 
 // WatchCalls gets all the calls that were made to Watch.
 // Check the length with:
-//     len(mockedResourceQuotaInterface.WatchCalls())
+//
+//	len(mockedResourceQuotaInterface.WatchCalls())
 func (mock *ResourceQuotaInterfaceMock) WatchCalls() []struct {
 	Opts metav1.ListOptions
 } {
@@ -1695,19 +1726,19 @@ var _ v11.ResourceQuotasGetter = &ResourceQuotasGetterMock{}
 
 // ResourceQuotasGetterMock is a mock implementation of v11.ResourceQuotasGetter.
 //
-//     func TestSomethingThatUsesResourceQuotasGetter(t *testing.T) {
+//	    func TestSomethingThatUsesResourceQuotasGetter(t *testing.T) {
 //
-//         // make and configure a mocked v11.ResourceQuotasGetter
-//         mockedResourceQuotasGetter := &ResourceQuotasGetterMock{
-//             ResourceQuotasFunc: func(namespace string) v11.ResourceQuotaInterface {
-// 	               panic("mock out the ResourceQuotas method")
-//             },
-//         }
+//	        // make and configure a mocked v11.ResourceQuotasGetter
+//	        mockedResourceQuotasGetter := &ResourceQuotasGetterMock{
+//	            ResourceQuotasFunc: func(namespace string) v11.ResourceQuotaInterface {
+//		               panic("mock out the ResourceQuotas method")
+//	            },
+//	        }
 //
-//         // use mockedResourceQuotasGetter in code that requires v11.ResourceQuotasGetter
-//         // and then make assertions.
+//	        // use mockedResourceQuotasGetter in code that requires v11.ResourceQuotasGetter
+//	        // and then make assertions.
 //
-//     }
+//	    }
 type ResourceQuotasGetterMock struct {
 	// ResourceQuotasFunc mocks the ResourceQuotas method.
 	ResourceQuotasFunc func(namespace string) v11.ResourceQuotaInterface
@@ -1740,7 +1771,8 @@ func (mock *ResourceQuotasGetterMock) ResourceQuotas(namespace string) v11.Resou
 
 // ResourceQuotasCalls gets all the calls that were made to ResourceQuotas.
 // Check the length with:
-//     len(mockedResourceQuotasGetter.ResourceQuotasCalls())
+//
+//	len(mockedResourceQuotasGetter.ResourceQuotasCalls())
 func (mock *ResourceQuotasGetterMock) ResourceQuotasCalls() []struct {
 	Namespace string
 } {

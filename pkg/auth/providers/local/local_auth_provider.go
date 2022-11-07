@@ -458,3 +458,14 @@ func (l *Provider) GetUserExtraAttributes(userPrincipal v3.Principal) map[string
 	}
 	return extras
 }
+
+// IsDisabledProvider checks if the local auth provider is currently disabled in Rancher.
+// As of now, local provider can't be disabled, so this method always returns false and nil for the error.
+func (l *Provider) IsDisabledProvider() (bool, error) {
+	return false, nil
+}
+
+// CleanupResources deletes resources associated with the local auth provider.
+func (l *Provider) CleanupResources(*v3.AuthConfig) error {
+	return nil
+}

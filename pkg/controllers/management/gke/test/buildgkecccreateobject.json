@@ -1,0 +1,76 @@
+{
+  "kind": "GKEClusterConfig",
+  "apiVersion": "gke.cattle.io/v1",
+  "metadata": {
+    "name": "c-5tzkk",
+    "creationTimestamp": null,
+    "ownerReferences": [
+      {
+        "apiVersion": "management.cattle.io/v3",
+        "kind": "Cluster",
+        "name": "c-5tzkk",
+        "uid": "53cd1838-e5ea-4d12-bb5c-9ecab9d8631b"
+      }
+    ]
+  },
+  "spec": {
+    "region": "",
+    "zone": "us-central1-c",
+    "imported": false,
+    "description": "",
+    "labels": {},
+    "enableKubernetesAlpha": false,
+    "clusterAddons": {
+      "httpLoadBalancing": true,
+      "horizontalPodAutoscaling": true
+    },
+    "clusterIpv4Cidr": "",
+    "projectID": "test-project-id",
+    "googleCredentialSecret": "cattle-global-data:cc-swv64",
+    "clusterName": "gke-test",
+    "kubernetesVersion": "1.22.11-gke.400",
+    "loggingService": "logging.googleapis.com/kubernetes",
+    "monitoringService": "monitoring.googleapis.com/kubernetes",
+    "nodePools": [
+      {
+        "autoscaling": {},
+        "config": {
+          "diskSizeGb": 100,
+          "diskType": "pd-standard",
+          "imageType": "COS",
+          "machineType": "n1-standard-2",
+          "oauthScopes": [
+            "https://www.googleapis.com/auth/devstorage.read_only",
+            "https://www.googleapis.com/auth/logging.write",
+            "https://www.googleapis.com/auth/monitoring",
+            "https://www.googleapis.com/auth/servicecontrol",
+            "https://www.googleapis.com/auth/service.management.readonly",
+            "https://www.googleapis.com/auth/trace.append"
+          ]
+        },
+        "initialNodeCount": 3,
+        "maxPodsConstraint": 110,
+        "name": "nodegroup",
+        "version": "1.22.11-gke.400",
+        "management": {
+          "autoRepair": true,
+          "autoUpgrade": true
+        }
+      }
+    ],
+    "network": "default",
+    "subnetwork": "default",
+    "networkPolicyEnabled": false,
+    "privateClusterConfig": {},
+    "ipAllocationPolicy": {
+      "useIpAliases": true
+    },
+    "masterAuthorizedNetworks": {},
+    "locations": [],
+    "maintenanceWindow": ""
+  },
+  "status": {
+    "phase": "",
+    "failureMessage": ""
+  }
+}

@@ -85,8 +85,11 @@ func (r *rbaccontroller) clusterRBACSync(key string, cluster *v3.Cluster) (runti
 	return nil, r.createRBForRestrictedAdminProvisioningClusterAccess(cluster, grbList)
 }
 
-/* createCRAndCRBForRestrictedAdminClusterAccess creates a CR with the resourceName field containing current cluster's ID. It also creates
-a CRB for binding this CR to all the restricted admins. This way all restricted admins become owners of the cluster*/
+/*
+	createCRAndCRBForRestrictedAdminClusterAccess creates a CR with the resourceName field containing current cluster's ID. It also creates
+
+a CRB for binding this CR to all the restricted admins. This way all restricted admins become owners of the cluster
+*/
 func (r *rbaccontroller) createCRAndCRBForRestrictedAdminClusterAccess(cluster *v3.Cluster, subjects []k8srbac.Subject) error {
 	var returnErr error
 
@@ -162,9 +165,12 @@ func (r *rbaccontroller) createCRAndCRBForRestrictedAdminClusterAccess(cluster *
 	return returnErr
 }
 
-/* createRBForRestrictedAdminProvisioningClusterAccess creates for all restrictedAdmin users, a RB to the cluster-admin Role
+/*
+	createRBForRestrictedAdminProvisioningClusterAccess creates for all restrictedAdmin users, a RB to the cluster-admin Role
+
 created with the resourceName field containing the provisioning cluster's ID corresponding to the v3.cluster,
-This way all restricted admins become owners of the provisioning cluster*/
+This way all restricted admins become owners of the provisioning cluster
+*/
 func (r *rbaccontroller) createRBForRestrictedAdminProvisioningClusterAccess(cluster *v3.Cluster, grbList []*v3.GlobalRoleBinding) error {
 	var returnErr error
 	clusterName := cluster.Name

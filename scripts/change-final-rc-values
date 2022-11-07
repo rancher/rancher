@@ -6,12 +6,12 @@ fi
 
 case $RELEASE_ACTION in
   release)
-    CURRENT_BRANCH="dev-v2.6"
-    NEW_BRANCH="release-v2.6"
+    CURRENT_BRANCH="dev-v2.7"
+    NEW_BRANCH="release-v2.7"
     ;;
   revert)
-    CURRENT_BRANCH="release-v2.6"
-    NEW_BRANCH="dev-v2.6"
+    CURRENT_BRANCH="release-v2.7"
+    NEW_BRANCH="dev-v2.7"
     ;;
   *)
     echo "Not a valid RELEASE_ACTION (${RELEASE_ACTION}), needs to be 'release' or 'revert'"
@@ -21,9 +21,9 @@ esac
 echo "RELEASE_ACTION is ${RELEASE_ACTION}"
 echo "Going to change ${CURRENT_BRANCH} to ${NEW_BRANCH}"
 
-# scripts/package
+# scripts/package-env
 for PKGENV in SYSTEM_CHART_DEFAULT_BRANCH CHART_DEFAULT_BRANCH; do
-   sed -i "/^${PKGENV}/ s/${CURRENT_BRANCH}/${NEW_BRANCH}/" scripts/package
+   sed -i "/^${PKGENV}/ s/${CURRENT_BRANCH}/${NEW_BRANCH}/" scripts/package-env
 done
 
 # package/Dockerfile

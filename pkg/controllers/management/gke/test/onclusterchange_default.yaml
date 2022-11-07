@@ -1,0 +1,93 @@
+apiVersion: management.cattle.io/v3
+kind: Cluster
+metadata:
+  annotations:
+    authz.management.cattle.io/creator-role-bindings: '{"created":["cluster-owner"],"required":["cluster-owner"]}'
+    field.cattle.io/creatorId: user-rgtsq
+    lifecycle.cattle.io/create.cluster-agent-controller-cleanup: "true"
+    lifecycle.cattle.io/create.cluster-provisioner-controller: "true"
+    lifecycle.cattle.io/create.cluster-scoped-gc: "true"
+    lifecycle.cattle.io/create.mgmt-cluster-rbac-remove: "true"
+  creationTimestamp: "2022-08-22T19:19:00Z"
+  finalizers:
+    - wrangler.cattle.io/mgmt-cluster-remove
+    - controller.cattle.io/cluster-agent-controller-cleanup
+    - controller.cattle.io/cluster-scoped-gc
+    - controller.cattle.io/cluster-provisioner-controller
+    - controller.cattle.io/mgmt-cluster-rbac-remove
+  generateName: c-
+  generation: 12
+  labels:
+    cattle.io/creator: norman
+  name: c-5tzkk
+  resourceVersion: "688695"
+  uid: 53cd1838-e5ea-4d12-bb5c-9ecab9d8631b
+spec:
+  agentImageOverride: ""
+  answers: {}
+  clusterSecrets: {}
+  description: ""
+  desiredAgentImage: ""
+  desiredAuthImage: ""
+  displayName: gke-test
+  dockerRootDir: /var/lib/docker
+  enableClusterAlerting: false
+  enableClusterMonitoring: false
+  enableNetworkPolicy: false
+  fleetWorkspaceName: fleet-default
+  gkeConfig:
+    clusterAddons:
+      horizontalPodAutoscaling: true
+      httpLoadBalancing: true
+    clusterIpv4Cidr: ""
+    clusterName: gke-test
+    description: ""
+    enableKubernetesAlpha: false
+    googleCredentialSecret: cattle-global-data:cc-swv64
+    imported: false
+    ipAllocationPolicy:
+      useIpAliases: true
+    kubernetesVersion: 1.22.11-gke.400
+    labels: {}
+    locations: []
+    loggingService: logging.googleapis.com/kubernetes
+    maintenanceWindow: ""
+    masterAuthorizedNetworks: {}
+    monitoringService: monitoring.googleapis.com/kubernetes
+    network: default
+    networkPolicyEnabled: false
+    nodePools:
+      - autoscaling: {}
+        config:
+          diskSizeGb: 100
+          diskType: pd-standard
+          imageType: COS
+          machineType: n1-standard-2
+          oauthScopes:
+            - https://www.googleapis.com/auth/devstorage.read_only
+            - https://www.googleapis.com/auth/logging.write
+            - https://www.googleapis.com/auth/monitoring
+            - https://www.googleapis.com/auth/servicecontrol
+            - https://www.googleapis.com/auth/service.management.readonly
+            - https://www.googleapis.com/auth/trace.append
+        initialNodeCount: 3
+        management:
+          autoRepair: true
+          autoUpgrade: true
+        maxPodsConstraint: 110
+        name: nodegroup
+        version: 1.22.11-gke.400
+    privateClusterConfig: {}
+    projectID: test-project-id
+    region: ""
+    subnetwork: default
+    zone: us-central1-c
+  internal: false
+  localClusterAuthEndpoint:
+    enabled: false
+  windowsPreferedCluster: false
+status:
+  conditions:
+    - status: Unknown
+      type: Provisioned
+  driver: GKE

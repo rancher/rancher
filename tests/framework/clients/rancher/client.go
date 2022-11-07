@@ -14,11 +14,13 @@ import (
 	"github.com/rancher/rancher/tests/framework/clients/ec2"
 	"github.com/rancher/rancher/tests/framework/clients/rancher/catalog"
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
-	provisioning "github.com/rancher/rancher/tests/framework/clients/rancher/generated/provisioning/v1"
+	v1 "github.com/rancher/rancher/tests/framework/clients/rancher/v1"
 
 	kubeProvisioning "github.com/rancher/rancher/tests/framework/clients/provisioning"
+	kubeRKE "github.com/rancher/rancher/tests/framework/clients/rke"
 	"github.com/rancher/rancher/tests/framework/pkg/clientbase"
 	"github.com/rancher/rancher/tests/framework/pkg/config"
+	"github.com/rancher/rancher/tests/framework/pkg/environmentflag"
 	"github.com/rancher/rancher/tests/framework/pkg/session"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -33,15 +35,17 @@ import (
 type Client struct {
 	// Client used to access management.cattle.io v3 API resources
 	Management *management.Client
-	// Client used to access provisioning.cattle.io v1 API resources (clusters)
-	Provisioning *provisioning.Client
+	// Client used to access Steve v1 API resources
+	Steve *v1.Client
 	// Client used to access catalog.cattle.io v1 API resources (apps, charts, etc.)
 	Catalog *catalog.Client
 	// Config used to test against a rancher instance
 	RancherConfig *Config
-	restConfig    *rest.Config
 	// Session is the session object used by the client to track all the resources being created by the client.
 	Session *session.Session
+	// Flags is the environment flags used by the client to test selectively against a rancher instance.
+	Flags      *environmentflag.EnvironmentFlags
+	restConfig *rest.Config
 }
 
 // NewClient is the constructor to the initializing a rancher Client. It takes a bearer token and session.Session. If bearer token is not provided,
@@ -50,12 +54,16 @@ func NewClient(bearerToken string, session *session.Session) (*Client, error) {
 	rancherConfig := new(Config)
 	config.LoadConfig(ConfigurationFileKey, rancherConfig)
 
+	environmentFlags := environmentflag.NewEnvironmentFlags()
+	environmentflag.LoadEnvironmentFlags(environmentflag.ConfigurationFileKey, environmentFlags)
+
 	if bearerToken == "" {
 		bearerToken = rancherConfig.AdminToken
 	}
 
 	c := &Client{
 		RancherConfig: rancherConfig,
+		Flags:         &environmentFlags,
 	}
 
 	session.CleanupEnabled = *rancherConfig.Cleanup
@@ -71,12 +79,12 @@ func NewClient(bearerToken string, session *session.Session) (*Client, error) {
 
 	c.Management.Ops.Session = session
 
-	c.Provisioning, err = provisioning.NewClient(clientOptsV1(restConfig, c.RancherConfig))
+	c.Steve, err = v1.NewClient(clientOptsV1(restConfig, c.RancherConfig))
 	if err != nil {
 		return nil, err
 	}
 
-	c.Provisioning.Ops.Session = session
+	c.Steve.Ops.Session = session
 
 	catalogClient, err := catalog.NewForConfig(restConfig, session)
 	if err != nil {
@@ -168,7 +176,7 @@ func (c *Client) AsUser(user *management.User) (*Client, error) {
 	return NewClient(returnedToken.Token, c.Session)
 }
 
-// ReLogin reinstantiates a Client to update it's API schema. This function would be used for a non admin user that needs to be
+// ReLogin reinstantiates a Client to update its API schema. This function would be used for a non admin user that needs to be
 // "reloaded" inorder to have updated permissions for certain resources.
 func (c *Client) ReLogin() (*Client, error) {
 	return NewClient(c.restConfig.BearerToken, c.Session)
@@ -180,7 +188,7 @@ func (c *Client) WithSession(session *session.Session) (*Client, error) {
 	return NewClient(c.restConfig.BearerToken, session)
 }
 
-// GetClusterCatalogClient is a function that takes a clusterID and instanitates a catalog client to directly communicate with that specific cluster.
+// GetClusterCatalogClient is a function that takes a clusterID and instantiates a catalog client to directly communicate with that specific cluster.
 func (c *Client) GetClusterCatalogClient(clusterID string) (*catalog.Client, error) {
 	restConfig := *c.restConfig
 	restConfig.Host = fmt.Sprintf("https://%s/k8s/clusters/%s", c.restConfig.Host, clusterID)
@@ -210,6 +218,16 @@ func (c *Client) GetKubeAPIProvisioningClient() (*kubeProvisioning.Client, error
 	}
 
 	return provClient, nil
+}
+
+// GetKubeAPIRKEClient is a function that instantiates a rke client that communicates with the Kube API of a cluster
+func (c *Client) GetKubeAPIRKEClient() (*kubeRKE.Client, error) {
+	rkeClient, err := kubeRKE.NewForConfig(c.restConfig, c.Session)
+	if err != nil {
+		return nil, err
+	}
+
+	return rkeClient, nil
 }
 
 // GetDownStreamClusterClient is a helper function that instantiates a dynamic client to communicate with a specific cluster.

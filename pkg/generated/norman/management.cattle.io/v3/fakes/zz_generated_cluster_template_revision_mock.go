@@ -29,22 +29,22 @@ var _ v31.ClusterTemplateRevisionLister = &ClusterTemplateRevisionListerMock{}
 
 // ClusterTemplateRevisionListerMock is a mock implementation of v31.ClusterTemplateRevisionLister.
 //
-//     func TestSomethingThatUsesClusterTemplateRevisionLister(t *testing.T) {
+//	    func TestSomethingThatUsesClusterTemplateRevisionLister(t *testing.T) {
 //
-//         // make and configure a mocked v31.ClusterTemplateRevisionLister
-//         mockedClusterTemplateRevisionLister := &ClusterTemplateRevisionListerMock{
-//             GetFunc: func(namespace string, name string) (*v3.ClusterTemplateRevision, error) {
-// 	               panic("mock out the Get method")
-//             },
-//             ListFunc: func(namespace string, selector labels.Selector) ([]*v3.ClusterTemplateRevision, error) {
-// 	               panic("mock out the List method")
-//             },
-//         }
+//	        // make and configure a mocked v31.ClusterTemplateRevisionLister
+//	        mockedClusterTemplateRevisionLister := &ClusterTemplateRevisionListerMock{
+//	            GetFunc: func(namespace string, name string) (*v3.ClusterTemplateRevision, error) {
+//		               panic("mock out the Get method")
+//	            },
+//	            ListFunc: func(namespace string, selector labels.Selector) ([]*v3.ClusterTemplateRevision, error) {
+//		               panic("mock out the List method")
+//	            },
+//	        }
 //
-//         // use mockedClusterTemplateRevisionLister in code that requires v31.ClusterTemplateRevisionLister
-//         // and then make assertions.
+//	        // use mockedClusterTemplateRevisionLister in code that requires v31.ClusterTemplateRevisionLister
+//	        // and then make assertions.
 //
-//     }
+//	    }
 type ClusterTemplateRevisionListerMock struct {
 	// GetFunc mocks the Get method.
 	GetFunc func(namespace string, name string) (*v3.ClusterTemplateRevision, error)
@@ -91,7 +91,8 @@ func (mock *ClusterTemplateRevisionListerMock) Get(namespace string, name string
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//     len(mockedClusterTemplateRevisionLister.GetCalls())
+//
+//	len(mockedClusterTemplateRevisionLister.GetCalls())
 func (mock *ClusterTemplateRevisionListerMock) GetCalls() []struct {
 	Namespace string
 	Name      string
@@ -126,7 +127,8 @@ func (mock *ClusterTemplateRevisionListerMock) List(namespace string, selector l
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//     len(mockedClusterTemplateRevisionLister.ListCalls())
+//
+//	len(mockedClusterTemplateRevisionLister.ListCalls())
 func (mock *ClusterTemplateRevisionListerMock) ListCalls() []struct {
 	Namespace string
 	Selector  labels.Selector
@@ -159,43 +161,43 @@ var _ v31.ClusterTemplateRevisionController = &ClusterTemplateRevisionController
 
 // ClusterTemplateRevisionControllerMock is a mock implementation of v31.ClusterTemplateRevisionController.
 //
-//     func TestSomethingThatUsesClusterTemplateRevisionController(t *testing.T) {
+//	    func TestSomethingThatUsesClusterTemplateRevisionController(t *testing.T) {
 //
-//         // make and configure a mocked v31.ClusterTemplateRevisionController
-//         mockedClusterTemplateRevisionController := &ClusterTemplateRevisionControllerMock{
-//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v31.ClusterTemplateRevisionHandlerFunc)  {
-// 	               panic("mock out the AddClusterScopedFeatureHandler method")
-//             },
-//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v31.ClusterTemplateRevisionHandlerFunc)  {
-// 	               panic("mock out the AddClusterScopedHandler method")
-//             },
-//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.ClusterTemplateRevisionHandlerFunc)  {
-// 	               panic("mock out the AddFeatureHandler method")
-//             },
-//             AddHandlerFunc: func(ctx context.Context, name string, handler v31.ClusterTemplateRevisionHandlerFunc)  {
-// 	               panic("mock out the AddHandler method")
-//             },
-//             EnqueueFunc: func(namespace string, name string)  {
-// 	               panic("mock out the Enqueue method")
-//             },
-//             EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
-// 	               panic("mock out the EnqueueAfter method")
-//             },
-//             GenericFunc: func() controller.GenericController {
-// 	               panic("mock out the Generic method")
-//             },
-//             InformerFunc: func() cache.SharedIndexInformer {
-// 	               panic("mock out the Informer method")
-//             },
-//             ListerFunc: func() v31.ClusterTemplateRevisionLister {
-// 	               panic("mock out the Lister method")
-//             },
-//         }
+//	        // make and configure a mocked v31.ClusterTemplateRevisionController
+//	        mockedClusterTemplateRevisionController := &ClusterTemplateRevisionControllerMock{
+//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v31.ClusterTemplateRevisionHandlerFunc)  {
+//		               panic("mock out the AddClusterScopedFeatureHandler method")
+//	            },
+//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v31.ClusterTemplateRevisionHandlerFunc)  {
+//		               panic("mock out the AddClusterScopedHandler method")
+//	            },
+//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.ClusterTemplateRevisionHandlerFunc)  {
+//		               panic("mock out the AddFeatureHandler method")
+//	            },
+//	            AddHandlerFunc: func(ctx context.Context, name string, handler v31.ClusterTemplateRevisionHandlerFunc)  {
+//		               panic("mock out the AddHandler method")
+//	            },
+//	            EnqueueFunc: func(namespace string, name string)  {
+//		               panic("mock out the Enqueue method")
+//	            },
+//	            EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
+//		               panic("mock out the EnqueueAfter method")
+//	            },
+//	            GenericFunc: func() controller.GenericController {
+//		               panic("mock out the Generic method")
+//	            },
+//	            InformerFunc: func() cache.SharedIndexInformer {
+//		               panic("mock out the Informer method")
+//	            },
+//	            ListerFunc: func() v31.ClusterTemplateRevisionLister {
+//		               panic("mock out the Lister method")
+//	            },
+//	        }
 //
-//         // use mockedClusterTemplateRevisionController in code that requires v31.ClusterTemplateRevisionController
-//         // and then make assertions.
+//	        // use mockedClusterTemplateRevisionController in code that requires v31.ClusterTemplateRevisionController
+//	        // and then make assertions.
 //
-//     }
+//	    }
 type ClusterTemplateRevisionControllerMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
 	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v31.ClusterTemplateRevisionHandlerFunc)
@@ -324,7 +326,8 @@ func (mock *ClusterTemplateRevisionControllerMock) AddClusterScopedFeatureHandle
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//     len(mockedClusterTemplateRevisionController.AddClusterScopedFeatureHandlerCalls())
+//
+//	len(mockedClusterTemplateRevisionController.AddClusterScopedFeatureHandlerCalls())
 func (mock *ClusterTemplateRevisionControllerMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -369,7 +372,8 @@ func (mock *ClusterTemplateRevisionControllerMock) AddClusterScopedHandler(ctx c
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//     len(mockedClusterTemplateRevisionController.AddClusterScopedHandlerCalls())
+//
+//	len(mockedClusterTemplateRevisionController.AddClusterScopedHandlerCalls())
 func (mock *ClusterTemplateRevisionControllerMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -412,7 +416,8 @@ func (mock *ClusterTemplateRevisionControllerMock) AddFeatureHandler(ctx context
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//     len(mockedClusterTemplateRevisionController.AddFeatureHandlerCalls())
+//
+//	len(mockedClusterTemplateRevisionController.AddFeatureHandlerCalls())
 func (mock *ClusterTemplateRevisionControllerMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
@@ -453,7 +458,8 @@ func (mock *ClusterTemplateRevisionControllerMock) AddHandler(ctx context.Contex
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//     len(mockedClusterTemplateRevisionController.AddHandlerCalls())
+//
+//	len(mockedClusterTemplateRevisionController.AddHandlerCalls())
 func (mock *ClusterTemplateRevisionControllerMock) AddHandlerCalls() []struct {
 	Ctx     context.Context
 	Name    string
@@ -490,7 +496,8 @@ func (mock *ClusterTemplateRevisionControllerMock) Enqueue(namespace string, nam
 
 // EnqueueCalls gets all the calls that were made to Enqueue.
 // Check the length with:
-//     len(mockedClusterTemplateRevisionController.EnqueueCalls())
+//
+//	len(mockedClusterTemplateRevisionController.EnqueueCalls())
 func (mock *ClusterTemplateRevisionControllerMock) EnqueueCalls() []struct {
 	Namespace string
 	Name      string
@@ -527,7 +534,8 @@ func (mock *ClusterTemplateRevisionControllerMock) EnqueueAfter(namespace string
 
 // EnqueueAfterCalls gets all the calls that were made to EnqueueAfter.
 // Check the length with:
-//     len(mockedClusterTemplateRevisionController.EnqueueAfterCalls())
+//
+//	len(mockedClusterTemplateRevisionController.EnqueueAfterCalls())
 func (mock *ClusterTemplateRevisionControllerMock) EnqueueAfterCalls() []struct {
 	Namespace string
 	Name      string
@@ -559,7 +567,8 @@ func (mock *ClusterTemplateRevisionControllerMock) Generic() controller.GenericC
 
 // GenericCalls gets all the calls that were made to Generic.
 // Check the length with:
-//     len(mockedClusterTemplateRevisionController.GenericCalls())
+//
+//	len(mockedClusterTemplateRevisionController.GenericCalls())
 func (mock *ClusterTemplateRevisionControllerMock) GenericCalls() []struct {
 } {
 	var calls []struct {
@@ -585,7 +594,8 @@ func (mock *ClusterTemplateRevisionControllerMock) Informer() cache.SharedIndexI
 
 // InformerCalls gets all the calls that were made to Informer.
 // Check the length with:
-//     len(mockedClusterTemplateRevisionController.InformerCalls())
+//
+//	len(mockedClusterTemplateRevisionController.InformerCalls())
 func (mock *ClusterTemplateRevisionControllerMock) InformerCalls() []struct {
 } {
 	var calls []struct {
@@ -611,7 +621,8 @@ func (mock *ClusterTemplateRevisionControllerMock) Lister() v31.ClusterTemplateR
 
 // ListerCalls gets all the calls that were made to Lister.
 // Check the length with:
-//     len(mockedClusterTemplateRevisionController.ListerCalls())
+//
+//	len(mockedClusterTemplateRevisionController.ListerCalls())
 func (mock *ClusterTemplateRevisionControllerMock) ListerCalls() []struct {
 } {
 	var calls []struct {
@@ -651,76 +662,76 @@ var _ v31.ClusterTemplateRevisionInterface = &ClusterTemplateRevisionInterfaceMo
 
 // ClusterTemplateRevisionInterfaceMock is a mock implementation of v31.ClusterTemplateRevisionInterface.
 //
-//     func TestSomethingThatUsesClusterTemplateRevisionInterface(t *testing.T) {
+//	    func TestSomethingThatUsesClusterTemplateRevisionInterface(t *testing.T) {
 //
-//         // make and configure a mocked v31.ClusterTemplateRevisionInterface
-//         mockedClusterTemplateRevisionInterface := &ClusterTemplateRevisionInterfaceMock{
-//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v31.ClusterTemplateRevisionHandlerFunc)  {
-// 	               panic("mock out the AddClusterScopedFeatureHandler method")
-//             },
-//             AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v31.ClusterTemplateRevisionLifecycle)  {
-// 	               panic("mock out the AddClusterScopedFeatureLifecycle method")
-//             },
-//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v31.ClusterTemplateRevisionHandlerFunc)  {
-// 	               panic("mock out the AddClusterScopedHandler method")
-//             },
-//             AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v31.ClusterTemplateRevisionLifecycle)  {
-// 	               panic("mock out the AddClusterScopedLifecycle method")
-//             },
-//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.ClusterTemplateRevisionHandlerFunc)  {
-// 	               panic("mock out the AddFeatureHandler method")
-//             },
-//             AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v31.ClusterTemplateRevisionLifecycle)  {
-// 	               panic("mock out the AddFeatureLifecycle method")
-//             },
-//             AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v31.ClusterTemplateRevisionHandlerFunc)  {
-// 	               panic("mock out the AddHandler method")
-//             },
-//             AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v31.ClusterTemplateRevisionLifecycle)  {
-// 	               panic("mock out the AddLifecycle method")
-//             },
-//             ControllerFunc: func() v31.ClusterTemplateRevisionController {
-// 	               panic("mock out the Controller method")
-//             },
-//             CreateFunc: func(in1 *v3.ClusterTemplateRevision) (*v3.ClusterTemplateRevision, error) {
-// 	               panic("mock out the Create method")
-//             },
-//             DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
-// 	               panic("mock out the Delete method")
-//             },
-//             DeleteCollectionFunc: func(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
-// 	               panic("mock out the DeleteCollection method")
-//             },
-//             DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
-// 	               panic("mock out the DeleteNamespaced method")
-//             },
-//             GetFunc: func(name string, opts metav1.GetOptions) (*v3.ClusterTemplateRevision, error) {
-// 	               panic("mock out the Get method")
-//             },
-//             GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v3.ClusterTemplateRevision, error) {
-// 	               panic("mock out the GetNamespaced method")
-//             },
-//             ListFunc: func(opts metav1.ListOptions) (*v3.ClusterTemplateRevisionList, error) {
-// 	               panic("mock out the List method")
-//             },
-//             ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v3.ClusterTemplateRevisionList, error) {
-// 	               panic("mock out the ListNamespaced method")
-//             },
-//             ObjectClientFunc: func() *objectclient.ObjectClient {
-// 	               panic("mock out the ObjectClient method")
-//             },
-//             UpdateFunc: func(in1 *v3.ClusterTemplateRevision) (*v3.ClusterTemplateRevision, error) {
-// 	               panic("mock out the Update method")
-//             },
-//             WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
-// 	               panic("mock out the Watch method")
-//             },
-//         }
+//	        // make and configure a mocked v31.ClusterTemplateRevisionInterface
+//	        mockedClusterTemplateRevisionInterface := &ClusterTemplateRevisionInterfaceMock{
+//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v31.ClusterTemplateRevisionHandlerFunc)  {
+//		               panic("mock out the AddClusterScopedFeatureHandler method")
+//	            },
+//	            AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v31.ClusterTemplateRevisionLifecycle)  {
+//		               panic("mock out the AddClusterScopedFeatureLifecycle method")
+//	            },
+//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v31.ClusterTemplateRevisionHandlerFunc)  {
+//		               panic("mock out the AddClusterScopedHandler method")
+//	            },
+//	            AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v31.ClusterTemplateRevisionLifecycle)  {
+//		               panic("mock out the AddClusterScopedLifecycle method")
+//	            },
+//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.ClusterTemplateRevisionHandlerFunc)  {
+//		               panic("mock out the AddFeatureHandler method")
+//	            },
+//	            AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v31.ClusterTemplateRevisionLifecycle)  {
+//		               panic("mock out the AddFeatureLifecycle method")
+//	            },
+//	            AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v31.ClusterTemplateRevisionHandlerFunc)  {
+//		               panic("mock out the AddHandler method")
+//	            },
+//	            AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v31.ClusterTemplateRevisionLifecycle)  {
+//		               panic("mock out the AddLifecycle method")
+//	            },
+//	            ControllerFunc: func() v31.ClusterTemplateRevisionController {
+//		               panic("mock out the Controller method")
+//	            },
+//	            CreateFunc: func(in1 *v3.ClusterTemplateRevision) (*v3.ClusterTemplateRevision, error) {
+//		               panic("mock out the Create method")
+//	            },
+//	            DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
+//		               panic("mock out the Delete method")
+//	            },
+//	            DeleteCollectionFunc: func(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
+//		               panic("mock out the DeleteCollection method")
+//	            },
+//	            DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
+//		               panic("mock out the DeleteNamespaced method")
+//	            },
+//	            GetFunc: func(name string, opts metav1.GetOptions) (*v3.ClusterTemplateRevision, error) {
+//		               panic("mock out the Get method")
+//	            },
+//	            GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v3.ClusterTemplateRevision, error) {
+//		               panic("mock out the GetNamespaced method")
+//	            },
+//	            ListFunc: func(opts metav1.ListOptions) (*v3.ClusterTemplateRevisionList, error) {
+//		               panic("mock out the List method")
+//	            },
+//	            ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v3.ClusterTemplateRevisionList, error) {
+//		               panic("mock out the ListNamespaced method")
+//	            },
+//	            ObjectClientFunc: func() *objectclient.ObjectClient {
+//		               panic("mock out the ObjectClient method")
+//	            },
+//	            UpdateFunc: func(in1 *v3.ClusterTemplateRevision) (*v3.ClusterTemplateRevision, error) {
+//		               panic("mock out the Update method")
+//	            },
+//	            WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
+//		               panic("mock out the Watch method")
+//	            },
+//	        }
 //
-//         // use mockedClusterTemplateRevisionInterface in code that requires v31.ClusterTemplateRevisionInterface
-//         // and then make assertions.
+//	        // use mockedClusterTemplateRevisionInterface in code that requires v31.ClusterTemplateRevisionInterface
+//	        // and then make assertions.
 //
-//     }
+//	    }
 type ClusterTemplateRevisionInterfaceMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
 	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v31.ClusterTemplateRevisionHandlerFunc)
@@ -973,7 +984,8 @@ func (mock *ClusterTemplateRevisionInterfaceMock) AddClusterScopedFeatureHandler
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//     len(mockedClusterTemplateRevisionInterface.AddClusterScopedFeatureHandlerCalls())
+//
+//	len(mockedClusterTemplateRevisionInterface.AddClusterScopedFeatureHandlerCalls())
 func (mock *ClusterTemplateRevisionInterfaceMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -1020,7 +1032,8 @@ func (mock *ClusterTemplateRevisionInterfaceMock) AddClusterScopedFeatureLifecyc
 
 // AddClusterScopedFeatureLifecycleCalls gets all the calls that were made to AddClusterScopedFeatureLifecycle.
 // Check the length with:
-//     len(mockedClusterTemplateRevisionInterface.AddClusterScopedFeatureLifecycleCalls())
+//
+//	len(mockedClusterTemplateRevisionInterface.AddClusterScopedFeatureLifecycleCalls())
 func (mock *ClusterTemplateRevisionInterfaceMock) AddClusterScopedFeatureLifecycleCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -1065,7 +1078,8 @@ func (mock *ClusterTemplateRevisionInterfaceMock) AddClusterScopedHandler(ctx co
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//     len(mockedClusterTemplateRevisionInterface.AddClusterScopedHandlerCalls())
+//
+//	len(mockedClusterTemplateRevisionInterface.AddClusterScopedHandlerCalls())
 func (mock *ClusterTemplateRevisionInterfaceMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -1108,7 +1122,8 @@ func (mock *ClusterTemplateRevisionInterfaceMock) AddClusterScopedLifecycle(ctx 
 
 // AddClusterScopedLifecycleCalls gets all the calls that were made to AddClusterScopedLifecycle.
 // Check the length with:
-//     len(mockedClusterTemplateRevisionInterface.AddClusterScopedLifecycleCalls())
+//
+//	len(mockedClusterTemplateRevisionInterface.AddClusterScopedLifecycleCalls())
 func (mock *ClusterTemplateRevisionInterfaceMock) AddClusterScopedLifecycleCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -1151,7 +1166,8 @@ func (mock *ClusterTemplateRevisionInterfaceMock) AddFeatureHandler(ctx context.
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//     len(mockedClusterTemplateRevisionInterface.AddFeatureHandlerCalls())
+//
+//	len(mockedClusterTemplateRevisionInterface.AddFeatureHandlerCalls())
 func (mock *ClusterTemplateRevisionInterfaceMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
@@ -1194,7 +1210,8 @@ func (mock *ClusterTemplateRevisionInterfaceMock) AddFeatureLifecycle(ctx contex
 
 // AddFeatureLifecycleCalls gets all the calls that were made to AddFeatureLifecycle.
 // Check the length with:
-//     len(mockedClusterTemplateRevisionInterface.AddFeatureLifecycleCalls())
+//
+//	len(mockedClusterTemplateRevisionInterface.AddFeatureLifecycleCalls())
 func (mock *ClusterTemplateRevisionInterfaceMock) AddFeatureLifecycleCalls() []struct {
 	Ctx       context.Context
 	Enabled   func() bool
@@ -1235,7 +1252,8 @@ func (mock *ClusterTemplateRevisionInterfaceMock) AddHandler(ctx context.Context
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//     len(mockedClusterTemplateRevisionInterface.AddHandlerCalls())
+//
+//	len(mockedClusterTemplateRevisionInterface.AddHandlerCalls())
 func (mock *ClusterTemplateRevisionInterfaceMock) AddHandlerCalls() []struct {
 	Ctx  context.Context
 	Name string
@@ -1274,7 +1292,8 @@ func (mock *ClusterTemplateRevisionInterfaceMock) AddLifecycle(ctx context.Conte
 
 // AddLifecycleCalls gets all the calls that were made to AddLifecycle.
 // Check the length with:
-//     len(mockedClusterTemplateRevisionInterface.AddLifecycleCalls())
+//
+//	len(mockedClusterTemplateRevisionInterface.AddLifecycleCalls())
 func (mock *ClusterTemplateRevisionInterfaceMock) AddLifecycleCalls() []struct {
 	Ctx       context.Context
 	Name      string
@@ -1306,7 +1325,8 @@ func (mock *ClusterTemplateRevisionInterfaceMock) Controller() v31.ClusterTempla
 
 // ControllerCalls gets all the calls that were made to Controller.
 // Check the length with:
-//     len(mockedClusterTemplateRevisionInterface.ControllerCalls())
+//
+//	len(mockedClusterTemplateRevisionInterface.ControllerCalls())
 func (mock *ClusterTemplateRevisionInterfaceMock) ControllerCalls() []struct {
 } {
 	var calls []struct {
@@ -1335,7 +1355,8 @@ func (mock *ClusterTemplateRevisionInterfaceMock) Create(in1 *v3.ClusterTemplate
 
 // CreateCalls gets all the calls that were made to Create.
 // Check the length with:
-//     len(mockedClusterTemplateRevisionInterface.CreateCalls())
+//
+//	len(mockedClusterTemplateRevisionInterface.CreateCalls())
 func (mock *ClusterTemplateRevisionInterfaceMock) CreateCalls() []struct {
 	In1 *v3.ClusterTemplateRevision
 } {
@@ -1368,7 +1389,8 @@ func (mock *ClusterTemplateRevisionInterfaceMock) Delete(name string, options *m
 
 // DeleteCalls gets all the calls that were made to Delete.
 // Check the length with:
-//     len(mockedClusterTemplateRevisionInterface.DeleteCalls())
+//
+//	len(mockedClusterTemplateRevisionInterface.DeleteCalls())
 func (mock *ClusterTemplateRevisionInterfaceMock) DeleteCalls() []struct {
 	Name    string
 	Options *metav1.DeleteOptions
@@ -1403,7 +1425,8 @@ func (mock *ClusterTemplateRevisionInterfaceMock) DeleteCollection(deleteOpts *m
 
 // DeleteCollectionCalls gets all the calls that were made to DeleteCollection.
 // Check the length with:
-//     len(mockedClusterTemplateRevisionInterface.DeleteCollectionCalls())
+//
+//	len(mockedClusterTemplateRevisionInterface.DeleteCollectionCalls())
 func (mock *ClusterTemplateRevisionInterfaceMock) DeleteCollectionCalls() []struct {
 	DeleteOpts *metav1.DeleteOptions
 	ListOpts   metav1.ListOptions
@@ -1440,7 +1463,8 @@ func (mock *ClusterTemplateRevisionInterfaceMock) DeleteNamespaced(namespace str
 
 // DeleteNamespacedCalls gets all the calls that were made to DeleteNamespaced.
 // Check the length with:
-//     len(mockedClusterTemplateRevisionInterface.DeleteNamespacedCalls())
+//
+//	len(mockedClusterTemplateRevisionInterface.DeleteNamespacedCalls())
 func (mock *ClusterTemplateRevisionInterfaceMock) DeleteNamespacedCalls() []struct {
 	Namespace string
 	Name      string
@@ -1477,7 +1501,8 @@ func (mock *ClusterTemplateRevisionInterfaceMock) Get(name string, opts metav1.G
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//     len(mockedClusterTemplateRevisionInterface.GetCalls())
+//
+//	len(mockedClusterTemplateRevisionInterface.GetCalls())
 func (mock *ClusterTemplateRevisionInterfaceMock) GetCalls() []struct {
 	Name string
 	Opts metav1.GetOptions
@@ -1514,7 +1539,8 @@ func (mock *ClusterTemplateRevisionInterfaceMock) GetNamespaced(namespace string
 
 // GetNamespacedCalls gets all the calls that were made to GetNamespaced.
 // Check the length with:
-//     len(mockedClusterTemplateRevisionInterface.GetNamespacedCalls())
+//
+//	len(mockedClusterTemplateRevisionInterface.GetNamespacedCalls())
 func (mock *ClusterTemplateRevisionInterfaceMock) GetNamespacedCalls() []struct {
 	Namespace string
 	Name      string
@@ -1549,7 +1575,8 @@ func (mock *ClusterTemplateRevisionInterfaceMock) List(opts metav1.ListOptions) 
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//     len(mockedClusterTemplateRevisionInterface.ListCalls())
+//
+//	len(mockedClusterTemplateRevisionInterface.ListCalls())
 func (mock *ClusterTemplateRevisionInterfaceMock) ListCalls() []struct {
 	Opts metav1.ListOptions
 } {
@@ -1582,7 +1609,8 @@ func (mock *ClusterTemplateRevisionInterfaceMock) ListNamespaced(namespace strin
 
 // ListNamespacedCalls gets all the calls that were made to ListNamespaced.
 // Check the length with:
-//     len(mockedClusterTemplateRevisionInterface.ListNamespacedCalls())
+//
+//	len(mockedClusterTemplateRevisionInterface.ListNamespacedCalls())
 func (mock *ClusterTemplateRevisionInterfaceMock) ListNamespacedCalls() []struct {
 	Namespace string
 	Opts      metav1.ListOptions
@@ -1612,7 +1640,8 @@ func (mock *ClusterTemplateRevisionInterfaceMock) ObjectClient() *objectclient.O
 
 // ObjectClientCalls gets all the calls that were made to ObjectClient.
 // Check the length with:
-//     len(mockedClusterTemplateRevisionInterface.ObjectClientCalls())
+//
+//	len(mockedClusterTemplateRevisionInterface.ObjectClientCalls())
 func (mock *ClusterTemplateRevisionInterfaceMock) ObjectClientCalls() []struct {
 } {
 	var calls []struct {
@@ -1641,7 +1670,8 @@ func (mock *ClusterTemplateRevisionInterfaceMock) Update(in1 *v3.ClusterTemplate
 
 // UpdateCalls gets all the calls that were made to Update.
 // Check the length with:
-//     len(mockedClusterTemplateRevisionInterface.UpdateCalls())
+//
+//	len(mockedClusterTemplateRevisionInterface.UpdateCalls())
 func (mock *ClusterTemplateRevisionInterfaceMock) UpdateCalls() []struct {
 	In1 *v3.ClusterTemplateRevision
 } {
@@ -1672,7 +1702,8 @@ func (mock *ClusterTemplateRevisionInterfaceMock) Watch(opts metav1.ListOptions)
 
 // WatchCalls gets all the calls that were made to Watch.
 // Check the length with:
-//     len(mockedClusterTemplateRevisionInterface.WatchCalls())
+//
+//	len(mockedClusterTemplateRevisionInterface.WatchCalls())
 func (mock *ClusterTemplateRevisionInterfaceMock) WatchCalls() []struct {
 	Opts metav1.ListOptions
 } {
@@ -1695,19 +1726,19 @@ var _ v31.ClusterTemplateRevisionsGetter = &ClusterTemplateRevisionsGetterMock{}
 
 // ClusterTemplateRevisionsGetterMock is a mock implementation of v31.ClusterTemplateRevisionsGetter.
 //
-//     func TestSomethingThatUsesClusterTemplateRevisionsGetter(t *testing.T) {
+//	    func TestSomethingThatUsesClusterTemplateRevisionsGetter(t *testing.T) {
 //
-//         // make and configure a mocked v31.ClusterTemplateRevisionsGetter
-//         mockedClusterTemplateRevisionsGetter := &ClusterTemplateRevisionsGetterMock{
-//             ClusterTemplateRevisionsFunc: func(namespace string) v31.ClusterTemplateRevisionInterface {
-// 	               panic("mock out the ClusterTemplateRevisions method")
-//             },
-//         }
+//	        // make and configure a mocked v31.ClusterTemplateRevisionsGetter
+//	        mockedClusterTemplateRevisionsGetter := &ClusterTemplateRevisionsGetterMock{
+//	            ClusterTemplateRevisionsFunc: func(namespace string) v31.ClusterTemplateRevisionInterface {
+//		               panic("mock out the ClusterTemplateRevisions method")
+//	            },
+//	        }
 //
-//         // use mockedClusterTemplateRevisionsGetter in code that requires v31.ClusterTemplateRevisionsGetter
-//         // and then make assertions.
+//	        // use mockedClusterTemplateRevisionsGetter in code that requires v31.ClusterTemplateRevisionsGetter
+//	        // and then make assertions.
 //
-//     }
+//	    }
 type ClusterTemplateRevisionsGetterMock struct {
 	// ClusterTemplateRevisionsFunc mocks the ClusterTemplateRevisions method.
 	ClusterTemplateRevisionsFunc func(namespace string) v31.ClusterTemplateRevisionInterface
@@ -1740,7 +1771,8 @@ func (mock *ClusterTemplateRevisionsGetterMock) ClusterTemplateRevisions(namespa
 
 // ClusterTemplateRevisionsCalls gets all the calls that were made to ClusterTemplateRevisions.
 // Check the length with:
-//     len(mockedClusterTemplateRevisionsGetter.ClusterTemplateRevisionsCalls())
+//
+//	len(mockedClusterTemplateRevisionsGetter.ClusterTemplateRevisionsCalls())
 func (mock *ClusterTemplateRevisionsGetterMock) ClusterTemplateRevisionsCalls() []struct {
 	Namespace string
 } {

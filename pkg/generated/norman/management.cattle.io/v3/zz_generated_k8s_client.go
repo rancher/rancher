@@ -43,8 +43,6 @@ type Interface interface {
 	PreferencesGetter
 	UserAttributesGetter
 	ProjectNetworkPoliciesGetter
-	ClusterLoggingsGetter
-	ProjectLoggingsGetter
 	SettingsGetter
 	FeaturesGetter
 	ClusterAlertsGetter
@@ -548,34 +546,6 @@ func (c *Client) ProjectNetworkPolicies(namespace string) ProjectNetworkPolicyIn
 	sharedClient := c.clientFactory.ForResourceKind(ProjectNetworkPolicyGroupVersionResource, ProjectNetworkPolicyGroupVersionKind.Kind, true)
 	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &ProjectNetworkPolicyResource, ProjectNetworkPolicyGroupVersionKind, projectNetworkPolicyFactory{})
 	return &projectNetworkPolicyClient{
-		ns:           namespace,
-		client:       c,
-		objectClient: objectClient,
-	}
-}
-
-type ClusterLoggingsGetter interface {
-	ClusterLoggings(namespace string) ClusterLoggingInterface
-}
-
-func (c *Client) ClusterLoggings(namespace string) ClusterLoggingInterface {
-	sharedClient := c.clientFactory.ForResourceKind(ClusterLoggingGroupVersionResource, ClusterLoggingGroupVersionKind.Kind, true)
-	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &ClusterLoggingResource, ClusterLoggingGroupVersionKind, clusterLoggingFactory{})
-	return &clusterLoggingClient{
-		ns:           namespace,
-		client:       c,
-		objectClient: objectClient,
-	}
-}
-
-type ProjectLoggingsGetter interface {
-	ProjectLoggings(namespace string) ProjectLoggingInterface
-}
-
-func (c *Client) ProjectLoggings(namespace string) ProjectLoggingInterface {
-	sharedClient := c.clientFactory.ForResourceKind(ProjectLoggingGroupVersionResource, ProjectLoggingGroupVersionKind.Kind, true)
-	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &ProjectLoggingResource, ProjectLoggingGroupVersionKind, projectLoggingFactory{})
-	return &projectLoggingClient{
 		ns:           namespace,
 		client:       c,
 		objectClient: objectClient,

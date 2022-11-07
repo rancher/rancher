@@ -46,7 +46,7 @@ const (
 
 var existLabel = map[string]string{sendRKELabel: "false"}
 
-//settings corresponding to keys in setting2.MetadataSettings
+// settings corresponding to keys in setting2.MetadataSettings
 var userUpdateSettingMap = map[string]settings.Setting{
 	settings.KubernetesVersion.Name:            settings.KubernetesVersion,
 	settings.KubernetesVersionsCurrent.Name:    settings.KubernetesVersionsCurrent,

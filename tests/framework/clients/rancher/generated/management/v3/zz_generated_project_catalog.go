@@ -8,6 +8,7 @@ const (
 	ProjectCatalogType                      = "projectCatalog"
 	ProjectCatalogFieldAnnotations          = "annotations"
 	ProjectCatalogFieldBranch               = "branch"
+	ProjectCatalogFieldCatalogSecrets       = "catalogSecrets"
 	ProjectCatalogFieldCommit               = "commit"
 	ProjectCatalogFieldConditions           = "conditions"
 	ProjectCatalogFieldCreated              = "created"
@@ -36,6 +37,7 @@ type ProjectCatalog struct {
 	types.Resource
 	Annotations          map[string]string  `json:"annotations,omitempty" yaml:"annotations,omitempty"`
 	Branch               string             `json:"branch,omitempty" yaml:"branch,omitempty"`
+	CatalogSecrets       *CatalogSecrets    `json:"catalogSecrets,omitempty" yaml:"catalogSecrets,omitempty"`
 	Commit               string             `json:"commit,omitempty" yaml:"commit,omitempty"`
 	Conditions           []CatalogCondition `json:"conditions,omitempty" yaml:"conditions,omitempty"`
 	Created              string             `json:"created,omitempty" yaml:"created,omitempty"`

@@ -1,3 +1,6 @@
+/*
+Package wrangler contains functions for creating a management context with wrangler controllers.
+*/
 package wrangler
 
 import (
@@ -7,7 +10,6 @@ import (
 	"net/http"
 	"sync"
 
-	istiov1alpha3api "github.com/knative/pkg/apis/istio/v1alpha3"
 	prommonitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	fleetv1alpha1api "github.com/rancher/fleet/pkg/apis/fleet.cattle.io/v1alpha1"
 	"github.com/rancher/lasso/pkg/controller"
@@ -22,6 +24,7 @@ import (
 	"github.com/rancher/rancher/pkg/catalogv2/content"
 	"github.com/rancher/rancher/pkg/catalogv2/helmop"
 	"github.com/rancher/rancher/pkg/catalogv2/system"
+	"github.com/rancher/rancher/pkg/controllers"
 	"github.com/rancher/rancher/pkg/generated/controllers/catalog.cattle.io"
 	catalogcontrollers "github.com/rancher/rancher/pkg/generated/controllers/catalog.cattle.io/v1"
 	capi "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io"
@@ -84,7 +87,6 @@ var (
 		apiextensionsv1.AddToScheme,
 		apiregistrationv12.AddToScheme,
 		prommonitoringv1.AddToScheme,
-		istiov1alpha3api.AddToScheme,
 		catalogv1.AddToScheme,
 	}
 	AddToScheme = localSchemeBuilder.AddToScheme
@@ -191,7 +193,8 @@ func enableProtobuf(cfg *rest.Config) *rest.Config {
 }
 
 func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restConfig *rest.Config) (*Context, error) {
-	controllerFactory, err := controller.NewSharedControllerFactoryFromConfig(enableProtobuf(restConfig), Scheme)
+	sharedOpts := controllers.GetOptsFromEnv(controllers.Management)
+	controllerFactory, err := controller.NewSharedControllerFactoryFromConfigWithOptions(enableProtobuf(restConfig), Scheme, sharedOpts)
 	if err != nil {
 		return nil, err
 	}

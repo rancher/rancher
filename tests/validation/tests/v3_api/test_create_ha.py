@@ -12,7 +12,7 @@ from .test_rke_cluster_provisioning import AZURE_CLIENT_ID, AZURE_CLIENT_SECRET,
 # RANCHER_HA_KUBECONFIG and RANCHER_HA_HOSTNAME are provided
 # when installing Rancher into a k3s setup
 RANCHER_HA_KUBECONFIG = os.environ.get("RANCHER_HA_KUBECONFIG")
-RANCHER_HA_HARDENED = ast.literal_eval(os.environ.get("RANCHER_HA_HARDENED", "False"))
+RANCHER_HA_HARDENED = os.environ.get("RANCHER_HA_HARDENED", "False")
 RANCHER_HA_HOSTNAME = os.environ.get(
     "RANCHER_HA_HOSTNAME", RANCHER_HOSTNAME_PREFIX + ".qa.rancher.space")
 resource_prefix = RANCHER_HA_HOSTNAME.split(".qa.rancher.space")[0]
@@ -68,6 +68,7 @@ def test_remove_rancher_ha():
 def test_install_rancher_ha(precheck_certificate_options):
     cm_install = True
     extra_settings = []
+    profile = 'rke-cis-1.5'
     if "byo-" in RANCHER_HA_CERT_OPTION:
         cm_install = False
     print("The hostname is: {}".format(RANCHER_HA_HOSTNAME))
@@ -79,7 +80,6 @@ def test_install_rancher_ha(precheck_certificate_options):
             print("RKE cluster is provisioning for the local cluster")
             nodes = create_resources()
             if RANCHER_HA_HARDENED:
-                profile = 'rke-cis-1.5'
                 node_role = [["worker", "controlplane", "etcd"]]
                 node_roles =[]
                 for role in node_role:
@@ -140,7 +140,7 @@ def test_install_rancher_ha(precheck_certificate_options):
         assert False, "check the logs in console for details"
 
     print_kubeconfig(kubeconfig_path)
-    if RANCHER_HA_HARDENED and RANCHER_LOCAL_CLUSTER_TYPE == "RKE":
+    if (RANCHER_HA_HARDENED.upper() == "TRUE" and RANCHER_LOCAL_CLUSTER_TYPE == "RKE") and RANCHER_HA_KUBECONFIG == "" and RANCHER_HA_HOSTNAME=="":
         prepare_hardened_cluster(profile, kubeconfig_path)
     if RANCHER_LOCAL_CLUSTER_TYPE == "RKE":
         check_rke_ingress_rollout()

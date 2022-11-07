@@ -10,6 +10,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/rancher/rancher/pkg/provisioningv2/image"
+
 	"github.com/rancher/rancher/pkg/controllers/management/secretmigrator"
 
 	v1 "k8s.io/api/core/v1"
@@ -19,7 +21,6 @@ import (
 	"github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
 	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2"
 	"github.com/rancher/rancher/pkg/nodeconfig"
-	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/wrangler/pkg/data"
 	"github.com/rancher/wrangler/pkg/data/convert"
 	corecontrollers "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
@@ -113,8 +114,8 @@ func addRoleConfig(config map[string]interface{}, controlPlane *rkev1.RKEControl
 		config["disable-etcd"] = true
 	}
 
-	if sdr := settings.SystemDefaultRegistry.Get(); sdr != "" && !isOnlyWorker(entry) {
-		config["system-default-registry"] = sdr
+	if pr := image.GetPrivateRepoURLFromControlPlane(controlPlane); pr != "" && !isOnlyWorker(entry) {
+		config["system-default-registry"] = pr
 	}
 
 	// If this is a control-plane node, then we need to set arguments/(and for RKE2, volume mounts) to allow probes
@@ -347,12 +348,12 @@ func addLabels(config map[string]interface{}, entry *planEntry) error {
 	return nil
 }
 
-func addTaints(config map[string]interface{}, entry *planEntry, runtime string) error {
+func addTaints(config map[string]interface{}, entry *planEntry) error {
 	var (
 		taintString []string
 	)
 
-	taints, err := getTaints(entry, runtime)
+	taints, err := getTaints(entry)
 	if err != nil {
 		return err
 	}
@@ -438,15 +439,14 @@ func (p *Planner) addConfigFile(nodePlan plan.NodePlan, controlPlane *rkev1.RKEC
 	addRoleConfig(config, controlPlane, entry, initNode, joinServer)
 	addLocalClusterAuthenticationEndpointConfig(config, controlPlane, entry)
 	addToken(config, entry, tokensSecret)
+
 	if err := addAddresses(p.secretCache, config, entry); err != nil {
 		return nodePlan, config, err
 	}
 	if err := addLabels(config, entry); err != nil {
 		return nodePlan, config, err
 	}
-
-	runtime := rke2.GetRuntime(controlPlane.Spec.KubernetesVersion)
-	if err := addTaints(config, entry, runtime); err != nil {
+	if err := addTaints(config, entry); err != nil {
 		return nodePlan, config, err
 	}
 
@@ -502,7 +502,7 @@ func (p *Planner) addConfigFile(nodePlan plan.NodePlan, controlPlane *rkev1.RKEC
 
 	nodePlan.Files = append(nodePlan.Files, plan.File{
 		Content: base64.StdEncoding.EncodeToString(configData),
-		Path:    fmt.Sprintf(ConfigYamlFileName, runtime),
+		Path:    fmt.Sprintf(ConfigYamlFileName, rke2.GetRuntime(controlPlane.Spec.KubernetesVersion)),
 	})
 
 	return nodePlan, config, nil

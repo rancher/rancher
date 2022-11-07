@@ -4,11 +4,13 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"time"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	v1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/rbac"
 	apiextcontrollers "github.com/rancher/wrangler/pkg/generated/controllers/apiextensions.k8s.io/v1"
+	"github.com/rancher/wrangler/pkg/generic"
 	"github.com/rancher/wrangler/pkg/name"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
@@ -21,8 +23,11 @@ import (
 )
 
 const (
-	clusterIndexed      = "clusterIndexed"
-	clusterIndexedLabel = "auth.cattle.io/cluster-indexed"
+	clusterIndexed        = "clusterIndexed"
+	clusterIndexedLabel   = "auth.cattle.io/cluster-indexed"
+	clusterNameLabel      = "cluster.cattle.io/name"
+	clusterNamespaceLabel = "cluster.cattle.io/namespace"
+	reenqueueTime         = time.Second * 5
 )
 
 func (h *handler) initializeCRDs(crdClient apiextcontrollers.CustomResourceDefinitionClient) error {
@@ -153,6 +158,92 @@ func (h *handler) OnChange(key string, rt *v3.RoleTemplate) (*v3.RoleTemplate, e
 	return rt, nil
 }
 
+func (h *handler) hasAnnotationsForDeletingCluster(annotations map[string]string, isClusterRole bool) (bool, error) {
+	clusterName, cOK := annotations[clusterNameLabel]
+	clusterNamespace, cnOK := annotations[clusterNamespaceLabel]
+	if !cOK || (!cnOK && !isClusterRole) {
+		// if this role doesn't have a clustername/namespace label it isn't one of the protected roles, so move on
+		return false, nil
+	}
+
+	mgmtCluster, err := h.mgmtClusters.Get(clusterName)
+	if err != nil {
+		if !apierror.IsNotFound(err) {
+			return false, err
+		}
+		// if management cluster was not found, ensure it's nil
+		mgmtCluster = nil
+	}
+
+	cluster, err := h.clusters.Get(clusterNamespace, clusterName)
+	if err != nil {
+		if !apierror.IsNotFound(err) {
+			return false, err
+		}
+		// if cluster was not found, ensure cluster is nil
+		cluster = nil
+	}
+
+	if (cluster != nil && cluster.DeletionTimestamp != nil) || (mgmtCluster != nil && mgmtCluster.DeletionTimestamp != nil) {
+		// if the cluster is being deleted
+		return true, nil
+	}
+
+	return false, nil
+}
+
+func (h *handler) OnRemoveRole(key string, role *rbacv1.Role) (*rbacv1.Role, error) {
+	shouldEnqueue, err := h.hasAnnotationsForDeletingCluster(role.Annotations, false)
+	if err != nil {
+		return role, err
+	}
+	if !shouldEnqueue {
+		return role, nil
+	}
+	// Enqueue to ensure perms remain until full delete. Err skips don't re-enqueue, so we do that manually
+	h.roleController.EnqueueAfter(role.Namespace, role.Name, reenqueueTime)
+	return role, generic.ErrSkip
+}
+
+func (h *handler) OnRemoveRoleBinding(key string, roleBinding *rbacv1.RoleBinding) (*rbacv1.RoleBinding, error) {
+	shouldEnqueue, err := h.hasAnnotationsForDeletingCluster(roleBinding.Annotations, false)
+	if err != nil {
+		return roleBinding, err
+	}
+	if !shouldEnqueue {
+		return roleBinding, nil
+	}
+	// Enqueue to ensure perms remain until full delete. Err skips don't re-enqueue, so we do that manually
+	h.roleBindingController.EnqueueAfter(roleBinding.Namespace, roleBinding.Name, reenqueueTime)
+	return roleBinding, generic.ErrSkip
+}
+
+func (h *handler) OnRemoveClusterRole(key string, role *rbacv1.ClusterRole) (*rbacv1.ClusterRole, error) {
+	shouldEnqueue, err := h.hasAnnotationsForDeletingCluster(role.Annotations, true)
+	if err != nil {
+		return role, err
+	}
+	if !shouldEnqueue {
+		return role, nil
+	}
+	// Enqueue to ensure perms remain until full delete. Err skips don't re-enqueue, so we do that manually
+	h.clusterRoleController.EnqueueAfter(role.Name, reenqueueTime)
+	return role, generic.ErrSkip
+}
+
+func (h *handler) OnRemoveClusterRoleBinding(key string, roleBinding *rbacv1.ClusterRoleBinding) (*rbacv1.ClusterRoleBinding, error) {
+	shouldEnqueue, err := h.hasAnnotationsForDeletingCluster(roleBinding.Annotations, true)
+	if err != nil {
+		return roleBinding, err
+	}
+	if !shouldEnqueue {
+		return roleBinding, nil
+	}
+	// Enqueue to ensure perms remain until full delete. Err skips don't re-enqueue, so we do that manually
+	h.clusterRoleBindingController.EnqueueAfter(roleBinding.Name, reenqueueTime)
+	return roleBinding, generic.ErrSkip
+}
+
 func (h *handler) objects(rt *v3.RoleTemplate, enqueue bool, cluster *v1.Cluster) error {
 	var (
 		matchResults []match
@@ -249,8 +340,9 @@ func (h *handler) createRoleForCluster(rt *v3.RoleTemplate, matches []match, clu
 	role := rbacv1.Role{
 		TypeMeta: metav1.TypeMeta{},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      roleTemplateRoleName(rt.Name, cluster.Name),
-			Namespace: cluster.Namespace,
+			Name:        roleTemplateRoleName(rt.Name, cluster.Name),
+			Namespace:   cluster.Namespace,
+			Annotations: map[string]string{clusterNameLabel: cluster.GetName(), clusterNamespaceLabel: cluster.GetNamespace()},
 			OwnerReferences: []metav1.OwnerReference{
 				{
 					APIVersion: cluster.APIVersion,

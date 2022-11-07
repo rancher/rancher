@@ -474,3 +474,17 @@ func (o *OpenIDCProvider) UpdateToken(refreshedToken *oauth2.Token, userID strin
 	o.TokenMGR.UpdateSecret(userID, o.Name, string(marshalledToken))
 	return err
 }
+
+// IsDisabledProvider checks if the OIDC auth provider is currently disabled in Rancher.
+func (o *OpenIDCProvider) IsDisabledProvider() (bool, error) {
+	oidcConfig, err := o.GetOIDCConfig()
+	if err != nil {
+		return false, err
+	}
+	return !oidcConfig.Enabled, nil
+}
+
+// CleanupResources deletes resources associated with the OIDC auth provider.
+func (o *OpenIDCProvider) CleanupResources(*v3.AuthConfig) error {
+	return nil
+}

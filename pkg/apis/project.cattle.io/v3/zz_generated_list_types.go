@@ -196,57 +196,6 @@ func NewNamespacedServiceAccountToken(namespace, name string, obj NamespacedServ
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// PipelineList is a list of Pipeline resources
-type PipelineList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata"`
-
-	Items []Pipeline `json:"items"`
-}
-
-func NewPipeline(namespace, name string, obj Pipeline) *Pipeline {
-	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("Pipeline").ToAPIVersionAndKind()
-	obj.Name = name
-	obj.Namespace = namespace
-	return &obj
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
-// PipelineExecutionList is a list of PipelineExecution resources
-type PipelineExecutionList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata"`
-
-	Items []PipelineExecution `json:"items"`
-}
-
-func NewPipelineExecution(namespace, name string, obj PipelineExecution) *PipelineExecution {
-	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("PipelineExecution").ToAPIVersionAndKind()
-	obj.Name = name
-	obj.Namespace = namespace
-	return &obj
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
-// PipelineSettingList is a list of PipelineSetting resources
-type PipelineSettingList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata"`
-
-	Items []PipelineSetting `json:"items"`
-}
-
-func NewPipelineSetting(namespace, name string, obj PipelineSetting) *PipelineSetting {
-	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("PipelineSetting").ToAPIVersionAndKind()
-	obj.Name = name
-	obj.Namespace = namespace
-	return &obj
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
 // SSHAuthList is a list of SSHAuth resources
 type SSHAuthList struct {
 	metav1.TypeMeta `json:",inline"`
@@ -274,74 +223,6 @@ type ServiceAccountTokenList struct {
 
 func NewServiceAccountToken(namespace, name string, obj ServiceAccountToken) *ServiceAccountToken {
 	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("ServiceAccountToken").ToAPIVersionAndKind()
-	obj.Name = name
-	obj.Namespace = namespace
-	return &obj
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
-// SourceCodeCredentialList is a list of SourceCodeCredential resources
-type SourceCodeCredentialList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata"`
-
-	Items []SourceCodeCredential `json:"items"`
-}
-
-func NewSourceCodeCredential(namespace, name string, obj SourceCodeCredential) *SourceCodeCredential {
-	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("SourceCodeCredential").ToAPIVersionAndKind()
-	obj.Name = name
-	obj.Namespace = namespace
-	return &obj
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
-// SourceCodeProviderList is a list of SourceCodeProvider resources
-type SourceCodeProviderList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata"`
-
-	Items []SourceCodeProvider `json:"items"`
-}
-
-func NewSourceCodeProvider(namespace, name string, obj SourceCodeProvider) *SourceCodeProvider {
-	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("SourceCodeProvider").ToAPIVersionAndKind()
-	obj.Name = name
-	obj.Namespace = namespace
-	return &obj
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
-// SourceCodeProviderConfigList is a list of SourceCodeProviderConfig resources
-type SourceCodeProviderConfigList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata"`
-
-	Items []SourceCodeProviderConfig `json:"items"`
-}
-
-func NewSourceCodeProviderConfig(namespace, name string, obj SourceCodeProviderConfig) *SourceCodeProviderConfig {
-	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("SourceCodeProviderConfig").ToAPIVersionAndKind()
-	obj.Name = name
-	obj.Namespace = namespace
-	return &obj
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
-// SourceCodeRepositoryList is a list of SourceCodeRepository resources
-type SourceCodeRepositoryList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata"`
-
-	Items []SourceCodeRepository `json:"items"`
-}
-
-func NewSourceCodeRepository(namespace, name string, obj SourceCodeRepository) *SourceCodeRepository {
-	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("SourceCodeRepository").ToAPIVersionAndKind()
 	obj.Name = name
 	obj.Namespace = namespace
 	return &obj

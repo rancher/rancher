@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/hashicorp/go-multierror"
 	lru "github.com/hashicorp/golang-lru"
 	"github.com/mitchellh/mapstructure"
 	"github.com/pkg/errors"
@@ -392,7 +393,7 @@ func formAzureRedirectURL(config map[string]interface{}) string {
 		// Extract the annotations from the map. This is needed because of the type structure of
 		// the Azure config and the Auth config it embeds. Full deserialization does not work for
 		// fields of the embedded Kubernetes types in this case.
-		ac.ObjectMeta.Annotations = extractAnnotations(config)
+		ac.ObjectMeta.Annotations = extractAnnotationsFromAuthConfig(config)
 		if !isConfigDeprecated(&ac) {
 			// Return the redirect URL for Microsoft Graph.
 			return fmt.Sprintf(
@@ -415,23 +416,31 @@ func formAzureRedirectURL(config map[string]interface{}) string {
 	)
 }
 
-func extractAnnotations(config map[string]interface{}) map[string]string {
-	annotations := make(map[string]string)
-	metadata, ok := config["metadata"].(map[string]interface{})
-	if !ok {
-		logrus.Info("Failed to decode the 'metadata' field of the auth config.")
-		return annotations
+// extractAnnotationsFromAuthConfig tries to extract the annotations from the AuthConfig value.
+// The AuthConfig value might come from either the database (on login attempts) or from the UI (on Azure AD setup attempts).
+// In these two cases, the structure of the config is different.
+// In the former, it's "metadata.annotations.[map of annotations]".
+// In the latter, it's "annotations.[map of annotations]". The function tries to find the annotations in either structure.
+func extractAnnotationsFromAuthConfig(config map[string]interface{}) map[string]string {
+	if metadata, ok := config["metadata"].(map[string]interface{}); ok {
+		return parseAnnotations(metadata)
 	}
+	logrus.Info("Failed to decode the 'metadata' field of the AuthConfig. Attempting to decode 'annotations' at the top level.")
+	return parseAnnotations(config)
+}
+
+func parseAnnotations(metadata map[string]interface{}) map[string]string {
+	annotations := make(map[string]string)
 	rawAnnotations, ok := metadata["annotations"].(map[string]interface{})
 	if !ok {
-		logrus.Info("Failed to decode the 'annotations' field of the auth config.")
+		logrus.Info("Failed to decode the 'annotations' field of the AuthConfig.")
 		return annotations
 	}
 	for k, v := range rawAnnotations {
 		if stringValue, ok := v.(string); ok {
 			annotations[k] = stringValue
 		} else {
-			logrus.Infof("Failed to decode the annotation value of the key %q as a string (%v of type %T) on the auth config.", k, v, v)
+			logrus.Infof("Failed to decode the annotation value of the key %q as a string (%v of type %T) on the AuthConfig.", k, v, v)
 		}
 	}
 	return annotations
@@ -480,4 +489,32 @@ func (ap *azureProvider) GetUserExtraAttributes(userPrincipal v3.Principal) map[
 		extras[common.UserAttributeUserName] = []string{userPrincipal.LoginName}
 	}
 	return extras
+}
+
+// IsDisabledProvider checks if the Azure AD auth provider is currently disabled in Rancher.
+func (ap *azureProvider) IsDisabledProvider() (bool, error) {
+	azureConfig, err := ap.getAzureConfigK8s()
+	if err != nil {
+		return false, err
+	}
+	return !azureConfig.Enabled, nil
+}
+
+// CleanupResources deletes resources associated with the Azure AD auth provider.
+func (ap *azureProvider) CleanupResources(config *v3.AuthConfig) error {
+	if config == nil {
+		return fmt.Errorf("cannot delete Azure AD auth provider resources if its config is nil")
+	}
+	var result error
+	err := ap.secrets.DeleteNamespaced(common.SecretsNamespace, clients.AccessTokenSecretName, &metav1.DeleteOptions{})
+	if err != nil && !apierrors.IsNotFound(err) {
+		result = multierror.Append(err, result)
+	}
+
+	secretName := fmt.Sprintf("%s-%s", strings.ToLower(config.Type), strings.ToLower(client.AzureADConfigFieldApplicationSecret))
+	err = ap.secrets.DeleteNamespaced(common.SecretsNamespace, secretName, &metav1.DeleteOptions{})
+	if err != nil && !apierrors.IsNotFound(err) {
+		result = multierror.Append(err, result)
+	}
+	return result
 }

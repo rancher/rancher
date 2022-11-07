@@ -1,7 +1,6 @@
 package charts
 
 import (
-	"context"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -11,16 +10,16 @@ import (
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	"github.com/rancher/rancher/pkg/controllers/managementuserlegacy/alert/config"
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
+	v1 "github.com/rancher/rancher/tests/framework/clients/rancher/v1"
 	"github.com/rancher/rancher/tests/framework/extensions/charts"
-	"github.com/rancher/rancher/tests/framework/extensions/unstructured"
+	"github.com/rancher/rancher/tests/framework/extensions/clusterrolebindings"
+	"github.com/rancher/rancher/tests/framework/extensions/configmaps"
+	"github.com/rancher/rancher/tests/framework/extensions/serviceaccounts"
 	"github.com/rancher/rancher/tests/framework/extensions/workloads/deployments"
 	"github.com/rancher/rancher/tests/framework/pkg/namegenerator"
-	"gopkg.in/yaml.v2"
-	appv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
@@ -29,14 +28,16 @@ const (
 	projectName = "System"
 	// Secret path that contains encoded alert manager config
 	secretPath = "alertmanager.yaml"
-	// Secret path that is used to manipulate alert manager secret with secrets helpers
-	secretPathForPatch = "/data/" + secretPath
+	// Secret ID that points alert manager secret
+	alertManagerSecretId = charts.RancherMonitoringNamespace + "/" + charts.RancherMonitoringAlertSecret
 	// Default random string length for random name generation
 	defaultRandStringLength = 5
 	// Webhook deployment annotation key that is being watched
 	webhookReceiverAnnotationKey = "didReceiveRequestFromAlertmanager"
 	// Webhook deployment annotation value that is being watched
 	webhookReceiverAnnotationValue = "true"
+	// Steve type for prometheus rules for schema
+	prometheusRulesSteveType = "monitoring.coreos.com.prometheusrule"
 	// Kubeconfig that linked to webhook deployment
 	kubeConfig = `
 apiVersion: v1
@@ -58,12 +59,6 @@ users:
     tokenFile: /run/secrets/kubernetes.io/serviceaccount/token
 `
 )
-
-var prometheusRulesGroupVersionResource = schema.GroupVersionResource{
-	Group:    "monitoring.coreos.com",
-	Version:  "v1",
-	Resource: "prometheusrules",
-}
 
 var (
 	// Rancher monitoring chart alert manager path
@@ -88,19 +83,6 @@ var (
 	ruleLabel = map[string]string{"team": "qa"}
 )
 
-// getChartCaseEndpointUntilHealthyResponse is a private helper function
-// that awaits the success response from the endpoint until the timeout.
-func getChartCaseEndpointUntilHealthyResponse(client *rancher.Client, host, path string) bool {
-	timeout := 30 * time.Second
-	for start := time.Now(); time.Since(start) < timeout; {
-		result, _ := charts.GetChartCaseEndpoint(client, host, path, false)
-		if result.Ok {
-			return true
-		}
-	}
-	return false
-}
-
 // waitUnknownPrometheusTargets is a private helper function
 // that awaits the unknown Prometheus targets to be resolved until the timeout by using Prometheus API.
 func waitUnknownPrometheusTargets(client *rancher.Client) error {
@@ -116,11 +98,11 @@ func waitUnknownPrometheusTargets(client *rancher.Client) error {
 			return statusInit, err
 		}
 		if mapResponse["status"] != "success" {
-			return statusInit, fmt.Errorf("Fail to get targets from prometheus")
+			return statusInit, fmt.Errorf("fail to get targets from prometheus")
 		}
 		activeTargets := mapResponse["data"].(map[string]interface{})["activeTargets"].([]interface{})
 		if len(activeTargets) < 1 {
-			return false, fmt.Errorf("Failed to find any active targets")
+			return false, fmt.Errorf("failed to find any active targets")
 		}
 		for _, target := range activeTargets {
 			targetMap := target.(map[string]interface{})
@@ -168,12 +150,12 @@ func checkPrometheusTargets(client *rancher.Client) (bool, error) {
 	}
 
 	if mapResponse["status"] != "success" {
-		return statusInit, fmt.Errorf("Fail to get targets from prometheus")
+		return statusInit, fmt.Errorf("fail to get targets from prometheus")
 	}
 
 	activeTargets := mapResponse["data"].(map[string]interface{})["activeTargets"].([]interface{})
 	if len(activeTargets) < 1 {
-		return false, fmt.Errorf("Failed to find any active targets")
+		return false, fmt.Errorf("failed to find any active targets")
 	}
 
 	for _, target := range activeTargets {
@@ -185,7 +167,7 @@ func checkPrometheusTargets(client *rancher.Client) (bool, error) {
 	statusInit = len(downTargets) == 0
 
 	if !statusInit {
-		return statusInit, fmt.Errorf("All active target(s) are not healthy: %v", downTargets)
+		return statusInit, fmt.Errorf("all active target(s) are not healthy: %v", downTargets)
 	}
 
 	return statusInit, nil
@@ -193,12 +175,10 @@ func checkPrometheusTargets(client *rancher.Client) (bool, error) {
 
 // editAlertReceiver is a private helper function
 // that edits alert config structure to be used by the webhook receiver.
-func editAlertReceiver(alertConfigByte []byte, origin string, originURL *url.URL) (string, error) {
-	alertConfig := config.Config{}
-
-	err := yaml.Unmarshal(alertConfigByte, &alertConfig)
+func editAlertReceiver(alertConfigByte []byte, origin string, originURL *url.URL) ([]byte, error) {
+	alertConfig, err := config.Load(string(alertConfigByte))
 	if err != nil {
-		return "", fmt.Errorf("Failed to unmarshal alert config: %v", err)
+		return nil, fmt.Errorf("failed to load alert config: %v", err)
 	}
 
 	alertConfig.Global = &config.GlobalConfig{
@@ -219,20 +199,19 @@ func editAlertReceiver(alertConfigByte []byte, origin string, originURL *url.URL
 		},
 	})
 
-	stringifiedAlertConfig := alertConfig.String()
-	encodedStringifiedAlertConfig := base64.StdEncoding.EncodeToString([]byte(stringifiedAlertConfig))
+	byteAlertConfig := []byte(alertConfig.String())
+	dst := make([]byte, base64.StdEncoding.EncodedLen(len(byteAlertConfig)))
+	base64.StdEncoding.Encode(dst, byteAlertConfig)
 
-	return encodedStringifiedAlertConfig, nil
+	return byteAlertConfig, nil
 }
 
 // editAlertRoute is a private helper function
 // that edits alert config structure to be used by the webhook receiver.
-func editAlertRoute(alertConfigByte []byte, origin string, originURL *url.URL) (string, error) {
-	alertConfig := config.Config{}
-
-	err := yaml.Unmarshal(alertConfigByte, &alertConfig)
+func editAlertRoute(alertConfigByte []byte, origin string, originURL *url.URL) ([]byte, error) {
+	alertConfig, err := config.Load(string(alertConfigByte))
 	if err != nil {
-		return "", fmt.Errorf("Failed to unmarshal alert config: %v", err)
+		return nil, fmt.Errorf("failed to load alert config: %v", err)
 	}
 
 	alertConfig.Global = &config.GlobalConfig{
@@ -246,10 +225,11 @@ func editAlertRoute(alertConfigByte []byte, origin string, originURL *url.URL) (
 		Receiver:       webhookReceiverDeploymentName,
 	})
 
-	stringifiedAlertConfig := alertConfig.String()
-	encodedStringifiedAlertConfig := base64.StdEncoding.EncodeToString([]byte(stringifiedAlertConfig))
+	byteAlertConfig := []byte(alertConfig.String())
+	dst := make([]byte, base64.StdEncoding.EncodedLen(len(byteAlertConfig)))
+	base64.StdEncoding.Encode(dst, byteAlertConfig)
 
-	return encodedStringifiedAlertConfig, nil
+	return byteAlertConfig, nil
 }
 
 // createPrometheusRule is a private helper function
@@ -257,12 +237,14 @@ func editAlertRoute(alertConfigByte []byte, origin string, originURL *url.URL) (
 func createPrometheusRule(client *rancher.Client, clusterID string) error {
 	ruleName := "webhook-rule-" + namegenerator.RandStringLower(defaultRandStringLength)
 	alertName := "alert-" + namegenerator.RandStringLower(defaultRandStringLength)
-	dynamicClient, err := client.GetDownStreamClusterClient(clusterID)
+
+	client.ReLogin()
+
+	steveclient, err := client.Steve.ProxyDownstream(clusterID)
 	if err != nil {
 		return err
 	}
 
-	prometheusRulesResource := dynamicClient.Resource(prometheusRulesGroupVersionResource).Namespace(charts.RancherMonitoringNamespace)
 	prometheusRule := &monitoringv1.PrometheusRule{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      ruleName,
@@ -284,7 +266,7 @@ func createPrometheusRule(client *rancher.Client, clusterID string) error {
 			},
 		},
 	}
-	_, err = prometheusRulesResource.Create(context.TODO(), unstructured.MustToUnstructured(prometheusRule), metav1.CreateOptions{})
+	_, err = steveclient.SteveType(prometheusRulesSteveType).Create(prometheusRule)
 	if err != nil {
 		return err
 	}
@@ -296,12 +278,12 @@ func createPrometheusRule(client *rancher.Client, clusterID string) error {
 // The deployment has two different containers with a shared volume, one for kubectl commands, and the other one to receive requests and write access logs to the shared empty dir volume.
 // Container that uses rancher/shell has a mounted volume to use the kubeconfig of the cluster. And it watches the access logs until a request from "alermanager" is received.
 // When the request is received it sets its deployment annotation "didReceiveRequestFromAlertmanager" to "true" while the annotations being watched by the test itself.
-func createAlertWebhookReceiverDeployment(client *rancher.Client, clusterID, namespace, deploymentName string) (*appv1.Deployment, error) {
+func createAlertWebhookReceiverDeployment(client *rancher.Client, clusterID, namespace, deploymentName string) (*v1.SteveAPIObject, error) {
 	serviceAccountName := "alert-receiver-sa-" + namegenerator.RandStringLower(defaultRandStringLength)
 	clusterRoleBindingName := "alert-receiver-cluster-admin-" + namegenerator.RandStringLower(defaultRandStringLength)
 	configMapName := "alert-receiver-cm-" + namegenerator.RandStringLower(defaultRandStringLength)
 
-	dynamicClient, err := client.GetDownStreamClusterClient(clusterID)
+	steveclient, err := client.Steve.ProxyDownstream(clusterID)
 	if err != nil {
 		return nil, err
 	}
@@ -309,10 +291,12 @@ func createAlertWebhookReceiverDeployment(client *rancher.Client, clusterID, nam
 	// Create webhook receiver service account
 	serviceAccount := &corev1.ServiceAccount{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: serviceAccountName,
+			Name:      serviceAccountName,
+			Namespace: namespace,
 		},
 	}
-	_, err = dynamicClient.Resource(corev1.SchemeGroupVersion.WithResource("serviceaccounts")).Namespace(namespace).Create(context.TODO(), unstructured.MustToUnstructured(serviceAccount), metav1.CreateOptions{})
+
+	_, err = steveclient.SteveType(serviceaccounts.ServiceAccountSteveType).Create(serviceAccount)
 	if err != nil {
 		return nil, err
 	}
@@ -335,7 +319,8 @@ func createAlertWebhookReceiverDeployment(client *rancher.Client, clusterID, nam
 			Name:     "cluster-admin",
 		},
 	}
-	_, err = dynamicClient.Resource(rbacv1.SchemeGroupVersion.WithResource("clusterrolebindings")).Namespace("").Create(context.TODO(), unstructured.MustToUnstructured(clusterRoleBinding), metav1.CreateOptions{})
+
+	_, err = steveclient.SteveType(clusterrolebindings.ClusterRoleBindingSteveType).Create(clusterRoleBinding)
 	if err != nil {
 		return nil, err
 	}
@@ -343,23 +328,29 @@ func createAlertWebhookReceiverDeployment(client *rancher.Client, clusterID, nam
 	// Create webhook receiver config map
 	configmap := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: configMapName,
+			Name:      configMapName,
+			Namespace: namespace,
 		},
 		Data: map[string]string{
 			"config": kubeConfig,
 		},
 	}
-	_, err = dynamicClient.Resource(corev1.SchemeGroupVersion.WithResource("configmaps")).Namespace(namespace).Create(context.TODO(), unstructured.MustToUnstructured(configmap), metav1.CreateOptions{})
+
+	_, err = steveclient.SteveType(configmaps.ConfigMapSteveType).Create(configmap)
 	if err != nil {
 		return nil, err
 	}
+
+	labels := map[string]string{}
+	labels["workload.user.cattle.io/workloadselector"] = fmt.Sprintf("apps.deployment-%v-%v", namespace, deploymentName)
 
 	// Create webhook receiver deployment
 	var runAsUser int64
 	var runAsGroup int64
 	deploymentTemplate := corev1.PodTemplateSpec{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "alert-reciver-deployment",
+			Name:      "alert-reciver-deployment",
+			Namespace: namespace,
 		},
 		Spec: corev1.PodSpec{
 			RestartPolicy:      corev1.RestartPolicyNever,
@@ -423,6 +414,7 @@ func createAlertWebhookReceiverDeployment(client *rancher.Client, clusterID, nam
 			},
 		},
 	}
+
 	deployment, err := deployments.CreateDeployment(client, clusterID, deploymentName, namespace, deploymentTemplate)
 	if err != nil {
 		return deployment, err

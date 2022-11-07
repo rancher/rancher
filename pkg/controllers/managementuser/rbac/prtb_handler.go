@@ -101,7 +101,7 @@ func (p *prtbLifecycle) syncPRTB(binding *v3.ProjectRoleTemplateBinding) error {
 		return errors.Wrapf(err, "couldn't list namespaces with project ID %v", binding.ProjectName)
 	}
 	roles := map[string]*v3.RoleTemplate{}
-	if err := p.m.gatherRoles(rt, roles); err != nil {
+	if err := p.m.gatherRoles(rt, roles, 0); err != nil {
 		return err
 	}
 
