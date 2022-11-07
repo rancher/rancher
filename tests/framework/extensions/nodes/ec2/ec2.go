@@ -119,12 +119,14 @@ func CreateNodes(client *rancher.Client, numOfInstances int) ([]*nodes.Node, err
 				}
 				ec2Nodes = append(ec2Nodes, ec2Node)
 			}
+
+			client.Session.RegisterCleanupFunc(func() error {
+				return DeleteNodes(client, ec2Nodes)
+			})
+
+			return ec2Nodes, nil
 		}
 	}
-
-	client.Session.RegisterCleanupFunc(func() error {
-		return DeleteNodes(client, ec2Nodes)
-	})
 
 	return ec2Nodes, nil
 }
@@ -224,7 +226,7 @@ func CreateWindowsNodes(client *rancher.Client, numOfInstancesWin int, testWindo
 				return nil, err
 			}
 
-			var ec2Nodes []*nodes.Node
+			// var ec2Nodes []*nodes.Node
 			for _, readyInstance := range readyInstances {
 				ec2Node := &nodes.Node{
 					NodeID:          *readyInstance.InstanceId,
@@ -234,12 +236,14 @@ func CreateWindowsNodes(client *rancher.Client, numOfInstancesWin int, testWindo
 				}
 				ec2Nodes = append(ec2Nodes, ec2Node)
 			}
+
+			client.Session.RegisterCleanupFunc(func() error {
+				return DeleteNodes(client, ec2Nodes)
+			})
+
+			return ec2Nodes, nil
 		}
 	}
-
-	client.Session.RegisterCleanupFunc(func() error {
-		return DeleteNodes(client, ec2Nodes)
-	})
 
 	return ec2Nodes, nil
 }
