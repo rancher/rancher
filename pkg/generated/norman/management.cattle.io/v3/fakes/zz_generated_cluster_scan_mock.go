@@ -29,22 +29,22 @@ var _ v31.ClusterScanLister = &ClusterScanListerMock{}
 
 // ClusterScanListerMock is a mock implementation of v31.ClusterScanLister.
 //
-//     func TestSomethingThatUsesClusterScanLister(t *testing.T) {
+//	    func TestSomethingThatUsesClusterScanLister(t *testing.T) {
 //
-//         // make and configure a mocked v31.ClusterScanLister
-//         mockedClusterScanLister := &ClusterScanListerMock{
-//             GetFunc: func(namespace string, name string) (*v3.ClusterScan, error) {
-// 	               panic("mock out the Get method")
-//             },
-//             ListFunc: func(namespace string, selector labels.Selector) ([]*v3.ClusterScan, error) {
-// 	               panic("mock out the List method")
-//             },
-//         }
+//	        // make and configure a mocked v31.ClusterScanLister
+//	        mockedClusterScanLister := &ClusterScanListerMock{
+//	            GetFunc: func(namespace string, name string) (*v3.ClusterScan, error) {
+//		               panic("mock out the Get method")
+//	            },
+//	            ListFunc: func(namespace string, selector labels.Selector) ([]*v3.ClusterScan, error) {
+//		               panic("mock out the List method")
+//	            },
+//	        }
 //
-//         // use mockedClusterScanLister in code that requires v31.ClusterScanLister
-//         // and then make assertions.
+//	        // use mockedClusterScanLister in code that requires v31.ClusterScanLister
+//	        // and then make assertions.
 //
-//     }
+//	    }
 type ClusterScanListerMock struct {
 	// GetFunc mocks the Get method.
 	GetFunc func(namespace string, name string) (*v3.ClusterScan, error)
@@ -91,7 +91,8 @@ func (mock *ClusterScanListerMock) Get(namespace string, name string) (*v3.Clust
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//     len(mockedClusterScanLister.GetCalls())
+//
+//	len(mockedClusterScanLister.GetCalls())
 func (mock *ClusterScanListerMock) GetCalls() []struct {
 	Namespace string
 	Name      string
@@ -126,7 +127,8 @@ func (mock *ClusterScanListerMock) List(namespace string, selector labels.Select
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//     len(mockedClusterScanLister.ListCalls())
+//
+//	len(mockedClusterScanLister.ListCalls())
 func (mock *ClusterScanListerMock) ListCalls() []struct {
 	Namespace string
 	Selector  labels.Selector
@@ -159,43 +161,43 @@ var _ v31.ClusterScanController = &ClusterScanControllerMock{}
 
 // ClusterScanControllerMock is a mock implementation of v31.ClusterScanController.
 //
-//     func TestSomethingThatUsesClusterScanController(t *testing.T) {
+//	    func TestSomethingThatUsesClusterScanController(t *testing.T) {
 //
-//         // make and configure a mocked v31.ClusterScanController
-//         mockedClusterScanController := &ClusterScanControllerMock{
-//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v31.ClusterScanHandlerFunc)  {
-// 	               panic("mock out the AddClusterScopedFeatureHandler method")
-//             },
-//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v31.ClusterScanHandlerFunc)  {
-// 	               panic("mock out the AddClusterScopedHandler method")
-//             },
-//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.ClusterScanHandlerFunc)  {
-// 	               panic("mock out the AddFeatureHandler method")
-//             },
-//             AddHandlerFunc: func(ctx context.Context, name string, handler v31.ClusterScanHandlerFunc)  {
-// 	               panic("mock out the AddHandler method")
-//             },
-//             EnqueueFunc: func(namespace string, name string)  {
-// 	               panic("mock out the Enqueue method")
-//             },
-//             EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
-// 	               panic("mock out the EnqueueAfter method")
-//             },
-//             GenericFunc: func() controller.GenericController {
-// 	               panic("mock out the Generic method")
-//             },
-//             InformerFunc: func() cache.SharedIndexInformer {
-// 	               panic("mock out the Informer method")
-//             },
-//             ListerFunc: func() v31.ClusterScanLister {
-// 	               panic("mock out the Lister method")
-//             },
-//         }
+//	        // make and configure a mocked v31.ClusterScanController
+//	        mockedClusterScanController := &ClusterScanControllerMock{
+//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v31.ClusterScanHandlerFunc)  {
+//		               panic("mock out the AddClusterScopedFeatureHandler method")
+//	            },
+//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v31.ClusterScanHandlerFunc)  {
+//		               panic("mock out the AddClusterScopedHandler method")
+//	            },
+//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.ClusterScanHandlerFunc)  {
+//		               panic("mock out the AddFeatureHandler method")
+//	            },
+//	            AddHandlerFunc: func(ctx context.Context, name string, handler v31.ClusterScanHandlerFunc)  {
+//		               panic("mock out the AddHandler method")
+//	            },
+//	            EnqueueFunc: func(namespace string, name string)  {
+//		               panic("mock out the Enqueue method")
+//	            },
+//	            EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
+//		               panic("mock out the EnqueueAfter method")
+//	            },
+//	            GenericFunc: func() controller.GenericController {
+//		               panic("mock out the Generic method")
+//	            },
+//	            InformerFunc: func() cache.SharedIndexInformer {
+//		               panic("mock out the Informer method")
+//	            },
+//	            ListerFunc: func() v31.ClusterScanLister {
+//		               panic("mock out the Lister method")
+//	            },
+//	        }
 //
-//         // use mockedClusterScanController in code that requires v31.ClusterScanController
-//         // and then make assertions.
+//	        // use mockedClusterScanController in code that requires v31.ClusterScanController
+//	        // and then make assertions.
 //
-//     }
+//	    }
 type ClusterScanControllerMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
 	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v31.ClusterScanHandlerFunc)
@@ -324,7 +326,8 @@ func (mock *ClusterScanControllerMock) AddClusterScopedFeatureHandler(ctx contex
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//     len(mockedClusterScanController.AddClusterScopedFeatureHandlerCalls())
+//
+//	len(mockedClusterScanController.AddClusterScopedFeatureHandlerCalls())
 func (mock *ClusterScanControllerMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -369,7 +372,8 @@ func (mock *ClusterScanControllerMock) AddClusterScopedHandler(ctx context.Conte
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//     len(mockedClusterScanController.AddClusterScopedHandlerCalls())
+//
+//	len(mockedClusterScanController.AddClusterScopedHandlerCalls())
 func (mock *ClusterScanControllerMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -412,7 +416,8 @@ func (mock *ClusterScanControllerMock) AddFeatureHandler(ctx context.Context, en
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//     len(mockedClusterScanController.AddFeatureHandlerCalls())
+//
+//	len(mockedClusterScanController.AddFeatureHandlerCalls())
 func (mock *ClusterScanControllerMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
@@ -453,7 +458,8 @@ func (mock *ClusterScanControllerMock) AddHandler(ctx context.Context, name stri
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//     len(mockedClusterScanController.AddHandlerCalls())
+//
+//	len(mockedClusterScanController.AddHandlerCalls())
 func (mock *ClusterScanControllerMock) AddHandlerCalls() []struct {
 	Ctx     context.Context
 	Name    string
@@ -490,7 +496,8 @@ func (mock *ClusterScanControllerMock) Enqueue(namespace string, name string) {
 
 // EnqueueCalls gets all the calls that were made to Enqueue.
 // Check the length with:
-//     len(mockedClusterScanController.EnqueueCalls())
+//
+//	len(mockedClusterScanController.EnqueueCalls())
 func (mock *ClusterScanControllerMock) EnqueueCalls() []struct {
 	Namespace string
 	Name      string
@@ -527,7 +534,8 @@ func (mock *ClusterScanControllerMock) EnqueueAfter(namespace string, name strin
 
 // EnqueueAfterCalls gets all the calls that were made to EnqueueAfter.
 // Check the length with:
-//     len(mockedClusterScanController.EnqueueAfterCalls())
+//
+//	len(mockedClusterScanController.EnqueueAfterCalls())
 func (mock *ClusterScanControllerMock) EnqueueAfterCalls() []struct {
 	Namespace string
 	Name      string
@@ -559,7 +567,8 @@ func (mock *ClusterScanControllerMock) Generic() controller.GenericController {
 
 // GenericCalls gets all the calls that were made to Generic.
 // Check the length with:
-//     len(mockedClusterScanController.GenericCalls())
+//
+//	len(mockedClusterScanController.GenericCalls())
 func (mock *ClusterScanControllerMock) GenericCalls() []struct {
 } {
 	var calls []struct {
@@ -585,7 +594,8 @@ func (mock *ClusterScanControllerMock) Informer() cache.SharedIndexInformer {
 
 // InformerCalls gets all the calls that were made to Informer.
 // Check the length with:
-//     len(mockedClusterScanController.InformerCalls())
+//
+//	len(mockedClusterScanController.InformerCalls())
 func (mock *ClusterScanControllerMock) InformerCalls() []struct {
 } {
 	var calls []struct {
@@ -611,7 +621,8 @@ func (mock *ClusterScanControllerMock) Lister() v31.ClusterScanLister {
 
 // ListerCalls gets all the calls that were made to Lister.
 // Check the length with:
-//     len(mockedClusterScanController.ListerCalls())
+//
+//	len(mockedClusterScanController.ListerCalls())
 func (mock *ClusterScanControllerMock) ListerCalls() []struct {
 } {
 	var calls []struct {
@@ -651,76 +662,76 @@ var _ v31.ClusterScanInterface = &ClusterScanInterfaceMock{}
 
 // ClusterScanInterfaceMock is a mock implementation of v31.ClusterScanInterface.
 //
-//     func TestSomethingThatUsesClusterScanInterface(t *testing.T) {
+//	    func TestSomethingThatUsesClusterScanInterface(t *testing.T) {
 //
-//         // make and configure a mocked v31.ClusterScanInterface
-//         mockedClusterScanInterface := &ClusterScanInterfaceMock{
-//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v31.ClusterScanHandlerFunc)  {
-// 	               panic("mock out the AddClusterScopedFeatureHandler method")
-//             },
-//             AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v31.ClusterScanLifecycle)  {
-// 	               panic("mock out the AddClusterScopedFeatureLifecycle method")
-//             },
-//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v31.ClusterScanHandlerFunc)  {
-// 	               panic("mock out the AddClusterScopedHandler method")
-//             },
-//             AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v31.ClusterScanLifecycle)  {
-// 	               panic("mock out the AddClusterScopedLifecycle method")
-//             },
-//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.ClusterScanHandlerFunc)  {
-// 	               panic("mock out the AddFeatureHandler method")
-//             },
-//             AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v31.ClusterScanLifecycle)  {
-// 	               panic("mock out the AddFeatureLifecycle method")
-//             },
-//             AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v31.ClusterScanHandlerFunc)  {
-// 	               panic("mock out the AddHandler method")
-//             },
-//             AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v31.ClusterScanLifecycle)  {
-// 	               panic("mock out the AddLifecycle method")
-//             },
-//             ControllerFunc: func() v31.ClusterScanController {
-// 	               panic("mock out the Controller method")
-//             },
-//             CreateFunc: func(in1 *v3.ClusterScan) (*v3.ClusterScan, error) {
-// 	               panic("mock out the Create method")
-//             },
-//             DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
-// 	               panic("mock out the Delete method")
-//             },
-//             DeleteCollectionFunc: func(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
-// 	               panic("mock out the DeleteCollection method")
-//             },
-//             DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
-// 	               panic("mock out the DeleteNamespaced method")
-//             },
-//             GetFunc: func(name string, opts metav1.GetOptions) (*v3.ClusterScan, error) {
-// 	               panic("mock out the Get method")
-//             },
-//             GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v3.ClusterScan, error) {
-// 	               panic("mock out the GetNamespaced method")
-//             },
-//             ListFunc: func(opts metav1.ListOptions) (*v3.ClusterScanList, error) {
-// 	               panic("mock out the List method")
-//             },
-//             ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v3.ClusterScanList, error) {
-// 	               panic("mock out the ListNamespaced method")
-//             },
-//             ObjectClientFunc: func() *objectclient.ObjectClient {
-// 	               panic("mock out the ObjectClient method")
-//             },
-//             UpdateFunc: func(in1 *v3.ClusterScan) (*v3.ClusterScan, error) {
-// 	               panic("mock out the Update method")
-//             },
-//             WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
-// 	               panic("mock out the Watch method")
-//             },
-//         }
+//	        // make and configure a mocked v31.ClusterScanInterface
+//	        mockedClusterScanInterface := &ClusterScanInterfaceMock{
+//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v31.ClusterScanHandlerFunc)  {
+//		               panic("mock out the AddClusterScopedFeatureHandler method")
+//	            },
+//	            AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v31.ClusterScanLifecycle)  {
+//		               panic("mock out the AddClusterScopedFeatureLifecycle method")
+//	            },
+//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v31.ClusterScanHandlerFunc)  {
+//		               panic("mock out the AddClusterScopedHandler method")
+//	            },
+//	            AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v31.ClusterScanLifecycle)  {
+//		               panic("mock out the AddClusterScopedLifecycle method")
+//	            },
+//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.ClusterScanHandlerFunc)  {
+//		               panic("mock out the AddFeatureHandler method")
+//	            },
+//	            AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v31.ClusterScanLifecycle)  {
+//		               panic("mock out the AddFeatureLifecycle method")
+//	            },
+//	            AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v31.ClusterScanHandlerFunc)  {
+//		               panic("mock out the AddHandler method")
+//	            },
+//	            AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v31.ClusterScanLifecycle)  {
+//		               panic("mock out the AddLifecycle method")
+//	            },
+//	            ControllerFunc: func() v31.ClusterScanController {
+//		               panic("mock out the Controller method")
+//	            },
+//	            CreateFunc: func(in1 *v3.ClusterScan) (*v3.ClusterScan, error) {
+//		               panic("mock out the Create method")
+//	            },
+//	            DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
+//		               panic("mock out the Delete method")
+//	            },
+//	            DeleteCollectionFunc: func(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
+//		               panic("mock out the DeleteCollection method")
+//	            },
+//	            DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
+//		               panic("mock out the DeleteNamespaced method")
+//	            },
+//	            GetFunc: func(name string, opts metav1.GetOptions) (*v3.ClusterScan, error) {
+//		               panic("mock out the Get method")
+//	            },
+//	            GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v3.ClusterScan, error) {
+//		               panic("mock out the GetNamespaced method")
+//	            },
+//	            ListFunc: func(opts metav1.ListOptions) (*v3.ClusterScanList, error) {
+//		               panic("mock out the List method")
+//	            },
+//	            ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v3.ClusterScanList, error) {
+//		               panic("mock out the ListNamespaced method")
+//	            },
+//	            ObjectClientFunc: func() *objectclient.ObjectClient {
+//		               panic("mock out the ObjectClient method")
+//	            },
+//	            UpdateFunc: func(in1 *v3.ClusterScan) (*v3.ClusterScan, error) {
+//		               panic("mock out the Update method")
+//	            },
+//	            WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
+//		               panic("mock out the Watch method")
+//	            },
+//	        }
 //
-//         // use mockedClusterScanInterface in code that requires v31.ClusterScanInterface
-//         // and then make assertions.
+//	        // use mockedClusterScanInterface in code that requires v31.ClusterScanInterface
+//	        // and then make assertions.
 //
-//     }
+//	    }
 type ClusterScanInterfaceMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
 	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v31.ClusterScanHandlerFunc)
@@ -973,7 +984,8 @@ func (mock *ClusterScanInterfaceMock) AddClusterScopedFeatureHandler(ctx context
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//     len(mockedClusterScanInterface.AddClusterScopedFeatureHandlerCalls())
+//
+//	len(mockedClusterScanInterface.AddClusterScopedFeatureHandlerCalls())
 func (mock *ClusterScanInterfaceMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -1020,7 +1032,8 @@ func (mock *ClusterScanInterfaceMock) AddClusterScopedFeatureLifecycle(ctx conte
 
 // AddClusterScopedFeatureLifecycleCalls gets all the calls that were made to AddClusterScopedFeatureLifecycle.
 // Check the length with:
-//     len(mockedClusterScanInterface.AddClusterScopedFeatureLifecycleCalls())
+//
+//	len(mockedClusterScanInterface.AddClusterScopedFeatureLifecycleCalls())
 func (mock *ClusterScanInterfaceMock) AddClusterScopedFeatureLifecycleCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -1065,7 +1078,8 @@ func (mock *ClusterScanInterfaceMock) AddClusterScopedHandler(ctx context.Contex
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//     len(mockedClusterScanInterface.AddClusterScopedHandlerCalls())
+//
+//	len(mockedClusterScanInterface.AddClusterScopedHandlerCalls())
 func (mock *ClusterScanInterfaceMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -1108,7 +1122,8 @@ func (mock *ClusterScanInterfaceMock) AddClusterScopedLifecycle(ctx context.Cont
 
 // AddClusterScopedLifecycleCalls gets all the calls that were made to AddClusterScopedLifecycle.
 // Check the length with:
-//     len(mockedClusterScanInterface.AddClusterScopedLifecycleCalls())
+//
+//	len(mockedClusterScanInterface.AddClusterScopedLifecycleCalls())
 func (mock *ClusterScanInterfaceMock) AddClusterScopedLifecycleCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -1151,7 +1166,8 @@ func (mock *ClusterScanInterfaceMock) AddFeatureHandler(ctx context.Context, ena
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//     len(mockedClusterScanInterface.AddFeatureHandlerCalls())
+//
+//	len(mockedClusterScanInterface.AddFeatureHandlerCalls())
 func (mock *ClusterScanInterfaceMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
@@ -1194,7 +1210,8 @@ func (mock *ClusterScanInterfaceMock) AddFeatureLifecycle(ctx context.Context, e
 
 // AddFeatureLifecycleCalls gets all the calls that were made to AddFeatureLifecycle.
 // Check the length with:
-//     len(mockedClusterScanInterface.AddFeatureLifecycleCalls())
+//
+//	len(mockedClusterScanInterface.AddFeatureLifecycleCalls())
 func (mock *ClusterScanInterfaceMock) AddFeatureLifecycleCalls() []struct {
 	Ctx       context.Context
 	Enabled   func() bool
@@ -1235,7 +1252,8 @@ func (mock *ClusterScanInterfaceMock) AddHandler(ctx context.Context, name strin
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//     len(mockedClusterScanInterface.AddHandlerCalls())
+//
+//	len(mockedClusterScanInterface.AddHandlerCalls())
 func (mock *ClusterScanInterfaceMock) AddHandlerCalls() []struct {
 	Ctx  context.Context
 	Name string
@@ -1274,7 +1292,8 @@ func (mock *ClusterScanInterfaceMock) AddLifecycle(ctx context.Context, name str
 
 // AddLifecycleCalls gets all the calls that were made to AddLifecycle.
 // Check the length with:
-//     len(mockedClusterScanInterface.AddLifecycleCalls())
+//
+//	len(mockedClusterScanInterface.AddLifecycleCalls())
 func (mock *ClusterScanInterfaceMock) AddLifecycleCalls() []struct {
 	Ctx       context.Context
 	Name      string
@@ -1306,7 +1325,8 @@ func (mock *ClusterScanInterfaceMock) Controller() v31.ClusterScanController {
 
 // ControllerCalls gets all the calls that were made to Controller.
 // Check the length with:
-//     len(mockedClusterScanInterface.ControllerCalls())
+//
+//	len(mockedClusterScanInterface.ControllerCalls())
 func (mock *ClusterScanInterfaceMock) ControllerCalls() []struct {
 } {
 	var calls []struct {
@@ -1335,7 +1355,8 @@ func (mock *ClusterScanInterfaceMock) Create(in1 *v3.ClusterScan) (*v3.ClusterSc
 
 // CreateCalls gets all the calls that were made to Create.
 // Check the length with:
-//     len(mockedClusterScanInterface.CreateCalls())
+//
+//	len(mockedClusterScanInterface.CreateCalls())
 func (mock *ClusterScanInterfaceMock) CreateCalls() []struct {
 	In1 *v3.ClusterScan
 } {
@@ -1368,7 +1389,8 @@ func (mock *ClusterScanInterfaceMock) Delete(name string, options *metav1.Delete
 
 // DeleteCalls gets all the calls that were made to Delete.
 // Check the length with:
-//     len(mockedClusterScanInterface.DeleteCalls())
+//
+//	len(mockedClusterScanInterface.DeleteCalls())
 func (mock *ClusterScanInterfaceMock) DeleteCalls() []struct {
 	Name    string
 	Options *metav1.DeleteOptions
@@ -1403,7 +1425,8 @@ func (mock *ClusterScanInterfaceMock) DeleteCollection(deleteOpts *metav1.Delete
 
 // DeleteCollectionCalls gets all the calls that were made to DeleteCollection.
 // Check the length with:
-//     len(mockedClusterScanInterface.DeleteCollectionCalls())
+//
+//	len(mockedClusterScanInterface.DeleteCollectionCalls())
 func (mock *ClusterScanInterfaceMock) DeleteCollectionCalls() []struct {
 	DeleteOpts *metav1.DeleteOptions
 	ListOpts   metav1.ListOptions
@@ -1440,7 +1463,8 @@ func (mock *ClusterScanInterfaceMock) DeleteNamespaced(namespace string, name st
 
 // DeleteNamespacedCalls gets all the calls that were made to DeleteNamespaced.
 // Check the length with:
-//     len(mockedClusterScanInterface.DeleteNamespacedCalls())
+//
+//	len(mockedClusterScanInterface.DeleteNamespacedCalls())
 func (mock *ClusterScanInterfaceMock) DeleteNamespacedCalls() []struct {
 	Namespace string
 	Name      string
@@ -1477,7 +1501,8 @@ func (mock *ClusterScanInterfaceMock) Get(name string, opts metav1.GetOptions) (
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//     len(mockedClusterScanInterface.GetCalls())
+//
+//	len(mockedClusterScanInterface.GetCalls())
 func (mock *ClusterScanInterfaceMock) GetCalls() []struct {
 	Name string
 	Opts metav1.GetOptions
@@ -1514,7 +1539,8 @@ func (mock *ClusterScanInterfaceMock) GetNamespaced(namespace string, name strin
 
 // GetNamespacedCalls gets all the calls that were made to GetNamespaced.
 // Check the length with:
-//     len(mockedClusterScanInterface.GetNamespacedCalls())
+//
+//	len(mockedClusterScanInterface.GetNamespacedCalls())
 func (mock *ClusterScanInterfaceMock) GetNamespacedCalls() []struct {
 	Namespace string
 	Name      string
@@ -1549,7 +1575,8 @@ func (mock *ClusterScanInterfaceMock) List(opts metav1.ListOptions) (*v3.Cluster
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//     len(mockedClusterScanInterface.ListCalls())
+//
+//	len(mockedClusterScanInterface.ListCalls())
 func (mock *ClusterScanInterfaceMock) ListCalls() []struct {
 	Opts metav1.ListOptions
 } {
@@ -1582,7 +1609,8 @@ func (mock *ClusterScanInterfaceMock) ListNamespaced(namespace string, opts meta
 
 // ListNamespacedCalls gets all the calls that were made to ListNamespaced.
 // Check the length with:
-//     len(mockedClusterScanInterface.ListNamespacedCalls())
+//
+//	len(mockedClusterScanInterface.ListNamespacedCalls())
 func (mock *ClusterScanInterfaceMock) ListNamespacedCalls() []struct {
 	Namespace string
 	Opts      metav1.ListOptions
@@ -1612,7 +1640,8 @@ func (mock *ClusterScanInterfaceMock) ObjectClient() *objectclient.ObjectClient 
 
 // ObjectClientCalls gets all the calls that were made to ObjectClient.
 // Check the length with:
-//     len(mockedClusterScanInterface.ObjectClientCalls())
+//
+//	len(mockedClusterScanInterface.ObjectClientCalls())
 func (mock *ClusterScanInterfaceMock) ObjectClientCalls() []struct {
 } {
 	var calls []struct {
@@ -1641,7 +1670,8 @@ func (mock *ClusterScanInterfaceMock) Update(in1 *v3.ClusterScan) (*v3.ClusterSc
 
 // UpdateCalls gets all the calls that were made to Update.
 // Check the length with:
-//     len(mockedClusterScanInterface.UpdateCalls())
+//
+//	len(mockedClusterScanInterface.UpdateCalls())
 func (mock *ClusterScanInterfaceMock) UpdateCalls() []struct {
 	In1 *v3.ClusterScan
 } {
@@ -1672,7 +1702,8 @@ func (mock *ClusterScanInterfaceMock) Watch(opts metav1.ListOptions) (watch.Inte
 
 // WatchCalls gets all the calls that were made to Watch.
 // Check the length with:
-//     len(mockedClusterScanInterface.WatchCalls())
+//
+//	len(mockedClusterScanInterface.WatchCalls())
 func (mock *ClusterScanInterfaceMock) WatchCalls() []struct {
 	Opts metav1.ListOptions
 } {
@@ -1695,19 +1726,19 @@ var _ v31.ClusterScansGetter = &ClusterScansGetterMock{}
 
 // ClusterScansGetterMock is a mock implementation of v31.ClusterScansGetter.
 //
-//     func TestSomethingThatUsesClusterScansGetter(t *testing.T) {
+//	    func TestSomethingThatUsesClusterScansGetter(t *testing.T) {
 //
-//         // make and configure a mocked v31.ClusterScansGetter
-//         mockedClusterScansGetter := &ClusterScansGetterMock{
-//             ClusterScansFunc: func(namespace string) v31.ClusterScanInterface {
-// 	               panic("mock out the ClusterScans method")
-//             },
-//         }
+//	        // make and configure a mocked v31.ClusterScansGetter
+//	        mockedClusterScansGetter := &ClusterScansGetterMock{
+//	            ClusterScansFunc: func(namespace string) v31.ClusterScanInterface {
+//		               panic("mock out the ClusterScans method")
+//	            },
+//	        }
 //
-//         // use mockedClusterScansGetter in code that requires v31.ClusterScansGetter
-//         // and then make assertions.
+//	        // use mockedClusterScansGetter in code that requires v31.ClusterScansGetter
+//	        // and then make assertions.
 //
-//     }
+//	    }
 type ClusterScansGetterMock struct {
 	// ClusterScansFunc mocks the ClusterScans method.
 	ClusterScansFunc func(namespace string) v31.ClusterScanInterface
@@ -1740,7 +1771,8 @@ func (mock *ClusterScansGetterMock) ClusterScans(namespace string) v31.ClusterSc
 
 // ClusterScansCalls gets all the calls that were made to ClusterScans.
 // Check the length with:
-//     len(mockedClusterScansGetter.ClusterScansCalls())
+//
+//	len(mockedClusterScansGetter.ClusterScansCalls())
 func (mock *ClusterScansGetterMock) ClusterScansCalls() []struct {
 	Namespace string
 } {

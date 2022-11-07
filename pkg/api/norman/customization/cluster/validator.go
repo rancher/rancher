@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"reflect"
 	"strings"
-	"time"
 
 	"github.com/Azure/azure-sdk-for-go/services/containerservice/mgmt/2020-11-01/containerservice"
 	"github.com/Azure/go-autorest/autorest/to"
@@ -18,13 +17,11 @@ import (
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	mgmtclient "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	"github.com/rancher/rancher/pkg/controllers/management/k3sbasedupgrade"
-	"github.com/rancher/rancher/pkg/controllers/managementuserlegacy/cis"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/kontainer-engine/service"
 	"github.com/rancher/rancher/pkg/namespace"
 	mgmtSchema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/settings"
-	"github.com/robfig/cron"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -36,10 +33,6 @@ type Validator struct {
 	Users                         v3.UserInterface
 	GrbLister                     v3.GlobalRoleBindingLister
 	GrLister                      v3.GlobalRoleLister
-	CisConfigClient               v3.CisConfigInterface
-	CisConfigLister               v3.CisConfigLister
-	CisBenchmarkVersionClient     v3.CisBenchmarkVersionInterface
-	CisBenchmarkVersionLister     v3.CisBenchmarkVersionLister
 }
 
 func (v *Validator) Validator(request *types.APIContext, schema *types.Schema, data map[string]interface{}) error {
@@ -65,10 +58,6 @@ func (v *Validator) Validator(request *types.APIContext, schema *types.Schema, d
 		return err
 	}
 
-	if err := v.validateScheduledClusterScan(&clientClusterSpec); err != nil {
-		return err
-	}
-
 	if err := v.validateGenericEngineConfig(request, &clusterSpec); err != nil {
 		return err
 	}
@@ -82,71 +71,6 @@ func (v *Validator) Validator(request *types.APIContext, schema *types.Schema, d
 	}
 
 	return v.validateGKEConfig(request, data, &clusterSpec)
-}
-
-func (v *Validator) validateScheduledClusterScan(spec *mgmtclient.Cluster) error {
-	// If this cluster is created using a template, we dont have the version in the provided data, skip
-	if spec.ClusterTemplateRevisionID != "" {
-		return nil
-	}
-
-	// If CIS scan is not present/enabled, skip
-	if spec.ScheduledClusterScan == nil ||
-		(spec.ScheduledClusterScan != nil && !spec.ScheduledClusterScan.Enabled) {
-		return nil
-	}
-	currentK8sVersion := spec.RancherKubernetesEngineConfig.Version
-	overrideBenchmarkVersion := ""
-	if spec.ScheduledClusterScan.ScanConfig.CisScanConfig != nil {
-		overrideBenchmarkVersion = spec.ScheduledClusterScan.ScanConfig.CisScanConfig.OverrideBenchmarkVersion
-	}
-	_, _, err := cis.GetBenchmarkVersionToUse(overrideBenchmarkVersion, currentK8sVersion,
-		v.CisConfigLister, v.CisConfigClient,
-		v.CisBenchmarkVersionLister, v.CisBenchmarkVersionClient,
-	)
-	if err != nil {
-		return httperror.NewAPIError(httperror.InvalidBodyContent, err.Error())
-	}
-	return validateScheduledClusterScan(spec)
-}
-
-func validateScheduledClusterScan(spec *mgmtclient.Cluster) error {
-	// If this cluster is created using a template, we dont have the version in the provided data, skip
-	if spec.ClusterTemplateRevisionID != "" {
-		return nil
-	}
-
-	if spec.ScheduledClusterScan.ScanConfig != nil &&
-		spec.ScheduledClusterScan.ScanConfig.CisScanConfig != nil {
-		profile := spec.ScheduledClusterScan.ScanConfig.CisScanConfig.Profile
-		if profile != string(v32.CisScanProfileTypePermissive) &&
-			profile != string(v32.CisScanProfileTypeHardened) {
-			return httperror.NewFieldAPIError(httperror.InvalidOption, "ScheduledClusterScan.ScanConfig.CisScanConfig.Profile", "profile can be either permissive or hardened")
-		}
-	}
-
-	if spec.ScheduledClusterScan.ScheduleConfig != nil {
-		if spec.ScheduledClusterScan.ScheduleConfig.Retention < 0 {
-			return httperror.NewFieldAPIError(httperror.MinLimitExceeded, "ScheduledClusterScan.ScheduleConfig.Retention", "Retention count cannot be negative")
-		}
-		schedule, err := cron.ParseStandard(spec.ScheduledClusterScan.ScheduleConfig.CronSchedule)
-		if err != nil {
-			return httperror.NewFieldAPIError(httperror.InvalidFormat, "ScheduledClusterScan.ScheduleConfig.CronSchedule", fmt.Sprintf("error parsing cron schedule: %v", err))
-		}
-		now := time.Now().Round(time.Second)
-		next1 := schedule.Next(now).Round(time.Second)
-		next2 := schedule.Next(next1).Round(time.Second)
-		timeAfter := next2.Sub(next1).Round(time.Second)
-
-		if timeAfter < (1 * time.Hour) {
-			if spec.ScheduledClusterScan.ScanConfig.CisScanConfig.DebugMaster ||
-				spec.ScheduledClusterScan.ScanConfig.CisScanConfig.DebugWorker {
-				return nil
-			}
-			return httperror.NewFieldAPIError(httperror.MinLimitExceeded, "ScheduledClusterScan.ScheduleConfig.CronSchedule", "minimum interval is one hour")
-		}
-	}
-	return nil
 }
 
 func (v *Validator) validateLocalClusterAuthEndpoint(request *types.APIContext, spec *v32.ClusterSpec) error {

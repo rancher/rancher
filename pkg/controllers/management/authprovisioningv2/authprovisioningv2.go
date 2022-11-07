@@ -31,6 +31,8 @@ type handler struct {
 	roleCache                            rbacv1.RoleCache
 	roleController                       rbacv1.RoleController
 	roleBindingController                rbacv1.RoleBindingController
+	clusterRoleController                rbacv1.ClusterRoleController
+	clusterRoleBindingController         rbacv1.ClusterRoleBindingController
 	clusterRoleCache                     rbacv1.ClusterRoleCache
 	roleTemplateController               mgmtcontrollers.RoleTemplateController
 	clusterRoleTemplateBindings          mgmtcontrollers.ClusterRoleTemplateBindingCache
@@ -38,6 +40,7 @@ type handler struct {
 	projectRoleTemplateBindingController mgmtcontrollers.ProjectRoleTemplateBindingController
 	roleTemplatesCache                   mgmtcontrollers.RoleTemplateCache
 	clusters                             provisioningcontrollers.ClusterCache
+	mgmtClusters                         mgmtcontrollers.ClusterCache
 	crdCache                             apiextcontrollers.CustomResourceDefinitionCache
 	dynamic                              *dynamic.Controller
 	resources                            map[schema.GroupVersionKind]resourceMatch
@@ -60,6 +63,8 @@ func Register(ctx context.Context, clients *wrangler.Context, management *config
 		roleCache:                            clients.RBAC.Role().Cache(),
 		roleController:                       clients.RBAC.Role(),
 		roleBindingController:                clients.RBAC.RoleBinding(),
+		clusterRoleController:                clients.RBAC.ClusterRole(),
+		clusterRoleBindingController:         clients.RBAC.ClusterRoleBinding(),
 		clusterRoleCache:                     clients.RBAC.ClusterRole().Cache(),
 		roleTemplateController:               clients.Mgmt.RoleTemplate(),
 		clusterRoleTemplateBindings:          clients.Mgmt.ClusterRoleTemplateBinding().Cache(),
@@ -67,6 +72,7 @@ func Register(ctx context.Context, clients *wrangler.Context, management *config
 		projectRoleTemplateBindingController: clients.Mgmt.ProjectRoleTemplateBinding(),
 		roleTemplatesCache:                   clients.Mgmt.RoleTemplate().Cache(),
 		clusters:                             clients.Provisioning.Cluster().Cache(),
+		mgmtClusters:                         clients.Mgmt.Cluster().Cache(),
 		crdCache:                             clients.CRD.CustomResourceDefinition().Cache(),
 		dynamic:                              clients.Dynamic,
 		apply: clients.Apply.WithCacheTypes(
@@ -88,6 +94,10 @@ func Register(ctx context.Context, clients *wrangler.Context, management *config
 	clients.Mgmt.RoleTemplate().OnChange(ctx, "auth-prov-v2-roletemplate", h.OnChange)
 	clients.Mgmt.ClusterRoleTemplateBinding().OnChange(ctx, "auth-prov-v2-crtb", h.OnCRTB)
 	clients.Mgmt.ProjectRoleTemplateBinding().OnChange(ctx, "auth-prov-v2-prtb", h.OnPRTB)
+	clients.RBAC.Role().OnRemove(ctx, "auth-prov-v2-role", h.OnRemoveRole)
+	clients.RBAC.RoleBinding().OnRemove(ctx, "auth-prov-v2-rb", h.OnRemoveRoleBinding)
+	clients.RBAC.ClusterRole().OnRemove(ctx, "auth-prov-v2-crole", h.OnRemoveClusterRole)
+	clients.RBAC.ClusterRoleBinding().OnRemove(ctx, "auth-prov-v2-crb", h.OnRemoveClusterRoleBinding)
 	clients.Provisioning.Cluster().OnChange(ctx, "auth-prov-v2-cluster", h.OnCluster)
 	clients.CRD.CustomResourceDefinition().OnChange(ctx, "auth-prov-v2-crd", h.OnCRD)
 	if features.RKE2.Enabled() {

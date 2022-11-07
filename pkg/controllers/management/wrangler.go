@@ -6,7 +6,6 @@ import (
 	"github.com/rancher/rancher/pkg/clustermanager"
 	"github.com/rancher/rancher/pkg/controllers/management/aks"
 	"github.com/rancher/rancher/pkg/controllers/management/authprovisioningv2"
-	"github.com/rancher/rancher/pkg/controllers/management/clusterconnected"
 	"github.com/rancher/rancher/pkg/controllers/management/clusterupstreamrefresher"
 	"github.com/rancher/rancher/pkg/controllers/management/eks"
 	"github.com/rancher/rancher/pkg/controllers/management/feature"
@@ -25,7 +24,6 @@ func RegisterWrangler(ctx context.Context, wranglerContext *wrangler.Context, ma
 	clusterupstreamrefresher.Register(ctx, wranglerContext)
 
 	feature.Register(ctx, wranglerContext)
-	clusterconnected.Register(ctx, wranglerContext)
 
 	if features.ProvisioningV2.Enabled() {
 		if err := authprovisioningv2.Register(ctx, wranglerContext, management); err != nil {

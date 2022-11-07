@@ -7,7 +7,7 @@ import (
 )
 
 type LogWriter struct {
-	Level  int
+	Level  Level
 	Output *lumberjack.Logger
 }
 
@@ -21,8 +21,8 @@ func (l *LogWriter) Start(ctx context.Context) {
 	}()
 }
 
-func NewLogWriter(path string, level, maxAge, maxBackup, maxSize int) *LogWriter {
-	if path == "" || level == levelNull {
+func NewLogWriter(path string, level Level, maxAge, maxBackup, maxSize int) *LogWriter {
+	if path == "" || level == LevelNull {
 		return nil
 	}
 

@@ -56,7 +56,7 @@ func (c *crtbLifecycle) syncCRTB(binding *v3.ClusterRoleTemplateBinding) error {
 	}
 
 	roles := map[string]*v3.RoleTemplate{}
-	if err := c.m.gatherRoles(rt, roles); err != nil {
+	if err := c.m.gatherRoles(rt, roles, 0); err != nil {
 		return err
 	}
 

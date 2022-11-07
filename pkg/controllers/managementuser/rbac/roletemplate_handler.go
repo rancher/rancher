@@ -17,7 +17,7 @@ func newRTLifecycle(m *manager) v3.RoleTemplateHandlerFunc {
 
 // rtSync is responsible for ensuring that roleTemplates and their corresponding clusterRoles stay in sync.
 // This means that if a roleTemplate's rules change, this handler will ensure the corresponding clusterRole's rules are changed
-//If a roleTemplate is removed the management lifecycle will remove the clusterRole from user clusters
+// If a roleTemplate is removed the management lifecycle will remove the clusterRole from user clusters
 // This handler does not create new clusterRoles. They are created on the fly when a ProjectRoleTemplateBinding or
 // ClusterRoleTemplateBinding references the roleTemplates. This handler only ensures they remain in-sync after being created
 type rtSync struct {
@@ -55,7 +55,7 @@ func (c *rtSync) sync(key string, obj *v3.RoleTemplate) (runtime.Object, error) 
 
 func (c *rtSync) syncRT(template *v3.RoleTemplate, usedInProjects bool, prtbs []interface{}, crtbs []interface{}) error {
 	roles := map[string]*v3.RoleTemplate{}
-	if err := c.m.gatherRoles(template, roles); err != nil {
+	if err := c.m.gatherRoles(template, roles, 0); err != nil {
 		return err
 	}
 

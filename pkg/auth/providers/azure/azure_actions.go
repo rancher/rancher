@@ -13,7 +13,6 @@ import (
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/providers/azure/clients"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
-	"github.com/rancher/rancher/pkg/auth/tokens"
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	managementschema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
@@ -37,7 +36,7 @@ func (ap *azureProvider) actionHandler(actionName string, action *types.Action, 
 	}
 
 	if actionName == "configureTest" {
-		return ap.configureTest(actionName, action, request)
+		return ap.ConfigureTest(actionName, action, request)
 	} else if actionName == "testAndApply" {
 		return ap.testAndApply(actionName, action, request)
 	} else if actionName == "upgrade" {
@@ -47,7 +46,7 @@ func (ap *azureProvider) actionHandler(actionName string, action *types.Action, 
 	return httperror.NewAPIError(httperror.ActionNotAvailable, "")
 }
 
-func (ap *azureProvider) configureTest(actionName string, action *types.Action, request *types.APIContext) error {
+func (ap *azureProvider) ConfigureTest(actionName string, action *types.Action, request *types.APIContext) error {
 	// Verify the body has all required fields
 	input, err := handler.ParseAndValidateActionBody(request, request.Schemas.Schema(&managementschema.Version,
 		client.AzureADConfigType))
@@ -65,6 +64,17 @@ func (ap *azureProvider) configureTest(actionName string, action *types.Action, 
 }
 
 func (ap *azureProvider) testAndApply(actionName string, action *types.Action, request *types.APIContext) error {
+	var err error
+	// On any error, delete the cached secret containing the access token to the Microsoft Graph, in case it had been
+	// cached without having sufficient API permissions. Rancher has no precise control over when this secret is cached.
+	defer func() {
+		if err != nil {
+			if err = ap.secrets.DeleteNamespaced(common.SecretsNamespace, clients.AccessTokenSecretName, &metav1.DeleteOptions{}); err != nil {
+				logrus.Errorf("Failed to delete the Azure AD access token secret from Kubernetes")
+			}
+		}
+	}()
+
 	azureADConfigApplyInput := &v32.AzureADConfigApplyInput{}
 	if err := json.NewDecoder(request.Request.Body).Decode(azureADConfigApplyInput); err != nil {
 		return httperror.NewAPIError(httperror.InvalidBodyContent,
@@ -73,14 +83,12 @@ func (ap *azureProvider) testAndApply(actionName string, action *types.Action, r
 
 	azureADConfig := &azureADConfigApplyInput.Config
 
-	// This covers the case where users upgrade Rancher to v2.6.7+ without having used Azure AD as the auth provider.
-	// In 2.6.7+, whether Azure AD is later registered or not, Rancher on startup creates the annotation on the template auth config.
-	// But in the case where the auth config had been created on Rancher startup prior to v2.6.7, the annotation would be missing.
-	// This ensures the annotation is set on next auth provider setup attempt.
-	if azureADConfig.ObjectMeta.Annotations == nil {
-		azureADConfig.ObjectMeta.Annotations = make(map[string]string)
+	currentConfig, err := ap.getAzureConfigK8s()
+	if err != nil {
+		logrus.Errorf("Failed to fetch Azure AD Config from Kubernetes: %v", err)
+		return httperror.NewAPIError(httperror.ServerError, "failed to fetch Azure AD Config from Kubernetes")
 	}
-	azureADConfig.ObjectMeta.Annotations[GraphEndpointMigratedAnnotation] = "true"
+	migrateNewFlowAnnotation(currentConfig, azureADConfig)
 
 	azureLogin := &v32.AzureADLogin{
 		Code: azureADConfigApplyInput.Code,
@@ -118,53 +126,19 @@ func (ap *azureProvider) testAndApply(actionName string, action *types.Action, r
 	return ap.tokenMGR.CreateTokenAndSetCookie(user.Name, userPrincipal, groupPrincipals, providerToken, 0, "Token via Azure Configuration", request, userExtraInfo)
 }
 
-// migrateToMicrosoftGraph represents the migration of the registered Azure AD auth provider
-// from the deprecated Azure AD Graph API to the Microsoft Graph API.
-// It modifies the existing auth config value in the database, so that it has up-to-date endpoints to the new API.
-// Most importantly, it sets the annotation that specifies that the auth config has been migrated to use the new auth flow.
-func (ap *azureProvider) migrateToMicrosoftGraph() error {
-	defer ap.deleteUserAccessTokens()
-	defer clients.GroupCache.Purge()
-
-	cfg, err := ap.getAzureConfigK8s()
-	if err != nil {
-		return err
-	}
-	if authProviderEnabled(cfg) {
-		updateAzureADEndpoints(cfg)
-
-		if cfg.ObjectMeta.Annotations == nil {
-			cfg.ObjectMeta.Annotations = make(map[string]string)
-		}
-		cfg.ObjectMeta.Annotations[GraphEndpointMigratedAnnotation] = "true"
-
-		err = ap.saveAzureConfigK8s(cfg)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-// deleteUserAccessTokens attempts to delete all secrets that contain users' access tokens used for working with
-// the deprecated Azure AD Graph API.
-// It is not possible to filter secrets easily by presence of specific key(s) in the data object. The method fetches all
-// Opaque secrets in the relevant namespace and looks at the target key in the data to find a secret that stores a user's
-// access token to delete.
-func (ap *azureProvider) deleteUserAccessTokens() {
-	secrets, err := ap.secrets.ListNamespaced(tokens.SecretNamespace, metav1.ListOptions{FieldSelector: "type=Opaque"})
-	if err != nil {
-		logrus.Errorf("failed to fetch secrets: %v", err)
+// Check the current auth config and make sure that the proposed one submitted through the API has up-to-date annotations.
+// Rancher relies on GraphEndpointMigratedAnnotation to choose the right authentication flow and Graph API.
+func migrateNewFlowAnnotation(current, proposed *v32.AzureADConfig) {
+	if isConfigDeprecated(current) {
 		return
 	}
-	// Provider name for Azure AD is the main key on secret data. This allows to identify the secrets to be deleted.
-	const key = Name
-	for _, secret := range secrets.Items {
-		if _, keyPresent := secret.Data[key]; keyPresent {
-			err := ap.secrets.DeleteNamespaced(tokens.SecretNamespace, secret.Name, &metav1.DeleteOptions{})
-			if err != nil {
-				logrus.Errorf("failed to delete secret %s:%s - %v", tokens.SecretNamespace, secret.Name, err)
-			}
-		}
+	// This covers the case where admins upgrade Rancher to v2.6.7+ without having used Azure AD as the auth provider.
+	// In 2.6.7+, whether Azure AD is later registered or not, Rancher on startup creates the annotation on the template auth config.
+	// But in the case where the auth config had been created on Rancher startup prior to v2.6.7, the annotation would be missing.
+	// This ensures the annotation is set on initial attempt to set up Azure AD.
+	// This also covers the case where admins want to reconfigure a v2.6.7+ new auth flow setup with a new secret or app.
+	if proposed.ObjectMeta.Annotations == nil {
+		proposed.ObjectMeta.Annotations = make(map[string]string)
 	}
+	proposed.ObjectMeta.Annotations[GraphEndpointMigratedAnnotation] = "true"
 }

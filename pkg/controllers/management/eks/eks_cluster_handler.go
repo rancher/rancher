@@ -252,12 +252,14 @@ func (e *eksOperatorController) onClusterChange(key string, cluster *mgmtv3.Clus
 			if mustTunnel != nil {
 				cluster = cluster.DeepCopy()
 				cluster.Status.EKSStatus.PrivateRequiresTunnel = mustTunnel
-				secret, err := secretmigrator.NewMigrator(e.SecretsCache, e.Secrets).CreateOrUpdateServiceAccountTokenSecret(cluster.Status.ServiceAccountTokenSecret, serviceToken, cluster)
-				if err != nil {
-					return nil, err
+				if serviceToken != "" {
+					secret, err := secretmigrator.NewMigrator(e.SecretsCache, e.Secrets).CreateOrUpdateServiceAccountTokenSecret(cluster.Status.ServiceAccountTokenSecret, serviceToken, cluster)
+					if err != nil {
+						return cluster, err
+					}
+					cluster.Status.ServiceAccountTokenSecret = secret.Name
+					cluster.Status.ServiceAccountToken = ""
 				}
-				cluster.Status.ServiceAccountTokenSecret = secret.Name
-				cluster.Status.ServiceAccountToken = ""
 				return e.ClusterClient.Update(cluster)
 			}
 			if err != nil {

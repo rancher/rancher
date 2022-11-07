@@ -26,6 +26,7 @@ const (
 	ClusterFieldCapabilities                         = "capabilities"
 	ClusterFieldCapacity                             = "capacity"
 	ClusterFieldCertificatesExpiration               = "certificatesExpiration"
+	ClusterFieldClusterSecrets                       = "clusterSecrets"
 	ClusterFieldClusterTemplateAnswers               = "answers"
 	ClusterFieldClusterTemplateID                    = "clusterTemplateId"
 	ClusterFieldClusterTemplateQuestions             = "questions"
@@ -109,6 +110,7 @@ type Cluster struct {
 	Capabilities                         *Capabilities                  `json:"capabilities,omitempty" yaml:"capabilities,omitempty"`
 	Capacity                             map[string]string              `json:"capacity,omitempty" yaml:"capacity,omitempty"`
 	CertificatesExpiration               map[string]CertExpiration      `json:"certificatesExpiration,omitempty" yaml:"certificatesExpiration,omitempty"`
+	ClusterSecrets                       *ClusterSecrets                `json:"clusterSecrets,omitempty" yaml:"clusterSecrets,omitempty"`
 	ClusterTemplateAnswers               *Answer                        `json:"answers,omitempty" yaml:"answers,omitempty"`
 	ClusterTemplateID                    string                         `json:"clusterTemplateId,omitempty" yaml:"clusterTemplateId,omitempty"`
 	ClusterTemplateQuestions             []Question                     `json:"questions,omitempty" yaml:"questions,omitempty"`
@@ -208,8 +210,6 @@ type ClusterOperations interface {
 	ActionRotateCertificates(resource *Cluster, input *RotateCertificateInput) (*RotateCertificateOutput, error)
 
 	ActionRotateEncryptionKey(resource *Cluster) (*RotateEncryptionKeyOutput, error)
-
-	ActionRunSecurityScan(resource *Cluster, input *CisScanConfig) error
 
 	ActionSaveAsTemplate(resource *Cluster, input *SaveAsTemplateInput) (*SaveAsTemplateOutput, error)
 
@@ -338,11 +338,6 @@ func (c *ClusterClient) ActionRotateEncryptionKey(resource *Cluster) (*RotateEnc
 	resp := &RotateEncryptionKeyOutput{}
 	err := c.apiClient.Ops.DoAction(ClusterType, "rotateEncryptionKey", &resource.Resource, nil, resp)
 	return resp, err
-}
-
-func (c *ClusterClient) ActionRunSecurityScan(resource *Cluster, input *CisScanConfig) error {
-	err := c.apiClient.Ops.DoAction(ClusterType, "runSecurityScan", &resource.Resource, input, nil)
-	return err
 }
 
 func (c *ClusterClient) ActionSaveAsTemplate(resource *Cluster, input *SaveAsTemplateInput) (*SaveAsTemplateOutput, error) {

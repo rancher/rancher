@@ -29,22 +29,22 @@ var _ v31.GroupLister = &GroupListerMock{}
 
 // GroupListerMock is a mock implementation of v31.GroupLister.
 //
-//     func TestSomethingThatUsesGroupLister(t *testing.T) {
+//	    func TestSomethingThatUsesGroupLister(t *testing.T) {
 //
-//         // make and configure a mocked v31.GroupLister
-//         mockedGroupLister := &GroupListerMock{
-//             GetFunc: func(namespace string, name string) (*v3.Group, error) {
-// 	               panic("mock out the Get method")
-//             },
-//             ListFunc: func(namespace string, selector labels.Selector) ([]*v3.Group, error) {
-// 	               panic("mock out the List method")
-//             },
-//         }
+//	        // make and configure a mocked v31.GroupLister
+//	        mockedGroupLister := &GroupListerMock{
+//	            GetFunc: func(namespace string, name string) (*v3.Group, error) {
+//		               panic("mock out the Get method")
+//	            },
+//	            ListFunc: func(namespace string, selector labels.Selector) ([]*v3.Group, error) {
+//		               panic("mock out the List method")
+//	            },
+//	        }
 //
-//         // use mockedGroupLister in code that requires v31.GroupLister
-//         // and then make assertions.
+//	        // use mockedGroupLister in code that requires v31.GroupLister
+//	        // and then make assertions.
 //
-//     }
+//	    }
 type GroupListerMock struct {
 	// GetFunc mocks the Get method.
 	GetFunc func(namespace string, name string) (*v3.Group, error)
@@ -91,7 +91,8 @@ func (mock *GroupListerMock) Get(namespace string, name string) (*v3.Group, erro
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//     len(mockedGroupLister.GetCalls())
+//
+//	len(mockedGroupLister.GetCalls())
 func (mock *GroupListerMock) GetCalls() []struct {
 	Namespace string
 	Name      string
@@ -126,7 +127,8 @@ func (mock *GroupListerMock) List(namespace string, selector labels.Selector) ([
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//     len(mockedGroupLister.ListCalls())
+//
+//	len(mockedGroupLister.ListCalls())
 func (mock *GroupListerMock) ListCalls() []struct {
 	Namespace string
 	Selector  labels.Selector
@@ -159,43 +161,43 @@ var _ v31.GroupController = &GroupControllerMock{}
 
 // GroupControllerMock is a mock implementation of v31.GroupController.
 //
-//     func TestSomethingThatUsesGroupController(t *testing.T) {
+//	    func TestSomethingThatUsesGroupController(t *testing.T) {
 //
-//         // make and configure a mocked v31.GroupController
-//         mockedGroupController := &GroupControllerMock{
-//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v31.GroupHandlerFunc)  {
-// 	               panic("mock out the AddClusterScopedFeatureHandler method")
-//             },
-//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v31.GroupHandlerFunc)  {
-// 	               panic("mock out the AddClusterScopedHandler method")
-//             },
-//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.GroupHandlerFunc)  {
-// 	               panic("mock out the AddFeatureHandler method")
-//             },
-//             AddHandlerFunc: func(ctx context.Context, name string, handler v31.GroupHandlerFunc)  {
-// 	               panic("mock out the AddHandler method")
-//             },
-//             EnqueueFunc: func(namespace string, name string)  {
-// 	               panic("mock out the Enqueue method")
-//             },
-//             EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
-// 	               panic("mock out the EnqueueAfter method")
-//             },
-//             GenericFunc: func() controller.GenericController {
-// 	               panic("mock out the Generic method")
-//             },
-//             InformerFunc: func() cache.SharedIndexInformer {
-// 	               panic("mock out the Informer method")
-//             },
-//             ListerFunc: func() v31.GroupLister {
-// 	               panic("mock out the Lister method")
-//             },
-//         }
+//	        // make and configure a mocked v31.GroupController
+//	        mockedGroupController := &GroupControllerMock{
+//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v31.GroupHandlerFunc)  {
+//		               panic("mock out the AddClusterScopedFeatureHandler method")
+//	            },
+//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v31.GroupHandlerFunc)  {
+//		               panic("mock out the AddClusterScopedHandler method")
+//	            },
+//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.GroupHandlerFunc)  {
+//		               panic("mock out the AddFeatureHandler method")
+//	            },
+//	            AddHandlerFunc: func(ctx context.Context, name string, handler v31.GroupHandlerFunc)  {
+//		               panic("mock out the AddHandler method")
+//	            },
+//	            EnqueueFunc: func(namespace string, name string)  {
+//		               panic("mock out the Enqueue method")
+//	            },
+//	            EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
+//		               panic("mock out the EnqueueAfter method")
+//	            },
+//	            GenericFunc: func() controller.GenericController {
+//		               panic("mock out the Generic method")
+//	            },
+//	            InformerFunc: func() cache.SharedIndexInformer {
+//		               panic("mock out the Informer method")
+//	            },
+//	            ListerFunc: func() v31.GroupLister {
+//		               panic("mock out the Lister method")
+//	            },
+//	        }
 //
-//         // use mockedGroupController in code that requires v31.GroupController
-//         // and then make assertions.
+//	        // use mockedGroupController in code that requires v31.GroupController
+//	        // and then make assertions.
 //
-//     }
+//	    }
 type GroupControllerMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
 	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v31.GroupHandlerFunc)
@@ -324,7 +326,8 @@ func (mock *GroupControllerMock) AddClusterScopedFeatureHandler(ctx context.Cont
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//     len(mockedGroupController.AddClusterScopedFeatureHandlerCalls())
+//
+//	len(mockedGroupController.AddClusterScopedFeatureHandlerCalls())
 func (mock *GroupControllerMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -369,7 +372,8 @@ func (mock *GroupControllerMock) AddClusterScopedHandler(ctx context.Context, na
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//     len(mockedGroupController.AddClusterScopedHandlerCalls())
+//
+//	len(mockedGroupController.AddClusterScopedHandlerCalls())
 func (mock *GroupControllerMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -412,7 +416,8 @@ func (mock *GroupControllerMock) AddFeatureHandler(ctx context.Context, enabled 
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//     len(mockedGroupController.AddFeatureHandlerCalls())
+//
+//	len(mockedGroupController.AddFeatureHandlerCalls())
 func (mock *GroupControllerMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
@@ -453,7 +458,8 @@ func (mock *GroupControllerMock) AddHandler(ctx context.Context, name string, ha
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//     len(mockedGroupController.AddHandlerCalls())
+//
+//	len(mockedGroupController.AddHandlerCalls())
 func (mock *GroupControllerMock) AddHandlerCalls() []struct {
 	Ctx     context.Context
 	Name    string
@@ -490,7 +496,8 @@ func (mock *GroupControllerMock) Enqueue(namespace string, name string) {
 
 // EnqueueCalls gets all the calls that were made to Enqueue.
 // Check the length with:
-//     len(mockedGroupController.EnqueueCalls())
+//
+//	len(mockedGroupController.EnqueueCalls())
 func (mock *GroupControllerMock) EnqueueCalls() []struct {
 	Namespace string
 	Name      string
@@ -527,7 +534,8 @@ func (mock *GroupControllerMock) EnqueueAfter(namespace string, name string, aft
 
 // EnqueueAfterCalls gets all the calls that were made to EnqueueAfter.
 // Check the length with:
-//     len(mockedGroupController.EnqueueAfterCalls())
+//
+//	len(mockedGroupController.EnqueueAfterCalls())
 func (mock *GroupControllerMock) EnqueueAfterCalls() []struct {
 	Namespace string
 	Name      string
@@ -559,7 +567,8 @@ func (mock *GroupControllerMock) Generic() controller.GenericController {
 
 // GenericCalls gets all the calls that were made to Generic.
 // Check the length with:
-//     len(mockedGroupController.GenericCalls())
+//
+//	len(mockedGroupController.GenericCalls())
 func (mock *GroupControllerMock) GenericCalls() []struct {
 } {
 	var calls []struct {
@@ -585,7 +594,8 @@ func (mock *GroupControllerMock) Informer() cache.SharedIndexInformer {
 
 // InformerCalls gets all the calls that were made to Informer.
 // Check the length with:
-//     len(mockedGroupController.InformerCalls())
+//
+//	len(mockedGroupController.InformerCalls())
 func (mock *GroupControllerMock) InformerCalls() []struct {
 } {
 	var calls []struct {
@@ -611,7 +621,8 @@ func (mock *GroupControllerMock) Lister() v31.GroupLister {
 
 // ListerCalls gets all the calls that were made to Lister.
 // Check the length with:
-//     len(mockedGroupController.ListerCalls())
+//
+//	len(mockedGroupController.ListerCalls())
 func (mock *GroupControllerMock) ListerCalls() []struct {
 } {
 	var calls []struct {
@@ -651,76 +662,76 @@ var _ v31.GroupInterface = &GroupInterfaceMock{}
 
 // GroupInterfaceMock is a mock implementation of v31.GroupInterface.
 //
-//     func TestSomethingThatUsesGroupInterface(t *testing.T) {
+//	    func TestSomethingThatUsesGroupInterface(t *testing.T) {
 //
-//         // make and configure a mocked v31.GroupInterface
-//         mockedGroupInterface := &GroupInterfaceMock{
-//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v31.GroupHandlerFunc)  {
-// 	               panic("mock out the AddClusterScopedFeatureHandler method")
-//             },
-//             AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v31.GroupLifecycle)  {
-// 	               panic("mock out the AddClusterScopedFeatureLifecycle method")
-//             },
-//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v31.GroupHandlerFunc)  {
-// 	               panic("mock out the AddClusterScopedHandler method")
-//             },
-//             AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v31.GroupLifecycle)  {
-// 	               panic("mock out the AddClusterScopedLifecycle method")
-//             },
-//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.GroupHandlerFunc)  {
-// 	               panic("mock out the AddFeatureHandler method")
-//             },
-//             AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v31.GroupLifecycle)  {
-// 	               panic("mock out the AddFeatureLifecycle method")
-//             },
-//             AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v31.GroupHandlerFunc)  {
-// 	               panic("mock out the AddHandler method")
-//             },
-//             AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v31.GroupLifecycle)  {
-// 	               panic("mock out the AddLifecycle method")
-//             },
-//             ControllerFunc: func() v31.GroupController {
-// 	               panic("mock out the Controller method")
-//             },
-//             CreateFunc: func(in1 *v3.Group) (*v3.Group, error) {
-// 	               panic("mock out the Create method")
-//             },
-//             DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
-// 	               panic("mock out the Delete method")
-//             },
-//             DeleteCollectionFunc: func(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
-// 	               panic("mock out the DeleteCollection method")
-//             },
-//             DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
-// 	               panic("mock out the DeleteNamespaced method")
-//             },
-//             GetFunc: func(name string, opts metav1.GetOptions) (*v3.Group, error) {
-// 	               panic("mock out the Get method")
-//             },
-//             GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v3.Group, error) {
-// 	               panic("mock out the GetNamespaced method")
-//             },
-//             ListFunc: func(opts metav1.ListOptions) (*v3.GroupList, error) {
-// 	               panic("mock out the List method")
-//             },
-//             ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v3.GroupList, error) {
-// 	               panic("mock out the ListNamespaced method")
-//             },
-//             ObjectClientFunc: func() *objectclient.ObjectClient {
-// 	               panic("mock out the ObjectClient method")
-//             },
-//             UpdateFunc: func(in1 *v3.Group) (*v3.Group, error) {
-// 	               panic("mock out the Update method")
-//             },
-//             WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
-// 	               panic("mock out the Watch method")
-//             },
-//         }
+//	        // make and configure a mocked v31.GroupInterface
+//	        mockedGroupInterface := &GroupInterfaceMock{
+//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v31.GroupHandlerFunc)  {
+//		               panic("mock out the AddClusterScopedFeatureHandler method")
+//	            },
+//	            AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v31.GroupLifecycle)  {
+//		               panic("mock out the AddClusterScopedFeatureLifecycle method")
+//	            },
+//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v31.GroupHandlerFunc)  {
+//		               panic("mock out the AddClusterScopedHandler method")
+//	            },
+//	            AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v31.GroupLifecycle)  {
+//		               panic("mock out the AddClusterScopedLifecycle method")
+//	            },
+//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.GroupHandlerFunc)  {
+//		               panic("mock out the AddFeatureHandler method")
+//	            },
+//	            AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v31.GroupLifecycle)  {
+//		               panic("mock out the AddFeatureLifecycle method")
+//	            },
+//	            AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v31.GroupHandlerFunc)  {
+//		               panic("mock out the AddHandler method")
+//	            },
+//	            AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v31.GroupLifecycle)  {
+//		               panic("mock out the AddLifecycle method")
+//	            },
+//	            ControllerFunc: func() v31.GroupController {
+//		               panic("mock out the Controller method")
+//	            },
+//	            CreateFunc: func(in1 *v3.Group) (*v3.Group, error) {
+//		               panic("mock out the Create method")
+//	            },
+//	            DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
+//		               panic("mock out the Delete method")
+//	            },
+//	            DeleteCollectionFunc: func(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
+//		               panic("mock out the DeleteCollection method")
+//	            },
+//	            DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
+//		               panic("mock out the DeleteNamespaced method")
+//	            },
+//	            GetFunc: func(name string, opts metav1.GetOptions) (*v3.Group, error) {
+//		               panic("mock out the Get method")
+//	            },
+//	            GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v3.Group, error) {
+//		               panic("mock out the GetNamespaced method")
+//	            },
+//	            ListFunc: func(opts metav1.ListOptions) (*v3.GroupList, error) {
+//		               panic("mock out the List method")
+//	            },
+//	            ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v3.GroupList, error) {
+//		               panic("mock out the ListNamespaced method")
+//	            },
+//	            ObjectClientFunc: func() *objectclient.ObjectClient {
+//		               panic("mock out the ObjectClient method")
+//	            },
+//	            UpdateFunc: func(in1 *v3.Group) (*v3.Group, error) {
+//		               panic("mock out the Update method")
+//	            },
+//	            WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
+//		               panic("mock out the Watch method")
+//	            },
+//	        }
 //
-//         // use mockedGroupInterface in code that requires v31.GroupInterface
-//         // and then make assertions.
+//	        // use mockedGroupInterface in code that requires v31.GroupInterface
+//	        // and then make assertions.
 //
-//     }
+//	    }
 type GroupInterfaceMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
 	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v31.GroupHandlerFunc)
@@ -973,7 +984,8 @@ func (mock *GroupInterfaceMock) AddClusterScopedFeatureHandler(ctx context.Conte
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//     len(mockedGroupInterface.AddClusterScopedFeatureHandlerCalls())
+//
+//	len(mockedGroupInterface.AddClusterScopedFeatureHandlerCalls())
 func (mock *GroupInterfaceMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -1020,7 +1032,8 @@ func (mock *GroupInterfaceMock) AddClusterScopedFeatureLifecycle(ctx context.Con
 
 // AddClusterScopedFeatureLifecycleCalls gets all the calls that were made to AddClusterScopedFeatureLifecycle.
 // Check the length with:
-//     len(mockedGroupInterface.AddClusterScopedFeatureLifecycleCalls())
+//
+//	len(mockedGroupInterface.AddClusterScopedFeatureLifecycleCalls())
 func (mock *GroupInterfaceMock) AddClusterScopedFeatureLifecycleCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -1065,7 +1078,8 @@ func (mock *GroupInterfaceMock) AddClusterScopedHandler(ctx context.Context, nam
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//     len(mockedGroupInterface.AddClusterScopedHandlerCalls())
+//
+//	len(mockedGroupInterface.AddClusterScopedHandlerCalls())
 func (mock *GroupInterfaceMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -1108,7 +1122,8 @@ func (mock *GroupInterfaceMock) AddClusterScopedLifecycle(ctx context.Context, n
 
 // AddClusterScopedLifecycleCalls gets all the calls that were made to AddClusterScopedLifecycle.
 // Check the length with:
-//     len(mockedGroupInterface.AddClusterScopedLifecycleCalls())
+//
+//	len(mockedGroupInterface.AddClusterScopedLifecycleCalls())
 func (mock *GroupInterfaceMock) AddClusterScopedLifecycleCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -1151,7 +1166,8 @@ func (mock *GroupInterfaceMock) AddFeatureHandler(ctx context.Context, enabled f
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//     len(mockedGroupInterface.AddFeatureHandlerCalls())
+//
+//	len(mockedGroupInterface.AddFeatureHandlerCalls())
 func (mock *GroupInterfaceMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
@@ -1194,7 +1210,8 @@ func (mock *GroupInterfaceMock) AddFeatureLifecycle(ctx context.Context, enabled
 
 // AddFeatureLifecycleCalls gets all the calls that were made to AddFeatureLifecycle.
 // Check the length with:
-//     len(mockedGroupInterface.AddFeatureLifecycleCalls())
+//
+//	len(mockedGroupInterface.AddFeatureLifecycleCalls())
 func (mock *GroupInterfaceMock) AddFeatureLifecycleCalls() []struct {
 	Ctx       context.Context
 	Enabled   func() bool
@@ -1235,7 +1252,8 @@ func (mock *GroupInterfaceMock) AddHandler(ctx context.Context, name string, syn
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//     len(mockedGroupInterface.AddHandlerCalls())
+//
+//	len(mockedGroupInterface.AddHandlerCalls())
 func (mock *GroupInterfaceMock) AddHandlerCalls() []struct {
 	Ctx  context.Context
 	Name string
@@ -1274,7 +1292,8 @@ func (mock *GroupInterfaceMock) AddLifecycle(ctx context.Context, name string, l
 
 // AddLifecycleCalls gets all the calls that were made to AddLifecycle.
 // Check the length with:
-//     len(mockedGroupInterface.AddLifecycleCalls())
+//
+//	len(mockedGroupInterface.AddLifecycleCalls())
 func (mock *GroupInterfaceMock) AddLifecycleCalls() []struct {
 	Ctx       context.Context
 	Name      string
@@ -1306,7 +1325,8 @@ func (mock *GroupInterfaceMock) Controller() v31.GroupController {
 
 // ControllerCalls gets all the calls that were made to Controller.
 // Check the length with:
-//     len(mockedGroupInterface.ControllerCalls())
+//
+//	len(mockedGroupInterface.ControllerCalls())
 func (mock *GroupInterfaceMock) ControllerCalls() []struct {
 } {
 	var calls []struct {
@@ -1335,7 +1355,8 @@ func (mock *GroupInterfaceMock) Create(in1 *v3.Group) (*v3.Group, error) {
 
 // CreateCalls gets all the calls that were made to Create.
 // Check the length with:
-//     len(mockedGroupInterface.CreateCalls())
+//
+//	len(mockedGroupInterface.CreateCalls())
 func (mock *GroupInterfaceMock) CreateCalls() []struct {
 	In1 *v3.Group
 } {
@@ -1368,7 +1389,8 @@ func (mock *GroupInterfaceMock) Delete(name string, options *metav1.DeleteOption
 
 // DeleteCalls gets all the calls that were made to Delete.
 // Check the length with:
-//     len(mockedGroupInterface.DeleteCalls())
+//
+//	len(mockedGroupInterface.DeleteCalls())
 func (mock *GroupInterfaceMock) DeleteCalls() []struct {
 	Name    string
 	Options *metav1.DeleteOptions
@@ -1403,7 +1425,8 @@ func (mock *GroupInterfaceMock) DeleteCollection(deleteOpts *metav1.DeleteOption
 
 // DeleteCollectionCalls gets all the calls that were made to DeleteCollection.
 // Check the length with:
-//     len(mockedGroupInterface.DeleteCollectionCalls())
+//
+//	len(mockedGroupInterface.DeleteCollectionCalls())
 func (mock *GroupInterfaceMock) DeleteCollectionCalls() []struct {
 	DeleteOpts *metav1.DeleteOptions
 	ListOpts   metav1.ListOptions
@@ -1440,7 +1463,8 @@ func (mock *GroupInterfaceMock) DeleteNamespaced(namespace string, name string, 
 
 // DeleteNamespacedCalls gets all the calls that were made to DeleteNamespaced.
 // Check the length with:
-//     len(mockedGroupInterface.DeleteNamespacedCalls())
+//
+//	len(mockedGroupInterface.DeleteNamespacedCalls())
 func (mock *GroupInterfaceMock) DeleteNamespacedCalls() []struct {
 	Namespace string
 	Name      string
@@ -1477,7 +1501,8 @@ func (mock *GroupInterfaceMock) Get(name string, opts metav1.GetOptions) (*v3.Gr
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//     len(mockedGroupInterface.GetCalls())
+//
+//	len(mockedGroupInterface.GetCalls())
 func (mock *GroupInterfaceMock) GetCalls() []struct {
 	Name string
 	Opts metav1.GetOptions
@@ -1514,7 +1539,8 @@ func (mock *GroupInterfaceMock) GetNamespaced(namespace string, name string, opt
 
 // GetNamespacedCalls gets all the calls that were made to GetNamespaced.
 // Check the length with:
-//     len(mockedGroupInterface.GetNamespacedCalls())
+//
+//	len(mockedGroupInterface.GetNamespacedCalls())
 func (mock *GroupInterfaceMock) GetNamespacedCalls() []struct {
 	Namespace string
 	Name      string
@@ -1549,7 +1575,8 @@ func (mock *GroupInterfaceMock) List(opts metav1.ListOptions) (*v3.GroupList, er
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//     len(mockedGroupInterface.ListCalls())
+//
+//	len(mockedGroupInterface.ListCalls())
 func (mock *GroupInterfaceMock) ListCalls() []struct {
 	Opts metav1.ListOptions
 } {
@@ -1582,7 +1609,8 @@ func (mock *GroupInterfaceMock) ListNamespaced(namespace string, opts metav1.Lis
 
 // ListNamespacedCalls gets all the calls that were made to ListNamespaced.
 // Check the length with:
-//     len(mockedGroupInterface.ListNamespacedCalls())
+//
+//	len(mockedGroupInterface.ListNamespacedCalls())
 func (mock *GroupInterfaceMock) ListNamespacedCalls() []struct {
 	Namespace string
 	Opts      metav1.ListOptions
@@ -1612,7 +1640,8 @@ func (mock *GroupInterfaceMock) ObjectClient() *objectclient.ObjectClient {
 
 // ObjectClientCalls gets all the calls that were made to ObjectClient.
 // Check the length with:
-//     len(mockedGroupInterface.ObjectClientCalls())
+//
+//	len(mockedGroupInterface.ObjectClientCalls())
 func (mock *GroupInterfaceMock) ObjectClientCalls() []struct {
 } {
 	var calls []struct {
@@ -1641,7 +1670,8 @@ func (mock *GroupInterfaceMock) Update(in1 *v3.Group) (*v3.Group, error) {
 
 // UpdateCalls gets all the calls that were made to Update.
 // Check the length with:
-//     len(mockedGroupInterface.UpdateCalls())
+//
+//	len(mockedGroupInterface.UpdateCalls())
 func (mock *GroupInterfaceMock) UpdateCalls() []struct {
 	In1 *v3.Group
 } {
@@ -1672,7 +1702,8 @@ func (mock *GroupInterfaceMock) Watch(opts metav1.ListOptions) (watch.Interface,
 
 // WatchCalls gets all the calls that were made to Watch.
 // Check the length with:
-//     len(mockedGroupInterface.WatchCalls())
+//
+//	len(mockedGroupInterface.WatchCalls())
 func (mock *GroupInterfaceMock) WatchCalls() []struct {
 	Opts metav1.ListOptions
 } {
@@ -1695,19 +1726,19 @@ var _ v31.GroupsGetter = &GroupsGetterMock{}
 
 // GroupsGetterMock is a mock implementation of v31.GroupsGetter.
 //
-//     func TestSomethingThatUsesGroupsGetter(t *testing.T) {
+//	    func TestSomethingThatUsesGroupsGetter(t *testing.T) {
 //
-//         // make and configure a mocked v31.GroupsGetter
-//         mockedGroupsGetter := &GroupsGetterMock{
-//             GroupsFunc: func(namespace string) v31.GroupInterface {
-// 	               panic("mock out the Groups method")
-//             },
-//         }
+//	        // make and configure a mocked v31.GroupsGetter
+//	        mockedGroupsGetter := &GroupsGetterMock{
+//	            GroupsFunc: func(namespace string) v31.GroupInterface {
+//		               panic("mock out the Groups method")
+//	            },
+//	        }
 //
-//         // use mockedGroupsGetter in code that requires v31.GroupsGetter
-//         // and then make assertions.
+//	        // use mockedGroupsGetter in code that requires v31.GroupsGetter
+//	        // and then make assertions.
 //
-//     }
+//	    }
 type GroupsGetterMock struct {
 	// GroupsFunc mocks the Groups method.
 	GroupsFunc func(namespace string) v31.GroupInterface
@@ -1740,7 +1771,8 @@ func (mock *GroupsGetterMock) Groups(namespace string) v31.GroupInterface {
 
 // GroupsCalls gets all the calls that were made to Groups.
 // Check the length with:
-//     len(mockedGroupsGetter.GroupsCalls())
+//
+//	len(mockedGroupsGetter.GroupsCalls())
 func (mock *GroupsGetterMock) GroupsCalls() []struct {
 	Namespace string
 } {

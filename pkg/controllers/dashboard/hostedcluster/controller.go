@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	"github.com/rancher/rancher/pkg/catalogv2/system"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/chart"
 	controllerv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	controllerprojectv3 "github.com/rancher/rancher/pkg/generated/controllers/project.cattle.io/v3"
@@ -18,8 +17,10 @@ import (
 	"github.com/rancher/rancher/pkg/wrangler"
 	v1 "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/pkg/kv"
+	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	apierror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -57,11 +58,12 @@ var (
 )
 
 type handler struct {
-	manager      *system.Manager
+	manager      chart.Manager
 	appCache     controllerprojectv3.AppCache
 	apps         controllerprojectv3.AppController
 	projectCache controllerv3.ProjectCache
-	secrets      v1.SecretController
+	secretsCache v1.SecretCache
+	chartsConfig chart.RancherConfigGetter
 }
 
 func Register(ctx context.Context, wContext *wrangler.Context) {
@@ -69,8 +71,9 @@ func Register(ctx context.Context, wContext *wrangler.Context) {
 		manager:      wContext.SystemChartsManager,
 		apps:         wContext.Project.App(),
 		projectCache: wContext.Mgmt.Project().Cache(),
-		secrets:      wContext.Core.Secret(),
+		secretsCache: wContext.Core.Secret().Cache(),
 		appCache:     wContext.Project.App().Cache(),
+		chartsConfig: chart.RancherConfigGetter{ConfigCache: wContext.Core.ConfigMap().Cache()},
 	}
 
 	wContext.Mgmt.Cluster().OnChange(ctx, "cluster-provisioning-operator", h.onClusterChange)
@@ -116,7 +119,7 @@ func (h handler) onClusterChange(key string, cluster *v3.Cluster) (*v3.Cluster, 
 		},
 	}
 
-	additionalCA, err := getAdditionalCA(h.secrets.Cache())
+	additionalCA, err := getAdditionalCA(h.secretsCache)
 	if err != nil {
 		return cluster, err
 	}
@@ -127,6 +130,14 @@ func (h handler) onClusterChange(key string, cluster *v3.Cluster) (*v3.Cluster, 
 		"httpsProxy":           os.Getenv("HTTPS_PROXY"),
 		"noProxy":              os.Getenv("NO_PROXY"),
 		"additionalTrustedCAs": additionalCA != nil,
+	}
+	// add priority class value
+	if priorityClassName, err := h.chartsConfig.GetPriorityClassName(); err != nil {
+		if !apierror.IsNotFound(err) {
+			logrus.Warnf("Failed to get rancher priorityClassName for %q: %v", toInstallChart.ChartName, err)
+		}
+	} else {
+		chartValues[chart.PriorityClassKey] = priorityClassName
 	}
 
 	if err := h.manager.Ensure(toInstallChart.ReleaseNamespace, toInstallChart.ChartName, "", chartValues, true); err != nil {

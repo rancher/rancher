@@ -211,8 +211,6 @@ type ClusterOperations interface {
 
 	ActionRotateEncryptionKey(resource *Cluster) (*RotateEncryptionKeyOutput, error)
 
-	ActionRunSecurityScan(resource *Cluster, input *CisScanConfig) error
-
 	ActionSaveAsTemplate(resource *Cluster, input *SaveAsTemplateInput) (*SaveAsTemplateOutput, error)
 
 	ActionViewMonitoring(resource *Cluster) (*MonitoringOutput, error)
@@ -340,11 +338,6 @@ func (c *ClusterClient) ActionRotateEncryptionKey(resource *Cluster) (*RotateEnc
 	resp := &RotateEncryptionKeyOutput{}
 	err := c.apiClient.Ops.DoAction(ClusterType, "rotateEncryptionKey", &resource.Resource, nil, resp)
 	return resp, err
-}
-
-func (c *ClusterClient) ActionRunSecurityScan(resource *Cluster, input *CisScanConfig) error {
-	err := c.apiClient.Ops.DoAction(ClusterType, "runSecurityScan", &resource.Resource, input, nil)
-	return err
 }
 
 func (c *ClusterClient) ActionSaveAsTemplate(resource *Cluster, input *SaveAsTemplateInput) (*SaveAsTemplateOutput, error) {

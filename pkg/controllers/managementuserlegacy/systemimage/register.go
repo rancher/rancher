@@ -4,8 +4,6 @@ import (
 	"context"
 
 	"github.com/rancher/rancher/pkg/controllers/managementuserlegacy/alert"
-	"github.com/rancher/rancher/pkg/controllers/managementuserlegacy/logging"
-	"github.com/rancher/rancher/pkg/controllers/managementuserlegacy/pipeline"
 	"github.com/rancher/rancher/pkg/types/config"
 )
 
@@ -16,8 +14,6 @@ func Register(ctx context.Context, cluster *config.UserContext) {
 	})
 
 	alert.AddStarter(ctx, cluster, starter)
-	logging.AddStarter(ctx, cluster, starter)
-	pipeline.AddStarter(ctx, cluster, starter)
 }
 
 func registerDeferred(ctx context.Context, cluster *config.UserContext) {

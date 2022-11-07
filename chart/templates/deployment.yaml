@@ -30,6 +30,7 @@ spec:
         app: {{ template "rancher.fullname" . }}
         release: {{ .Release.Name }}
     spec:
+      priorityClassName: {{ .Values.priorityClassName }}
       serviceAccountName: {{ template "rancher.fullname" . }}
 {{- if .Values.imagePullSecrets }}
       imagePullSecrets:
@@ -190,8 +191,16 @@ spec:
 {{- if eq .Values.auditLog.destination "sidecar" }}
   {{- if gt (int .Values.auditLog.level) 0 }}
       # Make audit logs available for Rancher log collector tools.
-      - image: {{ .Values.busyboxImage }}
-        imagePullPolicy: {{ default "IfNotPresent" .Values.busyboxImagePullPolicy }}
+      {{- if .Values.busyboxImage }}
+      - image: {{ .Values.busyboxImage}}
+      {{- else }}
+      - image: {{ .Values.auditLog.image.repository }}:{{.Values.auditLog.image.tag}}
+      {{- end }}
+      {{- if .Values.busyboxImagePullPolicy }}
+        imagePullPolicy: {{ .Values.busyboxImagePullPolicy }}
+      {{- else }}
+        imagePullPolicy: {{ .Values.auditLog.image.pullPolicy }}
+      {{- end }}
         name: {{ template "rancher.name" . }}-audit-log
         command: ["tail"]
         args: ["-F", "/var/log/auditlog/rancher-api-audit.log"]

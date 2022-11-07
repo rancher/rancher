@@ -23,14 +23,12 @@ import (
 	"github.com/rancher/rancher/pkg/api/norman/customization/globalrole"
 	"github.com/rancher/rancher/pkg/api/norman/customization/globalrolebinding"
 	"github.com/rancher/rancher/pkg/api/norman/customization/kontainerdriver"
-	"github.com/rancher/rancher/pkg/api/norman/customization/logging"
 	"github.com/rancher/rancher/pkg/api/norman/customization/monitor"
 	"github.com/rancher/rancher/pkg/api/norman/customization/multiclusterapp"
 	"github.com/rancher/rancher/pkg/api/norman/customization/namespacedresource"
 	"github.com/rancher/rancher/pkg/api/norman/customization/node"
 	"github.com/rancher/rancher/pkg/api/norman/customization/nodepool"
 	"github.com/rancher/rancher/pkg/api/norman/customization/nodetemplate"
-	"github.com/rancher/rancher/pkg/api/norman/customization/pipeline"
 	psptBinding "github.com/rancher/rancher/pkg/api/norman/customization/podsecuritypolicybinding"
 	"github.com/rancher/rancher/pkg/api/norman/customization/podsecuritypolicytemplate"
 	projectaction "github.com/rancher/rancher/pkg/api/norman/customization/project"
@@ -56,7 +54,6 @@ import (
 	rtStore "github.com/rancher/rancher/pkg/api/norman/store/roletemplate"
 	"github.com/rancher/rancher/pkg/api/norman/store/scoped"
 	settingstore "github.com/rancher/rancher/pkg/api/norman/store/setting"
-	"github.com/rancher/rancher/pkg/api/norman/store/userscope"
 	"github.com/rancher/rancher/pkg/api/scheme"
 	"github.com/rancher/rancher/pkg/auth/api"
 	authapi "github.com/rancher/rancher/pkg/auth/api"
@@ -69,7 +66,6 @@ import (
 	md "github.com/rancher/rancher/pkg/controllers/management/kontainerdrivermetadata"
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/nodeconfig"
-	sourcecodeproviders "github.com/rancher/rancher/pkg/pipeline/providers"
 	managementschema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
 	projectschema "github.com/rancher/rancher/pkg/schemas/project.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
@@ -126,7 +122,6 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 		client.ClusterAlertType,
 		client.ClusterAlertGroupType,
 		client.ClusterCatalogType,
-		client.ClusterLoggingType,
 		client.ClusterAlertRuleType,
 		client.ClusterMonitorGraphType,
 		client.ClusterScanType,
@@ -138,7 +133,6 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 		client.ProjectAlertType,
 		client.ProjectAlertGroupType,
 		client.ProjectCatalogType,
-		client.ProjectLoggingType,
 		client.ProjectAlertRuleType,
 		client.ProjectMonitorGraphType,
 		client.CisConfigType,
@@ -154,12 +148,6 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 	factory.BatchCreateCRDs(ctx, config.ManagementStorageContext, scheme.Scheme, schemas, &projectschema.Version,
 		projectclient.AppType,
 		projectclient.AppRevisionType,
-		projectclient.PipelineExecutionType,
-		projectclient.PipelineSettingType,
-		projectclient.PipelineType,
-		projectclient.SourceCodeCredentialType,
-		projectclient.SourceCodeProviderConfigType,
-		projectclient.SourceCodeRepositoryType,
 	)
 
 	if err := factory.BatchWait(); err != nil {
@@ -195,9 +183,7 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 	ProjectCatalog(schemas, apiContext)
 	ClusterCatalog(schemas, apiContext)
 	App(schemas, apiContext, clusterManager)
-	LoggingTypes(schemas, apiContext, clusterManager, k8sProxy)
 	Alert(schemas, apiContext)
-	Pipeline(schemas, apiContext, clusterManager)
 	TemplateContent(schemas)
 	Monitor(schemas, apiContext, clusterManager)
 	MultiClusterApps(schemas, apiContext)
@@ -293,11 +279,6 @@ func Clusters(ctx context.Context, schemas *types.Schemas, managementContext *co
 	handler.CisConfigLister = managementContext.Management.CisConfigs("").Controller().Lister()
 	handler.CisBenchmarkVersionClient = managementContext.Management.CisBenchmarkVersions("")
 	handler.CisBenchmarkVersionLister = managementContext.Management.CisBenchmarkVersions("").Controller().Lister()
-
-	clusterValidator.CisConfigClient = managementContext.Management.CisConfigs(namespace.GlobalNamespace)
-	clusterValidator.CisConfigLister = managementContext.Management.CisConfigs(namespace.GlobalNamespace).Controller().Lister()
-	clusterValidator.CisBenchmarkVersionClient = managementContext.Management.CisBenchmarkVersions(namespace.GlobalNamespace)
-	clusterValidator.CisBenchmarkVersionLister = managementContext.Management.CisBenchmarkVersions(namespace.GlobalNamespace).Controller().Lister()
 
 	schema.ActionHandler = handler.ClusterActionHandler
 	schema.Validator = clusterValidator.Validator
@@ -576,20 +557,6 @@ func Feature(schemas *types.Schemas, management *config.ScaledContext) {
 	schema.Store = featStore.New(schema.Store)
 }
 
-func LoggingTypes(schemas *types.Schemas, management *config.ScaledContext, clusterManager *clustermanager.Manager, k8sProxy http.Handler) {
-	handler := logging.NewHandler(management, clusterManager)
-
-	schema := schemas.Schema(&managementschema.Version, client.ClusterLoggingType)
-	schema.CollectionFormatter = logging.CollectionFormatter
-	schema.ActionHandler = handler.ActionHandler
-	schema.Validator = logging.ClusterLoggingValidator
-
-	schema = schemas.Schema(&managementschema.Version, client.ProjectLoggingType)
-	schema.CollectionFormatter = logging.CollectionFormatter
-	schema.ActionHandler = handler.ActionHandler
-	schema.Validator = logging.ProjectLoggingValidator
-}
-
 func Alert(schemas *types.Schemas, management *config.ScaledContext) {
 	handler := &alert.Handler{
 		ClusterAlertRule: management.Management.ClusterAlertRules(""),
@@ -635,55 +602,6 @@ func Monitor(schemas *types.Schemas, management *config.ScaledContext, clusterMa
 	schema = schemas.Schema(&managementschema.Version, client.MonitorMetricType)
 	schema.CollectionFormatter = monitor.MetricCollectionFormatter
 	schema.ActionHandler = metricHandler.Action
-}
-
-func Pipeline(schemas *types.Schemas, management *config.ScaledContext, clusterManager *clustermanager.Manager) {
-
-	pipelineHandler := &pipeline.Handler{
-		PipelineLister:             management.Project.Pipelines("").Controller().Lister(),
-		PipelineExecutions:         management.Project.PipelineExecutions(""),
-		SourceCodeCredentials:      management.Project.SourceCodeCredentials(""),
-		SourceCodeCredentialLister: management.Project.SourceCodeCredentials("").Controller().Lister(),
-	}
-	schema := schemas.Schema(&projectschema.Version, projectclient.PipelineType)
-	schema.Formatter = pipeline.Formatter
-	schema.ActionHandler = pipelineHandler.ActionHandler
-	schema.LinkHandler = pipelineHandler.LinkHandler
-
-	pipelineExecutionHandler := &pipeline.ExecutionHandler{
-		ClusterManager: clusterManager,
-
-		PipelineLister:          management.Project.Pipelines("").Controller().Lister(),
-		PipelineExecutionLister: management.Project.PipelineExecutions("").Controller().Lister(),
-		PipelineExecutions:      management.Project.PipelineExecutions(""),
-	}
-	schema = schemas.Schema(&projectschema.Version, projectclient.PipelineExecutionType)
-	schema.Formatter = pipelineExecutionHandler.ExecutionFormatter
-	schema.LinkHandler = pipelineExecutionHandler.LinkHandler
-	schema.ActionHandler = pipelineExecutionHandler.ActionHandler
-
-	schema = schemas.Schema(&projectschema.Version, projectclient.PipelineSettingType)
-	schema.Formatter = setting.PipelineFormatter
-
-	sourceCodeCredentialHandler := &pipeline.SourceCodeCredentialHandler{
-		SourceCodeCredentials:      management.Project.SourceCodeCredentials(""),
-		SourceCodeCredentialLister: management.Project.SourceCodeCredentials("").Controller().Lister(),
-		SourceCodeRepositories:     management.Project.SourceCodeRepositories(""),
-		SourceCodeRepositoryLister: management.Project.SourceCodeRepositories("").Controller().Lister(),
-	}
-	schema = schemas.Schema(&projectschema.Version, projectclient.SourceCodeCredentialType)
-	schema.Formatter = pipeline.SourceCodeCredentialFormatter
-	schema.ListHandler = sourceCodeCredentialHandler.ListHandler
-	schema.ActionHandler = sourceCodeCredentialHandler.ActionHandler
-	schema.LinkHandler = sourceCodeCredentialHandler.LinkHandler
-	schema.Store = userscope.NewStore(management.Core.Namespaces(""), schema.Store)
-
-	schema = schemas.Schema(&projectschema.Version, projectclient.SourceCodeRepositoryType)
-	schema.Store = userscope.NewStore(management.Core.Namespaces(""), schema.Store)
-
-	//register and setup source code providers
-	sourcecodeproviders.SetupSourceCodeProviderConfig(management, schemas)
-
 }
 
 func Project(schemas *types.Schemas, management *config.ScaledContext) {

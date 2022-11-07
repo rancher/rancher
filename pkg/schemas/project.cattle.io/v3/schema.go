@@ -3,7 +3,6 @@ package schema
 import (
 	"net/http"
 
-	istiov1alpha3 "github.com/knative/pkg/apis/istio/v1alpha3"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	"github.com/rancher/norman/types"
 	m "github.com/rancher/norman/types/mapper"
@@ -48,10 +47,8 @@ var (
 		Init(podTemplateSpecTypes).
 		Init(workloadTypes).
 		Init(appTypes).
-		Init(pipelineTypes).
 		Init(monitoringTypes).
-		Init(autoscalingTypes).
-		Init(istioTypes)
+		Init(autoscalingTypes)
 )
 
 func configMapTypes(schemas *types.Schemas) *types.Schemas {
@@ -845,149 +842,6 @@ func NewWorkloadTypeMapper() types.Mapper {
 	}
 }
 
-func pipelineTypes(schema *types.Schemas) *types.Schemas {
-	baseProviderCustomizeFunc := func(schema *types.Schema) {
-		schema.BaseType = "sourceCodeProvider"
-		schema.ResourceActions = map[string]types.Action{
-			"login": {
-				Input:  "authUserInput",
-				Output: "sourceCodeCredential",
-			},
-		}
-		schema.CollectionMethods = []string{}
-		schema.ResourceMethods = []string{http.MethodGet}
-	}
-	return schema.
-		AddMapperForType(&Version, v3.SourceCodeProviderConfig{}).
-		AddMapperForType(&Version, v3.Pipeline{},
-			&m.Embed{Field: "status"},
-			m.DisplayName{}).
-		AddMapperForType(&Version, v3.PipelineExecution{},
-			&m.Embed{Field: "status"}).
-		AddMapperForType(&Version, v3.SourceCodeCredential{},
-			&m.Embed{Field: "status"}).
-		AddMapperForType(&Version, v3.SourceCodeRepository{}).
-		MustImport(&Version, v3.AuthAppInput{}).
-		MustImport(&Version, v3.AuthUserInput{}).
-		MustImport(&Version, v3.RunPipelineInput{}).
-		MustImport(&Version, v3.PushPipelineConfigInput{}).
-		MustImport(&Version, v3.GithubApplyInput{}).
-		MustImport(&Version, v3.GitlabApplyInput{}).
-		MustImport(&Version, v3.BitbucketCloudApplyInput{}).
-		MustImport(&Version, v3.BitbucketServerApplyInput{}).
-		MustImport(&Version, v3.BitbucketServerRequestLoginInput{}).
-		MustImport(&Version, v3.BitbucketServerRequestLoginOutput{}).
-		MustImportAndCustomize(&Version, v3.SourceCodeProvider{}, func(schema *types.Schema) {
-			schema.CollectionMethods = []string{http.MethodGet}
-		}).
-		MustImportAndCustomize(&Version, v3.GithubProvider{}, baseProviderCustomizeFunc).
-		MustImportAndCustomize(&Version, v3.GitlabProvider{}, baseProviderCustomizeFunc).
-		MustImportAndCustomize(&Version, v3.BitbucketCloudProvider{}, baseProviderCustomizeFunc).
-		MustImportAndCustomize(&Version, v3.BitbucketServerProvider{}, func(schema *types.Schema) {
-			schema.BaseType = "sourceCodeProvider"
-			schema.ResourceActions = map[string]types.Action{
-				"requestLogin": {
-					Output: "bitbucketServerRequestLoginOutput",
-				},
-				"login": {
-					Input:  "authUserInput",
-					Output: "sourceCodeCredential",
-				},
-			}
-			schema.CollectionMethods = []string{}
-			schema.ResourceMethods = []string{http.MethodGet}
-		}).
-		//Github Integration Config
-		MustImportAndCustomize(&Version, v3.SourceCodeProviderConfig{}, func(schema *types.Schema) {
-			schema.CollectionMethods = []string{http.MethodGet}
-		}).
-		MustImportAndCustomize(&Version, v3.GithubPipelineConfig{}, func(schema *types.Schema) {
-			schema.BaseType = "sourceCodeProviderConfig"
-			schema.ResourceActions = map[string]types.Action{
-				"disable": {},
-				"testAndApply": {
-					Input: "githubApplyInput",
-				},
-			}
-			schema.CollectionMethods = []string{}
-			schema.ResourceMethods = []string{http.MethodGet, http.MethodPut}
-		}).
-		MustImportAndCustomize(&Version, v3.GitlabPipelineConfig{}, func(schema *types.Schema) {
-			schema.BaseType = "sourceCodeProviderConfig"
-			schema.ResourceActions = map[string]types.Action{
-				"disable": {},
-				"testAndApply": {
-					Input: "gitlabApplyInput",
-				},
-			}
-			schema.CollectionMethods = []string{}
-			schema.ResourceMethods = []string{http.MethodGet, http.MethodPut}
-		}).
-		MustImportAndCustomize(&Version, v3.BitbucketCloudPipelineConfig{}, func(schema *types.Schema) {
-			schema.BaseType = "sourceCodeProviderConfig"
-			schema.ResourceActions = map[string]types.Action{
-				"disable": {},
-				"testAndApply": {
-					Input: "bitbucketCloudApplyInput",
-				},
-			}
-			schema.CollectionMethods = []string{}
-			schema.ResourceMethods = []string{http.MethodGet, http.MethodPut}
-		}).MustImportAndCustomize(&Version, v3.BitbucketServerPipelineConfig{}, func(schema *types.Schema) {
-		schema.BaseType = "sourceCodeProviderConfig"
-		schema.ResourceActions = map[string]types.Action{
-			"disable":      {},
-			"generateKeys": {},
-			"requestLogin": {
-				Input:  "bitbucketServerRequestLoginInput",
-				Output: "bitbucketServerRequestLoginOutput",
-			},
-			"testAndApply": {
-				Input: "bitbucketServerApplyInput",
-			},
-		}
-		schema.CollectionMethods = []string{}
-		schema.ResourceMethods = []string{http.MethodGet, http.MethodPut}
-	}).
-		MustImportAndCustomize(&Version, v3.Pipeline{}, func(schema *types.Schema) {
-			schema.ResourceActions = map[string]types.Action{
-				"activate":   {},
-				"deactivate": {},
-				"run": {
-					Input: "runPipelineInput",
-				},
-				"pushconfig": {
-					Input: "pushPipelineConfigInput",
-				},
-			}
-		}).
-		MustImportAndCustomize(&Version, v3.PipelineExecution{}, func(schema *types.Schema) {
-			schema.ResourceActions = map[string]types.Action{
-				"stop":  {},
-				"rerun": {},
-			}
-		}).
-		MustImportAndCustomize(&Version, v3.PipelineSetting{}, func(schema *types.Schema) {
-			schema.MustCustomizeField("name", func(f types.Field) types.Field {
-				f.Required = true
-				return f
-			})
-		}).
-		MustImportAndCustomize(&Version, v3.SourceCodeCredential{}, func(schema *types.Schema) {
-			delete(schema.ResourceFields, "namespaceId")
-			schema.ResourceMethods = []string{http.MethodGet, http.MethodDelete}
-			schema.ResourceActions = map[string]types.Action{
-				"refreshrepos": {},
-				"logout":       {},
-			}
-		}).
-		MustImportAndCustomize(&Version, v3.SourceCodeRepository{}, func(schema *types.Schema) {
-			delete(schema.ResourceFields, "namespaceId")
-			schema.ResourceMethods = []string{http.MethodGet, http.MethodDelete}
-		})
-
-}
-
 func monitoringTypes(schemas *types.Schemas) *types.Schemas {
 	return schemas.
 		AddMapperForType(&Version, monitoringv1.Prometheus{},
@@ -1131,27 +985,5 @@ func autoscalingTypes(schemas *types.Schemas) *types.Schemas {
 		MustImport(&Version, autoscaling.HorizontalPodAutoscaler{}, projectOverride{}, struct {
 			DisplayName string `json:"displayName,omitempty"`
 			Description string `json:"description,omitempty"`
-		}{})
-}
-
-func istioTypes(schemas *types.Schemas) *types.Schemas {
-	return schemas.
-		MustImport(&Version, istiov1alpha3.HTTPMatchRequest{}, struct {
-			Port *uint32 `json:"port,omitempty"`
-		}{}).
-		MustImport(&Version, istiov1alpha3.HTTPRoute{}, struct {
-			WebsocketUpgrade *bool `json:"websocketUpgrade,omitempty"`
-		}{}).
-		MustImport(&Version, istiov1alpha3.VirtualService{}, projectOverride{}, struct {
-			Status interface{}
-		}{}).
-		MustImport(&Version, istiov1alpha3.ConsistentHashLB{}, struct {
-			UseSourceIP *bool `json:"useSourceIp,omitempty"`
-		}{}).
-		MustImport(&Version, istiov1alpha3.DestinationRule{}, projectOverride{}, struct {
-			Status interface{}
-		}{}).
-		MustImport(&Version, istiov1alpha3.Gateway{}, projectOverride{}, struct {
-			Status interface{}
 		}{})
 }

@@ -32,6 +32,10 @@ import (
 const (
 	clusterContext = "cluster"
 	projectContext = "project"
+
+	rolesCircularSoftLimit = 100
+	rolesCircularHardLimit = 500
+	clusterNameLabel       = "cluster.cattle.io/name"
 )
 
 var commonClusterAndProjectMgmtPlaneResources = map[string]bool{
@@ -156,7 +160,8 @@ func (m *manager) ensureClusterMembershipBinding(roleName, rtbNsAndName string, 
 		crbName := pkgrbac.NameForClusterRoleBinding(roleRef, subject) // use deterministic name for crb
 		_, err = m.mgmt.RBAC.ClusterRoleBindings("").Create(&v1.ClusterRoleBinding{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: crbName,
+				Name:        crbName,
+				Annotations: map[string]string{clusterNameLabel: cluster.Name},
 				Labels: map[string]string{
 					rtbNsAndName: MembershipBindingOwner,
 				},
@@ -333,6 +338,7 @@ func (m *manager) createMembershipRole(resourceType, roleName string, makeOwner 
 		},
 	}
 	if clusterRole {
+		objectMeta.Annotations = map[string]string{clusterNameLabel: metaObj.GetName()}
 		toCreate = &v1.ClusterRole{
 			ObjectMeta: objectMeta,
 			Rules:      rules,
@@ -846,7 +852,13 @@ func buildRule(resource string, verbs map[string]string) v1.PolicyRule {
 	}
 }
 
-func (m *manager) checkReferencedRoles(roleTemplateName, roleTemplateContext string) (bool, error) {
+func (m *manager) checkReferencedRoles(roleTemplateName, roleTemplateContext string, depthCounter int) (bool, error) {
+	if depthCounter == rolesCircularSoftLimit {
+		logrus.Warnf("roletemplate has caused %v recursive function calls", rolesCircularSoftLimit)
+	}
+	if depthCounter >= rolesCircularHardLimit {
+		return false, fmt.Errorf("roletemplate '%s' has caused %d recursive function calls, possible circular dependency", roleTemplateName, rolesCircularHardLimit)
+	}
 	roleTemplate, err := m.rtLister.Get("", roleTemplateName)
 	if err != nil {
 		return false, err
@@ -876,9 +888,10 @@ func (m *manager) checkReferencedRoles(roleTemplateName, roleTemplateContext str
 	}
 	isOwnerRole := false
 	if len(roleTemplate.RoleTemplateNames) > 0 {
+		depthCounter++
 		// get referenced roletemplate
 		for _, rtName := range roleTemplate.RoleTemplateNames {
-			isOwnerRole, err = m.checkReferencedRoles(rtName, roleTemplateContext)
+			isOwnerRole, err = m.checkReferencedRoles(rtName, roleTemplateContext, depthCounter)
 			if err != nil {
 				return false, err
 			}

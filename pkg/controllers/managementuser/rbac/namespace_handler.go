@@ -238,7 +238,7 @@ func (n *nsLifecycle) ensurePRTBAddToNamespace(ns *v1.Namespace) (bool, error) {
 		}
 
 		roles := map[string]*v3.RoleTemplate{}
-		if err := n.m.gatherRoles(rt, roles); err != nil {
+		if err := n.m.gatherRoles(rt, roles, 0); err != nil {
 			return false, err
 		}
 

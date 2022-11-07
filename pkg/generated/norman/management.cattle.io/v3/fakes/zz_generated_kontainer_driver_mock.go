@@ -29,22 +29,22 @@ var _ v31.KontainerDriverLister = &KontainerDriverListerMock{}
 
 // KontainerDriverListerMock is a mock implementation of v31.KontainerDriverLister.
 //
-//     func TestSomethingThatUsesKontainerDriverLister(t *testing.T) {
+//	    func TestSomethingThatUsesKontainerDriverLister(t *testing.T) {
 //
-//         // make and configure a mocked v31.KontainerDriverLister
-//         mockedKontainerDriverLister := &KontainerDriverListerMock{
-//             GetFunc: func(namespace string, name string) (*v3.KontainerDriver, error) {
-// 	               panic("mock out the Get method")
-//             },
-//             ListFunc: func(namespace string, selector labels.Selector) ([]*v3.KontainerDriver, error) {
-// 	               panic("mock out the List method")
-//             },
-//         }
+//	        // make and configure a mocked v31.KontainerDriverLister
+//	        mockedKontainerDriverLister := &KontainerDriverListerMock{
+//	            GetFunc: func(namespace string, name string) (*v3.KontainerDriver, error) {
+//		               panic("mock out the Get method")
+//	            },
+//	            ListFunc: func(namespace string, selector labels.Selector) ([]*v3.KontainerDriver, error) {
+//		               panic("mock out the List method")
+//	            },
+//	        }
 //
-//         // use mockedKontainerDriverLister in code that requires v31.KontainerDriverLister
-//         // and then make assertions.
+//	        // use mockedKontainerDriverLister in code that requires v31.KontainerDriverLister
+//	        // and then make assertions.
 //
-//     }
+//	    }
 type KontainerDriverListerMock struct {
 	// GetFunc mocks the Get method.
 	GetFunc func(namespace string, name string) (*v3.KontainerDriver, error)
@@ -91,7 +91,8 @@ func (mock *KontainerDriverListerMock) Get(namespace string, name string) (*v3.K
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//     len(mockedKontainerDriverLister.GetCalls())
+//
+//	len(mockedKontainerDriverLister.GetCalls())
 func (mock *KontainerDriverListerMock) GetCalls() []struct {
 	Namespace string
 	Name      string
@@ -126,7 +127,8 @@ func (mock *KontainerDriverListerMock) List(namespace string, selector labels.Se
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//     len(mockedKontainerDriverLister.ListCalls())
+//
+//	len(mockedKontainerDriverLister.ListCalls())
 func (mock *KontainerDriverListerMock) ListCalls() []struct {
 	Namespace string
 	Selector  labels.Selector
@@ -159,43 +161,43 @@ var _ v31.KontainerDriverController = &KontainerDriverControllerMock{}
 
 // KontainerDriverControllerMock is a mock implementation of v31.KontainerDriverController.
 //
-//     func TestSomethingThatUsesKontainerDriverController(t *testing.T) {
+//	    func TestSomethingThatUsesKontainerDriverController(t *testing.T) {
 //
-//         // make and configure a mocked v31.KontainerDriverController
-//         mockedKontainerDriverController := &KontainerDriverControllerMock{
-//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v31.KontainerDriverHandlerFunc)  {
-// 	               panic("mock out the AddClusterScopedFeatureHandler method")
-//             },
-//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v31.KontainerDriverHandlerFunc)  {
-// 	               panic("mock out the AddClusterScopedHandler method")
-//             },
-//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.KontainerDriverHandlerFunc)  {
-// 	               panic("mock out the AddFeatureHandler method")
-//             },
-//             AddHandlerFunc: func(ctx context.Context, name string, handler v31.KontainerDriverHandlerFunc)  {
-// 	               panic("mock out the AddHandler method")
-//             },
-//             EnqueueFunc: func(namespace string, name string)  {
-// 	               panic("mock out the Enqueue method")
-//             },
-//             EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
-// 	               panic("mock out the EnqueueAfter method")
-//             },
-//             GenericFunc: func() controller.GenericController {
-// 	               panic("mock out the Generic method")
-//             },
-//             InformerFunc: func() cache.SharedIndexInformer {
-// 	               panic("mock out the Informer method")
-//             },
-//             ListerFunc: func() v31.KontainerDriverLister {
-// 	               panic("mock out the Lister method")
-//             },
-//         }
+//	        // make and configure a mocked v31.KontainerDriverController
+//	        mockedKontainerDriverController := &KontainerDriverControllerMock{
+//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v31.KontainerDriverHandlerFunc)  {
+//		               panic("mock out the AddClusterScopedFeatureHandler method")
+//	            },
+//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v31.KontainerDriverHandlerFunc)  {
+//		               panic("mock out the AddClusterScopedHandler method")
+//	            },
+//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.KontainerDriverHandlerFunc)  {
+//		               panic("mock out the AddFeatureHandler method")
+//	            },
+//	            AddHandlerFunc: func(ctx context.Context, name string, handler v31.KontainerDriverHandlerFunc)  {
+//		               panic("mock out the AddHandler method")
+//	            },
+//	            EnqueueFunc: func(namespace string, name string)  {
+//		               panic("mock out the Enqueue method")
+//	            },
+//	            EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
+//		               panic("mock out the EnqueueAfter method")
+//	            },
+//	            GenericFunc: func() controller.GenericController {
+//		               panic("mock out the Generic method")
+//	            },
+//	            InformerFunc: func() cache.SharedIndexInformer {
+//		               panic("mock out the Informer method")
+//	            },
+//	            ListerFunc: func() v31.KontainerDriverLister {
+//		               panic("mock out the Lister method")
+//	            },
+//	        }
 //
-//         // use mockedKontainerDriverController in code that requires v31.KontainerDriverController
-//         // and then make assertions.
+//	        // use mockedKontainerDriverController in code that requires v31.KontainerDriverController
+//	        // and then make assertions.
 //
-//     }
+//	    }
 type KontainerDriverControllerMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
 	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v31.KontainerDriverHandlerFunc)
@@ -324,7 +326,8 @@ func (mock *KontainerDriverControllerMock) AddClusterScopedFeatureHandler(ctx co
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//     len(mockedKontainerDriverController.AddClusterScopedFeatureHandlerCalls())
+//
+//	len(mockedKontainerDriverController.AddClusterScopedFeatureHandlerCalls())
 func (mock *KontainerDriverControllerMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -369,7 +372,8 @@ func (mock *KontainerDriverControllerMock) AddClusterScopedHandler(ctx context.C
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//     len(mockedKontainerDriverController.AddClusterScopedHandlerCalls())
+//
+//	len(mockedKontainerDriverController.AddClusterScopedHandlerCalls())
 func (mock *KontainerDriverControllerMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -412,7 +416,8 @@ func (mock *KontainerDriverControllerMock) AddFeatureHandler(ctx context.Context
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//     len(mockedKontainerDriverController.AddFeatureHandlerCalls())
+//
+//	len(mockedKontainerDriverController.AddFeatureHandlerCalls())
 func (mock *KontainerDriverControllerMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
@@ -453,7 +458,8 @@ func (mock *KontainerDriverControllerMock) AddHandler(ctx context.Context, name 
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//     len(mockedKontainerDriverController.AddHandlerCalls())
+//
+//	len(mockedKontainerDriverController.AddHandlerCalls())
 func (mock *KontainerDriverControllerMock) AddHandlerCalls() []struct {
 	Ctx     context.Context
 	Name    string
@@ -490,7 +496,8 @@ func (mock *KontainerDriverControllerMock) Enqueue(namespace string, name string
 
 // EnqueueCalls gets all the calls that were made to Enqueue.
 // Check the length with:
-//     len(mockedKontainerDriverController.EnqueueCalls())
+//
+//	len(mockedKontainerDriverController.EnqueueCalls())
 func (mock *KontainerDriverControllerMock) EnqueueCalls() []struct {
 	Namespace string
 	Name      string
@@ -527,7 +534,8 @@ func (mock *KontainerDriverControllerMock) EnqueueAfter(namespace string, name s
 
 // EnqueueAfterCalls gets all the calls that were made to EnqueueAfter.
 // Check the length with:
-//     len(mockedKontainerDriverController.EnqueueAfterCalls())
+//
+//	len(mockedKontainerDriverController.EnqueueAfterCalls())
 func (mock *KontainerDriverControllerMock) EnqueueAfterCalls() []struct {
 	Namespace string
 	Name      string
@@ -559,7 +567,8 @@ func (mock *KontainerDriverControllerMock) Generic() controller.GenericControlle
 
 // GenericCalls gets all the calls that were made to Generic.
 // Check the length with:
-//     len(mockedKontainerDriverController.GenericCalls())
+//
+//	len(mockedKontainerDriverController.GenericCalls())
 func (mock *KontainerDriverControllerMock) GenericCalls() []struct {
 } {
 	var calls []struct {
@@ -585,7 +594,8 @@ func (mock *KontainerDriverControllerMock) Informer() cache.SharedIndexInformer 
 
 // InformerCalls gets all the calls that were made to Informer.
 // Check the length with:
-//     len(mockedKontainerDriverController.InformerCalls())
+//
+//	len(mockedKontainerDriverController.InformerCalls())
 func (mock *KontainerDriverControllerMock) InformerCalls() []struct {
 } {
 	var calls []struct {
@@ -611,7 +621,8 @@ func (mock *KontainerDriverControllerMock) Lister() v31.KontainerDriverLister {
 
 // ListerCalls gets all the calls that were made to Lister.
 // Check the length with:
-//     len(mockedKontainerDriverController.ListerCalls())
+//
+//	len(mockedKontainerDriverController.ListerCalls())
 func (mock *KontainerDriverControllerMock) ListerCalls() []struct {
 } {
 	var calls []struct {
@@ -651,76 +662,76 @@ var _ v31.KontainerDriverInterface = &KontainerDriverInterfaceMock{}
 
 // KontainerDriverInterfaceMock is a mock implementation of v31.KontainerDriverInterface.
 //
-//     func TestSomethingThatUsesKontainerDriverInterface(t *testing.T) {
+//	    func TestSomethingThatUsesKontainerDriverInterface(t *testing.T) {
 //
-//         // make and configure a mocked v31.KontainerDriverInterface
-//         mockedKontainerDriverInterface := &KontainerDriverInterfaceMock{
-//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v31.KontainerDriverHandlerFunc)  {
-// 	               panic("mock out the AddClusterScopedFeatureHandler method")
-//             },
-//             AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v31.KontainerDriverLifecycle)  {
-// 	               panic("mock out the AddClusterScopedFeatureLifecycle method")
-//             },
-//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v31.KontainerDriverHandlerFunc)  {
-// 	               panic("mock out the AddClusterScopedHandler method")
-//             },
-//             AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v31.KontainerDriverLifecycle)  {
-// 	               panic("mock out the AddClusterScopedLifecycle method")
-//             },
-//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.KontainerDriverHandlerFunc)  {
-// 	               panic("mock out the AddFeatureHandler method")
-//             },
-//             AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v31.KontainerDriverLifecycle)  {
-// 	               panic("mock out the AddFeatureLifecycle method")
-//             },
-//             AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v31.KontainerDriverHandlerFunc)  {
-// 	               panic("mock out the AddHandler method")
-//             },
-//             AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v31.KontainerDriverLifecycle)  {
-// 	               panic("mock out the AddLifecycle method")
-//             },
-//             ControllerFunc: func() v31.KontainerDriverController {
-// 	               panic("mock out the Controller method")
-//             },
-//             CreateFunc: func(in1 *v3.KontainerDriver) (*v3.KontainerDriver, error) {
-// 	               panic("mock out the Create method")
-//             },
-//             DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
-// 	               panic("mock out the Delete method")
-//             },
-//             DeleteCollectionFunc: func(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
-// 	               panic("mock out the DeleteCollection method")
-//             },
-//             DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
-// 	               panic("mock out the DeleteNamespaced method")
-//             },
-//             GetFunc: func(name string, opts metav1.GetOptions) (*v3.KontainerDriver, error) {
-// 	               panic("mock out the Get method")
-//             },
-//             GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v3.KontainerDriver, error) {
-// 	               panic("mock out the GetNamespaced method")
-//             },
-//             ListFunc: func(opts metav1.ListOptions) (*v3.KontainerDriverList, error) {
-// 	               panic("mock out the List method")
-//             },
-//             ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v3.KontainerDriverList, error) {
-// 	               panic("mock out the ListNamespaced method")
-//             },
-//             ObjectClientFunc: func() *objectclient.ObjectClient {
-// 	               panic("mock out the ObjectClient method")
-//             },
-//             UpdateFunc: func(in1 *v3.KontainerDriver) (*v3.KontainerDriver, error) {
-// 	               panic("mock out the Update method")
-//             },
-//             WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
-// 	               panic("mock out the Watch method")
-//             },
-//         }
+//	        // make and configure a mocked v31.KontainerDriverInterface
+//	        mockedKontainerDriverInterface := &KontainerDriverInterfaceMock{
+//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v31.KontainerDriverHandlerFunc)  {
+//		               panic("mock out the AddClusterScopedFeatureHandler method")
+//	            },
+//	            AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v31.KontainerDriverLifecycle)  {
+//		               panic("mock out the AddClusterScopedFeatureLifecycle method")
+//	            },
+//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v31.KontainerDriverHandlerFunc)  {
+//		               panic("mock out the AddClusterScopedHandler method")
+//	            },
+//	            AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v31.KontainerDriverLifecycle)  {
+//		               panic("mock out the AddClusterScopedLifecycle method")
+//	            },
+//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.KontainerDriverHandlerFunc)  {
+//		               panic("mock out the AddFeatureHandler method")
+//	            },
+//	            AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v31.KontainerDriverLifecycle)  {
+//		               panic("mock out the AddFeatureLifecycle method")
+//	            },
+//	            AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v31.KontainerDriverHandlerFunc)  {
+//		               panic("mock out the AddHandler method")
+//	            },
+//	            AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v31.KontainerDriverLifecycle)  {
+//		               panic("mock out the AddLifecycle method")
+//	            },
+//	            ControllerFunc: func() v31.KontainerDriverController {
+//		               panic("mock out the Controller method")
+//	            },
+//	            CreateFunc: func(in1 *v3.KontainerDriver) (*v3.KontainerDriver, error) {
+//		               panic("mock out the Create method")
+//	            },
+//	            DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
+//		               panic("mock out the Delete method")
+//	            },
+//	            DeleteCollectionFunc: func(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
+//		               panic("mock out the DeleteCollection method")
+//	            },
+//	            DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
+//		               panic("mock out the DeleteNamespaced method")
+//	            },
+//	            GetFunc: func(name string, opts metav1.GetOptions) (*v3.KontainerDriver, error) {
+//		               panic("mock out the Get method")
+//	            },
+//	            GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v3.KontainerDriver, error) {
+//		               panic("mock out the GetNamespaced method")
+//	            },
+//	            ListFunc: func(opts metav1.ListOptions) (*v3.KontainerDriverList, error) {
+//		               panic("mock out the List method")
+//	            },
+//	            ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v3.KontainerDriverList, error) {
+//		               panic("mock out the ListNamespaced method")
+//	            },
+//	            ObjectClientFunc: func() *objectclient.ObjectClient {
+//		               panic("mock out the ObjectClient method")
+//	            },
+//	            UpdateFunc: func(in1 *v3.KontainerDriver) (*v3.KontainerDriver, error) {
+//		               panic("mock out the Update method")
+//	            },
+//	            WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
+//		               panic("mock out the Watch method")
+//	            },
+//	        }
 //
-//         // use mockedKontainerDriverInterface in code that requires v31.KontainerDriverInterface
-//         // and then make assertions.
+//	        // use mockedKontainerDriverInterface in code that requires v31.KontainerDriverInterface
+//	        // and then make assertions.
 //
-//     }
+//	    }
 type KontainerDriverInterfaceMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
 	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v31.KontainerDriverHandlerFunc)
@@ -973,7 +984,8 @@ func (mock *KontainerDriverInterfaceMock) AddClusterScopedFeatureHandler(ctx con
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//     len(mockedKontainerDriverInterface.AddClusterScopedFeatureHandlerCalls())
+//
+//	len(mockedKontainerDriverInterface.AddClusterScopedFeatureHandlerCalls())
 func (mock *KontainerDriverInterfaceMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -1020,7 +1032,8 @@ func (mock *KontainerDriverInterfaceMock) AddClusterScopedFeatureLifecycle(ctx c
 
 // AddClusterScopedFeatureLifecycleCalls gets all the calls that were made to AddClusterScopedFeatureLifecycle.
 // Check the length with:
-//     len(mockedKontainerDriverInterface.AddClusterScopedFeatureLifecycleCalls())
+//
+//	len(mockedKontainerDriverInterface.AddClusterScopedFeatureLifecycleCalls())
 func (mock *KontainerDriverInterfaceMock) AddClusterScopedFeatureLifecycleCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -1065,7 +1078,8 @@ func (mock *KontainerDriverInterfaceMock) AddClusterScopedHandler(ctx context.Co
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//     len(mockedKontainerDriverInterface.AddClusterScopedHandlerCalls())
+//
+//	len(mockedKontainerDriverInterface.AddClusterScopedHandlerCalls())
 func (mock *KontainerDriverInterfaceMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -1108,7 +1122,8 @@ func (mock *KontainerDriverInterfaceMock) AddClusterScopedLifecycle(ctx context.
 
 // AddClusterScopedLifecycleCalls gets all the calls that were made to AddClusterScopedLifecycle.
 // Check the length with:
-//     len(mockedKontainerDriverInterface.AddClusterScopedLifecycleCalls())
+//
+//	len(mockedKontainerDriverInterface.AddClusterScopedLifecycleCalls())
 func (mock *KontainerDriverInterfaceMock) AddClusterScopedLifecycleCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -1151,7 +1166,8 @@ func (mock *KontainerDriverInterfaceMock) AddFeatureHandler(ctx context.Context,
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//     len(mockedKontainerDriverInterface.AddFeatureHandlerCalls())
+//
+//	len(mockedKontainerDriverInterface.AddFeatureHandlerCalls())
 func (mock *KontainerDriverInterfaceMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
@@ -1194,7 +1210,8 @@ func (mock *KontainerDriverInterfaceMock) AddFeatureLifecycle(ctx context.Contex
 
 // AddFeatureLifecycleCalls gets all the calls that were made to AddFeatureLifecycle.
 // Check the length with:
-//     len(mockedKontainerDriverInterface.AddFeatureLifecycleCalls())
+//
+//	len(mockedKontainerDriverInterface.AddFeatureLifecycleCalls())
 func (mock *KontainerDriverInterfaceMock) AddFeatureLifecycleCalls() []struct {
 	Ctx       context.Context
 	Enabled   func() bool
@@ -1235,7 +1252,8 @@ func (mock *KontainerDriverInterfaceMock) AddHandler(ctx context.Context, name s
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//     len(mockedKontainerDriverInterface.AddHandlerCalls())
+//
+//	len(mockedKontainerDriverInterface.AddHandlerCalls())
 func (mock *KontainerDriverInterfaceMock) AddHandlerCalls() []struct {
 	Ctx  context.Context
 	Name string
@@ -1274,7 +1292,8 @@ func (mock *KontainerDriverInterfaceMock) AddLifecycle(ctx context.Context, name
 
 // AddLifecycleCalls gets all the calls that were made to AddLifecycle.
 // Check the length with:
-//     len(mockedKontainerDriverInterface.AddLifecycleCalls())
+//
+//	len(mockedKontainerDriverInterface.AddLifecycleCalls())
 func (mock *KontainerDriverInterfaceMock) AddLifecycleCalls() []struct {
 	Ctx       context.Context
 	Name      string
@@ -1306,7 +1325,8 @@ func (mock *KontainerDriverInterfaceMock) Controller() v31.KontainerDriverContro
 
 // ControllerCalls gets all the calls that were made to Controller.
 // Check the length with:
-//     len(mockedKontainerDriverInterface.ControllerCalls())
+//
+//	len(mockedKontainerDriverInterface.ControllerCalls())
 func (mock *KontainerDriverInterfaceMock) ControllerCalls() []struct {
 } {
 	var calls []struct {
@@ -1335,7 +1355,8 @@ func (mock *KontainerDriverInterfaceMock) Create(in1 *v3.KontainerDriver) (*v3.K
 
 // CreateCalls gets all the calls that were made to Create.
 // Check the length with:
-//     len(mockedKontainerDriverInterface.CreateCalls())
+//
+//	len(mockedKontainerDriverInterface.CreateCalls())
 func (mock *KontainerDriverInterfaceMock) CreateCalls() []struct {
 	In1 *v3.KontainerDriver
 } {
@@ -1368,7 +1389,8 @@ func (mock *KontainerDriverInterfaceMock) Delete(name string, options *metav1.De
 
 // DeleteCalls gets all the calls that were made to Delete.
 // Check the length with:
-//     len(mockedKontainerDriverInterface.DeleteCalls())
+//
+//	len(mockedKontainerDriverInterface.DeleteCalls())
 func (mock *KontainerDriverInterfaceMock) DeleteCalls() []struct {
 	Name    string
 	Options *metav1.DeleteOptions
@@ -1403,7 +1425,8 @@ func (mock *KontainerDriverInterfaceMock) DeleteCollection(deleteOpts *metav1.De
 
 // DeleteCollectionCalls gets all the calls that were made to DeleteCollection.
 // Check the length with:
-//     len(mockedKontainerDriverInterface.DeleteCollectionCalls())
+//
+//	len(mockedKontainerDriverInterface.DeleteCollectionCalls())
 func (mock *KontainerDriverInterfaceMock) DeleteCollectionCalls() []struct {
 	DeleteOpts *metav1.DeleteOptions
 	ListOpts   metav1.ListOptions
@@ -1440,7 +1463,8 @@ func (mock *KontainerDriverInterfaceMock) DeleteNamespaced(namespace string, nam
 
 // DeleteNamespacedCalls gets all the calls that were made to DeleteNamespaced.
 // Check the length with:
-//     len(mockedKontainerDriverInterface.DeleteNamespacedCalls())
+//
+//	len(mockedKontainerDriverInterface.DeleteNamespacedCalls())
 func (mock *KontainerDriverInterfaceMock) DeleteNamespacedCalls() []struct {
 	Namespace string
 	Name      string
@@ -1477,7 +1501,8 @@ func (mock *KontainerDriverInterfaceMock) Get(name string, opts metav1.GetOption
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//     len(mockedKontainerDriverInterface.GetCalls())
+//
+//	len(mockedKontainerDriverInterface.GetCalls())
 func (mock *KontainerDriverInterfaceMock) GetCalls() []struct {
 	Name string
 	Opts metav1.GetOptions
@@ -1514,7 +1539,8 @@ func (mock *KontainerDriverInterfaceMock) GetNamespaced(namespace string, name s
 
 // GetNamespacedCalls gets all the calls that were made to GetNamespaced.
 // Check the length with:
-//     len(mockedKontainerDriverInterface.GetNamespacedCalls())
+//
+//	len(mockedKontainerDriverInterface.GetNamespacedCalls())
 func (mock *KontainerDriverInterfaceMock) GetNamespacedCalls() []struct {
 	Namespace string
 	Name      string
@@ -1549,7 +1575,8 @@ func (mock *KontainerDriverInterfaceMock) List(opts metav1.ListOptions) (*v3.Kon
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//     len(mockedKontainerDriverInterface.ListCalls())
+//
+//	len(mockedKontainerDriverInterface.ListCalls())
 func (mock *KontainerDriverInterfaceMock) ListCalls() []struct {
 	Opts metav1.ListOptions
 } {
@@ -1582,7 +1609,8 @@ func (mock *KontainerDriverInterfaceMock) ListNamespaced(namespace string, opts 
 
 // ListNamespacedCalls gets all the calls that were made to ListNamespaced.
 // Check the length with:
-//     len(mockedKontainerDriverInterface.ListNamespacedCalls())
+//
+//	len(mockedKontainerDriverInterface.ListNamespacedCalls())
 func (mock *KontainerDriverInterfaceMock) ListNamespacedCalls() []struct {
 	Namespace string
 	Opts      metav1.ListOptions
@@ -1612,7 +1640,8 @@ func (mock *KontainerDriverInterfaceMock) ObjectClient() *objectclient.ObjectCli
 
 // ObjectClientCalls gets all the calls that were made to ObjectClient.
 // Check the length with:
-//     len(mockedKontainerDriverInterface.ObjectClientCalls())
+//
+//	len(mockedKontainerDriverInterface.ObjectClientCalls())
 func (mock *KontainerDriverInterfaceMock) ObjectClientCalls() []struct {
 } {
 	var calls []struct {
@@ -1641,7 +1670,8 @@ func (mock *KontainerDriverInterfaceMock) Update(in1 *v3.KontainerDriver) (*v3.K
 
 // UpdateCalls gets all the calls that were made to Update.
 // Check the length with:
-//     len(mockedKontainerDriverInterface.UpdateCalls())
+//
+//	len(mockedKontainerDriverInterface.UpdateCalls())
 func (mock *KontainerDriverInterfaceMock) UpdateCalls() []struct {
 	In1 *v3.KontainerDriver
 } {
@@ -1672,7 +1702,8 @@ func (mock *KontainerDriverInterfaceMock) Watch(opts metav1.ListOptions) (watch.
 
 // WatchCalls gets all the calls that were made to Watch.
 // Check the length with:
-//     len(mockedKontainerDriverInterface.WatchCalls())
+//
+//	len(mockedKontainerDriverInterface.WatchCalls())
 func (mock *KontainerDriverInterfaceMock) WatchCalls() []struct {
 	Opts metav1.ListOptions
 } {
@@ -1695,19 +1726,19 @@ var _ v31.KontainerDriversGetter = &KontainerDriversGetterMock{}
 
 // KontainerDriversGetterMock is a mock implementation of v31.KontainerDriversGetter.
 //
-//     func TestSomethingThatUsesKontainerDriversGetter(t *testing.T) {
+//	    func TestSomethingThatUsesKontainerDriversGetter(t *testing.T) {
 //
-//         // make and configure a mocked v31.KontainerDriversGetter
-//         mockedKontainerDriversGetter := &KontainerDriversGetterMock{
-//             KontainerDriversFunc: func(namespace string) v31.KontainerDriverInterface {
-// 	               panic("mock out the KontainerDrivers method")
-//             },
-//         }
+//	        // make and configure a mocked v31.KontainerDriversGetter
+//	        mockedKontainerDriversGetter := &KontainerDriversGetterMock{
+//	            KontainerDriversFunc: func(namespace string) v31.KontainerDriverInterface {
+//		               panic("mock out the KontainerDrivers method")
+//	            },
+//	        }
 //
-//         // use mockedKontainerDriversGetter in code that requires v31.KontainerDriversGetter
-//         // and then make assertions.
+//	        // use mockedKontainerDriversGetter in code that requires v31.KontainerDriversGetter
+//	        // and then make assertions.
 //
-//     }
+//	    }
 type KontainerDriversGetterMock struct {
 	// KontainerDriversFunc mocks the KontainerDrivers method.
 	KontainerDriversFunc func(namespace string) v31.KontainerDriverInterface
@@ -1740,7 +1771,8 @@ func (mock *KontainerDriversGetterMock) KontainerDrivers(namespace string) v31.K
 
 // KontainerDriversCalls gets all the calls that were made to KontainerDrivers.
 // Check the length with:
-//     len(mockedKontainerDriversGetter.KontainerDriversCalls())
+//
+//	len(mockedKontainerDriversGetter.KontainerDriversCalls())
 func (mock *KontainerDriversGetterMock) KontainerDriversCalls() []struct {
 	Namespace string
 } {

@@ -29,22 +29,22 @@ var _ v11.ServiceAccountLister = &ServiceAccountListerMock{}
 
 // ServiceAccountListerMock is a mock implementation of v11.ServiceAccountLister.
 //
-//     func TestSomethingThatUsesServiceAccountLister(t *testing.T) {
+//	    func TestSomethingThatUsesServiceAccountLister(t *testing.T) {
 //
-//         // make and configure a mocked v11.ServiceAccountLister
-//         mockedServiceAccountLister := &ServiceAccountListerMock{
-//             GetFunc: func(namespace string, name string) (*v1.ServiceAccount, error) {
-// 	               panic("mock out the Get method")
-//             },
-//             ListFunc: func(namespace string, selector labels.Selector) ([]*v1.ServiceAccount, error) {
-// 	               panic("mock out the List method")
-//             },
-//         }
+//	        // make and configure a mocked v11.ServiceAccountLister
+//	        mockedServiceAccountLister := &ServiceAccountListerMock{
+//	            GetFunc: func(namespace string, name string) (*v1.ServiceAccount, error) {
+//		               panic("mock out the Get method")
+//	            },
+//	            ListFunc: func(namespace string, selector labels.Selector) ([]*v1.ServiceAccount, error) {
+//		               panic("mock out the List method")
+//	            },
+//	        }
 //
-//         // use mockedServiceAccountLister in code that requires v11.ServiceAccountLister
-//         // and then make assertions.
+//	        // use mockedServiceAccountLister in code that requires v11.ServiceAccountLister
+//	        // and then make assertions.
 //
-//     }
+//	    }
 type ServiceAccountListerMock struct {
 	// GetFunc mocks the Get method.
 	GetFunc func(namespace string, name string) (*v1.ServiceAccount, error)
@@ -91,7 +91,8 @@ func (mock *ServiceAccountListerMock) Get(namespace string, name string) (*v1.Se
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//     len(mockedServiceAccountLister.GetCalls())
+//
+//	len(mockedServiceAccountLister.GetCalls())
 func (mock *ServiceAccountListerMock) GetCalls() []struct {
 	Namespace string
 	Name      string
@@ -126,7 +127,8 @@ func (mock *ServiceAccountListerMock) List(namespace string, selector labels.Sel
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//     len(mockedServiceAccountLister.ListCalls())
+//
+//	len(mockedServiceAccountLister.ListCalls())
 func (mock *ServiceAccountListerMock) ListCalls() []struct {
 	Namespace string
 	Selector  labels.Selector
@@ -159,43 +161,43 @@ var _ v11.ServiceAccountController = &ServiceAccountControllerMock{}
 
 // ServiceAccountControllerMock is a mock implementation of v11.ServiceAccountController.
 //
-//     func TestSomethingThatUsesServiceAccountController(t *testing.T) {
+//	    func TestSomethingThatUsesServiceAccountController(t *testing.T) {
 //
-//         // make and configure a mocked v11.ServiceAccountController
-//         mockedServiceAccountController := &ServiceAccountControllerMock{
-//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v11.ServiceAccountHandlerFunc)  {
-// 	               panic("mock out the AddClusterScopedFeatureHandler method")
-//             },
-//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v11.ServiceAccountHandlerFunc)  {
-// 	               panic("mock out the AddClusterScopedHandler method")
-//             },
-//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v11.ServiceAccountHandlerFunc)  {
-// 	               panic("mock out the AddFeatureHandler method")
-//             },
-//             AddHandlerFunc: func(ctx context.Context, name string, handler v11.ServiceAccountHandlerFunc)  {
-// 	               panic("mock out the AddHandler method")
-//             },
-//             EnqueueFunc: func(namespace string, name string)  {
-// 	               panic("mock out the Enqueue method")
-//             },
-//             EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
-// 	               panic("mock out the EnqueueAfter method")
-//             },
-//             GenericFunc: func() controller.GenericController {
-// 	               panic("mock out the Generic method")
-//             },
-//             InformerFunc: func() cache.SharedIndexInformer {
-// 	               panic("mock out the Informer method")
-//             },
-//             ListerFunc: func() v11.ServiceAccountLister {
-// 	               panic("mock out the Lister method")
-//             },
-//         }
+//	        // make and configure a mocked v11.ServiceAccountController
+//	        mockedServiceAccountController := &ServiceAccountControllerMock{
+//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v11.ServiceAccountHandlerFunc)  {
+//		               panic("mock out the AddClusterScopedFeatureHandler method")
+//	            },
+//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v11.ServiceAccountHandlerFunc)  {
+//		               panic("mock out the AddClusterScopedHandler method")
+//	            },
+//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v11.ServiceAccountHandlerFunc)  {
+//		               panic("mock out the AddFeatureHandler method")
+//	            },
+//	            AddHandlerFunc: func(ctx context.Context, name string, handler v11.ServiceAccountHandlerFunc)  {
+//		               panic("mock out the AddHandler method")
+//	            },
+//	            EnqueueFunc: func(namespace string, name string)  {
+//		               panic("mock out the Enqueue method")
+//	            },
+//	            EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
+//		               panic("mock out the EnqueueAfter method")
+//	            },
+//	            GenericFunc: func() controller.GenericController {
+//		               panic("mock out the Generic method")
+//	            },
+//	            InformerFunc: func() cache.SharedIndexInformer {
+//		               panic("mock out the Informer method")
+//	            },
+//	            ListerFunc: func() v11.ServiceAccountLister {
+//		               panic("mock out the Lister method")
+//	            },
+//	        }
 //
-//         // use mockedServiceAccountController in code that requires v11.ServiceAccountController
-//         // and then make assertions.
+//	        // use mockedServiceAccountController in code that requires v11.ServiceAccountController
+//	        // and then make assertions.
 //
-//     }
+//	    }
 type ServiceAccountControllerMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
 	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v11.ServiceAccountHandlerFunc)
@@ -324,7 +326,8 @@ func (mock *ServiceAccountControllerMock) AddClusterScopedFeatureHandler(ctx con
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//     len(mockedServiceAccountController.AddClusterScopedFeatureHandlerCalls())
+//
+//	len(mockedServiceAccountController.AddClusterScopedFeatureHandlerCalls())
 func (mock *ServiceAccountControllerMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -369,7 +372,8 @@ func (mock *ServiceAccountControllerMock) AddClusterScopedHandler(ctx context.Co
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//     len(mockedServiceAccountController.AddClusterScopedHandlerCalls())
+//
+//	len(mockedServiceAccountController.AddClusterScopedHandlerCalls())
 func (mock *ServiceAccountControllerMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -412,7 +416,8 @@ func (mock *ServiceAccountControllerMock) AddFeatureHandler(ctx context.Context,
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//     len(mockedServiceAccountController.AddFeatureHandlerCalls())
+//
+//	len(mockedServiceAccountController.AddFeatureHandlerCalls())
 func (mock *ServiceAccountControllerMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
@@ -453,7 +458,8 @@ func (mock *ServiceAccountControllerMock) AddHandler(ctx context.Context, name s
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//     len(mockedServiceAccountController.AddHandlerCalls())
+//
+//	len(mockedServiceAccountController.AddHandlerCalls())
 func (mock *ServiceAccountControllerMock) AddHandlerCalls() []struct {
 	Ctx     context.Context
 	Name    string
@@ -490,7 +496,8 @@ func (mock *ServiceAccountControllerMock) Enqueue(namespace string, name string)
 
 // EnqueueCalls gets all the calls that were made to Enqueue.
 // Check the length with:
-//     len(mockedServiceAccountController.EnqueueCalls())
+//
+//	len(mockedServiceAccountController.EnqueueCalls())
 func (mock *ServiceAccountControllerMock) EnqueueCalls() []struct {
 	Namespace string
 	Name      string
@@ -527,7 +534,8 @@ func (mock *ServiceAccountControllerMock) EnqueueAfter(namespace string, name st
 
 // EnqueueAfterCalls gets all the calls that were made to EnqueueAfter.
 // Check the length with:
-//     len(mockedServiceAccountController.EnqueueAfterCalls())
+//
+//	len(mockedServiceAccountController.EnqueueAfterCalls())
 func (mock *ServiceAccountControllerMock) EnqueueAfterCalls() []struct {
 	Namespace string
 	Name      string
@@ -559,7 +567,8 @@ func (mock *ServiceAccountControllerMock) Generic() controller.GenericController
 
 // GenericCalls gets all the calls that were made to Generic.
 // Check the length with:
-//     len(mockedServiceAccountController.GenericCalls())
+//
+//	len(mockedServiceAccountController.GenericCalls())
 func (mock *ServiceAccountControllerMock) GenericCalls() []struct {
 } {
 	var calls []struct {
@@ -585,7 +594,8 @@ func (mock *ServiceAccountControllerMock) Informer() cache.SharedIndexInformer {
 
 // InformerCalls gets all the calls that were made to Informer.
 // Check the length with:
-//     len(mockedServiceAccountController.InformerCalls())
+//
+//	len(mockedServiceAccountController.InformerCalls())
 func (mock *ServiceAccountControllerMock) InformerCalls() []struct {
 } {
 	var calls []struct {
@@ -611,7 +621,8 @@ func (mock *ServiceAccountControllerMock) Lister() v11.ServiceAccountLister {
 
 // ListerCalls gets all the calls that were made to Lister.
 // Check the length with:
-//     len(mockedServiceAccountController.ListerCalls())
+//
+//	len(mockedServiceAccountController.ListerCalls())
 func (mock *ServiceAccountControllerMock) ListerCalls() []struct {
 } {
 	var calls []struct {
@@ -651,76 +662,76 @@ var _ v11.ServiceAccountInterface = &ServiceAccountInterfaceMock{}
 
 // ServiceAccountInterfaceMock is a mock implementation of v11.ServiceAccountInterface.
 //
-//     func TestSomethingThatUsesServiceAccountInterface(t *testing.T) {
+//	    func TestSomethingThatUsesServiceAccountInterface(t *testing.T) {
 //
-//         // make and configure a mocked v11.ServiceAccountInterface
-//         mockedServiceAccountInterface := &ServiceAccountInterfaceMock{
-//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v11.ServiceAccountHandlerFunc)  {
-// 	               panic("mock out the AddClusterScopedFeatureHandler method")
-//             },
-//             AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v11.ServiceAccountLifecycle)  {
-// 	               panic("mock out the AddClusterScopedFeatureLifecycle method")
-//             },
-//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v11.ServiceAccountHandlerFunc)  {
-// 	               panic("mock out the AddClusterScopedHandler method")
-//             },
-//             AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v11.ServiceAccountLifecycle)  {
-// 	               panic("mock out the AddClusterScopedLifecycle method")
-//             },
-//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v11.ServiceAccountHandlerFunc)  {
-// 	               panic("mock out the AddFeatureHandler method")
-//             },
-//             AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v11.ServiceAccountLifecycle)  {
-// 	               panic("mock out the AddFeatureLifecycle method")
-//             },
-//             AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v11.ServiceAccountHandlerFunc)  {
-// 	               panic("mock out the AddHandler method")
-//             },
-//             AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v11.ServiceAccountLifecycle)  {
-// 	               panic("mock out the AddLifecycle method")
-//             },
-//             ControllerFunc: func() v11.ServiceAccountController {
-// 	               panic("mock out the Controller method")
-//             },
-//             CreateFunc: func(in1 *v1.ServiceAccount) (*v1.ServiceAccount, error) {
-// 	               panic("mock out the Create method")
-//             },
-//             DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
-// 	               panic("mock out the Delete method")
-//             },
-//             DeleteCollectionFunc: func(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
-// 	               panic("mock out the DeleteCollection method")
-//             },
-//             DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
-// 	               panic("mock out the DeleteNamespaced method")
-//             },
-//             GetFunc: func(name string, opts metav1.GetOptions) (*v1.ServiceAccount, error) {
-// 	               panic("mock out the Get method")
-//             },
-//             GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v1.ServiceAccount, error) {
-// 	               panic("mock out the GetNamespaced method")
-//             },
-//             ListFunc: func(opts metav1.ListOptions) (*v1.ServiceAccountList, error) {
-// 	               panic("mock out the List method")
-//             },
-//             ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v1.ServiceAccountList, error) {
-// 	               panic("mock out the ListNamespaced method")
-//             },
-//             ObjectClientFunc: func() *objectclient.ObjectClient {
-// 	               panic("mock out the ObjectClient method")
-//             },
-//             UpdateFunc: func(in1 *v1.ServiceAccount) (*v1.ServiceAccount, error) {
-// 	               panic("mock out the Update method")
-//             },
-//             WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
-// 	               panic("mock out the Watch method")
-//             },
-//         }
+//	        // make and configure a mocked v11.ServiceAccountInterface
+//	        mockedServiceAccountInterface := &ServiceAccountInterfaceMock{
+//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v11.ServiceAccountHandlerFunc)  {
+//		               panic("mock out the AddClusterScopedFeatureHandler method")
+//	            },
+//	            AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v11.ServiceAccountLifecycle)  {
+//		               panic("mock out the AddClusterScopedFeatureLifecycle method")
+//	            },
+//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v11.ServiceAccountHandlerFunc)  {
+//		               panic("mock out the AddClusterScopedHandler method")
+//	            },
+//	            AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v11.ServiceAccountLifecycle)  {
+//		               panic("mock out the AddClusterScopedLifecycle method")
+//	            },
+//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v11.ServiceAccountHandlerFunc)  {
+//		               panic("mock out the AddFeatureHandler method")
+//	            },
+//	            AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v11.ServiceAccountLifecycle)  {
+//		               panic("mock out the AddFeatureLifecycle method")
+//	            },
+//	            AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v11.ServiceAccountHandlerFunc)  {
+//		               panic("mock out the AddHandler method")
+//	            },
+//	            AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v11.ServiceAccountLifecycle)  {
+//		               panic("mock out the AddLifecycle method")
+//	            },
+//	            ControllerFunc: func() v11.ServiceAccountController {
+//		               panic("mock out the Controller method")
+//	            },
+//	            CreateFunc: func(in1 *v1.ServiceAccount) (*v1.ServiceAccount, error) {
+//		               panic("mock out the Create method")
+//	            },
+//	            DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
+//		               panic("mock out the Delete method")
+//	            },
+//	            DeleteCollectionFunc: func(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
+//		               panic("mock out the DeleteCollection method")
+//	            },
+//	            DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
+//		               panic("mock out the DeleteNamespaced method")
+//	            },
+//	            GetFunc: func(name string, opts metav1.GetOptions) (*v1.ServiceAccount, error) {
+//		               panic("mock out the Get method")
+//	            },
+//	            GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v1.ServiceAccount, error) {
+//		               panic("mock out the GetNamespaced method")
+//	            },
+//	            ListFunc: func(opts metav1.ListOptions) (*v1.ServiceAccountList, error) {
+//		               panic("mock out the List method")
+//	            },
+//	            ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v1.ServiceAccountList, error) {
+//		               panic("mock out the ListNamespaced method")
+//	            },
+//	            ObjectClientFunc: func() *objectclient.ObjectClient {
+//		               panic("mock out the ObjectClient method")
+//	            },
+//	            UpdateFunc: func(in1 *v1.ServiceAccount) (*v1.ServiceAccount, error) {
+//		               panic("mock out the Update method")
+//	            },
+//	            WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
+//		               panic("mock out the Watch method")
+//	            },
+//	        }
 //
-//         // use mockedServiceAccountInterface in code that requires v11.ServiceAccountInterface
-//         // and then make assertions.
+//	        // use mockedServiceAccountInterface in code that requires v11.ServiceAccountInterface
+//	        // and then make assertions.
 //
-//     }
+//	    }
 type ServiceAccountInterfaceMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
 	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v11.ServiceAccountHandlerFunc)
@@ -973,7 +984,8 @@ func (mock *ServiceAccountInterfaceMock) AddClusterScopedFeatureHandler(ctx cont
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//     len(mockedServiceAccountInterface.AddClusterScopedFeatureHandlerCalls())
+//
+//	len(mockedServiceAccountInterface.AddClusterScopedFeatureHandlerCalls())
 func (mock *ServiceAccountInterfaceMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -1020,7 +1032,8 @@ func (mock *ServiceAccountInterfaceMock) AddClusterScopedFeatureLifecycle(ctx co
 
 // AddClusterScopedFeatureLifecycleCalls gets all the calls that were made to AddClusterScopedFeatureLifecycle.
 // Check the length with:
-//     len(mockedServiceAccountInterface.AddClusterScopedFeatureLifecycleCalls())
+//
+//	len(mockedServiceAccountInterface.AddClusterScopedFeatureLifecycleCalls())
 func (mock *ServiceAccountInterfaceMock) AddClusterScopedFeatureLifecycleCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -1065,7 +1078,8 @@ func (mock *ServiceAccountInterfaceMock) AddClusterScopedHandler(ctx context.Con
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//     len(mockedServiceAccountInterface.AddClusterScopedHandlerCalls())
+//
+//	len(mockedServiceAccountInterface.AddClusterScopedHandlerCalls())
 func (mock *ServiceAccountInterfaceMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -1108,7 +1122,8 @@ func (mock *ServiceAccountInterfaceMock) AddClusterScopedLifecycle(ctx context.C
 
 // AddClusterScopedLifecycleCalls gets all the calls that were made to AddClusterScopedLifecycle.
 // Check the length with:
-//     len(mockedServiceAccountInterface.AddClusterScopedLifecycleCalls())
+//
+//	len(mockedServiceAccountInterface.AddClusterScopedLifecycleCalls())
 func (mock *ServiceAccountInterfaceMock) AddClusterScopedLifecycleCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -1151,7 +1166,8 @@ func (mock *ServiceAccountInterfaceMock) AddFeatureHandler(ctx context.Context, 
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//     len(mockedServiceAccountInterface.AddFeatureHandlerCalls())
+//
+//	len(mockedServiceAccountInterface.AddFeatureHandlerCalls())
 func (mock *ServiceAccountInterfaceMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
@@ -1194,7 +1210,8 @@ func (mock *ServiceAccountInterfaceMock) AddFeatureLifecycle(ctx context.Context
 
 // AddFeatureLifecycleCalls gets all the calls that were made to AddFeatureLifecycle.
 // Check the length with:
-//     len(mockedServiceAccountInterface.AddFeatureLifecycleCalls())
+//
+//	len(mockedServiceAccountInterface.AddFeatureLifecycleCalls())
 func (mock *ServiceAccountInterfaceMock) AddFeatureLifecycleCalls() []struct {
 	Ctx       context.Context
 	Enabled   func() bool
@@ -1235,7 +1252,8 @@ func (mock *ServiceAccountInterfaceMock) AddHandler(ctx context.Context, name st
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//     len(mockedServiceAccountInterface.AddHandlerCalls())
+//
+//	len(mockedServiceAccountInterface.AddHandlerCalls())
 func (mock *ServiceAccountInterfaceMock) AddHandlerCalls() []struct {
 	Ctx  context.Context
 	Name string
@@ -1274,7 +1292,8 @@ func (mock *ServiceAccountInterfaceMock) AddLifecycle(ctx context.Context, name 
 
 // AddLifecycleCalls gets all the calls that were made to AddLifecycle.
 // Check the length with:
-//     len(mockedServiceAccountInterface.AddLifecycleCalls())
+//
+//	len(mockedServiceAccountInterface.AddLifecycleCalls())
 func (mock *ServiceAccountInterfaceMock) AddLifecycleCalls() []struct {
 	Ctx       context.Context
 	Name      string
@@ -1306,7 +1325,8 @@ func (mock *ServiceAccountInterfaceMock) Controller() v11.ServiceAccountControll
 
 // ControllerCalls gets all the calls that were made to Controller.
 // Check the length with:
-//     len(mockedServiceAccountInterface.ControllerCalls())
+//
+//	len(mockedServiceAccountInterface.ControllerCalls())
 func (mock *ServiceAccountInterfaceMock) ControllerCalls() []struct {
 } {
 	var calls []struct {
@@ -1335,7 +1355,8 @@ func (mock *ServiceAccountInterfaceMock) Create(in1 *v1.ServiceAccount) (*v1.Ser
 
 // CreateCalls gets all the calls that were made to Create.
 // Check the length with:
-//     len(mockedServiceAccountInterface.CreateCalls())
+//
+//	len(mockedServiceAccountInterface.CreateCalls())
 func (mock *ServiceAccountInterfaceMock) CreateCalls() []struct {
 	In1 *v1.ServiceAccount
 } {
@@ -1368,7 +1389,8 @@ func (mock *ServiceAccountInterfaceMock) Delete(name string, options *metav1.Del
 
 // DeleteCalls gets all the calls that were made to Delete.
 // Check the length with:
-//     len(mockedServiceAccountInterface.DeleteCalls())
+//
+//	len(mockedServiceAccountInterface.DeleteCalls())
 func (mock *ServiceAccountInterfaceMock) DeleteCalls() []struct {
 	Name    string
 	Options *metav1.DeleteOptions
@@ -1403,7 +1425,8 @@ func (mock *ServiceAccountInterfaceMock) DeleteCollection(deleteOpts *metav1.Del
 
 // DeleteCollectionCalls gets all the calls that were made to DeleteCollection.
 // Check the length with:
-//     len(mockedServiceAccountInterface.DeleteCollectionCalls())
+//
+//	len(mockedServiceAccountInterface.DeleteCollectionCalls())
 func (mock *ServiceAccountInterfaceMock) DeleteCollectionCalls() []struct {
 	DeleteOpts *metav1.DeleteOptions
 	ListOpts   metav1.ListOptions
@@ -1440,7 +1463,8 @@ func (mock *ServiceAccountInterfaceMock) DeleteNamespaced(namespace string, name
 
 // DeleteNamespacedCalls gets all the calls that were made to DeleteNamespaced.
 // Check the length with:
-//     len(mockedServiceAccountInterface.DeleteNamespacedCalls())
+//
+//	len(mockedServiceAccountInterface.DeleteNamespacedCalls())
 func (mock *ServiceAccountInterfaceMock) DeleteNamespacedCalls() []struct {
 	Namespace string
 	Name      string
@@ -1477,7 +1501,8 @@ func (mock *ServiceAccountInterfaceMock) Get(name string, opts metav1.GetOptions
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//     len(mockedServiceAccountInterface.GetCalls())
+//
+//	len(mockedServiceAccountInterface.GetCalls())
 func (mock *ServiceAccountInterfaceMock) GetCalls() []struct {
 	Name string
 	Opts metav1.GetOptions
@@ -1514,7 +1539,8 @@ func (mock *ServiceAccountInterfaceMock) GetNamespaced(namespace string, name st
 
 // GetNamespacedCalls gets all the calls that were made to GetNamespaced.
 // Check the length with:
-//     len(mockedServiceAccountInterface.GetNamespacedCalls())
+//
+//	len(mockedServiceAccountInterface.GetNamespacedCalls())
 func (mock *ServiceAccountInterfaceMock) GetNamespacedCalls() []struct {
 	Namespace string
 	Name      string
@@ -1549,7 +1575,8 @@ func (mock *ServiceAccountInterfaceMock) List(opts metav1.ListOptions) (*v1.Serv
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//     len(mockedServiceAccountInterface.ListCalls())
+//
+//	len(mockedServiceAccountInterface.ListCalls())
 func (mock *ServiceAccountInterfaceMock) ListCalls() []struct {
 	Opts metav1.ListOptions
 } {
@@ -1582,7 +1609,8 @@ func (mock *ServiceAccountInterfaceMock) ListNamespaced(namespace string, opts m
 
 // ListNamespacedCalls gets all the calls that were made to ListNamespaced.
 // Check the length with:
-//     len(mockedServiceAccountInterface.ListNamespacedCalls())
+//
+//	len(mockedServiceAccountInterface.ListNamespacedCalls())
 func (mock *ServiceAccountInterfaceMock) ListNamespacedCalls() []struct {
 	Namespace string
 	Opts      metav1.ListOptions
@@ -1612,7 +1640,8 @@ func (mock *ServiceAccountInterfaceMock) ObjectClient() *objectclient.ObjectClie
 
 // ObjectClientCalls gets all the calls that were made to ObjectClient.
 // Check the length with:
-//     len(mockedServiceAccountInterface.ObjectClientCalls())
+//
+//	len(mockedServiceAccountInterface.ObjectClientCalls())
 func (mock *ServiceAccountInterfaceMock) ObjectClientCalls() []struct {
 } {
 	var calls []struct {
@@ -1641,7 +1670,8 @@ func (mock *ServiceAccountInterfaceMock) Update(in1 *v1.ServiceAccount) (*v1.Ser
 
 // UpdateCalls gets all the calls that were made to Update.
 // Check the length with:
-//     len(mockedServiceAccountInterface.UpdateCalls())
+//
+//	len(mockedServiceAccountInterface.UpdateCalls())
 func (mock *ServiceAccountInterfaceMock) UpdateCalls() []struct {
 	In1 *v1.ServiceAccount
 } {
@@ -1672,7 +1702,8 @@ func (mock *ServiceAccountInterfaceMock) Watch(opts metav1.ListOptions) (watch.I
 
 // WatchCalls gets all the calls that were made to Watch.
 // Check the length with:
-//     len(mockedServiceAccountInterface.WatchCalls())
+//
+//	len(mockedServiceAccountInterface.WatchCalls())
 func (mock *ServiceAccountInterfaceMock) WatchCalls() []struct {
 	Opts metav1.ListOptions
 } {
@@ -1695,19 +1726,19 @@ var _ v11.ServiceAccountsGetter = &ServiceAccountsGetterMock{}
 
 // ServiceAccountsGetterMock is a mock implementation of v11.ServiceAccountsGetter.
 //
-//     func TestSomethingThatUsesServiceAccountsGetter(t *testing.T) {
+//	    func TestSomethingThatUsesServiceAccountsGetter(t *testing.T) {
 //
-//         // make and configure a mocked v11.ServiceAccountsGetter
-//         mockedServiceAccountsGetter := &ServiceAccountsGetterMock{
-//             ServiceAccountsFunc: func(namespace string) v11.ServiceAccountInterface {
-// 	               panic("mock out the ServiceAccounts method")
-//             },
-//         }
+//	        // make and configure a mocked v11.ServiceAccountsGetter
+//	        mockedServiceAccountsGetter := &ServiceAccountsGetterMock{
+//	            ServiceAccountsFunc: func(namespace string) v11.ServiceAccountInterface {
+//		               panic("mock out the ServiceAccounts method")
+//	            },
+//	        }
 //
-//         // use mockedServiceAccountsGetter in code that requires v11.ServiceAccountsGetter
-//         // and then make assertions.
+//	        // use mockedServiceAccountsGetter in code that requires v11.ServiceAccountsGetter
+//	        // and then make assertions.
 //
-//     }
+//	    }
 type ServiceAccountsGetterMock struct {
 	// ServiceAccountsFunc mocks the ServiceAccounts method.
 	ServiceAccountsFunc func(namespace string) v11.ServiceAccountInterface
@@ -1740,7 +1771,8 @@ func (mock *ServiceAccountsGetterMock) ServiceAccounts(namespace string) v11.Ser
 
 // ServiceAccountsCalls gets all the calls that were made to ServiceAccounts.
 // Check the length with:
-//     len(mockedServiceAccountsGetter.ServiceAccountsCalls())
+//
+//	len(mockedServiceAccountsGetter.ServiceAccountsCalls())
 func (mock *ServiceAccountsGetterMock) ServiceAccountsCalls() []struct {
 	Namespace string
 } {

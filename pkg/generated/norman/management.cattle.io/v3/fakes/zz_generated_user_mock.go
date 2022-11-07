@@ -29,22 +29,22 @@ var _ v31.UserLister = &UserListerMock{}
 
 // UserListerMock is a mock implementation of v31.UserLister.
 //
-//     func TestSomethingThatUsesUserLister(t *testing.T) {
+//	    func TestSomethingThatUsesUserLister(t *testing.T) {
 //
-//         // make and configure a mocked v31.UserLister
-//         mockedUserLister := &UserListerMock{
-//             GetFunc: func(namespace string, name string) (*v3.User, error) {
-// 	               panic("mock out the Get method")
-//             },
-//             ListFunc: func(namespace string, selector labels.Selector) ([]*v3.User, error) {
-// 	               panic("mock out the List method")
-//             },
-//         }
+//	        // make and configure a mocked v31.UserLister
+//	        mockedUserLister := &UserListerMock{
+//	            GetFunc: func(namespace string, name string) (*v3.User, error) {
+//		               panic("mock out the Get method")
+//	            },
+//	            ListFunc: func(namespace string, selector labels.Selector) ([]*v3.User, error) {
+//		               panic("mock out the List method")
+//	            },
+//	        }
 //
-//         // use mockedUserLister in code that requires v31.UserLister
-//         // and then make assertions.
+//	        // use mockedUserLister in code that requires v31.UserLister
+//	        // and then make assertions.
 //
-//     }
+//	    }
 type UserListerMock struct {
 	// GetFunc mocks the Get method.
 	GetFunc func(namespace string, name string) (*v3.User, error)
@@ -91,7 +91,8 @@ func (mock *UserListerMock) Get(namespace string, name string) (*v3.User, error)
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//     len(mockedUserLister.GetCalls())
+//
+//	len(mockedUserLister.GetCalls())
 func (mock *UserListerMock) GetCalls() []struct {
 	Namespace string
 	Name      string
@@ -126,7 +127,8 @@ func (mock *UserListerMock) List(namespace string, selector labels.Selector) ([]
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//     len(mockedUserLister.ListCalls())
+//
+//	len(mockedUserLister.ListCalls())
 func (mock *UserListerMock) ListCalls() []struct {
 	Namespace string
 	Selector  labels.Selector
@@ -159,43 +161,43 @@ var _ v31.UserController = &UserControllerMock{}
 
 // UserControllerMock is a mock implementation of v31.UserController.
 //
-//     func TestSomethingThatUsesUserController(t *testing.T) {
+//	    func TestSomethingThatUsesUserController(t *testing.T) {
 //
-//         // make and configure a mocked v31.UserController
-//         mockedUserController := &UserControllerMock{
-//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v31.UserHandlerFunc)  {
-// 	               panic("mock out the AddClusterScopedFeatureHandler method")
-//             },
-//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v31.UserHandlerFunc)  {
-// 	               panic("mock out the AddClusterScopedHandler method")
-//             },
-//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.UserHandlerFunc)  {
-// 	               panic("mock out the AddFeatureHandler method")
-//             },
-//             AddHandlerFunc: func(ctx context.Context, name string, handler v31.UserHandlerFunc)  {
-// 	               panic("mock out the AddHandler method")
-//             },
-//             EnqueueFunc: func(namespace string, name string)  {
-// 	               panic("mock out the Enqueue method")
-//             },
-//             EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
-// 	               panic("mock out the EnqueueAfter method")
-//             },
-//             GenericFunc: func() controller.GenericController {
-// 	               panic("mock out the Generic method")
-//             },
-//             InformerFunc: func() cache.SharedIndexInformer {
-// 	               panic("mock out the Informer method")
-//             },
-//             ListerFunc: func() v31.UserLister {
-// 	               panic("mock out the Lister method")
-//             },
-//         }
+//	        // make and configure a mocked v31.UserController
+//	        mockedUserController := &UserControllerMock{
+//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v31.UserHandlerFunc)  {
+//		               panic("mock out the AddClusterScopedFeatureHandler method")
+//	            },
+//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v31.UserHandlerFunc)  {
+//		               panic("mock out the AddClusterScopedHandler method")
+//	            },
+//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.UserHandlerFunc)  {
+//		               panic("mock out the AddFeatureHandler method")
+//	            },
+//	            AddHandlerFunc: func(ctx context.Context, name string, handler v31.UserHandlerFunc)  {
+//		               panic("mock out the AddHandler method")
+//	            },
+//	            EnqueueFunc: func(namespace string, name string)  {
+//		               panic("mock out the Enqueue method")
+//	            },
+//	            EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
+//		               panic("mock out the EnqueueAfter method")
+//	            },
+//	            GenericFunc: func() controller.GenericController {
+//		               panic("mock out the Generic method")
+//	            },
+//	            InformerFunc: func() cache.SharedIndexInformer {
+//		               panic("mock out the Informer method")
+//	            },
+//	            ListerFunc: func() v31.UserLister {
+//		               panic("mock out the Lister method")
+//	            },
+//	        }
 //
-//         // use mockedUserController in code that requires v31.UserController
-//         // and then make assertions.
+//	        // use mockedUserController in code that requires v31.UserController
+//	        // and then make assertions.
 //
-//     }
+//	    }
 type UserControllerMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
 	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v31.UserHandlerFunc)
@@ -324,7 +326,8 @@ func (mock *UserControllerMock) AddClusterScopedFeatureHandler(ctx context.Conte
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//     len(mockedUserController.AddClusterScopedFeatureHandlerCalls())
+//
+//	len(mockedUserController.AddClusterScopedFeatureHandlerCalls())
 func (mock *UserControllerMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -369,7 +372,8 @@ func (mock *UserControllerMock) AddClusterScopedHandler(ctx context.Context, nam
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//     len(mockedUserController.AddClusterScopedHandlerCalls())
+//
+//	len(mockedUserController.AddClusterScopedHandlerCalls())
 func (mock *UserControllerMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -412,7 +416,8 @@ func (mock *UserControllerMock) AddFeatureHandler(ctx context.Context, enabled f
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//     len(mockedUserController.AddFeatureHandlerCalls())
+//
+//	len(mockedUserController.AddFeatureHandlerCalls())
 func (mock *UserControllerMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
@@ -453,7 +458,8 @@ func (mock *UserControllerMock) AddHandler(ctx context.Context, name string, han
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//     len(mockedUserController.AddHandlerCalls())
+//
+//	len(mockedUserController.AddHandlerCalls())
 func (mock *UserControllerMock) AddHandlerCalls() []struct {
 	Ctx     context.Context
 	Name    string
@@ -490,7 +496,8 @@ func (mock *UserControllerMock) Enqueue(namespace string, name string) {
 
 // EnqueueCalls gets all the calls that were made to Enqueue.
 // Check the length with:
-//     len(mockedUserController.EnqueueCalls())
+//
+//	len(mockedUserController.EnqueueCalls())
 func (mock *UserControllerMock) EnqueueCalls() []struct {
 	Namespace string
 	Name      string
@@ -527,7 +534,8 @@ func (mock *UserControllerMock) EnqueueAfter(namespace string, name string, afte
 
 // EnqueueAfterCalls gets all the calls that were made to EnqueueAfter.
 // Check the length with:
-//     len(mockedUserController.EnqueueAfterCalls())
+//
+//	len(mockedUserController.EnqueueAfterCalls())
 func (mock *UserControllerMock) EnqueueAfterCalls() []struct {
 	Namespace string
 	Name      string
@@ -559,7 +567,8 @@ func (mock *UserControllerMock) Generic() controller.GenericController {
 
 // GenericCalls gets all the calls that were made to Generic.
 // Check the length with:
-//     len(mockedUserController.GenericCalls())
+//
+//	len(mockedUserController.GenericCalls())
 func (mock *UserControllerMock) GenericCalls() []struct {
 } {
 	var calls []struct {
@@ -585,7 +594,8 @@ func (mock *UserControllerMock) Informer() cache.SharedIndexInformer {
 
 // InformerCalls gets all the calls that were made to Informer.
 // Check the length with:
-//     len(mockedUserController.InformerCalls())
+//
+//	len(mockedUserController.InformerCalls())
 func (mock *UserControllerMock) InformerCalls() []struct {
 } {
 	var calls []struct {
@@ -611,7 +621,8 @@ func (mock *UserControllerMock) Lister() v31.UserLister {
 
 // ListerCalls gets all the calls that were made to Lister.
 // Check the length with:
-//     len(mockedUserController.ListerCalls())
+//
+//	len(mockedUserController.ListerCalls())
 func (mock *UserControllerMock) ListerCalls() []struct {
 } {
 	var calls []struct {
@@ -651,76 +662,76 @@ var _ v31.UserInterface = &UserInterfaceMock{}
 
 // UserInterfaceMock is a mock implementation of v31.UserInterface.
 //
-//     func TestSomethingThatUsesUserInterface(t *testing.T) {
+//	    func TestSomethingThatUsesUserInterface(t *testing.T) {
 //
-//         // make and configure a mocked v31.UserInterface
-//         mockedUserInterface := &UserInterfaceMock{
-//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v31.UserHandlerFunc)  {
-// 	               panic("mock out the AddClusterScopedFeatureHandler method")
-//             },
-//             AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v31.UserLifecycle)  {
-// 	               panic("mock out the AddClusterScopedFeatureLifecycle method")
-//             },
-//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v31.UserHandlerFunc)  {
-// 	               panic("mock out the AddClusterScopedHandler method")
-//             },
-//             AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v31.UserLifecycle)  {
-// 	               panic("mock out the AddClusterScopedLifecycle method")
-//             },
-//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.UserHandlerFunc)  {
-// 	               panic("mock out the AddFeatureHandler method")
-//             },
-//             AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v31.UserLifecycle)  {
-// 	               panic("mock out the AddFeatureLifecycle method")
-//             },
-//             AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v31.UserHandlerFunc)  {
-// 	               panic("mock out the AddHandler method")
-//             },
-//             AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v31.UserLifecycle)  {
-// 	               panic("mock out the AddLifecycle method")
-//             },
-//             ControllerFunc: func() v31.UserController {
-// 	               panic("mock out the Controller method")
-//             },
-//             CreateFunc: func(in1 *v3.User) (*v3.User, error) {
-// 	               panic("mock out the Create method")
-//             },
-//             DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
-// 	               panic("mock out the Delete method")
-//             },
-//             DeleteCollectionFunc: func(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
-// 	               panic("mock out the DeleteCollection method")
-//             },
-//             DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
-// 	               panic("mock out the DeleteNamespaced method")
-//             },
-//             GetFunc: func(name string, opts metav1.GetOptions) (*v3.User, error) {
-// 	               panic("mock out the Get method")
-//             },
-//             GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v3.User, error) {
-// 	               panic("mock out the GetNamespaced method")
-//             },
-//             ListFunc: func(opts metav1.ListOptions) (*v3.UserList, error) {
-// 	               panic("mock out the List method")
-//             },
-//             ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v3.UserList, error) {
-// 	               panic("mock out the ListNamespaced method")
-//             },
-//             ObjectClientFunc: func() *objectclient.ObjectClient {
-// 	               panic("mock out the ObjectClient method")
-//             },
-//             UpdateFunc: func(in1 *v3.User) (*v3.User, error) {
-// 	               panic("mock out the Update method")
-//             },
-//             WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
-// 	               panic("mock out the Watch method")
-//             },
-//         }
+//	        // make and configure a mocked v31.UserInterface
+//	        mockedUserInterface := &UserInterfaceMock{
+//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v31.UserHandlerFunc)  {
+//		               panic("mock out the AddClusterScopedFeatureHandler method")
+//	            },
+//	            AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v31.UserLifecycle)  {
+//		               panic("mock out the AddClusterScopedFeatureLifecycle method")
+//	            },
+//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v31.UserHandlerFunc)  {
+//		               panic("mock out the AddClusterScopedHandler method")
+//	            },
+//	            AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v31.UserLifecycle)  {
+//		               panic("mock out the AddClusterScopedLifecycle method")
+//	            },
+//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v31.UserHandlerFunc)  {
+//		               panic("mock out the AddFeatureHandler method")
+//	            },
+//	            AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v31.UserLifecycle)  {
+//		               panic("mock out the AddFeatureLifecycle method")
+//	            },
+//	            AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v31.UserHandlerFunc)  {
+//		               panic("mock out the AddHandler method")
+//	            },
+//	            AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v31.UserLifecycle)  {
+//		               panic("mock out the AddLifecycle method")
+//	            },
+//	            ControllerFunc: func() v31.UserController {
+//		               panic("mock out the Controller method")
+//	            },
+//	            CreateFunc: func(in1 *v3.User) (*v3.User, error) {
+//		               panic("mock out the Create method")
+//	            },
+//	            DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
+//		               panic("mock out the Delete method")
+//	            },
+//	            DeleteCollectionFunc: func(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
+//		               panic("mock out the DeleteCollection method")
+//	            },
+//	            DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
+//		               panic("mock out the DeleteNamespaced method")
+//	            },
+//	            GetFunc: func(name string, opts metav1.GetOptions) (*v3.User, error) {
+//		               panic("mock out the Get method")
+//	            },
+//	            GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v3.User, error) {
+//		               panic("mock out the GetNamespaced method")
+//	            },
+//	            ListFunc: func(opts metav1.ListOptions) (*v3.UserList, error) {
+//		               panic("mock out the List method")
+//	            },
+//	            ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v3.UserList, error) {
+//		               panic("mock out the ListNamespaced method")
+//	            },
+//	            ObjectClientFunc: func() *objectclient.ObjectClient {
+//		               panic("mock out the ObjectClient method")
+//	            },
+//	            UpdateFunc: func(in1 *v3.User) (*v3.User, error) {
+//		               panic("mock out the Update method")
+//	            },
+//	            WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
+//		               panic("mock out the Watch method")
+//	            },
+//	        }
 //
-//         // use mockedUserInterface in code that requires v31.UserInterface
-//         // and then make assertions.
+//	        // use mockedUserInterface in code that requires v31.UserInterface
+//	        // and then make assertions.
 //
-//     }
+//	    }
 type UserInterfaceMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
 	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v31.UserHandlerFunc)
@@ -973,7 +984,8 @@ func (mock *UserInterfaceMock) AddClusterScopedFeatureHandler(ctx context.Contex
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//     len(mockedUserInterface.AddClusterScopedFeatureHandlerCalls())
+//
+//	len(mockedUserInterface.AddClusterScopedFeatureHandlerCalls())
 func (mock *UserInterfaceMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -1020,7 +1032,8 @@ func (mock *UserInterfaceMock) AddClusterScopedFeatureLifecycle(ctx context.Cont
 
 // AddClusterScopedFeatureLifecycleCalls gets all the calls that were made to AddClusterScopedFeatureLifecycle.
 // Check the length with:
-//     len(mockedUserInterface.AddClusterScopedFeatureLifecycleCalls())
+//
+//	len(mockedUserInterface.AddClusterScopedFeatureLifecycleCalls())
 func (mock *UserInterfaceMock) AddClusterScopedFeatureLifecycleCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
@@ -1065,7 +1078,8 @@ func (mock *UserInterfaceMock) AddClusterScopedHandler(ctx context.Context, name
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//     len(mockedUserInterface.AddClusterScopedHandlerCalls())
+//
+//	len(mockedUserInterface.AddClusterScopedHandlerCalls())
 func (mock *UserInterfaceMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -1108,7 +1122,8 @@ func (mock *UserInterfaceMock) AddClusterScopedLifecycle(ctx context.Context, na
 
 // AddClusterScopedLifecycleCalls gets all the calls that were made to AddClusterScopedLifecycle.
 // Check the length with:
-//     len(mockedUserInterface.AddClusterScopedLifecycleCalls())
+//
+//	len(mockedUserInterface.AddClusterScopedLifecycleCalls())
 func (mock *UserInterfaceMock) AddClusterScopedLifecycleCalls() []struct {
 	Ctx         context.Context
 	Name        string
@@ -1151,7 +1166,8 @@ func (mock *UserInterfaceMock) AddFeatureHandler(ctx context.Context, enabled fu
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//     len(mockedUserInterface.AddFeatureHandlerCalls())
+//
+//	len(mockedUserInterface.AddFeatureHandlerCalls())
 func (mock *UserInterfaceMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
@@ -1194,7 +1210,8 @@ func (mock *UserInterfaceMock) AddFeatureLifecycle(ctx context.Context, enabled 
 
 // AddFeatureLifecycleCalls gets all the calls that were made to AddFeatureLifecycle.
 // Check the length with:
-//     len(mockedUserInterface.AddFeatureLifecycleCalls())
+//
+//	len(mockedUserInterface.AddFeatureLifecycleCalls())
 func (mock *UserInterfaceMock) AddFeatureLifecycleCalls() []struct {
 	Ctx       context.Context
 	Enabled   func() bool
@@ -1235,7 +1252,8 @@ func (mock *UserInterfaceMock) AddHandler(ctx context.Context, name string, sync
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//     len(mockedUserInterface.AddHandlerCalls())
+//
+//	len(mockedUserInterface.AddHandlerCalls())
 func (mock *UserInterfaceMock) AddHandlerCalls() []struct {
 	Ctx  context.Context
 	Name string
@@ -1274,7 +1292,8 @@ func (mock *UserInterfaceMock) AddLifecycle(ctx context.Context, name string, li
 
 // AddLifecycleCalls gets all the calls that were made to AddLifecycle.
 // Check the length with:
-//     len(mockedUserInterface.AddLifecycleCalls())
+//
+//	len(mockedUserInterface.AddLifecycleCalls())
 func (mock *UserInterfaceMock) AddLifecycleCalls() []struct {
 	Ctx       context.Context
 	Name      string
@@ -1306,7 +1325,8 @@ func (mock *UserInterfaceMock) Controller() v31.UserController {
 
 // ControllerCalls gets all the calls that were made to Controller.
 // Check the length with:
-//     len(mockedUserInterface.ControllerCalls())
+//
+//	len(mockedUserInterface.ControllerCalls())
 func (mock *UserInterfaceMock) ControllerCalls() []struct {
 } {
 	var calls []struct {
@@ -1335,7 +1355,8 @@ func (mock *UserInterfaceMock) Create(in1 *v3.User) (*v3.User, error) {
 
 // CreateCalls gets all the calls that were made to Create.
 // Check the length with:
-//     len(mockedUserInterface.CreateCalls())
+//
+//	len(mockedUserInterface.CreateCalls())
 func (mock *UserInterfaceMock) CreateCalls() []struct {
 	In1 *v3.User
 } {
@@ -1368,7 +1389,8 @@ func (mock *UserInterfaceMock) Delete(name string, options *metav1.DeleteOptions
 
 // DeleteCalls gets all the calls that were made to Delete.
 // Check the length with:
-//     len(mockedUserInterface.DeleteCalls())
+//
+//	len(mockedUserInterface.DeleteCalls())
 func (mock *UserInterfaceMock) DeleteCalls() []struct {
 	Name    string
 	Options *metav1.DeleteOptions
@@ -1403,7 +1425,8 @@ func (mock *UserInterfaceMock) DeleteCollection(deleteOpts *metav1.DeleteOptions
 
 // DeleteCollectionCalls gets all the calls that were made to DeleteCollection.
 // Check the length with:
-//     len(mockedUserInterface.DeleteCollectionCalls())
+//
+//	len(mockedUserInterface.DeleteCollectionCalls())
 func (mock *UserInterfaceMock) DeleteCollectionCalls() []struct {
 	DeleteOpts *metav1.DeleteOptions
 	ListOpts   metav1.ListOptions
@@ -1440,7 +1463,8 @@ func (mock *UserInterfaceMock) DeleteNamespaced(namespace string, name string, o
 
 // DeleteNamespacedCalls gets all the calls that were made to DeleteNamespaced.
 // Check the length with:
-//     len(mockedUserInterface.DeleteNamespacedCalls())
+//
+//	len(mockedUserInterface.DeleteNamespacedCalls())
 func (mock *UserInterfaceMock) DeleteNamespacedCalls() []struct {
 	Namespace string
 	Name      string
@@ -1477,7 +1501,8 @@ func (mock *UserInterfaceMock) Get(name string, opts metav1.GetOptions) (*v3.Use
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//     len(mockedUserInterface.GetCalls())
+//
+//	len(mockedUserInterface.GetCalls())
 func (mock *UserInterfaceMock) GetCalls() []struct {
 	Name string
 	Opts metav1.GetOptions
@@ -1514,7 +1539,8 @@ func (mock *UserInterfaceMock) GetNamespaced(namespace string, name string, opts
 
 // GetNamespacedCalls gets all the calls that were made to GetNamespaced.
 // Check the length with:
-//     len(mockedUserInterface.GetNamespacedCalls())
+//
+//	len(mockedUserInterface.GetNamespacedCalls())
 func (mock *UserInterfaceMock) GetNamespacedCalls() []struct {
 	Namespace string
 	Name      string
@@ -1549,7 +1575,8 @@ func (mock *UserInterfaceMock) List(opts metav1.ListOptions) (*v3.UserList, erro
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//     len(mockedUserInterface.ListCalls())
+//
+//	len(mockedUserInterface.ListCalls())
 func (mock *UserInterfaceMock) ListCalls() []struct {
 	Opts metav1.ListOptions
 } {
@@ -1582,7 +1609,8 @@ func (mock *UserInterfaceMock) ListNamespaced(namespace string, opts metav1.List
 
 // ListNamespacedCalls gets all the calls that were made to ListNamespaced.
 // Check the length with:
-//     len(mockedUserInterface.ListNamespacedCalls())
+//
+//	len(mockedUserInterface.ListNamespacedCalls())
 func (mock *UserInterfaceMock) ListNamespacedCalls() []struct {
 	Namespace string
 	Opts      metav1.ListOptions
@@ -1612,7 +1640,8 @@ func (mock *UserInterfaceMock) ObjectClient() *objectclient.ObjectClient {
 
 // ObjectClientCalls gets all the calls that were made to ObjectClient.
 // Check the length with:
-//     len(mockedUserInterface.ObjectClientCalls())
+//
+//	len(mockedUserInterface.ObjectClientCalls())
 func (mock *UserInterfaceMock) ObjectClientCalls() []struct {
 } {
 	var calls []struct {
@@ -1641,7 +1670,8 @@ func (mock *UserInterfaceMock) Update(in1 *v3.User) (*v3.User, error) {
 
 // UpdateCalls gets all the calls that were made to Update.
 // Check the length with:
-//     len(mockedUserInterface.UpdateCalls())
+//
+//	len(mockedUserInterface.UpdateCalls())
 func (mock *UserInterfaceMock) UpdateCalls() []struct {
 	In1 *v3.User
 } {
@@ -1672,7 +1702,8 @@ func (mock *UserInterfaceMock) Watch(opts metav1.ListOptions) (watch.Interface, 
 
 // WatchCalls gets all the calls that were made to Watch.
 // Check the length with:
-//     len(mockedUserInterface.WatchCalls())
+//
+//	len(mockedUserInterface.WatchCalls())
 func (mock *UserInterfaceMock) WatchCalls() []struct {
 	Opts metav1.ListOptions
 } {
@@ -1695,19 +1726,19 @@ var _ v31.UsersGetter = &UsersGetterMock{}
 
 // UsersGetterMock is a mock implementation of v31.UsersGetter.
 //
-//     func TestSomethingThatUsesUsersGetter(t *testing.T) {
+//	    func TestSomethingThatUsesUsersGetter(t *testing.T) {
 //
-//         // make and configure a mocked v31.UsersGetter
-//         mockedUsersGetter := &UsersGetterMock{
-//             UsersFunc: func(namespace string) v31.UserInterface {
-// 	               panic("mock out the Users method")
-//             },
-//         }
+//	        // make and configure a mocked v31.UsersGetter
+//	        mockedUsersGetter := &UsersGetterMock{
+//	            UsersFunc: func(namespace string) v31.UserInterface {
+//		               panic("mock out the Users method")
+//	            },
+//	        }
 //
-//         // use mockedUsersGetter in code that requires v31.UsersGetter
-//         // and then make assertions.
+//	        // use mockedUsersGetter in code that requires v31.UsersGetter
+//	        // and then make assertions.
 //
-//     }
+//	    }
 type UsersGetterMock struct {
 	// UsersFunc mocks the Users method.
 	UsersFunc func(namespace string) v31.UserInterface
@@ -1740,7 +1771,8 @@ func (mock *UsersGetterMock) Users(namespace string) v31.UserInterface {
 
 // UsersCalls gets all the calls that were made to Users.
 // Check the length with:
-//     len(mockedUsersGetter.UsersCalls())
+//
+//	len(mockedUsersGetter.UsersCalls())
 func (mock *UsersGetterMock) UsersCalls() []struct {
 	Namespace string
 } {

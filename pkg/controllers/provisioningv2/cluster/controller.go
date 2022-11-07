@@ -8,7 +8,6 @@ import (
 	"github.com/rancher/norman/types/convert"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	v1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
-	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2"
 	"github.com/rancher/rancher/pkg/features"
 	fleetconst "github.com/rancher/rancher/pkg/fleet"
 	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta1"
@@ -18,7 +17,6 @@ import (
 	"github.com/rancher/rancher/pkg/provisioningv2/image"
 	"github.com/rancher/rancher/pkg/provisioningv2/kubeconfig"
 	"github.com/rancher/rancher/pkg/settings"
-	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/rancher/wrangler/pkg/apply"
 	"github.com/rancher/wrangler/pkg/condition"
@@ -94,12 +92,17 @@ func Register(
 			clients.Mgmt.Cluster()),
 	}
 
+	clients.Provisioning.Cluster().Cache().AddIndexer(ByCluster, byClusterIndex)
+	clients.Provisioning.Cluster().Cache().AddIndexer(ByCloudCred, byCloudCredentialIndex)
+
+	// Register a generating handler in order to generate clusters.provisioning.cattle.io/v1 objects based on
+	// clusters.management.cattle.io/v3 (legacy) cluster objects.
 	mgmtcontrollers.RegisterClusterGeneratingHandler(ctx,
 		clients.Mgmt.Cluster(),
 		clients.Apply.WithCacheTypes(clients.Provisioning.Cluster()),
 		"",
 		"provisioning-cluster-create",
-		h.generateProvisioning,
+		h.generateProvisioningClusterFromLegacyCluster,
 		nil)
 
 	clusterCreateApply := clients.Apply.WithCacheTypes(clients.Mgmt.Cluster(),
@@ -112,12 +115,14 @@ func Register(
 		clusterCreateApply = clusterCreateApply.WithCacheTypes(clients.Mgmt.ClusterRoleTemplateBinding())
 	}
 
+	// Register a generating handler in order to generate clusters.management.cattle.io/v3 objects based on
+	// clusters.provisioning.cattle.io/v1 objects.
 	rocontrollers.RegisterClusterGeneratingHandler(ctx,
 		clients.Provisioning.Cluster(),
 		clusterCreateApply,
 		"Created",
 		"cluster-create",
-		h.generateCluster,
+		h.generateLegacyClusterFromProvisioningCluster,
 		&generic.GeneratingHandlerOptions{
 			AllowClusterScoped: true,
 		},
@@ -129,13 +134,6 @@ func Register(
 
 	clients.Mgmt.Cluster().OnRemove(ctx, "mgmt-cluster-remove", h.OnMgmtClusterRemove)
 	clients.Provisioning.Cluster().OnRemove(ctx, "provisioning-cluster-remove", h.OnClusterRemove)
-}
-
-func RegisterIndexers(context *config.ScaledContext) {
-	if features.ProvisioningV2.Enabled() {
-		context.Wrangler.Provisioning.Cluster().Cache().AddIndexer(ByCluster, byClusterIndex)
-		context.Wrangler.Provisioning.Cluster().Cache().AddIndexer(ByCloudCred, byCloudCredentialIndex)
-	}
 }
 
 func byClusterIndex(obj *v1.Cluster) ([]string, error) {
@@ -170,6 +168,9 @@ func (h *handler) clusterWatch(namespace, name string, obj runtime.Object) ([]re
 	}, nil
 }
 
+// isLegacyCluster returns true if the cluster name for a clusters.provisioning.cattle.io/v1 or
+// clusters.management.cattle.io/v3 cluster name matches the regex for a legacy cluster (c-XXXXX|local) where XXXXX is a
+// random string of characters.
 func (h *handler) isLegacyCluster(cluster interface{}) bool {
 	if c, ok := cluster.(*v3.Cluster); ok {
 		return mgmtNameRegexp.MatchString(c.Name)
@@ -179,7 +180,11 @@ func (h *handler) isLegacyCluster(cluster interface{}) bool {
 	return false
 }
 
-func (h *handler) generateProvisioning(cluster *v3.Cluster, status v3.ClusterStatus) ([]runtime.Object, v3.ClusterStatus, error) {
+// generateProvisioningClusterFromLegacyCluster will generate a clusters.provisioning.cattle.io/v1 object with a passed
+// in clusters.management.cattle.io/v3 object. It will not generate a clusters.provisioning.cattle.io/v1 cluster if the
+// cluster FleetWorkspaceName is empty or if the cluster name does not match (c-XXXXX|local) where XXXXX is a random
+// string of characters.
+func (h *handler) generateProvisioningClusterFromLegacyCluster(cluster *v3.Cluster, status v3.ClusterStatus) ([]runtime.Object, v3.ClusterStatus, error) {
 	if !h.isLegacyCluster(cluster) || cluster.Spec.FleetWorkspaceName == "" {
 		return nil, status, nil
 	}
@@ -195,7 +200,9 @@ func (h *handler) generateProvisioning(cluster *v3.Cluster, status v3.ClusterSta
 	}, status, nil
 }
 
-func (h *handler) generateCluster(cluster *v1.Cluster, status v1.ClusterStatus) ([]runtime.Object, v1.ClusterStatus, error) {
+// generateLegacyClusterFromProvisioningCluster will generate and return a clusters.management.cattle.io/v3 object based
+// on the clusters.provisioning.cattle.io/v1 object passed in.
+func (h *handler) generateLegacyClusterFromProvisioningCluster(cluster *v1.Cluster, status v1.ClusterStatus) ([]runtime.Object, v1.ClusterStatus, error) {
 	switch {
 	case cluster.Spec.ClusterAPIConfig != nil:
 		return h.createClusterAndDeployAgent(cluster, status)
@@ -267,6 +274,8 @@ func mgmtClusterName() (string, error) {
 	return name.SafeConcatName("c", "m", rand[:8]), nil
 }
 
+// createNewCluster creates a homologated clusters.management.cattle.io/v3 object based on a
+// clusters.provisioning.cattle.io/v1 object and the spec of the clusters.management.cattle.io/v3 object passed in.
 func (h *handler) createNewCluster(cluster *v1.Cluster, status v1.ClusterStatus, spec v3.ClusterSpec) ([]runtime.Object, v1.ClusterStatus, error) {
 	spec.DisplayName = cluster.Name
 	spec.Description = cluster.Annotations["field.cattle.io/description"]
@@ -276,6 +285,9 @@ func (h *handler) createNewCluster(cluster *v1.Cluster, status v1.ClusterStatus,
 	spec.EnableNetworkPolicy = cluster.Spec.EnableNetworkPolicy
 	spec.DesiredAgentImage = image.ResolveWithCluster(settings.AgentImage.Get(), cluster)
 	spec.DesiredAuthImage = image.ResolveWithCluster(settings.AuthImage.Get(), cluster)
+
+	spec.ClusterSecrets.PrivateRegistrySecret = image.GetPrivateRepoSecretFromCluster(cluster)
+	spec.ClusterSecrets.PrivateRegistryURL = image.GetPrivateRepoURLFromCluster(cluster)
 
 	spec.AgentEnvVars = nil
 	for _, env := range cluster.Spec.AgentEnvVars {
@@ -330,6 +342,7 @@ func (h *handler) createNewCluster(cluster *v1.Cluster, status v1.ClusterStatus,
 	}, cluster, status, newCluster)
 }
 
+// updateStatus will update the status on the clusters.provisioning.cattle.io/v1 object.
 func (h *handler) updateStatus(objs []runtime.Object, cluster *v1.Cluster, status v1.ClusterStatus, rCluster *v3.Cluster) ([]runtime.Object, v1.ClusterStatus, error) {
 	ready := false
 	existing, err := h.mgmtClusterCache.Get(rCluster.Name)
@@ -364,7 +377,7 @@ func (h *handler) updateStatus(objs []runtime.Object, cluster *v1.Cluster, statu
 				status.Conditions = append(status.Conditions, newCond)
 			}
 		}
-		status.AgentDeployed = rke2.AgentDeployed.IsTrue(existing)
+		status.AgentDeployed = v3.ClusterConditionAgentDeployed.IsTrue(existing)
 	}
 
 	// Never set ready back to false because we will end up deleting the secret

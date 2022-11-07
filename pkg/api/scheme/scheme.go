@@ -3,7 +3,6 @@ package scheme
 import (
 	"fmt"
 
-	istiov1alpha3 "github.com/knative/pkg/apis/istio/v1alpha3"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	monitoringv1alpha1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	fleet "github.com/rancher/fleet/pkg/apis/fleet.cattle.io/v1alpha1"
@@ -63,11 +62,9 @@ var builders = []runtime.SchemeBuilder{
 	management.SchemeBuilder,
 	cluster.SchemeBuilder,
 	catalog.SchemeBuilder,
-	istiov1alpha3.SchemeBuilder,
 	fleet.SchemeBuilder,
 	monitoringv1.SchemeBuilder,
 	monitoringv1alpha1.SchemeBuilder,
-	istiov1alpha3.SchemeBuilder,
 	planv1.SchemeBuilder,
 	appsv1.SchemeBuilder,
 	appsv1beta1.SchemeBuilder,
@@ -110,10 +107,6 @@ func init() {
 	Scheme.ExcludeGVK(management.SchemeGroupVersion.WithKind("ProjectAlertGroupList"))
 	Scheme.ExcludeGVK(management.SchemeGroupVersion.WithKind("ClusterMonitorGraphList"))
 	Scheme.ExcludeGVK(management.SchemeGroupVersion.WithKind("ProjectMonitorGraphList"))
-	Scheme.ExcludeGVK(management.SchemeGroupVersion.WithKind("ClusterLogging"))
-	Scheme.ExcludeGVK(management.SchemeGroupVersion.WithKind("ClusterLoggingList"))
-	Scheme.ExcludeGVK(management.SchemeGroupVersion.WithKind("ProjectLogging"))
-	Scheme.ExcludeGVK(management.SchemeGroupVersion.WithKind("ProjectLoggingList"))
 
 }
 

@@ -7,7 +7,7 @@ import (
 	"github.com/rancher/rancher/pkg/api/steve/catalog/types"
 	catalogv1 "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
-	crds "github.com/rancher/rancher/tests/framework/extensions/customresourcedefinitions"
+	kubenamespaces "github.com/rancher/rancher/tests/framework/extensions/kubeapi/namespaces"
 	"github.com/rancher/rancher/tests/framework/extensions/namespaces"
 	"github.com/rancher/rancher/tests/framework/pkg/wait"
 	"github.com/rancher/rancher/tests/integration/pkg/defaults"
@@ -20,7 +20,7 @@ const (
 	RancherGatekeeperNamespace = "cattle-gatekeeper-system"
 	// Name of the rancher gatekeeper chart
 	RancherGatekeeperName = "rancher-gatekeeper"
-	// Name of rancher gatekeepr crd chart
+	// Name of rancher gatekeeper crd chart
 	RancherGatekeeperCRDName = "rancher-gatekeeper-crd"
 )
 
@@ -62,9 +62,12 @@ func InstallRancherGatekeeperChart(client *rancher.Client, installOptions *Insta
 		}
 
 		err = wait.WatchWait(watchAppInterface, func(event watch.Event) (ready bool, err error) {
+			chart := event.Object.(*catalogv1.App)
 			if event.Type == watch.Error {
 				return false, fmt.Errorf("there was an error uninstalling rancher gatekeeper chart")
 			} else if event.Type == watch.Deleted {
+				return true, nil
+			} else if chart == nil {
 				return true, nil
 			}
 			return false, nil
@@ -73,24 +76,47 @@ func InstallRancherGatekeeperChart(client *rancher.Client, installOptions *Insta
 			return err
 		}
 
-		dynamicClient, err := client.GetDownStreamClusterClient(installOptions.ClusterID)
+		err = catalogClient.UninstallChart(RancherGatekeeperCRDName, RancherGatekeeperNamespace, defaultChartUninstallAction)
 		if err != nil {
 			return err
 		}
 
-		namespaceResource := dynamicClient.Resource(namespaces.NamespaceGroupVersionResource).Namespace("")
-
-		err = namespaceResource.Delete(context.TODO(), RancherGatekeeperNamespace, metav1.DeleteOptions{})
+		watchAppInterface, err = catalogClient.Apps(RancherGatekeeperNamespace).Watch(context.TODO(), metav1.ListOptions{
+			FieldSelector:  "metadata.name=" + RancherGatekeeperCRDName,
+			TimeoutSeconds: &defaults.WatchTimeoutSeconds,
+		})
 		if err != nil {
 			return err
 		}
 
-		unstructuredCRDList, err := crds.ListCustomResourceDefinitions(client, installOptions.ClusterID, "")
+		err = wait.WatchWait(watchAppInterface, func(event watch.Event) (ready bool, err error) {
+			chart := event.Object.(*catalogv1.App)
+			if event.Type == watch.Error {
+				return false, fmt.Errorf("there was an error uninstalling rancher gatekeeper chart")
+			} else if event.Type == watch.Deleted {
+				return true, nil
+			} else if chart == nil {
+				return true, nil
+			}
+			return false, nil
+		})
 		if err != nil {
 			return err
 		}
-		CRDSlice := crds.GetCustomResourceDefinitionsListByName(unstructuredCRDList, "gatekeeper")
-		err = crds.BatchDeleteCustomResourceDefinition(client, installOptions.ClusterID, "", CRDSlice)
+
+		steveclient, err := client.Steve.ProxyDownstream(installOptions.ClusterID)
+		if err != nil {
+			return err
+		}
+
+		namespaceClient := steveclient.SteveType(namespaces.NamespaceSteveType)
+
+		namespace, err := namespaceClient.ByID(RancherGatekeeperNamespace)
+		if err != nil {
+			return err
+		}
+
+		err = namespaceClient.Delete(namespace)
 		if err != nil {
 			return err
 		}
@@ -103,7 +129,7 @@ func InstallRancherGatekeeperChart(client *rancher.Client, installOptions *Insta
 		if err != nil {
 			return err
 		}
-		adminNamespaceResource := adminDynamicClient.Resource(namespaces.NamespaceGroupVersionResource).Namespace("")
+		adminNamespaceResource := adminDynamicClient.Resource(kubenamespaces.NamespaceGroupVersionResource).Namespace("")
 
 		watchNamespaceInterface, err := adminNamespaceResource.Watch(context.TODO(), metav1.ListOptions{
 			FieldSelector:  "metadata.name=" + RancherGatekeeperNamespace,
@@ -120,7 +146,6 @@ func InstallRancherGatekeeperChart(client *rancher.Client, installOptions *Insta
 			}
 			return false, nil
 		})
-
 	})
 
 	err = catalogClient.InstallChart(chartInstallAction)

@@ -27,9 +27,6 @@ var projectManagmentPlaneResources = map[string]string{
 	"apprevisions":                "project.cattle.io",
 	"catalogtemplates":            "management.cattle.io",
 	"catalogtemplateversions":     "management.cattle.io",
-	"pipelines":                   "project.cattle.io",
-	"pipelineexecutions":          "project.cattle.io",
-	"pipelinesettings":            "project.cattle.io",
 	"sourcecodeproviderconfigs":   "project.cattle.io",
 	"projectloggings":             "management.cattle.io",
 	"projectalertrules":           "management.cattle.io",
@@ -171,7 +168,7 @@ func (p *prtbLifecycle) reconcileBindings(binding *v3.ProjectRoleTemplateBinding
 
 	roleName := strings.ToLower(fmt.Sprintf("%v-clustermember", clusterName))
 	// if roletemplate is not builtin, check if it's inherited/cloned
-	isOwnerRole, err := p.mgr.checkReferencedRoles(binding.RoleTemplateName, projectContext)
+	isOwnerRole, err := p.mgr.checkReferencedRoles(binding.RoleTemplateName, projectContext, 0)
 	if err != nil {
 		return err
 	}

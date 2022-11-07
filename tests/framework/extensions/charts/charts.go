@@ -9,8 +9,8 @@ import (
 	"github.com/rancher/rancher/pkg/api/scheme"
 	catalogv1 "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
-	"github.com/rancher/rancher/tests/framework/extensions/workloads/daemonsets"
-	"github.com/rancher/rancher/tests/framework/extensions/workloads/deployments"
+	"github.com/rancher/rancher/tests/framework/extensions/kubeapi/workloads/daemonsets"
+	"github.com/rancher/rancher/tests/framework/extensions/kubeapi/workloads/deployments"
 	"github.com/rancher/rancher/tests/framework/pkg/wait"
 	"github.com/rancher/rancher/tests/integration/pkg/defaults"
 	appv1 "k8s.io/api/apps/v1"
@@ -54,6 +54,11 @@ type RancherMonitoringOpts struct {
 	RKEEtcd              bool
 	RKEProxy             bool
 	RKEScheduler         bool
+}
+
+// RancherLoggingOpts is a struct of the required options to install Rancher Logging with desired chart values.
+type RancherLoggingOpts struct {
+	AdditionalLoggingSources bool
 }
 
 // GetChartCaseEndpointResult is a struct that GetChartCaseEndpoint helper function returns.

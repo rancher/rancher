@@ -30,8 +30,6 @@ import (
 
 const (
 	rkeBootstrapName = "rke.cattle.io/rkebootstrap-name"
-	roleBootstrap    = "bootstrap"
-	rolePlan         = "plan"
 )
 
 type handler struct {
@@ -161,7 +159,7 @@ func (h *handler) assignPlanSecret(machine *capi.Machine, bootstrap *rkev1.RKEBo
 			Labels: map[string]string{
 				rke2.MachineNameLabel: machine.Name,
 				rkeBootstrapName:      bootstrap.Name,
-				rke2.RoleLabel:        rolePlan,
+				rke2.RoleLabel:        rke2.RolePlan,
 				rke2.PlanSecret:       secretName,
 			},
 		},
@@ -260,7 +258,7 @@ func (h *handler) assignBootStrapSecret(machine *capi.Machine, bootstrap *rkev1.
 			Labels: map[string]string{
 				rke2.MachineNameLabel: machine.Name,
 				rkeBootstrapName:      bootstrap.Name,
-				rke2.RoleLabel:        roleBootstrap,
+				rke2.RoleLabel:        rke2.RoleBootstrap,
 			},
 		},
 	}

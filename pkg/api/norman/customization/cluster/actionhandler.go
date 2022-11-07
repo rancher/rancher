@@ -121,8 +121,6 @@ func (a ActionHandler) ClusterActionHandler(actionName string, action *types.Act
 			return httperror.NewAPIError(httperror.PermissionDenied, "can not rotate encryption key")
 		}
 		return a.RotateEncryptionKey(actionName, action, apiContext)
-	case v32.ClusterActionRunSecurityScan:
-		return a.runCisScan(actionName, action, apiContext)
 	case v32.ClusterActionSaveAsTemplate:
 		if !canUpdateCluster(apiContext) {
 			return httperror.NewAPIError(httperror.PermissionDenied, "can not save the cluster as an RKETemplate")

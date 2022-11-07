@@ -2133,7 +2133,9 @@ def set_url_password_token(rancher_url, server_url=None, version=""):
         rancher_url + "/v3-public/localproviders/local?action=login"
     rpassword = 'admin'
     print(auth_url)
-    if version.find("master") > -1 or version.find("2.6") > -1:
+    if "master" in version or \
+            "2.6" in version or \
+            "2.7" in version:
         rpassword = ADMIN_PASSWORD
         print("on 2.6 or later")
     retries = 5
@@ -2642,7 +2644,7 @@ def create_connection(url, subprotocols):
         url=url,
         sslopt={"cert_reqs": ssl.CERT_NONE},
         subprotocols=subprotocols,
-        timeout=10,
+        timeout=20,
         cookie="R_SESS=" + USER_TOKEN
     )
     assert ws.connected, "failed to build the websocket"

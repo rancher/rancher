@@ -20,16 +20,6 @@ var ReadOnlySettings = []string{
 	"cacerts",
 }
 
-func PipelineFormatter(apiContext *types.APIContext, resource *types.RawResource) {
-	v, ok := resource.Values["value"]
-	if !ok || v == "" {
-		resource.Values["value"] = resource.Values["default"]
-		resource.Values["customized"] = false
-	} else {
-		resource.Values["customized"] = true
-	}
-}
-
 func Formatter(apiContext *types.APIContext, resource *types.RawResource) {
 	if convert.ToString(resource.Values["source"]) == "env" {
 		delete(resource.Links, "update")

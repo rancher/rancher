@@ -44,11 +44,11 @@ func GetURLAndInterval() (string, time.Duration) {
 
 // getChannelServerArg will return with an argument to pass to channel server
 // to indicate the server version that is running. If the current version is
-// not a proper release version, the argument will be empty.
+// not a proper release version, the argument will be set to the dev version.
 func getChannelServerArg() string {
 	serverVersion := settings.ServerVersion.Get()
 	if !utils.ReleaseServerVersion(serverVersion) {
-		return ""
+		return settings.RancherVersionDev
 	}
 	return serverVersion
 }

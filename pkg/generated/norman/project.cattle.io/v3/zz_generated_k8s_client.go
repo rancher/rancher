@@ -24,13 +24,6 @@ type Interface interface {
 	WorkloadsGetter
 	AppsGetter
 	AppRevisionsGetter
-	SourceCodeProvidersGetter
-	SourceCodeProviderConfigsGetter
-	SourceCodeCredentialsGetter
-	PipelinesGetter
-	PipelineExecutionsGetter
-	PipelineSettingsGetter
-	SourceCodeRepositoriesGetter
 }
 
 type Client struct {
@@ -236,104 +229,6 @@ func (c *Client) AppRevisions(namespace string) AppRevisionInterface {
 	sharedClient := c.clientFactory.ForResourceKind(AppRevisionGroupVersionResource, AppRevisionGroupVersionKind.Kind, true)
 	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &AppRevisionResource, AppRevisionGroupVersionKind, appRevisionFactory{})
 	return &appRevisionClient{
-		ns:           namespace,
-		client:       c,
-		objectClient: objectClient,
-	}
-}
-
-type SourceCodeProvidersGetter interface {
-	SourceCodeProviders(namespace string) SourceCodeProviderInterface
-}
-
-func (c *Client) SourceCodeProviders(namespace string) SourceCodeProviderInterface {
-	sharedClient := c.clientFactory.ForResourceKind(SourceCodeProviderGroupVersionResource, SourceCodeProviderGroupVersionKind.Kind, false)
-	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &SourceCodeProviderResource, SourceCodeProviderGroupVersionKind, sourceCodeProviderFactory{})
-	return &sourceCodeProviderClient{
-		ns:           namespace,
-		client:       c,
-		objectClient: objectClient,
-	}
-}
-
-type SourceCodeProviderConfigsGetter interface {
-	SourceCodeProviderConfigs(namespace string) SourceCodeProviderConfigInterface
-}
-
-func (c *Client) SourceCodeProviderConfigs(namespace string) SourceCodeProviderConfigInterface {
-	sharedClient := c.clientFactory.ForResourceKind(SourceCodeProviderConfigGroupVersionResource, SourceCodeProviderConfigGroupVersionKind.Kind, true)
-	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &SourceCodeProviderConfigResource, SourceCodeProviderConfigGroupVersionKind, sourceCodeProviderConfigFactory{})
-	return &sourceCodeProviderConfigClient{
-		ns:           namespace,
-		client:       c,
-		objectClient: objectClient,
-	}
-}
-
-type SourceCodeCredentialsGetter interface {
-	SourceCodeCredentials(namespace string) SourceCodeCredentialInterface
-}
-
-func (c *Client) SourceCodeCredentials(namespace string) SourceCodeCredentialInterface {
-	sharedClient := c.clientFactory.ForResourceKind(SourceCodeCredentialGroupVersionResource, SourceCodeCredentialGroupVersionKind.Kind, true)
-	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &SourceCodeCredentialResource, SourceCodeCredentialGroupVersionKind, sourceCodeCredentialFactory{})
-	return &sourceCodeCredentialClient{
-		ns:           namespace,
-		client:       c,
-		objectClient: objectClient,
-	}
-}
-
-type PipelinesGetter interface {
-	Pipelines(namespace string) PipelineInterface
-}
-
-func (c *Client) Pipelines(namespace string) PipelineInterface {
-	sharedClient := c.clientFactory.ForResourceKind(PipelineGroupVersionResource, PipelineGroupVersionKind.Kind, true)
-	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &PipelineResource, PipelineGroupVersionKind, pipelineFactory{})
-	return &pipelineClient{
-		ns:           namespace,
-		client:       c,
-		objectClient: objectClient,
-	}
-}
-
-type PipelineExecutionsGetter interface {
-	PipelineExecutions(namespace string) PipelineExecutionInterface
-}
-
-func (c *Client) PipelineExecutions(namespace string) PipelineExecutionInterface {
-	sharedClient := c.clientFactory.ForResourceKind(PipelineExecutionGroupVersionResource, PipelineExecutionGroupVersionKind.Kind, true)
-	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &PipelineExecutionResource, PipelineExecutionGroupVersionKind, pipelineExecutionFactory{})
-	return &pipelineExecutionClient{
-		ns:           namespace,
-		client:       c,
-		objectClient: objectClient,
-	}
-}
-
-type PipelineSettingsGetter interface {
-	PipelineSettings(namespace string) PipelineSettingInterface
-}
-
-func (c *Client) PipelineSettings(namespace string) PipelineSettingInterface {
-	sharedClient := c.clientFactory.ForResourceKind(PipelineSettingGroupVersionResource, PipelineSettingGroupVersionKind.Kind, true)
-	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &PipelineSettingResource, PipelineSettingGroupVersionKind, pipelineSettingFactory{})
-	return &pipelineSettingClient{
-		ns:           namespace,
-		client:       c,
-		objectClient: objectClient,
-	}
-}
-
-type SourceCodeRepositoriesGetter interface {
-	SourceCodeRepositories(namespace string) SourceCodeRepositoryInterface
-}
-
-func (c *Client) SourceCodeRepositories(namespace string) SourceCodeRepositoryInterface {
-	sharedClient := c.clientFactory.ForResourceKind(SourceCodeRepositoryGroupVersionResource, SourceCodeRepositoryGroupVersionKind.Kind, true)
-	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &SourceCodeRepositoryResource, SourceCodeRepositoryGroupVersionKind, sourceCodeRepositoryFactory{})
-	return &sourceCodeRepositoryClient{
 		ns:           namespace,
 		client:       c,
 		objectClient: objectClient,

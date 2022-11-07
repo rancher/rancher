@@ -40,15 +40,8 @@ type Interface interface {
 	NamespacedDockerCredential() NamespacedDockerCredentialController
 	NamespacedSSHAuth() NamespacedSSHAuthController
 	NamespacedServiceAccountToken() NamespacedServiceAccountTokenController
-	Pipeline() PipelineController
-	PipelineExecution() PipelineExecutionController
-	PipelineSetting() PipelineSettingController
 	SSHAuth() SSHAuthController
 	ServiceAccountToken() ServiceAccountTokenController
-	SourceCodeCredential() SourceCodeCredentialController
-	SourceCodeProvider() SourceCodeProviderController
-	SourceCodeProviderConfig() SourceCodeProviderConfigController
-	SourceCodeRepository() SourceCodeRepositoryController
 	Workload() WorkloadController
 }
 
@@ -92,32 +85,11 @@ func (c *version) NamespacedSSHAuth() NamespacedSSHAuthController {
 func (c *version) NamespacedServiceAccountToken() NamespacedServiceAccountTokenController {
 	return NewNamespacedServiceAccountTokenController(schema.GroupVersionKind{Group: "project.cattle.io", Version: "v3", Kind: "NamespacedServiceAccountToken"}, "namespacedserviceaccounttokens", true, c.controllerFactory)
 }
-func (c *version) Pipeline() PipelineController {
-	return NewPipelineController(schema.GroupVersionKind{Group: "project.cattle.io", Version: "v3", Kind: "Pipeline"}, "pipelines", true, c.controllerFactory)
-}
-func (c *version) PipelineExecution() PipelineExecutionController {
-	return NewPipelineExecutionController(schema.GroupVersionKind{Group: "project.cattle.io", Version: "v3", Kind: "PipelineExecution"}, "pipelineexecutions", true, c.controllerFactory)
-}
-func (c *version) PipelineSetting() PipelineSettingController {
-	return NewPipelineSettingController(schema.GroupVersionKind{Group: "project.cattle.io", Version: "v3", Kind: "PipelineSetting"}, "pipelinesettings", true, c.controllerFactory)
-}
 func (c *version) SSHAuth() SSHAuthController {
 	return NewSSHAuthController(schema.GroupVersionKind{Group: "project.cattle.io", Version: "v3", Kind: "SSHAuth"}, "sshauths", true, c.controllerFactory)
 }
 func (c *version) ServiceAccountToken() ServiceAccountTokenController {
 	return NewServiceAccountTokenController(schema.GroupVersionKind{Group: "project.cattle.io", Version: "v3", Kind: "ServiceAccountToken"}, "serviceaccounttokens", true, c.controllerFactory)
-}
-func (c *version) SourceCodeCredential() SourceCodeCredentialController {
-	return NewSourceCodeCredentialController(schema.GroupVersionKind{Group: "project.cattle.io", Version: "v3", Kind: "SourceCodeCredential"}, "sourcecodecredentials", true, c.controllerFactory)
-}
-func (c *version) SourceCodeProvider() SourceCodeProviderController {
-	return NewSourceCodeProviderController(schema.GroupVersionKind{Group: "project.cattle.io", Version: "v3", Kind: "SourceCodeProvider"}, "sourcecodeproviders", false, c.controllerFactory)
-}
-func (c *version) SourceCodeProviderConfig() SourceCodeProviderConfigController {
-	return NewSourceCodeProviderConfigController(schema.GroupVersionKind{Group: "project.cattle.io", Version: "v3", Kind: "SourceCodeProviderConfig"}, "sourcecodeproviderconfigs", true, c.controllerFactory)
-}
-func (c *version) SourceCodeRepository() SourceCodeRepositoryController {
-	return NewSourceCodeRepositoryController(schema.GroupVersionKind{Group: "project.cattle.io", Version: "v3", Kind: "SourceCodeRepository"}, "sourcecoderepositories", true, c.controllerFactory)
 }
 func (c *version) Workload() WorkloadController {
 	return NewWorkloadController(schema.GroupVersionKind{Group: "project.cattle.io", Version: "v3", Kind: "Workload"}, "workloads", true, c.controllerFactory)

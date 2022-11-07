@@ -380,3 +380,17 @@ func (p *ldapProvider) GetUserExtraAttributes(userPrincipal v3.Principal) map[st
 	}
 	return extras
 }
+
+// IsDisabledProvider checks if the LDAP auth provider is currently disabled in Rancher.
+func (p *ldapProvider) IsDisabledProvider() (bool, error) {
+	ldapConfig, _, err := p.getLDAPConfig()
+	if err != nil {
+		return false, err
+	}
+	return !ldapConfig.Enabled, nil
+}
+
+// CleanupResources deletes resources associated with the LDAP auth provider.
+func (p *ldapProvider) CleanupResources(*v3.AuthConfig) error {
+	return nil
+}

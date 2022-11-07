@@ -259,7 +259,7 @@ var (
 	eventGroupBy = getClusterAlertGroupBy(eventAlert.Spec)
 )
 
-//node
+// node
 var (
 	nodeRule = v32.NodeRule{
 		NodeName:  "node1",
@@ -289,7 +289,7 @@ var (
 	nodeGroupBy = getClusterAlertGroupBy(nodeAlert.Spec)
 )
 
-//system service
+// system service
 var (
 	systemServiceRule = v32.SystemServiceRule{
 		Condition: "etcd",
@@ -318,7 +318,7 @@ var (
 	systemServiceGroupBy = getClusterAlertGroupBy(systemServiceAlert.Spec)
 )
 
-//metric
+// metric
 var (
 	metricRule = v32.MetricRule{
 		Expression:     `sum(node_load5) by (instance) / count(node_cpu_seconds_total{mode="system"})`,
@@ -350,7 +350,7 @@ var (
 	metricGroupBy = getClusterAlertGroupBy(metricAlert.Spec)
 )
 
-//pod
+// pod
 var (
 	podRule = v32.PodRule{
 		PodName:   "pod1",
@@ -382,7 +382,7 @@ var (
 	podGroupBy = getProjectAlertGroupBy(podAlert.Spec)
 )
 
-//workload
+// workload
 var (
 	workloadRule = v32.WorkloadRule{
 		WorkloadID:          "workloadID1",
@@ -414,7 +414,7 @@ var (
 	workloadGroupBy = getProjectAlertGroupBy(workloadAlert.Spec)
 )
 
-//metric
+// metric
 var (
 	projectMetricRule = v32.MetricRule{
 		Expression: `sum(rate(container_cpu_user_seconds_total{container_name!="POD",namespace=~"cattle-alerting",pod_name=~"alert-manager",

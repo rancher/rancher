@@ -147,7 +147,7 @@ func (c *crtbLifecycle) reconcileBindings(binding *v3.ClusterRoleTemplateBinding
 		return errors.Errorf("cannot create binding because cluster %v was not found", clusterName)
 	}
 	// if roletemplate is not builtin, check if it's inherited/cloned
-	isOwnerRole, err := c.mgr.checkReferencedRoles(binding.RoleTemplateName, clusterContext)
+	isOwnerRole, err := c.mgr.checkReferencedRoles(binding.RoleTemplateName, clusterContext, 0)
 	if err != nil {
 		return err
 	}

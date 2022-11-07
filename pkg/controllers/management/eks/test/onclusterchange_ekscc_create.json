@@ -1,0 +1,58 @@
+{
+  "apiVersion": "eks.cattle.io/v1",
+  "kind": "EKSClusterConfig",
+  "spec": {
+    "amazonCredentialSecret": "cattle-global-data:cc-kxfmx",
+    "displayName": "eks-test",
+    "imported": false,
+    "kmsKey": "",
+    "kubernetesVersion": "1.22",
+    "loggingTypes": [],
+    "nodeGroups": [
+      {
+        "desiredSize": 2,
+        "diskSize": 20,
+        "ec2SshKey": "",
+        "gpu": false,
+        "imageId": "",
+        "instanceType": "t3.medium",
+        "labels": {},
+        "launchTemplate": null,
+        "maxSize": 2,
+        "minSize": 2,
+        "nodegroupName": "nodegroup",
+        "requestSpotInstances": false,
+        "resourceTags": {},
+        "spotInstanceTypes": [],
+        "subnets": [],
+        "tags": {},
+        "userData": "",
+        "version": "1.22"
+      }
+    ],
+    "privateAccess": false,
+    "publicAccess": true,
+    "publicAccessSources": [],
+    "region": "us-east-2",
+    "secretsEncryption": false,
+    "securityGroups": [],
+    "serviceRole": "",
+    "subnets": [],
+    "tags": {}
+  },
+  "status": {
+    "failureMessage": "",
+    "managedLaunchTemplateID": "",
+    "managedLaunchTemplateVersions": null,
+    "networkFieldsSource": "generated",
+    "phase": "creating",
+    "securityGroups": null,
+    "subnets": [
+      "subnet-01",
+      "subnet-02",
+      "subnet-03"
+    ],
+    "templateVersionsToDelete": null,
+    "virtualNetwork": "vpc-network"
+  }
+}

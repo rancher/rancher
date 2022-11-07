@@ -48,10 +48,10 @@ spec:
           service:
             name: {{ template "rancher.fullname" . }}
             port:
-              number: 80
+              number: {{ .Values.ingress.servicePort }}
           {{- else }}
           serviceName: {{ template "rancher.fullname" . }}
-          servicePort: 80
+          servicePort: {{ .Values.ingress.servicePort }}
           {{- end }}
         {{- if or (.Capabilities.APIVersions.Has "networking.k8s.io/v1/Ingress") (not (.Capabilities.APIVersions.Has "networking.k8s.io/v1beta1/Ingress")) }}
         pathType: ImplementationSpecific
