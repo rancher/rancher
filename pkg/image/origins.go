@@ -229,11 +229,15 @@ var OriginMap = map[string]string{
 	"hardened-node-feature-discovery":                         "https://github.com/rancher/image-build-node-feature-discovery",
 }
 
+const (
+	imageOriginFileName = "rancher-images-origins.txt"
+)
+
 // GenerateImageOrigins looks through all target images gathered from KDM/Charts and
 // ensures that they are covered by the OriginMap. If so, a file titled `rancher-image-origins.txt` will be written,
 // containing a space delimited list of un-versioned  images and their source code repository.
 func GenerateImageOrigins(linuxImagesFromArgs, targetImages, targetWindowsImages []string) error {
-	log.Printf("building rancher-image-origins.txt")
+	log.Printf("building %s", imageOriginFileName)
 
 	allImages := GetAllUniqueImages(linuxImagesFromArgs, targetImages, targetWindowsImages)
 
@@ -253,9 +257,9 @@ func GenerateImageOrigins(linuxImagesFromArgs, targetImages, targetWindowsImages
 		fileContents = fileContents + k + " " + v + "\n"
 	}
 
-	originsFile, err := os.Create("rancher-image-origins.txt")
+	originsFile, err := os.Create(imageOriginFileName)
 	if err != nil {
-		return fmt.Errorf("could not create rancher-image-origin.txt file: %w", err)
+		return fmt.Errorf("could not create %s file: %w", imageOriginFileName, err)
 	}
 
 	originsFile.Chmod(0755)
