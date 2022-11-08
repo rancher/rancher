@@ -4,13 +4,14 @@ import (
 	"context"
 	"fmt"
 	"testing"
-	"time"
 
 	apiv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
 	v1 "github.com/rancher/rancher/tests/framework/clients/rancher/v1"
 	"github.com/rancher/rancher/tests/framework/extensions/clusters"
+
+	"github.com/rancher/rancher/tests/framework/extensions/machinepools"
 	"github.com/rancher/rancher/tests/framework/extensions/tokenregistration"
 	"github.com/rancher/rancher/tests/framework/extensions/users"
 	"github.com/rancher/rancher/tests/framework/pkg/config"
@@ -18,12 +19,10 @@ import (
 	"github.com/rancher/rancher/tests/framework/pkg/wait"
 	"github.com/rancher/rancher/tests/integration/pkg/defaults"
 	provisioning "github.com/rancher/rancher/tests/v2/validation/provisioning"
-	"github.com/rancher/rancher/tests/framework/extensions/machinepools"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	kwait "k8s.io/apimachinery/pkg/util/wait"
 )
 
 type CustomClusterProvisioningTestSuite struct {
@@ -102,8 +101,8 @@ func (c *CustomClusterProvisioningTestSuite) ProvisioningRKE2CustomCluster(exter
 		{"3 nodes - 1 role per node Standard User", nodeRoles1, 0, false, c.standardUserClient},
 		{"1 Node all roles Admin User + 1 Windows Worker", nodeRoles0, 1, true, c.client},
 		{"1 Node all roles Standard User + 1 Windows Worker", nodeRoles0, 1, true, c.standardUserClient},
-		{"3 unique role nodes as Admin User + 1 Windows Worker", nodeRoles1, 1, true, c.client},
-		{"3 unique role nodes as Standard User + 1 Windows Worker", nodeRoles1, 1, true, c.standardUserClient},
+		{"3 nodes - 1 role per node Admin User + 2 Windows Workers", nodeRoles1, 2, true, c.client},
+		{"3 nodes - 1 role per node Standard User + 2 Windows Workers", nodeRoles1, 2, true, c.standardUserClient},
 	}
 	var name string
 	for _, tt := range tests {
@@ -119,7 +118,7 @@ func (c *CustomClusterProvisioningTestSuite) ProvisioningRKE2CustomCluster(exter
 					require.NoError(c.T(), err)
 
 					numNodesLin := len(tt.nodeRoles)
-					
+
 					linuxNodes, err := externalNodeProvider.NodeCreationFunc(client, numNodesLin)
 					require.NoError(c.T(), err)
 					winNodes, err := externalNodeProvider.WinNodeCreationFunc(client, tt.nodeCountWin, tt.hasWindows)
@@ -174,21 +173,18 @@ func (c *CustomClusterProvisioningTestSuite) ProvisioningRKE2CustomCluster(exter
 							require.NoError(c.T(), err)
 							c.T().Logf(string(output[:]))
 						}
-						err = kwait.Poll(500*time.Millisecond, 30*time.Minute, func() (done bool, err error) {
-							customCluster, err := client.Provisioning.Cluster.ByID(clusterResp.ID)
-							require.NoError(c.T(), err)
+						kubeWinProvisioningClient, err := c.client.GetKubeAPIProvisioningClient()
+						require.NoError(c.T(), err)
+						result, err := kubeWinProvisioningClient.Clusters(namespace).Watch(context.TODO(), metav1.ListOptions{
+							FieldSelector: "metadata.name=" + clusterName,
 
-							if err != nil {
-								return false, err
-							}
-
-							if customCluster.Status.Ready {
-								return true, nil
-							}
-
-							return false, nil
+							TimeoutSeconds: &defaults.WatchTimeoutSeconds,
 						})
 						require.NoError(c.T(), err)
+						checkFunc := clusters.IsProvisioningClusterReady
+						err = wait.WatchWait(result, checkFunc)
+						assert.NoError(c.T(), err)
+						assert.Equal(c.T(), clusterName, clusterResp.ObjectMeta.Name)
 					}
 				})
 			}
@@ -308,8 +304,8 @@ func (c *CustomClusterProvisioningTestSuite) TestProvisioningCustomClusterDynami
 	}
 
 	for _, nodeProviderName := range c.nodeProviders {
-	externalNodeProvider := provisioning.ExternalNodeProviderSetup(nodeProviderName)
-	c.ProvisioningRKE2CustomClusterDynamicInput(externalNodeProvider, nodesAndRoles)
+		externalNodeProvider := provisioning.ExternalNodeProviderSetup(nodeProviderName)
+		c.ProvisioningRKE2CustomClusterDynamicInput(externalNodeProvider, nodesAndRoles)
 	}
 }
 
