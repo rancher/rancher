@@ -153,7 +153,8 @@ var (
 	UIBanners = NewSetting("ui-banners", "{}")
 
 	// UIBrand High level 'brand' value, for example `suse`.
-	UIBrand = NewSetting("ui-brand", "")
+	// Fallback env, not a user-facing setting, used to indicate if this is a Prime install
+	UIBrand = NewSetting("ui-brand", os.Getenv("CATTLE_BASE_UI_BRAND"))
 
 	// UICommunityLinks displays community links in the UI.
 	// Deprecated in favour of UICustomLinks = NewSetting("ui-custom-links", "").
