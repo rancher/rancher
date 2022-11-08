@@ -6,8 +6,10 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
+	v1 "github.com/rancher/rancher/tests/framework/clients/rancher/v1"
 	"github.com/rancher/rancher/tests/framework/extensions/clusters"
 	"github.com/rancher/rancher/tests/framework/extensions/namespaces"
 	"github.com/rancher/rancher/tests/framework/extensions/users"
@@ -27,6 +29,9 @@ type RBTestSuite struct {
 	session            *session.Session
 	cluster            *management.Cluster
 	adminProject       *management.Project
+	steveAdminClient   *v1.Client
+	steveStdUserclient *v1.Client
+	
 }
 
 func (rb *RBTestSuite) TearDownSuite() {
@@ -55,10 +60,13 @@ func (rb *RBTestSuite) SetupSuite() {
 func (rb *RBTestSuite) ValidateListCluster(role string) {
 
 	//Testcase1 Verify cluster members - Owner/member are able to list clusters
-	clusterList, err := listClusters(rb.standardUserClient)
+	//clusterList, err := listClusters(rb.standardUserClient)
+
+	clusterList, err := rb.standardUserClient.Steve.SteveType(clusters.ProvisioningSteveResouceType).ListAll(&types.ListOpts{})
 	require.NoError(rb.T(), err)
 	assert.Equal(rb.T(), 1, len(clusterList.Data))
-	assert.Equal(rb.T(), rb.cluster.ID, clusterList.Data[0].Status.ClusterName)
+	actualClusterID := clusterList.Data[0].Status.(interface{}).(map[string]interface{})["clusterName"]
+	assert.Equal(rb.T(), rb.cluster.ID, actualClusterID)
 }
 
 func (rb *RBTestSuite) ValidateListProjects(role string) {
@@ -85,11 +93,11 @@ func (rb *RBTestSuite) ValidateListProjects(role string) {
 func (rb *RBTestSuite) ValidateCreateProjects(role string) {
 
 	//Testcase3 Validate if cluster members can create a project in the downstream cluster
-	createProjectAsClusterMembers, err := createProject(rb.client, rb.cluster.ID)
+	createProjectAsClusterMembers, err := createProject(rb.standardUserClient, rb.cluster.ID)
 	require.NoError(rb.T(), err)
 	log.Info("Created project as a ", role, " is ", createProjectAsClusterMembers.Name)
 	require.NoError(rb.T(), err)
-	actualStatus := fmt.Sprintf("%v", rb.adminProject.State)
+	actualStatus := fmt.Sprintf("%v", createProjectAsClusterMembers.State)
 	assert.Equal(rb.T(), "active", actualStatus)
 
 }
@@ -105,22 +113,23 @@ func (rb *RBTestSuite) ValidateNS(role string) {
 		require.NoError(rb.T(), err)
 		log.Info("Created a namespace as cluster Owner: ", createdNamespace.Name)
 		assert.Equal(rb.T(), namespaceName, createdNamespace.Name)
-		actualStatus := fmt.Sprintf("%v", createdNamespace.Status.Phase)
+		actualStatus := fmt.Sprintf("%v", createdNamespace.Status.(interface{}).(map[string]interface{})["phase"])
 		assert.Equal(rb.T(), "Active", actualStatus)
 	case roleMember:
 		require.Error(rb.T(), err)
 		//assert cluster member gets an error when creating a namespace in a project they are not owner of
 		errMessage := strings.Split(err.Error(), ":")[0]
-		assert.Equal(rb.T(), "namespaces is forbidden", errMessage)
+		assert.Equal(rb.T(), "Resource type [namespace] is not creatable", errMessage)
 	}
 
 	//Testcase5 Validate if cluster members are able to list all the namespaces in a cluster
 	log.Info("Testcase5 - Validating if ", role, " can lists all namespaces in a cluster.")
-	//Get the list of namespaces as and admin client
-	namespaceListAdmin, err := getNamespaces(rb.client, rb.cluster.ID)
+
+	//Get the list of namespaces as an admin client
+	namespaceListAdmin, err := getNamespaces(rb.client, rb.steveAdminClient)
 	require.NoError(rb.T(), err)
 	//Get the list of namespaces as an admin client
-	namespaceListClusterMembers, err := getNamespaces(rb.standardUserClient, rb.cluster.ID)
+	namespaceListClusterMembers, err := getNamespaces(rb.standardUserClient, rb.steveStdUserclient)
 
 	switch role {
 	case roleOwner:
@@ -130,15 +139,15 @@ func (rb *RBTestSuite) ValidateNS(role string) {
 		//Namespaces obtained as admin and cluster owner should be same
 		assert.Equal(rb.T(), namespaceListAdmin, namespaceListClusterMembers)
 	case roleMember:
-		require.Error(rb.T(), err)
-		errMessage := strings.Split(err.Error(), ":")[0]
-		//assert cluster member is not able to list namespaces
-		assert.Equal(rb.T(), "namespaces is forbidden", errMessage)
+		require.NoError(rb.T(), err)
+		//Length of namespace list cluster member should be nill
+		assert.Equal(rb.T(), 0, len(namespaceListClusterMembers))
 	}
 
 	//Testcase6 Validate if cluster members are able to delete the namespace in the project they are not owner of
 	log.Info("Testcase6 - Validating if ", role, " can delete a namespace from a project they are not owner of.")
-	err = namespaces.DeleteNamespace(rb.standardUserClient, namespaceName, rb.cluster.ID)
+
+	err = deleteNamespace(rb.standardUserClient, namespaceName, rb.steveStdUserclient)
 	switch role {
 	case roleOwner:
 		require.NoError(rb.T(), err)
@@ -195,11 +204,16 @@ func (rb *RBTestSuite) TestRBAC() {
 			createProjectAsAdmin, err := createProject(rb.client, rb.cluster.ID)
 			rb.adminProject = createProjectAsAdmin
 			require.NoError(rb.T(), err)
+
+			steveAdminClient, err := rb.client.Steve.ProxyDownstream(rb.cluster.ID)
+			require.NoError(rb.T(), err)
+			rb.steveAdminClient = steveAdminClient
+
 		})
 
 		//Verify standard users cannot list any clusters
 		rb.Run("Test case Validate standard users cannot list any downstream clusters before adding the cluster role "+tt.name, func() {
-			_, err := listClusters(rb.standardUserClient)
+			_, err := rb.standardUserClient.Steve.SteveType(clusters.ProvisioningSteveResouceType).ListAll(&types.ListOpts{})
 			require.Error(rb.T(), err)
 			assert.Equal(rb.T(), "Resource type [provisioning.cattle.io.cluster] is not listable", err.Error())
 		})
@@ -210,6 +224,10 @@ func (rb *RBTestSuite) TestRBAC() {
 			require.NoError(rb.T(), err)
 			rb.standardUserClient, err = rb.standardUserClient.ReLogin()
 			require.NoError(rb.T(), err)
+
+			steveStdUserclient, err := rb.standardUserClient.Steve.ProxyDownstream(rb.cluster.ID)
+			require.NoError(rb.T(), err)
+			rb.steveStdUserclient = steveStdUserclient
 		})
 
 		rb.T().Logf("Starting validations for %v", tt.clusterRole)
@@ -227,7 +245,7 @@ func (rb *RBTestSuite) TestRBAC() {
 
 		})
 
-		rb.Run("Test ase 4 through 6 - Validate namespaces checks for members with role "+tt.name, func() {
+		rb.Run("Testcase 4 through 6 - Validate namespaces checks for members with role "+tt.name, func() {
 			rb.ValidateNS(tt.clusterRole)
 
 		})
