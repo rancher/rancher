@@ -18,13 +18,16 @@ import (
 	rkecontroller "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/serviceaccounttoken"
 	"github.com/rancher/wrangler/pkg/condition"
+	"github.com/rancher/wrangler/pkg/data"
 	corecontrollers "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/pkg/generic"
 	"github.com/rancher/wrangler/pkg/name"
 	corev1 "k8s.io/api/core/v1"
 	apierror "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 	capierrors "sigs.k8s.io/cluster-api/errors"
 )
@@ -371,8 +374,8 @@ func CopyPlanMetadataToSecret(secret *corev1.Secret, metadata *plan.Metadata) {
 		secret.Annotations = map[string]string{}
 	}
 
-	CopyMapWithExcludes(secret.Labels, metadata.Labels, nil)
-	CopyMapWithExcludes(secret.Annotations, metadata.Annotations, nil)
+	CopyMap(secret.Labels, metadata.Labels)
+	CopyMap(secret.Annotations, metadata.Annotations)
 }
 
 // CopyMap will copy the items from source to destination. It will only copy items that have keys that start with
@@ -402,4 +405,77 @@ func SortedKeys(m map[string]interface{}) []string {
 	}
 	sort.Strings(keys)
 	return keys
+}
+
+var errNilObject = errors.New("cannot get capi cluster for nil object")
+
+// GetCAPIClusterFromLabel takes a runtime.Object and will attempt to find the label denoting which capi cluster it
+// belongs to.
+// If the object is nil, it cannot access to object or type metas, or the label is not present, it returns an error.
+// If the object has the expected label, it will return the capi cluster object.
+func GetCAPIClusterFromLabel(obj runtime.Object, cache capicontrollers.ClusterCache) (*capi.Cluster, error) {
+	if obj == nil {
+		return nil, errNilObject
+	}
+	data, err := data.Convert(obj)
+	if err != nil {
+		return nil, err
+	}
+	clusterName := data.String("metadata", "labels", capi.ClusterLabelName)
+	if clusterName != "" {
+		return cache.Get(data.String("metadata", "namespace"), clusterName)
+	}
+	return nil, fmt.Errorf("%s label not present on %s: %s/%s", capi.ClusterLabelName, obj.GetObjectKind().GroupVersionKind().Kind, data.String("metadata", "namespace"), data.String("metadata", "name"))
+}
+
+// GetOwnerCAPICluster takes an obj T and will attempt to find the capi cluster owner reference.
+// If the object is nil, it cannot access to object or type metas, the owner reference Kind or APIVersion do not match,
+// or the object could not be found, it returns an error.
+// If the owner reference exists and is valid, it will return the owning capi cluster object.
+func GetOwnerCAPICluster(obj runtime.Object, cache capicontrollers.ClusterCache) (*capi.Cluster, error) {
+	ref, namespace, err := GetOwnerFromGVK(capi.GroupVersion.String(), "Cluster", obj)
+	if err != nil {
+		return nil, err
+	}
+	return cache.Get(namespace, ref.Name)
+}
+
+// GetOwnerCAPIMachine takes an obj T and will attempt to find the capi machine owner reference.
+// If the object is nil, it cannot access to object or type metas, the owner reference Kind or APIVersion do not match,
+// or the object could not be found, it returns an error.
+// If the owner reference exists and is valid, it will return the owning capi machine object.
+func GetOwnerCAPIMachine(obj runtime.Object, cache capicontrollers.MachineCache) (*capi.Machine, error) {
+	ref, namespace, err := GetOwnerFromGVK(capi.GroupVersion.String(), "Machine", obj)
+	if err != nil {
+		return nil, err
+	}
+	return cache.Get(namespace, ref.Name)
+}
+
+// GetOwnerFromGVK takes a runtime.Object, and will search for a controlling owner reference of kind apiVersion.
+// If the object is nil, it cannot access to object or type metas, the owner reference Kind or APIVersion do not match,
+// or the object could not be found, it returns an error.
+// If the owner reference exists and is valid, it will return the owner reference and the namespace it belongs to.
+func GetOwnerFromGVK(groupVersion, kind string, obj runtime.Object) (*metav1.OwnerReference, string, error) {
+	if obj == nil {
+		return nil, "", errNilObject
+	}
+	objMeta, err := meta.Accessor(obj)
+	if err != nil {
+		return nil, "", err
+	}
+	ref := metav1.GetControllerOf(objMeta)
+	if ref == nil {
+		return nil, "", fmt.Errorf("%s %s/%s does not have a controller owner reference", obj.GetObjectKind().GroupVersionKind().Kind, objMeta.GetNamespace(),
+			objMeta.GetName())
+	}
+	if ref.Kind != kind {
+		return nil, "", fmt.Errorf("%s %s/%s has wrong owner kind %s", obj.GetObjectKind().GroupVersionKind().Kind, objMeta.GetNamespace(),
+			objMeta.GetName(), ref.Kind)
+	}
+	if ref.APIVersion != groupVersion {
+		return nil, "", fmt.Errorf("%s %s/%s has wrong owner api version %s", obj.GetObjectKind().GroupVersionKind().Kind, objMeta.GetNamespace(),
+			objMeta.GetName(), ref.APIVersion)
+	}
+	return ref, objMeta.GetNamespace(), nil
 }

@@ -12,6 +12,7 @@ import (
 
 type Interface interface {
 	JobsGetter
+	CronJobsGetter
 }
 
 type Client struct {
@@ -49,6 +50,20 @@ func (c *Client) Jobs(namespace string) JobInterface {
 	sharedClient := c.clientFactory.ForResourceKind(JobGroupVersionResource, JobGroupVersionKind.Kind, true)
 	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &JobResource, JobGroupVersionKind, jobFactory{})
 	return &jobClient{
+		ns:           namespace,
+		client:       c,
+		objectClient: objectClient,
+	}
+}
+
+type CronJobsGetter interface {
+	CronJobs(namespace string) CronJobInterface
+}
+
+func (c *Client) CronJobs(namespace string) CronJobInterface {
+	sharedClient := c.clientFactory.ForResourceKind(CronJobGroupVersionResource, CronJobGroupVersionKind.Kind, true)
+	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &CronJobResource, CronJobGroupVersionKind, cronJobFactory{})
+	return &cronJobClient{
 		ns:           namespace,
 		client:       c,
 		objectClient: objectClient,

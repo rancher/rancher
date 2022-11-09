@@ -214,30 +214,6 @@ steps:
     event:
     - push
 
-- name: docker-publish-head-runtime
-  image: plugins/docker
-  settings:
-    purge: false
-    build_args:
-    - ARCH=amd64
-    - VERSION=${DRONE_BRANCH/release\//}-${DRONE_COMMIT}-head
-    context: package/
-    custom_dns: 1.1.1.1
-    dockerfile: package/Dockerfile.runtime
-    tag: ${DRONE_BRANCH/release\//}-${DRONE_COMMIT}-linux-amd64
-    password:
-      from_secret: docker_password
-    repo: rancher/rancher-runtime
-    username:
-      from_secret: docker_username
-  when:
-    ref:
-      include:
-      - "refs/heads/master"
-      - "refs/heads/release/v*"
-    event:
-    - push
-
 - name: docker-publish
   image: plugins/docker
   settings:
@@ -293,26 +269,6 @@ steps:
     password:
       from_secret: docker_password
     repo: rancher/rancher-agent
-    tag: "${DRONE_TAG}-linux-amd64"
-    username:
-      from_secret: docker_username
-  when:
-    event:
-    - tag
-
-- name: docker-publish-runtime
-  image: plugins/docker
-  settings:
-    purge: false
-    build_args:
-    - ARCH=amd64
-    - "VERSION=${DRONE_TAG}"
-    context: package/
-    custom_dns: 1.1.1.1
-    dockerfile: package/Dockerfile.runtime
-    password:
-      from_secret: docker_password
-    repo: rancher/rancher-runtime
     tag: "${DRONE_TAG}-linux-amd64"
     username:
       from_secret: docker_username
@@ -1083,27 +1039,6 @@ kind: pipeline
 name: manifest
 
 steps:
-- name: push-runtime-manifest
-  image: plugins/manifest
-  settings:
-    username:
-      from_secret: docker_username
-    password:
-      from_secret: docker_password
-    spec: manifest-runtime.tmpl
-  when:
-    instance:
-      include:
-      - drone-publish.rancher.io
-    ref:
-      include:
-        - "refs/heads/master"
-        - "refs/heads/release/v*"
-        - "refs/tags/v*"
-    event:
-    - push
-    - tag
-
 - name: push-installer-manifest
   image: plugins/manifest
   settings:

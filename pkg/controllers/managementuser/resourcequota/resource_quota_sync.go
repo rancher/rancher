@@ -124,11 +124,11 @@ func (c *SyncController) CreateResourceQuota(ns *corev1.Namespace) (runtime.Obje
 
 	operation := "none"
 	if existing == nil {
-		if newQuotaSpec != nil {
+		if newQuotaSpec != nil && len(newQuotaSpec.Hard) > 0 {
 			operation = "create"
 		}
 	} else {
-		if newQuotaSpec == nil {
+		if newQuotaSpec == nil || len(newQuotaSpec.Hard) == 0 {
 			operation = "delete"
 		} else if !apiequality.Semantic.DeepEqual(existing.Spec.Hard, newQuotaSpec.Hard) {
 			operation = "update"
@@ -167,6 +167,12 @@ func (c *SyncController) CreateResourceQuota(ns *corev1.Namespace) (runtime.Obje
 		}
 		operationErr = c.updateResourceQuota(existing, newQuotaSpec)
 	case "delete":
+		updatedNs := ns.DeepCopy()
+		delete(updatedNs.Annotations, resourceQuotaAnnotation)
+		updatedNs, err = c.Namespaces.Update(updatedNs)
+		if err != nil {
+			return updatedNs, err
+		}
 		operationErr = c.deleteResourceQuota(existing)
 	}
 
@@ -438,7 +444,10 @@ func completeQuota(requestedQuota *v32.ResourceQuotaLimit, defaultQuota *v32.Res
 		return nil, err
 	}
 	for key, value := range requestedQuotaMap {
-		newLimitMap[key] = value
+		// Only override the values for keys (resources) that actually exist in the project quota.
+		if newLimitMap[key] != nil {
+			newLimitMap[key] = value
+		}
 	}
 
 	toReturn := &v32.ResourceQuotaLimit{}

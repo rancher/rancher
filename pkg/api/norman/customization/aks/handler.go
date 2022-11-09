@@ -132,8 +132,15 @@ func (h *handler) ServeHTTP(writer http.ResponseWriter, req *http.Request) {
 		}
 		writer.Write(serialized)
 	case "aksVMSizes":
-		if serialized, errCode, err = listVMSizes(req.Context(), capa); err != nil {
+		if serialized, errCode, err = listVMSizesV1(req.Context(), capa); err != nil {
 			logrus.Errorf("[aks-handler] error getting VM sizes: %v", err)
+			handleErr(writer, errCode, err)
+			return
+		}
+		writer.Write(serialized)
+	case "aksVMSizesV2":
+		if serialized, errCode, err = listVMSizesV2(req.Context(), capa); err != nil {
+			logrus.Errorf("[aks-handler] error getting VM sizes (v2): %v", err)
 			handleErr(writer, errCode, err)
 			return
 		}
@@ -186,11 +193,13 @@ func (h *handler) checkCredentials(req *http.Request) (int, error) {
 	}
 	client, err := NewSubscriptionServiceClient(cred)
 	if err != nil {
-		return http.StatusUnauthorized, fmt.Errorf("invalid credentials")
+		logrus.Errorf("[AKS] failed to create new subscription client: %v", err)
+		return http.StatusUnauthorized, fmt.Errorf("invalid credentials: %w", err)
 	}
 	_, err = client.Get(ctx, cred.SubscriptionID)
 	if err != nil {
-		return http.StatusUnauthorized, fmt.Errorf("invalid credentials")
+		logrus.Errorf("[AKS] failed to get subscription details: %v", err)
+		return http.StatusUnauthorized, fmt.Errorf("invalid credentials: %w", err)
 	}
 
 	return http.StatusOK, nil
@@ -334,8 +343,14 @@ func (h *handler) generateAPIContext(req *http.Request) *types.APIContext {
 }
 
 func handleErr(writer http.ResponseWriter, errorCode int, originalErr error) {
-	asJSON := []byte(fmt.Sprintf(`{"error":"%v"}`, originalErr))
-
 	writer.WriteHeader(errorCode)
-	writer.Write(asJSON)
+
+	payload := make(map[string]string)
+	payload["error"] = originalErr.Error()
+	payloadJSON, err := json.Marshal(payload)
+	if err != nil { // This should not happen given fixed types on the payload - https://stackoverflow.com/a/33964549
+		logrus.Errorf("[AKS] Failed to write payload JSON: %v", err)
+		return
+	}
+	writer.Write(payloadJSON)
 }

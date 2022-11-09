@@ -16,6 +16,7 @@ const (
 	ReplicationControllerSpecFieldHostIPC                       = "hostIPC"
 	ReplicationControllerSpecFieldHostNetwork                   = "hostNetwork"
 	ReplicationControllerSpecFieldHostPID                       = "hostPID"
+	ReplicationControllerSpecFieldHostUsers                     = "hostUsers"
 	ReplicationControllerSpecFieldHostname                      = "hostname"
 	ReplicationControllerSpecFieldImagePullSecrets              = "imagePullSecrets"
 	ReplicationControllerSpecFieldNodeID                        = "nodeId"
@@ -60,6 +61,7 @@ type ReplicationControllerSpec struct {
 	HostIPC                       bool                           `json:"hostIPC,omitempty" yaml:"hostIPC,omitempty"`
 	HostNetwork                   bool                           `json:"hostNetwork,omitempty" yaml:"hostNetwork,omitempty"`
 	HostPID                       bool                           `json:"hostPID,omitempty" yaml:"hostPID,omitempty"`
+	HostUsers                     *bool                          `json:"hostUsers,omitempty" yaml:"hostUsers,omitempty"`
 	Hostname                      string                         `json:"hostname,omitempty" yaml:"hostname,omitempty"`
 	ImagePullSecrets              []LocalObjectReference         `json:"imagePullSecrets,omitempty" yaml:"imagePullSecrets,omitempty"`
 	NodeID                        string                         `json:"nodeId,omitempty" yaml:"nodeId,omitempty"`

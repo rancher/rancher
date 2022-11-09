@@ -288,10 +288,10 @@ func (e *eksOperatorController) onClusterChange(key string, cluster *mgmtv3.Clus
 			}
 		}
 
-		clusterLaunchTemplateID, _ := status["managedLaunchTemplateID"].(string)
-		if clusterLaunchTemplateID != "" && cluster.Status.EKSStatus.ManagedLaunchTemplateID != clusterLaunchTemplateID {
+		managedLaunchTemplateID, _ := status["managedLaunchTemplateID"].(string)
+		if managedLaunchTemplateID != "" && cluster.Status.EKSStatus.ManagedLaunchTemplateID != managedLaunchTemplateID {
 			cluster = cluster.DeepCopy()
-			cluster.Status.EKSStatus.ManagedLaunchTemplateID = clusterLaunchTemplateID
+			cluster.Status.EKSStatus.ManagedLaunchTemplateID = managedLaunchTemplateID
 			cluster, err = e.ClusterClient.Update(cluster)
 			if err != nil {
 				return cluster, err
@@ -304,8 +304,18 @@ func (e *eksOperatorController) onClusterChange(key string, cluster *mgmtv3.Clus
 			for key, value := range managedLaunchTemplateVersions {
 				managedLaunchTemplateVersionsToString[key] = value.(string)
 			}
-			cluster.DeepCopy()
+			cluster = cluster.DeepCopy()
 			cluster.Status.EKSStatus.ManagedLaunchTemplateVersions = managedLaunchTemplateVersionsToString
+			cluster, err = e.ClusterClient.Update(cluster)
+			if err != nil {
+				return cluster, err
+			}
+		}
+
+		generatedNodeRole, _ := status["generatedNodeRole"].(string)
+		if generatedNodeRole != "" && cluster.Status.EKSStatus.GeneratedNodeRole != generatedNodeRole {
+			cluster = cluster.DeepCopy()
+			cluster.Status.EKSStatus.GeneratedNodeRole = generatedNodeRole
 			cluster, err = e.ClusterClient.Update(cluster)
 			if err != nil {
 				return cluster, err

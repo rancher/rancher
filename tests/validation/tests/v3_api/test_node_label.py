@@ -14,6 +14,7 @@ from .common import get_user_client_and_cluster
 from .common import execute_kubectl_cmd
 from .common import if_test_rbac
 from .common import LINODE_ACCESSKEY
+from .common import RANCHER_CLEANUP_CLUSTER
 from .common import random_name
 from .common import random_test_name
 from .common import rbac_get_user_token_by_role
@@ -432,7 +433,8 @@ def test_node_label_custom_add_edit_addnode():
     # cluster will go into updating state
     cluster = validate_cluster_state(client, cluster, True,
                                      intermediate_state="updating",
-                                     nodes_not_in_active_state=[])
+                                     nodes_not_in_active_state=[],
+                                     timeout=600)
 
     node = client.reload(node)
     # Label should be added
@@ -699,7 +701,8 @@ def test_node_label_node_template_delete_api():
     # cluster will go into updating state
     cluster = validate_cluster_state(client, cluster, True,
                                      intermediate_state="updating",
-                                     nodes_not_in_active_state=[])
+                                     nodes_not_in_active_state=[],
+                                     timeout=600)
 
     node = client.reload(node)
     # label should be deleted
@@ -758,9 +761,9 @@ def test_node_label_custom_edit():
     # cluster will go into updating state
     cluster = validate_cluster_state(client, cluster, True,
                                      intermediate_state="updating",
-                                     nodes_not_in_active_state=[])
+                                     nodes_not_in_active_state=[],
+                                     timeout=600)
     node = client.reload(node)
-
     validate_label_set_on_node(client, node, test_label, new_value)
     cluster_custom["label_value"] = new_value
 
@@ -827,7 +830,8 @@ def test_node_label_custom_delete():
     # cluster will go into updating state
     cluster = validate_cluster_state(client, cluster, True,
                                      intermediate_state="updating",
-                                     nodes_not_in_active_state=[])
+                                     nodes_not_in_active_state=[],
+                                     timeout=600)
 
     node = client.reload(node)
     # label should be deleted
@@ -923,7 +927,6 @@ def create_project_client(request):
     cluster_node_template["node_pools"] = node_pools[0]
     cluster_node_template["test_label"] = test_label
     cluster_node_template["label_value"] = label_value
-
     def fin():
         client = get_user_client()
         cluster = cluster_node_template["cluster"]
@@ -958,8 +961,8 @@ def create_project_client(request):
         for node_template in cluster_node_template_2["node_template"]:
             client.reload(node_template)
             client.delete(node_template)
-
-    request.addfinalizer(fin)
+    if RANCHER_CLEANUP_CLUSTER:
+        request.addfinalizer(fin)
 
 
 def check_cluster_deleted(client):

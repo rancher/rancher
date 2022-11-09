@@ -114,7 +114,7 @@ func (r *V2ProvCertRotationTestSuite) TestCertRotation() {
 		cloudCredential, err := provider.CloudCredFunc(client)
 		require.NoError(r.T(), err)
 
-		for _, kubernetesVersion := range r.config.KubernetesVersions {
+		for _, kubernetesVersion := range r.config.RKE2KubernetesVersions {
 			r.testCertRotation(provider, kubernetesVersion, r.config.NodesAndRoles, cloudCredential)
 		}
 

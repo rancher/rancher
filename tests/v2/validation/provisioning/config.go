@@ -7,17 +7,21 @@ import (
 )
 
 const (
+	namespace               = "fleet-default"
 	defaultRandStringLength = 5
 	ConfigurationFileKey    = "provisioningInput"
 )
 
 type Config struct {
-	NodesAndRoles      []machinepools.NodeRoles `json:"nodesAndRoles" yaml:"nodesAndRoles" default:"[]"`
-	NodesAndRolesRKE1  []nodepools.NodeRoles    `json:"nodesAndRolesRKE1" yaml:"nodesAndRolesRKE1" default:"[]"`
-	KubernetesVersions []string                 `json:"kubernetesVersion" yaml:"kubernetesVersion"`
-	CNIs               []string                 `json:"cni" yaml:"cni"`
-	Providers          []string                 `json:"providers" yaml:"providers"`
-	NodeProviders      []string                 `json:"nodeProviders" yaml:"nodeProviders"`
+	NodesAndRoles          []machinepools.NodeRoles `json:"nodesAndRoles" yaml:"nodesAndRoles" default:"[]"`
+	NodesAndRolesRKE1      []nodepools.NodeRoles    `json:"nodesAndRolesRKE1" yaml:"nodesAndRolesRKE1" default:"[]"`
+	K3SKubernetesVersions  []string                 `json:"k3sKubernetesVersion" yaml:"k3sKubernetesVersion"`
+	RKE1KubernetesVersions []string                 `json:"rke1KubernetesVersion" yaml:"rke1KubernetesVersion"`
+	RKE2KubernetesVersions []string                 `json:"rke2KubernetesVersion" yaml:"rke2KubernetesVersion"`
+	CNIs                   []string                 `json:"cni" yaml:"cni"`
+	Providers              []string                 `json:"providers" yaml:"providers"`
+	NodeProviders          []string                 `json:"nodeProviders" yaml:"nodeProviders"`
+	Hardened               bool                     `json:"hardened" yaml:"hardened"`
 }
 
 func AppendRandomString(baseClusterName string) string {

@@ -10,5 +10,6 @@ type EnvironmentFlag int
 const (
 	Ingress EnvironmentFlag = iota
 	Chart
+	UpgradeAllClusters
 	environmentFlagLastItem // This is used to determine the number of items in the enum
 )

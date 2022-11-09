@@ -84,12 +84,15 @@ type Store struct {
 }
 
 func (s *Store) Delete(apiContext *types.APIContext, schema *types.Schema, id string) (map[string]interface{}, error) {
+	// make sure the credential isn't being used by an active RKE2/K3s cluster
 	if provClusters, err := s.ProvClusterCache.GetByIndex(cluster.ByCloudCred, id); err != nil {
-		return nil, err
+		return nil, httperror.NewAPIError(httperror.ServerError, fmt.Sprintf("An error was encountered while attempting to delete the cloud credential: %s", err))
 	} else if len(provClusters) > 0 {
-		return nil, httperror.NewAPIError(httperror.InvalidAction, fmt.Sprintf("cloud credential is currently referenced by provisioning cluster %s", provClusters[0].Name))
+		return nil, httperror.NewAPIError(httperror.InvalidAction, fmt.Sprintf("Cloud credential is currently referenced by provisioning cluster %s", provClusters[0].Name))
 	}
 
+	// make sure the cloud credential isn't being used by an RKE1 node template
+	// which may be used by an active cluster
 	nodeTemplates, err := s.NodeTemplateLister.List("", labels.NewSelector())
 	if err != nil {
 		return nil, err
@@ -99,7 +102,7 @@ func (s *Store) Delete(apiContext *types.APIContext, schema *types.Schema, id st
 			if template.Spec.CloudCredentialName != id {
 				continue
 			}
-			return nil, httperror.NewAPIError(httperror.MethodNotAllowed, fmt.Sprintf("cloud credential is currently referenced by node template %s", template.Name))
+			return nil, httperror.NewAPIError(httperror.MethodNotAllowed, fmt.Sprintf("Cloud credential is currently referenced by node template %s", template.Name))
 		}
 	}
 	return s.Store.Delete(apiContext, schema, id)

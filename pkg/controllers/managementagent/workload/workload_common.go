@@ -10,12 +10,10 @@ import (
 	"github.com/rancher/norman/types/convert"
 	appsv1 "github.com/rancher/rancher/pkg/generated/norman/apps/v1"
 	batchv1 "github.com/rancher/rancher/pkg/generated/norman/batch/v1"
-	"github.com/rancher/rancher/pkg/generated/norman/batch/v1beta1"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	"github.com/rancher/rancher/pkg/types/config"
 	k8sappv1 "k8s.io/api/apps/v1"
 	corebatchv1 "k8s.io/api/batch/v1"
-	corebatchv1beta1 "k8s.io/api/batch/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -81,14 +79,14 @@ type CommonController struct {
 	DaemonSetLister             appsv1.DaemonSetLister
 	StatefulSetLister           appsv1.StatefulSetLister
 	JobLister                   batchv1.JobLister
-	CronJobLister               v1beta1.CronJobLister
+	CronJobLister               batchv1.CronJobLister
 	Deployments                 appsv1.DeploymentInterface
 	ReplicationControllers      v1.ReplicationControllerInterface
 	ReplicaSets                 appsv1.ReplicaSetInterface
 	DaemonSets                  appsv1.DaemonSetInterface
 	StatefulSets                appsv1.StatefulSetInterface
 	Jobs                        batchv1.JobInterface
-	CronJobs                    v1beta1.CronJobInterface
+	CronJobs                    batchv1.CronJobInterface
 	Sync                        func(key string, w *Workload) error
 }
 
@@ -100,14 +98,14 @@ func NewWorkloadController(ctx context.Context, workload *config.UserOnlyContext
 		DaemonSetLister:             workload.Apps.DaemonSets("").Controller().Lister(),
 		StatefulSetLister:           workload.Apps.StatefulSets("").Controller().Lister(),
 		JobLister:                   workload.BatchV1.Jobs("").Controller().Lister(),
-		CronJobLister:               workload.BatchV1Beta1.CronJobs("").Controller().Lister(),
+		CronJobLister:               workload.BatchV1.CronJobs("").Controller().Lister(),
 		Deployments:                 workload.Apps.Deployments(""),
 		ReplicationControllers:      workload.Core.ReplicationControllers(""),
 		ReplicaSets:                 workload.Apps.ReplicaSets(""),
 		DaemonSets:                  workload.Apps.DaemonSets(""),
 		StatefulSets:                workload.Apps.StatefulSets(""),
 		Jobs:                        workload.BatchV1.Jobs(""),
-		CronJobs:                    workload.BatchV1Beta1.CronJobs(""),
+		CronJobs:                    workload.BatchV1.CronJobs(""),
 		Sync:                        f,
 	}
 	if f != nil {
@@ -117,7 +115,7 @@ func NewWorkloadController(ctx context.Context, workload *config.UserOnlyContext
 		workload.Apps.DaemonSets("").AddHandler(ctx, getName(), c.syncDaemonSet)
 		workload.Apps.StatefulSets("").AddHandler(ctx, getName(), c.syncStatefulSet)
 		workload.BatchV1.Jobs("").AddHandler(ctx, getName(), c.syncJob)
-		workload.BatchV1Beta1.CronJobs("").AddHandler(ctx, getName(), c.syncCronJob)
+		workload.BatchV1.CronJobs("").AddHandler(ctx, getName(), c.syncCronJob)
 	}
 	return c
 }
@@ -190,7 +188,7 @@ func (c *CommonController) syncJob(key string, obj *corebatchv1.Job) (runtime.Ob
 	return nil, c.Sync(key, w)
 }
 
-func (c *CommonController) syncCronJob(key string, obj *corebatchv1beta1.CronJob) (runtime.Object, error) {
+func (c *CommonController) syncCronJob(key string, obj *corebatchv1.CronJob) (runtime.Object, error) {
 	if obj == nil || obj.DeletionTimestamp != nil {
 		return nil, nil
 	}
@@ -808,7 +806,7 @@ func (c CommonController) GetActualFromWorkload(w *Workload) (
 	ds *k8sappv1.DaemonSet,
 	ss *k8sappv1.StatefulSet,
 	job *corebatchv1.Job,
-	cj *corebatchv1beta1.CronJob,
+	cj *corebatchv1.CronJob,
 	err error,
 ) {
 	switch w.Kind {

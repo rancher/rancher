@@ -29,14 +29,9 @@ type ActionHandler struct {
 	ClusterManager                *clustermanager.Manager
 	CatalogTemplateVersionLister  v3.CatalogTemplateVersionLister
 	BackupClient                  v3.EtcdBackupInterface
-	ClusterScanClient             v3.ClusterScanInterface
 	ClusterTemplateClient         v3.ClusterTemplateInterface
 	ClusterTemplateRevisionClient v3.ClusterTemplateRevisionInterface
 	SubjectAccessReviewClient     v1.SubjectAccessReviewInterface
-	CisBenchmarkVersionClient     v3.CisBenchmarkVersionInterface
-	CisBenchmarkVersionLister     v3.CisBenchmarkVersionLister
-	CisConfigClient               v3.CisConfigInterface
-	CisConfigLister               v3.CisConfigLister
 	TokenClient                   v3.TokenInterface
 	Auth                          requests.Authenticator
 }

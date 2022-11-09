@@ -148,6 +148,7 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 		addRule().apiGroups("cluster.x-k8s.io").resources("machines").verbs("*").
 		addRule().apiGroups("rke-machine-config.cattle.io").resources("*").verbs("*").
 		addRule().apiGroups("rke-machine.cattle.io").resources("*").verbs("*").
+		addRule().apiGroups("management.cattle.io").resources("projects").verbs("updatepsa").
 		addRule().apiGroups().nonResourceURLs("*").verbs("*")
 
 	rb.addRoleTemplate("Cluster Member", "cluster-member", "cluster", false, false, false).

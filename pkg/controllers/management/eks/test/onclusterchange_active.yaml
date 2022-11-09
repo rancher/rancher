@@ -27,6 +27,7 @@ spec:
       launchTemplate: null
       maxSize: 2
       minSize: 2
+      nodeRole": null
       nodegroupName: nodegroup
       requestSpotInstances: false
       resourceTags: {}
@@ -123,4 +124,5 @@ status:
   eksStatus:
     upstreamSpec:
       publicAccess: true
+  generatedNodeRole: "arn:aws:iam::role/test"
   serviceAccountTokenSecret: cluster-serviceaccounttoken-secret

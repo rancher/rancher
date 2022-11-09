@@ -29,6 +29,8 @@ HOST_NAME = os.environ.get('RANCHER_HOST_NAME', "testsa")
 AG_HOST_NAME = HOST_NAME
 RANCHER_AG_INTERNAL_HOSTNAME = AG_HOST_NAME + "-internal.qa.rancher.space"
 RANCHER_AG_HOSTNAME = AG_HOST_NAME + ".qa.rancher.space"
+RANCHER_HELM_REPO = os.environ.get("RANCHER_HELM_REPO", "latest")
+RANCHER_HELM_URL = os.environ.get("RANCHER_HELM_URL", "https://releases.rancher.com/server-charts/")
 
 RESOURCE_DIR = os.path.join(os.path.dirname(os.path.realpath(__file__)),
                             'resource')
@@ -224,10 +226,10 @@ def add_rancher_images_to_private_registry(
             RANCHER_SERVER_VERSION)
     bastion_node.execute_command(get_images_command)
 
-    # Remove the "docker save" and "docker load" lines to save time
+    # comment out the "docker save" and "docker load" lines to save time
     edit_save_and_load_command = \
-        "sudo sed -i '58d' rancher-save-images.sh && " \
-        "sudo sed -i '76d' rancher-load-images.sh && " \
+        "sudo sed -i -e 's/docker save /# docker/g' rancher-save-images.sh && " \
+        "sudo sed -i -e 's/docker load /# docker/g' rancher-load-images.sh && " \
         "chmod +x rancher-save-images.sh && chmod +x rancher-load-images.sh"
     bastion_node.execute_command(edit_save_and_load_command)
 
@@ -337,16 +339,19 @@ def setup_airgap_rancher(bastion_node, number_of_nodes=NUMBER_OF_INSTANCES):
     assert bastion_node.execute_command(
         '/snap/bin/helm')[0].find("Flags:") > -1, \
         "helm is not installed correctly"
+    
+    repo_name = "rancher-" + RANCHER_HELM_REPO
+    repo_url = RANCHER_HELM_URL + RANCHER_HELM_REPO
     bastion_node.execute_command(
-        '/snap/bin/helm repo add rancher-latest'
-        ' https://releases.rancher.com/server-charts/latest')
+        '/snap/bin/helm repo add ' + repo_name + ' ' + repo_url)
     assert bastion_node.execute_command(
         "/snap/bin/helm repo list")[0].find("rancher") > -1, \
         "helm was unable to add rancher repo"
     bastion_node.execute_command(
-        "/snap/bin/helm fetch rancher-latest/rancher")
+        "/snap/bin/helm fetch " + repo_name + "/rancher")
     bastion_node.execute_command(
-        "/snap/bin/helm fetch rancher-latest/rancher --version={}".format(
+        "/snap/bin/helm fetch {}/rancher --version={}".format(
+            repo_name,
             RANCHER_SERVER_VERSION))
     # remove `v` from the version tag for helm formatting
     new_rancher_version = RANCHER_SERVER_VERSION

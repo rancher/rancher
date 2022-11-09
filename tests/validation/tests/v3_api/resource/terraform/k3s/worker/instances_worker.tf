@@ -18,7 +18,7 @@ resource "aws_instance" "worker" {
   subnet_id              = var.subnets
   availability_zone      = var.availability_zone
   vpc_security_group_ids = [var.sg_id]
-  key_name               = "jenkins-rke-validation"
+  key_name               = var.access_key_name
   tags = {
     Name                 = "${var.resource_name}-worker"
   }

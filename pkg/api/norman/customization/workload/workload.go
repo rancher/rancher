@@ -19,7 +19,6 @@ import (
 	"github.com/rancher/rancher/pkg/clustermanager"
 	appsv1 "github.com/rancher/rancher/pkg/generated/norman/apps/v1"
 	batchv1 "github.com/rancher/rancher/pkg/generated/norman/batch/v1"
-	batchv1beta1 "github.com/rancher/rancher/pkg/generated/norman/batch/v1beta1"
 	corev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	"github.com/rancher/rancher/pkg/rbac"
 	projectschema "github.com/rancher/rancher/pkg/schemas/project.cattle.io/v3"
@@ -322,9 +321,9 @@ func (a *Config) canUpdateWorkload(apiContext *types.APIContext, resource *types
 	case batchv1.JobResource.SingularName:
 		apiGroup = batchv1.GroupName
 		pluralName = batchv1.JobResource.Name
-	case batchv1beta1.CronJobResource.SingularName:
-		apiGroup = batchv1beta1.GroupName
-		pluralName = batchv1beta1.CronJobResource.Name
+	case batchv1.CronJobResource.SingularName:
+		apiGroup = batchv1.GroupName
+		pluralName = batchv1.CronJobResource.Name
 	default:
 		logrus.Debugf("Invalid workload type: %s", workloadType)
 		return errInvalidWorkloadType

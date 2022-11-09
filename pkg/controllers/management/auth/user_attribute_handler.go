@@ -1,3 +1,5 @@
+// Package auth contains handlers and helpful functions for managing authentication. This includes token cleanup and
+// managing Rancher's RBAC kubernetes resources: ClusterRoleTemplateBindings and ProjectRoleTemplateBindings.
 package auth
 
 import (
@@ -26,10 +28,6 @@ func newUserAttributeController(mgmt *config.ManagementContext) *UserAttributeCo
 func (ua *UserAttributeController) sync(key string, obj *v3.UserAttribute) (runtime.Object, error) {
 	if obj == nil || obj.DeletionTimestamp != nil {
 		return nil, nil
-	}
-
-	if obj.ExtraByProvider == nil {
-		obj.NeedsRefresh = true
 	}
 
 	if !obj.NeedsRefresh {

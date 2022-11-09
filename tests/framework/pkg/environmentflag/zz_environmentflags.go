@@ -10,12 +10,13 @@ func _() {
 	var x [1]struct{}
 	_ = x[Ingress-0]
 	_ = x[Chart-1]
-	_ = x[environmentFlagLastItem-2]
+	_ = x[UpgradeAllClusters-2]
+	_ = x[environmentFlagLastItem-3]
 }
 
-const _EnvironmentFlag_name = "IngressChartThis is used to determine the number of items in the enum"
+const _EnvironmentFlag_name = "IngressChartUpgradeAllClustersThis is used to determine the number of items in the enum"
 
-var _EnvironmentFlag_index = [...]uint8{0, 7, 12, 69}
+var _EnvironmentFlag_index = [...]uint8{0, 7, 12, 30, 87}
 
 func (i EnvironmentFlag) String() string {
 	if i < 0 || i >= EnvironmentFlag(len(_EnvironmentFlag_index)-1) {

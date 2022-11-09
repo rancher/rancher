@@ -1,3 +1,6 @@
+// Package settings registers the settings provider which acts as a client for setting and provides functions for
+// maintaining settings in k8s on startup. This maintenance includes configuring setting to match any corresponding
+// env variables that are set or updating their default values.
 package settings
 
 import (
@@ -75,12 +78,16 @@ func (s *settingsProvider) SetIfUnset(name, value string) error {
 	return err
 }
 
+// SetAll iterates through a map of settings.Setting and updates corresponding settings in k8s
+// to match any values set for them via their respective CATTLE_<setting-name> env var, their
+// source to "env" if configured by an env var, and their default to match the setting in the
+// map.
 func (s *settingsProvider) SetAll(settingsMap map[string]settings.Setting) error {
 	fallback := map[string]string{}
 
 	for name, setting := range settingsMap {
 		key := settings.GetEnvKey(name)
-		envValue := os.Getenv(key)
+		envValue, envOk := os.LookupEnv(key)
 
 		obj, err := s.settings.Get(setting.Name, metav1.GetOptions{})
 		if errors.IsNotFound(err) {
@@ -90,7 +97,7 @@ func (s *settingsProvider) SetAll(settingsMap map[string]settings.Setting) error
 				},
 				Default: setting.Default,
 			}
-			if envValue != "" {
+			if envOk {
 				newSetting.Source = "env"
 				newSetting.Value = envValue
 			}
@@ -113,11 +120,15 @@ func (s *settingsProvider) SetAll(settingsMap map[string]settings.Setting) error
 				obj.Default = setting.Default
 				update = true
 			}
-			if envValue != "" && obj.Source != "env" {
+			if envOk && obj.Source != "env" {
 				obj.Source = "env"
 				update = true
 			}
-			if envValue != "" && obj.Value != envValue {
+			if !envOk && obj.Source == "env" {
+				obj.Source = ""
+				update = true
+			}
+			if envOk && obj.Value != envValue {
 				obj.Value = envValue
 				update = true
 			}

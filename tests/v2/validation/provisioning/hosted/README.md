@@ -86,7 +86,7 @@ Below are example configs needed for the different hosted providers including GK
 "aksClusterConfig": {
   "dnsPrefix": "-dns",
   "imported": false,
-  "kubernetesVersion": "1.21.9",
+  "kubernetesVersion": "1.24.6",
   "linuxAdminUsername": "azureuser",
   "loadBalancerSku": "Standard",
   "networkPlugin": "kubenet",
@@ -96,6 +96,8 @@ Below are example configs needed for the different hosted providers including GK
       "nodeCount": 1,
       "enableAutoScaling": false,
       "maxPods": 110,
+      "maxCount": 2,
+      "minCount": 1,
       "mode": "System",
       "name": "agentpool",
       "osDiskSizeGB": 128,
@@ -108,7 +110,7 @@ Below are example configs needed for the different hosted providers including GK
   "resourceGroup": "",
   "resourceLocation": "eastus",
   "tags": {}
-},
+}
 ```
 ### GKE Cluster Config
 Note that the following are required and should be updated:
