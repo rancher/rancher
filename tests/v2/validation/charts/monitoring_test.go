@@ -16,6 +16,7 @@ import (
 	"github.com/rancher/rancher/tests/framework/extensions/projects"
 	"github.com/rancher/rancher/tests/framework/extensions/secrets"
 	"github.com/rancher/rancher/tests/framework/extensions/services"
+	"github.com/rancher/rancher/tests/framework/extensions/workloads"
 	"github.com/rancher/rancher/tests/framework/pkg/session"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -278,6 +279,18 @@ func (m *MonitoringTestSuite) TestUpgradeMonitoringChart() {
 	// Compare rancher monitoring versions
 	chartVersionPostUpgrade := monitoringChartPostUpgrade.ChartDetails.Spec.Chart.Metadata.Version
 	assert.Equal(m.T(), m.chartInstallOptions.Version, chartVersionPostUpgrade)
+}
+
+func (m *MonitoringTestSuite) TestVerifyNoPendingHelmOp() {
+	subSession := m.session.NewSession()
+	defer subSession.Cleanup()
+
+	client, err := m.client.WithSession(subSession)
+	require.NoError(m.T(), err)
+
+	m.T().Log("Asserting that all helm-operation-xxxx pods terminated")
+	done := workloads.WaitPodTerminated(client, m.project.ClusterID, "helm-operation-")
+	require.True(m.T(), done)
 }
 
 func TestMonitoringTestSuite(t *testing.T) {

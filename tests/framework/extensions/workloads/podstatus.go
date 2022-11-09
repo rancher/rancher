@@ -3,12 +3,15 @@ package workloads
 import (
 	"context"
 	"fmt"
+	"strings"
+	"time"
 
 	"github.com/rancher/rancher/pkg/api/scheme"
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/wait"
 )
 
 // PodGroupVersion is the required Group Version for accessing pods in a cluster,
@@ -45,15 +48,35 @@ func StatusPods(client *rancher.Client, clusterID string, listOpts metav1.ListOp
 
 	var podResults []string
 	var podErrors []error
-	podResults = append(podResults, "pods Status:\n")
 
 	for _, pod := range podList {
 		podStatus := pod.Status.Phase
 		if podStatus == "Succeeded" || podStatus == "Running" {
 			podResults = append(podResults, fmt.Sprintf("INFO: %s: %s\n", pod.Name, podStatus))
 		} else {
-			podErrors = append(podErrors, fmt.Errorf("ERROR: %s: %s", pod.Name, podStatus))
+			podErrors = append(podErrors, fmt.Errorf("ERROR: %s: %s\n", pod.Name, podStatus))
 		}
 	}
 	return podResults, podErrors
+}
+
+// WaitPodTerminated is a helper function that uses wait.Poll() to verify if all pods with podName
+// have terminated correctly or if there is still a pod runnnig.
+func WaitPodTerminated(client *rancher.Client, clusterID string, podName string) bool {
+	err := wait.Poll(5*time.Second, 2*time.Minute, func() (done bool, err error) {
+		podResults, _ := StatusPods(client, clusterID, metav1.ListOptions{})
+		for _, pod := range podResults {
+			p := strings.Split(pod, ": ")
+			if strings.HasPrefix(p[1], podName) && strings.HasPrefix(p[2], "Running") {
+				return false, nil
+			}
+		}
+		return true, nil
+	})
+
+	if err != nil {
+		return false
+	} else {
+		return true
+	}
 }

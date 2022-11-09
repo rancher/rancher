@@ -9,6 +9,7 @@ import (
 	"github.com/rancher/rancher/tests/framework/extensions/charts"
 	"github.com/rancher/rancher/tests/framework/extensions/clusters"
 	"github.com/rancher/rancher/tests/framework/extensions/namespaces"
+	"github.com/rancher/rancher/tests/framework/extensions/workloads"
 	"github.com/rancher/rancher/tests/framework/pkg/session"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -205,6 +206,18 @@ func (g *GateKeeperTestSuite) TestUpGradeGatekeeperChart() {
 	// Compare rancher-gatekeeper versions
 	chartVersionPostUpgrade := gatekeeperChartPostUpgrade.ChartDetails.Spec.Chart.Metadata.Version
 	require.Equal(g.T(), g.gatekeeperChartInstallOptions.Version, chartVersionPostUpgrade)
+}
+
+func (g *GateKeeperTestSuite) TestVerifyNoPendingHelmOp() {
+	subSession := g.session.NewSession()
+	defer subSession.Cleanup()
+
+	client, err := g.client.WithSession(subSession)
+	require.NoError(g.T(), err)
+
+	g.T().Log("Asserting that all helm-operation-xxxx pods terminated")
+	done := workloads.WaitPodTerminated(client, g.project.ClusterID, "helm-operation-")
+	require.True(g.T(), done)
 }
 
 func TestGateKeeperTestSuite(t *testing.T) {
