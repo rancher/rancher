@@ -161,10 +161,3 @@ postDelete:
 
 # Set a bootstrap password. If leave empty, a random password will be generated.
 bootstrapPassword: ""
-
-livenessProbe:
-  initialDelaySeconds: 60
-  periodSeconds: 30
-readinessProbe:
-  initialDelaySeconds: 5
-  periodSeconds: 30
