@@ -186,18 +186,41 @@ For custom clusters, the below config is needed, only AWS/EC2 will work.
 **Ensure you have nodeProviders in provisioningInput**
 
 ```json
- "awsEC2Config": {
+{
+  "awsEC2Configs": {
     "region": "us-east-2",
-    "instanceType": "t3a.medium",
-    "awsRegionAZ": "",
-    "awsAMI": "",
-    "awsSecurityGroups": [""],
-    "awsAccessKeyID": "",
     "awsSecretAccessKey": "",
-    "awsSSHKeyName": "",
-    "awsCICDInstanceTag": "",
-    "awsIAMProfile": "",
-    "awsUser": "ubuntu",
-    "volumeSize": 50
-  },
+    "awsAccessKeyID": "",
+    "awsEC2Config": [
+      {
+        "instanceType": "t3a.medium",
+        "awsRegionAZ": "",
+        "awsAMI": "",
+        "awsSecurityGroups": [
+          ""
+        ],
+        "awsSSHKeyName": "",
+        "awsCICDInstanceTag": "rancher-validation",
+        "awsIAMProfile": "",
+        "awsUser": "ubuntu",
+        "volumeSize": 25,
+        "isWindows": false
+      },
+      {
+        "instanceType": "t3a.xlarge",
+        "awsRegionAZ": "",
+        "awsAMI": "",
+        "awsSecurityGroups": [
+          ""
+        ],
+        "awsSSHKeyName": "",
+        "awsCICDInstanceTag": "rancher-validation",
+        "awsIAMProfile": "",
+        "awsUser": "Administrator",
+        "volumeSize": 50,
+        "isWindows": true
+      }
+    ]
+  }
+}
 ```
