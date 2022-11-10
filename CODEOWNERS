@@ -1,0 +1,6 @@
+.drone.yml @phillipsj @rosskirkpat @superseb
+*_windows.go @phillipsj @rosskirkpat
+/package/windows/  @phillipsj @rosskirkpat
+/scripts/windows/  @phillipsj @rosskirkpat
+Dockerfile-windows.dapper  @phillipsj @rosskirkpat
+/scripts/provisioning-test* @Oats87 @rosskirkpat
