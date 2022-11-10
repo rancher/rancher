@@ -6,6 +6,7 @@ import (
 
 	v1 "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
+	"github.com/rancher/rancher/tests/framework/clients/rancher/catalog"
 	stevev1 "github.com/rancher/rancher/tests/framework/clients/rancher/v1"
 	"github.com/rancher/rancher/tests/framework/pkg/session"
 	"github.com/stretchr/testify/assert"
@@ -16,8 +17,6 @@ import (
 )
 
 const (
-	ClusterRepoType = "catalog.cattle.io.clusterrepo"
-
 	HTTPClusterRepoName = "test-http-cluster-repo"
 	LatestHTTPRepoURL   = "https://releases.rancher.com/server-charts/latest"
 	StableHTTPRepoURL   = "https://releases.rancher.com/server-charts/stable"
@@ -91,7 +90,7 @@ func (c *ClusterRepoTestSuite) testClusterRepo(params ClusterRepoParams) {
 	// Create a ClusterRepo
 	cr := v1.NewClusterRepo("", params.Name, v1.ClusterRepo{})
 	setClusterRepoURL(&cr.Spec, params.Type, params.URL1)
-	_, err := c.client.Steve.SteveType(ClusterRepoType).Create(cr)
+	_, err := c.client.Steve.SteveType(catalog.ClusterRepoSteveResourceType).Create(cr)
 	require.NoError(c.T(), err)
 	time.Sleep(1 * time.Second)
 
@@ -111,7 +110,7 @@ func (c *ClusterRepoTestSuite) testClusterRepo(params ClusterRepoParams) {
 	setClusterRepoURL(spec, params.Type, params.URL2)
 	clusterRepoUpdated := *clusterRepo
 	clusterRepoUpdated.Spec = spec
-	_, err = c.client.Steve.SteveType(ClusterRepoType).Replace(&clusterRepoUpdated)
+	_, err = c.client.Steve.SteveType(catalog.ClusterRepoSteveResourceType).Replace(&clusterRepoUpdated)
 	require.NoError(c.T(), err)
 	time.Sleep(1 * time.Second)
 
@@ -123,10 +122,10 @@ func (c *ClusterRepoTestSuite) testClusterRepo(params ClusterRepoParams) {
 	assert.Greater(c.T(), status.ObservedGeneration, observedGeneration)
 
 	// Validate deleting the ClusterRepo
-	err = c.client.Steve.SteveType(ClusterRepoType).Delete(clusterRepo)
+	err = c.client.Steve.SteveType(catalog.ClusterRepoSteveResourceType).Delete(clusterRepo)
 	require.NoError(c.T(), err)
 
-	_, err = c.client.Steve.SteveType(ClusterRepoType).ByID(params.Name)
+	_, err = c.client.Steve.SteveType(catalog.ClusterRepoSteveResourceType).ByID(params.Name)
 	require.Error(c.T(), err)
 }
 
@@ -134,7 +133,7 @@ func (c *ClusterRepoTestSuite) testClusterRepo(params ClusterRepoParams) {
 func (c *ClusterRepoTestSuite) pollUntilDownloaded(ClusterRepoName string, prevDownloadTime metav1.Time) (*stevev1.SteveAPIObject, error) {
 	var clusterRepo *stevev1.SteveAPIObject
 	err := wait.Poll(PollInterval, PollTimeout, func() (done bool, err error) {
-		clusterRepo, err = c.client.Steve.SteveType(ClusterRepoType).ByID(ClusterRepoName)
+		clusterRepo, err = c.client.Steve.SteveType(catalog.ClusterRepoSteveResourceType).ByID(ClusterRepoName)
 		status := c.getStatusFromClusterRepo(clusterRepo)
 		if clusterRepo.Name != ClusterRepoName {
 			return false, nil
