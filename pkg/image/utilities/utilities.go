@@ -625,12 +625,12 @@ for ($i = $args.Length; $i -ge 0; $i--)
             $target_registry = ($vals | Select-Object -First 1)
             $vals = $null
         }
-        '^(-o|--os-release-id)$' {
-            $os_release_id = ($vals | Select-Object -First 1)
-            $vals = $null
-        }
         '^(-s|--source-registry)$' {
             $source_registry = ($vals | Select-Object -First 1)
+            $vals = $null
+        }
+        '^(-o|--os-release-id)$' {
+            $os_release_id = ($vals | Select-Object -First 1)
             $vals = $null
         }
         '^(-h|--help)$' {
