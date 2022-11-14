@@ -36,16 +36,18 @@ func (t *TokenController) sync(key string, obj *v3.Token) (runtime.Object, error
 	// remove legacy finalizers
 	if obj.DeletionTimestamp != nil {
 		finalizers := obj.GetFinalizers()
+		newObj := obj.DeepCopy()
 		for i, finalizer := range finalizers {
 			if finalizer == "controller.cattle.io/cat-token-controller" {
 				finalizers = append(finalizers[:i], finalizers[i+1:]...)
-				newObj := obj.DeepCopy()
+				newObj = obj.DeepCopy()
 				newObj.SetFinalizers(finalizers)
 				var err error
-				obj, err = t.tokens.Update(newObj)
+				newObj, err = t.tokens.Update(newObj)
 				if err != nil {
-					return nil, err
+					return obj, err
 				}
+				obj = newObj
 				break
 			}
 		}
@@ -54,22 +56,24 @@ func (t *TokenController) sync(key string, obj *v3.Token) (runtime.Object, error
 	if obj.TTLMillis != 0 && obj.ExpiresAt == "" {
 		//compute and save expiresAt
 		newObj := obj.DeepCopy()
+		var err error
 		tokenUtil.SetTokenExpiresAt(newObj)
-		if _, err := t.tokens.Update(newObj); err != nil {
-			return nil, err
+		if newObj, err = t.tokens.Update(newObj); err != nil {
+			return obj, err
 		}
+		obj = newObj
 	}
 
 	// trigger corresponding UserAttribute resource to refresh if token potentially
 	// provides new information that is missing from the UserAttribute resource
 	refreshUserAttributes, err := t.userAttributesNeedsRefresh(obj.UserID)
 	if err != nil {
-		return nil, err
+		return obj, err
 	}
 
 	if refreshUserAttributes {
 		if err = t.triggerUserAttributesRefresh(obj.UserID); err != nil {
-			return nil, err
+			return obj, err
 		}
 	}
 
@@ -84,14 +88,15 @@ func (t *TokenController) sync(key string, obj *v3.Token) (runtime.Object, error
 		newObj := obj.DeepCopy()
 		err := tokenUtil.ConvertTokenKeyToHash(newObj)
 		if err != nil {
-			return nil, err
+			return obj, err
 		}
 		if _, err := t.tokens.Update(newObj); err != nil {
-			return nil, err
+			return obj, err
 		}
+		obj = newObj
 	}
 
-	return nil, nil
+	return obj, nil
 }
 
 func (t *TokenController) userAttributesNeedsRefresh(user string) (bool, error) {
