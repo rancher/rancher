@@ -163,7 +163,7 @@ RUN curl -sLf ${!TINI_URL} > /usr/bin/tini && \
 
 # Versions for UI, DASHBOARD and CLI will be the same as 2.6 until new releases are made to these
 ENV CATTLE_UI_VERSION 2.7.0-rc10
-ENV CATTLE_DASHBOARD_UI_VERSION v2.7.0-rc10
+ENV CATTLE_DASHBOARD_UI_VERSION v2.7.0
 ENV CATTLE_CLI_VERSION v2.7.0-rc1
 
 # Base UI brand used as a fallback env setting (not user facing) to indicate this is a non-prime install
