@@ -34,6 +34,7 @@ RESOURCE_DIR = os.path.join(os.path.dirname(os.path.realpath(__file__)),
                             'resource')
 SSH_KEY_DIR = os.path.join(os.path.dirname(os.path.realpath(__file__)),
                            '.ssh')
+RANCHER_SOURCE_REGISTRY = os.environ.get("RANCHER_SOURCE_REGISTRY", "")
 
 
 def test_deploy_bastion():
@@ -257,16 +258,17 @@ def add_rancher_images_to_private_registry(bastion_node, push_images=True):
             RANCHER_SERVER_VERSION)
     bastion_node.execute_command(get_images_command)
 
-    # Remove the "docker save" and "docker load" lines to save time
+    # comment out the "docker save" and "docker load" lines to save time
     edit_save_and_load_command = \
-        "sudo sed -i '58d' rancher-save-images.sh && " \
-        "sudo sed -i '76d' rancher-load-images.sh && " \
+        "sudo sed -i -e 's/docker save /# docker/g' rancher-save-images.sh && " \
+        "sudo sed -i -e 's/docker load /# docker/g' rancher-load-images.sh && " \
         "chmod +x rancher-save-images.sh && chmod +x rancher-load-images.sh"
     bastion_node.execute_command(edit_save_and_load_command)
 
     save_images_command = \
-        "./rancher-save-images.sh --image-list ./rancher-images.txt" \
-
+        "./rancher-save-images.sh --image-list ./rancher-images.txt" 
+    if len(RANCHER_SOURCE_REGISTRY) > 0:
+        save_images_command += " --source-registry {}".format(RANCHER_SOURCE_REGISTRY)
     save_res = bastion_node.execute_command(save_images_command)
 
     if push_images:
@@ -276,6 +278,8 @@ def add_rancher_images_to_private_registry(bastion_node, push_images=True):
             "--registry {}".format(
                 bastion_node.host_name, PRIVATE_REGISTRY_USERNAME,
                 PRIVATE_REGISTRY_PASSWORD, bastion_node.host_name)
+        if len(RANCHER_SOURCE_REGISTRY) > 0:
+                load_images_command += " --source-registry {}".format(RANCHER_SOURCE_REGISTRY)
         load_res = bastion_node.execute_command(load_images_command)
         print(load_res)
     else:
