@@ -257,10 +257,10 @@ def add_rancher_images_to_private_registry(bastion_node, push_images=True):
             RANCHER_SERVER_VERSION)
     bastion_node.execute_command(get_images_command)
 
-    # Remove the "docker save" and "docker load" lines to save time
+    # comment out the "docker save" and "docker load" lines to save time
     edit_save_and_load_command = \
-        "sudo sed -i '58d' rancher-save-images.sh && " \
-        "sudo sed -i '76d' rancher-load-images.sh && " \
+        "sudo sed -i -e 's/docker save /# docker/g' rancher-save-images.sh && " \
+        "sudo sed -i -e 's/docker load /# docker/g' rancher-load-images.sh && " \
         "chmod +x rancher-save-images.sh && chmod +x rancher-load-images.sh"
     bastion_node.execute_command(edit_save_and_load_command)
 
