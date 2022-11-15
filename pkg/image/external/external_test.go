@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/rancher/rancher/pkg/image"
 	"github.com/rancher/rancher/pkg/settings"
 
 	"github.com/coreos/go-semver/semver"
@@ -116,7 +117,7 @@ func TestGetExternalImages(t *testing.T) {
 			}
 			systemAgentInstallerImage := fmt.Sprintf("%s%s:%s", settings.SystemAgentInstallerImage.Default, tt.args.source, strings.ReplaceAll(tt.args.version, "+", "-"))
 
-			got, err := GetExternalImages(tt.args.rancherVersion, tt.args.externalData, tt.args.source, tt.args.minimumKubernetesVersion)
+			got, err := GetExternalImages(tt.args.rancherVersion, tt.args.externalData, tt.args.source, tt.args.minimumKubernetesVersion, image.Linux)
 			if err != nil {
 				a.Equal(tt.wantErr, true, "GetExternalImages() errored as expected")
 			}
@@ -201,6 +202,7 @@ func Test_downloadExternalSupportingImages(t *testing.T) {
 	type args struct {
 		release string
 		source  Source
+		os      image.OSType
 		image1  string
 		image2  string
 		image3  string
@@ -217,6 +219,7 @@ func Test_downloadExternalSupportingImages(t *testing.T) {
 			args: args{
 				release: k3sWebVersion,
 				source:  k3s,
+				os:      image.Linux,
 				image1:  "rancher/klipper-lb:v0.3.5",
 				image2:  "rancher/mirrored-pause:3.6",
 				image3:  "rancher/mirrored-coredns-coredns:1.9.1",
@@ -224,14 +227,23 @@ func Test_downloadExternalSupportingImages(t *testing.T) {
 			},
 		},
 		{
-			name: "rke2-images",
+			name: "rke2-images-linux",
 			args: args{
 				release: rke2WebVersion,
 				source:  rke2,
+				os:      image.Linux,
 				image1:  "rancher/harvester-csi-driver:v0.1.3",
 				image2:  "rancher/rke2-runtime:v1.23.6-rke2r1",
-				image3:  "rancher/rke2-runtime:v1.23.6-rke2r1-windows-amd64",
-				image4:  "rancher/rke2-cloud-provider:v0.0.3-build20211118",
+				image3:  "rancher/rke2-cloud-provider:v0.0.3-build20211118",
+			},
+		},
+		{
+			name: "rke2-images-windows",
+			args: args{
+				release: rke2WebVersion,
+				source:  rke2,
+				os:      image.Windows,
+				image1:  "rancher/rke2-runtime:v1.23.6-rke2r1-windows-amd64",
 			},
 		},
 	}
@@ -239,7 +251,7 @@ func Test_downloadExternalSupportingImages(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			a := assert.New(t)
 
-			got, err := downloadExternalSupportingImages(url.QueryEscape(tt.args.release), tt.args.source)
+			got, err := downloadExternalSupportingImages(url.QueryEscape(tt.args.release), tt.args.source, tt.args.os)
 			if err != nil {
 				t.Errorf("downloadExternalSupportingImages() error = %v, wantErr %v", err, tt.wantErr)
 			}
