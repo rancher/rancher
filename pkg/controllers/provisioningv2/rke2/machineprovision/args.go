@@ -64,27 +64,27 @@ type driverArgs struct {
 	BackoffLimit        int32
 }
 
-func (h *handler) getArgsEnvAndStatus(infraObj *infraObject, args map[string]interface{}, driver string, create bool) (driverArgs, error) {
+func (h *handler) getArgsEnvAndStatus(infra *infraObject, args map[string]interface{}, driver string, create bool) (driverArgs, error) {
 	var (
 		url, hash, cloudCredentialSecretName string
 		jobBackoffLimit                      int32
 		filesSecret                          *corev1.Secret
 	)
 
-	if infraObj.data.String("spec", "providerID") != "" && !infraObj.data.Bool("status", "jobComplete") {
+	if infra.data.String("spec", "providerID") != "" && !infra.data.Bool("status", "jobComplete") {
 		// If the providerID is set, but jobComplete is false, then we need to re-enqueue the job so the proper status is set from that handler.
-		job, err := h.getJobFromInfraMachine(infraObj)
+		job, err := h.getJobFromInfraMachine(infra)
 		if err != nil {
 			return driverArgs{}, err
 		}
-		h.jobController.Enqueue(infraObj.meta.GetNamespace(), job.Name)
+		h.jobController.Enqueue(infra.meta.GetNamespace(), job.Name)
 		return driverArgs{}, generic.ErrSkip
 	}
 
 	nd, err := h.nodeDriverCache.Get(driver)
 	if !create && apierror.IsNotFound(err) {
-		url = infraObj.data.String("status", "driverURL")
-		hash = infraObj.data.String("status", "driverHash")
+		url = infra.data.String("status", "driverURL")
+		hash = infra.data.String("status", "driverHash")
 	} else if err != nil {
 		return driverArgs{}, err
 	} else if !strings.HasPrefix(nd.Spec.URL, "local://") {
@@ -96,17 +96,17 @@ func (h *handler) getArgsEnvAndStatus(infraObj *infraObject, args map[string]int
 
 	envSecret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      name2.SafeConcatName(infraObj.meta.GetName(), "machine", "driver", "secret"),
-			Namespace: infraObj.meta.GetNamespace(),
+			Name:      name2.SafeConcatName(infra.meta.GetName(), "machine", "driver", "secret"),
+			Namespace: infra.meta.GetNamespace(),
 		},
 		Data: getWhitelistedEnvVars(),
 	}
-	machine, err := rke2.GetMachineByOwner(h.machines, infraObj.meta)
+	machine, err := rke2.GetMachineByOwner(h.machineCache, infra.meta)
 	if err != nil && (create || !errors.Is(err, rke2.ErrNoMachineOwnerRef)) {
 		return driverArgs{}, err
 	}
 
-	bootstrapName, cloudCredentialSecretName, secrets, err := h.getSecretData(machine, infraObj.data, create)
+	bootstrapName, cloudCredentialSecretName, secrets, err := h.getSecretData(machine, infra.data, create)
 	if err != nil {
 		return driverArgs{}, err
 	}
@@ -120,12 +120,12 @@ func (h *handler) getArgsEnvAndStatus(infraObj *infraObject, args map[string]int
 		k := strings.ToUpper(envName + "_" + regExHyphen.ReplaceAllString(k, "${1}_${2}"))
 		envSecret.Data[k] = []byte(v)
 	}
-	secretName := rke2.MachineStateSecretName(infraObj.meta.GetName())
+	secretName := rke2.MachineStateSecretName(infra.meta.GetName())
 
 	cmd := []string{
 		fmt.Sprintf("--driver-download-url=%s", url),
 		fmt.Sprintf("--driver-hash=%s", hash),
-		fmt.Sprintf("--secret-namespace=%s", infraObj.meta.GetNamespace()),
+		fmt.Sprintf("--secret-namespace=%s", infra.meta.GetNamespace()),
 		fmt.Sprintf("--secret-name=%s", secretName),
 	}
 
@@ -134,7 +134,7 @@ func (h *handler) getArgsEnvAndStatus(infraObj *infraObject, args map[string]int
 			fmt.Sprintf("--driver=%s", driver),
 			fmt.Sprintf("--custom-install-script=/run/secrets/machine/value"))
 
-		rancherCluster, err := h.rancherClusterCache.Get(infraObj.meta.GetNamespace(), infraObj.meta.GetLabels()[capi.ClusterLabelName])
+		rancherCluster, err := h.rancherClusterCache.Get(infra.meta.GetNamespace(), infra.meta.GetLabels()[capi.ClusterLabelName])
 		if err != nil {
 			return driverArgs{}, err
 		}
@@ -147,21 +147,21 @@ func (h *handler) getArgsEnvAndStatus(infraObj *infraObject, args map[string]int
 		jobBackoffLimit = 3
 	}
 
-	certsSecret, err := h.constructCertsSecret(infraObj.meta.GetName(), infraObj.meta.GetNamespace())
+	certsSecret, err := h.constructCertsSecret(infra.meta.GetName(), infra.meta.GetNamespace())
 	if err != nil {
 		return driverArgs{}, err
 	}
 
 	// cloud-init will split the hostname on '.' and set the hostname to the first chunk. This causes an issue where all
 	// nodes in a machine pool may have the same node name in Kubernetes. Converting the '.' to '-' here prevents this.
-	cmd = append(cmd, strings.ReplaceAll(infraObj.meta.GetName(), ".", "-"))
+	cmd = append(cmd, strings.ReplaceAll(infra.meta.GetName(), ".", "-"))
 
 	return driverArgs{
 		DriverName:          driver,
 		CapiMachineName:     machine.Name,
-		MachineName:         infraObj.meta.GetName(),
-		MachineNamespace:    infraObj.meta.GetNamespace(),
-		MachineGVK:          infraObj.obj.GetObjectKind().GroupVersionKind(),
+		MachineName:         infra.meta.GetName(),
+		MachineNamespace:    infra.meta.GetNamespace(),
+		MachineGVK:          infra.obj.GetObjectKind().GroupVersionKind(),
 		ImageName:           settings.PrefixPrivateRegistry(settings.MachineProvisionImage.Get()),
 		ImagePullPolicy:     corev1.PullAlways,
 		EnvSecret:           envSecret,
@@ -173,7 +173,7 @@ func (h *handler) getArgsEnvAndStatus(infraObj *infraObject, args map[string]int
 		Args:                cmd,
 		BackoffLimit:        jobBackoffLimit,
 		RKEMachineStatus: rkev1.RKEMachineStatus{
-			Ready:                     infraObj.data.String("spec", "providerID") != "" && infraObj.data.Bool("status", "jobComplete"),
+			Ready:                     infra.data.String("spec", "providerID") != "" && infra.data.Bool("status", "jobComplete"),
 			DriverHash:                hash,
 			DriverURL:                 url,
 			CloudCredentialSecretName: cloudCredentialSecretName,
