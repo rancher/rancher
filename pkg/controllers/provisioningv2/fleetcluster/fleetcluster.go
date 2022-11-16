@@ -11,7 +11,7 @@ import (
 	fleetconst "github.com/rancher/rancher/pkg/fleet"
 	fleetcontrollers "github.com/rancher/rancher/pkg/generated/controllers/fleet.cattle.io/v1alpha1"
 	mgmtcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
-	rocontrollers "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
+	provcontrollers "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/provisioningv2/image"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/wrangler"
@@ -43,7 +43,7 @@ func Register(ctx context.Context, clients *wrangler.Context) {
 		apply:         clients.Apply.WithCacheTypes(clients.Provisioning.Cluster()),
 	}
 
-	rocontrollers.RegisterClusterGeneratingHandler(ctx,
+	provcontrollers.RegisterClusterGeneratingHandler(ctx,
 		clients.Provisioning.Cluster(),
 		clients.Apply.
 			WithCacheTypes(clients.Fleet.Cluster(),

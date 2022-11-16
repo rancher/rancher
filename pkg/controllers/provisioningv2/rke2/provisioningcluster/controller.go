@@ -15,7 +15,7 @@ import (
 	"github.com/rancher/rancher/pkg/features"
 	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta1"
 	mgmtcontroller "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
-	rocontrollers "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
+	provcontrollers "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
 	rkecontroller "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/rancher/wrangler/pkg/condition"
@@ -43,8 +43,8 @@ const (
 type handler struct {
 	dynamic           *dynamic.Controller
 	dynamicSchema     mgmtcontroller.DynamicSchemaCache
-	clusterCache      rocontrollers.ClusterCache
-	clusterController rocontrollers.ClusterController
+	clusterCache      provcontrollers.ClusterCache
+	clusterController provcontrollers.ClusterController
 	secretCache       corecontrollers.SecretCache
 	secretClient      corecontrollers.SecretClient
 	capiClusters      capicontrollers.ClusterCache
@@ -77,7 +77,7 @@ func Register(ctx context.Context, clients *wrangler.Context) {
 	clients.Dynamic.OnChange(ctx, "rke-dynamic", matchRKENodeGroup, h.infraWatch)
 	clients.Provisioning.Cluster().Cache().AddIndexer(byNodeInfra, byNodeInfraIndex)
 
-	rocontrollers.RegisterClusterGeneratingHandler(ctx,
+	provcontrollers.RegisterClusterGeneratingHandler(ctx,
 		clients.Provisioning.Cluster(),
 		clients.Apply.
 			// Because capi wants to own objects we don't set ownerreference with apply

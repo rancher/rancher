@@ -13,7 +13,7 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2/etcdmgmt"
 	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta1"
 	mgmtcontroller "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
-	rocontrollers "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
+	provcontrollers "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
 	rkecontroller "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/provisioningv2/kubeconfig"
 	"github.com/rancher/rancher/pkg/taints"
@@ -64,7 +64,7 @@ type handler struct {
 	capiClusterCache  capicontrollers.ClusterCache
 	machineCache      capicontrollers.MachineCache
 	machineClient     capicontrollers.MachineClient
-	clusterCache      rocontrollers.ClusterCache
+	clusterCache      provcontrollers.ClusterCache
 	secrets           corecontrollers.SecretClient
 	apply             apply.Apply
 }

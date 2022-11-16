@@ -13,7 +13,7 @@ import (
 	rancherv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	fleetconst "github.com/rancher/rancher/pkg/fleet"
 	v3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
-	rocontrollers "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
+	provcontrollers "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
 	namespaces "github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/provisioningv2/image"
 	"github.com/rancher/rancher/pkg/settings"
@@ -42,7 +42,7 @@ func Register(ctx context.Context, clients *wrangler.Context) {
 	h := &handler{
 		clusterRegistrationTokens: clients.Mgmt.ClusterRegistrationToken().Cache(),
 	}
-	rocontrollers.RegisterClusterGeneratingHandler(ctx, clients.Provisioning.Cluster(),
+	provcontrollers.RegisterClusterGeneratingHandler(ctx, clients.Provisioning.Cluster(),
 		clients.Apply.
 			WithSetOwnerReference(false, false).
 			WithCacheTypes(clients.Fleet.Bundle(),
@@ -53,7 +53,7 @@ func Register(ctx context.Context, clients *wrangler.Context) {
 		"", "manage-system-agent", h.OnChange, &generic.GeneratingHandlerOptions{
 			AllowCrossNamespace: true,
 		})
-	rocontrollers.RegisterClusterGeneratingHandler(ctx, clients.Provisioning.Cluster(),
+	provcontrollers.RegisterClusterGeneratingHandler(ctx, clients.Provisioning.Cluster(),
 		clients.Apply.
 			WithSetOwnerReference(false, false).
 			WithCacheTypes(clients.Mgmt.ManagedChart(),

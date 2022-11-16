@@ -12,7 +12,7 @@ import (
 	fleetconst "github.com/rancher/rancher/pkg/fleet"
 	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta1"
 	mgmtcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
-	rocontrollers "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
+	provcontrollers "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
 	rkecontrollers "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/provisioningv2/image"
 	"github.com/rancher/rancher/pkg/provisioningv2/kubeconfig"
@@ -55,8 +55,8 @@ type handler struct {
 	clusterTokens         mgmtcontrollers.ClusterRegistrationTokenClient
 	featureCache          mgmtcontrollers.FeatureCache
 	featureClient         mgmtcontrollers.FeatureClient
-	clusters              rocontrollers.ClusterController
-	clusterCache          rocontrollers.ClusterCache
+	clusters              provcontrollers.ClusterController
+	clusterCache          provcontrollers.ClusterCache
 	rkeControlPlanes      rkecontrollers.RKEControlPlaneClient
 	rkeControlPlanesCache rkecontrollers.RKEControlPlaneCache
 	secretCache           corecontrollers.SecretCache
@@ -117,7 +117,7 @@ func Register(
 
 	// Register a generating handler in order to generate clusters.management.cattle.io/v3 objects based on
 	// clusters.provisioning.cattle.io/v1 objects.
-	rocontrollers.RegisterClusterGeneratingHandler(ctx,
+	provcontrollers.RegisterClusterGeneratingHandler(ctx,
 		clients.Provisioning.Cluster(),
 		clusterCreateApply,
 		"Created",
