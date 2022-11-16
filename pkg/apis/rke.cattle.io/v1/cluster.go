@@ -3,6 +3,7 @@ package v1
 import (
 	"github.com/rancher/wrangler/pkg/genericcondition"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 )
 
 // +genclient
@@ -46,7 +47,7 @@ type RKESystemConfig struct {
 
 type RKEClusterSpec struct {
 	// Not used in anyway, just here to make cluster-api happy
-	ControlPlaneEndpoint *Endpoint `json:"controlPlaneEndpoint,omitempty"`
+	ControlPlaneEndpoint *capi.APIEndpoint `json:"controlPlaneEndpoint,omitempty"`
 }
 
 type ClusterUpgradeStrategy struct {
@@ -94,9 +95,4 @@ type DrainHook struct {
 	// "rke.cattle.io/pre-drain" before the planner will continue with drain the specific node.  The annotation
 	// "rke.cattle.io/pre-drain" is used for pre-drain and "rke.cattle.io/post-drain" is used for post drain.
 	Annotation string `json:"annotation,omitempty"`
-}
-
-type Endpoint struct {
-	Host string `json:"host,omitempty"`
-	Port int    `json:"port,omitempty"`
 }
