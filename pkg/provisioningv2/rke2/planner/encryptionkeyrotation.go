@@ -174,6 +174,10 @@ func (p *Planner) rotateEncryptionKeys(cp *rkev1.RKEControlPlane, releaseData *m
 		return p.setEncryptionKeyRotateState(cp, cp.Spec.RotateEncryptionKeys, rkev1.RotateEncryptionKeysPhasePrepare)
 	}
 
+	if err := p.toggleHealthChecksForCluster(cp, true); err != nil {
+		return err
+	}
+
 	leader, err := p.encryptionKeyRotationElectLeader(cp, clusterPlan)
 	if err != nil {
 		return err
@@ -215,6 +219,9 @@ func (p *Planner) rotateEncryptionKeys(cp *rkev1.RKEControlPlane, releaseData *m
 	case rkev1.RotateEncryptionKeysPhasePostReencryptRestart:
 		err = p.encryptionKeyRotationRestartNodes(cp, clusterPlan, leader)
 		if err != nil {
+			return err
+		}
+		if err = p.toggleHealthChecksForCluster(cp, true); err != nil {
 			return err
 		}
 		return p.setEncryptionKeyRotateState(cp, cp.Spec.RotateEncryptionKeys, rkev1.RotateEncryptionKeysPhaseDone)

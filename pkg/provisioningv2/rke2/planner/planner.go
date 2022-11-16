@@ -1180,3 +1180,22 @@ func isErrWaiting(err error) bool {
 	var errWaiting ErrWaiting
 	return errors.As(err, &errWaiting)
 }
+
+func (p *Planner) toggleHealthChecksForCluster(cp *rkev1.RKEControlPlane, pause bool) error {
+	if cp == nil {
+		return fmt.Errorf("cannot toggle health checks for nil controlplane")
+	}
+	cluster, err := rke2.FindOwnerCAPICluster(cp, p.capiClusters)
+	if err != nil {
+		return err
+	}
+	if cluster == nil {
+		return fmt.Errorf("CAPI cluster does not exist for %s/%s", cp.Namespace, cp.Name)
+	}
+	if cluster.Spec.Paused == pause {
+		return nil
+	}
+	cluster.Spec.Paused = pause
+	_, err = p.capiClient.Update(cluster)
+	return err
+}
