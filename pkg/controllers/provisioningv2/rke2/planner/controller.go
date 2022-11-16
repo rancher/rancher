@@ -51,19 +51,19 @@ func Register(ctx context.Context, clients *wrangler.Context, planner *planner.P
 	}, clients.RKE.RKEControlPlane(), clients.Core.Secret(), clients.CAPI.Machine())
 }
 
-func (h *handler) OnChange(cluster *rkev1.RKEControlPlane, status rkev1.RKEControlPlaneStatus) (rkev1.RKEControlPlaneStatus, error) {
-	logrus.Debugf("[planner] rkecluster %s/%s: handler OnChange called", cluster.Namespace, cluster.Name)
-	if !cluster.DeletionTimestamp.IsZero() {
+func (h *handler) OnChange(cp *rkev1.RKEControlPlane, status rkev1.RKEControlPlaneStatus) (rkev1.RKEControlPlaneStatus, error) {
+	logrus.Debugf("[planner] rkecluster %s/%s: handler OnChange called", cp.Namespace, cp.Name)
+	if !cp.DeletionTimestamp.IsZero() {
 		return status, nil
 	}
 
-	status.ObservedGeneration = cluster.Generation
+	status.ObservedGeneration = cp.Generation
 
-	logrus.Debugf("[planner] rkecluster %s/%s: calling planner process", cluster.Namespace, cluster.Name)
-	err := h.planner.Process(cluster)
+	logrus.Debugf("[planner] rkecluster %s/%s: calling planner process", cp.Namespace, cp.Name)
+	err := h.planner.Process(cp)
 	var errWaiting planner.ErrWaiting
 	if errors.As(err, &errWaiting) {
-		logrus.Infof("[planner] rkecluster %s/%s: waiting: %v", cluster.Namespace, cluster.Name, err)
+		logrus.Infof("[planner] rkecluster %s/%s: waiting: %v", cp.Namespace, cp.Name, err)
 		rke2.Ready.SetStatus(&status, "Unknown")
 		rke2.Ready.Message(&status, err.Error())
 		rke2.Ready.Reason(&status, "Waiting")
@@ -76,12 +76,12 @@ func (h *handler) OnChange(cluster *rkev1.RKEControlPlane, status rkev1.RKEContr
 			// because we don't register this handler with an associated condition. This is pretty much a bug in the
 			// framework but it's too impactful to change right before 2.6.0 so we should consider changing this later.
 			// If you are reading this years later we'll just assume we decided not to change the framework.
-			logrus.Errorf("[planner] rkecluster %s/%s: error encountered during plan processing was %v", cluster.Namespace, cluster.Name, err)
-			h.controlPlanes.EnqueueAfter(cluster.Namespace, cluster.Name, 5*time.Second)
+			logrus.Errorf("[planner] rkecluster %s/%s: error encountered during plan processing was %v", cp.Namespace, cp.Name, err)
+			h.controlPlanes.EnqueueAfter(cp.Namespace, cp.Name, 5*time.Second)
 		}
 	} else {
-		logrus.Debugf("[planner] rkecluster %s/%s: objects changed, waiting for cache sync before finishing reconciliation", cluster.Namespace, cluster.Name)
+		logrus.Debugf("[planner] rkecluster %s/%s: objects changed, waiting for cache sync before finishing reconciliation", cp.Namespace, cp.Name)
 	}
-	logrus.Debugf("[planner] rkecluster %s/%s: reconciliation complete", cluster.Namespace, cluster.Name)
+	logrus.Debugf("[planner] rkecluster %s/%s: reconciliation complete", cp.Namespace, cp.Name)
 	return status, nil
 }
