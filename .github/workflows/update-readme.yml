@@ -18,10 +18,15 @@ jobs:
     - name: Update README file
       run: |
        tmpfile=$(mktemp)
+       latest27=$(yq  '.entries.rancher[].appVersion | select(test("^v2.7") and select(. != "*-rc*"))' 'latest.index.yaml' | head -1)
+       stable27=$(yq  '.entries.rancher[].appVersion | select(test("^v2.7") and select(. != "*-rc*"))' 'stable.index.yaml' | head -1)
        latest26=$(yq  '.entries.rancher[].appVersion | select(test("^v2.6") and select(. != "*-rc*"))' 'latest.index.yaml' | head -1)
        stable26=$(yq  '.entries.rancher[].appVersion | select(test("^v2.6") and select(. != "*-rc*"))' 'stable.index.yaml' | head -1)
        latest25=$(yq  '.entries.rancher[].appVersion | select(test("^v2.5") and select(. != "*-rc*"))' 'latest.index.yaml' | head -1)
        stable25=$(yq  '.entries.rancher[].appVersion | select(test("^v2.5") and select(. != "*-rc*"))' 'stable.index.yaml' | head -1)
+       echo "* v2.7" > $tmpfile
+       echo "  * Latest - ${latest27} - \`rancher/rancher:${latest27}\` / \`rancher/rancher:latest\` - Read the full release [notes](https://github.com/rancher/rancher/releases/tag/${latest27})." >> $tmpfile
+       echo "  * Stable - ${stable27} - \`rancher/rancher:${stable27}\` / \`rancher/rancher:stable\` - Read the full release [notes](https://github.com/rancher/rancher/releases/tag/${stable27})." >> $tmpfile
        echo "* v2.6" > $tmpfile
        echo "  * Latest - ${latest26} - \`rancher/rancher:${latest26}\` / \`rancher/rancher:latest\` - Read the full release [notes](https://github.com/rancher/rancher/releases/tag/${latest26})." >> $tmpfile
        echo "  * Stable - ${stable26} - \`rancher/rancher:${stable26}\` / \`rancher/rancher:stable\` - Read the full release [notes](https://github.com/rancher/rancher/releases/tag/${stable26})." >> $tmpfile
