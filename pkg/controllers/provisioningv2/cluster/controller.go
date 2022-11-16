@@ -171,13 +171,8 @@ func (h *handler) clusterWatch(namespace, name string, obj runtime.Object) ([]re
 // isLegacyCluster returns true if the cluster name for a clusters.provisioning.cattle.io/v1 or
 // clusters.management.cattle.io/v3 cluster name matches the regex for a legacy cluster (c-XXXXX|local) where XXXXX is a
 // random string of characters.
-func (h *handler) isLegacyCluster(cluster interface{}) bool {
-	if c, ok := cluster.(*v3.Cluster); ok {
-		return mgmtNameRegexp.MatchString(c.Name)
-	} else if c, ok := cluster.(*v1.Cluster); ok {
-		return mgmtNameRegexp.MatchString(c.Name)
-	}
-	return false
+func isLegacyCluster(name string) bool {
+	return mgmtNameRegexp.MatchString(name)
 }
 
 // generateProvisioningClusterFromLegacyCluster will generate a clusters.provisioning.cattle.io/v1 object with a passed
@@ -185,7 +180,7 @@ func (h *handler) isLegacyCluster(cluster interface{}) bool {
 // cluster FleetWorkspaceName is empty or if the cluster name does not match (c-XXXXX|local) where XXXXX is a random
 // string of characters.
 func (h *handler) generateProvisioningClusterFromLegacyCluster(cluster *v3.Cluster, status v3.ClusterStatus) ([]runtime.Object, v3.ClusterStatus, error) {
-	if !h.isLegacyCluster(cluster) || cluster.Spec.FleetWorkspaceName == "" {
+	if !isLegacyCluster(cluster.Name) || cluster.Spec.FleetWorkspaceName == "" {
 		return nil, status, nil
 	}
 	return []runtime.Object{
@@ -256,7 +251,7 @@ func (h *handler) createToken(_ string, cluster *v3.Cluster) (*v3.Cluster, error
 }
 
 func (h *handler) createCluster(cluster *v1.Cluster, status v1.ClusterStatus, spec v3.ClusterSpec) ([]runtime.Object, v1.ClusterStatus, error) {
-	if h.isLegacyCluster(cluster) {
+	if isLegacyCluster(cluster.Name) {
 		mgmtCluster, err := h.mgmtClusterCache.Get(cluster.Name)
 		if err != nil {
 			return nil, status, err
@@ -453,7 +448,7 @@ func (h *handler) updateFeatureLockedValue(lockValueToTrue bool) error {
 		}
 
 		for _, cluster := range clusters {
-			if cluster.DeletionTimestamp.IsZero() && !h.isLegacyCluster(cluster) && cluster.Spec.RKEConfig != nil {
+			if cluster.DeletionTimestamp.IsZero() && !isLegacyCluster(cluster.Name) && cluster.Spec.RKEConfig != nil {
 				return nil
 			}
 		}

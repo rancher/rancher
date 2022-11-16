@@ -7,8 +7,8 @@ import (
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	v1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2"
+	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/wrangler/pkg/generic"
-	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -23,8 +23,8 @@ func (h *handler) OnMgmtClusterRemove(_ string, cluster *v3.Cluster) (*v3.Cluste
 
 	var legacyCluster bool
 	for _, provisioningCluster := range provisioningClusters {
-		legacyCluster = legacyCluster || h.isLegacyCluster(provisioningCluster)
-		if err := h.clusters.Delete(provisioningCluster.Namespace, provisioningCluster.Name, nil); err != nil {
+		legacyCluster = legacyCluster || isLegacyCluster(provisioningCluster.Name)
+		if err = h.clusters.Delete(provisioningCluster.Namespace, provisioningCluster.Name, nil); err != nil {
 			return nil, err
 		}
 	}
@@ -42,91 +42,114 @@ func (h *handler) OnMgmtClusterRemove(_ string, cluster *v3.Cluster) (*v3.Cluste
 }
 
 func (h *handler) OnClusterRemove(_ string, cluster *v1.Cluster) (*v1.Cluster, error) {
-	oldStatus := cluster.Status
 	cluster = cluster.DeepCopy()
 
-	err := rke2.DoRemoveAndUpdateStatus(cluster, h.doClusterRemove(cluster), h.clusters.EnqueueAfter)
+	if cluster.Status.ClusterName != "" {
+		mgmtCluster, err := h.mgmtClusters.Get(cluster.Status.ClusterName, metav1.GetOptions{})
+		if err != nil {
+			// We do nothing if the management cluster does not exist (IsNotFound) because it's been deleted.
+			if !apierrors.IsNotFound(err) {
+				return cluster, err
+			}
+		} else if cluster.Namespace == mgmtCluster.Spec.FleetWorkspaceName {
+			// We only delete the management cluster if its FleetWorkspaceName matches the provisioning cluster's
+			// namespace. The reason: if there's a mismatch, we know that the provisioning cluster needs to be migrated
+			// because the user moved the Fleet cluster (and provisioning cluster, by extension) to another
+			// FleetWorkspace. Ultimately, the aforementioned cluster objects are re-created in another namespace.
+			err = h.mgmtClusters.Delete(cluster.Status.ClusterName, nil)
+			if err != nil && !apierrors.IsNotFound(err) {
+				return cluster, err
+			}
 
-	if equality.Semantic.DeepEqual(oldStatus, cluster.Status) {
-		return cluster, err
-	}
-
-	cluster, updateErr := h.clusters.UpdateStatus(cluster)
-	if updateErr != nil {
-		return cluster, updateErr
-	}
-
-	return cluster, err
-}
-
-func (h *handler) doClusterRemove(cluster *v1.Cluster) func() (string, error) {
-	return func() (string, error) {
-		if cluster.Status.ClusterName != "" {
-			mgmtCluster, err := h.mgmtClusters.Get(cluster.Status.ClusterName, metav1.GetOptions{})
-			if err != nil {
-				// We do nothing if the management cluster does not exist (IsNotFound) because it's been deleted.
-				if !apierrors.IsNotFound(err) {
-					return "", err
-				}
-			} else if cluster.Namespace == mgmtCluster.Spec.FleetWorkspaceName {
-				// We only delete the management cluster if its FleetWorkspaceName matches the provisioning cluster's
-				// namespace. The reason: if there's a mismatch, we know that the provisioning cluster needs to be migrated
-				// because the user moved the Fleet cluster (and provisioning cluster, by extension) to another
-				// FleetWorkspace. Ultimately, the aforementioned cluster objects are re-created in another namespace.
-				err := h.mgmtClusters.Delete(cluster.Status.ClusterName, nil)
-				if err != nil && !apierrors.IsNotFound(err) {
-					return "", err
-				}
-
-				if h.isLegacyCluster(cluster) {
-					// If this is a legacy cluster (i.e. RKE1 cluster) then we should wait to remove the provisioning cluster until the v3.Cluster is gone.
-					_, err = h.mgmtClusterCache.Get(cluster.Status.ClusterName)
+			if isLegacyCluster(cluster.Name) {
+				// If this is a legacy cluster (i.e. RKE1 cluster) then we should wait to remove the provisioning cluster until the v3.Cluster is gone.
+				_, err = h.mgmtClusterCache.Get(cluster.Status.ClusterName)
+				if err != nil {
 					if !apierrors.IsNotFound(err) {
-						return fmt.Sprintf("waiting for cluster [%s] to delete", cluster.Status.ClusterName), nil
+						return cluster, err
 					}
+					return cluster, nil
 				} else {
-					if err = h.updateFeatureLockedValue(false); err != nil {
-						return "", err
+					rke2.Removed.SetStatus(cluster, "Unknown")
+					rke2.Removed.Reason(cluster, "Waiting")
+					rke2.Removed.Message(cluster, fmt.Sprintf("waiting for management cluster [%s] to delete", cluster.Status.ClusterName))
+					cluster, err = h.clusters.UpdateStatus(cluster)
+					if err != nil {
+						return cluster, err
 					}
+					return cluster, generic.ErrSkip
+				}
+			} else {
+				if err = h.updateFeatureLockedValue(false); err != nil {
+					return cluster, err
 				}
 			}
 		}
+	}
 
+	if !isLegacyCluster(cluster.Name) {
+		if !features.RKE2.Enabled() {
+			return cluster, fmt.Errorf("cannot delete cluster %s while %s is disabled", cluster.Name, features.RKE2.Name())
+		}
 		capiCluster, capiClusterErr := h.capiClustersCache.Get(cluster.Namespace, cluster.Name)
 		if capiClusterErr != nil && !apierrors.IsNotFound(capiClusterErr) {
-			return "", capiClusterErr
+			return cluster, capiClusterErr
 		}
 
 		if capiCluster != nil {
 			if capiCluster.DeletionTimestamp == nil {
 				// Deleting the CAPI cluster will start the process of deleting Machines, Bootstraps, etc.
-				if err := h.capiClusters.Delete(capiCluster.Namespace, capiCluster.Name, &metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
-					return "", err
+				err := h.capiClusters.Delete(capiCluster.Namespace, capiCluster.Name, &metav1.DeleteOptions{})
+				if err != nil && !apierrors.IsNotFound(err) {
+					return cluster, err
 				}
 			}
 
 			_, err := h.rkeControlPlanesCache.Get(cluster.Namespace, cluster.Name)
 			if err != nil && !apierrors.IsNotFound(err) {
-				return "", err
+				return cluster, err
 			} else if err == nil {
-				return "", generic.ErrSkip
+				return cluster, generic.ErrSkip
 			}
 		}
 
 		machines, err := h.capiMachinesCache.List(cluster.Namespace, labels.SelectorFromSet(labels.Set{capi.ClusterLabelName: cluster.Name}))
 		if err != nil {
-			return "", err
+			return cluster, err
 		}
 
 		// Machines will delete first so report their status, if any exist.
 		if len(machines) > 0 {
-			return rke2.GetMachineDeletionStatus(machines)
+			msg, err := rke2.GetMachineDeletionStatus(machines)
+			if err != nil {
+				return cluster, err
+			}
+			rke2.Removed.SetStatus(cluster, "Unknown")
+			rke2.Removed.Reason(cluster, "Waiting")
+			rke2.Removed.Message(cluster, msg)
+			cluster, err = h.clusters.UpdateStatus(cluster)
+			if err != nil {
+				return cluster, err
+			}
+			return cluster, generic.ErrSkip
 		}
 
 		if capiClusterErr == nil {
-			return fmt.Sprintf("waiting for cluster-api cluster [%s] to delete", cluster.Name), nil
+			rke2.Removed.SetStatus(cluster, "Unknown")
+			rke2.Removed.Reason(cluster, "Waiting")
+			rke2.Removed.Message(cluster, fmt.Sprintf("waiting for cluster-api cluster [%s] to delete", cluster.Name))
+			cluster, err = h.clusters.UpdateStatus(cluster)
+			if err != nil {
+				return cluster, err
+			}
+			return cluster, generic.ErrSkip
 		}
-
-		return "", h.kubeconfigManager.DeleteUser(cluster.Namespace, cluster.Name)
 	}
+
+	err := h.kubeconfigManager.DeleteUser(cluster.Namespace, cluster.Name)
+	if err != nil {
+		return cluster, err
+	}
+
+	return cluster, nil
 }
