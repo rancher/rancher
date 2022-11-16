@@ -2,9 +2,11 @@ package nodes
 
 import (
 	"io/ioutil"
+	"os"
 	"os/user"
 	"path/filepath"
 
+	"github.com/pkg/sftp"
 	"github.com/rancher/rancher/tests/framework/pkg/config"
 	"golang.org/x/crypto/ssh"
 )
@@ -34,6 +36,53 @@ type Node struct {
 // ExternalNodeConfig is a struct that is a collection of the node configurations
 type ExternalNodeConfig struct {
 	Nodes map[int][]*Node `json:"nodes" yaml:"nodes"`
+}
+
+func (n *Node) SCPFileToNode(localPath, remotePath string) error {
+	signer, err := ssh.ParsePrivateKey(n.SSHKey)
+
+	if err != nil {
+		return err
+	}
+
+	auths := []ssh.AuthMethod{ssh.PublicKeys([]ssh.Signer{signer}...)}
+
+	cfg := &ssh.ClientConfig{
+		User:            n.SSHUser,
+		Auth:            auths,
+		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+	}
+	cfg.SetDefaults()
+
+	client, err := ssh.Dial("tcp", n.PublicIPAddress+":22", cfg)
+	if err != nil {
+		return err
+	}
+	defer client.Close()
+
+	sftp, err := sftp.NewClient(client)
+	if err != nil {
+		return err
+	}
+	defer sftp.Close()
+
+	localFile, err := os.Open(localPath)
+	if err != nil {
+		return err
+	}
+	defer localFile.Close()
+
+	remoteFile, err := sftp.Create(remotePath)
+	if err != nil {
+		return err
+	}
+	defer remoteFile.Close()
+
+	if _, err := remoteFile.ReadFrom(localFile); err != nil {
+		return err
+	}
+
+	return err
 }
 
 // ExecuteCommand executes `command` in the specific node created.

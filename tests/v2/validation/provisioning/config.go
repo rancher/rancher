@@ -18,6 +18,7 @@ type Config struct {
 	CNIs               []string                 `json:"cni" yaml:"cni"`
 	Providers          []string                 `json:"providers" yaml:"providers"`
 	NodeProviders      []string                 `json:"nodeProviders" yaml:"nodeProviders"`
+	Hardened           bool                     `json:"hardened" yaml:"hardened"`
 }
 
 func AppendRandomString(baseClusterName string) string {

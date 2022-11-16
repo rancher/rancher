@@ -221,6 +221,37 @@ func NewK3SRKE2ClusterConfig(clusterName, namespace, cni, cloudCredentialSecretN
 	return v1Cluster
 }
 
+// HardenK3SRKE2ClusterConfig is a constructor for a apisV1.Cluster object, to be used by the rancher.Client.Provisioning client.
+func HardenK3SRKE2ClusterConfig(clusterName, namespace, cni, cloudCredentialSecretName, kubernetesVersion string, machinePools []apisV1.RKEMachinePool) *apisV1.Cluster {
+	v1Cluster := NewK3SRKE2ClusterConfig(clusterName, namespace, cni, cloudCredentialSecretName, kubernetesVersion, machinePools)
+
+	v1Cluster.Spec.RKEConfig.MachineGlobalConfig.Data["kube-apiserver-arg"] = []string{
+		"enable-admission-plugins=NodeRestriction,PodSecurityPolicy,ServiceAccount",
+		"audit-policy-file=/var/lib/rancher/k3s/server/audit.yaml",
+		"audit-log-path=/var/lib/rancher/k3s/server/logs/audit.log",
+		"audit-log-maxage=30",
+		"audit-log-maxbackup=10",
+		"audit-log-maxsize=100",
+		"request-timeout=300s",
+		"service-account-lookup=true",
+	}
+
+	v1Cluster.Spec.RKEConfig.MachineSelectorConfig = []rkev1.RKESystemConfig{
+		{
+			Config: rkev1.GenericMap{
+				Data: map[string]interface{}{
+					"kubelet-arg": []string{
+						"make-iptables-util-chains=true",
+					},
+					"protect-kernel-defaults": true,
+				},
+			},
+		},
+	}
+
+	return v1Cluster
+}
+
 // CreateRKE1Cluster is a "helper" functions that takes a rancher client, and the rke1 cluster config as parameters. This function
 // registers a delete cluster fuction with a wait.WatchWait to ensure the cluster is removed cleanly.
 func CreateRKE1Cluster(client *rancher.Client, rke1Cluster *management.Cluster) (*management.Cluster, error) {
@@ -337,6 +368,47 @@ func CreateK3SRKE2Cluster(client *rancher.Client, rke2Cluster *apisV1.Cluster) (
 			return false, nil
 		})
 	})
+
+	return cluster, nil
+}
+
+// UpdateK3SRKE2Cluster is a "helper" functions that takes a rancher client, old rke2/k3s cluster config, and the new rke2/k3s cluster config as parameters.
+func UpdateK3SRKE2Cluster(client *rancher.Client, cluster *v1.SteveAPIObject, updatedCluster *apisV1.Cluster) (*v1.SteveAPIObject, error) {
+	updateCluster, err := client.Steve.SteveType(ProvisioningSteveResouceType).ByID(cluster.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	updatedCluster.ObjectMeta.ResourceVersion = updateCluster.ObjectMeta.ResourceVersion
+
+	logrus.Infof("Applying cluster YAML hardening changes...")
+	cluster, err = client.Steve.SteveType(ProvisioningSteveResouceType).Update(cluster, updatedCluster)
+	if err != nil {
+		return nil, err
+	}
+
+	err = kwait.Poll(500*time.Millisecond, 5*time.Minute, func() (done bool, err error) {
+		client, err = client.ReLogin()
+		if err != nil {
+			return false, err
+		}
+
+		clusterResp, err := client.Steve.SteveType(ProvisioningSteveResouceType).ByID(cluster.ID)
+		if err != nil {
+			return false, err
+		}
+
+		if clusterResp.ObjectMeta.State.Name == "active" {
+			logrus.Infof("Cluster YAML has successfully been updated!")
+			return true, nil
+		} else {
+			return false, nil
+		}
+	})
+
+	if err != nil {
+		return nil, err
+	}
 
 	return cluster, nil
 }
