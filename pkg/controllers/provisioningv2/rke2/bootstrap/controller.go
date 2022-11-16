@@ -4,7 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/base64"
-	"errors"
+	"time"
 
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2"
@@ -20,12 +20,14 @@ import (
 	"github.com/rancher/wrangler/pkg/generic"
 	"github.com/rancher/wrangler/pkg/name"
 	"github.com/rancher/wrangler/pkg/relatedresource"
+	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
-	apierror "k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
+	capiannotations "sigs.k8s.io/cluster-api/util/annotations"
 )
 
 const (
@@ -37,10 +39,10 @@ type handler struct {
 	secretCache         corecontrollers.SecretCache
 	secretClient        corecontrollers.SecretClient
 	machineCache        capicontrollers.MachineCache
-	capiClusters        capicontrollers.ClusterCache
+	capiClusterCache    capicontrollers.ClusterCache
 	deploymentCache     appcontrollers.DeploymentCache
 	rkeControlPlanes    rkecontroller.RKEControlPlaneCache
-	rkeBootstrapClient  rkecontroller.RKEBootstrapClient
+	rkeBootstrap        rkecontroller.RKEBootstrapController
 }
 
 func Register(ctx context.Context, clients *wrangler.Context) {
@@ -49,10 +51,10 @@ func Register(ctx context.Context, clients *wrangler.Context) {
 		secretCache:         clients.Core.Secret().Cache(),
 		secretClient:        clients.Core.Secret(),
 		machineCache:        clients.CAPI.Machine().Cache(),
-		capiClusters:        clients.CAPI.Cluster().Cache(),
+		capiClusterCache:    clients.CAPI.Cluster().Cache(),
 		deploymentCache:     clients.Apps.Deployment().Cache(),
 		rkeControlPlanes:    clients.RKE.RKEControlPlane().Cache(),
-		rkeBootstrapClient:  clients.RKE.RKEBootstrap(),
+		rkeBootstrap:        clients.RKE.RKEBootstrap(),
 	}
 	rkecontroller.RegisterRKEBootstrapGeneratingHandler(ctx,
 		clients.RKE.RKEBootstrap(),
@@ -65,11 +67,11 @@ func Register(ctx context.Context, clients *wrangler.Context) {
 				clients.Core.Secret()).
 			WithSetOwnerReference(true, true),
 		"",
-		"rke-machine",
+		"rke-bootstrap",
 		h.OnChange,
 		nil)
 
-	relatedresource.Watch(ctx, "rke-machine-trigger", func(namespace, name string, obj runtime.Object) ([]relatedresource.Key, error) {
+	relatedresource.Watch(ctx, "rke-bootstrap-trigger", func(namespace, name string, obj runtime.Object) ([]relatedresource.Key, error) {
 		if sa, ok := obj.(*corev1.ServiceAccount); ok {
 			if name, ok := sa.Labels[rkeBootstrapName]; ok {
 				return []relatedresource.Key{
@@ -94,24 +96,23 @@ func Register(ctx context.Context, clients *wrangler.Context) {
 
 func (h *handler) getBootstrapSecret(namespace, name string, envVars []corev1.EnvVar, machine *capi.Machine) (*corev1.Secret, error) {
 	sa, err := h.serviceAccountCache.Get(namespace, name)
-	if apierror.IsNotFound(err) {
+	if apierrors.IsNotFound(err) {
 		return nil, nil
 	}
 
 	if err != nil {
 		return nil, err
-
 	}
 	sName := serviceaccounttoken.ServiceAccountSecretName(sa)
 	secret, err := h.secretCache.Get(sa.Namespace, sName)
 	if err != nil {
-		if !apierror.IsNotFound(err) {
+		if !apierrors.IsNotFound(err) {
 			return nil, err
 		}
 		sc := serviceaccounttoken.SecretTemplate(sa)
 		secret, err = h.secretClient.Create(sc)
 		if err != nil {
-			if !apierror.IsAlreadyExists(err) {
+			if !apierrors.IsAlreadyExists(err) {
 				return nil, err
 			}
 			secret, err = h.secretClient.Get(sa.Namespace, sName, metav1.GetOptions{})
@@ -187,7 +188,7 @@ func (h *handler) assignPlanSecret(machine *capi.Machine, bootstrap *rkev1.RKEBo
 			},
 		},
 	}
-	rolebinding := &rbacv1.RoleBinding{
+	roleBinding := &rbacv1.RoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      secretName,
 			Namespace: bootstrap.Namespace,
@@ -206,17 +207,10 @@ func (h *handler) assignPlanSecret(machine *capi.Machine, bootstrap *rkev1.RKEBo
 		},
 	}
 
-	return []runtime.Object{sa, secret, role, rolebinding}
+	return []runtime.Object{sa, secret, role, roleBinding}
 }
 
-func (h *handler) getEnvVar(bootstrap *rkev1.RKEBootstrap) (result []corev1.EnvVar, _ error) {
-	capiCluster, err := h.capiClusters.Get(bootstrap.Namespace, bootstrap.Spec.ClusterName)
-	if apierror.IsNotFound(err) {
-		return nil, nil
-	} else if err != nil {
-		return nil, err
-	}
-
+func (h *handler) getEnvVar(bootstrap *rkev1.RKEBootstrap, capiCluster *capi.Cluster) ([]corev1.EnvVar, error) {
 	if capiCluster.Spec.ControlPlaneRef == nil || capiCluster.Spec.ControlPlaneRef.Kind != "RKEControlPlane" {
 		return nil, nil
 	}
@@ -226,6 +220,7 @@ func (h *handler) getEnvVar(bootstrap *rkev1.RKEBootstrap) (result []corev1.EnvV
 		return nil, err
 	}
 
+	var result []corev1.EnvVar
 	for _, env := range cp.Spec.AgentEnvVars {
 		result = append(result, corev1.EnvVar{
 			Name:  env.Name,
@@ -236,7 +231,7 @@ func (h *handler) getEnvVar(bootstrap *rkev1.RKEBootstrap) (result []corev1.EnvV
 	return result, nil
 }
 
-func (h *handler) assignBootStrapSecret(machine *capi.Machine, bootstrap *rkev1.RKEBootstrap) (*corev1.Secret, []runtime.Object, error) {
+func (h *handler) assignBootStrapSecret(machine *capi.Machine, bootstrap *rkev1.RKEBootstrap, capiCluster *capi.Cluster) (*corev1.Secret, []runtime.Object, error) {
 	if capi.MachinePhase(machine.Status.Phase) != capi.MachinePhasePending &&
 		capi.MachinePhase(machine.Status.Phase) != capi.MachinePhaseDeleting &&
 		capi.MachinePhase(machine.Status.Phase) != capi.MachinePhaseFailed &&
@@ -244,7 +239,7 @@ func (h *handler) assignBootStrapSecret(machine *capi.Machine, bootstrap *rkev1.
 		return nil, nil, nil
 	}
 
-	envVars, err := h.getEnvVar(bootstrap)
+	envVars, err := h.getEnvVar(bootstrap, capiCluster)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -276,31 +271,58 @@ func (h *handler) OnChange(bootstrap *rkev1.RKEBootstrap, status rkev1.RKEBootst
 		result []runtime.Object
 	)
 
+	machine, err := rke2.GetOwnerCAPIMachine(bootstrap, h.machineCache)
+	if apierrors.IsNotFound(err) {
+		logrus.Debugf("[rkebootstrap] %s/%s: waiting: machine to be set as owner reference", bootstrap.Namespace, bootstrap.Name)
+		h.rkeBootstrap.EnqueueAfter(bootstrap.Namespace, bootstrap.Name, 10*time.Second)
+		return result, status, generic.ErrSkip
+	}
+	if err != nil {
+		logrus.Errorf("[rkebootstrap] %s/%s: error getting machine by owner reference %v", bootstrap.Namespace, bootstrap.Name, err)
+		return nil, status, err
+	}
+
+	capiCluster, err := h.capiClusterCache.Get(machine.Namespace, machine.Spec.ClusterName)
+	if apierrors.IsNotFound(err) {
+		logrus.Debugf("[rkebootstrap] %s/%s: waiting: CAPI cluster does not exist", bootstrap.Namespace, bootstrap.Name)
+		h.rkeBootstrap.EnqueueAfter(bootstrap.Namespace, bootstrap.Name, 10*time.Second)
+		return result, status, generic.ErrSkip
+	}
+	if err != nil {
+		logrus.Errorf("[rkebootstrap] %s/%s: error getting CAPI cluster %v", bootstrap.Namespace, bootstrap.Name, err)
+		return result, status, err
+	}
+
+	if capiannotations.IsPaused(capiCluster, bootstrap) {
+		logrus.Debugf("[rkebootstrap] %s/%s: waiting: CAPI cluster or RKEBootstrap is paused", bootstrap.Namespace, bootstrap.Name)
+		h.rkeBootstrap.EnqueueAfter(bootstrap.Namespace, bootstrap.Name, 10*time.Second)
+		return result, status, generic.ErrSkip
+	}
+
 	if bootstrap.Spec.ClusterName == "" {
+		logrus.Debugf("[rkebootstrap] %s/%s: setting cluster name", bootstrap.Namespace, bootstrap.Name)
 		// If the bootstrap spec cluster name is blank, we need to update the bootstrap spec to the correct value
 		// This is to handle old rkebootstrap objects for unmanaged clusters that did not have the spec properly set
 		if v, ok := bootstrap.Labels[capi.ClusterLabelName]; ok && v != "" {
 			bootstrap = bootstrap.DeepCopy()
 			bootstrap.Spec.ClusterName = v
 			var err error
-			bootstrap, err = h.rkeBootstrapClient.Update(bootstrap)
+			bootstrap, err = h.rkeBootstrap.Update(bootstrap)
 			if err != nil {
 				return nil, bootstrap.Status, err
 			}
 		}
 	}
 
-	machine, err := rke2.GetMachineByOwner(h.machineCache, bootstrap)
-	if err != nil {
-		if errors.Is(err, rke2.ErrNoMachineOwnerRef) {
-			return nil, status, generic.ErrSkip
-		}
-		return nil, status, err
+	if !capiCluster.Status.InfrastructureReady {
+		logrus.Debugf("[rkebootstrap] %s/%s: waiting: CAPI cluster infrastructure is not ready", bootstrap.Namespace, bootstrap.Name)
+		h.rkeBootstrap.EnqueueAfter(bootstrap.Namespace, bootstrap.Name, 10*time.Second)
+		return result, status, generic.ErrSkip
 	}
 
 	result = append(result, h.assignPlanSecret(machine, bootstrap)...)
 
-	bootstrapSecret, objs, err := h.assignBootStrapSecret(machine, bootstrap)
+	bootstrapSecret, objs, err := h.assignBootStrapSecret(machine, bootstrap, capiCluster)
 	if err != nil {
 		return nil, status, err
 	}
@@ -309,6 +331,7 @@ func (h *handler) OnChange(bootstrap *rkev1.RKEBootstrap, status rkev1.RKEBootst
 		if status.DataSecretName == nil {
 			status.DataSecretName = &bootstrapSecret.Name
 			status.Ready = true
+			logrus.Debugf("[rkebootstrap] %s/%s: setting dataSecretName: %s", bootstrap.Namespace, bootstrap.Name, *status.DataSecretName)
 		}
 		result = append(result, bootstrapSecret)
 	}
@@ -320,7 +343,7 @@ func (h *handler) OnChange(bootstrap *rkev1.RKEBootstrap, status rkev1.RKEBootst
 func (h *handler) rancherDeploymentHasHostPort() (bool, error) {
 	deployment, err := h.deploymentCache.Get(namespace.System, "rancher")
 	if err != nil {
-		if apierror.IsNotFound(err) {
+		if apierrors.IsNotFound(err) {
 			return false, nil
 		}
 		return false, err
