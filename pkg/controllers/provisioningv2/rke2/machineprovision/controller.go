@@ -43,6 +43,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 	capierrors "sigs.k8s.io/cluster-api/errors"
+	capiannotations "sigs.k8s.io/cluster-api/util/annotations"
 )
 
 const (
@@ -91,6 +92,7 @@ type handler struct {
 	jobs                batchcontrollers.JobCache
 	pods                corecontrollers.PodCache
 	secrets             corecontrollers.SecretCache
+	clusters            capicontrollers.ClusterCache
 	machines            capicontrollers.MachineCache
 	machinesClient      capicontrollers.MachineClient
 	namespaces          corecontrollers.NamespaceCache
@@ -114,6 +116,7 @@ func Register(ctx context.Context, clients *wrangler.Context) {
 		secrets:             clients.Core.Secret().Cache(),
 		machines:            clients.CAPI.Machine().Cache(),
 		machinesClient:      clients.CAPI.Machine(),
+		clusters:            clients.CAPI.Cluster().Cache(),
 		nodeDriverCache:     clients.Mgmt.NodeDriver().Cache(),
 		namespaces:          clients.Core.Namespace().Cache(),
 		dynamic:             clients.Dynamic,
@@ -172,12 +175,12 @@ func (h *handler) OnJobChange(_ string, job *batchv1.Job) (*batchv1.Job, error) 
 	}
 	newStatus.JobName = job.Name
 
-	if _, err := h.patchStatus(infraObj.obj, infraObj.data, newStatus); err != nil {
+	if _, err = h.patchStatus(infraObj.obj, infraObj.data, newStatus); err != nil {
 		return job, err
 	}
 
 	// Re-evaluate the infra-machine after this
-	if err := h.dynamic.Enqueue(infraMachine.GetObjectKind().GroupVersionKind(),
+	if err = h.dynamic.Enqueue(infraMachine.GetObjectKind().GroupVersionKind(),
 		infraObj.meta.GetNamespace(), infraObj.meta.GetName()); err != nil {
 		return nil, err
 	}
@@ -323,11 +326,11 @@ func (h *handler) OnRemove(key string, obj runtime.Object) (runtime.Object, erro
 		} else if err != nil {
 			return obj, err
 		}
-		logrus.Debugf("[MachineProvision] create job for %s not finished, job was found and the error was not nil and was not an isnotfound", key)
+		logrus.Debugf("[rkemachine] create job for %s not finished, job was found and the error was not nil and was not an isnotfound", key)
 		if job != nil {
 			// enqueue the job to force-reconcile the condition
 			h.jobController.Enqueue(job.Namespace, job.Name)
-			logrus.Tracef("[MachineProvision] create job object for %s was %+v", key, job)
+			logrus.Tracef("[rkemachine] create job object for %s was %+v", key, job)
 		}
 		return obj, fmt.Errorf("cannot delete machine %s because create job has not finished", infraObj.meta.GetName())
 	}
@@ -366,7 +369,7 @@ func (h *handler) OnRemove(key string, obj runtime.Object) (runtime.Object, erro
 
 	if machine == nil || machine.Status.NodeRef == nil {
 		// Machine noderef is nil, we should just allow deletion.
-		logrus.Debugf("[MachineProvision] There was no associated K8s node with this etcd dynamicmachine %s. Proceeding with deletion", key)
+		logrus.Debugf("[rkemachine] There was no associated K8s node with this etcd dynamicmachine %s. Proceeding with deletion", key)
 		return h.doRemove(infraObj)
 	}
 
@@ -380,7 +383,7 @@ func (h *handler) OnRemove(key string, obj runtime.Object) (runtime.Object, erro
 
 	removed := true
 	// In the event we are removing an etcd node (as indicated by the etcd-role label on the node), we must safely remove the etcd node from the cluster before allowing machine deprovisioning
-	if val := infraObj.meta.GetLabels()["rke.cattle.io/etcd-role"]; val == "true" {
+	if val := infraObj.meta.GetLabels()[rke2.EtcdRoleLabel]; val == "true" {
 		// we need to block removal until our the v1 node that corresponds has been removed
 		restConfig, err := h.kubeconfigManager.GetRESTConfig(cluster, cluster.Status)
 		if err != nil {
@@ -413,18 +416,65 @@ func (h *handler) doRemove(infraObj *infraObject) (runtime.Object, error) {
 	return obj, generic.ErrSkip
 }
 
+func (h *handler) EnqueueAfter(infra *infraObject, duration time.Duration) {
+	err := h.dynamic.EnqueueAfter(infra.obj.GetObjectKind().GroupVersionKind(), infra.meta.GetNamespace(), infra.meta.GetName(), duration)
+	if err != nil {
+		panic(err) // always programmer error
+	}
+}
+
 func (h *handler) OnChange(obj runtime.Object) (runtime.Object, error) {
-	infraObj, err := newInfraObject(obj)
+	infra, err := newInfraObject(obj)
 	if err != nil {
 		return nil, err
 	}
 
 	// don't process create if deleting
-	if !infraObj.meta.GetDeletionTimestamp().IsZero() {
+	if !infra.meta.GetDeletionTimestamp().IsZero() {
 		return obj, nil
 	}
 
-	newObj, err := h.run(infraObj, true)
+	machine, err := rke2.FindOwnerCAPIMachine(infra.meta, h.machines)
+	if err != nil {
+		logrus.Errorf("[rkemachine] %s/%s: error getting machine by owner reference %v", infra.meta.GetNamespace(), infra.meta.GetName(), err)
+		return obj, err
+	}
+	if machine == nil {
+		logrus.Infof("[rkemachine] %s/%s: waiting: machine to be set as owner reference", infra.meta.GetNamespace(), infra.meta.GetName())
+		h.EnqueueAfter(infra, 10*time.Second)
+		return obj, generic.ErrSkip
+	}
+
+	cluster, err := rke2.FindCAPIClusterFromLabel(machine.ObjectMeta, h.clusters)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			logrus.Infof("[rkemachine] %s/%s: waiting: CAPI cluster does not exist", infra.meta.GetNamespace(), infra.meta.GetName())
+			h.EnqueueAfter(infra, 10*time.Second)
+			return obj, generic.ErrSkip
+		}
+		logrus.Errorf("[rkebootstrap] %s/%s: error getting CAPI cluster %v", infra.meta.GetNamespace(), infra.meta.GetName(), err)
+		return obj, err
+	}
+
+	if capiannotations.IsPaused(cluster, infra.meta) {
+		logrus.Infof("[rkemachine] %s/%s: waiting: CAPI cluster or RKEMachine is paused", infra.meta.GetNamespace(), infra.meta.GetName())
+		h.EnqueueAfter(infra, 10*time.Second)
+		return obj, generic.ErrSkip
+	}
+
+	if machine.Spec.Bootstrap.DataSecretName == nil {
+		logrus.Infof("[rkemachine] %s/%s: waiting: dataSecretName is not populated on machine spec", infra.meta.GetNamespace(), infra.meta.GetName())
+		h.EnqueueAfter(infra, 10*time.Second)
+		return obj, generic.ErrSkip
+	}
+
+	if !cluster.Status.InfrastructureReady {
+		logrus.Infof("[rkemachine] %s/%s: waiting: CAPI cluster infrastructure is not ready", infra.meta.GetNamespace(), infra.meta.GetName())
+		h.EnqueueAfter(infra, 10*time.Second)
+		return obj, generic.ErrSkip
+	}
+
+	newObj, err := h.run(infra, true)
 	if newObj == nil {
 		newObj = obj
 	}
@@ -435,41 +485,44 @@ func (h *handler) OnChange(obj runtime.Object) (runtime.Object, error) {
 	return newObj, nil
 }
 
-func (h *handler) run(infraObj *infraObject, create bool) (runtime.Object, error) {
-	args := infraObj.data.Map("spec")
-	driver := getNodeDriverName(infraObj.typeMeta)
+func (h *handler) run(infra *infraObject, create bool) (runtime.Object, error) {
+	logrus.Infof("[rkemachine] %s/%s: reconciling machine job", infra.meta.GetNamespace(), infra.meta.GetName())
 
-	dArgs, err := h.getArgsEnvAndStatus(infraObj, args, driver, create)
+	args := infra.data.Map("spec")
+	driver := getNodeDriverName(infra.typeMeta)
+
+	dArgs, err := h.getArgsEnvAndStatus(infra, args, driver, create)
 	if err != nil {
-		return infraObj.obj, err
+		return infra.obj, err
 	}
 
 	if dArgs.BootstrapSecretName == "" && dArgs.BootstrapRequired {
-		return infraObj.obj,
-			h.dynamic.EnqueueAfter(infraObj.obj.GetObjectKind().GroupVersionKind(), infraObj.meta.GetNamespace(), infraObj.meta.GetName(), 2*time.Second)
+		return infra.obj,
+			h.dynamic.EnqueueAfter(infra.obj.GetObjectKind().GroupVersionKind(), infra.meta.GetNamespace(), infra.meta.GetName(), 2*time.Second)
 	}
 
-	failedCreate := infraObj.data.String("status", "failureReason") == string(capierrors.CreateMachineError)
+	failedCreate := infra.data.String("status", "failureReason") == string(capierrors.CreateMachineError)
 
-	if err := h.apply.WithOwner(infraObj.obj).ApplyObjects(objects((args.String("providerID") != "" || failedCreate) && create, dArgs)...); err != nil {
+	if err := h.apply.WithOwner(infra.obj).ApplyObjects(objects((args.String("providerID") != "" || failedCreate) && create, dArgs)...); err != nil {
 		return nil, err
 	}
 
 	if create {
-		infraObj.obj, err = h.patchStatus(infraObj.obj, infraObj.data, dArgs.RKEMachineStatus)
+		infra.obj, err = h.patchStatus(infra.obj, infra.data, dArgs.RKEMachineStatus)
 		if err != nil {
 			return nil, err
 		}
 
 		if failedCreate {
-			logrus.Infof("[MachineProvision] Failed to create infrastructure %s/%s for machine %s, deleting and recreating...", infraObj.meta.GetNamespace(), infraObj.meta.GetName(), dArgs.CapiMachineName)
-			if err = h.machinesClient.Delete(infraObj.meta.GetNamespace(), dArgs.CapiMachineName, &metav1.DeleteOptions{}); err != nil {
-				return infraObj.obj, fmt.Errorf("failed to delete CAPI machine %s: %w", dArgs.CapiMachineName, err)
+			logrus.Infof("[rkemachine] %s/%s: Failed to create infrastructure for machine %s, deleting and recreating...", infra.meta.GetNamespace(), infra.meta.GetName(), dArgs.CapiMachineName)
+			// TODO(jhyde): determine if it's possible to just delete the object instead of the CAPI object
+			if err = h.machinesClient.Delete(infra.meta.GetNamespace(), dArgs.CapiMachineName, &metav1.DeleteOptions{}); err != nil {
+				return infra.obj, fmt.Errorf("failed to delete CAPI machine %s: %w", dArgs.CapiMachineName, err)
 			}
 		}
 	}
 
-	return infraObj.obj, nil
+	return infra.obj, nil
 }
 
 func (h *handler) patchStatus(obj runtime.Object, d data.Object, state rkev1.RKEMachineStatus) (runtime.Object, error) {
