@@ -94,9 +94,10 @@ const (
 )
 
 var (
-	ErrNoMachineOwnerRef = errors.New("no machine owner ref")
-	labelAnnotationMatch = regexp.MustCompile(`^((rke\.cattle\.io)|((?:machine\.)?cluster\.x-k8s\.io))/`)
-	windowsDrivers       = map[string]struct{}{
+	ErrNoMachineOwnerRef           = errors.New("no machine owner ref")
+	ErrNoControllerMachineOwnerRef = errors.New("no machine controller owner ref")
+	labelAnnotationMatch           = regexp.MustCompile(`^((rke\.cattle\.io)|((?:machine\.)?cluster\.x-k8s\.io))/`)
+	windowsDrivers                 = map[string]struct{}{
 		"vmwarevsphere": {},
 	}
 )
@@ -454,7 +455,7 @@ func GetOwnerCAPIMachine(obj runtime.Object, cache capicontrollers.MachineCache)
 
 // GetOwnerFromGVK takes a runtime.Object, and will search for a controlling owner reference of kind apiVersion.
 // If the object is nil, it cannot access to object or type metas, the owner reference Kind or APIVersion do not match,
-// or the object could not be found, it returns an error.
+// or the object could not be found, it returns an ErrNoControllerMachineOwnerRef error.
 // If the owner reference exists and is valid, it will return the owner reference and the namespace it belongs to.
 func GetOwnerFromGVK(groupVersion, kind string, obj runtime.Object) (*metav1.OwnerReference, string, error) {
 	if obj == nil {
@@ -465,17 +466,8 @@ func GetOwnerFromGVK(groupVersion, kind string, obj runtime.Object) (*metav1.Own
 		return nil, "", err
 	}
 	ref := metav1.GetControllerOf(objMeta)
-	if ref == nil {
-		return nil, "", fmt.Errorf("%s %s/%s does not have a controller owner reference", obj.GetObjectKind().GroupVersionKind().Kind, objMeta.GetNamespace(),
-			objMeta.GetName())
-	}
-	if ref.Kind != kind {
-		return nil, "", fmt.Errorf("%s %s/%s has wrong owner kind %s", obj.GetObjectKind().GroupVersionKind().Kind, objMeta.GetNamespace(),
-			objMeta.GetName(), ref.Kind)
-	}
-	if ref.APIVersion != groupVersion {
-		return nil, "", fmt.Errorf("%s %s/%s has wrong owner api version %s", obj.GetObjectKind().GroupVersionKind().Kind, objMeta.GetNamespace(),
-			objMeta.GetName(), ref.APIVersion)
+	if ref == nil || ref.Kind != kind || ref.APIVersion != groupVersion {
+		return nil, "", ErrNoControllerMachineOwnerRef
 	}
 	return ref, objMeta.GetNamespace(), nil
 }
