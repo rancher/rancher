@@ -330,7 +330,9 @@ func (h *handler) updateClusterProvisioningStatus(cluster *rancherv1.Cluster, st
 			return status, err
 		}
 
-		if cpCondition.GetStatus(cp) != clusterCondition.GetStatus(mgmtCluster) || cpCondition.GetMessage(cp) != clusterCondition.GetMessage(mgmtCluster) {
+		if cpCondition.GetStatus(cp) != clusterCondition.GetStatus(mgmtCluster) ||
+			cpCondition.GetReason(cp) != clusterCondition.GetReason(mgmtCluster) ||
+			cpCondition.GetMessage(cp) != clusterCondition.GetMessage(mgmtCluster) {
 			mgmtCluster = mgmtCluster.DeepCopy()
 
 			clusterCondition.SetStatus(mgmtCluster, cpCondition.GetStatus(cp))
@@ -398,6 +400,7 @@ func (h *handler) OnRemove(_ string, cluster *rancherv1.Cluster) (*rancherv1.Clu
 		return cluster, err
 	}
 
+	// TODO(jhyde): verify if this does anything at all
 	status := *cluster.Status.DeepCopy()
 	status, err = h.updateClusterProvisioningStatus(cluster, status, rkeCP, rke2.Removed, rke2.Removed)
 	if apierror.IsNotFound(err) {

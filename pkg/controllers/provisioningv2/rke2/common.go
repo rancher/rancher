@@ -7,7 +7,6 @@ import (
 	"regexp"
 	"sort"
 	"strings"
-	"time"
 
 	"github.com/rancher/channelserver/pkg/model"
 	provv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
@@ -19,7 +18,6 @@ import (
 	"github.com/rancher/rancher/pkg/serviceaccounttoken"
 	"github.com/rancher/wrangler/pkg/condition"
 	corecontrollers "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
-	"github.com/rancher/wrangler/pkg/generic"
 	"github.com/rancher/wrangler/pkg/name"
 	corev1 "k8s.io/api/core/v1"
 	apierror "k8s.io/apimachinery/pkg/api/errors"
@@ -281,50 +279,18 @@ func PlanSecretFromBootstrapName(bootstrapName string) string {
 	return name.SafeConcatName(bootstrapName, "machine", "plan")
 }
 
-func DoRemoveAndUpdateStatus(obj metav1.Object, doRemove func() (string, error), enqueueAfter func(string, string, time.Duration)) error {
-	if !Provisioned.IsTrue(obj) || !Waiting.IsTrue(obj) || !Pending.IsTrue(obj) {
-		// Ensure the Removed obj appears in the UI.
-		Provisioned.SetStatus(obj, "True")
-		Waiting.SetStatus(obj, "True")
-		Pending.SetStatus(obj, "True")
-	}
-	message, err := doRemove()
-	if errors.Is(err, generic.ErrSkip) {
-		// If generic.ErrSkip is returned, we don't want to update the status.
-		return err
-	}
-
-	if err != nil {
-		Removed.SetError(obj, "", err)
-	} else if message == "" {
-		Removed.SetStatusBool(obj, true)
-		Removed.Reason(obj, "")
-		Removed.Message(obj, "")
-	} else {
-		Removed.SetStatus(obj, "Unknown")
-		Removed.Reason(obj, "Waiting")
-		Removed.Message(obj, message)
-		enqueueAfter(obj.GetNamespace(), obj.GetName(), 5*time.Second)
-		// generic.ErrSkip will mark the cluster as reconciled, but not remove the finalizer.
-		// The finalizer shouldn't be removed until other objects have all been removed.
-		err = generic.ErrSkip
-	}
-
-	return err
-}
-
 func GetMachineDeletionStatus(machines []*capi.Machine) (string, error) {
+	if len(machines) == 0 {
+		return "", nil
+	}
 	sort.Slice(machines, func(i, j int) bool {
 		return machines[i].Name < machines[j].Name
 	})
-	for _, machine := range machines {
-		if machine.Status.FailureReason != nil && *machine.Status.FailureReason == capierrors.DeleteMachineError {
-			return "", fmt.Errorf("error deleting machine [%s], machine must be deleted manually", machine.Name)
-		}
-		return fmt.Sprintf("waiting for machine [%s] to delete", machine.Name), nil
+	machine := machines[0]
+	if machine.Status.FailureReason != nil && *machine.Status.FailureReason == capierrors.DeleteMachineError {
+		return "", fmt.Errorf("error deleting machine [%s], machine must be deleted manually", machine.Name)
 	}
-
-	return "", nil
+	return fmt.Sprintf("waiting for machine [%s] to delete", machine.Name), nil
 }
 
 // GetMachineFromNode attempts to find the corresponding machine for an etcd snapshot that is found in the configmap. If the machine list is successful, it will return true on the boolean, otherwise, it can be assumed that a false, nil, and defined error indicate the machine does not exist.

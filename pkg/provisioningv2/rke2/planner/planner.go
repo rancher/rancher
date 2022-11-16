@@ -35,10 +35,11 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	apierror "k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
+	capiannotations "sigs.k8s.io/cluster-api/util/annotations"
 	"sigs.k8s.io/cluster-api/util/conditions"
 )
 
@@ -250,43 +251,47 @@ func removeConfiguredCondition(machine *capi.Machine) *capi.Machine {
 	return machine
 }
 
-func (p *Planner) getCAPICluster(controlPlane *rkev1.RKEControlPlane) (*capi.Cluster, error) {
-	ref := metav1.GetControllerOf(controlPlane)
-	if ref == nil {
-		return nil, generic.ErrSkip
-	}
-	gvk := schema.FromAPIVersionAndKind(ref.APIVersion, ref.Kind)
-	if gvk.Kind != "Cluster" || gvk.Group != "cluster.x-k8s.io" {
-		return nil, fmt.Errorf("RKEControlPlane %s/%s has wrong owner kind %s/%s", controlPlane.Namespace,
-			controlPlane.Name, ref.APIVersion, ref.Kind)
-	}
-	return p.capiClusters.Get(controlPlane.Namespace, ref.Name)
-}
+func (p *Planner) Process(cp *rkev1.RKEControlPlane) error {
+	logrus.Debugf("[planner] %s/%s: attempting to lock %s for processing", cp.Namespace, cp.Name, string(cp.UID))
+	p.locker.Lock(string(cp.UID))
+	defer func(namespace, name, uid string) {
+		logrus.Debugf("[planner] %s/%s: unlocking %s", namespace, name, uid)
+		_ = p.locker.Unlock(uid)
+	}(cp.Namespace, cp.Name, string(cp.UID))
 
-func (p *Planner) Process(controlPlane *rkev1.RKEControlPlane) error {
-	logrus.Debugf("[planner] rkecluster %s/%s: attempting to lock %s for processing", controlPlane.Namespace, controlPlane.Name, string(controlPlane.UID))
-	p.locker.Lock(string(controlPlane.UID))
-	defer func(namespace, name, uid string) error {
-		logrus.Debugf("[planner] rkecluster %s/%s: unlocking %s", namespace, name, uid)
-		return p.locker.Unlock(uid)
-	}(controlPlane.Namespace, controlPlane.Name, string(controlPlane.UID))
-
-	releaseData := rke2.GetKDMReleaseData(p.ctx, controlPlane)
+	releaseData := rke2.GetKDMReleaseData(p.ctx, cp)
 	if releaseData == nil {
-		return ErrWaitingf("rkecluster %s/%s: releaseData nil for version %s", controlPlane.Namespace, controlPlane.Name, controlPlane.Spec.KubernetesVersion)
+		return ErrWaitingf("%s/%s: releaseData nil for version %s", cp.Namespace, cp.Name, cp.Spec.KubernetesVersion)
 	}
 
-	cluster, err := p.getCAPICluster(controlPlane)
-	if err != nil || !cluster.DeletionTimestamp.IsZero() {
+	capiCluster, err := rke2.FindOwnerCAPICluster(cp, p.capiClusters)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			logrus.Infof("[planner] %s/%s: waiting: CAPI cluster does not exist", cp.Namespace, cp.Name)
+			p.rkeControlPlanes.EnqueueAfter(cp.Namespace, cp.Name, 10*time.Second)
+			return generic.ErrSkip
+		}
+		logrus.Errorf("[planner] %s/%s: error getting CAPI cluster %v", cp.Namespace, cp.Name, err)
 		return err
 	}
 
-	plan, err := p.store.Load(cluster, controlPlane)
+	if capiCluster == nil {
+		logrus.Infof("[planner] %s/%s: waiting: CAPI cluster does not exist", cp.Namespace, cp.Name)
+		p.rkeControlPlanes.EnqueueAfter(cp.Namespace, cp.Name, 10*time.Second)
+		return generic.ErrSkip
+	}
+
+	if !capiCluster.DeletionTimestamp.IsZero() {
+		logrus.Infof("[planner] %s/%s: reconciliation stopped: CAPI cluster is deleting", cp.Namespace, cp.Name)
+		return err
+	}
+
+	plan, err := p.store.Load(capiCluster, cp)
 	if err != nil {
 		return err
 	}
 
-	controlPlane, clusterSecretTokens, err := p.generateSecrets(controlPlane)
+	cp, clusterSecretTokens, err := p.generateSecrets(cp)
 	if err != nil {
 		return err
 	}
@@ -296,7 +301,7 @@ func (p *Planner) Process(controlPlane *rkev1.RKEControlPlane) error {
 		joinServer       string
 	)
 
-	if errs := p.createEtcdSnapshot(controlPlane, clusterSecretTokens, plan); len(errs) > 0 {
+	if errs := p.createEtcdSnapshot(cp, clusterSecretTokens, plan); len(errs) > 0 {
 		var errMsg string
 		for i, err := range errs {
 			if err == nil {
@@ -311,35 +316,44 @@ func (p *Planner) Process(controlPlane *rkev1.RKEControlPlane) error {
 		return ErrWaiting(errMsg)
 	}
 
-	if err = p.restoreEtcdSnapshot(controlPlane, clusterSecretTokens, plan); err != nil {
+	if err = p.restoreEtcdSnapshot(cp, clusterSecretTokens, plan); err != nil {
 		return err
 	}
 
+	if err = p.certificateRotation.RotateCertificates(cp, plan); err != nil {
+		return err
+	}
+
+	if err = p.rotateEncryptionKeys(cp, releaseData, plan); err != nil {
+		return err
+	}
+
+	// pausing only affects machine provisioning/reconciliation "extras"
+	if capiannotations.IsPaused(capiCluster, cp) {
+		return ErrWaitingf("rkecluster %s/%s: CAPI cluster or RKEControlPlane is paused", cp.Namespace, cp.Name)
+	}
+
+	if !capiCluster.Status.InfrastructureReady {
+		return ErrWaitingf("rkecluster %s/%s: waiting for infrastructure ready", cp.Namespace, cp.Name)
+	}
+
 	// on the first run through, electInitNode will return a `generic.ErrSkip` as it is attempting to wait for the cache to catch up.
-	joinServer, err = p.electInitNode(controlPlane, plan)
+	joinServer, err = p.electInitNode(cp, plan)
 	if err != nil {
 		return err
 	}
 
-	if err = p.certificateRotation.RotateCertificates(controlPlane, plan); err != nil {
-		return err
-	}
-
-	if err = p.rotateEncryptionKeys(controlPlane, releaseData, plan); err != nil {
-		return err
-	}
-
 	// select all etcd and then filter to just initNodes to that unavailable count is correct
-	err = p.reconcile(controlPlane, clusterSecretTokens, plan, true, bootstrapTier, isEtcd, isNotInitNodeOrIsDeleting,
+	err = p.reconcile(cp, clusterSecretTokens, plan, true, bootstrapTier, isEtcd, isNotInitNodeOrIsDeleting,
 		"1", "",
-		controlPlane.Spec.UpgradeStrategy.ControlPlaneDrainOptions)
+		cp.Spec.UpgradeStrategy.ControlPlaneDrainOptions)
 	firstIgnoreError, err = ignoreErrors(firstIgnoreError, err)
 	if err != nil {
 		return err
 	}
 
 	if joinServer == "" {
-		_, joinServer, _, err = p.findInitNode(controlPlane, plan)
+		_, joinServer, _, err = p.findInitNode(cp, plan)
 		if err != nil {
 			return err
 		} else if joinServer == "" && firstIgnoreError != nil {
@@ -349,17 +363,17 @@ func (p *Planner) Process(controlPlane *rkev1.RKEControlPlane) error {
 		}
 	}
 
-	err = p.reconcile(controlPlane, clusterSecretTokens, plan, true, etcdTier, isEtcd, isInitNodeOrDeleting,
+	err = p.reconcile(cp, clusterSecretTokens, plan, true, etcdTier, isEtcd, isInitNodeOrDeleting,
 		"1", joinServer,
-		controlPlane.Spec.UpgradeStrategy.ControlPlaneDrainOptions)
+		cp.Spec.UpgradeStrategy.ControlPlaneDrainOptions)
 	firstIgnoreError, err = ignoreErrors(firstIgnoreError, err)
 	if err != nil {
 		return err
 	}
 
-	err = p.reconcile(controlPlane, clusterSecretTokens, plan, true, controlPlaneTier, isControlPlane, isInitNodeOrDeleting,
-		controlPlane.Spec.UpgradeStrategy.ControlPlaneConcurrency, joinServer,
-		controlPlane.Spec.UpgradeStrategy.ControlPlaneDrainOptions)
+	err = p.reconcile(cp, clusterSecretTokens, plan, true, controlPlaneTier, isControlPlane, isInitNodeOrDeleting,
+		cp.Spec.UpgradeStrategy.ControlPlaneConcurrency, joinServer,
+		cp.Spec.UpgradeStrategy.ControlPlaneDrainOptions)
 	firstIgnoreError, err = ignoreErrors(firstIgnoreError, err)
 	if err != nil {
 		return err
@@ -370,9 +384,18 @@ func (p *Planner) Process(controlPlane *rkev1.RKEControlPlane) error {
 		return ErrWaiting("waiting for control plane to be available")
 	}
 
-	err = p.reconcile(controlPlane, clusterSecretTokens, plan, false, workerTier, isOnlyWorker, isInitNodeOrDeleting,
-		controlPlane.Spec.UpgradeStrategy.WorkerConcurrency, joinServer,
-		controlPlane.Spec.UpgradeStrategy.WorkerDrainOptions)
+	if cp.Status.Initialized != true {
+		cp.Status.Initialized = true
+		_, err := p.rkeControlPlanes.UpdateStatus(cp)
+		if err != nil {
+			return err
+		}
+		return ErrWaiting("setting control plane to initialized")
+	}
+
+	err = p.reconcile(cp, clusterSecretTokens, plan, false, workerTier, isOnlyWorker, isInitNodeOrDeleting,
+		cp.Spec.UpgradeStrategy.WorkerConcurrency, joinServer,
+		cp.Spec.UpgradeStrategy.WorkerDrainOptions)
 	firstIgnoreError, err = ignoreErrors(firstIgnoreError, err)
 	if err != nil {
 		return err
