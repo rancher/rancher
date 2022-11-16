@@ -64,19 +64,19 @@ func EnsureSecretForServiceAccount(ctx context.Context, secretGetter secretGette
 	}
 	logrus.Infof("EnsureSecretForServiceAccount: waiting for secret [%s] to be populated with token", secret.Name)
 	backoff := wait.Backoff{
-		Duration: 2 * time.Second,
-		Cap:      10 * time.Second,
-		Steps:    5,
+		Duration: 2 * time.Millisecond,
+		Cap:      100 * time.Millisecond,
+		Steps:    50,
 	}
 	err = wait.ExponentialBackoff(backoff, func() (bool, error) {
-		if len(secret.Data[v1.ServiceAccountTokenKey]) > 0 {
-			return true, nil
-		}
 		var err error
 		// use the secret client, rather than the secret getter, to circumvent the cache
 		secret, err = secretClient.Get(ctx, secret.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, fmt.Errorf("error ensuring secret for service account [%s:%s]: %w", sa.Namespace, sa.Name, err)
+		}
+		if len(secret.Data[v1.ServiceAccountTokenKey]) > 0 {
+			return true, nil
 		}
 		return false, nil
 	})
