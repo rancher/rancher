@@ -371,8 +371,8 @@ func CopyPlanMetadataToSecret(secret *corev1.Secret, metadata *plan.Metadata) {
 		secret.Annotations = map[string]string{}
 	}
 
-	CopyMapWithExcludes(secret.Labels, metadata.Labels, nil)
-	CopyMapWithExcludes(secret.Annotations, metadata.Annotations, nil)
+	CopyMap(secret.Labels, metadata.Labels)
+	CopyMap(secret.Annotations, metadata.Annotations)
 }
 
 // CopyMap will copy the items from source to destination. It will only copy items that have keys that start with
@@ -402,4 +402,35 @@ func SortedKeys(m map[string]interface{}) []string {
 	}
 	sort.Strings(keys)
 	return keys
+}
+
+type Getter[T any] interface {
+	Get(namespace, name string) (*T, error)
+}
+
+func FindCAPIClusterFromLabel(obj metav1.ObjectMeta, getter Getter[capi.Cluster]) (*capi.Cluster, error) {
+	if clusterName := obj.GetLabels()[capi.ClusterLabelName]; clusterName != "" {
+		return getter.Get(obj.GetNamespace(), clusterName)
+	}
+	return nil, nil
+}
+
+func FindOwnerCAPICluster(obj metav1.Object, getter Getter[capi.Cluster]) (*capi.Cluster, error) {
+	return findOwnerFromKindGroup("Cluster", capi.GroupVersion.String(), obj, getter)
+}
+
+func FindOwnerCAPIMachine(obj metav1.Object, getter Getter[capi.Machine]) (*capi.Machine, error) {
+	return findOwnerFromKindGroup("Machine", capi.GroupVersion.String(), obj, getter)
+}
+
+func findOwnerFromKindGroup[T any](kind, apiVersion string, obj metav1.Object, getter Getter[T]) (*T, error) {
+	ref := metav1.GetControllerOf(obj)
+	if ref == nil {
+		return nil, nil
+	}
+	if ref.Kind != kind || ref.APIVersion != apiVersion {
+		return nil, fmt.Errorf("RKEControlPlane %s/%s has wrong owner kind %s/%s", obj.GetNamespace(),
+			obj.GetName(), ref.APIVersion, ref.Kind)
+	}
+	return getter.Get(obj.GetNamespace(), ref.Name)
 }
