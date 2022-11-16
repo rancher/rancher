@@ -24,15 +24,15 @@ jobs:
        stable26=$(yq  '.entries.rancher[].appVersion | select(test("^v2.6") and select(. != "*-rc*"))' 'stable.index.yaml' | head -1)
        latest25=$(yq  '.entries.rancher[].appVersion | select(test("^v2.5") and select(. != "*-rc*"))' 'latest.index.yaml' | head -1)
        stable25=$(yq  '.entries.rancher[].appVersion | select(test("^v2.5") and select(. != "*-rc*"))' 'stable.index.yaml' | head -1)
-       echo "* v2.7" > $tmpfile
-       echo "  * Latest - ${latest27} - \`rancher/rancher:${latest27}\` / \`rancher/rancher:latest\` - Read the full release [notes](https://github.com/rancher/rancher/releases/tag/${latest27})." >> $tmpfile
-       echo "  * Stable - ${stable27} - \`rancher/rancher:${stable27}\` / \`rancher/rancher:stable\` - Read the full release [notes](https://github.com/rancher/rancher/releases/tag/${stable27})." >> $tmpfile
-       echo "* v2.6" >> $tmpfile
-       echo "  * Latest - ${latest26} - \`rancher/rancher:${latest26}\` / \`rancher/rancher:latest\` - Read the full release [notes](https://github.com/rancher/rancher/releases/tag/${latest26})." >> $tmpfile
-       echo "  * Stable - ${stable26} - \`rancher/rancher:${stable26}\` / \`rancher/rancher:stable\` - Read the full release [notes](https://github.com/rancher/rancher/releases/tag/${stable26})." >> $tmpfile
-       echo "* v2.5" >> $tmpfile
-       echo "  * Latest - ${latest25} - \`rancher/rancher:${latest25}\` - Read the full release [notes](https://github.com/rancher/rancher/releases/tag/${latest25})." >> $tmpfile
-       echo "  * Stable - ${stable25} - \`rancher/rancher:${stable25}\` - Read the full release [notes](https://github.com/rancher/rancher/releases/tag/${stable25})." >> $tmpfile
+       [[ -n ${latest27} ]] || [[ -n ${stable27} ]] && echo "* v2.7" > $tmpfile
+       [[ -n ${latest27} ]] && echo "  * Latest - ${latest27} - \`rancher/rancher:${latest27}\` / \`rancher/rancher:latest\` - Read the full release [notes](https://github.com/rancher/rancher/releases/tag/${latest27})." >> $tmpfile
+       [[ -n ${stable27} ]] && echo "  * Stable - ${stable27} - \`rancher/rancher:${stable27}\` / \`rancher/rancher:stable\` - Read the full release [notes](https://github.com/rancher/rancher/releases/tag/${stable27})." >> $tmpfile
+       [[ -n ${latest26} ]] || [[ -n ${stable26} ]] && echo "* v2.6" >> $tmpfile
+       [[ -n ${latest26} ]] && echo "  * Latest - ${latest26} - \`rancher/rancher:${latest26}\` / \`rancher/rancher:latest\` - Read the full release [notes](https://github.com/rancher/rancher/releases/tag/${latest26})." >> $tmpfile
+       [[ -n ${stable26} ]] && echo "  * Stable - ${stable26} - \`rancher/rancher:${stable26}\` / \`rancher/rancher:stable\` - Read the full release [notes](https://github.com/rancher/rancher/releases/tag/${stable26})." >> $tmpfile
+       [[ -n ${latest25} ]] || [[ -n ${stable25} ]] && echo "* v2.5" >> $tmpfile
+       [[ -n ${latest25} ]] && echo "  * Latest - ${latest25} - \`rancher/rancher:${latest25}\` - Read the full release [notes](https://github.com/rancher/rancher/releases/tag/${latest25})." >> $tmpfile
+       [[ -n ${stable25} ]] && echo "  * Stable - ${stable25} - \`rancher/rancher:${stable25}\` - Read the full release [notes](https://github.com/rancher/rancher/releases/tag/${stable25})." >> $tmpfile
        sed -e '/## Latest Release/r '"$tmpfile"'' -e 's/CURRENTYEAR/'"$(date +%Y)"'/g' README-template.md > README.md
     - name: Check for repository changes
       run: |
