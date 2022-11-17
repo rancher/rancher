@@ -49,14 +49,13 @@ func ExecutePlan(ctx context.Context, nodeConfig *NodeConfig, writeCertOnly bool
 				return err
 			}
 		}
-	}
 
-	for name, process := range nodeConfig.Processes {
 		if !strings.Contains(name, "sidekick") {
 			if err := runProcess(ctx, name, process, true, bundleChanged); err != nil {
 				return err
 			}
 		}
+
 	}
 
 	return nil
