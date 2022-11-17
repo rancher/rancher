@@ -2,18 +2,10 @@ package planner
 
 import (
 	"context"
-	"encoding/json"
-	"errors"
 	"fmt"
-	"math"
-	"path/filepath"
-	"reflect"
 	"sort"
-	"strconv"
 	"strings"
-	"time"
 
-	"github.com/Masterminds/semver/v3"
 	"github.com/moby/locker"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
@@ -23,11 +15,8 @@ import (
 	mgmtcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	ranchercontrollers "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
 	rkecontrollers "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
-	"github.com/rancher/rancher/pkg/provisioningv2/image"
-	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/wrangler"
 	corecontrollers "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
-	"github.com/rancher/wrangler/pkg/generic"
 	"github.com/rancher/wrangler/pkg/name"
 	"github.com/rancher/wrangler/pkg/randomtoken"
 	"github.com/rancher/wrangler/pkg/summary"
@@ -37,7 +26,6 @@ import (
 	apierror "k8s.io/apimachinery/pkg/api/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 	capiannotations "sigs.k8s.io/cluster-api/util/annotations"
 	"sigs.k8s.io/cluster-api/util/conditions"
@@ -138,7 +126,6 @@ type Planner struct {
 	rancherClusterCache           ranchercontrollers.ClusterCache
 	locker                        locker.Locker
 	etcdS3Args                    s3Args
-	certificateRotation           *certificateRotation
 }
 
 func New(ctx context.Context, clients *wrangler.Context) *Planner {
@@ -164,7 +151,6 @@ func New(ctx context.Context, clients *wrangler.Context) *Planner {
 		etcdS3Args: s3Args{
 			secretCache: clients.Core.Secret().Cache(),
 		},
-		certificateRotation: newCertificateRotation(clients, store),
 	}
 }
 
@@ -211,47 +197,7 @@ func (p *Planner) setMachineConditionStatus(clusterPlan *plan.Plan, machineNames
 	return nil
 }
 
-func atMostThree(names []string) string {
-	sort.Strings(names)
-	if len(names) > 3 {
-		return fmt.Sprintf("%s and %d more", strings.Join(names[:3], ","), len(names)-3)
-	}
-	return strings.Join(names, ",")
-}
-
-func detailMessage(machines []string, messages map[string][]string) string {
-	if len(machines) != 1 {
-		return ""
-	}
-	message := messages[machines[0]]
-	if len(message) != 0 {
-		return fmt.Sprintf(": %s", strings.Join(message, ", "))
-	}
-	return ""
-}
-
-func removeConfiguredCondition(machine *capi.Machine) *capi.Machine {
-	if machine == nil || len(machine.Status.Conditions) == 0 {
-		return machine
-	}
-
-	conds := make([]capi.Condition, 0, len(machine.Status.Conditions))
-	for _, c := range machine.Status.Conditions {
-		if string(c.Type) != string(rke2.Reconciled) {
-			conds = append(conds, c)
-		}
-	}
-
-	if len(conds) == len(machine.Status.Conditions) {
-		return machine
-	}
-
-	machine = machine.DeepCopy()
-	machine.SetConditions(conds)
-	return machine
-}
-
-func (p *Planner) Process(cp *rkev1.RKEControlPlane) error {
+func (p *Planner) process(cp *rkev1.RKEControlPlane, status rkev1.RKEControlPlaneStatus) (rkev1.RKEControlPlaneStatus, error) {
 	logrus.Debugf("[planner] %s/%s: attempting to lock %s for processing", cp.Namespace, cp.Name, string(cp.UID))
 	p.locker.Lock(string(cp.UID))
 	defer func(namespace, name, uid string) {
@@ -261,39 +207,46 @@ func (p *Planner) Process(cp *rkev1.RKEControlPlane) error {
 
 	releaseData := rke2.GetKDMReleaseData(p.ctx, cp)
 	if releaseData == nil {
-		return ErrWaitingf("%s/%s: releaseData nil for version %s", cp.Namespace, cp.Name, cp.Spec.KubernetesVersion)
+		return status, ErrWaitingf("%s/%s: releaseData nil for version %s", cp.Namespace, cp.Name, cp.Spec.KubernetesVersion)
 	}
 
 	capiCluster, err := rke2.FindOwnerCAPICluster(cp, p.capiClusters)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
-			logrus.Infof("[planner] %s/%s: waiting: CAPI cluster does not exist", cp.Namespace, cp.Name)
-			p.rkeControlPlanes.EnqueueAfter(cp.Namespace, cp.Name, 10*time.Second)
-			return generic.ErrSkip
+			return status, ErrWaiting("CAPI cluster does not exist")
 		}
-		logrus.Errorf("[planner] %s/%s: error getting CAPI cluster %v", cp.Namespace, cp.Name, err)
-		return err
+		return status, err
 	}
 
 	if capiCluster == nil {
-		logrus.Infof("[planner] %s/%s: waiting: CAPI cluster does not exist", cp.Namespace, cp.Name)
-		p.rkeControlPlanes.EnqueueAfter(cp.Namespace, cp.Name, 10*time.Second)
-		return generic.ErrSkip
+		return status, ErrWaiting("CAPI cluster does not exist")
 	}
 
 	if !capiCluster.DeletionTimestamp.IsZero() {
+		// because we pause reconciliation during encryption key rotation and cert rotation, unpause it. This is effectively
+		// a hack since the planner pauses the entire cluster during
+		if capiannotations.IsPaused(capiCluster, cp) {
+			err = p.pauseCAPICluster(cp, false)
+			if err != nil {
+				logrus.Errorf("error unpausing CAPI cluster during deletion: %s", err)
+			}
+		}
 		logrus.Infof("[planner] %s/%s: reconciliation stopped: CAPI cluster is deleting", cp.Namespace, cp.Name)
-		return err
+		return status, nil
+	}
+
+	if !capiCluster.Status.InfrastructureReady {
+		return status, ErrWaitingf("rkecluster %s/%s: waiting for infrastructure ready", cp.Namespace, cp.Name)
 	}
 
 	plan, err := p.store.Load(capiCluster, cp)
 	if err != nil {
-		return err
+		return status, err
 	}
 
-	cp, clusterSecretTokens, err := p.generateSecrets(cp)
+	clusterSecretTokens, err := p.generateSecrets(cp)
 	if err != nil {
-		return err
+		return status, err
 	}
 
 	var (
@@ -301,65 +254,51 @@ func (p *Planner) Process(cp *rkev1.RKEControlPlane) error {
 		joinServer       string
 	)
 
-	if errs := p.createEtcdSnapshot(cp, clusterSecretTokens, plan); len(errs) > 0 {
-		var errMsg string
-		for i, err := range errs {
-			if err == nil {
-				continue
-			}
-			if i == 0 {
-				errMsg = err.Error()
-			} else {
-				errMsg = errMsg + ", " + err.Error()
-			}
-		}
-		return ErrWaiting(errMsg)
+	if status, err = p.createEtcdSnapshot(cp, status, clusterSecretTokens, plan); err != nil {
+		return status, err
 	}
 
-	if err = p.restoreEtcdSnapshot(cp, clusterSecretTokens, plan); err != nil {
-		return err
+	if status, err = p.restoreEtcdSnapshot(cp, status, clusterSecretTokens, plan); err != nil {
+		return status, err
 	}
 
-	if err = p.certificateRotation.RotateCertificates(cp, plan); err != nil {
-		return err
+	if status, err = p.rotateCertificates(cp, status, plan); err != nil {
+		return status, err
 	}
 
-	if err = p.rotateEncryptionKeys(cp, releaseData, plan); err != nil {
-		return err
+	if status, err = p.rotateEncryptionKeys(cp, status, releaseData, plan); err != nil {
+		return status, err
 	}
 
-	// pausing only affects machine provisioning/reconciliation "extras"
+	// pausing the control plane only affects machine reconciliation: etcd snapshot/restore, encryption key & cert
+	// rotation are not interruptable processes, and therefore must always be completed when requested
 	if capiannotations.IsPaused(capiCluster, cp) {
-		return ErrWaitingf("rkecluster %s/%s: CAPI cluster or RKEControlPlane is paused", cp.Namespace, cp.Name)
-	}
-
-	if !capiCluster.Status.InfrastructureReady {
-		return ErrWaitingf("rkecluster %s/%s: waiting for infrastructure ready", cp.Namespace, cp.Name)
+		return status, ErrWaitingf("rkecluster %s/%s: CAPI cluster or RKEControlPlane is paused", cp.Namespace, cp.Name)
 	}
 
 	// on the first run through, electInitNode will return a `generic.ErrSkip` as it is attempting to wait for the cache to catch up.
 	joinServer, err = p.electInitNode(cp, plan)
 	if err != nil {
-		return err
+		return status, err
 	}
 
-	// select all etcd and then filter to just initNodes to that unavailable count is correct
+	// select all etcd and then filter to just initNodes so that unavailable count is correct
 	err = p.reconcile(cp, clusterSecretTokens, plan, true, bootstrapTier, isEtcd, isNotInitNodeOrIsDeleting,
 		"1", "",
 		cp.Spec.UpgradeStrategy.ControlPlaneDrainOptions)
 	firstIgnoreError, err = ignoreErrors(firstIgnoreError, err)
 	if err != nil {
-		return err
+		return status, err
 	}
 
 	if joinServer == "" {
 		_, joinServer, _, err = p.findInitNode(cp, plan)
 		if err != nil {
-			return err
+			return status, err
 		} else if joinServer == "" && firstIgnoreError != nil {
-			return ErrWaiting(firstIgnoreError.Error() + " and join url to be available on bootstrap node")
+			return status, ErrWaiting(firstIgnoreError.Error() + " and join url to be available on bootstrap node")
 		} else if joinServer == "" {
-			return ErrWaiting("waiting for join url to be available on bootstrap node")
+			return status, ErrWaiting("waiting for join url to be available on bootstrap node")
 		}
 	}
 
@@ -368,7 +307,7 @@ func (p *Planner) Process(cp *rkev1.RKEControlPlane) error {
 		cp.Spec.UpgradeStrategy.ControlPlaneDrainOptions)
 	firstIgnoreError, err = ignoreErrors(firstIgnoreError, err)
 	if err != nil {
-		return err
+		return status, err
 	}
 
 	err = p.reconcile(cp, clusterSecretTokens, plan, true, controlPlaneTier, isControlPlane, isInitNodeOrDeleting,
@@ -376,21 +315,17 @@ func (p *Planner) Process(cp *rkev1.RKEControlPlane) error {
 		cp.Spec.UpgradeStrategy.ControlPlaneDrainOptions)
 	firstIgnoreError, err = ignoreErrors(firstIgnoreError, err)
 	if err != nil {
-		return err
+		return status, err
 	}
 
 	joinServer = getControlPlaneJoinURL(plan)
 	if joinServer == "" {
-		return ErrWaiting("waiting for control plane to be available")
+		return status, ErrWaiting("waiting for control plane to be available")
 	}
 
-	if cp.Status.Initialized != true {
-		cp.Status.Initialized = true
-		_, err := p.rkeControlPlanes.UpdateStatus(cp)
-		if err != nil {
-			return err
-		}
-		return ErrWaiting("setting control plane to initialized")
+	if status.Initialized != true {
+		status.Initialized = true
+		return status, ErrWaiting("marking control plane as initialized")
 	}
 
 	err = p.reconcile(cp, clusterSecretTokens, plan, false, workerTier, isOnlyWorker, isInitNodeOrDeleting,
@@ -398,137 +333,14 @@ func (p *Planner) Process(cp *rkev1.RKEControlPlane) error {
 		cp.Spec.UpgradeStrategy.WorkerDrainOptions)
 	firstIgnoreError, err = ignoreErrors(firstIgnoreError, err)
 	if err != nil {
-		return err
+		return status, err
 	}
 
 	if firstIgnoreError != nil {
-		return ErrWaiting(firstIgnoreError.Error())
+		return status, ErrWaiting(firstIgnoreError.Error())
 	}
 
-	return nil
-}
-
-// ignoreErrors accepts two errors. If the err is type errIgnore, it will return (err, nil) if firstIgnoreErr is nil or (firstIgnoreErr, nil).
-// Otherwise, it will simply return (firstIgnoreErr, err)
-func ignoreErrors(firstIgnoreError error, err error) (error, error) {
-	var errIgnore errIgnore
-	if errors.As(err, &errIgnore) {
-		if firstIgnoreError == nil {
-			return err, nil
-		}
-		return firstIgnoreError, nil
-	}
-	return firstIgnoreError, err
-}
-
-// getControlPlaneJoinURL will return the first encountered join URL based on machine annotations for machines that are
-// marked as control plane nodes
-func getControlPlaneJoinURL(plan *plan.Plan) string {
-	entries := collect(plan, isControlPlane)
-	if len(entries) == 0 {
-		return ""
-	}
-
-	return entries[0].Metadata.Annotations[rke2.JoinURLAnnotation]
-}
-
-// isUnavailable returns a boolean indicating whether the machine/node corresponding to the planEntry is available
-// If the plan is not in sync or the machine is being drained, it will return true.
-func isUnavailable(entry *planEntry) bool {
-	return !entry.Plan.InSync || isInDrain(entry)
-}
-
-func isInDrain(entry *planEntry) bool {
-	return entry.Metadata.Annotations[rke2.PreDrainAnnotation] != "" ||
-		entry.Metadata.Annotations[rke2.PostDrainAnnotation] != "" ||
-		entry.Metadata.Annotations[rke2.DrainAnnotation] != "" ||
-		entry.Metadata.Annotations[rke2.UnCordonAnnotation] != ""
-}
-
-// planAppliedButWaitingForProbes returns a boolean indicating whether a plan was successfully able to be applied, but
-// the probes have not been successful. This indicates that while the overall plan hasn't completed yet, it's
-// instructions have and can now be overridden if necessary without causing thrashing.
-func planAppliedButWaitingForProbes(entry *planEntry) bool {
-	return entry.Plan.AppliedPlan != nil && reflect.DeepEqual(entry.Plan.Plan, *entry.Plan.AppliedPlan) && !entry.Plan.Healthy
-}
-
-func calculateConcurrency(maxUnavailable string, entries []*planEntry, exclude roleFilter) (int, int, error) {
-	var (
-		count, unavailable int
-	)
-
-	for _, entry := range entries {
-		if !exclude(entry) {
-			count++
-		}
-		if entry.Plan != nil && isUnavailable(entry) {
-			unavailable++
-		}
-	}
-
-	num, err := strconv.Atoi(maxUnavailable)
-	if err == nil {
-		return num, unavailable, nil
-	}
-
-	if maxUnavailable == "" {
-		return 1, unavailable, nil
-	}
-
-	percentage, err := strconv.ParseFloat(strings.TrimSuffix(maxUnavailable, "%"), 64)
-	if err != nil {
-		return 0, 0, fmt.Errorf("concurrency must be a number or a percentage: %w", err)
-	}
-
-	max := float64(count) * (percentage / float64(100))
-	return int(math.Ceil(max)), unavailable, nil
-}
-
-func minorPlanChangeDetected(old, new plan.NodePlan) bool {
-	if !equality.Semantic.DeepEqual(old.Instructions, new.Instructions) ||
-		!equality.Semantic.DeepEqual(old.PeriodicInstructions, new.PeriodicInstructions) ||
-		!equality.Semantic.DeepEqual(old.Probes, new.Probes) ||
-		old.Error != new.Error {
-		return false
-	}
-
-	if len(old.Files) == 0 && len(new.Files) == 0 {
-		// if the old plan had no files and no new files were found, there was no plan change detected
-		return false
-	}
-
-	newFiles := make(map[string]plan.File)
-	for _, newFile := range new.Files {
-		newFiles[newFile.Path] = newFile
-	}
-
-	for _, oldFile := range old.Files {
-		if newFile, ok := newFiles[oldFile.Path]; ok {
-			if oldFile.Content == newFile.Content {
-				// If the file already exists, we don't care if it is minor
-				delete(newFiles, oldFile.Path)
-			}
-		} else {
-			// the old file didn't exist in the new file map,
-			// so check to see if the old file is major and if it is, this is not a minor change.
-			if !oldFile.Minor {
-				return false
-			}
-		}
-	}
-
-	if len(newFiles) > 0 {
-		// If we still have new files in the list, check to see if any of them are major, and if they are, this is not a major change
-		for _, newFile := range newFiles {
-			// if we find a new major file, there is not a minor change
-			if !newFile.Minor {
-				return false
-			}
-		}
-		// There were new files and all were not major
-		return true
-	}
-	return false
+	return status, nil
 }
 
 func (p *Planner) reconcile(controlPlane *rkev1.RKEControlPlane, tokensSecret plan.Secret, clusterPlan *plan.Plan, required bool,
@@ -554,7 +366,7 @@ func (p *Planner) reconcile(controlPlane *rkev1.RKEControlPlane, tokensSecret pl
 		}
 
 		// The Reconciled condition should be removed when summarizing so that the messages are not duplicated.
-		summary := summary.Summarize(removeConfiguredCondition(entry.Machine))
+		summary := summary.Summarize(removeReconciledCondition(entry.Machine))
 		if summary.Error {
 			errMachines = append(errMachines, entry.Machine.Name)
 		}
@@ -699,209 +511,6 @@ func (p *Planner) reconcile(controlPlane *rkev1.RKEControlPlane, tokensSecret pl
 	return nil
 }
 
-func kubeletVersionUpToDate(controlPlane *rkev1.RKEControlPlane, machine *capi.Machine) bool {
-	if controlPlane == nil || machine == nil || machine.Status.NodeInfo == nil || !controlPlane.Status.AgentConnected {
-		// If any of controlPlane, machine, or machine.Status.NodeInfo are nil, then provisioning is still happening.
-		// If controlPlane.Status.AgentConnected is false, then it cannot be reliably determined if the kubelet is up-to-date.
-		// Return true so that provisioning is not slowed down.
-		return true
-	}
-
-	kubeletVersion, err := semver.NewVersion(strings.TrimPrefix(machine.Status.NodeInfo.KubeletVersion, "v"))
-	if err != nil {
-		return false
-	}
-
-	kubernetesVersion, err := semver.NewVersion(strings.TrimPrefix(controlPlane.Spec.KubernetesVersion, "v"))
-	if err != nil {
-		return false
-	}
-
-	// Compare and ignore pre-release and build metadata
-	return kubeletVersion.Major() == kubernetesVersion.Major() && kubeletVersion.Minor() == kubernetesVersion.Minor() && kubeletVersion.Patch() == kubernetesVersion.Patch()
-}
-
-// splitArgKeyVal takes a value and returns a pair (key, value) of the argument, or two empty strings if there was not
-// a parsed key/val.
-func splitArgKeyVal(val string, delim string) (string, string) {
-	if splitSubArg := strings.SplitN(val, delim, 2); len(splitSubArg) == 2 {
-		return splitSubArg[0], splitSubArg[1]
-	}
-	return "", ""
-}
-
-// getArgValue will search the passed in interface (arg) for a key that matches the searchArg. If a match is found, it
-// returns the value of the argument, otherwise it returns an empty string.
-func getArgValue(arg interface{}, searchArg string, delim string) string {
-	logrus.Tracef("getArgValue (searchArg: %s, delim: %s) type of %v is %T", searchArg, delim, arg, arg)
-	switch arg := arg.(type) {
-	case []interface{}:
-		logrus.Tracef("getArgValue (searchArg: %s, delim: %s) encountered interface slice %v", searchArg, delim, arg)
-		return getArgValue(convertInterfaceSliceToStringSlice(arg), searchArg, delim)
-	case []string:
-		logrus.Tracef("getArgValue (searchArg: %s, delim: %s) found string array: %v", searchArg, delim, arg)
-		for _, v := range arg {
-			argKey, argVal := splitArgKeyVal(v, delim)
-			if argKey == searchArg {
-				return argVal
-			}
-		}
-	case string:
-		logrus.Tracef("getArgValue (searchArg: %s, delim: %s) found string: %v", searchArg, delim, arg)
-		argKey, argVal := splitArgKeyVal(arg, delim)
-		if argKey == searchArg {
-			return argVal
-		}
-	}
-	logrus.Tracef("getArgValue (searchArg: %s, delim: %s) did not find searchArg in: %v", searchArg, delim, arg)
-	return ""
-}
-
-// convertInterfaceSliceToStringSlice converts an input interface slice to a string slice by iterating through the
-// interface slice and converting each entry to a string using Sprintf.
-func convertInterfaceSliceToStringSlice(input []interface{}) []string {
-	var stringArr []string
-	for _, v := range input {
-		stringArr = append(stringArr, fmt.Sprintf("%v", v))
-	}
-	return stringArr
-}
-
-// appendToInterface will return an interface that has the value appended to it. The interface returned will always be
-// a slice of strings, and will convert a raw string to a slice of strings.
-func appendToInterface(input interface{}, elem string) []string {
-	switch input := input.(type) {
-	case []interface{}:
-		stringArr := convertInterfaceSliceToStringSlice(input)
-		return appendToInterface(stringArr, elem)
-	case []string:
-		return append(input, elem)
-	case string:
-		return []string{input, elem}
-	}
-	return []string{elem}
-}
-
-// convertInterfaceToStringSlice converts an input interface to a string slice by determining its type and converting
-// it accordingly. If it is not a known convertible type, an empty string slice is returned.
-func convertInterfaceToStringSlice(input interface{}) []string {
-	switch input := input.(type) {
-	case []interface{}:
-		return convertInterfaceSliceToStringSlice(input)
-	case []string:
-		return input
-	case string:
-		return []string{input}
-	}
-	return []string{}
-}
-
-// renderArgAndMount takes the value of the existing value of the argument and mount and renders an output argument and
-// mount based on the value of the input interfaces. It will always return a set of slice of strings.
-func renderArgAndMount(existingArg interface{}, existingMount interface{}, runtime string, defaultSecurePort string, defaultCertDir string) ([]string, []string) {
-	retArg := convertInterfaceToStringSlice(existingArg)
-	retMount := convertInterfaceToStringSlice(existingMount)
-	renderedCertDir := fmt.Sprintf(defaultCertDir, runtime)
-	// Set a default value for certDirArg and certDirMount (for the case where the user does not set these values)
-	// If a user sets these values, we will set them to an empty string and check to make sure they are not empty
-	// strings before adding them to the rendered arg/mount slices.
-	certDirMount := fmt.Sprintf("%s:%s", renderedCertDir, renderedCertDir)
-	certDirArg := fmt.Sprintf("%s=%s", CertDirArgument, renderedCertDir)
-	securePortArg := fmt.Sprintf("%s=%s", SecurePortArgument, defaultSecurePort)
-	if len(retArg) > 0 {
-		tlsCF := getArgValue(retArg, TLSCertFileArgument, "=")
-		if tlsCF == "" {
-			// If the --tls-cert-file Argument was not set in the config for this component, we can look to see if
-			// the --cert-dir was set. --tls-cert-file (if set) will take precedence over --tls-cert-file
-			certDir := getArgValue(retArg, CertDirArgument, "=")
-			if certDir != "" {
-				// If --cert-dir was set, we use the --cert-dir that the user provided and should set certDirArg to ""
-				// so that we don't append it.
-				certDirArg = ""
-				// Set certDirMount to an intelligently interpolated value based off of the custom certDir set by the
-				// user.
-				certDirMount = fmt.Sprintf("%s:%s", certDir, certDir)
-			}
-		} else {
-			// If the --tls-cert-file argument was set by the user, we don't need to set --cert-dir, but still should
-			// render a --cert-dir-mount that is based on the --tls-cert-file argument to map the files necessary
-			// to the static pod (in the RKE2 case)
-			certDirArg = ""
-			dir := filepath.Dir(tlsCF)
-			certDirMount = fmt.Sprintf("%s:%s", dir, dir)
-		}
-		sPA := getArgValue(retArg, SecurePortArgument, "=")
-		if sPA != "" {
-			// If the user set a custom --secure-port, set --secure-port to an empty string so we don't override
-			// their custom value
-			securePortArg = ""
-		}
-	}
-	if certDirArg != "" {
-		logrus.Debugf("renderArgAndMount adding %s to component arguments", certDirArg)
-		retArg = appendToInterface(existingArg, certDirArg)
-	}
-	if securePortArg != "" {
-		logrus.Debugf("renderArgAndMount adding %s to component arguments", securePortArg)
-		retArg = appendToInterface(retArg, securePortArg)
-	}
-	if runtime == rke2.RuntimeRKE2 {
-		// todo: make sure the certDirMount is not already set by the user to some custom value before we set it for the static pod extraMount
-		logrus.Debugf("renderArgAndMount adding %s to component mounts", certDirMount)
-		retMount = appendToInterface(existingMount, certDirMount)
-	}
-	return retArg, retMount
-}
-
-func PruneEmpty(config map[string]interface{}) {
-	for k, v := range config {
-		if v == nil {
-			delete(config, k)
-		}
-		switch t := v.(type) {
-		case string:
-			if t == "" {
-				delete(config, k)
-			}
-		case []interface{}:
-			if len(t) == 0 {
-				delete(config, k)
-			}
-		case []string:
-			if len(t) == 0 {
-				delete(config, k)
-			}
-		}
-	}
-}
-
-// getTaints returns a slice of taints for the machine in question
-func getTaints(entry *planEntry) (result []corev1.Taint, _ error) {
-	data := entry.Metadata.Annotations[rke2.TaintsAnnotation]
-	if data != "" {
-		if err := json.Unmarshal([]byte(data), &result); err != nil {
-			return result, err
-		}
-	}
-
-	if !isWorker(entry) {
-		if isEtcd(entry) {
-			result = append(result, corev1.Taint{
-				Key:    "node-role.kubernetes.io/etcd",
-				Effect: corev1.TaintEffectNoExecute,
-			})
-		}
-		if isControlPlane(entry) {
-			result = append(result, corev1.Taint{
-				Key:    "node-role.kubernetes.io/control-plane",
-				Effect: corev1.TaintEffectNoSchedule,
-			})
-		}
-	}
-
-	return
-}
-
 // generatePlanWithConfigFiles will generate a node plan with the corresponding config files for the entry in question.
 // Notably, it will discard the existing nodePlan in the given entry.
 func (p *Planner) generatePlanWithConfigFiles(controlPlane *rkev1.RKEControlPlane, tokensSecret plan.Secret, entry *planEntry, joinServer string) (nodePlan plan.NodePlan, config map[string]interface{}, err error) {
@@ -989,92 +598,6 @@ func (p *Planner) desiredPlan(controlPlane *rkev1.RKEControlPlane, tokensSecret 
 	return nodePlan, nil
 }
 
-func getInstallerImage(controlPlane *rkev1.RKEControlPlane) string {
-	runtime := rke2.GetRuntime(controlPlane.Spec.KubernetesVersion)
-	installerImage := settings.SystemAgentInstallerImage.Get()
-	installerImage = installerImage + runtime + ":" + strings.ReplaceAll(controlPlane.Spec.KubernetesVersion, "+", "-")
-	return image.ResolveWithControlPlane(installerImage, controlPlane)
-}
-
-func isEtcd(entry *planEntry) bool {
-	return entry.Metadata != nil && entry.Metadata.Labels[rke2.EtcdRoleLabel] == "true"
-}
-
-func isInitNode(entry *planEntry) bool {
-	return entry.Metadata != nil && entry.Metadata.Labels[rke2.InitNodeLabel] == "true"
-}
-
-func isInitNodeOrDeleting(entry *planEntry) bool {
-	return isInitNode(entry) || isDeleting(entry)
-}
-
-func IsEtcdOnlyInitNode(entry *planEntry) bool {
-	return isInitNode(entry) && IsOnlyEtcd(entry)
-}
-
-func isNotInitNodeOrIsDeleting(entry *planEntry) bool {
-	return !isInitNode(entry) || isDeleting(entry)
-}
-
-func isDeleting(entry *planEntry) bool {
-	return entry.Machine.DeletionTimestamp != nil
-}
-
-// isFailed returns true if the provided entry machine.status.phase is failed
-func isFailed(entry *planEntry) bool {
-	return entry.Machine.Status.Phase == string(capi.MachinePhaseFailed)
-}
-
-// canBeInitNode returns true if the provided entry is an etcd node, is not deleting, is not failed, and has its infrastructure ready
-// We should wait for the infrastructure condition to be marked as ready because we need the IP address(es) set prior to bootstrapping the node.
-func canBeInitNode(entry *planEntry) bool {
-	return isEtcd(entry) && !isDeleting(entry) && !isFailed(entry) && rke2.InfrastructureReady.IsTrue(entry.Machine)
-}
-
-func isControlPlane(entry *planEntry) bool {
-	return entry.Metadata != nil && entry.Metadata.Labels[rke2.ControlPlaneRoleLabel] == "true"
-}
-
-func isControlPlaneAndNotInitNode(entry *planEntry) bool {
-	return isControlPlane(entry) && !isInitNode(entry)
-}
-
-func isControlPlaneEtcd(entry *planEntry) bool {
-	return isControlPlane(entry) || isEtcd(entry)
-}
-
-func IsOnlyEtcd(entry *planEntry) bool {
-	return isEtcd(entry) && !isControlPlane(entry)
-}
-
-func isOnlyControlPlane(entry *planEntry) bool {
-	return !isEtcd(entry) && isControlPlane(entry)
-}
-
-func isWorker(entry *planEntry) bool {
-	return entry.Metadata != nil && entry.Metadata.Labels[rke2.WorkerRoleLabel] == "true"
-}
-
-func noRole(entry *planEntry) bool {
-	return !isEtcd(entry) && !isControlPlane(entry) && !isWorker(entry)
-}
-
-func anyRole(entry *planEntry) bool {
-	return !noRole(entry)
-}
-
-func anyRoleWithoutWindows(entry *planEntry) bool {
-	return !noRole(entry) && notWindows(entry)
-}
-
-func isOnlyWorker(entry *planEntry) bool {
-	return !isEtcd(entry) && !isControlPlane(entry) && isWorker(entry)
-}
-
-func notWindows(entry *planEntry) bool {
-	return entry.Machine.Status.NodeInfo.OperatingSystem != windows
-}
-
 type planEntry struct {
 	Machine  *capi.Machine
 	Plan     *plan.Node
@@ -1102,14 +625,13 @@ func collect(plan *plan.Plan, include roleFilter) (result []*planEntry) {
 }
 
 // generateSecrets generates the server/agent tokens for a v2prov cluster
-func (p *Planner) generateSecrets(controlPlane *rkev1.RKEControlPlane) (*rkev1.RKEControlPlane, plan.Secret, error) {
+func (p *Planner) generateSecrets(controlPlane *rkev1.RKEControlPlane) (plan.Secret, error) {
 	_, secret, err := p.ensureRKEStateSecret(controlPlane)
 	if err != nil {
-		return nil, secret, err
+		return secret, err
 	}
 
-	controlPlane = controlPlane.DeepCopy()
-	return controlPlane, secret, nil
+	return secret, nil
 }
 
 func (p *Planner) ensureRKEStateSecret(controlPlane *rkev1.RKEControlPlane) (string, plan.Secret, error) {
@@ -1165,46 +687,7 @@ func (p *Planner) ensureRKEStateSecret(controlPlane *rkev1.RKEControlPlane) (str
 	}, nil
 }
 
-type helmChartConfig struct {
-	metav1.TypeMeta   `json:",inline"`
-	metav1.ObjectMeta `json:"metadata,omitempty"`
-
-	Spec helmChartConfigSpec `json:"spec,omitempty"`
-}
-
-type helmChartConfigSpec struct {
-	ValuesContent string `json:"valuesContent,omitempty"`
-}
-
-func (h *helmChartConfig) DeepCopyObject() runtime.Object {
-	panic("unsupported")
-}
-
-func (p *Planner) enqueueAndSkip(cp *rkev1.RKEControlPlane) error {
-	p.rkeControlPlanes.EnqueueAfter(cp.Namespace, cp.Name, 10*time.Second)
-	return generic.ErrSkip
-}
-
-// enqueueIfErrWaiting will enqueue the control plan if err is ErrWaiting, otherwise err is returned.
-// Some plan store functions as well as internal functions can return ErrWaiting, for instance when the plan has been
-// applied, but output is not yet available for periodic status.
-func (p *Planner) enqueueIfErrWaiting(cp *rkev1.RKEControlPlane, err error) error {
-	if err != nil {
-		if isErrWaiting(err) {
-			logrus.Tracef("Enqueuing [%s] because of ErrWaiting: %s", cp.Spec.ClusterName, err.Error())
-			return p.enqueueAndSkip(cp)
-		}
-		return err
-	}
-	return nil
-}
-
-func isErrWaiting(err error) bool {
-	var errWaiting ErrWaiting
-	return errors.As(err, &errWaiting)
-}
-
-func (p *Planner) toggleHealthChecksForCluster(cp *rkev1.RKEControlPlane, pause bool) error {
+func (p *Planner) pauseCAPICluster(cp *rkev1.RKEControlPlane, pause bool) error {
 	if cp == nil {
 		return fmt.Errorf("cannot toggle health checks for nil controlplane")
 	}

@@ -109,11 +109,9 @@ func (h *handler) OnChange(cp *rkev1.RKEControlPlane, status rkev1.RKEControlPla
 		return status, err
 	}
 
-	connected := clusterconnected.Connected.IsTrue(cluster)
-	if status.AgentConnected != connected {
-		status.AgentConnected = connected
-		logrus.Infof("[rkecontrolplane] %s/%s: setting agentConnected: %v", cp.Namespace, cp.Name, connected)
-	}
+	status.Ready = rke2.Ready.IsTrue(cluster)
+	status.Initialized = rke2.Ready.IsTrue(cluster)
+	status.AgentConnected = clusterconnected.Connected.IsTrue(cluster)
 
 	return status, nil
 }

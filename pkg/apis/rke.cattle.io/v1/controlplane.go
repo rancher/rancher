@@ -42,6 +42,7 @@ type RKEControlPlaneStatus struct {
 	CertificateRotationGeneration int64                               `json:"certificateRotationGeneration"`
 	RotateEncryptionKeys          *RotateEncryptionKeys               `json:"rotateEncryptionKeys,omitempty"`
 	RotateEncryptionKeysPhase     RotateEncryptionKeysPhase           `json:"rotateEncryptionKeysPhase,omitempty"`
+	RotateEncryptionKeysLeader    string                              `json:"rotateEncryptionKeysLeader,omitempty"`
 	ETCDSnapshotRestore           *ETCDSnapshotRestore                `json:"etcdSnapshotRestore,omitempty"`
 	ETCDSnapshotRestorePhase      ETCDSnapshotPhase                   `json:"etcdSnapshotRestorePhase,omitempty"`
 	ETCDSnapshotCreate            *ETCDSnapshotCreate                 `json:"etcdSnapshotCreate,omitempty"`

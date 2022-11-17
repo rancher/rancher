@@ -23,7 +23,6 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2/unmanaged"
 	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/provisioningv2/capi"
-	planner2 "github.com/rancher/rancher/pkg/provisioningv2/rke2/planner"
 	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/sirupsen/logrus"
 )
@@ -38,7 +37,7 @@ func Register(ctx context.Context, clients *wrangler.Context) error {
 	}
 
 	if features.RKE2.Enabled() {
-		rkePlanner := planner2.New(ctx, clients)
+		rkePlanner := planner.New(ctx, clients)
 		if features.MCM.Enabled() {
 			dynamicschema.Register(ctx, clients)
 			machineprovision.Register(ctx, clients)

@@ -8,7 +8,6 @@ import (
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2"
 	v1 "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
-	"github.com/rancher/rancher/pkg/provisioningv2/rke2/planner"
 	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/rancher/wrangler/pkg/generic"
 	"github.com/rancher/wrangler/pkg/relatedresource"
@@ -19,11 +18,11 @@ import (
 )
 
 type handler struct {
-	planner       *planner.Planner
+	planner       *Planner
 	controlPlanes v1.RKEControlPlaneController
 }
 
-func Register(ctx context.Context, clients *wrangler.Context, planner *planner.Planner) {
+func Register(ctx context.Context, clients *wrangler.Context, planner *Planner) {
 	h := handler{
 		planner:       planner,
 		controlPlanes: clients.RKE.RKEControlPlane(),
@@ -60,28 +59,32 @@ func (h *handler) OnChange(cp *rkev1.RKEControlPlane, status rkev1.RKEControlPla
 	status.ObservedGeneration = cp.Generation
 
 	logrus.Debugf("[planner] rkecluster %s/%s: calling planner process", cp.Namespace, cp.Name)
-	err := h.planner.Process(cp)
-	var errWaiting planner.ErrWaiting
-	if errors.As(err, &errWaiting) {
-		logrus.Infof("[planner] rkecluster %s/%s: waiting: %v", cp.Namespace, cp.Name, err)
-		rke2.Ready.SetStatus(&status, "Unknown")
-		rke2.Ready.Message(&status, err.Error())
-		rke2.Ready.Reason(&status, "Waiting")
-		return status, nil
-	}
-	if !errors.Is(err, generic.ErrSkip) {
-		rke2.Ready.SetError(&status, "", err)
-		if err != nil {
-			// don't return error because the controller will reset the status and then not assign the error
-			// because we don't register this handler with an associated condition. This is pretty much a bug in the
-			// framework but it's too impactful to change right before 2.6.0 so we should consider changing this later.
-			// If you are reading this years later we'll just assume we decided not to change the framework.
+	status, err := h.planner.process(cp, status)
+	if err != nil {
+		if isErrWaiting(err) {
+			logrus.Infof("[planner] rkecluster %s/%s: waiting: %v", cp.Namespace, cp.Name, err)
+			// if still waiting for same condition, convert err to generic.ErrSkip to avoid updating controlplane status and
+			// enqueue until no longer waiting.
+			if rke2.Ready.GetMessage(&status) == err.Error() && rke2.Ready.GetStatus(&status) == "Unknown" && rke2.Ready.GetReason(&status) == "Waiting" {
+				err = generic.ErrSkip
+			} else {
+				rke2.Ready.SetStatus(&status, "Unknown")
+				rke2.Ready.Message(&status, err.Error())
+				rke2.Ready.Reason(&status, "Waiting")
+				err = nil
+			}
+		} else if !errors.Is(err, generic.ErrSkip) {
 			logrus.Errorf("[planner] rkecluster %s/%s: error encountered during plan processing was %v", cp.Namespace, cp.Name, err)
+			rke2.Ready.SetError(&status, "", err)
+		}
+		if errors.Is(err, generic.ErrSkip) {
 			h.controlPlanes.EnqueueAfter(cp.Namespace, cp.Name, 5*time.Second)
 		}
 	} else {
-		logrus.Debugf("[planner] rkecluster %s/%s: objects changed, waiting for cache sync before finishing reconciliation", cp.Namespace, cp.Name)
+		logrus.Debugf("[planner] rkecluster %s/%s: reconciliation complete", cp.Namespace, cp.Name)
+		rke2.Ready.True(&status)
+		rke2.Ready.Message(&status, "")
+		rke2.Ready.Reason(&status, "")
 	}
-	logrus.Debugf("[planner] rkecluster %s/%s: reconciliation complete", cp.Namespace, cp.Name)
-	return status, nil
+	return status, err
 }

@@ -199,6 +199,21 @@ func addVSphereCharts(controlPlane *rkev1.RKEControlPlane, entry *planEntry) (ma
 	return controlPlane.Spec.ChartValues.Data, nil
 }
 
+type helmChartConfig struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+
+	Spec helmChartConfigSpec `json:"spec,omitempty"`
+}
+
+type helmChartConfigSpec struct {
+	ValuesContent string `json:"valuesContent,omitempty"`
+}
+
+func (h *helmChartConfig) DeepCopyObject() runtime.Object {
+	panic("unsupported")
+}
+
 func (p *Planner) addChartConfigs(nodePlan plan.NodePlan, controlPlane *rkev1.RKEControlPlane, entry *planEntry) (plan.NodePlan, error) {
 	if isOnlyWorker(entry) {
 		return nodePlan, nil
