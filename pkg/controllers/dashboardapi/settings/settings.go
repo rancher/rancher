@@ -87,7 +87,7 @@ func (s *settingsProvider) SetAll(settingsMap map[string]settings.Setting) error
 
 	for name, setting := range settingsMap {
 		key := settings.GetEnvKey(name)
-		envValue := os.Getenv(key)
+		envValue, envOk := os.LookupEnv(key)
 
 		obj, err := s.settings.Get(setting.Name, metav1.GetOptions{})
 		if errors.IsNotFound(err) {
@@ -97,7 +97,7 @@ func (s *settingsProvider) SetAll(settingsMap map[string]settings.Setting) error
 				},
 				Default: setting.Default,
 			}
-			if envValue != "" {
+			if envOk {
 				newSetting.Source = "env"
 				newSetting.Value = envValue
 			}
@@ -120,15 +120,15 @@ func (s *settingsProvider) SetAll(settingsMap map[string]settings.Setting) error
 				obj.Default = setting.Default
 				update = true
 			}
-			if envValue != "" && obj.Source != "env" {
+			if envOk && obj.Source != "env" {
 				obj.Source = "env"
 				update = true
 			}
-			if envValue == "" && obj.Source == "env" {
+			if !envOk && obj.Source == "env" {
 				obj.Source = ""
 				update = true
 			}
-			if envValue != "" && obj.Value != envValue {
+			if envOk && obj.Value != envValue {
 				obj.Value = envValue
 				update = true
 			}
