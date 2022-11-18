@@ -185,6 +185,7 @@ steps:
 
 - name: github_binary_prerelease
   image: plugins/github-release
+  failure: ignore
   settings:
     api_key:
       from_secret: github_token
@@ -206,6 +207,7 @@ steps:
 
 - name: github_binary_release
   image: plugins/github-release
+  failure: ignore
   settings:
     api_key:
       from_secret: github_token
