@@ -40,6 +40,7 @@ func convertResourceLimitResourceQuotaSpec(limit *v32.ResourceQuotaLimit) (*core
 	return quotaSpec, err
 }
 
+// convertProjectResourceLimitToResourceList tries to convert a Rancher-defined resource quota limit to its native Kubernetes notation.
 func convertProjectResourceLimitToResourceList(limit *v32.ResourceQuotaLimit) (corev1.ResourceList, error) {
 	in, err := json.Marshal(limit)
 	if err != nil {
