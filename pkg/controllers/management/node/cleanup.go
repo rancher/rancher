@@ -10,10 +10,10 @@ import (
 	"github.com/rancher/rancher/pkg/agent/clean"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	util "github.com/rancher/rancher/pkg/cluster"
-	"github.com/rancher/rancher/pkg/controllers/management/secretmigrator"
 	"github.com/rancher/rancher/pkg/dialer"
 	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/kubectl"
+	"github.com/rancher/rancher/pkg/namespace"
 	nodehelper "github.com/rancher/rancher/pkg/node"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/systemtemplate"
@@ -345,19 +345,11 @@ func (m *Lifecycle) createCleanupJob(userContext *config.UserContext, cluster *v
 	}
 
 	var imagePullSecrets []corev1.LocalObjectReference
-	privateRegistrySecretRef := cluster.GetSecret("PrivateRegistrySecret")
-	ecrSecretRef := cluster.GetSecret("RKEPrivateRegistryECRSecret")
-	if privateRegistrySecretRef != "" || ecrSecretRef != "" {
-		cluster := cluster.DeepCopy()
-		cluster.Spec, err = secretmigrator.AssemblePrivateRegistryCredential(cluster.GetSecret("PrivateRegistrySecret"), secretmigrator.ClusterType, cluster.Name, cluster.Spec, m.secretLister)
+	if cluster.GetSecret("PrivateRegistrySecret") != "" {
+		privateRegistries, err := m.credLister.Get(namespace.GlobalNamespace, cluster.GetSecret("PrivateRegistrySecret"))
 		if err != nil {
 			return nil, err
-		}
-		cluster.Spec, err = secretmigrator.AssembleRKEPrivateRegistryECRCredential(cluster.GetSecret("RKEPrivateRegistryECRSecret"), secretmigrator.ClusterType, cluster.Name, cluster.Spec, m.secretLister)
-		if err != nil {
-			return nil, err
-		}
-		if url, err := util.GeneratePrivateRegistryDockerConfig(util.GetPrivateRepo(cluster)); err != nil {
+		} else if url, err := util.GeneratePrivateRegistryDockerConfig(util.GetPrivateRepo(cluster), privateRegistries); err != nil {
 			return nil, err
 		} else if url != "" {
 			imagePullSecrets = append(imagePullSecrets, corev1.LocalObjectReference{Name: "cattle-private-registry"})
