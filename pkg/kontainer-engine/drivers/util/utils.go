@@ -7,7 +7,7 @@ import (
 
 	errs "github.com/pkg/errors"
 	"github.com/rancher/rancher/pkg/serviceaccounttoken"
-	rketypes "github.com/rancher/rke/types"
+	v3 "github.com/rancher/rke/types"
 	"gopkg.in/yaml.v2"
 	v1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -133,8 +133,8 @@ func DeleteLegacyServiceAccountAndRoleBinding(clientset kubernetes.Interface) er
 	return nil
 }
 
-func ConvertToRkeConfig(config string) (rketypes.RancherKubernetesEngineConfig, error) {
-	var rkeConfig rketypes.RancherKubernetesEngineConfig
+func ConvertToRkeConfig(config string) (v3.RancherKubernetesEngineConfig, error) {
+	var rkeConfig v3.RancherKubernetesEngineConfig
 	if err := yaml.Unmarshal([]byte(config), &rkeConfig); err != nil {
 		return rkeConfig, err
 	}

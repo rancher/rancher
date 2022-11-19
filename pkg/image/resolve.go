@@ -8,12 +8,12 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/pkg/errors"
-	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	util "github.com/rancher/rancher/pkg/cluster"
+	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/settings"
 	rketypes "github.com/rancher/rke/types"
 	img "github.com/rancher/rke/types/image"
-	corev1 "k8s.io/api/core/v1"
 )
 
 // ExportConfig provides parameters you can define to configure image exporting for Rancher components
@@ -42,7 +42,7 @@ func Resolve(image string) string {
 	return ResolveWithCluster(image, nil)
 }
 
-func ResolveWithCluster(image string, cluster *apimgmtv3.Cluster) string {
+func ResolveWithCluster(image string, cluster *v3.Cluster) string {
 	reg := util.GetPrivateRepoURL(cluster)
 	if reg != "" && !strings.HasPrefix(image, reg) {
 		// Images from Dockerhub Library repo, we add rancher prefix when using private registry
@@ -92,7 +92,7 @@ func GetImages(exportConfig ExportConfig, externalImages map[string][]string, im
 	return imagesList, imagesAndSourcesList, nil
 }
 
-func AddImagesToImageListConfigMap(cm *corev1.ConfigMap, rancherVersion, systemChartsPath string) error {
+func AddImagesToImageListConfigMap(cm *v1.ConfigMap, rancherVersion, systemChartsPath string) error {
 	exportConfig := ExportConfig{
 		SystemChartsPath: systemChartsPath,
 		OsType:           Windows,
@@ -113,7 +113,7 @@ func AddImagesToImageListConfigMap(cm *corev1.ConfigMap, rancherVersion, systemC
 	return nil
 }
 
-func ParseCatalogImageListConfigMap(cm *corev1.ConfigMap) ([]string, []string) {
+func ParseCatalogImageListConfigMap(cm *v1.ConfigMap) ([]string, []string) {
 	windowsImages := strings.Split(cm.Data[osTypeImageListName[Windows]], imageListDelimiter)
 	linuxImages := strings.Split(cm.Data[osTypeImageListName[Linux]], imageListDelimiter)
 	return windowsImages, linuxImages

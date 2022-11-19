@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -88,16 +89,16 @@ func (d *Driver) wrapTransport(config *v3.RancherKubernetesEngineConfig) transpo
 
 }
 
-func (d *Driver) GetCapabilities(_ context.Context) (*types.Capabilities, error) {
+func (d *Driver) GetCapabilities(ctx context.Context) (*types.Capabilities, error) {
 	return &d.driverCapabilities, nil
 }
 
-func (d *Driver) GetK8SCapabilities(_ context.Context, _ *types.DriverOptions) (*types.K8SCapabilities, error) {
+func (d *Driver) GetK8SCapabilities(ctx context.Context, _ *types.DriverOptions) (*types.K8SCapabilities, error) {
 	return &types.K8SCapabilities{}, nil
 }
 
 // GetDriverCreateOptions returns create flags for rke driver
-func (d *Driver) GetDriverCreateOptions(_ context.Context) (*types.DriverFlags, error) {
+func (d *Driver) GetDriverCreateOptions(ctx context.Context) (*types.DriverFlags, error) {
 	driverFlag := types.DriverFlags{
 		Options: make(map[string]*types.Flag),
 	}
@@ -109,7 +110,7 @@ func (d *Driver) GetDriverCreateOptions(_ context.Context) (*types.DriverFlags, 
 }
 
 // GetDriverUpdateOptions returns update flags for rke driver
-func (d *Driver) GetDriverUpdateOptions(_ context.Context) (*types.DriverFlags, error) {
+func (d *Driver) GetDriverUpdateOptions(ctx context.Context) (*types.DriverFlags, error) {
 	driverFlag := types.DriverFlags{
 		Options: make(map[string]*types.Flag),
 	}
@@ -124,7 +125,7 @@ func (d *Driver) GetDriverUpdateOptions(_ context.Context) (*types.DriverFlags, 
 func getYAML(driverOptions *types.DriverOptions) (string, error) {
 	// first look up the file path then look up raw rkeConfig
 	if path, ok := driverOptions.StringOptions["config-file-path"]; ok {
-		data, err := os.ReadFile(path)
+		data, err := ioutil.ReadFile(path)
 		if err != nil {
 			return "", err
 		}
@@ -428,12 +429,8 @@ func (d *Driver) RemoveLegacyServiceAccount(ctx context.Context, info *types.Clu
 }
 
 func (d *Driver) restore(info *types.ClusterInfo) (string, error) {
-	err := os.MkdirAll(rancherPath, 0700)
-	if err != nil && !os.IsExist(err) {
-		return "", err
-	}
-
-	dir, err := os.MkdirTemp(rancherPath, "rke-")
+	os.MkdirAll(rancherPath, 0700)
+	dir, err := ioutil.TempDir(rancherPath, "rke-")
 	if err != nil {
 		return "", err
 	}
@@ -441,11 +438,11 @@ func (d *Driver) restore(info *types.ClusterInfo) (string, error) {
 	if info != nil {
 		state := info.Metadata["state"]
 		if state != "" {
-			os.WriteFile(kubeConfig(dir), []byte(state), 0600)
+			ioutil.WriteFile(kubeConfig(dir), []byte(state), 0600)
 		}
 		fullState := info.Metadata["fullState"]
 		if fullState != "" {
-			os.WriteFile(clusterState(dir), []byte(fullState), 0600)
+			ioutil.WriteFile(clusterState(dir), []byte(fullState), 0600)
 		}
 	}
 
@@ -454,14 +451,14 @@ func (d *Driver) restore(info *types.ClusterInfo) (string, error) {
 
 func (d *Driver) save(info *types.ClusterInfo, stateDir string) *types.ClusterInfo {
 	if info != nil {
-		b, err := os.ReadFile(kubeConfig(stateDir))
+		b, err := ioutil.ReadFile(kubeConfig(stateDir))
 		if err == nil {
 			if info.Metadata == nil {
 				info.Metadata = map[string]string{}
 			}
 			info.Metadata["state"] = string(b)
 		}
-		s, err := os.ReadFile(clusterState(stateDir))
+		s, err := ioutil.ReadFile(clusterState(stateDir))
 		if err == nil {
 			info.Metadata["fullState"] = string(s)
 		}
