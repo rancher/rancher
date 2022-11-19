@@ -105,6 +105,7 @@ steps:
 
 - name: bin-publish
   image: plugins/gcs
+  failure: ignore
   settings:
     acl:
     - allUsers:READER
@@ -645,6 +646,11 @@ steps:
     instance:
       include:
       - drone-publish.rancher.io
+    ref:
+      include:
+        - "refs/heads/master"
+        - "refs/heads/release/v*"
+        - "refs/tags/v*"
     event:
     - push
     - tag
@@ -688,6 +694,7 @@ steps:
     password:
       from_secret: docker_password
     spec: manifest.tmpl
+    ignore_missing: true
   when:
     instance:
       include:
@@ -711,6 +718,7 @@ steps:
 
 - name: chart-publish
   image: plugins/gcs
+  failure: ignore
   settings:
     acl:
     - allUsers:READER
@@ -959,6 +967,7 @@ steps:
 
 - name: chart-publish
   image: plugins/gcs
+  failure: ignore
   settings:
     acl:
     - allUsers:READER
