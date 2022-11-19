@@ -21,7 +21,7 @@ func (h *clusterHandler) sync(key string, obj *mgmtv3.Cluster) (runtime.Object, 
 	if obj == nil || obj.DeletionTimestamp != nil || obj.Name != h.clusterName {
 		return obj, nil
 	}
-	if !v32.ClusterConditionSystemProjectCreated.IsTrue(obj) {
+	if !v32.ClusterConditionconditionSystemProjectCreated.IsTrue(obj) {
 		return obj, nil
 	}
 	enabled, err := h.getIstioAppEnabled()
