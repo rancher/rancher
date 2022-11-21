@@ -13,7 +13,7 @@ cd $(dirname $0)/../package
 
 ../scripts/k3s-images.sh
 
-cp ../bin/rancher.yaml ../bin/rancher-namespace.yaml ../bin/rancher ../bin/agent ../bin/data.json ../bin/k3s-airgap-images.tar .
+cp ../bin/rancher ../bin/agent ../bin/data.json ../bin/k3s-airgap-images.tar .
 
 # Make sure the used data.json is a release artifact
 cp ../bin/data.json ../bin/rancher-data.json
@@ -50,9 +50,6 @@ fi
 docker build --build-arg VERSION=${TAG} --build-arg ARCH=${ARCH} --build-arg IMAGE_REPO=${REPO} --build-arg SYSTEM_CHART_DEFAULT_BRANCH=${SYSTEM_CHART_DEFAULT_BRANCH} --build-arg CHART_DEFAULT_BRANCH=${CHART_DEFAULT_BRANCH} -t ${IMAGE} .
 
 docker build --build-arg VERSION=${TAG} --build-arg ARCH=${ARCH} --build-arg RANCHER_TAG=${TAG} --build-arg RANCHER_REPO=${REPO} -t ${AGENT_IMAGE} -f Dockerfile.agent .
-if [ "${ARCH}" == amd64 ]; then
-    docker build -t ${RUNTIME_IMAGE} -f Dockerfile.runtime .
-fi
 
 mkdir -p ../dist
 echo ${IMAGE} > ../dist/images
@@ -74,13 +71,6 @@ fi
 if [ ${ARCH} == amd64 ]; then
     # Move this out of ARCH check for local dev on non-amd64 hardware.
     TAG=$TAG REPO=${REPO} go run ../pkg/image/export/main.go $SYSTEM_CHART_REPO_DIR $CHART_REPO_DIR $IMAGE $AGENT_IMAGE $RUNTIME_IMAGE $SYSTEM_AGENT_UPGRADE_IMAGE $WINS_AGENT_UPGRADE_IMAGE ${SYSTEM_AGENT_INSTALLER_RKE2_IMAGES[@]} ${SYSTEM_AGENT_INSTALLER_K3S_IMAGES[@]}
-
-    # rancherd tarball
-    rm -rf build/rancherd/bundle
-    mkdir -p build/rancherd/bundle
-    tar c -C ../cmd/rancherd/bundle . | tar x -C build/rancherd/bundle
-    cp -vf rancherd build/rancherd/bundle/bin
-    tar czf rancherd-${ARCH}.tar.gz -C build/rancherd/bundle .
 fi
 
 # Create components file used for pre-release notes
