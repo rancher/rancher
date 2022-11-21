@@ -50,13 +50,11 @@ var (
 		Init(globalDNSTypes).
 		Init(kontainerTypes).
 		Init(etcdBackupTypes).
-		Init(clusterScanTypes).
 		Init(monitorTypes).
 		Init(credTypes).
 		Init(mgmtSecretTypes).
 		Init(clusterTemplateTypes).
 		Init(driverMetadataTypes).
-		Init(driverMetadataCisTypes).
 		Init(encryptionTypes).
 		Init(fleetTypes).
 		Init(notificationTypes)
@@ -131,14 +129,6 @@ func driverMetadataTypes(schemas *types.Schemas) *types.Schemas {
 		MustImport(&Version, v3.RkeK8sSystemImage{}).
 		MustImport(&Version, v3.RkeK8sServiceOption{}).
 		MustImport(&Version, v3.RkeAddon{})
-}
-
-func driverMetadataCisTypes(schemas *types.Schemas) *types.Schemas {
-	return schemas.
-		AddMapperForType(&Version, v3.CisConfig{}, m.Drop{Field: "namespaceId"}).
-		AddMapperForType(&Version, v3.CisBenchmarkVersion{}, m.Drop{Field: "namespaceId"}).
-		MustImport(&Version, v3.CisConfig{}).
-		MustImport(&Version, v3.CisBenchmarkVersion{})
 }
 
 func catalogTypes(schemas *types.Schemas) *types.Schemas {
@@ -1033,13 +1023,6 @@ func clusterTemplateTypes(schemas *types.Schemas) *types.Schemas {
 			}
 		})
 
-}
-
-func clusterScanTypes(schemas *types.Schemas) *types.Schemas {
-	return schemas.MustImportAndCustomize(&Version, v3.ClusterScan{}, func(schema *types.Schema) {
-		schema.CollectionMethods = []string{http.MethodGet}
-		schema.ResourceMethods = []string{http.MethodGet, http.MethodDelete}
-	})
 }
 
 func encryptionTypes(schemas *types.Schemas) *types.Schemas {
