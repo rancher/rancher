@@ -33,3 +33,19 @@ func GetProjectByName(client *rancher.Client, clusterID, projectName string) (*m
 
 	return project, nil
 }
+
+// GetProjectList is a helper function that returns all the project in a specific cluster
+func GetProjectList(client *rancher.Client, clusterID string) (*management.ProjectCollection, error) {
+	var projectsList *management.ProjectCollection
+
+	projectsList, err := client.Management.Project.List(&types.ListOpts{
+		Filters: map[string]interface{}{
+			"clusterId": clusterID,
+		},
+	})
+	if err != nil {
+		return projectsList, err
+	}
+
+	return projectsList, nil
+}
