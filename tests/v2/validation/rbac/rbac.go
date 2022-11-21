@@ -16,6 +16,7 @@ import (
 
 const roleOwner = "cluster-owner"
 const roleMember = "cluster-member"
+const roleProjectOwner = "project-owner"
 
 func createUser(client *rancher.Client) (*management.User, error) {
 	enabled := true
