@@ -3,12 +3,10 @@ package provisioning
 import (
 	"github.com/rancher/rancher/tests/framework/extensions/machinepools"
 	nodepools "github.com/rancher/rancher/tests/framework/extensions/rke1/nodepools"
-	"github.com/rancher/rancher/tests/framework/pkg/namegenerator"
 )
 
 const (
-	defaultRandStringLength = 5
-	ConfigurationFileKey    = "provisioningInput"
+	ConfigurationFileKey = "provisioningInput"
 )
 
 type Config struct {
@@ -21,9 +19,4 @@ type Config struct {
 	Providers              []string                 `json:"providers" yaml:"providers"`
 	NodeProviders          []string                 `json:"nodeProviders" yaml:"nodeProviders"`
 	Hardened               bool                     `json:"hardened" yaml:"hardened"`
-}
-
-func AppendRandomString(baseClusterName string) string {
-	clusterName := "auto-" + baseClusterName + "-" + namegenerator.RandStringLower(defaultRandStringLength)
-	return clusterName
 }

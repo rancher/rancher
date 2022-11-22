@@ -11,7 +11,7 @@ import (
 	"github.com/rancher/rancher/tests/framework/extensions/projects"
 	"github.com/rancher/rancher/tests/framework/extensions/users"
 	password "github.com/rancher/rancher/tests/framework/extensions/users/passwordgenerator"
-	provisioning "github.com/rancher/rancher/tests/v2/validation/provisioning"
+	namegen "github.com/rancher/rancher/tests/framework/pkg/namegenerator"
 )
 
 const roleOwner = "cluster-owner"
@@ -21,7 +21,7 @@ const roleProjectMember = "project-member"
 
 func createUser(client *rancher.Client) (*management.User, error) {
 	enabled := true
-	var username = provisioning.AppendRandomString("testuser-")
+	var username = namegen.AppendRandomString("testuser-")
 	var testpassword = password.GenerateUserPassword("testpass-")
 	user := &management.User{
 		Username: username,
@@ -75,7 +75,7 @@ func deleteNamespace(namespaceID *v1.SteveAPIObject, steveclient *v1.Client) err
 }
 
 func createProject(client *rancher.Client, clusterID string) (createProject *management.Project, err error) {
-	projectName := provisioning.AppendRandomString("testproject-")
+	projectName := namegen.AppendRandomString("testproject-")
 	projectConfig := &management.Project{
 		ClusterID: clusterID,
 		Name:      projectName,

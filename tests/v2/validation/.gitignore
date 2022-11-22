@@ -4,3 +4,4 @@
 *.json
 #yaml
 *.yaml
+!manifest.yaml
