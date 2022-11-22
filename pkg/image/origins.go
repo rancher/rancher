@@ -107,6 +107,7 @@ var OriginMap = map[string]string{
 	"mirrored-coreos-prometheus-config-reloader":              "https://github.com/prometheus-operator/prometheus-operator/pkgs/container/prometheus-config-reloader",
 	"mirrored-coreos-prometheus-operator":                     "https://github.com/prometheus-operator/prometheus-operator",
 	"mirrored-curlimages-curl":                                "https://github.com/curl/curl-docker",
+	"mirrored-dexidp-dex":                                     "https://github.com/dexidp/dex",
 	"mirrored-directxman12-k8s-prometheus-adapter":            "https://hub.docker.com/r/directxman12/k8s-prometheus-adapter/tags",
 	"mirrored-epinio-epinio-server":                           "https://github.com/epinio/epinio",
 	"mirrored-epinio-epinio-ui":                               "https://github.com/kubeops/config-syncer",
