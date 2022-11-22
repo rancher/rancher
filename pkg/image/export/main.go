@@ -96,31 +96,30 @@ func run(systemChartsPath, chartsPath string, imagesFromArgs []string) error {
 		return err
 	}
 
-	externalImages := make(map[string][]string)
-	k3sUpgradeImages, err := ext.GetExternalImages(rancherVersion, data.K3S, ext.K3S, &semver.Version{
+	k8sVersion1_21_0 := &semver.Version{
 		Major: 1,
 		Minor: 21,
 		Patch: 0,
-	})
+	}
+
+	externalLinuxImages := make(map[string][]string)
+
+	k3sUpgradeImages, err := ext.GetExternalImages(rancherVersion, data.K3S, ext.K3S, k8sVersion1_21_0, img.Linux)
 	if err != nil {
 		return err
 	}
 	if k3sUpgradeImages != nil {
-		externalImages["k3sUpgrade"] = k3sUpgradeImages
+		externalLinuxImages["k3sUpgrade"] = k3sUpgradeImages
 	}
 
 	// RKE2 Provisioning will only be supported on Kubernetes v1.21+. In addition, only RKE2
-	// releases corresponding to Kubernetes v1.21+ include the "rke2-images-all" file that we need.
-	rke2AllImages, err := ext.GetExternalImages(rancherVersion, data.RKE2, ext.RKE2, &semver.Version{
-		Major: 1,
-		Minor: 21,
-		Patch: 0,
-	})
+	// releases corresponding to Kubernetes v1.21+ include the "rke2-images-all.linux-amd64.txt" file that we need.
+	rke2AllImages, err := ext.GetExternalImages(rancherVersion, data.RKE2, ext.RKE2, k8sVersion1_21_0, img.Linux)
 	if err != nil {
 		return err
 	}
 	if rke2AllImages != nil {
-		externalImages["rke2All"] = rke2AllImages
+		externalLinuxImages["rke2All"] = rke2AllImages
 	}
 
 	sort.Strings(imagesFromArgs)
@@ -138,7 +137,7 @@ func run(systemChartsPath, chartsPath string, imagesFromArgs []string) error {
 		OsType:           img.Linux,
 		RancherVersion:   rancherVersion,
 	}
-	targetImages, targetImagesAndSources, err := img.GetImages(exportConfig, externalImages, linuxImagesFromArgs, linuxInfo.RKESystemImages)
+	targetImages, targetImagesAndSources, err := img.GetImages(exportConfig, externalLinuxImages, linuxImagesFromArgs, linuxInfo.RKESystemImages)
 	if err != nil {
 		return err
 	}
@@ -563,7 +562,7 @@ while IFS= read -r i; do
         pulled="${pulled} ${i}"
     else
         if docker inspect "${i}" > /dev/null 2>&1; then
-            pulled="${pulled} ${i}"		
+            pulled="${pulled} ${i}"
         else
             echo "Image pull failed: ${i}"
         fi
@@ -666,7 +665,7 @@ Get-Content -Force -Path $image_list | ForEach-Object {
     if ($_) {
         $fullname_image = ('{0}-windows-{1}' -f $_, $os_release_id)
 		echo "Tagging $registry/$fullname_image"
-	
+
 		switch -regex ($fullname_image)
 		{
 			'.+/.+' {
