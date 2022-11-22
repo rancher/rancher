@@ -5,7 +5,6 @@ ENV GOPATH /go
 ENV PATH ${PATH}:/go/bin
 
 ENV WORKSPACE ${GOPATH}/src/github.com/rancher/rancher
-
 # configure VPN
 ARG EXTERNAL_ENCODED_VPN
 ARG VPN_ENCODED_LOGIN
@@ -16,6 +15,14 @@ COPY [".", "$WORKSPACE"]
 
 RUN go mod download && \
     go install gotest.tools/gotestsum@latest
+
+
+# Configure Corral
+ENV CORRAL_VERSION="v1.1.1"
+RUN go install github.com/rancherlabs/corral@${CORRAL_VERSION}
+
+RUN mkdir /root/.ssh && chmod 600 .ssh/jenkins-*
+RUN ssh-keygen -f .ssh/jenkins-* -y > /root/.ssh/public.pub
 
 RUN CGO_ENABLED=0
 

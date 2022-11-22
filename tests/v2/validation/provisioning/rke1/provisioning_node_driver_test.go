@@ -10,6 +10,7 @@ import (
 	"github.com/rancher/rancher/tests/framework/extensions/users"
 	password "github.com/rancher/rancher/tests/framework/extensions/users/passwordgenerator"
 	"github.com/rancher/rancher/tests/framework/pkg/config"
+	namegen "github.com/rancher/rancher/tests/framework/pkg/namegenerator"
 	"github.com/rancher/rancher/tests/framework/pkg/session"
 	"github.com/rancher/rancher/tests/framework/pkg/wait"
 	"github.com/rancher/rancher/tests/integration/pkg/defaults"
@@ -51,7 +52,7 @@ func (r *RKE1NodeDriverProvisioningTestSuite) SetupSuite() {
 	r.client = client
 
 	enabled := true
-	var testuser = provisioning.AppendRandomString("testuser-")
+	var testuser = namegen.AppendRandomString("testuser-")
 	var testpassword = password.GenerateUserPassword("testpass-")
 	user := &management.User{
 		Username: testuser,
@@ -133,7 +134,7 @@ func (r *RKE1NodeDriverProvisioningTestSuite) ProvisioningRKE1Cluster(provider P
 					testSessionClient, err := tt.client.WithSession(testSession)
 					require.NoError(r.T(), err)
 
-					clusterName := provisioning.AppendRandomString(provider.Name)
+					clusterName := namegen.AppendRandomString(provider.Name)
 
 					cluster := clusters.NewRKE1ClusterConfig(clusterName, cni, kubeVersion, testSessionClient)
 
@@ -203,7 +204,7 @@ func (r *RKE1NodeDriverProvisioningTestSuite) ProvisioningRKE1ClusterDynamicInpu
 					testSessionClient, err := tt.client.WithSession(testSession)
 					require.NoError(r.T(), err)
 
-					clusterName := provisioning.AppendRandomString(provider.Name)
+					clusterName := namegen.AppendRandomString(provider.Name)
 
 					cluster := clusters.NewRKE1ClusterConfig(clusterName, cni, kubeVersion, testSessionClient)
 
