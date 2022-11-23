@@ -44,7 +44,7 @@ func newAuthConfigController(context context.Context, mgmt *config.ManagementCon
 	controller := &authConfigController{
 		users:            mgmt.Management.Users("").Controller().Lister(),
 		authRefresher:    providerrefresh.NewUserAuthRefresher(context, scaledContext),
-		cleanup:          cleanup.NewCleanupService(mgmt.Core.Secrets("")),
+		cleanup:          cleanup.NewCleanupService(mgmt.Core.Secrets(""), mgmt.Wrangler.Mgmt),
 		authConfigClient: mgmt.Wrangler.Mgmt.AuthConfig(),
 	}
 	return controller
@@ -54,8 +54,8 @@ func (ac *authConfigController) setCleanupAnnotation(obj *v3.AuthConfig, value s
 	if obj.Annotations == nil {
 		obj.Annotations = make(map[string]string)
 	}
-	obj.Annotations[CleanupAnnotation] = value
 	objCopy := obj.DeepCopy()
+	objCopy.Annotations[CleanupAnnotation] = value
 	return ac.authConfigClient.Update(objCopy)
 }
 
