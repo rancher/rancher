@@ -24,11 +24,22 @@ const (
 
 // InstallRancherIstioChart is a helper function that installs the rancher-istio chart.
 func InstallRancherIstioChart(client *rancher.Client, installOptions *InstallOptions, rancherIstioOpts *RancherIstioOpts) error {
+	serverSetting, err := client.Management.Setting.ByID(serverURLSettingID)
+	if err != nil {
+		return err
+	}
+
+	registrySetting, err := client.Management.Setting.ByID(defaultRegistrySettingID)
+	if err != nil {
+		return err
+	}
+
 	istioChartInstallActionPayload := &payloadOpts{
-		InstallOptions: *installOptions,
-		Name:           RancherIstioName,
-		Host:           client.RancherConfig.Host,
-		Namespace:      RancherIstioNamespace,
+		InstallOptions:  *installOptions,
+		Name:            RancherIstioName,
+		Namespace:       RancherIstioNamespace,
+		Host:            serverSetting.Value,
+		DefaultRegistry: registrySetting.Value,
 	}
 
 	chartInstallAction := newIstioChartInstallAction(istioChartInstallActionPayload, rancherIstioOpts)
@@ -166,7 +177,7 @@ func newIstioChartInstallAction(p *payloadOpts, rancherIstioOpts *RancherIstioOp
 			"enabled": rancherIstioOpts.CNI,
 		},
 	}
-	chartInstall := newChartInstall(p.Name, p.InstallOptions.Version, p.InstallOptions.ClusterID, p.InstallOptions.ClusterName, p.Host, istioValues)
+	chartInstall := newChartInstall(p.Name, p.InstallOptions.Version, p.InstallOptions.ClusterID, p.InstallOptions.ClusterName, p.Host, p.DefaultRegistry, istioValues)
 	chartInstalls := []types.ChartInstall{*chartInstall}
 
 	chartInstallAction := newChartInstallAction(p.Namespace, p.InstallOptions.ProjectID, chartInstalls)
@@ -176,11 +187,22 @@ func newIstioChartInstallAction(p *payloadOpts, rancherIstioOpts *RancherIstioOp
 
 // UpgradeRancherIstioChart is a helper function that upgrades the rancher-istio chart.
 func UpgradeRancherIstioChart(client *rancher.Client, installOptions *InstallOptions, rancherIstioOpts *RancherIstioOpts) error {
+	serverSetting, err := client.Management.Setting.ByID(serverURLSettingID)
+	if err != nil {
+		return err
+	}
+
+	registrySetting, err := client.Management.Setting.ByID(defaultRegistrySettingID)
+	if err != nil {
+		return err
+	}
+
 	istioChartUpgradeActionPayload := &payloadOpts{
-		InstallOptions: *installOptions,
-		Name:           RancherIstioName,
-		Host:           client.RancherConfig.Host,
-		Namespace:      RancherIstioNamespace,
+		InstallOptions:  *installOptions,
+		Name:            RancherIstioName,
+		Namespace:       RancherIstioNamespace,
+		Host:            serverSetting.Value,
+		DefaultRegistry: registrySetting.Value,
 	}
 
 	chartUpgradeAction := newIstioChartUpgradeAction(istioChartUpgradeActionPayload, rancherIstioOpts)
@@ -276,7 +298,7 @@ func newIstioChartUpgradeAction(p *payloadOpts, rancherIstioOpts *RancherIstioOp
 			"enabled": rancherIstioOpts.CNI,
 		},
 	}
-	chartUpgrade := newChartUpgrade(p.Name, p.InstallOptions.Version, p.InstallOptions.ClusterID, p.InstallOptions.ClusterName, p.Host, istioValues)
+	chartUpgrade := newChartUpgrade(p.Name, p.InstallOptions.Version, p.InstallOptions.ClusterID, p.InstallOptions.ClusterName, p.Host, p.DefaultRegistry, istioValues)
 	chartUpgrades := []types.ChartUpgrade{*chartUpgrade}
 
 	chartUpgradeAction := newChartUpgradeAction(p.Namespace, chartUpgrades)
