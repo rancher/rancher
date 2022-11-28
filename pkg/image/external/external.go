@@ -9,6 +9,7 @@ import (
 
 	"github.com/coreos/go-semver/semver"
 	"github.com/rancher/rancher/pkg/controllers/management/k3sbasedupgrade"
+	"github.com/rancher/rancher/pkg/image"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/sirupsen/logrus"
 )
@@ -20,7 +21,7 @@ const (
 	RKE2 Source = "rke2"
 )
 
-func GetExternalImages(rancherVersion string, externalData map[string]interface{}, source Source, minimumKubernetesVersion *semver.Version) ([]string, error) {
+func GetExternalImages(rancherVersion string, externalData map[string]interface{}, source Source, minimumKubernetesVersion *semver.Version, osType image.OSType) ([]string, error) {
 	if source != K3S && source != RKE2 {
 		return nil, fmt.Errorf("invalid source provided: %s", source)
 	}
@@ -96,7 +97,7 @@ func GetExternalImages(rancherVersion string, externalData map[string]interface{
 		systemAgentInstallerImage := fmt.Sprintf("%s%s:%s", settings.SystemAgentInstallerImage.Default, source, strings.ReplaceAll(release, "+", "-"))
 		externalImagesMap[systemAgentInstallerImage] = true
 
-		images, err := downloadExternalSupportingImages(release, source)
+		images, err := downloadExternalSupportingImages(release, source, osType)
 		if err != nil {
 			logrus.Infof("could not find supporting images for %s release [%s]: %v", source, release, err)
 			continue
@@ -124,24 +125,29 @@ func GetExternalImages(rancherVersion string, externalData map[string]interface{
 	return externalImages, nil
 }
 
-func downloadExternalSupportingImages(release string, source Source) (string, error) {
+// downloadExternalSupportingImages downloads the list of images used by a Source from GitHub releases.
+// The osType parameter is only used by RKE2 since K3s is not currently available for Windows containers.
+func downloadExternalSupportingImages(release string, source Source, osType image.OSType) (string, error) {
 	switch source {
 	case RKE2:
-		// The "images-all" file is only provided for RKE2 amd64 images. This may be subject to change.
-		linuxImages, err := downloadExternalImageListFromURL(fmt.Sprintf("https://github.com/rancher/rke2/releases/download/%s/rke2-images-all.linux-amd64.txt", release))
+		// FIXME: Support s390x and arm64 images lists.
+		// rke2 publishes a list of images for s390x but not for arm64 at the moment.
+		var externalImageURL string
+		switch osType {
+		case image.Linux:
+			externalImageURL = fmt.Sprintf("https://github.com/rancher/rke2/releases/download/%s/rke2-images-all.linux-amd64.txt", release)
+		case image.Windows:
+			externalImageURL = fmt.Sprintf("https://github.com/rancher/rke2/releases/download/%s/rke2-images.windows-amd64.txt", release)
+		default:
+			return "", fmt.Errorf("could not download external supporting images: unsupported os type %v", osType)
+		}
+		images, err := downloadExternalImageListFromURL(externalImageURL)
 		if err != nil {
 			return "", err
 		}
-		windowsImages, err := downloadExternalImageListFromURL(fmt.Sprintf("https://github.com/rancher/rke2/releases/download/%s/rke2-images.windows-amd64.txt", release))
-		if err != nil {
-			return "", err
-		}
-		builder := strings.Builder{}
-		builder.WriteString(linuxImages)
-		builder.WriteString("\n")
-		builder.WriteString(windowsImages)
-		return builder.String(), nil
+		return images, nil
 	case K3S:
+		// k3s does not support Windows containers at the moment.
 		return downloadExternalImageListFromURL(fmt.Sprintf("https://github.com/k3s-io/k3s/releases/download/%s/k3s-images.txt", release))
 	default:
 		// This function should never be called with an invalid source, but we will anticipate this
