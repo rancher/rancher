@@ -7,7 +7,7 @@ platform:
   arch: amd64
 
 steps:
-- name: provisioning-tests
+- name: provisioning-tests-pr
   image: rancher/dapper:v0.5.8
   commands:
   - dapper provisioning-tests
@@ -17,8 +17,25 @@ steps:
     path: /var/run/docker.sock
   when:
     event:
-    - push
     - pull_request
+- name: provisioning-tests-push
+  image: rancher/dapper:v0.5.8
+  commands:
+  - dapper provisioning-tests
+  privileged: true
+  volumes:
+  - name: docker
+    path: /var/run/docker.sock
+  when:
+    instance:
+      - drone-publish.rancher.io
+    ref:
+      include:
+        - "refs/heads/master"
+        - "refs/heads/release/v*"
+        - "refs/tags/v*"
+    event:
+    - push
 
 volumes:
 - name: docker
@@ -38,7 +55,7 @@ platform:
   arch: amd64
 
 steps:
-- name: provisioning-tests
+- name: provisioning-tests-pr
   image: rancher/dapper:v0.5.8
   commands:
   - dapper provisioning-tests-rke
@@ -48,8 +65,25 @@ steps:
     path: /var/run/docker.sock
   when:
     event:
-    - push
     - pull_request
+- name: provisioning-tests-push
+  image: rancher/dapper:v0.5.8
+  commands:
+  - dapper provisioning-tests-rke
+  privileged: true
+  volumes:
+  - name: docker
+    path: /var/run/docker.sock
+  when:
+    instance:
+      - drone-publish.rancher.io
+    ref:
+      include:
+        - "refs/heads/master"
+        - "refs/heads/release/v*"
+        - "refs/tags/v*"
+    event:
+    - push
 
 volumes:
 - name: docker
