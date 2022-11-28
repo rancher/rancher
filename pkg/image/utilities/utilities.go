@@ -99,32 +99,31 @@ func GatherTargetImagesAndSources(systemChartsPath, chartsPath string, imagesFro
 		return ImageTargetsAndSources{}, fmt.Errorf("%s: %w", "could not write rancher-rke-k8s-versions.txt file", err)
 	}
 
-	externalImages := make(map[string][]string)
-	k3sUpgradeImages, err := ext.GetExternalImages(rancherVersion, data.K3S, ext.K3S, &semver.Version{
+	k8sVersion1_21_0 := &semver.Version{
 		Major: 1,
 		Minor: 21,
 		Patch: 0,
-	})
+	}
+
+	externalLinuxImages := make(map[string][]string)
+
+	k3sUpgradeImages, err := ext.GetExternalImages(rancherVersion, data.K3S, ext.K3S, k8sVersion1_21_0, img.Linux)
 	if err != nil {
 		return ImageTargetsAndSources{}, fmt.Errorf("%s: %w", "could not get external images for K3s", err)
 	}
 	if k3sUpgradeImages != nil {
-		externalImages["k3sUpgrade"] = k3sUpgradeImages
+		externalLinuxImages["k3sUpgrade"] = k3sUpgradeImages
 	}
 
 	// RKE2 Provisioning will only be supported on Kubernetes v1.21+. In addition, only RKE2
-	// releases corresponding to Kubernetes v1.21+ include the "rke2-images-all" file that we need.
-	rke2AllImages, err := ext.GetExternalImages(rancherVersion, data.RKE2, ext.RKE2, &semver.Version{
-		Major: 1,
-		Minor: 21,
-		Patch: 0,
-	})
+	// releases corresponding to Kubernetes v1.21+ include the "rke2-images-all.linux-amd64.txt" file that we need.
+	rke2LinuxImages, err := ext.GetExternalImages(rancherVersion, data.RKE2, ext.RKE2, k8sVersion1_21_0, img.Linux)
 	if err != nil {
 		return ImageTargetsAndSources{}, fmt.Errorf("%s: %w", "could not get external images for RKE2", err)
 
 	}
-	if rke2AllImages != nil {
-		externalImages["rke2All"] = rke2AllImages
+	if rke2LinuxImages != nil {
+		externalLinuxImages["rke2All"] = rke2LinuxImages
 	}
 
 	sort.Strings(imagesFromArgs)
@@ -142,7 +141,7 @@ func GatherTargetImagesAndSources(systemChartsPath, chartsPath string, imagesFro
 		OsType:           img.Linux,
 		RancherVersion:   rancherVersion,
 	}
-	targetImages, targetImagesAndSources, err := img.GetImages(exportConfig, externalImages, linuxImagesFromArgs, linuxInfo.RKESystemImages)
+	targetImages, targetImagesAndSources, err := img.GetImages(exportConfig, externalLinuxImages, linuxImagesFromArgs, linuxInfo.RKESystemImages)
 	if err != nil {
 		return ImageTargetsAndSources{}, err
 	}

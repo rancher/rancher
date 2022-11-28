@@ -93,7 +93,7 @@ var (
 	PartnerChartDefaultBranch           = NewSetting("partner-chart-default-branch", "main")
 	RKE2ChartDefaultBranch              = NewSetting("rke2-chart-default-branch", "main")
 	FleetDefaultWorkspaceName           = NewSetting("fleet-default-workspace-name", fleetconst.ClustersDefaultNamespace) // fleetWorkspaceName to assign to clusters with none
-	ShellImage                          = NewSetting("shell-image", "rancher/shell:v0.1.18")
+	ShellImage                          = NewSetting("shell-image", "rancher/shell:v0.1.19-rc7")
 	IgnoreNodeName                      = NewSetting("ignore-node-name", "") // nodes to ignore when syncing v1.node to v3.node
 	NoDefaultAdmin                      = NewSetting("no-default-admin", "")
 	RestrictedDefaultAdmin              = NewSetting("restricted-default-admin", "false") // When bootstrapping the admin for the first time, give them the global role restricted-admin
@@ -102,7 +102,7 @@ var (
 	EKSUpstreamRefresh                  = NewSetting("eks-refresh", "300")
 	GKEUpstreamRefresh                  = NewSetting("gke-refresh", "300")
 	HideLocalCluster                    = NewSetting("hide-local-cluster", "false")
-	MachineProvisionImage               = NewSetting("machine-provision-image", "rancher/machine:v0.15.0-rancher95")
+	MachineProvisionImage               = NewSetting("machine-provision-image", "rancher/machine:v0.15.0-rancher97")
 	SystemFeatureChartRefreshSeconds    = NewSetting("system-feature-chart-refresh-seconds", "900")
 
 	Rke2DefaultVersion = NewSetting("rke2-default-version", "")
@@ -167,7 +167,7 @@ var (
 	UIDashboardPath = NewSetting("ui-dashboard-path", "/usr/share/rancher/ui-dashboard")
 
 	// UIDashboardIndex depends on ui-offline-preferred, use this version of the dashboard instead of the one contained in Rancher Manager.
-	UIDashboardIndex = NewSetting("ui-dashboard-index", "https://releases.rancher.com/dashboard/release-2.7.0/index.html")
+	UIDashboardIndex = NewSetting("ui-dashboard-index", "https://releases.rancher.com/dashboard/latest/index.html")
 
 	// UIDashboardHarvesterLegacyPlugin depending on ui-offline-preferred and if a Harvester Cluster does not contain it's own Harvester plugin, use this version of the plugin instead.
 	UIDashboardHarvesterLegacyPlugin = NewSetting("ui-dashboard-harvester-legacy-plugin", "https://releases.rancher.com/harvester-ui/plugin/harvester-1.0.3-head/harvester-1.0.3-head.umd.min.js")
@@ -182,7 +182,7 @@ var (
 	UIFeedBackForm = NewSetting("ui-feedback-form", "")
 
 	// UIIndex depends on ui-offline-preferred, use this version of the old ember UI instead of the one contained in Rancher Manager.
-	UIIndex = NewSetting("ui-index", "https://releases.rancher.com/ui/release-2.7.0/index.html")
+	UIIndex = NewSetting("ui-index", "https://releases.rancher.com/ui/latest2/index.html")
 
 	// UIIssues use a url address to send new 'File an Issue' reports instead of sending users to the Github issues page.
 	// Deprecated in favour of UICustomLinks = NewSetting("ui-custom-links", {}).

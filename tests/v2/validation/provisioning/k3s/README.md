@@ -35,7 +35,8 @@ provisioningInput is needed to the run the K3S tests, specifically kubernetesVer
     ],
     "kubernetesVersion": ["v1.24.4+k3s1"],
     "providers": ["linode", "aws", "azure", "harvester"],
-    "nodeProviders": ["ec2"]
+    "nodeProviders": ["ec2"],
+    "hardened": true
   }
 ```
 

@@ -24,11 +24,22 @@ const (
 
 // InstallRancherLoggingChart is a helper function that installs the rancher-logging chart.
 func InstallRancherLoggingChart(client *rancher.Client, installOptions *InstallOptions, rancherLoggingOpts *RancherLoggingOpts) error {
+	serverSetting, err := client.Management.Setting.ByID(serverURLSettingID)
+	if err != nil {
+		return err
+	}
+
+	registrySetting, err := client.Management.Setting.ByID(defaultRegistrySettingID)
+	if err != nil {
+		return err
+	}
+
 	loggingChartInstallActionPayload := &payloadOpts{
-		InstallOptions: *installOptions,
-		Name:           RancherLoggingName,
-		Host:           client.RancherConfig.Host,
-		Namespace:      RancherLoggingNamespace,
+		InstallOptions:  *installOptions,
+		Name:            RancherLoggingName,
+		Namespace:       RancherLoggingNamespace,
+		Host:            serverSetting.Value,
+		DefaultRegistry: registrySetting.Value,
 	}
 
 	chartInstallAction := newLoggingChartInstallAction(loggingChartInstallActionPayload, rancherLoggingOpts)
@@ -149,8 +160,8 @@ func newLoggingChartInstallAction(p *payloadOpts, rancherLoggingOpts *RancherLog
 		},
 	}
 
-	chartInstall := newChartInstall(p.Name, p.InstallOptions.Version, p.InstallOptions.ClusterID, p.InstallOptions.ClusterName, p.Host, loggingValues)
-	chartInstallCRD := newChartInstall(p.Name+"-crd", p.Version, p.InstallOptions.ClusterID, p.InstallOptions.ClusterName, p.Host, nil)
+	chartInstall := newChartInstall(p.Name, p.InstallOptions.Version, p.InstallOptions.ClusterID, p.InstallOptions.ClusterName, p.Host, p.DefaultRegistry, loggingValues)
+	chartInstallCRD := newChartInstall(p.Name+"-crd", p.Version, p.InstallOptions.ClusterID, p.InstallOptions.ClusterName, p.Host, p.DefaultRegistry, nil)
 	chartInstalls := []types.ChartInstall{*chartInstallCRD, *chartInstall}
 
 	chartInstallAction := newChartInstallAction(p.Namespace, p.ProjectID, chartInstalls)
