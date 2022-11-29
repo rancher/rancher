@@ -38,7 +38,10 @@ func Resolve(image string) string {
 }
 
 func ResolveWithCluster(image string, cluster *v3.Cluster) string {
-	reg := util.GetPrivateRepoURL(cluster)
+	if cluster == nil {
+		return image
+	}
+	reg := util.GetPrivateRegistryURL(cluster.Spec.RancherKubernetesEngineConfig)
 	if reg != "" && !strings.HasPrefix(image, reg) {
 		//Images from Dockerhub Library repo, we add rancher prefix when using private registry
 		if !strings.Contains(image, "/") {
