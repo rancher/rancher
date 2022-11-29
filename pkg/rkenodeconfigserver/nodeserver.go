@@ -268,7 +268,7 @@ OuterLoop:
 	if shared {
 		agentImage := settings.AgentImage.Get()
 		nodeCommand := clusterregistrationtokens.ShareMntCommand(nodeName, token)
-		privateRegistryConfig, _ := util.GenerateClusterPrivateRegistryDockerConfig(cluster)
+		privateRegistryConfig, _ := util.GenerateClusterPrivateRegistryDockerConfig(cluster.Spec.RancherKubernetesEngineConfig)
 		processes["share-mnt"] = rketypes.Process{
 			Name:  "share-mnt",
 			Args:  nodeCommand,
