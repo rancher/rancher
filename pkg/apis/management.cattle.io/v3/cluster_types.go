@@ -53,10 +53,10 @@ const (
 	ClusterConditionNoDiskPressure condition.Cond = "NoDiskPressure"
 	// ClusterConditionNoMemoryPressure true when all cluster nodes have sufficient memory
 	ClusterConditionNoMemoryPressure condition.Cond = "NoMemoryPressure"
-	// ClusterConditionconditionDefaultProjectCreated true when default project has been created
-	ClusterConditionconditionDefaultProjectCreated condition.Cond = "DefaultProjectCreated"
-	// ClusterConditionconditionSystemProjectCreated true when system project has been created
-	ClusterConditionconditionSystemProjectCreated condition.Cond = "SystemProjectCreated"
+	// ClusterConditionDefaultProjectCreated true when default project has been created
+	ClusterConditionDefaultProjectCreated condition.Cond = "DefaultProjectCreated"
+	// ClusterConditionSystemProjectCreated true when system project has been created
+	ClusterConditionSystemProjectCreated condition.Cond = "SystemProjectCreated"
 	// Deprecated: ClusterConditionDefaultNamespaceAssigned true when cluster's default namespace has been initially assigned
 	ClusterConditionDefaultNamespaceAssigned condition.Cond = "DefaultNamespaceAssigned"
 	// Deprecated: ClusterConditionSystemNamespacesAssigned true when cluster's system namespaces has been initially assigned to

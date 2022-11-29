@@ -87,7 +87,7 @@ func Register(ctx context.Context, management *config.ManagementContext, cluster
 		configMapGetter:           management.K8sClient.CoreV1(),
 		clusterLister:             management.Management.Clusters("").Controller().Lister(),
 		schemaLister:              management.Management.DynamicSchemas("").Controller().Lister(),
-		credLister:                management.Core.Secrets("").Controller().Lister(),
+		secretLister:              management.Core.Secrets("").Controller().Lister(),
 		userManager:               management.UserManager,
 		systemTokens:              management.SystemTokens,
 		clusterManager:            clusterManager,
@@ -110,7 +110,7 @@ type Lifecycle struct {
 	configMapGetter           typedv1.ConfigMapsGetter
 	clusterLister             v3.ClusterLister
 	schemaLister              v3.DynamicSchemaLister
-	credLister                corev1.SecretLister
+	secretLister              corev1.SecretLister
 	userManager               user.Manager
 	systemTokens              systemtokens.Interface
 	clusterManager            *clustermanager.Manager
@@ -417,7 +417,7 @@ func (m *Lifecycle) deployAgent(nodeDir string, obj *apimgmtv3.Node) error {
 
 	// make a deep copy of the cluster, so we are not modifying the original cluster object
 	clusterCopy := cluster.DeepCopy()
-	clusterCopy.Spec, err = secretmigrator.AssembleRKEConfigSpec(clusterCopy, clusterCopy.Spec, m.credLister)
+	clusterCopy.Spec, err = secretmigrator.AssembleRKEConfigSpec(clusterCopy, clusterCopy.Spec, m.secretLister)
 	if err != nil {
 		return err
 	}
@@ -779,7 +779,7 @@ func (m *Lifecycle) setCredFields(data interface{}, fields map[string]apimgmtv3.
 	if len(splitID) != 2 {
 		return fmt.Errorf("invalid credential id %s", credID)
 	}
-	cred, err := m.credLister.Get(namespace.GlobalNamespace, splitID[1])
+	cred, err := m.secretLister.Get(namespace.GlobalNamespace, splitID[1])
 	if err != nil {
 		return err
 	}
