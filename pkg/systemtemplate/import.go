@@ -15,7 +15,6 @@ import (
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	util "github.com/rancher/rancher/pkg/cluster"
 	"github.com/rancher/rancher/pkg/features"
-	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/image"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rke/templates"
@@ -47,15 +46,6 @@ type context struct {
 	ClusterRegistry       string
 }
 
-var (
-	staticFeatures = features.MCM.Name() + "=false," +
-		features.MCMAgent.Name() + "=true," +
-		features.Fleet.Name() + "=false," +
-		features.RKE2.Name() + "=false," +
-		features.ProvisioningV2.Name() + "=false," +
-		features.EmbeddedClusterAPI.Name() + "=false"
-)
-
 func toFeatureString(features map[string]bool) string {
 	buf := &strings.Builder{}
 	var keys []string
@@ -80,7 +70,7 @@ func toFeatureString(features map[string]bool) string {
 }
 
 func SystemTemplate(resp io.Writer, agentImage, authImage, namespace, token, url string, isWindowsCluster bool,
-	cluster *v3.Cluster, features map[string]bool, taints []corev1.Taint, privateRegistries map[string][]byte) error {
+	cluster *apimgmtv3.Cluster, features map[string]bool, taints []corev1.Taint, privateRegistries map[string][]byte) error {
 	var tolerations, agentEnvVars string
 	d := md5.Sum([]byte(url + token + namespace))
 	tokenKey := hex.EncodeToString(d[:])[:7]
@@ -144,7 +134,7 @@ func SystemTemplate(resp io.Writer, agentImage, authImage, namespace, token, url
 	return t.Execute(resp, context)
 }
 
-func GetDesiredFeatures(cluster *v3.Cluster) map[string]bool {
+func GetDesiredFeatures(cluster *apimgmtv3.Cluster) map[string]bool {
 	return map[string]bool{
 		features.MCM.Name():                false,
 		features.MCMAgent.Name():           true,
@@ -156,7 +146,7 @@ func GetDesiredFeatures(cluster *v3.Cluster) map[string]bool {
 	}
 }
 
-func ForCluster(cluster *v3.Cluster, token string, taints []corev1.Taint, privateRegistries map[string][]byte) ([]byte, error) {
+func ForCluster(cluster *apimgmtv3.Cluster, token string, taints []corev1.Taint, privateRegistries map[string][]byte) ([]byte, error) {
 	buf := &bytes.Buffer{}
 	err := SystemTemplate(buf, GetDesiredAgentImage(cluster),
 		GetDesiredAuthImage(cluster),
@@ -189,7 +179,7 @@ func CAChecksum() string {
 	return ""
 }
 
-func GetDesiredAgentImage(cluster *v3.Cluster) string {
+func GetDesiredAgentImage(cluster *apimgmtv3.Cluster) string {
 	logrus.Tracef("clusterDeploy: deployAgent called for [%s]", cluster.Name)
 	desiredAgent := cluster.Spec.DesiredAgentImage
 	if cluster.Spec.AgentImageOverride != "" {
@@ -202,7 +192,7 @@ func GetDesiredAgentImage(cluster *v3.Cluster) string {
 	return desiredAgent
 }
 
-func GetDesiredAuthImage(cluster *v3.Cluster) string {
+func GetDesiredAuthImage(cluster *apimgmtv3.Cluster) string {
 	var desiredAuth string
 	if cluster.Spec.LocalClusterAuthEndpoint.Enabled {
 		desiredAuth = cluster.Spec.DesiredAuthImage

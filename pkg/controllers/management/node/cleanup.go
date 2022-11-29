@@ -354,7 +354,7 @@ func (m *Lifecycle) createCleanupJob(userContext *config.UserContext, cluster *v
 
 	var imagePullSecrets []corev1.LocalObjectReference
 	if registrySecret := cluster.GetSecret(v3.ClusterPrivateRegistrySecret); registrySecret != "" {
-		privateRegistries, err := m.credLister.Get(namespace.GlobalNamespace, registrySecret)
+		privateRegistries, err := m.secretLister.Get(namespace.GlobalNamespace, registrySecret)
 		if err != nil {
 			return nil, err
 		} else if url, err := util.GeneratePrivateRegistryDockerConfig(util.GetPrivateRepo(cluster), privateRegistries.Data[".dockerconfigjson"]); err != nil {
