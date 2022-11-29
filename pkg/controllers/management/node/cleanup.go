@@ -10,10 +10,10 @@ import (
 	"github.com/rancher/rancher/pkg/agent/clean"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	util "github.com/rancher/rancher/pkg/cluster"
+	"github.com/rancher/rancher/pkg/controllers/management/secretmigrator"
 	"github.com/rancher/rancher/pkg/dialer"
 	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/kubectl"
-	"github.com/rancher/rancher/pkg/namespace"
 	nodehelper "github.com/rancher/rancher/pkg/node"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/systemtemplate"
@@ -351,11 +351,22 @@ func (m *Lifecycle) createCleanupJob(userContext *config.UserContext, cluster *v
 	}
 
 	var imagePullSecrets []corev1.LocalObjectReference
-	if registrySecret := cluster.GetSecret(v3.ClusterPrivateRegistrySecret); registrySecret != "" {
-		privateRegistries, err := m.secretLister.Get(namespace.GlobalNamespace, registrySecret)
+	// assemble private registry
+	privateRegistrySecretRef := cluster.GetSecret("PrivateRegistrySecret")
+	privateRegistryURL := cluster.Spec.ClusterSecrets.PrivateRegistryURL
+	ecrSecretRef := cluster.Spec.ClusterSecrets.PrivateRegistryECRSecret
+	if privateRegistrySecretRef != "" || privateRegistryURL != "" || ecrSecretRef != "" {
+		// Assemble private registry secrets here instead of directly on the cluster object
+		spec := *cluster.Spec.DeepCopy()
+		spec, err = secretmigrator.AssemblePrivateRegistryCredential(privateRegistrySecretRef, privateRegistryURL, secretmigrator.ClusterType, cluster.Name, spec, m.secretLister)
 		if err != nil {
 			return nil, err
-		} else if url, err := util.GeneratePrivateRegistryDockerConfig(util.GetPrivateRepo(cluster), privateRegistries.Data[".dockerconfigjson"]); err != nil {
+		}
+		spec, err = secretmigrator.AssemblePrivateRegistryECRCredential(cluster.Spec.ClusterSecrets.PrivateRegistryECRSecret, secretmigrator.ClusterType, cluster.Name, cluster.Spec, m.secretLister)
+		if err != nil {
+			return nil, err
+		}
+		if url, err := util.GeneratePrivateRegistryDockerConfig(util.GetPrivateRegistry(spec.RancherKubernetesEngineConfig)); err != nil {
 			return nil, err
 		} else if url != "" {
 			imagePullSecrets = append(imagePullSecrets, corev1.LocalObjectReference{Name: "cattle-private-registry"})

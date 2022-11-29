@@ -19,6 +19,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	configv1 "k8s.io/apiserver/pkg/apis/config/v1"
 	"k8s.io/kubernetes/pkg/credentialprovider"
 )
 
@@ -28,7 +29,6 @@ var (
 )
 
 const (
-	credKey   = "credential"
 	secretsNS = "cattle-global-data"
 )
 
@@ -43,10 +43,42 @@ func resetMockClusters() {
 func newTestHandler() *handler {
 	secrets := corefakes.SecretInterfaceMock{
 		CreateFunc: func(secret *corev1.Secret) (*corev1.Secret, error) {
-			if secret.Name == "" {
+			if secret.GenerateName != "" {
 				uniqueIdentifier := md5.Sum([]byte(time.Now().String()))
-				secret.Name = hex.EncodeToString(uniqueIdentifier[:])
+				secret.Name = secret.GenerateName + hex.EncodeToString(uniqueIdentifier[:])[:5]
+				secret.GenerateName = ""
 			}
+			// All key-value pairs in the stringData field are internally merged into the data field.
+			// If a key appears in both the data and the stringData field, the value specified in the stringData field takes
+			// precedence.
+			// https://kubernetes.io/docs/concepts/configuration/secret/#restriction-names-data
+			// All keys and values are merged into the data field on write, overwriting any existing values.
+			// The stringData field is never output when reading from the API.
+			// https://pkg.go.dev/k8s.io/api/core/v1@v0.24.2#Secret.StringData
+			if secret.StringData != nil && len(secret.StringData) != 0 {
+				if secret.Data == nil {
+					secret.Data = map[string][]byte{}
+				}
+				for k, v := range secret.StringData {
+					secret.Data[k] = []byte(v)
+				}
+			}
+			secret.StringData = map[string]string{}
+			mockSecrets[fmt.Sprintf("%s:%s", secret.Namespace, secret.Name)] = secret
+			return secret, nil
+		},
+		UpdateFunc: func(secret *corev1.Secret) (*corev1.Secret, error) {
+			key := fmt.Sprintf("%s:%s", secret.Namespace, secret.Name)
+			if _, ok := mockSecrets[key]; !ok {
+				return nil, apierror.NewNotFound(schema.GroupResource{}, fmt.Sprintf("secret [%s] not found", key))
+			}
+
+			if secret.StringData != nil && len(secret.StringData) != 0 {
+				for k, v := range secret.StringData {
+					secret.Data[k] = []byte(v)
+				}
+			}
+			secret.StringData = map[string]string{}
 			mockSecrets[fmt.Sprintf("%s:%s", secret.Namespace, secret.Name)] = secret
 			return secret, nil
 		},
@@ -182,12 +214,6 @@ func TestMigrateClusterSecrets(t *testing.T) {
 	cluster, err := h.migrateClusterSecrets(testCluster)
 	assert.Nil(t, err)
 
-	assert.Equal(t, "", cluster.Spec.RancherKubernetesEngineConfig.PrivateRegistries[0].Password)
-	secretName := cluster.Spec.ClusterSecrets.PrivateRegistrySecret
-	assert.NotEqual(t, "", secretName)
-	secret, err := h.migrator.secretLister.Get(secretsNS, secretName)
-	assert.Nil(t, err)
-	// this will fail
 	registry := credentialprovider.DockerConfigJSON{
 		Auths: credentialprovider.DockerConfig{
 			"testurl": credentialprovider.DockerConfigEntry{
@@ -195,61 +221,84 @@ func TestMigrateClusterSecrets(t *testing.T) {
 			},
 		},
 	}
+
 	registryJSON, err := json.Marshal(registry)
 	assert.Nil(t, err)
-	registryData := map[string][]byte{
-		corev1.DockerConfigJsonKey: registryJSON,
+
+	tests := []struct {
+		name       string
+		field      string
+		secretName string
+		key        string
+		expected   string
+	}{
+		{
+			name:       "privateRegistry",
+			field:      cluster.Spec.RancherKubernetesEngineConfig.PrivateRegistries[0].Password,
+			secretName: cluster.Spec.ClusterSecrets.PrivateRegistrySecret,
+			key:        corev1.DockerConfigJsonKey,
+			expected:   string(registryJSON),
+		},
+		{
+			name:       "s3Secret",
+			field:      cluster.Spec.RancherKubernetesEngineConfig.Services.Etcd.BackupConfig.S3BackupConfig.SecretKey,
+			secretName: cluster.Spec.ClusterSecrets.S3CredentialSecret,
+			key:        SecretKey,
+			expected:   secretKey,
+		},
+		{
+			name:       "WeavePassword",
+			field:      cluster.Spec.RancherKubernetesEngineConfig.Network.WeaveNetworkProvider.Password,
+			secretName: cluster.Spec.ClusterSecrets.WeavePasswordSecret,
+			key:        SecretKey,
+			expected:   secretKey,
+		},
+		{
+			name:       "VspherePassword",
+			field:      cluster.Spec.RancherKubernetesEngineConfig.CloudProvider.VsphereCloudProvider.Global.Password,
+			secretName: cluster.Spec.ClusterSecrets.VsphereSecret,
+			key:        SecretKey,
+			expected:   secretKey,
+		},
+		{
+			name:       "VirtualCenterPassword",
+			field:      cluster.Spec.RancherKubernetesEngineConfig.CloudProvider.VsphereCloudProvider.VirtualCenter["vc1"].Password,
+			secretName: cluster.Spec.ClusterSecrets.VirtualCenterSecret,
+			key:        "vc1",
+			expected:   secretKey,
+		},
+		{
+			name:       "OpenStackPassword",
+			field:      cluster.Spec.RancherKubernetesEngineConfig.CloudProvider.OpenstackCloudProvider.Global.Password,
+			secretName: cluster.Spec.ClusterSecrets.OpenStackSecret,
+			key:        SecretKey,
+			expected:   secretKey,
+		},
+		{
+			name:       "AADClientSecret",
+			field:      cluster.Spec.RancherKubernetesEngineConfig.CloudProvider.AzureCloudProvider.AADClientSecret,
+			secretName: cluster.Spec.ClusterSecrets.AADClientSecret,
+			key:        SecretKey,
+			expected:   secretKey,
+		},
+		{
+			name:       "AADClientCertSecret",
+			field:      cluster.Spec.RancherKubernetesEngineConfig.CloudProvider.AzureCloudProvider.AADClientCertPassword,
+			secretName: cluster.Spec.ClusterSecrets.AADClientCertSecret,
+			key:        SecretKey,
+			expected:   secretKey,
+		},
 	}
-	assert.Equal(t, registryData, secret.Data)
 
-	assert.Equal(t, "", cluster.Spec.RancherKubernetesEngineConfig.Services.Etcd.BackupConfig.S3BackupConfig.SecretKey)
-	secretName = cluster.Spec.ClusterSecrets.S3CredentialSecret
-	assert.NotEqual(t, "", secretName)
-	secret, err = h.migrator.secretLister.Get(secretsNS, secretName)
-	assert.Nil(t, err)
-	assert.Equal(t, secretKey, secret.StringData[credKey])
-
-	assert.Equal(t, "", cluster.Spec.RancherKubernetesEngineConfig.Network.WeaveNetworkProvider.Password)
-	secretName = cluster.Spec.ClusterSecrets.WeavePasswordSecret
-	assert.NotEqual(t, "", secretName)
-	secret, err = h.migrator.secretLister.Get(secretsNS, secretName)
-	assert.Nil(t, err)
-	assert.Equal(t, secretKey, secret.StringData[credKey])
-
-	assert.Equal(t, "", cluster.Spec.RancherKubernetesEngineConfig.CloudProvider.VsphereCloudProvider.Global.Password)
-	secretName = cluster.Spec.ClusterSecrets.VsphereSecret
-	assert.NotEqual(t, "", secretName)
-	secret, err = h.migrator.secretLister.Get(secretsNS, secretName)
-	assert.Nil(t, err)
-	assert.Equal(t, secretKey, secret.StringData[credKey])
-
-	assert.Equal(t, "", cluster.Spec.RancherKubernetesEngineConfig.CloudProvider.VsphereCloudProvider.VirtualCenter["vc1"].Password)
-	secretName = cluster.Spec.ClusterSecrets.VirtualCenterSecret
-	assert.NotEqual(t, "", secretName)
-	secret, err = h.migrator.secretLister.Get(secretsNS, secretName)
-	assert.Nil(t, err)
-	assert.Equal(t, secretKey, secret.StringData["vc1"])
-
-	assert.Equal(t, "", cluster.Spec.RancherKubernetesEngineConfig.CloudProvider.OpenstackCloudProvider.Global.Password)
-	secretName = cluster.Spec.ClusterSecrets.OpenStackSecret
-	assert.NotEqual(t, "", secretName)
-	secret, err = h.migrator.secretLister.Get(secretsNS, secretName)
-	assert.Nil(t, err)
-	assert.Equal(t, secretKey, secret.StringData[credKey])
-
-	assert.Equal(t, "", cluster.Spec.RancherKubernetesEngineConfig.CloudProvider.AzureCloudProvider.AADClientSecret)
-	secretName = cluster.Spec.ClusterSecrets.AADClientSecret
-	assert.NotEqual(t, "", secretName)
-	secret, err = h.migrator.secretLister.Get(secretsNS, secretName)
-	assert.Nil(t, err)
-	assert.Equal(t, secretKey, secret.StringData[credKey])
-
-	assert.Equal(t, "", cluster.Spec.RancherKubernetesEngineConfig.CloudProvider.AzureCloudProvider.AADClientCertPassword)
-	secretName = cluster.Spec.ClusterSecrets.AADClientCertSecret
-	assert.NotEqual(t, "", secretName)
-	secret, err = h.migrator.secretLister.Get(secretsNS, secretName)
-	assert.Nil(t, err)
-	assert.Equal(t, secretKey, secret.StringData[credKey])
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, "", tt.field)
+			assert.NotEqual(t, "", tt.secretName)
+			secret, err := h.migrator.secretLister.Get(secretsNS, tt.secretName)
+			assert.Nil(t, err)
+			assert.Equal(t, tt.expected, string(secret.Data[tt.key]))
+		})
+	}
 
 	assert.True(t, apimgmtv3.ClusterConditionSecretsMigrated.IsTrue(cluster))
 
@@ -265,10 +314,13 @@ func TestMigrateClusterSecrets(t *testing.T) {
 		Spec: apimgmtv3.ClusterSpec{
 			ClusterSpecBase: apimgmtv3.ClusterSpecBase{
 				RancherKubernetesEngineConfig: &rketypes.RancherKubernetesEngineConfig{
-					PrivateRegistries: []rketypes.PrivateRegistry{
-						{
-							URL:      "testurl",
-							Password: secretKey,
+					Services: rketypes.RKEConfigServices{
+						Etcd: rketypes.ETCDService{
+							BackupConfig: &rketypes.BackupConfig{
+								S3BackupConfig: &rketypes.S3BackupConfig{
+									SecretKey: secretKey,
+								},
+							},
 						},
 					},
 				},
@@ -278,6 +330,7 @@ func TestMigrateClusterSecrets(t *testing.T) {
 	cluster, err = h.migrateClusterSecrets(testCluster2)
 	assert.Equal(t, err.Error(), fmt.Sprintf(" \"cluster [%s]\" not found", testCluster2.Name))
 	// no change should
+	assert.Equal(t, cluster.Spec.RancherKubernetesEngineConfig, testCluster2.Spec.RancherKubernetesEngineConfig)
 	assert.Equal(t, cluster, testCluster2)
 	assert.True(t, apimgmtv3.ClusterConditionSecretsMigrated.IsFalse(cluster))
 }
@@ -306,11 +359,145 @@ func TestMigrateClusterServiceAccountToken(t *testing.T) {
 	assert.NotEqual(t, secretName, "")
 	secret, err := h.migrator.secretLister.Get(secretsNS, secretName)
 	assert.Nil(t, err)
-	assert.Equal(t, secret.StringData[credKey], token)
+	assert.Equal(t, secret.Data[SecretKey], []byte(token))
 	assert.True(t, apimgmtv3.ClusterConditionServiceAccountSecretsMigrated.IsTrue(cluster))
 
 	// test that cluster object has not been modified since last update with client
 	clusterFromClient, err := h.clusters.Get(cluster.Name, metav1.GetOptions{})
 	assert.Nil(t, err)
 	assert.True(t, reflect.DeepEqual(cluster, clusterFromClient))
+}
+
+func TestMigrateRKESecrets(t *testing.T) {
+	h := newTestHandler()
+	defer resetMockClusters()
+	defer resetMockSecrets()
+
+	testCluster := &apimgmtv3.Cluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "testcluster",
+		},
+		Spec: apimgmtv3.ClusterSpec{
+			ClusterSpecBase: apimgmtv3.ClusterSpecBase{
+				RancherKubernetesEngineConfig: &rketypes.RancherKubernetesEngineConfig{
+					BastionHost: rketypes.BastionHost{
+						SSHKey: "sshKey",
+					},
+					PrivateRegistries: []rketypes.PrivateRegistry{
+						{
+							URL: "testurl",
+							ECRCredentialPlugin: &rketypes.ECRCredentialPlugin{
+								AwsAccessKeyID:     "keyId",
+								AwsSecretAccessKey: "secret",
+								AwsSessionToken:    "token",
+							},
+						},
+					},
+					Services: rketypes.RKEConfigServices{
+						Kubelet: rketypes.KubeletService{
+							BaseService: rketypes.BaseService{
+								ExtraEnv: []string{
+									"AWS_ACCESS_KEY_ID=keyId",
+									"AWS_SECRET_ACCESS_KEY=secret",
+								},
+							},
+						},
+						KubeAPI: rketypes.KubeAPIService{
+							SecretsEncryptionConfig: &rketypes.SecretsEncryptionConfig{
+								CustomConfig: &configv1.EncryptionConfiguration{
+									Resources: []configv1.ResourceConfiguration{
+										{
+											Providers: []configv1.ProviderConfiguration{
+												{
+													AESGCM: &configv1.AESConfiguration{
+														Keys: []configv1.Key{
+															{
+																Name:   "testName",
+																Secret: "testSecret",
+															},
+														},
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	_, err := h.clusters.Create(testCluster)
+	assert.Nil(t, err)
+	cluster, err := h.migrateRKESecrets(testCluster)
+	assert.Nil(t, err)
+
+	type cleanupVerifyFunc func(t *testing.T, cluster *apimgmtv3.Cluster)
+
+	emptyStringCondition := func(fields ...string) cleanupVerifyFunc {
+		return func(t *testing.T, cluster *apimgmtv3.Cluster) {
+			for _, field := range fields {
+				assert.Equal(t, "", field)
+			}
+		}
+	}
+
+	tests := []struct {
+		name              string
+		cleanupVerifyFunc cleanupVerifyFunc
+		secretName        string
+		key               string
+		expected          string
+	}{
+		{
+			name: "rkeSecretsEncryptionCustomConfig",
+			cleanupVerifyFunc: func(t *testing.T, cluster *apimgmtv3.Cluster) {
+				assert.Nil(t, cluster.Spec.RancherKubernetesEngineConfig.Services.KubeAPI.SecretsEncryptionConfig.CustomConfig.Resources)
+			},
+			secretName: cluster.Spec.ClusterSecrets.SecretsEncryptionProvidersSecret,
+			key:        SecretKey,
+			expected:   `[{"resources":null,"providers":[{"aesgcm":{"keys":[{"name":"testName","secret":"testSecret"}]}}]}]`,
+		},
+		{
+			name:              "bastionHostSSHKey",
+			cleanupVerifyFunc: emptyStringCondition(cluster.Spec.RancherKubernetesEngineConfig.BastionHost.SSHKey),
+			secretName:        cluster.Spec.ClusterSecrets.BastionHostSSHKeySecret,
+			key:               SecretKey,
+			expected:          "sshKey",
+		},
+		{
+			name: "kubeletExtraEnv",
+			cleanupVerifyFunc: func(t *testing.T, cluster *apimgmtv3.Cluster) {
+				assert.Len(t, cluster.Spec.RancherKubernetesEngineConfig.Services.Kubelet.ExtraEnv, 1)
+				assert.Equal(t, "AWS_ACCESS_KEY_ID=keyId", cluster.Spec.RancherKubernetesEngineConfig.Services.Kubelet.ExtraEnv[0])
+			},
+			secretName: cluster.Spec.ClusterSecrets.KubeletExtraEnvSecret,
+			key:        SecretKey,
+			expected:   "secret",
+		},
+		{
+			name: "privateRegistryECR",
+			cleanupVerifyFunc: emptyStringCondition(
+				cluster.Spec.RancherKubernetesEngineConfig.PrivateRegistries[0].ECRCredentialPlugin.AwsSecretAccessKey,
+				cluster.Spec.RancherKubernetesEngineConfig.PrivateRegistries[0].ECRCredentialPlugin.AwsSessionToken,
+			),
+			secretName: cluster.Spec.ClusterSecrets.PrivateRegistryECRSecret,
+			key:        SecretKey,
+			expected:   `{"testurl":"{\"awsSecretAccessKey\":\"secret\",\"awsAccessToken\":\"token\"}"}`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tt.cleanupVerifyFunc(t, cluster)
+			assert.NotEqual(t, "", tt.secretName)
+			secret, err := h.migrator.secretLister.Get(secretsNS, tt.secretName)
+			assert.Nil(t, err)
+			assert.Equal(t, tt.expected, string(secret.Data[tt.key]))
+		})
+	}
+
+	assert.True(t, apimgmtv3.ClusterConditionRKESecretsMigrated.IsTrue(cluster))
 }
