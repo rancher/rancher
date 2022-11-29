@@ -2,13 +2,12 @@ package secretmigrator
 
 import (
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
-func (h *handler) syncTemplate(key string, clusterTemplateRevision *v3.ClusterTemplateRevision) (runtime.Object, error) {
+func (h *handler) syncTemplate(key string, clusterTemplateRevision *apimgmtv3.ClusterTemplateRevision) (runtime.Object, error) {
 	if clusterTemplateRevision == nil || clusterTemplateRevision.DeletionTimestamp != nil {
 		return clusterTemplateRevision, nil
 	}
@@ -232,7 +231,7 @@ func (h *handler) syncTemplate(key string, clusterTemplateRevision *v3.ClusterTe
 		clusterTemplateRevision = clusterTemplateRevisionCopy
 		return clusterTemplateRevisionCopy, nil
 	})
-	clusterTemplateRevisionCopy, _ = obj.(*v3.ClusterTemplateRevision)
+	clusterTemplateRevisionCopy, _ = obj.(*apimgmtv3.ClusterTemplateRevision)
 	var err error
 	logrus.Tracef("[secretmigrator] setting clusterTemplateRevision [%s] condition and updating clusterTemplateRevision [%s]", apimgmtv3.ClusterConditionSecretsMigrated, clusterTemplateRevisionCopy.Name)
 	clusterTemplateRevisionCopy, err = h.clusterTemplateRevisions.Update(clusterTemplateRevisionCopy)
@@ -337,7 +336,7 @@ func (h *handler) syncTemplate(key string, clusterTemplateRevision *v3.ClusterTe
 		clusterTemplateRevision = clusterTemplateRevisionCopy
 		return clusterTemplateRevisionCopy, nil
 	})
-	clusterTemplateRevisionCopy, _ = obj.(*v3.ClusterTemplateRevision)
+	clusterTemplateRevisionCopy, _ = obj.(*apimgmtv3.ClusterTemplateRevision)
 	logrus.Tracef("[secretmigrator] setting clusterTemplateRevision [%s] condition and updating clusterTemplateRevision [%s]", apimgmtv3.ClusterConditionACISecretsMigrated, clusterTemplateRevisionCopy.Name)
 	clusterTemplateRevisionCopy, err = h.clusterTemplateRevisions.Update(clusterTemplateRevisionCopy)
 	if err != nil {
