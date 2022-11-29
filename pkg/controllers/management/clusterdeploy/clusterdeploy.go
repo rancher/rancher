@@ -12,7 +12,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/types"
-	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	util "github.com/rancher/rancher/pkg/cluster"
 	"github.com/rancher/rancher/pkg/clustermanager"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
@@ -44,8 +44,8 @@ const (
 var (
 	agentImagesMutex sync.RWMutex
 	agentImages      = map[string]map[string]string{
-		nodeImage:    map[string]string{},
-		clusterImage: map[string]string{},
+		nodeImage:    {},
+		clusterImage: {},
 	}
 	controlPlaneTaintsMutex sync.RWMutex
 	controlPlaneTaints      = make(map[string][]corev1.Taint)
@@ -78,7 +78,7 @@ type clusterDeploy struct {
 	secretLister         v1.SecretLister
 }
 
-func (cd *clusterDeploy) sync(key string, cluster *v3.Cluster) (runtime.Object, error) {
+func (cd *clusterDeploy) sync(key string, cluster *apimgmtv3.Cluster) (runtime.Object, error) {
 	logrus.Tracef("clusterDeploy: sync called for key [%s]", key)
 	var (
 		err, updateErr error
@@ -95,7 +95,7 @@ func (cd *clusterDeploy) sync(key string, cluster *v3.Cluster) (runtime.Object, 
 	original := cluster
 	cluster = original.DeepCopy()
 
-	if cluster.Status.Driver == v32.ClusterDriverRKE {
+	if cluster.Status.Driver == apimgmtv3.ClusterDriverRKE {
 		if cluster.Spec.LocalClusterAuthEndpoint.Enabled {
 			cluster.Spec.RancherKubernetesEngineConfig.Authentication.Strategy = "x509|webhook"
 		} else {
@@ -116,10 +116,10 @@ func (cd *clusterDeploy) sync(key string, cluster *v3.Cluster) (runtime.Object, 
 	return nil, updateErr
 }
 
-func (cd *clusterDeploy) doSync(cluster *v3.Cluster) error {
+func (cd *clusterDeploy) doSync(cluster *apimgmtv3.Cluster) error {
 	logrus.Tracef("clusterDeploy: doSync called for cluster [%s]", cluster.Name)
 
-	if !v32.ClusterConditionProvisioned.IsTrue(cluster) {
+	if !apimgmtv3.ClusterConditionProvisioned.IsTrue(cluster) {
 		logrus.Tracef("clusterDeploy: doSync: cluster [%s] is not yet provisioned (ClusterConditionProvisioned is not True)", cluster.Name)
 		return nil
 	}
@@ -134,7 +134,7 @@ func (cd *clusterDeploy) doSync(cluster *v3.Cluster) error {
 		return nil
 	}
 
-	_, err = v32.ClusterConditionSystemAccountCreated.DoUntilTrue(cluster, func() (runtime.Object, error) {
+	_, err = apimgmtv3.ClusterConditionSystemAccountCreated.DoUntilTrue(cluster, func() (runtime.Object, error) {
 		logrus.Tracef("clusterDeploy: doSync: Creating SystemAccount for cluster [%s]", cluster.Name)
 		return cluster, cd.systemAccountManager.CreateSystemAccount(cluster)
 	})
@@ -181,9 +181,9 @@ func agentFeaturesChanged(desired, actual map[string]bool) bool {
 	return false
 }
 
-func redeployAgent(cluster *v3.Cluster, desiredAgent, desiredAuth string, desiredFeatures map[string]bool, desiredTaints []corev1.Taint) bool {
+func redeployAgent(cluster *apimgmtv3.Cluster, desiredAgent, desiredAuth string, desiredFeatures map[string]bool, desiredTaints []corev1.Taint) bool {
 	logrus.Tracef("clusterDeploy: redeployAgent called for cluster [%s]", cluster.Name)
-	if !v32.ClusterConditionAgentDeployed.IsTrue(cluster) {
+	if !apimgmtv3.ClusterConditionAgentDeployed.IsTrue(cluster) {
 		return true
 	}
 	forceDeploy := cluster.Annotations[AgentForceDeployAnn] == "true"
@@ -216,7 +216,7 @@ func redeployAgent(cluster *v3.Cluster, desiredAgent, desiredAuth string, desire
 	}
 
 	na, ca := getAgentImages(cluster.Name)
-	if (cluster.Status.AgentImage != na && cluster.Status.Driver == v32.ClusterDriverRKE) || cluster.Status.AgentImage != ca {
+	if (cluster.Status.AgentImage != na && cluster.Status.Driver == apimgmtv3.ClusterDriverRKE) || cluster.Status.AgentImage != ca {
 		// downstream agent does not match, kick a redeploy with settings agent
 		logrus.Infof("clusterDeploy: redeployAgent: redeploy Rancher agents due to downstream agent image mismatch for [%s]: was [%s] and will be [%s]",
 			cluster.Name, na, image.ResolveWithCluster(settings.AgentImage.Get(), cluster))
@@ -248,7 +248,7 @@ func redeployAgent(cluster *v3.Cluster, desiredAgent, desiredAuth string, desire
 	return false
 }
 
-func getDesiredImage(cluster *v3.Cluster) string {
+func getDesiredImage(cluster *apimgmtv3.Cluster) string {
 	if cluster.Spec.AgentImageOverride != "" {
 		return cluster.Spec.AgentImageOverride
 	}
@@ -256,7 +256,7 @@ func getDesiredImage(cluster *v3.Cluster) string {
 	return cluster.Spec.DesiredAgentImage
 }
 
-func (cd *clusterDeploy) deployAgent(cluster *v3.Cluster) error {
+func (cd *clusterDeploy) deployAgent(cluster *apimgmtv3.Cluster) error {
 	if cluster.Spec.Internal {
 		return nil
 	}
@@ -304,7 +304,7 @@ func (cd *clusterDeploy) deployAgent(cluster *v3.Cluster) error {
 		return err
 	}
 
-	if _, err = v32.ClusterConditionAgentDeployed.Do(cluster, func() (runtime.Object, error) {
+	if _, err = apimgmtv3.ClusterConditionAgentDeployed.Do(cluster, func() (runtime.Object, error) {
 		yaml, err := cd.getYAML(cluster, desiredAgent, desiredAuth, desiredFeatures, desiredTaints, privateRegistries)
 		if err != nil {
 			return cluster, err
@@ -326,7 +326,7 @@ func (cd *clusterDeploy) deployAgent(cluster *v3.Cluster) error {
 		if err != nil {
 			return cluster, errors.WithMessage(types.NewErrors(err, errors.New(formatKubectlApplyOutput(string(output)))), "Error while applying agent YAML, it will be retried automatically")
 		}
-		v32.ClusterConditionAgentDeployed.Message(cluster, string(output))
+		apimgmtv3.ClusterConditionAgentDeployed.Message(cluster, string(output))
 		if !cluster.Spec.LocalClusterAuthEndpoint.Enabled && cluster.Status.AppliedSpec.LocalClusterAuthEndpoint.Enabled && cluster.Status.AuthImage != "" {
 			output, err = kubectl.Delete([]byte(systemtemplate.AuthDaemonSet), kubeConfig)
 		}
@@ -339,7 +339,7 @@ func (cd *clusterDeploy) deployAgent(cluster *v3.Cluster) error {
 			}
 			logrus.Debugf("Ignored '%s' error during delete kube-api-auth DaemonSet", dsNotFoundError)
 		}
-		if cluster.Status.Driver != v32.ClusterDriverRKE {
+		if cluster.Status.Driver != apimgmtv3.ClusterDriverRKE {
 			if output, err = kubectl.Delete([]byte(systemtemplate.NodeAgentDaemonSet), kubeConfig); err != nil {
 				logrus.Tracef("Output from kubectl delete cattle-node-agent DaemonSet, output: %s, err: %v", string(output), err)
 				// Ignore if the resource does not exist and it returns 'daemonsets.apps "kube-api-auth" not found'
@@ -350,7 +350,7 @@ func (cd *clusterDeploy) deployAgent(cluster *v3.Cluster) error {
 				logrus.Debugf("Ignored '%s' error during delete cattle-node-agent DaemonSet", dsNotFoundError)
 			}
 		} else if strings.ToLower(settings.AgentRolloutWait.Get()) == "true" {
-			// Check for agent daemonset rollout if parameter is set and driverv32.ClusterDriverRKE
+			// Check for agent daemonset rollout if parameter is set and driverapimgmtv3.ClusterDriverRKE
 			timeout := settings.AgentRolloutTimeout.Get()
 			_, err = time.ParseDuration(timeout)
 			if err != nil {
@@ -364,9 +364,9 @@ func (cd *clusterDeploy) deployAgent(cluster *v3.Cluster) error {
 				return cluster, errors.WithMessage(types.NewErrors(err, errors.New(formatKubectlApplyOutput(string(output)))), "Timeout waiting rollout agent daemonset")
 			}
 			logrus.Debugf("clusterDeploy: deployAgent: successfully rollout agent daemonset for cluster [%s]", cluster.Name)
-			v32.ClusterConditionAgentDeployed.Message(cluster, "Successfully rollout agent daemonset")
+			apimgmtv3.ClusterConditionAgentDeployed.Message(cluster, "Successfully rollout agent daemonset")
 		}
-		v32.ClusterConditionAgentDeployed.Message(cluster, string(output))
+		apimgmtv3.ClusterConditionAgentDeployed.Message(cluster, string(output))
 		return cluster, nil
 	}); err != nil {
 		return err
@@ -394,7 +394,7 @@ func (cd *clusterDeploy) deployAgent(cluster *v3.Cluster) error {
 	return nil
 }
 
-func (cd *clusterDeploy) setNetworkPolicyAnn(cluster *v3.Cluster) error {
+func (cd *clusterDeploy) setNetworkPolicyAnn(cluster *apimgmtv3.Cluster) error {
 	if cluster.Spec.EnableNetworkPolicy != nil {
 		return nil
 	}
@@ -408,7 +408,7 @@ func (cd *clusterDeploy) setNetworkPolicyAnn(cluster *v3.Cluster) error {
 	return nil
 }
 
-func (cd *clusterDeploy) getKubeConfig(cluster *v3.Cluster) (*clientcmdapi.Config, error) {
+func (cd *clusterDeploy) getKubeConfig(cluster *apimgmtv3.Cluster) (*clientcmdapi.Config, error) {
 	logrus.Tracef("clusterDeploy: getKubeConfig called for cluster [%s]", cluster.Name)
 	user, err := cd.systemAccountManager.GetSystemUser(cluster.Name)
 	if err != nil {
@@ -423,7 +423,7 @@ func (cd *clusterDeploy) getKubeConfig(cluster *v3.Cluster) (*clientcmdapi.Confi
 	return cd.clusterManager.KubeConfig(cluster.Name, token), nil
 }
 
-func (cd *clusterDeploy) getYAML(cluster *v3.Cluster, agentImage, authImage string, features map[string]bool, taints []corev1.Taint, privateRegistries *corev1.Secret) ([]byte, error) {
+func (cd *clusterDeploy) getYAML(cluster *apimgmtv3.Cluster, agentImage, authImage string, features map[string]bool, taints []corev1.Taint, privateRegistries *corev1.Secret) ([]byte, error) {
 	logrus.Tracef("clusterDeploy: getYAML: Desired agent image is [%s] for cluster [%s]", agentImage, cluster.Name)
 	logrus.Tracef("clusterDeploy: getYAML: Desired auth image is [%s] for cluster [%s]", authImage, cluster.Name)
 	logrus.Tracef("clusterDeploy: getYAML: Desired features are [%v] for cluster [%s]", features, cluster.Name)
