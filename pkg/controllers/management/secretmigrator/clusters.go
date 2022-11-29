@@ -7,14 +7,13 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/rancher/rancher/pkg/controllers/management/secretmigrator/assemblers"
 	"github.com/rancher/rancher/pkg/fleet"
 
 	"github.com/rancher/norman/types/convert"
 	v1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
-	"github.com/rancher/rancher/pkg/namespace"
 	rketypes "github.com/rancher/rke/types"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
@@ -27,8 +26,8 @@ import (
 )
 
 const (
-	SecretNamespace              = namespace.GlobalNamespace
-	SecretKey                    = "credential"
+	SecretNamespace              = assemblers.SecretNamespace
+	SecretKey                    = assemblers.SecretKey
 	S3BackupAnswersPath          = "rancherKubernetesEngineConfig.services.etcd.backupConfig.s3BackupConfig.secretKey"
 	WeavePasswordAnswersPath     = "rancherKubernetesEngineConfig.network.weaveNetworkProvider.password"
 	RegistryPasswordAnswersPath  = "rancherKubernetesEngineConfig.privateRegistries[%d].password"
@@ -45,7 +44,7 @@ const (
 var PrivateRegistryQuestion = regexp.MustCompile(`rancherKubernetesEngineConfig.privateRegistries[[0-9]+].password`)
 var VcenterQuestion = regexp.MustCompile(`rancherKubernetesEngineConfig.cloudProvider.vsphereCloudProvider.virtualCenter\[.+\].password`)
 
-func (h *handler) sync(_ string, cluster *v3.Cluster) (runtime.Object, error) {
+func (h *handler) sync(_ string, cluster *apimgmtv3.Cluster) (runtime.Object, error) {
 	if cluster == nil || cluster.DeletionTimestamp != nil {
 		return cluster, nil
 	}
@@ -58,8 +57,15 @@ func (h *handler) sync(_ string, cluster *v3.Cluster) (runtime.Object, error) {
 		return cluster, err
 	}
 
-	return h.migrateServiceAccountSecrets(cluster)
+	cluster, err = h.migrateServiceAccountSecrets(cluster)
+	if err != nil {
+		return cluster, err
+	}
+
+	return h.migrateRKESecrets(cluster)
 }
+
+type CreateOrUpdateSecretFunc func(secretName string, rkeConfig *rketypes.RancherKubernetesEngineConfig, owner runtime.Object) (*corev1.Secret, error)
 
 // CreateOrUpdatePrivateRegistrySecret accepts an optional secret name and a RancherKubernetesEngineConfig object and creates a dockerconfigjson Secret
 // containing the login credentials for every registry in the array, if there are any.
@@ -80,7 +86,6 @@ func (m *Migrator) CreateOrUpdatePrivateRegistrySecret(secretName string, rkeCon
 	var existing *corev1.Secret
 	var err error
 	if secretName != "" {
-		var err error
 		existing, err = m.secretLister.Get(SecretNamespace, secretName)
 		if err != nil && !apierrors.IsNotFound(err) {
 			return nil, err
@@ -446,19 +451,114 @@ func (m *Migrator) CreateOrUpdateACIKafkaClientKeySecret(secretName string, rkeC
 	return m.createOrUpdateSecretForCredential(secretName, SecretNamespace, rkeConfig.Network.AciNetworkProvider.KafkaClientKey, nil, owner, "cluster", "acikafkakey")
 }
 
+// CreateOrUpdateSecretsEncryptionProvidersSecret accepts an optional secret name and an rkeConfig and creates a
+// Secret containing the list of Custom Encryption Resources.
+// If an owner is passed, the owner is set as an owner reference on the Secret.
+// If the desired number of encryption keys is empty, a secret is not created.
+// The entire encryption configuration is stored wholesale as a json blob, due to the variable amount of data.
+func (m *Migrator) CreateOrUpdateSecretsEncryptionProvidersSecret(secretName string, rkeConfig *rketypes.RancherKubernetesEngineConfig, owner runtime.Object) (*corev1.Secret, error) {
+	if rkeConfig == nil ||
+		rkeConfig.Services.KubeAPI.SecretsEncryptionConfig == nil ||
+		rkeConfig.Services.KubeAPI.SecretsEncryptionConfig.CustomConfig == nil ||
+		len(rkeConfig.Services.KubeAPI.SecretsEncryptionConfig.CustomConfig.Resources) == 0 {
+		return nil, nil
+	}
+	data, err := json.Marshal(rkeConfig.Services.KubeAPI.SecretsEncryptionConfig.CustomConfig.Resources)
+	if err != nil {
+		return nil, err
+	}
+	strData := string(data)
+	if len(strData) == 0 {
+		return nil, nil
+	}
+	return m.createOrUpdateSecretForCredential(secretName, SecretNamespace, strData, nil, owner, "cluster", "secretsencryptionproviders")
+}
+
+// CreateOrUpdateBastionHostSSHKeySecret accepts an optional secret name and an rkeConfig and creates a
+// Secret containing the bastion host ssh key.
+// If an owner is passed, the owner is set as an owner reference on the Secret.
+// If the ssh key is unset, a secret is not created.
+func (m *Migrator) CreateOrUpdateBastionHostSSHKeySecret(secretName string, rkeConfig *rketypes.RancherKubernetesEngineConfig, owner runtime.Object) (*corev1.Secret, error) {
+	if rkeConfig == nil || rkeConfig.BastionHost.SSHKey == "" {
+		return nil, nil
+	}
+	return m.createOrUpdateSecretForCredential(secretName, SecretNamespace, rkeConfig.BastionHost.SSHKey, nil, owner, "cluster", "bastionhostsshkey")
+}
+
+// CreateOrUpdateKubeletExtraEnvSecret accepts an optional secret name and an rkeConfig and creates a
+// Secret containing the AWS_SECRET_ACCESS_KEY env variable.
+// If an owner is passed, the owner is set as an owner reference on the Secret.
+// If the environment variable are not present is unset, a secret is not created.
+func (m *Migrator) CreateOrUpdateKubeletExtraEnvSecret(secretName string, rkeConfig *rketypes.RancherKubernetesEngineConfig, owner runtime.Object) (*corev1.Secret, error) {
+	if rkeConfig == nil || len(rkeConfig.Services.Kubelet.ExtraEnv) == 0 {
+		return nil, nil
+	}
+	var awsSecretKey string
+	for _, k := range rkeConfig.Services.Kubelet.ExtraEnv {
+		s := strings.Split(k, "=")
+		if len(s) != 2 {
+			continue
+		}
+		key, value := s[0], s[1]
+		if key == "AWS_SECRET_ACCESS_KEY" {
+			awsSecretKey = value
+			break
+		}
+	}
+	if awsSecretKey == "" {
+		return nil, nil
+	}
+	return m.createOrUpdateSecretForCredential(secretName, SecretNamespace, awsSecretKey, nil, owner, "cluster", "kubeletextraenv")
+}
+
+// CreateOrUpdatePrivateRegistryECRSecret accepts an optional secret name and an rkeConfig and creates a
+// Secret containing the ecr credentials.
+// If an owner is passed, the owner is set as an owner reference on the Secret.
+// If there are no credentials set, a secret is not created.
+func (m *Migrator) CreateOrUpdatePrivateRegistryECRSecret(secretName string, rkeConfig *rketypes.RancherKubernetesEngineConfig, owner runtime.Object) (*corev1.Secret, error) {
+	if rkeConfig == nil || len(rkeConfig.PrivateRegistries) == 0 {
+		return nil, nil
+	}
+	data := map[string]string{}
+	for _, v := range rkeConfig.PrivateRegistries {
+		if v.ECRCredentialPlugin != nil {
+			if v.ECRCredentialPlugin.AwsSecretAccessKey != "" || v.ECRCredentialPlugin.AwsSessionToken != "" {
+				ecr := *v.ECRCredentialPlugin
+				ecr.AwsAccessKeyID = ""
+				ecrData, err := json.Marshal(&ecr)
+				if err != nil {
+					return nil, err
+				}
+				data[v.URL] = string(ecrData)
+			}
+		}
+	}
+	if len(data) == 0 {
+		return nil, nil
+	}
+	b, err := json.Marshal(data)
+	if err != nil {
+		return nil, err
+	}
+	data = map[string]string{
+		SecretKey: string(b),
+	}
+	return m.createOrUpdateSecret(secretName, SecretNamespace, data, nil, owner, "cluster", "privateregistryecr")
+}
+
 // Cleanup deletes a secret if provided a secret name, otherwise does nothing.
 func (m *Migrator) Cleanup(secretName string) error {
 	if secretName == "" {
 		return nil
 	}
-	_, err := m.secretLister.Get(namespace.GlobalNamespace, secretName)
+	_, err := m.secretLister.Get(SecretNamespace, secretName)
 	if apierrors.IsNotFound(err) {
 		return nil
 	}
 	if err != nil {
 		return err
 	}
-	err = m.secrets.DeleteNamespaced(namespace.GlobalNamespace, secretName, &metav1.DeleteOptions{})
+	err = m.secrets.DeleteNamespaced(SecretNamespace, secretName, &metav1.DeleteOptions{})
 	return err
 }
 
@@ -515,7 +615,7 @@ func MatchesQuestionPath(variable string) bool {
 
 // cleanQuestions removes credentials from the questions and answers sections of the cluster object.
 // Answers are already substituted into the spec in norman, so they can be deleted without migration.
-func cleanQuestions(cluster *v3.Cluster) {
+func cleanQuestions(cluster *apimgmtv3.Cluster) {
 	cleanQuestions := func(questions []apimgmtv3.Question) {
 		for i, q := range questions {
 			if MatchesQuestionPath(q.Variable) {
@@ -568,265 +668,138 @@ func cleanQuestions(cluster *v3.Cluster) {
 	}
 }
 
-func (h *handler) migrateClusterSecrets(cluster *v3.Cluster) (*v3.Cluster, error) {
+type cleanupFunc func(spec *apimgmtv3.ClusterSpec)
+
+func (h *handler) migrateSecret(cluster *apimgmtv3.Cluster, secretName, secretClass string, secretField *string, createOrUpdateSecret CreateOrUpdateSecretFunc, cleanup cleanupFunc) (*apimgmtv3.Cluster, error) {
+	logrus.Tracef("[secretmigrator] migrating %s secrets for cluster %s", secretClass, cluster.Name)
+	secret, err := createOrUpdateSecret(cluster.GetSecret(secretName), cluster.Spec.RancherKubernetesEngineConfig, cluster)
+	if err != nil {
+		logrus.Errorf("[secretmigrator] failed to migrate %s secrets for cluster %s, will retry: %v", secretClass, cluster.Name, err)
+		return cluster, err
+	}
+	if secret != nil {
+		logrus.Tracef("[secretmigrator] %s found for cluster %s", secretClass, cluster.Name)
+		*secretField = secret.Name
+		cleanup(&cluster.Spec)
+		if cluster.Status.AppliedSpec.RancherKubernetesEngineConfig != nil {
+			cleanup(&cluster.Status.AppliedSpec)
+		}
+		if cluster.Status.FailedSpec != nil && cluster.Status.FailedSpec.RancherKubernetesEngineConfig != nil {
+			cleanup(cluster.Status.FailedSpec)
+		}
+
+		clusterCopy, err := h.clusters.Update(cluster)
+		if err != nil {
+			logrus.Errorf("[secretmigrator] failed to migrate %s secrets for cluster %s, will retry: %v", secretClass, cluster.Name, err)
+			deleteErr := h.migrator.secrets.DeleteNamespaced(SecretNamespace, secret.Name, &metav1.DeleteOptions{})
+			if deleteErr != nil {
+				logrus.Errorf("[secretmigrator] encountered error while handling migration error: %v", deleteErr)
+			}
+			return cluster, err
+		}
+		cluster = clusterCopy.DeepCopy()
+	}
+	return cluster, nil
+}
+
+func (h *handler) migrateClusterSecrets(cluster *apimgmtv3.Cluster) (*apimgmtv3.Cluster, error) {
 	clusterCopy := cluster.DeepCopy()
+	var err error
 	obj, doErr := apimgmtv3.ClusterConditionSecretsMigrated.DoUntilTrue(clusterCopy, func() (runtime.Object, error) {
-		// privateRegistries
-		if clusterCopy.GetSecret("PrivateRegistrySecret") == "" {
-			logrus.Tracef("[secretmigrator] migrating private registry secrets for cluster %s", clusterCopy.Name)
-			regSecret, err := h.migrator.CreateOrUpdatePrivateRegistrySecret(clusterCopy.GetSecret("PrivateRegistrySecret"), clusterCopy.Spec.RancherKubernetesEngineConfig, clusterCopy)
-			if err != nil {
-				logrus.Errorf("[secretmigrator] failed to migrate private registry secrets for cluster %s, will retry: %v", clusterCopy.Name, err)
-				return cluster, err
-			}
-			if regSecret != nil {
-				logrus.Tracef("[secretmigrator] private registry secret found for cluster %s", clusterCopy.Name)
-				clusterCopy.Spec.ClusterSecrets.PrivateRegistrySecret = regSecret.Name
-				clusterCopy.Spec.RancherKubernetesEngineConfig.PrivateRegistries = CleanRegistries(clusterCopy.Spec.RancherKubernetesEngineConfig.PrivateRegistries)
-				if clusterCopy.Status.AppliedSpec.RancherKubernetesEngineConfig != nil {
-					clusterCopy.Status.AppliedSpec.RancherKubernetesEngineConfig.PrivateRegistries = CleanRegistries(clusterCopy.Status.AppliedSpec.RancherKubernetesEngineConfig.PrivateRegistries)
-				}
-				if clusterCopy.Status.FailedSpec != nil && clusterCopy.Status.FailedSpec.RancherKubernetesEngineConfig != nil {
-					clusterCopy.Status.FailedSpec.RancherKubernetesEngineConfig.PrivateRegistries = CleanRegistries(clusterCopy.Status.FailedSpec.RancherKubernetesEngineConfig.PrivateRegistries)
-				}
-
-				clusterCopy, err = h.clusters.Update(clusterCopy)
-				if err != nil {
-					logrus.Errorf("[secretmigrator] failed to migrate private registry secrets for cluster %s, will retry: %v", cluster.Name, err)
-					deleteErr := h.migrator.secrets.DeleteNamespaced(SecretNamespace, regSecret.Name, &metav1.DeleteOptions{})
-					if deleteErr != nil {
-						logrus.Errorf("[secretmigrator] encountered error while handling migration error: %v", deleteErr)
-					}
-					return cluster, err
-				}
-				cluster = clusterCopy.DeepCopy()
-			}
-		}
-
 		// s3 backup cred
-		if clusterCopy.GetSecret("S3CredentialSecret") == "" {
-			logrus.Tracef("[secretmigrator] migrating S3 secrets for cluster %s", clusterCopy.Name)
-			s3Secret, err := h.migrator.CreateOrUpdateS3Secret("", clusterCopy.Spec.RancherKubernetesEngineConfig, clusterCopy)
-			if err != nil {
-				logrus.Errorf("[secretmigrator] failed to migrate S3 secrets for cluster %s, will retry: %v", clusterCopy.Name, err)
-				return cluster, err
+		clusterCopy, err = h.migrateSecret(clusterCopy, "S3CredentialSecret", "S3", &clusterCopy.Spec.ClusterSecrets.S3CredentialSecret, h.migrator.CreateOrUpdateS3Secret, func(spec *apimgmtv3.ClusterSpec) {
+			if spec == nil || spec.RancherKubernetesEngineConfig == nil {
+				return
 			}
-			if s3Secret != nil {
-				logrus.Tracef("[secretmigrator] S3 secret found for cluster %s", clusterCopy.Name)
-				clusterCopy.Spec.ClusterSecrets.S3CredentialSecret = s3Secret.Name
-				clusterCopy.Spec.RancherKubernetesEngineConfig.Services.Etcd.BackupConfig.S3BackupConfig.SecretKey = ""
-				if clusterCopy.Status.AppliedSpec.RancherKubernetesEngineConfig != nil && clusterCopy.Status.AppliedSpec.RancherKubernetesEngineConfig.Services.Etcd.BackupConfig != nil && clusterCopy.Status.AppliedSpec.RancherKubernetesEngineConfig.Services.Etcd.BackupConfig.S3BackupConfig != nil {
-					clusterCopy.Status.AppliedSpec.RancherKubernetesEngineConfig.Services.Etcd.BackupConfig.S3BackupConfig.SecretKey = ""
-				}
-				if clusterCopy.Status.FailedSpec != nil && clusterCopy.Status.FailedSpec.RancherKubernetesEngineConfig != nil && clusterCopy.Status.FailedSpec.RancherKubernetesEngineConfig.Services.Etcd.BackupConfig != nil && clusterCopy.Status.FailedSpec.RancherKubernetesEngineConfig.Services.Etcd.BackupConfig.S3BackupConfig != nil {
-					clusterCopy.Status.FailedSpec.RancherKubernetesEngineConfig.Services.Etcd.BackupConfig.S3BackupConfig.SecretKey = ""
-				}
-				clusterCopy, err = h.clusters.Update(clusterCopy)
-				if err != nil {
-					logrus.Errorf("[secretmigrator] failed to migrate S3 secrets for cluster %s, will retry: %v", cluster.Name, err)
-					deleteErr := h.migrator.secrets.DeleteNamespaced(SecretNamespace, s3Secret.Name, &metav1.DeleteOptions{})
-					if deleteErr != nil {
-						logrus.Errorf("[secretmigrator] encountered error while handling migration error: %v", deleteErr)
-					}
-					return cluster, err
-				}
-				cluster = clusterCopy.DeepCopy()
-			}
+			spec.RancherKubernetesEngineConfig.Services.Etcd.BackupConfig.S3BackupConfig.SecretKey = ""
+		})
+		if err != nil {
+			return cluster, err
 		}
+		cluster = clusterCopy
+
+		// private registry
+		clusterCopy, err = h.migrateSecret(clusterCopy, "PrivateRegistrySecret", "private registry", &clusterCopy.Spec.ClusterSecrets.PrivateRegistrySecret, h.migrator.CreateOrUpdatePrivateRegistrySecret, func(spec *apimgmtv3.ClusterSpec) {
+			if spec == nil || spec.RancherKubernetesEngineConfig == nil {
+				return
+			}
+			spec.RancherKubernetesEngineConfig.PrivateRegistries = CleanRegistries(spec.RancherKubernetesEngineConfig.PrivateRegistries)
+		})
+		if err != nil {
+			return cluster, err
+		}
+		cluster = clusterCopy
 
 		// weave CNI password
-		if clusterCopy.GetSecret("WeavePasswordSecret") == "" {
-			logrus.Tracef("[secretmigrator] migrating weave CNI secrets for cluster %s", clusterCopy.Name)
-			weaveSecret, err := h.migrator.CreateOrUpdateWeaveSecret("", clusterCopy.Spec.RancherKubernetesEngineConfig, clusterCopy)
-			if err != nil {
-				logrus.Errorf("[secretmigrator] failed to migrate weave CNI secrets for cluster %s, will retry: %v", clusterCopy.Name, err)
-				return cluster, err
+		clusterCopy, err = h.migrateSecret(clusterCopy, "WeavePasswordSecret", "weave CNI", &clusterCopy.Spec.ClusterSecrets.WeavePasswordSecret, h.migrator.CreateOrUpdateWeaveSecret, func(spec *apimgmtv3.ClusterSpec) {
+			if spec == nil || spec.RancherKubernetesEngineConfig == nil || spec.RancherKubernetesEngineConfig.Network.WeaveNetworkProvider == nil {
+				return
 			}
-			if weaveSecret != nil {
-				logrus.Tracef("[secretmigrator] weave secret found for cluster %s", clusterCopy.Name)
-				clusterCopy.Spec.ClusterSecrets.WeavePasswordSecret = weaveSecret.Name
-				clusterCopy.Spec.RancherKubernetesEngineConfig.Network.WeaveNetworkProvider.Password = ""
-				if clusterCopy.Status.AppliedSpec.RancherKubernetesEngineConfig != nil && clusterCopy.Status.AppliedSpec.RancherKubernetesEngineConfig.Network.WeaveNetworkProvider != nil {
-					clusterCopy.Status.AppliedSpec.RancherKubernetesEngineConfig.Network.WeaveNetworkProvider.Password = ""
-				}
-				if clusterCopy.Status.FailedSpec != nil && clusterCopy.Status.FailedSpec.RancherKubernetesEngineConfig != nil && clusterCopy.Status.FailedSpec.RancherKubernetesEngineConfig.Network.WeaveNetworkProvider != nil {
-					clusterCopy.Status.FailedSpec.RancherKubernetesEngineConfig.Network.WeaveNetworkProvider.Password = ""
-				}
-				clusterCopy, err = h.clusters.Update(clusterCopy)
-				if err != nil {
-					logrus.Errorf("[secretmigrator] failed to migrate weave CNI secrets for cluster %s, will retry: %v", cluster.Name, err)
-					deleteErr := h.migrator.secrets.DeleteNamespaced(SecretNamespace, weaveSecret.Name, &metav1.DeleteOptions{})
-					if deleteErr != nil {
-						logrus.Errorf("[secretmigrator] encountered error while handling migration error: %v", deleteErr)
-					}
-					return cluster, err
-				}
-				cluster = clusterCopy.DeepCopy()
-			}
+			spec.RancherKubernetesEngineConfig.Network.WeaveNetworkProvider.Password = ""
+		})
+		if err != nil {
+			return cluster, err
 		}
-
+		cluster = clusterCopy
 		// cloud provider secrets
-
 		// vsphere global
-		if clusterCopy.GetSecret("VsphereSecret") == "" {
-			logrus.Tracef("[secretmigrator] migrating vsphere global secret for cluster %s", clusterCopy.Name)
-			vsphereSecret, err := h.migrator.CreateOrUpdateVsphereGlobalSecret("", clusterCopy.Spec.RancherKubernetesEngineConfig, clusterCopy)
-			if err != nil {
-				logrus.Errorf("[secretmigrator] failed to migrate vsphere global secret for cluster %s, will retry: %v", clusterCopy.Name, err)
-				return cluster, err
+		clusterCopy, err = h.migrateSecret(clusterCopy, "VsphereSecret", "vsphere global", &clusterCopy.Spec.ClusterSecrets.VsphereSecret, h.migrator.CreateOrUpdateVsphereGlobalSecret, func(spec *apimgmtv3.ClusterSpec) {
+			if spec == nil || spec.RancherKubernetesEngineConfig == nil || spec.RancherKubernetesEngineConfig.CloudProvider.VsphereCloudProvider == nil {
+				return
 			}
-			if vsphereSecret != nil {
-				logrus.Tracef("[secretmigrator] vsphere global secret found for cluster %s", clusterCopy.Name)
-				clusterCopy.Spec.ClusterSecrets.VsphereSecret = vsphereSecret.Name
-				clusterCopy.Spec.RancherKubernetesEngineConfig.CloudProvider.VsphereCloudProvider.Global.Password = ""
-				if clusterCopy.Status.AppliedSpec.RancherKubernetesEngineConfig != nil && clusterCopy.Status.AppliedSpec.RancherKubernetesEngineConfig.CloudProvider.VsphereCloudProvider != nil {
-					clusterCopy.Status.AppliedSpec.RancherKubernetesEngineConfig.CloudProvider.VsphereCloudProvider.Global.Password = ""
-				}
-				if clusterCopy.Status.FailedSpec != nil && clusterCopy.Status.FailedSpec.RancherKubernetesEngineConfig != nil && clusterCopy.Status.FailedSpec.RancherKubernetesEngineConfig.CloudProvider.VsphereCloudProvider != nil {
-					clusterCopy.Status.FailedSpec.RancherKubernetesEngineConfig.CloudProvider.VsphereCloudProvider.Global.Password = ""
-				}
-				clusterCopy, err = h.clusters.Update(clusterCopy)
-				if err != nil {
-					logrus.Errorf("[secretmigrator] failed to migrate vsphere global secret for cluster %s, will retry: %v", cluster.Name, err)
-					deleteErr := h.migrator.secrets.DeleteNamespaced(SecretNamespace, vsphereSecret.Name, &metav1.DeleteOptions{})
-					if deleteErr != nil {
-						logrus.Errorf("[secretmigrator] encountered error while handling migration error: %v", deleteErr)
-					}
-					return cluster, err
-				}
-				cluster = clusterCopy.DeepCopy()
-			}
+			spec.RancherKubernetesEngineConfig.CloudProvider.VsphereCloudProvider.Global.Password = ""
+		})
+		if err != nil {
+			return cluster, err
 		}
+		cluster = clusterCopy
 		// vsphere virtual center
-		if clusterCopy.GetSecret("VirtualCenterSecret") == "" {
-			logrus.Tracef("[secretmigrator] migrating vsphere virtualcenter secret for cluster %s", clusterCopy.Name)
-			vcenterSecret, err := h.migrator.CreateOrUpdateVsphereVirtualCenterSecret("", clusterCopy.Spec.RancherKubernetesEngineConfig, clusterCopy)
-			if err != nil {
-				logrus.Errorf("[secretmigrator] failed to migrate vsphere virtualcenter secret for cluster %s, will retry: %v", clusterCopy.Name, err)
-				return cluster, err
+		clusterCopy, err = h.migrateSecret(clusterCopy, "VirtualCenterSecret", "vsphere virtualcenter", &clusterCopy.Spec.ClusterSecrets.VirtualCenterSecret, h.migrator.CreateOrUpdateVsphereVirtualCenterSecret, func(spec *apimgmtv3.ClusterSpec) {
+			if spec == nil || spec.RancherKubernetesEngineConfig == nil || spec.RancherKubernetesEngineConfig.CloudProvider.VsphereCloudProvider == nil {
+				return
 			}
-			if vcenterSecret != nil {
-				logrus.Tracef("[secretmigrator] vsphere virtualcenter secret found for cluster %s", clusterCopy.Name)
-				clusterCopy.Spec.ClusterSecrets.VirtualCenterSecret = vcenterSecret.Name
-				for k, v := range clusterCopy.Spec.RancherKubernetesEngineConfig.CloudProvider.VsphereCloudProvider.VirtualCenter {
-					v.Password = ""
-					clusterCopy.Spec.RancherKubernetesEngineConfig.CloudProvider.VsphereCloudProvider.VirtualCenter[k] = v
-				}
-				if clusterCopy.Status.AppliedSpec.RancherKubernetesEngineConfig != nil && clusterCopy.Status.AppliedSpec.RancherKubernetesEngineConfig.CloudProvider.VsphereCloudProvider != nil {
-					for k, v := range clusterCopy.Status.AppliedSpec.RancherKubernetesEngineConfig.CloudProvider.VsphereCloudProvider.VirtualCenter {
-						v.Password = ""
-						clusterCopy.Status.AppliedSpec.RancherKubernetesEngineConfig.CloudProvider.VsphereCloudProvider.VirtualCenter[k] = v
-					}
-				}
-
-				if clusterCopy.Status.FailedSpec != nil && clusterCopy.Status.FailedSpec.RancherKubernetesEngineConfig != nil && clusterCopy.Status.FailedSpec.RancherKubernetesEngineConfig.CloudProvider.VsphereCloudProvider != nil {
-					for k, v := range clusterCopy.Status.FailedSpec.RancherKubernetesEngineConfig.CloudProvider.VsphereCloudProvider.VirtualCenter {
-						v.Password = ""
-						clusterCopy.Status.FailedSpec.RancherKubernetesEngineConfig.CloudProvider.VsphereCloudProvider.VirtualCenter[k] = v
-					}
-				}
-				clusterCopy, err = h.clusters.Update(clusterCopy)
-				if err != nil {
-					logrus.Errorf("[secretmigrator] failed to migrate vsphere virtualcenter secret for cluster %s, will retry: %v", cluster.Name, err)
-					deleteErr := h.migrator.secrets.DeleteNamespaced(SecretNamespace, vcenterSecret.Name, &metav1.DeleteOptions{})
-					if deleteErr != nil {
-						logrus.Errorf("[secretmigrator] encountered error while handling migration error: %v", deleteErr)
-					}
-					return cluster, err
-				}
-				cluster = clusterCopy.DeepCopy()
+			for k, v := range clusterCopy.Spec.RancherKubernetesEngineConfig.CloudProvider.VsphereCloudProvider.VirtualCenter {
+				v.Password = ""
+				clusterCopy.Spec.RancherKubernetesEngineConfig.CloudProvider.VsphereCloudProvider.VirtualCenter[k] = v
 			}
+		})
+		if err != nil {
+			return cluster, err
 		}
+		cluster = clusterCopy
 		// openstack
-		if clusterCopy.GetSecret("OpenStackSecret") == "" {
-			logrus.Tracef("[secretmigrator] migrating openstack secret for cluster %s", clusterCopy.Name)
-			openStackSecret, err := h.migrator.CreateOrUpdateOpenStackSecret("", clusterCopy.Spec.RancherKubernetesEngineConfig, nil)
-			if err != nil {
-				logrus.Errorf("[secretmigrator] failed to migrate openstack secret for cluster %s, will retry: %v", clusterCopy.Name, err)
-				return cluster, err
+		clusterCopy, err = h.migrateSecret(clusterCopy, "OpenStackSecret", "openstack", &clusterCopy.Spec.ClusterSecrets.OpenStackSecret, h.migrator.CreateOrUpdateOpenStackSecret, func(spec *apimgmtv3.ClusterSpec) {
+			if spec == nil || spec.RancherKubernetesEngineConfig == nil || spec.RancherKubernetesEngineConfig.CloudProvider.OpenstackCloudProvider == nil {
+				return
 			}
-			if openStackSecret != nil {
-				logrus.Tracef("[secretmigrator] openstack secret found for cluster %s", clusterCopy.Name)
-				clusterCopy.Spec.ClusterSecrets.OpenStackSecret = openStackSecret.Name
-				clusterCopy.Spec.RancherKubernetesEngineConfig.CloudProvider.OpenstackCloudProvider.Global.Password = ""
-				if clusterCopy.Status.AppliedSpec.RancherKubernetesEngineConfig != nil && clusterCopy.Status.AppliedSpec.RancherKubernetesEngineConfig.CloudProvider.OpenstackCloudProvider != nil {
-					clusterCopy.Status.AppliedSpec.RancherKubernetesEngineConfig.CloudProvider.OpenstackCloudProvider.Global.Password = ""
-				}
-				if clusterCopy.Status.FailedSpec != nil && clusterCopy.Status.FailedSpec.RancherKubernetesEngineConfig != nil && clusterCopy.Status.FailedSpec.RancherKubernetesEngineConfig.CloudProvider.OpenstackCloudProvider != nil {
-					clusterCopy.Status.FailedSpec.RancherKubernetesEngineConfig.CloudProvider.OpenstackCloudProvider.Global.Password = ""
-				}
-				clusterCopy, err = h.clusters.Update(clusterCopy)
-				if err != nil {
-					logrus.Errorf("[secretmigrator] failed to migrate openstack secret for cluster %s, will retry: %v", cluster.Name, err)
-					deleteErr := h.migrator.secrets.DeleteNamespaced(SecretNamespace, openStackSecret.Name, &metav1.DeleteOptions{})
-					if deleteErr != nil {
-						logrus.Errorf("[secretmigrator] encountered error while handling migration error: %v", deleteErr)
-					}
-					return cluster, err
-				}
-				cluster = clusterCopy.DeepCopy()
-			}
+			spec.RancherKubernetesEngineConfig.CloudProvider.OpenstackCloudProvider.Global.Password = ""
+		})
+		if err != nil {
+			return cluster, err
 		}
+		cluster = clusterCopy
 		// aad client secret
-		if clusterCopy.GetSecret("AADClientSecret") == "" {
-			logrus.Tracef("[secretmigrator] migrating aad client secret for cluster %s", clusterCopy.Name)
-			aadClientSecret, err := h.migrator.CreateOrUpdateAADClientSecret("", clusterCopy.Spec.RancherKubernetesEngineConfig, nil)
-			if err != nil {
-				logrus.Errorf("[secretmigrator] failed to migrate aad client secret for cluster %s, will retry: %v", clusterCopy.Name, err)
-				return cluster, err
+		clusterCopy, err = h.migrateSecret(clusterCopy, "AADClientSecret", "aad client", &clusterCopy.Spec.ClusterSecrets.AADClientSecret, h.migrator.CreateOrUpdateAADClientSecret, func(spec *apimgmtv3.ClusterSpec) {
+			if spec == nil || spec.RancherKubernetesEngineConfig == nil || spec.RancherKubernetesEngineConfig.CloudProvider.AzureCloudProvider == nil {
+				return
 			}
-			if aadClientSecret != nil {
-				logrus.Tracef("[secretmigrator] aad client secret found for cluster %s", clusterCopy.Name)
-				clusterCopy.Spec.ClusterSecrets.AADClientSecret = aadClientSecret.Name
-				clusterCopy.Spec.RancherKubernetesEngineConfig.CloudProvider.AzureCloudProvider.AADClientSecret = ""
-				if clusterCopy.Status.AppliedSpec.RancherKubernetesEngineConfig != nil && clusterCopy.Status.AppliedSpec.RancherKubernetesEngineConfig.CloudProvider.AzureCloudProvider != nil {
-					clusterCopy.Status.AppliedSpec.RancherKubernetesEngineConfig.CloudProvider.AzureCloudProvider.AADClientSecret = ""
-				}
-				if clusterCopy.Status.FailedSpec != nil && clusterCopy.Status.FailedSpec.RancherKubernetesEngineConfig != nil && clusterCopy.Status.FailedSpec.RancherKubernetesEngineConfig.CloudProvider.AzureCloudProvider != nil {
-					clusterCopy.Status.FailedSpec.RancherKubernetesEngineConfig.CloudProvider.AzureCloudProvider.AADClientSecret = ""
-				}
-				clusterCopy, err = h.clusters.Update(clusterCopy)
-				if err != nil {
-					logrus.Errorf("[secretmigrator] failed to migrate aad client secret for cluster %s, will retry: %v", cluster.Name, err)
-					deleteErr := h.migrator.secrets.DeleteNamespaced(SecretNamespace, aadClientSecret.Name, &metav1.DeleteOptions{})
-					if deleteErr != nil {
-						logrus.Errorf("[secretmigrator] encountered error while handling migration error: %v", deleteErr)
-					}
-					return cluster, err
-				}
-				cluster = clusterCopy.DeepCopy()
-			}
+			spec.RancherKubernetesEngineConfig.CloudProvider.AzureCloudProvider.AADClientSecret = ""
+		})
+		if err != nil {
+			return cluster, err
 		}
+		cluster = clusterCopy
 		// aad cert password
-		if clusterCopy.GetSecret("AADClientCertSecret") == "" {
-			logrus.Tracef("[secretmigrator] migrating aad cert secret for cluster %s", clusterCopy.Name)
-			aadCertSecret, err := h.migrator.CreateOrUpdateAADCertSecret("", clusterCopy.Spec.RancherKubernetesEngineConfig, nil)
-			if err != nil {
-				logrus.Errorf("[secretmigrator] failed to migrate aad cert secret for cluster %s, will retry: %v", clusterCopy.Name, err)
-				return cluster, err
+		clusterCopy, err = h.migrateSecret(clusterCopy, "AADClientCertSecret", "aad cert", &clusterCopy.Spec.ClusterSecrets.AADClientCertSecret, h.migrator.CreateOrUpdateAADCertSecret, func(spec *apimgmtv3.ClusterSpec) {
+			if spec == nil || spec.RancherKubernetesEngineConfig == nil || spec.RancherKubernetesEngineConfig.CloudProvider.AzureCloudProvider == nil {
+				return
 			}
-			if aadCertSecret != nil {
-				logrus.Tracef("[secretmigrator] aad cert secret found for cluster %s", clusterCopy.Name)
-				clusterCopy.Spec.ClusterSecrets.AADClientCertSecret = aadCertSecret.Name
-				clusterCopy.Spec.RancherKubernetesEngineConfig.CloudProvider.AzureCloudProvider.AADClientCertPassword = ""
-				if clusterCopy.Status.AppliedSpec.RancherKubernetesEngineConfig != nil && clusterCopy.Status.AppliedSpec.RancherKubernetesEngineConfig.CloudProvider.AzureCloudProvider != nil {
-					clusterCopy.Status.AppliedSpec.RancherKubernetesEngineConfig.CloudProvider.AzureCloudProvider.AADClientCertPassword = ""
-				}
-				if clusterCopy.Status.FailedSpec != nil && clusterCopy.Status.FailedSpec.RancherKubernetesEngineConfig != nil && clusterCopy.Status.FailedSpec.RancherKubernetesEngineConfig.CloudProvider.AzureCloudProvider != nil {
-					clusterCopy.Status.FailedSpec.RancherKubernetesEngineConfig.CloudProvider.AzureCloudProvider.AADClientCertPassword = ""
-				}
-				clusterCopy, err = h.clusters.Update(clusterCopy)
-				if err != nil {
-					logrus.Errorf("[secretmigrator] failed to migrate aad cert secret for cluster %s, will retry: %v", cluster.Name, err)
-					deleteErr := h.migrator.secrets.DeleteNamespaced(SecretNamespace, aadCertSecret.Name, &metav1.DeleteOptions{})
-					if deleteErr != nil {
-						logrus.Errorf("[secretmigrator] encountered error while handling migration error: %v", deleteErr)
-					}
-					return cluster, err
-				}
-				cluster = clusterCopy.DeepCopy()
-			}
+			spec.RancherKubernetesEngineConfig.CloudProvider.AzureCloudProvider.AADClientCertPassword = ""
+		})
+		if err != nil {
+			return cluster, err
 		}
+		cluster = clusterCopy
 
 		// cluster template questions and answers
 		logrus.Tracef("[secretmigrator] cleaning questions and answers from cluster %s", clusterCopy.Name)
@@ -986,9 +959,9 @@ func (h *handler) migrateClusterSecrets(cluster *v3.Cluster) (*v3.Cluster, error
 		// clusterCopy is returned here since it's value will be passed and fields modified without an update
 		return clusterCopy, err
 	})
-	// this is done for safety, but obj should never be nil as long as the object passed into DoUntilTrue() is not nil
-	clusterCopy, _ = obj.(*v3.Cluster)
-	var err error
+
+	// this is done for safety, but obj should never be nil as long as the object passed into Do() is not nil
+	clusterCopy, _ = obj.(*apimgmtv3.Cluster)
 	clusterCopy, err = h.clusters.Update(clusterCopy)
 	if err != nil {
 		return cluster, err
@@ -997,7 +970,7 @@ func (h *handler) migrateClusterSecrets(cluster *v3.Cluster) (*v3.Cluster, error
 	return cluster, doErr
 }
 
-func (h *handler) migrateServiceAccountSecrets(cluster *v3.Cluster) (*v3.Cluster, error) {
+func (h *handler) migrateServiceAccountSecrets(cluster *apimgmtv3.Cluster) (*apimgmtv3.Cluster, error) {
 	clusterCopy := cluster.DeepCopy()
 	obj, doErr := apimgmtv3.ClusterConditionServiceAccountSecretsMigrated.DoUntilTrue(clusterCopy, func() (runtime.Object, error) {
 		// serviceAccountToken
@@ -1034,7 +1007,7 @@ func (h *handler) migrateServiceAccountSecrets(cluster *v3.Cluster) (*v3.Cluster
 		return clusterCopy, nil
 	})
 	// this is done for safety, but obj should never be nil as long as the object passed into DoUntilTrue() is not nil
-	clusterCopy, _ = obj.(*v3.Cluster)
+	clusterCopy, _ = obj.(*apimgmtv3.Cluster)
 	var err error
 	clusterCopy, err = h.clusters.Update(clusterCopy)
 	if err != nil {
@@ -1044,7 +1017,7 @@ func (h *handler) migrateServiceAccountSecrets(cluster *v3.Cluster) (*v3.Cluster
 	return cluster, doErr
 }
 
-func (h *handler) migrateACISecrets(cluster *v3.Cluster) (*v3.Cluster, error) {
+func (h *handler) migrateACISecrets(cluster *apimgmtv3.Cluster) (*apimgmtv3.Cluster, error) {
 	clusterCopy := cluster.DeepCopy()
 	obj, doErr := apimgmtv3.ClusterConditionACISecretsMigrated.DoUntilTrue(clusterCopy, func() (runtime.Object, error) {
 		// aci apic user key
@@ -1149,8 +1122,95 @@ func (h *handler) migrateACISecrets(cluster *v3.Cluster) (*v3.Cluster, error) {
 		return clusterCopy, nil
 	})
 	// this is done for safety, but obj should never be nil as long as the object passed into Do() is not nil
-	clusterCopy, _ = obj.(*v3.Cluster)
+	clusterCopy, _ = obj.(*apimgmtv3.Cluster)
 	var err error
+	clusterCopy, err = h.clusters.Update(clusterCopy)
+	if err != nil {
+		return cluster, err
+	}
+	cluster = clusterCopy.DeepCopy()
+	return cluster, doErr
+}
+
+func (h *handler) migrateRKESecrets(cluster *apimgmtv3.Cluster) (*apimgmtv3.Cluster, error) {
+	clusterCopy := cluster.DeepCopy()
+	var err error
+	obj, doErr := apimgmtv3.ClusterConditionServiceAccountSecretsMigrated.Do(clusterCopy, func() (runtime.Object, error) {
+		// rke secrets encryption
+		clusterCopy, err = h.migrateSecret(clusterCopy, "SecretsEncryptionProvidersSecret", "secrets encryption providers", &clusterCopy.Spec.ClusterSecrets.SecretsEncryptionProvidersSecret, h.migrator.CreateOrUpdateSecretsEncryptionProvidersSecret, func(spec *apimgmtv3.ClusterSpec) {
+			if spec == nil ||
+				spec.RancherKubernetesEngineConfig.Services.KubeAPI.SecretsEncryptionConfig == nil ||
+				spec.RancherKubernetesEngineConfig.Services.KubeAPI.SecretsEncryptionConfig.CustomConfig == nil {
+				return
+			}
+			spec.RancherKubernetesEngineConfig.Services.KubeAPI.SecretsEncryptionConfig.CustomConfig.Resources = nil
+		})
+		if err != nil {
+			return cluster, err
+		}
+		cluster = clusterCopy
+
+		// rke bastion host
+		clusterCopy, err = h.migrateSecret(clusterCopy, "BastionHostSSHKeySecret", "bastion host ssh key", &clusterCopy.Spec.ClusterSecrets.BastionHostSSHKeySecret, h.migrator.CreateOrUpdateBastionHostSSHKeySecret, func(spec *apimgmtv3.ClusterSpec) {
+			if spec == nil ||
+				spec.RancherKubernetesEngineConfig == nil {
+				return
+			}
+			spec.RancherKubernetesEngineConfig.BastionHost.SSHKey = ""
+		})
+		if err != nil {
+			return cluster, err
+		}
+		cluster = clusterCopy
+
+		// rke kubelet extra env
+		clusterCopy, err = h.migrateSecret(clusterCopy, "KubeletExtraEnvSecret", "kubelet extra env", &clusterCopy.Spec.ClusterSecrets.KubeletExtraEnvSecret, h.migrator.CreateOrUpdateKubeletExtraEnvSecret, func(spec *apimgmtv3.ClusterSpec) {
+			if spec == nil ||
+				spec.RancherKubernetesEngineConfig == nil {
+				return
+			}
+			env := make([]string, 0, len(spec.RancherKubernetesEngineConfig.Services.Kubelet.ExtraEnv))
+			for _, e := range spec.RancherKubernetesEngineConfig.Services.Kubelet.ExtraEnv {
+				if !strings.Contains(e, "AWS_SECRET_ACCESS_KEY") {
+					env = append(env, e)
+				}
+			}
+			spec.RancherKubernetesEngineConfig.Services.Kubelet.ExtraEnv = env
+		})
+		if err != nil {
+			return cluster, err
+		}
+		cluster = clusterCopy
+
+		// rke private registry ecr
+		clusterCopy, err = h.migrateSecret(clusterCopy, "PrivateRegistryECRSecret", "private registry ecr", &clusterCopy.Spec.ClusterSecrets.PrivateRegistryECRSecret, h.migrator.CreateOrUpdatePrivateRegistryECRSecret, func(spec *apimgmtv3.ClusterSpec) {
+			if spec == nil ||
+				spec.RancherKubernetesEngineConfig == nil {
+				return
+			}
+			for _, reg := range spec.RancherKubernetesEngineConfig.PrivateRegistries {
+				if ecr := reg.ECRCredentialPlugin; ecr != nil {
+					ecr.AwsSecretAccessKey = ""
+					ecr.AwsSessionToken = ""
+				}
+			}
+		})
+		if err != nil {
+			return cluster, err
+		}
+		cluster = clusterCopy
+
+		logrus.Tracef("[secretmigrator] setting cluster condition [%s] and updating cluster [%s]", apimgmtv3.ClusterConditionRKESecretsMigrated, clusterCopy.Name)
+		apimgmtv3.ClusterConditionRKESecretsMigrated.True(clusterCopy)
+		clusterCopy, err = h.clusters.Update(clusterCopy)
+		if err != nil {
+			return cluster, err
+		}
+		cluster = clusterCopy.DeepCopy()
+		return clusterCopy, nil
+	})
+	// this is done for safety, but obj should never be nil as long as the object passed into Do() is not nil
+	clusterCopy, _ = obj.(*apimgmtv3.Cluster)
 	clusterCopy, err = h.clusters.Update(clusterCopy)
 	if err != nil {
 		return cluster, err

@@ -20,7 +20,7 @@ import (
 	"github.com/rancher/rancher/pkg/clustermanager"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/clusterregistrationtoken"
 	"github.com/rancher/rancher/pkg/controllers/management/drivers/nodedriver"
-	"github.com/rancher/rancher/pkg/controllers/management/secretmigrator"
+	"github.com/rancher/rancher/pkg/controllers/management/secretmigrator/assemblers"
 	"github.com/rancher/rancher/pkg/encryptedstore"
 	corev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
@@ -417,7 +417,7 @@ func (m *Lifecycle) deployAgent(nodeDir string, obj *apimgmtv3.Node) error {
 
 	// make a deep copy of the cluster, so we are not modifying the original cluster object
 	clusterCopy := cluster.DeepCopy()
-	clusterCopy.Spec, err = secretmigrator.AssembleRKEConfigSpec(clusterCopy, clusterCopy.Spec, m.secretLister)
+	clusterCopy.Spec, err = assemblers.AssembleRKEConfigSpec(clusterCopy, clusterCopy.Spec, m.secretLister)
 	if err != nil {
 		return err
 	}
@@ -447,7 +447,7 @@ func (m *Lifecycle) deployAgent(nodeDir string, obj *apimgmtv3.Node) error {
 // authenticateRegistry authenticates the machine to a private registry if one is defined on the cluster
 // this enables the agent image to be pulled from the private registry
 func (m *Lifecycle) authenticateRegistry(nodeDir string, node *apimgmtv3.Node, cluster *apimgmtv3.Cluster) error {
-	reg := util.GetPrivateRepo(cluster)
+	reg := util.GetPrivateRegistry(cluster)
 	// if there is no private registry defined or there is a registry without credentials, return since auth is not needed
 	if reg == nil || reg.User == "" || reg.Password == "" {
 		return nil

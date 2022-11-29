@@ -12,7 +12,7 @@ import (
 	cond "github.com/rancher/norman/condition"
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	kd "github.com/rancher/rancher/pkg/controllers/management/kontainerdrivermetadata"
-	"github.com/rancher/rancher/pkg/controllers/management/secretmigrator"
+	"github.com/rancher/rancher/pkg/controllers/management/secretmigrator/assemblers"
 	"github.com/rancher/rancher/pkg/controllers/managementagent/podresources"
 	"github.com/rancher/rancher/pkg/controllers/managementlegacy/compose/common"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
@@ -335,7 +335,7 @@ func (m *nodesSyncer) getNodePlan(node *apimgmtv3.Node) (rketypes.RKEConfigNodeP
 		return rketypes.RKEConfigNodePlan{}, err
 	}
 
-	appliedSpec, err := secretmigrator.AssembleRKEConfigSpec(cluster, cluster.Status.AppliedSpec, m.secretLister)
+	appliedSpec, err := assemblers.AssembleRKEConfigSpec(cluster, cluster.Status.AppliedSpec, m.secretLister)
 	if err != nil {
 		return rketypes.RKEConfigNodePlan{}, err
 	}

@@ -19,7 +19,7 @@ import (
 	"github.com/minio/minio-go/v7/pkg/credentials"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/controllers/management/clusterprovisioner"
-	"github.com/rancher/rancher/pkg/controllers/management/secretmigrator"
+	"github.com/rancher/rancher/pkg/controllers/management/secretmigrator/assemblers"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/kontainer-engine/drivers/rke"
@@ -371,7 +371,7 @@ func (c *Controller) etcdSave(b *v3.EtcdBackup) (*v3.EtcdBackup, error) {
 			return b, err
 		}
 		cluster.Spec.RancherKubernetesEngineConfig.Services.Etcd.BackupConfig = b.Spec.BackupConfig.DeepCopy()
-		spec, err := secretmigrator.AssembleS3Credential(cluster.GetSecret("S3CredentialSecret"), secretmigrator.ClusterType, cluster.Name, cluster.Spec, c.secretLister)
+		spec, err := assemblers.AssembleS3Credential(cluster.GetSecret("S3CredentialSecret"), assemblers.ClusterType, cluster.Name, cluster.Spec, c.secretLister)
 		if err != nil {
 			return b, err
 		}
@@ -402,7 +402,7 @@ func (c *Controller) etcdRemoveSnapshotWithBackoff(b *v3.EtcdBackup) error {
 		return err
 	}
 	cluster.Spec.RancherKubernetesEngineConfig.Services.Etcd.BackupConfig = b.Spec.BackupConfig.DeepCopy()
-	spec, err := secretmigrator.AssembleS3Credential(cluster.GetSecret("S3CredentialSecret"), secretmigrator.ClusterType, cluster.Name, cluster.Spec, c.secretLister)
+	spec, err := assemblers.AssembleS3Credential(cluster.GetSecret("S3CredentialSecret"), assemblers.ClusterType, cluster.Name, cluster.Spec, c.secretLister)
 	if err != nil {
 		return err
 	}

@@ -130,7 +130,7 @@ func (h *handler) createCluster(cluster *v1.Cluster, status v1.ClusterStatus) ([
 	if cluster.Spec.RKEConfig == nil {
 		// If the RKEConfig is nil, we are likely dealing with a legacy (v3/mgmt) cluster, and need to check the v3
 		// cluster for the cluster level registry.
-		privateRepoURL = mgmtcluster.GetPrivateRepoURL(mgmtCluster)
+		privateRepoURL = mgmtcluster.GetPrivateRegistryURL(mgmtCluster)
 	} else {
 		privateRepoURL = image.GetPrivateRepoURLFromCluster(cluster)
 	}
