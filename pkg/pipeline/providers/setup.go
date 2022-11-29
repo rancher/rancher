@@ -71,6 +71,7 @@ func configure(management *config.ScaledContext) {
 			management.Core.Secrets("").Controller().Lister(),
 			management.Core.Secrets(""),
 		),
+		SecretLister: management.Core.Secrets("").Controller().Lister(),
 
 		PipelineIndexer:             pipelineInformer.GetIndexer(),
 		PipelineExecutionIndexer:    executionInformer.GetIndexer(),
@@ -81,11 +82,6 @@ func configure(management *config.ScaledContext) {
 	ghProvider := &github.GhProvider{
 		BaseProvider: baseProvider,
 		AuthConfigs:  management.Management.AuthConfigs(""),
-		Secrets:      management.Core.Secrets(""),
-		SecretMigrator: secretmigrator.NewMigrator(
-			management.Core.Secrets("").Controller().Lister(),
-			management.Core.Secrets(""),
-		),
 	}
 	glProvider := &gitlab.GlProvider{
 		BaseProvider: baseProvider,

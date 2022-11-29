@@ -4,13 +4,13 @@ import (
 	"fmt"
 
 	v32 "github.com/rancher/rancher/pkg/apis/project.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/controllers/management/secretmigrator/assemblers"
+	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/rancher/norman/store/subtype"
 	"github.com/rancher/norman/types"
 	client "github.com/rancher/rancher/pkg/client/generated/project/v3"
-	"github.com/rancher/rancher/pkg/controllers/management/secretmigrator"
-	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	mv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/project.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/pipeline/providers/common"
@@ -23,9 +23,8 @@ import (
 
 type GhProvider struct {
 	common.BaseProvider
-	AuthConfigs    mv3.AuthConfigInterface
-	Secrets        v1.SecretInterface
-	SecretMigrator *secretmigrator.Migrator
+	Secrets     v1.SecretInterface
+	AuthConfigs mv3.AuthConfigInterface
 }
 
 func (g *GhProvider) CustomizeSchemas(schemas *types.Schemas) {
@@ -76,7 +75,7 @@ func (g *GhProvider) GetProviderConfig(projectID string) (interface{}, error) {
 		}
 		storedGithubPipelineConfig.ClientSecret = globalConfig.ClientSecret
 	} else {
-		storedGithubPipelineConfig, err = g.SecretMigrator.AssembleGithubPipelineConfigCredential(storedGithubPipelineConfig)
+		storedGithubPipelineConfig, err = assemblers.AssembleGithubPipelineConfigCredential(storedGithubPipelineConfig, g.SecretLister)
 		if err != nil {
 			return nil, err
 		}
