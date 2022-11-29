@@ -1,13 +1,15 @@
 package secretmigrator
 
 import (
+	"strings"
+
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
-func (h *handler) syncTemplate(key string, clusterTemplateRevision *apimgmtv3.ClusterTemplateRevision) (runtime.Object, error) {
+func (h *handler) syncTemplate(_ string, clusterTemplateRevision *apimgmtv3.ClusterTemplateRevision) (runtime.Object, error) {
 	if clusterTemplateRevision == nil || clusterTemplateRevision.DeletionTimestamp != nil {
 		return clusterTemplateRevision, nil
 	}
@@ -233,7 +235,7 @@ func (h *handler) syncTemplate(key string, clusterTemplateRevision *apimgmtv3.Cl
 	})
 	clusterTemplateRevisionCopy, _ = obj.(*apimgmtv3.ClusterTemplateRevision)
 	var err error
-	logrus.Tracef("[secretmigrator] setting clusterTemplateRevision [%s] condition and updating clusterTemplateRevision [%s]", apimgmtv3.ClusterConditionSecretsMigrated, clusterTemplateRevisionCopy.Name)
+	logrus.Tracef("[secretmigrator] setting clusterTemplateRevision [%s] condition and updating clusterTemplateRevision [%s]", apimgmtv3.ClusterTemplateRevisionConditionSecretsMigrated, clusterTemplateRevisionCopy.Name)
 	clusterTemplateRevisionCopy, err = h.clusterTemplateRevisions.Update(clusterTemplateRevisionCopy)
 	if err != nil {
 		return clusterTemplateRevision, err
@@ -336,8 +338,150 @@ func (h *handler) syncTemplate(key string, clusterTemplateRevision *apimgmtv3.Cl
 		clusterTemplateRevision = clusterTemplateRevisionCopy
 		return clusterTemplateRevisionCopy, nil
 	})
+
 	clusterTemplateRevisionCopy, _ = obj.(*apimgmtv3.ClusterTemplateRevision)
-	logrus.Tracef("[secretmigrator] setting clusterTemplateRevision [%s] condition and updating clusterTemplateRevision [%s]", apimgmtv3.ClusterConditionACISecretsMigrated, clusterTemplateRevisionCopy.Name)
+	logrus.Tracef("[secretmigrator] setting clusterTemplateRevision [%s] condition and updating clusterTemplateRevision [%s]", apimgmtv3.ClusterTemplateRevisionConditionACISecretsMigrated, clusterTemplateRevisionCopy.Name)
+	clusterTemplateRevisionCopy, err = h.clusterTemplateRevisions.Update(clusterTemplateRevisionCopy)
+	if err != nil {
+		return clusterTemplateRevision, err
+	}
+	clusterTemplateRevision = clusterTemplateRevisionCopy.DeepCopy()
+	if doErr != nil {
+		return clusterTemplateRevision, doErr
+	}
+
+	obj, doErr = apimgmtv3.ClusterTemplateRevisionConditionRKESecretsMigrated.DoUntilTrue(clusterTemplateRevisionCopy, func() (runtime.Object, error) {
+		// rke secrets encryption providers
+		if clusterTemplateRevisionCopy.Status.SecretsEncryptionProvidersSecret == "" {
+			logrus.Tracef("[secretmigrator] migrating secrets encryption provider secret for clusterTemplateRevision %s", clusterTemplateRevisionCopy.Name)
+			secretsEncryptionProvidersSecret, err := h.migrator.CreateOrUpdateSecretsEncryptionProvidersSecret("", clusterTemplateRevisionCopy.Spec.ClusterConfig.RancherKubernetesEngineConfig, clusterTemplateRevisionCopy)
+			if err != nil {
+				logrus.Errorf("[secretmigrator] failed to migrate secrets encryption provider secret for clusterTemplateRevision %s, will retry: %v", clusterTemplateRevisionCopy.Name, err)
+				return clusterTemplateRevision, err
+			}
+			if secretsEncryptionProvidersSecret != nil {
+				logrus.Tracef("[secretmigrator] secrets encryption provider secret found for clusterTemplateRevision %s", clusterTemplateRevisionCopy.Name)
+				clusterTemplateRevisionCopy.Status.SecretsEncryptionProvidersSecret = secretsEncryptionProvidersSecret.Name
+				clusterTemplateRevisionCopy.Spec.ClusterConfig.RancherKubernetesEngineConfig.Services.KubeAPI.SecretsEncryptionConfig.CustomConfig.Resources = nil
+				clusterTemplateRevisionCopy, err := h.clusterTemplateRevisions.Update(clusterTemplateRevisionCopy)
+				if err != nil {
+					logrus.Errorf("[secretmigrator] failed to migrate secrets encryption provider secret for clusterTemplateRevision %s, will retry: %v", clusterTemplateRevision.Name, err)
+					deleteErr := h.migrator.secrets.DeleteNamespaced(SecretNamespace, secretsEncryptionProvidersSecret.Name, &metav1.DeleteOptions{})
+					if deleteErr != nil {
+						logrus.Errorf("[secretmigrator] encountered error while handling migration error: %v", deleteErr)
+					}
+					return clusterTemplateRevision, err
+				}
+				clusterTemplateRevision = clusterTemplateRevisionCopy
+			}
+		}
+
+		// rke bastion host
+		if clusterTemplateRevisionCopy.Status.BastionHostSSHKeySecret == "" {
+			logrus.Tracef("[secretmigrator] migrating rke bastion host ssh key secret for clusterTemplateRevision %s", clusterTemplateRevisionCopy.Name)
+			bastionHostSSHKeySecret, err := h.migrator.CreateOrUpdateBastionHostSSHKeySecret("", clusterTemplateRevisionCopy.Spec.ClusterConfig.RancherKubernetesEngineConfig, clusterTemplateRevisionCopy)
+			if err != nil {
+				logrus.Errorf("[secretmigrator] failed to migrate rke bastion host ssh key secret for clusterTemplateRevision %s, will retry: %v", clusterTemplateRevisionCopy.Name, err)
+				return clusterTemplateRevision, err
+			}
+			if bastionHostSSHKeySecret != nil {
+				logrus.Tracef("[secretmigrator] rke bastion host ssh key secret found for clusterTemplateRevision %s", clusterTemplateRevisionCopy.Name)
+				clusterTemplateRevisionCopy.Status.BastionHostSSHKeySecret = bastionHostSSHKeySecret.Name
+				clusterTemplateRevisionCopy.Spec.ClusterConfig.RancherKubernetesEngineConfig.BastionHost.SSHKey = ""
+				clusterTemplateRevisionCopy, err := h.clusterTemplateRevisions.Update(clusterTemplateRevisionCopy)
+				if err != nil {
+					logrus.Errorf("[secretmigrator] failed to migrate rke bastion host ssh key secret for clusterTemplateRevision %s, will retry: %v", clusterTemplateRevision.Name, err)
+					deleteErr := h.migrator.secrets.DeleteNamespaced(SecretNamespace, bastionHostSSHKeySecret.Name, &metav1.DeleteOptions{})
+					if deleteErr != nil {
+						logrus.Errorf("[secretmigrator] encountered error while handling migration error: %v", deleteErr)
+					}
+					return clusterTemplateRevision, err
+				}
+				clusterTemplateRevision = clusterTemplateRevisionCopy
+			}
+		}
+
+		// rke kubelet extra env
+		if clusterTemplateRevisionCopy.Status.KubeletExtraEnvSecret == "" {
+			logrus.Tracef("[secretmigrator] migrating rke kubelet extra env secret for clusterTemplateRevision %s", clusterTemplateRevisionCopy.Name)
+			kubeletExtraEnvSecret, err := h.migrator.CreateOrUpdateKubeletExtraEnvSecret("", clusterTemplateRevisionCopy.Spec.ClusterConfig.RancherKubernetesEngineConfig, clusterTemplateRevisionCopy)
+			if err != nil {
+				logrus.Errorf("[secretmigrator] failed to migrate rke kubelet extra env secret for clusterTemplateRevision %s, will retry: %v", clusterTemplateRevisionCopy.Name, err)
+				return clusterTemplateRevision, err
+			}
+			if kubeletExtraEnvSecret != nil {
+				logrus.Tracef("[secretmigrator] rke kubelet extra env secret found for clusterTemplateRevision %s", clusterTemplateRevisionCopy.Name)
+				clusterTemplateRevisionCopy.Status.KubeletExtraEnvSecret = kubeletExtraEnvSecret.Name
+				env := make([]string, 0, len(clusterTemplateRevisionCopy.Spec.ClusterConfig.RancherKubernetesEngineConfig.Services.Kubelet.ExtraEnv))
+				for _, e := range clusterTemplateRevisionCopy.Spec.ClusterConfig.RancherKubernetesEngineConfig.Services.Kubelet.ExtraEnv {
+					if !strings.Contains(e, "AWS_SECRET_ACCESS_KEY") {
+						env = append(env, e)
+					}
+				}
+				clusterTemplateRevisionCopy.Spec.ClusterConfig.RancherKubernetesEngineConfig.Services.Kubelet.ExtraEnv = env
+				clusterTemplateRevisionCopy, err := h.clusterTemplateRevisions.Update(clusterTemplateRevisionCopy)
+				if err != nil {
+					logrus.Errorf("[secretmigrator] failed to migrate rke kubelet extra env secret for clusterTemplateRevision %s, will retry: %v", clusterTemplateRevision.Name, err)
+					deleteErr := h.migrator.secrets.DeleteNamespaced(SecretNamespace, kubeletExtraEnvSecret.Name, &metav1.DeleteOptions{})
+					if deleteErr != nil {
+						logrus.Errorf("[secretmigrator] encountered error while handling migration error: %v", deleteErr)
+					}
+					return clusterTemplateRevision, err
+				}
+				clusterTemplateRevision = clusterTemplateRevisionCopy
+			}
+		}
+
+		// rke private registry ecr
+		if clusterTemplateRevisionCopy.Status.PrivateRegistryECRSecret == "" {
+			logrus.Tracef("[secretmigrator] migrating rke private registry ecr secret for clusterTemplateRevision %s", clusterTemplateRevisionCopy.Name)
+			privateRegistryEcrSecret, err := h.migrator.CreateOrUpdatePrivateRegistryECRSecret("", clusterTemplateRevisionCopy.Spec.ClusterConfig.RancherKubernetesEngineConfig, clusterTemplateRevisionCopy)
+			if err != nil {
+				logrus.Errorf("[secretmigrator] failed to migrate rke private registry ecr secret for clusterTemplateRevision %s, will retry: %v", clusterTemplateRevisionCopy.Name, err)
+				return clusterTemplateRevision, err
+			}
+			if privateRegistryEcrSecret != nil {
+				logrus.Tracef("[secretmigrator] rke private registry ecr secret found for clusterTemplateRevision %s", clusterTemplateRevisionCopy.Name)
+				clusterTemplateRevisionCopy.Status.PrivateRegistryECRSecret = privateRegistryEcrSecret.Name
+				for _, reg := range clusterTemplateRevisionCopy.Spec.ClusterConfig.RancherKubernetesEngineConfig.PrivateRegistries {
+					if ecr := reg.ECRCredentialPlugin; ecr != nil {
+						ecr.AwsSecretAccessKey = ""
+						ecr.AwsSessionToken = ""
+					}
+				}
+				clusterTemplateRevisionCopy, err := h.clusterTemplateRevisions.Update(clusterTemplateRevisionCopy)
+				if err != nil {
+					logrus.Errorf("[secretmigrator] failed to migrate rke private registry ecr secret for clusterTemplateRevision %s, will retry: %v", clusterTemplateRevision.Name, err)
+					deleteErr := h.migrator.secrets.DeleteNamespaced(SecretNamespace, privateRegistryEcrSecret.Name, &metav1.DeleteOptions{})
+					if deleteErr != nil {
+						logrus.Errorf("[secretmigrator] encountered error while handling migration error: %v", deleteErr)
+					}
+					return clusterTemplateRevision, err
+				}
+				clusterTemplateRevision = clusterTemplateRevisionCopy
+			}
+		}
+
+		// cluster template questions and answers
+		// The cluster store will look up defaults in the ClusterConfig after assembling it.
+		logrus.Tracef("[secretmigrator] cleaning questions and answers from clusterTemplateRevision %s", clusterTemplateRevisionCopy.Name)
+		for i, q := range clusterTemplateRevisionCopy.Spec.Questions {
+			if MatchesQuestionPath(q.Variable) {
+				clusterTemplateRevisionCopy.Spec.Questions[i].Default = ""
+			}
+		}
+
+		var err error
+		clusterTemplateRevisionCopy, err = h.clusterTemplateRevisions.Update(clusterTemplateRevisionCopy)
+		if err != nil {
+			return clusterTemplateRevision, err
+		}
+		clusterTemplateRevision = clusterTemplateRevisionCopy
+		return clusterTemplateRevisionCopy, nil
+	})
+
+	clusterTemplateRevisionCopy, _ = obj.(*apimgmtv3.ClusterTemplateRevision)
+	logrus.Tracef("[secretmigrator] setting clusterTemplateRevision [%s] condition and updating clusterTemplateRevision [%s]", apimgmtv3.ClusterTemplateRevisionConditionRKESecretsMigrated, clusterTemplateRevisionCopy.Name)
 	clusterTemplateRevisionCopy, err = h.clusterTemplateRevisions.Update(clusterTemplateRevisionCopy)
 	if err != nil {
 		return clusterTemplateRevision, err
