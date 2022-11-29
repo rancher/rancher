@@ -444,7 +444,7 @@ func (m *Lifecycle) deployAgent(nodeDir string, obj *v32.Node) error {
 // authenticateRegistry authenticates the machine to a private registry if one is defined on the cluster
 // this enables the agent image to be pulled from the private registry
 func (m *Lifecycle) authenticateRegistry(nodeDir string, node *v32.Node, cluster *v32.Cluster) error {
-	reg := util.GetPrivateRepo(cluster)
+	reg := util.GetPrivateRegistry(cluster.Spec.RancherKubernetesEngineConfig)
 	// if there is no private registry defined or there is a registry without credentials, return since auth is not needed
 	if reg == nil || reg.User == "" || reg.Password == "" {
 		return nil
