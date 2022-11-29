@@ -4,13 +4,11 @@ import (
 	"fmt"
 	"sort"
 
-	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	util "github.com/rancher/rancher/pkg/cluster"
-	"github.com/rancher/rancher/pkg/fleet"
+	"github.com/rancher/rancher/pkg/controllers/management/secretmigrator"
 	"github.com/rancher/rancher/pkg/systemtemplate"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	rketypes "github.com/rancher/rke/types"
 )
 
 // generateClusterAgentManifest generates a cluster agent manifest
@@ -42,22 +40,24 @@ func (p *Planner) generateClusterAgentManifest(controlPlane *rkev1.RKEControlPla
 		return nil, err
 	}
 
-	var formattedPrivateRegistry map[string][]byte
-	privateRegistrySecret := mgmtCluster.GetSecret(v3.ClusterPrivateRegistrySecret)
-	privateRegistryURL := mgmtCluster.GetSecret(v3.ClusterPrivateRegistryURL)
-	if privateRegistrySecret != "" && privateRegistryURL != "" {
-		// cluster level registry has been defined and should be used when generating agent manifest.
-		// This ensures images pulled by the agent (e.g. shell) come from the correct registry.
-		privateRegistries, err := p.secretClient.Get(fleet.ClustersDefaultNamespace, privateRegistrySecret, metav1.GetOptions{})
+	// assemble private registry
+	var registry *rketypes.PrivateRegistry
+	privateRegistrySecretRef := mgmtCluster.GetSecret("PrivateRegistrySecret")
+	privateRegistryURL := mgmtCluster.Spec.ClusterSecrets.PrivateRegistryURL
+	ecrSecretRef := mgmtCluster.Spec.ClusterSecrets.PrivateRegistryECRSecret
+	if privateRegistrySecretRef != "" || privateRegistryURL != "" || ecrSecretRef != "" {
+		// Assemble private registry secrets here instead of directly on the cluster object
+		spec := *mgmtCluster.Spec.DeepCopy()
+		spec, err = secretmigrator.AssemblePrivateRegistryCredential(privateRegistrySecretRef, privateRegistryURL, secretmigrator.ClusterType, mgmtCluster.Name, spec, p.secretCache)
 		if err != nil {
 			return nil, err
 		}
-		// transform the registry secrets for ProvV2 as they only have 'username' and 'password' fields, but SystemTemplate expects the credentialprovider.DockerConfigJSON type
-		formattedPrivateRegistry, err = util.TransformProvV2RegistryCredentialsToDockerConfigJSON(privateRegistryURL, privateRegistries)
+		spec, err = secretmigrator.AssemblePrivateRegistryECRCredential(ecrSecretRef, secretmigrator.ClusterType, mgmtCluster.Name, mgmtCluster.Spec, p.secretCache)
 		if err != nil {
 			return nil, err
 		}
+		registry = util.GetPrivateRegistry(spec.RancherKubernetesEngineConfig)
 	}
 
-	return systemtemplate.ForCluster(mgmtCluster, tokens[0].Status.Token, taints, formattedPrivateRegistry)
+	return systemtemplate.ForCluster(mgmtCluster, tokens[0].Status.Token, registry, taints)
 }

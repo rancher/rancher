@@ -70,7 +70,7 @@ func toFeatureString(features map[string]bool) string {
 }
 
 func SystemTemplate(resp io.Writer, agentImage, authImage, namespace, token, url string, isWindowsCluster bool,
-	cluster *apimgmtv3.Cluster, features map[string]bool, taints []corev1.Taint, privateRegistries map[string][]byte) error {
+	cluster *apimgmtv3.Cluster, registry *rketypes.PrivateRegistry, features map[string]bool, taints []corev1.Taint) error {
 	var tolerations, agentEnvVars string
 	d := md5.Sum([]byte(url + token + namespace))
 	tokenKey := hex.EncodeToString(d[:])[:7]
@@ -79,27 +79,13 @@ func SystemTemplate(resp io.Writer, agentImage, authImage, namespace, token, url
 		authImage = settings.AuthImage.Get()
 	}
 
-	privateRepo := util.GetPrivateRepo(cluster)
-
-	// cluster.GetSecret("PrivateRegistryURL") will be empty if the cluster is
-	// RKE1, imported, or RKE2 with no cluster level registry configured.
-	// For RKE2 with a cluster level registry configured, this is the
-	// only reference to the registry URL available on the v3.Cluster.
-	if privateRegistryURL := cluster.GetSecret(apimgmtv3.ClusterPrivateRegistryURL); privateRegistryURL != "" {
-		privateRepo = &rketypes.PrivateRegistry{
-			URL: privateRegistryURL,
-		}
-	}
-
-	// Generate the private registry access credentials.
-	// The 'privateRegistries' secret takes precedence over the 'privateRepo'
-	privateRegistryConfig, err := util.GeneratePrivateRegistryDockerConfig(privateRepo, privateRegistries[".dockerconfigjson"])
+	privateRegistryConfig, err := util.GeneratePrivateRegistryDockerConfig(registry)
 	if err != nil {
 		return err
 	}
 	var clusterRegistry string
-	if privateRepo != nil {
-		clusterRegistry = privateRepo.URL
+	if registry != nil {
+		clusterRegistry = registry.URL
 	}
 
 	if taints != nil {
@@ -146,12 +132,12 @@ func GetDesiredFeatures(cluster *apimgmtv3.Cluster) map[string]bool {
 	}
 }
 
-func ForCluster(cluster *apimgmtv3.Cluster, token string, taints []corev1.Taint, privateRegistries map[string][]byte) ([]byte, error) {
+func ForCluster(cluster *apimgmtv3.Cluster, token string, registry *rketypes.PrivateRegistry, taints []corev1.Taint) ([]byte, error) {
 	buf := &bytes.Buffer{}
 	err := SystemTemplate(buf, GetDesiredAgentImage(cluster),
 		GetDesiredAuthImage(cluster),
 		cluster.Name, token, settings.ServerURL.Get(), cluster.Spec.WindowsPreferedCluster,
-		cluster, GetDesiredFeatures(cluster), taints, privateRegistries)
+		cluster, registry, GetDesiredFeatures(cluster), taints)
 	return buf.Bytes(), err
 }
 
