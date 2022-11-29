@@ -506,6 +506,22 @@ func AssembleRKEConfigTemplateSpec(template *apimgmtv3.ClusterTemplateRevision, 
 	if err != nil {
 		return spec, err
 	}
+	spec, err = AssembleSecretsEncryptionProvidersSecretCredential(template.Status.SecretsEncryptionProvidersSecret, ClusterTemplateRevisionType, template.Name, spec, secretLister)
+	if err != nil {
+		return spec, err
+	}
+	spec, err = AssembleBastionHostSSHKeyCredential(template.Status.BastionHostSSHKeySecret, ClusterTemplateRevisionType, template.Name, spec, secretLister)
+	if err != nil {
+		return spec, err
+	}
+	spec, err = AssembleKubeletExtraEnvCredential(template.Status.KubeletExtraEnvSecret, ClusterTemplateRevisionType, template.Name, spec, secretLister)
+	if err != nil {
+		return spec, err
+	}
+	spec, err = AssemblePrivateRegistryECRCredential(template.Status.PrivateRegistryECRSecret, ClusterTemplateRevisionType, template.Name, spec, secretLister)
+	if err != nil {
+		return spec, err
+	}
 	return spec, nil
 }
 
