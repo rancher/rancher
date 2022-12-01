@@ -20,6 +20,8 @@ const (
 	RancherLoggingNamespace = "cattle-logging-system"
 	// Name of the rancher logging chart
 	RancherLoggingName = "rancher-logging"
+	// Name of rancher logging crd chart
+	RancherLoggingCRDName = "rancher-logging-crd"
 )
 
 // InstallRancherLoggingChart is a helper function that installs the rancher-logging chart.
@@ -71,6 +73,34 @@ func InstallRancherLoggingChart(client *rancher.Client, installOptions *InstallO
 			if event.Type == watch.Error {
 				return false, fmt.Errorf("there was an error uninstalling rancher logging chart")
 			} else if event.Type == watch.Deleted {
+				return true, nil
+			}
+			return false, nil
+		})
+		if err != nil {
+			return err
+		}
+
+		err = catalogClient.UninstallChart(RancherLoggingCRDName, RancherLoggingNamespace, defaultChartUninstallAction)
+		if err != nil {
+			return err
+		}
+
+		watchAppInterface, err = catalogClient.Apps(RancherLoggingNamespace).Watch(context.TODO(), metav1.ListOptions{
+			FieldSelector:  "metadata.name=" + RancherLoggingCRDName,
+			TimeoutSeconds: &defaults.WatchTimeoutSeconds,
+		})
+		if err != nil {
+			return err
+		}
+
+		err = wait.WatchWait(watchAppInterface, func(event watch.Event) (ready bool, err error) {
+			chart := event.Object.(*catalogv1.App)
+			if event.Type == watch.Error {
+				return false, fmt.Errorf("there was an error uninstalling rancher logging chart")
+			} else if event.Type == watch.Deleted {
+				return true, nil
+			} else if chart == nil {
 				return true, nil
 			}
 			return false, nil
