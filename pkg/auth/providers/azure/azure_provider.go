@@ -98,7 +98,7 @@ func (ap *azureProvider) RefetchGroupPrincipals(principalID, secret string) ([]v
 
 	logrus.Debug("[AZURE_PROVIDER] Completed getting user info from AzureAD")
 
-	userGroups, err := azureClient.ListGroupMemberships(clients.GetPrincipalID(userPrincipal))
+	userGroups, err := azureClient.ListGroupMemberships(clients.GetPrincipalID(userPrincipal), cfg.GroupMembershipsFilter)
 	if err != nil {
 		return nil, err
 	}

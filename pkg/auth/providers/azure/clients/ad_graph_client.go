@@ -74,7 +74,7 @@ func (c *azureADGraphClient) ListGroups(filter string) ([]v3.Principal, error) {
 }
 
 // ListGroupMemberships takes a user ID and fetches the user's group principals as strings IDs from the Azure AD Graph API.
-func (c *azureADGraphClient) ListGroupMemberships(id string) ([]string, error) {
+func (c *azureADGraphClient) ListGroupMemberships(id string, filter string) ([]string, error) {
 	securityEnabledOnly := false
 	params := graphrbac.UserGetMemberGroupsParameters{
 		SecurityEnabledOnly: &securityEnabledOnly,
@@ -101,7 +101,7 @@ func (c *azureADGraphClient) LoginUser(_ *v32.AzureADConfig, _ *v32.AzureADLogin
 	userPrincipal.Me = true
 	logrus.Debug("[AZURE_PROVIDER] Completed getting user info from AzureAD")
 
-	userGroups, err := c.ListGroupMemberships(GetPrincipalID(userPrincipal))
+	userGroups, err := c.ListGroupMemberships(GetPrincipalID(userPrincipal), "")
 	if err != nil {
 		return v3.Principal{}, nil, "", err
 	}
