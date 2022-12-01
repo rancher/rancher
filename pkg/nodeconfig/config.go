@@ -9,9 +9,9 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/values"
+	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/encryptedstore"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
-	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/jailer"
 	"github.com/sirupsen/logrus"
 	k8serror "k8s.io/apimachinery/pkg/api/errors"
@@ -94,7 +94,7 @@ func (m *NodeConfig) Cleanup() error {
 }
 
 func (m *NodeConfig) Remove() error {
-	m.Cleanup()
+	_ = m.Cleanup()
 	logrus.Debugf("Removing [%v]", m.id)
 	return m.store.Remove(m.id)
 }
@@ -139,7 +139,7 @@ func (m *NodeConfig) Save() error {
 		return err
 	}
 
-	if err := m.loadConfig(); err != nil {
+	if err = m.loadConfig(); err != nil {
 		return err
 	}
 
@@ -149,7 +149,7 @@ func (m *NodeConfig) Save() error {
 
 	m.cm[configKey] = extractedConfig
 
-	if err := m.store.Set(m.id, m.cm); err != nil {
+	if err = m.store.Set(m.id, m.cm); err != nil {
 		m.cm = nil
 		return err
 	}
@@ -192,7 +192,7 @@ func (m *NodeConfig) UpdateAmazonAuth(rawConfig interface{}) (bool, error) {
 	for _, file := range files {
 		if file.IsDir() {
 			configPath := filepath.Join(machines, file.Name(), "config.json")
-			b, err := ioutil.ReadFile(configPath)
+			b, err := os.ReadFile(configPath)
 			if err != nil {
 				if os.IsNotExist(err) {
 					// config.json doesn't exist, no changes needed
@@ -242,7 +242,7 @@ func (m *NodeConfig) UpdateAmazonAuth(rawConfig interface{}) (bool, error) {
 					return update, errors.WithMessage(err, "error marshaling new machine config")
 				}
 
-				if err := ioutil.WriteFile(configPath, out, 0600); err != nil {
+				if err := os.WriteFile(configPath, out, 0600); err != nil {
 					return update, errors.WithMessage(err, "error writing  new machine config")
 				}
 			}
