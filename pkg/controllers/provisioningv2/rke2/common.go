@@ -21,8 +21,10 @@ import (
 	"github.com/rancher/wrangler/pkg/name"
 	corev1 "k8s.io/api/core/v1"
 	apierror "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 	capierrors "sigs.k8s.io/cluster-api/errors"
 )
@@ -374,29 +376,50 @@ type Getter[T any] interface {
 	Get(namespace, name string) (*T, error)
 }
 
-func FindCAPIClusterFromLabel(obj metav1.ObjectMeta, getter Getter[capi.Cluster]) (*capi.Cluster, error) {
-	if clusterName := obj.GetLabels()[capi.ClusterLabelName]; clusterName != "" {
-		return getter.Get(obj.GetNamespace(), clusterName)
+var errNilObject = errors.New("cannot get capi cluster for nil object")
+
+func FindCAPIClusterFromLabel[T any](obj *T, getter Getter[capi.Cluster]) (*capi.Cluster, error) {
+	if obj == nil {
+		return nil, errNilObject
 	}
-	return nil, nil
+	objMeta, err := meta.Accessor(obj)
+	if err != nil {
+		return nil, err
+	}
+	typeMeta, err := meta.TypeAccessor(obj)
+	if err != nil {
+		return nil, err
+	}
+	if clusterName := objMeta.GetLabels()[capi.ClusterLabelName]; clusterName != "" {
+		return getter.Get(objMeta.GetNamespace(), clusterName)
+	}
+	return nil, fmt.Errorf("%s label not present on %s: %s/%s", capi.ClusterLabelName, typeMeta.GetKind(), objMeta.GetNamespace(), objMeta.GetName())
 }
 
-func FindOwnerCAPICluster(obj metav1.Object, getter Getter[capi.Cluster]) (*capi.Cluster, error) {
+func FindOwnerCAPICluster(obj runtime.Object, getter Getter[capi.Cluster]) (*capi.Cluster, error) {
 	return findOwnerFromKindGroup("Cluster", capi.GroupVersion.String(), obj, getter)
 }
 
-func FindOwnerCAPIMachine(obj metav1.Object, getter Getter[capi.Machine]) (*capi.Machine, error) {
+func FindOwnerCAPIMachine(obj runtime.Object, getter Getter[capi.Machine]) (*capi.Machine, error) {
 	return findOwnerFromKindGroup("Machine", capi.GroupVersion.String(), obj, getter)
 }
 
-func findOwnerFromKindGroup[T any](kind, apiVersion string, obj metav1.Object, getter Getter[T]) (*T, error) {
-	ref := metav1.GetControllerOf(obj)
+func findOwnerFromKindGroup[T any](kind, apiVersion string, obj runtime.Object, getter Getter[T]) (*T, error) {
+	objMeta, err := meta.Accessor(obj)
+	if err != nil {
+		return nil, err
+	}
+	typeMeta, err := meta.TypeAccessor(obj)
+	if err != nil {
+		return nil, err
+	}
+	ref := metav1.GetControllerOf(objMeta)
 	if ref == nil {
 		return nil, nil
 	}
 	if ref.Kind != kind || ref.APIVersion != apiVersion {
-		return nil, fmt.Errorf("RKEControlPlane %s/%s has wrong owner kind %s/%s", obj.GetNamespace(),
-			obj.GetName(), ref.APIVersion, ref.Kind)
+		return nil, fmt.Errorf("%s %s/%s has wrong owner kind %s/%s", typeMeta.GetKind(), objMeta.GetNamespace(),
+			objMeta.GetName(), ref.APIVersion, ref.Kind)
 	}
-	return getter.Get(obj.GetNamespace(), ref.Name)
+	return getter.Get(objMeta.GetNamespace(), ref.Name)
 }

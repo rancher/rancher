@@ -434,7 +434,7 @@ func (h *handler) OnChange(obj runtime.Object) (runtime.Object, error) {
 		return obj, nil
 	}
 
-	machine, err := rke2.FindOwnerCAPIMachine(infra.meta, h.machines)
+	machine, err := rke2.FindOwnerCAPIMachine(obj, h.machines)
 	if err != nil {
 		logrus.Errorf("[rkemachine] %s/%s: error getting machine by owner reference %v", infra.meta.GetNamespace(), infra.meta.GetName(), err)
 		return obj, err
@@ -445,7 +445,7 @@ func (h *handler) OnChange(obj runtime.Object) (runtime.Object, error) {
 		return obj, generic.ErrSkip
 	}
 
-	cluster, err := rke2.FindCAPIClusterFromLabel(machine.ObjectMeta, h.clusters)
+	cluster, err := rke2.FindCAPIClusterFromLabel(machine, h.clusters)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			logrus.Infof("[rkemachine] %s/%s: waiting: CAPI cluster does not exist", infra.meta.GetNamespace(), infra.meta.GetName())

@@ -64,12 +64,7 @@ func (h *handler) OnClusterRemove(_ string, cluster *v1.Cluster) (*v1.Cluster, e
 			if isLegacyCluster(cluster.Name) {
 				// If this is a legacy cluster (i.e. RKE1 cluster) then we should wait to remove the provisioning cluster until the v3.Cluster is gone.
 				_, err = h.mgmtClusterCache.Get(cluster.Status.ClusterName)
-				if err != nil {
-					if !apierrors.IsNotFound(err) {
-						return cluster, err
-					}
-					return cluster, nil
-				} else {
+				if !apierrors.IsNotFound(err) {
 					rke2.Removed.SetStatus(cluster, "Unknown")
 					rke2.Removed.Reason(cluster, "Waiting")
 					rke2.Removed.Message(cluster, fmt.Sprintf("waiting for management cluster [%s] to delete", cluster.Status.ClusterName))
@@ -77,7 +72,7 @@ func (h *handler) OnClusterRemove(_ string, cluster *v1.Cluster) (*v1.Cluster, e
 					if err != nil {
 						return cluster, err
 					}
-					return cluster, generic.ErrSkip
+					return cluster, generic.ErrSkip // don't remove finalizer until after v3.Cluster is gone
 				}
 			} else {
 				if err = h.updateFeatureLockedValue(false); err != nil {
