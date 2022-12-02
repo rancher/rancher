@@ -27,6 +27,7 @@ spec:
       launchTemplate: null
       maxSize: 2
       minSize: 2
+      nodeRole: null
       nodegroupName: nodegroup
       requestSpotInstances: false
       resourceTags: {}
@@ -226,6 +227,7 @@ status:
         launchTemplate: null
         maxSize: 2
         minSize: 2
+        nodeRole: null
         nodegroupName: nodegroup
         requestSpotInstances: false
         resourceTags: {}
@@ -248,6 +250,7 @@ status:
       subnets: []
       tags: {}
     virtualNetwork: vpc-network
+  generatedNodeRole: "arn:aws:iam::role/test"
   limits:
     cpu: "0"
     memory: 340Mi
