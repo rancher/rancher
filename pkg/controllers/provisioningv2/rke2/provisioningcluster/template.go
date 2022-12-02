@@ -547,7 +547,7 @@ func rkeControlPlane(cluster *rancherv1.Cluster) (*rkev1.RKEControlPlane, error)
 		return nil, err
 	}
 	rkeConfig := cluster.Spec.RKEConfig.DeepCopy()
-	return &rkev1.RKEControlPlane{
+	cp := &rkev1.RKEControlPlane{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      cluster.Name,
 			Namespace: cluster.Namespace,
@@ -570,7 +570,11 @@ func rkeControlPlane(cluster *rancherv1.Cluster) (*rkev1.RKEControlPlane, error)
 			AgentEnvVars:             cluster.Spec.AgentEnvVars,
 			ClusterName:              cluster.Name, // cluster name is for the CAPI cluster
 		},
-	}, nil
+	}
+	rke2.Provisioned.SetStatus(&cp.Status, "Unknown")
+	rke2.Provisioned.Message(&cp.Status, "waiting for initial provisioning")
+	rke2.Provisioned.Reason(&cp.Status, "Waiting")
+	return cp, nil
 }
 
 func capiCluster(cluster *rancherv1.Cluster, rkeControlPlane *rkev1.RKEControlPlane, infraRef *corev1.ObjectReference) *capi.Cluster {

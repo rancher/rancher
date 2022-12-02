@@ -36,6 +36,7 @@ type RKEControlPlaneSpec struct {
 }
 
 type RKEControlPlaneStatus struct {
+	AppliedSpec                   RKEControlPlaneSpec
 	Conditions                    []genericcondition.GenericCondition `json:"conditions,omitempty"`
 	Ready                         bool                                `json:"ready,omitempty"`
 	ObservedGeneration            int64                               `json:"observedGeneration"`
