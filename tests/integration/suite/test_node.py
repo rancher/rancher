@@ -68,7 +68,7 @@ def test_node_template_delete(admin_mc, remove_resource):
     node_template, cloud_credential = create_node_template(client)
     node_pool = client.create_node_pool(
         nodeTemplateId=node_template.id,
-        hostnamePrefix="test1",
+        hostnamePrefix=random_str(),
         clusterId="local")
 
     # node_pool needs to come first or the API will stop the delete if the
@@ -122,7 +122,7 @@ def test_cloud_credential_delete(admin_mc, remove_resource):
     node_template, cloud_credential = create_node_template(client)
     node_pool = client.create_node_pool(
         nodeTemplateId=node_template.id,
-        hostnamePrefix="test1",
+        hostnamePrefix=random_str(),
         clusterId="local")
     assert node_pool.nodeTemplateId == node_template.id
 
@@ -169,7 +169,7 @@ def test_writing_config_to_disk(admin_mc, wait_remove_resource):
 
     node_pool = client.create_node_pool(
         nodeTemplateId=node_template.id,
-        hostnamePrefix="test1",
+        hostnamePrefix=random_str(),
         clusterId="local")
 
     def node_available():
@@ -289,7 +289,7 @@ def test_user_access_to_other_template(user_factory, remove_resource):
     with pytest.raises(ApiError) as e:
         user1_client.create_node_pool(
             nodeTemplateId=user2_node_template.id,
-            hostnamePrefix="test1",
+            hostnamePrefix=random_str(),
             clusterId="local")
     assert e.value.error.status == 404
     assert e.value.error.message == \
@@ -341,7 +341,7 @@ def test_user_cluster_owner_access_to_pool(admin_mc,
         admin_client, "admincloudcred-" + random_str())
     admin_pool = admin_client.create_node_pool(
         nodeTemplateId=admin_node_template.id,
-        hostnamePrefix="test",
+        hostnamePrefix=random_str(),
         clusterId=cluster.id)
     wait_remove_resource(admin_pool)
     remove_resource(admin_cloud_credential)
@@ -385,7 +385,7 @@ def test_admin_access_to_node_template(admin_mc, list_remove_resource):
     # after it passes validation.
     node_pool = admin_client.create_node_pool(
         nodeTemplateId=admin_node_template.id,
-        hostnamePrefix="test1",
+        hostnamePrefix=random_str(),
         clusterId="local")
 
     remove_list.insert(0, node_pool)
@@ -405,7 +405,7 @@ def test_user_access_to_node_template(user_mc, remove_resource):
     with pytest.raises(ApiError) as e:
         user_client.create_node_pool(
             nodeTemplateId=user_node_template.id,
-            hostnamePrefix="test1",
+            hostnamePrefix=random_str(),
             clusterId="local")
     # User does not have access to create nodepools but has
     # access to nodetemplate. Nodepool create happens after
@@ -429,7 +429,7 @@ def test_admin_access_user_template(admin_mc, user_mc, list_remove_resource):
     # after it passes validation.
     node_pool = admin_client.create_node_pool(
         nodeTemplateId=user_node_template.id,
-        hostnamePrefix="test1",
+        hostnamePrefix=random_str(),
         clusterId="local")
     remove_list.insert(0, node_pool)
 
@@ -444,7 +444,7 @@ def test_no_node_template(user_mc):
     with pytest.raises(ApiError) as e:
         user_client.create_node_pool(
             nodeTemplateId=invalid_template_id,
-            hostnamePrefix="test1",
+            hostnamePrefix=random_str(),
             clusterId="local")
     assert e.value.error.status == 404
     assert e.value.error.message == \
