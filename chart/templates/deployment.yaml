@@ -180,7 +180,7 @@ spec:
         - mountPath: /usr/share/rancher/ui/assets/images/logos
           name: custom-logos
           subPath: {{ .Values.customLogos.volumeSubpaths.emberUi | default "ember" | quote }}
-        - mountPath: /usr/share/rancher/ui-dashboard/dashboard/_nuxt/assets/images/pl
+        - mountPath: /usr/share/rancher/ui-dashboard/dashboard/_nuxt/shell/assets/images/pl
           name: custom-logos
           subPath: {{ .Values.customLogos.volumeSubpaths.vueUi | default "vue" | quote }}
 {{- end }}
