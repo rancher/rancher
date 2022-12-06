@@ -5,167 +5,169 @@ import (
 )
 
 const (
-	ClusterType                                      = "cluster"
-	ClusterFieldAADClientCertSecret                  = "aadClientCertSecret"
-	ClusterFieldAADClientSecret                      = "aadClientSecret"
-	ClusterFieldAKSConfig                            = "aksConfig"
-	ClusterFieldAKSStatus                            = "aksStatus"
-	ClusterFieldAPIEndpoint                          = "apiEndpoint"
-	ClusterFieldAgentEnvVars                         = "agentEnvVars"
-	ClusterFieldAgentFeatures                        = "agentFeatures"
-	ClusterFieldAgentImage                           = "agentImage"
-	ClusterFieldAgentImageOverride                   = "agentImageOverride"
-	ClusterFieldAllocatable                          = "allocatable"
-	ClusterFieldAnnotations                          = "annotations"
-	ClusterFieldAppliedAgentEnvVars                  = "appliedAgentEnvVars"
-	ClusterFieldAppliedEnableNetworkPolicy           = "appliedEnableNetworkPolicy"
-	ClusterFieldAppliedPodSecurityPolicyTemplateName = "appliedPodSecurityPolicyTemplateId"
-	ClusterFieldAppliedSpec                          = "appliedSpec"
-	ClusterFieldAuthImage                            = "authImage"
-	ClusterFieldCACert                               = "caCert"
-	ClusterFieldCapabilities                         = "capabilities"
-	ClusterFieldCapacity                             = "capacity"
-	ClusterFieldCertificatesExpiration               = "certificatesExpiration"
-	ClusterFieldClusterSecrets                       = "clusterSecrets"
-	ClusterFieldClusterTemplateAnswers               = "answers"
-	ClusterFieldClusterTemplateID                    = "clusterTemplateId"
-	ClusterFieldClusterTemplateQuestions             = "questions"
-	ClusterFieldClusterTemplateRevisionID            = "clusterTemplateRevisionId"
-	ClusterFieldComponentStatuses                    = "componentStatuses"
-	ClusterFieldConditions                           = "conditions"
-	ClusterFieldCreated                              = "created"
-	ClusterFieldCreatorID                            = "creatorId"
-	ClusterFieldCurrentCisRunName                    = "currentCisRunName"
-	ClusterFieldDefaultClusterRoleForProjectMembers  = "defaultClusterRoleForProjectMembers"
-	ClusterFieldDefaultPodSecurityPolicyTemplateID   = "defaultPodSecurityPolicyTemplateId"
-	ClusterFieldDescription                          = "description"
-	ClusterFieldDesiredAgentImage                    = "desiredAgentImage"
-	ClusterFieldDesiredAuthImage                     = "desiredAuthImage"
-	ClusterFieldDockerRootDir                        = "dockerRootDir"
-	ClusterFieldDriver                               = "driver"
-	ClusterFieldEKSConfig                            = "eksConfig"
-	ClusterFieldEKSStatus                            = "eksStatus"
-	ClusterFieldEnableClusterAlerting                = "enableClusterAlerting"
-	ClusterFieldEnableClusterMonitoring              = "enableClusterMonitoring"
-	ClusterFieldEnableNetworkPolicy                  = "enableNetworkPolicy"
-	ClusterFieldFailedSpec                           = "failedSpec"
-	ClusterFieldFleetWorkspaceName                   = "fleetWorkspaceName"
-	ClusterFieldGKEConfig                            = "gkeConfig"
-	ClusterFieldGKEStatus                            = "gkeStatus"
-	ClusterFieldImportedConfig                       = "importedConfig"
-	ClusterFieldInternal                             = "internal"
-	ClusterFieldIstioEnabled                         = "istioEnabled"
-	ClusterFieldK3sConfig                            = "k3sConfig"
-	ClusterFieldLabels                               = "labels"
-	ClusterFieldLimits                               = "limits"
-	ClusterFieldLinuxWorkerCount                     = "linuxWorkerCount"
-	ClusterFieldLocalClusterAuthEndpoint             = "localClusterAuthEndpoint"
-	ClusterFieldMonitoringStatus                     = "monitoringStatus"
-	ClusterFieldName                                 = "name"
-	ClusterFieldNodeCount                            = "nodeCount"
-	ClusterFieldNodeVersion                          = "nodeVersion"
-	ClusterFieldOpenStackSecret                      = "openStackSecret"
-	ClusterFieldOwnerReferences                      = "ownerReferences"
-	ClusterFieldPrivateRegistrySecret                = "privateRegistrySecret"
-	ClusterFieldProvider                             = "provider"
-	ClusterFieldRancherKubernetesEngineConfig        = "rancherKubernetesEngineConfig"
-	ClusterFieldRemoved                              = "removed"
-	ClusterFieldRequested                            = "requested"
-	ClusterFieldRke2Config                           = "rke2Config"
-	ClusterFieldS3CredentialSecret                   = "s3CredentialSecret"
-	ClusterFieldServiceAccountTokenSecret            = "serviceAccountTokenSecret"
-	ClusterFieldState                                = "state"
-	ClusterFieldTransitioning                        = "transitioning"
-	ClusterFieldTransitioningMessage                 = "transitioningMessage"
-	ClusterFieldUUID                                 = "uuid"
-	ClusterFieldVersion                              = "version"
-	ClusterFieldVirtualCenterSecret                  = "virtualCenterSecret"
-	ClusterFieldVsphereSecret                        = "vsphereSecret"
-	ClusterFieldWeavePasswordSecret                  = "weavePasswordSecret"
-	ClusterFieldWindowsPreferedCluster               = "windowsPreferedCluster"
-	ClusterFieldWindowsWorkerCount                   = "windowsWorkerCount"
+	ClusterType                                                      = "cluster"
+	ClusterFieldAADClientCertSecret                                  = "aadClientCertSecret"
+	ClusterFieldAADClientSecret                                      = "aadClientSecret"
+	ClusterFieldAKSConfig                                            = "aksConfig"
+	ClusterFieldAKSStatus                                            = "aksStatus"
+	ClusterFieldAPIEndpoint                                          = "apiEndpoint"
+	ClusterFieldAgentEnvVars                                         = "agentEnvVars"
+	ClusterFieldAgentFeatures                                        = "agentFeatures"
+	ClusterFieldAgentImage                                           = "agentImage"
+	ClusterFieldAgentImageOverride                                   = "agentImageOverride"
+	ClusterFieldAllocatable                                          = "allocatable"
+	ClusterFieldAnnotations                                          = "annotations"
+	ClusterFieldAppliedAgentEnvVars                                  = "appliedAgentEnvVars"
+	ClusterFieldAppliedEnableNetworkPolicy                           = "appliedEnableNetworkPolicy"
+	ClusterFieldAppliedPodSecurityPolicyTemplateName                 = "appliedPodSecurityPolicyTemplateId"
+	ClusterFieldAppliedSpec                                          = "appliedSpec"
+	ClusterFieldAuthImage                                            = "authImage"
+	ClusterFieldCACert                                               = "caCert"
+	ClusterFieldCapabilities                                         = "capabilities"
+	ClusterFieldCapacity                                             = "capacity"
+	ClusterFieldCertificatesExpiration                               = "certificatesExpiration"
+	ClusterFieldClusterSecrets                                       = "clusterSecrets"
+	ClusterFieldClusterTemplateAnswers                               = "answers"
+	ClusterFieldClusterTemplateID                                    = "clusterTemplateId"
+	ClusterFieldClusterTemplateQuestions                             = "questions"
+	ClusterFieldClusterTemplateRevisionID                            = "clusterTemplateRevisionId"
+	ClusterFieldComponentStatuses                                    = "componentStatuses"
+	ClusterFieldConditions                                           = "conditions"
+	ClusterFieldCreated                                              = "created"
+	ClusterFieldCreatorID                                            = "creatorId"
+	ClusterFieldCurrentCisRunName                                    = "currentCisRunName"
+	ClusterFieldDefaultClusterRoleForProjectMembers                  = "defaultClusterRoleForProjectMembers"
+	ClusterFieldDefaultPodSecurityAdmissionConfigurationTemplateName = "defaultPodSecurityAdmissionConfigurationTemplateName"
+	ClusterFieldDefaultPodSecurityPolicyTemplateID                   = "defaultPodSecurityPolicyTemplateId"
+	ClusterFieldDescription                                          = "description"
+	ClusterFieldDesiredAgentImage                                    = "desiredAgentImage"
+	ClusterFieldDesiredAuthImage                                     = "desiredAuthImage"
+	ClusterFieldDockerRootDir                                        = "dockerRootDir"
+	ClusterFieldDriver                                               = "driver"
+	ClusterFieldEKSConfig                                            = "eksConfig"
+	ClusterFieldEKSStatus                                            = "eksStatus"
+	ClusterFieldEnableClusterAlerting                                = "enableClusterAlerting"
+	ClusterFieldEnableClusterMonitoring                              = "enableClusterMonitoring"
+	ClusterFieldEnableNetworkPolicy                                  = "enableNetworkPolicy"
+	ClusterFieldFailedSpec                                           = "failedSpec"
+	ClusterFieldFleetWorkspaceName                                   = "fleetWorkspaceName"
+	ClusterFieldGKEConfig                                            = "gkeConfig"
+	ClusterFieldGKEStatus                                            = "gkeStatus"
+	ClusterFieldImportedConfig                                       = "importedConfig"
+	ClusterFieldInternal                                             = "internal"
+	ClusterFieldIstioEnabled                                         = "istioEnabled"
+	ClusterFieldK3sConfig                                            = "k3sConfig"
+	ClusterFieldLabels                                               = "labels"
+	ClusterFieldLimits                                               = "limits"
+	ClusterFieldLinuxWorkerCount                                     = "linuxWorkerCount"
+	ClusterFieldLocalClusterAuthEndpoint                             = "localClusterAuthEndpoint"
+	ClusterFieldMonitoringStatus                                     = "monitoringStatus"
+	ClusterFieldName                                                 = "name"
+	ClusterFieldNodeCount                                            = "nodeCount"
+	ClusterFieldNodeVersion                                          = "nodeVersion"
+	ClusterFieldOpenStackSecret                                      = "openStackSecret"
+	ClusterFieldOwnerReferences                                      = "ownerReferences"
+	ClusterFieldPrivateRegistrySecret                                = "privateRegistrySecret"
+	ClusterFieldProvider                                             = "provider"
+	ClusterFieldRancherKubernetesEngineConfig                        = "rancherKubernetesEngineConfig"
+	ClusterFieldRemoved                                              = "removed"
+	ClusterFieldRequested                                            = "requested"
+	ClusterFieldRke2Config                                           = "rke2Config"
+	ClusterFieldS3CredentialSecret                                   = "s3CredentialSecret"
+	ClusterFieldServiceAccountTokenSecret                            = "serviceAccountTokenSecret"
+	ClusterFieldState                                                = "state"
+	ClusterFieldTransitioning                                        = "transitioning"
+	ClusterFieldTransitioningMessage                                 = "transitioningMessage"
+	ClusterFieldUUID                                                 = "uuid"
+	ClusterFieldVersion                                              = "version"
+	ClusterFieldVirtualCenterSecret                                  = "virtualCenterSecret"
+	ClusterFieldVsphereSecret                                        = "vsphereSecret"
+	ClusterFieldWeavePasswordSecret                                  = "weavePasswordSecret"
+	ClusterFieldWindowsPreferedCluster                               = "windowsPreferedCluster"
+	ClusterFieldWindowsWorkerCount                                   = "windowsWorkerCount"
 )
 
 type Cluster struct {
 	types.Resource
-	AADClientCertSecret                  string                         `json:"aadClientCertSecret,omitempty" yaml:"aadClientCertSecret,omitempty"`
-	AADClientSecret                      string                         `json:"aadClientSecret,omitempty" yaml:"aadClientSecret,omitempty"`
-	AKSConfig                            *AKSClusterConfigSpec          `json:"aksConfig,omitempty" yaml:"aksConfig,omitempty"`
-	AKSStatus                            *AKSStatus                     `json:"aksStatus,omitempty" yaml:"aksStatus,omitempty"`
-	APIEndpoint                          string                         `json:"apiEndpoint,omitempty" yaml:"apiEndpoint,omitempty"`
-	AgentEnvVars                         []EnvVar                       `json:"agentEnvVars,omitempty" yaml:"agentEnvVars,omitempty"`
-	AgentFeatures                        map[string]bool                `json:"agentFeatures,omitempty" yaml:"agentFeatures,omitempty"`
-	AgentImage                           string                         `json:"agentImage,omitempty" yaml:"agentImage,omitempty"`
-	AgentImageOverride                   string                         `json:"agentImageOverride,omitempty" yaml:"agentImageOverride,omitempty"`
-	Allocatable                          map[string]string              `json:"allocatable,omitempty" yaml:"allocatable,omitempty"`
-	Annotations                          map[string]string              `json:"annotations,omitempty" yaml:"annotations,omitempty"`
-	AppliedAgentEnvVars                  []EnvVar                       `json:"appliedAgentEnvVars,omitempty" yaml:"appliedAgentEnvVars,omitempty"`
-	AppliedEnableNetworkPolicy           bool                           `json:"appliedEnableNetworkPolicy,omitempty" yaml:"appliedEnableNetworkPolicy,omitempty"`
-	AppliedPodSecurityPolicyTemplateName string                         `json:"appliedPodSecurityPolicyTemplateId,omitempty" yaml:"appliedPodSecurityPolicyTemplateId,omitempty"`
-	AppliedSpec                          *ClusterSpec                   `json:"appliedSpec,omitempty" yaml:"appliedSpec,omitempty"`
-	AuthImage                            string                         `json:"authImage,omitempty" yaml:"authImage,omitempty"`
-	CACert                               string                         `json:"caCert,omitempty" yaml:"caCert,omitempty"`
-	Capabilities                         *Capabilities                  `json:"capabilities,omitempty" yaml:"capabilities,omitempty"`
-	Capacity                             map[string]string              `json:"capacity,omitempty" yaml:"capacity,omitempty"`
-	CertificatesExpiration               map[string]CertExpiration      `json:"certificatesExpiration,omitempty" yaml:"certificatesExpiration,omitempty"`
-	ClusterSecrets                       *ClusterSecrets                `json:"clusterSecrets,omitempty" yaml:"clusterSecrets,omitempty"`
-	ClusterTemplateAnswers               *Answer                        `json:"answers,omitempty" yaml:"answers,omitempty"`
-	ClusterTemplateID                    string                         `json:"clusterTemplateId,omitempty" yaml:"clusterTemplateId,omitempty"`
-	ClusterTemplateQuestions             []Question                     `json:"questions,omitempty" yaml:"questions,omitempty"`
-	ClusterTemplateRevisionID            string                         `json:"clusterTemplateRevisionId,omitempty" yaml:"clusterTemplateRevisionId,omitempty"`
-	ComponentStatuses                    []ClusterComponentStatus       `json:"componentStatuses,omitempty" yaml:"componentStatuses,omitempty"`
-	Conditions                           []ClusterCondition             `json:"conditions,omitempty" yaml:"conditions,omitempty"`
-	Created                              string                         `json:"created,omitempty" yaml:"created,omitempty"`
-	CreatorID                            string                         `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
-	CurrentCisRunName                    string                         `json:"currentCisRunName,omitempty" yaml:"currentCisRunName,omitempty"`
-	DefaultClusterRoleForProjectMembers  string                         `json:"defaultClusterRoleForProjectMembers,omitempty" yaml:"defaultClusterRoleForProjectMembers,omitempty"`
-	DefaultPodSecurityPolicyTemplateID   string                         `json:"defaultPodSecurityPolicyTemplateId,omitempty" yaml:"defaultPodSecurityPolicyTemplateId,omitempty"`
-	Description                          string                         `json:"description,omitempty" yaml:"description,omitempty"`
-	DesiredAgentImage                    string                         `json:"desiredAgentImage,omitempty" yaml:"desiredAgentImage,omitempty"`
-	DesiredAuthImage                     string                         `json:"desiredAuthImage,omitempty" yaml:"desiredAuthImage,omitempty"`
-	DockerRootDir                        string                         `json:"dockerRootDir,omitempty" yaml:"dockerRootDir,omitempty"`
-	Driver                               string                         `json:"driver,omitempty" yaml:"driver,omitempty"`
-	EKSConfig                            *EKSClusterConfigSpec          `json:"eksConfig,omitempty" yaml:"eksConfig,omitempty"`
-	EKSStatus                            *EKSStatus                     `json:"eksStatus,omitempty" yaml:"eksStatus,omitempty"`
-	EnableClusterAlerting                bool                           `json:"enableClusterAlerting,omitempty" yaml:"enableClusterAlerting,omitempty"`
-	EnableClusterMonitoring              bool                           `json:"enableClusterMonitoring,omitempty" yaml:"enableClusterMonitoring,omitempty"`
-	EnableNetworkPolicy                  *bool                          `json:"enableNetworkPolicy,omitempty" yaml:"enableNetworkPolicy,omitempty"`
-	FailedSpec                           *ClusterSpec                   `json:"failedSpec,omitempty" yaml:"failedSpec,omitempty"`
-	FleetWorkspaceName                   string                         `json:"fleetWorkspaceName,omitempty" yaml:"fleetWorkspaceName,omitempty"`
-	GKEConfig                            *GKEClusterConfigSpec          `json:"gkeConfig,omitempty" yaml:"gkeConfig,omitempty"`
-	GKEStatus                            *GKEStatus                     `json:"gkeStatus,omitempty" yaml:"gkeStatus,omitempty"`
-	ImportedConfig                       *ImportedConfig                `json:"importedConfig,omitempty" yaml:"importedConfig,omitempty"`
-	Internal                             bool                           `json:"internal,omitempty" yaml:"internal,omitempty"`
-	IstioEnabled                         bool                           `json:"istioEnabled,omitempty" yaml:"istioEnabled,omitempty"`
-	K3sConfig                            *K3sConfig                     `json:"k3sConfig,omitempty" yaml:"k3sConfig,omitempty"`
-	Labels                               map[string]string              `json:"labels,omitempty" yaml:"labels,omitempty"`
-	Limits                               map[string]string              `json:"limits,omitempty" yaml:"limits,omitempty"`
-	LinuxWorkerCount                     int64                          `json:"linuxWorkerCount,omitempty" yaml:"linuxWorkerCount,omitempty"`
-	LocalClusterAuthEndpoint             *LocalClusterAuthEndpoint      `json:"localClusterAuthEndpoint,omitempty" yaml:"localClusterAuthEndpoint,omitempty"`
-	MonitoringStatus                     *MonitoringStatus              `json:"monitoringStatus,omitempty" yaml:"monitoringStatus,omitempty"`
-	Name                                 string                         `json:"name,omitempty" yaml:"name,omitempty"`
-	NodeCount                            int64                          `json:"nodeCount,omitempty" yaml:"nodeCount,omitempty"`
-	NodeVersion                          int64                          `json:"nodeVersion,omitempty" yaml:"nodeVersion,omitempty"`
-	OpenStackSecret                      string                         `json:"openStackSecret,omitempty" yaml:"openStackSecret,omitempty"`
-	OwnerReferences                      []OwnerReference               `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
-	PrivateRegistrySecret                string                         `json:"privateRegistrySecret,omitempty" yaml:"privateRegistrySecret,omitempty"`
-	Provider                             string                         `json:"provider,omitempty" yaml:"provider,omitempty"`
-	RancherKubernetesEngineConfig        *RancherKubernetesEngineConfig `json:"rancherKubernetesEngineConfig,omitempty" yaml:"rancherKubernetesEngineConfig,omitempty"`
-	Removed                              string                         `json:"removed,omitempty" yaml:"removed,omitempty"`
-	Requested                            map[string]string              `json:"requested,omitempty" yaml:"requested,omitempty"`
-	Rke2Config                           *Rke2Config                    `json:"rke2Config,omitempty" yaml:"rke2Config,omitempty"`
-	S3CredentialSecret                   string                         `json:"s3CredentialSecret,omitempty" yaml:"s3CredentialSecret,omitempty"`
-	ServiceAccountTokenSecret            string                         `json:"serviceAccountTokenSecret,omitempty" yaml:"serviceAccountTokenSecret,omitempty"`
-	State                                string                         `json:"state,omitempty" yaml:"state,omitempty"`
-	Transitioning                        string                         `json:"transitioning,omitempty" yaml:"transitioning,omitempty"`
-	TransitioningMessage                 string                         `json:"transitioningMessage,omitempty" yaml:"transitioningMessage,omitempty"`
-	UUID                                 string                         `json:"uuid,omitempty" yaml:"uuid,omitempty"`
-	Version                              *Info                          `json:"version,omitempty" yaml:"version,omitempty"`
-	VirtualCenterSecret                  string                         `json:"virtualCenterSecret,omitempty" yaml:"virtualCenterSecret,omitempty"`
-	VsphereSecret                        string                         `json:"vsphereSecret,omitempty" yaml:"vsphereSecret,omitempty"`
-	WeavePasswordSecret                  string                         `json:"weavePasswordSecret,omitempty" yaml:"weavePasswordSecret,omitempty"`
-	WindowsPreferedCluster               bool                           `json:"windowsPreferedCluster,omitempty" yaml:"windowsPreferedCluster,omitempty"`
-	WindowsWorkerCount                   int64                          `json:"windowsWorkerCount,omitempty" yaml:"windowsWorkerCount,omitempty"`
+	AADClientCertSecret                                  string                         `json:"aadClientCertSecret,omitempty" yaml:"aadClientCertSecret,omitempty"`
+	AADClientSecret                                      string                         `json:"aadClientSecret,omitempty" yaml:"aadClientSecret,omitempty"`
+	AKSConfig                                            *AKSClusterConfigSpec          `json:"aksConfig,omitempty" yaml:"aksConfig,omitempty"`
+	AKSStatus                                            *AKSStatus                     `json:"aksStatus,omitempty" yaml:"aksStatus,omitempty"`
+	APIEndpoint                                          string                         `json:"apiEndpoint,omitempty" yaml:"apiEndpoint,omitempty"`
+	AgentEnvVars                                         []EnvVar                       `json:"agentEnvVars,omitempty" yaml:"agentEnvVars,omitempty"`
+	AgentFeatures                                        map[string]bool                `json:"agentFeatures,omitempty" yaml:"agentFeatures,omitempty"`
+	AgentImage                                           string                         `json:"agentImage,omitempty" yaml:"agentImage,omitempty"`
+	AgentImageOverride                                   string                         `json:"agentImageOverride,omitempty" yaml:"agentImageOverride,omitempty"`
+	Allocatable                                          map[string]string              `json:"allocatable,omitempty" yaml:"allocatable,omitempty"`
+	Annotations                                          map[string]string              `json:"annotations,omitempty" yaml:"annotations,omitempty"`
+	AppliedAgentEnvVars                                  []EnvVar                       `json:"appliedAgentEnvVars,omitempty" yaml:"appliedAgentEnvVars,omitempty"`
+	AppliedEnableNetworkPolicy                           bool                           `json:"appliedEnableNetworkPolicy,omitempty" yaml:"appliedEnableNetworkPolicy,omitempty"`
+	AppliedPodSecurityPolicyTemplateName                 string                         `json:"appliedPodSecurityPolicyTemplateId,omitempty" yaml:"appliedPodSecurityPolicyTemplateId,omitempty"`
+	AppliedSpec                                          *ClusterSpec                   `json:"appliedSpec,omitempty" yaml:"appliedSpec,omitempty"`
+	AuthImage                                            string                         `json:"authImage,omitempty" yaml:"authImage,omitempty"`
+	CACert                                               string                         `json:"caCert,omitempty" yaml:"caCert,omitempty"`
+	Capabilities                                         *Capabilities                  `json:"capabilities,omitempty" yaml:"capabilities,omitempty"`
+	Capacity                                             map[string]string              `json:"capacity,omitempty" yaml:"capacity,omitempty"`
+	CertificatesExpiration                               map[string]CertExpiration      `json:"certificatesExpiration,omitempty" yaml:"certificatesExpiration,omitempty"`
+	ClusterSecrets                                       *ClusterSecrets                `json:"clusterSecrets,omitempty" yaml:"clusterSecrets,omitempty"`
+	ClusterTemplateAnswers                               *Answer                        `json:"answers,omitempty" yaml:"answers,omitempty"`
+	ClusterTemplateID                                    string                         `json:"clusterTemplateId,omitempty" yaml:"clusterTemplateId,omitempty"`
+	ClusterTemplateQuestions                             []Question                     `json:"questions,omitempty" yaml:"questions,omitempty"`
+	ClusterTemplateRevisionID                            string                         `json:"clusterTemplateRevisionId,omitempty" yaml:"clusterTemplateRevisionId,omitempty"`
+	ComponentStatuses                                    []ClusterComponentStatus       `json:"componentStatuses,omitempty" yaml:"componentStatuses,omitempty"`
+	Conditions                                           []ClusterCondition             `json:"conditions,omitempty" yaml:"conditions,omitempty"`
+	Created                                              string                         `json:"created,omitempty" yaml:"created,omitempty"`
+	CreatorID                                            string                         `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
+	CurrentCisRunName                                    string                         `json:"currentCisRunName,omitempty" yaml:"currentCisRunName,omitempty"`
+	DefaultClusterRoleForProjectMembers                  string                         `json:"defaultClusterRoleForProjectMembers,omitempty" yaml:"defaultClusterRoleForProjectMembers,omitempty"`
+	DefaultPodSecurityAdmissionConfigurationTemplateName string                         `json:"defaultPodSecurityAdmissionConfigurationTemplateName,omitempty" yaml:"defaultPodSecurityAdmissionConfigurationTemplateName,omitempty"`
+	DefaultPodSecurityPolicyTemplateID                   string                         `json:"defaultPodSecurityPolicyTemplateId,omitempty" yaml:"defaultPodSecurityPolicyTemplateId,omitempty"`
+	Description                                          string                         `json:"description,omitempty" yaml:"description,omitempty"`
+	DesiredAgentImage                                    string                         `json:"desiredAgentImage,omitempty" yaml:"desiredAgentImage,omitempty"`
+	DesiredAuthImage                                     string                         `json:"desiredAuthImage,omitempty" yaml:"desiredAuthImage,omitempty"`
+	DockerRootDir                                        string                         `json:"dockerRootDir,omitempty" yaml:"dockerRootDir,omitempty"`
+	Driver                                               string                         `json:"driver,omitempty" yaml:"driver,omitempty"`
+	EKSConfig                                            *EKSClusterConfigSpec          `json:"eksConfig,omitempty" yaml:"eksConfig,omitempty"`
+	EKSStatus                                            *EKSStatus                     `json:"eksStatus,omitempty" yaml:"eksStatus,omitempty"`
+	EnableClusterAlerting                                bool                           `json:"enableClusterAlerting,omitempty" yaml:"enableClusterAlerting,omitempty"`
+	EnableClusterMonitoring                              bool                           `json:"enableClusterMonitoring,omitempty" yaml:"enableClusterMonitoring,omitempty"`
+	EnableNetworkPolicy                                  *bool                          `json:"enableNetworkPolicy,omitempty" yaml:"enableNetworkPolicy,omitempty"`
+	FailedSpec                                           *ClusterSpec                   `json:"failedSpec,omitempty" yaml:"failedSpec,omitempty"`
+	FleetWorkspaceName                                   string                         `json:"fleetWorkspaceName,omitempty" yaml:"fleetWorkspaceName,omitempty"`
+	GKEConfig                                            *GKEClusterConfigSpec          `json:"gkeConfig,omitempty" yaml:"gkeConfig,omitempty"`
+	GKEStatus                                            *GKEStatus                     `json:"gkeStatus,omitempty" yaml:"gkeStatus,omitempty"`
+	ImportedConfig                                       *ImportedConfig                `json:"importedConfig,omitempty" yaml:"importedConfig,omitempty"`
+	Internal                                             bool                           `json:"internal,omitempty" yaml:"internal,omitempty"`
+	IstioEnabled                                         bool                           `json:"istioEnabled,omitempty" yaml:"istioEnabled,omitempty"`
+	K3sConfig                                            *K3sConfig                     `json:"k3sConfig,omitempty" yaml:"k3sConfig,omitempty"`
+	Labels                                               map[string]string              `json:"labels,omitempty" yaml:"labels,omitempty"`
+	Limits                                               map[string]string              `json:"limits,omitempty" yaml:"limits,omitempty"`
+	LinuxWorkerCount                                     int64                          `json:"linuxWorkerCount,omitempty" yaml:"linuxWorkerCount,omitempty"`
+	LocalClusterAuthEndpoint                             *LocalClusterAuthEndpoint      `json:"localClusterAuthEndpoint,omitempty" yaml:"localClusterAuthEndpoint,omitempty"`
+	MonitoringStatus                                     *MonitoringStatus              `json:"monitoringStatus,omitempty" yaml:"monitoringStatus,omitempty"`
+	Name                                                 string                         `json:"name,omitempty" yaml:"name,omitempty"`
+	NodeCount                                            int64                          `json:"nodeCount,omitempty" yaml:"nodeCount,omitempty"`
+	NodeVersion                                          int64                          `json:"nodeVersion,omitempty" yaml:"nodeVersion,omitempty"`
+	OpenStackSecret                                      string                         `json:"openStackSecret,omitempty" yaml:"openStackSecret,omitempty"`
+	OwnerReferences                                      []OwnerReference               `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
+	PrivateRegistrySecret                                string                         `json:"privateRegistrySecret,omitempty" yaml:"privateRegistrySecret,omitempty"`
+	Provider                                             string                         `json:"provider,omitempty" yaml:"provider,omitempty"`
+	RancherKubernetesEngineConfig                        *RancherKubernetesEngineConfig `json:"rancherKubernetesEngineConfig,omitempty" yaml:"rancherKubernetesEngineConfig,omitempty"`
+	Removed                                              string                         `json:"removed,omitempty" yaml:"removed,omitempty"`
+	Requested                                            map[string]string              `json:"requested,omitempty" yaml:"requested,omitempty"`
+	Rke2Config                                           *Rke2Config                    `json:"rke2Config,omitempty" yaml:"rke2Config,omitempty"`
+	S3CredentialSecret                                   string                         `json:"s3CredentialSecret,omitempty" yaml:"s3CredentialSecret,omitempty"`
+	ServiceAccountTokenSecret                            string                         `json:"serviceAccountTokenSecret,omitempty" yaml:"serviceAccountTokenSecret,omitempty"`
+	State                                                string                         `json:"state,omitempty" yaml:"state,omitempty"`
+	Transitioning                                        string                         `json:"transitioning,omitempty" yaml:"transitioning,omitempty"`
+	TransitioningMessage                                 string                         `json:"transitioningMessage,omitempty" yaml:"transitioningMessage,omitempty"`
+	UUID                                                 string                         `json:"uuid,omitempty" yaml:"uuid,omitempty"`
+	Version                                              *Info                          `json:"version,omitempty" yaml:"version,omitempty"`
+	VirtualCenterSecret                                  string                         `json:"virtualCenterSecret,omitempty" yaml:"virtualCenterSecret,omitempty"`
+	VsphereSecret                                        string                         `json:"vsphereSecret,omitempty" yaml:"vsphereSecret,omitempty"`
+	WeavePasswordSecret                                  string                         `json:"weavePasswordSecret,omitempty" yaml:"weavePasswordSecret,omitempty"`
+	WindowsPreferedCluster                               bool                           `json:"windowsPreferedCluster,omitempty" yaml:"windowsPreferedCluster,omitempty"`
+	WindowsWorkerCount                                   int64                          `json:"windowsWorkerCount,omitempty" yaml:"windowsWorkerCount,omitempty"`
 }
 
 type ClusterCollection struct {

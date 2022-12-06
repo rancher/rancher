@@ -15,6 +15,7 @@ type Interface interface {
 	NodesGetter
 	NodeDriversGetter
 	NodeTemplatesGetter
+	PodSecurityAdmissionConfigurationTemplatesGetter
 	ProjectsGetter
 	GlobalRolesGetter
 	GlobalRoleBindingsGetter
@@ -151,6 +152,20 @@ func (c *Client) NodeTemplates(namespace string) NodeTemplateInterface {
 	sharedClient := c.clientFactory.ForResourceKind(NodeTemplateGroupVersionResource, NodeTemplateGroupVersionKind.Kind, true)
 	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &NodeTemplateResource, NodeTemplateGroupVersionKind, nodeTemplateFactory{})
 	return &nodeTemplateClient{
+		ns:           namespace,
+		client:       c,
+		objectClient: objectClient,
+	}
+}
+
+type PodSecurityAdmissionConfigurationTemplatesGetter interface {
+	PodSecurityAdmissionConfigurationTemplates(namespace string) PodSecurityAdmissionConfigurationTemplateInterface
+}
+
+func (c *Client) PodSecurityAdmissionConfigurationTemplates(namespace string) PodSecurityAdmissionConfigurationTemplateInterface {
+	sharedClient := c.clientFactory.ForResourceKind(PodSecurityAdmissionConfigurationTemplateGroupVersionResource, PodSecurityAdmissionConfigurationTemplateGroupVersionKind.Kind, false)
+	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &PodSecurityAdmissionConfigurationTemplateResource, PodSecurityAdmissionConfigurationTemplateGroupVersionKind, podSecurityAdmissionConfigurationTemplateFactory{})
+	return &podSecurityAdmissionConfigurationTemplateClient{
 		ns:           namespace,
 		client:       c,
 		objectClient: objectClient,
