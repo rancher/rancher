@@ -43,6 +43,10 @@ import (
 	"github.com/rancher/rancher/pkg/user"
 	"github.com/rancher/rancher/pkg/wrangler"
 	steve "github.com/rancher/steve/pkg/server"
+	apiextcontroller "github.com/rancher/wrangler/pkg/generated/controllers/apiextensions.k8s.io"
+	apiextcontrollerv1 "github.com/rancher/wrangler/pkg/generated/controllers/apiextensions.k8s.io/v1"
+	apiregcontroller "github.com/rancher/wrangler/pkg/generated/controllers/apiregistration.k8s.io"
+	apiregcontrollerv1 "github.com/rancher/wrangler/pkg/generated/controllers/apiregistration.k8s.io/v1"
 	"github.com/rancher/wrangler/pkg/generated/controllers/rbac"
 	wrbacv1 "github.com/rancher/wrangler/pkg/generated/controllers/rbac/v1"
 	"github.com/rancher/wrangler/pkg/generic"
@@ -223,6 +227,8 @@ type UserContext struct {
 	Policy         policyv1beta1.Interface
 
 	RBACw          wrbacv1.Interface
+	CRDw           apiextcontrollerv1.Interface
+	APIServicew    apiregcontrollerv1.Interface
 	KindNamespaces map[schema.GroupVersionKind]string
 }
 
@@ -444,6 +450,18 @@ func NewUserContext(scaledContext *ScaledContext, config rest.Config, clusterNam
 		return nil, err
 	}
 	context.RBACw = rbacw.Rbac().V1()
+
+	crdw, err := apiextcontroller.NewFactoryFromConfigWithOptions(&wranglerConf, opts)
+	if err != nil {
+		return nil, err
+	}
+	context.CRDw = crdw.Apiextensions().V1()
+
+	apiservicew, err := apiregcontroller.NewFactoryFromConfigWithOptions(&wranglerConf, opts)
+	if err != nil {
+		return nil, err
+	}
+	context.APIServicew = apiservicew.Apiregistration().V1()
 
 	ctlg, err := catalog.NewFactoryFromConfigWithOptions(&context.RESTConfig, &catalog.FactoryOptions{SharedControllerFactory: controllerFactory})
 	if err != nil {

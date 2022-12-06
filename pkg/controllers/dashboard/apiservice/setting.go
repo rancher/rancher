@@ -7,6 +7,7 @@ import (
 	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/settings"
+	"github.com/rancher/rancher/pkg/tls"
 	corev1 "k8s.io/api/core/v1"
 )
 
@@ -57,7 +58,7 @@ func (h *handler) getInternalServerAndURL() (string, string, error) {
 	serverURL := settings.ServerURL.Get()
 	ca := settings.CACerts.Get()
 
-	tlsSecret, err := h.secretsCache.Get(namespace.System, "tls-rancher-internal-ca")
+	tlsSecret, err := h.secretsCache.Get(namespace.System, tls.InternalCA)
 	if err != nil {
 		return "", "", err
 	}

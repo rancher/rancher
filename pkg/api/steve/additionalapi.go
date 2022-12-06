@@ -8,6 +8,7 @@ import (
 	"github.com/rancher/rancher/pkg/api/steve/aggregation"
 	"github.com/rancher/rancher/pkg/api/steve/github"
 	"github.com/rancher/rancher/pkg/api/steve/health"
+	"github.com/rancher/rancher/pkg/api/steve/projectresources"
 	"github.com/rancher/rancher/pkg/api/steve/projects"
 	"github.com/rancher/rancher/pkg/api/steve/proxy"
 	"github.com/rancher/rancher/pkg/capr/configserver"
@@ -57,6 +58,8 @@ func AdditionalAPIs(ctx context.Context, config *wrangler.Context, steve *steve.
 	mux.UseEncodedPath()
 	mux.Handle("/v1/github{path:.*}", githubHandler)
 	mux.Handle("/v3/connect", Tunnel(config))
+
+	projectresources.Register(ctx, mux, config, steve)
 	health.Register(mux)
 
 	return func(next http.Handler) http.Handler {

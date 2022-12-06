@@ -1,3 +1,6 @@
+// Package rbac contains operations for translating role templates,
+// role template bindings, and projects into the desired state on the downtream
+// cluster.
 package rbac
 
 import (
@@ -8,6 +11,7 @@ import (
 
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/slice"
+	"github.com/rancher/rancher/pkg/api/steve/projectresources"
 	wranglerv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/resourcequota"
 	typescorev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
@@ -24,6 +28,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/discovery/cached/memory"
+	"k8s.io/client-go/restmapper"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -50,6 +56,7 @@ const (
 	rolesCircularHardLimit = 500
 )
 
+// Register sets up caches and clients and starts handlers for RTs, CRTBs, PRTBs, and projects.
 func Register(ctx context.Context, workload *config.UserContext) {
 	management := workload.Management.WithAgent("rbac-handler-base")
 
@@ -85,6 +92,9 @@ func Register(ctx context.Context, workload *config.UserContext) {
 	}
 	rtInformer.AddIndexers(rtIndexers)
 
+	mapper := restmapper.NewDeferredDiscoveryRESTMapper(memory.NewMemCacheClient(workload.K8sClient.Discovery()))
+	apis := projectresources.WatchAPIResources(ctx, workload.K8sClient.Discovery(), workload.CRDw.CustomResourceDefinition(), workload.APIServicew.APIService(), mapper)
+
 	r := &manager{
 		workload:            workload,
 		prtbIndexer:         prtbInformer.GetIndexer(),
@@ -93,6 +103,7 @@ func Register(ctx context.Context, workload *config.UserContext) {
 		crIndexer:           crInformer.GetIndexer(),
 		crbIndexer:          crbInformer.GetIndexer(),
 		rtLister:            management.Management.RoleTemplates("").Controller().Lister(),
+		roleTemplates:       management.Management.RoleTemplates(""),
 		rLister:             management.RBAC.Roles("").Controller().Lister(),
 		roles:               management.RBAC.Roles(""),
 		rbLister:            workload.RBAC.RoleBindings("").Controller().Lister(),
@@ -110,6 +121,7 @@ func Register(ctx context.Context, workload *config.UserContext) {
 		userAttributeLister: management.Management.UserAttributes("").Controller().Lister(),
 		crtbs:               management.Management.ClusterRoleTemplateBindings(""),
 		prtbs:               management.Management.ProjectRoleTemplateBindings(""),
+		apis:                apis,
 		clusterName:         workload.ClusterName,
 	}
 	management.Management.Projects(workload.ClusterName).AddClusterScopedLifecycle(ctx, "project-namespace-auth", workload.ClusterName, newProjectLifecycle(r))
@@ -151,6 +163,7 @@ type manager struct {
 	rbLister            typesrbacv1.RoleBindingLister
 	roleBindings        typesrbacv1.RoleBindingInterface
 	rLister             typesrbacv1.RoleLister
+	roleTemplates       v3.RoleTemplateInterface
 	roles               typesrbacv1.RoleInterface
 	nsLister            typescorev1.NamespaceLister
 	nsController        typescorev1.NamespaceController
@@ -161,19 +174,24 @@ type manager struct {
 	userAttributeLister v3.UserAttributeLister
 	crtbs               v3.ClusterRoleTemplateBindingInterface
 	prtbs               v3.ProjectRoleTemplateBindingInterface
+	apis                projectresources.APIResourceWatcher
 	clusterName         string
 }
 
 func (m *manager) ensureRoles(rts map[string]*v3.RoleTemplate) error {
 	for _, rt := range rts {
-		if rt.External {
-			continue
+		if !rt.External {
+			if err := m.ensureClusterRoles(rt); err != nil {
+				return err
+			}
 		}
-		if err := m.ensureClusterRoles(rt); err != nil {
+		if err := m.ensureProjectResourcesRoles(rt); err != nil {
 			return err
 		}
-		if err := m.ensureNamespacedRoles(rt); err != nil {
-			return err
+		if !rt.External {
+			if err := m.ensureNamespacedRoles(rt); err != nil {
+				return err
+			}
 		}
 	}
 	return nil
@@ -196,7 +214,7 @@ func (m *manager) ensureClusterRoles(rt *v3.RoleTemplate) error {
 		return fmt.Errorf("couldn't update clusterRole %s: %w", rt.Name, err)
 	}
 
-	return m.createClusterRole(rt)
+	return m.createClusterRole(rt.Name, rt, nil)
 }
 
 func (m *manager) compareAndUpdateClusterRole(clusterRole *rbacv1.ClusterRole, rt *v3.RoleTemplate) error {
@@ -213,12 +231,16 @@ func (m *manager) compareAndUpdateClusterRole(clusterRole *rbacv1.ClusterRole, r
 	return nil
 }
 
-func (m *manager) createClusterRole(rt *v3.RoleTemplate) error {
-	logrus.Infof("Creating clusterRole for roleTemplate %v (%v).", rt.DisplayName, rt.Name)
+func (m *manager) createClusterRole(name string, rt *v3.RoleTemplate, addAnnotations map[string]string) error {
+	logrus.Infof("Creating clusterRole for roleTemplate %v (%v).", rt.DisplayName, name)
+	annotations := map[string]string{clusterRoleOwner: rt.Name}
+	for k, v := range addAnnotations {
+		annotations[k] = v
+	}
 	_, err := m.clusterRoles.Create(&rbacv1.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        rt.Name,
-			Annotations: map[string]string{clusterRoleOwner: rt.Name},
+			Name:        name,
+			Annotations: annotations,
 		},
 		Rules: rt.Rules,
 	})
@@ -228,6 +250,7 @@ func (m *manager) createClusterRole(rt *v3.RoleTemplate) error {
 	return nil
 }
 
+// ensureNamespacedRoles syncs rolebindings in the management cluster for the cluster and project namespaces.
 func (m *manager) ensureNamespacedRoles(rt *v3.RoleTemplate) error {
 	// if the RoleTemplate has cluster owner rules, don't update Roles
 	if isClusterOwner, err := m.isClusterOwner(rt.Name); isClusterOwner || err != nil {
@@ -331,6 +354,8 @@ func (m *manager) compareAndUpdateNamespacedRole(role *rbacv1.Role, rt *v3.RoleT
 	return err
 }
 
+// ToLowerRoleTemplates lowercases the verbs and resources in the role template
+// rules to be ready to be used in Kubernetes roles.
 func ToLowerRoleTemplates(roleTemplates map[string]*v3.RoleTemplate) {
 	// clean the roles for kubeneretes: lowercase resources and verbs
 	for key, rt := range roleTemplates {
@@ -393,7 +418,7 @@ func (m *manager) gatherRolesRecurse(rt *v3.RoleTemplate, roleTemplates map[stri
 	return nil
 }
 
-func (m *manager) ensureClusterBindings(roles map[string]*v3.RoleTemplate, binding *v3.ClusterRoleTemplateBinding) error {
+func (m *manager) ensureClusterBindings(roles map[string]*v3.RoleTemplate, binding *v3.ClusterRoleTemplateBinding, annotations map[string]string, owners map[string]metav1.OwnerReference) error {
 	create := func(objectMeta metav1.ObjectMeta, subjects []rbacv1.Subject, roleRef rbacv1.RoleRef) runtime.Object {
 		return &rbacv1.ClusterRoleBinding{
 			ObjectMeta: objectMeta,
@@ -402,12 +427,12 @@ func (m *manager) ensureClusterBindings(roles map[string]*v3.RoleTemplate, bindi
 		}
 	}
 
-	list := func(ns string, selector labels.Selector) ([]interface{}, error) {
+	list := func(ns string, selector labels.Selector) ([]runtime.Object, error) {
 		currentRBs, err := m.crbLister.List(ns, selector)
 		if err != nil {
 			return nil, err
 		}
-		var items []interface{}
+		var items []runtime.Object
 		for _, c := range currentRBs {
 			items = append(items, c)
 		}
@@ -419,10 +444,10 @@ func (m *manager) ensureClusterBindings(roles map[string]*v3.RoleTemplate, bindi
 		return crb.Name, crb.RoleRef.Name, crb.Subjects
 	}
 
-	return m.ensureBindings("", roles, binding, create, list, convert)
+	return m.ensureBindings("", roles, binding, annotations, owners, create, list, convert)
 }
 
-func (m *manager) ensureProjectRoleBindings(ns string, roles map[string]*v3.RoleTemplate, binding *v3.ProjectRoleTemplateBinding) error {
+func (m *manager) ensureProjectRoleBindings(ns string, roles map[string]*v3.RoleTemplate, binding *v3.ProjectRoleTemplateBinding, annotations map[string]string) error {
 	create := func(objectMeta metav1.ObjectMeta, subjects []rbacv1.Subject, roleRef rbacv1.RoleRef) runtime.Object {
 		return &rbacv1.RoleBinding{
 			ObjectMeta: objectMeta,
@@ -431,12 +456,12 @@ func (m *manager) ensureProjectRoleBindings(ns string, roles map[string]*v3.Role
 		}
 	}
 
-	list := func(ns string, selector labels.Selector) ([]interface{}, error) {
+	list := func(ns string, selector labels.Selector) ([]runtime.Object, error) {
 		currentRBs, err := m.rbLister.List(ns, selector)
 		if err != nil {
 			return nil, err
 		}
-		var items []interface{}
+		var items []runtime.Object
 		for _, c := range currentRBs {
 			items = append(items, c)
 		}
@@ -448,14 +473,14 @@ func (m *manager) ensureProjectRoleBindings(ns string, roles map[string]*v3.Role
 		return rb.Name, rb.RoleRef.Name, rb.Subjects
 	}
 
-	return m.ensureBindings(ns, roles, binding, create, list, convert)
+	return m.ensureBindings(ns, roles, binding, annotations, nil, create, list, convert)
 }
 
 type createFn func(objectMeta metav1.ObjectMeta, subjects []rbacv1.Subject, roleRef rbacv1.RoleRef) runtime.Object
-type listFn func(ns string, selector labels.Selector) ([]interface{}, error)
+type listFn func(ns string, selector labels.Selector) ([]runtime.Object, error)
 type convertFn func(i interface{}) (string, string, []rbacv1.Subject)
 
-func (m *manager) ensureBindings(ns string, roles map[string]*v3.RoleTemplate, binding metav1.Object,
+func (m *manager) ensureBindings(ns string, roles map[string]*v3.RoleTemplate, binding metav1.Object, annotations map[string]string, owners map[string]metav1.OwnerReference,
 	create createFn, list listFn, convert convertFn) error {
 	meta, err := meta.Accessor(binding)
 	if err != nil {
@@ -469,6 +494,24 @@ func (m *manager) ensureBindings(ns string, roles map[string]*v3.RoleTemplate, b
 	}
 	for roleName := range roles {
 		rbKey, objectMeta, subjects, roleRef := bindingParts(ns, roleName, meta.GetNamespace()+"_"+meta.GetName(), subject)
+		if annotations != nil {
+			objAnnotations := objectMeta.GetAnnotations()
+			if objAnnotations == nil {
+				objAnnotations = make(map[string]string)
+			}
+			for k, v := range annotations {
+				objAnnotations[k] = v
+			}
+			objectMeta.SetAnnotations(objAnnotations)
+		}
+		if owners != nil {
+			ownerRefs := objectMeta.GetOwnerReferences()
+			if ownerRefs == nil {
+				ownerRefs = make([]metav1.OwnerReference, 0)
+			}
+			ownerRefs = append(ownerRefs, owners[roleName])
+			objectMeta.SetOwnerReferences(ownerRefs)
+		}
 		desiredRBs[rbKey] = create(objectMeta, subjects, roleRef)
 	}
 
@@ -477,7 +520,7 @@ func (m *manager) ensureBindings(ns string, roles map[string]*v3.RoleTemplate, b
 	if err != nil {
 		return err
 	}
-	rbsToDelete := map[string]interface{}{}
+	rbsToDelete := map[string]runtime.Object{}
 	processed := map[string]bool{}
 	for _, rb := range currentRBs {
 		rbName, roleName, subjects := convert(rb)
@@ -500,12 +543,12 @@ func (m *manager) ensureBindings(ns string, roles map[string]*v3.RoleTemplate, b
 		}
 	}
 
-	for key, rb := range desiredRBs {
+	for name, rb := range desiredRBs {
 		switch roleBinding := rb.(type) {
 		case *rbacv1.RoleBinding:
 			_, err := m.rbLister.Get(ns, roleBinding.Name)
 			if apierrors.IsNotFound(err) {
-				logrus.Infof("Creating roleBinding %v in %s", key, ns)
+				logrus.Infof("Creating roleBinding %v in %s", name, ns)
 				_, err := m.roleBindings.Create(roleBinding)
 				if err != nil && !apierrors.IsAlreadyExists(err) {
 					return err
@@ -514,7 +557,7 @@ func (m *manager) ensureBindings(ns string, roles map[string]*v3.RoleTemplate, b
 				return err
 			}
 		case *rbacv1.ClusterRoleBinding:
-			logrus.Infof("Creating clusterRoleBinding %v", key)
+			logrus.Infof("Creating clusterRoleBinding %v", name)
 			_, err := m.clusterRoleBindings.Create(roleBinding)
 			if err != nil && !apierrors.IsAlreadyExists(err) {
 				return err
@@ -522,15 +565,15 @@ func (m *manager) ensureBindings(ns string, roles map[string]*v3.RoleTemplate, b
 		}
 	}
 
-	for key, rb := range rbsToDelete {
-		logrus.Infof("Deleting roleBinding %v", key)
+	for name, rb := range rbsToDelete {
+		logrus.Infof("Deleting roleBinding %v", name)
 		switch rb.(type) {
 		case *rbacv1.RoleBinding:
-			if err := m.roleBindings.DeleteNamespaced(ns, key, &metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
+			if err := m.roleBindings.DeleteNamespaced(ns, name, &metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
 				return err
 			}
 		case *rbacv1.ClusterRoleBinding:
-			if err := m.clusterRoleBindings.Delete(key, &metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
+			if err := m.clusterRoleBindings.Delete(name, &metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
 				return err
 			}
 		}

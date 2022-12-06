@@ -4,14 +4,19 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/rancher/rancher/pkg/api/steve/projectresources"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	projectpkg "github.com/rancher/rancher/pkg/project"
 	"github.com/rancher/rancher/pkg/settings"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+)
+
+const (
+	projectNamespaceAnnotation = "management.cattle.io/system-namespace"
 )
 
 func newProjectLifecycle(r *manager) *pLifecycle {
@@ -22,6 +27,7 @@ type pLifecycle struct {
 	m *manager
 }
 
+// Create runs lifecycle operations for a newly created project.
 func (p *pLifecycle) Create(project *v3.Project) (runtime.Object, error) {
 	for verb, suffix := range projectNSVerbToSuffix {
 		roleName := fmt.Sprintf(projectNSGetClusterRoleNameFmt, project.Name, suffix)
@@ -38,19 +44,30 @@ func (p *pLifecycle) Create(project *v3.Project) (runtime.Object, error) {
 	}
 
 	err := p.ensureNamespacesAssigned(project)
+	if err != nil {
+		return project, err
+	}
+
+	err = p.ensureProjectNS(project)
 	return project, err
 }
 
+// Updated runs lifecycle operations for an updated project.
 func (p *pLifecycle) Updated(project *v3.Project) (runtime.Object, error) {
 	err := p.ensureNamespacesAssigned(project)
+	if err != nil {
+		return project, err
+	}
+	err = p.ensureProjectNS(project)
 	return project, err
 }
 
+// Remove runs lifecycle operations for a deleted project.
 func (p *pLifecycle) Remove(project *v3.Project) (runtime.Object, error) {
 	for _, suffix := range projectNSVerbToSuffix {
 		roleName := fmt.Sprintf(projectNSGetClusterRoleNameFmt, project.Name, suffix)
 
-		err := p.m.clusterRoles.Delete(roleName, &v1.DeleteOptions{})
+		err := p.m.clusterRoles.Delete(roleName, &metav1.DeleteOptions{})
 		if err != nil && !apierrors.IsNotFound(err) {
 			return project, err
 		}
@@ -65,7 +82,7 @@ func (p *pLifecycle) Remove(project *v3.Project) (runtime.Object, error) {
 	for _, o := range namespaces {
 		namespace, _ := o.(*corev1.Namespace)
 		if _, ok := namespace.Annotations["field.cattle.io/creatorId"]; ok {
-			err := p.m.namespaces.Delete(namespace.Name, &v1.DeleteOptions{})
+			err := p.m.namespaces.Delete(namespace.Name, &metav1.DeleteOptions{})
 			if err != nil && !apierrors.IsNotFound(err) {
 				return project, err
 			}
@@ -79,6 +96,18 @@ func (p *pLifecycle) Remove(project *v3.Project) (runtime.Object, error) {
 				}
 			}
 		}
+	}
+
+	projectNamespace, err := p.m.nsLister.Get("", project.Name)
+	if apierrors.IsNotFound(err) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	if _, ok := projectNamespace.Annotations[projectNamespaceAnnotation]; !ok { // let management controller handle local namespace projects
+		err = p.m.namespaces.Delete(project.Name, &metav1.DeleteOptions{})
+		return nil, err
 	}
 
 	return nil, nil
@@ -172,4 +201,39 @@ func getDefaultAndSystemProjectsToNamespaces() (map[string][]string, error) {
 		projectpkg.Default: {"default"},
 		projectpkg.System:  systemNamespaces,
 	}, nil
+}
+
+// ensureProjectNS creates a namespace representing the project in the downstream cluster
+// for the purpose of assign roles on it. This allows the resources.project.cattle.io API to work.
+func (p *pLifecycle) ensureProjectNS(project *v3.Project) error {
+	if p.m.clusterName == "local" {
+		// the management context will create the namespace backing for the project, don't interfere
+		return nil
+	}
+
+	namespace, err := p.m.nsLister.Get("", project.Name)
+	if err != nil && !apierrors.IsNotFound(err) {
+		return fmt.Errorf("error looking up namespace for project %s: %w", project.Name, err)
+	}
+	if namespace != nil {
+		labels := namespace.GetLabels() // downstream cluster namespace has the parent label
+		if _, ok := labels[projectresources.ParentLabel]; ok {
+			return nil
+		}
+		annotations := namespace.GetAnnotations() // local cluster namespace has the system-namespace annotation
+		if _, ok := annotations[projectNamespaceAnnotation]; ok {
+			return nil
+		}
+		return fmt.Errorf("failed to create namespace for project %s, a namespace with that name already exists", project.Name)
+	}
+	_, err = p.m.namespaces.Create(&corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   project.Name,
+			Labels: map[string]string{projectresources.ParentLabel: "true"},
+		},
+	})
+	if err != nil {
+		return fmt.Errorf("failed to create namespace for project %s: %w", project.Name, err)
+	}
+	return nil
 }

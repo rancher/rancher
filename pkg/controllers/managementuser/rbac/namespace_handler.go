@@ -1,12 +1,14 @@
 package rbac
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 	"time"
 
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/slice"
+	"github.com/rancher/rancher/pkg/api/steve/projectresources"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/resourcequota"
 	fleetconst "github.com/rancher/rancher/pkg/fleet"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
@@ -181,6 +183,10 @@ func IsFleetNamespace(ns *v1.Namespace) bool {
 }
 
 func (n *nsLifecycle) ensurePRTBAddToNamespace(ns *v1.Namespace) (bool, error) {
+	// Skip parent namespaces
+	if _, ok := ns.GetLabels()[projectresources.ParentLabel]; ok {
+		return false, nil
+	}
 	// Get project that contain this namespace
 	projectID := ns.Annotations[projectIDAnnotation]
 	if len(projectID) == 0 {
@@ -241,10 +247,15 @@ func (n *nsLifecycle) ensurePRTBAddToNamespace(ns *v1.Namespace) (bool, error) {
 		}
 
 		if err := n.m.ensureRoles(roles); err != nil {
+			if errors.Is(err, errNotReady) {
+				logrus.Debugf("not finished setting up project roles, retrying")
+				n.m.namespaces.Controller().EnqueueAfter("", ns.Name, enqueueAfterPeriod)
+				return false, nil
+			}
 			return false, fmt.Errorf("couldn't ensure roles: %w", err)
 		}
 
-		if err := n.m.ensureProjectRoleBindings(ns.Name, roles, prtb); err != nil {
+		if err := n.m.ensureProjectRoleBindings(ns.Name, roles, prtb, nil); err != nil {
 			return false, fmt.Errorf("couldn't ensure binding %s in %s: %w", prtb.Name, ns.Name, err)
 		}
 	}
