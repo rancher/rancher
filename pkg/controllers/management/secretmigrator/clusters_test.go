@@ -10,6 +10,7 @@ import (
 	"time"
 
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/controllers/management/secretmigrator/assemblers"
 	corefakes "github.com/rancher/rancher/pkg/generated/norman/core/v1/fakes"
 	v3fakes "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3/fakes"
 	rketypes "github.com/rancher/rke/types"
@@ -434,9 +435,9 @@ func TestMigrateRKESecrets(t *testing.T) {
 	cluster, err := h.migrateRKESecrets(testCluster)
 	assert.Nil(t, err)
 
-	type cleanupVerifyFunc func(t *testing.T, cluster *apimgmtv3.Cluster)
+	type verifyFunc func(t *testing.T, cluster *apimgmtv3.Cluster)
 
-	emptyStringCondition := func(fields ...string) cleanupVerifyFunc {
+	emptyStringCondition := func(fields ...string) verifyFunc {
 		return func(t *testing.T, cluster *apimgmtv3.Cluster) {
 			for _, field := range fields {
 				assert.Equal(t, "", field)
@@ -445,11 +446,13 @@ func TestMigrateRKESecrets(t *testing.T) {
 	}
 
 	tests := []struct {
-		name              string
-		cleanupVerifyFunc cleanupVerifyFunc
-		secretName        string
-		key               string
-		expected          string
+		name               string
+		cleanupVerifyFunc  verifyFunc
+		secretName         string
+		key                string
+		expected           string
+		assembler          assemblers.Assembler
+		assembleVerifyFunc verifyFunc
 	}{
 		{
 			name: "rkeSecretsEncryptionCustomConfig",
@@ -459,6 +462,10 @@ func TestMigrateRKESecrets(t *testing.T) {
 			secretName: cluster.Spec.ClusterSecrets.SecretsEncryptionProvidersSecret,
 			key:        SecretKey,
 			expected:   `[{"resources":null,"providers":[{"aesgcm":{"keys":[{"name":"testName","secret":"testSecret"}]}}]}]`,
+			assembler:  assemblers.AssembleSecretsEncryptionProvidersSecretCredential,
+			assembleVerifyFunc: func(t *testing.T, cluster *apimgmtv3.Cluster) {
+				assert.Equal(t, testCluster.Spec.RancherKubernetesEngineConfig.Services.KubeAPI.SecretsEncryptionConfig, cluster.Spec.RancherKubernetesEngineConfig.Services.KubeAPI.SecretsEncryptionConfig)
+			},
 		},
 		{
 			name:              "bastionHostSSHKey",
@@ -466,6 +473,10 @@ func TestMigrateRKESecrets(t *testing.T) {
 			secretName:        cluster.Spec.ClusterSecrets.BastionHostSSHKeySecret,
 			key:               SecretKey,
 			expected:          "sshKey",
+			assembler:         assemblers.AssembleBastionHostSSHKeyCredential,
+			assembleVerifyFunc: func(t *testing.T, cluster *apimgmtv3.Cluster) {
+				assert.Equal(t, testCluster.Spec.RancherKubernetesEngineConfig.BastionHost.SSHKey, cluster.Spec.RancherKubernetesEngineConfig.BastionHost.SSHKey)
+			},
 		},
 		{
 			name: "kubeletExtraEnv",
@@ -476,6 +487,10 @@ func TestMigrateRKESecrets(t *testing.T) {
 			secretName: cluster.Spec.ClusterSecrets.KubeletExtraEnvSecret,
 			key:        SecretKey,
 			expected:   "secret",
+			assembler:  assemblers.AssembleKubeletExtraEnvCredential,
+			assembleVerifyFunc: func(t *testing.T, cluster *apimgmtv3.Cluster) {
+				assert.Equal(t, testCluster.Spec.RancherKubernetesEngineConfig.Services.Kubelet.ExtraEnv, cluster.Spec.RancherKubernetesEngineConfig.Services.Kubelet.ExtraEnv)
+			},
 		},
 		{
 			name: "privateRegistryECR",
@@ -486,6 +501,10 @@ func TestMigrateRKESecrets(t *testing.T) {
 			secretName: cluster.Spec.ClusterSecrets.PrivateRegistryECRSecret,
 			key:        SecretKey,
 			expected:   `{"testurl":"{\"awsSecretAccessKey\":\"secret\",\"awsAccessToken\":\"token\"}"}`,
+			assembler:  assemblers.AssemblePrivateRegistryECRCredential,
+			assembleVerifyFunc: func(t *testing.T, cluster *apimgmtv3.Cluster) {
+				assert.Equal(t, testCluster.Spec.RancherKubernetesEngineConfig.PrivateRegistries, cluster.Spec.RancherKubernetesEngineConfig.PrivateRegistries)
+			},
 		},
 	}
 
@@ -496,6 +515,9 @@ func TestMigrateRKESecrets(t *testing.T) {
 			secret, err := h.migrator.secretLister.Get(secretsNS, tt.secretName)
 			assert.Nil(t, err)
 			assert.Equal(t, tt.expected, string(secret.Data[tt.key]))
+			cluster.Spec, err = tt.assembler(tt.secretName, "", "", cluster.Spec, h.migrator.secretLister)
+			assert.Nil(t, err)
+			tt.assembleVerifyFunc(t, cluster)
 		})
 	}
 

@@ -22,6 +22,8 @@ const (
 	SecretKey                   = "credential"
 )
 
+type Assembler func(secretRef, objType, objName string, spec apimgmtv3.ClusterSpec, secretLister v1.SecretLister) (apimgmtv3.ClusterSpec, error)
+
 // AssemblePrivateRegistryCredential looks up the registry Secret and inserts the keys into the PrivateRegistries list on the Cluster spec.
 // It returns a new copy of the spec without modifying the original. The Cluster is never updated.
 func AssemblePrivateRegistryCredential(secretRef, objType, objName string, spec apimgmtv3.ClusterSpec, secretLister v1.SecretLister) (apimgmtv3.ClusterSpec, error) {
