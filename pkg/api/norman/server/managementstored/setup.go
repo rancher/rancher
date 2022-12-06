@@ -95,6 +95,7 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 		client.NodePoolType,
 		client.NodeTemplateType,
 		client.NodeType,
+		client.PodSecurityAdmissionConfigurationTemplateType,
 		client.PodSecurityPolicyTemplateProjectBindingType,
 		client.PodSecurityPolicyTemplateType,
 		client.PreferenceType,
@@ -162,6 +163,7 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 	NodeTemplates(schemas, apiContext)
 	Project(schemas, apiContext)
 	ProjectRoleTemplateBinding(schemas, apiContext)
+	PodSecurityAdmissionConfigurationTemplate(schemas, apiContext)
 	PodSecurityPolicyTemplate(schemas, apiContext)
 	PodSecurityPolicyTemplateProjectBinding(schemas, apiContext)
 	GlobalRole(schemas, apiContext)
@@ -605,6 +607,10 @@ func Project(schemas *types.Schemas, management *config.ScaledContext) {
 		PSPTemplateLister: management.Management.PodSecurityPolicyTemplates("").Controller().Lister(),
 	}
 	schema.ActionHandler = handler.Actions
+}
+
+func PodSecurityAdmissionConfigurationTemplate(schemas *types.Schemas, management *config.ScaledContext) {
+	schemas.Schema(&managementschema.Version, client.PodSecurityAdmissionConfigurationTemplateType)
 }
 
 func PodSecurityPolicyTemplate(schemas *types.Schemas, management *config.ScaledContext) {

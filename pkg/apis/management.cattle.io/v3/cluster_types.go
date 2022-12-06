@@ -108,20 +108,21 @@ type Cluster struct {
 }
 
 type ClusterSpecBase struct {
-	DesiredAgentImage                    string                                  `json:"desiredAgentImage"`
-	DesiredAuthImage                     string                                  `json:"desiredAuthImage"`
-	AgentImageOverride                   string                                  `json:"agentImageOverride"`
-	AgentEnvVars                         []v1.EnvVar                             `json:"agentEnvVars,omitempty"`
-	RancherKubernetesEngineConfig        *rketypes.RancherKubernetesEngineConfig `json:"rancherKubernetesEngineConfig,omitempty"`
-	DefaultPodSecurityPolicyTemplateName string                                  `json:"defaultPodSecurityPolicyTemplateName,omitempty" norman:"type=reference[podSecurityPolicyTemplate]"`
-	DefaultClusterRoleForProjectMembers  string                                  `json:"defaultClusterRoleForProjectMembers,omitempty" norman:"type=reference[roleTemplate]"`
-	DockerRootDir                        string                                  `json:"dockerRootDir,omitempty" norman:"default=/var/lib/docker"`
-	EnableNetworkPolicy                  *bool                                   `json:"enableNetworkPolicy" norman:"default=false"`
-	EnableClusterAlerting                bool                                    `json:"enableClusterAlerting" norman:"default=false"`
-	EnableClusterMonitoring              bool                                    `json:"enableClusterMonitoring" norman:"default=false"`
-	WindowsPreferedCluster               bool                                    `json:"windowsPreferedCluster" norman:"noupdate"`
-	LocalClusterAuthEndpoint             LocalClusterAuthEndpoint                `json:"localClusterAuthEndpoint,omitempty"`
-	ClusterSecrets                       ClusterSecrets                          `json:"clusterSecrets" norman:"nocreate,noupdate"`
+	DesiredAgentImage                                    string                                  `json:"desiredAgentImage"`
+	DesiredAuthImage                                     string                                  `json:"desiredAuthImage"`
+	AgentImageOverride                                   string                                  `json:"agentImageOverride"`
+	AgentEnvVars                                         []v1.EnvVar                             `json:"agentEnvVars,omitempty"`
+	RancherKubernetesEngineConfig                        *rketypes.RancherKubernetesEngineConfig `json:"rancherKubernetesEngineConfig,omitempty"`
+	DefaultPodSecurityAdmissionConfigurationTemplateName string                                  `json:"defaultPodSecurityAdmissionConfigurationTemplateName,omitempty"`
+	DefaultPodSecurityPolicyTemplateName                 string                                  `json:"defaultPodSecurityPolicyTemplateName,omitempty" norman:"type=reference[podSecurityPolicyTemplate]"`
+	DefaultClusterRoleForProjectMembers                  string                                  `json:"defaultClusterRoleForProjectMembers,omitempty" norman:"type=reference[roleTemplate]"`
+	DockerRootDir                                        string                                  `json:"dockerRootDir,omitempty" norman:"default=/var/lib/docker"`
+	EnableNetworkPolicy                                  *bool                                   `json:"enableNetworkPolicy" norman:"default=false"`
+	EnableClusterAlerting                                bool                                    `json:"enableClusterAlerting" norman:"default=false"`
+	EnableClusterMonitoring                              bool                                    `json:"enableClusterMonitoring" norman:"default=false"`
+	WindowsPreferedCluster                               bool                                    `json:"windowsPreferedCluster" norman:"noupdate"`
+	LocalClusterAuthEndpoint                             LocalClusterAuthEndpoint                `json:"localClusterAuthEndpoint,omitempty"`
+	ClusterSecrets                                       ClusterSecrets                          `json:"clusterSecrets" norman:"nocreate,noupdate"`
 }
 
 type ClusterSpec struct {

@@ -29,6 +29,7 @@ var (
 	Schemas = factory.Schemas(&Version).
 		Init(nativeNodeTypes).
 		Init(nodeTypes).
+		Init(podSecurityAdmissionTypes).
 		Init(authzTypes).
 		Init(clusterTypes).
 		Init(catalogTypes).
@@ -299,6 +300,10 @@ func clusterTypes(schemas *types.Schemas) *types.Schemas {
 				Output: "saveAsTemplateOutput",
 			}
 		})
+}
+
+func podSecurityAdmissionTypes(schemas *types.Schemas) *types.Schemas {
+	return schemas.MustImport(&Version, v3.PodSecurityAdmissionConfigurationTemplate{})
 }
 
 func authzTypes(schemas *types.Schemas) *types.Schemas {
