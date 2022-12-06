@@ -171,7 +171,7 @@ func getSearchURL(issuer string) (string, error) {
 	}
 	iss = strings.SplitN(issuer, "/realms/", 2) // keycloak >= 19 doesn't have auth prefix
 	if len(iss) == 2 {
-		return fmt.Sprintf("%s/admin/realms/%s", iss[0], strings.Join(iss[1:], "")), nil
+		return fmt.Sprintf("%s/admin/realms/%s", iss[0], iss[1]), nil
 	}
 	return "", fmt.Errorf("can't parse issuer url")
 }
