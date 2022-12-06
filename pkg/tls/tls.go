@@ -36,6 +36,7 @@ import (
 )
 
 const (
+	InternalCA         = "tls-rancher-internal-ca"
 	rancherCertFile    = "/etc/rancher/ssl/cert.pem"
 	rancherKeyFile     = "/etc/rancher/ssl/key.pem"
 	rancherCACertsFile = "/etc/rancher/ssl/cacerts.pem"
@@ -105,10 +106,15 @@ func ListenAndServe(ctx context.Context, restConfig *rest.Config, handler http.H
 	serverOptions := &server.ListenOpts{
 		Storage:       opts.Storage,
 		Secrets:       opts.Secrets,
-		CAName:        "tls-rancher-internal-ca",
+		CAName:        InternalCA,
 		CANamespace:   namespace.System,
 		CertNamespace: namespace.System,
 		CertName:      "tls-rancher-internal",
+		TLSListenerConfig: dynamiclistener.Config{
+			TLSConfig: &tls.Config{
+				ClientAuth: tls.RequestClientCert, // makes the client cert available in the http.Request if an endpoint wants to verify it, ignored if not provided
+			},
+		},
 	}
 	clusterIP, err := getClusterIP(core.Core().V1().Service())
 	if err != nil {
@@ -123,9 +129,7 @@ func ListenAndServe(ctx context.Context, restConfig *rest.Config, handler http.H
 		hostIPs = append(hostIPs, clusterIP)
 	}
 	if len(hostIPs) > 0 {
-		serverOptions.TLSListenerConfig = dynamiclistener.Config{
-			SANs: hostIPs,
-		}
+		serverOptions.TLSListenerConfig.SANs = hostIPs
 	}
 
 	internalAPICtx := context.WithValue(ctx, InternalAPI, true)

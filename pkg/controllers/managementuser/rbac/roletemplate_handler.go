@@ -8,6 +8,7 @@ import (
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/wrangler/pkg/relatedresource"
+	"github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -76,6 +77,11 @@ func (c *rtSync) syncRT(template *v3.RoleTemplate, usedInProjects bool, prtbs []
 	}
 
 	if err := c.m.ensureRoles(roles); err != nil {
+		if errors.Is(err, errNotReady) {
+			logrus.Debugf("not finished setting up project roles, retrying")
+			c.m.roleTemplates.Controller().EnqueueAfter(template.Namespace, template.Name, enqueueAfterPeriod)
+			return nil
+		}
 		return fmt.Errorf("couldn't ensure roles: %w", err)
 	}
 
@@ -133,10 +139,15 @@ func (c *rtSync) syncRT(template *v3.RoleTemplate, usedInProjects bool, prtbs []
 			if !ns.DeletionTimestamp.IsZero() {
 				continue
 			}
-			if err := c.m.ensureProjectRoleBindings(ns.Name, roles, prtb); err != nil {
+			if err := c.m.ensureProjectRoleBindings(ns.Name, roles, prtb, nil); err != nil {
 				return fmt.Errorf("couldn't ensure binding %s in %s: %w", prtb.Name, ns.Name, err)
 			}
 		}
+		err = c.m.ensureProjectResourcesRoleBindings(prtb.Namespace, roles, prtb)
+		if err != nil {
+			return fmt.Errorf("couldn't ensure project resources bindings for prtb %s: %w", prtb.Name, err)
+		}
+
 	}
 
 	for _, obj := range crtbs {
@@ -144,8 +155,11 @@ func (c *rtSync) syncRT(template *v3.RoleTemplate, usedInProjects bool, prtbs []
 		if !ok {
 			continue
 		}
-		if err := c.m.ensureClusterBindings(roles, crtb); err != nil {
-			return err
+		if err := c.m.ensureClusterBindings(roles, crtb, nil, nil); err != nil {
+			return fmt.Errorf("couldn't ensure binding %s: %w", crtb.Name, err)
+		}
+		if err := c.m.ensureProjectResourcesClusterRoleBindings(roles, crtb); err != nil {
+			return fmt.Errorf("couldn't ensure project resources bindings for crtb %s: %w", crtb.Name, err)
 		}
 	}
 	return nil

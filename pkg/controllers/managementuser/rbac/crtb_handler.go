@@ -1,11 +1,13 @@
 package rbac
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/hashicorp/go-multierror"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	pkgrbac "github.com/rancher/rancher/pkg/rbac"
+	"github.com/rancher/wrangler/pkg/generic"
 	"github.com/sirupsen/logrus"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -62,11 +64,20 @@ func (c *crtbLifecycle) syncCRTB(binding *v3.ClusterRoleTemplateBinding) error {
 	}
 
 	if err := c.m.ensureRoles(roles); err != nil {
+		if errors.Is(err, errNotReady) {
+			logrus.Debugf("not finished setting up project roles, retrying")
+			c.m.crtbs.Controller().EnqueueAfter(binding.Namespace, binding.Name, enqueueAfterPeriod)
+			return generic.ErrSkip
+		}
 		return fmt.Errorf("couldn't ensure roles: %w", err)
 	}
 
-	if err := c.m.ensureClusterBindings(roles, binding); err != nil {
-		return fmt.Errorf("couldn't ensure cluster bindings %s: %w", binding, err)
+	if err := c.m.ensureClusterBindings(roles, binding, nil, nil); err != nil {
+		return fmt.Errorf("couldn't ensure cluster binding %s: %w", binding.Name, err)
+	}
+
+	if err := c.m.ensureProjectResourcesClusterRoleBindings(roles, binding); err != nil {
+		return fmt.Errorf("couldn't ensure project resources bindings for crtb %s: %w", binding.Name, err)
 	}
 
 	if binding.UserName != "" {
@@ -80,14 +91,13 @@ func (c *crtbLifecycle) syncCRTB(binding *v3.ClusterRoleTemplateBinding) error {
 
 func (c *crtbLifecycle) ensureCRTBDelete(binding *v3.ClusterRoleTemplateBinding) error {
 	set := labels.Set(map[string]string{rtbOwnerLabel: pkgrbac.GetRTBLabel(binding.ObjectMeta)})
-	bindingCli := c.m.workload.RBAC.ClusterRoleBindings("")
 	rbs, err := c.m.crbLister.List("", set.AsSelector())
 	if err != nil {
 		return fmt.Errorf("couldn't list clusterrolebindings with selector %s: %w", set.AsSelector(), err)
 	}
 
 	for _, rb := range rbs {
-		if err := bindingCli.Delete(rb.Name, &metav1.DeleteOptions{}); err != nil {
+		if err := c.m.clusterRoleBindings.Delete(rb.Name, &metav1.DeleteOptions{}); err != nil {
 			if !apierrors.IsNotFound(err) {
 				return fmt.Errorf("error deleting clusterrolebinding %s: %w", rb.Name, err)
 			}

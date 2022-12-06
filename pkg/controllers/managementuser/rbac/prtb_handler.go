@@ -1,6 +1,7 @@
 package rbac
 
 import (
+	"errors"
 	"fmt"
 	"reflect"
 	"sort"
@@ -106,6 +107,11 @@ func (p *prtbLifecycle) syncPRTB(binding *v3.ProjectRoleTemplateBinding) error {
 	}
 
 	if err := p.m.ensureRoles(roles); err != nil {
+		if errors.Is(err, errNotReady) {
+			logrus.Debugf("not finished setting up project roles, retrying")
+			p.m.prtbs.Controller().EnqueueAfter(binding.Namespace, binding.Name, enqueueAfterPeriod)
+			return nil
+		}
 		return fmt.Errorf("couldn't ensure roles: %w", err)
 	}
 
@@ -114,9 +120,13 @@ func (p *prtbLifecycle) syncPRTB(binding *v3.ProjectRoleTemplateBinding) error {
 		if !ns.DeletionTimestamp.IsZero() {
 			continue
 		}
-		if err := p.m.ensureProjectRoleBindings(ns.Name, roles, binding); err != nil {
+		if err := p.m.ensureProjectRoleBindings(ns.Name, roles, binding, nil); err != nil {
 			return fmt.Errorf("couldn't ensure binding %s in %s: %w", binding.Name, ns.Name, err)
 		}
+	}
+
+	if err := p.m.ensureProjectResourcesRoleBindings(binding.Namespace, roles, binding); err != nil {
+		return fmt.Errorf("couldn't ensure project resources bindings for prtb %s: %w", binding.Name, err)
 	}
 
 	if binding.UserName != "" {
@@ -134,21 +144,32 @@ func (p *prtbLifecycle) ensurePRTBDelete(binding *v3.ProjectRoleTemplateBinding)
 	if err != nil {
 		return fmt.Errorf("couldn't list namespaces with project ID %s: %w", binding.ProjectName, err)
 	}
-
 	set := labels.Set(map[string]string{rtbOwnerLabel: pkgrbac.GetRTBLabel(binding.ObjectMeta)})
 	for _, n := range namespaces {
 		ns := n.(*v1.Namespace)
-		bindingCli := p.m.workload.RBAC.RoleBindings(ns.Name)
 		rbs, err := p.m.rbLister.List(ns.Name, set.AsSelector())
 		if err != nil {
 			return fmt.Errorf("couldn't list rolebindings with selector %s: %w", set.AsSelector(), err)
 		}
 
 		for _, rb := range rbs {
-			if err := bindingCli.Delete(rb.Name, &metav1.DeleteOptions{}); err != nil {
+			if err := p.m.roleBindings.DeleteNamespaced(rb.Namespace, rb.Name, &metav1.DeleteOptions{}); err != nil {
 				if !apierrors.IsNotFound(err) {
-					return fmt.Errorf("error deleting rolebinding %s: %w", rb.Name, err)
+					return fmt.Errorf("error deleting rolebinding %s/%s: %w", rb.Namespace, rb.Name, err)
 				}
+			}
+		}
+	}
+
+	// delete rolebindings in the project namespace itself
+	rbs, err := p.m.rbLister.List(binding.Namespace, set.AsSelector())
+	if err != nil {
+		return fmt.Errorf("couldn't list rolebindings with selector %s: %w", set.AsSelector(), err)
+	}
+	for _, rb := range rbs {
+		if err := p.m.roleBindings.DeleteNamespaced(rb.Namespace, rb.Name, &metav1.DeleteOptions{}); err != nil {
+			if !apierrors.IsNotFound(err) {
+				return fmt.Errorf("error deleting rolebinding %s/%s: %w", rb.Namespace, rb.Name, err)
 			}
 		}
 	}

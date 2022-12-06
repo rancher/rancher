@@ -63,6 +63,7 @@ func BaseTLSConfig() (*tls.Config, error) {
 		PreferServerCipherSuites: true,
 		MinVersion:               TLSMinVersion,
 		CipherSuites:             TLSCiphers,
+		ClientAuth:               tls.RequestClientCert, // makes the client cert available in the http.Request if an endpoint wants to verify it, ignored if not provided
 	}, nil
 }
 
