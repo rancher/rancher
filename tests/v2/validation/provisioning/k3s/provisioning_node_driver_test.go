@@ -46,7 +46,7 @@ func (k *K3SNodeDriverProvisioningTestSuite) SetupSuite() {
 	clustersConfig := new(provisioning.Config)
 	config.LoadConfig(provisioning.ConfigurationFileKey, clustersConfig)
 
-	k.kubernetesVersions = clustersConfig.KubernetesVersions
+	k.kubernetesVersions = clustersConfig.K3SKubernetesVersions
 	k.providers = clustersConfig.Providers
 
 	client, err := rancher.NewClient("", testSession)
