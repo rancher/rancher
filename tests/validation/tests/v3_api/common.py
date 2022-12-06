@@ -878,6 +878,19 @@ def check_if_ok(url, verify=False, headers={}):
         print("Connection Error - " + url)
         return False
 
+def retry_cmd_validate_expected(pod, cmd, expected, timeout=300):
+    start = time.time()
+    timeout = start + timeout
+    cmd_output = kubectl_pod_exec(pod, cmd)
+    decode_cmd = cmd_output.decode('utf-8')
+    while time.time() < timeout:
+        if any(x in str(cmd_output) for x in expected):
+            return decode_cmd
+        time.sleep(5)
+        cmd_output = kubectl_pod_exec(pod, cmd)
+        decode_cmd = cmd_output.decode('utf-8')
+    raise AssertionError(
+        "Timed out waiting to get expected output")
 
 def validate_http_response(cmd, target_name_list, client_pod=None,
                            insecure=False):
@@ -900,8 +913,7 @@ def validate_http_response(cmd, target_name_list, client_pod=None,
             else:
                 wget_cmd = "wget -qO- " + cmd
             time.sleep(6)
-            result = kubectl_pod_exec(client_pod, wget_cmd)
-            result = result.decode()
+            result = retry_cmd_validate_expected(client_pod, wget_cmd, target_name_list)
         if result is not None:
             result = result.rstrip()
             assert result in target_name_list
@@ -1008,8 +1020,9 @@ def validate_dns_record(pod, record, expected, port=TEST_IMAGE_PORT):
         record["name"], record["namespaceId"])
     validate_dns_entry(pod, host, expected, port=port)
 
-def retry_dig(host, pod, expected, retry_count=3):
-    for i in range(0, retry_count):
+def retry_dig(host, pod, expected, timeout=300):
+    start = 0
+    while start < timeout:
         dig_cmd = 'dig {0} +short'.format(host)
         dig_output = kubectl_pod_exec(pod, dig_cmd)
         decode_dig = dig_output.decode('utf-8')
@@ -1018,9 +1031,10 @@ def retry_dig(host, pod, expected, retry_count=3):
         expected_length = len(expected)
         if dig_length >= expected_length:
             return dig_output
-        elif dig_length < expected_length:
-            time.sleep(3)
-    pytest.fail(f"failed to get the expected number of dns hosts from dig")
+        start += 5
+        time.sleep(5)
+    raise AssertionError(
+        "Timed out waiting to get expected output")
 
 def validate_dns_entry(pod, host, expected, port=TEST_IMAGE_PORT, retry_count=3):
     if is_windows():
@@ -1031,16 +1045,8 @@ def validate_dns_entry(pod, host, expected, port=TEST_IMAGE_PORT, retry_count=3)
     if HARDENED_CLUSTER:
         cmd = 'curl -vs {}:{} 2>&1'.format(host, port)
     else:
-        cmd = 'ping -c 1 -W 1 {0}'.format(host)
-    cmd_output = kubectl_pod_exec(pod, cmd)
-
-    if str(pod.name) not in str(cmd_output):
-        for i in range(0, retry_count):
-            cmd_output = kubectl_pod_exec(pod, cmd)
-            if str(pod.name) in str(cmd_output):
-                break
-            else:
-                time.sleep(5)
+        cmd = 'ping -c 2 -W 2 {0}'.format(host)
+    cmd_output = retry_cmd_validate_expected(pod, cmd, expected)
 
     connectivity_validation_pass = False
     for expected_value in expected:
@@ -1302,7 +1308,7 @@ def check_connectivity_between_pods(pod1, pod2, allow_connectivity=True):
     else:
         cmd = "ping -c 1 -W 1 " + pod_ip
 
-    response = kubectl_pod_exec(pod1, cmd)
+    response = retry_cmd_validate_expected(pod1, cmd, pod_ip)
     if not HARDENED_CLUSTER:
         assert pod_ip in str(response)
     if allow_connectivity:
