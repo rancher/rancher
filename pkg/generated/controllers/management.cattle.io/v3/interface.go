@@ -81,6 +81,7 @@ type Interface interface {
 	Notifier() NotifierController
 	OIDCProvider() OIDCProviderController
 	OpenLdapProvider() OpenLdapProviderController
+	PodSecurityAdmissionConfigurationTemplate() PodSecurityAdmissionConfigurationTemplateController
 	PodSecurityPolicyTemplate() PodSecurityPolicyTemplateController
 	PodSecurityPolicyTemplateProjectBinding() PodSecurityPolicyTemplateProjectBindingController
 	Preference() PreferenceController
@@ -272,6 +273,9 @@ func (c *version) OIDCProvider() OIDCProviderController {
 }
 func (c *version) OpenLdapProvider() OpenLdapProviderController {
 	return NewOpenLdapProviderController(schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "OpenLdapProvider"}, "openldapproviders", false, c.controllerFactory)
+}
+func (c *version) PodSecurityAdmissionConfigurationTemplate() PodSecurityAdmissionConfigurationTemplateController {
+	return NewPodSecurityAdmissionConfigurationTemplateController(schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "PodSecurityAdmissionConfigurationTemplate"}, "podsecurityadmissionconfigurationtemplates", true, c.controllerFactory)
 }
 func (c *version) PodSecurityPolicyTemplate() PodSecurityPolicyTemplateController {
 	return NewPodSecurityPolicyTemplateController(schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "PodSecurityPolicyTemplate"}, "podsecuritypolicytemplates", false, c.controllerFactory)
