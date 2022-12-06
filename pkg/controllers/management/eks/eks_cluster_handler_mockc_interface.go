@@ -71,6 +71,14 @@ func (m MockClusterClient) Patch(name string, pt types.PatchType, data []byte, s
 
 type MockNamespaceableResourceInterfaceDefault struct{}
 
+func (m MockNamespaceableResourceInterfaceDefault) Apply(ctx context.Context, name string, obj *unstructured.Unstructured, options meta1.ApplyOptions, subresources ...string) (*unstructured.Unstructured, error) {
+	panic("implement me")
+}
+
+func (m MockNamespaceableResourceInterfaceDefault) ApplyStatus(ctx context.Context, name string, obj *unstructured.Unstructured, options meta1.ApplyOptions) (*unstructured.Unstructured, error) {
+	panic("implement me")
+}
+
 func (m MockNamespaceableResourceInterfaceDefault) Namespace(s string) dynamic.ResourceInterface {
 	return MockResourceInterfaceDefault{}
 }
@@ -149,9 +157,24 @@ func (m MockResourceInterfaceDefault) Patch(ctx context.Context, name string, pt
 	panic("implement me")
 }
 
+func (m MockResourceInterfaceDefault) Apply(ctx context.Context, name string, obj *unstructured.Unstructured, options meta1.ApplyOptions, subresources ...string) (*unstructured.Unstructured, error) {
+	panic("implement me")
+}
+func (m MockResourceInterfaceDefault) ApplyStatus(ctx context.Context, name string, obj *unstructured.Unstructured, options meta1.ApplyOptions) (*unstructured.Unstructured, error) {
+	panic("implement me")
+}
+
 // Test 2 - cluster in creating state
 
 type MockNamespaceableResourceInterfaceCreate struct{}
+
+func (m MockNamespaceableResourceInterfaceCreate) Apply(ctx context.Context, name string, obj *unstructured.Unstructured, options meta1.ApplyOptions, subresources ...string) (*unstructured.Unstructured, error) {
+	panic("implement me")
+}
+
+func (m MockNamespaceableResourceInterfaceCreate) ApplyStatus(ctx context.Context, name string, obj *unstructured.Unstructured, options meta1.ApplyOptions) (*unstructured.Unstructured, error) {
+	panic("implement me")
+}
 
 func (m MockNamespaceableResourceInterfaceCreate) Namespace(s string) dynamic.ResourceInterface {
 	return MockResourceInterfaceCreate{}
@@ -231,9 +254,25 @@ func (m MockResourceInterfaceCreate) Patch(ctx context.Context, name string, pt 
 	panic("implement me")
 }
 
+func (m MockResourceInterfaceCreate) Apply(ctx context.Context, name string, obj *unstructured.Unstructured, options meta1.ApplyOptions, subresources ...string) (*unstructured.Unstructured, error) {
+	panic("implement me")
+}
+
+func (m MockResourceInterfaceCreate) ApplyStatus(ctx context.Context, name string, obj *unstructured.Unstructured, options meta1.ApplyOptions) (*unstructured.Unstructured, error) {
+	panic("implement me")
+}
+
 // Test 3 - cluster in active state
 
 type MockNamespaceableResourceInterfaceActive struct{}
+
+func (m MockNamespaceableResourceInterfaceActive) Apply(ctx context.Context, name string, obj *unstructured.Unstructured, options meta1.ApplyOptions, subresources ...string) (*unstructured.Unstructured, error) {
+	panic("implement me")
+}
+
+func (m MockNamespaceableResourceInterfaceActive) ApplyStatus(ctx context.Context, name string, obj *unstructured.Unstructured, options meta1.ApplyOptions) (*unstructured.Unstructured, error) {
+	panic("implement me")
+}
 
 func (m MockNamespaceableResourceInterfaceActive) Namespace(s string) dynamic.ResourceInterface {
 	return MockResourceInterfaceActive{}
@@ -313,9 +352,27 @@ func (m MockResourceInterfaceActive) Patch(ctx context.Context, name string, pt 
 	panic("implement me")
 }
 
+func (m MockResourceInterfaceActive) Apply(ctx context.Context, name string, obj *unstructured.Unstructured, options meta1.ApplyOptions, subresources ...string) (*unstructured.Unstructured, error) {
+	// TODO implement me
+	panic("implement me")
+}
+
+func (m MockResourceInterfaceActive) ApplyStatus(ctx context.Context, name string, obj *unstructured.Unstructured, options meta1.ApplyOptions) (*unstructured.Unstructured, error) {
+	// TODO implement me
+	panic("implement me")
+}
+
 // Test 4 - cluster in update node pool state
 
 type MockNamespaceableResourceInterfaceUpdate struct{}
+
+func (m MockNamespaceableResourceInterfaceUpdate) Apply(ctx context.Context, name string, obj *unstructured.Unstructured, options meta1.ApplyOptions, subresources ...string) (*unstructured.Unstructured, error) {
+	panic("implement me")
+}
+
+func (m MockNamespaceableResourceInterfaceUpdate) ApplyStatus(ctx context.Context, name string, obj *unstructured.Unstructured, options meta1.ApplyOptions) (*unstructured.Unstructured, error) {
+	panic("implement me")
+}
 
 func (m MockNamespaceableResourceInterfaceUpdate) Namespace(s string) dynamic.ResourceInterface {
 	return MockResourceInterfaceUpdate{}
@@ -395,9 +452,25 @@ func (m MockResourceInterfaceUpdate) Patch(ctx context.Context, name string, pt 
 	panic("implement me")
 }
 
+func (m MockResourceInterfaceUpdate) Apply(ctx context.Context, name string, obj *unstructured.Unstructured, options meta1.ApplyOptions, subresources ...string) (*unstructured.Unstructured, error) {
+	panic("implement me")
+}
+
+func (m MockResourceInterfaceUpdate) ApplyStatus(ctx context.Context, name string, obj *unstructured.Unstructured, options meta1.ApplyOptions) (*unstructured.Unstructured, error) {
+	panic("implement me")
+}
+
 // Test UpdateEksClusterConfig
 
 type MockNamespaceableResourceInterfaceEksCC struct{}
+
+func (m MockNamespaceableResourceInterfaceEksCC) Apply(ctx context.Context, name string, obj *unstructured.Unstructured, options meta1.ApplyOptions, subresources ...string) (*unstructured.Unstructured, error) {
+	panic("implement me")
+}
+
+func (m MockNamespaceableResourceInterfaceEksCC) ApplyStatus(ctx context.Context, name string, obj *unstructured.Unstructured, options meta1.ApplyOptions) (*unstructured.Unstructured, error) {
+	panic("implement me")
+}
 
 func (m MockNamespaceableResourceInterfaceEksCC) Namespace(s string) dynamic.ResourceInterface {
 	return MockResourceInterfaceEksCC{}
@@ -474,6 +547,14 @@ func (m MockResourceInterfaceEksCC) List(ctx context.Context, opts meta1.ListOpt
 		},
 		Items: nil,
 	}, nil
+}
+
+func (m MockResourceInterfaceEksCC) Apply(ctx context.Context, name string, obj *unstructured.Unstructured, options meta1.ApplyOptions, subresources ...string) (*unstructured.Unstructured, error) {
+	panic("implement me")
+}
+
+func (m MockResourceInterfaceEksCC) ApplyStatus(ctx context.Context, name string, obj *unstructured.Unstructured, options meta1.ApplyOptions) (*unstructured.Unstructured, error) {
+	panic("implement me")
 }
 
 // mock interface that returns a watch event (for updateEksClusterConfig test)
