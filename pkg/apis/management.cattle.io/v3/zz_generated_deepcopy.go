@@ -2481,11 +2481,6 @@ func (in *ClusterSpecBase) DeepCopyInto(out *ClusterSpecBase) {
 		**out = **in
 	}
 	out.LocalClusterAuthEndpoint = in.LocalClusterAuthEndpoint
-	if in.ScheduledClusterScan != nil {
-		in, out := &in.ScheduledClusterScan, &out.ScheduledClusterScan
-		*out = new(ScheduledClusterScan)
-		(*in).DeepCopyInto(*out)
-	}
 	out.ClusterSecrets = in.ClusterSecrets
 	return
 }
@@ -2580,11 +2575,6 @@ func (in *ClusterStatus) DeepCopyInto(out *ClusterStatus) {
 		for key, val := range *in {
 			(*out)[key] = val
 		}
-	}
-	if in.ScheduledClusterScanStatus != nil {
-		in, out := &in.ScheduledClusterScanStatus, &out.ScheduledClusterScanStatus
-		*out = new(ScheduledClusterScanStatus)
-		**out = **in
 	}
 	in.AKSStatus.DeepCopyInto(&out.AKSStatus)
 	in.EKSStatus.DeepCopyInto(&out.EKSStatus)

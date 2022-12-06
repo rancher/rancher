@@ -73,8 +73,6 @@ const (
 	ClusterFieldRequested                            = "requested"
 	ClusterFieldRke2Config                           = "rke2Config"
 	ClusterFieldS3CredentialSecret                   = "s3CredentialSecret"
-	ClusterFieldScheduledClusterScan                 = "scheduledClusterScan"
-	ClusterFieldScheduledClusterScanStatus           = "scheduledClusterScanStatus"
 	ClusterFieldServiceAccountTokenSecret            = "serviceAccountTokenSecret"
 	ClusterFieldState                                = "state"
 	ClusterFieldTransitioning                        = "transitioning"
@@ -157,8 +155,6 @@ type Cluster struct {
 	Requested                            map[string]string              `json:"requested,omitempty" yaml:"requested,omitempty"`
 	Rke2Config                           *Rke2Config                    `json:"rke2Config,omitempty" yaml:"rke2Config,omitempty"`
 	S3CredentialSecret                   string                         `json:"s3CredentialSecret,omitempty" yaml:"s3CredentialSecret,omitempty"`
-	ScheduledClusterScan                 *ScheduledClusterScan          `json:"scheduledClusterScan,omitempty" yaml:"scheduledClusterScan,omitempty"`
-	ScheduledClusterScanStatus           *ScheduledClusterScanStatus    `json:"scheduledClusterScanStatus,omitempty" yaml:"scheduledClusterScanStatus,omitempty"`
 	ServiceAccountTokenSecret            string                         `json:"serviceAccountTokenSecret,omitempty" yaml:"serviceAccountTokenSecret,omitempty"`
 	State                                string                         `json:"state,omitempty" yaml:"state,omitempty"`
 	Transitioning                        string                         `json:"transitioning,omitempty" yaml:"transitioning,omitempty"`

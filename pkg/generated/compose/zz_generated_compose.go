@@ -66,8 +66,6 @@ type Config struct {
 	RkeK8sSystemImages                       map[string]managementClient.RkeK8sSystemImage                       `json:"rkeK8sSystemImages,omitempty" yaml:"rkeK8sSystemImages,omitempty"`
 	RkeK8sServiceOptions                     map[string]managementClient.RkeK8sServiceOption                     `json:"rkeK8sServiceOptions,omitempty" yaml:"rkeK8sServiceOptions,omitempty"`
 	RkeAddons                                map[string]managementClient.RkeAddon                                `json:"rkeAddons,omitempty" yaml:"rkeAddons,omitempty"`
-	CisConfigs                               map[string]managementClient.CisConfig                               `json:"cisConfigs,omitempty" yaml:"cisConfigs,omitempty"`
-	CisBenchmarkVersions                     map[string]managementClient.CisBenchmarkVersion                     `json:"cisBenchmarkVersions,omitempty" yaml:"cisBenchmarkVersions,omitempty"`
 	FleetWorkspaces                          map[string]managementClient.FleetWorkspace                          `json:"fleetWorkspaces,omitempty" yaml:"fleetWorkspaces,omitempty"`
 	RancherUserNotifications                 map[string]managementClient.RancherUserNotification                 `json:"rancherUserNotifications,omitempty" yaml:"rancherUserNotifications,omitempty"`
 
