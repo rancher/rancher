@@ -424,9 +424,9 @@ func TestMigrateRKESecrets(t *testing.T) {
 	cluster, err := h.migrateRKESecrets(testCluster)
 	assert.Nil(t, err)
 
-	type cleanupVerifyFunc func(t *testing.T, cluster *apimgmtv3.Cluster)
+	type verifyFunc func(t *testing.T, cluster *apimgmtv3.Cluster)
 
-	emptyStringCondition := func(fields ...string) cleanupVerifyFunc {
+	emptyStringCondition := func(fields ...string) verifyFunc {
 		return func(t *testing.T, cluster *apimgmtv3.Cluster) {
 			for _, field := range fields {
 				assert.Equal(t, "", field)
@@ -435,11 +435,13 @@ func TestMigrateRKESecrets(t *testing.T) {
 	}
 
 	tests := []struct {
-		name              string
-		cleanupVerifyFunc cleanupVerifyFunc
-		secretName        string
-		key               string
-		expected          string
+		name               string
+		cleanupVerifyFunc  verifyFunc
+		secretName         string
+		key                string
+		expected           string
+		assembler          Assembler
+		assembleVerifyFunc verifyFunc
 	}{
 		{
 			name: "rkeSecretsEncryptionCustomConfig",
@@ -448,7 +450,11 @@ func TestMigrateRKESecrets(t *testing.T) {
 			},
 			secretName: cluster.Spec.ClusterSecrets.SecretsEncryptionProvidersSecret,
 			key:        SecretKey,
-			expected:   `[{"resources":null,"providers":[{"aesgcm":{"keys":[{"name":"testName","secret":"testSecret"}]}}]}]`,
+			expected:   `[{"Resources":null,"Providers":[{"AESGCM":{"Keys":[{"Name":"testName","Secret":"testSecret"}]},"AESCBC":null,"Secretbox":null,"Identity":null,"KMS":null}]}]`,
+			assembler:  AssembleSecretsEncryptionProvidersSecretCredential,
+			assembleVerifyFunc: func(t *testing.T, cluster *apimgmtv3.Cluster) {
+				assert.Equal(t, testCluster.Spec.RancherKubernetesEngineConfig.Services.KubeAPI.SecretsEncryptionConfig, cluster.Spec.RancherKubernetesEngineConfig.Services.KubeAPI.SecretsEncryptionConfig)
+			},
 		},
 		{
 			name:              "bastionHostSSHKey",
@@ -456,6 +462,10 @@ func TestMigrateRKESecrets(t *testing.T) {
 			secretName:        cluster.Spec.ClusterSecrets.BastionHostSSHKeySecret,
 			key:               SecretKey,
 			expected:          "sshKey",
+			assembler:         AssembleBastionHostSSHKeyCredential,
+			assembleVerifyFunc: func(t *testing.T, cluster *apimgmtv3.Cluster) {
+				assert.Equal(t, testCluster.Spec.RancherKubernetesEngineConfig.BastionHost.SSHKey, cluster.Spec.RancherKubernetesEngineConfig.BastionHost.SSHKey)
+			},
 		},
 		{
 			name: "kubeletExtraEnv",
@@ -466,6 +476,10 @@ func TestMigrateRKESecrets(t *testing.T) {
 			secretName: cluster.Spec.ClusterSecrets.KubeletExtraEnvSecret,
 			key:        SecretKey,
 			expected:   "secret",
+			assembler:  AssembleKubeletExtraEnvCredential,
+			assembleVerifyFunc: func(t *testing.T, cluster *apimgmtv3.Cluster) {
+				assert.Equal(t, testCluster.Spec.RancherKubernetesEngineConfig.Services.Kubelet.ExtraEnv, cluster.Spec.RancherKubernetesEngineConfig.Services.Kubelet.ExtraEnv)
+			},
 		},
 	}
 
@@ -476,6 +490,9 @@ func TestMigrateRKESecrets(t *testing.T) {
 			secret, err := h.migrator.secretLister.Get(secretsNS, tt.secretName)
 			assert.Nil(t, err)
 			assert.Equal(t, tt.expected, string(secret.Data[tt.key]))
+			cluster.Spec, err = tt.assembler(tt.secretName, "", "", cluster.Spec, h.migrator.secretLister)
+			assert.Nil(t, err)
+			tt.assembleVerifyFunc(t, cluster)
 		})
 	}
 
