@@ -3,6 +3,7 @@ package client
 const (
 	AciNetworkProviderType                                   = "aciNetworkProvider"
 	AciNetworkProviderFieldAEP                               = "aep"
+	AciNetworkProviderFieldAddExternalSubnetsToRdconfig      = "addExternalSubnetsToRdconfig"
 	AciNetworkProviderFieldApicHosts                         = "apicHosts"
 	AciNetworkProviderFieldApicRefreshTickerAdjust           = "apicRefreshTickerAdjust"
 	AciNetworkProviderFieldApicRefreshTime                   = "apicRefreshTime"
@@ -39,6 +40,7 @@ const (
 	AciNetworkProviderFieldMcastRangeStart                   = "mcastRangeStart"
 	AciNetworkProviderFieldMultusDisable                     = "multusDisable"
 	AciNetworkProviderFieldNoPriorityClass                   = "noPriorityClass"
+	AciNetworkProviderFieldNoWaitForServiceEpReadiness       = "noWaitForServiceEpReadiness"
 	AciNetworkProviderFieldNodePodIfEnable                   = "nodePodIfEnable"
 	AciNetworkProviderFieldNodeSubnet                        = "nodeSubnet"
 	AciNetworkProviderFieldOVSMemoryLimit                    = "ovsMemoryLimit"
@@ -80,6 +82,7 @@ const (
 
 type AciNetworkProvider struct {
 	AEP                               string   `json:"aep,omitempty" yaml:"aep,omitempty"`
+	AddExternalSubnetsToRdconfig      string   `json:"addExternalSubnetsToRdconfig,omitempty" yaml:"addExternalSubnetsToRdconfig,omitempty"`
 	ApicHosts                         []string `json:"apicHosts,omitempty" yaml:"apicHosts,omitempty"`
 	ApicRefreshTickerAdjust           string   `json:"apicRefreshTickerAdjust,omitempty" yaml:"apicRefreshTickerAdjust,omitempty"`
 	ApicRefreshTime                   string   `json:"apicRefreshTime,omitempty" yaml:"apicRefreshTime,omitempty"`
@@ -116,6 +119,7 @@ type AciNetworkProvider struct {
 	McastRangeStart                   string   `json:"mcastRangeStart,omitempty" yaml:"mcastRangeStart,omitempty"`
 	MultusDisable                     string   `json:"multusDisable,omitempty" yaml:"multusDisable,omitempty"`
 	NoPriorityClass                   string   `json:"noPriorityClass,omitempty" yaml:"noPriorityClass,omitempty"`
+	NoWaitForServiceEpReadiness       string   `json:"noWaitForServiceEpReadiness,omitempty" yaml:"noWaitForServiceEpReadiness,omitempty"`
 	NodePodIfEnable                   string   `json:"nodePodIfEnable,omitempty" yaml:"nodePodIfEnable,omitempty"`
 	NodeSubnet                        string   `json:"nodeSubnet,omitempty" yaml:"nodeSubnet,omitempty"`
 	OVSMemoryLimit                    string   `json:"ovsMemoryLimit,omitempty" yaml:"ovsMemoryLimit,omitempty"`

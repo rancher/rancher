@@ -1,4 +1,4 @@
-package v1beta1
+package v1
 
 import (
 	"context"
@@ -7,7 +7,7 @@ import (
 	"github.com/rancher/norman/controller"
 	"github.com/rancher/norman/objectclient"
 	"github.com/rancher/norman/resource"
-	"k8s.io/api/batch/v1beta1"
+	"k8s.io/api/batch/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -43,23 +43,23 @@ func init() {
 	resource.Put(CronJobGroupVersionResource)
 }
 
-// Deprecated: use v1beta1.CronJob instead
-type CronJob = v1beta1.CronJob
+// Deprecated: use v1.CronJob instead
+type CronJob = v1.CronJob
 
-func NewCronJob(namespace, name string, obj v1beta1.CronJob) *v1beta1.CronJob {
+func NewCronJob(namespace, name string, obj v1.CronJob) *v1.CronJob {
 	obj.APIVersion, obj.Kind = CronJobGroupVersionKind.ToAPIVersionAndKind()
 	obj.Name = name
 	obj.Namespace = namespace
 	return &obj
 }
 
-type CronJobHandlerFunc func(key string, obj *v1beta1.CronJob) (runtime.Object, error)
+type CronJobHandlerFunc func(key string, obj *v1.CronJob) (runtime.Object, error)
 
-type CronJobChangeHandlerFunc func(obj *v1beta1.CronJob) (runtime.Object, error)
+type CronJobChangeHandlerFunc func(obj *v1.CronJob) (runtime.Object, error)
 
 type CronJobLister interface {
-	List(namespace string, selector labels.Selector) (ret []*v1beta1.CronJob, err error)
-	Get(namespace, name string) (*v1beta1.CronJob, error)
+	List(namespace string, selector labels.Selector) (ret []*v1.CronJob, err error)
+	Get(namespace, name string) (*v1.CronJob, error)
 }
 
 type CronJobController interface {
@@ -76,14 +76,14 @@ type CronJobController interface {
 
 type CronJobInterface interface {
 	ObjectClient() *objectclient.ObjectClient
-	Create(*v1beta1.CronJob) (*v1beta1.CronJob, error)
-	GetNamespaced(namespace, name string, opts metav1.GetOptions) (*v1beta1.CronJob, error)
-	Get(name string, opts metav1.GetOptions) (*v1beta1.CronJob, error)
-	Update(*v1beta1.CronJob) (*v1beta1.CronJob, error)
+	Create(*v1.CronJob) (*v1.CronJob, error)
+	GetNamespaced(namespace, name string, opts metav1.GetOptions) (*v1.CronJob, error)
+	Get(name string, opts metav1.GetOptions) (*v1.CronJob, error)
+	Update(*v1.CronJob) (*v1.CronJob, error)
 	Delete(name string, options *metav1.DeleteOptions) error
 	DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error
-	List(opts metav1.ListOptions) (*v1beta1.CronJobList, error)
-	ListNamespaced(namespace string, opts metav1.ListOptions) (*v1beta1.CronJobList, error)
+	List(opts metav1.ListOptions) (*v1.CronJobList, error)
+	ListNamespaced(namespace string, opts metav1.ListOptions) (*v1.CronJobList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() CronJobController
@@ -102,17 +102,17 @@ type cronJobLister struct {
 	controller *cronJobController
 }
 
-func (l *cronJobLister) List(namespace string, selector labels.Selector) (ret []*v1beta1.CronJob, err error) {
+func (l *cronJobLister) List(namespace string, selector labels.Selector) (ret []*v1.CronJob, err error) {
 	if namespace == "" {
 		namespace = l.ns
 	}
 	err = cache.ListAllByNamespace(l.controller.Informer().GetIndexer(), namespace, selector, func(obj interface{}) {
-		ret = append(ret, obj.(*v1beta1.CronJob))
+		ret = append(ret, obj.(*v1.CronJob))
 	})
 	return
 }
 
-func (l *cronJobLister) Get(namespace, name string) (*v1beta1.CronJob, error) {
+func (l *cronJobLister) Get(namespace, name string) (*v1.CronJob, error) {
 	var key string
 	if namespace != "" {
 		key = namespace + "/" + name
@@ -129,7 +129,7 @@ func (l *cronJobLister) Get(namespace, name string) (*v1beta1.CronJob, error) {
 			Resource: CronJobGroupVersionResource.Resource,
 		}, key)
 	}
-	return obj.(*v1beta1.CronJob), nil
+	return obj.(*v1.CronJob), nil
 }
 
 type cronJobController struct {
@@ -152,7 +152,7 @@ func (c *cronJobController) AddHandler(ctx context.Context, name string, handler
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if obj == nil {
 			return handler(key, nil)
-		} else if v, ok := obj.(*v1beta1.CronJob); ok {
+		} else if v, ok := obj.(*v1.CronJob); ok {
 			return handler(key, v)
 		} else {
 			return nil, nil
@@ -166,7 +166,7 @@ func (c *cronJobController) AddFeatureHandler(ctx context.Context, enabled func(
 			return nil, nil
 		} else if obj == nil {
 			return handler(key, nil)
-		} else if v, ok := obj.(*v1beta1.CronJob); ok {
+		} else if v, ok := obj.(*v1.CronJob); ok {
 			return handler(key, v)
 		} else {
 			return nil, nil
@@ -178,7 +178,7 @@ func (c *cronJobController) AddClusterScopedHandler(ctx context.Context, name, c
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if obj == nil {
 			return handler(key, nil)
-		} else if v, ok := obj.(*v1beta1.CronJob); ok && controller.ObjectInCluster(cluster, obj) {
+		} else if v, ok := obj.(*v1.CronJob); ok && controller.ObjectInCluster(cluster, obj) {
 			return handler(key, v)
 		} else {
 			return nil, nil
@@ -192,7 +192,7 @@ func (c *cronJobController) AddClusterScopedFeatureHandler(ctx context.Context, 
 			return nil, nil
 		} else if obj == nil {
 			return handler(key, nil)
-		} else if v, ok := obj.(*v1beta1.CronJob); ok && controller.ObjectInCluster(cluster, obj) {
+		} else if v, ok := obj.(*v1.CronJob); ok && controller.ObjectInCluster(cluster, obj) {
 			return handler(key, v)
 		} else {
 			return nil, nil
@@ -204,11 +204,11 @@ type cronJobFactory struct {
 }
 
 func (c cronJobFactory) Object() runtime.Object {
-	return &v1beta1.CronJob{}
+	return &v1.CronJob{}
 }
 
 func (c cronJobFactory) List() runtime.Object {
-	return &v1beta1.CronJobList{}
+	return &v1.CronJobList{}
 }
 
 func (s *cronJobClient) Controller() CronJobController {
@@ -232,29 +232,29 @@ func (s *cronJobClient) ObjectClient() *objectclient.ObjectClient {
 	return s.objectClient
 }
 
-func (s *cronJobClient) Create(o *v1beta1.CronJob) (*v1beta1.CronJob, error) {
+func (s *cronJobClient) Create(o *v1.CronJob) (*v1.CronJob, error) {
 	obj, err := s.objectClient.Create(o)
-	return obj.(*v1beta1.CronJob), err
+	return obj.(*v1.CronJob), err
 }
 
-func (s *cronJobClient) Get(name string, opts metav1.GetOptions) (*v1beta1.CronJob, error) {
+func (s *cronJobClient) Get(name string, opts metav1.GetOptions) (*v1.CronJob, error) {
 	obj, err := s.objectClient.Get(name, opts)
-	return obj.(*v1beta1.CronJob), err
+	return obj.(*v1.CronJob), err
 }
 
-func (s *cronJobClient) GetNamespaced(namespace, name string, opts metav1.GetOptions) (*v1beta1.CronJob, error) {
+func (s *cronJobClient) GetNamespaced(namespace, name string, opts metav1.GetOptions) (*v1.CronJob, error) {
 	obj, err := s.objectClient.GetNamespaced(namespace, name, opts)
-	return obj.(*v1beta1.CronJob), err
+	return obj.(*v1.CronJob), err
 }
 
-func (s *cronJobClient) Update(o *v1beta1.CronJob) (*v1beta1.CronJob, error) {
+func (s *cronJobClient) Update(o *v1.CronJob) (*v1.CronJob, error) {
 	obj, err := s.objectClient.Update(o.Name, o)
-	return obj.(*v1beta1.CronJob), err
+	return obj.(*v1.CronJob), err
 }
 
-func (s *cronJobClient) UpdateStatus(o *v1beta1.CronJob) (*v1beta1.CronJob, error) {
+func (s *cronJobClient) UpdateStatus(o *v1.CronJob) (*v1.CronJob, error) {
 	obj, err := s.objectClient.UpdateStatus(o.Name, o)
-	return obj.(*v1beta1.CronJob), err
+	return obj.(*v1.CronJob), err
 }
 
 func (s *cronJobClient) Delete(name string, options *metav1.DeleteOptions) error {
@@ -265,14 +265,14 @@ func (s *cronJobClient) DeleteNamespaced(namespace, name string, options *metav1
 	return s.objectClient.DeleteNamespaced(namespace, name, options)
 }
 
-func (s *cronJobClient) List(opts metav1.ListOptions) (*v1beta1.CronJobList, error) {
+func (s *cronJobClient) List(opts metav1.ListOptions) (*v1.CronJobList, error) {
 	obj, err := s.objectClient.List(opts)
-	return obj.(*v1beta1.CronJobList), err
+	return obj.(*v1.CronJobList), err
 }
 
-func (s *cronJobClient) ListNamespaced(namespace string, opts metav1.ListOptions) (*v1beta1.CronJobList, error) {
+func (s *cronJobClient) ListNamespaced(namespace string, opts metav1.ListOptions) (*v1.CronJobList, error) {
 	obj, err := s.objectClient.ListNamespaced(namespace, opts)
-	return obj.(*v1beta1.CronJobList), err
+	return obj.(*v1.CronJobList), err
 }
 
 func (s *cronJobClient) Watch(opts metav1.ListOptions) (watch.Interface, error) {
@@ -280,9 +280,9 @@ func (s *cronJobClient) Watch(opts metav1.ListOptions) (watch.Interface, error) 
 }
 
 // Patch applies the patch and returns the patched deployment.
-func (s *cronJobClient) Patch(o *v1beta1.CronJob, patchType types.PatchType, data []byte, subresources ...string) (*v1beta1.CronJob, error) {
+func (s *cronJobClient) Patch(o *v1.CronJob, patchType types.PatchType, data []byte, subresources ...string) (*v1.CronJob, error) {
 	obj, err := s.objectClient.Patch(o.Name, o, patchType, data, subresources...)
-	return obj.(*v1beta1.CronJob), err
+	return obj.(*v1.CronJob), err
 }
 
 func (s *cronJobClient) DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error {
