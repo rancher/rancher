@@ -101,25 +101,25 @@ require (
 	github.com/prometheus/client_model v0.2.0
 	github.com/prometheus/common v0.32.1
 	github.com/rancher/aks-operator v1.0.8-rc1
-	github.com/rancher/apiserver v0.0.0-20220610164457-643f1d19e3fc
+	github.com/rancher/apiserver v0.0.0-20221205175736-7c507bd5c076
 	github.com/rancher/channelserver v0.5.1-0.20220405170618-28c9b37deff1
 	github.com/rancher/dynamiclistener v0.3.4
 	github.com/rancher/eks-operator v1.1.6-rc1
 	github.com/rancher/fleet/pkg/apis v0.0.0-20221027125947-f0d403b940d6
 	github.com/rancher/gke-operator v1.1.5
 	github.com/rancher/kubernetes-provider-detector v0.1.5
-	github.com/rancher/lasso v0.0.0-20220628160937-749b3397db38
+	github.com/rancher/lasso v0.0.0-20221202205459-e7138f16489c
 	github.com/rancher/lasso/controller-runtime v0.0.0-20220627205005-00d9c8e9dda6
 	github.com/rancher/machine v0.15.0-rancher97
-	github.com/rancher/norman v0.0.0-20220627222520-b74009fac3ff
+	github.com/rancher/norman v0.0.0-20221205184727-32ef2e185b99
 	github.com/rancher/rancher/pkg/apis v0.0.0
 	github.com/rancher/rancher/pkg/client v0.0.0
 	github.com/rancher/rdns-server v0.0.0-20180802070304-bf662911db6a
 	github.com/rancher/remotedialer v0.2.6-0.20220624190122-ea57207bf2b8
-	github.com/rancher/rke v1.4.1-rc2
-	github.com/rancher/steve v0.0.0-20220928204312-06584d207dac
+	github.com/rancher/rke v1.4.1-rc2.0.20221206175654-ea7edd42337c
+	github.com/rancher/steve v0.0.0-20221205213404-5595803a7b66
 	github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20210727200656-10b094e30007
-	github.com/rancher/wrangler v1.0.1-0.20220520195731-8eeded9bae2a
+	github.com/rancher/wrangler v1.0.1-0.20221202234327-1cafffeaa9a1
 	github.com/robfig/cron v1.1.0
 	github.com/sirupsen/logrus v1.9.0
 	github.com/stretchr/testify v1.8.0
@@ -160,7 +160,10 @@ require (
 
 require github.com/google/gnostic v0.5.7-v3refs
 
-require github.com/kr/fs v0.1.0 // indirect
+require (
+	github.com/kr/fs v0.1.0 // indirect
+	k8s.io/pod-security-admission v0.25.4 // indirect
+)
 
 require (
 	cloud.google.com/go/compute v1.6.1 // indirect
@@ -335,7 +338,7 @@ require (
 	google.golang.org/genproto v0.0.0-20220720214146-176da50484ac // indirect
 	google.golang.org/protobuf v1.28.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
-	gopkg.in/ini.v1 v1.66.4 // indirect
+	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/square/go-jose.v2 v2.5.1 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	k8s.io/cluster-bootstrap v0.24.0 // indirect
