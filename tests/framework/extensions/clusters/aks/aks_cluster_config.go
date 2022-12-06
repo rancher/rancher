@@ -41,11 +41,13 @@ type AKSClusterConfig struct {
 // AKSNodePool is the configuration needed to an AKS node pool
 type AKSNodePool struct {
 	AvailabilityZones   *[]string `json:"availabilityZones,omitempty" yaml:"availabilityZones,omitempty"`
-	NodeCount           *int64    `json:"nodeCount,omitempty" yaml:"nodeCount,omitempty"`
 	EnableAutoScaling   *bool     `json:"enableAutoScaling,omitempty" yaml:"enableAutoScaling,omitempty"`
 	MaxPods             *int64    `json:"maxPods,omitempty" yaml:"maxPods,omitempty"`
+	MaxCount            *int64    `json:"maxCount,omitempty" yaml:"maxCount,omitempty"`
+	MinCount            *int64    `json:"minCount,omitempty" yaml:"minCount,omitempty"`
 	Mode                string    `json:"mode,omitempty" yaml:"mode,omitempty"`
 	Name                *string   `json:"name,omitempty" yaml:"name,omitempty"`
+	NodeCount           *int64    `json:"nodeCount,omitempty" yaml:"nodeCount,omitempty"`
 	OrchestratorVersion *string   `json:"orchestratorVersion,omitempty" yaml:"orchestratorVersion,omitempty"`
 	OsDiskSizeGB        *int64    `json:"osDiskSizeGB,omitempty" yaml:"osDiskSizeGB,omitempty"`
 	OsDiskType          string    `json:"osDiskType,omitempty" yaml:"osDiskType,omitempty"`
@@ -61,6 +63,8 @@ func aksNodePoolConstructor(aksNodePoolConfigs *[]AKSNodePool, kubernetesVersion
 			Count:               aksNodePoolConfig.NodeCount,
 			EnableAutoScaling:   aksNodePoolConfig.EnableAutoScaling,
 			MaxPods:             aksNodePoolConfig.MaxPods,
+			MaxCount:            aksNodePoolConfig.MaxCount,
+			MinCount:            aksNodePoolConfig.MinCount,
 			Mode:                aksNodePoolConfig.Mode,
 			Name:                aksNodePoolConfig.Name,
 			OrchestratorVersion: &kubernetesVersion,
@@ -74,7 +78,7 @@ func aksNodePoolConstructor(aksNodePoolConfigs *[]AKSNodePool, kubernetesVersion
 	return aksNodePools
 }
 
-func aksHostClusterConfig(displayName, cloudCredentialID string) *management.AKSClusterConfigSpec {
+func AKSHostClusterConfig(displayName, cloudCredentialID string) *management.AKSClusterConfigSpec {
 	var aksClusterConfig AKSClusterConfig
 	config.LoadConfig(AKSClusterConfigConfigurationFileKey, &aksClusterConfig)
 
@@ -83,11 +87,11 @@ func aksHostClusterConfig(displayName, cloudCredentialID string) *management.AKS
 		ClusterName:           displayName,
 		DNSPrefix:             aksClusterConfig.DNSPrefix,
 		Imported:              false,
-		NodePools:             aksNodePoolConstructor(aksClusterConfig.NodePools, *aksClusterConfig.KubernetesVersion),
 		KubernetesVersion:     aksClusterConfig.KubernetesVersion,
 		LinuxAdminUsername:    aksClusterConfig.LinuxAdminUsername,
 		LoadBalancerSKU:       aksClusterConfig.LoadBalancerSKU,
 		NetworkPlugin:         aksClusterConfig.NetworkPlugin,
+		NodePools:             aksNodePoolConstructor(aksClusterConfig.NodePools, *aksClusterConfig.KubernetesVersion),
 		PrivateCluster:        aksClusterConfig.PrivateCluster,
 		ResourceGroup:         aksClusterConfig.ResourceGroup,
 		ResourceLocation:      aksClusterConfig.ResourceLocation,
