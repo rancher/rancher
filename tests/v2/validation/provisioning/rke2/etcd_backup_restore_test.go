@@ -61,7 +61,7 @@ func (r *RKE2EtcdSnapshotRestoreTestSuite) SetupSuite() {
 	clustersConfig := new(provisioning.Config)
 	config.LoadConfig(provisioning.ConfigurationFileKey, clustersConfig)
 
-	r.kubernetesVersions = clustersConfig.KubernetesVersions
+	r.kubernetesVersions = clustersConfig.RKE2KubernetesVersions
 	r.cnis = clustersConfig.CNIs
 	r.providers = clustersConfig.Providers
 	r.nodesAndRoles = clustersConfig.NodesAndRoles

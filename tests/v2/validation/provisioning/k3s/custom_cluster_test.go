@@ -47,7 +47,7 @@ func (c *CustomClusterProvisioningTestSuite) SetupSuite() {
 	clustersConfig := new(provisioning.Config)
 	config.LoadConfig(provisioning.ConfigurationFileKey, clustersConfig)
 
-	c.kubernetesVersions = clustersConfig.KubernetesVersions
+	c.kubernetesVersions = clustersConfig.K3SKubernetesVersions
 	c.nodeProviders = clustersConfig.NodeProviders
 	c.provisioning = clustersConfig
 
