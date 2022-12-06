@@ -18,6 +18,8 @@ from .common import delete_node
 import pytest
 import time
 
+# Skipping all the tests from this module because Multi-Cluster Apps have been deprecated as of Rancher v2.5.0
+pytest.skip(allow_module_level=True)
 
 project = {}
 project_detail = {"c0_id": None, "c1_id": None, "c2_id": None,
