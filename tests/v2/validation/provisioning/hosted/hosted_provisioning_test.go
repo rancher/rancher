@@ -1,4 +1,4 @@
-package provisioning
+package hosted
 
 import (
 	"testing"
@@ -10,6 +10,9 @@ import (
 	"github.com/rancher/rancher/tests/framework/extensions/cloudcredentials/google"
 	"github.com/rancher/rancher/tests/framework/extensions/clusters"
 	"github.com/rancher/rancher/tests/framework/extensions/clusters/aks"
+	"github.com/rancher/rancher/tests/framework/extensions/clusters/aks/importing"
+	"github.com/rancher/rancher/tests/framework/extensions/clusters/aks/nodepools"
+	"github.com/rancher/rancher/tests/framework/extensions/clusters/aks/upgrades"
 	"github.com/rancher/rancher/tests/framework/extensions/clusters/eks"
 	"github.com/rancher/rancher/tests/framework/extensions/clusters/gke"
 	"github.com/rancher/rancher/tests/framework/extensions/users"
@@ -129,7 +132,7 @@ func (h *HostedClusterProvisioningTestSuite) TestProvisioningHostedAKSCluster() 
 			cloudCredential, err := azure.CreateAzureCloudCredentials(client)
 			require.NoError(h.T(), err)
 
-			clusterName := provisioning.AppendRandomString("ekshostcluster")
+			clusterName := provisioning.AppendRandomString("akshostcluster")
 			clusterResp, err := aks.CreateAKSHostedCluster(client, clusterName, cloudCredential.ID, false, false, false, false, map[string]string{})
 			require.NoError(h.T(), err)
 
@@ -149,6 +152,18 @@ func (h *HostedClusterProvisioningTestSuite) TestProvisioningHostedAKSCluster() 
 			clusterToken, err := clusters.CheckServiceAccountTokenSecret(client, clusterName)
 			require.NoError(h.T(), err)
 			assert.NotEmpty(h.T(), clusterToken)
+
+			updatedCluster, err := nodepools.ScalingAKSNodePools(client, clusterResp, clusterName, cloudCredential.ID)
+			require.NoError(h.T(), err)
+			assert.Equal(h.T(), clusterName, updatedCluster.Name)
+
+			upgradeK8S, err := upgrades.UpgradeK8SVersion(client, clusterResp, updatedCluster.Name, cloudCredential.ID)
+			require.NoError(h.T(), err)
+			assert.Equal(h.T(), updatedCluster.Name, upgradeK8S.Name)
+
+			importedCluster, err := importing.ImportAKSCluster(client, cloudCredential, clusterName)
+			require.NoError(h.T(), err)
+			assert.Equal(h.T(), clusterName, importedCluster.Name)
 		})
 	}
 }
@@ -199,6 +214,6 @@ func (h *HostedClusterProvisioningTestSuite) TestProvisioningHostedEKSCluster() 
 
 // In order for 'go test' to run this suite, we need to create
 // a normal test function and pass our suite to suite.Run
-func TestHostesdClusterProvisioningTestSuite(t *testing.T) {
+func TestHostedClusterProvisioningTestSuite(t *testing.T) {
 	suite.Run(t, new(HostedClusterProvisioningTestSuite))
 }

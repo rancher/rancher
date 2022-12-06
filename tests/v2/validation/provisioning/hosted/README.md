@@ -1,6 +1,4 @@
 
-
-
 ## Hosted Provider Provisioning Configs
 
 For your config, you will need everything in the Prerequisites section on the previous readme along with and at least one [Cloud Credential](#cloud-credentials) and [Hosted Provider Config](#hosted-provider-configs). 
@@ -96,6 +94,8 @@ Below are example configs needed for the different hosted providers including GK
       "nodeCount": 1,
       "enableAutoScaling": false,
       "maxPods": 110,
+      "maxCount": 2,
+      "minCount": 1,
       "mode": "System",
       "name": "agentpool",
       "osDiskSizeGB": 128,
@@ -104,7 +104,6 @@ Below are example configs needed for the different hosted providers including GK
       "vmSize": "Standard_DS2_v2"
     }
   ],
-  "privateCluster": false,
   "resourceGroup": "",
   "resourceLocation": "eastus",
   "tags": {}
