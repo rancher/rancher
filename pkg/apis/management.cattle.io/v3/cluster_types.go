@@ -393,6 +393,7 @@ type EKSStatus struct {
 	PrivateRequiresTunnel         *bool                       `json:"privateRequiresTunnel"`
 	ManagedLaunchTemplateID       string                      `json:"managedLaunchTemplateID"`
 	ManagedLaunchTemplateVersions map[string]string           `json:"managedLaunchTemplateVersions"`
+	GeneratedNodeRole             string                      `json:"generatedNodeRole"`
 }
 
 type GKEStatus struct {
