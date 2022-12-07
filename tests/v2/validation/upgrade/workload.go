@@ -97,7 +97,7 @@ func newTestContainerMinimal() corev1.Container {
 func newPodTemplateWithTestContainer() corev1.PodTemplateSpec {
 	testContainer := newTestContainerMinimal()
 	containers := []corev1.Container{testContainer}
-	return workloads.NewPodTemplate(containers, nil, nil)
+	return workloads.NewPodTemplate(containers, nil, nil, nil)
 }
 
 // newPodTemplateWithSecretVolume is a private constructor that returns pod template spec with volume option for workload creations
@@ -116,7 +116,7 @@ func newPodTemplateWithSecretVolume(secretName string) corev1.PodTemplateSpec {
 		},
 	}
 
-	return workloads.NewPodTemplate(containers, volumes, nil)
+	return workloads.NewPodTemplate(containers, volumes, nil, nil)
 }
 
 // newPodTemplateWithSecretEnvironmentVariable is a private constructor that returns pod template spec with envFrom option for workload creations
@@ -132,7 +132,7 @@ func newPodTemplateWithSecretEnvironmentVariable(secretName string) corev1.PodTe
 	container := workloads.NewContainer(containerName, containerImage, pullPolicy, nil, envFrom)
 	containers := []corev1.Container{container}
 
-	return workloads.NewPodTemplate(containers, nil, nil)
+	return workloads.NewPodTemplate(containers, nil, nil, nil)
 }
 
 // waitUntilIngressIsAccessible waits until the ingress is accessible
