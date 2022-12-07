@@ -5,6 +5,7 @@ from rancher import ApiError
 import pytest
 from kubernetes.client.rest import ApiException
 
+# Skipping these modules because K8s 1.25 does not support PSPs
 pytest.skip(allow_module_level=True)
 
 def cleanup_pspt(client, request, cluster):
@@ -282,6 +283,7 @@ def test_project_action_set_pspt(admin_mc, admin_pc,
     wait_for(check_project)
 
     set_cluster_psp(admin_mc, "false")
+
 
 def test_psp_annotations(admin_mc, remove_resouce_func):
     """Test that a psp with a pspt owner annotation will get cleaned up if the
