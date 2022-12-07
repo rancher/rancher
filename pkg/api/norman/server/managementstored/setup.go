@@ -241,8 +241,7 @@ func Clusters(ctx context.Context, schemas *types.Schemas, managementContext *co
 	clusterFormatter := ccluster.NewFormatter(schemas, managementContext)
 	schema.Formatter = clusterFormatter.Formatter
 	schema.CollectionFormatter = clusterFormatter.CollectionFormatter
-	clusterStore := cluster.GetClusterStore(schema, managementContext, clusterManager, k8sProxy)
-	schema.Store = clusterStore
+	schema.Store = cluster.GetClusterStore(schema, managementContext, clusterManager, k8sProxy)
 
 	handler := ccluster.ActionHandler{
 		NodepoolGetter:                managementContext.Management,
