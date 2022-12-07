@@ -15,7 +15,7 @@ const (
 type EnvironmentFlags map[EnvironmentFlag]bool
 
 type Config struct {
-	DesiredFlags string `json:"use" yaml:"use" default:""`
+	DesiredFlags string `json:"desiredflags" yaml:"desiredflags" default:""`
 }
 
 // NewEnvironmentFlags creates a new EnvironmentFlags.
