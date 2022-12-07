@@ -32,6 +32,7 @@
         "launchTemplate": null,
         "maxSize": 2,
         "minSize": 2,
+        "nodeRole": null,
         "nodegroupName": "nodegroup",
         "requestSpotInstances": false,
         "resourceTags": {},
@@ -54,6 +55,7 @@
   },
   "status": {
     "failureMessage": "",
+    "generatedNodeRole": "",
     "managedLaunchTemplateID": "",
     "managedLaunchTemplateVersions": null,
     "networkFieldsSource": "",
