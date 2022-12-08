@@ -46,6 +46,12 @@ func List(cfg *rest.Config) (_ []crd.CRD, err error) {
 			c.GVK.Version = "v1"
 			return c
 		}),
+		newCRD(&v3.PodSecurityAdmissionConfigurationTemplate{}, func(c crd.CRD) crd.CRD {
+			c.NonNamespace = true
+			c.GVK.Kind = "PodSecurityAdmissionConfigurationTemplate"
+			c.GVK.Version = "v3"
+			return c
+		}),
 		newCRD(&v3.Cluster{}, func(c crd.CRD) crd.CRD {
 			c.Status = false
 			c.NonNamespace = true
