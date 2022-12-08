@@ -5,6 +5,7 @@ from rancher import ApiError
 import pytest
 from kubernetes.client.rest import ApiException
 
+
 def cleanup_pspt(client, request, cluster):
     def remove_pspt_from_cluster_and_delete(cluster):
         pspt_id = cluster.defaultPodSecurityPolicyTemplateId
