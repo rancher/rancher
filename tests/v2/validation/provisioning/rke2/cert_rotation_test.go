@@ -88,7 +88,7 @@ func (r *V2ProvCertRotationTestSuite) testCertRotation(provider Provider, kubeVe
 			kubeProvisioningClient, err := r.client.GetKubeAPIProvisioningClient()
 			require.NoError(r.T(), err)
 
-			result, err := kubeProvisioningClient.Clusters("fleet-default").Watch(context.TODO(), metav1.ListOptions{
+			result, err := kubeProvisioningClient.Clusters(namespace).Watch(context.TODO(), metav1.ListOptions{
 				FieldSelector:  "metadata.name=" + cluster.ObjectMeta.Name,
 				TimeoutSeconds: &defaults.WatchTimeoutSeconds,
 			})
@@ -173,7 +173,7 @@ func (r *V2ProvCertRotationTestSuite) rotateCerts(id string, generation int64) e
 		return err
 	}
 
-	clusterWait, err := kubeProvisioningClient.Clusters("fleet-default").Watch(context.TODO(), metav1.ListOptions{
+	clusterWait, err := kubeProvisioningClient.Clusters(namespace).Watch(context.TODO(), metav1.ListOptions{
 		FieldSelector:  "metadata.name=" + cluster.ObjectMeta.Name,
 		TimeoutSeconds: &defaults.WatchTimeoutSeconds,
 	})

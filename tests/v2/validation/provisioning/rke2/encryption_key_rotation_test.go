@@ -6,8 +6,10 @@ import (
 	"strings"
 	"testing"
 
+	apiv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
+	v1 "github.com/rancher/rancher/tests/framework/clients/rancher/v1"
 	"github.com/rancher/rancher/tests/framework/extensions/cloudcredentials"
 	"github.com/rancher/rancher/tests/framework/extensions/clusters"
 	"github.com/rancher/rancher/tests/framework/extensions/kubeapi"
@@ -111,14 +113,7 @@ func (r *RKE2EncryptionKeyRotationTestSuite) TestEncryptionKeyRotationFreshClust
 			require.NoError(r.T(), err)
 			assert.Equal(r.T(), clusterName, clusterResp.ObjectMeta.Name)
 
-			cluster, err = kubeProvisioningClient.Clusters(namespace).Get(context.TODO(), clusterName, metav1.GetOptions{})
-			require.NoError(r.T(), err)
-			require.NotNil(r.T(), cluster.Status)
-
-			require.NoError(r.T(), r.rotateEncryptionKeys(clusterName, 1, defaults.WatchTimeoutSeconds))
-			// verify status
-			cluster, err = kubeProvisioningClient.Clusters(namespace).Get(context.TODO(), clusterName, metav1.GetOptions{})
-			require.NoError(r.T(), err)
+			require.NoError(r.T(), r.rotateEncryptionKeys(clusterResp.ID, 1, defaults.WatchTimeoutSeconds))
 			r.T().Logf("Successfully completed encryption key rotation for %s", name)
 
 			r.T().Logf("Creating %d secrets in namespace default for encryption key rotation for %s", scale, name)
@@ -142,7 +137,7 @@ func (r *RKE2EncryptionKeyRotationTestSuite) TestEncryptionKeyRotationFreshClust
 			r.T().Logf("Successfully created %d secrets in namespace default for encryption key rotation for %s", scale, name)
 			// encryption key rotation is capped at 5 secrets per second (10 every 2 seconds), so 10000 secrets will take
 			// 2000 seconds which is ~33 minutes.
-			require.NoError(r.T(), r.rotateEncryptionKeys(clusterName, 2, 60*60))
+			require.NoError(r.T(), r.rotateEncryptionKeys(clusterResp.ID, 2, 60*60))
 			r.T().Logf("Successfully completed second encryption key rotation for %s", name)
 		})
 	})
@@ -152,16 +147,24 @@ func (r *RKE2EncryptionKeyRotationTestSuite) rotateEncryptionKeys(id string, gen
 	kubeProvisioningClient, err := r.client.GetKubeAPIProvisioningClient()
 	require.NoError(r.T(), err)
 
-	cluster, err := kubeProvisioningClient.Clusters(namespace).Get(context.TODO(), id, metav1.GetOptions{})
+	cluster, err := r.client.Steve.SteveType(clusters.ProvisioningSteveResouceType).ByID(id)
 	if err != nil {
 		return err
 	}
 
-	cluster.Spec.RKEConfig.RotateEncryptionKeys = &rkev1.RotateEncryptionKeys{
+	clusterSpec := &apiv1.ClusterSpec{}
+	err = v1.ConvertToK8sType(cluster.Spec, clusterSpec)
+	require.NoError(r.T(), err)
+
+	updatedCluster := *cluster
+
+	clusterSpec.RKEConfig.RotateEncryptionKeys = &rkev1.RotateEncryptionKeys{
 		Generation: generation,
 	}
 
-	cluster, err = kubeProvisioningClient.Clusters(namespace).Update(context.TODO(), cluster, metav1.UpdateOptions{})
+	updatedCluster.Spec = *clusterSpec
+
+	cluster, err = r.client.Steve.SteveType(clusters.ProvisioningSteveResouceType).Update(cluster, updatedCluster)
 	if err != nil {
 		return err
 	}
@@ -183,6 +186,22 @@ func (r *RKE2EncryptionKeyRotationTestSuite) rotateEncryptionKeys(id string, gen
 			return err
 		}
 	}
+
+	clusterWait, err := kubeProvisioningClient.Clusters(namespace).Watch(context.TODO(), metav1.ListOptions{
+		FieldSelector:  "metadata.name=" + cluster.ObjectMeta.Name,
+		TimeoutSeconds: &defaults.WatchTimeoutSeconds,
+	})
+	if err != nil {
+		return err
+	}
+
+	clusterCheckFunc := clusters.IsProvisioningClusterReady
+
+	err = wait.WatchWait(clusterWait, clusterCheckFunc)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
