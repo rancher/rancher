@@ -106,11 +106,6 @@ func AddProjectMember(rancherClient *rancher.Client, project *management.Project
 		return err
 	}
 
-	adminClient, err := rancher.NewClient(rancherClient.RancherConfig.AdminToken, rancherClient.Session)
-	if err != nil {
-		return err
-	}
-
 	adminDynamicClient, err := adminClient.GetDownStreamClusterClient(project.ClusterID)
 	if err != nil {
 		return err
