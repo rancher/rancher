@@ -121,12 +121,21 @@ func (p *prtbLifecycle) reconcileSubject(binding *v3.ProjectRoleTemplateBinding)
 		if err != nil {
 			return binding, err
 		}
+		// choosing the first non-local principal we find, but falling back to local if there are no other options
+		var localFallback string
 		for _, p := range u.PrincipalIDs {
-			if strings.HasSuffix(p, binding.UserName) {
+			if strings.HasPrefix(p, "local://") {
+				localFallback = p
+				continue
+			} else {
 				binding.UserPrincipalName = p
 				break
 			}
 		}
+		if binding.UserPrincipalName == "" {
+			binding.UserPrincipalName = localFallback
+		}
+
 		return binding, nil
 	}
 
