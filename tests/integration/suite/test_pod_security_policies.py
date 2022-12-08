@@ -60,7 +60,6 @@ def setup_cluster_with_pspt(client, request):
     return pspt
 
 
-@pytest.mark.skip(reason="CI is failing, skipping for now")
 def service_account_has_role_binding(rbac, pspt):
     try:
         rbac.read_namespaced_role_binding("default-asdf-default-" + pspt.id +
@@ -70,6 +69,7 @@ def service_account_has_role_binding(rbac, pspt):
         return False
 
 
+@pytest.mark.skip(reason="CI is failing, skipping for now")
 def test_service_accounts_have_role_binding(admin_mc, request):
     api_client = admin_mc.client
     pspt = setup_cluster_with_pspt(api_client, request)
