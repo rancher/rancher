@@ -11,6 +11,8 @@ import (
 )
 
 const (
+	ClusterRepoSteveResourceType = "catalog.cattle.io.clusterrepo"
+
 	rancherChartsURL = "v1/catalog.cattle.io.clusterrepos/rancher-charts"
 	rancherAppsURL   = "v1/catalog.cattle.io.apps/"
 )

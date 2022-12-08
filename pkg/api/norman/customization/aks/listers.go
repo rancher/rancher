@@ -8,7 +8,7 @@ import (
 	"regexp"
 	"sort"
 
-	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2020-06-30/compute"
+	"github.com/Azure/azure-sdk-for-go/profiles/latest/compute/mgmt/skus"
 	"github.com/Azure/azure-sdk-for-go/services/containerservice/mgmt/2020-09-01/containerservice"
 	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2020-07-01/network"
 	"github.com/Azure/azure-sdk-for-go/services/subscription/mgmt/2020-09-01/subscription"
@@ -34,7 +34,7 @@ type subnet struct {
 
 var matchResourceGroup = regexp.MustCompile("/resource[gG]roups/(.+?)/")
 
-func NewClientAuthorizer(cap *Capabilities) (autorest.Authorizer, error) {
+func NewAzureClientAuthorizer(cap *Capabilities) (autorest.Authorizer, error) {
 	oauthConfig, err := adal.NewOAuthConfig(cap.AuthBaseURL, cap.TenantID)
 	if err != nil {
 		return nil, err
@@ -48,20 +48,20 @@ func NewClientAuthorizer(cap *Capabilities) (autorest.Authorizer, error) {
 	return autorest.NewBearerAuthorizer(spToken), nil
 }
 
-func NewVirtualMachineClient(cap *Capabilities) (*compute.VirtualMachineSizesClient, error) {
-	authorizer, err := NewClientAuthorizer(cap)
+func NewVirtualMachineSKUClient(cap *Capabilities) (*skus.ResourceSkusClient, error) {
+	authorizer, err := NewAzureClientAuthorizer(cap)
 	if err != nil {
 		return nil, err
 	}
 
-	virtualMachine := compute.NewVirtualMachineSizesClient(cap.SubscriptionID)
-	virtualMachine.Authorizer = authorizer
+	skusClient := skus.NewResourceSkusClient(cap.SubscriptionID)
+	skusClient.Authorizer = authorizer
 
-	return &virtualMachine, nil
+	return &skusClient, nil
 }
 
 func NewContainerServiceClient(cap *Capabilities) (*containerservice.ContainerServicesClient, error) {
-	authorizer, err := NewClientAuthorizer(cap)
+	authorizer, err := NewAzureClientAuthorizer(cap)
 	if err != nil {
 		return nil, err
 	}
@@ -73,7 +73,7 @@ func NewContainerServiceClient(cap *Capabilities) (*containerservice.ContainerSe
 }
 
 func NewNetworkServiceClient(cap *Capabilities) (*network.VirtualNetworksClient, error) {
-	authorizer, err := NewClientAuthorizer(cap)
+	authorizer, err := NewAzureClientAuthorizer(cap)
 	if err != nil {
 		return nil, err
 	}
@@ -85,7 +85,7 @@ func NewNetworkServiceClient(cap *Capabilities) (*network.VirtualNetworksClient,
 }
 
 func NewClusterClient(cap *Capabilities) (*containerservice.ManagedClustersClient, error) {
-	authorizer, err := NewClientAuthorizer(cap)
+	authorizer, err := NewAzureClientAuthorizer(cap)
 	if err != nil {
 		return nil, err
 	}
@@ -97,7 +97,7 @@ func NewClusterClient(cap *Capabilities) (*containerservice.ManagedClustersClien
 }
 
 func NewSubscriptionServiceClient(cap *Capabilities) (*subscription.SubscriptionsClient, error) {
-	authorizer, err := NewClientAuthorizer(cap)
+	authorizer, err := NewAzureClientAuthorizer(cap)
 	if err != nil {
 		return nil, err
 	}
@@ -373,27 +373,87 @@ func listClusters(ctx context.Context, cap *Capabilities) ([]byte, int, error) {
 	return encodeOutput(clusters)
 }
 
+const (
+	AzureSkuResourceTypeVM            = "virtualMachines"
+	AzureAcceleratedNetworkingFeature = "AcceleratedNetworkingEnabled"
+)
+
 func listVMSizes(ctx context.Context, cap *Capabilities) ([]byte, int, error) {
 	if cap.ResourceLocation == "" {
 		return nil, http.StatusBadRequest, fmt.Errorf("region is required")
 	}
 
-	virtualMachine, err := NewVirtualMachineClient(cap)
+	type VMSizeInfo struct {
+		//Name is synonymous with the size shown in Rancher UI
+		Name                           string
+		AcceleratedNetworkingSupported bool
+		AvailabilityZones              []string
+	}
+
+	skuClient, err := NewVirtualMachineSKUClient(cap)
 	if err != nil {
 		return nil, http.StatusInternalServerError, err
 	}
-	vmMachineSizeList, err := virtualMachine.List(ctx, cap.ResourceLocation)
+
+	req, err := skuClient.ListPreparer(ctx)
 	if err != nil {
-		return nil, http.StatusBadRequest, fmt.Errorf("failed to get VM sizes: %v", err)
+		return nil, http.StatusInternalServerError, err
 	}
 
-	vmSizes := make([]string, 0, len(*vmMachineSizeList.Value))
+	// only get resources for the given location.
+	// this is the only filter supported by API version 2017-09-01,
+	// which is the latest version at time of writing.
+	// A guide to azure API filtering can be found here
+	// https://learn.microsoft.com/en-us/rest/api/monitor/filter-syntax
+	q := req.URL.Query()
+	q.Add("$filter", fmt.Sprintf("location eq '%s'", cap.ResourceLocation))
+	req.URL.RawQuery = q.Encode()
 
-	for _, virtualMachineSize := range *vmMachineSizeList.Value {
-		vmSizes = append(vmSizes, to.String(virtualMachineSize.Name))
+	resp, err := skuClient.ListSender(req)
+	if err != nil {
+		return nil, resp.StatusCode, err
 	}
 
-	return encodeOutput(vmSizes)
+	skuList, err := skuClient.ListResponder(resp)
+	if err != nil {
+		return nil, http.StatusInternalServerError, fmt.Errorf("failed to get VM sizes: %v", err)
+	}
+
+	if skuList.Value == nil {
+		return nil, http.StatusNotFound, err
+	}
+
+	var vmSkuInfo []VMSizeInfo
+	for _, resourceSku := range *skuList.Value {
+		// we currently can't specify a particular SKU type in the API request,
+		// we have to filter them out here
+		if to.String(resourceSku.ResourceType) != AzureSkuResourceTypeVM {
+			continue
+		}
+
+		vm := VMSizeInfo{
+			Name: to.String(resourceSku.Name),
+		}
+
+		if resourceSku.Capabilities != nil {
+			for _, skuCapabilities := range *resourceSku.Capabilities {
+				if to.String(skuCapabilities.Name) == AzureAcceleratedNetworkingFeature && to.String(skuCapabilities.Value) == "True" {
+					vm.AcceleratedNetworkingSupported = true
+					break
+				}
+			}
+		}
+
+		if resourceSku.LocationInfo != nil && len(*resourceSku.LocationInfo) > 0 {
+			locInfo := *resourceSku.LocationInfo
+			// We specified a location in the Azure API request so there is at most one element
+			vm.AvailabilityZones = to.StringSlice(locInfo[0].Zones)
+		}
+
+		vmSkuInfo = append(vmSkuInfo, vm)
+	}
+
+	return encodeOutput(vmSkuInfo)
 }
 
 type locationsResponseBody struct {

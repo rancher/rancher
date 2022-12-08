@@ -27,6 +27,7 @@ spec:
       launchTemplate: null
       maxSize: 2
       minSize: 2
+      nodeRole: null
       nodegroupName: nodegroup
       requestSpotInstances: false
       resourceTags: {}
@@ -83,3 +84,4 @@ status:
     status: Unknown
     type: Updated
   driver: EKS
+  generatedNodeRole: "arn:aws:iam::role/test"

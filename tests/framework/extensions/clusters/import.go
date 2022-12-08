@@ -15,6 +15,8 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 
+	apisV3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -187,4 +189,17 @@ func ImportCluster(client *rancher.Client, cluster *apisV1.Cluster, rest *rest.C
 	}
 
 	return nil
+}
+
+// IsClusterImported is a function to get a boolean value about if the cluster is imported or not.
+// For custom and imported clusters the node driver value is different than "imported".
+func IsClusterImported(client *rancher.Client, clusterID string) (isImported bool, err error) {
+	cluster, err := client.Management.Cluster.ByID(clusterID)
+	if err != nil {
+		return
+	}
+
+	isImported = cluster.Driver == apisV3.ClusterDriverImported // For imported K3s and RKE2, driver != "imported", for custom and provisioning drive ones = "imported"
+
+	return
 }
