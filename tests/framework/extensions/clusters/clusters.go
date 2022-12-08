@@ -28,6 +28,7 @@ import (
 
 const (
 	ProvisioningSteveResouceType = "provisioning.cattle.io.cluster"
+	FleetSteveResourceType       = "fleet.cattle.io.cluster"
 )
 
 // GetClusterIDByName is a helper function that returns the cluster ID by name

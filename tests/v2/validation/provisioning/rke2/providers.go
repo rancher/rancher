@@ -20,6 +20,7 @@ const (
 	doProviderName        = "do"
 	harvesterProviderName = "harvester"
 	linodeProviderName    = "linode"
+	etcdnodeCount         = 3
 )
 
 type CloudCredFunc func(rancherClient *rancher.Client) (*cloudcredentials.CloudCredential, error)
