@@ -1,6 +1,8 @@
 package users
 
 import (
+	"context"
+	"fmt"
 	"strings"
 	"time"
 
@@ -9,6 +11,8 @@ import (
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
+	kubeapiSecrets "github.com/rancher/rancher/tests/framework/extensions/kubeapi/secrets"
+	"github.com/rancher/rancher/tests/framework/extensions/secrets"
 	"github.com/rancher/rancher/tests/framework/pkg/wait"
 	"github.com/rancher/rancher/tests/integration/pkg/defaults"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -83,18 +87,74 @@ func AddProjectMember(rancherClient *rancher.Client, project *management.Project
 	}
 
 	roleTemplateResp, err := rancherClient.Management.ProjectRoleTemplateBinding.Create(role)
+	if err != nil {
+		return err
+	}
 
 	err = kwait.Poll(500*time.Millisecond, 2*time.Minute, func() (done bool, err error) {
 		projectRoleTemplate, err := rancherClient.Management.ProjectRoleTemplateBinding.ByID(roleTemplateResp.ID)
 		if err != nil {
 			return false, err
 		}
-		if projectRoleTemplate != nil {
+		if projectRoleTemplate != nil && projectRoleTemplate.UserID == user.ID && projectRoleTemplate.ProjectID == project.ID {
 			return true, nil
 		}
 
 		return false, nil
 	})
+	if err != nil {
+		return err
+	}
+
+	adminClient, err := rancher.NewClient(rancherClient.RancherConfig.AdminToken, rancherClient.Session)
+	if err != nil {
+		return err
+	}
+
+	adminDynamicClient, err := adminClient.GetDownStreamClusterClient(project.ClusterID)
+	if err != nil {
+		return err
+	}
+
+	steveClient, err := adminClient.Steve.ProxyDownstream(project.ClusterID)
+	if err != nil {
+		return err
+	}
+
+	secretOpts := metav1.ListOptions{
+		FieldSelector:  "metadata.namespace=" + "cattle-impersonation-system",
+		TimeoutSeconds: &defaults.WatchTimeoutSeconds,
+	}
+
+	var numOfActiveSecrets int
+	err = kwait.Poll(500*time.Millisecond, 2*time.Minute, func() (done bool, err error) {
+		secretsList, err := adminDynamicClient.Resource(kubeapiSecrets.SecretGroupVersionResource).List(context.TODO(), secretOpts)
+		if err != nil {
+			return false, err
+		}
+
+		for _, secret := range secretsList.Items {
+
+			if strings.Contains(secret.GetName(), user.ID) {
+				secretID := fmt.Sprintf("%s/%s", secret.GetNamespace(), secret.GetName())
+				steveSecret, err := steveClient.SteveType(secrets.SecretSteveType).ByID(secretID)
+				if err != nil {
+					return false, err
+				}
+
+				if steveSecret.ObjectMeta.State.Name == "active" {
+					numOfActiveSecrets += 1
+				}
+
+				if numOfActiveSecrets == 2 {
+					return true, nil
+				}
+			}
+		}
+
+		return false, nil
+	})
+
 	return err
 }
 
