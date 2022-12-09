@@ -37,8 +37,6 @@ var (
 	CatalogResourceName                                   = "catalogs"
 	CatalogTemplateResourceName                           = "catalogtemplates"
 	CatalogTemplateVersionResourceName                    = "catalogtemplateversions"
-	CisBenchmarkVersionResourceName                       = "cisbenchmarkversions"
-	CisConfigResourceName                                 = "cisconfigs"
 	CloudCredentialResourceName                           = "cloudcredentials"
 	ClusterResourceName                                   = "clusters"
 	ClusterAlertResourceName                              = "clusteralerts"
@@ -148,10 +146,6 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&CatalogTemplateList{},
 		&CatalogTemplateVersion{},
 		&CatalogTemplateVersionList{},
-		&CisBenchmarkVersion{},
-		&CisBenchmarkVersionList{},
-		&CisConfig{},
-		&CisConfigList{},
 		&CloudCredential{},
 		&CloudCredentialList{},
 		&Cluster{},

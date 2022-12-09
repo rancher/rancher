@@ -27,6 +27,7 @@ type ActionHandler struct {
 	NodeTemplateGetter            v3.NodeTemplatesGetter
 	UserMgr                       user.Manager
 	ClusterManager                *clustermanager.Manager
+	ClusterScanClient             v3.ClusterScanInterface
 	CatalogTemplateVersionLister  v3.CatalogTemplateVersionLister
 	BackupClient                  v3.EtcdBackupInterface
 	ClusterTemplateClient         v3.ClusterTemplateInterface

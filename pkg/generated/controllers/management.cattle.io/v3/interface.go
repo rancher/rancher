@@ -39,8 +39,6 @@ type Interface interface {
 	Catalog() CatalogController
 	CatalogTemplate() CatalogTemplateController
 	CatalogTemplateVersion() CatalogTemplateVersionController
-	CisBenchmarkVersion() CisBenchmarkVersionController
-	CisConfig() CisConfigController
 	CloudCredential() CloudCredentialController
 	Cluster() ClusterController
 	ClusterAlert() ClusterAlertController
@@ -147,12 +145,6 @@ func (c *version) CatalogTemplate() CatalogTemplateController {
 }
 func (c *version) CatalogTemplateVersion() CatalogTemplateVersionController {
 	return NewCatalogTemplateVersionController(schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "CatalogTemplateVersion"}, "catalogtemplateversions", true, c.controllerFactory)
-}
-func (c *version) CisBenchmarkVersion() CisBenchmarkVersionController {
-	return NewCisBenchmarkVersionController(schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "CisBenchmarkVersion"}, "cisbenchmarkversions", true, c.controllerFactory)
-}
-func (c *version) CisConfig() CisConfigController {
-	return NewCisConfigController(schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "CisConfig"}, "cisconfigs", true, c.controllerFactory)
 }
 func (c *version) CloudCredential() CloudCredentialController {
 	return NewCloudCredentialController(schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "CloudCredential"}, "cloudcredentials", true, c.controllerFactory)
