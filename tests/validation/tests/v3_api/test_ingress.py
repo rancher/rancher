@@ -40,6 +40,7 @@ from .common import DEFAULT_TIMEOUT
 from .common import rbac_get_workload
 from .common import wait_for_ingress_to_active
 from .common import get_setting_value_by_name
+from .test_import_k3s_cluster import RANCHER_K3S_VERSION
 from .test_secrets import is_version_greater_than_v25
 from packaging import version
 
@@ -332,9 +333,14 @@ def test_ingress_rule_with_only_path():
 
     host = ""
     path = "/service2.html"
-    rule = {"host": host,
-            "paths": [{"workloadIds": [workload.id],
-                       "targetPort": TEST_IMAGE_PORT}]}
+    if RANCHER_K3S_VERSION != "":
+        rule = {"host": host,
+                "paths": [{"workloadIds": [workload.id],
+                           "targetPort": TEST_IMAGE_PORT, "pathType": "Prefix", "path": "/"}]}
+    else:
+        rule = {"host": host,
+                "paths": [{"workloadIds": [workload.id],
+                           "targetPort": TEST_IMAGE_PORT}]}
     p_client.create_ingress(name=name,
                             namespaceId=ns.id,
                             rules=[rule])
