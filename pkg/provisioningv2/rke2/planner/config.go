@@ -348,12 +348,12 @@ func addLabels(config map[string]interface{}, entry *planEntry) error {
 	return nil
 }
 
-func addTaints(config map[string]interface{}, entry *planEntry, runtime string) error {
+func addTaints(config map[string]interface{}, entry *planEntry) error {
 	var (
 		taintString []string
 	)
 
-	taints, err := getTaints(entry, runtime)
+	taints, err := getTaints(entry)
 	if err != nil {
 		return err
 	}
@@ -439,15 +439,14 @@ func (p *Planner) addConfigFile(nodePlan plan.NodePlan, controlPlane *rkev1.RKEC
 	addRoleConfig(config, controlPlane, entry, initNode, joinServer)
 	addLocalClusterAuthenticationEndpointConfig(config, controlPlane, entry)
 	addToken(config, entry, tokensSecret)
+
 	if err := addAddresses(p.secretCache, config, entry); err != nil {
 		return nodePlan, config, err
 	}
 	if err := addLabels(config, entry); err != nil {
 		return nodePlan, config, err
 	}
-
-	runtime := rke2.GetRuntime(controlPlane.Spec.KubernetesVersion)
-	if err := addTaints(config, entry, runtime); err != nil {
+	if err := addTaints(config, entry); err != nil {
 		return nodePlan, config, err
 	}
 
@@ -503,7 +502,7 @@ func (p *Planner) addConfigFile(nodePlan plan.NodePlan, controlPlane *rkev1.RKEC
 
 	nodePlan.Files = append(nodePlan.Files, plan.File{
 		Content: base64.StdEncoding.EncodeToString(configData),
-		Path:    fmt.Sprintf(ConfigYamlFileName, runtime),
+		Path:    fmt.Sprintf(ConfigYamlFileName, rke2.GetRuntime(controlPlane.Spec.KubernetesVersion)),
 	})
 
 	return nodePlan, config, nil

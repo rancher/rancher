@@ -141,10 +141,10 @@ func (k *K3SNodeDriverProvisioningTestSuite) ProvisioningK3SCluster(provider Pro
 				generatedPoolName := fmt.Sprintf("nc-%s-pool1-", clusterName)
 				machinePoolConfig := provider.MachinePoolFunc(generatedPoolName, namespace)
 
-				machineConfigResp, err := machinepools.CreateMachineConfig(provider.MachineConfig, machinePoolConfig, testSessionClient)
+				machineConfigResp, err := testSessionClient.Steve.SteveType(provider.MachineConfigPoolResourceSteveType).Create(machinePoolConfig)
 				require.NoError(k.T(), err)
 
-				machinePools := machinepools.MachinePoolSetup(tt.nodeRoles, machineConfigResp)
+				machinePools := machinepools.RKEMachinePoolSetup(tt.nodeRoles, machineConfigResp)
 
 				cluster := clusters.NewK3SRKE2ClusterConfig(clusterName, namespace, "", cloudCredential.ID, kubeVersion, machinePools)
 
@@ -208,10 +208,10 @@ func (k *K3SNodeDriverProvisioningTestSuite) ProvisioningK3SClusterDynamicInput(
 				generatedPoolName := fmt.Sprintf("nc-%s-pool1-", clusterName)
 				machinePoolConfig := provider.MachinePoolFunc(generatedPoolName, namespace)
 
-				machineConfigResp, err := machinepools.CreateMachineConfig(provider.MachineConfig, machinePoolConfig, testSessionClient)
+				machineConfigResp, err := testSessionClient.Steve.SteveType(provider.MachineConfigPoolResourceSteveType).Create(machinePoolConfig)
 				require.NoError(k.T(), err)
 
-				machinePools := machinepools.MachinePoolSetup(nodesAndRoles, machineConfigResp)
+				machinePools := machinepools.RKEMachinePoolSetup(nodesAndRoles, machineConfigResp)
 
 				cluster := clusters.NewK3SRKE2ClusterConfig(clusterName, namespace, "", cloudCredential.ID, kubeVersion, machinePools)
 

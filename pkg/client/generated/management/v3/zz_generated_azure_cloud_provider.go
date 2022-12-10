@@ -26,6 +26,7 @@ const (
 	AzureCloudProviderFieldSecurityGroupName            = "securityGroupName"
 	AzureCloudProviderFieldSubnetName                   = "subnetName"
 	AzureCloudProviderFieldSubscriptionID               = "subscriptionId"
+	AzureCloudProviderFieldTags                         = "tags"
 	AzureCloudProviderFieldTenantID                     = "tenantId"
 	AzureCloudProviderFieldUseInstanceMetadata          = "useInstanceMetadata"
 	AzureCloudProviderFieldUseManagedIdentityExtension  = "useManagedIdentityExtension"
@@ -60,6 +61,7 @@ type AzureCloudProvider struct {
 	SecurityGroupName            string `json:"securityGroupName,omitempty" yaml:"securityGroupName,omitempty"`
 	SubnetName                   string `json:"subnetName,omitempty" yaml:"subnetName,omitempty"`
 	SubscriptionID               string `json:"subscriptionId,omitempty" yaml:"subscriptionId,omitempty"`
+	Tags                         string `json:"tags,omitempty" yaml:"tags,omitempty"`
 	TenantID                     string `json:"tenantId,omitempty" yaml:"tenantId,omitempty"`
 	UseInstanceMetadata          bool   `json:"useInstanceMetadata,omitempty" yaml:"useInstanceMetadata,omitempty"`
 	UseManagedIdentityExtension  bool   `json:"useManagedIdentityExtension,omitempty" yaml:"useManagedIdentityExtension,omitempty"`

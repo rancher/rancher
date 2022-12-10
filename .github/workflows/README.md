@@ -11,3 +11,7 @@ If `URL of the source for this workflow run` is set, the URL will be mentioned i
 ## Replace environment variable in file (`replace-env-value.yml`)
 
 Replace environment variable in file can be used to replace an environment variable in any file. It will run `./scripts/replace-env-value-in-file.sh`, commit and create a pull request with the changes. This is mostly used for bumping versions. This workflow should work for `KEY=VALUE` (equal sign separated) values and `KEY VALUE` (space separated) values.
+
+## Update README (`update-readme.yml`)
+
+Updates the `README.md` with the latest 2.6 and 2.5 versions under `## Latest Release` based on the stable and latest Helm repositories. It uses the `README-template.md` to generate the `README.md`. It will create a pull request if the generated `README.md` differs from the current one.

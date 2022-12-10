@@ -6,7 +6,6 @@ import (
 	"encoding/base32"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path"
 	"strings"
@@ -16,7 +15,7 @@ import (
 	"github.com/rancher/norman/objectclient"
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/values"
-	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	util "github.com/rancher/rancher/pkg/cluster"
 	"github.com/rancher/rancher/pkg/clustermanager"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/clusterregistrationtoken"
@@ -46,9 +45,10 @@ import (
 )
 
 const (
-	defaultEngineInstallURL       = "https://releases.rancher.com/install-docker/17.03.2.sh"
-	amazonec2                     = "amazonec2"
-	userNodeRemoveFinalizerPrefix = "clusterscoped.controller.cattle.io/user-node-remove_"
+	defaultEngineInstallURL         = "https://releases.rancher.com/install-docker/17.03.2.sh"
+	amazonec2                       = "amazonec2"
+	userNodeRemoveCleanupAnnotation = "cleanup.cattle.io/user-node-remove"
+	userNodeRemoveFinalizerPrefix   = "clusterscoped.controller.cattle.io/user-node-remove_"
 )
 
 // SchemaToDriverFields maps Schema field => driver field
@@ -95,6 +95,7 @@ func Register(ctx context.Context, management *config.ManagementContext, cluster
 	}
 
 	nodeClient.AddLifecycle(ctx, "node-controller", nodeLifecycle)
+	nodeClient.AddHandler(ctx, "node-controller-sync", nodeLifecycle.sync)
 }
 
 type Lifecycle struct {
@@ -116,7 +117,7 @@ type Lifecycle struct {
 	devMode                   bool
 }
 
-func (m *Lifecycle) setupCustom(obj *v32.Node) {
+func (m *Lifecycle) setupCustom(obj *apimgmtv3.Node) {
 	obj.Status.NodeConfig = &rketypes.RKEConfigNode{
 		NodeName:         obj.Namespace + ":" + obj.Name,
 		HostnameOverride: obj.Spec.RequestedHostname,
@@ -143,34 +144,34 @@ func (m *Lifecycle) setupCustom(obj *v32.Node) {
 	}
 }
 
-func isCustom(obj *v32.Node) bool {
+func isCustom(obj *apimgmtv3.Node) bool {
 	return obj.Spec.CustomConfig != nil && obj.Spec.CustomConfig.Address != ""
 }
 
-func (m *Lifecycle) setWaiting(node *v32.Node) {
-	v32.NodeConditionRegistered.IsUnknown(node)
-	v32.NodeConditionRegistered.Message(node, "waiting to register with Kubernetes")
+func (m *Lifecycle) setWaiting(node *apimgmtv3.Node) {
+	apimgmtv3.NodeConditionRegistered.IsUnknown(node)
+	apimgmtv3.NodeConditionRegistered.Message(node, "waiting to register with Kubernetes")
 }
 
-func (m *Lifecycle) Create(obj *v32.Node) (runtime.Object, error) {
+func (m *Lifecycle) Create(obj *apimgmtv3.Node) (runtime.Object, error) {
 	if isCustom(obj) {
 		m.setupCustom(obj)
-		newObj, err := v32.NodeConditionInitialized.Once(obj, func() (runtime.Object, error) {
+		newObj, err := apimgmtv3.NodeConditionInitialized.Once(obj, func() (runtime.Object, error) {
 			if err := validateCustomHost(obj); err != nil {
 				return obj, err
 			}
 			m.setWaiting(obj)
 			return obj, nil
 		})
-		return newObj.(*v32.Node), err
+		return newObj.(*apimgmtv3.Node), err
 	}
 
 	if obj.Spec.NodeTemplateName == "" {
 		return obj, nil
 	}
 
-	newObj, err := v32.NodeConditionInitialized.Once(obj, func() (runtime.Object, error) {
-		logrus.Debugf("Called v32.NodeConditionInitialized.Once for [%s] in namespace [%s]", obj.Name, obj.Namespace)
+	newObj, err := apimgmtv3.NodeConditionInitialized.Once(obj, func() (runtime.Object, error) {
+		logrus.Debugf("[node-controller] Called apimgmtv3.NodeConditionInitialized.Once for [%s] in namespace [%s]", obj.Name, obj.Namespace)
 		// Ensure jail is created first, else the function `NewNodeConfig` will create the full jail path (including parent jail directory) and CreateJail will remove the directory as it does not contain a done file
 		if !m.devMode {
 			err := jailer.CreateJail(obj.Namespace)
@@ -207,90 +208,91 @@ func (m *Lifecycle) Create(obj *v32.Node) (runtime.Object, error) {
 		return obj, nil
 	})
 
-	return newObj.(*v32.Node), err
+	return newObj.(*apimgmtv3.Node), err
 }
 
-func (m *Lifecycle) getNodeTemplate(nodeTemplateName string) (*v32.NodeTemplate, error) {
+func (m *Lifecycle) getNodeTemplate(nodeTemplateName string) (*apimgmtv3.NodeTemplate, error) {
 	ns, n := ref.Parse(nodeTemplateName)
-	logrus.Debugf("getNodeTemplate parsed [%s] to ns: [%s] and n: [%s]", nodeTemplateName, ns, n)
+	logrus.Debugf("[node-controller] getNodeTemplate parsed [%s] to ns: [%s] and n: [%s]", nodeTemplateName, ns, n)
 	return m.nodeTemplateClient.GetNamespaced(ns, n, metav1.GetOptions{})
 }
 
-func (m *Lifecycle) getNodePool(nodePoolName string) (*v32.NodePool, error) {
+func (m *Lifecycle) getNodePool(nodePoolName string) (*apimgmtv3.NodePool, error) {
 	ns, p := ref.Parse(nodePoolName)
 	return m.nodePoolLister.Get(ns, p)
 }
 
-func (m *Lifecycle) Remove(obj *v32.Node) (runtime.Object, error) {
-	obj.SetFinalizers(removeFinalizerWithPrefix(obj.GetFinalizers(), userNodeRemoveFinalizerPrefix))
+func (m *Lifecycle) Remove(machine *apimgmtv3.Node) (obj runtime.Object, err error) {
+	machine = m.userNodeRemoveCleanup(machine)
 
-	if obj.Status.NodeTemplateSpec == nil {
-		if err := m.cleanRKENode(obj); err != nil {
-			return obj, err
+	if machine.Status.NodeTemplateSpec == nil {
+		if err = m.cleanRKENode(machine); err != nil {
+			return machine, err
 		}
 
-		return m.deleteV1Node(obj)
+		return m.deleteV1Node(machine)
 	}
 
-	newObj, err := v32.NodeConditionRemoved.DoUntilTrue(obj, func() (runtime.Object, error) {
-		found, err := m.isNodeInAppliedSpec(obj)
+	obj, err = apimgmtv3.NodeConditionRemoved.DoUntilTrue(machine, func() (runtime.Object, error) {
+		found, err := m.isNodeInAppliedSpec(machine)
 		if err != nil {
-			return obj, err
+			return machine, err
 		}
 		if found {
-			return obj, errors.New("waiting for node to be removed from cluster")
+			return machine, errors.New("waiting for node to be removed from cluster")
 		}
 
 		if !m.devMode {
-			err := jailer.CreateJail(obj.Namespace)
+			err = jailer.CreateJail(machine.Namespace)
 			if err != nil {
 				return nil, errors.WithMessage(err, "node remove jail error")
 			}
 		}
 
-		config, err := nodeconfig.NewNodeConfig(m.secretStore, obj)
+		config, err := nodeconfig.NewNodeConfig(m.secretStore, machine)
 		if err != nil {
-			return obj, err
+			return machine, err
 		}
 
-		if err := config.Restore(); err != nil {
-			return obj, err
+		if err = config.Restore(); err != nil {
+			return machine, err
 		}
 
 		defer config.Remove()
 
-		err = m.refreshNodeConfig(config, obj)
+		err = m.refreshNodeConfig(config, machine)
 		if err != nil {
-			return nil, errors.WithMessagef(err, "unable to refresh config for node %v", obj.Name)
+			return nil, errors.WithMessagef(err, "unable to refresh config for node %v", machine.Name)
 		}
 
-		mExists, err := nodeExists(config.Dir(), obj)
+		exists, err := nodeExists(config.Dir(), machine)
 		if err != nil {
-			return obj, err
+			return machine, err
 		}
 
-		if mExists {
-			logrus.Infof("Removing node %s", obj.Spec.RequestedHostname)
-			if err := m.drainNode(obj); err != nil {
-				return obj, err
+		if exists {
+			logrus.Infof("[node-controller] Removing node %s", machine.Spec.RequestedHostname)
+			if err = m.drainNode(machine); err != nil {
+				return machine, err
 			}
-			if err := deleteNode(config.Dir(), obj); err != nil {
-				return obj, err
+			if err = deleteNode(config.Dir(), machine); err != nil {
+				return machine, err
 			}
-			logrus.Infof("Removing node %s done", obj.Spec.RequestedHostname)
+			logrus.Infof("[node-controller] Removing node %s done", machine.Spec.RequestedHostname)
 		}
 
-		return obj, nil
+		return machine, nil
 	})
 
+	machine = obj.(*apimgmtv3.Node)
 	if err != nil {
-		return newObj.(*v32.Node), err
+		return machine, err
 	}
 
-	return m.deleteV1Node(newObj.(*v32.Node))
+	return m.deleteV1Node(machine)
 }
 
-func (m *Lifecycle) provision(driverConfig, nodeDir string, obj *v32.Node) (*v32.Node, error) {
+func (m *Lifecycle) provision(driverConfig, nodeDir string, obj *apimgmtv3.Node) (*apimgmtv3.Node, error) {
 	configRawMap := map[string]interface{}{}
 	if err := json.Unmarshal([]byte(driverConfig), &configRawMap); err != nil {
 		return obj, errors.Wrap(err, "failed to unmarshal node config")
@@ -313,7 +315,7 @@ func (m *Lifecycle) provision(driverConfig, nodeDir string, obj *v32.Node) (*v32
 		return obj, err
 	}
 
-	logrus.Infof("Provisioning node %s", obj.Spec.RequestedHostname)
+	logrus.Infof("[node-controller] Provisioning node %s", obj.Spec.RequestedHostname)
 
 	stdoutReader, stderrReader, err := startReturnOutput(cmd)
 	if err != nil {
@@ -328,15 +330,15 @@ func (m *Lifecycle) provision(driverConfig, nodeDir string, obj *v32.Node) (*v32
 		return obj, err
 	}
 
-	if err := cmd.Wait(); err != nil {
+	if err = cmd.Wait(); err != nil {
 		return obj, err
 	}
 
-	if err := m.deployAgent(nodeDir, obj); err != nil {
+	if err = m.deployAgent(nodeDir, obj); err != nil {
 		return obj, err
 	}
 
-	logrus.Infof("Provisioning node %s done", obj.Spec.RequestedHostname)
+	logrus.Infof("[node-controller] Provisioning node %s done", obj.Spec.RequestedHostname)
 	return obj, nil
 }
 
@@ -386,7 +388,7 @@ func aliasToPath(driver string, config map[string]interface{}, ns string) error 
 					return err
 				}
 				fullPath := path.Join(fileDir, fileName)
-				err = ioutil.WriteFile(fullPath, []byte(fileContents), 0600)
+				err = os.WriteFile(fullPath, []byte(fileContents), 0600)
 				if err != nil {
 					return err
 				}
@@ -402,7 +404,7 @@ func aliasToPath(driver string, config map[string]interface{}, ns string) error 
 	return nil
 }
 
-func (m *Lifecycle) deployAgent(nodeDir string, obj *v32.Node) error {
+func (m *Lifecycle) deployAgent(nodeDir string, obj *apimgmtv3.Node) error {
 	token, err := m.systemAccountManager.GetOrCreateSystemClusterToken(obj.Namespace)
 	if err != nil {
 		return err
@@ -444,14 +446,14 @@ func (m *Lifecycle) deployAgent(nodeDir string, obj *v32.Node) error {
 
 // authenticateRegistry authenticates the machine to a private registry if one is defined on the cluster
 // this enables the agent image to be pulled from the private registry
-func (m *Lifecycle) authenticateRegistry(nodeDir string, node *v32.Node, cluster *v32.Cluster) error {
+func (m *Lifecycle) authenticateRegistry(nodeDir string, node *apimgmtv3.Node, cluster *apimgmtv3.Cluster) error {
 	reg := util.GetPrivateRepo(cluster)
 	// if there is no private registry defined or there is a registry without credentials, return since auth is not needed
 	if reg == nil || reg.User == "" || reg.Password == "" {
 		return nil
 	}
 
-	logrus.Infof("[node-controller-rancher-machine] private registry detected, authenticating %s to %s", node.Spec.RequestedHostname, reg.URL)
+	logrus.Infof("[node-controller] private registry detected, authenticating %s to %s", node.Spec.RequestedHostname, reg.URL)
 
 	login := clusterregistrationtoken.LoginCommand(*reg)
 	args := buildLoginCommand(node, login)
@@ -460,7 +462,7 @@ func (m *Lifecycle) authenticateRegistry(nodeDir string, node *v32.Node, cluster
 		return err
 	}
 
-	logrus.Tracef("[node-controller-rancher-machine] login command: %s", cmd.String())
+	logrus.Tracef("[node-controller] login command: %s", cmd.String())
 
 	output, err := cmd.CombinedOutput()
 	if err != nil {
@@ -470,7 +472,7 @@ func (m *Lifecycle) authenticateRegistry(nodeDir string, node *v32.Node, cluster
 	return nil
 }
 
-func (m *Lifecycle) ready(obj *v32.Node) (*v32.Node, error) {
+func (m *Lifecycle) ready(obj *apimgmtv3.Node) (*apimgmtv3.Node, error) {
 	config, err := nodeconfig.NewNodeConfig(m.secretStore, obj)
 	if err != nil {
 		return obj, err
@@ -506,22 +508,34 @@ outer:
 		case err = <-done:
 			break outer
 		case <-time.After(5 * time.Second):
-			config.Save()
+			_ = config.Save()
 		}
 	}
 
-	newObj, saveError := v32.NodeConditionConfigSaved.Once(obj, func() (runtime.Object, error) {
+	newObj, saveError := apimgmtv3.NodeConditionConfigSaved.Once(obj, func() (runtime.Object, error) {
 		return m.saveConfig(config, config.FullDir(), obj)
 	})
-	obj = newObj.(*v32.Node)
+	obj = newObj.(*apimgmtv3.Node)
 	if err == nil {
 		return obj, saveError
 	}
 	return obj, err
 }
 
-func (m *Lifecycle) Updated(obj *v32.Node) (runtime.Object, error) {
-	newObj, err := v32.NodeConditionProvisioned.Once(obj, func() (runtime.Object, error) {
+func (m *Lifecycle) sync(_ string, machine *apimgmtv3.Node) (runtime.Object, error) {
+	if machine == nil {
+		return nil, nil
+	}
+
+	if machine.Annotations[userNodeRemoveCleanupAnnotation] != "true" {
+		machine = m.userNodeRemoveCleanup(machine)
+	}
+
+	return m.nodeClient.Update(machine)
+}
+
+func (m *Lifecycle) Updated(obj *apimgmtv3.Node) (runtime.Object, error) {
+	newObj, err := apimgmtv3.NodeConditionProvisioned.Once(obj, func() (runtime.Object, error) {
 		if obj.Status.NodeTemplateSpec == nil {
 			m.setWaiting(obj)
 			return obj, nil
@@ -541,11 +555,11 @@ func (m *Lifecycle) Updated(obj *v32.Node) (runtime.Object, error) {
 		}
 		return obj, err
 	})
-	return newObj.(*v32.Node), err
+	return newObj.(*apimgmtv3.Node), err
 }
 
-func (m *Lifecycle) saveConfig(config *nodeconfig.NodeConfig, nodeDir string, obj *v32.Node) (*v32.Node, error) {
-	logrus.Infof("Generating and uploading node config %s", obj.Spec.RequestedHostname)
+func (m *Lifecycle) saveConfig(config *nodeconfig.NodeConfig, nodeDir string, obj *apimgmtv3.Node) (*apimgmtv3.Node, error) {
+	logrus.Infof("[node-controller] Generating and uploading node config %s", obj.Spec.RequestedHostname)
 	if err := config.Save(); err != nil {
 		return obj, err
 	}
@@ -625,7 +639,7 @@ func (m *Lifecycle) saveConfig(config *nodeconfig.NodeConfig, nodeDir string, ob
 	return obj, nil
 }
 
-func (m *Lifecycle) refreshNodeConfig(nc *nodeconfig.NodeConfig, obj *v32.Node) error {
+func (m *Lifecycle) refreshNodeConfig(nc *nodeconfig.NodeConfig, obj *apimgmtv3.Node) error {
 	template, err := m.getNodeTemplate(obj.Spec.NodeTemplateName)
 	if err != nil {
 		return err
@@ -643,7 +657,7 @@ func (m *Lifecycle) refreshNodeConfig(nc *nodeconfig.NodeConfig, obj *v32.Node) 
 	}
 
 	if err := m.updateRawConfigFromCredential(data, rawConfig, template); err != nil {
-		logrus.Debugf("refreshNodeConfig: error calling updateRawConfigFromCredential for [%v]: %v", obj.Name, err)
+		logrus.Debugf("[node-controller] refreshNodeConfig: error calling updateRawConfigFromCredential for [%v]: %v", obj.Name, err)
 		return err
 	}
 
@@ -651,7 +665,7 @@ func (m *Lifecycle) refreshNodeConfig(nc *nodeconfig.NodeConfig, obj *v32.Node) 
 
 	if template.Spec.Driver == amazonec2 {
 		setEc2ClusterIDTag(rawConfig, obj.Namespace)
-		logrus.Debug("refreshNodeConfig: Updating amazonec2 machine config")
+		logrus.Debug("[node-controller] refreshNodeConfig: Updating amazonec2 machine config")
 		//TODO: Update to not be amazon specific, this needs to be moved to the driver
 		update, err = nc.UpdateAmazonAuth(rawConfig)
 		if err != nil {
@@ -683,7 +697,7 @@ func (m *Lifecycle) refreshNodeConfig(nc *nodeconfig.NodeConfig, obj *v32.Node) 
 	return nil
 }
 
-func (m *Lifecycle) isNodeInAppliedSpec(node *v32.Node) (bool, error) {
+func (m *Lifecycle) isNodeInAppliedSpec(node *apimgmtv3.Node) (bool, error) {
 	// worker/controlplane nodes can just be immediately deleted
 	if !node.Spec.Etcd {
 		return false, nil
@@ -718,7 +732,7 @@ func (m *Lifecycle) isNodeInAppliedSpec(node *v32.Node) (bool, error) {
 	return false, nil
 }
 
-func validateCustomHost(obj *v32.Node) error {
+func validateCustomHost(obj *apimgmtv3.Node) error {
 	if obj.Spec.Imported {
 		return nil
 	}
@@ -743,7 +757,7 @@ func validateCustomHost(obj *v32.Node) error {
 	return nil
 }
 
-func roles(node *v32.Node) []string {
+func roles(node *apimgmtv3.Node) []string {
 	var roles []string
 	if node.Spec.Etcd {
 		roles = append(roles, "etcd")
@@ -760,7 +774,7 @@ func roles(node *v32.Node) []string {
 	return roles
 }
 
-func (m *Lifecycle) setCredFields(data interface{}, fields map[string]v32.Field, credID string) error {
+func (m *Lifecycle) setCredFields(data interface{}, fields map[string]apimgmtv3.Field, credID string) error {
 	splitID := strings.Split(credID, ":")
 	if len(splitID) != 2 {
 		return fmt.Errorf("invalid credential id %s", credID)
@@ -782,14 +796,14 @@ func (m *Lifecycle) setCredFields(data interface{}, fields map[string]v32.Field,
 	return nil
 }
 
-func (m *Lifecycle) updateRawConfigFromCredential(data map[string]interface{}, rawConfig interface{}, template *v32.NodeTemplate) error {
+func (m *Lifecycle) updateRawConfigFromCredential(data map[string]interface{}, rawConfig interface{}, template *apimgmtv3.NodeTemplate) error {
 	credID := convert.ToString(values.GetValueN(data, "spec", "cloudCredentialName"))
 	if credID != "" {
 		existingSchema, err := m.schemaLister.Get("", template.Spec.Driver+"config")
 		if err != nil {
 			return err
 		}
-		logrus.Debugf("setCredFields for credentialName %s", credID)
+		logrus.Debugf("[node-controller] setCredFields for credentialName %s", credID)
 		err = m.setCredFields(rawConfig, existingSchema.Spec.ResourceFields, credID)
 		if err != nil {
 			return errors.Wrap(err, "failed to set credential fields")

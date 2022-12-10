@@ -22,6 +22,7 @@ RANCHER_CHART_VERSION = os.environ.get("RANCHER_CHART_VERSION")
 RANCHER_HELM_EXTRA_SETTINGS = os.environ.get("RANCHER_HELM_EXTRA_SETTINGS")
 RANCHER_IMAGE_TAG = os.environ.get("RANCHER_IMAGE_TAG")
 RANCHER_HELM_REPO = os.environ.get("RANCHER_HELM_REPO", "latest")
+RANCHER_HELM_URL = os.environ.get("RANCHER_HELM_URL", "https://releases.rancher.com/server-charts/")
 RANCHER_LETSENCRYPT_EMAIL = os.environ.get("RANCHER_LETSENCRYPT_EMAIL")
 # Here is the list of cert types for HA install
 # [rancher-self-signed, byo-valid, byo-self-signed, letsencrypt]
@@ -68,6 +69,7 @@ def test_remove_rancher_ha():
 def test_install_rancher_ha(precheck_certificate_options):
     cm_install = True
     extra_settings = []
+    profile = 'rke-cis-1.5'
     if "byo-" in RANCHER_HA_CERT_OPTION:
         cm_install = False
     print("The hostname is: {}".format(RANCHER_HA_HOSTNAME))
@@ -79,7 +81,6 @@ def test_install_rancher_ha(precheck_certificate_options):
             print("RKE cluster is provisioning for the local cluster")
             nodes = create_resources()
             if RANCHER_HA_HARDENED:
-                profile = 'rke-cis-1.5'
                 node_role = [["worker", "controlplane", "etcd"]]
                 node_roles =[]
                 for role in node_role:
@@ -140,7 +141,7 @@ def test_install_rancher_ha(precheck_certificate_options):
         assert False, "check the logs in console for details"
 
     print_kubeconfig(kubeconfig_path)
-    if RANCHER_HA_HARDENED and RANCHER_LOCAL_CLUSTER_TYPE == "RKE":
+    if (RANCHER_HA_HARDENED and RANCHER_LOCAL_CLUSTER_TYPE == "RKE") and RANCHER_HA_KUBECONFIG == "" and RANCHER_HA_HOSTNAME=="":
         prepare_hardened_cluster(profile, kubeconfig_path)
     if RANCHER_LOCAL_CLUSTER_TYPE == "RKE":
         check_rke_ingress_rollout()
@@ -323,9 +324,9 @@ def set_route53_with_ingress():
     time.sleep(60)
 
 
-def add_repo_create_namespace(repo=RANCHER_HELM_REPO):
+def add_repo_create_namespace(repo=RANCHER_HELM_REPO, url=RANCHER_HELM_URL):
     repo_name = "rancher-" + repo
-    repo_url = "https://releases.rancher.com/server-charts/" + repo
+    repo_url = url + repo
 
     run_command_with_stderr("helm_v3 repo add " + repo_name + " " + repo_url)
     run_command_with_stderr("helm_v3 repo update")

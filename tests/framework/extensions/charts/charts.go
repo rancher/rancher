@@ -9,14 +9,21 @@ import (
 	"github.com/rancher/rancher/pkg/api/scheme"
 	catalogv1 "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
-	"github.com/rancher/rancher/tests/framework/extensions/workloads/daemonsets"
-	"github.com/rancher/rancher/tests/framework/extensions/workloads/deployments"
+	"github.com/rancher/rancher/tests/framework/extensions/kubeapi/workloads/daemonsets"
+	"github.com/rancher/rancher/tests/framework/extensions/kubeapi/workloads/deployments"
 	"github.com/rancher/rancher/tests/framework/pkg/wait"
 	"github.com/rancher/rancher/tests/integration/pkg/defaults"
 	appv1 "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/watch"
+)
+
+const (
+	// defaultRegistrySettingID is a private constant string that contains the ID of system default registry setting.
+	defaultRegistrySettingID = "system-default-registry"
+	// serverURLSettingID is a private constant string that contains the ID of server URL setting.
+	serverURLSettingID = "server-url"
 )
 
 // InstallOptions is a struct of the required options to install a chart.
@@ -31,9 +38,10 @@ type InstallOptions struct {
 // It is used to avoid passing the same options to different functions while using the chart helpers.
 type payloadOpts struct {
 	InstallOptions
-	Name      string
-	Host      string
-	Namespace string
+	Name            string
+	Namespace       string
+	Host            string
+	DefaultRegistry string
 }
 
 // RancherIstioOpts is a struct of the required options to install Rancher Istio with desired chart values.

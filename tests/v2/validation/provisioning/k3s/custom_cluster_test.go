@@ -5,9 +5,12 @@ import (
 	"fmt"
 	"testing"
 
+	apiv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
+	v1 "github.com/rancher/rancher/tests/framework/clients/rancher/v1"
 	"github.com/rancher/rancher/tests/framework/extensions/clusters"
+	hardening "github.com/rancher/rancher/tests/framework/extensions/hardening/k3s"
 	"github.com/rancher/rancher/tests/framework/extensions/machinepools"
 	"github.com/rancher/rancher/tests/framework/extensions/tokenregistration"
 	"github.com/rancher/rancher/tests/framework/extensions/users"
@@ -26,6 +29,7 @@ import (
 type CustomClusterProvisioningTestSuite struct {
 	suite.Suite
 	client             *rancher.Client
+	provisioning       *provisioning.Config
 	session            *session.Session
 	standardUserClient *rancher.Client
 	kubernetesVersions []string
@@ -45,6 +49,7 @@ func (c *CustomClusterProvisioningTestSuite) SetupSuite() {
 
 	c.kubernetesVersions = clustersConfig.KubernetesVersions
 	c.nodeProviders = clustersConfig.NodeProviders
+	c.provisioning = clustersConfig
 
 	client, err := rancher.NewClient("", testSession)
 	require.NoError(c.T(), err)
@@ -88,12 +93,13 @@ func (c *CustomClusterProvisioningTestSuite) ProvisioningK3SCustomCluster(extern
 	tests := []struct {
 		name      string
 		nodeRoles []string
+		hardening *provisioning.Config
 		client    *rancher.Client
 	}{
-		{"1 Node all roles Admin User", nodeRoles0, c.client},
-		{"1 Node all roles Standard User", nodeRoles0, c.standardUserClient},
-		{"3 nodes - 1 role per node Admin User", nodeRoles1, c.client},
-		{"3 nodes - 1 role per node Standard User", nodeRoles1, c.standardUserClient},
+		{"1 Node all roles Admin User", nodeRoles0, c.provisioning, c.client},
+		{"1 Node all roles Standard User", nodeRoles0, c.provisioning, c.standardUserClient},
+		{"3 nodes - 1 role per node Admin User", nodeRoles1, c.provisioning, c.client},
+		{"3 nodes - 1 role per node Standard User", nodeRoles1, c.provisioning, c.standardUserClient},
 	}
 	var name string
 	for _, tt := range tests {
@@ -120,10 +126,14 @@ func (c *CustomClusterProvisioningTestSuite) ProvisioningK3SCustomCluster(extern
 				client, err = client.ReLogin()
 				require.NoError(c.T(), err)
 
-				customCluster, err := client.Provisioning.Cluster.ByID(clusterResp.ID)
+				customCluster, err := client.Steve.SteveType(clusters.ProvisioningSteveResouceType).ByID(clusterResp.ID)
 				require.NoError(c.T(), err)
 
-				token, err := tokenregistration.GetRegistrationToken(client, customCluster.Status.ClusterName)
+				clusterStatus := &apiv1.ClusterStatus{}
+				err = v1.ConvertToK8sType(customCluster.Status, clusterStatus)
+				require.NoError(c.T(), err)
+
+				token, err := tokenregistration.GetRegistrationToken(client, clusterStatus.ClusterName)
 				require.NoError(c.T(), err)
 
 				for key, node := range nodes {
@@ -153,6 +163,17 @@ func (c *CustomClusterProvisioningTestSuite) ProvisioningK3SCustomCluster(extern
 				clusterToken, err := clusters.CheckServiceAccountTokenSecret(client, clusterName)
 				require.NoError(c.T(), err)
 				assert.NotEmpty(c.T(), clusterToken)
+
+				if tt.hardening.Hardened {
+					err = hardening.HardeningNodes(client, tt.hardening.Hardened, nodes, tt.nodeRoles)
+					require.NoError(c.T(), err)
+
+					hardenCluster := clusters.HardenK3SRKE2ClusterConfig(clusterName, namespace, "", "", kubeVersion, nil)
+
+					hardenClusterResp, err := clusters.UpdateK3SRKE2Cluster(client, clusterResp, hardenCluster)
+					require.NoError(c.T(), err)
+					assert.Equal(c.T(), clusterName, hardenClusterResp.ObjectMeta.Name)
+				}
 			})
 		}
 	}
@@ -180,11 +201,12 @@ func (c *CustomClusterProvisioningTestSuite) ProvisioningK3SCustomClusterDynamic
 	numOfNodes := len(rolesPerNode)
 
 	tests := []struct {
-		name   string
-		client *rancher.Client
+		name      string
+		client    *rancher.Client
+		hardening *provisioning.Config
 	}{
-		{"Admin User", c.client},
-		{"Standard User", c.standardUserClient},
+		{"Admin User", c.client, c.provisioning},
+		{"Standard User", c.standardUserClient, c.provisioning},
 	}
 
 	var name string
@@ -211,10 +233,14 @@ func (c *CustomClusterProvisioningTestSuite) ProvisioningK3SCustomClusterDynamic
 				client, err = client.ReLogin()
 				require.NoError(c.T(), err)
 
-				customCluster, err := client.Provisioning.Cluster.ByID(clusterResp.ID)
+				customCluster, err := client.Steve.SteveType(clusters.ProvisioningSteveResouceType).ByID(clusterResp.ID)
 				require.NoError(c.T(), err)
 
-				token, err := tokenregistration.GetRegistrationToken(client, customCluster.Status.ClusterName)
+				clusterStatus := &apiv1.ClusterStatus{}
+				err = v1.ConvertToK8sType(customCluster.Status, clusterStatus)
+				require.NoError(c.T(), err)
+
+				token, err := tokenregistration.GetRegistrationToken(client, clusterStatus.ClusterName)
 				require.NoError(c.T(), err)
 
 				for key, node := range nodes {
@@ -244,6 +270,17 @@ func (c *CustomClusterProvisioningTestSuite) ProvisioningK3SCustomClusterDynamic
 				clusterToken, err := clusters.CheckServiceAccountTokenSecret(client, clusterName)
 				require.NoError(c.T(), err)
 				assert.NotEmpty(c.T(), clusterToken)
+
+				if tt.hardening.Hardened {
+					err = hardening.HardeningNodes(client, tt.hardening.Hardened, nodes, rolesPerNode)
+					require.NoError(c.T(), err)
+
+					hardenCluster := clusters.HardenK3SRKE2ClusterConfig(clusterName, namespace, "", "", kubeVersion, nil)
+
+					hardenClusterResp, err := clusters.UpdateK3SRKE2Cluster(client, clusterResp, hardenCluster)
+					require.NoError(c.T(), err)
+					assert.Equal(c.T(), clusterName, hardenClusterResp.ObjectMeta.Name)
+				}
 			})
 		}
 	}
@@ -273,6 +310,6 @@ func (c *CustomClusterProvisioningTestSuite) TestProvisioningCustomClusterDynami
 
 // In order for 'go test' to run this suite, we need to create
 // a normal test function and pass our suite to suite.Run
-func TestCustomClusterProvisioningTestSuite(t *testing.T) {
+func TestCustomClusterK3SProvisioningTestSuite(t *testing.T) {
 	suite.Run(t, new(CustomClusterProvisioningTestSuite))
 }

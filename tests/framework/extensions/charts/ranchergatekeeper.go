@@ -7,7 +7,7 @@ import (
 	"github.com/rancher/rancher/pkg/api/steve/catalog/types"
 	catalogv1 "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
-	crds "github.com/rancher/rancher/tests/framework/extensions/customresourcedefinitions"
+	kubenamespaces "github.com/rancher/rancher/tests/framework/extensions/kubeapi/namespaces"
 	"github.com/rancher/rancher/tests/framework/extensions/namespaces"
 	"github.com/rancher/rancher/tests/framework/pkg/wait"
 	"github.com/rancher/rancher/tests/integration/pkg/defaults"
@@ -20,18 +20,28 @@ const (
 	RancherGatekeeperNamespace = "cattle-gatekeeper-system"
 	// Name of the rancher gatekeeper chart
 	RancherGatekeeperName = "rancher-gatekeeper"
-	// Name of rancher gatekeepr crd chart
+	// Name of rancher gatekeeper crd chart
 	RancherGatekeeperCRDName = "rancher-gatekeeper-crd"
 )
 
 // InstallRancherGatekeeperChart installs the OPA gatekeeper chart
 func InstallRancherGatekeeperChart(client *rancher.Client, installOptions *InstallOptions) error {
-	hostWithProtocol := fmt.Sprintf("https:// %s", client.RancherConfig.Host)
+	serverSetting, err := client.Management.Setting.ByID(serverURLSettingID)
+	if err != nil {
+		return err
+	}
+
+	registrySetting, err := client.Management.Setting.ByID(defaultRegistrySettingID)
+	if err != nil {
+		return err
+	}
+
 	gatekeeperChartInstallActionPayload := &payloadOpts{
-		InstallOptions: *installOptions,
-		Name:           RancherGatekeeperName,
-		Host:           hostWithProtocol,
-		Namespace:      RancherGatekeeperNamespace,
+		InstallOptions:  *installOptions,
+		Name:            RancherGatekeeperName,
+		Namespace:       RancherGatekeeperNamespace,
+		Host:            serverSetting.Value,
+		DefaultRegistry: registrySetting.Value,
 	}
 
 	chartInstallAction := newGatekeeperChartInstallAction(gatekeeperChartInstallActionPayload)
@@ -62,9 +72,12 @@ func InstallRancherGatekeeperChart(client *rancher.Client, installOptions *Insta
 		}
 
 		err = wait.WatchWait(watchAppInterface, func(event watch.Event) (ready bool, err error) {
+			chart := event.Object.(*catalogv1.App)
 			if event.Type == watch.Error {
 				return false, fmt.Errorf("there was an error uninstalling rancher gatekeeper chart")
 			} else if event.Type == watch.Deleted {
+				return true, nil
+			} else if chart == nil {
 				return true, nil
 			}
 			return false, nil
@@ -73,24 +86,47 @@ func InstallRancherGatekeeperChart(client *rancher.Client, installOptions *Insta
 			return err
 		}
 
-		dynamicClient, err := client.GetDownStreamClusterClient(installOptions.ClusterID)
+		err = catalogClient.UninstallChart(RancherGatekeeperCRDName, RancherGatekeeperNamespace, defaultChartUninstallAction)
 		if err != nil {
 			return err
 		}
 
-		namespaceResource := dynamicClient.Resource(namespaces.NamespaceGroupVersionResource).Namespace("")
-
-		err = namespaceResource.Delete(context.TODO(), RancherGatekeeperNamespace, metav1.DeleteOptions{})
+		watchAppInterface, err = catalogClient.Apps(RancherGatekeeperNamespace).Watch(context.TODO(), metav1.ListOptions{
+			FieldSelector:  "metadata.name=" + RancherGatekeeperCRDName,
+			TimeoutSeconds: &defaults.WatchTimeoutSeconds,
+		})
 		if err != nil {
 			return err
 		}
 
-		unstructuredCRDList, err := crds.ListCustomResourceDefinitions(client, installOptions.ClusterID, "")
+		err = wait.WatchWait(watchAppInterface, func(event watch.Event) (ready bool, err error) {
+			chart := event.Object.(*catalogv1.App)
+			if event.Type == watch.Error {
+				return false, fmt.Errorf("there was an error uninstalling rancher gatekeeper chart")
+			} else if event.Type == watch.Deleted {
+				return true, nil
+			} else if chart == nil {
+				return true, nil
+			}
+			return false, nil
+		})
 		if err != nil {
 			return err
 		}
-		CRDSlice := crds.GetCustomResourceDefinitionsListByName(unstructuredCRDList, "gatekeeper")
-		err = crds.BatchDeleteCustomResourceDefinition(client, installOptions.ClusterID, "", CRDSlice)
+
+		steveclient, err := client.Steve.ProxyDownstream(installOptions.ClusterID)
+		if err != nil {
+			return err
+		}
+
+		namespaceClient := steveclient.SteveType(namespaces.NamespaceSteveType)
+
+		namespace, err := namespaceClient.ByID(RancherGatekeeperNamespace)
+		if err != nil {
+			return err
+		}
+
+		err = namespaceClient.Delete(namespace)
 		if err != nil {
 			return err
 		}
@@ -103,7 +139,7 @@ func InstallRancherGatekeeperChart(client *rancher.Client, installOptions *Insta
 		if err != nil {
 			return err
 		}
-		adminNamespaceResource := adminDynamicClient.Resource(namespaces.NamespaceGroupVersionResource).Namespace("")
+		adminNamespaceResource := adminDynamicClient.Resource(kubenamespaces.NamespaceGroupVersionResource).Namespace("")
 
 		watchNamespaceInterface, err := adminNamespaceResource.Watch(context.TODO(), metav1.ListOptions{
 			FieldSelector:  "metadata.name=" + RancherGatekeeperNamespace,
@@ -120,7 +156,6 @@ func InstallRancherGatekeeperChart(client *rancher.Client, installOptions *Insta
 			}
 			return false, nil
 		})
-
 	})
 
 	err = catalogClient.InstallChart(chartInstallAction)
@@ -154,10 +189,9 @@ func InstallRancherGatekeeperChart(client *rancher.Client, installOptions *Insta
 
 // newGatekeeperChartInstallAction is a helper function that returns an array of newChartInstallActions for installing the gatekeeper and gatekeepr-crd charts
 func newGatekeeperChartInstallAction(p *payloadOpts) *types.ChartInstallAction {
-	gatekeeperValues := map[string]interface{}{}
+	chartInstall := newChartInstall(p.Name, p.InstallOptions.Version, p.InstallOptions.ClusterID, p.InstallOptions.ClusterName, p.Host, p.DefaultRegistry, nil)
+	chartInstallCRD := newChartInstall(p.Name+"-crd", p.InstallOptions.Version, p.InstallOptions.ClusterID, p.InstallOptions.ClusterName, p.Host, p.DefaultRegistry, nil)
 
-	chartInstall := newChartInstall(p.Name, p.InstallOptions.Version, p.InstallOptions.ClusterID, p.InstallOptions.ClusterName, p.Host, gatekeeperValues)
-	chartInstallCRD := newChartInstall(p.Name+"-crd", p.InstallOptions.Version, p.InstallOptions.ClusterID, p.InstallOptions.ClusterName, p.Host, gatekeeperValues)
 	chartInstalls := []types.ChartInstall{*chartInstallCRD, *chartInstall}
 
 	chartInstallAction := newChartInstallAction(p.Namespace, p.ProjectID, chartInstalls)
@@ -167,11 +201,22 @@ func newGatekeeperChartInstallAction(p *payloadOpts) *types.ChartInstallAction {
 
 // UpgradeRanchergatekeeperChart is a helper function that upgrades the rancher-gatekeeper chart.
 func UpgradeRancherGatekeeperChart(client *rancher.Client, installOptions *InstallOptions) error {
+	serverSetting, err := client.Management.Setting.ByID(serverURLSettingID)
+	if err != nil {
+		return err
+	}
+
+	registrySetting, err := client.Management.Setting.ByID(defaultRegistrySettingID)
+	if err != nil {
+		return err
+	}
+
 	gatekeeperChartUpgradeActionPayload := &payloadOpts{
-		InstallOptions: *installOptions,
-		Name:           RancherGatekeeperName,
-		Host:           client.RancherConfig.Host,
-		Namespace:      RancherGatekeeperNamespace,
+		InstallOptions:  *installOptions,
+		Name:            RancherGatekeeperName,
+		Namespace:       RancherGatekeeperNamespace,
+		Host:            serverSetting.Value,
+		DefaultRegistry: registrySetting.Value,
 	}
 
 	chartUpgradeAction := newGatekeeperChartUpgradeAction(gatekeeperChartUpgradeActionPayload)
@@ -244,10 +289,8 @@ func UpgradeRancherGatekeeperChart(client *rancher.Client, installOptions *Insta
 
 // newGatekeeperChartUpgradeAction is a private helper function that returns chart upgrade action.
 func newGatekeeperChartUpgradeAction(p *payloadOpts) *types.ChartUpgradeAction {
-	gatekeeperValues := map[string]interface{}{}
-
-	chartUpgrade := newChartUpgrade(p.Name, p.InstallOptions.Version, p.InstallOptions.ClusterID, p.InstallOptions.ClusterName, p.Host, gatekeeperValues)
-	chartUpgradeCRD := newChartUpgrade(p.Name+"-crd", p.InstallOptions.Version, p.InstallOptions.ClusterID, p.InstallOptions.ClusterName, p.Host, gatekeeperValues)
+	chartUpgrade := newChartUpgrade(p.Name, p.InstallOptions.Version, p.InstallOptions.ClusterID, p.InstallOptions.ClusterName, p.Host, p.DefaultRegistry, nil)
+	chartUpgradeCRD := newChartUpgrade(p.Name+"-crd", p.InstallOptions.Version, p.InstallOptions.ClusterID, p.InstallOptions.ClusterName, p.Host, p.DefaultRegistry, nil)
 	chartUpgrades := []types.ChartUpgrade{*chartUpgradeCRD, *chartUpgrade}
 
 	chartUpgradeAction := newChartUpgradeAction(p.Namespace, chartUpgrades)

@@ -164,10 +164,18 @@ if ( true == via_webhook() && (!(rancher_version ==~ rancher_version_regex)) ) {
                       }
                       else if (rancher_version.startsWith("v2.6")){
                         if (!env.RKE_VERSION) {
-                          RKE_VERSION = "v1.3.13"
+                          RKE_VERSION = "v1.3.15"
                         }
                         if (!env.RANCHER_K3S_VERSION) {
-                          RANCHER_K3S_VERSION = "v1.24.2+k3s1"
+                          RANCHER_K3S_VERSION = "v1.24.6+k3s1"
+                        }
+                      }
+                      else if (rancher_version.startsWith("v2.7")){
+                        if (!env.RKE_VERSION) {
+                          RKE_VERSION = "v1.4.0-rc4"
+                        }
+                        if (!env.RANCHER_K3S_VERSION) {
+                          RANCHER_K3S_VERSION = "v1.24.6+k3s1"
                         }
                       }
                       params = [ string(name: 'CATTLE_TEST_URL', value: "${CATTLE_TEST_URL}"),
@@ -192,7 +200,7 @@ if ( true == via_webhook() && (!(rancher_version ==~ rancher_version_regex)) ) {
                       jobs["custom"] = { build job: 'rancher-v3_ontag_custom_certification', parameters: params}
                       // windows note: https://github.com/rancher/dashboard/issues/6549
                       // jobs["windows"] = { build job: 'rancher-v3_ontag_windows_certification', parameters: params}
-                      if (rancher_version.startsWith("v2.6")){
+                      if (rancher_version.startsWith("v2.6") || rancher_version.startsWith("v2.7")){
                         // Rancher server 2 is used to test GKE, EKS, AKS and Imported clusters
                         jobs["eks"] = { build job: 'rancher-v3_ontag_eks_certification', parameters: params2 }
                         jobs["aks"] = { build job: 'rancher-v3_ontag_aks_certification', parameters: params2 }

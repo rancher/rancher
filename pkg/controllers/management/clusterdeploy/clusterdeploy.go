@@ -17,6 +17,7 @@ import (
 	util "github.com/rancher/rancher/pkg/cluster"
 	"github.com/rancher/rancher/pkg/clustermanager"
 	"github.com/rancher/rancher/pkg/features"
+	"github.com/rancher/rancher/pkg/fleet"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/image"
@@ -289,12 +290,9 @@ func (cd *clusterDeploy) deployAgent(cluster *v3.Cluster) error {
 	}
 	logrus.Tracef("clusterDeploy: deployAgent: desiredTaints is [%v] for cluster [%s]", desiredTaints, cluster.Name)
 
-	var privateRegistries *corev1.Secret
-	if cluster.GetSecret("PrivateRegistrySecret") != "" {
-		privateRegistries, err = cd.secretLister.Get(namespace.GlobalNamespace, cluster.GetSecret("PrivateRegistrySecret"))
-		if err != nil {
-			return err
-		}
+	privateRegistrySecretData, err := cd.getPrivateRegistrySecretData(cluster)
+	if err != nil {
+		return err
 	}
 
 	if !redeployAgent(cluster, desiredAgent, desiredAuth, desiredFeatures, desiredTaints) {
@@ -312,7 +310,7 @@ func (cd *clusterDeploy) deployAgent(cluster *v3.Cluster) error {
 	}()
 
 	if _, err = v32.ClusterConditionAgentDeployed.Do(cluster, func() (runtime.Object, error) {
-		yaml, err := cd.getYAML(cluster, desiredAgent, desiredAuth, desiredFeatures, desiredTaints, privateRegistries)
+		yaml, err := cd.getYAML(cluster, desiredAgent, desiredAuth, desiredFeatures, desiredTaints, privateRegistrySecretData)
 		if err != nil {
 			return cluster, err
 		}
@@ -432,7 +430,7 @@ func (cd *clusterDeploy) getKubeConfig(cluster *v3.Cluster) (*clientcmdapi.Confi
 	return cd.clusterManager.KubeConfig(cluster.Name, token), tokenName, nil
 }
 
-func (cd *clusterDeploy) getYAML(cluster *v3.Cluster, agentImage, authImage string, features map[string]bool, taints []corev1.Taint, privateRegistries *corev1.Secret) ([]byte, error) {
+func (cd *clusterDeploy) getYAML(cluster *v3.Cluster, agentImage, authImage string, features map[string]bool, taints []corev1.Taint, privateRegistries map[string][]byte) ([]byte, error) {
 	logrus.Tracef("clusterDeploy: getYAML: Desired agent image is [%s] for cluster [%s]", agentImage, cluster.Name)
 	logrus.Tracef("clusterDeploy: getYAML: Desired auth image is [%s] for cluster [%s]", authImage, cluster.Name)
 	logrus.Tracef("clusterDeploy: getYAML: Desired features are [%v] for cluster [%s]", features, cluster.Name)
@@ -518,6 +516,45 @@ func (cd *clusterDeploy) cacheAgentImages(name string) error {
 	agentImages[nodeImage][name] = na
 	agentImages[clusterImage][name] = ca
 	return nil
+}
+
+// getPrivateRegistrySecretData will retrieve the contents of the clusters PrivateRegistrySecret, which contains
+// the credentials for a private registry which system images and custom work loads may be pulled from. For RKE1 clusters, the secret
+// is queried and then returned with the format that it was stored in. For RKE2/K3s clusters the secret is retrieved
+// and then transformed into the .dockerconfigjson format. In either case, the credentials can be accessed via the .dockerconfigjson key.
+func (cd *clusterDeploy) getPrivateRegistrySecretData(cluster *v3.Cluster) (map[string][]byte, error) {
+	var privateRegistries *corev1.Secret
+	var err error
+
+	registrySecret := cluster.GetSecret(v32.ClusterPrivateRegistrySecret)
+	if registrySecret == "" { // no private registry configured
+		return nil, nil
+	}
+
+	// check for the RKE1 registry secret first
+	privateRegistries, err = cd.secretLister.Get(namespace.GlobalNamespace, registrySecret)
+	if err == nil {
+		return privateRegistries.Data, nil
+	}
+	if err != nil && !apierrors.IsNotFound(err) { // ignore secret not found errors as we need to check ProvV2 namespace as well
+		return nil, err
+	}
+
+	// This is the only place that ProvV2 stores the system-default-registry URL on the v3.Cluster object.
+	// Without it, we cannot generate the registry credentials (.dockerconfigjson)
+	registryURL := cluster.GetSecret(v32.ClusterPrivateRegistryURL)
+	if registryURL == "" {
+		return nil, nil
+	}
+
+	privateRegistries, err = cd.secretLister.Get(fleet.ClustersDefaultNamespace, registrySecret)
+	if err != nil {
+		return nil, err
+	}
+
+	// ProvV2 PrivateRegistrySecret is not in proper .dockerconfigjson format as-is, so we have to transform it into that format
+	// so that the SystemTemplate generates the cluster agent manifest properly.
+	return util.TransformProvV2RegistryCredentialsToDockerConfigJSON(registryURL, privateRegistries)
 }
 
 func agentImagesCached(name string) bool {

@@ -19,6 +19,7 @@ import (
 	"github.com/rancher/rancher/pkg/image"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rke/templates"
+	rketypes "github.com/rancher/rke/types"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 )
@@ -79,7 +80,7 @@ func toFeatureString(features map[string]bool) string {
 }
 
 func SystemTemplate(resp io.Writer, agentImage, authImage, namespace, token, url string, isWindowsCluster bool,
-	cluster *v3.Cluster, features map[string]bool, taints []corev1.Taint, privateRegistries *corev1.Secret) error {
+	cluster *v3.Cluster, features map[string]bool, taints []corev1.Taint, privateRegistries map[string][]byte) error {
 	var tolerations, agentEnvVars string
 	d := md5.Sum([]byte(url + token + namespace))
 	tokenKey := hex.EncodeToString(d[:])[:7]
@@ -89,7 +90,20 @@ func SystemTemplate(resp io.Writer, agentImage, authImage, namespace, token, url
 	}
 
 	privateRepo := util.GetPrivateRepo(cluster)
-	privateRegistryConfig, err := util.GeneratePrivateRegistryDockerConfig(privateRepo, privateRegistries)
+
+	// cluster.GetSecret("PrivateRegistryURL") will be empty if the cluster is
+	// RKE1, imported, or RKE2 with no cluster level registry configured.
+	// For RKE2 with a cluster level registry configured, this is the
+	// only reference to the registry URL available on the v3.Cluster.
+	if privateRegistryURL := cluster.GetSecret(apimgmtv3.ClusterPrivateRegistryURL); privateRegistryURL != "" {
+		privateRepo = &rketypes.PrivateRegistry{
+			URL: privateRegistryURL,
+		}
+	}
+
+	// Generate the private registry access credentials.
+	// The 'privateRegistries' secret takes precedence over the 'privateRepo'
+	privateRegistryConfig, err := util.GeneratePrivateRegistryDockerConfig(privateRepo, privateRegistries[".dockerconfigjson"])
 	if err != nil {
 		return err
 	}
@@ -142,12 +156,12 @@ func GetDesiredFeatures(cluster *v3.Cluster) map[string]bool {
 	}
 }
 
-func ForCluster(cluster *v3.Cluster, token string, taints []corev1.Taint) ([]byte, error) {
+func ForCluster(cluster *v3.Cluster, token string, taints []corev1.Taint, privateRegistries map[string][]byte) ([]byte, error) {
 	buf := &bytes.Buffer{}
 	err := SystemTemplate(buf, GetDesiredAgentImage(cluster),
 		GetDesiredAuthImage(cluster),
 		cluster.Name, token, settings.ServerURL.Get(), cluster.Spec.WindowsPreferedCluster,
-		cluster, GetDesiredFeatures(cluster), taints, nil)
+		cluster, GetDesiredFeatures(cluster), taints, privateRegistries)
 	return buf.Bytes(), err
 }
 

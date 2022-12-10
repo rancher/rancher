@@ -12,6 +12,10 @@ from .common import wait_for_app_to_remove
 from .common import CATTLE_TEST_URL
 from .common import USER_TOKEN
 
+# Skipping this test module because library-fluentd-aggregator from library catalog is not supported on latest
+# rancher versions
+pytest.skip(allow_module_level=True)
+
 namespace = {"p_client": None, "ns": None, "cluster": None, "project": None,
              "name_prefix": None, "admin_client": None, "sys_p_client": None}
 fluentd_aggregator_answers = {"defaultImage": "true",

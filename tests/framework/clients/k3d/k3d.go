@@ -8,7 +8,6 @@ import (
 	"github.com/pkg/errors"
 	apisV1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
-	provisioning "github.com/rancher/rancher/tests/framework/clients/rancher/generated/provisioning/v1"
 	"github.com/rancher/rancher/tests/framework/extensions/clusters"
 	"github.com/rancher/rancher/tests/framework/pkg/config"
 	"github.com/rancher/rancher/tests/framework/pkg/session"
@@ -73,13 +72,13 @@ func CreateAndImportK3DCluster(client *rancher.Client, name string) (*apisV1.Clu
 	name = defaultName(name)
 
 	// create the provisioning cluster
-	cluster := &provisioning.Cluster{
-		ObjectMeta: &provisioning.ObjectMeta{
+	cluster := &apisV1.Cluster{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: "fleet-default",
 		},
 	}
-	_, err = client.Provisioning.Cluster.Create(cluster)
+	_, err = client.Steve.SteveType(clusters.ProvisioningSteveResouceType).Create(cluster)
 	if err != nil {
 		return nil, errors.Wrap(err, "CreateAndImportK3DCluster: failed to create provisioning cluster")
 	}

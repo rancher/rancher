@@ -47,7 +47,7 @@ func newChartUpgradeAction(namespace string, chartUpgrades []types.ChartUpgrade)
 }
 
 // newChartInstallAction is a private constructor that creates a chart install with given chart values that can be used for chart install action.
-func newChartInstall(name, version, clusterId, clusterName, host string, chartValues map[string]interface{}) *types.ChartInstall {
+func newChartInstall(name, version, clusterId, clusterName, url, defaultRegistry string, chartValues map[string]interface{}) *types.ChartInstall {
 	chartInstall := types.ChartInstall{
 		Annotations: map[string]string{
 			"catalog.cattle.io/ui-source-repo":      "rancher-charts",
@@ -63,10 +63,10 @@ func newChartInstall(name, version, clusterId, clusterName, host string, chartVa
 					"clusterName":           clusterName,
 					"rkePathPrefix":         "",
 					"rkeWindowsPathPrefix":  "",
-					"systemDefaultRegistry": "",
-					"url":                   host,
+					"systemDefaultRegistry": defaultRegistry,
+					"url":                   url,
 				},
-				"systemDefaultRegistry": "",
+				"systemDefaultRegistry": defaultRegistry,
 			},
 		},
 	}
@@ -79,7 +79,7 @@ func newChartInstall(name, version, clusterId, clusterName, host string, chartVa
 }
 
 // newChartUpgradeAction is a private constructor that creates a chart upgrade with given chart values that can be used for chart upgrade action.
-func newChartUpgrade(name, version, clusterId, clusterName, host string, chartValues map[string]interface{}) *types.ChartUpgrade {
+func newChartUpgrade(name, version, clusterId, clusterName, url, defaultRegistry string, chartValues map[string]interface{}) *types.ChartUpgrade {
 	chartUpgrade := types.ChartUpgrade{
 		Annotations: map[string]string{
 			"catalog.cattle.io/ui-source-repo":      "rancher-charts",
@@ -95,10 +95,10 @@ func newChartUpgrade(name, version, clusterId, clusterName, host string, chartVa
 					"clusterName":           clusterName,
 					"rkePathPrefix":         "",
 					"rkeWindowsPathPrefix":  "",
-					"systemDefaultRegistry": "",
-					"url":                   host,
+					"systemDefaultRegistry": defaultRegistry,
+					"url":                   url,
 				},
-				"systemDefaultRegistry": "",
+				"systemDefaultRegistry": defaultRegistry,
 			},
 		},
 		ResetValues: false,

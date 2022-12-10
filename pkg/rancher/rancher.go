@@ -25,6 +25,7 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/dashboard/apiservice"
 	"github.com/rancher/rancher/pkg/controllers/dashboardapi"
 	managementauth "github.com/rancher/rancher/pkg/controllers/management/auth"
+	provisioningv2 "github.com/rancher/rancher/pkg/controllers/provisioningv2/cluster"
 	crds "github.com/rancher/rancher/pkg/crds/dashboard"
 	dashboarddata "github.com/rancher/rancher/pkg/data/dashboard"
 	"github.com/rancher/rancher/pkg/features"
@@ -145,6 +146,11 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 	podsecuritypolicytemplate.RegisterIndexers(wranglerContext)
 	kontainerdriver.RegisterIndexers(wranglerContext)
 	managementauth.RegisterWranglerIndexers(wranglerContext)
+
+	if features.ProvisioningV2.Enabled() {
+		// ensure indexers are registered for all replicas
+		provisioningv2.RegisterIndexers(wranglerContext)
+	}
 
 	if err := crds.Create(ctx, restConfig); err != nil {
 		return nil, err

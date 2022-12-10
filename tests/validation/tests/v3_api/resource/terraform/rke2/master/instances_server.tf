@@ -15,7 +15,7 @@ resource "aws_instance" "master" {
   subnet_id = var.subnets
   availability_zone = var.availability_zone
   vpc_security_group_ids = ["${var.sg_id}"]
-  key_name = "jenkins-rke-validation"
+  key_name = var.access_key_name
   tags = {
     Name = "${var.resource_name}-server"
     "kubernetes.io/cluster/clusterid" = "owned"
@@ -75,7 +75,7 @@ resource "aws_instance" "master2" {
   subnet_id = var.subnets
   availability_zone = var.availability_zone
   vpc_security_group_ids = ["${var.sg_id}"]
-  key_name = "jenkins-rke-validation"
+  key_name = var.access_key_name
   tags = {
     Name = "${var.resource_name}-servers"
     "kubernetes.io/cluster/clusterid" = "owned"

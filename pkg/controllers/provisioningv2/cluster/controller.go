@@ -92,9 +92,6 @@ func Register(
 			clients.Mgmt.Cluster()),
 	}
 
-	clients.Provisioning.Cluster().Cache().AddIndexer(ByCluster, byClusterIndex)
-	clients.Provisioning.Cluster().Cache().AddIndexer(ByCloudCred, byCloudCredentialIndex)
-
 	mgmtcontrollers.RegisterClusterGeneratingHandler(ctx,
 		clients.Mgmt.Cluster(),
 		clients.Apply.WithCacheTypes(clients.Provisioning.Cluster()),
@@ -130,6 +127,11 @@ func Register(
 
 	clients.Mgmt.Cluster().OnRemove(ctx, "mgmt-cluster-remove", h.OnMgmtClusterRemove)
 	clients.Provisioning.Cluster().OnRemove(ctx, "provisioning-cluster-remove", h.OnClusterRemove)
+}
+
+func RegisterIndexers(config *wrangler.Context) {
+	config.Provisioning.Cluster().Cache().AddIndexer(ByCluster, byClusterIndex)
+	config.Provisioning.Cluster().Cache().AddIndexer(ByCloudCred, byCloudCredentialIndex)
 }
 
 func byClusterIndex(obj *v1.Cluster) ([]string, error) {
@@ -270,6 +272,9 @@ func (h *handler) createNewCluster(cluster *v1.Cluster, status v1.ClusterStatus,
 	spec.EnableNetworkPolicy = cluster.Spec.EnableNetworkPolicy
 	spec.DesiredAgentImage = image.ResolveWithCluster(settings.AgentImage.Get(), cluster)
 	spec.DesiredAuthImage = image.ResolveWithCluster(settings.AuthImage.Get(), cluster)
+
+	spec.ClusterSecrets.PrivateRegistrySecret = image.GetPrivateRepoSecretFromCluster(cluster)
+	spec.ClusterSecrets.PrivateRegistryURL = image.GetPrivateRepoURLFromCluster(cluster)
 
 	spec.AgentEnvVars = nil
 	for _, env := range cluster.Spec.AgentEnvVars {
