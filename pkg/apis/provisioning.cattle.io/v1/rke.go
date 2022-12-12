@@ -28,6 +28,7 @@ type RKEMachinePool struct {
 	MaxUnhealthy                 *string                      `json:"maxUnhealthy,omitempty"`
 	UnhealthyRange               *string                      `json:"unhealthyRange,omitempty"`
 	MachineOS                    string                       `json:"machineOS,omitempty"`
+	Hooks                        []string                     `json:"hooks,omitempty"`
 }
 
 type RKEMachinePoolRollingUpdate struct {

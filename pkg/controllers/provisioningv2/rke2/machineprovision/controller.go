@@ -645,7 +645,7 @@ func constructFilesSecret(driver string, config map[string]interface{}) *corev1.
 					fileName = "id_rsa"
 				}
 
-				// The ending newline gets stripped, add em back
+				// The ending newline gets stripped, add them back
 				if !strings.HasSuffix(fileContents, "\n") {
 					fileContents = fileContents + "\n"
 				}

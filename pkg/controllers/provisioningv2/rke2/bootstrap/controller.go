@@ -9,6 +9,7 @@ import (
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2"
 	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta1"
+	provcontrollers "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
 	rkecontroller "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/provisioningv2/rke2/installer"
@@ -40,6 +41,7 @@ type handler struct {
 	capiClusters        capicontrollers.ClusterCache
 	deploymentCache     appcontrollers.DeploymentCache
 	rkeControlPlanes    rkecontroller.RKEControlPlaneCache
+	provClusters        provcontrollers.ClusterCache
 	rkeBootstrapClient  rkecontroller.RKEBootstrapClient
 }
 
@@ -52,8 +54,10 @@ func Register(ctx context.Context, clients *wrangler.Context) {
 		capiClusters:        clients.CAPI.Cluster().Cache(),
 		deploymentCache:     clients.Apps.Deployment().Cache(),
 		rkeControlPlanes:    clients.RKE.RKEControlPlane().Cache(),
+		provClusters:        clients.Provisioning.Cluster().Cache(),
 		rkeBootstrapClient:  clients.RKE.RKEBootstrap(),
 	}
+
 	rkecontroller.RegisterRKEBootstrapGeneratingHandler(ctx,
 		clients.RKE.RKEBootstrap(),
 		clients.Apply.
@@ -62,6 +66,7 @@ func Register(ctx context.Context, clients *wrangler.Context) {
 				clients.RBAC.RoleBinding(),
 				clients.CAPI.Machine(),
 				clients.Core.ServiceAccount(),
+				clients.Provisioning.Cluster(),
 				clients.Core.Secret()).
 			WithSetOwnerReference(true, true),
 		"",
@@ -131,7 +136,25 @@ func (h *handler) getBootstrapSecret(namespace, name string, envVars []corev1.En
 	if os := machine.GetLabels()[rke2.CattleOSLabel]; os == rke2.WindowsMachineOS {
 		is = installer.WindowsInstallScript
 	}
-	data, err := is(context.WithValue(context.Background(), tls.InternalAPI, hasHostPort), base64.URLEncoding.EncodeToString(hash[:]), envVars, "")
+
+	// find the machine pool which the current machine belongs to
+	// so that we can utilize any provided hooks.
+	provCluster, err := h.provClusters.Get(namespace, machine.Spec.ClusterName)
+	if err != nil {
+		return nil, err
+	}
+	var hooks []string
+	if config := provCluster.Spec.RKEConfig; config != nil {
+		machinePoolName := machine.ObjectMeta.Labels[rke2.RKEMachinePoolNameLabel]
+		for _, pool := range config.MachinePools {
+			if pool.Name == machinePoolName {
+				hooks = pool.Hooks
+				break
+			}
+		}
+	}
+
+	data, err := is(context.WithValue(context.Background(), tls.InternalAPI, hasHostPort), base64.URLEncoding.EncodeToString(hash[:]), envVars, "", hooks)
 	if err != nil {
 		return nil, err
 	}

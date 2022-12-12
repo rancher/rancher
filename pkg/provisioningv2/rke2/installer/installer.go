@@ -55,7 +55,7 @@ func installScript(setting settings.Setting, files []string) ([]byte, error) {
 	return ioutil.ReadAll(resp.Body)
 }
 
-func LinuxInstallScript(ctx context.Context, token string, envVars []corev1.EnvVar, defaultHost string) ([]byte, error) {
+func LinuxInstallScript(ctx context.Context, token string, envVars []corev1.EnvVar, defaultHost string, hooks []string) ([]byte, error) {
 	data, err := installScript(
 		settings.SystemAgentInstallScript,
 		localAgentInstallScripts)
@@ -91,18 +91,34 @@ func LinuxInstallScript(ctx context.Context, token string, envVars []corev1.EnvV
 	if settings.ServerURL.Get() != "" {
 		server = fmt.Sprintf("CATTLE_SERVER=%s", settings.ServerURL.Get())
 	}
+
+	// build all the user defined hooks. Each hook is a set of commands
+	// that can be used to configure a node.
+	// Each hook will be added in the following format
+	//
+	// #HOOK_NAME
+	// HOOK_VALUE
+	combinedHooks := ""
+	if len(hooks) > 0 {
+		combinedHooks = "#user specified hooks\n"
+		for _, hookName := range hooks {
+			if hookValue := GetLinuxHook(hookName); hookValue != "" {
+				combinedHooks = fmt.Sprintf("%s\n#%s%s", combinedHooks, hookName, hookValue)
+			}
+		}
+	}
 	return []byte(fmt.Sprintf(`#!/usr/bin/env sh
 %s
 %s
 %s
 %s
 %s
-
 %s
-`, envVarBuf.String(), binaryURL, server, ca, token, data)), nil
+%s
+`, combinedHooks, envVarBuf.String(), binaryURL, server, ca, token, data)), nil
 }
 
-func WindowsInstallScript(ctx context.Context, token string, envVars []corev1.EnvVar, defaultHost string) ([]byte, error) {
+func WindowsInstallScript(ctx context.Context, token string, envVars []corev1.EnvVar, defaultHost string, hooks []string) ([]byte, error) {
 	data, err := installScript(
 		settings.WinsAgentInstallScript,
 		localWindowsRke2InstallScripts)
@@ -152,8 +168,24 @@ func WindowsInstallScript(ctx context.Context, token string, envVars []corev1.En
 		server = fmt.Sprintf("$env:CATTLE_SERVER=\"%s\"", settings.ServerURL.Get())
 	}
 
+	// build all the user defined hooks. Each hook is a set of commands
+	// that can be used to configure a node.
+	// Each hook will be added in the following format
+	//
+	// #HOOK_NAME
+	// HOOK_VALUE
+	combinedHooks := ""
+	if len(hooks) > 0 {
+		combinedHooks = "#user specified hooks\n"
+		for _, hookName := range hooks {
+			if hookValue := GetWindowsHook(hookName); hookValue != "" {
+				combinedHooks = fmt.Sprintf("%s\n#%s%s", combinedHooks, hookName, hookValue)
+			}
+		}
+	}
 	return []byte(fmt.Sprintf(`%s
 
+%s
 %s
 %s
 %s
@@ -167,5 +199,5 @@ $env:CSI_PROXY_KUBELET_PATH = "C:/var/lib/rancher/rke2/bin/kubelet.exe"
 
 Invoke-WinsInstaller @PSBoundParameters
 exit 0
-`, data, envVarBuf.String(), binaryURL, server, ca, token, csiProxyURL, csiProxyVersion)), nil
+`, data, combinedHooks, envVarBuf.String(), binaryURL, server, ca, token, csiProxyURL, csiProxyVersion)), nil
 }

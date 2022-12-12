@@ -4,11 +4,15 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"fmt"
+
+	provcontrollers "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
+	"github.com/rancher/rancher/pkg/provisioningv2/rke2/installer"
 	"testing"
 
 	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2"
 	"github.com/rancher/rancher/pkg/settings"
 
+	provv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta1"
 	"github.com/rancher/rancher/pkg/namespace"
 	v1wa "github.com/rancher/wrangler/pkg/generated/controllers/apps/v1"
@@ -86,6 +90,22 @@ func (m *machineCacheMock) GetByIndex(indexName, key string) ([]*v1beta1.Machine
 	return args.Get(0).([]*v1beta1.Machine), args.Error(1)
 }
 
+type provisioningClusterCacheMock struct{ mock.Mock }
+
+func (m *provisioningClusterCacheMock) List(namespace string, selector labels.Selector) ([]*provv1.Cluster, error) {
+	return []*provv1.Cluster{}, nil
+}
+func (m *provisioningClusterCacheMock) AddIndexer(indexName string, indexer provcontrollers.ClusterIndexer) {
+	return
+}
+func (m *provisioningClusterCacheMock) GetByIndex(indexName, key string) ([]*provv1.Cluster, error) {
+	return []*provv1.Cluster{}, nil
+}
+func (m *provisioningClusterCacheMock) Get(namespace, name string) (*provv1.Cluster, error) {
+	args := m.Called(namespace, name)
+	return args.Get(0).(*provv1.Cluster), args.Error(1)
+}
+
 func Test_getBootstrapSecret(t *testing.T) {
 	type args struct {
 		secretName    string
@@ -135,6 +155,7 @@ func Test_getBootstrapSecret(t *testing.T) {
 				secretCache:         getSecretCacheMock(tt.args.namespaceName, tt.args.secretName),
 				deploymentCache:     getDeploymentCacheMock(),
 				machineCache:        getMachineCacheMock(tt.args.namespaceName, tt.args.os),
+				provClusters:        getProvisioningClusterMock(tt.args.namespaceName, "test-cluster"),
 			}
 
 			//act
@@ -175,6 +196,7 @@ func Test_getBootstrapSecret(t *testing.T) {
 				a.True(machine.GetLabels()[rke2.WorkerRoleLabel] == "true")
 				a.Contains(data, "CATTLE_SERVER=localhost")
 				a.Contains(data, "CATTLE_ROLE_NONE=true")
+				a.Contains(data, installer.GetLinuxHook("disable-network-manager"))
 
 			case rke2.WindowsMachineOS:
 				a.Equal(tt.args.os, rke2.WindowsMachineOS)
@@ -201,11 +223,15 @@ func getMachineCacheMock(namespace, os string) *machineCacheMock {
 			Name:      os,
 			Namespace: namespace,
 			Labels: map[string]string{
-				rke2.ControlPlaneRoleLabel: "true",
-				rke2.EtcdRoleLabel:         "true",
-				rke2.WorkerRoleLabel:       "true",
-				rke2.CattleOSLabel:         os,
+				rke2.ControlPlaneRoleLabel:   "true",
+				rke2.EtcdRoleLabel:           "true",
+				rke2.WorkerRoleLabel:         "true",
+				rke2.CattleOSLabel:           os,
+				rke2.RKEMachinePoolNameLabel: "test-pool",
 			},
+		},
+		Spec: v1beta1.MachineSpec{
+			ClusterName: "test-cluster",
 		},
 	}, nil)
 	mockMachineCache.On("Get", namespace, rke2.WindowsMachineOS).Return(&v1beta1.Machine{
@@ -279,4 +305,23 @@ func getServiceAccountCacheMock(namespace, name string) *serviceAccountCacheMock
 		},
 	}, nil)
 	return mockServiceAccountCache
+}
+
+func getProvisioningClusterMock(namespace, name string) *provisioningClusterCacheMock {
+	provmock := new(provisioningClusterCacheMock)
+	provmock.On("Get", namespace, name).Return(&provv1.Cluster{
+		ObjectMeta: metav1.ObjectMeta{},
+		Spec: provv1.ClusterSpec{
+			RKEConfig: &provv1.RKEConfig{
+				MachinePools: []provv1.RKEMachinePool{
+					{
+						Name:  "test-pool",
+						Hooks: []string{"disable-network-manager"},
+					},
+				},
+			},
+		},
+	}, nil)
+	provmock.On("Get", namespace, "").Return(&provv1.Cluster{}, nil)
+	return provmock
 }
