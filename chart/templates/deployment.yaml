@@ -146,14 +146,14 @@ spec:
           httpGet:
             path: /healthz
             port: 80
-          initialDelaySeconds: 60
-          periodSeconds: 30
+          initialDelaySeconds: {{.Values.livenessProbe.initialDelaySeconds | default 60 }}
+          periodSeconds: {{ .Values.livenessProbe.periodSeconds | default 30 }}
         readinessProbe:
           httpGet:
             path: /healthz
             port: 80
-          initialDelaySeconds: 5
-          periodSeconds: 30
+          initialDelaySeconds: {{.Values.readinessProbe.initialDelaySeconds | default  5}}
+          periodSeconds: {{ .Values.readinessProbe.periodSeconds | default 30}}
         resources:
 {{ toYaml .Values.resources | indent 10 }}
         volumeMounts:
