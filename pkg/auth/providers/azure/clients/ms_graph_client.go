@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/AzureAD/microsoft-authentication-library-for-go/apps/cache"
@@ -22,6 +21,9 @@ import (
 )
 
 const (
+	// AccessTokenSecretName is the name of the secret that contains an access token for the Microsoft Graph API.
+	AccessTokenSecretName = "azuread-access-token"
+
 	providerLogPrefix = "AZUREAD_PROVIDER"
 	cacheLogPrefix    = "AZUREAD_PROVIDER_CACHE"
 )
@@ -114,10 +116,6 @@ func (c azureMSGraphClient) LoginUser(config *v32.AzureADConfig, credential *v32
 	}
 	logrus.Debugf("[%s] Completed token swap with AzureAD", providerLogPrefix)
 
-	if err := EnsureMSGraphTokenHasPermissions(c.AccessToken()); err != nil {
-		return v3.Principal{}, nil, "", err
-	}
-
 	logrus.Debugf("[%s] Started getting user info from AzureAD", providerLogPrefix)
 	userPrincipal, err := c.GetUser(oid)
 	if err != nil {
@@ -139,38 +137,6 @@ func (c azureMSGraphClient) LoginUser(config *v32.AzureADConfig, credential *v32
 	// Return an empty string for the provider token, so that it does not get saved in a secret later, like users'
 	// access tokens are stored in secrets in the old Azure AD Graph flow.
 	return userPrincipal, groupPrincipals, "", nil
-}
-
-// EnsureMSGraphTokenHasPermissions checks that a token received from Azure AD has the permissions Rancher requires
-// for working with the Microsoft Graph API.
-func EnsureMSGraphTokenHasPermissions(token string) error {
-	msGraphRequiredPermissions := []string{
-		"Group.Read.All",
-		"User.Read.All",
-	}
-	errMSGraphMissingPermissions := fmt.Errorf("missing required Application type permissions from Microsoft Graph: need %s",
-		strings.Join(msGraphRequiredPermissions, ", "))
-
-	field, err := ExtractFieldFromJWT(token, "roles")
-	if err != nil {
-		return fmt.Errorf("failed to parse the 'roles' field in JWT - either the token is malformed or lacks permissions")
-	}
-	roles, ok := field.([]interface{})
-	if !ok {
-		return errMSGraphMissingPermissions
-	}
-	permissionSet := make(map[string]struct{})
-	for _, r := range roles {
-		if name, ok := r.(string); ok {
-			permissionSet[name] = struct{}{}
-		}
-	}
-	for _, p := range msGraphRequiredPermissions {
-		if _, ok := permissionSet[p]; !ok {
-			return errMSGraphMissingPermissions
-		}
-	}
-	return nil
 }
 
 type customAuthResult struct {
@@ -232,36 +198,33 @@ type AccessTokenCache struct {
 	Secrets corev1.SecretInterface
 }
 
-// Replace fetches the access token from a secret in a database into the cache.
+// Replace fetches the access token from a secret in Kubernetes.
 func (c AccessTokenCache) Replace(cache cache.Unmarshaler, key string) {
-	secret, err := common.ReadFromSecret(c.Secrets, common.SecretsNamespace+":azuread-access-token", "access-token")
+	secretName := fmt.Sprintf("%s:%s", common.SecretsNamespace, AccessTokenSecretName)
+	secret, err := common.ReadFromSecret(c.Secrets, secretName, "access-token")
 	if err != nil {
-		logrus.Errorf("[%s] failed to read the access token from the database: %v", cacheLogPrefix, err)
+		logrus.Errorf("[%s] failed to read the access token from Kubernetes: %v", cacheLogPrefix, err)
 		return
 	}
 
 	err = cache.Unmarshal([]byte(secret))
 	if err != nil {
-		logrus.Errorf("[%s] failed to put the access token secret into the cache: %v", cacheLogPrefix, err)
+		logrus.Errorf("[%s] failed to unmarshal the access token: %v", cacheLogPrefix, err)
 	}
 }
 
-// Export persists the access token to a secret in the database.
+// Export persists the access token to a secret in Kubernetes.
 func (c AccessTokenCache) Export(cache cache.Marshaler, key string) {
 	marshalled, err := cache.Marshal()
 	if err != nil {
-		logrus.Errorf("[%s] failed to marshal the access token before saving to the database: %v", cacheLogPrefix, err)
+		logrus.Errorf("[%s] failed to marshal the access token before saving in Kubernetes: %v", cacheLogPrefix, err)
 		return
 	}
 
 	err = common.CreateOrUpdateSecrets(c.Secrets, string(marshalled), "access-token", "azuread")
 	if err != nil {
-		logrus.Errorf("[%s] failed to save the access token in the database: %v", cacheLogPrefix, err)
+		logrus.Errorf("[%s] failed to save the access token in Kubernetes: %v", cacheLogPrefix, err)
 	}
-}
-
-func (c AccessTokenCache) Clear() error {
-	return c.Secrets.DeleteNamespaced(common.SecretsNamespace, "azuread-access-token", &metav1.DeleteOptions{})
 }
 
 // NewMSGraphClient returns a client of the Microsoft Graph API. It attempts to get an access token to the API.
@@ -292,14 +255,6 @@ func NewMSGraphClient(config *v32.AzureADConfig, secrets corev1.SecretInterface)
 		if err != nil {
 			return nil, err
 		}
-	}
-
-	if err = EnsureMSGraphTokenHasPermissions(ar.AccessToken); err != nil {
-		if deletionErr := tokenCache.Clear(); deletionErr != nil {
-			logrus.Errorf("[%s] failed to delete the cached secret with an invalid Azure AD access token: %v",
-				providerLogPrefix, deletionErr)
-		}
-		return nil, err
 	}
 
 	authResult := getCustomAuthResult(&ar)
