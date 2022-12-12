@@ -288,6 +288,11 @@ func (in *RKEMachinePool) DeepCopyInto(out *RKEMachinePool) {
 		*out = new(string)
 		**out = **in
 	}
+	if in.Hooks != nil {
+		in, out := &in.Hooks, &out.Hooks
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	return
 }
 
