@@ -6,6 +6,7 @@ const (
 	CSIPersistentVolumeSourceFieldControllerPublishSecretRef = "controllerPublishSecretRef"
 	CSIPersistentVolumeSourceFieldDriver                     = "driver"
 	CSIPersistentVolumeSourceFieldFSType                     = "fsType"
+	CSIPersistentVolumeSourceFieldNodeExpandSecretRef        = "nodeExpandSecretRef"
 	CSIPersistentVolumeSourceFieldNodePublishSecretRef       = "nodePublishSecretRef"
 	CSIPersistentVolumeSourceFieldNodeStageSecretRef         = "nodeStageSecretRef"
 	CSIPersistentVolumeSourceFieldReadOnly                   = "readOnly"
@@ -18,6 +19,7 @@ type CSIPersistentVolumeSource struct {
 	ControllerPublishSecretRef *SecretReference  `json:"controllerPublishSecretRef,omitempty" yaml:"controllerPublishSecretRef,omitempty"`
 	Driver                     string            `json:"driver,omitempty" yaml:"driver,omitempty"`
 	FSType                     string            `json:"fsType,omitempty" yaml:"fsType,omitempty"`
+	NodeExpandSecretRef        *SecretReference  `json:"nodeExpandSecretRef,omitempty" yaml:"nodeExpandSecretRef,omitempty"`
 	NodePublishSecretRef       *SecretReference  `json:"nodePublishSecretRef,omitempty" yaml:"nodePublishSecretRef,omitempty"`
 	NodeStageSecretRef         *SecretReference  `json:"nodeStageSecretRef,omitempty" yaml:"nodeStageSecretRef,omitempty"`
 	ReadOnly                   bool              `json:"readOnly,omitempty" yaml:"readOnly,omitempty"`

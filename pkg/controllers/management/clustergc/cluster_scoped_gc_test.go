@@ -102,6 +102,14 @@ func setObjectMeta(u *unstructured.Unstructured, objectMeta *metav1.ObjectMeta) 
 
 type mockDynamicResourceInterface struct{}
 
+func (i mockDynamicResourceInterface) Apply(ctx context.Context, name string, obj *unstructured.Unstructured, options metav1.ApplyOptions, subresources ...string) (*unstructured.Unstructured, error) {
+	panic("implement me")
+}
+
+func (i mockDynamicResourceInterface) ApplyStatus(ctx context.Context, name string, obj *unstructured.Unstructured, options metav1.ApplyOptions) (*unstructured.Unstructured, error) {
+	panic("implement me")
+}
+
 func (mockDynamicResourceInterface) Update(ctx context.Context, obj *unstructured.Unstructured, options metav1.UpdateOptions, subresources ...string) (*unstructured.Unstructured, error) {
 	return obj, nil
 }

@@ -22,7 +22,6 @@ import (
 	appsv1 "github.com/rancher/rancher/pkg/generated/norman/apps/v1"
 	autoscaling "github.com/rancher/rancher/pkg/generated/norman/autoscaling/v2beta2"
 	batchv1 "github.com/rancher/rancher/pkg/generated/norman/batch/v1"
-	batchv1beta1 "github.com/rancher/rancher/pkg/generated/norman/batch/v1beta1"
 	clusterv3 "github.com/rancher/rancher/pkg/generated/norman/cluster.cattle.io/v3"
 	corev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	extv1beta1 "github.com/rancher/rancher/pkg/generated/norman/extensions/v1beta1"
@@ -233,7 +232,6 @@ type UserContext struct {
 	RBAC           rbacv1.Interface
 	Extensions     extv1beta1.Interface
 	BatchV1        batchv1.Interface
-	BatchV1Beta1   batchv1beta1.Interface
 	Networking     knetworkingv1.Interface
 	Monitoring     monitoringv1.Interface
 	Cluster        clusterv3.Interface
@@ -299,19 +297,18 @@ func (w *UserContext) UserOnlyContext() *UserOnlyContext {
 		UnversionedClient: w.UnversionedClient,
 		K8sClient:         w.K8sClient,
 
-		Autoscaling:  w.Autoscaling,
-		Apps:         w.Apps,
-		Project:      w.Project,
-		Core:         w.Core,
-		RBAC:         w.RBAC,
-		Extensions:   w.Extensions,
-		Networking:   w.Networking,
-		BatchV1:      w.BatchV1,
-		BatchV1Beta1: w.BatchV1Beta1,
-		Monitoring:   w.Monitoring,
-		Cluster:      w.Cluster,
-		Storage:      w.Storage,
-		Policy:       w.Policy,
+		Autoscaling: w.Autoscaling,
+		Apps:        w.Apps,
+		Project:     w.Project,
+		Core:        w.Core,
+		RBAC:        w.RBAC,
+		Extensions:  w.Extensions,
+		Networking:  w.Networking,
+		BatchV1:     w.BatchV1,
+		Monitoring:  w.Monitoring,
+		Cluster:     w.Cluster,
+		Storage:     w.Storage,
+		Policy:      w.Policy,
 	}
 }
 
@@ -331,7 +328,6 @@ type UserOnlyContext struct {
 	RBAC            rbacv1.Interface
 	Extensions      extv1beta1.Interface
 	BatchV1         batchv1.Interface
-	BatchV1Beta1    batchv1beta1.Interface
 	Networking      knetworkingv1.Interface
 	Monitoring      monitoringv1.Interface
 	Cluster         clusterv3.Interface
@@ -491,11 +487,6 @@ func NewUserContext(scaledContext *ScaledContext, config rest.Config, clusterNam
 		return nil, err
 	}
 
-	context.BatchV1Beta1, err = batchv1beta1.NewFromControllerFactory(controllerFactory)
-	if err != nil {
-		return nil, err
-	}
-
 	context.Autoscaling, err = autoscaling.NewFromControllerFactory(controllerFactory)
 	if err != nil {
 		return nil, err
@@ -608,11 +599,6 @@ func NewUserOnlyContext(config *wrangler.Context) (*UserOnlyContext, error) {
 	}
 
 	context.BatchV1, err = batchv1.NewFromControllerFactory(context.ControllerFactory)
-	if err != nil {
-		return nil, err
-	}
-
-	context.BatchV1Beta1, err = batchv1beta1.NewFromControllerFactory(context.ControllerFactory)
 	if err != nil {
 		return nil, err
 	}

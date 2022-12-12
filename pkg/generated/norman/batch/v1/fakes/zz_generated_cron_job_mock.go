@@ -10,8 +10,8 @@ import (
 
 	"github.com/rancher/norman/controller"
 	"github.com/rancher/norman/objectclient"
-	v1beta11 "github.com/rancher/rancher/pkg/generated/norman/batch/v1beta1"
-	"k8s.io/api/batch/v1beta1"
+	v11 "github.com/rancher/rancher/pkg/generated/norman/batch/v1"
+	v1 "k8s.io/api/batch/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/watch"
@@ -23,34 +23,34 @@ var (
 	lockCronJobListerMockList sync.RWMutex
 )
 
-// Ensure, that CronJobListerMock does implement v1beta11.CronJobLister.
+// Ensure, that CronJobListerMock does implement v11.CronJobLister.
 // If this is not the case, regenerate this file with moq.
-var _ v1beta11.CronJobLister = &CronJobListerMock{}
+var _ v11.CronJobLister = &CronJobListerMock{}
 
-// CronJobListerMock is a mock implementation of v1beta11.CronJobLister.
+// CronJobListerMock is a mock implementation of v11.CronJobLister.
 //
 //	    func TestSomethingThatUsesCronJobLister(t *testing.T) {
 //
-//	        // make and configure a mocked v1beta11.CronJobLister
+//	        // make and configure a mocked v11.CronJobLister
 //	        mockedCronJobLister := &CronJobListerMock{
-//	            GetFunc: func(namespace string, name string) (*v1beta1.CronJob, error) {
+//	            GetFunc: func(namespace string, name string) (*v1.CronJob, error) {
 //		               panic("mock out the Get method")
 //	            },
-//	            ListFunc: func(namespace string, selector labels.Selector) ([]*v1beta1.CronJob, error) {
+//	            ListFunc: func(namespace string, selector labels.Selector) ([]*v1.CronJob, error) {
 //		               panic("mock out the List method")
 //	            },
 //	        }
 //
-//	        // use mockedCronJobLister in code that requires v1beta11.CronJobLister
+//	        // use mockedCronJobLister in code that requires v11.CronJobLister
 //	        // and then make assertions.
 //
 //	    }
 type CronJobListerMock struct {
 	// GetFunc mocks the Get method.
-	GetFunc func(namespace string, name string) (*v1beta1.CronJob, error)
+	GetFunc func(namespace string, name string) (*v1.CronJob, error)
 
 	// ListFunc mocks the List method.
-	ListFunc func(namespace string, selector labels.Selector) ([]*v1beta1.CronJob, error)
+	ListFunc func(namespace string, selector labels.Selector) ([]*v1.CronJob, error)
 
 	// calls tracks calls to the methods.
 	calls struct {
@@ -72,7 +72,7 @@ type CronJobListerMock struct {
 }
 
 // Get calls GetFunc.
-func (mock *CronJobListerMock) Get(namespace string, name string) (*v1beta1.CronJob, error) {
+func (mock *CronJobListerMock) Get(namespace string, name string) (*v1.CronJob, error) {
 	if mock.GetFunc == nil {
 		panic("CronJobListerMock.GetFunc: method is nil but CronJobLister.Get was just called")
 	}
@@ -108,7 +108,7 @@ func (mock *CronJobListerMock) GetCalls() []struct {
 }
 
 // List calls ListFunc.
-func (mock *CronJobListerMock) List(namespace string, selector labels.Selector) ([]*v1beta1.CronJob, error) {
+func (mock *CronJobListerMock) List(namespace string, selector labels.Selector) ([]*v1.CronJob, error) {
 	if mock.ListFunc == nil {
 		panic("CronJobListerMock.ListFunc: method is nil but CronJobLister.List was just called")
 	}
@@ -155,26 +155,26 @@ var (
 	lockCronJobControllerMockLister                         sync.RWMutex
 )
 
-// Ensure, that CronJobControllerMock does implement v1beta11.CronJobController.
+// Ensure, that CronJobControllerMock does implement v11.CronJobController.
 // If this is not the case, regenerate this file with moq.
-var _ v1beta11.CronJobController = &CronJobControllerMock{}
+var _ v11.CronJobController = &CronJobControllerMock{}
 
-// CronJobControllerMock is a mock implementation of v1beta11.CronJobController.
+// CronJobControllerMock is a mock implementation of v11.CronJobController.
 //
 //	    func TestSomethingThatUsesCronJobController(t *testing.T) {
 //
-//	        // make and configure a mocked v1beta11.CronJobController
+//	        // make and configure a mocked v11.CronJobController
 //	        mockedCronJobController := &CronJobControllerMock{
-//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v1beta11.CronJobHandlerFunc)  {
+//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v11.CronJobHandlerFunc)  {
 //		               panic("mock out the AddClusterScopedFeatureHandler method")
 //	            },
-//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v1beta11.CronJobHandlerFunc)  {
+//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v11.CronJobHandlerFunc)  {
 //		               panic("mock out the AddClusterScopedHandler method")
 //	            },
-//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v1beta11.CronJobHandlerFunc)  {
+//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v11.CronJobHandlerFunc)  {
 //		               panic("mock out the AddFeatureHandler method")
 //	            },
-//	            AddHandlerFunc: func(ctx context.Context, name string, handler v1beta11.CronJobHandlerFunc)  {
+//	            AddHandlerFunc: func(ctx context.Context, name string, handler v11.CronJobHandlerFunc)  {
 //		               panic("mock out the AddHandler method")
 //	            },
 //	            EnqueueFunc: func(namespace string, name string)  {
@@ -189,27 +189,27 @@ var _ v1beta11.CronJobController = &CronJobControllerMock{}
 //	            InformerFunc: func() cache.SharedIndexInformer {
 //		               panic("mock out the Informer method")
 //	            },
-//	            ListerFunc: func() v1beta11.CronJobLister {
+//	            ListerFunc: func() v11.CronJobLister {
 //		               panic("mock out the Lister method")
 //	            },
 //	        }
 //
-//	        // use mockedCronJobController in code that requires v1beta11.CronJobController
+//	        // use mockedCronJobController in code that requires v11.CronJobController
 //	        // and then make assertions.
 //
 //	    }
 type CronJobControllerMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
-	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v1beta11.CronJobHandlerFunc)
+	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v11.CronJobHandlerFunc)
 
 	// AddClusterScopedHandlerFunc mocks the AddClusterScopedHandler method.
-	AddClusterScopedHandlerFunc func(ctx context.Context, name string, clusterName string, handler v1beta11.CronJobHandlerFunc)
+	AddClusterScopedHandlerFunc func(ctx context.Context, name string, clusterName string, handler v11.CronJobHandlerFunc)
 
 	// AddFeatureHandlerFunc mocks the AddFeatureHandler method.
-	AddFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, syncMoqParam v1beta11.CronJobHandlerFunc)
+	AddFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, syncMoqParam v11.CronJobHandlerFunc)
 
 	// AddHandlerFunc mocks the AddHandler method.
-	AddHandlerFunc func(ctx context.Context, name string, handler v1beta11.CronJobHandlerFunc)
+	AddHandlerFunc func(ctx context.Context, name string, handler v11.CronJobHandlerFunc)
 
 	// EnqueueFunc mocks the Enqueue method.
 	EnqueueFunc func(namespace string, name string)
@@ -224,7 +224,7 @@ type CronJobControllerMock struct {
 	InformerFunc func() cache.SharedIndexInformer
 
 	// ListerFunc mocks the Lister method.
-	ListerFunc func() v1beta11.CronJobLister
+	ListerFunc func() v11.CronJobLister
 
 	// calls tracks calls to the methods.
 	calls struct {
@@ -239,7 +239,7 @@ type CronJobControllerMock struct {
 			// ClusterName is the clusterName argument value.
 			ClusterName string
 			// Handler is the handler argument value.
-			Handler v1beta11.CronJobHandlerFunc
+			Handler v11.CronJobHandlerFunc
 		}
 		// AddClusterScopedHandler holds details about calls to the AddClusterScopedHandler method.
 		AddClusterScopedHandler []struct {
@@ -250,7 +250,7 @@ type CronJobControllerMock struct {
 			// ClusterName is the clusterName argument value.
 			ClusterName string
 			// Handler is the handler argument value.
-			Handler v1beta11.CronJobHandlerFunc
+			Handler v11.CronJobHandlerFunc
 		}
 		// AddFeatureHandler holds details about calls to the AddFeatureHandler method.
 		AddFeatureHandler []struct {
@@ -261,7 +261,7 @@ type CronJobControllerMock struct {
 			// Name is the name argument value.
 			Name string
 			// Sync is the sync argument value.
-			Sync v1beta11.CronJobHandlerFunc
+			Sync v11.CronJobHandlerFunc
 		}
 		// AddHandler holds details about calls to the AddHandler method.
 		AddHandler []struct {
@@ -270,7 +270,7 @@ type CronJobControllerMock struct {
 			// Name is the name argument value.
 			Name string
 			// Handler is the handler argument value.
-			Handler v1beta11.CronJobHandlerFunc
+			Handler v11.CronJobHandlerFunc
 		}
 		// Enqueue holds details about calls to the Enqueue method.
 		Enqueue []struct {
@@ -301,7 +301,7 @@ type CronJobControllerMock struct {
 }
 
 // AddClusterScopedFeatureHandler calls AddClusterScopedFeatureHandlerFunc.
-func (mock *CronJobControllerMock) AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name string, clusterName string, handler v1beta11.CronJobHandlerFunc) {
+func (mock *CronJobControllerMock) AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name string, clusterName string, handler v11.CronJobHandlerFunc) {
 	if mock.AddClusterScopedFeatureHandlerFunc == nil {
 		panic("CronJobControllerMock.AddClusterScopedFeatureHandlerFunc: method is nil but CronJobController.AddClusterScopedFeatureHandler was just called")
 	}
@@ -310,7 +310,7 @@ func (mock *CronJobControllerMock) AddClusterScopedFeatureHandler(ctx context.Co
 		Enabled     func() bool
 		Name        string
 		ClusterName string
-		Handler     v1beta11.CronJobHandlerFunc
+		Handler     v11.CronJobHandlerFunc
 	}{
 		Ctx:         ctx,
 		Enabled:     enabled,
@@ -333,14 +333,14 @@ func (mock *CronJobControllerMock) AddClusterScopedFeatureHandlerCalls() []struc
 	Enabled     func() bool
 	Name        string
 	ClusterName string
-	Handler     v1beta11.CronJobHandlerFunc
+	Handler     v11.CronJobHandlerFunc
 } {
 	var calls []struct {
 		Ctx         context.Context
 		Enabled     func() bool
 		Name        string
 		ClusterName string
-		Handler     v1beta11.CronJobHandlerFunc
+		Handler     v11.CronJobHandlerFunc
 	}
 	lockCronJobControllerMockAddClusterScopedFeatureHandler.RLock()
 	calls = mock.calls.AddClusterScopedFeatureHandler
@@ -349,7 +349,7 @@ func (mock *CronJobControllerMock) AddClusterScopedFeatureHandlerCalls() []struc
 }
 
 // AddClusterScopedHandler calls AddClusterScopedHandlerFunc.
-func (mock *CronJobControllerMock) AddClusterScopedHandler(ctx context.Context, name string, clusterName string, handler v1beta11.CronJobHandlerFunc) {
+func (mock *CronJobControllerMock) AddClusterScopedHandler(ctx context.Context, name string, clusterName string, handler v11.CronJobHandlerFunc) {
 	if mock.AddClusterScopedHandlerFunc == nil {
 		panic("CronJobControllerMock.AddClusterScopedHandlerFunc: method is nil but CronJobController.AddClusterScopedHandler was just called")
 	}
@@ -357,7 +357,7 @@ func (mock *CronJobControllerMock) AddClusterScopedHandler(ctx context.Context, 
 		Ctx         context.Context
 		Name        string
 		ClusterName string
-		Handler     v1beta11.CronJobHandlerFunc
+		Handler     v11.CronJobHandlerFunc
 	}{
 		Ctx:         ctx,
 		Name:        name,
@@ -378,13 +378,13 @@ func (mock *CronJobControllerMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
 	ClusterName string
-	Handler     v1beta11.CronJobHandlerFunc
+	Handler     v11.CronJobHandlerFunc
 } {
 	var calls []struct {
 		Ctx         context.Context
 		Name        string
 		ClusterName string
-		Handler     v1beta11.CronJobHandlerFunc
+		Handler     v11.CronJobHandlerFunc
 	}
 	lockCronJobControllerMockAddClusterScopedHandler.RLock()
 	calls = mock.calls.AddClusterScopedHandler
@@ -393,7 +393,7 @@ func (mock *CronJobControllerMock) AddClusterScopedHandlerCalls() []struct {
 }
 
 // AddFeatureHandler calls AddFeatureHandlerFunc.
-func (mock *CronJobControllerMock) AddFeatureHandler(ctx context.Context, enabled func() bool, name string, syncMoqParam v1beta11.CronJobHandlerFunc) {
+func (mock *CronJobControllerMock) AddFeatureHandler(ctx context.Context, enabled func() bool, name string, syncMoqParam v11.CronJobHandlerFunc) {
 	if mock.AddFeatureHandlerFunc == nil {
 		panic("CronJobControllerMock.AddFeatureHandlerFunc: method is nil but CronJobController.AddFeatureHandler was just called")
 	}
@@ -401,7 +401,7 @@ func (mock *CronJobControllerMock) AddFeatureHandler(ctx context.Context, enable
 		Ctx     context.Context
 		Enabled func() bool
 		Name    string
-		Sync    v1beta11.CronJobHandlerFunc
+		Sync    v11.CronJobHandlerFunc
 	}{
 		Ctx:     ctx,
 		Enabled: enabled,
@@ -422,13 +422,13 @@ func (mock *CronJobControllerMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
 	Name    string
-	Sync    v1beta11.CronJobHandlerFunc
+	Sync    v11.CronJobHandlerFunc
 } {
 	var calls []struct {
 		Ctx     context.Context
 		Enabled func() bool
 		Name    string
-		Sync    v1beta11.CronJobHandlerFunc
+		Sync    v11.CronJobHandlerFunc
 	}
 	lockCronJobControllerMockAddFeatureHandler.RLock()
 	calls = mock.calls.AddFeatureHandler
@@ -437,14 +437,14 @@ func (mock *CronJobControllerMock) AddFeatureHandlerCalls() []struct {
 }
 
 // AddHandler calls AddHandlerFunc.
-func (mock *CronJobControllerMock) AddHandler(ctx context.Context, name string, handler v1beta11.CronJobHandlerFunc) {
+func (mock *CronJobControllerMock) AddHandler(ctx context.Context, name string, handler v11.CronJobHandlerFunc) {
 	if mock.AddHandlerFunc == nil {
 		panic("CronJobControllerMock.AddHandlerFunc: method is nil but CronJobController.AddHandler was just called")
 	}
 	callInfo := struct {
 		Ctx     context.Context
 		Name    string
-		Handler v1beta11.CronJobHandlerFunc
+		Handler v11.CronJobHandlerFunc
 	}{
 		Ctx:     ctx,
 		Name:    name,
@@ -463,12 +463,12 @@ func (mock *CronJobControllerMock) AddHandler(ctx context.Context, name string, 
 func (mock *CronJobControllerMock) AddHandlerCalls() []struct {
 	Ctx     context.Context
 	Name    string
-	Handler v1beta11.CronJobHandlerFunc
+	Handler v11.CronJobHandlerFunc
 } {
 	var calls []struct {
 		Ctx     context.Context
 		Name    string
-		Handler v1beta11.CronJobHandlerFunc
+		Handler v11.CronJobHandlerFunc
 	}
 	lockCronJobControllerMockAddHandler.RLock()
 	calls = mock.calls.AddHandler
@@ -607,7 +607,7 @@ func (mock *CronJobControllerMock) InformerCalls() []struct {
 }
 
 // Lister calls ListerFunc.
-func (mock *CronJobControllerMock) Lister() v1beta11.CronJobLister {
+func (mock *CronJobControllerMock) Lister() v11.CronJobLister {
 	if mock.ListerFunc == nil {
 		panic("CronJobControllerMock.ListerFunc: method is nil but CronJobController.Lister was just called")
 	}
@@ -656,44 +656,44 @@ var (
 	lockCronJobInterfaceMockWatch                            sync.RWMutex
 )
 
-// Ensure, that CronJobInterfaceMock does implement v1beta11.CronJobInterface.
+// Ensure, that CronJobInterfaceMock does implement v11.CronJobInterface.
 // If this is not the case, regenerate this file with moq.
-var _ v1beta11.CronJobInterface = &CronJobInterfaceMock{}
+var _ v11.CronJobInterface = &CronJobInterfaceMock{}
 
-// CronJobInterfaceMock is a mock implementation of v1beta11.CronJobInterface.
+// CronJobInterfaceMock is a mock implementation of v11.CronJobInterface.
 //
 //	    func TestSomethingThatUsesCronJobInterface(t *testing.T) {
 //
-//	        // make and configure a mocked v1beta11.CronJobInterface
+//	        // make and configure a mocked v11.CronJobInterface
 //	        mockedCronJobInterface := &CronJobInterfaceMock{
-//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v1beta11.CronJobHandlerFunc)  {
+//	            AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v11.CronJobHandlerFunc)  {
 //		               panic("mock out the AddClusterScopedFeatureHandler method")
 //	            },
-//	            AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v1beta11.CronJobLifecycle)  {
+//	            AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v11.CronJobLifecycle)  {
 //		               panic("mock out the AddClusterScopedFeatureLifecycle method")
 //	            },
-//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v1beta11.CronJobHandlerFunc)  {
+//	            AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, syncMoqParam v11.CronJobHandlerFunc)  {
 //		               panic("mock out the AddClusterScopedHandler method")
 //	            },
-//	            AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v1beta11.CronJobLifecycle)  {
+//	            AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v11.CronJobLifecycle)  {
 //		               panic("mock out the AddClusterScopedLifecycle method")
 //	            },
-//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v1beta11.CronJobHandlerFunc)  {
+//	            AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, syncMoqParam v11.CronJobHandlerFunc)  {
 //		               panic("mock out the AddFeatureHandler method")
 //	            },
-//	            AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v1beta11.CronJobLifecycle)  {
+//	            AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v11.CronJobLifecycle)  {
 //		               panic("mock out the AddFeatureLifecycle method")
 //	            },
-//	            AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v1beta11.CronJobHandlerFunc)  {
+//	            AddHandlerFunc: func(ctx context.Context, name string, syncMoqParam v11.CronJobHandlerFunc)  {
 //		               panic("mock out the AddHandler method")
 //	            },
-//	            AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v1beta11.CronJobLifecycle)  {
+//	            AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v11.CronJobLifecycle)  {
 //		               panic("mock out the AddLifecycle method")
 //	            },
-//	            ControllerFunc: func() v1beta11.CronJobController {
+//	            ControllerFunc: func() v11.CronJobController {
 //		               panic("mock out the Controller method")
 //	            },
-//	            CreateFunc: func(in1 *v1beta1.CronJob) (*v1beta1.CronJob, error) {
+//	            CreateFunc: func(in1 *v1.CronJob) (*v1.CronJob, error) {
 //		               panic("mock out the Create method")
 //	            },
 //	            DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
@@ -705,22 +705,22 @@ var _ v1beta11.CronJobInterface = &CronJobInterfaceMock{}
 //	            DeleteNamespacedFunc: func(namespace string, name string, options *metav1.DeleteOptions) error {
 //		               panic("mock out the DeleteNamespaced method")
 //	            },
-//	            GetFunc: func(name string, opts metav1.GetOptions) (*v1beta1.CronJob, error) {
+//	            GetFunc: func(name string, opts metav1.GetOptions) (*v1.CronJob, error) {
 //		               panic("mock out the Get method")
 //	            },
-//	            GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v1beta1.CronJob, error) {
+//	            GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v1.CronJob, error) {
 //		               panic("mock out the GetNamespaced method")
 //	            },
-//	            ListFunc: func(opts metav1.ListOptions) (*v1beta1.CronJobList, error) {
+//	            ListFunc: func(opts metav1.ListOptions) (*v1.CronJobList, error) {
 //		               panic("mock out the List method")
 //	            },
-//	            ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v1beta1.CronJobList, error) {
+//	            ListNamespacedFunc: func(namespace string, opts metav1.ListOptions) (*v1.CronJobList, error) {
 //		               panic("mock out the ListNamespaced method")
 //	            },
 //	            ObjectClientFunc: func() *objectclient.ObjectClient {
 //		               panic("mock out the ObjectClient method")
 //	            },
-//	            UpdateFunc: func(in1 *v1beta1.CronJob) (*v1beta1.CronJob, error) {
+//	            UpdateFunc: func(in1 *v1.CronJob) (*v1.CronJob, error) {
 //		               panic("mock out the Update method")
 //	            },
 //	            WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
@@ -728,40 +728,40 @@ var _ v1beta11.CronJobInterface = &CronJobInterfaceMock{}
 //	            },
 //	        }
 //
-//	        // use mockedCronJobInterface in code that requires v1beta11.CronJobInterface
+//	        // use mockedCronJobInterface in code that requires v11.CronJobInterface
 //	        // and then make assertions.
 //
 //	    }
 type CronJobInterfaceMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
-	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v1beta11.CronJobHandlerFunc)
+	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v11.CronJobHandlerFunc)
 
 	// AddClusterScopedFeatureLifecycleFunc mocks the AddClusterScopedFeatureLifecycle method.
-	AddClusterScopedFeatureLifecycleFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v1beta11.CronJobLifecycle)
+	AddClusterScopedFeatureLifecycleFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v11.CronJobLifecycle)
 
 	// AddClusterScopedHandlerFunc mocks the AddClusterScopedHandler method.
-	AddClusterScopedHandlerFunc func(ctx context.Context, name string, clusterName string, syncMoqParam v1beta11.CronJobHandlerFunc)
+	AddClusterScopedHandlerFunc func(ctx context.Context, name string, clusterName string, syncMoqParam v11.CronJobHandlerFunc)
 
 	// AddClusterScopedLifecycleFunc mocks the AddClusterScopedLifecycle method.
-	AddClusterScopedLifecycleFunc func(ctx context.Context, name string, clusterName string, lifecycle v1beta11.CronJobLifecycle)
+	AddClusterScopedLifecycleFunc func(ctx context.Context, name string, clusterName string, lifecycle v11.CronJobLifecycle)
 
 	// AddFeatureHandlerFunc mocks the AddFeatureHandler method.
-	AddFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, syncMoqParam v1beta11.CronJobHandlerFunc)
+	AddFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, syncMoqParam v11.CronJobHandlerFunc)
 
 	// AddFeatureLifecycleFunc mocks the AddFeatureLifecycle method.
-	AddFeatureLifecycleFunc func(ctx context.Context, enabled func() bool, name string, lifecycle v1beta11.CronJobLifecycle)
+	AddFeatureLifecycleFunc func(ctx context.Context, enabled func() bool, name string, lifecycle v11.CronJobLifecycle)
 
 	// AddHandlerFunc mocks the AddHandler method.
-	AddHandlerFunc func(ctx context.Context, name string, syncMoqParam v1beta11.CronJobHandlerFunc)
+	AddHandlerFunc func(ctx context.Context, name string, syncMoqParam v11.CronJobHandlerFunc)
 
 	// AddLifecycleFunc mocks the AddLifecycle method.
-	AddLifecycleFunc func(ctx context.Context, name string, lifecycle v1beta11.CronJobLifecycle)
+	AddLifecycleFunc func(ctx context.Context, name string, lifecycle v11.CronJobLifecycle)
 
 	// ControllerFunc mocks the Controller method.
-	ControllerFunc func() v1beta11.CronJobController
+	ControllerFunc func() v11.CronJobController
 
 	// CreateFunc mocks the Create method.
-	CreateFunc func(in1 *v1beta1.CronJob) (*v1beta1.CronJob, error)
+	CreateFunc func(in1 *v1.CronJob) (*v1.CronJob, error)
 
 	// DeleteFunc mocks the Delete method.
 	DeleteFunc func(name string, options *metav1.DeleteOptions) error
@@ -773,22 +773,22 @@ type CronJobInterfaceMock struct {
 	DeleteNamespacedFunc func(namespace string, name string, options *metav1.DeleteOptions) error
 
 	// GetFunc mocks the Get method.
-	GetFunc func(name string, opts metav1.GetOptions) (*v1beta1.CronJob, error)
+	GetFunc func(name string, opts metav1.GetOptions) (*v1.CronJob, error)
 
 	// GetNamespacedFunc mocks the GetNamespaced method.
-	GetNamespacedFunc func(namespace string, name string, opts metav1.GetOptions) (*v1beta1.CronJob, error)
+	GetNamespacedFunc func(namespace string, name string, opts metav1.GetOptions) (*v1.CronJob, error)
 
 	// ListFunc mocks the List method.
-	ListFunc func(opts metav1.ListOptions) (*v1beta1.CronJobList, error)
+	ListFunc func(opts metav1.ListOptions) (*v1.CronJobList, error)
 
 	// ListNamespacedFunc mocks the ListNamespaced method.
-	ListNamespacedFunc func(namespace string, opts metav1.ListOptions) (*v1beta1.CronJobList, error)
+	ListNamespacedFunc func(namespace string, opts metav1.ListOptions) (*v1.CronJobList, error)
 
 	// ObjectClientFunc mocks the ObjectClient method.
 	ObjectClientFunc func() *objectclient.ObjectClient
 
 	// UpdateFunc mocks the Update method.
-	UpdateFunc func(in1 *v1beta1.CronJob) (*v1beta1.CronJob, error)
+	UpdateFunc func(in1 *v1.CronJob) (*v1.CronJob, error)
 
 	// WatchFunc mocks the Watch method.
 	WatchFunc func(opts metav1.ListOptions) (watch.Interface, error)
@@ -806,7 +806,7 @@ type CronJobInterfaceMock struct {
 			// ClusterName is the clusterName argument value.
 			ClusterName string
 			// Sync is the sync argument value.
-			Sync v1beta11.CronJobHandlerFunc
+			Sync v11.CronJobHandlerFunc
 		}
 		// AddClusterScopedFeatureLifecycle holds details about calls to the AddClusterScopedFeatureLifecycle method.
 		AddClusterScopedFeatureLifecycle []struct {
@@ -819,7 +819,7 @@ type CronJobInterfaceMock struct {
 			// ClusterName is the clusterName argument value.
 			ClusterName string
 			// Lifecycle is the lifecycle argument value.
-			Lifecycle v1beta11.CronJobLifecycle
+			Lifecycle v11.CronJobLifecycle
 		}
 		// AddClusterScopedHandler holds details about calls to the AddClusterScopedHandler method.
 		AddClusterScopedHandler []struct {
@@ -830,7 +830,7 @@ type CronJobInterfaceMock struct {
 			// ClusterName is the clusterName argument value.
 			ClusterName string
 			// Sync is the sync argument value.
-			Sync v1beta11.CronJobHandlerFunc
+			Sync v11.CronJobHandlerFunc
 		}
 		// AddClusterScopedLifecycle holds details about calls to the AddClusterScopedLifecycle method.
 		AddClusterScopedLifecycle []struct {
@@ -841,7 +841,7 @@ type CronJobInterfaceMock struct {
 			// ClusterName is the clusterName argument value.
 			ClusterName string
 			// Lifecycle is the lifecycle argument value.
-			Lifecycle v1beta11.CronJobLifecycle
+			Lifecycle v11.CronJobLifecycle
 		}
 		// AddFeatureHandler holds details about calls to the AddFeatureHandler method.
 		AddFeatureHandler []struct {
@@ -852,7 +852,7 @@ type CronJobInterfaceMock struct {
 			// Name is the name argument value.
 			Name string
 			// Sync is the sync argument value.
-			Sync v1beta11.CronJobHandlerFunc
+			Sync v11.CronJobHandlerFunc
 		}
 		// AddFeatureLifecycle holds details about calls to the AddFeatureLifecycle method.
 		AddFeatureLifecycle []struct {
@@ -863,7 +863,7 @@ type CronJobInterfaceMock struct {
 			// Name is the name argument value.
 			Name string
 			// Lifecycle is the lifecycle argument value.
-			Lifecycle v1beta11.CronJobLifecycle
+			Lifecycle v11.CronJobLifecycle
 		}
 		// AddHandler holds details about calls to the AddHandler method.
 		AddHandler []struct {
@@ -872,7 +872,7 @@ type CronJobInterfaceMock struct {
 			// Name is the name argument value.
 			Name string
 			// Sync is the sync argument value.
-			Sync v1beta11.CronJobHandlerFunc
+			Sync v11.CronJobHandlerFunc
 		}
 		// AddLifecycle holds details about calls to the AddLifecycle method.
 		AddLifecycle []struct {
@@ -881,7 +881,7 @@ type CronJobInterfaceMock struct {
 			// Name is the name argument value.
 			Name string
 			// Lifecycle is the lifecycle argument value.
-			Lifecycle v1beta11.CronJobLifecycle
+			Lifecycle v11.CronJobLifecycle
 		}
 		// Controller holds details about calls to the Controller method.
 		Controller []struct {
@@ -889,7 +889,7 @@ type CronJobInterfaceMock struct {
 		// Create holds details about calls to the Create method.
 		Create []struct {
 			// In1 is the in1 argument value.
-			In1 *v1beta1.CronJob
+			In1 *v1.CronJob
 		}
 		// Delete holds details about calls to the Delete method.
 		Delete []struct {
@@ -948,7 +948,7 @@ type CronJobInterfaceMock struct {
 		// Update holds details about calls to the Update method.
 		Update []struct {
 			// In1 is the in1 argument value.
-			In1 *v1beta1.CronJob
+			In1 *v1.CronJob
 		}
 		// Watch holds details about calls to the Watch method.
 		Watch []struct {
@@ -959,7 +959,7 @@ type CronJobInterfaceMock struct {
 }
 
 // AddClusterScopedFeatureHandler calls AddClusterScopedFeatureHandlerFunc.
-func (mock *CronJobInterfaceMock) AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v1beta11.CronJobHandlerFunc) {
+func (mock *CronJobInterfaceMock) AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name string, clusterName string, syncMoqParam v11.CronJobHandlerFunc) {
 	if mock.AddClusterScopedFeatureHandlerFunc == nil {
 		panic("CronJobInterfaceMock.AddClusterScopedFeatureHandlerFunc: method is nil but CronJobInterface.AddClusterScopedFeatureHandler was just called")
 	}
@@ -968,7 +968,7 @@ func (mock *CronJobInterfaceMock) AddClusterScopedFeatureHandler(ctx context.Con
 		Enabled     func() bool
 		Name        string
 		ClusterName string
-		Sync        v1beta11.CronJobHandlerFunc
+		Sync        v11.CronJobHandlerFunc
 	}{
 		Ctx:         ctx,
 		Enabled:     enabled,
@@ -991,14 +991,14 @@ func (mock *CronJobInterfaceMock) AddClusterScopedFeatureHandlerCalls() []struct
 	Enabled     func() bool
 	Name        string
 	ClusterName string
-	Sync        v1beta11.CronJobHandlerFunc
+	Sync        v11.CronJobHandlerFunc
 } {
 	var calls []struct {
 		Ctx         context.Context
 		Enabled     func() bool
 		Name        string
 		ClusterName string
-		Sync        v1beta11.CronJobHandlerFunc
+		Sync        v11.CronJobHandlerFunc
 	}
 	lockCronJobInterfaceMockAddClusterScopedFeatureHandler.RLock()
 	calls = mock.calls.AddClusterScopedFeatureHandler
@@ -1007,7 +1007,7 @@ func (mock *CronJobInterfaceMock) AddClusterScopedFeatureHandlerCalls() []struct
 }
 
 // AddClusterScopedFeatureLifecycle calls AddClusterScopedFeatureLifecycleFunc.
-func (mock *CronJobInterfaceMock) AddClusterScopedFeatureLifecycle(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v1beta11.CronJobLifecycle) {
+func (mock *CronJobInterfaceMock) AddClusterScopedFeatureLifecycle(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v11.CronJobLifecycle) {
 	if mock.AddClusterScopedFeatureLifecycleFunc == nil {
 		panic("CronJobInterfaceMock.AddClusterScopedFeatureLifecycleFunc: method is nil but CronJobInterface.AddClusterScopedFeatureLifecycle was just called")
 	}
@@ -1016,7 +1016,7 @@ func (mock *CronJobInterfaceMock) AddClusterScopedFeatureLifecycle(ctx context.C
 		Enabled     func() bool
 		Name        string
 		ClusterName string
-		Lifecycle   v1beta11.CronJobLifecycle
+		Lifecycle   v11.CronJobLifecycle
 	}{
 		Ctx:         ctx,
 		Enabled:     enabled,
@@ -1039,14 +1039,14 @@ func (mock *CronJobInterfaceMock) AddClusterScopedFeatureLifecycleCalls() []stru
 	Enabled     func() bool
 	Name        string
 	ClusterName string
-	Lifecycle   v1beta11.CronJobLifecycle
+	Lifecycle   v11.CronJobLifecycle
 } {
 	var calls []struct {
 		Ctx         context.Context
 		Enabled     func() bool
 		Name        string
 		ClusterName string
-		Lifecycle   v1beta11.CronJobLifecycle
+		Lifecycle   v11.CronJobLifecycle
 	}
 	lockCronJobInterfaceMockAddClusterScopedFeatureLifecycle.RLock()
 	calls = mock.calls.AddClusterScopedFeatureLifecycle
@@ -1055,7 +1055,7 @@ func (mock *CronJobInterfaceMock) AddClusterScopedFeatureLifecycleCalls() []stru
 }
 
 // AddClusterScopedHandler calls AddClusterScopedHandlerFunc.
-func (mock *CronJobInterfaceMock) AddClusterScopedHandler(ctx context.Context, name string, clusterName string, syncMoqParam v1beta11.CronJobHandlerFunc) {
+func (mock *CronJobInterfaceMock) AddClusterScopedHandler(ctx context.Context, name string, clusterName string, syncMoqParam v11.CronJobHandlerFunc) {
 	if mock.AddClusterScopedHandlerFunc == nil {
 		panic("CronJobInterfaceMock.AddClusterScopedHandlerFunc: method is nil but CronJobInterface.AddClusterScopedHandler was just called")
 	}
@@ -1063,7 +1063,7 @@ func (mock *CronJobInterfaceMock) AddClusterScopedHandler(ctx context.Context, n
 		Ctx         context.Context
 		Name        string
 		ClusterName string
-		Sync        v1beta11.CronJobHandlerFunc
+		Sync        v11.CronJobHandlerFunc
 	}{
 		Ctx:         ctx,
 		Name:        name,
@@ -1084,13 +1084,13 @@ func (mock *CronJobInterfaceMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
 	ClusterName string
-	Sync        v1beta11.CronJobHandlerFunc
+	Sync        v11.CronJobHandlerFunc
 } {
 	var calls []struct {
 		Ctx         context.Context
 		Name        string
 		ClusterName string
-		Sync        v1beta11.CronJobHandlerFunc
+		Sync        v11.CronJobHandlerFunc
 	}
 	lockCronJobInterfaceMockAddClusterScopedHandler.RLock()
 	calls = mock.calls.AddClusterScopedHandler
@@ -1099,7 +1099,7 @@ func (mock *CronJobInterfaceMock) AddClusterScopedHandlerCalls() []struct {
 }
 
 // AddClusterScopedLifecycle calls AddClusterScopedLifecycleFunc.
-func (mock *CronJobInterfaceMock) AddClusterScopedLifecycle(ctx context.Context, name string, clusterName string, lifecycle v1beta11.CronJobLifecycle) {
+func (mock *CronJobInterfaceMock) AddClusterScopedLifecycle(ctx context.Context, name string, clusterName string, lifecycle v11.CronJobLifecycle) {
 	if mock.AddClusterScopedLifecycleFunc == nil {
 		panic("CronJobInterfaceMock.AddClusterScopedLifecycleFunc: method is nil but CronJobInterface.AddClusterScopedLifecycle was just called")
 	}
@@ -1107,7 +1107,7 @@ func (mock *CronJobInterfaceMock) AddClusterScopedLifecycle(ctx context.Context,
 		Ctx         context.Context
 		Name        string
 		ClusterName string
-		Lifecycle   v1beta11.CronJobLifecycle
+		Lifecycle   v11.CronJobLifecycle
 	}{
 		Ctx:         ctx,
 		Name:        name,
@@ -1128,13 +1128,13 @@ func (mock *CronJobInterfaceMock) AddClusterScopedLifecycleCalls() []struct {
 	Ctx         context.Context
 	Name        string
 	ClusterName string
-	Lifecycle   v1beta11.CronJobLifecycle
+	Lifecycle   v11.CronJobLifecycle
 } {
 	var calls []struct {
 		Ctx         context.Context
 		Name        string
 		ClusterName string
-		Lifecycle   v1beta11.CronJobLifecycle
+		Lifecycle   v11.CronJobLifecycle
 	}
 	lockCronJobInterfaceMockAddClusterScopedLifecycle.RLock()
 	calls = mock.calls.AddClusterScopedLifecycle
@@ -1143,7 +1143,7 @@ func (mock *CronJobInterfaceMock) AddClusterScopedLifecycleCalls() []struct {
 }
 
 // AddFeatureHandler calls AddFeatureHandlerFunc.
-func (mock *CronJobInterfaceMock) AddFeatureHandler(ctx context.Context, enabled func() bool, name string, syncMoqParam v1beta11.CronJobHandlerFunc) {
+func (mock *CronJobInterfaceMock) AddFeatureHandler(ctx context.Context, enabled func() bool, name string, syncMoqParam v11.CronJobHandlerFunc) {
 	if mock.AddFeatureHandlerFunc == nil {
 		panic("CronJobInterfaceMock.AddFeatureHandlerFunc: method is nil but CronJobInterface.AddFeatureHandler was just called")
 	}
@@ -1151,7 +1151,7 @@ func (mock *CronJobInterfaceMock) AddFeatureHandler(ctx context.Context, enabled
 		Ctx     context.Context
 		Enabled func() bool
 		Name    string
-		Sync    v1beta11.CronJobHandlerFunc
+		Sync    v11.CronJobHandlerFunc
 	}{
 		Ctx:     ctx,
 		Enabled: enabled,
@@ -1172,13 +1172,13 @@ func (mock *CronJobInterfaceMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
 	Name    string
-	Sync    v1beta11.CronJobHandlerFunc
+	Sync    v11.CronJobHandlerFunc
 } {
 	var calls []struct {
 		Ctx     context.Context
 		Enabled func() bool
 		Name    string
-		Sync    v1beta11.CronJobHandlerFunc
+		Sync    v11.CronJobHandlerFunc
 	}
 	lockCronJobInterfaceMockAddFeatureHandler.RLock()
 	calls = mock.calls.AddFeatureHandler
@@ -1187,7 +1187,7 @@ func (mock *CronJobInterfaceMock) AddFeatureHandlerCalls() []struct {
 }
 
 // AddFeatureLifecycle calls AddFeatureLifecycleFunc.
-func (mock *CronJobInterfaceMock) AddFeatureLifecycle(ctx context.Context, enabled func() bool, name string, lifecycle v1beta11.CronJobLifecycle) {
+func (mock *CronJobInterfaceMock) AddFeatureLifecycle(ctx context.Context, enabled func() bool, name string, lifecycle v11.CronJobLifecycle) {
 	if mock.AddFeatureLifecycleFunc == nil {
 		panic("CronJobInterfaceMock.AddFeatureLifecycleFunc: method is nil but CronJobInterface.AddFeatureLifecycle was just called")
 	}
@@ -1195,7 +1195,7 @@ func (mock *CronJobInterfaceMock) AddFeatureLifecycle(ctx context.Context, enabl
 		Ctx       context.Context
 		Enabled   func() bool
 		Name      string
-		Lifecycle v1beta11.CronJobLifecycle
+		Lifecycle v11.CronJobLifecycle
 	}{
 		Ctx:       ctx,
 		Enabled:   enabled,
@@ -1216,13 +1216,13 @@ func (mock *CronJobInterfaceMock) AddFeatureLifecycleCalls() []struct {
 	Ctx       context.Context
 	Enabled   func() bool
 	Name      string
-	Lifecycle v1beta11.CronJobLifecycle
+	Lifecycle v11.CronJobLifecycle
 } {
 	var calls []struct {
 		Ctx       context.Context
 		Enabled   func() bool
 		Name      string
-		Lifecycle v1beta11.CronJobLifecycle
+		Lifecycle v11.CronJobLifecycle
 	}
 	lockCronJobInterfaceMockAddFeatureLifecycle.RLock()
 	calls = mock.calls.AddFeatureLifecycle
@@ -1231,14 +1231,14 @@ func (mock *CronJobInterfaceMock) AddFeatureLifecycleCalls() []struct {
 }
 
 // AddHandler calls AddHandlerFunc.
-func (mock *CronJobInterfaceMock) AddHandler(ctx context.Context, name string, syncMoqParam v1beta11.CronJobHandlerFunc) {
+func (mock *CronJobInterfaceMock) AddHandler(ctx context.Context, name string, syncMoqParam v11.CronJobHandlerFunc) {
 	if mock.AddHandlerFunc == nil {
 		panic("CronJobInterfaceMock.AddHandlerFunc: method is nil but CronJobInterface.AddHandler was just called")
 	}
 	callInfo := struct {
 		Ctx  context.Context
 		Name string
-		Sync v1beta11.CronJobHandlerFunc
+		Sync v11.CronJobHandlerFunc
 	}{
 		Ctx:  ctx,
 		Name: name,
@@ -1257,12 +1257,12 @@ func (mock *CronJobInterfaceMock) AddHandler(ctx context.Context, name string, s
 func (mock *CronJobInterfaceMock) AddHandlerCalls() []struct {
 	Ctx  context.Context
 	Name string
-	Sync v1beta11.CronJobHandlerFunc
+	Sync v11.CronJobHandlerFunc
 } {
 	var calls []struct {
 		Ctx  context.Context
 		Name string
-		Sync v1beta11.CronJobHandlerFunc
+		Sync v11.CronJobHandlerFunc
 	}
 	lockCronJobInterfaceMockAddHandler.RLock()
 	calls = mock.calls.AddHandler
@@ -1271,14 +1271,14 @@ func (mock *CronJobInterfaceMock) AddHandlerCalls() []struct {
 }
 
 // AddLifecycle calls AddLifecycleFunc.
-func (mock *CronJobInterfaceMock) AddLifecycle(ctx context.Context, name string, lifecycle v1beta11.CronJobLifecycle) {
+func (mock *CronJobInterfaceMock) AddLifecycle(ctx context.Context, name string, lifecycle v11.CronJobLifecycle) {
 	if mock.AddLifecycleFunc == nil {
 		panic("CronJobInterfaceMock.AddLifecycleFunc: method is nil but CronJobInterface.AddLifecycle was just called")
 	}
 	callInfo := struct {
 		Ctx       context.Context
 		Name      string
-		Lifecycle v1beta11.CronJobLifecycle
+		Lifecycle v11.CronJobLifecycle
 	}{
 		Ctx:       ctx,
 		Name:      name,
@@ -1297,12 +1297,12 @@ func (mock *CronJobInterfaceMock) AddLifecycle(ctx context.Context, name string,
 func (mock *CronJobInterfaceMock) AddLifecycleCalls() []struct {
 	Ctx       context.Context
 	Name      string
-	Lifecycle v1beta11.CronJobLifecycle
+	Lifecycle v11.CronJobLifecycle
 } {
 	var calls []struct {
 		Ctx       context.Context
 		Name      string
-		Lifecycle v1beta11.CronJobLifecycle
+		Lifecycle v11.CronJobLifecycle
 	}
 	lockCronJobInterfaceMockAddLifecycle.RLock()
 	calls = mock.calls.AddLifecycle
@@ -1311,7 +1311,7 @@ func (mock *CronJobInterfaceMock) AddLifecycleCalls() []struct {
 }
 
 // Controller calls ControllerFunc.
-func (mock *CronJobInterfaceMock) Controller() v1beta11.CronJobController {
+func (mock *CronJobInterfaceMock) Controller() v11.CronJobController {
 	if mock.ControllerFunc == nil {
 		panic("CronJobInterfaceMock.ControllerFunc: method is nil but CronJobInterface.Controller was just called")
 	}
@@ -1338,12 +1338,12 @@ func (mock *CronJobInterfaceMock) ControllerCalls() []struct {
 }
 
 // Create calls CreateFunc.
-func (mock *CronJobInterfaceMock) Create(in1 *v1beta1.CronJob) (*v1beta1.CronJob, error) {
+func (mock *CronJobInterfaceMock) Create(in1 *v1.CronJob) (*v1.CronJob, error) {
 	if mock.CreateFunc == nil {
 		panic("CronJobInterfaceMock.CreateFunc: method is nil but CronJobInterface.Create was just called")
 	}
 	callInfo := struct {
-		In1 *v1beta1.CronJob
+		In1 *v1.CronJob
 	}{
 		In1: in1,
 	}
@@ -1358,10 +1358,10 @@ func (mock *CronJobInterfaceMock) Create(in1 *v1beta1.CronJob) (*v1beta1.CronJob
 //
 //	len(mockedCronJobInterface.CreateCalls())
 func (mock *CronJobInterfaceMock) CreateCalls() []struct {
-	In1 *v1beta1.CronJob
+	In1 *v1.CronJob
 } {
 	var calls []struct {
-		In1 *v1beta1.CronJob
+		In1 *v1.CronJob
 	}
 	lockCronJobInterfaceMockCreate.RLock()
 	calls = mock.calls.Create
@@ -1482,7 +1482,7 @@ func (mock *CronJobInterfaceMock) DeleteNamespacedCalls() []struct {
 }
 
 // Get calls GetFunc.
-func (mock *CronJobInterfaceMock) Get(name string, opts metav1.GetOptions) (*v1beta1.CronJob, error) {
+func (mock *CronJobInterfaceMock) Get(name string, opts metav1.GetOptions) (*v1.CronJob, error) {
 	if mock.GetFunc == nil {
 		panic("CronJobInterfaceMock.GetFunc: method is nil but CronJobInterface.Get was just called")
 	}
@@ -1518,7 +1518,7 @@ func (mock *CronJobInterfaceMock) GetCalls() []struct {
 }
 
 // GetNamespaced calls GetNamespacedFunc.
-func (mock *CronJobInterfaceMock) GetNamespaced(namespace string, name string, opts metav1.GetOptions) (*v1beta1.CronJob, error) {
+func (mock *CronJobInterfaceMock) GetNamespaced(namespace string, name string, opts metav1.GetOptions) (*v1.CronJob, error) {
 	if mock.GetNamespacedFunc == nil {
 		panic("CronJobInterfaceMock.GetNamespacedFunc: method is nil but CronJobInterface.GetNamespaced was just called")
 	}
@@ -1558,7 +1558,7 @@ func (mock *CronJobInterfaceMock) GetNamespacedCalls() []struct {
 }
 
 // List calls ListFunc.
-func (mock *CronJobInterfaceMock) List(opts metav1.ListOptions) (*v1beta1.CronJobList, error) {
+func (mock *CronJobInterfaceMock) List(opts metav1.ListOptions) (*v1.CronJobList, error) {
 	if mock.ListFunc == nil {
 		panic("CronJobInterfaceMock.ListFunc: method is nil but CronJobInterface.List was just called")
 	}
@@ -1590,7 +1590,7 @@ func (mock *CronJobInterfaceMock) ListCalls() []struct {
 }
 
 // ListNamespaced calls ListNamespacedFunc.
-func (mock *CronJobInterfaceMock) ListNamespaced(namespace string, opts metav1.ListOptions) (*v1beta1.CronJobList, error) {
+func (mock *CronJobInterfaceMock) ListNamespaced(namespace string, opts metav1.ListOptions) (*v1.CronJobList, error) {
 	if mock.ListNamespacedFunc == nil {
 		panic("CronJobInterfaceMock.ListNamespacedFunc: method is nil but CronJobInterface.ListNamespaced was just called")
 	}
@@ -1653,12 +1653,12 @@ func (mock *CronJobInterfaceMock) ObjectClientCalls() []struct {
 }
 
 // Update calls UpdateFunc.
-func (mock *CronJobInterfaceMock) Update(in1 *v1beta1.CronJob) (*v1beta1.CronJob, error) {
+func (mock *CronJobInterfaceMock) Update(in1 *v1.CronJob) (*v1.CronJob, error) {
 	if mock.UpdateFunc == nil {
 		panic("CronJobInterfaceMock.UpdateFunc: method is nil but CronJobInterface.Update was just called")
 	}
 	callInfo := struct {
-		In1 *v1beta1.CronJob
+		In1 *v1.CronJob
 	}{
 		In1: in1,
 	}
@@ -1673,10 +1673,10 @@ func (mock *CronJobInterfaceMock) Update(in1 *v1beta1.CronJob) (*v1beta1.CronJob
 //
 //	len(mockedCronJobInterface.UpdateCalls())
 func (mock *CronJobInterfaceMock) UpdateCalls() []struct {
-	In1 *v1beta1.CronJob
+	In1 *v1.CronJob
 } {
 	var calls []struct {
-		In1 *v1beta1.CronJob
+		In1 *v1.CronJob
 	}
 	lockCronJobInterfaceMockUpdate.RLock()
 	calls = mock.calls.Update
@@ -1720,28 +1720,28 @@ var (
 	lockCronJobsGetterMockCronJobs sync.RWMutex
 )
 
-// Ensure, that CronJobsGetterMock does implement v1beta11.CronJobsGetter.
+// Ensure, that CronJobsGetterMock does implement v11.CronJobsGetter.
 // If this is not the case, regenerate this file with moq.
-var _ v1beta11.CronJobsGetter = &CronJobsGetterMock{}
+var _ v11.CronJobsGetter = &CronJobsGetterMock{}
 
-// CronJobsGetterMock is a mock implementation of v1beta11.CronJobsGetter.
+// CronJobsGetterMock is a mock implementation of v11.CronJobsGetter.
 //
 //	    func TestSomethingThatUsesCronJobsGetter(t *testing.T) {
 //
-//	        // make and configure a mocked v1beta11.CronJobsGetter
+//	        // make and configure a mocked v11.CronJobsGetter
 //	        mockedCronJobsGetter := &CronJobsGetterMock{
-//	            CronJobsFunc: func(namespace string) v1beta11.CronJobInterface {
+//	            CronJobsFunc: func(namespace string) v11.CronJobInterface {
 //		               panic("mock out the CronJobs method")
 //	            },
 //	        }
 //
-//	        // use mockedCronJobsGetter in code that requires v1beta11.CronJobsGetter
+//	        // use mockedCronJobsGetter in code that requires v11.CronJobsGetter
 //	        // and then make assertions.
 //
 //	    }
 type CronJobsGetterMock struct {
 	// CronJobsFunc mocks the CronJobs method.
-	CronJobsFunc func(namespace string) v1beta11.CronJobInterface
+	CronJobsFunc func(namespace string) v11.CronJobInterface
 
 	// calls tracks calls to the methods.
 	calls struct {
@@ -1754,7 +1754,7 @@ type CronJobsGetterMock struct {
 }
 
 // CronJobs calls CronJobsFunc.
-func (mock *CronJobsGetterMock) CronJobs(namespace string) v1beta11.CronJobInterface {
+func (mock *CronJobsGetterMock) CronJobs(namespace string) v11.CronJobInterface {
 	if mock.CronJobsFunc == nil {
 		panic("CronJobsGetterMock.CronJobsFunc: method is nil but CronJobsGetter.CronJobs was just called")
 	}

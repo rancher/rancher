@@ -341,7 +341,7 @@ func TestFourNodesServerAndWorkerRolesWithDelete(t *testing.T) {
 
 	c, err := cluster.New(clients, &provisioningv1api.Cluster{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "test-four-nodes-server-and-worker-roles-with-delete",
+			Name: "test-worker-roles-with-delete",
 		},
 		Spec: provisioningv1api.ClusterSpec{
 			KubernetesVersion: defaults.SomeK8sVersion,
