@@ -12,6 +12,7 @@ const (
 	NodeGroupFieldLaunchTemplate       = "launchTemplate"
 	NodeGroupFieldMaxSize              = "maxSize"
 	NodeGroupFieldMinSize              = "minSize"
+	NodeGroupFieldNodeRole             = "nodeRole"
 	NodeGroupFieldNodegroupName        = "nodegroupName"
 	NodeGroupFieldRequestSpotInstances = "requestSpotInstances"
 	NodeGroupFieldResourceTags         = "resourceTags"
@@ -33,6 +34,7 @@ type NodeGroup struct {
 	LaunchTemplate       *LaunchTemplate   `json:"launchTemplate,omitempty" yaml:"launchTemplate,omitempty"`
 	MaxSize              *int64            `json:"maxSize,omitempty" yaml:"maxSize,omitempty"`
 	MinSize              *int64            `json:"minSize,omitempty" yaml:"minSize,omitempty"`
+	NodeRole             *string           `json:"nodeRole,omitempty" yaml:"nodeRole,omitempty"`
 	NodegroupName        *string           `json:"nodegroupName,omitempty" yaml:"nodegroupName,omitempty"`
 	RequestSpotInstances *bool             `json:"requestSpotInstances,omitempty" yaml:"requestSpotInstances,omitempty"`
 	ResourceTags         map[string]string `json:"resourceTags,omitempty" yaml:"resourceTags,omitempty"`

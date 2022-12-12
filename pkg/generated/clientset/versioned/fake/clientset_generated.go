@@ -59,6 +59,7 @@ func NewSimpleClientset(objects ...runtime.Object) *Clientset {
 		}
 		return true, watch, nil
 	})
+
 	return cs
 }
 
