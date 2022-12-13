@@ -161,7 +161,9 @@ require (
 require github.com/google/gnostic v0.5.7-v3refs
 
 require (
+	github.com/hashicorp/terraform-json v0.14.0 // indirect
 	github.com/kr/fs v0.1.0 // indirect
+	github.com/zclconf/go-cty v1.11.0 // indirect
 	k8s.io/pod-security-admission v0.25.4 // indirect
 )
 
@@ -241,7 +243,9 @@ require (
 	github.com/hashicorp/go-hclog v1.2.0 // indirect
 	github.com/hashicorp/go-retryablehttp v0.7.0 // indirect
 	github.com/hashicorp/go-uuid v1.0.2 // indirect
-	github.com/hashicorp/go-version v1.3.0 // indirect
+	github.com/hashicorp/go-version v1.6.0
+	github.com/hashicorp/hc-install v0.4.0
+	github.com/hashicorp/terraform-exec v0.17.3
 	github.com/huandu/xstrings v1.3.2 // indirect
 	github.com/imdario/mergo v0.3.12 // indirect
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect
