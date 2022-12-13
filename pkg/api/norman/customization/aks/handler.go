@@ -132,8 +132,15 @@ func (h *handler) ServeHTTP(writer http.ResponseWriter, req *http.Request) {
 		}
 		writer.Write(serialized)
 	case "aksVMSizes":
-		if serialized, errCode, err = listVMSizes(req.Context(), capa); err != nil {
+		if serialized, errCode, err = listVMSizesV1(req.Context(), capa); err != nil {
 			logrus.Errorf("[aks-handler] error getting VM sizes: %v", err)
+			handleErr(writer, errCode, err)
+			return
+		}
+		writer.Write(serialized)
+	case "aksVMSizesV2":
+		if serialized, errCode, err = listVMSizesV2(req.Context(), capa); err != nil {
+			logrus.Errorf("[aks-handler] error getting VM sizes (v2): %v", err)
 			handleErr(writer, errCode, err)
 			return
 		}
