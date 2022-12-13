@@ -34,7 +34,7 @@ var (
 				}
 			},
 			Enabled: func() bool {
-				return features.MCM.Enabled() || features.EmbeddedClusterAPI.Enabled()
+				return true
 			},
 		},
 		{
