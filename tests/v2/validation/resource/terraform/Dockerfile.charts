@@ -1,0 +1,17 @@
+FROM golang:1.19
+
+# Configure Go
+ENV GOPATH /go
+ENV PATH ${PATH}:/go/bin
+
+ENV WORKSPACE ${GOPATH}/src/github.com/rancher/rancher
+
+WORKDIR $WORKSPACE/tests/v2/validation/resource/terraform
+
+COPY [".", "$WORKSPACE"]
+RUN curl -LO "https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl" \
+    && chmod +x ./kubectl \
+    && mv ./kubectl /go/bin
+
+
+RUN go mod tidy

@@ -19,7 +19,7 @@ RUN go mod download && \
 
 # Configure Corral
 ENV CORRAL_VERSION="v1.1.1"
-RUN go install github.com/rancherlabs/corral@${CORRAL_VERSION}
+RUN go instal@${CORRAL_VERSION}
 
 RUN mkdir /root/.ssh && chmod 600 .ssh/jenkins-*
 RUN ssh-keygen -f .ssh/jenkins-* -y > /root/.ssh/public.pub

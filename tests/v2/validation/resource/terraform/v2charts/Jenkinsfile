@@ -1,0 +1,186 @@
+// Job Params
+// Provisioning Requirements: RANCHER_API_URL, RANCHER_TOKEN_KEY, CLUSTER_PREFIX, WORKER_COUNT, AWS_AMI, AWS_AMI_USER
+// Target Requirements: RANCHER_API_URL, RANCHER_TOKEN_KEY, CLUSTER_ID, PROJECT_ID
+
+node {
+  def job_name = "${JOB_NAME}"
+  if (job_name.contains('/')) { 
+    job_names = job_name.split('/')
+    job_name = job_names[job_names.size() - 1] 
+  }
+  def testContainer = "${job_name}${env.BUILD_NUMBER}_test"
+  def imageName = "rancher-validation-${job_name}${env.BUILD_NUMBER}"
+  def envFile = ".env"
+
+  def branch = "release/v2.6"
+  if ("${env.branch}" != "null" && "${env.branch}" != "") {
+    branch = "${env.branch}"
+  }
+
+  def rancher_api_url = "${env.RANCHER_API_URL}"
+  def rancher_token_key = "${env.RANCHER_TOKEN_KEY}"
+  def rancher_monitoring_version = "${env.RANCHER_MONITORING_V2_VERSION}"
+  def rancher_logging_version = "${env.RANCHER_LOGGING_V2_VERSION}"
+  def rancher_kiali_version = "${env.RANCHER_KIALI_V2_VERSION}"
+  def rancher_istio_version = "${env.RANCHER_ISTIO_V2_VERSION}"
+  def rancher_tracing_version = "${env.RANCHER_TRACING_VERSION}"
+  def rancher_cis_version = "${env.RANCHER_CIS_V2_VERSION}"
+  def rancher_gatekeeper_version = "${env.RANCHER_GATEKEEPER_V2_VERSION}"
+  def rancher_backup_version = "${env.RANCHER_BACKUP_V2_VERSION}"
+  def rancher_longhorn_version = "${env.RANCHER_LONGHORN_V2_VERSION}"
+  def rancher_longhorn_prereq_version = "v1.3.1"
+  if ("${env.RANCHER_LONGHORN_PREREQ_VERSION}" != "null" && "${env.RANCHER_LONGHORN_PREREQ_VERSION}" != "") {
+    rancher_longhorn_prereq_version = "${env.RANCHER_LONGHORN_PREREQ_VERSION}"
+  }
+  def install_rancher_backups = "${env.INSTALL_RANCHER_BACKUPS}"
+  def rancher_neuvector_version = "${env.RANCHER_NEUVECTOR_V2_VERSION}"
+  def install_rancher_neuvector = "${env.INSTALL_RANCHER_NEUVECTOR}"
+  def neuvector_docker_runtime = "${env.NEUVECTOR_DOCKER_RUNTIME}"
+  def neuvector_k3s_runtime = "${env.NEUVECTOR_K3S_RUNTIME}"
+  def neuvector_crio_runtime = "${env.NEUVECTOR_CRIO_RUNTIME}"
+  def neuvector_containerd_runtime = "${env.NEUVECTOR_CONTAINERD_RUNTIME}"
+  def cluster_id = "${env.CLUSTER_ID}"
+  def project_id = "${env.PROJECT_ID}"
+  def cluster_prefix = "${env.CLUSTER_PREFIX}"
+  def worker_count = "${env.WORKER_COUNT}"
+  def aws_ami = "${env.AWS_AMI_AUTO}"
+  def aws_ami_user = "${env.AWS_AMI_USER_AUTO}"
+  def aws_vpc_id = "${env.AWS_VPC_ID_AUTO}"
+  def aws_zone = "${env.AWS_ZONE_AUTO}"
+  def aws_region = "${env.AWS_REGION_AUTO}"
+  def aws_root_size = "${env.AWS_ROOT_SIZE_AUTO}"
+  def aws_instance_type = "${env.AWS_INSTANCE_TYPE_AUTO}"
+  def aws_volume_type = "${env.AWS_VOLUME_TYPE_AUTO}"
+  def aws_subnet = "${env.AWS_SUBNET_AUTO}"
+  def tf_version = "${env.TF_VERSION}"
+  def rancher_k8s_version = "${env.RANCHER_K8S_VERSION}"
+  def etcd_suffix = "-auto-etcd-0"
+  def cp_suffix = "-auto-controlplane-0"
+  def worker_suffix = "-auto-worker-0"
+  def cluster_suffix = "-auto-v2charts"
+
+
+  wrap([$class: 'AnsiColorBuildWrapper', 'colorMapName': 'XTerm', 'defaultFg': 2, 'defaultBg':1]) {
+    withFolderProperties {
+      paramsMap = []
+      params.each {
+        paramsMap << "$it.key=$it.value"
+      }
+      withEnv(paramsMap) {
+      withCredentials([ string(credentialsId: 'AWS_ACCESS_KEY_ID', variable: 'AWS_ACCESS_KEY_ID'),
+                        string(credentialsId: 'AWS_SECRET_ACCESS_KEY', variable: 'AWS_SECRET_ACCESS_KEY'),
+                        string(credentialsId: 'AWS_SSH_PEM_KEY', variable: 'AWS_SSH_PEM_KEY'),
+                        string(credentialsId: 'ADMIN_PASSWORD', variable: 'ADMIN_PASSWORD'),
+                        string(credentialsId: 'USER_PASSWORD', variable: 'USER_PASSWORD')
+                        ]) {
+                          
+        stage('Checkout') {
+          deleteDir()
+          checkout([
+                    $class: 'GitSCM',
+                    branches: [[name: "*/${branch}"]],
+                    extensions: scm.extensions + [[$class: 'CleanCheckout']],
+                    userRemoteConfigs: scm.userRemoteConfigs
+                  ])
+        }
+
+        dir ("./") {
+          stage('Configure and Build') {
+            if (env.AWS_SSH_PEM_KEY && env.AWS_SSH_KEY_NAME) {
+              dir(".ssh") {
+                def decoded = new String(AWS_SSH_PEM_KEY.decodeBase64())
+                writeFile file: AWS_SSH_KEY_NAME, text: decoded
+              }
+            }
+
+            sh "./tests/v2/validation/resource/terraform/configure.sh"
+            sh "./tests/v2/validation/resource/terraform/build.sh"
+          }
+
+          try {
+            stage('Run Chart Installation') {
+                if (cluster_id == "") {                  
+                  sh "docker run --name ${testContainer} -t --env-file ${envFile} " + 
+                  "${imageName} sh -c \"export TF_VAR_rancher_api_url=${rancher_api_url}" + 
+                  "&& export TF_VAR_rancher_token_key=${rancher_token_key}" + 
+                  "&& export TF_VAR_aws_access_key=${AWS_ACCESS_KEY_ID}" + 
+                  "&& export TF_VAR_aws_secret_key=${AWS_SECRET_ACCESS_KEY}" + 
+                  "&& export provider=v2charts/provision/aws" + 
+                  "&& export tfversion=${tf_version}" + 
+                  "&& export TF_VAR_cluster_name=${cluster_prefix}"+"$cluster_suffix" + 
+                  "&& export TF_VAR_node_pool_name_etcd=${cluster_prefix}"+"$etcd_suffix" + 
+                  "&& export TF_VAR_node_pool_name_cp=${cluster_prefix}"+"$cp_suffix" + 
+                  "&& export TF_VAR_node_pool_name_worker=${cluster_prefix}"+"$worker_suffix" + 
+                  "&& export TF_VAR_worker_count=${worker_count}" + 
+                  "&& export TF_VAR_aws_ami=${aws_ami}" +  
+                  "&& export TF_VAR_aws_ami_user=${aws_ami_user}" + 
+                  "&& export TF_VAR_aws_vpc_id=${aws_vpc_id}" +  
+                  "&& export TF_VAR_aws_subnet=${aws_subnet}" +
+                  "&& export TF_VAR_aws_zone=${aws_zone}" +  
+                  "&& export TF_VAR_aws_region=${aws_region}" + 
+                  "&& export TF_VAR_aws_root_size=${aws_root_size}" +  
+                  "&& export TF_VAR_aws_instance_type=${aws_instance_type}" +  
+                  "&& export TF_VAR_aws_volume_type=${aws_volume_type}" + 
+                  "&& export TF_VAR_rancher_k8s_version=${rancher_k8s_version}" +
+                  "&& export TF_VAR_rancher_monitoring_version=${rancher_monitoring_version}" + 
+                  "&& export TF_VAR_rancher_logging_version=${rancher_logging_version}" + 
+                  "&& export TF_VAR_rancher_kiali_version=${rancher_kiali_version}" + 
+                  "&& export TF_VAR_rancher_istio_version=${rancher_istio_version}" + 
+                  "&& export TF_VAR_rancher_cis_version=${rancher_cis_version}" +
+                  "&& export TF_VAR_rancher_longhorn_version=${rancher_longhorn_version}" + 
+                  "&& export TF_VAR_rancher_longhorn_prereq_version=${rancher_longhorn_prereq_version}" + 
+                  "&& export TF_VAR_rancher_backup_version=${rancher_backup_version}" + 
+                  "&& export TF_VAR_rancher_gatekeeper_version=${rancher_gatekeeper_version}" +
+                  "&& export TF_VAR_rancher_neuvector_version=${rancher_neuvector_version}" +
+                  "&& export TF_VAR_rancher_tracing_version=${rancher_tracing_version}" +
+                  "&& export TF_VAR_install_rancher_backups=${install_rancher_backups}" + 
+                  "&& export TF_VAR_install_rancher_neuvector=${install_rancher_neuvector}" + 
+                  "&& go run .\""
+                } else {
+                    sh "docker run --name ${testContainer} -t --env-file ${envFile} " + 
+                    "${imageName} sh -c \"export TF_VAR_rancher_api_url=${rancher_api_url}" + 
+                    "&& export TF_VAR_rancher_token_key=${rancher_token_key}" + 
+                    "&& export provider=v2charts/target" + 
+                    "&& export tfversion=${tf_version}" + 
+                    "&& export TF_VAR_rancher_monitoring_version=${rancher_monitoring_version}" + 
+                    "&& export TF_VAR_rancher_logging_version=${rancher_logging_version}" + 
+                    "&& export TF_VAR_rancher_kiali_version=${rancher_kiali_version}" + 
+                    "&& export TF_VAR_rancher_istio_version=${rancher_istio_version}" + 
+                    "&& export TF_VAR_rancher_cis_version=${rancher_cis_version}" +
+                    "&& export TF_VAR_rancher_longhorn_version=${rancher_longhorn_version}" + 
+                    "&& export TF_VAR_rancher_longhorn_prereq_version=${rancher_longhorn_prereq_version}" + 
+                    "&& export TF_VAR_rancher_backup_version=${rancher_backup_version}" + 
+                    "&& export TF_VAR_rancher_gatekeeper_version=${rancher_gatekeeper_version}" +
+                    "&& export TF_VAR_rancher_neuvector_version=${rancher_neuvector_version}" +
+                    "&& export TF_VAR_rancher_tracing_version=${rancher_tracing_version}" +
+                    "&& export TF_VAR_cluster_id=${cluster_id}" + 
+                    "&& export TF_VAR_project_id=${project_id}" + 
+                    "&& export TF_VAR_install_rancher_backups=${install_rancher_backups}" + 
+                    "&& export TF_VAR_install_rancher_neuvector=${install_rancher_neuvector}" + 
+                    "&& export TF_VAR_neuvector_docker_runtime=$neuvector_docker_runtime" + 
+                    "&& export TF_VAR_neuvector_k3s_runtime=$neuvector_k3s_runtime" + 
+                    "&& export TF_VAR_neuvector_crio_runtime=$neuvector_crio_runtime" + 
+                    "&& export TF_VAR_neuvector_containerd_runtime=$neuvector_containerd_runtime" + 
+                    "&& go run .\""
+                }
+            }
+          } catch(err) {
+            echo 'Test run had failures. Collecting results...'
+          }
+
+          try {
+            stage('Cleanup') {
+              sh "docker rm -v ${testContainer}"
+              sh "docker rmi ${imageName}"
+            }
+          } catch(err){
+            sh "docker stop ${testContainer}"
+            sh "docker rm -v ${testContainer}"
+            sh "docker rmi ${imageName}"
+          }
+        }
+      }
+    }
+  } 
+  }
+}
