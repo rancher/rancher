@@ -100,11 +100,11 @@ require (
 	github.com/prometheus/client_golang v1.12.1
 	github.com/prometheus/client_model v0.2.0
 	github.com/prometheus/common v0.32.1
-	github.com/rancher/aks-operator v1.0.8-rc1
+	github.com/rancher/aks-operator v1.1.0-rc1
 	github.com/rancher/apiserver v0.0.0-20221205175736-7c507bd5c076
 	github.com/rancher/channelserver v0.5.1-0.20220405170618-28c9b37deff1
 	github.com/rancher/dynamiclistener v0.3.4
-	github.com/rancher/eks-operator v1.1.6-rc1
+	github.com/rancher/eks-operator v1.2.0-rc2
 	github.com/rancher/fleet/pkg/apis v0.0.0-20221027125947-f0d403b940d6
 	github.com/rancher/gke-operator v1.1.5
 	github.com/rancher/kubernetes-provider-detector v0.1.5
