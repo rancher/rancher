@@ -54,7 +54,7 @@ require (
 	github.com/bep/debounce v1.2.0
 	github.com/blang/semver v3.5.1+incompatible
 	github.com/coreos/go-semver v0.3.0
-	github.com/crewjam/saml v0.4.5
+	github.com/crewjam/saml v0.4.10
 	github.com/davecgh/go-spew v1.1.1
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/docker/distribution v2.7.1+incompatible
@@ -76,7 +76,7 @@ require (
 	github.com/heptio/authenticator v0.0.0-20180409043135-d282f87a1972
 	github.com/knative/pkg v0.0.0-20190817231834-12ee58e32cc8
 	github.com/manicminer/hamilton v0.46.0
-	github.com/mattermost/xml-roundtrip-validator v0.0.0-20201213122252-bcd7e1b9601e
+	github.com/mattermost/xml-roundtrip-validator v0.1.0
 	github.com/mattn/go-colorable v0.1.2
 	github.com/mattn/go-runewidth v0.0.6 // indirect
 	github.com/mcuadros/go-version v0.0.0-20180611085657-6d5863ca60fa
@@ -120,14 +120,14 @@ require (
 	github.com/xanzy/go-gitlab v0.0.0-20180830102804-feb856f4760f
 	github.com/xdg/scram v0.0.0-20180814205039-7eeb5667e42c // indirect
 	github.com/xdg/stringprep v1.0.0 // indirect
-	golang.org/x/crypto v0.0.0-20211215153901-e495a2d5b3d3
+	golang.org/x/crypto v0.0.0-20220128200615-198e4374d7ed
 	golang.org/x/net v0.0.0-20211112202133-69e39bad7dc2
 	golang.org/x/oauth2 v0.0.0-20210514164344-f6687ab2804c
 	golang.org/x/sync v0.0.0-20201207232520-09787c993a3a
 	google.golang.org/api v0.40.0
 	google.golang.org/genproto v0.0.0-20210315173758-2651cd453018 // indirect
 	google.golang.org/grpc v1.34.0
-	gopkg.in/check.v1 v1.0.0-20190902080502-41f04d3bba15
+	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
 	gopkg.in/yaml.v2 v2.3.0
 	helm.sh/helm/v3 v3.3.0
