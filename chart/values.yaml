@@ -143,6 +143,10 @@ customLogos:
   # storageClass: "-"
   accessMode: ReadWriteOnce
   size: 1Gi
+  ## Just for volumeKind: configMap
+  ## If specified, the listed keys will be projected into the specified paths, and unlisted keys will not be present.
+  ## Ref: https://kubernetes.io/docs/tasks/configure-pod-container/configure-pod-configmap/#add-configmap-data-to-a-specific-path-in-the-volume
+  items: []
 
 # Rancher post-delete hook
 postDelete:

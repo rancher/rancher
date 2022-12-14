@@ -241,5 +241,9 @@ spec:
   {{- else if (eq .Values.customLogos.volumeKind "configMap") }}
         configMap:
           name: {{ .Values.customLogos.volumeName }}
+    {{- if .Values.customLogos.items }}
+          items:
+{{ toYaml .Values.customLogos.items | indent 10 }}
+    {{- end }}
   {{- end }}
 {{- end }}
