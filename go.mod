@@ -103,7 +103,7 @@ require (
 	github.com/rancher/aks-operator v1.1.0-rc1
 	github.com/rancher/apiserver v0.0.0-20221205175736-7c507bd5c076
 	github.com/rancher/channelserver v0.5.1-0.20220405170618-28c9b37deff1
-	github.com/rancher/dynamiclistener v0.3.4
+	github.com/rancher/dynamiclistener v0.3.5
 	github.com/rancher/eks-operator v1.2.0-rc2
 	github.com/rancher/fleet/pkg/apis v0.0.0-20221027125947-f0d403b940d6
 	github.com/rancher/gke-operator v1.1.5
@@ -117,7 +117,7 @@ require (
 	github.com/rancher/rdns-server v0.0.0-20180802070304-bf662911db6a
 	github.com/rancher/remotedialer v0.2.6-0.20220624190122-ea57207bf2b8
 	github.com/rancher/rke v1.4.3-rc1
-	github.com/rancher/steve v0.0.0-20221205213404-5595803a7b66
+	github.com/rancher/steve v0.0.0-20221213231519-9757b4eaefbc
 	github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20210727200656-10b094e30007
 	github.com/rancher/wrangler v1.0.1-0.20221202234327-1cafffeaa9a1
 	github.com/robfig/cron v1.1.0
@@ -151,7 +151,7 @@ require (
 	k8s.io/kube-aggregator v0.25.4
 	k8s.io/kubectl v0.25.4
 	k8s.io/kubernetes v1.25.4
-	k8s.io/utils v0.0.0-20220728103510-ee6ede2d64ed
+	k8s.io/utils v0.0.0-20221011040102-427025108f67
 	sigs.k8s.io/aws-iam-authenticator v0.5.9
 	sigs.k8s.io/cluster-api v1.2.7
 	sigs.k8s.io/controller-runtime v0.12.3
@@ -346,7 +346,7 @@ require (
 	k8s.io/component-base v0.25.4 // indirect
 	k8s.io/component-helpers v0.25.4 // indirect
 	k8s.io/klog v1.0.0 // indirect
-	k8s.io/klog/v2 v2.70.1 // indirect
+	k8s.io/klog/v2 v2.80.1 // indirect
 	k8s.io/kube-openapi v0.0.0-20220803162953-67bda5d908f1 // indirect
 	oras.land/oras-go v1.1.0 // indirect
 	sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.33 // indirect
