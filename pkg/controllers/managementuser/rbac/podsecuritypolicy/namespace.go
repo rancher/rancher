@@ -2,18 +2,22 @@ package podsecuritypolicy
 
 import (
 	"context"
-
-	"k8s.io/apimachinery/pkg/runtime"
+	"errors"
+	"fmt"
 
 	v12 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 type namespaceManager struct {
 	serviceAccountsController v12.ServiceAccountController
 	serviceAccountLister      v12.ServiceAccountLister
+	clusterLister             v3.ClusterLister
+	clusterName               string
 }
 
 // RegisterNamespace resyncs the current namespace's service accounts.  This is necessary because service accounts
@@ -26,6 +30,8 @@ func RegisterNamespace(ctx context.Context, context *config.UserContext) {
 	m := &namespaceManager{
 		serviceAccountLister:      context.Core.ServiceAccounts("").Controller().Lister(),
 		serviceAccountsController: context.Core.ServiceAccounts("").Controller(),
+		clusterLister:             context.Management.Management.Clusters("").Controller().Lister(),
+		clusterName:               context.ClusterName,
 	}
 
 	context.Core.Namespaces("").AddHandler(ctx, "NamespaceSyncHandler", m.sync)
@@ -35,6 +41,14 @@ func (m *namespaceManager) sync(key string, obj *v1.Namespace) (runtime.Object, 
 	if obj == nil || obj.DeletionTimestamp != nil ||
 		obj.Status.Phase == v1.NamespaceTerminating {
 		return nil, nil
+	}
+
+	err := checkClusterVersion(m.clusterName, m.clusterLister)
+	if err != nil {
+		if errors.Is(err, errVersionIncompatible) {
+			return obj, nil
+		}
+		return obj, fmt.Errorf(clusterVersionCheckErrorString, err)
 	}
 
 	return nil, resyncServiceAccounts(m.serviceAccountLister, m.serviceAccountsController, obj.Name)

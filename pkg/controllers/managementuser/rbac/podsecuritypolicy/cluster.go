@@ -2,10 +2,9 @@ package podsecuritypolicy
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
-
-	"k8s.io/apimachinery/pkg/runtime"
 
 	v12 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
@@ -15,8 +14,9 @@ import (
 	"github.com/sirupsen/logrus"
 	v1beta13 "k8s.io/api/policy/v1beta1"
 	rbac "k8s.io/api/rbac/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 type clusterManager struct {
@@ -28,6 +28,7 @@ type clusterManager struct {
 	serviceAccountsController v12.ServiceAccountController
 	clusterRoleLister         v1.ClusterRoleLister
 	clusterRoles              v1.ClusterRoleInterface
+	clusterLister             v3.ClusterLister
 	clusters                  v3.ClusterInterface
 }
 
@@ -37,10 +38,10 @@ func RegisterCluster(ctx context.Context, context *config.UserContext) {
 	logrus.Infof("registering podsecuritypolicy cluster handler for cluster %v", context.ClusterName)
 
 	m := &clusterManager{
-		clusterName: context.ClusterName,
-		policies:    context.Policy.PodSecurityPolicies(""),
-
+		clusterName:               context.ClusterName,
+		policies:                  context.Policy.PodSecurityPolicies(""),
 		clusters:                  context.Management.Management.Clusters(""),
+		clusterLister:             context.Management.Management.Clusters("").Controller().Lister(),
 		templateLister:            context.Management.Management.PodSecurityPolicyTemplates("").Controller().Lister(),
 		policyLister:              context.Policy.PodSecurityPolicies("").Controller().Lister(),
 		clusterRoleLister:         context.RBAC.ClusterRoles("").Controller().Lister(),
@@ -60,12 +61,20 @@ func (m *clusterManager) sync(key string, obj *v3.Cluster) (runtime.Object, erro
 		return nil, nil
 	}
 
+	err := checkClusterVersion(m.clusterName, m.clusterLister)
+	if err != nil {
+		if errors.Is(err, errVersionIncompatible) {
+			return obj, nil
+		}
+		return obj, fmt.Errorf(clusterVersionCheckErrorString, err)
+	}
+
 	if obj.Spec.DefaultPodSecurityPolicyTemplateName != "" {
 		podSecurityPolicyName := fmt.Sprintf("%v-psp", obj.Spec.DefaultPodSecurityPolicyTemplateName)
 
 		_, err := m.policyLister.Get("", podSecurityPolicyName)
 		if err != nil {
-			if errors.IsNotFound(err) {
+			if k8serrors.IsNotFound(err) {
 				template, err := m.templateLister.Get("", obj.Spec.DefaultPodSecurityPolicyTemplateName)
 				if err != nil {
 					return nil, fmt.Errorf("error getting pspt: %v", err)
@@ -105,7 +114,7 @@ func (m *clusterManager) sync(key string, obj *v3.Cluster) (runtime.Object, erro
 		clusterRoleName := fmt.Sprintf("%v-clusterrole", obj.Spec.DefaultPodSecurityPolicyTemplateName)
 		_, err = m.clusterRoleLister.Get("", clusterRoleName)
 		if err != nil {
-			if errors.IsNotFound(err) {
+			if k8serrors.IsNotFound(err) {
 				newRole := &rbac.ClusterRole{
 					ObjectMeta: metav1.ObjectMeta{
 						Annotations: map[string]string{},

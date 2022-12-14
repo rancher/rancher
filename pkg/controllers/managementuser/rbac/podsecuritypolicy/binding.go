@@ -2,10 +2,9 @@ package podsecuritypolicy
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
-
-	"k8s.io/apimachinery/pkg/runtime"
 
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
@@ -16,8 +15,9 @@ import (
 	v13 "k8s.io/api/core/v1"
 	v1beta13 "k8s.io/api/policy/v1beta1"
 	rbac "k8s.io/api/rbac/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -38,6 +38,7 @@ func RegisterBindings(ctx context.Context, context *config.UserContext) {
 		policyLister:         context.Policy.PodSecurityPolicies("").Controller().Lister(),
 		policies:             context.Policy.PodSecurityPolicies(""),
 		psptLister:           context.Management.Management.PodSecurityPolicyTemplates("").Controller().Lister(),
+		clusterLister:        context.Management.Management.Clusters("").Controller().Lister(),
 		clusterRoleLister:    context.RBAC.ClusterRoles("").Controller().Lister(),
 		clusterRoles:         context.RBAC.ClusterRoles(""),
 		serviceAccountLister: context.Core.ServiceAccounts("").Controller().Lister(),
@@ -45,6 +46,7 @@ func RegisterBindings(ctx context.Context, context *config.UserContext) {
 
 		namespaces:       context.Core.Namespaces(""),
 		namespaceIndexer: namespaceInformer.GetIndexer(),
+		clusterName:      context.ClusterName,
 	}
 
 	context.Management.Management.PodSecurityPolicyTemplateProjectBindings("").
@@ -71,6 +73,8 @@ type lifecycle struct {
 
 	namespaces       v1.NamespaceInterface
 	namespaceIndexer cache.Indexer
+	clusterName      string
+	clusterLister    v3.ClusterLister
 }
 
 func (l *lifecycle) Create(obj *v3.PodSecurityPolicyTemplateProjectBinding) (runtime.Object, error) {
@@ -90,10 +94,18 @@ func (l *lifecycle) sync(obj *v3.PodSecurityPolicyTemplateProjectBinding) (runti
 		return obj, nil
 	}
 
-	podSecurityPolicyName := fmt.Sprintf("%v-psp", obj.PodSecurityPolicyTemplateName)
-	_, err := l.policyLister.Get("", podSecurityPolicyName)
+	err := checkClusterVersion(l.clusterName, l.clusterLister)
 	if err != nil {
-		if errors.IsNotFound(err) {
+		if errors.Is(err, errVersionIncompatible) {
+			return obj, nil
+		}
+		return obj, fmt.Errorf(clusterVersionCheckErrorString, err)
+	}
+
+	podSecurityPolicyName := fmt.Sprintf("%v-psp", obj.PodSecurityPolicyTemplateName)
+	_, err = l.policyLister.Get("", podSecurityPolicyName)
+	if err != nil {
+		if k8serrors.IsNotFound(err) {
 			_, err = l.createPolicy(obj, podSecurityPolicyName)
 			if err != nil {
 				return nil, fmt.Errorf("error creating policy: %v", err)
@@ -106,7 +118,7 @@ func (l *lifecycle) sync(obj *v3.PodSecurityPolicyTemplateProjectBinding) (runti
 	clusterRoleName := fmt.Sprintf("%v-clusterrole", obj.PodSecurityPolicyTemplateName)
 	_, err = l.clusterRoleLister.Get("", clusterRoleName)
 	if err != nil {
-		if errors.IsNotFound(err) {
+		if k8serrors.IsNotFound(err) {
 			_, err = l.createClusterRole(clusterRoleName, podSecurityPolicyName, obj)
 			if err != nil {
 				return nil, fmt.Errorf("error creating cluster role: %v", err)
