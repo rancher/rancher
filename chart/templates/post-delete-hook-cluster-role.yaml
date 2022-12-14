@@ -30,9 +30,11 @@ rules:
   - apiGroups: [ "admissionregistration.k8s.io" ]
     resources: [ "validatingwebhookconfigurations", "mutatingwebhookconfigurations" ]
     verbs: [ "get", "list", "delete" ]
+  {{- if .Capabilities.APIVersions.Has "policy/v1beta1/PodSecurityPolicy" }}
   - apiGroups: [ "policy" ]
     resources: [ "podsecuritypolicies" ]
     verbs: [ "use", "delete", "create" ]
+  {{- end }}
   - apiGroups: [ "networking.k8s.io" ]
     resources: [ "ingresses" ]
     verbs: [ "delete" ]
