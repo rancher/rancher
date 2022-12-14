@@ -1361,8 +1361,8 @@ github.com/rancher/lasso v0.0.0-20221202205459-e7138f16489c h1:RKGa+6plIHqyfBcC+
 github.com/rancher/lasso v0.0.0-20221202205459-e7138f16489c/go.mod h1:Qewwr/xGzhtG7WCxhubrKZrdAobv5yqAIuHbDoxThZQ=
 github.com/rancher/lasso/controller-runtime v0.0.0-20220627205005-00d9c8e9dda6 h1:oknExrom2bdZ2uiBaFR2+KUV1VJ7BY4pUc1/2EXoqmc=
 github.com/rancher/lasso/controller-runtime v0.0.0-20220627205005-00d9c8e9dda6/go.mod h1:oh2UhUDqqBEJuhjDll7NhKt433fX/D/hj49yBKEZi+0=
-github.com/rancher/machine v0.15.0-rancher97 h1:nVnEh2PUyBLixSR5apyM786CiZ4uuelvRiFYSKa1yQ0=
-github.com/rancher/machine v0.15.0-rancher97/go.mod h1:rwF2JgIwaIqHthd9ByUQAZohCROaUP807Zsx1DLKo84=
+github.com/rancher/machine v0.15.0-rancher98 h1:3QzZEwarcGNSRjtt/kwwJbOZE3NoQJ0wgelp1oriYyw=
+github.com/rancher/machine v0.15.0-rancher98/go.mod h1:rwF2JgIwaIqHthd9ByUQAZohCROaUP807Zsx1DLKo84=
 github.com/rancher/moq v0.0.0-20200712062324-13d1f37d2d77 h1:k+vzmkZQsH06rZnDr+phskSixG9ByNj9gVdzHcc8nxw=
 github.com/rancher/moq v0.0.0-20200712062324-13d1f37d2d77/go.mod h1:wpITyDPTi/Na5h73XkbuEf2AP9fbgrIGqqxVzFhYD6U=
 github.com/rancher/norman v0.0.0-20221205184727-32ef2e185b99 h1:+Oob+DG+SZoX8hnKBWpZfVwxx6K84hMou9nbBOTux7w=
