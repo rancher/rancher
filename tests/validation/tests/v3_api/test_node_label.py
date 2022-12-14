@@ -14,6 +14,7 @@ from .common import get_user_client_and_cluster
 from .common import execute_kubectl_cmd
 from .common import if_test_rbac
 from .common import LINODE_ACCESSKEY
+from .common import RANCHER_CLEANUP_CLUSTER
 from .common import random_name
 from .common import random_test_name
 from .common import rbac_get_user_token_by_role
@@ -923,7 +924,6 @@ def create_project_client(request):
     cluster_node_template["node_pools"] = node_pools[0]
     cluster_node_template["test_label"] = test_label
     cluster_node_template["label_value"] = label_value
-
     def fin():
         client = get_user_client()
         cluster = cluster_node_template["cluster"]
@@ -958,8 +958,8 @@ def create_project_client(request):
         for node_template in cluster_node_template_2["node_template"]:
             client.reload(node_template)
             client.delete(node_template)
-
-    request.addfinalizer(fin)
+    if RANCHER_CLEANUP_CLUSTER:
+        request.addfinalizer(fin)
 
 
 def check_cluster_deleted(client):
