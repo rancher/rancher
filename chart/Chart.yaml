@@ -1,4 +1,4 @@
-apiVersion: v1
+apiVersion: v2
 name: rancher
 description: Install Rancher Server to manage Kubernetes clusters across providers.
 version: %VERSION%
