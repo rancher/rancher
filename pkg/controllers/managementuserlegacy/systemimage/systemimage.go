@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/pkg/errors"
+	"github.com/rancher/rancher/pkg/catalog/manager"
 	cutils "github.com/rancher/rancher/pkg/catalog/utils"
 	alerting "github.com/rancher/rancher/pkg/controllers/managementuserlegacy/alert/deployer"
 	logging "github.com/rancher/rancher/pkg/controllers/managementuserlegacy/logging/deployer"
@@ -73,6 +74,11 @@ func (s *Syncer) Sync() error {
 		oldVersion := versionMap[k]
 		newVersion, err := v.Upgrade(oldVersion)
 		if err != nil {
+			_, ok := err.(manager.IncompatibleTemplateVersionErr)
+			if ok {
+				// there's no valid version to update to, so don't update the versionMap with this systemService
+				continue
+			}
 			return errors.Wrapf(err, "upgrade cluster %s system service %s failed", s.clusterName, k)
 		}
 		if oldVersion != newVersion {
