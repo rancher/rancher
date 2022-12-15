@@ -581,6 +581,7 @@ steps:
 
   - name: docker-publish-agent
     image: rancher/drone-images:docker-2004
+    failure: ignore
     settings:
       purge: false
       build_args:
@@ -761,8 +762,6 @@ trigger:
 depends_on:
 - default-linux-amd64
 - default-linux-arm64
-- default-windows-1809
-- default-windows-2004
 ---
 kind: pipeline
 name: docker-image-digests-linux-amd64
