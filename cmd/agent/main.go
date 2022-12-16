@@ -31,6 +31,7 @@ import (
 	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/logserver"
 	"github.com/rancher/rancher/pkg/rkenodeconfigclient"
+	"github.com/rancher/rancher/pkg/rkenodeconfigserver"
 	"github.com/rancher/remotedialer"
 	"github.com/rancher/wrangler/pkg/signals"
 	"github.com/sirupsen/logrus"
@@ -41,7 +42,8 @@ var (
 )
 
 const (
-	Token = "X-API-Tunnel-Token"
+	Token                    = "X-API-Tunnel-Token"
+	KubeletCertValidityLimit = time.Hour * 72
 )
 
 func main() {
@@ -203,9 +205,14 @@ func run(ctx context.Context) error {
 		return err
 	}
 
-	headers := map[string][]string{
+	headers := http.Header{
 		Token:                      {token},
 		rkenodeconfigclient.Params: {base64.StdEncoding.EncodeToString(bytes)},
+	}
+
+	err = KubeletNeedsNewCertificate(headers)
+	if err != nil {
+		return err
 	}
 
 	serverURL, err := url.Parse(server)
@@ -337,6 +344,12 @@ func run(ctx context.Context) error {
 			for {
 				select {
 				case <-time.After(tt):
+					// each time we request a plan we should
+					// check if our cert about to expire
+					err = KubeletNeedsNewCertificate(headers)
+					if err != nil {
+						logrus.Errorf("failed to check validity of kubelet certs: %v", err)
+					}
 					receivedInterval, err := rkenodeconfigclient.ConfigClient(ctx, connectConfig, headers, writeCertsOnly)
 					if err != nil {
 						logrus.Errorf("failed to check plan: %v", err)
@@ -365,6 +378,13 @@ func run(ctx context.Context) error {
 		if !isConnect() {
 			wsURL += "/register"
 		}
+
+		// check if we need a new kubelet cert on reconnection
+		err = KubeletNeedsNewCertificate(headers)
+		if err != nil {
+			return err
+		}
+
 		logrus.Infof("Connecting to %s with token starting with %s", wsURL, token[:len(token)/2])
 		logrus.Tracef("Connecting to %s with token %s", wsURL, token)
 		remotedialer.ClientConnect(ctx, wsURL, headers, nil, func(proto, address string) bool {
@@ -484,4 +504,80 @@ func reconcileKubelet(ctx context.Context) (bool, error) {
 		}
 	}
 	return false, nil
+}
+
+// KubeletNeedsNewCertificate will set the
+// 'RegenerateKubeletCertificate' header field to true if
+// a) the kubelet serving certificate does not exist
+// b) the certificate will expire in 72 hours
+// c) the certificate does not accurately represent the
+//
+//	current IP address and Hostname of the node
+//
+// While the agent may denote it needs a new kubelet certificate
+// in its connection request, a new certificate will only be
+// delivered by Rancher if the generate_serving_certificate property
+// is set to 'true' for the clusters kubelet service.
+func KubeletNeedsNewCertificate(headers http.Header) error {
+	ipAddress := os.Getenv("CATTLE_ADDRESS")
+	currentHostname := os.Getenv("CATTLE_NODE_NAME")
+	fileSafeIPAddress := strings.ReplaceAll(ipAddress, ".", "-")
+
+	cert, err := tls.LoadX509KeyPair(fmt.Sprintf("/etc/kubernetes/ssl/kube-kubelet-%s.pem", fileSafeIPAddress), fmt.Sprintf("/etc/kubernetes/ssl/kube-kubelet-%s-key.pem", fileSafeIPAddress))
+	if err != nil && !strings.Contains(err.Error(), "no such file") {
+		return err
+	}
+
+	needsRegen, err := KubeletCertificateNeedsRegeneration(ipAddress, currentHostname, cert, time.Now())
+	if err != nil {
+		return err
+	}
+
+	if needsRegen {
+		headers.Set(rkenodeconfigserver.RegenerateKubeletCertificate, "true")
+	} else {
+		headers.Set(rkenodeconfigserver.RegenerateKubeletCertificate, "false")
+	}
+
+	return nil
+}
+
+func KubeletCertificateNeedsRegeneration(ipAddress, currentHostname string, cert tls.Certificate, currentTime time.Time) (bool, error) {
+	if len(cert.Certificate) == 0 {
+		return true, nil
+	}
+
+	parsedCert, err := x509.ParseCertificate(cert.Certificate[0])
+	if err != nil {
+		return false, err
+	}
+
+	return !CertificateIncludesHostname(currentHostname, parsedCert) || CertificateIsExpiring(parsedCert, currentTime) || !CertificateIncludesCurrentIP(ipAddress, parsedCert), nil
+}
+
+// CertificateIsExpiring checks if the passed certificate will expire within
+// the KubeletCertValidityLimit
+func CertificateIsExpiring(cert *x509.Certificate, currentTime time.Time) bool {
+	return cert.NotAfter.Sub(currentTime) < KubeletCertValidityLimit
+}
+
+// CertificateIncludesHostname checks that the passed certificate includes
+// the provided hostname in its SAN list
+func CertificateIncludesHostname(hostname string, cert *x509.Certificate) bool {
+	for _, name := range cert.DNSNames {
+		if name == hostname {
+			return true
+		}
+	}
+	return false
+}
+
+// CertificateIncludesCurrentIP checks that the passed certificate includes the provided IP address
+func CertificateIncludesCurrentIP(ipAddress string, cert *x509.Certificate) bool {
+	for _, ip := range cert.IPAddresses {
+		if ipAddress == ip.String() {
+			return true
+		}
+	}
+	return false
 }
