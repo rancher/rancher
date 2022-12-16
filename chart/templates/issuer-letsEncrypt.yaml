@@ -18,9 +18,9 @@ metadata:
 spec:
   acme:
     {{- if eq .Values.letsEncrypt.environment "production" }}
-    server: https://acme-v02.api.letsencrypt.org/directory
+    server: https://acme-v02.api.letsencrypt.org./directory
     {{- else }}
-    server: https://acme-staging-v02.api.letsencrypt.org/directory
+    server: https://acme-staging-v02.api.letsencrypt.org./directory
     {{- end }}
     email: {{ .Values.letsEncrypt.email }}
     privateKeySecretRef:
