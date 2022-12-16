@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"strconv"
 	"testing"
 	"time"
 
@@ -128,14 +129,21 @@ func newTestHandler() *handler {
 		clusters: &v3fakes.ClusterInterfaceMock{
 			CreateFunc: func(cluster *apimgmtv3.Cluster) (*apimgmtv3.Cluster, error) {
 				mockClusters[cluster.Name] = cluster.DeepCopy()
-				return cluster, nil
+				mockClusters[cluster.Name].ObjectMeta.ResourceVersion = "0"
+				return mockClusters[cluster.Name], nil
 			},
 			UpdateFunc: func(cluster *apimgmtv3.Cluster) (*apimgmtv3.Cluster, error) {
 				if _, ok := mockClusters[cluster.Name]; !ok {
 					return nil, apierror.NewNotFound(schema.GroupResource{}, fmt.Sprintf("cluster [%s]", cluster.Name))
 				}
+				if reflect.DeepEqual(mockClusters[cluster.Name], cluster) {
+					return cluster, nil
+				}
 				mockClusters[cluster.Name] = cluster.DeepCopy()
-				return cluster, nil
+				rv, _ := strconv.Atoi(mockClusters[cluster.Name].ObjectMeta.ResourceVersion)
+				rv++
+				mockClusters[cluster.Name].ObjectMeta.ResourceVersion = strconv.Itoa(rv)
+				return mockClusters[cluster.Name], nil
 			},
 			GetFunc: func(name string, opts metav1.GetOptions) (*apimgmtv3.Cluster, error) {
 				cluster, ok := mockClusters[name]
@@ -210,7 +218,7 @@ func TestMigrateClusterSecrets(t *testing.T) {
 			},
 		},
 	}
-	_, err := h.clusters.Create(testCluster)
+	testCluster, err := h.clusters.Create(testCluster)
 	assert.Nil(t, err)
 	cluster, err := h.migrateClusterSecrets(testCluster)
 	assert.Nil(t, err)
@@ -303,10 +311,11 @@ func TestMigrateClusterSecrets(t *testing.T) {
 
 	assert.True(t, apimgmtv3.ClusterConditionSecretsMigrated.IsTrue(cluster))
 
-	// test that cluster object has not been modified since last update with client
-	clusterFromClient, err := h.clusters.Get(cluster.Name, metav1.GetOptions{})
+	// test that cluster does not get updated if migrated again
+	clusterCopy := cluster.DeepCopy()
+	clusterCopy, err = h.migrateClusterSecrets(clusterCopy)
 	assert.Nil(t, err)
-	assert.True(t, reflect.DeepEqual(cluster, clusterFromClient))
+	assert.Equal(t, cluster, clusterCopy)
 
 	testCluster2 := &apimgmtv3.Cluster{
 		ObjectMeta: metav1.ObjectMeta{
@@ -363,10 +372,11 @@ func TestMigrateClusterServiceAccountToken(t *testing.T) {
 	assert.Equal(t, secret.Data[SecretKey], []byte(token))
 	assert.True(t, apimgmtv3.ClusterConditionServiceAccountSecretsMigrated.IsTrue(cluster))
 
-	// test that cluster object has not been modified since last update with client
-	clusterFromClient, err := h.clusters.Get(cluster.Name, metav1.GetOptions{})
+	// test that cluster object does not get updated if migrated again
+	clusterCopy := cluster.DeepCopy()
+	clusterCopy, err = h.migrateServiceAccountSecrets(clusterCopy)
 	assert.Nil(t, err)
-	assert.True(t, reflect.DeepEqual(cluster, clusterFromClient))
+	assert.Equal(t, cluster, clusterCopy)
 }
 
 func TestMigrateRKESecrets(t *testing.T) {
@@ -434,6 +444,12 @@ func TestMigrateRKESecrets(t *testing.T) {
 	assert.Nil(t, err)
 	cluster, err := h.migrateRKESecrets(testCluster)
 	assert.Nil(t, err)
+
+	// test that cluster object does not get updated if migrated again
+	clusterCopy := cluster.DeepCopy()
+	clusterCopy, err = h.migrateRKESecrets(clusterCopy)
+	assert.Nil(t, err)
+	assert.Equal(t, cluster, clusterCopy)
 
 	type verifyFunc func(t *testing.T, cluster *apimgmtv3.Cluster)
 

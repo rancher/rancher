@@ -1135,7 +1135,7 @@ func (h *handler) migrateACISecrets(cluster *apimgmtv3.Cluster) (*apimgmtv3.Clus
 func (h *handler) migrateRKESecrets(cluster *apimgmtv3.Cluster) (*apimgmtv3.Cluster, error) {
 	clusterCopy := cluster.DeepCopy()
 	var err error
-	obj, doErr := apimgmtv3.ClusterConditionServiceAccountSecretsMigrated.Do(clusterCopy, func() (runtime.Object, error) {
+	obj, doErr := apimgmtv3.ClusterConditionRKESecretsMigrated.DoUntilTrue(clusterCopy, func() (runtime.Object, error) {
 		// rke secrets encryption
 		clusterCopy, err = h.migrateSecret(clusterCopy, "SecretsEncryptionProvidersSecret", "secrets encryption providers", &clusterCopy.Spec.ClusterSecrets.SecretsEncryptionProvidersSecret, h.migrator.CreateOrUpdateSecretsEncryptionProvidersSecret, func(spec *apimgmtv3.ClusterSpec) {
 			if spec == nil ||
@@ -1201,7 +1201,6 @@ func (h *handler) migrateRKESecrets(cluster *apimgmtv3.Cluster) (*apimgmtv3.Clus
 		cluster = clusterCopy
 
 		logrus.Tracef("[secretmigrator] setting cluster condition [%s] and updating cluster [%s]", apimgmtv3.ClusterConditionRKESecretsMigrated, clusterCopy.Name)
-		apimgmtv3.ClusterConditionRKESecretsMigrated.True(clusterCopy)
 		clusterCopy, err = h.clusters.Update(clusterCopy)
 		if err != nil {
 			return cluster, err
