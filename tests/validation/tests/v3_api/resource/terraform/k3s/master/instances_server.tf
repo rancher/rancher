@@ -71,7 +71,7 @@ resource "aws_instance" "master" {
   subnet_id              = var.subnets
   availability_zone      = var.availability_zone
   vpc_security_group_ids = [var.sg_id]
-  key_name               = "jenkins-rke-validation"
+  key_name               = var.access_key_name
   tags = {
     Name                 = "${var.resource_name}-server"
   }
@@ -171,7 +171,7 @@ resource "aws_instance" "master2-ha" {
   subnet_id              = var.subnets
   availability_zone      = var.availability_zone
   vpc_security_group_ids = [var.sg_id]
-  key_name               = "jenkins-rke-validation"
+  key_name               = var.access_key_name
   depends_on             = [aws_instance.master]
   tags = {
     Name                 = "${var.resource_name}-servers"
