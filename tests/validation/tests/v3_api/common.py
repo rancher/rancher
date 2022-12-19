@@ -1427,14 +1427,14 @@ def validate_cluster_state(client, cluster,
                            nodes_not_in_active_state=[],
                            timeout=MACHINE_TIMEOUT):
     start_time = time.time()
-    timeout = start_time + timeout
     if check_intermediate_state:
         cluster = wait_for_condition(
             client, cluster,
             lambda x: x.state == intermediate_state,
             lambda x: 'State is: ' + x.state,
             timeout=timeout)
-        assert cluster.state == intermediate_state
+        if intermediate_state != "updating":
+            assert cluster.state == intermediate_state
     cluster = wait_for_condition(
         client, cluster,
         lambda x: x.state == "active",
