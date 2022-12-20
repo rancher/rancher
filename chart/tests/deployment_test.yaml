@@ -294,3 +294,51 @@ tests:
   asserts:
   - isNull:
       path: spec.template.spec.containers[0].volumeMounts
+- it: should default livenessProbe initialDelaySeconds to 60
+  asserts:
+    - equal:
+        path: spec.template.spec.containers[0].livenessProbe.initialDelaySeconds
+        value: 60
+- it: should default livenessProbe periodSeconds to 30
+  asserts:
+    - equal:
+        path: spec.template.spec.containers[0].livenessProbe.periodSeconds
+        value: 30
+- it: should default readinessProbe initialDelaySeconds to 5
+  asserts:
+    - equal:
+        path: spec.template.spec.containers[0].readinessProbe.initialDelaySeconds
+        value: 5
+- it: should default readinessProbe periodSeconds to 30
+  asserts:
+    - equal:
+        path: spec.template.spec.containers[0].readinessProbe.periodSeconds
+        value: 30
+- it: should set livenessProbe initialDelaySeconds to 90
+  set:
+    livenessProbe.initialDelaySeconds: 90
+  asserts:
+    - equal:
+        path: spec.template.spec.containers[0].livenessProbe.initialDelaySeconds
+        value: 90
+- it: should set livenessProbe periodSeconds to 60
+  set:
+    livenessProbe.periodSeconds: 60
+  asserts:
+    - equal:
+        path: spec.template.spec.containers[0].livenessProbe.periodSeconds
+        value: 60
+- it: should set readinessProbe initialDelaySeconds to 20
+  set:
+    readinessProbe.initialDelaySeconds: 20
+  asserts:
+    - equal:
+        path: spec.template.spec.containers[0].readinessProbe.initialDelaySeconds
+        value: 20
+- it: should set readinessProbe periodSeconds to 60
+  set:
+    readinessProbe.periodSeconds: 60
+  asserts:
+    - equal:
+        path: spec.template.spec.containers[0].readinessProbe.periodSeconds
+        value: 60
