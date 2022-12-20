@@ -6,6 +6,9 @@ ENV PATH ${PATH}:/go/bin
 
 ENV WORKSPACE ${GOPATH}/src/github.com/rancher/rancher
 
+# Configure Terraform
+ARG TERRAFORM_VERSION=0.13.7
+
 # configure VPN
 ARG EXTERNAL_ENCODED_VPN
 ARG VPN_ENCODED_LOGIN
@@ -18,6 +21,8 @@ RUN go mod download && \
     go install gotest.tools/gotestsum@latest
 
 RUN CGO_ENABLED=0
+
+RUN wget https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_amd64.zip && apt-get update && apt-get install unzip &&  unzip terraform_${TERRAFORM_VERSION}_linux_amd64.zip && rm terraform_${TERRAFORM_VERSION}_linux_amd64.zip && chmod u+x terraform && mv terraform /usr/bin/terraform
 
 # necessary to run if statements using [[ ]]
 SHELL ["/bin/bash", "-c"] 
