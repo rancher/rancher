@@ -39,8 +39,6 @@ type Interface interface {
 	Catalog() CatalogController
 	CatalogTemplate() CatalogTemplateController
 	CatalogTemplateVersion() CatalogTemplateVersionController
-	CisBenchmarkVersion() CisBenchmarkVersionController
-	CisConfig() CisConfigController
 	CloudCredential() CloudCredentialController
 	Cluster() ClusterController
 	ClusterAlert() ClusterAlertController
@@ -51,7 +49,6 @@ type Interface interface {
 	ClusterMonitorGraph() ClusterMonitorGraphController
 	ClusterRegistrationToken() ClusterRegistrationTokenController
 	ClusterRoleTemplateBinding() ClusterRoleTemplateBindingController
-	ClusterScan() ClusterScanController
 	ClusterTemplate() ClusterTemplateController
 	ClusterTemplateRevision() ClusterTemplateRevisionController
 	ComposeConfig() ComposeConfigController
@@ -148,12 +145,6 @@ func (c *version) CatalogTemplate() CatalogTemplateController {
 func (c *version) CatalogTemplateVersion() CatalogTemplateVersionController {
 	return NewCatalogTemplateVersionController(schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "CatalogTemplateVersion"}, "catalogtemplateversions", true, c.controllerFactory)
 }
-func (c *version) CisBenchmarkVersion() CisBenchmarkVersionController {
-	return NewCisBenchmarkVersionController(schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "CisBenchmarkVersion"}, "cisbenchmarkversions", true, c.controllerFactory)
-}
-func (c *version) CisConfig() CisConfigController {
-	return NewCisConfigController(schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "CisConfig"}, "cisconfigs", true, c.controllerFactory)
-}
 func (c *version) CloudCredential() CloudCredentialController {
 	return NewCloudCredentialController(schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "CloudCredential"}, "cloudcredentials", true, c.controllerFactory)
 }
@@ -183,9 +174,6 @@ func (c *version) ClusterRegistrationToken() ClusterRegistrationTokenController 
 }
 func (c *version) ClusterRoleTemplateBinding() ClusterRoleTemplateBindingController {
 	return NewClusterRoleTemplateBindingController(schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "ClusterRoleTemplateBinding"}, "clusterroletemplatebindings", true, c.controllerFactory)
-}
-func (c *version) ClusterScan() ClusterScanController {
-	return NewClusterScanController(schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "ClusterScan"}, "clusterscans", true, c.controllerFactory)
 }
 func (c *version) ClusterTemplate() ClusterTemplateController {
 	return NewClusterTemplateController(schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "ClusterTemplate"}, "clustertemplates", true, c.controllerFactory)
