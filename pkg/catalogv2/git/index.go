@@ -60,7 +60,7 @@ func buildOrGetIndex(dir string) (*repo.IndexFile, error) {
 			return fmt.Errorf("building path for chart at %s: %w", dir, err)
 		}
 
-		builtIndex.Add(archive.Metadata, rel, "", digest)
+		builtIndex.MustAdd(archive.Metadata, rel, "", digest)
 		return filepath.SkipDir
 	})
 	if err != nil {
