@@ -6,5 +6,16 @@ source $(dirname $0)/version
 cd $(dirname $0)/..
 
 mkdir -p bin
-[ "$(uname)" != "Darwin" ] && LINKFLAGS="-extldflags -static -s"
-CGO_ENABLED=0 go build -tags k8s -ldflags "-X main.VERSION=$VERSION $LINKFLAGS" -o bin/agent ./cmd/agent
+
+if [ -n "${DEBUG}" ]; then
+  GCFLAGS="-N -l"
+fi
+
+if [ "$(uname)" != "Darwin" ]; then
+  LINKFLAGS="-extldflags -static"
+  if [ -z "${DEBUG}" ]; then
+    LINKFLAGS="${LINKFLAGS} -s"
+  fi
+fi
+
+CGO_ENABLED=0 go build -tags k8s -gcflags="all=${GCFLAGS}" -ldflags "-X main.VERSION=$VERSION $LINKFLAGS" -o bin/agent ./cmd/agent
