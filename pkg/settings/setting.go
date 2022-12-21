@@ -24,6 +24,47 @@ var (
 	provider       Provider
 	InjectDefaults string
 
+	systemNamespaces = []string{
+		"kube-node-lease",
+		"kube-public",
+		"kube-system",
+		"cattle-alerting",
+		"cattle-csp-adapter-system",
+		"cattle-epinio-system",
+		"cattle-externalip-system",
+		"cattle-fleet-local-system",
+		"cattle-fleet-system",
+		"cattle-gatekeeper-system",
+		"cattle-global-data",
+		"cattle-global-nt",
+		"cattle-helm-system",
+		"cattle-impersonation-system",
+		"cattle-istio",
+		"cattle-logging",
+		"cattle-logging-system",
+		"cattle-monitoring-system",
+		"cattle-neuvector-system",
+		"cattle-prometheus",
+		"cattle-resources-system",
+		"cattle-sriov-system",
+		"cattle-system",
+		"cattle-ui-plugin-system",
+		"cattle-windows-gmsa-system",
+		"cattle-wins-system",
+		"rancher-operator-system",
+		"calico-apiserver",
+		"calico-system",
+		"cert-manager",
+		"cis-operator-system",
+		"fleet-system",
+		"ingress-nginx",
+		"istio-system",
+		"longhorn-system",
+		"rio-system",
+		"security-scan",
+		"tigera-operator",
+	}
+
 	AgentImage                          = NewSetting("agent-image", "rancher/rancher-agent:v2.6-head")
 	AgentRolloutTimeout                 = NewSetting("agent-rollout-timeout", "300s")
 	AgentRolloutWait                    = NewSetting("agent-rollout-wait", "true")
@@ -76,7 +117,7 @@ var (
 	SystemAgentInstallerImage           = NewSetting("system-agent-installer-image", "rancher/system-agent-installer-")
 	SystemAgentUpgradeImage             = NewSetting("system-agent-upgrade-image", "")
 	WinsAgentUpgradeImage               = NewSetting("wins-agent-upgrade-image", "")
-	SystemNamespaces                    = NewSetting("system-namespaces", "kube-system,kube-public,cattle-system,cattle-alerting,cattle-logging,cattle-prometheus,ingress-nginx,cattle-global-data,cattle-istio,kube-node-lease,cert-manager,cattle-global-nt,security-scan,cattle-fleet-system,cattle-fleet-local-system,calico-system,tigera-operator,cattle-impersonation-system,rancher-operator-system,cattle-csp-adapter-system,calico-apiserver")
+	SystemNamespaces                    = NewSetting("system-namespaces", strings.Join(systemNamespaces, ","))
 	SystemUpgradeControllerChartVersion = NewSetting("system-upgrade-controller-chart-version", "")
 	TelemetryOpt                        = NewSetting("telemetry-opt", "")
 	TLSMinVersion                       = NewSetting("tls-min-version", "1.2")
