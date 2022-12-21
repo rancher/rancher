@@ -10,6 +10,7 @@ import (
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
 	v1 "github.com/rancher/rancher/tests/framework/clients/rancher/v1"
 	"github.com/rancher/rancher/tests/framework/extensions/clusters"
+	hardening "github.com/rancher/rancher/tests/framework/extensions/hardening/rke2"
 	"github.com/rancher/rancher/tests/framework/extensions/machinepools"
 	"github.com/rancher/rancher/tests/framework/extensions/tokenregistration"
 	"github.com/rancher/rancher/tests/framework/extensions/users"
@@ -30,6 +31,7 @@ type CustomClusterProvisioningTestSuite struct {
 	client             *rancher.Client
 	session            *session.Session
 	standardUserClient *rancher.Client
+	provisioning       *provisioning.Config
 	kubernetesVersions []string
 	cnis               []string
 	nodeProviders      []string
@@ -49,6 +51,7 @@ func (c *CustomClusterProvisioningTestSuite) SetupSuite() {
 	c.kubernetesVersions = clustersConfig.RKE2KubernetesVersions
 	c.cnis = clustersConfig.CNIs
 	c.nodeProviders = clustersConfig.NodeProviders
+	c.provisioning = clustersConfig
 
 	client, err := rancher.NewClient("", testSession)
 	require.NoError(c.T(), err)
@@ -92,12 +95,13 @@ func (c *CustomClusterProvisioningTestSuite) ProvisioningRKE2CustomCluster(exter
 	tests := []struct {
 		name      string
 		nodeRoles []string
+		hardening *provisioning.Config
 		client    *rancher.Client
 	}{
-		{"1 Node all roles Admin User", nodeRoles0, c.client},
-		{"1 Node all roles Standard User", nodeRoles0, c.standardUserClient},
-		{"3 nodes - 1 role per node Admin User", nodeRoles1, c.client},
-		{"3 nodes - 1 role per node Standard User", nodeRoles1, c.standardUserClient},
+		{"1 Node all roles Admin User", nodeRoles0, c.provisioning, c.client},
+		{"1 Node all roles Standard User", nodeRoles0, c.provisioning, c.standardUserClient},
+		{"3 nodes - 1 role per node Admin User", nodeRoles1, c.provisioning, c.client},
+		{"3 nodes - 1 role per node Standard User", nodeRoles1, c.provisioning, c.standardUserClient},
 	}
 	var name string
 	for _, tt := range tests {
@@ -125,7 +129,6 @@ func (c *CustomClusterProvisioningTestSuite) ProvisioningRKE2CustomCluster(exter
 
 					client, err = client.ReLogin()
 					require.NoError(c.T(), err)
-
 					customCluster, err := client.Steve.SteveType(clusters.ProvisioningSteveResouceType).ByID(clusterResp.ID)
 					require.NoError(c.T(), err)
 
@@ -163,6 +166,21 @@ func (c *CustomClusterProvisioningTestSuite) ProvisioningRKE2CustomCluster(exter
 					clusterToken, err := clusters.CheckServiceAccountTokenSecret(client, clusterName)
 					require.NoError(c.T(), err)
 					assert.NotEmpty(c.T(), clusterToken)
+
+					if tt.hardening.Hardened {
+						err = hardening.HardeningNodes(client, tt.hardening.Hardened, nodes, tt.nodeRoles)
+						require.NoError(c.T(), err)
+
+						hardenCluster := clusters.HardenK3SRKE2ClusterConfig(clusterName, namespace, "", "", kubeVersion, nil)
+
+						hardenClusterResp, err := clusters.UpdateK3SRKE2Cluster(client, clusterResp, hardenCluster)
+						require.NoError(c.T(), err)
+						assert.Equal(c.T(), clusterName, hardenClusterResp.ObjectMeta.Name)
+						
+						err = hardening.PostHardeningConfig(client, tt.hardening.Hardened, nodes, tt.nodeRoles)
+						require.NoError(c.T(), err)
+
+					}
 				})
 			}
 		}
@@ -191,11 +209,12 @@ func (c *CustomClusterProvisioningTestSuite) ProvisioningRKE2CustomClusterDynami
 	numOfNodes := len(rolesPerNode)
 
 	tests := []struct {
-		name   string
-		client *rancher.Client
+		name      string
+		client    *rancher.Client
+		hardening *provisioning.Config
 	}{
-		{"Admin User", c.client},
-		{"Standard User", c.standardUserClient},
+		{"Admin User", c.client, c.provisioning},
+		{"Standard User", c.standardUserClient, c.provisioning},
 	}
 
 	var name string
@@ -261,6 +280,22 @@ func (c *CustomClusterProvisioningTestSuite) ProvisioningRKE2CustomClusterDynami
 					clusterToken, err := clusters.CheckServiceAccountTokenSecret(client, clusterName)
 					require.NoError(c.T(), err)
 					assert.NotEmpty(c.T(), clusterToken)
+
+					if tt.hardening.Hardened {
+						err = hardening.HardeningNodes(client, tt.hardening.Hardened, nodes, rolesPerNode)
+						require.NoError(c.T(), err)
+
+						hardenCluster := clusters.HardenK3SRKE2ClusterConfig(clusterName, namespace, "", "", kubeVersion, nil)
+
+						hardenClusterResp, err := clusters.UpdateK3SRKE2Cluster(client, clusterResp, hardenCluster)
+						require.NoError(c.T(), err)
+						assert.Equal(c.T(), clusterName, hardenClusterResp.ObjectMeta.Name)
+
+						err = hardening.PostHardeningConfig(client, tt.hardening.Hardened, nodes, rolesPerNode)
+						require.NoError(c.T(), err)
+
+					}
+
 				})
 			}
 		}
