@@ -9,18 +9,20 @@ import (
 	"strings"
 	"time"
 
-	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	"github.com/rancher/rancher/pkg/controllers/management/imported"
-
 	"github.com/ghodss/yaml"
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/api/handler"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	provisioningv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	"github.com/rancher/rancher/pkg/clustermanager"
+	"github.com/rancher/rancher/pkg/controllers/management/imported"
+	"github.com/rancher/rancher/pkg/fleet"
 	"github.com/rancher/rancher/pkg/generated/compose"
+	provisioningcontrollerv1 "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/monitoring"
 	"github.com/rancher/rancher/pkg/ref"
@@ -48,12 +50,13 @@ func Formatter(apiContext *types.APIContext, resource *types.RawResource) {
 }
 
 type Handler struct {
-	Projects          v3.ProjectInterface
-	ProjectLister     v3.ProjectLister
-	ClusterManager    *clustermanager.Manager
-	ClusterLister     v3.ClusterLister
-	UserMgr           user.Manager
-	PSPTemplateLister v3.PodSecurityPolicyTemplateLister
+	Projects                 v3.ProjectInterface
+	ProjectLister            v3.ProjectLister
+	ClusterManager           *clustermanager.Manager
+	ClusterLister            v3.ClusterLister
+	ProvisioningClusterCache provisioningcontrollerv1.ClusterCache
+	UserMgr                  user.Manager
+	PSPTemplateLister        v3.PodSecurityPolicyTemplateLister
 }
 
 func (h *Handler) Actions(actionName string, action *types.Action, apiContext *types.APIContext) error {
@@ -281,13 +284,18 @@ func (h *Handler) setPodSecurityPolicyTemplate(actionName string, action *types.
 		}
 
 		clusterName := idParts[0]
-		cluster, err := h.ClusterLister.Get("", clusterName)
+		managementCluster, err := h.ClusterLister.Get("", clusterName)
 		if err != nil {
-			return fmt.Errorf("error retrieving cluster [%s]: %v", clusterName, err)
+			return fmt.Errorf("error retrieving management cluster [%s]: %w", clusterName, err)
+		}
+
+		k3sPodSecurityPoliciesEnabled, err := h.areK3SPodSecurityPoliciesEnabled(managementCluster)
+		if err != nil {
+			return fmt.Errorf("error checking if K3s pod security policies are enabled for cluster [%s]: %w", clusterName, err)
 		}
 
 		// rke2 provisioned clusters always have PSP enabled
-		if !cluster.Status.Capabilities.PspEnabled && !isProvisionedRke2Cluster(cluster) {
+		if !managementCluster.Status.Capabilities.PspEnabled && !isProvisionedRke2Cluster(managementCluster) && !k3sPodSecurityPoliciesEnabled {
 			return httperror.NewAPIError(httperror.InvalidAction,
 				fmt.Sprintf("cluster [%s] does not have Pod Security Policies enabled", clusterName))
 		}
@@ -436,6 +444,24 @@ func (h *Handler) updateBinding(binding map[string]interface{}, request *types.A
 	return nil
 }
 
+func (h *Handler) areK3SPodSecurityPoliciesEnabled(managementCluster *v32.Cluster) (bool, error) {
+	if managementCluster.Status.Provider != v32.ClusterDriverK3s {
+		return false, nil
+	}
+
+	provisioningCluster, err := h.ProvisioningClusterCache.Get(fleet.ClustersDefaultNamespace, managementCluster.Spec.DisplayName)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			// cluster not found by provisioning API, assume PSPs are not enabled
+			return false, nil
+		}
+		return false, fmt.Errorf("error retrieving provisioning cluster [%s]: %w", managementCluster.Spec.DisplayName, err)
+	}
+
+	args := parseKubeAPIServerArgs(provisioningCluster)
+	return strings.Contains(args["enable-admission-plugins"], "PodSecurityPolicy"), nil
+}
+
 func getID(id interface{}) (string, error) {
 	s, ok := id.(string)
 	if !ok {
@@ -449,4 +475,34 @@ func getID(id interface{}) (string, error) {
 // isProvisionedRke2Cluster check to see if this is a rancher provisioned rke2 cluster
 func isProvisionedRke2Cluster(cluster *v3.Cluster) bool {
 	return cluster.Status.Provider == v32.ClusterDriverRke2 && imported.IsAdministratedByProvisioningCluster(cluster)
+}
+
+// parseKubeApiServerArgs parses the "kube-apiserver-arg" available in the
+// clusters' MachineGlobalConfig to a map. The arguments are expected to
+// follow the "key=value" format. Arguments that don't follow this format
+// are ignored.
+func parseKubeAPIServerArgs(provisioningCluster *provisioningv1.Cluster) map[string]string {
+	result := make(map[string]string)
+
+	rawArgs, ok := provisioningCluster.Spec.RKEConfig.MachineGlobalConfig.Data["kube-apiserver-arg"]
+	if !ok || rawArgs == nil {
+		return result
+	}
+
+	args, ok := rawArgs.([]any)
+	if !ok || args == nil {
+		return result
+	}
+
+	for _, arg := range args {
+		s, ok := arg.(string)
+		if !ok {
+			continue
+		}
+		key, value, found := strings.Cut(s, "=")
+		if found {
+			result[key] = value
+		}
+	}
+	return result
 }
