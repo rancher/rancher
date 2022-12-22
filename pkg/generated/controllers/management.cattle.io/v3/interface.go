@@ -275,7 +275,7 @@ func (c *version) OpenLdapProvider() OpenLdapProviderController {
 	return NewOpenLdapProviderController(schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "OpenLdapProvider"}, "openldapproviders", false, c.controllerFactory)
 }
 func (c *version) PodSecurityAdmissionConfigurationTemplate() PodSecurityAdmissionConfigurationTemplateController {
-	return NewPodSecurityAdmissionConfigurationTemplateController(schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "PodSecurityAdmissionConfigurationTemplate"}, "podsecurityadmissionconfigurationtemplates", true, c.controllerFactory)
+	return NewPodSecurityAdmissionConfigurationTemplateController(schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "PodSecurityAdmissionConfigurationTemplate"}, "podsecurityadmissionconfigurationtemplates", false, c.controllerFactory)
 }
 func (c *version) PodSecurityPolicyTemplate() PodSecurityPolicyTemplateController {
 	return NewPodSecurityPolicyTemplateController(schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "PodSecurityPolicyTemplate"}, "podsecuritypolicytemplates", false, c.controllerFactory)

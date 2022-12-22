@@ -46,8 +46,8 @@ type PodSecurityAdmissionConfigurationTemplateController interface {
 
 	OnChange(ctx context.Context, name string, sync PodSecurityAdmissionConfigurationTemplateHandler)
 	OnRemove(ctx context.Context, name string, sync PodSecurityAdmissionConfigurationTemplateHandler)
-	Enqueue(namespace, name string)
-	EnqueueAfter(namespace, name string, duration time.Duration)
+	Enqueue(name string)
+	EnqueueAfter(name string, duration time.Duration)
 
 	Cache() PodSecurityAdmissionConfigurationTemplateCache
 }
@@ -56,16 +56,16 @@ type PodSecurityAdmissionConfigurationTemplateClient interface {
 	Create(*v3.PodSecurityAdmissionConfigurationTemplate) (*v3.PodSecurityAdmissionConfigurationTemplate, error)
 	Update(*v3.PodSecurityAdmissionConfigurationTemplate) (*v3.PodSecurityAdmissionConfigurationTemplate, error)
 
-	Delete(namespace, name string, options *metav1.DeleteOptions) error
-	Get(namespace, name string, options metav1.GetOptions) (*v3.PodSecurityAdmissionConfigurationTemplate, error)
-	List(namespace string, opts metav1.ListOptions) (*v3.PodSecurityAdmissionConfigurationTemplateList, error)
-	Watch(namespace string, opts metav1.ListOptions) (watch.Interface, error)
-	Patch(namespace, name string, pt types.PatchType, data []byte, subresources ...string) (result *v3.PodSecurityAdmissionConfigurationTemplate, err error)
+	Delete(name string, options *metav1.DeleteOptions) error
+	Get(name string, options metav1.GetOptions) (*v3.PodSecurityAdmissionConfigurationTemplate, error)
+	List(opts metav1.ListOptions) (*v3.PodSecurityAdmissionConfigurationTemplateList, error)
+	Watch(opts metav1.ListOptions) (watch.Interface, error)
+	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v3.PodSecurityAdmissionConfigurationTemplate, err error)
 }
 
 type PodSecurityAdmissionConfigurationTemplateCache interface {
-	Get(namespace, name string) (*v3.PodSecurityAdmissionConfigurationTemplate, error)
-	List(namespace string, selector labels.Selector) ([]*v3.PodSecurityAdmissionConfigurationTemplate, error)
+	Get(name string) (*v3.PodSecurityAdmissionConfigurationTemplate, error)
+	List(selector labels.Selector) ([]*v3.PodSecurityAdmissionConfigurationTemplate, error)
 
 	AddIndexer(indexName string, indexer PodSecurityAdmissionConfigurationTemplateIndexer)
 	GetByIndex(indexName, key string) ([]*v3.PodSecurityAdmissionConfigurationTemplate, error)
@@ -151,12 +151,12 @@ func (c *podSecurityAdmissionConfigurationTemplateController) OnRemove(ctx conte
 	c.AddGenericHandler(ctx, name, generic.NewRemoveHandler(name, c.Updater(), FromPodSecurityAdmissionConfigurationTemplateHandlerToHandler(sync)))
 }
 
-func (c *podSecurityAdmissionConfigurationTemplateController) Enqueue(namespace, name string) {
-	c.controller.Enqueue(namespace, name)
+func (c *podSecurityAdmissionConfigurationTemplateController) Enqueue(name string) {
+	c.controller.Enqueue("", name)
 }
 
-func (c *podSecurityAdmissionConfigurationTemplateController) EnqueueAfter(namespace, name string, duration time.Duration) {
-	c.controller.EnqueueAfter(namespace, name, duration)
+func (c *podSecurityAdmissionConfigurationTemplateController) EnqueueAfter(name string, duration time.Duration) {
+	c.controller.EnqueueAfter("", name, duration)
 }
 
 func (c *podSecurityAdmissionConfigurationTemplateController) Informer() cache.SharedIndexInformer {
@@ -176,38 +176,38 @@ func (c *podSecurityAdmissionConfigurationTemplateController) Cache() PodSecurit
 
 func (c *podSecurityAdmissionConfigurationTemplateController) Create(obj *v3.PodSecurityAdmissionConfigurationTemplate) (*v3.PodSecurityAdmissionConfigurationTemplate, error) {
 	result := &v3.PodSecurityAdmissionConfigurationTemplate{}
-	return result, c.client.Create(context.TODO(), obj.Namespace, obj, result, metav1.CreateOptions{})
+	return result, c.client.Create(context.TODO(), "", obj, result, metav1.CreateOptions{})
 }
 
 func (c *podSecurityAdmissionConfigurationTemplateController) Update(obj *v3.PodSecurityAdmissionConfigurationTemplate) (*v3.PodSecurityAdmissionConfigurationTemplate, error) {
 	result := &v3.PodSecurityAdmissionConfigurationTemplate{}
-	return result, c.client.Update(context.TODO(), obj.Namespace, obj, result, metav1.UpdateOptions{})
+	return result, c.client.Update(context.TODO(), "", obj, result, metav1.UpdateOptions{})
 }
 
-func (c *podSecurityAdmissionConfigurationTemplateController) Delete(namespace, name string, options *metav1.DeleteOptions) error {
+func (c *podSecurityAdmissionConfigurationTemplateController) Delete(name string, options *metav1.DeleteOptions) error {
 	if options == nil {
 		options = &metav1.DeleteOptions{}
 	}
-	return c.client.Delete(context.TODO(), namespace, name, *options)
+	return c.client.Delete(context.TODO(), "", name, *options)
 }
 
-func (c *podSecurityAdmissionConfigurationTemplateController) Get(namespace, name string, options metav1.GetOptions) (*v3.PodSecurityAdmissionConfigurationTemplate, error) {
+func (c *podSecurityAdmissionConfigurationTemplateController) Get(name string, options metav1.GetOptions) (*v3.PodSecurityAdmissionConfigurationTemplate, error) {
 	result := &v3.PodSecurityAdmissionConfigurationTemplate{}
-	return result, c.client.Get(context.TODO(), namespace, name, result, options)
+	return result, c.client.Get(context.TODO(), "", name, result, options)
 }
 
-func (c *podSecurityAdmissionConfigurationTemplateController) List(namespace string, opts metav1.ListOptions) (*v3.PodSecurityAdmissionConfigurationTemplateList, error) {
+func (c *podSecurityAdmissionConfigurationTemplateController) List(opts metav1.ListOptions) (*v3.PodSecurityAdmissionConfigurationTemplateList, error) {
 	result := &v3.PodSecurityAdmissionConfigurationTemplateList{}
-	return result, c.client.List(context.TODO(), namespace, result, opts)
+	return result, c.client.List(context.TODO(), "", result, opts)
 }
 
-func (c *podSecurityAdmissionConfigurationTemplateController) Watch(namespace string, opts metav1.ListOptions) (watch.Interface, error) {
-	return c.client.Watch(context.TODO(), namespace, opts)
+func (c *podSecurityAdmissionConfigurationTemplateController) Watch(opts metav1.ListOptions) (watch.Interface, error) {
+	return c.client.Watch(context.TODO(), "", opts)
 }
 
-func (c *podSecurityAdmissionConfigurationTemplateController) Patch(namespace, name string, pt types.PatchType, data []byte, subresources ...string) (*v3.PodSecurityAdmissionConfigurationTemplate, error) {
+func (c *podSecurityAdmissionConfigurationTemplateController) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (*v3.PodSecurityAdmissionConfigurationTemplate, error) {
 	result := &v3.PodSecurityAdmissionConfigurationTemplate{}
-	return result, c.client.Patch(context.TODO(), namespace, name, pt, data, result, metav1.PatchOptions{}, subresources...)
+	return result, c.client.Patch(context.TODO(), "", name, pt, data, result, metav1.PatchOptions{}, subresources...)
 }
 
 type podSecurityAdmissionConfigurationTemplateCache struct {
@@ -215,8 +215,8 @@ type podSecurityAdmissionConfigurationTemplateCache struct {
 	resource schema.GroupResource
 }
 
-func (c *podSecurityAdmissionConfigurationTemplateCache) Get(namespace, name string) (*v3.PodSecurityAdmissionConfigurationTemplate, error) {
-	obj, exists, err := c.indexer.GetByKey(namespace + "/" + name)
+func (c *podSecurityAdmissionConfigurationTemplateCache) Get(name string) (*v3.PodSecurityAdmissionConfigurationTemplate, error) {
+	obj, exists, err := c.indexer.GetByKey(name)
 	if err != nil {
 		return nil, err
 	}
@@ -226,9 +226,9 @@ func (c *podSecurityAdmissionConfigurationTemplateCache) Get(namespace, name str
 	return obj.(*v3.PodSecurityAdmissionConfigurationTemplate), nil
 }
 
-func (c *podSecurityAdmissionConfigurationTemplateCache) List(namespace string, selector labels.Selector) (ret []*v3.PodSecurityAdmissionConfigurationTemplate, err error) {
+func (c *podSecurityAdmissionConfigurationTemplateCache) List(selector labels.Selector) (ret []*v3.PodSecurityAdmissionConfigurationTemplate, err error) {
 
-	err = cache.ListAllByNamespace(c.indexer, namespace, selector, func(m interface{}) {
+	err = cache.ListAll(c.indexer, selector, func(m interface{}) {
 		ret = append(ret, m.(*v3.PodSecurityAdmissionConfigurationTemplate))
 	})
 
