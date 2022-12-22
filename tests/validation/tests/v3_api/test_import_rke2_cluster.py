@@ -4,6 +4,8 @@ from .common import *  # NOQA
 
 RANCHER_AWS_AMI = os.environ.get("AWS_AMI", "")
 RANCHER_AWS_USER = os.environ.get("AWS_USER", "ubuntu")
+RANCHER_AWS_WINDOWS_AMI = os.environ.get("AWS_WINDOWS_AMI", "")
+RANCHER_AWS_WINDOWS_USER = os.environ.get("AWS_WINDOWS_USER", "Administrator")
 RANCHER_REGION = os.environ.get("AWS_REGION")
 RANCHER_VPC_ID = os.environ.get("AWS_VPC")
 RANCHER_SUBNETS = os.environ.get("AWS_SUBNET")
@@ -11,6 +13,7 @@ RANCHER_AWS_SG = os.environ.get("AWS_SECURITY_GROUPS")
 RANCHER_AVAILABILITY_ZONE = os.environ.get("AWS_AVAILABILITY_ZONE")
 RANCHER_QA_SPACE = os.environ.get("RANCHER_QA_SPACE", "qa.rancher.space.")
 RANCHER_EC2_INSTANCE_CLASS = os.environ.get("AWS_INSTANCE_TYPE", "t3a.medium")
+RANCHER_EC2_WINDOWS_INSTANCE_CLASS = os.environ.get("AWS_WINDOWS_INSTANCE_TYPE", "t3.xlarge")
 HOST_NAME = os.environ.get('RANCHER_HOST_NAME', "sa")
 RANCHER_IAM_ROLE = os.environ.get("RANCHER_IAM_ROLE")
 RKE2_CREATE_LB = os.environ.get("RKE2_CREATE_LB", False)
@@ -22,6 +25,8 @@ RANCHER_RKE2_NO_OF_SERVER_NODES = \
     os.environ.get("RANCHER_RKE2_NO_OF_SERVER_NODES", 3)
 RANCHER_RKE2_NO_OF_WORKER_NODES = \
     os.environ.get("RANCHER_RKE2_NO_OF_WORKER_NODES", 0)
+RANCHER_RKE2_NO_OF_WINDOWS_WORKER_NODES = \
+    os.environ.get("RANCHER_RKE2_NO_OF_WINDOWS_WORKER_NODES", 0)
 RANCHER_RKE2_SERVER_FLAGS = os.environ.get("RANCHER_RKE2_SERVER_FLAGS", "server")
 RANCHER_RKE2_WORKER_FLAGS = os.environ.get("RANCHER_RKE2_WORKER_FLAGS", "agent")
 RANCHER_RKE2_OPERATING_SYSTEM = os.environ.get("RANCHER_RKE2_OPERATING_SYSTEM")
@@ -114,6 +119,7 @@ def create_rke2_multiple_control_cluster(cluster_type, cluster_version):
     else:
         no_of_servers = int(RANCHER_RKE2_NO_OF_SERVER_NODES) - 1
 
+    # Server nodes
     tf = Terraform(working_dir=tf_dir,
                    variables={'region': RANCHER_REGION,
                               'vpc_id': RANCHER_VPC_ID,
@@ -153,6 +159,8 @@ def create_rke2_multiple_control_cluster(cluster_type, cluster_version):
     tf.plan(out="plan_server.out")
     print(tf.apply("--auto-approve"))
     print("\n\n")
+
+    # Worker nodes
     if int(RANCHER_RKE2_NO_OF_WORKER_NODES) > 0:
         tf_dir = DATA_SUBDIR + "/" + "terraform/rke2/worker"
         tf = Terraform(working_dir=tf_dir,
@@ -179,12 +187,42 @@ def create_rke2_multiple_control_cluster(cluster_type, cluster_version):
                                   'worker_flags': RANCHER_RKE2_WORKER_FLAGS,
                                   'iam_role': RANCHER_IAM_ROLE,
                                   'volume_size': AWS_VOLUME_SIZE})
-
-        print("Joining worker nodes")
+    
+        print("Creating worker nodes")
         tf.init()
         tf.plan(out="plan_worker.out")
         print(tf.apply("--auto-approve"))
+        print("Finished Creating worker nodes")
         print("\n\n")
+    
+    # Windows worker nodes
+    if int(RANCHER_RKE2_NO_OF_WINDOWS_WORKER_NODES) > 0:
+        tf_dir = DATA_SUBDIR + "/" + "terraform/rke2/windows_worker"
+        tf = Terraform(working_dir=tf_dir,
+                       variables={'region': RANCHER_REGION,
+                                  'vpc_id': RANCHER_VPC_ID,
+                                  'subnets': RANCHER_SUBNETS,
+                                  'sg_id': RANCHER_AWS_SG,
+                                  'availability_zone': RANCHER_AVAILABILITY_ZONE,
+                                  'aws_ami': RANCHER_AWS_WINDOWS_AMI,
+                                  'aws_user': RANCHER_AWS_WINDOWS_USER,
+                                  'ec2_instance_class': RANCHER_EC2_WINDOWS_INSTANCE_CLASS,
+                                  'resource_name': RANCHER_HOSTNAME_PREFIX,
+                                  'access_key': keyPath,
+                                  'access_key_name': AWS_SSH_KEY_NAME.replace(".pem", ""),
+                                  'rke2_version': cluster_version,
+                                  'node_os': "windows",
+                                  'cluster_type': cluster_type,
+                                  'no_of_windows_worker_nodes': int(RANCHER_RKE2_NO_OF_WINDOWS_WORKER_NODES),
+                                  'iam_role': RANCHER_IAM_ROLE})
+    
+        print("Creating Windows worker nodes")
+        tf.init()
+        tf.plan(out="plan_windows_worker.out")
+        print(tf.apply("--auto-approve"))
+        print("Finished Creating Windows worker nodes")
+        print("\n\n")
+        
     cmd = "cp /tmp/" + RANCHER_HOSTNAME_PREFIX + "_kubeconfig " + \
           rke2_clusterfilepath
     os.system(cmd)
@@ -227,46 +265,66 @@ def create_rancher_cluster(client, rke2_clusterfilepath):
 
 
 def check_cluster_status(kubeconfig):
-    nodeNotReady = True
-    retries =0
+    print("Checking cluster status for {} server and {} agents nodes...".format(RANCHER_RKE2_NO_OF_SERVER_NODES, (int(RANCHER_RKE2_NO_OF_WORKER_NODES) + int(RANCHER_RKE2_NO_OF_WINDOWS_WORKER_NODES))))
+    retries = 0
+    actual_count_of_nodes = 0
+    expected_count_of_nodes = int(RANCHER_RKE2_NO_OF_SERVER_NODES) + \
+                              int(RANCHER_RKE2_NO_OF_WORKER_NODES) + \
+                              int(RANCHER_RKE2_NO_OF_WINDOWS_WORKER_NODES)
     try:
-        while nodeNotReady and (retries < 10):
-            cmd = "kubectl get nodes --no-headers -A --kubeconfig=" + kubeconfig
-            nodes = execute_command(cmd, False)
-            nodeNotReady = False
-            for node in nodes.strip().split("\n"):
-                state = node.split()[1]
-                if state != "Ready":
-                    nodeNotReady = True
-                if not nodeNotReady:
-                    break
+        # Retry logic for matching node count for 5 mins
+        while (actual_count_of_nodes < expected_count_of_nodes):
+            actual_count_of_nodes = len(get_states("nodes",kubeconfig))
+            print("Retrying for 1 min to check node count...")
             time.sleep(60)
             retries = retries + 1
-        if nodeNotReady:
-            raise AssertionError("Nodes failed to be in Ready state after 5 min")
-        actual_count_of_nodes = len(nodes.strip().split("\n"))
-        expected_count_of_nodes = int(RANCHER_RKE2_NO_OF_SERVER_NODES) - 1 + \
-                                  int(RANCHER_RKE2_NO_OF_WORKER_NODES)
-        if actual_count_of_nodes < expected_count_of_nodes:
-            raise AssertionError("Nodes failed to join the cluster, \
-            Expected: {} Actual: {}".format(expected_count_of_nodes, actual_count_of_nodes))
-
-        podsNotReady = True
-        retries = 0
-        while podsNotReady and (retries < 10):
-            cmd = "kubectl get pods --no-headers -A --kubeconfig=" + kubeconfig
-            pods = execute_command(cmd, False)
-            podsNotReady = False
-            for pod in pods.strip().split("\n"):
-                status = pod.split()[3]
-                if status != "Running" and status != "Completed":
-                    podsNotReady = True
-            if not podsNotReady:
+            print("Waiting for agent nodes to join the cluster, retry count: {}".format(retries))
+            if (actual_count_of_nodes == expected_count_of_nodes):
                 break
-            time.sleep(60)
-            retries = retries + 1
-        if podsNotReady:
-            raise AssertionError("Pods are not in desired state")
+            if (retries == 5):
+                if (actual_count_of_nodes < expected_count_of_nodes):
+                    raise AssertionError("Nodes failed to join the cluster after 5 min, \
+                    Expected: {} Actual: {}".format(expected_count_of_nodes, actual_count_of_nodes))
+        
+        # Retry logic for node status to be Ready for 5 mins
+        print("Checking node status....")
+        states = get_states("nodes",kubeconfig)
+        if 'NotReady' in states:
+            nodeNotReady = True
+            print("Found one or more nodes in 'NotReady' state")
+            retries = 0
+            while nodeNotReady and (retries < 5):
+                print("Retrying for 1 min to check node status...")
+                time.sleep(60)
+                retries = retries + 1
+                print("Waiting for agent nodes to be ready, retry count: {}".format(retries))
+                states = get_states("nodes",kubeconfig)
+                if not 'NotReady' in states:
+                    nodeNotReady = False
+                if (retries == 5):
+                    if nodeNotReady:
+                        raise AssertionError("Nodes failed to be in Ready state after 5 min, please check logs...")
+        print('All nodes found to be in Ready state')
+        
+        # Retry logic for pods status to be Ready or Completed for 5 mins
+        print('Checking pods status...')
+        states = get_states("pods",kubeconfig)
+        retries = 0
+        if not all(state in ['Running','Completed'] for state in states):
+            print("Found one or more pods in un-desired status")
+            podsNotReady = True
+            while podsNotReady and (retries < 5):
+                print("Retrying for 1 min to check pod status...")
+                time.sleep(60)
+                retries = retries + 1
+                print("Waiting for pods to be in desired state, retry count: {}".format(retries))
+                states = get_states("pods",kubeconfig)
+                if all(state in ['Running','Completed'] for state in states):
+                    podsNotReady = False
+                if (retries == 5):
+                    if podsNotReady:
+                        raise AssertionError("Pods are not found to be in desired state after 5 min, please check logs...")
+        print('All pods found to be in desired state')
     except AssertionError as e:
         print("FAIL: {}".format(str(e)))
 
@@ -281,3 +339,19 @@ def execute_command(command, log_out=True):
             print("Re-trying...")
             time.sleep(10)
     return res
+
+def get_states(type, kubeconfig):
+    if type == "nodes":
+        cmd = "kubectl get nodes --no-headers -A --kubeconfig=" + kubeconfig
+        cmd_res = execute_command(cmd, False)
+        nodes = cmd_res.strip().split("\n")
+        states = [node.split()[1] for node in nodes]
+        return states
+    elif type == "pods":
+        cmd = "kubectl get pods --no-headers -A --kubeconfig=" + kubeconfig
+        cmd_res = execute_command(cmd, False)
+        pods = cmd_res.strip().split("\n")
+        states = [pod.split()[3] for pod in pods]
+        return states
+    else:
+        raise AssertionError("Invalid type: {}, only nodes and pods are allowed".format(type))
