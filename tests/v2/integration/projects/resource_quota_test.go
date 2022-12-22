@@ -1,18 +1,29 @@
 package integration
 
 import (
+	"context"
+	"fmt"
 	"testing"
-	"time"
 
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
+	"github.com/rancher/rancher/tests/framework/extensions/kubeapi/resourcequotas"
 	"github.com/rancher/rancher/tests/framework/extensions/namespaces"
-	"github.com/rancher/rancher/tests/framework/extensions/resourcequotas"
+	steveResourceQuotas "github.com/rancher/rancher/tests/framework/extensions/resourcequotas"
 	"github.com/rancher/rancher/tests/framework/pkg/session"
+	"github.com/rancher/rancher/tests/framework/pkg/wait"
+	"github.com/rancher/rancher/tests/integration/pkg/defaults"
 	"github.com/stretchr/testify/suite"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/watch"
+)
+
+const (
+	resourceQuotaNamespaceName  = "ns1"
+	resourceQuotaNamespaceName2 = "ns2"
+	localClusterID              = "local"
 )
 
 type ResourceQuotaSuite struct {
@@ -61,11 +72,11 @@ func (s *ResourceQuotaSuite) TestCreateNamespaceWithQuotaInProject() {
 	testProject, err := client.Management.Project.Create(projectConfig)
 	s.Require().NoError(err)
 
-	namespace, err := namespaces.CreateNamespace(client, "ns1", "", map[string]string{}, map[string]string{}, testProject)
+	namespace, err := namespaces.CreateNamespace(client, resourceQuotaNamespaceName, "", map[string]string{}, map[string]string{}, testProject)
 	s.Require().NoError(err)
 	s.Require().NotNil(namespace)
 
-	quotas, err := resourcequotas.ListResourceQuotas(client, "local", "ns1", metav1.ListOptions{})
+	quotas, err := resourcequotas.ListResourceQuotas(client, localClusterID, resourceQuotaNamespaceName, metav1.ListOptions{})
 	s.Require().NoError(err)
 	s.Require().NotNil(quotas)
 	s.Require().Lenf(quotas.Items, 1, "Expected 1 quota in a new namespace, but got %d", len(quotas.Items))
@@ -105,21 +116,21 @@ func (s *ResourceQuotaSuite) TestCreateNamespaceWithOverriddenQuotaInProject() {
 	annotations1 := map[string]string{
 		"field.cattle.io/resourceQuota": "{\"limit\":{\"limitsCpu\":\"190m\"}}",
 	}
-	namespace, err := namespaces.CreateNamespace(client, "ns1", "", map[string]string{}, annotations1, testProject)
+	namespace, err := namespaces.CreateNamespace(client, resourceQuotaNamespaceName, "", map[string]string{}, annotations1, testProject)
 	s.Require().NoError(err)
 	s.Require().NotNil(namespace)
 
 	annotations2 := map[string]string{
 		"field.cattle.io/resourceQuota": "{\"limit\":{\"limitsCpu\":\"400m\", \"configMaps\":\"50\"}}",
 	}
-	namespace, err = namespaces.CreateNamespace(client, "ns2", "", map[string]string{}, annotations2, testProject)
+	namespace, err = namespaces.CreateNamespace(client, resourceQuotaNamespaceName2, "", map[string]string{}, annotations2, testProject)
 	s.Require().NoError(err)
 	s.Require().NotNil(namespace)
 
-	quotas, err := resourcequotas.ListResourceQuotas(client, "local", "ns1", metav1.ListOptions{})
+	quotas, err := resourcequotas.ListResourceQuotas(client, localClusterID, resourceQuotaNamespaceName, metav1.ListOptions{})
 	s.Require().NoError(err)
 	s.Require().NotNil(quotas)
-	s.Require().Lenf(quotas.Items, 1, "Expected 1 quota in ns1, but got %d", len(quotas.Items))
+	s.Require().Lenf(quotas.Items, 1, "Expected 1 quota in %s, but got %d", resourceQuotaNamespaceName, len(quotas.Items))
 
 	resourceList := quotas.Items[0].Spec.Hard
 	want := v1.ResourceList{
@@ -128,10 +139,10 @@ func (s *ResourceQuotaSuite) TestCreateNamespaceWithOverriddenQuotaInProject() {
 	s.Require().Equal(want, resourceList)
 	s.Require().NoError(err)
 
-	quotas, err = resourcequotas.ListResourceQuotas(client, "local", "ns2", metav1.ListOptions{})
+	quotas, err = resourcequotas.ListResourceQuotas(client, localClusterID, resourceQuotaNamespaceName2, metav1.ListOptions{})
 	s.Require().NoError(err)
 	s.Require().NotNil(quotas)
-	s.Require().Lenf(quotas.Items, 1, "Expected 1 quota in ns2, but got %d", len(quotas.Items))
+	s.Require().Lenf(quotas.Items, 1, "Expected 1 quota in %s, but got %d", resourceQuotaNamespaceName2, len(quotas.Items))
 
 	resourceList = quotas.Items[0].Spec.Hard
 	want = v1.ResourceList{
@@ -146,6 +157,9 @@ func (s *ResourceQuotaSuite) TestRemoveQuotaFromProjectWithNamespacePropagation(
 	defer subSession.Cleanup()
 
 	client, err := s.client.WithSession(subSession)
+	s.Require().NoError(err)
+
+	dynamicClient, err := client.GetRancherDynamicClient()
 	s.Require().NoError(err)
 
 	projectLimit := &management.ResourceQuotaLimit{
@@ -170,7 +184,7 @@ func (s *ResourceQuotaSuite) TestRemoveQuotaFromProjectWithNamespacePropagation(
 	testProject, err := client.Management.Project.Create(projectConfig)
 	s.Require().NoError(err)
 
-	namespace, err := namespaces.CreateNamespace(client, "ns1", "", map[string]string{}, map[string]string{}, testProject)
+	namespace, err := namespaces.CreateNamespace(client, resourceQuotaNamespaceName, "", map[string]string{}, map[string]string{}, testProject)
 	s.Require().NoError(err)
 	s.Require().NotNil(namespace)
 
@@ -180,10 +194,16 @@ func (s *ResourceQuotaSuite) TestRemoveQuotaFromProjectWithNamespacePropagation(
 	_, err = client.Management.Project.Replace(testProject)
 	s.Require().NoError(err)
 
-	// Allow the controller to update the resource quotas after the project has been updated.
-	time.Sleep(2 * time.Second)
+	quotas, err := resourcequotas.ListResourceQuotas(client, localClusterID, resourceQuotaNamespaceName, metav1.ListOptions{})
+	s.Require().NoError(err)
 
-	quotas, err := resourcequotas.ListResourceQuotas(client, "local", "ns1", metav1.ListOptions{})
+	// Allow the controller to update the resource quotas after the project has been updated.
+	quotaName := quotas.Items[0].Name
+	quotaID := fmt.Sprintf("%s/%s", resourceQuotaNamespaceName, quotaName)
+	err = steveResourceQuotas.CheckResourceActiveState(client, quotaID)
+	s.Require().NoError(err)
+
+	quotas, err = resourcequotas.ListResourceQuotas(client, localClusterID, resourceQuotaNamespaceName, metav1.ListOptions{})
 	s.Require().NoError(err)
 	s.Require().NotNil(quotas)
 	s.Require().Lenf(quotas.Items, 1, "Expected 1 quota in the namespace, but got %d", len(quotas.Items))
@@ -199,11 +219,26 @@ func (s *ResourceQuotaSuite) TestRemoveQuotaFromProjectWithNamespacePropagation(
 	testProject.ResourceQuota.Limit.ConfigMaps = ""
 	testProject.NamespaceDefaultResourceQuota.Limit.ConfigMaps = ""
 
+	watchInterface, err := dynamicClient.Resource(resourcequotas.ResourceQuotaGroupVersionResource).Watch(context.TODO(), metav1.ListOptions{
+		FieldSelector:  "metadata.name=" + quotaName,
+		TimeoutSeconds: &defaults.WatchTimeoutSeconds,
+	})
+	s.Require().NoError(err)
+
 	_, err = client.Management.Project.Replace(testProject)
 	s.Require().NoError(err)
 
-	time.Sleep(2 * time.Second)
-	quotas, err = resourcequotas.ListResourceQuotas(client, "local", "ns1", metav1.ListOptions{})
+	err = wait.WatchWait(watchInterface, func(event watch.Event) (ready bool, err error) {
+		if event.Type == watch.Error {
+			return false, fmt.Errorf("there was an error deleting cluster")
+		} else if event.Type == watch.Deleted {
+			return true, nil
+		}
+		return false, nil
+	})
+	s.Require().NoError(err)
+
+	quotas, err = resourcequotas.ListResourceQuotas(client, localClusterID, resourceQuotaNamespaceName, metav1.ListOptions{})
 	s.Require().NoError(err)
 	s.Require().NotNil(quotas)
 	s.Require().Lenf(quotas.Items, 0, "Expected no quotas in the namespace, but got %d", len(quotas.Items))
@@ -236,7 +271,7 @@ func (s *ResourceQuotaSuite) TestAddQuotaFromProjectWithNamespacePropagation() {
 	testProject, err := client.Management.Project.Create(projectConfig)
 	s.Require().NoError(err)
 
-	namespace, err := namespaces.CreateNamespace(client, "ns1", "", map[string]string{}, map[string]string{}, testProject)
+	namespace, err := namespaces.CreateNamespace(client, resourceQuotaNamespaceName, "", map[string]string{}, map[string]string{}, testProject)
 	s.Require().NoError(err)
 	s.Require().NotNil(namespace)
 
@@ -246,10 +281,16 @@ func (s *ResourceQuotaSuite) TestAddQuotaFromProjectWithNamespacePropagation() {
 	_, err = client.Management.Project.Replace(testProject)
 	s.Require().NoError(err)
 
-	// Allow the controller to update the resource quotas after the project has been updated.
-	time.Sleep(2 * time.Second)
+	quotas, err := resourcequotas.ListResourceQuotas(client, localClusterID, resourceQuotaNamespaceName, metav1.ListOptions{})
+	s.Require().NoError(err)
 
-	quotas, err := resourcequotas.ListResourceQuotas(client, "local", "ns1", metav1.ListOptions{})
+	// Allow the controller to update the resource quotas after the project has been updated.
+	quotaName := quotas.Items[0].Name
+	quotaID := fmt.Sprintf("%s/%s", resourceQuotaNamespaceName, quotaName)
+	err = steveResourceQuotas.CheckResourceActiveState(client, quotaID)
+	s.Require().NoError(err)
+
+	quotas, err = resourcequotas.ListResourceQuotas(client, localClusterID, resourceQuotaNamespaceName, metav1.ListOptions{})
 	s.Require().NoError(err)
 	s.Require().NotNil(quotas)
 	s.Require().Lenf(quotas.Items, 1, "Expected 1 quota in the namespace, but got %d", len(quotas.Items))
