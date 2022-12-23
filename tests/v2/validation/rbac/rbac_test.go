@@ -6,7 +6,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/rancher/norman/types"
 	apiV1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
@@ -66,7 +65,7 @@ func (rb *RBTestSuite) SetupSuite() {
 func (rb *RBTestSuite) ValidateListCluster(role string) {
 
 	//Testcase1 Verify cluster members - Owner/member,  Project members - Owner/member are able to list clusters
-	clusterList, err := rb.standardUserClient.Steve.SteveType(clusters.ProvisioningSteveResouceType).ListAll(&types.ListOpts{})
+	clusterList, err := rb.standardUserClient.Steve.SteveType(clusters.ProvisioningSteveResouceType).ListAll(nil)
 	require.NoError(rb.T(), err)
 	assert.Equal(rb.T(), 1, len(clusterList.Data))
 
@@ -301,7 +300,7 @@ func (rb *RBTestSuite) ValidateAddMemberAsClusterRoles() {
 	require.NoError(rb.T(), err)
 	rb.additionalUserClient = additionalUserClient
 
-	clusterList, err := rb.additionalUserClient.Steve.SteveType(clusters.ProvisioningSteveResouceType).ListAll(&types.ListOpts{})
+	clusterList, err := rb.additionalUserClient.Steve.SteveType(clusters.ProvisioningSteveResouceType).ListAll(nil)
 	require.NoError(rb.T(), err)
 	assert.Equal(rb.T(), 1, len(clusterList.Data))
 
@@ -320,7 +319,7 @@ func (rb *RBTestSuite) ValidateAddCMAsProjectOwner() {
 	require.NoError(rb.T(), err)
 	rb.additionalUserClient = additionalUserClient
 
-	clusterList, err := rb.standardUserClient.Steve.SteveType(clusters.ProvisioningSteveResouceType).ListAll(&types.ListOpts{})
+	clusterList, err := rb.standardUserClient.Steve.SteveType(clusters.ProvisioningSteveResouceType).ListAll(nil)
 	require.NoError(rb.T(), err)
 	assert.Equal(rb.T(), 1, len(clusterList.Data))
 
@@ -367,7 +366,7 @@ func (rb *RBTestSuite) TestRBAC() {
 
 		//Verify standard users cannot list any clusters
 		rb.Run("Test case Validate standard users cannot list any downstream clusters before adding the cluster role "+tt.name, func() {
-			_, err := rb.standardUserClient.Steve.SteveType(clusters.ProvisioningSteveResouceType).ListAll(&types.ListOpts{})
+			_, err := rb.standardUserClient.Steve.SteveType(clusters.ProvisioningSteveResouceType).ListAll(nil)
 			require.Error(rb.T(), err)
 			assert.Equal(rb.T(), "Resource type [provisioning.cattle.io.cluster] is not listable", err.Error())
 		})

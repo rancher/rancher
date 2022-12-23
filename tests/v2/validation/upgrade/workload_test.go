@@ -3,7 +3,6 @@ package upgrade
 import (
 	"testing"
 
-	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
 	v1 "github.com/rancher/rancher/tests/framework/clients/rancher/v1"
@@ -279,9 +278,7 @@ func (u *UpgradeWorkloadTestSuite) TestWorkloadPostUpgrade() {
 	steveClient, err := u.client.Steve.ProxyDownstream(u.project.ClusterID)
 	require.NoError(u.T(), err)
 
-	defaultListOptions := &types.ListOpts{}
-
-	namespaceList, err := steveClient.SteveType(namespaces.NamespaceSteveType).List(defaultListOptions)
+	namespaceList, err := steveClient.SteveType(namespaces.NamespaceSteveType).List(nil)
 	require.NoError(u.T(), err)
 	doesNamespaceExist := containsItemWithPrefix(steve.Names(namespaceList), u.names.core["namespaceName"])
 	assert.True(u.T(), doesNamespaceExist)
@@ -297,7 +294,7 @@ func (u *UpgradeWorkloadTestSuite) TestWorkloadPostUpgrade() {
 	u.namespace = namespace
 
 	u.T().Logf("Checking deployments in namespace %s", u.namespace.Name)
-	deploymentList, err := steveClient.SteveType(workloads.DeploymentSteveType).List(defaultListOptions)
+	deploymentList, err := steveClient.SteveType(workloads.DeploymentSteveType).List(nil)
 	require.NoError(u.T(), err)
 	deploymentNames := []string{
 		u.names.coreWithSuffix["deploymentNameForVolumeSecret"],
@@ -309,7 +306,7 @@ func (u *UpgradeWorkloadTestSuite) TestWorkloadPostUpgrade() {
 	}
 
 	u.T().Logf("Checking daemonsets in namespace %s", u.namespace.Name)
-	daemonsetList, err := steveClient.SteveType(workloads.DaemonsetSteveType).List(defaultListOptions)
+	daemonsetList, err := steveClient.SteveType(workloads.DaemonsetSteveType).List(nil)
 	require.NoError(u.T(), err)
 	daemonsetNames := []string{
 		u.names.coreWithSuffix["daemonsetName"],
@@ -331,7 +328,7 @@ func (u *UpgradeWorkloadTestSuite) TestWorkloadPostUpgrade() {
 		assert.Truef(u.T(), doesContainDaemonsetForIngress, "Daemonset with prefix %s doesn't exist", u.names.coreWithSuffix["daemonsetNameForIngress"])
 
 		u.T().Logf("Checking ingresses in namespace %s", u.namespace.Name)
-		ingressList, err := steveClient.SteveType(ingresses.IngressSteveType).List(defaultListOptions)
+		ingressList, err := steveClient.SteveType(ingresses.IngressSteveType).List(nil)
 		require.NoError(u.T(), err)
 		ingressNames := []string{
 			u.names.coreWithSuffix["ingressNameForDeployment"],
@@ -359,7 +356,7 @@ func (u *UpgradeWorkloadTestSuite) TestWorkloadPostUpgrade() {
 	}
 
 	u.T().Logf("Checking the secret in namespace %s", u.namespace.Name)
-	secretList, err := steveClient.SteveType(secrets.SecretSteveType).List(defaultListOptions)
+	secretList, err := steveClient.SteveType(secrets.SecretSteveType).List(nil)
 	require.NoError(u.T(), err)
 	doesContainSecret := containsItemWithPrefix(steve.Names(secretList), u.names.core["secretName"])
 	assert.Truef(u.T(), doesContainSecret, "Secret with prefix %s doesn't exist", u.names.core["secretName"])

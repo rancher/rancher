@@ -3,7 +3,6 @@ package charts
 import (
 	"time"
 
-	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
 	v1 "github.com/rancher/rancher/tests/framework/clients/rancher/v1"
@@ -35,7 +34,7 @@ func getAuditTimestamp(client *rancher.Client, project *management.Project) erro
 	return wait.Poll(1*time.Second, 5*time.Minute, func() (done bool, err error) {
 
 		// get list of constraints
-		auditList, err := steveClient.SteveType(ConstraintResourceSteveType).List(&types.ListOpts{})
+		auditList, err := steveClient.SteveType(ConstraintResourceSteveType).List(nil)
 		if err != nil {
 			return false, nil
 		}

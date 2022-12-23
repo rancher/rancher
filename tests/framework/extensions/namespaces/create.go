@@ -27,9 +27,15 @@ const (
 // CreateNamespace is a helper function that uses the dynamic client to create a namespace on a project.
 // It registers a delete function with a wait.WatchWait to ensure the namspace is deleted cleanly.
 func CreateNamespace(client *rancher.Client, namespaceName, containerDefaultResourceLimit string, labels, annotations map[string]string, project *management.Project) (*v1.SteveAPIObject, error) {
-	// Namespace object for a project name space
-	annotations["field.cattle.io/containerDefaultResourceLimit"] = containerDefaultResourceLimit
-	annotations["field.cattle.io/projectId"] = project.ID
+	if annotations == nil {
+		annotations = make(map[string]string)
+	}
+	if containerDefaultResourceLimit != "" {
+		annotations["field.cattle.io/containerDefaultResourceLimit"] = containerDefaultResourceLimit
+	}
+	if project != nil {
+		annotations["field.cattle.io/projectId"] = project.ID
+	}
 	namespace := &coreV1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        namespaceName,
