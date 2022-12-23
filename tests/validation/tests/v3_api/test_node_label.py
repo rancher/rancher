@@ -433,7 +433,8 @@ def test_node_label_custom_add_edit_addnode():
     # cluster will go into updating state
     cluster = validate_cluster_state(client, cluster, True,
                                      intermediate_state="updating",
-                                     nodes_not_in_active_state=[])
+                                     nodes_not_in_active_state=[],
+                                     timeout=600)
 
     node = client.reload(node)
     # Label should be added
@@ -700,7 +701,8 @@ def test_node_label_node_template_delete_api():
     # cluster will go into updating state
     cluster = validate_cluster_state(client, cluster, True,
                                      intermediate_state="updating",
-                                     nodes_not_in_active_state=[])
+                                     nodes_not_in_active_state=[],
+                                     timeout=600)
 
     node = client.reload(node)
     # label should be deleted
@@ -759,9 +761,9 @@ def test_node_label_custom_edit():
     # cluster will go into updating state
     cluster = validate_cluster_state(client, cluster, True,
                                      intermediate_state="updating",
-                                     nodes_not_in_active_state=[])
+                                     nodes_not_in_active_state=[],
+                                     timeout=600)
     node = client.reload(node)
-
     validate_label_set_on_node(client, node, test_label, new_value)
     cluster_custom["label_value"] = new_value
 
@@ -828,7 +830,8 @@ def test_node_label_custom_delete():
     # cluster will go into updating state
     cluster = validate_cluster_state(client, cluster, True,
                                      intermediate_state="updating",
-                                     nodes_not_in_active_state=[])
+                                     nodes_not_in_active_state=[],
+                                     timeout=600)
 
     node = client.reload(node)
     # label should be deleted
