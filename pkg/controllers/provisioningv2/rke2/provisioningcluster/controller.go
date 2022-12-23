@@ -288,7 +288,7 @@ func (h *handler) OnRancherClusterChange(obj *rancherv1.Cluster, status rancherv
 		if status, err = h.setProvisionedStatusFromMachineInfra(obj, status, rkeCP); err != nil && !apierror.IsNotFound(err) && !errors.Is(err, generic.ErrSkip) {
 			return nil, status, err
 		} else if err == nil {
-			if status, err = h.updateClusterProvisioningStatus(obj, status, rkeCP, rke2.Updated, rke2.Ready); err != nil && !apierror.IsNotFound(err) {
+			if status, err = h.updateClusterProvisioningStatus(obj, status, rkeCP, rke2.Updated, rke2.Reconciled); err != nil && !apierror.IsNotFound(err) {
 				return nil, status, err
 			}
 		}

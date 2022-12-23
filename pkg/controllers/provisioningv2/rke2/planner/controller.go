@@ -58,6 +58,9 @@ func (h *handler) OnChange(cp *rkev1.RKEControlPlane, status rkev1.RKEControlPla
 	}
 
 	status.ObservedGeneration = cp.Generation
+	rke2.Provisioned.CreateUnknownIfNotExists(&status)
+	rke2.Reconciled.CreateUnknownIfNotExists(&status)
+	rke2.Ready.CreateUnknownIfNotExists(&status)
 
 	logrus.Debugf("[planner] rkecluster %s/%s: calling planner process", cp.Namespace, cp.Name)
 	status, err := h.planner.Process(cp, status)
@@ -67,14 +70,22 @@ func (h *handler) OnChange(cp *rkev1.RKEControlPlane, status rkev1.RKEControlPla
 			if rke2.Reconciled.GetMessage(&status) == err.Error() && rke2.Reconciled.GetStatus(&status) == "Unknown" && rke2.Reconciled.GetReason(&status) == "Waiting" {
 				h.controlPlanes.EnqueueAfter(cp.Namespace, cp.Name, 5*time.Second)
 			} else {
+				if !rke2.Provisioned.IsTrue(&status) {
+					rke2.Provisioned.SetStatus(&status, "Unknown")
+					rke2.Provisioned.Message(&status, err.Error())
+					rke2.Provisioned.Reason(&status, "Waiting")
+				}
 				rke2.Reconciled.SetStatus(&status, "Unknown")
 				rke2.Reconciled.Message(&status, err.Error())
 				rke2.Reconciled.Reason(&status, "Waiting")
-				err = nil
 			}
+			err = nil
 		} else if !errors.Is(err, generic.ErrSkip) {
 			logrus.Errorf("[planner] rkecluster %s/%s: error encountered during plan processing was %v", cp.Namespace, cp.Name, err)
 			rke2.Reconciled.SetError(&status, "", err)
+			if !rke2.Provisioned.IsTrue(&status) {
+				rke2.Provisioned.SetError(&status, "", err)
+			}
 			// if error is generic.ErrSkip, no control plane updates will be enqueued
 		} else {
 			h.controlPlanes.EnqueueAfter(cp.Namespace, cp.Name, 5*time.Second)

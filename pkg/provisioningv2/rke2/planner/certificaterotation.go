@@ -44,12 +44,12 @@ func (p *Planner) rotateCertificates(cp *rkev1.RKEControlPlane, status rkev1.RKE
 // shouldRotate `true` if the cluster is ready and the generation is stale
 func shouldRotate(cp *rkev1.RKEControlPlane) bool {
 	// The controlplane must be initialized before we rotate anything
-	if cp.Status.Initialized != true {
+	if !cp.Status.Initialized {
 		return false
 	}
 
 	// The controlplane must be ready before we rotate anything
-	if !cp.Status.Ready != true {
+	if !cp.Status.Ready {
 		return false
 	}
 

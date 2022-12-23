@@ -79,17 +79,11 @@ func appendLog(error bool, oldLog, log string) string {
 }
 
 func (h *handler) recordMessage(provCluster *provv1.Cluster, cm *corev1.ConfigMap) (*corev1.ConfigMap, error) {
-	msg := rke2.Provisioned.GetMessage(provCluster)
-	error := rke2.Provisioned.IsFalse(provCluster)
-	done := rke2.Provisioned.IsTrue(provCluster)
+	msg := rke2.Updated.GetMessage(provCluster)
+	failure := rke2.Updated.IsFalse(provCluster)
+	success := rke2.Updated.IsTrue(provCluster)
 
-	if done && msg == "" {
-		done = rke2.Updated.IsTrue(provCluster)
-		msg = rke2.Updated.GetMessage(provCluster)
-		error = rke2.Updated.IsFalse(provCluster)
-	}
-
-	if done && msg == "" && provCluster.Status.Ready {
+	if success && msg == "" && provCluster.Status.Ready {
 		msg = "provisioning done"
 	}
 
@@ -107,7 +101,7 @@ func (h *handler) recordMessage(provCluster *provv1.Cluster, cm *corev1.ConfigMa
 		cm.Data = map[string]string{}
 	}
 
-	cm.Data["log"] = appendLog(error, cm.Data["log"], msg)
+	cm.Data["log"] = appendLog(failure, cm.Data["log"], msg)
 	cm.Data["last"] = msg
 	return h.configMaps.Update(cm)
 }

@@ -3,6 +3,10 @@ module github.com/rancher/rancher
 go 1.19
 
 replace (
+	github.com/rancher/wrangler => /home/jfh/Documents/work/rancher/wrangler
+)
+
+replace (
 	github.com/docker/distribution => github.com/docker/distribution v2.7.1+incompatible // oras dep requires a replace is set
 	github.com/docker/docker => github.com/docker/docker v20.10.9+incompatible // oras dep requires a replace is set
 

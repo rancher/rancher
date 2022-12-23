@@ -37,6 +37,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/util/retry"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 	capiannotations "sigs.k8s.io/cluster-api/util/annotations"
 	"sigs.k8s.io/cluster-api/util/conditions"
@@ -1186,14 +1187,16 @@ func (p *Planner) pauseCAPICluster(cp *rkev1.RKEControlPlane, pause bool) error 
 	if cp == nil {
 		return fmt.Errorf("cannot toggle health checks for nil controlplane")
 	}
-	cluster, err := rke2.GetOwnerCAPICluster(cp, p.capiClusterCache)
-	if err != nil {
+	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		cluster, err := rke2.GetOwnerCAPICluster(cp, p.capiClusterCache)
+		if err != nil {
+			return err
+		}
+		if cluster.Spec.Paused == pause {
+			return nil
+		}
+		cluster.Spec.Paused = pause
+		_, err = p.capiClient.Update(cluster)
 		return err
-	}
-	if cluster.Spec.Paused == pause {
-		return nil
-	}
-	cluster.Spec.Paused = pause
-	_, err = p.capiClient.Update(cluster)
-	return err
+	})
 }

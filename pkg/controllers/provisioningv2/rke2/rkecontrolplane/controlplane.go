@@ -70,16 +70,14 @@ func (h *handler) clusterWatch(_, _ string, obj runtime.Object) ([]relatedresour
 	}, nil
 }
 
-func (h *handler) OnChange(obj *rkev1.RKEControlPlane, status rkev1.RKEControlPlaneStatus) (rkev1.RKEControlPlaneStatus, error) {
-	status.ObservedGeneration = obj.Generation
-	cluster, err := h.clusterCache.Get(obj.Spec.ManagementClusterName)
+func (h *handler) OnChange(cp *rkev1.RKEControlPlane, status rkev1.RKEControlPlaneStatus) (rkev1.RKEControlPlaneStatus, error) {
+	status.ObservedGeneration = cp.Generation
+	cluster, err := h.clusterCache.Get(cp.Spec.ManagementClusterName)
 	if err != nil {
-		h.rkeControlPlaneController.EnqueueAfter(obj.Namespace, obj.Name, 2*time.Second)
+		h.rkeControlPlaneController.EnqueueAfter(cp.Namespace, cp.Name, 2*time.Second)
 		return status, nil
 	}
 
-	status.Ready = rke2.Ready.IsTrue(cluster)
-	status.Initialized = rke2.Ready.IsTrue(cluster)
 	status.AgentConnected = clusterconnected.Connected.IsTrue(cluster)
 	return status, nil
 }
