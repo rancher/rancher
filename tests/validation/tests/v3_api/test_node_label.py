@@ -759,13 +759,11 @@ def test_node_label_custom_edit():
     node_labels[test_label] = new_value
     client.update(node, labels=node_labels)
     # cluster will go into updating state
-    print("before validate cluster state")
     cluster = validate_cluster_state(client, cluster, True,
                                      intermediate_state="updating",
                                      nodes_not_in_active_state=[],
                                      timeout=600)
     node = client.reload(node)
-    print("before validate set on node")
     validate_label_set_on_node(client, node, test_label, new_value)
     cluster_custom["label_value"] = new_value
 
