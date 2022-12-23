@@ -161,6 +161,13 @@ export CATTLE_ADDRESS=$(get_address $CATTLE_ADDRESS)
 export CATTLE_INTERNAL_ADDRESS=$(get_address $CATTLE_INTERNAL_ADDRESS)
 
 if [ -z "$CATTLE_ADDRESS" ]; then
+    # Try to get external IP with dig, often works better than ip -o route.
+    if dig +short myip.opendns.com @resolver1.opendns.com && echo $?; then
+        CATTLE_ADDRESS=$(dig +short myip.opendns.com @resolver1.opendns.com)
+    fi
+fi
+
+if [ -z "$CATTLE_ADDRESS" ]; then
     # Example output: '8.8.8.8 via 10.128.0.1 dev ens4 src 10.128.0.34 uid 0'
     CATTLE_ADDRESS=$(ip -o route get 8.8.8.8 | sed -n 's/.*src \([0-9.]\+\).*/\1/p')
 fi
