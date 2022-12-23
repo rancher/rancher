@@ -4,7 +4,6 @@ import (
 	"os"
 	"testing"
 
-	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
 	v1 "github.com/rancher/rancher/tests/framework/clients/rancher/v1"
@@ -115,7 +114,7 @@ func (g *GateKeeperTestSuite) TestGatekeeperChart() {
 	require.NoError(g.T(), err)
 
 	// now that audit has run, get the list of constraints again
-	constraintList, err := steveClient.SteveType(ConstraintResourceSteveType).List(&types.ListOpts{})
+	constraintList, err := steveClient.SteveType(ConstraintResourceSteveType).List(nil)
 	require.NoError(g.T(), err)
 
 	// parse list of constraints
@@ -125,7 +124,7 @@ func (g *GateKeeperTestSuite) TestGatekeeperChart() {
 	require.NoError(g.T(), err)
 
 	g.T().Log("getting list of all namespaces")
-	namespacesList, err := steveClient.SteveType(namespaces.NamespaceSteveType).List(&types.ListOpts{})
+	namespacesList, err := steveClient.SteveType(namespaces.NamespaceSteveType).List(nil)
 	require.NoError(g.T(), err)
 
 	g.T().Log("getting list of namespaces with violations...")

@@ -3,9 +3,11 @@ package v1
 import (
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"regexp"
 
-	"github.com/rancher/norman/types"
+	"github.com/rancher/apiserver/pkg/types"
+	normantypes "github.com/rancher/norman/types"
 	"github.com/rancher/rancher/tests/framework/pkg/clientbase"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -31,7 +33,7 @@ type ObjectMeta struct {
 
 // SteveAPIObject is the generic object used in the v1/steve API call responses
 type SteveAPIObject struct {
-	types.Resource
+	normantypes.Resource
 	JSONResp        map[string]any
 	metav1.TypeMeta `json:",inline"`
 	ObjectMeta      `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
@@ -52,9 +54,15 @@ type SteveClient struct {
 	steveType string
 }
 
+// NamespacedSteveClient is the client used to access namespaced Steve API endpoints
+type NamespacedSteveClient struct {
+	SteveClient
+	namespace string
+}
+
 type SteveOperations interface {
-	List(opts *types.ListOpts) (*SteveCollection, error)
-	ListAll(opts *types.ListOpts) (*SteveCollection, error)
+	List(params url.Values) (*SteveCollection, error)
+	ListAll(params url.Values) (*SteveCollection, error)
 	Create(opts any) (*SteveAPIObject, error)
 	Update(existing *SteveAPIObject, updates any) (*SteveAPIObject, error)
 	Replace(existing *SteveAPIObject) (*SteveAPIObject, error)
@@ -88,6 +96,10 @@ func (c *Client) SteveType(steveType string) *SteveClient {
 		apiClient: c,
 		steveType: steveType,
 	}
+}
+
+func (c *SteveClient) NamespacedSteveClient(namespace string) *NamespacedSteveClient {
+	return &NamespacedSteveClient{*c, namespace}
 }
 
 // ProxyDownstream is a function that sets the URL to a proxy URL
@@ -151,10 +163,15 @@ func (c *SteveClient) Replace(obj *SteveAPIObject) (*SteveAPIObject, error) {
 	return resp, err
 }
 
-func (c *SteveClient) List(opts *types.ListOpts) (*SteveCollection, error) {
+func (c *SteveClient) List(query url.Values) (*SteveCollection, error) {
 	resp := &SteveCollection{}
 	var jsonResp map[string]any
-	err := c.apiClient.Ops.DoList(c.steveType, opts, &jsonResp)
+	url, err := c.apiClient.Ops.GetCollectionURL(c.steveType, "GET")
+	if err != nil {
+		return nil, err
+	}
+	url = url + "?" + query.Encode()
+	err = c.apiClient.Ops.DoGet(url, nil, &jsonResp)
 	if err != nil {
 		return nil, err
 	}
@@ -171,8 +188,8 @@ func (c *SteveClient) List(opts *types.ListOpts) (*SteveCollection, error) {
 	return resp, err
 }
 
-func (c *SteveClient) ListAll(opts *types.ListOpts) (*SteveCollection, error) {
-	resp, err := c.List(opts)
+func (c *SteveClient) ListAll(params url.Values) (*SteveCollection, error) {
+	resp, err := c.List(params)
 	if err != nil {
 		return resp, err
 	}
@@ -213,6 +230,88 @@ func (c *SteveClient) ByID(id string) (*SteveAPIObject, error) {
 
 func (c *SteveClient) Delete(container *SteveAPIObject) error {
 	return c.apiClient.Ops.DoResourceDelete(c.steveType, &container.Resource)
+}
+
+func (c *NamespacedSteveClient) Create(container any) (*SteveAPIObject, error) {
+	resp := &SteveAPIObject{}
+	var jsonResp map[string]any
+	url, err := c.apiClient.Ops.GetCollectionURL(c.steveType, "POST")
+	if err != nil {
+		return nil, err
+	}
+	if c.namespace != "" {
+		url += "/" + c.namespace
+	}
+	err = c.apiClient.Ops.DoModify("POST", url, container, &jsonResp)
+	if err != nil {
+		return nil, err
+	}
+	err = ConvertToK8sType(jsonResp, resp)
+	resp.JSONResp = jsonResp
+	return resp, err
+}
+
+func (c *NamespacedSteveClient) Update(existing *SteveAPIObject, updates any) (*SteveAPIObject, error) {
+	return c.SteveClient.Update(existing, updates)
+}
+
+func (c *NamespacedSteveClient) Replace(obj *SteveAPIObject) (*SteveAPIObject, error) {
+	return c.SteveClient.Replace(obj)
+}
+
+func (c *NamespacedSteveClient) List(query url.Values) (*SteveCollection, error) {
+	resp := &SteveCollection{}
+	var jsonResp map[string]any
+	url, err := c.apiClient.Ops.GetCollectionURL(c.steveType, "GET")
+	if err != nil {
+		return nil, err
+	}
+	if c.namespace != "" {
+		url += "/" + c.namespace
+	}
+	if len(query) > 0 {
+		url += "?" + query.Encode()
+	}
+	err = c.apiClient.Ops.DoGet(url, nil, &jsonResp)
+	if err != nil {
+		return nil, err
+	}
+
+	err = ConvertToK8sType(jsonResp, resp)
+	if err != nil {
+		return nil, err
+	}
+
+	steveList := jsonResp["data"]
+	for index, item := range steveList.([]any) {
+		resp.Data[index].JSONResp = item.(map[string]any)
+	}
+	return resp, err
+}
+
+func (c *NamespacedSteveClient) ListAll(params url.Values) (*SteveCollection, error) {
+	resp, err := c.List(params)
+	if err != nil {
+		return resp, err
+	}
+	data := resp.Data
+	for next, err := resp.Next(); next != nil && err == nil; next, err = next.Next() {
+		data = append(data, next.Data...)
+		resp = next
+		resp.Data = data
+	}
+	if err != nil {
+		return resp, err
+	}
+	return resp, err
+}
+
+func (c *NamespacedSteveClient) ByID(id string) (*SteveAPIObject, error) {
+	return c.SteveClient.ByID(id)
+}
+
+func (c *NamespacedSteveClient) Delete(container *SteveAPIObject) error {
+	return c.SteveClient.Delete(container)
 }
 
 // ConvertToK8sType is helper function that coverts the generic Spec, Status, JSONResp fields of a
