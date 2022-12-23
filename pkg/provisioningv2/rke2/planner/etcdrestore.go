@@ -12,43 +12,38 @@ import (
 
 const ETCDRestoreMessage = "etcd restore"
 
-func (p *Planner) setEtcdSnapshotRestoreState(controlPlane *rkev1.RKEControlPlane, status *rkev1.ETCDSnapshotRestore, phase rkev1.ETCDSnapshotPhase) error {
-	controlPlane = controlPlane.DeepCopy()
-	controlPlane.Status.ETCDSnapshotRestorePhase = phase
-	controlPlane.Status.ETCDSnapshotRestore = status
-	_, err := p.rkeControlPlanes.UpdateStatus(controlPlane)
-	if err != nil {
-		return err
-	}
-	return ErrWaiting("refreshing etcd restore state")
+func (p *Planner) setEtcdSnapshotRestoreState(status rkev1.RKEControlPlaneStatus, restore *rkev1.ETCDSnapshotRestore, phase rkev1.ETCDSnapshotPhase) (rkev1.RKEControlPlaneStatus, error) {
+	status.ETCDSnapshotRestorePhase = phase
+	status.ETCDSnapshotRestore = restore
+	return status, ErrWaiting("refreshing etcd restore state")
 }
 
-func (p *Planner) resetEtcdSnapshotRestoreState(controlPlane *rkev1.RKEControlPlane) error {
-	if controlPlane.Status.ETCDSnapshotRestore == nil && controlPlane.Status.ETCDSnapshotRestorePhase == "" {
-		return nil
+func (p *Planner) resetEtcdSnapshotRestoreState(status rkev1.RKEControlPlaneStatus) (rkev1.RKEControlPlaneStatus, error) {
+	if status.ETCDSnapshotRestore == nil && status.ETCDSnapshotRestorePhase == "" {
+		return status, nil
 	}
-	return p.setEtcdSnapshotRestoreState(controlPlane, nil, "")
+	return p.setEtcdSnapshotRestoreState(status, nil, "")
 }
 
-func (p *Planner) startOrRestartEtcdSnapshotRestore(controlPlane *rkev1.RKEControlPlane) error {
-	if controlPlane.Status.ETCDSnapshotRestore == nil || !equality.Semantic.DeepEqual(*controlPlane.Spec.ETCDSnapshotRestore, *controlPlane.Status.ETCDSnapshotRestore) {
-		return p.setEtcdSnapshotRestoreState(controlPlane, controlPlane.Spec.ETCDSnapshotRestore, rkev1.ETCDSnapshotPhaseStarted)
+func (p *Planner) startOrRestartEtcdSnapshotRestore(cp *rkev1.RKEControlPlane, status rkev1.RKEControlPlaneStatus) (rkev1.RKEControlPlaneStatus, error) {
+	if status.ETCDSnapshotRestore == nil || !equality.Semantic.DeepEqual(*cp.Spec.ETCDSnapshotRestore, *status.ETCDSnapshotRestore) {
+		return p.setEtcdSnapshotRestoreState(status, cp.Spec.ETCDSnapshotRestore, rkev1.ETCDSnapshotPhaseStarted)
 	}
-	return nil
+	return status, nil
 }
 
-func (p *Planner) runEtcdSnapshotRestorePlan(controlPlane *rkev1.RKEControlPlane, snapshot *rkev1.ETCDSnapshot, tokensSecret plan.Secret, clusterPlan *plan.Plan) error {
+func (p *Planner) runEtcdSnapshotRestorePlan(cp *rkev1.RKEControlPlane, snapshot *rkev1.ETCDSnapshot, tokensSecret plan.Secret, clusterPlan *plan.Plan) error {
 	var joinServer string
 	var err error
 	isS3 := snapshot.SnapshotFile.S3 != nil
 	if isS3 {
-		joinServer, err = p.electInitNode(controlPlane, clusterPlan)
+		joinServer, err = p.electInitNode(cp, clusterPlan)
 		if err != nil {
 			return err
 		}
 	} else {
-		logrus.Infof("rkecluster %s/%s: re-electing specific init node for etcd snapshot restore", controlPlane.Namespace, controlPlane.Spec.ClusterName)
-		joinServer, err = p.designateInitNodeByMachineID(controlPlane, clusterPlan, snapshot.Labels[rke2.MachineIDLabel])
+		logrus.Infof("rkecluster %s/%s: re-electing specific init node for etcd snapshot restore", cp.Namespace, cp.Spec.ClusterName)
+		joinServer, err = p.designateInitNodeByMachineID(cp, clusterPlan, snapshot.Labels[rke2.MachineIDLabel])
 		if err != nil {
 			return err
 		}
@@ -59,7 +54,7 @@ func (p *Planner) runEtcdSnapshotRestorePlan(controlPlane *rkev1.RKEControlPlane
 		if isS3 ||
 			(server.Machine.Labels[rke2.MachineIDLabel] != "" && snapshot.Labels[rke2.MachineIDLabel] != "" &&
 				server.Machine.Labels[rke2.MachineIDLabel] == snapshot.Labels[rke2.MachineIDLabel]) {
-			restorePlan, err := p.generateEtcdSnapshotRestorePlan(controlPlane, snapshot, tokensSecret, server, joinServer)
+			restorePlan, err := p.generateEtcdSnapshotRestorePlan(cp, snapshot, tokensSecret, server, joinServer)
 			if err != nil {
 				return err
 			}
@@ -71,8 +66,8 @@ func (p *Planner) runEtcdSnapshotRestorePlan(controlPlane *rkev1.RKEControlPlane
 }
 
 // generateEtcdSnapshotRestorePlan returns a node plan that contains instructions to stop etcd, remove the tombstone file (if one exists), then restore etcd in that order.
-func (p *Planner) generateEtcdSnapshotRestorePlan(controlPlane *rkev1.RKEControlPlane, snapshot *rkev1.ETCDSnapshot, tokensSecret plan.Secret, server *planEntry, joinServer string) (plan.NodePlan, error) {
-	if controlPlane.Spec.ETCDSnapshotRestore == nil {
+func (p *Planner) generateEtcdSnapshotRestorePlan(cp *rkev1.RKEControlPlane, snapshot *rkev1.ETCDSnapshot, tokensSecret plan.Secret, server *planEntry, joinServer string) (plan.NodePlan, error) {
+	if cp.Spec.ETCDSnapshotRestore == nil {
 		return plan.NodePlan{}, fmt.Errorf("ETCD Snapshot restore was not defined")
 	}
 	args := []string{
@@ -86,19 +81,19 @@ func (p *Planner) generateEtcdSnapshotRestorePlan(controlPlane *rkev1.RKEControl
 		args = append(args, fmt.Sprintf("--cluster-reset-restore-path=%s", snapshot.SnapshotFile.Name))
 	}
 
-	s3Args, s3Env, s3Files, err := p.etcdS3Args.ToArgs(snapshot.SnapshotFile.S3, controlPlane, "etcd-", true)
+	s3Args, s3Env, s3Files, err := p.etcdS3Args.ToArgs(snapshot.SnapshotFile.S3, cp, "etcd-", true)
 	if err != nil {
 		return plan.NodePlan{}, err
 	}
 
 	// This is likely redundant but can make sense in the event that there is an external watchdog.
-	stopPlan, err := p.generateStopServiceAndKillAllPlan(controlPlane, tokensSecret, server, joinServer)
+	stopPlan, err := p.generateStopServiceAndKillAllPlan(cp, tokensSecret, server, joinServer)
 	if err != nil {
 		return plan.NodePlan{}, err
 	}
 
 	// make sure to install the desired version before performing restore
-	stopPlan.Instructions = append(stopPlan.Instructions, p.generateInstallInstructionWithSkipStart(controlPlane, server))
+	stopPlan.Instructions = append(stopPlan.Instructions, p.generateInstallInstructionWithSkipStart(cp, server))
 
 	planInstructions := append(stopPlan.Instructions,
 		plan.OneTimeInstruction{
@@ -106,7 +101,7 @@ func (p *Planner) generateEtcdSnapshotRestorePlan(controlPlane *rkev1.RKEControl
 			Command: "rm",
 			Args: []string{
 				"-rf",
-				fmt.Sprintf("/var/lib/rancher/%s/server/db/etcd", rke2.GetRuntimeCommand(controlPlane.Spec.KubernetesVersion)),
+				fmt.Sprintf("/var/lib/rancher/%s/server/db/etcd", rke2.GetRuntimeCommand(cp.Spec.KubernetesVersion)),
 			}})
 
 	nodePlan := plan.NodePlan{
@@ -115,19 +110,19 @@ func (p *Planner) generateEtcdSnapshotRestorePlan(controlPlane *rkev1.RKEControl
 			Name:    "restore",
 			Env:     s3Env,
 			Args:    append(args, s3Args...),
-			Command: rke2.GetRuntimeCommand(controlPlane.Spec.KubernetesVersion),
+			Command: rke2.GetRuntimeCommand(cp.Spec.KubernetesVersion),
 		}),
 	}
 
 	return nodePlan, nil
 }
 
-func (p *Planner) generateStopServiceAndKillAllPlan(controlPlane *rkev1.RKEControlPlane, tokensSecret plan.Secret, server *planEntry, joinServer string) (plan.NodePlan, error) {
-	nodePlan, _, err := p.generatePlanWithConfigFiles(controlPlane, tokensSecret, server, joinServer)
+func (p *Planner) generateStopServiceAndKillAllPlan(cp *rkev1.RKEControlPlane, tokensSecret plan.Secret, server *planEntry, joinServer string) (plan.NodePlan, error) {
+	nodePlan, _, err := p.generatePlanWithConfigFiles(cp, tokensSecret, server, joinServer)
 	if err != nil {
 		return nodePlan, err
 	}
-	runtime := rke2.GetRuntime(controlPlane.Spec.KubernetesVersion)
+	runtime := rke2.GetRuntime(cp.Spec.KubernetesVersion)
 	nodePlan.Instructions = append(nodePlan.Instructions,
 		generateKillAllInstruction(runtime))
 	return nodePlan, nil
@@ -145,29 +140,29 @@ func generateKillAllInstruction(runtime string) plan.OneTimeInstruction {
 	}
 }
 
-func generateCreateEtcdTombstoneInstruction(controlPlane *rkev1.RKEControlPlane) plan.OneTimeInstruction {
+func generateCreateEtcdTombstoneInstruction(cp *rkev1.RKEControlPlane) plan.OneTimeInstruction {
 	return plan.OneTimeInstruction{
 		Name:    "create-etcd-tombstone",
 		Command: "touch",
 		Args: []string{
-			fmt.Sprintf("/var/lib/rancher/%s/server/db/etcd/tombstone", rke2.GetRuntimeCommand(controlPlane.Spec.KubernetesVersion)),
+			fmt.Sprintf("/var/lib/rancher/%s/server/db/etcd/tombstone", rke2.GetRuntimeCommand(cp.Spec.KubernetesVersion)),
 		},
 	}
 }
 
 // runEtcdRestoreServiceStop generates service stop plans for every non-windows node in the cluster and
 // assigns/checks the plans to ensure they were successful
-func (p *Planner) runEtcdRestoreServiceStop(controlPlane *rkev1.RKEControlPlane, snapshot *rkev1.ETCDSnapshot, tokensSecret plan.Secret, clusterPlan *plan.Plan) error {
+func (p *Planner) runEtcdRestoreServiceStop(cp *rkev1.RKEControlPlane, snapshot *rkev1.ETCDSnapshot, tokensSecret plan.Secret, clusterPlan *plan.Plan) error {
 	var joinServer string
 	var err error
 	isS3 := snapshot.SnapshotFile.S3 != nil
 	if !isS3 { // In the event that we are restoring a local snapshot, we need to reset our initNode
-		joinServer, err = p.designateInitNodeByMachineID(controlPlane, clusterPlan, snapshot.Labels[rke2.MachineIDLabel])
+		joinServer, err = p.designateInitNodeByMachineID(cp, clusterPlan, snapshot.Labels[rke2.MachineIDLabel])
 		if err != nil {
 			return fmt.Errorf("error while designating init node during control plane/etcd stop: %w", err)
 		}
 	} else {
-		joinServer, err = p.electInitNode(controlPlane, clusterPlan)
+		joinServer, err = p.electInitNode(cp, clusterPlan)
 		if err != nil {
 			return err
 		}
@@ -175,12 +170,12 @@ func (p *Planner) runEtcdRestoreServiceStop(controlPlane *rkev1.RKEControlPlane,
 	servers := collect(clusterPlan, anyRoleWithoutWindows)
 	updated := false
 	for _, server := range servers {
-		stopPlan, err := p.generateStopServiceAndKillAllPlan(controlPlane, tokensSecret, server, joinServer)
+		stopPlan, err := p.generateStopServiceAndKillAllPlan(cp, tokensSecret, server, joinServer)
 		if err != nil {
 			return err
 		}
 		if isEtcd(server) {
-			stopPlan.Instructions = append(stopPlan.Instructions, generateCreateEtcdTombstoneInstruction(controlPlane))
+			stopPlan.Instructions = append(stopPlan.Instructions, generateCreateEtcdTombstoneInstruction(cp))
 		}
 		if server.Plan == nil || !equality.Semantic.DeepEqual(server.Plan.Plan, stopPlan) {
 			if err := p.store.UpdatePlan(server, stopPlan, 0, 0); err != nil {
@@ -192,15 +187,15 @@ func (p *Planner) runEtcdRestoreServiceStop(controlPlane *rkev1.RKEControlPlane,
 
 	// If any of the controlplane/etcd node plans were updated, return an errwaiting message for shutting down control plane and etcd
 	if updated {
-		return ErrWaiting("stopping " + rke2.GetRuntime(controlPlane.Spec.KubernetesVersion) + " services on control plane and etcd machines/nodes")
+		return ErrWaiting("stopping " + rke2.GetRuntime(cp.Spec.KubernetesVersion) + " services on control plane and etcd machines/nodes")
 	}
 
 	for _, server := range servers {
 		if !server.Plan.InSync {
 			if server.Machine.Status.NodeRef == nil {
-				return ErrWaiting(fmt.Sprintf("waiting to stop %s services on machine [%s]", rke2.GetRuntime(controlPlane.Spec.KubernetesVersion), server.Machine.Name))
+				return ErrWaiting(fmt.Sprintf("waiting to stop %s services on machine [%s]", rke2.GetRuntime(cp.Spec.KubernetesVersion), server.Machine.Name))
 			}
-			return ErrWaiting(fmt.Sprintf("waiting to stop %s services on node [%s]", rke2.GetRuntime(controlPlane.Spec.KubernetesVersion), server.Machine.Status.NodeRef.Name))
+			return ErrWaiting(fmt.Sprintf("waiting to stop %s services on node [%s]", rke2.GetRuntime(cp.Spec.KubernetesVersion), server.Machine.Status.NodeRef.Name))
 		}
 	}
 
@@ -209,17 +204,17 @@ func (p *Planner) runEtcdRestoreServiceStop(controlPlane *rkev1.RKEControlPlane,
 
 // runEtcdRestoreServiceStart walks through the reconciliation process for the entire cluster.
 // Notably, this function will blatantly ignore drain and concurrency options, as during an etcd snapshot restore, there is no necessity to drain nodes.
-func (p *Planner) runEtcdRestoreServiceStart(controlPlane *rkev1.RKEControlPlane, tokensSecret plan.Secret, clusterPlan *plan.Plan) error {
-	if err := p.runEtcdSnapshotManagementServiceStart(controlPlane, tokensSecret, clusterPlan, isControlPlaneEtcd, "etcd restore"); err != nil {
+func (p *Planner) runEtcdRestoreServiceStart(cp *rkev1.RKEControlPlane, tokensSecret plan.Secret, clusterPlan *plan.Plan) error {
+	if err := p.runEtcdSnapshotManagementServiceStart(cp, tokensSecret, clusterPlan, isControlPlaneEtcd, "etcd restore"); err != nil {
 		return err
 	}
-	return p.runEtcdSnapshotWorkerServiceStart(controlPlane, tokensSecret, clusterPlan, "etcd restore")
+	return p.runEtcdSnapshotWorkerServiceStart(cp, tokensSecret, clusterPlan, "etcd restore")
 }
 
 // runEtcdSnapshotManagementServiceStart walks through the reconciliation process for the controlplane and etcd nodes.
 // Notably, this function will blatantly ignore drain and concurrency options, as during an etcd snapshot operation, there is no necessity to drain nodes.
-func (p *Planner) runEtcdSnapshotManagementServiceStart(controlPlane *rkev1.RKEControlPlane, tokensSecret plan.Secret, clusterPlan *plan.Plan, include roleFilter, operation string) error {
-	_, joinServer, initNode, err := p.findInitNode(controlPlane, clusterPlan)
+func (p *Planner) runEtcdSnapshotManagementServiceStart(cp *rkev1.RKEControlPlane, tokensSecret plan.Secret, clusterPlan *plan.Plan, include roleFilter, operation string) error {
+	_, joinServer, initNode, err := p.findInitNode(cp, clusterPlan)
 	if err != nil {
 		return err
 	}
@@ -227,7 +222,7 @@ func (p *Planner) runEtcdSnapshotManagementServiceStart(controlPlane *rkev1.RKEC
 		return fmt.Errorf("error encountered restarting cluster during %s, joinServer was empty", operation)
 	}
 
-	plan, err := p.desiredPlan(controlPlane, tokensSecret, initNode, "")
+	plan, err := p.desiredPlan(cp, tokensSecret, initNode, "")
 	if err != nil {
 		return err
 	}
@@ -240,7 +235,7 @@ func (p *Planner) runEtcdSnapshotManagementServiceStart(controlPlane *rkev1.RKEC
 		if isInitNodeOrDeleting(entry) {
 			continue
 		}
-		plan, err = p.desiredPlan(controlPlane, tokensSecret, entry, joinServer)
+		plan, err = p.desiredPlan(cp, tokensSecret, entry, joinServer)
 		if err != nil {
 			return err
 		}
@@ -253,7 +248,7 @@ func (p *Planner) runEtcdSnapshotManagementServiceStart(controlPlane *rkev1.RKEC
 
 // runEtcdSnapshotControlPlaneEtcdServiceStart walks through the reconciliation process for the worker nodes.
 // Notably, this function will blatantly ignore drain and concurrency options, as during an etcd snapshot operation, there is no necessity to drain nodes.
-func (p *Planner) runEtcdSnapshotWorkerServiceStart(controlPlane *rkev1.RKEControlPlane, tokensSecret plan.Secret, clusterPlan *plan.Plan, operation string) error {
+func (p *Planner) runEtcdSnapshotWorkerServiceStart(cp *rkev1.RKEControlPlane, tokensSecret plan.Secret, clusterPlan *plan.Plan, operation string) error {
 	joinServer := getControlPlaneJoinURL(clusterPlan)
 	if joinServer == "" {
 		return ErrWaiting("waiting for control plane to be available")
@@ -263,7 +258,7 @@ func (p *Planner) runEtcdSnapshotWorkerServiceStart(controlPlane *rkev1.RKEContr
 		if isInitNodeOrDeleting(entry) {
 			continue
 		}
-		plan, err := p.desiredPlan(controlPlane, tokensSecret, entry, joinServer)
+		plan, err := p.desiredPlan(cp, tokensSecret, entry, joinServer)
 		if err != nil {
 			return err
 		}
@@ -274,17 +269,17 @@ func (p *Planner) runEtcdSnapshotWorkerServiceStart(controlPlane *rkev1.RKEContr
 	return nil
 }
 
-func (p *Planner) retrieveEtcdSnapshot(controlPlane *rkev1.RKEControlPlane) (*rkev1.ETCDSnapshot, error) {
-	if controlPlane == nil {
+func (p *Planner) retrieveEtcdSnapshot(cp *rkev1.RKEControlPlane) (*rkev1.ETCDSnapshot, error) {
+	if cp == nil {
 		return nil, fmt.Errorf("controlplane was nil")
 	}
-	if controlPlane.Spec.ETCDSnapshotRestore == nil {
+	if cp.Spec.ETCDSnapshotRestore == nil {
 		return nil, fmt.Errorf("etcdsnapshotrestore spec was nil")
 	}
-	if controlPlane.Spec.ClusterName == "" {
-		return nil, fmt.Errorf("cluster name on rkecontrolplane %s/%s was blank", controlPlane.Namespace, controlPlane.Name)
+	if cp.Spec.ClusterName == "" {
+		return nil, fmt.Errorf("cluster name on rkecontrolplane %s/%s was blank", cp.Namespace, cp.Name)
 	}
-	return p.etcdSnapshotCache.Get(controlPlane.Namespace, controlPlane.Spec.ETCDSnapshotRestore.Name)
+	return p.etcdSnapshotCache.Get(cp.Namespace, cp.Spec.ETCDSnapshotRestore.Name)
 }
 
 // restoreEtcdSnapshot is called multiple times during an etcd snapshot restoration.
@@ -294,46 +289,45 @@ func (p *Planner) retrieveEtcdSnapshot(controlPlane *rkev1.RKEControlPlane) (*rk
 // Shutdown -> When the phase is shutdown, it attempts to shut down etcd on all nodes (stop etcd)
 // Restore ->  When the phase is restore, it attempts to restore etcd
 // Finished -> When the phase is finished, Restore returns nil.
-func (p *Planner) restoreEtcdSnapshot(controlPlane *rkev1.RKEControlPlane, tokensSecret plan.Secret, clusterPlan *plan.Plan) error {
-	if controlPlane.Spec.ETCDSnapshotRestore == nil || controlPlane.Spec.ETCDSnapshotRestore.Name == "" {
-		return p.resetEtcdSnapshotRestoreState(controlPlane)
+func (p *Planner) restoreEtcdSnapshot(cp *rkev1.RKEControlPlane, status rkev1.RKEControlPlaneStatus, tokensSecret plan.Secret, clusterPlan *plan.Plan) (rkev1.RKEControlPlaneStatus, error) {
+	if cp.Spec.ETCDSnapshotRestore == nil || cp.Spec.ETCDSnapshotRestore.Name == "" {
+		return p.resetEtcdSnapshotRestoreState(status)
 	}
 
-	if err := p.startOrRestartEtcdSnapshotRestore(controlPlane); err != nil {
-		return err
+	if status, err := p.startOrRestartEtcdSnapshotRestore(cp, status); err != nil {
+		return status, err
 	}
 
-	switch controlPlane.Status.ETCDSnapshotRestorePhase {
+	switch status.ETCDSnapshotRestorePhase {
 	case rkev1.ETCDSnapshotPhaseStarted:
-		return p.setEtcdSnapshotRestoreState(controlPlane, controlPlane.Spec.ETCDSnapshotRestore, rkev1.ETCDSnapshotPhaseShutdown)
+		return p.setEtcdSnapshotRestoreState(status, cp.Spec.ETCDSnapshotRestore, rkev1.ETCDSnapshotPhaseShutdown)
 	case rkev1.ETCDSnapshotPhaseShutdown:
-		snapshot, err := p.retrieveEtcdSnapshot(controlPlane)
+		snapshot, err := p.retrieveEtcdSnapshot(cp)
 		if err != nil {
-			return err
+			return status, err
 		}
-		if err := p.runEtcdRestoreServiceStop(controlPlane, snapshot, tokensSecret, clusterPlan); err != nil {
-			return err
+		if err := p.runEtcdRestoreServiceStop(cp, snapshot, tokensSecret, clusterPlan); err != nil {
+			return status, err
 		}
-		return p.setEtcdSnapshotRestoreState(controlPlane, controlPlane.Spec.ETCDSnapshotRestore, rkev1.ETCDSnapshotPhaseRestore)
+		return p.setEtcdSnapshotRestoreState(status, cp.Spec.ETCDSnapshotRestore, rkev1.ETCDSnapshotPhaseRestore)
 	case rkev1.ETCDSnapshotPhaseRestore:
-		snapshot, err := p.retrieveEtcdSnapshot(controlPlane)
+		snapshot, err := p.retrieveEtcdSnapshot(cp)
 		if err != nil {
-			return err
+			return status, err
 		}
-		if err := p.runEtcdSnapshotRestorePlan(controlPlane, snapshot, tokensSecret, clusterPlan); err != nil {
-			return err
+		if err := p.runEtcdSnapshotRestorePlan(cp, snapshot, tokensSecret, clusterPlan); err != nil {
+			return status, err
 		}
-		controlPlane := controlPlane.DeepCopy()
-		controlPlane.Status.ConfigGeneration++
-		return p.setEtcdSnapshotRestoreState(controlPlane, controlPlane.Spec.ETCDSnapshotRestore, rkev1.ETCDSnapshotPhaseRestartCluster)
+		status.ConfigGeneration++
+		return p.setEtcdSnapshotRestoreState(status, cp.Spec.ETCDSnapshotRestore, rkev1.ETCDSnapshotPhaseRestartCluster)
 	case rkev1.ETCDSnapshotPhaseRestartCluster:
-		if err := p.runEtcdRestoreServiceStart(controlPlane, tokensSecret, clusterPlan); err != nil {
-			return err
+		if err := p.runEtcdRestoreServiceStart(cp, tokensSecret, clusterPlan); err != nil {
+			return status, err
 		}
-		return p.setEtcdSnapshotRestoreState(controlPlane, controlPlane.Spec.ETCDSnapshotRestore, rkev1.ETCDSnapshotPhaseFinished)
+		return p.setEtcdSnapshotRestoreState(status, cp.Spec.ETCDSnapshotRestore, rkev1.ETCDSnapshotPhaseFinished)
 	case rkev1.ETCDSnapshotPhaseFinished:
-		return nil
+		return status, nil
 	default:
-		return p.setEtcdSnapshotRestoreState(controlPlane, controlPlane.Spec.ETCDSnapshotRestore, rkev1.ETCDSnapshotPhaseStarted)
+		return p.setEtcdSnapshotRestoreState(status, cp.Spec.ETCDSnapshotRestore, rkev1.ETCDSnapshotPhaseStarted)
 	}
 }

@@ -428,7 +428,7 @@ func GetCAPIClusterFromLabel(obj runtime.Object, cache capicontrollers.ClusterCa
 	return nil, fmt.Errorf("%s label not present on %s: %s/%s", capi.ClusterLabelName, obj.GetObjectKind().GroupVersionKind().Kind, data.String("metadata", "namespace"), data.String("metadata", "name"))
 }
 
-// GetOwnerCAPICluster takes an obj T and will attempt to find the capi cluster owner reference.
+// GetOwnerCAPICluster takes an obj and will attempt to find the capi cluster owner reference.
 // If the object is nil, it cannot access to object or type metas, the owner reference Kind or APIVersion do not match,
 // or the object could not be found, it returns an error.
 // If the owner reference exists and is valid, it will return the owning capi cluster object.
@@ -440,7 +440,7 @@ func GetOwnerCAPICluster(obj runtime.Object, cache capicontrollers.ClusterCache)
 	return cache.Get(namespace, ref.Name)
 }
 
-// GetOwnerCAPIMachine takes an obj T and will attempt to find the capi machine owner reference.
+// GetOwnerCAPIMachine takes an obj and will attempt to find the capi machine owner reference.
 // If the object is nil, it cannot access to object or type metas, the owner reference Kind or APIVersion do not match,
 // or the object could not be found, it returns an error.
 // If the owner reference exists and is valid, it will return the owning capi machine object.

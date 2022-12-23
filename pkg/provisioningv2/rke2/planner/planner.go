@@ -11,7 +11,6 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/moby/locker"
@@ -34,11 +33,12 @@ import (
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
-	apierror "k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
+	capiannotations "sigs.k8s.io/cluster-api/util/annotations"
 	"sigs.k8s.io/cluster-api/util/conditions"
 )
 
@@ -132,12 +132,11 @@ type Planner struct {
 	machinesCache                 capicontrollers.MachineCache
 	clusterRegistrationTokenCache mgmtcontrollers.ClusterRegistrationTokenCache
 	capiClient                    capicontrollers.ClusterClient
-	capiClusters                  capicontrollers.ClusterCache
+	capiClusterCache              capicontrollers.ClusterCache
 	managementClusters            mgmtcontrollers.ClusterCache
 	rancherClusterCache           ranchercontrollers.ClusterCache
 	locker                        locker.Locker
 	etcdS3Args                    s3Args
-	certificateRotation           *certificateRotation
 }
 
 func New(ctx context.Context, clients *wrangler.Context) *Planner {
@@ -155,7 +154,7 @@ func New(ctx context.Context, clients *wrangler.Context) *Planner {
 		secretCache:                   clients.Core.Secret().Cache(),
 		clusterRegistrationTokenCache: clients.Mgmt.ClusterRegistrationToken().Cache(),
 		capiClient:                    clients.CAPI.Cluster(),
-		capiClusters:                  clients.CAPI.Cluster().Cache(),
+		capiClusterCache:              clients.CAPI.Cluster().Cache(),
 		managementClusters:            clients.Mgmt.Cluster().Cache(),
 		rancherClusterCache:           clients.Provisioning.Cluster().Cache(),
 		rkeControlPlanes:              clients.RKE.RKEControlPlane(),
@@ -163,7 +162,6 @@ func New(ctx context.Context, clients *wrangler.Context) *Planner {
 		etcdS3Args: s3Args{
 			secretCache: clients.Core.Secret().Cache(),
 		},
-		certificateRotation: newCertificateRotation(clients, store),
 	}
 }
 
@@ -260,35 +258,45 @@ func (p *Planner) getCAPICluster(controlPlane *rkev1.RKEControlPlane) (*capi.Clu
 		return nil, fmt.Errorf("RKEControlPlane %s/%s has wrong owner kind %s/%s", controlPlane.Namespace,
 			controlPlane.Name, ref.APIVersion, ref.Kind)
 	}
-	return p.capiClusters.Get(controlPlane.Namespace, ref.Name)
+	return p.capiClusterCache.Get(controlPlane.Namespace, ref.Name)
 }
 
-func (p *Planner) Process(controlPlane *rkev1.RKEControlPlane) error {
-	logrus.Debugf("[planner] rkecluster %s/%s: attempting to lock %s for processing", controlPlane.Namespace, controlPlane.Name, string(controlPlane.UID))
-	p.locker.Lock(string(controlPlane.UID))
+type ProcessResult struct {
+	Status rkev1.RKEControlPlaneStatus
+	Err    error
+}
+
+func (p *Planner) Process(cp *rkev1.RKEControlPlane, status rkev1.RKEControlPlaneStatus) (rkev1.RKEControlPlaneStatus, error) {
+	logrus.Debugf("[planner] rkecluster %s/%s: attempting to lock %s for processing", cp.Namespace, cp.Name, string(cp.UID))
+	p.locker.Lock(string(cp.UID))
 	defer func(namespace, name, uid string) error {
 		logrus.Debugf("[planner] rkecluster %s/%s: unlocking %s", namespace, name, uid)
 		return p.locker.Unlock(uid)
-	}(controlPlane.Namespace, controlPlane.Name, string(controlPlane.UID))
+	}(cp.Namespace, cp.Name, string(cp.UID))
 
-	releaseData := rke2.GetKDMReleaseData(p.ctx, controlPlane)
+	releaseData := rke2.GetKDMReleaseData(p.ctx, cp)
 	if releaseData == nil {
-		return ErrWaitingf("rkecluster %s/%s: releaseData nil for version %s", controlPlane.Namespace, controlPlane.Name, controlPlane.Spec.KubernetesVersion)
+		return status, ErrWaitingf("[planner] %s/%s: releaseData nil for version %s", cp.Namespace, cp.Name, cp.Spec.KubernetesVersion)
 	}
 
-	cluster, err := p.getCAPICluster(controlPlane)
-	if err != nil || !cluster.DeletionTimestamp.IsZero() {
-		return err
+	capiCluster, err := rke2.GetOwnerCAPICluster(cp, p.capiClusterCache)
+	if apierrors.IsNotFound(err) {
+		logrus.Debugf("[planner] %s/%s: waiting: CAPI cluster does not exist", cp.Namespace, cp.Name)
+		return status, ErrWaitingf("[planner] %s/%s: waiting: CAPI cluster does not exist", cp.Namespace, cp.Name)
 	}
-
-	plan, err := p.store.Load(cluster, controlPlane)
 	if err != nil {
-		return err
+		logrus.Errorf("[planner] %s/%s: error getting CAPI cluster %v", cp.Namespace, cp.Name, err)
+		return status, err
 	}
 
-	controlPlane, clusterSecretTokens, err := p.generateSecrets(controlPlane)
+	plan, err := p.store.Load(capiCluster, cp)
 	if err != nil {
-		return err
+		return status, err
+	}
+
+	cp, clusterSecretTokens, err := p.generateSecrets(cp)
+	if err != nil {
+		return status, err
 	}
 
 	var (
@@ -296,7 +304,7 @@ func (p *Planner) Process(controlPlane *rkev1.RKEControlPlane) error {
 		joinServer       string
 	)
 
-	if errs := p.createEtcdSnapshot(controlPlane, clusterSecretTokens, plan); len(errs) > 0 {
+	if status, errs := p.createEtcdSnapshot(cp, status, clusterSecretTokens, plan); len(errs) > 0 {
 		var errMsg string
 		for i, err := range errs {
 			if err == nil {
@@ -308,81 +316,93 @@ func (p *Planner) Process(controlPlane *rkev1.RKEControlPlane) error {
 				errMsg = errMsg + ", " + err.Error()
 			}
 		}
-		return ErrWaiting(errMsg)
+		return status, ErrWaiting(errMsg)
 	}
 
-	if err = p.restoreEtcdSnapshot(controlPlane, clusterSecretTokens, plan); err != nil {
-		return err
+	if status, err = p.restoreEtcdSnapshot(cp, status, clusterSecretTokens, plan); err != nil {
+		return status, err
 	}
 
 	// on the first run through, electInitNode will return a `generic.ErrSkip` as it is attempting to wait for the cache to catch up.
-	joinServer, err = p.electInitNode(controlPlane, plan)
+	joinServer, err = p.electInitNode(cp, plan)
 	if err != nil {
-		return err
+		return status, err
 	}
 
-	if err = p.certificateRotation.RotateCertificates(controlPlane, plan); err != nil {
-		return err
+	if status, err = p.rotateCertificates(cp, status, plan); err != nil {
+		return status, err
 	}
 
-	if err = p.rotateEncryptionKeys(controlPlane, releaseData, plan); err != nil {
-		return err
+	if status, err = p.rotateEncryptionKeys(cp, status, releaseData, plan); err != nil {
+		return status, err
+	}
+
+	// pausing the control plane only affects machine reconciliation: etcd snapshot/restore, encryption key & cert
+	// rotation are not interruptable processes, and therefore must always be completed when requested
+	if capiannotations.IsPaused(capiCluster, cp) {
+		return status, ErrWaitingf("rkecluster %s/%s: CAPI cluster or RKEControlPlane is paused", cp.Namespace, cp.Name)
 	}
 
 	// select all etcd and then filter to just initNodes to that unavailable count is correct
-	err = p.reconcile(controlPlane, clusterSecretTokens, plan, true, bootstrapTier, isEtcd, isNotInitNodeOrIsDeleting,
+	err = p.reconcile(cp, clusterSecretTokens, plan, true, bootstrapTier, isEtcd, isNotInitNodeOrIsDeleting,
 		"1", "",
-		controlPlane.Spec.UpgradeStrategy.ControlPlaneDrainOptions)
+		cp.Spec.UpgradeStrategy.ControlPlaneDrainOptions)
 	firstIgnoreError, err = ignoreErrors(firstIgnoreError, err)
 	if err != nil {
-		return err
+		return status, err
 	}
 
 	if joinServer == "" {
-		_, joinServer, _, err = p.findInitNode(controlPlane, plan)
+		_, joinServer, _, err = p.findInitNode(cp, plan)
 		if err != nil {
-			return err
+			return status, err
 		} else if joinServer == "" && firstIgnoreError != nil {
-			return ErrWaiting(firstIgnoreError.Error() + " and join url to be available on bootstrap node")
+			return status, ErrWaiting(firstIgnoreError.Error() + " and join url to be available on bootstrap node")
 		} else if joinServer == "" {
-			return ErrWaiting("waiting for join url to be available on bootstrap node")
+			return status, ErrWaiting("waiting for join url to be available on bootstrap node")
 		}
 	}
 
-	err = p.reconcile(controlPlane, clusterSecretTokens, plan, true, etcdTier, isEtcd, isInitNodeOrDeleting,
+	err = p.reconcile(cp, clusterSecretTokens, plan, true, etcdTier, isEtcd, isInitNodeOrDeleting,
 		"1", joinServer,
-		controlPlane.Spec.UpgradeStrategy.ControlPlaneDrainOptions)
+		cp.Spec.UpgradeStrategy.ControlPlaneDrainOptions)
 	firstIgnoreError, err = ignoreErrors(firstIgnoreError, err)
 	if err != nil {
-		return err
+		return status, err
 	}
 
-	err = p.reconcile(controlPlane, clusterSecretTokens, plan, true, controlPlaneTier, isControlPlane, isInitNodeOrDeleting,
-		controlPlane.Spec.UpgradeStrategy.ControlPlaneConcurrency, joinServer,
-		controlPlane.Spec.UpgradeStrategy.ControlPlaneDrainOptions)
+	err = p.reconcile(cp, clusterSecretTokens, plan, true, controlPlaneTier, isControlPlane, isInitNodeOrDeleting,
+		cp.Spec.UpgradeStrategy.ControlPlaneConcurrency, joinServer,
+		cp.Spec.UpgradeStrategy.ControlPlaneDrainOptions)
 	firstIgnoreError, err = ignoreErrors(firstIgnoreError, err)
 	if err != nil {
-		return err
+		return status, err
 	}
 
 	joinServer = getControlPlaneJoinURL(plan)
 	if joinServer == "" {
-		return ErrWaiting("waiting for control plane to be available")
+		return status, ErrWaiting("waiting for control plane to be available")
 	}
 
-	err = p.reconcile(controlPlane, clusterSecretTokens, plan, false, workerTier, isOnlyWorker, isInitNodeOrDeleting,
-		controlPlane.Spec.UpgradeStrategy.WorkerConcurrency, joinServer,
-		controlPlane.Spec.UpgradeStrategy.WorkerDrainOptions)
+	if !status.Initialized || !status.Ready {
+		status.Initialized = true
+		status.Ready = true
+		return status, ErrWaiting("marking controlplane initialized and ready")
+	}
+
+	err = p.reconcile(cp, clusterSecretTokens, plan, false, workerTier, isOnlyWorker, isInitNodeOrDeleting,
+		cp.Spec.UpgradeStrategy.WorkerConcurrency, joinServer,
+		cp.Spec.UpgradeStrategy.WorkerDrainOptions)
 	firstIgnoreError, err = ignoreErrors(firstIgnoreError, err)
 	if err != nil {
-		return err
+		return status, err
 	}
 
 	if firstIgnoreError != nil {
-		return ErrWaiting(firstIgnoreError.Error())
+		return status, ErrWaiting(firstIgnoreError.Error())
 	}
 
-	return nil
+	return status, nil
 }
 
 // ignoreErrors accepts two errors. If the err is type errIgnore, it will return (err, nil) if firstIgnoreErr is nil or (firstIgnoreErr, nil).
@@ -1096,7 +1116,7 @@ func (p *Planner) ensureRKEStateSecret(controlPlane *rkev1.RKEControlPlane) (str
 
 	name := name.SafeConcatName(controlPlane.Name, "rke", "state")
 	secret, err := p.secretCache.Get(controlPlane.Namespace, name)
-	if apierror.IsNotFound(err) {
+	if apierrors.IsNotFound(err) {
 		serverToken, err := randomtoken.Generate()
 		if err != nil {
 			return "", plan.Secret{}, err
@@ -1157,26 +1177,23 @@ func (h *helmChartConfig) DeepCopyObject() runtime.Object {
 	panic("unsupported")
 }
 
-func (p *Planner) enqueueAndSkip(cp *rkev1.RKEControlPlane) error {
-	p.rkeControlPlanes.EnqueueAfter(cp.Namespace, cp.Name, 10*time.Second)
-	return generic.ErrSkip
-}
-
-// enqueueIfErrWaiting will enqueue the control plan if err is ErrWaiting, otherwise err is returned.
-// Some plan store functions as well as internal functions can return ErrWaiting, for instance when the plan has been
-// applied, but output is not yet available for periodic status.
-func (p *Planner) enqueueIfErrWaiting(cp *rkev1.RKEControlPlane, err error) error {
-	if err != nil {
-		if isErrWaiting(err) {
-			logrus.Tracef("Enqueuing [%s] because of ErrWaiting: %s", cp.Spec.ClusterName, err.Error())
-			return p.enqueueAndSkip(cp)
-		}
-		return err
-	}
-	return nil
-}
-
-func isErrWaiting(err error) bool {
+func IsErrWaiting(err error) bool {
 	var errWaiting ErrWaiting
 	return errors.As(err, &errWaiting)
+}
+
+func (p *Planner) pauseCAPICluster(cp *rkev1.RKEControlPlane, pause bool) error {
+	if cp == nil {
+		return fmt.Errorf("cannot toggle health checks for nil controlplane")
+	}
+	cluster, err := rke2.GetOwnerCAPICluster(cp, p.capiClusterCache)
+	if err != nil {
+		return err
+	}
+	if cluster.Spec.Paused == pause {
+		return nil
+	}
+	cluster.Spec.Paused = pause
+	_, err = p.capiClient.Update(cluster)
+	return err
 }

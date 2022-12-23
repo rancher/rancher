@@ -14,5 +14,6 @@ const (
 )
 
 type RotateEncryptionKeys struct {
-	Generation int64 `json:"generation,omitempty"`
+	Generation         int64  `json:"generation,omitempty"`
+	ControlPlaneLeader string `json:"controlPlaneLeader,omitempty"`
 }
