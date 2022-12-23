@@ -4,7 +4,7 @@ ARG DAPPER_HOST_ARCH
 ENV HOST_ARCH=${DAPPER_HOST_ARCH} ARCH=${DAPPER_HOST_ARCH}
 ENV CATTLE_HELM_VERSION v2.16.8-rancher2
 ENV CATTLE_MACHINE_VERSION v0.15.0-rancher98
-ENV CATTLE_K3S_VERSION v1.25.4+k3s1
+ENV CATTLE_K3S_VERSION v1.25.5+k3s1
 # version used by helm plugin install script
 ENV CATTLE_HELM_UNITTEST_VERSION v0.1.7-rancher4
 # helm 3 version
@@ -54,9 +54,8 @@ RUN mkdir /usr/tmp && \
     chmod +x /usr/bin/kustomize
 
 # Set up K3s: copy the necessary binaries from the K3s image.
-COPY --from=rancher/k3s:v1.25.4-k3s1 \
+COPY --from=rancher/k3s:v1.25.5-k3s1 \
     /bin/blkid \
-    /bin/charon \
     /bin/cni \
     /bin/conntrack \
     /bin/containerd \
@@ -68,7 +67,6 @@ COPY --from=rancher/k3s:v1.25.4-k3s1 \
     /bin/losetup \
     /bin/pigz \
     /bin/runc \
-    /bin/swanctl \
     /bin/which \
     /bin/aux/xtables-legacy-multi \
 /usr/bin/
