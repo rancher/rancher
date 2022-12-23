@@ -3,7 +3,6 @@ package pods
 import (
 	"fmt"
 
-	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	v1 "github.com/rancher/rancher/tests/framework/clients/rancher/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -24,7 +23,7 @@ func StatusPods(client *rancher.Client, clusterID string) ([]string, []error) {
 
 	steveClient := downstreamClient.SteveType(PodResourceSteveType)
 
-	pods, err := steveClient.List(&types.ListOpts{})
+	pods, err := steveClient.List(nil)
 	if err != nil {
 		return nil, []error{err}
 	}

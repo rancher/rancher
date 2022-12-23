@@ -31,6 +31,7 @@ func main() {
 	rancherConfig.AdminToken = token.Token
 	rancherConfig.Host = hostURL
 	rancherConfig.Cleanup = &cleanup
+	rancherConfig.ClusterName = "local"
 
 	if err := defaults.Set(rancherConfig); err != nil {
 		logrus.Fatalf("error with setting up config file: %v", err)

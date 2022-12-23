@@ -3,7 +3,6 @@ package rbac
 import (
 	"sort"
 
-	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
 	v1 "github.com/rancher/rancher/tests/framework/clients/rancher/v1"
@@ -56,7 +55,7 @@ func listProjects(client *rancher.Client, clusterID string) (projectNames []stri
 
 func getNamespaces(steveclient *v1.Client) (namespace []string, err error) {
 
-	namespaceList, err := steveclient.SteveType(namespaces.NamespaceSteveType).List(&types.ListOpts{})
+	namespaceList, err := steveclient.SteveType(namespaces.NamespaceSteveType).List(nil)
 	if err != nil {
 		return namespace, err
 	}

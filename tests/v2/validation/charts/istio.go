@@ -5,7 +5,6 @@ import (
 	"time"
 	"unicode"
 
-	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	v1 "github.com/rancher/rancher/tests/framework/clients/rancher/v1"
 	"github.com/rancher/rancher/tests/framework/extensions/charts"
@@ -85,7 +84,7 @@ func getChartCaseEndpointUntilBodyHas(client *rancher.Client, host, path, bodyPa
 // listIstioDeployments is a private helper function
 // that returns the deployment specs if deployments have "operator.istio.io/version" label
 func listIstioDeployments(steveclient *v1.Client) (deploymentSpecList []*appv1.DeploymentSpec, err error) {
-	deploymentList, err := steveclient.SteveType(workloads.DeploymentSteveType).List(&types.ListOpts{})
+	deploymentList, err := steveclient.SteveType(workloads.DeploymentSteveType).List(nil)
 	if err != nil {
 		return
 	}
