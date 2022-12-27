@@ -157,6 +157,7 @@ func (p *Store) Create(apiContext *types.APIContext, schema *types.Schema, data 
 				return result, httperror.WrapAPIError(err, httperror.PermissionDenied, "You must have the `Create Cluster Templates` global role in order to create cluster templates or revisions. These permissions can be granted by an administrator.")
 			}
 		}
+		return nil, err
 	}
 
 	if strings.EqualFold(apiContext.Type, managementv3.ClusterTemplateRevisionType) {
@@ -326,7 +327,7 @@ func (p *Store) Delete(apiContext *types.APIContext, schema *types.Schema, id st
 		return nil, httperror.NewAPIError(httperror.InvalidAction, fmt.Sprintf("Cannot delete the %v until Clusters referring it are removed", apiContext.Type))
 	}
 
-	//check if template.DefaultRevisionId is set, if yes error out if the revision is being deleted.
+	// check if template.DefaultRevisionId is set, if yes error out if the revision is being deleted.
 	if strings.EqualFold(apiContext.Type, managementv3.ClusterTemplateRevisionType) {
 		isDefault, err := isDefaultTemplateRevision(apiContext, id)
 		if err != nil {
@@ -464,7 +465,7 @@ func (p *Store) checkKubernetesVersionFormat(apiContext *types.APIContext, data 
 		return err
 	}
 	if genericPatch {
-		//ensure a question is added for "rancherKubernetesEngineConfig.kubernetesVersion"
+		// ensure a question is added for "rancherKubernetesEngineConfig.kubernetesVersion"
 		templateQuestions, ok := data[managementv3.ClusterTemplateRevisionFieldQuestions]
 		if !ok {
 			return httperror.NewAPIError(httperror.MissingRequired, fmt.Sprintf("ClusterTemplateRevision must have a Question set for %v", clustertemplate.RKEConfigK8sVersion))

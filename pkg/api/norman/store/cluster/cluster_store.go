@@ -235,7 +235,7 @@ func (r *Store) Create(apiContext *types.APIContext, schema *types.Schema, data 
 		return nil, err
 	}
 
-	//check if template is passed. if yes, load template data
+	// check if template is passed. if yes, load template data
 	if hasTemplate(data) {
 		clusterTemplateRevision, clusterTemplate, err := r.validateTemplateInput(apiContext, data, false)
 		if err != nil {
@@ -427,7 +427,7 @@ func loadDataFromTemplate(clusterTemplateRevision *v3.ClusterTemplateRevision, c
 
 	dataFromTemplate = transposeNameFields(dataFromTemplate, clusterConfigSchema)
 	var revisionQuestions []map[string]interface{}
-	//Add in any answers to the clusterTemplateRevision's Questions[]
+	// Add in any answers to the clusterTemplateRevision's Questions[]
 	allAnswers := convert.ToMapInterface(convert.ToMapInterface(data[managementv3.ClusterSpecFieldClusterTemplateAnswers])["values"])
 	existingAnswers := convert.ToMapInterface(convert.ToMapInterface(existingCluster[managementv3.ClusterSpecFieldClusterTemplateAnswers])["values"])
 
@@ -526,7 +526,7 @@ func loadDataFromTemplate(clusterTemplateRevision *v3.ClusterTemplateRevision, c
 		// save privateRegistries back to rancherKubernetesEngineConfig
 		values.PutValue(dataFromTemplate, registries, managementv3.ClusterSpecFieldRancherKubernetesEngineConfig, managementv3.RancherKubernetesEngineConfigFieldPrivateRegistries)
 	}
-	//save defaultAnswers to answer
+	// save defaultAnswers to answer
 	if allAnswers == nil {
 		allAnswers = make(map[string]interface{})
 	}
@@ -557,7 +557,7 @@ func loadDataFromTemplate(clusterTemplateRevision *v3.ClusterTemplateRevision, c
 		dataFromTemplate[managementv3.ClusterFieldFleetWorkspaceName] = fleetworkspace
 	}
 
-	//validate that the data loaded is valid clusterSpec
+	// validate that the data loaded is valid clusterSpec
 	var spec v32.ClusterSpec
 	if err := convert.ToObj(dataFromTemplate, &spec); err != nil {
 		return nil, httperror.WrapAPIError(err, httperror.InvalidBodyContent, "Invalid clusterTemplate, cannot convert to cluster spec")
@@ -618,7 +618,7 @@ func hasTemplate(data map[string]interface{}) bool {
 func (r *Store) validateTemplateInput(apiContext *types.APIContext, data map[string]interface{}, isUpdate bool) (*v3.ClusterTemplateRevision, *v3.ClusterTemplate, error) {
 
 	if !isUpdate {
-		//if data also has rkeconfig, error out on create
+		// if data also has rkeconfig, error out on create
 		rkeConfig, ok := values.GetValue(data, "rancherKubernetesEngineConfig")
 		if ok && rkeConfig != nil {
 			return nil, nil, fmt.Errorf("cannot set rancherKubernetesEngineConfig and clusterTemplateRevision both")
@@ -630,7 +630,7 @@ func (r *Store) validateTemplateInput(apiContext *types.APIContext, data map[str
 	templateRevIDStr := convert.ToString(data[managementv3.ClusterSpecFieldClusterTemplateRevisionID])
 	var clusterTemplateRev managementv3.ClusterTemplateRevision
 
-	//access check.
+	// access check.
 	if err := access.ByID(apiContext, apiContext.Version, managementv3.ClusterTemplateRevisionType, templateRevIDStr, &clusterTemplateRev); err != nil {
 		if apiError, ok := err.(*httperror.APIError); ok {
 			if apiError.Code.Status == httperror.PermissionDenied.Status {
@@ -738,7 +738,7 @@ func (r *Store) Update(apiContext *types.APIContext, schema *types.Schema, data 
 		}
 	}
 
-	//check if template is passed. if yes, load template data
+	// check if template is passed. if yes, load template data
 	if hasTemplate(data) {
 		if existingCluster[managementv3.ClusterSpecFieldClusterTemplateRevisionID] == "" {
 			return nil, httperror.NewAPIError(httperror.InvalidOption, fmt.Sprintf("this cluster is not created using a clusterTemplate, cannot update it to use a clusterTemplate now"))
@@ -765,7 +765,7 @@ func (r *Store) Update(apiContext *types.APIContext, schema *types.Schema, data 
 
 		data = clusterUpdate
 
-		//keep monitoring and alerting flags on the cluster as is, no turning off these flags from templaterevision.
+		// keep monitoring and alerting flags on the cluster as is, no turning off these flags from templaterevision.
 		if !clusterTemplateRevision.Spec.ClusterConfig.EnableClusterMonitoring {
 			data[managementv3.ClusterSpecFieldEnableClusterMonitoring] = existingCluster[managementv3.ClusterSpecFieldEnableClusterMonitoring]
 		}
@@ -888,6 +888,7 @@ func (r *Store) Update(apiContext *types.APIContext, schema *types.Schema, data 
 				logrus.Errorf("cluster store: encountered error while handling migration error: %v, original error: %v", cleanupErr, err)
 			}
 		}
+		return nil, err
 	}
 	if allSecrets.regSecret != nil || allSecrets.s3Secret != nil || allSecrets.weaveSecret != nil || allSecrets.vsphereSecret != nil || allSecrets.vcenterSecret != nil || allSecrets.openStackSecret != nil || allSecrets.aadClientSecret != nil || allSecrets.aadCertSecret != nil {
 		if r.ClusterClient == nil {
@@ -1163,7 +1164,7 @@ func canUseClusterName(apiContext *types.APIContext, requestedName string) error
 
 	for _, c := range clusters {
 		if c.Removed == "" && strings.EqualFold(c.Name, requestedName) {
-			//cluster exists by this name
+			// cluster exists by this name
 			return httperror.NewFieldAPIError(httperror.NotUnique, "Cluster name", "")
 		}
 	}
@@ -1178,13 +1179,13 @@ func setKubernetesVersion(data map[string]interface{}, create bool) error {
 		if k8sVersion == nil || k8sVersion == "" {
 			// Only set when its a new cluster
 			if create {
-				//set k8s version to system default on the spec
+				// set k8s version to system default on the spec
 				defaultVersion := settings.KubernetesVersion.Get()
 				values.PutValue(data, defaultVersion, "rancherKubernetesEngineConfig", "kubernetesVersion")
 			}
 		} else {
-			//if k8s version is already of rancher version form, noop
-			//if k8s version is of form 1.14.x, figure out the latest
+			// if k8s version is already of rancher version form, noop
+			// if k8s version is of form 1.14.x, figure out the latest
 			k8sVersionRequested := convert.ToString(k8sVersion)
 			if strings.Contains(k8sVersionRequested, "-rancher") {
 				deprecated, err := isDeprecated(k8sVersionRequested)
