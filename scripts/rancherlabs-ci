@@ -1,0 +1,6 @@
+#!/bin/bash
+set -e
+
+echo "machine github.com login rancher password $GITHUB_TOKEN" > ${HOME}/.netrc
+
+go env -w GOPRIVATE=github.com/rancherlabs/*
