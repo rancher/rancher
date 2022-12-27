@@ -3,6 +3,7 @@ set -e
 
 cd $(dirname $0)
 
+./rancherlabs-ci
 ./validate
 ./build
 ./test
