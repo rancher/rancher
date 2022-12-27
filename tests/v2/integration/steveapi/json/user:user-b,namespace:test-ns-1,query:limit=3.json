@@ -1,6 +1,7 @@
 {
   "actions": {},
   "continue": "nondeterministictoken",
+  "count": 3,
   "data": [
     {
       "actions": null,

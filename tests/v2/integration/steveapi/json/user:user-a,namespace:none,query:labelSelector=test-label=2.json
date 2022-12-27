@@ -1,5 +1,6 @@
 {
   "actions": {},
+  "count": 5,
   "createTypes": {
     "secret": "https://localhost:8443/v1/secrets"
   },
