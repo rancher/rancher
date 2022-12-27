@@ -30,6 +30,8 @@ if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
   exit 1
 fi
 
+exit
+
 # Check diff between ./go.mod and ./pkg/apis/go.mod
 badmodule="false"
 while read -r module tag; do

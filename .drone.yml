@@ -9,6 +9,9 @@ platform:
 steps:
 - name: provisioning-tests
   image: rancher/dapper:v0.5.8
+  environment:
+    GITHUB_TOKEN:
+      from_secret: github_token
   commands:
   - dapper provisioning-tests
   privileged: true
@@ -40,6 +43,9 @@ platform:
 steps:
 - name: provisioning-tests
   image: rancher/dapper:v0.5.8
+  environment:
+    GITHUB_TOKEN:
+      from_secret: github_token
   commands:
   - dapper provisioning-tests-rke
   privileged: true
@@ -71,6 +77,9 @@ platform:
 steps:
 - name: build-pr
   image: rancher/dapper:v0.5.8
+  environment:
+    GITHUB_TOKEN:
+      from_secret: github_token
   commands:
   - dapper ci
   privileged: true
@@ -80,9 +89,13 @@ steps:
   when:
     event:
     - pull_request
+    - push
 
 - name: build-push-tag
   image: rancher/dapper:v0.5.8
+  environment:
+    GITHUB_TOKEN:
+      from_secret: github_token
   commands:
   - dapper ci
   privileged: true
@@ -398,6 +411,9 @@ platform:
 steps:
 - name: build-pr
   image: rancher/dapper:v0.5.8
+  environment:
+    GITHUB_TOKEN:
+      from_secret: github_token
   commands:
   - dapper ci
   privileged: true
@@ -407,9 +423,13 @@ steps:
   when:
     event:
     - pull_request
+    - push
 
 - name: build-push-tag
   image: rancher/dapper:v0.5.8
+  environment:
+    GITHUB_TOKEN:
+      from_secret: github_token
   commands:
   - dapper ci
   privileged: true
@@ -615,6 +635,9 @@ steps:
 - name: build-pr
   image: rancher/dapper:v0.5.8
   failure: ignore
+  environment:
+    GITHUB_TOKEN:
+      from_secret: github_token
   commands:
   - dapper ci
   privileged: true
@@ -624,10 +647,14 @@ steps:
   when:
     event:
     - pull_request
+    - push
 
 - name: build-push-tag
   image: rancher/dapper:v0.5.8
   failure: ignore
+  environment:
+    GITHUB_TOKEN:
+      from_secret: github_token
   commands:
   - K3S_BUILDER=k3s_root dapper ci
   privileged: true
@@ -833,253 +860,6 @@ trigger:
     exclude:
     - promote
 ---
-kind: pipeline
-name: default-windows-1809
-
-platform:
-  os: windows
-  arch: amd64
-  version: 1809
-
-steps:
-  - name: build-pr
-    pull: always
-    image: rancher/dapper:v0.5.8
-    commands:
-      - dapper.exe -f Dockerfile-windows.dapper -d ci
-    volumes:
-      - name: docker_pipe
-        path: \\\\.\\pipe\\docker_engine
-    when:
-      event:
-        - pull_request
-
-  - name: build-push-tag
-    pull: always
-    image: rancher/dapper:v0.5.8
-    commands:
-      - dapper.exe -f Dockerfile-windows.dapper -d ci
-    volumes:
-      - name: docker_pipe
-        path: \\\\.\\pipe\\docker_engine
-    when:
-      instance:
-        - drone-publish.rancher.io
-      ref:
-        include:
-          - "refs/heads/master"
-          - "refs/heads/release/v*"
-          - "refs/tags/v*"
-      event:
-        - push
-        - tag
-
-  - name: stage-binaries
-    image: rancher/dapper:v0.5.8
-    commands:
-      - "cp -r ./bin/* ./package/windows/"
-    when:
-      instance:
-        - drone-publish.rancher.io
-      ref:
-        include:
-          - "refs/heads/master"
-          - "refs/heads/release/v*"
-          - "refs/tags/v*"
-      event:
-        - push
-        - tag
-
-  - name: docker-publish-head-agent
-    image: plugins/docker:windows-1809-amd64
-    settings:
-      purge: false
-      build_args:
-        - SERVERCORE_VERSION=1809
-        - ARCH=amd64
-        - VERSION=${DRONE_BRANCH/release\//}-${DRONE_COMMIT}-head
-      context: package/windows
-      custom_dns: 1.1.1.1
-      dockerfile: package/windows/Dockerfile.agent
-      password:
-        from_secret: docker_password
-      repo: rancher/rancher-agent
-      tag: ${DRONE_BRANCH/release\//}-${DRONE_COMMIT}-windows-1809
-      username:
-        from_secret: docker_username
-    volumes:
-      - name: docker_pipe
-        path: \\\\.\\pipe\\docker_engine
-    when:
-      ref:
-        include:
-        - "refs/heads/master"
-        - "refs/heads/release/v*"
-      event:
-        - push
-
-  - name: docker-publish-agent
-    image: plugins/docker:windows-1809-amd64
-    settings:
-      purge: false
-      build_args:
-        - SERVERCORE_VERSION=1809
-        - ARCH=amd64
-        - "VERSION=${DRONE_TAG}"
-      context: package/windows
-      custom_dns: 1.1.1.1
-      dockerfile: package/windows/Dockerfile.agent
-      password:
-        from_secret: docker_password
-      repo: rancher/rancher-agent
-      tag: "${DRONE_TAG}-windows-1809"
-      username:
-        from_secret: docker_username
-    volumes:
-      - name: docker_pipe
-        path: \\\\.\\pipe\\docker_engine
-    when:
-      event:
-        - tag
-
-volumes:
-  - name: docker_pipe
-    host:
-      path: \\\\.\\pipe\\docker_engine
-
-trigger:
-  event:
-    exclude:
-      - promote
-
----
-kind: pipeline
-name: default-windows-ltsc2022
-
-platform:
-  os: windows
-  arch: amd64
-  version: 2022
-
-# remove this and use upstream images when https://github.com/drone/drone-git/pull/25 is merged
-clone:
-  disable: true
-
-steps:
-  - name: clone
-    image: rancher/drone-images:git-amd64-ltsc2022
-    settings:
-      depth: 20
-  - name: build-pr
-    pull: always
-    image: rancher/dapper:v0.5.8
-    commands:
-      - dapper.exe -f Dockerfile-windows.dapper -d ci
-    volumes:
-      - name: docker_pipe
-        path: \\\\.\\pipe\\docker_engine
-    when:
-      event:
-        - pull_request
-
-  - name: build-push-tag
-    pull: always
-    image: rancher/dapper:v0.5.8
-    commands:
-      - dapper.exe -f Dockerfile-windows.dapper -d ci
-    volumes:
-      - name: docker_pipe
-        path: \\\\.\\pipe\\docker_engine
-    when:
-      instance:
-        - drone-publish.rancher.io
-      ref:
-        include:
-          - "refs/heads/master"
-          - "refs/heads/release/v*"
-          - "refs/tags/v*"
-      event:
-        - push
-        - tag
-
-  - name: stage-binaries
-    image: rancher/dapper:v0.5.8
-    commands:
-      - "cp -r ./bin/* ./package/windows/"
-    when:
-      instance:
-        - drone-publish.rancher.io
-      ref:
-        include:
-          - "refs/heads/master"
-          - "refs/heads/release/v*"
-          - "refs/tags/v*"
-      event:
-        - push
-        - tag
-
-  - name: docker-publish-head-agent
-    image: rancher/drone-images:docker-amd64-ltsc2022
-    settings:
-      purge: false
-      build_args:
-        - SERVERCORE_VERSION=ltsc2022
-        - ARCH=amd64
-        - VERSION=${DRONE_BRANCH/release\//}-${DRONE_COMMIT}-head
-      context: package/windows
-      custom_dns: 1.1.1.1
-      dockerfile: package/windows/Dockerfile.agent
-      password:
-        from_secret: docker_password
-      repo: rancher/rancher-agent
-      tag: ${DRONE_BRANCH/release\//}-${DRONE_COMMIT}-windows-ltsc2022
-      username:
-        from_secret: docker_username
-    volumes:
-      - name: docker_pipe
-        path: \\\\.\\pipe\\docker_engine
-    when:
-      ref:
-        include:
-          - "refs/heads/master"
-          - "refs/heads/release/v*"
-      event:
-        - push
-
-  - name: docker-publish-agent
-    image: rancher/drone-images:docker-amd64-ltsc2022
-    settings:
-      purge: false
-      build_args:
-        - SERVERCORE_VERSION=ltsc2022
-        - ARCH=amd64
-        - "VERSION=${DRONE_TAG}"
-      context: package/windows
-      custom_dns: 1.1.1.1
-      dockerfile: package/windows/Dockerfile.agent
-      password:
-        from_secret: docker_password
-      repo: rancher/rancher-agent
-      tag: "${DRONE_TAG}-windows-ltsc2022"
-      username:
-        from_secret: docker_username
-    volumes:
-      - name: docker_pipe
-        path: \\\\.\\pipe\\docker_engine
-    when:
-      event:
-        - tag
-
-volumes:
-  - name: docker_pipe
-    host:
-      path: \\\\.\\pipe\\docker_engine
-
-trigger:
-  event:
-    exclude:
-      - promote
----
 
 kind: pipeline
 name: manifest
@@ -1237,6 +1017,9 @@ steps:
 
 - name: build-chart
   image: rancher/dapper:v0.5.8
+  environment:
+    GITHUB_TOKEN:
+      from_secret: github_token
   commands:
   - dapper chart/ci
   privileged: true
@@ -1283,8 +1066,6 @@ depends_on:
 - default-linux-amd64
 - default-linux-arm64
 - default-linux-s390x
-- default-windows-1809
-- default-windows-ltsc2022
 ---
 kind: pipeline
 name: docker-image-digests-linux-amd64
@@ -1428,104 +1209,6 @@ trigger:
 depends_on:
 - default-linux-amd64
 - default-linux-s390x
----
-kind: pipeline
-name: docker-image-digests-windows-1809
-
-platform:
-  os: windows
-  arch: amd64
-  version: 1809
-
-steps:
-- name: docker-image-digests
-  image: rancher/drone-docker-image-digests:v0.0.12
-  environment:
-    PLUGIN_GITHUB_REPOSITORY: "rancher/rancher"
-    PLUGIN_GITHUB_TOKEN:
-      from_secret: github_token
-    PLUGIN_GITHUB_TAG: "${DRONE_TAG}"
-    PLUGIN_INPUT_FILE: "rancher-windows-images.txt"
-    PLUGIN_OUTPUT_FILE: "rancher-images-digests-windows-1809.txt"
-    PLUGIN_REGISTRY: "docker.io"
-  volumes:
-    - name: docker_pipe
-      path: \\\\.\\pipe\\docker_engine
-  when:
-    instance:
-      include:
-      - drone-publish.rancher.io
-    event:
-    - tag
-
-volumes:
-  - name: docker_pipe
-    host:
-      path: \\\\.\\pipe\\docker_engine
-
-trigger:
-  event:
-    exclude:
-    - promote
-    - pull_request
-
-depends_on:
-- default-linux-amd64
-- default-windows-1809
-
----
-kind: pipeline
-name: docker-image-digests-windows-ltsc2022
-
-platform:
-  os: windows
-  arch: amd64
-  version: 2022
-
-# remove this and use upstream images when https://github.com/drone/drone-git/pull/25 is merged
-clone:
-  disable: true
-
-steps:
-- name: clone
-  image: rancher/drone-images:git-amd64-ltsc2022
-  settings:
-    depth: 1
-
-- name: docker-image-digests
-  image: rancher/drone-docker-image-digests:v0.0.12
-  environment:
-    PLUGIN_GITHUB_REPOSITORY: "rancher/rancher"
-    PLUGIN_GITHUB_TOKEN:
-      from_secret: github_token
-    PLUGIN_GITHUB_TAG: "${DRONE_TAG}"
-    PLUGIN_INPUT_FILE: "rancher-windows-images.txt"
-    PLUGIN_OUTPUT_FILE: "rancher-images-digests-windows-ltsc2022.txt"
-    PLUGIN_REGISTRY: "docker.io"
-  volumes:
-    - name: docker_pipe
-      path: \\\\.\\pipe\\docker_engine
-  when:
-    instance:
-      include:
-      - drone-publish.rancher.io
-    event:
-    - tag
-
-volumes:
-  - name: docker_pipe
-    host:
-      path: \\\\.\\pipe\\docker_engine
-
-trigger:
-  event:
-    exclude:
-    - promote
-    - pull_request
-
-depends_on:
-- default-linux-amd64
-- default-windows-ltsc2022
 ---
 kind: pipeline
 name: publish

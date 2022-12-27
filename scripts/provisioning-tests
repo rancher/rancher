@@ -1,5 +1,8 @@
 #!/bin/bash
 set -e
+
+./scripts/rancherlabs-ci
+
 if ./scripts/only-ui-bumps.sh; then
     exit 0
 fi
