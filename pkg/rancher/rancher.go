@@ -40,6 +40,7 @@ import (
 	aggregation2 "github.com/rancher/steve/pkg/aggregation"
 	steveauth "github.com/rancher/steve/pkg/auth"
 	steveserver "github.com/rancher/steve/pkg/server"
+	"github.com/rancher/wrangler/pkg/generic"
 	"github.com/rancher/wrangler/pkg/k8scheck"
 	"github.com/rancher/wrangler/pkg/unstructured"
 	"github.com/sirupsen/logrus"
@@ -175,9 +176,14 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 		}
 	}
 
+	steveControllers, err := steveserver.NewController(restConfig, &generic.FactoryOptions{SharedControllerFactory: wranglerContext.SharedControllerFactory})
+	if err != nil {
+		return nil, err
+	}
+
 	steve, err := steveserver.New(ctx, restConfig, &steveserver.Options{
 		ServerVersion:   settings.ServerVersion.Get(),
-		Controllers:     wranglerContext.Controllers,
+		Controllers:     steveControllers,
 		AccessSetLookup: wranglerContext.ASL,
 		AuthMiddleware:  steveauth.ExistingContext,
 		Next:            ui.New(wranglerContext.Mgmt.Preference().Cache(), wranglerContext.Mgmt.ClusterRegistrationToken().Cache()),

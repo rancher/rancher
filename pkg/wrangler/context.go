@@ -41,22 +41,30 @@ import (
 	"github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io"
 	rkecontrollers "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/peermanager"
+	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/tunnelserver"
 	"github.com/rancher/remotedialer"
 	"github.com/rancher/steve/pkg/accesscontrol"
 	"github.com/rancher/steve/pkg/client"
-	"github.com/rancher/steve/pkg/server"
 	"github.com/rancher/wrangler/pkg/apply"
 	admissionreg "github.com/rancher/wrangler/pkg/generated/controllers/admissionregistration.k8s.io"
 	admissionregcontrollers "github.com/rancher/wrangler/pkg/generated/controllers/admissionregistration.k8s.io/v1"
+	"github.com/rancher/wrangler/pkg/generated/controllers/apiextensions.k8s.io"
+	crdv1 "github.com/rancher/wrangler/pkg/generated/controllers/apiextensions.k8s.io/v1"
+	"github.com/rancher/wrangler/pkg/generated/controllers/apiregistration.k8s.io"
+	apiregv1 "github.com/rancher/wrangler/pkg/generated/controllers/apiregistration.k8s.io/v1"
 	"github.com/rancher/wrangler/pkg/generated/controllers/apps"
 	appsv1 "github.com/rancher/wrangler/pkg/generated/controllers/apps/v1"
 	"github.com/rancher/wrangler/pkg/generated/controllers/batch"
 	batchv1 "github.com/rancher/wrangler/pkg/generated/controllers/batch/v1"
+	"github.com/rancher/wrangler/pkg/generated/controllers/core"
+	corev1 "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/pkg/generated/controllers/rbac"
+	rbacv1 "github.com/rancher/wrangler/pkg/generated/controllers/rbac/v1"
 	"github.com/rancher/wrangler/pkg/generic"
 	"github.com/rancher/wrangler/pkg/leader"
 	"github.com/rancher/wrangler/pkg/schemes"
+	"github.com/sirupsen/logrus"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -102,7 +110,7 @@ func init() {
 }
 
 type Context struct {
-	*server.Controllers
+	RESTConfig *rest.Config
 
 	Apply               apply.Apply
 	Dynamic             *dynamic.Controller
@@ -121,6 +129,11 @@ type Context struct {
 	TunnelAuthorizer    *tunnelserver.Authorizers
 	PeerManager         peermanager.PeerManager
 	Provisioning        provisioningv1.Interface
+	RBAC                rbacv1.Interface
+	Core                corev1.Interface
+	API                 apiregv1.Interface
+	CRD                 crdv1.Interface
+	K8s                 *kubernetes.Clientset
 
 	ASL                     accesscontrol.AccessSetLookup
 	ClientConfig            clientcmd.ClientConfig
@@ -128,12 +141,27 @@ type Context struct {
 	RESTMapper              meta.RESTMapper
 	SharedControllerFactory controller.SharedControllerFactory
 	leadership              *leader.Manager
-	controllerLock          sync.Mutex
+	controllerLock          *sync.Mutex
 
 	RESTClientGetter      genericclioptions.RESTClientGetter
 	CatalogContentManager *content.Manager
 	HelmOperations        *helmop.Operations
 	SystemChartsManager   *system.Manager
+
+	mgmt         *management.Factory
+	rbac         *rbac.Factory
+	project      *project.Factory
+	ctlg         *catalog.Factory
+	adminReg     *admissionreg.Factory
+	apps         *apps.Factory
+	capi         *capi.Factory
+	rke          *rke.Factory
+	fleet        *fleet.Factory
+	provisioning *provisioning.Factory
+	batch        *batch.Factory
+	core         *core.Factory
+	api          *apiregistration.Factory
+	crd          *apiextensions.Factory
 
 	started bool
 }
@@ -187,6 +215,49 @@ func (w *Context) Start(ctx context.Context) error {
 	return nil
 }
 
+// WithAgent returns a shallow copy of the Context that has been configured to use a user agent in its
+// clients that is the given userAgent appended to "rancher-%s-%s".
+func (w *Context) WithAgent(userAgent string) *Context {
+	userAgent = fmt.Sprintf("rancher-%s-%s", settings.ServerVersion.Get(), userAgent)
+	wContextCopy := *w
+	var restConfigCopy *rest.Config
+	if w.RESTConfig != nil {
+		*restConfigCopy = *w.RESTConfig
+		restConfigCopy.UserAgent = userAgent
+	}
+	k8sClientWithAgent, err := kubernetes.NewForConfig(restConfigCopy)
+	if err != nil {
+		logrus.Debugf("failed to set agent [%s] on k8s client: %v", userAgent, err)
+	}
+	if err == nil {
+		wContextCopy.K8s = k8sClientWithAgent
+	}
+	applyWithAgent, err := apply.NewForConfig(restConfigCopy)
+	if err != nil {
+		logrus.Debugf("failed to set agent [%s] on apply client: %v", userAgent, err)
+	}
+	if err == nil {
+		wContextCopy.Apply = applyWithAgent
+	}
+	wContextCopy.Dynamic = dynamic.New(wContextCopy.K8s.Discovery())
+	wContextCopy.CAPI = wContextCopy.capi.WithAgent(userAgent).V1beta1()
+	wContextCopy.RKE = wContextCopy.rke.WithAgent(userAgent).V1()
+	wContextCopy.Mgmt = wContextCopy.mgmt.WithAgent(userAgent).V3()
+	wContextCopy.Apps = wContextCopy.apps.WithAgent(userAgent).V1()
+	wContextCopy.Admission = wContextCopy.adminReg.WithAgent(userAgent).V1()
+	wContextCopy.Batch = wContextCopy.batch.WithAgent(userAgent).V1()
+	wContextCopy.Fleet = wContextCopy.fleet.WithAgent(userAgent).V1alpha1()
+	wContextCopy.Project = wContextCopy.project.WithAgent(userAgent).V3()
+	wContextCopy.Catalog = wContextCopy.ctlg.WithAgent(userAgent).V1()
+	wContextCopy.Provisioning = wContextCopy.provisioning.WithAgent(userAgent).V1()
+	wContextCopy.RBAC = wContextCopy.rbac.WithAgent(userAgent).V1()
+	wContextCopy.Core = wContextCopy.core.WithAgent(userAgent).V1()
+	wContextCopy.API = wContextCopy.api.WithAgent(userAgent).V1()
+	wContextCopy.CRD = wContextCopy.crd.WithAgent(userAgent).V1()
+
+	return &wContextCopy
+}
+
 func enableProtobuf(cfg *rest.Config) *rest.Config {
 	cpy := rest.CopyConfig(cfg)
 	cpy.AcceptContentTypes = "application/vnd.kubernetes.protobuf, application/json"
@@ -204,14 +275,6 @@ func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restCo
 	opts := &generic.FactoryOptions{
 		SharedControllerFactory: controllerFactory,
 	}
-
-	steveControllers, err := server.NewController(restConfig, opts)
-	if err != nil {
-		return nil, err
-	}
-
-	cache := memory.NewMemCacheClient(steveControllers.K8s.Discovery())
-	restMapper := restmapper.NewDeferredDiscoveryRESTMapper(cache)
 
 	apply, err := apply.NewForConfig(restConfig)
 	if err != nil {
@@ -278,7 +341,27 @@ func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restCo
 		return nil, err
 	}
 
-	asl := accesscontrol.NewAccessStore(ctx, true, steveControllers.RBAC)
+	core, err := core.NewFactoryFromConfigWithOptions(restConfig, opts)
+	if err != nil {
+		return nil, err
+	}
+
+	api, err := apiregistration.NewFactoryFromConfigWithOptions(restConfig, opts)
+	if err != nil {
+		return nil, err
+	}
+
+	crd, err := apiextensions.NewFactoryFromConfigWithOptions(restConfig, opts)
+	if err != nil {
+		return nil, err
+	}
+
+	k8s, err := kubernetes.NewForConfig(restConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	asl := accesscontrol.NewAccessStore(ctx, true, rbac.Rbac().V1())
 
 	cg, err := client.NewFactory(restConfig, false)
 	if err != nil {
@@ -286,17 +369,19 @@ func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restCo
 	}
 
 	content := content.NewManager(
-		steveControllers.K8s.Discovery(),
-		steveControllers.Core.ConfigMap().Cache(),
-		steveControllers.Core.Secret().Cache(),
+		k8s.Discovery(),
+		core.Core().V1().ConfigMap().Cache(),
+		core.Core().V1().Secret().Cache(),
 		helm.Catalog().V1().ClusterRepo().Cache())
 
 	helmop := helmop.NewOperations(cg,
 		helm.Catalog().V1(),
 		rbac.Rbac().V1(),
 		content,
-		steveControllers.Core.Pod())
+		core.Core().V1().Pod())
 
+	cache := memory.NewMemCacheClient(k8s.Discovery())
+	restMapper := restmapper.NewDeferredDiscoveryRESTMapper(cache)
 	restClientGetter := &SimpleRESTClientGetter{
 		ClientConfig:    clientConfig,
 		RESTConfig:      restConfig,
@@ -304,7 +389,7 @@ func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restCo
 		RESTMapper:      restMapper,
 	}
 
-	systemCharts, err := system.NewManager(ctx, restClientGetter, content, helmop, steveControllers.Core.Pod(),
+	systemCharts, err := system.NewManager(ctx, restClientGetter, content, helmop, core.Core().V1().Pod(),
 		mgmt.Management().V3().Setting(), ctlg.Catalog().V1().ClusterRepo())
 	if err != nil {
 		return nil, err
@@ -312,24 +397,23 @@ func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restCo
 
 	tunnelAuth := &tunnelserver.Authorizers{}
 	tunnelServer := remotedialer.New(tunnelAuth.Authorize, tunnelserver.ErrorWriter)
-	peerManager, err := tunnelserver.NewPeerManager(ctx, steveControllers.Core.Endpoints(), tunnelServer)
+	peerManager, err := tunnelserver.NewPeerManager(ctx, core.Core().V1().Endpoints(), tunnelServer)
 	if err != nil {
 		return nil, err
 	}
 
-	leadership := leader.NewManager("", "cattle-controllers", steveControllers.K8s)
+	leadership := leader.NewManager("", "cattle-controllers", k8s)
 	leadership.OnLeader(func(ctx context.Context) error {
 		if peerManager != nil {
 			peerManager.Leader()
 		}
 		return nil
 	})
-
-	return &Context{
-		Controllers:             steveControllers,
+	wContext := &Context{
+		RESTConfig:              restConfig,
 		Apply:                   apply,
 		SharedControllerFactory: controllerFactory,
-		Dynamic:                 dynamic.New(steveControllers.K8s.Discovery()),
+		Dynamic:                 dynamic.New(k8s.Discovery()),
 		CAPI:                    capi.Cluster().V1beta1(),
 		RKE:                     rke.Rke().V1(),
 		Mgmt:                    mgmt.Management().V3(),
@@ -340,6 +424,11 @@ func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restCo
 		Provisioning:            provisioning.Provisioning().V1(),
 		Catalog:                 helm.Catalog().V1(),
 		Batch:                   batch.Batch().V1(),
+		RBAC:                    rbac.Rbac().V1(),
+		Core:                    core.Core().V1(),
+		API:                     api.Apiregistration().V1(),
+		CRD:                     crd.Apiextensions().V1(),
+		K8s:                     k8s,
 		ControllerFactory:       controllerFactory,
 		ASL:                     asl,
 		ClientConfig:            clientConfig,
@@ -347,6 +436,7 @@ func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restCo
 		CachedDiscovery:         cache,
 		RESTMapper:              restMapper,
 		leadership:              leadership,
+		controllerLock:          &sync.Mutex{},
 		PeerManager:             peerManager,
 		RESTClientGetter:        restClientGetter,
 		CatalogContentManager:   content,
@@ -354,7 +444,21 @@ func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restCo
 		SystemChartsManager:     systemCharts,
 		TunnelAuthorizer:        tunnelAuth,
 		TunnelServer:            tunnelServer,
-	}, nil
+
+		mgmt:         mgmt,
+		apps:         apps,
+		adminReg:     adminReg,
+		project:      project,
+		fleet:        fleet,
+		provisioning: provisioning,
+		ctlg:         helm,
+		batch:        batch,
+		core:         core,
+		api:          api,
+		crd:          crd,
+	}
+
+	return wContext, nil
 }
 
 type noopMCM struct {
