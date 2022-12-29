@@ -234,12 +234,14 @@ type UserContext struct {
 // clients that is the given userAgent appended to "rancher-%s-%s".
 func (c *ManagementContext) WithAgent(userAgent string) *ManagementContext {
 	mgmtCopy := *c
+	fullUserAgent := fmt.Sprintf("rancher-%s-%s", settings.ServerVersion.Get(), userAgent)
+	mgmtCopy.Management = managementv3.NewFromControllerFactoryWithAgent(fullUserAgent, c.ControllerFactory)
+	mgmtCopy.Project = projectv3.NewFromControllerFactoryWithAgent(fullUserAgent, c.ControllerFactory)
+	mgmtCopy.RBAC = rbacv1.NewFromControllerFactoryWithAgent(fullUserAgent, c.ControllerFactory)
+	mgmtCopy.Core = corev1.NewFromControllerFactoryWithAgent(fullUserAgent, c.ControllerFactory)
+	mgmtCopy.Apps = appsv1.NewFromControllerFactoryWithAgent(fullUserAgent, c.ControllerFactory)
 
-	mgmtCopy.Management = managementv3.NewFromControllerFactoryWithAgent(fmt.Sprintf("rancher-%s-%s", settings.ServerVersion.Get(), userAgent), c.ControllerFactory)
-	mgmtCopy.Project = projectv3.NewFromControllerFactoryWithAgent(fmt.Sprintf("rancher-%s-%s", settings.ServerVersion.Get(), userAgent), c.ControllerFactory)
-	mgmtCopy.RBAC = rbacv1.NewFromControllerFactoryWithAgent(fmt.Sprintf("rancher-%s-%s", settings.ServerVersion.Get(), userAgent), c.ControllerFactory)
-	mgmtCopy.Core = corev1.NewFromControllerFactoryWithAgent(fmt.Sprintf("rancher-%s-%s", settings.ServerVersion.Get(), userAgent), c.ControllerFactory)
-	mgmtCopy.Apps = appsv1.NewFromControllerFactoryWithAgent(fmt.Sprintf("rancher-%s-%s", settings.ServerVersion.Get(), userAgent), c.ControllerFactory)
+	mgmtCopy.Wrangler = mgmtCopy.Wrangler.WithAgent(userAgent)
 
 	return &mgmtCopy
 }
