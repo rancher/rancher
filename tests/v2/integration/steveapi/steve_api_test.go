@@ -1,8 +1,14 @@
 package integration
 
 import (
+	"bufio"
+	"encoding/csv"
+	"encoding/json"
 	"fmt"
 	"net/url"
+	"os"
+	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -34,6 +40,7 @@ const (
 
 var (
 	userEnabled                = true
+	continueReg                = regexp.MustCompile(`(continue=)[\w]+(%3D){0,2}`)
 	namespaceSecretManagerRole = rbacv1.Role{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "namespace-secret-manager",
@@ -817,6 +824,10 @@ func (s *SteveAPITestSuite) TestList() {
 		},
 	}
 
+	csvWriter, fp, jsonDir, err := setUpResults()
+	defer fp.Close()
+	require.NoError(s.T(), err)
+
 	for _, test := range tests {
 		s.Run(test.description, func() {
 			client, err := s.userClients[test.user].Steve.ProxyDownstream(s.project.ClusterID)
@@ -850,8 +861,106 @@ func (s *SteveAPITestSuite) TestList() {
 				assert.Equal(s.T(), w["name"], secretList.Data[i].Name)
 				assert.Equal(s.T(), namespaceMap[w["namespace"]], secretList.Data[i].Namespace)
 			}
+
+			// Write human-readable request and response examples
+			curlURL, err := getCurlURL(client, test.namespace, test.query)
+			require.NoError(s.T(), err)
+			jsonResp, err := formatJSON(secretList)
+			require.NoError(s.T(), err)
+			jsonFilePath := filepath.Join(jsonDir, test.description+".json")
+			err = writeResp(csvWriter, test.user, curlURL, jsonFilePath, jsonResp)
+			require.NoError(s.T(), err)
 		})
 	}
+	csvWriter.Flush()
+	require.NoError(s.T(), csvWriter.Error())
+}
+
+func getCurlURL(client *clientv1.Client, namespace, query string) (string, error) {
+	curlURL, err := client.APIBaseClient.Ops.GetCollectionURL(stevesecrets.SecretSteveType, "GET")
+	if err != nil {
+		return "", err
+	}
+	if namespace != "" {
+		curlURL += "/" + namespace
+	}
+	if query != "" {
+		curlURL += "?" + query
+	}
+	return curlURL, nil
+}
+
+func formatJSON(obj *clientv1.SteveCollection) ([]byte, error) {
+	jsonResp, err := json.Marshal(obj)
+	if err != nil {
+		return nil, err
+	}
+	var mapResp map[string]interface{}
+	err = json.Unmarshal(jsonResp, &mapResp)
+	if err != nil {
+		return nil, err
+	}
+	mapResp["revision"] = "100"
+	if _, ok := mapResp["continue"]; ok {
+		mapResp["continue"] = continueToken
+	}
+	if pagination, ok := mapResp["pagination"].(map[string]interface{}); ok {
+		if next, ok := pagination["next"].(string); ok {
+			next = continueReg.ReplaceAllString(next, "${1}"+continueToken)
+			pagination["next"] = next
+			mapResp["pagination"] = pagination
+		}
+	}
+	data, ok := mapResp["data"].([]interface{})
+	if ok {
+		for i := range data {
+			delete(data[i].(map[string]interface{}), "JSONResp")
+			delete(data[i].(map[string]interface{})["metadata"].(map[string]interface{}), "creationTimestamp")
+			delete(data[i].(map[string]interface{})["metadata"].(map[string]interface{}), "managedFields")
+			delete(data[i].(map[string]interface{})["metadata"].(map[string]interface{}), "uid")
+			data[i].(map[string]interface{})["metadata"].(map[string]interface{})["resourceVersion"] = "1000"
+		}
+		mapResp["data"] = data
+	}
+	jsonBytes, err := json.MarshalIndent(mapResp, "", "  ")
+	if err != nil {
+		return nil, err
+	}
+	jsonString := string(jsonBytes)
+	for k, v := range namespaceMap {
+		jsonString = strings.ReplaceAll(jsonString, v, k)
+	}
+	return []byte(jsonString), nil
+}
+
+func setUpResults() (*csv.Writer, *os.File, string, error) {
+	outputFile := "output.csv"
+	fields := []string{"user", "url", "response"}
+	csvFile, err := os.OpenFile(outputFile, os.O_RDWR|os.O_CREATE, 0644)
+	if err != nil {
+		return nil, nil, "", err
+	}
+	csvWriter := csv.NewWriter(bufio.NewWriter(csvFile))
+	csvWriter.Write(fields)
+	if csvWriter.Error() != nil {
+		return nil, csvFile, "", err
+	}
+	jsonDir := "json"
+	err = os.MkdirAll(jsonDir, 0755)
+	if err != nil {
+		return nil, csvFile, "", err
+	}
+	return csvWriter, csvFile, jsonDir, nil
+}
+
+func writeResp(csvWriter *csv.Writer, user, url, path string, resp []byte) error {
+	jsonFile, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0644)
+	if err != nil {
+		return err
+	}
+	jsonFile.Write(resp)
+	csvWriter.Write([]string{user, url, fmt.Sprintf("[%s](%s)", path, path)})
+	return nil
 }
 
 func (s *SteveAPITestSuite) TestCRUD() {

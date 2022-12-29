@@ -1,0 +1,9 @@
+{
+  "actions": {},
+  "links": {
+    "self": "https://localhost:8443/v1/secrets"
+  },
+  "resourceType": "secret",
+  "revision": "100",
+  "type": "collection"
+}
