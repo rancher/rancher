@@ -95,18 +95,19 @@ func (c *CustomClusterProvisioningTestSuite) ProvisioningRKE2CustomCluster(exter
 	tests := []struct {
 		name         string
 		nodeRoles    []string
+		hardening *provisioning.Config
 		nodeCountWin int
 		hasWindows   bool
 		client       *rancher.Client
 	}{
-		{"1 Node all roles Admin User", nodeRoles0, 0, false, c.client},
-		{"1 Node all roles Standard User", nodeRoles0, 0, false, c.standardUserClient},
-		{"3 nodes - 1 role per node Admin User", nodeRoles1, 0, false, c.client},
-		{"3 nodes - 1 role per node Standard User", nodeRoles1, 0, false, c.standardUserClient},
-		{"1 Node all roles Admin User + 1 Windows Worker", nodeRoles0, 1, true, c.client},
-		{"1 Node all roles Standard User + 1 Windows Worker", nodeRoles0, 1, true, c.standardUserClient},
-		{"3 nodes - 1 role per node Admin User + 2 Windows Workers", nodeRoles1, 2, true, c.client},
-		{"3 nodes - 1 role per node Standard User + 2 Windows Workers", nodeRoles1, 2, true, c.standardUserClient},
+		{"1 Node all roles Admin User", nodeRoles0, c.provisioning, 0, false, c.client},
+		{"1 Node all roles Standard User", nodeRoles0, c.provisioning, 0, false, c.standardUserClient},
+		{"3 nodes - 1 role per node Admin User", nodeRoles1, c.provisioning, 0, false, c.client},
+		{"3 nodes - 1 role per node Standard User", nodeRoles1, c.provisioning, 0, false, c.standardUserClient},
+		{"1 Node all roles Admin User + 1 Windows Worker", nodeRoles0, c.provisioning, 1, true, c.client},
+		{"1 Node all roles Standard User + 1 Windows Worker", nodeRoles0, c.provisioning, 1, true, c.standardUserClient},
+		{"3 nodes - 1 role per node Admin User + 2 Windows Workers", nodeRoles1, c.provisioning, 2, true, c.client},
+		{"3 nodes - 1 role per node Standard User + 2 Windows Workers", nodeRoles1, c.provisioning, 2, true, c.standardUserClient},
 	}
 	var name string
 	for _, tt := range tests {
