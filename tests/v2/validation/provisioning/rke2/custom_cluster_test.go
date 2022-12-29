@@ -188,6 +188,24 @@ func (c *CustomClusterProvisioningTestSuite) ProvisioningRKE2CustomCluster(exter
 						assert.NoError(c.T(), err)
 						assert.Equal(c.T(), clusterName, clusterResp.ObjectMeta.Name)
 					}
+
+					clusterToken, err := clusters.CheckServiceAccountTokenSecret(client, clusterName)
+					require.NoError(c.T(), err)
+					assert.NotEmpty(c.T(), clusterToken)
+
+					if tt.hardening.Hardened {
+						err = hardening.HardeningNodes(client, tt.hardening.Hardened, linuxNodes, tt.nodeRoles)
+						require.NoError(c.T(), err)
+
+						hardenCluster := clusters.HardenK3SRKE2ClusterConfig(clusterName, namespace, "", "", kubeVersion, nil)
+
+						hardenClusterResp, err := clusters.UpdateK3SRKE2Cluster(client, clusterResp, hardenCluster)
+						require.NoError(c.T(), err)
+						assert.Equal(c.T(), clusterName, hardenClusterResp.ObjectMeta.Name)
+						
+						err = hardening.PostHardeningConfig(client, tt.hardening.Hardened, linuxNodes, tt.nodeRoles)
+						require.NoError(c.T(), err)
+					}
 				})
 			}
 		}
