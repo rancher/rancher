@@ -41,7 +41,7 @@ func (r *RKE1NodeDriverProvisioningTestSuite) SetupSuite() {
 	clustersConfig := new(provisioning.Config)
 	config.LoadConfig(provisioning.ConfigurationFileKey, clustersConfig)
 
-	r.kubernetesVersions = clustersConfig.KubernetesVersions
+	r.kubernetesVersions = clustersConfig.RKE1KubernetesVersions
 	r.cnis = clustersConfig.CNIs
 	r.providers = clustersConfig.Providers
 

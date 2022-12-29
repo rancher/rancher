@@ -2,16 +2,30 @@ package podsecuritypolicy
 
 import (
 	"context"
+	"errors"
 	"strings"
 
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
+	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
 func Register(ctx context.Context, userContext *config.UserContext) {
 	starter := userContext.DeferredStart(ctx, func(ctx context.Context) error {
+		clusterName := userContext.ClusterName
+		logrus.Infof("Checking cluster [%s] compatibility before registering podsecuritypolicy controllers.", clusterName)
+		clusterLister := userContext.Management.Management.Clusters("").Controller().Lister()
+		err := checkClusterVersion(clusterName, clusterLister)
+		if err != nil {
+			if errors.Is(err, errVersionIncompatible) {
+				logrus.Errorf("%v - will not register podsecuritypolicy controllers for cluster [%s].", err, clusterName)
+				return nil
+			}
+			return err
+		}
+		logrus.Infof("cluster [%s] compatibility for podsecuritypolicy controllers check succeeded.", clusterName)
 		registerDeferred(ctx, userContext)
 		return nil
 	})

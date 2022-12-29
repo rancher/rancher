@@ -33,7 +33,7 @@ provisioningInput is needed to the run the RKE2 tests, specifically kubernetesVe
         "quantity": 1,
       }
     ],
-    "kubernetesVersion": ["v1.21.6+rke2r1"],
+    "rke2KubernetesVersion": ["v1.21.6+rke2r1"],
     "cni": ["calico"],
     "providers": ["linode", "aws", "do", "harvester"],
     "nodeProviders": ["ec2"]

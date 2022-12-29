@@ -16,6 +16,7 @@ import (
 	"github.com/rancher/rancher/tests/framework/extensions/clusters"
 	"github.com/rancher/rancher/tests/framework/extensions/namespaces"
 	"github.com/rancher/rancher/tests/framework/pkg/session"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 )
@@ -114,29 +115,45 @@ func (i *IstioTestSuite) TestIstioChart() {
 	client, err := i.client.WithSession(subSession)
 	require.NoError(i.T(), err)
 
-	i.T().Log("Installing monitoring chart with the latest version")
-	err = charts.InstallRancherMonitoringChart(client, i.chartInstallOptions.monitoring, i.chartFeatureOptions.monitoring)
+	i.T().Log("Checking if the monitoring chart is installed")
+	monitoringChart, err := charts.GetChartStatus(client, i.project.ClusterID, charts.RancherMonitoringNamespace, charts.RancherMonitoringName)
 	require.NoError(i.T(), err)
 
-	i.T().Log("Waiting monitoring chart deployments to have expected number of available replicas")
-	err = charts.WatchAndWaitDeployments(client, i.project.ClusterID, charts.RancherMonitoringNamespace, metav1.ListOptions{})
+	if !monitoringChart.IsAlreadyInstalled {
+		i.T().Log("Installing monitoring chart")
+		err = charts.InstallRancherMonitoringChart(client, i.chartInstallOptions.monitoring, i.chartFeatureOptions.monitoring)
+		require.NoError(i.T(), err)
+
+		i.T().Log("Waiting monitoring chart deployments to have expected number of available replicas")
+		err = charts.WatchAndWaitDeployments(client, i.project.ClusterID, charts.RancherMonitoringNamespace, metav1.ListOptions{})
+		require.NoError(i.T(), err)
+
+		i.T().Log("Waiting monitoring chart DaemonSets to have expected number of available nodes")
+		err = charts.WatchAndWaitDaemonSets(client, i.project.ClusterID, charts.RancherMonitoringNamespace, metav1.ListOptions{})
+		require.NoError(i.T(), err)
+
+		i.T().Log("Waiting monitoring chart StatefulSets to have expected number of ready replicas")
+		err = charts.WatchAndWaitStatefulSets(client, i.project.ClusterID, charts.RancherMonitoringNamespace, metav1.ListOptions{})
+		require.NoError(i.T(), err)
+	}
+
+	i.T().Log("Checking if the istio chart is installed")
+	istioChart, err := charts.GetChartStatus(client, i.project.ClusterID, charts.RancherIstioNamespace, charts.RancherIstioName)
 	require.NoError(i.T(), err)
 
-	i.T().Log("Waiting monitoring chart DaemonSets to have expected number of available nodes")
-	err = charts.WatchAndWaitDaemonSets(client, i.project.ClusterID, charts.RancherMonitoringNamespace, metav1.ListOptions{})
-	require.NoError(i.T(), err)
+	if !istioChart.IsAlreadyInstalled {
+		i.T().Log("Installing istio chart with the latest version")
+		err = charts.InstallRancherIstioChart(client, i.chartInstallOptions.istio, i.chartFeatureOptions.istio)
+		require.NoError(i.T(), err)
 
-	i.T().Log("Installing istio chart with the latest version")
-	err = charts.InstallRancherIstioChart(client, i.chartInstallOptions.istio, i.chartFeatureOptions.istio)
-	require.NoError(i.T(), err)
+		i.T().Log("Waiting istio chart deployments to have expected number of available replicas")
+		err = charts.WatchAndWaitDeployments(client, i.project.ClusterID, charts.RancherIstioNamespace, metav1.ListOptions{})
+		require.NoError(i.T(), err)
 
-	i.T().Log("Waiting istio chart deployments to have expected number of available replicas")
-	err = charts.WatchAndWaitDeployments(client, i.project.ClusterID, charts.RancherIstioNamespace, metav1.ListOptions{})
-	require.NoError(i.T(), err)
-
-	i.T().Log("Waiting istio chart DaemonSets to have expected number of available nodes")
-	err = charts.WatchAndWaitDaemonSets(client, i.project.ClusterID, charts.RancherIstioNamespace, metav1.ListOptions{})
-	require.NoError(i.T(), err)
+		i.T().Log("Waiting istio chart DaemonSets to have expected number of available nodes")
+		err = charts.WatchAndWaitDaemonSets(client, i.project.ClusterID, charts.RancherIstioNamespace, metav1.ListOptions{})
+		require.NoError(i.T(), err)
+	}
 
 	i.T().Log("Creating namespace with istio injection enabled option for the example app")
 	createdNamespace, err := namespaces.CreateNamespace(client, exampleAppNamespaceName, "{}", map[string]string{"istio-injection": "enabled"}, map[string]string{}, i.project)
@@ -144,7 +161,7 @@ func (i *IstioTestSuite) TestIstioChart() {
 	require.Equal(i.T(), exampleAppNamespaceName, createdNamespace.Name)
 
 	i.T().Log("Importing example app objects to the namespace")
-	readYamlFile, err := os.ReadFile("./demobookapp.yaml")
+	readYamlFile, err := os.ReadFile("./resources/istio-demobookapp.yaml")
 	require.NoError(i.T(), err)
 	yamlInput := &management.ImportClusterYamlInput{
 		DefaultNamespace: exampleAppNamespaceName,
@@ -162,11 +179,11 @@ func (i *IstioTestSuite) TestIstioChart() {
 	i.T().Log("Validating kiali and jaeger endpoints are accessible")
 	kialiResult, err := charts.GetChartCaseEndpoint(client, client.RancherConfig.Host, kialiPath, true)
 	require.NoError(i.T(), err)
-	require.True(i.T(), kialiResult.Ok)
+	assert.True(i.T(), kialiResult.Ok)
 
 	tracingResult, err := charts.GetChartCaseEndpoint(client, client.RancherConfig.Host, tracingPath, true)
 	require.NoError(i.T(), err)
-	require.True(i.T(), tracingResult.Ok)
+	assert.True(i.T(), tracingResult.Ok)
 
 	// Get a random worker node' public external IP of a specific cluster
 	nodeCollection, err := client.Management.Node.List(&types.ListOpts{Filters: map[string]interface{}{
@@ -183,20 +200,20 @@ func (i *IstioTestSuite) TestIstioChart() {
 	i.T().Log("Validating example app is accessible")
 	exampleAppResult, err := charts.GetChartCaseEndpoint(client, istioGatewayHost, exampleAppProductPagePath, false)
 	require.NoError(i.T(), err)
-	require.True(i.T(), exampleAppResult.Ok)
+	assert.True(i.T(), exampleAppResult.Ok)
 
 	i.T().Log("Validating example app has three different reviews bodies")
 	doesContainFirstPart, err := getChartCaseEndpointUntilBodyHas(client, istioGatewayHost, exampleAppProductPagePath, firstReviewBodyPart)
 	require.NoError(i.T(), err)
-	require.True(i.T(), doesContainFirstPart)
+	assert.True(i.T(), doesContainFirstPart)
 
 	doesContainSecondPart, err := getChartCaseEndpointUntilBodyHas(client, istioGatewayHost, exampleAppProductPagePath, secondReviewBodyPart)
 	require.NoError(i.T(), err)
-	require.True(i.T(), doesContainSecondPart)
+	assert.True(i.T(), doesContainSecondPart)
 
 	doesContainThirdPart, err := getChartCaseEndpointUntilBodyHas(client, istioGatewayHost, exampleAppProductPagePath, thirdReviewBodyPart)
 	require.NoError(i.T(), err)
-	require.True(i.T(), doesContainThirdPart)
+	assert.True(i.T(), doesContainThirdPart)
 }
 
 func (i *IstioTestSuite) TestUpgradeIstioChart() {
@@ -224,6 +241,10 @@ func (i *IstioTestSuite) TestUpgradeIstioChart() {
 
 		i.T().Log("Waiting monitoring chart DaemonSets to have expected number of available nodes")
 		err = charts.WatchAndWaitDaemonSets(client, i.project.ClusterID, charts.RancherMonitoringNamespace, metav1.ListOptions{})
+		require.NoError(i.T(), err)
+
+		i.T().Log("Waiting monitoring chart StatefulSets to have expected number of ready replicas")
+		err = charts.WatchAndWaitStatefulSets(client, i.project.ClusterID, charts.RancherMonitoringNamespace, metav1.ListOptions{})
 		require.NoError(i.T(), err)
 	}
 
@@ -296,7 +317,7 @@ func (i *IstioTestSuite) TestUpgradeIstioChart() {
 
 	// Compare rancheristio versions
 	chartVersionPostUpgrade := istioChartPostUpgrade.ChartDetails.Spec.Chart.Metadata.Version
-	require.Equal(i.T(), i.chartInstallOptions.istio.Version, chartVersionPostUpgrade)
+	assert.Equal(i.T(), i.chartInstallOptions.istio.Version, chartVersionPostUpgrade)
 
 	// List deployments that have the istio app version as label
 	istioVersionPostUpgrade := istioChartPostUpgrade.ChartDetails.Spec.Chart.Metadata.AppVersion

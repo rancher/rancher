@@ -21,20 +21,16 @@ import (
 )
 
 type MetadataController struct {
-	NamespacesLister          v1.NamespaceLister
-	SystemImagesLister        v3.RkeK8sSystemImageLister
-	SystemImages              v3.RkeK8sSystemImageInterface
-	ServiceOptionsLister      v3.RkeK8sServiceOptionLister
-	ServiceOptions            v3.RkeK8sServiceOptionInterface
-	AddonsLister              v3.RkeAddonLister
-	Addons                    v3.RkeAddonInterface
-	SettingLister             v3.SettingLister
-	Settings                  v3.SettingInterface
-	CisConfigLister           v3.CisConfigLister
-	CisConfig                 v3.CisConfigInterface
-	CisBenchmarkVersionLister v3.CisBenchmarkVersionLister
-	CisBenchmarkVersion       v3.CisBenchmarkVersionInterface
-	url                       *MetadataURL
+	NamespacesLister     v1.NamespaceLister
+	SystemImagesLister   v3.RkeK8sSystemImageLister
+	SystemImages         v3.RkeK8sSystemImageInterface
+	ServiceOptionsLister v3.RkeK8sServiceOptionLister
+	ServiceOptions       v3.RkeK8sServiceOptionInterface
+	AddonsLister         v3.RkeAddonLister
+	Addons               v3.RkeAddonInterface
+	SettingLister        v3.SettingLister
+	Settings             v3.SettingInterface
+	url                  *MetadataURL
 }
 
 type MetadataURL struct {
@@ -77,11 +73,6 @@ func Register(ctx context.Context, management *config.ManagementContext) {
 		SettingLister:        mgmt.Settings("").Controller().Lister(),
 		Settings:             mgmt.Settings(""),
 	}
-
-	m.CisConfigLister = mgmt.CisConfigs("").Controller().Lister()
-	m.CisConfig = mgmt.CisConfigs("")
-	m.CisBenchmarkVersionLister = mgmt.CisBenchmarkVersions("").Controller().Lister()
-	m.CisBenchmarkVersion = mgmt.CisBenchmarkVersions("")
 
 	mgmt.Settings("").AddHandler(ctx, "rke-metadata-handler", m.sync)
 	mgmt.Settings("").Controller().Enqueue("", rkeMetadataConfig)

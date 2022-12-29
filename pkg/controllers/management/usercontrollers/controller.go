@@ -303,6 +303,10 @@ func (c *ClusterLifecycleCleanup) createCleanupJob(userContext *config.UserConte
 								},
 							},
 							ImagePullPolicy: coreV1.PullAlways,
+							SecurityContext: &coreV1.SecurityContext{
+								RunAsUser:  &[]int64{1000}[0],
+								RunAsGroup: &[]int64{1000}[0],
+							},
 						},
 					},
 					RestartPolicy: "OnFailure",

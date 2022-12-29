@@ -37,7 +37,7 @@ func Setup(ctx context.Context, mgmt *config.ScaledContext, clusterManager *clus
 	schemas := mgmt.Schemas
 
 	addProxyStore(ctx, schemas, mgmt, client.ConfigMapType, "v1", nil)
-	addProxyStore(ctx, schemas, mgmt, client.CronJobType, "batch/v1beta1", workload.NewCustomizeStore)
+	addProxyStore(ctx, schemas, mgmt, client.CronJobType, "batch/v1", workload.NewCustomizeStore)
 	addProxyStore(ctx, schemas, mgmt, client.DaemonSetType, "apps/v1", workload.NewCustomizeStore)
 	addProxyStore(ctx, schemas, mgmt, client.DeploymentType, "apps/v1", workload.NewCustomizeStore)
 	addProxyStore(ctx, schemas, mgmt, client.IngressType, "networking.k8s.io/v1", ingress.Wrap(clusterManager, mgmt))

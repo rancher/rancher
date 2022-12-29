@@ -2,10 +2,9 @@ package podsecuritypolicy
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
-
-	"k8s.io/apimachinery/pkg/runtime"
 
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	v1beta12 "github.com/rancher/rancher/pkg/generated/norman/policy/v1beta1"
@@ -15,6 +14,7 @@ import (
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	rbac "k8s.io/api/rbac/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -41,7 +41,9 @@ func RegisterTemplate(ctx context.Context, context *config.UserContext) {
 	handler := &psptHandler{
 		policies:                   context.Policy.PodSecurityPolicies(""),
 		podSecurityPolicyTemplates: context.Management.Management.PodSecurityPolicyTemplates(""),
+		clusterLister:              context.Management.Management.Clusters("").Controller().Lister(),
 		clusterRoles:               context.RBAC.ClusterRoles(""),
+		clusterName:                context.ClusterName,
 
 		policyIndexer:      policyInformer.GetIndexer(),
 		clusterRoleIndexer: clusterRoleInformer.GetIndexer(),
@@ -57,11 +59,21 @@ type psptHandler struct {
 
 	policyIndexer      cache.Indexer
 	clusterRoleIndexer cache.Indexer
+	clusterLister      v3.ClusterLister
+	clusterName        string
 }
 
 func (p *psptHandler) sync(key string, obj *v3.PodSecurityPolicyTemplate) (runtime.Object, error) {
 	if obj == nil {
 		return nil, nil
+	}
+
+	err := checkClusterVersion(p.clusterName, p.clusterLister)
+	if err != nil {
+		if errors.Is(err, errVersionIncompatible) {
+			return obj, nil
+		}
+		return obj, fmt.Errorf(clusterVersionCheckErrorString, err)
 	}
 
 	if _, ok := obj.Annotations[podSecurityPolicyTemplateUpgrade]; !ok {

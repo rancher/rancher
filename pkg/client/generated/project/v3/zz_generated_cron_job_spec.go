@@ -18,12 +18,14 @@ const (
 	CronJobSpecFieldHostIPC                       = "hostIPC"
 	CronJobSpecFieldHostNetwork                   = "hostNetwork"
 	CronJobSpecFieldHostPID                       = "hostPID"
+	CronJobSpecFieldHostUsers                     = "hostUsers"
 	CronJobSpecFieldHostname                      = "hostname"
 	CronJobSpecFieldImagePullSecrets              = "imagePullSecrets"
 	CronJobSpecFieldNodeID                        = "nodeId"
 	CronJobSpecFieldOS                            = "os"
 	CronJobSpecFieldObjectMeta                    = "metadata"
 	CronJobSpecFieldOverhead                      = "overhead"
+	CronJobSpecFieldPodFailurePolicy              = "podFailurePolicy"
 	CronJobSpecFieldPreemptionPolicy              = "preemptionPolicy"
 	CronJobSpecFieldReadinessGates                = "readinessGates"
 	CronJobSpecFieldRestartPolicy                 = "restartPolicy"
@@ -64,12 +66,14 @@ type CronJobSpec struct {
 	HostIPC                       bool                           `json:"hostIPC,omitempty" yaml:"hostIPC,omitempty"`
 	HostNetwork                   bool                           `json:"hostNetwork,omitempty" yaml:"hostNetwork,omitempty"`
 	HostPID                       bool                           `json:"hostPID,omitempty" yaml:"hostPID,omitempty"`
+	HostUsers                     *bool                          `json:"hostUsers,omitempty" yaml:"hostUsers,omitempty"`
 	Hostname                      string                         `json:"hostname,omitempty" yaml:"hostname,omitempty"`
 	ImagePullSecrets              []LocalObjectReference         `json:"imagePullSecrets,omitempty" yaml:"imagePullSecrets,omitempty"`
 	NodeID                        string                         `json:"nodeId,omitempty" yaml:"nodeId,omitempty"`
 	OS                            *PodOS                         `json:"os,omitempty" yaml:"os,omitempty"`
 	ObjectMeta                    *ObjectMeta                    `json:"metadata,omitempty" yaml:"metadata,omitempty"`
 	Overhead                      map[string]string              `json:"overhead,omitempty" yaml:"overhead,omitempty"`
+	PodFailurePolicy              *PodFailurePolicy              `json:"podFailurePolicy,omitempty" yaml:"podFailurePolicy,omitempty"`
 	PreemptionPolicy              string                         `json:"preemptionPolicy,omitempty" yaml:"preemptionPolicy,omitempty"`
 	ReadinessGates                []PodReadinessGate             `json:"readinessGates,omitempty" yaml:"readinessGates,omitempty"`
 	RestartPolicy                 string                         `json:"restartPolicy,omitempty" yaml:"restartPolicy,omitempty"`

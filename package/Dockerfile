@@ -1,6 +1,6 @@
-FROM registry.suse.com/bci/bci-base:15.3
+FROM registry.suse.com/bci/bci-base:15.4
 
-RUN zypper -n install git-core curl ca-certificates unzip xz gzip sed tar shadow gawk vim netcat-openbsd mkisofs && \
+RUN zypper -n install --no-recommends git-core curl ca-certificates unzip xz gzip sed tar shadow gawk vim-small netcat-openbsd mkisofs && \
     zypper -n clean -a && rm -rf /tmp/* /var/tmp/* /usr/share/doc/packages/* && \
     useradd rancher && \
     mkdir -p /var/lib/rancher /var/lib/cattle /opt/jail /opt/drivers/management-state/bin && \
@@ -27,8 +27,8 @@ ENV CATTLE_CHART_DEFAULT_BRANCH=$CHART_DEFAULT_BRANCH
 ENV CATTLE_PARTNER_CHART_DEFAULT_BRANCH=$PARTNER_CHART_DEFAULT_BRANCH
 ENV CATTLE_RKE2_CHART_DEFAULT_BRANCH=$RKE2_CHART_DEFAULT_BRANCH
 ENV CATTLE_HELM_VERSION v2.16.8-rancher2
-ENV CATTLE_MACHINE_VERSION v0.15.0-rancher95
-ENV CATTLE_K3S_VERSION v1.24.4+k3s1
+ENV CATTLE_MACHINE_VERSION v0.15.0-rancher98
+ENV CATTLE_K3S_VERSION v1.25.5+k3s1
 ENV CATTLE_MACHINE_PROVISION_IMAGE rancher/machine:${CATTLE_MACHINE_VERSION}
 ENV CATTLE_ETCD_VERSION v3.5.1
 ENV LOGLEVEL_VERSION v0.1.5
@@ -39,8 +39,8 @@ ENV LINODE_UI_DRIVER_VERSION v0.4.0
 # make sure the version number is consistent with the one at Line 100 of pkg/data/management/machinedriver_data.go
 ENV DOCKER_MACHINE_HARVESTER_VERSION v0.5.0
 ENV CATTLE_KDM_BRANCH ${CATTLE_KDM_BRANCH}
-ENV HELM_VERSION v3.9.0
-ENV KUSTOMIZE_VERSION v4.5.5
+ENV HELM_VERSION v3.10.3
+ENV KUSTOMIZE_VERSION v4.5.7
 ENV CATTLE_WINS_AGENT_VERSION v0.4.11
 ENV CATTLE_WINS_AGENT_INSTALL_SCRIPT https://raw.githubusercontent.com/rancher/wins/${CATTLE_WINS_AGENT_VERSION}/install.ps1
 ENV CATTLE_WINS_AGENT_UNINSTALL_SCRIPT https://raw.githubusercontent.com/rancher/wins/${CATTLE_WINS_AGENT_VERSION}/uninstall.ps1
@@ -53,9 +53,9 @@ ENV CATTLE_SYSTEM_AGENT_UPGRADE_IMAGE rancher/system-agent:${CATTLE_SYSTEM_AGENT
 ENV CATTLE_SYSTEM_UPGRADE_CONTROLLER_CHART_VERSION 101.0.0+up0.3.3
 
 # System charts minimal version
-ENV CATTLE_FLEET_MIN_VERSION=101.0.0+up0.5.0-rc4
-ENV CATTLE_RANCHER_WEBHOOK_MIN_VERSION=2.0.0+up0.3.0-rc5
-ENV CATTLE_CSP_ADAPTER_MIN_VERSION=2.0.0
+ENV CATTLE_FLEET_MIN_VERSION=101.1.0+up0.6.0-rc.1
+ENV CATTLE_RANCHER_WEBHOOK_MIN_VERSION=2.0.2+up0.3.2-rc5
+ENV CATTLE_CSP_ADAPTER_MIN_VERSION=2.0.1-rc1
 
 RUN mkdir -p /var/lib/rancher-data/local-catalogs/system-library && \
     mkdir -p /var/lib/rancher-data/local-catalogs/library && \
@@ -114,9 +114,8 @@ RUN curl ${HELM_URL_V3} | tar xvzf - --strip-components=1 -C /usr/bin && \
     chmod +x /usr/bin/kustomize
 
 # Set up K3s: copy the necessary binaries from the K3s image.
-COPY --from=rancher/k3s:v1.24.4-k3s1 \
+COPY --from=rancher/k3s:v1.25.5-k3s1 \
     /bin/blkid \
-    /bin/charon \
     /bin/cni \
     /bin/conntrack \
     /bin/containerd \
@@ -128,7 +127,6 @@ COPY --from=rancher/k3s:v1.24.4-k3s1 \
     /bin/losetup \
     /bin/pigz \
     /bin/runc \
-    /bin/swanctl \
     /bin/which \
     /bin/aux/xtables-legacy-multi \
 /usr/bin/

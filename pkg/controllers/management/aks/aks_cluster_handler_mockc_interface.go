@@ -71,6 +71,14 @@ func (m MockClusterClient) Patch(name string, pt types.PatchType, data []byte, s
 
 type MockNamespaceableResourceInterfaceDefault struct{}
 
+func (m MockNamespaceableResourceInterfaceDefault) Apply(ctx context.Context, name string, obj *unstructured.Unstructured, options meta1.ApplyOptions, subresources ...string) (*unstructured.Unstructured, error) {
+	panic("implement me")
+}
+
+func (m MockNamespaceableResourceInterfaceDefault) ApplyStatus(ctx context.Context, name string, obj *unstructured.Unstructured, options meta1.ApplyOptions) (*unstructured.Unstructured, error) {
+	panic("implement me")
+}
+
 func (m MockNamespaceableResourceInterfaceDefault) Namespace(s string) dynamic.ResourceInterface {
 	return MockResourceInterfaceDefault{}
 }
@@ -113,6 +121,14 @@ func (m MockNamespaceableResourceInterfaceDefault) Patch(ctx context.Context, na
 
 type MockResourceInterfaceDefault struct{}
 
+func (m MockResourceInterfaceDefault) Apply(ctx context.Context, name string, obj *unstructured.Unstructured, options meta1.ApplyOptions, subresources ...string) (*unstructured.Unstructured, error) {
+	panic("implement me")
+}
+
+func (m MockResourceInterfaceDefault) ApplyStatus(ctx context.Context, name string, obj *unstructured.Unstructured, options meta1.ApplyOptions) (*unstructured.Unstructured, error) {
+	panic("implement me")
+}
+
 func (m MockResourceInterfaceDefault) Create(ctx context.Context, obj *unstructured.Unstructured, options meta1.CreateOptions, subresources ...string) (*unstructured.Unstructured, error) {
 	panic("implement me")
 }
@@ -152,6 +168,14 @@ func (m MockResourceInterfaceDefault) Patch(ctx context.Context, name string, pt
 // Test 2 - cluster in creating state
 
 type MockNamespaceableResourceInterfaceCreate struct{}
+
+func (m MockNamespaceableResourceInterfaceCreate) Apply(ctx context.Context, name string, obj *unstructured.Unstructured, options meta1.ApplyOptions, subresources ...string) (*unstructured.Unstructured, error) {
+	panic("implement me")
+}
+
+func (m MockNamespaceableResourceInterfaceCreate) ApplyStatus(ctx context.Context, name string, obj *unstructured.Unstructured, options meta1.ApplyOptions) (*unstructured.Unstructured, error) {
+	panic("implement me")
+}
 
 func (m MockNamespaceableResourceInterfaceCreate) Namespace(s string) dynamic.ResourceInterface {
 	return MockResourceInterfaceCreate{}
@@ -195,6 +219,14 @@ func (m MockNamespaceableResourceInterfaceCreate) Patch(ctx context.Context, nam
 
 type MockResourceInterfaceCreate struct{}
 
+func (m MockResourceInterfaceCreate) Apply(ctx context.Context, name string, obj *unstructured.Unstructured, options meta1.ApplyOptions, subresources ...string) (*unstructured.Unstructured, error) {
+	panic("implement me")
+}
+
+func (m MockResourceInterfaceCreate) ApplyStatus(ctx context.Context, name string, obj *unstructured.Unstructured, options meta1.ApplyOptions) (*unstructured.Unstructured, error) {
+	panic("implement me")
+}
+
 func (m MockResourceInterfaceCreate) Create(ctx context.Context, obj *unstructured.Unstructured, options meta1.CreateOptions, subresources ...string) (*unstructured.Unstructured, error) {
 	panic("implement me")
 }
@@ -234,6 +266,14 @@ func (m MockResourceInterfaceCreate) Patch(ctx context.Context, name string, pt 
 // Test 3 - cluster in active state
 
 type MockNamespaceableResourceInterfaceActive struct{}
+
+func (m MockNamespaceableResourceInterfaceActive) Apply(ctx context.Context, name string, obj *unstructured.Unstructured, options meta1.ApplyOptions, subresources ...string) (*unstructured.Unstructured, error) {
+	panic("implement me")
+}
+
+func (m MockNamespaceableResourceInterfaceActive) ApplyStatus(ctx context.Context, name string, obj *unstructured.Unstructured, options meta1.ApplyOptions) (*unstructured.Unstructured, error) {
+	panic("implement me")
+}
 
 func (m MockNamespaceableResourceInterfaceActive) Namespace(s string) dynamic.ResourceInterface {
 	return MockResourceInterfaceActive{}
@@ -277,6 +317,14 @@ func (m MockNamespaceableResourceInterfaceActive) Patch(ctx context.Context, nam
 
 type MockResourceInterfaceActive struct{}
 
+func (m MockResourceInterfaceActive) Apply(ctx context.Context, name string, obj *unstructured.Unstructured, options meta1.ApplyOptions, subresources ...string) (*unstructured.Unstructured, error) {
+	panic("implement me")
+}
+
+func (m MockResourceInterfaceActive) ApplyStatus(ctx context.Context, name string, obj *unstructured.Unstructured, options meta1.ApplyOptions) (*unstructured.Unstructured, error) {
+	panic("implement me")
+}
+
 func (m MockResourceInterfaceActive) Create(ctx context.Context, obj *unstructured.Unstructured, options meta1.CreateOptions, subresources ...string) (*unstructured.Unstructured, error) {
 	panic("implement me")
 }
@@ -316,6 +364,14 @@ func (m MockResourceInterfaceActive) Patch(ctx context.Context, name string, pt 
 // Test 4 - cluster in update node pool state
 
 type MockNamespaceableResourceInterfaceUpdate struct{}
+
+func (m MockNamespaceableResourceInterfaceUpdate) Apply(ctx context.Context, name string, obj *unstructured.Unstructured, options meta1.ApplyOptions, subresources ...string) (*unstructured.Unstructured, error) {
+	panic("implement me")
+}
+
+func (m MockNamespaceableResourceInterfaceUpdate) ApplyStatus(ctx context.Context, name string, obj *unstructured.Unstructured, options meta1.ApplyOptions) (*unstructured.Unstructured, error) {
+	panic("implement me")
+}
 
 func (m MockNamespaceableResourceInterfaceUpdate) Namespace(s string) dynamic.ResourceInterface {
 	return MockResourceInterfaceUpdate{}
@@ -359,6 +415,14 @@ func (m MockNamespaceableResourceInterfaceUpdate) Patch(ctx context.Context, nam
 
 type MockResourceInterfaceUpdate struct{}
 
+func (m MockResourceInterfaceUpdate) Apply(ctx context.Context, name string, obj *unstructured.Unstructured, options meta1.ApplyOptions, subresources ...string) (*unstructured.Unstructured, error) {
+	panic("implement me")
+}
+
+func (m MockResourceInterfaceUpdate) ApplyStatus(ctx context.Context, name string, obj *unstructured.Unstructured, options meta1.ApplyOptions) (*unstructured.Unstructured, error) {
+	panic("implement me")
+}
+
 func (m MockResourceInterfaceUpdate) Create(ctx context.Context, obj *unstructured.Unstructured, options meta1.CreateOptions, subresources ...string) (*unstructured.Unstructured, error) {
 	panic("implement me")
 }
@@ -398,6 +462,14 @@ func (m MockResourceInterfaceUpdate) Patch(ctx context.Context, name string, pt 
 // Test UpdateAKSClusterConfig
 
 type MockNamespaceableResourceInterfaceAKSCC struct{}
+
+func (m MockNamespaceableResourceInterfaceAKSCC) Apply(ctx context.Context, name string, obj *unstructured.Unstructured, options meta1.ApplyOptions, subresources ...string) (*unstructured.Unstructured, error) {
+	panic("implement me")
+}
+
+func (m MockNamespaceableResourceInterfaceAKSCC) ApplyStatus(ctx context.Context, name string, obj *unstructured.Unstructured, options meta1.ApplyOptions) (*unstructured.Unstructured, error) {
+	panic("implement me")
+}
 
 func (m MockNamespaceableResourceInterfaceAKSCC) Namespace(s string) dynamic.ResourceInterface {
 	return MockResourceInterfaceAKSCC{}
@@ -440,6 +512,15 @@ func (m MockNamespaceableResourceInterfaceAKSCC) Patch(ctx context.Context, name
 }
 
 type MockResourceInterfaceAKSCC struct{}
+
+func (m MockResourceInterfaceAKSCC) Apply(ctx context.Context, name string, obj *unstructured.Unstructured, options meta1.ApplyOptions, subresources ...string) (*unstructured.Unstructured, error) {
+	panic("implement me")
+}
+
+func (m MockResourceInterfaceAKSCC) ApplyStatus(ctx context.Context, name string, obj *unstructured.Unstructured, options meta1.ApplyOptions) (*unstructured.Unstructured, error) {
+	// TODO implement m
+	panic("implement me")
+}
 
 func (m MockResourceInterfaceAKSCC) Create(ctx context.Context, obj *unstructured.Unstructured, options meta1.CreateOptions, subresources ...string) (*unstructured.Unstructured, error) {
 	panic("implement me")

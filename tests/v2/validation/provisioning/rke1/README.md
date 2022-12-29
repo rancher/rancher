@@ -32,7 +32,7 @@ provisioningInput is needed to the run the RKE1 tests, specifically kubernetesVe
         "quantity": 2,
       }
     ],
-    "kubernetesVersion": ["v1.24.2-rancher1-1"],
+    "rke1KubernetesVersion": ["v1.24.2-rancher1-1"],
     "providers": ["linode", "aws", "azure", "harvester"],
     "nodeProviders": ["ec2"]
   }
@@ -54,7 +54,7 @@ RKE1 specifically needs a node template config to run properly. These are the in
     "iamInstanceProfile": "EngineeringUsersUS",
     "insecureTransport": false,
     "instanceType": "t2.2xlarge",
-    "keypairName": "jenkins-rke-validation",
+    "keypairName": "your-key-name",
     "kmsKey": "",
     "monitoring": false,
     "privateAddressOnly": false,

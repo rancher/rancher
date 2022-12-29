@@ -876,6 +876,23 @@ func NewOpenLdapProvider(namespace, name string, obj OpenLdapProvider) *OpenLdap
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
+// PodSecurityAdmissionConfigurationTemplateList is a list of PodSecurityAdmissionConfigurationTemplate resources
+type PodSecurityAdmissionConfigurationTemplateList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata"`
+
+	Items []PodSecurityAdmissionConfigurationTemplate `json:"items"`
+}
+
+func NewPodSecurityAdmissionConfigurationTemplate(namespace, name string, obj PodSecurityAdmissionConfigurationTemplate) *PodSecurityAdmissionConfigurationTemplate {
+	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("PodSecurityAdmissionConfigurationTemplate").ToAPIVersionAndKind()
+	obj.Name = name
+	obj.Namespace = namespace
+	return &obj
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 // PodSecurityPolicyTemplateList is a list of PodSecurityPolicyTemplate resources
 type PodSecurityPolicyTemplateList struct {
 	metav1.TypeMeta `json:",inline"`

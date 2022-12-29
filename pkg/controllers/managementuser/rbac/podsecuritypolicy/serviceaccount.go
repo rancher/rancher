@@ -2,6 +2,7 @@ package podsecuritypolicy
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	v13 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
@@ -12,7 +13,7 @@ import (
 	"github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
 	rbac "k8s.io/api/rbac/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -50,7 +51,6 @@ func RegisterServiceAccount(ctx context.Context, context *config.UserContext) {
 
 	m := &serviceAccountManager{
 		clusterName:        context.ClusterName,
-		clusters:           context.Management.Management.Clusters(""),
 		pspts:              context.Management.Management.PodSecurityPolicyTemplates(""),
 		roleBindings:       context.RBAC.RoleBindings(""),
 		roleBindingIndexer: roleBindingInformer.GetIndexer(),
@@ -97,7 +97,6 @@ func roleBindingByServiceAccount(obj interface{}) ([]string, error) {
 type serviceAccountManager struct {
 	clusterName        string
 	clusterLister      v3.ClusterLister
-	clusters           v3.ClusterInterface
 	pspts              v3.PodSecurityPolicyTemplateInterface
 	psptLister         v3.PodSecurityPolicyTemplateLister
 	psptpbIndexer      cache.Indexer
@@ -117,6 +116,14 @@ func (m *serviceAccountManager) sync(key string, obj *v1.ServiceAccount) (runtim
 	if obj == nil {
 		// do nothing
 		return nil, nil
+	}
+
+	err := checkClusterVersion(m.clusterName, m.clusterLister)
+	if err != nil {
+		if errors.Is(err, errVersionIncompatible) {
+			return obj, nil
+		}
+		return obj, fmt.Errorf(clusterVersionCheckErrorString, err)
 	}
 
 	namespace, err := m.namespaceLister.Get("", obj.Namespace)
@@ -230,7 +237,7 @@ func (m *serviceAccountManager) sync(key string, obj *v1.ServiceAccount) (runtim
 		if cluster.Spec.DefaultPodSecurityPolicyTemplateName != "" {
 			_, err := m.roleBindingLister.Get(obj.Namespace, roleBindingName)
 			if err != nil {
-				if errors.IsNotFound(err) {
+				if k8serrors.IsNotFound(err) {
 					_, err = m.roleBindings.Create(&rbac.RoleBinding{
 						ObjectMeta: metav1.ObjectMeta{
 							Name:      roleBindingName,

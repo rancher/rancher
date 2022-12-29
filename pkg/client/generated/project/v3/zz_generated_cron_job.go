@@ -26,6 +26,7 @@ const (
 	CronJobFieldHostIPC                       = "hostIPC"
 	CronJobFieldHostNetwork                   = "hostNetwork"
 	CronJobFieldHostPID                       = "hostPID"
+	CronJobFieldHostUsers                     = "hostUsers"
 	CronJobFieldHostname                      = "hostname"
 	CronJobFieldImagePullSecrets              = "imagePullSecrets"
 	CronJobFieldLabels                        = "labels"
@@ -35,6 +36,7 @@ const (
 	CronJobFieldOS                            = "os"
 	CronJobFieldOverhead                      = "overhead"
 	CronJobFieldOwnerReferences               = "ownerReferences"
+	CronJobFieldPodFailurePolicy              = "podFailurePolicy"
 	CronJobFieldPreemptionPolicy              = "preemptionPolicy"
 	CronJobFieldProjectID                     = "projectId"
 	CronJobFieldPublicEndpoints               = "publicEndpoints"
@@ -90,6 +92,7 @@ type CronJob struct {
 	HostIPC                       bool                           `json:"hostIPC,omitempty" yaml:"hostIPC,omitempty"`
 	HostNetwork                   bool                           `json:"hostNetwork,omitempty" yaml:"hostNetwork,omitempty"`
 	HostPID                       bool                           `json:"hostPID,omitempty" yaml:"hostPID,omitempty"`
+	HostUsers                     *bool                          `json:"hostUsers,omitempty" yaml:"hostUsers,omitempty"`
 	Hostname                      string                         `json:"hostname,omitempty" yaml:"hostname,omitempty"`
 	ImagePullSecrets              []LocalObjectReference         `json:"imagePullSecrets,omitempty" yaml:"imagePullSecrets,omitempty"`
 	Labels                        map[string]string              `json:"labels,omitempty" yaml:"labels,omitempty"`
@@ -99,6 +102,7 @@ type CronJob struct {
 	OS                            *PodOS                         `json:"os,omitempty" yaml:"os,omitempty"`
 	Overhead                      map[string]string              `json:"overhead,omitempty" yaml:"overhead,omitempty"`
 	OwnerReferences               []OwnerReference               `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
+	PodFailurePolicy              *PodFailurePolicy              `json:"podFailurePolicy,omitempty" yaml:"podFailurePolicy,omitempty"`
 	PreemptionPolicy              string                         `json:"preemptionPolicy,omitempty" yaml:"preemptionPolicy,omitempty"`
 	ProjectID                     string                         `json:"projectId,omitempty" yaml:"projectId,omitempty"`
 	PublicEndpoints               []PublicEndpoint               `json:"publicEndpoints,omitempty" yaml:"publicEndpoints,omitempty"`

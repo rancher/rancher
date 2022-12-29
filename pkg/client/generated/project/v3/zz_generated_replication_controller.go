@@ -23,6 +23,7 @@ const (
 	ReplicationControllerFieldHostIPC                       = "hostIPC"
 	ReplicationControllerFieldHostNetwork                   = "hostNetwork"
 	ReplicationControllerFieldHostPID                       = "hostPID"
+	ReplicationControllerFieldHostUsers                     = "hostUsers"
 	ReplicationControllerFieldHostname                      = "hostname"
 	ReplicationControllerFieldImagePullSecrets              = "imagePullSecrets"
 	ReplicationControllerFieldLabels                        = "labels"
@@ -85,6 +86,7 @@ type ReplicationController struct {
 	HostIPC                       bool                           `json:"hostIPC,omitempty" yaml:"hostIPC,omitempty"`
 	HostNetwork                   bool                           `json:"hostNetwork,omitempty" yaml:"hostNetwork,omitempty"`
 	HostPID                       bool                           `json:"hostPID,omitempty" yaml:"hostPID,omitempty"`
+	HostUsers                     *bool                          `json:"hostUsers,omitempty" yaml:"hostUsers,omitempty"`
 	Hostname                      string                         `json:"hostname,omitempty" yaml:"hostname,omitempty"`
 	ImagePullSecrets              []LocalObjectReference         `json:"imagePullSecrets,omitempty" yaml:"imagePullSecrets,omitempty"`
 	Labels                        map[string]string              `json:"labels,omitempty" yaml:"labels,omitempty"`

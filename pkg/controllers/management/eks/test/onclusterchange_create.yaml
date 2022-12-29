@@ -27,6 +27,7 @@ spec:
       launchTemplate: null
       maxSize: 2
       minSize: 2
+      nodeRole: null
       nodegroupName: nodegroup
       requestSpotInstances: false
       resourceTags: {}
@@ -61,3 +62,4 @@ status:
   eksStatus:
     upstreamSpec:
       testField: "upstream spec is already set"
+  generatedNodeRole: "arn:aws:iam::role/test"

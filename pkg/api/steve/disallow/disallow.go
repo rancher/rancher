@@ -10,6 +10,9 @@ import (
 )
 
 var (
+	allowAll = map[string]bool{
+		"podsecurityadmissionconfigurationtemplates": true,
+	}
 	allowPost = map[string]bool{
 		"settings": true,
 	}
@@ -34,6 +37,9 @@ func Register(server *steve.Server) {
 		Customize: func(schema *types.APISchema) {
 			gr := attributes.GR(schema)
 			if gr.Group == "management.cattle.io" || gr.Group == "project.cattle.io" {
+				if allowAll[gr.Resource] {
+					return
+				}
 				attributes.AddDisallowMethods(schema,
 					http.MethodPatch,
 					http.MethodDelete)

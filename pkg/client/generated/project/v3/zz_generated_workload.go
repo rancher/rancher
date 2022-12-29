@@ -32,6 +32,7 @@ const (
 	WorkloadFieldHostIPC                              = "hostIPC"
 	WorkloadFieldHostNetwork                          = "hostNetwork"
 	WorkloadFieldHostPID                              = "hostPID"
+	WorkloadFieldHostUsers                            = "hostUsers"
 	WorkloadFieldHostname                             = "hostname"
 	WorkloadFieldImagePullSecrets                     = "imagePullSecrets"
 	WorkloadFieldJobConfig                            = "jobConfig"
@@ -48,6 +49,7 @@ const (
 	WorkloadFieldOwnerReferences                      = "ownerReferences"
 	WorkloadFieldPaused                               = "paused"
 	WorkloadFieldPersistentVolumeClaimRetentionPolicy = "persistentVolumeClaimRetentionPolicy"
+	WorkloadFieldPodFailurePolicy                     = "podFailurePolicy"
 	WorkloadFieldPreemptionPolicy                     = "preemptionPolicy"
 	WorkloadFieldProjectID                            = "projectId"
 	WorkloadFieldPublicEndpoints                      = "publicEndpoints"
@@ -115,6 +117,7 @@ type Workload struct {
 	HostIPC                              bool                                             `json:"hostIPC,omitempty" yaml:"hostIPC,omitempty"`
 	HostNetwork                          bool                                             `json:"hostNetwork,omitempty" yaml:"hostNetwork,omitempty"`
 	HostPID                              bool                                             `json:"hostPID,omitempty" yaml:"hostPID,omitempty"`
+	HostUsers                            *bool                                            `json:"hostUsers,omitempty" yaml:"hostUsers,omitempty"`
 	Hostname                             string                                           `json:"hostname,omitempty" yaml:"hostname,omitempty"`
 	ImagePullSecrets                     []LocalObjectReference                           `json:"imagePullSecrets,omitempty" yaml:"imagePullSecrets,omitempty"`
 	JobConfig                            *JobConfig                                       `json:"jobConfig,omitempty" yaml:"jobConfig,omitempty"`
@@ -131,6 +134,7 @@ type Workload struct {
 	OwnerReferences                      []OwnerReference                                 `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
 	Paused                               bool                                             `json:"paused,omitempty" yaml:"paused,omitempty"`
 	PersistentVolumeClaimRetentionPolicy *StatefulSetPersistentVolumeClaimRetentionPolicy `json:"persistentVolumeClaimRetentionPolicy,omitempty" yaml:"persistentVolumeClaimRetentionPolicy,omitempty"`
+	PodFailurePolicy                     *PodFailurePolicy                                `json:"podFailurePolicy,omitempty" yaml:"podFailurePolicy,omitempty"`
 	PreemptionPolicy                     string                                           `json:"preemptionPolicy,omitempty" yaml:"preemptionPolicy,omitempty"`
 	ProjectID                            string                                           `json:"projectId,omitempty" yaml:"projectId,omitempty"`
 	PublicEndpoints                      []PublicEndpoint                                 `json:"publicEndpoints,omitempty" yaml:"publicEndpoints,omitempty"`
