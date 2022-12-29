@@ -147,3 +147,5 @@ require (
 	sigs.k8s.io/aws-iam-authenticator v0.5.1
 	sigs.k8s.io/yaml v1.2.0
 )
+
+replace github.com/rancher/wrangler => github.com/rancherlabs/wrangler-security v0.7.3-0.20221221180351-9c4353694c41
