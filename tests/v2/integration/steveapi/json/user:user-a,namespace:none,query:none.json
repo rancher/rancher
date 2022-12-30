@@ -64,6 +64,9 @@
         "view": "https://localhost:8443/api/v1/namespaces/test-ns-1/secrets/test3"
       },
       "metadata": {
+        "labels": {
+          "test-label-gte": "3"
+        },
         "name": "test3",
         "namespace": "test-ns-1",
         "resourceVersion": "1000",
@@ -86,6 +89,9 @@
         "view": "https://localhost:8443/api/v1/namespaces/test-ns-1/secrets/test4"
       },
       "metadata": {
+        "labels": {
+          "test-label-gte": "3"
+        },
         "name": "test4",
         "namespace": "test-ns-1",
         "resourceVersion": "1000",
@@ -108,6 +114,9 @@
         "view": "https://localhost:8443/api/v1/namespaces/test-ns-1/secrets/test5"
       },
       "metadata": {
+        "labels": {
+          "test-label-gte": "3"
+        },
         "name": "test5",
         "namespace": "test-ns-1",
         "resourceVersion": "1000",
@@ -177,6 +186,9 @@
         "view": "https://localhost:8443/api/v1/namespaces/test-ns-2/secrets/test3"
       },
       "metadata": {
+        "labels": {
+          "test-label-gte": "3"
+        },
         "name": "test3",
         "namespace": "test-ns-2",
         "resourceVersion": "1000",
@@ -199,6 +211,9 @@
         "view": "https://localhost:8443/api/v1/namespaces/test-ns-2/secrets/test4"
       },
       "metadata": {
+        "labels": {
+          "test-label-gte": "3"
+        },
         "name": "test4",
         "namespace": "test-ns-2",
         "resourceVersion": "1000",
@@ -221,6 +236,9 @@
         "view": "https://localhost:8443/api/v1/namespaces/test-ns-2/secrets/test5"
       },
       "metadata": {
+        "labels": {
+          "test-label-gte": "3"
+        },
         "name": "test5",
         "namespace": "test-ns-2",
         "resourceVersion": "1000",
@@ -290,6 +308,9 @@
         "view": "https://localhost:8443/api/v1/namespaces/test-ns-3/secrets/test3"
       },
       "metadata": {
+        "labels": {
+          "test-label-gte": "3"
+        },
         "name": "test3",
         "namespace": "test-ns-3",
         "resourceVersion": "1000",
@@ -312,6 +333,9 @@
         "view": "https://localhost:8443/api/v1/namespaces/test-ns-3/secrets/test4"
       },
       "metadata": {
+        "labels": {
+          "test-label-gte": "3"
+        },
         "name": "test4",
         "namespace": "test-ns-3",
         "resourceVersion": "1000",
@@ -334,6 +358,9 @@
         "view": "https://localhost:8443/api/v1/namespaces/test-ns-3/secrets/test5"
       },
       "metadata": {
+        "labels": {
+          "test-label-gte": "3"
+        },
         "name": "test5",
         "namespace": "test-ns-3",
         "resourceVersion": "1000",
@@ -403,6 +430,9 @@
         "view": "https://localhost:8443/api/v1/namespaces/test-ns-4/secrets/test3"
       },
       "metadata": {
+        "labels": {
+          "test-label-gte": "3"
+        },
         "name": "test3",
         "namespace": "test-ns-4",
         "resourceVersion": "1000",
@@ -425,6 +455,9 @@
         "view": "https://localhost:8443/api/v1/namespaces/test-ns-4/secrets/test4"
       },
       "metadata": {
+        "labels": {
+          "test-label-gte": "3"
+        },
         "name": "test4",
         "namespace": "test-ns-4",
         "resourceVersion": "1000",
@@ -447,6 +480,9 @@
         "view": "https://localhost:8443/api/v1/namespaces/test-ns-4/secrets/test5"
       },
       "metadata": {
+        "labels": {
+          "test-label-gte": "3"
+        },
         "name": "test5",
         "namespace": "test-ns-4",
         "resourceVersion": "1000",
@@ -516,6 +552,9 @@
         "view": "https://localhost:8443/api/v1/namespaces/test-ns-5/secrets/test3"
       },
       "metadata": {
+        "labels": {
+          "test-label-gte": "3"
+        },
         "name": "test3",
         "namespace": "test-ns-5",
         "resourceVersion": "1000",
@@ -538,6 +577,9 @@
         "view": "https://localhost:8443/api/v1/namespaces/test-ns-5/secrets/test4"
       },
       "metadata": {
+        "labels": {
+          "test-label-gte": "3"
+        },
         "name": "test4",
         "namespace": "test-ns-5",
         "resourceVersion": "1000",
@@ -560,6 +602,9 @@
         "view": "https://localhost:8443/api/v1/namespaces/test-ns-5/secrets/test5"
       },
       "metadata": {
+        "labels": {
+          "test-label-gte": "3"
+        },
         "name": "test5",
         "namespace": "test-ns-5",
         "resourceVersion": "1000",

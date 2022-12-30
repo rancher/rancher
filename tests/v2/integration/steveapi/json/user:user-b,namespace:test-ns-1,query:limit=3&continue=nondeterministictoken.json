@@ -12,6 +12,9 @@
         "view": "https://localhost:8443/api/v1/namespaces/test-ns-1/secrets/test4"
       },
       "metadata": {
+        "labels": {
+          "test-label-gte": "3"
+        },
         "name": "test4",
         "namespace": "test-ns-1",
         "resourceVersion": "1000",
@@ -32,6 +35,9 @@
         "view": "https://localhost:8443/api/v1/namespaces/test-ns-1/secrets/test5"
       },
       "metadata": {
+        "labels": {
+          "test-label-gte": "3"
+        },
         "name": "test5",
         "namespace": "test-ns-1",
         "resourceVersion": "1000",
