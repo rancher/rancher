@@ -50,6 +50,8 @@ const (
 )
 
 func Register(ctx context.Context, workload *config.UserContext) {
+	management := workload.Management.WithAgent("rbac-handler-base")
+
 	// Add cache informer to project role template bindings
 	prtbInformer := workload.Management.Management.ProjectRoleTemplateBindings("").Controller().Informer()
 	crtbInformer := workload.Management.Management.ClusterRoleTemplateBindings("").Controller().Informer()
@@ -82,9 +84,9 @@ func Register(ctx context.Context, workload *config.UserContext) {
 		nsIndexer:           nsInformer.GetIndexer(),
 		crIndexer:           crInformer.GetIndexer(),
 		crbIndexer:          crbInformer.GetIndexer(),
-		rtLister:            workload.Management.Management.RoleTemplates("").Controller().Lister(),
-		rLister:             workload.Management.RBAC.Roles("").Controller().Lister(),
-		roles:               workload.Management.RBAC.Roles(""),
+		rtLister:            management.Management.RoleTemplates("").Controller().Lister(),
+		rLister:             management.RBAC.Roles("").Controller().Lister(),
+		roles:               management.RBAC.Roles(""),
 		rbLister:            workload.RBAC.RoleBindings("").Controller().Lister(),
 		crbLister:           workload.RBAC.ClusterRoleBindings("").Controller().Lister(),
 		crLister:            workload.RBAC.ClusterRoles("").Controller().Lister(),
@@ -93,21 +95,21 @@ func Register(ctx context.Context, workload *config.UserContext) {
 		roleBindings:        workload.RBAC.RoleBindings(""),
 		nsLister:            workload.Core.Namespaces("").Controller().Lister(),
 		nsController:        workload.Core.Namespaces("").Controller(),
-		clusterLister:       workload.Management.Management.Clusters("").Controller().Lister(),
-		projectLister:       workload.Management.Management.Projects(workload.ClusterName).Controller().Lister(),
-		userLister:          workload.Management.Management.Users("").Controller().Lister(),
-		userAttributeLister: workload.Management.Management.UserAttributes("").Controller().Lister(),
-		crtbs:               workload.Management.Management.ClusterRoleTemplateBindings(""),
-		prtbs:               workload.Management.Management.ProjectRoleTemplateBindings(""),
+		clusterLister:       management.Management.Clusters("").Controller().Lister(),
+		projectLister:       management.Management.Projects(workload.ClusterName).Controller().Lister(),
+		userLister:          management.Management.Users("").Controller().Lister(),
+		userAttributeLister: management.Management.UserAttributes("").Controller().Lister(),
+		crtbs:               management.Management.ClusterRoleTemplateBindings(""),
+		prtbs:               management.Management.ProjectRoleTemplateBindings(""),
 		clusterName:         workload.ClusterName,
 	}
-	workload.Management.Management.Projects(workload.ClusterName).AddClusterScopedLifecycle(ctx, "project-namespace-auth", workload.ClusterName, newProjectLifecycle(r))
-	workload.Management.Management.ProjectRoleTemplateBindings("").AddClusterScopedLifecycle(ctx, "cluster-prtb-sync", workload.ClusterName, newPRTBLifecycle(r))
+	management.Management.Projects(workload.ClusterName).AddClusterScopedLifecycle(ctx, "project-namespace-auth", workload.ClusterName, newProjectLifecycle(r))
+	management.Management.ProjectRoleTemplateBindings("").AddClusterScopedLifecycle(ctx, "cluster-prtb-sync", workload.ClusterName, newPRTBLifecycle(r))
 	workload.RBAC.ClusterRoles("").AddHandler(ctx, "cluster-clusterrole-sync", newClusterRoleHandler(r).sync)
 	workload.RBAC.ClusterRoleBindings("").AddHandler(ctx, "legacy-crb-cleaner-sync", newLegacyCRBCleaner(r).sync)
-	workload.Management.Management.ClusterRoleTemplateBindings("").AddClusterScopedLifecycle(ctx, "cluster-crtb-sync", workload.ClusterName, newCRTBLifecycle(r))
-	workload.Management.Management.Clusters("").AddHandler(ctx, "global-admin-cluster-sync", newClusterHandler(workload))
-	workload.Management.Management.GlobalRoleBindings("").AddHandler(ctx, "grb-cluster-sync", newGlobalRoleBindingHandler(workload))
+	management.Management.ClusterRoleTemplateBindings("").AddClusterScopedLifecycle(ctx, "cluster-crtb-sync", workload.ClusterName, newCRTBLifecycle(r))
+	management.Management.Clusters("").AddHandler(ctx, "global-admin-cluster-sync", newClusterHandler(workload))
+	management.Management.GlobalRoleBindings("").AddHandler(ctx, "grb-cluster-sync", newGlobalRoleBindingHandler(workload))
 
 	sync := &resourcequota.SyncController{
 		Namespaces:          workload.Core.Namespaces(""),
@@ -116,11 +118,11 @@ func Register(ctx context.Context, workload *config.UserContext) {
 		ResourceQuotaLister: workload.Core.ResourceQuotas("").Controller().Lister(),
 		LimitRange:          workload.Core.LimitRanges(""),
 		LimitRangeLister:    workload.Core.LimitRanges("").Controller().Lister(),
-		ProjectLister:       workload.Management.Management.Projects(workload.ClusterName).Controller().Lister(),
+		ProjectLister:       management.Management.Projects(workload.ClusterName).Controller().Lister(),
 	}
 
 	workload.Core.Namespaces("").AddLifecycle(ctx, "namespace-auth", newNamespaceLifecycle(r, sync))
-	workload.Management.Management.RoleTemplates("").AddHandler(ctx, "cluster-roletemplate-sync", newRTLifecycle(r))
+	management.Management.RoleTemplates("").AddHandler(ctx, "cluster-roletemplate-sync", newRTLifecycle(r))
 }
 
 type manager struct {
