@@ -24,7 +24,6 @@ import (
 	"github.com/rancher/wrangler/pkg/generic"
 	"github.com/rancher/wrangler/pkg/kv"
 	name2 "github.com/rancher/wrangler/pkg/name"
-	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	apierror "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -100,11 +99,7 @@ func (h *handler) getArgsEnvAndStatus(infraObj *infraObject, args map[string]int
 			Name:      name2.SafeConcatName(infraObj.meta.GetName(), "machine", "driver", "secret"),
 			Namespace: infraObj.meta.GetNamespace(),
 		},
-		Data: map[string][]byte{
-			"HTTP_PROXY":  []byte(os.Getenv("HTTP_PROXY")),
-			"HTTPS_PROXY": []byte(os.Getenv("HTTPS_PROXY")),
-			"NO_PROXY":    []byte(os.Getenv("NO_PROXY")),
-		},
+		Data: getWhitelistedEnvVars(),
 	}
 	machine, err := rke2.GetMachineByOwner(h.machines, infraObj.meta)
 	if err != nil && (create || !errors.Is(err, rke2.ErrNoMachineOwnerRef)) {
@@ -132,12 +127,6 @@ func (h *handler) getArgsEnvAndStatus(infraObj *infraObject, args map[string]int
 		fmt.Sprintf("--driver-hash=%s", hash),
 		fmt.Sprintf("--secret-namespace=%s", infraObj.meta.GetNamespace()),
 		fmt.Sprintf("--secret-name=%s", secretName),
-	}
-
-	// only in trace because machine has sensitive details and we can't control who debugs what in there easily
-	if logrus.GetLevel() >= logrus.TraceLevel {
-		// add --debug to pass directly to machine
-		cmd = append(cmd, "--debug")
 	}
 
 	if create {
@@ -350,4 +339,12 @@ func hashFile(path string) (string, error) {
 	}
 
 	return hex.EncodeToString(hasher.Sum(nil)), nil
+}
+
+func getWhitelistedEnvVars() map[string][]byte {
+	result := make(map[string][]byte)
+	settings.IterateWhitelistedEnvVars(func(name, value string) {
+		result[name] = []byte(value)
+	})
+	return result
 }
