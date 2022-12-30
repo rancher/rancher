@@ -23,7 +23,7 @@ func JailCommand(cmd *exec.Cmd, jailPath string) (*exec.Cmd, error) {
 	cmd.SysProcAttr = &syscall.SysProcAttr{}
 	cmd.SysProcAttr.Credential = cred
 	cmd.SysProcAttr.Chroot = jailPath
-	cmd.Env = WhitelistEnvvars(cmd.Env)
+	cmd.Env = getWhitelistedEnvVars(cmd.Env)
 	cmd.Env = append(cmd.Env, "PWD=/")
 	cmd.Dir = "/"
 	return cmd, nil
