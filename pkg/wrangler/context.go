@@ -218,7 +218,7 @@ func (w *Context) Start(ctx context.Context) error {
 func (w *Context) WithAgent(userAgent string) *Context {
 	userAgent = fmt.Sprintf("rancher-%s-%s", settings.ServerVersion.Get(), userAgent)
 	wContextCopy := *w
-	var restConfigCopy *rest.Config
+	restConfigCopy := &rest.Config{}
 	if w.RESTConfig != nil {
 		*restConfigCopy = *w.RESTConfig
 		restConfigCopy.UserAgent = userAgent
@@ -454,6 +454,9 @@ func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restCo
 		core:         core,
 		api:          api,
 		crd:          crd,
+		capi:         capi,
+		rke:          rke,
+		rbac:         rbac,
 	}
 
 	return wContext, nil
