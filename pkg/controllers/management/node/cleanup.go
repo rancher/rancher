@@ -121,8 +121,10 @@ func (m *Lifecycle) drainNode(node *v3.Node) error {
 	}
 
 	logrus.Infof("[node-cleanup] node [%s] attempting to drain, retrying up to 3 times", nodeCopy.Spec.RequestedHostname)
-	// purposefully ignoring error, if the drain fails this falls back to deleting the node as usual
-	return wait.ExponentialBackoff(backoff, func() (bool, error) {
+	// purposefully ignoring kubectl.drain error. However, if the node fails to drain after 3 attempts
+	// wait.ExponentialBackoff will still return a wait.ErrWaitTimeout error, which must also be ignored.
+	// Otherwise, the node will not actually delete and resources will be orphaned in the provider.
+	_ = wait.ExponentialBackoff(backoff, func() (bool, error) {
 		ctx, cancel := context.WithTimeout(m.ctx, time.Duration(nodeCopy.Spec.NodeDrainInput.Timeout)*time.Second)
 		defer cancel()
 
@@ -132,7 +134,6 @@ func (m *Lifecycle) drainNode(node *v3.Node) error {
 			return false, nil
 		}
 		if err != nil {
-			// kubectl failed continue on with delete any way
 			logrus.Errorf("[node-cleanup] node [%s] kubectl drain error, retrying: %s", nodeCopy.Spec.RequestedHostname, err)
 			return false, nil
 		}
@@ -140,6 +141,8 @@ func (m *Lifecycle) drainNode(node *v3.Node) error {
 		logrus.Infof("[node-cleanup] node [%s] kubectl drain response: %s", nodeCopy.Spec.RequestedHostname, msg)
 		return true, nil
 	})
+	// always return nil so the node is deleted regardless of drain outcome
+	return nil
 }
 
 func (m *Lifecycle) cleanRKENode(node *v3.Node) error {
