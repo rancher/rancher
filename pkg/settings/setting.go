@@ -384,3 +384,18 @@ func GetRancherVersion() string {
 	}
 	return strings.TrimPrefix(rancherVersion, "v")
 }
+
+// IterateWhitelistedEnvVars iterates over the environment variables whitelisted
+// by CATTLE_WHITELIST_ENVVARS. If a variable is whitelisted but unset or empty,
+// the handler function will not be called for it.
+func IterateWhitelistedEnvVars(handler func(name, value string)) {
+	wl := WhitelistEnvironmentVars.Get()
+	envWhiteList := strings.Split(wl, ",")
+
+	for _, wlVar := range envWhiteList {
+		wlVar = strings.TrimSpace(wlVar)
+		if val := os.Getenv(wlVar); val != "" {
+			handler(wlVar, val)
+		}
+	}
+}

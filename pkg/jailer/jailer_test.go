@@ -39,7 +39,7 @@ func Test_WhitelistEnvvars(t *testing.T) {
 
 	for _, tc := range testCases {
 		os.Setenv("ENVVAR_FOO", tc.envValue)
-		envs := WhitelistEnvvars(tc.input)
+		envs := getWhitelistedEnvVars(tc.input)
 		assert.Equal(t, envs, tc.expected)
 	}
 
