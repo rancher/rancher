@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/rancher/norman/types"
+	apiV1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
 	v1 "github.com/rancher/rancher/tests/framework/clients/rancher/v1"
@@ -20,6 +21,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
+	coreV1 "k8s.io/api/core/v1"
+	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 )
 
 type RBTestSuite struct {
@@ -62,11 +65,16 @@ func (rb *RBTestSuite) SetupSuite() {
 
 func (rb *RBTestSuite) ValidateListCluster(role string) {
 
-	//Testcase1 Verify cluster members - Owner/member are able to list clusters
+	//Testcase1 Verify cluster members - Owner/member,  Project members - Owner/member are able to list clusters
 	clusterList, err := rb.standardUserClient.Steve.SteveType(clusters.ProvisioningSteveResouceType).ListAll(&types.ListOpts{})
 	require.NoError(rb.T(), err)
 	assert.Equal(rb.T(), 1, len(clusterList.Data))
-	actualClusterID := clusterList.Data[0].Status.(interface{}).(map[string]interface{})["clusterName"]
+
+	clusterStatus := &apiV1.ClusterStatus{}
+	err = v1.ConvertToK8sType(clusterList.Data[0].Status, clusterStatus)
+	require.NoError(rb.T(), err)
+
+	actualClusterID := clusterStatus.ClusterName
 	assert.Equal(rb.T(), rb.cluster.ID, actualClusterID)
 }
 
@@ -76,7 +84,7 @@ func (rb *RBTestSuite) ValidateListProjects(role string) {
 	//Get project list as an admin
 	projectlistAdmin, err := listProjects(rb.client, rb.cluster.ID)
 	require.NoError(rb.T(), err)
-	//Get project list as a cluster owner/member
+	//Get project list as a cluster owner/member and project owner/member
 	projectlistClusterMembers, err := listProjects(rb.standardUserClient, rb.cluster.ID)
 	require.NoError(rb.T(), err)
 	switch role {
@@ -88,6 +96,11 @@ func (rb *RBTestSuite) ValidateListProjects(role string) {
 	case roleMember:
 		//assert projects list obtained as a cluster member is empty
 		assert.Equal(rb.T(), 0, len(projectlistClusterMembers))
+	case roleProjectOwner, roleProjectMember:
+		//assert projects list obtained as a project owner/member is 1
+		assert.Equal(rb.T(), 1, len(projectlistClusterMembers))
+		//assert project created by admin and project obtained by project owner is same
+		assert.Equal(rb.T(), rb.adminProject.Name, projectlistClusterMembers[0])
 	}
 }
 
@@ -95,37 +108,60 @@ func (rb *RBTestSuite) ValidateCreateProjects(role string) {
 
 	//Testcase3 Validate if cluster members can create a project in the downstream cluster
 	createProjectAsClusterMembers, err := createProject(rb.standardUserClient, rb.cluster.ID)
-	require.NoError(rb.T(), err)
-	log.Info("Created project as a ", role, " is ", createProjectAsClusterMembers.Name)
-	require.NoError(rb.T(), err)
-	actualStatus := fmt.Sprintf("%v", createProjectAsClusterMembers.State)
-	assert.Equal(rb.T(), "active", actualStatus)
-
+	switch role {
+	case roleOwner, roleMember:
+		require.NoError(rb.T(), err)
+		log.Info("Created project as a ", role, " is ", createProjectAsClusterMembers.Name)
+		require.NoError(rb.T(), err)
+		actualStatus := fmt.Sprintf("%v", createProjectAsClusterMembers.State)
+		assert.Equal(rb.T(), "active", actualStatus)
+	case roleProjectOwner, roleProjectMember:
+		require.Error(rb.T(), err)
+		errStatus := strings.Split(err.Error(), ".")[1]
+		rgx := regexp.MustCompile(`\[(.*?)\]`)
+		errorMsg := rgx.FindStringSubmatch(errStatus)
+		assert.Equal(rb.T(), "403 Forbidden", errorMsg[1])
+	}
 }
 
 func (rb *RBTestSuite) ValidateNS(role string) {
+	var checkErr error
 
-	//Testcase4 Validate if cluster members can create namespaces in project they are not owner of
-	log.Info("Testcase4 - Validating if ", role, " can create namespace in a project they are not owner of. ")
+	//Testcase4 Validate if cluster members can create namespaces in admin created project
+	log.Info("Testcase4 - Validating if ", role, " can create namespace in admin created project. ")
 	namespaceName := provisioning.AppendRandomString("testns-")
-	createdNamespace, err := namespaces.CreateNamespace(rb.standardUserClient, namespaceName, "{}", map[string]string{}, map[string]string{}, rb.adminProject)
 	adminNamespace, err := namespaces.CreateNamespace(rb.client, namespaceName+"-admin", "{}", map[string]string{}, map[string]string{}, rb.adminProject)
+	require.NoError(rb.T(), err)
+
+	relogin, err := rb.standardUserClient.ReLogin()
+	require.NoError(rb.T(), err)
+	rb.standardUserClient = relogin
+
+	steveStdUserclient, err := rb.standardUserClient.Steve.ProxyDownstream(rb.cluster.ID)
+	require.NoError(rb.T(), err)
+	rb.steveStdUserclient = steveStdUserclient
+
+	createdNamespace, checkErr := namespaces.CreateNamespace(rb.standardUserClient, namespaceName, "{}", map[string]string{}, map[string]string{}, rb.adminProject)
 
 	switch role {
-	case roleOwner:
-		require.NoError(rb.T(), err)
-		log.Info("Created a namespace as cluster Owner: ", createdNamespace.Name)
+	case roleOwner, roleProjectOwner, roleProjectMember:
+		require.NoError(rb.T(), checkErr)
+		log.Info("Created a namespace as role ", role, createdNamespace.Name)
 		assert.Equal(rb.T(), namespaceName, createdNamespace.Name)
-		actualStatus := fmt.Sprintf("%v", createdNamespace.Status.(interface{}).(map[string]interface{})["phase"])
+
+		namespaceStatus := &coreV1.NamespaceStatus{}
+		err = v1.ConvertToK8sType(createdNamespace.Status, namespaceStatus)
+		require.NoError(rb.T(), err)
+		actualStatus := fmt.Sprintf("%v", namespaceStatus.Phase)
 		assert.Equal(rb.T(), "Active", actualStatus)
 	case roleMember:
-		require.Error(rb.T(), err)
+		require.Error(rb.T(), checkErr)
 		//assert cluster member gets an error when creating a namespace in a project they are not owner of
 		errMessage := strings.Split(err.Error(), ":")[0]
 		assert.Equal(rb.T(), "Resource type [namespace] is not creatable", errMessage)
 	}
 
-	//Testcase5 Validate if cluster members are able to list all the namespaces in a cluster
+	//Testcase5 Validate if cluster members/project members are able to list all the namespaces in a cluster
 	log.Info("Testcase5 - Validating if ", role, " can lists all namespaces in a cluster.")
 
 	//Get the list of namespaces as an admin client
@@ -145,15 +181,21 @@ func (rb *RBTestSuite) ValidateNS(role string) {
 		require.NoError(rb.T(), err)
 		//Length of namespace list cluster member should be nill
 		assert.Equal(rb.T(), 0, len(namespaceListClusterMembers))
+	case roleProjectOwner, roleProjectMember:
+		require.NoError(rb.T(), err)
+		//Length of namespace list for admin and project owner/member should not match
+		assert.NotEqual(rb.T(), len(namespaceListAdmin), len(namespaceListClusterMembers))
+		assert.Equal(rb.T(), 2, len(namespaceListClusterMembers))
 	}
 
-	//Testcase6 Validate if cluster members are able to delete the namespace in the project they are not owner of
-	log.Info("Testcase6 - Validating if ", role, " can delete a namespace from a project they are not owner of.")
+	//Testcase6 Validate if cluster members are able to delete the namespace in the admin created project
+	log.Info("Testcase6 - Validating if ", role, " cannot delete a namespace from a project they own.")
 
 	namespaceID, err := rb.steveAdminClient.SteveType(namespaces.NamespaceSteveType).ByID(adminNamespace.ID)
+	require.NoError(rb.T(), err)
 	err = deleteNamespace(namespaceID, rb.steveStdUserclient)
 	switch role {
-	case roleOwner:
+	case roleOwner, roleProjectOwner, roleProjectMember:
 		require.NoError(rb.T(), err)
 	case roleMember:
 		require.Error(rb.T(), err)
@@ -162,13 +204,47 @@ func (rb *RBTestSuite) ValidateNS(role string) {
 	}
 }
 
+func (rb *RBTestSuite) ValidateAddClusterRoles(role string) {
+
+	//Testcase7 Validate if project members are able to add other membes in cluster
+	errUserRole := users.AddClusterRoleToUser(rb.standardUserClient, rb.cluster, rb.additionalUser, role)
+
+	switch role {
+	case roleProjectOwner, roleProjectMember:
+		require.Error(rb.T(), errUserRole)
+		assert.Equal(rb.T(), true, k8sErrors.IsForbidden(errUserRole))
+	}
+}
+
+func (rb *RBTestSuite) ValidateAddProjectRoles(role string) {
+
+	//Testcase8 Validate if project owners/members are able to add another standard user as a project members
+	errUserRole := users.AddProjectMember(rb.standardUserClient, rb.adminProject, rb.additionalUser, role)
+
+	switch role {
+	case roleProjectOwner:
+		require.NoError(rb.T(), errUserRole)
+		additionalUserClient, err := rb.additionalUserClient.ReLogin()
+		require.NoError(rb.T(), err)
+		rb.additionalUserClient = additionalUserClient
+
+		projectList, err := listProjects(rb.standardUserClient, rb.cluster.ID)
+		require.NoError(rb.T(), err)
+		assert.Equal(rb.T(), 1, len(projectList))
+		assert.Equal(rb.T(), rb.adminProject.Name, projectList[0])
+	case roleProjectMember:
+		require.Error(rb.T(), errUserRole)
+	}
+
+}
+
 func (rb *RBTestSuite) ValidateDeleteProject(role string) {
 
-	//Testcase7 Validate if cluster members are able to delete the project they are not owner of
+	//Testcase9 Validate if cluster members are able to delete the admin created project
 	err := rb.standardUserClient.Management.Project.Delete(rb.adminProject)
 
 	switch role {
-	case roleOwner:
+	case roleOwner, roleProjectOwner:
 		require.NoError(rb.T(), err)
 	case roleMember:
 		require.Error(rb.T(), err)
@@ -176,13 +252,22 @@ func (rb *RBTestSuite) ValidateDeleteProject(role string) {
 		rgx := regexp.MustCompile(`\[(.*?)\]`)
 		errorMsg := rgx.FindStringSubmatch(errStatus)
 		assert.Equal(rb.T(), "403 Forbidden", errorMsg[1])
+	case roleProjectMember:
+		require.Error(rb.T(), err)
 	}
 }
 
-func (rb *RBTestSuite) ValidateRemoveClusterRoles(role string) {
+func (rb *RBTestSuite) ValidateRemoveClusterRoles() {
 
-	//Testcase8 Remove added cluster member from the cluster as an admin
+	//Testcase10a Remove added cluster member from the cluster as an admin
 	err := users.RemoveClusterRoleFromUser(rb.client, rb.standardUser)
+	require.NoError(rb.T(), err)
+}
+
+func (rb *RBTestSuite) ValidateRemoveProjectRoles() {
+
+	//Testcase10b Remove added project member from the cluster projects as an admin
+	err := users.RemoveProjectMember(rb.client, rb.standardUser)
 	require.NoError(rb.T(), err)
 
 }
@@ -198,6 +283,7 @@ func (rb *RBTestSuite) ValidateAddStdUserAsProjectOwner() {
 	err = users.AddProjectMember(rb.standardUserClient, rb.standardUserCOProject, rb.additionalUser, roleProjectOwner)
 	require.NoError(rb.T(), err)
 	userGetProject, err := projects.GetProjectList(rb.additionalUserClient, rb.cluster.ID)
+	require.NoError(rb.T(), err)
 	assert.Equal(rb.T(), 1, len(userGetProject.Data))
 	assert.Equal(rb.T(), rb.standardUserCOProject.Name, userGetProject.Data[0].Name)
 
@@ -242,17 +328,20 @@ func (rb *RBTestSuite) ValidateAddCMAsProjectOwner() {
 	err = users.AddProjectMember(rb.standardUserClient, rb.standardUserCOProject, rb.additionalUser, roleProjectOwner)
 	require.NoError(rb.T(), err)
 	userGetProject, err := projects.GetProjectList(rb.additionalUserClient, rb.cluster.ID)
+	require.NoError(rb.T(), err)
 	assert.Equal(rb.T(), rb.standardUserCOProject.Name, userGetProject.Data[0].Name)
 
 }
 
 func (rb *RBTestSuite) TestRBAC() {
 	tests := []struct {
-		name        string
-		clusterRole string
+		name string
+		role string
 	}{
 		{"Cluster Owner", roleOwner},
 		{"Cluster Member", roleMember},
+		{"Project Owner", roleProjectOwner},
+		{"Project Member", roleProjectMember},
 	}
 	for _, tt := range tests {
 		rb.Run("Set up User with Cluster Role "+tt.name, func() {
@@ -285,10 +374,18 @@ func (rb *RBTestSuite) TestRBAC() {
 
 		rb.Run("Adding user as "+tt.name+" to the downstream cluster.", func() {
 			//Adding created user to the downstream clusters with the specified roles.
-			err := users.AddClusterRoleToUser(rb.client, rb.cluster, rb.standardUser, tt.clusterRole)
+
+			if strings.Contains(tt.role, "project") {
+				err := users.AddProjectMember(rb.client, rb.adminProject, rb.standardUser, tt.role)
+				require.NoError(rb.T(), err)
+			} else {
+				err := users.AddClusterRoleToUser(rb.client, rb.cluster, rb.standardUser, tt.role)
+				require.NoError(rb.T(), err)
+			}
+
+			relogin, err := rb.standardUserClient.ReLogin()
 			require.NoError(rb.T(), err)
-			rb.standardUserClient, err = rb.standardUserClient.ReLogin()
-			require.NoError(rb.T(), err)
+			rb.standardUserClient = relogin
 
 			//Create a steve user client for a standard user to get the cluster details
 			steveStdUserclient, err := rb.standardUserClient.Steve.ProxyDownstream(rb.cluster.ID)
@@ -296,31 +393,53 @@ func (rb *RBTestSuite) TestRBAC() {
 			rb.steveStdUserclient = steveStdUserclient
 		})
 
-		rb.T().Logf("Starting validations for %v", tt.clusterRole)
+		rb.T().Logf("Starting validations for %v", tt.role)
 
 		rb.Run("Testcase1 - Validating the cluster count obtained as the role "+tt.name, func() {
-			rb.ValidateListCluster(tt.clusterRole)
+			rb.ValidateListCluster(tt.role)
 		})
 
 		rb.Run("Testcase2 - Validating if members with role "+tt.name+" are able to list all projects", func() {
-			rb.ValidateListProjects(tt.clusterRole)
+			rb.ValidateListProjects(tt.role)
 		})
 
 		rb.Run("Testcase3 - Validating if members with role "+tt.name+" is able to create a project in the cluster", func() {
-			rb.ValidateCreateProjects(tt.clusterRole)
+			rb.ValidateCreateProjects(tt.role)
 
 		})
 
 		rb.Run("Testcase 4 through 6 - Validate namespaces checks for members with role "+tt.name, func() {
-			rb.ValidateNS(tt.clusterRole)
+			rb.ValidateNS(tt.role)
 		})
 
-		rb.Run("Testcase7 - Validating if member with role "+tt.name+" can delete a project they are not owner of ", func() {
-			rb.ValidateDeleteProject(tt.clusterRole)
+		if strings.Contains(tt.role, "project") {
+			rb.Run("Testcase7 - Validating if member with role "+tt.name+" can add members to the cluster", func() {
+				//Set up additional user client to be added to the project
+				additionalUser, err := createUser(rb.client)
+				require.NoError(rb.T(), err)
+				rb.additionalUser = additionalUser
+				rb.additionalUserClient, err = rb.client.AsUser(rb.additionalUser)
+				require.NoError(rb.T(), err)
+
+				rb.ValidateAddClusterRoles(tt.role)
+			})
+
+			rb.Run("Testcase8 - Validating if member with role "+tt.name+" can add members to the cluster", func() {
+				rb.ValidateAddProjectRoles(tt.role)
+			})
+
+		}
+
+		rb.Run("Testcase9 - Validating if member with role "+tt.name+" can delete a project they are not owner of ", func() {
+			rb.ValidateDeleteProject(tt.role)
 		})
 
-		rb.Run("Testcase8 - Validating if member with role "+tt.name+" is removed from the cluster and returns nil clusters", func() {
-			rb.ValidateRemoveClusterRoles(tt.clusterRole)
+		rb.Run("Testcase10 - Validating if member with role "+tt.name+" is removed from the cluster and returns nil clusters", func() {
+			if strings.Contains(tt.role, "project") {
+				rb.ValidateRemoveProjectRoles()
+			} else {
+				rb.ValidateRemoveClusterRoles()
+			}
 		})
 
 	}
