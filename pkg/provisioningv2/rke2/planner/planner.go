@@ -370,6 +370,19 @@ func (p *Planner) Process(controlPlane *rkev1.RKEControlPlane) error {
 		return ErrWaiting("waiting for control plane to be available")
 	}
 
+	if !controlPlane.Status.Initialized {
+		return ErrWaiting("waiting for control plane to be initialized")
+	} else if !controlPlane.Status.Ready {
+		// The relevant predicate to test that a cluster has been initialized is the cluster agent having connected once for
+		// a single control plane node.
+		controlPlane.Status.Ready = true
+		_, err = p.rkeControlPlanes.UpdateStatus(controlPlane)
+		if err == nil {
+			err = ErrWaiting("marking control plane ready")
+		}
+		return err
+	}
+
 	err = p.reconcile(controlPlane, clusterSecretTokens, plan, false, workerTier, isOnlyWorker, isInitNodeOrDeleting,
 		controlPlane.Spec.UpgradeStrategy.WorkerConcurrency, joinServer,
 		controlPlane.Spec.UpgradeStrategy.WorkerDrainOptions)

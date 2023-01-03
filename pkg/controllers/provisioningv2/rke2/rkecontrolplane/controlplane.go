@@ -70,22 +70,29 @@ func (h *handler) clusterWatch(_, _ string, obj runtime.Object) ([]relatedresour
 	}, nil
 }
 
-func (h *handler) OnChange(obj *rkev1.RKEControlPlane, status rkev1.RKEControlPlaneStatus) (rkev1.RKEControlPlaneStatus, error) {
-	status.ObservedGeneration = obj.Generation
-	cluster, err := h.clusterCache.Get(obj.Spec.ManagementClusterName)
+func (h *handler) OnChange(cp *rkev1.RKEControlPlane, status rkev1.RKEControlPlaneStatus) (rkev1.RKEControlPlaneStatus, error) {
+	status.ObservedGeneration = cp.Generation
+	cluster, err := h.clusterCache.Get(cp.Spec.ManagementClusterName)
 	if err != nil {
-		h.rkeControlPlaneController.EnqueueAfter(obj.Namespace, obj.Name, 2*time.Second)
+		h.rkeControlPlaneController.EnqueueAfter(cp.Namespace, cp.Name, 2*time.Second)
 		return status, nil
 	}
 
-	status.Ready = rke2.Ready.IsTrue(cluster)
-	status.Initialized = rke2.Ready.IsTrue(cluster)
 	status.AgentConnected = clusterconnected.Connected.IsTrue(cluster)
+
+	if !status.Initialized && status.AgentConnected {
+		status.Initialized = true
+		rke2.Ready.Unknown(&status)
+		rke2.Ready.Message(&status, "marking control plane initialized")
+		rke2.Ready.Reason(&status, "Waiting")
+	}
+
 	return status, nil
 }
 
 func (h *handler) OnRemove(_ string, cp *rkev1.RKEControlPlane) (*rkev1.RKEControlPlane, error) {
 	status := cp.Status
+
 	cp = cp.DeepCopy()
 	err := rke2.DoRemoveAndUpdateStatus(cp, h.doRemove(cp), h.rkeControlPlaneController.EnqueueAfter)
 
@@ -121,7 +128,10 @@ func (h *handler) doRemove(obj *rkev1.RKEControlPlane) func() (string, error) {
 		logrus.Tracef("[rkecontrolplane] (%s/%s) machine list: %+v", obj.Namespace, obj.Name, machines)
 		allMachines := append(machines, otherMachines...)
 		for _, machine := range allMachines {
+			// only custom clusters (clusters with unmanaged machines) will not be deleted, as node driver clusters will be
+			// deleted when their related machine set is deleted.
 			if machine.DeletionTimestamp == nil {
+				logrus.Infof("machine still exists")
 				if err = h.machineClient.Delete(machine.Namespace, machine.Name, &metav1.DeleteOptions{}); err != nil {
 					return "", fmt.Errorf("error deleting machine %s/%s: %v", machine.Namespace, machine.Name, err)
 				}
