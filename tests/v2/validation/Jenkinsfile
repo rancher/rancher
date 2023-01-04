@@ -28,9 +28,10 @@ node {
       withFolderProperties {
         paramsMap = []
         params.each {
-          paramsMap << "$it.key=$it.value"
+          if (it.value && it.value.trim() != "") {
+              paramsMap << "$it.key=$it.value"
+          }
         }
-        withEnv(paramsMap) {
         withCredentials([ string(credentialsId: 'AWS_ACCESS_KEY_ID', variable: 'AWS_ACCESS_KEY_ID'),
                           string(credentialsId: 'AWS_SECRET_ACCESS_KEY', variable: 'AWS_SECRET_ACCESS_KEY'),
                           string(credentialsId: 'AWS_ACCESS_KEY_ID', variable: 'RANCHER_EKS_ACCESS_KEY'),
@@ -77,6 +78,8 @@ node {
                           string(credentialsId: 'RANCHER_BYO_TLS_CERT', variable: 'RANCHER_BYO_TLS_CERT'),
                           string(credentialsId: 'RANCHER_BYO_TLS_KEY', variable: 'RANCHER_BYO_TLS_KEY'),
                           string(credentialsId: 'RANCHER_LINODE_ACCESSKEY', variable: "RANCHER_LINODE_ACCESSKEY")]) {
+          
+        withEnv(paramsMap) {
           stage('Checkout') {
             deleteDir()
             checkout([
@@ -118,11 +121,11 @@ node {
                 sh "docker stop ${testContainer}"
                 sh "docker rm -v ${testContainer}"
                 sh "docker rmi -f ${imageName}"
-              }
+              } // stage
             } // finally
           } // dir 
-        } // creds
-      } // folder properties
-    } // wrap 
-  } 
-}// node
+        } // withEnv
+      } // creds
+    } // folder properties
+  } // wrap 
+} // node
