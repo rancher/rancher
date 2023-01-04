@@ -14,7 +14,7 @@ const (
 	fromConfig          = "config"
 )
 
-type NodeCreationFunc func(client *rancher.Client, numOfInstances int) ([]*nodes.Node, error)
+type NodeCreationFunc func(client *rancher.Client, numOfInstances int, numOfWinInstances int, multiconfig bool) (nodes []*nodes.Node, winNodes []*nodes.Node, err error)
 
 type ExternalNodeProvider struct {
 	Name             string
@@ -33,20 +33,42 @@ func ExternalNodeProviderSetup(providerType string) ExternalNodeProvider {
 	case fromConfig:
 		return ExternalNodeProvider{
 			Name: providerType,
-			NodeCreationFunc: func(client *rancher.Client, numOfInstances int) ([]*nodes.Node, error) {
+			NodeCreationFunc: func(client *rancher.Client, numOfInstances int, numOfWinInstances int, multiconfig bool) (nodesList []*nodes.Node, winNodesList []*nodes.Node, err error) {
 				var nodeConfig nodes.ExternalNodeConfig
 				config.LoadConfig(nodes.ExternalNodeConfigConfigurationFileKey, &nodeConfig)
 
-				nodesList := nodeConfig.Nodes[numOfInstances]
-				for _, node := range nodesList {
-					sshKey, err := nodes.GetSSHKey(node.SSHKeyName)
-					if err != nil {
-						return nil, err
-					}
+				nodesList = nodeConfig.Nodes[numOfInstances]
+				winNodesList = nodeConfig.Nodes[numOfWinInstances]
 
-					node.SSHKey = sshKey
+				if multiconfig {
+					for _, node := range nodesList {
+						sshKey, err := nodes.GetSSHKey(node.SSHKeyName)
+						if err != nil {
+							return nil, nil, err
+						}
+	
+						node.SSHKey = sshKey
+					}
+					for _, node2 := range winNodesList {
+						sshKey, err := nodes.GetSSHKey(node2.SSHKeyName)
+						if err != nil {
+							return nil, nil, err
+						}
+
+						node2.SSHKey = sshKey
+					}
+				} else {
+					for _, node := range nodesList {
+						sshKey, err := nodes.GetSSHKey(node.SSHKeyName)
+						if err != nil {
+							return nil, nil, err
+						}
+	
+						node.SSHKey = sshKey
+					}
+					winNodesList = nil
 				}
-				return nodesList, nil
+				return nodesList, winNodesList, nil
 			},
 		}
 	default:
