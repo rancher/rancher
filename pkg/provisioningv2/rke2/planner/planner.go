@@ -853,7 +853,7 @@ func PruneEmpty(config map[string]interface{}) {
 }
 
 // getTaints returns a slice of taints for the machine in question
-func getTaints(entry *planEntry) (result []corev1.Taint, _ error) {
+func getTaints(entry *planEntry, cp *rkev1.RKEControlPlane) (result []corev1.Taint, _ error) {
 	data := entry.Metadata.Annotations[rke2.TaintsAnnotation]
 	if data != "" {
 		if err := json.Unmarshal([]byte(data), &result); err != nil {
@@ -862,7 +862,8 @@ func getTaints(entry *planEntry) (result []corev1.Taint, _ error) {
 	}
 
 	if !isWorker(entry) {
-		if isEtcd(entry) {
+		// k3s charts do not have correct tolerations when the master node is both controlplane and etcd
+		if isEtcd(entry) && (rke2.GetRuntime(cp.Spec.KubernetesVersion) != rke2.RuntimeK3S || !isControlPlane(entry)) {
 			result = append(result, corev1.Taint{
 				Key:    "node-role.kubernetes.io/etcd",
 				Effect: corev1.TaintEffectNoExecute,
