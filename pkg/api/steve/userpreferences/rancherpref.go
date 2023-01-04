@@ -33,7 +33,7 @@ func (e *rancherPrefStore) getClient(apiOp *types.APIRequest) (dynamic.ResourceI
 		return nil, validation.NotFound
 	}
 
-	return e.cg.AdminClient(apiOp, cmSchema, u)
+	return e.cg.AdminClient(apiOp, cmSchema, u, nil)
 }
 
 func (e *rancherPrefStore) ByID(apiOp *types.APIRequest, schema *types.APISchema, id string) (types.APIObject, error) {
@@ -80,7 +80,7 @@ func (e *rancherPrefStore) List(apiOp *types.APIRequest, schema *types.APISchema
 }
 
 func (e *rancherPrefStore) createNamespace(apiOp *types.APIRequest, ns string) error {
-	client, err := e.cg.AdminClient(apiOp, apiOp.Schemas.LookupSchema("namespace"), "")
+	client, err := e.cg.AdminClient(apiOp, apiOp.Schemas.LookupSchema("namespace"), "", nil)
 	if err != nil {
 		return err
 	}
