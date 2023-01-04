@@ -3,10 +3,6 @@ module github.com/rancher/rancher
 go 1.19
 
 replace (
-	github.com/rancher/wrangler => /home/jfh/Documents/work/rancher/wrangler
-)
-
-replace (
 	github.com/docker/distribution => github.com/docker/distribution v2.7.1+incompatible // oras dep requires a replace is set
 	github.com/docker/docker => github.com/docker/docker v20.10.9+incompatible // oras dep requires a replace is set
 
@@ -123,7 +119,7 @@ require (
 	github.com/rancher/rke v1.4.3-rc3
 	github.com/rancher/steve v0.0.0-20230103180000-f4338dd8396f
 	github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20210727200656-10b094e30007
-	github.com/rancher/wrangler v1.0.1-0.20221202234327-1cafffeaa9a1
+	github.com/rancher/wrangler v1.0.1-0.20230103171004-6ebfa7ca12ad
 	github.com/robfig/cron v1.1.0
 	github.com/sirupsen/logrus v1.9.0
 	github.com/stretchr/testify v1.8.0
