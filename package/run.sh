@@ -172,6 +172,15 @@ if [ -z "$CATTLE_ADDRESS" ]; then
     CATTLE_ADDRESS=$(ip -o route get 8.8.8.8 | sed -n 's/.*src \([0-9.]\+\).*/\1/p')
 fi
 
+if [ -z "$CATTLE_INTERNAL_ADDRESS" ]; then
+    # Example output: '8.8.8.8 via 10.128.0.1 dev ens4 src 10.128.0.34 uid 0'
+    # Will provide the private IP address, if no private IP address is found the public IP address will be returned
+    ROUTE_OUTPUT=$(ip -o route get 8.8.8.8 | sed -n 's/.*src \([0-9.]\+\).*/\1/p')
+    if [ "$CATTLE_ADDRESS" != "$ROUTE_OUTPUT" ]; then
+        CATTLE_INTERNAL_ADDRESS="$ROUTE_OUTPUT"
+    fi
+fi
+
 if [ "$CATTLE_K8S_MANAGED" != "true" ]; then
     if [ -z "$CATTLE_TOKEN" ]; then
         error -- --token is a required option
