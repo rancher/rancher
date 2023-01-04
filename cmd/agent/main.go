@@ -519,11 +519,17 @@ func reconcileKubelet(ctx context.Context) (bool, error) {
 // delivered by Rancher if the generate_serving_certificate property
 // is set to 'true' for the clusters kubelet service.
 func KubeletNeedsNewCertificate(headers http.Header) error {
-	ipAddress := os.Getenv("CATTLE_ADDRESS")
 	currentHostname := os.Getenv("CATTLE_NODE_NAME")
-	fileSafeIPAddress := strings.ReplaceAll(ipAddress, ".", "-")
 
-	cert, err := tls.LoadX509KeyPair(fmt.Sprintf("/etc/kubernetes/ssl/kube-kubelet-%s.pem", fileSafeIPAddress), fmt.Sprintf("/etc/kubernetes/ssl/kube-kubelet-%s-key.pem", fileSafeIPAddress))
+	// RKE will save the certs on the node using either the public or private IP address, depending on the infrastructure provider.
+	// For example, the certs will be stored using the public IP address for VM's on digital ocean, but will use the private IP
+	// address for VM's on AWS. We do not know which IP address RKE decided to use, so we need to check both locations.
+	kubeletCertFile, kubeletCertKeyFile, ipAddress := findCertificateFiles(os.Getenv("CATTLE_ADDRESS"), os.Getenv("CATTLE_INTERNAL_ADDRESS"))
+	if kubeletCertFile == "" || kubeletCertKeyFile == "" || ipAddress == "" {
+		logrus.Tracef("did not find kubelet certificate files using either public ip address (%s) or private ip address (%s)", os.Getenv("CATTLE_ADDRESS"), os.Getenv("CATTLE_INTERNAL_ADDRESS"))
+	}
+
+	cert, err := tls.LoadX509KeyPair(kubeletCertFile, kubeletCertKeyFile)
 	if err != nil && !strings.Contains(err.Error(), "no such file") {
 		return err
 	}
@@ -542,6 +548,21 @@ func KubeletNeedsNewCertificate(headers http.Header) error {
 	return nil
 }
 
+func findCertificateFiles(IPAddresses ...string) (string, string, string) {
+	for _, ip := range IPAddresses {
+		fileSafeIPAddress := strings.ReplaceAll(ip, ".", "-")
+		certFile := fmt.Sprintf("/etc/kubernetes/ssl/kube-kubelet-%s.pem", fileSafeIPAddress)
+		certKeyFile := fmt.Sprintf("/etc/kubernetes/ssl/kube-kubelet-%s-key.pem", fileSafeIPAddress)
+		_, certErr := os.Stat(certFile)
+		_, keyErr := os.Stat(certKeyFile)
+		// check that both files exist
+		if certErr == nil && keyErr == nil {
+			return certFile, certKeyFile, ip
+		}
+	}
+	return "", "", ""
+}
+
 func KubeletCertificateNeedsRegeneration(ipAddress, currentHostname string, cert tls.Certificate, currentTime time.Time) (bool, error) {
 	if len(cert.Certificate) == 0 {
 		return true, nil
@@ -552,7 +573,22 @@ func KubeletCertificateNeedsRegeneration(ipAddress, currentHostname string, cert
 		return false, err
 	}
 
-	return !CertificateIncludesHostname(currentHostname, parsedCert) || CertificateIsExpiring(parsedCert, currentTime) || !CertificateIncludesCurrentIP(ipAddress, parsedCert), nil
+	if !CertificateIncludesHostname(currentHostname, parsedCert) {
+		logrus.Tracef("certificate does not include current hostname, requesting new certificate")
+		return true, nil
+	}
+
+	if CertificateIsExpiring(parsedCert, currentTime) {
+		logrus.Tracef("certificate is expiring soon, requesting new certificate")
+		return true, nil
+	}
+
+	if !CertificateIncludesCurrentIP(ipAddress, parsedCert) {
+		logrus.Tracef("certificate does not include current IP address, requesting new certificate")
+		return true, nil
+	}
+
+	return false, nil
 }
 
 // CertificateIsExpiring checks if the passed certificate will expire within
