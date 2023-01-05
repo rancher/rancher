@@ -18,5 +18,3 @@ require (
 	k8s.io/api v0.20.0
 	k8s.io/apimachinery v0.20.0
 )
-
-replace github.com/rancher/wrangler => github.com/rancherlabs/wrangler-security v0.7.3-0.20221221180351-9c4353694c41
