@@ -6,7 +6,7 @@ fi
 
 case $RELEASE_ACTION in
   release)
-    CURRENT_BRANCH="dev-v2.6"
+    CURRENT_BRANCH="dev-v2.6.10"
     NEW_BRANCH="release-v2.6"
     ;;
   revert)
