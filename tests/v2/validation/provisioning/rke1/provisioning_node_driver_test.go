@@ -72,8 +72,7 @@ func (r *RKE1NodeDriverProvisioningTestSuite) SetupSuite() {
 	r.standardUserClient = standardUserClient
 }
 
-func (r *RKE1NodeDriverProvisioningTestSuite) ProvisioningRKE1Cluster(provider Provider) {
-	providerName := " Node Provider: " + provider.Name
+func (r *RKE1NodeDriverProvisioningTestSuite) TestProvisioningRKE1Cluster() {
 	nodeRoles0 := []nodepools.NodeRoles{
 		{
 			ControlPlane: true,
@@ -115,7 +114,7 @@ func (r *RKE1NodeDriverProvisioningTestSuite) ProvisioningRKE1Cluster(provider P
 		{"3 nodes - 1 role per node Standard User", nodeRoles1, r.standardUserClient},
 	}
 
-	var name string
+	var name, scaleName string
 	for _, tt := range tests {
 		subSession := r.session.NewSession()
 		defer subSession.Cleanup()
@@ -123,136 +122,28 @@ func (r *RKE1NodeDriverProvisioningTestSuite) ProvisioningRKE1Cluster(provider P
 		client, err := tt.client.WithSession(subSession)
 		require.NoError(r.T(), err)
 
-		for _, kubeVersion := range r.kubernetesVersions {
-			name = tt.name + providerName + " Kubernetes version: " + kubeVersion
-			for _, cni := range r.cnis {
-				name += " cni: " + cni
-				r.Run(name, func() {
-					testSession := session.NewSession(r.T())
-					defer testSession.Cleanup()
+		for _, providerName := range r.providers {
+			provider := CreateProvider(providerName)
+			providerName := " Node Provider: " + provider.Name
+			for _, kubeVersion := range r.kubernetesVersions {
+				name = tt.name + providerName + " Kubernetes version: " + kubeVersion
+				for _, cni := range r.cnis {
+					name += " cni: " + cni
+					scaleName += name + " scaling"
+					r.Run(name, func() {
+						r.testProvisioningRKE1Cluster(client, provider, tt.nodeRoles, kubeVersion, cni)
+					})
 
-					testSessionClient, err := tt.client.WithSession(testSession)
-					require.NoError(r.T(), err)
-
-					clusterName := namegen.AppendRandomString(provider.Name)
-
-					cluster := clusters.NewRKE1ClusterConfig(clusterName, cni, kubeVersion, testSessionClient)
-
-					clusterResp, err := clusters.CreateRKE1Cluster(testSessionClient, cluster)
-					require.NoError(r.T(), err)
-
-					nodeTemplateResp, err := provider.NodeTemplateFunc(client)
-					require.NoError(r.T(), err)
-
-					nodePool, err := nodepools.NodePoolSetup(testSessionClient, tt.nodeRoles, clusterResp.ID, nodeTemplateResp.ID)
-					require.NoError(r.T(), err)
-
-					nodePoolName := nodePool.Name
-
-					opts := metav1.ListOptions{
-						FieldSelector:  "metadata.name=" + clusterResp.ID,
-						TimeoutSeconds: &defaults.WatchTimeoutSeconds,
-					}
-					watchInterface, err := r.client.GetManagementWatchInterface(management.ClusterType, opts)
-					require.NoError(r.T(), err)
-
-					checkFunc := clusters.IsHostedProvisioningClusterReady
-
-					err = wait.WatchWait(watchInterface, checkFunc)
-					require.NoError(r.T(), err)
-					assert.Equal(r.T(), clusterName, clusterResp.Name)
-					assert.Equal(r.T(), nodePoolName, nodePool.Name)
-
-					clusterToken, err := clusters.CheckServiceAccountTokenSecret(client, clusterName)
-					require.NoError(r.T(), err)
-					assert.NotEmpty(r.T(), clusterToken)
-
-					err = nodepools.ScaleWorkerNodePool(testSessionClient, tt.nodeRoles, clusterResp.ID, nodeTemplateResp.ID)
-					require.NoError(r.T(), err)
-				})
+					r.Run(scaleName, func() {
+						r.testScalingRKE1NodePools(client, provider, tt.nodeRoles, kubeVersion, cni)
+					})
+				}
 			}
 		}
 	}
 }
 
-func (r *RKE1NodeDriverProvisioningTestSuite) ProvisioningRKE1ClusterDynamicInput(provider Provider, nodesAndRoles []nodepools.NodeRoles) {
-	providerName := " Node Provider: " + provider.Name
-	tests := []struct {
-		name   string
-		client *rancher.Client
-	}{
-		{"Admin User", r.client},
-		{"Standard User", r.standardUserClient},
-	}
-
-	var name string
-	for _, tt := range tests {
-		subSession := r.session.NewSession()
-		defer subSession.Cleanup()
-
-		client, err := tt.client.WithSession(subSession)
-		require.NoError(r.T(), err)
-
-		for _, kubeVersion := range r.kubernetesVersions {
-			name = tt.name + providerName + " Kubernetes version: " + kubeVersion
-			for _, cni := range r.cnis {
-				name += " cni: " + cni
-				r.Run(name, func() {
-					testSession := session.NewSession(r.T())
-					defer testSession.Cleanup()
-
-					testSessionClient, err := tt.client.WithSession(testSession)
-					require.NoError(r.T(), err)
-
-					clusterName := namegen.AppendRandomString(provider.Name)
-
-					cluster := clusters.NewRKE1ClusterConfig(clusterName, cni, kubeVersion, testSessionClient)
-
-					clusterResp, err := clusters.CreateRKE1Cluster(testSessionClient, cluster)
-					require.NoError(r.T(), err)
-
-					nodeTemplateResp, err := provider.NodeTemplateFunc(client)
-					require.NoError(r.T(), err)
-
-					nodePool, err := nodepools.NodePoolSetup(testSessionClient, nodesAndRoles, clusterResp.ID, nodeTemplateResp.ID)
-					require.NoError(r.T(), err)
-
-					nodePoolName := nodePool.Name
-
-					opts := metav1.ListOptions{
-						FieldSelector:  "metadata.name=" + clusterResp.ID,
-						TimeoutSeconds: &defaults.WatchTimeoutSeconds,
-					}
-					watchInterface, err := r.client.GetManagementWatchInterface(management.ClusterType, opts)
-					require.NoError(r.T(), err)
-
-					checkFunc := clusters.IsHostedProvisioningClusterReady
-
-					err = wait.WatchWait(watchInterface, checkFunc)
-					require.NoError(r.T(), err)
-					assert.Equal(r.T(), clusterName, clusterResp.Name)
-					assert.Equal(r.T(), nodePoolName, nodePool.Name)
-
-					clusterToken, err := clusters.CheckServiceAccountTokenSecret(client, clusterName)
-					require.NoError(r.T(), err)
-					assert.NotEmpty(r.T(), clusterToken)
-
-					err = nodepools.ScaleWorkerNodePool(testSessionClient, nodesAndRoles, clusterResp.ID, nodeTemplateResp.ID)
-					require.NoError(r.T(), err)
-				})
-			}
-		}
-	}
-}
-
-func (r *RKE1NodeDriverProvisioningTestSuite) TestProvisioning() {
-	for _, providerName := range r.providers {
-		provider := CreateProvider(providerName)
-		r.ProvisioningRKE1Cluster(provider)
-	}
-}
-
-func (r *RKE1NodeDriverProvisioningTestSuite) TestProvisioningDynamicInput() {
+func (r *RKE1NodeDriverProvisioningTestSuite) TestProvisioningRKE1ClusterDynamicInput() {
 	clustersConfig := new(provisioning.Config)
 	config.LoadConfig(provisioning.ConfigurationFileKey, clustersConfig)
 	nodesAndRoles := clustersConfig.NodesAndRolesRKE1
@@ -261,10 +152,88 @@ func (r *RKE1NodeDriverProvisioningTestSuite) TestProvisioningDynamicInput() {
 		r.T().Skip()
 	}
 
-	for _, providerName := range r.providers {
-		provider := CreateProvider(providerName)
-		r.ProvisioningRKE1ClusterDynamicInput(provider, nodesAndRoles)
+	tests := []struct {
+		name   string
+		client *rancher.Client
+	}{
+		{"Admin User", r.client},
+		{"Standard User", r.standardUserClient},
 	}
+
+	var name, scaleName string
+	for _, tt := range tests {
+		subSession := r.session.NewSession()
+		defer subSession.Cleanup()
+
+		client, err := tt.client.WithSession(subSession)
+		require.NoError(r.T(), err)
+
+		for _, providerName := range r.providers {
+			provider := CreateProvider(providerName)
+			providerName := " Node Provider: " + provider.Name
+			for _, kubeVersion := range r.kubernetesVersions {
+				name = tt.name + providerName + " Kubernetes version: " + kubeVersion
+				for _, cni := range r.cnis {
+					name += " cni: " + cni
+					scaleName += name + " scaling"
+					r.Run(name, func() {
+						r.testProvisioningRKE1Cluster(client, provider, nodesAndRoles, kubeVersion, cni)
+					})
+
+					r.Run(scaleName, func() {
+						r.testScalingRKE1NodePools(client, provider, nodesAndRoles, kubeVersion, cni)
+					})
+				}
+			}
+		}
+	}
+}
+
+func (r *RKE1NodeDriverProvisioningTestSuite) testProvisioningRKE1Cluster(client *rancher.Client, provider Provider, nodesAndRoles []nodepools.NodeRoles, kubeVersion, cni string) (*management.Cluster, error) {
+	clusterName := namegen.AppendRandomString(provider.Name)
+
+	cluster := clusters.NewRKE1ClusterConfig(clusterName, cni, kubeVersion, client)
+	clusterResp, err := clusters.CreateRKE1Cluster(client, cluster)
+	require.NoError(r.T(), err)
+
+	nodeTemplateResp, err := provider.NodeTemplateFunc(client)
+	require.NoError(r.T(), err)
+
+	nodePool, err := nodepools.NodePoolSetup(client, nodesAndRoles, clusterResp.ID, nodeTemplateResp.ID)
+	require.NoError(r.T(), err)
+
+	nodePoolName := nodePool.Name
+
+	opts := metav1.ListOptions{
+		FieldSelector:  "metadata.name=" + clusterResp.ID,
+		TimeoutSeconds: &defaults.WatchTimeoutSeconds,
+	}
+	watchInterface, err := r.client.GetManagementWatchInterface(management.ClusterType, opts)
+	require.NoError(r.T(), err)
+
+	checkFunc := clusters.IsHostedProvisioningClusterReady
+
+	err = wait.WatchWait(watchInterface, checkFunc)
+	require.NoError(r.T(), err)
+	assert.Equal(r.T(), clusterName, clusterResp.Name)
+	assert.Equal(r.T(), nodePoolName, nodePool.Name)
+
+	clusterToken, err := clusters.CheckServiceAccountTokenSecret(client, clusterName)
+	require.NoError(r.T(), err)
+	assert.NotEmpty(r.T(), clusterToken)
+
+	return clusterResp, nil
+}
+
+func (r *RKE1NodeDriverProvisioningTestSuite) testScalingRKE1NodePools(client *rancher.Client, provider Provider, nodesAndRoles []nodepools.NodeRoles, kubeVersion, cni string) {
+	nodeTemplateResp, err := provider.NodeTemplateFunc(client)
+	require.NoError(r.T(), err)
+
+	clusterResp, err := r.testProvisioningRKE1Cluster(client, provider, nodesAndRoles, kubeVersion, cni)
+	require.NoError(r.T(), err)
+
+	err = nodepools.ScaleWorkerNodePool(client, nodesAndRoles, clusterResp.ID, nodeTemplateResp.ID)
+	require.NoError(r.T(), err)
 }
 
 // In order for 'go test' to run this suite, we need to create
