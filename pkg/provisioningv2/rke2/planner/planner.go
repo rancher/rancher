@@ -11,7 +11,6 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/moby/locker"
@@ -27,7 +26,6 @@ import (
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/wrangler"
 	corecontrollers "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
-	"github.com/rancher/wrangler/pkg/generic"
 	"github.com/rancher/wrangler/pkg/name"
 	"github.com/rancher/wrangler/pkg/randomtoken"
 	"github.com/rancher/wrangler/pkg/summary"
@@ -35,10 +33,11 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	apierror "k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
+	capiannotations "sigs.k8s.io/cluster-api/util/annotations"
 	"sigs.k8s.io/cluster-api/util/conditions"
 )
 
@@ -137,7 +136,6 @@ type Planner struct {
 	rancherClusterCache           ranchercontrollers.ClusterCache
 	locker                        locker.Locker
 	etcdS3Args                    s3Args
-	certificateRotation           *certificateRotation
 }
 
 func New(ctx context.Context, clients *wrangler.Context) *Planner {
@@ -163,7 +161,6 @@ func New(ctx context.Context, clients *wrangler.Context) *Planner {
 		etcdS3Args: s3Args{
 			secretCache: clients.Core.Secret().Cache(),
 		},
-		certificateRotation: newCertificateRotation(clients, store),
 	}
 }
 
@@ -210,6 +207,152 @@ func (p *Planner) setMachineConditionStatus(clusterPlan *plan.Plan, machineNames
 	return nil
 }
 
+func (p *Planner) Process(cp *rkev1.RKEControlPlane, status rkev1.RKEControlPlaneStatus) (rkev1.RKEControlPlaneStatus, error) {
+	logrus.Debugf("[planner] %s/%s: attempting to lock %s for processing", cp.Namespace, cp.Name, string(cp.UID))
+	p.locker.Lock(string(cp.UID))
+	defer func(namespace, name, uid string) {
+		logrus.Debugf("[planner] %s/%s: unlocking %s", namespace, name, uid)
+		_ = p.locker.Unlock(uid)
+	}(cp.Namespace, cp.Name, string(cp.UID))
+
+	releaseData := rke2.GetKDMReleaseData(p.ctx, cp)
+	if releaseData == nil {
+		return status, ErrWaitingf("%s/%s: releaseData nil for version %s", cp.Namespace, cp.Name, cp.Spec.KubernetesVersion)
+	}
+
+	capiCluster, err := rke2.GetOwnerCAPICluster(cp, p.capiClusters)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			return status, ErrWaiting("CAPI cluster does not exist")
+		}
+		return status, err
+	}
+
+	if capiCluster == nil {
+		return status, ErrWaiting("CAPI cluster does not exist")
+	}
+
+	if !capiCluster.DeletionTimestamp.IsZero() {
+		// because we pause reconciliation during encryption key rotation and cert rotation, unpause it. This is effectively
+		// a hack since the planner pauses the entire cluster during
+		if capiannotations.IsPaused(capiCluster, cp) {
+			err = p.pauseCAPICluster(cp, false)
+			if err != nil {
+				logrus.Errorf("error unpausing CAPI cluster during deletion: %s", err)
+			}
+		}
+		logrus.Infof("[planner] %s/%s: reconciliation stopped: CAPI cluster is deleting", cp.Namespace, cp.Name)
+		return status, nil
+	}
+
+	if !capiCluster.Status.InfrastructureReady {
+		return status, ErrWaitingf("rkecluster %s/%s: waiting for infrastructure ready", cp.Namespace, cp.Name)
+	}
+
+	plan, err := p.store.Load(capiCluster, cp)
+	if err != nil {
+		return status, err
+	}
+
+	clusterSecretTokens, err := p.generateSecrets(cp)
+	if err != nil {
+		return status, err
+	}
+
+	var (
+		firstIgnoreError error
+		joinServer       string
+	)
+
+	if status, err = p.createEtcdSnapshot(cp, status, clusterSecretTokens, plan); err != nil {
+		return status, err
+	}
+
+	if status, err = p.restoreEtcdSnapshot(cp, status, clusterSecretTokens, plan); err != nil {
+		return status, err
+	}
+
+	if status, err = p.rotateCertificates(cp, status, plan); err != nil {
+		return status, err
+	}
+
+	if status, err = p.rotateEncryptionKeys(cp, status, releaseData, plan); err != nil {
+		return status, err
+	}
+
+	// pausing the control plane only affects machine reconciliation: etcd snapshot/restore, encryption key & cert
+	// rotation are not interruptable processes, and therefore must always be completed when requested
+	if capiannotations.IsPaused(capiCluster, cp) {
+		return status, ErrWaitingf("rkecluster %s/%s: CAPI cluster or RKEControlPlane is paused", cp.Namespace, cp.Name)
+	}
+
+	// on the first run through, electInitNode will return a `generic.ErrSkip` as it is attempting to wait for the cache to catch up.
+	joinServer, err = p.electInitNode(cp, plan)
+	if err != nil {
+		return status, err
+	}
+
+	// select all etcd and then filter to just initNodes so that unavailable count is correct
+	err = p.reconcile(cp, clusterSecretTokens, plan, true, bootstrapTier, isEtcd, isNotInitNodeOrIsDeleting,
+		"1", "",
+		cp.Spec.UpgradeStrategy.ControlPlaneDrainOptions)
+	firstIgnoreError, err = ignoreErrors(firstIgnoreError, err)
+	if err != nil {
+		return status, err
+	}
+
+	if joinServer == "" {
+		_, joinServer, _, err = p.findInitNode(cp, plan)
+		if err != nil {
+			return status, err
+		} else if joinServer == "" && firstIgnoreError != nil {
+			return status, ErrWaiting(firstIgnoreError.Error() + " and join url to be available on bootstrap node")
+		} else if joinServer == "" {
+			return status, ErrWaiting("waiting for join url to be available on bootstrap node")
+		}
+	}
+
+	err = p.reconcile(cp, clusterSecretTokens, plan, true, etcdTier, isEtcd, isInitNodeOrDeleting,
+		"1", joinServer,
+		cp.Spec.UpgradeStrategy.ControlPlaneDrainOptions)
+	firstIgnoreError, err = ignoreErrors(firstIgnoreError, err)
+	if err != nil {
+		return status, err
+	}
+
+	err = p.reconcile(cp, clusterSecretTokens, plan, true, controlPlaneTier, isControlPlane, isInitNodeOrDeleting,
+		cp.Spec.UpgradeStrategy.ControlPlaneConcurrency, joinServer,
+		cp.Spec.UpgradeStrategy.ControlPlaneDrainOptions)
+	firstIgnoreError, err = ignoreErrors(firstIgnoreError, err)
+	if err != nil {
+		return status, err
+	}
+
+	joinServer = getControlPlaneJoinURL(plan)
+	if joinServer == "" {
+		return status, ErrWaiting("waiting for control plane to be available")
+	}
+
+	if status.Initialized != true {
+		status.Initialized = true
+		return status, ErrWaiting("marking control plane as initialized")
+	}
+
+	err = p.reconcile(cp, clusterSecretTokens, plan, false, workerTier, isOnlyWorker, isInitNodeOrDeleting,
+		cp.Spec.UpgradeStrategy.WorkerConcurrency, joinServer,
+		cp.Spec.UpgradeStrategy.WorkerDrainOptions)
+	firstIgnoreError, err = ignoreErrors(firstIgnoreError, err)
+	if err != nil {
+		return status, err
+	}
+
+	if firstIgnoreError != nil {
+		return status, ErrWaiting(firstIgnoreError.Error())
+	}
+
+	return status, nil
+}
+
 func atMostThree(names []string) string {
 	sort.Strings(names)
 	if len(names) > 3 {
@@ -229,7 +372,7 @@ func detailMessage(machines []string, messages map[string][]string) string {
 	return ""
 }
 
-func removeConfiguredCondition(machine *capi.Machine) *capi.Machine {
+func removeReconciledCondition(machine *capi.Machine) *capi.Machine {
 	if machine == nil || len(machine.Status.Conditions) == 0 {
 		return machine
 	}
@@ -248,141 +391,6 @@ func removeConfiguredCondition(machine *capi.Machine) *capi.Machine {
 	machine = machine.DeepCopy()
 	machine.SetConditions(conds)
 	return machine
-}
-
-func (p *Planner) getCAPICluster(controlPlane *rkev1.RKEControlPlane) (*capi.Cluster, error) {
-	ref := metav1.GetControllerOf(controlPlane)
-	if ref == nil {
-		return nil, generic.ErrSkip
-	}
-	gvk := schema.FromAPIVersionAndKind(ref.APIVersion, ref.Kind)
-	if gvk.Kind != "Cluster" || gvk.Group != "cluster.x-k8s.io" {
-		return nil, fmt.Errorf("RKEControlPlane %s/%s has wrong owner kind %s/%s", controlPlane.Namespace,
-			controlPlane.Name, ref.APIVersion, ref.Kind)
-	}
-	return p.capiClusters.Get(controlPlane.Namespace, ref.Name)
-}
-
-func (p *Planner) Process(controlPlane *rkev1.RKEControlPlane) error {
-	logrus.Debugf("[planner] rkecluster %s/%s: attempting to lock %s for processing", controlPlane.Namespace, controlPlane.Name, string(controlPlane.UID))
-	p.locker.Lock(string(controlPlane.UID))
-	defer func(namespace, name, uid string) error {
-		logrus.Debugf("[planner] rkecluster %s/%s: unlocking %s", namespace, name, uid)
-		return p.locker.Unlock(uid)
-	}(controlPlane.Namespace, controlPlane.Name, string(controlPlane.UID))
-
-	releaseData := rke2.GetKDMReleaseData(p.ctx, controlPlane)
-	if releaseData == nil {
-		return ErrWaitingf("rkecluster %s/%s: releaseData nil for version %s", controlPlane.Namespace, controlPlane.Name, controlPlane.Spec.KubernetesVersion)
-	}
-
-	cluster, err := p.getCAPICluster(controlPlane)
-	if err != nil || !cluster.DeletionTimestamp.IsZero() {
-		return err
-	}
-
-	plan, err := p.store.Load(cluster, controlPlane)
-	if err != nil {
-		return err
-	}
-
-	controlPlane, clusterSecretTokens, err := p.generateSecrets(controlPlane)
-	if err != nil {
-		return err
-	}
-
-	var (
-		firstIgnoreError error
-		joinServer       string
-	)
-
-	if errs := p.createEtcdSnapshot(controlPlane, clusterSecretTokens, plan); len(errs) > 0 {
-		var errMsg string
-		for i, err := range errs {
-			if err == nil {
-				continue
-			}
-			if i == 0 {
-				errMsg = err.Error()
-			} else {
-				errMsg = errMsg + ", " + err.Error()
-			}
-		}
-		return ErrWaiting(errMsg)
-	}
-
-	if err = p.restoreEtcdSnapshot(controlPlane, clusterSecretTokens, plan); err != nil {
-		return err
-	}
-
-	// on the first run through, electInitNode will return a `generic.ErrSkip` as it is attempting to wait for the cache to catch up.
-	joinServer, err = p.electInitNode(controlPlane, plan)
-	if err != nil {
-		return err
-	}
-
-	if err = p.certificateRotation.RotateCertificates(controlPlane, plan); err != nil {
-		return err
-	}
-
-	if err = p.rotateEncryptionKeys(controlPlane, releaseData, plan); err != nil {
-		return err
-	}
-
-	// select all etcd and then filter to just initNodes to that unavailable count is correct
-	err = p.reconcile(controlPlane, clusterSecretTokens, plan, true, bootstrapTier, isEtcd, isNotInitNodeOrIsDeleting,
-		"1", "",
-		controlPlane.Spec.UpgradeStrategy.ControlPlaneDrainOptions)
-	firstIgnoreError, err = ignoreErrors(firstIgnoreError, err)
-	if err != nil {
-		return err
-	}
-
-	if joinServer == "" {
-		_, joinServer, _, err = p.findInitNode(controlPlane, plan)
-		if err != nil {
-			return err
-		} else if joinServer == "" && firstIgnoreError != nil {
-			return ErrWaiting(firstIgnoreError.Error() + " and join url to be available on bootstrap node")
-		} else if joinServer == "" {
-			return ErrWaiting("waiting for join url to be available on bootstrap node")
-		}
-	}
-
-	err = p.reconcile(controlPlane, clusterSecretTokens, plan, true, etcdTier, isEtcd, isInitNodeOrDeleting,
-		"1", joinServer,
-		controlPlane.Spec.UpgradeStrategy.ControlPlaneDrainOptions)
-	firstIgnoreError, err = ignoreErrors(firstIgnoreError, err)
-	if err != nil {
-		return err
-	}
-
-	err = p.reconcile(controlPlane, clusterSecretTokens, plan, true, controlPlaneTier, isControlPlane, isInitNodeOrDeleting,
-		controlPlane.Spec.UpgradeStrategy.ControlPlaneConcurrency, joinServer,
-		controlPlane.Spec.UpgradeStrategy.ControlPlaneDrainOptions)
-	firstIgnoreError, err = ignoreErrors(firstIgnoreError, err)
-	if err != nil {
-		return err
-	}
-
-	joinServer = getControlPlaneJoinURL(plan)
-	if joinServer == "" {
-		return ErrWaiting("waiting for control plane to be available")
-	}
-
-	err = p.reconcile(controlPlane, clusterSecretTokens, plan, false, workerTier, isOnlyWorker, isInitNodeOrDeleting,
-		controlPlane.Spec.UpgradeStrategy.WorkerConcurrency, joinServer,
-		controlPlane.Spec.UpgradeStrategy.WorkerDrainOptions)
-	firstIgnoreError, err = ignoreErrors(firstIgnoreError, err)
-	if err != nil {
-		return err
-	}
-
-	if firstIgnoreError != nil {
-		return ErrWaiting(firstIgnoreError.Error())
-	}
-
-	return nil
 }
 
 // ignoreErrors accepts two errors. If the err is type errIgnore, it will return (err, nil) if firstIgnoreErr is nil or (firstIgnoreErr, nil).
@@ -506,174 +514,6 @@ func minorPlanChangeDetected(old, new plan.NodePlan) bool {
 		return true
 	}
 	return false
-}
-
-func (p *Planner) reconcile(controlPlane *rkev1.RKEControlPlane, tokensSecret plan.Secret, clusterPlan *plan.Plan, required bool,
-	tierName string, include, exclude roleFilter, maxUnavailable string, joinServer string, drainOptions rkev1.DrainOptions) error {
-	var (
-		ready, outOfSync, reconciling, nonReady, errMachines, draining, uncordoned []string
-		messages                                                                   = map[string][]string{}
-	)
-
-	entries := collect(clusterPlan, include)
-
-	concurrency, unavailable, err := calculateConcurrency(maxUnavailable, entries, exclude)
-	if err != nil {
-		return err
-	}
-
-	for _, entry := range entries {
-		logrus.Tracef("[planner] rkecluster %s/%s reconcile tier %s - processing machine entry: %s/%s", controlPlane.Namespace, controlPlane.Name, tierName, entry.Machine.Namespace, entry.Machine.Name)
-		// we exclude here and not in collect to ensure that include matched at least one node
-		if exclude(entry) {
-			logrus.Tracef("[planner] rkecluster %s/%s reconcile tier %s - excluding machine entry: %s/%s", controlPlane.Namespace, controlPlane.Name, tierName, entry.Machine.Namespace, entry.Machine.Name)
-			continue
-		}
-
-		// The Reconciled condition should be removed when summarizing so that the messages are not duplicated.
-		summary := summary.Summarize(removeConfiguredCondition(entry.Machine))
-		if summary.Error {
-			errMachines = append(errMachines, entry.Machine.Name)
-		}
-		if summary.Transitioning {
-			nonReady = append(nonReady, entry.Machine.Name)
-		}
-
-		planStatusMessage := getPlanStatusReasonMessage(entry)
-		if planStatusMessage != "" {
-			summary.Message = append(summary.Message, planStatusMessage)
-		}
-		messages[entry.Machine.Name] = summary.Message
-
-		plan, err := p.desiredPlan(controlPlane, tokensSecret, entry, joinServer)
-		if err != nil {
-			return err
-		}
-
-		if entry.Plan == nil {
-			logrus.Debugf("[planner] rkecluster %s/%s reconcile tier %s - setting initial plan for machine %s/%s", controlPlane.Namespace, controlPlane.Name, tierName, entry.Machine.Namespace, entry.Machine.Name)
-			logrus.Tracef("[planner] rkecluster %s/%s reconcile tier %s - initial plan for machine %s/%s new: %+v", controlPlane.Namespace, controlPlane.Name, tierName, entry.Machine.Namespace, entry.Machine.Name, plan)
-			outOfSync = append(outOfSync, entry.Machine.Name)
-			if err := p.store.UpdatePlan(entry, plan, -1, 1); err != nil {
-				return err
-			}
-		} else if minorPlanChangeDetected(entry.Plan.Plan, plan) {
-			logrus.Debugf("[planner] rkecluster %s/%s reconcile tier %s - minor plan change detected for machine %s/%s, updating plan immediately", controlPlane.Namespace, controlPlane.Name, tierName, entry.Machine.Namespace, entry.Machine.Name)
-			logrus.Tracef("[planner] rkecluster %s/%s reconcile tier %s - minor plan change for machine %s/%s old: %+v, new: %+v", controlPlane.Namespace, controlPlane.Name, tierName, entry.Machine.Namespace, entry.Machine.Name, entry.Plan.Plan, plan)
-			outOfSync = append(outOfSync, entry.Machine.Name)
-			if err := p.store.UpdatePlan(entry, plan, -1, 1); err != nil {
-				return err
-			}
-		} else if !equality.Semantic.DeepEqual(entry.Plan.Plan, plan) {
-			logrus.Debugf("[planner] rkecluster %s/%s reconcile tier %s - plan for machine %s/%s did not match, appending to outOfSync", controlPlane.Namespace, controlPlane.Name, tierName, entry.Machine.Namespace, entry.Machine.Name)
-			outOfSync = append(outOfSync, entry.Machine.Name)
-			// Conditions
-			// 1. If the node is already draining then the plan is out of sync.  There is no harm in updating it if
-			// the node is currently drained.
-			// 2. If the plan has failed to apply. Note that the `Failed` will only be `true` if the max failure count has passed, or (if max-failures is not set) the plan has failed to apply at least once.
-			// 3. concurrency == 0 which means infinite concurrency.
-			// 4. unavailable < concurrency meaning we have capacity to make something unavailable
-			// 5. If the plans are in sync, but we are still waiting for probes, it is safe to apply new instructions
-			logrus.Debugf("[planner] rkecluster %s/%s reconcile tier %s - concurrency: %d, unavailable: %d", controlPlane.Namespace, controlPlane.Name, tierName, concurrency, unavailable)
-			if isInDrain(entry) || entry.Plan.Failed || concurrency == 0 || unavailable < concurrency || planAppliedButWaitingForProbes(entry) {
-				reconciling = append(reconciling, entry.Machine.Name)
-				if !isUnavailable(entry) {
-					unavailable++
-				}
-				if ok, err := p.drain(entry.Plan.AppliedPlan, plan, entry, clusterPlan, drainOptions); !ok && err != nil {
-					return err
-				} else if ok && err == nil {
-					// Drain is done (or didn't need to be done) and there are no errors, so the plan should be updated to enact the reason the node was drained.
-					logrus.Debugf("[planner] rkecluster %s/%s reconcile tier %s - major plan change for machine %s/%s", controlPlane.Namespace, controlPlane.Name, tierName, entry.Machine.Namespace, entry.Machine.Name)
-					logrus.Tracef("[planner] rkecluster %s/%s reconcile tier %s - major plan change for machine %s/%s old: %+v, new: %+v", controlPlane.Namespace, controlPlane.Name, tierName, entry.Machine.Namespace, entry.Machine.Name, entry.Plan.Plan, plan)
-					if err = p.store.UpdatePlan(entry, plan, -1, 1); err != nil {
-						return err
-					} else if entry.Metadata.Annotations[rke2.DrainDoneAnnotation] != "" {
-						messages[entry.Machine.Name] = append(messages[entry.Machine.Name], "drain completed")
-					} else if planStatusMessage == "" {
-						messages[entry.Machine.Name] = append(messages[entry.Machine.Name], WaitingPlanStatusMessage)
-					}
-				} else {
-					// In this case, it is true that ((ok == true && err != nil) || (ok == false && err == nil))
-					// The first case indicates that there is an error trying to drain the node.
-					// The second case indicates that the node is draining.
-					draining = append(draining, entry.Machine.Name)
-					if err != nil {
-						messages[entry.Machine.Name] = append(messages[entry.Machine.Name], err.Error())
-					} else {
-						messages[entry.Machine.Name] = append(messages[entry.Machine.Name], "draining node")
-					}
-				}
-			}
-		} else if planStatusMessage != "" {
-			outOfSync = append(outOfSync, entry.Machine.Name)
-		} else if ok, err := p.undrain(entry); !ok && err != nil {
-			return err
-		} else if !ok || err != nil {
-			// The uncordoning is happening or there was an error.
-			// Either way, the planner should wait for the result and display the message on the machine.
-			uncordoned = append(uncordoned, entry.Machine.Name)
-			if err != nil {
-				messages[entry.Machine.Name] = append(messages[entry.Machine.Name], err.Error())
-			} else {
-				messages[entry.Machine.Name] = append(messages[entry.Machine.Name], "waiting for uncordon to finish")
-			}
-		} else if !kubeletVersionUpToDate(controlPlane, entry.Machine) {
-			outOfSync = append(outOfSync, entry.Machine.Name)
-			messages[entry.Machine.Name] = append(messages[entry.Machine.Name], "waiting for kubelet to update")
-		} else if isControlPlane(entry) && !controlPlane.Status.AgentConnected {
-			// If the control plane nodes are currently being provisioned/updated, then it should be ensured that cluster-agent is connected.
-			// Without the agent connected, the controllers running in Rancher, including CAPI, can't communicate with the downstream cluster.
-			outOfSync = append(outOfSync, entry.Machine.Name)
-			messages[entry.Machine.Name] = append(messages[entry.Machine.Name], "waiting for cluster agent to connect")
-		} else {
-			ready = append(ready, entry.Machine.Name)
-		}
-	}
-
-	if required && len(entries) == 0 {
-		return ErrWaiting("waiting for at least one " + tierName + " node")
-	}
-
-	// If multiple machines are changing status, then all of their statuses should be updated to avoid having stale conditions.
-	// However, only the first one will be returned so that status goes on the control plane and cluster objects.
-	var firstError error
-	if err := p.setMachineConditionStatus(clusterPlan, uncordoned, fmt.Sprintf("uncordoning %s node(s) ", tierName), messages); err != nil && firstError == nil {
-		firstError = err
-	}
-
-	if err := p.setMachineConditionStatus(clusterPlan, draining, fmt.Sprintf("draining %s node(s) ", tierName), messages); err != nil && firstError == nil {
-		firstError = err
-	}
-
-	if err := p.setMachineConditionStatus(clusterPlan, reconciling, fmt.Sprintf("configuring %s node(s) ", tierName), messages); err != nil && firstError == nil {
-		firstError = err
-	}
-
-	if err := p.setMachineConditionStatus(clusterPlan, outOfSync, fmt.Sprintf("configuring %s node(s) ", tierName), messages); err != nil && firstError == nil {
-		firstError = err
-	}
-
-	// Ensure that the conditions that we control are updated.
-	if err := p.setMachineConditionStatus(clusterPlan, ready, "", nil); err != nil && firstError == nil {
-		firstError = err
-	}
-
-	if firstError != nil {
-		return firstError
-	}
-
-	// The messages for these machines come from the machine itself, so nothing needs to be added.
-	// we want these errors to get reported, but not block the process
-	if len(errMachines) > 0 {
-		return errIgnore("failing " + tierName + " machine(s) " + atMostThree(errMachines) + detailMessage(errMachines, messages))
-	}
-
-	if len(nonReady) > 0 {
-		return errIgnore("non-ready " + tierName + " machine(s) " + atMostThree(nonReady) + detailMessage(nonReady, messages))
-	}
-
-	return nil
 }
 
 func kubeletVersionUpToDate(controlPlane *rkev1.RKEControlPlane, machine *capi.Machine) bool {
@@ -880,6 +720,174 @@ func getTaints(entry *planEntry, cp *rkev1.RKEControlPlane) (result []corev1.Tai
 	return
 }
 
+func (p *Planner) reconcile(controlPlane *rkev1.RKEControlPlane, tokensSecret plan.Secret, clusterPlan *plan.Plan, required bool,
+	tierName string, include, exclude roleFilter, maxUnavailable string, joinServer string, drainOptions rkev1.DrainOptions) error {
+	var (
+		ready, outOfSync, reconciling, nonReady, errMachines, draining, uncordoned []string
+		messages                                                                   = map[string][]string{}
+	)
+
+	entries := collect(clusterPlan, include)
+
+	concurrency, unavailable, err := calculateConcurrency(maxUnavailable, entries, exclude)
+	if err != nil {
+		return err
+	}
+
+	for _, entry := range entries {
+		logrus.Tracef("[planner] rkecluster %s/%s reconcile tier %s - processing machine entry: %s/%s", controlPlane.Namespace, controlPlane.Name, tierName, entry.Machine.Namespace, entry.Machine.Name)
+		// we exclude here and not in collect to ensure that include matched at least one node
+		if exclude(entry) {
+			logrus.Tracef("[planner] rkecluster %s/%s reconcile tier %s - excluding machine entry: %s/%s", controlPlane.Namespace, controlPlane.Name, tierName, entry.Machine.Namespace, entry.Machine.Name)
+			continue
+		}
+
+		// The Reconciled condition should be removed when summarizing so that the messages are not duplicated.
+		summary := summary.Summarize(removeReconciledCondition(entry.Machine))
+		if summary.Error {
+			errMachines = append(errMachines, entry.Machine.Name)
+		}
+		if summary.Transitioning {
+			nonReady = append(nonReady, entry.Machine.Name)
+		}
+
+		planStatusMessage := getPlanStatusReasonMessage(entry)
+		if planStatusMessage != "" {
+			summary.Message = append(summary.Message, planStatusMessage)
+		}
+		messages[entry.Machine.Name] = summary.Message
+
+		plan, err := p.desiredPlan(controlPlane, tokensSecret, entry, joinServer)
+		if err != nil {
+			return err
+		}
+
+		if entry.Plan == nil {
+			logrus.Debugf("[planner] rkecluster %s/%s reconcile tier %s - setting initial plan for machine %s/%s", controlPlane.Namespace, controlPlane.Name, tierName, entry.Machine.Namespace, entry.Machine.Name)
+			logrus.Tracef("[planner] rkecluster %s/%s reconcile tier %s - initial plan for machine %s/%s new: %+v", controlPlane.Namespace, controlPlane.Name, tierName, entry.Machine.Namespace, entry.Machine.Name, plan)
+			outOfSync = append(outOfSync, entry.Machine.Name)
+			if err := p.store.UpdatePlan(entry, plan, -1, 1); err != nil {
+				return err
+			}
+		} else if minorPlanChangeDetected(entry.Plan.Plan, plan) {
+			logrus.Debugf("[planner] rkecluster %s/%s reconcile tier %s - minor plan change detected for machine %s/%s, updating plan immediately", controlPlane.Namespace, controlPlane.Name, tierName, entry.Machine.Namespace, entry.Machine.Name)
+			logrus.Tracef("[planner] rkecluster %s/%s reconcile tier %s - minor plan change for machine %s/%s old: %+v, new: %+v", controlPlane.Namespace, controlPlane.Name, tierName, entry.Machine.Namespace, entry.Machine.Name, entry.Plan.Plan, plan)
+			outOfSync = append(outOfSync, entry.Machine.Name)
+			if err := p.store.UpdatePlan(entry, plan, -1, 1); err != nil {
+				return err
+			}
+		} else if !equality.Semantic.DeepEqual(entry.Plan.Plan, plan) {
+			logrus.Debugf("[planner] rkecluster %s/%s reconcile tier %s - plan for machine %s/%s did not match, appending to outOfSync", controlPlane.Namespace, controlPlane.Name, tierName, entry.Machine.Namespace, entry.Machine.Name)
+			outOfSync = append(outOfSync, entry.Machine.Name)
+			// Conditions
+			// 1. If the node is already draining then the plan is out of sync.  There is no harm in updating it if
+			// the node is currently drained.
+			// 2. If the plan has failed to apply. Note that the `Failed` will only be `true` if the max failure count has passed, or (if max-failures is not set) the plan has failed to apply at least once.
+			// 3. concurrency == 0 which means infinite concurrency.
+			// 4. unavailable < concurrency meaning we have capacity to make something unavailable
+			// 5. If the plans are in sync, but we are still waiting for probes, it is safe to apply new instructions
+			logrus.Debugf("[planner] rkecluster %s/%s reconcile tier %s - concurrency: %d, unavailable: %d", controlPlane.Namespace, controlPlane.Name, tierName, concurrency, unavailable)
+			if isInDrain(entry) || entry.Plan.Failed || concurrency == 0 || unavailable < concurrency || planAppliedButWaitingForProbes(entry) {
+				reconciling = append(reconciling, entry.Machine.Name)
+				if !isUnavailable(entry) {
+					unavailable++
+				}
+				if ok, err := p.drain(entry.Plan.AppliedPlan, plan, entry, clusterPlan, drainOptions); !ok && err != nil {
+					return err
+				} else if ok && err == nil {
+					// Drain is done (or didn't need to be done) and there are no errors, so the plan should be updated to enact the reason the node was drained.
+					logrus.Debugf("[planner] rkecluster %s/%s reconcile tier %s - major plan change for machine %s/%s", controlPlane.Namespace, controlPlane.Name, tierName, entry.Machine.Namespace, entry.Machine.Name)
+					logrus.Tracef("[planner] rkecluster %s/%s reconcile tier %s - major plan change for machine %s/%s old: %+v, new: %+v", controlPlane.Namespace, controlPlane.Name, tierName, entry.Machine.Namespace, entry.Machine.Name, entry.Plan.Plan, plan)
+					if err = p.store.UpdatePlan(entry, plan, -1, 1); err != nil {
+						return err
+					} else if entry.Metadata.Annotations[rke2.DrainDoneAnnotation] != "" {
+						messages[entry.Machine.Name] = append(messages[entry.Machine.Name], "drain completed")
+					} else if planStatusMessage == "" {
+						messages[entry.Machine.Name] = append(messages[entry.Machine.Name], WaitingPlanStatusMessage)
+					}
+				} else {
+					// In this case, it is true that ((ok == true && err != nil) || (ok == false && err == nil))
+					// The first case indicates that there is an error trying to drain the node.
+					// The second case indicates that the node is draining.
+					draining = append(draining, entry.Machine.Name)
+					if err != nil {
+						messages[entry.Machine.Name] = append(messages[entry.Machine.Name], err.Error())
+					} else {
+						messages[entry.Machine.Name] = append(messages[entry.Machine.Name], "draining node")
+					}
+				}
+			}
+		} else if planStatusMessage != "" {
+			outOfSync = append(outOfSync, entry.Machine.Name)
+		} else if ok, err := p.undrain(entry); !ok && err != nil {
+			return err
+		} else if !ok || err != nil {
+			// The uncordoning is happening or there was an error.
+			// Either way, the planner should wait for the result and display the message on the machine.
+			uncordoned = append(uncordoned, entry.Machine.Name)
+			if err != nil {
+				messages[entry.Machine.Name] = append(messages[entry.Machine.Name], err.Error())
+			} else {
+				messages[entry.Machine.Name] = append(messages[entry.Machine.Name], "waiting for uncordon to finish")
+			}
+		} else if !kubeletVersionUpToDate(controlPlane, entry.Machine) {
+			outOfSync = append(outOfSync, entry.Machine.Name)
+			messages[entry.Machine.Name] = append(messages[entry.Machine.Name], "waiting for kubelet to update")
+		} else if isControlPlane(entry) && !controlPlane.Status.AgentConnected {
+			// If the control plane nodes are currently being provisioned/updated, then it should be ensured that cluster-agent is connected.
+			// Without the agent connected, the controllers running in Rancher, including CAPI, can't communicate with the downstream cluster.
+			outOfSync = append(outOfSync, entry.Machine.Name)
+			messages[entry.Machine.Name] = append(messages[entry.Machine.Name], "waiting for cluster agent to connect")
+		} else {
+			ready = append(ready, entry.Machine.Name)
+		}
+	}
+
+	if required && len(entries) == 0 {
+		return ErrWaiting("waiting for at least one " + tierName + " node")
+	}
+
+	// If multiple machines are changing status, then all of their statuses should be updated to avoid having stale conditions.
+	// However, only the first one will be returned so that status goes on the control plane and cluster objects.
+	var firstError error
+	if err := p.setMachineConditionStatus(clusterPlan, uncordoned, fmt.Sprintf("uncordoning %s node(s) ", tierName), messages); err != nil && firstError == nil {
+		firstError = err
+	}
+
+	if err := p.setMachineConditionStatus(clusterPlan, draining, fmt.Sprintf("draining %s node(s) ", tierName), messages); err != nil && firstError == nil {
+		firstError = err
+	}
+
+	if err := p.setMachineConditionStatus(clusterPlan, reconciling, fmt.Sprintf("configuring %s node(s) ", tierName), messages); err != nil && firstError == nil {
+		firstError = err
+	}
+
+	if err := p.setMachineConditionStatus(clusterPlan, outOfSync, fmt.Sprintf("configuring %s node(s) ", tierName), messages); err != nil && firstError == nil {
+		firstError = err
+	}
+
+	// Ensure that the conditions that we control are updated.
+	if err := p.setMachineConditionStatus(clusterPlan, ready, "", nil); err != nil && firstError == nil {
+		firstError = err
+	}
+
+	if firstError != nil {
+		return firstError
+	}
+
+	// The messages for these machines come from the machine itself, so nothing needs to be added.
+	// we want these errors to get reported, but not block the process
+	if len(errMachines) > 0 {
+		return errIgnore("failing " + tierName + " machine(s) " + atMostThree(errMachines) + detailMessage(errMachines, messages))
+	}
+
+	if len(nonReady) > 0 {
+		return errIgnore("non-ready " + tierName + " machine(s) " + atMostThree(nonReady) + detailMessage(nonReady, messages))
+	}
+
+	return nil
+}
+
 // generatePlanWithConfigFiles will generate a node plan with the corresponding config files for the entry in question.
 // Notably, it will discard the existing nodePlan in the given entry.
 func (p *Planner) generatePlanWithConfigFiles(controlPlane *rkev1.RKEControlPlane, tokensSecret plan.Secret, entry *planEntry, joinServer string) (nodePlan plan.NodePlan, config map[string]interface{}, err error) {
@@ -1080,14 +1088,13 @@ func collect(plan *plan.Plan, include roleFilter) (result []*planEntry) {
 }
 
 // generateSecrets generates the server/agent tokens for a v2prov cluster
-func (p *Planner) generateSecrets(controlPlane *rkev1.RKEControlPlane) (*rkev1.RKEControlPlane, plan.Secret, error) {
+func (p *Planner) generateSecrets(controlPlane *rkev1.RKEControlPlane) (plan.Secret, error) {
 	_, secret, err := p.ensureRKEStateSecret(controlPlane)
 	if err != nil {
-		return nil, secret, err
+		return secret, err
 	}
 
-	controlPlane = controlPlane.DeepCopy()
-	return controlPlane, secret, nil
+	return secret, nil
 }
 
 func (p *Planner) ensureRKEStateSecret(controlPlane *rkev1.RKEControlPlane) (string, plan.Secret, error) {
@@ -1158,26 +1165,26 @@ func (h *helmChartConfig) DeepCopyObject() runtime.Object {
 	panic("unsupported")
 }
 
-func (p *Planner) enqueueAndSkip(cp *rkev1.RKEControlPlane) error {
-	p.rkeControlPlanes.EnqueueAfter(cp.Namespace, cp.Name, 10*time.Second)
-	return generic.ErrSkip
-}
-
-// enqueueIfErrWaiting will enqueue the control plan if err is ErrWaiting, otherwise err is returned.
-// Some plan store functions as well as internal functions can return ErrWaiting, for instance when the plan has been
-// applied, but output is not yet available for periodic status.
-func (p *Planner) enqueueIfErrWaiting(cp *rkev1.RKEControlPlane, err error) error {
-	if err != nil {
-		if isErrWaiting(err) {
-			logrus.Tracef("Enqueuing [%s] because of ErrWaiting: %s", cp.Spec.ClusterName, err.Error())
-			return p.enqueueAndSkip(cp)
-		}
-		return err
-	}
-	return nil
-}
-
-func isErrWaiting(err error) bool {
+func IsErrWaiting(err error) bool {
 	var errWaiting ErrWaiting
 	return errors.As(err, &errWaiting)
+}
+
+func (p *Planner) pauseCAPICluster(cp *rkev1.RKEControlPlane, pause bool) error {
+	if cp == nil {
+		return fmt.Errorf("cannot toggle health checks for nil controlplane")
+	}
+	cluster, err := rke2.GetOwnerCAPICluster(cp, p.capiClusters)
+	if err != nil {
+		return err
+	}
+	if cluster == nil {
+		return fmt.Errorf("CAPI cluster does not exist for %s/%s", cp.Namespace, cp.Name)
+	}
+	if cluster.Spec.Paused == pause {
+		return nil
+	}
+	cluster.Spec.Paused = pause
+	_, err = p.capiClient.Update(cluster)
+	return err
 }

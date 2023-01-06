@@ -14,6 +14,7 @@ import (
 	"github.com/rancher/wrangler/pkg/relatedresource"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/runtime"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 )
@@ -51,37 +52,56 @@ func Register(ctx context.Context, clients *wrangler.Context, planner *planner.P
 	}, clients.RKE.RKEControlPlane(), clients.Core.Secret(), clients.CAPI.Machine())
 }
 
-func (h *handler) OnChange(cluster *rkev1.RKEControlPlane, status rkev1.RKEControlPlaneStatus) (rkev1.RKEControlPlaneStatus, error) {
-	logrus.Debugf("[planner] rkecluster %s/%s: handler OnChange called", cluster.Namespace, cluster.Name)
-	if !cluster.DeletionTimestamp.IsZero() {
+func (h *handler) OnChange(cp *rkev1.RKEControlPlane, status rkev1.RKEControlPlaneStatus) (rkev1.RKEControlPlaneStatus, error) {
+	logrus.Debugf("[planner] rkecluster %s/%s: handler OnChange called", cp.Namespace, cp.Name)
+	if !cp.DeletionTimestamp.IsZero() {
 		return status, nil
 	}
 
-	status.ObservedGeneration = cluster.Generation
+	status.ObservedGeneration = cp.Generation
 
-	logrus.Debugf("[planner] rkecluster %s/%s: calling planner process", cluster.Namespace, cluster.Name)
-	err := h.planner.Process(cluster)
-	var errWaiting planner.ErrWaiting
-	if errors.As(err, &errWaiting) {
-		logrus.Infof("[planner] rkecluster %s/%s: waiting: %v", cluster.Namespace, cluster.Name, err)
-		rke2.Ready.SetStatus(&status, "Unknown")
-		rke2.Ready.Message(&status, err.Error())
-		rke2.Ready.Reason(&status, "Waiting")
-		return status, nil
+	if rke2.Reconciled.IsTrue(&status) && !equality.Semantic.DeepEqual(cp.Spec, status.AppliedSpec) {
+		rke2.Reconciled.SetStatus(&status, "Unknown")
+		rke2.Reconciled.Message(&status, "reconciling control plane")
+		rke2.Reconciled.Reason(&status, "Waiting")
 	}
-	if !errors.Is(err, generic.ErrSkip) {
-		rke2.Ready.SetError(&status, "", err)
-		if err != nil {
-			// don't return error because the controller will reset the status and then not assign the error
-			// because we don't register this handler with an associated condition. This is pretty much a bug in the
-			// framework but it's too impactful to change right before 2.6.0 so we should consider changing this later.
-			// If you are reading this years later we'll just assume we decided not to change the framework.
-			logrus.Errorf("[planner] rkecluster %s/%s: error encountered during plan processing was %v", cluster.Namespace, cluster.Name, err)
-			h.controlPlanes.EnqueueAfter(cluster.Namespace, cluster.Name, 5*time.Second)
+
+	logrus.Debugf("[planner] rkecluster %s/%s: calling planner process", cp.Namespace, cp.Name)
+	status, err := h.planner.Process(cp, status)
+	if err != nil {
+		if planner.IsErrWaiting(err) {
+			logrus.Infof("[planner] rkecluster %s/%s: waiting: %v", cp.Namespace, cp.Name, err)
+			rke2.Reconciled.Message(&status, "reconciling control plane")
+			// if still waiting for same condition, convert err to generic.ErrSkip to avoid updating controlplane status and
+			// enqueue until no longer waiting.
+			if rke2.Ready.GetMessage(&status) == err.Error() && rke2.Ready.GetStatus(&status) == "Unknown" && rke2.Ready.GetReason(&status) == "Waiting" {
+				err = generic.ErrSkip
+			} else {
+				rke2.Ready.SetStatus(&status, "Unknown")
+				rke2.Ready.Message(&status, err.Error())
+				rke2.Ready.Reason(&status, "Waiting")
+				err = nil
+			}
+		} else if !errors.Is(err, generic.ErrSkip) {
+			logrus.Errorf("[planner] rkecluster %s/%s: error encountered during plan processing was %v", cp.Namespace, cp.Name, err)
+			rke2.Ready.SetError(&status, "", err)
+			rke2.Reconciled.SetError(&status, "", err)
+		}
+		if errors.Is(err, generic.ErrSkip) {
+			h.controlPlanes.EnqueueAfter(cp.Namespace, cp.Name, 5*time.Second)
 		}
 	} else {
-		logrus.Debugf("[planner] rkecluster %s/%s: objects changed, waiting for cache sync before finishing reconciliation", cluster.Namespace, cluster.Name)
+		logrus.Debugf("[planner] rkecluster %s/%s: reconciliation complete", cp.Namespace, cp.Name)
+		rke2.Provisioned.True(&status)
+		rke2.Provisioned.Message(&status, "")
+		rke2.Provisioned.Reason(&status, "")
+		rke2.Ready.True(&status)
+		rke2.Ready.Message(&status, "")
+		rke2.Ready.Reason(&status, "")
+		status.AppliedSpec = &cp.Spec
+		rke2.Reconciled.True(&status)
+		rke2.Reconciled.Message(&status, "")
+		rke2.Reconciled.Reason(&status, "")
 	}
-	logrus.Debugf("[planner] rkecluster %s/%s: reconciliation complete", cluster.Namespace, cluster.Name)
-	return status, nil
+	return status, err
 }

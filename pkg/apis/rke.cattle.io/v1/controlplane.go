@@ -36,12 +36,14 @@ type RKEControlPlaneSpec struct {
 }
 
 type RKEControlPlaneStatus struct {
+	AppliedSpec                   *RKEControlPlaneSpec                `json:"appliedSpec,omitempty"`
 	Conditions                    []genericcondition.GenericCondition `json:"conditions,omitempty"`
 	Ready                         bool                                `json:"ready,omitempty"`
 	ObservedGeneration            int64                               `json:"observedGeneration"`
 	CertificateRotationGeneration int64                               `json:"certificateRotationGeneration"`
 	RotateEncryptionKeys          *RotateEncryptionKeys               `json:"rotateEncryptionKeys,omitempty"`
 	RotateEncryptionKeysPhase     RotateEncryptionKeysPhase           `json:"rotateEncryptionKeysPhase,omitempty"`
+	RotateEncryptionKeysLeader    string                              `json:"rotateEncryptionKeysLeader,omitempty"`
 	ETCDSnapshotRestore           *ETCDSnapshotRestore                `json:"etcdSnapshotRestore,omitempty"`
 	ETCDSnapshotRestorePhase      ETCDSnapshotPhase                   `json:"etcdSnapshotRestorePhase,omitempty"`
 	ETCDSnapshotCreate            *ETCDSnapshotCreate                 `json:"etcdSnapshotCreate,omitempty"`
