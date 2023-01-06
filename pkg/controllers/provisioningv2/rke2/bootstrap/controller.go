@@ -56,6 +56,9 @@ func Register(ctx context.Context, clients *wrangler.Context) {
 		rkeControlPlanes:    clients.RKE.RKEControlPlane().Cache(),
 		rkeBootstrap:        clients.RKE.RKEBootstrap(),
 	}
+
+	clients.RKE.RKEBootstrap().OnChange(ctx, "rke-bootstrap-cluster-name", h.OnChange)
+
 	rkecontroller.RegisterRKEBootstrapGeneratingHandler(ctx,
 		clients.RKE.RKEBootstrap(),
 		clients.Apply.
@@ -68,7 +71,7 @@ func Register(ctx context.Context, clients *wrangler.Context) {
 			WithSetOwnerReference(true, true),
 		"",
 		"rke-bootstrap",
-		h.OnChange,
+		h.GeneratingHandler,
 		nil)
 
 	relatedresource.Watch(ctx, "rke-bootstrap-trigger", func(namespace, name string, obj runtime.Object) ([]relatedresource.Key, error) {
@@ -266,7 +269,28 @@ func (h *handler) assignBootStrapSecret(machine *capi.Machine, bootstrap *rkev1.
 	return bootstrapSecret, []runtime.Object{sa}, nil
 }
 
-func (h *handler) OnChange(bootstrap *rkev1.RKEBootstrap, status rkev1.RKEBootstrapStatus) ([]runtime.Object, rkev1.RKEBootstrapStatus, error) {
+func (h *handler) OnChange(_ string, bootstrap *rkev1.RKEBootstrap) (*rkev1.RKEBootstrap, error) {
+	if bootstrap == nil {
+		return nil, nil
+	}
+
+	if !bootstrap.DeletionTimestamp.IsZero() || bootstrap.Spec.ClusterName != "" {
+		return bootstrap, nil
+	}
+
+	logrus.Debugf("[rkebootstrap] %s/%s: setting cluster name", bootstrap.Namespace, bootstrap.Name)
+	// If the bootstrap spec cluster name is blank, we need to update the bootstrap spec to the correct value
+	// This is to handle old rkebootstrap objects for unmanaged clusters that did not have the spec properly set
+	if v, ok := bootstrap.Labels[capi.ClusterLabelName]; ok && v != "" {
+		bootstrap = bootstrap.DeepCopy()
+		bootstrap.Spec.ClusterName = v
+		return h.rkeBootstrap.Update(bootstrap)
+	}
+
+	return bootstrap, nil
+}
+
+func (h *handler) GeneratingHandler(bootstrap *rkev1.RKEBootstrap, status rkev1.RKEBootstrapStatus) ([]runtime.Object, rkev1.RKEBootstrapStatus, error) {
 	var (
 		result []runtime.Object
 	)
@@ -297,21 +321,6 @@ func (h *handler) OnChange(bootstrap *rkev1.RKEBootstrap, status rkev1.RKEBootst
 		logrus.Debugf("[rkebootstrap] %s/%s: waiting: CAPI cluster or RKEBootstrap is paused", bootstrap.Namespace, bootstrap.Name)
 		h.rkeBootstrap.EnqueueAfter(bootstrap.Namespace, bootstrap.Name, 10*time.Second)
 		return result, status, generic.ErrSkip
-	}
-
-	if bootstrap.Spec.ClusterName == "" {
-		logrus.Debugf("[rkebootstrap] %s/%s: setting cluster name", bootstrap.Namespace, bootstrap.Name)
-		// If the bootstrap spec cluster name is blank, we need to update the bootstrap spec to the correct value
-		// This is to handle old rkebootstrap objects for unmanaged clusters that did not have the spec properly set
-		if v, ok := bootstrap.Labels[capi.ClusterLabelName]; ok && v != "" {
-			bootstrap = bootstrap.DeepCopy()
-			bootstrap.Spec.ClusterName = v
-			var err error
-			bootstrap, err = h.rkeBootstrap.Update(bootstrap)
-			if err != nil {
-				return nil, bootstrap.Status, err
-			}
-		}
 	}
 
 	if !capiCluster.Status.InfrastructureReady {
