@@ -8,6 +8,20 @@ import kubernetes
 rb_resource = 'rolebinding'
 
 
+@pytest.fixture(scope='module')
+def check_cluster_kubernetes_version(admin_mc):
+    """
+       Checks the local cluster's k8s version
+    """
+    client = admin_mc.client
+    cluster = client.by_id_cluster("local")
+    version = cluster.get("version")
+    if version is not None:
+        k8s_version = int(version.get("gitVersion")[3:5])
+        if k8s_version >= 25:
+            pytest.skip("Needs to be reworked for PSA")
+
+
 def test_create_cluster_template_with_revision(admin_mc, remove_resource):
 
     cluster_template = create_cluster_template(admin_mc, [], admin_mc)
@@ -61,6 +75,7 @@ def test_create_template_revision_k8s_translation(admin_mc, remove_resource):
     assert e.value.error.status == 422
 
 
+@pytest.mark.usefixtures('check_cluster_kubernetes_version')
 def test_default_pod_sec(admin_mc, list_remove_resource):
     cluster_template = create_cluster_template(admin_mc,
                                                [], admin_mc)
@@ -480,6 +495,7 @@ def test_permissions_removed_on_downgrading_access(admin_mc, remove_resource,
         assert e.error.status == 403
 
 
+@pytest.mark.usefixtures('check_cluster_kubernetes_version')
 def test_required_template_question(admin_mc, remove_resource):
     cluster_template = create_cluster_template(admin_mc, [], admin_mc)
     remove_resource(cluster_template)
@@ -537,6 +553,7 @@ def test_required_template_question(admin_mc, remove_resource):
         assert e.error.status == 422
 
 
+@pytest.mark.usefixtures('check_cluster_kubernetes_version')
 def test_secret_template_answers(admin_mc, remove_resource,
                                  list_remove_resource):
     cluster_template = create_cluster_template(admin_mc, [], admin_mc)
@@ -647,6 +664,7 @@ def test_member_accesstype_check(admin_mc, user_factory, remove_resource):
         assert e.error.status == 422
 
 
+@pytest.mark.usefixtures('check_cluster_kubernetes_version')
 def test_create_cluster_with_invalid_revision(admin_mc, remove_resource):
     cluster_template = create_cluster_template(admin_mc, [], admin_mc)
     remove_resource(cluster_template)
@@ -834,6 +852,7 @@ def test_cluster_desc_update(admin_mc, list_remove_resource):
     wait_for_cluster_to_be_deleted(client, cluster.id)
 
 
+@pytest.mark.usefixtures('check_cluster_kubernetes_version')
 def test_update_cluster_monitoring(admin_mc, list_remove_resource):
     cluster_template = create_cluster_template(admin_mc, [], admin_mc)
 

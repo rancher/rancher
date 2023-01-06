@@ -5,6 +5,20 @@ from .common import random_str
 from .conftest import wait_for
 
 
+@pytest.fixture(scope='module')
+def check_cluster_kubernetes_version(admin_mc):
+    """
+       Checks the local cluster's k8s version
+    """
+    client = admin_mc.client
+    cluster = client.by_id_cluster("local")
+    version = cluster.get("version")
+    if version is not None:
+        k8s_version = int(version.get("gitVersion")[3:5])
+        if k8s_version >= 25:
+            pytest.skip("Needs to be reworked for PSA")
+
+
 @pytest.mark.skip(reason="cluster-defaults disabled")
 def test_generic_initial_defaults(admin_mc):
     cclient = admin_mc.client
@@ -127,6 +141,7 @@ def test_rke_initial_conditions(admin_mc, remove_resource):
     assert 'exportYaml' in cluster.actions
 
 
+@pytest.mark.usefixtures('check_cluster_kubernetes_version')
 def test_psp_enabled_set(admin_mc, remove_resource):
     """Asserts podSecurityPolicy field is used to populate pspEnabled in
     cluster capabilities"""
