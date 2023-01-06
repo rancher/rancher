@@ -19,6 +19,20 @@ def cleanup_pspt(client, request, cluster):
     )
 
 
+@pytest.fixture(scope='module')
+def check_cluster_kubernetes_version(admin_mc):
+    """
+       Checks the local cluster's k8s version
+    """
+    client = admin_mc.client
+    cluster = client.by_id_cluster("local")
+    version = cluster.get("version")
+    if version is not None:
+        k8s_version = int(version.get("gitVersion")[3:5])
+        if k8s_version >= 25:
+            pytest.skip("Needs to be reworked for PSA")
+
+
 def create_pspt(client):
     """ Creates a minimally valid pspt with cleanup left to caller"""
     runas = {"rule": "RunAsAny"}
@@ -69,7 +83,7 @@ def service_account_has_role_binding(rbac, pspt):
         return False
 
 
-@pytest.mark.skip(reason="CI is failing, skipping for now")
+@pytest.mark.usefixtures('check_cluster_kubernetes_version')
 def test_service_accounts_have_role_binding(admin_mc, request):
     api_client = admin_mc.client
     pspt = setup_cluster_with_pspt(api_client, request)
@@ -94,6 +108,7 @@ def test_service_accounts_have_role_binding(admin_mc, request):
 
 
 @pytest.mark.nonparallel
+@pytest.mark.usefixtures('check_cluster_kubernetes_version')
 def test_pod_security_policy_template_del(admin_mc, admin_pc, remove_resource,
                                           restore_cluster_psp):
     """ Test for pod security policy template binding correctly.
@@ -164,6 +179,7 @@ def test_pod_security_policy_template_del(admin_mc, admin_pc, remove_resource,
     set_cluster_psp(admin_mc, "false")
 
 
+@pytest.mark.usefixtures('check_cluster_kubernetes_version')
 def test_incorrect_pspt(admin_mc, remove_resource):
     """ Test that incorrect pod security policy templates cannot be created"""
     api_client = admin_mc.client
@@ -189,6 +205,7 @@ def test_incorrect_pspt(admin_mc, remove_resource):
     assert e.value.error.code == 'InvalidBodyContent'
 
 
+@pytest.mark.usefixtures('check_cluster_kubernetes_version')
 def test_pspt_binding(admin_mc, admin_pc, remove_resource):
     """Test that a PSPT binding is validated before creating it"""
     api_client = admin_mc.client
@@ -222,6 +239,7 @@ def test_pspt_binding(admin_mc, admin_pc, remove_resource):
 
 
 @pytest.mark.nonparallel
+@pytest.mark.usefixtures('check_cluster_kubernetes_version')
 def test_project_action_set_pspt(admin_mc, admin_pc,
                                  remove_resource, restore_cluster_psp):
     """Test project's action: setpodsecuritypolicytemplate"""
@@ -284,7 +302,7 @@ def test_project_action_set_pspt(admin_mc, admin_pc,
     set_cluster_psp(admin_mc, "false")
 
 
-@pytest.mark.skip(reason="CI is failing, skipping for now")
+@pytest.mark.usefixtures('check_cluster_kubernetes_version')
 def test_psp_annotations(admin_mc, remove_resouce_func):
     """Test that a psp with a pspt owner annotation will get cleaned up if the
     parent pspt does not exist"""
