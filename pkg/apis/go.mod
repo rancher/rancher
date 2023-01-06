@@ -80,7 +80,3 @@ require (
 	sigs.k8s.io/structured-merge-diff/v4 v4.2.3 // indirect
 	sigs.k8s.io/yaml v1.3.0 // indirect
 )
-
-replace github.com/rancher/wrangler => github.com/rancherlabs/wrangler-security v1.0.1-0.20221220045115-757856aa451b
-
-replace github.com/rancher/fleet/pkg/apis => github.com/rancherlabs/fleet-security/pkg/apis v0.0.0-20221220193402-f2886caa8ef3
