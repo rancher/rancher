@@ -8,26 +8,12 @@ import (
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
 	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2"
-	rkecontrollers "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
-	"github.com/rancher/rancher/pkg/wrangler"
 )
 
-type certificateRotation struct {
-	rkeControlPlanes rkecontrollers.RKEControlPlaneClient
-	store            *PlanStore
-}
-
-func newCertificateRotation(clients *wrangler.Context, store *PlanStore) *certificateRotation {
-	return &certificateRotation{
-		rkeControlPlanes: clients.RKE.RKEControlPlane(),
-		store:            store,
-	}
-}
-
-// RotateCertificates checks if there is a need to rotate any certificates and updates the plan accordingly.
-func (r *certificateRotation) RotateCertificates(controlPlane *rkev1.RKEControlPlane, clusterPlan *plan.Plan) error {
+// rotateCertificates checks if there is a need to rotate any certificates and updates the plan accordingly.
+func (p *Planner) rotateCertificates(controlPlane *rkev1.RKEControlPlane, status rkev1.RKEControlPlaneStatus, clusterPlan *plan.Plan) (rkev1.RKEControlPlaneStatus, error) {
 	if !shouldRotate(controlPlane) {
-		return nil
+		return status, nil
 	}
 
 	for _, node := range collect(clusterPlan, anyRole) {
@@ -36,15 +22,14 @@ func (r *certificateRotation) RotateCertificates(controlPlane *rkev1.RKEControlP
 		}
 
 		rotatePlan := rotateCertificatesPlan(controlPlane, controlPlane.Spec.RotateCertificates, node)
-		err := assignAndCheckPlan(r.store, fmt.Sprintf("[%s] certificate rotation", node.Machine.Name), node, rotatePlan, 0, 0)
+		err := assignAndCheckPlan(p.store, fmt.Sprintf("[%s] certificate rotation", node.Machine.Name), node, rotatePlan, 0, 0)
 		if err != nil {
-			return err
+			return status, err
 		}
 	}
 
-	controlPlane.Status.CertificateRotationGeneration = controlPlane.Spec.RotateCertificates.Generation
-	_, err := r.rkeControlPlanes.UpdateStatus(controlPlane)
-	return err
+	status.CertificateRotationGeneration = controlPlane.Spec.RotateCertificates.Generation
+	return status, ErrWaiting("certificate rotation done")
 }
 
 // shouldRotate `true` if the cluster is ready and the generation is stale
