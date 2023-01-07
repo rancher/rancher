@@ -7,20 +7,26 @@ import (
 	"regexp"
 
 	"github.com/pkg/errors"
+	"github.com/rancher/rancher/tests/framework/pkg/session"
 	"github.com/sirupsen/logrus"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 )
 
 const (
-	debugFlag = "--debug"
+	debugFlag       = "--trace"
+	skipCleanupFlag = "--skip-cleanup"
 )
 
 // SetupCorralConfig sets the corral config vars. It takes a map[string]string as a parameter; the key is the value and the value the value you are setting
 // For example we are getting the aws config vars to build a corral from aws.
 // results := aws.AWSCorralConfigVars()
 // err := corral.SetupCorralConfig(results)
-func SetupCorralConfig(configVars map[string]string) error {
+func SetupCorralConfig(configVars map[string]string, configUser string, configSSHPath string) error {
+	msg, err := exec.Command("corral", "config", "--user_id", configUser, "--public_key", configSSHPath).CombinedOutput()
+	if err != nil {
+		return errors.Wrap(err, "Unable to set configuraion: "+string(msg))
+	}
 	for variable, value := range configVars {
 		msg, err := exec.Command("corral", "config", "vars", "set", variable, value).CombinedOutput()
 		if err != nil {
@@ -30,24 +36,49 @@ func SetupCorralConfig(configVars map[string]string) error {
 	return nil
 }
 
+// SetCustomRepo sets a custom repo for corral to use. It takes a string as a parameter which is the repo you want to use
+func SetCustomRepo(repo string) error {
+	msg, err := exec.Command("git", "clone", repo, "corral-packages").CombinedOutput()
+	if err != nil {
+		return errors.Wrap(err, "Failed to git clone remote repo: "+string(msg))
+	}
+	makemsg, err := exec.Command("make", "init", "-C", "corral-packages").CombinedOutput()
+	if err != nil {
+		return errors.Wrap(err, "Failed to git clone remote repo: "+string(makemsg))
+	}
+	makebuildmsg, err := exec.Command("make", "build", "-C", "corral-packages").CombinedOutput()
+	if err != nil {
+		return errors.Wrap(err, "Failed to git clone remote repo: "+string(makebuildmsg))
+	}
+	logrus.Infof("Successfully set custom repo: %s", repo)
+	return nil
+}
+
 // CreateCorral creates a corral taking the corral name, the package path, and a debug set so if someone wants to view the
 // corral create log
-func CreateCorral(corralName, packagePath string, debug bool) (*rest.Config, error) {
-	if debug {
-		msg, err := exec.Command("corral", "create", corralName, packagePath, debugFlag).CombinedOutput()
-		if err != nil {
-			return nil, errors.Wrap(err, "CreateCorral: "+string(msg))
-		}
-
-		myString := string(msg[:])
-		logrus.Infof(myString)
-	} else {
-		msg, err := exec.Command("corral", "create", corralName, packagePath).CombinedOutput()
-		if err != nil {
-			return nil, errors.Wrap(err, "CreateCorral: "+string(msg))
-		}
+func CreateCorral(ts *session.Session, corralName, packageName string, debug bool, cleanup bool) (*rest.Config, error) {
+	if cleanup {
+		ts.RegisterCleanupFunc(func() error {
+			return DeleteCorral(corralName)
+		})
 	}
 
+	args := []string{"create"}
+	if !cleanup {
+		args = append(args, skipCleanupFlag)
+	}
+	if debug {
+		args = append(args, debugFlag)
+	}
+	args = append(args, corralName, packageName)
+	logrus.Infof("Creating corral with the following parameters: %", args)
+	// complicated, but running the command in a way that allows us to
+	// capture the output and error(s) and print it to the console
+	msg, err := exec.Command("corral", args...).CombinedOutput()
+	logrus.Infof("Corral create output: %s", string(msg))
+	if err != nil {
+		return nil, errors.Wrap(err, "Unable to create corral: "+string(msg))
+	}
 	kubeConfig, err := GetKubeConfig(corralName)
 	if err != nil {
 		return nil, err

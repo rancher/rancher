@@ -16,6 +16,7 @@ import (
 	"github.com/rancher/rancher/tests/framework/extensions/users"
 	password "github.com/rancher/rancher/tests/framework/extensions/users/passwordgenerator"
 	"github.com/rancher/rancher/tests/framework/pkg/config"
+	namegen "github.com/rancher/rancher/tests/framework/pkg/namegenerator"
 	"github.com/rancher/rancher/tests/framework/pkg/session"
 	"github.com/rancher/rancher/tests/framework/pkg/wait"
 	"github.com/rancher/rancher/tests/integration/pkg/defaults"
@@ -57,7 +58,7 @@ func (c *CustomClusterProvisioningTestSuite) SetupSuite() {
 	c.client = client
 
 	enabled := true
-	var testuser = provisioning.AppendRandomString("testuser-")
+	var testuser = namegen.AppendRandomString("testuser-")
 	var testpassword = password.GenerateUserPassword("testpass-")
 	user := &management.User{
 		Username: testuser,
@@ -116,7 +117,7 @@ func (c *CustomClusterProvisioningTestSuite) ProvisioningK3SCustomCluster(extern
 				nodes, err := externalNodeProvider.NodeCreationFunc(client, numNodes)
 				require.NoError(c.T(), err)
 
-				clusterName := provisioning.AppendRandomString(externalNodeProvider.Name)
+				clusterName := namegen.AppendRandomString(externalNodeProvider.Name)
 
 				cluster := clusters.NewK3SRKE2ClusterConfig(clusterName, namespace, "", "", kubeVersion, nil)
 
@@ -223,7 +224,7 @@ func (c *CustomClusterProvisioningTestSuite) ProvisioningK3SCustomClusterDynamic
 				nodes, err := externalNodeProvider.NodeCreationFunc(client, numOfNodes)
 				require.NoError(c.T(), err)
 
-				clusterName := provisioning.AppendRandomString(externalNodeProvider.Name)
+				clusterName := namegen.AppendRandomString(externalNodeProvider.Name)
 
 				cluster := clusters.NewK3SRKE2ClusterConfig(clusterName, namespace, "", "", kubeVersion, nil)
 
