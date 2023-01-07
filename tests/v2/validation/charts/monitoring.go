@@ -364,7 +364,7 @@ func createAlertWebhookReceiverDeployment(client *rancher.Client, clusterID, nam
 			Containers: []corev1.Container{
 				{
 					Name:    "kubectl",
-					Image:   "rancher/shell:v0.1.19-rc7",
+					Image:   "rancher/shell:v0.1.19-rc8",
 					Command: []string{"/bin/sh", "-c"},
 					Args: []string{
 						fmt.Sprintf(
