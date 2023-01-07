@@ -15,8 +15,8 @@ import (
 	"github.com/rancher/rancher/tests/framework/extensions/namespaces"
 	"github.com/rancher/rancher/tests/framework/extensions/projects"
 	"github.com/rancher/rancher/tests/framework/extensions/users"
+	namegen "github.com/rancher/rancher/tests/framework/pkg/namegenerator"
 	"github.com/rancher/rancher/tests/framework/pkg/session"
-	provisioning "github.com/rancher/rancher/tests/v2/validation/provisioning"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -129,7 +129,7 @@ func (rb *RBTestSuite) ValidateNS(role string) {
 
 	//Testcase4 Validate if cluster members can create namespaces in admin created project
 	log.Info("Testcase4 - Validating if ", role, " can create namespace in admin created project. ")
-	namespaceName := provisioning.AppendRandomString("testns-")
+	namespaceName := namegen.AppendRandomString("testns-")
 	adminNamespace, err := namespaces.CreateNamespace(rb.client, namespaceName+"-admin", "{}", map[string]string{}, map[string]string{}, rb.adminProject)
 	require.NoError(rb.T(), err)
 

@@ -8,6 +8,7 @@ import (
 const lowerLetterBytes = "abcdefghijklmnopqrstuvwxyz"
 const upperLetterBytes = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 const numberBytes = "0123456789"
+const defaultRandStringLength = 5
 
 func init() {
 	rand.Seed(time.Now().UnixNano())
@@ -37,4 +38,9 @@ func RandStringWithCharset(length int, charset string) string {
 // with the length depending on `n`. Used for creating a random string for resource names, such as clusters.
 func RandStringAll(length int) string {
 	return RandStringWithCharset(length, lowerLetterBytes+upperLetterBytes+numberBytes)
+}
+
+func AppendRandomString(baseClusterName string) string {
+	clusterName := "auto-" + baseClusterName + "-" + RandStringLower(defaultRandStringLength)
+	return clusterName
 }

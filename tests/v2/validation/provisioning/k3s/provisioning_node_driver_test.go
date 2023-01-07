@@ -12,6 +12,7 @@ import (
 	"github.com/rancher/rancher/tests/framework/extensions/users"
 	password "github.com/rancher/rancher/tests/framework/extensions/users/passwordgenerator"
 	"github.com/rancher/rancher/tests/framework/pkg/config"
+	namegen "github.com/rancher/rancher/tests/framework/pkg/namegenerator"
 	"github.com/rancher/rancher/tests/framework/pkg/session"
 	"github.com/rancher/rancher/tests/framework/pkg/wait"
 	"github.com/rancher/rancher/tests/integration/pkg/defaults"
@@ -55,7 +56,7 @@ func (k *K3SNodeDriverProvisioningTestSuite) SetupSuite() {
 	k.client = client
 
 	enabled := true
-	var testuser = provisioning.AppendRandomString("testuser-")
+	var testuser = namegen.AppendRandomString("testuser-")
 	var testpassword = password.GenerateUserPassword("testpass-")
 	user := &management.User{
 		Username: testuser,
@@ -137,7 +138,7 @@ func (k *K3SNodeDriverProvisioningTestSuite) ProvisioningK3SCluster(provider Pro
 				testSessionClient, err := tt.client.WithSession(testSession)
 				require.NoError(k.T(), err)
 
-				clusterName := provisioning.AppendRandomString(provider.Name)
+				clusterName := namegen.AppendRandomString(provider.Name)
 				generatedPoolName := fmt.Sprintf("nc-%s-pool1-", clusterName)
 				machinePoolConfig := provider.MachinePoolFunc(generatedPoolName, namespace)
 
@@ -204,7 +205,7 @@ func (k *K3SNodeDriverProvisioningTestSuite) ProvisioningK3SClusterDynamicInput(
 				testSessionClient, err := tt.client.WithSession(testSession)
 				require.NoError(k.T(), err)
 
-				clusterName := provisioning.AppendRandomString(provider.Name)
+				clusterName := namegen.AppendRandomString(provider.Name)
 				generatedPoolName := fmt.Sprintf("nc-%s-pool1-", clusterName)
 				machinePoolConfig := provider.MachinePoolFunc(generatedPoolName, namespace)
 
