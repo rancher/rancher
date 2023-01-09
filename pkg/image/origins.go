@@ -224,6 +224,7 @@ var OriginMap = map[string]string{
 	"system-agent-installer-rke2":                             "https://github.com/rancher/system-agent-installer-rke2",
 	"system-upgrade-controller":                               "https://github.com/rancher/system-upgrade-controller",
 	"tekton-utils":                                            "https://github.com/rancher/build-tekton",
+	"test-gitjob":                                             "https://github.com/rancherlabs/gitjob-security",
 	"thanosio-thanos":                                         "https://github.com/thanos-io/thanos",
 	"ui-plugin-operator":                                      "https://github.com/rancher/ui-plugin-operator",
 	"weave-kube":                                              "https://github.com/weaveworks-experiments/weave-kube",
