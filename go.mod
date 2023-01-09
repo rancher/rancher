@@ -139,7 +139,7 @@ require (
 	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
 	gopkg.in/yaml.v2 v2.4.0
-	helm.sh/helm/v3 v3.9.0
+	helm.sh/helm/v3 v3.10.3
 	k8s.io/api v0.25.4
 	k8s.io/apiextensions-apiserver v0.25.4
 	k8s.io/apimachinery v0.25.4
@@ -147,7 +147,7 @@ require (
 	k8s.io/cli-runtime v0.25.4
 	k8s.io/client-go v12.0.0+incompatible
 	k8s.io/gengo v0.0.0-20211129171323-c02415ce4185
-	k8s.io/helm v2.16.7+incompatible
+	k8s.io/helm v2.17.0+incompatible
 	k8s.io/kube-aggregator v0.25.4
 	k8s.io/kubectl v0.25.4
 	k8s.io/kubernetes v1.25.4
@@ -158,7 +158,10 @@ require (
 	sigs.k8s.io/yaml v1.3.0
 )
 
-require github.com/google/gnostic v0.5.7-v3refs
+require (
+	github.com/google/gnostic v0.5.7-v3refs
+	github.com/helm/helm-mapkubeapis v0.3.2
+)
 
 require (
 	github.com/kr/fs v0.1.0 // indirect
@@ -179,7 +182,7 @@ require (
 	github.com/BurntSushi/toml v1.0.0 // indirect
 	github.com/MakeNowJust/heredoc v1.0.0 // indirect
 	github.com/Masterminds/goutils v1.1.1 // indirect
-	github.com/Masterminds/squirrel v1.5.2 // indirect
+	github.com/Masterminds/squirrel v1.5.3 // indirect
 	github.com/Microsoft/go-winio v0.5.2 // indirect
 	github.com/Microsoft/hcsshim v0.9.3 // indirect
 	github.com/PuerkitoBio/purell v1.1.1 // indirect
@@ -246,7 +249,7 @@ require (
 	github.com/imdario/mergo v0.3.12 // indirect
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
-	github.com/jmoiron/sqlx v1.3.4 // indirect
+	github.com/jmoiron/sqlx v1.3.5 // indirect
 	github.com/jonboulle/clockwork v0.2.2 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
@@ -257,7 +260,7 @@ require (
 	github.com/kylelemons/godebug v1.1.0 // indirect
 	github.com/lann/builder v0.0.0-20180802200727-47ae307949d0 // indirect
 	github.com/lann/ps v0.0.0-20150810152359-62de8c46ede0 // indirect
-	github.com/lib/pq v1.10.4 // indirect
+	github.com/lib/pq v1.10.6 // indirect
 	github.com/liggitt/tabwriter v0.0.0-20181228230101-89fcab3d43de // indirect
 	github.com/mailru/easyjson v0.7.6 // indirect
 	github.com/matryer/moq v0.0.0-20200607124540-4638a53893e6 // indirect
@@ -348,7 +351,7 @@ require (
 	k8s.io/klog v1.0.0 // indirect
 	k8s.io/klog/v2 v2.80.1 // indirect
 	k8s.io/kube-openapi v0.0.0-20220803162953-67bda5d908f1 // indirect
-	oras.land/oras-go v1.1.0 // indirect
+	oras.land/oras-go v1.2.0 // indirect
 	sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.33 // indirect
 	sigs.k8s.io/cli-utils v0.27.0 // indirect
 	sigs.k8s.io/json v0.0.0-20220713155537-f223a00ba0e2 // indirect

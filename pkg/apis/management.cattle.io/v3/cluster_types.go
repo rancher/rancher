@@ -75,6 +75,10 @@ const (
 	ClusterConditionServiceAccountSecretsMigrated        condition.Cond = "ServiceAccountSecretsMigrated"
 	ClusterConditionHarvesterCloudProviderConfigMigrated condition.Cond = "HarvesterCloudProviderConfigMigrated"
 
+	// ClusterConditionHelmReleasesMigrated is true when the migration for Helm release secrets has already happened in
+	// a cluster
+	ClusterConditionHelmReleasesMigrated condition.Cond = "HelmReleasesMigrated"
+
 	ClusterDriverImported = "imported"
 	ClusterDriverLocal    = "local"
 	ClusterDriverRKE      = "rancherKubernetesEngine"

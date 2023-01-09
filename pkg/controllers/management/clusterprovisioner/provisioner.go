@@ -11,6 +11,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/rancher/rancher/pkg/wrangler"
+	"golang.org/x/mod/semver"
+
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/controller"
 	"github.com/rancher/norman/types/convert"
@@ -46,6 +49,9 @@ const (
 	RKEDriverKey          = "rancherKubernetesEngineConfig"
 	KontainerEngineUpdate = "provisioner.cattle.io/ke-driver-update"
 	RkeRestoreAnnotation  = "rke.cattle.io/restore"
+
+	// UpgradeDescription is a description of why a Helm release was upgraded
+	UpgradeDescription = "Kubernetes deprecated API upgrade - DO NOT rollback from this version"
 )
 
 type Provisioner struct {
@@ -64,6 +70,7 @@ type Provisioner struct {
 	RKESystemImagesLister v3.RkeK8sSystemImageLister
 	SecretLister          corev1.SecretLister
 	Secrets               corev1.SecretInterface
+	clusterManager        wrangler.MultiClusterManager
 }
 
 func Register(ctx context.Context, management *config.ManagementContext) {
@@ -83,6 +90,7 @@ func Register(ctx context.Context, management *config.ManagementContext) {
 		DaemonsetLister:       management.Apps.DaemonSets("").Controller().Lister(),
 		SecretLister:          management.Core.Secrets("").Controller().Lister(),
 		Secrets:               management.Core.Secrets(""),
+		clusterManager:        management.Wrangler.MultiClusterManager,
 	}
 	// Add handlers
 	p.Clusters.AddLifecycle(ctx, "cluster-provisioner-controller", p)
@@ -179,6 +187,24 @@ func (p *Provisioner) Remove(cluster *v3.Cluster) (runtime.Object, error) {
 }
 
 func (p *Provisioner) Updated(cluster *v3.Cluster) (runtime.Object, error) {
+	if cluster.Status.Version != nil && semver.Compare(cluster.Status.Version.GitVersion, "v1.25") >= 0 &&
+		!apimgmtv3.ClusterConditionHelmReleasesMigrated.IsTrue(cluster) {
+		err := p.cleanupHelmReleases(cluster)
+
+		if err != nil {
+			logrus.Errorf("[reconcileCluster] failed to cleanup Helm releases: %#v", err)
+		}
+
+		// Attempt to manually trigger updating, otherwise it will not be triggered until after exiting reconcile
+		apimgmtv3.ClusterConditionHelmReleasesMigrated.True(cluster)
+		apimgmtv3.ClusterConditionHelmReleasesMigrated.Message(cluster, "Helm releases cleaned up")
+
+		cluster, err = p.Clusters.Update(cluster)
+		if err != nil {
+			return cluster, fmt.Errorf("[reconcileCluster] failed to update cluster [%s]: %v", cluster.Name, err)
+		}
+	}
+
 	if skipOperatorCluster("update", cluster) || imported.IsAdministratedByProvisioningCluster(cluster) {
 		return cluster, nil
 	}
