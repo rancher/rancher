@@ -109,7 +109,7 @@ func TestFindOwnerCAPICluster(t *testing.T) {
 		{
 			name:        "no owner",
 			expected:    nil,
-			expectedErr: errors.New("RKECluster testnamespace/testcluster does not have a controller owner reference"),
+			expectedErr: ErrNoControllerMachineOwnerRef,
 			obj: &rkev1.RKECluster{
 				TypeMeta: metav1.TypeMeta{
 					Kind: "RKECluster",
@@ -123,7 +123,7 @@ func TestFindOwnerCAPICluster(t *testing.T) {
 		{
 			name:        "no controller",
 			expected:    nil,
-			expectedErr: errors.New("RKECluster testnamespace/testcluster does not have a controller owner reference"),
+			expectedErr: ErrNoControllerMachineOwnerRef,
 			obj: &rkev1.RKECluster{
 				TypeMeta: metav1.TypeMeta{
 					Kind: "RKECluster",
@@ -142,7 +142,7 @@ func TestFindOwnerCAPICluster(t *testing.T) {
 		{
 			name:        "owner wrong kind",
 			expected:    nil,
-			expectedErr: errors.New("RKECluster testnamespace/testcluster has wrong owner kind nil"),
+			expectedErr: ErrNoControllerMachineOwnerRef,
 			obj: &rkev1.RKECluster{
 				TypeMeta: metav1.TypeMeta{
 					Kind: "RKECluster",
@@ -163,7 +163,7 @@ func TestFindOwnerCAPICluster(t *testing.T) {
 		{
 			name:        "owner wrong api version",
 			expected:    nil,
-			expectedErr: errors.New("RKECluster testnamespace/testcluster has wrong owner api version nil"),
+			expectedErr: ErrNoControllerMachineOwnerRef,
 			obj: &rkev1.RKECluster{
 				TypeMeta: metav1.TypeMeta{
 					Kind: "RKECluster",
