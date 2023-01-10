@@ -22,6 +22,7 @@ import (
 	"github.com/rancher/wrangler/pkg/data/convert"
 	corecontrollers "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/pkg/generic"
+	"github.com/rancher/wrangler/pkg/genericcondition"
 	"github.com/rancher/wrangler/pkg/kv"
 	name2 "github.com/rancher/wrangler/pkg/name"
 	corev1 "k8s.io/api/core/v1"
@@ -156,6 +157,28 @@ func (h *handler) getArgsEnvAndStatus(infra *infraObject, args map[string]interf
 	// nodes in a machine pool may have the same node name in Kubernetes. Converting the '.' to '-' here prevents this.
 	cmd = append(cmd, strings.ReplaceAll(infra.meta.GetName(), ".", "-"))
 
+	status := rkev1.RKEMachineStatus{
+		Ready:                     infra.data.String("spec", "providerID") != "" && infra.data.Bool("status", "jobComplete"),
+		DriverHash:                hash,
+		DriverURL:                 url,
+		CloudCredentialSecretName: cloudCredentialSecretName,
+	}
+
+	// there exists a race condition with the job handler where the job may be deleted before the Ready condition is set
+	// this should ideally be handled via some other mechanism.
+	if create && infra.data.String("spec", "providerID") != "" && infra.data.Bool("status", "jobComplete") {
+		status.Conditions = []genericcondition.GenericCondition{
+			{
+				Type:   createJobConditionType,
+				Status: corev1.ConditionTrue,
+			},
+			{
+				Type:   "Ready",
+				Status: corev1.ConditionTrue,
+			},
+		}
+	}
+
 	return driverArgs{
 		DriverName:          driver,
 		CapiMachineName:     machine.Name,
@@ -172,12 +195,7 @@ func (h *handler) getArgsEnvAndStatus(infra *infraObject, args map[string]interf
 		BootstrapRequired:   create,
 		Args:                cmd,
 		BackoffLimit:        jobBackoffLimit,
-		RKEMachineStatus: rkev1.RKEMachineStatus{
-			Ready:                     infra.data.String("spec", "providerID") != "" && infra.data.Bool("status", "jobComplete"),
-			DriverHash:                hash,
-			DriverURL:                 url,
-			CloudCredentialSecretName: cloudCredentialSecretName,
-		},
+		RKEMachineStatus:    status,
 	}, nil
 }
 

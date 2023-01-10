@@ -143,6 +143,10 @@ func (h *handler) OnJobChange(_ string, job *batchv1.Job) (*batchv1.Job, error) 
 		return nil, nil
 	}
 
+	if !job.DeletionTimestamp.IsZero() {
+		return job, nil
+	}
+
 	name := job.Spec.Template.Labels[InfraMachineName]
 	group := job.Spec.Template.Labels[InfraMachineGroup]
 	version := job.Spec.Template.Labels[InfraMachineVersion]
@@ -158,7 +162,7 @@ func (h *handler) OnJobChange(_ string, job *batchv1.Job) (*batchv1.Job, error) 
 		Kind:    kind,
 	}, job.Namespace, name)
 	if apierrors.IsNotFound(err) {
-		// ignore err
+		h.jobController.Enqueue(job.Namespace, job.Name)
 		return job, nil
 	} else if err != nil {
 		return job, err
