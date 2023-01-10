@@ -130,7 +130,6 @@ func (rb *RBTestSuite) ValidateNS(role string) {
 	//Testcase4 Validate if cluster members can create namespaces in project they are not owner of
 	log.Info("Testcase4 - Validating if ", role, " can create namespace in a project they are not owner of. ")
 	namespaceName := namegen.AppendRandomString("testns-")
-	createdNamespace, err := namespaces.CreateNamespace(rb.standardUserClient, namespaceName, "{}", map[string]string{}, map[string]string{}, rb.adminProject)
 	adminNamespace, err := namespaces.CreateNamespace(rb.client, namespaceName+"-admin", "{}", map[string]string{}, map[string]string{}, rb.adminProject)
 	require.NoError(rb.T(), err)
 
