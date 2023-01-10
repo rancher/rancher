@@ -333,9 +333,10 @@ func (p *Planner) Process(cp *rkev1.RKEControlPlane, status rkev1.RKEControlPlan
 		return status, ErrWaiting("waiting for control plane to be available")
 	}
 
-	if status.Initialized != true {
+	if status.Initialized != true || status.Ready != true {
 		status.Initialized = true
-		return status, ErrWaiting("marking control plane as initialized")
+		status.Ready = true
+		return status, ErrWaiting("marking control plane as initialized and ready")
 	}
 
 	err = p.reconcile(cp, clusterSecretTokens, plan, false, workerTier, isOnlyWorker, isInitNodeOrDeleting,
