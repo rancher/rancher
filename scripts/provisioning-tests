@@ -40,8 +40,11 @@ eval "$(grep '^ENV CATTLE_CSI_PROXY_AGENT' package/Dockerfile | awk '{print "exp
 eval "$(grep '^ENV CATTLE_KDM_BRANCH' package/Dockerfile | awk '{print "export " $2 "=" $3}')"
 
 # Get the last release for $DIST, which is usually the latest version or an experimental version.
+# Previously this would use channels, but channels no longer reflect the latest version since
+# https://github.com/rancher/rancher/issues/36827 has added appDefaults. We do not use appDefaults
+# here for simplicity's sake, as it requires semver parsing & matching. The last release should
+# be good enough for our needs.
 export SOME_K8S_VERSION=$(curl -sS https://raw.githubusercontent.com/rancher/kontainer-driver-metadata/dev-v2.7/data/data.json | jq -r ".$DIST.releases[-1].version")
-echo "K8s version: $SOME_K8S_VERSION"
 
 echo "Starting rancher server for provisioning-tests using $SOME_K8S_VERSION"
 touch /tmp/rancher.log
