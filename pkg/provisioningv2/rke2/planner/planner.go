@@ -370,6 +370,17 @@ func (p *Planner) Process(controlPlane *rkev1.RKEControlPlane) error {
 		return ErrWaiting("waiting for control plane to be available")
 	}
 
+	if controlPlane.Status.Initialized != true || controlPlane.Status.Ready != true {
+		controlPlane = controlPlane.DeepCopy()
+		controlPlane.Status.Initialized = true
+		controlPlane.Status.Ready = true
+		_, err := p.rkeControlPlanes.UpdateStatus(controlPlane)
+		if err != nil {
+			return err
+		}
+		return ErrWaiting("marking control plane initialized and ready")
+	}
+
 	err = p.reconcile(controlPlane, clusterSecretTokens, plan, false, workerTier, isOnlyWorker, isInitNodeOrDeleting,
 		controlPlane.Spec.UpgradeStrategy.WorkerConcurrency, joinServer,
 		controlPlane.Spec.UpgradeStrategy.WorkerDrainOptions)

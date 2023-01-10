@@ -78,8 +78,6 @@ func (h *handler) OnChange(obj *rkev1.RKEControlPlane, status rkev1.RKEControlPl
 		return status, nil
 	}
 
-	status.Ready = rke2.Ready.IsTrue(cluster)
-	status.Initialized = rke2.Ready.IsTrue(cluster)
 	status.AgentConnected = clusterconnected.Connected.IsTrue(cluster)
 	return status, nil
 }
