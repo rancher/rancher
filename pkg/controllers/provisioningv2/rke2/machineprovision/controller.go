@@ -193,7 +193,8 @@ func (h *handler) getMachineStatus(job *batchv1.Job) (rkev1.RKEMachineStatus, er
 	if job.Spec.Template.Labels[InfraJobRemove] == "true" {
 		condType = deleteJobConditionType
 	}
-	if !job.Status.CompletionTime.IsZero() {
+
+	if condition.Cond("Complete").IsTrue(job) {
 		return rkev1.RKEMachineStatus{
 			Conditions: []genericcondition.GenericCondition{
 				{
@@ -207,9 +208,7 @@ func (h *handler) getMachineStatus(job *batchv1.Job) (rkev1.RKEMachineStatus, er
 			},
 			JobComplete: true,
 		}, nil
-	}
-
-	if condition.Cond("Failed").IsTrue(job) {
+	} else if condition.Cond("Failed").IsTrue(job) {
 		sel, err := metav1.LabelSelectorAsSelector(job.Spec.Selector)
 		if err != nil {
 			return rkev1.RKEMachineStatus{}, err
