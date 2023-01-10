@@ -17,6 +17,8 @@ import (
 	"github.com/rancher/rancher/tests/framework/extensions/workloads/pods"
 	"github.com/rancher/rancher/tests/integration/pkg/defaults"
 
+	namegen "github.com/rancher/rancher/tests/framework/pkg/namegenerator"
+
 	"github.com/rancher/rancher/tests/framework/pkg/config"
 	"github.com/rancher/rancher/tests/framework/pkg/session"
 	"github.com/rancher/rancher/tests/framework/pkg/wait"
@@ -87,7 +89,7 @@ func (r *RKE2EtcdSnapshotRestoreTestSuite) EtcdSnapshotRestoreWithK8sUpgrade(pro
 	require.NoError(r.T(), err)
 	logrus.Infof("kube provisioning client created.............")
 
-	clusterName := provisioning.AppendRandomString(provider.Name)
+	clusterName := namegen.AppendRandomString(provider.Name)
 
 	logrus.Infof("creating rke2Cluster.............")
 	clusterResp, err := createRKE2NodeDriverCluster(client, provider, clusterName, initialK8sVersion, r.ns, r.cnis[0])

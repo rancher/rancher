@@ -11,10 +11,10 @@ import (
 	"github.com/rancher/rancher/tests/framework/extensions/clusters/aks"
 	"github.com/rancher/rancher/tests/framework/extensions/users"
 	password "github.com/rancher/rancher/tests/framework/extensions/users/passwordgenerator"
+	namegen "github.com/rancher/rancher/tests/framework/pkg/namegenerator"
 	"github.com/rancher/rancher/tests/framework/pkg/session"
 	"github.com/rancher/rancher/tests/framework/pkg/wait"
 	"github.com/rancher/rancher/tests/integration/pkg/defaults"
-	provisioning "github.com/rancher/rancher/tests/v2/validation/provisioning"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -42,7 +42,7 @@ func (h *HostedAKSClusterProvisioningTestSuite) SetupSuite() {
 	h.client = client
 
 	enabled := true
-	var testuser = provisioning.AppendRandomString("testuser-")
+	var testuser = namegen.AppendRandomString("testuser-")
 	var testpassword = password.GenerateUserPassword("testpass-")
 	user := &management.User{
 		Username: testuser,
@@ -113,7 +113,7 @@ func (h *HostedAKSClusterProvisioningTestSuite) testProvisioningHostedAKSCluster
 	cloudCredential, err := azure.CreateAzureCloudCredentials(rancherClient)
 	require.NoError(h.T(), err)
 
-	clusterName = provisioning.AppendRandomString("akshostcluster")
+	clusterName = namegen.AppendRandomString("akshostcluster")
 	clusterResp, err := aks.CreateAKSHostedCluster(rancherClient, clusterName, cloudCredential.ID, false, false, false, false, map[string]string{})
 	require.NoError(h.T(), err)
 
