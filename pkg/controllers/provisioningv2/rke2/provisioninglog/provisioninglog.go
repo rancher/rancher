@@ -97,6 +97,10 @@ func (h *handler) recordMessage(provCluster *provv1.Cluster, cm *corev1.ConfigMa
 		return cm, nil
 	}
 
+	if strings.Contains(msg, "the object has been modified; please apply your changes to the latest version and try again") {
+		msg = fmt.Sprintf("Transient error encountered: %s", msg)
+	}
+
 	last := cm.Data["last"]
 	if msg == last {
 		return cm, nil
