@@ -11,6 +11,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/rancher/rancher/pkg/features"
+
 	"github.com/rancher/rancher/pkg/wrangler"
 	"golang.org/x/mod/semver"
 
@@ -187,22 +189,11 @@ func (p *Provisioner) Remove(cluster *v3.Cluster) (runtime.Object, error) {
 }
 
 func (p *Provisioner) Updated(cluster *v3.Cluster) (runtime.Object, error) {
-	if cluster.Status.Version != nil && semver.Compare(cluster.Status.Version.GitVersion, "v1.25") >= 0 &&
-		!apimgmtv3.ClusterConditionHelmReleasesMigrated.IsTrue(cluster) {
-		err := p.cleanupHelmReleases(cluster)
-
-		if err != nil {
-			logrus.Errorf("[reconcileCluster] failed to cleanup Helm releases: %#v", err)
-		}
-
-		// Attempt to manually trigger updating, otherwise it will not be triggered until after exiting reconcile
-		apimgmtv3.ClusterConditionHelmReleasesMigrated.True(cluster)
-		apimgmtv3.ClusterConditionHelmReleasesMigrated.Message(cluster, "Helm releases cleaned up")
-
-		cluster, err = p.Clusters.Update(cluster)
-		if err != nil {
-			return cluster, fmt.Errorf("[reconcileCluster] failed to update cluster [%s]: %v", cluster.Name, err)
-		}
+	cluster, err := p.migrateHelmReleases(cluster)
+	if err != nil {
+		// errors here should not prevent the cluster from upgrading
+		// log and continue the process
+		logrus.Errorf("failed to clean up Helm releases in upgraded cluster: %#v", err)
 	}
 
 	if skipOperatorCluster("update", cluster) || imported.IsAdministratedByProvisioningCluster(cluster) {
@@ -238,6 +229,32 @@ func (p *Provisioner) Updated(cluster *v3.Cluster) (runtime.Object, error) {
 	})
 
 	return obj.(*v3.Cluster), err
+}
+
+func (p *Provisioner) migrateHelmReleases(cluster *v3.Cluster) (*v3.Cluster, error) {
+	if !features.HelmCleanupOnUpgrade.Enabled() ||
+		cluster.Status.Version == nil ||
+		semver.Compare(cluster.Status.Version.GitVersion, "v1.25") < 0 ||
+		apimgmtv3.ClusterConditionHelmReleasesMigrated.IsTrue(cluster) {
+		// Skip cleaning up releases if any of the conditions are true
+		return cluster, nil
+	}
+
+	err := p.cleanupHelmReleases(cluster)
+	if err != nil {
+		return cluster, err
+	}
+
+	// Attempt to manually trigger updating, otherwise it will not be triggered until after exiting reconcile
+	apimgmtv3.ClusterConditionHelmReleasesMigrated.True(cluster)
+	apimgmtv3.ClusterConditionHelmReleasesMigrated.Message(cluster, "Helm releases cleaned up")
+
+	cluster, err = p.Clusters.Update(cluster)
+	if err != nil {
+		return cluster, fmt.Errorf("[migrateHelmReleases] failed to update cluster [%s]: %v", cluster.Name, err)
+	}
+
+	return cluster, nil
 }
 
 // waitForSchema waits for the driver and schema to be populated for the cluster

@@ -6,6 +6,13 @@ import (
 	"os"
 	"strings"
 
+	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/client-go/discovery"
+	"k8s.io/client-go/discovery/cached/memory"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
+
 	"github.com/helm/helm-mapkubeapis/pkg/mapping"
 	"github.com/pkg/errors"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
@@ -14,7 +21,6 @@ import (
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/release"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
 )
 
 var (
@@ -30,6 +36,34 @@ var (
 	}
 )
 
+type ClientGetter struct {
+	k8sClient  kubernetes.Clientset
+	restConfig rest.Config
+}
+
+func (c ClientGetter) ToRESTConfig() (*rest.Config, error) {
+	return &c.restConfig, nil
+}
+
+func (c ClientGetter) ToDiscoveryClient() (discovery.CachedDiscoveryInterface, error) {
+	return memory.NewMemCacheClient(c.k8sClient.Discovery()), nil
+}
+
+func (c ClientGetter) ToRESTMapper() (meta.RESTMapper, error) {
+	return meta.NewDefaultRESTMapper(nil), nil
+}
+
+func (c ClientGetter) ToRawKubeConfigLoader() clientcmd.ClientConfig {
+	return &clientcmd.DefaultClientConfig
+}
+
+func NewClientGetter(k8sClient kubernetes.Interface, restConfig rest.Config) ClientGetter {
+	return ClientGetter{
+		k8sClient:  *k8sClient.(*kubernetes.Clientset),
+		restConfig: restConfig,
+	}
+}
+
 func (p *Provisioner) cleanupHelmReleases(cluster *v3.Cluster) error {
 	clusterManager := p.clusterManager
 	client, err := clusterManager.K8sClient(cluster.Name)
@@ -42,34 +76,24 @@ func (p *Provisioner) cleanupHelmReleases(cluster *v3.Cluster) error {
 		return errors.Wrapf(err, "[cleanupHelmReleases] failed to obtain the Kubernetes REST config instance")
 	}
 
-	// FIXME find a better way of passing the CA file to Helm
-	caCertFile := "/tmp/ca.crt"
-	if err := os.WriteFile(caCertFile, restConfig.CAData, 0400); err != nil {
-		return errors.Wrapf(err, "[cleanupHelmReleases] failed to generate CA file on disk")
-	}
-	defer os.Remove(caCertFile)
-
 	listNamespaces, err := client.CoreV1().Namespaces().List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		return errors.Wrapf(err, "[cleanupHelmReleases] failed to list namespaces on cluster %v", cluster.Name)
 	}
 
+	clientGetter := NewClientGetter(client, *restConfig)
+	helmDriver := os.Getenv("HELM_DRIVER")
+
 	for _, namespace := range listNamespaces.Items {
-		configFlags := genericclioptions.ConfigFlags{
-			APIServer:   &restConfig.Host,
-			Namespace:   &namespace.Name,
-			BearerToken: &restConfig.BearerToken,
-			CAFile:      &caCertFile,
-			CertFile:    &restConfig.CertFile,
-			KeyFile:     &restConfig.KeyFile,
-		}
 		// TODO check if there's a way of doing this using a more API-based approach
 		actionConfig := new(action.Configuration)
 
-		if err = actionConfig.Init(&configFlags, namespace.Name, os.Getenv("HELM_DRIVER"), func(format string, v ...interface{}) {
-			format = fmt.Sprintf("[cleanupHelmReleases][debug] %s\n", format)
-			logrus.Debug(fmt.Sprintf(format, v...))
-		}); err != nil {
+		if err = actionConfig.Init(
+			clientGetter,
+			namespace.Name,
+			helmDriver,
+			debugLog,
+		); err != nil {
 			return errors.Wrapf(err, "[cleanupHelmReleases] failed to create ActionConfiguration instance for Helm")
 		}
 
@@ -82,11 +106,14 @@ func (p *Provisioner) cleanupHelmReleases(cluster *v3.Cluster) error {
 			lastRelease, err := actionConfig.Releases.Last(helmRelease.Name)
 			if err != nil {
 				logrus.Errorf("[cleanupHelmReleases] failed to find latest release version for release %v", helmRelease.Name)
+				// If this fails, something went wrong. Skip to the next release.
+				continue
 			}
 
 			// TODO consume the function from helm-mapkubeapis once that is merged in
 			modifiedManifest, err := ReplaceManifestData(apiMappings, lastRelease.Manifest, cluster.Status.Version.GitVersion)
 			if err != nil {
+				// If this fails, it probably means we don't have adequate write permissions
 				return errors.Wrapf(err, "[cleanupHelmReleases] failed to replace deprecated/removed APIs on cluster %v", cluster.Name)
 			}
 
@@ -99,6 +126,12 @@ func (p *Provisioner) cleanupHelmReleases(cluster *v3.Cluster) error {
 	}
 
 	return nil
+}
+
+// debugLog is a function conforming to the DebugLog type in action.Configuration#Init to write debug messages
+func debugLog(format string, v ...interface{}) {
+	format = fmt.Sprintf("[cleanupHelmReleases][debug] %s\n", format)
+	logrus.Debug(fmt.Sprintf(format, v...))
 }
 
 // ReplaceManifestData replaces the out-of-date APIs with their respective valid successors, or removes an API that
