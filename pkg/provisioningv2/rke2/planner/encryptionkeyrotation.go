@@ -166,10 +166,6 @@ func (p *Planner) rotateEncryptionKeys(cp *rkev1.RKEControlPlane, status rkev1.R
 		return p.setEncryptionKeyRotateState(status, cp.Spec.RotateEncryptionKeys, rkev1.RotateEncryptionKeysPhasePrepare)
 	}
 
-	if err := p.pauseCAPICluster(cp, true); err != nil {
-		return status, err
-	}
-
 	leader, err := p.encryptionKeyRotationFindLeader(cp, status, clusterPlan)
 	if err != nil {
 		return status, err
@@ -184,6 +180,9 @@ func (p *Planner) rotateEncryptionKeys(cp *rkev1.RKEControlPlane, status rkev1.R
 
 	switch cp.Status.RotateEncryptionKeysPhase {
 	case rkev1.RotateEncryptionKeysPhasePrepare:
+		if err := p.pauseCAPICluster(cp, true); err != nil {
+			return status, ErrWaiting("pausing CAPI cluster")
+		}
 		status, err = p.encryptionKeyRotationLeaderPhaseReconcile(cp, status, leader)
 		if err != nil {
 			return status, err
@@ -219,7 +218,7 @@ func (p *Planner) rotateEncryptionKeys(cp *rkev1.RKEControlPlane, status rkev1.R
 			return status, err
 		}
 		if err = p.pauseCAPICluster(cp, false); err != nil {
-			return status, err
+			return status, ErrWaiting("unpausing CAPI cluster")
 		}
 		status.RotateEncryptionKeysLeader = ""
 		return p.setEncryptionKeyRotateState(status, cp.Spec.RotateEncryptionKeys, rkev1.RotateEncryptionKeysPhaseDone)
@@ -418,22 +417,16 @@ func (p *Planner) encryptionKeyRotationRestartNodes(cp *rkev1.RKEControlPlane, s
 // status can be successfully queried, and then gets the status. leaderStage is allowed to be empty if entry is the
 // leader.
 func (p *Planner) encryptionKeyRotationRestartService(cp *rkev1.RKEControlPlane, status rkev1.RKEControlPlaneStatus, entry *planEntry, scrapeStage bool, leaderStage string) (string, rkev1.RKEControlPlaneStatus, error) {
-	//runtime := rke2.GetRuntime(cp.Spec.KubernetesVersion)
 	nodePlan := plan.NodePlan{
 		Files: []plan.File{
 			{
 				Content: base64.StdEncoding.EncodeToString([]byte(encryptionKeyRotationWaitForSystemctlStatus)),
 				Path:    encryptionKeyRotationScriptPath(cp, encryptionKeyRotationWaitForSystemctlStatusPath),
 			},
-			{
-				Content: base64.StdEncoding.EncodeToString([]byte(encryptionKeyRotationWaitForSecretsEncryptStatusScript)),
-				Path:    encryptionKeyRotationScriptPath(cp, encryptionKeyRotationWaitForSecretsEncryptStatusPath),
-			},
 		},
 		Instructions: []plan.OneTimeInstruction{
-			encryptionKeyRotationWaitForSystemctlStatusInstruction(cp),
-			//generateKillAllInstruction(runtime),
 			encryptionKeyRotationRestartInstruction(cp),
+			encryptionKeyRotationWaitForSystemctlStatusInstruction(cp),
 		},
 	}
 
@@ -442,6 +435,10 @@ func (p *Planner) encryptionKeyRotationRestartService(cp *rkev1.RKEControlPlane,
 			plan.File{
 				Content: base64.StdEncoding.EncodeToString([]byte(encryptionKeyRotationSecretsEncryptStatusScript)),
 				Path:    encryptionKeyRotationScriptPath(cp, encryptionKeyRotationSecretsEncryptStatusPath),
+			},
+			plan.File{
+				Content: base64.StdEncoding.EncodeToString([]byte(encryptionKeyRotationWaitForSecretsEncryptStatusScript)),
+				Path:    encryptionKeyRotationScriptPath(cp, encryptionKeyRotationWaitForSecretsEncryptStatusPath),
 			},
 		)
 		nodePlan.Instructions = append(nodePlan.Instructions,
