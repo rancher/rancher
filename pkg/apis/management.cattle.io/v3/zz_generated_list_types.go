@@ -179,40 +179,6 @@ func NewCatalogTemplateVersion(namespace, name string, obj CatalogTemplateVersio
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// CisBenchmarkVersionList is a list of CisBenchmarkVersion resources
-type CisBenchmarkVersionList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata"`
-
-	Items []CisBenchmarkVersion `json:"items"`
-}
-
-func NewCisBenchmarkVersion(namespace, name string, obj CisBenchmarkVersion) *CisBenchmarkVersion {
-	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("CisBenchmarkVersion").ToAPIVersionAndKind()
-	obj.Name = name
-	obj.Namespace = namespace
-	return &obj
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
-// CisConfigList is a list of CisConfig resources
-type CisConfigList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata"`
-
-	Items []CisConfig `json:"items"`
-}
-
-func NewCisConfig(namespace, name string, obj CisConfig) *CisConfig {
-	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("CisConfig").ToAPIVersionAndKind()
-	obj.Name = name
-	obj.Namespace = namespace
-	return &obj
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
 // CloudCredentialList is a list of CloudCredential resources
 type CloudCredentialList struct {
 	metav1.TypeMeta `json:",inline"`
@@ -359,23 +325,6 @@ type ClusterRoleTemplateBindingList struct {
 
 func NewClusterRoleTemplateBinding(namespace, name string, obj ClusterRoleTemplateBinding) *ClusterRoleTemplateBinding {
 	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("ClusterRoleTemplateBinding").ToAPIVersionAndKind()
-	obj.Name = name
-	obj.Namespace = namespace
-	return &obj
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
-// ClusterScanList is a list of ClusterScan resources
-type ClusterScanList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata"`
-
-	Items []ClusterScan `json:"items"`
-}
-
-func NewClusterScan(namespace, name string, obj ClusterScan) *ClusterScan {
-	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("ClusterScan").ToAPIVersionAndKind()
 	obj.Name = name
 	obj.Namespace = namespace
 	return &obj
