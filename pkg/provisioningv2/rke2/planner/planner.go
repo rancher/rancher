@@ -283,7 +283,7 @@ func (p *Planner) Process(cp *rkev1.RKEControlPlane, status rkev1.RKEControlPlan
 	// pausing the control plane only affects machine reconciliation: etcd snapshot/restore, encryption key & cert
 	// rotation are not interruptable processes, and therefore must always be completed when requested
 	if capiannotations.IsPaused(capiCluster, cp) {
-		return status, ErrWaitingf("rkecluster %s/%s: CAPI cluster or RKEControlPlane is paused", cp.Namespace, cp.Name)
+		return status, ErrWaitingf("CAPI cluster or RKEControlPlane is paused")
 	}
 
 	// on the first run through, electInitNode will return a `generic.ErrSkip` as it is attempting to wait for the cache to catch up.

@@ -16,6 +16,10 @@ func (p *Planner) rotateCertificates(controlPlane *rkev1.RKEControlPlane, status
 		return status, nil
 	}
 
+	if err := p.pauseCAPICluster(controlPlane, true); err != nil {
+		return status, ErrWaiting("pausing CAPI cluster")
+	}
+
 	for _, node := range collect(clusterPlan, anyRole) {
 		if !shouldRotateEntry(controlPlane.Spec.RotateCertificates, node) {
 			continue
@@ -26,6 +30,10 @@ func (p *Planner) rotateCertificates(controlPlane *rkev1.RKEControlPlane, status
 		if err != nil {
 			return status, err
 		}
+	}
+
+	if err := p.pauseCAPICluster(controlPlane, false); err != nil {
+		return status, ErrWaiting("unpausing CAPI cluster")
 	}
 
 	status.CertificateRotationGeneration = controlPlane.Spec.RotateCertificates.Generation
