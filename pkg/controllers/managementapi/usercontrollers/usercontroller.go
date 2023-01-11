@@ -2,12 +2,14 @@ package usercontrollers
 
 import (
 	"context"
+	"fmt"
 	"hash/crc32"
 	"math"
 	"sort"
 	"sync"
 	"time"
 
+	mVersion "github.com/mcuadros/go-version"
 	v33 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -27,6 +29,8 @@ import (
 var (
 	all = "_all_"
 )
+
+const controllersRestartedAnnotation = "mgmt.cattle.io/controllers-restarted"
 
 func Register(ctx context.Context, scaledContext *config.ScaledContext, clusterManager *clustermanager.Manager) {
 	u := &userControllersController{
@@ -94,8 +98,29 @@ func (u *userControllersController) sync(key string, cluster *v3.Cluster) (runti
 	if key == all {
 		return nil, u.setPeers(nil)
 	}
+
+	//TODO: Check if the cluster has been upgraded in a generic way and always restart on any version upgrade
+	if cluster != nil && cluster.Status.Version != nil && mVersion.Compare(cluster.Status.Version.String(), "v1.25", ">=") && !u.controllersRestarted(cluster) {
+		u.manager.Stop(cluster)
+		err := u.manager.Start(u.ctx, cluster, u.amOwner(u.peers, cluster))
+		if err != nil {
+			return nil, fmt.Errorf("unable to restart controllers for cluster %s: %w", cluster.Name, err)
+		}
+		cluster = cluster.DeepCopy()
+		cluster.Annotations[controllersRestartedAnnotation] = "true"
+		cluster, err = u.clusters.Update(cluster)
+		if err != nil {
+			return nil, fmt.Errorf("unable to update cluster with annotation indicating cluster controllers were restarted: %w", err)
+		}
+	}
+
 	u.clusters.Controller().Enqueue("", all)
 	return cluster, nil
+}
+
+func (u *userControllersController) controllersRestarted(cluster *v3.Cluster) bool {
+	value, ok := cluster.Annotations[controllersRestartedAnnotation]
+	return ok && value == "true"
 }
 
 func (u *userControllersController) setPeers(peers *tpeermanager.Peers) error {
