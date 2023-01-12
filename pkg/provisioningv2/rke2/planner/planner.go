@@ -202,7 +202,7 @@ func (p *Planner) setMachineConditionStatus(clusterPlan *plan.Plan, machineNames
 	}
 
 	if waiting {
-		return ErrWaiting(messagePrefix + atMostThree(machineNames) + detailMessage(machineNames, messages))
+		return ErrWaiting(messagePrefix + atMostThree(machineNames) + detailedMessage(machineNames, messages))
 	}
 	return nil
 }
@@ -362,7 +362,7 @@ func atMostThree(names []string) string {
 	return strings.Join(names, ",")
 }
 
-func detailMessage(machines []string, messages map[string][]string) string {
+func detailedMessage(machines []string, messages map[string][]string) string {
 	if len(machines) != 1 {
 		return ""
 	}
@@ -878,11 +878,11 @@ func (p *Planner) reconcile(controlPlane *rkev1.RKEControlPlane, tokensSecret pl
 	// The messages for these machines come from the machine itself, so nothing needs to be added.
 	// we want these errors to get reported, but not block the process
 	if len(errMachines) > 0 {
-		return errIgnore("failing " + tierName + " machine(s) " + atMostThree(errMachines) + detailMessage(errMachines, messages))
+		return errIgnore("failing " + tierName + " machine(s) " + atMostThree(errMachines) + detailedMessage(errMachines, messages))
 	}
 
 	if len(nonReady) > 0 {
-		return errIgnore("non-ready " + tierName + " machine(s) " + atMostThree(nonReady) + detailMessage(nonReady, messages))
+		return errIgnore("non-ready " + tierName + " machine(s) " + atMostThree(nonReady) + detailedMessage(nonReady, messages))
 	}
 
 	return nil

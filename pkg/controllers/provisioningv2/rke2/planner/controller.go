@@ -71,7 +71,7 @@ func (h *handler) OnChange(cp *rkev1.RKEControlPlane, status rkev1.RKEControlPla
 	if err != nil {
 		if planner.IsErrWaiting(err) {
 			logrus.Infof("[planner] rkecluster %s/%s: waiting: %v", cp.Namespace, cp.Name, err)
-			rke2.Reconciled.Message(&status, "reconciling control plane")
+			rke2.Reconciled.Message(&status, "reconciling cluster")
 			// if still waiting for same condition, convert err to generic.ErrSkip to avoid updating controlplane status and
 			// enqueue until no longer waiting.
 			if rke2.Ready.GetMessage(&status) == err.Error() && rke2.Ready.GetStatus(&status) == "Unknown" && rke2.Ready.GetReason(&status) == "Waiting" {
