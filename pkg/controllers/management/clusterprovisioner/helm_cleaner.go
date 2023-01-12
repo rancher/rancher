@@ -29,8 +29,78 @@ var (
 			{
 				DeprecatedAPI:    "apiVersion: policy/v1beta1\nkind: PodSecurityPolicy\n",
 				RemovedInVersion: "v1.25",
-				// TODO add all APIs we want to cover here. Perhaps store it in a ConfigMap so we don't need to change
-				// code for updates.
+			},
+			{
+				DeprecatedAPI:    "kind: PodSecurityPolicy\napiVersion: policy/v1beta1\n",
+				RemovedInVersion: "v1.25",
+			},
+			{
+				DeprecatedAPI:    "apiVersion: policy/v1beta1\r\nkind: PodSecurityPolicy\r\n",
+				RemovedInVersion: "v1.25",
+			},
+			{
+				DeprecatedAPI:    "kind: PodSecurityPolicy\r\napiVersion: policy/v1beta1\r\n",
+				RemovedInVersion: "v1.25",
+			},
+			{
+				DeprecatedAPI:    "apiVersion: batch/v1beta1\nkind: CronJob\n",
+				NewAPI:           "apiVersion: batch/v1\nkind: CronJob\n",
+				RemovedInVersion: "v1.25",
+			},
+			{
+				DeprecatedAPI:    "kind: CronJob\napiVersion: batch/v1beta1\n",
+				NewAPI:           "apiVersion: batch/v1\nkind: CronJob\n",
+				RemovedInVersion: "v1.25",
+			},
+			{
+				DeprecatedAPI:    "apiVersion: batch/v1beta1\r\nkind: CronJob\r\n",
+				NewAPI:           "apiVersion: batch/v1\r\nkind: CronJob\r\n",
+				RemovedInVersion: "v1.25",
+			},
+			{
+				DeprecatedAPI:    "kind: CronJob\r\napiVersion: batch/v1beta1\r\n",
+				NewAPI:           "apiVersion: batch/v1\r\nkind: CronJob\r\n",
+				RemovedInVersion: "v1.25",
+			},
+			{
+				DeprecatedAPI:    "apiVersion: autoscaling/v2beta1\nkind: HorizontalPodAutoscaler\n",
+				NewAPI:           "apiVersion: autoscaling/v2\nkind: HorizontalPodAutoscaler\n",
+				RemovedInVersion: "v1.25",
+			},
+			{
+				DeprecatedAPI:    "kind: HorizontalPodAutoscaler\napiVersion: autoscaling/v2beta1\n",
+				NewAPI:           "apiVersion: autoscaling/v2\nkind: HorizontalPodAutoscaler\n",
+				RemovedInVersion: "v1.25",
+			},
+			{
+				DeprecatedAPI:    "apiVersion: autoscaling/v2beta1\r\nkind: HorizontalPodAutoscaler\r\n",
+				NewAPI:           "apiVersion: autoscaling/v2\r\nkind: HorizontalPodAutoscaler\r\n",
+				RemovedInVersion: "v1.25",
+			},
+			{
+				DeprecatedAPI:    "kind: HorizontalPodAutoscaler\r\napiVersion: autoscaling/v2beta1\r\n",
+				NewAPI:           "apiVersion: autoscaling/v2\r\nkind: HorizontalPodAutoscaler\r\n",
+				RemovedInVersion: "v1.25",
+			},
+			{
+				DeprecatedAPI:    "apiVersion: policy/v1beta1\nkind: PodDisruptionBudget\n",
+				NewAPI:           "apiVersion: policy/v1\nkind: PodDisruptionBudget\n",
+				RemovedInVersion: "v1.25",
+			},
+			{
+				DeprecatedAPI:    "kind: PodDisruptionBudget\napiVersion: policy/v1beta1\n",
+				NewAPI:           "apiVersion: policy/v1\nkind: PodDisruptionBudget\n",
+				RemovedInVersion: "v1.25",
+			},
+			{
+				DeprecatedAPI:    "apiVersion: policy/v1beta1\r\nkind: PodDisruptionBudget\r\n",
+				NewAPI:           "apiVersion: policy/v1\r\nkind: PodDisruptionBudget\r\n",
+				RemovedInVersion: "v1.25",
+			},
+			{
+				DeprecatedAPI:    "kind: PodDisruptionBudget\r\napiVersion: policy/v1beta1\r\n",
+				NewAPI:           "apiVersion: policy/v1\r\nkind: PodDisruptionBudget\r\n",
+				RemovedInVersion: "v1.25",
 			},
 		},
 	}
