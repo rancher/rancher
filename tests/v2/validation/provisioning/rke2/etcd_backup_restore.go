@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/rancher/norman/types"
 	apisV1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
@@ -73,7 +72,7 @@ func getSnapshots(client *rancher.Client,
 	if err != nil {
 		return nil, err
 	}
-	snapshotSteveObjList, err := steveclient.SteveType("rke.cattle.io.etcdsnapshot").List(&types.ListOpts{})
+	snapshotSteveObjList, err := steveclient.SteveType("rke.cattle.io.etcdsnapshot").List(nil)
 	if err != nil {
 		return nil, err
 	}

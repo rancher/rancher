@@ -102,21 +102,28 @@ func (a *APIOperations) DoGet(url string, opts *types.ListOpts, respObject inter
 }
 
 func (a *APIOperations) DoList(schemaType string, opts *types.ListOpts, respObject interface{}) error {
+	collectionURL, err := a.GetCollectionURL(schemaType, "GET")
+	if err != nil {
+		return err
+	}
+	return a.DoGet(collectionURL, opts, respObject)
+}
+
+func (a *APIOperations) GetCollectionURL(schemaType, method string) (string, error) {
 	schema, ok := a.Types[schemaType]
 	if !ok {
-		return errors.New("Unknown schema type [" + schemaType + "]")
+		return "", errors.New("Unknown schema type [" + schemaType + "]")
 	}
 
-	if !contains(schema.CollectionMethods, "GET") {
-		return errors.New("Resource type [" + schemaType + "] is not listable")
+	if !contains(schema.CollectionMethods, method) {
+		return "", errors.New("Resource type [" + schemaType + "] has no method " + method)
 	}
 
 	collectionURL, ok := schema.Links["collection"]
 	if !ok {
-		return errors.New("Resource type [" + schemaType + "] does not have a collection URL")
+		return "", errors.New("Resource type [" + schemaType + "] does not have a collection URL")
 	}
-
-	return a.DoGet(collectionURL, opts, respObject)
+	return collectionURL, nil
 }
 
 func (a *APIOperations) DoNext(nextURL string, respObject interface{}) error {
