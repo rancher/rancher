@@ -11,9 +11,10 @@ import (
 	"strings"
 	"time"
 
+	"k8s.io/client-go/util/retry"
+
 	"github.com/rancher/rancher/pkg/features"
 
-	"github.com/rancher/rancher/pkg/wrangler"
 	"golang.org/x/mod/semver"
 
 	"github.com/pkg/errors"
@@ -72,10 +73,14 @@ type Provisioner struct {
 	RKESystemImagesLister v3.RkeK8sSystemImageLister
 	SecretLister          corev1.SecretLister
 	Secrets               corev1.SecretInterface
-	clusterManager        wrangler.MultiClusterManager
+	clusterManager        UserContextGetter
 }
 
-func Register(ctx context.Context, management *config.ManagementContext) {
+type UserContextGetter interface {
+	UserContextNoControllers(string) (*config.UserContext, error)
+}
+
+func Register(ctx context.Context, management *config.ManagementContext, manager UserContextGetter) {
 	p := &Provisioner{
 		engineService:         service.NewEngineService(NewPersistentStore(management.Core.Namespaces(""), management.Core)),
 		Clusters:              management.Management.Clusters(""),
@@ -92,7 +97,7 @@ func Register(ctx context.Context, management *config.ManagementContext) {
 		DaemonsetLister:       management.Apps.DaemonSets("").Controller().Lister(),
 		SecretLister:          management.Core.Secrets("").Controller().Lister(),
 		Secrets:               management.Core.Secrets(""),
-		clusterManager:        management.Wrangler.MultiClusterManager,
+		clusterManager:        manager,
 	}
 	// Add handlers
 	p.Clusters.AddLifecycle(ctx, "cluster-provisioner-controller", p)
@@ -189,11 +194,20 @@ func (p *Provisioner) Remove(cluster *v3.Cluster) (runtime.Object, error) {
 }
 
 func (p *Provisioner) Updated(cluster *v3.Cluster) (runtime.Object, error) {
-	cluster, err := p.migrateHelmReleases(cluster)
-	if err != nil {
-		// errors here should not prevent the cluster from upgrading
-		// log and continue the process
-		logrus.Errorf("failed to clean up Helm releases in upgraded cluster: %#v", err)
+	var err error
+
+	if shouldCleanHelmReleases(features.HelmCleanupOnUpgrade.Enabled(), cluster) {
+		if err = p.startCleanUpHelmReleases(cluster); err != nil {
+			// errors here should not prevent the cluster from upgrading
+			// log and continue the process
+			logrus.Errorf("failed to clean up Helm releases in upgraded cluster: %#v", err)
+		}
+
+		cluster, err = p.Clusters.Get(cluster.Name, metav1.GetOptions{})
+		if err != nil {
+			// if we failed to get a cluster, something bad must have happened
+			return cluster, errors.Wrapf(err, "[updated] failed to get updated cluster %#v after startCleanUpHelmReleases", cluster.Name)
+		}
 	}
 
 	if skipOperatorCluster("update", cluster) || imported.IsAdministratedByProvisioningCluster(cluster) {
@@ -231,30 +245,37 @@ func (p *Provisioner) Updated(cluster *v3.Cluster) (runtime.Object, error) {
 	return obj.(*v3.Cluster), err
 }
 
-func (p *Provisioner) migrateHelmReleases(cluster *v3.Cluster) (*v3.Cluster, error) {
-	if !features.HelmCleanupOnUpgrade.Enabled() ||
-		cluster.Status.Version == nil ||
-		semver.Compare(cluster.Status.Version.GitVersion, "v1.25") < 0 ||
-		apimgmtv3.ClusterConditionHelmReleasesMigrated.IsTrue(cluster) {
-		// Skip cleaning up releases if any of the conditions are true
-		return cluster, nil
-	}
-
+func (p *Provisioner) startCleanUpHelmReleases(cluster *v3.Cluster) error {
 	err := p.cleanupHelmReleases(cluster)
 	if err != nil {
-		return cluster, err
+		return err
 	}
 
-	// Attempt to manually trigger updating, otherwise it will not be triggered until after exiting reconcile
-	apimgmtv3.ClusterConditionHelmReleasesMigrated.True(cluster)
-	apimgmtv3.ClusterConditionHelmReleasesMigrated.Message(cluster, "Helm releases cleaned up")
+	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		cluster, err = p.Clusters.Get(cluster.Name, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
 
-	cluster, err = p.Clusters.Update(cluster)
-	if err != nil {
-		return cluster, fmt.Errorf("[migrateHelmReleases] failed to update cluster [%s]: %v", cluster.Name, err)
-	}
+		// Attempt to manually trigger updating, otherwise it will not be triggered until after exiting reconcile
+		apimgmtv3.ClusterConditionHelmReleasesMigrated.True(cluster)
+		apimgmtv3.ClusterConditionHelmReleasesMigrated.Message(cluster, "Helm releases cleaned up")
 
-	return cluster, nil
+		cluster, err = p.Clusters.Update(cluster)
+		if err != nil {
+			return err
+		}
+
+		return nil
+	})
+}
+
+// shouldCleanHelmReleases indicates whether the cluster upgrade process should clean up existing Helm releases
+func shouldCleanHelmReleases(helmCleanupOnUpgradeEnabled bool, cluster *v3.Cluster) bool {
+	return helmCleanupOnUpgradeEnabled &&
+		!apimgmtv3.ClusterConditionHelmReleasesMigrated.IsTrue(cluster) &&
+		cluster.Status.Version != nil &&
+		semver.Compare(cluster.Status.Version.GitVersion, "v1.25") >= 0
 }
 
 // waitForSchema waits for the driver and schema to be populated for the cluster

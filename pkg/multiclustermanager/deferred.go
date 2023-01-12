@@ -8,8 +8,6 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/client-go/rest"
-
 	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/wrangler"
@@ -140,16 +138,4 @@ func (s *DeferredServer) K8sClient(clusterName string) (kubernetes.Interface, er
 		return nil, err
 	}
 	return clusterContext.K8sClient, nil
-}
-
-func (s *DeferredServer) RESTConfig(clusterName string) (*rest.Config, error) {
-	mcm := s.getMCM()
-	if mcm == nil {
-		return nil, nil
-	}
-	clusterContext, err := mcm.clusterManager.UserContextNoControllers(clusterName)
-	if err != nil {
-		return nil, err
-	}
-	return &clusterContext.RESTConfig, nil
 }

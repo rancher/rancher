@@ -1,13 +1,11 @@
 package clusterprovisioner
 
 import (
-	"context"
-	"fmt"
-	"os"
 	"strings"
 
+	"github.com/rancher/rancher/pkg/wrangler"
+
 	"k8s.io/apimachinery/pkg/api/meta"
-	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/discovery/cached/memory"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -20,7 +18,6 @@ import (
 	"golang.org/x/mod/semver"
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/release"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 var (
@@ -104,72 +101,67 @@ var (
 			},
 		},
 	}
+
+	// FeatureAppNS is a list of feature namespaces to clean up Helm releases from.
+	// This is temporary as importing pkg/data/management causes an import cycle.
+	FeatureAppNS = []string{
+		"ingress-nginx",              // This is for Ingress, not feature app
+		"kube-system",                // Harvester, vSphere CPI, vSphere CSI
+		"cattle-system",              // AKS/GKE/EKS Operator, Webhook, System Upgrade Controller
+		"cattle-epinio-system",       // Epinio
+		"cattle-fleet-system",        // Fleet
+		"longhorn-system",            // Longhorn
+		"cattle-neuvector-system",    // Neuvector
+		"cattle-monitoring-system",   // Monitoring and Sub-charts
+		"rancher-alerting-drivers",   // Alert Driver
+		"cis-operator-system",        // CIS Benchmark
+		"cattle-csp-adapter-system",  // CSP Adapter
+		"cattle-externalip-system",   // External IP Webhook
+		"cattle-gatekeeper-system",   // Gatekeeper
+		"istio-system",               // Istio and Sub-charts
+		"cattle-istio-system",        // Kiali
+		"cattle-logging-system",      // Logging
+		"cattle-windows-gmsa-system", // Windows GMSA
+		"cattle-sriov-system",        // Sriov
+		"cattle-ui-plugin-system",    // UI Plugin System
+	}
 )
 
-type ClientGetter struct {
-	k8sClient  kubernetes.Clientset
-	restConfig rest.Config
-}
+// EmptyHelmDriverName is a placeholder for the empty Helm driver.
+const EmptyHelmDriverName = ""
 
-func (c ClientGetter) ToRESTConfig() (*rest.Config, error) {
-	return &c.restConfig, nil
-}
-
-func (c ClientGetter) ToDiscoveryClient() (discovery.CachedDiscoveryInterface, error) {
-	return memory.NewMemCacheClient(c.k8sClient.Discovery()), nil
-}
-
-func (c ClientGetter) ToRESTMapper() (meta.RESTMapper, error) {
-	return meta.NewDefaultRESTMapper(nil), nil
-}
-
-func (c ClientGetter) ToRawKubeConfigLoader() clientcmd.ClientConfig {
-	return &clientcmd.DefaultClientConfig
-}
-
-func NewClientGetter(k8sClient kubernetes.Interface, restConfig rest.Config) ClientGetter {
-	return ClientGetter{
-		k8sClient:  *k8sClient.(*kubernetes.Clientset),
-		restConfig: restConfig,
+func newClientGetter(k8sClient kubernetes.Interface, restConfig rest.Config) *wrangler.SimpleRESTClientGetter {
+	return &wrangler.SimpleRESTClientGetter{
+		ClientConfig:    &clientcmd.DefaultClientConfig,
+		RESTConfig:      &restConfig,
+		CachedDiscovery: memory.NewMemCacheClient(k8sClient.Discovery()),
+		RESTMapper:      meta.NewDefaultRESTMapper(nil),
 	}
 }
 
 func (p *Provisioner) cleanupHelmReleases(cluster *v3.Cluster) error {
 	clusterManager := p.clusterManager
-	client, err := clusterManager.K8sClient(cluster.Name)
+	userContext, err := clusterManager.UserContextNoControllers(cluster.Name)
 	if err != nil {
 		return errors.Wrapf(err, "[cleanupHelmReleases] failed to obtain the Kubernetes client instance")
 	}
 
-	restConfig, err := clusterManager.RESTConfig(cluster.Name)
-	if err != nil {
-		return errors.Wrapf(err, "[cleanupHelmReleases] failed to obtain the Kubernetes REST config instance")
-	}
+	client := userContext.K8sClient
+	restConfig := userContext.RESTConfig
 
-	listNamespaces, err := client.CoreV1().Namespaces().List(context.TODO(), metav1.ListOptions{})
-	if err != nil {
-		return errors.Wrapf(err, "[cleanupHelmReleases] failed to list namespaces on cluster %v", cluster.Name)
-	}
+	clientGetter := newClientGetter(client, restConfig)
 
-	clientGetter := NewClientGetter(client, *restConfig)
-	helmDriver := os.Getenv("HELM_DRIVER")
-
-	for _, namespace := range listNamespaces.Items {
+	for _, namespace := range FeatureAppNS {
 		// TODO check if there's a way of doing this using a more API-based approach
-		actionConfig := new(action.Configuration)
-
-		if err = actionConfig.Init(
-			clientGetter,
-			namespace.Name,
-			helmDriver,
-			debugLog,
-		); err != nil {
+		actionConfig := &action.Configuration{}
+		if err = actionConfig.Init(clientGetter, namespace, EmptyHelmDriverName, logrus.Debugf); err != nil {
 			return errors.Wrapf(err, "[cleanupHelmReleases] failed to create ActionConfiguration instance for Helm")
 		}
 
-		releases, err := actionConfig.Releases.ListReleases()
+		listAction := action.NewList(actionConfig)
+		releases, err := listAction.Run()
 		if err != nil {
-			return errors.Wrapf(err, "[cleanupHelmReleases] failed to list Helm releases for namespace %v", namespace.Name)
+			return errors.Wrapf(err, "[cleanupHelmReleases] failed to list Helm releases for namespace %v", namespace)
 		}
 
 		for _, helmRelease := range releases {
@@ -181,15 +173,18 @@ func (p *Provisioner) cleanupHelmReleases(cluster *v3.Cluster) error {
 			}
 
 			// TODO consume the function from helm-mapkubeapis once that is merged in
-			modifiedManifest, err := ReplaceManifestData(apiMappings, lastRelease.Manifest, cluster.Status.Version.GitVersion)
+			replaced, modifiedManifest, err := ReplaceManifestData(apiMappings, lastRelease.Manifest, cluster.Status.Version.GitVersion)
 			if err != nil {
 				// If this fails, it probably means we don't have adequate write permissions
 				return errors.Wrapf(err, "[cleanupHelmReleases] failed to replace deprecated/removed APIs on cluster %v", cluster.Name)
 			}
 
-			if modifiedManifest == lastRelease.Manifest {
-				logrus.Infof("[cleanupHelmReleases] release %v in namespace %v has no deprecated or removed APIs", lastRelease.Name, namespace.Name)
-			} else if err := updateRelease(lastRelease, modifiedManifest, actionConfig); err != nil {
+			if !replaced {
+				logrus.Infof("[cleanupHelmReleases] release %v in namespace %v has no deprecated or removed APIs", lastRelease.Name, namespace)
+				continue
+			}
+
+			if err := updateRelease(lastRelease, modifiedManifest, actionConfig); err != nil {
 				logrus.Errorf("[cleanupHelmReleases] failed to update release %v in namespace %v, skipping...", lastRelease.Name, lastRelease.Namespace)
 			}
 		}
@@ -198,16 +193,11 @@ func (p *Provisioner) cleanupHelmReleases(cluster *v3.Cluster) error {
 	return nil
 }
 
-// debugLog is a function conforming to the DebugLog type in action.Configuration#Init to write debug messages
-func debugLog(format string, v ...interface{}) {
-	format = fmt.Sprintf("[cleanupHelmReleases][debug] %s\n", format)
-	logrus.Debug(fmt.Sprintf(format, v...))
-}
-
 // ReplaceManifestData replaces the out-of-date APIs with their respective valid successors, or removes an API that
 // does not have a successor.
 // Logic extracted from https://github.com/stormqueen1990/helm-mapkubeapis/blob/0245b7a7837a36fd164d83e496c453811d62c083/pkg/common/common.go#L81-L142
-func ReplaceManifestData(mapMetadata *mapping.Metadata, manifest string, kubeVersion string) (string, error) {
+func ReplaceManifestData(mapMetadata *mapping.Metadata, manifest string, kubeVersion string) (bool, string, error) {
+	var replaced = false
 	for _, mappingData := range mapMetadata.Mappings {
 		deprecatedAPI := mappingData.DeprecatedAPI
 		supportedAPI := mappingData.NewAPI
@@ -219,18 +209,22 @@ func ReplaceManifestData(mapMetadata *mapping.Metadata, manifest string, kubeVer
 			apiVersion = mappingData.RemovedInVersion
 		}
 
+		if !semver.IsValid(kubeVersion) {
+			return replaced, "", errors.Errorf("Invalid format for Kubernetes semantic version: %v", kubeVersion)
+		}
+
 		if !semver.IsValid(apiVersion) {
-			return "", errors.Errorf("Failed to get the deprecated or removed Kubernetes version for API: %s", strings.ReplaceAll(deprecatedAPI, "\n", " "))
+			return replaced, "", errors.Errorf("Failed to get the deprecated or removed Kubernetes version for API: %s", strings.ReplaceAll(deprecatedAPI, "\n", " "))
 		}
 
 		if count := strings.Count(manifest, deprecatedAPI); count > 0 {
 			if semver.Compare(apiVersion, kubeVersion) > 0 {
-				logrus.Printf("The following API does not require mapping as the "+
+				logrus.Debugf("The following API does not require mapping as the "+
 					"API is not deprecated or removed in Kubernetes '%s':\n\"%s\"\n", apiVersion,
 					deprecatedAPI)
 			} else {
 				if supportedAPI == "" {
-					logrus.Printf("Found %d instances of deprecated or removed Kubernetes API:\n\"%s\"\n", count, deprecatedAPI)
+					logrus.Debugf("Found %d instances of deprecated or removed Kubernetes API:\n\"%s\"\n", count, deprecatedAPI)
 
 					for repl := 0; repl < count; repl++ {
 						// find the position where the API header is
@@ -263,13 +257,15 @@ func ReplaceManifestData(mapMetadata *mapping.Metadata, manifest string, kubeVer
 
 					manifest = strings.Trim(manifest, "\n")
 				} else {
-					logrus.Printf("Found %d instances of deprecated or removed Kubernetes API:\n\"%s\"\nSupported API equivalent:\n\"%s\"\n", count, deprecatedAPI, supportedAPI)
+					logrus.Debugf("Found %d instances of deprecated or removed Kubernetes API:\n\"%s\"\nSupported API equivalent:\n\"%s\"\n", count, deprecatedAPI, supportedAPI)
 					manifest = strings.ReplaceAll(manifest, deprecatedAPI, supportedAPI)
 				}
+
+				replaced = true
 			}
 		}
 	}
-	return manifest, nil
+	return replaced, manifest, nil
 }
 
 // updateRelease updates a release in the cluster with an equivalent with the superseded APIs replaced or removed as

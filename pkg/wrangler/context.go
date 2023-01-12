@@ -171,7 +171,6 @@ type MultiClusterManager interface {
 	Wait(ctx context.Context)
 	Middleware(next http.Handler) http.Handler
 	K8sClient(clusterName string) (kubernetes.Interface, error)
-	RESTConfig(clusterName string) (*rest.Config, error)
 }
 
 func (w *Context) OnLeader(f func(ctx context.Context) error) {
@@ -488,10 +487,6 @@ func (n noopMCM) Middleware(next http.Handler) http.Handler {
 }
 
 func (n noopMCM) K8sClient(clusterName string) (kubernetes.Interface, error) {
-	return nil, nil
-}
-
-func (n noopMCM) RESTConfig(clusterName string) (*rest.Config, error) {
 	return nil, nil
 }
 

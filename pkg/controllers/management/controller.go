@@ -46,7 +46,7 @@ func Register(ctx context.Context, management *config.ManagementContext, manager
 	cluster.Register(ctx, management)
 	clusterdeploy.Register(ctx, management, manager)
 	clustergc.Register(ctx, management)
-	clusterprovisioner.Register(ctx, management)
+	clusterprovisioner.Register(ctx, management, manager)
 	clusterstats.Register(ctx, management, manager)
 	clusterstatus.Register(ctx, management)
 	kontainerdriver.Register(ctx, management)
