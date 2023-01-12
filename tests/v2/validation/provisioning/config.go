@@ -6,7 +6,9 @@ import (
 )
 
 const (
-	ConfigurationFileKey = "provisioningInput"
+	namespace               = "fleet-default"
+	defaultRandStringLength = 5
+	ConfigurationFileKey    = "provisioningInput"
 )
 
 type Config struct {
