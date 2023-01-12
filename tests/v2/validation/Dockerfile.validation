@@ -19,7 +19,7 @@ RUN go mod download && \
 
 RUN CGO_ENABLED=0
 
-RUN sudo apt install unzip
+RUN apt install unzip
 RUN wget https://releases.hashicorp.com/terraform/0.12.21/terraform_0.12.21_linux_amd64.zip
 RUN unzip terraform_0.12.21_linux_amd64.zip && rm terraform_0.12.21_linux_amd64.zip
 RUN mv terraform /usr/bin/terraform
