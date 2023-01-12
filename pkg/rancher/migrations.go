@@ -29,15 +29,17 @@ import (
 )
 
 const (
-	cattleNamespace                           = "cattle-system"
-	forceUpgradeLogoutConfig                  = "forceupgradelogout"
-	forceLocalSystemAndDefaultProjectCreation = "forcelocalprojectcreation"
-	forceSystemNamespacesAssignment           = "forcesystemnamespaceassignment"
-	migrateFromMachineToPlanSecret            = "migratefrommachinetoplanesecret"
-	rancherVersionKey                         = "rancherVersion"
-	projectsCreatedKey                        = "projectsCreated"
-	namespacesAssignedKey                     = "namespacesAssigned"
-	capiMigratedKey                           = "capiMigrated"
+	cattleNamespace                            = "cattle-system"
+	forceUpgradeLogoutConfig                   = "forceupgradelogout"
+	forceLocalSystemAndDefaultProjectCreation  = "forcelocalprojectcreation"
+	forceSystemNamespacesAssignment            = "forcesystemnamespaceassignment"
+	migrateFromMachineToPlanSecret             = "migratefrommachinetoplanesecret"
+	migrateEncryptionKeyRotationLeaderToStatus = "migrateencryptionkeyrotationleadertostatus"
+	rancherVersionKey                          = "rancherVersion"
+	projectsCreatedKey                         = "projectsCreated"
+	namespacesAssignedKey                      = "namespacesAssigned"
+	capiMigratedKey                            = "capiMigrated"
+	encryptionKeyRotationStatusMigratedKey     = "encryptionKeyRotationStatusMigrated"
 )
 
 func runMigrations(wranglerContext *wrangler.Context) error {
@@ -63,6 +65,9 @@ func runMigrations(wranglerContext *wrangler.Context) error {
 
 	if features.RKE2.Enabled() {
 		if err := migrateCAPIMachineLabelsAndAnnotationsToPlanSecret(wranglerContext); err != nil {
+			return err
+		}
+		if err := migrateEncryptionKeyRotationLeader(wranglerContext); err != nil {
 			return err
 		}
 	}
@@ -413,6 +418,56 @@ func migrateCAPIMachineLabelsAndAnnotationsToPlanSecret(w *wrangler.Context) err
 	}
 
 	cm.Data[capiMigratedKey] = "true"
+	return createOrUpdateConfigMap(w.Core.ConfigMap(), cm)
+}
+
+func migrateEncryptionKeyRotationLeader(w *wrangler.Context) error {
+	cm, err := getConfigMap(w.Core.ConfigMap(), migrateEncryptionKeyRotationLeaderToStatus)
+	if err != nil || cm == nil {
+		return err
+	}
+
+	if cm.Data[encryptionKeyRotationStatusMigratedKey] == "true" {
+		return nil
+	}
+
+	mgmtClusters, err := w.Mgmt.Cluster().List(metav1.ListOptions{})
+	if err != nil {
+		return err
+	}
+
+	for _, mgmtCluster := range mgmtClusters.Items {
+		if err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+			cp, err := w.RKE.RKEControlPlane().Get(mgmtCluster.Spec.FleetWorkspaceName, mgmtCluster.Name, metav1.GetOptions{})
+			if k8serror.IsNotFound(err) {
+				return nil
+			}
+			if err != nil {
+				return err
+			}
+			leader := cp.Annotations["rke.cattle.io/encrypt-key-rotation-leader"]
+			if leader == "" {
+				return nil
+			}
+			cp = cp.DeepCopy()
+			cp.Status.RotateEncryptionKeysLeader = leader
+			cp, err = w.RKE.RKEControlPlane().UpdateStatus(cp)
+			if err != nil {
+				return err
+			}
+			cp = cp.DeepCopy()
+			delete(cp.Annotations, "rke.cattle.io/encrypt-key-rotation-leader")
+			cp, err = w.RKE.RKEControlPlane().Update(cp)
+			if err != nil {
+				return err
+			}
+			return nil
+		}); err != nil {
+			return err
+		}
+	}
+
+	cm.Data[encryptionKeyRotationStatusMigratedKey] = "true"
 	return createOrUpdateConfigMap(w.Core.ConfigMap(), cm)
 }
 
