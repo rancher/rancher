@@ -3,6 +3,7 @@ package cluster
 import (
 	"encoding/json"
 	"fmt"
+	"os/exec"
 	"strings"
 	"time"
 
@@ -170,9 +171,95 @@ func WaitForCreate(clients *clients.Clients, c *provisioningv1api.Cluster) (_ *p
 
 	err = wait.Object(clients.Ctx, clients.Provisioning.Cluster().Watch, c, func(obj runtime.Object) (bool, error) {
 		c = obj.(*provisioningv1api.Cluster)
-		return c.Status.Ready, nil
+		if c.Status.Ready {
+			return true, nil
+		}
+		machines, err := Machines(clients, c)
+		if apierrors.IsNotFound(err) {
+			return false, nil
+		}
+		if err != nil {
+			return false, err
+		}
+		if len(machines.Items) == 0 {
+			return false, nil
+		}
+		for _, machine := range machines.Items {
+			if !rke2.PlanApplied.IsFalse(machine.Status) {
+				continue
+			}
+			pod, err := clients.Core.Pod().Get(machine.Namespace, machine.Spec.InfrastructureRef.Name, metav1.GetOptions{})
+			if apierrors.IsNotFound(err) {
+				// custom
+				pods, err := clients.Core.Pod().List(machine.Namespace, metav1.ListOptions{})
+				if apierrors.IsNotFound(err) {
+					continue
+				} else if err != nil {
+					logrus.Errorf("failed to get machine pod for %s/%s: %v", machine.Namespace, machine.Name, err)
+					continue
+				}
+				for _, pod := range pods.Items {
+					cmd := exec.CommandContext(clients.Ctx, "kubectl", "exec", pod.Name, "journalctl -u rancher-system-agent")
+					output, err := cmd.CombinedOutput()
+					if err != nil {
+						logrus.Errorf("failed to pod logs for %s/%s: %v", pod.Namespace, pod.Name, err)
+					}
+					logrus.Errorf("failing rancher-system-agent logs: %s", output)
+					return false, nil
+				}
+				return false, nil
+			} else if err != nil {
+				logrus.Errorf("failed to get machine pod for %s/%s: %v", machine.Namespace, machine.Name, err)
+				continue
+			}
+			cmd := exec.CommandContext(clients.Ctx, "kubectl", "exec", pod.Name, "journalctl -u rancher-system-agent")
+			output, err := cmd.CombinedOutput()
+			if err != nil {
+				logrus.Errorf("failed to pod logs for %s/%s: %v", pod.Namespace, pod.Name, err)
+			}
+			logrus.Errorf("failing rancher-system-agent logs: %s", output)
+		}
+		return false, nil
 	})
 	if err != nil {
+		machines, err2 := Machines(clients, c)
+		if err2 != nil {
+			return nil, err
+		}
+	loop:
+		for _, machine := range machines.Items {
+			pod, err := clients.Core.Pod().Get(machine.Namespace, machine.Spec.InfrastructureRef.Name, metav1.GetOptions{})
+			if apierrors.IsNotFound(err) {
+				// custom
+				pods, err := clients.Core.Pod().List(machine.Namespace, metav1.ListOptions{})
+				if apierrors.IsNotFound(err) {
+					continue
+				} else if err != nil {
+					logrus.Errorf("failed to get machine pod for %s/%s: %v", machine.Namespace, machine.Name, err)
+					continue
+				}
+				for _, pod := range pods.Items {
+					cmd := exec.CommandContext(clients.Ctx, "kubectl", "exec", pod.Name, "journalctl -u rancher-system-agent")
+					output, err := cmd.CombinedOutput()
+					if err != nil {
+						logrus.Errorf("failed to pod logs for %s/%s: %v", pod.Namespace, pod.Name, err)
+					}
+					logrus.Errorf("failing rancher-system-agent logs: %s", output)
+					return nil, fmt.Errorf("prov cluster is not ready: %s", output)
+				}
+				break loop
+			} else if err != nil {
+				logrus.Errorf("failed to get machine pod for %s/%s: %v", machine.Namespace, machine.Name, err)
+				continue
+			}
+			cmd := exec.CommandContext(clients.Ctx, "kubectl", "exec", pod.Name, "journalctl -u rancher-system-agent")
+			output, err := cmd.CombinedOutput()
+			if err != nil {
+				logrus.Errorf("failed to pod logs for %s/%s: %v", pod.Namespace, pod.Name, err)
+			}
+			logrus.Errorf("failing rancher-system-agent logs: %s", output)
+			return nil, fmt.Errorf("prov cluster is not ready: %s", output)
+		}
 		return nil, fmt.Errorf("prov cluster is not ready: %w", err)
 	}
 
