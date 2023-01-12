@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	provisioningV1 "github.com/rancher/rancher/tests/framework/clients/rancher/v1"
 	"github.com/rancher/rancher/tests/framework/extensions/clusters"
@@ -229,10 +228,7 @@ func (r *RKE2EtcdSnapshotRestoreTestSuite) EtcdSnapshotRestoreWithK8sUpgrade(pro
 	logrus.Infof("All pods are up and running.............")
 
 	logrus.Infof("fetching deployment list to validate restore.............")
-	deploymentList, err := steveclient.SteveType(workloads.DeploymentSteveType).List(&types.ListOpts{
-		Filters: map[string]interface{}{
-			"fieldSelector": "metadata.namespace=" + r.ns,
-		}})
+	deploymentList, err := steveclient.SteveType(workloads.DeploymentSteveType).NamespacedSteveClient(r.ns).List(nil)
 	require.NoError(r.T(), err)
 	require.Equal(r.T(), 1, len(deploymentList.Data))
 	require.Equal(r.T(), wloadBeforeRestore, deploymentList.Data[0].ObjectMeta.Name)
@@ -278,7 +274,7 @@ func (r *RKE2EtcdSnapshotRestoreTestSuite) watchAndWaitForPods(client *rancher.C
 		if err != nil {
 			return false, nil
 		}
-		pods, err := steveClient.SteveType(pods.PodResourceSteveType).List(&types.ListOpts{})
+		pods, err := steveClient.SteveType(pods.PodResourceSteveType).List(nil)
 		if err != nil {
 			return false, nil
 		}

@@ -1,0 +1,172 @@
+{
+  "actions": {},
+  "continue": "nondeterministictoken",
+  "count": 12,
+  "createTypes": {
+    "secret": "https://localhost:8443/v1/secrets"
+  },
+  "data": [
+    {
+      "actions": null,
+      "apiVersion": "v1",
+      "id": "test-ns-3/test4",
+      "kind": "Secret",
+      "links": {
+        "remove": "https://localhost:8443/v1/secrets/test-ns-3/test4",
+        "self": "https://localhost:8443/v1/secrets/test-ns-3/test4",
+        "update": "https://localhost:8443/v1/secrets/test-ns-3/test4",
+        "view": "https://localhost:8443/api/v1/namespaces/test-ns-3/secrets/test4"
+      },
+      "metadata": {
+        "labels": {
+          "test-label-gte": "3"
+        },
+        "name": "test4",
+        "namespace": "test-ns-3",
+        "resourceVersion": "1000",
+        "state": {
+          "message": "Resource is always ready",
+          "name": "active"
+        }
+      },
+      "type": "secret"
+    },
+    {
+      "actions": null,
+      "apiVersion": "v1",
+      "id": "test-ns-4/test4",
+      "kind": "Secret",
+      "links": {
+        "remove": "https://localhost:8443/v1/secrets/test-ns-4/test4",
+        "self": "https://localhost:8443/v1/secrets/test-ns-4/test4",
+        "update": "https://localhost:8443/v1/secrets/test-ns-4/test4",
+        "view": "https://localhost:8443/api/v1/namespaces/test-ns-4/secrets/test4"
+      },
+      "metadata": {
+        "labels": {
+          "test-label-gte": "3"
+        },
+        "name": "test4",
+        "namespace": "test-ns-4",
+        "resourceVersion": "1000",
+        "state": {
+          "message": "Resource is always ready",
+          "name": "active"
+        }
+      },
+      "type": "secret"
+    },
+    {
+      "actions": null,
+      "apiVersion": "v1",
+      "id": "test-ns-1/test3",
+      "kind": "Secret",
+      "links": {
+        "remove": "https://localhost:8443/v1/secrets/test-ns-1/test3",
+        "self": "https://localhost:8443/v1/secrets/test-ns-1/test3",
+        "update": "https://localhost:8443/v1/secrets/test-ns-1/test3",
+        "view": "https://localhost:8443/api/v1/namespaces/test-ns-1/secrets/test3"
+      },
+      "metadata": {
+        "labels": {
+          "test-label-gte": "3"
+        },
+        "name": "test3",
+        "namespace": "test-ns-1",
+        "resourceVersion": "1000",
+        "state": {
+          "message": "Resource is always ready",
+          "name": "active"
+        }
+      },
+      "type": "secret"
+    },
+    {
+      "actions": null,
+      "apiVersion": "v1",
+      "id": "test-ns-2/test3",
+      "kind": "Secret",
+      "links": {
+        "remove": "https://localhost:8443/v1/secrets/test-ns-2/test3",
+        "self": "https://localhost:8443/v1/secrets/test-ns-2/test3",
+        "update": "https://localhost:8443/v1/secrets/test-ns-2/test3",
+        "view": "https://localhost:8443/api/v1/namespaces/test-ns-2/secrets/test3"
+      },
+      "metadata": {
+        "labels": {
+          "test-label-gte": "3"
+        },
+        "name": "test3",
+        "namespace": "test-ns-2",
+        "resourceVersion": "1000",
+        "state": {
+          "message": "Resource is always ready",
+          "name": "active"
+        }
+      },
+      "type": "secret"
+    },
+    {
+      "actions": null,
+      "apiVersion": "v1",
+      "id": "test-ns-3/test3",
+      "kind": "Secret",
+      "links": {
+        "remove": "https://localhost:8443/v1/secrets/test-ns-3/test3",
+        "self": "https://localhost:8443/v1/secrets/test-ns-3/test3",
+        "update": "https://localhost:8443/v1/secrets/test-ns-3/test3",
+        "view": "https://localhost:8443/api/v1/namespaces/test-ns-3/secrets/test3"
+      },
+      "metadata": {
+        "labels": {
+          "test-label-gte": "3"
+        },
+        "name": "test3",
+        "namespace": "test-ns-3",
+        "resourceVersion": "1000",
+        "state": {
+          "message": "Resource is always ready",
+          "name": "active"
+        }
+      },
+      "type": "secret"
+    },
+    {
+      "actions": null,
+      "apiVersion": "v1",
+      "id": "test-ns-4/test3",
+      "kind": "Secret",
+      "links": {
+        "remove": "https://localhost:8443/v1/secrets/test-ns-4/test3",
+        "self": "https://localhost:8443/v1/secrets/test-ns-4/test3",
+        "update": "https://localhost:8443/v1/secrets/test-ns-4/test3",
+        "view": "https://localhost:8443/api/v1/namespaces/test-ns-4/secrets/test3"
+      },
+      "metadata": {
+        "labels": {
+          "test-label-gte": "3"
+        },
+        "name": "test3",
+        "namespace": "test-ns-4",
+        "resourceVersion": "1000",
+        "state": {
+          "message": "Resource is always ready",
+          "name": "active"
+        }
+      },
+      "type": "secret"
+    }
+  ],
+  "links": {
+    "self": "https://localhost:8443/v1/secrets"
+  },
+  "pages": 2,
+  "pagination": {
+    "first": "https://localhost:8443/v1/secrets",
+    "next": "https://localhost:8443/v1/secrets?continue=nondeterministictoken\u0026filter=metadata.labels.test-label-gte%3D3\u0026limit=20\u0026page=2\u0026pagesize=6\u0026sort=-metadata.name",
+    "partial": true
+  },
+  "resourceType": "secret",
+  "revision": "100",
+  "type": "collection"
+}

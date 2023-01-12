@@ -1,0 +1,33 @@
+{
+  "actions": {},
+  "count": 2,
+  "data": [
+    {
+      "actions": null,
+      "apiVersion": "v1",
+      "id": "test-ns-3/test1",
+      "kind": "Secret",
+      "links": {
+        "self": "https://localhost:8443/v1/secrets/test-ns-3/test1",
+        "view": "https://localhost:8443/api/v1/namespaces/test-ns-3/secrets/test1"
+      },
+      "metadata": {
+        "name": "test1",
+        "namespace": "test-ns-3",
+        "resourceVersion": "1000",
+        "state": {
+          "message": "Resource is always ready",
+          "name": "active"
+        }
+      },
+      "type": "secret"
+    }
+  ],
+  "links": {
+    "self": "https://localhost:8443/v1/secrets"
+  },
+  "pages": 2,
+  "resourceType": "secret",
+  "revision": "100",
+  "type": "collection"
+}
