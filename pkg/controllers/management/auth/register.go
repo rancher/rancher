@@ -56,14 +56,14 @@ func RegisterIndexers(scaledContext *config.ScaledContext) error {
 }
 
 func RegisterEarly(ctx context.Context, management *config.ManagementContext, clusterManager *clustermanager.Manager) {
-	prtb, crtb := newRTBLifecycles(management)
-	gr := newGlobalRoleLifecycle(management)
-	grb := newGlobalRoleBindingLifecycle(management, clusterManager)
+	prtb, crtb := newRTBLifecycles(management.WithAgent("mgmt-auth-crtb-prtb-controller"))
+	gr := newGlobalRoleLifecycle(management.WithAgent(grController))
+	grb := newGlobalRoleBindingLifecycle(management.WithAgent(grbController), clusterManager)
 	p, c := newPandCLifecycles(management)
 	u := newUserLifecycle(management, clusterManager)
-	n := newTokenController(management)
+	n := newTokenController(management.WithAgent(tokenController))
 	ac := newAuthConfigController(ctx, management, clusterManager.ScaledContext)
-	ua := newUserAttributeController(management)
+	ua := newUserAttributeController(management.WithAgent(userAttributeController))
 	s := newAuthSettingController(management)
 	rt := newRoleTemplateLifecycle(management, clusterManager)
 	grbLegacy := newLegacyGRBCleaner(management)

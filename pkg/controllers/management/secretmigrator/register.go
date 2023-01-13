@@ -39,6 +39,7 @@ func NewMigrator(secretLister v1.SecretLister, secrets v1.SecretInterface) *Migr
 }
 
 func Register(ctx context.Context, management *config.ManagementContext) {
+	management = management.WithAgent("secret-migrator")
 	h := handler{
 		migrator: NewMigrator(
 			management.Core.Secrets("").Controller().Lister(),

@@ -9,9 +9,9 @@ require (
 	github.com/rancher/eks-operator v1.2.0-rc2
 	github.com/rancher/fleet/pkg/apis v0.0.0-20221220171827-374ed17d8499
 	github.com/rancher/gke-operator v1.1.5
-	github.com/rancher/norman v0.0.0-20221205184727-32ef2e185b99
+	github.com/rancher/norman v0.0.0-20230110004459-34230bb2787c
 	github.com/rancher/rke v1.4.3-rc3
-	github.com/rancher/wrangler v1.0.1-0.20221202234327-1cafffeaa9a1
+	github.com/rancher/wrangler v1.0.1-0.20230110004444-57f14d386afb
 	github.com/sirupsen/logrus v1.8.1
 	k8s.io/api v0.25.4
 	k8s.io/apimachinery v0.25.4
@@ -53,7 +53,7 @@ require (
 	github.com/prometheus/client_model v0.2.0 // indirect
 	github.com/prometheus/common v0.32.1 // indirect
 	github.com/prometheus/procfs v0.7.3 // indirect
-	github.com/rancher/lasso v0.0.0-20221202205459-e7138f16489c // indirect
+	github.com/rancher/lasso v0.0.0-20221227210133-6ea88ca2fbcc // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	golang.org/x/net v0.2.0 // indirect
 	golang.org/x/oauth2 v0.0.0-20220608161450-d0670ef3b1eb // indirect
