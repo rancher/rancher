@@ -125,7 +125,7 @@ func addMachineDrivers(management *config.ManagementContext) error {
 	if err := addMachineDriver(PacketDriver, "https://github.com/equinix/docker-machine-driver-metal/releases/download/v0.6.0/docker-machine-driver-metal_linux-amd64.zip", "https://rancher-drivers.equinixmetal.net/1.0.2/component.js", "fad5e551a35d2ef2db742b07ca6d61bb9c9b574d322d3000f0c557d5fb90a734", []string{"api.packet.net", "api.equinix.com", "rancher-drivers.equinixmetal.net"}, false, false, false, management); err != nil {
 		return err
 	}
-	if err := addMachineDriver(PhoenixNAPDriver, "https://github.com/phoenixnap/docker-machine-driver-pnap/releases/download/v0.4.0/docker-machine-driver-pnap_0.4.0_linux_amd64.zip", "", "0bc81bdc80ab258fa0db67918f3b04435ed2c81f84c942c9123a0729f884190b", []string{"api.securedservers.com", "api.phoenixnap.com"}, false, false, false, management); err != nil {
+	if err := addMachineDriver(PhoenixNAPDriver, "https://github.com/phoenixnap/docker-machine-driver-pnap/releases/download/v0.4.0/docker-machine-driver-pnap_0.4.0_linux_amd64.zip", "", "0bc81bdc80ab258fa0db67918f3b04435ed2c81f84c942c9123a0729f884190b", []string{"api.securedservers.com", "api.phoenixnap.com", "auth.phoenixnap.com"}, false, false, false, management); err != nil {
 		return err
 	}
 	if err := addMachineDriver(RackspaceDriver, "local://", "", "", nil, false, true, false, management); err != nil {
