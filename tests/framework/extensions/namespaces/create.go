@@ -4,7 +4,8 @@ import (
 	"context"
 	"fmt"
 	"strings"
-
+	kwait "k8s.io/apimachinery/pkg/util/wait"
+	"time"
 	"github.com/rancher/rancher/pkg/api/scheme"
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
@@ -132,6 +133,16 @@ func CreateNamespace(client *rancher.Client, namespaceName, containerDefaultReso
 			return false, nil
 		})
 	})
-
+	err = kwait.Poll(300*time.Millisecond, 3*time.Minute, func() (done bool, err error) {
+		namespaceStatus := &coreV1.NamespaceStatus{}
+		err = v1.ConvertToK8sType(resp.Status, namespaceStatus)
+		if err != nil {
+			return false, err
+		}
+		if namespaceStatus.Phase == "Active" {
+			return true, nil
+		}
+		return false, nil
+	})
 	return resp, nil
 }
