@@ -1,7 +1,11 @@
 package rbac
 
 import (
+	"errors"
+	"fmt"
 	"sort"
+	"strings"
+	"time"
 
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
@@ -10,15 +14,27 @@ import (
 	"github.com/rancher/rancher/tests/framework/extensions/projects"
 	"github.com/rancher/rancher/tests/framework/extensions/users"
 	password "github.com/rancher/rancher/tests/framework/extensions/users/passwordgenerator"
+	"github.com/rancher/rancher/tests/framework/extensions/workloads"
 	namegen "github.com/rancher/rancher/tests/framework/pkg/namegenerator"
+	appv1 "k8s.io/api/apps/v1"
+	coreV1 "k8s.io/api/core/v1"
+	kwait "k8s.io/apimachinery/pkg/util/wait"
 )
 
 const roleOwner = "cluster-owner"
 const roleMember = "cluster-member"
 const roleProjectOwner = "project-owner"
 const roleProjectMember = "project-member"
+const roleProjectReadOnly = "read-only"
+const restrictedAdmin = "restricted-admin"
+const pssRestrictedPolicy = "restricted"
+const pssBaselinePolicy = "baseline"
+const pssPrivilegedPolicy = "privileged"
+const psaWarn = "pod-security.kubernetes.io/warn"
+const psaAudit = "pod-security.kubernetes.io/audit"
+const psaEnforce = "pod-security.kubernetes.io/enforce"
 
-func createUser(client *rancher.Client) (*management.User, error) {
+func createUser(client *rancher.Client, role string) (*management.User, error) {
 	enabled := true
 	var username = namegen.AppendRandomString("testuser-")
 	var testpassword = password.GenerateUserPassword("testpass-")
@@ -29,7 +45,7 @@ func createUser(client *rancher.Client) (*management.User, error) {
 		Enabled:  &enabled,
 	}
 
-	newUser, err := users.CreateUserWithRole(client, user, "user")
+	newUser, err := users.CreateUserWithRole(client, user, role)
 	if err != nil {
 		return newUser, err
 	}
@@ -82,5 +98,63 @@ func createProject(client *rancher.Client, clusterID string) (createProject *man
 
 	createProject, err = client.Management.Project.Create(projectConfig)
 	return createProject, err
+
+}
+
+func getPSALabels(response *v1.SteveAPIObject, actualLabels map[string]string) map[string]string {
+	expectedLabels := map[string]string{}
+
+	for label := range response.Labels {
+		if _, found := actualLabels[label]; found {
+			expectedLabels[label] = actualLabels[label]
+		}
+	}
+	return expectedLabels
+
+}
+
+func createDeployment(steveclient *v1.Client, client *rancher.Client, clusterID string, containerName string, image string, namespaceName string) (*v1.SteveAPIObject, error) {
+
+	deploymentName := namegen.AppendRandomString("")
+	containerTemplate := workloads.NewContainer(containerName, image, coreV1.PullAlways, []coreV1.VolumeMount{}, []coreV1.EnvFromSource{})
+	matchLabels := map[string]string{}
+	matchLabels["workload.user.cattle.io/workloadselector"] = fmt.Sprintf("apps.deployment-%v-%v", namespaceName, deploymentName)
+
+	podTemplate := workloads.NewPodTemplate([]coreV1.Container{containerTemplate}, []coreV1.Volume{}, []coreV1.LocalObjectReference{}, matchLabels)
+	deployment := workloads.NewDeploymentTemplate(deploymentName, namespaceName, podTemplate, matchLabels)
+
+	deploymentResp, err := steveclient.SteveType(workloads.DeploymentSteveType).Create(deployment)
+	if err != nil {
+		return nil, err
+	}
+	err = kwait.Poll(5*time.Second, 5*time.Minute, func() (done bool, err error) {
+		steveclient, err := client.Steve.ProxyDownstream(clusterID)
+		if err != nil {
+			return false, nil
+		}
+		deploymentResp, err := steveclient.SteveType(workloads.DeploymentSteveType).ByID(deployment.Namespace + "/" + deployment.Name)
+		if err != nil {
+			return false, nil
+		}
+		deployment := &appv1.Deployment{}
+		err = v1.ConvertToK8sType(deploymentResp.JSONResp, deployment)
+		if err != nil {
+			return false, nil
+		}
+		status := deployment.Status.Conditions
+		for _, statusCondition := range status {
+			if strings.Contains(statusCondition.Message, "forbidden") {
+				err = errors.New(statusCondition.Message)
+				return false, err
+			}
+		}
+
+		if *deployment.Spec.Replicas == deployment.Status.AvailableReplicas {
+			return true, nil
+		}
+
+		return false, nil
+	})
+	return deploymentResp, err
 
 }

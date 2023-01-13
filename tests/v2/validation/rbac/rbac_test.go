@@ -344,7 +344,7 @@ func (rb *RBTestSuite) TestRBAC() {
 	}
 	for _, tt := range tests {
 		rb.Run("Set up User with Cluster Role "+tt.name, func() {
-			newUser, err := createUser(rb.client)
+			newUser, err := createUser(rb.client, "user")
 			require.NoError(rb.T(), err)
 			rb.standardUser = newUser
 			rb.T().Logf("Created user: %v", rb.standardUser.Username)
@@ -414,7 +414,7 @@ func (rb *RBTestSuite) TestRBAC() {
 		if strings.Contains(tt.role, "project") {
 			rb.Run("Testcase7 - Validating if member with role "+tt.name+" can add members to the cluster", func() {
 				//Set up additional user client to be added to the project
-				additionalUser, err := createUser(rb.client)
+				additionalUser, err := createUser(rb.client, "user")
 				require.NoError(rb.T(), err)
 				rb.additionalUser = additionalUser
 				rb.additionalUserClient, err = rb.client.AsUser(rb.additionalUser)
@@ -446,7 +446,7 @@ func (rb *RBTestSuite) TestRBAC() {
 
 func (rb *RBTestSuite) TestRBACAdditional() {
 	rb.Run("Set up User with cluster Role for additional rbac test cases "+roleOwner, func() {
-		newUser, err := createUser(rb.client)
+		newUser, err := createUser(rb.client, "user")
 		require.NoError(rb.T(), err)
 		rb.standardUser = newUser
 		rb.T().Logf("Created user: %v", rb.standardUser.Username)
@@ -464,7 +464,7 @@ func (rb *RBTestSuite) TestRBACAdditional() {
 		require.NoError(rb.T(), err)
 
 		//Setting up an additional user for the additional rbac cases
-		additionalUser, err := createUser(rb.client)
+		additionalUser, err := createUser(rb.client, "user")
 		require.NoError(rb.T(), err)
 		rb.additionalUser = additionalUser
 		rb.additionalUserClient, err = rb.client.AsUser(rb.additionalUser)
