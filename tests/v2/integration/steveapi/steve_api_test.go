@@ -1530,13 +1530,26 @@ func (s *SteveAPITestSuite) TestList() {
 			require.NoError(s.T(), err)
 			jsonResp, err := formatJSON(secretList)
 			require.NoError(s.T(), err)
-			jsonFilePath := filepath.Join(jsonDir, test.description+".json")
+			jsonFilePath := filepath.Join(jsonDir, getFileName(test.user, test.namespace, test.query))
 			err = writeResp(csvWriter, test.user, curlURL, jsonFilePath, jsonResp)
 			require.NoError(s.T(), err)
 		})
 	}
 	csvWriter.Flush()
 	require.NoError(s.T(), csvWriter.Error())
+}
+
+func getFileName(user, ns, query string) string {
+	if user == "" {
+		user = "none"
+	}
+	if ns == "" {
+		ns = "none"
+	}
+	if query == "" {
+		query = "none"
+	}
+	return user + "_" + ns + "_" + query + ".json"
 }
 
 func getCurlURL(client *clientv1.Client, namespace, query string) (string, error) {
@@ -1600,7 +1613,7 @@ func formatJSON(obj *clientv1.SteveCollection) ([]byte, error) {
 func setUpResults() (*csv.Writer, *os.File, string, error) {
 	outputFile := "output.csv"
 	fields := []string{"user", "url", "response"}
-	csvFile, err := os.OpenFile(outputFile, os.O_RDWR|os.O_CREATE, 0644)
+	csvFile, err := os.OpenFile(outputFile, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0644)
 	if err != nil {
 		return nil, nil, "", err
 	}
