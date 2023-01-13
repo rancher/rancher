@@ -99,10 +99,13 @@ func TestSingleNodeAllRolesWithDelete(t *testing.T) {
 }
 
 func TestMachineTemplateClonedAnnotations(t *testing.T) {
+	// This test focuses on the behavior provisioning V2 controllers. The behavior
+	// of these controllers are not dependent on the specific kubernetes distribution
+	// the Rancher server is running on. Because of this, we only run this test on one
+	// distribution (k3s) so as not to duplicate test coverage.
 	if strings.ToLower(os.Getenv("DIST")) == "rke2" {
 		t.Skip()
 	}
-
 	clients, err := clients.New()
 	if err != nil {
 		t.Fatal(err)
@@ -161,10 +164,13 @@ func TestMachineTemplateClonedAnnotations(t *testing.T) {
 }
 
 func TestMachineSetDeletePolicyOldestSet(t *testing.T) {
+	// This test focuses on the behavior provisioning V2 controllers. The behavior
+	// of these controllers are not dependent on the specific kubernetes distribution
+	// the Rancher server is running on. Because of this, we only run this test on one
+	// distribution (k3s) so as not to duplicate test coverage.
 	if strings.ToLower(os.Getenv("DIST")) == "rke2" {
 		t.Skip()
 	}
-
 	clients, err := clients.New()
 	if err != nil {
 		t.Fatal(err)
@@ -274,9 +280,7 @@ func TestThreeNodesAllRolesWithDelete(t *testing.T) {
 }
 
 func TestFiveNodesUniqueRolesWithDelete(t *testing.T) {
-	if strings.ToLower(os.Getenv("DIST")) == "rke2" {
-		t.Skip()
-	}
+
 	clients, err := clients.New()
 	if err != nil {
 		t.Fatal(err)
@@ -329,9 +333,7 @@ func TestFiveNodesUniqueRolesWithDelete(t *testing.T) {
 }
 
 func TestFourNodesServerAndWorkerRolesWithDelete(t *testing.T) {
-	if strings.ToLower(os.Getenv("DIST")) == "rke2" {
-		t.Skip()
-	}
+
 	t.Parallel()
 	clients, err := clients.New()
 	if err != nil {
