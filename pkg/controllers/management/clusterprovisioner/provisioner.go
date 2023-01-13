@@ -11,8 +11,6 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/client-go/util/retry"
-
 	"github.com/rancher/rancher/pkg/features"
 
 	"golang.org/x/mod/semver"
@@ -197,7 +195,8 @@ func (p *Provisioner) Updated(cluster *v3.Cluster) (runtime.Object, error) {
 	var err error
 
 	if shouldCleanHelmReleases(features.HelmCleanupOnUpgrade.Enabled(), cluster) {
-		if err = p.startCleanUpHelmReleases(cluster); err != nil {
+		cluster, err = p.startCleanUpHelmReleases(cluster)
+		if err != nil {
 			// errors here should not prevent the cluster from upgrading
 			// log and continue the process
 			logrus.Errorf("failed to clean up Helm releases in upgraded cluster: %#v", err)
@@ -245,29 +244,17 @@ func (p *Provisioner) Updated(cluster *v3.Cluster) (runtime.Object, error) {
 	return obj.(*v3.Cluster), err
 }
 
-func (p *Provisioner) startCleanUpHelmReleases(cluster *v3.Cluster) error {
-	err := p.cleanupHelmReleases(cluster)
-	if err != nil {
-		return err
-	}
-
-	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		cluster, err = p.Clusters.Get(cluster.Name, metav1.GetOptions{})
+func (p *Provisioner) startCleanUpHelmReleases(cluster *v3.Cluster) (*v3.Cluster, error) {
+	object, err := apimgmtv3.ClusterConditionHelmReleasesMigrated.Do(cluster, func() (runtime.Object, error) {
+		err := p.cleanupHelmReleases(cluster)
 		if err != nil {
-			return err
+			return cluster, err
 		}
 
-		// Attempt to manually trigger updating, otherwise it will not be triggered until after exiting reconcile
-		apimgmtv3.ClusterConditionHelmReleasesMigrated.True(cluster)
-		apimgmtv3.ClusterConditionHelmReleasesMigrated.Message(cluster, "Helm releases cleaned up")
-
-		cluster, err = p.Clusters.Update(cluster)
-		if err != nil {
-			return err
-		}
-
-		return nil
+		return cluster, nil
 	})
+
+	return object.(*v3.Cluster), err
 }
 
 // shouldCleanHelmReleases indicates whether the cluster upgrade process should clean up existing Helm releases

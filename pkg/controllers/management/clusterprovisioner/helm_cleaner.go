@@ -127,13 +127,9 @@ func (p *Provisioner) cleanupHelmReleases(cluster *v3.Cluster) error {
 		return errors.Wrapf(err, "[cleanupHelmReleases] failed to obtain the Kubernetes client instance")
 	}
 
-	client := userContext.K8sClient
-	restConfig := userContext.RESTConfig
-
-	clientGetter := newClientGetter(client, restConfig)
+	clientGetter := newClientGetter(userContext.K8sClient, userContext.RESTConfig)
 
 	for _, namespace := range FeatureAppNS {
-		// TODO check if there's a way of doing this using a more API-based approach
 		actionConfig := &action.Configuration{}
 		if err = actionConfig.Init(clientGetter, namespace, EmptyHelmDriverName, logrus.Debugf); err != nil {
 			return errors.Wrapf(err, "[cleanupHelmReleases] failed to create ActionConfiguration instance for Helm")
@@ -178,6 +174,10 @@ func (p *Provisioner) cleanupHelmReleases(cluster *v3.Cluster) error {
 // does not have a successor.
 // Logic extracted from https://github.com/stormqueen1990/helm-mapkubeapis/blob/0245b7a7837a36fd164d83e496c453811d62c083/pkg/common/common.go#L81-L142
 func ReplaceManifestData(mapMetadata *mapping.Metadata, manifest string, kubeVersion string) (bool, string, error) {
+	if !semver.IsValid(kubeVersion) {
+		return false, "", errors.Errorf("Invalid format for Kubernetes semantic version: %v", kubeVersion)
+	}
+
 	var replaced = false
 	for _, mappingData := range mapMetadata.Mappings {
 		deprecatedAPI := mappingData.DeprecatedAPI
@@ -190,63 +190,69 @@ func ReplaceManifestData(mapMetadata *mapping.Metadata, manifest string, kubeVer
 			apiVersion = mappingData.RemovedInVersion
 		}
 
-		if !semver.IsValid(kubeVersion) {
-			return replaced, "", errors.Errorf("Invalid format for Kubernetes semantic version: %v", kubeVersion)
-		}
-
 		if !semver.IsValid(apiVersion) {
 			return replaced, "", errors.Errorf("Failed to get the deprecated or removed Kubernetes version for API: %s", strings.ReplaceAll(deprecatedAPI, "\n", " "))
 		}
 
-		if count := strings.Count(manifest, deprecatedAPI); count > 0 {
-			if semver.Compare(apiVersion, kubeVersion) > 0 {
-				logrus.Debugf("The following API does not require mapping as the "+
-					"API is not deprecated or removed in Kubernetes '%s':\n\"%s\"\n", apiVersion,
-					deprecatedAPI)
+		var count int
+		if count = strings.Count(manifest, deprecatedAPI); count <= 0 {
+			continue
+		}
+
+		if semver.Compare(apiVersion, kubeVersion) > 0 {
+			logrus.Debugf("The following API does not require mapping as the "+
+				"API is not deprecated or removed in Kubernetes '%s':\n\"%s\"\n", apiVersion,
+				deprecatedAPI)
+			continue
+		}
+
+		if supportedAPI == "" {
+			logrus.Debugf("Found %d instances of deprecated or removed Kubernetes API:\n\"%s\"\n", count, deprecatedAPI)
+			manifest = removeResourceWithNoSuccessors(count, manifest, deprecatedAPI)
+		} else {
+			logrus.Debugf("Found %d instances of deprecated or removed Kubernetes API:\n\"%s\"\nSupported API equivalent:\n\"%s\"\n", count, deprecatedAPI, supportedAPI)
+			manifest = strings.ReplaceAll(manifest, deprecatedAPI, supportedAPI)
+		}
+
+		replaced = true
+	}
+
+	return replaced, manifest, nil
+}
+
+// removeResourceWithNoSuccessors removes a resource for which its respective API has no successors.
+func removeResourceWithNoSuccessors(count int, manifest string, deprecatedAPI string) string {
+	for repl := 0; repl < count; repl++ {
+		// find the position where the API header is
+		apiIndex := strings.Index(manifest, deprecatedAPI)
+
+		// find the next separator index
+		separatorIndex := strings.Index(manifest[apiIndex:], "---\n")
+
+		// find the previous separator index
+		previousSeparatorIndex := strings.LastIndex(manifest[:apiIndex], "---\n")
+
+		/*
+		 * if no previous separator index was found, it means the resource is at the beginning and not
+		 * prefixed by ---
+		 */
+		if previousSeparatorIndex == -1 {
+			if apiIndex == 0 {
+				previousSeparatorIndex = 0
 			} else {
-				if supportedAPI == "" {
-					logrus.Debugf("Found %d instances of deprecated or removed Kubernetes API:\n\"%s\"\n", count, deprecatedAPI)
-
-					for repl := 0; repl < count; repl++ {
-						// find the position where the API header is
-						apiIndex := strings.Index(manifest, deprecatedAPI)
-
-						// find the next separator index
-						separatorIndex := strings.Index(manifest[apiIndex:], "---\n")
-
-						// find the previous separator index
-						previousSeparatorIndex := strings.LastIndex(manifest[:apiIndex], "---\n")
-
-						/*
-						 * if no previous separator index was found, it means the resource is at the beginning and not
-						 * prefixed by ---
-						 */
-						if previousSeparatorIndex == -1 {
-							if apiIndex == 0 {
-								previousSeparatorIndex = 0
-							} else {
-								previousSeparatorIndex = apiIndex - 1
-							}
-						}
-
-						if separatorIndex == -1 { // this means we reached the end of input
-							manifest = manifest[:previousSeparatorIndex]
-						} else {
-							manifest = manifest[:previousSeparatorIndex] + manifest[separatorIndex+apiIndex:]
-						}
-					}
-
-					manifest = strings.Trim(manifest, "\n")
-				} else {
-					logrus.Debugf("Found %d instances of deprecated or removed Kubernetes API:\n\"%s\"\nSupported API equivalent:\n\"%s\"\n", count, deprecatedAPI, supportedAPI)
-					manifest = strings.ReplaceAll(manifest, deprecatedAPI, supportedAPI)
-				}
-
-				replaced = true
+				previousSeparatorIndex = apiIndex - 1
 			}
 		}
+
+		if separatorIndex == -1 { // this means we reached the end of input
+			manifest = manifest[:previousSeparatorIndex]
+		} else {
+			manifest = manifest[:previousSeparatorIndex] + manifest[separatorIndex+apiIndex:]
+		}
 	}
-	return replaced, manifest, nil
+
+	manifest = strings.Trim(manifest, "\n")
+	return manifest
 }
 
 // updateRelease updates a release in the cluster with an equivalent with the superseded APIs replaced or removed as
