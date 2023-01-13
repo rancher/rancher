@@ -60,6 +60,9 @@ func main() {
 		if os.Getenv("CATTLE_DEBUG") == "true" || os.Getenv("RANCHER_DEBUG") == "true" {
 			logrus.SetLevel(logrus.DebugLevel)
 		}
+		if os.Getenv("CATTLE_TRACE") == "true" {
+			logrus.SetLevel(logrus.TraceLevel)
+		}
 
 		initFeatures()
 
