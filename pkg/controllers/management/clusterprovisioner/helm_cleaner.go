@@ -1,108 +1,61 @@
 package clusterprovisioner
 
 import (
+	"fmt"
 	"strings"
 
+	"github.com/helm/helm-mapkubeapis/pkg/mapping"
+	"github.com/pkg/errors"
 	"github.com/rancher/rancher/pkg/data/util"
-
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/wrangler"
-
+	"github.com/sirupsen/logrus"
+	"golang.org/x/mod/semver"
+	"helm.sh/helm/v3/pkg/action"
+	"helm.sh/helm/v3/pkg/release"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/client-go/discovery/cached/memory"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
-
-	"github.com/helm/helm-mapkubeapis/pkg/mapping"
-	"github.com/pkg/errors"
-	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
-	"github.com/sirupsen/logrus"
-	"golang.org/x/mod/semver"
-	"helm.sh/helm/v3/pkg/action"
-	"helm.sh/helm/v3/pkg/release"
 )
 
+type DeprecatedAPIData struct {
+	DeprecatedAPIVersion string
+	NewAPIVersion        string
+	Kind                 string
+	KubernetesVersion    string
+}
+
 var (
-	apiMappings = &mapping.Metadata{
-		Mappings: []*mapping.Mapping{
-			{
-				DeprecatedAPI:    "apiVersion: policy/v1beta1\nkind: PodSecurityPolicy\n",
-				RemovedInVersion: "v1.25",
-			},
-			{
-				DeprecatedAPI:    "kind: PodSecurityPolicy\napiVersion: policy/v1beta1\n",
-				RemovedInVersion: "v1.25",
-			},
-			{
-				DeprecatedAPI:    "apiVersion: policy/v1beta1\r\nkind: PodSecurityPolicy\r\n",
-				RemovedInVersion: "v1.25",
-			},
-			{
-				DeprecatedAPI:    "kind: PodSecurityPolicy\r\napiVersion: policy/v1beta1\r\n",
-				RemovedInVersion: "v1.25",
-			},
-			{
-				DeprecatedAPI:    "apiVersion: batch/v1beta1\nkind: CronJob\n",
-				NewAPI:           "apiVersion: batch/v1\nkind: CronJob\n",
-				RemovedInVersion: "v1.25",
-			},
-			{
-				DeprecatedAPI:    "kind: CronJob\napiVersion: batch/v1beta1\n",
-				NewAPI:           "apiVersion: batch/v1\nkind: CronJob\n",
-				RemovedInVersion: "v1.25",
-			},
-			{
-				DeprecatedAPI:    "apiVersion: batch/v1beta1\r\nkind: CronJob\r\n",
-				NewAPI:           "apiVersion: batch/v1\r\nkind: CronJob\r\n",
-				RemovedInVersion: "v1.25",
-			},
-			{
-				DeprecatedAPI:    "kind: CronJob\r\napiVersion: batch/v1beta1\r\n",
-				NewAPI:           "apiVersion: batch/v1\r\nkind: CronJob\r\n",
-				RemovedInVersion: "v1.25",
-			},
-			{
-				DeprecatedAPI:    "apiVersion: autoscaling/v2beta1\nkind: HorizontalPodAutoscaler\n",
-				NewAPI:           "apiVersion: autoscaling/v2\nkind: HorizontalPodAutoscaler\n",
-				RemovedInVersion: "v1.25",
-			},
-			{
-				DeprecatedAPI:    "kind: HorizontalPodAutoscaler\napiVersion: autoscaling/v2beta1\n",
-				NewAPI:           "apiVersion: autoscaling/v2\nkind: HorizontalPodAutoscaler\n",
-				RemovedInVersion: "v1.25",
-			},
-			{
-				DeprecatedAPI:    "apiVersion: autoscaling/v2beta1\r\nkind: HorizontalPodAutoscaler\r\n",
-				NewAPI:           "apiVersion: autoscaling/v2\r\nkind: HorizontalPodAutoscaler\r\n",
-				RemovedInVersion: "v1.25",
-			},
-			{
-				DeprecatedAPI:    "kind: HorizontalPodAutoscaler\r\napiVersion: autoscaling/v2beta1\r\n",
-				NewAPI:           "apiVersion: autoscaling/v2\r\nkind: HorizontalPodAutoscaler\r\n",
-				RemovedInVersion: "v1.25",
-			},
-			{
-				DeprecatedAPI:    "apiVersion: policy/v1beta1\nkind: PodDisruptionBudget\n",
-				NewAPI:           "apiVersion: policy/v1\nkind: PodDisruptionBudget\n",
-				RemovedInVersion: "v1.25",
-			},
-			{
-				DeprecatedAPI:    "kind: PodDisruptionBudget\napiVersion: policy/v1beta1\n",
-				NewAPI:           "apiVersion: policy/v1\nkind: PodDisruptionBudget\n",
-				RemovedInVersion: "v1.25",
-			},
-			{
-				DeprecatedAPI:    "apiVersion: policy/v1beta1\r\nkind: PodDisruptionBudget\r\n",
-				NewAPI:           "apiVersion: policy/v1\r\nkind: PodDisruptionBudget\r\n",
-				RemovedInVersion: "v1.25",
-			},
-			{
-				DeprecatedAPI:    "kind: PodDisruptionBudget\r\napiVersion: policy/v1beta1\r\n",
-				NewAPI:           "apiVersion: policy/v1\r\nkind: PodDisruptionBudget\r\n",
-				RemovedInVersion: "v1.25",
-			},
+	// deprecatedAPIs is the list of deprecated APIs for which mappings should be generated
+	deprecatedAPIs = []DeprecatedAPIData{
+		{
+			DeprecatedAPIVersion: "policy/v1beta1",
+			Kind:                 "PodSecurityPolicy",
+			KubernetesVersion:    "v1.25",
+		},
+		{
+			DeprecatedAPIVersion: "batch/v1beta1",
+			NewAPIVersion:        "batch/v1",
+			Kind:                 "CronJob",
+			KubernetesVersion:    "v1.25",
+		},
+		{
+			DeprecatedAPIVersion: "autoscaling/v2beta1",
+			NewAPIVersion:        "autoscaling/v2",
+			Kind:                 "HorizontalPodAutoscaler",
+			KubernetesVersion:    "v1.25",
+		},
+		{
+			DeprecatedAPIVersion: "policy/v1beta1",
+			NewAPIVersion:        "policy/v1",
+			Kind:                 "PodDisruptionBudget",
+			KubernetesVersion:    "v1.25",
 		},
 	}
+
+	apiMappings = generateAPIMappings(deprecatedAPIs)
 
 	// FeatureAppNS is a list of feature namespaces to clean up Helm releases from.
 	FeatureAppNS = util.FeatureAppNS
@@ -110,6 +63,46 @@ var (
 
 // EmptyHelmDriverName is a placeholder for the empty Helm driver.
 const EmptyHelmDriverName = ""
+
+var (
+	InvalidMappingError = errors.New("invalid API version in mapping")
+)
+
+// generateAPIMappings generates the API mappings for replacement in Helm releases.
+func generateAPIMappings(deprecatedAPIs []DeprecatedAPIData) *mapping.Metadata {
+	var (
+		apiVersionFormat = "apiVersion: %[1]s"
+		kindFormat       = "kind: %[2]s"
+		windowsLineBreak = "\r\n"
+		linuxLineBreak   = "\n"
+
+		formats = []string{
+			apiVersionFormat + linuxLineBreak + kindFormat + linuxLineBreak,     // apiVersion: ... \n kind: ... \n
+			kindFormat + linuxLineBreak + apiVersionFormat + linuxLineBreak,     // kind: ... \n apiVersion: ... \n
+			apiVersionFormat + windowsLineBreak + kindFormat + windowsLineBreak, // apiVersion: ... \r\n kind: ... \r\n
+			kindFormat + windowsLineBreak + apiVersionFormat + windowsLineBreak, // kind: ... \r\n apiVersion: ... \r\n
+		}
+	)
+
+	mappings := mapping.Metadata{}
+
+	for _, api := range deprecatedAPIs {
+		for _, format := range formats {
+			mappingItem := &mapping.Mapping{
+				DeprecatedAPI:    fmt.Sprintf(format, api.DeprecatedAPIVersion, api.Kind),
+				RemovedInVersion: api.KubernetesVersion,
+			}
+
+			if api.NewAPIVersion != "" {
+				mappingItem.NewAPI = fmt.Sprintf(format, api.NewAPIVersion, api.Kind)
+			}
+
+			mappings.Mappings = append(mappings.Mappings, mappingItem)
+		}
+	}
+
+	return &mappings
+}
 
 func newClientGetter(k8sClient kubernetes.Interface, restConfig rest.Config) *wrangler.SimpleRESTClientGetter {
 	return &wrangler.SimpleRESTClientGetter{
@@ -131,7 +124,7 @@ func (p *Provisioner) cleanupHelmReleases(cluster *v3.Cluster) error {
 
 	for _, namespace := range FeatureAppNS {
 		actionConfig := &action.Configuration{}
-		if err = actionConfig.Init(clientGetter, namespace, EmptyHelmDriverName, logrus.Debugf); err != nil {
+		if err = actionConfig.Init(clientGetter, namespace, EmptyHelmDriverName, logrus.Infof); err != nil {
 			return errors.Wrapf(err, "[cleanupHelmReleases] failed to create ActionConfiguration instance for Helm")
 		}
 
@@ -162,7 +155,7 @@ func (p *Provisioner) cleanupHelmReleases(cluster *v3.Cluster) error {
 			}
 
 			if err := updateRelease(lastRelease, modifiedManifest, actionConfig); err != nil {
-				logrus.Errorf("[cleanupHelmReleases] failed to update release %v in namespace %v, skipping...", lastRelease.Name, lastRelease.Namespace)
+				return errors.Wrapf(err, "[cleanupHelmReleases] failed to update release %v in namespace %v", lastRelease.Name, lastRelease.Namespace)
 			}
 		}
 	}
@@ -191,7 +184,8 @@ func ReplaceManifestData(mapMetadata *mapping.Metadata, manifest string, kubeVer
 		}
 
 		if !semver.IsValid(apiVersion) {
-			return replaced, "", errors.Errorf("Failed to get the deprecated or removed Kubernetes version for API: %s", strings.ReplaceAll(deprecatedAPI, "\n", " "))
+			logrus.Errorf("Failed to get the deprecated or removed Kubernetes version for API: %s", strings.ReplaceAll(deprecatedAPI, "\n", " "))
+			return replaced, "", InvalidMappingError
 		}
 
 		var count int
@@ -237,11 +231,7 @@ func removeResourceWithNoSuccessors(count int, manifest string, deprecatedAPI st
 		 * prefixed by ---
 		 */
 		if previousSeparatorIndex == -1 {
-			if apiIndex == 0 {
-				previousSeparatorIndex = 0
-			} else {
-				previousSeparatorIndex = apiIndex - 1
-			}
+			previousSeparatorIndex = 0
 		}
 
 		if separatorIndex == -1 { // this means we reached the end of input

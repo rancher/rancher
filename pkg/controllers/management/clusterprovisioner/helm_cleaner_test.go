@@ -1,9 +1,10 @@
 package clusterprovisioner
 
 import (
+	"testing"
+
 	"github.com/helm/helm-mapkubeapis/pkg/mapping"
 	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 var (
@@ -865,6 +866,133 @@ spec:
     name: test-deploy`,
 			replaced: true,
 		},
+		{
+			name: "PodSecurityPolicy is removed correctly even if the API lines are not the first thing in the manifest",
+			testManifest: `metadata:
+  name: test
+apiVersion: policy/v1beta1
+kind: PodSecurityPolicy
+spec:
+  allowPrivilegeEscalation: false
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  creationTimestamp: null
+  labels:
+    app: test-deploy
+  name: test-deploy
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: test-deploy
+  strategy: {}
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        app: test-deploy
+    spec:
+      containers:
+      - image: registry.k8s.io/pause
+        name: pause
+        resources: {}`,
+			kubernetesVersion: "v1.25",
+			resultManifest: `---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  creationTimestamp: null
+  labels:
+    app: test-deploy
+  name: test-deploy
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: test-deploy
+  strategy: {}
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        app: test-deploy
+    spec:
+      containers:
+      - image: registry.k8s.io/pause
+        name: pause
+        resources: {}`,
+			replaced: true,
+		},
+		{
+			name: "PodSecurityPolicy is removed correctly even if the API lines are not the first thing in the manifest and it is in the middle of a manifest",
+			testManifest: `apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: test-sa
+---
+metadata:
+  name: test
+apiVersion: policy/v1beta1
+kind: PodSecurityPolicy
+spec:
+  allowPrivilegeEscalation: false
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  creationTimestamp: null
+  labels:
+    app: test-deploy
+  name: test-deploy
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: test-deploy
+  strategy: {}
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        app: test-deploy
+    spec:
+      containers:
+      - image: registry.k8s.io/pause
+        name: pause
+        resources: {}`,
+			kubernetesVersion: "v1.25",
+			resultManifest: `apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: test-sa
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  creationTimestamp: null
+  labels:
+    app: test-deploy
+  name: test-deploy
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: test-deploy
+  strategy: {}
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        app: test-deploy
+    spec:
+      containers:
+      - image: registry.k8s.io/pause
+        name: pause
+        resources: {}`,
+			replaced: true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -895,6 +1023,6 @@ metadata:
 
 		assert.False(t, replaced)
 		assert.Empty(t, modifiedManifest)
-		assert.ErrorContains(t, err, "Failed to get the deprecated or removed Kubernetes version for API")
+		assert.ErrorContains(t, err, "invalid API version in mapping")
 	})
 }

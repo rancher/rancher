@@ -11,10 +11,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/rancher/rancher/pkg/features"
-
-	"golang.org/x/mod/semver"
-
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/controller"
 	"github.com/rancher/norman/types/convert"
@@ -25,6 +21,7 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/management/imported"
 	kd "github.com/rancher/rancher/pkg/controllers/management/kontainerdrivermetadata"
 	"github.com/rancher/rancher/pkg/controllers/management/secretmigrator"
+	"github.com/rancher/rancher/pkg/features"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/apps/v1"
 	corev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
@@ -38,6 +35,7 @@ import (
 	"github.com/rancher/rke/services"
 	rketypes "github.com/rancher/rke/types"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/mod/semver"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -197,15 +195,14 @@ func (p *Provisioner) Updated(cluster *v3.Cluster) (runtime.Object, error) {
 	if shouldCleanHelmReleases(features.HelmCleanupOnUpgrade.Enabled(), cluster) {
 		cluster, err = p.startCleanUpHelmReleases(cluster)
 		if err != nil {
+			// Invalid mapping is probably the only kind of error not worth retrying
+			if !errors.Is(err, InvalidMappingError) {
+				return cluster, err
+			}
+
 			// errors here should not prevent the cluster from upgrading
 			// log and continue the process
 			logrus.Errorf("failed to clean up Helm releases in upgraded cluster: %#v", err)
-		}
-
-		cluster, err = p.Clusters.Get(cluster.Name, metav1.GetOptions{})
-		if err != nil {
-			// if we failed to get a cluster, something bad must have happened
-			return cluster, errors.Wrapf(err, "[updated] failed to get updated cluster %#v after startCleanUpHelmReleases", cluster.Name)
 		}
 	}
 
@@ -251,10 +248,22 @@ func (p *Provisioner) startCleanUpHelmReleases(cluster *v3.Cluster) (*v3.Cluster
 			return cluster, err
 		}
 
+		cluster, err = p.Clusters.Get(cluster.Name, metav1.GetOptions{})
+		if err != nil {
+			// if we failed to get a cluster, something bad must have happened
+			return cluster, errors.Wrapf(err, "[updated] failed to get updated cluster %#v after startCleanUpHelmReleases", cluster.Name)
+		}
+
 		return cluster, nil
 	})
 
-	return object.(*v3.Cluster), err
+	cluster = object.(*v3.Cluster)
+	cluster, updateErr := p.Clusters.Update(cluster)
+	if updateErr != nil {
+		return cluster, updateErr
+	}
+
+	return cluster, err
 }
 
 // shouldCleanHelmReleases indicates whether the cluster upgrade process should clean up existing Helm releases
