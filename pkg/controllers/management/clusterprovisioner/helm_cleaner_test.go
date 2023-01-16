@@ -1026,3 +1026,90 @@ metadata:
 		assert.ErrorContains(t, err, "invalid API version in mapping")
 	})
 }
+
+func TestGenerateAPIPermutations(t *testing.T) {
+	testCases := []struct {
+		name           string
+		apiData        []DeprecatedAPIData
+		expectedResult *mapping.Metadata
+	}{
+		{
+			name: "test generate API without successor",
+			apiData: []DeprecatedAPIData{
+				{
+					DeprecatedAPIVersion: "policy/v1beta1",
+					Kind:                 "PodSecurityPolicy",
+					KubernetesVersion:    "v1.25",
+				},
+			},
+			expectedResult: &mapping.Metadata{
+				Mappings: []*mapping.Mapping{
+					// PodSecurityPolicy
+					{
+						DeprecatedAPI:    "apiVersion: policy/v1beta1\nkind: PodSecurityPolicy\n",
+						RemovedInVersion: "v1.25",
+					},
+
+					{
+						DeprecatedAPI:    "apiVersion: policy/v1beta1\r\nkind: PodSecurityPolicy\r\n",
+						RemovedInVersion: "v1.25",
+					},
+					{
+						DeprecatedAPI:    "kind: PodSecurityPolicy\napiVersion: policy/v1beta1\n",
+						RemovedInVersion: "v1.25",
+					},
+					{
+						DeprecatedAPI:    "kind: PodSecurityPolicy\r\napiVersion: policy/v1beta1\r\n",
+						RemovedInVersion: "v1.25",
+					},
+				},
+			},
+		},
+		{
+			name: "test generate API with successor",
+			apiData: []DeprecatedAPIData{
+				{
+					DeprecatedAPIVersion: "policy/v1beta1",
+					NewAPIVersion:        "policy/v1",
+					Kind:                 "PodDisruptionBudget",
+					KubernetesVersion:    "v1.25",
+				},
+			},
+			expectedResult: &mapping.Metadata{
+				Mappings: []*mapping.Mapping{
+					// PodDisruptionBudget
+					{
+						DeprecatedAPI:    "apiVersion: policy/v1beta1\nkind: PodDisruptionBudget\n",
+						NewAPI:           "apiVersion: policy/v1\nkind: PodDisruptionBudget\n",
+						RemovedInVersion: "v1.25",
+					},
+					{
+						DeprecatedAPI:    "apiVersion: policy/v1beta1\r\nkind: PodDisruptionBudget\r\n",
+						NewAPI:           "apiVersion: policy/v1\r\nkind: PodDisruptionBudget\r\n",
+						RemovedInVersion: "v1.25",
+					},
+					{
+						DeprecatedAPI:    "kind: PodDisruptionBudget\napiVersion: policy/v1beta1\n",
+						NewAPI:           "kind: PodDisruptionBudget\napiVersion: policy/v1\n",
+						RemovedInVersion: "v1.25",
+					},
+					{
+						DeprecatedAPI:    "kind: PodDisruptionBudget\r\napiVersion: policy/v1beta1\r\n",
+						NewAPI:           "kind: PodDisruptionBudget\r\napiVersion: policy/v1\r\n",
+						RemovedInVersion: "v1.25",
+					},
+				},
+			},
+		},
+	}
+
+	for _, tt := range testCases {
+		t.Run(tt.name, func(t *testing.T) {
+			result := generateAPIMappings(tt.apiData)
+
+			assert.NotNil(t, result)
+			assert.NotNil(t, result.Mappings)
+			assert.ElementsMatch(t, tt.expectedResult.Mappings, result.Mappings)
+		})
+	}
+}

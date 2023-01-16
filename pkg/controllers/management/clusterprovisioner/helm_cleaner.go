@@ -13,6 +13,7 @@ import (
 	"golang.org/x/mod/semver"
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/release"
+	helmv3time "helm.sh/helm/v3/pkg/time"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/client-go/discovery/cached/memory"
 	"k8s.io/client-go/kubernetes"
@@ -249,25 +250,48 @@ func removeResourceWithNoSuccessors(count int, manifest string, deprecatedAPI st
 // needed.
 // Logic extracted from https://github.com/helm/helm-mapkubeapis/blob/main/pkg/v3/release.go#L71-L94
 func updateRelease(originalRelease *release.Release, modifiedManifest string, config *action.Configuration) error {
-	originalRelease.Info.Status = release.StatusSuperseded
+	originalRelease.SetStatus(release.StatusSuperseded, "")
 	if err := config.Releases.Update(originalRelease); err != nil {
 		return errors.Wrapf(err, "[updateRelease] failed to update original release %v in namespace %v", originalRelease.Name, originalRelease.Namespace)
 	}
 
-	newRelease := originalRelease
-	newRelease.Manifest = modifiedManifest
-	newRelease.Info.Description = UpgradeDescription
-	newRelease.Info.LastDeployed = config.Now()
-	newRelease.Version = originalRelease.Version + 1
-	newRelease.Info.Status = release.StatusDeployed
+	newRelease := copyReleaseData(originalRelease, modifiedManifest, config.Now())
 
 	logrus.Infof("[updateRelease] add release version %v for release %v with updated supported APIs in namespace %v", originalRelease.Version, originalRelease.Name, originalRelease.Namespace)
 
 	if err := config.Releases.Create(newRelease); err != nil {
+		originalRelease.SetStatus(release.StatusDeployed, "")
+		updateErr := config.Releases.Update(newRelease)
+		if updateErr != nil {
+			return errors.Wrapf(err, "[updateRelease] failed to create new release version %v for release %v in namespace %v and failed to rollback to previous version", newRelease.Version, newRelease.Name, newRelease.Namespace)
+		}
+
 		return errors.Wrapf(err, "[updateRelease] failed to create new release version %v for release %v in namespace %v", newRelease.Version, newRelease.Name, newRelease.Namespace)
 	}
 
 	logrus.Infof("[updateRelease] successfully created new version for release %v in namespace %v", newRelease.Name, newRelease.Namespace)
 
 	return nil
+}
+
+// copyReleaseData copies the original release data into a new object in order to retain previous release information
+// for rollback, if needed.
+func copyReleaseData(originalRelease *release.Release, newManifest string, lastDeployed helmv3time.Time) *release.Release {
+	newRelease := release.Release{
+		Name:      originalRelease.Name,
+		Info:      originalRelease.Info,
+		Chart:     originalRelease.Chart,
+		Config:    originalRelease.Config,
+		Manifest:  newManifest,
+		Hooks:     originalRelease.Hooks,
+		Version:   originalRelease.Version + 1,
+		Namespace: originalRelease.Namespace,
+		Labels:    originalRelease.Labels,
+	}
+
+	newRelease.Info.Description = UpgradeDescription
+	newRelease.Info.LastDeployed = lastDeployed
+	newRelease.SetStatus(release.StatusDeployed, "")
+
+	return &newRelease
 }
