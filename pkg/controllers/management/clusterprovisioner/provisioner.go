@@ -196,7 +196,7 @@ func (p *Provisioner) Updated(cluster *v3.Cluster) (runtime.Object, error) {
 		cluster, err = p.startCleanUpHelmReleases(cluster)
 		if err != nil {
 			// Invalid mapping is probably the only kind of error not worth retrying
-			if !errors.Is(err, InvalidMappingError) {
+			if !errors.Is(err, ErrorInvalidMapping) {
 				return cluster, err
 			}
 

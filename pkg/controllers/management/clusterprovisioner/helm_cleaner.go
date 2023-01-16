@@ -65,7 +65,7 @@ var (
 const EmptyHelmDriverName = ""
 
 var (
-	InvalidMappingError = errors.New("invalid API version in mapping")
+	ErrorInvalidMapping = errors.New("invalid API version in mapping")
 )
 
 // generateAPIMappings generates the API mappings for replacement in Helm releases.
@@ -185,7 +185,7 @@ func ReplaceManifestData(mapMetadata *mapping.Metadata, manifest string, kubeVer
 
 		if !semver.IsValid(apiVersion) {
 			logrus.Errorf("Failed to get the deprecated or removed Kubernetes version for API: %s", strings.ReplaceAll(deprecatedAPI, "\n", " "))
-			return replaced, "", InvalidMappingError
+			return replaced, "", ErrorInvalidMapping
 		}
 
 		var count int
