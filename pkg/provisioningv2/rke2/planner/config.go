@@ -386,18 +386,6 @@ func retrieveClusterAuthorizedSecret(secret *v1.Secret, clusterName string) ([]b
 	return secretContent, nil
 }
 
-func checkForSecretFormat(configValue string) (bool, string, string, error) {
-	if strings.HasPrefix(configValue, "secret://") {
-		configValue = strings.ReplaceAll(configValue, "secret://", "")
-		namespaceAndName := strings.Split(configValue, ":")
-		if len(namespaceAndName) != 2 || namespaceAndName[0] == "" || namespaceAndName[1] == "" {
-			return true, "", "", fmt.Errorf("provided value for cloud-provider-config secret is malformed, must be of the format secret://namespace:name")
-		}
-		return true, namespaceAndName[0], namespaceAndName[1], nil
-	}
-	return false, "", "", nil
-}
-
 // configFile renders the full path to a config file based on the passed in filename and controlPlane
 // If the desired filename does not have a defined path template in the `filePaths` map, the function will fall back
 // to rendering a filepath based on `/var/lib/rancher/%s/etc/config-files/%s` where the first %s is the runtime and
@@ -461,7 +449,7 @@ func (p *Planner) addConfigFile(nodePlan plan.NodePlan, controlPlane *rkev1.RKEC
 			if err != nil {
 				// provided secret for cloud-provider-config does not follow the format of
 				// secret://namespace:name
-				return nodePlan, config, err
+				return nodePlan, config, fmt.Errorf("failed to get cloud-provider-config: %w", err)
 			}
 			if isSecretFormat {
 				secret, err := p.secretCache.Get(namespace, name)

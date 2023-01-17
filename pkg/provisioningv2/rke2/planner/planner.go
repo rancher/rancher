@@ -2,6 +2,7 @@ package planner
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -35,6 +36,7 @@ import (
 	apierror "k8s.io/apimachinery/pkg/api/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 	capiannotations "sigs.k8s.io/cluster-api/util/annotations"
@@ -912,6 +914,11 @@ func (p *Planner) generatePlanWithConfigFiles(controlPlane *rkev1.RKEControlPlan
 			return nodePlan, config, err
 		}
 
+		nodePlan, err = p.addMachineSelectorFiles(nodePlan, controlPlane, entry)
+		if err != nil {
+			return nodePlan, config, err
+		}
+
 		nodePlan, err = addOtherFiles(nodePlan, controlPlane, entry)
 		if err != nil {
 			return nodePlan, config, err
@@ -1187,4 +1194,39 @@ func (p *Planner) pauseCAPICluster(cp *rkev1.RKEControlPlane, pause bool) error 
 	cluster.Spec.Paused = pause
 	_, err = p.capiClient.Update(cluster)
 	return err
+}
+
+// addMachineSelectorFiles creates files in the target nodes based on the MachineSelectorFiles defined in the NodePlan
+func (p *Planner) addMachineSelectorFiles(nodePlan plan.NodePlan, plane *rkev1.RKEControlPlane, entry *planEntry) (plan.NodePlan, error) {
+	// logrus.Info("=== addMachineSelectorFiles")
+	for _, selectorEntry := range plane.Spec.MachineSelectorFiles {
+		// logrus.Infof("=== selectorEntry: [%v]", selectorEntry)
+		sel, err := metav1.LabelSelectorAsSelector(selectorEntry.MachineLabelSelector)
+		if err != nil {
+			return nodePlan, err
+		}
+		if selectorEntry.MachineLabelSelector == nil || sel.Matches(labels.Set(entry.Machine.Labels)) {
+			for _, file := range selectorEntry.Files {
+				isSecretFormat, namespace, name, err := checkForSecretFormat(file.Source)
+				if err != nil {
+					return nodePlan, fmt.Errorf("failed to get file: %w", err)
+				}
+				if isSecretFormat {
+					secret, err := p.secretCache.Get(namespace, name)
+					if err != nil {
+						return nodePlan, fmt.Errorf("failed to get secret: %w", err)
+					}
+					for filename, content := range secret.Data {
+						file := plan.File{
+							Content: base64.StdEncoding.EncodeToString(content),
+							Path:    filepath.Join(file.Directory, filename),
+						}
+						// logrus.Infof("=== file: [%v]", file)
+						nodePlan.Files = append(nodePlan.Files, file)
+					}
+				}
+			}
+		}
+	}
+	return nodePlan, nil
 }

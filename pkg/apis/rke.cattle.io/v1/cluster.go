@@ -26,6 +26,7 @@ type RKEClusterSpecCommon struct {
 	ChartValues           GenericMap             `json:"chartValues,omitempty" wrangler:"nullable"`
 	MachineGlobalConfig   GenericMap             `json:"machineGlobalConfig,omitempty" wrangler:"nullable"`
 	MachineSelectorConfig []RKESystemConfig      `json:"machineSelectorConfig,omitempty"`
+	MachineSelectorFiles  []RKESystemFiles       `json:"machineSelectorFiles,omitempty"`
 	AdditionalManifest    string                 `json:"additionalManifest,omitempty"`
 	Registries            *Registry              `json:"registries,omitempty"`
 	ETCD                  *ETCD                  `json:"etcd,omitempty"`
@@ -42,6 +43,19 @@ type LocalClusterAuthEndpoint struct {
 type RKESystemConfig struct {
 	MachineLabelSelector *metav1.LabelSelector `json:"machineLabelSelector,omitempty"`
 	Config               GenericMap            `json:"config,omitempty" wrangler:"nullable"`
+}
+
+type RKESystemFiles struct {
+	MachineLabelSelector *metav1.LabelSelector `json:"machineLabelSelector,omitempty"`
+	Files                []File                `json:"files,omitempty"`
+}
+
+// File represents a file which would be copied into the node
+type File struct {
+	// Directory is the absolute path in the node where the file to be created
+	Directory string `json:"directory,omitempty"`
+	// Source is where to retrieve the file, currently the supported format is "secret://namespace:name"
+	Source string `json:"source,omitempty"`
 }
 
 type RKEClusterSpec struct {
@@ -75,7 +89,7 @@ type DrainOptions struct {
 	DeleteEmptyDirData bool `json:"deleteEmptyDirData"`
 	// DisableEviction forces drain to use delete rather than evict
 	DisableEviction bool `json:"disableEviction"`
-	//Period of time in seconds given to each pod to terminate gracefully.
+	// Period of time in seconds given to each pod to terminate gracefully.
 	// If negative, the default value specified in the pod will be used
 	GracePeriod int `json:"gracePeriod"`
 	// Time to wait (in seconds) before giving up for one try
