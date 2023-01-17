@@ -221,7 +221,7 @@ func (c *CustomClusterProvisioningTestSuite) ProvisioningK3SCustomClusterDynamic
 				client, err := tt.client.WithSession(testSession)
 				require.NoError(c.T(), err)
 
-				nodes, _, err := externalNodeProvider.NodeCreationFunc(client, numOfNode, 0, false)
+				nodes, _, err := externalNodeProvider.NodeCreationFunc(client, numOfNodes, 0, false)
 				require.NoError(c.T(), err)
 
 				clusterName := namegen.AppendRandomString(externalNodeProvider.Name)
