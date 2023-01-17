@@ -7,7 +7,6 @@ import (
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
 	"github.com/rancher/rancher/tests/framework/extensions/clusters"
-	nodepools "github.com/rancher/rancher/tests/framework/extensions/rke1/nodepools"
 	"github.com/rancher/rancher/tests/framework/extensions/tokenregistration"
 	"github.com/rancher/rancher/tests/framework/extensions/users"
 	password "github.com/rancher/rancher/tests/framework/extensions/users/passwordgenerator"
@@ -74,7 +73,7 @@ func (c *CustomClusterProvisioningTestSuite) SetupSuite() {
 	c.standardUserClient = standardUserClient
 }
 
-func (c *CustomClusterProvisioningTestSuite) ProvisioningRKE1CustomCluster(externalNodeProvider provisioning.ExternalNodeProvider) {
+func (c *CustomClusterProvisioningTestSuite) TestProvisioningRKE1CustomCluster() {
 	nodeRoles0 := []string{
 		"--etcd --controlplane --worker",
 	}
@@ -97,70 +96,37 @@ func (c *CustomClusterProvisioningTestSuite) ProvisioningRKE1CustomCluster(exter
 	}
 	var name string
 	for _, tt := range tests {
-		for _, kubeVersion := range c.kubernetesVersions {
-			name = tt.name + " Kubernetes version: " + kubeVersion
-			for _, cni := range c.cnis {
-				name += " cni: " + cni
-				c.Run(name, func() {
-					testSession := session.NewSession(c.T())
-					defer testSession.Cleanup()
+		testSession := session.NewSession(c.T())
+		defer testSession.Cleanup()
 
-					client, err := tt.client.WithSession(testSession)
-					require.NoError(c.T(), err)
+		client, err := tt.client.WithSession(testSession)
+		require.NoError(c.T(), err)
 
-					numNodes := len(tt.nodeRoles)
-					nodes, _, err := externalNodeProvider.NodeCreationFunc(client, numNodes, 0, false)
-					require.NoError(c.T(), err)
-
-					clusterName := namegen.AppendRandomString(externalNodeProvider.Name)
-
-					cluster := clusters.NewRKE1ClusterConfig(clusterName, cni, kubeVersion, client)
-
-					clusterResp, err := clusters.CreateRKE1Cluster(client, cluster)
-					require.NoError(c.T(), err)
-
-					client, err = client.ReLogin()
-					require.NoError(c.T(), err)
-
-					customCluster, err := client.Management.Cluster.ByID(clusterResp.ID)
-					require.NoError(c.T(), err)
-
-					token, err := tokenregistration.GetRegistrationToken(client, customCluster.ID)
-					require.NoError(c.T(), err)
-
-					for key, node := range nodes {
-						c.T().Logf("Execute Registration Command for node %s", node.NodeID)
-						command := fmt.Sprintf("%s %s", token.NodeCommand, tt.nodeRoles[key])
-
-						output, err := node.ExecuteCommand(command)
-						require.NoError(c.T(), err)
-						c.T().Logf(output)
-					}
-
-					opts := metav1.ListOptions{
-						FieldSelector:  "metadata.name=" + clusterResp.ID,
-						TimeoutSeconds: &defaults.WatchTimeoutSeconds,
-					}
-					watchInterface, err := c.client.GetManagementWatchInterface(management.ClusterType, opts)
-					require.NoError(c.T(), err)
-
-					checkFunc := clusters.IsHostedProvisioningClusterReady
-
-					err = wait.WatchWait(watchInterface, checkFunc)
-					require.NoError(c.T(), err)
-					assert.Equal(c.T(), clusterName, clusterResp.Name)
-
-					clusterToken, err := clusters.CheckServiceAccountTokenSecret(client, clusterName)
-					require.NoError(c.T(), err)
-					assert.NotEmpty(c.T(), clusterToken)
-				})
+		for _, nodeProviderName := range c.nodeProviders {
+			externalNodeProvider := provisioning.ExternalNodeProviderSetup(nodeProviderName)
+			for _, kubeVersion := range c.kubernetesVersions {
+				name = tt.name + " Kubernetes version: " + kubeVersion
+				for _, cni := range c.cnis {
+					name += " cni: " + cni
+					c.Run(name, func() {
+						c.testProvisioningRKE1CustomCluster(client, externalNodeProvider, tt.nodeRoles, kubeVersion, cni)
+					})
+				}
 			}
 		}
 	}
 }
 
-func (c *CustomClusterProvisioningTestSuite) ProvisioningRKE1CustomClusterDynamicInput(externalNodeProvider provisioning.ExternalNodeProvider, nodesAndRoles []nodepools.NodeRoles) {
+func (c *CustomClusterProvisioningTestSuite) TestProvisioningRKE1CustomClusterDynamicInput() {
 	rolesPerNode := []string{}
+
+	clustersConfig := new(provisioning.Config)
+	config.LoadConfig(provisioning.ConfigurationFileKey, clustersConfig)
+	nodesAndRoles := clustersConfig.NodesAndRolesRKE1
+
+	if len(nodesAndRoles) == 0 {
+		c.T().Skip()
+	}
 
 	for _, nodes := range nodesAndRoles {
 		var finalRoleCommand string
@@ -176,8 +142,6 @@ func (c *CustomClusterProvisioningTestSuite) ProvisioningRKE1CustomClusterDynami
 		rolesPerNode = append(rolesPerNode, finalRoleCommand)
 	}
 
-	numOfNodes := len(rolesPerNode)
-
 	tests := []struct {
 		name   string
 		client *rancher.Client
@@ -188,87 +152,73 @@ func (c *CustomClusterProvisioningTestSuite) ProvisioningRKE1CustomClusterDynami
 
 	var name string
 	for _, tt := range tests {
-		for _, kubeVersion := range c.kubernetesVersions {
-			name = tt.name + " Kubernetes version: " + kubeVersion
-			for _, cni := range c.cnis {
-				name += " cni: " + cni
-				c.Run(name, func() {
-					testSession := session.NewSession(c.T())
-					defer testSession.Cleanup()
+		testSession := session.NewSession(c.T())
+		defer testSession.Cleanup()
 
-					client, err := tt.client.WithSession(testSession)
-					require.NoError(c.T(), err)
+		client, err := tt.client.WithSession(testSession)
+		require.NoError(c.T(), err)
 
-					nodes, _, err := externalNodeProvider.NodeCreationFunc(client, numOfNodes, 0, false)
-					require.NoError(c.T(), err)
-
-					clusterName := namegen.AppendRandomString(externalNodeProvider.Name)
-
-					cluster := clusters.NewRKE1ClusterConfig(clusterName, cni, kubeVersion, client)
-
-					clusterResp, err := clusters.CreateRKE1Cluster(client, cluster)
-					require.NoError(c.T(), err)
-
-					client, err = client.ReLogin()
-					require.NoError(c.T(), err)
-
-					customCluster, err := client.Management.Cluster.ByID(clusterResp.ID)
-					require.NoError(c.T(), err)
-
-					token, err := tokenregistration.GetRegistrationToken(client, customCluster.ID)
-					require.NoError(c.T(), err)
-
-					for key, node := range nodes {
-						c.T().Logf("Execute Registration Command for node %s", node.NodeID)
-						command := fmt.Sprintf("%s %s", token.NodeCommand, rolesPerNode[key])
-
-						output, err := node.ExecuteCommand(command)
-						require.NoError(c.T(), err)
-						c.T().Logf(output)
-					}
-
-					opts := metav1.ListOptions{
-						FieldSelector:  "metadata.name=" + clusterResp.ID,
-						TimeoutSeconds: &defaults.WatchTimeoutSeconds,
-					}
-					watchInterface, err := c.client.GetManagementWatchInterface(management.ClusterType, opts)
-					require.NoError(c.T(), err)
-
-					checkFunc := clusters.IsHostedProvisioningClusterReady
-
-					err = wait.WatchWait(watchInterface, checkFunc)
-					require.NoError(c.T(), err)
-					assert.Equal(c.T(), clusterName, clusterResp.Name)
-
-					clusterToken, err := clusters.CheckServiceAccountTokenSecret(client, clusterName)
-					require.NoError(c.T(), err)
-					assert.NotEmpty(c.T(), clusterToken)
-				})
+		for _, nodeProviderName := range c.nodeProviders {
+			externalNodeProvider := provisioning.ExternalNodeProviderSetup(nodeProviderName)
+			for _, kubeVersion := range c.kubernetesVersions {
+				name = tt.name + " Kubernetes version: " + kubeVersion
+				for _, cni := range c.cnis {
+					name += " cni: " + cni
+					c.Run(name, func() {
+						c.testProvisioningRKE1CustomCluster(client, externalNodeProvider, rolesPerNode, kubeVersion, cni)
+					})
+				}
 			}
 		}
 	}
 }
 
-func (c *CustomClusterProvisioningTestSuite) TestProvisioningCustomCluster() {
-	for _, nodeProviderName := range c.nodeProviders {
-		externalNodeProvider := provisioning.ExternalNodeProviderSetup(nodeProviderName)
-		c.ProvisioningRKE1CustomCluster(externalNodeProvider)
-	}
-}
+func (c *CustomClusterProvisioningTestSuite) testProvisioningRKE1CustomCluster(client *rancher.Client, externalNodeProvider provisioning.ExternalNodeProvider, nodesAndRoles []string, kubeVersion string, cni string) {
+	numNodes := len(nodesAndRoles)
+	nodes, _, err := externalNodeProvider.NodeCreationFunc(client, numNodes, 0, false)
+	require.NoError(c.T(), err)
 
-func (c *CustomClusterProvisioningTestSuite) TestProvisioningCustomClusterDynamicInput() {
-	clustersConfig := new(provisioning.Config)
-	config.LoadConfig(provisioning.ConfigurationFileKey, clustersConfig)
-	nodesAndRoles := clustersConfig.NodesAndRolesRKE1
+	clusterName := namegen.AppendRandomString(externalNodeProvider.Name)
 
-	if len(nodesAndRoles) == 0 {
-		c.T().Skip()
+	cluster := clusters.NewRKE1ClusterConfig(clusterName, cni, kubeVersion, client)
+
+	clusterResp, err := clusters.CreateRKE1Cluster(client, cluster)
+	require.NoError(c.T(), err)
+
+	client, err = client.ReLogin()
+	require.NoError(c.T(), err)
+
+	customCluster, err := client.Management.Cluster.ByID(clusterResp.ID)
+	require.NoError(c.T(), err)
+
+	token, err := tokenregistration.GetRegistrationToken(client, customCluster.ID)
+	require.NoError(c.T(), err)
+
+	for key, node := range nodes {
+		c.T().Logf("Execute Registration Command for node %s", node.NodeID)
+		command := fmt.Sprintf("%s %s", token.NodeCommand, nodesAndRoles[key])
+
+		output, err := node.ExecuteCommand(command)
+		require.NoError(c.T(), err)
+		c.T().Logf(output)
 	}
 
-	for _, nodeProviderName := range c.nodeProviders {
-		externalNodeProvider := provisioning.ExternalNodeProviderSetup(nodeProviderName)
-		c.ProvisioningRKE1CustomClusterDynamicInput(externalNodeProvider, nodesAndRoles)
+	opts := metav1.ListOptions{
+		FieldSelector:  "metadata.name=" + clusterResp.ID,
+		TimeoutSeconds: &defaults.WatchTimeoutSeconds,
 	}
+	watchInterface, err := c.client.GetManagementWatchInterface(management.ClusterType, opts)
+	require.NoError(c.T(), err)
+
+	checkFunc := clusters.IsHostedProvisioningClusterReady
+
+	err = wait.WatchWait(watchInterface, checkFunc)
+	require.NoError(c.T(), err)
+	assert.Equal(c.T(), clusterName, clusterResp.Name)
+
+	clusterToken, err := clusters.CheckServiceAccountTokenSecret(client, clusterName)
+	require.NoError(c.T(), err)
+	assert.NotEmpty(c.T(), clusterToken)
 }
 
 // In order for 'go test' to run this suite, we need to create

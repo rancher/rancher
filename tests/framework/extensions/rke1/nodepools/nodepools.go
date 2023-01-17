@@ -87,7 +87,7 @@ func NodePoolSetup(client *rancher.Client, nodeRoles []NodeRoles, ClusterID, Nod
 		nodePoolConfig.Etcd = roles.Etcd
 		nodePoolConfig.Worker = roles.Worker
 		nodePoolConfig.Quantity = roles.Quantity
-		nodePoolConfig.HostnamePrefix = "auto-rke1-" + strconv.Itoa(index)
+		nodePoolConfig.HostnamePrefix = "auto-rke1-" + strconv.Itoa(index) + ClusterID
 
 		_, err := client.Management.NodePool.Create(&nodePoolConfig)
 
