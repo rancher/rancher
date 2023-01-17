@@ -109,7 +109,7 @@ func (c *CustomClusterProvisioningTestSuite) ProvisioningRKE1CustomCluster(exter
 					require.NoError(c.T(), err)
 
 					numNodes := len(tt.nodeRoles)
-					nodes, err := externalNodeProvider.NodeCreationFunc(client, numNodes)
+					nodes, _, err := externalNodeProvider.NodeCreationFunc(client, numNodes, 0, false)
 					require.NoError(c.T(), err)
 
 					clusterName := namegen.AppendRandomString(externalNodeProvider.Name)
@@ -199,7 +199,7 @@ func (c *CustomClusterProvisioningTestSuite) ProvisioningRKE1CustomClusterDynami
 					client, err := tt.client.WithSession(testSession)
 					require.NoError(c.T(), err)
 
-					nodes, err := externalNodeProvider.NodeCreationFunc(client, numOfNodes)
+					nodes, _, err := externalNodeProvider.NodeCreationFunc(client, numOfNodes, 0, false)
 					require.NoError(c.T(), err)
 
 					clusterName := namegen.AppendRandomString(externalNodeProvider.Name)
