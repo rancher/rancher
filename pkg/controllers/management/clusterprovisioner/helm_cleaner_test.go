@@ -1030,12 +1030,12 @@ metadata:
 func TestGenerateAPIPermutations(t *testing.T) {
 	testCases := []struct {
 		name           string
-		apiData        []DeprecatedAPIData
+		apiData        []deprecatedAPIData
 		expectedResult *mapping.Metadata
 	}{
 		{
 			name: "test generate API without successor",
-			apiData: []DeprecatedAPIData{
+			apiData: []deprecatedAPIData{
 				{
 					DeprecatedAPIVersion: "policy/v1beta1",
 					Kind:                 "PodSecurityPolicy",
@@ -1067,7 +1067,7 @@ func TestGenerateAPIPermutations(t *testing.T) {
 		},
 		{
 			name: "test generate API with successor",
-			apiData: []DeprecatedAPIData{
+			apiData: []deprecatedAPIData{
 				{
 					DeprecatedAPIVersion: "policy/v1beta1",
 					NewAPIVersion:        "policy/v1",

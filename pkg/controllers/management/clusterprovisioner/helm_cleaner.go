@@ -20,7 +20,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 )
 
-type DeprecatedAPIData struct {
+type deprecatedAPIData struct {
 	DeprecatedAPIVersion string
 	NewAPIVersion        string
 	Kind                 string
@@ -29,7 +29,7 @@ type DeprecatedAPIData struct {
 
 var (
 	// deprecatedAPIs is the list of deprecated APIs for which mappings should be generated
-	deprecatedAPIs = []DeprecatedAPIData{
+	deprecatedAPIs = []deprecatedAPIData{
 		{
 			DeprecatedAPIVersion: "policy/v1beta1",
 			Kind:                 "PodSecurityPolicy",
@@ -88,7 +88,7 @@ var (
 )
 
 // generateAPIMappings generates the API mappings for replacement in Helm releases.
-func generateAPIMappings(deprecatedAPIs []DeprecatedAPIData) *mapping.Metadata {
+func generateAPIMappings(deprecatedAPIs []deprecatedAPIData) *mapping.Metadata {
 	var (
 		apiVersionFormat = "apiVersion: %[1]s"
 		kindFormat       = "kind: %[2]s"
