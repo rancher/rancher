@@ -111,18 +111,25 @@ node {
                 sh "./tests/v2/validation/build.sh"
               }
               stage('Run Validation Tests') {
-                sh "docker run --name ${testContainer} -t --env-file ${envFile} " +
+                try {
+                  sh "docker run --name ${testContainer} -t --env-file ${envFile} " +
                   "${imageName} sh -c \"/go/bin/gotestsum --format standard-verbose --packages=${testsDir} --junitfile ${testResultsOut} -- ${GOTEST_TESTCASE} -timeout=${timeout} -v\""
+                } catch(err) {
+                  echo 'Test run had failures. Collecting results...'
+                }
               }
-            } finally {           
               stage('Test Report') {
                 sh "docker cp ${testContainer}:${rootPath}${testResultsOut} ."
                 step([$class: 'JUnitResultArchiver', testResults: "**/${testResultsOut}"])
                 sh "docker stop ${testContainer}"
                 sh "docker rm -v ${testContainer}"
                 sh "docker rmi -f ${imageName}"
-              } // stage
-            } // finally
+              }
+            } catch(err) {           
+                sh "docker stop ${testContainer}"
+                sh "docker rm -v ${testContainer}"
+                sh "docker rmi -f ${imageName}"
+            } // catch error
           } // dir 
         } // withEnv
       } // creds
