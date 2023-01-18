@@ -6,7 +6,6 @@ import (
 
 	"github.com/helm/helm-mapkubeapis/pkg/mapping"
 	"github.com/pkg/errors"
-	"github.com/rancher/rancher/pkg/data/util"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/sirupsen/logrus"
@@ -59,7 +58,26 @@ var (
 	apiMappings = generateAPIMappings(deprecatedAPIs)
 
 	// FeatureAppNS is a list of feature namespaces to clean up Helm releases from.
-	FeatureAppNS = util.FeatureAppNS
+	FeatureAppNS = []string{
+		"kube-system",                // Harvester, vSphere CPI, vSphere CSI
+		"cattle-system",              // AKS/GKE/EKS Operator, Webhook, System Upgrade Controller
+		"cattle-epinio-system",       // Epinio
+		"cattle-fleet-system",        // Fleet
+		"longhorn-system",            // Longhorn
+		"cattle-neuvector-system",    // Neuvector
+		"cattle-monitoring-system",   // Monitoring and Sub-charts
+		"rancher-alerting-drivers",   // Alert Driver
+		"cis-operator-system",        // CIS Benchmark
+		"cattle-csp-adapter-system",  // CSP Adapter
+		"cattle-externalip-system",   // External IP Webhook
+		"cattle-gatekeeper-system",   // Gatekeeper
+		"istio-system",               // Istio and Sub-charts
+		"cattle-istio-system",        // Kiali
+		"cattle-logging-system",      // Logging
+		"cattle-windows-gmsa-system", // Windows GMSA
+		"cattle-sriov-system",        // Sriov
+		"cattle-ui-plugin-system",    // UI Plugin System
+	}
 )
 
 // EmptyHelmDriverName is a placeholder for the empty Helm driver.
