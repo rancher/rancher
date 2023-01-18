@@ -3,7 +3,6 @@ package machineprovision
 import (
 	"crypto/sha256"
 	"encoding/hex"
-	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -71,16 +70,6 @@ func (h *handler) getArgsEnvAndStatus(infra *infraObject, args map[string]interf
 		filesSecret                          *corev1.Secret
 	)
 
-	if infra.data.String("spec", "providerID") != "" && !infra.data.Bool("status", "jobComplete") {
-		// If the providerID is set, but jobComplete is false, then we need to re-enqueue the job so the proper status is set from that handler.
-		job, err := h.getJobFromInfraMachine(infra)
-		if err != nil {
-			return driverArgs{}, err
-		}
-		h.jobController.Enqueue(infra.meta.GetNamespace(), job.Name)
-		return driverArgs{}, generic.ErrSkip
-	}
-
 	nd, err := h.nodeDriverCache.Get(driver)
 	if !create && apierror.IsNotFound(err) {
 		url = infra.data.String("status", "driverURL")
@@ -101,8 +90,10 @@ func (h *handler) getArgsEnvAndStatus(infra *infraObject, args map[string]interf
 		},
 		Data: getWhitelistedEnvVars(),
 	}
-	machine, err := rke2.GetMachineByOwner(h.machineCache, infra.meta)
-	if err != nil && (create || !errors.Is(err, rke2.ErrNoMachineOwnerRef)) {
+	// the owner reference may be deleted if the machine is cleaned up forcefully
+	machineName := infra.meta.GetLabels()[CapiMachineName]
+	machine, err := h.machineCache.Get(infra.meta.GetNamespace(), machineName)
+	if err != nil {
 		return driverArgs{}, err
 	}
 
@@ -158,7 +149,7 @@ func (h *handler) getArgsEnvAndStatus(infra *infraObject, args map[string]interf
 
 	return driverArgs{
 		DriverName:          driver,
-		CapiMachineName:     machine.Name,
+		CapiMachineName:     machineName,
 		MachineName:         infra.meta.GetName(),
 		MachineNamespace:    infra.meta.GetNamespace(),
 		MachineGVK:          infra.obj.GetObjectKind().GroupVersionKind(),
@@ -173,7 +164,7 @@ func (h *handler) getArgsEnvAndStatus(infra *infraObject, args map[string]interf
 		Args:                cmd,
 		BackoffLimit:        jobBackoffLimit,
 		RKEMachineStatus: rkev1.RKEMachineStatus{
-			Ready:                     infra.data.String("spec", "providerID") != "" && infra.data.Bool("status", "jobComplete"),
+			Ready:                     infra.data.String("spec", "providerID") != "",
 			DriverHash:                hash,
 			DriverURL:                 url,
 			CloudCredentialSecretName: cloudCredentialSecretName,
