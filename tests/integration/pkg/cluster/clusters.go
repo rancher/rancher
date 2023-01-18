@@ -1,6 +1,7 @@
 package cluster
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -225,6 +226,19 @@ func WaitForDelete(clients *clients.Clients, c *provisioningv1api.Cluster) (_ *p
 				logrus.Errorf("failed to get machines for %s/%s to print error: %v", c.Namespace, c.Name, err)
 			}
 
+			gvr := schema.GroupVersionResource{
+				Group:    "rke-machine.cattle.io",
+				Version:  "v1",
+				Resource: "podmachines",
+			}
+
+			infraMachines, newErr := clients.Dynamic.Resource(gvr).List(context.TODO(), metav1.ListOptions{
+				LabelSelector: "cluster.x-k8s.io/cluster-name=" + c.Name,
+			})
+			if newErr != nil {
+				logrus.Errorf("failed to get infra machines for %s/%s to print error: %v", c.Namespace, c.Name, err)
+			}
+
 			mgmtCluster, newErr := clients.Mgmt.Cluster().Get(c.Status.ClusterName, metav1.GetOptions{})
 			if apierrors.IsNotFound(newErr) {
 				mgmtCluster = nil
@@ -240,10 +254,11 @@ func WaitForDelete(clients *clients.Clients, c *provisioningv1api.Cluster) (_ *p
 			}
 
 			data, _ := json.Marshal(map[string]interface{}{
-				"cluster":     newC,
-				"mgmtCluster": mgmtCluster,
-				"capiCluster": capiCluster,
-				"machines":    machines,
+				"cluster":       newC,
+				"mgmtCluster":   mgmtCluster,
+				"capiCluster":   capiCluster,
+				"machines":      machines,
+				"infraMachines": infraMachines,
 			})
 			err = fmt.Errorf("deletion wait failed on %s: %w", data, err)
 		}
