@@ -447,17 +447,52 @@ func (p *Planner) encryptionKeyRotationRestartService(cp *rkev1.RKEControlPlane,
 			encryptionKeyRotationSecretsEncryptStatusOneTimeInstruction(cp),
 		)
 	}
+
+	capiCluster, err := rke2.GetOwnerCAPICluster(cp, p.capiClusters)
+	if err != nil {
+		return "", status, err
+	}
+
+	plan, err := p.store.Load(capiCluster, cp)
+	if err != nil {
+		return "", status, err
+	}
+
+	joinServer, err := p.electInitNode(cp, plan)
+	if err != nil {
+		return "", status, err
+	}
+
+	tokensSecret, err := p.generateSecrets(cp)
+	if err != nil {
+		return "", status, err
+	}
+
+	_, config, err := p.generatePlanWithConfigFiles(cp, tokensSecret, entry, joinServer)
+	if err != nil {
+		return "", status, err
+	}
+
+	probes, err := p.generateProbes(cp, entry, config)
+	if err != nil {
+		return "", status, err
+	}
+	nodePlan.Probes = probes
+
 	// retry is important here because without it, we always seem to run into some sort of issue such as:
 	// - the follower node reporting the wrong status after a restart
 	// - the plan failing with the k3s/rke2-server services crashing the first, and resuming subsequent times
 	// It's not necessarily ideal if encryption key rotation can never complete, especially since we don't have access to
 	// the downstream k3s/rke2-server service logs, but it has to be done in order for encryption key rotation to succeed
-	err := assignAndCheckPlan(p.store, fmt.Sprintf("encryption key rotation [%s] for machine [%s]", cp.Status.RotateEncryptionKeysPhase, entry.Machine.Name), entry, nodePlan, 5, 5)
+	err = assignAndCheckPlan(p.store, fmt.Sprintf("encryption key rotation [%s] for machine [%s]", cp.Status.RotateEncryptionKeysPhase, entry.Machine.Name), entry, nodePlan, 5, 5)
 	if err != nil {
 		if IsErrWaiting(err) {
+			if planAppliedButWaitingForProbes(entry) {
+				return "", status, ErrWaitingf("%s: %s", err.Error(), probesMessage(entry.Plan))
+			}
 			return "", status, err
 		}
-		status, err := p.encryptionKeyRotationFailed(status, err)
+		status, err = p.encryptionKeyRotationFailed(status, err)
 		return "", status, err
 	}
 
