@@ -110,7 +110,7 @@ var (
 	HelmCleanupOnUpgrade = newFeature(
 		"helm-cleanup-on-upgrade",
 		"Enables Helm release cleanup for deprecated APIs on cluster upgrade",
-		true,
+		false,
 		true,
 		true)
 )
