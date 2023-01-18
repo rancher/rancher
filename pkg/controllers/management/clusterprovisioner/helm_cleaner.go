@@ -118,7 +118,7 @@ func (p *Provisioner) cleanupHelmReleases(cluster *v3.Cluster) error {
 	clusterManager := p.clusterManager
 	userContext, err := clusterManager.UserContextNoControllers(cluster.Name)
 	if err != nil {
-		return errors.Wrapf(err, "[cleanupHelmReleases] failed to obtain the Kubernetes client instance")
+		return fmt.Errorf("[cleanupHelmReleases] failed to obtain the Kubernetes client instance: %w", err)
 	}
 
 	clientGetter := newClientGetter(userContext.K8sClient, userContext.RESTConfig)
@@ -126,28 +126,26 @@ func (p *Provisioner) cleanupHelmReleases(cluster *v3.Cluster) error {
 	for _, namespace := range FeatureAppNS {
 		actionConfig := &action.Configuration{}
 		if err = actionConfig.Init(clientGetter, namespace, EmptyHelmDriverName, logrus.Infof); err != nil {
-			return errors.Wrapf(err, "[cleanupHelmReleases] failed to create ActionConfiguration instance for Helm")
+			return fmt.Errorf("[cleanupHelmReleases] failed to create ActionConfiguration instance for Helm: %w", err)
 		}
 
 		listAction := action.NewList(actionConfig)
 		releases, err := listAction.Run()
 		if err != nil {
-			return errors.Wrapf(err, "[cleanupHelmReleases] failed to list Helm releases for namespace %v", namespace)
+			return fmt.Errorf("[cleanupHelmReleases] failed to list Helm releases for namespace %v: %w", namespace, err)
 		}
 
 		for _, helmRelease := range releases {
 			lastRelease, err := actionConfig.Releases.Last(helmRelease.Name)
 			if err != nil {
-				logrus.Errorf("[cleanupHelmReleases] failed to find latest release version for release %v", helmRelease.Name)
-				// If this fails, something went wrong. Skip to the next release.
-				continue
+				return fmt.Errorf("[cleanupHelmReleases] failed to find latest release version for release %v: %w", helmRelease.Name, err)
 			}
 
 			// TODO consume the function from helm-mapkubeapis once that is merged in
 			replaced, modifiedManifest, err := ReplaceManifestData(apiMappings, lastRelease.Manifest, cluster.Status.Version.GitVersion)
 			if err != nil {
 				// If this fails, it probably means we don't have adequate write permissions
-				return errors.Wrapf(err, "[cleanupHelmReleases] failed to replace deprecated/removed APIs on cluster %v", cluster.Name)
+				return fmt.Errorf("[cleanupHelmReleases] failed to replace deprecated/removed APIs on cluster %v: %w", cluster.Name, err)
 			}
 
 			if !replaced {
@@ -156,7 +154,7 @@ func (p *Provisioner) cleanupHelmReleases(cluster *v3.Cluster) error {
 			}
 
 			if err := updateRelease(lastRelease, modifiedManifest, actionConfig); err != nil {
-				return errors.Wrapf(err, "[cleanupHelmReleases] failed to update release %v in namespace %v", lastRelease.Name, lastRelease.Namespace)
+				return fmt.Errorf("[cleanupHelmReleases] failed to update release %v in namespace %v: %w", lastRelease.Name, lastRelease.Namespace, err)
 			}
 		}
 	}
@@ -252,7 +250,7 @@ func removeResourceWithNoSuccessors(count int, manifest string, deprecatedAPI st
 func updateRelease(originalRelease *release.Release, modifiedManifest string, config *action.Configuration) error {
 	originalRelease.SetStatus(release.StatusSuperseded, "")
 	if err := config.Releases.Update(originalRelease); err != nil {
-		return errors.Wrapf(err, "[updateRelease] failed to update original release %v in namespace %v", originalRelease.Name, originalRelease.Namespace)
+		return fmt.Errorf("[updateRelease] failed to update original release %v in namespace %v: %w", originalRelease.Name, originalRelease.Namespace, err)
 	}
 
 	newRelease := copyReleaseData(originalRelease, modifiedManifest, config.Now())
@@ -263,10 +261,10 @@ func updateRelease(originalRelease *release.Release, modifiedManifest string, co
 		originalRelease.SetStatus(release.StatusDeployed, "")
 		updateErr := config.Releases.Update(newRelease)
 		if updateErr != nil {
-			return errors.Wrapf(err, "[updateRelease] failed to create new release version %v for release %v in namespace %v and failed to rollback to previous version", newRelease.Version, newRelease.Name, newRelease.Namespace)
+			return fmt.Errorf("[updateRelease] failed to create new release version %v for release %v in namespace %v and failed to rollback to previous version: %w", newRelease.Version, newRelease.Name, newRelease.Namespace, err)
 		}
 
-		return errors.Wrapf(err, "[updateRelease] failed to create new release version %v for release %v in namespace %v", newRelease.Version, newRelease.Name, newRelease.Namespace)
+		return fmt.Errorf("[updateRelease] failed to create new release version %v for release %v in namespace %v: %w", newRelease.Version, newRelease.Name, newRelease.Namespace, err)
 	}
 
 	logrus.Infof("[updateRelease] successfully created new version for release %v in namespace %v", newRelease.Name, newRelease.Namespace)
