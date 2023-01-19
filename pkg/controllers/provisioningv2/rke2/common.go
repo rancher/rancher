@@ -94,10 +94,10 @@ const (
 )
 
 var (
-	ErrNoMachineOwnerRef           = errors.New("no machine owner ref")
-	ErrNoControllerMachineOwnerRef = errors.New("no machine controller owner ref")
-	labelAnnotationMatch           = regexp.MustCompile(`^((rke\.cattle\.io)|((?:machine\.)?cluster\.x-k8s\.io))/`)
-	windowsDrivers                 = map[string]struct{}{
+	ErrNoMachineOwnerRef            = errors.New("no machine owner ref")
+	ErrNoMatchingControllerOwnerRef = errors.New("no matching controller owner ref")
+	labelAnnotationMatch            = regexp.MustCompile(`^((rke\.cattle\.io)|((?:machine\.)?cluster\.x-k8s\.io))/`)
+	windowsDrivers                  = map[string]struct{}{
 		"vmwarevsphere": {},
 	}
 )
@@ -429,7 +429,7 @@ func GetCAPIClusterFromLabel(obj runtime.Object, cache capicontrollers.ClusterCa
 	return nil, fmt.Errorf("%s label not present on %s: %s/%s", capi.ClusterLabelName, obj.GetObjectKind().GroupVersionKind().Kind, data.String("metadata", "namespace"), data.String("metadata", "name"))
 }
 
-// GetOwnerCAPICluster takes an obj T and will attempt to find the capi cluster owner reference.
+// GetOwnerCAPICluster takes an obj and will attempt to find the capi cluster owner reference.
 // If the object is nil, it cannot access to object or type metas, the owner reference Kind or APIVersion do not match,
 // or the object could not be found, it returns an error.
 // If the owner reference exists and is valid, it will return the owning capi cluster object.
@@ -441,7 +441,7 @@ func GetOwnerCAPICluster(obj runtime.Object, cache capicontrollers.ClusterCache)
 	return cache.Get(namespace, ref.Name)
 }
 
-// GetOwnerCAPIMachine takes an obj T and will attempt to find the capi machine owner reference.
+// GetOwnerCAPIMachine takes an obj and will attempt to find the capi machine owner reference.
 // If the object is nil, it cannot access to object or type metas, the owner reference Kind or APIVersion do not match,
 // or the object could not be found, it returns an error.
 // If the owner reference exists and is valid, it will return the owning capi machine object.
@@ -453,9 +453,21 @@ func GetOwnerCAPIMachine(obj runtime.Object, cache capicontrollers.MachineCache)
 	return cache.Get(namespace, ref.Name)
 }
 
+// GetOwnerCAPIMachineSet takes an obj and will attempt to find the capi machine set owner reference.
+// If the object is nil, it cannot access to object or type metas, the owner reference Kind or APIVersion do not match,
+// or the object could not be found, it returns an error.
+// If the owner reference exists and is valid, it will return the owning capi machine object.
+func GetOwnerCAPIMachineSet(obj runtime.Object, cache capicontrollers.MachineSetCache) (*capi.MachineSet, error) {
+	ref, namespace, err := GetOwnerFromGVK(capi.GroupVersion.String(), "MachineSet", obj)
+	if err != nil {
+		return nil, err
+	}
+	return cache.Get(namespace, ref.Name)
+}
+
 // GetOwnerFromGVK takes a runtime.Object, and will search for a controlling owner reference of kind apiVersion.
 // If the object is nil, it cannot access to object or type metas, the owner reference Kind or APIVersion do not match,
-// or the object could not be found, it returns an ErrNoControllerMachineOwnerRef error.
+// or the object could not be found, it returns an ErrNoMatchingControllerOwnerRef error.
 // If the owner reference exists and is valid, it will return the owner reference and the namespace it belongs to.
 func GetOwnerFromGVK(groupVersion, kind string, obj runtime.Object) (*metav1.OwnerReference, string, error) {
 	if obj == nil {
@@ -467,7 +479,7 @@ func GetOwnerFromGVK(groupVersion, kind string, obj runtime.Object) (*metav1.Own
 	}
 	ref := metav1.GetControllerOf(objMeta)
 	if ref == nil || ref.Kind != kind || ref.APIVersion != groupVersion {
-		return nil, "", ErrNoControllerMachineOwnerRef
+		return nil, "", ErrNoMatchingControllerOwnerRef
 	}
 	return ref, objMeta.GetNamespace(), nil
 }

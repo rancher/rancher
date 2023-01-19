@@ -95,6 +95,7 @@ type handler struct {
 	capiClusterCache    capicontrollers.ClusterCache
 	machineCache        capicontrollers.MachineCache
 	machineClient       capicontrollers.MachineClient
+	machineSetCache     capicontrollers.MachineSetCache
 	namespaces          corecontrollers.NamespaceCache
 	nodeDriverCache     mgmtcontrollers.NodeDriverCache
 	dynamic             *dynamic.Controller
@@ -116,6 +117,7 @@ func Register(ctx context.Context, clients *wrangler.Context) {
 		secrets:             clients.Core.Secret().Cache(),
 		machineCache:        clients.CAPI.Machine().Cache(),
 		machineClient:       clients.CAPI.Machine(),
+		machineSetCache:     clients.CAPI.MachineSet().Cache(),
 		capiClusterCache:    clients.CAPI.Cluster().Cache(),
 		nodeDriverCache:     clients.Mgmt.NodeDriver().Cache(),
 		namespaces:          clients.Core.Namespace().Cache(),
@@ -315,6 +317,11 @@ func (h *handler) OnRemove(key string, obj runtime.Object) (runtime.Object, erro
 		return obj, err
 	}
 
+	// infra was never adopted by a machine, just delete
+	if machineSet, _ := rke2.GetOwnerCAPIMachineSet(infra.obj, h.machineSetCache); machineSet != nil {
+		return obj, nil
+	}
+
 	// Initial provisioning not finished
 	if cond := getCondition(infra.data, createJobConditionType); cond != nil && cond.Status() != "True" {
 		job, err := h.getJobFromInfraMachine(infra)
@@ -362,7 +369,7 @@ func (h *handler) OnRemove(key string, obj runtime.Object) (runtime.Object, erro
 	}
 
 	machine, err := rke2.GetOwnerCAPIMachine(obj, h.machineCache)
-	if err != nil && !errors.Is(err, rke2.ErrNoControllerMachineOwnerRef) && !apierrors.IsNotFound(err) {
+	if err != nil && !errors.Is(err, rke2.ErrNoMatchingControllerOwnerRef) && !apierrors.IsNotFound(err) {
 		logrus.Errorf("[machineprovision] %s/%s: error getting machine by owner reference: %v", infra.meta.GetNamespace(), infra.meta.GetName(), err)
 		return obj, err
 	}
