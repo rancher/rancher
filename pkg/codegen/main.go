@@ -112,6 +112,7 @@ func main() {
 			"cluster.x-k8s.io": {
 				Types: []interface{}{
 					capi.Machine{},
+					capi.MachineSet{},
 					capi.MachineDeployment{},
 					capi.Cluster{},
 				},
