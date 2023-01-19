@@ -338,6 +338,8 @@ func (h *handler) OnRemove(key string, obj runtime.Object) (runtime.Object, erro
 			logrus.Tracef("[machineprovision] create job object for %s was %+v", key, job)
 		}
 		return obj, fmt.Errorf("cannot delete machine %s because create job has not finished", infra.meta.GetName())
+	} else if cond == nil {
+		return obj, nil
 	}
 
 	// infrastructure deletion finished
@@ -483,6 +485,11 @@ func (h *handler) OnChange(obj runtime.Object) (runtime.Object, error) {
 		logrus.Debugf("[machineprovision] %s/%s: waiting: CAPI cluster or RKEMachine is paused", infra.meta.GetNamespace(), infra.meta.GetName())
 		h.EnqueueAfter(infra, 10*time.Second)
 		return obj, generic.ErrSkip
+	}
+
+	if !capiCluster.DeletionTimestamp.IsZero() {
+		logrus.Debugf("[machineprovision] %s/%s: refusing to reconcile: CAPI cluster is deleting", infra.meta.GetNamespace(), infra.meta.GetName())
+		return obj, nil
 	}
 
 	if !capiCluster.Status.InfrastructureReady {
