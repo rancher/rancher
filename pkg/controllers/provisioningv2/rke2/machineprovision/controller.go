@@ -487,11 +487,6 @@ func (h *handler) OnChange(obj runtime.Object) (runtime.Object, error) {
 		return obj, generic.ErrSkip
 	}
 
-	if !capiCluster.DeletionTimestamp.IsZero() {
-		logrus.Debugf("[machineprovision] %s/%s: refusing to reconcile: CAPI cluster is deleting", infra.meta.GetNamespace(), infra.meta.GetName())
-		return obj, nil
-	}
-
 	if !capiCluster.Status.InfrastructureReady {
 		logrus.Debugf("[machineprovision] %s/%s: waiting: CAPI cluster infrastructure is not ready", infra.meta.GetNamespace(), infra.meta.GetName())
 		h.EnqueueAfter(infra, 10*time.Second)
