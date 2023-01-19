@@ -33,6 +33,7 @@ type Interface interface {
 	Cluster() ClusterController
 	Machine() MachineController
 	MachineDeployment() MachineDeploymentController
+	MachineSet() MachineSetController
 }
 
 func New(controllerFactory controller.SharedControllerFactory) Interface {
@@ -53,4 +54,7 @@ func (c *version) Machine() MachineController {
 }
 func (c *version) MachineDeployment() MachineDeploymentController {
 	return NewMachineDeploymentController(schema.GroupVersionKind{Group: "cluster.x-k8s.io", Version: "v1beta1", Kind: "MachineDeployment"}, "machinedeployments", true, c.controllerFactory)
+}
+func (c *version) MachineSet() MachineSetController {
+	return NewMachineSetController(schema.GroupVersionKind{Group: "cluster.x-k8s.io", Version: "v1beta1", Kind: "MachineSet"}, "machinesets", true, c.controllerFactory)
 }
