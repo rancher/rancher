@@ -84,7 +84,7 @@ run_rancher()
         fi
         if [ "$PID" = "-1" ]; then
           echo Starting rancher server using run
-          ./scripts/run >/tmp/rancher.log 2>&1 &
+          ./scripts/run --debug >/tmp/rancher.log 2>&1 &
           PID=$!
         fi
         sleep 2
