@@ -240,6 +240,11 @@ func WaitForDelete(clients *clients.Clients, c *provisioningv1api.Cluster) (_ *p
 				logrus.Errorf("failed to get infra machines for %s/%s to print error: %v", c.Namespace, c.Name, err)
 			}
 
+			machineSets, newErr := MachineSets(clients, c)
+			if newErr != nil {
+				logrus.Errorf("failed to get machineSets for %s/%s to print error: %v", c.Namespace, c.Name, err)
+			}
+
 			mgmtCluster, newErr := clients.Mgmt.Cluster().Get(c.Status.ClusterName, metav1.GetOptions{})
 			if apierrors.IsNotFound(newErr) {
 				mgmtCluster = nil
@@ -260,6 +265,7 @@ func WaitForDelete(clients *clients.Clients, c *provisioningv1api.Cluster) (_ *p
 				"capiCluster":   capiCluster,
 				"machines":      machines,
 				"infraMachines": infraMachines,
+				"machineSets":   machineSets,
 			})
 			err = fmt.Errorf("deletion wait failed on %s: %w", data, err)
 		}
