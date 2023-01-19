@@ -26,6 +26,11 @@ RUN ssh-keygen -f .ssh/jenkins-* -y > /root/.ssh/public.pub
 
 RUN CGO_ENABLED=0
 
+RUN dnf install unzip
+RUN wget https://releases.hashicorp.com/terraform/0.12.21/terraform_0.12.21_linux_amd64.zip
+RUN unzip terraform_0.12.21_linux_amd64.zip && rm terraform_0.12.21_linux_amd64.zip
+RUN mv terraform /usr/bin/terraform
+
 # necessary to run if statements using [[ ]]
 SHELL ["/bin/bash", "-c"] 
 
