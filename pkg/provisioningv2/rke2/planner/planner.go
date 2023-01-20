@@ -276,7 +276,7 @@ func (p *Planner) Process(cp *rkev1.RKEControlPlane, status rkev1.RKEControlPlan
 		return status, err
 	}
 
-	if status, err = p.rotateEncryptionKeys(cp, status, releaseData, plan); err != nil {
+	if status, err = p.rotateEncryptionKeys(cp, status, clusterSecretTokens, plan, releaseData); err != nil {
 		return status, err
 	}
 
@@ -943,10 +943,11 @@ func (p *Planner) desiredPlan(controlPlane *rkev1.RKEControlPlane, tokensSecret 
 		return nodePlan, err
 	}
 
-	nodePlan, err = p.addProbes(nodePlan, controlPlane, entry, config)
+	probes, err := p.generateProbes(controlPlane, entry, config)
 	if err != nil {
 		return nodePlan, err
 	}
+	nodePlan.Probes = probes
 
 	// Add instruction last because it hashes config content
 	nodePlan, err = p.addInstallInstructionWithRestartStamp(nodePlan, controlPlane, entry)
