@@ -348,12 +348,12 @@ func addLabels(config map[string]interface{}, entry *planEntry) error {
 	return nil
 }
 
-func addTaints(config map[string]interface{}, entry *planEntry) error {
+func addTaints(config map[string]interface{}, entry *planEntry, cp *rkev1.RKEControlPlane) error {
 	var (
 		taintString []string
 	)
 
-	taints, err := getTaints(entry)
+	taints, err := getTaints(entry, cp)
 	if err != nil {
 		return err
 	}
@@ -446,7 +446,7 @@ func (p *Planner) addConfigFile(nodePlan plan.NodePlan, controlPlane *rkev1.RKEC
 	if err := addLabels(config, entry); err != nil {
 		return nodePlan, config, err
 	}
-	if err := addTaints(config, entry); err != nil {
+	if err := addTaints(config, entry, controlPlane); err != nil {
 		return nodePlan, config, err
 	}
 
