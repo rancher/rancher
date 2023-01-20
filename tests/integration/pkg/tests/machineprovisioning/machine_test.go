@@ -389,9 +389,12 @@ func TestDrain(t *testing.T) {
 	defer clients.Close()
 
 	drainOpt := rkev1.DrainOptions{
-		IgnoreDaemonSets:   &[]bool{true}[0],
-		DeleteEmptyDirData: true,
-		Enabled:            true,
+		IgnoreDaemonSets:                &[]bool{true}[0],
+		DeleteEmptyDirData:              true,
+		Enabled:                         true,
+		Force:                           true,
+		SkipWaitForDeleteTimeoutSeconds: 30,
+		GracePeriod:                     5,
 		PreDrainHooks: []rkev1.DrainHook{
 			{
 				Annotation: "test.io/pre-hook1",
