@@ -81,3 +81,19 @@ func UpdateConfig(key string, config interface{}) {
 		panic(err)
 	}
 }
+
+func WriteConfig(key string, config interface{}) {
+	configPath := os.Getenv("CATTLE_TEST_CONFIG")
+	all := map[string]interface{}{}
+	all[key] = config
+
+	yamlConfig, err := yaml.Marshal(all)
+	if err != nil {
+		panic(err)
+	}
+
+	err = os.WriteFile(configPath, yamlConfig, 0644)
+	if err != nil {
+		panic(err)
+	}
+}

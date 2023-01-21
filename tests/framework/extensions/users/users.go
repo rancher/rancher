@@ -21,6 +21,8 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 )
 
+var timeout = int64(60 * 3)
+
 // CreateUserWithRole is helper function that creates a user with a role or multiple roles
 func CreateUserWithRole(rancherClient *rancher.Client, user *management.User, roles ...string) (*management.User, error) {
 	createdUser, err := rancherClient.Management.User.Create(user)
@@ -60,7 +62,7 @@ func AddProjectMember(rancherClient *rancher.Client, project *management.Project
 
 	opts := metav1.ListOptions{
 		FieldSelector:  "metadata.name=" + name,
-		TimeoutSeconds: &defaults.WatchTimeoutSeconds,
+		TimeoutSeconds: &timeout,
 	}
 	watchInterface, err := adminClient.GetManagementWatchInterface(management.ProjectType, opts)
 	if err != nil {
@@ -181,8 +183,9 @@ func AddClusterRoleToUser(rancherClient *rancher.Client, cluster *management.Clu
 
 	opts := metav1.ListOptions{
 		FieldSelector:  "metadata.name=" + cluster.ID,
-		TimeoutSeconds: &defaults.WatchTimeoutSeconds,
+		TimeoutSeconds: &timeout,
 	}
+
 	watchInterface, err := rancherClient.GetManagementWatchInterface(management.ClusterType, opts)
 	if err != nil {
 		return err
@@ -191,14 +194,15 @@ func AddClusterRoleToUser(rancherClient *rancher.Client, cluster *management.Clu
 	checkFunc := func(event watch.Event) (ready bool, err error) {
 		clusterUnstructured := event.Object.(*unstructured.Unstructured)
 		cluster := &v3.Cluster{}
+
 		err = scheme.Scheme.Convert(clusterUnstructured, cluster, clusterUnstructured.GroupVersionKind())
 		if err != nil {
 			return false, err
 		}
-		if v3.ClusterConditionInitialRolesPopulated.IsTrue(cluster) {
+		v3.ClusterConditionInitialRolesPopulated.CreateUnknownIfNotExists(cluster)
+		if v3.ClusterConditionInitialRolesPopulated.IsUnknown(cluster) || v3.ClusterConditionInitialRolesPopulated.IsTrue(cluster) {
 			return true, nil
 		}
-
 		return false, nil
 	}
 
@@ -245,4 +249,24 @@ func RemoveClusterRoleFromUser(rancherClient *rancher.Client, user *management.U
 	}
 
 	return rancherClient.Management.ClusterRoleTemplateBinding.Delete(&roleToDelete)
+}
+
+// GetUserIDByName is a helper function that returns the user ID by name
+func GetUserIDByName(client *rancher.Client, username string) (string, error) {
+	userList, err := client.Management.User.List(&types.ListOpts{})
+	if err != nil {
+		return "", err
+	}
+
+	if err != nil {
+		return "", err
+	}
+
+	for _, user := range userList.Data {
+		if user.Username == username {
+			return user.ID, nil
+		}
+	}
+
+	return "", nil
 }

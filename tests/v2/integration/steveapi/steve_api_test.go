@@ -20,6 +20,7 @@ import (
 	"github.com/rancher/rancher/tests/framework/extensions/kubeapi/rbac"
 	"github.com/rancher/rancher/tests/framework/extensions/kubeapi/secrets"
 	stevesecrets "github.com/rancher/rancher/tests/framework/extensions/secrets"
+	"github.com/rancher/rancher/tests/framework/extensions/serviceaccounts"
 	"github.com/rancher/rancher/tests/framework/extensions/users"
 	password "github.com/rancher/rancher/tests/framework/extensions/users/passwordgenerator"
 	"github.com/rancher/rancher/tests/framework/pkg/namegenerator"
@@ -36,11 +37,15 @@ const (
 	projectNamePrefix = "test-project"
 	labelKey          = "test-label"
 	continueToken     = "nondeterministictoken"
+	defautlUrlString  = "https://rancherurl/"
 )
 
 var (
+	impersonationNamespace     = "cattle-impersonation-system"
+	impersonationSABase        = "cattle-impersonation-"
 	userEnabled                = true
 	continueReg                = regexp.MustCompile(`(continue=)[\w]+(%3D){0,2}`)
+	urlRegex                   = regexp.MustCompile(`https://([\w.:]+)/`)
 	namespaceSecretManagerRole = rbacv1.Role{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "namespace-secret-manager",
@@ -173,6 +178,9 @@ func (s *SteveAPITestSuite) SetupSuite() {
 	clusterID, err := clusters.GetClusterIDByName(client, clusterName)
 	require.NoError(s.T(), err)
 
+	mgmtCluster, err := client.Management.Cluster.ByID(clusterID)
+	require.NoError(s.T(), err)
+
 	// create project
 	projectName := namegenerator.AppendRandomString(projectNamePrefix)
 	s.project, err = s.client.Management.Project.Create(&management.Project{
@@ -181,10 +189,16 @@ func (s *SteveAPITestSuite) SetupSuite() {
 	})
 	require.NoError(s.T(), err)
 
+	userID, err := users.GetUserIDByName(client, "admin")
+	require.NoError(s.T(), err)
+
+	impersonationSA := impersonationSABase + userID
+	err = serviceaccounts.IsServiceAccountReady(client, clusterID, impersonationNamespace, impersonationSA)
+	require.NoError(s.T(), err)
 	// create project namespaces
 	for k := range namespaceMap {
 		name := namegenerator.AppendRandomString(k)
-		_, err := namespaces.CreateNamespace(client, name, "", nil, nil, s.project)
+		_, err := namespaces.CreateNamespace(client, name, "{}", nil, nil, s.project)
 		require.NoError(s.T(), err)
 		namespaceMap[k] = name
 	}
@@ -235,8 +249,11 @@ func (s *SteveAPITestSuite) SetupSuite() {
 		// users either have access to a whole project or to select namespaces or resources in a project
 		switch binding := access.(type) {
 		case management.ProjectRoleTemplateBinding:
-			users.AddProjectMember(client, s.project, userObj, binding.RoleTemplateID)
+			err = users.AddProjectMember(client, s.project, userObj, binding.RoleTemplateID)
+			require.NoError(s.T(), err)
 		case []rbacv1.RoleBinding:
+			err = users.AddClusterRoleToUser(client, mgmtCluster, userObj, "cluster-member")
+			require.NoError(s.T(), err)
 			for _, rb := range binding {
 				subject := rbacv1.Subject{
 					Kind: "User",
@@ -832,7 +849,11 @@ func (s *SteveAPITestSuite) TestList() {
 
 	for _, test := range tests {
 		s.Run(test.description, func() {
-			client, err := s.userClients[test.user].Steve.ProxyDownstream(s.project.ClusterID)
+			userClient := s.userClients[test.user]
+			userClient, err := userClient.ReLogin()
+			require.NoError(s.T(), err)
+
+			client, err := userClient.Steve.ProxyDownstream(s.project.ClusterID)
 			require.NoError(s.T(), err)
 			var secretClient clientv1.SteveOperations
 			secretClient = client.SteveType(stevesecrets.SecretSteveType)
@@ -902,6 +923,8 @@ func getCurlURL(client *clientv1.Client, namespace, query string) (string, error
 	if query != "" {
 		curlURL += "?" + query
 	}
+
+	curlURL = urlRegex.ReplaceAllString(curlURL, defautlUrlString)
 	return curlURL, nil
 }
 
@@ -915,6 +938,7 @@ func formatJSON(obj *clientv1.SteveCollection) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	mapResp["revision"] = "100"
 	if _, ok := mapResp["continue"]; ok {
 		mapResp["continue"] = continueToken
@@ -945,6 +969,7 @@ func formatJSON(obj *clientv1.SteveCollection) ([]byte, error) {
 	for k, v := range namespaceMap {
 		jsonString = strings.ReplaceAll(jsonString, v, k)
 	}
+	jsonString = urlRegex.ReplaceAllString(jsonString, defautlUrlString)
 	return []byte(jsonString), nil
 }
 
