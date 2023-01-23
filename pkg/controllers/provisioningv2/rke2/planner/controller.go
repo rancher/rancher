@@ -75,7 +75,13 @@ func (h *handler) OnChange(cp *rkev1.RKEControlPlane, status rkev1.RKEControlPla
 			// if still waiting for same condition, convert err to generic.ErrSkip to avoid updating controlplane status and
 			// enqueue until no longer waiting.
 			if rke2.Ready.GetMessage(&status) == err.Error() && rke2.Ready.GetStatus(&status) == "Unknown" && rke2.Ready.GetReason(&status) == "Waiting" {
-				err = generic.ErrSkip
+				// This is effectively a bug, wherein "ErrWaiting" is returned with the same message for two different back to back changesets
+				// This design needs to be revisited in the future to prevent unnecessary churn.
+				if !equality.Semantic.DeepEqual(cp.Status, status) {
+					err = nil
+				} else {
+					err = generic.ErrSkip
+				}
 			} else {
 				rke2.Ready.SetStatus(&status, "Unknown")
 				rke2.Ready.Message(&status, err.Error())
