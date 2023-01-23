@@ -405,6 +405,11 @@ platform:
   arch: amd64
   version: 1809
 
+# Currently have to define "depth" as otherwise clone fails at
+# https://github.com/drone/drone-git/blob/39d233b3d9eccc68e66508a06a725a2567f33143/windows/clone-tag.ps1#L12
+clone:
+  depth: 20
+  
 steps:
   - name: build
     pull: always
@@ -844,6 +849,11 @@ platform:
   os: windows
   arch: amd64
   version: 1809
+  
+# Currently have to define "depth" as otherwise clone fails at
+# https://github.com/drone/drone-git/blob/39d233b3d9eccc68e66508a06a725a2567f33143/windows/clone-tag.ps1#L12
+clone:
+  depth: 20
 
 steps:
 - name: docker-image-digests
