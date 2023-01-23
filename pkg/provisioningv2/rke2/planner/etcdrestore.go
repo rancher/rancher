@@ -29,7 +29,7 @@ func (p *Planner) resetEtcdSnapshotRestoreState(status rkev1.RKEControlPlaneStat
 }
 
 func (p *Planner) startOrRestartEtcdSnapshotRestore(status rkev1.RKEControlPlaneStatus, restore *rkev1.ETCDSnapshotRestore) (rkev1.RKEControlPlaneStatus, error) {
-	if restore == nil || !equality.Semantic.DeepEqual(*restore, *status.ETCDSnapshotRestore) {
+	if status.ETCDSnapshotRestore == nil || !equality.Semantic.DeepEqual(restore, status.ETCDSnapshotRestore) {
 		return p.setEtcdSnapshotRestoreState(status, restore, rkev1.ETCDSnapshotPhaseStarted)
 	}
 	return status, nil
@@ -321,9 +321,8 @@ func (p *Planner) restoreEtcdSnapshot(cp *rkev1.RKEControlPlane, status rkev1.RK
 		if err = p.runEtcdSnapshotRestorePlan(cp, snapshot, tokensSecret, clusterPlan); err != nil {
 			return status, err
 		}
-		controlPlane := cp.DeepCopy()
-		controlPlane.Status.ConfigGeneration++
-		return p.setEtcdSnapshotRestoreState(status, controlPlane.Spec.ETCDSnapshotRestore, rkev1.ETCDSnapshotPhaseRestartCluster)
+		status.ConfigGeneration++
+		return p.setEtcdSnapshotRestoreState(status, cp.Spec.ETCDSnapshotRestore, rkev1.ETCDSnapshotPhaseRestartCluster)
 	case rkev1.ETCDSnapshotPhaseRestartCluster:
 		if err := p.runEtcdRestoreServiceStart(cp, tokensSecret, clusterPlan); err != nil {
 			return status, err
