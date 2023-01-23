@@ -586,8 +586,8 @@ github.com/rancher/aks-operator v1.0.7 h1:tCGr5vi5ggsUspyMZyI4EGzKN0ojLgYUR8337z
 github.com/rancher/aks-operator v1.0.7/go.mod h1:qK59c7DFxpYn14sXHbbPkNl7zUNyuN0qkFUUHXsQ0jA=
 github.com/rancher/eks-operator v1.1.5 h1:IAE7nLBCaJaMEFGxZj23drpoq6R6+RXSYvr3AiFJ8KA=
 github.com/rancher/eks-operator v1.1.5/go.mod h1:mx3fp0rFzDX7gEXJtisHWDFeDJHpDsAjwDkmbSf1BKs=
-github.com/rancher/fleet/pkg/apis v0.0.0-20220916041858-eae202f68985 h1:7nK4cyBRg/F+Gurw3XupkmBVDLqP4Y60LidG7W/HsLQ=
-github.com/rancher/fleet/pkg/apis v0.0.0-20220916041858-eae202f68985/go.mod h1:TEpjOKZ5Zy/omGNx+l/ZBprQ4QSnpZ5E5E/ozcer0K8=
+github.com/rancher/fleet/pkg/apis v0.0.0-20230123175930-d296259590be h1:6COvy2n88yI4m8Libx9vIFJVwWSbFEB0tu4TXkjrNeo=
+github.com/rancher/fleet/pkg/apis v0.0.0-20230123175930-d296259590be/go.mod h1:l64RFpFuKmcfb73Viq0dAbkj5kqRJjEh+AagOq13qyk=
 github.com/rancher/gke-operator v1.1.4 h1:M42t+UmXVZyYPF60ex5U1FpvxXEKhBBMA0OJ9xdzrKQ=
 github.com/rancher/gke-operator v1.1.4/go.mod h1:7lDe4okbyZeYZppEz1i60eowLN8iiT4ZN5UiEIVHp18=
 github.com/rancher/lasso v0.0.0-20200427171700-e0509f89f319/go.mod h1:6Dw19z1lDIpL887eelVjyqH/mna1hfR61ddCFOG78lw=
@@ -603,8 +603,8 @@ github.com/rancher/rke v1.3.15/go.mod h1:FYb66B2+kAJVQ80SFEr56mC9yjm7TrviK2miZG+
 github.com/rancher/wrangler v0.6.2-0.20200427172034-da9b142ae061/go.mod h1:n5Du/gGD7WoiqnEo0SHnPirDIp1V9Zu+6guc8lXS2dk=
 github.com/rancher/wrangler v0.6.2-0.20200820173016-2068de651106/go.mod h1:iKqQcYs4YSDjsme52OZtQU4jHPmLlIiM93aj2c8c/W8=
 github.com/rancher/wrangler v0.8.10/go.mod h1:Lte9WjPtGYxYacIWeiS9qawvu2R4NujFU9xuXWJvc/0=
-github.com/rancher/wrangler v1.0.1-0.20220520195731-8eeded9bae2a h1:vkH6CA+ennCzgSP5BDbAsmVXQRVfYsQvxUcR4iHEGJQ=
-github.com/rancher/wrangler v1.0.1-0.20220520195731-8eeded9bae2a/go.mod h1:8jRLk3G7CWp2Huu+SzDkcdg/F5qWPESGsKG2bIiThNM=
+github.com/rancher/wrangler v1.0.1 h1:toavOGC1+eaZufcOJD6UyIf+aGM4rlJjPqm511Ls4sI=
+github.com/rancher/wrangler v1.0.1/go.mod h1:Blhan9LdaIJjC9w+xGteSrHHEiIFIdPEHEMrtx82dPk=
 github.com/rancher/wrangler-api v0.6.1-0.20200427172631-a7c2f09b783e/go.mod h1:2lcWR98q8HU3U4mVETnXc8quNG0uXxrt8vKd6cAa/30=
 github.com/remyoudompheng/bigfft v0.0.0-20170806203942-52369c62f446/go.mod h1:uYEyJGbgTkfkS4+E/PavXkNJcbFIpEtjt2B0KDQ5+9M=
 github.com/rogpeppe/fastuuid v0.0.0-20150106093220-6724a57986af/go.mod h1:XWv6SoW27p1b0cqNHllgS5HIMJraePCO15w5zCzIWYg=
