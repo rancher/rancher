@@ -3,6 +3,7 @@ package planner
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
 
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
@@ -32,13 +33,24 @@ func Register(ctx context.Context, clients *wrangler.Context, planner *planner.P
 	v1.RegisterRKEControlPlaneStatusHandler(ctx, clients.RKE.RKEControlPlane(), "", "planner", h.OnChange)
 	relatedresource.Watch(ctx, "planner", func(namespace, name string, obj runtime.Object) ([]relatedresource.Key, error) {
 		if secret, ok := obj.(*corev1.Secret); ok {
+			var relatedResources []relatedresource.Key
 			clusterName := secret.Labels[rke2.ClusterNameLabel]
 			if clusterName != "" {
-				return []relatedresource.Key{{
+				relatedResources = append(relatedResources, relatedresource.Key{
 					Namespace: secret.Namespace,
 					Name:      clusterName,
-				}}, nil
+				})
 			}
+			authorizedObjects := secret.Annotations[rke2.AuthorizedObjectAnnotation]
+			if authorizedObjects != "" {
+				for _, clusterName = range strings.Split(authorizedObjects, ",") {
+					relatedResources = append(relatedResources, relatedresource.Key{
+						Namespace: secret.Namespace,
+						Name:      clusterName,
+					})
+				}
+			}
+			return relatedResources, nil
 		} else if machine, ok := obj.(*capi.Machine); ok {
 			clusterName := machine.Labels[capi.ClusterLabelName]
 			if clusterName != "" {
@@ -47,9 +59,21 @@ func Register(ctx context.Context, clients *wrangler.Context, planner *planner.P
 					Name:      clusterName,
 				}}, nil
 			}
+		} else if configmap, ok := obj.(*corev1.ConfigMap); ok {
+			var relatedResources []relatedresource.Key
+			authorizedObjects := configmap.Annotations[rke2.AuthorizedObjectAnnotation]
+			if authorizedObjects != "" {
+				for _, clusterName := range strings.Split(authorizedObjects, ",") {
+					relatedResources = append(relatedResources, relatedresource.Key{
+						Namespace: secret.Namespace,
+						Name:      clusterName,
+					})
+				}
+			}
+			return relatedResources, nil
 		}
 		return nil, nil
-	}, clients.RKE.RKEControlPlane(), clients.Core.Secret(), clients.CAPI.Machine())
+	}, clients.RKE.RKEControlPlane(), clients.Core.Secret(), clients.CAPI.Machine(), clients.Core.ConfigMap())
 }
 
 func (h *handler) OnChange(cp *rkev1.RKEControlPlane, status rkev1.RKEControlPlaneStatus) (rkev1.RKEControlPlaneStatus, error) {

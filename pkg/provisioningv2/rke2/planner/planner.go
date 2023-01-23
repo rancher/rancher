@@ -127,6 +127,7 @@ type Planner struct {
 	etcdSnapshotCache             rkecontrollers.ETCDSnapshotCache
 	secretClient                  corecontrollers.SecretClient
 	secretCache                   corecontrollers.SecretCache
+	configMapCache                corecontrollers.ConfigMapCache
 	machines                      capicontrollers.MachineClient
 	machinesCache                 capicontrollers.MachineCache
 	clusterRegistrationTokenCache mgmtcontrollers.ClusterRegistrationTokenCache
@@ -151,6 +152,7 @@ func New(ctx context.Context, clients *wrangler.Context) *Planner {
 		machinesCache:                 clients.CAPI.Machine().Cache(),
 		secretClient:                  clients.Core.Secret(),
 		secretCache:                   clients.Core.Secret().Cache(),
+		configMapCache:                clients.Core.ConfigMap().Cache(),
 		clusterRegistrationTokenCache: clients.Mgmt.ClusterRegistrationToken().Cache(),
 		capiClient:                    clients.CAPI.Cluster(),
 		capiClusters:                  clients.CAPI.Cluster().Cache(),
