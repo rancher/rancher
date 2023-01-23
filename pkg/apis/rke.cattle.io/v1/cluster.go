@@ -70,7 +70,7 @@ type DrainOptions struct {
 	// (even when set to true, kubectl won't delete pods - so setting default to true)
 	IgnoreDaemonSets *bool `json:"ignoreDaemonSets"`
 	// IgnoreErrors Ignore errors occurred between drain nodes in group
-	IgnoreErrors bool
+	IgnoreErrors bool `json:"ignoreErrors"`
 	// Continue even if there are pods using emptyDir
 	DeleteEmptyDirData bool `json:"deleteEmptyDirData"`
 	// DisableEviction forces drain to use delete rather than evict
