@@ -15,7 +15,6 @@ type RKECommonNodeConfig struct {
 
 type RKEMachineStatus struct {
 	Conditions                []genericcondition.GenericCondition `json:"conditions,omitempty"`
-	JobComplete               bool                                `json:"jobComplete,omitempty"`
 	JobName                   string                              `json:"jobName,omitempty"`
 	Ready                     bool                                `json:"ready,omitempty"`
 	DriverHash                string                              `json:"driverHash,omitempty"`
