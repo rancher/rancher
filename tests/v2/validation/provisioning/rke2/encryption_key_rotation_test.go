@@ -16,7 +16,7 @@ import (
 	"github.com/rancher/rancher/tests/framework/extensions/kubeapi/secrets"
 	"github.com/rancher/rancher/tests/framework/extensions/machinepools"
 	"github.com/rancher/rancher/tests/framework/pkg/config"
-	"github.com/rancher/rancher/tests/framework/pkg/namegenerator"
+	namegen "github.com/rancher/rancher/tests/framework/pkg/namegenerator"
 	"github.com/rancher/rancher/tests/framework/pkg/session"
 	"github.com/rancher/rancher/tests/framework/pkg/wait"
 	"github.com/rancher/rancher/tests/integration/pkg/defaults"
@@ -55,7 +55,7 @@ func (r *RKE2EncryptionKeyRotationTestSuite) TearDownSuite() {
 }
 
 func (r *RKE2EncryptionKeyRotationTestSuite) SetupSuite() {
-	testSession := session.NewSession(r.T())
+	testSession := session.NewSession()
 	r.session = testSession
 
 	r.config = new(provisioning.Config)
@@ -74,13 +74,13 @@ func (r *RKE2EncryptionKeyRotationTestSuite) TestEncryptionKeyRotationFreshClust
 	name := fmt.Sprintf("Provider_%s/Kubernetes_Version_%s/Nodes_%v", provider.Name, kubeVersion, nodesAndRoles)
 	r.Run(name, func() {
 		r.Run("initial", func() {
-			testSession := session.NewSession(r.T())
+			testSession := session.NewSession()
 			defer testSession.Cleanup()
 
 			testSessionClient, err := r.client.WithSession(testSession)
 			require.NoError(r.T(), err)
 
-			clusterName := provisioning.AppendRandomString(fmt.Sprintf("%s-%s", r.clusterName, provider.Name))
+			clusterName := namegen.AppendRandomString(fmt.Sprintf("%s-%s", r.clusterName, provider.Name))
 			generatedPoolName := fmt.Sprintf("nc-%s-pool1-", clusterName)
 			machinePoolConfig := provider.MachinePoolFunc(generatedPoolName, namespace)
 
@@ -89,7 +89,7 @@ func (r *RKE2EncryptionKeyRotationTestSuite) TestEncryptionKeyRotationFreshClust
 
 			machinePools := machinepools.RKEMachinePoolSetup(nodesAndRoles, machineConfigResp)
 
-			cluster := clusters.NewK3SRKE2ClusterConfig(clusterName, namespace, "calico", credential.ID, kubeVersion, machinePools)
+			cluster := clusters.NewK3SRKE2ClusterConfig(clusterName, namespace, "calico", credential.ID, kubeVersion, "", machinePools, r.config.AdvancedOptions)
 
 			if strings.Contains(kubeVersion, "k3s") {
 				cluster.Spec.RKEConfig.MachineGlobalConfig.Data["secrets-encryption"] = true
@@ -118,7 +118,9 @@ func (r *RKE2EncryptionKeyRotationTestSuite) TestEncryptionKeyRotationFreshClust
 
 			r.T().Logf("Creating %d secrets in namespace default for encryption key rotation for %s", scale, name)
 
-			secretResource, err := kubeapi.ResourceForClient(r.client, clusterName, namespace, secrets.SecretGroupVersionResource)
+			clusterID, err := clusters.GetClusterIDByName(r.client, clusterName)
+			require.NoError(r.T(), err)
+			secretResource, err := kubeapi.ResourceForClient(r.client, clusterID, "default", secrets.SecretGroupVersionResource)
 			require.NoError(r.T(), err)
 
 			for i := 0; i < scale; i++ {
@@ -127,7 +129,7 @@ func (r *RKE2EncryptionKeyRotationTestSuite) TestEncryptionKeyRotationFreshClust
 						GenerateName: fmt.Sprintf("encryption-key-rotation-test-%d-", i),
 					},
 					Data: map[string][]byte{
-						"key": []byte(namegenerator.RandStringLower(5)),
+						"key": []byte(namegen.RandStringLower(5)),
 					},
 				}
 				_, err = secrets.CreateSecret(secretResource, secret)
@@ -217,7 +219,11 @@ func (r *RKE2EncryptionKeyRotationTestSuite) TestEncryptionKeyRotation() {
 		cloudCredential, err := provider.CloudCredFunc(client)
 		require.NoError(r.T(), err)
 
-		for _, kubernetesVersion := range r.config.KubernetesVersions {
+		for _, kubernetesVersion := range r.config.K3SKubernetesVersions {
+			r.TestEncryptionKeyRotationFreshCluster(provider, kubernetesVersion, r.config.NodesAndRoles, cloudCredential)
+		}
+
+		for _, kubernetesVersion := range r.config.RKE2KubernetesVersions {
 			r.TestEncryptionKeyRotationFreshCluster(provider, kubernetesVersion, r.config.NodesAndRoles, cloudCredential)
 		}
 
