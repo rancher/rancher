@@ -273,7 +273,7 @@ OuterLoop:
 		if err != nil {
 			return nil, err
 		}
-		privateRegistryConfig, _ := util.GenerateClusterPrivateRegistryDockerConfig(cluster)
+		privateRegistryConfig, _ := util.GenerateClusterPrivateRegistryDockerConfig(cluster.Spec.RancherKubernetesEngineConfig)
 		processes["share-mnt"] = rketypes.Process{
 			Name:  "share-mnt",
 			Args:  nodeCommand,

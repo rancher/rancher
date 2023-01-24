@@ -489,3 +489,11 @@ func (ap *azureProvider) GetUserExtraAttributes(userPrincipal v3.Principal) map[
 	}
 	return extras
 }
+
+func (ap *azureProvider) IsDisabledProvider() (bool, error) {
+	azureConfig, err := ap.getAzureConfigK8s()
+	if err != nil {
+		return false, err
+	}
+	return !azureConfig.Enabled, nil
+}
