@@ -64,7 +64,7 @@ func (f *Formatter) Formatter(request *types.APIContext, resource *types.RawReso
 			ca)
 		// for windows
 		var agentImageDockerEnv string
-		if util.GetPrivateRepoURL(cluster) != "" {
+		if util.GetPrivateRegistryURL(cluster.Spec.RancherKubernetesEngineConfig) != "" {
 			// patch the AGENT_IMAGE env
 			agentImageDockerEnv = fmt.Sprintf("-e AGENT_IMAGE=%s ", agentImage)
 		}

@@ -38,9 +38,9 @@ ENV HELM_VERSION v3.3.1
 ENV KUSTOMIZE_VERSION v3.5.4
 
 # System charts minimal version
-ENV CATTLE_FLEET_MIN_VERSION=0.3.900
+ENV CATTLE_FLEET_MIN_VERSION=0.3.1000+up0.3.10-security1
 ENV CATTLE_RANCHER_OPERATOR_MIN_VERSION=0.1.500
-ENV CATTLE_RANCHER_WEBHOOK_MIN_VERSION=0.1.500
+ENV CATTLE_RANCHER_WEBHOOK_MIN_VERSION=0.1.600-rc2
 
 RUN mkdir -p /var/lib/rancher-data/local-catalogs/system-library && \
     mkdir -p /var/lib/rancher-data/local-catalogs/library && \

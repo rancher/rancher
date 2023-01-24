@@ -427,3 +427,11 @@ func (g *googleOauthProvider) getDirectoryService(ctx context.Context, userEmail
 	}
 	return srv, nil
 }
+
+func (g *googleOauthProvider) IsDisabledProvider() (bool, error) {
+	googleOauthConfig, err := g.getGoogleOAuthConfigCR()
+	if err != nil {
+		return false, err
+	}
+	return !googleOauthConfig.Enabled, nil
+}

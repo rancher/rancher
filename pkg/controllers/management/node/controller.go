@@ -6,7 +6,6 @@ import (
 	"encoding/base32"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path"
 	"strings"
@@ -91,7 +90,7 @@ func Register(ctx context.Context, management *config.ManagementContext, cluster
 		configMapGetter:           management.K8sClient.CoreV1(),
 		clusterLister:             management.Management.Clusters("").Controller().Lister(),
 		schemaLister:              management.Management.DynamicSchemas("").Controller().Lister(),
-		credLister:                management.Core.Secrets("").Controller().Lister(),
+		secretLister:              management.Core.Secrets("").Controller().Lister(),
 		userManager:               management.UserManager,
 		clusterManager:            clusterManager,
 		devMode:                   os.Getenv("CATTLE_DEV_MODE") != "",
@@ -113,7 +112,7 @@ type Lifecycle struct {
 	configMapGetter           typedv1.ConfigMapsGetter
 	clusterLister             v3.ClusterLister
 	schemaLister              v3.DynamicSchemaLister
-	credLister                corev1.SecretLister
+	secretLister              corev1.SecretLister
 	userManager               user.Manager
 	clusterManager            *clustermanager.Manager
 	devMode                   bool
@@ -383,7 +382,7 @@ func aliasToPath(driver string, config map[string]interface{}, ns string) error 
 					return err
 				}
 				fullPath := path.Join(fileDir, fileName)
-				err = ioutil.WriteFile(fullPath, []byte(fileContents), 0600)
+				err = os.WriteFile(fullPath, []byte(fileContents), 0600)
 				if err != nil {
 					return err
 				}
@@ -412,7 +411,7 @@ func (m *Lifecycle) deployAgent(nodeDir string, obj *v3.Node) error {
 
 	// make a deep copy of the cluster, so we are not modifying the original cluster object
 	clusterCopy := cluster.DeepCopy()
-	clusterCopy.Spec, err = secretmigrator.AssembleRKEConfigSpec(clusterCopy, clusterCopy.Spec, m.credLister)
+	clusterCopy.Spec, err = secretmigrator.AssembleRKEConfigSpec(clusterCopy, clusterCopy.Spec, m.secretLister)
 	if err != nil {
 		return err
 	}
@@ -438,8 +437,8 @@ func (m *Lifecycle) deployAgent(nodeDir string, obj *v3.Node) error {
 
 // authenticateRegistry authenticates the machine to a private registry if one is defined on the cluster
 // this enables the agent image to be pulled from the private registry
-func (m *Lifecycle) authenticateRegistry(nodeDir string, node *v3.Node, cluster *v3.Cluster) error {
-	reg := util.GetPrivateRepo(cluster)
+func (m *Lifecycle) authenticateRegistry(nodeDir string, node *v32.Node, cluster *v32.Cluster) error {
+	reg := util.GetPrivateRegistry(cluster.Spec.RancherKubernetesEngineConfig)
 	// if there is no private registry defined or there is a registry without credentials, return since auth is not needed
 	if reg == nil || reg.User == "" || reg.Password == "" {
 		return nil
@@ -773,7 +772,7 @@ func (m *Lifecycle) setCredFields(data interface{}, fields map[string]v32.Field,
 	if len(splitID) != 2 {
 		return fmt.Errorf("invalid credential id %s", credID)
 	}
-	cred, err := m.credLister.Get(namespace.GlobalNamespace, splitID[1])
+	cred, err := m.secretLister.Get(namespace.GlobalNamespace, splitID[1])
 	if err != nil {
 		return err
 	}
