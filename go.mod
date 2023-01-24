@@ -122,7 +122,7 @@ require (
 	github.com/rancher/security-scan v0.1.7-0.20200222041501-f7377f127168
 	github.com/rancher/steve v0.0.0-20221209194631-acf9d31ce0dd
 	github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20210727200656-10b094e30007
-	github.com/rancher/wrangler v1.0.1
+	github.com/rancher/wrangler v1.0.2
 	github.com/robfig/cron v1.1.0
 	github.com/satori/go.uuid v1.2.1-0.20181016170032-d91630c85102
 	github.com/segmentio/kafka-go v0.0.0-20190411192201-218fd49cff39
