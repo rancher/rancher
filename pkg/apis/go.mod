@@ -7,11 +7,11 @@ replace k8s.io/client-go => k8s.io/client-go v0.24.5
 require (
 	github.com/rancher/aks-operator v1.0.7
 	github.com/rancher/eks-operator v1.1.5
-	github.com/rancher/fleet/pkg/apis v0.0.0-20221027125947-f0d403b940d6
+	github.com/rancher/fleet/pkg/apis v0.0.0-20230123175930-d296259590be
 	github.com/rancher/gke-operator v1.1.5
 	github.com/rancher/norman v0.0.0-20220627222520-b74009fac3ff
 	github.com/rancher/rke v1.4.2
-	github.com/rancher/wrangler v1.0.1-0.20220520195731-8eeded9bae2a
+	github.com/rancher/wrangler v1.0.2-0.20230124030249-09873be990e2
 	github.com/sirupsen/logrus v1.8.1
 	k8s.io/api v0.24.5
 	k8s.io/apimachinery v0.24.5

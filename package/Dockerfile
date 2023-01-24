@@ -1,4 +1,4 @@
-FROM registry.suse.com/bci/bci-base:15.3
+FROM registry.suse.com/bci/bci-base:15.4
 
 RUN zypper -n install git-core curl ca-certificates unzip xz gzip sed tar shadow gawk vim netcat-openbsd mkisofs && \
     zypper -n clean -a && rm -rf /tmp/* /var/tmp/* /usr/share/doc/packages/* && \
@@ -53,7 +53,7 @@ ENV CATTLE_SYSTEM_AGENT_UPGRADE_IMAGE rancher/system-agent:${CATTLE_SYSTEM_AGENT
 ENV CATTLE_SYSTEM_UPGRADE_CONTROLLER_CHART_VERSION 101.0.0+up0.3.3
 
 # System charts minimal version
-ENV CATTLE_FLEET_MIN_VERSION=101.0.0+up0.5.0
+ENV CATTLE_FLEET_MIN_VERSION=101.0.1+up0.5.0
 ENV CATTLE_RANCHER_WEBHOOK_MIN_VERSION=2.0.0+up0.3.0
 ENV CATTLE_CSP_ADAPTER_MIN_VERSION=2.0.0
 

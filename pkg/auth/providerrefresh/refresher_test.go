@@ -3,6 +3,7 @@ package providerrefresh
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/rancher/norman/types"
@@ -19,12 +20,15 @@ import (
 
 func Test_refreshAttributes(t *testing.T) {
 	tests := []struct {
-		name    string
-		user    *v3.User
-		attribs *v3.UserAttribute
-		tokens  []*v3.Token
-		enabled bool
-		want    *v3.UserAttribute
+		name                  string
+		user                  *v3.User
+		attribs               *v3.UserAttribute
+		providerDisabled      bool
+		providerDisabledError error
+		tokens                []*v3.Token
+		enabled               bool
+		deleted               bool
+		want                  *v3.UserAttribute
 	}{
 		{
 			name: "local user no tokens",
@@ -271,6 +275,116 @@ func Test_refreshAttributes(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "disabled provider, disabled/deleted tokens",
+			user: &v3.User{
+				ObjectMeta: metav1.ObjectMeta{Name: "user-abcde"},
+				Username:   "admin",
+				PrincipalIDs: []string{
+					"local://user-abcde",
+				},
+			},
+			attribs: &v3.UserAttribute{
+				ObjectMeta:      metav1.ObjectMeta{Name: "user-abcde"},
+				GroupPrincipals: map[string]v3.Principals{},
+				ExtraByProvider: map[string]map[string][]string{},
+			},
+			tokens: []*v3.Token{
+				{
+					UserID:       "user-abcde",
+					IsDerived:    false,
+					AuthProvider: providers.LocalProvider,
+					UserPrincipal: v3.Principal{
+						Provider: providers.LocalProvider,
+						ExtraInfo: map[string]string{
+							common.UserAttributePrincipalID: "local://user-abcde",
+							common.UserAttributeUserName:    "admin",
+						},
+					},
+				},
+				{
+					UserID:       "user-abcde",
+					IsDerived:    true,
+					AuthProvider: providers.LocalProvider,
+					UserPrincipal: v3.Principal{
+						Provider: providers.LocalProvider,
+						ExtraInfo: map[string]string{
+							common.UserAttributePrincipalID: "local://user-abcde",
+							common.UserAttributeUserName:    "admin",
+						},
+					},
+				},
+			},
+			want: &v3.UserAttribute{
+				ObjectMeta: metav1.ObjectMeta{Name: "user-abcde"},
+				GroupPrincipals: map[string]v3.Principals{
+					"local":      v3.Principals{},
+					"shibboleth": v3.Principals{},
+				},
+				ExtraByProvider: map[string]map[string][]string{},
+			},
+			providerDisabled: true,
+			deleted:          true,
+			enabled:          false,
+		},
+		{
+			name: "error in determining if provider is disabled, tokens left unchanged",
+			user: &v3.User{
+				ObjectMeta: metav1.ObjectMeta{Name: "user-abcde"},
+				Username:   "admin",
+				PrincipalIDs: []string{
+					"local://user-abcde",
+				},
+			},
+			attribs: &v3.UserAttribute{
+				ObjectMeta:      metav1.ObjectMeta{Name: "user-abcde"},
+				GroupPrincipals: map[string]v3.Principals{},
+				ExtraByProvider: map[string]map[string][]string{},
+			},
+			tokens: []*v3.Token{
+				{
+					UserID:       "user-abcde",
+					IsDerived:    false,
+					AuthProvider: providers.LocalProvider,
+					UserPrincipal: v3.Principal{
+						Provider: providers.LocalProvider,
+						ExtraInfo: map[string]string{
+							common.UserAttributePrincipalID: "local://user-abcde",
+							common.UserAttributeUserName:    "admin",
+						},
+					},
+				},
+				{
+					UserID:       "user-abcde",
+					IsDerived:    true,
+					AuthProvider: providers.LocalProvider,
+					UserPrincipal: v3.Principal{
+						Provider: providers.LocalProvider,
+						ExtraInfo: map[string]string{
+							common.UserAttributePrincipalID: "local://user-abcde",
+							common.UserAttributeUserName:    "admin",
+						},
+					},
+				},
+			},
+			want: &v3.UserAttribute{
+				ObjectMeta: metav1.ObjectMeta{Name: "user-abcde"},
+				GroupPrincipals: map[string]v3.Principals{
+					"local":      v3.Principals{},
+					"shibboleth": v3.Principals{},
+				},
+				ExtraByProvider: map[string]map[string][]string{
+					providers.LocalProvider: map[string][]string{
+						common.UserAttributePrincipalID: []string{"local://user-abcde"},
+						common.UserAttributeUserName:    []string{"admin"},
+					},
+				},
+			},
+			providerDisabled:      true,
+			providerDisabledError: fmt.Errorf("unable to determine if provider was disabled"),
+			deleted:               false,
+			enabled:               true,
+		},
 	}
 
 	providers.ProviderNames = map[string]bool{
@@ -279,10 +393,13 @@ func Test_refreshAttributes(t *testing.T) {
 	}
 	for _, tt := range tests {
 		tokenUpdateCalled := false
+		tokenDeleteCalled := false
 		t.Run(tt.name, func(t *testing.T) {
 			providers.Providers = map[string]common.AuthProvider{
 				providers.LocalProvider: &mockLocalProvider{
-					canAccess: tt.enabled,
+					canAccess:   tt.enabled,
+					disabled:    tt.providerDisabled,
+					disabledErr: tt.providerDisabledError,
 				},
 				saml.ShibbolethName: &mockShibbolethProvider{},
 			}
@@ -299,6 +416,7 @@ func Test_refreshAttributes(t *testing.T) {
 				},
 				tokens: &fakes.TokenInterfaceMock{
 					DeleteFunc: func(_ string, _ *metav1.DeleteOptions) error {
+						tokenDeleteCalled = true
 						return nil
 					},
 				},
@@ -313,12 +431,96 @@ func Test_refreshAttributes(t *testing.T) {
 			assert.Nil(t, err)
 			assert.Equal(t, tt.want, got)
 			assert.NotEqual(t, tt.enabled, tokenUpdateCalled)
+			assert.Equal(t, tt.deleted, tokenDeleteCalled)
+		})
+	}
+}
+
+func TestGetPrincipalIDForProvider(t *testing.T) {
+	const testUserUsername = "tUser"
+	tests := []struct {
+		name               string
+		userPrincipalIds   []string
+		providerName       string
+		desiredPrincipalId string
+	}{
+		{
+			name:               "basic test",
+			userPrincipalIds:   []string{fmt.Sprintf("azure_user://%s", testUserUsername)},
+			providerName:       "azure",
+			desiredPrincipalId: fmt.Sprintf("azure_user://%s", testUserUsername),
+		},
+		{
+			name:               "no principal for provider",
+			userPrincipalIds:   []string{fmt.Sprintf("azure_user://%s", testUserUsername)},
+			providerName:       "not-a-provider",
+			desiredPrincipalId: "",
+		},
+		{
+			name:               "local provider principal",
+			userPrincipalIds:   []string{fmt.Sprintf("local://%s", testUserUsername)},
+			providerName:       "local",
+			desiredPrincipalId: fmt.Sprintf("local://%s", testUserUsername),
+		},
+		{
+			name:               "local provider missing principal",
+			userPrincipalIds:   []string{fmt.Sprintf("local_user://%s", testUserUsername)},
+			providerName:       "local",
+			desiredPrincipalId: "",
+		},
+		{
+			name: "multiple providers, correct one (first) chosen",
+			userPrincipalIds: []string{
+				fmt.Sprintf("ldap_user://%s", testUserUsername),
+				fmt.Sprintf("azure_user://%s", testUserUsername),
+			},
+			providerName:       "ldap",
+			desiredPrincipalId: fmt.Sprintf("ldap_user://%s", testUserUsername),
+		},
+		{
+			name: "multiple providers, correct one (last) chosen",
+			userPrincipalIds: []string{
+				fmt.Sprintf("ldap_user://%s", testUserUsername),
+				fmt.Sprintf("azure_user://%s", testUserUsername),
+			},
+			providerName:       "azure",
+			desiredPrincipalId: fmt.Sprintf("azure_user://%s", testUserUsername),
+		},
+		{
+			name: "multiple correct providers, first one chosen",
+			userPrincipalIds: []string{
+				fmt.Sprintf("ldap_user://%s", testUserUsername),
+				fmt.Sprintf("ldap_user://%s", "tUser2"),
+			},
+			providerName:       "ldap",
+			desiredPrincipalId: fmt.Sprintf("ldap_user://%s", testUserUsername),
+		},
+	}
+
+	for _, test := range tests {
+		test := test
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			user := v3.User{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: testUserUsername,
+				},
+				PrincipalIDs: test.userPrincipalIds,
+			}
+			outputPrincipalID := GetPrincipalIDForProvider(test.providerName, &user)
+			assert.Equal(t, test.desiredPrincipalId, outputPrincipalID, "got a different principal id than expected")
 		})
 	}
 }
 
 type mockLocalProvider struct {
-	canAccess bool
+	canAccess   bool
+	disabled    bool
+	disabledErr error
+}
+
+func (p *mockLocalProvider) IsDisabledProvider() (bool, error) {
+	return p.disabled, p.disabledErr
 }
 
 func (p *mockLocalProvider) GetName() string {
@@ -360,15 +562,18 @@ func (p *mockLocalProvider) GetUserExtraAttributes(userPrincipal v3.Principal) m
 	}
 }
 
-func (p *mockLocalProvider) IsDisabledProvider() (bool, error) {
-	return false, nil
-}
-
 func (p *mockLocalProvider) CleanupResources(*v3.AuthConfig) error {
 	return nil
 }
 
-type mockShibbolethProvider struct{}
+type mockShibbolethProvider struct {
+	enabled    bool
+	enabledErr error
+}
+
+func (p *mockShibbolethProvider) IsDisabledProvider() (bool, error) {
+	return p.enabled, p.enabledErr
+}
 
 func (p *mockShibbolethProvider) GetName() string {
 	panic("not implemented")
@@ -407,10 +612,6 @@ func (p *mockShibbolethProvider) GetUserExtraAttributes(userPrincipal v3.Princip
 		common.UserAttributePrincipalID: []string{userPrincipal.ExtraInfo[common.UserAttributePrincipalID]},
 		common.UserAttributeUserName:    []string{userPrincipal.ExtraInfo[common.UserAttributeUserName]},
 	}
-}
-
-func (p *mockShibbolethProvider) IsDisabledProvider() (bool, error) {
-	return false, nil
 }
 
 func (p *mockShibbolethProvider) CleanupResources(*v3.AuthConfig) error {

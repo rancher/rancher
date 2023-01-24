@@ -68,7 +68,7 @@ require (
 	github.com/coreos/go-oidc/v3 v3.0.0
 	github.com/coreos/go-semver v0.3.0
 	github.com/creasty/defaults v1.5.2
-	github.com/crewjam/saml v0.4.5
+	github.com/crewjam/saml v0.4.10
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/docker/distribution v2.8.1+incompatible
 	github.com/docker/docker v20.10.17+incompatible
@@ -105,7 +105,7 @@ require (
 	github.com/rancher/channelserver v0.5.1-0.20220405170618-28c9b37deff1
 	github.com/rancher/dynamiclistener v0.3.4
 	github.com/rancher/eks-operator v1.1.5
-	github.com/rancher/fleet/pkg/apis v0.0.0-20221027125947-f0d403b940d6
+	github.com/rancher/fleet/pkg/apis v0.0.0-20230123175930-d296259590be
 	github.com/rancher/gke-operator v1.1.5
 	github.com/rancher/kubernetes-provider-detector v0.1.5
 	github.com/rancher/lasso v0.0.0-20220628160937-749b3397db38
@@ -118,9 +118,9 @@ require (
 	github.com/rancher/remotedialer v0.2.6-0.20220624190122-ea57207bf2b8
 	github.com/rancher/rke v1.4.2
 	github.com/rancher/security-scan v0.1.7-0.20200222041501-f7377f127168
-	github.com/rancher/steve v0.0.0-20220928204312-06584d207dac
+	github.com/rancher/steve v0.0.0-20221209195153-419d791a0f69
 	github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20210727200656-10b094e30007
-	github.com/rancher/wrangler v1.0.1-0.20220520195731-8eeded9bae2a
+	github.com/rancher/wrangler v1.0.2-0.20230124030249-09873be990e2
 	github.com/robfig/cron v1.1.0
 	github.com/sirupsen/logrus v1.9.0
 	github.com/stretchr/testify v1.7.1
@@ -221,7 +221,7 @@ require (
 	github.com/gobwas/glob v0.2.3 // indirect
 	github.com/gofrs/flock v0.8.1 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
-	github.com/golang-jwt/jwt/v4 v4.2.0 // indirect
+	github.com/golang-jwt/jwt/v4 v4.4.2 // indirect
 	github.com/golang/glog v1.0.0 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/google/btree v1.0.1 // indirect
