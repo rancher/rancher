@@ -74,9 +74,9 @@ func (p *ldapProvider) loginUser(credential *v32.BasicLogin, config *v3.LdapConf
 		operationalAttrList, nil)
 	opResult, err := lConn.Search(searchOpRequest)
 
-	// If no object is found, try again using SA
+	// If no object is found, try again using the service account
 	if err != nil && ldapv3.IsErrorWithCode(err, ldapv3.LDAPResultNoSuchObject) {
-		// Re-bind SA
+		// Re-bind the service account
 		err = ldap.AuthenticateServiceAccountUser(serviceAccountPassword, serviceAccountUserName, "", lConn)
 		if err != nil {
 			return v3.Principal{}, nil, httperror.WrapAPIError(err, httperror.Unauthorized, "authentication failed")
