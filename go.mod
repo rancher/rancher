@@ -120,7 +120,7 @@ require (
 	github.com/rancher/security-scan v0.1.7-0.20200222041501-f7377f127168
 	github.com/rancher/steve v0.0.0-20221209195153-419d791a0f69
 	github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20210727200656-10b094e30007
-	github.com/rancher/wrangler v1.0.2-0.20230124030249-09873be990e2
+	github.com/rancher/wrangler v1.0.2
 	github.com/robfig/cron v1.1.0
 	github.com/sirupsen/logrus v1.9.0
 	github.com/stretchr/testify v1.7.1
