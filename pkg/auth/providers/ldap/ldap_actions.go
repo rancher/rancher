@@ -122,7 +122,7 @@ func (p *ldapProvider) saveLDAPConfig(config *v3.LdapConfig) error {
 		return err
 	}
 
-	config.ServiceAccountPassword = common.GetName(config.Type, field)
+	config.ServiceAccountPassword = common.GetFullSecretName(config.Type, field)
 
 	logrus.Debugf("updating %s config", p.providerName)
 	_, err = p.authConfigs.ObjectClient().Update(config.ObjectMeta.Name, config)
