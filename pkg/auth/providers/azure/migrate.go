@@ -3,10 +3,9 @@ package azure
 import (
 	"github.com/rancher/norman/httperror"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/auth/api/secrets"
 	"github.com/rancher/rancher/pkg/auth/providers/azure/clients"
-	"github.com/rancher/rancher/pkg/auth/tokens"
 	"github.com/sirupsen/logrus"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // migrateToMicrosoftGraph performs a migration of the registered Azure AD auth provider
@@ -58,25 +57,8 @@ func (ap *azureProvider) applyUpdatedConfig(cfg *v32.AzureADConfig) error {
 	return ap.saveAzureConfigK8s(cfg)
 }
 
-// deleteUserAccessTokens attempts to delete all secrets that contain users' access tokens used for working with
-// the deprecated Azure AD Graph API.
-// It is not possible to filter secrets easily by presence of specific key(s) in the data object. The method fetches all
-// Opaque secrets in the relevant namespace and looks at the target key in the data to find a secret that stores a user's
-// access token to delete.
 func (ap *azureProvider) deleteUserAccessTokens() {
-	secrets, err := ap.secrets.ListNamespaced(tokens.SecretNamespace, metav1.ListOptions{FieldSelector: "type=Opaque"})
-	if err != nil {
-		logrus.Errorf("failed to fetch secrets: %v", err)
-		return
-	}
-	// Provider name for Azure AD is the main key on secret data. This allows to identify the secrets to be deleted.
-	const key = Name
-	for _, secret := range secrets.Items {
-		if _, keyPresent := secret.Data[key]; keyPresent {
-			err := ap.secrets.DeleteNamespaced(tokens.SecretNamespace, secret.Name, &metav1.DeleteOptions{})
-			if err != nil {
-				logrus.Errorf("failed to delete secret %s:%s - %v", tokens.SecretNamespace, secret.Name, err)
-			}
-		}
+	if err := secrets.CleanupOAuthTokens(ap.secrets, ap.GetName()); err != nil {
+		logrus.Errorf("error during OAuth secrets clean up on Azure AD endpoint update: %v", err)
 	}
 }
