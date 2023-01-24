@@ -100,7 +100,7 @@ require (
 	github.com/prometheus/client_golang v1.12.1
 	github.com/prometheus/client_model v0.2.0
 	github.com/prometheus/common v0.32.1
-	github.com/rancher/aks-operator v1.1.0-rc1
+	github.com/rancher/aks-operator v1.1.0-rc4
 	github.com/rancher/apiserver v0.0.0-20230120214941-e88c32739dc7
 	github.com/rancher/channelserver v0.5.1-0.20220405170618-28c9b37deff1
 	github.com/rancher/dynamiclistener v0.3.5
@@ -127,13 +127,13 @@ require (
 	github.com/urfave/cli v1.22.9
 	github.com/vishvananda/netlink v1.1.1-0.20210330154013-f5de75959ad5
 	github.com/vmware/govmomi v0.26.0
-	golang.org/x/crypto v0.0.0-20220622213112-05595931fe9d
-	golang.org/x/mod v0.6.0-dev.0.20220419223038-86c51ed26bb4
+	golang.org/x/crypto v0.1.0
+	golang.org/x/mod v0.6.0
 	golang.org/x/net v0.2.0
 	golang.org/x/oauth2 v0.0.0-20220628200809-02e64fa58f26
 	golang.org/x/sync v0.0.0-20220722155255-886fb9371eb4
 	golang.org/x/text v0.4.0 // indirect
-	golang.org/x/tools v0.1.12 // indirect
+	golang.org/x/tools v0.2.0 // indirect
 	google.golang.org/api v0.81.0
 	google.golang.org/grpc v1.48.0
 	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c
@@ -226,7 +226,7 @@ require (
 	github.com/golang-jwt/jwt/v4 v4.2.0 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/google/btree v1.0.1 // indirect
-	github.com/google/go-cmp v0.5.8 // indirect
+	github.com/google/go-cmp v0.5.9 // indirect
 	github.com/google/go-github/v29 v29.0.3 // indirect
 	github.com/google/gofuzz v1.2.0 // indirect
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510 // indirect
@@ -281,7 +281,7 @@ require (
 	github.com/morikuni/aec v1.0.0 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/mxk/go-flowrate v0.0.0-20140419014527-cca7078d478f // indirect
-	github.com/onsi/gomega v1.20.1 // indirect
+	github.com/onsi/gomega v1.24.1 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/opencontainers/image-spec v1.0.3-0.20220114050600-8b9d41f48198 // indirect
 	github.com/opencontainers/runc v1.1.3 // indirect

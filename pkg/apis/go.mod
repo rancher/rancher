@@ -5,7 +5,7 @@ go 1.19
 replace k8s.io/client-go => github.com/rancher/client-go v1.25.4-rancher1
 
 require (
-	github.com/rancher/aks-operator v1.1.0-rc1
+	github.com/rancher/aks-operator v1.1.0-rc4
 	github.com/rancher/eks-operator v1.2.0-rc2
 	github.com/rancher/fleet/pkg/apis v0.0.0-20221220171827-374ed17d8499
 	github.com/rancher/gke-operator v1.1.5
@@ -37,7 +37,7 @@ require (
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/google/gnostic v0.5.7-v3refs // indirect
-	github.com/google/go-cmp v0.5.8 // indirect
+	github.com/google/go-cmp v0.5.9 // indirect
 	github.com/google/gofuzz v1.2.0 // indirect
 	github.com/google/uuid v1.3.0 // indirect
 	github.com/imdario/mergo v0.3.12 // indirect
