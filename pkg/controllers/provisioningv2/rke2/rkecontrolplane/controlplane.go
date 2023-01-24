@@ -18,7 +18,6 @@ import (
 	"github.com/rancher/wrangler/pkg/relatedresource"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/equality"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -87,14 +86,7 @@ func (h *handler) OnRemove(_ string, cp *rkev1.RKEControlPlane) (*rkev1.RKEContr
 	status := cp.Status
 	cp = cp.DeepCopy()
 
-	provCluster, err := h.provClusterCache.Get(cp.Namespace, cp.Name)
-	if err != nil && !apierrors.IsNotFound(err) {
-		return cp, err
-	}
-
-	// only delete machines from custom clusters, node driver will clean up themselves
-	deleteMachines := len(provCluster.Spec.RKEConfig.MachinePools) == 0
-	err = rke2.DoRemoveAndUpdateStatus(cp, h.doRemove(cp, deleteMachines), h.rkeControlPlaneController.EnqueueAfter)
+	err := rke2.DoRemoveAndUpdateStatus(cp, h.doRemove(cp), h.rkeControlPlaneController.EnqueueAfter)
 
 	if equality.Semantic.DeepEqual(status, cp.Status) {
 		return cp, err
@@ -107,7 +99,7 @@ func (h *handler) OnRemove(_ string, cp *rkev1.RKEControlPlane) (*rkev1.RKEContr
 	return cp, err
 }
 
-func (h *handler) doRemove(cp *rkev1.RKEControlPlane, deleteMachines bool) func() (string, error) {
+func (h *handler) doRemove(cp *rkev1.RKEControlPlane) func() (string, error) {
 	return func() (string, error) {
 		logrus.Debugf("[rkecontrolplane] (%s/%s) Peforming removal of rkecontrolplane", cp.Namespace, cp.Name)
 		// Control plane nodes are managed by the control plane object. Therefore, the control plane object shouldn't be cleaned up before the control plane nodes are removed.
@@ -128,12 +120,14 @@ func (h *handler) doRemove(cp *rkev1.RKEControlPlane, deleteMachines bool) func(
 		logrus.Tracef("[rkecontrolplane] (%s/%s) machine list: %+v", cp.Namespace, cp.Name, machines)
 		allMachines := append(machines, otherMachines...)
 
-		if deleteMachines {
-			for _, machine := range allMachines {
-				if machine.DeletionTimestamp == nil {
-					if err = h.machineClient.Delete(machine.Namespace, machine.Name, &metav1.DeleteOptions{}); err != nil {
-						return "", fmt.Errorf("error deleting machine %s/%s: %v", machine.Namespace, machine.Name, err)
-					}
+		for _, machine := range allMachines {
+			// Only delete custom machines. Custom machines can be added outside the UI, so it is important to check each machine.
+			if machine.APIVersion != "rke-machine.cattle.io" || machine.Kind != "CustomMachine" {
+				continue
+			}
+			if machine.DeletionTimestamp == nil {
+				if err = h.machineClient.Delete(machine.Namespace, machine.Name, &metav1.DeleteOptions{}); err != nil {
+					return "", fmt.Errorf("error deleting machine %s/%s: %v", machine.Namespace, machine.Name, err)
 				}
 			}
 		}
