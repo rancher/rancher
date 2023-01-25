@@ -8,7 +8,7 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/rancher/aks-operator v1.0.8-rc2
 	github.com/rancher/eks-operator v1.1.5
-	github.com/rancher/fleet/pkg/apis v0.0.0-20220916041858-eae202f68985
+	github.com/rancher/fleet/pkg/apis v0.0.0-20230116113701-fc276f5505be
 	github.com/rancher/gke-operator v1.1.4
 	github.com/rancher/norman v0.0.0-20221228020905-1dcd4fa94899
 	github.com/rancher/rke v1.3.19-rc1
