@@ -12,12 +12,13 @@ Rancher is an open source container management platform built for organizations 
 
 ## Latest Release
 * v2.7
-  * Latest - v2.7.0 - `rancher/rancher:v2.7.0` / `rancher/rancher:latest` - Read the full release [notes](https://github.com/rancher/rancher/releases/tag/v2.7.0).
+  * Latest - v2.7.1 - `rancher/rancher:v2.7.1` / `rancher/rancher:latest` - Read the full release [notes](https://github.com/rancher/rancher/releases/tag/v2.7.1).
+  * Stable - v2.7.1 - `rancher/rancher:v2.7.1` / `rancher/rancher:stable` - Read the full release [notes](https://github.com/rancher/rancher/releases/tag/v2.7.1).
 * v2.6
-  * Latest - v2.6.9 - `rancher/rancher:v2.6.9` - Read the full release [notes](https://github.com/rancher/rancher/releases/tag/v2.6.9).
-  * Stable - v2.6.9 - `rancher/rancher:v2.6.9` / `rancher/rancher:stable` - Read the full release [notes](https://github.com/rancher/rancher/releases/tag/v2.6.9).
+  * Latest - v2.6.10 - `rancher/rancher:v2.6.10` - Read the full release [notes](https://github.com/rancher/rancher/releases/tag/v2.6.10).
+  * Stable - v2.6.9 - `rancher/rancher:v2.6.9` - Read the full release [notes](https://github.com/rancher/rancher/releases/tag/v2.6.9).
 * v2.5
-  * Latest - v2.5.16 - `rancher/rancher:v2.5.16` - Read the full release [notes](https://github.com/rancher/rancher/releases/tag/v2.5.16).
+  * Latest - v2.5.17 - `rancher/rancher:v2.5.17` - Read the full release [notes](https://github.com/rancher/rancher/releases/tag/v2.5.17).
   * Stable - v2.5.16 - `rancher/rancher:v2.5.16` - Read the full release [notes](https://github.com/rancher/rancher/releases/tag/v2.5.16).
 
 To get automated notifications of our latest release, you can watch the announcements category in our [forums](http://forums.rancher.com/c/announcements), or subscribe to the RSS feed `https://forums.rancher.com/c/announcements.rss`.
@@ -58,7 +59,7 @@ For security issues, please first check our [security policy](SECURITY.md) and e
 
 # License
 
-Copyright (c) 2014-2022 [Rancher Labs, Inc.](http://rancher.com)
+Copyright (c) 2014-2023 [Rancher Labs, Inc.](http://rancher.com)
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
