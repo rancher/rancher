@@ -28,7 +28,7 @@ func (p *Planner) resetEtcdSnapshotCreateState(status rkev1.RKEControlPlaneStatu
 }
 
 func (p *Planner) startOrRestartEtcdSnapshotCreate(status rkev1.RKEControlPlaneStatus, snapshot *rkev1.ETCDSnapshotCreate) (rkev1.RKEControlPlaneStatus, error) {
-	if status.ETCDSnapshotCreate == nil || !equality.Semantic.DeepEqual(*snapshot, *status.ETCDSnapshotCreate) {
+	if status.ETCDSnapshotCreate == nil || !equality.Semantic.DeepEqual(snapshot, status.ETCDSnapshotCreate) {
 		return p.setEtcdSnapshotCreateState(status, snapshot, rkev1.ETCDSnapshotPhaseStarted)
 	}
 	return status, nil

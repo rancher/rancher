@@ -124,7 +124,7 @@ echo "$targetGeneration" > "$generationFile"
 )
 
 func (p *Planner) setEncryptionKeyRotateState(status rkev1.RKEControlPlaneStatus, rotate *rkev1.RotateEncryptionKeys, phase rkev1.RotateEncryptionKeysPhase) (rkev1.RKEControlPlaneStatus, error) {
-	if equality.Semantic.DeepEqual(status.RotateEncryptionKeys, status) && equality.Semantic.DeepEqual(status.RotateEncryptionKeysPhase, phase) {
+	if equality.Semantic.DeepEqual(status.RotateEncryptionKeys, rotate) && equality.Semantic.DeepEqual(status.RotateEncryptionKeysPhase, phase) {
 		return status, nil
 	}
 	status.RotateEncryptionKeys = rotate
