@@ -1,11 +1,12 @@
 package planner
 
 import (
+	"testing"
+
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
 	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2"
 	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 func Test_shouldRotateEntry(t *testing.T) {

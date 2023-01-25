@@ -43,6 +43,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 	capierrors "sigs.k8s.io/cluster-api/errors"
+	capiannotations "sigs.k8s.io/cluster-api/util/annotations"
 )
 
 const (
@@ -91,8 +92,10 @@ type handler struct {
 	jobs                batchcontrollers.JobCache
 	pods                corecontrollers.PodCache
 	secrets             corecontrollers.SecretCache
-	machines            capicontrollers.MachineCache
-	machinesClient      capicontrollers.MachineClient
+	capiClusterCache    capicontrollers.ClusterCache
+	machineCache        capicontrollers.MachineCache
+	machineClient       capicontrollers.MachineClient
+	machineSetCache     capicontrollers.MachineSetCache
 	namespaces          corecontrollers.NamespaceCache
 	nodeDriverCache     mgmtcontrollers.NodeDriverCache
 	dynamic             *dynamic.Controller
@@ -112,8 +115,10 @@ func Register(ctx context.Context, clients *wrangler.Context) {
 		jobController:       clients.Batch.Job(),
 		jobs:                clients.Batch.Job().Cache(),
 		secrets:             clients.Core.Secret().Cache(),
-		machines:            clients.CAPI.Machine().Cache(),
-		machinesClient:      clients.CAPI.Machine(),
+		machineCache:        clients.CAPI.Machine().Cache(),
+		machineClient:       clients.CAPI.Machine(),
+		machineSetCache:     clients.CAPI.MachineSet().Cache(),
+		capiClusterCache:    clients.CAPI.Cluster().Cache(),
 		nodeDriverCache:     clients.Mgmt.NodeDriver().Cache(),
 		namespaces:          clients.Core.Namespace().Cache(),
 		dynamic:             clients.Dynamic,
@@ -161,25 +166,23 @@ func (h *handler) OnJobChange(_ string, job *batchv1.Job) (*batchv1.Job, error) 
 		return job, err
 	}
 
-	infraObj, err := newInfraObject(infraMachine)
-	if err != nil {
-		return nil, err
-	}
-
-	newStatus, err := h.getMachineStatus(job)
+	infra, err := newInfraObject(infraMachine)
 	if err != nil {
 		return job, err
 	}
-	newStatus.JobName = job.Name
 
-	if _, err := h.patchStatus(infraObj.obj, infraObj.data, newStatus); err != nil {
+	if infra.data.String("status", "jobName") == "" {
+		infra.data.SetNested(job.Name, "status", "jobName")
+		_, err = h.dynamic.UpdateStatus(&unstructured.Unstructured{
+			Object: infra.data,
+		})
 		return job, err
 	}
 
 	// Re-evaluate the infra-machine after this
-	if err := h.dynamic.Enqueue(infraMachine.GetObjectKind().GroupVersionKind(),
-		infraObj.meta.GetNamespace(), infraObj.meta.GetName()); err != nil {
-		return nil, err
+	if err = h.dynamic.Enqueue(infraMachine.GetObjectKind().GroupVersionKind(),
+		infra.meta.GetNamespace(), infra.meta.GetName()); err != nil {
+		return job, err
 	}
 
 	return job, nil
@@ -190,7 +193,8 @@ func (h *handler) getMachineStatus(job *batchv1.Job) (rkev1.RKEMachineStatus, er
 	if job.Spec.Template.Labels[InfraJobRemove] == "true" {
 		condType = deleteJobConditionType
 	}
-	if !job.Status.CompletionTime.IsZero() {
+
+	if condition.Cond("Complete").IsTrue(job) {
 		return rkev1.RKEMachineStatus{
 			Conditions: []genericcondition.GenericCondition{
 				{
@@ -202,11 +206,8 @@ func (h *handler) getMachineStatus(job *batchv1.Job) (rkev1.RKEMachineStatus, er
 					Status: corev1.ConditionTrue,
 				},
 			},
-			JobComplete: true,
 		}, nil
-	}
-
-	if condition.Cond("Failed").IsTrue(job) {
+	} else if condition.Cond("Failed").IsTrue(job) {
 		sel, err := metav1.LabelSelectorAsSelector(job.Spec.Selector)
 		if err != nil {
 			return rkev1.RKEMachineStatus{}, err
@@ -259,7 +260,6 @@ func getMachineStatusFromPod(pod *corev1.Pod, condType string) rkev1.RKEMachineS
 					Status: corev1.ConditionTrue,
 				},
 			},
-			JobComplete: true,
 		}
 	}
 
@@ -310,40 +310,74 @@ func (h *handler) OnRemove(key string, obj runtime.Object) (runtime.Object, erro
 		return obj, err
 	}
 
-	infraObj, err := newInfraObject(obj)
+	infra, err := newInfraObject(obj)
 	if err != nil {
 		return obj, err
 	}
 
-	if !infraObj.data.Bool("status", "jobComplete") && infraObj.data.String("status", "failureReason") == "" {
-		job, err := h.getJobFromInfraMachine(infraObj)
+	// When infra machines are initially created, the machine set controller sets itself as the owner reference
+	// Later, the CAPI machine will adopt the node, setting itself as the owner reference
+	// If the machine set is still present as the owner reference, just delete the machine since no provisioning will have taken place yet
+	if machineSet, _ := rke2.GetOwnerCAPIMachineSet(infra.obj, h.machineSetCache); machineSet != nil {
+		return obj, nil
+	}
+
+	// Initial provisioning not finished
+	if cond := getCondition(infra.data, createJobConditionType); cond != nil && cond.Status() == "Unknown" {
+		job, err := h.getJobFromInfraMachine(infra)
 		if apierrors.IsNotFound(err) {
 			// If the job is not found, go ahead and proceed with machine deletion
 			return obj, h.apply.WithOwner(obj).ApplyObjects()
 		} else if err != nil {
 			return obj, err
 		}
-		logrus.Debugf("[MachineProvision] create job for %s not finished, job was found and the error was not nil and was not an isnotfound", key)
-		if job != nil {
-			// enqueue the job to force-reconcile the condition
-			h.jobController.Enqueue(job.Namespace, job.Name)
-			logrus.Tracef("[MachineProvision] create job object for %s was %+v", key, job)
+		logrus.Debugf("[machineprovision] create job for %s not finished, job was found and the error was not nil and was not an isnotfound", key)
+		// OnChange handler will not run when the infra machine is being deleted, we have to reconcile here in order to
+		// finish the create job, since it has to have completed successfully or never ran for the delete job to run
+		state, _, err := h.run(infra, true)
+		if err != nil {
+			return obj, err
 		}
-		return obj, fmt.Errorf("cannot delete machine %s because create job has not finished", infraObj.meta.GetName())
+		if err = reconcileStatus(infra.data, state); err != nil {
+			return obj, err
+		}
+		if job != nil {
+			newStatus, err := h.getMachineStatus(job)
+			if err != nil {
+				return obj, err
+			}
+			newStatus.JobName = job.Name
+
+			err = reconcileStatus(infra.data, newStatus)
+			if err != nil {
+				return obj, err
+			}
+		}
+		if obj, err = h.dynamic.UpdateStatus(&unstructured.Unstructured{
+			Object: infra.data,
+		}); err != nil {
+			return obj, err
+		}
+		return obj, fmt.Errorf("cannot delete machine %s because create job has not finished", infra.meta.GetName())
+	} else if cond == nil {
+		// If the createJobCondition is not set on this infra object, that means we never actually tried to run a create job
+		// so there should be no infrastructure, proceed with delete
+		return obj, nil
 	}
 
-	if cond := getCondition(infraObj.data, deleteJobConditionType); cond != nil {
-		job, err := h.getJobFromInfraMachine(infraObj)
+	// infrastructure deletion finished
+	if cond := getCondition(infra.data, deleteJobConditionType); cond != nil && cond.Status() == "True" {
+		job, err := h.getJobFromInfraMachine(infra)
 		if apierrors.IsNotFound(err) {
 			// If the deletion job condition has been set on the infrastructure object and the deletion job has been removed,
 			// then we don't want to create another deletion job.
-			logrus.Infof("Machine %s %s has already been deleted", infraObj.obj.GetObjectKind().GroupVersionKind(), infraObj.meta.GetName())
+			logrus.Infof("[machineprovision] Machine %s %s has already been deleted", infra.obj.GetObjectKind().GroupVersionKind(), infra.meta.GetName())
 			return obj, h.apply.WithOwner(obj).ApplyObjects()
 		} else if err != nil {
 			return obj, err
 		}
 
-		if shouldCleanupObjects(job, infraObj.data) {
+		if shouldCleanupObjects(job, infra.data) {
 			// Calling WithOwner(obj).ApplyObjects with no objects here will look for all objects with types passed to
 			// WithCacheTypes above that have an owner label (not owner reference) to the given obj. It will compare the existing
 			// objects it finds to the ones that are passed to ApplyObjects (which there are none in this case). The apply
@@ -354,33 +388,36 @@ func (h *handler) OnRemove(key string, obj runtime.Object) (runtime.Object, erro
 		return obj, generic.ErrSkip
 	}
 
-	clusterName := infraObj.meta.GetLabels()[capi.ClusterLabelName]
+	clusterName := infra.meta.GetLabels()[capi.ClusterLabelName]
 	if clusterName == "" {
 		return obj, fmt.Errorf("error retrieving the clustername for machine, label key %s does not appear to exist for dynamic machine %s", capi.ClusterLabelName, key)
 	}
 
-	machine, err := rke2.GetMachineByOwner(h.machines, infraObj.meta)
-	if err != nil && !errors.Is(err, rke2.ErrNoMachineOwnerRef) {
+	machine, err := rke2.GetOwnerCAPIMachine(obj, h.machineCache)
+	if err != nil && !errors.Is(err, rke2.ErrNoMatchingControllerOwnerRef) && !apierrors.IsNotFound(err) {
+		logrus.Errorf("[machineprovision] %s/%s: error getting machine by owner reference: %v", infra.meta.GetNamespace(), infra.meta.GetName(), err)
 		return obj, err
 	}
 
+	// If the controller owner reference is not properly configured, or the CAPI machine does not exist, there is no way
+	// to recover from this situation, so we should proceed with deletion
 	if machine == nil || machine.Status.NodeRef == nil {
 		// Machine noderef is nil, we should just allow deletion.
-		logrus.Debugf("[MachineProvision] There was no associated K8s node with this etcd dynamicmachine %s. Proceeding with deletion", key)
-		return h.doRemove(infraObj)
+		logrus.Debugf("[machineprovision] There was no associated K8s node with this machine %s. Proceeding with deletion", key)
+		return h.doRemove(infra)
 	}
 
-	cluster, err := h.rancherClusterCache.Get(infraObj.meta.GetNamespace(), clusterName)
+	cluster, err := h.rancherClusterCache.Get(infra.meta.GetNamespace(), clusterName)
 	if err != nil && !apierrors.IsNotFound(err) {
 		return obj, err
 	}
 	if apierrors.IsNotFound(err) || !cluster.DeletionTimestamp.IsZero() {
-		return h.doRemove(infraObj)
+		return h.doRemove(infra)
 	}
 
 	removed := true
 	// In the event we are removing an etcd node (as indicated by the etcd-role label on the node), we must safely remove the etcd node from the cluster before allowing machine deprovisioning
-	if val := infraObj.meta.GetLabels()["rke.cattle.io/etcd-role"]; val == "true" {
+	if strings.ToLower(infra.meta.GetLabels()[rke2.EtcdRoleLabel]) == "true" {
 		// we need to block removal until our the v1 node that corresponds has been removed
 		restConfig, err := h.kubeconfigManager.GetRESTConfig(cluster, cluster.Status)
 		if err != nil {
@@ -394,98 +431,254 @@ func (h *handler) OnRemove(key string, obj runtime.Object) (runtime.Object, erro
 	}
 
 	if !removed {
-		if err = h.dynamic.EnqueueAfter(obj.GetObjectKind().GroupVersionKind(), infraObj.meta.GetNamespace(), infraObj.meta.GetName(), 5*time.Second); err != nil {
+		if err = h.dynamic.EnqueueAfter(obj.GetObjectKind().GroupVersionKind(), infra.meta.GetNamespace(), infra.meta.GetName(), 5*time.Second); err != nil {
 			return obj, err
 		}
 		return obj, generic.ErrSkip
 	}
 
-	return h.doRemove(infraObj)
+	return h.doRemove(infra)
 }
 
-func (h *handler) doRemove(infraObj *infraObject) (runtime.Object, error) {
-	obj, err := h.run(infraObj, false)
+func (h *handler) doRemove(infra *infraObject) (runtime.Object, error) {
+	state, _, err := h.run(infra, false)
 	if err != nil {
-		return nil, err
+		return infra.obj, err
 	}
 
-	// ErrSkip will not remove finalizer but treat this as currently reconciled
-	return obj, generic.ErrSkip
+	if err = reconcileStatus(infra.data, state); err != nil {
+		return infra.obj, err
+	}
+
+	if cond := getCondition(infra.data, deleteJobConditionType); cond == nil {
+		if err = reconcileStatus(infra.data, rkev1.RKEMachineStatus{
+			Conditions: []genericcondition.GenericCondition{
+				{
+					Type:    deleteJobConditionType,
+					Status:  corev1.ConditionUnknown,
+					Message: "creating machine deletion job",
+				},
+			}}); err != nil {
+			return infra.obj, err
+		}
+		if infra.obj, err = h.dynamic.UpdateStatus(&unstructured.Unstructured{
+			Object: infra.data,
+		}); err != nil {
+			return infra.obj, err
+		}
+		return infra.obj, generic.ErrSkip
+	}
+
+	jobName := infra.data.String("status", "jobName")
+	if jobName == "" {
+		return infra.obj, generic.ErrSkip
+	}
+
+	job, err := h.jobs.Get(infra.meta.GetNamespace(), jobName)
+	if apierrors.IsNotFound(err) {
+		if infra.obj, err = h.dynamic.UpdateStatus(&unstructured.Unstructured{
+			Object: infra.data,
+		}); err != nil {
+			return infra.obj, err
+		}
+		return infra.obj, generic.ErrSkip
+	} else if err != nil {
+		return infra.obj, err
+	}
+
+	newStatus, err := h.getMachineStatus(job)
+	if err != nil {
+		return infra.obj, err
+	}
+	newStatus.JobName = job.Name
+
+	err = reconcileStatus(infra.data, newStatus)
+	if err != nil {
+		return infra.obj, err
+	}
+
+	// We need to reset failureReason & failureMessage, otherwise the deletion status will not be shown
+	if infra.data.String("status", "failureReason") == string(capierrors.CreateMachineError) {
+		infra.data.SetNested("", "status", "failureReason")
+		infra.data.SetNested("", "status", "failureMessage")
+	}
+
+	if infra.obj, err = h.dynamic.UpdateStatus(&unstructured.Unstructured{
+		Object: infra.data,
+	}); err != nil {
+		return infra.obj, err
+	}
+
+	return infra.obj, generic.ErrSkip
 }
 
+func (h *handler) EnqueueAfter(infra *infraObject, duration time.Duration) {
+	err := h.dynamic.EnqueueAfter(infra.obj.GetObjectKind().GroupVersionKind(), infra.meta.GetNamespace(), infra.meta.GetName(), duration)
+	if err != nil {
+		logrus.Errorf("[machineprovision] error enqueuing %s %s/%s: %v", infra.obj.GetObjectKind().GroupVersionKind(), infra.meta.GetNamespace(), infra.meta.GetName(), err)
+	}
+}
+
+// OnChange is called whenever the infrastructure machine is updated, including when the object is being deleted.
 func (h *handler) OnChange(obj runtime.Object) (runtime.Object, error) {
-	infraObj, err := newInfraObject(obj)
+	infra, err := newInfraObject(obj)
 	if err != nil {
-		return nil, err
+		return obj, err
 	}
 
-	// don't process create if deleting
-	if !infraObj.meta.GetDeletionTimestamp().IsZero() {
+	if !infra.meta.GetDeletionTimestamp().IsZero() {
 		return obj, nil
 	}
 
-	newObj, err := h.run(infraObj, true)
-	if newObj == nil {
-		newObj = obj
+	machine, err := rke2.GetOwnerCAPIMachine(obj, h.machineCache)
+	if apierrors.IsNotFound(err) {
+		logrus.Debugf("[machineprovision] %s/%s: waiting: machine to be set as owner reference", infra.meta.GetNamespace(), infra.meta.GetName())
+		h.EnqueueAfter(infra, 10*time.Second)
+		return obj, generic.ErrSkip
 	}
 
 	if err != nil {
-		return setCondition(h.dynamic, newObj, createJobConditionType, err)
+		logrus.Errorf("[machineprovision] %s/%s: error getting machine by owner reference: %v", infra.meta.GetNamespace(), infra.meta.GetName(), err)
+		return obj, err
 	}
-	return newObj, nil
+
+	// If the CAPI machine is deleted forcefully, the owner reference will not be usable, so the label allows us to create
+	// the delete job with the same name
+	if infra.meta.GetLabels()[CapiMachineName] == "" {
+		infra.data.SetNested(machine.Name, "metadata", "labels", CapiMachineName)
+		// Return prematurely, we want the caches to be as up-to-date as possible, so that we don't lose changes when
+		// reconciling in the event of other errors
+		return h.dynamic.Update(&unstructured.Unstructured{
+			Object: infra.data,
+		})
+	}
+
+	capiCluster, err := rke2.GetCAPIClusterFromLabel(machine, h.capiClusterCache)
+	if apierrors.IsNotFound(err) {
+		logrus.Debugf("[machineprovision] %s/%s: waiting: CAPI cluster does not exist", infra.meta.GetNamespace(), infra.meta.GetName())
+		h.EnqueueAfter(infra, 10*time.Second)
+		return obj, generic.ErrSkip
+	}
+	if err != nil {
+		logrus.Errorf("[machineprovision] %s/%s: error getting CAPI cluster %v", infra.meta.GetNamespace(), infra.meta.GetName(), err)
+		return obj, err
+	}
+
+	if capiannotations.IsPaused(capiCluster, infra.meta) {
+		logrus.Debugf("[machineprovision] %s/%s: waiting: CAPI cluster or RKEMachine is paused", infra.meta.GetNamespace(), infra.meta.GetName())
+		h.EnqueueAfter(infra, 10*time.Second)
+		return obj, generic.ErrSkip
+	}
+
+	if !capiCluster.Status.InfrastructureReady {
+		logrus.Debugf("[machineprovision] %s/%s: waiting: CAPI cluster infrastructure is not ready", infra.meta.GetNamespace(), infra.meta.GetName())
+		h.EnqueueAfter(infra, 10*time.Second)
+		return obj, generic.ErrSkip
+	}
+
+	if machine.Spec.Bootstrap.DataSecretName == nil {
+		logrus.Debugf("[machineprovision] %s/%s: waiting: dataSecretName is not populated on machine spec", infra.meta.GetNamespace(), infra.meta.GetName())
+		h.EnqueueAfter(infra, 10*time.Second)
+		return obj, generic.ErrSkip
+	}
+
+	state, failure, err := h.run(infra, true)
+	if err != nil {
+		return obj, err
+	}
+
+	if failure {
+		logrus.Infof("[machineprovision] %s/%s: Failed to create infrastructure for machine %s, deleting and recreating...", infra.meta.GetNamespace(), infra.meta.GetName(), machine.Name)
+		if err = h.machineClient.Delete(machine.Namespace, machine.Name, &metav1.DeleteOptions{}); err != nil {
+			return obj, err
+		}
+	}
+
+	if err = reconcileStatus(infra.data, state); err != nil {
+		return obj, err
+	}
+
+	if cond := getCondition(infra.data, createJobConditionType); cond == nil {
+		if err = reconcileStatus(infra.data, rkev1.RKEMachineStatus{
+			Conditions: []genericcondition.GenericCondition{
+				{
+					Type:    createJobConditionType,
+					Status:  corev1.ConditionUnknown,
+					Message: "creating machine provision job",
+				},
+			}}); err != nil {
+			return obj, err
+		}
+		return h.dynamic.UpdateStatus(&unstructured.Unstructured{
+			Object: infra.data,
+		})
+	}
+
+	jobName := infra.data.String("status", "jobName")
+	if jobName == "" {
+		return obj, nil
+	}
+
+	job, err := h.jobs.Get(infra.meta.GetNamespace(), jobName)
+	if apierrors.IsNotFound(err) {
+		return h.dynamic.UpdateStatus(&unstructured.Unstructured{
+			Object: infra.data,
+		})
+	} else if err != nil {
+		return obj, err
+	}
+
+	newStatus, err := h.getMachineStatus(job)
+	if err != nil {
+		return obj, err
+	}
+	newStatus.JobName = job.Name
+
+	err = reconcileStatus(infra.data, newStatus)
+	if err != nil {
+		return obj, err
+	}
+
+	return h.dynamic.UpdateStatus(&unstructured.Unstructured{
+		Object: infra.data,
+	})
 }
 
-func (h *handler) run(infraObj *infraObject, create bool) (runtime.Object, error) {
-	args := infraObj.data.Map("spec")
-	driver := getNodeDriverName(infraObj.typeMeta)
+func (h *handler) run(infra *infraObject, create bool) (rkev1.RKEMachineStatus, bool, error) {
+	logrus.Infof("[machineprovision] %s/%s: reconciling machine job", infra.meta.GetNamespace(), infra.meta.GetName())
 
-	dArgs, err := h.getArgsEnvAndStatus(infraObj, args, driver, create)
+	args := infra.data.Map("spec")
+	driver := getNodeDriverName(infra.typeMeta)
+
+	dArgs, err := h.getArgsEnvAndStatus(infra, args, driver, create)
 	if err != nil {
-		return infraObj.obj, err
+		return rkev1.RKEMachineStatus{}, false, err
 	}
 
 	if dArgs.BootstrapSecretName == "" && dArgs.BootstrapRequired {
-		return infraObj.obj,
-			h.dynamic.EnqueueAfter(infraObj.obj.GetObjectKind().GroupVersionKind(), infraObj.meta.GetNamespace(), infraObj.meta.GetName(), 2*time.Second)
+		return rkev1.RKEMachineStatus{}, false,
+			h.dynamic.EnqueueAfter(infra.obj.GetObjectKind().GroupVersionKind(), infra.meta.GetNamespace(), infra.meta.GetName(), 2*time.Second)
 	}
 
-	failedCreate := infraObj.data.String("status", "failureReason") == string(capierrors.CreateMachineError)
-
-	if err := h.apply.WithOwner(infraObj.obj).ApplyObjects(objects((args.String("providerID") != "" || failedCreate) && create, dArgs)...); err != nil {
-		return nil, err
+	failureReasonType := capierrors.CreateMachineError
+	if !create {
+		failureReasonType = capierrors.DeleteMachineError
 	}
 
-	if create {
-		infraObj.obj, err = h.patchStatus(infraObj.obj, infraObj.data, dArgs.RKEMachineStatus)
-		if err != nil {
-			return nil, err
-		}
+	failure := infra.data.String("status", "failureReason") == string(failureReasonType)
 
-		if failedCreate {
-			logrus.Infof("[MachineProvision] Failed to create infrastructure %s/%s for machine %s, deleting and recreating...", infraObj.meta.GetNamespace(), infraObj.meta.GetName(), dArgs.CapiMachineName)
-			if err = h.machinesClient.Delete(infraObj.meta.GetNamespace(), dArgs.CapiMachineName, &metav1.DeleteOptions{}); err != nil {
-				return infraObj.obj, fmt.Errorf("failed to delete CAPI machine %s: %w", dArgs.CapiMachineName, err)
-			}
-		}
+	if err := h.apply.WithOwner(infra.obj).ApplyObjects(objects((args.String("providerID") != "" || failure) && create, dArgs)...); err != nil {
+		return rkev1.RKEMachineStatus{}, failure, err
 	}
 
-	return infraObj.obj, nil
+	return dArgs.RKEMachineStatus, failure, err
 }
 
-func (h *handler) patchStatus(obj runtime.Object, d data.Object, state rkev1.RKEMachineStatus) (runtime.Object, error) {
+// reconcileStatus will update the infra machine's status by updating each field based on the value of status.
+func reconcileStatus(d data.Object, state rkev1.RKEMachineStatus) error {
 	statusData, err := convert.EncodeToMap(state)
 	if err != nil {
-		return nil, err
-	}
-
-	if state.JobComplete {
-		// Reset failureMessage and failureReason if they are not provided.
-		if _, ok := statusData["failureMessage"]; !ok {
-			statusData["failureMessage"] = ""
-		}
-		if _, ok := statusData["failureReason"]; !ok {
-			statusData["failureReason"] = ""
-		}
+		return err
 	}
 
 	changed := false
@@ -497,7 +690,7 @@ func (h *handler) patchStatus(obj runtime.Object, d data.Object, state rkev1.RKE
 		} else if len(state.Conditions) > 0 {
 			for _, c := range state.Conditions {
 				if thisChanged, err := insertOrUpdateCondition(d, summary.NewCondition(c.Type, string(c.Status), c.Reason, c.Message)); err != nil {
-					return nil, err
+					return err
 				} else if thisChanged {
 					changed = true
 				}
@@ -506,7 +699,7 @@ func (h *handler) patchStatus(obj runtime.Object, d data.Object, state rkev1.RKE
 	}
 
 	if !changed {
-		return obj, nil
+		return nil
 	}
 
 	status := d.Map("status")
@@ -519,25 +712,22 @@ func (h *handler) patchStatus(obj runtime.Object, d data.Object, state rkev1.RKE
 			status[k] = v
 		}
 	}
-
-	return h.dynamic.UpdateStatus(&unstructured.Unstructured{
-		Object: d,
-	})
+	return nil
 }
 
-func (h *handler) getJobFromInfraMachine(infraObj *infraObject) (*batchv1.Job, error) {
-	gvk := infraObj.obj.GetObjectKind().GroupVersionKind()
-	jobs, err := h.jobs.List(infraObj.meta.GetNamespace(), labels.Set{
+func (h *handler) getJobFromInfraMachine(infra *infraObject) (*batchv1.Job, error) {
+	gvk := infra.obj.GetObjectKind().GroupVersionKind()
+	jobs, err := h.jobs.List(infra.meta.GetNamespace(), labels.Set{
 		InfraMachineGroup:   gvk.Group,
 		InfraMachineVersion: gvk.Version,
 		InfraMachineKind:    gvk.Kind,
-		InfraMachineName:    infraObj.meta.GetName()}.AsSelector(),
+		InfraMachineName:    infra.meta.GetName()}.AsSelector(),
 	)
 	if err != nil {
 		return nil, err
 	} else if len(jobs) == 0 {
 		// This is likely the name of the job, expect if the infra machine object has a very long name.
-		return nil, apierrors.NewNotFound(batchv1.Resource("jobs"), GetJobName(infraObj.meta.GetName()))
+		return nil, apierrors.NewNotFound(batchv1.Resource("jobs"), GetJobName(infra.meta.GetName()))
 	}
 
 	// There can be at most one job returned here because there can be at most one infra machine object with the given GVK and name.
