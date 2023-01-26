@@ -168,3 +168,8 @@ livenessProbe:
 readinessProbe:
   initialDelaySeconds: 5
   periodSeconds: 30
+
+global:
+  cattle:
+    psp:
+      enabled: true #PSPs enablement should default to true
