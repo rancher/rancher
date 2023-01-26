@@ -50,7 +50,7 @@ replace (
 	k8s.io/sample-apiserver => k8s.io/sample-apiserver v0.25.4
 
 	sigs.k8s.io/aws-iam-authenticator => github.com/rancher/aws-iam-authenticator v0.5.9-0.20220713170329-78acb8c83863
-	sigs.k8s.io/cluster-api => sigs.k8s.io/cluster-api v1.2.7
+	sigs.k8s.io/cluster-api => sigs.k8s.io/cluster-api v1.2.8
 )
 
 require (
@@ -59,8 +59,8 @@ require (
 	github.com/Azure/go-autorest/autorest/adal v0.9.20
 	github.com/Azure/go-autorest/autorest/to v0.4.1-0.20210111195520-9fc88b15294e
 	github.com/AzureAD/microsoft-authentication-library-for-go v0.5.1
-	github.com/Masterminds/semver/v3 v3.1.1
-	github.com/Masterminds/sprig/v3 v3.2.2
+	github.com/Masterminds/semver/v3 v3.2.0
+	github.com/Masterminds/sprig/v3 v3.2.3
 	github.com/aws/aws-sdk-go v1.44.83
 	github.com/bep/debounce v1.2.0
 	github.com/blang/semver v3.5.1+incompatible
@@ -127,12 +127,12 @@ require (
 	github.com/urfave/cli v1.22.9
 	github.com/vishvananda/netlink v1.1.1-0.20210330154013-f5de75959ad5
 	github.com/vmware/govmomi v0.26.0
-	golang.org/x/crypto v0.1.0
+	golang.org/x/crypto v0.3.0
 	golang.org/x/mod v0.6.0
 	golang.org/x/net v0.2.0
 	golang.org/x/oauth2 v0.0.0-20220628200809-02e64fa58f26
 	golang.org/x/sync v0.0.0-20220722155255-886fb9371eb4
-	golang.org/x/text v0.4.0 // indirect
+	golang.org/x/text v0.5.0 // indirect
 	golang.org/x/tools v0.2.0 // indirect
 	google.golang.org/api v0.81.0
 	google.golang.org/grpc v1.48.0
@@ -153,7 +153,7 @@ require (
 	k8s.io/kubernetes v1.25.4
 	k8s.io/utils v0.0.0-20221011040102-427025108f67
 	sigs.k8s.io/aws-iam-authenticator v0.5.9
-	sigs.k8s.io/cluster-api v1.2.7
+	sigs.k8s.io/cluster-api v1.2.8
 	sigs.k8s.io/controller-runtime v0.12.3
 	sigs.k8s.io/yaml v1.3.0
 )
@@ -242,7 +242,7 @@ require (
 	github.com/hashicorp/go-retryablehttp v0.7.0 // indirect
 	github.com/hashicorp/go-uuid v1.0.2 // indirect
 	github.com/hashicorp/go-version v1.3.0 // indirect
-	github.com/huandu/xstrings v1.3.2 // indirect
+	github.com/huandu/xstrings v1.3.3 // indirect
 	github.com/imdario/mergo v0.3.12 // indirect
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
