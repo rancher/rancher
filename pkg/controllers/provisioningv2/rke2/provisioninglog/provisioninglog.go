@@ -27,14 +27,15 @@ var (
 	clusterRegexp = regexp.MustCompile("^c-m-[a-z0-9]{8}$")
 )
 
-func Register(ctx context.Context, wContext *wrangler.Context) {
+func Register(ctx context.Context, clients *wrangler.Context) {
 	h := &handler{
-		configMapsCache: wContext.Core.ConfigMap().Cache(),
-		configMaps:      wContext.Core.ConfigMap(),
-		clusterCache:    wContext.Provisioning.Cluster().Cache(),
+		configMapsCache: clients.Core.ConfigMap().Cache(),
+		configMaps:      clients.Core.ConfigMap(),
+		clusterCache:    clients.Provisioning.Cluster().Cache(),
 	}
-	wContext.Core.Namespace().OnChange(ctx, "prov-log-namespace", h.OnNamespace)
-	wContext.Core.ConfigMap().OnChange(ctx, "prov-log-configmap", h.OnConfigMap)
+
+	clients.Core.Namespace().OnChange(ctx, "prov-log-namespace", h.OnNamespace)
+	clients.Core.ConfigMap().OnChange(ctx, "prov-log-configmap", h.OnConfigMap)
 }
 
 type handler struct {
@@ -44,17 +45,19 @@ type handler struct {
 }
 
 func (h *handler) OnConfigMap(key string, cm *corev1.ConfigMap) (*corev1.ConfigMap, error) {
-	if cm == nil {
+	if cm == nil || !cm.DeletionTimestamp.IsZero() {
 		return nil, nil
 	}
 	if cm.Name != provisioningLogName || (!clusterRegexp.MatchString(cm.Namespace) && cm.Namespace != "local") {
 		return cm, nil
 	}
 	provCluster, err := h.clusterCache.GetByIndex(clusterindex.ClusterV1ByClusterV3Reference, cm.Namespace)
-	if apierrors.IsNotFound(err) || len(provCluster) == 0 {
-		return cm, nil
-	} else if err != nil {
+	if err != nil && !apierrors.IsNotFound(err) {
 		return cm, err
+	}
+	if apierrors.IsNotFound(err) || len(provCluster) == 0 {
+		h.configMaps.EnqueueAfter(cm.Namespace, cm.Name, 2*time.Second)
+		return cm, nil
 	}
 	if provCluster[0].Spec.RKEConfig == nil {
 		return cm, nil
