@@ -1,6 +1,8 @@
 package dashboard
 
 import (
+	"time"
+
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	fleetconst "github.com/rancher/rancher/pkg/fleet"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
@@ -8,8 +10,8 @@ import (
 	"github.com/rancher/rancher/pkg/wrangler"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
 )
 
 func addLocalCluster(embedded bool, wrangler *wrangler.Context) error {
@@ -40,13 +42,23 @@ func addLocalCluster(embedded bool, wrangler *wrangler.Context) error {
 	}
 
 	var err error
-	c, err = wrangler.Mgmt.Cluster().Create(c)
-	if apierrors.IsAlreadyExists(err) {
-		c, err = wrangler.Mgmt.Cluster().Get("local", metav1.GetOptions{})
-		if err != nil {
-			return err
+	err = wait.PollImmediateInfinite(100*time.Millisecond, func() (bool, error) {
+		temporaryCluster, err := wrangler.Mgmt.Cluster().Create(c)
+		if err == nil {
+			c = temporaryCluster
+			return true, nil
+		} else if apierrors.IsAlreadyExists(err) {
+			temporaryCluster, err = wrangler.Mgmt.Cluster().Get("local", v1.GetOptions{})
+			if err == nil {
+				c = temporaryCluster
+				return true, nil
+			}
 		}
-	}
+		if apierrors.IsServiceUnavailable(err) {
+			return false, nil
+		}
+		return false, err
+	})
 	if err != nil {
 		return err
 	}
