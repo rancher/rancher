@@ -29,6 +29,8 @@ var FeatureAppNS = []string{
 	"cattle-windows-gmsa-system", // Windows GMSA
 	"cattle-sriov-system",        // Sriov
 	"cattle-ui-plugin-system",    // UI Plugin System
+	"cis-operator-system",        // From RKE2 default restricted PSA Config. See https://github.com/rancher/rke2/blob/34633dcc188d3a79744636fe21529ef6f5d64d71/pkg/rke2/psa.go#L58
+	"tigera-operator",            // From RKE2 default restricted PSA Config. See https://github.com/rancher/rke2/blob/34633dcc188d3a79744636fe21529ef6f5d64d71/pkg/rke2/psa.go#L58
 }
 
 func addDefaultPodSecurityAdmissionConfigurationTemplates(management *config.ManagementContext) error {
