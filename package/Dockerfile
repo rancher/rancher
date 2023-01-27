@@ -54,7 +54,7 @@ ENV CATTLE_SYSTEM_UPGRADE_CONTROLLER_CHART_VERSION 100.0.3+up0.3.3
 
 # System charts minimal version
 ENV CATTLE_FLEET_MIN_VERSION=100.2.2+up0.5.2-rc.2
-ENV CATTLE_RANCHER_WEBHOOK_MIN_VERSION=1.0.6+up0.2.7
+ENV CATTLE_RANCHER_WEBHOOK_MIN_VERSION=1.0.7+up0.2.8
 ENV CATTLE_CSP_ADAPTER_MIN_VERSION=1.0.1
 
 RUN mkdir -p /var/lib/rancher-data/local-catalogs/system-library && \
@@ -162,7 +162,7 @@ RUN curl -sLf ${!TINI_URL} > /usr/bin/tini && \
     mkdir -p /var/lib/rancher-data/driver-metadata
 
 ENV CATTLE_UI_VERSION 2.6.11-rc2
-ENV CATTLE_DASHBOARD_UI_VERSION v2.6.11-rc1
+ENV CATTLE_DASHBOARD_UI_VERSION v2.6.11-rc2
 ENV CATTLE_CLI_VERSION v2.6.11-rc1
 
 # Please update the api-ui-version in pkg/settings/settings.go when updating the version here.
