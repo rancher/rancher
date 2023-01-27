@@ -2,6 +2,7 @@ package systemcharts
 
 import (
 	"context"
+	"strconv"
 
 	catalog "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/chart"
@@ -100,6 +101,12 @@ func (h *handler) getChartsToInstall() []*chart.Definition {
 					"mcm": map[string]interface{}{
 						"enabled": features.MCM.Enabled(),
 					},
+					"global": map[string]any{
+						"cattle": map[string]any{
+							"systemDefaultRegistry": settings.SystemDefaultRegistry.Get(),
+							"psp":                   map[string]any{},
+						},
+					},
 				}
 				// add priority class value.
 				if priorityClassName, err := h.chartsConfig.GetPriorityClassName(); err != nil {
@@ -109,6 +116,20 @@ func (h *handler) getChartsToInstall() []*chart.Definition {
 				} else {
 					values[chart.PriorityClassKey] = priorityClassName
 				}
+
+				if pspEnabled, err := h.chartsConfig.GetPSPEnablement(); err != nil {
+					if !apierror.IsNotFound(err) {
+						logrus.Warnf("Failed to get pspEnablement value for 'rancher-webhook': %v", err)
+					}
+				} else {
+					enabled, err := strconv.ParseBool(pspEnabled)
+					if err != nil {
+						logrus.Warnf("Failed to parse pspEnablement value as a bool for 'rancher-webhook'")
+					} else {
+						values["global"].(map[string]any)["cattle"].(map[string]any)["psp"].(map[string]any)["enabled"] = enabled
+					}
+				}
+
 				return values
 			},
 			Enabled: func() bool { return true },
