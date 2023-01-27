@@ -442,58 +442,59 @@ func (p *Planner) renderFiles(controlPlane *rkev1.RKEControlPlane, entry *planEn
 		if err != nil {
 			return files, err
 		}
-		if msf.MachineLabelSelector == nil || sel.Matches(labels.Set(entry.Machine.Labels)) {
-			for _, fs := range msf.FileSources {
-				if fs.Secret.Name != "" && fs.ConfigMap.Name != "" {
-					return files, fmt.Errorf("secret %s/%s and configmap %s/%s cannot both be defined at the same time for files, use separate entries", controlPlane.Namespace, fs.Secret.Name, controlPlane.Namespace, fs.ConfigMap.Name)
+		if msf.MachineLabelSelector != nil && !sel.Matches(labels.Set(entry.Machine.Labels)) {
+			continue
+		}
+		for _, fs := range msf.FileSources {
+			if fs.Secret.Name != "" && fs.ConfigMap.Name != "" {
+				return files, fmt.Errorf("secret %s/%s and configmap %s/%s cannot both be defined at the same time for files, use separate entries", controlPlane.Namespace, fs.Secret.Name, controlPlane.Namespace, fs.ConfigMap.Name)
+			}
+			if fs.Secret.Name != "" {
+				// retrieve secret and auth then use contents
+				secret, err := p.secretCache.Get(controlPlane.Namespace, fs.Secret.Name)
+				if err != nil {
+					return files, fmt.Errorf("error retrieving secret %s/%s while rendering files: %v", controlPlane.Namespace, fs.Secret.Name, err)
 				}
-				if fs.Secret.Name != "" {
-					// retrieve secret and auth then use contents
-					secret, err := p.secretCache.Get(controlPlane.Namespace, fs.Secret.Name)
-					if err != nil {
-						return files, fmt.Errorf("error retrieving secret %s/%s while rendering files: %v", controlPlane.Namespace, fs.Secret.Name, err)
-					}
-					if authorized, found := clusterObjectAuthorized(secret, rke2.AuthorizedObjectAnnotation, controlPlane.Name); authorized && found {
-						for _, v := range fs.Secret.Items {
-							file := plan.File{
-								Path:    v.Path,
-								Content: base64.StdEncoding.EncodeToString(secret.Data[v.Key]),
-								Dynamic: v.Dynamic,
-							}
-							if v.Permissions != "" {
-								file.Permissions = v.Permissions
-							} else if fs.ConfigMap.DefaultPermissions != "" {
-								file.Permissions = v.Permissions
-							}
-							files = append(files, file)
+				if authorized, found := clusterObjectAuthorized(secret, rke2.AuthorizedObjectAnnotation, controlPlane.Name); authorized && found {
+					for _, v := range fs.Secret.Items {
+						file := plan.File{
+							Path:    v.Path,
+							Content: base64.StdEncoding.EncodeToString(secret.Data[v.Key]),
+							Dynamic: v.Dynamic,
 						}
-					} else {
-						return files, fmt.Errorf("error rendering files: cluster %s/%s was not authorized to access secret %s/%s", controlPlane.Namespace, controlPlane.Name, controlPlane.Namespace, fs.Secret.Name)
+						if v.Permissions != "" {
+							file.Permissions = v.Permissions
+						} else if fs.Secret.DefaultPermissions != "" {
+							file.Permissions = fs.Secret.DefaultPermissions
+						}
+						files = append(files, file)
 					}
+				} else {
+					return files, fmt.Errorf("error rendering files: cluster %s/%s was not authorized to access secret %s/%s", controlPlane.Namespace, controlPlane.Name, controlPlane.Namespace, fs.Secret.Name)
 				}
-				if fs.ConfigMap.Name != "" {
-					configmap, err := p.configMapCache.Get(controlPlane.Namespace, fs.ConfigMap.Name)
-					if err != nil {
-						return files, fmt.Errorf("error retrieving configmap %s/%s while rendering files: %v", controlPlane.Namespace, fs.ConfigMap.Name, err)
-					}
-					// retrieve configmap and use contents
-					if authorized, found := clusterObjectAuthorized(configmap, rke2.AuthorizedObjectAnnotation, controlPlane.Name); authorized && found {
-						for _, v := range fs.ConfigMap.Items {
-							file := plan.File{
-								Path:    v.Path,
-								Content: base64.StdEncoding.EncodeToString([]byte(configmap.Data[v.Key])),
-								Dynamic: v.Dynamic,
-							}
-							if v.Permissions != "" {
-								file.Permissions = v.Permissions
-							} else if fs.ConfigMap.DefaultPermissions != "" {
-								file.Permissions = v.Permissions
-							}
-							files = append(files, file)
+			}
+			if fs.ConfigMap.Name != "" {
+				configmap, err := p.configMapCache.Get(controlPlane.Namespace, fs.ConfigMap.Name)
+				if err != nil {
+					return files, fmt.Errorf("error retrieving configmap %s/%s while rendering files: %v", controlPlane.Namespace, fs.ConfigMap.Name, err)
+				}
+				// retrieve configmap and use contents
+				if authorized, found := clusterObjectAuthorized(configmap, rke2.AuthorizedObjectAnnotation, controlPlane.Name); authorized && found {
+					for _, v := range fs.ConfigMap.Items {
+						file := plan.File{
+							Path:    v.Path,
+							Content: base64.StdEncoding.EncodeToString([]byte(configmap.Data[v.Key])),
+							Dynamic: v.Dynamic,
 						}
-					} else {
-						return files, fmt.Errorf("error rendering files: cluster %s/%s was not authorized to access configmap %s/%s", controlPlane.Namespace, controlPlane.Name, controlPlane.Namespace, fs.ConfigMap.Name)
+						if v.Permissions != "" {
+							file.Permissions = v.Permissions
+						} else if fs.ConfigMap.DefaultPermissions != "" {
+							file.Permissions = fs.ConfigMap.DefaultPermissions
+						}
+						files = append(files, file)
 					}
+				} else {
+					return files, fmt.Errorf("error rendering files: cluster %s/%s was not authorized to access configmap %s/%s", controlPlane.Namespace, controlPlane.Name, controlPlane.Namespace, fs.ConfigMap.Name)
 				}
 			}
 		}
