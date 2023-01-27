@@ -14,11 +14,16 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+const defaultURL = "https://git.rancher.io/"
+
 var (
 	prefix = "rancher-"
 )
 
-func addRepo(wrangler *wrangler.Context, repoName, branchName string) error {
+func addRepo(wrangler *wrangler.Context, repoName, repoURL, branchName string) error {
+	if repoURL == "" || repoURL == defaultURL {
+		repoURL = defaultURL + strings.TrimPrefix(repoName, prefix)
+	}
 	repo, err := wrangler.Catalog.ClusterRepo().Get(repoName, metav1.GetOptions{})
 	if apierrors.IsNotFound(err) {
 		_, err = wrangler.Catalog.ClusterRepo().Create(&v1.ClusterRepo{
@@ -26,11 +31,12 @@ func addRepo(wrangler *wrangler.Context, repoName, branchName string) error {
 				Name: repoName,
 			},
 			Spec: v1.RepoSpec{
-				GitRepo:   "https://git.rancher.io/" + strings.TrimPrefix(repoName, prefix),
+				GitRepo:   repoURL,
 				GitBranch: branchName,
 			},
 		})
-	} else if err == nil && repo.Spec.GitBranch != branchName {
+	} else if err == nil && (repo.Spec.GitBranch != branchName || repo.Spec.GitRepo != repoURL) {
+		repo.Spec.GitRepo = repoURL
 		repo.Spec.GitBranch = branchName
 		_, err = wrangler.Catalog.ClusterRepo().Update(repo)
 	}
@@ -39,15 +45,15 @@ func addRepo(wrangler *wrangler.Context, repoName, branchName string) error {
 }
 
 func addRepos(ctx context.Context, wrangler *wrangler.Context) error {
-	if err := addRepo(wrangler, "rancher-charts", settings.ChartDefaultBranch.Get()); err != nil {
+	if err := addRepo(wrangler, "rancher-charts", settings.ChartDefaultURL.Get(), settings.ChartDefaultBranch.Get()); err != nil {
 		return err
 	}
-	if err := addRepo(wrangler, "rancher-partner-charts", settings.PartnerChartDefaultBranch.Get()); err != nil {
+	if err := addRepo(wrangler, "rancher-partner-charts", defaultURL, settings.PartnerChartDefaultBranch.Get()); err != nil {
 		return err
 	}
 
 	if features.RKE2.Enabled() {
-		if err := addRepo(wrangler, "rancher-rke2-charts", settings.RKE2ChartDefaultBranch.Get()); err != nil {
+		if err := addRepo(wrangler, "rancher-rke2-charts", defaultURL, settings.RKE2ChartDefaultBranch.Get()); err != nil {
 			return err
 		}
 	}
