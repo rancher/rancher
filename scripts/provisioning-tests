@@ -93,8 +93,8 @@ run_rancher()
 
 # uncomment to get startup logs. Don't leave them on because it slows drone down too
 # much
-#tail -F /tmp/rancher.log &
-#TPID=$!
+tail -F /tmp/rancher.log &
+TPID=$!
 
 trap "exit 1" 42
 PWRAPPROC="$$"
@@ -111,7 +111,9 @@ while ! curl -sf http://localhost:8080/ping; do
     sleep 2
 done
 while ! kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml rollout status -w -n cattle-system deploy/rancher-webhook; do
-    sleep 2
+    sleep 60
+    #kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml get deployment -n cattle-system rancher-webhook -o yaml
+    kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml get pods -A -o yaml
 done
 #kill $TPID
 
