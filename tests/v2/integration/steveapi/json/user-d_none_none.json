@@ -1,0 +1,864 @@
+{
+  "actions": {},
+  "count": 33,
+  "createTypes": {
+    "secret": "https://rancherurl/v1/secrets"
+  },
+  "data": [
+    {
+      "actions": null,
+      "apiVersion": "v1",
+      "id": "test-ns-1/test1",
+      "kind": "Secret",
+      "links": {
+        "remove": "https://rancherurl/v1/secrets/test-ns-1/test1",
+        "self": "https://rancherurl/v1/secrets/test-ns-1/test1",
+        "update": "https://rancherurl/v1/secrets/test-ns-1/test1",
+        "view": "https://rancherurl/api/v1/namespaces/test-ns-1/secrets/test1"
+      },
+      "metadata": {
+        "labels": {
+          "test.cattle.io/steveapi": "nondeterministicid"
+        },
+        "name": "test1",
+        "namespace": "test-ns-1",
+        "resourceVersion": "1000",
+        "state": {
+          "message": "Resource is always ready",
+          "name": "active"
+        }
+      },
+      "type": "secret"
+    },
+    {
+      "actions": null,
+      "apiVersion": "v1",
+      "id": "test-ns-1/test2",
+      "kind": "Secret",
+      "links": {
+        "remove": "https://rancherurl/v1/secrets/test-ns-1/test2",
+        "self": "https://rancherurl/v1/secrets/test-ns-1/test2",
+        "update": "https://rancherurl/v1/secrets/test-ns-1/test2",
+        "view": "https://rancherurl/api/v1/namespaces/test-ns-1/secrets/test2"
+      },
+      "metadata": {
+        "labels": {
+          "test-label": "2",
+          "test.cattle.io/steveapi": "nondeterministicid"
+        },
+        "name": "test2",
+        "namespace": "test-ns-1",
+        "resourceVersion": "1000",
+        "state": {
+          "message": "Resource is always ready",
+          "name": "active"
+        }
+      },
+      "type": "secret"
+    },
+    {
+      "actions": null,
+      "apiVersion": "v1",
+      "id": "test-ns-1/test3",
+      "kind": "Secret",
+      "links": {
+        "remove": "https://rancherurl/v1/secrets/test-ns-1/test3",
+        "self": "https://rancherurl/v1/secrets/test-ns-1/test3",
+        "update": "https://rancherurl/v1/secrets/test-ns-1/test3",
+        "view": "https://rancherurl/api/v1/namespaces/test-ns-1/secrets/test3"
+      },
+      "metadata": {
+        "labels": {
+          "test-label-gte": "3",
+          "test.cattle.io/steveapi": "nondeterministicid"
+        },
+        "name": "test3",
+        "namespace": "test-ns-1",
+        "resourceVersion": "1000",
+        "state": {
+          "message": "Resource is always ready",
+          "name": "active"
+        }
+      },
+      "type": "secret"
+    },
+    {
+      "actions": null,
+      "apiVersion": "v1",
+      "id": "test-ns-1/test4",
+      "kind": "Secret",
+      "links": {
+        "remove": "https://rancherurl/v1/secrets/test-ns-1/test4",
+        "self": "https://rancherurl/v1/secrets/test-ns-1/test4",
+        "update": "https://rancherurl/v1/secrets/test-ns-1/test4",
+        "view": "https://rancherurl/api/v1/namespaces/test-ns-1/secrets/test4"
+      },
+      "metadata": {
+        "labels": {
+          "test-label-gte": "3",
+          "test.cattle.io/steveapi": "nondeterministicid"
+        },
+        "name": "test4",
+        "namespace": "test-ns-1",
+        "resourceVersion": "1000",
+        "state": {
+          "message": "Resource is always ready",
+          "name": "active"
+        }
+      },
+      "type": "secret"
+    },
+    {
+      "actions": null,
+      "apiVersion": "v1",
+      "id": "test-ns-1/test5",
+      "kind": "Secret",
+      "links": {
+        "remove": "https://rancherurl/v1/secrets/test-ns-1/test5",
+        "self": "https://rancherurl/v1/secrets/test-ns-1/test5",
+        "update": "https://rancherurl/v1/secrets/test-ns-1/test5",
+        "view": "https://rancherurl/api/v1/namespaces/test-ns-1/secrets/test5"
+      },
+      "metadata": {
+        "labels": {
+          "test-label-gte": "3",
+          "test.cattle.io/steveapi": "nondeterministicid"
+        },
+        "name": "test5",
+        "namespace": "test-ns-1",
+        "resourceVersion": "1000",
+        "state": {
+          "message": "Resource is always ready",
+          "name": "active"
+        }
+      },
+      "type": "secret"
+    },
+    {
+      "actions": null,
+      "apiVersion": "v1",
+      "id": "test-ns-2/test1",
+      "kind": "Secret",
+      "links": {
+        "remove": "https://rancherurl/v1/secrets/test-ns-2/test1",
+        "self": "https://rancherurl/v1/secrets/test-ns-2/test1",
+        "update": "https://rancherurl/v1/secrets/test-ns-2/test1",
+        "view": "https://rancherurl/api/v1/namespaces/test-ns-2/secrets/test1"
+      },
+      "metadata": {
+        "labels": {
+          "test.cattle.io/steveapi": "nondeterministicid"
+        },
+        "name": "test1",
+        "namespace": "test-ns-2",
+        "resourceVersion": "1000",
+        "state": {
+          "message": "Resource is always ready",
+          "name": "active"
+        }
+      },
+      "type": "secret"
+    },
+    {
+      "actions": null,
+      "apiVersion": "v1",
+      "id": "test-ns-2/test2",
+      "kind": "Secret",
+      "links": {
+        "remove": "https://rancherurl/v1/secrets/test-ns-2/test2",
+        "self": "https://rancherurl/v1/secrets/test-ns-2/test2",
+        "update": "https://rancherurl/v1/secrets/test-ns-2/test2",
+        "view": "https://rancherurl/api/v1/namespaces/test-ns-2/secrets/test2"
+      },
+      "metadata": {
+        "labels": {
+          "test-label": "2",
+          "test.cattle.io/steveapi": "nondeterministicid"
+        },
+        "name": "test2",
+        "namespace": "test-ns-2",
+        "resourceVersion": "1000",
+        "state": {
+          "message": "Resource is always ready",
+          "name": "active"
+        }
+      },
+      "type": "secret"
+    },
+    {
+      "actions": null,
+      "apiVersion": "v1",
+      "id": "test-ns-2/test3",
+      "kind": "Secret",
+      "links": {
+        "remove": "https://rancherurl/v1/secrets/test-ns-2/test3",
+        "self": "https://rancherurl/v1/secrets/test-ns-2/test3",
+        "update": "https://rancherurl/v1/secrets/test-ns-2/test3",
+        "view": "https://rancherurl/api/v1/namespaces/test-ns-2/secrets/test3"
+      },
+      "metadata": {
+        "labels": {
+          "test-label-gte": "3",
+          "test.cattle.io/steveapi": "nondeterministicid"
+        },
+        "name": "test3",
+        "namespace": "test-ns-2",
+        "resourceVersion": "1000",
+        "state": {
+          "message": "Resource is always ready",
+          "name": "active"
+        }
+      },
+      "type": "secret"
+    },
+    {
+      "actions": null,
+      "apiVersion": "v1",
+      "id": "test-ns-2/test4",
+      "kind": "Secret",
+      "links": {
+        "remove": "https://rancherurl/v1/secrets/test-ns-2/test4",
+        "self": "https://rancherurl/v1/secrets/test-ns-2/test4",
+        "update": "https://rancherurl/v1/secrets/test-ns-2/test4",
+        "view": "https://rancherurl/api/v1/namespaces/test-ns-2/secrets/test4"
+      },
+      "metadata": {
+        "labels": {
+          "test-label-gte": "3",
+          "test.cattle.io/steveapi": "nondeterministicid"
+        },
+        "name": "test4",
+        "namespace": "test-ns-2",
+        "resourceVersion": "1000",
+        "state": {
+          "message": "Resource is always ready",
+          "name": "active"
+        }
+      },
+      "type": "secret"
+    },
+    {
+      "actions": null,
+      "apiVersion": "v1",
+      "id": "test-ns-2/test5",
+      "kind": "Secret",
+      "links": {
+        "remove": "https://rancherurl/v1/secrets/test-ns-2/test5",
+        "self": "https://rancherurl/v1/secrets/test-ns-2/test5",
+        "update": "https://rancherurl/v1/secrets/test-ns-2/test5",
+        "view": "https://rancherurl/api/v1/namespaces/test-ns-2/secrets/test5"
+      },
+      "metadata": {
+        "labels": {
+          "test-label-gte": "3",
+          "test.cattle.io/steveapi": "nondeterministicid"
+        },
+        "name": "test5",
+        "namespace": "test-ns-2",
+        "resourceVersion": "1000",
+        "state": {
+          "message": "Resource is always ready",
+          "name": "active"
+        }
+      },
+      "type": "secret"
+    },
+    {
+      "actions": null,
+      "apiVersion": "v1",
+      "id": "test-ns-3/test1",
+      "kind": "Secret",
+      "links": {
+        "remove": "https://rancherurl/v1/secrets/test-ns-3/test1",
+        "self": "https://rancherurl/v1/secrets/test-ns-3/test1",
+        "update": "https://rancherurl/v1/secrets/test-ns-3/test1",
+        "view": "https://rancherurl/api/v1/namespaces/test-ns-3/secrets/test1"
+      },
+      "metadata": {
+        "labels": {
+          "test.cattle.io/steveapi": "nondeterministicid"
+        },
+        "name": "test1",
+        "namespace": "test-ns-3",
+        "resourceVersion": "1000",
+        "state": {
+          "message": "Resource is always ready",
+          "name": "active"
+        }
+      },
+      "type": "secret"
+    },
+    {
+      "actions": null,
+      "apiVersion": "v1",
+      "id": "test-ns-3/test2",
+      "kind": "Secret",
+      "links": {
+        "remove": "https://rancherurl/v1/secrets/test-ns-3/test2",
+        "self": "https://rancherurl/v1/secrets/test-ns-3/test2",
+        "update": "https://rancherurl/v1/secrets/test-ns-3/test2",
+        "view": "https://rancherurl/api/v1/namespaces/test-ns-3/secrets/test2"
+      },
+      "metadata": {
+        "labels": {
+          "test-label": "2",
+          "test.cattle.io/steveapi": "nondeterministicid"
+        },
+        "name": "test2",
+        "namespace": "test-ns-3",
+        "resourceVersion": "1000",
+        "state": {
+          "message": "Resource is always ready",
+          "name": "active"
+        }
+      },
+      "type": "secret"
+    },
+    {
+      "actions": null,
+      "apiVersion": "v1",
+      "id": "test-ns-3/test3",
+      "kind": "Secret",
+      "links": {
+        "remove": "https://rancherurl/v1/secrets/test-ns-3/test3",
+        "self": "https://rancherurl/v1/secrets/test-ns-3/test3",
+        "update": "https://rancherurl/v1/secrets/test-ns-3/test3",
+        "view": "https://rancherurl/api/v1/namespaces/test-ns-3/secrets/test3"
+      },
+      "metadata": {
+        "labels": {
+          "test-label-gte": "3",
+          "test.cattle.io/steveapi": "nondeterministicid"
+        },
+        "name": "test3",
+        "namespace": "test-ns-3",
+        "resourceVersion": "1000",
+        "state": {
+          "message": "Resource is always ready",
+          "name": "active"
+        }
+      },
+      "type": "secret"
+    },
+    {
+      "actions": null,
+      "apiVersion": "v1",
+      "id": "test-ns-3/test4",
+      "kind": "Secret",
+      "links": {
+        "remove": "https://rancherurl/v1/secrets/test-ns-3/test4",
+        "self": "https://rancherurl/v1/secrets/test-ns-3/test4",
+        "update": "https://rancherurl/v1/secrets/test-ns-3/test4",
+        "view": "https://rancherurl/api/v1/namespaces/test-ns-3/secrets/test4"
+      },
+      "metadata": {
+        "labels": {
+          "test-label-gte": "3",
+          "test.cattle.io/steveapi": "nondeterministicid"
+        },
+        "name": "test4",
+        "namespace": "test-ns-3",
+        "resourceVersion": "1000",
+        "state": {
+          "message": "Resource is always ready",
+          "name": "active"
+        }
+      },
+      "type": "secret"
+    },
+    {
+      "actions": null,
+      "apiVersion": "v1",
+      "id": "test-ns-3/test5",
+      "kind": "Secret",
+      "links": {
+        "remove": "https://rancherurl/v1/secrets/test-ns-3/test5",
+        "self": "https://rancherurl/v1/secrets/test-ns-3/test5",
+        "update": "https://rancherurl/v1/secrets/test-ns-3/test5",
+        "view": "https://rancherurl/api/v1/namespaces/test-ns-3/secrets/test5"
+      },
+      "metadata": {
+        "labels": {
+          "test-label-gte": "3",
+          "test.cattle.io/steveapi": "nondeterministicid"
+        },
+        "name": "test5",
+        "namespace": "test-ns-3",
+        "resourceVersion": "1000",
+        "state": {
+          "message": "Resource is always ready",
+          "name": "active"
+        }
+      },
+      "type": "secret"
+    },
+    {
+      "actions": null,
+      "apiVersion": "v1",
+      "id": "test-ns-4/test1",
+      "kind": "Secret",
+      "links": {
+        "remove": "https://rancherurl/v1/secrets/test-ns-4/test1",
+        "self": "https://rancherurl/v1/secrets/test-ns-4/test1",
+        "update": "https://rancherurl/v1/secrets/test-ns-4/test1",
+        "view": "https://rancherurl/api/v1/namespaces/test-ns-4/secrets/test1"
+      },
+      "metadata": {
+        "labels": {
+          "test.cattle.io/steveapi": "nondeterministicid"
+        },
+        "name": "test1",
+        "namespace": "test-ns-4",
+        "resourceVersion": "1000",
+        "state": {
+          "message": "Resource is always ready",
+          "name": "active"
+        }
+      },
+      "type": "secret"
+    },
+    {
+      "actions": null,
+      "apiVersion": "v1",
+      "id": "test-ns-4/test2",
+      "kind": "Secret",
+      "links": {
+        "remove": "https://rancherurl/v1/secrets/test-ns-4/test2",
+        "self": "https://rancherurl/v1/secrets/test-ns-4/test2",
+        "update": "https://rancherurl/v1/secrets/test-ns-4/test2",
+        "view": "https://rancherurl/api/v1/namespaces/test-ns-4/secrets/test2"
+      },
+      "metadata": {
+        "labels": {
+          "test-label": "2",
+          "test.cattle.io/steveapi": "nondeterministicid"
+        },
+        "name": "test2",
+        "namespace": "test-ns-4",
+        "resourceVersion": "1000",
+        "state": {
+          "message": "Resource is always ready",
+          "name": "active"
+        }
+      },
+      "type": "secret"
+    },
+    {
+      "actions": null,
+      "apiVersion": "v1",
+      "id": "test-ns-4/test3",
+      "kind": "Secret",
+      "links": {
+        "remove": "https://rancherurl/v1/secrets/test-ns-4/test3",
+        "self": "https://rancherurl/v1/secrets/test-ns-4/test3",
+        "update": "https://rancherurl/v1/secrets/test-ns-4/test3",
+        "view": "https://rancherurl/api/v1/namespaces/test-ns-4/secrets/test3"
+      },
+      "metadata": {
+        "labels": {
+          "test-label-gte": "3",
+          "test.cattle.io/steveapi": "nondeterministicid"
+        },
+        "name": "test3",
+        "namespace": "test-ns-4",
+        "resourceVersion": "1000",
+        "state": {
+          "message": "Resource is always ready",
+          "name": "active"
+        }
+      },
+      "type": "secret"
+    },
+    {
+      "actions": null,
+      "apiVersion": "v1",
+      "id": "test-ns-4/test4",
+      "kind": "Secret",
+      "links": {
+        "remove": "https://rancherurl/v1/secrets/test-ns-4/test4",
+        "self": "https://rancherurl/v1/secrets/test-ns-4/test4",
+        "update": "https://rancherurl/v1/secrets/test-ns-4/test4",
+        "view": "https://rancherurl/api/v1/namespaces/test-ns-4/secrets/test4"
+      },
+      "metadata": {
+        "labels": {
+          "test-label-gte": "3",
+          "test.cattle.io/steveapi": "nondeterministicid"
+        },
+        "name": "test4",
+        "namespace": "test-ns-4",
+        "resourceVersion": "1000",
+        "state": {
+          "message": "Resource is always ready",
+          "name": "active"
+        }
+      },
+      "type": "secret"
+    },
+    {
+      "actions": null,
+      "apiVersion": "v1",
+      "id": "test-ns-4/test5",
+      "kind": "Secret",
+      "links": {
+        "remove": "https://rancherurl/v1/secrets/test-ns-4/test5",
+        "self": "https://rancherurl/v1/secrets/test-ns-4/test5",
+        "update": "https://rancherurl/v1/secrets/test-ns-4/test5",
+        "view": "https://rancherurl/api/v1/namespaces/test-ns-4/secrets/test5"
+      },
+      "metadata": {
+        "labels": {
+          "test-label-gte": "3",
+          "test.cattle.io/steveapi": "nondeterministicid"
+        },
+        "name": "test5",
+        "namespace": "test-ns-4",
+        "resourceVersion": "1000",
+        "state": {
+          "message": "Resource is always ready",
+          "name": "active"
+        }
+      },
+      "type": "secret"
+    },
+    {
+      "actions": null,
+      "apiVersion": "v1",
+      "id": "test-ns-5/test1",
+      "kind": "Secret",
+      "links": {
+        "remove": "https://rancherurl/v1/secrets/test-ns-5/test1",
+        "self": "https://rancherurl/v1/secrets/test-ns-5/test1",
+        "update": "https://rancherurl/v1/secrets/test-ns-5/test1",
+        "view": "https://rancherurl/api/v1/namespaces/test-ns-5/secrets/test1"
+      },
+      "metadata": {
+        "labels": {
+          "test.cattle.io/steveapi": "nondeterministicid"
+        },
+        "name": "test1",
+        "namespace": "test-ns-5",
+        "resourceVersion": "1000",
+        "state": {
+          "message": "Resource is always ready",
+          "name": "active"
+        }
+      },
+      "type": "secret"
+    },
+    {
+      "actions": null,
+      "apiVersion": "v1",
+      "id": "test-ns-5/test2",
+      "kind": "Secret",
+      "links": {
+        "remove": "https://rancherurl/v1/secrets/test-ns-5/test2",
+        "self": "https://rancherurl/v1/secrets/test-ns-5/test2",
+        "update": "https://rancherurl/v1/secrets/test-ns-5/test2",
+        "view": "https://rancherurl/api/v1/namespaces/test-ns-5/secrets/test2"
+      },
+      "metadata": {
+        "labels": {
+          "test-label": "2",
+          "test.cattle.io/steveapi": "nondeterministicid"
+        },
+        "name": "test2",
+        "namespace": "test-ns-5",
+        "resourceVersion": "1000",
+        "state": {
+          "message": "Resource is always ready",
+          "name": "active"
+        }
+      },
+      "type": "secret"
+    },
+    {
+      "actions": null,
+      "apiVersion": "v1",
+      "id": "test-ns-5/test3",
+      "kind": "Secret",
+      "links": {
+        "remove": "https://rancherurl/v1/secrets/test-ns-5/test3",
+        "self": "https://rancherurl/v1/secrets/test-ns-5/test3",
+        "update": "https://rancherurl/v1/secrets/test-ns-5/test3",
+        "view": "https://rancherurl/api/v1/namespaces/test-ns-5/secrets/test3"
+      },
+      "metadata": {
+        "labels": {
+          "test-label-gte": "3",
+          "test.cattle.io/steveapi": "nondeterministicid"
+        },
+        "name": "test3",
+        "namespace": "test-ns-5",
+        "resourceVersion": "1000",
+        "state": {
+          "message": "Resource is always ready",
+          "name": "active"
+        }
+      },
+      "type": "secret"
+    },
+    {
+      "actions": null,
+      "apiVersion": "v1",
+      "id": "test-ns-5/test4",
+      "kind": "Secret",
+      "links": {
+        "remove": "https://rancherurl/v1/secrets/test-ns-5/test4",
+        "self": "https://rancherurl/v1/secrets/test-ns-5/test4",
+        "update": "https://rancherurl/v1/secrets/test-ns-5/test4",
+        "view": "https://rancherurl/api/v1/namespaces/test-ns-5/secrets/test4"
+      },
+      "metadata": {
+        "labels": {
+          "test-label-gte": "3",
+          "test.cattle.io/steveapi": "nondeterministicid"
+        },
+        "name": "test4",
+        "namespace": "test-ns-5",
+        "resourceVersion": "1000",
+        "state": {
+          "message": "Resource is always ready",
+          "name": "active"
+        }
+      },
+      "type": "secret"
+    },
+    {
+      "actions": null,
+      "apiVersion": "v1",
+      "id": "test-ns-5/test5",
+      "kind": "Secret",
+      "links": {
+        "remove": "https://rancherurl/v1/secrets/test-ns-5/test5",
+        "self": "https://rancherurl/v1/secrets/test-ns-5/test5",
+        "update": "https://rancherurl/v1/secrets/test-ns-5/test5",
+        "view": "https://rancherurl/api/v1/namespaces/test-ns-5/secrets/test5"
+      },
+      "metadata": {
+        "labels": {
+          "test-label-gte": "3",
+          "test.cattle.io/steveapi": "nondeterministicid"
+        },
+        "name": "test5",
+        "namespace": "test-ns-5",
+        "resourceVersion": "1000",
+        "state": {
+          "message": "Resource is always ready",
+          "name": "active"
+        }
+      },
+      "type": "secret"
+    },
+    {
+      "actions": null,
+      "apiVersion": "v1",
+      "id": "test-ns-6/test1",
+      "kind": "Secret",
+      "links": {
+        "remove": "https://rancherurl/v1/secrets/test-ns-6/test1",
+        "self": "https://rancherurl/v1/secrets/test-ns-6/test1",
+        "update": "https://rancherurl/v1/secrets/test-ns-6/test1",
+        "view": "https://rancherurl/api/v1/namespaces/test-ns-6/secrets/test1"
+      },
+      "metadata": {
+        "labels": {
+          "test.cattle.io/steveapi": "nondeterministicid"
+        },
+        "name": "test1",
+        "namespace": "test-ns-6",
+        "resourceVersion": "1000",
+        "state": {
+          "message": "Resource is always ready",
+          "name": "active"
+        }
+      },
+      "type": "secret"
+    },
+    {
+      "actions": null,
+      "apiVersion": "v1",
+      "id": "test-ns-6/test2",
+      "kind": "Secret",
+      "links": {
+        "remove": "https://rancherurl/v1/secrets/test-ns-6/test2",
+        "self": "https://rancherurl/v1/secrets/test-ns-6/test2",
+        "update": "https://rancherurl/v1/secrets/test-ns-6/test2",
+        "view": "https://rancherurl/api/v1/namespaces/test-ns-6/secrets/test2"
+      },
+      "metadata": {
+        "labels": {
+          "test-label": "2",
+          "test.cattle.io/steveapi": "nondeterministicid"
+        },
+        "name": "test2",
+        "namespace": "test-ns-6",
+        "resourceVersion": "1000",
+        "state": {
+          "message": "Resource is always ready",
+          "name": "active"
+        }
+      },
+      "type": "secret"
+    },
+    {
+      "actions": null,
+      "apiVersion": "v1",
+      "id": "test-ns-7/test1",
+      "kind": "Secret",
+      "links": {
+        "remove": "https://rancherurl/v1/secrets/test-ns-7/test1",
+        "self": "https://rancherurl/v1/secrets/test-ns-7/test1",
+        "update": "https://rancherurl/v1/secrets/test-ns-7/test1",
+        "view": "https://rancherurl/api/v1/namespaces/test-ns-7/secrets/test1"
+      },
+      "metadata": {
+        "labels": {
+          "test.cattle.io/steveapi": "nondeterministicid"
+        },
+        "name": "test1",
+        "namespace": "test-ns-7",
+        "resourceVersion": "1000",
+        "state": {
+          "message": "Resource is always ready",
+          "name": "active"
+        }
+      },
+      "type": "secret"
+    },
+    {
+      "actions": null,
+      "apiVersion": "v1",
+      "id": "test-ns-7/test2",
+      "kind": "Secret",
+      "links": {
+        "remove": "https://rancherurl/v1/secrets/test-ns-7/test2",
+        "self": "https://rancherurl/v1/secrets/test-ns-7/test2",
+        "update": "https://rancherurl/v1/secrets/test-ns-7/test2",
+        "view": "https://rancherurl/api/v1/namespaces/test-ns-7/secrets/test2"
+      },
+      "metadata": {
+        "labels": {
+          "test-label": "2",
+          "test.cattle.io/steveapi": "nondeterministicid"
+        },
+        "name": "test2",
+        "namespace": "test-ns-7",
+        "resourceVersion": "1000",
+        "state": {
+          "message": "Resource is always ready",
+          "name": "active"
+        }
+      },
+      "type": "secret"
+    },
+    {
+      "actions": null,
+      "apiVersion": "v1",
+      "id": "test-ns-8/test1",
+      "kind": "Secret",
+      "links": {
+        "remove": "https://rancherurl/v1/secrets/test-ns-8/test1",
+        "self": "https://rancherurl/v1/secrets/test-ns-8/test1",
+        "update": "https://rancherurl/v1/secrets/test-ns-8/test1",
+        "view": "https://rancherurl/api/v1/namespaces/test-ns-8/secrets/test1"
+      },
+      "metadata": {
+        "labels": {
+          "test.cattle.io/steveapi": "nondeterministicid"
+        },
+        "name": "test1",
+        "namespace": "test-ns-8",
+        "resourceVersion": "1000",
+        "state": {
+          "message": "Resource is always ready",
+          "name": "active"
+        }
+      },
+      "type": "secret"
+    },
+    {
+      "actions": null,
+      "apiVersion": "v1",
+      "id": "test-ns-8/test2",
+      "kind": "Secret",
+      "links": {
+        "remove": "https://rancherurl/v1/secrets/test-ns-8/test2",
+        "self": "https://rancherurl/v1/secrets/test-ns-8/test2",
+        "update": "https://rancherurl/v1/secrets/test-ns-8/test2",
+        "view": "https://rancherurl/api/v1/namespaces/test-ns-8/secrets/test2"
+      },
+      "metadata": {
+        "labels": {
+          "test-label": "2",
+          "test.cattle.io/steveapi": "nondeterministicid"
+        },
+        "name": "test2",
+        "namespace": "test-ns-8",
+        "resourceVersion": "1000",
+        "state": {
+          "message": "Resource is always ready",
+          "name": "active"
+        }
+      },
+      "type": "secret"
+    },
+    {
+      "actions": null,
+      "apiVersion": "v1",
+      "id": "test-ns-9/test1",
+      "kind": "Secret",
+      "links": {
+        "remove": "https://rancherurl/v1/secrets/test-ns-9/test1",
+        "self": "https://rancherurl/v1/secrets/test-ns-9/test1",
+        "update": "https://rancherurl/v1/secrets/test-ns-9/test1",
+        "view": "https://rancherurl/api/v1/namespaces/test-ns-9/secrets/test1"
+      },
+      "metadata": {
+        "labels": {
+          "test.cattle.io/steveapi": "nondeterministicid"
+        },
+        "name": "test1",
+        "namespace": "test-ns-9",
+        "resourceVersion": "1000",
+        "state": {
+          "message": "Resource is always ready",
+          "name": "active"
+        }
+      },
+      "type": "secret"
+    },
+    {
+      "actions": null,
+      "apiVersion": "v1",
+      "id": "test-ns-9/test2",
+      "kind": "Secret",
+      "links": {
+        "remove": "https://rancherurl/v1/secrets/test-ns-9/test2",
+        "self": "https://rancherurl/v1/secrets/test-ns-9/test2",
+        "update": "https://rancherurl/v1/secrets/test-ns-9/test2",
+        "view": "https://rancherurl/api/v1/namespaces/test-ns-9/secrets/test2"
+      },
+      "metadata": {
+        "labels": {
+          "test-label": "2",
+          "test.cattle.io/steveapi": "nondeterministicid"
+        },
+        "name": "test2",
+        "namespace": "test-ns-9",
+        "resourceVersion": "1000",
+        "state": {
+          "message": "Resource is always ready",
+          "name": "active"
+        }
+      },
+      "type": "secret"
+    }
+  ],
+  "links": {
+    "self": "https://rancherurl/v1/secrets"
+  },
+  "resourceType": "secret",
+  "revision": "100",
+  "type": "collection"
+}
