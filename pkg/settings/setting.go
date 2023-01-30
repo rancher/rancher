@@ -113,7 +113,6 @@ var (
 	ClusterTemplateEnforcement          = NewSetting("cluster-template-enforcement", "false")
 	InitialDockerRootDir                = NewSetting("initial-docker-root-dir", "/var/lib/docker")
 	SystemCatalog                       = NewSetting("system-catalog", "external") // Options are 'external' or 'bundled'
-	ChartDefaultURL                     = NewSetting("chart-default-url", "https://git.rancher.io/")
 	ChartDefaultBranch                  = NewSetting("chart-default-branch", "dev-v2.7")
 	PartnerChartDefaultBranch           = NewSetting("partner-chart-default-branch", "main")
 	RKE2ChartDefaultBranch              = NewSetting("rke2-chart-default-branch", "main")
