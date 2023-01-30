@@ -26,6 +26,7 @@ type RKEClusterSpecCommon struct {
 	ChartValues           GenericMap             `json:"chartValues,omitempty" wrangler:"nullable"`
 	MachineGlobalConfig   GenericMap             `json:"machineGlobalConfig,omitempty" wrangler:"nullable"`
 	MachineSelectorConfig []RKESystemConfig      `json:"machineSelectorConfig,omitempty"`
+	MachineSelectorFiles  []RKEProvisioningFiles `json:"machineSelectorFiles,omitempty"`
 	AdditionalManifest    string                 `json:"additionalManifest,omitempty"`
 	Registries            *Registry              `json:"registries,omitempty"`
 	ETCD                  *ETCD                  `json:"etcd,omitempty"`
@@ -42,6 +43,11 @@ type LocalClusterAuthEndpoint struct {
 type RKESystemConfig struct {
 	MachineLabelSelector *metav1.LabelSelector `json:"machineLabelSelector,omitempty"`
 	Config               GenericMap            `json:"config,omitempty" wrangler:"nullable"`
+}
+
+type RKEProvisioningFiles struct {
+	MachineLabelSelector *metav1.LabelSelector    `json:"machineLabelSelector,omitempty"`
+	FileSources          []ProvisioningFileSource `json:"fileSources,omitempty"`
 }
 
 type RKEClusterSpec struct {
@@ -94,4 +100,22 @@ type DrainHook struct {
 	// "rke.cattle.io/pre-drain" before the planner will continue with drain the specific node.  The annotation
 	// "rke.cattle.io/pre-drain" is used for pre-drain and "rke.cattle.io/post-drain" is used for post drain.
 	Annotation string `json:"annotation,omitempty"`
+}
+
+type ProvisioningFileSource struct {
+	Secret    K8sObjectFileSource `json:"secret,omitempty"`
+	ConfigMap K8sObjectFileSource `json:"configMap,omitempty"`
+}
+
+type K8sObjectFileSource struct {
+	Name               string      `json:"name"`
+	Items              []KeyToPath `json:"items,omitempty"`
+	DefaultPermissions string      `json:"defaultPermissions,omitempty"`
+}
+
+type KeyToPath struct {
+	Key         string `json:"key"`
+	Path        string `json:"path"`
+	Dynamic     bool   `json:"dynamic,omitempty"`
+	Permissions string `json:"permissions,omitempty"`
 }

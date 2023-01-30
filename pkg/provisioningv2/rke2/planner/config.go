@@ -10,24 +10,22 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/rancher/rancher/pkg/provisioningv2/image"
-
-	"github.com/rancher/rancher/pkg/controllers/management/secretmigrator"
-
-	v1 "k8s.io/api/core/v1"
-
 	"github.com/rancher/norman/types/values"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
+	"github.com/rancher/rancher/pkg/controllers/management/secretmigrator"
 	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2"
 	"github.com/rancher/rancher/pkg/nodeconfig"
+	"github.com/rancher/rancher/pkg/provisioningv2/image"
 	"github.com/rancher/wrangler/pkg/data"
 	"github.com/rancher/wrangler/pkg/data/convert"
 	corecontrollers "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/pkg/kv"
 	"github.com/rancher/wrangler/pkg/yaml"
 	"github.com/sirupsen/logrus"
+	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -374,8 +372,8 @@ func addTaints(config map[string]interface{}, entry *planEntry, cp *rkev1.RKECon
 // by looking at the 'v2prov-secret-authorized-for-cluster' annotation and determining if it is equal to the cluster name.
 // if the cluster is authorized to use the secret, the contents of the 'credential' key are returned as a byte slice
 func retrieveClusterAuthorizedSecret(secret *v1.Secret, clusterName string) ([]byte, error) {
-	specifiedClusterName, ownerFound := secret.Annotations[secretmigrator.AuthorizedSecretAnnotation]
-	if !ownerFound || specifiedClusterName != clusterName {
+	authorized, ownerFound := clusterObjectAuthorized(secret, secretmigrator.AuthorizedSecretAnnotation, clusterName)
+	if !ownerFound || !authorized {
 		return nil, fmt.Errorf("the secret 'secret://%s:%s' provided within the cloud-provider-config does not belong to cluster '%s'", secret.Namespace, secret.Name, clusterName)
 	}
 
@@ -386,12 +384,36 @@ func retrieveClusterAuthorizedSecret(secret *v1.Secret, clusterName string) ([]b
 	return secretContent, nil
 }
 
-func checkForSecretFormat(configValue string) (bool, string, string, error) {
+// clusterObjectAuthorized accepts any object, and inspects the metadata.Annotations of the object for the specified annotation
+// and determines if the object has authorized the cluster to access it. It returns two booleans, the first being whether the
+// cluster is authorized to access the object and the second being whether the annotation and a corresponding value were found
+// on the object
+func clusterObjectAuthorized(obj runtime.Object, annotation, clusterName string) (bool, bool) {
+	annotationValueFound := false
+	if obj == nil || annotation == "" || clusterName == "" {
+		return false, annotationValueFound
+	}
+	copiedObj := obj.DeepCopyObject()
+	if objMeta, err := meta.Accessor(copiedObj); err == nil && objMeta != nil {
+		authorizedClusters := strings.Split(objMeta.GetAnnotations()[annotation], ",")
+		if len(authorizedClusters) > 0 {
+			annotationValueFound = true
+		}
+		for _, authorizedCluster := range authorizedClusters {
+			if clusterName == authorizedCluster {
+				return true, annotationValueFound
+			}
+		}
+	}
+	return false, annotationValueFound
+}
+
+func checkForSecretFormat(secretFieldName, configValue string) (bool, string, string, error) {
 	if strings.HasPrefix(configValue, "secret://") {
 		configValue = strings.ReplaceAll(configValue, "secret://", "")
 		namespaceAndName := strings.Split(configValue, ":")
 		if len(namespaceAndName) != 2 || namespaceAndName[0] == "" || namespaceAndName[1] == "" {
-			return true, "", "", fmt.Errorf("provided value for cloud-provider-config secret is malformed, must be of the format secret://namespace:name")
+			return true, "", "", fmt.Errorf("provided value for %s secret is malformed, must be of the format secret://namespace:name", secretFieldName)
 		}
 		return true, namespaceAndName[0], namespaceAndName[1], nil
 	}
@@ -411,6 +433,73 @@ func configFile(controlPlane *rkev1.RKEControlPlane, filename string) string {
 	}
 	return fmt.Sprintf("/var/lib/rancher/%s/etc/config-files/%s",
 		rke2.GetRuntime(controlPlane.Spec.KubernetesVersion), filename)
+}
+
+func (p *Planner) renderFiles(controlPlane *rkev1.RKEControlPlane, entry *planEntry) ([]plan.File, error) {
+	var files []plan.File
+	for _, msf := range controlPlane.Spec.MachineSelectorFiles {
+		sel, err := metav1.LabelSelectorAsSelector(msf.MachineLabelSelector)
+		if err != nil {
+			return files, err
+		}
+		if msf.MachineLabelSelector != nil && !sel.Matches(labels.Set(entry.Machine.Labels)) {
+			continue
+		}
+		for _, fs := range msf.FileSources {
+			if fs.Secret.Name != "" && fs.ConfigMap.Name != "" {
+				return files, fmt.Errorf("secret %s/%s and configmap %s/%s cannot both be defined at the same time for files, use separate entries", controlPlane.Namespace, fs.Secret.Name, controlPlane.Namespace, fs.ConfigMap.Name)
+			}
+			if fs.Secret.Name != "" {
+				// retrieve secret and auth then use contents
+				secret, err := p.secretCache.Get(controlPlane.Namespace, fs.Secret.Name)
+				if err != nil {
+					return files, fmt.Errorf("error retrieving secret %s/%s while rendering files: %v", controlPlane.Namespace, fs.Secret.Name, err)
+				}
+				if authorized, found := clusterObjectAuthorized(secret, rke2.AuthorizedObjectAnnotation, controlPlane.Name); authorized && found {
+					for _, v := range fs.Secret.Items {
+						file := plan.File{
+							Path:    v.Path,
+							Content: base64.StdEncoding.EncodeToString(secret.Data[v.Key]),
+							Dynamic: v.Dynamic,
+						}
+						if v.Permissions != "" {
+							file.Permissions = v.Permissions
+						} else if fs.Secret.DefaultPermissions != "" {
+							file.Permissions = fs.Secret.DefaultPermissions
+						}
+						files = append(files, file)
+					}
+				} else {
+					return files, fmt.Errorf("error rendering files: cluster %s/%s was not authorized to access secret %s/%s", controlPlane.Namespace, controlPlane.Name, controlPlane.Namespace, fs.Secret.Name)
+				}
+			}
+			if fs.ConfigMap.Name != "" {
+				configmap, err := p.configMapCache.Get(controlPlane.Namespace, fs.ConfigMap.Name)
+				if err != nil {
+					return files, fmt.Errorf("error retrieving configmap %s/%s while rendering files: %v", controlPlane.Namespace, fs.ConfigMap.Name, err)
+				}
+				// retrieve configmap and use contents
+				if authorized, found := clusterObjectAuthorized(configmap, rke2.AuthorizedObjectAnnotation, controlPlane.Name); authorized && found {
+					for _, v := range fs.ConfigMap.Items {
+						file := plan.File{
+							Path:    v.Path,
+							Content: base64.StdEncoding.EncodeToString([]byte(configmap.Data[v.Key])),
+							Dynamic: v.Dynamic,
+						}
+						if v.Permissions != "" {
+							file.Permissions = v.Permissions
+						} else if fs.ConfigMap.DefaultPermissions != "" {
+							file.Permissions = fs.ConfigMap.DefaultPermissions
+						}
+						files = append(files, file)
+					}
+				} else {
+					return files, fmt.Errorf("error rendering files: cluster %s/%s was not authorized to access configmap %s/%s", controlPlane.Namespace, controlPlane.Name, controlPlane.Namespace, fs.ConfigMap.Name)
+				}
+			}
+		}
+	}
+	return files, nil
 }
 
 func (p *Planner) addConfigFile(nodePlan plan.NodePlan, controlPlane *rkev1.RKEControlPlane, entry *planEntry, tokensSecret plan.Secret,
@@ -457,7 +546,7 @@ func (p *Planner) addConfigFile(nodePlan plan.NodePlan, controlPlane *rkev1.RKEC
 		}
 
 		if fileParam == "cloud-provider-config" {
-			isSecretFormat, namespace, name, err := checkForSecretFormat(convert.ToString(content))
+			isSecretFormat, namespace, name, err := checkForSecretFormat("cloud-provider-config", convert.ToString(content))
 			if err != nil {
 				// provided secret for cloud-provider-config does not follow the format of
 				// secret://namespace:name
@@ -492,6 +581,13 @@ func (p *Planner) addConfigFile(nodePlan plan.NodePlan, controlPlane *rkev1.RKEC
 			Path:    filePath,
 		})
 	}
+
+	files, err = p.renderFiles(controlPlane, entry)
+	if err != nil {
+		return nodePlan, config, err
+	}
+
+	nodePlan.Files = append(nodePlan.Files, files...)
 
 	PruneEmpty(config)
 
