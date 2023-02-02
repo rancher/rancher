@@ -48,49 +48,6 @@ func addKontainerDrivers(management *config.ManagementContext) error {
 	}
 
 	if err := creator.addCustomDriver(
-		"baiducloudcontainerengine",
-		"https://drivers.rancher.cn/kontainer-engine-driver-baidu/0.2.0/kontainer-engine-driver-baidu-linux",
-		"4613e3be3ae5487b0e21dfa761b95de2144f80f98bf76847411e5fcada343d5e",
-		"https://drivers.rancher.cn/kontainer-engine-driver-baidu/0.2.0/component.js",
-		false,
-		"drivers.rancher.cn", "*.baidubce.com",
-	); err != nil {
-		return err
-	}
-
-	if err := creator.addCustomDriver(
-		"aliyunkubernetescontainerservice",
-		"https://drivers.rancher.cn/kontainer-engine-driver-aliyun/0.2.6/kontainer-engine-driver-aliyun-linux",
-		"8a5360269ec803e3d8cf2c9cc94c66879da03a1fd2b580912c1a83454509c84c",
-		"https://drivers.rancher.cn/pandaria/ui/cluster-driver-aliyun/0.1.1/component.js",
-		false,
-		"*.aliyuncs.com",
-	); err != nil {
-		return err
-	}
-
-	if err := creator.addCustomDriver(
-		"tencentkubernetesengine",
-		"https://drivers.rancher.cn/kontainer-engine-driver-tencent/0.3.0/kontainer-engine-driver-tencent-linux",
-		"ad5406502daf826874889963d7bdaed78db4689f147889ecf97394bc4e8d3d76",
-		"",
-		false,
-		"*.tencentcloudapi.com", "*.qcloud.com",
-	); err != nil {
-		return err
-	}
-
-	if err := creator.addCustomDriver(
-		"huaweicontainercloudengine",
-		"https://drivers.rancher.cn/kontainer-engine-driver-huawei/0.1.2/kontainer-engine-driver-huawei-linux",
-		"0b6c1dfaa477a60a3bd9f8a60a55fcafd883866c2c5c387aec75b95d6ba81d45",
-		"",
-		false,
-		"*.myhuaweicloud.com",
-	); err != nil {
-		return err
-	}
-	if err := creator.addCustomDriver(
 		"oraclecontainerengine",
 		"https://github.com/rancher-plugins/kontainer-engine-driver-oke/releases/download/v1.7.1/kontainer-engine-driver-oke-linux",
 		"5a708bfc01c67558adc887258615900082263ca7d6f4160efb1a58501b0cc608",
