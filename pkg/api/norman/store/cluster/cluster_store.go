@@ -43,6 +43,7 @@ import (
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/types/config/dialer"
 	rkedefaults "github.com/rancher/rke/cluster"
+	"github.com/rancher/rke/k8s"
 	rkeservices "github.com/rancher/rke/services"
 	rketypes "github.com/rancher/rke/types"
 	"github.com/sirupsen/logrus"
@@ -254,6 +255,7 @@ func (r *Store) Create(apiContext *types.APIContext, schema *types.Schema, data 
 		return nil, err
 	}
 	enableCRIDockerd(data)
+	setInstanceMetadataHostname(data)
 	// enable local backups for rke clusters by default
 	enableLocalBackup(data)
 	if err := setNodeUpgradeStrategy(data, nil); err != nil {
@@ -782,6 +784,7 @@ func (r *Store) Update(apiContext *types.APIContext, schema *types.Schema, data 
 		return nil, err
 	}
 	enableCRIDockerd(data)
+	setInstanceMetadataHostname(data)
 	if err := setNodeUpgradeStrategy(data, existingCluster); err != nil {
 		return nil, err
 	}
@@ -1354,6 +1357,20 @@ func enableLocalBackup(data map[string]interface{}) {
 			}
 			// enable rancher etcd backup
 			values.PutValue(data, backupConfig, "rancherKubernetesEngineConfig", "services", "etcd", "backupConfig")
+		}
+	}
+}
+
+func setInstanceMetadataHostname(data map[string]interface{}) {
+	rkeConfig, ok := values.GetValue(data, "rancherKubernetesEngineConfig")
+	if ok && rkeConfig != nil {
+		cloudProviderName := convert.ToString(values.GetValueN(data, "rancherKubernetesEngineConfig", "cloudProvider", "name"))
+		if cloudProviderName == k8s.AWSCloudProvider {
+			_, ok := values.GetValue(data, "rancherKubernetesEngineConfig", "cloudProvider", "useInstanceMetadataHostname")
+			if !ok {
+				// set default false for aws cloud provider
+				values.PutValue(data, false, "rancherKubernetesEngineConfig", "cloudProvider", "useInstanceMetadataHostname")
+			}
 		}
 	}
 }
