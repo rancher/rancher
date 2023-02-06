@@ -9,7 +9,6 @@ import (
 	"github.com/rancher/rancher/tests/framework/pkg/wait"
 	"github.com/rancher/rancher/tests/integration/pkg/defaults"
 	batchv1 "k8s.io/api/batch/v1"
-	"k8s.io/api/batch/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -27,20 +26,20 @@ var CronJobGroupVersionResource = schema.GroupVersionResource{
 
 // CreateCronJob is a helper function that uses the dynamic client to create a cronjob on a namespace for a specific cluster.
 // It registers a delete fuction a wait.WatchWait to ensure the cronjob is deleted cleanly.
-func CreateCronJob(client *rancher.Client, clusterName, cronJobName, namespace, schedule string, template corev1.PodTemplateSpec) (*v1beta1.CronJob, error) {
+func CreateCronJob(client *rancher.Client, clusterName, cronJobName, namespace, schedule string, template corev1.PodTemplateSpec) (*batchv1.CronJob, error) {
 	dynamicClient, err := client.GetDownStreamClusterClient(clusterName)
 	if err != nil {
 		return nil, err
 	}
 
 	template.Spec.RestartPolicy = corev1.RestartPolicyNever
-	cronJob := &v1beta1.CronJob{
+	cronJob := &batchv1.CronJob{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      cronJobName,
 			Namespace: namespace,
 		},
-		Spec: v1beta1.CronJobSpec{
-			JobTemplate: v1beta1.JobTemplateSpec{
+		Spec: batchv1.CronJobSpec{
+			JobTemplate: batchv1.JobTemplateSpec{
 				Spec: batchv1.JobSpec{
 					Template: template,
 				},
@@ -82,7 +81,7 @@ func CreateCronJob(client *rancher.Client, clusterName, cronJobName, namespace, 
 		})
 	})
 
-	newcronJob := &v1beta1.CronJob{}
+	newcronJob := &batchv1.CronJob{}
 	err = scheme.Scheme.Convert(unstructuredResp, newcronJob, unstructuredResp.GroupVersionKind())
 	if err != nil {
 		return nil, err
