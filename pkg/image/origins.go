@@ -201,6 +201,7 @@ var OriginMap = map[string]string{
 	"mirrored-thanos-thanos":                                  "https://github.com/thanos-io/thanos",
 	"mirrored-thanosio-thanos":                                "https://github.com/thanos-io/thanos",
 	"nginx-ingress-controller":                                "https://github.com/rancher/ingress-nginx",
+	"mirrored-skopeo-skopeo":                                  "https://github.com/containers/skopeo",
 	"openvswitch":                                             "https://github.com/servicefractal/ovs",
 	"opflex":                                                  "https://github.com/noironetworks/opflex",
 	"opflex-server":                                           "https://github.com/noironetworks/opflex",
