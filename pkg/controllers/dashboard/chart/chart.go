@@ -12,9 +12,11 @@ import (
 const (
 	// PriorityClassKey is the name of the helm value used for setting the name of the priority class on pods deployed by rancher and feature charts.
 	PriorityClassKey = "priorityClassName"
+	// PSPEnablement is the value that determines whether PSPs and related resources are enabled in the relevant charts.
+	PSPEnablement = "pspEnablement"
 )
 
-// Manager is an interface used by the handler to install an uninstall charts
+// Manager is an interface used by the handler to install and uninstall charts.
 type Manager interface {
 	// Ensure ensures that the chart is installed into the given namespace with the given minVersion version and values.
 	Ensure(namespace, name, minVersion string, values map[string]interface{}, forceAdopt bool) error
@@ -44,13 +46,22 @@ type RancherConfigGetter struct {
 
 // GetPriorityClassName attempts to retrieve the priority class for rancher pods and feature charts as set via helm values.
 func (r *RancherConfigGetter) GetPriorityClassName() (string, error) {
+	return r.getByKey(PriorityClassKey)
+}
+
+// GetPSPEnablement attempts to retrieve the value indicating if PSPs are enabled as set via Helm values.
+func (r *RancherConfigGetter) GetPSPEnablement() (string, error) {
+	return r.getByKey(PSPEnablement)
+}
+
+func (r *RancherConfigGetter) getByKey(key string) (string, error) {
 	configMap, err := r.ConfigCache.Get(namespace.System, settings.ConfigMapName.Get())
 	if err != nil {
 		return "", fmt.Errorf("failed to get rancher config: %w", err)
 	}
-	priorityClassName, ok := configMap.Data[PriorityClassKey]
+	value, ok := configMap.Data[key]
 	if !ok {
-		return "", fmt.Errorf("%q not set in %q configMap", PriorityClassKey, configMap.Name)
+		return "", fmt.Errorf("%q not set in %q configMap", key, configMap.Name)
 	}
-	return priorityClassName, nil
+	return value, nil
 }
