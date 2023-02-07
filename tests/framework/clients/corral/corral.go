@@ -10,8 +10,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rancher/rancher/tests/framework/pkg/session"
 	"github.com/sirupsen/logrus"
-	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/clientcmd"
 )
 
 const (
@@ -69,7 +67,7 @@ func SetCustomRepo(repo string) error {
 
 // CreateCorral creates a corral taking the corral name, the package path, and a debug set so if someone wants to view the
 // corral create log
-func CreateCorral(ts *session.Session, corralName, packageName string, debug bool, cleanup bool) (*rest.Config, error) {
+func CreateCorral(ts *session.Session, corralName, packageName string, debug bool, cleanup bool) ([]byte, error) {
 	if cleanup {
 		ts.RegisterCleanupFunc(func() error {
 			return DeleteCorral(corralName)
@@ -92,17 +90,8 @@ func CreateCorral(ts *session.Session, corralName, packageName string, debug boo
 	if err != nil {
 		return nil, errors.Wrap(err, "Unable to create corral: "+string(msg))
 	}
-	kubeConfig, err := GetKubeConfig(corralName)
-	if err != nil {
-		return nil, err
-	}
 
-	restConfig, err := clientcmd.RESTConfigFromKubeConfig(kubeConfig)
-	if err != nil {
-		return nil, errors.Wrap(err, "CreateCorral: failed to parse kubeconfig for k3d cluster")
-	}
-
-	return restConfig, nil
+	return msg, nil
 }
 
 // DeleteCorral deletes a corral based on the corral name
