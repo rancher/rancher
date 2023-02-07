@@ -39,7 +39,8 @@ def get_ip():
 
 
 IP = get_ip()
-SERVER_URL = 'https://' + IP + ':8443'
+SERVER_URL = os.environ.get('CATTLE_TEST_URL', 'https://' + IP + ':8443')
+SERVER_PASSWORD = os.environ.get('RANCHER_SERVER_PASSWORD', 'admin')
 BASE_URL = SERVER_URL + '/v3'
 AUTH_URL = BASE_URL + '-public/localproviders/local?action=login'
 DEFAULT_TIMEOUT = 120
@@ -101,7 +102,7 @@ def admin_mc():
     """Returns a ManagementContext for the default global admin user."""
     r = requests.post(AUTH_URL, json={
         'username': 'admin',
-        'password': 'admin',
+        'password': SERVER_PASSWORD,
         'responseType': 'json',
     }, verify=False)
     protect_response(r)
@@ -192,7 +193,6 @@ def user_mc(user_factory):
 def user_factory(admin_mc, remove_resource):
     """Returns a factory for creating new users which a ManagementContext for
     a newly created standard user is returned.
-
     This user and globalRoleBinding will be cleaned up automatically by the
     fixture remove_resource.
     """

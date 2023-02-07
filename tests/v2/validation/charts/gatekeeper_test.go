@@ -30,7 +30,7 @@ func (g *GateKeeperTestSuite) TearDownSuite() {
 }
 
 func (g *GateKeeperTestSuite) SetupSuite() {
-	testSession := session.NewSession(g.T())
+	testSession := session.NewSession()
 	g.session = testSession
 
 	client, err := rancher.NewClient("", testSession)

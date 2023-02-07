@@ -1,7 +1,7 @@
 package session
 
 import (
-	"testing"
+	"github.com/sirupsen/logrus"
 )
 
 // CleanupFunc is the type RegisterCleanupFunc accepts
@@ -12,16 +12,14 @@ type Session struct {
 	CleanupEnabled bool
 	cleanupQueue   []CleanupFunc
 	open           bool
-	TestingT       *testing.T
 }
 
 // NewSession is a constructor instantiates a new `Session`
-func NewSession(t *testing.T) *Session {
+func NewSession() *Session {
 	return &Session{
 		CleanupEnabled: true,
 		cleanupQueue:   []CleanupFunc{},
 		open:           true,
-		TestingT:       t,
 	}
 }
 
@@ -44,7 +42,7 @@ func (ts *Session) Cleanup() {
 		for i := len(ts.cleanupQueue) - 1; i >= 0; i-- {
 			err := ts.cleanupQueue[i]()
 			if err != nil {
-				ts.TestingT.Logf("error calling cleanup function: %v", err)
+				logrus.Errorf("error calling cleanup function: %v", err)
 			}
 		}
 		ts.cleanupQueue = []CleanupFunc{}
@@ -53,7 +51,7 @@ func (ts *Session) Cleanup() {
 
 // NewSession returns a `Session` who's cleanup method is registered with this `Session`
 func (ts *Session) NewSession() *Session {
-	sess := NewSession(ts.TestingT)
+	sess := NewSession()
 
 	ts.RegisterCleanupFunc(func() error {
 		sess.Cleanup()

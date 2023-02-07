@@ -41,7 +41,7 @@ func (u *UpgradeWorkloadTestSuite) TearDownSuite() {
 }
 
 func (u *UpgradeWorkloadTestSuite) SetupSuite() {
-	testSession := session.NewSession(u.T())
+	testSession := session.NewSession()
 	u.session = testSession
 
 	client, err := rancher.NewClient("", testSession)

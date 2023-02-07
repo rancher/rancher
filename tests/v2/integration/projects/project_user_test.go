@@ -31,7 +31,7 @@ func (p *ProjectUserTestSuite) TearDownSuite() {
 }
 
 func (p *ProjectUserTestSuite) SetupSuite() {
-	testSession := session.NewSession(p.T())
+	testSession := session.NewSession()
 	p.session = testSession
 
 	client, err := rancher.NewClient("", testSession)

@@ -41,7 +41,7 @@ func (c *CustomClusterProvisioningTestSuite) TearDownSuite() {
 }
 
 func (c *CustomClusterProvisioningTestSuite) SetupSuite() {
-	testSession := session.NewSession(c.T())
+	testSession := session.NewSession()
 	c.session = testSession
 
 	clustersConfig := new(provisioning.Config)
@@ -113,7 +113,7 @@ func (c *CustomClusterProvisioningTestSuite) ProvisioningRKE2CustomCluster(exter
 			for _, cni := range c.cnis {
 				name += " cni: " + cni
 				c.Run(name, func() {
-					testSession := session.NewSession(c.T())
+					testSession := session.NewSession()
 					defer testSession.Cleanup()
 
 					client, err := tt.client.WithSession(testSession)
@@ -218,8 +218,8 @@ func (c *CustomClusterProvisioningTestSuite) ProvisioningRKE2CustomClusterDynami
 	numOfNodes := len(rolesPerNode)
 
 	tests := []struct {
-		name          string
-		client        *rancher.Client
+		name       string
+		client     *rancher.Client
 		hasWindows bool
 	}{
 		{"Admin User", c.client, false},
@@ -233,7 +233,7 @@ func (c *CustomClusterProvisioningTestSuite) ProvisioningRKE2CustomClusterDynami
 			for _, cni := range c.cnis {
 				name += " cni: " + cni
 				c.Run(name, func() {
-					testSession := session.NewSession(c.T())
+					testSession := session.NewSession()
 					defer testSession.Cleanup()
 
 					client, err := tt.client.WithSession(testSession)
