@@ -1,0 +1,14 @@
+FROM registry.suse.com/bci/golang:1.20
+
+# Configure Go
+ENV GOPATH /root/go
+ENV PATH ${PATH}:/root/go/bin
+
+ENV WORKSPACE ${GOPATH}/src/github.com/rancher/rancher
+
+WORKDIR $WORKSPACE
+
+COPY [".", "$WORKSPACE"]
+
+RUN zypper -n install gcc binutils glibc-devel-static ca-certificates git-core wget curl unzip tar vim less file xz gzip sed gawk iproute2 iptables jq
+RUN zypper install -y -f docker && rpm -e --nodeps --noscripts containerd

@@ -54,7 +54,7 @@ func (r *RKE2EtcdSnapshotRestoreTestSuite) TearDownSuite() {
 }
 
 func (r *RKE2EtcdSnapshotRestoreTestSuite) SetupSuite() {
-	testSession := session.NewSession(r.T())
+	testSession := session.NewSession()
 	r.session = testSession
 
 	r.ns = defaultNamespace

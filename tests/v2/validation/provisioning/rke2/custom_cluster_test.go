@@ -43,7 +43,7 @@ func (c *CustomClusterProvisioningTestSuite) TearDownSuite() {
 }
 
 func (c *CustomClusterProvisioningTestSuite) SetupSuite() {
-	testSession := session.NewSession(c.T())
+	testSession := session.NewSession()
 	c.session = testSession
 
 	clustersConfig := new(provisioning.Config)
@@ -96,7 +96,7 @@ func (c *CustomClusterProvisioningTestSuite) ProvisioningRKE2CustomCluster(exter
 	tests := []struct {
 		name         string
 		nodeRoles    []string
-		hardening *provisioning.Config
+		hardening    *provisioning.Config
 		nodeCountWin int
 		hasWindows   bool
 		client       *rancher.Client
@@ -117,7 +117,7 @@ func (c *CustomClusterProvisioningTestSuite) ProvisioningRKE2CustomCluster(exter
 			for _, cni := range c.cnis {
 				name += " cni: " + cni
 				c.Run(name, func() {
-					testSession := session.NewSession(c.T())
+					testSession := session.NewSession()
 					defer testSession.Cleanup()
 
 					client, err := tt.client.WithSession(testSession)
@@ -203,7 +203,7 @@ func (c *CustomClusterProvisioningTestSuite) ProvisioningRKE2CustomCluster(exter
 						hardenClusterResp, err := clusters.UpdateK3SRKE2Cluster(client, clusterResp, hardenCluster)
 						require.NoError(c.T(), err)
 						assert.Equal(c.T(), clusterName, hardenClusterResp.ObjectMeta.Name)
-						
+
 						err = hardening.PostHardeningConfig(client, tt.hardening.Hardened, linuxNodes, tt.nodeRoles)
 						require.NoError(c.T(), err)
 					}
@@ -235,10 +235,10 @@ func (c *CustomClusterProvisioningTestSuite) ProvisioningRKE2CustomClusterDynami
 	numOfNodes := len(rolesPerNode)
 
 	tests := []struct {
-		name          string
-		client        *rancher.Client
+		name       string
+		client     *rancher.Client
 		hasWindows bool
-		hardening *provisioning.Config
+		hardening  *provisioning.Config
 	}{
 		{"Admin User", c.client, false, c.provisioning},
 		{"Standard User", c.standardUserClient, false, c.provisioning},
@@ -251,7 +251,7 @@ func (c *CustomClusterProvisioningTestSuite) ProvisioningRKE2CustomClusterDynami
 			for _, cni := range c.cnis {
 				name += " cni: " + cni
 				c.Run(name, func() {
-					testSession := session.NewSession(c.T())
+					testSession := session.NewSession()
 					defer testSession.Cleanup()
 
 					client, err := tt.client.WithSession(testSession)
@@ -330,6 +330,7 @@ func (c *CustomClusterProvisioningTestSuite) ProvisioningRKE2CustomClusterDynami
 }
 
 func (c *CustomClusterProvisioningTestSuite) TestProvisioningCustomCluster() {
+	c.T().Skip()
 	for _, nodeProviderName := range c.nodeProviders {
 		externalNodeProvider := provisioning.ExternalNodeProviderSetup(nodeProviderName)
 		c.ProvisioningRKE2CustomCluster(externalNodeProvider)

@@ -23,7 +23,7 @@ func (u *UpgradeKubernetesTestSuite) TearDownSuite() {
 }
 
 func (u *UpgradeKubernetesTestSuite) SetupSuite() {
-	testSession := session.NewSession(u.T())
+	testSession := session.NewSession()
 	u.session = testSession
 
 	client, err := rancher.NewClient("", testSession)

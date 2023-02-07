@@ -1,0 +1,67 @@
+#!groovy
+node {
+  def workPath = "/root/go/src/github.com/rancher/rancher/tests/v2/codecoverage/"
+  def job_name = "${JOB_NAME}"
+  if (job_name.contains('/')) { 
+    job_names = job_name.split('/')
+    job_name = job_names[job_names.size() - 1] 
+  }
+  def testContainer = "${job_name}${env.BUILD_NUMBER}_test"
+  def imageName = "rancher-code-coverage-image-build-${job_name}${env.BUILD_NUMBER}"
+  def buildDockerContainer = "build-code-cover-docker-container"
+  def envFile = ".env"
+  def rancherConfig = "rancher_env.config"
+  def branch = "release/v2.7"
+  def coverfile = "cover.out"
+  if ("${env.BRANCH}" != "null" && "${env.BRANCH}" != "") {
+    branch = "${env.BRANCH}"
+  }
+  def repo = scm.userRemoteConfigs
+  if ("${env.REPO}" != "null" && "${env.REPO}" != "") {
+    repo = [[url: "${env.REPO}"]]
+  }
+  def timeout = "60m"
+  if ("${env.TIMEOUT}" != "null" && "${env.TIMEOUT}" != "") {
+    timeout = "${env.TIMEOUT}" 
+  }
+  wrap([$class: 'AnsiColorBuildWrapper', 'colorMapName': 'XTerm', 'defaultFg': 2, 'defaultBg':1]) {
+    withFolderProperties {
+      paramsMap = []
+      params.each {
+        paramsMap << "$it.key=$it.value"
+      }
+      withEnv(paramsMap) {
+        withCredentials([ string(credentialsId: 'RANCHER_TEST_DOCKER_USERNAME', variable: 'RANCHER_TEST_DOCKER_USERNAME'),
+                          string(credentialsId: 'RANCHER_TEST_DOCKER_PASSWORD', variable: 'RANCHER_TEST_DOCKER_PASSWORD')]) {
+          stage('Checkout') {
+            deleteDir()
+            checkout([
+                      $class: 'GitSCM',
+                      branches: [[name: "*/${branch}"]],
+                      extensions: scm.extensions + [[$class: 'CleanCheckout']],
+                      userRemoteConfigs: repo
+                    ])
+          }
+          dir ("/home/jenkins/go/src/github.com/rancher/rancher") {
+            try {
+              stage('Configure and Build') {
+                sh "tests/v2/validation/configure.sh"
+                sh "docker build . -f tests/v2/codecoverage/Dockerfile.buildcodecoverage -t ${goImageName}"
+              }
+              stage('Build Code Coverage Test Image') {
+                sh "docker run -v /var/run/docker.sock:/var/run/docker.sock --name ${buildDockerContainer} -t --env-file ${envFile} " +
+                  "${goImageName} sh -c \"${workPath}scripts/build_test_images.sh;${workPath}scripts/build_docker_images.sh\""
+              }
+            } finally {           
+              stage('Test Report') {
+                sh "docker stop ${testContainer}"
+                sh "docker rm -v ${testContainer}"
+                sh "docker rmi -f ${imageName}"
+              }
+            } // finally
+          } // dir 
+        } // creds
+      } // withEnv 
+    } // folder properties
+  } // wrap
+}// node
