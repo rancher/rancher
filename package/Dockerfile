@@ -39,7 +39,7 @@ ENV LINODE_UI_DRIVER_VERSION v0.4.0
 # make sure the version number is consistent with the one at Line 100 of pkg/data/management/machinedriver_data.go
 ENV DOCKER_MACHINE_HARVESTER_VERSION v0.6.1
 ENV CATTLE_KDM_BRANCH ${CATTLE_KDM_BRANCH}
-ENV HELM_VERSION v3.10.3
+ENV HELM_VERSION v3.11.1
 ENV KUSTOMIZE_VERSION v5.0.0
 ENV CATTLE_WINS_AGENT_VERSION v0.4.11
 ENV CATTLE_WINS_AGENT_INSTALL_SCRIPT https://raw.githubusercontent.com/rancher/wins/${CATTLE_WINS_AGENT_VERSION}/install.ps1
@@ -161,8 +161,8 @@ RUN curl -sLf ${!TINI_URL} > /usr/bin/tini && \
     chmod +x /usr/bin/tini /usr/bin/telemetry && \
     mkdir -p /var/lib/rancher-data/driver-metadata
 
-ENV CATTLE_UI_VERSION 2.6.11-rc2
-ENV CATTLE_DASHBOARD_UI_VERSION v2.6.11-rc2
+ENV CATTLE_UI_VERSION 2.6.11-rc4
+ENV CATTLE_DASHBOARD_UI_VERSION v2.6.11-rc4
 ENV CATTLE_CLI_VERSION v2.6.11-rc1
 
 # Please update the api-ui-version in pkg/settings/settings.go when updating the version here.

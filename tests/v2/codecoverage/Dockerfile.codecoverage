@@ -1,0 +1,22 @@
+FROM registry.suse.com/bci/golang:1.20
+
+# Configure Go
+ENV GOPATH /root/go
+ENV PATH ${PATH}:/root/go/bin
+
+ENV WORKSPACE ${GOPATH}/src/github.com
+
+WORKDIR $WORKSPACE/rancher/rancher
+
+ADD rancherlabs/corral-packages "$WORKSPACE"/rancherlabs/corral-packages
+ADD rancher "$WORKSPACE"/rancher
+ENV CORRAL_VERSION="v1.1.1"
+
+RUN zypper -n install gcc binutils glibc-devel-static ca-certificates git-core wget curl unzip tar vim less file xz gzip sed gawk iproute2 iptables jq
+RUN zypper install -y -f docker && rpm -e --nodeps --noscripts containerd
+RUN zypper install -y python3-tox python3-base python3 libffi-devel libopenssl-devel
+RUN go mod download && \
+    go install gotest.tools/gotestsum@latest && \
+    go install golang.org/x/tools/cmd/cover@latest && \
+    go install github.com/rancherlabs/corral@${CORRAL_VERSION} && \
+    go install github.com/wadey/gocovmerge@latest

@@ -12,7 +12,8 @@ import (
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
 )
 
-// GenerateUserToken is a helper function that generates a bearer token for a specified user
+// GenerateUserToken is a helper function that generates a bearer token for a specified user using the
+// username and password
 func GenerateUserToken(user *management.User, url string) (*management.Token, error) {
 	token := &management.Token{}
 
