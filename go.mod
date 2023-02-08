@@ -10,6 +10,7 @@ replace (
 	github.com/matryer/moq => github.com/rancher/moq v0.0.0-20200712062324-13d1f37d2d77
 
 	github.com/opencontainers/runc => github.com/opencontainers/runc v1.1.2
+	github.com/rancher/channelserver => github.com/niusmallnan/channelserver v0.0.0-20230208040100-661af6314fc8
 	github.com/rancher/rancher/pkg/apis => ./pkg/apis
 	github.com/rancher/rancher/pkg/client => ./pkg/client
 
