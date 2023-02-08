@@ -27,7 +27,7 @@ docker build --build-arg VERSION=${TAG} --build-arg ARCH=${ARCH} --build-arg IMA
 echo "building agent test docker image"
 docker build --build-arg VERSION=${TAG} --build-arg ARCH=${ARCH} --build-arg RANCHER_TAG=${TAG} --build-arg RANCHER_REPO=${REPO} -t ${AGENT_IMAGE} -f Dockerfile.agent . --no-cache
 
-echo ${RANCHER_TEST_DOCKER_PASSWORD} | docker login --username ${RANCHER_TEST_DOCKER_USERNAME} --password-stdin
+echo ${DOCKERHUB_PASSWORD} | docker login --username ${DOCKERHUB_USERNAME} --password-stdin
 
 echo "docker push rancher"
 docker image push ${IMAGE}
