@@ -20,8 +20,8 @@ type CorralConfigs struct {
 // CorralPackages is a struct that has the path to the packages
 type CorralPackages struct {
 	CorralPackageImages map[string]string `json:"corralPackageImages" yaml:"corralPackageImages"`
-	Cleanup             bool              `json:"cleanup" yaml:"cleanup" default:true`
-	Debug               bool              `json:"debug" yaml:"debug" default:false`
+	Cleanup             bool              `json:"cleanup" yaml:"cleanup" default:"true"`
+	Debug               bool              `json:"debug" yaml:"debug" default:"false"`
 	CustomRepo          string            `json:"customRepo" yaml:"customRepo" default:"https://github.com/rancherlabs/corral-packages.git"`
 }
 

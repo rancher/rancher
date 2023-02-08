@@ -39,7 +39,7 @@ func (r *V2ProvCertRotationTestSuite) TearDownSuite() {
 }
 
 func (r *V2ProvCertRotationTestSuite) SetupSuite() {
-	testSession := session.NewSession(r.T())
+	testSession := session.NewSession()
 	r.session = testSession
 
 	r.config = new(provisioning.Config)
@@ -58,7 +58,7 @@ func (r *V2ProvCertRotationTestSuite) testCertRotation(provider Provider, kubeVe
 	name := fmt.Sprintf("Provider_%s/Kubernetes_Version_%s/Nodes_%v", provider.Name, kubeVersion, nodesAndRoles)
 	r.Run(name, func() {
 		r.Run("initial", func() {
-			testSession := session.NewSession(r.T())
+			testSession := session.NewSession()
 			defer testSession.Cleanup()
 
 			testSessionClient, err := r.client.WithSession(testSession)

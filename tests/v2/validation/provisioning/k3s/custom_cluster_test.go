@@ -42,7 +42,7 @@ func (c *CustomClusterProvisioningTestSuite) TearDownSuite() {
 }
 
 func (c *CustomClusterProvisioningTestSuite) SetupSuite() {
-	testSession := session.NewSession(c.T())
+	testSession := session.NewSession()
 	c.session = testSession
 
 	clustersConfig := new(provisioning.Config)
@@ -107,7 +107,7 @@ func (c *CustomClusterProvisioningTestSuite) ProvisioningK3SCustomCluster(extern
 		for _, kubeVersion := range c.kubernetesVersions {
 			name = tt.name + " Kubernetes version: " + kubeVersion
 			c.Run(name, func() {
-				testSession := session.NewSession(c.T())
+				testSession := session.NewSession()
 				defer testSession.Cleanup()
 
 				client, err := tt.client.WithSession(testSession)
@@ -215,7 +215,7 @@ func (c *CustomClusterProvisioningTestSuite) ProvisioningK3SCustomClusterDynamic
 		for _, kubeVersion := range c.kubernetesVersions {
 			name = tt.name + " Kubernetes version: " + kubeVersion
 			c.Run(name, func() {
-				testSession := session.NewSession(c.T())
+				testSession := session.NewSession()
 				defer testSession.Cleanup()
 
 				client, err := tt.client.WithSession(testSession)

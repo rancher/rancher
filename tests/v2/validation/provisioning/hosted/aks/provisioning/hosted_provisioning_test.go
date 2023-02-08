@@ -33,7 +33,7 @@ func (h *HostedAKSClusterProvisioningTestSuite) TearDownSuite() {
 }
 
 func (h *HostedAKSClusterProvisioningTestSuite) SetupSuite() {
-	testSession := session.NewSession(h.T())
+	testSession := session.NewSession()
 	h.session = testSession
 
 	client, err := rancher.NewClient("", testSession)

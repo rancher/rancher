@@ -35,7 +35,7 @@ func (i *IstioTestSuite) TearDownSuite() {
 }
 
 func (i *IstioTestSuite) SetupSuite() {
-	testSession := session.NewSession(i.T())
+	testSession := session.NewSession()
 	i.session = testSession
 
 	client, err := rancher.NewClient("", testSession)

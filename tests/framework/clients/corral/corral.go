@@ -5,6 +5,7 @@ import (
 	"io"
 	"os/exec"
 	"regexp"
+	"strings"
 
 	"github.com/pkg/errors"
 	"github.com/rancher/rancher/tests/framework/pkg/session"
@@ -17,6 +18,18 @@ const (
 	debugFlag       = "--trace"
 	skipCleanupFlag = "--skip-cleanup"
 )
+
+// GetCorralEnvVar gets corral environment variables
+func GetCorralEnvVar(corralName, envVar string) (string, error) {
+	msg, err := exec.Command("corral", "vars", corralName, envVar).CombinedOutput()
+	if err != nil {
+		return "", errors.Wrap(err, "GetCorralEnvVar: "+string(msg))
+	}
+
+	corralEnvVar := string(msg)
+	corralEnvVar = strings.TrimSuffix(corralEnvVar, "\n")
+	return corralEnvVar, nil
+}
 
 // SetupCorralConfig sets the corral config vars. It takes a map[string]string as a parameter; the key is the value and the value the value you are setting
 // For example we are getting the aws config vars to build a corral from aws.

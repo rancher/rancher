@@ -5,3 +5,4 @@ metadata:
   labels: {{ include "rancher.labels" . | nindent 4 }}
 data:
   priorityClassName:  {{ .Values.priorityClassName }}
+  pspEnablement: '{{ .Values.global.cattle.psp.enabled }}'

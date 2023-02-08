@@ -1,0 +1,7 @@
+/bin
+/package/data.json
+/package/k3s-airgap-images.tar
+/package/rancher
+/package/agent
+*.yaml
+/ranchercover/cover

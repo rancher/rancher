@@ -55,6 +55,9 @@ func Test_ChartInstallation(t *testing.T) {
 					"global": map[string]interface{}{
 						"cattle": map[string]interface{}{
 							"systemDefaultRegistry": settings.SystemDefaultRegistry.Get(),
+							"psp": map[string]interface{}{
+								"enabled": true,
+							},
 						},
 					},
 				}
@@ -72,7 +75,7 @@ func Test_ChartInstallation(t *testing.T) {
 			},
 		},
 		{
-			name: "installation without webhook priority class",
+			name: "installation without webhook priority class and PSP enablement",
 			setup: func(ctrl *gomock.Controller) chart.Manager {
 				settings.ConfigMapName.Set("fail")
 				manager := fake.NewMockManager(ctrl)
@@ -86,6 +89,7 @@ func Test_ChartInstallation(t *testing.T) {
 					"global": map[string]interface{}{
 						"cattle": map[string]interface{}{
 							"systemDefaultRegistry": settings.SystemDefaultRegistry.Get(),
+							"psp":                   map[string]interface{}{},
 						},
 					},
 				}
@@ -133,7 +137,10 @@ func (m *mockCache) Get(namespace string, name string) (*v1.ConfigMap, error) {
 			Name:      name,
 			Namespace: namespace,
 		},
-		Data: map[string]string{"priorityClassName": priorityClassName},
+		Data: map[string]string{
+			"priorityClassName": priorityClassName,
+			"pspEnablement":     "true",
+		},
 	}, nil
 }
 
