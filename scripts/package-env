@@ -8,7 +8,6 @@ CHART_DEFAULT_BRANCH=${CHART_DEFAULT_BRANCH:-"dev-v2.7"}
 
 IMAGE=${REPO}/rancher:${TAG}
 AGENT_IMAGE=${REPO}/rancher-agent:${AGENT_TAG}
-RUNTIME_IMAGE=${REPO}/rancher-runtime:${TAG}
 SYSTEM_AGENT_UPGRADE_TAG=$(grep "ENV CATTLE_SYSTEM_AGENT_VERSION" ../package/Dockerfile | awk '{ print $NF }')-suc
 SYSTEM_AGENT_UPGRADE_IMAGE=${REPO}/system-agent:${SYSTEM_AGENT_UPGRADE_TAG}
 WINS_AGENT_UPGRADE_TAG=$(grep "ENV CATTLE_WINS_AGENT_VERSION" ../package/Dockerfile | awk '{ print $NF }')
