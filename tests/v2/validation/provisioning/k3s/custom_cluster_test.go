@@ -11,7 +11,6 @@ import (
 	v1 "github.com/rancher/rancher/tests/framework/clients/rancher/v1"
 	"github.com/rancher/rancher/tests/framework/extensions/clusters"
 	hardening "github.com/rancher/rancher/tests/framework/extensions/hardening/k3s"
-	"github.com/rancher/rancher/tests/framework/extensions/machinepools"
 	"github.com/rancher/rancher/tests/framework/extensions/tokenregistration"
 	"github.com/rancher/rancher/tests/framework/extensions/users"
 	password "github.com/rancher/rancher/tests/framework/extensions/users/passwordgenerator"
@@ -30,9 +29,9 @@ import (
 type CustomClusterProvisioningTestSuite struct {
 	suite.Suite
 	client             *rancher.Client
-	provisioning       *provisioning.Config
 	session            *session.Session
 	standardUserClient *rancher.Client
+	provisioning       *provisioning.Config
 	kubernetesVersions []string
 	nodeProviders      []string
 }
@@ -78,9 +77,7 @@ func (c *CustomClusterProvisioningTestSuite) SetupSuite() {
 	c.standardUserClient = standardUserClient
 }
 
-func (c *CustomClusterProvisioningTestSuite) ProvisioningK3SCustomCluster(externalNodeProvider provisioning.ExternalNodeProvider) {
-	namespace := "fleet-default"
-
+func (c *CustomClusterProvisioningTestSuite) TestProvisioningK3SCustomCluster() {
 	nodeRoles0 := []string{
 		"--etcd --controlplane --worker",
 	}
@@ -104,84 +101,32 @@ func (c *CustomClusterProvisioningTestSuite) ProvisioningK3SCustomCluster(extern
 	}
 	var name string
 	for _, tt := range tests {
-		for _, kubeVersion := range c.kubernetesVersions {
-			name = tt.name + " Kubernetes version: " + kubeVersion
-			c.Run(name, func() {
-				testSession := session.NewSession()
-				defer testSession.Cleanup()
+		testSession := session.NewSession()
+		defer testSession.Cleanup()
 
-				client, err := tt.client.WithSession(testSession)
-				require.NoError(c.T(), err)
+		client, err := tt.client.WithSession(testSession)
+		require.NoError(c.T(), err)
 
-				numNodes := len(tt.nodeRoles)
-				nodes, _, err := externalNodeProvider.NodeCreationFunc(client, numNodes, 0, false)
-				require.NoError(c.T(), err)
-
-				clusterName := namegen.AppendRandomString(externalNodeProvider.Name)
-
-				cluster := clusters.NewK3SRKE2ClusterConfig(clusterName, namespace, "", "", kubeVersion, nil)
-
-				clusterResp, err := clusters.CreateK3SRKE2Cluster(client, cluster)
-				require.NoError(c.T(), err)
-
-				client, err = client.ReLogin()
-				require.NoError(c.T(), err)
-
-				customCluster, err := client.Steve.SteveType(clusters.ProvisioningSteveResouceType).ByID(clusterResp.ID)
-				require.NoError(c.T(), err)
-
-				clusterStatus := &apiv1.ClusterStatus{}
-				err = v1.ConvertToK8sType(customCluster.Status, clusterStatus)
-				require.NoError(c.T(), err)
-
-				token, err := tokenregistration.GetRegistrationToken(client, clusterStatus.ClusterName)
-				require.NoError(c.T(), err)
-
-				for key, node := range nodes {
-					c.T().Logf("Execute Registration Command for node %s", node.NodeID)
-					command := fmt.Sprintf("%s %s", token.InsecureNodeCommand, tt.nodeRoles[key])
-
-					output, err := node.ExecuteCommand(command)
-					require.NoError(c.T(), err)
-					c.T().Logf(output)
-				}
-
-				kubeProvisioningClient, err := c.client.GetKubeAPIProvisioningClient()
-				require.NoError(c.T(), err)
-
-				result, err := kubeProvisioningClient.Clusters(namespace).Watch(context.TODO(), metav1.ListOptions{
-					FieldSelector:  "metadata.name=" + clusterName,
-					TimeoutSeconds: &defaults.WatchTimeoutSeconds,
+		for _, nodeProviderName := range c.nodeProviders {
+			externalNodeProvider := provisioning.ExternalNodeProviderSetup(nodeProviderName)
+			for _, kubeVersion := range c.kubernetesVersions {
+				name = tt.name + " Kubernetes version: " + kubeVersion
+				c.Run(name, func() {
+					c.testProvisioningK3SCustomCluster(client, externalNodeProvider, tt.nodeRoles, kubeVersion, tt.hardening)
 				})
-				require.NoError(c.T(), err)
-
-				checkFunc := clusters.IsProvisioningClusterReady
-
-				err = wait.WatchWait(result, checkFunc)
-				assert.NoError(c.T(), err)
-				assert.Equal(c.T(), clusterName, clusterResp.ObjectMeta.Name)
-
-				clusterToken, err := clusters.CheckServiceAccountTokenSecret(client, clusterName)
-				require.NoError(c.T(), err)
-				assert.NotEmpty(c.T(), clusterToken)
-
-				if tt.hardening.Hardened {
-					err = hardening.HardeningNodes(client, tt.hardening.Hardened, nodes, tt.nodeRoles)
-					require.NoError(c.T(), err)
-
-					hardenCluster := clusters.HardenK3SRKE2ClusterConfig(clusterName, namespace, "", "", kubeVersion, nil)
-
-					hardenClusterResp, err := clusters.UpdateK3SRKE2Cluster(client, clusterResp, hardenCluster)
-					require.NoError(c.T(), err)
-					assert.Equal(c.T(), clusterName, hardenClusterResp.ObjectMeta.Name)
-				}
-			})
+			}
 		}
 	}
 }
 
-func (c *CustomClusterProvisioningTestSuite) ProvisioningK3SCustomClusterDynamicInput(externalNodeProvider provisioning.ExternalNodeProvider, nodesAndRoles []machinepools.NodeRoles) {
-	namespace := "fleet-default"
+func (c *CustomClusterProvisioningTestSuite) TestProvisioningK3SCustomClusterDynamicInput() {
+	clustersConfig := new(provisioning.Config)
+	config.LoadConfig(provisioning.ConfigurationFileKey, clustersConfig)
+	nodesAndRoles := clustersConfig.NodesAndRoles
+
+	if len(nodesAndRoles) == 0 {
+		c.T().Skip()
+	}
 
 	rolesPerNode := []string{}
 
@@ -199,8 +144,6 @@ func (c *CustomClusterProvisioningTestSuite) ProvisioningK3SCustomClusterDynamic
 		rolesPerNode = append(rolesPerNode, finalRoleCommand)
 	}
 
-	numOfNodes := len(rolesPerNode)
-
 	tests := []struct {
 		name      string
 		client    *rancher.Client
@@ -209,103 +152,89 @@ func (c *CustomClusterProvisioningTestSuite) ProvisioningK3SCustomClusterDynamic
 		{"Admin User", c.client, c.provisioning},
 		{"Standard User", c.standardUserClient, c.provisioning},
 	}
-
 	var name string
 	for _, tt := range tests {
-		for _, kubeVersion := range c.kubernetesVersions {
-			name = tt.name + " Kubernetes version: " + kubeVersion
-			c.Run(name, func() {
-				testSession := session.NewSession()
-				defer testSession.Cleanup()
+		testSession := session.NewSession()
+		defer testSession.Cleanup()
 
-				client, err := tt.client.WithSession(testSession)
-				require.NoError(c.T(), err)
+		client, err := tt.client.WithSession(testSession)
+		require.NoError(c.T(), err)
 
-				nodes, _, err := externalNodeProvider.NodeCreationFunc(client, numOfNodes, 0, false)
-				require.NoError(c.T(), err)
-
-				clusterName := namegen.AppendRandomString(externalNodeProvider.Name)
-
-				cluster := clusters.NewK3SRKE2ClusterConfig(clusterName, namespace, "", "", kubeVersion, nil)
-
-				clusterResp, err := clusters.CreateK3SRKE2Cluster(client, cluster)
-				require.NoError(c.T(), err)
-
-				client, err = client.ReLogin()
-				require.NoError(c.T(), err)
-
-				customCluster, err := client.Steve.SteveType(clusters.ProvisioningSteveResouceType).ByID(clusterResp.ID)
-				require.NoError(c.T(), err)
-
-				clusterStatus := &apiv1.ClusterStatus{}
-				err = v1.ConvertToK8sType(customCluster.Status, clusterStatus)
-				require.NoError(c.T(), err)
-
-				token, err := tokenregistration.GetRegistrationToken(client, clusterStatus.ClusterName)
-				require.NoError(c.T(), err)
-
-				for key, node := range nodes {
-					c.T().Logf("Execute Registration Command for node %s", node.NodeID)
-					command := fmt.Sprintf("%s %s", token.InsecureNodeCommand, rolesPerNode[key])
-
-					output, err := node.ExecuteCommand(command)
-					require.NoError(c.T(), err)
-					c.T().Logf(output)
-				}
-
-				kubeProvisioningClient, err := c.client.GetKubeAPIProvisioningClient()
-				require.NoError(c.T(), err)
-
-				result, err := kubeProvisioningClient.Clusters(namespace).Watch(context.TODO(), metav1.ListOptions{
-					FieldSelector:  "metadata.name=" + clusterName,
-					TimeoutSeconds: &defaults.WatchTimeoutSeconds,
+		for _, nodeProviderName := range c.nodeProviders {
+			externalNodeProvider := provisioning.ExternalNodeProviderSetup(nodeProviderName)
+			for _, kubeVersion := range c.kubernetesVersions {
+				name = tt.name + " Kubernetes version: " + kubeVersion
+				c.Run(name, func() {
+					c.testProvisioningK3SCustomCluster(client, externalNodeProvider, rolesPerNode, kubeVersion, tt.hardening)
 				})
-				require.NoError(c.T(), err)
-
-				checkFunc := clusters.IsProvisioningClusterReady
-
-				err = wait.WatchWait(result, checkFunc)
-				assert.NoError(c.T(), err)
-				assert.Equal(c.T(), clusterName, clusterResp.ObjectMeta.Name)
-
-				clusterToken, err := clusters.CheckServiceAccountTokenSecret(client, clusterName)
-				require.NoError(c.T(), err)
-				assert.NotEmpty(c.T(), clusterToken)
-
-				if tt.hardening.Hardened {
-					err = hardening.HardeningNodes(client, tt.hardening.Hardened, nodes, rolesPerNode)
-					require.NoError(c.T(), err)
-
-					hardenCluster := clusters.HardenK3SRKE2ClusterConfig(clusterName, namespace, "", "", kubeVersion, nil)
-
-					hardenClusterResp, err := clusters.UpdateK3SRKE2Cluster(client, clusterResp, hardenCluster)
-					require.NoError(c.T(), err)
-					assert.Equal(c.T(), clusterName, hardenClusterResp.ObjectMeta.Name)
-				}
-			})
+			}
 		}
 	}
 }
 
-func (c *CustomClusterProvisioningTestSuite) TestProvisioningCustomCluster() {
-	for _, nodeProviderName := range c.nodeProviders {
-		externalNodeProvider := provisioning.ExternalNodeProviderSetup(nodeProviderName)
-		c.ProvisioningK3SCustomCluster(externalNodeProvider)
+func (c *CustomClusterProvisioningTestSuite) testProvisioningK3SCustomCluster(client *rancher.Client, externalNodeProvider provisioning.ExternalNodeProvider, nodesAndRoles []string, kubeVersion string, harden *provisioning.Config) {
+	namespace := "fleet-default"
+
+	numNodes := len(nodesAndRoles)
+	nodes, _, err := externalNodeProvider.NodeCreationFunc(client, numNodes, 0, false)
+	require.NoError(c.T(), err)
+
+	clusterName := namegen.AppendRandomString(externalNodeProvider.Name)
+
+	cluster := clusters.NewK3SRKE2ClusterConfig(clusterName, namespace, "", "", kubeVersion, nil)
+
+	clusterResp, err := clusters.CreateK3SRKE2Cluster(client, cluster)
+	require.NoError(c.T(), err)
+
+	client, err = client.ReLogin()
+	require.NoError(c.T(), err)
+	customCluster, err := client.Steve.SteveType(clusters.ProvisioningSteveResouceType).ByID(clusterResp.ID)
+	require.NoError(c.T(), err)
+
+	clusterStatus := &apiv1.ClusterStatus{}
+	err = v1.ConvertToK8sType(customCluster.Status, clusterStatus)
+	require.NoError(c.T(), err)
+
+	token, err := tokenregistration.GetRegistrationToken(client, clusterStatus.ClusterName)
+	require.NoError(c.T(), err)
+
+	for key, node := range nodes {
+		c.T().Logf("Execute Registration Command for node %s", node.NodeID)
+		command := fmt.Sprintf("%s %s", token.InsecureNodeCommand, nodesAndRoles[key])
+
+		output, err := node.ExecuteCommand(command)
+		require.NoError(c.T(), err)
+		c.T().Logf(output)
 	}
-}
 
-func (c *CustomClusterProvisioningTestSuite) TestProvisioningCustomClusterDynamicInput() {
-	clustersConfig := new(provisioning.Config)
-	config.LoadConfig(provisioning.ConfigurationFileKey, clustersConfig)
-	nodesAndRoles := clustersConfig.NodesAndRoles
+	kubeProvisioningClient, err := c.client.GetKubeAPIProvisioningClient()
+	require.NoError(c.T(), err)
 
-	if len(nodesAndRoles) == 0 {
-		c.T().Skip()
-	}
+	result, err := kubeProvisioningClient.Clusters(namespace).Watch(context.TODO(), metav1.ListOptions{
+		FieldSelector:  "metadata.name=" + clusterName,
+		TimeoutSeconds: &defaults.WatchTimeoutSeconds,
+	})
+	require.NoError(c.T(), err)
 
-	for _, nodeProviderName := range c.nodeProviders {
-		externalNodeProvider := provisioning.ExternalNodeProviderSetup(nodeProviderName)
-		c.ProvisioningK3SCustomClusterDynamicInput(externalNodeProvider, nodesAndRoles)
+	checkFunc := clusters.IsProvisioningClusterReady
+
+	err = wait.WatchWait(result, checkFunc)
+	assert.NoError(c.T(), err)
+	assert.Equal(c.T(), clusterName, clusterResp.ObjectMeta.Name)
+
+	clusterToken, err := clusters.CheckServiceAccountTokenSecret(client, clusterName)
+	require.NoError(c.T(), err)
+	assert.NotEmpty(c.T(), clusterToken)
+
+	if harden.Hardened && kubeVersion < "v1.25.0" {
+		err = hardening.HardeningNodes(client, harden.Hardened, nodes, nodesAndRoles)
+		require.NoError(c.T(), err)
+
+		hardenCluster := clusters.HardenK3SRKE2ClusterConfig(clusterName, namespace, "", "", kubeVersion, nil)
+
+		hardenClusterResp, err := clusters.UpdateK3SRKE2Cluster(client, clusterResp, hardenCluster)
+		require.NoError(c.T(), err)
+		assert.Equal(c.T(), clusterName, hardenClusterResp.ObjectMeta.Name)
 	}
 }
 

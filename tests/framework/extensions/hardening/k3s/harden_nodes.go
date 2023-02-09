@@ -1,6 +1,8 @@
 package hardening
 
 import (
+	"strings"
+
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	"github.com/rancher/rancher/tests/framework/pkg/nodes"
 	"github.com/sirupsen/logrus"
@@ -34,7 +36,7 @@ func HardeningNodes(client *rancher.Client, hardened bool, nodes []*nodes.Node, 
 			return err
 		}
 
-		if nodeRoles[key] == "--etcd --controlplane --worker" || nodeRoles[key] == "--controlplane" || nodeRoles[key] == " --controlplane" {
+		if strings.Contains(nodeRoles[key], "--controlplane") {
 			logrus.Infof("Copying over files to node %s", node.NodeID)
 			dir := "/go/src/github.com/rancher/rancher/tests/framework/extensions/hardening/k3s"
 			err = node.SCPFileToNode(dir+"/audit.yaml", "/home/"+node.SSHUser+"/audit.yaml")
