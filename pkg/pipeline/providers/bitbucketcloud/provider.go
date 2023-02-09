@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	v32 "github.com/rancher/rancher/pkg/apis/project.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/controllers/management/secretmigrator/assemblers"
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/rancher/norman/store/subtype"
@@ -62,7 +63,7 @@ func (b *BcProvider) GetProviderConfig(projectID string) (interface{}, error) {
 	if err := mapstructure.Decode(storedBitbucketPipelineConfigMap, &storedBitbucketPipelineConfig); err != nil {
 		return nil, fmt.Errorf("failed to decode the config, error: %v", err)
 	}
-	storedBitbucketPipelineConfig, err = b.SecretMigrator.AssembleBitbucketCloudPipelineConfigCredential(storedBitbucketPipelineConfig)
+	storedBitbucketPipelineConfig, err = assemblers.AssembleBitbucketCloudPipelineConfigCredential(storedBitbucketPipelineConfig, b.SecretLister)
 	if err != nil {
 		return nil, err
 	}

@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	v32 "github.com/rancher/rancher/pkg/apis/project.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/controllers/management/secretmigrator/assemblers"
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/rancher/norman/store/subtype"
@@ -63,7 +64,7 @@ func (g *GlProvider) GetProviderConfig(projectID string) (interface{}, error) {
 	if err := mapstructure.Decode(storedGitlabPipelineConfigMap, &storedGitlabPipelineConfig); err != nil {
 		return nil, fmt.Errorf("failed to decode the config, error: %v", err)
 	}
-	storedGitlabPipelineConfig, err = g.SecretMigrator.AssembleGitlabPipelineConfigCredential(storedGitlabPipelineConfig)
+	storedGitlabPipelineConfig, err = assemblers.AssembleGitlabPipelineConfigCredential(storedGitlabPipelineConfig, g.SecretLister)
 	if err != nil {
 		return nil, err
 	}

@@ -13,6 +13,7 @@ import (
 	"github.com/sirupsen/logrus"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -101,7 +102,18 @@ func (ac *authConfigController) sync(key string, obj *v3.AuthConfig) (runtime.Ob
 	if obj == nil {
 		return nil, nil
 	}
-
+	users, err := ac.users.List("", labels.Everything())
+	if err != nil {
+		return obj, err
+	}
+	for _, user := range users {
+		principalID := providerrefresh.GetPrincipalIDForProvider(obj.Name, user)
+		if principalID != "" {
+			// if we have a principal on this provider, then we need to be refreshed to potentially invalidate
+			// access derived from this provider
+			ac.authRefresher.TriggerUserRefresh(user.Name, true)
+		}
+	}
 	value := obj.Annotations[CleanupAnnotation]
 	if value == "" {
 		if obj.Enabled {
@@ -139,6 +151,5 @@ func (ac *authConfigController) sync(key string, obj *v3.AuthConfig) (runtime.Ob
 			return obj, nil
 		}
 	}
-
 	return obj, nil
 }

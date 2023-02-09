@@ -22,10 +22,10 @@ import (
 	"time"
 
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/controllers/management/secretmigrator/assemblers"
 
 	"github.com/pkg/errors"
 	"github.com/prometheus/common/model"
-	"github.com/rancher/rancher/pkg/controllers/management/secretmigrator"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config/dialer"
@@ -62,7 +62,7 @@ func SendMessage(ctx context.Context, notifier *v3.Notifier, recipient string, m
 
 	if notifier.Spec.SMTPConfig != nil {
 		if secretLister != nil {
-			spec, err := secretmigrator.AssembleSMTPCredential(notifier, *secretLister)
+			spec, err := assemblers.AssembleSMTPCredential(notifier, *secretLister)
 			if err != nil {
 				return err
 			}
@@ -82,7 +82,7 @@ func SendMessage(ctx context.Context, notifier *v3.Notifier, recipient string, m
 
 	if notifier.Spec.WechatConfig != nil {
 		if secretLister != nil {
-			spec, err := secretmigrator.AssembleWechatCredential(notifier, *secretLister)
+			spec, err := assemblers.AssembleWechatCredential(notifier, *secretLister)
 			if err != nil {
 				return err
 			}
@@ -103,7 +103,7 @@ func SendMessage(ctx context.Context, notifier *v3.Notifier, recipient string, m
 
 	if notifier.Spec.DingtalkConfig != nil {
 		if secretLister != nil {
-			spec, err := secretmigrator.AssembleDingtalkCredential(notifier, *secretLister)
+			spec, err := assemblers.AssembleDingtalkCredential(notifier, *secretLister)
 			if err != nil {
 				return err
 			}

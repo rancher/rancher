@@ -25,7 +25,7 @@ type tokenTestCase struct {
 	description                 string
 }
 
-func TestSync(t *testing.T) {
+func TestTokenSync(t *testing.T) {
 	tokens := make(map[string]*v3.Token)
 	userAttributes := make(map[string]*v3.UserAttribute)
 
