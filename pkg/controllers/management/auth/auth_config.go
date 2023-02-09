@@ -2,13 +2,17 @@ package auth
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 
+	"github.com/rancher/norman/objectclient"
 	"github.com/rancher/rancher/pkg/auth/cleanup"
 	"github.com/rancher/rancher/pkg/auth/providerrefresh"
-	controllers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/sirupsen/logrus"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 )
@@ -34,29 +38,62 @@ type CleanupService interface {
 }
 
 type authConfigController struct {
-	users            v3.UserLister
-	authRefresher    providerrefresh.UserAuthRefresher
-	cleanup          CleanupService
-	authConfigClient controllers.AuthConfigClient
+	users         v3.UserLister
+	authRefresher providerrefresh.UserAuthRefresher
+	cleanup       CleanupService
+	// Note the use of the GenericClient here. AuthConfigs contain internal-only fields that deal with
+	// various auth providers. Those fields are not present everywhere, nor are they defined in the CRD. Given
+	// that, the regular client will "eat" those internal-only fields, so in this case, we use
+	// the unstructured client, losing some validation, but gaining the flexibility we require.
+	authConfigsUnstructured objectclient.GenericClient
 }
 
 func newAuthConfigController(context context.Context, mgmt *config.ManagementContext, scaledContext *config.ScaledContext) *authConfigController {
 	controller := &authConfigController{
-		users:            mgmt.Management.Users("").Controller().Lister(),
-		authRefresher:    providerrefresh.NewUserAuthRefresher(context, scaledContext),
-		cleanup:          cleanup.NewCleanupService(mgmt.Core.Secrets(""), mgmt.Wrangler.Mgmt),
-		authConfigClient: mgmt.Wrangler.Mgmt.AuthConfig(),
+		users:                   mgmt.Management.Users("").Controller().Lister(),
+		authRefresher:           providerrefresh.NewUserAuthRefresher(context, scaledContext),
+		cleanup:                 cleanup.NewCleanupService(mgmt.Core.Secrets(""), mgmt.Wrangler.Mgmt),
+		authConfigsUnstructured: scaledContext.Management.AuthConfigs("").ObjectClient().UnstructuredClient(),
 	}
 	return controller
 }
 
-func (ac *authConfigController) setCleanupAnnotation(obj *v3.AuthConfig, value string) (runtime.Object, error) {
-	if obj.Annotations == nil {
-		obj.Annotations = make(map[string]string)
+func (ac *authConfigController) setCleanupAnnotation(obj *v3.AuthConfig, value string) (*v3.AuthConfig, error) {
+	runtimeObj, err := ac.authConfigsUnstructured.Get(obj.Name, v1.GetOptions{})
+	if err != nil {
+		return nil, err
 	}
-	objCopy := obj.DeepCopy()
-	objCopy.Annotations[CleanupAnnotation] = value
-	return ac.authConfigClient.Update(objCopy)
+	unstructuredObj, ok := runtimeObj.(*unstructured.Unstructured)
+	if !ok {
+		return nil, fmt.Errorf("auth config %s is not an unstructured value", obj.Name)
+	}
+	annotations := unstructuredObj.GetAnnotations()
+	if annotations == nil {
+		annotations = make(map[string]string)
+	}
+	annotations[CleanupAnnotation] = value
+	unstructuredObj.SetAnnotations(annotations)
+	uobj, err := ac.authConfigsUnstructured.Update(obj.Name, unstructuredObj)
+	if err != nil {
+		return nil, fmt.Errorf("failed to update AuthConfig object: %w", err)
+	}
+	// We need to return an AuthConfig, but Update deals in terms of unstructured objects.
+	// Given that, we need to convert the unstructured object to an AuthConfig.
+	// Normally, we'd like to use mapstructure.Decode, but its handling of embedded structs
+	// does not give us the desired result in this instance, hence the use of json.
+	unObject, ok := uobj.(*unstructured.Unstructured)
+	if !ok {
+		return nil, fmt.Errorf("failed to read to unstructured data")
+	}
+	data, err := json.Marshal(unObject.UnstructuredContent())
+	if err != nil {
+		return nil, fmt.Errorf("unable to marshal unstructured object: %w", err)
+	}
+	result := &v3.AuthConfig{}
+	if err := json.Unmarshal(data, result); err != nil {
+		return nil, fmt.Errorf("uanble to unmarshal to AuthConfig object: %w", err)
+	}
+	return result, nil
 }
 
 func (ac *authConfigController) sync(key string, obj *v3.AuthConfig) (runtime.Object, error) {
