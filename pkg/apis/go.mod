@@ -10,7 +10,7 @@ require (
 	github.com/rancher/fleet/pkg/apis v0.0.0-20221220171827-374ed17d8499
 	github.com/rancher/gke-operator v1.1.5
 	github.com/rancher/norman v0.0.0-20230110004459-34230bb2787c
-	github.com/rancher/rke v1.4.3-rc4
+	github.com/rancher/rke v1.4.3-rc6
 	github.com/rancher/wrangler v1.0.1-0.20230110004444-57f14d386afb
 	github.com/sirupsen/logrus v1.8.1
 	k8s.io/api v0.25.4
