@@ -49,7 +49,7 @@ func addDefaultPodSecurityAdmissionConfigurationTemplates(management *config.Man
 func newPodSecurityAdmissionConfigurationTemplateRestricted() *v3.PodSecurityAdmissionConfigurationTemplate {
 	return &v3.PodSecurityAdmissionConfigurationTemplate{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "restricted",
+			Name: "rancher-restricted",
 		},
 		Description: "The default restricted pod security admission configuration template",
 		Configuration: v3.PodSecurityAdmissionConfigurationTemplateSpec{
@@ -73,7 +73,7 @@ func newPodSecurityAdmissionConfigurationTemplateRestricted() *v3.PodSecurityAdm
 func newPodSecurityAdmissionConfigurationTemplatePrivileged() *v3.PodSecurityAdmissionConfigurationTemplate {
 	return &v3.PodSecurityAdmissionConfigurationTemplate{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "privileged",
+			Name: "rancher-privileged",
 		},
 		Description: "The default privileged pod security admission configuration template",
 		Configuration: v3.PodSecurityAdmissionConfigurationTemplateSpec{
