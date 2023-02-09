@@ -12,8 +12,8 @@ TEMP_FILE=$(mktemp)
 
 if [ -n "${DRONE_TAG}" ]; then
   if [ -s ./bin/rancher-images.txt ]; then
-    # We skip rancher/rancher, rancher/rancher-agent and rancher/rancher-runtime because the manifest for these gets created later in the pipeline
-    for rancherimage in $(cat ./bin/rancher-images.txt | egrep -v "^rancher/rancher:|^rancher/rancher-agent:|^rancher/rancher-runtime:"); do
+    # We skip rancher/rancher and rancher/rancher-agent because the manifest for these gets created later in the pipeline
+    for rancherimage in $(cat ./bin/rancher-images.txt | egrep -v "^rancher/rancher:|^rancher/rancher-agent:"); do
       echo "INFO: Checking if image [${rancherimage}] exists"
       if ! docker manifest inspect ${rancherimage} >/dev/null; then
         echo "ERROR: Image [${rancherimage}] does not exist"
