@@ -9,7 +9,7 @@ ENV CATTLE_K3S_VERSION v1.25.5+k3s1
 ENV CATTLE_HELM_UNITTEST_VERSION v0.1.7-rancher4
 # helm 3 version
 ENV HELM_VERSION v3.11.1
-ENV KUSTOMIZE_VERSION v4.5.7
+ENV KUSTOMIZE_VERSION v5.0.0
 
 # kontainer-driver-metadata branch to be set for specific branch other than dev/master, logic at rancher/rancher/pkg/settings/setting.go
 ENV CATTLE_KDM_BRANCH=dev-v2.7
