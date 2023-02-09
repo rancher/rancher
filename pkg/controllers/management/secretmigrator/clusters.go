@@ -671,6 +671,9 @@ func cleanQuestions(cluster *apimgmtv3.Cluster) {
 type cleanupFunc func(spec *apimgmtv3.ClusterSpec)
 
 func (h *handler) migrateSecret(cluster *apimgmtv3.Cluster, secretName, secretClass string, secretField *string, createOrUpdateSecret CreateOrUpdateSecretFunc, cleanup cleanupFunc) (*apimgmtv3.Cluster, error) {
+	if cluster.GetSecret(secretName) != "" {
+		return cluster, nil
+	}
 	logrus.Tracef("[secretmigrator] migrating %s secrets for cluster %s", secretClass, cluster.Name)
 	secret, err := createOrUpdateSecret(cluster.GetSecret(secretName), cluster.Spec.RancherKubernetesEngineConfig, cluster)
 	if err != nil {
