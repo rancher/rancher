@@ -10,7 +10,6 @@ import (
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
 	v1 "github.com/rancher/rancher/tests/framework/clients/rancher/v1"
 	"github.com/rancher/rancher/tests/framework/extensions/clusters"
-	"github.com/rancher/rancher/tests/framework/extensions/machinepools"
 	"github.com/rancher/rancher/tests/framework/extensions/tokenregistration"
 	"github.com/rancher/rancher/tests/framework/extensions/users"
 	password "github.com/rancher/rancher/tests/framework/extensions/users/passwordgenerator"
@@ -77,9 +76,7 @@ func (c *CustomClusterProvisioningTestSuite) SetupSuite() {
 	c.standardUserClient = standardUserClient
 }
 
-func (c *CustomClusterProvisioningTestSuite) ProvisioningRKE2CustomCluster(externalNodeProvider provisioning.ExternalNodeProvider) {
-	namespace := "fleet-default"
-
+func (c *CustomClusterProvisioningTestSuite) TestProvisioningRKE2CustomCluster() {
 	nodeRoles0 := []string{
 		"--etcd --controlplane --worker",
 	}
@@ -92,112 +89,51 @@ func (c *CustomClusterProvisioningTestSuite) ProvisioningRKE2CustomCluster(exter
 
 	tests := []struct {
 		name         string
+		client       *rancher.Client
 		nodeRoles    []string
 		nodeCountWin int
 		hasWindows   bool
-		client       *rancher.Client
 	}{
-		{"1 Node all roles Admin User", nodeRoles0, 0, false, c.client},
-		{"1 Node all roles Standard User", nodeRoles0, 0, false, c.standardUserClient},
-		{"3 nodes - 1 role per node Admin User", nodeRoles1, 0, false, c.client},
-		{"3 nodes - 1 role per node Standard User", nodeRoles1, 0, false, c.standardUserClient},
-		{"1 Node all roles Admin User + 1 Windows Worker", nodeRoles0, 1, true, c.client},
-		{"1 Node all roles Standard User + 1 Windows Worker", nodeRoles0, 1, true, c.standardUserClient},
-		{"3 nodes - 1 role per node Admin User + 2 Windows Workers", nodeRoles1, 2, true, c.client},
-		{"3 nodes - 1 role per node Standard User + 2 Windows Workers", nodeRoles1, 2, true, c.standardUserClient},
+		{"1 Node all roles Admin User", c.client, nodeRoles0, 0, false},
+		{"1 Node all roles Standard User", c.standardUserClient, nodeRoles0, 0, false},
+		{"3 nodes - 1 role per node Admin User", c.client, nodeRoles1, 0, false},
+		{"3 nodes - 1 role per node Standard User", c.standardUserClient, nodeRoles1, 0, false},
+		{"1 Node all roles Admin User + 1 Windows Worker", c.client, nodeRoles0, 1, true},
+		{"1 Node all roles Standard User + 1 Windows Worker", c.standardUserClient, nodeRoles0, 1, true},
+		{"3 nodes - 1 role per node Admin User + 2 Windows Workers", c.client, nodeRoles1, 2, true},
+		{"3 nodes - 1 role per node Standard User + 2 Windows Workers", c.standardUserClient, nodeRoles1, 2, true},
 	}
 	var name string
 	for _, tt := range tests {
-		for _, kubeVersion := range c.kubernetesVersions {
-			name = tt.name + " Kubernetes version: " + kubeVersion
-			for _, cni := range c.cnis {
-				name += " cni: " + cni
-				c.Run(name, func() {
-					testSession := session.NewSession()
-					defer testSession.Cleanup()
+		testSession := session.NewSession()
+		defer testSession.Cleanup()
 
-					client, err := tt.client.WithSession(testSession)
-					require.NoError(c.T(), err)
+		client, err := tt.client.WithSession(testSession)
+		require.NoError(c.T(), err)
 
-					numNodesLin := len(tt.nodeRoles)
-
-					linuxNodes, winNodes, err := externalNodeProvider.NodeCreationFunc(client, numNodesLin, tt.nodeCountWin, tt.hasWindows)
-					require.NoError(c.T(), err)
-
-					clusterName := namegen.AppendRandomString(externalNodeProvider.Name)
-
-					cluster := clusters.NewK3SRKE2ClusterConfig(clusterName, namespace, cni, "", kubeVersion, nil)
-
-					clusterResp, err := clusters.CreateK3SRKE2Cluster(client, cluster)
-					require.NoError(c.T(), err)
-
-					client, err = client.ReLogin()
-					require.NoError(c.T(), err)
-					customCluster, err := client.Steve.SteveType(clusters.ProvisioningSteveResouceType).ByID(clusterResp.ID)
-					require.NoError(c.T(), err)
-
-					clusterStatus := &apiv1.ClusterStatus{}
-					err = v1.ConvertToK8sType(customCluster.Status, clusterStatus)
-					require.NoError(c.T(), err)
-
-					token, err := tokenregistration.GetRegistrationToken(client, clusterStatus.ClusterName)
-					require.NoError(c.T(), err)
-
-					for key, linuxNode := range linuxNodes {
-						c.T().Logf("Execute Registration Command for node %s", linuxNode.NodeID)
-						command := fmt.Sprintf("%s %s", token.InsecureNodeCommand, tt.nodeRoles[key])
-						output, err := linuxNode.ExecuteCommand(command)
-						require.NoError(c.T(), err)
-						c.T().Logf(output)
-					}
-
-					kubeProvisioningClient, err := c.client.GetKubeAPIProvisioningClient()
-					require.NoError(c.T(), err)
-					result, err := kubeProvisioningClient.Clusters(namespace).Watch(context.TODO(), metav1.ListOptions{
-						FieldSelector: "metadata.name=" + clusterName,
-
-						TimeoutSeconds: &defaults.WatchTimeoutSeconds,
+		for _, nodeProviderName := range c.nodeProviders {
+			externalNodeProvider := provisioning.ExternalNodeProviderSetup(nodeProviderName)
+			for _, kubeVersion := range c.kubernetesVersions {
+				name = tt.name + " Kubernetes version: " + kubeVersion
+				for _, cni := range c.cnis {
+					name += " cni: " + cni
+					c.Run(name, func() {
+						c.testProvisioningRKE2CustomCluster(client, externalNodeProvider, tt.nodeRoles, kubeVersion, cni, tt.nodeCountWin, tt.hasWindows)
 					})
-					require.NoError(c.T(), err)
-					checkFunc := clusters.IsProvisioningClusterReady
-					err = wait.WatchWait(result, checkFunc)
-					assert.NoError(c.T(), err)
-					assert.Equal(c.T(), clusterName, clusterResp.ObjectMeta.Name)
-
-					if tt.hasWindows {
-						for _, winNode := range winNodes {
-							c.T().Logf("Execute Registration Command for node %s", winNode.NodeID)
-							winCommand := fmt.Sprintf("%s", token.InsecureWindowsNodeCommand)
-							output, err := winNode.ExecuteCommand("powershell.exe" + winCommand)
-							require.NoError(c.T(), err)
-							c.T().Logf(string(output[:]))
-						}
-						kubeWinProvisioningClient, err := c.client.GetKubeAPIProvisioningClient()
-						require.NoError(c.T(), err)
-						result, err := kubeWinProvisioningClient.Clusters(namespace).Watch(context.TODO(), metav1.ListOptions{
-							FieldSelector: "metadata.name=" + clusterName,
-
-							TimeoutSeconds: &defaults.WatchTimeoutSeconds,
-						})
-						require.NoError(c.T(), err)
-						checkFunc := clusters.IsProvisioningClusterReady
-						err = wait.WatchWait(result, checkFunc)
-						assert.NoError(c.T(), err)
-						assert.Equal(c.T(), clusterName, clusterResp.ObjectMeta.Name)
-					}
-
-					clusterToken, err := clusters.CheckServiceAccountTokenSecret(client, clusterName)
-					require.NoError(c.T(), err)
-					assert.NotEmpty(c.T(), clusterToken)
-
-				})
+				}
 			}
 		}
 	}
 }
 
-func (c *CustomClusterProvisioningTestSuite) ProvisioningRKE2CustomClusterDynamicInput(externalNodeProvider provisioning.ExternalNodeProvider, nodesAndRoles []machinepools.NodeRoles) {
-	namespace := "fleet-default"
+func (c *CustomClusterProvisioningTestSuite) TestProvisioningRKE2CustomClusterDynamicInput() {
+	clustersConfig := new(provisioning.Config)
+	config.LoadConfig(provisioning.ConfigurationFileKey, clustersConfig)
+	nodesAndRoles := clustersConfig.NodesAndRoles
+
+	if len(nodesAndRoles) == 0 {
+		c.T().Skip()
+	}
 
 	rolesPerNode := []string{}
 
@@ -215,107 +151,119 @@ func (c *CustomClusterProvisioningTestSuite) ProvisioningRKE2CustomClusterDynami
 		rolesPerNode = append(rolesPerNode, finalRoleCommand)
 	}
 
-	numOfNodes := len(rolesPerNode)
-
 	tests := []struct {
-		name       string
-		client     *rancher.Client
-		hasWindows bool
+		name         string
+		client       *rancher.Client
+		nodeCountWin int
+		hasWindows   bool
 	}{
-		{"Admin User", c.client, false},
-		{"Standard User", c.standardUserClient, false},
+		{"Admin User", c.client, 0, false},
+		{"Standard User", c.standardUserClient, 0, false},
+		{"Admin User + 1 Windows Worker", c.client, 1, false},
+		{"Standard User + 1 Windows Worker", c.standardUserClient, 1, false},
 	}
-
 	var name string
 	for _, tt := range tests {
-		for _, kubeVersion := range c.kubernetesVersions {
-			name = tt.name + " Kubernetes version: " + kubeVersion
-			for _, cni := range c.cnis {
-				name += " cni: " + cni
-				c.Run(name, func() {
-					testSession := session.NewSession()
-					defer testSession.Cleanup()
+		testSession := session.NewSession()
+		defer testSession.Cleanup()
 
-					client, err := tt.client.WithSession(testSession)
-					require.NoError(c.T(), err)
+		client, err := tt.client.WithSession(testSession)
+		require.NoError(c.T(), err)
 
-					nodes, _, err := externalNodeProvider.NodeCreationFunc(client, numOfNodes, 0, false)
-					require.NoError(c.T(), err)
-
-					clusterName := namegen.AppendRandomString(externalNodeProvider.Name)
-
-					cluster := clusters.NewK3SRKE2ClusterConfig(clusterName, namespace, cni, "", kubeVersion, nil)
-
-					clusterResp, err := clusters.CreateK3SRKE2Cluster(client, cluster)
-					require.NoError(c.T(), err)
-
-					client, err = client.ReLogin()
-					require.NoError(c.T(), err)
-
-					customCluster, err := client.Steve.SteveType(clusters.ProvisioningSteveResouceType).ByID(clusterResp.ID)
-					require.NoError(c.T(), err)
-
-					clusterStatus := &apiv1.ClusterStatus{}
-					err = v1.ConvertToK8sType(customCluster.Status, clusterStatus)
-					require.NoError(c.T(), err)
-
-					token, err := tokenregistration.GetRegistrationToken(client, clusterStatus.ClusterName)
-					require.NoError(c.T(), err)
-
-					for key, node := range nodes {
-						c.T().Logf("Execute Registration Command for node %s", node.NodeID)
-						command := fmt.Sprintf("%s %s", token.InsecureNodeCommand, rolesPerNode[key])
-
-						output, err := node.ExecuteCommand(command)
-						require.NoError(c.T(), err)
-						c.T().Logf(output)
-					}
-
-					kubeProvisioningClient, err := c.client.GetKubeAPIProvisioningClient()
-					require.NoError(c.T(), err)
-
-					result, err := kubeProvisioningClient.Clusters(namespace).Watch(context.TODO(), metav1.ListOptions{
-						FieldSelector:  "metadata.name=" + clusterName,
-						TimeoutSeconds: &defaults.WatchTimeoutSeconds,
+		for _, nodeProviderName := range c.nodeProviders {
+			externalNodeProvider := provisioning.ExternalNodeProviderSetup(nodeProviderName)
+			for _, kubeVersion := range c.kubernetesVersions {
+				name = tt.name + " Kubernetes version: " + kubeVersion
+				for _, cni := range c.cnis {
+					name += " cni: " + cni
+					c.Run(name, func() {
+						c.testProvisioningRKE2CustomCluster(client, externalNodeProvider, rolesPerNode, kubeVersion, cni, tt.nodeCountWin, tt.hasWindows)
 					})
-					require.NoError(c.T(), err)
-
-					checkFunc := clusters.IsProvisioningClusterReady
-
-					err = wait.WatchWait(result, checkFunc)
-					assert.NoError(c.T(), err)
-					assert.Equal(c.T(), clusterName, clusterResp.ObjectMeta.Name)
-
-					clusterToken, err := clusters.CheckServiceAccountTokenSecret(client, clusterName)
-					require.NoError(c.T(), err)
-					assert.NotEmpty(c.T(), clusterToken)
-
-				})
+				}
 			}
 		}
 	}
 }
 
-func (c *CustomClusterProvisioningTestSuite) TestProvisioningCustomCluster() {
-	for _, nodeProviderName := range c.nodeProviders {
-		externalNodeProvider := provisioning.ExternalNodeProviderSetup(nodeProviderName)
-		c.ProvisioningRKE2CustomCluster(externalNodeProvider)
-	}
-}
+func (c *CustomClusterProvisioningTestSuite) testProvisioningRKE2CustomCluster(client *rancher.Client, externalNodeProvider provisioning.ExternalNodeProvider, nodesAndRoles []string, kubeVersion, cni string, nodeCountWin int, hasWindows bool) {
+	numNodesLin := len(nodesAndRoles)
 
-func (c *CustomClusterProvisioningTestSuite) TestProvisioningCustomClusterDynamicInput() {
-	clustersConfig := new(provisioning.Config)
-	config.LoadConfig(provisioning.ConfigurationFileKey, clustersConfig)
-	nodesAndRoles := clustersConfig.NodesAndRoles
+	linuxNodes, winNodes, err := externalNodeProvider.NodeCreationFunc(client, numNodesLin, nodeCountWin, hasWindows)
+	require.NoError(c.T(), err)
 
-	if len(nodesAndRoles) == 0 {
-		c.T().Skip()
+	clusterName := namegen.AppendRandomString(externalNodeProvider.Name)
+
+	cluster := clusters.NewK3SRKE2ClusterConfig(clusterName, namespace, cni, "", kubeVersion, nil)
+
+	clusterResp, err := clusters.CreateK3SRKE2Cluster(client, cluster)
+	require.NoError(c.T(), err)
+
+	client, err = client.ReLogin()
+	require.NoError(c.T(), err)
+	customCluster, err := client.Steve.SteveType(clusters.ProvisioningSteveResouceType).ByID(clusterResp.ID)
+	require.NoError(c.T(), err)
+
+	clusterStatus := &apiv1.ClusterStatus{}
+	err = v1.ConvertToK8sType(customCluster.Status, clusterStatus)
+	require.NoError(c.T(), err)
+
+	token, err := tokenregistration.GetRegistrationToken(client, clusterStatus.ClusterName)
+	require.NoError(c.T(), err)
+
+	for key, linuxNode := range linuxNodes {
+		c.T().Logf("Execute Registration Command for node %s", linuxNode.NodeID)
+		command := fmt.Sprintf("%s %s", token.InsecureNodeCommand, nodesAndRoles[key])
+
+		output, err := linuxNode.ExecuteCommand(command)
+		require.NoError(c.T(), err)
+
+		c.T().Logf(output)
 	}
 
-	for _, nodeProviderName := range c.nodeProviders {
-		externalNodeProvider := provisioning.ExternalNodeProviderSetup(nodeProviderName)
-		c.ProvisioningRKE2CustomClusterDynamicInput(externalNodeProvider, nodesAndRoles)
+	kubeProvisioningClient, err := c.client.GetKubeAPIProvisioningClient()
+	require.NoError(c.T(), err)
+	result, err := kubeProvisioningClient.Clusters(namespace).Watch(context.TODO(), metav1.ListOptions{
+		FieldSelector: "metadata.name=" + clusterName,
+
+		TimeoutSeconds: &defaults.WatchTimeoutSeconds,
+	})
+	require.NoError(c.T(), err)
+
+	checkFunc := clusters.IsProvisioningClusterReady
+	err = wait.WatchWait(result, checkFunc)
+	assert.NoError(c.T(), err)
+	assert.Equal(c.T(), clusterName, clusterResp.ObjectMeta.Name)
+
+	if hasWindows {
+		for _, winNode := range winNodes {
+			c.T().Logf("Execute Registration Command for node %s", winNode.NodeID)
+			winCommand := fmt.Sprintf("%s", token.InsecureWindowsNodeCommand)
+
+			output, err := winNode.ExecuteCommand("powershell.exe" + winCommand)
+			require.NoError(c.T(), err)
+
+			c.T().Logf(string(output[:]))
+		}
+
+		kubeWinProvisioningClient, err := c.client.GetKubeAPIProvisioningClient()
+		require.NoError(c.T(), err)
+
+		result, err := kubeWinProvisioningClient.Clusters(namespace).Watch(context.TODO(), metav1.ListOptions{
+			FieldSelector: "metadata.name=" + clusterName,
+
+			TimeoutSeconds: &defaults.WatchTimeoutSeconds,
+		})
+		require.NoError(c.T(), err)
+
+		checkFunc := clusters.IsProvisioningClusterReady
+		err = wait.WatchWait(result, checkFunc)
+		assert.NoError(c.T(), err)
+		assert.Equal(c.T(), clusterName, clusterResp.ObjectMeta.Name)
 	}
+
+	clusterToken, err := clusters.CheckServiceAccountTokenSecret(client, clusterName)
+	require.NoError(c.T(), err)
+	assert.NotEmpty(c.T(), clusterToken)
 }
 
 // In order for 'go test' to run this suite, we need to create
