@@ -8,8 +8,8 @@
       "id": "test-ns-1/test1",
       "kind": "Secret",
       "links": {
-        "self": "https://localhost:8443/v1/secrets/test-ns-1/test1",
-        "view": "https://localhost:8443/api/v1/namespaces/test-ns-1/secrets/test1"
+        "self": "https://rancherurl/v1/secrets/test-ns-1/test1",
+        "view": "https://rancherurl/api/v1/namespaces/test-ns-1/secrets/test1"
       },
       "metadata": {
         "name": "test1",
@@ -28,8 +28,8 @@
       "id": "test-ns-1/test2",
       "kind": "Secret",
       "links": {
-        "self": "https://localhost:8443/v1/secrets/test-ns-1/test2",
-        "view": "https://localhost:8443/api/v1/namespaces/test-ns-1/secrets/test2"
+        "self": "https://rancherurl/v1/secrets/test-ns-1/test2",
+        "view": "https://rancherurl/api/v1/namespaces/test-ns-1/secrets/test2"
       },
       "metadata": {
         "labels": {
@@ -51,8 +51,8 @@
       "id": "test-ns-1/test3",
       "kind": "Secret",
       "links": {
-        "self": "https://localhost:8443/v1/secrets/test-ns-1/test3",
-        "view": "https://localhost:8443/api/v1/namespaces/test-ns-1/secrets/test3"
+        "self": "https://rancherurl/v1/secrets/test-ns-1/test3",
+        "view": "https://rancherurl/api/v1/namespaces/test-ns-1/secrets/test3"
       },
       "metadata": {
         "labels": {
@@ -74,8 +74,8 @@
       "id": "test-ns-1/test4",
       "kind": "Secret",
       "links": {
-        "self": "https://localhost:8443/v1/secrets/test-ns-1/test4",
-        "view": "https://localhost:8443/api/v1/namespaces/test-ns-1/secrets/test4"
+        "self": "https://rancherurl/v1/secrets/test-ns-1/test4",
+        "view": "https://rancherurl/api/v1/namespaces/test-ns-1/secrets/test4"
       },
       "metadata": {
         "labels": {
@@ -97,8 +97,8 @@
       "id": "test-ns-1/test5",
       "kind": "Secret",
       "links": {
-        "self": "https://localhost:8443/v1/secrets/test-ns-1/test5",
-        "view": "https://localhost:8443/api/v1/namespaces/test-ns-1/secrets/test5"
+        "self": "https://rancherurl/v1/secrets/test-ns-1/test5",
+        "view": "https://rancherurl/api/v1/namespaces/test-ns-1/secrets/test5"
       },
       "metadata": {
         "labels": {
@@ -116,7 +116,7 @@
     }
   ],
   "links": {
-    "self": "https://localhost:8443/v1/secrets"
+    "self": "https://rancherurl/v1/secrets"
   },
   "resourceType": "secret",
   "revision": "100",

@@ -3,7 +3,7 @@
   "continue": "nondeterministictoken",
   "count": 3,
   "createTypes": {
-    "secret": "https://localhost:8443/v1/secrets"
+    "secret": "https://rancherurl/v1/secrets"
   },
   "data": [
     {
@@ -12,10 +12,10 @@
       "id": "test-ns-1/test1",
       "kind": "Secret",
       "links": {
-        "remove": "https://localhost:8443/v1/secrets/test-ns-1/test1",
-        "self": "https://localhost:8443/v1/secrets/test-ns-1/test1",
-        "update": "https://localhost:8443/v1/secrets/test-ns-1/test1",
-        "view": "https://localhost:8443/api/v1/namespaces/test-ns-1/secrets/test1"
+        "remove": "https://rancherurl/v1/secrets/test-ns-1/test1",
+        "self": "https://rancherurl/v1/secrets/test-ns-1/test1",
+        "update": "https://rancherurl/v1/secrets/test-ns-1/test1",
+        "view": "https://rancherurl/api/v1/namespaces/test-ns-1/secrets/test1"
       },
       "metadata": {
         "name": "test1",
@@ -34,10 +34,10 @@
       "id": "test-ns-1/test2",
       "kind": "Secret",
       "links": {
-        "remove": "https://localhost:8443/v1/secrets/test-ns-1/test2",
-        "self": "https://localhost:8443/v1/secrets/test-ns-1/test2",
-        "update": "https://localhost:8443/v1/secrets/test-ns-1/test2",
-        "view": "https://localhost:8443/api/v1/namespaces/test-ns-1/secrets/test2"
+        "remove": "https://rancherurl/v1/secrets/test-ns-1/test2",
+        "self": "https://rancherurl/v1/secrets/test-ns-1/test2",
+        "update": "https://rancherurl/v1/secrets/test-ns-1/test2",
+        "view": "https://rancherurl/api/v1/namespaces/test-ns-1/secrets/test2"
       },
       "metadata": {
         "labels": {
@@ -59,10 +59,10 @@
       "id": "test-ns-1/test3",
       "kind": "Secret",
       "links": {
-        "remove": "https://localhost:8443/v1/secrets/test-ns-1/test3",
-        "self": "https://localhost:8443/v1/secrets/test-ns-1/test3",
-        "update": "https://localhost:8443/v1/secrets/test-ns-1/test3",
-        "view": "https://localhost:8443/api/v1/namespaces/test-ns-1/secrets/test3"
+        "remove": "https://rancherurl/v1/secrets/test-ns-1/test3",
+        "self": "https://rancherurl/v1/secrets/test-ns-1/test3",
+        "update": "https://rancherurl/v1/secrets/test-ns-1/test3",
+        "view": "https://rancherurl/api/v1/namespaces/test-ns-1/secrets/test3"
       },
       "metadata": {
         "labels": {
@@ -80,11 +80,11 @@
     }
   ],
   "links": {
-    "self": "https://localhost:8443/v1/secrets/test-ns-1"
+    "self": "https://rancherurl/v1/secrets/test-ns-1"
   },
   "pagination": {
-    "first": "https://localhost:8443/v1/secrets/test-ns-1",
-    "next": "https://localhost:8443/v1/secrets/test-ns-1?continue=nondeterministictoken\u0026limit=3",
+    "first": "https://rancherurl/v1/secrets/test-ns-1",
+    "next": "https://rancherurl/v1/secrets/test-ns-1?continue=nondeterministictoken\u0026limit=3",
     "partial": true
   },
   "resourceType": "secret",

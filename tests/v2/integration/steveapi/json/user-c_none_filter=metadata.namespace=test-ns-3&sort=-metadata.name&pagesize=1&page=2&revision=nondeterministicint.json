@@ -8,8 +8,8 @@
       "id": "test-ns-3/test1",
       "kind": "Secret",
       "links": {
-        "self": "https://localhost:8443/v1/secrets/test-ns-3/test1",
-        "view": "https://localhost:8443/api/v1/namespaces/test-ns-3/secrets/test1"
+        "self": "https://rancherurl/v1/secrets/test-ns-3/test1",
+        "view": "https://rancherurl/api/v1/namespaces/test-ns-3/secrets/test1"
       },
       "metadata": {
         "name": "test1",
@@ -24,7 +24,7 @@
     }
   ],
   "links": {
-    "self": "https://localhost:8443/v1/secrets"
+    "self": "https://rancherurl/v1/secrets"
   },
   "pages": 2,
   "resourceType": "secret",
