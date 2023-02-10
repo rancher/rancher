@@ -19,7 +19,8 @@ import (
 )
 
 const (
-	repoName = "rancher-charts"
+	repoName         = "rancher-charts"
+	webhookChartName = "rancher-webhook"
 )
 
 func Register(ctx context.Context, wContext *wrangler.Context) error {
@@ -79,7 +80,9 @@ func (h *handler) onRepo(key string, repo *catalog.ClusterRepo) (*catalog.Cluste
 				values[k] = v
 			}
 		}
-		if err := h.manager.Ensure(chartDef.ReleaseNamespace, chartDef.ChartName, chartDef.MinVersionSetting.Get(), values, false); err != nil {
+		// webhook needs to be able to adopt the MutatingWebhookConfiguration which originally wasn't a part of the
+		// chart definition, but is now part of the chart definition
+		if err := h.manager.Ensure(chartDef.ReleaseNamespace, chartDef.ChartName, chartDef.MinVersionSetting.Get(), values, chartDef.ChartName == webhookChartName); err != nil {
 			return repo, err
 		}
 	}
@@ -91,7 +94,7 @@ func (h *handler) getChartsToInstall() []*chart.Definition {
 	return []*chart.Definition{
 		{
 			ReleaseNamespace:  namespace.System,
-			ChartName:         "rancher-webhook",
+			ChartName:         webhookChartName,
 			MinVersionSetting: settings.RancherWebhookMinVersion,
 			Values: func() map[string]interface{} {
 				values := map[string]interface{}{
