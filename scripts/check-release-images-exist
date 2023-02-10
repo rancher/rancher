@@ -15,7 +15,7 @@ if [ -n "${DRONE_TAG}" ]; then
     # We skip rancher/rancher and rancher/rancher-agent because the manifest for these gets created later in the pipeline
     for rancherimage in $(cat ./bin/rancher-images.txt | egrep -v "^rancher/rancher:|^rancher/rancher-agent:"); do
       echo "INFO: Checking if image [${rancherimage}] exists"
-      if ! docker manifest inspect ${rancherimage} >/dev/null; then
+      if ! skopeo inspect "docker://${rancherimage}" >/dev/null; then
         echo "ERROR: Image [${rancherimage}] does not exist"
         echo "${rancherimage}" >> $TEMP_FILE
       else

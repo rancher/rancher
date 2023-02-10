@@ -14,7 +14,7 @@ ENV KUSTOMIZE_VERSION v5.0.0
 # kontainer-driver-metadata branch to be set for specific branch other than dev/master, logic at rancher/rancher/pkg/settings/setting.go
 ENV CATTLE_KDM_BRANCH=dev-v2.7
 
-RUN zypper -n install gcc binutils glibc-devel-static ca-certificates git-core wget curl unzip tar vim less file xz gzip sed gawk iproute2 iptables jq
+RUN zypper -n install gcc binutils glibc-devel-static ca-certificates git-core wget curl unzip tar vim less file xz gzip sed gawk iproute2 iptables jq skopeo
 # use containerd from k3s image, not from bci
 RUN zypper install -y -f docker && rpm -e --nodeps --noscripts containerd
 
