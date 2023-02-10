@@ -9,6 +9,7 @@ import (
 
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/clusterregistrationtoken"
+	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	"github.com/rancher/rancher/pkg/tunnelserver/mcmauthorizer"
 	"github.com/rancher/rke/hosts"
 
@@ -28,7 +29,7 @@ import (
 	rkepki "github.com/rancher/rke/pki"
 	rkeservices "github.com/rancher/rke/services"
 	"github.com/sirupsen/logrus"
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 )
 
 const (
@@ -284,7 +285,7 @@ func FilterHostForSpec(spec *rketypes.RancherKubernetesEngineConfig, n *v3.Node)
 }
 
 func AugmentProcesses(token string, processes map[string]rketypes.Process, worker bool, nodeName string,
-	cluster *v3.Cluster) (map[string]rketypes.Process, error) {
+	cluster *v3.Cluster, secretLister v1.SecretLister) (map[string]rketypes.Process, error) {
 	var shared bool
 
 OuterLoop:
@@ -304,7 +305,7 @@ OuterLoop:
 		if err != nil {
 			return nil, err
 		}
-		privateRegistryConfig, _ := util.GenerateClusterPrivateRegistryDockerConfig(cluster)
+		_, privateRegistryConfig, _ := util.GeneratePrivateRegistryDockerConfig(cluster, secretLister)
 		processes["share-mnt"] = rketypes.Process{
 			Name:  "share-mnt",
 			Args:  nodeCommand,
@@ -361,7 +362,7 @@ func EnhanceWindowsProcesses(processes map[string]rketypes.Process) map[string]r
 func AppendTaintsToKubeletArgs(processes map[string]rketypes.Process, nodeConfigTaints []rketypes.RKETaint) map[string]rketypes.Process {
 	if kubelet, ok := processes["kubelet"]; ok && len(nodeConfigTaints) != 0 {
 		initialTaints := taints.GetTaintsFromStrings(taints.GetStringsFromRKETaint(nodeConfigTaints))
-		var currentTaints []v1.Taint
+		var currentTaints []corev1.Taint
 		foundArgs := ""
 		for i, arg := range kubelet.Command {
 			if strings.HasPrefix(arg, "--register-with-taints=") {

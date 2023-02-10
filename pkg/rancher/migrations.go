@@ -177,8 +177,8 @@ func forceSystemAndDefaultProjectCreation(configMapController controllerv1.Confi
 			return err
 		}
 
-		v32.ClusterConditionconditionDefaultProjectCreated.Unknown(localCluster)
-		v32.ClusterConditionconditionSystemProjectCreated.Unknown(localCluster)
+		v32.ClusterConditionDefaultProjectCreated.Unknown(localCluster)
+		v32.ClusterConditionSystemProjectCreated.Unknown(localCluster)
 
 		_, err = clusterClient.Update(localCluster)
 		return err
