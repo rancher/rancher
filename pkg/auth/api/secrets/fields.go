@@ -20,7 +20,7 @@ var (
 		client.ShibbolethConfigType:      {client.ShibbolethConfigFieldSpKey},
 		client.GoogleOauthConfigType:     {client.GoogleOauthConfigFieldOauthCredential, client.GoogleOauthConfigFieldServiceAccountCredential},
 		client.OIDCConfigType:            {client.OIDCConfigFieldPrivateKey, client.OIDCConfigFieldClientSecret},
-		client.KeyCloakOIDCConfigType:    {client.KeyCloakOIDCConfigFieldPrivateKey},
+		client.KeyCloakOIDCConfigType:    {client.KeyCloakOIDCConfigFieldPrivateKey, client.KeyCloakOIDCConfigFieldClientSecret},
 	}
 	// SubTypeToFields associates an Auth Config type with a nested map of secret names related to the config.
 	SubTypeToFields = map[string]map[string][]string{
