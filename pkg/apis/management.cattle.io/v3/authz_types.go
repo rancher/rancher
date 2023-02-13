@@ -193,5 +193,5 @@ func (c *ClusterRoleTemplateBinding) ObjClusterName() string {
 }
 
 type SetPodSecurityPolicyTemplateInput struct {
-	PodSecurityPolicyTemplateName string `json:"podSecurityPolicyTemplateId" norman:"required,type=reference[podSecurityPolicyTemplate]"`
+	PodSecurityPolicyTemplateName string `json:"podSecurityPolicyTemplateId" norman:"type=reference[podSecurityPolicyTemplate]"`
 }
