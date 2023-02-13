@@ -129,6 +129,11 @@ func (e *eksOperatorController) onClusterChange(key string, cluster *mgmtv3.Clus
 
 	}
 
+	// imported cluster's nodegroups may nil
+	if cluster.Spec.EKSConfig.Imported && cluster.Spec.EKSConfig.DisplayName != "" && cluster.Spec.EKSConfig.NodeGroups == nil {
+		cluster.Spec.EKSConfig.NodeGroups = []eksv1.NodeGroup{}
+	}
+
 	eksClusterConfigMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&cluster.Spec.EKSConfig)
 	if err != nil {
 		return cluster, err
