@@ -35,7 +35,9 @@ if [ -e /var/lib/rancher/k3s/server/db/etcd ]; then
   k3s server --cluster-init --cluster-reset &> ./k3s-cluster-reset.log
   K3S_CR_CODE=$?
   if [ "${K3S_CR_CODE}" -ne 0 ]; then
-    echo "ERROR:" && cat ./k3s-cluster-reset.log
+    echo "ERROR while running 'k3s server --cluster-init --cluster-reset', exit code ${K3S_CR_CODE}"
+    echo "Last 50 lines of k3s.log:" && tail -n 50 ./k3s.log
+    echo "Contents of k3s-cluster-reset.log:" && cat ./k3s-cluster-reset.log
     rm -f /var/lib/rancher/k3s/server/db/reset-flag
     exit ${K3S_CR_CODE}
   fi
