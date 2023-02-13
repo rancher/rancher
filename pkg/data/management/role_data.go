@@ -78,8 +78,6 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 		addRule().apiGroups("management.cattle.io").resources("features").verbs("get", "list", "watch", "update")
 	rb.addRole("Manage PodSecurityPolicy Templates", "podsecuritypolicytemplates-manage").
 		addRule().apiGroups("management.cattle.io").resources("podsecuritypolicytemplates").verbs("*")
-	rb.addRole("Manage PodSecurityAdmissionConfiguration Templates", "podsecurityadmissionconfigurationtemplates-manage").
-		addRule().apiGroups("management.cattle.io").resources("podsecurityadmissionconfigurationtemplates").verbs("*")
 	rb.addRole("Create RKE Templates", "clustertemplates-create").
 		addRule().apiGroups("management.cattle.io").resources("clustertemplates").verbs("create")
 	rb.addRole("Create RKE Template Revisions", "clustertemplaterevisions-create").
