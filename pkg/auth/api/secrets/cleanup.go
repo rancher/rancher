@@ -16,7 +16,7 @@ import (
 // CleanupClientSecrets tries to delete common client secrets for each auth provider.
 func CleanupClientSecrets(secretInterface corev1.SecretInterface, config *v3.AuthConfig) error {
 	if config == nil {
-		return fmt.Errorf("cannot delete auth provider resources if its config is nil")
+		return fmt.Errorf("cannot delete auth provider secrets if its config is nil")
 	}
 
 	fields, ok := TypeToFields[config.Type]

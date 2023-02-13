@@ -73,7 +73,7 @@ func TestCleanupRuns(t *testing.T) {
 			configEnabled:      true,
 			annotationValue:    CleanupRancherLocked,
 			expectCleanup:      false,
-			newAnnotationValue: CleanupRancherLocked,
+			newAnnotationValue: CleanupUnlocked,
 		},
 		{
 			name:               "no cleanup in enabled user_locked auth config",
@@ -95,7 +95,6 @@ func TestCleanupRuns(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			t.Parallel()
 			mockUsers := newMockUserLister()
 			var service cleanupService
 			controller := authConfigController{
