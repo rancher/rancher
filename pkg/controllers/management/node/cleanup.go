@@ -355,7 +355,7 @@ func (m *Lifecycle) createCleanupJob(userContext *config.UserContext, cluster *v
 	// We don't need the value of these secrets, however their existence means there should be a secret to add to the list
 	// of imagePullSecrets
 	if cluster.GetSecret(v3.ClusterPrivateRegistrySecret) != "" || cluster.Spec.ClusterSecrets.PrivateRegistryECRSecret != "" {
-		if url, _, err := util.GeneratePrivateRegistryDockerConfig(cluster, m.secretLister); err != nil {
+		if url, _, err := util.GeneratePrivateRegistryEncodedDockerConfig(cluster, m.secretLister); err != nil {
 			return nil, err
 		} else if url != "" {
 			imagePullSecrets = append(imagePullSecrets, corev1.LocalObjectReference{Name: "cattle-private-registry"})
