@@ -1,6 +1,7 @@
 package cluster
 
 import (
+	"encoding/base64"
 	"fmt"
 	"testing"
 
@@ -49,7 +50,7 @@ func TestGeneratePrivateRegistryDockerConfig(t *testing.T) {
 		{
 			name:           "rke1 private registry",
 			expectedUrl:    "0123456789abcdef.dkr.ecr.us-east-1.amazonaws.com",
-			expectedConfig: "testConfig", // should be directly copied from RKE1 secret
+			expectedConfig: base64.URLEncoding.EncodeToString([]byte("testConfig")), // should be directly copied from RKE1 secret
 			expectedError:  "",
 			cluster: &v3.Cluster{
 				Spec: v3.ClusterSpec{
@@ -83,7 +84,7 @@ func TestGeneratePrivateRegistryDockerConfig(t *testing.T) {
 		{
 			name:           "v2prov private registry",
 			expectedUrl:    "0123456789abcdef.dkr.ecr.us-east-1.amazonaws.com",
-			expectedConfig: `{"auths":{"0123456789abcdef.dkr.ecr.us-east-1.amazonaws.com":{"username":"testuser","password":"password","auth":"dGVzdHVzZXI6cGFzc3dvcmQ="}}}`,
+			expectedConfig: base64.URLEncoding.EncodeToString([]byte(`{"auths":{"0123456789abcdef.dkr.ecr.us-east-1.amazonaws.com":{"username":"testuser","password":"password","auth":"dGVzdHVzZXI6cGFzc3dvcmQ="}}}`)),
 			expectedError:  "",
 			cluster: &v3.Cluster{
 				Spec: v3.ClusterSpec{
@@ -117,7 +118,7 @@ func TestGeneratePrivateRegistryDockerConfig(t *testing.T) {
 			for _, s := range tt.secrets {
 				mockSecrets[fmt.Sprintf("%s:%s", s.Namespace, s.Name)] = s
 			}
-			url, cfg, err := GeneratePrivateRegistryDockerConfig(tt.cluster, secretLister)
+			url, cfg, err := GeneratePrivateRegistryEncodedDockerConfig(tt.cluster, secretLister)
 			assert.Equal(t, tt.expectedUrl, url)
 			assert.Equal(t, tt.expectedConfig, cfg)
 			if tt.expectedError == "" {

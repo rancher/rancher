@@ -53,19 +53,19 @@ func GetPrivateClusterLevelRegistry(cluster *v3.Cluster) *rketypes.PrivateRegist
 	return nil
 }
 
-// GeneratePrivateRegistryDockerConfig generates a base64 encoded docker config JSON blob for the provided registry, and
-// returns the registry url, the json credentials, and an error if one was encountered. If the cluster is nil or no
-// registry is configured for an RKE1 or v2prov cluster, no registry url or json blob are returned, but there is no
-// error returned, since not having a registry is not an error. If a registry is configured for the cluster such that
-// we know what the URL is, but we do not have enough information to generate the auth config, we return the url, an
-// empty string for the auth config, and no error, as we have determined where the private registry is, but the lack of
-// secrets indicate to us that the registry does not need authentication to communicate. For RKE1, we attempt to utilize
-// the ECR credential plugin if the corresponding secret exists, otherwise the RKE1 private registry secret is stored in
-// the docker config JSON format, so no transformation is required. Otherwise, for v2prov clusters, we extract the
-// username and password from the secret, and transform it into the expected docker config JSON format. This function
-// should not be called with unmigrated clusters, although it is benign to call this function with assembler clusters,
-// as the function will reassemble them anyway.
-func GeneratePrivateRegistryDockerConfig(cluster *v3.Cluster, secretLister v1.SecretLister) (string, string, error) {
+// GeneratePrivateRegistryEncodedDockerConfig generates a base64 encoded docker config JSON blob for the provided
+// registry, and returns the registry url, the json credentials, and an error if one was encountered. If the cluster is
+// nil or no registry is configured for an RKE1 or v2prov cluster, no registry url or json blob are returned, but there
+// is no error returned, since not having a registry is not an error. If a registry is configured for the cluster such
+// that we know what the URL is, but we do not have enough information to generate the auth config, we return the url,
+// an empty string for the auth config, and no error, as we have determined where the private registry is, but the lack
+// of secrets indicate to us that the registry does not need authentication to communicate. For RKE1, we attempt to
+// utilize the ECR credential plugin if the corresponding secret exists, otherwise the RKE1 private registry secret is
+// stored in the docker config JSON format, so no transformation is required. Otherwise, for v2prov clusters, we extract
+// the username and password from the secret, and transform it into the expected docker config JSON format. This
+// function should not be called with unmigrated clusters, although it is benign to call this function with assembler
+// clusters, as the function will reassemble them anyway.
+func GeneratePrivateRegistryEncodedDockerConfig(cluster *v3.Cluster, secretLister v1.SecretLister) (string, string, error) {
 	var err error
 	if cluster == nil {
 		return "", "", nil
@@ -107,7 +107,7 @@ func GeneratePrivateRegistryDockerConfig(cluster *v3.Cluster, secretLister v1.Se
 		// check for the RKE1 registry secret next
 		registrySecret, err := secretLister.Get(namespace.GlobalNamespace, registrySecretName)
 		if err == nil {
-			return registry.URL, string(registrySecret.Data[corev1.DockerConfigJsonKey]), nil
+			return registry.URL, base64.URLEncoding.EncodeToString(registrySecret.Data[corev1.DockerConfigJsonKey]), nil
 		}
 		if err != nil && !apierrors.IsNotFound(err) { // ignore secret not found errors as we need to check v2prov clusters
 			return registry.URL, "", err
@@ -149,5 +149,5 @@ func GeneratePrivateRegistryDockerConfig(cluster *v3.Cluster, secretLister v1.Se
 		return registryURL, "", err
 	}
 
-	return registryURL, string(registryJSON), nil
+	return registryURL, base64.URLEncoding.EncodeToString(registryJSON), nil
 }
