@@ -14,7 +14,7 @@
 ### Manual Testing
 <!-- Describe what manual testing you did (if no testing was done, explain why). -->
 
-### Automated Testing
+### What automated test did you add? The issue cannot be sent to QA without a test.
 <!--If you added/updated unit/integration/validation tests, describe what cases they cover and do not cover. -->
 
 ## QA Testing Considerations
