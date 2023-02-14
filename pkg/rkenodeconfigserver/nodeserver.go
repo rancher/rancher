@@ -305,7 +305,7 @@ OuterLoop:
 		if err != nil {
 			return nil, err
 		}
-		_, privateRegistryConfig, _ := util.GeneratePrivateRegistryDockerConfig(cluster, lister)
+		_, privateRegistryConfig, _ := util.GeneratePrivateRegistryEncodedDockerConfig(cluster, lister)
 		processes["share-mnt"] = rketypes.Process{
 			Name:  "share-mnt",
 			Args:  nodeCommand,
