@@ -24,8 +24,10 @@ const (
 	AzureCloudProviderFieldResourceGroup                = "resourceGroup"
 	AzureCloudProviderFieldRouteTableName               = "routeTableName"
 	AzureCloudProviderFieldSecurityGroupName            = "securityGroupName"
+	AzureCloudProviderFieldSecurityGroupResourceGroup   = "securityGroupResourceGroup"
 	AzureCloudProviderFieldSubnetName                   = "subnetName"
 	AzureCloudProviderFieldSubscriptionID               = "subscriptionId"
+	AzureCloudProviderFieldTags                         = "tags"
 	AzureCloudProviderFieldTenantID                     = "tenantId"
 	AzureCloudProviderFieldUseInstanceMetadata          = "useInstanceMetadata"
 	AzureCloudProviderFieldUseManagedIdentityExtension  = "useManagedIdentityExtension"
@@ -58,8 +60,10 @@ type AzureCloudProvider struct {
 	ResourceGroup                string `json:"resourceGroup,omitempty" yaml:"resourceGroup,omitempty"`
 	RouteTableName               string `json:"routeTableName,omitempty" yaml:"routeTableName,omitempty"`
 	SecurityGroupName            string `json:"securityGroupName,omitempty" yaml:"securityGroupName,omitempty"`
+	SecurityGroupResourceGroup   string `json:"securityGroupResourceGroup,omitempty" yaml:"securityGroupResourceGroup,omitempty"`
 	SubnetName                   string `json:"subnetName,omitempty" yaml:"subnetName,omitempty"`
 	SubscriptionID               string `json:"subscriptionId,omitempty" yaml:"subscriptionId,omitempty"`
+	Tags                         string `json:"tags,omitempty" yaml:"tags,omitempty"`
 	TenantID                     string `json:"tenantId,omitempty" yaml:"tenantId,omitempty"`
 	UseInstanceMetadata          bool   `json:"useInstanceMetadata,omitempty" yaml:"useInstanceMetadata,omitempty"`
 	UseManagedIdentityExtension  bool   `json:"useManagedIdentityExtension,omitempty" yaml:"useManagedIdentityExtension,omitempty"`

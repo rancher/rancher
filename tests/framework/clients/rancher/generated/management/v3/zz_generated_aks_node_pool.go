@@ -15,6 +15,7 @@ const (
 	AKSNodePoolFieldOsDiskType          = "osDiskType"
 	AKSNodePoolFieldOsType              = "osType"
 	AKSNodePoolFieldVMSize              = "vmSize"
+	AKSNodePoolFieldVnetSubnetID        = "vnetSubnetID"
 )
 
 type AKSNodePool struct {
@@ -31,4 +32,5 @@ type AKSNodePool struct {
 	OsDiskType          string    `json:"osDiskType,omitempty" yaml:"osDiskType,omitempty"`
 	OsType              string    `json:"osType,omitempty" yaml:"osType,omitempty"`
 	VMSize              string    `json:"vmSize,omitempty" yaml:"vmSize,omitempty"`
+	VnetSubnetID        *string   `json:"vnetSubnetID,omitempty" yaml:"vnetSubnetID,omitempty"`
 }
