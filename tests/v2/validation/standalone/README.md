@@ -10,6 +10,7 @@ corralPackages:
     ...
   debug: <bool, default=false>
   cleanup: <bool, default=true>
+  customRepo: <string, (optional) suggeseted=https://github.com/rancherlabs/corral-packages.git>
 
 corralConfigs:
   corralConfigUser: <string, default="jenkauto">
