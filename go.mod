@@ -119,7 +119,7 @@ require (
 	github.com/rancher/rke v1.4.3-rc6
 	github.com/rancher/steve v0.0.0-20230120232010-53fbb87f5968
 	github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20210727200656-10b094e30007
-	github.com/rancher/wrangler v1.0.1-0.20230110004444-57f14d386afb
+	github.com/rancher/wrangler v1.0.1-0.20230131212012-76adc44fca0c
 	github.com/robfig/cron v1.1.0
 	github.com/sirupsen/logrus v1.9.0
 	github.com/stretchr/testify v1.8.1
