@@ -40,6 +40,8 @@ const (
 	webhookReceiverAnnotationValue = "true"
 	// Steve type for prometheus rules for schema
 	prometheusRulesSteveType = "monitoring.coreos.com.prometheusrule"
+	// rancherShellSettingID is the setting ID that used to grab rancher/shell image
+	rancherShellSettingID = "shell-image"
 	// Kubeconfig that linked to webhook deployment
 	kubeConfig = `
 apiVersion: v1
@@ -350,6 +352,11 @@ func createAlertWebhookReceiverDeployment(client *rancher.Client, clusterID, nam
 	labels := map[string]string{}
 	labels["workload.user.cattle.io/workloadselector"] = fmt.Sprintf("apps.deployment-%v-%v", namespace, deploymentName)
 
+	imageSetting, err := client.Management.Setting.ByID(rancherShellSettingID)
+	if err != nil {
+		return nil, err
+	}
+
 	// Create webhook receiver deployment
 	var runAsUser int64
 	var runAsGroup int64
@@ -364,7 +371,7 @@ func createAlertWebhookReceiverDeployment(client *rancher.Client, clusterID, nam
 			Containers: []corev1.Container{
 				{
 					Name:    "kubectl",
-					Image:   "rancher/shell:v0.1.19",
+					Image:   imageSetting.Value,
 					Command: []string{"/bin/sh", "-c"},
 					Args: []string{
 						fmt.Sprintf(
