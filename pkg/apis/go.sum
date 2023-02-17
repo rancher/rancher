@@ -617,8 +617,8 @@ github.com/rancher/rke v1.4.3-rc6 h1:GeUxFQQ/N06qc4LHLePGleMKohsCYrSl0PsTJHaw+O8
 github.com/rancher/rke v1.4.3-rc6/go.mod h1:0s8+XfiyC9Ff3KLaQ4Z5mDNI+taSb/hma13xOpW6slg=
 github.com/rancher/wrangler v0.6.2-0.20200427172034-da9b142ae061/go.mod h1:n5Du/gGD7WoiqnEo0SHnPirDIp1V9Zu+6guc8lXS2dk=
 github.com/rancher/wrangler v0.8.10/go.mod h1:Lte9WjPtGYxYacIWeiS9qawvu2R4NujFU9xuXWJvc/0=
-github.com/rancher/wrangler v1.0.1-0.20230110004444-57f14d386afb h1:aPUKbac/9bcGAO1aaCng/brvDFd1d7iAagjd/suIsaw=
-github.com/rancher/wrangler v1.0.1-0.20230110004444-57f14d386afb/go.mod h1:lQorqAAIMkNWteece1GiuwZTmMqkaVTXL5qjiiPVDxQ=
+github.com/rancher/wrangler v1.0.1-0.20230131212012-76adc44fca0c h1:KlUxzuRkMTIal+OuhATLy7UqtVkDr8QKszzvqzc+pKw=
+github.com/rancher/wrangler v1.0.1-0.20230131212012-76adc44fca0c/go.mod h1:lQorqAAIMkNWteece1GiuwZTmMqkaVTXL5qjiiPVDxQ=
 github.com/rancher/wrangler-api v0.6.1-0.20200427172631-a7c2f09b783e/go.mod h1:2lcWR98q8HU3U4mVETnXc8quNG0uXxrt8vKd6cAa/30=
 github.com/remyoudompheng/bigfft v0.0.0-20170806203942-52369c62f446/go.mod h1:uYEyJGbgTkfkS4+E/PavXkNJcbFIpEtjt2B0KDQ5+9M=
 github.com/rogpeppe/fastuuid v0.0.0-20150106093220-6724a57986af/go.mod h1:XWv6SoW27p1b0cqNHllgS5HIMJraePCO15w5zCzIWYg=
