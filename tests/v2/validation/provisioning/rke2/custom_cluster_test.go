@@ -270,7 +270,7 @@ func (c *CustomClusterProvisioningTestSuite) testProvisioningRKE2CustomCluster(c
 	require.NoError(c.T(), err)
 	assert.NotEmpty(c.T(), clusterToken)
 
-	if harden.Hardened && kubeVersion < "v1.25.0" {
+	if harden.Hardened && kubeVersion <= string(provisioning.HardenedKubeVersion) {
 		err = hardening.HardeningNodes(client, harden.Hardened, linuxNodes, nodesAndRoles)
 		require.NoError(c.T(), err)
 

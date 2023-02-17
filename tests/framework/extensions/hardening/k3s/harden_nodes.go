@@ -1,6 +1,8 @@
 package hardening
 
 import (
+	"os/user"
+	"path/filepath"
 	"strings"
 
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
@@ -38,16 +40,21 @@ func HardeningNodes(client *rancher.Client, hardened bool, nodes []*nodes.Node, 
 
 		if strings.Contains(nodeRoles[key], "--controlplane") {
 			logrus.Infof("Copying over files to node %s", node.NodeID)
-			dir := "/go/src/github.com/rancher/rancher/tests/framework/extensions/hardening/k3s"
-			err = node.SCPFileToNode(dir+"/audit.yaml", "/home/"+node.SSHUser+"/audit.yaml")
+			user, err := user.Current()
+			if err != nil {
+				return nil
+			}
+
+			dirPath := filepath.Join(user.HomeDir, "go/src/github.com/rancher/rancher/tests/framework/extensions/hardening/rke2")
+			err = node.SCPFileToNode(dirPath+"/audit.yaml", "/home/"+node.SSHUser+"/audit.yaml")
 			if err != nil {
 				return err
 			}
-			err = node.SCPFileToNode(dir+"/psp.yaml", "/home/"+node.SSHUser+"/psp.yaml")
+			err = node.SCPFileToNode(dirPath+"/psp.yaml", "/home/"+node.SSHUser+"/psp.yaml")
 			if err != nil {
 				return err
 			}
-			err = node.SCPFileToNode(dir+"/system-policy.yaml", "/home/"+node.SSHUser+"/system-policy.yaml")
+			err = node.SCPFileToNode(dirPath+"/system-policy.yaml", "/home/"+node.SSHUser+"/system-policy.yaml")
 			if err != nil {
 				return err
 			}
