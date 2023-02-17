@@ -7,9 +7,11 @@ import (
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
 	"github.com/rancher/rancher/tests/framework/extensions/clusters"
+	nodestat "github.com/rancher/rancher/tests/framework/extensions/nodes"
 	"github.com/rancher/rancher/tests/framework/extensions/tokenregistration"
 	"github.com/rancher/rancher/tests/framework/extensions/users"
 	password "github.com/rancher/rancher/tests/framework/extensions/users/passwordgenerator"
+	"github.com/rancher/rancher/tests/framework/extensions/workloads/pods"
 	"github.com/rancher/rancher/tests/framework/pkg/config"
 	namegen "github.com/rancher/rancher/tests/framework/pkg/namegenerator"
 	"github.com/rancher/rancher/tests/framework/pkg/session"
@@ -215,10 +217,18 @@ func (c *CustomClusterProvisioningTestSuite) testProvisioningRKE1CustomCluster(c
 	err = wait.WatchWait(watchInterface, checkFunc)
 	require.NoError(c.T(), err)
 	assert.Equal(c.T(), clusterName, clusterResp.Name)
+	assert.Equal(c.T(), kubeVersion, clusterResp.RancherKubernetesEngineConfig.Version)
+
+	err = nodestat.IsNodeReady(client, clusterResp.ID)
+	require.NoError(c.T(), err)
 
 	clusterToken, err := clusters.CheckServiceAccountTokenSecret(client, clusterName)
 	require.NoError(c.T(), err)
 	assert.NotEmpty(c.T(), clusterToken)
+
+	podResults, podErrors := pods.StatusPods(client, clusterResp.ID)
+	assert.NotEmpty(c.T(), podResults)
+	assert.Empty(c.T(), podErrors)
 }
 
 // In order for 'go test' to run this suite, we need to create

@@ -9,8 +9,10 @@ import (
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
 	"github.com/rancher/rancher/tests/framework/extensions/clusters"
 	"github.com/rancher/rancher/tests/framework/extensions/machinepools"
+	nodestat "github.com/rancher/rancher/tests/framework/extensions/nodes"
 	"github.com/rancher/rancher/tests/framework/extensions/users"
 	password "github.com/rancher/rancher/tests/framework/extensions/users/passwordgenerator"
+	"github.com/rancher/rancher/tests/framework/extensions/workloads/pods"
 	"github.com/rancher/rancher/tests/framework/pkg/config"
 	namegen "github.com/rancher/rancher/tests/framework/pkg/namegenerator"
 	"github.com/rancher/rancher/tests/framework/pkg/session"
@@ -128,6 +130,7 @@ func (k *K3SNodeDriverProvisioningTestSuite) TestProvisioningK3SCluster() {
 
 		for _, providerName := range k.providers {
 			provider := CreateProvider(providerName)
+			providerName := " Node Provider: " + provider.Name
 			for _, kubeVersion := range k.kubernetesVersions {
 				name = tt.name + providerName + " Kubernetes version: " + kubeVersion
 				k.Run(name, func() {
@@ -165,6 +168,7 @@ func (k *K3SNodeDriverProvisioningTestSuite) TestProvisioningK3SClusterDynamicIn
 
 		for _, providerName := range k.providers {
 			provider := CreateProvider(providerName)
+			providerName := " Node Provider: " + provider.Name
 			for _, kubeVersion := range k.kubernetesVersions {
 				name = tt.name + providerName + " Kubernetes version: " + kubeVersion
 				k.Run(name, func() {
@@ -206,10 +210,21 @@ func (k *K3SNodeDriverProvisioningTestSuite) testProvisioningK3SCluster(client *
 	err = wait.WatchWait(result, checkFunc)
 	assert.NoError(k.T(), err)
 	assert.Equal(k.T(), clusterName, clusterResp.ObjectMeta.Name)
+	assert.Equal(k.T(), kubeVersion, cluster.Spec.KubernetesVersion)
+
+	clusterIDName, err := clusters.GetClusterIDByName(k.client, clusterName)
+	assert.NoError(k.T(), err)
+
+	err = nodestat.IsNodeReady(client, clusterIDName)
+	require.NoError(k.T(), err)
 
 	clusterToken, err := clusters.CheckServiceAccountTokenSecret(client, clusterName)
 	require.NoError(k.T(), err)
 	assert.NotEmpty(k.T(), clusterToken)
+
+	podResults, podErrors := pods.StatusPods(client, clusterIDName)
+	assert.NotEmpty(k.T(), podResults)
+	assert.Empty(k.T(), podErrors)
 }
 
 // In order for 'go test' to run this suite, we need to create

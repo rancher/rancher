@@ -5,12 +5,13 @@ import (
 
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
-	"github.com/rancher/rancher/tests/framework/extensions/cloudcredentials"
 	"github.com/rancher/rancher/tests/framework/extensions/cloudcredentials/aws"
 	"github.com/rancher/rancher/tests/framework/extensions/clusters"
 	"github.com/rancher/rancher/tests/framework/extensions/clusters/eks"
+	nodestat "github.com/rancher/rancher/tests/framework/extensions/nodes"
 	"github.com/rancher/rancher/tests/framework/extensions/users"
 	password "github.com/rancher/rancher/tests/framework/extensions/users/passwordgenerator"
+	"github.com/rancher/rancher/tests/framework/extensions/workloads/pods"
 	namegen "github.com/rancher/rancher/tests/framework/pkg/namegenerator"
 	"github.com/rancher/rancher/tests/framework/pkg/session"
 	"github.com/rancher/rancher/tests/framework/pkg/wait"
@@ -64,29 +65,28 @@ func (h *HostedEKSClusterProvisioningTestSuite) SetupSuite() {
 
 func (h *HostedEKSClusterProvisioningTestSuite) TestProvisioningHostedEKS() {
 	tests := []struct {
-		name            string
-		client          *rancher.Client
-		clusterName     string
-		cloudCredential *cloudcredentials.CloudCredential
+		name        string
+		client      *rancher.Client
+		clusterName string
 	}{
-		{"Admin User", h.client, "", nil},
-		{"Standard User", h.standardUserClient, "", nil},
+		{"Admin User", h.client, ""},
+		{"Standard User", h.standardUserClient, ""},
 	}
 
 	for _, tt := range tests {
+		subSession := h.session.NewSession()
+		defer subSession.Cleanup()
+
+		client, err := tt.client.WithSession(subSession)
+		require.NoError(h.T(), err)
+
 		h.Run(tt.name, func() {
-			subSession := h.session.NewSession()
-			defer subSession.Cleanup()
-
-			client, err := tt.client.WithSession(subSession)
-			require.NoError(h.T(), err)
-
-			h.testProvisioningHostedEKSCluster(client, tt.clusterName, tt.cloudCredential)
+			h.testProvisioningHostedEKSCluster(client, tt.clusterName)
 		})
 	}
 }
 
-func (h *HostedEKSClusterProvisioningTestSuite) testProvisioningHostedEKSCluster(rancherClient *rancher.Client, clusterName string, cloudcredential *cloudcredentials.CloudCredential) (*management.Cluster, error) {
+func (h *HostedEKSClusterProvisioningTestSuite) testProvisioningHostedEKSCluster(rancherClient *rancher.Client, clusterName string) (*management.Cluster, error) {
 	cloudCredential, err := aws.CreateAWSCloudCredentials(rancherClient)
 	require.NoError(h.T(), err)
 
@@ -110,6 +110,13 @@ func (h *HostedEKSClusterProvisioningTestSuite) testProvisioningHostedEKSCluster
 	clusterToken, err := clusters.CheckServiceAccountTokenSecret(rancherClient, clusterName)
 	require.NoError(h.T(), err)
 	assert.NotEmpty(h.T(), clusterToken)
+
+	err = nodestat.IsNodeReady(rancherClient, clusterResp.ID)
+	require.NoError(h.T(), err)
+
+	podResults, podErrors := pods.StatusPods(rancherClient, clusterResp.ID)
+	assert.NotEmpty(h.T(), podResults)
+	assert.Empty(h.T(), podErrors)
 
 	return clusterResp, nil
 }

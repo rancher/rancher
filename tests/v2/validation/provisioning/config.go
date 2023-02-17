@@ -5,10 +5,13 @@ import (
 	nodepools "github.com/rancher/rancher/tests/framework/extensions/rke1/nodepools"
 )
 
+type Version string
+
 const (
-	namespace = "fleet-default"
-	defaultRandStringLength = 5
-	ConfigurationFileKey    = "provisioningInput"
+	namespace                       = "fleet-default"
+	defaultRandStringLength         = 5
+	ConfigurationFileKey            = "provisioningInput"
+	HardenedKubeVersion     Version = "v1.24.99"
 )
 
 type Config struct {

@@ -2,54 +2,12 @@ package rke1
 
 import (
 	"strconv"
-	"time"
 
-	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
-	"k8s.io/apimachinery/pkg/util/wait"
+	nodestat "github.com/rancher/rancher/tests/framework/extensions/nodes"
+	"github.com/sirupsen/logrus"
 )
-
-// IsNodeReady is a helper method that will loop and check if the node is ready in the RKE1 cluster.
-// It will return an error if the node is not ready after set amount of time.
-func IsNodeReady(client *rancher.Client, nodePool *management.NodePool, ClusterID string) error {
-	err := wait.Poll(500*time.Millisecond, 30*time.Minute, func() (bool, error) {
-		nodes, err := client.Management.Node.List(&types.ListOpts{
-			Filters: map[string]interface{}{
-				"clusterId":  ClusterID,
-				"nodePoolId": nodePool.ID,
-			},
-		})
-		if err != nil {
-			return false, err
-		}
-
-		const active = "active"
-
-		for _, node := range nodes.Data {
-			node, err := client.Management.Node.ByID(node.ID)
-			if err != nil {
-				return false, err
-			}
-
-			if node.State == active {
-				return true, nil
-			}
-
-			return false, nil
-		}
-		if err != nil {
-			return false, err
-		}
-
-		return false, nil
-	})
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
 
 type NodeRoles struct {
 	ControlPlane bool  `json:"controlplane,omitempty" yaml:"controlplane,omitempty"`
@@ -107,39 +65,53 @@ func ScaleWorkerNodePool(client *rancher.Client, nodeRoles []NodeRoles, ClusterI
 		ControlPlane:            false,
 		DeleteNotReadyAfterSecs: 0,
 		Etcd:                    false,
-		HostnamePrefix:          "auto-rke1-scale-test",
+		HostnamePrefix:          "auto-rke1-scale-" + ClusterID,
 		NodeTemplateID:          NodeTemplateID,
 		Quantity:                1,
 		Worker:                  true,
 	}
 
+	logrus.Infof("Creating new worker node pool...")
 	nodePool, err := client.Management.NodePool.Create(&nodePoolConfig)
 	if err != nil {
 		return err
 	}
 
-	IsNodeReady(client, nodePool, ClusterID)
+	if nodestat.IsNodeReady(client, ClusterID) != nil {
+		return err
+	}
 
+	logrus.Infof("New node pool is ready!")
 	nodePoolConfig.Quantity = 2
 
+	logrus.Infof("Scaling node pool to 2 worker nodes...")
 	updatedPool, err := client.Management.NodePool.Update(nodePool, &nodePoolConfig)
 	if err != nil {
 		return err
 	}
 
-	IsNodeReady(client, updatedPool, ClusterID)
+	if nodestat.IsNodeReady(client, ClusterID) != nil {
+		return err
+	}
 
+	logrus.Infof("Node pool is scaled to 2 worker nodes!")
 	nodePoolConfig.Quantity = 1
 
+	logrus.Infof("Scaling node pool back to 1 worker node...")
 	_, err = client.Management.NodePool.Update(updatedPool, &nodePoolConfig)
 	if err != nil {
 		return err
 	}
 
+	logrus.Infof("Node pool is scaled back to 1 worker node!")
+
+	logrus.Infof("Deleting node pool...")
 	err = client.Management.NodePool.Delete(nodePool)
 	if err != nil {
 		return err
 	}
+
+	logrus.Infof("Node pool deleted!")
 
 	return nil
 }
