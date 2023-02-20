@@ -6,7 +6,7 @@ ENV CATTLE_HELM_VERSION v2.16.8-rancher2
 ENV CATTLE_MACHINE_VERSION v0.15.0-rancher99
 ENV CATTLE_K3S_VERSION v1.25.5+k3s1
 # version used by helm plugin install script
-ENV CATTLE_HELM_UNITTEST_VERSION v0.1.7-rancher4
+ENV HELM_UNITTEST_VERSION v0.2.11
 # helm 3 version
 ENV HELM_VERSION v3.11.3
 ENV KUSTOMIZE_VERSION v5.0.0
@@ -49,14 +49,17 @@ RUN curl -sLf ${!HELM_URL_V2} -o /usr/bin/rancher-helm && \
     chmod +x /usr/bin/rancher-helm /usr/bin/rancher-tiller && \
     ln -s /usr/bin/rancher-helm /usr/bin/helm && \
     ln -s /usr/bin/rancher-tiller /usr/bin/tiller && \
-    helm init -c --stable-repo-url https://charts.helm.sh/stable/ && \
-    helm plugin install https://github.com/rancher/helm-unittest
+    helm init -c --stable-repo-url https://charts.helm.sh/stable/
 
 # set up helm 3
 RUN mkdir /usr/tmp && \
     curl ${HELM_URL_V3} | tar xvzf - --strip-components=1 -C /usr/tmp/ && \
     mv /usr/tmp/helm /usr/bin/helm_v3 && \
     chmod +x /usr/bin/kustomize
+
+RUN if [ "${ARCH}" == "amd64" ]; then \
+    helm_v3 plugin install --version $HELM_UNITTEST_VERSION https://github.com/helm-unittest/helm-unittest; \
+    fi
 
 # Set up K3s: copy the necessary binaries from the K3s image.
 COPY --from=rancher/k3s:v1.25.5-k3s1 \

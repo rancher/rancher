@@ -1,6 +1,10 @@
 #!/bin/bash
 set -e
 
+if [ "${ARCH}" != "amd64"  ]; then
+    exit 0
+fi
+
 cd $(dirname $0)
 
 ./build chart

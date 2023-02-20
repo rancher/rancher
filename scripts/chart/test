@@ -2,18 +2,18 @@
 
 echo "-- chart/test --"
 
-# Check for helm
-if [ -z "$(type -p helm)" ]; then
-    echo "helm not found. Helm is required to run tests."
+# Check for helm_v3
+if [ -z "$(type -p helm_v3)" ]; then
+    echo "helm_v3 not found. Helm is required to run tests."
     exit 1
 fi
 
 # Check for unittest plugin
-helm unittest --help >/dev/null 2>&1
+HELM_PLUGINS=/root/.local/share/helm/plugins/ helm_v3 unittest --help >/dev/null 2>&1
 if [[ $? > 0 ]]; then
-    echo "helm plugin unittest not found."
-    echo "Run to install plugin: helm plugin install https://github.com/rancher/helm-unittest"
+    echo "helm_v3 plugin unittest not found."
+    echo "Run to install plugin: helm_v3 plugin install https://github.com/helm-unittest/helm-unittest"
     exit 1
 fi
 
-helm unittest ../../build/chart/rancher
+HELM_PLUGINS=/root/.local/share/helm/plugins/ helm_v3 unittest --helm3 ../../build/chart/rancher

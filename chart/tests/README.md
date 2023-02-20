@@ -10,10 +10,10 @@ Option 1: Full chart CI run with a live cluster
 Option 2: Test runs against the chart only 
 
 ```bash
-# Install plugin if necessary, for version see CATTLE_HELM_UNITTEST_VERSION
+# Install plugin if necessary, for version see HELM_UNITTEST_VERSION
 # For a Mac you'll need to download a release and install the darwin binary
 # For linux:
-export ARCH=amd64 export CATTLE_HELM_UNITTEST_VERSION={version} helm plugin install https://github.com/rancher/helm-unittest
+export ARCH=amd64 export HELM_UNITTEST_VERSION={version} helm plugin install https://github.com/helm-unittest/helm-unittest
 
 # change automated parts of templates
 test_image="rancher/rancher"
