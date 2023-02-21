@@ -203,3 +203,30 @@ func IsClusterImported(client *rancher.Client, clusterID string) (isImported boo
 
 	return
 }
+
+// IsImportedClusterReady is basic check function that would be used for the wait.WatchWait func in pkg/wait.
+// This functions just waits until an imported cluster becomes ready.
+func IsImportedClusterReady(event watch.Event) (ready bool, err error) {
+	cluster := event.Object.(*apisV1.Cluster)
+	var readyCondition bool
+	ready = cluster.Status.Ready
+	agentDeployed := cluster.Status.AgentDeployed
+	var numSuccess int
+	for _, condition := range cluster.Status.Conditions {
+		if condition.Type == "Ready" && condition.Status == corev1.ConditionTrue {
+			numSuccess += 1
+		}
+		if condition.Type == "SystemAccountCreated" && condition.Status == corev1.ConditionTrue {
+			numSuccess += 1
+		}
+		if condition.Type == "ServiceAccountSecretsMigrated" && condition.Status == corev1.ConditionTrue {
+			numSuccess += 1
+		}
+	}
+
+	if numSuccess == 3 {
+		readyCondition = true
+	}
+
+	return ready && readyCondition && agentDeployed, nil
+}

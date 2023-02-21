@@ -1,8 +1,6 @@
 package session
 
-import (
-	"github.com/sirupsen/logrus"
-)
+import "github.com/sirupsen/logrus"
 
 // CleanupFunc is the type RegisterCleanupFunc accepts
 type CleanupFunc func() error
