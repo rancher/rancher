@@ -9,11 +9,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"reflect"
 	"strings"
 
 	"github.com/rancher/lasso/pkg/dynamic"
 	rancherv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
+	"github.com/rancher/rancher/pkg/controllers/management/drivers/nodedriver"
 	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2"
 	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2/machineprovision"
 	mgmtcontroller "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
@@ -79,14 +81,18 @@ func objects(cluster *rancherv1.Cluster, dynamic *dynamic.Controller, dynamicSch
 
 func pruneBySchema(kind string, data map[string]interface{}, dynamicSchema mgmtcontroller.DynamicSchemaCache) error {
 	ds, err := dynamicSchema.Get(strings.ToLower(kind))
+	if ds.Annotations == nil || ds.Annotations[nodedriver.OptionalFieldsMigratedAnnotation] != "true" {
+		return fmt.Errorf("waiting for dynamic schema [%s] to finish migrating", ds.Name)
+	}
 	if apierror.IsNotFound(err) {
 		return nil
 	} else if err != nil {
 		return err
 	}
 
-	for k := range data {
-		if _, ok := ds.Spec.ResourceFields[k]; !ok {
+	for k, v := range data {
+		// if the field is not expected, or if it is not required and is either empty or equal to the default value, omit it
+		if f, ok := ds.Spec.ResourceFields[k]; !ok || !f.Required && (v == nil || reflect.DeepEqual(f.DefaultValue(), v)) {
 			delete(data, k)
 		}
 	}

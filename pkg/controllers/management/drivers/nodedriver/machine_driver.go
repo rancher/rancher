@@ -50,8 +50,9 @@ var (
 )
 
 const (
-	driverNameLabel  = "io.cattle.node_driver.name"
-	uiFieldHintsAnno = "io.cattle.nodedriver/ui-field-hints"
+	driverNameLabel                  = "io.cattle.node_driver.name"
+	uiFieldHintsAnno                 = "io.cattle.nodedriver/ui-field-hints"
+	OptionalFieldsMigratedAnnotation = "management.cattle.io/migrated-optional"
 )
 
 func Register(ctx context.Context, management *config.ManagementContext) {
@@ -229,6 +230,10 @@ func (m *Lifecycle) download(obj *v3.NodeDriver) (*v3.NodeDriver, error) {
 	}
 	dynamicSchema.Labels = map[string]string{}
 	dynamicSchema.Labels[driverNameLabel] = obj.Spec.DisplayName
+	if dynamicSchema.Annotations == nil {
+		dynamicSchema.Annotations = map[string]string{}
+	}
+	dynamicSchema.Annotations[OptionalFieldsMigratedAnnotation] = "true"
 
 	_, err = m.schemaClient.Create(dynamicSchema)
 	if err != nil {
@@ -240,6 +245,10 @@ func (m *Lifecycle) download(obj *v3.NodeDriver) (*v3.NodeDriver, error) {
 			return obj, err
 		}
 		ds.Spec.ResourceFields = resourceFields
+		if ds.Annotations == nil {
+			ds.Annotations = map[string]string{}
+		}
+		ds.Annotations[OptionalFieldsMigratedAnnotation] = "true"
 
 		_, err = m.schemaClient.Update(ds)
 		if err != nil {
@@ -286,6 +295,7 @@ func (m *Lifecycle) createCredSchema(obj *v3.NodeDriver, credFields map[string]v
 		return obj, err
 	} else if !reflect.DeepEqual(credSchema.Spec.ResourceFields, credFields) {
 		toUpdate := credSchema.DeepCopy()
+		toUpdate.Annotations[OptionalFieldsMigratedAnnotation] = "true"
 		toUpdate.Spec.ResourceFields = credFields
 		_, err := m.schemaClient.Update(toUpdate)
 		if err != nil {

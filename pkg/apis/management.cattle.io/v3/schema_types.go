@@ -67,6 +67,20 @@ type Values struct {
 	StringSliceValue []string `json:"stringSliceValue"`
 }
 
+func (f *Field) DefaultValue() interface{} {
+	switch f.Type {
+	case "int":
+		return f.Default.IntValue
+	case "boolean":
+		return f.Default.BoolValue
+	case "array[string]":
+		return f.Default.StringSliceValue
+	case "password", "string":
+		return f.Default.StringValue
+	}
+	return nil
+}
+
 type Action struct {
 	Input  string `json:"input,omitempty"`
 	Output string `json:"output,omitempty"`

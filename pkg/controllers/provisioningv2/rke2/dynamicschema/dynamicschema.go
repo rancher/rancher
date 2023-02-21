@@ -211,16 +211,17 @@ func getSpecSchemas(name string, allSchemas *schemas.Schemas, spec *v3.DynamicSc
 
 		// set to nil because if map is len() == 0
 		field.Default = nil
-
-		switch field.Type {
-		case "string", "password":
-			field.Default = defMap["stringValue"]
-		case "int":
-			field.Default = defMap["intValue"]
-		case "boolean":
-			field.Default = defMap["boolValue"]
-		case "array[string]":
-			field.Default = defMap["stringSliceValue"]
+		if field.Required {
+			switch field.Type {
+			case "string", "password":
+				field.Default = defMap["stringValue"]
+			case "int":
+				field.Default = defMap["intValue"]
+			case "boolean":
+				field.Default = defMap["boolValue"]
+			case "array[string]":
+				field.Default = defMap["stringSliceValue"]
+			}
 		}
 
 		specSchema.ResourceFields[name] = field

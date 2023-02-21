@@ -31,23 +31,28 @@ func FlagToField(flag cli.Flag) (string, v32.Field, error) {
 	case *cli.StringFlag:
 		field.Description = v.Usage
 		field.Default.StringValue = v.Value
+		field.Required = !v.Optional
 	case *cli.IntFlag:
 		// This will make the int flag appear as a string field in the rancher API, but we are doing this to maintain
 		// backward compatibility, at least until we fix a bug that prevents nodeDriver schemas from updating upon
 		// a Rancher upgrade
 		field.Description = v.Usage
 		field.Default.StringValue = strconv.Itoa(v.Value)
+		field.Required = !v.Optional
 	case *cli.BoolFlag:
 		field.Type = "boolean"
 		field.Description = v.Usage
+		field.Required = !v.Optional
 	case *cli.StringSliceFlag:
 		field.Type = "array[string]"
 		field.Description = v.Usage
 		field.Nullable = true
 		field.Default.StringSliceValue = v.Value
+		field.Required = !v.Optional
 	case *BoolPointerFlag:
 		field.Type = "boolean"
 		field.Description = v.Usage
+		field.Required = !v.Optional
 	default:
 		return name, field, fmt.Errorf("unknown type of flag %v: %v", flag, reflect.TypeOf(flag))
 	}
