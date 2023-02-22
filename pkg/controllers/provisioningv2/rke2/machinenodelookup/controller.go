@@ -45,13 +45,13 @@ type handler struct {
 	dynamic             *dynamic.Controller
 }
 
-func Register(ctx context.Context, clients *wrangler.Context) {
+func Register(ctx context.Context, clients *wrangler.Context, kubeconfigManager *kubeconfig.Manager) {
 	h := &handler{
 		rancherClusterCache: clients.Provisioning.Cluster().Cache(),
 		machines:            clients.CAPI.Machine(),
 		machineCache:        clients.CAPI.Machine().Cache(),
 		rkeBootstrap:        clients.RKE.RKEBootstrap(),
-		kubeconfigManager:   kubeconfig.New(clients),
+		kubeconfigManager:   kubeconfigManager,
 		dynamic:             clients.Dynamic,
 	}
 
