@@ -58,6 +58,14 @@ func onlyRKE(machines []*capi.Machine) (result []*capi.Machine) {
 	return
 }
 
+// ClusterHasBeenBootstrapped determines if a cluster has undergone the bootstrapping process
+// by assessing the value of the joinURL. the control plane joinURL is generated during the bootstrapping process,
+// and its existence implies the creation of the cluster at some point in time.
+// Caution: there does exist a small window of time in which the joinURL has not been set, but the bootstrap node is up.
+func (p *PlanStore) ClusterHasBeenBootstrapped(plan *plan.Plan) bool {
+	return getControlPlaneJoinURL(plan) != ""
+}
+
 func (p *PlanStore) Load(cluster *capi.Cluster, rkeControlPlane *rkev1.RKEControlPlane) (*plan.Plan, error) {
 	result := &plan.Plan{
 		Nodes:    map[string]*plan.Node{},

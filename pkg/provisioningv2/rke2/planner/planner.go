@@ -256,6 +256,17 @@ func (p *Planner) Process(cp *rkev1.RKEControlPlane, status rkev1.RKEControlPlan
 		return status, err
 	}
 
+	// we need to make sure the cluster has undergone initial provisioning and bootstrapping before we can enforce this condition,
+	// otherwise the system-upgrade-controller bundle will never become ready and the planner will be indefinitely blocked.
+	// We do this by ensuring the cluster has reconciled, and has a valid control plane join URL. However, it should be noted
+	// that a small window of time does exist when the joinURL has not been set, but the bootstrap node is up.
+	if rke2.Reconciled.IsTrue(cp) && p.store.ClusterHasBeenBootstrapped(plan) && rke2.SystemUpgradeControllerReady.IsFalse(&status) {
+		if rke2.SystemUpgradeControllerReady.GetReason(&status) != "" {
+			return status, ErrWaitingf("Waiting for System Upgrade Controller to be updated for Kubernetes version %s: %s", cp.Spec.KubernetesVersion, rke2.SystemUpgradeControllerReady.GetReason(&status))
+		}
+		return status, ErrWaitingf("Waiting for System Upgrade Controller to be updated for Kubernetes version %s", cp.Spec.KubernetesVersion)
+	}
+
 	clusterSecretTokens, err := p.generateSecrets(cp)
 	if err != nil {
 		return status, err
