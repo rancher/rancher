@@ -122,7 +122,7 @@ func (h *handler) doRemove(cp *rkev1.RKEControlPlane) func() (string, error) {
 
 		for _, machine := range allMachines {
 			// Only delete custom machines. Custom machines can be added outside the UI, so it is important to check each machine.
-			if machine.APIVersion != "rke-machine.cattle.io" || machine.Kind != "CustomMachine" {
+			if machine.Spec.InfrastructureRef.APIVersion != "rke.cattle.io/v1" || machine.Spec.InfrastructureRef.Kind != "CustomMachine" {
 				continue
 			}
 			if machine.DeletionTimestamp == nil {
