@@ -103,7 +103,7 @@ type handler struct {
 	kubeconfigManager   *kubeconfig.Manager
 }
 
-func Register(ctx context.Context, clients *wrangler.Context) {
+func Register(ctx context.Context, clients *wrangler.Context, kubeconfigManager *kubeconfig.Manager) {
 	h := &handler{
 		ctx: ctx,
 		apply: clients.Apply.WithCacheTypes(clients.Core.Secret(),
@@ -123,7 +123,7 @@ func Register(ctx context.Context, clients *wrangler.Context) {
 		namespaces:          clients.Core.Namespace().Cache(),
 		dynamic:             clients.Dynamic,
 		rancherClusterCache: clients.Provisioning.Cluster().Cache(),
-		kubeconfigManager:   kubeconfig.New(clients),
+		kubeconfigManager:   kubeconfigManager,
 	}
 
 	removeHandler := generic.NewRemoveHandler("machine-provision-remove", clients.Dynamic.Update, h.OnRemove)
