@@ -54,7 +54,7 @@ func addLocalCluster(embedded bool, wrangler *wrangler.Context) error {
 				return true, nil
 			}
 		}
-		if apierrors.IsServiceUnavailable(err) {
+		if apierrors.IsServiceUnavailable(err) || apierrors.IsInternalError(err) {
 			return false, nil
 		}
 		return false, err
