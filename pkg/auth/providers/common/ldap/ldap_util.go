@@ -43,7 +43,7 @@ func NewLDAPConn(servers []string, TLS, startTLS bool, port int64, connectionTim
 		return nil, errors.New("invalid server config. at least 1 server needs to be configured")
 	}
 	for _, server := range servers {
-		tlsConfig = &tls.Config{RootCAs: caPool, InsecureSkipVerify: false, ServerName: server}
+		tlsConfig = &tls.Config{RootCAs: caPool, InsecureSkipVerify: false, ServerName: server, MinVersion: tls.VersionTLS10}
 		if TLS {
 			lConn, err = ldapv3.DialTLS("tcp", fmt.Sprintf("%s:%d", server, port), tlsConfig)
 			if err != nil {
