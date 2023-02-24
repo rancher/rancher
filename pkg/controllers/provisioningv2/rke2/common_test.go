@@ -1,9 +1,11 @@
 package rke2
 
 import (
+	"reflect"
 	"testing"
 
 	"github.com/pkg/errors"
+	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta1"
 	"github.com/stretchr/testify/assert"
@@ -281,4 +283,67 @@ func TestSafeConcatName(t *testing.T) {
 			t.Log(out)
 		})
 	}
+}
+
+func TestCompressInterface(t *testing.T) {
+	tests := []struct {
+		name   string
+		value  any
+		output any
+	}{
+		{
+			name:  "int",
+			value: &[]int{1}[0],
+		},
+		{
+			name:  "string",
+			value: &[]string{"test"}[0],
+		},
+		{
+			name: "struct",
+			value: &struct {
+				TestInt    int
+				TestString string
+			}{
+				TestInt:    1,
+				TestString: "test",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := CompressInterface(tt.value)
+			assert.Nil(t, err)
+			assert.True(t, result != "")
+
+			target := reflect.New(reflect.ValueOf(tt.value).Elem().Type()).Interface()
+
+			err = DecompressInterface(result, target)
+			assert.Nil(t, err)
+			assert.Equal(t, tt.value, target)
+		})
+	}
+}
+
+func TestCompressDynamicSchemaSpec(t *testing.T) {
+	expected := apimgmtv3.DynamicSchemaSpec{
+		SchemaName: "testSchema",
+		ResourceFields: map[string]apimgmtv3.Field{
+			"field1": {
+				Unique:   true,
+				Nullable: true,
+				Create:   true,
+			},
+		},
+		DynamicSchemaVersion: "test",
+	}
+
+	c, err := CompressInterface(&expected)
+	assert.Nil(t, err)
+
+	actual, err := DecompressDynamicSchemaSpec(c)
+	assert.Nil(t, err)
+
+	assert.Equal(t, &expected, actual)
 }

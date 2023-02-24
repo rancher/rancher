@@ -1,17 +1,14 @@
 package provisioningcluster
 
 import (
-	"bytes"
-	"compress/gzip"
 	"crypto/sha256"
-	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"io"
 	"strings"
 
 	"github.com/rancher/lasso/pkg/dynamic"
+	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	rancherv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2"
@@ -26,7 +23,6 @@ import (
 	"github.com/rancher/wrangler/pkg/name"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
-	apierror "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -77,21 +73,12 @@ func objects(cluster *rancherv1.Cluster, dynamic *dynamic.Controller, dynamicSch
 	return result, nil
 }
 
-func pruneBySchema(kind string, data map[string]interface{}, dynamicSchema mgmtcontroller.DynamicSchemaCache) error {
-	ds, err := dynamicSchema.Get(strings.ToLower(kind))
-	if apierror.IsNotFound(err) {
-		return nil
-	} else if err != nil {
-		return err
-	}
-
+func pruneBySchema(data map[string]interface{}, dynamicSchemaSpec v3.DynamicSchemaSpec) {
 	for k := range data {
-		if _, ok := ds.Spec.ResourceFields[k]; !ok {
+		if _, ok := dynamicSchemaSpec.ResourceFields[k]; !ok {
 			delete(data, k)
 		}
 	}
-
-	return nil
 }
 
 func takeOwnership(dynamic *dynamic.Controller, cluster *rancherv1.Cluster, nodeConfig runtime.Object) error {
@@ -156,9 +143,17 @@ func toMachineTemplate(machinePoolName string, cluster *rancherv1.Cluster, machi
 		return nil, err
 	}
 
-	if err := pruneBySchema(gvk.Kind, machinePoolData, dynamicSchema); err != nil {
+	if machinePool.MachineDeploymentAnnotations == nil || machinePool.MachineDeploymentAnnotations[rke2.DynamicSchemaSpecAnnotation] == "" {
+		return nil, fmt.Errorf("cannot find existing dynamic schema for machine pool %s", machinePoolName)
+	}
+	// If provisioning with a previous version of machine, we have to remove newly added fields, otherwise the entire
+	// cluster will reprovision
+	spec, err := rke2.DecompressDynamicSchemaSpec(machinePool.MachineDeploymentAnnotations[rke2.DynamicSchemaSpecAnnotation])
+	if err != nil {
 		return nil, err
 	}
+
+	pruneBySchema(machinePoolData, *spec)
 
 	commonData, err := convert.EncodeToMap(machinePool.RKECommonNodeConfig)
 	if err != nil {
@@ -476,61 +471,6 @@ func rkeCluster(cluster *rancherv1.Cluster) *rkev1.RKECluster {
 	}
 }
 
-// compressInterface is a function that will marshal, gzip, then base64 encode the provided interface.
-func compressInterface(v interface{}) (string, error) {
-	var b64GZCluster string
-	marshalledCluster, err := json.Marshal(v)
-	if err != nil {
-		return "", err
-	}
-	var b bytes.Buffer
-	gz := gzip.NewWriter(&b)
-	if _, err := gz.Write(marshalledCluster); err != nil {
-		return "", err
-	}
-	if err := gz.Flush(); err != nil {
-		return "", err
-	}
-	if err := gz.Close(); err != nil {
-		return "", err
-	}
-	b64GZCluster = base64.StdEncoding.EncodeToString(b.Bytes())
-	return b64GZCluster, nil
-}
-
-// decompressClusterSpec accepts an input string that is a base64/compressed cluster spec and will return a pointer to the cluster spec decompressed
-func decompressClusterSpec(inputb64 string) (*rancherv1.ClusterSpec, error) {
-	if inputb64 == "" {
-		return nil, fmt.Errorf("empty base64 input")
-	}
-
-	decodedGzip, err := base64.StdEncoding.DecodeString(inputb64)
-	if err != nil {
-		return nil, fmt.Errorf("error base64.DecodeString: %v", err)
-	}
-
-	buffer := bytes.NewBuffer(decodedGzip)
-
-	var gz io.Reader
-	gz, err = gzip.NewReader(buffer)
-	if err != nil {
-		return nil, err
-	}
-
-	csBytes, err := io.ReadAll(gz)
-	if err != nil {
-		return nil, err
-	}
-
-	c := rancherv1.ClusterSpec{}
-	err = json.Unmarshal(csBytes, &c)
-	if err != nil {
-		return nil, err
-	}
-
-	return &c, nil
-}
-
 // rkeControlPlane generates the rkecontrolplane object for a provided cluster object
 func rkeControlPlane(cluster *rancherv1.Cluster) (*rkev1.RKEControlPlane, error) {
 	// We need to base64/gzip encode the spec of our rancherv1.Cluster object so that we can reference it from the
@@ -541,7 +481,7 @@ func rkeControlPlane(cluster *rancherv1.Cluster) (*rkev1.RKEControlPlane, error)
 	filteredClusterSpec.RKEConfig.ETCDSnapshotCreate = nil
 	filteredClusterSpec.RKEConfig.RotateEncryptionKeys = nil
 	filteredClusterSpec.RKEConfig.RotateCertificates = nil
-	b64GZCluster, err := compressInterface(filteredClusterSpec)
+	b64GZCluster, err := rke2.CompressInterface(filteredClusterSpec)
 	if err != nil {
 		logrus.Errorf("cluster: %s/%s : error while gz/b64 encoding cluster specification: %v", cluster.Namespace, cluster.Name, err)
 		return nil, err

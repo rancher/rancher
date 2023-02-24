@@ -129,6 +129,11 @@ func getSchemas(name string, spec *v3.DynamicSchemaSpec) (string, string, string
 		return "", "", "", nil, err
 	}
 
+	configSpecSchema, err := getConfigSchemas(name, allSchemas, spec)
+	if err != nil {
+		return "", "", "", nil, err
+	}
+
 	specSchema, err := getSpecSchemas(name, allSchemas, spec)
 	if err != nil {
 		return "", "", "", nil, err
@@ -139,7 +144,7 @@ func getSchemas(name string, spec *v3.DynamicSchemaSpec) (string, string, string
 		return "", "", "", nil, err
 	}
 
-	nodeConfigID, err := addConfigSchema(name, specSchema, allSchemas)
+	nodeConfigID, err := addConfigSchema(name, configSpecSchema, allSchemas)
 	if err != nil {
 		return "", "", "", nil, err
 	}
@@ -179,12 +184,12 @@ func addField(rFields map[string]schemas.Field, name, newField string) map[strin
 	return newf
 }
 
-func getSpecSchemas(name string, allSchemas *schemas.Schemas, spec *v3.DynamicSchemaSpec) (*schemas.Schema, error) {
+func getConfigSchemas(name string, allSchemas *schemas.Schemas, spec *v3.DynamicSchemaSpec) (*schemas.Schema, error) {
 	specSchema := schemas.Schema{}
 	if err := convert.ToObj(spec, &specSchema); err != nil {
 		return nil, err
 	}
-	specSchema.ID = name + "Spec"
+	specSchema.ID = name + "ConfigSpec"
 
 	commonField, err := allSchemas.Import(rkev1.RKECommonNodeConfig{})
 	if err != nil {
@@ -212,6 +217,7 @@ func getSpecSchemas(name string, allSchemas *schemas.Schemas, spec *v3.DynamicSc
 		// set to nil because if map is len() == 0
 		field.Default = nil
 
+		// Only add defaults for config objects, defaults will be handled for machines and machine templates based on config
 		switch field.Type {
 		case "string", "password":
 			field.Default = defMap["stringValue"]
@@ -223,6 +229,43 @@ func getSpecSchemas(name string, allSchemas *schemas.Schemas, spec *v3.DynamicSc
 			field.Default = defMap["stringSliceValue"]
 		}
 
+		specSchema.ResourceFields[name] = field
+	}
+
+	if err := allSchemas.AddSchema(specSchema); err != nil {
+		return nil, err
+	}
+
+	return allSchemas.Schema(specSchema.ID), nil
+}
+
+func getSpecSchemas(name string, allSchemas *schemas.Schemas, spec *v3.DynamicSchemaSpec) (*schemas.Schema, error) {
+	specSchema := schemas.Schema{}
+	if err := convert.ToObj(spec, &specSchema); err != nil {
+		return nil, err
+	}
+	specSchema.ID = name + "Spec"
+
+	commonField, err := allSchemas.Import(rkev1.RKECommonNodeConfig{})
+	if err != nil {
+		return nil, err
+	}
+
+	if specSchema.ResourceFields == nil {
+		specSchema.ResourceFields = map[string]schemas.Field{}
+	}
+
+	specSchema.ResourceFields["common"] = schemas.Field{
+		Type: commonField.ID,
+	}
+
+	specSchema.ResourceFields["providerID"] = schemas.Field{
+		Type: "string",
+	}
+
+	for name, field := range specSchema.ResourceFields {
+		// Clear all defaults, defaults will be handled for machines and machine templates based on config objects
+		field.Default = nil
 		specSchema.ResourceFields[name] = field
 	}
 

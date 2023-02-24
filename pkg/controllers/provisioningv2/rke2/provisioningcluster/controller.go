@@ -183,7 +183,7 @@ func (h *handler) findSnapshotClusterSpec(snapshotNamespace, snapshotName string
 			return nil, err
 		}
 		if v, ok := md["provisioning-cluster-spec"]; ok {
-			return decompressClusterSpec(v)
+			return rke2.DecompressClusterSpec(v)
 		}
 	}
 	return nil, fmt.Errorf("unable to find and decode snapshot ClusterSpec for snapshot %s/%s", snapshotNamespace, snapshotName)
@@ -296,6 +296,41 @@ func (h *handler) OnRancherClusterChange(obj *rancherv1.Cluster, status rancherv
 				return nil, status, err
 			}
 		}
+	}
+
+	for i, machinePool := range obj.Spec.RKEConfig.MachinePools {
+		if machinePool.MachineDeploymentAnnotations != nil && machinePool.MachineDeploymentAnnotations[rke2.DynamicSchemaSpecAnnotation] != "" {
+			continue
+		}
+		obj = obj.DeepCopy()
+		for j := i; j < len(obj.Spec.RKEConfig.MachinePools); j++ {
+			if obj.Spec.RKEConfig.MachinePools[j].MachineDeploymentAnnotations == nil {
+				obj.Spec.RKEConfig.MachinePools[j].MachineDeploymentAnnotations = map[string]string{}
+			}
+			existingSpecAnnotation := obj.Spec.RKEConfig.MachinePools[j].MachineDeploymentAnnotations[rke2.DynamicSchemaSpecAnnotation]
+			if existingSpecAnnotation != "" {
+				continue
+			}
+			nodeConfig := obj.Spec.RKEConfig.MachinePools[j].NodeConfig
+			if nodeConfig == nil {
+				return nil, status, fmt.Errorf("machine pool node config must not be nil")
+			}
+			ds, err := h.dynamicSchema.Get(strings.ToLower(nodeConfig.Kind))
+			if err != nil {
+				return nil, status, err
+			}
+			compressedSpec, err := rke2.CompressInterface(&ds.Spec)
+			if err != nil {
+				return nil, status, err
+			}
+			obj.Spec.RKEConfig.MachinePools[j].MachineDeploymentAnnotations[rke2.DynamicSchemaSpecAnnotation] = compressedSpec
+
+		}
+		_, err = h.clusterController.Update(obj)
+		if err == nil {
+			err = generic.ErrSkip // if update was successful, return ErrSkip waiting for caches to sync
+		}
+		return nil, status, err
 	}
 
 	objs, err := objects(obj, h.dynamic, h.dynamicSchema, h.secretCache)
