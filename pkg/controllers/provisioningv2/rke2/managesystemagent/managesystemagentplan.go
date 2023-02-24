@@ -17,10 +17,15 @@ func (h *handler) OnChangeInstallSUC(cluster *rancherv1.Cluster, status rancherv
 		return nil, status, nil
 	}
 
+	// we must limit the output of name.SafeConcatName to at most 48 characters because
+	// a) the chart release name cannot exceed 53 characters, and
+	// b) upon creation of this resource the prefix 'mcc-' will be added to the release name, hence the limiting to 48 characters
+	managedChartName := name.Limit(name.SafeConcatName(cluster.Name, "managed", "system-upgrade-controller"), 48)
+
 	mcc := &v3.ManagedChart{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: cluster.Namespace,
-			Name:      name.SafeConcatName(cluster.Name, "managed", "system-upgrade-controller"),
+			Name:      managedChartName,
 		},
 		Spec: v3.ManagedChartSpec{
 			DefaultNamespace: namespaces.System,
