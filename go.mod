@@ -116,7 +116,7 @@ require (
 	github.com/rancher/rancher/pkg/client v0.0.0
 	github.com/rancher/rdns-server v0.0.0-20180802070304-bf662911db6a
 	github.com/rancher/remotedialer v0.2.6-0.20220624190122-ea57207bf2b8
-	github.com/rancher/rke v1.4.4-rc1
+	github.com/rancher/rke v1.4.3-rc8
 	github.com/rancher/steve v0.0.0-20230120232010-53fbb87f5968
 	github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20210727200656-10b094e30007
 	github.com/rancher/wrangler v1.1.0
@@ -160,10 +160,7 @@ require (
 
 require github.com/google/gnostic v0.5.7-v3refs
 
-require (
-	github.com/kr/fs v0.1.0 // indirect
-	k8s.io/pod-security-admission v0.25.4 // indirect
-)
+require github.com/kr/fs v0.1.0 // indirect
 
 require (
 	cloud.google.com/go/compute v1.6.1 // indirect
