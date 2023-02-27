@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/hashicorp/go-multierror"
@@ -50,6 +51,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/net"
+	"k8s.io/apimachinery/pkg/util/wait"
 	k8dynamic "k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -527,26 +529,26 @@ func migrateEncryptionConfig(ctx context.Context, restConfig *rest.Config) error
 	var allErrors error
 
 	for _, c := range clusters.Items {
-		err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		err := wait.PollImmediateInfinite(100*time.Millisecond, func() (bool, error) {
 			rawDynamicCluster, err := clusterDynamicClient.Get(ctx, c.GetName(), metav1.GetOptions{})
 			if err != nil {
-				return err
+				return false, err
 			}
 
 			annotations := rawDynamicCluster.GetAnnotations()
 			if annotations != nil && annotations[encryptionConfigUpdate] == "true" {
-				return nil
+				return true, nil
 			}
 
 			clusterBytes, err := rawDynamicCluster.MarshalJSON()
 			if err != nil {
-				return errors.Wrap(err, "error trying to Marshal dynamic cluster")
+				return false, errors.Wrap(err, "error trying to Marshal dynamic cluster")
 			}
 
 			var cluster *v3.Cluster
 
 			if err := json.Unmarshal(clusterBytes, &cluster); err != nil {
-				return errors.Wrap(err, "error trying to Unmarshal dynamicCluster into v3 cluster")
+				return false, errors.Wrap(err, "error trying to Unmarshal dynamicCluster into v3 cluster")
 			}
 
 			if cluster.Annotations == nil {
@@ -556,11 +558,17 @@ func migrateEncryptionConfig(ctx context.Context, restConfig *rest.Config) error
 
 			u, err := unstructured.ToUnstructured(cluster)
 			if err != nil {
-				return err
+				return false, err
 			}
 
 			_, err = clusterDynamicClient.Update(ctx, u, metav1.UpdateOptions{})
-			return err
+			if err == nil {
+				return true, nil
+			}
+			if k8serror.IsConflict(err) || k8serror.IsServiceUnavailable(err) || k8serror.IsInternalError(err) {
+				return false, nil
+			}
+			return false, err
 		})
 		if err != nil {
 			allErrors = multierror.Append(err, allErrors)
