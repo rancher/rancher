@@ -1,0 +1,16 @@
+{
+  "extends": [
+    "github>rancher/renovate-config#release"
+  ],
+  "baseBranches": [
+    "release/v2.7"
+  ],
+  "prHourlyLimit": 2,
+  "enabledManagers": [
+    "droneci",
+    "dockerfile",
+    "github-actions",
+    "helm-values",
+    "regex"
+  ]
+}
