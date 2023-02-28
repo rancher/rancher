@@ -18,6 +18,6 @@ fi
 
 ./validate
 ./build
-./package
 ./test
+./package
 ./chart/ci

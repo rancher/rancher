@@ -2,7 +2,7 @@ import time
 import pytest
 from rancher import ApiError
 from .test_catalog import wait_for_template_to_be_created
-from .common import random_str, wait_for_template_versions_to_be_created
+from .common import random_str
 from .conftest import set_server_version, wait_for, wait_for_condition, \
     wait_until, user_project_client, DEFAULT_CATALOG
 
@@ -627,9 +627,8 @@ def test_app_upgrade_has_helmversion(admin_pc, admin_mc, remove_resource):
         helmVersion=helm_3
     )
     remove_resource(helm3_catalog)
-    version = catalog_name+"-rancher-v3-issue-0.1.0"
     wait_for_template_to_be_created(catalog_client, catalog_name)
-    wait_for_template_versions_to_be_created(catalog_client, version)
+
     ns = admin_pc.cluster.client.create_namespace(name=random_str(),
                                                   projectId=admin_pc.
                                                   project.id)
@@ -639,7 +638,7 @@ def test_app_upgrade_has_helmversion(admin_pc, admin_mc, remove_resource):
     assert templates[1].status.helmVersion == helm_3
     # check helm version at templateVersion level
     templateVersion = catalog_client.list_templateVersion(
-        name=version)
+        name=catalog_name+"-rancher-v3-issue-0.1.0")
     assert templateVersion.data[0].status.helmVersion == helm_3
     # creating app with existing chart version in catalog
     app1 = app_client.create_app(
@@ -675,13 +674,10 @@ def test_app_upgrade_has_helmversion(admin_pc, admin_mc, remove_resource):
         lambda: ensure_updated_catalog(helm3_catalog),
         fail_handler=lambda:
         "Timed out waiting for catalog to stop transitioning")
-
-    version = catalog_name+"-rancher-v3-issue-0.1.1"
-    wait_for_template_versions_to_be_created(catalog_client, version)
     templates = catalog_client.list_template(catalogId=helm3_catalog.id).data
     assert templates[1].status.helmVersion == helm_3
     templateVersion = catalog_client.list_templateVersion(
-        name=version)
+        name=catalog_name+"-rancher-v3-issue-0.1.1")
     assert templateVersion.data[0].status.helmVersion == helm_3
     project_client = user_project_client(admin_pc, admin_pc.project)
     # update existing app with new version to ensure correct

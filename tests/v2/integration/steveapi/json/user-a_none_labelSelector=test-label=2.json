@@ -1,7 +1,7 @@
 {
   "actions": {},
   "createTypes": {
-    "secret": "https://rancherurl/v1/secrets"
+    "secret": "https://localhost:8443/v1/secrets"
   },
   "data": [
     {
@@ -10,10 +10,10 @@
       "id": "test-ns-1/test2",
       "kind": "Secret",
       "links": {
-        "remove": "https://rancherurl/v1/secrets/test-ns-1/test2",
-        "self": "https://rancherurl/v1/secrets/test-ns-1/test2",
-        "update": "https://rancherurl/v1/secrets/test-ns-1/test2",
-        "view": "https://rancherurl/api/v1/namespaces/test-ns-1/secrets/test2"
+        "remove": "https://localhost:8443/v1/secrets/test-ns-1/test2",
+        "self": "https://localhost:8443/v1/secrets/test-ns-1/test2",
+        "update": "https://localhost:8443/v1/secrets/test-ns-1/test2",
+        "view": "https://localhost:8443/api/v1/namespaces/test-ns-1/secrets/test2"
       },
       "metadata": {
         "labels": {
@@ -35,10 +35,10 @@
       "id": "test-ns-2/test2",
       "kind": "Secret",
       "links": {
-        "remove": "https://rancherurl/v1/secrets/test-ns-2/test2",
-        "self": "https://rancherurl/v1/secrets/test-ns-2/test2",
-        "update": "https://rancherurl/v1/secrets/test-ns-2/test2",
-        "view": "https://rancherurl/api/v1/namespaces/test-ns-2/secrets/test2"
+        "remove": "https://localhost:8443/v1/secrets/test-ns-2/test2",
+        "self": "https://localhost:8443/v1/secrets/test-ns-2/test2",
+        "update": "https://localhost:8443/v1/secrets/test-ns-2/test2",
+        "view": "https://localhost:8443/api/v1/namespaces/test-ns-2/secrets/test2"
       },
       "metadata": {
         "labels": {
@@ -60,10 +60,10 @@
       "id": "test-ns-3/test2",
       "kind": "Secret",
       "links": {
-        "remove": "https://rancherurl/v1/secrets/test-ns-3/test2",
-        "self": "https://rancherurl/v1/secrets/test-ns-3/test2",
-        "update": "https://rancherurl/v1/secrets/test-ns-3/test2",
-        "view": "https://rancherurl/api/v1/namespaces/test-ns-3/secrets/test2"
+        "remove": "https://localhost:8443/v1/secrets/test-ns-3/test2",
+        "self": "https://localhost:8443/v1/secrets/test-ns-3/test2",
+        "update": "https://localhost:8443/v1/secrets/test-ns-3/test2",
+        "view": "https://localhost:8443/api/v1/namespaces/test-ns-3/secrets/test2"
       },
       "metadata": {
         "labels": {
@@ -85,10 +85,10 @@
       "id": "test-ns-4/test2",
       "kind": "Secret",
       "links": {
-        "remove": "https://rancherurl/v1/secrets/test-ns-4/test2",
-        "self": "https://rancherurl/v1/secrets/test-ns-4/test2",
-        "update": "https://rancherurl/v1/secrets/test-ns-4/test2",
-        "view": "https://rancherurl/api/v1/namespaces/test-ns-4/secrets/test2"
+        "remove": "https://localhost:8443/v1/secrets/test-ns-4/test2",
+        "self": "https://localhost:8443/v1/secrets/test-ns-4/test2",
+        "update": "https://localhost:8443/v1/secrets/test-ns-4/test2",
+        "view": "https://localhost:8443/api/v1/namespaces/test-ns-4/secrets/test2"
       },
       "metadata": {
         "labels": {
@@ -110,10 +110,10 @@
       "id": "test-ns-5/test2",
       "kind": "Secret",
       "links": {
-        "remove": "https://rancherurl/v1/secrets/test-ns-5/test2",
-        "self": "https://rancherurl/v1/secrets/test-ns-5/test2",
-        "update": "https://rancherurl/v1/secrets/test-ns-5/test2",
-        "view": "https://rancherurl/api/v1/namespaces/test-ns-5/secrets/test2"
+        "remove": "https://localhost:8443/v1/secrets/test-ns-5/test2",
+        "self": "https://localhost:8443/v1/secrets/test-ns-5/test2",
+        "update": "https://localhost:8443/v1/secrets/test-ns-5/test2",
+        "view": "https://localhost:8443/api/v1/namespaces/test-ns-5/secrets/test2"
       },
       "metadata": {
         "labels": {
@@ -131,7 +131,7 @@
     }
   ],
   "links": {
-    "self": "https://rancherurl/v1/secrets"
+    "self": "https://localhost:8443/v1/secrets"
   },
   "resourceType": "secret",
   "revision": "100",

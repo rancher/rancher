@@ -212,7 +212,8 @@ func NewK3SRKE2ClusterConfig(clusterName, namespace, cni, cloudCredentialSecretN
 		CloudCredentialSecretName: cloudCredentialSecretName,
 		KubernetesVersion:         kubernetesVersion,
 		LocalClusterAuthEndpoint:  localClusterAuthEndpoint,
-		RKEConfig:                 rkeConfig,
+
+		RKEConfig: rkeConfig,
 	}
 
 	v1Cluster := &apisV1.Cluster{
@@ -228,41 +229,28 @@ func NewK3SRKE2ClusterConfig(clusterName, namespace, cni, cloudCredentialSecretN
 func HardenK3SRKE2ClusterConfig(clusterName, namespace, cni, cloudCredentialSecretName, kubernetesVersion string, machinePools []apisV1.RKEMachinePool) *apisV1.Cluster {
 	v1Cluster := NewK3SRKE2ClusterConfig(clusterName, namespace, cni, cloudCredentialSecretName, kubernetesVersion, machinePools)
 
-	if strings.Contains(kubernetesVersion, "k3s") {
-		v1Cluster.Spec.RKEConfig.MachineGlobalConfig.Data["kube-apiserver-arg"] = []string{
-			"enable-admission-plugins=NodeRestriction,PodSecurityPolicy,ServiceAccount",
-			"audit-policy-file=/var/lib/rancher/k3s/server/audit.yaml",
-			"audit-log-path=/var/lib/rancher/k3s/server/logs/audit.log",
-			"audit-log-maxage=30",
-			"audit-log-maxbackup=10",
-			"audit-log-maxsize=100",
-			"request-timeout=300s",
-			"service-account-lookup=true",
-		}
+	v1Cluster.Spec.RKEConfig.MachineGlobalConfig.Data["kube-apiserver-arg"] = []string{
+		"enable-admission-plugins=NodeRestriction,PodSecurityPolicy,ServiceAccount",
+		"audit-policy-file=/var/lib/rancher/k3s/server/audit.yaml",
+		"audit-log-path=/var/lib/rancher/k3s/server/logs/audit.log",
+		"audit-log-maxage=30",
+		"audit-log-maxbackup=10",
+		"audit-log-maxsize=100",
+		"request-timeout=300s",
+		"service-account-lookup=true",
+	}
 
-		v1Cluster.Spec.RKEConfig.MachineSelectorConfig = []rkev1.RKESystemConfig{
-			{
-				Config: rkev1.GenericMap{
-					Data: map[string]interface{}{
-						"kubelet-arg": []string{
-							"make-iptables-util-chains=true",
-						},
-						"protect-kernel-defaults": true,
+	v1Cluster.Spec.RKEConfig.MachineSelectorConfig = []rkev1.RKESystemConfig{
+		{
+			Config: rkev1.GenericMap{
+				Data: map[string]interface{}{
+					"kubelet-arg": []string{
+						"make-iptables-util-chains=true",
 					},
+					"protect-kernel-defaults": true,
 				},
 			},
-		}
-	} else {
-		v1Cluster.Spec.RKEConfig.MachineSelectorConfig = []rkev1.RKESystemConfig{
-			{
-				Config: rkev1.GenericMap{
-					Data: map[string]interface{}{
-						"profile":                 "cis-1.6",
-						"protect-kernel-defaults": true,
-					},
-				},
-			},
-		}
+		},
 	}
 
 	return v1Cluster

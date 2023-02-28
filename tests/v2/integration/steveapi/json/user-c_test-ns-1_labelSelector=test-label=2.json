@@ -7,8 +7,8 @@
       "id": "test-ns-1/test2",
       "kind": "Secret",
       "links": {
-        "self": "https://rancherurl/v1/secrets/test-ns-1/test2",
-        "view": "https://rancherurl/api/v1/namespaces/test-ns-1/secrets/test2"
+        "self": "https://localhost:8443/v1/secrets/test-ns-1/test2",
+        "view": "https://localhost:8443/api/v1/namespaces/test-ns-1/secrets/test2"
       },
       "metadata": {
         "labels": {
@@ -26,7 +26,7 @@
     }
   ],
   "links": {
-    "self": "https://rancherurl/v1/secrets/test-ns-1"
+    "self": "https://localhost:8443/v1/secrets/test-ns-1"
   },
   "resourceType": "secret",
   "revision": "100",

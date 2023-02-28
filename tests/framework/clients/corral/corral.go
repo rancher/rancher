@@ -99,7 +99,7 @@ func CreateCorral(ts *session.Session, corralName, packageName string, debug boo
 
 	restConfig, err := clientcmd.RESTConfigFromKubeConfig(kubeConfig)
 	if err != nil {
-		return nil, errors.Wrap(err, "CreateCorral: failed to parse kubeconfig for cluster")
+		return nil, errors.Wrap(err, "CreateCorral: failed to parse kubeconfig for k3d cluster")
 	}
 
 	return restConfig, nil
