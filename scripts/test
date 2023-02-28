@@ -81,22 +81,14 @@ while ! kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml rollout status -w -n catt
 done
 #kill $TPID
 
-# get correct agent tag
-COMMIT=$(git rev-parse --short HEAD)
-SUFFIX=""
-[ "${ARCH}" != "amd64" ] && SUFFIX="_${ARCH}"
-
-TAG=${TAG:-${COMMIT}${SUFFIX}}
-export AGENT_TAG=${TAG}
-
 echo Running tests
 
 echo Running: build-token-generator
 ./tests/v2/integration/scripts/build-integration-setup
 
 path=$(pwd)
-export CATTLE_TEST_CONFIG=${path}/config.yaml
 ./tests/v2/integration/bin/integrationsetup
+export CATTLE_TEST_CONFIG=${path}/config.yaml
 go test -v ./tests/v2/integration/...
 
 INT_TESTS_STARTED=true

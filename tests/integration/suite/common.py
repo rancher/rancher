@@ -112,28 +112,13 @@ def auth_check(schema, id, access, props=None):
 def wait_for_template_to_be_created(client, name, timeout=45):
     found = False
     start = time.time()
-    interval = 1
+    interval = 0.5
     while not found:
         if time.time() - start > timeout:
             raise AssertionError(
                 "Timed out waiting for templates")
         templates = client.list_template(catalogId=name)
         if len(templates) > 0:
-            found = True
-        time.sleep(interval)
-        interval *= 2
-
-
-def wait_for_template_versions_to_be_created(client, version, timeout=45):
-    found = False
-    start = time.time()
-    interval = 1
-    while not found:
-        if time.time() - start > timeout:
-            raise AssertionError(
-                "Timed out waiting for templates")
-        templateVersion = client.list_templateVersion(name=version)
-        if len(templateVersion) > 0:
             found = True
         time.sleep(interval)
         interval *= 2
