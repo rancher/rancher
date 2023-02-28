@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
-	"github.com/rancher/norman/objectclient"
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/slice"
 	wranglerv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
@@ -105,6 +104,7 @@ func Register(ctx context.Context, workload *config.UserContext) {
 		roleBindings:        workload.RBAC.RoleBindings(""),
 		nsLister:            workload.Core.Namespaces("").Controller().Lister(),
 		nsController:        workload.Core.Namespaces("").Controller(),
+		namespaces:          workload.Core.Namespaces(""),
 		clusterLister:       management.Management.Clusters("").Controller().Lister(),
 		projectLister:       management.Management.Projects(workload.ClusterName).Controller().Lister(),
 		userLister:          management.Management.Users("").Controller().Lister(),
@@ -155,6 +155,7 @@ type manager struct {
 	roles               typesrbacv1.RoleInterface
 	nsLister            typescorev1.NamespaceLister
 	nsController        typescorev1.NamespaceController
+	namespaces          typescorev1.NamespaceInterface
 	clusterLister       v3.ClusterLister
 	projectLister       v3.ProjectLister
 	userLister          v3.UserLister
@@ -419,7 +420,7 @@ func (m *manager) ensureClusterBindings(roles map[string]*v3.RoleTemplate, bindi
 		return crb.Name, crb.RoleRef.Name, crb.Subjects
 	}
 
-	return m.ensureBindings("", roles, binding, m.workload.RBAC.ClusterRoleBindings("").ObjectClient(), create, list, convert)
+	return m.ensureBindings("", roles, binding, create, list, convert)
 }
 
 func (m *manager) ensureProjectRoleBindings(ns string, roles map[string]*v3.RoleTemplate, binding *v3.ProjectRoleTemplateBinding) error {
@@ -448,14 +449,14 @@ func (m *manager) ensureProjectRoleBindings(ns string, roles map[string]*v3.Role
 		return rb.Name, rb.RoleRef.Name, rb.Subjects
 	}
 
-	return m.ensureBindings(ns, roles, binding, m.workload.RBAC.RoleBindings(ns).ObjectClient(), create, list, convert)
+	return m.ensureBindings(ns, roles, binding, create, list, convert)
 }
 
 type createFn func(objectMeta metav1.ObjectMeta, subjects []rbacv1.Subject, roleRef rbacv1.RoleRef) runtime.Object
 type listFn func(ns string, selector labels.Selector) ([]interface{}, error)
 type convertFn func(i interface{}) (string, string, []rbacv1.Subject)
 
-func (m *manager) ensureBindings(ns string, roles map[string]*v3.RoleTemplate, binding metav1.Object, client *objectclient.ObjectClient,
+func (m *manager) ensureBindings(ns string, roles map[string]*v3.RoleTemplate, binding metav1.Object,
 	create createFn, list listFn, convert convertFn) error {
 	meta, err := meta.Accessor(binding)
 	if err != nil {
@@ -477,7 +478,7 @@ func (m *manager) ensureBindings(ns string, roles map[string]*v3.RoleTemplate, b
 	if err != nil {
 		return err
 	}
-	rbsToDelete := map[string]bool{}
+	rbsToDelete := map[string]interface{}{}
 	processed := map[string]bool{}
 	for _, rb := range currentRBs {
 		rbName, roleName, subjects := convert(rb)
@@ -488,7 +489,7 @@ func (m *manager) ensureBindings(ns string, roles map[string]*v3.RoleTemplate, b
 		processed[rbName] = true
 
 		if len(subjects) != 1 {
-			rbsToDelete[rbName] = true
+			rbsToDelete[rbName] = rb
 			continue
 		}
 
@@ -496,17 +497,17 @@ func (m *manager) ensureBindings(ns string, roles map[string]*v3.RoleTemplate, b
 		if _, ok := desiredRBs[crbKey]; ok {
 			delete(desiredRBs, crbKey)
 		} else {
-			rbsToDelete[rbName] = true
+			rbsToDelete[rbName] = rb
 		}
 	}
 
 	for key, rb := range desiredRBs {
 		switch roleBinding := rb.(type) {
 		case *rbacv1.RoleBinding:
-			_, err := m.workload.RBAC.RoleBindings("").Controller().Lister().Get(ns, roleBinding.Name)
+			_, err := m.rbLister.Get(ns, roleBinding.Name)
 			if apierrors.IsNotFound(err) {
 				logrus.Infof("Creating roleBinding %v in %s", key, ns)
-				_, err := m.workload.RBAC.RoleBindings(ns).Create(roleBinding)
+				_, err := m.roleBindings.Create(roleBinding)
 				if err != nil && !apierrors.IsAlreadyExists(err) {
 					return err
 				}
@@ -515,18 +516,26 @@ func (m *manager) ensureBindings(ns string, roles map[string]*v3.RoleTemplate, b
 			}
 		case *rbacv1.ClusterRoleBinding:
 			logrus.Infof("Creating clusterRoleBinding %v", key)
-			_, err := m.workload.RBAC.ClusterRoleBindings("").Create(roleBinding)
+			_, err := m.clusterRoleBindings.Create(roleBinding)
 			if err != nil && !apierrors.IsAlreadyExists(err) {
 				return err
 			}
 		}
 	}
 
-	for name := range rbsToDelete {
-		logrus.Infof("Deleting roleBinding %v", name)
-		if err := client.Delete(name, &metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
-			return err
+	for key, rb := range rbsToDelete {
+		logrus.Infof("Deleting roleBinding %v", key)
+		switch rb.(type) {
+		case *rbacv1.RoleBinding:
+			if err := m.roleBindings.DeleteNamespaced(ns, key, &metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
+				return err
+			}
+		case *rbacv1.ClusterRoleBinding:
+			if err := m.clusterRoleBindings.Delete(key, &metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
+				return err
+			}
 		}
+
 	}
 	return nil
 }
@@ -548,8 +557,9 @@ func bindingParts(namespace, roleName, parentNsAndName string, subject rbacv1.Su
 
 	return key,
 		metav1.ObjectMeta{
-			Name:   name,
-			Labels: map[string]string{rtbOwnerLabel: parentNsAndName},
+			Name:      name,
+			Namespace: namespace,
+			Labels:    map[string]string{rtbOwnerLabel: parentNsAndName},
 		},
 		[]rbacv1.Subject{subject},
 		roleRef

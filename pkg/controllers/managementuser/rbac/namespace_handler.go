@@ -192,18 +192,17 @@ func (n *nsLifecycle) ensurePRTBAddToNamespace(ns *v1.Namespace) (bool, error) {
 		if err != nil {
 			return false, errors.Wrapf(err, "couldn't list role bindings in %s", ns.Name)
 		}
-		client := n.m.workload.RBAC.RoleBindings(ns.Name).ObjectClient()
 		for _, rb := range rbs {
 			// rtbOwnerLabelLegacy
 			if uid := convert.ToString(rb.Labels[rtbOwnerLabelLegacy]); uid != "" {
 				logrus.Infof("Deleting role binding %s in %s", rb.Name, ns.Name)
-				if err := client.Delete(rb.Name, &metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
+				if err := n.m.roleBindings.DeleteNamespaced(ns.Name, rb.Name, &metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
 					return false, errors.Wrapf(err, "couldn't delete role binding %s", rb.Name)
 				}
 			}
 			if nsAndName := convert.ToString(rb.Labels[rtbOwnerLabel]); nsAndName != "" {
 				logrus.Infof("Deleting role binding %s in %s", rb.Name, ns.Name)
-				if err := client.Delete(rb.Name, &metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
+				if err := n.m.roleBindings.DeleteNamespaced(ns.Name, rb.Name, &metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
 					return false, errors.Wrapf(err, "couldn't delete role binding %s", rb.Name)
 				}
 			}
@@ -262,7 +261,6 @@ func (n *nsLifecycle) ensurePRTBAddToNamespace(ns *v1.Namespace) (bool, error) {
 	if err != nil {
 		return false, errors.Wrapf(err, "couldn't list role bindings in %s", ns.Name)
 	}
-	client := n.m.workload.RBAC.RoleBindings(ns.Name).ObjectClient()
 
 	for _, rb := range rbs {
 		if uid := convert.ToString(rb.Labels[rtbOwnerLabelLegacy]); uid != "" {
@@ -278,7 +276,7 @@ func (n *nsLifecycle) ensurePRTBAddToNamespace(ns *v1.Namespace) (bool, error) {
 				if prtb, ok := prtb.(*v3.ProjectRoleTemplateBinding); ok {
 					if prtb.Namespace != namespace {
 						logrus.Infof("Deleting role binding %s in %s", rb.Name, ns.Name)
-						if err := client.Delete(rb.Name, &metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
+						if err := n.m.roleBindings.DeleteNamespaced(ns.Name, rb.Name, &metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
 							return false, errors.Wrapf(err, "couldn't delete role binding %s", rb.Name)
 						}
 					}
@@ -299,7 +297,7 @@ func (n *nsLifecycle) ensurePRTBAddToNamespace(ns *v1.Namespace) (bool, error) {
 				if prtb, ok := prtb.(*v3.ProjectRoleTemplateBinding); ok {
 					if prtb.Namespace != namespace {
 						logrus.Infof("Deleting role binding %s in %s", rb.Name, ns.Name)
-						if err := client.Delete(rb.Name, &metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
+						if err := n.m.roleBindings.DeleteNamespaced(ns.Name, rb.Name, &metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
 							return false, errors.Wrapf(err, "couldn't delete role binding %s", rb.Name)
 						}
 					}

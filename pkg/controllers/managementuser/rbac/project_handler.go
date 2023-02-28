@@ -50,7 +50,7 @@ func (p *pLifecycle) Remove(project *v3.Project) (runtime.Object, error) {
 	for _, suffix := range projectNSVerbToSuffix {
 		roleName := fmt.Sprintf(projectNSGetClusterRoleNameFmt, project.Name, suffix)
 
-		err := p.m.workload.RBAC.ClusterRoles("").Delete(roleName, &v1.DeleteOptions{})
+		err := p.m.clusterRoles.Delete(roleName, &v1.DeleteOptions{})
 		if err != nil && !apierrors.IsNotFound(err) {
 			return project, err
 		}
@@ -65,7 +65,7 @@ func (p *pLifecycle) Remove(project *v3.Project) (runtime.Object, error) {
 	for _, o := range namespaces {
 		namespace, _ := o.(*corev1.Namespace)
 		if _, ok := namespace.Annotations["field.cattle.io/creatorId"]; ok {
-			err := p.m.workload.Core.Namespaces("").Delete(namespace.Name, &v1.DeleteOptions{})
+			err := p.m.namespaces.Delete(namespace.Name, &v1.DeleteOptions{})
 			if err != nil && !apierrors.IsNotFound(err) {
 				return project, err
 			}
@@ -73,7 +73,7 @@ func (p *pLifecycle) Remove(project *v3.Project) (runtime.Object, error) {
 			namespace = namespace.DeepCopy()
 			if namespace.Annotations != nil {
 				delete(namespace.Annotations, projectIDAnnotation)
-				_, err := p.m.workload.Core.Namespaces("").Update(namespace)
+				_, err := p.m.namespaces.Update(namespace)
 				if err != nil {
 					return project, err
 				}
@@ -149,7 +149,7 @@ func (p *pLifecycle) assignNamespacesToProject(project *v3.Project, projectName 
 			ns.Annotations = map[string]string{}
 		}
 		ns.Annotations[projectIDAnnotation] = fmt.Sprintf("%v:%v", p.m.clusterName, project.Name)
-		if _, err := p.m.workload.Core.Namespaces(p.m.clusterName).Update(ns); err != nil {
+		if _, err := p.m.namespaces.Update(ns); err != nil {
 			return err
 		}
 	}
