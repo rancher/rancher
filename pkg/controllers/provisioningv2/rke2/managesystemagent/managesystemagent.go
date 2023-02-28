@@ -11,6 +11,7 @@ import (
 
 	"github.com/rancher/fleet/pkg/apis/fleet.cattle.io/v1alpha1"
 	rancherv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
+	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2"
 	fleetconst "github.com/rancher/rancher/pkg/fleet"
 	v3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	rocontrollers "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
@@ -110,7 +111,7 @@ func (h *handler) OnChange(cluster *rancherv1.Cluster, status rancherv1.ClusterS
 	result = append(result, &v1alpha1.Bundle{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: cluster.Namespace,
-			Name:      name.SafeConcatName(cluster.Name, "managed", "system", "agent"),
+			Name:      rke2.SafeConcatName(rke2.MaxHelmReleaseNameLength, cluster.Name, "managed", "system", "agent"),
 		},
 		Spec: v1alpha1.BundleSpec{
 			BundleDeploymentOptions: v1alpha1.BundleDeploymentOptions{
