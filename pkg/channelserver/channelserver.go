@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"sort"
 	"strconv"
 	"sync"
 	"time"
@@ -171,7 +170,7 @@ func getDefaultFromAppDefaultsByRuntimeAndServerVersion(ctx context.Context, run
 		return "", fmt.Errorf("faild to parse %s defaultVersionRange for %s: %v", runtime, serverVersion, err)
 	}
 
-	var candidate []string
+	var candidate []semver.Version
 	for _, release := range config.ReleasesConfig().Releases {
 		version, err := semver.ParseTolerant(release.Version)
 		if err != nil {
@@ -179,14 +178,17 @@ func getDefaultFromAppDefaultsByRuntimeAndServerVersion(ctx context.Context, run
 			continue
 		}
 		if dvrParsed(version) {
-			candidate = append(candidate, release.Version)
+			candidate = append(candidate, version)
 		}
 	}
 	if len(candidate) == 0 {
 		return "", fmt.Errorf("no %s version is found for %s", runtime, serverVersion)
 	}
-	sort.Strings(candidate)
-	return candidate[len(candidate)-1], nil
+	// the build metadata parts are ignored when sorting versions,
+	// thankfully KDM does not contain two versions that differ only in the build metadata,
+	// so we do not need to worry about the order for such case.
+	semver.Sort(candidate)
+	return candidate[len(candidate)-1].String(), nil
 }
 
 func getDefaultFromChannel(ctx context.Context, runtime, channelName string) string {
