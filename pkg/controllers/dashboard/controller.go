@@ -21,7 +21,7 @@ import (
 	"github.com/rancher/wrangler/pkg/needacert"
 )
 
-func Register(ctx context.Context, wrangler *wrangler.Context, embedded bool) error {
+func Register(ctx context.Context, wrangler *wrangler.Context, embedded bool, registryOverride string) error {
 	helm.Register(ctx, wrangler)
 	kubernetesprovider.Register(ctx,
 		wrangler.Mgmt.Cluster(),
@@ -35,7 +35,7 @@ func Register(ctx context.Context, wrangler *wrangler.Context, embedded bool) er
 		wrangler.Admission.ValidatingWebhookConfiguration(),
 		wrangler.CRD.CustomResourceDefinition())
 	scaleavailable.Register(ctx, wrangler)
-	if err := systemcharts.Register(ctx, wrangler); err != nil {
+	if err := systemcharts.Register(ctx, wrangler, registryOverride); err != nil {
 		return err
 	}
 
