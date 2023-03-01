@@ -35,9 +35,10 @@ func Test_ChartInstallation(t *testing.T) {
 		chartsConfig: chart.RancherConfigGetter{ConfigCache: &mockCache{}},
 	}
 	tests := []struct {
-		name    string
-		setup   func(*gomock.Controller) chart.Manager
-		wantErr bool
+		name             string
+		setup            func(*gomock.Controller) chart.Manager
+		registryOverride string
+		wantErr          bool
 	}{
 		{
 			name: "normal installation",
@@ -65,6 +66,7 @@ func Test_ChartInstallation(t *testing.T) {
 					settings.RancherWebhookMinVersion.Get(),
 					expectedValues,
 					gomock.AssignableToTypeOf(b),
+					"",
 				).Return(nil)
 
 				manager.EXPECT().Uninstall(operatorNamespace, "rancher-operator").Return(nil)
@@ -96,12 +98,49 @@ func Test_ChartInstallation(t *testing.T) {
 					settings.RancherWebhookMinVersion.Get(),
 					expectedValues,
 					gomock.AssignableToTypeOf(b),
+					"",
 				).Return(nil)
 
 				manager.EXPECT().Uninstall(operatorNamespace, "rancher-operator").Return(nil)
 				return manager
 
 			},
+		},
+		{
+			name: "installation with image override",
+			setup: func(ctrl *gomock.Controller) chart.Manager {
+				settings.ConfigMapName.Set("fail")
+				manager := fake.NewMockManager(ctrl)
+				expectedValues := map[string]interface{}{
+					"capi": map[string]interface{}{
+						"enabled": features.EmbeddedClusterAPI.Enabled(),
+					},
+					"mcm": map[string]interface{}{
+						"enabled": features.MCM.Enabled(),
+					},
+					"global": map[string]interface{}{
+						"cattle": map[string]interface{}{
+							"systemDefaultRegistry": "",
+						},
+					},
+					"image": map[string]interface{}{
+						"repository": "rancher-test.io/rancher/rancher-webhook",
+					},
+				}
+				var b bool
+				manager.EXPECT().Ensure(
+					namespace.System,
+					"rancher-webhook",
+					settings.RancherWebhookMinVersion.Get(),
+					expectedValues,
+					gomock.AssignableToTypeOf(b),
+					"rancher-test.io/"+settings.ShellImage.Get(),
+				).Return(nil)
+
+				manager.EXPECT().Uninstall(operatorNamespace, "rancher-operator").Return(nil)
+				return manager
+			},
+			registryOverride: "rancher-test.io",
 		},
 	}
 	for _, tt := range tests {
@@ -111,6 +150,7 @@ func Test_ChartInstallation(t *testing.T) {
 			namespaceCtrl.EXPECT().Delete(operatorNamespace, nil).Return(nil)
 			h.manager = tt.setup(ctrl)
 			h.namespaces = namespaceCtrl
+			h.registryOverride = tt.registryOverride
 			_, err := h.onRepo("", repo)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("handler.onRepo() error = %v, wantErr %v", err, tt.wantErr)
