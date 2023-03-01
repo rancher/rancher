@@ -513,7 +513,6 @@ func SafeConcatName(maxLength int, name ...string) string {
 
 // CompressInterface is a function that will marshal, gzip, then base64 encode the provided interface.
 func CompressInterface(v interface{}) (string, error) {
-	var b64GZCluster string
 	marshalledCluster, err := json.Marshal(v)
 	if err != nil {
 		return "", err
@@ -529,8 +528,7 @@ func CompressInterface(v interface{}) (string, error) {
 	if err := gz.Close(); err != nil {
 		return "", err
 	}
-	b64GZCluster = base64.StdEncoding.EncodeToString(b.Bytes())
-	return b64GZCluster, nil
+	return base64.StdEncoding.EncodeToString(b.Bytes()), nil
 }
 
 // DecompressInterface is a function that will base64 decode, ungzip, and unmarshal a string into the provided interface.

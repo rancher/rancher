@@ -505,36 +505,32 @@ func migrateMachinePoolsDynamicSchemaLabel(w *wrangler.Context) error {
 			if provCluster.Spec.RKEConfig == nil {
 				continue
 			}
+			// search for machine pools without the `dynamic-schema-spec` annotation and apply it
 			for i := range provCluster.Spec.RKEConfig.MachinePools {
 				if provCluster.Spec.RKEConfig.MachinePools[i].MachineDeploymentAnnotations == nil {
 					provCluster.Spec.RKEConfig.MachinePools[i].MachineDeploymentAnnotations = map[string]string{}
 				}
 				existingSpecAnnotation := provCluster.Spec.RKEConfig.MachinePools[i].MachineDeploymentAnnotations[rke2.DynamicSchemaSpecAnnotation]
-				if existingSpecAnnotation == "" {
-					for j := i; j < len(provCluster.Spec.RKEConfig.MachinePools); j++ {
-						existingSpecAnnotation = provCluster.Spec.RKEConfig.MachinePools[j].MachineDeploymentAnnotations[rke2.DynamicSchemaSpecAnnotation]
-						if existingSpecAnnotation != "" {
-							continue
-						}
-						nodeConfig := provCluster.Spec.RKEConfig.MachinePools[j].NodeConfig
-						if nodeConfig == nil {
-							return fmt.Errorf("machine pool node config must not be nil")
-						}
-						ds, err := w.Mgmt.DynamicSchema().Cache().Get(strings.ToLower(nodeConfig.Kind))
-						if err != nil {
-							return err
-						}
-						compressedSpec, err := rke2.CompressInterface(&ds.Spec)
-						if err != nil {
-							return err
-						}
-						provCluster.Spec.RKEConfig.MachinePools[j].MachineDeploymentAnnotations[rke2.DynamicSchemaSpecAnnotation] = compressedSpec
-					}
+				if existingSpecAnnotation != "" {
+					continue
 				}
-				_, err = w.Provisioning.Cluster().Update(&provCluster)
+				nodeConfig := provCluster.Spec.RKEConfig.MachinePools[i].NodeConfig
+				if nodeConfig == nil {
+					return fmt.Errorf("machine pool node config must not be nil")
+				}
+				ds, err := w.Mgmt.DynamicSchema().Cache().Get(strings.ToLower(nodeConfig.Kind))
 				if err != nil {
 					return err
 				}
+				compressedSpec, err := rke2.CompressInterface(&ds.Spec)
+				if err != nil {
+					return err
+				}
+				provCluster.Spec.RKEConfig.MachinePools[i].MachineDeploymentAnnotations[rke2.DynamicSchemaSpecAnnotation] = compressedSpec
+			}
+			_, err = w.Provisioning.Cluster().Update(&provCluster)
+			if err != nil {
+				return err
 			}
 		}
 	}

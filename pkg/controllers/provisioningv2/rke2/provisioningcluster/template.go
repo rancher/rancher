@@ -121,7 +121,7 @@ func takeOwnership(dynamic *dynamic.Controller, cluster *rancherv1.Cluster, node
 }
 
 func toMachineTemplate(machinePoolName string, cluster *rancherv1.Cluster, machinePool rancherv1.RKEMachinePool,
-	dynamic *dynamic.Controller, dynamicSchema mgmtcontroller.DynamicSchemaCache, secrets v1.SecretCache) (*unstructured.Unstructured, error) {
+	dynamic *dynamic.Controller, secrets v1.SecretCache) (*unstructured.Unstructured, error) {
 	apiVersion := machinePool.NodeConfig.APIVersion
 	kind := machinePool.NodeConfig.Kind
 	if apiVersion == "" {
@@ -280,7 +280,7 @@ func machineDeployments(cluster *rancherv1.Cluster, capiCluster *capi.Cluster, d
 		)
 
 		if machinePool.NodeConfig.APIVersion == "" || machinePool.NodeConfig.APIVersion == "rke-machine-config.cattle.io/v1" {
-			machineTemplate, err := toMachineTemplate(machineDeploymentName, cluster, machinePool, dynamic, dynamicSchema, secrets)
+			machineTemplate, err := toMachineTemplate(machineDeploymentName, cluster, machinePool, dynamic, secrets)
 			if err != nil {
 				return nil, err
 			}

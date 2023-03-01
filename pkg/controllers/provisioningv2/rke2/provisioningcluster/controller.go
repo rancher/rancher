@@ -298,10 +298,12 @@ func (h *handler) OnRancherClusterChange(obj *rancherv1.Cluster, status rancherv
 		}
 	}
 
+	// the outer loop searches for machine pools without the `dynamic-schema-spec` annotation
 	for i, machinePool := range obj.Spec.RKEConfig.MachinePools {
 		if machinePool.MachineDeploymentAnnotations != nil && machinePool.MachineDeploymentAnnotations[rke2.DynamicSchemaSpecAnnotation] != "" {
 			continue
 		}
+		// if the annotation is not found, add to any machine pools that do not have it and exit, preferring to rereconcile
 		obj = obj.DeepCopy()
 		for j := i; j < len(obj.Spec.RKEConfig.MachinePools); j++ {
 			if obj.Spec.RKEConfig.MachinePools[j].MachineDeploymentAnnotations == nil {
@@ -324,7 +326,6 @@ func (h *handler) OnRancherClusterChange(obj *rancherv1.Cluster, status rancherv
 				return nil, status, err
 			}
 			obj.Spec.RKEConfig.MachinePools[j].MachineDeploymentAnnotations[rke2.DynamicSchemaSpecAnnotation] = compressedSpec
-
 		}
 		_, err = h.clusterController.Update(obj)
 		if err == nil {
