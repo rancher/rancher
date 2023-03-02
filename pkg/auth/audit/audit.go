@@ -48,7 +48,7 @@ var (
 		http.MethodPut:  true,
 		http.MethodPost: true,
 	}
-	sensitiveRequestHeader  = []string{"Cookie", "Authorization"}
+	sensitiveRequestHeader  = []string{"Cookie", "Authorization", "X-Api-Tunnel-Params", "X-Api-Tunnel-Token"}
 	sensitiveResponseHeader = []string{"Cookie", "Set-Cookie"}
 	// ErrUnsupportedEncoding is returned when the response encoding is unsupported
 	ErrUnsupportedEncoding = fmt.Errorf("unsupported encoding")
