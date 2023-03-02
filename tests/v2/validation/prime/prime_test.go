@@ -26,7 +26,7 @@ func (t *PrimeVersionTestSuite) TearDownSuite() {
 }
 
 func (t *PrimeVersionTestSuite) SetupSuite() {
-	testSession := session.NewSession(t.T())
+	testSession := session.NewSession()
 	t.session = testSession
 	primeConfig := new(rancherversion.Config)
 
