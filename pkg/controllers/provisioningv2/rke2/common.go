@@ -2,6 +2,8 @@ package rke2
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"regexp"
@@ -91,6 +93,8 @@ const (
 
 	RoleBootstrap = "bootstrap"
 	RolePlan      = "plan"
+
+	MaxHelmReleaseNameLength = 53
 )
 
 var (
@@ -447,4 +451,50 @@ func GetOwnerFromGVK(groupVersion, kind string, obj runtime.Object) (*metav1.Own
 		return nil, "", ErrNoMatchingControllerOwnerRef
 	}
 	return ref, objMeta.GetNamespace(), nil
+}
+
+// SafeConcatName takes a maximum length and set of strings, it returns a string
+// representing the concatenation of the given strings which is at most maxLength long.
+// If a given set of strings exceeds the maxLength parameter, the concatenated string will be truncated and
+// a hash will be appended so that the result is at most maxLength long.
+// If the maxLength parameter is equal to or less than 5, the string will simply be shortened with no additional hash added.
+// TODO; move this updated logic into wrangler, where it belongs.
+func SafeConcatName(maxLength int, name ...string) string {
+
+	hashLength := 6
+
+	fullPath := strings.Join(name, "-")
+	if len(fullPath) <= maxLength {
+		return fullPath
+	}
+
+	if maxLength == 0 {
+		return ""
+	}
+
+	if maxLength <= 5 {
+		return fullPath[:maxLength]
+	}
+
+	digest := sha256.Sum256([]byte(fullPath))
+
+	// since we index the string in the middle, the last char may not be compatible with what is expected in k8s
+	// we are checking and if necessary removing the last char
+	trailingCharacterIndex := maxLength - (hashLength + 1)
+	if trailingCharacterIndex < 0 {
+		trailingCharacterIndex = 0
+	}
+	c := fullPath[trailingCharacterIndex]
+
+	if 'a' <= c && c <= 'z' || '0' <= c && c <= '9' {
+		remainingString := fullPath[0 : maxLength-(hashLength)]
+		hash := hex.EncodeToString(digest[0:])[0 : hashLength-1]
+		if remainingString == "" {
+			// if we've completely converted the input into a hash don't append '-'
+			return hash
+		}
+		return remainingString + "-" + hash
+	}
+
+	return fullPath[0:maxLength-(hashLength+1)] + "-" + hex.EncodeToString(digest[0:])[0:hashLength]
 }
