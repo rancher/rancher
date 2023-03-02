@@ -34,17 +34,17 @@ func (m *MockManager) EXPECT() *MockManagerMockRecorder {
 }
 
 // Ensure mocks base method.
-func (m *MockManager) Ensure(arg0, arg1, arg2 string, arg3 map[string]interface{}, arg4 bool) error {
+func (m *MockManager) Ensure(arg0, arg1, arg2 string, arg3 map[string]interface{}, arg4 bool, arg5 string) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Ensure", arg0, arg1, arg2, arg3, arg4)
+	ret := m.ctrl.Call(m, "Ensure", arg0, arg1, arg2, arg3, arg4, arg5)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // Ensure indicates an expected call of Ensure.
-func (mr *MockManagerMockRecorder) Ensure(arg0, arg1, arg2, arg3, arg4 interface{}) *gomock.Call {
+func (mr *MockManagerMockRecorder) Ensure(arg0, arg1, arg2, arg3, arg4, arg5 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Ensure", reflect.TypeOf((*MockManager)(nil).Ensure), arg0, arg1, arg2, arg3, arg4)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Ensure", reflect.TypeOf((*MockManager)(nil).Ensure), arg0, arg1, arg2, arg3, arg4, arg5)
 }
 
 // Remove mocks base method.

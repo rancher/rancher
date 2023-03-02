@@ -109,7 +109,7 @@ func (h handler) onClusterChange(key string, cluster *v3.Cluster) (*v3.Cluster, 
 		return cluster, err
 	}
 
-	if err := h.manager.Ensure(toInstallCrdChart.ReleaseNamespace, toInstallCrdChart.ChartName, "", nil, true); err != nil {
+	if err := h.manager.Ensure(toInstallCrdChart.ReleaseNamespace, toInstallCrdChart.ChartName, "", nil, true, ""); err != nil {
 		return cluster, err
 	}
 
@@ -140,7 +140,7 @@ func (h handler) onClusterChange(key string, cluster *v3.Cluster) (*v3.Cluster, 
 		chartValues[chart.PriorityClassKey] = priorityClassName
 	}
 
-	if err := h.manager.Ensure(toInstallChart.ReleaseNamespace, toInstallChart.ChartName, "", chartValues, true); err != nil {
+	if err := h.manager.Ensure(toInstallChart.ReleaseNamespace, toInstallChart.ChartName, "", chartValues, true, ""); err != nil {
 		return cluster, err
 	}
 

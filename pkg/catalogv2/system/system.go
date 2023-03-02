@@ -45,9 +45,10 @@ var (
 )
 
 type desiredKey struct {
-	namespace  string
-	name       string
-	minVersion string
+	namespace            string
+	name                 string
+	minVersion           string
+	installImageOverride string
 }
 
 type desired struct {
@@ -168,7 +169,7 @@ func (m *Manager) installCharts(charts map[desiredKey]map[string]interface{}, fo
 	var errs []error
 	for key, values := range charts {
 		for {
-			if err := m.install(key.namespace, key.name, key.minVersion, values, forceAdopt); err == repo.ErrNoChartName || apierrors.IsNotFound(err) {
+			if err := m.install(key.namespace, key.name, key.minVersion, values, forceAdopt, key.installImageOverride); err == repo.ErrNoChartName || apierrors.IsNotFound(err) {
 				logrus.Errorf("Failed to find system chart %s will try again in 5 seconds: %v", key.name, err)
 				time.Sleep(5 * time.Second)
 				continue
@@ -210,13 +211,14 @@ func (m *Manager) Uninstall(namespace, name string) error {
 	return m.waitPodDone(op)
 }
 
-func (m *Manager) Ensure(namespace, name, minVersion string, values map[string]interface{}, forceAdopt bool) error {
+func (m *Manager) Ensure(namespace, name, minVersion string, values map[string]interface{}, forceAdopt bool, installImageOverride string) error {
 	go func() {
 		m.sync <- desired{
 			key: desiredKey{
-				namespace:  namespace,
-				name:       name,
-				minVersion: minVersion,
+				namespace:            namespace,
+				name:                 name,
+				minVersion:           minVersion,
+				installImageOverride: installImageOverride,
 			},
 			values:     values,
 			forceAdopt: forceAdopt,
@@ -233,7 +235,7 @@ func (m *Manager) Remove(namespace, name, minVersion string) {
 	})
 }
 
-func (m *Manager) install(namespace, name, minVersion string, values map[string]interface{}, forceAdopt bool) error {
+func (m *Manager) install(namespace, name, minVersion string, values map[string]interface{}, forceAdopt bool, installImageOverride string) error {
 	index, err := m.content.Index("", "rancher-charts", true)
 	if err != nil {
 		return err
@@ -281,7 +283,7 @@ func (m *Manager) install(namespace, name, minVersion string, values map[string]
 		return err
 	}
 
-	op, err := m.operation.Upgrade(m.ctx, installUser, "", "rancher-charts", bytes.NewBuffer(upgrade), "")
+	op, err := m.operation.Upgrade(m.ctx, installUser, "", "rancher-charts", bytes.NewBuffer(upgrade), installImageOverride)
 	if err != nil {
 		return err
 	}
