@@ -78,11 +78,24 @@ if ( true == via_webhook() && (!(rancher_version ==~ rancher_version_regex)) ) {
       def ADMIN_TOKEN_2 = ""
       def USER_TOKEN_2 = ""
 
+      def configYAML = "../provision-config.yaml"
+      def TIMEOUT = "6h"
+
+      def rke2EC2TestCase = "-run ^TestRKE2ProvisioningTestSuite/TestProvisioningRKE2Cluster$"
+      def rke2AZTestCase = "-run ^TestRKE2ProvisioningTestSuite/TestProvisioningRKE2Cluster$"
+      def rke2CustomTestCase = "-run ^TestCustomClusterRKE2ProvisioningTestSuite/TestProvisioningRKE2CustomCluster$"
+      def k3sEC2TestCase = "-run ^TestK3sProvisioningTestSuite/TestProvisioningK3SCluster$"
+      def k3sAZTestCase = "-run ^TestK3sProvisioningTestSuite/TestProvisioningK3SCluster$"
+      def k3sCustomTestCase = "-run ^TestCustomClusterK3sProvisioningTestSuite/TestProvisioningK3SCustomCluster$"
+
       wrap([$class: 'AnsiColorBuildWrapper', 'colorMapName': 'XTerm', 'defaultFg': 2, 'defaultBg':1]) {
         withFolderProperties {
           withCredentials([ string(credentialsId: 'AWS_ACCESS_KEY_ID', variable: 'AWS_ACCESS_KEY_ID'),
                             string(credentialsId: 'AWS_SECRET_ACCESS_KEY', variable: 'AWS_SECRET_ACCESS_KEY'),
                             string(credentialsId: 'AWS_SSH_PEM_KEY', variable: 'AWS_SSH_PEM_KEY'),
+                            string(credentialsId: 'AZURE_CLIENT_ID', variable: 'AZURE_CLIENT_ID'),
+                            string(credentialsId: 'AZURE_CLIENT_SECRET', variable: 'AZURE_CLIENT_SECRET'),
+                            string(credentialsId: 'AZURE_SUBSCRIPTION_ID', variable: 'AZURE_SUBSCRIPTION_ID'),
                             string(credentialsId: 'ADMIN_PASSWORD', variable: 'ADMIN_PASSWORD'),
                             string(credentialsId: 'USER_PASSWORD', variable: 'USER_PASSWORD')]) {
 
@@ -172,7 +185,7 @@ if ( true == via_webhook() && (!(rancher_version ==~ rancher_version_regex)) ) {
                       }
                       else if (rancher_version.startsWith("v2.7")){
                         if (!env.RKE_VERSION) {
-                          RKE_VERSION = "v1.4.0-rc4"
+                          RKE_VERSION = "v1.4.0"
                         }
                         if (!env.RANCHER_K3S_VERSION) {
                           RANCHER_K3S_VERSION = "v1.24.6+k3s1"
@@ -192,12 +205,60 @@ if ( true == via_webhook() && (!(rancher_version ==~ rancher_version_regex)) ) {
                                   string(name: 'RANCHER_K3S_VERSION', value: "${RANCHER_K3S_VERSION}"),
                                   string(name: 'BRANCH', value: branch) ]
 
-                      // Rancher server 1 is used to test RKE clusters
+                      goRKE2EC2Params = [ string(name: 'TIMEOUT', value: "${TIMEOUT}"),
+                                  text(name: 'CONFIG', value: "${provision-config.yaml}"),
+                                  string(name: 'REPO', value: "https://github.com/rancher/rancher.git"),
+                                  string(name: 'BRANCH', value: branch),
+                                  string(name: 'TEST_PACKAGE', value: "provisioning/rke2"),
+                                  string(name: 'GOTEST_TESTCASE', value: "${rke2EC2TestCase}") ]
+
+                      goRKE2AZParams = [ string(name: 'TIMEOUT', value: "${TIMEOUT}"),
+                                  text(name: 'CONFIG', value: "${provision-config.yaml}"),
+                                  string(name: 'REPO', value: "https://github.com/rancher/rancher.git"),
+                                  string(name: 'BRANCH', value: branch),
+                                  string(name: 'TEST_PACKAGE', value: "provisioning/rke2"),
+                                  string(name: 'GOTEST_TESTCASE', value: "${rke2AZTestCase}") ]
+
+                      goRKE2CustomParams = [ string(name: 'TIMEOUT', value: "${TIMEOUT}"),
+                                  text(name: 'CONFIG', value: "${provision-config.yaml}"),
+                                  string(name: 'REPO', value: "https://github.com/rancher/rancher.git"),
+                                  string(name: 'BRANCH', value: branch),
+                                  string(name: 'TEST_PACKAGE', value: "provisioning/rke2"),
+                                  string(name: 'GOTEST_TESTCASE', value: "${rke2CustomTestCase}") ]
+
+                      goK3SEC2Params = [ string(name: 'TIMEOUT', value: "${TIMEOUT}"),
+                                  text(name: 'CONFIG', value: "${provision-config.yaml}"),
+                                  string(name: 'REPO', value: "https://github.com/rancher/rancher.git"),
+                                  string(name: 'BRANCH', value: branch),
+                                  string(name: 'TEST_PACKAGE', value: "provisioning/k3s"),
+                                  string(name: 'GOTEST_TESTCASE', value: "${k3sEC2TestCase}") ]
+
+                      goK3SAZParams = [ string(name: 'TIMEOUT', value: "${TIMEOUT}"),
+                                  text(name: 'CONFIG', value: "${provision-config.yaml}"),
+                                  string(name: 'REPO', value: "https://github.com/rancher/rancher.git"),
+                                  string(name: 'BRANCH', value: branch),
+                                  string(name: 'TEST_PACKAGE', value: "provisioning/k3s"),
+                                  string(name: 'GOTEST_TESTCASE', value: "${k3sAZTestCase}") ]                  
+
+                      goK3SCustomParams = [ string(name: 'TIMEOUT', value: "${TIMEOUT}"),
+                                  text(name: 'CONFIG', value: "${provision-config.yaml}"),
+                                  string(name: 'REPO', value: "https://github.com/rancher/rancher.git"),
+                                  string(name: 'BRANCH', value: branch),
+                                  string(name: 'TEST_PACKAGE', value: "provisioning/k3s"),
+                                  string(name: 'GOTEST_TESTCASE', value: "${k3sCustomTestCase}") ]
+
+                      // Rancher server 1 is used to test RKE1, RKE2 and K3s clusters
                       // DO Note: https://github.com/rancher/qa-tasks/issues/318
                       // jobs["do"] = { build job: 'rancher-v3_ontag_do_certification', parameters: params }
                       jobs["ec2"] = { build job: 'rancher-v3_ontag_ec2_certification', parameters: params }
                       jobs["az"] = { build job: 'rancher-v3_ontag_az_certification', parameters: params }
                       jobs["custom"] = { build job: 'rancher-v3_ontag_custom_certification', parameters: params}
+                      jobs["go-rke2-ec2"] = { build job: 'go-automation-freeform-job', parameters: goRKE2EC2Params }
+                      jobs["go-rke2-az"] = { build job: 'go-automation-freeform-job', parameters: goRKE2AZParams }
+                      jobs["go-rke2-custom"] = { build job: 'go-automation-freeform-job', parameters: goRKE2CustomParams }
+                      jobs["go-k3s-ec2"] = { build job: 'go-automation-freeform-job', parameters: goK3SEC2Params }
+                      jobs["go-k3s-az"] = { build job: 'go-automation-freeform-job', parameters: goK3SAZParams }
+                      jobs["go-k3s-custom"] = { build job: 'go-automation-freeform-job', parameters: goK3SCustomParams }
                       // windows note: https://github.com/rancher/dashboard/issues/6549
                       // jobs["windows"] = { build job: 'rancher-v3_ontag_windows_certification', parameters: params}
                       if (rancher_version.startsWith("v2.6") || rancher_version.startsWith("v2.7")){

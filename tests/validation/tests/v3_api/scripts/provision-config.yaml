@@ -1,0 +1,207 @@
+rancher:
+  host: ${CATTLE_TEST_URL}
+  adminToken: ${ADMIN_TOKEN}
+  cleanup: true
+provisioningInput:
+  nodesAndRoles: [
+    etcd: true,
+    controlplane: true,
+    worker: true,
+  ]
+  k3sKubernetesVersion: ["v1.24.10+k3s1"]
+  cni: ["calico"]
+  providers: ["azure"]
+  hardened: true
+azureCredentials:
+  clientId: ${AZURE_CLIENT_ID}
+  clientSecret: ${AZURE_CLIENT_SECRET}
+  subscriptionId: ${AZURE_SUBSCRIPTION_ID}
+  environment: "AzurePublicCloud"
+azureMachineConfig:
+  availabilitySet: "docker-machine"
+  diskSize: "30"
+  environment: "AzurePublicCloud"
+  faultDomainCount: "3"
+  image: "canonical:UbuntuServer:20.04-LTS:latest"
+  location: "westus"
+  managedDisks: false
+  noPublicIp: false
+  nsg: ""
+  openPort: ["6443/tcp", "2379/tcp", "2380/tcp", "8472/udp", "4789/udp", "9796/tcp", "10256/tcp", "10250/tcp", "10251/tcp", "10252/tcp"]
+  resourceGroup: "docker-machine"
+  size: "Standard_D2_v2"
+  sshUser: "docker-user"
+  staticPublicIp: false
+  storageType: "Standard_LRS"
+  subnet: "docker-machine"
+  subnetPrefix: "192.168.0.0/16"
+  updateDomainCount: "5"
+  usePrivateIp: false
+  vnet: "docker-machine-vnet"
+---
+rancher:
+  host: "${CATTLE_TEST_URL}"
+  adminToken: "${ADMIN_TOKEN}"
+  cleanup: true
+provisioningInput:
+  nodesAndRoles: [
+    etcd: true,
+    controlplane: true,
+    worker: true,
+  ]
+  rke2KubernetesVersion: ["v1.24.10+rke2r1"]
+  cni: ["calico"]
+  providers: ["aws"]
+  hardened: true
+awsCredentials:
+  secretKey: "${AWS_SECRET_ACCESS_KEY}"
+  accessKey: "${AWS_ACCESS_KEY_ID}"
+  defaultRegion: "${AWS_REGION}"
+awsMachineConfig:
+  region: "${AWS_REGION}"
+  ami: "${AWS_AMI}"
+  instanceType: "${AWS_INSTANCE_TYPE}"
+  sshUser: "${AWS_USER}"
+  vpcId: "${AWS_VPC}"
+  volumeType: "gp2"
+  zone: "a"
+  retries: "5"
+  rootSize: "60"
+  securityGroup: "${AWS_SECURITY_GROUPS}"
+---
+rancher:
+  host: ${CATTLE_TEST_URL}
+  adminToken: ${ADMIN_TOKEN}
+  cleanup: true
+provisioningInput:
+  nodesAndRoles: [
+    etcd: true,
+    controlplane: true,
+    worker: true,
+  ]
+  k3sKubernetesVersion: ["v1.24.10+k3s1"]
+  cni: ["calico"]
+  providers: ["aws"]
+  nodeProviders: ["ec2"]
+  hardened: true
+awsEC2Configs:
+  region: "${AWS_REGION}"
+  awsSecretAccessKey: ${AWS_SECRET_ACCESS_KEY}
+  awsAccessKeyID: ${AWS_ACCESS_KEY_ID}
+  awsEC2Config:
+    - instanceType: "${AWS_INSTANCE_TYPE}"
+      awsRegionAZ: ""
+      awsAMI: "${AWS_AMI}"
+      awsSecurityGroups: "${AWS_SECURITY_GROUPS}"
+      awsSSHKeyName: "${AWS_SSH_PEM_KEY}"
+      awsCICDInstanceTag: "${AWS_CICD_INSTANCE_TAG}"
+      awsIAMProfile: "${AWS_IAM_PROFILE}"
+      awsUser: "${AWS_USER}"
+      volumeSize: "${AWS_VOLUME_SIZE}"
+      isWindows: false
+sshPath: 
+  sshPath: "/go/src/github.com/rancher/rancher/tests/v2/validation/.ssh"
+---
+rancher:
+  host: "${CATTLE_TEST_URL}"
+  adminToken: "${ADMIN_TOKEN}"
+  cleanup: true
+provisioningInput:
+  nodesAndRoles: [
+    etcd: true,
+    controlplane: true,
+    worker: true,
+  ]
+  k3sKubernetesVersion: ["v1.24.10+k3s1"]
+  cni: ["calico"]
+  providers: ["aws"]
+  hardened: true
+awsCredentials:
+  secretKey: "${AWS_SECRET_ACCESS_KEY}"
+  accessKey: "${AWS_ACCESS_KEY_ID}"
+  defaultRegion: "${AWS_REGION}"
+awsMachineConfig:
+  region: "${AWS_REGION}"
+  ami: "${AWS_AMI}"
+  instanceType: "${AWS_INSTANCE_TYPE}"
+  sshUser: "${AWS_USER}"
+  vpcId: "${AWS_VPC}"
+  volumeType: "gp2"
+  zone: "a"
+  retries: "5"
+  rootSize: "60"
+  securityGroup: "${AWS_SECURITY_GROUPS}"
+---
+rancher:
+  hhost: "${CATTLE_TEST_URL}"
+  adminToken: "${ADMIN_TOKEN}"
+  cleanup: true
+provisioningInput:
+  nodesAndRoles: [
+    etcd: true,
+    controlplane: true,
+    worker: true,
+  ]
+  rke2KubernetesVersion: ["v1.24.10+rke2r1"]
+  cni: ["calico"]
+  providers: ["azure"]
+  hardened: true
+azureCredentials:
+  clientId: "${AZURE_CLIENT_ID}"
+  clientSecret: "${AZURE_CLIENT_SECRET}"
+  subscriptionId: "${AZURE_SUBSCRIPTION_ID}"
+  environment: "AzurePublicCloud"
+azureMachineConfig:
+  availabilitySet: "docker-machine"
+  diskSize: "30"
+  environment: "AzurePublicCloud"
+  faultDomainCount: "3"
+  image: "canonical:UbuntuServer:20.04-LTS:latest"
+  location: "westus"
+  managedDisks: false
+  noPublicIp: false
+  nsg: ""
+  openPort: ["6443/tcp", "2379/tcp", "2380/tcp", "8472/udp", "4789/udp", "9796/tcp", "10256/tcp", "10250/tcp", "10251/tcp", "10252/tcp"]
+  resourceGroup: "docker-machine"
+  size: "Standard_D2_v2"
+  sshUser: "docker-user"
+  staticPublicIp: false
+  storageType: "Standard_LRS"
+  subnet: "docker-machine"
+  subnetPrefix: "192.168.0.0/16"
+  updateDomainCount: "5"
+  usePrivateIp: false
+  vnet: "docker-machine-vnet"
+---
+rancher:
+  host: ${CATTLE_TEST_URL}
+  adminToken: ${ADMIN_TOKEN}
+  cleanup: true
+provisioningInput:
+  nodesAndRoles: [
+    etcd: true,
+    controlplane: true,
+    worker: true,
+  ]
+  rke2KubernetesVersion: ["v1.24.10+rke2r1"]
+  cni: ["calico"]
+  providers: ["aws"]
+  nodeProviders: ["ec2"]
+  hardened: true
+awsEC2Configs:
+  region: "${AWS_REGION}"
+  awsSecretAccessKey: ${AWS_SECRET_ACCESS_KEY}
+  awsAccessKeyID: ${AWS_ACCESS_KEY_ID}
+  awsEC2Config:
+    - instanceType: "${AWS_INSTANCE_TYPE}"
+      awsRegionAZ: ""
+      awsAMI: "${AWS_AMI}"
+      awsSecurityGroups: "${AWS_SECURITY_GROUPS}"
+      awsSSHKeyName: "${AWS_SSH_PEM_KEY}"
+      awsCICDInstanceTag: "${AWS_CICD_INSTANCE_TAG}"
+      awsIAMProfile: "${AWS_IAM_PROFILE}"
+      awsUser: "${AWS_USER}"
+      volumeSize: "${AWS_VOLUME_SIZE}"
+      isWindows: false
+sshPath: 
+  sshPath: "/go/src/github.com/rancher/rancher/tests/v2/validation/.ssh"
