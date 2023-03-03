@@ -313,16 +313,111 @@ func (a *AuditTest) TestCompression() {
 
 			// validate the json written to the file is as expected\
 
-			expectedData := a.addMeta(auditLog.log, test.respHeader, test.expectedReqBody, test.expectedRespBody)
+			expectedData := a.addMeta(auditLog.log, nil, test.respHeader, test.expectedReqBody, test.expectedRespBody)
 
-			a.JSONEqf(a.drain(tmpPath), expectedData, "Incorrect JSON stored.")
+			a.JSONEqf(expectedData, a.drain(tmpPath), "Incorrect JSON stored.")
 		})
 	}
 
 }
 
-// addMeta adds expected log meta data to the expected log message.
-func (a *AuditTest) addMeta(log *log, respHeader http.Header, reqBody, respBody string) string {
+func (a *AuditTest) TestFilterSensitiveHeader() {
+	// Create a temp log file
+	tmpFile, err := os.CreateTemp("", "audit-test")
+	a.Require().NoError(err, "Failed to create temp directory.")
+	// close the file so the logger can open it for writing
+	err = tmpFile.Close()
+	a.Require().NoError(err, "Failed to close temporary file after creation")
+
+	tmpPath := tmpFile.Name()
+	defer func() {
+		err = os.RemoveAll(tmpPath)
+		a.NoError(err, "Failed to clean up temp directory")
+	}()
+
+	writer := NewLogWriter(tmpPath, LevelRequestResponse, 30, 30, 100)
+	a.Require().NotNil(writer, "Failed to create auditWriter.")
+
+	sensitiveRegex, err := regexp.Compile(`[pP]assword|[tT]oken`)
+	a.Require().NoErrorf(err, "Failed to create valid regex: %v", err)
+
+	req, err := http.NewRequest(http.MethodGet, "/test", nil)
+	a.Require().NoErrorf(err, "Failed to create request: %v", err)
+
+	auditLog, err := newAuditLog(writer, req, sensitiveRegex)
+	a.Require().NoErrorf(err, "Failed to create AuditLog: %v", err)
+
+	tests := []struct {
+		name               string
+		respHeader         http.Header
+		reqHeader          http.Header
+		expectedRespHeader http.Header
+		expectedReqHeader  http.Header
+	}{
+		{
+			name:               "sensitive request header: \"X-Api-Tunnel-Param\"",
+			reqHeader:          http.Header{"X-Api-Tunnel-Params": []string{"abcd"}},
+			respHeader:         http.Header{"Content-Type": []string{"application/json"}, "Content-Encoding": []string{"none"}},
+			expectedRespHeader: http.Header{"Content-Type": []string{"application/json"}, "Content-Encoding": []string{"none"}},
+		},
+		{
+			name:               "sensitive request header: \"X-Api-Tunnel-Token\"",
+			reqHeader:          http.Header{"X-Api-Tunnel-Token": []string{"abcd"}},
+			respHeader:         http.Header{"Content-Type": []string{"application/json"}, "Content-Encoding": []string{"none"}},
+			expectedRespHeader: http.Header{"Content-Type": []string{"application/json"}, "Content-Encoding": []string{"none"}},
+		},
+		{
+			name:               "sensitive request header: \"Authorization\"",
+			reqHeader:          http.Header{"Authorization": []string{"abcd"}},
+			respHeader:         http.Header{"Content-Type": []string{"application/json"}, "Content-Encoding": []string{"none"}},
+			expectedRespHeader: http.Header{"Content-Type": []string{"application/json"}, "Content-Encoding": []string{"none"}},
+		},
+		{
+			name:               "sensitive request header: \"Cookie\"",
+			reqHeader:          http.Header{"Cookie": []string{"abcd"}},
+			respHeader:         http.Header{"Content-Type": []string{"application/json"}, "Content-Encoding": []string{"none"}},
+			expectedRespHeader: http.Header{"Content-Type": []string{"application/json"}, "Content-Encoding": []string{"none"}},
+		},
+		{
+			name:               "non-sensitive request header and sensitive request header: \"Cookie\"",
+			reqHeader:          http.Header{"Cookie": []string{"abcd"}, "User-Agent": []string{"useragent1"}},
+			respHeader:         http.Header{"Content-Type": []string{"application/json"}, "Content-Encoding": []string{"none"}},
+			expectedRespHeader: http.Header{"Content-Type": []string{"application/json"}, "Content-Encoding": []string{"none"}},
+			expectedReqHeader:  http.Header{"User-Agent": []string{"useragent1"}},
+		},
+		{
+			name:               "sensitive response header: \"Cookie\"",
+			respHeader:         http.Header{"Content-Type": []string{"application/json"}, "Content-Encoding": []string{"none"}, "Cookie": []string{"abcd"}},
+			expectedRespHeader: http.Header{"Content-Type": []string{"application/json"}, "Content-Encoding": []string{"none"}},
+		},
+		{
+			name:               "sensitive response header: \"Set-Cookie\"",
+			respHeader:         http.Header{"Content-Type": []string{"application/json"}, "Content-Encoding": []string{"none"}, "Set-Cookie": []string{"abcd"}},
+			expectedRespHeader: http.Header{"Content-Type": []string{"application/json"}, "Content-Encoding": []string{"none"}},
+		},
+	}
+	writer.Level = LevelMetadata
+	for i := range tests {
+		test := tests[i]
+		a.Run(test.name, func() {
+			writer.Level = 1
+			// write the test to the audit logger
+			auditLog.log.RequestHeader = test.reqHeader
+			err := auditLog.write(nil, test.reqHeader, test.respHeader, 0, []byte{})
+
+			a.Require().NoErrorf(err, "Failed to write log: %v.", err)
+
+			// validate the json written to the file is as expected\
+
+			expectedData := a.addMeta(auditLog.log, test.expectedReqHeader, test.expectedRespHeader, "", "")
+
+			a.JSONEqf(expectedData, a.drain(tmpPath), "Incorrect JSON stored.")
+		})
+	}
+}
+
+// addMeta adds expected log metadata to the expected log message.
+func (a *AuditTest) addMeta(log *log, reqHeader, respHeader http.Header, reqBody, respBody string) string {
 	data := map[string]interface{}{}
 	if reqBody != "" {
 		reqBodyData := map[string]interface{}{}
@@ -341,6 +436,9 @@ func (a *AuditTest) addMeta(log *log, respHeader http.Header, reqBody, respBody 
 	data["requestTimestamp"] = log.RequestTimestamp
 	data["auditID"] = log.AuditID
 	data["responseHeader"] = respHeader
+	if reqHeader != nil {
+		data["requestHeader"] = reqHeader
+	}
 	data["responseTimestamp"] = log.ResponseTimestamp
 	retJSON, err := json.Marshal(data)
 	a.NoErrorf(err, "Failed to add json metadata for log message check: %v", err)
