@@ -351,6 +351,7 @@ func machineDeployments(cluster *rancherv1.Cluster, capiCluster *capi.Cluster, d
 		for k, v := range machinePool.MachineDeploymentLabels {
 			machineDeploymentLabels[k] = v
 		}
+		machineDeploymentLabels[capi.WatchLabel] = capr.CAPIFilterValue
 
 		machineSpecAnnotations := map[string]string{}
 		// Ignore drain if DrainBeforeDelete is unset or the pool is for etcd nodes
@@ -388,6 +389,7 @@ func machineDeployments(cluster *rancherv1.Cluster, capiCluster *capi.Cluster, d
 							capr.ClusterNameLabel:           capiCluster.Name,
 							capi.MachineDeploymentLabelName: machineDeploymentName,
 							capr.RKEMachinePoolNameLabel:    machinePool.Name,
+							capi.WatchLabel:                 capr.CAPIFilterValue,
 						},
 						Annotations: machineSpecAnnotations,
 					},
@@ -582,6 +584,9 @@ func capiCluster(cluster *rancherv1.Cluster, rkeControlPlane *rkev1.RKEControlPl
 					Controller:         &[]bool{true}[0],
 					BlockOwnerDeletion: &[]bool{true}[0],
 				},
+			},
+			Labels: map[string]string{
+				capi.WatchLabel: capr.CAPIFilterValue,
 			},
 		},
 		Spec: capi.ClusterSpec{

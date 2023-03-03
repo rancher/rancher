@@ -4,6 +4,7 @@ import (
 	"context"
 
 	controllerruntime "github.com/rancher/lasso/controller-runtime"
+	rke2 "github.com/rancher/rancher/pkg/capr"
 	"github.com/rancher/rancher/pkg/controllers/capi/logger"
 	rkecontrollers "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/wrangler"
@@ -127,31 +128,37 @@ func reconcilers(mgr ctrl.Manager, clients *wrangler.Context) ([]reconciler, err
 			// If the cluster agent gets disconnected, then the caches that CAPI uses could get out of sync.
 			// By using a connectedAgentClusterCacheClient (which returns a NotFound error if the agent is not connected), then
 			// we can force CAPI to refresh its caches once the agent is connected again.
-			Client:  &connectedAgentClusterCacheClient{Client: mgr.GetClient(), rkeControlPlanesCache: clients.RKE.RKEControlPlane().Cache()},
-			Log:     ctrl.Log.WithName("remote").WithName("ClusterCacheReconciler"),
-			Tracker: tracker,
+			Client:           &connectedAgentClusterCacheClient{Client: mgr.GetClient(), rkeControlPlanesCache: clients.RKE.RKEControlPlane().Cache()},
+			Log:              ctrl.Log.WithName("remote").WithName("ClusterCacheReconciler"),
+			Tracker:          tracker,
+			WatchFilterValue: rke2.CAPIFilterValue,
 		},
 		&controllers.ClusterReconciler{
-			Client:    mgr.GetClient(),
-			APIReader: mgr.GetAPIReader(),
+			Client:           mgr.GetClient(),
+			APIReader:        mgr.GetAPIReader(),
+			WatchFilterValue: rke2.CAPIFilterValue,
 		},
 		&controllers.MachineReconciler{
-			Client:    mgr.GetClient(),
-			APIReader: mgr.GetAPIReader(),
-			Tracker:   tracker,
+			Client:           mgr.GetClient(),
+			APIReader:        mgr.GetAPIReader(),
+			Tracker:          tracker,
+			WatchFilterValue: rke2.CAPIFilterValue,
 		},
 		&controllers.MachineSetReconciler{
-			Client:    mgr.GetClient(),
-			APIReader: mgr.GetAPIReader(),
-			Tracker:   tracker,
+			Client:           mgr.GetClient(),
+			APIReader:        mgr.GetAPIReader(),
+			Tracker:          tracker,
+			WatchFilterValue: rke2.CAPIFilterValue,
 		},
 		&controllers.MachineDeploymentReconciler{
-			Client:    mgr.GetClient(),
-			APIReader: mgr.GetAPIReader(),
+			Client:           mgr.GetClient(),
+			APIReader:        mgr.GetAPIReader(),
+			WatchFilterValue: rke2.CAPIFilterValue,
 		},
 		&controllers.MachineHealthCheckReconciler{
-			Client:  mgr.GetClient(),
-			Tracker: tracker,
+			Client:           mgr.GetClient(),
+			Tracker:          tracker,
+			WatchFilterValue: rke2.CAPIFilterValue,
 		},
 	}, nil
 }

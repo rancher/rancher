@@ -120,6 +120,8 @@ const (
 
 	MinimumHostnameLengthLimit = 10
 	MaximumHostnameLengthLimit = 63
+
+	CAPIFilterValue = "rancher-prov-v2"
 )
 
 var (

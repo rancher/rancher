@@ -8,6 +8,7 @@ import (
 	"github.com/mcuadros/go-version"
 	"github.com/rancher/norman/condition"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	rancherv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	"github.com/rancher/rancher/pkg/capr"
 	"github.com/rancher/rancher/pkg/features"
@@ -79,6 +80,10 @@ func runMigrations(wranglerContext *wrangler.Context) error {
 		if err := migrateMachinePoolsDynamicSchemaLabel(wranglerContext); err != nil {
 			return err
 		}
+	}
+
+	if err := migrateAddCAPIWatchFilterLabels(wranglerContext); err != nil {
+		return err
 	}
 
 	return nil
@@ -285,6 +290,68 @@ func addWebhookConfigToCAPICRDs(crdClient controllerapiextv1.CustomResourceDefin
 	}
 
 	return nil
+}
+
+func migrateAddCAPIWatchFilterLabels(w *wrangler.Context) error {
+	namespaces, err := w.Core.Namespace().List(metav1.ListOptions{})
+	if err != nil {
+		return fmt.Errorf("listing namespaces: %w", err)
+	}
+	for _, ns := range namespaces.Items {
+		// Clusters
+		clusters, err := w.CAPI.Cluster().List(ns.Name, metav1.ListOptions{})
+		if err != nil {
+			return fmt.Errorf("listing capi clusters in ns %s: %w", ns.Name, err)
+		}
+		for _, cluster := range clusters.Items {
+			if isRancherOwned(cluster.OwnerReferences) {
+				if _, ok := cluster.Labels[capi.WatchLabel]; !ok {
+					clusterCopy := cluster.DeepCopy()
+					clusterCopy.Labels[capi.WatchLabel] = capr.CAPIFilterValue
+					if _, updateErr := w.CAPI.Cluster().Update(clusterCopy); updateErr != nil {
+						return fmt.Errorf("saving update to cluster %s: %w", clusterCopy.Name, updateErr)
+					}
+				}
+			}
+		}
+
+		// MachineDeployments
+		deployments, err := w.CAPI.MachineDeployment().List(ns.Name, metav1.ListOptions{})
+		if err != nil {
+			return fmt.Errorf("listing capi machine deployments in ns %s: %w", ns.Name, err)
+		}
+		for _, dep := range deployments.Items {
+			if isRancherOwned(dep.OwnerReferences) {
+				if _, ok := dep.Labels[capi.WatchLabel]; !ok {
+					depCopy := dep.DeepCopy()
+					depCopy.Labels[capi.WatchLabel] = capr.CAPIFilterValue
+					if _, updateErr := w.CAPI.MachineDeployment().Update(depCopy); updateErr != nil {
+						return fmt.Errorf("saving update to machine deployment %s: %w", depCopy.Name, updateErr)
+					}
+				}
+			}
+		}
+
+		// Machines
+		machines, err := w.CAPI.Machine().List(ns.Name, metav1.ListOptions{})
+		if err != nil {
+			return fmt.Errorf("listing capi machines in ns %s: %w", ns.Name, err)
+		}
+		for _, machine := range machines.Items {
+			if isRancherOwned(machine.OwnerReferences) {
+				if _, ok := machine.Labels[capi.WatchLabel]; !ok {
+					machineCopy := machine.DeepCopy()
+					machineCopy.Labels[capi.WatchLabel] = capr.CAPIFilterValue
+					if _, updateErr := w.CAPI.Machine().Update(machineCopy); updateErr != nil {
+						return fmt.Errorf("saving update to machine %s: %w", machineCopy.Name, updateErr)
+					}
+				}
+			}
+		}
+	}
+
+	return nil
+
 }
 
 func migrateCAPIMachineLabelsAndAnnotationsToPlanSecret(w *wrangler.Context) error {
@@ -576,4 +643,18 @@ func insertOrUpdateCondition(d data.Object, desiredCondition summary.Condition) 
 	d.SetNested(conditions, "status", "conditions")
 
 	return true, nil
+}
+
+func isRancherOwned(ownerRefs []metav1.OwnerReference) bool {
+	if len(ownerRefs) == 0 {
+		return false
+	}
+
+	for _, ref := range ownerRefs {
+		if ref.Kind == "Cluster" && ref.APIVersion == rancherv1.SchemeGroupVersion.Identifier() {
+			return true
+		}
+	}
+
+	return false
 }
