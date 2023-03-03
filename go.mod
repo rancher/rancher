@@ -168,7 +168,10 @@ require (
 
 require github.com/google/gnostic v0.5.7-v3refs
 
-require github.com/kr/fs v0.1.0 // indirect
+require (
+	github.com/golang/mock v1.6.0 // indirect
+	github.com/kr/fs v0.1.0 // indirect
+)
 
 require (
 	cloud.google.com/go/compute v1.6.1 // indirect
