@@ -19,8 +19,8 @@ jobs:
           stale-pr-label: 'status/stale'
           days-before-stale: 60
           days-before-close: 14 
-          exempt-issue-labels: 'internal,kind/bug,kind/bug-qa,kind/task,kind/feature,kind/design,kind/ci-improvements,kind/performance,kind/flaky-test'
-          exempt-pr-labels: 'internal,kind/bug,kind/bug-qa,kind/task,kind/feature,kind/design,kind/ci-improvements,kind/performance,kind/flaky-test'
+          exempt-issue-labels: 'internal,kind/bug,kind/bug-qa,kind/task,kind/feature,kind/design,kind/ci-improvements,kind/performance,kind/flaky-test,kind/tech-debt'
+          exempt-pr-labels: 'internal,kind/bug,kind/bug-qa,kind/task,kind/feature,kind/design,kind/ci-improvements,kind/performance,kind/flaky-test,kind/tech-debt'
           exempt-all-milestones: true
           exempt-all-assignees: true
           operations-per-run: 2500

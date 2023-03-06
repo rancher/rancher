@@ -35,26 +35,26 @@ ENV LOGLEVEL_VERSION v0.1.5
 ENV TINI_VERSION v0.18.0
 ENV TELEMETRY_VERSION v0.5.20
 ENV DOCKER_MACHINE_LINODE_VERSION v0.1.8
-ENV LINODE_UI_DRIVER_VERSION v0.4.0
+ENV LINODE_UI_DRIVER_VERSION v0.5.0
 # make sure the version number is consistent with the one at Line 100 of pkg/data/management/machinedriver_data.go
-ENV DOCKER_MACHINE_HARVESTER_VERSION v0.5.0
+ENV DOCKER_MACHINE_HARVESTER_VERSION v0.6.2
 ENV CATTLE_KDM_BRANCH ${CATTLE_KDM_BRANCH}
-ENV HELM_VERSION v3.10.3
-ENV KUSTOMIZE_VERSION v4.5.7
+ENV HELM_VERSION v3.11.1
+ENV KUSTOMIZE_VERSION v5.0.0
 ENV CATTLE_WINS_AGENT_VERSION v0.4.11
 ENV CATTLE_WINS_AGENT_INSTALL_SCRIPT https://raw.githubusercontent.com/rancher/wins/${CATTLE_WINS_AGENT_VERSION}/install.ps1
 ENV CATTLE_WINS_AGENT_UNINSTALL_SCRIPT https://raw.githubusercontent.com/rancher/wins/${CATTLE_WINS_AGENT_VERSION}/uninstall.ps1
 ENV CATTLE_WINS_AGENT_UPGRADE_IMAGE rancher/wins:${CATTLE_WINS_AGENT_VERSION}
 ENV CATTLE_CSI_PROXY_AGENT_VERSION v1.1.1
-ENV CATTLE_SYSTEM_AGENT_VERSION v0.2.13
+ENV CATTLE_SYSTEM_AGENT_VERSION v0.3.2
 ENV CATTLE_SYSTEM_AGENT_INSTALL_SCRIPT https://raw.githubusercontent.com/rancher/system-agent/${CATTLE_SYSTEM_AGENT_VERSION}/install.sh
 ENV CATTLE_SYSTEM_AGENT_UNINSTALL_SCRIPT https://raw.githubusercontent.com/rancher/system-agent/${CATTLE_SYSTEM_AGENT_VERSION}/system-agent-uninstall.sh
 ENV CATTLE_SYSTEM_AGENT_UPGRADE_IMAGE rancher/system-agent:${CATTLE_SYSTEM_AGENT_VERSION}-suc
 ENV CATTLE_SYSTEM_UPGRADE_CONTROLLER_CHART_VERSION 101.0.0+up0.3.3
 
 # System charts minimal version
-ENV CATTLE_FLEET_MIN_VERSION=101.1.0+up0.6.0-rc.1
-ENV CATTLE_RANCHER_WEBHOOK_MIN_VERSION=2.0.2+up0.3.2-rc9
+ENV CATTLE_FLEET_MIN_VERSION=102.0.0+up0.6.0-rc.5
+ENV CATTLE_RANCHER_WEBHOOK_MIN_VERSION=2.0.2+up0.3.2-rc19
 ENV CATTLE_CSP_ADAPTER_MIN_VERSION=2.0.1-rc1
 
 RUN mkdir -p /var/lib/rancher-data/local-catalogs/system-library && \
@@ -159,8 +159,8 @@ RUN curl -sLf ${!TINI_URL} > /usr/bin/tini && \
     chmod +x /usr/bin/tini /usr/bin/telemetry && \
     mkdir -p /var/lib/rancher-data/driver-metadata
 
-ENV CATTLE_UI_VERSION 2.7.2-rc1
-ENV CATTLE_DASHBOARD_UI_VERSION v2.7.2-rc1
+ENV CATTLE_UI_VERSION 2.7.2-rc4
+ENV CATTLE_DASHBOARD_UI_VERSION v2.7.2-rc4
 ENV CATTLE_CLI_VERSION v2.7.2-rc1
 
 # Base UI brand used as a fallback env setting (not user facing) to indicate this is a non-prime install
@@ -192,7 +192,6 @@ RUN mkdir -p /usr/share/rancher/ui && \
     curl -sL https://releases.rancher.com/dashboard/${CATTLE_DASHBOARD_UI_VERSION}.tar.gz | tar xvzf - --strip-components=2 && \
     ln -s dashboard/index.html ../index.html && \
     cd ../../ui/assets && \
-    curl -sfL https://github.com/rancher/system-agent/releases/download/${CATTLE_SYSTEM_AGENT_VERSION}/rancher-system-agent-arm -O && \
     curl -sfL https://github.com/rancher/system-agent/releases/download/${CATTLE_SYSTEM_AGENT_VERSION}/rancher-system-agent-arm64 -O && \
     curl -sfL https://github.com/rancher/system-agent/releases/download/${CATTLE_SYSTEM_AGENT_VERSION}/rancher-system-agent-amd64 -O && \
     curl -sfL https://github.com/rancher/system-agent/releases/download/${CATTLE_SYSTEM_AGENT_VERSION}/rancher-system-agent-s390x -O && \

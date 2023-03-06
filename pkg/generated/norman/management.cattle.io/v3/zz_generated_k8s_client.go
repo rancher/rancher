@@ -92,14 +92,21 @@ func NewForConfig(cfg rest.Config) (Interface, error) {
 	if err != nil {
 		return nil, err
 	}
-	return NewFromControllerFactory(controllerFactory)
+	return NewFromControllerFactory(controllerFactory), nil
 }
 
-func NewFromControllerFactory(factory controller.SharedControllerFactory) (Interface, error) {
+func NewFromControllerFactory(factory controller.SharedControllerFactory) Interface {
 	return &Client{
 		controllerFactory: factory,
 		clientFactory:     factory.SharedCacheFactory().SharedClientFactory(),
-	}, nil
+	}
+}
+
+func NewFromControllerFactoryWithAgent(userAgent string, factory controller.SharedControllerFactory) Interface {
+	return &Client{
+		controllerFactory: factory,
+		clientFactory:     client.NewSharedClientFactoryWithAgent(userAgent, factory.SharedCacheFactory().SharedClientFactory()),
+	}
 }
 
 type NodePoolsGetter interface {

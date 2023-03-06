@@ -163,7 +163,7 @@ func (s *SteveAPITestSuite) TearDownSuite() {
 }
 
 func (s *SteveAPITestSuite) SetupSuite() {
-	testSession := session.NewSession(s.T())
+	testSession := session.NewSession()
 	s.session = testSession
 
 	client, err := rancher.NewClient("", testSession)
@@ -183,9 +183,10 @@ func (s *SteveAPITestSuite) SetupSuite() {
 		ClusterID: clusterID,
 		Name:      projectName,
 	})
+	require.NoError(s.T(), err)
 
 	// create project namespaces
-	for k, _ := range namespaceMap {
+	for k := range namespaceMap {
 		name := namegenerator.AppendRandomString(k)
 		_, err := namespaces.CreateNamespace(client, name, "", nil, nil, s.project)
 		require.NoError(s.T(), err)
@@ -251,6 +252,7 @@ func (s *SteveAPITestSuite) SetupSuite() {
 					Name: userObj.ID,
 				}
 				_, err = rbac.CreateRoleBinding(s.client, s.project.ClusterID, namegenerator.AppendRandomString(rb.Name), namespaceMap[rb.Namespace], rb.RoleRef.Name, subject)
+				require.NoError(s.T(), err)
 			}
 		}
 		s.userClients[user], err = s.client.AsUser(userObj)
@@ -1530,13 +1532,26 @@ func (s *SteveAPITestSuite) TestList() {
 			require.NoError(s.T(), err)
 			jsonResp, err := formatJSON(secretList)
 			require.NoError(s.T(), err)
-			jsonFilePath := filepath.Join(jsonDir, test.description+".json")
+			jsonFilePath := filepath.Join(jsonDir, getFileName(test.user, test.namespace, test.query))
 			err = writeResp(csvWriter, test.user, curlURL, jsonFilePath, jsonResp)
 			require.NoError(s.T(), err)
 		})
 	}
 	csvWriter.Flush()
 	require.NoError(s.T(), csvWriter.Error())
+}
+
+func getFileName(user, ns, query string) string {
+	if user == "" {
+		user = "none"
+	}
+	if ns == "" {
+		ns = "none"
+	}
+	if query == "" {
+		query = "none"
+	}
+	return user + "_" + ns + "_" + query + ".json"
 }
 
 func getCurlURL(client *clientv1.Client, namespace, query string) (string, error) {
@@ -1600,7 +1615,7 @@ func formatJSON(obj *clientv1.SteveCollection) ([]byte, error) {
 func setUpResults() (*csv.Writer, *os.File, string, error) {
 	outputFile := "output.csv"
 	fields := []string{"user", "url", "response"}
-	csvFile, err := os.OpenFile(outputFile, os.O_RDWR|os.O_CREATE, 0644)
+	csvFile, err := os.OpenFile(outputFile, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0644)
 	if err != nil {
 		return nil, nil, "", err
 	}

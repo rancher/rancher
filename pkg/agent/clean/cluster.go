@@ -24,6 +24,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/rancher/rancher/pkg/controllers/management/usercontrollers"
 	"github.com/rancher/rancher/pkg/controllers/managementagent/nslabels"
 	"github.com/rancher/rancher/pkg/controllers/managementuserlegacy/helm"
 	"github.com/rancher/rancher/pkg/monitoring"
@@ -118,6 +119,11 @@ func Cluster() error {
 		if err := removeNamespace(ns, client); err != nil {
 			errors = append(errors, err)
 		}
+	}
+
+	webhookErr := cleanupWebhookResources(client)
+	if len(webhookErr) > 0 {
+		errors = append(errors, webhookErr...)
 	}
 
 	nsErr := cleanupNamespaces(client)
@@ -344,6 +350,33 @@ func cleanupRoles(client *kubernetes.Clientset) []error {
 			if err != nil {
 				errs = append(errs, err)
 			}
+		}
+	}
+	return errs
+}
+
+func cleanupWebhookResources(client *kubernetes.Clientset) []error {
+	logrus.Info("Starting cleanup of webhook-specific resources")
+	logrus.Infof("Deleting clusterrolebinding %s", usercontrollers.WebhookClusterRoleBindingName)
+	logrus.Infof("Deleting mutatingwebhookconfiguration %s", usercontrollers.WebhookConfigurationName)
+	logrus.Infof("Deleting validatingwebhookconfigurations %s", usercontrollers.WebhookConfigurationName)
+
+	var errs []error
+
+	if !dryRun {
+		err := client.RbacV1().ClusterRoleBindings().Delete(context.TODO(), usercontrollers.WebhookClusterRoleBindingName, metav1.DeleteOptions{})
+		if err != nil && !apierror.IsNotFound(err) {
+			errs = append(errs, err)
+		}
+
+		err = client.AdmissionregistrationV1().MutatingWebhookConfigurations().Delete(context.TODO(), usercontrollers.WebhookConfigurationName, metav1.DeleteOptions{})
+		if err != nil && !apierror.IsNotFound(err) {
+			errs = append(errs, err)
+		}
+
+		err = client.AdmissionregistrationV1().ValidatingWebhookConfigurations().Delete(context.TODO(), usercontrollers.WebhookConfigurationName, metav1.DeleteOptions{})
+		if err != nil && !apierror.IsNotFound(err) {
+			errs = append(errs, err)
 		}
 	}
 	return errs

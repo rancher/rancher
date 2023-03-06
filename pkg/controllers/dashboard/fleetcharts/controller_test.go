@@ -80,6 +80,7 @@ func Test_ChartInstallation(t *testing.T) {
 					settings.FleetMinVersion.Get(),
 					nil,
 					gomock.AssignableToTypeOf(b),
+					"",
 				).Return(nil)
 				manager.EXPECT().Ensure(
 					fleetconst.ReleaseNamespace,
@@ -87,6 +88,7 @@ func Test_ChartInstallation(t *testing.T) {
 					settings.FleetMinVersion.Get(),
 					expectedValues,
 					gomock.AssignableToTypeOf(b),
+					"",
 				).Return(nil)
 
 				manager.EXPECT().Uninstall(fleetconst.ReleaseLegacyNamespace, fleetconst.ChartName).Return(nil)
@@ -120,6 +122,7 @@ func Test_ChartInstallation(t *testing.T) {
 					settings.FleetMinVersion.Get(),
 					nil,
 					gomock.AssignableToTypeOf(b),
+					"",
 				).Return(nil)
 				manager.EXPECT().Ensure(
 					fleetconst.ReleaseNamespace,
@@ -127,6 +130,7 @@ func Test_ChartInstallation(t *testing.T) {
 					settings.FleetMinVersion.Get(),
 					expectedValues,
 					gomock.AssignableToTypeOf(b),
+					"",
 				).Return(nil)
 
 				manager.EXPECT().Uninstall(fleetconst.ReleaseLegacyNamespace, fleetconst.ChartName).Return(nil)

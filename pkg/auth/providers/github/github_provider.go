@@ -7,13 +7,12 @@ import (
 	"strconv"
 	"strings"
 
-	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-
 	"github.com/mitchellh/mapstructure"
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	util2 "github.com/rancher/rancher/pkg/auth/util"
@@ -131,7 +130,7 @@ func (g *ghProvider) saveGithubConfig(config *v32.GithubConfig) error {
 		return err
 	}
 
-	config.ClientSecret = common.GetName(config.Type, field)
+	config.ClientSecret = common.GetFullSecretName(config.Type, field)
 
 	_, err = g.authConfigs.ObjectClient().Update(config.ObjectMeta.Name, config)
 	if err != nil {
@@ -427,9 +426,4 @@ func (g *ghProvider) IsDisabledProvider() (bool, error) {
 		return false, err
 	}
 	return !ghConfig.Enabled, nil
-}
-
-// CleanupResources deletes resources associated with the GitHub auth provider.
-func (g *ghProvider) CleanupResources(*v3.AuthConfig) error {
-	return nil
 }

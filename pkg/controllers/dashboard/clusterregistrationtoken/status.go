@@ -118,7 +118,7 @@ func (h *handler) assignStatus(crt *v32.ClusterRegistrationToken) (v32.ClusterRe
 			caWindows)
 	} else {
 		var agentImageDockerEnv string
-		if util.GetPrivateRepoURL(cluster) != "" {
+		if util.GetPrivateRegistryURL(cluster) != "" {
 			// patch the AGENT_IMAGE env
 			agentImageDockerEnv = fmt.Sprintf("-e AGENT_IMAGE=%s ", agentImage)
 		}

@@ -33,9 +33,9 @@ import (
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 )
 
-func Register(ctx context.Context, clients *wrangler.Context) {
+func Register(ctx context.Context, clients *wrangler.Context, kubeconfigManager *kubeconfig.Manager) {
 	h := handler{
-		kubeconfigManager: kubeconfig.New(clients),
+		kubeconfigManager: kubeconfigManager,
 		unmanagedMachine:  clients.RKE.CustomMachine(),
 		mgmtClusterCache:  clients.Mgmt.Cluster().Cache(),
 		clusterCache:      clients.Provisioning.Cluster().Cache(),

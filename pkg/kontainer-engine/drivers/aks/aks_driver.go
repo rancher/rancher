@@ -17,6 +17,7 @@ import (
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/rancher/aks-operator/pkg/aks"
+	"github.com/rancher/aks-operator/pkg/aks/services"
 	"github.com/rancher/rancher/pkg/kontainer-engine/drivers/options"
 	"github.com/rancher/rancher/pkg/kontainer-engine/drivers/util"
 	"github.com/rancher/rancher/pkg/kontainer-engine/types"
@@ -655,7 +656,7 @@ func (d *Driver) createOrUpdate(ctx context.Context, options *types.DriverOption
 		return info, err
 	}
 
-	operationInsightsWorkspaceClient, err := newOperationInsightsWorkspaceClient(azureAuthorizer, driverState)
+	workplacesClient, err := services.NewWorkplacesClient(azureAuthorizer, driverState.BaseURL, driverState.SubscriptionID)
 	if err != nil {
 		return info, err
 	}
@@ -715,7 +716,7 @@ func (d *Driver) createOrUpdate(ctx context.Context, options *types.DriverOption
 		},
 	}
 	if driverState.AddonEnableMonitoring {
-		logAnalyticsWorkspaceResourceID, err := aks.CheckLogAnalyticsWorkspaceForMonitoring(ctx, operationInsightsWorkspaceClient,
+		logAnalyticsWorkspaceResourceID, err := aks.CheckLogAnalyticsWorkspaceForMonitoring(ctx, workplacesClient,
 			driverState.Location, driverState.ResourceGroup, driverState.LogAnalyticsWorkspaceResourceGroup, driverState.LogAnalyticsWorkspace)
 		if err != nil {
 			return info, err

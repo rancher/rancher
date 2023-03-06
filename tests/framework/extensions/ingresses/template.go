@@ -26,3 +26,18 @@ func NewIngressTemplate(ingressName, namespaceName string, hostName string, path
 		},
 	}
 }
+
+func NewIngressPathTemplate(pathType networkingv1.PathType, path string, serviceName string, servicePort int32) networkingv1.HTTPIngressPath {
+	return networkingv1.HTTPIngressPath{
+		Path:     path,
+		PathType: &pathType,
+		Backend: networkingv1.IngressBackend{
+			Service: &networkingv1.IngressServiceBackend{
+				Name: serviceName,
+				Port: networkingv1.ServiceBackendPort{
+					Number: servicePort,
+				},
+			},
+		},
+	}
+}

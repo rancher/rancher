@@ -2,7 +2,7 @@ import pytest
 import rancher
 import requests
 import time
-from .conftest import BASE_URL, AUTH_URL, protect_response
+from .conftest import SERVER_PASSWORD, BASE_URL, AUTH_URL, protect_response
 
 
 def test_certificates(admin_mc):
@@ -94,7 +94,7 @@ def test_kubeconfig_token_ttl(admin_mc, user_mc):
 def login():
     r = requests.post(AUTH_URL, json={
         'username': 'admin',
-        'password': 'admin',
+        'password': SERVER_PASSWORD,
         'responseType': 'kubeconfig',
     }, verify=False)
     protect_response(r)

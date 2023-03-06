@@ -78,8 +78,6 @@ func (h *handler) OnChange(obj *rkev1.RKEControlPlane, status rkev1.RKEControlPl
 		return status, nil
 	}
 
-	status.Ready = rke2.Ready.IsTrue(cluster)
-	status.Initialized = rke2.Ready.IsTrue(cluster)
 	status.AgentConnected = clusterconnected.Connected.IsTrue(cluster)
 	return status, nil
 }
@@ -87,6 +85,7 @@ func (h *handler) OnChange(obj *rkev1.RKEControlPlane, status rkev1.RKEControlPl
 func (h *handler) OnRemove(_ string, cp *rkev1.RKEControlPlane) (*rkev1.RKEControlPlane, error) {
 	status := cp.Status
 	cp = cp.DeepCopy()
+
 	err := rke2.DoRemoveAndUpdateStatus(cp, h.doRemove(cp), h.rkeControlPlaneController.EnqueueAfter)
 
 	if equality.Semantic.DeepEqual(status, cp.Status) {
@@ -100,11 +99,11 @@ func (h *handler) OnRemove(_ string, cp *rkev1.RKEControlPlane) (*rkev1.RKEContr
 	return cp, err
 }
 
-func (h *handler) doRemove(obj *rkev1.RKEControlPlane) func() (string, error) {
+func (h *handler) doRemove(cp *rkev1.RKEControlPlane) func() (string, error) {
 	return func() (string, error) {
-		logrus.Debugf("[rkecontrolplane] (%s/%s) Peforming removal of rkecontrolplane", obj.Namespace, obj.Name)
+		logrus.Debugf("[rkecontrolplane] (%s/%s) Peforming removal of rkecontrolplane", cp.Namespace, cp.Name)
 		// Control plane nodes are managed by the control plane object. Therefore, the control plane object shouldn't be cleaned up before the control plane nodes are removed.
-		machines, err := h.machineCache.List(obj.Namespace, labels.SelectorFromSet(labels.Set{capi.ClusterLabelName: obj.Name, rke2.ControlPlaneRoleLabel: "true"}))
+		machines, err := h.machineCache.List(cp.Namespace, labels.SelectorFromSet(labels.Set{capi.ClusterLabelName: cp.Name, rke2.ControlPlaneRoleLabel: "true"}))
 		if err != nil {
 			return "", err
 		}
@@ -112,15 +111,20 @@ func (h *handler) doRemove(obj *rkev1.RKEControlPlane) func() (string, error) {
 		// Some machines may not have gotten the CAPI cluster-name label in previous versions in Rancher.
 		// Because of update issues with the conversion webhook in rancher-webhook, we can't use a "migration" to add the label (it will fail because the conversion webhook is not available).
 		// In addition, there is no way to "or" label selectors in the API, so we need to do this manually.
-		otherMachines, err := h.machineCache.List(obj.Namespace, labels.SelectorFromSet(labels.Set{rke2.ClusterNameLabel: obj.Name, rke2.ControlPlaneRoleLabel: "true"}))
+		otherMachines, err := h.machineCache.List(cp.Namespace, labels.SelectorFromSet(labels.Set{rke2.ClusterNameLabel: cp.Name, rke2.ControlPlaneRoleLabel: "true"}))
 		if err != nil {
 			return "", err
 		}
 
-		logrus.Debugf("[rkecontrolplane] (%s/%s) listed %d machines during removal", obj.Namespace, obj.Name, len(machines))
-		logrus.Tracef("[rkecontrolplane] (%s/%s) machine list: %+v", obj.Namespace, obj.Name, machines)
+		logrus.Debugf("[rkecontrolplane] (%s/%s) listed %d machines during removal", cp.Namespace, cp.Name, len(machines))
+		logrus.Tracef("[rkecontrolplane] (%s/%s) machine list: %+v", cp.Namespace, cp.Name, machines)
 		allMachines := append(machines, otherMachines...)
+
 		for _, machine := range allMachines {
+			// Only delete custom machines. Custom machines can be added outside the UI, so it is important to check each machine.
+			if machine.Spec.InfrastructureRef.APIVersion != "rke.cattle.io/v1" || machine.Spec.InfrastructureRef.Kind != "CustomMachine" {
+				continue
+			}
 			if machine.DeletionTimestamp == nil {
 				if err = h.machineClient.Delete(machine.Namespace, machine.Name, &metav1.DeleteOptions{}); err != nil {
 					return "", fmt.Errorf("error deleting machine %s/%s: %v", machine.Namespace, machine.Name, err)

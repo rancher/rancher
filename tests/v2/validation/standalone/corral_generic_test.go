@@ -21,7 +21,7 @@ func (r *CorralStandaloneTestSuite) TearDownSuite() {
 }
 
 func (r *CorralStandaloneTestSuite) SetupSuite() {
-	testSession := session.NewSession(r.T())
+	testSession := session.NewSession()
 	r.session = testSession
 
 	corralConfig := corral.CorralConfigurations()

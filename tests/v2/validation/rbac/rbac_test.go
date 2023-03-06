@@ -44,7 +44,7 @@ func (rb *RBTestSuite) TearDownSuite() {
 }
 
 func (rb *RBTestSuite) SetupSuite() {
-	testSession := session.NewSession(rb.T())
+	testSession := session.NewSession()
 	rb.session = testSession
 
 	client, err := rancher.NewClient("", testSession)

@@ -9,11 +9,14 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/Masterminds/semver/v3"
 	"github.com/rancher/fleet/pkg/apis/fleet.cattle.io/v1alpha1"
 	rancherv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	fleetconst "github.com/rancher/rancher/pkg/fleet"
+	fleetcontrollers "github.com/rancher/rancher/pkg/generated/controllers/fleet.cattle.io/v1alpha1"
 	v3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	rocontrollers "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
+	v1 "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
 	namespaces "github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/provisioningv2/image"
 	"github.com/rancher/rancher/pkg/settings"
@@ -34,14 +37,24 @@ const (
 	generationSecretName = "system-agent-upgrade-generation"
 )
 
+var Kubernetes125 = semver.MustParse("v1.25.0")
+
 type handler struct {
 	clusterRegistrationTokens v3.ClusterRegistrationTokenCache
+	bundles                   fleetcontrollers.BundleClient
+	rkeControlPlane           v1.RKEControlPlaneController
 }
 
 func Register(ctx context.Context, clients *wrangler.Context) {
 	h := &handler{
 		clusterRegistrationTokens: clients.Mgmt.ClusterRegistrationToken().Cache(),
+		bundles:                   clients.Fleet.Bundle(),
+		rkeControlPlane:           clients.RKE.RKEControlPlane(),
 	}
+
+	v1.RegisterRKEControlPlaneStatusHandler(ctx, clients.RKE.RKEControlPlane(),
+		"", "monitor-system-upgrade-controller-readiness", h.syncSystemUpgradeControllerStatus)
+
 	rocontrollers.RegisterClusterGeneratingHandler(ctx, clients.Provisioning.Cluster(),
 		clients.Apply.
 			WithSetOwnerReference(false, false).
@@ -53,6 +66,7 @@ func Register(ctx context.Context, clients *wrangler.Context) {
 		"", "manage-system-agent", h.OnChange, &generic.GeneratingHandlerOptions{
 			AllowCrossNamespace: true,
 		})
+
 	rocontrollers.RegisterClusterGeneratingHandler(ctx, clients.Provisioning.Cluster(),
 		clients.Apply.
 			WithSetOwnerReference(false, false).

@@ -14,10 +14,12 @@ const (
 	PriorityClassKey = "priorityClassName"
 )
 
-// Manager is an interface used by the handler to install an uninstall charts
+// Manager is an interface used by the handler to install an uninstall charts. If the interface is changed,
+// regenerate the mock with the below command (run from project root):
+// mockgen --build_flags=--mod=mod -destination=pkg/controllers/dashboard/chart/fake/manager.go -package=fake github.com/rancher/rancher/pkg/controllers/dashboard/chart Manager
 type Manager interface {
 	// Ensure ensures that the chart is installed into the given namespace with the given minVersion version and values.
-	Ensure(namespace, name, minVersion string, values map[string]interface{}, forceAdopt bool) error
+	Ensure(namespace, name, minVersion string, values map[string]interface{}, forceAdopt bool, installImageOverride string) error
 
 	// Uninstall uninstalls the given chart in the given namespace.
 	Uninstall(namespace, name string) error

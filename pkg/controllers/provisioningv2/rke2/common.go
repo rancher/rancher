@@ -23,11 +23,11 @@ import (
 	"github.com/rancher/wrangler/pkg/generic"
 	"github.com/rancher/wrangler/pkg/name"
 	corev1 "k8s.io/api/core/v1"
-	apierror "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/kubernetes"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 	capierrors "sigs.k8s.io/cluster-api/errors"
 )
@@ -36,33 +36,34 @@ const (
 	AddressAnnotation = "rke.cattle.io/address"
 	ClusterNameLabel  = "rke.cattle.io/cluster-name"
 	// ClusterSpecAnnotation is used to define the cluster spec used to generate the rkecontrolplane object as an annotation on the object
-	ClusterSpecAnnotation     = "rke.cattle.io/cluster-spec"
-	ControlPlaneRoleLabel     = "rke.cattle.io/control-plane-role"
-	DrainAnnotation           = "rke.cattle.io/drain-options"
-	DrainDoneAnnotation       = "rke.cattle.io/drain-done"
-	DrainErrorAnnotation      = "rke.cattle.io/drain-error"
-	EtcdRoleLabel             = "rke.cattle.io/etcd-role"
-	InitNodeLabel             = "rke.cattle.io/init-node"
-	InitNodeMachineIDLabel    = "rke.cattle.io/init-node-machine-id"
-	InternalAddressAnnotation = "rke.cattle.io/internal-address"
-	JoinURLAnnotation         = "rke.cattle.io/join-url"
-	LabelsAnnotation          = "rke.cattle.io/labels"
-	MachineIDLabel            = "rke.cattle.io/machine-id"
-	MachineNameLabel          = "rke.cattle.io/machine-name"
-	MachineTemplateHashLabel  = "rke.cattle.io/machine-template-hash"
-	RKEMachinePoolNameLabel   = "rke.cattle.io/rke-machine-pool-name"
-	MachineNamespaceLabel     = "rke.cattle.io/machine-namespace"
-	MachineRequestType        = "rke.cattle.io/machine-request"
-	MachineUIDLabel           = "rke.cattle.io/machine"
-	NodeNameLabel             = "rke.cattle.io/node-name"
-	PlanSecret                = "rke.cattle.io/plan-secret-name"
-	PostDrainAnnotation       = "rke.cattle.io/post-drain"
-	PreDrainAnnotation        = "rke.cattle.io/pre-drain"
-	RoleLabel                 = "rke.cattle.io/service-account-role"
-	SecretTypeMachinePlan     = "rke.cattle.io/machine-plan"
-	TaintsAnnotation          = "rke.cattle.io/taints"
-	UnCordonAnnotation        = "rke.cattle.io/uncordon"
-	WorkerRoleLabel           = "rke.cattle.io/worker-role"
+	ClusterSpecAnnotation      = "rke.cattle.io/cluster-spec"
+	ControlPlaneRoleLabel      = "rke.cattle.io/control-plane-role"
+	DrainAnnotation            = "rke.cattle.io/drain-options"
+	DrainDoneAnnotation        = "rke.cattle.io/drain-done"
+	DrainErrorAnnotation       = "rke.cattle.io/drain-error"
+	EtcdRoleLabel              = "rke.cattle.io/etcd-role"
+	InitNodeLabel              = "rke.cattle.io/init-node"
+	InitNodeMachineIDLabel     = "rke.cattle.io/init-node-machine-id"
+	InternalAddressAnnotation  = "rke.cattle.io/internal-address"
+	JoinURLAnnotation          = "rke.cattle.io/join-url"
+	LabelsAnnotation           = "rke.cattle.io/labels"
+	MachineIDLabel             = "rke.cattle.io/machine-id"
+	MachineNameLabel           = "rke.cattle.io/machine-name"
+	MachineTemplateHashLabel   = "rke.cattle.io/machine-template-hash"
+	RKEMachinePoolNameLabel    = "rke.cattle.io/rke-machine-pool-name"
+	MachineNamespaceLabel      = "rke.cattle.io/machine-namespace"
+	MachineRequestType         = "rke.cattle.io/machine-request"
+	MachineUIDLabel            = "rke.cattle.io/machine"
+	NodeNameLabel              = "rke.cattle.io/node-name"
+	PlanSecret                 = "rke.cattle.io/plan-secret-name"
+	PostDrainAnnotation        = "rke.cattle.io/post-drain"
+	PreDrainAnnotation         = "rke.cattle.io/pre-drain"
+	RoleLabel                  = "rke.cattle.io/service-account-role"
+	SecretTypeMachinePlan      = "rke.cattle.io/machine-plan"
+	TaintsAnnotation           = "rke.cattle.io/taints"
+	UnCordonAnnotation         = "rke.cattle.io/uncordon"
+	WorkerRoleLabel            = "rke.cattle.io/worker-role"
+	AuthorizedObjectAnnotation = "rke.cattle.io/object-authorized-for-clusters"
 
 	MachineTemplateClonedFromGroupVersionAnn = "rke.cattle.io/cloned-from-group-version"
 	MachineTemplateClonedFromKindAnn         = "rke.cattle.io/cloned-from-kind"
@@ -76,15 +77,16 @@ const (
 	RKEMachineAPIVersion           = "rke-machine.cattle.io/v1"
 	RKEAPIVersion                  = "rke.cattle.io/v1"
 
-	Provisioned         = condition.Cond("Provisioned")
-	Updated             = condition.Cond("Updated")
-	Reconciled          = condition.Cond("Reconciled")
-	Ready               = condition.Cond("Ready")
-	Waiting             = condition.Cond("Waiting")
-	Pending             = condition.Cond("Pending")
-	Removed             = condition.Cond("Removed")
-	PlanApplied         = condition.Cond("PlanApplied")
-	InfrastructureReady = condition.Cond(capi.InfrastructureReadyCondition)
+	Provisioned                  = condition.Cond("Provisioned")
+	Updated                      = condition.Cond("Updated")
+	Reconciled                   = condition.Cond("Reconciled")
+	Ready                        = condition.Cond("Ready")
+	Waiting                      = condition.Cond("Waiting")
+	Pending                      = condition.Cond("Pending")
+	Removed                      = condition.Cond("Removed")
+	PlanApplied                  = condition.Cond("PlanApplied")
+	InfrastructureReady          = condition.Cond(capi.InfrastructureReadyCondition)
+	SystemUpgradeControllerReady = condition.Cond("SystemUpgradeControllerReady")
 
 	RuntimeK3S  = "k3s"
 	RuntimeRKE2 = "rke2"
@@ -94,10 +96,10 @@ const (
 )
 
 var (
-	ErrNoMachineOwnerRef           = errors.New("no machine owner ref")
-	ErrNoControllerMachineOwnerRef = errors.New("no machine controller owner ref")
-	labelAnnotationMatch           = regexp.MustCompile(`^((rke\.cattle\.io)|((?:machine\.)?cluster\.x-k8s\.io))/`)
-	windowsDrivers                 = map[string]struct{}{
+	ErrNoMachineOwnerRef            = errors.New("no machine owner ref")
+	ErrNoMatchingControllerOwnerRef = errors.New("no matching controller owner ref")
+	labelAnnotationMatch            = regexp.MustCompile(`^((rke\.cattle\.io)|((?:machine\.)?cluster\.x-k8s\.io))/`)
+	windowsDrivers                  = map[string]struct{}{
 		"vmwarevsphere": {},
 	}
 )
@@ -235,50 +237,15 @@ func GetPlanSecretName(planSA *corev1.ServiceAccount) (string, error) {
 
 // GetPlanServiceAccountTokenSecret retrieves the secret that corresponds to the plan service account that is passed in. It will create a secret if one does not
 // already exist for the plan service account.
-func GetPlanServiceAccountTokenSecret(secretClient corecontrollers.SecretController, planSA *corev1.ServiceAccount) (*corev1.Secret, bool, error) {
+func GetPlanServiceAccountTokenSecret(secretClient corecontrollers.SecretController, k8s kubernetes.Interface, planSA *corev1.ServiceAccount) (*corev1.Secret, bool, error) {
 	if planSA == nil {
 		return nil, false, fmt.Errorf("planSA was nil")
 	}
-	sName := serviceaccounttoken.ServiceAccountSecretName(planSA)
-	secret, err := secretClient.Cache().Get(planSA.Namespace, sName)
+	secret, err := serviceaccounttoken.EnsureSecretForServiceAccount(context.Background(), secretClient.Cache().Get, k8s, planSA)
 	if err != nil {
-		if !apierror.IsNotFound(err) {
-			return nil, false, err
-		}
-		sc := serviceaccounttoken.SecretTemplate(planSA)
-		secret, err = secretClient.Create(sc)
-		if err != nil {
-			if !apierror.IsAlreadyExists(err) {
-				return nil, false, err
-			}
-			secret, err = secretClient.Cache().Get(planSA.Namespace, sName)
-			if err != nil {
-				return nil, false, err
-			}
-		}
-	}
-	// wait for token to be populated
-	if !PlanServiceAccountTokenReady(planSA, secret) {
-		return secret, true, fmt.Errorf("planSA %s/%s token secret %s/%s was not ready for consumption yet", planSA.Namespace, planSA.Name, secret.Namespace, secret.Name)
+		return nil, false, fmt.Errorf("error ensuring secret for service account [%s:%s]: %w", planSA.Namespace, planSA.Name, err)
 	}
 	return secret, true, nil
-}
-
-func PlanServiceAccountTokenReady(planSA *corev1.ServiceAccount, tokenSecret *corev1.Secret) bool {
-	if planSA == nil || tokenSecret == nil {
-		return false
-	}
-	if tokenSecret.Name != serviceaccounttoken.ServiceAccountSecretName(planSA) {
-		return false
-	}
-	if v, ok := tokenSecret.Data[corev1.ServiceAccountTokenKey]; ok {
-		if len(v) == 0 {
-			return false
-		}
-	} else {
-		return false
-	}
-	return true
 }
 
 func PlanSecretFromBootstrapName(bootstrapName string) string {
@@ -429,7 +396,7 @@ func GetCAPIClusterFromLabel(obj runtime.Object, cache capicontrollers.ClusterCa
 	return nil, fmt.Errorf("%s label not present on %s: %s/%s", capi.ClusterLabelName, obj.GetObjectKind().GroupVersionKind().Kind, data.String("metadata", "namespace"), data.String("metadata", "name"))
 }
 
-// GetOwnerCAPICluster takes an obj T and will attempt to find the capi cluster owner reference.
+// GetOwnerCAPICluster takes an obj and will attempt to find the capi cluster owner reference.
 // If the object is nil, it cannot access to object or type metas, the owner reference Kind or APIVersion do not match,
 // or the object could not be found, it returns an error.
 // If the owner reference exists and is valid, it will return the owning capi cluster object.
@@ -441,7 +408,7 @@ func GetOwnerCAPICluster(obj runtime.Object, cache capicontrollers.ClusterCache)
 	return cache.Get(namespace, ref.Name)
 }
 
-// GetOwnerCAPIMachine takes an obj T and will attempt to find the capi machine owner reference.
+// GetOwnerCAPIMachine takes an obj and will attempt to find the capi machine owner reference.
 // If the object is nil, it cannot access to object or type metas, the owner reference Kind or APIVersion do not match,
 // or the object could not be found, it returns an error.
 // If the owner reference exists and is valid, it will return the owning capi machine object.
@@ -453,9 +420,21 @@ func GetOwnerCAPIMachine(obj runtime.Object, cache capicontrollers.MachineCache)
 	return cache.Get(namespace, ref.Name)
 }
 
+// GetOwnerCAPIMachineSet takes an obj and will attempt to find the capi machine set owner reference.
+// If the object is nil, it cannot access to object or type metas, the owner reference Kind or APIVersion do not match,
+// or the object could not be found, it returns an error.
+// If the owner reference exists and is valid, it will return the owning capi machine object.
+func GetOwnerCAPIMachineSet(obj runtime.Object, cache capicontrollers.MachineSetCache) (*capi.MachineSet, error) {
+	ref, namespace, err := GetOwnerFromGVK(capi.GroupVersion.String(), "MachineSet", obj)
+	if err != nil {
+		return nil, err
+	}
+	return cache.Get(namespace, ref.Name)
+}
+
 // GetOwnerFromGVK takes a runtime.Object, and will search for a controlling owner reference of kind apiVersion.
 // If the object is nil, it cannot access to object or type metas, the owner reference Kind or APIVersion do not match,
-// or the object could not be found, it returns an ErrNoControllerMachineOwnerRef error.
+// or the object could not be found, it returns an ErrNoMatchingControllerOwnerRef error.
 // If the owner reference exists and is valid, it will return the owner reference and the namespace it belongs to.
 func GetOwnerFromGVK(groupVersion, kind string, obj runtime.Object) (*metav1.OwnerReference, string, error) {
 	if obj == nil {
@@ -467,7 +446,7 @@ func GetOwnerFromGVK(groupVersion, kind string, obj runtime.Object) (*metav1.Own
 	}
 	ref := metav1.GetControllerOf(objMeta)
 	if ref == nil || ref.Kind != kind || ref.APIVersion != groupVersion {
-		return nil, "", ErrNoControllerMachineOwnerRef
+		return nil, "", ErrNoMatchingControllerOwnerRef
 	}
 	return ref, objMeta.GetNamespace(), nil
 }

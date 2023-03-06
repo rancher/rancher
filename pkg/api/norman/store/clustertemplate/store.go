@@ -29,15 +29,22 @@ import (
 )
 
 const (
-	clusterTemplateLabelName = "io.cattle.field/clusterTemplateId"
-	registrySecretKey        = "privateRegistrySecret"
-	s3SecretKey              = "s3CredentialSecret"
-	weaveSecretKey           = "weavePasswordSecret"
-	vsphereSecretKey         = "vsphereSecret"
-	virtualCenterSecretKey   = "virtualCenterSecret"
-	openStackSecretKey       = "openStackSecret"
-	aadClientSecretKey       = "aadClientSecret"
-	aadClientCertSecretKey   = "aadClientCertSecret"
+	clusterTemplateLabelName            = "io.cattle.field/clusterTemplateId"
+	registrySecretKey                   = "privateRegistrySecret"
+	s3SecretKey                         = "s3CredentialSecret"
+	weaveSecretKey                      = "weavePasswordSecret"
+	vsphereSecretKey                    = "vsphereSecret"
+	virtualCenterSecretKey              = "virtualCenterSecret"
+	openStackSecretKey                  = "openStackSecret"
+	aadClientSecretKey                  = "aadClientSecret"
+	aadClientCertSecretKey              = "aadClientCertSecret"
+	aciAPICUserKeySecretKey             = "aciAPICUserKeySecret"
+	aciTokenSecretKey                   = "aciTokenSecret"
+	aciKafkaClientKeySecretKey          = "aciKafkaClientKeySecret"
+	secretsEncryptionProvidersSecretKey = "secretsEncryptionProvidersSecret"
+	bastionHostSSHKeySecretKey          = "bastionHostSSHKeySecret"
+	kubeletExtraEnvSecretKey            = "kubeletExtraEnvSecret"
+	privateRegistryECRSecretKey         = "privateRegistryECRSecret"
 )
 
 func WrapStore(store types.Store, mgmt *config.ScaledContext) types.Store {
@@ -68,14 +75,21 @@ type Store struct {
 }
 
 type secrets struct {
-	regSecret       *corev1.Secret
-	s3Secret        *corev1.Secret
-	weaveSecret     *corev1.Secret
-	vsphereSecret   *corev1.Secret
-	vcenterSecret   *corev1.Secret
-	openStackSecret *corev1.Secret
-	aadClientSecret *corev1.Secret
-	aadCertSecret   *corev1.Secret
+	regSecret                        *corev1.Secret
+	s3Secret                         *corev1.Secret
+	weaveSecret                      *corev1.Secret
+	vsphereSecret                    *corev1.Secret
+	vcenterSecret                    *corev1.Secret
+	openStackSecret                  *corev1.Secret
+	aadClientSecret                  *corev1.Secret
+	aadCertSecret                    *corev1.Secret
+	aciAPICUserKeySecret             *corev1.Secret
+	aciTokenSecret                   *corev1.Secret
+	aciKafkaClientKeySecret          *corev1.Secret
+	secretsEncryptionProvidersSecret *corev1.Secret
+	bastionHostSSHKeySecret          *corev1.Secret
+	kubeletExtraEnvSecret            *corev1.Secret
+	privateRegistryECRSecret         *corev1.Secret
 }
 
 func (p *Store) Create(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}) (map[string]interface{}, error) {
@@ -101,7 +115,7 @@ func (p *Store) Create(apiContext *types.APIContext, schema *types.Schema, data 
 		if err := setLabelsAndOwnerRef(apiContext, data); err != nil {
 			return nil, err
 		}
-		allSecrets, err = p.migrateSecrets(data, "", "", "", "", "", "", "", "")
+		allSecrets, err = p.migrateSecrets(data, "", "", "", "", "", "", "", "", "", "", "", "", "", "", "")
 		if err != nil {
 			return nil, err
 		}
@@ -148,6 +162,41 @@ func (p *Store) Create(apiContext *types.APIContext, schema *types.Schema, data 
 			}
 			if allSecrets.aadCertSecret != nil {
 				if cleanupErr := p.secretMigrator.Cleanup(allSecrets.aadCertSecret.Name); cleanupErr != nil {
+					logrus.Errorf("clustertemplate store: encountered error while handling migration error: %v, original error: %v", cleanupErr, err)
+				}
+			}
+			if allSecrets.aciAPICUserKeySecret != nil {
+				if cleanupErr := p.secretMigrator.Cleanup(allSecrets.aciAPICUserKeySecret.Name); cleanupErr != nil {
+					logrus.Errorf("clustertemplate store: encountered error while handling migration error: %v, original error: %v", cleanupErr, err)
+				}
+			}
+			if allSecrets.aciTokenSecret != nil {
+				if cleanupErr := p.secretMigrator.Cleanup(allSecrets.aciTokenSecret.Name); cleanupErr != nil {
+					logrus.Errorf("clustertemplate store: encountered error while handling migration error: %v, original error: %v", cleanupErr, err)
+				}
+			}
+			if allSecrets.aciKafkaClientKeySecret != nil {
+				if cleanupErr := p.secretMigrator.Cleanup(allSecrets.aciKafkaClientKeySecret.Name); cleanupErr != nil {
+					logrus.Errorf("clustertemplate store: encountered error while handling migration error: %v, original error: %v", cleanupErr, err)
+				}
+			}
+			if allSecrets.secretsEncryptionProvidersSecret != nil {
+				if cleanupErr := p.secretMigrator.Cleanup(allSecrets.secretsEncryptionProvidersSecret.Name); cleanupErr != nil {
+					logrus.Errorf("clustertemplate store: encountered error while handling migration error: %v, original error: %v", cleanupErr, err)
+				}
+			}
+			if allSecrets.bastionHostSSHKeySecret != nil {
+				if cleanupErr := p.secretMigrator.Cleanup(allSecrets.bastionHostSSHKeySecret.Name); cleanupErr != nil {
+					logrus.Errorf("clustertemplate store: encountered error while handling migration error: %v, original error: %v", cleanupErr, err)
+				}
+			}
+			if allSecrets.kubeletExtraEnvSecret != nil {
+				if cleanupErr := p.secretMigrator.Cleanup(allSecrets.kubeletExtraEnvSecret.Name); cleanupErr != nil {
+					logrus.Errorf("clustertemplate store: encountered error while handling migration error: %v, original error: %v", cleanupErr, err)
+				}
+			}
+			if allSecrets.privateRegistryECRSecret != nil {
+				if cleanupErr := p.secretMigrator.Cleanup(allSecrets.privateRegistryECRSecret.Name); cleanupErr != nil {
 					logrus.Errorf("clustertemplate store: encountered error while handling migration error: %v, original error: %v", cleanupErr, err)
 				}
 			}
@@ -216,6 +265,48 @@ func (p *Store) Create(apiContext *types.APIContext, schema *types.Schema, data 
 				logrus.Errorf("cluster store: failed to set %s %s as secret owner", owner.Kind, owner.Name)
 			}
 		}
+		if allSecrets.aciAPICUserKeySecret != nil {
+			err = p.secretMigrator.UpdateSecretOwnerReference(allSecrets.aciAPICUserKeySecret, owner)
+			if err != nil {
+				logrus.Errorf("cluster store: failed to set %s %s as secret owner", owner.Kind, owner.Name)
+			}
+		}
+		if allSecrets.aciTokenSecret != nil {
+			err = p.secretMigrator.UpdateSecretOwnerReference(allSecrets.aciTokenSecret, owner)
+			if err != nil {
+				logrus.Errorf("cluster store: failed to set %s %s as secret owner", owner.Kind, owner.Name)
+			}
+		}
+		if allSecrets.aciKafkaClientKeySecret != nil {
+			err = p.secretMigrator.UpdateSecretOwnerReference(allSecrets.aciKafkaClientKeySecret, owner)
+			if err != nil {
+				logrus.Errorf("cluster store: failed to set %s %s as secret owner", owner.Kind, owner.Name)
+			}
+		}
+		if allSecrets.secretsEncryptionProvidersSecret != nil {
+			err = p.secretMigrator.UpdateSecretOwnerReference(allSecrets.secretsEncryptionProvidersSecret, owner)
+			if err != nil {
+				logrus.Errorf("cluster store: failed to set %s %s as secret owner", owner.Kind, owner.Name)
+			}
+		}
+		if allSecrets.bastionHostSSHKeySecret != nil {
+			err = p.secretMigrator.UpdateSecretOwnerReference(allSecrets.bastionHostSSHKeySecret, owner)
+			if err != nil {
+				logrus.Errorf("cluster store: failed to set %s %s as secret owner", owner.Kind, owner.Name)
+			}
+		}
+		if allSecrets.kubeletExtraEnvSecret != nil {
+			err = p.secretMigrator.UpdateSecretOwnerReference(allSecrets.kubeletExtraEnvSecret, owner)
+			if err != nil {
+				logrus.Errorf("cluster store: failed to set %s %s as secret owner", owner.Kind, owner.Name)
+			}
+		}
+		if allSecrets.privateRegistryECRSecret != nil {
+			err = p.secretMigrator.UpdateSecretOwnerReference(allSecrets.privateRegistryECRSecret, owner)
+			if err != nil {
+				logrus.Errorf("cluster store: failed to set %s %s as secret owner", owner.Kind, owner.Name)
+			}
+		}
 	}
 	return result, err
 }
@@ -230,6 +321,8 @@ func (p *Store) Update(apiContext *types.APIContext, schema *types.Schema, data 
 	var allSecrets secrets
 	var currentRegSecret, currentS3Secret, currentWeaveSecret string
 	var currentVsphereSecret, currentVcenterSecret, currentOpenStackSecret, currentAADClientSecret, currentAADCertSecret string
+	var currentACIAPICUserKeySecret, currentACITokenSecret, currentACIKafkaClientKeySecret string
+	var currentSecretsEncryptionProvidersSecret, currentBastionHostSSHKeySecret, currentKubeletExtraEnvSecret, currentPrivateRegistryECRSecret string
 	if strings.EqualFold(apiContext.Type, managementv3.ClusterTemplateRevisionType) {
 		err := p.checkKubernetesVersionFormat(apiContext, data)
 		if err != nil {
@@ -255,7 +348,15 @@ func (p *Store) Update(apiContext *types.APIContext, schema *types.Schema, data 
 		currentOpenStackSecret, _ = existingClusterTemplate[openStackSecretKey].(string)
 		currentAADClientSecret, _ = existingClusterTemplate[aadClientSecretKey].(string)
 		currentAADCertSecret, _ = existingClusterTemplate[aadClientCertSecretKey].(string)
-		allSecrets, err = p.migrateSecrets(data, currentRegSecret, currentS3Secret, currentWeaveSecret, currentVsphereSecret, currentVcenterSecret, currentOpenStackSecret, currentAADClientSecret, currentAADCertSecret)
+		currentACIAPICUserKeySecret, _ = existingClusterTemplate[aciAPICUserKeySecretKey].(string)
+		currentACITokenSecret, _ = existingClusterTemplate[aciTokenSecretKey].(string)
+		currentACIKafkaClientKeySecret, _ = existingClusterTemplate[aciKafkaClientKeySecretKey].(string)
+
+		currentSecretsEncryptionProvidersSecret, _ = existingClusterTemplate[secretsEncryptionProvidersSecretKey].(string)
+		currentBastionHostSSHKeySecret, _ = existingClusterTemplate[bastionHostSSHKeySecretKey].(string)
+		currentKubeletExtraEnvSecret, _ = existingClusterTemplate[kubeletExtraEnvSecretKey].(string)
+		currentPrivateRegistryECRSecret, _ = existingClusterTemplate[privateRegistryECRSecretKey].(string)
+		allSecrets, err = p.migrateSecrets(data, currentRegSecret, currentS3Secret, currentWeaveSecret, currentVsphereSecret, currentVcenterSecret, currentOpenStackSecret, currentAADClientSecret, currentAADCertSecret, currentACIAPICUserKeySecret, currentACITokenSecret, currentACIKafkaClientKeySecret, currentSecretsEncryptionProvidersSecret, currentBastionHostSSHKeySecret, currentKubeletExtraEnvSecret, currentPrivateRegistryECRSecret)
 		if err != nil {
 			return nil, err
 		}
@@ -303,6 +404,41 @@ func (p *Store) Update(apiContext *types.APIContext, schema *types.Schema, data 
 			}
 			if allSecrets.aadCertSecret != nil && currentAADCertSecret == "" {
 				if cleanupErr := p.secretMigrator.Cleanup(allSecrets.aadCertSecret.Name); cleanupErr != nil {
+					logrus.Errorf("cluster store: encountered error while handling migration error: %v, original error: %v", cleanupErr, err)
+				}
+			}
+			if allSecrets.aciAPICUserKeySecret != nil && currentACIAPICUserKeySecret == "" {
+				if cleanupErr := p.secretMigrator.Cleanup(allSecrets.aciAPICUserKeySecret.Name); cleanupErr != nil {
+					logrus.Errorf("cluster store: encountered error while handling migration error: %v, original error: %v", cleanupErr, err)
+				}
+			}
+			if allSecrets.aciTokenSecret != nil && currentACITokenSecret == "" {
+				if cleanupErr := p.secretMigrator.Cleanup(allSecrets.aciTokenSecret.Name); cleanupErr != nil {
+					logrus.Errorf("cluster store: encountered error while handling migration error: %v, original error: %v", cleanupErr, err)
+				}
+			}
+			if allSecrets.aciKafkaClientKeySecret != nil && currentACIKafkaClientKeySecret == "" {
+				if cleanupErr := p.secretMigrator.Cleanup(allSecrets.aciKafkaClientKeySecret.Name); cleanupErr != nil {
+					logrus.Errorf("cluster store: encountered error while handling migration error: %v, original error: %v", cleanupErr, err)
+				}
+			}
+			if allSecrets.secretsEncryptionProvidersSecret != nil && currentSecretsEncryptionProvidersSecret == "" {
+				if cleanupErr := p.secretMigrator.Cleanup(allSecrets.secretsEncryptionProvidersSecret.Name); cleanupErr != nil {
+					logrus.Errorf("cluster store: encountered error while handling migration error: %v, original error: %v", cleanupErr, err)
+				}
+			}
+			if allSecrets.bastionHostSSHKeySecret != nil && currentBastionHostSSHKeySecret == "" {
+				if cleanupErr := p.secretMigrator.Cleanup(allSecrets.bastionHostSSHKeySecret.Name); cleanupErr != nil {
+					logrus.Errorf("cluster store: encountered error while handling migration error: %v, original error: %v", cleanupErr, err)
+				}
+			}
+			if allSecrets.kubeletExtraEnvSecret != nil && currentKubeletExtraEnvSecret == "" {
+				if cleanupErr := p.secretMigrator.Cleanup(allSecrets.kubeletExtraEnvSecret.Name); cleanupErr != nil {
+					logrus.Errorf("cluster store: encountered error while handling migration error: %v, original error: %v", cleanupErr, err)
+				}
+			}
+			if allSecrets.privateRegistryECRSecret != nil && currentPrivateRegistryECRSecret == "" {
+				if cleanupErr := p.secretMigrator.Cleanup(allSecrets.privateRegistryECRSecret.Name); cleanupErr != nil {
 					logrus.Errorf("cluster store: encountered error while handling migration error: %v, original error: %v", cleanupErr, err)
 				}
 			}
@@ -496,7 +632,7 @@ func (p *Store) checkMembersAccessType(data map[string]interface{}) error {
 	return nil
 }
 
-func (p *Store) migrateSecrets(data map[string]interface{}, currentReg, currentS3, currentWeave, currentVsphere, currentVCenter, currentOpenStack, currentAADClientSecret, currentAADCert string) (secrets, error) {
+func (p *Store) migrateSecrets(data map[string]interface{}, currentReg, currentS3, currentWeave, currentVsphere, currentVCenter, currentOpenStack, currentAADClientSecret, currentAADCert, currentACIAPICUserKey, currentACIToken, currentACIKafkaClientKey, currentSecretsEncryptionProviders, currentBastionHostSSHKey, currentKubeletExtraEnv, currentPrivateRegistryECR string) (secrets, error) {
 	rkeConfig, err := getRkeConfig(data)
 	if err != nil || rkeConfig == nil {
 		return secrets{}, err
@@ -568,6 +704,73 @@ func (p *Store) migrateSecrets(data map[string]interface{}, currentReg, currentS
 	if s.aadCertSecret != nil {
 		data[aadClientCertSecretKey] = s.aadCertSecret.Name
 		rkeConfig.CloudProvider.AzureCloudProvider.AADClientCertPassword = ""
+	}
+	s.aciAPICUserKeySecret, err = p.secretMigrator.CreateOrUpdateACIAPICUserKeySecret(currentACIAPICUserKey, rkeConfig, nil)
+	if err != nil {
+		return secrets{}, err
+	}
+	if s.aciAPICUserKeySecret != nil {
+		data[aciAPICUserKeySecretKey] = s.aciAPICUserKeySecret.Name
+		rkeConfig.Network.AciNetworkProvider.ApicUserKey = ""
+	}
+	s.aciTokenSecret, err = p.secretMigrator.CreateOrUpdateACITokenSecret(currentACIToken, rkeConfig, nil)
+	if err != nil {
+		return secrets{}, err
+	}
+	if s.aciTokenSecret != nil {
+		data[aciTokenSecretKey] = s.aciTokenSecret.Name
+		rkeConfig.Network.AciNetworkProvider.Token = ""
+	}
+	s.aciKafkaClientKeySecret, err = p.secretMigrator.CreateOrUpdateACIKafkaClientKeySecret(currentACIKafkaClientKey, rkeConfig, nil)
+	if err != nil {
+		return secrets{}, err
+	}
+	if s.aciKafkaClientKeySecret != nil {
+		data[aciKafkaClientKeySecretKey] = s.aciKafkaClientKeySecret.Name
+		rkeConfig.Network.AciNetworkProvider.KafkaClientKey = ""
+	}
+	s.secretsEncryptionProvidersSecret, err = p.secretMigrator.CreateOrUpdateSecretsEncryptionProvidersSecret(currentSecretsEncryptionProviders, rkeConfig, nil)
+	if err != nil {
+		return secrets{}, err
+	}
+	if s.secretsEncryptionProvidersSecret != nil {
+		data[secretsEncryptionProvidersSecretKey] = s.secretsEncryptionProvidersSecret.Name
+		rkeConfig.Services.KubeAPI.SecretsEncryptionConfig.CustomConfig.Resources = nil
+	}
+	s.bastionHostSSHKeySecret, err = p.secretMigrator.CreateOrUpdateBastionHostSSHKeySecret(currentBastionHostSSHKey, rkeConfig, nil)
+	if err != nil {
+		return secrets{}, err
+	}
+	if s.bastionHostSSHKeySecret != nil {
+		data[bastionHostSSHKeySecretKey] = s.bastionHostSSHKeySecret.Name
+		rkeConfig.BastionHost.SSHKey = ""
+	}
+	s.kubeletExtraEnvSecret, err = p.secretMigrator.CreateOrUpdateKubeletExtraEnvSecret(currentKubeletExtraEnv, rkeConfig, nil)
+	if err != nil {
+		return secrets{}, err
+	}
+	if s.kubeletExtraEnvSecret != nil {
+		data[kubeletExtraEnvSecretKey] = s.kubeletExtraEnvSecret.Name
+		env := make([]string, 0, len(rkeConfig.Services.Kubelet.ExtraEnv))
+		for _, e := range rkeConfig.Services.Kubelet.ExtraEnv {
+			if !strings.Contains(e, "AWS_SECRET_ACCESS_KEY") {
+				env = append(env, e)
+			}
+		}
+		rkeConfig.Services.Kubelet.ExtraEnv = env
+	}
+	s.privateRegistryECRSecret, err = p.secretMigrator.CreateOrUpdatePrivateRegistryECRSecret(currentPrivateRegistryECR, rkeConfig, nil)
+	if err != nil {
+		return secrets{}, err
+	}
+	if s.privateRegistryECRSecret != nil {
+		data[privateRegistryECRSecretKey] = s.privateRegistryECRSecret.Name
+		for _, reg := range rkeConfig.PrivateRegistries {
+			if ecr := reg.ECRCredentialPlugin; ecr != nil {
+				ecr.AwsSecretAccessKey = ""
+				ecr.AwsSessionToken = ""
+			}
+		}
 	}
 
 	encodedRkeConfig, err := convert.EncodeToMap(rkeConfig)

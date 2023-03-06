@@ -8,12 +8,11 @@ import (
 	"strings"
 	"time"
 
-	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-
 	"github.com/mitchellh/mapstructure"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
@@ -28,7 +27,6 @@ import (
 	admin "google.golang.org/api/admin/directory/v1"
 	"google.golang.org/api/googleapi"
 	"google.golang.org/api/option"
-
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -349,7 +347,7 @@ func (g *googleOauthProvider) saveGoogleOAuthConfigCR(config *v32.GoogleOauthCon
 	if err := common.CreateOrUpdateSecrets(g.secrets, secretInfo, field, strings.ToLower(config.Type)); err != nil {
 		return err
 	}
-	config.OauthCredential = common.GetName(config.Type, field)
+	config.OauthCredential = common.GetFullSecretName(config.Type, field)
 
 	if config.ServiceAccountCredential != "" {
 		secretInfo = convert.ToString(config.ServiceAccountCredential)
@@ -357,7 +355,7 @@ func (g *googleOauthProvider) saveGoogleOAuthConfigCR(config *v32.GoogleOauthCon
 		if err := common.CreateOrUpdateSecrets(g.secrets, secretInfo, field, strings.ToLower(config.Type)); err != nil {
 			return err
 		}
-		config.ServiceAccountCredential = common.GetName(config.Type, field)
+		config.ServiceAccountCredential = common.GetFullSecretName(config.Type, field)
 	}
 
 	_, err = g.authConfigs.ObjectClient().Update(config.ObjectMeta.Name, config)
@@ -446,9 +444,4 @@ func (g *googleOauthProvider) IsDisabledProvider() (bool, error) {
 		return false, err
 	}
 	return !googleOauthConfig.Enabled, nil
-}
-
-// CleanupResources deletes resources associated with the Google auth provider.
-func (g *googleOauthProvider) CleanupResources(*v3.AuthConfig) error {
-	return nil
 }

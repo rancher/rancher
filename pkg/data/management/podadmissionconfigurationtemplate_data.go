@@ -11,7 +11,7 @@ import (
 
 var FeatureAppNS = []string{
 	"ingress-nginx",              // This is for Ingress, not feature app
-	"kube-system",                // Harvester, vSphere CPI, vSphere CSI
+	"kube-system",                // Harvester, vSphere CPI, vSphere CSI, RKE2 restricted PSA Config
 	"cattle-system",              // AKS/GKE/EKS Operator, Webhook, System Upgrade Controller
 	"cattle-epinio-system",       // Epinio
 	"cattle-fleet-system",        // Fleet
@@ -19,7 +19,7 @@ var FeatureAppNS = []string{
 	"cattle-neuvector-system",    // Neuvector
 	"cattle-monitoring-system",   // Monitoring and Sub-charts
 	"rancher-alerting-drivers",   // Alert Driver
-	"cis-operator-system",        // CIS Benchmark
+	"cis-operator-system",        // CIS Benchmark, RKE2 restricted PSA Config
 	"cattle-csp-adapter-system",  // CSP Adapter
 	"cattle-externalip-system",   // External IP Webhook
 	"cattle-gatekeeper-system",   // Gatekeeper
@@ -29,6 +29,7 @@ var FeatureAppNS = []string{
 	"cattle-windows-gmsa-system", // Windows GMSA
 	"cattle-sriov-system",        // Sriov
 	"cattle-ui-plugin-system",    // UI Plugin System
+	"tigera-operator",            // RKE2 restricted PSA Config, source: https://github.com/rancher/rke2/blob/34633dcc188d3a79744636fe21529ef6f5d64d71/pkg/rke2/psa.go#L58
 }
 
 func addDefaultPodSecurityAdmissionConfigurationTemplates(management *config.ManagementContext) error {
@@ -48,7 +49,7 @@ func addDefaultPodSecurityAdmissionConfigurationTemplates(management *config.Man
 func newPodSecurityAdmissionConfigurationTemplateRestricted() *v3.PodSecurityAdmissionConfigurationTemplate {
 	return &v3.PodSecurityAdmissionConfigurationTemplate{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "restricted",
+			Name: "rancher-restricted",
 		},
 		Description: "The default restricted pod security admission configuration template",
 		Configuration: v3.PodSecurityAdmissionConfigurationTemplateSpec{
@@ -72,7 +73,7 @@ func newPodSecurityAdmissionConfigurationTemplateRestricted() *v3.PodSecurityAdm
 func newPodSecurityAdmissionConfigurationTemplatePrivileged() *v3.PodSecurityAdmissionConfigurationTemplate {
 	return &v3.PodSecurityAdmissionConfigurationTemplate{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "privileged",
+			Name: "rancher-privileged",
 		},
 		Description: "The default privileged pod security admission configuration template",
 		Configuration: v3.PodSecurityAdmissionConfigurationTemplateSpec{

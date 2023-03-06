@@ -109,6 +109,8 @@ func (h *handler) createCluster(cluster *v1.Cluster, status v1.ClusterStatus) ([
 		return nil, status, generic.ErrSkip
 	}
 
+	// this overwrites the default labels from fleet and any labels a user
+	// set on the fleet cluster resource directly
 	labels := yaml.CleanAnnotationsForExport(mgmtCluster.Labels)
 	labels["management.cattle.io/cluster-name"] = mgmtCluster.Name
 	if errs := validation.IsValidLabelValue(mgmtCluster.Spec.DisplayName); len(errs) == 0 {
@@ -120,13 +122,15 @@ func (h *handler) createCluster(cluster *v1.Cluster, status v1.ClusterStatus) ([
 	if mgmtCluster.Spec.Internal {
 		agentNamespace = fleetconst.ReleaseLocalNamespace
 		clientSecret = "local-cluster"
+		// restore fleet's hardcoded name label for the local cluster
+		labels["name"] = "local"
 	}
 
 	var privateRepoURL string
 	if cluster.Spec.RKEConfig == nil {
 		// If the RKEConfig is nil, we are likely dealing with a legacy (v3/mgmt) cluster, and need to check the v3
 		// cluster for the cluster level registry.
-		privateRepoURL = mgmtcluster.GetPrivateRepoURL(mgmtCluster)
+		privateRepoURL = mgmtcluster.GetPrivateRegistryURL(mgmtCluster)
 	} else {
 		privateRepoURL = image.GetPrivateRepoURLFromCluster(cluster)
 	}

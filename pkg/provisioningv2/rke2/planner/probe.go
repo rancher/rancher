@@ -110,15 +110,14 @@ func renderSecureProbe(arg interface{}, rawProbe plan.Probe, runtime string, def
 	return replaceCACertAndPortForProbes(rawProbe, TLSCert, securePort)
 }
 
-// addProbes adds probes for the machine (based on type of machine) to the nodePlan and returns the nodePlan and an error
+// generateProbes generates probes for the machine (based on type of machine) to the nodePlan and returns the probes and an error
 // if one occurred.
-func (p *Planner) addProbes(nodePlan plan.NodePlan, controlPlane *rkev1.RKEControlPlane, entry *planEntry, config map[string]interface{}) (plan.NodePlan, error) {
+func (p *Planner) generateProbes(controlPlane *rkev1.RKEControlPlane, entry *planEntry, config map[string]interface{}) (map[string]plan.Probe, error) {
 	var (
 		runtime    = rke2.GetRuntime(controlPlane.Spec.KubernetesVersion)
 		probeNames []string
+		probes     = map[string]plan.Probe{}
 	)
-
-	nodePlan.Probes = map[string]plan.Probe{}
 
 	if runtime != rke2.RuntimeK3S && isEtcd(entry) {
 		probeNames = append(probeNames, "etcd")
@@ -137,25 +136,25 @@ func (p *Planner) addProbes(nodePlan plan.NodePlan, controlPlane *rkev1.RKEContr
 	}
 
 	for _, probeName := range probeNames {
-		nodePlan.Probes[probeName] = allProbes[probeName]
+		probes[probeName] = allProbes[probeName]
 	}
 
-	nodePlan.Probes = replaceRuntimeForProbes(nodePlan.Probes, runtime)
+	probes = replaceRuntimeForProbes(probes, runtime)
 
 	if isControlPlane(entry) {
-		kcmProbe, err := renderSecureProbe(config[KubeControllerManagerArg], nodePlan.Probes["kube-controller-manager"], rke2.GetRuntime(controlPlane.Spec.KubernetesVersion), DefaultKubeControllerManagerDefaultSecurePort, DefaultKubeControllerManagerCertDir, DefaultKubeControllerManagerCert)
+		kcmProbe, err := renderSecureProbe(config[KubeControllerManagerArg], probes["kube-controller-manager"], runtime, DefaultKubeControllerManagerDefaultSecurePort, DefaultKubeControllerManagerCertDir, DefaultKubeControllerManagerCert)
 		if err != nil {
-			return nodePlan, err
+			return probes, err
 		}
-		nodePlan.Probes["kube-controller-manager"] = kcmProbe
+		probes["kube-controller-manager"] = kcmProbe
 
-		ksProbe, err := renderSecureProbe(config[KubeSchedulerArg], nodePlan.Probes["kube-scheduler"], rke2.GetRuntime(controlPlane.Spec.KubernetesVersion), DefaultKubeSchedulerDefaultSecurePort, DefaultKubeSchedulerCertDir, DefaultKubeSchedulerCert)
+		ksProbe, err := renderSecureProbe(config[KubeSchedulerArg], probes["kube-scheduler"], runtime, DefaultKubeSchedulerDefaultSecurePort, DefaultKubeSchedulerCertDir, DefaultKubeSchedulerCert)
 		if err != nil {
-			return nodePlan, err
+			return probes, err
 		}
-		nodePlan.Probes["kube-scheduler"] = ksProbe
+		probes["kube-scheduler"] = ksProbe
 	}
-	return nodePlan, nil
+	return probes, nil
 }
 
 // replaceCACertAndPortForProbes adds/replaces the CACert and URL with rendered values based on the values provided.
