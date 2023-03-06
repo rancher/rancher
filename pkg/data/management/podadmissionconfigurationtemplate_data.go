@@ -51,7 +51,9 @@ func newPodSecurityAdmissionConfigurationTemplateRestricted() *v3.PodSecurityAdm
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "rancher-restricted",
 		},
-		Description: "The default restricted pod security admission configuration template",
+		Description: "This is the built-in restricted Pod Security Admission Configuration Template. " +
+			"It defines a heavily restricted policy, based on current Pod hardening best practices. " +
+			"This policy contains namespace level exemptions for Rancher components.",
 		Configuration: v3.PodSecurityAdmissionConfigurationTemplateSpec{
 			Defaults: v3.PodSecurityAdmissionConfigurationTemplateDefaults{
 				Enforce:        "restricted",
@@ -75,7 +77,9 @@ func newPodSecurityAdmissionConfigurationTemplatePrivileged() *v3.PodSecurityAdm
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "rancher-privileged",
 		},
-		Description: "The default privileged pod security admission configuration template",
+		Description: "This is the built-in unrestricted Pod Security Admission Configuration Template. " +
+			"It defines the most permissive PSS policy, allowing for known privilege escalations. " +
+			"This policy contains no exemptions.",
 		Configuration: v3.PodSecurityAdmissionConfigurationTemplateSpec{
 			Defaults: v3.PodSecurityAdmissionConfigurationTemplateDefaults{
 				Enforce:        "privileged",
