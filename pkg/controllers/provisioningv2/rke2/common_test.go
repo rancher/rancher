@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/pkg/errors"
-	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta1"
 	"github.com/stretchr/testify/assert"
@@ -324,26 +323,4 @@ func TestCompressInterface(t *testing.T) {
 			assert.Equal(t, tt.value, target)
 		})
 	}
-}
-
-func TestCompressDynamicSchemaSpec(t *testing.T) {
-	expected := apimgmtv3.DynamicSchemaSpec{
-		SchemaName: "testSchema",
-		ResourceFields: map[string]apimgmtv3.Field{
-			"field1": {
-				Unique:   true,
-				Nullable: true,
-				Create:   true,
-			},
-		},
-		DynamicSchemaVersion: "test",
-	}
-
-	c, err := CompressInterface(&expected)
-	assert.Nil(t, err)
-
-	actual, err := DecompressDynamicSchemaSpec(c)
-	assert.Nil(t, err)
-
-	assert.Equal(t, &expected, actual)
 }

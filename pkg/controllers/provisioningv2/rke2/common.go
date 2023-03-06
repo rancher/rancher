@@ -17,7 +17,6 @@ import (
 	"time"
 
 	"github.com/rancher/channelserver/pkg/model"
-	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	provv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
@@ -44,38 +43,34 @@ const (
 	AddressAnnotation = "rke.cattle.io/address"
 	ClusterNameLabel  = "rke.cattle.io/cluster-name"
 	// ClusterSpecAnnotation is used to define the cluster spec used to generate the rkecontrolplane object as an annotation on the object
-	ClusterSpecAnnotation = "rke.cattle.io/cluster-spec"
-	ControlPlaneRoleLabel = "rke.cattle.io/control-plane-role"
-	DrainAnnotation       = "rke.cattle.io/drain-options"
-	DrainDoneAnnotation   = "rke.cattle.io/drain-done"
-	DrainErrorAnnotation  = "rke.cattle.io/drain-error"
-	// DynamicSchemaSpecAnnotation is an annotation present in the provisioning cluster's machine pool
-	// machineDeploymentAnnotations which contains a gzip+base64 encoded json representation of the machine driver's
-	// dynamic schema object's spec.
-	DynamicSchemaSpecAnnotation = "rke.cattle.io/dynamic-schema-spec"
-	EtcdRoleLabel               = "rke.cattle.io/etcd-role"
-	InitNodeLabel               = "rke.cattle.io/init-node"
-	InitNodeMachineIDLabel      = "rke.cattle.io/init-node-machine-id"
-	InternalAddressAnnotation   = "rke.cattle.io/internal-address"
-	JoinURLAnnotation           = "rke.cattle.io/join-url"
-	LabelsAnnotation            = "rke.cattle.io/labels"
-	MachineIDLabel              = "rke.cattle.io/machine-id"
-	MachineNameLabel            = "rke.cattle.io/machine-name"
-	MachineTemplateHashLabel    = "rke.cattle.io/machine-template-hash"
-	RKEMachinePoolNameLabel     = "rke.cattle.io/rke-machine-pool-name"
-	MachineNamespaceLabel       = "rke.cattle.io/machine-namespace"
-	MachineRequestType          = "rke.cattle.io/machine-request"
-	MachineUIDLabel             = "rke.cattle.io/machine"
-	NodeNameLabel               = "rke.cattle.io/node-name"
-	PlanSecret                  = "rke.cattle.io/plan-secret-name"
-	PostDrainAnnotation         = "rke.cattle.io/post-drain"
-	PreDrainAnnotation          = "rke.cattle.io/pre-drain"
-	RoleLabel                   = "rke.cattle.io/service-account-role"
-	SecretTypeMachinePlan       = "rke.cattle.io/machine-plan"
-	TaintsAnnotation            = "rke.cattle.io/taints"
-	UnCordonAnnotation          = "rke.cattle.io/uncordon"
-	WorkerRoleLabel             = "rke.cattle.io/worker-role"
-	AuthorizedObjectAnnotation  = "rke.cattle.io/object-authorized-for-clusters"
+	ClusterSpecAnnotation      = "rke.cattle.io/cluster-spec"
+	ControlPlaneRoleLabel      = "rke.cattle.io/control-plane-role"
+	DrainAnnotation            = "rke.cattle.io/drain-options"
+	DrainDoneAnnotation        = "rke.cattle.io/drain-done"
+	DrainErrorAnnotation       = "rke.cattle.io/drain-error"
+	EtcdRoleLabel              = "rke.cattle.io/etcd-role"
+	InitNodeLabel              = "rke.cattle.io/init-node"
+	InitNodeMachineIDLabel     = "rke.cattle.io/init-node-machine-id"
+	InternalAddressAnnotation  = "rke.cattle.io/internal-address"
+	JoinURLAnnotation          = "rke.cattle.io/join-url"
+	LabelsAnnotation           = "rke.cattle.io/labels"
+	MachineIDLabel             = "rke.cattle.io/machine-id"
+	MachineNameLabel           = "rke.cattle.io/machine-name"
+	MachineTemplateHashLabel   = "rke.cattle.io/machine-template-hash"
+	RKEMachinePoolNameLabel    = "rke.cattle.io/rke-machine-pool-name"
+	MachineNamespaceLabel      = "rke.cattle.io/machine-namespace"
+	MachineRequestType         = "rke.cattle.io/machine-request"
+	MachineUIDLabel            = "rke.cattle.io/machine"
+	NodeNameLabel              = "rke.cattle.io/node-name"
+	PlanSecret                 = "rke.cattle.io/plan-secret-name"
+	PostDrainAnnotation        = "rke.cattle.io/post-drain"
+	PreDrainAnnotation         = "rke.cattle.io/pre-drain"
+	RoleLabel                  = "rke.cattle.io/service-account-role"
+	SecretTypeMachinePlan      = "rke.cattle.io/machine-plan"
+	TaintsAnnotation           = "rke.cattle.io/taints"
+	UnCordonAnnotation         = "rke.cattle.io/uncordon"
+	WorkerRoleLabel            = "rke.cattle.io/worker-role"
+	AuthorizedObjectAnnotation = "rke.cattle.io/object-authorized-for-clusters"
 
 	MachineTemplateClonedFromGroupVersionAnn = "rke.cattle.io/cloned-from-group-version"
 	MachineTemplateClonedFromKindAnn         = "rke.cattle.io/cloned-from-kind"
@@ -571,15 +566,4 @@ func DecompressClusterSpec(inputb64 string) (*provv1.ClusterSpec, error) {
 		return nil, err
 	}
 	return &c, nil
-}
-
-// DecompressDynamicSchemaSpec is a function that will base64 decode, ungzip, and unmarshal a string into a dynamic
-// schema spec.
-func DecompressDynamicSchemaSpec(inputb64 string) (*apimgmtv3.DynamicSchemaSpec, error) {
-	d := apimgmtv3.DynamicSchemaSpec{}
-	err := DecompressInterface(inputb64, &d)
-	if err != nil {
-		return nil, err
-	}
-	return &d, nil
 }

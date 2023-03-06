@@ -143,12 +143,11 @@ func toMachineTemplate(machinePoolName string, cluster *rancherv1.Cluster, machi
 		return nil, err
 	}
 
-	if machinePool.MachineDeploymentAnnotations == nil || machinePool.MachineDeploymentAnnotations[rke2.DynamicSchemaSpecAnnotation] == "" {
-		return nil, fmt.Errorf("cannot find existing dynamic schema for machine pool %s", machinePoolName)
+	if machinePool.DynamicSchemaSpec == "" {
+		return nil, fmt.Errorf("waiting for dynamic schema to be populated for machine pool %s", machinePoolName)
 	}
-	// If provisioning with a previous version of machine, we have to remove newly added fields, otherwise the entire
-	// cluster will reprovision
-	spec, err := rke2.DecompressDynamicSchemaSpec(machinePool.MachineDeploymentAnnotations[rke2.DynamicSchemaSpecAnnotation])
+	var spec *v3.DynamicSchemaSpec
+	err = json.Unmarshal([]byte(machinePool.DynamicSchemaSpec), spec)
 	if err != nil {
 		return nil, err
 	}

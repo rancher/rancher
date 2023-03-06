@@ -1,6 +1,7 @@
 package rancher
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -506,27 +507,24 @@ func migrateMachinePoolsDynamicSchemaLabel(w *wrangler.Context) error {
 				continue
 			}
 			// search for machine pools without the `dynamic-schema-spec` annotation and apply it
-			for i := range provCluster.Spec.RKEConfig.MachinePools {
-				if provCluster.Spec.RKEConfig.MachinePools[i].MachineDeploymentAnnotations == nil {
-					provCluster.Spec.RKEConfig.MachinePools[i].MachineDeploymentAnnotations = map[string]string{}
-				}
-				existingSpecAnnotation := provCluster.Spec.RKEConfig.MachinePools[i].MachineDeploymentAnnotations[rke2.DynamicSchemaSpecAnnotation]
-				if existingSpecAnnotation != "" {
+			for i, machinePool := range provCluster.Spec.RKEConfig.MachinePools {
+				var spec *v32.DynamicSchemaSpec
+				if machinePool.DynamicSchemaSpec != "" && json.Unmarshal([]byte(machinePool.DynamicSchemaSpec), spec) == nil {
 					continue
 				}
-				nodeConfig := provCluster.Spec.RKEConfig.MachinePools[i].NodeConfig
+				nodeConfig := machinePool.NodeConfig
 				if nodeConfig == nil {
 					return fmt.Errorf("machine pool node config must not be nil")
 				}
-				ds, err := w.Mgmt.DynamicSchema().Cache().Get(strings.ToLower(nodeConfig.Kind))
+				ds, err := w.Mgmt.DynamicSchema().Get(strings.ToLower(nodeConfig.Kind), metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
-				compressedSpec, err := rke2.CompressInterface(&ds.Spec)
+				specJSON, err := json.Marshal(ds.Spec)
 				if err != nil {
 					return err
 				}
-				provCluster.Spec.RKEConfig.MachinePools[i].MachineDeploymentAnnotations[rke2.DynamicSchemaSpecAnnotation] = compressedSpec
+				provCluster.Spec.RKEConfig.MachinePools[i].DynamicSchemaSpec = string(specJSON)
 			}
 			_, err = w.Provisioning.Cluster().Update(&provCluster)
 			if err != nil {

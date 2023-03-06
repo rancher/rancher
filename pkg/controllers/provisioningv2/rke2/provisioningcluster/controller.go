@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/rancher/lasso/pkg/dynamic"
+	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	rancherv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2"
@@ -104,6 +105,7 @@ func Register(ctx context.Context, clients *wrangler.Context) {
 		return nil, nil
 	}, clients.Provisioning.Cluster(), clients.RKE.RKEControlPlane())
 
+	clients.Provisioning.Cluster().OnChange(ctx, "provisioning-cluster-change", h.OnChange)
 	clients.Provisioning.Cluster().OnRemove(ctx, "rke-cluster-remove", h.OnRemove)
 }
 
@@ -166,6 +168,44 @@ func (h *handler) infraWatch(obj runtime.Object) (runtime.Object, error) {
 	}
 
 	return obj, nil
+}
+
+func (h *handler) OnChange(_ string, cluster *rancherv1.Cluster) (*rancherv1.Cluster, error) {
+	if cluster == nil || !cluster.DeletionTimestamp.IsZero() || cluster.Spec.RKEConfig == nil {
+		return cluster, nil
+	}
+
+	// the outer loop searches for machine pools without a populated DynamicSchemaSpec field
+	for i, machinePool := range cluster.Spec.RKEConfig.MachinePools {
+		var spec *apimgmtv3.DynamicSchemaSpec
+		if machinePool.DynamicSchemaSpec != "" && json.Unmarshal([]byte(machinePool.DynamicSchemaSpec), spec) == nil {
+			continue
+		}
+		// if the field is empty or invalid, add to any machine pools that do not have it and update the cluster
+		cluster = cluster.DeepCopy()
+		for j := i; j < len(cluster.Spec.RKEConfig.MachinePools); j++ {
+			machinePool := cluster.Spec.RKEConfig.MachinePools[j]
+			spec = &apimgmtv3.DynamicSchemaSpec{}
+			if machinePool.DynamicSchemaSpec != "" && json.Unmarshal([]byte(machinePool.DynamicSchemaSpec), spec) == nil {
+				continue
+			}
+			nodeConfig := machinePool.NodeConfig
+			if nodeConfig == nil {
+				return cluster, fmt.Errorf("machine pool node config must not be nil")
+			}
+			ds, err := h.dynamicSchema.Get(strings.ToLower(nodeConfig.Kind))
+			if err != nil {
+				return cluster, err
+			}
+			specJSON, err := json.Marshal(ds.Spec)
+			if err != nil {
+				return cluster, err
+			}
+			cluster.Spec.RKEConfig.MachinePools[j].DynamicSchemaSpec = string(specJSON)
+		}
+		return h.clusterController.Update(cluster)
+	}
+	return cluster, nil
 }
 
 func (h *handler) findSnapshotClusterSpec(snapshotNamespace, snapshotName string) (*rancherv1.ClusterSpec, error) {
@@ -296,42 +336,6 @@ func (h *handler) OnRancherClusterChange(obj *rancherv1.Cluster, status rancherv
 				return nil, status, err
 			}
 		}
-	}
-
-	// the outer loop searches for machine pools without the `dynamic-schema-spec` annotation
-	for i, machinePool := range obj.Spec.RKEConfig.MachinePools {
-		if machinePool.MachineDeploymentAnnotations != nil && machinePool.MachineDeploymentAnnotations[rke2.DynamicSchemaSpecAnnotation] != "" {
-			continue
-		}
-		// if the annotation is not found, add to any machine pools that do not have it and exit, preferring to rereconcile
-		obj = obj.DeepCopy()
-		for j := i; j < len(obj.Spec.RKEConfig.MachinePools); j++ {
-			if obj.Spec.RKEConfig.MachinePools[j].MachineDeploymentAnnotations == nil {
-				obj.Spec.RKEConfig.MachinePools[j].MachineDeploymentAnnotations = map[string]string{}
-			}
-			existingSpecAnnotation := obj.Spec.RKEConfig.MachinePools[j].MachineDeploymentAnnotations[rke2.DynamicSchemaSpecAnnotation]
-			if existingSpecAnnotation != "" {
-				continue
-			}
-			nodeConfig := obj.Spec.RKEConfig.MachinePools[j].NodeConfig
-			if nodeConfig == nil {
-				return nil, status, fmt.Errorf("machine pool node config must not be nil")
-			}
-			ds, err := h.dynamicSchema.Get(strings.ToLower(nodeConfig.Kind))
-			if err != nil {
-				return nil, status, err
-			}
-			compressedSpec, err := rke2.CompressInterface(&ds.Spec)
-			if err != nil {
-				return nil, status, err
-			}
-			obj.Spec.RKEConfig.MachinePools[j].MachineDeploymentAnnotations[rke2.DynamicSchemaSpecAnnotation] = compressedSpec
-		}
-		_, err = h.clusterController.Update(obj)
-		if err == nil {
-			err = generic.ErrSkip // if update was successful, return ErrSkip waiting for caches to sync
-		}
-		return nil, status, err
 	}
 
 	objs, err := objects(obj, h.dynamic, h.dynamicSchema, h.secretCache)
