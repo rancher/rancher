@@ -81,7 +81,7 @@ type DrainOptions struct {
 	DeleteEmptyDirData bool `json:"deleteEmptyDirData"`
 	// DisableEviction forces drain to use delete rather than evict
 	DisableEviction bool `json:"disableEviction"`
-	//Period of time in seconds given to each pod to terminate gracefully.
+	// Period of time in seconds given to each pod to terminate gracefully.
 	// If negative, the default value specified in the pod will be used
 	GracePeriod int `json:"gracePeriod"`
 	// Time to wait (in seconds) before giving up for one try
@@ -118,4 +118,5 @@ type KeyToPath struct {
 	Path        string `json:"path"`
 	Dynamic     bool   `json:"dynamic,omitempty"`
 	Permissions string `json:"permissions,omitempty"`
+	Hash        string `json:"hash,omitempty"`
 }
