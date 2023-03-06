@@ -230,3 +230,21 @@ func watchAndWaitForPods(client *rancher.Client, clusterID string) error {
 	})
 	return err
 }
+
+func upgradeClusterK8sVersionWithUpgradeStrategy(client *rancher.Client, clustername string, k8sUpgradedVersion string, namespaceName string) error {
+	clusterObj, existingSteveAPIObj, err := getProvisioningClusterByName(client, clustername, namespaceName)
+	if err != nil {
+		return err
+	}
+
+	clusterObj.Spec.RKEConfig.UpgradeStrategy.ControlPlaneConcurrency = "15%"
+	clusterObj.Spec.RKEConfig.UpgradeStrategy.WorkerConcurrency = "20%"
+	clusterObj.Spec.KubernetesVersion = k8sUpgradedVersion
+
+	_, err = client.Steve.SteveType(clusters.ProvisioningSteveResouceType).Update(existingSteveAPIObj, clusterObj)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
