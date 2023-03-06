@@ -15,6 +15,7 @@ import (
 	v1 "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/catalogv2/content"
+	"github.com/rancher/rancher/pkg/controllers/provisioningv2/rke2"
 	fleetcontrollers "github.com/rancher/rancher/pkg/generated/controllers/fleet.cattle.io/v1alpha1"
 	mgmtcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/wrangler"
@@ -92,7 +93,7 @@ func (h *handler) OnChange(mcc *v3.ManagedChart, status v3.ManagedChartStatus) (
 
 	bundle := &v1alpha1.Bundle{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      name.SafeConcatName("mcc", mcc.Name),
+			Name:      rke2.SafeConcatName(rke2.MaxHelmReleaseNameLength, "mcc", mcc.Name),
 			Namespace: mcc.Namespace,
 		},
 		Spec: v1alpha1.BundleSpec{
@@ -100,7 +101,7 @@ func (h *handler) OnChange(mcc *v3.ManagedChart, status v3.ManagedChartStatus) (
 				DefaultNamespace: mcc.Spec.DefaultNamespace,
 				TargetNamespace:  mcc.Spec.TargetNamespace,
 				Helm: &v1alpha1.HelmOptions{
-					ReleaseName:    mcc.Spec.ReleaseName,
+					ReleaseName:    name.Limit(mcc.Spec.ReleaseName, rke2.MaxHelmReleaseNameLength),
 					Version:        mcc.Spec.Version,
 					TimeoutSeconds: mcc.Spec.TimeoutSeconds,
 					Values:         mcc.Spec.Values,
