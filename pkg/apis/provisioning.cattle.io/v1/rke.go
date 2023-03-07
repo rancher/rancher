@@ -28,6 +28,7 @@ type RKEMachinePool struct {
 	MaxUnhealthy                 *string                      `json:"maxUnhealthy,omitempty"`
 	UnhealthyRange               *string                      `json:"unhealthyRange,omitempty"`
 	MachineOS                    string                       `json:"machineOS,omitempty"`
+	DynamicSchemaSpec            string                       `json:"dynamicSchemaSpec,omitempty"`
 }
 
 type RKEMachinePoolRollingUpdate struct {
