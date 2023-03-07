@@ -5,12 +5,12 @@ go 1.19
 replace k8s.io/client-go => github.com/rancher/client-go v1.25.4-rancher1
 
 require (
-	github.com/rancher/aks-operator v1.1.0-rc5
+	github.com/rancher/aks-operator v1.1.0-rc4
 	github.com/rancher/eks-operator v1.2.0-rc2
 	github.com/rancher/fleet/pkg/apis v0.0.0-20221220171827-374ed17d8499
 	github.com/rancher/gke-operator v1.1.5
 	github.com/rancher/norman v0.0.0-20230110004459-34230bb2787c
-	github.com/rancher/rke v1.4.4-rc3
+	github.com/rancher/rke v1.4.3
 	github.com/rancher/wrangler v1.1.0
 	github.com/sirupsen/logrus v1.9.0
 	k8s.io/api v0.25.4
@@ -55,6 +55,7 @@ require (
 	github.com/prometheus/procfs v0.7.3 // indirect
 	github.com/rancher/lasso v0.0.0-20221227210133-6ea88ca2fbcc // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
+	go.uber.org/zap v1.21.0 // indirect
 	golang.org/x/net v0.7.0 // indirect
 	golang.org/x/oauth2 v0.0.0-20220608161450-d0670ef3b1eb // indirect
 	golang.org/x/sys v0.5.0 // indirect
@@ -73,7 +74,6 @@ require (
 	k8s.io/component-base v0.25.4 // indirect
 	k8s.io/klog/v2 v2.70.1 // indirect
 	k8s.io/kube-openapi v0.0.0-20220803162953-67bda5d908f1 // indirect
-	k8s.io/kubernetes v1.13.0 // indirect
 	k8s.io/utils v0.0.0-20220728103510-ee6ede2d64ed // indirect
 	sigs.k8s.io/cli-utils v0.27.0 // indirect
 	sigs.k8s.io/controller-runtime v0.12.3 // indirect
