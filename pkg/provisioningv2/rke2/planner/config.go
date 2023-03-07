@@ -462,6 +462,10 @@ func (p *Planner) renderFiles(controlPlane *rkev1.RKEControlPlane, entry *planEn
 							Content: base64.StdEncoding.EncodeToString(secret.Data[v.Key]),
 							Dynamic: v.Dynamic,
 						}
+						hash := sha256.Sum256(secret.Data[v.Key])
+						if v.Hash != "" && v.Hash != base64.StdEncoding.EncodeToString(hash[:]) {
+							return files, fmt.Errorf("secret %s does not cotain the expected content", secret.Name)
+						}
 						if v.Permissions != "" {
 							file.Permissions = v.Permissions
 						} else if fs.Secret.DefaultPermissions != "" {
@@ -485,6 +489,10 @@ func (p *Planner) renderFiles(controlPlane *rkev1.RKEControlPlane, entry *planEn
 							Path:    v.Path,
 							Content: base64.StdEncoding.EncodeToString([]byte(configmap.Data[v.Key])),
 							Dynamic: v.Dynamic,
+						}
+						hash := sha256.Sum256([]byte(configmap.Data[v.Key]))
+						if v.Hash != "" && v.Hash != base64.StdEncoding.EncodeToString(hash[:]) {
+							return files, fmt.Errorf("configmap %s does not cotain the expected content", configmap.Name)
 						}
 						if v.Permissions != "" {
 							file.Permissions = v.Permissions
