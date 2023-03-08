@@ -283,6 +283,7 @@ func (h *handler) createNewCluster(cluster *v1.Cluster, status v1.ClusterStatus,
 	spec.Description = cluster.Annotations["field.cattle.io/description"]
 	spec.FleetWorkspaceName = cluster.Namespace
 	spec.DefaultPodSecurityPolicyTemplateName = cluster.Spec.DefaultPodSecurityPolicyTemplateName
+	spec.DefaultPodSecurityAdmissionConfigurationTemplateName = cluster.Spec.DefaultPodSecurityAdmissionConfigurationTemplateName
 	spec.DefaultClusterRoleForProjectMembers = cluster.Spec.DefaultClusterRoleForProjectMembers
 	spec.EnableNetworkPolicy = cluster.Spec.EnableNetworkPolicy
 	spec.DesiredAgentImage = image.ResolveWithCluster(settings.AgentImage.Get(), cluster)
