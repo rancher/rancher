@@ -129,7 +129,7 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 	// TODO user should be dynamically authorized to only see herself
 	// TODO enable when groups are "in". they need to be self-service
 
-	if err := rb.reconcileGlobalRoles(management); err != nil {
+	if err := rb.reconcileGlobalRoles(wrangler.Mgmt.GlobalRole()); err != nil {
 		return "", errors.Wrap(err, "problem reconciling global roles")
 	}
 
@@ -439,7 +439,7 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 	//	addRule().apiGroups("").resources("events").verbs("get", "list", "watch").
 	//	addRule().apiGroups("management.cattle.io").resources("clusterevents").verbs("get", "list", "watch")
 
-	if err := rb.reconcileRoleTemplates(management); err != nil {
+	if err := rb.reconcileRoleTemplates(wrangler.Mgmt.RoleTemplate()); err != nil {
 		return "", errors.Wrap(err, "problem reconciling role templates")
 	}
 
