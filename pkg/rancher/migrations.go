@@ -508,8 +508,8 @@ func migrateMachinePoolsDynamicSchemaLabel(w *wrangler.Context) error {
 			}
 			// search for machine pools without the `dynamic-schema-spec` annotation and apply it
 			for i, machinePool := range provCluster.Spec.RKEConfig.MachinePools {
-				var spec *v32.DynamicSchemaSpec
-				if machinePool.DynamicSchemaSpec != "" && json.Unmarshal([]byte(machinePool.DynamicSchemaSpec), spec) == nil {
+				var spec v32.DynamicSchemaSpec
+				if machinePool.DynamicSchemaSpec != "" && json.Unmarshal([]byte(machinePool.DynamicSchemaSpec), &spec) == nil {
 					continue
 				}
 				nodeConfig := machinePool.NodeConfig

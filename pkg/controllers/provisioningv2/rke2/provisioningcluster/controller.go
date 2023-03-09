@@ -177,16 +177,16 @@ func (h *handler) OnChange(_ string, cluster *rancherv1.Cluster) (*rancherv1.Clu
 
 	// the outer loop searches for machine pools without a populated DynamicSchemaSpec field
 	for i, machinePool := range cluster.Spec.RKEConfig.MachinePools {
-		var spec *apimgmtv3.DynamicSchemaSpec
-		if machinePool.DynamicSchemaSpec != "" && json.Unmarshal([]byte(machinePool.DynamicSchemaSpec), spec) == nil {
+		var spec apimgmtv3.DynamicSchemaSpec
+		if machinePool.DynamicSchemaSpec != "" && json.Unmarshal([]byte(machinePool.DynamicSchemaSpec), &spec) == nil {
 			continue
 		}
 		// if the field is empty or invalid, add to any machine pools that do not have it and update the cluster
 		cluster = cluster.DeepCopy()
 		for j := i; j < len(cluster.Spec.RKEConfig.MachinePools); j++ {
 			machinePool := cluster.Spec.RKEConfig.MachinePools[j]
-			spec = &apimgmtv3.DynamicSchemaSpec{}
-			if machinePool.DynamicSchemaSpec != "" && json.Unmarshal([]byte(machinePool.DynamicSchemaSpec), spec) == nil {
+			spec = apimgmtv3.DynamicSchemaSpec{}
+			if machinePool.DynamicSchemaSpec != "" && json.Unmarshal([]byte(machinePool.DynamicSchemaSpec), &spec) == nil {
 				continue
 			}
 			nodeConfig := machinePool.NodeConfig

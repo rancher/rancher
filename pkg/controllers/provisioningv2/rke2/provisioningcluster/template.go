@@ -146,13 +146,13 @@ func toMachineTemplate(machinePoolName string, cluster *rancherv1.Cluster, machi
 	if machinePool.DynamicSchemaSpec == "" {
 		return nil, fmt.Errorf("waiting for dynamic schema to be populated for machine pool %s", machinePoolName)
 	}
-	var spec *v3.DynamicSchemaSpec
-	err = json.Unmarshal([]byte(machinePool.DynamicSchemaSpec), spec)
+	var spec v3.DynamicSchemaSpec
+	err = json.Unmarshal([]byte(machinePool.DynamicSchemaSpec), &spec)
 	if err != nil {
 		return nil, err
 	}
 
-	pruneBySchema(machinePoolData, *spec)
+	pruneBySchema(machinePoolData, spec)
 
 	commonData, err := convert.EncodeToMap(machinePool.RKECommonNodeConfig)
 	if err != nil {
