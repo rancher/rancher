@@ -118,6 +118,11 @@ func decodeHelm3(data string) (*release.Release, error) {
 		return nil, err
 	}
 
+	// Data is too small to be helm 3 release object
+	if len(b) <= 3 {
+		return nil, ErrNotHelmRelease
+	}
+
 	// For backwards compatibility with releases that were stored before
 	// compression was introduced we skip decompression if the
 	// gzip magic header is not found
