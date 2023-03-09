@@ -286,9 +286,8 @@ func TestSafeConcatName(t *testing.T) {
 
 func TestCompressInterface(t *testing.T) {
 	tests := []struct {
-		name   string
-		value  any
-		output any
+		name  string
+		value any
 	}{
 		{
 			name:  "int",
