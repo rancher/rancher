@@ -46,7 +46,7 @@ TEST_OS = os.environ.get('RANCHER_TEST_OS', "linux")
 TEST_IMAGE = os.environ.get(
     'RANCHER_TEST_IMAGE', "ranchertest/mytestcontainer")
 TEST_IMAGE_PORT = os.environ.get('RANCHER_TEST_IMAGE_PORT', "80")
-TEST_IMAGE_NGINX = os.environ.get('RANCHER_TEST_IMAGE_NGINX', "nginx")
+TEST_IMAGE_NGINX = os.environ.get('RANCHER_TEST_IMAGE_REDIS', "redis:latest")
 TEST_IMAGE_OS_BASE = os.environ.get('RANCHER_TEST_IMAGE_OS_BASE', "ubuntu")
 if TEST_OS == "windows":
     DEFAULT_TIMEOUT = 300
