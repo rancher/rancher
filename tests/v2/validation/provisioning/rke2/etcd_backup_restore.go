@@ -2,27 +2,32 @@ package rke2
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	apisV1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
+	provisioningV1 "github.com/rancher/rancher/tests/framework/clients/rancher/v1"
 	v1 "github.com/rancher/rancher/tests/framework/clients/rancher/v1"
 	"github.com/rancher/rancher/tests/framework/extensions/clusters"
 	"github.com/rancher/rancher/tests/framework/extensions/machinepools"
 	"github.com/rancher/rancher/tests/framework/extensions/workloads"
+	"github.com/rancher/rancher/tests/framework/extensions/workloads/pods"
 	"github.com/sirupsen/logrus"
 	appv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	kwait "k8s.io/apimachinery/pkg/util/wait"
 )
 
 const (
+	defaultNamespace             = "default"
 	localClusterName             = "local"
 	wloadBeforeRestore           = "wload-before-restore"
 	ingressName                  = "ingress"
 	wloadServiceName             = "wload-service"
-	wloadAfterRestore            = "wload-after-restore"
 	ProvisioningSteveResouceType = "provisioning.cattle.io.cluster"
+	wloadAfterBackup             = "wload-after-backup"
 )
 
 func createSnapshot(client *rancher.Client, clustername string, generation int, namespace string) error {
@@ -185,4 +190,43 @@ func createDeployment(deployment *appv1.Deployment, steveclient *v1.Client, clie
 	})
 	return deploymentResp2, err
 
+}
+func watchAndWaitForPods(client *rancher.Client, clusterID string) error {
+	logrus.Infof("waiting for all Pods to be up.............")
+	err := kwait.Poll(5*time.Second, 5*time.Minute, func() (done bool, err error) {
+		steveClient, err := client.Steve.ProxyDownstream(clusterID)
+		if err != nil {
+			return false, nil
+		}
+		pods, err := steveClient.SteveType(pods.PodResourceSteveType).List(nil)
+		if err != nil {
+			return false, nil
+		}
+		isIngressControllerPodPresent := false
+		isKubeControllerManagerPresent := false
+		for _, pod := range pods.Data {
+			podStatus := &corev1.PodStatus{}
+			err = provisioningV1.ConvertToK8sType(pod.Status, podStatus)
+			if err != nil {
+				return false, err
+			}
+			if !isIngressControllerPodPresent && strings.Contains(pod.ObjectMeta.Name, "ingress-nginx-controller") {
+				isIngressControllerPodPresent = true
+			}
+			if !isKubeControllerManagerPresent && strings.Contains(pod.ObjectMeta.Name, "kube-controller-manager") {
+				isKubeControllerManagerPresent = true
+			}
+
+			phase := podStatus.Phase
+			if phase != corev1.PodRunning && phase != corev1.PodSucceeded {
+				return false, nil
+			}
+
+		}
+		if isIngressControllerPodPresent && isKubeControllerManagerPresent {
+			return true, nil
+		}
+		return false, nil
+	})
+	return err
 }
