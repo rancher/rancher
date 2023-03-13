@@ -1,6 +1,7 @@
 package rke2
 
 import (
+	"reflect"
 	"testing"
 
 	"github.com/pkg/errors"
@@ -279,6 +280,46 @@ func TestSafeConcatName(t *testing.T) {
 				t.Logf("expected output %s with length of %d, got %s with length of %d", tc.expectedOutput, len(tc.expectedOutput), out, len(out))
 			}
 			t.Log(out)
+		})
+	}
+}
+
+func TestCompressInterface(t *testing.T) {
+	tests := []struct {
+		name  string
+		value any
+	}{
+		{
+			name:  "int",
+			value: &[]int{1}[0],
+		},
+		{
+			name:  "string",
+			value: &[]string{"test"}[0],
+		},
+		{
+			name: "struct",
+			value: &struct {
+				TestInt    int
+				TestString string
+			}{
+				TestInt:    1,
+				TestString: "test",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := CompressInterface(tt.value)
+			assert.Nil(t, err)
+			assert.True(t, result != "")
+
+			target := reflect.New(reflect.ValueOf(tt.value).Elem().Type()).Interface()
+
+			err = DecompressInterface(result, target)
+			assert.Nil(t, err)
+			assert.Equal(t, tt.value, target)
 		})
 	}
 }

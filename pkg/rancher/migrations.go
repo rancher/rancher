@@ -1,6 +1,10 @@
 package rancher
 
 import (
+	"encoding/json"
+	"fmt"
+	"strings"
+
 	"github.com/mcuadros/go-version"
 	"github.com/rancher/norman/condition"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
@@ -35,11 +39,13 @@ const (
 	forceSystemNamespacesAssignment            = "forcesystemnamespaceassignment"
 	migrateFromMachineToPlanSecret             = "migratefrommachinetoplanesecret"
 	migrateEncryptionKeyRotationLeaderToStatus = "migrateencryptionkeyrotationleadertostatus"
+	migrateDynamicSchemaToMachinePools         = "migratedynamicschematomachinepools"
 	rancherVersionKey                          = "rancherVersion"
 	projectsCreatedKey                         = "projectsCreated"
 	namespacesAssignedKey                      = "namespacesAssigned"
 	capiMigratedKey                            = "capiMigrated"
 	encryptionKeyRotationStatusMigratedKey     = "encryptionKeyRotationStatusMigrated"
+	dynamicSchemaMachinePoolsMigratedKey       = "dynamicSchemaMachinePoolsMigrated"
 )
 
 func runMigrations(wranglerContext *wrangler.Context) error {
@@ -68,6 +74,9 @@ func runMigrations(wranglerContext *wrangler.Context) error {
 			return err
 		}
 		if err := migrateEncryptionKeyRotationLeader(wranglerContext); err != nil {
+			return err
+		}
+		if err := migrateMachinePoolsDynamicSchemaLabel(wranglerContext); err != nil {
 			return err
 		}
 	}
@@ -468,6 +477,63 @@ func migrateEncryptionKeyRotationLeader(w *wrangler.Context) error {
 	}
 
 	cm.Data[encryptionKeyRotationStatusMigratedKey] = "true"
+	return createOrUpdateConfigMap(w.Core.ConfigMap(), cm)
+}
+
+func migrateMachinePoolsDynamicSchemaLabel(w *wrangler.Context) error {
+	cm, err := getConfigMap(w.Core.ConfigMap(), migrateDynamicSchemaToMachinePools)
+	if err != nil || cm == nil {
+		return err
+	}
+
+	if cm.Data[dynamicSchemaMachinePoolsMigratedKey] == "true" {
+		return nil
+	}
+
+	mgmtClusters, err := w.Mgmt.Cluster().List(metav1.ListOptions{})
+	if err != nil {
+		return err
+	}
+
+	for _, mgmtCluster := range mgmtClusters.Items {
+		provClusters, err := w.Provisioning.Cluster().List(mgmtCluster.Spec.FleetWorkspaceName, metav1.ListOptions{})
+		if k8serror.IsNotFound(err) || len(provClusters.Items) == 0 {
+			continue
+		} else if err != nil {
+			return err
+		}
+		for _, provCluster := range provClusters.Items {
+			if provCluster.Spec.RKEConfig == nil {
+				continue
+			}
+			// search for machine pools without the `dynamic-schema-spec` annotation and apply it
+			for i, machinePool := range provCluster.Spec.RKEConfig.MachinePools {
+				var spec v32.DynamicSchemaSpec
+				if machinePool.DynamicSchemaSpec != "" && json.Unmarshal([]byte(machinePool.DynamicSchemaSpec), &spec) == nil {
+					continue
+				}
+				nodeConfig := machinePool.NodeConfig
+				if nodeConfig == nil {
+					return fmt.Errorf("machine pool node config must not be nil")
+				}
+				ds, err := w.Mgmt.DynamicSchema().Get(strings.ToLower(nodeConfig.Kind), metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+				specJSON, err := json.Marshal(ds.Spec)
+				if err != nil {
+					return err
+				}
+				provCluster.Spec.RKEConfig.MachinePools[i].DynamicSchemaSpec = string(specJSON)
+			}
+			_, err = w.Provisioning.Cluster().Update(&provCluster)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	cm.Data[dynamicSchemaMachinePoolsMigratedKey] = "true"
 	return createOrUpdateConfigMap(w.Core.ConfigMap(), cm)
 }
 
