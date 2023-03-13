@@ -15,14 +15,15 @@ import (
 )
 
 func newMockUserControllersController(starter *simpleControllerStarter) *userControllersController {
+	mockClusterController := &fakes.ClusterControllerMock{
+		EnqueueFunc: func(namespace string, name string) {},
+	}
 	return &userControllersController{
 		starter:       starter,
 		clusterLister: &fakes.ClusterListerMock{},
 		clusters: &fakes.ClusterInterfaceMock{
 			ControllerFunc: func() v3.ClusterController {
-				return &fakes.ClusterControllerMock{
-					EnqueueFunc: func(namespace string, name string) {},
-				}
+				return mockClusterController
 			},
 			UpdateFunc: func(c *apimgmtv3.Cluster) (*apimgmtv3.Cluster, error) {
 				if c.Name == "bad cluster" {
@@ -112,10 +113,9 @@ func TestClusterControllerFailsToRestart(t *testing.T) {
 
 	obj, err := controller.sync("", cluster)
 	require.Error(t, err)
-	require.NotNil(t, obj)
+	require.Nil(t, obj)
 	assert.True(t, starter.stopCalled)
 	assert.False(t, starter.startCalled)
-	assert.Equal(t, "1.22.0", obj.(*v3.Cluster).Annotations[currentClusterControllersVersion])
 }
 
 func TestClusterWithoutControllersVersionAnnotationGetsUpdated(t *testing.T) {
@@ -210,4 +210,52 @@ func TestClusterControllersWereStoppedAndStartedOnVersionChange(t *testing.T) {
 		assert.True(t, starter.startCalled)
 		assert.True(t, starter.stopCalled)
 	})
+}
+
+func TestClusterControllerEnqueuesControllers(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name    string
+		cluster *v3.Cluster
+	}{
+		{
+			name:    "nil cluster enqueues all controllers",
+			cluster: nil,
+		},
+		{
+			name: "same version cluster enqueues all controllers",
+			cluster: &v3.Cluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "my-cluster",
+					Annotations: map[string]string{currentClusterControllersVersion: "1.23.4"},
+				},
+				Status: apimgmtv3.ClusterStatus{
+					Version: &version.Info{GitVersion: "1.23.4"},
+				},
+			},
+		},
+		{
+			name: "new cluster enqueues all controllers",
+			cluster: &v3.Cluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "my-cluster",
+					Annotations: map[string]string{},
+				},
+				Status: apimgmtv3.ClusterStatus{
+					Version: &version.Info{GitVersion: "1.23.4"},
+				},
+			},
+		},
+	}
+	for _, test := range tests {
+		test := test
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			starter := simpleControllerStarter{}
+			controller := newMockUserControllersController(&starter)
+			_, err := controller.sync("", test.cluster)
+			require.NoError(t, err)
+			assert.Equal(t, 1, len(controller.clusters.Controller().(*fakes.ClusterControllerMock).EnqueueCalls()))
+		})
+	}
 }
