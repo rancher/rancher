@@ -39,6 +39,10 @@ resource "azurerm_kubernetes_cluster" "default" {
     client_secret = "secret_placeholder"
   }
 
+  identity {
+    tenant = "tenant_placeholder"
+  }
+
   tags = {
     environment = "automation"
   }

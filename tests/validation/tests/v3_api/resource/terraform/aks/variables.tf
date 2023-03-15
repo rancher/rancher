@@ -1,6 +1,6 @@
 variable "kubernetes_version" {
   description = "Azure Kubernetes Cluster K8s version"
-  default = "1.23.5"
+  default = "1.24.9"
 }
 
 variable "location" {
