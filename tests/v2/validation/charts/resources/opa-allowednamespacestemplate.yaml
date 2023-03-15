@@ -1,0 +1,27 @@
+apiVersion: templates.gatekeeper.sh/v1beta1
+kind: ConstraintTemplate
+metadata:
+  name: k8sallowednamespaces
+spec:
+  crd:
+    spec:
+      names:
+        kind: K8sAllowedNamespaces
+      validation:
+        # Schema for the `parameters` field
+        openAPIV3Schema:
+          properties:
+            namespaces:
+              type: array
+              items: string
+  targets:
+    - target: admission.k8s.gatekeeper.sh
+      rego: |
+        package k8sallowednamespaces
+
+        violation[{"msg": msg, "details": msg}] {
+          ns := input.review.object.metadata.name
+          allowed := { allowed_ns | allowed_ns := input.parameters.namespaces[_] }
+          not allowed[ns]
+          msg := sprintf("Namespace not allowed: %v must be one of %v", [ns, allowed])
+        }

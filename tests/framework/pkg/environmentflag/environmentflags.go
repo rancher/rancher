@@ -9,6 +9,7 @@ type EnvironmentFlag int
 // And run `go generate` in the tests/framework/pkg/environmentflag directory.
 const (
 	Ingress EnvironmentFlag = iota
+	GatekeeperAllowedNamespaces
 	Chart
 	UpgradeAllClusters
 	environmentFlagLastItem // This is used to determine the number of items in the enum
