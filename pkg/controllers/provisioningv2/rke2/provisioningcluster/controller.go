@@ -182,7 +182,7 @@ func (h *handler) OnChange(_ string, cluster *rancherv1.Cluster) (*rancherv1.Clu
 			continue
 		}
 		// if the field is empty or invalid, add to any machine pools that do not have it and update the cluster
-		cluster = cluster.DeepCopy()
+		clusterCopy := cluster.DeepCopy()
 		for j := i; j < len(cluster.Spec.RKEConfig.MachinePools); j++ {
 			machinePool := cluster.Spec.RKEConfig.MachinePools[j]
 			spec = apimgmtv3.DynamicSchemaSpec{}
@@ -201,9 +201,9 @@ func (h *handler) OnChange(_ string, cluster *rancherv1.Cluster) (*rancherv1.Clu
 			if err != nil {
 				return cluster, err
 			}
-			cluster.Spec.RKEConfig.MachinePools[j].DynamicSchemaSpec = string(specJSON)
+			clusterCopy.Spec.RKEConfig.MachinePools[j].DynamicSchemaSpec = string(specJSON)
 		}
-		return h.clusterController.Update(cluster)
+		return h.clusterController.Update(clusterCopy)
 	}
 	return cluster, nil
 }
