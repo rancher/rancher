@@ -73,6 +73,19 @@ func (p *ldapProvider) loginUser(credential *v32.BasicLogin, config *v3.LdapConf
 		fmt.Sprintf("(%v=%v)", ObjectClass, config.UserObjectClass),
 		operationalAttrList, nil)
 	opResult, err := lConn.Search(searchOpRequest)
+
+	// If no object is found, try again using the service account
+	if err != nil && ldapv3.IsErrorWithCode(err, ldapv3.LDAPResultNoSuchObject) {
+		// Re-bind the service account
+		err = ldap.AuthenticateServiceAccountUser(serviceAccountPassword, serviceAccountUserName, "", lConn)
+		if err != nil {
+			return v3.Principal{}, nil, httperror.WrapAPIError(err, httperror.Unauthorized, "authentication failed")
+		}
+
+		// Re-execute the search
+		opResult, err = lConn.Search(searchOpRequest)
+	}
+
 	if err != nil {
 		return v3.Principal{}, nil, httperror.WrapAPIError(err, httperror.Unauthorized, "authentication failed") // need to reload this error
 	}
