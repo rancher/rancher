@@ -69,6 +69,7 @@ rules:
   - ""
   resources:
   - namespaces
+  - services
   verbs:
   - list
   - get
@@ -89,6 +90,15 @@ rules:
   - batch
   resources:
   - jobs
+  verbs:
+  - list
+  - get
+  - delete
+- apiGroups:
+  - admissionregistration.k8s.io
+  resources:
+  - mutatingwebhookconfigurations
+  - validatingwebhookconfigurations
   verbs:
   - list
   - get
