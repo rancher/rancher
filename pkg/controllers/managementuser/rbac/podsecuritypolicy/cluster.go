@@ -64,6 +64,14 @@ func (m *clusterManager) sync(key string, obj *v3.Cluster) (runtime.Object, erro
 	err := checkClusterVersion(m.clusterName, m.clusterLister)
 	if err != nil {
 		if errors.Is(err, errVersionIncompatible) {
+			if obj.Status.AppliedPodSecurityPolicyTemplateName != "" {
+				obj = obj.DeepCopy()
+				obj.Status.AppliedPodSecurityPolicyTemplateName = ""
+				obj, err = m.clusters.Update(obj)
+				if err != nil {
+					return nil, fmt.Errorf("error updating cluster: %v", err)
+				}
+			}
 			return obj, nil
 		}
 		return obj, fmt.Errorf(clusterVersionCheckErrorString, err)
@@ -143,6 +151,7 @@ func (m *clusterManager) sync(key string, obj *v3.Cluster) (runtime.Object, erro
 			}
 		}
 
+		obj = obj.DeepCopy()
 		obj.Status.AppliedPodSecurityPolicyTemplateName = obj.Spec.DefaultPodSecurityPolicyTemplateName
 		_, err = m.clusters.Update(obj)
 		if err != nil {
