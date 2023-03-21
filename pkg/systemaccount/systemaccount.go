@@ -124,19 +124,23 @@ func (s *Manager) GetOrCreateSystemClusterToken(clusterName string) (string, err
 	return token, nil
 }
 
-func (s *Manager) GetOrCreateProjectSystemAccount(projectID string) error {
+// EnsureProjectSystemAccount attempts to get the project system user and a
+// ProjectRoleTemplateBinding of the format "<user>-member". These will be
+// created if they do not exist. Users will be returned if the existence of
+// both have been ensured.
+func (s *Manager) EnsureProjectSystemAccount(projectID string) (*v3.User, error) {
 	_, projectName := ref.Parse(projectID)
 
-	u, err := s.GetProjectSystemUser(projectName)
+	u, err := s.EnsureProjectSystemUser(projectName)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	bindingName := u.Name + "-member"
 	_, err = s.prtbLister.Get(projectName, bindingName)
 	if err != nil {
 		if !errors2.IsNotFound(err) {
-			return err
+			return nil, err
 		}
 		// prtb does not exist in cache, attempt to create it
 		prtb := &v3.ProjectRoleTemplateBinding{
@@ -149,13 +153,14 @@ func (s *Manager) GetOrCreateProjectSystemAccount(projectID string) error {
 			RoleTemplateName: projectMemberRole,
 		}
 		if _, err := s.prtbs.Create(prtb); err != nil && !errors2.IsAlreadyExists(err) {
-			return err
+			return nil, err
 		}
 	}
-	return nil
+	return u, nil
 }
 
-func (s *Manager) GetProjectSystemUser(projectName string) (*v3.User, error) {
+// EnsureProjectSystemUser Ensures the existence of the system user for a given project.
+func (s *Manager) EnsureProjectSystemUser(projectName string) (*v3.User, error) {
 	return s.userManager.EnsureUser(fmt.Sprintf("system://%s", projectName), ProjectSystemAccountPrefix+projectName)
 }
 
@@ -167,7 +172,7 @@ func (s *Manager) GetProjectPipelineSystemToken(projectName string) (*v3.Token, 
 // if one does not exist. If a token already exists, it's value will be overwritten with a
 // new token.
 func (s *Manager) CreateProjectPipelineSystemToken(projectName string) (string, error) {
-	user, err := s.GetProjectSystemUser(projectName)
+	user, err := s.EnsureProjectSystemUser(projectName)
 	if err != nil {
 		return "", err
 	}
@@ -176,7 +181,7 @@ func (s *Manager) CreateProjectPipelineSystemToken(projectName string) (string, 
 }
 
 func (s *Manager) CreateProjectHelmSystemToken(projectName string) (string, error) {
-	user, err := s.GetProjectSystemUser(projectName)
+	user, err := s.EnsureProjectSystemUser(projectName)
 	if err != nil {
 		return "", err
 	}

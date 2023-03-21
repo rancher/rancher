@@ -139,7 +139,7 @@ func (ph *projectHandler) doSync(project *mgmtv3.Project, clusterName string) er
 }
 
 func (ph *projectHandler) ensureAppProjectName(appTargetNamespace string, project *mgmtv3.Project) (string, error) {
-	creator, err := ph.app.systemAccountManager.GetProjectSystemUser(project.Name)
+	creator, err := ph.app.systemAccountManager.EnsureProjectSystemUser(project.Name)
 	if err != nil {
 		return "", err
 	}
@@ -212,7 +212,7 @@ func (ph *projectHandler) deployApp(appName, appTargetNamespace string, appProje
 		appAnswers["prometheus.sync.path"] = "/api/v1/read"
 	}
 
-	creator, err := ph.app.systemAccountManager.GetProjectSystemUser(project.Name)
+	creator, err := ph.app.systemAccountManager.EnsureProjectSystemAccount(project.Name)
 	if err != nil {
 		return err
 	}
