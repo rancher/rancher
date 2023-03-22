@@ -10,6 +10,7 @@ import (
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
 	v1 "github.com/rancher/rancher/tests/framework/clients/rancher/v1"
 	"github.com/rancher/rancher/tests/framework/extensions/clusters"
+	hardening "github.com/rancher/rancher/tests/framework/extensions/hardening/rke2"
 	"github.com/rancher/rancher/tests/framework/extensions/tokenregistration"
 	"github.com/rancher/rancher/tests/framework/extensions/users"
 	password "github.com/rancher/rancher/tests/framework/extensions/users/passwordgenerator"
@@ -30,6 +31,7 @@ type CustomClusterProvisioningTestSuite struct {
 	client             *rancher.Client
 	session            *session.Session
 	standardUserClient *rancher.Client
+	provisioning       *provisioning.Config
 	kubernetesVersions []string
 	cnis               []string
 	nodeProviders      []string
@@ -49,6 +51,7 @@ func (c *CustomClusterProvisioningTestSuite) SetupSuite() {
 	c.kubernetesVersions = clustersConfig.RKE2KubernetesVersions
 	c.cnis = clustersConfig.CNIs
 	c.nodeProviders = clustersConfig.NodeProviders
+	c.provisioning = clustersConfig
 
 	client, err := rancher.NewClient("", testSession)
 	require.NoError(c.T(), err)
@@ -91,17 +94,18 @@ func (c *CustomClusterProvisioningTestSuite) TestProvisioningRKE2CustomCluster()
 		name         string
 		client       *rancher.Client
 		nodeRoles    []string
+		hardening    *provisioning.Config
 		nodeCountWin int
 		hasWindows   bool
 	}{
-		{"1 Node all roles Admin User", c.client, nodeRoles0, 0, false},
-		{"1 Node all roles Standard User", c.standardUserClient, nodeRoles0, 0, false},
-		{"3 nodes - 1 role per node Admin User", c.client, nodeRoles1, 0, false},
-		{"3 nodes - 1 role per node Standard User", c.standardUserClient, nodeRoles1, 0, false},
-		{"1 Node all roles Admin User + 1 Windows Worker", c.client, nodeRoles0, 1, true},
-		{"1 Node all roles Standard User + 1 Windows Worker", c.standardUserClient, nodeRoles0, 1, true},
-		{"3 nodes - 1 role per node Admin User + 2 Windows Workers", c.client, nodeRoles1, 2, true},
-		{"3 nodes - 1 role per node Standard User + 2 Windows Workers", c.standardUserClient, nodeRoles1, 2, true},
+		{"1 Node all roles Admin User", c.client, nodeRoles0, c.provisioning, 0, false},
+		{"1 Node all roles Standard User", c.standardUserClient, nodeRoles0, c.provisioning, 0, false},
+		{"3 nodes - 1 role per node Admin User", c.client, nodeRoles1, c.provisioning, 0, false},
+		{"3 nodes - 1 role per node Standard User", c.standardUserClient, nodeRoles1, c.provisioning, 0, false},
+		{"1 Node all roles Admin User + 1 Windows Worker", c.client, nodeRoles0, c.provisioning, 1, true},
+		{"1 Node all roles Standard User + 1 Windows Worker", c.standardUserClient, nodeRoles0, c.provisioning, 1, true},
+		{"3 nodes - 1 role per node Admin User + 2 Windows Workers", c.client, nodeRoles1, c.provisioning, 2, true},
+		{"3 nodes - 1 role per node Standard User + 2 Windows Workers", c.standardUserClient, nodeRoles1, c.provisioning, 2, true},
 	}
 	var name string
 	for _, tt := range tests {
@@ -118,7 +122,7 @@ func (c *CustomClusterProvisioningTestSuite) TestProvisioningRKE2CustomCluster()
 				for _, cni := range c.cnis {
 					name += " cni: " + cni
 					c.Run(name, func() {
-						c.testProvisioningRKE2CustomCluster(client, externalNodeProvider, tt.nodeRoles, kubeVersion, cni, tt.nodeCountWin, tt.hasWindows)
+						c.testProvisioningRKE2CustomCluster(client, externalNodeProvider, tt.nodeRoles, kubeVersion, cni, tt.hardening, tt.nodeCountWin, tt.hasWindows)
 					})
 				}
 			}
@@ -154,13 +158,14 @@ func (c *CustomClusterProvisioningTestSuite) TestProvisioningRKE2CustomClusterDy
 	tests := []struct {
 		name         string
 		client       *rancher.Client
+		hardening    *provisioning.Config
 		nodeCountWin int
 		hasWindows   bool
 	}{
-		{"Admin User", c.client, 0, false},
-		{"Standard User", c.standardUserClient, 0, false},
-		{"Admin User + 1 Windows Worker", c.client, 1, false},
-		{"Standard User + 1 Windows Worker", c.standardUserClient, 1, false},
+		{"Admin User", c.client, c.provisioning, 0, false},
+		{"Standard User", c.standardUserClient, c.provisioning, 0, false},
+		{"Admin User + 1 Windows Worker", c.client, c.provisioning, 1, false},
+		{"Standard User + 1 Windows Worker", c.standardUserClient, c.provisioning, 1, false},
 	}
 	var name string
 	for _, tt := range tests {
@@ -177,7 +182,7 @@ func (c *CustomClusterProvisioningTestSuite) TestProvisioningRKE2CustomClusterDy
 				for _, cni := range c.cnis {
 					name += " cni: " + cni
 					c.Run(name, func() {
-						c.testProvisioningRKE2CustomCluster(client, externalNodeProvider, rolesPerNode, kubeVersion, cni, tt.nodeCountWin, tt.hasWindows)
+						c.testProvisioningRKE2CustomCluster(client, externalNodeProvider, rolesPerNode, kubeVersion, cni, tt.hardening, tt.nodeCountWin, tt.hasWindows)
 					})
 				}
 			}
@@ -185,7 +190,7 @@ func (c *CustomClusterProvisioningTestSuite) TestProvisioningRKE2CustomClusterDy
 	}
 }
 
-func (c *CustomClusterProvisioningTestSuite) testProvisioningRKE2CustomCluster(client *rancher.Client, externalNodeProvider provisioning.ExternalNodeProvider, nodesAndRoles []string, kubeVersion, cni string, nodeCountWin int, hasWindows bool) {
+func (c *CustomClusterProvisioningTestSuite) testProvisioningRKE2CustomCluster(client *rancher.Client, externalNodeProvider provisioning.ExternalNodeProvider, nodesAndRoles []string, kubeVersion, cni string, harden *provisioning.Config, nodeCountWin int, hasWindows bool) {
 	numNodesLin := len(nodesAndRoles)
 
 	linuxNodes, winNodes, err := externalNodeProvider.NodeCreationFunc(client, numNodesLin, nodeCountWin, hasWindows)
@@ -264,6 +269,20 @@ func (c *CustomClusterProvisioningTestSuite) testProvisioningRKE2CustomCluster(c
 	clusterToken, err := clusters.CheckServiceAccountTokenSecret(client, clusterName)
 	require.NoError(c.T(), err)
 	assert.NotEmpty(c.T(), clusterToken)
+
+	if harden.Hardened {
+		err = hardening.HardeningNodes(client, harden.Hardened, linuxNodes, nodesAndRoles)
+		require.NoError(c.T(), err)
+
+		hardenCluster := clusters.HardenK3SRKE2ClusterConfig(clusterName, namespace, "", "", kubeVersion, nil)
+
+		hardenClusterResp, err := clusters.UpdateK3SRKE2Cluster(client, clusterResp, hardenCluster)
+		require.NoError(c.T(), err)
+		assert.Equal(c.T(), clusterName, hardenClusterResp.ObjectMeta.Name)
+
+		err = hardening.PostHardeningConfig(client, harden.Hardened, linuxNodes, nodesAndRoles)
+		require.NoError(c.T(), err)
+	}
 }
 
 // In order for 'go test' to run this suite, we need to create
