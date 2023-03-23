@@ -6,7 +6,7 @@ import time
 from lib.aws import AWS_USER
 from .common import (
     ADMIN_PASSWORD, AmazonWebServices, run_command, wait_for_status_code,
-    TEST_IMAGE, TEST_IMAGE_NGINX, TEST_IMAGE_OS_BASE, readDataFile,
+    TEST_IMAGE, TEST_IMAGE_REDIS, TEST_IMAGE_OS_BASE, readDataFile,
     DEFAULT_CLUSTER_STATE_TIMEOUT, compare_versions
 )
 from .test_custom_host_reg import (
@@ -23,7 +23,7 @@ PRIVATE_REGISTRY_PASSWORD = \
 BASTION_ID = os.environ.get("RANCHER_BASTION_ID", "")
 NUMBER_OF_INSTANCES = int(os.environ.get("RANCHER_AIRGAP_INSTANCE_COUNT", "1"))
 IMAGE_LIST = os.environ.get("RANCHER_IMAGE_LIST", ",".join(
-    [TEST_IMAGE, TEST_IMAGE_NGINX, TEST_IMAGE_OS_BASE])).split(",")
+    [TEST_IMAGE, TEST_IMAGE_REDIS, TEST_IMAGE_OS_BASE])).split(",")
 TARBALL_TYPE = os.environ.get("K3S_TARBALL_TYPE", "tar.gz")
 ARCH = os.environ.get("K3S_ARCH", "amd64")
 
