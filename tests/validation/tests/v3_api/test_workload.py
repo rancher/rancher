@@ -32,7 +32,7 @@ def test_wl_sidekick():
     validate_workload(p_client, workload, "deployment", ns.name)
 
     side_con = {"name": "test2",
-                "image": TEST_IMAGE_NGINX,
+                "image": TEST_IMAGE_REDIS,
                 "stdin": True,
                 "tty": True}
     con.append(side_con)
@@ -121,16 +121,16 @@ def test_wl_upgrade():
             firstrevision = revision.id
 
     con = [{"name": "test1",
-            "image": TEST_IMAGE_NGINX}]
+            "image": TEST_IMAGE_REDIS}]
     p_client.update(workload, containers=con)
-    wait_for_pod_images(p_client, workload, ns.name, TEST_IMAGE_NGINX, 2)
+    wait_for_pod_images(p_client, workload, ns.name, TEST_IMAGE_REDIS, 2)
     wait_for_pods_in_workload(p_client, workload, 2)
     validate_workload(p_client, workload, "deployment", ns.name, 2)
-    validate_workload_image(p_client, workload, TEST_IMAGE_NGINX, ns)
+    validate_workload_image(p_client, workload, TEST_IMAGE_REDIS, ns)
     revisions = workload.revisions()
     assert len(revisions) == 2
     for revision in revisions:
-        if revision["containers"][0]["image"] == TEST_IMAGE_NGINX:
+        if revision["containers"][0]["image"] == TEST_IMAGE_REDIS:
             secondrevision = revision.id
 
     con = [{"name": "test1",
@@ -155,10 +155,10 @@ def test_wl_upgrade():
     validate_workload_image(p_client, workload, TEST_IMAGE, ns)
 
     p_client.action(workload, "rollback", replicaSetId=secondrevision)
-    wait_for_pod_images(p_client, workload, ns.name, TEST_IMAGE_NGINX, 2)
+    wait_for_pod_images(p_client, workload, ns.name, TEST_IMAGE_REDIS, 2)
     wait_for_pods_in_workload(p_client, workload, 2)
     validate_workload(p_client, workload, "deployment", ns.name, 2)
-    validate_workload_image(p_client, workload, TEST_IMAGE_NGINX, ns)
+    validate_workload_image(p_client, workload, TEST_IMAGE_REDIS, ns)
 
     p_client.action(workload, "rollback", replicaSetId=thirdrevision)
     wait_for_pod_images(p_client, workload, ns.name, TEST_IMAGE_OS_BASE, 2)
@@ -242,14 +242,14 @@ def test_wl_pause_orchestration():
     p_client.action(workload, "pause")
     validate_workload_paused(p_client, workload, True)
     con = [{"name": "test1",
-            "image": TEST_IMAGE_NGINX}]
+            "image": TEST_IMAGE_REDIS}]
     p_client.update(workload, containers=con)
     validate_pod_images(TEST_IMAGE, workload, ns.name)
     p_client.action(workload, "resume")
     workload = wait_for_wl_to_active(p_client, workload)
     wait_for_pods_in_workload(p_client, workload, 2)
     validate_workload_paused(p_client, workload, False)
-    validate_pod_images(TEST_IMAGE_NGINX, workload, ns.name)
+    validate_pod_images(TEST_IMAGE_REDIS, workload, ns.name)
 
 
 # Windows could not support host port for now.
