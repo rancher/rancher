@@ -45,7 +45,7 @@ func HardeningNodes(client *rancher.Client, hardened bool, nodes []*nodes.Node, 
 				return nil
 			}
 
-			dirPath := filepath.Join(user.HomeDir, "go/src/github.com/rancher/rancher/tests/framework/extensions/hardening/rke2")
+			dirPath := filepath.Join(user.HomeDir, "go/src/github.com/rancher/rancher/tests/framework/extensions/hardening/k3s")
 			err = node.SCPFileToNode(dirPath+"/audit.yaml", "/home/"+node.SSHUser+"/audit.yaml")
 			if err != nil {
 				return err
