@@ -9,6 +9,7 @@ import (
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
 	"github.com/rancher/rancher/tests/framework/extensions/clusters"
 	"github.com/rancher/rancher/tests/framework/extensions/machinepools"
+	nodestat "github.com/rancher/rancher/tests/framework/extensions/nodes"
 	"github.com/rancher/rancher/tests/framework/extensions/users"
 	password "github.com/rancher/rancher/tests/framework/extensions/users/passwordgenerator"
 	"github.com/rancher/rancher/tests/framework/extensions/workloads/pods"
@@ -131,6 +132,7 @@ func (r *RKE2NodeDriverProvisioningTestSuite) TestProvisioningRKE2Cluster() {
 
 		for _, providerName := range r.providers {
 			provider := CreateProvider(providerName)
+			providerName := " Node Provider: " + provider.Name
 			for _, kubeVersion := range r.kubernetesVersions {
 				name = tt.name + providerName + " Kubernetes version: " + kubeVersion
 				for _, cni := range r.cnis {
@@ -171,6 +173,7 @@ func (r *RKE2NodeDriverProvisioningTestSuite) TestProvisioningRKE2ClusterDynamic
 
 		for _, providerName := range r.providers {
 			provider := CreateProvider(providerName)
+			providerName := " Node Provider: " + provider.Name
 			for _, kubeVersion := range r.kubernetesVersions {
 				name = tt.name + providerName + " Kubernetes version: " + kubeVersion
 				for _, cni := range r.cnis {
@@ -215,15 +218,19 @@ func (r *RKE2NodeDriverProvisioningTestSuite) testProvisioningRKE2Cluster(client
 	err = wait.WatchWait(result, checkFunc)
 	assert.NoError(r.T(), err)
 	assert.Equal(r.T(), clusterName, clusterResp.ObjectMeta.Name)
+	assert.Equal(r.T(), kubeVersion, cluster.Spec.KubernetesVersion)
+
+	clusterIDName, err := clusters.GetClusterIDByName(r.client, clusterName)
+	assert.NoError(r.T(), err)
+
+	err = nodestat.IsNodeReady(client, clusterIDName)
+	require.NoError(r.T(), err)
 
 	clusterToken, err := clusters.CheckServiceAccountTokenSecret(client, clusterName)
 	require.NoError(r.T(), err)
 	assert.NotEmpty(r.T(), clusterToken)
 
-	clusterID, err := clusters.GetClusterIDByName(r.client, clusterName)
-	assert.NoError(r.T(), err)
-
-	podResults, podErrors := pods.StatusPods(client, clusterID)
+	podResults, podErrors := pods.StatusPods(client, clusterIDName)
 	assert.NotEmpty(r.T(), podResults)
 	assert.Empty(r.T(), podErrors)
 }

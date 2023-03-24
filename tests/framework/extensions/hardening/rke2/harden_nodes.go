@@ -1,10 +1,13 @@
 package hardening
 
 import (
+	"os/user"
+	"path/filepath"
+	"strings"
+
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	"github.com/rancher/rancher/tests/framework/pkg/nodes"
 	"github.com/sirupsen/logrus"
-	"strings"
 )
 
 func HardeningNodes(client *rancher.Client, hardened bool, nodes []*nodes.Node, nodeRoles []string) error {
@@ -42,14 +45,19 @@ func HardeningNodes(client *rancher.Client, hardened bool, nodes []*nodes.Node, 
 
 func PostHardeningConfig(client *rancher.Client, hardened bool, nodes []*nodes.Node, nodeRoles []string) error {
 	for key, node := range nodes {
-
 		if strings.Contains(nodeRoles[key], "--controlplane") {
-			dir_local := "/go/src/github.com/rancher/rancher/tests/framework/extensions/hardening/rke2"
-			err := node.SCPFileToNode(dir_local+"/account-update.yaml", "/home/"+node.SSHUser+"/account-update.yaml")
+			logrus.Infof("Copying over files to node %s", node.NodeID)
+			user, err := user.Current()
+			if err != nil {
+				return nil
+			}
+
+			dirPath := filepath.Join(user.HomeDir, "go/src/github.com/rancher/rancher/tests/framework/extensions/hardening/rke2")
+			err = node.SCPFileToNode(dirPath+"/account-update.yaml", "/home/"+node.SSHUser+"/account-update.yaml")
 			if err != nil {
 				return err
 			}
-			err = node.SCPFileToNode(dir_local+"/account-update.sh", "/home/"+node.SSHUser+"/account-update.sh")
+			err = node.SCPFileToNode(dirPath+"/account-update.sh", "/home/"+node.SSHUser+"/account-update.sh")
 			if err != nil {
 				return err
 			}
