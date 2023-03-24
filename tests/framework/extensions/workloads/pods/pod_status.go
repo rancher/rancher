@@ -5,6 +5,7 @@ import (
 
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	v1 "github.com/rancher/rancher/tests/framework/clients/rancher/v1"
+	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 )
 
@@ -15,7 +16,6 @@ const (
 // StatusPods is a helper function that uses the steve client to list pods on a namespace for a specific cluster
 // and return the statuses in a list of strings
 func StatusPods(client *rancher.Client, clusterID string) ([]string, []error) {
-
 	downstreamClient, err := client.Steve.ProxyDownstream(clusterID)
 	if err != nil {
 		return nil, []error{err}
@@ -30,7 +30,8 @@ func StatusPods(client *rancher.Client, clusterID string) ([]string, []error) {
 
 	var podResults []string
 	var podErrors []error
-	podResults = append(podResults, "pods Status:\n")
+
+	podResults = append(podResults, "Pod's Status: \n")
 
 	for _, pod := range pods.Data {
 		podStatus := &corev1.PodStatus{}
@@ -42,9 +43,12 @@ func StatusPods(client *rancher.Client, clusterID string) ([]string, []error) {
 		phase := podStatus.Phase
 		if phase == corev1.PodFailed || phase == corev1.PodUnknown {
 			podErrors = append(podErrors, fmt.Errorf("ERROR: %s: %s", pod.Name, podStatus))
-		} else {
+			logrus.Infof("%Pod %s is not in an active state", pod.Name)
+		} else if phase == corev1.PodRunning {
 			podResults = append(podResults, fmt.Sprintf("INFO: %s: %s\n", pod.Name, podStatus))
+			logrus.Infof("Pod %s is in an active state!", pod.Name)
 		}
 	}
+
 	return podResults, podErrors
 }

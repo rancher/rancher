@@ -11,9 +11,11 @@ import (
 	v1 "github.com/rancher/rancher/tests/framework/clients/rancher/v1"
 	"github.com/rancher/rancher/tests/framework/extensions/clusters"
 	hardening "github.com/rancher/rancher/tests/framework/extensions/hardening/k3s"
+	nodestat "github.com/rancher/rancher/tests/framework/extensions/nodes"
 	"github.com/rancher/rancher/tests/framework/extensions/tokenregistration"
 	"github.com/rancher/rancher/tests/framework/extensions/users"
 	password "github.com/rancher/rancher/tests/framework/extensions/users/passwordgenerator"
+	"github.com/rancher/rancher/tests/framework/extensions/workloads/pods"
 	"github.com/rancher/rancher/tests/framework/pkg/config"
 	namegen "github.com/rancher/rancher/tests/framework/pkg/namegenerator"
 	"github.com/rancher/rancher/tests/framework/pkg/session"
@@ -31,9 +33,9 @@ type CustomClusterProvisioningTestSuite struct {
 	client             *rancher.Client
 	session            *session.Session
 	standardUserClient *rancher.Client
-	provisioning       *provisioning.Config
 	kubernetesVersions []string
 	nodeProviders      []string
+	hardened           bool
 }
 
 func (c *CustomClusterProvisioningTestSuite) TearDownSuite() {
@@ -49,7 +51,7 @@ func (c *CustomClusterProvisioningTestSuite) SetupSuite() {
 
 	c.kubernetesVersions = clustersConfig.K3SKubernetesVersions
 	c.nodeProviders = clustersConfig.NodeProviders
-	c.provisioning = clustersConfig
+	c.hardened = clustersConfig.Hardened
 
 	client, err := rancher.NewClient("", testSession)
 	require.NoError(c.T(), err)
@@ -91,13 +93,12 @@ func (c *CustomClusterProvisioningTestSuite) TestProvisioningK3SCustomCluster() 
 	tests := []struct {
 		name      string
 		nodeRoles []string
-		hardening *provisioning.Config
 		client    *rancher.Client
 	}{
-		{"1 Node all roles Admin User", nodeRoles0, c.provisioning, c.client},
-		{"1 Node all roles Standard User", nodeRoles0, c.provisioning, c.standardUserClient},
-		{"3 nodes - 1 role per node Admin User", nodeRoles1, c.provisioning, c.client},
-		{"3 nodes - 1 role per node Standard User", nodeRoles1, c.provisioning, c.standardUserClient},
+		{"1 Node all roles Admin User", nodeRoles0, c.client},
+		{"1 Node all roles Standard User", nodeRoles0, c.standardUserClient},
+		{"3 nodes - 1 role per node Admin User", nodeRoles1, c.client},
+		{"3 nodes - 1 role per node Standard User", nodeRoles1, c.standardUserClient},
 	}
 	var name string
 	for _, tt := range tests {
@@ -112,7 +113,7 @@ func (c *CustomClusterProvisioningTestSuite) TestProvisioningK3SCustomCluster() 
 			for _, kubeVersion := range c.kubernetesVersions {
 				name = tt.name + " Kubernetes version: " + kubeVersion
 				c.Run(name, func() {
-					c.testProvisioningK3SCustomCluster(client, externalNodeProvider, tt.nodeRoles, kubeVersion, tt.hardening)
+					c.testProvisioningK3SCustomCluster(client, externalNodeProvider, tt.nodeRoles, kubeVersion)
 				})
 			}
 		}
@@ -145,12 +146,11 @@ func (c *CustomClusterProvisioningTestSuite) TestProvisioningK3SCustomClusterDyn
 	}
 
 	tests := []struct {
-		name      string
-		client    *rancher.Client
-		hardening *provisioning.Config
+		name   string
+		client *rancher.Client
 	}{
-		{"Admin User", c.client, c.provisioning},
-		{"Standard User", c.standardUserClient, c.provisioning},
+		{"Admin User", c.client},
+		{"Standard User", c.standardUserClient},
 	}
 	var name string
 	for _, tt := range tests {
@@ -165,14 +165,14 @@ func (c *CustomClusterProvisioningTestSuite) TestProvisioningK3SCustomClusterDyn
 			for _, kubeVersion := range c.kubernetesVersions {
 				name = tt.name + " Kubernetes version: " + kubeVersion
 				c.Run(name, func() {
-					c.testProvisioningK3SCustomCluster(client, externalNodeProvider, rolesPerNode, kubeVersion, tt.hardening)
+					c.testProvisioningK3SCustomCluster(client, externalNodeProvider, rolesPerNode, kubeVersion)
 				})
 			}
 		}
 	}
 }
 
-func (c *CustomClusterProvisioningTestSuite) testProvisioningK3SCustomCluster(client *rancher.Client, externalNodeProvider provisioning.ExternalNodeProvider, nodesAndRoles []string, kubeVersion string, harden *provisioning.Config) {
+func (c *CustomClusterProvisioningTestSuite) testProvisioningK3SCustomCluster(client *rancher.Client, externalNodeProvider provisioning.ExternalNodeProvider, nodesAndRoles []string, kubeVersion string) {
 	namespace := "fleet-default"
 
 	numNodes := len(nodesAndRoles)
@@ -221,13 +221,24 @@ func (c *CustomClusterProvisioningTestSuite) testProvisioningK3SCustomCluster(cl
 	err = wait.WatchWait(result, checkFunc)
 	assert.NoError(c.T(), err)
 	assert.Equal(c.T(), clusterName, clusterResp.ObjectMeta.Name)
+	assert.Equal(c.T(), kubeVersion, cluster.Spec.KubernetesVersion)
+
+	clusterIDName, err := clusters.GetClusterIDByName(c.client, clusterName)
+	assert.NoError(c.T(), err)
+
+	err = nodestat.IsNodeReady(client, clusterIDName)
+	require.NoError(c.T(), err)
 
 	clusterToken, err := clusters.CheckServiceAccountTokenSecret(client, clusterName)
 	require.NoError(c.T(), err)
 	assert.NotEmpty(c.T(), clusterToken)
 
-	if harden.Hardened && kubeVersion < "v1.25.0" {
-		err = hardening.HardeningNodes(client, harden.Hardened, nodes, nodesAndRoles)
+	podResults, podErrors := pods.StatusPods(client, clusterIDName)
+	assert.NotEmpty(c.T(), podResults)
+	assert.Empty(c.T(), podErrors)
+
+	if c.hardened && kubeVersion <= string(provisioning.HardenedKubeVersion) {
+		err = hardening.HardeningNodes(client, c.hardened, nodes, nodesAndRoles)
 		require.NoError(c.T(), err)
 
 		hardenCluster := clusters.HardenK3SRKE2ClusterConfig(clusterName, namespace, "", "", kubeVersion, nil)
