@@ -1,4 +1,4 @@
-package main
+package rkenodeconfigclient
 
 import (
 	"bytes"
@@ -8,12 +8,106 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
-	"github.com/stretchr/testify/assert"
 	"math/big"
 	"net"
 	"testing"
 	"time"
+
+	"github.com/rancher/rke/types"
+	"github.com/stretchr/testify/assert"
 )
+
+func TestFindCommandValue(t *testing.T) {
+	commands := []string{
+		"--hostname=test.com",
+		"--tls-cert-file=a-test-value",
+		"---abc=123",
+	}
+
+	type testcase struct {
+		testName string
+		flag     string
+		value    string
+	}
+
+	tests := []testcase{
+		{
+			testName: "successfully find flag in command arguments",
+			value:    "a-test-value",
+			flag:     "--tls-cert-file",
+		},
+		{
+			testName: "unsuccessfully find flag in command arguments",
+			value:    "",
+			flag:     "--not-a-flag",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.testName, func(t *testing.T) {
+			v := findCommandValue(tc.flag, commands)
+			if v != tc.value {
+				t.Logf("wanted %s, got %s", tc.value, v)
+				t.Fail()
+			}
+		})
+	}
+}
+
+func TestGetKubeletCertificateFilesFromProcess(t *testing.T) {
+
+	type testcase struct {
+		testName            string
+		processes           map[string]types.Process
+		privateKeyFileValue string
+		tlsCertFileValue    string
+		want                bool
+	}
+
+	testCases := []testcase{
+		{
+			testName: "successfully find kubelet arg",
+			processes: map[string]types.Process{
+				"kubelet": {
+					// rancher actually passes all args in the 'Command' field, since
+					// we use the entrypoint.sh file
+					Command: []string{
+						"--tls-private-key-file=/etc/kubernetes/ssl/a-private-key.pem",
+						"--tls-cert-file=/etc/kubernetes/ssl/a-private.pem",
+					},
+				},
+				"not-kubelet": {},
+			},
+			privateKeyFileValue: "/etc/kubernetes/ssl/a-private-key.pem",
+			tlsCertFileValue:    "/etc/kubernetes/ssl/a-private.pem",
+			want:                true,
+		},
+		{
+			testName: "unsuccessfully find kubelet arg",
+			processes: map[string]types.Process{
+				"kubelet": {
+					// rancher actually passes all args in the 'Command' field, since
+					// we use the entrypoint.sh file
+					Command: []string{},
+				},
+				"not-kubelet": {},
+			},
+			privateKeyFileValue: "a-private-key.pem",
+			tlsCertFileValue:    "a-private.pem",
+			want:                false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.testName, func(t *testing.T) {
+			privateKeyFileName, tlsCertFileName := getKubeletCertificateFilesFromProcess(tc.processes)
+			if (privateKeyFileName != tc.privateKeyFileValue || tlsCertFileName != tc.tlsCertFileValue) && tc.want {
+				t.Logf("wanted %s %s, got %s %s ", tc.tlsCertFileValue, tc.privateKeyFileValue, tlsCertFileName, privateKeyFileName)
+				t.Fail()
+			}
+		})
+	}
+}
 
 func TestKubeletCertificateNeedsRegeneration(t *testing.T) {
 
@@ -65,7 +159,7 @@ func TestKubeletCertificateNeedsRegeneration(t *testing.T) {
 	t.Log("successfully generated test certificate")
 	for _, c := range testCases {
 		t.Run(c.testName, func(t *testing.T) {
-			got, err := KubeletCertificateNeedsRegeneration(c.testIPAddress, c.testHostName, testCert, c.testTime)
+			got, err := kubeletCertificateNeedsRegeneration(c.testIPAddress, c.testHostName, testCert, c.testTime)
 			assert.Equal(t, nil, err)
 			assert.Equal(t, c.want, got)
 		})
