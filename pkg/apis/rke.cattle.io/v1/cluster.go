@@ -88,6 +88,8 @@ type DrainOptions struct {
 	Timeout int `json:"timeout"`
 	// SkipWaitForDeleteTimeoutSeconds If pod DeletionTimestamp older than N seconds, skip waiting for the pod.  Seconds must be greater than 0 to skip.
 	SkipWaitForDeleteTimeoutSeconds int `json:"skipWaitForDeleteTimeoutSeconds"`
+	// PodSelector for selecting pods to drain
+	PodSelector string `json:"podSelector"`
 
 	// PreDrainHooks A list of hooks to run prior to draining a node
 	PreDrainHooks []DrainHook `json:"preDrainHooks"`

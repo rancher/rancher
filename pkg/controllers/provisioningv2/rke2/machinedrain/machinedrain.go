@@ -16,6 +16,7 @@ import (
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/util/retry"
@@ -193,6 +194,11 @@ func (h *handler) getHelper(machine *capi.Machine, drainOpts rkev1.DrainOptions)
 		timeout = 600
 	}
 
+	podSelector, err := labels.Parse(drainOpts.PodSelector)
+	if err != nil {
+		return nil, nil, err
+	}
+
 	helper := &drain.Helper{
 		Ctx:                             h.ctx,
 		Client:                          k8s,
@@ -203,6 +209,7 @@ func (h *handler) getHelper(machine *capi.Machine, drainOpts rkev1.DrainOptions)
 		DeleteEmptyDirData:              drainOpts.DeleteEmptyDirData,
 		DisableEviction:                 drainOpts.DisableEviction,
 		SkipWaitForDeleteTimeoutSeconds: drainOpts.SkipWaitForDeleteTimeoutSeconds,
+		PodSelector:                     podSelector.String(),
 		Out:                             os.Stdout,
 		ErrOut:                          os.Stderr,
 	}
