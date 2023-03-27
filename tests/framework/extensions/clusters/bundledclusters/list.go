@@ -14,9 +14,16 @@ import (
 func (bc *BundledCluster) ListAvailableVersions(client *rancher.Client) (versions []string, err error) {
 	switch bc.Meta.Provider {
 	case clusters.KubernetesProviderRKE:
-		versions, err = available.ListRKE1AvailableVersions(client, bc.V3)
-		if err != nil {
-			return
+		if bc.Meta.IsImported {
+			versions, err = available.ListRKE1ImportedAvailableVersions(client, bc.V3)
+			if err != nil {
+				return
+			}
+		} else {
+			versions, err = available.ListRKE1AvailableVersions(client, bc.V3)
+			if err != nil {
+				return
+			}
 		}
 	case clusters.KubernetesProviderRKE2:
 		if bc.Meta.IsImported {
@@ -24,7 +31,7 @@ func (bc *BundledCluster) ListAvailableVersions(client *rancher.Client) (version
 			if err != nil {
 				return
 			}
-		} else if !bc.Meta.IsImported {
+		} else {
 			versions, err = available.ListNormanRKE2AvailableVersions(client, bc.V3)
 			if err != nil {
 				return
@@ -36,7 +43,7 @@ func (bc *BundledCluster) ListAvailableVersions(client *rancher.Client) (version
 			if err != nil {
 				return
 			}
-		} else if !bc.Meta.IsImported {
+		} else {
 			versions, err = available.ListNormanK3SAvailableVersions(client, bc.V3)
 			if err != nil {
 				return
