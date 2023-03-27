@@ -7,6 +7,7 @@ import (
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	v3 "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
 	v1 "github.com/rancher/rancher/tests/framework/clients/rancher/v1"
+	"github.com/rancher/rancher/tests/framework/clients/rkecli"
 	"github.com/rancher/rancher/tests/framework/extensions/clusters"
 )
 
@@ -48,13 +49,40 @@ func (bc *BundledCluster) UpdateKubernetesVersion(client *rancher.Client, versio
 
 	switch bc.Meta.Provider {
 	case clusters.KubernetesProviderRKE:
-		bundledv3.V3.Name = bc.Meta.Name
-		bundledv3.V3.RancherKubernetesEngineConfig = bc.V3.RancherKubernetesEngineConfig
-		bundledv3.V3.RancherKubernetesEngineConfig.Version = *versionToUpgrade
+		if !bc.Meta.IsImported {
+			bundledv3.V3.Name = bc.Meta.Name
+			bundledv3.V3.RancherKubernetesEngineConfig = bc.V3.RancherKubernetesEngineConfig
+			bundledv3.V3.RancherKubernetesEngineConfig.Version = *versionToUpgrade
 
-		updatedCluster, err = bc.Update(client, &bundledv3)
-		if err != nil {
-			return updatedCluster, err
+			updatedCluster, err = bc.Update(client, &bundledv3)
+			if err != nil {
+				return updatedCluster, err
+			}
+		} else {
+			bundledv3.Meta = bc.Meta
+			//rke up
+			statePath, clusterPath, err := rkecli.NewRKEConfigs(client)
+			if err != nil {
+				return nil, errors.Wrap(err, "couldn't generate new rke configs")
+			}
+			err = rkecli.UpdateKubernetesVersion(*versionToUpgrade, clusterPath)
+			if err != nil {
+				return nil, errors.Wrap(err, "couldn't update kubernetes version in the rke config")
+			}
+
+			err = rkecli.Up(clusterPath)
+			if err != nil {
+				return nil, errors.Wrap(err, "couldn't update the cluster")
+			}
+
+			// read from state to get v3 rke config without any type cast
+			rkeConfig, err := rkecli.ReadClusterFromStateFile(statePath)
+			if err != nil {
+				return nil, errors.Wrap(err, "couldn't read the new state from the state file")
+			}
+
+			bundledv3.V3.RancherKubernetesEngineConfig = rkeConfig
+			updatedCluster = &bundledv3
 		}
 	case clusters.KubernetesProviderRKE2:
 		if !bc.Meta.IsImported {
@@ -66,7 +94,7 @@ func (bc *BundledCluster) UpdateKubernetesVersion(client *rancher.Client, versio
 			if err != nil {
 				return updatedCluster, err
 			}
-		} else if bc.Meta.IsImported {
+		} else {
 			bundledv1.V1 = bc.V1
 			clusterSpec := &apiv1.ClusterSpec{}
 			err = v1.ConvertToK8sType(bundledv1.V1.Spec, clusterSpec)
@@ -92,7 +120,7 @@ func (bc *BundledCluster) UpdateKubernetesVersion(client *rancher.Client, versio
 			if err != nil {
 				return updatedCluster, err
 			}
-		} else if bc.Meta.IsImported {
+		} else {
 			bundledv1.V1 = bc.V1
 			clusterSpec := &apiv1.ClusterSpec{}
 			err = v1.ConvertToK8sType(bundledv1.V1.Spec, clusterSpec)

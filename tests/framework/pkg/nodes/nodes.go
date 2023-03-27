@@ -124,9 +124,7 @@ func (n *Node) ExecuteCommand(command string) (string, error) {
 func GetSSHKey(sshKeyname string) ([]byte, error) {
 	var keyPath string
 
-	sshPathConfig := new(SSHPath)
-
-	config.LoadConfig(SSHPathConfigurationKey, sshPathConfig)
+	sshPathConfig := GetSSHPath()
 	if sshPathConfig.SSHPath == "" {
 		user, err := user.Current()
 		if err != nil {
@@ -143,4 +141,13 @@ func GetSSHKey(sshKeyname string) ([]byte, error) {
 	}
 
 	return content, nil
+}
+
+// GetSSHPath gets ssh path from the config
+func GetSSHPath() *SSHPath {
+	sshPathConfig := new(SSHPath)
+
+	config.LoadConfig(SSHPathConfigurationKey, sshPathConfig)
+
+	return sshPathConfig
 }
