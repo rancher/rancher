@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"regexp"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/rancher/apiserver/pkg/types"
@@ -406,7 +407,15 @@ func (c *NamespacedSteveClient) ListAll(params url.Values) (*SteveCollection, er
 }
 
 func (c *NamespacedSteveClient) ByID(id string) (*SteveAPIObject, error) {
-	return c.SteveClient.ByID(id)
+	var namespacedID string
+
+	if strings.Contains(id, c.namespace) {
+		namespacedID = id
+	} else {
+		namespacedID = fmt.Sprintf(c.namespace + "/" + id)
+	}
+
+	return c.SteveClient.ByID(namespacedID)
 }
 
 func (c *NamespacedSteveClient) Delete(container *SteveAPIObject) error {
