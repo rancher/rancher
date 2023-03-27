@@ -124,6 +124,9 @@ func (h *handler) getArgsEnvAndStatus(infra *infraObject, args map[string]interf
 
 	instanceName := getInstanceName(*infra)
 
+	// The files secret must be constructed before toArgs is called because
+	// constructFilesSecret replaces file contents and creates a secret to be passed as a volume.
+	filesSecret = constructFilesSecret(driver, args)
 	if create {
 		cmd = append(cmd, "create",
 			fmt.Sprintf("--driver=%s", driver),
@@ -138,9 +141,6 @@ func (h *handler) getArgsEnvAndStatus(infra *infraObject, args map[string]interf
 		if err != nil {
 			return driverArgs{}, err
 		}
-		// The files secret must be constructed before toArgs is called because
-		// constructFilesSecret replaces file contents and creates a secret to be passed as a volume.
-		filesSecret = constructFilesSecret(driver, args)
 		cmd = append(cmd, toArgs(driver, args, rancherCluster.Status.ClusterName)...)
 	} else {
 		cmd = append(cmd, "rm", "-y")
