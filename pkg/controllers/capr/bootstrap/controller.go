@@ -232,11 +232,19 @@ func (h *handler) getEnvVar(bootstrap *rkev1.RKEBootstrap, capiCluster *capi.Clu
 	return result, nil
 }
 
+// shouldCreateBootstrapSecret returns true if the generated handler should create/ensure the bootstrap secret's
+// existence, otherwise it wil be cleaned up. The bootstrap secret is created immediately in the Pending phase and
+// should be present until machine deletion.
+func shouldCreateBootstrapSecret(phase capi.MachinePhase) bool {
+	return phase != capi.MachinePhaseDeleting && phase != capi.MachinePhaseDeleted && phase != capi.MachinePhaseFailed
+}
+
+// assignBootStrapSecret is utilized by the bootstrap controller's GeneratingHandler method to designate the lifecycle
+// of both the bootstrap secret and related service account. The bootstrap secret and service account must be valid
+// until the corresponding CAPI Machine object's Machine Phase is at least "Running", which indicates that the machine
+// "has become a Kubernetes Node in a Ready state".
 func (h *handler) assignBootStrapSecret(machine *capi.Machine, bootstrap *rkev1.RKEBootstrap, capiCluster *capi.Cluster) (*corev1.Secret, []runtime.Object, error) {
-	if capi.MachinePhase(machine.Status.Phase) != capi.MachinePhasePending &&
-		capi.MachinePhase(machine.Status.Phase) != capi.MachinePhaseDeleting &&
-		capi.MachinePhase(machine.Status.Phase) != capi.MachinePhaseFailed &&
-		capi.MachinePhase(machine.Status.Phase) != capi.MachinePhaseProvisioning {
+	if !shouldCreateBootstrapSecret(capi.MachinePhase(machine.Status.Phase)) {
 		return nil, nil, nil
 	}
 
