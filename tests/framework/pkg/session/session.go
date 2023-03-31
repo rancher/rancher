@@ -1,7 +1,10 @@
 package session
 
 import (
+	"time"
+
 	"github.com/sirupsen/logrus"
+	"k8s.io/apimachinery/pkg/util/wait"
 )
 
 // CleanupFunc is the type RegisterCleanupFunc accepts
@@ -39,10 +42,27 @@ func (ts *Session) RegisterCleanupFunc(f CleanupFunc) {
 func (ts *Session) Cleanup() {
 	if ts.CleanupEnabled {
 		ts.open = false
+
+		// sometimes it is necessary to retry cleanup due to the webhook validator block initial delete attempts
+		// due to using a stale cache
+		var backoff = wait.Backoff{
+			Duration: 100 * time.Millisecond,
+			Factor:   1,
+			Jitter:   0,
+			Steps:    5,
+		}
+
 		for i := len(ts.cleanupQueue) - 1; i >= 0; i-- {
-			err := ts.cleanupQueue[i]()
+			var cleanupErr error
+			err := wait.ExponentialBackoff(backoff, func() (done bool, err error) {
+				cleanupErr = ts.cleanupQueue[i]()
+				if cleanupErr != nil {
+					return false, nil
+				}
+				return true, nil
+			})
 			if err != nil {
-				logrus.Errorf("error calling cleanup function: %v", err)
+				logrus.Errorf("failed to cleanup resource. Backoff error: %v. Cleanup error: %v", err, cleanupErr)
 			}
 		}
 		ts.cleanupQueue = []CleanupFunc{}
