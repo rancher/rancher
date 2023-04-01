@@ -5,19 +5,23 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
 	"github.com/rancher/rancher/tests/framework/extensions/clusters"
 	"github.com/rancher/rancher/tests/framework/extensions/machinepools"
+	"github.com/rancher/rancher/tests/framework/extensions/sshkeys"
 	"github.com/rancher/rancher/tests/framework/extensions/users"
 	password "github.com/rancher/rancher/tests/framework/extensions/users/passwordgenerator"
 	"github.com/rancher/rancher/tests/framework/extensions/workloads/pods"
 	"github.com/rancher/rancher/tests/framework/pkg/config"
 	namegen "github.com/rancher/rancher/tests/framework/pkg/namegenerator"
+	"github.com/rancher/rancher/tests/framework/pkg/nodes"
 	"github.com/rancher/rancher/tests/framework/pkg/session"
 	"github.com/rancher/rancher/tests/framework/pkg/wait"
 	"github.com/rancher/rancher/tests/integration/pkg/defaults"
 	provisioning "github.com/rancher/rancher/tests/v2/validation/provisioning"
+	ssh "github.com/rancher/rancher/tests/v2/validation/provisioning/ssh"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -226,6 +230,31 @@ func (r *RKE2NodeDriverProvisioningTestSuite) testProvisioningRKE2Cluster(client
 	podResults, podErrors := pods.StatusPods(client, clusterID)
 	assert.NotEmpty(r.T(), podResults)
 	assert.Empty(r.T(), podErrors)
+
+	nodesList, err := client.Management.Node.ListAll(&types.ListOpts{
+		Filters: map[string]interface{}{
+			"clusterId": clusterID,
+		},
+	})
+	require.NoError(r.T(), err)
+	assert.NotEmpty(r.T(), nodesList)
+
+	for _, rancherNode := range nodesList.Data {
+		sshkey, err := sshkeys.DownloadSSHKeys(client, rancherNode.Name)
+		require.NoError(r.T(), err)
+		assert.NotEmpty(r.T(), sshkey)
+		ec2Node := &nodes.Node{
+			NodeID:          rancherNode.Name,
+			PublicIPAddress: rancherNode.ExternalIPAddress,
+			SSHUser:         rancherNode.SshUser,
+			SSHKey:          sshkey,
+		}
+		// Check CPU usage
+		output, err := ssh.CheckCPU(ec2Node)
+		require.NoError(r.T(), err)
+		assert.NotEmpty(r.T(), output)
+
+	}
 }
 
 // In order for 'go test' to run this suite, we need to create
