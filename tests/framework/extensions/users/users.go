@@ -9,16 +9,24 @@ import (
 	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/pkg/api/scheme"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
+	"github.com/rancher/rancher/tests/framework/extensions/kubeapi/rbac"
 	kubeapiSecrets "github.com/rancher/rancher/tests/framework/extensions/kubeapi/secrets"
 	"github.com/rancher/rancher/tests/framework/extensions/secrets"
 	"github.com/rancher/rancher/tests/framework/pkg/wait"
 	"github.com/rancher/rancher/tests/integration/pkg/defaults"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/selection"
 	kwait "k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
+)
+
+const (
+	rtbOwnerLabel = "authz.cluster.cattle.io/rtb-owner-updated"
 )
 
 // CreateUserWithRole is helper function that creates a user with a role or multiple roles
@@ -168,7 +176,36 @@ func RemoveProjectMember(rancherClient *rancher.Client, user *management.User) e
 			break
 		}
 	}
-	return rancherClient.Management.ProjectRoleTemplateBinding.Delete(&roleToDelete)
+
+	var backoff = kwait.Backoff{
+		Duration: 100 * time.Millisecond,
+		Factor:   1,
+		Jitter:   0,
+		Steps:    5,
+	}
+	err = rancherClient.Management.ProjectRoleTemplateBinding.Delete(&roleToDelete)
+	if err != nil {
+		return err
+	}
+	err = kwait.ExponentialBackoff(backoff, func() (done bool, err error) {
+		clusterID, projName := ref.Parse(roleToDelete.ProjectID)
+		req, err := labels.NewRequirement(rtbOwnerLabel, selection.Equals, []string{fmt.Sprintf("%s_%s", projName, roleToDelete.Name)})
+		if err != nil {
+			return false, err
+		}
+
+		downstreamRBs, err := rbac.ListRoleBindings(rancherClient, clusterID, "", metav1.ListOptions{
+			LabelSelector: labels.NewSelector().Add(*req).String(),
+		})
+		if err != nil {
+			return false, err
+		}
+		if len(downstreamRBs.Items) != 0 {
+			return false, nil
+		}
+		return true, nil
+	})
+	return err
 }
 
 // AddClusterRoleToUser is a helper function that adds a cluster role to `user`.
