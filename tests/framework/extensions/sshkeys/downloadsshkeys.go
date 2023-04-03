@@ -16,35 +16,35 @@ const (
 
 // DownloadSSHKeys is a helper function that takes a client, the machinePoolNodeName to download
 // the ssh key for a particular node.
-func DownloadSSHKeys(client *rancher.Client, machinePoolNodeName string) (string, error) {
+func DownloadSSHKeys(client *rancher.Client, machinePoolNodeName string) ([]byte, error) {
 	machinePoolNodeNameName := fmt.Sprintf("fleet-default/%s", machinePoolNodeName)
 	machine, err := client.Steve.SteveType(ClusterMachineConstraintResourceSteveType).ByID(machinePoolNodeNameName)
 	if err != nil {
-		return "", err
+		return []byte{}, err
 	}
 
 	sshKeyLink := machine.Links["sshkeys"]
 
 	req, err := http.NewRequest("GET", sshKeyLink, nil)
 	if err != nil {
-		return "", err
+		return []byte{}, err
 	}
 
 	req.Header.Add("Authorization", "Bearer "+client.RancherConfig.AdminToken)
 
 	resp, err := client.Management.APIBaseClient.Ops.Client.Do(req)
 	if err != nil {
-		return "", err
+		return []byte{}, err
 	}
 	defer resp.Body.Close()
 
 	bodyBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return "", err
+		return []byte{}, err
 	}
 
 	privateSSHKeyRegEx := regexp.MustCompile(privateKeySSHKeyRegExPattern)
 	privateSSHKey := privateSSHKeyRegEx.FindString(string(bodyBytes))
 
-	return privateSSHKey, err
+	return []byte(privateSSHKey), err
 }
