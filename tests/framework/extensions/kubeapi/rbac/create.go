@@ -8,24 +8,7 @@ import (
 	"github.com/rancher/rancher/tests/framework/extensions/unstructured"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 )
-
-// RoleGroupVersionResource is the required Group Version Resource for accessing roles in a cluster,
-// using the dynamic client.
-var RoleGroupVersionResource = schema.GroupVersionResource{
-	Group:    rbacv1.SchemeGroupVersion.Group,
-	Version:  rbacv1.SchemeGroupVersion.Version,
-	Resource: "roles",
-}
-
-// RoleBindingGroupVersionResource is the required Group Version Resource for accessing rolebindings in a cluster,
-// using the dynamic client.
-var RoleBindingGroupVersionResource = schema.GroupVersionResource{
-	Group:    rbacv1.SchemeGroupVersion.Group,
-	Version:  rbacv1.SchemeGroupVersion.Version,
-	Resource: "rolebindings",
-}
 
 // CreateRole is a helper function that uses the dynamic client to create a role on a namespace for a specific cluster.
 func CreateRole(client *rancher.Client, clusterName string, role *rbacv1.Role) (*rbacv1.Role, error) {
