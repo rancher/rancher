@@ -20,3 +20,11 @@ var RoleBindingGroupVersionResource = schema.GroupVersionResource{
 	Version:  rbacv1.SchemeGroupVersion.Version,
 	Resource: "rolebindings",
 }
+
+// ClusterRoleBindingGroupVersionResource is the required Group Version Resource for accessing clusterrolebindings in a cluster,
+// using the dynamic client.
+var ClusterRoleBindingGroupVersionResource = schema.GroupVersionResource{
+	Group:    rbacv1.SchemeGroupVersion.Group,
+	Version:  rbacv1.SchemeGroupVersion.Version,
+	Resource: "clusterrolebindings",
+}
