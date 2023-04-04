@@ -232,6 +232,10 @@ func AddClusterRoleToUser(rancherClient *rancher.Client, cluster *management.Clu
 		if err != nil {
 			return false, err
 		}
+		if cluster.Annotations == nil || cluster.Annotations["field.cattle.io/creatorId"] == "" {
+			// no cluster creator, no roles to populate. This will be the case for the "local" cluster.
+			return true, nil
+		}
 		if v3.ClusterConditionInitialRolesPopulated.IsTrue(cluster) {
 			return true, nil
 		}
@@ -281,5 +285,33 @@ func RemoveClusterRoleFromUser(rancherClient *rancher.Client, user *management.U
 		}
 	}
 
-	return rancherClient.Management.ClusterRoleTemplateBinding.Delete(&roleToDelete)
+	if err = rancherClient.Management.ClusterRoleTemplateBinding.Delete(&roleToDelete); err != nil {
+		return err
+	}
+
+	var backoff = kwait.Backoff{
+		Duration: 100 * time.Millisecond,
+		Factor:   1,
+		Jitter:   0,
+		Steps:    5,
+	}
+
+	err = kwait.ExponentialBackoff(backoff, func() (done bool, err error) {
+		req, err := labels.NewRequirement(rtbOwnerLabel, selection.Equals, []string{fmt.Sprintf("%s_%s", roleToDelete.ClusterID, roleToDelete.Name)})
+		if err != nil {
+			return false, err
+		}
+
+		downstreamCRBs, err := rbac.ListClusterRoleBindings(rancherClient, roleToDelete.ClusterID, metav1.ListOptions{
+			LabelSelector: labels.NewSelector().Add(*req).String(),
+		})
+		if err != nil {
+			return false, err
+		}
+		if len(downstreamCRBs.Items) != 0 {
+			return false, nil
+		}
+		return true, nil
+	})
+	return err
 }
