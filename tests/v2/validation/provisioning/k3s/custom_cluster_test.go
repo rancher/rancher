@@ -72,6 +72,11 @@ func (c *CustomClusterProvisioningTestSuite) TestProvisioningK3SCustomCluster() 
 	}
 
 	nodeRoles1 := []string{
+		"--etcd --controlplane",
+		"--worker",
+	}
+
+	nodeRoles2 := []string{
 		"--etcd",
 		"--controlplane",
 		"--worker",
@@ -84,8 +89,10 @@ func (c *CustomClusterProvisioningTestSuite) TestProvisioningK3SCustomCluster() 
 	}{
 		{"1 Node all roles Admin User", nodeRoles0, c.client},
 		{"1 Node all roles Standard User", nodeRoles0, c.standardUserClient},
-		{"3 nodes - 1 role per node Admin User", nodeRoles1, c.client},
-		{"3 nodes - 1 role per node Standard User", nodeRoles1, c.standardUserClient},
+		{"2 nodes - etcd/cp roles per 1 node Admin User", nodeRoles1, c.client},
+		{"2 nodes - etcd/cp roles per 1 node Standard User", nodeRoles1, c.standardUserClient},
+		{"3 nodes - 1 role per node Admin User", nodeRoles2, c.client},
+		{"3 nodes - 1 role per node Standard User", nodeRoles2, c.standardUserClient},
 	}
 	var name string
 	for _, tt := range tests {

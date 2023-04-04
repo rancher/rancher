@@ -78,6 +78,21 @@ func (k *K3SNodeDriverProvisioningTestSuite) TestProvisioningK3SCluster() {
 	nodeRoles1 := []machinepools.NodeRoles{
 		{
 			ControlPlane: true,
+			Etcd:         true,
+			Worker:       false,
+			Quantity:     1,
+		},
+		{
+			ControlPlane: false,
+			Etcd:         false,
+			Worker:       true,
+			Quantity:     1,
+		},
+	}
+
+	nodeRoles2 := []machinepools.NodeRoles{
+		{
+			ControlPlane: true,
 			Etcd:         false,
 			Worker:       false,
 			Quantity:     1,
@@ -103,8 +118,10 @@ func (k *K3SNodeDriverProvisioningTestSuite) TestProvisioningK3SCluster() {
 	}{
 		{"1 Node all roles Admin User", nodeRoles0, k.client},
 		{"1 Node all roles Standard User", nodeRoles0, k.standardUserClient},
-		{"3 nodes - 1 role per node Admin User", nodeRoles1, k.client},
-		{"3 nodes - 1 role per node Standard User", nodeRoles1, k.standardUserClient},
+		{"2 nodes - etcd/cp roles per 1 node Admin User", nodeRoles1, k.client},
+		{"2 nodes - etcd/cp roles per 1 node Standard User", nodeRoles1, k.standardUserClient},
+		{"3 nodes - 1 role per node Admin User", nodeRoles2, k.client},
+		{"3 nodes - 1 role per node Standard User", nodeRoles2, k.standardUserClient},
 	}
 
 	var name string

@@ -80,6 +80,21 @@ func (r *RKE2NodeDriverProvisioningTestSuite) TestProvisioningRKE2Cluster() {
 	nodeRoles1 := []machinepools.NodeRoles{
 		{
 			ControlPlane: true,
+			Etcd:         true,
+			Worker:       false,
+			Quantity:     1,
+		},
+		{
+			ControlPlane: false,
+			Etcd:         false,
+			Worker:       true,
+			Quantity:     1,
+		},
+	}
+
+	nodeRoles2 := []machinepools.NodeRoles{
+		{
+			ControlPlane: true,
 			Etcd:         false,
 			Worker:       false,
 			Quantity:     1,
@@ -105,8 +120,10 @@ func (r *RKE2NodeDriverProvisioningTestSuite) TestProvisioningRKE2Cluster() {
 	}{
 		{"1 Node all roles Admin User", nodeRoles0, r.client},
 		{"1 Node all roles Standard User", nodeRoles0, r.standardUserClient},
-		{"3 nodes - 1 role per node Admin User", nodeRoles1, r.client},
-		{"3 nodes - 1 role per node Standard User", nodeRoles1, r.standardUserClient},
+		{"2 nodes - etcd/cp roles per 1 node Admin User", nodeRoles1, r.client},
+		{"2 nodes - etcd/cp roles per 1 node Standard User", nodeRoles1, r.standardUserClient},
+		{"3 nodes - 1 role per node Admin User", nodeRoles2, r.client},
+		{"3 nodes - 1 role per node Standard User", nodeRoles2, r.standardUserClient},
 	}
 
 	var name string
