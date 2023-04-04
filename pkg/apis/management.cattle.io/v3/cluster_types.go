@@ -125,6 +125,14 @@ type ClusterSpecBase struct {
 	WindowsPreferedCluster                               bool                                    `json:"windowsPreferedCluster" norman:"noupdate"`
 	LocalClusterAuthEndpoint                             LocalClusterAuthEndpoint                `json:"localClusterAuthEndpoint,omitempty"`
 	ClusterSecrets                                       ClusterSecrets                          `json:"clusterSecrets" norman:"nocreate,noupdate"`
+	ClusterAgentDeploymentCustomization                  *AgentDeploymentCustomization           `json:"clusterAgentDeploymentCustomization,omitempty"`
+	FleetAgentDeploymentCustomization                    *AgentDeploymentCustomization           `json:"fleetAgentDeploymentCustomization,omitempty"`
+}
+
+type AgentDeploymentCustomization struct {
+	AppendTolerations             []v1.Toleration          `json:"appendTolerations,omitempty"`
+	OverrideAffinity              *v1.Affinity             `json:"overrideAffinity,omitempty"`
+	OverrideResourceRequirements  *v1.ResourceRequirements `json:"overrideResourceRequirements,omitempty"`
 }
 
 type ClusterSpec struct {
