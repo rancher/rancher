@@ -37,14 +37,14 @@ type CleanupService interface {
 	Run(config *v3.AuthConfig) error
 }
 
-// Note the use of the GenericClient here.  Our AuthConfigs contain internal-only fields that deal with
-// various auth providers.  Those fields are not present everywhere, nor are they defined in the CRD.  Given
-// that, the regular client will "eat" those internal-only fields, so in this case, we use
-// the unstructured client, losing some validation, but gaining the flexibility we require.
 type authConfigController struct {
-	users                   v3.UserLister
-	authRefresher           providerrefresh.UserAuthRefresher
-	cleanup                 CleanupService
+	users         v3.UserLister
+	authRefresher providerrefresh.UserAuthRefresher
+	cleanup       CleanupService
+	// Note the use of the GenericClient here. AuthConfigs contain internal-only fields that deal with
+	// various auth providers. Those fields are not present everywhere, nor are they defined in the CRD. Given
+	// that, the regular client will "eat" those internal-only fields, so in this case, we use
+	// the unstructured client, losing some validation, but gaining the flexibility we require.
 	authConfigsUnstructured objectclient.GenericClient
 }
 
@@ -58,26 +58,103 @@ func newAuthConfigController(context context.Context, mgmt *config.ManagementCon
 	return controller
 }
 
-func (ac *authConfigController) setCleanupAnnotation(obj *v3.AuthConfig, value string) (*v3.AuthConfig, error) {
+func (ac *authConfigController) getUnstructured(obj *v3.AuthConfig) (*unstructured.Unstructured, error) {
+	if obj == nil {
+		return nil, fmt.Errorf("cannot get a nil auth config")
+	}
 	runtimeObj, err := ac.authConfigsUnstructured.Get(obj.Name, v1.GetOptions{})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get auth config %s from Kubernetes: %w", obj.Name, err)
 	}
 	unstructuredObj, ok := runtimeObj.(*unstructured.Unstructured)
 	if !ok {
 		return nil, fmt.Errorf("auth config %s is not an unstructured value", obj.Name)
 	}
+	return unstructuredObj, nil
+}
+
+func (ac *authConfigController) setCleanupAnnotation(unstructuredObj *unstructured.Unstructured, value string) {
 	annotations := unstructuredObj.GetAnnotations()
 	if annotations == nil {
 		annotations = make(map[string]string)
 	}
 	annotations[CleanupAnnotation] = value
 	unstructuredObj.SetAnnotations(annotations)
+}
+
+func (ac *authConfigController) sync(key string, obj *v3.AuthConfig) (runtime.Object, error) {
+	// If obj is nil, the auth config has been deleted. Rancher currently does not handle deletions gracefully,
+	// meaning it does not perform resource cleanup. Admins should disable an auth provider instead of deleting its auth config.
+	if obj == nil {
+		return nil, nil
+	}
+	err := ac.refreshUsers(obj)
+	if err != nil {
+		return obj, err
+	}
+
+	unstructuredObj, err := ac.getUnstructured(obj)
+	if err != nil {
+		return nil, err
+	}
+
+	value := obj.Annotations[CleanupAnnotation]
+	if value == "" {
+		if obj.Enabled {
+			value = CleanupUnlocked
+		} else {
+			value = CleanupRancherLocked
+		}
+		ac.setCleanupAnnotation(unstructuredObj, value)
+		return ac.updateAuthConfig(unstructuredObj, obj)
+	}
+
+	if obj.Enabled && value == CleanupRancherLocked {
+		ac.setCleanupAnnotation(unstructuredObj, CleanupUnlocked)
+		return ac.updateAuthConfig(unstructuredObj, obj)
+	}
+
+	if !obj.Enabled {
+		refusalFmt := "Refusing to reset the config and clean up resources of the auth provider %s because its auth config annotation %s is set to %s."
+
+		switch value {
+		case CleanupUnlocked:
+			// First, reset the auth config by removing all but essential metadata fields.
+			cfg := unstructuredObj.UnstructuredContent()
+			resetAuthConfig(cfg)
+			unstructuredObj.SetUnstructuredContent(cfg)
+
+			// Second, run resource cleanup.
+			err = ac.cleanup.Run(obj)
+			if err != nil {
+				return obj, err
+			}
+
+			// Third, lock the config after cleanup and commit any updates to it.
+			logrus.Infof("The resources of the auth provider %s have been cleaned up successfully, and the auth config fields have been reset. Locking down the cleanup operation.", obj.Name)
+			ac.setCleanupAnnotation(unstructuredObj, CleanupRancherLocked)
+			return ac.updateAuthConfig(unstructuredObj, obj)
+		case CleanupRancherLocked:
+			logrus.Infof(refusalFmt, obj.Name, CleanupAnnotation, CleanupRancherLocked)
+			return obj, nil
+		case CleanupUserLocked:
+			logrus.Infof(refusalFmt, obj.Name, CleanupAnnotation, CleanupUserLocked)
+			return obj, nil
+		default:
+			logrus.Infof("Refusing to clean up auth provider %s because its auth config annotation %s is invalid", obj.Name, CleanupAnnotation)
+			return obj, nil
+		}
+	}
+
+	return obj, nil
+}
+
+func (ac *authConfigController) updateAuthConfig(unstructuredObj *unstructured.Unstructured, obj *v3.AuthConfig) (*v3.AuthConfig, error) {
 	uobj, err := ac.authConfigsUnstructured.Update(obj.Name, unstructuredObj)
 	if err != nil {
 		return nil, fmt.Errorf("failed to update AuthConfig object: %w", err)
 	}
-	// We ned to return an AuthConfig, but Update deals in terms of unstructured objects.
+	// We need to return an AuthConfig, but Update deals in terms of unstructured objects.
 	// Given that, we need to convert the unstructured object to an AuthConfig.
 	// Normally, we'd like to use mapstructure.Decode, but its handling of embedded structs
 	// does not give us the desired result in this instance, hence the use of json.
@@ -96,15 +173,13 @@ func (ac *authConfigController) setCleanupAnnotation(obj *v3.AuthConfig, value s
 	return result, nil
 }
 
-func (ac *authConfigController) sync(key string, obj *v3.AuthConfig) (runtime.Object, error) {
-	// If obj is nil, the auth config has been deleted. Rancher currently does not handle deletions gracefully,
-	// meaning it does not perform resource cleanup. Admins should disable an auth provider instead of deleting its auth config.
-	if obj == nil {
-		return nil, nil
-	}
+func (ac *authConfigController) refreshUsers(obj *v3.AuthConfig) error {
+	// if we have changed an auth config, refresh all users belonging to the auth config. This addresses:
+	// Disabling an auth provider - now we disable user access
+	// Removing a user from auth provider access - now we will immediately revoke access
 	users, err := ac.users.List("", labels.Everything())
 	if err != nil {
-		return obj, err
+		return err
 	}
 	for _, user := range users {
 		principalID := providerrefresh.GetPrincipalIDForProvider(obj.Name, user)
@@ -114,42 +189,15 @@ func (ac *authConfigController) sync(key string, obj *v3.AuthConfig) (runtime.Ob
 			ac.authRefresher.TriggerUserRefresh(user.Name, true)
 		}
 	}
-	value := obj.Annotations[CleanupAnnotation]
-	if value == "" {
-		if obj.Enabled {
-			value = CleanupUnlocked
-		} else {
-			value = CleanupRancherLocked
-		}
-		return ac.setCleanupAnnotation(obj, value)
-	}
+	return nil
+}
 
-	if obj.Enabled && value == CleanupRancherLocked {
-		return ac.setCleanupAnnotation(obj, CleanupUnlocked)
-	}
-
-	if !obj.Enabled {
-		refusalFmt := "Refusing to clean up auth provider %s because its auth config annotation %s is set to %s."
-
-		switch value {
-		case CleanupUnlocked:
-			err := ac.cleanup.Run(obj)
-			if err != nil {
-				return obj, err
-			}
-			logrus.Infof("Auth provider %s has been cleaned up successfully. Locking down its cleanup operation...", obj.Name)
-			// Lock the config after cleanup.
-			return ac.setCleanupAnnotation(obj, CleanupRancherLocked)
-		case CleanupRancherLocked:
-			logrus.Infof(refusalFmt, obj.Name, CleanupAnnotation, CleanupRancherLocked)
-			return obj, nil
-		case CleanupUserLocked:
-			logrus.Infof(refusalFmt, obj.Name, CleanupAnnotation, CleanupUserLocked)
-			return obj, nil
-		default:
-			logrus.Infof("Refusing to clean up auth provider %s because its auth config annotation %s is invalid", obj.Name, CleanupAnnotation)
-			return obj, nil
+// resetAuthConfig takes an Auth Config as a map and deletes all entries except those with basic metadata fields.
+func resetAuthConfig(cfg map[string]any) {
+	retainFields := map[string]bool{"apiVersion": true, "kind": true, "metadata": true, "type": true}
+	for field := range cfg {
+		if !retainFields[field] {
+			delete(cfg, field)
 		}
 	}
-	return obj, nil
 }

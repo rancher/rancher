@@ -5,16 +5,15 @@ import (
 	"fmt"
 	"testing"
 
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-
 	"github.com/rancher/norman/objectclient"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	azuread "github.com/rancher/rancher/pkg/auth/providers/azure/clients"
+	"github.com/rancher/rancher/pkg/auth/providers/github"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	apierror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -98,7 +97,6 @@ func TestCleanupRuns(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			t.Parallel()
 			mockUsers := newMockUserLister()
 			config := &v3.AuthConfig{
 				ObjectMeta: metav1.ObjectMeta{
@@ -107,7 +105,6 @@ func TestCleanupRuns(t *testing.T) {
 				},
 				Enabled: test.configEnabled,
 			}
-
 			var service cleanupService
 			controller := authConfigController{
 				cleanup:                 &service,
@@ -124,7 +121,67 @@ func TestCleanupRuns(t *testing.T) {
 	}
 }
 
+func TestAuthConfigReset(t *testing.T) {
+	t.Parallel()
+
+	allFields := []string{"accessMode", "allowedPrincipalIds", "apiVersion", "kind", "metadata", "type"}
+	postResetFields := []string{"apiVersion", "kind", "metadata", "type"}
+
+	tests := []struct {
+		annotationValue string
+		retainedFields  []string
+	}{
+		{CleanupRancherLocked, allFields},
+		{CleanupUserLocked, allFields},
+		{CleanupUnlocked, postResetFields},
+	}
+
+	for _, test := range tests {
+		test := test
+		t.Run(test.annotationValue, func(t *testing.T) {
+			t.Parallel()
+			config := v3.AuthConfig{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "Auth Config",
+					APIVersion: "management.cattle.io/v3",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        github.Name,
+					Annotations: map[string]string{CleanupAnnotation: test.annotationValue},
+				},
+				Type:                "githubConfig",
+				Enabled:             false,
+				AccessMode:          "unrestricted",
+				AllowedPrincipalIDs: []string{"user1", "user2"},
+			}
+
+			mockUsers := newMockUserLister()
+			controller := authConfigController{
+				cleanup:                 new(cleanupService),
+				authConfigsUnstructured: newMockAuthConfigClient(&config),
+				users:                   &mockUsers,
+			}
+
+			_, err := controller.sync("test", &config)
+			require.NoError(t, err)
+			u, err := controller.getUnstructured(&config)
+			require.NoError(t, err)
+
+			cfg := u.UnstructuredContent()
+			assert.Equal(t, len(test.retainedFields), len(cfg))
+			for _, field := range test.retainedFields {
+				assert.Contains(t, cfg, field)
+			}
+		})
+	}
+}
+
 func TestAuthConfigSync(t *testing.T) {
+	config := v3.AuthConfig{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: github.Name,
+		},
+	}
 	tests := []struct {
 		name                    string
 		usernamesForTestConfig  []string
@@ -182,9 +239,14 @@ func TestAuthConfigSync(t *testing.T) {
 			}
 
 			mockRefresher := newMockAuthProvider()
-			controller := authConfigController{users: &mockUsers, authRefresher: &mockRefresher}
+			controller := authConfigController{
+				users:                   &mockUsers,
+				authRefresher:           &mockRefresher,
+				cleanup:                 &fakeCleanupService{},
+				authConfigsUnstructured: newMockAuthConfigClient(&config),
+			}
 			config := v3.AuthConfig{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name: testConfigName,
 					Annotations: map[string]string{
 						CleanupAnnotation: CleanupUnlocked,
@@ -206,6 +268,57 @@ func TestAuthConfigSync(t *testing.T) {
 			}
 		})
 	}
+}
+
+type mockUserLister struct {
+	users        []*v3.User
+	listUsersErr error
+}
+
+func newMockUserLister() mockUserLister {
+	return mockUserLister{
+		users: []*v3.User{},
+	}
+}
+
+func (m *mockUserLister) List(_ string, _ labels.Selector) (ret []*v3.User, err error) {
+	if m.listUsersErr != nil {
+		return nil, m.listUsersErr
+	}
+	return m.users, nil
+}
+func (m *mockUserLister) Get(_, name string) (*v3.User, error) {
+	for _, user := range m.users {
+		if user.Name == name {
+			return user, nil
+		}
+	}
+	return nil, apierror.NewNotFound(schema.GroupResource{Group: "management.cattle.io", Resource: "user"}, name)
+}
+
+func (m *mockUserLister) AddUser(username string, provider string) {
+	principalIds := []string{
+		fmt.Sprintf("local://%s", username),
+		fmt.Sprintf("%s_user://%s", provider, username),
+	}
+	newUser := v3.User{
+		ObjectMeta:   metav1.ObjectMeta{Name: username},
+		PrincipalIDs: principalIds,
+	}
+	found := false
+	for idx, user := range m.users {
+		if user.Name == newUser.Name {
+			m.users[idx] = &newUser
+			found = true
+		}
+	}
+	if !found {
+		m.users = append(m.users, &newUser)
+	}
+}
+
+func (m *mockUserLister) AddListUserError(err error) {
+	m.listUsersErr = err
 }
 
 type cleanupService struct {
@@ -264,7 +377,7 @@ func (m mockUnstructuredAuthConfig) IsList() bool {
 	panic("implement me")
 }
 
-func (m mockUnstructuredAuthConfig) EachListItem(f func(runtime.Object) error) error {
+func (m mockUnstructuredAuthConfig) EachListItem(_ func(runtime.Object) error) error {
 	//TODO implement me
 	panic("implement me")
 }
@@ -274,138 +387,110 @@ type mockAuthConfigClient struct {
 }
 
 func newMockAuthConfigClient(authConfig *v3.AuthConfig) objectclient.GenericClient {
-	return mockAuthConfigClient{config: mockUnstructuredAuthConfig{authConfig}}
+	return &mockAuthConfigClient{config: mockUnstructuredAuthConfig{authConfig}}
 }
 
-func (m mockAuthConfigClient) Get(name string, opts metav1.GetOptions) (runtime.Object, error) {
+func (m *mockAuthConfigClient) Get(_ string, _ metav1.GetOptions) (runtime.Object, error) {
 	o := unstructured.Unstructured{}
-	o.SetUnstructuredContent(map[string]any{"Object": m.config})
+	js, err := json.Marshal(m.config.config)
+	if err != nil {
+		return nil, err
+	}
+	var aMap map[string]any
+	if err = json.Unmarshal(js, &aMap); err != nil {
+		return nil, err
+	}
+	o.SetUnstructuredContent(aMap)
 	return &o, nil
 }
 
-func (m mockAuthConfigClient) Update(name string, o runtime.Object) (runtime.Object, error) {
+func (m *mockAuthConfigClient) Update(_ string, o runtime.Object) (runtime.Object, error) {
+	b, err := json.Marshal(o)
+	if err != nil {
+		return nil, err
+	}
+	var cfg v3.AuthConfig
+	if err = json.Unmarshal(b, &cfg); err != nil {
+		return nil, err
+	}
+	m.config.config = &cfg
 	return o, nil
 }
 
-func (m mockAuthConfigClient) UnstructuredClient() objectclient.GenericClient {
+func (m *mockAuthConfigClient) UnstructuredClient() objectclient.GenericClient {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (m mockAuthConfigClient) GroupVersionKind() schema.GroupVersionKind {
+func (m *mockAuthConfigClient) GroupVersionKind() schema.GroupVersionKind {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (m mockAuthConfigClient) Create(o runtime.Object) (runtime.Object, error) {
+func (m *mockAuthConfigClient) Create(_ runtime.Object) (runtime.Object, error) {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (m mockAuthConfigClient) GetNamespaced(namespace, name string, opts metav1.GetOptions) (runtime.Object, error) {
+func (m *mockAuthConfigClient) GetNamespaced(_, _ string, _ metav1.GetOptions) (runtime.Object, error) {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (m mockAuthConfigClient) UpdateStatus(name string, o runtime.Object) (runtime.Object, error) {
+func (m *mockAuthConfigClient) UpdateStatus(_ string, _ runtime.Object) (runtime.Object, error) {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (m mockAuthConfigClient) DeleteNamespaced(namespace, name string, opts *metav1.DeleteOptions) error {
+func (m *mockAuthConfigClient) DeleteNamespaced(_, _ string, _ *metav1.DeleteOptions) error {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (m mockAuthConfigClient) Delete(name string, opts *metav1.DeleteOptions) error {
+func (m *mockAuthConfigClient) Delete(_ string, _ *metav1.DeleteOptions) error {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (m mockAuthConfigClient) List(opts metav1.ListOptions) (runtime.Object, error) {
+func (m *mockAuthConfigClient) List(_ metav1.ListOptions) (runtime.Object, error) {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (m mockAuthConfigClient) ListNamespaced(namespace string, opts metav1.ListOptions) (runtime.Object, error) {
+func (m *mockAuthConfigClient) ListNamespaced(_ string, _ metav1.ListOptions) (runtime.Object, error) {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (m mockAuthConfigClient) Watch(opts metav1.ListOptions) (watch.Interface, error) {
+func (m *mockAuthConfigClient) Watch(_ metav1.ListOptions) (watch.Interface, error) {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (m mockAuthConfigClient) DeleteCollection(deleteOptions *metav1.DeleteOptions, listOptions metav1.ListOptions) error {
+func (m *mockAuthConfigClient) DeleteCollection(_ *metav1.DeleteOptions, _ metav1.ListOptions) error {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (m mockAuthConfigClient) Patch(name string, o runtime.Object, patchType types.PatchType, data []byte, subresources ...string) (runtime.Object, error) {
+func (m *mockAuthConfigClient) Patch(_ string, _ runtime.Object, _ types.PatchType, _ []byte, _ ...string) (runtime.Object, error) {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (m mockAuthConfigClient) ObjectFactory() objectclient.ObjectFactory {
+func (m *mockAuthConfigClient) ObjectFactory() objectclient.ObjectFactory {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (m mockAuthConfigClient) ObjectClient() *objectclient.ObjectClient {
+func (m *mockAuthConfigClient) ObjectClient() *objectclient.ObjectClient {
 	//TODO implement me
 	panic("implement me")
 }
 
-type mockUserLister struct {
-	users        []*v3.User
-	listUsersErr error
-}
+type fakeCleanupService struct{}
 
-func newMockUserLister() mockUserLister {
-	return mockUserLister{
-		users: []*v3.User{},
-	}
-}
-
-func (m *mockUserLister) List(namespace string, selector labels.Selector) (ret []*v3.User, err error) {
-	if m.listUsersErr != nil {
-		return nil, m.listUsersErr
-	}
-	return m.users, nil
-}
-func (m *mockUserLister) Get(namespace, name string) (*v3.User, error) {
-	for _, user := range m.users {
-		if user.Name == name {
-			return user, nil
-		}
-	}
-	return nil, apierror.NewNotFound(schema.GroupResource{Group: "management.cattle.io", Resource: "user"}, name)
-}
-
-func (m *mockUserLister) AddUser(username string, provider string) {
-	principalIds := []string{
-		fmt.Sprintf("local://%s", username),
-		fmt.Sprintf("%s_user://%s", provider, username),
-	}
-	newUser := v3.User{
-		ObjectMeta:   v1.ObjectMeta{Name: username},
-		PrincipalIDs: principalIds,
-	}
-	found := false
-	for idx, user := range m.users {
-		if user.Name == newUser.Name {
-			m.users[idx] = &newUser
-			found = true
-		}
-	}
-	if !found {
-		m.users = append(m.users, &newUser)
-	}
-}
-
-func (m *mockUserLister) AddListUserError(err error) {
-	m.listUsersErr = err
+func (f *fakeCleanupService) Run(_ *v3.AuthConfig) error {
+	return nil
 }
 
 type mockAuthProvider struct {
