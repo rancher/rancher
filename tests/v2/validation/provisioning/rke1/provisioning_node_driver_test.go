@@ -5,23 +5,16 @@ import (
 
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
-	"github.com/rancher/rancher/tests/framework/extensions/clusters"
-	nodestat "github.com/rancher/rancher/tests/framework/extensions/nodes"
 	nodepools "github.com/rancher/rancher/tests/framework/extensions/rke1/nodepools"
 	"github.com/rancher/rancher/tests/framework/extensions/rke1/nodetemplates"
 	"github.com/rancher/rancher/tests/framework/extensions/users"
 	password "github.com/rancher/rancher/tests/framework/extensions/users/passwordgenerator"
-	"github.com/rancher/rancher/tests/framework/extensions/workloads/pods"
 	"github.com/rancher/rancher/tests/framework/pkg/config"
 	namegen "github.com/rancher/rancher/tests/framework/pkg/namegenerator"
 	"github.com/rancher/rancher/tests/framework/pkg/session"
-	"github.com/rancher/rancher/tests/framework/pkg/wait"
-	"github.com/rancher/rancher/tests/integration/pkg/defaults"
 	provisioning "github.com/rancher/rancher/tests/v2/validation/provisioning"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 type RKE1NodeDriverProvisioningTestSuite struct {
@@ -138,7 +131,7 @@ func (r *RKE1NodeDriverProvisioningTestSuite) TestProvisioningRKE1Cluster() {
 					name += " cni: " + cni
 					scaleName = "scaling " + name
 					r.Run(name, func() {
-						cluster, err := r.testProvisioningRKE1Cluster(client, provider, tt.nodeRoles, kubeVersion, cni, nodeTemplate)
+						cluster, err := TestProvisioningRKE1Cluster(r.T(), client, provider, tt.nodeRoles, kubeVersion, cni, nodeTemplate)
 						require.NoError(r.T(), err)
 
 						r.cluster = cluster
@@ -192,7 +185,7 @@ func (r *RKE1NodeDriverProvisioningTestSuite) TestProvisioningRKE1ClusterDynamic
 					name += " cni: " + cni
 					scaleName = "scaling " + name
 					r.Run(name, func() {
-						cluster, err := r.testProvisioningRKE1Cluster(client, provider, nodesAndRoles, kubeVersion, cni, nodeTemplate)
+						cluster, err := TestProvisioningRKE1Cluster(r.T(), client, provider, nodesAndRoles, kubeVersion, cni, nodeTemplate)
 						require.NoError(r.T(), err)
 
 						r.cluster = cluster
@@ -209,51 +202,9 @@ func (r *RKE1NodeDriverProvisioningTestSuite) TestProvisioningRKE1ClusterDynamic
 	}
 }
 
-func (r *RKE1NodeDriverProvisioningTestSuite) testProvisioningRKE1Cluster(client *rancher.Client, provider Provider, nodesAndRoles []nodepools.NodeRoles, kubeVersion, cni string, nodeTemplate *nodetemplates.NodeTemplate) (*management.Cluster, error) {
-	clusterName := namegen.AppendRandomString(provider.Name)
-
-	cluster := clusters.NewRKE1ClusterConfig(clusterName, cni, kubeVersion, client)
-	clusterResp, err := clusters.CreateRKE1Cluster(client, cluster)
-	require.NoError(r.T(), err)
-
-	nodePool, err := nodepools.NodePoolSetup(client, nodesAndRoles, clusterResp.ID, nodeTemplate.ID)
-	require.NoError(r.T(), err)
-
-	nodePoolName := nodePool.Name
-
-	opts := metav1.ListOptions{
-		FieldSelector:  "metadata.name=" + clusterResp.ID,
-		TimeoutSeconds: &defaults.WatchTimeoutSeconds,
-	}
-
-	watchInterface, err := r.client.GetManagementWatchInterface(management.ClusterType, opts)
-	require.NoError(r.T(), err)
-
-	checkFunc := clusters.IsHostedProvisioningClusterReady
-
-	err = wait.WatchWait(watchInterface, checkFunc)
-	require.NoError(r.T(), err)
-	assert.Equal(r.T(), clusterName, clusterResp.Name)
-	assert.Equal(r.T(), nodePoolName, nodePool.Name)
-	assert.Equal(r.T(), kubeVersion, clusterResp.RancherKubernetesEngineConfig.Version)
-
-	err = nodestat.IsNodeReady(client, clusterResp.ID)
-	require.NoError(r.T(), err)
-
-	clusterToken, err := clusters.CheckServiceAccountTokenSecret(client, clusterName)
-	require.NoError(r.T(), err)
-	assert.NotEmpty(r.T(), clusterToken)
-
-	podResults, podErrors := pods.StatusPods(client, clusterResp.ID)
-	assert.NotEmpty(r.T(), podResults)
-	assert.Empty(r.T(), podErrors)
-
-	return clusterResp, nil
-}
-
 func (r *RKE1NodeDriverProvisioningTestSuite) testScalingRKE1NodePools(client *rancher.Client, provider Provider, nodesAndRoles []nodepools.NodeRoles, kubeVersion, cni string, cluster *management.Cluster, nodeTemplate *nodetemplates.NodeTemplate) {
 	if cluster == nil {
-		cluster, err := r.testProvisioningRKE1Cluster(client, provider, nodesAndRoles, kubeVersion, cni, nodeTemplate)
+		cluster, err := TestProvisioningRKE1Cluster(r.T(), client, provider, nodesAndRoles, kubeVersion, cni, nodeTemplate)
 		require.NoError(r.T(), err)
 
 		err = nodepools.ScaleWorkerNodePool(client, nodesAndRoles, cluster.ID, nodeTemplate.ID)

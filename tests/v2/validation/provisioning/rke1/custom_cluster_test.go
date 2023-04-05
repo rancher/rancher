@@ -1,27 +1,18 @@
 package rke1
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
-	"github.com/rancher/rancher/tests/framework/extensions/clusters"
-	nodestat "github.com/rancher/rancher/tests/framework/extensions/nodes"
-	"github.com/rancher/rancher/tests/framework/extensions/tokenregistration"
 	"github.com/rancher/rancher/tests/framework/extensions/users"
 	password "github.com/rancher/rancher/tests/framework/extensions/users/passwordgenerator"
-	"github.com/rancher/rancher/tests/framework/extensions/workloads/pods"
 	"github.com/rancher/rancher/tests/framework/pkg/config"
 	namegen "github.com/rancher/rancher/tests/framework/pkg/namegenerator"
 	"github.com/rancher/rancher/tests/framework/pkg/session"
-	"github.com/rancher/rancher/tests/framework/pkg/wait"
-	"github.com/rancher/rancher/tests/integration/pkg/defaults"
-	provisioning "github.com/rancher/rancher/tests/v2/validation/provisioning"
-	"github.com/stretchr/testify/assert"
+	"github.com/rancher/rancher/tests/v2/validation/provisioning"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 type CustomClusterProvisioningTestSuite struct {
@@ -111,7 +102,7 @@ func (c *CustomClusterProvisioningTestSuite) TestProvisioningRKE1CustomCluster()
 				for _, cni := range c.cnis {
 					name += " cni: " + cni
 					c.Run(name, func() {
-						c.testProvisioningRKE1CustomCluster(client, externalNodeProvider, tt.nodeRoles, kubeVersion, cni)
+						TestProvisioningRKE1CustomCluster(c.T(), client, externalNodeProvider, tt.nodeRoles, kubeVersion, cni)
 					})
 				}
 			}
@@ -167,68 +158,12 @@ func (c *CustomClusterProvisioningTestSuite) TestProvisioningRKE1CustomClusterDy
 				for _, cni := range c.cnis {
 					name += " cni: " + cni
 					c.Run(name, func() {
-						c.testProvisioningRKE1CustomCluster(client, externalNodeProvider, rolesPerNode, kubeVersion, cni)
+						TestProvisioningRKE1CustomCluster(c.T(), client, externalNodeProvider, rolesPerNode, kubeVersion, cni)
 					})
 				}
 			}
 		}
 	}
-}
-
-func (c *CustomClusterProvisioningTestSuite) testProvisioningRKE1CustomCluster(client *rancher.Client, externalNodeProvider provisioning.ExternalNodeProvider, nodesAndRoles []string, kubeVersion string, cni string) {
-	numNodes := len(nodesAndRoles)
-	nodes, _, err := externalNodeProvider.NodeCreationFunc(client, numNodes, 0, false)
-	require.NoError(c.T(), err)
-
-	clusterName := namegen.AppendRandomString(externalNodeProvider.Name)
-
-	cluster := clusters.NewRKE1ClusterConfig(clusterName, cni, kubeVersion, client)
-
-	clusterResp, err := clusters.CreateRKE1Cluster(client, cluster)
-	require.NoError(c.T(), err)
-
-	client, err = client.ReLogin()
-	require.NoError(c.T(), err)
-
-	customCluster, err := client.Management.Cluster.ByID(clusterResp.ID)
-	require.NoError(c.T(), err)
-
-	token, err := tokenregistration.GetRegistrationToken(client, customCluster.ID)
-	require.NoError(c.T(), err)
-
-	for key, node := range nodes {
-		c.T().Logf("Execute Registration Command for node %s", node.NodeID)
-		command := fmt.Sprintf("%s %s", token.NodeCommand, nodesAndRoles[key])
-
-		output, err := node.ExecuteCommand(command)
-		require.NoError(c.T(), err)
-		c.T().Logf(output)
-	}
-
-	opts := metav1.ListOptions{
-		FieldSelector:  "metadata.name=" + clusterResp.ID,
-		TimeoutSeconds: &defaults.WatchTimeoutSeconds,
-	}
-	watchInterface, err := c.client.GetManagementWatchInterface(management.ClusterType, opts)
-	require.NoError(c.T(), err)
-
-	checkFunc := clusters.IsHostedProvisioningClusterReady
-
-	err = wait.WatchWait(watchInterface, checkFunc)
-	require.NoError(c.T(), err)
-	assert.Equal(c.T(), clusterName, clusterResp.Name)
-	assert.Equal(c.T(), kubeVersion, clusterResp.RancherKubernetesEngineConfig.Version)
-
-	err = nodestat.IsNodeReady(client, clusterResp.ID)
-	require.NoError(c.T(), err)
-
-	clusterToken, err := clusters.CheckServiceAccountTokenSecret(client, clusterName)
-	require.NoError(c.T(), err)
-	assert.NotEmpty(c.T(), clusterToken)
-
-	podResults, podErrors := pods.StatusPods(client, clusterResp.ID)
-	assert.NotEmpty(c.T(), podResults)
-	assert.Empty(c.T(), podErrors)
 }
 
 // In order for 'go test' to run this suite, we need to create
