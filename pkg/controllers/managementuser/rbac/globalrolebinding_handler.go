@@ -1,6 +1,7 @@
 package rbac
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/rancher/norman/types/slice"
@@ -65,6 +66,8 @@ func newGlobalRoleBindingHandler(workload *config.UserContext) v3.GlobalRoleBind
 		clusterRoleBindings: workload.RBAC.ClusterRoleBindings(""),
 		crbLister:           workload.RBAC.ClusterRoleBindings("").Controller().Lister(),
 		// The following clients/controllers all point at the management cluster
+		crtbLister:                  workload.Management.Management.ClusterRoleTemplateBindings("").Controller().Lister(),
+		clusterRoleTemplateBindings: workload.Management.Management.ClusterRoleTemplateBindings(""),
 		grLister:                    workload.Management.Management.GlobalRoles("").Controller().Lister(),
 		rbLister:                    workload.Management.RBAC.RoleBindings("").Controller().Lister(),
 		roleBindings:                workload.Management.RBAC.RoleBindings(""),
@@ -83,6 +86,8 @@ type grbHandler struct {
 	clusterRoleBindings         rbacv1.ClusterRoleBindingInterface
 	crbLister                   rbacv1.ClusterRoleBindingLister
 	grbIndexer                  cache.Indexer
+	crtbLister                  v3.ClusterRoleTemplateBindingLister
+	clusterRoleTemplateBindings v3.ClusterRoleTemplateBindingInterface
 	grLister                    v3.GlobalRoleLister
 	rbLister                    rbacv1.RoleBindingLister
 	roleBindings                rbacv1.RoleBindingInterface
@@ -181,6 +186,43 @@ func (c *grbHandler) ensureProvisioningClusterAdminBinding(obj *v3.GlobalRoleBin
 	provCluster := pClusters[0]
 
 	subject := rbac.GetGRBSubject(obj)
+	crtbName := fmt.Sprintf("crtb-%s-%s-%s", rbac.GetGRBTargetKey(obj), "restricted-admin", "cluster-owner")
+	_, err = c.crtbLister.Get(provCluster.Name, crtbName)
+	if err != nil {
+		if !apierrors.IsNotFound(err) {
+			return err
+		}
+
+		// Add the restricted admin user as a member of the downstream cluster
+		// by creating a CRTB in the local custer in the namespace named after the downstream cluster.
+		crtb := v3.ClusterRoleTemplateBinding{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      crtbName,
+				Namespace: provCluster.Name,
+				OwnerReferences: []metav1.OwnerReference{
+					{
+						APIVersion: obj.APIVersion,
+						Kind:       obj.Kind,
+						Name:       obj.Name,
+						UID:        obj.UID,
+					},
+				},
+			},
+			ClusterName:      provCluster.Name,
+			RoleTemplateName: "cluster-owner",
+		}
+		if subject.Kind == "Group" {
+			crtb.GroupPrincipalName = subject.Name
+		} else if subject.Kind == "User" {
+			crtb.UserPrincipalName = subject.Name
+		}
+
+		_, err = c.clusterRoleTemplateBindings.Create(&crtb)
+		if err != nil && !apierrors.IsAlreadyExists(err) {
+			return fmt.Errorf("failed to create a CRTB for subject %s: %w", subject.Name, err)
+		}
+	}
+
 	rbName := name.SafeConcatName(rbac.ProvisioningClusterAdminName(provCluster), rbac.GetGRBTargetKey(obj))
 
 	existingRb, err := c.rbLister.Get(provCluster.Namespace, rbName)
