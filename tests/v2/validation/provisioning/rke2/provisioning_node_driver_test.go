@@ -1,32 +1,19 @@
 package rke2
 
 import (
-	"context"
-	"fmt"
 	"testing"
 
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
-	"github.com/rancher/rancher/tests/framework/extensions/clusters"
 	"github.com/rancher/rancher/tests/framework/extensions/machinepools"
-	nodestat "github.com/rancher/rancher/tests/framework/extensions/nodes"
 	"github.com/rancher/rancher/tests/framework/extensions/users"
 	password "github.com/rancher/rancher/tests/framework/extensions/users/passwordgenerator"
-	"github.com/rancher/rancher/tests/framework/extensions/workloads/pods"
 	"github.com/rancher/rancher/tests/framework/pkg/config"
 	namegen "github.com/rancher/rancher/tests/framework/pkg/namegenerator"
 	"github.com/rancher/rancher/tests/framework/pkg/session"
-	"github.com/rancher/rancher/tests/framework/pkg/wait"
-	"github.com/rancher/rancher/tests/integration/pkg/defaults"
 	provisioning "github.com/rancher/rancher/tests/v2/validation/provisioning"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-)
-
-const (
-	namespace = "fleet-default"
 )
 
 type RKE2NodeDriverProvisioningTestSuite struct {
@@ -138,7 +125,7 @@ func (r *RKE2NodeDriverProvisioningTestSuite) TestProvisioningRKE2Cluster() {
 				for _, cni := range r.cnis {
 					name += " cni: " + cni
 					r.Run(name, func() {
-						r.testProvisioningRKE2Cluster(client, provider, tt.nodeRoles, kubeVersion, cni)
+						TestProvisioningRKE2Cluster(r.T(), client, provider, tt.nodeRoles, kubeVersion, cni)
 					})
 				}
 			}
@@ -179,60 +166,12 @@ func (r *RKE2NodeDriverProvisioningTestSuite) TestProvisioningRKE2ClusterDynamic
 				for _, cni := range r.cnis {
 					name += " cni: " + cni
 					r.Run(name, func() {
-						r.testProvisioningRKE2Cluster(client, provider, nodesAndRoles, kubeVersion, cni)
+						TestProvisioningRKE2Cluster(r.T(), client, provider, nodesAndRoles, kubeVersion, cni)
 					})
 				}
 			}
 		}
 	}
-}
-
-func (r *RKE2NodeDriverProvisioningTestSuite) testProvisioningRKE2Cluster(client *rancher.Client, provider Provider, nodesAndRoles []machinepools.NodeRoles, kubeVersion, cni string) {
-	cloudCredential, err := provider.CloudCredFunc(client)
-
-	clusterName := namegen.AppendRandomString(provider.Name)
-	generatedPoolName := fmt.Sprintf("nc-%s-pool1-", clusterName)
-	machinePoolConfig := provider.MachinePoolFunc(generatedPoolName, namespace)
-
-	machineConfigResp, err := client.Steve.SteveType(provider.MachineConfigPoolResourceSteveType).Create(machinePoolConfig)
-	require.NoError(r.T(), err)
-
-	machinePools := machinepools.RKEMachinePoolSetup(nodesAndRoles, machineConfigResp)
-
-	cluster := clusters.NewK3SRKE2ClusterConfig(clusterName, namespace, cni, cloudCredential.ID, kubeVersion, machinePools)
-
-	clusterResp, err := clusters.CreateK3SRKE2Cluster(client, cluster)
-	require.NoError(r.T(), err)
-
-	kubeProvisioningClient, err := r.client.GetKubeAPIProvisioningClient()
-	require.NoError(r.T(), err)
-
-	result, err := kubeProvisioningClient.Clusters(namespace).Watch(context.TODO(), metav1.ListOptions{
-		FieldSelector:  "metadata.name=" + clusterName,
-		TimeoutSeconds: &defaults.WatchTimeoutSeconds,
-	})
-	require.NoError(r.T(), err)
-
-	checkFunc := clusters.IsProvisioningClusterReady
-
-	err = wait.WatchWait(result, checkFunc)
-	assert.NoError(r.T(), err)
-	assert.Equal(r.T(), clusterName, clusterResp.ObjectMeta.Name)
-	assert.Equal(r.T(), kubeVersion, cluster.Spec.KubernetesVersion)
-
-	clusterIDName, err := clusters.GetClusterIDByName(r.client, clusterName)
-	assert.NoError(r.T(), err)
-
-	err = nodestat.IsNodeReady(client, clusterIDName)
-	require.NoError(r.T(), err)
-
-	clusterToken, err := clusters.CheckServiceAccountTokenSecret(client, clusterName)
-	require.NoError(r.T(), err)
-	assert.NotEmpty(r.T(), clusterToken)
-
-	podResults, podErrors := pods.StatusPods(client, clusterIDName)
-	assert.NotEmpty(r.T(), podResults)
-	assert.Empty(r.T(), podErrors)
 }
 
 // In order for 'go test' to run this suite, we need to create
