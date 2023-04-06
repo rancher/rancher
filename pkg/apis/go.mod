@@ -7,7 +7,7 @@ replace k8s.io/client-go => github.com/rancher/client-go v1.25.4-rancher1
 require (
 	github.com/rancher/aks-operator v1.1.0
 	github.com/rancher/eks-operator v1.2.0
-	github.com/rancher/fleet/pkg/apis v0.0.0-20221220171827-374ed17d8499
+	github.com/rancher/fleet/pkg/apis v0.0.0-20230302144315-26bdd9326b02
 	github.com/rancher/gke-operator v1.1.5
 	github.com/rancher/norman v0.0.0-20230328153514-ae12f166495a
 	github.com/rancher/rke v1.4.4-rc7
@@ -25,7 +25,7 @@ require (
 	github.com/blang/semver v3.5.1+incompatible // indirect
 	github.com/cespare/xxhash/v2 v2.1.2 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
-	github.com/emicklei/go-restful/v3 v3.8.0 // indirect
+	github.com/emicklei/go-restful/v3 v3.10.1 // indirect
 	github.com/evanphx/json-patch v4.12.0+incompatible // indirect
 	github.com/fsnotify/fsnotify v1.5.4 // indirect
 	github.com/ghodss/yaml v1.0.0 // indirect
