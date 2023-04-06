@@ -78,9 +78,8 @@ func TestProvisioningRKE2CustomCluster(t *testing.T, client *rancher.Client, ext
 	if hasWindows {
 		for _, winNode := range winNodes {
 			t.Logf("Execute Registration Command for node %s", winNode.NodeID)
-			winCommand := fmt.Sprintf("%s", token.InsecureWindowsNodeCommand)
 
-			output, err := winNode.ExecuteCommand("powershell.exe" + winCommand)
+			output, err := winNode.ExecuteCommand("powershell.exe" + token.InsecureWindowsNodeCommand)
 			require.NoError(t, err)
 
 			t.Logf(string(output[:]))

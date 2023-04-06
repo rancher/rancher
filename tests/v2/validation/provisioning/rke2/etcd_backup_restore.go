@@ -8,8 +8,7 @@ import (
 	apisV1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
-	provisioningV1 "github.com/rancher/rancher/tests/framework/clients/rancher/v1"
-	v1 "github.com/rancher/rancher/tests/framework/clients/rancher/v1"
+	steveV1 "github.com/rancher/rancher/tests/framework/clients/rancher/v1"
 	"github.com/rancher/rancher/tests/framework/extensions/clusters"
 	"github.com/rancher/rancher/tests/framework/extensions/machinepools"
 	"github.com/rancher/rancher/tests/framework/extensions/workloads"
@@ -71,7 +70,7 @@ func restoreSnapshot(client *rancher.Client, clustername string, name string,
 }
 
 func getSnapshots(client *rancher.Client,
-	localClusterID string) ([]v1.SteveAPIObject, error) {
+	localClusterID string) ([]steveV1.SteveAPIObject, error) {
 
 	steveclient, err := client.Steve.ProxyDownstream(localClusterID)
 	if err != nil {
@@ -86,7 +85,7 @@ func getSnapshots(client *rancher.Client,
 
 }
 
-func createRKE2NodeDriverCluster(client *rancher.Client, provider *Provider, clusterName string, k8sVersion string, namespace string, cni string) (*v1.SteveAPIObject, error) {
+func createRKE2NodeDriverCluster(client *rancher.Client, provider *Provider, clusterName string, k8sVersion string, namespace string, cni string) (*steveV1.SteveAPIObject, error) {
 
 	nodeRoles := []machinepools.NodeRoles{
 		{
@@ -129,14 +128,14 @@ func createRKE2NodeDriverCluster(client *rancher.Client, provider *Provider, clu
 
 }
 
-func getProvisioningClusterByName(client *rancher.Client, clusterName string, namespace string) (*apisV1.Cluster, *v1.SteveAPIObject, error) {
+func getProvisioningClusterByName(client *rancher.Client, clusterName string, namespace string) (*apisV1.Cluster, *steveV1.SteveAPIObject, error) {
 	clusterObj, err := client.Steve.SteveType(ProvisioningSteveResouceType).ByID(namespace + "/" + clusterName)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	cluster := new(apisV1.Cluster)
-	err = v1.ConvertToK8sType(clusterObj, &cluster)
+	err = steveV1.ConvertToK8sType(clusterObj, &cluster)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -160,7 +159,7 @@ func upgradeClusterK8sVersion(client *rancher.Client, clustername string, k8sUpg
 	return nil
 }
 
-func createDeployment(deployment *appv1.Deployment, steveclient *v1.Client, client *rancher.Client, clusterID string) (*v1.SteveAPIObject, error) {
+func createDeployment(deployment *appv1.Deployment, steveclient *steveV1.Client, client *rancher.Client, clusterID string) (*steveV1.SteveAPIObject, error) {
 	deploymentResp2, err := steveclient.SteveType(workloads.DeploymentSteveType).Create(deployment)
 	if err != nil {
 		return nil, err
@@ -179,7 +178,7 @@ func createDeployment(deployment *appv1.Deployment, steveclient *v1.Client, clie
 			return false, nil
 		}
 		deployment := &appv1.Deployment{}
-		err = v1.ConvertToK8sType(deploymentResp.JSONResp, deployment)
+		err = steveV1.ConvertToK8sType(deploymentResp.JSONResp, deployment)
 		if err != nil {
 			return false, nil
 		}
@@ -207,7 +206,7 @@ func watchAndWaitForPods(client *rancher.Client, clusterID string) error {
 		isKubeControllerManagerPresent := false
 		for _, pod := range pods.Data {
 			podStatus := &corev1.PodStatus{}
-			err = provisioningV1.ConvertToK8sType(pod.Status, podStatus)
+			err = steveV1.ConvertToK8sType(pod.Status, podStatus)
 			if err != nil {
 				return false, err
 			}
