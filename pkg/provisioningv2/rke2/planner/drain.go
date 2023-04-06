@@ -25,6 +25,8 @@ func getRestartStamp(plan *plan.NodePlan) string {
 	return ""
 }
 
+// shouldDrain determines whether the node should be drained based on the plans provided. If the oldPlan doesn't exist,
+// then it will not be drained, otherwise, it compares the restart stamps to determine whether the engine will be restarted
 func shouldDrain(oldPlan *plan.NodePlan, newPlan plan.NodePlan) bool {
 	if oldPlan == nil {
 		return false

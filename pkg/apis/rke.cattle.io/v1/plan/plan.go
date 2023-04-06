@@ -27,6 +27,7 @@ type Node struct {
 	Failed         bool                                 `json:"failed,omitempty"`
 	InSync         bool                                 `json:"inSync,omitempty"`
 	Healthy        bool                                 `json:"healthy,omitempty"`
+	PlanDataExists bool                                 `json:"planDataExists,omitempty"`
 	ProbeStatus    map[string]ProbeStatus               `json:"probeStatus,omitempty"`
 }
 

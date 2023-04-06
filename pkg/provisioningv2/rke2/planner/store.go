@@ -109,21 +109,19 @@ func (p *PlanStore) Load(cluster *capi.Cluster, rkeControlPlane *rkev1.RKEContro
 			Labels:      secret.Labels,
 			Annotations: secret.Annotations,
 		}
-		node, planExists, err := SecretToNode(secret)
+		node, err := SecretToNode(secret)
 		if err != nil {
 			return nil, anyPlanDelivered, err
-		}
-		if planExists {
-			anyPlanDelivered = true
 		}
 		if node == nil {
 			continue
 		}
-
+		if node.PlanDataExists {
+			anyPlanDelivered = true
+		}
 		if err := p.setMachineJoinURL(&planEntry{Machine: result.Machines[machineName], Metadata: result.Metadata[machineName], Plan: node}, cluster, rkeControlPlane); err != nil {
 			return nil, anyPlanDelivered, err
 		}
-
 		result.Nodes[machineName] = node
 	}
 
@@ -174,20 +172,19 @@ func getPlanStatusReasonMessage(entry *planEntry) string {
 	}
 }
 
-// SecretToNode consumes a secret of type rke.cattle.io/machine-plan and returns a node object, a boolean indicating
-// whether the secret had plan data, and an error
-func SecretToNode(secret *corev1.Secret) (*plan.Node, bool, error) {
+// SecretToNode consumes a secret of type rke.cattle.io/machine-plan and returns a node object and an error if one exists
+func SecretToNode(secret *corev1.Secret) (*plan.Node, error) {
 	if secret == nil {
-		return nil, false, fmt.Errorf("unable to convert secret to node plan, secret was nil")
+		return nil, fmt.Errorf("unable to convert secret to node plan, secret was nil")
 	}
 	if secret.Type != rke2.SecretTypeMachinePlan {
-		return nil, false, fmt.Errorf("secret %s/%s was not type %s", secret.Namespace, secret.Name, rke2.SecretTypeMachinePlan)
+		return nil, fmt.Errorf("secret %s/%s was not type %s", secret.Namespace, secret.Name, rke2.SecretTypeMachinePlan)
 	}
 	result := &plan.Node{
 		Healthy: true,
 	}
 	planData := secret.Data["plan"]
-	planDataExists := len(secret.Data["plan"]) != 0
+	result.PlanDataExists = len(secret.Data["plan"]) != 0
 	appliedPlanData := secret.Data["appliedPlan"]
 	failedChecksum := string(secret.Data["failed-checksum"])
 	output := secret.Data["applied-output"]
@@ -198,7 +195,7 @@ func SecretToNode(secret *corev1.Secret) (*plan.Node, bool, error) {
 	if len(failureCount) > 0 && PlanHash(planData) == failedChecksum {
 		failureCount, err := strconv.Atoi(string(failureCount))
 		if err != nil {
-			return nil, planDataExists, err
+			return nil, err
 		}
 		if failureCount > 0 {
 			result.Failed = true
@@ -208,7 +205,7 @@ func SecretToNode(secret *corev1.Secret) (*plan.Node, bool, error) {
 			if len(rawFailureThreshold) > 0 {
 				failureThreshold, err := strconv.Atoi(string(rawFailureThreshold))
 				if err != nil {
-					return nil, planDataExists, err
+					return nil, err
 				}
 				if failureCount < failureThreshold || failureThreshold == -1 {
 					// the plan hasn't actually failed to be applied because we haven't passed the failure threshold or failure threshold is set to -1.
@@ -221,7 +218,7 @@ func SecretToNode(secret *corev1.Secret) (*plan.Node, bool, error) {
 	if len(probes) > 0 {
 		result.ProbeStatus = map[string]plan.ProbeStatus{}
 		if err := json.Unmarshal(probes, &result.ProbeStatus); err != nil {
-			return nil, planDataExists, err
+			return nil, err
 		}
 		for _, status := range result.ProbeStatus {
 			if !status.Healthy {
@@ -232,16 +229,16 @@ func SecretToNode(secret *corev1.Secret) (*plan.Node, bool, error) {
 
 	if len(planData) > 0 {
 		if err := json.Unmarshal(planData, &result.Plan); err != nil {
-			return nil, planDataExists, err
+			return nil, err
 		}
 	} else {
-		return nil, planDataExists, nil
+		return nil, nil
 	}
 
 	if len(appliedPlanData) > 0 {
 		newPlan := &plan.NodePlan{}
 		if err := json.Unmarshal(appliedPlanData, newPlan); err != nil {
-			return nil, planDataExists, err
+			return nil, err
 		}
 		result.AppliedPlan = newPlan
 	}
@@ -249,35 +246,35 @@ func SecretToNode(secret *corev1.Secret) (*plan.Node, bool, error) {
 	if len(output) > 0 {
 		gz, err := gzip.NewReader(bytes.NewBuffer(output))
 		if err != nil {
-			return nil, planDataExists, err
+			return nil, err
 		}
 		output, err = io.ReadAll(gz)
 		if err != nil {
-			return nil, planDataExists, err
+			return nil, err
 		}
 		result.Output = map[string][]byte{}
 		if err := json.Unmarshal(output, &result.Output); err != nil {
-			return nil, planDataExists, err
+			return nil, err
 		}
 	}
 
 	if len(appliedPeriodicOutput) > 0 {
 		gz, err := gzip.NewReader(bytes.NewBuffer(appliedPeriodicOutput))
 		if err != nil {
-			return nil, planDataExists, err
+			return nil, err
 		}
 		output, err = io.ReadAll(gz)
 		if err != nil {
-			return nil, planDataExists, err
+			return nil, err
 		}
 		result.PeriodicOutput = map[string]plan.PeriodicInstructionOutput{}
 		if err := json.Unmarshal(output, &result.PeriodicOutput); err != nil {
-			return nil, planDataExists, err
+			return nil, err
 		}
 	}
 
 	result.InSync = result.Healthy && bytes.Equal(planData, appliedPlanData)
-	return result, planDataExists, nil
+	return result, nil
 }
 
 func PlanHash(plan []byte) string {
@@ -342,7 +339,7 @@ func (p *PlanStore) getPlanSecretFromMachine(machine *capi.Machine) (*corev1.Sec
 
 // UpdatePlan should not be called directly as it will not block further progress if the plan is not in sync
 // maxFailures is the number of attempts the system-agent will make to run the plan (in a failed state). failureThreshold is used to determine when the plan has failed.
-func (p *PlanStore) UpdatePlan(entry *planEntry, plan plan.NodePlan, maxFailures, failureThreshold int) error {
+func (p *PlanStore) UpdatePlan(entry *planEntry, newNodePlan plan.NodePlan, maxFailures, failureThreshold int) error {
 	if maxFailures < failureThreshold && failureThreshold != -1 && maxFailures != -1 {
 		return fmt.Errorf("failureThreshold (%d) cannot be greater than maxFailures (%d)", failureThreshold, maxFailures)
 	}
@@ -351,7 +348,7 @@ func (p *PlanStore) UpdatePlan(entry *planEntry, plan plan.NodePlan, maxFailures
 		return err
 	}
 
-	data, err := json.Marshal(plan)
+	data, err := json.Marshal(newNodePlan)
 	if err != nil {
 		return err
 	}
@@ -380,8 +377,19 @@ func (p *PlanStore) UpdatePlan(entry *planEntry, plan plan.NodePlan, maxFailures
 		delete(secret.Data, "failure-threshold")
 	}
 
-	_, err = p.secrets.Update(secret)
-	return err
+	updatedSecret, err := p.secrets.Update(secret)
+	if err != nil {
+		return err
+	}
+
+	// Update the node immediately so that future plan processing occurs
+	newNode, err := SecretToNode(updatedSecret)
+	if err != nil {
+		return err
+	}
+
+	entry.Plan = newNode
+	return nil
 }
 
 func (p *PlanStore) updatePlanSecretLabelsAndAnnotations(entry *planEntry) error {
@@ -414,17 +422,17 @@ func (p *PlanStore) removePlanSecretLabel(entry *planEntry, key string) error {
 }
 
 // assignAndCheckPlan assigns the given newPlan to the designated server in the planEntry, and will return nil if the plan is assigned and in sync.
-func assignAndCheckPlan(store *PlanStore, msg string, server *planEntry, newPlan plan.NodePlan, failureThreshold, maxRetries int) error {
-	if server.Plan == nil || !equality.Semantic.DeepEqual(server.Plan.Plan, newPlan) {
-		if err := store.UpdatePlan(server, newPlan, failureThreshold, maxRetries); err != nil {
+func assignAndCheckPlan(store *PlanStore, msg string, entry *planEntry, newPlan plan.NodePlan, failureThreshold, maxRetries int) error {
+	if entry.Plan == nil || !equality.Semantic.DeepEqual(entry.Plan.Plan, newPlan) {
+		if err := store.UpdatePlan(entry, newPlan, failureThreshold, maxRetries); err != nil {
 			return err
 		}
 		return errWaiting(fmt.Sprintf("starting %s", msg))
 	}
-	if server.Plan.Failed {
+	if entry.Plan.Failed {
 		return fmt.Errorf("operation %s failed", msg)
 	}
-	if !server.Plan.InSync {
+	if !entry.Plan.InSync {
 		return errWaiting(fmt.Sprintf("waiting for %s", msg))
 	}
 	return nil

@@ -101,8 +101,6 @@ contexts:
 `)
 )
 
-type roleFilter func(*planEntry) bool
-
 type Planner struct {
 	ctx                           context.Context
 	store                         *PlanStore
@@ -284,8 +282,8 @@ func (p *Planner) Process(cp *rkev1.RKEControlPlane, status rkev1.RKEControlPlan
 
 	// In the case where the cluster has been initialized, there is no current init node, and no plans have been
 	// delivered, don't proceed with electing a new init node. The only way out of this is to restore an etcd snapshot.
-	if status.Initialized && !plansDelivered {
-		return status, errIgnoref("rkecontrolplane %s/%s was already initialized but no machines exist that have plans, indicating the etcd plane has been entirely replaced. Restoration from etcd snapshot is required.", cp.Namespace, cp.Name)
+	if status.Initialized && !anyPlanDelivered(plan, isEtcd) {
+		return status, errIgnoref("rkecontrolplane %s/%s was already initialized but no etcd machines exist that have plans, indicating the etcd plane has been entirely replaced. Restoration from etcd snapshot is required.", cp.Namespace, cp.Name)
 	}
 
 	// on the first run through, electInitNode will return a `generic.ErrSkip` as it is attempting to wait for the cache to catch up.
@@ -971,111 +969,6 @@ func getInstallerImage(controlPlane *rkev1.RKEControlPlane) string {
 	installerImage := settings.SystemAgentInstallerImage.Get()
 	installerImage = installerImage + runtime + ":" + strings.ReplaceAll(controlPlane.Spec.KubernetesVersion, "+", "-")
 	return image.ResolveWithControlPlane(installerImage, controlPlane)
-}
-
-func isEtcd(entry *planEntry) bool {
-	return entry.Metadata != nil && entry.Metadata.Labels[rke2.EtcdRoleLabel] == "true"
-}
-
-func isInitNode(entry *planEntry) bool {
-	return entry.Metadata != nil && entry.Metadata.Labels[rke2.InitNodeLabel] == "true"
-}
-
-func isInitNodeOrDeleting(entry *planEntry) bool {
-	return isInitNode(entry) || isDeleting(entry)
-}
-
-func IsEtcdOnlyInitNode(entry *planEntry) bool {
-	return isInitNode(entry) && IsOnlyEtcd(entry)
-}
-
-func isNotInitNodeOrIsDeleting(entry *planEntry) bool {
-	return !isInitNode(entry) || isDeleting(entry)
-}
-
-func isDeleting(entry *planEntry) bool {
-	return entry.Machine.DeletionTimestamp != nil
-}
-
-// isFailed returns true if the provided entry machine.status.phase is failed
-func isFailed(entry *planEntry) bool {
-	return entry.Machine.Status.Phase == string(capi.MachinePhaseFailed)
-}
-
-// canBeInitNode returns true if the provided entry is an etcd node, is not deleting, is not failed, and has its infrastructure ready
-// We should wait for the infrastructure condition to be marked as ready because we need the IP address(es) set prior to bootstrapping the node.
-func canBeInitNode(entry *planEntry) bool {
-	return isEtcd(entry) && !isDeleting(entry) && !isFailed(entry) && rke2.InfrastructureReady.IsTrue(entry.Machine)
-}
-
-func isControlPlane(entry *planEntry) bool {
-	return entry.Metadata != nil && entry.Metadata.Labels[rke2.ControlPlaneRoleLabel] == "true"
-}
-
-func isControlPlaneAndNotInitNode(entry *planEntry) bool {
-	return isControlPlane(entry) && !isInitNode(entry)
-}
-
-func isControlPlaneEtcd(entry *planEntry) bool {
-	return isControlPlane(entry) || isEtcd(entry)
-}
-
-func IsOnlyEtcd(entry *planEntry) bool {
-	return isEtcd(entry) && !isControlPlane(entry)
-}
-
-func isOnlyControlPlane(entry *planEntry) bool {
-	return !isEtcd(entry) && isControlPlane(entry)
-}
-
-func isWorker(entry *planEntry) bool {
-	return entry.Metadata != nil && entry.Metadata.Labels[rke2.WorkerRoleLabel] == "true"
-}
-
-func noRole(entry *planEntry) bool {
-	return !isEtcd(entry) && !isControlPlane(entry) && !isWorker(entry)
-}
-
-func anyRole(entry *planEntry) bool {
-	return !noRole(entry)
-}
-
-func anyRoleWithoutWindows(entry *planEntry) bool {
-	return !noRole(entry) && notWindows(entry)
-}
-
-func isOnlyWorker(entry *planEntry) bool {
-	return !isEtcd(entry) && !isControlPlane(entry) && isWorker(entry)
-}
-
-func notWindows(entry *planEntry) bool {
-	return entry.Machine.Status.NodeInfo.OperatingSystem != windows
-}
-
-type planEntry struct {
-	Machine  *capi.Machine
-	Plan     *plan.Node
-	Metadata *plan.Metadata
-}
-
-func collect(plan *plan.Plan, include roleFilter) (result []*planEntry) {
-	for machineName, machine := range plan.Machines {
-		entry := &planEntry{
-			Machine:  machine,
-			Plan:     plan.Nodes[machineName],
-			Metadata: plan.Metadata[machineName],
-		}
-		if !include(entry) {
-			continue
-		}
-		result = append(result, entry)
-	}
-
-	sort.Slice(result, func(i, j int) bool {
-		return result[i].Machine.Name < result[j].Machine.Name
-	})
-
-	return result
 }
 
 // ensureRKEStateSecret ensures that the RKE state secret for the given RKEControlPlane exists. This secret contains the
