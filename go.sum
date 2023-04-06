@@ -1338,8 +1338,8 @@ github.com/quasilyte/go-ruleguard/dsl v0.3.10/go.mod h1:KeCP03KrjuSO0H1kTuZQCWlQ
 github.com/quasilyte/go-ruleguard/rules v0.0.0-20201231183845-9e62ed36efe1/go.mod h1:7JTjp89EGyU1d6XfBiXihJNG37wB2VRkd125Q1u7Plc=
 github.com/quasilyte/go-ruleguard/rules v0.0.0-20210428214800-545e0d2e0bf7/go.mod h1:4cgAphtvu7Ftv7vOT2ZOYhC6CvBxZixcasr8qIOTA50=
 github.com/quasilyte/regex/syntax v0.0.0-20200407221936-30656e2c4a95/go.mod h1:rlzQ04UMyJXu/aOvhd8qT+hvDrFpiwqp8MRXDY9szc0=
-github.com/rancher/aks-operator v1.1.0-rc7 h1:gs7HQfWIHolfFO0s0yNy/QPPOGzmsBIIJkuP3QLiqqU=
-github.com/rancher/aks-operator v1.1.0-rc7/go.mod h1:64vexLWSXByy05B2PX0TbCcCV7uQLs44S/8NVPsAlqE=
+github.com/rancher/aks-operator v1.1.0 h1://RJGHfAyZ0oGf6H1l4v7Sj7IHDsVd2/juXjtAb1/xQ=
+github.com/rancher/aks-operator v1.1.0/go.mod h1:64vexLWSXByy05B2PX0TbCcCV7uQLs44S/8NVPsAlqE=
 github.com/rancher/apiserver v0.0.0-20201023000256-1a0a904f9197/go.mod h1:8W0EwaR9dH5NDFw6mpAX437D0q+EZqKWbZyX71+z2WI=
 github.com/rancher/apiserver v0.0.0-20230120214941-e88c32739dc7 h1:Ob72oeF0iM8gWEMh+qKT5e1pzTwQU70I5kx4gMaqCmI=
 github.com/rancher/apiserver v0.0.0-20230120214941-e88c32739dc7/go.mod h1:xwQhXv3XFxWfA6tLa4ZeaERu8ldNbyKv2sF+mT+c5WA=
@@ -1351,8 +1351,8 @@ github.com/rancher/client-go v1.25.4-rancher1 h1:9MlBC8QbgngUkhNzMR8rZmmCIj6WNRH
 github.com/rancher/client-go v1.25.4-rancher1/go.mod h1:8trHCAC83XKY0wsBIpbirZU4NTUpbuhc2JnI7OruGZw=
 github.com/rancher/dynamiclistener v0.3.5 h1:5TaIHvkDGmZKvc96Huur16zfTKOiLhDtK4S+WV0JA6A=
 github.com/rancher/dynamiclistener v0.3.5/go.mod h1:dW/YF6/m2+uEyJ5VtEcd9THxda599HP6N9dSXk81+k0=
-github.com/rancher/eks-operator v1.2.0-rc2 h1:6VOUjQ03XPsGVNBE1ZDPTRAjbeO3dQXii9xRsZaXkrw=
-github.com/rancher/eks-operator v1.2.0-rc2/go.mod h1:mx3fp0rFzDX7gEXJtisHWDFeDJHpDsAjwDkmbSf1BKs=
+github.com/rancher/eks-operator v1.2.0 h1:hwM6HBegxC62Am8Og1PLOGtCrDDLXXp5I259rYlUwLI=
+github.com/rancher/eks-operator v1.2.0/go.mod h1:mx3fp0rFzDX7gEXJtisHWDFeDJHpDsAjwDkmbSf1BKs=
 github.com/rancher/fleet/pkg/apis v0.0.0-20230302144315-26bdd9326b02 h1:v7vRsjYVOwfkZ9v6zNWGttHK5j9MaCJ1YKctjRTR10U=
 github.com/rancher/fleet/pkg/apis v0.0.0-20230302144315-26bdd9326b02/go.mod h1:3855TZydHgNlp6aUHW08QqTJIAG3gGU8G6YearJJvc0=
 github.com/rancher/gke-operator v1.1.5 h1:XHNrM67enwDkqYG5C4s1HVgfJGmfwtVYGfl9TgXT6zA=

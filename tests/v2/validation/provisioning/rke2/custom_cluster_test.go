@@ -1,29 +1,18 @@
 package rke2
 
 import (
-	"context"
-	"fmt"
 	"testing"
 
-	apiv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
-	v1 "github.com/rancher/rancher/tests/framework/clients/rancher/v1"
-	"github.com/rancher/rancher/tests/framework/extensions/clusters"
-	hardening "github.com/rancher/rancher/tests/framework/extensions/hardening/rke2"
-	"github.com/rancher/rancher/tests/framework/extensions/tokenregistration"
 	"github.com/rancher/rancher/tests/framework/extensions/users"
 	password "github.com/rancher/rancher/tests/framework/extensions/users/passwordgenerator"
 	"github.com/rancher/rancher/tests/framework/pkg/config"
 	namegen "github.com/rancher/rancher/tests/framework/pkg/namegenerator"
 	"github.com/rancher/rancher/tests/framework/pkg/session"
-	"github.com/rancher/rancher/tests/framework/pkg/wait"
-	"github.com/rancher/rancher/tests/integration/pkg/defaults"
 	provisioning "github.com/rancher/rancher/tests/v2/validation/provisioning"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 type CustomClusterProvisioningTestSuite struct {
@@ -122,7 +111,7 @@ func (c *CustomClusterProvisioningTestSuite) TestProvisioningRKE2CustomCluster()
 				for _, cni := range c.cnis {
 					name += " cni: " + cni
 					c.Run(name, func() {
-						c.testProvisioningRKE2CustomCluster(client, externalNodeProvider, tt.nodeRoles, kubeVersion, cni, tt.hardening, tt.nodeCountWin, tt.hasWindows)
+						TestProvisioningRKE2CustomCluster(c.T(), client, externalNodeProvider, tt.nodeRoles, kubeVersion, cni, tt.hardening, tt.nodeCountWin, tt.hasWindows)
 					})
 				}
 			}
@@ -182,106 +171,11 @@ func (c *CustomClusterProvisioningTestSuite) TestProvisioningRKE2CustomClusterDy
 				for _, cni := range c.cnis {
 					name += " cni: " + cni
 					c.Run(name, func() {
-						c.testProvisioningRKE2CustomCluster(client, externalNodeProvider, rolesPerNode, kubeVersion, cni, tt.hardening, tt.nodeCountWin, tt.hasWindows)
+						TestProvisioningRKE2CustomCluster(c.T(), client, externalNodeProvider, rolesPerNode, kubeVersion, cni, tt.hardening, tt.nodeCountWin, tt.hasWindows)
 					})
 				}
 			}
 		}
-	}
-}
-
-func (c *CustomClusterProvisioningTestSuite) testProvisioningRKE2CustomCluster(client *rancher.Client, externalNodeProvider provisioning.ExternalNodeProvider, nodesAndRoles []string, kubeVersion, cni string, harden *provisioning.Config, nodeCountWin int, hasWindows bool) {
-	numNodesLin := len(nodesAndRoles)
-
-	linuxNodes, winNodes, err := externalNodeProvider.NodeCreationFunc(client, numNodesLin, nodeCountWin, hasWindows)
-	require.NoError(c.T(), err)
-
-	clusterName := namegen.AppendRandomString(externalNodeProvider.Name)
-
-	cluster := clusters.NewK3SRKE2ClusterConfig(clusterName, namespace, cni, "", kubeVersion, nil)
-
-	clusterResp, err := clusters.CreateK3SRKE2Cluster(client, cluster)
-	require.NoError(c.T(), err)
-
-	client, err = client.ReLogin()
-	require.NoError(c.T(), err)
-	customCluster, err := client.Steve.SteveType(clusters.ProvisioningSteveResouceType).ByID(clusterResp.ID)
-	require.NoError(c.T(), err)
-
-	clusterStatus := &apiv1.ClusterStatus{}
-	err = v1.ConvertToK8sType(customCluster.Status, clusterStatus)
-	require.NoError(c.T(), err)
-
-	token, err := tokenregistration.GetRegistrationToken(client, clusterStatus.ClusterName)
-	require.NoError(c.T(), err)
-
-	for key, linuxNode := range linuxNodes {
-		c.T().Logf("Execute Registration Command for node %s", linuxNode.NodeID)
-		command := fmt.Sprintf("%s %s", token.InsecureNodeCommand, nodesAndRoles[key])
-
-		output, err := linuxNode.ExecuteCommand(command)
-		require.NoError(c.T(), err)
-
-		c.T().Logf(output)
-	}
-
-	kubeProvisioningClient, err := c.client.GetKubeAPIProvisioningClient()
-	require.NoError(c.T(), err)
-	result, err := kubeProvisioningClient.Clusters(namespace).Watch(context.TODO(), metav1.ListOptions{
-		FieldSelector: "metadata.name=" + clusterName,
-
-		TimeoutSeconds: &defaults.WatchTimeoutSeconds,
-	})
-	require.NoError(c.T(), err)
-
-	checkFunc := clusters.IsProvisioningClusterReady
-	err = wait.WatchWait(result, checkFunc)
-	assert.NoError(c.T(), err)
-	assert.Equal(c.T(), clusterName, clusterResp.ObjectMeta.Name)
-
-	if hasWindows {
-		for _, winNode := range winNodes {
-			c.T().Logf("Execute Registration Command for node %s", winNode.NodeID)
-			winCommand := fmt.Sprintf("%s", token.InsecureWindowsNodeCommand)
-
-			output, err := winNode.ExecuteCommand("powershell.exe" + winCommand)
-			require.NoError(c.T(), err)
-
-			c.T().Logf(string(output[:]))
-		}
-
-		kubeWinProvisioningClient, err := c.client.GetKubeAPIProvisioningClient()
-		require.NoError(c.T(), err)
-
-		result, err := kubeWinProvisioningClient.Clusters(namespace).Watch(context.TODO(), metav1.ListOptions{
-			FieldSelector: "metadata.name=" + clusterName,
-
-			TimeoutSeconds: &defaults.WatchTimeoutSeconds,
-		})
-		require.NoError(c.T(), err)
-
-		checkFunc := clusters.IsProvisioningClusterReady
-		err = wait.WatchWait(result, checkFunc)
-		assert.NoError(c.T(), err)
-		assert.Equal(c.T(), clusterName, clusterResp.ObjectMeta.Name)
-	}
-
-	clusterToken, err := clusters.CheckServiceAccountTokenSecret(client, clusterName)
-	require.NoError(c.T(), err)
-	assert.NotEmpty(c.T(), clusterToken)
-
-	if harden.Hardened && kubeVersion <= string(provisioning.HardenedKubeVersion) {
-		err = hardening.HardeningNodes(client, harden.Hardened, linuxNodes, nodesAndRoles)
-		require.NoError(c.T(), err)
-
-		hardenCluster := clusters.HardenK3SRKE2ClusterConfig(clusterName, namespace, "", "", kubeVersion, nil)
-
-		hardenClusterResp, err := clusters.UpdateK3SRKE2Cluster(client, clusterResp, hardenCluster)
-		require.NoError(c.T(), err)
-		assert.Equal(c.T(), clusterName, hardenClusterResp.ObjectMeta.Name)
-
-		err = hardening.PostHardeningConfig(client, harden.Hardened, linuxNodes, nodesAndRoles)
-		require.NoError(c.T(), err)
 	}
 }
 
