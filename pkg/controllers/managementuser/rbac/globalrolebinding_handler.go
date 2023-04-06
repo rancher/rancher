@@ -11,9 +11,7 @@ import (
 	rbacv1 "github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1"
 	"github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/rancher/pkg/types/config"
-	"github.com/rancher/wrangler/pkg/name"
 	"github.com/sirupsen/logrus"
-	k8srbac "k8s.io/api/rbac/v1"
 	v12 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -115,12 +113,12 @@ func (c *grbHandler) sync(key string, obj *v3.GlobalRoleBinding) (runtime.Object
 
 	logrus.Debugf("%v is an admin role", obj.GlobalRoleName)
 
-	err = c.ensureClusterAdminBinding(obj)
+	err = c.addAdminAsClusterAdmin(obj)
 	if err != nil {
 		return nil, err
 	}
 
-	err = c.ensureProvisioningClusterAdminBinding(obj)
+	err = c.addRestrictedAdminCRTB(obj)
 	if err != nil {
 		return nil, err
 	}
@@ -128,8 +126,12 @@ func (c *grbHandler) sync(key string, obj *v3.GlobalRoleBinding) (runtime.Object
 	return obj, nil
 }
 
-// ensureClusterAdminBinding creates a cluster-admin binding in the downstream cluster
-func (c *grbHandler) ensureClusterAdminBinding(obj *v3.GlobalRoleBinding) error {
+// addAdminAsClusterAdmin creates a cluster role binding of an admin user
+// to the regular Kubernetes "cluster-admin" cluster role in the downstream cluster.
+func (c *grbHandler) addAdminAsClusterAdmin(obj *v3.GlobalRoleBinding) error {
+	if obj == nil || obj.GlobalRoleName != rbac.GlobalAdmin {
+		return nil
+	}
 	bindingName := rbac.GrbCRBName(obj)
 	b, err := c.crbLister.Get("", bindingName)
 	if err != nil && !apierrors.IsNotFound(err) {
@@ -159,11 +161,9 @@ func (c *grbHandler) ensureClusterAdminBinding(obj *v3.GlobalRoleBinding) error 
 	return nil
 }
 
-// ensureProvisioningClusterAdminBinding creates a bindings from the restricted-admin to the
-// cluster-owner role in the cluster namespace in the management cluster. This grants
-// permissions to all the v2 provisioning resources that are marked as cluster indexed in the
-// management cluster.
-func (c *grbHandler) ensureProvisioningClusterAdminBinding(obj *v3.GlobalRoleBinding) error {
+// addRestrictedAdminCRTB adds a restricted-admin to the downstream cluster as cluster-owner
+// by creating a CRTB with the "cluster-owner" role template.
+func (c *grbHandler) addRestrictedAdminCRTB(obj *v3.GlobalRoleBinding) error {
 	// Restricted-admin needs this, a regular admin will already have access to all the resources
 	// this binding grants in the management cluster.
 	if obj.GlobalRoleName != rbac.GlobalRestrictedAdmin {
@@ -221,40 +221,6 @@ func (c *grbHandler) ensureProvisioningClusterAdminBinding(obj *v3.GlobalRoleBin
 		if err != nil && !apierrors.IsAlreadyExists(err) {
 			return fmt.Errorf("failed to create a CRTB for subject %s: %w", subject.Name, err)
 		}
-	}
-
-	rbName := name.SafeConcatName(rbac.ProvisioningClusterAdminName(provCluster), rbac.GetGRBTargetKey(obj))
-
-	existingRb, err := c.rbLister.Get(provCluster.Namespace, rbName)
-	if err != nil && !apierrors.IsNotFound(err) {
-		return err
-	}
-	if existingRb != nil {
-		return nil
-	}
-
-	_, err = c.roleBindings.Create(&k8srbac.RoleBinding{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      rbName,
-			Namespace: provCluster.Namespace,
-			OwnerReferences: []metav1.OwnerReference{
-				{
-					APIVersion: obj.APIVersion,
-					Kind:       obj.Kind,
-					Name:       obj.Name,
-					UID:        obj.UID,
-				},
-			},
-		},
-		RoleRef: k8srbac.RoleRef{
-			APIGroup: k8srbac.GroupName,
-			Kind:     "Role",
-			Name:     rbac.ProvisioningClusterAdminName(provCluster),
-		},
-		Subjects: []k8srbac.Subject{subject},
-	})
-	if err != nil && !apierrors.IsAlreadyExists(err) {
-		return err
 	}
 
 	return nil
