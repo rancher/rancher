@@ -13,12 +13,16 @@ import (
 	namegen "github.com/rancher/rancher/tests/framework/pkg/namegenerator"
 )
 
-const roleOwner = "cluster-owner"
-const roleMember = "cluster-member"
-const roleProjectOwner = "project-owner"
-const roleProjectMember = "project-member"
+const (
+	roleOwner         = "cluster-owner"
+	roleMember        = "cluster-member"
+	roleProjectOwner  = "project-owner"
+	roleProjectMember = "project-member"
+	restrictedAdmin   = "restricted-admin"
+	standardUser      = "user"
+)
 
-func createUser(client *rancher.Client) (*management.User, error) {
+func createUser(client *rancher.Client, role string) (*management.User, error) {
 	enabled := true
 	var username = namegen.AppendRandomString("testuser-")
 	var testpassword = password.GenerateUserPassword("testpass-")
@@ -28,12 +32,10 @@ func createUser(client *rancher.Client) (*management.User, error) {
 		Name:     username,
 		Enabled:  &enabled,
 	}
-
-	newUser, err := users.CreateUserWithRole(client, user, "user")
+	newUser, err := users.CreateUserWithRole(client, user, role)
 	if err != nil {
 		return newUser, err
 	}
-
 	newUser.Password = user.Password
 	return newUser, err
 }
@@ -82,5 +84,4 @@ func createProject(client *rancher.Client, clusterID string) (createProject *man
 
 	createProject, err = client.Management.Project.Create(projectConfig)
 	return createProject, err
-
 }
