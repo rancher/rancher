@@ -14,6 +14,7 @@ RUN mkdir /root/.kube && \
 WORKDIR /var/lib/rancher
 
 ARG ARCH=amd64
+ARG ETCD_UNSUPPORTED_ARCH
 ARG IMAGE_REPO=rancher
 ARG SYSTEM_CHART_DEFAULT_BRANCH=dev-v2.6
 ARG CHART_DEFAULT_BRANCH=dev-v2.6
@@ -226,5 +227,7 @@ VOLUME /var/lib/rancher
 VOLUME /var/lib/kubelet
 VOLUME /var/lib/cni
 VOLUME /var/log
+
+ENV ETCD_UNSUPPORTED_ARCH ${ETCD_UNSUPPORTED_ARCH}
 
 ENTRYPOINT ["entrypoint.sh"]
