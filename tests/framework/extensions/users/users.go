@@ -179,11 +179,16 @@ func AddClusterRoleToUser(rancherClient *rancher.Client, cluster *management.Clu
 		RoleTemplateID:  clusterRole,
 	}
 
+	adminClient, err := rancher.NewClient(rancherClient.RancherConfig.AdminToken, rancherClient.Session)
+	if err != nil {
+		return err
+	}
+
 	opts := metav1.ListOptions{
 		FieldSelector:  "metadata.name=" + cluster.ID,
 		TimeoutSeconds: &defaults.WatchTimeoutSeconds,
 	}
-	watchInterface, err := rancherClient.GetManagementWatchInterface(management.ClusterType, opts)
+	watchInterface, err := adminClient.GetManagementWatchInterface(management.ClusterType, opts)
 	if err != nil {
 		return err
 	}
