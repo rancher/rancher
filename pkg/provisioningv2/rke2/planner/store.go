@@ -24,6 +24,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	apierror "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 )
@@ -307,7 +308,9 @@ func isRKEBootstrap(machine *capi.Machine) bool {
 		machine.Spec.Bootstrap.ConfigRef.Kind == "RKEBootstrap"
 }
 
-// getPlanSecretFromMachine returns the plan secret from the secretsCache for the given machine, or an error if the plan secret is not available
+// getPlanSecretFromMachine returns the plan secret from the secrets client for the given machine,
+// or an error if the plan secret is not available. Notably we do not use the secretsCache to ensure we only operate
+// on the latest version of a machine plan secret.
 func (p *PlanStore) getPlanSecretFromMachine(machine *capi.Machine) (*corev1.Secret, error) {
 	if machine == nil {
 		return nil, fmt.Errorf("machine was nil")
@@ -325,7 +328,16 @@ func (p *PlanStore) getPlanSecretFromMachine(machine *capi.Machine) (*corev1.Sec
 		return nil, fmt.Errorf("machine %s/%s bootstrap configref name was empty", machine.Namespace, machine.Name)
 	}
 
-	return p.secretsCache.Get(machine.Namespace, rke2.PlanSecretFromBootstrapName(machine.Spec.Bootstrap.ConfigRef.Name))
+	secret, err := p.secrets.Get(machine.Namespace, rke2.PlanSecretFromBootstrapName(machine.Spec.Bootstrap.ConfigRef.Name), metav1.GetOptions{})
+	if err != nil {
+		return nil, err
+	}
+
+	if secret.Type != rke2.SecretTypeMachinePlan {
+		return nil, fmt.Errorf("retrieved secret %s/%s type %s did not match expected type %s", secret.Namespace, secret.Name, secret.Type, rke2.SecretTypeMachinePlan)
+	}
+
+	return secret, nil
 }
 
 // UpdatePlan should not be called directly as it will not block further progress if the plan is not in sync
