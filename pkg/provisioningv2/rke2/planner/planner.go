@@ -271,7 +271,7 @@ func (p *Planner) Process(cp *rkev1.RKEControlPlane, status rkev1.RKEControlPlan
 		return status, ErrWaitingf("Waiting for System Upgrade Controller to be updated for Kubernetes version %s", cp.Spec.KubernetesVersion)
 	}
 
-	clusterSecretTokens, err := p.generateSecrets(cp)
+	_, clusterSecretTokens, err := p.ensureRKEStateSecret(cp)
 	if err != nil {
 		return status, err
 	}
@@ -1112,16 +1112,8 @@ func collect(plan *plan.Plan, include roleFilter) (result []*planEntry) {
 	return result
 }
 
-// generateSecrets generates the server/agent tokens for a v2prov cluster
-func (p *Planner) generateSecrets(controlPlane *rkev1.RKEControlPlane) (plan.Secret, error) {
-	_, secret, err := p.ensureRKEStateSecret(controlPlane)
-	if err != nil {
-		return secret, err
-	}
-
-	return secret, nil
-}
-
+// ensureRKEStateSecret ensures that the RKE state secret for the given RKEControlPlane exists. This secret contains the
+// serverToken and agentToken used for server/agent registration.
 func (p *Planner) ensureRKEStateSecret(controlPlane *rkev1.RKEControlPlane) (string, plan.Secret, error) {
 	if controlPlane.Spec.UnmanagedConfig {
 		return "", plan.Secret{}, nil
@@ -1157,7 +1149,7 @@ func (p *Planner) ensureRKEStateSecret(controlPlane *rkev1.RKEControlPlane) (str
 				"serverToken": []byte(serverToken),
 				"agentToken":  []byte(agentToken),
 			},
-			Type: "rke.cattle.io/cluster-state",
+			Type: rke2.SecretTypeClusterState,
 		}
 
 		_, err = p.secretClient.Create(secret)
@@ -1167,6 +1159,10 @@ func (p *Planner) ensureRKEStateSecret(controlPlane *rkev1.RKEControlPlane) (str
 		}, err
 	} else if err != nil {
 		return "", plan.Secret{}, err
+	}
+
+	if secret.Type != rke2.SecretTypeClusterState {
+		return "", plan.Secret{}, fmt.Errorf("secret %s/%s type %s did not match expected type %s", secret.Namespace, secret.Name, secret.Type, rke2.SecretTypeClusterState)
 	}
 
 	return secret.Name, plan.Secret{
