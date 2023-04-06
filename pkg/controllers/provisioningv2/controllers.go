@@ -25,6 +25,7 @@ import (
 	"github.com/rancher/rancher/pkg/provisioningv2/capi"
 	"github.com/rancher/rancher/pkg/provisioningv2/kubeconfig"
 	planner2 "github.com/rancher/rancher/pkg/provisioningv2/rke2/planner"
+	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/sirupsen/logrus"
 )
@@ -40,7 +41,9 @@ func Register(ctx context.Context, clients *wrangler.Context) error {
 	}
 
 	if features.RKE2.Enabled() {
-		rkePlanner := planner2.New(ctx, clients)
+		rkePlanner := planner2.New(ctx, clients, planner2.InfoFunctions{
+			SystemAgentImage: settings.SystemAgentInstallerImage.Get,
+		})
 		if features.MCM.Enabled() {
 			dynamicschema.Register(ctx, clients)
 			machineprovision.Register(ctx, clients, kubeconfigManager)

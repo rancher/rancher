@@ -18,6 +18,8 @@ func TestPlanner_generateInstallInstruction(t *testing.T) {
 		scriptName      string
 		envs            []string
 		expectedEnvsLen int
+		image           string
+		expectedImage   string
 	}
 
 	tests := []struct {
@@ -34,6 +36,8 @@ func TestPlanner_generateInstallInstruction(t *testing.T) {
 				scriptName:      "run.sh",
 				envs:            []string{},
 				expectedEnvsLen: 1,
+				image:           "my/custom-image-",
+				expectedImage:   "my/custom-image-rke2:v1.21.5-rke2r2",
 			},
 		},
 		{
@@ -46,6 +50,8 @@ func TestPlanner_generateInstallInstruction(t *testing.T) {
 				scriptName:      "run.ps1",
 				envs:            []string{},
 				expectedEnvsLen: 1,
+				image:           "my/custom-image-",
+				expectedImage:   "my/custom-image-rke2:v1.21.5-rke2r2",
 			},
 		},
 		{
@@ -58,6 +64,8 @@ func TestPlanner_generateInstallInstruction(t *testing.T) {
 				scriptName:      "run.sh",
 				envs:            []string{"HTTP_PROXY", "HTTPS_PROXY", "INSTALL_RKE2_EXEC"},
 				expectedEnvsLen: 3,
+				image:           "my/custom-image-",
+				expectedImage:   "my/custom-image-rke2:v1.21.5-rke2r2",
 			},
 		},
 		{
@@ -70,6 +78,8 @@ func TestPlanner_generateInstallInstruction(t *testing.T) {
 				scriptName:      "run.ps1",
 				envs:            []string{"$env:HTTP_PROXY", "$env:HTTPS_PROXY", "$env:INSTALL_RKE2_EXEC"},
 				expectedEnvsLen: 3,
+				image:           "my/custom-image-",
+				expectedImage:   "my/custom-image-rke2:v1.21.5-rke2r2",
 			},
 		},
 	}
@@ -82,14 +92,16 @@ func TestPlanner_generateInstallInstruction(t *testing.T) {
 				controlPlane.Spec.AgentEnvVars = []v1.EnvVar{{Name: "HTTP_PROXY", Value: "0.0.0.0"}, {Name: "HTTPS_PROXY", Value: "0.0.0.0"}}
 			}
 			entry := createTestPlanEntry(tt.args.os)
-
+			var planner Planner
+			planner.retrievalFunctions.SystemAgentImage = func() string { return tt.args.image }
 			// act
-			p := generateInstallInstruction(controlPlane, entry, []string{})
+			p := planner.generateInstallInstruction(controlPlane, entry, []string{})
 
 			// assert
 			a.NotNil(p)
 			a.Contains(p.Command, tt.args.command)
 			a.Contains(p.Args, tt.args.scriptName)
+			a.Equal(p.Image, tt.args.expectedImage)
 			a.Equal(tt.args.expectedEnvsLen, len(p.Env))
 			for _, e := range tt.args.envs {
 				a.True(findEnv(p.Env, e), "couldn't find %s in environment", e)
@@ -106,6 +118,8 @@ func TestPlanner_addInstallInstructionWithRestartStamp(t *testing.T) {
 		command         string
 		scriptName      string
 		envs            []string
+		image           string
+		expectedImage   string
 	}
 
 	tests := []struct {
@@ -121,6 +135,8 @@ func TestPlanner_addInstallInstructionWithRestartStamp(t *testing.T) {
 				command:         "sh",
 				scriptName:      "run.sh",
 				envs:            []string{"RESTART_STAMP"},
+				image:           "my/custom-image-",
+				expectedImage:   "my/custom-image-rke2:v1.21.5-rke2r2",
 			},
 		},
 		{
@@ -132,6 +148,8 @@ func TestPlanner_addInstallInstructionWithRestartStamp(t *testing.T) {
 				command:         "powershell.exe",
 				scriptName:      "run.ps1",
 				envs:            []string{"$env:RESTART_STAMP"},
+				image:           "my/custom-image-",
+				expectedImage:   "my/custom-image-rke2:v1.21.5-rke2r2",
 			},
 		},
 	}
@@ -140,6 +158,7 @@ func TestPlanner_addInstallInstructionWithRestartStamp(t *testing.T) {
 			// arrange
 			a := assert.New(t)
 			var planner Planner
+			planner.retrievalFunctions.SystemAgentImage = func() string { return tt.args.image }
 			controlPlane := createTestControlPlane(tt.args.version)
 			entry := createTestPlanEntry(tt.args.os)
 
@@ -153,6 +172,7 @@ func TestPlanner_addInstallInstructionWithRestartStamp(t *testing.T) {
 			a.NotZero(len(p.Instructions))
 			instruction := p.Instructions[0]
 			a.Contains(instruction.Image, tt.args.expectedVersion)
+			a.Equal(instruction.Image, tt.args.expectedImage)
 			a.Contains(instruction.Command, tt.args.command)
 			a.Contains(instruction.Image, tt.args.expectedVersion)
 			a.Contains(instruction.Args, tt.args.scriptName)
@@ -172,6 +192,8 @@ func TestPlanner_generateInstallInstructionWithSkipStart(t *testing.T) {
 		command         string
 		scriptName      string
 		envs            []string
+		image           string
+		expectedImage   string
 	}
 
 	tests := []struct {
@@ -187,6 +209,8 @@ func TestPlanner_generateInstallInstructionWithSkipStart(t *testing.T) {
 				command:         "sh",
 				scriptName:      "run.sh",
 				envs:            []string{"INSTALL_RKE2_SKIP_START=true"},
+				image:           "my/custom-image-",
+				expectedImage:   "my/custom-image-rke2:v1.21.5-rke2r2",
 			},
 		},
 		{
@@ -198,6 +222,8 @@ func TestPlanner_generateInstallInstructionWithSkipStart(t *testing.T) {
 				command:         "powershell.exe",
 				scriptName:      "run.ps1",
 				envs:            []string{"$env:INSTALL_RKE2_SKIP_START=\"true\""},
+				image:           "my/custom-image-",
+				expectedImage:   "my/custom-image-rke2:v1.21.5-rke2r2",
 			},
 		},
 	}
@@ -206,6 +232,7 @@ func TestPlanner_generateInstallInstructionWithSkipStart(t *testing.T) {
 			// arrange
 			a := assert.New(t)
 			var planner Planner
+			planner.retrievalFunctions.SystemAgentImage = func() string { return tt.args.image }
 			controlPlane := createTestControlPlane(tt.args.version)
 			entry := createTestPlanEntry(tt.args.os)
 
@@ -216,6 +243,7 @@ func TestPlanner_generateInstallInstructionWithSkipStart(t *testing.T) {
 			a.NotNil(p)
 			a.Equal(entry.Metadata.Labels[rke2.CattleOSLabel], tt.args.os)
 			a.Contains(p.Image, tt.args.expectedVersion)
+			a.Equal(p.Image, tt.args.expectedImage)
 			a.Contains(p.Command, tt.args.command)
 			a.Contains(p.Image, tt.args.expectedVersion)
 			a.Contains(p.Args, tt.args.scriptName)

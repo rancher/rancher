@@ -15,9 +15,9 @@ const (
 )
 
 // generateInstallInstruction generates the instruction necessary to install the desired tool.
-func generateInstallInstruction(controlPlane *rkev1.RKEControlPlane, entry *planEntry, env []string) plan.OneTimeInstruction {
+func (p *Planner) generateInstallInstruction(controlPlane *rkev1.RKEControlPlane, entry *planEntry, env []string) plan.OneTimeInstruction {
 	var instruction plan.OneTimeInstruction
-	image := getInstallerImage(controlPlane)
+	image := p.getInstallerImage(controlPlane)
 	cattleOS := entry.Metadata.Labels[rke2.CattleOSLabel]
 	for _, arg := range controlPlane.Spec.AgentEnvVars {
 		if arg.Value == "" {
@@ -67,7 +67,7 @@ func generateInstallInstruction(controlPlane *rkev1.RKEControlPlane, entry *plan
 // passed in configuration to determine whether it needs to start/restart the service being managed.
 func (p *Planner) addInstallInstructionWithRestartStamp(nodePlan plan.NodePlan, controlPlane *rkev1.RKEControlPlane, entry *planEntry) (plan.NodePlan, error) {
 	var restartStampEnv string
-	stamp := restartStamp(nodePlan, controlPlane, getInstallerImage(controlPlane))
+	stamp := restartStamp(nodePlan, controlPlane, p.getInstallerImage(controlPlane))
 	switch entry.Metadata.Labels[rke2.CattleOSLabel] {
 	case windows:
 		restartStampEnv = "$env:RESTART_STAMP=\"" + stamp + "\""
@@ -75,7 +75,7 @@ func (p *Planner) addInstallInstructionWithRestartStamp(nodePlan plan.NodePlan, 
 		restartStampEnv = "RESTART_STAMP=" + stamp
 	}
 	instEnv := []string{restartStampEnv}
-	nodePlan.Instructions = append(nodePlan.Instructions, generateInstallInstruction(controlPlane, entry, instEnv))
+	nodePlan.Instructions = append(nodePlan.Instructions, p.generateInstallInstruction(controlPlane, entry, instEnv))
 	return nodePlan, nil
 }
 
@@ -91,7 +91,7 @@ func (p *Planner) generateInstallInstructionWithSkipStart(controlPlane *rkev1.RK
 		skipStartEnv = fmt.Sprintf("INSTALL_%s_SKIP_START=true", strings.ToUpper(rke2.GetRuntime(controlPlane.Spec.KubernetesVersion)))
 	}
 	instEnv := []string{skipStartEnv}
-	return generateInstallInstruction(controlPlane, entry, instEnv)
+	return p.generateInstallInstruction(controlPlane, entry, instEnv)
 }
 
 func (p *Planner) addInitNodePeriodicInstruction(nodePlan plan.NodePlan, controlPlane *rkev1.RKEControlPlane) (plan.NodePlan, error) {

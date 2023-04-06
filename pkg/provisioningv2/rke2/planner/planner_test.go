@@ -69,7 +69,7 @@ func TestPlanner_addInstruction(t *testing.T) {
 			var planner Planner
 			controlPlane := createTestControlPlane(tt.args.version)
 			entry := createTestPlanEntry(tt.args.os)
-
+			planner.retrievalFunctions.SystemAgentImage = func() string { return "system-agent" }
 			// act
 			p, err := planner.addInstallInstructionWithRestartStamp(plan.NodePlan{}, controlPlane, entry)
 

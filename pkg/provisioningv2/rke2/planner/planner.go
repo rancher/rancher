@@ -21,7 +21,6 @@ import (
 	ranchercontrollers "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
 	rkecontrollers "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/provisioningv2/image"
-	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/wrangler"
 	corecontrollers "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/pkg/name"
@@ -116,9 +115,16 @@ type Planner struct {
 	rancherClusterCache           ranchercontrollers.ClusterCache
 	locker                        locker.Locker
 	etcdS3Args                    s3Args
+	retrievalFunctions            InfoFunctions
 }
 
-func New(ctx context.Context, clients *wrangler.Context) *Planner {
+// InfoFunctions is a struct that contains various dynamic functions that allow for abstracting out Rancher-specific
+// logic from the Planner
+type InfoFunctions struct {
+	SystemAgentImage func() string
+}
+
+func New(ctx context.Context, clients *wrangler.Context, functions InfoFunctions) *Planner {
 	clients.Mgmt.ClusterRegistrationToken().Cache().AddIndexer(clusterRegToken, func(obj *v3.ClusterRegistrationToken) ([]string, error) {
 		return []string{obj.Spec.ClusterName}, nil
 	})
@@ -142,6 +148,7 @@ func New(ctx context.Context, clients *wrangler.Context) *Planner {
 		etcdS3Args: s3Args{
 			secretCache: clients.Core.Secret().Cache(),
 		},
+		retrievalFunctions: functions,
 	}
 }
 
@@ -924,10 +931,10 @@ func (p *Planner) desiredPlan(controlPlane *rkev1.RKEControlPlane, tokensSecret 
 	return nodePlan, nil
 }
 
-func getInstallerImage(controlPlane *rkev1.RKEControlPlane) string {
+// getInstallerImage returns the correct system-agent-installer image for a given controlplane
+func (p *Planner) getInstallerImage(controlPlane *rkev1.RKEControlPlane) string {
 	runtime := rke2.GetRuntime(controlPlane.Spec.KubernetesVersion)
-	installerImage := settings.SystemAgentInstallerImage.Get()
-	installerImage = installerImage + runtime + ":" + strings.ReplaceAll(controlPlane.Spec.KubernetesVersion, "+", "-")
+	installerImage := p.retrievalFunctions.SystemAgentImage() + runtime + ":" + strings.ReplaceAll(controlPlane.Spec.KubernetesVersion, "+", "-")
 	return image.ResolveWithControlPlane(installerImage, controlPlane)
 }
 
