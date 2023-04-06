@@ -6,7 +6,6 @@ type Plan struct {
 	Nodes    map[string]*Node         `json:"nodes,omitempty"`
 	Machines map[string]*capi.Machine `json:"machines,omitempty"`
 	Metadata map[string]*Metadata     `json:"metadata,omitempty"`
-	Cluster  *capi.Cluster            `json:"cluster,omitempty"`
 }
 
 type Metadata struct {

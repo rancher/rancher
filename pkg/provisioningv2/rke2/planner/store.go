@@ -71,7 +71,6 @@ func (p *PlanStore) Load(cluster *capi.Cluster, rkeControlPlane *rkev1.RKEContro
 		Nodes:    map[string]*plan.Node{},
 		Machines: map[string]*capi.Machine{},
 		Metadata: map[string]*plan.Metadata{},
-		Cluster:  cluster,
 	}
 
 	machines, err := p.machineCache.List(cluster.Namespace, labels.SelectorFromSet(map[string]string{
