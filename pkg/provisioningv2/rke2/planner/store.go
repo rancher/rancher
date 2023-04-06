@@ -419,13 +419,13 @@ func assignAndCheckPlan(store *PlanStore, msg string, server *planEntry, newPlan
 		if err := store.UpdatePlan(server, newPlan, failureThreshold, maxRetries); err != nil {
 			return err
 		}
-		return ErrWaiting(fmt.Sprintf("starting %s", msg))
+		return errWaiting(fmt.Sprintf("starting %s", msg))
 	}
 	if server.Plan.Failed {
 		return fmt.Errorf("operation %s failed", msg)
 	}
 	if !server.Plan.InSync {
-		return ErrWaiting(fmt.Sprintf("waiting for %s", msg))
+		return errWaiting(fmt.Sprintf("waiting for %s", msg))
 	}
 	return nil
 }

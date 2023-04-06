@@ -143,7 +143,7 @@ func (p *Planner) electInitNode(rkeControlPlane *rkev1.RKEControlPlane, plan *pl
 		logrus.Debugf("rkecluster %s/%s: init node was already elected and found with joinURL: %s", rkeControlPlane.Namespace, rkeControlPlane.Spec.ClusterName, joinURL)
 		return joinURL, err
 	} else if !initNodeFound && rkeControlPlane.Labels[rke2.InitNodeMachineIDLabel] != "" {
-		return "", ErrWaitingf("unable to find designated init node matching machine ID %s", rkeControlPlane.Labels[rke2.InitNodeMachineIDLabel])
+		return "", errWaitingf("unable to find designated init node matching machine ID %s", rkeControlPlane.Labels[rke2.InitNodeMachineIDLabel])
 	}
 	// If the joinURL (or an errSkip) was not found, re-elect the init node.
 	logrus.Debugf("rkecluster %s/%s: performing election of init node", rkeControlPlane.Namespace, rkeControlPlane.Spec.ClusterName)
@@ -185,7 +185,7 @@ func (p *Planner) electInitNode(rkeControlPlane *rkev1.RKEControlPlane, plan *pl
 	}
 
 	logrus.Debugf("rkecluster %s/%s: failed to elect init node, no suitable init nodes were found", rkeControlPlane.Namespace, rkeControlPlane.Spec.ClusterName)
-	return "", ErrWaiting("waiting for viable init node")
+	return "", errWaiting("waiting for viable init node")
 }
 
 // designateInitNodeByID is used to force-designate an init node in the cluster. This is especially useful for things like

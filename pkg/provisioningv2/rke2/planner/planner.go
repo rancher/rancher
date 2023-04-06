@@ -3,7 +3,6 @@ package planner
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"math"
 	"path/filepath"
@@ -102,26 +101,6 @@ contexts:
 `)
 )
 
-type ErrWaiting string
-
-func (e ErrWaiting) Error() string {
-	return string(e)
-}
-
-func ErrWaitingf(format string, a ...interface{}) ErrWaiting {
-	return ErrWaiting(fmt.Sprintf(format, a...))
-}
-
-type errIgnore string
-
-func (e errIgnore) Error() string {
-	return string(e)
-}
-
-func errIgnoref(format string, a ...interface{}) errIgnore {
-	return errIgnore(fmt.Sprintf(format, a...))
-}
-
 type roleFilter func(*planEntry) bool
 
 type Planner struct {
@@ -208,7 +187,7 @@ func (p *Planner) setMachineConditionStatus(clusterPlan *plan.Plan, machineNames
 	}
 
 	if waiting {
-		return ErrWaiting(messagePrefix + atMostThree(machineNames) + detailedMessage(machineNames, messages))
+		return errWaiting(messagePrefix + atMostThree(machineNames) + detailedMessage(machineNames, messages))
 	}
 	return nil
 }
@@ -223,19 +202,19 @@ func (p *Planner) Process(cp *rkev1.RKEControlPlane, status rkev1.RKEControlPlan
 
 	releaseData := rke2.GetKDMReleaseData(p.ctx, cp)
 	if releaseData == nil {
-		return status, ErrWaitingf("%s/%s: releaseData nil for version %s", cp.Namespace, cp.Name, cp.Spec.KubernetesVersion)
+		return status, errWaitingf("%s/%s: releaseData nil for version %s", cp.Namespace, cp.Name, cp.Spec.KubernetesVersion)
 	}
 
 	capiCluster, err := rke2.GetOwnerCAPICluster(cp, p.capiClusters)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
-			return status, ErrWaiting("CAPI cluster does not exist")
+			return status, errWaiting("CAPI cluster does not exist")
 		}
 		return status, err
 	}
 
 	if capiCluster == nil {
-		return status, ErrWaiting("CAPI cluster does not exist")
+		return status, errWaiting("CAPI cluster does not exist")
 	}
 
 	if !capiCluster.DeletionTimestamp.IsZero() {
@@ -252,7 +231,7 @@ func (p *Planner) Process(cp *rkev1.RKEControlPlane, status rkev1.RKEControlPlan
 	}
 
 	if !capiCluster.Status.InfrastructureReady {
-		return status, ErrWaitingf("rkecluster %s/%s: waiting for infrastructure ready", cp.Namespace, cp.Name)
+		return status, errWaitingf("rkecluster %s/%s: waiting for infrastructure ready", cp.Namespace, cp.Name)
 	}
 
 	plan, plansDelivered, err := p.store.Load(capiCluster, cp)
@@ -266,9 +245,9 @@ func (p *Planner) Process(cp *rkev1.RKEControlPlane, status rkev1.RKEControlPlan
 	// that a small window of time does exist when the joinURL has not been set, but the bootstrap node is up.
 	if rke2.Reconciled.IsTrue(cp) && plansDelivered && p.store.ClusterHasBeenBootstrapped(plan) && rke2.SystemUpgradeControllerReady.IsFalse(&status) {
 		if rke2.SystemUpgradeControllerReady.GetReason(&status) != "" {
-			return status, ErrWaitingf("Waiting for System Upgrade Controller to be updated for Kubernetes version %s: %s", cp.Spec.KubernetesVersion, rke2.SystemUpgradeControllerReady.GetReason(&status))
+			return status, errWaitingf("Waiting for System Upgrade Controller to be updated for Kubernetes version %s: %s", cp.Spec.KubernetesVersion, rke2.SystemUpgradeControllerReady.GetReason(&status))
 		}
-		return status, ErrWaitingf("Waiting for System Upgrade Controller to be updated for Kubernetes version %s", cp.Spec.KubernetesVersion)
+		return status, errWaitingf("Waiting for System Upgrade Controller to be updated for Kubernetes version %s", cp.Spec.KubernetesVersion)
 	}
 
 	_, clusterSecretTokens, err := p.ensureRKEStateSecret(cp)
@@ -300,7 +279,7 @@ func (p *Planner) Process(cp *rkev1.RKEControlPlane, status rkev1.RKEControlPlan
 	// pausing the control plane only affects machine reconciliation: etcd snapshot/restore, encryption key & cert
 	// rotation are not interruptable processes, and therefore must always be completed when requested
 	if capiannotations.IsPaused(capiCluster, cp) {
-		return status, ErrWaitingf("CAPI cluster or RKEControlPlane is paused")
+		return status, errWaitingf("CAPI cluster or RKEControlPlane is paused")
 	}
 
 	// In the case where the cluster has been initialized, there is no current init node, and no plans have been
@@ -329,9 +308,9 @@ func (p *Planner) Process(cp *rkev1.RKEControlPlane, status rkev1.RKEControlPlan
 		if err != nil {
 			return status, err
 		} else if joinServer == "" && firstIgnoreError != nil {
-			return status, ErrWaiting(firstIgnoreError.Error() + " and join url to be available on bootstrap node")
+			return status, errWaiting(firstIgnoreError.Error() + " and join url to be available on bootstrap node")
 		} else if joinServer == "" {
-			return status, ErrWaiting("waiting for join url to be available on bootstrap node")
+			return status, errWaiting("waiting for join url to be available on bootstrap node")
 		}
 	}
 
@@ -353,13 +332,13 @@ func (p *Planner) Process(cp *rkev1.RKEControlPlane, status rkev1.RKEControlPlan
 
 	joinServer = getControlPlaneJoinURL(plan)
 	if joinServer == "" {
-		return status, ErrWaiting("waiting for control plane to be available")
+		return status, errWaiting("waiting for control plane to be available")
 	}
 
 	if status.Initialized != true || status.Ready != true {
 		status.Initialized = true
 		status.Ready = true
-		return status, ErrWaiting("marking control plane as initialized and ready")
+		return status, errWaiting("marking control plane as initialized and ready")
 	}
 
 	err = p.reconcile(cp, clusterSecretTokens, plan, false, workerTier, isOnlyWorker, isInitNodeOrDeleting,
@@ -371,7 +350,7 @@ func (p *Planner) Process(cp *rkev1.RKEControlPlane, status rkev1.RKEControlPlan
 	}
 
 	if firstIgnoreError != nil {
-		return status, ErrWaiting(firstIgnoreError.Error())
+		return status, errWaiting(firstIgnoreError.Error())
 	}
 
 	return status, nil
@@ -415,19 +394,6 @@ func removeReconciledCondition(machine *capi.Machine) *capi.Machine {
 	machine = machine.DeepCopy()
 	machine.SetConditions(conds)
 	return machine
-}
-
-// ignoreErrors accepts two errors. If the err is type errIgnore, it will return (err, nil) if firstIgnoreErr is nil or (firstIgnoreErr, nil).
-// Otherwise, it will simply return (firstIgnoreErr, err)
-func ignoreErrors(firstIgnoreError error, err error) (error, error) {
-	var errIgnore errIgnore
-	if errors.As(err, &errIgnore) {
-		if firstIgnoreError == nil {
-			return err, nil
-		}
-		return firstIgnoreError, nil
-	}
-	return firstIgnoreError, err
 }
 
 // getControlPlaneJoinURL will return the first encountered join URL based on machine annotations for machines that are
@@ -868,7 +834,7 @@ func (p *Planner) reconcile(controlPlane *rkev1.RKEControlPlane, tokensSecret pl
 	}
 
 	if required && len(entries) == 0 {
-		return ErrWaiting("waiting for at least one " + tierName + " node")
+		return errWaiting("waiting for at least one " + tierName + " node")
 	}
 
 	// If multiple machines are changing status, then all of their statuses should be updated to avoid having stale conditions.
@@ -1184,11 +1150,6 @@ type helmChartConfigSpec struct {
 
 func (h *helmChartConfig) DeepCopyObject() runtime.Object {
 	panic("unsupported")
-}
-
-func IsErrWaiting(err error) bool {
-	var errWaiting ErrWaiting
-	return errors.As(err, &errWaiting)
 }
 
 func (p *Planner) pauseCAPICluster(cp *rkev1.RKEControlPlane, pause bool) error {

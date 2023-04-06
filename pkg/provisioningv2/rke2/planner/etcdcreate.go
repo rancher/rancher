@@ -15,7 +15,7 @@ func (p *Planner) setEtcdSnapshotCreateState(status rkev1.RKEControlPlaneStatus,
 	if status.ETCDSnapshotCreatePhase != phase || !equality.Semantic.DeepEqual(status.ETCDSnapshotCreate, create) {
 		status.ETCDSnapshotCreatePhase = phase
 		status.ETCDSnapshotCreate = create
-		return status, ErrWaiting("refreshing etcd create state")
+		return status, errWaiting("refreshing etcd create state")
 	}
 	return status, nil
 }
@@ -109,7 +109,7 @@ func (p *Planner) createEtcdSnapshot(controlPlane *rkev1.RKEControlPlane, status
 					}
 				}
 			}
-			return status, ErrWaiting(merr.NewErrors(finErrs...).Error())
+			return status, errWaiting(merr.NewErrors(finErrs...).Error())
 		}
 		if status, err = p.setEtcdSnapshotCreateState(status, snapshot, rkev1.ETCDSnapshotPhaseRestartCluster); err != nil {
 			return status, err
