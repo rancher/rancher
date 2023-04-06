@@ -118,6 +118,10 @@ func (e errIgnore) Error() string {
 	return string(e)
 }
 
+func errIgnoref(format string, a ...interface{}) errIgnore {
+	return errIgnore(fmt.Sprintf(format, a...))
+}
+
 type roleFilter func(*planEntry) bool
 
 type Planner struct {
@@ -251,7 +255,7 @@ func (p *Planner) Process(cp *rkev1.RKEControlPlane, status rkev1.RKEControlPlan
 		return status, ErrWaitingf("rkecluster %s/%s: waiting for infrastructure ready", cp.Namespace, cp.Name)
 	}
 
-	plan, err := p.store.Load(capiCluster, cp)
+	plan, plansDelivered, err := p.store.Load(capiCluster, cp)
 	if err != nil {
 		return status, err
 	}
@@ -260,7 +264,7 @@ func (p *Planner) Process(cp *rkev1.RKEControlPlane, status rkev1.RKEControlPlan
 	// otherwise the system-upgrade-controller bundle will never become ready and the planner will be indefinitely blocked.
 	// We do this by ensuring the cluster has reconciled, and has a valid control plane join URL. However, it should be noted
 	// that a small window of time does exist when the joinURL has not been set, but the bootstrap node is up.
-	if rke2.Reconciled.IsTrue(cp) && p.store.ClusterHasBeenBootstrapped(plan) && rke2.SystemUpgradeControllerReady.IsFalse(&status) {
+	if rke2.Reconciled.IsTrue(cp) && plansDelivered && p.store.ClusterHasBeenBootstrapped(plan) && rke2.SystemUpgradeControllerReady.IsFalse(&status) {
 		if rke2.SystemUpgradeControllerReady.GetReason(&status) != "" {
 			return status, ErrWaitingf("Waiting for System Upgrade Controller to be updated for Kubernetes version %s: %s", cp.Spec.KubernetesVersion, rke2.SystemUpgradeControllerReady.GetReason(&status))
 		}
@@ -297,6 +301,12 @@ func (p *Planner) Process(cp *rkev1.RKEControlPlane, status rkev1.RKEControlPlan
 	// rotation are not interruptable processes, and therefore must always be completed when requested
 	if capiannotations.IsPaused(capiCluster, cp) {
 		return status, ErrWaitingf("CAPI cluster or RKEControlPlane is paused")
+	}
+
+	// In the case where the cluster has been initialized, there is no current init node, and no plans have been
+	// delivered, don't proceed with electing a new init node. The only way out of this is to restore an etcd snapshot.
+	if status.Initialized && !plansDelivered {
+		return status, errIgnoref("rkecontrolplane %s/%s was already initialized but no machines exist that have plans, indicating the etcd plane has been entirely replaced. Restoration from etcd snapshot is required.", cp.Namespace, cp.Name)
 	}
 
 	// on the first run through, electInitNode will return a `generic.ErrSkip` as it is attempting to wait for the cache to catch up.

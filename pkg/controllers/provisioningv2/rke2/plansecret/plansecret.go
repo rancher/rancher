@@ -51,7 +51,7 @@ func (h *handler) OnChange(key string, secret *corev1.Secret) (*corev1.Secret, e
 
 	logrus.Debugf("[plansecret] reconciling secret %s/%s", secret.Namespace, secret.Name)
 
-	node, err := planner.SecretToNode(secret)
+	node, _, err := planner.SecretToNode(secret)
 	if err != nil {
 		return secret, err
 	}
