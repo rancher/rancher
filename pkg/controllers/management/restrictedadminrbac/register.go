@@ -51,7 +51,6 @@ func Register(ctx context.Context, management *config.ManagementContext, wrangle
 		provClusters:        wrangler.Provisioning.Cluster().Cache(),
 	}
 
-	r.clusters.AddHandler(ctx, "restrictedAdminsRBACCluster", r.clusterRBACSync)
 	r.projects.AddHandler(ctx, "restrictedAdminsRBACProject", r.projectRBACSync)
 
 	r.globalRoleBindings.AddHandler(ctx, "restrictedAdminGlobalBindingsFleet", r.ensureRestricedAdminForFleet)
