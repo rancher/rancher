@@ -33,7 +33,6 @@ import (
 	apierror "k8s.io/apimachinery/pkg/api/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 	capiannotations "sigs.k8s.io/cluster-api/util/annotations"
 	"sigs.k8s.io/cluster-api/util/conditions"
@@ -987,21 +986,6 @@ func (p *Planner) ensureRKEStateSecret(controlPlane *rkev1.RKEControlPlane) (str
 		ServerToken: string(secret.Data["serverToken"]),
 		AgentToken:  string(secret.Data["agentToken"]),
 	}, nil
-}
-
-type helmChartConfig struct {
-	metav1.TypeMeta   `json:",inline"`
-	metav1.ObjectMeta `json:"metadata,omitempty"`
-
-	Spec helmChartConfigSpec `json:"spec,omitempty"`
-}
-
-type helmChartConfigSpec struct {
-	ValuesContent string `json:"valuesContent,omitempty"`
-}
-
-func (h *helmChartConfig) DeepCopyObject() runtime.Object {
-	panic("unsupported")
 }
 
 func (p *Planner) pauseCAPICluster(cp *rkev1.RKEControlPlane, pause bool) error {
