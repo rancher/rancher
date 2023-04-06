@@ -188,7 +188,7 @@ func (p *Planner) runEtcdRestoreServiceStop(controlPlane *rkev1.RKEControlPlane,
 		}
 	}
 
-	// If any of the controlplane/etcd node plans were updated, return an errwaiting message for shutting down control plane and etcd
+	// If any of the controlplane/etcd node plans were updated, return an errWaiting message for shutting down control plane and etcd
 	if updated {
 		return errWaiting("stopping " + rke2.GetRuntime(controlPlane.Spec.KubernetesVersion) + " services on control plane and etcd machines/nodes")
 	}

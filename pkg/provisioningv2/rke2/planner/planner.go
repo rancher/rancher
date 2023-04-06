@@ -369,6 +369,8 @@ func isUnavailable(entry *planEntry) bool {
 	return !entry.Plan.InSync || isInDrain(entry)
 }
 
+// isInDrain returns a boolean indicating whether the machine/node corresponding to the planEntry is currently in any
+// part of the drain process
 func isInDrain(entry *planEntry) bool {
 	return entry.Metadata.Annotations[rke2.PreDrainAnnotation] != "" ||
 		entry.Metadata.Annotations[rke2.PostDrainAnnotation] != "" ||

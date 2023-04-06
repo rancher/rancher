@@ -405,6 +405,7 @@ func (p *PlanStore) updatePlanSecretLabelsAndAnnotations(entry *planEntry) error
 	return err
 }
 
+// removePlanSecretLabel removes a label with the given key from the plan secret that corresponds to the RKEBootstrap
 func (p *PlanStore) removePlanSecretLabel(entry *planEntry, key string) error {
 	secret, err := p.getPlanSecretFromMachine(entry.Machine)
 	if err != nil {

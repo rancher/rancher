@@ -368,6 +368,7 @@ func (h *handler) getRKEControlPlaneForCluster(cluster *rancherv1.Cluster) (*rke
 	return cp, nil
 }
 
+// updateClusterProvisioningStatus copies the condition (clusterCondition) to both the clusters.management.cattle.io and clusters.provisioning.cattle.io objects based on the passed in rkecontrolplane cp + cpCondition
 func (h *handler) updateClusterProvisioningStatus(cluster *rancherv1.Cluster, status rancherv1.ClusterStatus, cp *rkev1.RKEControlPlane, clusterCondition, cpCondition condition.Cond) (rancherv1.ClusterStatus, error) {
 	if cp == nil {
 		return status, fmt.Errorf("error while updating cluster provisioning status - rkecontrolplane was nil")

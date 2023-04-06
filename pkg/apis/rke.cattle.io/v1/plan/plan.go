@@ -70,6 +70,7 @@ type File struct {
 	Minor       bool   `json:"minor,omitempty"` // minor signifies that the file can be changed on a node without having to cause a full-blown drain/cordon operation
 }
 
+// NodePlan is the struct used to deliver instructions/files/probes to the system-agent, and retrieve feedback
 type NodePlan struct {
 	Files                []File                `json:"files,omitempty"`
 	Instructions         []OneTimeInstruction  `json:"instructions,omitempty"`
