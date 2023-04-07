@@ -5,6 +5,7 @@ ENV GOPATH /root/go
 ENV PATH ${PATH}:/root/go/bin
 
 ENV WORKSPACE ${GOPATH}/src/github.com/rancher/rancher
+
 # configure VPN
 ARG EXTERNAL_ENCODED_VPN
 ARG VPN_ENCODED_LOGIN
@@ -16,13 +17,16 @@ COPY [".", "$WORKSPACE"]
 RUN go mod download && \
     go install gotest.tools/gotestsum@latest
 
-
 # Configure Corral
 ENV CORRAL_VERSION="v1.1.1"
 RUN go install github.com/rancherlabs/corral@${CORRAL_VERSION}
 
 RUN mkdir /root/.ssh && chmod 600 .ssh/jenkins-*
 RUN ssh-keygen -f .ssh/jenkins-* -y > /root/.ssh/public.pub
+
+# Configure Terraform
+ARG TERRAFORM_VERSION=0.13.7
+RUN wget https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_amd64.zip && apt-get update && apt-get install unzip &&  unzip terraform_${TERRAFORM_VERSION}_linux_amd64.zip && rm terraform_${TERRAFORM_VERSION}_linux_amd64.zip && chmod u+x terraform && mv terraform /usr/bin/terraform
 
 RUN CGO_ENABLED=0
 
