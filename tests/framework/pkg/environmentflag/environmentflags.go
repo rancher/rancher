@@ -11,5 +11,7 @@ const (
 	Ingress EnvironmentFlag = iota
 	Chart
 	UpgradeAllClusters
+	UseExistingRegistries
+	InstallRancher
 	environmentFlagLastItem // This is used to determine the number of items in the enum
 )
