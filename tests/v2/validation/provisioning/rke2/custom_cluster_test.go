@@ -74,6 +74,11 @@ func (c *CustomClusterProvisioningTestSuite) TestProvisioningRKE2CustomCluster()
 	}
 
 	nodeRoles1 := []string{
+		"--etcd --controlplane",
+		"--worker",
+	}
+
+	nodeRoles2 := []string{
 		"--etcd",
 		"--controlplane",
 		"--worker",
@@ -89,12 +94,16 @@ func (c *CustomClusterProvisioningTestSuite) TestProvisioningRKE2CustomCluster()
 	}{
 		{"1 Node all roles Admin User", c.client, nodeRoles0, c.provisioning, 0, false},
 		{"1 Node all roles Standard User", c.standardUserClient, nodeRoles0, c.provisioning, 0, false},
-		{"3 nodes - 1 role per node Admin User", c.client, nodeRoles1, c.provisioning, 0, false},
-		{"3 nodes - 1 role per node Standard User", c.standardUserClient, nodeRoles1, c.provisioning, 0, false},
+		{"2 nodes - etcd/cp roles per 1 node Admin User", c.client, nodeRoles1, c.provisioning, 0, false},
+		{"2 nodes - etcd/cp roles per 1 node Standard User", c.client, nodeRoles1, c.provisioning, 0, false},
+		{"3 nodes - 1 role per node Admin User", c.client, nodeRoles2, c.provisioning, 0, false},
+		{"3 nodes - 1 role per node Standard User", c.standardUserClient, nodeRoles2, c.provisioning, 0, false},
 		{"1 Node all roles Admin User + 1 Windows Worker", c.client, nodeRoles0, c.provisioning, 1, true},
 		{"1 Node all roles Standard User + 1 Windows Worker", c.standardUserClient, nodeRoles0, c.provisioning, 1, true},
-		{"3 nodes - 1 role per node Admin User + 2 Windows Workers", c.client, nodeRoles1, c.provisioning, 2, true},
-		{"3 nodes - 1 role per node Standard User + 2 Windows Workers", c.standardUserClient, nodeRoles1, c.provisioning, 2, true},
+		{"2 nodes - etcd/cp roles per 1 node Admin User + 1 Windows Worker", c.client, nodeRoles1, c.provisioning, 1, true},
+		{"2 nodes - etcd/cp roles per 1 node Standard User + 1 Windows Worker", c.client, nodeRoles1, c.provisioning, 1, true},
+		{"3 nodes - 1 role per node Admin User + 2 Windows Workers", c.client, nodeRoles2, c.provisioning, 2, true},
+		{"3 nodes - 1 role per node Standard User + 2 Windows Workers", c.standardUserClient, nodeRoles2, c.provisioning, 2, true},
 	}
 	var name string
 	for _, tt := range tests {
