@@ -10,7 +10,9 @@ import (
 	v1 "github.com/rancher/rancher/tests/framework/clients/rancher/v1"
 	"github.com/rancher/rancher/tests/framework/extensions/clusters"
 	hardening "github.com/rancher/rancher/tests/framework/extensions/hardening/rke2"
+	nodestat "github.com/rancher/rancher/tests/framework/extensions/nodes"
 	"github.com/rancher/rancher/tests/framework/extensions/tokenregistration"
+	"github.com/rancher/rancher/tests/framework/extensions/workloads/pods"
 	namegen "github.com/rancher/rancher/tests/framework/pkg/namegenerator"
 	"github.com/rancher/rancher/tests/framework/pkg/wait"
 	"github.com/rancher/rancher/tests/integration/pkg/defaults"
@@ -101,9 +103,19 @@ func TestProvisioningRKE2CustomCluster(t *testing.T, client *rancher.Client, ext
 		assert.Equal(t, clusterName, clusterResp.ObjectMeta.Name)
 	}
 
+	clusterIDName, err := clusters.GetClusterIDByName(adminClient, clusterName)
+	assert.NoError(t, err)
+
+	err = nodestat.IsNodeReady(client, clusterIDName)
+	require.NoError(t, err)
+
 	clusterToken, err := clusters.CheckServiceAccountTokenSecret(client, clusterName)
 	require.NoError(t, err)
 	assert.NotEmpty(t, clusterToken)
+
+	podResults, podErrors := pods.StatusPods(client, clusterIDName)
+	assert.NotEmpty(t, podResults)
+	assert.Empty(t, podErrors)
 
 	if harden.Hardened && kubeVersion <= string(provisioning.HardenedKubeVersion) {
 		err = hardening.HardeningNodes(client, harden.Hardened, linuxNodes, nodesAndRoles)
