@@ -2,15 +2,14 @@ package rbac
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/rancher/norman/types/slice"
-	clusterv2 "github.com/rancher/rancher/pkg/controllers/provisioningv2/cluster"
 	provisioningcontrollers "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	rbacv1 "github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1"
 	"github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/rancher/pkg/types/config"
+	"github.com/rancher/wrangler/pkg/name"
 	"github.com/sirupsen/logrus"
 	v12 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -170,57 +169,43 @@ func (c *grbHandler) addRestrictedAdminCRTB(obj *v3.GlobalRoleBinding) error {
 		return nil
 	}
 
-	pClusters, err := c.provClusters.GetByIndex(clusterv2.ByCluster, c.clusterName)
-	if err != nil {
-		return err
+	crtbName := name.SafeConcatName(rbac.GetGRBTargetKey(obj), "restricted-admin", "cluster-owner")
+	_, err := c.crtbLister.Get(c.clusterName, crtbName)
+	if err != nil && !apierrors.IsNotFound(err) {
+		return fmt.Errorf("failed to get CRTB from cache: %w", err)
 	}
-
-	if len(pClusters) == 0 {
-		// When no provisioning cluster is found, enqueue the GRB to wait for
-		// the provisioning cluster to be created.
-		logrus.Debugf("No provisioning cluster found for cluster %v in GRB sync, enqueuing", c.clusterName)
-		c.globalroleBindingController.EnqueueAfter(obj.Namespace, obj.Name, 10*time.Second)
+	if err == nil {
+		// CRTB was already created.
 		return nil
 	}
 
-	provCluster := pClusters[0]
-
-	subject := rbac.GetGRBSubject(obj)
-	crtbName := fmt.Sprintf("crtb-%s-%s-%s", rbac.GetGRBTargetKey(obj), "restricted-admin", "cluster-owner")
-	_, err = c.crtbLister.Get(provCluster.Name, crtbName)
-	if err != nil {
-		if !apierrors.IsNotFound(err) {
-			return err
-		}
-
-		// Add the restricted admin user as a member of the downstream cluster
-		// by creating a CRTB in the local custer in the namespace named after the downstream cluster.
-		crtb := v3.ClusterRoleTemplateBinding{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      crtbName,
-				Namespace: provCluster.Name,
-				OwnerReferences: []metav1.OwnerReference{
-					{
-						APIVersion: obj.APIVersion,
-						Kind:       obj.Kind,
-						Name:       obj.Name,
-						UID:        obj.UID,
-					},
+	// Add the restricted admin user as a member of the downstream cluster
+	// by creating a CRTB in the local custer in the namespace named after the downstream cluster.
+	crtb := v3.ClusterRoleTemplateBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      crtbName,
+			Namespace: c.clusterName,
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					APIVersion: obj.APIVersion,
+					Kind:       obj.Kind,
+					Name:       obj.Name,
+					UID:        obj.UID,
 				},
 			},
-			ClusterName:      provCluster.Name,
-			RoleTemplateName: "cluster-owner",
-		}
-		if subject.Kind == "Group" {
-			crtb.GroupPrincipalName = subject.Name
-		} else if subject.Kind == "User" {
-			crtb.UserPrincipalName = subject.Name
-		}
+		},
+		ClusterName:      c.clusterName,
+		RoleTemplateName: "cluster-owner",
+	}
+	if obj.UserName != "" {
+		crtb.UserName = obj.UserName
+	} else {
+		crtb.GroupPrincipalName = obj.GroupPrincipalName
+	}
 
-		_, err = c.clusterRoleTemplateBindings.Create(&crtb)
-		if err != nil && !apierrors.IsAlreadyExists(err) {
-			return fmt.Errorf("failed to create a CRTB for subject %s: %w", subject.Name, err)
-		}
+	_, err = c.clusterRoleTemplateBindings.Create(&crtb)
+	if err != nil && !apierrors.IsAlreadyExists(err) {
+		return fmt.Errorf("failed to create a CRTB '%s': %w", crtbName, err)
 	}
 
 	return nil
