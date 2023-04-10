@@ -28,7 +28,7 @@ const (
 	namespace = "fleet-default"
 )
 
-func TestProvisioningRKE2CustomCluster(t *testing.T, client *rancher.Client, externalNodeProvider provisioning.ExternalNodeProvider, nodesAndRoles []string, kubeVersion, cni string, harden *provisioning.Config, nodeCountWin int, hasWindows bool) {
+func TestProvisioningRKE2CustomCluster(t *testing.T, client *rancher.Client, externalNodeProvider provisioning.ExternalNodeProvider, nodesAndRoles []string, kubeVersion, cni string, hardened bool, nodeCountWin int, hasWindows bool) {
 	numNodesLin := len(nodesAndRoles)
 
 	adminClient, err := rancher.NewClient(client.RancherConfig.AdminToken, client.Session)
@@ -123,8 +123,8 @@ func TestProvisioningRKE2CustomCluster(t *testing.T, client *rancher.Client, ext
 	assert.NotEmpty(t, podResults)
 	assert.Empty(t, podErrors)
 
-	if harden.Hardened && kubeVersion <= string(provisioning.HardenedKubeVersion) {
-		err = hardening.HardeningNodes(client, harden.Hardened, linuxNodes, nodesAndRoles)
+	if hardened && kubeVersion <= string(provisioning.HardenedKubeVersion) {
+		err = hardening.HardeningNodes(client, hardened, linuxNodes, nodesAndRoles)
 		require.NoError(t, err)
 
 		hardenCluster := clusters.HardenK3SRKE2ClusterConfig(clusterName, namespace, "", "", kubeVersion, nil)
@@ -133,7 +133,7 @@ func TestProvisioningRKE2CustomCluster(t *testing.T, client *rancher.Client, ext
 		require.NoError(t, err)
 		assert.Equal(t, clusterName, hardenClusterResp.ObjectMeta.Name)
 
-		err = hardening.PostHardeningConfig(client, harden.Hardened, linuxNodes, nodesAndRoles)
+		err = hardening.PostHardeningConfig(client, hardened, linuxNodes, nodesAndRoles)
 		require.NoError(t, err)
 	}
 }

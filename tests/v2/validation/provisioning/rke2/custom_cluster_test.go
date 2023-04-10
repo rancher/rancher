@@ -20,10 +20,10 @@ type CustomClusterProvisioningTestSuite struct {
 	client             *rancher.Client
 	session            *session.Session
 	standardUserClient *rancher.Client
-	provisioning       *provisioning.Config
 	kubernetesVersions []string
 	cnis               []string
 	nodeProviders      []string
+	hardened           bool
 }
 
 func (c *CustomClusterProvisioningTestSuite) TearDownSuite() {
@@ -40,7 +40,7 @@ func (c *CustomClusterProvisioningTestSuite) SetupSuite() {
 	c.kubernetesVersions = clustersConfig.RKE2KubernetesVersions
 	c.cnis = clustersConfig.CNIs
 	c.nodeProviders = clustersConfig.NodeProviders
-	c.provisioning = clustersConfig
+	c.hardened = clustersConfig.Hardened
 
 	client, err := rancher.NewClient("", testSession)
 	require.NoError(c.T(), err)
@@ -88,22 +88,21 @@ func (c *CustomClusterProvisioningTestSuite) TestProvisioningRKE2CustomCluster()
 		name         string
 		client       *rancher.Client
 		nodeRoles    []string
-		hardening    *provisioning.Config
 		nodeCountWin int
 		hasWindows   bool
 	}{
-		{"1 Node all roles " + provisioning.AdminClientName.String(), c.client, nodeRoles0, c.provisioning, 0, false},
-		{"1 Node all roles " + provisioning.StandardClientName.String(), c.standardUserClient, nodeRoles0, c.provisioning, 0, false},
-		{"2 nodes - etcd/cp roles per 1 node " + provisioning.AdminClientName.String(), c.client, nodeRoles1, c.provisioning, 0, false},
-		{"2 nodes - etcd/cp roles per 1 node " + provisioning.StandardClientName.String(), c.standardUserClient, nodeRoles1, c.provisioning, 0, false},
-		{"3 nodes - 1 role per node " + provisioning.AdminClientName.String(), c.client, nodeRoles2, c.provisioning, 0, false},
-		{"3 nodes - 1 role per node " + provisioning.StandardClientName.String(), c.standardUserClient, nodeRoles2, c.provisioning, 0, false},
-		{provisioning.AdminClientName.String() + " 1 Node all roles + 1 Windows Worker", c.client, nodeRoles0, c.provisioning, 1, true},
-		{provisioning.StandardClientName.String() + " 1 Node all roles + 1 Windows Worker", c.standardUserClient, nodeRoles0, c.provisioning, 1, true},
-		{provisioning.AdminClientName.String() + " 2 nodes - etcd/cp roles per 1 node + 1 Windows Worker", c.client, nodeRoles1, c.provisioning, 1, true},
-		{provisioning.StandardClientName.String() + " 2 nodes - etcd/cp roles per 1 node + 1 Windows Worker", c.standardUserClient, nodeRoles1, c.provisioning, 1, true},
-		{"3 nodes - 1 role per node " + provisioning.AdminClientName.String(), c.client, nodeRoles2, c.provisioning, 2, true},
-		{"3 nodes - 1 role per node " + provisioning.StandardClientName.String(), c.standardUserClient, nodeRoles2, c.provisioning, 2, true},
+		{"1 Node all roles " + provisioning.AdminClientName.String(), c.client, nodeRoles0, 0, false},
+		{"1 Node all roles " + provisioning.StandardClientName.String(), c.standardUserClient, nodeRoles0, 0, false},
+		{"2 nodes - etcd/cp roles per 1 node " + provisioning.AdminClientName.String(), c.client, nodeRoles1, 0, false},
+		{"2 nodes - etcd/cp roles per 1 node " + provisioning.StandardClientName.String(), c.standardUserClient, nodeRoles1, 0, false},
+		{"3 nodes - 1 role per node " + provisioning.AdminClientName.String(), c.client, nodeRoles2, 0, false},
+		{"3 nodes - 1 role per node " + provisioning.StandardClientName.String(), c.standardUserClient, nodeRoles2, 0, false},
+		{provisioning.AdminClientName.String() + " 1 Node all roles + 1 Windows Worker", c.client, nodeRoles0, 1, true},
+		{provisioning.StandardClientName.String() + " 1 Node all roles + 1 Windows Worker", c.standardUserClient, nodeRoles0, 1, true},
+		{provisioning.AdminClientName.String() + " 2 nodes - etcd/cp roles per 1 node + 1 Windows Worker", c.client, nodeRoles1, 1, true},
+		{provisioning.StandardClientName.String() + " 2 nodes - etcd/cp roles per 1 node + 1 Windows Worker", c.standardUserClient, nodeRoles1, 1, true},
+		{"3 nodes - 1 role per node " + provisioning.AdminClientName.String(), c.client, nodeRoles2, 2, true},
+		{"3 nodes - 1 role per node " + provisioning.StandardClientName.String(), c.standardUserClient, nodeRoles2, 2, true},
 	}
 	var name string
 	for _, tt := range tests {
@@ -121,7 +120,7 @@ func (c *CustomClusterProvisioningTestSuite) TestProvisioningRKE2CustomCluster()
 				for _, cni := range c.cnis {
 					name += " cni: " + cni
 					c.Run(name, func() {
-						TestProvisioningRKE2CustomCluster(c.T(), client, externalNodeProvider, tt.nodeRoles, kubeVersion, cni, tt.hardening, tt.nodeCountWin, tt.hasWindows)
+						TestProvisioningRKE2CustomCluster(c.T(), client, externalNodeProvider, tt.nodeRoles, kubeVersion, cni, c.hardened, tt.nodeCountWin, tt.hasWindows)
 					})
 				}
 			}
@@ -157,14 +156,13 @@ func (c *CustomClusterProvisioningTestSuite) TestProvisioningRKE2CustomClusterDy
 	tests := []struct {
 		name         string
 		client       *rancher.Client
-		hardening    *provisioning.Config
 		nodeCountWin int
 		hasWindows   bool
 	}{
-		{provisioning.AdminClientName.String(), c.client, c.provisioning, 0, false},
-		{provisioning.StandardClientName.String(), c.standardUserClient, c.provisioning, 0, false},
-		{"1 Windows Worker" + provisioning.AdminClientName.String(), c.client, c.provisioning, 1, true},
-		{"1 Windows Worker" + provisioning.StandardClientName.String(), c.standardUserClient, c.provisioning, 1, true},
+		{provisioning.AdminClientName.String(), c.client, 0, false},
+		{provisioning.StandardClientName.String(), c.standardUserClient, 0, false},
+		{"1 Windows Worker" + provisioning.AdminClientName.String(), c.client, 1, true},
+		{"1 Windows Worker" + provisioning.StandardClientName.String(), c.standardUserClient, 1, true},
 	}
 	var name string
 	for _, tt := range tests {
@@ -182,7 +180,7 @@ func (c *CustomClusterProvisioningTestSuite) TestProvisioningRKE2CustomClusterDy
 				for _, cni := range c.cnis {
 					name += " cni: " + cni
 					c.Run(name, func() {
-						TestProvisioningRKE2CustomCluster(c.T(), client, externalNodeProvider, rolesPerNode, kubeVersion, cni, tt.hardening, tt.nodeCountWin, tt.hasWindows)
+						TestProvisioningRKE2CustomCluster(c.T(), client, externalNodeProvider, rolesPerNode, kubeVersion, cni, c.hardened, tt.nodeCountWin, tt.hasWindows)
 					})
 				}
 			}
