@@ -360,7 +360,7 @@ func createTestCluster(client, adminClient *rancher.Client, numClusters int, clu
 	for i := 0; i < numClusters; i++ {
 		clusterName := namegen.AppendRandomString(clusterNameBase)
 		clusterNames = append(clusterNames, clusterName)
-		cluster := clusters.NewRKE1ClusterConfig(clusterName, cni, kubeVersion, client)
+		cluster := clusters.NewRKE1ClusterConfig(clusterName, cni, kubeVersion, "", client)
 
 		clusterResp, err := clusters.CreateRKE1Cluster(client, cluster)
 		if err != nil {

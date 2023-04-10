@@ -15,7 +15,7 @@ Please see below for more details for your config.
 6. [Back to general provisioning](../README.md)
 
 ## Provisioning Input
-provisioningInput is needed to the run the K3S tests, specifically kubernetesVersion and providers. nodesAndRoles is only needed for the TestProvisioningDynamicInput test, node pools are divided by "{nodepool},". 
+provisioningInput is needed to the run the K3S tests, specifically kubernetesVersion and providers. nodesAndRoles is only needed for the TestProvisioningDynamicInput test, node pools are divided by "{nodepool},". psact is optional and takes values `rancher-privileged` and `rancher-restricted` only.
 
 **nodeProviders is only needed for custom cluster tests; the framework only supports custom clusters through aws/ec2 instances.**
 
@@ -36,7 +36,8 @@ provisioningInput is needed to the run the K3S tests, specifically kubernetesVer
     "k3sKubernetesVersion": ["v1.24.4+k3s1"],
     "providers": ["linode", "aws", "azure", "harvester"],
     "nodeProviders": ["ec2"],
-    "hardened": true
+    "hardened": true,
+    "psact": ""
   }
 ```
 

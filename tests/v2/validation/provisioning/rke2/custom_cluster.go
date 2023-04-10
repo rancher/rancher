@@ -12,6 +12,7 @@ import (
 	hardening "github.com/rancher/rancher/tests/framework/extensions/hardening/rke2"
 	nodestat "github.com/rancher/rancher/tests/framework/extensions/nodes"
 	"github.com/rancher/rancher/tests/framework/extensions/pipeline"
+	psadeploy "github.com/rancher/rancher/tests/framework/extensions/psact"
 	"github.com/rancher/rancher/tests/framework/extensions/tokenregistration"
 	"github.com/rancher/rancher/tests/framework/extensions/workloads/pods"
 	"github.com/rancher/rancher/tests/framework/pkg/environmentflag"
@@ -28,7 +29,7 @@ const (
 	namespace = "fleet-default"
 )
 
-func TestProvisioningRKE2CustomCluster(t *testing.T, client *rancher.Client, externalNodeProvider provisioning.ExternalNodeProvider, nodesAndRoles []string, kubeVersion, cni string, harden *provisioning.Config, nodeCountWin int, hasWindows bool) {
+func TestProvisioningRKE2CustomCluster(t *testing.T, client *rancher.Client, externalNodeProvider provisioning.ExternalNodeProvider, nodesAndRoles []string, psact, kubeVersion, cni string, hardened bool, nodeCountWin int, hasWindows bool) {
 	numNodesLin := len(nodesAndRoles)
 
 	adminClient, err := rancher.NewClient(client.RancherConfig.AdminToken, client.Session)
@@ -39,7 +40,7 @@ func TestProvisioningRKE2CustomCluster(t *testing.T, client *rancher.Client, ext
 
 	clusterName := namegen.AppendRandomString(externalNodeProvider.Name)
 
-	cluster := clusters.NewK3SRKE2ClusterConfig(clusterName, namespace, cni, "", kubeVersion, nil)
+	cluster := clusters.NewK3SRKE2ClusterConfig(clusterName, namespace, cni, "", kubeVersion, psact, nil)
 
 	clusterResp, err := clusters.CreateK3SRKE2Cluster(client, cluster)
 	require.NoError(t, err)
@@ -123,17 +124,25 @@ func TestProvisioningRKE2CustomCluster(t *testing.T, client *rancher.Client, ext
 	assert.NotEmpty(t, podResults)
 	assert.Empty(t, podErrors)
 
-	if harden.Hardened && kubeVersion <= string(provisioning.HardenedKubeVersion) {
-		err = hardening.HardeningNodes(client, harden.Hardened, linuxNodes, nodesAndRoles)
+	if hardened && kubeVersion <= string(provisioning.HardenedKubeVersion) {
+		err = hardening.HardeningNodes(client, hardened, linuxNodes, nodesAndRoles)
 		require.NoError(t, err)
 
-		hardenCluster := clusters.HardenK3SRKE2ClusterConfig(clusterName, namespace, "", "", kubeVersion, nil)
+		hardenCluster := clusters.HardenK3SRKE2ClusterConfig(clusterName, namespace, "", "", kubeVersion, psact, nil)
 
 		hardenClusterResp, err := clusters.UpdateK3SRKE2Cluster(client, clusterResp, hardenCluster)
 		require.NoError(t, err)
 		assert.Equal(t, clusterName, hardenClusterResp.ObjectMeta.Name)
 
-		err = hardening.PostHardeningConfig(client, harden.Hardened, linuxNodes, nodesAndRoles)
+		err = hardening.PostHardeningConfig(client, hardened, linuxNodes, nodesAndRoles)
+		require.NoError(t, err)
+	}
+
+	if psact == string(provisioning.RancherPrivileged) || psact == string(provisioning.RancherRestricted) {
+		err = psadeploy.CheckPSACT(client, clusterName)
+		require.NoError(t, err)
+
+		_, err = psadeploy.CreateNginxDeployment(client, clusterIDName, psact)
 		require.NoError(t, err)
 	}
 }

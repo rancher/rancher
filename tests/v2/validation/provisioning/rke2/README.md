@@ -15,7 +15,7 @@ Please see below for more details for your config.
 6. [Back to general provisioning](../README.md)
 
 ## Provisioning Input
-provisioningInput is needed to the run the RKE2 tests, specifically kubernetesVersion, cni, and providers. nodesAndRoles is only needed for the TestProvisioningDynamicInput test, node pools are divided by "{nodepool},". 
+provisioningInput is needed to the run the RKE2 tests, specifically kubernetesVersion, cni, and providers. nodesAndRoles is only needed for the TestProvisioningDynamicInput test, node pools are divided by "{nodepool},". psact is optional and takes values `rancher-privileged` and `rancher-restricted` only.
 
 **nodeProviders is only needed for custom cluster tests; the framework only supports custom clusters through aws/ec2 instances.**
 
@@ -36,7 +36,9 @@ provisioningInput is needed to the run the RKE2 tests, specifically kubernetesVe
     "rke2KubernetesVersion": ["v1.21.6+rke2r1"],
     "cni": ["calico"],
     "providers": ["linode", "aws", "do", "harvester"],
-    "nodeProviders": ["ec2"]
+    "nodeProviders": ["ec2"],
+    "hardened": true,
+    "psact": ""
   }
 ```
 

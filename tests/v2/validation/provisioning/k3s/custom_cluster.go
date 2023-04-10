@@ -12,6 +12,7 @@ import (
 	hardening "github.com/rancher/rancher/tests/framework/extensions/hardening/k3s"
 	nodestat "github.com/rancher/rancher/tests/framework/extensions/nodes"
 	"github.com/rancher/rancher/tests/framework/extensions/pipeline"
+	psadeploy "github.com/rancher/rancher/tests/framework/extensions/psact"
 	"github.com/rancher/rancher/tests/framework/extensions/tokenregistration"
 	"github.com/rancher/rancher/tests/framework/extensions/workloads/pods"
 	"github.com/rancher/rancher/tests/framework/pkg/environmentflag"
@@ -24,7 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func TestProvisioningK3SCustomCluster(t *testing.T, client *rancher.Client, externalNodeProvider provisioning.ExternalNodeProvider, nodesAndRoles []string, kubeVersion string, hardened bool) {
+func TestProvisioningK3SCustomCluster(t *testing.T, client *rancher.Client, externalNodeProvider provisioning.ExternalNodeProvider, nodesAndRoles []string, kubeVersion string, hardened bool, psact string) {
 	namespace := "fleet-default"
 
 	numNodes := len(nodesAndRoles)
@@ -33,7 +34,7 @@ func TestProvisioningK3SCustomCluster(t *testing.T, client *rancher.Client, exte
 
 	clusterName := namegen.AppendRandomString(externalNodeProvider.Name)
 
-	cluster := clusters.NewK3SRKE2ClusterConfig(clusterName, namespace, "", "", kubeVersion, nil)
+	cluster := clusters.NewK3SRKE2ClusterConfig(clusterName, namespace, "", "", kubeVersion, psact, nil)
 
 	clusterResp, err := clusters.CreateK3SRKE2Cluster(client, cluster)
 	require.NoError(t, err)
@@ -99,9 +100,17 @@ func TestProvisioningK3SCustomCluster(t *testing.T, client *rancher.Client, exte
 		err = hardening.HardeningNodes(client, hardened, nodes, nodesAndRoles)
 		require.NoError(t, err)
 
-		hardenCluster := clusters.HardenK3SRKE2ClusterConfig(clusterName, namespace, "", "", kubeVersion, nil)
+		hardenCluster := clusters.HardenK3SRKE2ClusterConfig(clusterName, namespace, "", "", kubeVersion, psact, nil)
 		hardenClusterResp, err := clusters.UpdateK3SRKE2Cluster(client, clusterResp, hardenCluster)
 		require.NoError(t, err)
 		assert.Equal(t, clusterName, hardenClusterResp.ObjectMeta.Name)
+	}
+
+	if psact == string(provisioning.RancherPrivileged) || psact == string(provisioning.RancherRestricted) {
+		err = psadeploy.CheckPSACT(client, clusterName)
+		require.NoError(t, err)
+
+		_, err = psadeploy.CreateNginxDeployment(client, clusterIDName, psact)
+		require.NoError(t, err)
 	}
 }

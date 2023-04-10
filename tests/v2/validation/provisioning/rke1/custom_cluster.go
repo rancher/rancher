@@ -9,6 +9,7 @@ import (
 	"github.com/rancher/rancher/tests/framework/extensions/clusters"
 	nodestat "github.com/rancher/rancher/tests/framework/extensions/nodes"
 	"github.com/rancher/rancher/tests/framework/extensions/pipeline"
+	psadeploy "github.com/rancher/rancher/tests/framework/extensions/psact"
 	"github.com/rancher/rancher/tests/framework/extensions/tokenregistration"
 	"github.com/rancher/rancher/tests/framework/extensions/workloads/pods"
 	"github.com/rancher/rancher/tests/framework/pkg/environmentflag"
@@ -21,13 +22,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func TestProvisioningRKE1CustomCluster(t *testing.T, client *rancher.Client, externalNodeProvider provisioning.ExternalNodeProvider, nodesAndRoles []string, kubeVersion string, cni string) {
+func TestProvisioningRKE1CustomCluster(t *testing.T, client *rancher.Client, externalNodeProvider provisioning.ExternalNodeProvider, nodesAndRoles []string, psact, kubeVersion, cni string) {
 	numNodes := len(nodesAndRoles)
 	nodes, _, err := externalNodeProvider.NodeCreationFunc(client, numNodes, 0, false)
 	require.NoError(t, err)
 
 	clusterName := namegen.AppendRandomString(externalNodeProvider.Name)
-	cluster := clusters.NewRKE1ClusterConfig(clusterName, cni, kubeVersion, client)
+
+	cluster := clusters.NewRKE1ClusterConfig(clusterName, cni, kubeVersion, psact, client)
 	clusterResp, err := clusters.CreateRKE1Cluster(client, cluster)
 	require.NoError(t, err)
 
@@ -80,4 +82,12 @@ func TestProvisioningRKE1CustomCluster(t *testing.T, client *rancher.Client, ext
 	podResults, podErrors := pods.StatusPods(client, clusterResp.ID)
 	assert.NotEmpty(t, podResults)
 	assert.Empty(t, podErrors)
+
+	if psact == string(provisioning.RancherPrivileged) || psact == string(provisioning.RancherRestricted) {
+		err = psadeploy.CheckPSACT(client, clusterName)
+		require.NoError(t, err)
+
+		_, err = psadeploy.CreateNginxDeployment(client, clusterName, psact)
+		require.NoError(t, err)
+	}
 }

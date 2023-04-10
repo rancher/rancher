@@ -6,12 +6,15 @@ import (
 )
 
 type Version string
+type PSACT string
 
 const (
 	namespace                       = "fleet-default"
 	defaultRandStringLength         = 5
 	ConfigurationFileKey            = "provisioningInput"
 	HardenedKubeVersion     Version = "v1.24.99"
+	RancherPrivileged       PSACT   = "rancher-privileged"
+	RancherRestricted       PSACT   = "rancher-restricted"
 )
 
 // ProviderName is string enum for provider names used in provisioning tests.
@@ -54,5 +57,6 @@ type Config struct {
 	CNIs                   []string                 `json:"cni" yaml:"cni"`
 	Providers              []string                 `json:"providers" yaml:"providers"`
 	NodeProviders          []string                 `json:"nodeProviders" yaml:"nodeProviders"`
+	PSACT                  string                   `json:"psact" yaml:"psact"`
 	Hardened               bool                     `json:"hardened" yaml:"hardened"`
 }
