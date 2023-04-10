@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
-	provisioningV1 "github.com/rancher/rancher/tests/framework/clients/rancher/v1"
+	steveV1 "github.com/rancher/rancher/tests/framework/clients/rancher/v1"
 	"github.com/rancher/rancher/tests/framework/extensions/clusters"
 	"github.com/rancher/rancher/tests/framework/extensions/ingresses"
 	"github.com/rancher/rancher/tests/framework/extensions/machinepools"
@@ -411,7 +411,7 @@ func (r *RKE2EtcdSnapshotRestoreTestSuite) watchAndWaitForPods(client *rancher.C
 		isKubeControllerManagerPresent := false
 		for _, pod := range pods.Data {
 			podStatus := &v1.PodStatus{}
-			err = provisioningV1.ConvertToK8sType(pod.Status, podStatus)
+			err = steveV1.ConvertToK8sType(pod.Status, podStatus)
 			if err != nil {
 				return false, err
 			}

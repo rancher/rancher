@@ -1,6 +1,6 @@
 #!groovy
 node {
-    def rootPath = "/go/src/github.com/rancher/rancher/tests/v2/validation/"
+    def rootPath = "/root/go/src/github.com/rancher/rancher/tests/v2/validation/"
     def job_name = "${JOB_NAME}"
     if (job_name.contains('/')) { 
       job_names = job_name.split('/')
@@ -95,7 +95,7 @@ node {
                   dir("./tests/v2/validation/.ssh") {
                     def decoded = new String(AWS_SSH_PEM_KEY.decodeBase64())
                     writeFile file: AWS_SSH_KEY_NAME, text: decoded
-                    env.SSH_PATH = "/go/src/github.com/rancher/rancher/tests/v2/validation/.ssh"
+                    env.SSH_PATH = rootPath+".ssh"
                   }
                 }
 
@@ -104,7 +104,7 @@ node {
                   def configContents = env.CONFIG
 
                   writeFile file: filename, text: configContents
-                  env.CATTLE_TEST_CONFIG = "/go/src/github.com/rancher/rancher/tests/v2/validation/"+filename
+                  env.CATTLE_TEST_CONFIG = rootPath+filename
                 }
 
                 sh "./tests/v2/validation/configure.sh"
@@ -114,7 +114,7 @@ node {
               if (env.EXTERNAL_ENCODED_VPN) {
                 runArgs = runArgs + "openvpn --daemon --config external.ovpn && sleep 10 && "
               }
-              runArgs = runArgs + "/go/bin/gotestsum --format standard-verbose --packages=${testsDir} --junitfile ${testResultsOut} -- ${GOTEST_TESTCASE} -timeout=${timeout} -v"
+              runArgs = runArgs + "/root/go/bin/gotestsum --format standard-verbose --packages=${testsDir} --junitfile ${testResultsOut} -- ${GOTEST_TESTCASE} -timeout=${timeout} -v"
               stage('Run Validation Tests') {
                 sh "docker run --name ${testContainer} -t --env-file ${envFile} --privileged " +
                   "${imageName} sh -c \"${runArgs}\""
