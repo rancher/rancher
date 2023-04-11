@@ -1,0 +1,262 @@
+policies:
+- name: mark-unknown-instances-for-deletion
+  resource: aws.ec2
+  description: |
+    Mark unknown user instances for deletion in 1 day
+  filters:
+    - "State.Name": running
+    # instance name not in accepted user keys
+    - type: value
+      key: tag:Name
+      op: regex
+      #doesNOTcontain
+      value:  "^((?!USERKEYS).)*$"
+    # instance is not doNotDelete
+    - 'tag:doNotDelete': absent
+    - 'tag:DoNotDelete': absent
+    - 'tag:ec2_known_user': absent
+    - "tag:DeletesOnFriday": absent
+    - not: 
+      - type: value
+        key: tag:Name
+        op: regex
+        value:  "^.*DONOTDELETEKEYS.*$"
+  actions:
+    - type: mark-for-op
+      tag: ec2_unknown_user
+      op: terminate
+      days: 1
+
+- name: mark-known-instances-for-deletion
+  resource: aws.ec2
+  description: |
+    Mark known user instances for deletion in 2 days
+  filters:
+    - "State.Name": running
+    - type: value
+      key: tag:Name
+      op: regex
+      value:  "^.*USERKEYS.*$"
+    - 'tag:doNotDelete': absent
+    - 'tag:DoNotDelete': absent
+    - 'tag:ec2_unknown_user': absent
+    - "tag:DeletesOnFriday": absent
+    - not: 
+      - type: value
+        key: tag:Name
+        op: regex
+        value:  "^.*DONOTDELETEKEYS.*$"
+  actions:
+    - type: mark-for-op
+      tag: ec2_known_user
+      op: terminate
+      days: 2
+
+- name: ec2-unmark-if-friday-tagged
+  resource: aws.ec2
+  description: |
+    Remove the deletion tag from any resource group which now contain resources
+    so it doesn't get deleted by the following policy
+  filters:
+    - or:
+      - "tag:ec2_unknown_user": not-null
+      - "tag:ec2_known_user": not-null
+    - "tag:DeletesOnFriday": present
+  actions:
+    - type: remove-tag
+      tags: ['ec2_unknown_user', 'ec2_known_user']
+
+- name: ec2-terminate-instances
+  resource: aws.ec2
+  description: |
+    Delete any marked instances which have been 
+    marked for deletion for more than 1 day.
+  filters:
+    - or:
+      - type: marked-for-op
+        tag: ec2_unknown_user
+        op: terminate
+      - type: marked-for-op
+        tag: ec2_known_user
+        op: terminate
+  actions:
+    - type: terminate
+
+# EKS Policies
+# Note: cannot manage EKS nodegroups at this time, but the
+# above ec2 policies should take care of any nodes
+
+# There is a resource for eks-nodegroup in cloud custodian, 
+# however there is no support for time delay nor tagging.
+
+# EKS
+- name: eks-mark-unknown-instances-for-deletion
+  resource: aws.eks
+  description: |
+    Mark unknown user instances for deletion in 1 day
+  filters:
+    - type: value
+      key: name
+      op: regex
+      #doesNOTcontain
+      value:  "^((?!USERKEYS).)*$"
+    # instance is not doNotDelete
+    - 'tag:doNotDelete': absent
+    - 'tag:DoNotDelete': absent
+    - 'tag:ec2_known_user': absent
+    - "tag:DeletesOnFriday": absent
+    - not: 
+      - type: value
+        key: name
+        op: regex
+        value:  "^.*DONOTDELETEKEYS.*$"
+  actions:
+    - type: mark-for-op
+      tag: ec2_unknown_user
+      op: delete
+      days: 1
+
+- name: eks-mark-known-instances-for-deletion
+  resource: aws.eks
+  description: |
+    Mark known user instances for deletion in 2 days
+  filters:
+    - type: value
+      key: name
+      op: regex
+      value:  "^.*USERKEYS.*$"
+    - 'tag:doNotDelete': absent
+    - 'tag:DoNotDelete': absent
+    - 'tag:ec2_unknown_user': absent
+    - "tag:DeletesOnFriday": absent
+    - not: 
+      - type: value
+        key: name
+        op: regex
+        value:  "^.*DONOTDELETEKEYS.*$"
+  actions:
+    - type: mark-for-op
+      tag: ec2_known_user
+      op: delete
+      days: 2
+
+- name: eks-unmark-if-friday-tagged
+  resource: aws.eks
+  description: |
+    Remove the deletion tag from any resource group which now contain resources
+    so it doesn't get deleted by the following policy
+  filters:
+    - or:
+      - "tag:ec2_unknown_user": not-null
+      - "tag:ec2_known_user": not-null
+    - "tag:DeletesOnFriday": present
+  actions:
+    - type: remove-tag
+      tags: ['ec2_unknown_user', 'ec2_known_user']
+
+- name: eks-terminate-instances
+  resource: aws.eks
+  description: |
+    Delete any marked instances which have been 
+    marked for deletion for more than 1 day.
+  filters:
+    - or:
+      - type: marked-for-op
+        tag: ec2_unknown_user
+        op: delete
+      - type: marked-for-op
+        tag: ec2_known_user
+        op: delete
+  actions:
+    - type: delete
+
+# NLBs
+- name: mark-unknown-nlbs-for-deletion
+  resource: app-elb
+  filters:
+     # nlb name not in accepted user keys
+    - type: value
+      key: LoadBalancerArn
+      op: regex
+      #doesNOTcontain
+      value:  "^((?!USERKEYS).)*$"
+    # instance is not doNotDelete
+    - 'tag:doNotDelete': absent
+    - 'tag:DoNotDelete': absent
+    - 'tag:ec2_known_user': absent
+    - "tag:DeletesOnFriday": absent
+    - not: 
+      - type: value
+        key: LoadBalancerArn
+        op: regex
+        value:  "^.*DONOTDELETEKEYS.*$"
+  actions:
+    - type: mark-for-op
+      tag: ec2_unknown_user
+      op: delete
+      days: 1
+    ### option for notifying slack / via email (needs lambda permissions)
+    # - type: notify
+    #   slack_template: slack_default
+    #   slack_msg_color: danger
+    #   violation_desc: No violation.
+    #   action_desc: No action taken. 
+    #   to:
+    #     - https://hooks.slack.com/services/T0000000000/B000000000/XXXXXXXXXXXXXXX
+    #   transport:
+    #     type: sqs
+    #     queue: queue-url
+
+- name: mark-known-nlbs-for-deletion
+  resource: app-elb
+  filters:
+    # nlb is named with accepted user key
+    - type: value
+      key: LoadBalancerArn
+      op: regex
+      value:  "^.*USERKEYS.*$"
+    # nlb is not doNotDelete
+    - 'tag:doNotDelete': absent
+    - 'tag:DoNotDelete': absent
+    - 'tag:ec2_unknown_user': absent
+    - "tag:DeletesOnFriday": absent
+    - not: 
+      - type: value
+        key: LoadBalancerArn
+        op: regex
+        value:  "^.*DONOTDELETEKEYS.*$"
+  actions:
+    - type: mark-for-op
+      tag: ec2_known_user
+      op: delete
+      days: 2
+
+- name: nlb-unmark-if-friday-tagged
+  resource: app-elb
+  description: |
+    Remove the deletion tag from any resource group which now contain resources
+    so it doesn't get deleted by the following policy
+  filters:
+    - or:
+      - "tag:ec2_unknown_user": not-null
+      - "tag:ec2_known_user": not-null
+    - "tag:DeletesOnFriday": present
+  actions:
+    - type: remove-tag
+      tags: ['ec2_unknown_user', 'ec2_known_user']
+
+- name: ec2-delete-nlbs
+  resource: app-elb
+  description: |
+    Delete any marked nlbs which have been 
+    marked for deletion for more than 1 day.
+  filters:
+    - or:
+      - type: marked-for-op
+        tag: ec2_unknown_user
+        op: delete
+      - type: marked-for-op
+        tag: ec2_known_user
+        op: delete
+  actions:
+    - type: delete

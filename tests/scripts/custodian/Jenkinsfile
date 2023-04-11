@@ -1,0 +1,82 @@
+#!groovy
+node {
+  def rootPath = "/root/go/src/github.com/rancher/rancher/tests/scripts/"
+  def job_name = "${JOB_NAME}"
+  if (job_name.contains('/')) { 
+    job_names = job_name.split('/')
+    job_name = job_names[job_names.size() - 1] 
+  }
+  def testContainer = "${job_name}${env.BUILD_NUMBER}_test"
+  def imageName = "qa-custodian-${job_name}${env.BUILD_NUMBER}"
+  def testResultsOut = "results.xml"
+  def envFile = ".env"
+  def rancherConfig = "rancher_env.config"
+  def awsYaml="aws.yaml"
+  def azureYaml="azure.yaml"
+  def gcpYaml="gcp.yaml"
+  if ("${env.CUSTODIAN_YAML}" != "null" && "${env.CUSTODIAN_YAML}" != "") {
+    yamlToRun="${env.CUSTODIAN_YAML}"
+  }
+  def branch = "release/v2.7"
+  if ("${env.branch}" != "null" && "${env.branch}" != "") {
+    branch = "${env.branch}"
+  }
+  def repo = scm.userRemoteConfigs
+  if ("${env.REPO}" != "null" && "${env.REPO}" != "") {
+    repo = [[url: "${env.REPO}"]]
+  }
+  withFolderProperties {
+    paramsMap = []
+    params.each {
+      if (it.value && it.value.trim() != "") {
+          paramsMap << "$it.key=$it.value"
+      }
+    }
+    withEnv(paramsMap) {
+      withCredentials([ string(credentialsId: 'AWS_ACCESS_KEY_ID', variable: 'AWS_ACCESS_KEY_ID'),
+                        string(credentialsId: 'AWS_SECRET_ACCESS_KEY', variable: 'AWS_SECRET_ACCESS_KEY'),
+                        string(credentialsId: 'AZURE_SUBSCRIPTION_ID', variable: 'AZURE_SUBSCRIPTION_ID'),
+                        string(credentialsId: 'AZURE_TENANT_ID', variable: 'AZURE_TENANT_ID'),
+                        string(credentialsId: 'AZURE_CLIENT_ID', variable: 'AZURE_CLIENT_ID'),
+                        string(credentialsId: 'AZURE_CLIENT_SECRET', variable: 'AZURE_CLIENT_SECRET'),
+                        string(credentialsId: 'RANCHER_GKE_CREDENTIAL', variable: 'RANCHER_GKE_CREDENTIAL'),
+                        string(credentialsId: 'RANCHER_LINODE_ACCESSKEY', variable: "RANCHER_LINODE_ACCESSKEY")]) {
+        stage('Checkout') {
+          deleteDir()
+          checkout([
+                    $class: 'GitSCM',
+                    branches: [[name: "*/${branch}"]],
+                    extensions: scm.extensions + [[$class: 'CleanCheckout']],
+                    userRemoteConfigs: repo
+                  ])
+        }
+        dir ("./tests/scripts/custodian/") {
+          stage('Build Docker Image') {
+            try {
+              sh "docker build -t ${imageName} -f Dockerfile . --build-arg AWS_ACCESS_KEY_ID="${AWS_ACCESS_KEY_ID}" --build-arg AWS_SECRET_ACCESS_KEY="${AWS_SECRET_ACCESS_KEY}" --build-arg AZURE_SUBSCRIPTION_ID="${AZURE_SUBSCRIPTION_ID}" --build-arg AZURE_TENANT_ID="${AZURE_TENANT_ID}" --build-arg AZURE_CLIENT_ID="${AZURE_CLIENT_ID}" --build-arg AZURE_CLIENT_SECRET="${AZURE_CLIENT_SECRET}" --build-arg GOOGLE_APPLICATION_CREDENTIALS="${RANCHER_GKE_CREDENTIAL}" --build-arg GOOGLE_CLOUD_PROJECT="${GOOGLE_CLOUD_PROJECT}" --build-arg RANCHER_LINODE_ACCESSKEY="${RANCHER_LINODE_ACCESSKEY}""
+            }
+          catch(err) {
+                  echo 'Docker Build had partial failures...'
+            }
+          }
+          stage('Run Docker Image for Adding Tags') {
+              // if a user only wants to run the test using a subset of keys, they can pass in OVERRIDE_REGION
+              if ("${env.OVERRIDE_REGION}" != "null" && "${env.OVERRIDE_REGION}" != "") {
+              sh "docker run --privileged --name ${testContainer} -e CUSTODIAN_YAML=\"add-friday-tags.yaml\" -e OVERRIDE_REGION=\"${env.OVERRIDE_REGION}\" -e DONOTDELETE_KEYS=\"${env.DONOTDELETE_KEYS}\" -e USER_KEYS=\"${env.USER_KEYS}\" ${imageName} "
+              } else {
+                echo "No OVERRIDE_REGION passed in, running all tests"
+              }
+              } else {
+                echo "No OVERRIDE_REGION passed in, running all tests"
+              }
+          }
+          stage('Run Docker Image for AWS,Azure, and GCP'){
+            sh "docker run --privileged --name ${testContainer} -e CUSTODIAN_YAML=\"${awsYaml}\" -e DONOTDELETE_KEYS=\"${env.DONOTDELETE_KEYS}\" -e USER_KEYS=\"${env.USER_KEYS}\" ${imageName}"
+            sh "docker run --privileged --name ${testContainer} -e CUSTODIAN_YAML=\"${azureYaml}\" -e DONOTDELETE_KEYS=\"${env.DONOTDELETE_KEYS}\" -e USER_KEYS=\"${env.USER_KEYS}\" ${imageName}"
+            sh "docker run --privileged --name ${testContainer} -e CUSTODIAN_YAML=\"${gcpYaml}\" -e DONOTDELETE_KEYS=\"${env.DONOTDELETE_KEYS}\" -e USER_KEYS=\"${env.USER_KEYS}\" ${imageName}"
+          }
+        } // dir 
+      } // creds
+    } // folder properties
+  } 
+}// node
