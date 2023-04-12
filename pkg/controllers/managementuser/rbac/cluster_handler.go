@@ -1,6 +1,8 @@
 package rbac
 
 import (
+	"fmt"
+
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1"
@@ -70,24 +72,30 @@ func (h *clusterHandler) doSync(cluster *v3.Cluster) error {
 		// For restricted admins, re-enqueue the GRBs to trigger the creation of any RBAC resources on new cluster creation.
 		grbs, err := h.grbIndexer.ByIndex(grbByRoleIndex, rbac.GlobalRestrictedAdmin)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to list GlobalRoleBindings for restricted-admin: %w", err)
 		}
 		for _, x := range grbs {
-			grb, _ := x.(*v3.GlobalRoleBinding)
+			grb, ok := x.(*v3.GlobalRoleBinding)
+			if !ok || grb == nil {
+				continue
+			}
 			h.grbController.Enqueue("", grb.Name)
 		}
 
 		grbs, err = h.grbIndexer.ByIndex(grbByRoleIndex, rbac.GlobalAdmin)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to list GlobalRoleBindings for global-admin: %w", err)
 		}
 
 		for _, x := range grbs {
-			grb, _ := x.(*v3.GlobalRoleBinding)
+			grb, ok := x.(*v3.GlobalRoleBinding)
+			if !ok || grb == nil {
+				continue
+			}
 			bindingName := rbac.GrbCRBName(grb)
 			b, err := h.userGRBLister.Get("", bindingName)
 			if err != nil && !k8serrors.IsNotFound(err) {
-				return nil, err
+				return nil, fmt.Errorf("failed to get GlobalRoleBinding for '%s': %w", bindingName, err)
 			}
 
 			if b != nil {
@@ -108,7 +116,7 @@ func (h *clusterHandler) doSync(cluster *v3.Cluster) error {
 				},
 			})
 			if err != nil && !k8serrors.IsAlreadyExists(err) {
-				return nil, err
+				return nil, fmt.Errorf("failed to create new ClusterRoleBinding for GlobalRoleBinding '%s': %w", grb.Name, err)
 			}
 		}
 

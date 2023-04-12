@@ -17,7 +17,6 @@ import (
 	apiextcontrollers "github.com/rancher/wrangler/pkg/generated/controllers/apiextensions.k8s.io/v1"
 	rbacv1 "github.com/rancher/wrangler/pkg/generated/controllers/rbac/v1"
 	"github.com/rancher/wrangler/pkg/gvk"
-	"github.com/rancher/wrangler/pkg/relatedresource"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
@@ -35,8 +34,6 @@ type handler struct {
 	clusterRoleController                rbacv1.ClusterRoleController
 	clusterRoleBindingController         rbacv1.ClusterRoleBindingController
 	clusterRoleCache                     rbacv1.ClusterRoleCache
-	globalRoleBindingsLister             mgmtcontrollers.GlobalRoleBindingCache
-	globalRoleBindings                   mgmtcontrollers.GlobalRoleBindingController
 	roleTemplateController               mgmtcontrollers.RoleTemplateController
 	clusterRoleTemplateBindings          mgmtcontrollers.ClusterRoleTemplateBindingCache
 	clusterRoleTemplateBindingController mgmtcontrollers.ClusterRoleTemplateBindingController
@@ -70,8 +67,6 @@ func Register(ctx context.Context, clients *wrangler.Context, management *config
 		clusterRoleBindingController:         clients.RBAC.ClusterRoleBinding(),
 		clusterRoleCache:                     clients.RBAC.ClusterRole().Cache(),
 		roleTemplateController:               clients.Mgmt.RoleTemplate(),
-		globalRoleBindingsLister:             clients.Mgmt.GlobalRoleBinding().Cache(),
-		globalRoleBindings:                   clients.Mgmt.GlobalRoleBinding(),
 		clusterRoleTemplateBindings:          clients.Mgmt.ClusterRoleTemplateBinding().Cache(),
 		clusterRoleTemplateBindingController: clients.Mgmt.ClusterRoleTemplateBinding(),
 		projectRoleTemplateBindingController: clients.Mgmt.ProjectRoleTemplateBinding(),
@@ -114,7 +109,5 @@ func Register(ctx context.Context, clients *wrangler.Context, management *config
 	clients.Mgmt.ClusterRoleTemplateBinding().Cache().AddIndexer(crbtByRoleTemplateName, func(obj *v3.ClusterRoleTemplateBinding) ([]string, error) {
 		return []string{obj.RoleTemplateName}, nil
 	})
-	relatedresource.WatchClusterScoped(ctx, "restricted-admin-grb-syncer", h.enqueueGRBAfterCRTBChange, h.globalRoleBindings, h.clusterRoleTemplateBindingController)
-
 	return nil
 }

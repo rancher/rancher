@@ -119,7 +119,7 @@ func Register(ctx context.Context, workload *config.UserContext) {
 	workload.RBAC.ClusterRoleBindings("").AddHandler(ctx, "legacy-crb-cleaner-sync", newLegacyCRBCleaner(r).sync)
 	management.Management.ClusterRoleTemplateBindings("").AddClusterScopedLifecycle(ctx, "cluster-crtb-sync", workload.ClusterName, newCRTBLifecycle(r))
 	management.Management.Clusters("").AddHandler(ctx, "global-admin-cluster-sync", newClusterHandler(workload))
-	management.Management.GlobalRoleBindings("").AddHandler(ctx, "grb-cluster-sync", newGlobalRoleBindingHandler(workload))
+	management.Management.GlobalRoleBindings("").AddHandler(ctx, grbHandlerName, newGlobalRoleBindingHandler(workload))
 
 	sync := &resourcequota.SyncController{
 		Namespaces:          workload.Core.Namespaces(""),
@@ -135,6 +135,10 @@ func Register(ctx context.Context, workload *config.UserContext) {
 	management.Management.RoleTemplates("").AddHandler(ctx, "cluster-roletemplate-sync", newRTLifecycle(r))
 	relatedresource.WatchClusterScoped(ctx, "enqueue-beneficiary-roletemplates", newRTEnqueueFunc(rtInformer.GetIndexer()),
 		management.Wrangler.Mgmt.RoleTemplate(), management.Wrangler.Mgmt.RoleTemplate())
+
+	// If a CRTB that is owned by a GRB is updated or deleted re-enqueue the GRB to reconcile the modified CRTB.
+	resolver := newCRTBtoGRBResolver(workload.Management.Wrangler.Mgmt.GlobalRoleBinding().Cache())
+	relatedresource.WatchClusterScoped(ctx, "restricted-admin-grb-syncer", resolver, workload.Management.Wrangler.Mgmt.GlobalRoleBinding(), workload.Management.Wrangler.Mgmt.ClusterRoleTemplateBinding())
 }
 
 type manager struct {
