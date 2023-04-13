@@ -5,16 +5,20 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	"github.com/rancher/rancher/tests/framework/extensions/clusters"
 	"github.com/rancher/rancher/tests/framework/extensions/machinepools"
 	nodestat "github.com/rancher/rancher/tests/framework/extensions/nodes"
 	"github.com/rancher/rancher/tests/framework/extensions/pipeline"
+	"github.com/rancher/rancher/tests/framework/extensions/sshkeys"
 	"github.com/rancher/rancher/tests/framework/extensions/workloads/pods"
 	"github.com/rancher/rancher/tests/framework/pkg/environmentflag"
 	namegen "github.com/rancher/rancher/tests/framework/pkg/namegenerator"
+	"github.com/rancher/rancher/tests/framework/pkg/nodes"
 	"github.com/rancher/rancher/tests/framework/pkg/wait"
 	"github.com/rancher/rancher/tests/integration/pkg/defaults"
+	provisioning "github.com/rancher/rancher/tests/v2/validation/provisioning"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -72,4 +76,29 @@ func TestProvisioningRKE2Cluster(t *testing.T, client *rancher.Client, provider 
 	podResults, podErrors := pods.StatusPods(client, clusterIDName)
 	assert.NotEmpty(t, podResults)
 	assert.Empty(t, podErrors)
+
+	nodesList, err := client.Management.Node.ListAll(&types.ListOpts{
+		Filters: map[string]interface{}{
+			"clusterId": clusterIDName,
+		},
+	})
+	require.NoError(&testing.T{}, err)
+	assert.NotEmpty(&testing.T{}, nodesList)
+
+	for _, rancherNode := range nodesList.Data {
+		sshkey, err := sshkeys.DownloadSSHKeys(client, rancherNode.Name)
+		require.NoError(&testing.T{}, err)
+		assert.NotEmpty(&testing.T{}, sshkey)
+		ec2Node := &nodes.Node{
+			NodeID:          rancherNode.Name,
+			PublicIPAddress: rancherNode.ExternalIPAddress,
+			SSHUser:         rancherNode.SshUser,
+			SSHKey:          sshkey,
+		}
+
+		output, err := provisioning.CheckCPU(ec2Node)
+		require.NoError(&testing.T{}, err)
+		assert.NotEmpty(&testing.T{}, output)
+
+	}
 }
