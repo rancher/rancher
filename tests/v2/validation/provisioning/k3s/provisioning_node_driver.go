@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
+	v1 "github.com/rancher/rancher/tests/framework/clients/rancher/v1"
 	"github.com/rancher/rancher/tests/framework/extensions/clusters"
 	"github.com/rancher/rancher/tests/framework/extensions/defaults"
 	"github.com/rancher/rancher/tests/framework/extensions/machinepools"
@@ -26,7 +27,7 @@ const (
 	namespace = "fleet-default"
 )
 
-func TestProvisioningK3SCluster(t *testing.T, client *rancher.Client, provider Provider, nodesAndRoles []machinepools.NodeRoles, kubeVersion string, psact string, advancedOptions provisioning.AdvancedOptions) {
+func TestProvisioningK3SCluster(t *testing.T, client *rancher.Client, provider Provider, nodesAndRoles []machinepools.NodeRoles, kubeVersion string, psact string, advancedOptions provisioning.AdvancedOptions) *v1.SteveAPIObject {
 	cloudCredential, err := provider.CloudCredFunc(client)
 	require.NoError(t, err)
 
@@ -87,4 +88,5 @@ func TestProvisioningK3SCluster(t *testing.T, client *rancher.Client, provider P
 		_, err = psadeploy.CreateNginxDeployment(client, clusterIDName, psact)
 		require.NoError(t, err)
 	}
+	return clusterResp
 }
