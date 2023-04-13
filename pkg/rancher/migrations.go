@@ -516,6 +516,10 @@ func migrateMachinePoolsDynamicSchemaLabel(w *wrangler.Context) error {
 				if nodeConfig == nil {
 					return fmt.Errorf("machine pool node config must not be nil")
 				}
+				apiVersion := nodeConfig.APIVersion
+				if apiVersion != rke2.DefaultMachineConfigAPIVersion && apiVersion != "" {
+					continue
+				}
 				ds, err := w.Mgmt.DynamicSchema().Get(strings.ToLower(nodeConfig.Kind), metav1.GetOptions{})
 				if err != nil {
 					return err
