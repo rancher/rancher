@@ -503,6 +503,7 @@ func (c Command) renderArgs() ([]string, error) {
 	delete(dataMap, "releaseName")
 	delete(dataMap, "chartName")
 	delete(dataMap, "projectId")
+	delete(dataMap, "operationTolerations")
 	if v, ok := dataMap["disableOpenAPIValidation"]; ok {
 		delete(dataMap, "disableOpenAPIValidation")
 		dataMap["disableOpenapiValidation"] = v
@@ -724,6 +725,7 @@ func (s *Operations) getInstallCommand(repoNamespace, repoName string, body io.R
 
 	status.Namespace = namespace(installArgs.Namespace)
 	status.ProjectID = installArgs.ProjectID
+	status.Tolerations = installArgs.Tolerations
 
 	return status, cmds, err
 }
@@ -756,7 +758,7 @@ func (s *Operations) createOperation(ctx context.Context, user user.Info, status
 		kustomize = true
 		break
 	}
-	pod, podOptions := s.createPod(secretData, kustomize, imageOverride)
+	pod, podOptions := s.createPod(secretData, kustomize, imageOverride, status.Tolerations)
 	pod, err = s.Impersonator.CreatePod(ctx, user, pod, podOptions)
 	if err != nil {
 		return nil, err
@@ -901,7 +903,7 @@ func (s *Operations) createNamespace(ctx context.Context, namespace, projectID s
 	return nil, fmt.Errorf("failed to wait for roles to be populated")
 }
 
-func (s *Operations) createPod(secretData map[string][]byte, kustomize bool, imageOverride string) (*v1.Pod, *podimpersonation.PodOptions) {
+func (s *Operations) createPod(secretData map[string][]byte, kustomize bool, imageOverride string, tolerations []corev1.Toleration) (*v1.Pod, *podimpersonation.PodOptions) {
 	image := imageOverride
 	if image == "" {
 		image = settings.FullShellImage()
@@ -987,6 +989,7 @@ func (s *Operations) createPod(secretData map[string][]byte, kustomize bool, ima
 			},
 		},
 	}
+	pod.Spec.Tolerations = append(pod.Spec.Tolerations, tolerations...)
 
 	// if kustomize is false then helmDataPath is an acceptable path for helm to run. If it is true,
 	// files are copied from helmDataPath to helmRunPath. This is because the kustomize.sh script

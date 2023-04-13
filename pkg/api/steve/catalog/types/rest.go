@@ -2,6 +2,7 @@ package types
 
 import (
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -15,12 +16,13 @@ type ChartInstall struct {
 }
 
 type ChartInstallAction struct {
-	Timeout                  *metav1.Duration `json:"timeout,omitempty"`
-	Wait                     bool             `json:"wait,omitempty"`
-	DisableHooks             bool             `json:"noHooks,omitempty"`
-	DisableOpenAPIValidation bool             `json:"disableOpenAPIValidation,omitempty"`
-	Namespace                string           `json:"namespace,omitempty"`
-	ProjectID                string           `json:"projectId,omitempty"`
+	Timeout                  *metav1.Duration    `json:"timeout,omitempty"`
+	Wait                     bool                `json:"wait,omitempty"`
+	DisableHooks             bool                `json:"noHooks,omitempty"`
+	DisableOpenAPIValidation bool                `json:"disableOpenAPIValidation,omitempty"`
+	Namespace                string              `json:"namespace,omitempty"`
+	ProjectID                string              `json:"projectId,omitempty"`
+	Tolerations              []corev1.Toleration `json:"operationTolerations,omitempty"`
 
 	Charts []ChartInstall `json:"charts,omitempty"`
 }
